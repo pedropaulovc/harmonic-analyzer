@@ -1,0 +1,7 @@
+transgear-thumbnut:
+  number: MHA-126
+  material: Brass
+  finish: "knurled thumb disc (knurl not modelled); bright"
+  tolerance_class: machined_block
+  fit_class: shaft_in_bushing
+  process: "turned (brass); tapped bore modelled as a plain slip bore"

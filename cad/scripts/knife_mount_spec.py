@@ -9,12 +9,13 @@ assembly layout; the fixed values are mirrored here for the drawing's view math,
 and the offline lockstep test asserts the part marks and the drawing keeps
 EXACTLY ``DRAWING_DIMENSIONS``.
 
-NOTE on the "knife edge": this brass BEARING BLOCK carries a circular bore MUCH
-larger than the mating hex trunnion, so only the trunnion's TOP VERTEX LINE nears
-the bore's upper inner wall -- the true knife-edge line contact.  The sharp ridge
-is on the LEVER trunnion (``build_summing_lever``), NOT on this part; this part's
-critical surface is the bore's upper inner wall, whose roundness/finish is called
-out in the notes.
+NOTE on the "knife edge": this hardened-steel BEARING BLOCK (ch18 p.42,
+2026-09-02 user re-read: unpainted heat-treated steel, not brass) carries a
+circular bore CLOSE around the mating hex trunnion (Ø12 over the 8.653 x 10.268
+hex), so only the trunnion's TOP VERTEX LINE nears the bore's upper inner wall
+-- the true knife-edge line contact.  The sharp ridge is on the LEVER trunnion
+(``build_summing_lever``), NOT on this part; this part's critical surface is the
+bore's upper inner wall, whose roundness/finish is called out in the notes.
 """
 
 from __future__ import annotations
@@ -23,12 +24,12 @@ from _gtol_spec import CylinderFace
 from _surface_finish import GROUND_UM, SurfaceFinishControl
 
 # --- fixed geometry for the drawing's view math (mirrors build_knife_mount) ----
-R_BORE = 8.0  # Ø16 knife-bearing bore (2026-09 photo re-derive)
+R_BORE = 6.0  # Ø12 knife-bearing bore (2026-09-02 ch18 p.42 re-read: close bore)
 BLK_HALF_X = 12.0  # block half-width (24 across)
 SUPPORT_Z_THICK = 14.0  # axial depth straddling the trunnion mid
 BLK_TOP = 14.62  # local block top (hangs 0.25 under the top-frame casting underside)
-BLK_BOT = -18.75  # local block bottom
-BORE_CY = -7.75  # bore centre below the ridge origin (TopClear - R_BORE)
+BLK_BOT = -14.75  # local block bottom (BORE_CY - R_BORE - 3.0 wall)
+BORE_CY = -5.75  # bore centre below the ridge origin (TopClear 0.25 - R_BORE)
 
 SURFACE_FINISHES = (
     SurfaceFinishControl("knife_bore", GROUND_UM, CylinderFace(2.0 * R_BORE)),
@@ -56,10 +57,9 @@ DRAWING_NOTES = "\n".join(
         "CENTRELINE AT MID-DEPTH -- THE KNIFE-HANGER STUD THREADS IN AND",
         "HANGS THE BLOCK FROM THE TOP-FRAME CASTING'S INTEGRAL CROSSBAR.",
         "THE TAP-DRILL POINT BREAKS INTO THE BORE CROWN (BEARING CONTACT",
-        "INTERRUPTED ~2 WIDE AT MID-LENGTH): ACCEPTED BY DESIGN.",
-        "THE CURRENT MODEL HAS NO HARDENED KNIFE SEAT. SEAT MATERIAL,",
-        "GEOMETRY, AND RETENTION ARE NOT DEFINED. DO NOT RELEASE UNTIL",
-        "THOSE DETAILS ARE SPECIFIED.",
+        "INTERRUPTED ~3 WIDE AT MID-LENGTH): ACCEPTED BY DESIGN.",
+        "HARDEN AND TEMPER TO 58-60 HRC AFTER MACHINING; LEAVE UNPAINTED.",
+        "THE BORE UPPER WALL IS THE HARDENED KNIFE SEAT.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

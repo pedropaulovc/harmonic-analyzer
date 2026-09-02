@@ -5,7 +5,7 @@ views, dimension layout, hole callout, and manufacturing notes; every shared
 sheet/template, import, curation, and export behavior lives in
 ``_drawing_common``.
 
-The sheet runs at 4:1 (the plate is 22 x 19 x 2); the isometric carries an
+The sheet runs at 4:1 (the plate is 22 x 15 x 2); the isometric carries an
 explicit 2:1 override so it stays clear of the title block.  A flat plate
 needs only the face view (front), one thickness view (right) and the iso.
 
@@ -69,8 +69,8 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (4.0, 1.0)
 
-# Sheet layout (meters).  The front view's model bbox is 22 x 19 (the plate
-# face); at 4:1 the view is 88 x 76 mm.  Third angle: the right view (the
+# Sheet layout (meters).  The front view's model bbox is 22 x 15 (the plate
+# face); at 4:1 the view is 88 x 60 mm.  Third angle: the right view (the
 # 2-thick strip section) sits to its right; the isometric rides top-right.
 FRONT_CENTER = (0.120, 0.150)
 RIGHT_CENTER = (0.230, 0.150)

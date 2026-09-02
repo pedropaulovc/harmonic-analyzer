@@ -5,6 +5,12 @@ flange and 17.5 x 10.5 x 1.5 in pad. The v2 post/carrier fit preserves their
 both plates remain on the legacy centred footprint; the v2 post/carrier fit is
 handled by the mechanism installation contracts.
 
+Top-face seats: the cone-swing pivot/stop taps, the pinion-rig block/foot
+taps, and (2026-09-02) the four blind #4-40 taps under the maker's nameplate's
+corner screws -- stations derived from the plate's own hole pattern through
+its mount transform (``nameplate_spec``), so the plate, the base and the
+frame's screws can never drift apart.
+
 Finishing (chamfer external, fillet internal; legacy 1/8-1/16 sizes): C3.18
 x 45 breaks on the eight vertical plan corners, C1.59 x 45 breaks on both
 plates' exposed top rims and the underside rim, and the R0.50 pad-to-flange
@@ -67,12 +73,14 @@ from harmonic_base_spec import (
     LIP_W,
     DRAWING_NOTES,
     SIDE_VIEW_NOTE,
+    STACK_HEIGHT,
     TOP_FRONT_Z,
     TOP_LENGTH,
     TOP_REAR_Z,
     TOP_THICKNESS,
     TOP_WIDTH,
 )
+import nameplate_spec
 from cone_pivot_post_installation import (
     MECHANISM_X_SHIFT,
     MECHANISM_Z_SHIFT,
@@ -111,9 +119,11 @@ CBORE_XZ = HOLE_XZ  # all four heads counterbored
 # vertical plan corners at 1/8 in legs, the exposed top rims and the
 # underside rim at 1/16 in (single-pass mill/file breaks). The one internal
 # wall junction -- the pad side walls meeting the flange top face -- carries
-# the R0.50 root fillet note 1 already caps (a cutter-corner radius). All
-# hole features sit >= 26 from every plate edge, so no break touches a rim
-# or seat.
+# the R0.50 root fillet note 1 already caps (a cutter-corner radius). Every
+# mechanism hole sits >= 26 from every plate edge; the closest seats to a rim
+# are the nameplate taps (NAMEPLATE_SCREW_XZ), Ø2.26 at 12.5 in from the pad
+# side and 5.5 inside the raised rim's inner wall -- still far clear of the
+# 1.59 breaks, so no break touches a rim or seat.
 # Plan corners are ROUNDED, not chamfered (2026-09 photo re-derive): every
 # ch30 plate (p002/p003 front corners, p006 rear) shows the casting's vertical
 # corners as one large radius running the full height, flange and pad
@@ -209,6 +219,53 @@ FOOT_SCREW_XZ = tuple(
 FOOT_SCREW_HOLE_DEPTH = 7.7  # 8.0 shank under the 0.8 spring strip + air
 FOOT_SCREW_DRILL_DEPTH = 11.0
 
+# Maker's nameplate seats (2026-09-02 ch26 p.71 re-derive: four brass slotted
+# round-head screws hold the plate at its corners), blind from the TOP face
+# like the other seats. The stations are the plate's four corner screw holes
+# (nameplate_spec.SCREW_XY, plate-local) carried through the plate's mount
+# transform into the machine frame -- nameplate_spec.MOUNT_HOLE_XZ, the ONE
+# derivation the frame assembly's screw drops read too:
+# (209.75, +/-45.5) and (163.75, +/-45.5). The plate is anchored to the pad's
+# east edge, not to the mechanism, so unlike the swing/rig seats no
+# MECHANISM/POST shift applies (no _FORMER_ twin). The plate lies flat on the
+# deck (its back face at STACK_HEIGHT, gap 0 -- asserted below), so each
+# screw axis runs -Y straight from the plate's front face into the deck.
+NAMEPLATE_SCREW_XZ = nameplate_spec.MOUNT_HOLE_XZ
+# nameplate seats: #4-40 tap drill -- the shared brass fillister-screw (4.0
+# shank, Ø2.0 modelled minor) threads in through the 1.5 plate: 2.5 buried +
+# 3.5 spare in a 6.0 thread, drill 3.0 deeper for the tap's runout (the
+# STOP seat's 6.0/9.0 split).
+NAMEPLATE_SCREW_HOLE_DEPTH = 6.0
+NAMEPLATE_SCREW_DRILL_DEPTH = 9.0
+if abs(nameplate_spec.MOUNT_BACK_Y - STACK_HEIGHT) > 1e-9:
+    raise AssertionError(
+        f"nameplate back face y {nameplate_spec.MOUNT_BACK_Y} is not on the deck "
+        f"({STACK_HEIGHT}); its seats are cut from the deck face"
+    )
+if nameplate_spec.MOUNT_NORMAL != (0.0, 1.0, 0.0):
+    raise AssertionError(
+        f"nameplate front normal {nameplate_spec.MOUNT_NORMAL} is not the deck's +Y"
+    )
+# The whole plate (its four corners, both faces) must land on the deck INSIDE
+# the raised rim's inner wall, or the seats would be cut through the lip.
+_NAMEPLATE_CORNERS_XZ = tuple(
+    (pt[0], pt[2])
+    for pt in (
+        nameplate_spec.mount_point((x, y, 0.0))
+        for x in (0.0, nameplate_spec.PLATE_WIDTH)
+        for y in (0.0, nameplate_spec.PLATE_HEIGHT)
+    )
+)
+NAMEPLATE_RIM_CLEARANCE = min(
+    min(TOP_LENGTH / 2.0 - LIP_W - abs(x), TOP_WIDTH / 2.0 - LIP_W - abs(z))
+    for x, z in _NAMEPLATE_CORNERS_XZ
+)
+if NAMEPLATE_RIM_CLEARANCE < 1.0:
+    raise AssertionError(
+        f"nameplate footprint {_NAMEPLATE_CORNERS_XZ} clears the rim's inner wall by "
+        f"only {NAMEPLATE_RIM_CLEARANCE:.2f} (need >= 1.0)"
+    )
+
 # The four seat specs, hoisted to module level so the drive-train assembly can
 # import the TRUE wizard cut diameters for its clearance assertions (the old
 # hand-authored *_HOLE_DIA constants are derived from the specs now -- one
@@ -241,10 +298,18 @@ FOOT_SEAT_SPEC = HoleSpec(
     depth_mm=FOOT_SCREW_DRILL_DEPTH,
     overrides_mm={"ThreadDepth": FOOT_SCREW_HOLE_DEPTH},
 )
+NAMEPLATE_SEAT_SPEC = HoleSpec(
+    "tapped",
+    "#4-40",
+    end="blind",
+    depth_mm=NAMEPLATE_SCREW_DRILL_DEPTH,
+    overrides_mm={"ThreadDepth": NAMEPLATE_SCREW_HOLE_DEPTH},
+)
 PIVOT_SCREW_HOLE_DIA = blind_cut_dia_mm(PIVOT_SEAT_SPEC)  # 3.797 tap drill
 STOP_SCREW_HOLE_DIA = blind_cut_dia_mm(STOP_SEAT_SPEC)  # #8-32 tap drill
 BLOCK_SCREW_HOLE_DIA = blind_cut_dia_mm(BLOCK_SEAT_SPEC)  # #8-32 tap drill
 FOOT_SCREW_HOLE_DIA = blind_cut_dia_mm(FOOT_SEAT_SPEC)  # #4-40 tap drill
+NAMEPLATE_SCREW_HOLE_DIA = blind_cut_dia_mm(NAMEPLATE_SEAT_SPEC)  # #4-40 tap drill
 
 MM3_PER_IN3 = IN**3
 
@@ -496,11 +561,15 @@ async def build(adapter) -> dict[str, str]:
             f"fastener holes removed {pre_holes - after:.1f}, expected {v_holes:.1f}"
         )
 
-    # Cone swing hardware + alignment-pinion rig seats: native Hole Wizard
-    # blind holes from the top face. The pivot, stop, block and foot screws all
-    # thread into their matching tapped base seats; the platform itself swings
-    # on the pivot screw's shoulder. A wizard blind hole ends in a 118-degree drill point, so the
-    # analytic expectation is blind_hole_volume_mm3 (cylinder + point).
+    # Cone swing hardware + alignment-pinion rig seats + nameplate seats: native
+    # Hole Wizard blind holes from the top face. The pivot, stop, block, foot
+    # and nameplate screws all thread into their matching tapped base seats; the
+    # platform itself swings on the pivot screw's shoulder. A wizard blind hole
+    # ends in a 118-degree drill point, so the analytic expectation is
+    # blind_hole_volume_mm3 (cylinder + point). The nameplate seats are cut
+    # from the same deck face the plate lies on (NAMEPLATE_SCREW_XZ derivation
+    # above) -- before the rim, which would otherwise be the +Y face at the
+    # pad outline and confuse the face walk.
     for tag, spec, xz, label in (
         (
             "PivotSeat",
@@ -525,6 +594,12 @@ async def build(adapter) -> dict[str, str]:
             FOOT_SEAT_SPEC,
             FOOT_SCREW_XZ,
             "foot-screw tapped seats (#4-40)",
+        ),
+        (
+            "NameplateSeats",
+            NAMEPLATE_SEAT_SPEC,
+            NAMEPLATE_SCREW_XZ,
+            "nameplate fillister-screw tapped seats (#4-40)",
         ),
     ):
         dia = blind_cut_dia_mm(spec)

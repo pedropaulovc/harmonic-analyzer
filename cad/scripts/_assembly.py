@@ -588,6 +588,7 @@ _FLIP_INVERT: frozenset[str] = frozenset(
         "pivot bracket datum x",
         "pivot bracket datum y",
         "pivot bracket datum z",
+        "pivot bracket datum y @npn",
         "pivot bushing axial z",
         "platen feed snapshot",
         # (was "rack pinion disc axial" -- the 120T disc's label became "reducer
@@ -2198,6 +2199,7 @@ _ALLOWED_FREE_STEMS: dict[str, tuple[str, ...]] = {
         "transgear-knob-shaft",
         "transgear-pinion",
         "transgear-removable",
+        "transgear-thumbnut",  # rides the free knob shaft (lock-mated), 2026-09-02
     ),
 }
 

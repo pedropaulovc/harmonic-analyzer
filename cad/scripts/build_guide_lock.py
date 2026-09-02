@@ -62,12 +62,13 @@ MATERIAL = "Plain Carbon Steel"
 # LOCK_WIDTH/LOCK_HEIGHT/LOCK_THICK/HOLE_XY live in guide_lock_spec.py (the
 # dimensional contract shared with draw_guide_lock.py; re-exported here for
 # build_paper_drive_assembly). LOCK_HEIGHT is sized by the BOTTOM station: its
-# rail sits 7 below the bar (open channel), so reaching a 7 overlap behind the
-# bar band takes 5 (rail) + 7 (channel) + 7 (bar) = 19. The top rail sits ON
-# the bar, so the same plate overlaps the bar by 14 there -- and the two rows
-# still clear each other by 1.0 in y (2026-07-07 field report: a 12-tall plate
-# topped out AT the bar's bottom edge and retained nothing at the bottom
-# stations).
+# rail sits 7 below the bar (open channel), so reaching the bar band takes
+# 5 (rail) + 7 (channel) + the overlap behind the bar. The 2026-09-02 user
+# re-read of ch22 p.54 shows a LOW lock and caps it at 15: 5 rail + 7 channel
+# + 3 bar overlap (the 2026-07 plate reached a 7 overlap = 19). The top rail
+# sits ON the bar, so the same plate overlaps the bar by 10 there. (2026-07-07
+# field report: a 12-tall plate topped out AT the bar's bottom edge and
+# retained nothing at the bottom stations -- 15 keeps a 3 overlap.)
 # The fillister screws' O2.9 shanks pass through: #4 clearance, CLOSE fit
 # (Ø3.048, the wizard-table twin of the old Ø3.0 artefact dim; nearest UNC to
 # the ~Ø2.9 screw -- memory/fastener-policy-us-customary).

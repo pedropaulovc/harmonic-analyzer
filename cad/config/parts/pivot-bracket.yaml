@@ -1,7 +1,7 @@
 pivot-bracket:
   number: MHA-123
   material: Plain Carbon Steel
-  finish: "black oxide"
+  finish: "black oxide; bright (polished steel) pivot ball"
   tolerance_class: machined_block
   quantity: 2
-  process: "milled foot + ear, reamed cross-bore; drilled hold-down holes"
+  process: "milled L foot + ear stub, ball brazed on and reamed through; drilled hold-down holes"

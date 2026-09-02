@@ -25,7 +25,8 @@ Cross-subassembly fits proven by the top-level interference check:
   z -155 chain plane;
 * rocker-arm connecting-rod rings (channel) ride the cam lobes integral
   to the drive-train's cylinder gears;
-* the loose measuring-stick sits on the base top (y 50.8). The spare T18
+* the loose measuring-stick stands on its stop block on the base top (y 50.8),
+  the stop's thumbscrew head resting on the deck. The spare T18
   transgear-removable, a swap part for the platen drive, rides inside
   paper-drive (a flat sibling of its mounted T24) rather than floating here --
   at the top level its leaf name would collide with the T12/T24 instances
@@ -78,7 +79,8 @@ SUBASSEMBLIES = (
 
 # Loose hardware on the base top -- a generic tool, not part of any mechanism.
 # Parked on the deck just INBOARD of the west columns, running along Z
-# (machine x -183..-175, z -100..100, y 50.8..53.8): the old far-west margin
+# (machine x -183..-175, z -100..100, propped on its stop block ~8 above the
+# deck -- see the height derivation below): the old far-west margin
 # lane (x -220..-212) is under the base's raised rim since the 2026-09 photo
 # re-derive (lip inner edge x -215.25, interference-gate proven 2375 mm^3),
 # and the corridor left between rim and columns (5.5) is narrower than the
@@ -91,28 +93,67 @@ SUBASSEMBLIES = (
 # requires local -Z -> machine +Y, i.e. local +Z -> -Y. The rows therefore map
 # part X(length 200)->machine +Z, part Y(width 8)->machine -X, part Z(3 thick)->
 # machine -Y; the body hangs in -Y from the graduated face, so the placed corner
-# (part origin, on the z=0 face) sits at y 53.8 = base-top 50.8 + 3 thickness,
-# dropping the body onto the base with the graduated face up. POS.x = -175 so the
-# width runs -X into x -175..-183. euler [90,-90,0] is rows_from_euler of those
-# rows.
-STICK_POS = (-170.0, 53.8, -100.0)  # 2026-09: 5 further inboard so the stop
-# block straddling it (14 across) clears the base rim's inner edge (x -183)
-STICK_EULER = [90.0, -90.0, 0.0]
-STICK_ROWS = [[0.0, 0.0, 1.0], [-1.0, 0.0, 0.0], [0.0, -1.0, 0.0]]
+# (part origin, on the z=0 face) sits STICK_THICK above the bar's underside.
+# POS.x = -175 so the width runs -X into x -175..-183. euler [90,-90,0] is
+# rows_from_euler of those rows.
+#
+# Height (2026-09-02 stop rework): the parked stick is PROPPED ON THE STOP
+# BLOCK, as the ch30 plates show it standing on the block rather than flat on
+# the deck -- the stop's closed window wraps the bar and its knurled thumbscrew
+# head hangs under the block, so the head bottom is what rests on the deck
+# (STOP_DECK_GAP above it) and the bar rides SLOT_FLOOR + half the window
+# clearance above the block bottom. STICK_POS.y (the graduated top face) is
+# therefore derived from the stop's constants, never a literal.
+import _telemetry  # noqa: E402
 from build_measuring_stick import (  # noqa: E402
+    BODY_THICKNESS as STICK_THICK,
     BODY_WIDTH as STICK_WIDTH,
     DIVISION_SPACING as STICK_DIVISION,
     SCALE_START_X as STICK_SCALE_START,
 )
+from build_measuring_stick_stop import (  # noqa: E402
+    HEAD_H as STOP_HEAD_H,
+    SLOT_FLOOR as STOP_SLOT_FLOOR,
+    SLOT_H as STOP_SLOT_H,
+    SLOT_W as STOP_SLOT_W,
+)
+
+DECK_TOP_Y = 50.8  # harmonic-base top face
+STOP_DECK_GAP = 0.25  # thumbscrew head bottom above the deck (sliver margin)
+# The bar (3 thick x 8 wide) must pass the stop's closed window with clearance
+# on every side (the window is 8.4 x 3.4, floor 4.0 above the block bottom).
+STOP_BAR_CLEAR_Y = (STOP_SLOT_H - STICK_THICK) / 2.0  # 0.2 above and below
+assert STOP_BAR_CLEAR_Y > 0.0, (STOP_SLOT_H, STICK_THICK)
+assert STOP_SLOT_W - STICK_WIDTH >= 0.2, (STOP_SLOT_W, STICK_WIDTH)
+
+# Stack up from the deck: gap + head + floor + centring clearance = bar
+# underside; + bar thickness = the graduated face the part origin sits on.
+STICK_BOTTOM_Y = (
+    DECK_TOP_Y + STOP_DECK_GAP + STOP_HEAD_H + STOP_SLOT_FLOOR + STOP_BAR_CLEAR_Y
+)
+STICK_POS = (-170.0, STICK_BOTTOM_Y + STICK_THICK, -100.0)  # 2026-09: 5 further
+# inboard so the stop block straddling it clears the base rim's inner edge (x -183)
+STICK_EULER = [90.0, -90.0, 0.0]
+STICK_ROWS = [[0.0, 0.0, 1.0], [-1.0, 0.0, 0.0], [0.0, -1.0, 0.0]]
 
 STOP_MARK = 2.0  # the ch16 p.36 setting
 STOP_POS = (
     STICK_POS[0] - STICK_WIDTH / 2.0,  # centred across the bar (part +Y -> machine -X)
-    STICK_POS[1] - 3.0,  # seat on the deck under the 3-thick bar
+    # Bar centred in the window: the block bottom sits SLOT_FLOOR + 0.2 below
+    # the bar's underside (the bar rides the window floor + half the clearance).
+    STICK_BOTTOM_Y - STOP_SLOT_FLOOR - STOP_BAR_CLEAR_Y,
     STICK_POS[2] + STICK_SCALE_START + STOP_MARK * STICK_DIVISION,
 )
 STOP_EULER = [0.0, -90.0, 0.0]
 STOP_ROWS = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [-1.0, 0.0, 0.0]]
+STOP_HEAD_BOTTOM_Y = STOP_POS[1] - STOP_HEAD_H
+STICK_DECK_FLOAT = STICK_BOTTOM_Y - DECK_TOP_Y
+assert abs(STOP_HEAD_BOTTOM_Y - DECK_TOP_Y - STOP_DECK_GAP) < 1e-6, STOP_HEAD_BOTTOM_Y
+assert STICK_DECK_FLOAT > 0.0, STICK_DECK_FLOAT
+_telemetry.info(
+    f"measuring stick propped on its stop: underside floats {STICK_DECK_FLOAT:.2f} "
+    f"above the deck (head bottom {STOP_HEAD_BOTTOM_Y:.2f}, deck {DECK_TOP_Y})"
+)
 
 
 def _subassembly(name: str) -> str:

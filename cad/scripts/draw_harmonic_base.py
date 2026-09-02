@@ -47,6 +47,8 @@ from build_harmonic_base import (
     FOOT_SCREW_XZ,
     HOLE_DIA,
     HOLE_XZ,
+    NAMEPLATE_SCREW_HOLE_DIA,
+    NAMEPLATE_SCREW_XZ,
     PIVOT_SCREW_HOLE_DIA,
     PIVOT_SCREW_XZ,
     STOP_SCREW_HOLE_DIA,
@@ -135,6 +137,9 @@ ALL_HOLES = (
     (*STOP_SCREW_XZ, STOP_SCREW_HOLE_DIA),
     *((x, z, BLOCK_SCREW_HOLE_DIA) for x, z in BLOCK_SCREW_XZ),
     *((x, z, FOOT_SCREW_HOLE_DIA) for x, z in FOOT_SCREW_XZ),
+    # Appended LAST so hole_entities[8] (the tapped-position FCF's block-hole
+    # anchor) keeps its index.
+    *((x, z, NAMEPLATE_SCREW_HOLE_DIA) for x, z in NAMEPLATE_SCREW_XZ),
 )
 
 
@@ -408,7 +413,10 @@ async def build(adapter: Any) -> dict[str, str]:
         tolerance=GEOMETRIC_TOLERANCES_MM["tapped-hole true position"],
         datums=("A", "B", "C"),
         diameter=True,
-        quantity="A1, B1, C1-C3, D1-D4",
+        # Tag letters follow each wizard group's first hole in XY order
+        # (swHoleTableTagOrder_XY): A stop, B pivot, C foot, D block, E lags,
+        # F the nameplate seats at x 163.75/209.75 (the east-most group).
+        quantity="A1, B1, C1-C3, D1-D4, F1-F4",
         label="tapped-hole true position",
         entity=hole_entities[8],
     )
@@ -456,9 +464,10 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Harmonic Base Manufacturing Drawing",
         scale=SHEET_SCALE,
         redundant_note_substrings=("Tapped Hole",),
-        # The cone-pivot seat is now the fourth Hole Wizard tapped group; all
-        # four imported generic notes are replaced by the native hole table.
-        expected_redundant_notes=4,
+        # Five Hole Wizard tapped groups (pivot, stop, block, foot, nameplate
+        # seats); all five imported generic notes are replaced by the native
+        # hole table.
+        expected_redundant_notes=5,
     )
 
 

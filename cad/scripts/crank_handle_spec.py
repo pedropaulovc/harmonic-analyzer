@@ -3,7 +3,7 @@ manufacturing drawing.
 
 PURE DATA, no SolidWorks/COM imports.  A turned stained-oak pear grip on the
 crank-arm pivot: an integral collar profile at the crank end, a waisted neck, a smooth
-twin-arc swell to the Ø22 max, and a blunt domed butt with a flat cap.  The
+twin-arc swell to the Ø21 max, and a blunt domed butt with a flat cap.  The
 pear silhouette is two internally-tangent arcs, so the swell/neck/butt
 DIAMETERS derive from the profile geometry and cannot be marked without
 over-defining; the drawing therefore dimensions the clean AXIAL stations
@@ -17,17 +17,18 @@ from __future__ import annotations
 
 from _fit_limits import band_text
 
-# 2026-09 photo re-derive (ch11 page002_img03 at 12.6 px/mm against the 75
-# mm arm c2c; page002_img05/06 agree): a SHORT egg, not the 90 mm baton of
-# the first pass -- overall 44 from the collar face, swell 25 across at
-# 0.64 of the length, brass collar 15 x 7, butt cap 11 with the screw.
-HANDLE_LENGTH = 44.0  # overall length (collar face to butt cap)
-HANDLE_MAX_DIA = 25.0  # max diameter at the swell
+# 2026-09-02 user re-read of the pass-2 model against ch11 p.14 and the ch30
+# p002 front view: the 44 mm egg of the 2026-09 photo re-derive (ch11
+# page002_img03 at 12.6 px/mm) read too STUBBY -- the grip is longer and
+# slimmer than that egg: overall 58 from the collar face, swell 21 across at
+# 0.62 of the length, neck Ø11, butt cap Ø10; the brass collar stays 15 x 7.
+HANDLE_LENGTH = 58.0  # overall length (collar face to butt cap)
+HANDLE_MAX_DIA = 21.0  # max diameter at the swell
 COLLAR_LENGTH = 7.0  # brass collar length
 COLLAR_DIA = 15.0  # brass collar OD
-NECK_R = 6.0  # waist just below the collar (neck Ø12)
-PEAK_X = 28.0  # axial station of the maximum diameter
-CAP_R = 5.5  # flat butt cap radius (Ø11)
+NECK_R = 5.5  # waist just below the collar (neck Ø11)
+PEAK_X = 36.0  # axial station of the maximum diameter
+CAP_R = 5.0  # flat butt cap radius (Ø10)
 PIVOT_BORE_DIA = 6.125  # final reamed bore limits 6.10-6.15
 # Symmetric ream band about the mid nominal: 6.15 MAX / 6.10 MIN.
 PIVOT_BORE_BAND = (0.025, -0.025)

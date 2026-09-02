@@ -925,6 +925,7 @@ _CHECK_NAMES = (
     "config",
     "graph",
     "nameplate",
+    "numerals",
     "recipe",
     "cache",
     "telemetry",
@@ -2202,6 +2203,7 @@ def task_check():
             # retired), so the gate depends on the file + its integrity test.
             "file_dep": [
                 str((SCRIPTS_DIR / "test_nameplate_geometry.py").resolve()),
+                str((SCRIPTS_DIR / "nameplate_spec.py").resolve()),
                 str(
                     (
                         REPO_ROOT / "cad" / "references" / "nameplate-engraving.dxf"
@@ -2209,6 +2211,24 @@ def task_check():
                 ),
             ],
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_nameplate_geometry.py")],
+        },
+        "numerals": {
+            # Guards the GENERATED numerals DXF the measuring-stick build imports:
+            # byte-identical regeneration from gen_stick_numerals_dxf, closed-loop
+            # census, clearance from every tick, and the area/bbox the build pins.
+            # Deps: the test, the asset, and the generator/build/font-render
+            # modules it imports (module_deps_of), so a layout-constant edit that
+            # forgot to regenerate the DXF fails this gate.
+            "file_dep": [
+                str((SCRIPTS_DIR / "test_dxf_text.py").resolve()),
+                *module_deps_of(SCRIPTS_DIR / "test_dxf_text.py"),
+                str(
+                    (
+                        REPO_ROOT / "cad" / "references" / "measuring-stick-numerals.dxf"
+                    ).resolve()
+                ),
+            ],
+            "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_dxf_text.py")],
         },
         "recipe": {
             # _CONFIG_YAMLS: the metadata-ownership contracts read part rows via

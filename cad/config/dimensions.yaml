@@ -125,7 +125,7 @@ sections:
         - stated
         - high
       - - Nameplate
-        - 100 × 55 mm, brass, 4 corner screws, on base near platen
+        - 100 × 55 mm, brass, 4 corner #4-40 brass fillister screws into blind taps in the base deck (2026-09-02: the model had holes but no screws), on base near platen
         - ch.26 text p.70
         - stated
         - high
@@ -175,14 +175,14 @@ sections:
         - scaled
         - med
       - - Handle length
-        - 44 mm (egg-shaped grip; Ø15 × 7 collar at the arm)
-        - '1.73'
+        - '58 mm (slim egg grip; Ø15 × 7 collar at the arm; 2026-09-02 user re-read: the 44 egg was too stubby)'
+        - '2.28'
         - 'ch11 p.14 close-up (2026-09 re-derive): the grip is a short egg, widest ~28 from the collar, not a 90 baton — SUPERSEDES the p.12 arm-proportion read (`crank_handle_spec.py`)'
         - scaled
         - med
       - - Handle diameter
-        - 25 mm max (Ø11 at the tip)
-        - '0.98'
+        - 21 mm max at 36 from the collar (Ø10 at the tip; 2026-09-02)
+        - '0.83'
         - ch11 p.14 close-up (2026-09 re-derive, with the handle length)
         - scaled
         - med
@@ -767,7 +767,7 @@ sections:
         - the support's 63.5 mounting-hole pitch (`build_rocker_arm_support.py`); placed in frame.SLDASM (`build_lag_screw.py`)
         - low
       - - Pivot brackets ×2 (replaced the chrome ball mounts 2026-09)
-        - black foot-and-ear bracket — foot 24 × 6 × 12 with two Ø4.2 screw holes at ±9, ear 14 wide × 6 thick with a full-round top, Ø6.5 shaft bore 25.2 above the foot
+        - 'black L-bracket (2026-09-02, was a T): foot 16 wide (fits the support''s 16.93 apex) × 6 × 24 running INBOARD from the ear with two Ø4.2 holes on its centreline, ear stub 14 × 6 carrying a Ø16 chrome ball at 25.2 above the foot with the Ø6.5 shaft bore through the ball; north bracket turned Ry180 in channel.SLDASM'
         - 'ch14 p.27 (2026-09 re-derive): the shaft rides in two black cast brackets bolted to the support rail, not chrome ball pillars; seated on the support at stack-mid z ±78 so the pivot axis stays 228.6 + 25.2 = 253.8 (`build_pivot_bracket.py`)'
         - scaled
         - med
@@ -907,7 +907,7 @@ sections:
         - stated
         - high
       - - Scale span (10 divisions)
-        - 142 mm (14.20 per division; nine 1.42-pitch minor ticks per division; 0.5 end margin at the 10 end)
+        - 142 mm (14.20 per division; nine 1.42-pitch minor ticks per division; 0.5 end margin at the 10 end); numerals 0-10 engraved 2.0 high, turned 90° with their tops toward the 10 end, 0.6 past each full tick (2026-09-02, `measuring-stick-numerals.dxf`)
         - '5.59'
         - 'pp.34–37 plates re-read 2026-09 (the earlier 80 mm was a low read): the ruling runs ~0.71 of the 200 bar with tenths between the numbered ticks; close to the 146.05 half-arm (ch.14), so the face is near 1:1 mm — see notes (`build_measuring_stick.py`)'
         - scaled
@@ -919,7 +919,7 @@ sections:
         - scaled
         - low
       - - Stop block (2026-09)
-        - black block 14 × 11 × 14 with an open-bottom 8.4 × 3.4 slot over the bar; Ø9 × 3 bright thumb head; parked at the 2 mark
+        - 'black 12 mm cube with a closed 8.4 × 3.4 window for the bar (floor 4.0 up) and a Ø7 × 3.5 knurled thumbscrew UNDERNEATH (2026-09-02, p.34: square block, screw below); parked at the 2 mark, so the stick stands propped on the block 7.95 above the deck'
         - —
         - 'pp.34–35: the sliding/locking stop the text names sits on the bar as a small dark block with a bright screw head (`build_measuring_stick_stop.py`)'
         - scaled
@@ -1026,7 +1026,8 @@ sections:
       180° phase flip. M6.3 closure, renumbered by the 2026-08-02 rederive:
       fulcrum height 1061.4 = bar-top pin height (levers level in the d = 0
       default state) — rail top 1036.2 + 25.2 ball mounts; the capped columns
-      continue to 1064.8, all within photo error (ball measured
+      end at 1044.8, 4 above the corner bosses (2026-09-02 p002 re-read: the
+      earlier 1064.8 stub stood 20 too tall), all within photo error (ball measured
       (−205, 1078) on the tilted museum machine). Spring row hangs at
       x = +54.1 (lever tips), z = lever stations; lower ends reach the summing
       lever (ch. 18, M6.4).
@@ -1138,7 +1139,7 @@ sections:
         - derived
         - low
       - - Knife mount
-        - '8-square hardened bar set diamond-wise (edge up), 31.8 long — rides inside the lever tube''s slot tunnel (z ±15.9 vs slot ±16; contact bands outside the slot are geometrically impossible — the diamond flanks clash with the tube lower wall); brass block 24 wide × 33.4 tall × 14 deep with a Ø16 bore (2026-09 re-derive from ch18 p.42: bore 25.4 → 16, width 34 → 24) below, seated under the casting underside 999.7 (knife edge at 979.7, contact ridge 984.834); tapped 1/2-13 blind hole × 12 deep in the block top on the trunnion axis for the knife-hanger-stud: Ø12.7 shank up through the tube slot and the casting crossbar (Ø13.49 close clearance), capped above the top face 1036.2 by integral washer Ø28 × 2.5 + HEX nut AF19 × 11 + turned collar Ø11 × 3 + centre-drilled tip Ø6 × 4 — one merged part, total 69.25 (y 987.45..1056.7), ×2 at z −83.972/+90.148'
+        - '8-square hardened bar set diamond-wise (edge up), 31.8 long — rides inside the lever tube''s slot tunnel (z ±15.9 vs slot ±16; contact bands outside the slot are geometrically impossible — the diamond flanks clash with the tube lower wall); hardened-steel block 24 wide × 29.4 tall × 14 deep with a Ø12 bore, unpainted (2026-09-02 user re-read of ch18 p.42: bore 16 → 12 around the 8.7 × 10.3 hex, brass → O1 tool steel 58-60 HRC; earlier 2026-09: bore 25.4 → 16, width 34 → 24) below, seated under the casting underside 999.7 (knife edge at 979.7, contact ridge 984.834); tapped 1/2-13 blind hole × 12 deep in the block top on the trunnion axis for the knife-hanger-stud: Ø12.7 shank up through the tube slot and the casting crossbar (Ø13.49 close clearance), capped above the top face 1036.2 by integral washer Ø28 × 2.5 + HEX nut AF19 × 11 + turned collar Ø11 × 3 + centre-drilled tip Ø6 × 4 — one merged part, total 69.25 (y 987.45..1056.7), ×2 at z −83.972/+90.148'
         - —
         - 'p.42/43 + top.png stud crops (tmp_measure/crops/top_stud1/2.png); ch30 px measurement anchored on column pitch + GT rescale + ch19 closeups (2026-08-02 rederive)'
         - measured
@@ -1216,7 +1217,7 @@ sections:
       - - Gooseneck
         - 'Ø16 chrome tube: vertical leg machine x 197 (east column line), y 880..1390 — geometry UNCHANGED by the 2026-08-02 rederive; the post drops ≈120 below the rail underside (999.7, unchanged) and ends in a free tip, passing through the Ø17 clearance bore in the top-frame''s east-rail hub and gripped by the hub''s square-head set screw (clamp deleted); 180° bend R 51; tip leg x 95 — plumb above the boss hook — ending y 1378; lug + Ø4 X-pin at y 1373 carries the spring''s top loop'
         - —
-        - 'tip drop: ch. 7 back-left ¾ view (page001_img17) — free tip clear of the columns at image y 491, machine 880 by frame-height scale (41 mm/26 px), cross-checked by the Ø16 silhouette (10 px). Leg-top/bend: 0.515 px/mm + p3 90° page; tip "slotted screw" modeled as lug + pin'
+        - 'tip drop: ch. 7 back-left ¾ view (page001_img17) — free tip clear of the columns at image y 491, machine 880 by frame-height scale (41 mm/26 px), cross-checked by the Ø16 silhouette (10 px). Leg-top/bend: 0.515 px/mm + p3 90° page; tip "slotted screw" modeled as lug + pin -- SUPERSEDED 2026-09-02 (ch19 p.45 page001_img02): a #6-32 slotted screw driven AXIALLY into the arm''s plugged end face (Ø3.6 shank, Ø10 head), the counter spring''s top eye hanging on the shank against the head; arm centreline lowered 1386 -> 1373.3 and shortened to end at machine x 101.75 so the eye stays at (95, 1370.7) (`gooseneck_geom.py`)'
         - scaled + derived
         - leg-top med, drop med
       - - Gooseneck clamp
@@ -1474,6 +1475,12 @@ sections:
         - 'ch22 p.54-55 back photo (rails + bright wear band + lock plates) + front photo (two rows of 5 screw heads)'
         - scaled + derived
         - med
+      - - Guide lock plates (2026-09-02)
+        - '22 × 15 × 2 (was 19 tall): 5 rail + 7 channel + 3 bar overlap'
+        - —
+        - 'ch22 p.54: the locks read low against the rail (`guide_lock_spec.py`)'
+        - scaled
+        - low
       - - Paper clip strips (×2)
         - 83.5 × 8.988 × 1.2, #4 clearance end-screw holes, bright brass (NOT blackened)
         - —
@@ -1636,12 +1643,18 @@ sections:
         - '`v4_transgear_008/020` + ch. 23 topology; stack derived from the disc window −148.4..−145.4 (0.3 in front of the platen furniture''s deepest reach) and the −155 chain plane'
         - scaled + derived
         - low/med
-      - - Latch strip (2026-09)
-        - '12 × 1.0 polished steel strip with stadium ends on the support bar''s front face at z −144.15; Ø5.4 eye over the knob-shaft seat, Ø4.4 hole for a #8-32 screw into the bar at x −42.575 through a 4.25 spacer'
+      - - Latch hook (2026-09-02; replaces the 2026-09 latch strip)
+        - 'short curved spring-steel hook, 4.5 x 0.8 strip on an R45 centreline arc, 27 long (25.4 drop, 7.9 inward run), Ø8 eye screwed to the support bar''s front face with a #8-32 bracket screw; parked at x -50 (west of the platen edge) bending toward the disc'
         - —
-        - 'ch23 p.58 + video 4/4: the spring latch that locks the swing cluster — the model had none (`build_latch_strip.py`; the bar gains the tapped hole in `build_support_bar.py`)'
+        - 'engineerguy 4/4 keyframes v4_transgear_001 (latched) / 011 (released): the latch is a small curved leaf hanging from the bar between the pivot ball and the disc, at x ~ +52 in the video -- parked at -50 because the model''s bar front is hidden behind the platen there (see memory/photo-rederive-3-audit.md) (`build_latch_hook.py`, LATCH_HOOK_X)'
         - scaled
         - low
+      - - Transgear thumbnut (2026-09-02)
+        - 'knurled brass nut Ø26 x 7 with a Ø14 x 4 neck, outermost on the knob shaft in FRONT of the removable gear (z -156.45..-167.45); the shaft gains a 9.5 front stub; knurl not modelled'
+        - —
+        - 'ch23 p.58/59 (page002_img03/04) + video 4/4 "unscrew the nut that holds the other gear in place" (`build_transgear_thumbnut.py`)'
+        - scaled
+        - med
   - prose: |2
 
       Notes: speed combos — small driving + large driven = slowest platen (smallest

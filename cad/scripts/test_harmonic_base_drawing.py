@@ -6,6 +6,8 @@ import math
 from pathlib import Path
 import re
 
+import pytest
+
 import build_harmonic_base as part
 import build_cone_swing_platform as platform
 import draw_harmonic_base as drawing
@@ -75,7 +77,7 @@ def test_notes_cover_the_top_plate_reveal_and_seats() -> None:
     assert "LEAST-SQUARES CYLINDER FITS OVER" in notes
     assert "SEPARATION AT C'BORE MOUTH/BOTTOM: 0.05 MAX" in notes
     assert "PROCESS DATA" not in notes
-    assert "A1/B1/C1-C3/D1-D4 ARE BLIND TAPPED" in notes
+    assert "A1/B1/C1-C3/D1-D4/F1-F4 ARE BLIND TAPPED" in notes
     assert "MASK DATUM A/B/C FACES AND ALL BORES/THREADS" in notes
     assert "COAT PAD SIDES, ROOTS AND RIM" in notes
     assert "DECK INSIDE THE RIM: BLACK" in notes
@@ -104,18 +106,24 @@ def test_notes_cover_the_top_plate_reveal_and_seats() -> None:
     assert 'quantity="E1-E4 DIA 13 THRU"' in source
     assert 'quantity="DATUM B LONG SIDE"' in source
     assert 'quantity="DATUM C LEFT END"' in source
-    assert 'quantity="A1, B1, C1-C3, D1-D4"' in source
+    assert 'quantity="A1, B1, C1-C3, D1-D4, F1-F4"' in source
     assert "6.53 BLIND HOLE" not in source
     assert "underside-only counterbore rims are visible" in source
     assert 'redundant_note_substrings=("Tapped Hole",)' in source
-    assert "expected_redundant_notes=4" in source
+    assert "expected_redundant_notes=5" in source
 
 
 def test_hole_table_covers_mounting_holes_and_every_hardware_seat() -> None:
     assert len(part.HOLE_XZ) == 4
-    assert len(drawing.ALL_HOLES) == 13
+    # 4 lag c'bores + pivot + stop + 4 block + 3 foot + 4 nameplate seats
+    assert len(drawing.ALL_HOLES) == 17
     assert drawing.ALL_HOLES[:4] == tuple(
         (x, z, part.HOLE_DIA) for x, z in part.HOLE_XZ
+    )
+    # The nameplate seats are appended LAST so hole_entities[8] (the tapped
+    # position FCF's block-hole anchor) keeps its index.
+    assert drawing.ALL_HOLES[13:] == tuple(
+        (x, z, part.NAMEPLATE_SCREW_HOLE_DIA) for x, z in part.NAMEPLATE_SCREW_XZ
     )
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "basic_locations=True" in source
@@ -130,9 +138,49 @@ def test_plan_view_clears_top_border_and_lower_notes() -> None:
 
 
 def test_blind_taps_have_drill_and_tap_runout_clearance() -> None:
-    for spec in (part.STOP_SEAT_SPEC, part.BLOCK_SEAT_SPEC, part.FOOT_SEAT_SPEC):
+    for spec in (
+        part.STOP_SEAT_SPEC,
+        part.BLOCK_SEAT_SPEC,
+        part.FOOT_SEAT_SPEC,
+        part.NAMEPLATE_SEAT_SPEC,
+    ):
         thread_depth = spec.overrides_mm["ThreadDepth"]
         assert spec.depth_mm - thread_depth >= 3.0
+
+
+def test_nameplate_seats_are_derived_from_the_plate_mount() -> None:
+    """The four #4-40 taps sit under the plate's corner holes carried through
+    its mount transform (nameplate_spec), cut from the deck the plate lies on."""
+    import nameplate_spec
+    from fillister_screw_spec import SHANK_DIA, SHANK_LEN, THREAD
+
+    assert part.NAMEPLATE_SEAT_SPEC.kind == "tapped"
+    assert part.NAMEPLATE_SEAT_SPEC.size == THREAD == "#4-40"
+    assert part.NAMEPLATE_SEAT_SPEC.end == "blind"
+    assert part.NAMEPLATE_SCREW_HOLE_DIA == pytest.approx(2.261)
+    # Ø2.0 modelled shank inside the Ø2.261 tap drill (foot-screw convention):
+    # no interference pair to allow.
+    assert SHANK_DIA < part.NAMEPLATE_SCREW_HOLE_DIA
+    # Plate back face ON the deck (gap 0) and cut from the deck's +Y face.
+    assert nameplate_spec.MOUNT_BACK_Y == pytest.approx(harmonic_base_spec.STACK_HEIGHT)
+    assert nameplate_spec.MOUNT_NORMAL == (0.0, 1.0, 0.0)
+    assert part.NAMEPLATE_SCREW_XZ == nameplate_spec.MOUNT_HOLE_XZ
+    assert set(part.NAMEPLATE_SCREW_XZ) == {
+        (209.75, 45.5), (209.75, -45.5), (163.75, 45.5), (163.75, -45.5),
+    }
+    # No mechanism shift applies (the plate anchors to the pad edge): the
+    # stations are the pure mount-transform image of the plate holes.
+    assert part.NAMEPLATE_SCREW_XZ == tuple(
+        (nameplate_spec.MOUNT_POS[0] - y, nameplate_spec.MOUNT_POS[2] - x)
+        for x, y in nameplate_spec.SCREW_XY
+    )
+    # Inside the raised rim's inner wall by >= 1.0.
+    assert part.NAMEPLATE_RIM_CLEARANCE == pytest.approx(1.0)
+    # Shank engagement: 4.0 shank through the 1.5 plate buries 2.5 in a 6.0
+    # thread, with >= 0.5 spare before the thread bottom.
+    plate_t = nameplate_spec.PLATE_THICKNESS
+    assert SHANK_LEN >= plate_t + 2.0
+    assert part.NAMEPLATE_SCREW_HOLE_DEPTH >= SHANK_LEN - plate_t + 0.5
 
 
 def test_v2_platform_swing_stop_coordinate_is_rederived() -> None:

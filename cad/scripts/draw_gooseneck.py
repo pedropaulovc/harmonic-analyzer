@@ -6,9 +6,10 @@ manufacturing notes; every shared sheet/template, import, curation, and export
 behavior lives in ``_drawing_common``.
 
 The post is a polished chrome Ø16 tube: a tall vertical leg, a 90-degree bend
-(R51) at the top, and a horizontal arm carrying a Ø4 spring cross-pin at its
-lug.  The part is ~506 mm tall, so the sheet runs 1:3; the isometric drops to
-1:4.
+(R51) at the top, and a horizontal arm whose plugged end face carries the
+axial slotted spring screw (Ø3.6 shank, Ø10 head) the counter spring's top eye
+hangs on.  The part is ~493 mm tall, so the sheet runs 1:3; the isometric
+drops to 1:4.
 
 Run with SolidWorks open::
 
@@ -56,15 +57,17 @@ SHEET_SCALE = (1.0, 3.0)   # 1:3 whole sheet (~506 mm tall post)
 # sits far right; the notes fill the lower-left.
 FRONT_CENTER = (0.180, 0.150)
 ISO_CENTER = (0.350, 0.150)
-# NO lug detail view. Four attempts (three commits + a bbox-shift fix) left
+# NO end-screw detail view. Four attempts (three commits + a bbox-shift fix)
+# on the arm-end feature it replaced (a lug + cross-pin) left
 # CreateDetailViewAt4 rendering an empty or near-empty circle even with the
-# fence verified ON the lug: the activated-view sketch transform anchors the
-# model ORIGIN at the view position while CreateDrawViewFromModelView3 centers
-# the geometry BBOX there, and even a correctly-shifted fence produced a detail
-# whose content window did not match its fence. The lug/pin are fully specified
-# by notes 3-5 (sizes, locations, braze schedule), matching the note-based
-# style the rest of this batch already uses, so the detail adds legibility
-# only -- not manufacturability -- and is dropped rather than iterated again.
+# fence verified ON the feature: the activated-view sketch transform anchors
+# the model ORIGIN at the view position while CreateDrawViewFromModelView3
+# centers the geometry BBOX there, and even a correctly-shifted fence produced
+# a detail whose content window did not match its fence. The plug + screw are
+# fully specified by notes 3-5 (sizes, locations, braze + tap schedule),
+# matching the note-based style the rest of this batch already uses, so the
+# detail adds legibility only -- not manufacturability -- and stays dropped
+# rather than iterated again.
 
 # Per-view survivors of the marked-dimension import: the bend radius (R51) and
 # the horizontal arm run, both on the Front-plane sweep path (so both project to

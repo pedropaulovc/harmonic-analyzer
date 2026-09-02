@@ -21,7 +21,8 @@ from __future__ import annotations
 # bottom-station height derivation). These drive the part's named equation
 # globals AND the drawing's coordinate math. ---
 LOCK_WIDTH = 22.0  # along +X
-LOCK_HEIGHT = 19.0  # along +Y; y = 0 is the guide-side edge
+LOCK_HEIGHT = 15.0  # along +Y; y = 0 is the guide-side edge (2026-09-02
+# user re-read of ch22 p.54: a LOW lock -- 5 rail + 7 channel + 3 bar overlap)
 LOCK_THICK = 2.0  # extruded +Z
 
 # Screw-hole layout on the guide-side band (matches the guide's hole pitch:

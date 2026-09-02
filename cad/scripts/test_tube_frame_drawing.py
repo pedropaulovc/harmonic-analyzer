@@ -31,11 +31,12 @@ def test_tube_nominals_are_single_sourced() -> None:
     assert tube_frame_spec.OUTER_DIA == 25.4
     # 1 in OD, 0.12 in wall -> Ø19.304 bore.
     assert abs(tube_frame_spec.INNER_DIA - 19.304) < 1e-6
-    # 2026-08-02 top-frame rederive: 1014.0 overall = 1010.7 tube + 3.3
-    # integral dome cap (capped stub top at machine 1064.8).
-    assert tube_frame_spec.COLUMN_LENGTH == 1014.0
+    # 2026-09-02 user re-read (ch30 p002: columns end just above the corner
+    # bosses): 994.0 overall = 990.7 tube + 3.3 integral dome cap (capped
+    # stub top at machine 1044.8, 4.1 above the 1040.7 boss tops).
+    assert tube_frame_spec.COLUMN_LENGTH == 994.0
     assert tube_frame_spec.CAP_HEIGHT == 3.3
-    assert abs(tube_frame_spec.BODY_LENGTH - 1010.7) < 1e-9
+    assert abs(tube_frame_spec.BODY_LENGTH - 990.7) < 1e-9
     # Full-width spherical cap: R = (a^2 + h^2) / (2h) with a = OD/2.
     assert abs(tube_frame_spec.CAP_SPHERE_RADIUS - 26.08787878787879) < 1e-9
 

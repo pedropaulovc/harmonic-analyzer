@@ -4,9 +4,11 @@ Static structure of the machine: the two-plate cast base, four smooth
 polished columns at the corners, the rocker-arm-support that carries the
 rocker-pivot shaft, the top-frame casting clamped around the columns, and
 the five fasteners that pin the casting (4 corner-boss side screws + the
-gooseneck set screw). Column tops rise to 1064.8 -- +28.6 plain capped
-stubs above the casting's top face 1036.2 (2026-08-02 top-frame rederive;
-supersedes the M6.8 "flush at 1040.7, no stub above" stack).
+gooseneck set screw), plus the maker's nameplate and the four brass screws
+that hold it to the base. Column tops rise to 1044.8 -- short plain capped
+stubs 8.6 above the casting's rail top 1036.2 and 4.1 above its corner-boss
+tops 1040.7 (2026-09-02 user re-read of ch30 p002: the columns end just
+above the bosses; supersedes the 2026-08-02 +28.6 stub / 1064.8 top).
 
 Layout (from the ch. 6 dimension photo and the ch. 30 eight views; assembly
 axes follow the harmonic-base part: X = 46 cm length, Y = up, Z = 28 cm
@@ -52,7 +54,13 @@ depth):
 * nameplate x1: the maker's plate (book ch. 26), laid FLAT on the base top
   face on the EAST (+X) side, decorated side up, centred front-back between the
   two east columns and read by an operator at that face. Cosmetic; constrained
-  at its measured transform and locked to the fixed base (see NAMEPLATE_POS).
+  at its measured transform and locked to the fixed base (see
+  nameplate_spec.MOUNT_POS).
+* fillister-screw x4 (2026-09-02 ch26 p.71 re-derive): the brass slotted
+  round-head screws at the plate's four corners, heads seated on the
+  decorated face, shanks down through the plate's #4 clearance holes into the
+  base's blind #4-40 taps (build_harmonic_base NAMEPLATE_SCREW_XZ -- the same
+  nameplate_spec derivation). Same single-mate fix-all treatment.
 
 Hold-down: four 9/16-12 lag screws come up through the base into the support
 foot's tapped holes. The base was re-drilled to the foot's pattern (4 holes at
@@ -102,10 +110,23 @@ from _assembly import (
     place_component,
     save_assembly_and_images,
 )
-from _transforms import ROT_X_NEG90, ROT_X_POS90, ROT_Y_POS90, rot_z_rows
+from _transforms import ROT_X_NEG90, ROT_X_POS90, ROT_Y_POS90, rot_z_rows, rows_from_euler
+from build_harmonic_base import (
+    NAMEPLATE_SCREW_HOLE_DEPTH,
+    NAMEPLATE_SCREW_XZ,
+)
 from cone_pivot_post_installation import (
     FRAME_FRONT_COLUMN_Z,
     FRAME_REAR_COLUMN_Z,
+)
+from fillister_screw_spec import SHANK_LEN as NAMEPLATE_SCREW_SHANK_LEN
+from nameplate_spec import (
+    MOUNT_EULER as NAMEPLATE_EULER,
+    MOUNT_FRONT_Y as NAMEPLATE_FRONT_Y,
+    MOUNT_HOLE_XZ as NAMEPLATE_SCREW_STATIONS,
+    MOUNT_POS as NAMEPLATE_POS,
+    MOUNT_ROWS as NAMEPLATE_ROWS,
+    PLATE_THICKNESS as NAMEPLATE_THICKNESS,
 )
 from rocker_arm_support_spec import (
     SUPPORT_HOLD_DOWN_XZ,
@@ -181,28 +202,56 @@ SET_SCREW_TIP_X = -205.15  # 0.15 clear (outboard) of the Ø16 post surface -205
 SET_SCREW_UNDER_HEAD_X = SET_SCREW_TIP_X - 16.0  # -221.15 under-head plane
 
 # Maker's nameplate (book ch. 26, pp. 70-71): the 100 x 55 brass plate lies FLAT
-# on the base top, decorated side up, on the EAST (+X) face -- read off the in-situ
-# photos (photogrammetry 195527397 / 195530756 / 195532820: the plate sits on the
-# base top, centred between the two columns of one face, read by an operator
-# standing at that face) and the ch. 30 eight views.
+# on the base top, decorated side up, on the EAST (+X) face. The mount
+# transform (NAMEPLATE_POS / _EULER / _ROWS, formerly authored here) now lives
+# in nameplate_spec -- the pure-data contract build_harmonic_base reads to
+# derive the tapped seats under the plate's corner screws -- so the plate, the
+# base taps and the screws below derive from ONE source; the provenance and
+# the axis mapping are documented there. The literal rows are re-proved
+# against the euler at import (rows_from_euler is what assert_component_placed
+# reads back).
+if any(
+    abs(a - b) > 1e-12
+    for ra, rb in zip(rows_from_euler(NAMEPLATE_EULER), NAMEPLATE_ROWS)
+    for a, b in zip(ra, rb)
+):
+    raise AssertionError(
+        f"nameplate_spec.MOUNT_ROWS {NAMEPLATE_ROWS} != rows_from_euler({NAMEPLATE_EULER})"
+    )
 #
-# The part's decorated face is its FRONT face (+Z local; build_nameplate extrudes
-# the body in -Z so the engraving is frontmost and reads with no mirror).
-# NAMEPLATE_ROWS (euler [-90,90,0]) lays it flat on the EAST face: local +Z
-# (decorated front) -> +Y so the engraving faces up; local +Y (text height) -> -X
-# so the text top faces the machine interior and reads upright to an east operator;
-# local +X (text length, 100) -> -Z so the line runs front-back; the 1.5 body
-# (local -Z) drops onto the base top. The placed point is the part origin CORNER
-# (decorated face, x=0/y=0): Y 52.3 lays the decorated face on top with the 1.5
-# body resting on the base top (50.8); Z 50 centres the 100 mm line at z 0 between
-# the east columns (z +/-112); X 214.25 sets the plate's east edge ~8 mm in from
-# the top-plate east edge (x 222.25), span x 159.25..214.25 -- east of the
-# rocker-arm-support (x 28..117) and clear of the east columns (which sit at
-# both column stations, away from the plate's z -50..50), so it grounds 0-DOF,
-# no interference.
-NAMEPLATE_POS = [214.25, 52.3, 50.0]
-NAMEPLATE_EULER = [-90.0, 90.0, 0.0]
-NAMEPLATE_ROWS = [[0.0, 0.0, -1.0], [-1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
+# nameplate screws (2026-09-02 ch26 p.71 re-derive): 4x #4-40 brass
+# fillister-screw, one per plate corner, screwed DOWN into the base's blind
+# #4-40 taps (build_harmonic_base NAMEPLATE_SCREW_XZ -- the plate's own
+# corner holes carried through the mount transform: x 209.75/163.75,
+# z +/-45.5). The part is authored axis along local +Z with the origin at the
+# UNDER-HEAD bearing plane, head at -Z (build_fillister_screw: head -2.2..0,
+# shank 0..+4), so the placement point is the under-head seat on the plate's
+# decorated face (y NAMEPLATE_FRONT_Y 52.3) and ROT_X_POS90 (euler [90,0,0])
+# turns local +Z -> -Y: the 4.0 shank drops through the 1.5 plate into the
+# tap (2.5 buried, tip y 48.3 in a 6.0 thread), the head rides 52.3..54.5
+# above the deck rim (53.3). The under-head plane seats FLUSH on the plate
+# face, exactly as the paper-drive seats the same screw on its clips: the
+# interference gate ignores coincident contact
+# (TreatCoincidenceAsInterference off), so no 0.25 air gap is owed. The Ø2.0
+# modelled shank sits inside the Ø2.261 tap drill, the repo's foot-screw
+# convention, so no allowed-interference pair is needed.
+NAMEPLATE_SCREW_EULER = [90.0, 0.0, 0.0]
+NAMEPLATE_SCREW_ROWS = ROT_X_POS90
+if NAMEPLATE_SCREW_STATIONS != NAMEPLATE_SCREW_XZ:
+    raise AssertionError(
+        f"nameplate screw stations {NAMEPLATE_SCREW_STATIONS} != base taps {NAMEPLATE_SCREW_XZ}"
+    )
+if NAMEPLATE_SCREW_SHANK_LEN < NAMEPLATE_THICKNESS + 2.0:
+    raise AssertionError(
+        f"fillister-screw shank {NAMEPLATE_SCREW_SHANK_LEN} cannot pass the "
+        f"{NAMEPLATE_THICKNESS} nameplate with 2.0 thread engagement"
+    )
+if NAMEPLATE_SCREW_HOLE_DEPTH < NAMEPLATE_SCREW_SHANK_LEN - NAMEPLATE_THICKNESS + 0.5:
+    raise AssertionError(
+        f"base nameplate tap thread depth {NAMEPLATE_SCREW_HOLE_DEPTH} bottoms the "
+        f"{NAMEPLATE_SCREW_SHANK_LEN} shank (needs "
+        f"{NAMEPLATE_SCREW_SHANK_LEN - NAMEPLATE_THICKNESS + 0.5})"
+    )
 
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
 
@@ -225,6 +274,7 @@ async def build(adapter) -> dict[str, str]:
     _part("lag-screw")  # support hold-down; placed via place_component below
     _part("frame-side-screw")  # corner-boss screws; placed via place_component
     _part("gooseneck-set-screw")  # west-hub set screw; placed via place_component
+    _part("fillister-screw")  # nameplate corner screws; placed via place_component
     top_frame_path = _part("top-frame")
 
     check("create_assembly", await adapter.create_assembly())
@@ -391,6 +441,30 @@ async def build(adapter) -> dict[str, str]:
         label="nameplate fixed to base",
     )
     assert_component_placed(adapter, nameplate_name, NAMEPLATE_POS, NAMEPLATE_ROWS)
+
+    # Nameplate corner screws: one #4-40 brass fillister per corner, under-head
+    # plane flush on the decorated face, shank down into the base tap (see
+    # NAMEPLATE_SCREW_* constants). Rigid fasteners -> the same single-mate
+    # fix-all treatment as the frame-side screws below.
+    for (nx, nz) in NAMEPLATE_SCREW_STATIONS:
+        tag = f"{'rear' if nz > 0 else 'front'} {'east' if nx > 200.0 else 'west'}"
+        np_target = [nx, NAMEPLATE_FRONT_Y, nz]
+        np_screw = await place_component(
+            adapter,
+            "fillister-screw",
+            np_target,
+            NAMEPLATE_SCREW_EULER,
+            NAMEPLATE_SCREW_ROWS,
+            ground=False,
+            label=f"fillister-screw (nameplate {tag})",
+        )
+        await lock_mate(
+            adapter,
+            named_ref(f"Right Plane@{np_screw}", "PLANE"),
+            named_ref(f"Right Plane@{base_name}", "PLANE"),
+            label=f"fillister-screw (nameplate {tag}) fixed to base",
+        )
+        assert_component_placed(adapter, np_screw, np_target, NAMEPLATE_SCREW_ROWS)
 
     # Corner-boss side screws: one #10-24 cheese-head per boss, screwed from
     # OUTSIDE the frame (front pair from -Z, rear pair from +Z), under-head
