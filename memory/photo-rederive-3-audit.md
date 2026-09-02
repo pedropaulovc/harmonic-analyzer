@@ -33,8 +33,11 @@ gear") and keyframes `v4_transgear_001..013`.
 | 16 | stop block | ch16 p.34: square block, knurled thumbscrew UNDERNEATH | `build_measuring_stick_stop` rework |
 | 17 | amplitude-bar fan / rocker sinusoidal setup as configurations | ch14 p.28-29 fan; end views at 0/6/14/40 cranks | PR C -- user decision 2026-09-02: DEFAULT = fanned arms + level bars (matches the ch30 eight views); a second config poses the sinusoidal setup (ch14 end views at a chosen crank count); a third keeps today's parallel bank for comparison |
 
-Also seen, not yet listed by the user: the crank taper pin's brass keeper
-ring hanging from a screw on the crank arm (ch11 p.14); the transgear stud's
+Also seen, not listed by the user: the crank taper pin was never PLACED in
+the drive-train and its brass keeper ring did not exist (ch11 p.14) -- both
+added 2026-09-02 (`crank-pin` through the arm hub + shaft cross-hole,
+`crank-pin-ring` MHA-128 hanging from a new hole in the pin's head; the ring's
+anchor screw + chain on the arm face stay unmodelled); the transgear stud's
 brass collar with a slotted cap (ch23 p.59). The support-bar vs platen
 "mismatch" seen while placing the latch hook is NOT a geometry error: the
 platen slides vertically with the paper feed, so keyframe `v4_transgear_001`
