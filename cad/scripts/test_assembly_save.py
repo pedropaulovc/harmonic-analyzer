@@ -81,7 +81,10 @@ def test_new_assembly_save_is_silent_copy_without_references(tmp_path: Path) -> 
 
     assert adapter.currentModel.options == 1 | 2 | 8
     assert target.read_bytes() == b"assembly"
-    assert adapter.currentModel.props["Revision"] == _config.release_revision()
+    assert (
+        adapter.currentModel.GetCustomInfoValue("", "Revision")
+        == _config.release_revision()
+    )
 
 
 def test_copy_source_is_discarded_by_document_title() -> None:
