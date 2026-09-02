@@ -121,8 +121,9 @@ async def _paint_bright_faces(adapter) -> None:
     """Face-level finishes over the black body: rim ring outer cylinder + both
     annular sides -> POLISHED_STEEL; hub drum cylinder -> BRASS_DRUM. Faces are
     classified by their bounding box (the wheel axis is Z): the rim faces span
-    the full RIM_OUTER_DIA in X and Y, the drum spans HUB_DIA and is
-    non-planar (``Normal`` is empty). Fails loud if the expected faces are not
+    the full RIM_OUTER_DIA in X and Y; the drum's cylinder is split into arc
+    segments by the spokes, so it is picked by its HUB_AXIAL length and a
+    diameter cap (non-planar: ``Normal`` is empty). Fails loud if the expected faces are not
     found, so a geometry change here cannot silently drop the finish."""
     from solidworks_mcp.adapters.com_variant import double_array
 
@@ -144,10 +145,13 @@ async def _paint_bright_faces(adapter) -> None:
                 n_rim += 1
             elif (
                 not planar
-                and abs(xs - HUB_DIA) < 0.5
-                and abs(ys - HUB_DIA) < 0.5
-                and zs > SPOKE_AXIAL
+                and abs(zs - HUB_AXIAL) < 0.5
+                and BORE_DIA + 1.0 < max(xs, ys) <= HUB_DIA + 0.5
             ):
+                # The six spokes bite into the drum, splitting its cylinder into
+                # arc segments whose boxes are narrower than the diameter -- so
+                # classify by the drum's axial length and a diameter CAP, and
+                # exclude the axle bore by its diameter.
                 face.MaterialPropertyValues = brass
                 n_hub += 1
     if n_rim < 3 or n_hub < 1:

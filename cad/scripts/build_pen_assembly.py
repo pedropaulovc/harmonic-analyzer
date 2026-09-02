@@ -101,12 +101,15 @@ PEN_ROD_X = 3.0
 PEN_Z_MID = -157.0  # pen-rod axis plane (was -151.5: see the module docstring)
 ROD_SECTION = 5.0  # pen_rod_spec.ROD_SECTION (asserted below)
 HANGER_POS = (PEN_ROD_X, 505.0, PEN_Z_MID)
-# The rod's bottom end sits 14 into the v-block's 18-tall rod bore, putting
-# the marker axis (block bottom + 0.25) at paper mid-height: paper y 324.5..405
-# (build_paper_drive_assembly), centre 364.75 -> marker axis 364.25.
-ROD_BORE_ENGAGEMENT = 14.0
-BLOCK_BOTTOM_Y = 364.0
-PEN_ROD_POS = (PEN_ROD_X, BLOCK_BOTTOM_Y + 4.0, PEN_Z_MID - ROD_SECTION / 2.0)
+# The rod's bottom end sits 13 into the v-block's 18-tall rod bore -- its end
+# face 0.5 above the groove roof (18 - 13 = 5.0 > GROOVE_DEPTH 4.5), clear of the
+# marker barrel that fills the groove below it (a 14 engagement dipped 0.5 into
+# the groove: interference-gate proven, 2.81 mm^3 rod/marker) -- putting the
+# marker axis (block bottom + 0.25) near paper mid-height: paper y 324.5..405
+# (build_paper_drive_assembly), centre 364.75 -> marker axis 363.25.
+ROD_BORE_ENGAGEMENT = 13.0
+BLOCK_BOTTOM_Y = 363.0
+PEN_ROD_POS = (PEN_ROD_X, BLOCK_BOTTOM_Y + 5.0, PEN_Z_MID - ROD_SECTION / 2.0)
 
 # --- v-block on the rod --------------------------------------------------------
 # Block-local frame (build_pen_v_block): length X 0..36, height Y 0..18, depth
@@ -199,8 +202,13 @@ MARKER_ROT = euler_from_rows(MARKER_ROWS)
 # block section with 1.0 a side, its top rail FRAME_TOP_GAP above the block
 # top, and the ring sits FRAME_ROD_GAP forward of the rod's front face.
 FRAME_TOP_GAP = 0.1
+# The rod is a machine-axis-aligned 5-square inside the 45-degree-yawed block, so
+# along the block length it spans the rod's DIAGONAL (+/-3.54 about the bore
+# axis), not +/-2.5: the stirrup's rear face stands FRAME_ROD_GAP past that
+# (a 1.0 gap measured from the flat left 0.04 of overlap, 0.01 mm^3).
 FRAME_ROD_GAP = 1.0
-FRAME_X_CENTER_LOCAL = ROD_BORE_LOCAL[0] + ROD_SECTION / 2.0 + FRAME_ROD_GAP + FRAME_DEPTH / 2.0
+ROD_HALF_DIAGONAL = ROD_SECTION / math.sqrt(2.0)  # 3.54
+FRAME_X_CENTER_LOCAL = ROD_BORE_LOCAL[0] + ROD_HALF_DIAGONAL + FRAME_ROD_GAP + FRAME_DEPTH / 2.0
 assert OUTER_WIDTH - 2 * RAIL_SIDE >= BLOCK_DEPTH + 2.0, "stirrup window must pass the block"
 assert FRAME_X_CENTER_LOCAL + FRAME_DEPTH / 2.0 < BLOCK_LENGTH, "stirrup off the block end"
 _FRAME_ORIGIN_LOCAL = (
