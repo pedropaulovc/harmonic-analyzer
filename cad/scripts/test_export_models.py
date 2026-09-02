@@ -681,3 +681,49 @@ def test_save_as_sanitizes_glb_outputs(tmp_path: Path) -> None:
     assert export_models._save_as(_Doc(), output) == 1
     fixed = _read_glb_json(output)
     assert fixed["meshes"][0]["primitives"][0]["attributes"] == {"POSITION": 0}
+
+
+def test_sanitize_glb_keeps_textures_on_surviving_uv_sets(tmp_path: Path) -> None:
+    gltf = {
+        "asset": {"version": "2.0"},
+        "accessors": [
+            {"count": 100, "type": "VEC3", "componentType": 5126},  # POSITION
+            {"count": 96, "type": "VEC2", "componentType": 5126},  # TEXCOORD_0 (bad)
+            {"count": 100, "type": "VEC2", "componentType": 5126},  # TEXCOORD_1 (good)
+        ],
+        "materials": [
+            {
+                "name": "decal",
+                "pbrMetallicRoughness": {
+                    "baseColorTexture": {"index": 0, "texCoord": 1},
+                    "metallicRoughnessTexture": {"index": 1},  # texCoord 0 (default)
+                },
+                "normalTexture": {"index": 2, "texCoord": 1},
+            }
+        ],
+        "meshes": [
+            {
+                "primitives": [
+                    {
+                        "attributes": {"POSITION": 0, "TEXCOORD_0": 1, "TEXCOORD_1": 2},
+                        "material": 0,
+                    }
+                ]
+            }
+        ],
+    }
+    glb = tmp_path / "decal.glb"
+    glb.write_bytes(_glb_bytes(gltf))
+    dropped = export_models.sanitize_glb(glb)
+    assert [d["attribute"] for d in dropped] == ["TEXCOORD_0"]
+    fixed = _read_glb_json(glb)
+    prim = fixed["meshes"][0]["primitives"][0]
+    assert prim["attributes"] == {"POSITION": 0, "TEXCOORD_1": 2}
+    clone = fixed["materials"][prim["material"]]
+    assert clone["name"] == "decal-untextured"
+    # the slot on the dropped set is gone; the slots on TEXCOORD_1 survive
+    assert "metallicRoughnessTexture" not in clone["pbrMetallicRoughness"]
+    assert clone["pbrMetallicRoughness"]["baseColorTexture"] == {"index": 0, "texCoord": 1}
+    assert clone["normalTexture"] == {"index": 2, "texCoord": 1}
+    # the source material is untouched
+    assert "metallicRoughnessTexture" in fixed["materials"][0]["pbrMetallicRoughness"]

@@ -38,6 +38,7 @@ Run after any --rebuild so the render cache tracks geometry:
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import os
@@ -825,9 +826,10 @@ def sanitize_glb(path: Path) -> list[dict[str, Any]]:
     ``IndexError: index 576 is out of bounds for axis 0 with size 576`` --
     which meshprobe then surfaced as a worker timeout. The spec requires every
     attribute accessor of a primitive to share one count, so the mismatched
-    attribute is dropped (its buffer bytes stay, unreferenced); a primitive
-    left textured without UVs gets an untextured clone of its material so the
-    file stays valid. Returns one record per dropped attribute (empty when the
+    attribute is dropped (its buffer bytes stay, unreferenced); a texture slot
+    whose ``texCoord`` selected a dropped UV set is removed on a clone of the
+    material (slots on surviving sets keep their textures) so the file stays
+    valid. Returns one record per dropped attribute (empty when the
     file was already clean) -- the caller logs them; a clean file is not
     rewritten at all."""
     with path.open("rb") as fh:
@@ -840,13 +842,15 @@ def sanitize_glb(path: Path) -> list[dict[str, Any]]:
     accessors = gltf.get("accessors", [])
     materials = gltf.setdefault("materials", [])
     dropped: list[dict[str, Any]] = []
-    untextured: dict[int, int] = {}
+    # (source material, frozenset of removed texture slots) -> clone index
+    untextured: dict[tuple[int, frozenset[str]], int] = {}
     for mesh_index, mesh in enumerate(gltf.get("meshes", [])):
         for prim_index, prim in enumerate(mesh.get("primitives", [])):
             attrs = prim.get("attributes", {})
             if "POSITION" not in attrs:
                 continue
             n_pos = accessors[attrs["POSITION"]]["count"]
+            removed_uv_sets: set[int] = set()
             for key in list(attrs):
                 if key == "POSITION":
                     continue
@@ -863,19 +867,43 @@ def sanitize_glb(path: Path) -> list[dict[str, Any]]:
                         "positions": n_pos,
                     }
                 )
-                if key.startswith("TEXCOORD") and "material" in prim:
-                    src = prim["material"]
-                    if src not in untextured:
-                        clone = json.loads(json.dumps(materials[src]))
-                        pbr = clone.get("pbrMetallicRoughness", {})
-                        pbr.pop("baseColorTexture", None)
-                        pbr.pop("metallicRoughnessTexture", None)
-                        for tex_key in ("normalTexture", "occlusionTexture", "emissiveTexture"):
-                            clone.pop(tex_key, None)
-                        clone["name"] = f"{clone.get('name') or 'material'}-untextured"
-                        materials.append(clone)
-                        untextured[src] = len(materials) - 1
-                    prim["material"] = untextured[src]
+                if key.startswith("TEXCOORD_"):
+                    removed_uv_sets.add(int(key.split("_", 1)[1]))
+            if not removed_uv_sets or "material" not in prim:
+                continue
+            # Only the texture slots whose ``texCoord`` selects a removed UV set
+            # lose their texture; a slot on a surviving set (e.g. texCoord 1
+            # when only TEXCOORD_0 was dropped) keeps it.
+            src = prim["material"]
+            source = materials[src]
+            pbr_src = source.get("pbrMetallicRoughness", {})
+            slots = {
+                "baseColorTexture": pbr_src,
+                "metallicRoughnessTexture": pbr_src,
+                "normalTexture": source,
+                "occlusionTexture": source,
+                "emissiveTexture": source,
+            }
+            doomed = frozenset(
+                name
+                for name, holder in slots.items()
+                if isinstance(holder.get(name), dict)
+                and int(holder[name].get("texCoord", 0)) in removed_uv_sets
+            )
+            if not doomed:
+                continue
+            cache_key = (src, doomed)
+            if cache_key not in untextured:
+                clone = copy.deepcopy(source)
+                pbr = clone.get("pbrMetallicRoughness", {})
+                for name in doomed:
+                    (pbr if name in ("baseColorTexture", "metallicRoughnessTexture") else clone).pop(
+                        name, None
+                    )
+                clone["name"] = f"{clone.get('name') or 'material'}-untextured"
+                materials.append(clone)
+                untextured[cache_key] = len(materials) - 1
+            prim["material"] = untextured[cache_key]
     if not dropped:
         return dropped
     payload = json.dumps(gltf, separators=(",", ":")).encode("utf-8")

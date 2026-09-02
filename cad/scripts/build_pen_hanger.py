@@ -149,8 +149,9 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError(f"block volume {vol:.1f} != {expected:.1f}")
 
     # 1b. Square rod channel cut along Y (the pen rod hangs vertically).
-    # The +-2.7 footprint stays inside the block's z -4..12.6 band and well
-    # clear of the strap's z 9.6..12.6 band, so a through cut is safe.
+    # The +-2.7 footprint stays inside the block's z -4..18.1 band (BLOCK_Z) and
+    # well clear of the strap's z 15.1..18.1 band (STRAP_Z), so a through cut
+    # is safe.
     channel = SketchDims()
     check("create_sketch channel", await adapter.create_sketch("Top"))
     await define_centered_rectangle(
@@ -225,10 +226,10 @@ async def build(adapter) -> dict[str, str]:
     expected = vol
 
     # 3. Hanger-screw hole through the strap: ONE native Hole Wizard #6-32
-    # tapped feature drilled from the strap BACK face (local z 9.6, outward
-    # normal -Z) -- the screw enters from behind. At local y 60 only the strap
-    # band 9.6..12.6 is material, so the through hole spans just the 3-thick
-    # strap.
+    # tapped feature drilled from the strap BACK face (local z STRAP_Z[0] =
+    # 15.1, outward normal -Z) -- the screw enters from behind. At local y 60
+    # only the strap band 15.1..18.1 is material, so the through hole spans
+    # just the 3-thick strap.
     screw_dia = TAP_DRILL_MM["#6-32"]
     screw_cut = wizard_holes(
         adapter,

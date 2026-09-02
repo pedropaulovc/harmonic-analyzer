@@ -89,10 +89,10 @@ async def build(adapter) -> dict[str, str]:
     check("create_part", await adapter.create_part())
 
     # Editable knobs (Tools > Equations): the block envelope, the chamfer, the
-    # two bores, the slit band and the front screw hole. The mm suffix is
+    # two bores, the bottom groove and the front screw hole. The mm suffix is
     # load-bearing -- this is an INCH document and the equation manager reads
     # BARE numbers in document units (an unsuffixed 32 = 32 in, blowing the part
-    # up 25.4x in-plane). Bore/slit/screw stations are independent globals so a
+    # up 25.4x in-plane). Bore/groove/screw stations are independent globals so a
     # GUI edit nudges one feature without touching its neighbours.
     await set_global(adapter, "BlockLength", f"{BLOCK_LENGTH}mm")
     await set_global(adapter, "BlockHeight", f"{BLOCK_HEIGHT}mm")

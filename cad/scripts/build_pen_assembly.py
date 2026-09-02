@@ -16,7 +16,7 @@ the curve. Everything below the guide rides the rod (ch24 pp.60-65 and the
   chained-Fourier driver transiently (reproduces truth_model.pen_y from a
   CrankDeg global, no force solver).
 * pen-v-block -- the brass block HANGING on the rod's bottom end (the rod
-  drops 14 into the bore nearest the paper; a side set screw pins it in the
+  drops 13 into the bore nearest the paper; a side set screw pins it in the
   real device). Its length runs at 45 degrees to the paper (the "45 deg" nib
   callout of v4_t00603), lock-mated to the rod.
 * pen-marker -- the full-length marker lying in the block's bottom groove
