@@ -418,7 +418,9 @@ async def build(adapter) -> dict[str, str]:
         "pin seat",
         dims=seat,
         names=("PinSeatCz", "PinSeatCy", "PinSeatDia"),
-        drives=('"StrapThickness" / 2', '"PinDrop"', '"PinBore"'),
+        # PinSeatCy is an UNSIGNED distance; PinDrop is signed (negative = the
+        # seat above the pivot), so drive the magnitude.
+        drives=('"StrapThickness" / 2', 'abs("PinDrop")', '"PinBore"'),
     )
     await ensure_fully_defined(adapter, "pin seat sketch")
     check("exit_sketch pin seat", await adapter.exit_sketch())
