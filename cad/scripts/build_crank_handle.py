@@ -39,7 +39,7 @@ from _common import (
     apply_material,
     name_bore_axis,
     apply_color,
-    STAINED_OAK,
+    PANEL_BLACK,
     check,
     define_circle,
     drive_dimension,
@@ -351,7 +351,9 @@ async def build(adapter) -> dict[str, str]:
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
 
     await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, STAINED_OAK)  # ch30 plates: see _common palette
+    # ch11 pp.20-21 + ch30 plates: the pear grip is EBONIZED (painted/stained
+    # black, satin), not a brown oak tone -- only the collar reads brass.
+    await apply_color(adapter, PANEL_BLACK)
     await report_mass_properties(adapter)
     apply_drawing_properties(
         adapter,

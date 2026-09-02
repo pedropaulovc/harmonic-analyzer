@@ -1456,7 +1456,7 @@ sections:
         - scaled + derived
         - med
       - - Paper clip strips (×2)
-        - 112.35 × 8.988 × 1.2, #4 clearance end-screw holes, bright brass (NOT blackened)
+        - 83.5 × 8.988 × 1.2, #4 clearance end-screw holes, bright brass (NOT blackened)
         - —
         - ch30-p002 Pose Studio scale fit (the strips read bright against the darkened platen)
         - scaled
@@ -1476,11 +1476,11 @@ sections:
       - - Paper clips position (rework E4)
         - 'two vertical strips hugging the resized platen''s extreme left/right edges from the TOP edge down (y 295.704..408.054): left x −32.314..−23.326, right +226.540..+235.528, on the paper face (z −144.1..−142.9)'
         - —
-        - 'ch22 front photo: the bright strips run at the edges from the top edge down; ch30-p002 fit sets 112.35; REFUTES the M6.4 inboard bottom-anchored bands'
+        - 'ch22 front photo: the bright strips run at the edges from the top edge down; the p.55 rear photo (140 mm callout) scales them to 86.7 of 140 = 0.619 of the plate height -> 83.5 on the 134.82 plate (the old ch30-p002 fit of 112.35 ran them 83% down, hiding the bare lower band the ch30 front plates show); REFUTES the M6.4 inboard bottom-anchored bands'
         - scaled
         - med
       - - Clip screws ×4 + platen sockets
-        - brass fillister Ø5.5 × 2.2 head + Ø2.9 × 4 shank through each clip's #4 clearance end holes (machine x −27.820/+231.034, y 302.894/400.864) into #4-40 bottoming-tapped sockets in the platen front face; under-head faces on the clip fronts (z −144.1); ALL platen-riding screws lock-mated to the platen (rework E5 — grounded screws floated while the platen fed); slots below render resolution — omitted
+        - brass fillister Ø5.5 × 2.2 head + Ø2.9 × 4 shank through each clip's #4 clearance end holes (machine x −27.820/+231.034, y 331.744/400.864) into #4-40 bottoming-tapped sockets in the platen front face; under-head faces on the clip fronts (z −144.1); ALL platen-riding screws lock-mated to the platen (rework E5 — grounded screws floated while the platen fed); slots below render resolution — omitted
         - —
         - p.55 front photo (clip end screws)
         - scaled + derived

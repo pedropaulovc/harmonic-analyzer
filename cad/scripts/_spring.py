@@ -24,7 +24,7 @@ from __future__ import annotations
 from typing import Iterable
 
 from _common import (
-    SPRING_BLACK,
+    POLISHED_STEEL,
     SketchDims,
     _feature_by_name,
     apply_color,
@@ -185,7 +185,10 @@ async def build_spring(
     await volume_check(adapter, "driven spring (equations neutral)", v_built, 5e-3 * v_built)
 
     await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, SPRING_BLACK)  # ch30 plates: see _common palette
+    # ch17 pp.40-41 + p.41 inset: the channel springs are BRIGHT steel wire
+    # (every coil reads silver against the black levers); only the counter
+    # spring (build_counter_spring) is black.
+    await apply_color(adapter, POLISHED_STEEL)
     await report_mass_properties(adapter)
     # ``views=[]`` saves the part with no PNG exports -- used when build_channel_
     # assembly mass-produces the per-channel stretched variants (the slow

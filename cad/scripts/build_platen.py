@@ -74,8 +74,8 @@ SOCKET_DEPTH = 3.2  # drill-point reach 3.2 + 0.30*2.261 = 3.88 keeps 0.12 web
 # 4.18 and pierced a O0.36 pinhole through the platen surface. Screw
 # engagement (~2.8) still clears.
 SOCKET_XY = (
-    (5.3928, 29.6604), (5.3928, 127.6296),
-    (264.2472, 29.6604), (264.2472, 127.6296),
+    (5.3928, 58.5104), (5.3928, 127.6296),
+    (264.2472, 58.5104), (264.2472, 127.6296),
 )
 
 # Guide-screw through-holes: 2 rows of 5 (heads on the front face, shanks

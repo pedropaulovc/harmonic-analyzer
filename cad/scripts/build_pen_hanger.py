@@ -34,8 +34,10 @@ import math
 import sys
 
 from _common import (
+    PANEL_BLACK,
     SketchDims,
     add_line_chain,
+    apply_color,
     apply_material,
     check,
     define_centered_rectangle,
@@ -263,6 +265,9 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "driven pen hanger (equations neutral)", vol, 1.0)
 
     await apply_material(adapter, MATERIAL)
+    # ch21 p.52 (img03) / ch30 plates: the hanger strap is BLACK-oxide steel
+    # (the dark bar the brass pen rod runs beside), not bright.
+    await apply_color(adapter, PANEL_BLACK)
     await report_mass_properties(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
