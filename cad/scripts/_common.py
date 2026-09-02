@@ -1153,6 +1153,38 @@ def _git_sha() -> str:
         return "unknown"
 
 
+def _build_id() -> str:
+    """``<next release>-b<N>[-dirty]`` -- N = commits since the last release tag.
+
+    The title block's REV cell stays the formal release designator
+    (``release.yaml``); this is the between-releases build identifier a sheet
+    stamps on itself (``$PRP:{BUILD_ID}``) so two prints of the same part can be
+    told apart by eye.  Source-derived like :func:`_git_sha` (no wall clock):
+    the count is deterministic per commit, monotonic between releases, and the
+    release commit is simply the last candidate.  Stamped only when a drawing
+    task actually runs -- git state is in no cache key or file_dep, so a commit
+    never rebuilds anything; a restored sheet keeps the id of the build that
+    made it.
+    """
+    import subprocess
+
+    import _config
+
+    def _git(*args: str) -> str:
+        return subprocess.run(
+            ["git", *args], cwd=str(CAD_ROOT), capture_output=True, text=True,
+            check=True,
+        ).stdout.strip()
+
+    try:
+        last_tag = _git("describe", "--tags", "--abbrev=0", "--match", "v*")
+        count = _git("rev-list", f"{last_tag}..HEAD", "--count")
+    except subprocess.CalledProcessError:  # no release tag reachable
+        count = _git("rev-list", "HEAD", "--count")
+    dirty = "-dirty" if _git("status", "--porcelain") else ""
+    return f"{_config.release_revision()}-b{int(count)}{dirty}"
+
+
 def _git_commit_year() -> str:
     """Year of the HEAD commit, for the title block's copyright line.
 
