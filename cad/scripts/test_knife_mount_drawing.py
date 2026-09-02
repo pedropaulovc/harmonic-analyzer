@@ -50,7 +50,7 @@ def test_spec_geometry_mirrors_the_build_source() -> None:
 
 def test_linked_notes_expose_the_stud_tap_and_unresolved_knife_seat() -> None:
     notes = knife_mount_spec.DRAWING_NOTES
-    assert "BORE Ø25.4 THRU" in notes
+    assert f"BORE Ø{2.0 * knife_mount_spec.R_BORE:.1f} THRU, CENTRED IN THE {2.0 * knife_mount_spec.BLK_HALF_X:.2f} WIDTH" in notes
     assert "TAP 1/2-13 UNC-2B X 12.0 DEEP" in notes
     assert "KNIFE-HANGER STUD" in notes
     assert "TAP-DRILL POINT BREAKS INTO THE BORE CROWN" in notes
