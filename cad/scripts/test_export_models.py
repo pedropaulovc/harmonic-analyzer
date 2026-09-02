@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import importlib.util
 import json
+import struct
 import os
 import sys
 import time
@@ -590,3 +591,93 @@ def test_routine_view_cleanup_preserves_configuration_renders(tmp_path: Path) ->
     assert configured.exists()
     assert not stale_front.exists()
     assert not stale_top.exists()
+
+
+def _glb_bytes(gltf: dict) -> bytes:
+    payload = json.dumps(gltf, separators=(",", ":")).encode("utf-8")
+    payload += b" " * (-len(payload) % 4)
+    body = b"\0" * 64
+    return (
+        struct.pack("<III", 0x46546C67, 2, 12 + 8 + len(payload) + 8 + len(body))
+        + struct.pack("<II", len(payload), 0x4E4F534A)
+        + payload
+        + struct.pack("<II", len(body), 0x004E4942)
+        + body
+    )
+
+
+def _read_glb_json(path: Path) -> dict:
+    raw = path.read_bytes()
+    json_len = struct.unpack("<I", raw[12:16])[0]
+    return json.loads(raw[20 : 20 + json_len])
+
+
+def test_sanitize_glb_drops_mismatched_texcoord_and_untextures_the_material(
+    tmp_path: Path,
+) -> None:
+    gltf = {
+        "asset": {"version": "2.0", "generator": "SOLIDWORKSGLTF"},
+        "accessors": [
+            {"count": 580, "type": "VEC3", "componentType": 5126},  # POSITION
+            {"count": 576, "type": "VEC2", "componentType": 5126},  # TEXCOORD_0 (short)
+            {"count": 580, "type": "VEC3", "componentType": 5126},  # NORMAL
+            {"count": 450, "type": "VEC3", "componentType": 5126},  # clean POSITION
+            {"count": 450, "type": "VEC2", "componentType": 5126},  # clean TEXCOORD_0
+        ],
+        "materials": [
+            {
+                "name": "cast-iron",
+                "pbrMetallicRoughness": {"baseColorTexture": {"index": 0}},
+            }
+        ],
+        "meshes": [
+            {
+                "primitives": [
+                    {"attributes": {"POSITION": 0, "TEXCOORD_0": 1, "NORMAL": 2}, "material": 0},
+                    {"attributes": {"POSITION": 3, "TEXCOORD_0": 4}, "material": 0},
+                ]
+            }
+        ],
+    }
+    glb = tmp_path / "top-frame.glb"
+    glb.write_bytes(_glb_bytes(gltf))
+    dropped = export_models.sanitize_glb(glb)
+    assert dropped == [
+        {"mesh": 0, "primitive": 0, "attribute": "TEXCOORD_0", "count": 576, "positions": 580}
+    ]
+    fixed = _read_glb_json(glb)
+    prims = fixed["meshes"][0]["primitives"]
+    assert prims[0]["attributes"] == {"POSITION": 0, "NORMAL": 2}
+    assert prims[0]["material"] == 1
+    assert "baseColorTexture" not in fixed["materials"][1]["pbrMetallicRoughness"]
+    assert fixed["materials"][1]["name"] == "cast-iron-untextured"
+    # the clean primitive keeps its UVs and its textured material
+    assert prims[1]["attributes"] == {"POSITION": 3, "TEXCOORD_0": 4}
+    assert prims[1]["material"] == 0
+    # binary chunk untouched
+    assert glb.read_bytes().endswith(b"\0" * 64)
+    # idempotent: a clean file is left alone
+    before = glb.read_bytes()
+    assert export_models.sanitize_glb(glb) == []
+    assert glb.read_bytes() == before
+
+
+def test_save_as_sanitizes_glb_outputs(tmp_path: Path) -> None:
+    gltf = {
+        "asset": {"version": "2.0"},
+        "accessors": [
+            {"count": 10, "type": "VEC3", "componentType": 5126},
+            {"count": 12, "type": "VEC2", "componentType": 5126},
+        ],
+        "meshes": [{"primitives": [{"attributes": {"POSITION": 0, "TEXCOORD_0": 1}}]}],
+    }
+
+    class _Doc:
+        def SaveAs3(self, path: str, version: int, options: int) -> int:
+            Path(path).write_bytes(_glb_bytes(gltf))
+            return 1
+
+    output = tmp_path / "machine.glb"
+    assert export_models._save_as(_Doc(), output) == 1
+    fixed = _read_glb_json(output)
+    assert fixed["meshes"][0]["primitives"][0]["attributes"] == {"POSITION": 0}

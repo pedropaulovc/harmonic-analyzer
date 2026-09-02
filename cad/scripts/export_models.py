@@ -42,6 +42,7 @@ import hashlib
 import json
 import os
 import shutil
+import struct
 import subprocess
 import sys
 import time
@@ -800,7 +801,93 @@ def _save_as(doc: Any, out: Path) -> int:
         if not out.exists() or out.stat().st_size == 0:
             out.unlink(missing_ok=True)  # never leave a zero-byte placeholder behind
             raise RuntimeError(f"SaveAs3 produced no/empty file: {out} (rc={ok})")
+        if out.suffix.lower() == ".glb":
+            dropped = sanitize_glb(out)
+            sp.set_attribute("glb.attributes_dropped", len(dropped))
+            if dropped:
+                _telemetry.event("glb.sanitized", dropped=json.dumps(dropped))
+                _telemetry.warn(
+                    f"{out.name}: dropped {len(dropped)} attribute accessor(s) whose "
+                    f"count differs from POSITION (SolidWorks glTF exporter quirk; "
+                    f"Blender's importer would raise IndexError): {dropped}"
+                )
         return ok
+
+
+def sanitize_glb(path: Path) -> list[dict[str, Any]]:
+    """Repair a SolidWorks-exported glTF binary in place so Blender can import it.
+
+    SolidWorks' glTF exporter (``SOLIDWORKSGLTF``) can write a primitive whose
+    ``TEXCOORD_0`` accessor has a DIFFERENT element count from its ``POSITION``
+    accessor (seen on textured cast-iron faces: harmonic-base 850 UVs / 450
+    positions, top-frame 576 / 580 in the v31 bundle). Blender's importer
+    indexes the UV array by the vertex indices and dies with
+    ``IndexError: index 576 is out of bounds for axis 0 with size 576`` --
+    which meshprobe then surfaced as a worker timeout. The spec requires every
+    attribute accessor of a primitive to share one count, so the mismatched
+    attribute is dropped (its buffer bytes stay, unreferenced); a primitive
+    left textured without UVs gets an untextured clone of its material so the
+    file stays valid. Returns one record per dropped attribute (empty when the
+    file was already clean) -- the caller logs them; a clean file is not
+    rewritten at all."""
+    with path.open("rb") as fh:
+        magic, version, _length = struct.unpack("<III", fh.read(12))
+        json_len, json_type = struct.unpack("<II", fh.read(8))
+        gltf = json.loads(fh.read(json_len))
+        rest = fh.read()
+    if magic != 0x46546C67:  # b"glTF"
+        raise ValueError(f"not a glTF binary: {path}")
+    accessors = gltf.get("accessors", [])
+    materials = gltf.setdefault("materials", [])
+    dropped: list[dict[str, Any]] = []
+    untextured: dict[int, int] = {}
+    for mesh_index, mesh in enumerate(gltf.get("meshes", [])):
+        for prim_index, prim in enumerate(mesh.get("primitives", [])):
+            attrs = prim.get("attributes", {})
+            if "POSITION" not in attrs:
+                continue
+            n_pos = accessors[attrs["POSITION"]]["count"]
+            for key in list(attrs):
+                if key == "POSITION":
+                    continue
+                n_attr = accessors[attrs[key]]["count"]
+                if n_attr == n_pos:
+                    continue
+                del attrs[key]
+                dropped.append(
+                    {
+                        "mesh": mesh_index,
+                        "primitive": prim_index,
+                        "attribute": key,
+                        "count": n_attr,
+                        "positions": n_pos,
+                    }
+                )
+                if key.startswith("TEXCOORD") and "material" in prim:
+                    src = prim["material"]
+                    if src not in untextured:
+                        clone = json.loads(json.dumps(materials[src]))
+                        pbr = clone.get("pbrMetallicRoughness", {})
+                        pbr.pop("baseColorTexture", None)
+                        pbr.pop("metallicRoughnessTexture", None)
+                        for tex_key in ("normalTexture", "occlusionTexture", "emissiveTexture"):
+                            clone.pop(tex_key, None)
+                        clone["name"] = f"{clone.get('name') or 'material'}-untextured"
+                        materials.append(clone)
+                        untextured[src] = len(materials) - 1
+                    prim["material"] = untextured[src]
+    if not dropped:
+        return dropped
+    payload = json.dumps(gltf, separators=(",", ":")).encode("utf-8")
+    payload += b" " * (-len(payload) % 4)
+    total = 12 + 8 + len(payload) + len(rest)
+    with path.open("wb") as fh:
+        fh.write(struct.pack("<III", magic, version, total))
+        fh.write(struct.pack("<II", len(payload), json_type))
+        fh.write(payload)
+        fh.write(rest)
+    return dropped
+
 
 
 @_telemetry.traced("export.build_png", label_param="stem")
