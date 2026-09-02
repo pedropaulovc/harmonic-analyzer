@@ -2101,6 +2101,10 @@ def task_check():
         # attributes the sheet no longer defines, and every check:* gate stayed
         # green (codex #416). Enrolled so the cross-sheet contracts are covered.
         SCRIPTS_DIR / "test_assembly_drawing_batch_contract.py",
+        # The blind machinist-review runner (cad/docs/drawing-simplicity-policy.md):
+        # prompt calibration, strict output schema, neutral-workdir command, pass
+        # logic and the blind-review tool-event detector are pinned offline.
+        SCRIPTS_DIR / "test_machinist_review.py",
     ]
     # test_out_param_binding SCANS sources instead of importing them (it reads
     # every top-level build script and every diagnostics/*.py looking for

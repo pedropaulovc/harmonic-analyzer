@@ -13,7 +13,6 @@ import build_cone_gear_shaft
 import build_cone_pivot_screw
 import build_cone_tip_bushing
 import build_connecting_rod
-import build_crank_arm
 import build_crank_drive_gear
 import build_crank_pinion
 import build_crankshaft
@@ -24,7 +23,6 @@ import cone_gear_spec
 import cone_pivot_screw_spec
 import cone_tip_bushing_spec
 import connecting_rod_spec
-import crank_arm_spec
 import crank_drive_gear_spec
 import crank_pinion_spec
 import crankshaft_spec
@@ -37,7 +35,6 @@ import draw_cone_gear_shaft
 import draw_cone_pivot_screw
 import draw_cone_tip_bushing
 import draw_connecting_rod
-import draw_crank_arm
 import draw_crank_drive_gear
 import draw_crank_pinion
 import draw_crankshaft
@@ -147,18 +144,9 @@ CASES = (
             ),
         ),
     ),
-    (
-        crank_arm_spec,
-        build_crank_arm,
-        draw_crank_arm,
-        (
-            SurfaceFinishControl(
-                "shaft_bore",
-                MACHINED_UM,
-                CylinderFace(crank_arm_spec.SHAFT_BORE_DIA),
-            ),
-        ),
-    ),
+    # crank_arm: no finish controls -- the arm is pinned to its shaft, nothing
+    # runs on the bore (drawing-simplicity-policy.md rule 5); its empty tuple is
+    # pinned by test_crank_arm_drawing.
     (
         crank_drive_gear_spec,
         build_crank_drive_gear,

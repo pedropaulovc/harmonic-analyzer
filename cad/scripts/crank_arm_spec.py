@@ -25,7 +25,6 @@ without SolidWorks in ~1 s.
 
 from __future__ import annotations
 
-from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 # inch -> mm. Mirrors ``_common.IN`` but kept local so the spec pulls in NO COM
@@ -56,9 +55,10 @@ DIMPLE_DIA = 8.0  # fiducial indentation (low)
 DIMPLE_DEPTH = 0.5  # fiducial indentation (low)
 DIMPLE_X = 30.0  # on the arm near the boss (low)
 
-SURFACE_FINISHES = (
-    SurfaceFinishControl("shaft_bore", MACHINED_UM, CylinderFace(SHAFT_BORE_DIA)),
-)
+# No roughness callouts: the arm is pinned to its crankshaft, so nothing runs
+# on the bore; the title block's Ra 3.2 covers every face
+# (cad/docs/drawing-simplicity-policy.md rule 5).
+SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
 
 # Derived spans (equations of the primitives above).
 ARM_END_X = ARM_C2C + SQUARE_END_OVERHANG  # 76.0: square end past the shaft-bore origin
@@ -76,25 +76,14 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "DimpleProfile": {"DimpleX", "DimpleDia"},
 }
 
-# True free-text instructions only. Geometry, datum structure, form/orientation,
-# and roughness live in native dimensions / datum tags / FCFs / surface symbols.
-# The part build stamps these strings into the SLDPRT; the drawing displays only
-# $PRPSHEET links, so the print cannot silently diverge from its source model.
+# Notes: part-specific process facts only, never a tolerance, never the
+# title block (drawing-simplicity-policy.md rule 6).
 DRAWING_NOTES = "\n".join(
     (
-        "SHAFT BORE CENTRED ACROSS 16 WIDTH.",
-        "HANDLE PIVOT: 15/64 DRILL THRU.",
-        "THE CROSS-HOLE CALLOUT IS THE FINISHED SIZE FOR THIS PART.",
-        "CROSS-HOLE AXIS INTERSECTS DATUM AXIS B.",
-        "DIMPLE: <MOD-DIAM>8 FLAT-BOTTOM, 0.50 +0.20/-0.10 DEEP; LOCATION +/-0.25.",
+        "BORE, PIVOT HOLE, DIMPLE AND CROSS-HOLE ON ARM CENTRELINES.",
+        "PIVOT HOLE: 15/64 DRILL THRU. CROSS-HOLE: #14 DRILL THRU INTO BORE.",
+        "16 X 8 BAR STOCK FACES OK AS RECEIVED.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
 
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "cross-hole true position": "0.20",
-    "handle pivot position": "0.20",
-    "crank broad-face parallelism": "0.10",
-}
