@@ -1153,7 +1153,20 @@ async def _install_pose_configurations(
                 sf["foot_r"],
                 label=f"J5 bar-foot on rocker arc ch{j:02d} lifted r={sf['foot_r']:.3f}",
             )
-        await repose_springs(adapter, [sin_foot[j]["lever_tilt"] for j in range(CHANNELS)])
+        # Springs FOLLOW their lever holes here (a rigid translation by the
+        # hole's displacement, orientation kept): the lift is <= ~0.7 mm at
+        # the spring hole, within the bottom eye's 1.55 radial clearance on
+        # the plate hook, while the fan's bottom-on-hook scheme would leave
+        # the top eye's wire 0.2 mm into the lever hole's wall (first seat
+        # run: 20 x 0.05 mm^3 lever/spring slivers).
+        phi_0 = math.radians(solve_state(0.0)["lever_tilt"])
+        for j in range(CHANNELS):
+            phi = math.radians(sin_foot[j]["lever_tilt"])
+            dx = -LEVER_SPRING_X * (math.cos(phi) - math.cos(phi_0))
+            dy = LEVER_SPRING_X * (math.sin(phi) - math.sin(phi_0))
+            t = rest_spring[j]
+            pos = [t[9] * 1000.0 + dx, t[10] * 1000.0 + dy, t[11] * 1000.0]
+            await repose_fixed_component(adapter, spring_instances[j], pos, 0.0)
 
     def sin_verify(adapter) -> None:
         # Sign-safe readback: the rocker's rod-pin bore must sit at the solved
