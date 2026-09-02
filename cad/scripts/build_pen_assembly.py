@@ -339,13 +339,11 @@ async def build(adapter) -> dict[str, str]:
             label=f"{part} locked to rod",
         )
         assert_component_placed(adapter, name, pos, rows)
-    # The thumb screw's own axis must sit on the frame's tapped hole -- an
-    # analytic check of the two placements (both locked to the rod), read
-    # back through the frame's named axis by a coincident mate would be
-    # redundant with the Lock and over-constrain the solve.
-    frame = placed["pen-frame"]
-    set_screw = placed["pen-set-screw"]
-    _ = (frame, set_screw)
+    # The thumb screw sits on the stirrup's tapped-hole axis by construction
+    # (SET_SCREW_POS is derived from FRAME_X_CENTER_LOCAL / the block depth
+    # centre, the same block-local station the frame's ScrewX/ScrewZ resolve
+    # to); a coincident axis mate on top of the two Locks would only
+    # over-constrain the solve.
 
     # Amplification wire 2: the straight rest-pose run hanging off the wheel
     # rim's 3 o'clock tangent down to the rod's wire hole level (the tie-off
