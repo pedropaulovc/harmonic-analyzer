@@ -21,15 +21,21 @@ RING_WALL = 5.0  # radial strap wall
 RING_THICKNESS = 3.0
 SHANK_WIDTH = 8.0
 SHANK_THICKNESS = 2.5
-HEAD_WIDTH = 10.0  # across the tombstone cheeks
-HEAD_HEIGHT = 10.5  # crown top -> shoulder root
-HEAD_CROWN_ABOVE_PIN = 2.4  # crown top above the pin centre
-HEAD_THICKNESS = 2.5
+# 2026-09-02 re-derive (ch14 p.28 end views 0/6/14/40 cranks, ch15 p.33
+# page002_img01): the head is a narrow flat-topped BLOCK -- a bright ~5 square
+# top on each rod, ~3x taller than wide -- not the 10-wide x 2.5 tombstone.
+# Thickness is bounded by the arm-to-arm gap it hangs in (7.0565 pitch - 2.5
+# arm = 4.56, the rod plane 1.76 from the near arm): 2.9 symmetric leaves
+# 0.31 to the neighbour arm (asserted in build_channel_assembly).
+HEAD_WIDTH = 5.0  # block width (X)
+HEAD_HEIGHT = 15.0  # top -> shoulder root
+HEAD_CROWN_ABOVE_PIN = 2.4  # flat top above the pin centre
+HEAD_THICKNESS = 2.9  # block thickness (Z), mid-plane on the shank
 PIN_HOLE_DIA = 1.994  # rocker pin hole = #47 number drill
 
 # --- Derived spans (mirror build_connecting_rod). ---
 RING_OUTER_RADIUS = RING_BORE_DIA / 2.0 + RING_WALL  # 20.4
-HEAD_TOP_Y = CENTER_DISTANCE + HEAD_CROWN_ABOVE_PIN  # crown top (150.07)
+HEAD_TOP_Y = CENTER_DISTANCE + HEAD_CROWN_ABOVE_PIN  # flat top (165.50)
 RING_BOTTOM_Y = -RING_OUTER_RADIUS  # -20.4
 
 SURFACE_FINISHES = (

@@ -656,9 +656,9 @@ sections:
         - scaled
         - low
       - - Ring / shank / tip-strap thickness
-        - 3 / 2.5 / 2.5 mm
+        - 3 / 2.5 / 2.9 mm
         - —
-        - sandwich budget (7.5 axial pitch); tip strap = arm thickness so the pin joint is strap-beside-arm inside the 7.06 channel pitch (M6.3 — the "thick tip blocks" read of p.29 was wrong, see ch. 14 note)
+        - sandwich budget (7.5 axial pitch); tip strap = arm thickness so the pin joint is strap-beside-arm inside the 7.06 channel pitch (M6.3 — the "thick tip blocks" read of p.29 was wrong, see ch. 14 note) -- 2026-09-02, the head is a 5 x 15 flat-topped BLOCK 2.9 thick (ch14 p.28 end views, a bright ~5 square top per rod ~3x taller than wide; the 4.56 arm-to-arm gap bounds the thickness)
         - scaled/derived
         - med
       - - Shank width

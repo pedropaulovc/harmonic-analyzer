@@ -3,7 +3,7 @@ r"""Reproduction script: connecting rod (book ch. 13 pp. 22-25 / ch. 14 p. 29; 2
 Black rough-finished rod converting each cam's rotation into the rocker
 arm's see-saw: a full ring (strap) riding the Ø30.6 eccentric cam (cast
 integral with each cylinder gear), a thin flat shank, and a rounded
-TOMBSTONE head (the Y-shaped upper end of the ch14 fan photo) pinned (Ø2)
+flat-topped BLOCK head (the bright square tops of the ch14 end views) pinned (Ø2)
 to the rocker arm's rod-pin hole near the arm's rod-side tip. Centre
 distance 163.10103: the rod hangs PLUMB with the arm LEVEL after the fixed-post
 photos show every rod dropping vertically from the arm tip onto its cam,
@@ -11,11 +11,11 @@ the ch14 end views show the 0-crank tip row dead level (cos-mode home =
 top of stroke, cam lobe UP), so the pin (127.37 out from the mid-seesaw
 pivot) sits directly above the phased lobe centre at machine
 (-54.474, 99.155) and the rod length closes that vertical link. The head
-is SHORTER than the 16 mm arm depth (10.5 crown-to-shoulder), 10 wide,
-crown 2.4 above the pin, angled shoulders narrowing into the 8 shank --
-proportions read off the ch14 fan photo against the 16 mm arm-depth
-callout. It matches the arm's 2.5 thickness so the pin joint stacks
-head-beside-arm inside the 7.06 channel pitch; the M2 "thick stepped tip
+is 15 tall (top-to-shoulder), 5 wide, flat top 2.4 above the pin, the 8
+shank stepping IN to it (2026-09-02: the ch14 p.28 end views show a narrow
+bright square top on every rod, ~3x taller than wide, and ch15 p.33 shows
+the blocks hanging below the bar feet). It is 2.9 thick -- the most the
+arm-to-arm gap it hangs in allows -- beside the arm inside the 7.06 pitch; the M2 "thick stepped tip
 blocks" read of p.29 was amplitude-bar feet, not these rods.
 
 Dimensions: cad/DIMENSIONS.md "Chapter 13 - Connecting rods" - centre
@@ -101,12 +101,11 @@ MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
 # pre-ROM-fit lobe-down phase and -7.82 deg tilt. build_channel_assembly
 # imports this as ROD_C2C (imported, NOT copied). Nominal geometry lives in
 # connecting_rod_spec so the part, channel and drawing move as one recipe.
-# Tombstone head (the "Y" upper end): proportions from the ch14 fan photo
-# scaled by the 16 mm arm-depth callout in the same frame. Rounded crown
-# (radius = half width), short vertical cheeks, angled shoulders narrowing
-# into the shank. The head is SHORTER than the arm depth and the pin sits
-# HIGH in the head / LOW in the arm (crown only 2.4 above the pin).
-HEAD_SHOULDER_RISE = 1.2  # shoulder taper height (width 8 -> 10, photo ~1.2)
+# Block head: flat top, vertical cheeks, angled shoulders stepping the 8
+# shank IN to the 5 block (2026-09-02 end-view re-derive). The pin sits HIGH
+# in the head / LOW in the arm (top only 2.4 above the pin), so the block
+# hangs ~12.6 below the pin beside the arm tip.
+HEAD_SHOULDER_RISE = 1.2  # shoulder step height (width 8 -> 5)
 # rocker-arm rod-end pin hole (ch14): was Ø2.0 drill, now #47 (Ø1.994) native
 # Hole Wizard feature; diameter is imported from connecting_rod_spec.
 THROUGH_CUT_DEPTH = 20.0  # mid-plane total; > any local thickness
@@ -115,7 +114,6 @@ RING_OUTER_RADIUS = RING_BORE_DIA / 2.0 + RING_WALL  # 20.4
 SHANK_START_Y = RING_BORE_DIA / 2.0 - 0.5  # overlaps the strap annulus
 HEAD_TOP_Y = CENTER_DISTANCE + HEAD_CROWN_ABOVE_PIN
 HEAD_START_Y = HEAD_TOP_Y - HEAD_HEIGHT
-HEAD_CROWN_CY = HEAD_TOP_Y - HEAD_WIDTH / 2.0
 SHOULDER_TOP_Y = HEAD_START_Y + HEAD_SHOULDER_RISE
 
 
@@ -150,8 +148,8 @@ async def build(adapter) -> dict[str, str]:
         '"CenterDistance" + "HeadCrownAbovePin" - "HeadHeight"',
     )
     await set_global(
-        adapter, "HeadCrownCy",
-        '"CenterDistance" + "HeadCrownAbovePin" - "HeadWidth" / 2',
+        adapter, "HeadTopY",
+        '"CenterDistance" + "HeadCrownAbovePin"',
     )
 
     # Each sketch records its dim names + drive equations into a per-sketch
@@ -213,20 +211,15 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "Shank")
 
-    # Tombstone head, pinned beside the rocker arm at assembly (the ch14 fan
-    # photo's "Y" upper end): angled shoulders flare the 8 shank to the 10-wide
-    # cheeks, short vertical cheeks, and a semicircular crown (R = HeadWidth/2,
-    # tangent to the cheeks -- add_arc runs CCW start->end, so right-cheek-top ->
-    # left-cheek-top bows over the TOP). Because the crown centre sits on the
-    # sketch axis (x 0) with radius = the cheek half-width, each cheek-top lands
-    # at the crown's equator by construction (x = R forces y = centre y).
+    # Block head, pinned beside the rocker arm at assembly: angled shoulders
+    # step the 8 shank IN to the 5-wide cheeks, vertical cheeks, and a FLAT
+    # top (2026-09-02: the ch14 end views' bright square tops).
     # Dim EMISSION ORDER (each recorded as its display dim is created): shoulder
     # width (= ShankWidth), the shoulder-root corner anchor (X half-width, then
-    # Z = HeadStartY), crown radius, crown-centre height (x on-axis, so
-    # anchor_point_to_origin emits ONE dim), the two shoulder rises, the two
-    # cheek half-width offsets. Bottom horizontal + cheek verticals are
-    # RELATIONS, not dims -- exactly 14 coordinate constraints for the 7 free
-    # vertices, no redundancy.
+    # Z = HeadStartY), the top's height, the two shoulder rises, the two cheek
+    # half-width offsets. Bottom horizontal + cheek verticals + top horizontal
+    # are RELATIONS, not dims -- exactly 12 coordinate constraints for the 6
+    # free vertices, no redundancy.
     head_sd = SketchDims()
     check("create_sketch head", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
@@ -241,15 +234,15 @@ async def build(adapter) -> dict[str, str]:
     )
     head_cheek_r = check(
         "head cheek right",
-        await adapter.add_line(hw, SHOULDER_TOP_Y, hw, HEAD_CROWN_CY),
+        await adapter.add_line(hw, SHOULDER_TOP_Y, hw, HEAD_TOP_Y),
     )
-    head_crown = check(
-        "head crown",
-        await adapter.add_arc(0.0, HEAD_CROWN_CY, hw, HEAD_CROWN_CY, -hw, HEAD_CROWN_CY),
+    head_top = check(
+        "head top",
+        await adapter.add_line(hw, HEAD_TOP_Y, -hw, HEAD_TOP_Y),
     )
     head_cheek_l = check(
         "head cheek left",
-        await adapter.add_line(-hw, HEAD_CROWN_CY, -hw, SHOULDER_TOP_Y),
+        await adapter.add_line(-hw, HEAD_TOP_Y, -hw, SHOULDER_TOP_Y),
     )
     check(
         "head shoulder left",
@@ -260,6 +253,7 @@ async def build(adapter) -> dict[str, str]:
         (head_bottom, "horizontal"),
         (head_cheek_r, "vertical"),
         (head_cheek_l, "vertical"),
+        (head_top, "horizontal"),
     ):
         check(f"head {relation}", await adapter.add_sketch_constraint(ent, None, relation))
     check(
@@ -273,14 +267,12 @@ async def build(adapter) -> dict[str, str]:
     head_sd.record("HeadAnchorX", '"ShankWidth" / 2')
     head_sd.record("HeadAnchorZ", '"HeadStartY"')
     check(
-        "dimension crown radius",
-        await adapter.add_sketch_dimension(head_crown, None, "radial", hw),
+        "dimension head top height",
+        await adapter.add_sketch_dimension(
+            f"{head_top}.start", "origin", "vertical_distance", HEAD_TOP_Y
+        ),
     )
-    head_sd.record("HeadCrownR", '"HeadWidth" / 2')
-    await anchor_point_to_origin(
-        adapter, f"{head_crown}.center", 0.0, HEAD_CROWN_CY, "crown centre"
-    )
-    head_sd.record("HeadCrownCyDim", '"HeadCrownCy"')
+    head_sd.record("HeadTopYDim", '"HeadTopY"')
     check(
         "dimension shoulder rise right",
         await adapter.add_sketch_dimension(
@@ -324,9 +316,8 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "Head")
     res = await adapter.get_mass_properties()
     _telemetry.info(f"volume after bosses: {res.data.volume:.1f} mm^3")
-    # disc ~3922 + shank ~2467 + head ~233 (shoulder trapezoid 10.8 + cheeks
-    # 43.0 + crown semicircle 39.3 = 93.1 mm^2 x 2.5) - overlap; Phase 3
-    # rebuild confirms
+    # disc ~3922 + shank ~2467 + head ~226 (shoulder trapezoid 7.8 + block
+    # 69.0 = 76.8 mm^2 x 2.9) - overlap; Phase 3 rebuild confirms
 
     # Strap bore - rides the eccentric cam. On-axis circle: diameter only.
     bore_sd = SketchDims()

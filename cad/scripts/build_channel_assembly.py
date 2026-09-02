@@ -192,6 +192,7 @@ from build_cylinder_gear import ECCENTRICITY as CAM_ECC  # cam lobe throw (mm):
 # OD-62.2 re-anchor that moved ECCENTRICITY to 3.06, mislocating the ring 2.02 mm
 # south of the lobe -> the Ø30.8 bore dug into the Ø30.6 cam (20 x 171.67 mm^3).
 from connecting_rod_spec import CENTER_DISTANCE as ROD_C2C  # ring centre ->
+from connecting_rod_spec import HEAD_THICKNESS as ROD_HEAD_THICKNESS  # noqa: E402
 
 # rocker pin (imported, NOT copied -- the part and the assembly must agree on
 # the link length or the J2 revolute drags the ring off the cam). Solved for
@@ -229,6 +230,17 @@ if abs(Z0 - CHANNEL_Z0) > 1e-9:
     )
 ARM_MID_DZ = 0.8  # arm/bar/lever mid-planes at z_j + 0.8
 CAM_DZ = -3.25  # end-for-end cylinder gear: cam / rod-ring plane at z_j - 3.25
+# The rod (and its HEAD, mid-plane on the shank) hangs in the gap between its
+# own arm (z_j + ARM_MID_DZ) and the previous channel's (z_j - PITCH +
+# ARM_MID_DZ); the head is the thickest thing in that gap, so its half
+# thickness must clear the nearer arm face (2026-09-02 block head, 2.9).
+_ROD_GAP_NEAR = (PITCH - ARM_MID_DZ + CAM_DZ) - 2.5 / 2.0  # rod plane -> previous arm face
+_ROD_GAP_FAR = (ARM_MID_DZ - CAM_DZ) - 2.5 / 2.0  # rod plane -> own arm face
+if ROD_HEAD_THICKNESS / 2.0 > min(_ROD_GAP_NEAR, _ROD_GAP_FAR) - 0.25:
+    raise RuntimeError(
+        f"connecting-rod head {ROD_HEAD_THICKNESS} too thick for its gap: rod plane"
+        f" {_ROD_GAP_NEAR:.2f} / {_ROD_GAP_FAR:.2f} from the arm faces"
+    )
 
 # --- rocker bank ------------------------------------------------------------
 PIVOT = (72.9, 253.8)  # rocker pivot shaft axis (x, y); machine frame (crank at -X)

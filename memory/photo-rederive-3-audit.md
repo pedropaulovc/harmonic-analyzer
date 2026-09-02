@@ -44,3 +44,18 @@ same machine in two feed states; the model matches the ch30 rest state
 (checked 2026-09-02 on the p002 photo/render pair: bar top ~15 px under
 the paper's bottom edge in both). At rest a hook at +52 would sit behind
 the platen, so it stays at LATCH_HOOK_X = -50 where it is visible.
+
+2026-09-02 (pass-3 reread, PR E scoping): the "amplitude-bar foot TABS" item
+was a MISREAD. ch15 p.33 page002_img01 shows the bank from the rod (-X) side:
+the rusty 6.35 bars are the amplitude bars standing at their pivots, and the
+bright blocks hanging below their ends are the CONNECTING-ROD HEADS at the
+arm tips, lower where the arm has dipped (the heights trace one 13.3-channel
+wave = the 6-crank sinusoid, 360/27 deg). The apparent near/far alternation
+of the heads in the 6/14/40-crank end views is KINEMATIC (at 40 cranks the
+even harmonics stand at the stroke top and the odd at the bottom); the
+0-crank end view (ch14 page002_img08) shows ONE level, evenly spaced row, so
+the rod-pin station is NOT staggered. What the end views do fix is the head's
+shape: a ~5-wide block with a flat bright top, ~15 tall, thicker than the
+2.5 shank -- not the 10-wide x 2.5 tombstone (PR E: rod head reshape; the
+arm-to-arm gap of 4.56 bounds the thickness at 2.9 symmetric). The bars'
+feet are plain (page001_img02: the notch in the bar itself straddles the arm).
