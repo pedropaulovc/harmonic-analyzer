@@ -193,6 +193,7 @@ assert sorted(round(WHEEL_BAR_X0 + lx, 6) for lx in BAR_CLAMP_HOLE_LOCAL_X) == s
     round(x, 6) for x in CLAMP_SCREW_X
 ), "wheel-bar clamp holes drifted off the column clamp-screw lines"
 from build_wheel_axle import FLANGE_LEN, STUD_LEN  # noqa: E402
+from wheel_axle_spec import COLLAR_LEN as AXLE_COLLAR_LEN, NUT_H as AXLE_NUT_H  # noqa: E402
 
 WHEEL_MID_Z = BAR_FRONT_Z - FLANGE_LEN - (STUD_LEN - 4.0) / 2.0  # -146.9:
 # the 10-wide hub sits flush between the flange face and the tip collar
@@ -512,6 +513,27 @@ async def build(adapter) -> dict[str, str]:
         [WHEEL_X, WHEEL_BAR_Y, BAR_FRONT_Z],
         [-90.0, 0.0, 0.0],
         ROT_X_NEG90,
+    )
+    # Hex nut on the stud tip over the axle's washer (2026-09-02, ch21 p.51):
+    # nut back face at axle y FLANGE_LEN + WHEEL_HUB_RIDE + COLLAR_LEN, i.e.
+    # machine z BAR_FRONT_Z - that; the stud runs NUT_H + 3 past it.
+    nut_y = FLANGE_LEN + 10.0 + AXLE_COLLAR_LEN  # 14: flange + hub ride + washer
+    if nut_y + AXLE_NUT_H > FLANGE_LEN + STUD_LEN:
+        raise RuntimeError("wheel-axle nut runs past the stud tip")
+    nut = await place_component(
+        adapter,
+        "wheel-axle-nut",
+        [WHEEL_X, WHEEL_BAR_Y, BAR_FRONT_Z - nut_y],
+        [-90.0, 0.0, 0.0],
+        ROT_X_NEG90,
+        ground=False,
+        label="wheel-axle nut",
+    )
+    await lock_mate(
+        adapter,
+        named_ref(f"Front Plane@{nut}", "PLANE"),
+        named_ref(f"Front Plane@{ax}", "PLANE"),
+        label="wheel-axle nut locked to the axle",
     )
     wh = await place_component(
         adapter,

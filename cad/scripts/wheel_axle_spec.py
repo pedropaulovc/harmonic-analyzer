@@ -9,10 +9,14 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 FLANGE_DIA = 35.0
 FLANGE_LEN = 3.0
 STUD_DIA = 5.0
-STUD_LEN = 14.0
+STUD_LEN = 17.0  # 2026-09-02: runs through the washer + hex nut (ch21 p.51), tip 3 proud
 STUD_DIA_BAND = (-0.02, -0.05)
-COLLAR_DIA = 9.0
-COLLAR_LEN = 4.0
+COLLAR_DIA = 9.0  # the WASHER under the nut (2026-09-02: the collar was the photo's
+# washer + hex nut collapsed; the nut is now its own part, wheel-axle-nut)
+COLLAR_LEN = 1.0
+NUT_AF = 8.0  # hex nut across flats (ch21 p.51, low)
+NUT_H = 3.0
+NUT_BORE_DIA = 5.1  # slips the O5 stud (0.05 radial)
 
 # Geometric controls, authored on the model as plain annotations by the part build
 # (_part_pmi.author_part_pmi) and IMPORTED onto the sheet — the sheet types no

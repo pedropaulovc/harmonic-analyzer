@@ -2,12 +2,12 @@ r"""Reproduction script: magnifying-wheel axle (book ch. 21, pp. 50-51).
 
 The stud that mounts the magnifying wheel on its support bar: a flange
 seated on the bar's front face, a O5 stud the wheel's bore rides, and a
-retaining collar at the stud tip (the photo's washer + hex nut collapsed
-to one round collar -- simplification).
+washer at the stud tip under a hex nut (2026-09-02, ch21 p.51: the nut is
+the separate wheel-axle-nut part; the O9 x 1 collar here is the washer).
 
 Layout: axle axis +Y from the origin at the flange's bar-side face; the
 assembly rotates it so +Y points -Z (machine front). Flange y 0..3,
-stud 3..17, wheel hub rides 3..13, collar 13..17. Dimensions:
+stud 3..20, wheel hub rides 3..13, washer 13..14, nut 14..17 (assembly), tip 3 proud. Dimensions:
 cad/DIMENSIONS.md ch. 21 (M6.4, low).
 
 Built as three coaxial extrusions off the Top plane (flange disc, stud,
