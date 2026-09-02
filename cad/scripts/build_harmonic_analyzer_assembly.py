@@ -77,20 +77,25 @@ SUBASSEMBLIES = (
 )
 
 # Loose hardware on the base top -- a generic tool, not part of any mechanism.
-# Parked in the FAR-WEST margin lane running along Z (machine x -220..-212,
-# z -100..100, y 50.8..53.8), the ~12.5 mm clear lane between the west columns
-# (west face x -209.7) and the west top-plate edge (x -222.25); well clear of the
-# rocker-arm-support foot (x 41..105). Authored as the EXACT machine transform:
+# Parked on the deck just INBOARD of the west columns, running along Z
+# (machine x -183..-175, z -100..100, y 50.8..53.8): the old far-west margin
+# lane (x -220..-212) is under the base's raised rim since the 2026-09 photo
+# re-derive (lip inner edge x -215.25, interference-gate proven 2375 mm^3),
+# and the corridor left between rim and columns (5.5) is narrower than the
+# 8 mm stick, while the column pair leaves only 198.6 along Z for its 200 --
+# so it sits east of the column band (column east face x -184.3, 1.3 clear),
+# well clear of the crank column (x >= -150.7) and the rocker-arm-support foot
+# (x 41..105). Authored as the EXACT machine transform:
 # flat, long axis along Z, GRADUATIONS UP. build_measuring_stick
 # cuts the ticks into the local z=0 face (outward normal -Z), so graduations-up
 # requires local -Z -> machine +Y, i.e. local +Z -> -Y. The rows therefore map
 # part X(length 200)->machine +Z, part Y(width 8)->machine -X, part Z(3 thick)->
 # machine -Y; the body hangs in -Y from the graduated face, so the placed corner
 # (part origin, on the z=0 face) sits at y 53.8 = base-top 50.8 + 3 thickness,
-# dropping the body onto the base with the graduated face up. POS.x = -212 so the
-# width runs -X into x -212..-220 (same lane as before, on the base). euler
-# [90,-90,0] is rows_from_euler of those rows.
-STICK_POS = (-212.0, 53.8, -100.0)
+# dropping the body onto the base with the graduated face up. POS.x = -175 so the
+# width runs -X into x -175..-183. euler [90,-90,0] is rows_from_euler of those
+# rows.
+STICK_POS = (-175.0, 53.8, -100.0)
 STICK_EULER = [90.0, -90.0, 0.0]
 STICK_ROWS = [[0.0, 0.0, 1.0], [-1.0, 0.0, 0.0], [0.0, -1.0, 0.0]]
 
