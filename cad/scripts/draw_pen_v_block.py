@@ -105,7 +105,10 @@ FRONT_KEEP = {
         _sheet_x(BLOCK_LENGTH - CHAMFER / 2.0),
         _front_y(BLOCK_HEIGHT) + 0.012,
     ),
-    "ScrewHoleCx": (_sheet_x(SCREW_HOLE_XY[0] - 5.0), _front_y(BLOCK_HEIGHT) + 0.026),
+    # The set-screw hole now sits ON the rod-bore axis (x 10), so its station
+    # dim would overprint the top view's Bore0X (10.00) above the front view;
+    # it goes in the free band under the front view instead (the old slit row).
+    "ScrewHoleCx": (_sheet_x(SCREW_HOLE_XY[0] / 2.0), 0.070),
     # +0.012 keeps this vertical dimension's line (drawn at the text's x, from the
     # block bottom up to the hole centre) out of datum C's box in the crowded
     # corridor between the front and right views; its text still clears the front
@@ -119,9 +122,9 @@ TOP_KEEP = {
     "Bore0Dia": (_sheet_x(BORE_X[0]) + 0.030, TOP_CENTER[1] + 0.042),
     # Bottom groove band (a Top-plane sketch, so its Z dims project into the
     # top view): the width and its offset from the front depth face, stacked
-    # right of the view.
-    "GrooveWidth": (_sheet_x(BLOCK_LENGTH) + 0.014, TOP_CENTER[1]),
-    "GrooveZ0": (_sheet_x(BLOCK_LENGTH) + 0.026, TOP_CENTER[1] - 0.024),
+    # LEFT of the view (the right side carries the bore position FCF).
+    "GrooveWidth": (_sheet_x(0.0) - 0.018, TOP_CENTER[1]),
+    "GrooveZ0": (_sheet_x(0.0) - 0.032, TOP_CENTER[1] - 0.024),
 }
 RIGHT_KEEP = {
     "Depth": (RIGHT_CENTER[0], 0.068),
