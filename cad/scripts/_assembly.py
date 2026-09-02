@@ -588,6 +588,7 @@ _FLIP_INVERT: frozenset[str] = frozenset(
         "pivot bracket datum x",
         "pivot bracket datum y",
         "pivot bracket datum z",
+        "pivot bracket datum y @npn",
         "pivot bushing axial z",
         "platen feed snapshot",
         # (was "rack pinion disc axial" -- the 120T disc's label became "reducer
