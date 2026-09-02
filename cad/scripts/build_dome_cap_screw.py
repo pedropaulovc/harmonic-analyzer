@@ -101,10 +101,18 @@ async def build(adapter) -> dict[str, str]:
         ("axis", centerline, "vertical"),
     ):
         check(f"{label} {relation}", await adapter.add_sketch_constraint(ent, None, relation))
-    check(
-        "base on origin",
-        await adapter.add_sketch_constraint(f"{closing}.end", "origin", "vertical_points"),
-    )
+    # (The axis-side x of the profile comes from anchor_point_to_origin's own
+    # vertical_points relation on the stub-bottom corner below; a second one
+    # here would over-define.)
+    # Direct-to-DB leaves the centreline's ends loose: tie them to the profile
+    # corners on the axis (the ball-mount idiom, done explicitly here).
+    for label, a, b in (
+        ("axis start", f"{centerline}.start", f"{stub_bottom}.start"),
+        ("axis end", f"{centerline}.end", f"{arc}.end"),
+    ):
+        check(label, await adapter.add_sketch_constraint(a, b, "coincident"))
+    check("stub length", await adapter.add_sketch_dimension(stub_wall, None, "linear", STUB_LEN))
+    prof.record("StubWall", '"StubLen"')
     await anchor_point_to_origin(adapter, f"{stub_bottom}.start", 0.0, -STUB_LEN, "stub bottom")
     prof.record("StubLen", '"StubLen"')
     check("stub radius", await adapter.add_sketch_dimension(stub_bottom, None, "linear", STUB_DIA / 2.0))
