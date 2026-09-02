@@ -352,6 +352,7 @@ def test_assembly_title_properties_never_read_part_registry_fields():
         "Title",
         "Revision",
         "Generator",
+        "COPYRIGHT_YEAR",
         "TOL_LIN_X",
         "TOL_LIN_XX",
         "TOL_LIN_XXX",

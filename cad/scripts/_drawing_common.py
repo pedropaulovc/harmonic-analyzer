@@ -1302,6 +1302,9 @@ TITLE_BLOCK_TOLERANCE_PROPERTIES = (
     "THREAD_CLASS",
 )
 TITLE_BLOCK_REVISION_PROPERTY = "Revision"
+# The copyright line's year ($PRPSHEET:{COPYRIGHT_YEAR}); required like the
+# tolerance rows so a stale source model cannot print "(c)  Pedro ...".
+TITLE_BLOCK_COPYRIGHT_PROPERTY = "COPYRIGHT_YEAR"
 
 
 def read_required_properties(
@@ -4638,10 +4641,15 @@ async def finalize_drawing(
         )
         read_required_properties(
             linked_model,
-            (*TITLE_BLOCK_TOLERANCE_PROPERTIES, TITLE_BLOCK_REVISION_PROPERTY),
+            (
+                *TITLE_BLOCK_TOLERANCE_PROPERTIES,
+                TITLE_BLOCK_REVISION_PROPERTY,
+                TITLE_BLOCK_COPYRIGHT_PROPERTY,
+            ),
             required=(
                 *TITLE_BLOCK_TOLERANCE_PROPERTIES,
                 TITLE_BLOCK_REVISION_PROPERTY,
+                TITLE_BLOCK_COPYRIGHT_PROPERTY,
             ),
         )
 
