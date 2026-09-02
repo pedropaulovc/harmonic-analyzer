@@ -88,3 +88,62 @@ def test_pose_module_rides_the_three_assembly_recipes():
         deps = {Path(p).name for p in _buildgraph.module_deps_of(scripts / stem)}
         assert "_pose_configs.py" in deps, (stem, sorted(deps))
         assert "poses.yaml" in _buildgraph.config_files_of(scripts / stem), stem
+
+
+def _roof_corners(fx, fy, beta):
+    """Both notch-roof corners of a bar at foot (fx, fy) with solve_state's swing
+    root ``beta`` (up vector (sin b, cos b), +X edge (cos b, -sin b))."""
+    s, c = math.sin(beta), math.cos(beta)
+    return [
+        (fx + side * ch._CONTACT_OFF_X * c + ch._CONTACT_OFF_Y * s,
+         fy - side * ch._CONTACT_OFF_X * s + ch._CONTACT_OFF_Y * c)
+        for side in (-1.0, 1.0)
+    ]
+
+
+def test_fanned_bar_roof_lies_flat_on_its_arc():
+    # 2026-09-02: the contact-offset rotation was mirrored -- at a = 80 the bar
+    # floated 0.64 mm off the arc. Both corners now sit on the R800 arc (the
+    # roof is parallel to the arc's tangent because the bar hangs from ~the
+    # arc centre), so the foot->centre radius is amplitude-independent.
+    for a in (0.0, 40.0, 80.0):
+        st = ch.solve_state(a)
+        beta = -math.radians(st["bar_tilt"])
+        for cx, cy in _roof_corners(ch.PIVOT[0] + a, st["bar_bottom"], beta):
+            r = math.hypot(cx - ch._ARC["acx"], cy - ch._ARC["acy"])
+            assert abs(r - ch.ARM_TOP_RADIUS) < 0.01, (a, cx, cy, r)
+        assert abs(ch.foot_radius(a) - ch.foot_radius(0.0)) < 0.02, a
+
+
+def test_sinusoid_foot_reproduces_the_rest_pose_at_zero_cranks():
+    rest = ch.solve_state(0.0)
+    sf = ch.solve_sinusoid_foot(ch.solve_cam_pose(0.0, 20))
+    assert abs(sf["theta_deg"]) < 1e-9
+    assert abs(sf["foot_y"] - rest["bar_bottom"]) < 1e-5
+    assert abs(sf["foot_r"] - ch.foot_radius(0.0)) < 1e-5
+    assert abs(sf["lever_tilt"] - rest["lever_tilt"]) < 1e-5
+
+
+def test_sinusoid_foot_rides_the_turned_arc_on_its_lower_corner():
+    rest = ch.solve_state(0.0)
+    lifts = []
+    for k in (1, 8, 14, 17, 20):
+        st = ch.solve_cam_pose(6.0, k)
+        sf = ch.solve_sinusoid_foot(st)
+        assert abs(sf["theta_deg"] + st["arm_tilt"]) < 1e-4, (k, sf["theta_deg"], st["arm_tilt"])
+        beta = -math.radians(sf["bar_tilt"])
+        radii = [
+            math.hypot(cx - sf["arc_cx"], cy - sf["arc_cy"])
+            for cx, cy in _roof_corners(sf["foot_x"], sf["foot_y"], beta)
+        ]
+        # the lower corner ON the arc, the other one above it (inside R800)
+        assert abs(max(radii) - ch.ARM_TOP_RADIUS) < 1e-6, (k, radii)
+        assert min(radii) <= ch.ARM_TOP_RADIUS + 1e-6
+        lift = sf["foot_y"] - rest["bar_bottom"]
+        assert lift >= -1e-9
+        lifts.append((abs(st["arm_tilt"]), lift))
+        assert sf["foot_r"] <= ch.foot_radius(0.0) + 1e-9
+    lifts.sort()
+    assert all(b[1] >= a[1] for a, b in zip(lifts, lifts[1:]))  # monotone in |tilt|
+    assert 0.4 < lifts[-1][1] < 0.6, lifts[-1]  # ~7.4 deg: 3.175 * tan + the centre swing
+

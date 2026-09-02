@@ -16,6 +16,11 @@ notes: >
   values are not readable, so the ramp tops out at the square preset's 80 mm.
   The sinusoid pose is the ch14 p.28 middle end view: 6 crank turns, so cylinder
   gear k stands at 360 * 6 * k / 80 deg from notch-up (gear law, ch29).
+  With the arms turned under bars held at amplitude 0, each bar's flat notch
+  roof rides the arc on its lower CORNER and the bar lifts (<= ~0.5 mm at the
+  7.4 deg stroke bottom): the build sets every channel's J5 foot-on-arc radius
+  in that configuration to the corner-riding value (build_channel_assembly
+  .solve_sinusoid_foot); Default keeps the roof-centre measure.
 
 amplitude_fan:
   configuration: amplitude-fan

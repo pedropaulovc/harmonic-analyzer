@@ -186,6 +186,36 @@ def set_pose_value_in_active_configuration(adapter: Any, mate: PoseMate, value: 
         raise RuntimeError(f"pose: SetSystemValue3({pose_dim_name(mate.key)}, {value}) -> {rc!r}")
 
 
+def set_distance_mate_value_in_active_configuration(
+    adapter: Any, component: str, rest_mm: float, value_mm: float, *, label: str = ""
+) -> None:
+    """Set a NON-pose distance mate's value in the ACTIVE configuration only.
+
+    The mate is the one distance mate on ``component`` currently at ``rest_mm``
+    (``_cwm``'s value lookup -- copied slices carry SolidWorks-named mates, so
+    the value is the only handle that survives CopyWithMates2). Used for the
+    channel's J5 foot-on-arc coupling, whose radius is a POSE-dependent measure
+    (the bar lifts onto its roof corner when the arm turns under it)."""
+    from solidworks_mcp.adapters.solidworks.features import _read_member
+
+    from _common import _flag_only
+    from _cwm import _component_distance_mate
+
+    mate = _component_distance_mate(adapter, component, rest_mm)
+    _flag_only(mate, "DisplayDimension2")
+    display = adapter._attempt(lambda: mate.DisplayDimension2(0), default=None)
+    dim = _read_member(display, "GetDimension") if display is not None else None
+    if dim is None:
+        raise RuntimeError(f"pose: {component}: distance mate at {rest_mm:.3f} has no dimension")
+    rc = adapter._attempt(lambda: dim.SetSystemValue3(value_mm / 1000.0, _SET_IN_THIS_CONFIGURATION, None), default=None)
+    if rc not in (0, True):
+        raise RuntimeError(f"pose: {label or component}: SetSystemValue3({value_mm:.4f}) -> {rc!r}")
+    got = float(adapter._attempt(lambda: dim.SystemValue, default=float("nan"))) * 1000.0
+    if abs(got - value_mm) > 1e-3:
+        raise RuntimeError(f"pose: {label or component}: set {value_mm:.4f} read back {got:.4f}")
+    _telemetry.event("pose.distance_mate", component=component, rest_mm=rest_mm, value_mm=value_mm, label=label)
+
+
 def read_pose_value(adapter: Any, mate: PoseMate) -> float:
     dim = adapter.currentModel.Parameter(pose_dim_name(mate.key))
     si = float(adapter._attempt(lambda: dim.SystemValue, default=float("nan")))
