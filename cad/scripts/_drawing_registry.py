@@ -81,22 +81,10 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         script_name="draw_rocker_arm_support.py",
     ),
     DrawingSpec(
-        name="lever_bushing",
-        part="lever_bushing",
-        artifact_stem="lever-bushing",
-        script_name="draw_lever_bushing.py",
-    ),
-    DrawingSpec(
         name="cone_tip_bushing",
         part="cone_tip_bushing",
         artifact_stem="cone-tip-bushing",
         script_name="draw_cone_tip_bushing.py",
-    ),
-    DrawingSpec(
-        name="pivot_bushing",
-        part="pivot_bushing",
-        artifact_stem="pivot-bushing",
-        script_name="draw_pivot_bushing.py",
     ),
     DrawingSpec(
         name="fulcrum_shaft",

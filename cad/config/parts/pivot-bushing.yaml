@@ -1,9 +1,0 @@
-pivot-bushing:
-  number: MHA-064
-  material: Brass
-  material_specification: C36000 free-machining brass
-  finish: turned, deburred, oiled
-  quantity: 19
-  tolerance_class: machined_block
-  fit_class: shaft_in_bushing
-  process: "machined (brass)"

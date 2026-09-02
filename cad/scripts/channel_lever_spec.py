@@ -32,6 +32,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "FulcrumProfile": {"FulcrumDia"},
 }
 
+# Integral fulcrum hub (2026-09-02 photo re-derive, ch17 p.40 page002_img03):
+# the levers stack hub-to-hub on the fulcrum shaft at the station pitch; the
+# 19 `lever-bushing` spacers are retired. OD = the old bushing's O12.
+HUB_DIA = 12.0
+HUB_LENGTH = 7.0565  # == machine channels.station_pitch_mm (asserted by the build)
+
 DRAWING_NOTES = "\n".join(
     (
         "1. MACHINE FROM CONTINUOUS-CAST FLAT STOCK.",
@@ -46,6 +52,9 @@ DRAWING_NOTES = "\n".join(
         "6. SPRING-HOLE AND TIP R3 CENTRES ARE NOT CONCENTRIC.",
         "7. PROFILE FCF APPLIES ALL AROUND OUTER PERIMETER",
         "   EXCEPT DATUM C; STRAIGHTS TANGENT TO RADII.",
+        f"8. INTEGRAL HUB DIA {HUB_DIA:.2f} X {HUB_LENGTH:.2f} LONG ON THE",
+        "   FULCRUM BORE, PROUD 2.03 EACH FACE; HUB FACES",
+        "   SET THE STATION PITCH (NO SPACERS).",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"

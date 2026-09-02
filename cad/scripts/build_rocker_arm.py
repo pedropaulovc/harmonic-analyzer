@@ -84,7 +84,8 @@ from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from rocker_arm_notes import DRAWING_NOTES, ISOMETRIC_VIEW_NOTE
 from rocker_arm_notes import DRAWING_DIMENSIONS
-from rocker_arm_spec import SURFACE_FINISHES
+from rocker_arm_spec import ARM_THICKNESS as SPEC_ARM_THICKNESS, HUB_DIA, HUB_LENGTH, SURFACE_FINISHES
+import _config
 
 PART_NAME = "rocker-arm"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
@@ -96,6 +97,12 @@ TOP_ARC_LEN = 292.1  # top edge arc length = 11.5" (ch.30 back view, manual)
 BOT_ARC_LEN = 266.7  # bottom edge arc length = 10.5" (ch.30 back-view sketch)
 TIP_FACE = 5.588  # 0.22" tip face, PERPENDICULAR to the top edge (ch.30 sketch)
 PIVOT_HOLE_DIA = 6.5  # rides the 6.35 pivot shaft (DIMENSIONS.md ch14, derived)
+# The hub length IS the station pitch: hub faces of neighbouring arms touch.
+if abs(HUB_LENGTH - _config.machine("channels", "station_pitch_mm")) > 1e-6:
+    raise AssertionError("rocker_arm_spec.HUB_LENGTH must equal the channel station pitch")
+HUB_PROUD = (HUB_LENGTH - ARM_THICKNESS) / 2.0  # 2.278 each face
+if ARM_THICKNESS != SPEC_ARM_THICKNESS:
+    raise AssertionError("rocker_arm_spec.ARM_THICKNESS drifted from the build")
 # rod pin hole: was Ø2.0 drill, now #47 (Ø1.994) native Hole Wizard feature
 ROD_HOLE_X = 127.3738 - MECHANISM_X_SHIFT
 # bottom-arc end (132.76): solved so the pin sits DIRECTLY ABOVE the phased cam
@@ -207,6 +214,8 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "ArmThickness", f"{ARM_THICKNESS}mm")
     await set_global(adapter, "TipFaceLen", f"{TIP_FACE}mm")
     await set_global(adapter, "PivotHoleDia", f"{PIVOT_HOLE_DIA}mm")
+    await set_global(adapter, "HubDia", f"{HUB_DIA}mm")
+    await set_global(adapter, "HubLength", f"{HUB_LENGTH}mm")
     await set_global(adapter, "RodHoleX", f"{ROD_HOLE_X}mm")
     # (The old RodHoleDia/RodHoleX knobs are gone: the rod pin hole is now a native
     # Hole Wizard #47 feature whose diameter comes from the drill standard; its
@@ -354,6 +363,35 @@ async def build(adapter) -> dict[str, str]:
     v_strap = _strap_area() * ARM_THICKNESS
     await volume_check(adapter, "strap", v_strap, 0.01 * v_strap)
 
+    # Integral pivot hub (2026-09-02, ch14 p.28): a O10 boss coaxial with the
+    # pivot bore, HUB_LENGTH long mid-plane (= the station pitch), so it stands
+    # HUB_PROUD of each strap face and touches the neighbour arms' hubs. The
+    # circle (r 5 about (0, ArmDepth/2)) lies inside the 16-deep strap, so the
+    # boss only ADDS the two proud discs. Cut BEFORE the pivot hole so the bore
+    # runs through hub + strap.
+    hub = SketchDims()
+    check("create_sketch hub", await adapter.create_sketch("Front"))
+    await define_circle(
+        adapter, 0.0, _mid_y(0.0), HUB_DIA / 2.0, "hub",
+        dims=hub,
+        names=("HubX", "HubZ", "HubDia"),
+        drives=(None, '"ArmDepth" / 2', '"HubDia"'),
+    )
+    await ensure_fully_defined(adapter, "hub sketch")
+    check("exit_sketch hub", await adapter.exit_sketch())
+    name_last_feature(adapter, "HubProfile")
+    drive_jobs += hub.apply(adapter, "HubProfile")
+    check(
+        "extrude hub",
+        await adapter.create_extrusion(
+            ExtrusionParameters(depth=HUB_LENGTH, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "Hub")
+    drive_jobs.append(("D1@Hub", '"HubLength"'))
+    v_hub = math.pi * (HUB_DIA / 2.0) ** 2 * (HUB_LENGTH - ARM_THICKNESS)
+    await volume_check(adapter, "strap + hub", v_strap + v_hub, 0.01 * v_strap)
+
     # Pivot pin hole on the axis (x 0), mid-depth. On-axis centre: define_circle
     # records only the centre-Z dim (the X is a relation) + the diameter -- TWO
     # dims, so the "X" name/drive slot is ignored. The centre sits at
@@ -422,15 +460,14 @@ async def build(adapter) -> dict[str, str]:
         drive_b='"CenterY"', drive_jobs=drive_jobs,
     )
 
-    # Both bores are full-thickness through the 2.5 strap, entirely inside the
-    # material, so each removes pi*r^2*thickness.
+    # The pivot bore runs the full hub length; the rod bore only the 2.5 strap.
     rod_dia = NUMBER_DRILL_MM["#47"]
-    v_pivot = math.pi * (PIVOT_HOLE_DIA / 2.0) ** 2 * ARM_THICKNESS
+    v_pivot = math.pi * (PIVOT_HOLE_DIA / 2.0) ** 2 * HUB_LENGTH
     v_rod = math.pi * (rod_dia / 2.0) ** 2 * ARM_THICKNESS
     # The tip faces are cut into the SKETCH profile (not a 3D chamfer feature), so
     # _strap_area already accounts for them: the bored-strap volume is tight.
     v_measured = await volume_check(
-        adapter, "bored strap", v_strap - v_pivot - v_rod, 0.01 * v_strap
+        adapter, "bored strap + hub", v_strap + v_hub - v_pivot - v_rod, 0.01 * v_strap
     )
 
     # Apply the deferred drive equations now -- after the whole model + a rebuild

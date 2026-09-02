@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from rocker_arm_spec import (
     ARM_DEPTH,
+    ARM_THICKNESS,
     BOT_ARC_LEN,
     CENTER_Y,
     PIVOT_MID_Y,
@@ -19,6 +20,8 @@ from rocker_arm_spec import (
     R_TOP,
     TIP_FACE,
     TOP_ARC_LEN,
+    HUB_DIA,
+    HUB_LENGTH,
 )
 
 # True free-text instructions only; geometry / datum structure / roughness live
@@ -49,6 +52,10 @@ DRAWING_NOTES = "\n".join(
         f"5. EACH END: {TIP_FACE:.2f} RADIAL LAND PERP TO",
         "   TOP EDGE; STRAIGHT TAPER TO BOTTOM ARC.",
         "6. PIVOT HOLE: REAM +0.03/0, Ra 1.6.",
+        f"7. INTEGRAL HUB DIA {HUB_DIA:.2f} X {HUB_LENGTH:.2f} LONG ON THE",
+        f"   PIVOT BORE, PROUD {(HUB_LENGTH - ARM_THICKNESS) / 2.0:.2f} EACH FACE;",
+        "   HUB FACES SET THE STATION PITCH AGAINST",
+        "   THE NEIGHBOUR HUBS (NO SPACERS).",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"

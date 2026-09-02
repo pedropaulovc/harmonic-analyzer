@@ -567,7 +567,6 @@ _FLIP_INVERT: frozenset[str] = frozenset(
         "hanger screw head plane",
         "knob wheel axial",
         "lever axial seat",
-        "lever bushing axial z",
         "lift rod axial",
         "mag lever depth @npn",
         "mag lever knife line across @npn",
@@ -589,7 +588,6 @@ _FLIP_INVERT: frozenset[str] = frozenset(
         "pivot bracket datum y",
         "pivot bracket datum z",
         "pivot bracket datum y @npn",
-        "pivot bushing axial z",
         "platen feed snapshot",
         # (was "rack pinion disc axial" -- the 120T disc's label became "reducer
         # disc" in the PR #196 real-train rework; same mate, same learned side.

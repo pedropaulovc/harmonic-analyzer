@@ -22,13 +22,13 @@ gear") and keyframes `v4_transgear_001..013`.
 | 5 | platen paper holder spring | two overlapping slotted brass strips + a round knurled screw at each end (ch22 p.54) | open -- `build_platen_clip` rework |
 | 6 | knife mounts: unpainted heat-treated steel | ch18 p.42: bare hardened steel blocks | material + colour + notes |
 | 7 | knife mount holes too big | Ø16 bore around a 8.7 x 10.3 hex | bore Ø12 |
-| 8 | no bushings between rocker arms; integral hubs | ch14 p.28 `page002_img02`: every arm carries a stepped hub each side | PR B: arm hub bosses, 19 pivot bushings retired |
+| 8 | no bushings between rocker arms; integral hubs | ch14 p.28 `page002_img02`: every arm carries a stepped hub each side | DONE (PR B): O10 x 7.0565 hub on every arm, O12 on every lever; both bushing parts retired; rockers seat PITCH off the previous rocker |
 | 9 | pivot brackets L-shaped, base matches the support | ch14 p.27/28; the pass-2 foot (24) overhung the 16.93 apex and its holes fell outside the casting | foot 16 x 24 along Z, ear at the inboard end, Ø16 ball on the ear |
 | 10 | measuring stick numerals | 0..10 engraved right of each full tick, ~2 mm (ch16 p.34) | DXF numerals |
 | 11 | tube frame too tall above the top frame | ch30 p002: columns end just above the corner bosses | COLUMN_LENGTH 1014 -> 994 |
 | 12 | crank handle too stubby | ch11 p.14 / ch30 p002 | 44 -> 58 long, Ø25 -> Ø21 |
 | 13 | guide lock too tall | ch22 p.54 | 19 -> 15 |
-| 14 | lever bushings do not exist | ch17 p.40: levers stack with their own spacers | PR B: retire `lever-bushing` |
+| 14 | lever bushings do not exist | ch17 p.40: levers stack with their own spacers | DONE (PR B) |
 | 15 | gooseneck attaches the spring via an end screw | ch19 p.45 `page001_img02`: slotted screw axially in the arm end, eye on the shank | lug + X-pin -> end screw |
 | 16 | stop block | ch16 p.34: square block, knurled thumbscrew UNDERNEATH | `build_measuring_stick_stop` rework |
 | 17 | amplitude-bar fan / rocker sinusoidal setup as configurations | ch14 p.28-29 fan; end views at 0/6/14/40 cranks | PR C -- user decision 2026-09-02: DEFAULT = fanned arms + level bars (matches the ch30 eight views); a second config poses the sinusoidal setup (ch14 end views at a chosen crank count); a third keeps today's parallel bank for comparison |

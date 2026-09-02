@@ -114,7 +114,7 @@ def test_module_deps_are_transitive():
     import (so parts.yaml-driven custom properties stay correctly tracked)."""
     links = _helper_names("build_chain_inner_link.py")
     assert {"_chain_link", "_chain", "_common"} <= links, links
-    assert "_config" in _helper_names("build_lever_bushing.py"), (
+    assert "_config" in _helper_names("build_cone_tip_bushing.py"), (
         "lazy _config edge lost"
     )
 

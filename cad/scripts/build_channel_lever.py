@@ -35,6 +35,8 @@ Run (SolidWorks already open)::
 from __future__ import annotations
 
 import math
+
+import _config
 import sys
 
 from _common import (
@@ -68,6 +70,8 @@ from channel_lever_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     ISOMETRIC_VIEW_NOTE,
+    HUB_DIA,
+    HUB_LENGTH,
 )
 
 PART_NAME = "channel-lever"
@@ -78,6 +82,9 @@ LEVER_SPRING_X = 177.8  # DIMENSIONS.md ch17: fulcrum->spring-hole c2c, 7" (deri
 BAR_TALL = 9.5  # DIMENSIONS.md ch17: bar height, p.39 vs spring OD (low)
 LEVER_THICKNESS = 3.0  # DIMENSIONS.md ch17: fits 7.06 pitch + 3.2 bar slot (derived)
 PIVOT_HOLE_DIA = 6.5  # DIMENSIONS.md ch17: rides the 6.35 fulcrum shaft (derived)
+if abs(HUB_LENGTH - _config.machine("channels", "station_pitch_mm")) > 1e-6:
+    raise AssertionError("channel_lever_spec.HUB_LENGTH must equal the channel station pitch")
+HUB_PROUD = (HUB_LENGTH - LEVER_THICKNESS) / 2.0  # 2.028 each face
 BAR_PIN_X = 127.0  # 5" from the fulcrum (bar line -72.9, fulcrum -199.9)
 # bar pin hole: was Ø2.0 drill, now #47 (Ø1.994) native Hole Wizard feature.
 # spring eye hole: was Ø4.0 drill, now #21 (Ø4.039) native Hole Wizard feature
@@ -229,6 +236,40 @@ async def build(adapter) -> dict[str, str]:
     expected = area * LEVER_THICKNESS
     await volume_check(adapter, "lever outline", expected, 0.005 * expected)
 
+    # Integral fulcrum hub (2026-09-02, ch17 p.40): O12 boss on the origin,
+    # HUB_LENGTH long mid-plane (= the station pitch). r 6 > the 4.75 half-bar,
+    # so the boss also stands proud of the bar's edges in-plane: the added
+    # volume is the full cylinder minus its overlap with the body (the r 4.75
+    # nose half-disc on x < 0, the strip |y| < 4.75 clipped by the circle on
+    # x >= 0).
+    await set_global(adapter, "HubDia", f"{HUB_DIA}mm")
+    await set_global(adapter, "HubLength", f"{HUB_LENGTH}mm")
+    hub = SketchDims()
+    check("create_sketch hub", await adapter.create_sketch("Front"))
+    await define_circle(
+        adapter, 0.0, 0.0, HUB_DIA / 2.0, "hub", dims=hub,
+        names=("HubCx", "HubCz", "HubDia"),
+        drives=(None, None, '"HubDia"'),
+    )
+    await ensure_fully_defined(adapter, "hub sketch")
+    check("exit_sketch hub", await adapter.exit_sketch())
+    name_last_feature(adapter, "HubProfile")
+    drive_jobs += hub.apply(adapter, "HubProfile")
+    check(
+        "extrude hub",
+        await adapter.create_extrusion(
+            ExtrusionParameters(depth=HUB_LENGTH, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "Hub")
+    drive_jobs.append(("D1@Hub", '"HubLength"'))
+    _r, _h = HUB_DIA / 2.0, HALF_BAR
+    _half_strip = _h * math.sqrt(_r**2 - _h**2) + _r**2 * math.asin(_h / _r)
+    _overlap = _half_strip + math.pi * _h**2 / 2.0
+    v_hub = math.pi * _r**2 * HUB_LENGTH - _overlap * LEVER_THICKNESS
+    expected += v_hub
+    await volume_check(adapter, "lever + hub", expected, 0.005 * expected)
+
     # Fulcrum hole (Ø6.5, rides the fulcrum shaft): a bearing bore, kept a plain
     # circle cut. On the origin, so only its diameter is a dim.
     fulcrum = SketchDims()
@@ -249,7 +290,7 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "FulcrumHole")
-    v_fulcrum = math.pi * (PIVOT_HOLE_DIA / 2.0) ** 2 * LEVER_THICKNESS
+    v_fulcrum = math.pi * (PIVOT_HOLE_DIA / 2.0) ** 2 * HUB_LENGTH  # through the hub
     expected -= v_fulcrum
     await volume_check(adapter, "fulcrum hole", expected, 0.005 * expected)
 
