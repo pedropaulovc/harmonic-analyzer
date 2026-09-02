@@ -34,3 +34,13 @@ GLBs in durable sessions. Hard-won usage notes (2026-07-17, filed as issues #93â
   PR #339 (Codex caught it committed).
 - Schema discovery: `meshprobe schema --kind commands` (no per-command lookup);
   invalid preset/enum values error with the valid list â€” cheap discovery trick.
+
+- **Worker timeout (2026-09-01):** `meshprobe open` on the 105 MB whole-machine
+  `harmonic-analyzer.glb` dies with `Invalid value: timed out` -- the daemon's Blender
+  worker has a hard-coded `DEFAULT_WORKER_TIMEOUT_SECONDS = 180` in
+  `meshprobe/controller.py` (no env/CLI override; `client.py` derives its read timeout
+  from it). Either patch that constant in `.venv` (session-local -- `uv sync` reverts
+  it; then `meshprobe kill --all` so the daemon restarts) or, cheaper, open the
+  per-subassembly GLBs from the release bundle (`pen.glb` 141 KB .. `channel.glb`
+  69 MB) -- every part is in one of them. `meshprobe find` needs a PATTERN or
+  `--name` (a bare `*` is expanded by the shell -- quote it).
