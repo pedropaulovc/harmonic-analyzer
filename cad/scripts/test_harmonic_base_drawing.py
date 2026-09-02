@@ -79,7 +79,8 @@ def test_notes_cover_the_top_plate_reveal_and_seats() -> None:
     assert "MASK DATUM A/B/C FACES AND ALL BORES/THREADS" in notes
     assert "COAT PAD SIDES, ROOTS AND RIM" in notes
     assert "DECK INSIDE THE RIM: BLACK" in notes
-    assert "VERTICAL PLAN CORNERS C3.18 X 45 DEG BOTH PLATES" in notes
+    assert "VERTICAL PLAN CORNERS: FLANGE R22.22, PAD AND RIM R15.88" in notes
+    assert "RIM INNER CORNERS R8.88" in notes
     assert "FLANGE TOP RIM" in notes
     assert "RAISED RIM 7.00 WIDE X 2.50 HIGH" in notes
     assert "AND UNDERSIDE RIM C1.59 X 45 DEG" in notes

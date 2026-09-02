@@ -38,7 +38,6 @@ from _common import (
     apply_material,
     bbox_extent_check,
     check,
-    define_polygon_chain,
     define_rectilinear_chain,
     drive_dimension,
     ensure_fully_defined,
@@ -113,7 +112,14 @@ CBORE_XZ = HOLE_XZ  # all four heads counterbored
 # the R0.50 root fillet note 1 already caps (a cutter-corner radius). All
 # hole features sit >= 26 from every plate edge, so no break touches a rim
 # or seat.
-CORNER_CHAMFER = 0.125 * IN  # 3.175 legs, vertical plan corners
+# Plan corners are ROUNDED, not chamfered (2026-09 photo re-derive): every
+# ch30 plate (p002/p003 front corners, p006 rear) shows the casting's vertical
+# corners as one large radius running the full height, flange and pad
+# together. 7/8 in on the flange; the pad's radius is 1/4 in smaller so the
+# two arcs stay concentric across the 1/4 in reveal, and the raised rim's
+# inner corners follow LIP_W further in.
+FLANGE_CORNER_R = 0.875 * IN  # 22.225
+PAD_CORNER_R = FLANGE_CORNER_R - (BOTTOM_LENGTH - TOP_LENGTH) / 2.0  # 15.875
 RIM_CHAMFER = 0.0625 * IN  # 1.5875 legs, top rims + underside rim
 PAD_ROOT_R = 0.5  # pad-to-flange root fillet (note 1: R0.50 MAX)
 
@@ -129,6 +135,8 @@ PAD_ROOT_R = 0.5  # pad-to-flange root fillet (note 1: R0.50 MAX)
 # by >= 1.0.
 LIP_W = 7.0  # rim width, in from the pad outline
 LIP_H = 2.5  # rim height above the deck
+RIM_INNER_R = PAD_CORNER_R - LIP_W  # 8.875: the deck pocket's plan corners
+RIM_OVERLAP = 1.0  # the ring starts this far below the pad top so it merges
 
 # Cone swing hardware, blind from the TOP face. MACHINE-handed part coords,
 # and since #151 the drive-train derivation is machine-handed too, so the
@@ -253,19 +261,20 @@ def _fillet_section_area(r: float) -> float:
     return (1.0 - math.pi / 4.0) * r * r
 
 
-def _plan_perimeter(length: float, width: float) -> float:
-    """Plate outline length after the 45-degree plan-corner chamfers.
+def _plan_perimeter(length: float, width: float, corner_r: float) -> float:
+    """Outline length of a length x width rectangle with corner_r plan corners.
 
-    Each corner trades two CORNER_CHAMFER legs for one sqrt(2) flat. A rim
-    section swept along this polyline removes area x perimeter; the eight
-    blunt 135-degree vertices contribute only O(section^3) corner patches,
-    absorbed by the check tolerances.
+    A rim section swept along this outline removes (or, for a root fillet,
+    adds) area x perimeter; the corner arcs are tangent to the sides, so
+    there are no vertex patches to absorb.
     """
-    return (
-        2.0 * (length + width)
-        - 8.0 * CORNER_CHAMFER
-        + 4.0 * CORNER_CHAMFER * math.sqrt(2.0)
-    )
+    return 2.0 * (length + width) - 8.0 * corner_r + 2.0 * math.pi * corner_r
+
+
+def _corner_removal(corner_r: float, height: float) -> float:
+    """Volume four plan-corner fillets of corner_r remove from a height-tall
+    rectangular prism (or ADD when the corners are reentrant)."""
+    return 4.0 * _fillet_section_area(corner_r) * height
 
 
 async def _define_fixed_edge_rectangle(
@@ -532,71 +541,124 @@ async def build(adapter) -> dict[str, str]:
             )
         after = after_cut
 
-    # Edge finishing (chamfer external, fillet internal). Plan corners
-    # FIRST: the rim breaks then run along the chamfered outline whose
-    # length _plan_perimeter gives exactly. Corner flats are separate
-    # non-tangent edges, so every rim loop selects its four side edges AND
-    # its four corner-flat edges explicitly.
+    # Raised rim FIRST (2026-09 photo re-derive, see LIP_W): one ring feature
+    # -- outer rectangle on the pad's plan outline, inner rectangle LIP_W in --
+    # boss-extruded from RIM_OVERLAP below the pad top to LIP_H above it, so
+    # it merges into the pad and its outer faces continue the pad sides. Net
+    # material: the ring over LIP_H. Top-plane sketch: (x, y) -> (X, -Z).
+    half_x, half_z = TOP_LENGTH / 2.0, TOP_WIDTH / 2.0
+    outer_pts = [
+        (-half_x, -half_z), (half_x, -half_z), (half_x, half_z), (-half_x, half_z),
+    ]
+    inner_pts = [
+        (-half_x + LIP_W, -half_z + LIP_W), (half_x - LIP_W, -half_z + LIP_W),
+        (half_x - LIP_W, half_z - LIP_W), (-half_x + LIP_W, half_z - LIP_W),
+    ]
+    check("create_sketch rim", await adapter.create_sketch("Top"))
+    outer_lines = await add_line_chain(adapter, outer_pts)
+    inner_lines = await add_line_chain(adapter, inner_pts)
+    await define_rectilinear_chain(adapter, outer_lines, outer_pts, label="rim outer")
+    await define_rectilinear_chain(adapter, inner_lines, inner_pts, label="rim inner")
+    await ensure_fully_defined(adapter, "rim sketch")
+    check("exit_sketch rim", await adapter.exit_sketch())
+    name_last_feature(adapter, "RimProfile")
+    extrude_at_offset(adapter, RIM_OVERLAP + LIP_H, total - RIM_OVERLAP)
+    name_last_feature(adapter, "Rim")
+    a_ring = TOP_LENGTH * TOP_WIDTH - (TOP_LENGTH - 2.0 * LIP_W) * (TOP_WIDTH - 2.0 * LIP_W)
+    v_lip = a_ring * LIP_H
+    after = await volume_check(adapter, "raised rim", after + v_lip, 0.01 * v_lip + 5.0)
+    deck_top = total + LIP_H
+
+    # Plan corners: one full-height radius per plate. The flange's four
+    # vertical corner edges at FLANGE_CORNER_R; the pad + rim (one merged
+    # side face, so one edge from the flange top to the rim top) at the
+    # concentric PAD_CORNER_R; then the rim's four reentrant inner corners at
+    # RIM_INNER_R so the lip stays LIP_W wide round the corner.
     check(
-        "chamfer plan corners",
-        await adapter.add_chamfer(
-            CORNER_CHAMFER,
+        "fillet flange plan corners",
+        await adapter.add_fillet(
+            FLANGE_CORNER_R,
             [
-                [
-                    sx * BOTTOM_LENGTH / 2.0,
-                    BOTTOM_THICKNESS / 2.0,
-                    sz * BOTTOM_WIDTH / 2.0,
-                ]
+                [sx * BOTTOM_LENGTH / 2.0, BOTTOM_THICKNESS / 2.0, sz * BOTTOM_WIDTH / 2.0]
                 for sx in (-1.0, 1.0)
                 for sz in (-1.0, 1.0)
-            ]
-            + [
+            ],
+        ),
+    )
+    name_last_feature(adapter, "FlangeCorners")
+    v_flange_corners = _corner_removal(FLANGE_CORNER_R, BOTTOM_THICKNESS)
+    after = await volume_check(
+        adapter, "flange plan corners", after - v_flange_corners, 0.01 * v_flange_corners + 2.0
+    )
+    check(
+        "fillet pad plan corners",
+        await adapter.add_fillet(
+            PAD_CORNER_R,
+            [
+                [sx * TOP_LENGTH / 2.0, (BOTTOM_THICKNESS + deck_top) / 2.0, sz * TOP_WIDTH / 2.0]
+                for sx in (-1.0, 1.0)
+                for sz in (-1.0, 1.0)
+            ],
+        ),
+    )
+    name_last_feature(adapter, "PadCorners")
+    v_pad_corners = _corner_removal(PAD_CORNER_R, deck_top - BOTTOM_THICKNESS)
+    after = await volume_check(
+        adapter, "pad plan corners", after - v_pad_corners, 0.01 * v_pad_corners + 2.0
+    )
+    check(
+        "fillet rim inner corners",
+        await adapter.add_fillet(
+            RIM_INNER_R,
+            [
                 [
-                    sx * TOP_LENGTH / 2.0,
-                    total - TOP_THICKNESS / 2.0,
-                    sz * TOP_WIDTH / 2.0,
+                    sx * (TOP_LENGTH / 2.0 - LIP_W),
+                    total + LIP_H / 2.0,
+                    sz * (TOP_WIDTH / 2.0 - LIP_W),
                 ]
                 for sx in (-1.0, 1.0)
                 for sz in (-1.0, 1.0)
             ],
         ),
     )
-    name_last_feature(adapter, "CornerBreaks")
-    v_corners = 4.0 * (CORNER_CHAMFER**2 / 2.0) * total
+    name_last_feature(adapter, "RimInnerCorners")
+    v_rim_corners = _corner_removal(RIM_INNER_R, LIP_H)  # reentrant: ADDS
     after = await volume_check(
-        adapter, "plan corner breaks", after - v_corners, 0.01 * v_corners + 2.0
+        adapter, "rim inner corners", after + v_rim_corners, 0.05 * v_rim_corners + 2.0
     )
 
-    def _rim_points(half_x: float, y_rim: float, half_z: float) -> list[list[float]]:
-        """One rim loop: four side-edge midpoints + four corner-flat midpoints."""
-        flat_x = half_x - CORNER_CHAMFER / 2.0
-        flat_z = half_z - CORNER_CHAMFER / 2.0
+    def _rim_points(
+        half_x: float, y_rim: float, half_z: float, corner_r: float
+    ) -> list[list[float]]:
+        """One rim loop: four side-edge midpoints + four corner-arc midpoints."""
+        arc_x = half_x - corner_r + corner_r / math.sqrt(2.0)
+        arc_z = half_z - corner_r + corner_r / math.sqrt(2.0)
         return [
             [0.0, y_rim, -half_z],
             [0.0, y_rim, half_z],
             [half_x, y_rim, 0.0],
             [-half_x, y_rim, 0.0],
         ] + [
-            [sx * flat_x, y_rim, sz * flat_z]
+            [sx * arc_x, y_rim, sz * arc_z]
             for sx in (-1.0, 1.0)
             for sz in (-1.0, 1.0)
         ]
 
-    # Top rims: 1/16 in x 45-degree breaks on both plates' exposed top
-    # perimeter edges (the flange's reveal rim and the pad's top rim).
+    # Top rims: 1/16 in x 45-degree breaks on the flange's reveal rim and the
+    # raised rim's top outer perimeter.
     check(
         "chamfer top rims",
         await adapter.add_chamfer(
             RIM_CHAMFER,
-            _rim_points(BOTTOM_LENGTH / 2.0, BOTTOM_THICKNESS, BOTTOM_WIDTH / 2.0)
-            + _rim_points(TOP_LENGTH / 2.0, total, TOP_WIDTH / 2.0),
+            _rim_points(BOTTOM_LENGTH / 2.0, BOTTOM_THICKNESS, BOTTOM_WIDTH / 2.0, FLANGE_CORNER_R)
+            + _rim_points(TOP_LENGTH / 2.0, deck_top, TOP_WIDTH / 2.0, PAD_CORNER_R),
         ),
     )
     name_last_feature(adapter, "TopRimBreaks")
     rim_area = RIM_CHAMFER**2 / 2.0
     v_rims = rim_area * (
-        _plan_perimeter(BOTTOM_LENGTH, BOTTOM_WIDTH)
-        + _plan_perimeter(TOP_LENGTH, TOP_WIDTH)
+        _plan_perimeter(BOTTOM_LENGTH, BOTTOM_WIDTH, FLANGE_CORNER_R)
+        + _plan_perimeter(TOP_LENGTH, TOP_WIDTH, PAD_CORNER_R)
     )
     after = await volume_check(
         adapter, "top rim breaks", after - v_rims, 0.02 * v_rims + 5.0
@@ -607,11 +669,11 @@ async def build(adapter) -> dict[str, str]:
         "chamfer underside rim",
         await adapter.add_chamfer(
             RIM_CHAMFER,
-            _rim_points(BOTTOM_LENGTH / 2.0, 0.0, BOTTOM_WIDTH / 2.0),
+            _rim_points(BOTTOM_LENGTH / 2.0, 0.0, BOTTOM_WIDTH / 2.0, FLANGE_CORNER_R),
         ),
     )
     name_last_feature(adapter, "BottomEdgeBreak")
-    v_break = rim_area * _plan_perimeter(BOTTOM_LENGTH, BOTTOM_WIDTH)
+    v_break = rim_area * _plan_perimeter(BOTTOM_LENGTH, BOTTOM_WIDTH, FLANGE_CORNER_R)
     after = await volume_check(
         adapter, "underside edge break", after - v_break, 0.02 * v_break + 5.0
     )
@@ -619,52 +681,21 @@ async def build(adapter) -> dict[str, str]:
     # Pad root: the one INTERNAL wall junction -- the pad sides meeting the
     # flange top face -- filleted at the R0.50 note 1 caps (the cutter-corner
     # radius that machining the reveal leaves anyway). Reentrant: ADDS
-    # material along the pad's chamfered base outline.
+    # material along the pad's rounded base outline.
     check(
         "fillet pad root",
         await adapter.add_fillet(
             PAD_ROOT_R,
-            _rim_points(TOP_LENGTH / 2.0, BOTTOM_THICKNESS, TOP_WIDTH / 2.0),
+            _rim_points(TOP_LENGTH / 2.0, BOTTOM_THICKNESS, TOP_WIDTH / 2.0, PAD_CORNER_R),
         ),
     )
     name_last_feature(adapter, "PadRootFillet")
-    v_root = _fillet_section_area(PAD_ROOT_R) * _plan_perimeter(TOP_LENGTH, TOP_WIDTH)
+    v_root = _fillet_section_area(PAD_ROOT_R) * _plan_perimeter(
+        TOP_LENGTH, TOP_WIDTH, PAD_CORNER_R
+    )
     after = await volume_check(
         adapter, "pad root fillet", after + v_root, 0.05 * v_root + 3.0
     )
-
-    # Raised rim: one ring feature (outer octagon on the pad's chamfered plan
-    # outline + inner rectangle LIP_W in) boss-extruded from RIM_CHAMFER below
-    # the pad top up to LIP_H above it. Starting below the top fills the
-    # TopRimBreaks chamfer notch along the pad's outer edge (the lip's outer
-    # faces continue the pad sides), so the net material added is the ring
-    # over LIP_H plus that notch. Top-plane sketch: (x, y) -> (X, -Z).
-    half_x, half_z = TOP_LENGTH / 2.0, TOP_WIDTH / 2.0
-    cc = CORNER_CHAMFER
-    outer_pts = [
-        (-half_x + cc, -half_z), (half_x - cc, -half_z),
-        (half_x, -half_z + cc), (half_x, half_z - cc),
-        (half_x - cc, half_z), (-half_x + cc, half_z),
-        (-half_x, half_z - cc), (-half_x, -half_z + cc),
-    ]
-    inner_pts = [
-        (-half_x + LIP_W, -half_z + LIP_W), (half_x - LIP_W, -half_z + LIP_W),
-        (half_x - LIP_W, half_z - LIP_W), (-half_x + LIP_W, half_z - LIP_W),
-    ]
-    check("create_sketch rim", await adapter.create_sketch("Top"))
-    outer_lines = await add_line_chain(adapter, outer_pts)
-    inner_lines = await add_line_chain(adapter, inner_pts)
-    await define_polygon_chain(adapter, outer_lines, outer_pts, label="rim outer")
-    await define_rectilinear_chain(adapter, inner_lines, inner_pts, label="rim inner")
-    await ensure_fully_defined(adapter, "rim sketch")
-    check("exit_sketch rim", await adapter.exit_sketch())
-    name_last_feature(adapter, "RimProfile")
-    extrude_at_offset(adapter, RIM_CHAMFER + LIP_H, total - RIM_CHAMFER)
-    name_last_feature(adapter, "Rim")
-    a_outer = TOP_LENGTH * TOP_WIDTH - 2.0 * cc * cc
-    a_inner = (TOP_LENGTH - 2.0 * LIP_W) * (TOP_WIDTH - 2.0 * LIP_W)
-    v_lip = (a_outer - a_inner) * LIP_H + rim_area * _plan_perimeter(TOP_LENGTH, TOP_WIDTH)
-    after = await volume_check(adapter, "raised rim", after + v_lip, 0.01 * v_lip + 5.0)
 
     # Apply the deferred drive equations after the whole model exists, then
     # re-check neutrality against the as-built volume. Frame components are
