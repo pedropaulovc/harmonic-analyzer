@@ -1,34 +1,45 @@
 ---
 name: codex-drawing-image-review
-description: "No-context machinist review of drawing PNGs via codex exec gpt-5.6-sol high — command recipe (stdin prompt, NOT inline), what it catches, when to stop"
-metadata:
+description: Blind machinist review of drawing PNGs is now a repo script (cad/scripts/machinist_review.py) with a policy-calibrated prompt; the old gap-hunting prompt produced the over-engineered fleet
+metadata: 
+  node_type: memory
   type: feedback
+  originSessionId: dd57a3c2-7d38-4878-8a31-99f6cc6dadb1
+  modified: 2026-09-02T16:57:27.210Z
 ---
 
-Pedro's flow for validating manufacturing drawings (2026-07-11): render the sheet PNG, then have codex review the IMAGE with zero repo context, role-played as a machinist handed one sheet.
+Pedro's flow for validating manufacturing drawings: render the sheet PNG, then have
+Codex (gpt-5.6-sol, high) review the IMAGE with zero repo context as a senior
+machinist. 2026-09-02: the flow is now `uv run cad/scripts/machinist_review.py
+<name>... | --all --jobs N`, prompts in `cad/scripts/prompts/`, reports under
+`cad/out/reports/machinist-review/` (index.md + per-sheet json/md/events).
 
-**Why:** it catches what the pipeline's gates cannot — a geometrically impossible note (90° spot drill × 0.5 deep cannot open Ø8), features hidden in every view, missing taper direction, dims that read as contradictions (a window height outside the view reads as an overall height). Two rounds took the crank-arm print from "cannot manufacture" to "machinable as a pre-assembly blank" (the intended state).
+**Why the prompt was recalibrated:** the earlier ad-hoc prompts ("is this print
+manufacturable/certifiable as a standalone drawing? list missing tolerances,
+datums, finish, threads...") rewarded the reviewer for GAPS, so two months of
+rounds grew ~125 FCFs, 100+ datums, Ra on hand-crank bores and 5-12-line notes —
+exactly what Pedro flagged as "way too overengineered". The new prompt (distilled
+from Harvey *Machine Shop Trade Secrets* ch. 9 and Lipton *Sink or Swim* ch. 2-3)
+reads the title block as the general spec, scores **over-specification as a
+defect**, and encodes hidden-lines-on / one origin / drill-vs-ream / few notes.
+Standard: `cad/docs/drawing-simplicity-policy.md`. Baseline check: the old
+crank-arm sheet came back FIX with 11 over-spec findings naming every datum,
+frame and boxed basic — the calibration works.
 
-**Command recipe** (run from an EMPTY dir so it has no context):
+**Mechanics that matter:**
+- Isolation is by COPY: PNG + schema copied into a mktemp dir, `-C` there,
+  `--ignore-user-config --ignore-rules --skip-git-repo-check --ephemeral
+  --sandbox read-only`, prompt on stdin. `--ignore-user-config` drops the config
+  model, so `-m`/`-c model_reasoning_effort` are passed explicitly.
+- `--json` event stream is scanned for tool/command events; any hit marks the
+  review `blind: false` and fails it.
+- `--output-schema` strict JSON: `{verdict SHIP|FIX, summary, blockers[],
+  over_specification[], clarity[], minor[]}`; pass = SHIP with the three gating
+  lists empty. ~200-330 s per sheet at high effort.
+- Run it from the REPO ROOT with an absolute script path — the Bash cwd drifts
+  after `cd cad/scripts` and `uv run cad/scripts/...` then fails to spawn.
 
-```
-codex exec --sandbox danger-full-access --skip-git-repo-check \
-  -C <empty-dir> -m gpt-5.6-sol -c model_reasoning_effort=high \
-  -i <sheet.png> - < prompt.txt
-```
-
-- **Pass the prompt via stdin (`- < prompt.txt`), never inline** — the command-chain-separator hook mangles a long quoted prompt argument after `&&`/`cd`, and codex then dies with "No prompt provided via stdin".
-- Prompt shape: "experienced machinist, NO other context, could you manufacture this part from this sheet alone? Report (1) blockers (2) ambiguities/contradictions (3) standards/readability (4) items to confirm."
-
-**How to apply:** triage findings into (a) cheap note-text fixes — do them; (b) view/layout changes (hidden-lines-visible view, dim repositioning) — do if one rebuild; (c) foundation-level (GD&T frames, title-block rows, watermark, decimal display) — file on the foundations PR instead. Stop after ~2 rounds ([[codex-review-diminishing-returns]]); the reviewer will always want a full production drawing package.
-
-**UPDATE 2026-07-21 — the broken-sandbox belt is GONE; isolate by PNG COPY.**
-On codex-cli 0.144.6 the default sandbox EXECUTES shell commands (the 0.142.x
-"orchestrator_helper_launch_failed" wall this note and
-[[drawing-fanout-orchestration]] leaned on is fixed), and an `-i` path inside
-the repo is a road back in: run exactly per the old recipe, codex read
-`_drawing_registry.py`, ran `git status`, and cited MHA numbers in a "blind"
-review. The reliable isolation is to **copy the PNG into the neutral mktemp dir
-and pass the COPY's path** — nothing in the invocation then references the repo.
-Keep `--ignore-user-config --ignore-rules`; drop any reliance on the sandbox
-failing.
+**How to apply:** rebuild the sheet, run the script, fix blockers and every
+over-spec/clarity item that the policy agrees with; a clarity finding that asks
+for a package item the policy forbids is declined, not fixed. Judge rounds by
+finding quality ([[codex-review-diminishing-returns]]).
