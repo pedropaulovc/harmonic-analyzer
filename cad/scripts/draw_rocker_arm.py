@@ -22,7 +22,7 @@ import math
 import sys
 from typing import Any
 
-from rocker_arm_spec import GEOMETRIC_TOLERANCES_MM
+from rocker_arm_spec import ARM_DEPTH, GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
 from _common import CAD_ROOT, check, run_build
@@ -255,7 +255,13 @@ async def build(adapter: Any) -> dict[str, str]:
     # Datum B (broad face, on the end view) orients the hole axes; datum C
     # (the +X tip face) clocks rotation about the pivot axis, so the X/Y BASIC
     # coordinates above have an inspectable direction.
-    broad_face = (RIGHT_CENTER[0] - ARM_THICKNESS / 2000.0, RIGHT_CENTER[1])
+    # Datum B on the strap's broad face in the end view, picked ABOVE the hub
+    # band (the O10 hub hides the flank over y 3..13 since 2026-09-02); the
+    # end view is centred on the strap's mid-depth (_PIVOT_MID_Y).
+    broad_face = (
+        RIGHT_CENTER[0] - ARM_THICKNESS / 2000.0,
+        RIGHT_CENTER[1] + (ARM_DEPTH - 1.0 - _PIVOT_MID_Y) * _S / 1000.0,
+    )
     add_datum_feature(
         adapter,
         right,
