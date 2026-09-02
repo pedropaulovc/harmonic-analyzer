@@ -573,7 +573,7 @@ _CONTACT_OFF_X = BAR_WIDTH / 2.0
 _CONTACT_OFF_Y = BAR_FOOT_NOTCH - BAR_CONTACT_GAP
 
 
-def _arc_geometry() -> dict[str, float]:
+def _arc_geometry(ring_center: tuple[float, float] | None = None) -> dict[str, float]:
     """Amplitude-independent rocker/rod kinematics + the top-edge arc centre.
 
     Rod-pin point P: |P - pivot| = ARM_ROD_LEVER (127.583) and
@@ -582,7 +582,7 @@ def _arc_geometry() -> dict[str, float]:
     pivot hole at local (0, 8).
     """
     ox, oy = PIVOT
-    cx, cy = RING_CENTER
+    cx, cy = RING_CENTER if ring_center is None else ring_center
     dx, dy = cx - ox, cy - oy
     d = math.hypot(dx, dy)
     a = (ARM_ROD_LEVER**2 - ROD_C2C**2 + d * d) / (2.0 * d)
@@ -620,6 +620,32 @@ def _arc_geometry() -> dict[str, float]:
 
 
 _ARC = _arc_geometry()
+
+
+def cam_lobe_angle_deg(crank_turns: float, harmonic_n: int) -> float:
+    """Cam lobe direction after ``crank_turns`` crank turns, measured from +Y
+    toward +X (the RING_CENTER convention): rest = GEAR_PHASE_DEG; cylinder gear
+    k turns k/80 rev per crank rev (ch29 gear law) in the sense that LOWERS its
+    world yaw (drive-train spike 2026-09-02: +45 deg on the crank read -11.25 on
+    the k = 20 gear), i.e. the lobe swings +X-ward."""
+    return GEAR_PHASE_DEG + 360.0 * crank_turns * harmonic_n / 80.0
+
+
+def ring_center_at(lobe_deg: float) -> tuple[float, float]:
+    """The rod ring centre riding the cam with its lobe at ``lobe_deg``."""
+    return (
+        X_DRUM + CAM_ECC * math.sin(math.radians(lobe_deg)),
+        Y_DRIVE + CAM_ECC * math.cos(math.radians(lobe_deg)),
+    )
+
+
+def solve_cam_pose(crank_turns: float, harmonic_n: int) -> dict[str, float]:
+    """Rocker/rod pose of one channel after ``crank_turns`` crank turns: the
+    ring follows its cam, the rod hangs from the rocker pin, the rocker tilts
+    about the pivot (the same two-circle closure as the rest pose)."""
+    ring = ring_center_at(cam_lobe_angle_deg(crank_turns, harmonic_n))
+    g = _arc_geometry(ring)
+    return {**g, "ring_x": ring[0], "ring_y": ring[1]}
 # LEVEL rest pose is authored, not incidental: ROD_HOLE_X / ROD_C2C /
 # RING_CENTER are co-solved so the neutral arm sits flat (ch14 end views,
 # 0-crank tip row). Any drift here means one of those constants moved without
@@ -941,6 +967,111 @@ def _spring_spec(amplitude: float, hole_x_0: float) -> dict[str, Any]:
         "uy": dy / gap,
         "theta": math.degrees(math.atan2(-dx, dy)),
     }
+
+
+# --- saved pose configurations (2026-09-02, cad/config/poses.yaml) ------------
+# Default stays the free rest model. Each pose configuration unsuppresses the
+# permanent POSE_<key> mates (authored from the DOF manifest at rest) and sets
+# their values IN THAT CONFIGURATION ONLY; see _pose_configs.
+from _pose_configs import (  # noqa: E402
+    PoseConfiguration,
+    author_pose_mates,
+    install_pose_configurations,
+    repose_fixed_component,
+    wrap_deg,
+    yaw_deg,
+)
+
+
+def _pose_tolerance_ok(got: float, want: float, tol: float) -> bool:
+    return abs(got - want) <= tol
+
+
+async def _install_pose_configurations(
+    adapter, amplitudes, spring_specs, spring_instances, hole_x_0
+) -> None:
+    poses = _config.poses()
+    fan = poses["amplitude_fan"]
+    sinus = poses["sinusoid"]
+    fan_amps = [float(a) for a in fan["amplitude_mm"]][:CHANNELS]
+    if len(fan_amps) != CHANNELS or any(a < 0.0 for a in fan_amps):
+        raise RuntimeError(f"poses.yaml amplitude_fan needs {CHANNELS} amplitudes >= 0")
+    crank_turns = float(sinus["crank_turns"])
+    harmonics = [int(row["harmonic_n"]) for row in _config.channels()][:CHANNELS]
+
+    specs = collected_dof_specs()
+    pose_mates = await author_pose_mates(adapter, specs)
+    rest_values = {k: m.rest for k, m in pose_mates.items()}
+    rest_bar_x = {j: component_transform(adapter, f"amplitude-bar-{j + 1}")[9] * 1000.0 for j in range(CHANNELS)}
+    rest_spring = {j: component_transform(adapter, spring_instances[j]) for j in range(CHANNELS)}
+
+    # --- amplitude fan: the bars slide along the arcs, the levers + springs follow
+    fan_values = dict(rest_values)
+    for j, a in enumerate(fan_amps):
+        fan_values[f"bar_amplitude_{j:02d}"] = PIVOT[0] + a
+
+    async def fan_hook(adapter) -> None:
+        # Re-pose the cosmetic springs to the fanned lever tips (Default's
+        # length variants: the bottom eye stays on its plate hook, the top eye
+        # follows the span direction -- the lift, <= ~6 mm at a = 80, is the
+        # stretch a config cannot re-cut; documented in poses.yaml).
+        for j, a in enumerate(fan_amps):
+            new = _spring_spec(a, hole_x_0)
+            old = spring_specs[j]
+            ux, uy = new["ux"], new["uy"]
+            pos = [hole_x_0 + SPRING_BOTTOM_LEAD * ux, PLATE_EYE_Y + SPRING_BOTTOM_LEAD * uy, z_station(j) + ARM_MID_DZ]
+            delta = math.degrees(math.atan2(old["ux"] * uy - old["uy"] * ux, old["ux"] * ux + old["uy"] * uy))
+            await repose_fixed_component(adapter, spring_instances[j], pos, delta)
+
+    def fan_verify(adapter) -> None:
+        bad = []
+        for j, a in enumerate(fan_amps):
+            x = component_transform(adapter, f"amplitude-bar-{j + 1}")[9] * 1000.0
+            if not _pose_tolerance_ok(x, rest_bar_x[j] + a, 0.05):
+                bad.append((j, round(x - rest_bar_x[j], 3), a))
+        if bad:
+            raise RuntimeError(f"amplitude-fan: bars off their amplitudes (j, got, want): {bad[:5]}")
+        log(f"amplitude-fan: {CHANNELS} bars at their amplitudes (0..{max(fan_amps):.1f})")
+
+    # --- sinusoid: every cam turned N cranks, rods + rockers on their cams
+    sin_values = dict(rest_values)
+    expect = {}
+    rest0 = _arc_geometry()
+    for j, k in enumerate(harmonics):
+        st = solve_cam_pose(crank_turns, k)
+        sin_values[f"rocker_angle_{j:02d}"] = rest_values[f"rocker_angle_{j:02d}"] + (st["pin_y"] - rest0["pin_y"])
+        sin_values[f"rod_swing_{j:02d}"] = abs(st["ring_x"])
+        expect[j] = st
+
+    def sin_verify(adapter) -> None:
+        bad = []
+        for j, st in expect.items():
+            t = component_transform(adapter, f"rocker-arm-{j + 1}")
+            tilt = wrap_deg(yaw_deg(t) - 180.0)  # arm rows = Rz(tilt) . Ry180
+            rod = component_transform(adapter, f"connecting-rod-{j + 1}")
+            rx, ry = rod[9] * 1000.0, rod[10] * 1000.0
+            if not (_pose_tolerance_ok(tilt, st["arm_tilt"], 0.05)
+                    and _pose_tolerance_ok(rx, st["ring_x"], 0.05)
+                    and _pose_tolerance_ok(ry, st["ring_y"], 0.05)):
+                bad.append((j, round(tilt, 3), round(st["arm_tilt"], 3), round(rx, 2), round(st["ring_x"], 2), round(ry, 2), round(st["ring_y"], 2)))
+        if bad:
+            raise RuntimeError(f"{sinus['configuration']}: rockers/rods off their cams (j, tilt, want, rx, want, ry, want): {bad[:5]}")
+        log(f"{sinus['configuration']}: {CHANNELS} rockers on their cams after {crank_turns:g} cranks")
+
+    await install_pose_configurations(
+        adapter,
+        pose_mates,
+        [
+            PoseConfiguration(fan["configuration"], "ch15 p.30 amplitude-bar fan (poses.yaml)", fan_values, hook=fan_hook, verify=fan_verify),
+            PoseConfiguration(sinus["configuration"], f"ch14 p.28 rocker sinusoid, {crank_turns:g} cranks (poses.yaml)", sin_values, verify=sin_verify),
+        ],
+        interference=check_no_interference,
+    )
+    # the spring bank in Default is exactly where the batch put it
+    for j in range(CHANNELS):
+        t = component_transform(adapter, spring_instances[j])
+        if max(abs(a - b) for a, b in zip(t[:12], rest_spring[j][:12], strict=True)) > 1e-6:
+            raise RuntimeError(f"spring {spring_instances[j]} moved in Default")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -1892,9 +2023,14 @@ async def build(adapter) -> dict[str, str]:
     # vertical-only trap does not apply (nothing is re-derived from a mate).
     for spec in grounded_specs:
         spec["ground"] = True
-    await place_components_batch(
+    bank_names = await place_components_batch(
         adapter, grounded_specs, label="cosmetic bank (springs + hooks, grounded)"
     )
+    spring_instances = [
+        n for n, spec in zip(bank_names, grounded_specs, strict=True) if spec.get("kind") == "spring"
+    ]
+    if len(spring_instances) != CHANNELS:
+        raise RuntimeError(f"expected {CHANNELS} spring instances, got {len(spring_instances)}")
 
     # Free kinematic model: the per-channel operational DOF (rocker swing +
     # rod follow + bar amplitude) are FREE -- their drivers were recorded into
@@ -1922,6 +2058,9 @@ async def build(adapter) -> dict[str, str]:
     )
     write_dof_manifest(ASM_NAME)
     check_no_interference(adapter)
+    # Saved pose configurations (poses.yaml): the amplitude-bar fan and the
+    # rocker sinusoid, on top of the free Default the gates above just proved.
+    await _install_pose_configurations(adapter, amplitudes, spring_specs, spring_instances, hole_x_0)
     # Title-block identity for the assembly drawing (draw_channel_assembly.py):
     # assembly_title_properties supplies the Title/Generator and TOL_* cells
     # finalize_drawing requires without consulting the part registry;

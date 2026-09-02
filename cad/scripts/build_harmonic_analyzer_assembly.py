@@ -63,6 +63,7 @@ from _assembly import (
 from _transforms import IDENTITY
 from _interference_contracts import allowed_interference_pairs
 
+import _config
 import _telemetry
 
 ASM_NAME = "harmonic-analyzer"
@@ -104,7 +105,6 @@ SUBASSEMBLIES = (
 # (STOP_DECK_GAP above it) and the bar rides SLOT_FLOOR + half the window
 # clearance above the block bottom. STICK_POS.y (the graduated top face) is
 # therefore derived from the stop's constants, never a literal.
-import _telemetry  # noqa: E402
 from build_measuring_stick import (  # noqa: E402
     BODY_THICKNESS as STICK_THICK,
     BODY_WIDTH as STICK_WIDTH,
@@ -165,6 +165,48 @@ def _subassembly(name: str) -> str:
     return str(path)
 
 
+# --- saved pose configurations at the top (2026-09-02, poses.yaml) -------------
+# The top carries no pose mates of its own: each pose configuration points the
+# posed subassemblies at THEIR same-named configuration (per-configuration
+# referenced configuration, CompConfigProperties5) and re-proves the
+# cross-subassembly fits there -- the sinusoid's rods must still ride the
+# drive-train's turned cams.
+from _pose_configs import PoseConfiguration, install_pose_configurations  # noqa: E402
+
+
+async def _install_top_pose_configurations(adapter, sub_instances: dict[str, str]) -> None:
+    from solidworks_mcp.adapters.base import SetComponentConfigurationParameters
+
+    poses = _config.poses()
+    fan_name = poses["amplitude_fan"]["configuration"]
+    sin_name = poses["sinusoid"]["configuration"]
+
+    def _selector(targets: dict[str, str]):
+        async def hook(adapter) -> None:
+            for sub, cfg in targets.items():
+                check(
+                    f"{sub_instances[sub]} -> configuration {cfg!r}",
+                    await adapter.set_component_configuration(
+                        SetComponentConfigurationParameters(name=sub_instances[sub], configuration=cfg)
+                    ),
+                )
+        return hook
+
+    await install_pose_configurations(
+        adapter,
+        {},
+        [
+            PoseConfiguration(fan_name, "amplitude fan: channel posed (poses.yaml)", hook=_selector({"channel": fan_name})),
+            PoseConfiguration(
+                sin_name,
+                "rocker sinusoid: channel + drive-train posed (poses.yaml)",
+                hook=_selector({"channel": sin_name, "drive-train": sin_name}),
+            ),
+        ],
+        interference=lambda a: check_no_interference(a, allowed_pairs=allowed_interference_pairs(ASM_NAME)),
+    )
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         ComponentRefParameters,
@@ -172,6 +214,7 @@ async def build(adapter) -> dict[str, str]:
     )
 
     check("create_assembly", await adapter.create_assembly())
+    sub_instances: dict[str, str] = {}
 
     for name in SUBASSEMBLIES:
         data = check(
@@ -185,6 +228,7 @@ async def build(adapter) -> dict[str, str]:
             ),
         )
         comp = data["name"]
+        sub_instances[name] = comp
         if not data.get("fixed"):
             check(
                 f"fix {name}",
@@ -209,6 +253,7 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         allowed_pairs=allowed_interference_pairs(ASM_NAME),
     )
+    await _install_top_pose_configurations(adapter, sub_instances)
 
     # Title-block identity for the top assembly drawing
     # (draw_harmonic_analyzer_assembly.py): assembly_title_properties supplies

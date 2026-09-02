@@ -1917,6 +1917,76 @@ async def _place_on_shaft(
     )
 
 
+# --- saved pose configuration: the rocker sinusoid's gear state ----------------
+# After N whole crank turns the crank and the cone train are back at rest (the
+# 16:64 crank drive turns the cone shaft N/4 times and every cone gear has 6k
+# teeth: an integer number of tooth pitches), but cylinder gear k has turned
+# 360 N k / 80 -- an integer number of ITS tooth pitches too (120 teeth, 3 deg),
+# so only the integral CAM (and notch) moves. The pose configuration therefore
+# suppresses the gear mates (config-scoped) and rotates each cylinder gear by
+# its residual about the arbor; the channel's rods/rockers are posed to the same
+# lobe angles (build_channel_assembly.solve_cam_pose) and the top-level
+# interference check proves the rings still ride their cams.
+from _pose_configs import (  # noqa: E402
+    PoseConfiguration,
+    install_pose_configurations,
+    wrap_deg,
+    yaw_deg,
+)
+
+
+async def _install_sinusoid_gear_pose(adapter) -> None:
+    from solidworks_mcp.adapters.base import RotateComponentParameters
+
+    sinus = _config.poses()["sinusoid"]
+    n_ch = _config.active_count()  # the built cylinder ladder
+    crank_turns = float(sinus["crank_turns"])
+    harmonics = [int(row["harmonic_n"]) for row in _config.channels()][:n_ch]
+    residual = {j: wrap_deg(-360.0 * crank_turns * k / 80.0) for j, k in enumerate(harmonics)}
+    mates = check("list mates", await adapter.list_mates())
+    gear_mates = [m["name"] for m in mates if str(m.get("type", "")) == "MateGearDim"]
+    if len(gear_mates) < n_ch:
+        raise RuntimeError(f"expected >= {n_ch} gear mates, found {len(gear_mates)}")
+    rest_yaw = {j: yaw_deg(component_transform(adapter, f"cylinder-gear-{j + 1}")) for j in range(n_ch)}
+
+    async def hook(adapter) -> None:
+        for j in range(n_ch):
+            name = f"cylinder-gear-{j + 1}"
+            t = component_transform(adapter, name)
+            origin = [t[9] * 1000.0, t[10] * 1000.0, t[11] * 1000.0]
+            check(
+                f"rotate {name} {residual[j]:+.3f} deg",
+                await adapter.rotate_component(
+                    RotateComponentParameters(name=name, angle=residual[j], axis_vector=[0.0, 0.0, 1.0], axis_point=origin)
+                ),
+            )
+
+    def verify(adapter) -> None:
+        bad = []
+        for j in range(n_ch):
+            got = wrap_deg(yaw_deg(component_transform(adapter, f"cylinder-gear-{j + 1}")) - rest_yaw[j])
+            if abs(wrap_deg(got - residual[j])) > 0.01:
+                bad.append((j, round(got, 3), round(residual[j], 3)))
+        if bad:
+            raise RuntimeError(f"{sinus['configuration']}: cylinder gears off their residuals (j, got, want): {bad[:5]}")
+        log(f"{sinus['configuration']}: {n_ch} cylinder gears at their {crank_turns:g}-crank residuals")
+
+    await install_pose_configurations(
+        adapter,
+        {},
+        [
+            PoseConfiguration(
+                sinus["configuration"],
+                f"ch14 p.28 rocker sinusoid, {crank_turns:g} cranks: cylinder gears at their residual angles (poses.yaml)",
+                suppress_mates=gear_mates,
+                hook=hook,
+                verify=verify,
+            )
+        ],
+        interference=lambda a: check_no_interference(a, allowed_pairs=allowed_interference_pairs(ASM_NAME)),
+    )
+
+
 async def build(adapter) -> dict[str, str]:
     # Reset the free-DOF manifest buffer before any *_driver(free_dof_key=...)
     # call: each freed DOF is recorded (never authored) and persisted below.
@@ -3665,6 +3735,7 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         allowed_pairs=allowed_interference_pairs(ASM_NAME),
     )
+    await _install_sinusoid_gear_pose(adapter)
     # Title-block identity for the assembly drawing (draw_drive_train_assembly.py):
     # assembly_title_properties supplies the Title/Generator and TOL_* cells
     # finalize_drawing requires without consulting the part registry;
