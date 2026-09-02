@@ -234,14 +234,21 @@ async def build(adapter: Any) -> dict[str, str]:
         # persistence check for freely positioned annotations.
         position_tolerance_m=0.0001,
     )
-    # Ra on the bore at 6 o'clock, and a position FCF tying the rod-pin hole
-    # to the complete A-B-C datum reference frame.
-    pivot_bottom = _sheet_xy(0.0, _PIVOT_MID_Y - PIVOT_HOLE_DIA / 2.0)
+    # Ra on the bore rim at 7:30 -- oblique to both centre-mark axes like the
+    # datum above: since the integral hub (2026-09-02) the 6 o'clock point on
+    # the bore lies on the centre mark's vertical extension and the coordinate
+    # pick resolved to the hub's O10 rim instead of the O6.5 bore edge. Then a
+    # position FCF tying the rod-pin hole to the complete A-B-C frame.
+    pivot_finish_angle = math.radians(225.0)
+    pivot_bottom = _sheet_xy(
+        pivot_radius * math.cos(pivot_finish_angle),
+        _PIVOT_MID_Y + pivot_radius * math.sin(pivot_finish_angle),
+    )
     add_surface_finish(
         adapter,
         front,
         edge_xy=pivot_bottom,
-        symbol_xy=(pivot_bottom[0] + 0.010, pivot_bottom[1] - 0.020),
+        symbol_xy=(pivot_bottom[0] - 0.012, pivot_bottom[1] - 0.020),
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bore"),
         label="pivot bore finish",
     )
