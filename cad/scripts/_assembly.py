@@ -2199,6 +2199,7 @@ _ALLOWED_FREE_STEMS: dict[str, tuple[str, ...]] = {
         "transgear-knob-shaft",
         "transgear-pinion",
         "transgear-removable",
+        "transgear-thumbnut",  # rides the free knob shaft (lock-mated), 2026-09-02
     ),
 }
 
