@@ -1249,14 +1249,17 @@ async def build(adapter) -> dict[str, str]:
             label=f"channel-lever ch{j:02d}",
         )
 
-        # J1 rocker revolute (shaft OD ↔ pivot bore). Axial Z chains off the
-        # PREVIOUS channel's rocker: the two hubs touch face to face, so the
-        # mid-planes sit one PITCH apart (2026-09-02, integral hubs; was a
-        # PITCH/2 seat on a spacer bushing). Channel 0 is the single global Z
-        # anchor (#110 neighbour idiom, request #4). The spin is a freed DOF:
-        # recorded, not authored, so the rocker swings about its pivot.
+        # J1 rocker revolute (shaft OD ↔ pivot bore). Axial Z: the hubs stack
+        # face to face from channel 0's rocker (integral hubs, 2026-09-02), so
+        # rocker j sits j * PITCH off CHANNEL 0's rocker mid-plane -- always the
+        # authored anchor, never a copied slice's own rocker: CopyWithMates2
+        # re-binds any reference to a copied component onto the copy, so a
+        # 'previous rocker' reference collapsed the first copy's seat onto
+        # itself (swFeatureErrorMateIlldefine, 2026-09-02). Channel 0 is the
+        # single global Z anchor. The spin is a freed DOF: recorded, not
+        # authored, so the rocker swings about its pivot.
         axial = (
-            ("distance", rocker_by_channel[j - 1], PITCH) if j >= 1 else ("datum",)
+            ("distance", rocker_by_channel[0], j * PITCH) if j >= 1 else ("datum",)
         )
         await _revolute(
             adapter,
@@ -1426,7 +1429,7 @@ async def build(adapter) -> dict[str, str]:
             "channel-lever": lever,
         }
 
-    def _slice_slots(seed_comps: dict[str, str]) -> dict[str, Any]:
+    def _slice_slots(seed_comps: dict[str, str], seed_j: int) -> dict[str, Any]:
         """Measure the seed slice's CopyWithMates2 slot layout: the array
         length, the J1a dim's Values slot index, the seed parts' as-authored
         transform arrays (the pose targets every copy is landed on) and their
@@ -1467,10 +1470,10 @@ async def build(adapter) -> dict[str, str]:
                 f"external dim {dim['name']!r} is not the J1a rocker->rocker"
                 f" axial (owners {sorted(dim['owners'])})"
             )
-        if abs(dim["mm"] - PITCH) > 0.01:
+        if abs(dim["mm"] - seed_j * PITCH) > 0.01:
             raise RuntimeError(
-                f"J1a seed value {dim['mm']:.3f} mm != PITCH"
-                f" {PITCH:.3f} -- the axial anchor moved"
+                f"J1a seed value {dim['mm']:.3f} mm != {seed_j} x PITCH"
+                f" {seed_j * PITCH:.3f} -- the axial anchor moved"
             )
         # The seed's J1a side is CARRIED to each copy (flips[dim_slot]) via the
         # Repeat=false + own-bushing idiom, so any seed side is honoured; the
@@ -1532,20 +1535,20 @@ async def build(adapter) -> dict[str, str]:
             continue
         seed_j, seed_comps = seed
         if seed_j not in slots_by_seed:
-            slots_by_seed[seed_j] = _slice_slots(seed_comps)
+            slots_by_seed[seed_j] = _slice_slots(seed_comps, seed_j)
         slice_info = slots_by_seed[seed_j]
         n_slice, dim_slot = slice_info["n"], slice_info["dim_slot"]
         seed_arrays = slice_info["arrays"]
-        # Re-point ONLY the J1a slot to the PREVIOUS channel's rocker (hub on
-        # hub; Repeat=false + NewEntityToMateTo) at the LOCAL PITCH seat -- exactly
+        # Re-point ONLY the J1a slot to channel 0's rocker (the hub-stack anchor;
+        # Repeat=false + NewEntityToMateTo) at j * PITCH -- exactly
         # the authored #110 neighbour idiom -- honouring the seed's side via
         # flips[dim_slot]. The other two external slots (J1 radial on the shared
         # pivot-shaft) keep the seed's references (Repeat=true), the measured
         # mixed-array idiom. This drops the old cumulative always-positive ladder
         # off the seed's bushing (see _cwm.py module doc).
-        prev_rocker = rocker_by_channel[j - 1]
+        prev_rocker = rocker_by_channel[0]  # the hub-stack anchor (authored channel 0)
         values = [0.0] * n_slice
-        values[dim_slot] = PITCH / 1000.0
+        values[dim_slot] = (j * PITCH) / 1000.0
         repeat = [True] * n_slice
         repeat[dim_slot] = False
         new_ents: list = [None] * n_slice
@@ -1700,7 +1703,7 @@ async def build(adapter) -> dict[str, str]:
             raise
         log(
             f"ch{j:02d} <- CopyWithMates2 of ch{seed_j:02d}"
-            f" (J1a PITCH {PITCH:.2f} mm <- previous rocker"
+            f" (J1a {j * PITCH:.2f} mm <- channel 0 rocker"
             f" {rec['prev_rocker']}, driven to pose + freed)"
         )
 
