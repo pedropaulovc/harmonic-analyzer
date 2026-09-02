@@ -60,11 +60,13 @@ shape: a ~5-wide block with a flat bright top, ~15 tall, thicker than the
 arm-to-arm gap of 4.56 bounds the thickness at 2.9 symmetric). The bars'
 feet are plain (page001_img02: the notch in the bar itself straddles the arm).
 
-Open after PR #658 (2026-09-02): the ROCKER-ARM ROD-END TIP. ch14 page002_img02
-(the 16 mm callout photo) and page002_img10 (cos(10x)) show each arm's rod
-end STEPPED: the top edge drops a few mm a short way before the tip, and the
-rod's head sits in/at that step (a bright small block at every tip). The CAD
-arm ends in a plain radial land with the head beside it. Read the step
-depth/length off page002_img02 at the 16 mm scale (~4 x 5) before modelling;
-it changes the strap outline (rocker_arm_spec TIP_FACE region) and the
-rod-head seat.
+Open after PR #658 (2026-09-02): the ROD HEAD IS A CLEVIS. ch14 page002_img02
+zoomed 4x at the arm tips: every rod ends in a bright U-shaped yoke whose two
+prongs straddle the arm's tip (pin through prongs + arm), and the arm's top
+edge steps DOWN ~2 mm over the last ~6 mm so the prong tops sit flush with
+it. The end views' bright square tops are those prongs + the arm between
+(~6 wide). PR #658's 5 x 15 block beside the arm is closer than the tombstone
+but still not this. Before modelling: the CAD rod plane sits 4.05 off the arm
+plane (CAM_DZ -3.25 vs ARM_MID_DZ 0.8, the cam on the gear's far face), so a
+clevis centred on the arm needs a cranked shank -- or CAM_DZ re-read from
+the ch13 photos. Also the arm tip's top-edge step (rocker_arm_spec outline).
