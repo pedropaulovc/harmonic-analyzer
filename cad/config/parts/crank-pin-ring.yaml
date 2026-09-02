@@ -1,0 +1,7 @@
+crank-pin-ring:
+  number: MHA-128
+  material: Brass
+  finish: "bright"
+  tolerance_class: visual_noncritical
+  quantity: 1
+  process: "formed brass wire, ends silver-soldered"

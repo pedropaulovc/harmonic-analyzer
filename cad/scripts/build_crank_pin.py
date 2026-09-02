@@ -29,6 +29,7 @@ from _common import (
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
+    define_circle,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -45,6 +46,8 @@ from _drawing_marks import (
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from crank_pin_spec import (
+    RING_HOLE_DIA,
+    RING_HOLE_X,
     BIG_END_DIA,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
@@ -59,7 +62,7 @@ MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import RevolveParameters
+    from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 
     check("create_part", await adapter.create_part())
 
@@ -67,6 +70,8 @@ async def build(adapter) -> dict[str, str]:
     # suffix is load-bearing (INCH document; the equation manager reads bare
     # numbers in document units).
     await set_global(adapter, "PinLength", f"{PIN_LENGTH}mm")
+    await set_global(adapter, "RingHoleX", f"{RING_HOLE_X}mm")
+    await set_global(adapter, "RingHoleDia", f"{RING_HOLE_DIA}mm")
     await set_global(adapter, "BigEndDia", f"{BIG_END_DIA}mm")
     await set_global(adapter, "SmallEndDia", f"{SMALL_END_DIA}mm")
 
@@ -139,6 +144,32 @@ async def build(adapter) -> dict[str, str]:
     r1, r2 = BIG_END_DIA / 2.0, SMALL_END_DIA / 2.0
     v_pin = math.pi * PIN_LENGTH / 3.0 * (r1 * r1 + r1 * r2 + r2 * r2)
     await volume_check(adapter, "pin", v_pin, 0.005 * v_pin)
+
+    # Keeper-ring cross-hole: a Front-plane circle at (RING_HOLE_X, 0) cut
+    # mid-plane along Z clean through the head (both directions, depth well
+    # past the big end). Removed ~ a cylinder through the local pin diameter.
+    ring_hole = SketchDims()
+    check("create_sketch ring hole", await adapter.create_sketch("Front"))
+    await define_circle(
+        adapter, RING_HOLE_X, 0.0, RING_HOLE_DIA / 2.0, "ring hole", dims=ring_hole,
+        names=("RingHoleX", "RingHoleY", "RingHoleDia"),
+        drives=('"RingHoleX"', None, '"RingHoleDia"'),
+    )
+    await ensure_fully_defined(adapter, "ring hole sketch")
+    check("exit_sketch ring hole", await adapter.exit_sketch())
+    name_last_feature(adapter, "RingHoleProfile")
+    drive_jobs += ring_hole.apply(adapter, "RingHoleProfile")
+    check(
+        "cut ring hole",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=2.0 * BIG_END_DIA, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "RingHole")
+    d_at_hole = BIG_END_DIA - (BIG_END_DIA - SMALL_END_DIA) * RING_HOLE_X / PIN_LENGTH
+    v_ring_hole = math.pi * (RING_HOLE_DIA / 2.0) ** 2 * d_at_hole
+    v_pin -= v_ring_hole
+    await volume_check(adapter, "pin with ring hole", v_pin, 0.1 * v_ring_hole)
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).

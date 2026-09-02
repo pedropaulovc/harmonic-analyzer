@@ -471,7 +471,8 @@ CRANK_ARM_Z0 = CRANKSHAFT_Z0  # arm PLATE south face: the hub band is
 # the chain when the crank turns (user, book p005). The placed pose composes a
 # Ry(180) (the plate's local +z extrusion runs machine -z), so the component
 # ORIGIN sits at the north face -- see CRANK_ARM_ORIGIN_Z.
-from crank_arm_spec import ARM_C2C  # noqa: E402  # 75: handle pivot from the
+from crank_arm_spec import ARM_C2C, ARM_WIDTH  # noqa: E402
+from crankshaft_spec import PIN_HOLE_HEIGHT  # noqa: E402  # 75: handle pivot from the
 # shaft axis (2026-09 front-view re-derive, see crank_arm_spec; was 66 from the
 # perspective-magnified side view, 150 before that)
 REMOVABLE_Z0 = -157.5  # mounted T12 (face 5.0): band -157.5..-152.5, mid -155 =
@@ -547,6 +548,24 @@ from build_crankshaft import (  # noqa: E402
 )
 
 CRANK_ARM_ORIGIN_Z = CRANK_ARM_Z0 + ARM_THICKNESS  # the arm origin's world z
+# Crank taper pin + keeper ring (ch11 p.14): pin axis along machine X through
+# the arm hub's mid-thickness (= the crankshaft's PIN_HOLE_HEIGHT above its
+# outboard end), big end PIN_PROUD outside the hub's -X face.
+from crank_pin_spec import (  # noqa: E402
+    PIN_LENGTH as CRANK_PIN_LENGTH,
+    RING_HOLE_DIA as PIN_RING_HOLE_DIA,
+    RING_HOLE_X as PIN_RING_HOLE_X,
+)
+from build_crank_pin_ring import RING_INNER_R as CRANK_RING_INNER_R  # noqa: E402
+
+PIN_PROUD = 3.0
+CRANK_PIN_Z = CRANK_ARM_Z0 + ARM_THICKNESS / 2.0  # -171: hub mid-thickness
+CRANK_PIN_X0 = X_CRANK - ARM_WIDTH / 2.0 - PIN_PROUD  # big end, -X of the hub
+CRANK_RING_Y = Y_CRANK - (PIN_RING_HOLE_DIA / 2.0 + 0.25 + CRANK_RING_INNER_R)
+if abs((CRANKSHAFT_Z0 + PIN_HOLE_HEIGHT) - CRANK_PIN_Z) > 1e-6:
+    raise AssertionError("crankshaft cross-hole is not at the arm hub's mid-thickness")
+if CRANK_PIN_X0 + CRANK_PIN_LENGTH < X_CRANK + ARM_WIDTH / 2.0 + 2.0:
+    raise AssertionError("crank pin does not run out the far side of the hub")
 # = the plate's NORTH face (-167): the placed rows compose a Ry(180), so the
 # +z-extruded plate fills CRANK_ARM_Z0..here running machine -z from the
 # origin. Both the place_component z and the crankshaft's SeatArm datum
@@ -2381,6 +2400,44 @@ async def build(adapter) -> dict[str, str]:
         [180.0, 0.0, -90.0],
         compose_rows(rot_z_rows(-90.0), ROT_Y_180),
         ground=False,
+    )
+    # Taper pin (2026-09-02, ch11 p.14): through the arm hub + the crankshaft
+    # cross-hole along machine X at the arm's mid-thickness, big end PIN_PROUD
+    # proud of the hub's outer (-X) face, the small end running out the far
+    # side; the brass keeper ring hangs from the head's cross-hole (0.25 air
+    # under the hole's bottom edge). Both lock to the arm so they spin with the
+    # crank. The pin's nominal taper is larger than the arm's #14 / shaft's #9
+    # pilot holes (they are taper-reamed together at assembly), so the two
+    # overlaps are volume-bounded allowed pairs in _interference_contracts.
+    pin = await place_component(
+        adapter,
+        "crank-pin",
+        [CRANK_PIN_X0, Y_CRANK, CRANK_PIN_Z],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        ground=False,
+        label="crank taper pin",
+    )
+    await lock_mate(
+        adapter,
+        named_ref(f"Front Plane@{pin}", "PLANE"),
+        named_ref(f"Front Plane@{arm}", "PLANE"),
+        label="crank pin locked to the arm",
+    )
+    ring = await place_component(
+        adapter,
+        "crank-pin-ring",
+        [CRANK_PIN_X0 + PIN_RING_HOLE_X, CRANK_RING_Y, CRANK_PIN_Z],
+        [90.0, 0.0, 0.0],
+        ROT_X_POS90,
+        ground=False,
+        label="crank pin keeper ring",
+    )
+    await lock_mate(
+        adapter,
+        named_ref(f"Front Plane@{ring}", "PLANE"),
+        named_ref(f"Front Plane@{pin}", "PLANE"),
+        label="keeper ring locked to the pin",
     )
     # Handle pivot rides the arm tip, now ARM_C2C below the crankshaft. Its grip
     # axis stays parallel to the crankshaft (ROT_Y_POS90 -> assembly -Z).
