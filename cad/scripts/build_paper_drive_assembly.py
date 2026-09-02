@@ -125,7 +125,13 @@ ROT_Y_180 = [[-1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, -1.0]]
 ROT_X_180 = [[1.0, 0.0, 0.0], [0.0, -1.0, 0.0], [0.0, 0.0, -1.0]]
 
 # --- machine anchors ---------------------------------------------------------
+from build_latch_strip import (  # noqa: E402
+    EYE_DIA as LATCH_STRIP_EYE_DIA,
+    SCREW_Y as LATCH_STRIP_SCREW_Y,
+    STRIP_T as LATCH_STRIP_T,
+)
 from build_support_bar import (  # noqa: E402
+    LATCH_HOLE_X as BAR_LATCH_HOLE_X,
     BAR_DEPTH,
     BAR_HEIGHT,
     BRACKET_HOLE_X as BAR_BRACKET_HOLE_X,  # MACHINE-handed (machine -X holes)
@@ -251,6 +257,30 @@ ARM_Z = (RACK_BACK_Z + BAR_BACK_Z) / 2.0  # -131.4: the arm's 2.6 band fits the
 BRACKET_Z0 = BAR_BACK_Z  # plate -129.9..-125.9 on the bar's back face
 STUB_Z0 = BRACKET_Z0 + BRACKET_THICK  # -125.9 (Rx-90: local +Y -> -Z)
 KNOB_SHAFT_Z0 = -157.5  # Rx+90: local +Y -> +Z (stack runs to the knob at the back)
+# Latch strip (2026-09, ch23 p.58 / 4/4 video): the bright spring strip
+# screwed to the bar's front face at the knob-shaft line, hanging down to an
+# eye over the knob shaft's O5 third-gear seat -- in the 1.5 band between the
+# third gear's back face and the seat shoulder, 0.25 air each side. Its
+# integral spacer boss packs the top out to the bar face.
+from build_transgear_knob_shaft import (  # noqa: E402
+    FRONT_LEN as KNOB_FRONT_LEN,
+    SEAT_DIA as KNOB_SEAT_DIA,
+    SEAT_LEN as KNOB_SEAT_LEN,
+)
+
+LATCH_STRIP_AIR = 0.25
+LATCH_STRIP_Z0 = THIRD_Z0 + THIRD_FACE + LATCH_STRIP_AIR  # -144.15
+_SEAT_SHOULDER_Z = KNOB_SHAFT_Z0 + KNOB_FRONT_LEN + KNOB_SEAT_LEN  # -142.9
+if LATCH_STRIP_Z0 + LATCH_STRIP_T + LATCH_STRIP_AIR > _SEAT_SHOULDER_Z + 1e-9:
+    raise AssertionError("latch strip does not fit the knob-shaft seat band")
+if LATCH_STRIP_EYE_DIA < KNOB_SEAT_DIA + 0.3:
+    raise AssertionError("latch strip eye too tight on the O5 seat")
+if abs(BAR_LATCH_HOLE_X - KNOB_SHAFT_XY[0]) > 0.01:
+    raise AssertionError(
+        f"support-bar latch hole x {BAR_LATCH_HOLE_X} != knob shaft {KNOB_SHAFT_XY[0]:.3f}"
+    )
+if abs((KNOB_SHAFT_XY[1] + LATCH_STRIP_SCREW_Y) - BAR_CY) > 0.01:
+    raise AssertionError("latch strip screw hole misses the bar mid-height")
 
 REMOVABLE_Z0 = -156.2  # mounted removables: face 2.4 about the -155 chain plane
 T24_MID_Z = REMOVABLE_Z0 + 1.2  # -155.0
@@ -1132,6 +1162,24 @@ async def build(adapter) -> dict[str, str]:
         named_ref(f"Front Plane@{feed}", "PLANE"),
         named_ref(f"Front Plane@{disc}", "PLANE"),
         label="feed pinion locked to the disc",
+    )
+    # Latch strip on the bar's front face, eye over the knob-shaft seat; its
+    # bracket-screw (identity: shank +Z into the bar, head in front).
+    await place_component(
+        adapter,
+        "latch-strip",
+        [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], LATCH_STRIP_Z0],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        label="latch-strip (spring latch of the swing cluster)",
+    )
+    await place_component(
+        adapter,
+        "bracket-screw",
+        [KNOB_SHAFT_XY[0], BAR_CY, LATCH_STRIP_Z0],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        label="latch-strip screw",
     )
     # Knob shaft on the latch's small hub: Rx(+90) runs local +Y to machine +Z
     # (removable seat at the chain plane, O5 third-gear seat, hub ride, knob).

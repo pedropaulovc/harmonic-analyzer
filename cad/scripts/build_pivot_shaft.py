@@ -1,9 +1,9 @@
 r"""Reproduction script: pivot shaft (book ch. 14 / ch. 17; 1 used).
 
-Plain Ø6.35 (1/4") x 203.2 (8") steel shaft carrying the 20 rocker arms
-at machine (x, y) = (-72.9, 253.8). Each end seats in a pivot-ball-mount's
-Ø6.5 cross-bore (north mount seated on the rocker-support at z +81.5,
-south mount on the A-frame clevis at z -111, M6.5); pivot-bushing spacers
+Plain Ø6.35 (1/4") x 170 steel shaft carrying the 20 rocker arms
+at machine (x, y) = (72.9, 253.8). Each end seats in a pivot-bracket's
+Ø6.5 cross-bore (both brackets on the rocker-arm-support's top, 78 either
+side of the stack centre, 2026-09); pivot-bushing spacers
 set the 7.0565 channel pitch along it. The top levers' fulcrum is the
 shorter build_fulcrum_shaft.py (182), which clears the west columns.
 

@@ -95,9 +95,24 @@ SUBASSEMBLIES = (
 # dropping the body onto the base with the graduated face up. POS.x = -175 so the
 # width runs -X into x -175..-183. euler [90,-90,0] is rows_from_euler of those
 # rows.
-STICK_POS = (-175.0, 53.8, -100.0)
+STICK_POS = (-170.0, 53.8, -100.0)  # 2026-09: 5 further inboard so the stop
+# block straddling it (14 across) clears the base rim's inner edge (x -183)
 STICK_EULER = [90.0, -90.0, 0.0]
 STICK_ROWS = [[0.0, 0.0, 1.0], [-1.0, 0.0, 0.0], [0.0, -1.0, 0.0]]
+from build_measuring_stick import (  # noqa: E402
+    BODY_WIDTH as STICK_WIDTH,
+    DIVISION_SPACING as STICK_DIVISION,
+    SCALE_START_X as STICK_SCALE_START,
+)
+
+STOP_MARK = 2.0  # the ch16 p.36 setting
+STOP_POS = (
+    STICK_POS[0] - STICK_WIDTH / 2.0,  # centred across the bar (part +Y -> machine -X)
+    STICK_POS[1] - 3.0,  # seat on the deck under the 3-thick bar
+    STICK_POS[2] + STICK_SCALE_START + STOP_MARK * STICK_DIVISION,
+)
+STOP_EULER = [0.0, -90.0, 0.0]
+STOP_ROWS = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [-1.0, 0.0, 0.0]]
 
 
 def _subassembly(name: str) -> str:
@@ -140,6 +155,12 @@ async def build(adapter) -> dict[str, str]:
     # transform: flat, graduated face up, long axis along Z.
     await place_component(
         adapter, "measuring-stick", list(STICK_POS), STICK_EULER, STICK_ROWS
+    )
+    # Its sliding stop (ch16 page001_img01), parked at the 2.0 mark: the
+    # block's seat is on the deck, its open-bottom slot straddling the bar
+    # (part +X along the stick = machine +Z, +Y up, +Z across = machine -X).
+    await place_component(
+        adapter, "measuring-stick-stop", list(STOP_POS), STOP_EULER, STOP_ROWS
     )
 
     assert_components_fully_defined(adapter)

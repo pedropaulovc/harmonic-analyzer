@@ -461,8 +461,9 @@ ARBOR_LENGTH = 187.0  # north end at z +132.415: 7.5 seated in the NORTH
 # cylinder-gear-shaft SHAFT_LENGTH; the pedestal geometry is asserted below.
 CRANKSHAFT_Z0 = -175.0  # outboard (crank) end (was -160: the crank plane moved
 # south with the ch30 GT re-read -- arm hub -175..-167, GT axle bolt -189 +- 2.7)
-CRANKSHAFT_LENGTH = 150.0  # rederived contract: -175..-25 covers the moved
-# pinion's north face (-25.625) while retaining the photographed arm/T12 plane.
+CRANKSHAFT_LENGTH = 122.0  # 2026-09 re-derive: -175..-53 ends 6.2 past the
+# 16T pinion's north face (-59.2) -- ch12 page002_img02 shows a short capped
+# end right behind the pinion, not a 34 mm bare stub out the column's back.
 CRANK_ARM_Z0 = CRANKSHAFT_Z0  # arm PLATE south face: the hub band is
 # -175..-167 at the shaft's south end, in FRONT of (south of) the T12 chain
 # wheel (-157.5..-152.5): the arm + the handle (its grip extends -Z, further
@@ -488,6 +489,38 @@ ARBOR_PEDESTAL_NORTH_Z = 97.5 + MECHANISM_Z_SHIFT
 # about Y so its strap looks SOUTH at the drum.  After the fixed-post recenter
 # its foot spans z 92.588..108.588, still north of the unchanged rocker support.
 from build_arbor_pedestal import FOOT_DEPTH as ARBOR_PED_DEPTH  # noqa: E402
+from build_cylinder_end_disc import DISC_THICK as END_DISC_THICK  # noqa: E402
+
+# Cylinder END DISCS (2026-09, ch13 page002_img01/img03, ch25 page001_img02):
+# the plain brass washer closing each end of the gear/rod sandwich, seated
+# END_DISC_AIR outboard of the END GEAR on the arbor (p.23 "back side": the
+# disc face sits right against the last gear's teeth, the pedestal further
+# out). Every drum gear is end-for-end: face z_j -+ DRUM_FACE/2, its cam on
+# the south side (z_j - DRUM_FACE/2 - cam), so the south disc clears gear 0's
+# cam and rod ring, the north disc gear 19's face. Beside the north pedestal
+# instead, the O60 disc fouled the cone-tip block (interference gate).
+from build_cylinder_gear import CAM_THICKNESS as DRUM_CAM_T  # noqa: E402
+
+END_DISC_AIR = 0.5
+# Dome cap screws (2026-09, ch13 page002_img01/img03, ch25 page002_img03): the
+# bright crown head on each pedestal's OUTER strap face, on the arbor axis --
+# it closes the blind arbor bore (the arbor ends 2.5 inside the strap; the
+# cap's 2.0 spigot stops 0.5 short of it). South strap face = foot centre
+# - 2 (band -2..+8 of the 16 foot); north casting turned 180 -> + 2.
+from build_dome_cap_screw import STUB_LEN as CAP_STUB_LEN  # noqa: E402
+
+CAP_SOUTH_Z = -ARBOR_PEDESTAL_Z - 2.0  # crown base on the south face, +Y -> -Z
+CAP_NORTH_Z = ARBOR_PEDESTAL_NORTH_Z + 2.0  # crown base on the north face, +Y -> +Z
+if (ARBOR_SOUTH_Z - CAP_SOUTH_Z) - CAP_STUB_LEN < 0.25:
+    raise AssertionError("south dome cap spigot reaches the arbor end")
+END_DISC_SOUTH_Z0 = (
+    Z_DRUM0 - DRUM_FACE / 2.0 - DRUM_CAM_T - END_DISC_AIR - END_DISC_THICK
+)
+END_DISC_NORTH_Z0 = Z_DRUM0 + 19 * Z_PITCH + DRUM_FACE / 2.0 + END_DISC_AIR
+if END_DISC_SOUTH_Z0 < -ARBOR_PEDESTAL_Z + ARBOR_PED_DEPTH / 2.0 + 0.25:
+    raise AssertionError("south end disc reaches the south pedestal strap")
+if END_DISC_NORTH_Z0 + END_DISC_THICK > ARBOR_PEDESTAL_NORTH_Z - ARBOR_PED_DEPTH / 2.0 - 0.25:
+    raise AssertionError("north end disc reaches the north pedestal strap")
 # (also imported with the main block below; repeated here because these
 # asserts run before it)
 
@@ -1192,7 +1225,11 @@ LIFT_ROD_Z0 = -114.0 + MECHANISM_Z_SHIFT
 BLOCK_X = (PIVOT_X + LIFT_X) / 2.0  # block local origin midway the bores
 BLOCK_FRONT_Z0 = -104.0 + MECHANISM_Z_SHIFT
 BLOCK_BACK_Z0 = 76.0 + MECHANISM_Z_SHIFT
-LEVER_TILT_DEG = 40.0  # from vertical, leaning east (p.68). The p002-fitted
+LEVER_TILT_DEG = -40.0  # from vertical; NEGATIVE = leaning machine +X, away
+# from the drum and the pinion arbor (2026-09: with the lift rod now right
+# under the drum, the old +40 lean ran the rod into the arbor's front stub --
+# 40.8 mm^3 in the gate; 4/4 v4_pinion_004 shows the lever standing off to
+# the front-right, i.e. this side). The p002-fitted
 # 32 was measured with the lever rooted EAST of the pivot (pre-PR5); from the
 # west root that tilt swept the shaft through the pinion's front arbor stub
 # (117.9 mm^3), and 36 still grazed it (10.3 mm^3): the binding quantity is
@@ -1206,7 +1243,10 @@ LEVER_LEN = LEVER_ROD_LEN  # 86: hub centre -> tip (img07 @9.37 px/mm,
 LEVER_Z = -111.0 + MECHANISM_Z_SHIFT
 # seats on the translated lift-rod front end; north face stays 2 off the block.
 HANDLE_TILT_DEG = 65.0  # cross rod from vertical
-HANDLE_Z = -144.0 + MECHANISM_Z_SHIFT
+HANDLE_Z = (-135.0 + MECHANISM_Z_SHIFT) - (HANDLE_GRIP_LEN / 2.0 + HANDLE_WALL_T)
+# = ARBOR_Z0 - (hub bore floor station): the blind hub's floor seats on the
+# arbor's flat front tip (asserted below), so the grip station follows the
+# grip length (2026-09: the O23 x 14 drum became a O15 x 9 ball-crowned grip).
 # translated with the p2 arbor. The hub is a blind tubular cap
 # (PR7 item 14): its bore floor at local +9 lands on -99.585, where the
 # steel arbor's flat front tip seats flush (build_pinion_arbor)
@@ -1253,7 +1293,9 @@ if abs((LEVER_Z - (LEVER_HUB_LEN / 2.0 - LEVER_WALL_T)) - LIFT_ROD_Z0) > 1e-9:
 # segment, endpoint distance otherwise. Rod ROOT dia books the worst case
 # (the PR7 taper only thins toward the tip).
 _LEV_T = math.radians(LEVER_TILT_DEG)
-_LEV_U = (math.sin(_LEV_T), math.cos(_LEV_T))  # up the rod, east lean
+_LEV_U = (-math.sin(_LEV_T), math.cos(_LEV_T))  # up the rod: rot_z(+tilt) tips
+# the +Y rod toward -X (CCW), so the placement and this check agree (2026-09:
+# the old +sin let a +40 lean read as clear while the gate found it in the arbor)
 _LEV_REL = (APINION_X - LIFT_X, APINION_Y - LIFT_Y)  # root -> arbor axis
 _LEV_FOOT = _LEV_REL[0] * _LEV_U[0] + _LEV_REL[1] * _LEV_U[1]
 if 0.0 <= _LEV_FOOT <= LEVER_LEN:
@@ -1355,8 +1397,8 @@ if SPRING_HOLE_X + FSCREW_HEAD_DIA / 2.0 + 0.25 > SPRING_X - SPR_FOOT_END_L[0]:
     raise AssertionError("spring foot screw head overhangs the foot's free end")
 
 # --- cam engage path (ch. 25 + page001_img01; PR8) ---------------------------
-# Each strap carries a Ø4 follower STUD in a blind west-edge seat FPIN_DROP
-# below the pivot (build_pinion_bracket); it RESTS ON the eccentric cam collar
+# Each strap carries a Ø4 follower STUD in a blind edge seat FPIN_DROP
+# below the pivot (negative = above, 2026-09) (build_pinion_bracket); it RESTS ON the eccentric cam collar
 # (build_pinion_cam) pinned to the lift rod in the reclosed WEST bore
 # the pivot shaft in the blocks' reclosed west bores. Turning the lever spins rod +
 # collars as one; the rising OD lifts the pin -- an upward push ~15 west of
@@ -1515,7 +1557,13 @@ if STRAP_CAM_RELIEF_R < _RELIEF_REQUIRED_R:
         f"bracket cam relief R{STRAP_CAM_RELIEF_R:.3f} does not cover "
         f"R{_RELIEF_REQUIRED_R:.3f} moving envelope"
     )
-_PIN_SEAT_SURFACE_X = -math.sqrt(STRAP_R_END**2 - FPIN_DROP**2)
+# Seat mouth: on the straight flank when the stud sits between the two bores
+# (0 <= -FPIN_DROP <= C2C), else on the end cap arc.
+_PIN_SEAT_SURFACE_X = (
+    -STRAP_R_END
+    if 0.0 <= -FPIN_DROP <= STRAP_C2C
+    else -math.sqrt(STRAP_R_END**2 - FPIN_DROP**2)
+)
 _PIN_SEAT_BOTTOM_X = -(STRAP_R_END - FPIN_SEAT)
 _PIN_SEAT_OPEN_X = _PIN_SEAT_SURFACE_X
 for _cx, _cy in (STRAP_CAM_RELIEF_PARK, STRAP_CAM_RELIEF_ENGAGED):
@@ -1603,7 +1651,8 @@ if _TEE_HUB_Z[0] < CRANK_ARM_Z0 + ARM_THICKNESS + 0.25:
 # and prove the swept tip annulus shares no z band with anything it could hit.
 for _step in range(0, 81):
     _t = math.radians(LEVER_TILT_DEG + math.copysign(_step * 0.25, LEVER_TILT_DEG))
-    _d = abs(_LEV_REL[0] * math.cos(_t) - _LEV_REL[1] * math.sin(_t))
+    # rod direction (-sin t, cos t), the placement's rot_z convention (see _LEV_U)
+    _d = abs(_LEV_REL[0] * math.cos(_t) + _LEV_REL[1] * math.sin(_t))
     if _d < (ARBOR_DIA + max(LEVER_ROD_DIA, LEVER_ROD_TIP_DIA)) / 2.0 + 0.25:
         raise AssertionError("lever shaft crowds the arbor mid-throw")
 _LEV_Z = (LEVER_Z - 3.0, LEVER_Z + 3.0)  # rod plane through the throw
@@ -1922,6 +1971,35 @@ async def build(adapter) -> dict[str, str]:
         label=f"arbor-pedestal north z={ARBOR_PEDESTAL_NORTH_Z:g}",
     )
     await _lock_static(adapter, north_pedestal, arbor)
+    # Cylinder end discs: one against each pedestal strap (END_DISC_AIR off),
+    # riding the arbor; retained like the pedestals (they turn with nothing).
+    for _disc_z0, _end in ((END_DISC_SOUTH_Z0, "south"), (END_DISC_NORTH_Z0, "north")):
+        end_disc = await place_component(
+            adapter,
+            "cylinder-end-disc",
+            [X_DRUM, Y_DRIVE, _disc_z0],
+            [0.0, 0.0, 0.0],
+            IDENTITY,
+            ground=False,
+            label=f"cylinder end disc {_end} z0={_disc_z0:.3f}",
+        )
+        await _lock_static(adapter, end_disc, arbor)
+    # Dome cap screws: crown base on each strap's outer face, spigot into the
+    # blind bore (+Y turned outward: -Z south, +Z north).
+    for _cap_z, _euler, _rows, _end in (
+        (CAP_SOUTH_Z, [-90.0, 0.0, 0.0], [[1.0, 0.0, 0.0], [0.0, 0.0, -1.0], [0.0, 1.0, 0.0]], "south"),
+        (CAP_NORTH_Z, [90.0, 0.0, 0.0], ROT_X_POS90, "north"),
+    ):
+        cap = await place_component(
+            adapter,
+            "dome-cap-screw",
+            [X_DRUM, Y_DRIVE, _cap_z],
+            _euler,
+            _rows,
+            ground=False,
+            label=f"dome cap screw {_end} z={_cap_z:.3f}",
+        )
+        await _lock_static(adapter, cap, arbor)
     # The cone SWING PLATFORM is the swing bracket (ch.12, p.18 "pivot"):
     # floated so the whole cone set can swing horizontally out of mesh about
     # its tip-end vertical pivot (p1). Pinned at the engaged rest pose by a

@@ -196,14 +196,16 @@ def test_v2_platform_swing_stop_coordinate_is_rederived() -> None:
 
 
 def test_v2_structural_holes_follow_the_same_installation_delta() -> None:
+    # 2026-09 short-strap pinion rig: blocks at machine x -5.863 +/- 13.5,
+    # spring foot screw at 7.486 (build_drive_train_assembly derives both).
     former_blocks = (
-        (15.240530460002873, -98.0),
-        (42.24053046000287, -98.0),
-        (15.240530460002873, 82.0),
-        (42.24053046000287, 82.0),
+        (-13.669764612476252, -98.0),
+        (13.33023538752375, -98.0),
+        (-13.669764612476252, 82.0),
+        (13.33023538752375, 82.0),
     )
     former_feet = (
-        (43.13610240207359, 70.95),
+        (13.179270253802283, 70.95),
         (-54.7, -95.5),
         (-54.7, 102.5),
     )

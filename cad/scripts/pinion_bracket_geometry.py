@@ -15,14 +15,20 @@ from pinion_cam_geometry import CAM_OD, ECC
 
 # cad/config/dimensions.yaml "Chapter 25", photo-scaled.  The pivot bore is at
 # the origin, the arbor bore at (0, C2C), and the blind follower-pin seat enters
-# the west (-X) edge.
-WIDTH = 18.0
-C2C = 43.0
+# the -X edge (machine EAST after the assembly's Ry(180)), ABOVE the pivot.
+# 2026-09 photo re-derive (ch25 page002_img01 at ~10 px/mm on the O22.4 drum,
+# page001_img02): the strap is SHORT and near-vertical -- ~28 pivot-to-arbor,
+# ~15 wide, the pivot block sitting right under the drum -- not the 43 x 18
+# 50-deg-leaning link of the first pass. The follower stud sits ~6 above the
+# pivot on the lift-rod side, resting on the cam collar (the p.68 arrow).
+WIDTH = 15.0
+C2C = 28.0
 THICKNESS = 5.0
 PIVOT_BORE = 6.35
 ARBOR_BORE = 8.0
 PIN_BORE = 4.0
-PIN_DROP = 2.0
+PIN_DROP = -6.0  # NEGATIVE: the stud seat is 6 ABOVE the pivot bore (on the
+# straight flank), where the collar under it can clear the base top
 PIN_SEAT = 4.0
 
 R_END = WIDTH / 2.0
@@ -37,8 +43,8 @@ OVERALL_LENGTH = C2C + 2.0 * R_END
 # in build_drive_train_assembly, so a future axis/angle change fails loud.
 CAM_RELIEF_CLEARANCE = 0.25
 CAM_RELIEF_RADIUS = 6.90
-CAM_RELIEF_PARK_CENTER = (-9.410689150171967, -8.415553488372089)
-CAM_RELIEF_ENGAGED_CENTER = (-8.265374539187958, -9.542860919229591)
+CAM_RELIEF_PARK_CENTER = (-12.6368839229725, 0.06789999999999563)
+CAM_RELIEF_ENGAGED_CENTER = (-12.567707922051557, -1.3221812578778047)
 CAM_RELIEF_ENVELOPE_RADIUS = ECC + CAM_OD / 2.0 + CAM_RELIEF_CLEARANCE
 CAM_RELIEF_MIN_PIVOT_LIGAMENT = min(
     math.hypot(*CAM_RELIEF_PARK_CENTER),

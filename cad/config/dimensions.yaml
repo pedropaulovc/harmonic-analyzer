@@ -175,17 +175,17 @@ sections:
         - scaled
         - med
       - - Handle length
-        - ~90 mm
-        - ~3.5
-        - p.12 photo, proportion of arm length
+        - 44 mm (egg-shaped grip; Ø15 × 7 collar at the arm)
+        - '1.73'
+        - 'ch11 p.14 close-up (2026-09 re-derive): the grip is a short egg, widest ~28 from the collar, not a 90 baton — SUPERSEDES the p.12 arm-proportion read (`crank_handle_spec.py`)'
         - scaled
-        - low
+        - med
       - - Handle diameter
-        - ~22 mm
-        - ~0.87
-        - p.12 photo, proportion of arm length
+        - 25 mm max (Ø11 at the tip)
+        - '0.98'
+        - ch11 p.14 close-up (2026-09 re-derive, with the handle length)
         - scaled
-        - low
+        - med
       - - Crank arm width
         - ~16 mm
         - ~0.63
@@ -235,9 +235,9 @@ sections:
         - scaled
         - low
       - - Crankshaft length
-        - 145 mm
-        - '5.7'
-        - 'derived, lengthened with the ch30 GT re-read (2026-07-02): the crank plane moved south (arm hub z −175..−167, T12 chain wheel −157.5, pedestal cylinder front face −121.4) while the inboard 16T station stayed — the shaft spans z −175..−30 (`build_crankshaft.py`)'
+        - 122 mm
+        - '4.8'
+        - 'shortened 2026-09 (ch12 p.19: the shaft ends just past the inboard pinion with a capped end — no 34 mm bare stub out the column back); the crank plane stays at the ch30 GT read (arm hub z −175..−167, T12 chain wheel −157.5, pedestal cylinder front face −121.4) — the shaft spans z −175..−53 (`crankshaft_spec.py`)'
         - derived
         - med
   - prose: |2
@@ -439,6 +439,18 @@ sections:
         - 'derived: 134 stack (20 × 7.06 Z-pitch) + journal/clamp each end (eight-views 8/8 pedestals)'
         - derived
         - low
+      - - Cylinder end discs ×2 (2026-09)
+        - Ø55 × 3 brass annulus, Ø9.6 bore, 0.5 outboard of gears 0 and 19 on the arbor
+        - '2.17'
+        - 'p.23 "back side" / p.25 "front side" + ch25 p.67 edge-on: a toothless brass washer closes each end of the sandwich (~0.9 of the gear OD; Ø55 since a Ø60 grazed the cone-tip bushing) (`build_cylinder_end_disc.py`)'
+        - scaled
+        - low
+      - - Pedestal dome cap screws ×2 (2026-09)
+        - Ø10 × 3 spherical crown with a Ø5 × 2 spigot, on the arbor axis on each pedestal's outer strap face
+        - '0.39'
+        - 'p.23/25 + ch25 p.67: a bright domed head closes the blind arbor bore on each pedestal (`build_dome_cap_screw.py`)'
+        - scaled
+        - low
   - prose: |2
 
       Notes: set is a sandwich — shiny brass gears alternating with black rough-finished
@@ -596,7 +608,7 @@ sections:
       - - '`swing-stop-screw` (p1 travel limit)'
         - slotted screw — Ø4 shank, 6 embedded into the base + 8 proud (covering the 6.35 plate band), head Ø8 × 2.5 on top
         - 'base-threaded STATIC at (−139.665, +2.334), derived so the 223.354-long plate''s EAST taper edge just touches the shank flank at the 4.883° disengaged swing — the disengage swing sweeps the plate EAST (the sense that walks the knob stud out the notch mouth), so the east edge is the one that advances onto the stop; 8.929 mm signed clearance to the ENGAGED edge (offline-derived and asserted against the base hole)'
-        - user review (v4: small screw the platform bumps against); position derived from the notch/knob geometry
+        - 'user review (v4: small screw the platform bumps against); position derived from the notch/knob geometry'
         - med (role high, dims low)
       - - '`cone-tip-bushing` (T006 spacer on the tip stub)'
         - brass sleeve Ø6 × 4, Ø0.79 (1/32") bore
@@ -606,7 +618,7 @@ sections:
       - - '`cone-tip-adjuster` (axial end-play screw, partially hollow)'
         - slotted steel screw Ø7.9 × 14, blind cup Ø2 × 6 in the far end, 1.5 × 1.5 driver slot across the head
         - 'threaded into the tip block''s north counterbore, head proud 8 to station 155.272; its blind cup (mouth station 141.272, floor 147.272) holds the shaft''s tip end (146.272) — turning it takes up the cone stack''s axial end play so the 20 gears stay registered against the cylinder set; the block''s slit + pinch screw lock the setting'
-        - v4_t00471 / 7:49 (t00147: hollow slotted screw the cone shaft rests in)
+        - 'v4_t00471 / 7:49 (t00147: hollow slotted screw the cone shaft rests in)'
         - med (role high, dims low)
       - - '`cone-tip-pinch-screw` (locks the adjuster)'
         - slotted steel screw — head Ø4.8 × 2, Ø2.4 shank × 8, 0.8 × 0.8 driver slot
@@ -738,7 +750,7 @@ sections:
       - confidence
       rows:
       - - Pivot shaft
-        - Ø6.35 × 228.6 (9") along Z at (x, y) = (+72.9, 253.8), shaft centre z −9.612
+        - 'Ø6.35 × 170 along Z at (x, y) = (+72.9, 253.8), centred on the channel stack mid-plane (2026-09: was 203.2 with the south end 19 mm past the support in mid-air)'
         - 'ball x photo-measured 66…81, ball y 252–255 in both 0°/180° views; y = support apex 228.6 + ball rise 25.2. The fixed support remains at its old world location while the channel bank recenters to z +3.088 and the longer rocker lever reaches drum x −60.394.'
         - med (x, y photo + frame; dia low)
       - - Support casting ×1 (windowed rocker-arm support)
@@ -754,11 +766,11 @@ sections:
         - '9/16-12 screws rise through the base into the support''s source-replayed four-tap pattern at machine (x, z) = (55.44 or 90.36, −60.32 or +60.32); base holes and counterbores consume this shared transformed contract.'
         - the support's 63.5 mounting-hole pitch (`build_rocker_arm_support.py`); placed in frame.SLDASM (`build_lag_screw.py`)
         - low
-      - - Ball mounts ×2
-        - clevis + Ø19 ball, ball centre 25.2 above its seat; Ø6.5 shaft cross-bore
-        - apex/saddle top 228.6 + 25.2 = 253.8 = pivot axis; rocker mounts at z −107.912/+84.588 around the recentered bank; same style at the lever rail (ch. 17)
+      - - Pivot brackets ×2 (replaced the chrome ball mounts 2026-09)
+        - black foot-and-ear bracket — foot 24 × 6 × 12 with two Ø4.2 screw holes at ±9, ear 14 wide × 6 thick with a full-round top, Ø6.5 shaft bore 25.2 above the foot
+        - 'ch14 p.27 (2026-09 re-derive): the shaft rides in two black cast brackets bolted to the support rail, not chrome ball pillars; seated on the support at stack-mid z ±78 so the pivot axis stays 228.6 + 25.2 = 253.8 (`build_pivot_bracket.py`)'
         - scaled
-        - low
+        - med
       - - Pivot spacer bushings ×19
         - Ø10 OD × 4.5565 long × Ø6.5 bore (pitch 7.0565 − arm 2.5)
         - 'M6.3 geometric ceiling: at d = 0 the bar-foot cheeks pass 5.63 above the shaft axis (contact 261.81 − notch 2.381 − axis 253.8; level rest pose), so OD < ~11.25 — REFUTES the p.27 "Ø~25 barrel" read (those barrels are something else); Ø10 keeps 0.63 clearance'
@@ -895,10 +907,10 @@ sections:
         - stated
         - high
       - - Scale span (10 divisions)
-        - 80 mm
-        - '3.15'
-        - the p.34 gauge face (0–10 = "one half of the rocker arm"); with the 11.5" arm (ch.14) that half is 146.05 mm, so the face reads coefficient, not mm 1:1 — see notes
-        - derived
+        - 142 mm (14.20 per division; nine 1.42-pitch minor ticks per division; 0.5 end margin at the 10 end)
+        - '5.59'
+        - 'pp.34–37 plates re-read 2026-09 (the earlier 80 mm was a low read): the ruling runs ~0.71 of the 200 bar with tenths between the numbered ticks; close to the 146.05 half-arm (ch.14), so the face is near 1:1 mm — see notes (`build_measuring_stick.py`)'
+        - scaled
         - med
       - - Body thickness
         - ~3 mm
@@ -906,15 +918,22 @@ sections:
         - pp. 34–35 photo proportion
         - scaled
         - low
+      - - Stop block (2026-09)
+        - black block 14 × 11 × 14 with an open-bottom 8.4 × 3.4 slot over the bar; Ø9 × 3 bright thumb head; parked at the 2 mark
+        - —
+        - 'pp.34–35: the sliding/locking stop the text names sits on the bar as a small dark block with a bright screw head (`build_measuring_stick_stop.py`)'
+        - scaled
+        - low
   - prose: |2
 
       Notes: ruled brass gauge (Wm. Gaertner & Co.) with a sliding/locking stop. The
       0–10 scale spans "the 10 equal divisions of one half of the rocker arm." With the
       arm re-read to 11.5" (ch.14 back view), that half is 146.05 mm → full working
-      length ≈ 292 mm (was ≈160 at the 9" arm). CAVEAT: the gauge's physical scale span
-      still measures ~80 mm in the p.34/35 photo, so the 0–10 face is a COEFFICIENT
-      scale (≈14.6 mm of arm travel per division), NOT 1:1 mm — do not rescale the
-      physical stick to 292 without a photo re-read. This working length was also the
+      length ≈ 292 mm (was ≈160 at the 9" arm). The gauge's physical scale span
+      re-reads as ~142 mm on the p.34/35 plate (2026-09; the earlier ~80 was a low
+      read), i.e. 14.2 mm per division against 14.6 of arm travel — near 1:1 mm,
+      with tenths ruled between the numbered ticks. Do not rescale the physical
+      stick to 292 without a photo re-read. This working length was also the
       top-down channel-geometry anchor: if the longer arm is meant to widen the channel
       span, machine/channels.yaml must be rebuilt to match (flagged, NOT done here — the
       channel parts still build to the old anchor). Cross-check against the 16 mm callout
@@ -1119,7 +1138,7 @@ sections:
         - derived
         - low
       - - Knife mount
-        - '8-square hardened bar set diamond-wise (edge up), 31.8 long — rides inside the lever tube''s slot tunnel (z ±15.9 vs slot ±16; contact bands outside the slot are geometrically impossible — the diamond flanks clash with the tube lower wall); brass block 24 × 28 × 24 below, seated under the casting underside 999.7 (knife edge at 979.7, contact ridge 984.834); tapped 1/2-13 blind hole × 12 deep in the block top on the trunnion axis for the knife-hanger-stud: Ø12.7 shank up through the tube slot and the casting crossbar (Ø13.49 close clearance), capped above the top face 1036.2 by integral washer Ø28 × 2.5 + HEX nut AF19 × 11 + turned collar Ø11 × 3 + centre-drilled tip Ø6 × 4 — one merged part, total 69.25 (y 987.45..1056.7), ×2 at z −83.972/+90.148'
+        - '8-square hardened bar set diamond-wise (edge up), 31.8 long — rides inside the lever tube''s slot tunnel (z ±15.9 vs slot ±16; contact bands outside the slot are geometrically impossible — the diamond flanks clash with the tube lower wall); brass block 24 wide × 33.4 tall × 14 deep with a Ø16 bore (2026-09 re-derive from ch18 p.42: bore 25.4 → 16, width 34 → 24) below, seated under the casting underside 999.7 (knife edge at 979.7, contact ridge 984.834); tapped 1/2-13 blind hole × 12 deep in the block top on the trunnion axis for the knife-hanger-stud: Ø12.7 shank up through the tube slot and the casting crossbar (Ø13.49 close clearance), capped above the top face 1036.2 by integral washer Ø28 × 2.5 + HEX nut AF19 × 11 + turned collar Ø11 × 3 + centre-drilled tip Ø6 × 4 — one merged part, total 69.25 (y 987.45..1056.7), ×2 at z −83.972/+90.148'
         - —
         - 'p.42/43 + top.png stud crops (tmp_measure/crops/top_stud1/2.png); ch30 px measurement anchored on column pitch + GT rescale + ch19 closeups (2026-08-02 rederive)'
         - measured
@@ -1617,6 +1636,12 @@ sections:
         - '`v4_transgear_008/020` + ch. 23 topology; stack derived from the disc window −148.4..−145.4 (0.3 in front of the platen furniture''s deepest reach) and the −155 chain plane'
         - scaled + derived
         - low/med
+      - - Latch strip (2026-09)
+        - '12 × 1.0 polished steel strip with stadium ends on the support bar''s front face at z −144.15; Ø5.4 eye over the knob-shaft seat, Ø4.4 hole for a #8-32 screw into the bar at x −42.575 through a 4.25 spacer'
+        - —
+        - 'ch23 p.58 + video 4/4: the spring latch that locks the swing cluster — the model had none (`build_latch_strip.py`; the bar gains the tapped hole in `build_support_bar.py`)'
+        - scaled
+        - low
   - prose: |2
 
       Notes: speed combos — small driving + large driven = slowest platen (smallest
@@ -1702,7 +1727,7 @@ sections:
         - scaled + derived
         - low
       - - Pen marker
-        - Ø8 barrel, 5-tall conical tip, 110 overall (a full-length marker: ~75 shows in front of the block on ch30 p002/p004 and v4_t00612); collar/ferrule detail omitted
+        - 'Ø8 barrel, 5-tall conical tip, 110 overall (a full-length marker: ~75 shows in front of the block on ch30 p002/p004 and v4_t00612); collar/ferrule detail omitted'
         - —
         - p.60–63, ch30 p002/p004, v4_t00612
         - scaled
@@ -1774,13 +1799,25 @@ sections:
         - stated
         - high
       - - Return spring (leaf)
-        - 0.8 × 4.0 brass strip; 25.4 foot, R2 bend, 36.666 straight blade parallel to the 49.864° parked strap, R1.5 × 20° return kink, 2.0 terminal flat
+        - 0.8 × 4.0 brass strip; 28.0 foot, R2 bend, straight blade ~8.1° off vertical alongside the near-vertical parked strap, R1.5 × 20° return kink, 2.0 terminal flat (re-solved 2026-09 with the strap re-derive; `pinion_spring_geometry.py`)
         - —
         - 'p.68–69 + v4_pinion_013/018/019: a brass leaf bears on the BACK strap''s east flank in both poses, more flexed engaged — it holds the drum disengaged by default; front strap clean (t00393). Sized against the 5.0 strap; blade offset 10.1 east of the strap axis (build_pinion_spring / build_drive_train SPRING_*)'
         - scaled
         - med
+      - - Swing straps ×2 (2026-09 re-derive)
+        - 28.0 centre-to-centre × 15 wide × 5 thick, R7.5 ends, parked near-vertical with the pivot blocks UNDER the drum; Ø8 arbor bore, Ø6.35 pivot bore; two R6.9 cam-relief scallops
+        - —
+        - 'ch25 p.68 (2026-09): the straps read ~28 × 15 and stand near-vertical — SUPERSEDES the 43 × 18 straps leaning 50° with the blocks 33 mm east (`pinion_bracket_geometry.py`, `pinion_pivot_block_spec.py` — 36 × 18.75 × 12 blocks, lift bore 1.86 above the pivot bore)'
+        - scaled
+        - med
+      - - Tee handle (2026-09 re-derive)
+        - Ø15 × 9 grip (SR10.9 crown) on a Ø6 cross rod, 65 overall (32 down / 33 up)
+        - —
+        - 'ch25 p.68: a ~Ø15 ball on a ~65 rod — SUPERSEDES the Ø23 × 14 drum on an 85 rod (`pinion_handle_geometry.py`)'
+        - scaled
+        - med
       - - Cam-follower pin (per strap)
-        - Ø4 × 17 steel stud, seated 4.0 in a blind west-edge bore 2.0 below the pivot axis; 13 proud reaches the lift cam through the v2 linkage's steeper swing
+        - Ø4 × 17 steel stud, seated 4.0 in a blind edge bore 6.0 ABOVE the pivot axis (2026-09 re-solve); 13 proud reaches the lift cam
         - —
         - 'PR8 re-derivation of the p.69 block close-up (page002_img01): the bright follower reads as a fatter (~Ø4-5) stud at the pivot-height band, resting on the eccentric collar. A 4.0 blind edge seat is the geometry that clears the Ø6.35 pivot bore; contact reach + clearances are asserted analytically (build_drive_train CAM_*)'
         - scaled

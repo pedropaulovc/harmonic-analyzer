@@ -178,15 +178,16 @@ STOP_SCREW_DRILL_DEPTH = 9.0
 # Alignment-pinion rig hold-downs (PR7 items 2/11/12), blind from the TOP face
 # like the swing hardware and in the SAME machine-handed convention: four
 # Ø4.2 holes under the two pivot blocks' bright slotted screws
-# (build_pinion_pivot_block SCREW_* stations: block x 28.741 +/- 13.5, hole
+# (build_pinion_pivot_block SCREW_* stations: block x -5.863 +/- 13.5 (2026-09
+# short-strap rig, the blocks right under the drum), hole
 # z = block z0 + depth/2 -- asserted directly at drive-train import) and two
 # Ø3.2 holes under the black foot screws (build_foot_screw): the spring foot
 # and the arbor-pedestal flange.
 _FORMER_BLOCK_SCREW_XZ = (
-    (15.240530460002873, -98.0),  # front block, east screw
-    (42.24053046000287, -98.0),  # front block, west screw
-    (15.240530460002873, 82.0),  # back block, east screw
-    (42.24053046000287, 82.0),  # back block, west screw
+    (-13.669764612476252, -98.0),  # front block, east screw
+    (13.33023538752375, -98.0),  # front block, west screw
+    (-13.669764612476252, 82.0),  # back block, east screw
+    (13.33023538752375, 82.0),  # back block, west screw
 )
 BLOCK_SCREW_XZ = tuple(
     (x + MECHANISM_X_SHIFT, z + MECHANISM_Z_SHIFT) for x, z in _FORMER_BLOCK_SCREW_XZ
@@ -195,7 +196,7 @@ BLOCK_SCREW_XZ = tuple(
 BLOCK_SCREW_HOLE_DEPTH = 3.5  # 22 shank - 18.75 block = 3.25 buried + 0.25 air
 BLOCK_SCREW_DRILL_DEPTH = 7.0
 _FORMER_FOOT_SCREW_XZ = (
-    (43.13610240207359, 70.95),  # spring foot: 1-in reach keeps its screw head
+    (13.179270253802283, 70.95),  # spring foot: 28 reach keeps its screw head
     # clear of the unchanged rocker-arm-support casting after the rig recenter
     (-54.7, -95.5),  # south arbor-pedestal flange (build_arbor_pedestal SCREW_Z)
     (-54.7, 102.5),  # NORTH arbor-pedestal flange (PR8, ch12 img09: the

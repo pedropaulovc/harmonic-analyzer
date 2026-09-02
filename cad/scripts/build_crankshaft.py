@@ -79,7 +79,8 @@ MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 # ShaftDiameter (uncontradicted); length was rederived with the ch30 GT re-read
 # (2026-07-02): the crank plane moved south (arm hub at machine z -175..-167,
 # T12 at -157.5, pedestal slab at -145..-125) while the inboard 16T station
-# stayed, so the shaft spans -175..-30. The arm/handle sweep entirely in front
+# stayed, so the shaft spans -175..-53 (2026-09: shortened to end 6.2 past
+# the 16T's north face, ch12 page002_img02). The arm/handle sweep entirely in front
 # of the chain plane and cannot foul the chain when turning (book ch30
 # p005/p002). Pin cross-hole: #9 drill (Ø4.978, wizard) through local X at
 # station 4.0, coaxial with the crank arm's local-Y pilot after the arm's

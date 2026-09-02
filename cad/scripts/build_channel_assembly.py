@@ -10,13 +10,15 @@ the lever tips, each caught at the plate by a little open hook fastener.
 Coordinates are machine frame (#151: crank at machine -X, output side -Z;
 the M6.8 mirror layer is gone).
 
-* pivot-shaft x1 (rocker bank at (72.9, 253.8), along Z, centred z 22.715)
+* pivot-shaft x1 (rocker bank at (72.9, 253.8), along Z, centred on the
+  20-station stack, 170 long -- 2026-09: ends 4 past each bracket ear)
   + fulcrum-shaft x1 (lever bank at (199.9, 1061.4), 182 long - the
   228.6 shaft clipped the west columns at top level, M6.5)
-* pivot-ball-mount x2 (rocker pair translated with the channel bank: north
-  at (72.9, 228.6, +116.915), south at (72.9, 228.6, -75.585),
-  the front stand is the rocker-arm-support's transgear-A-frame leg
-  (frame.SLDASM) whose ears flank this mount's O16 base)
+* pivot-bracket x2 (2026-09 photo re-derive, ch14 page002_img01/img07: the
+  black foot-and-ear brackets on the rocker-arm-support's top, 78 either
+  side of the stack centre so both feet sit ON the support (the old chrome
+  pivot-ball-mount pair is retired -- photo-refuted, and its south pillar
+  stood 19 mm past the support's end in mid-air))
 * fulcrum-keeper x2 + frame-side-screw x2 (the black shaft-END brackets on
   the top-frame west rail top face -- ch17 p.40 bottom-left / ch30 p008;
   ball centres (199.9, 1061.4, 3.088 +- 88.75), foot screws down into the
@@ -306,10 +308,14 @@ LEVER_THICKNESS = 3.0
 # --- supports / mounts ------------------------------------------------------
 SUPPORT_APEX_Y = 228.6
 CHANNEL_BANK_REAR_SHIFT = MECHANISM_Z_SHIFT
-SUPPORT_Z = 81.5 + CHANNEL_BANK_REAR_SHIFT  # 116.915 north rocker mount
-AFRAME_MOUNT_Z = -111.0 + CHANNEL_BANK_REAR_SHIFT  # -75.585 south rocker mount
-# Keep the proven 203.2-mm shaft and support overhangs, translated with the bank.
-PIVOT_SHAFT_Z = -12.7 + CHANNEL_BANK_REAR_SHIFT  # 22.715; span -78.885..124.315
+# Rocker pivot brackets (pivot-bracket, 2026-09): symmetric about the 20-
+# station arm stack's mid-plane, PIVOT_BRACKET_OFF either side -- ear faces
+# 6.7 clear of the outermost arms, feet inside the rocker-arm-support's
+# +-88.9 top (it is the only stand; the old south "A-frame" is gone).
+_STACK_MID_Z = Z0 + ARM_MID_DZ + 19 * PITCH / 2.0  # 3.83 (the full machine)
+PIVOT_BRACKET_OFF = 78.0
+PIVOT_BRACKET_Z = (_STACK_MID_Z - PIVOT_BRACKET_OFF, _STACK_MID_Z + PIVOT_BRACKET_OFF)
+PIVOT_SHAFT_Z = _STACK_MID_Z  # the 170 shaft spans -81.2..88.8: 4 past each ear
 RAIL_TOP_Y = 1036.2  # new top-frame casting top face (was 1040.7; the rederive
 # dropped the rail top 4.5 -- the ball-mount seats and the whole fulcrum chain
 # follow)
@@ -1213,20 +1219,20 @@ async def build(adapter) -> dict[str, str]:
     pivot_od = [pivot_w[0] + SHAFT_R, pivot_w[1], 0.0]
     fulc_od = [fulc_w[0] + SHAFT_R, fulc_w[1], 0.0]
 
-    # Ball mounts. Free-space structure with no contact partner, so each is
-    # datum-located (three orthogonal plane distances), not fixed -- the #110
-    # idiom. The rocker pair is asymmetric (M6.5): north seats on the
-    # rocker-support apex, south on the A-frame clevis saddle (both tops at
-    # y 228.6).
-    for mount_z in (AFRAME_MOUNT_Z, SUPPORT_Z):
+    # Pivot brackets. Free-space structure with no contact partner inside
+    # this subassembly, so each is datum-located (three orthogonal plane
+    # distances), not fixed -- the #110 idiom. Both seat on the rocker-arm-
+    # support's top (y 228.6), symmetric about the stack (the part is
+    # symmetric, so one IDENTITY pose serves both ends).
+    for mount_z in PIVOT_BRACKET_Z:
         mount = await place_component(
             adapter,
-            "pivot-ball-mount",
+            "pivot-bracket",
             [PIVOT[0], SUPPORT_APEX_Y, mount_z],
             [0.0, 0.0, 0.0],
             IDENTITY,
             ground=False,
-            label=f"ball-mount rocker z{mount_z:+.0f}",
+            label=f"pivot-bracket rocker z{mount_z:+.0f}",
         )
         await _locate_to_datum(adapter, mount)
     # Fulcrum end keepers (MHA-120): the black shaft-END brackets of the

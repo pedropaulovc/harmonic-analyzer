@@ -40,11 +40,11 @@ BORE_DIA = 6.35  # 1/4 in: rides the Ø6.35 torque shaft / lift rod (derived)
 BORE_HALF_SPACING = 6.25  # half the pivot-to-lift rod spacing 12.5 -- the
 # lift rod must clear BOTH the cone-pivot-post column (machine x -47.1)
 # and the strap's swinging r 11 bottom cap (build_drive_train_assembly)
-LIFT_BORE_RISE = 1.769918302299855  # v2 post raises the drive axis, steepening
-# the parked strap to 49.864 deg.  Re-solving the follower-pin/cam contact puts
-# the WEST lift bore above the pivot. This rise and the 12.5 c2c X spacing give
-# exactly 0.15 mm parked air after the cam OD grows 9.2 -> 10.32 to restore its
-# 0.575-mm thin-side wall. The block retains >1.8 mm above the reamed bore.
+LIFT_BORE_RISE = 1.8561911789147132  # 2026-09 re-solve for the short near-
+# vertical strap (pinion_bracket_geometry C2C 28, lean ~8.1 deg, follower stud
+# 6 ABOVE the pivot): the lift bore sits this much above the pivot bore so the
+# ecc-down cam collar hovers exactly 0.15 under the stud (scratchpad solver,
+# re-proven at import by build_drive_train_assembly's park-gap band).
 SCREW_HALF_SPACING = 13.5  # hold-down hole centres out past the bores: 0.6 web
 # to the bore wall, 0.9 rim to the block end
 SCREW_HOLE_DIA = 4.216  # #19 drill; mirrors _holes.NUMBER_DRILL_MM["#19"]

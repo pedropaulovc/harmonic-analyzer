@@ -30,6 +30,7 @@ from _common import (
     apply_material,
     check,
     drive_dimension,
+    dump_dimensions,
     ensure_fully_defined,
     force_rebuild,
     measure_check,
@@ -60,10 +61,15 @@ BODY_WIDTH = 8.0  # DIMENSIONS.md ch16: stick width, annotated (high) — the 8 
 # callout is the stick WIDTH (bd992c6 re-read), not the division spacing; the
 # superseded ~15 mm scaled body-width is retired.
 BODY_THICKNESS = 3.0  # DIMENSIONS.md ch16: scaled (low)
-DIVISION_SPACING = 8.0  # DIMENSIONS.md ch16: scale span 80 mm / 10 divisions
-# (derived, med) — one half of the rocker-arm working length, NOT 10×8 mm.
-DIVISION_COUNT = 11  # ticks 0..10 (stated 0-10 scale)
-SCALE_START_X = (BODY_LENGTH - 10 * DIVISION_SPACING) / 2.0  # centre the scale
+DIVISION_SPACING = 14.2  # ch16 page001_img02 (200 mm bar at 5.65 px/mm): the
+# 0 and 10 numerals sit 805 px = 142 mm apart -- one half of the rocker arm's
+# 292 mm working arc, as the text says (2026-09 re-derive; the old 80 mm was a
+# misread of the 8 mm width callout).
+DIVISION_COUNT = 11  # full ticks 0..10 (stated 0-10 scale)
+MINOR_PER_DIVISION = 10  # tenths: 9 short ticks between full ticks (page001_img03)
+MINOR_SPACING = DIVISION_SPACING / MINOR_PER_DIVISION  # 1.42
+SCALE_END_MARGIN = 0.5  # the 10 tick lands just short of the far end (img02)
+SCALE_START_X = BODY_LENGTH - 10 * DIVISION_SPACING - SCALE_END_MARGIN  # 57.5
 
 TICK_WIDTH = 0.4
 # Graduation-mark lengths are modelling choices: ch16 pins only the 200×8 body and
@@ -74,6 +80,7 @@ TICK_WIDTH = 0.4
 # width — that put the 0.5 tick's bottom corner 1 mm off the edge, which SolidWorks
 # rejected when dimensioning that corner to the origin (vertical_distance = 1).
 TICK_LENGTH = 3.0  # main ticks, from the top edge down
+MINOR_TICK_LENGTH = 1.8  # the tenths (~0.6 of a full tick, page001_img03)
 HALF_TICK_LENGTH = 4.0  # the special 0.5 tick ("longer than any other")
 TICK_DEPTH = 0.5  # engraving depth
 TICK_OVERHANG = 1.0  # sketch reaches past the top edge: a line drawn exactly
@@ -177,12 +184,16 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "BodyWidth", f"{BODY_WIDTH}mm")
     await set_global(adapter, "BodyThickness", f"{BODY_THICKNESS}mm")
     await set_global(adapter, "DivisionSpacing", f"{DIVISION_SPACING}mm")
+    await set_global(adapter, "ScaleEndMargin", f"{SCALE_END_MARGIN}mm")
     await set_global(adapter, "TickWidth", f"{TICK_WIDTH}mm")
     await set_global(adapter, "TickLength", f"{TICK_LENGTH}mm")
+    await set_global(adapter, "MinorTickLength", f"{MINOR_TICK_LENGTH}mm")
     await set_global(adapter, "HalfTickLength", f"{HALF_TICK_LENGTH}mm")
     await set_global(adapter, "TickOverhang", f"{TICK_OVERHANG}mm")
     await set_global(
-        adapter, "ScaleStartX", '("BodyLength" - 10 * "DivisionSpacing") / 2'
+        adapter,
+        "ScaleStartX",
+        '"BodyLength" - 10 * "DivisionSpacing" - "ScaleEndMargin"',
     )
 
     drive_jobs: list[tuple[str, str]] = []
@@ -261,7 +272,53 @@ async def build(adapter) -> dict[str, str]:
     # so it stays neutral.
     drive_jobs.append(("D3@TickPattern", '"DivisionSpacing"'))
 
-    # The hand-stamped artefact the book calls out: a longer 0.5 tick.
+    # Tenths: nine short ticks between the 0 and 1 full ticks, cut one by one
+    # (each drives off ScaleStartX + k * DivisionSpacing / 10), then the nine
+    # patterned as a group across the other nine divisions. (A pattern of the
+    # minor pattern would need two nested pattern features; nine seed cuts +
+    # one pattern keeps every feature a plain cut or pattern.) The pattern's
+    # own spacing dim is driven from DivisionSpacing below, resolved by VALUE
+    # rather than by the D3 index (CodeRabbit #651: a static pitch would
+    # leave the patterned tenths at 14.2 after a GUI DivisionSpacing edit).
+    minor_names = []
+    for k in range(1, MINOR_PER_DIVISION):
+        minor_names.append(
+            await _cut_tick(
+                adapter, f"minor tick 0.{k}", f"Minor{k}",
+                SCALE_START_X + k * MINOR_SPACING, MINOR_TICK_LENGTH,
+                drive_jobs=drive_jobs,
+                drive_xcenter=f'"ScaleStartX" + {k} * "DivisionSpacing" / {MINOR_PER_DIVISION}',
+                drive_length='"MinorTickLength"',
+            )
+        )
+    check(
+        "linear pattern minor ticks across divisions 1..9",
+        await adapter.linear_pattern_feature(
+            LinearPatternParameters(
+                direction_point=[BODY_LENGTH / 2.0, 0.0, 0.0],
+                features=minor_names,
+                count=DIVISION_COUNT - 1,
+                spacing=DIVISION_SPACING,
+            )
+        ),
+    )
+    name_last_feature(adapter, "MinorPattern")
+    # The pattern's dims are the direction-reference length (~11000 mm), the
+    # count and the pitch; the one reading the as-built pitch is unambiguous.
+    minor_pitch_dims = [
+        row["full_name"]
+        for row in dump_dimensions(adapter, "MinorPattern")
+        if abs(row["value_mm"] - DIVISION_SPACING) < 1e-3
+    ]
+    if len(minor_pitch_dims) != 1:
+        raise RuntimeError(
+            f"MinorPattern: expected one dim reading the {DIVISION_SPACING} pitch, "
+            f"found {minor_pitch_dims}"
+        )
+    drive_jobs.append((minor_pitch_dims[0], '"DivisionSpacing"'))
+
+    # The hand-stamped artefact the book calls out: a longer 0.5 tick (it
+    # overcuts the 0.5 tenth above).
     await _cut_tick(
         adapter, "tick 0.5", "TickHalf",
         SCALE_START_X + DIVISION_SPACING / 2.0, HALF_TICK_LENGTH,
@@ -288,7 +345,7 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # Verify the annotated 200 mm length and the untouched front face
-    # (the 8 mm tick spacing is driven by the linear pattern's spacing).
+    # (the 14.2 mm tick spacing is driven by the linear pattern's spacing).
     # End faces are edge-on in the active view (point picking is
     # screen-projected) — measure the uncut front-bottom edge instead;
     # the ticks only engrave the back face from the top edge down.

@@ -24,7 +24,7 @@ directions; the part is
 an exact mid-plane z-extrude, so the Ry(180)'s z-flip is immaterial):
 strip centreline path = 25.4 foot at y 0.8 pointing
 WEST of the bend, r 2.0 bend (77.62 deg sweep), blade up-east at the
-strap's parked 49.86 deg lean to t 32 along the strap axis, r 1.5 x
+strap's parked lean (BLADE_TILT_DEG) to t KINK_T along the strap axis, r 1.5 x
 20 deg WEST kink, 2.0 flat to the free tip.
 Thin mid-plane extrude, width 4.0 symmetric about z 0. The thin side is
 ONE-sided and orientation-dependent (RevThinDir 0 -- see the SolidworksMCP

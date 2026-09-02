@@ -1,0 +1,7 @@
+dome-cap-screw:
+  number: MHA-125
+  material: Plain Carbon Steel
+  finish: "bright nickel"
+  tolerance_class: visual_noncritical
+  quantity: 2
+  process: "turned crown head + spigot"

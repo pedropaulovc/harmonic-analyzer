@@ -112,7 +112,10 @@ def test_unique_feature_dimensions_and_direct_bore_limits() -> None:
     assert "HUB PROJECTION: DATUM B TO GRIP FACE 12.00 +0.10/-0.00" in (
         pinion_handle_spec.DRAWING_NOTES
     )
-    assert "DATUM A TO LOWER END 42.00+/-0.10" in pinion_handle_spec.DRAWING_NOTES
+    assert (
+        f"DATUM A TO LOWER END {pinion_handle_spec.ROD_DOWN:.2f}+/-0.10"
+        in pinion_handle_spec.DRAWING_NOTES
+    )
 
 
 def test_transverse_axis_uses_basic_location_and_position_control() -> None:
@@ -138,7 +141,7 @@ def test_transverse_axis_uses_basic_location_and_position_control() -> None:
 def test_crown_has_one_toleranced_form_control() -> None:
     notes = pinion_handle_spec.DRAWING_NOTES
     assert f"SR{pinion_handle_spec.CAP_RADIUS:.2f}+/-0.10" in notes
-    assert "2.00 REF HIGH" in notes
+    assert f"{pinion_handle_spec.CAP_SAG:.2f} REF HIGH" in notes
     assert "2.00+/-0.10 HIGH" not in notes
 
 

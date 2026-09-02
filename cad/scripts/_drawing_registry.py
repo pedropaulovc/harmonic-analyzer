@@ -466,12 +466,6 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         script_name="draw_arbor_pedestal.py",
     ),
     DrawingSpec(
-        name="pivot_ball_mount",
-        part="pivot_ball_mount",
-        artifact_stem="pivot-ball-mount",
-        script_name="draw_pivot_ball_mount.py",
-    ),
-    DrawingSpec(
         name="crankshaft",
         part="crankshaft",
         artifact_stem="crankshaft",

@@ -78,6 +78,10 @@ BRACKET_STUD_X = 0.0
 BRACKET_HOLE_X = tuple(BRACKET_STUD_X + dx for dx in (-10.0, 10.0))
 # The ~Ø4 bracket screws THREAD IN: tapped #8-32 (nearest UNC coarse).
 BRACKET_HOLE_SPEC = HoleSpec("tapped", "#8-32")
+# Latch-strip screw (2026-09, ch23 p.58): the same #8-32 tap on the FRONT
+# face line, at the transgear knob-shaft x (paper-drive KNOB_SHAFT_XY[0] =
+# stud + 44.766 cos(-162 deg); asserted there against this constant).
+LATCH_HOLE_X = -42.575
 
 CLAMP_HOLE_X = tuple(
     s * (COLUMN_X + d) for s in (-1.0, 1.0) for d in (-CLAMP_SCREW_DX, CLAMP_SCREW_DX)
@@ -141,8 +145,8 @@ async def build(adapter) -> dict[str, str]:
     )
     wizard_holes(
         adapter, BRACKET_HOLE_SPEC,
-        [[x, 0.0, front_z] for x in BRACKET_HOLE_X],
-        (0.0, 0.0, -1.0), "bracket-screw tapped holes (#8-32)", name="BracketHoles",
+        [[x, 0.0, front_z] for x in (*BRACKET_HOLE_X, LATCH_HOLE_X)],
+        (0.0, 0.0, -1.0), "bracket + latch-strip tapped holes (#8-32)", name="BracketHoles",
     )
     v_holes = (
         len(CLAMP_HOLE_X)
@@ -152,7 +156,7 @@ async def build(adapter) -> dict[str, str]:
             * ((CLAMP_CBORE_DIA / 2.0) ** 2 - (clamp_dia / 2.0) ** 2)
             * CLAMP_CBORE_DEPTH
         )
-        + len(BRACKET_HOLE_X)
+        + (len(BRACKET_HOLE_X) + 1)
         * math.pi
         * (bracket_dia / 2.0) ** 2
         * BAR_DEPTH
