@@ -470,9 +470,9 @@ CRANK_ARM_Z0 = CRANKSHAFT_Z0  # arm PLATE south face: the hub band is
 # the chain when the crank turns (user, book p005). The placed pose composes a
 # Ry(180) (the plate's local +z extrusion runs machine -z), so the component
 # ORIGIN sits at the north face -- see CRANK_ARM_ORIGIN_Z.
-ARM_C2C = 66.0  # handle pivot from the shaft axis (rederived from the ch30
-# eight-views, see build_crank_arm.py; was 150 -- a down-pointing 150 arm put
-# the handle below the table)
+from crank_arm_spec import ARM_C2C  # noqa: E402  # 75: handle pivot from the
+# shaft axis (2026-09 front-view re-derive, see crank_arm_spec; was 66 from the
+# perspective-magnified side view, 150 before that)
 REMOVABLE_Z0 = -157.5  # mounted T12 (face 5.0): band -157.5..-152.5, mid -155 =
 # the front chain plane (ch30 GT: solved-camera z-ticks bracket the physical
 # chain run at -153 +- 3), between the merged crank column (south flank -98.6,

@@ -169,9 +169,9 @@ sections:
       - confidence
       rows:
       - - Crank arm length (center-to-center)
-        - ~66 mm
-        - ~2.6
-        - 'REDERIVED from the ch30 eight-views (angle 90 side view): crankshaft axis to handle-pivot axis, scaled to the 280 mm base depth (ch6, annotated). The crank hangs straight DOWN; with cone-pivot-post-v2 fixing Y_CRANK = 129.850, the 66 mm arm puts the handle axis 13.05 mm above the base top. SUPERSEDES the former ~150 (cone-axial scaled, low), which was >2x too long.'
+        - ~75 mm
+        - ~3.0
+        - '2026-09 re-derive from the ch30 FRONT view (p002 registered pair: 107 px hub-to-pivot vs the model''s 92 px at 66 -> 77, less ~2% perspective) cross-checked on the ch11 p.13 studio photo (~78 at the arm-width scale). The earlier 66 was scaled on the angle-90 side view, where the crank is the closest object to the camera and the base depth it was scaled against sits ~200 mm behind it. The crank hangs straight DOWN; with cone-pivot-post-v2 fixing Y_CRANK = 129.850 the handle axis sits 4.05 mm above the base top, the grip hanging in front of the base. SUPERSEDES 66 and the former ~150.'
         - scaled
         - med
       - - Handle length
