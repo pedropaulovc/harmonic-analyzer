@@ -53,7 +53,7 @@ DRAWING_NOTES = "\n".join(
         "   TOP EDGE; STRAIGHT TAPER TO BOTTOM ARC.",
         "6. PIVOT HOLE: REAM +0.03/0, Ra 1.6.",
         f"7. INTEGRAL HUB DIA {HUB_DIA:.2f} X {HUB_LENGTH:.2f} ON THE PIVOT",
-        f"   BORE, PROUD {HUB_PROUD:.2f} EACH FACE: THE HUBS",
+        f"   BORE, PROUD {(HUB_LENGTH - ARM_THICKNESS) / 2.0:.2f} EACH FACE: THE HUBS",
         "   SET THE STATION PITCH (NO SPACERS).",
     )
 )
