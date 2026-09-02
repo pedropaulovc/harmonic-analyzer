@@ -28,7 +28,7 @@ def test_notes_describe_the_yoke_and_set_screw() -> None:
     notes = pen_frame_spec.DRAWING_NOTES
     assert "#4-40 UNC-2B" in notes
     assert "WINDOW" in notes
-    assert "10.25 +/-0.05 FROM LEFT OUTER FACE" in notes
+    assert "12.25 +/-0.05 FROM LEFT OUTER FACE" in notes
     assert "MID-DEPTH CENTER PLANE" in notes
     assert "CDA" not in notes
     assert "X.XX" not in notes

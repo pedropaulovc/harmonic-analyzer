@@ -50,8 +50,9 @@ from pen_v_block_spec import (
     BORE_X,
     CHAMFER,
     SCREW_HOLE_XY,
-    SLIT_LENGTH,
-    SLIT_Y,
+    GROOVE_DEPTH,
+    GROOVE_WIDTH,
+    GROOVE_Z0,
     SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -100,9 +101,6 @@ def _front_y(model_y_mm: float) -> float:
 # sits right, between the front and right views.
 FRONT_KEEP = {
     "Length": (_sheet_x(BLOCK_LENGTH / 2.0), 0.058),
-    "SlitLength": (_sheet_x(SLIT_LENGTH / 2.0), 0.070),
-    "SlitY0": (_sheet_x(0.0) - 0.022, _front_y(SLIT_Y[0] / 2.0)),
-    "SlitWidth": (_sheet_x(0.0) - 0.022, _front_y(SLIT_Y[1] + 2.0)),
     "Chamfer2dx": (
         _sheet_x(BLOCK_LENGTH - CHAMFER / 2.0),
         _front_y(BLOCK_HEIGHT) + 0.012,
@@ -119,8 +117,17 @@ TOP_KEEP = {
     "Bore0X": (_sheet_x(BORE_X[0] / 2.0), TOP_CENTER[1] - 0.042),
     "Bore1X": (_sheet_x(BORE_X[1] / 2.0), TOP_CENTER[1] - 0.052),
     "Bore0Dia": (_sheet_x(BORE_X[0]) + 0.030, TOP_CENTER[1] + 0.042),
+    # Bottom groove band (a Top-plane sketch, so its Z dims project into the
+    # top view): the width and its offset from the front depth face, stacked
+    # right of the view.
+    "GrooveWidth": (_sheet_x(BLOCK_LENGTH) + 0.014, TOP_CENTER[1]),
+    "GrooveZ0": (_sheet_x(BLOCK_LENGTH) + 0.026, TOP_CENTER[1] - 0.024),
 }
-RIGHT_KEEP = {"Depth": (RIGHT_CENTER[0], 0.068)}
+RIGHT_KEEP = {
+    "Depth": (RIGHT_CENTER[0], 0.068),
+    # The groove rise, seen in the end section left of the right view.
+    "GrooveDepth": (RIGHT_CENTER[0] - 0.046, 0.088),
+}
 
 # Right-view half extents at 4:1: the 16 (Z) x 18 (Y) stock section.
 RIGHT_HALF_Z = BLOCK_DEPTH / 2.0 * SHEET_SCALE[0] / 1000.0
@@ -168,7 +175,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Pen V-Block Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "pen v-block; brass; clamp slit; manufacturing drawing",
+            3: "pen v-block; brass; marker groove; manufacturing drawing",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

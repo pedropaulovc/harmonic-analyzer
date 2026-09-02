@@ -639,10 +639,12 @@ _REQUIRED_FREE_STEMS = {
     # read under-constrained WITH it (a grounded/fixed regression would freeze
     # the counter-spring anchor while the lever still swings, codex #201).
     "summing": ("summing-lever", "boss-hook"),
-    # One freed DOF (the carriage travel); the lock-mated marker + pen-wire
-    # must ride it -- with the neutral preset the motion sweep reads
-    # got == want == 0 even if the marker were disconnected (codex #201).
-    "pen": ("pen-rod", "pen-marker", "pen-wire"),
+    # One freed DOF (the carriage travel); the lock-mated carriage (v-block,
+    # marker, stirrup frame + its thumb screw) and the pen-wire must ride it --
+    # with the neutral preset the motion sweep reads got == want == 0 even if a
+    # rider were disconnected (codex #201).
+    "pen": ("pen-rod", "pen-marker", "pen-wire", "pen-v-block", "pen-frame",
+            "pen-set-screw"),
 }
 
 def _required_free_instances(name: str) -> tuple[str, ...]:

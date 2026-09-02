@@ -1666,21 +1666,21 @@ sections:
         - scaled
         - low
       - - Square rod length
-        - ~120 mm, Ø2 wire hole near top
-        - ~4.7
-        - p.64 inset; resolved in M2
-        - scaled
+        - 150 mm, #47 wire hole 5 below the top
+        - ~5.9
+        - 'p.64 inset; 2026-09 photo re-derive: the rod runs from the hanger guide (y 505) down into the v-block bore at paper mid-height (y 368), so 120 no longer reaches'
+        - scaled + derived
         - low
       - - Frame (stirrup)
-        - ~22 × 40 × 10; side rails 4 (long sides), end rails 5; Ø3 set-screw hole in one end rail
+        - ~26 × 40 × 10; side rails 4 (long sides), end rails 5; #4-40 thumb-screw hole up through the bottom rail
         - —
-        - 'p.64–65 vs 5 mm rod; resolved in M2; M6.4: side rails thinned 5 → 4 (read thinner in the photo; the 14-wide window must clear the marker barrel at the platen side)'
+        - 'p.64–65 + v4_t00591/t00612 vs 5 mm rod: the ring WRAPS the v-block''s 16 × 18 end section (window 18 wide, 1.0 a side), its plane perpendicular to the block length, standing 1.0 forward of the rod; the thumb screw presses the marker up into the block groove. Was 22 wide lying flat on the block top (M6.4 read, refuted by the video)'
         - scaled
         - low
       - - V-block
-        - ~32 × 18 × 16; 6 mm 45° top chamfers; 2 × Ø8 vertical bores at x = 11/21; stopped clamp slit 26 long × 4 (y 4–8); Ø2.5 screw hole
+        - 36 × 18 × 16; 6 mm 45° top chamfers; 2 × Ø8 vertical bores at x = 10 (rod, paper end) / 26 (spare pen seat); bottom marker groove 8.5 wide × 4.5 deep along the full length, centred across the depth; Ø2.5 rod set-screw hole on the rod-bore axis
         - —
-        - p.65 close-up
+        - 'p.60/65 close-ups + v4_t00579/t00612: the block HANGS on the rod (rod 14 into the bore, side set screw), its length at 45° to the paper (t00603 nib callout), the marker running through the bottom groove. The old p.65 read of the end-face notch as a stopped flexure slit is refuted by t00612 (marker passes right through)'
         - scaled
         - low
       - - Set screw
@@ -1690,7 +1690,7 @@ sections:
         - scaled
         - low
       - - Pen hanger (M6.4)
-        - black strap (3 thick, tapering 16 → 10 wide) flat on the wheel-bar front face (z −138.9), descending from the bar band (y 560..570) to a 12 × 12 guide block (z −155.5..−138.9) with a 5.4-square VERTICAL channel (cut along Y) the pen rod slides in
+        - black strap (3 thick, tapering 16 → 10 wide) flat on the wheel-bar front face (z −138.9), descending from the bar band (y 560..570) to a 12 × 12 guide block (z −161.0..−138.9, 22.1 deep) with a 5.4-square VERTICAL channel (cut along Y, centre z −157.0) the pen rod slides in
         - —
         - p.60–63
         - scaled + derived
@@ -1701,10 +1701,10 @@ sections:
         - p.60–63 (the strap is bolted to the bar)
         - scaled + derived
         - low
-      - - Pen marker (M6.4)
-        - Ø8 brass barrel, 12-tall conical tip, 60 overall; collar/ferrule detail omitted
+      - - Pen marker
+        - Ø8 barrel, 5-tall conical tip, 110 overall (a full-length marker: ~75 shows in front of the block on ch30 p002/p004 and v4_t00612); collar/ferrule detail omitted
         - —
-        - p.60–63
+        - p.60–63, ch30 p002/p004, v4_t00612
         - scaled
         - low
   - prose: |2
@@ -1716,17 +1716,21 @@ sections:
       book photos is a modern replacement designed/built by Mike Harland and Tom
       Wilson. Model the replacement (it is what the photos document).
 
-      M6.4 pen layout (machine coords): pen rod vertical at x −3, z −151.5 band
-      (rod z −154..−149), y 398..518, Ø2 wire hole at y 513 just above the hanger
-      block top (511); v-block at (−24, 390, −159.5) — rod bore (local x 21) on
-      the rod axis; marker VERTICAL in the x −13 bore, tip at y 368, i.e. 8.6 off
-      the paper plane — the book's ~12° tilt would cut the v-block's vertical
-      bores, so the marker stands plumb (documented deviation, settle in M6.5);
-      pen frame flat on the v-block top (y 408), long axis along X (Ry+90·Rx+90 at
-      (−29, 418, −143)): window machine x −25..+7, z −161..−147 spans marker +
-      rod, the plate's near edge stops 0.1 short of the platen front face −142.9;
-      set screw along +X at (−38, 413, −154) — knob x −38..−33, shank threading
-      the west end rail (x −29..−24), tip at −18, 1 shy of the marker barrel.
+      Pen layout (machine coords, 2026-09 photo re-derive — build_pen_assembly):
+      pen rod vertical at x 3, z −157.0 band (rod z −159.5..−154.5), y 368..518,
+      #47 wire hole at y 513 just above the hanger block top (511); the rod line
+      sits 5.5 forward of the old −151.5 so the 45° block's paper-side corner
+      (z −144.3) clears the paper front (−143.4). V-block origin (−9.73, 364,
+      −155.59), yawed +45° about Y (its length runs forward + east): the rod bore
+      (local x 10, z 8) on the rod axis with the rod 14 into it; marker in the
+      bottom groove along the block length, axis 0.25 under the groove roof,
+      nib at (−10.35, 364.25, −143.65) = 0.25 off the paper front at paper
+      mid-height, barrel running 110 forward to (67.4, ., −221.4). Stirrup frame
+      yawed −45° with its window round the block section (1.0 a side, top rail
+      0.1 above the block top), 1.0 forward of the rod's front face; thumb screw
+      stood on end (+X → +Y) on the frame's screw axis, knob outer face y 340,
+      tip 0.25 under the marker. All carriage parts lock-mated to the rod; the
+      rod's Y travel is the freed DOF.
 - heading: Chapter 25 — Pinion Gear (pp. 66–69)
   elements:
   - prose: ''

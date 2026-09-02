@@ -37,9 +37,9 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
         pen_v_block_spec.BLOCK_HEIGHT,
         pen_v_block_spec.BLOCK_DEPTH,
     )
-    assert (drawing.BORE_X, drawing.SLIT_LENGTH, drawing.SCREW_HOLE_XY) == (
+    assert (drawing.BORE_X, drawing.GROOVE_WIDTH, drawing.SCREW_HOLE_XY) == (
         pen_v_block_spec.BORE_X,
-        pen_v_block_spec.SLIT_LENGTH,
+        pen_v_block_spec.GROOVE_WIDTH,
         pen_v_block_spec.SCREW_HOLE_XY,
     )
 
@@ -53,13 +53,14 @@ def test_sheet_runs_at_4_to_1_with_2_to_1_isometric() -> None:
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
 
 
-def test_linked_notes_cover_the_stopped_slit_and_functional_tolerances() -> None:
+def test_linked_notes_cover_the_marker_groove_and_functional_tolerances() -> None:
     notes = pen_v_block_spec.DRAWING_NOTES
-    # The one make-or-scrap instruction: the slit must NOT run the full length,
-    # or the clamp jaw separates from the block.
-    assert "FROM LEFT END ONLY" in notes
-    assert "FLEX HINGE" in notes
-    assert "PAINT MACHINE GREEN" in notes
+    # The make-or-scrap instructions: the marker groove runs the FULL length
+    # (the barrel passes right through, v4_t00612) and the block ships bright.
+    assert "ALONG THE FULL LENGTH" in notes
+    assert "MARKER GROOVE" in notes
+    assert "DO NOT PAINT" in notes
+    assert "GREEN" not in notes
     # General tolerances live in the title block ONLY -- a second general
     # tolerance in the notes would conflict with it.
     assert "LINEAR +/-" not in notes
@@ -104,5 +105,5 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
 
     spec = _config.parts("pen-v-block")
     assert "brass" in str(spec["material_specification"]).lower()
-    assert "green" in str(spec["finish"]).lower()
+    assert "bright brass" in str(spec["finish"]).lower()
     assert int(spec["quantity"]) == 1

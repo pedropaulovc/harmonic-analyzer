@@ -58,7 +58,9 @@ from pen_frame_spec import (
 PART_NAME = "pen-frame"
 MATERIAL = "Brass"  # see _common.apply_material docstring
 
-OUTER_WIDTH = 22.0  # X  DIMENSIONS.md ch24: p.64/65 vs 5 mm rod (low)
+OUTER_WIDTH = 26.0  # X: the window must pass the 16-deep v-block with 1.0 a side
+# (v4_t00591/t00612 -- the stirrup wraps the block's end section, the block
+# hanging on the rod beside it); was 22 when the ring lay flat on the block
 OUTER_HEIGHT = 40.0  # Y
 RAIL_SIDE = 4.0  # long-side rails (local X): read thinner in the photo; the
 # extra 1 mm of window also clears the marker barrel at the platen side in

@@ -7,9 +7,10 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 
 ROD_SECTION = 5.0  # DIMENSIONS.md ch24: square section (low)
-ROD_LENGTH = 120.0  # DIMENSIONS.md ch24: p.64 inset (low)
+ROD_LENGTH = 150.0  # ch30 p002 / v4_t00603: the rod runs from the hanger guide
+# down to the v-block at paper mid-height (was 120 with the block grounded)
 SECTION_BAND = (0.00, -0.05)
-WIRE_HOLE_Y = 115.0  # wire tie-off near the top (build_pen_assembly imports this)
+WIRE_HOLE_Y = 145.0  # wire tie-off near the top (build_pen_assembly imports this)
 WIRE_HOLE_DRILL = "#47"  # number drill (see _holes.NUMBER_DRILL_MM)
 WIRE_HOLE_DIA = 1.994
 

@@ -75,9 +75,12 @@ PART_NAME = "pen-hanger"
 MATERIAL = "Plain Carbon Steel"  # black hardware
 
 BLOCK_HALF = 6.0  # guide block 12 x 12 (low)
-BLOCK_Z = (-4.0, 12.6)  # deep block: back face on the bar front (derived)
+BLOCK_Z = (-4.0, 18.1)  # deep block: back face on the bar front (derived); the
+# rod line moved 5.5 forward of the bar (build_pen_assembly PEN_Z_MID) so the
+# 45-degree v-block clears the paper, and the block deepens to keep the strap
+# flush on the bar
 GUIDE_HOLE_HALF = 2.7  # 5.4 square: the 5-square pen rod slides (derived)
-STRAP_Z = (9.6, 12.6)  # strap 3 thick, flush with the block back (derived)
+STRAP_Z = (15.1, 18.1)  # strap 3 thick, flush with the block back (derived)
 STRAP_TOP_Y = 75.7  # machine 580.7: bar top after the ch30 p002 wheel-bar
 # re-anchor (y 575.7) -- the strap stretches up to the raised bar while the
 # guide block stays put on the pen line (the pen geometry did not move)
