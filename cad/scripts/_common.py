@@ -1153,6 +1153,30 @@ def _git_sha() -> str:
         return "unknown"
 
 
+def _git_commit_year() -> str:
+    """Year of the HEAD commit, for the title block's copyright line.
+
+    Same determinism rule as :func:`_git_sha`: derived from the source state,
+    never the wall clock, so a rebuild from the same commit stamps the same
+    year and a cache restore cannot disagree with a fresh build.  Outside a
+    git checkout there is no source-derived year, so fail loud rather than
+    stamp a guess into every part.
+    """
+    import subprocess
+
+    date = subprocess.run(
+        ["git", "log", "-1", "--format=%cs"],
+        cwd=str(CAD_ROOT),
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    year = date[:4]
+    if not (len(year) == 4 and year.isdigit()):
+        raise RuntimeError(f"HEAD commit date is not ISO-dated: {date!r}")
+    return year
+
+
 def part_properties(part_name: str) -> dict[str, str]:
     """SolidWorks custom properties for ``part_name`` from the parts registry.
 
@@ -1166,6 +1190,10 @@ def part_properties(part_name: str) -> dict[str, str]:
         "Title": part_name,
         "Revision": _config.release_revision(),
         "Generator": f"harmonic-analyzer @ {_git_sha()}",
+        # The title block's "(c) <year> <holder>" line reads this via
+        # $PRPSHEET:{COPYRIGHT_YEAR}; SolidWorks has no built-in year-only
+        # property and its date built-ins change on every rebuild.
+        "COPYRIGHT_YEAR": _git_commit_year(),
     }
     # Title-block general tolerances (title_block.yaml) — read by the drawing
     # template's title block via $PRPSHEET, so EVERY part carries them,
