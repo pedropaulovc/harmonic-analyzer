@@ -57,6 +57,7 @@ from harmonic_base_spec import (
     BOTTOM_LENGTH,
     BOTTOM_REAR_Z,
     BOTTOM_WIDTH,
+    RIM_TOP,
     STACK_HEIGHT,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -273,8 +274,10 @@ def _visible_side_datum_edges(adapter: Any, view: Any) -> tuple[Any, Any]:
             )
         return matching[0]
 
+    # The side silhouette's top edge is the raised rim's top (RIM_TOP), not the
+    # deck: the deck sits LIP_H below it inside the rim.
     return _at_height(0.0, "underside datum A"), _at_height(
-        STACK_HEIGHT / 1000.0, "top pad"
+        RIM_TOP / 1000.0, "rim top"
     )
 
 

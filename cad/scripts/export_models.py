@@ -38,10 +38,12 @@ Run after any --rebuild so the render cache tracks geometry:
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import os
 import shutil
+import struct
 import subprocess
 import sys
 import time
@@ -800,7 +802,134 @@ def _save_as(doc: Any, out: Path) -> int:
         if not out.exists() or out.stat().st_size == 0:
             out.unlink(missing_ok=True)  # never leave a zero-byte placeholder behind
             raise RuntimeError(f"SaveAs3 produced no/empty file: {out} (rc={ok})")
+        if out.suffix.lower() == ".glb":
+            dropped = sanitize_glb(out)
+            sp.set_attribute("glb.attributes_dropped", len(dropped))
+            if dropped:
+                _telemetry.event("glb.sanitized", dropped=json.dumps(dropped))
+                _telemetry.warn(
+                    f"{out.name}: dropped {len(dropped)} attribute accessor(s) whose "
+                    f"count differs from POSITION (SolidWorks glTF exporter quirk; "
+                    f"Blender's importer would raise IndexError): {dropped}"
+                )
         return ok
+
+
+def _effective_tex_coord(info: dict[str, Any]) -> int:
+    """The UV set a ``textureInfo`` actually samples: the
+    ``KHR_texture_transform`` extension's ``texCoord`` overrides the slot's own
+    ``texCoord`` (default 0) on every consumer that supports the extension, and
+    the exporter writes the same set in both places when it has no separate
+    pre-transform UV set -- so the override, when present, is the one that
+    decides whether a dropped ``TEXCOORD_N`` orphans the slot."""
+    transform = info.get("extensions", {}).get("KHR_texture_transform", {})
+    if isinstance(transform, dict) and "texCoord" in transform:
+        return int(transform["texCoord"])
+    return int(info.get("texCoord", 0))
+
+
+def sanitize_glb(path: Path) -> list[dict[str, Any]]:
+    """Repair a SolidWorks-exported glTF binary in place so Blender can import it.
+
+    SolidWorks' glTF exporter (``SOLIDWORKSGLTF``) can write a primitive whose
+    ``TEXCOORD_0`` accessor has a DIFFERENT element count from its ``POSITION``
+    accessor (seen on textured cast-iron faces: harmonic-base 850 UVs / 450
+    positions, top-frame 576 / 580 in the v31 bundle). Blender's importer
+    indexes the UV array by the vertex indices and dies with
+    ``IndexError: index 576 is out of bounds for axis 0 with size 576`` --
+    which meshprobe then surfaced as a worker timeout. The spec requires every
+    attribute accessor of a primitive to share one count, so the mismatched
+    attribute is dropped (its buffer bytes stay, unreferenced); a texture slot
+    whose EFFECTIVE UV set (``KHR_texture_transform.texCoord`` when the slot
+    carries that extension, else ``textureInfo.texCoord``) was dropped is
+    removed on a clone of the material (slots on surviving sets keep their
+    textures) so the file stays valid. Returns one record per dropped attribute (empty when the
+    file was already clean) -- the caller logs them; a clean file is not
+    rewritten at all."""
+    with path.open("rb") as fh:
+        magic, version, _length = struct.unpack("<III", fh.read(12))
+        json_len, json_type = struct.unpack("<II", fh.read(8))
+        gltf = json.loads(fh.read(json_len))
+        rest = fh.read()
+    if magic != 0x46546C67:  # b"glTF"
+        raise ValueError(f"not a glTF binary: {path}")
+    accessors = gltf.get("accessors", [])
+    materials = gltf.setdefault("materials", [])
+    dropped: list[dict[str, Any]] = []
+    # (source material, frozenset of removed texture slots) -> clone index
+    untextured: dict[tuple[int, frozenset[str]], int] = {}
+    for mesh_index, mesh in enumerate(gltf.get("meshes", [])):
+        for prim_index, prim in enumerate(mesh.get("primitives", [])):
+            attrs = prim.get("attributes", {})
+            if "POSITION" not in attrs:
+                continue
+            n_pos = accessors[attrs["POSITION"]]["count"]
+            removed_uv_sets: set[int] = set()
+            for key in list(attrs):
+                if key == "POSITION":
+                    continue
+                n_attr = accessors[attrs[key]]["count"]
+                if n_attr == n_pos:
+                    continue
+                del attrs[key]
+                dropped.append(
+                    {
+                        "mesh": mesh_index,
+                        "primitive": prim_index,
+                        "attribute": key,
+                        "count": n_attr,
+                        "positions": n_pos,
+                    }
+                )
+                if key.startswith("TEXCOORD_"):
+                    removed_uv_sets.add(int(key.split("_", 1)[1]))
+            if not removed_uv_sets or "material" not in prim:
+                continue
+            # Only the texture slots whose EFFECTIVE UV set was removed lose
+            # their texture; a slot on a surviving set (e.g. texCoord 1 when
+            # only TEXCOORD_0 was dropped) keeps it.
+            src = prim["material"]
+            source = materials[src]
+            pbr_src = source.get("pbrMetallicRoughness", {})
+            slots = {
+                "baseColorTexture": pbr_src,
+                "metallicRoughnessTexture": pbr_src,
+                "normalTexture": source,
+                "occlusionTexture": source,
+                "emissiveTexture": source,
+            }
+            doomed = frozenset(
+                name
+                for name, holder in slots.items()
+                if isinstance(holder.get(name), dict)
+                and _effective_tex_coord(holder[name]) in removed_uv_sets
+            )
+            if not doomed:
+                continue
+            cache_key = (src, doomed)
+            if cache_key not in untextured:
+                clone = copy.deepcopy(source)
+                pbr = clone.get("pbrMetallicRoughness", {})
+                for name in doomed:
+                    (pbr if name in ("baseColorTexture", "metallicRoughnessTexture") else clone).pop(
+                        name, None
+                    )
+                clone["name"] = f"{clone.get('name') or 'material'}-untextured"
+                materials.append(clone)
+                untextured[cache_key] = len(materials) - 1
+            prim["material"] = untextured[cache_key]
+    if not dropped:
+        return dropped
+    payload = json.dumps(gltf, separators=(",", ":")).encode("utf-8")
+    payload += b" " * (-len(payload) % 4)
+    total = 12 + 8 + len(payload) + len(rest)
+    with path.open("wb") as fh:
+        fh.write(struct.pack("<III", magic, version, total))
+        fh.write(struct.pack("<II", len(payload), json_type))
+        fh.write(payload)
+        fh.write(rest)
+    return dropped
+
 
 
 @_telemetry.traced("export.build_png", label_param="stem")

@@ -297,9 +297,9 @@ SPARE_GEAR_POS = (160.0, 53.2, -15.0)  # machine +X (west) of the platen
 CLIP_SCREW_XY = tuple((PLATE_X0 + sx, PLATE_Y0 + sy) for sx, sy in PLATEN_SOCKET_XY)
 # The clips run from the platen's top edge down; their end holes (inset
 # CLIP_HOLE_INSET) must land exactly on the platen's edge sockets.
-_CLIP_Y0_LOCAL = PLATE_HEIGHT - CLIP_LENGTH  # 15
-assert PLATEN_SOCKET_XY[0][1] == _CLIP_Y0_LOCAL + CLIP_HOLE_INSET
-assert PLATEN_SOCKET_XY[1][1] == PLATE_HEIGHT - CLIP_HOLE_INSET
+_CLIP_Y0_LOCAL = PLATE_HEIGHT - CLIP_LENGTH  # 51.32
+assert math.isclose(PLATEN_SOCKET_XY[0][1], _CLIP_Y0_LOCAL + CLIP_HOLE_INSET, abs_tol=1e-6)
+assert math.isclose(PLATEN_SOCKET_XY[1][1], PLATE_HEIGHT - CLIP_HOLE_INSET, abs_tol=1e-6)
 # Guide screws: 2 rows of 5, heads counterbored 0.2 sub-flush of the platen
 # front (ch22 front photo shows the slotted heads; the paper lies flat over
 # them), shanks threading 2.4 into the rails' blind holes.
@@ -886,7 +886,7 @@ async def build(adapter) -> dict[str, str]:
     # edge clips, with the fitted side/top margins. The 0.25-thick sheet leaves 0.25 air
     # behind it (build_platen_paper) so no face lands coplanar on the platen.
     paper_side_margin = (PLATE_WIDTH - PAPER_WIDTH) / 2.0
-    paper_top_margin = 5.3928  # ch30-p002 fit: old 6 mm margin * 0.8988
+    paper_top_margin = 3.0  # ch30-p002: the sheet's top edge sits just under the plate top
     paper = await place_component(
         adapter,
         "platen-paper",

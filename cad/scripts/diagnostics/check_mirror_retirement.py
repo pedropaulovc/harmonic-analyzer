@@ -321,7 +321,7 @@ for i, sx in enumerate((p.PLATEN_SOCKET_XY[0][0], p.PLATEN_SOCKET_XY[2][0])):
            [clip_x, p.PLATE_Y0 + p.PLATE_HEIGHT, p.PLATE_FRONT_Z - p.CLIP_THICKNESS],
            _rz(-90.0), f"platen-clip x{clip_x:+.0f}", **_SOLV)
 _paper_side = (p.PLATE_WIDTH - p.PAPER_WIDTH) / 2.0
-_paper_y = p.PLATE_Y0 + p.PLATE_HEIGHT - p.PAPER_HEIGHT - 5.3928
+_paper_y = p.PLATE_Y0 + p.PLATE_HEIGHT - p.PAPER_HEIGHT - 3.0
 expect(PD, "platen-paper-1", [p.PLATE_X0 + _paper_side, _paper_y, p.PLATE_FRONT_Z - 0.5],
        IDENTITY, "platen-paper", **_SOLV)
 _fs = 0

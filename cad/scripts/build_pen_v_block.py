@@ -1,18 +1,19 @@
-r"""Reproduction script: pen v-block (book ch. 24, pp. 64-65).
+r"""Reproduction script: pen v-block (book ch. 24, pp. 60-65).
 
-The chunky brass block that seats the marker: chamfered top corners, two
-vertical bores, a stopped horizontal slit from one end (the flexing clamp
-jaw -- it must NOT run the full length or the block would fall apart) and
-a small front hole for the clamp/set screw. This is the modern
-replacement pen holder (Harland/Wilson) documented by the book photos;
-the marker itself is a consumable, not modelled.
+The chunky brass block that hangs on the square pen rod and carries the
+marker: chamfered top corners, two vertical bores (the rod drops into the one
+nearest the paper, the other is a spare pen seat), a groove milled along the
+bottom face that the marker lies in (the U-notch on the p.60 end-face macro;
+v4_t00612 shows the marker running through it), and a small front hole for
+the rod set screw over the rod bore. This is the modern replacement pen
+holder (Harland/Wilson) documented by the book photos.
 
-Dimensions: cad/DIMENSIONS.md "Chapter 24" — all scaled from the p.65
-close-up vs the ~5 mm square rod (low).
+Dimensions: cad/config/dimensions.yaml ch. 24 -- scaled from the p.60/65
+close-ups and the 4/4 video frames vs the ~5 mm square rod (low).
 
 Layout: length along +X, height along +Y from the origin corner, depth
-extruded +Z. Vertical bores cut from a Top-plane sketch (maps (x, y) ->
-global (X, -Z)); slit and front hole from Front-plane sketches.
+extruded +Z. Vertical bores and the bottom groove cut from Top-plane sketches
+(maps (x, y) -> global (X, -Z)); the front hole from a Front-plane sketch.
 
 Run (SolidWorks already open)::
 
@@ -21,13 +22,12 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
+import math
 import sys
 
 from _common import (
-    CASTING_GREEN,
     SketchDims,
     add_line_chain,
-    apply_color,
     apply_material,
     check,
     define_circle,
@@ -66,8 +66,9 @@ from pen_v_block_spec import (
     ISOMETRIC_VIEW_NOTE,
     SCREW_HOLE_DIA,
     SCREW_HOLE_XY,
-    SLIT_LENGTH,
-    SLIT_Y,
+    GROOVE_DEPTH,
+    GROOVE_WIDTH,
+    GROOVE_Z0,
     SURFACE_FINISHES,
 )
 
@@ -88,10 +89,10 @@ async def build(adapter) -> dict[str, str]:
     check("create_part", await adapter.create_part())
 
     # Editable knobs (Tools > Equations): the block envelope, the chamfer, the
-    # two bores, the slit band and the front screw hole. The mm suffix is
+    # two bores, the bottom groove and the front screw hole. The mm suffix is
     # load-bearing -- this is an INCH document and the equation manager reads
     # BARE numbers in document units (an unsuffixed 32 = 32 in, blowing the part
-    # up 25.4x in-plane). Bore/slit/screw stations are independent globals so a
+    # up 25.4x in-plane). Bore/groove/screw stations are independent globals so a
     # GUI edit nudges one feature without touching its neighbours.
     await set_global(adapter, "BlockLength", f"{BLOCK_LENGTH}mm")
     await set_global(adapter, "BlockHeight", f"{BLOCK_HEIGHT}mm")
@@ -100,9 +101,9 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
     await set_global(adapter, "BoreX0", f"{BORE_X[0]}mm")
     await set_global(adapter, "BoreX1", f"{BORE_X[1]}mm")
-    await set_global(adapter, "SlitLength", f"{SLIT_LENGTH}mm")
-    await set_global(adapter, "SlitY0", f"{SLIT_Y[0]}mm")
-    await set_global(adapter, "SlitY1", f"{SLIT_Y[1]}mm")
+    await set_global(adapter, "GrooveWidth", f"{GROOVE_WIDTH}mm")
+    await set_global(adapter, "GrooveDepth", f"{GROOVE_DEPTH}mm")
+    await set_global(adapter, "GrooveZ0", f"{GROOVE_Z0}mm")
     await set_global(adapter, "ScrewHoleDia", f"{SCREW_HOLE_DIA}mm")
     await set_global(adapter, "ScrewHoleX", f"{SCREW_HOLE_XY[0]}mm")
     await set_global(adapter, "ScrewHoleY", f"{SCREW_HOLE_XY[1]}mm")
@@ -181,38 +182,51 @@ async def build(adapter) -> dict[str, str]:
     vol = await _volume(adapter)
     _telemetry.info(f"volume after bores: {vol:.1f} mm^3")
 
-    # Stopped clamp slit through Z from the x=0 end. Rectilinear chain anchored
-    # at vertex 0 (0, SlitY0): the last segment of each direction is supplied by
-    # closure, so the distance dims are seg0 horizontal (SlitLength) and seg1
-    # vertical (SlitY1 - SlitY0); then the anchor vertical_distance (SlitY0,
-    # x is on the axis so no anchor-X dim) = 3 dims.
-    slit_dims = SketchDims()
-    check("create_sketch slit", await adapter.create_sketch("Front"))
-    slit_rect = [
-        (0.0, SLIT_Y[0]),
-        (SLIT_LENGTH, SLIT_Y[0]),
-        (SLIT_LENGTH, SLIT_Y[1]),
-        (0.0, SLIT_Y[1]),
+    # Bottom marker groove: a full-length channel milled up into the bottom
+    # face, centred across the depth. Top-plane sketch (x, y) -> global (X, -Z):
+    # a rectangle spanning the whole length in X and the groove band in Z,
+    # cut GROOVE_DEPTH up (+Y) from the bottom face (Top plane = y 0). The
+    # rectilinear chain is anchored at (0, -GrooveZ0): the last segment of each
+    # direction comes from closure, so the distance dims are seg0 horizontal
+    # (full length) and seg1 vertical (the groove width), then the anchor's
+    # vertical_distance (GrooveZ0; x on the axis emits no anchor-X dim) = 3 dims.
+    groove_dims = SketchDims()
+    check("create_sketch groove", await adapter.create_sketch("Top"))
+    groove_rect = [
+        (0.0, -GROOVE_Z0),
+        (BLOCK_LENGTH, -GROOVE_Z0),
+        (BLOCK_LENGTH, -(GROOVE_Z0 + GROOVE_WIDTH)),
+        (0.0, -(GROOVE_Z0 + GROOVE_WIDTH)),
     ]
-    slit = await add_line_chain(adapter, slit_rect)
+    groove = await add_line_chain(adapter, groove_rect)
     await define_rectilinear_chain(
-        adapter, slit, slit_rect, label="slit", dims=slit_dims,
-        names=["SlitLength", "SlitWidth", "SlitY0"],
-        drives=['"SlitLength"', '"SlitY1" - "SlitY0"', '"SlitY0"'],
+        adapter, groove, groove_rect, label="groove", dims=groove_dims,
+        names=["GrooveLength", "GrooveWidth", "GrooveZ0"],
+        drives=['"BlockLength"', '"GrooveWidth"', '"GrooveZ0"'],
     )
-    await ensure_fully_defined(adapter, "slit sketch")
-    check("exit_sketch slit", await adapter.exit_sketch())
-    name_last_feature(adapter, "SlitProfile")
-    drive_jobs += slit_dims.apply(adapter, "SlitProfile")
+    await ensure_fully_defined(adapter, "groove sketch")
+    check("exit_sketch groove", await adapter.exit_sketch())
+    name_last_feature(adapter, "GrooveProfile")
+    drive_jobs += groove_dims.apply(adapter, "GrooveProfile")
+    v_before_groove = await _volume(adapter)
     check(
-        "cut slit",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
-        ),
+        "cut groove",
+        await adapter.create_cut_extrude(ExtrusionParameters(depth=GROOVE_DEPTH)),
     )
-    name_last_feature(adapter, "Slit")
-    vol = await _volume(adapter)
-    _telemetry.info(f"volume after slit: {vol:.1f} mm^3")
+    name_last_feature(adapter, "Groove")
+    groove_depth_dim = name_dimensions(adapter, "Groove", ["GrooveDepth"])
+    drive_jobs += [(groove_depth_dim[0], '"GrooveDepth"')]
+    # The groove crosses the two vertical bores, so the removed volume is the
+    # channel prism minus the bore cylinders already absent over the groove
+    # band (each bore is fully inside the groove width: O8 in 8.5).
+    v_groove = (
+        GROOVE_WIDTH * GROOVE_DEPTH * BLOCK_LENGTH
+        - len(BORE_X) * math.pi * (BORE_DIA / 2.0) ** 2 * GROOVE_DEPTH
+    )
+    vol = await volume_check(
+        adapter, "groove", v_before_groove - v_groove, 0.02 * v_groove + 1.0
+    )
+    _telemetry.info(f"volume after groove: {vol:.1f} mm^3")
 
     # Front-face screw hole along Z. Centre off both axes -> centre-X,
     # centre-Z, diameter = 3 dims.
@@ -257,10 +271,9 @@ async def build(adapter) -> dict[str, str]:
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
 
+    # Bright brass in every photo (ch24 p.60/61, v4_t00603..t00645): no colour
+    # override, the material appearance is the finish.
     await apply_material(adapter, MATERIAL)
-    # The ch24 macro shows the cradle painted the machine green (manifest note
-    # "pen v-block authored brass vs green"); keep the brass mass model.
-    await apply_color(adapter, CASTING_GREEN)
     await report_mass_properties(adapter)
     apply_drawing_properties(
         adapter,

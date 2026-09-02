@@ -34,3 +34,17 @@ GLBs in durable sessions. Hard-won usage notes (2026-07-17, filed as issues #93â
   PR #339 (Codex caught it committed).
 - Schema discovery: `meshprobe schema --kind commands` (no per-command lookup);
   invalid preset/enum values error with the valid list â€” cheap discovery trick.
+
+- **"timed out" on `open` = a Blender importer error, not a slow import (2026-09-01):**
+  the v31 whole-machine `harmonic-analyzer.glb` (105 MB, 2.2 M tris) imports in ~5 s
+  once it is valid; it hung for the full worker timeout because the SolidWorks glTF
+  exporter wrote two primitives (`harmonic-base-1`, `top-frame-1`) whose `TEXCOORD_0`
+  count differs from `POSITION`, Blender's importer raises `IndexError: index 576 is
+  out of bounds`, and meshprobe 1.2.0's worker glues its error JSON onto Blender's
+  un-newlined traceback line so the controller never parses the reply
+  (filed upstream: pedropaulovc/meshprobe). Fixes: `export_models.sanitize_glb` now
+  strips such attributes at export time (every `.glb` through `_save_as`); for an
+  already-exported bundle run the same function on the file. Local venv patch to
+  `meshprobe/blender/worker.py::emit` (an empty `print()` before the JSON) makes a
+  bad file fail in 6 s with the importer's message -- `uv sync` reverts it. Bare
+  `meshprobe find *` gets shell-expanded: quote the pattern.

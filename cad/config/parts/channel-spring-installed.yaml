@@ -2,7 +2,7 @@ channel-spring-installed:
   number: MHA-011
   material: Alloy Steel
   material_specification: ASTM A228 music-wire spring steel
-  finish: black japanned
+  finish: bright (plain music wire, light oil)
   quantity: 20
   tolerance_class: machined_block
   fit_class: spring_eye_threading

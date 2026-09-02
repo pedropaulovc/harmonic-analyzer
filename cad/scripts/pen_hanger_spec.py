@@ -25,7 +25,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # (x >= 0.264 m) and the tall front view; it grows DOWNWARD from its anchor.
 DRAWING_NOTES = "\n".join(
     (
-        "1. GUIDE BLOCK 12.00 W X 12.00 H X 16.60 DEEP. CUT 5.40",
+        "1. GUIDE BLOCK 12.00 W X 12.00 H X 22.10 DEEP. CUT 5.40",
         "   +0.10/0.00 SQUARE HOLE THRU 12.00 H; INTERNAL R0.25 MAX.",
         "   SIDE WALLS 3.30 NOM; WALL-THICKNESS DIFFERENCE 0.10 MAX.",
         "   HOLE CENTER 4.00 +/-0.05 FROM FRONT DEPTH FACE; FRONT",

@@ -31,8 +31,8 @@ def test_platen_furniture_cascades_with_resized_envelope() -> None:
     side_margin = (platen.PLATE_WIDTH - paper.PAPER_WIDTH) / 2.0
     assert math.isclose(side_margin, 18.2007)
     assert math.isclose(
-        platen.PLATE_HEIGHT - paper.PAPER_HEIGHT - 5.3928,
-        14.3808,
+        platen.PLATE_HEIGHT - paper.PAPER_HEIGHT - 3.0,
+        51.32,
     )
 
 

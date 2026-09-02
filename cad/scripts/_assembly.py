@@ -2145,7 +2145,10 @@ def write_dof_manifest(name: str) -> Any:
 _ALLOWED_FREE_STEMS: dict[str, tuple[str, ...]] = {
     "channel": ("rocker-arm", "connecting-rod", "amplitude-bar", "channel-lever"),
     "summing": ("summing-lever", "boss-hook"),
-    "pen": ("pen-rod", "pen-marker", "pen-wire"),
+    # The carriage riders (v-block, marker, stirrup frame, thumb screw) are
+    # lock-mated to the free rod and read under-constrained with it.
+    "pen": ("pen-rod", "pen-marker", "pen-wire", "pen-v-block", "pen-frame",
+            "pen-set-screw"),
     "drive-train": (
         "alignment-pinion",
         "cone-gear",

@@ -25,8 +25,10 @@ import math
 import sys
 
 from _common import (
+    PANEL_BLACK,
     SketchDims,
     add_line_chain,
+    apply_color,
     apply_material,
     check,
     define_circle,
@@ -216,6 +218,9 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "driven magnifying clamp (equations neutral)", v_final, 80.0)
 
     await apply_material(adapter, MATERIAL)
+    # ch20 p.47 (img07) + p.46: the clamp block is BLACKENED brass (reads
+    # dark against the bright lever rod and the bright thumb screw).
+    await apply_color(adapter, PANEL_BLACK)
     await report_mass_properties(adapter)
 
     # Manufacturing drawing support: mark exactly the print's dimensions and

@@ -35,11 +35,16 @@ MM_PER_IN = 25.4
 
 # --- Nominal geometry (DIMENSIONS.md "Chapter 11", photo-scaled low unless noted).
 # These drive the part's named equation globals AND the drawing's coordinate math. ---
-ARM_C2C = 66.0  # shaft-to-handle-pivot centres -- REDERIVED from the ch30 eight-views
-# (angle-90 side view, scaled to the 280 mm base depth): the crank hangs straight
-# down, handle pivot 66 mm below the crankshaft axis, landing the handle ~10 mm above
-# the base top. The former 150 (cone-axial scaled, low) was >2x too long -- a
-# down-pointing 150 arm would drive the handle below the table (med).
+ARM_C2C = 75.0  # shaft-to-handle-pivot centres -- 2026-09 re-derive from the ch30
+# FRONT view (p002, registered pair: the arm reads 107 px hub-to-pivot against the
+# model's 92 px at 66 -> 77, less ~2% perspective for the crank standing 60 mm
+# nearer the camera than the columns) and the ch11 p.13 studio photo (~78 at the
+# arm-width scale). The earlier 66 came from the angle-90 side view, where the
+# crank is the closest thing to the camera and the base depth it was scaled to
+# sits 200 mm behind it. The crank hangs straight down; the handle axis lands
+# 4.0 mm above the base top and the handle itself hangs in front of the base
+# (its grip runs -Z, south of the base front). The former 150 (cone-axial
+# scaled, low) was >2x too long (med).
 ARM_WIDTH = 16.0  # arm width (low)
 ARM_THICKNESS = 8.0  # ~half the arm width, p.12 photo (low)
 SQUARE_END_OVERHANG = 10.0  # square end past the pivot (low)

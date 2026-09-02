@@ -72,5 +72,5 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
 
     cfg = _config.parts("channel-spring-installed")
     assert cfg["material_specification"] == "ASTM A228 music-wire spring steel"
-    assert cfg["finish"] == "black japanned"
+    assert cfg["finish"] == "bright (plain music wire, light oil)"
     assert int(cfg["quantity"]) == 20

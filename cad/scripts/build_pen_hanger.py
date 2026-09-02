@@ -34,8 +34,10 @@ import math
 import sys
 
 from _common import (
+    PANEL_BLACK,
     SketchDims,
     add_line_chain,
+    apply_color,
     apply_material,
     check,
     define_centered_rectangle,
@@ -73,9 +75,12 @@ PART_NAME = "pen-hanger"
 MATERIAL = "Plain Carbon Steel"  # black hardware
 
 BLOCK_HALF = 6.0  # guide block 12 x 12 (low)
-BLOCK_Z = (-4.0, 12.6)  # deep block: back face on the bar front (derived)
+BLOCK_Z = (-4.0, 18.1)  # deep block: back face on the bar front (derived); the
+# rod line moved 5.5 forward of the bar (build_pen_assembly PEN_Z_MID) so the
+# 45-degree v-block clears the paper, and the block deepens to keep the strap
+# flush on the bar
 GUIDE_HOLE_HALF = 2.7  # 5.4 square: the 5-square pen rod slides (derived)
-STRAP_Z = (9.6, 12.6)  # strap 3 thick, flush with the block back (derived)
+STRAP_Z = (15.1, 18.1)  # strap 3 thick, flush with the block back (derived)
 STRAP_TOP_Y = 75.7  # machine 580.7: bar top after the ch30 p002 wheel-bar
 # re-anchor (y 575.7) -- the strap stretches up to the raised bar while the
 # guide block stays put on the pen line (the pen geometry did not move)
@@ -144,8 +149,9 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError(f"block volume {vol:.1f} != {expected:.1f}")
 
     # 1b. Square rod channel cut along Y (the pen rod hangs vertically).
-    # The +-2.7 footprint stays inside the block's z -4..12.6 band and well
-    # clear of the strap's z 9.6..12.6 band, so a through cut is safe.
+    # The +-2.7 footprint stays inside the block's z -4..18.1 band (BLOCK_Z) and
+    # well clear of the strap's z 15.1..18.1 band (STRAP_Z), so a through cut
+    # is safe.
     channel = SketchDims()
     check("create_sketch channel", await adapter.create_sketch("Top"))
     await define_centered_rectangle(
@@ -220,10 +226,10 @@ async def build(adapter) -> dict[str, str]:
     expected = vol
 
     # 3. Hanger-screw hole through the strap: ONE native Hole Wizard #6-32
-    # tapped feature drilled from the strap BACK face (local z 9.6, outward
-    # normal -Z) -- the screw enters from behind. At local y 60 only the strap
-    # band 9.6..12.6 is material, so the through hole spans just the 3-thick
-    # strap.
+    # tapped feature drilled from the strap BACK face (local z STRAP_Z[0] =
+    # 15.1, outward normal -Z) -- the screw enters from behind. At local y 60
+    # only the strap band 15.1..18.1 is material, so the through hole spans
+    # just the 3-thick strap.
     screw_dia = TAP_DRILL_MM["#6-32"]
     screw_cut = wizard_holes(
         adapter,
@@ -263,6 +269,9 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "driven pen hanger (equations neutral)", vol, 1.0)
 
     await apply_material(adapter, MATERIAL)
+    # ch21 p.52 (img03) / ch30 plates: the hanger strap is BLACK-oxide steel
+    # (the dark bar the brass pen rod runs beside), not bright.
+    await apply_color(adapter, PANEL_BLACK)
     await report_mass_properties(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

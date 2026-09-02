@@ -7,7 +7,7 @@ dark board. Consumable media, but modeled for photo fidelity (M6.8
 photo-tuning).
 
 Sized by the ch30-p002 Pose Studio fit to sit between the resized platen
-clips with an 18.2007 mm side margin and 5.3928 mm top margin. The front
+clips with an 18.2007 mm side margin and 3.0 mm top margin. The front
 face sits 0.5 mm proud of the platen front
 face; the sheet is 0.25 thick so its BACK face keeps the standard 0.25 clear
 of the platen instead of landing coplanar on it — two coincident faces
@@ -49,7 +49,9 @@ PART_NAME = "platen-paper"
 MATERIAL = "Oak"  # nearest wood-fibre entry in the SW database; colour overridden
 
 PAPER_WIDTH = 233.2386  # ch30-p002 Pose Studio: 259.5 * 0.8988
-PAPER_HEIGHT = 115.0464  # ch30-p002 Pose Studio: 128 * 0.8988
+PAPER_HEIGHT = 80.5  # ch30-p002 + ch22 p.55: the sheet ends level with the clip bottoms
+# (clip 83.5 minus the 3.0 top margin) -- the lower ~38% of the platen face
+# stays bare black with its two screw rows showing (ch30 p002/p003/p009)
 PAPER_THICKNESS = 0.25  # front face stays 0.5 proud (assembly plants it at
 # PLATE_FRONT_Z - 0.5); the thinner sheet leaves 0.25 air behind so the back
 # face never coincides with the platen front face (render z-fight)

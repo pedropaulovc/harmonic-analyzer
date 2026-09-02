@@ -6,7 +6,8 @@ from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 BARREL_DIA = 8.0  # (low)
-BARREL_TOP_Y = 60.0
+BARREL_TOP_Y = 110.0  # ch30 p002/p004 + v4_t00612: ~75 of barrel shows in front
+# of the 36 block plus the 6 nib reach -- a full-length marker, not a 60 stub
 CONE_H = 5.0  # tip nose (low) — the ch24 macro shows a blunt bullet nose
 # (~0.6x dia), not the needle cone the old 12 gave; keep the same tip origin
 

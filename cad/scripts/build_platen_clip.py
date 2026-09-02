@@ -44,7 +44,7 @@ from _holes import CLEARANCE_MM, HoleSpec, wizard_holes
 PART_NAME = "platen-clip"
 MATERIAL = "Brass"  # see _common.apply_material docstring
 
-CLIP_LENGTH = 112.35  # ch30-p002 Pose Studio: 125 * 0.8988
+CLIP_LENGTH = 83.5  # ch22 p.55 rear photo: 86.7 of the 140 mm plate (0.619) x PLATE_HEIGHT 134.82
 CLIP_WIDTH = 8.988  # ch30-p002 Pose Studio: 10 * 0.8988
 CLIP_THICKNESS = 1.2  # DIMENSIONS.md ch22: thin spring strip (low)
 # End screws: the brass fillister clip screws (Ø2.9 shank) pass THROUGH, so

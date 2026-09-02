@@ -50,8 +50,9 @@ from pen_v_block_spec import (
     BORE_X,
     CHAMFER,
     SCREW_HOLE_XY,
-    SLIT_LENGTH,
-    SLIT_Y,
+    GROOVE_DEPTH,
+    GROOVE_WIDTH,
+    GROOVE_Z0,
     SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -100,14 +101,14 @@ def _front_y(model_y_mm: float) -> float:
 # sits right, between the front and right views.
 FRONT_KEEP = {
     "Length": (_sheet_x(BLOCK_LENGTH / 2.0), 0.058),
-    "SlitLength": (_sheet_x(SLIT_LENGTH / 2.0), 0.070),
-    "SlitY0": (_sheet_x(0.0) - 0.022, _front_y(SLIT_Y[0] / 2.0)),
-    "SlitWidth": (_sheet_x(0.0) - 0.022, _front_y(SLIT_Y[1] + 2.0)),
     "Chamfer2dx": (
         _sheet_x(BLOCK_LENGTH - CHAMFER / 2.0),
         _front_y(BLOCK_HEIGHT) + 0.012,
     ),
-    "ScrewHoleCx": (_sheet_x(SCREW_HOLE_XY[0] - 5.0), _front_y(BLOCK_HEIGHT) + 0.026),
+    # The set-screw hole now sits ON the rod-bore axis (x 10), so its station
+    # dim would overprint the top view's Bore0X (10.00) above the front view;
+    # it goes in the free band under the front view instead (the old slit row).
+    "ScrewHoleCx": (_sheet_x(SCREW_HOLE_XY[0] / 2.0), 0.070),
     # +0.012 keeps this vertical dimension's line (drawn at the text's x, from the
     # block bottom up to the hole centre) out of datum C's box in the crowded
     # corridor between the front and right views; its text still clears the front
@@ -119,8 +120,17 @@ TOP_KEEP = {
     "Bore0X": (_sheet_x(BORE_X[0] / 2.0), TOP_CENTER[1] - 0.042),
     "Bore1X": (_sheet_x(BORE_X[1] / 2.0), TOP_CENTER[1] - 0.052),
     "Bore0Dia": (_sheet_x(BORE_X[0]) + 0.030, TOP_CENTER[1] + 0.042),
+    # Bottom groove band (a Top-plane sketch, so its Z dims project into the
+    # top view): the width and its offset from the front depth face, stacked
+    # LEFT of the view (the right side carries the bore position FCF).
+    "GrooveWidth": (_sheet_x(0.0) - 0.018, TOP_CENTER[1]),
+    "GrooveZ0": (_sheet_x(0.0) - 0.032, TOP_CENTER[1] - 0.024),
 }
-RIGHT_KEEP = {"Depth": (RIGHT_CENTER[0], 0.068)}
+RIGHT_KEEP = {
+    "Depth": (RIGHT_CENTER[0], 0.068),
+    # The groove rise, seen in the end section left of the right view.
+    "GrooveDepth": (RIGHT_CENTER[0] - 0.046, 0.088),
+}
 
 # Right-view half extents at 4:1: the 16 (Z) x 18 (Y) stock section.
 RIGHT_HALF_Z = BLOCK_DEPTH / 2.0 * SHEET_SCALE[0] / 1000.0
@@ -168,7 +178,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Pen V-Block Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "pen v-block; brass; clamp slit; manufacturing drawing",
+            3: "pen v-block; brass; marker groove; manufacturing drawing",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
@@ -215,11 +225,14 @@ async def build(adapter: Any) -> dict[str, str]:
         set_basic_dimension(adapter, display, label=f"{station} basic bore station")
     # Block height (18): dimension the right view's flat top/bottom silhouette
     # edges.  At 4:1 the 16 x 18 section spans +/-0.032 (Z) x +/-0.036 (Y)
-    # around the view center.
+    # around the view center. The bottom edge is interrupted by the marker
+    # groove (GROOVE_Z0..GROOVE_Z0 + GROOVE_WIDTH across the depth), so pick
+    # it on the remaining land beside the groove, not at mid-depth.
+    _bottom_land_x = RIGHT_CENTER[0] - RIGHT_HALF_Z + GROOVE_Z0 / 2.0 * SHEET_SCALE[0] / 1000.0
     add_edge_dimension(
         adapter,
         right,
-        p0=(RIGHT_CENTER[0], RIGHT_CENTER[1] - RIGHT_HALF_Y),
+        p0=(_bottom_land_x, RIGHT_CENTER[1] - RIGHT_HALF_Y),
         p1=(RIGHT_CENTER[0], RIGHT_CENTER[1] + RIGHT_HALF_Y),
         text_xy=(RIGHT_CENTER[0] + RIGHT_HALF_Z + 0.014, RIGHT_CENTER[1]),
         label="block-height overall",
@@ -319,7 +332,10 @@ async def build(adapter: Any) -> dict[str, str]:
         control=surface_finish_by_key(SURFACE_FINISHES, "pen_bore_0"),
         label="pen bore finish (bore 0)",
     )
-    bore1_edge = (_sheet_x(BORE_X[1]) + 0.016, TOP_CENTER[1])
+    # Bore 1's RIGHT silhouette point (x 30) now coincides with the top chamfer's
+    # start line in the top view (BLOCK_LENGTH - CHAMFER = 30), so the pick
+    # grabbed that edge instead of the circle; pick the LEFT point (x 22).
+    bore1_edge = (_sheet_x(BORE_X[1]) - 0.016, TOP_CENTER[1])
     add_surface_finish(
         adapter,
         top,

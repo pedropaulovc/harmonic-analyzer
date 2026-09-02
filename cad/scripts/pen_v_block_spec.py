@@ -30,18 +30,27 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 # --- Nominal geometry (DIMENSIONS.md "Chapter 24", all scaled from the p.65
 # close-up vs the ~5 mm square rod, low).  These drive the part's named
 # equation globals AND the drawing's coordinate math. ---
-BLOCK_LENGTH = 32.0  # X
+# Photo read (ch24 p.60 macro + the 4/4 video, v4_t00579..t00645): a plain
+# brass block hanging on the square rod -- the rod drops into the bore nearest
+# the paper and a side set screw (front face, over that bore) pins it; the
+# second bore is a spare pen seat. The marker lies in a GROOVE milled along
+# the block's bottom face (the U-notch on the p.60 end face), and the stirrup
+# frame's thumb screw presses it up into that groove. The old read of the
+# p.60 notch as a stopped flexure slit is refuted by t00612 (the marker runs
+# through the groove, block level).
+BLOCK_LENGTH = 36.0  # X, along the marker (t00612: ~2.2x the 16 end face)
 BLOCK_HEIGHT = 18.0  # Y
 BLOCK_DEPTH = 16.0  # Z
 CHAMFER = 6.0  # 45 deg top corners
 BORE_DIA = 8.0  # two vertical pen bores
-BORE_X = (11.0, 21.0)
-SLIT_LENGTH = 26.0  # stopped cut from x=0; hinge remains 26..32
-SLIT_Y = (4.0, 8.0)  # slit band
-SCREW_HOLE_DIA = 2.5  # front-face clamp/set screw hole
-SCREW_HOLE_XY = (29.0, 11.0)
+BORE_X = (10.0, 26.0)  # rod bore (paper end) / spare pen seat (free end)
+GROOVE_WIDTH = 8.5  # bottom marker groove, across Z (O8 barrel + 0.25 each side)
+GROOVE_DEPTH = 4.5  # groove rise from the bottom face (the barrel stands 3.5 proud)
+GROOVE_Z0 = (BLOCK_DEPTH - GROOVE_WIDTH) / 2.0  # 3.75: centred across the depth
+SCREW_HOLE_DIA = 2.5  # front-face rod set-screw hole, over the rod bore
+SCREW_HOLE_XY = (BORE_X[0], 11.0)
 
-_UPPER_BORE_Y = (SLIT_Y[1] + BLOCK_HEIGHT) / 2.0
+_UPPER_BORE_Y = (GROOVE_DEPTH + BLOCK_HEIGHT) / 2.0
 SURFACE_FINISHES = tuple(
     SurfaceFinishControl(
         f"pen_bore_{index}",
@@ -56,8 +65,6 @@ SURFACE_FINISHES = tuple(
 )
 
 # Derived spans (equations of the primitives above).
-SLIT_WIDTH = SLIT_Y[1] - SLIT_Y[0]  # 4.0
-HINGE_LENGTH = BLOCK_LENGTH - SLIT_LENGTH  # 6.0: the uncut flex hinge
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  ``build_pen_v_block`` marks exactly these; ``draw_pen_v_block``
@@ -68,7 +75,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "OutlineProfile": {"Length", "Chamfer2dx"},
     "Block": {"Depth"},
     "BoreProfile": {"Bore0X", "Bore1X", "Bore0Dia"},
-    "SlitProfile": {"SlitLength", "SlitWidth", "SlitY0"},
+    "GrooveProfile": {"GrooveWidth", "GrooveZ0"},
+    "Groove": {"GrooveDepth"},
     "ScrewHoleProfile": {"ScrewHoleCx", "ScrewHoleCz", "ScrewHoleDiaDim"},
 }
 
@@ -79,11 +87,11 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_NOTES = "\n".join(
     (
         "PEN BORES: 2X <MOD-DIAM>8 THRU (VERTICAL), CENTRED ACROSS 16 DEPTH.",
-        "CLAMP SLIT: SAW OR MILL 4 WIDE THRU DEPTH FROM LEFT END ONLY;",
-        "STOP AT 26 -- THE UNCUT 6 AT THE RIGHT END IS THE FLEX HINGE.",
-        "CLAMP-SCREW HOLE <MOD-DIAM>2.5 DRILL THRU (FRONT TO BACK);",
-        "THREAD/FIT TO SUIT CLAMP SCREW AT ASSEMBLY.",
-        "FINISH: PAINT MACHINE GREEN AFTER MACHINING; MASK THE PEN BORES.",
+        "MARKER GROOVE: MILL 8.5 WIDE X 4.5 DEEP ALONG THE FULL LENGTH OF",
+        "THE BOTTOM FACE, CENTRED ACROSS THE 16 DEPTH; FLOOR FLAT.",
+        "ROD SET-SCREW HOLE <MOD-DIAM>2.5 DRILL THRU (FRONT TO BACK) ON THE",
+        "LEFT BORE AXIS; THREAD/FIT TO SUIT SET SCREW AT ASSEMBLY.",
+        "FINISH: BRIGHT BRASS, DEBURR ALL EDGES; DO NOT PAINT.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
