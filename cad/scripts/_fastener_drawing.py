@@ -18,6 +18,7 @@ from _drawing_common import (
     read_required_properties,
     set_dimension_callouts,
     set_hidden_lines_removed,
+    set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
@@ -116,7 +117,10 @@ async def build_fastener_sheet(
         *recipe.iso_center,
         scale=recipe.scale,
     )
-    set_hidden_lines_removed(adapter, side)
+    # The side view keeps its hidden lines (drawing-simplicity-policy.md rule
+    # 7, Harvey #30): a slot bottom, a socket or a drilled tip shows as a
+    # hidden line the machinist checks the other views against.
+    set_hidden_lines_visible(adapter, side)
     set_hidden_lines_removed(adapter, iso)
     # The shank is fully occluded in the driver/knob-face view.  Showing its
     # hidden circle reads like a counterbore or boss on these tiny sheets and
