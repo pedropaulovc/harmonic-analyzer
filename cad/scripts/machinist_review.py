@@ -1,12 +1,12 @@
-r"""Blind senior-machinist review of rendered drawing sheets via Claude.
+r"""Blind senior-machinist review of rendered drawing sheets via Claude or Codex.
 
 The review the fleet is gated on (``cad/docs/drawing-simplicity-policy.md``):
-each sheet PNG is copied into a neutral temp directory and handed to
-``claude -p --model fable --effort high`` with NO repo context, under the
-calibrated prompt in ``cad/scripts/prompts/`` — a part print gets the part
-prompt, an assembly orientation sheet the assembly prompt.  The verdict comes
-back as structured JSON (``machinist_review_schema.json``) and is written,
-under ``cad/out/reports/machinist-review/``.
+each sheet PNG is copied into a neutral temp directory and handed to the
+explicitly selected reviewer with NO repo context, under the calibrated prompt
+in ``cad/scripts/prompts/`` — a part print gets the part prompt, an assembly
+orientation sheet the assembly prompt.  The verdict comes back as structured
+JSON (``machinist_review_schema.json``) and is written, with its reviewer,
+model, and effort provenance, under ``cad/out/reports/machinist-review/``.
 
 Why the prompt is calibrated the way it is: the earlier ad-hoc reviews asked a
 "senior machinist" to hunt for MISSING tolerances / datums / finishes and were
@@ -17,17 +17,22 @@ Harvey (*Machine Shop Trade Secrets*, ch. 9) and Lipton (*Metalworking Sink or
 Swim*, ch. 2-3): decimal places carry tolerance, GD&T only where a ± cannot
 say it, hidden lines on, one origin, drill vs ream, few specific notes.
 
-Isolation is enforced by Claude's restricted mode in a neutral temp directory:
-nothing in the invocation references the repo, the PNG is copied as
-``sheet.png``, safe mode disables project/user customizations, MCP is disabled,
-and Read is the only available tool.  The event stream is scanned so any tool
-use beyond reading that copied image flags the review as non-blind.
+Isolation is enforced independently for each provider in a neutral temp
+directory. Claude runs restricted and may only Read the copied ``sheet.png``
+before returning StructuredOutput. Codex receives the copied image, schema,
+and output paths through isolated ``codex exec`` and its event stream must
+contain no tool or command activity. A blindness-policy violation fails the
+review closed.
+
+The caller deliberately chooses the opposite provider from the agent launching
+the review: a GPT/ChatGPT agent passes ``--reviewer claude``; a Claude Code
+agent passes ``--reviewer codex``.
 
 Usage (SolidWorks-free; needs the rendered PNGs under ``cad/out/png``)::
 
-    uv run cad/scripts/machinist_review.py crank_arm pivot_shaft
-    uv run cad/scripts/machinist_review.py --all --jobs 4
-    uv run cad/scripts/machinist_review.py --png some/sheet.png --kind part
+    uv run cad/scripts/machinist_review.py --reviewer claude crank_arm pivot_shaft
+    uv run cad/scripts/machinist_review.py --reviewer codex --all --jobs 4
+    uv run cad/scripts/machinist_review.py --reviewer claude --png some/sheet.png --kind part
     uv run cad/scripts/machinist_review.py --index      # rebuild index.md only
 
 Exit status is 0 only when every reviewed sheet passes (``SHIP`` with no
@@ -39,7 +44,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
 import shutil
 import subprocess
 import sys
@@ -64,13 +68,17 @@ PROMPT_FILES = {
 SCHEMA_FILE = PROMPTS_DIR / "machinist_review_schema.json"
 REPORT_DIR = CAD_ROOT / "out" / "reports" / "machinist-review"
 
-DEFAULT_MODEL = "fable"
+DEFAULT_MODELS = {
+    "claude": "fable",
+    "codex": "gpt-5.6-sol",
+}
 DEFAULT_EFFORT = "high"
+REVIEWERS = tuple(DEFAULT_MODELS)
 FINDING_KEYS = ("blockers", "over_specification", "clarity", "minor")
 GATING_KEYS = ("blockers", "over_specification", "clarity")
 
-# Claude must use Read once to inspect the neutral ``sheet.png`` copy.  Any
-# other tool use in the stream means the review escaped the intended input.
+# Event/item types that indicate tool or command activity. Claude permits only
+# Read(sheet.png) and StructuredOutput; Codex permits none of these.
 _TOOL_EVENT_MARKERS = (
     "command_execution",
     "function_call",
@@ -100,6 +108,7 @@ class Review:
     passed: bool
     blind: bool
     tool_events: int
+    reviewer: str
     model: str
     effort: str
     prompt_sha256: str
@@ -133,7 +142,7 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def build_command(
+def build_claude_command(
     *,
     workdir: Path,
     image: Path,
@@ -142,13 +151,7 @@ def build_command(
     effort: str,
     claude: str = "claude",
 ) -> list[str]:
-    """Return the exact isolated ``claude -p`` argv.
-
-    The prompt is sent on stdin rather than as a positional argument.  Claude
-    gets one restricted file tool so it can read only the copied image in the
-    neutral working directory; safe mode and strict empty MCP configuration
-    prevent repo instructions or external context from entering the review.
-    """
+    """Return the exact isolated ``claude -p`` argv."""
     if image.parent != workdir or schema.parent != workdir:
         raise ValueError("review inputs must be inside the neutral workdir")
     schema_json = json.dumps(
@@ -183,6 +186,45 @@ def build_command(
     ]
 
 
+def build_codex_command(
+    *,
+    workdir: Path,
+    image: Path,
+    schema: Path,
+    output: Path,
+    model: str,
+    effort: str,
+    codex: str = "codex",
+) -> list[str]:
+    """Return the exact isolated ``codex exec`` argv."""
+    if any(path.parent != workdir for path in (image, schema, output)):
+        raise ValueError("review inputs and output must be inside the neutral workdir")
+    return [
+        codex,
+        "exec",
+        "--ignore-user-config",
+        "--ignore-rules",
+        "--skip-git-repo-check",
+        "--ephemeral",
+        "--sandbox",
+        "read-only",
+        "-C",
+        str(workdir),
+        "-m",
+        model,
+        "-c",
+        f"model_reasoning_effort={effort}",
+        "-i",
+        str(image),
+        "--output-schema",
+        str(schema),
+        "-o",
+        str(output),
+        "--json",
+        "-",
+    ]
+
+
 def _walk(obj: Any) -> Iterable[Any]:
     yield obj
     if isinstance(obj, dict):
@@ -193,16 +235,10 @@ def _walk(obj: Any) -> Iterable[Any]:
             yield from _walk(value)
 
 
-def count_tool_events(
-    events: Sequence[dict[str, Any]], *, allowed_image: Path | None = None
+def count_claude_tool_events(
+    events: Sequence[dict[str, Any]], *, allowed_image: Path
 ) -> int:
-    """Count tool-bearing events outside the two allowed review operations.
-
-    Restricted mode confines Read to the neutral working directory.  The
-    expected ``Read(sheet.png)`` delivers the input and ``StructuredOutput``
-    returns the schema-validated verdict; neither escapes blind review.  Any
-    other tool invocation fails closed.
-    """
+    """Count Claude events other than Read(sheet.png) and StructuredOutput."""
     hits = 0
     for event in events:
         matched = False
@@ -222,7 +258,7 @@ def count_tool_events(
                     if isinstance(tool_input, dict)
                     else None
                 )
-                if raw_path and allowed_image is not None:
+                if raw_path:
                     read_path = Path(str(raw_path))
                     if not read_path.is_absolute():
                         read_path = allowed_image.parent / read_path
@@ -231,6 +267,25 @@ def count_tool_events(
             if "command" in node and node.get("command"):
                 matched = True
                 break
+            if any(marker in kind for marker in _TOOL_EVENT_MARKERS):
+                matched = True
+                break
+        hits += int(matched)
+    return hits
+
+
+def count_codex_tool_events(events: Sequence[dict[str, Any]]) -> int:
+    """Count every Codex event containing tool or command activity."""
+    hits = 0
+    for event in events:
+        matched = False
+        for node in _walk(event):
+            if not isinstance(node, dict):
+                continue
+            if "command" in node and node.get("command"):
+                matched = True
+                break
+            kind = str(node.get("type", "")).lower()
             if any(marker in kind for marker in _TOOL_EVENT_MARKERS):
                 matched = True
                 break
@@ -257,55 +312,84 @@ def _parse_events(stdout: str) -> list[dict[str, Any]]:
     return events
 
 
-def _extract_verdict(events: Sequence[dict[str, Any]]) -> dict[str, Any]:
-    """Extract Claude's schema-validated structured result."""
-    verdict: dict[str, Any] | None = None
-    text = ""
-    for event in reversed(events):
-        structured = event.get("structured_output")
-        if isinstance(structured, dict):
-            verdict = structured
-            break
-        if event.get("type") == "result":
-            text = str(event.get("result") or "")
-            if text.strip():
-                break
-    if verdict is None:
-        if not text.strip():
-            raise RuntimeError("claude produced no final message")
-        start, end = text.find("{"), text.rfind("}")
-        if start < 0 or end < 0:
-            raise RuntimeError(f"final message is not JSON: {text[:200]!r}")
-        parsed = json.loads(text[start : end + 1])
-        if not isinstance(parsed, dict):
-            raise RuntimeError("structured verdict is not an object")
-        verdict = parsed
+def _validate_verdict(verdict: Any) -> dict[str, Any]:
+    if not isinstance(verdict, dict):
+        raise RuntimeError("structured verdict is not an object")
     missing = [k for k in ("verdict", "summary", *FINDING_KEYS) if k not in verdict]
     if missing:
         raise RuntimeError(f"verdict missing keys {missing}")
     return verdict
 
 
+def extract_claude_verdict(events: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    """Extract Claude's schema-validated structured result."""
+    text = ""
+    for event in reversed(events):
+        structured = event.get("structured_output")
+        if isinstance(structured, dict):
+            return _validate_verdict(structured)
+        if event.get("type") == "result":
+            text = str(event.get("result") or "")
+            if text.strip():
+                break
+    if not text.strip():
+        raise RuntimeError("claude produced no final message")
+    start, end = text.find("{"), text.rfind("}")
+    if start < 0 or end < 0:
+        raise RuntimeError(f"final message is not JSON: {text[:200]!r}")
+    return _validate_verdict(json.loads(text[start : end + 1]))
+
+
+def extract_codex_verdict(
+    output_file: Path, events: Sequence[dict[str, Any]]
+) -> dict[str, Any]:
+    """Extract Codex's output file, falling back to its last agent message."""
+    text = output_file.read_text(encoding="utf-8") if output_file.is_file() else ""
+    if not text.strip():
+        for event in reversed(events):
+            for node in _walk(event):
+                if isinstance(node, dict) and node.get("type") == "agent_message":
+                    text = str(node.get("text") or node.get("message") or "")
+                    if text.strip():
+                        break
+            if text.strip():
+                break
+    if not text.strip():
+        raise RuntimeError("codex produced no final message")
+    start, end = text.find("{"), text.rfind("}")
+    if start < 0 or end < 0:
+        raise RuntimeError(f"final message is not JSON: {text[:200]!r}")
+    return _validate_verdict(json.loads(text[start : end + 1]))
+
+
 def review_sheet(
     sheet: Sheet,
     *,
-    model: str = DEFAULT_MODEL,
+    reviewer: str,
+    model: str | None = None,
     effort: str = DEFAULT_EFFORT,
     report_dir: Path = REPORT_DIR,
     retries: int = 1,
     timeout_s: float = 1800.0,
     claude: str | None = None,
+    codex: str | None = None,
 ) -> Review:
+    if reviewer not in REVIEWERS:
+        raise ValueError(f"unknown reviewer {reviewer!r}; choose one of {REVIEWERS}")
     if not sheet.png.is_file():
         raise FileNotFoundError(f"{sheet.name}: sheet PNG missing: {sheet.png}")
-    claude_exe = claude or shutil.which("claude")
-    if not claude_exe:
-        raise RuntimeError("claude CLI not found on PATH")
-    prompt = (
-        "Use the Read tool to inspect sheet.png, the only drawing supplied. "
-        "Do not read any other file. Then perform this blind review.\n\n"
-        + load_prompt(sheet.kind)
-    )
+    model = model or DEFAULT_MODELS[reviewer]
+    executable = (claude if reviewer == "claude" else codex) or shutil.which(reviewer)
+    if not executable:
+        raise RuntimeError(f"{reviewer} CLI not found on PATH")
+
+    prompt = load_prompt(sheet.kind)
+    if reviewer == "claude":
+        prompt = (
+            "Use the Read tool to inspect sheet.png, the only drawing supplied. "
+            "Do not read any other file. Then perform this blind review.\n\n"
+            + prompt
+        )
     prompt_sha = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
     png_sha = _sha256(sheet.png)
     report_dir.mkdir(parents=True, exist_ok=True)
@@ -319,22 +403,32 @@ def review_sheet(
     image: Path | None = None
     for attempt in range(retries + 1):
         attempts = attempt + 1
-        # A NEUTRAL directory: system temp, never under the repo, so restricted
-        # Read can reach only this copied image and schema.
         workdir = Path(tempfile.mkdtemp(prefix="machrev-"))
         try:
             image = workdir / "sheet.png"
             shutil.copyfile(sheet.png, image)
             schema = workdir / "schema.json"
             shutil.copyfile(SCHEMA_FILE, schema)
-            cmd = build_command(
-                workdir=workdir,
-                image=image,
-                schema=schema,
-                model=model,
-                effort=effort,
-                claude=claude_exe,
-            )
+            output = workdir / "verdict.json"
+            if reviewer == "claude":
+                cmd = build_claude_command(
+                    workdir=workdir,
+                    image=image,
+                    schema=schema,
+                    model=model,
+                    effort=effort,
+                    claude=executable,
+                )
+            else:
+                cmd = build_codex_command(
+                    workdir=workdir,
+                    image=image,
+                    schema=schema,
+                    output=output,
+                    model=model,
+                    effort=effort,
+                    codex=executable,
+                )
             proc = subprocess.run(
                 cmd,
                 input=prompt,
@@ -351,9 +445,13 @@ def review_sheet(
             )
             if proc.returncode != 0:
                 raise RuntimeError(
-                    f"claude exit {proc.returncode}: {proc.stderr.strip()[-800:]}"
+                    f"{reviewer} exit {proc.returncode}: {proc.stderr.strip()[-800:]}"
                 )
-            verdict = _extract_verdict(events)
+            verdict = (
+                extract_claude_verdict(events)
+                if reviewer == "claude"
+                else extract_codex_verdict(output, events)
+            )
             error = None
             break
         except Exception as exc:  # noqa: BLE001 - recorded, retried, reported
@@ -362,7 +460,13 @@ def review_sheet(
         finally:
             shutil.rmtree(workdir, ignore_errors=True)
 
-    tool_events = count_tool_events(events, allowed_image=image)
+    if image is None:
+        raise RuntimeError("review attempt did not create its neutral image")
+    tool_events = (
+        count_claude_tool_events(events, allowed_image=image)
+        if reviewer == "claude"
+        else count_codex_tool_events(events)
+    )
     review = Review(
         name=sheet.name,
         kind=sheet.kind,
@@ -371,6 +475,7 @@ def review_sheet(
         passed=is_pass(verdict) and tool_events == 0,
         blind=tool_events == 0,
         tool_events=tool_events,
+        reviewer=reviewer,
         model=model,
         effort=effort,
         prompt_sha256=prompt_sha,
@@ -400,8 +505,8 @@ def render_markdown(review: Review) -> str:
         f"# {review.name} — {'PASS' if review.passed else 'FAIL'}",
         "",
         f"- kind: {review.kind}",
-        f"- reviewed: {review.reviewed_at} by {review.model} ({review.effort}), "
-        f"{review.duration_s}s, attempts {review.attempts}",
+        f"- reviewed: {review.reviewed_at} by {review.reviewer}/{review.model} "
+        f"({review.effort}), {review.duration_s}s, attempts {review.attempts}",
         f"- blind: {review.blind} (tool events: {review.tool_events})",
         f"- png sha256: {review.png_sha256[:12]}  prompt sha256: {review.prompt_sha256[:12]}",
     ]
@@ -469,7 +574,10 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--png", type=Path, help="review one arbitrary sheet PNG")
     parser.add_argument("--kind", choices=("part", "assembly"), default="part")
-    parser.add_argument("--model", default=DEFAULT_MODEL)
+    parser.add_argument("--reviewer", choices=REVIEWERS)
+    parser.add_argument(
+        "--model", help="reviewer model (defaults to fable or gpt-5.6-sol)"
+    )
     parser.add_argument("--effort", default=DEFAULT_EFFORT)
     parser.add_argument("--jobs", type=int, default=3)
     parser.add_argument("--retries", type=int, default=1)
@@ -492,6 +600,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.index:
         print(write_index(report_dir))
         return 0
+    if args.reviewer is None:
+        print(
+            "--reviewer is required for review runs (choose claude or codex)",
+            file=sys.stderr,
+        )
+        return 2
 
     sheets: list[Sheet]
     if args.png:
@@ -518,6 +632,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             pool.submit(
                 review_sheet,
                 sheet,
+                reviewer=args.reviewer,
                 model=args.model,
                 effort=args.effort,
                 report_dir=report_dir,
