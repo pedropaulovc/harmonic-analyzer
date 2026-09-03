@@ -10,8 +10,10 @@ metadata:
 
 Pedro's flow for validating manufacturing drawings: render the sheet PNG, then have
 Codex (gpt-5.6-sol, high) review the IMAGE with zero repo context as a senior
-machinist. 2026-09-02: the flow is now `uv run cad/scripts/machinist_review.py
-<name>... | --all --jobs N`, prompts in `cad/scripts/prompts/`, reports under
+machinist. 2026-09-02: the two review modes are explicit commands:
+`uv run cad/scripts/machinist_review.py crank_arm pivot_shaft` for named sheets,
+or `uv run cad/scripts/machinist_review.py --all --jobs 4` for the whole fleet.
+Prompts live in `cad/scripts/prompts/`; reports go under
 `cad/out/reports/machinist-review/` (index.md + per-sheet json/md/events).
 
 **Why the prompt was recalibrated:** the earlier ad-hoc prompts ("is this print

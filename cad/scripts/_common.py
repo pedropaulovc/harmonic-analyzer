@@ -1176,6 +1176,12 @@ def _build_id() -> str:
             check=True,
         ).stdout.strip()
 
+    shallow = _git("rev-parse", "--is-shallow-repository").lower()
+    if shallow != "false":
+        raise RuntimeError(
+            "cannot compute a release-relative build id from a shallow Git "
+            f"repository (git reported {shallow!r}); fetch the full history"
+        )
     try:
         last_tag = _git("describe", "--tags", "--abbrev=0", "--match", "v*")
         count = _git("rev-list", f"{last_tag}..HEAD", "--count")

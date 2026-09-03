@@ -21,8 +21,22 @@ part-way with no rollback.
 **How to apply:**
 - Bisect with a worktree (`git worktree add`) or `git diff`/`git show`, never
   `git stash`, while a COM build may be holding a template or part.
-- Recovery: `git diff --stat stash@{0} -- <locked file>` (working copy usually
-  already equals the stash), then `git checkout stash@{0} -- $(git diff
-  --name-only HEAD stash@{0} | grep -v <locked>)` and `git reset` to unstage;
-  verify `git diff --stat stash@{0}` is empty before dropping the stash.
+- Recovery: first check the locked file with
+  `git diff --stat 'stash@{0}' -- 'cad/templates/harmonic-analyzer.DRWDOT'`
+  (the working copy usually already equals the stash). Then, from PowerShell,
+  build a NUL-delimited list with an exact top-level literal exclusion and let
+  Git consume that list directly:
+
+  ```powershell
+  $locked = 'cad/templates/harmonic-analyzer.DRWDOT'
+  $pathspec = Join-Path $env:TEMP "stash-restore-$PID.pathspec"
+  git diff --name-only -z --output="$pathspec" HEAD 'stash@{0}' -- . ":(top,literal,exclude)$locked"
+  git checkout 'stash@{0}' --pathspec-from-file="$pathspec" --pathspec-file-nul
+  git reset
+  Remove-Item -LiteralPath $pathspec
+  ```
+
+  Git writes and reads the NUL-delimited pathspec file itself, so spaces and
+  other shell-sensitive characters in filenames are preserved. Verify
+  `git diff --stat 'stash@{0}'` is empty before dropping the stash.
 - Kill any seat build started in the window; its inputs were HEAD's.
