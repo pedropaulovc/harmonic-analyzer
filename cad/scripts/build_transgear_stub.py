@@ -92,33 +92,149 @@ def _com_get(obj, name: str):
     return value() if callable(value) else value
 
 
+def _circular_strip_area_mm2(diameter_mm: float, width_mm: float) -> float:
+    """Area of a diameter-spanning strip clipped by a circular profile."""
+    if not 0.0 < width_mm <= diameter_mm:
+        raise ValueError("strip width must be positive and no greater than diameter")
+    radius = diameter_mm / 2.0
+    half_width = width_mm / 2.0
+    return (
+        width_mm * math.sqrt(radius**2 - half_width**2)
+        + 2.0 * radius**2 * math.asin(half_width / radius)
+    )
+
+
+def _brass_region_from_stations(
+    stations_mm: tuple[float, ...],
+    collar_start_mm: float,
+    cap_start_mm: float,
+    *,
+    tolerance_mm: float = 1e-3,
+) -> str | None:
+    """Classify a face from exact B-rep axial stations, never an approximate box."""
+    if not stations_mm:
+        return None
+    first = min(stations_mm)
+    if first < collar_start_mm - tolerance_mm:
+        return None
+    if first >= cap_start_mm - tolerance_mm:
+        return "cap"
+    return "collar"
+
+
+def _brass_span_evidence_region(
+    stations_mm: tuple[float, ...],
+    collar_start_mm: float,
+    cap_start_mm: float,
+    cap_end_mm: float,
+    *,
+    tolerance_mm: float = 1e-3,
+) -> str | None:
+    """Return the region proved by a nonzero axial span wholly inside it."""
+    if not stations_mm:
+        return None
+    first, last = min(stations_mm), max(stations_mm)
+    if last - first <= tolerance_mm:
+        return None
+    if (
+        first >= collar_start_mm - tolerance_mm
+        and last <= cap_start_mm + tolerance_mm
+    ):
+        return "collar"
+    if first >= cap_start_mm - tolerance_mm and last <= cap_end_mm + tolerance_mm:
+        return "cap"
+    return None
+
+
+def _face_y_stations_mm(face) -> tuple[float, ...]:
+    """Return exact Y stations from a face's analytic surface and edge topology."""
+    stations: list[float] = []
+
+    surface = face.GetSurface()
+    if surface is not None:
+        surface = _early_bound(surface, "ISurface")
+        if surface.IsPlane():
+            params = tuple(
+                float(value) for value in _com_get(surface, "PlaneParams")
+            )
+            normal_length = math.sqrt(
+                sum(component * component for component in params[:3])
+            )
+            if normal_length and abs(params[1] / normal_length) > 1.0 - 1e-9:
+                stations.append(params[4] * 1000.0)
+
+    for raw_edge in _com_get(face, "GetEdges") or []:
+        edge = _early_bound(raw_edge, "IEdge")
+        for member in ("GetStartVertex", "GetEndVertex"):
+            vertex = _com_get(edge, member)
+            if vertex is None:
+                continue
+            point = _com_get(_early_bound(vertex, "IVertex"), "GetPoint")
+            stations.append(float(point[1]) * 1000.0)
+        curve = edge.GetCurve()
+        if curve is None:
+            continue
+        curve = _early_bound(curve, "ICurve")
+        if curve.IsCircle():
+            params = _com_get(curve, "CircleParams")
+            stations.append(float(params[1]) * 1000.0)
+
+    return tuple(stations)
+
+
 async def _paint_collar_brass(adapter, y_from: float) -> None:
-    """Face-level bright-brass finish on the collar + cap (every face whose box
-    lies at or above the collar's start ``y_from`` along the +Y axis); the
-    steel stud below stays as the material renders it. Fails loud if nothing
-    matched."""
+    """Apply bright brass to every collar and cap face using exact topology.
+
+    ``IFace2.GetBox`` is deliberately unsuitable here: SolidWorks documents it
+    as approximate, so its lower Y can leak below a true collar boundary and
+    silently leave a face steel. Analytic plane stations plus B-rep vertices
+    and circular-edge centres identify the actual axial extent instead.
+    """
     from solidworks_mcp.adapters.com_variant import double_array
 
     rgb = _config.palette("brass_bright")
     brass = double_array([*rgb, 1.0, 1.0, 0.5, 0.31, 0.0, 0.0])
     part_h = _early_bound(adapter.currentModel, "IPartDoc")
-    n = 0
+    cap_from = y_from + COLLAR_LEN
+    cap_end = cap_from + CAP_LEN
+    matched = {"collar": 0, "cap": 0}
+    span_evidence = {"collar": 0, "cap": 0}
     for body in part_h.GetBodies2(0, True) or []:
-        for face in _com_get(body, "GetFaces") or []:
-            box = _com_get(face, "GetBox")
-            if not box:
+        for raw_face in _com_get(body, "GetFaces") or []:
+            face = _early_bound(raw_face, "IFace2")
+            stations = _face_y_stations_mm(face)
+            if not stations:
+                raise RuntimeError("face has no exact axial topology stations")
+            region = _brass_region_from_stations(stations, y_from, cap_from)
+            if region is None:
                 continue
-            ymin = float(box[1]) * 1000.0
-            if ymin >= y_from - 1e-3:
-                face.MaterialPropertyValues = brass
-                n += 1
-    if n < 4:
-        raise RuntimeError(f"collar/cap faces not found ({n} matched)")
-    _telemetry.info(f"transgear-stub: {n} collar + cap faces bright brass")
+            face.MaterialPropertyValues = brass
+            matched[region] += 1
+            proof = _brass_span_evidence_region(
+                stations, y_from, cap_from, cap_end
+            )
+            if proof is not None:
+                span_evidence[proof] += 1
+    for region, count in matched.items():
+        if count == 0:
+            raise RuntimeError(f"{region} faces not found for bright-brass finish")
+        if span_evidence[region] == 0:
+            raise RuntimeError(
+                f"{region} has no nonzero axial-span face proving its finish region"
+            )
+    _telemetry.info(
+        f"transgear-stub: {matched['collar']} collar + "
+        f"{matched['cap']} cap faces bright brass "
+        f"({span_evidence['collar']} + {span_evidence['cap']} span proofs)"
+    )
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters, RevolveParameters
+    from solidworks_mcp.adapters.base import (
+        CreatePlaneParameters,
+        ExtrusionParameters,
+        RevolveParameters,
+    )
 
     check("create_part", await adapter.create_part())
 
@@ -267,7 +383,7 @@ async def build(adapter) -> dict[str, str]:
         "measure volume after cap slot", await adapter.get_mass_properties()
     ).volume
     name_last_feature(adapter, "CapSlot")
-    v_slot = CAP_DIA * CAP_SLOT_D * CAP_SLOT_W  # the slot spans the cap's full diameter
+    v_slot = _circular_strip_area_mm2(CAP_DIA, CAP_SLOT_W) * CAP_SLOT_D
     removed_slot = before_slot - after_slot
     if abs(removed_slot - v_slot) > 0.02 * v_slot:
         raise RuntimeError(
