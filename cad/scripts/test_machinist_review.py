@@ -66,6 +66,10 @@ def test_schema_is_strict_structured_output() -> None:
     assert finding["additionalProperties"] is False
     assert set(finding["required"]) == {"where", "issue", "fix"}
     assert schema["properties"]["verdict"]["enum"] == ["SHIP", "FIX"]
+    assert schema["properties"]["summary"]["minLength"] == 1
+    assert all(
+        finding["properties"][key]["minLength"] == 1 for key in finding["required"]
+    )
 
 
 def test_command_references_only_the_neutral_workdir(tmp_path: Path) -> None:
@@ -96,6 +100,8 @@ def test_command_references_only_the_neutral_workdir(tmp_path: Path) -> None:
         schema_json,
         "--tools",
         "Read",
+        "--allowedTools",
+        "Read(sheet.png)",
         "--restricted",
         "--safe-mode",
         "--no-session-persistence",

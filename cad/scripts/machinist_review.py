@@ -269,6 +269,8 @@ def build_claude_command(
         schema_json,
         "--tools",
         "Read",
+        "--allowedTools",
+        f"Read({image.name})",
         "--restricted",
         "--safe-mode",
         "--no-session-persistence",
@@ -337,15 +339,16 @@ def _walk(obj: Any) -> Iterable[Any]:
             yield from _walk(value)
 
 
-def count_tool_events(
-    events: Sequence[dict[str, Any]], *, allowed_images: Sequence[Path] = ()
-) -> int:
-    """Count Claude events except reads of copied package images and output."""
+def _claude_event_evidence(
+    events: Sequence[dict[str, Any]], *, allowed_images: Sequence[Path]
+) -> tuple[int, set[Path]]:
+    """Return unauthorized-event count and copied package images read."""
     allowed = {path.resolve() for path in allowed_images}
-    workdir = next(iter(allowed)).parent if allowed else None
-    hits = 0
+    workdirs = {path.parent for path in allowed}
+    unauthorized = 0
+    reads: set[Path] = set()
     for event in events:
-        matched = False
+        event_unauthorized = False
         for node in _walk(event):
             if not isinstance(node, dict):
                 continue
@@ -360,19 +363,33 @@ def count_tool_events(
                     if isinstance(tool_input, dict)
                     else None
                 )
-                if raw_path and workdir is not None:
-                    read_path = Path(str(raw_path))
-                    if not read_path.is_absolute():
-                        read_path = workdir / read_path
-                    if read_path.resolve() in allowed:
+                if raw_path:
+                    candidates = (
+                        [Path(str(raw_path))]
+                        if Path(str(raw_path)).is_absolute()
+                        else [workdir / str(raw_path) for workdir in workdirs]
+                    )
+                    match = next(
+                        (candidate.resolve() for candidate in candidates if candidate.resolve() in allowed),
+                        None,
+                    )
+                    if match is not None:
+                        reads.add(match)
                         continue
+                event_unauthorized = True
+                continue
             if ("command" in node and node.get("command")) or any(
                 marker in kind for marker in _TOOL_EVENT_MARKERS
             ):
-                matched = True
-                break
-        hits += int(matched)
-    return hits
+                event_unauthorized = True
+        unauthorized += int(event_unauthorized)
+    return unauthorized, reads
+
+
+def count_tool_events(
+    events: Sequence[dict[str, Any]], *, allowed_images: Sequence[Path] = ()
+) -> int:
+    return _claude_event_evidence(events, allowed_images=allowed_images)[0]
 
 
 def validate_verdict(value: Any) -> dict[str, Any]:
@@ -450,6 +467,7 @@ def _parse_events(stdout: str) -> list[dict[str, Any]]:
         except json.JSONDecodeError:
             continue
     return events
+
 
 
 def extract_claude_verdict(events: Sequence[dict[str, Any]]) -> dict[str, Any]:
@@ -537,6 +555,7 @@ def review_package(
     verdict: dict[str, Any] | None = None
     events: list[dict[str, Any]] = []
     allowed_images: list[Path] = []
+    verdict_images: list[Path] = []
     attempts = 0
     for attempt in range(retries + 1):
         attempts = attempt + 1
@@ -593,6 +612,7 @@ def review_package(
                 if reviewer == "claude"
                 else extract_codex_verdict(output, attempt_events)
             )
+            verdict_images = list(images)
             error = None
             break
         except subprocess.TimeoutExpired as exc:
@@ -610,11 +630,20 @@ def review_package(
             shutil.rmtree(workdir, ignore_errors=True)
 
     _write_events(events_path, events)
-    tool_events = count_tool_events(
-        events,
-        allowed_images=allowed_images if reviewer == "claude" else (),
-    )
-    blind = tool_events == 0
+    if reviewer == "claude":
+        tool_events, read_images = _claude_event_evidence(
+            events, allowed_images=allowed_images
+        )
+        inspection_proven = set(verdict_images) == read_images
+        extra = {
+            "image_read_events": len(read_images),
+            "images_read": sorted(path.name for path in read_images),
+        }
+    else:
+        tool_events = count_tool_events(events)
+        inspection_proven = True
+        extra = {}
+    blind = tool_events == 0 and inspection_proven
     review = Review(
         name=package.name,
         kind=package.kind,
@@ -634,6 +663,7 @@ def review_package(
         error=error,
         events_file=str(events_path),
         attempts=attempts,
+        extra=extra,
     )
     write_review(review, report_dir)
     return review
