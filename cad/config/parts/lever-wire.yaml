@@ -1,8 +1,8 @@
 lever-wire:
   number: MHA-115
   material: Plain Carbon Steel
-  material_specification: Plain Carbon Steel
-  finish: drawn wire
+  material_specification: ASTM A228 music-wire spring steel
+  finish: bare
   quantity: 1
   tolerance_class: machined_block
   process: "drawn steel wire"

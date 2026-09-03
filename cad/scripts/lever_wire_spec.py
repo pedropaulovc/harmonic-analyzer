@@ -15,9 +15,10 @@ moved wholesale into ``lever_wire_geom``.)
 The wire is a Ø0.8 drawn-steel cylinder ~353 long -- a thin silhouette with no
 flat face, no end-face big enough to pick and no selectable silhouette edge, so
 NOTHING is a marked dimension; the diameter and straight rest-run length ride the
-notes.  The rest-run length is COMPUTED between the two solved endpoints, but it
-is NOT a developed cut length: the source model deliberately omits both end
-terminations and the hub wrap, so their development allowance is unknown.
+notes.  The rest-run length is COMPUTED between the two solved endpoints (the
+build appends it as the third note line), but it is NOT a developed cut length:
+the source model omits both end terminations and the hub wrap, so the maker
+forms those at assembly and cuts long.
 """
 
 from __future__ import annotations
@@ -29,14 +30,13 @@ from lever_wire_geom import WIRE_DIA  # noqa: F401 (re-export, import-pure)
 # union(marks) == union(keeps) == {}).
 DRAWING_DIMENSIONS: dict[str, set[str]] = {}
 
-# True free-text instructions only; the build stamps these and APPENDS the
-# computed straight-run line, then the drawing displays only the $PRPSHEET link.
+# Wire data only (policy rule 6): diameter, and the forming the print cannot
+# dimension.  The build APPENDS the computed straight rest-run line, so the
+# stamped note is three lines.
 DRAWING_NOTES = "\n".join(
     (
-        "Ø0.8 WIRE, ONE PIECE.",
-        "THIS SHEET DEFINES THE STRAIGHT REST RUN ONLY.",
-        "FORMED HOOK, HUB WRAP, AND DEVELOPED CUT LENGTH ARE NOT DEFINED BY",
-        "THE SOURCE MODEL. DO NOT RELEASE UNTIL THOSE DETAILS ARE SPECIFIED.",
+        f"Ø{WIRE_DIA:g} WIRE, ONE PIECE.",
+        "END HOOK AND HUB WRAP FORMED AT ASSEMBLY; CUT LONG AND TRIM.",
     )
 )
 FRONT_VIEW_NOTE = "FRONT VIEW SCALE 1:5"

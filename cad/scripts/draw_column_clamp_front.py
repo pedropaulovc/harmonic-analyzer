@@ -11,6 +11,12 @@ angle: the top view (the 17.9 x 48 plan carrying the column-relief arc) sits
 above the front view; the right view (the 48 x 16 bar face carrying the two
 ear holes) sits to its right.
 
+The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): a
+clamp casting carries no datums, no feature-control frames, no roughness
+symbols and no basic dimensions -- the title block's general tolerances
+govern everything, and the relief bore is finished as a pair with its back
+arc.
+
 Run with SolidWorks open::
 
     uv run python cad\scripts\draw_column_clamp_front.py column-clamp-front
@@ -22,22 +28,17 @@ import argparse
 import sys
 from typing import Any
 
-from column_clamp_front_spec import GEOMETRIC_TOLERANCES_MM
-
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
     add_edge_dimension,
-    add_feature_control_frame,
     add_native_hole_callout,
     add_property_linked_note,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    set_basic_dimension,
     set_dimension_callouts,
     set_dimension_precision,
     set_hidden_lines_removed,
@@ -46,9 +47,7 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from column_clamp_front_spec import (
-    ARC_DEPTH,
     ARC_HEIGHT,
-    BORE_RADIUS,
     EAR_HOLE_DIA,
     EAR_HOLE_Z,
 )
@@ -83,11 +82,6 @@ ISO_CENTER = (0.355, 0.205)
 _M = SHEET_SCALE[0] / 1000.0  # model mm -> sheet meters
 
 
-def _plan_x(model_x_mm: float) -> float:
-    """Sheet X of a model-X point in the front/top views (2:1, bbox-centred)."""
-    return FRONT_CENTER[0] + (model_x_mm - ARC_DEPTH / 2.0) * _M
-
-
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
 # position.  All three live on the top view (their sketches lie on the part's
 # Top plane): the depth chain above the view, the width chain to its left, the
@@ -100,7 +94,7 @@ TOP_KEEP = {
 FRONT_KEEP = {}
 RIGHT_KEEP = {}
 DIMENSION_CALLOUTS = {
-    "BoreDia": "THRU\nSLIP FIT ON <MOD-DIAM>25.4 COLUMN",
+    "BoreDia": "BORE THRU\nSLIP FIT ON <MOD-DIAM>25.4 COLUMN",
 }
 
 
@@ -150,11 +144,11 @@ async def build(adapter: Any) -> dict[str, str]:
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(2, 1))
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(2, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
-    for view in (right, iso):
-        set_hidden_lines_removed(adapter, view)
-    # The front view shows the relief depth profile and the ear drills edge-on;
-    # the top view carries the hidden ear-hole rectangles beside the open arc.
-    for view in (front, top):
+    set_hidden_lines_removed(adapter, iso)
+    # Hidden lines stay ON in every orthographic view (policy rule 7): the
+    # front view shows the ear drills edge-on, the top view the hidden
+    # ear-hole rectangles beside the open arc.
+    for view in (front, top, right):
         set_hidden_lines_visible(adapter, view)
 
     top_annotations = curate_view_dimensions(
@@ -192,65 +186,15 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, right, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the right view")
 
-    # Ear-hole span (35 c-c), BASIC: the position FCF below carries the
-    # tolerance.  Both ears show round in the right view.
+    # Ear-hole span (35 c-c); both ears show round in the right view.
     ear_top = EAR_HOLE_DIA / 2.0 * _M
-    ear_spacing = add_edge_dimension(
+    add_edge_dimension(
         adapter,
         right,
         p0=(RIGHT_CENTER[0] - EAR_HOLE_Z * _M, RIGHT_CENTER[1] + ear_top),
         p1=(RIGHT_CENTER[0] + EAR_HOLE_Z * _M, RIGHT_CENTER[1] + ear_top),
         text_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] + 0.028),
         label="ear-hole spacing",
-    )
-    set_basic_dimension(adapter, ear_spacing, label="ear-hole spacing")
-
-    # Native datum/GD&T/surface annotations.  Datum A is the bar-seat face
-    # (the full-depth flat at x = 17.9 the support bar clamps against); datum
-    # B is the column-relief bore.
-    add_datum_feature(
-        adapter,
-        top,
-        edge_xy=(_plan_x(ARC_DEPTH), TOP_CENTER[1] - 0.035),
-        symbol_xy=(0.150, TOP_CENTER[1] - 0.035),
-        datum="A",
-        label="bar-seat face",
-    )
-    add_datum_feature(
-        adapter,
-        top,
-        edge_xy=(_plan_x(BORE_RADIUS), TOP_CENTER[1]),
-        symbol_xy=(0.150, TOP_CENTER[1]),
-        datum="B",
-        label="column-relief bore",
-        # Live readback normalizes this restricted bore tag by 3.253 um. Bound
-        # only annotation placement; part dimensions and GD&T remain unchanged.
-        position_tolerance_m=0.000005,
-    )
-    add_feature_control_frame(
-        adapter,
-        right,
-        edge_xy=(
-            RIGHT_CENTER[0] + EAR_HOLE_Z * _M,
-            RIGHT_CENTER[1] - ear_top,
-        ),
-        frame_xy=(0.297, 0.108),
-        characteristic="position",
-        tolerance=GEOMETRIC_TOLERANCES_MM["ear-hole position"],
-        datums=("A", "B"),
-        diameter=True,
-        quantity="2X",
-        label="ear-hole position",
-    )
-    add_feature_control_frame(
-        adapter,
-        front,
-        edge_xy=(_plan_x(0.0), FRONT_CENTER[1]),
-        frame_xy=(0.040, 0.096),
-        characteristic="parallelism",
-        tolerance=GEOMETRIC_TOLERANCES_MM["mating-face parallelism"],
-        datums=("A",),
-        label="mating-face parallelism",
     )
     add_native_hole_callout(
         adapter,
@@ -261,6 +205,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         callout_xy=(0.170, 0.093),
         label="ear holes",
+        process="#9 DRILL",
     )
 
     # 0.020: the note is left-aligned ON its anchor, so the ink starts here. The

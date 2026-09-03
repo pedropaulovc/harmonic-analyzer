@@ -1,8 +1,8 @@
 wheel-bar:
   number: MHA-085
   material: Plain Carbon Steel
-  material_specification: Plain Carbon Steel
-  finish: machined
+  material_specification: AISI 1018 cold-finished steel bar
+  finish: bright
   quantity: 1
   tolerance_class: machined_block
   process: "machined (steel)"

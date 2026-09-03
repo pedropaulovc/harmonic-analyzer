@@ -9,7 +9,7 @@ import draw_column_clamp_front as drawing
 import build_column_clamp_front as part
 import _clamp_arc
 from _drawing_registry import DRAWINGS_BY_NAME
-from _holes import blind_cut_dia_mm
+from _holes import NUMBER_DRILL_MM, blind_cut_dia_mm
 
 
 def test_required_drawing_paths() -> None:
@@ -58,48 +58,60 @@ def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
 
 
-def test_linked_notes_use_us_customary_fasteners_and_functional_tolerances() -> None:
+def test_notes_are_few_specific_and_never_the_title_block() -> None:
     notes = spec.DRAWING_NOTES
-    assert "#8 CLEARANCE" in notes
-    assert "#8-32" in notes
-    assert "MHA-106" in notes  # the mating back arc the pair is bored with
-    # General tolerances live in the title block ONLY -- a second general
-    # tolerance in the notes would conflict with it.
-    assert "LINEAR +/-" not in notes
-    assert "HOLE CENTRES" not in notes
+    lines = notes.split("\n")
+    assert len(lines) <= 4
+    assert "AS A PAIR" in notes  # the relief is bored clamped to its back arc
+    assert "MATES WITH MHA-106" in notes  # the only way a part number appears
+    assert "MASK" in notes
+    # The drill size rides the ear-hole callout; nothing the title block says.
+    assert "DRILL" not in notes
+    assert "#8" not in notes
+    for banned in ("LINEAR +/-", "+/-", "HOLE CENTRES", "DATUM", "UOS", "X.XX"):
+        assert banned not in notes, banned
     # Pedro 2026-07-10: drawings spec the closest US-customary fastener, not
     # the period British Association series ("BACK ARC" is not a BA thread).
     assert "0BA" not in notes and "2BA" not in notes and "4BA" not in notes
-    assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
     assert "_NOTES_" not in source
 
 
-def test_hole_states_are_annotated() -> None:
+def test_hole_callouts_state_size_and_process() -> None:
     callouts = drawing.DIMENSION_CALLOUTS
-    assert callouts["BoreDia"].startswith("THRU")
+    assert callouts["BoreDia"].startswith("BORE THRU")
     assert "25.4" in callouts["BoreDia"]  # the column the relief slips on
-
-
-def test_native_gdt_replaces_form_orientation_notes() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 2
-    assert (
-        "        edge_xy=(_plan_x(BORE_RADIUS), TOP_CENTER[1]),\n"
-        "        symbol_xy=(0.150, TOP_CENTER[1]),\n"
-        '        datum="B",\n'
-        '        label="column-relief bore",\n'
-        "        # Live readback normalizes this restricted bore tag by 3.253 um. Bound\n"
-        "        # only annotation placement; part dimensions and GD&T remain unchanged.\n"
-        "        position_tolerance_m=0.000005,"
-        in source
-    )
-    assert source.count("position_tolerance_m=0.000005") == 1
-    assert source.count("add_feature_control_frame(") == 2
-    assert "characteristic=\"parallelism\"" in source
-    assert "characteristic=\"position\"" in source
-    assert "quantity=\"2X\"" in source  # both ear holes under one FCF
+    # Harvey #13: the ear-hole callout says DRILL; the #8 normal clearance
+    # (4.978) is exactly the #9 drill, which rides as the callout prefix.
+    assert 'process="#9 DRILL"' in source
+    assert spec.EAR_HOLE_DIA == NUMBER_DRILL_MM["#9"]
+
+
+def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:
+    # drawing-simplicity-policy.md rules 3-5: a clamp casting is not on the
+    # GD&T allowlist and nothing runs in its relief bore.
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    for helper in (
+        "add_datum_feature(",
+        "add_feature_control_frame(",
+        "add_surface_finish(",
+        "set_basic_dimension(",
+        "project_part_pmi(",
+    ):
+        assert helper not in source, helper
+    assert not hasattr(spec, "GEOMETRIC_TOLERANCES_MM")
+    assert not hasattr(spec, "SURFACE_FINISHES")
+    # The ear-hole spacing and collar height stay as ordinary dimensions.
+    assert 'label="ear-hole spacing"' in source
+    assert 'label="collar-height overall"' in source
+
+
+def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "for view in (front, top, right):\n        set_hidden_lines_visible" in source
+    assert "set_hidden_lines_removed(adapter, iso)" in source
 
 
 def test_wizard_holes_are_not_fake_marked_dimensions() -> None:

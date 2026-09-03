@@ -1,9 +1,14 @@
-r"""Create the curated machinist drawing for the magnifying-wheel axle."""
+r"""Create the curated machinist drawing for the magnifying-wheel axle.
+
+The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): a
+flanged stud turned in one setting carries no datums and no feature-control
+frames -- the stud's running fit is the band on the model diameter, plus one
+roughness symbol on the OD the wheel spins on.
+"""
 
 from __future__ import annotations
 
 import argparse
-import math
 import sys
 from typing import Any
 
@@ -11,13 +16,10 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    PmiDrawingPlacement,
     add_property_linked_note,
     add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
-    find_edge_near,
-    project_part_pmi,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
@@ -32,8 +34,6 @@ from wheel_axle_spec import (
     COLLAR_LEN,
     FLANGE_DIA,
     FLANGE_LEN,
-    GEOMETRIC_CONTROLS,
-    PART_DATUMS,
     STUD_DIA,
     STUD_LEN,
     SURFACE_FINISHES,
@@ -106,13 +106,6 @@ END_KEEP = {
 }
 # The stud's unilateral-minus running-fit band lives on its source-model dimension.
 DIMENSION_CALLOUTS: dict[str, str] = {}
-
-# Datum B's projected-symbol offset from the end-view centre. Placed off-axis at
-# ~-54 deg so the tag's leader runs radially out of the stud circle clear of the
-# O35 dimension ray and the O5.00 text (measured live while this tag was still
-# sheet-authored; the same placement is now driven from the model PMI spec).
-_DATUM_B_OFFSET = (0.038, -0.052)
-_DATUM_B_ANGLE = math.atan2(_DATUM_B_OFFSET[1], _DATUM_B_OFFSET[0])
 
 
 def _view_center_delta(
@@ -187,20 +180,18 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(3, 1))
     end = place_view(adapter, str(SOURCE), "*Top", *END_CENTER, scale=(3, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(3, 1))
-    for view in (front, iso):
-        set_hidden_lines_removed(adapter, view)
-    # The O5 stud hides under the O9 collar from the tip side; show it greyed
-    # so its diameter and GD&T attach to a real circle.
-    set_hidden_lines_visible(adapter, end)
+    set_hidden_lines_removed(adapter, iso)
+    # Hidden lines stay ON in every orthographic view (Harvey #30 / Lipton):
+    # the O5 stud hides under the O9 collar from the tip side, and its
+    # diameter attaches to that greyed circle.
+    for view in (front, end):
+        set_hidden_lines_visible(adapter, view)
 
     fdx, fdy = _view_center_delta(adapter, front, FRONT_CENTER, "front")
     edx, edy = _view_center_delta(adapter, end, END_CENTER, "end")
 
     def fpt(x: float, y: float) -> tuple[float, float]:
         return (x + fdx, y + fdy)
-
-    def ept(x: float, y: float) -> tuple[float, float]:
-        return (x + edx, y + edy)
 
     front_annotations = curate_view_dimensions(
         adapter, front, keep=_shift(FRONT_KEEP, fdx, fdy), view_label="front"
@@ -214,92 +205,14 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to axle end view")
 
-    flange_face_edge = find_edge_near(
-        adapter,
-        front,
-        fpt(FRONT_CENTER[0] + FLANGE_DIA / 4.0 * _K, _front_y(0.0)),
-        axis="y",
-        label="flange seating face pick",
-    )
-    stud_circle_top = find_edge_near(
-        adapter,
-        end,
-        ept(END_CENTER[0], END_CENTER[1] + STUD_DIA / 2.0 * _K),
-        axis="y",
-        label="stud circle top pick",
-    )
-    collar_circle_left = find_edge_near(
-        adapter,
-        end,
-        ept(END_CENTER[0] - COLLAR_DIA / 2.0 * _K, END_CENTER[1]),
-        axis="x",
-        label="collar circle left pick",
-    )
-    stud_circle_at_datum_b = find_edge_near(
-        adapter,
-        end,
-        ept(
-            END_CENTER[0] + STUD_DIA / 2.0 * _K * math.cos(_DATUM_B_ANGLE),
-            END_CENTER[1] + STUD_DIA / 2.0 * _K * math.sin(_DATUM_B_ANGLE),
-        ),
-        axis="y",
-        label="stud circle datum-B pick",
-    )
-
-    # GD&T is model PMI (wheel_axle_spec.PART_DATUMS/GEOMETRIC_CONTROLS,
-    # authored by build_wheel_axle) — project it and place it where the
-    # hand-authored symbols used to sit. Which VIEW receives each annotation
-    # depends on its attachment (a datum tag only lands in a view aligned
-    # with its face), and the projection fails loud on any mismatch. Placements track the measured view-centre deltas
-    # (fpt/ept), the same corrections the retired edge picks used.
-    project_part_pmi(
-        adapter,
-        placements={
-            "datum:A": PmiDrawingPlacement(
-                view=front,
-                position=fpt(
-                    FRONT_CENTER[0] + FLANGE_DIA / 4.0 * _K + 0.006,
-                    _front_y(0.0) - 0.016,
-                ),
-                attachment_xy=flange_face_edge,
-            ),
-            "datum:B": PmiDrawingPlacement(
-                view=end,
-                position=ept(
-                    END_CENTER[0] + _DATUM_B_OFFSET[0],
-                    END_CENTER[1] + _DATUM_B_OFFSET[1],
-                ),
-                attachment_xy=stud_circle_at_datum_b,
-                position_tolerance_m=0.00003,
-            ),
-            # +0.052 in y put the frame's 8 mm half-box 8.3 mm over the top
-            # margin. Held to +0.045 and pushed out to +0.058 in x, which keeps
-            # it clear of the flange circle (52.5 mm radius) without reaching
-            # the 0.4191 right margin (a frame grows RIGHT by its full width).
-            "stud_perpendicularity": PmiDrawingPlacement(
-                view=end,
-                position=ept(END_CENTER[0] + 0.058, END_CENTER[1] + 0.045),
-                attachment_xy=stud_circle_top,
-            ),
-            "collar_runout": PmiDrawingPlacement(
-                view=end,
-                position=ept(END_CENTER[0] - 0.075, END_CENTER[1] - 0.045),
-                attachment_xy=collar_circle_left,
-            ),
-        },
-        datums=PART_DATUMS,
-        controls=GEOMETRIC_CONTROLS,
-        label="wheel axle PMI",
-    )
-    # The stud OD is dimensioned in the end view, but its Ra belongs on the
-    # FRONT view. The symbol's TEXT renders ABOVE its arm (ASME Y14.36) and runs
-    # ~13..39 mm to the RIGHT of the anchor, so in the end view it cannot clear
-    # the O35 flange circle at ANY height the 12.7 mm left margin allows -- the
-    # arc reaches x=0.0534 at bore height while the text would need to stop by
-    # x=0.0144 -- and it printed over the arc. (The audit cannot catch that: it
-    # boxes the symbol as a nominal square about its anchor.) On the profile the
-    # stud's left flank has ~45 mm of empty sheet beside it, which takes the
-    # short, roughly horizontal leader this symbol wants.
+    # The stud OD is the one running surface (the magnifying wheel spins on
+    # it), so it alone carries a roughness symbol. The stud is dimensioned in
+    # the end view, but its Ra belongs on the FRONT view: the symbol's TEXT
+    # renders ABOVE its arm (ASME Y14.36) and runs ~13..39 mm to the RIGHT of
+    # the anchor, so in the end view it cannot clear the O35 flange circle at
+    # any height the 12.7 mm left margin allows. On the profile the stud's
+    # left flank has ~45 mm of empty sheet beside it, which takes the short,
+    # roughly horizontal leader this symbol wants.
     stud_flank_y = _front_y(FLANGE_LEN + STUD_LEN / 2.0)
     add_surface_finish(
         adapter,

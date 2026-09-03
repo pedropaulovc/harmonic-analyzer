@@ -101,12 +101,15 @@ async def build(adapter) -> dict[str, str]:
         await adapter.add_arc(R, 0.0, R, R, 0.0, 0.0),
     )
     set_sketch_direct_db(adapter, False)
-    # 14-unknown half-profile: origin corner anchored, both dome centres
-    # anchored on the axis, ONE radial dim (the left dome's radius is
-    # already forced by its anchored centre + the anchored origin end --
-    # dimensioning it too over-defines), the top edge horizontal with its
-    # start vertically aligned over the left centre. The centerline
-    # merged into the two axis corners, so it carries no constraints.
+    # 14-unknown half-profile: origin corner anchored, both dome centres held
+    # on the axis, the OVERALL length dimensioned on the axis line (tip to
+    # tip -- the print's controlling length, so it is a real driving dim, not
+    # a note), ONE radial dim (the left dome's radius is already forced by its
+    # anchored centre + the anchored origin end -- dimensioning it too
+    # over-defines; the right dome centre is then fixed by the axis end + that
+    # radius), the top edge horizontal with its start vertically aligned over
+    # the left centre. The centerline merged into the two axis corners, so it
+    # carries no constraints.
     check(
         "anchor origin corner",
         await adapter.add_sketch_constraint(
@@ -119,18 +122,25 @@ async def build(adapter) -> dict[str, str]:
     )
     # Record each manual display dim into SketchDims as it is created (creation
     # order): the left dome centre is on the axis (x = R, one horizontal dim),
-    # then the right dome centre (x = L - R, one horizontal dim), then the right
+    # then the overall length on the axis line (L, tip to tip), then the right
     # dome radius. The origin-corner anchor is a coincident relation (no dim) and
-    # the horizontal / vertical-points constraints carry no dims either -- three
-    # display dims total.
+    # the horizontal / horizontal-points / vertical-points constraints carry no
+    # dims either -- three display dims total.
     await anchor_point_to_origin(
         adapter, f"{cap_left}.center", R, 0.0, "left dome centre"
     )
     profile.record("LeftDomeCentre", '"RodDia" / 2')
-    await anchor_point_to_origin(
-        adapter, f"{cap_right}.center", ROD_LENGTH - R, 0.0, "right dome centre"
+    check(
+        "right dome centre on axis",
+        await adapter.add_sketch_constraint(
+            f"{cap_right}.center", "origin", "horizontal_points"
+        ),
     )
-    profile.record("RightDomeCentre", '"RodLength" - "RodDia" / 2')
+    check(
+        "rod overall length",
+        await adapter.add_sketch_dimension(axis_line, None, "linear", ROD_LENGTH),
+    )
+    profile.record("RodOverall", '"RodLength"')
     check(
         "right dome radius",
         await adapter.add_sketch_dimension(cap_right, None, "radial", R),

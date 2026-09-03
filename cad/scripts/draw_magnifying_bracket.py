@@ -10,6 +10,10 @@ the notes (a revolved tube has no clean marked Ø and its curved wall is not a
 dependable pick).  The collar axis is local +X, so the RIGHT view shows the
 collar end as concentric circles (the bore takes the ASME centre mark).
 
+The print is plain (cad/docs/drawing-simplicity-policy.md): a bracket is not on
+the GD&T allowlist and it is lock-mated to the lever rod in service, so it
+carries no datum, frame, roughness or basic dimension.
+
 Run with SolidWorks open::
 
     uv run python cad\scripts\draw_magnifying_bracket.py magnifying-bracket
@@ -126,10 +130,11 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(1, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
-    for view in (right, iso):
-        set_hidden_lines_removed(adapter, view)
-    # The top + front views carry the collar bore + arm/flange hidden edges.
-    for view in (top, front):
+    set_hidden_lines_removed(adapter, iso)
+    # Hidden lines ON in every orthographic view (policy rule 7): the top +
+    # front views carry the collar bore + arm/flange hidden edges, the right
+    # view the arm and flange behind the collar.
+    for view in (top, front, right):
         set_hidden_lines_visible(adapter, view)
 
     top_annotations = curate_view_dimensions(

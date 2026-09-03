@@ -57,45 +57,27 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from magnifying_bracket_spec import (
+    ARM_HALF_X,
+    ARM_Y,
+    ARM_Z,
+    COLLAR_BORE,
+    COLLAR_HALF_LEN,
+    COLLAR_OD,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
+    FLANGE_X,
+    FLANGE_Y,
+    FLANGE_Z,
     ISOMETRIC_VIEW_NOTE,
 )
 
 PART_NAME = "magnifying-bracket"
 MATERIAL = "Plain Carbon Steel"  # black hardware
 
-COLLAR_OD = 12.0  # rod collar (low)
-COLLAR_BORE = 6.2  # the O6 magnifying rod clamps in (derived)
-COLLAR_HALF_LEN = 5.0  # along X
-ARM_HALF_X = 5.0  # arm 10 wide (x), y -3..+4.5 (low)
-ARM_Y = (-3.0, 4.5)
-# DEPTH RE-ANCHOR (2026-07-04): the collar (part origin) moved forward with
-# the lever rod (machine z -85 -> -128.3, ch30 p.4 plumb-wire re-anchor in
-# build_magnifier_assembly), while the flange stays butted on the summing
-# plate's UNCHANGED front face (machine -81..-76.45, north face 0.25 off the
-# plate's -76.2). The arm therefore lengthens: local z 4 .. 58.3 = machine
-# -124.3..-70 (same -70 end as before). The real black bracket cantilevers
-# the rod well forward of the plate -- video 4/4 shows the rod extending from
-# the pivoted summing bar over the wheel line.
-ARM_Z = (4.0, 58.3)
-FLANGE_X = (-20.0, 5.0)  # mounting flange, machine x +20..+45. The collar sits
-# at machine x +40, EAST of the plate's east edge (+29.45), so the flange reaches
-# WEST onto the plate front face: x +20..+29.45 (9.45 wide) butts it, the rest
-# wraps the collar. (At -11 the flange stopped at x +29, touching the plate only at
-# a 0.45-wide corner sliver -> it read as floating in the top view.) The west tab
-# remains on the unchanged front-column/output side. The re-anchored channel
-# spring bank now starts at z -64.012, still clear of this flange.
-FLANGE_Y = (-2.54, 2.54)  # spans the plate's FULL height: with the collar/rod now
-# at the plate centreline (machine 979.7, see build_magnifier_assembly LEVER_ROD_Y),
-# the flange butts the plate FRONT FACE rather than tucking under it -- machine
-# 977.16..982.24 = the coplanar .cs plate band
-FLANGE_Z = (47.3, 51.85)  # SAME machine band as ever (-81..-76.45): north face
-# at machine -76.45 = 0.25 south of the plate's real FRONT (-Z) face at -76.2
-# (the plate is the Top-rect z +-76.2, centred on the pivot -- NOT -70, an
-# earlier mis-read); the flange butts that face. Local values shifted by the
-# 2026-07-04 depth re-anchor (collar/origin at machine -123.5, was -85); only
-# the ARM between them lengthened.
+# Nominals live in magnifying_bracket_spec (imported above): the drawing
+# reads the same constants to aim its sheet picks.
+
+
 async def _volume(adapter) -> float:
     res = await adapter.get_mass_properties()
     return res.data.volume if res.is_success else float("nan")
@@ -313,9 +295,11 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
 
-    # Manufacturing drawing support: mark exactly the print's plan dimensions
-    # (the two extruded rectangles -- the collar Ø/bore + Y through-thicknesses
-    # ride the notes) and stamp the make-critical title-block properties.
+    # Manufacturing drawing support: mark exactly the print's model dimensions
+    # (the collar length, the plan rectangles' widths/depth and their corner
+    # stations from the collar axis -- the collar diameters and the Y
+    # thicknesses are drawing-added on real edges) and stamp the
+    # make-critical title-block properties.
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

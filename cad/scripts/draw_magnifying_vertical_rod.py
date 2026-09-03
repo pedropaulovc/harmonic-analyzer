@@ -3,11 +3,15 @@ r"""Create the curated machinist drawing for the magnifying vertical rod.
 The rod is a revolved Ø5 x 150 brass capsule with hemispherical ends -- a
 smooth, tangent-continuous body with NO flat face, no end-face circle and no
 selectable silhouette edge, so coordinate picks are unreliable (the dome-tip
-pick fails) and the print rests on the auto-imported profile marks only: the far
-dome-centre station and the dome radius R2.5.  The outside diameter and the overall
-length ride the dome-radius callout + the notes (the note-based path the recipe
-pitfall endorses for un-pickable turned features).  The rod axis is local +X, so
+pick fails) and the print rests on the auto-imported profile marks only: the
+tip-to-tip overall length (the profile's axis line) and the dome radius R2.5.  The outside diameter rides the stock
+note (the dome radius implies it); the overall is a real dimension between the
+two tips, with a longitudinal centreline.  The rod axis is local +X, so
 the FRONT view is the long side elevation and the RIGHT view is the circular end.
+
+The print is plain (cad/docs/drawing-simplicity-policy.md): a plain rod is not
+on the GD&T allowlist and it is lock-mated in service, so it carries no datum,
+frame, roughness or basic dimension.
 
 Run with SolidWorks open::
 
@@ -25,12 +29,14 @@ from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
+    add_view_centerline,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
     set_hidden_lines_removed,
+    set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -63,17 +69,19 @@ RIGHT_CENTER = (
 ISO_CENTER = (0.350, 0.185)
 ISO_SCALE = (1, 2)
 
-# The two native profile dims the print keeps: the far dome-centre station
-# (below the side view) and the dome radius (above the right dome).
+# The two native profile dims the print keeps: the overall length, tip to tip
+# on the profile's axis line (below the side view, the conspicuous controlling
+# length), and the dome radius (above the right dome).
 FRONT_KEEP = {
-    "RightDomeCentre": (FRONT_CENTER[0], FRONT_CENTER[1] - 0.032),
+    "RodOverall": (FRONT_CENTER[0], FRONT_CENTER[1] - 0.032),
     "DomeRadius": (RIGHT_CENTER[0] - 0.075, FRONT_CENTER[1] + 0.028),
 }
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
-DIMENSION_CALLOUTS = {
-    "DomeRadius": f"FULL R, BOTH ENDS - Ø{ROD_DIA:g} ROD",
-    "RightDomeCentre": "TO FAR DOME CENTRE",
-}
+# Longitudinal centreline: the rod's cylindrical face picked at the view
+# centre (a revolved outline is a silhouette, so the FACE is the pick).
+AXIS_FACE_PICK = (FRONT_CENTER[0], FRONT_CENTER[1])
+# The stock Ø rides the note; the dome instruction stays at the leader.
+DIMENSION_CALLOUTS = {"DomeRadius": "FULL R, BOTH ENDS"}
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -122,14 +130,19 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(4, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
-    for view in (front, right, iso):
-        set_hidden_lines_removed(adapter, view)
+    set_hidden_lines_removed(adapter, iso)
+    # Hidden lines ON in every orthographic view (policy rule 7).
+    for view in (front, right):
+        set_hidden_lines_visible(adapter, view)
 
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
     )
     curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
     set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
+    add_view_centerline(
+        adapter, front, face_xy=AXIS_FACE_PICK, label="rod longitudinal axis"
+    )
     # The end silhouette is circular; SolidWorks files it under the same
     # "hole" bit as a bored circle, so a disabled bit makes the API a no-op.
     if not auto_center_marks(adapter, right, holes=True, size=0.0025):

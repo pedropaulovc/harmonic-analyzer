@@ -33,6 +33,7 @@ from _common import (
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -45,16 +46,20 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
 )
+from _fit_limits import deviations
 from _holes import TAP_DRILL_MM
 from output_fixture_spec import (
     COLLAR_DIA,
     COLLAR_HEIGHT,
     CROSS_HOLE_DIA,
+    CROSS_HOLE_TAP,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     END_VIEW_NOTE,
     ISOMETRIC_VIEW_NOTE,
+    ROD_BORE_BAND,
     ROD_BORE_DIA,
 )
 
@@ -72,10 +77,10 @@ MATERIAL = "Brass"  # see _common.apply_material docstring
 #   -- so it stays a plain cut at the #4-40 tap-drill diameter as the geometric
 #   stand-in. No interference either way: the assembly OMITS this thumb screw
 #   (the cross hole doubles as the wire tie) and the mating Ø2.0 shank fits.
-if CROSS_HOLE_DIA != TAP_DRILL_MM["#4-40"]:  # spec is pure data; pin it here
+if CROSS_HOLE_DIA != TAP_DRILL_MM[CROSS_HOLE_TAP]:  # spec is pure data; pin it here
     raise RuntimeError(
         f"output_fixture_spec.CROSS_HOLE_DIA {CROSS_HOLE_DIA} != "
-        f"#4-40 tap drill {TAP_DRILL_MM['#4-40']}"
+        f"{CROSS_HOLE_TAP} tap drill {TAP_DRILL_MM[CROSS_HOLE_TAP]}"
     )
 THROUGH_CUT_DEPTH = 40.0  # mid-plane total; > any extent crossed
 
@@ -127,11 +132,14 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=COLLAR_HEIGHT)),
     )
     name_last_feature(adapter, "Collar")
-    # Drive the collar's extrude depth from CollarHeight too (D1 is the blind-
-    # extrude depth dim). The cross hole is driven to CollarHeight/2, so the body
-    # height must move with it or a GUI edit of CollarHeight leaves the hole
-    # off-centre (or outside the collar). Evaluates to as-built -> neutral.
-    drive_jobs.append(("D1@Collar", '"CollarHeight"'))
+    # Name the extrude DEPTH so the collar length is a markable drawing
+    # dimension (the print's overall axial length, between the two faced
+    # ends), and drive it from CollarHeight: the cross hole is driven to
+    # CollarHeight/2, so the body height must move with it or a GUI edit of
+    # CollarHeight leaves the hole off-centre (or outside the collar).
+    # Evaluates to as-built -> neutral.
+    height_dim = name_dimensions(adapter, "Collar", ["CollarHeightDim"])
+    drive_jobs += [(height_dim[0], '"CollarHeight"')]
     v_collar = math.pi * (COLLAR_DIA / 2.0) ** 2 * COLLAR_HEIGHT
     await volume_check(adapter, "collar", v_collar, 0.005 * v_collar)
 
@@ -163,6 +171,8 @@ async def build(adapter) -> dict[str, str]:
     # wall has no planar seat for the Hole Wizard (see the CROSS_HOLE_DIA note).
     # On the Front plane the centre is off-axis in y (height) only, so
     # define_circle emits a z (height) dim then the diameter -- x slot ignored.
+    # CrossHeight runs from the sketch origin = the collar's bottom face, so it
+    # prints as the hole station from that faced end.
     cross = SketchDims()
     check("create_sketch cross hole", await adapter.create_sketch("Front"))
     await define_circle(
@@ -195,6 +205,11 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
+    # The slip-fit band rides the MODEL dimension (drawing-spec-purity), so the
+    # print's reamed bore re-renders under any unit switch.
+    set_dimension_bilateral_tolerance(
+        adapter, "RodBoreProfile", "RodBoreDiaDim", *deviations(ROD_BORE_BAND)
+    )
     await volume_check(adapter, "driven output fixture (equations neutral)", v_final, 30.0)
 
     # HookAnchorPoint: the lever-wire ball joint's fixture-side anchor (see
