@@ -152,3 +152,51 @@ def test_every_authored_cone_is_keyed_before_downstream_gear_coupling() -> None:
         "distance_driver",
         "parallel_mate",
     ]
+
+
+def test_cone_key_bank_is_force_rebuilt_before_cylinder_mesh_batch() -> None:
+    build = _function("build")
+    key_index = next(
+        index
+        for index, statement in enumerate(build.body)
+        if isinstance(statement, ast.For)
+        and isinstance(statement.iter, ast.Name)
+        and statement.iter.id == "cone_gears"
+        and _calls(statement, "_key_to_shaft")
+    )
+
+    rebuild_index = next(
+        index
+        for index, statement in enumerate(build.body)
+        if index > key_index
+        and isinstance(statement, ast.Expr)
+        and isinstance(statement.value, ast.Await)
+        and isinstance(statement.value.value, ast.Call)
+        and isinstance(statement.value.value.func, ast.Name)
+        and statement.value.value.func.id == "force_rebuild"
+    )
+    crank_mesh_index = next(
+        index
+        for index, statement in enumerate(build.body)
+        if index > rebuild_index
+        and isinstance(statement, ast.Expr)
+        and isinstance(statement.value, ast.Await)
+        and isinstance(statement.value.value, ast.Call)
+        and isinstance(statement.value.value.func, ast.Name)
+        and statement.value.value.func.id == "gear_mate"
+    )
+    cylinder_batch_index = next(
+        index
+        for index, statement in enumerate(build.body)
+        if index > crank_mesh_index
+        and isinstance(statement, ast.Expr)
+        and isinstance(statement.value, ast.Call)
+        and isinstance(statement.value.func, ast.Name)
+        and statement.value.func.id == "gear_mates_batch"
+    )
+
+    assert key_index < rebuild_index < crank_mesh_index < cylinder_batch_index
+    batch = build.body[cylinder_batch_index]
+    assert isinstance(batch, ast.Expr) and isinstance(batch.value, ast.Call)
+    label = next(keyword.value for keyword in batch.value.keywords if keyword.arg == "label")
+    assert isinstance(label, ast.Constant) and label.value == "cylinder.mesh_bank"

@@ -2765,6 +2765,12 @@ async def build(adapter) -> dict[str, str]:
             cone_axis_dir,
             f"cone-gear T{teeth:03d}",
         )
+    # Directly authoring all 20 configured gears leaves the keyed family dirty
+    # even though each mate add solved locally. Close that authoring epoch with
+    # the authoritative deep rebuild before reading/freezing the train phase or
+    # opening the deferred cylinder-mesh batch. A failed solve is a real model
+    # fault: force_rebuild checks and propagates the adapter's false result.
+    await force_rebuild(adapter)
     # 16T pinion (keyed to the crank) drives the 64T -> the cone cluster turns.
     # Solving the 20 freshly authored keyed mate sets can WANDER the free cone
     # train's spin off its inserted phase. The gear mate authored NEXT records
