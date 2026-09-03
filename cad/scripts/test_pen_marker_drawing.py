@@ -146,6 +146,17 @@ def test_native_gdt_controls_tip_runout_and_barrel_finish() -> None:
     assert 'characteristic="circular_runout"' in source
     assert 'datums=("A",)' in source
     assert source.count("add_surface_finish(") == 1
+    tip_segment_midpoint = (
+        drawing.APEX[0]
+        + (pen_marker_spec.TIP_POINT_Y + pen_marker_spec.TIP_NECK_Y)
+        / 2.0
+        * drawing._AXIAL_SCALE,
+        drawing.FRONT_CENTER[1]
+        + (pen_marker_spec.TIP_POINT_DIAMETER + pen_marker_spec.TIP_NECK_DIAMETER)
+        / 4.0
+        * drawing._RADIAL_SCALE,
+    )
+    assert drawing.TIP_FLANK == tip_segment_midpoint
 
 
 def test_view_scales_are_explicit_and_profile_is_rotated() -> None:

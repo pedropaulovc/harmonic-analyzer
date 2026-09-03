@@ -40,6 +40,8 @@ from pen_marker_spec import (
     SHOULDER_Y,
     SURFACE_FINISHES,
     TIP_NECK_DIAMETER,
+    TIP_POINT_DIAMETER,
+    TIP_POINT_Y,
     TIP_NECK_Y,
 )
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
@@ -90,9 +92,11 @@ BARREL_BOTTOM_EDGE = (
     _FLARE_PICK_X,
     FRONT_CENTER[1] - _FLARE_PICK_RADIUS * _RADIAL_SCALE,
 )
+_TIP_PICK_Y = (TIP_POINT_Y + TIP_NECK_Y) / 2.0
+_TIP_PICK_RADIUS = (TIP_POINT_DIAMETER + TIP_NECK_DIAMETER) / 4.0
 TIP_FLANK = (
-    (APEX[0] + TIP_NECK_X) / 2.0,
-    FRONT_CENTER[1] + TIP_NECK_DIAMETER * _RADIAL_SCALE / 4.0,
+    APEX[0] + _TIP_PICK_Y * _AXIAL_SCALE,
+    FRONT_CENTER[1] + _TIP_PICK_RADIUS * _RADIAL_SCALE,
 )
 
 FRONT_KEEP = {
