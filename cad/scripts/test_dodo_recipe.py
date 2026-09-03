@@ -1623,3 +1623,56 @@ def test_abandoning_the_grace_is_recorded_on_the_span(monkeypatch):
 
     assert [n for n, _ in events] == ["sw.grace_abandoned"], events
     assert events[0][1]["grace_s"] > 0
+
+
+def test_modal_dialog_exit_code_is_a_solidworks_failure():
+    # exit 88 (_watchdog.EXIT_MODAL_DIALOG) must take the kill + relaunch + retry
+    # path like a crash, not raise as an ordinary gate failure.
+    dodo = _load_dodo()
+    assert {86, 87, 88} <= set(dodo._WATCHDOG_EXIT_CODES)
+
+
+def test_sw_preflight_restarts_only_past_the_commit_budget(monkeypatch):
+    dodo = _load_dodo()
+    calls: list[str] = []
+    monkeypatch.setattr(dodo._sw_lifecycle, "force_recover", lambda: calls.append("recover") or "connected")
+    monkeypatch.setattr(dodo._sw_lifecycle, "wait_until_ready", lambda: calls.append("wait") or "connected")
+    monkeypatch.setenv("HARMONIC_SW_MAX_COMMIT_GB", "40")
+
+    monkeypatch.setattr(dodo, "_sw_commit_gb", lambda: 12.5)
+    dodo._sw_preflight()
+    assert calls == []
+
+    monkeypatch.setattr(dodo, "_sw_commit_gb", lambda: 66.3)  # the 2026-09-02 seat
+    dodo._sw_preflight()
+    assert calls == ["recover"]
+
+    monkeypatch.setattr(dodo, "_sw_commit_gb", lambda: None)  # not running / probe glitch
+    dodo._sw_preflight()
+    assert calls == ["recover"]
+
+    monkeypatch.setattr(dodo, "_sw_commit_gb", lambda: 66.3)
+    monkeypatch.setenv("HARMONIC_SW_MAX_COMMIT_GB", "0")  # disabled
+    dodo._sw_preflight()
+    assert calls == ["recover"]
+
+
+def test_sw_preflight_waits_out_a_slow_cold_start(monkeypatch):
+    dodo = _load_dodo()
+    calls: list[str] = []
+    monkeypatch.setattr(dodo._sw_lifecycle, "force_recover", lambda: calls.append("recover") or "starting")
+    monkeypatch.setattr(dodo._sw_lifecycle, "wait_until_ready", lambda: calls.append("wait") or "connected")
+    monkeypatch.setenv("HARMONIC_SW_MAX_COMMIT_GB", "40")
+    monkeypatch.setattr(dodo, "_sw_commit_gb", lambda: 66.3)
+    dodo._sw_preflight()
+    assert calls == ["recover", "wait"]
+
+
+def test_sw_preflight_budget_rejects_non_finite_overrides(monkeypatch):
+    dodo = _load_dodo()
+    for raw in ("nan", "inf", "-inf", "banana"):
+        monkeypatch.setenv("HARMONIC_SW_MAX_COMMIT_GB", raw)
+        assert dodo._sw_max_commit_gb() == dodo._SW_MAX_COMMIT_GB_DEFAULT, raw
+    monkeypatch.setenv("HARMONIC_SW_MAX_COMMIT_GB", "12.5")
+    assert dodo._sw_max_commit_gb() == 12.5
+

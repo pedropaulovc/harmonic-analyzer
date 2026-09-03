@@ -56,3 +56,23 @@ neither watchdog signal fires; a build just blocks on `sw.connect`. That case
 is detected + recovered by [[connector-lifecycle-lib]]
 (`sw_recovery.find_dotnet_splash_dialog` / `recover_solidworks`), now auto-run
 before connect in every COM task.
+
+2026-09-02 addendum -- the LOW-MEMORY MODAL (now watchdog signal 4, exit 88):
+after ~10 h of builds on one session (sldworks.exe at 66 GB committed / 11 GB
+working set, 127 GB box, 67 GB free), SolidWorks popped a `#32770`
+"SOLIDWORKS Design" MessageBox mid top-assembly build: "Warning! Your system is
+running critically low on committed memory. Executing this command might
+cause SOLIDWORKS to fail... SOLIDWORKS strongly recommends that you do not
+continue. [Yes] [No]". Facts: (1) it is owned by sldworks.exe (no sldexitapp,
+so the crash signal is blind to it) and disables the main frame -- the hung
+probe warned every poll but nothing was fatal until the 900 s op timeout;
+(2) while it is up, COM queries return EMPTY rather than blocking:
+`GetComponentByName` came back None ("Component not found: 'channel-1'") for a
+component that a probe on a fresh session found at once -- so a "not found"
+right after hung warns is the dialog, not the model; (3) Win32 BM_CLICK,
+WM_COMMAND IDYES and SendKeys Alt+Y all no-op'd on it (same UIPI/owner issue as
+the Document Recovery popup); the user's ruling is that killing SolidWorks is
+the safe answer, never clicking Yes. Hence `_watchdog._seat_modal_dialog`
+(fatal after 2 polls, dodo retries after force_recover) plus the preventive
+`dodo._sw_preflight` (restart past `HARMONIC_SW_MAX_COMMIT_GB`, default 40).
+

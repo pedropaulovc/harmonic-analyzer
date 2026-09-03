@@ -1,7 +1,9 @@
 """Offline contract for the COM watchdog (check:watchdog, no SolidWorks).
 
-Pins the three signals and their severities: a NEW sldexitapp.exe pid is fatal
-(exit 86) while a stale pre-existing one is ignored; telemetry silence past the
+Pins the four signals and their severities: a NEW sldexitapp.exe pid is fatal
+(exit 86) while a stale pre-existing one is ignored; a modal message box
+blocking the seat is fatal (exit 88) once it survives two polls, and one that
+clears in between is not; telemetry silence past the
 op timeout is fatal (exit 87) and fresh activity is not; a hung SolidWorks
 window only WARNS, throttled -- per the 2026-07-18 decision that
 ``Responding == False`` is too noisy to kill on (SolidWorks legitimately stops
@@ -18,7 +20,7 @@ import pytest
 
 import _telemetry
 import _watchdog
-from _watchdog import EXIT_CRASH, EXIT_OP_TIMEOUT, Watchdog
+from _watchdog import EXIT_CRASH, EXIT_MODAL_DIALOG, EXIT_OP_TIMEOUT, Watchdog
 
 
 class _Exit(Exception):
@@ -33,6 +35,7 @@ def _make(
     hung: bool = False,
     idle: float = 0.0,
     timeout: float = 900.0,
+    dialog_probe=lambda: None,
 ) -> tuple[Watchdog, list[int]]:
     exits: list[int] = []
 
@@ -49,6 +52,7 @@ def _make(
         op_timeout=timeout,
         crash_pids=lambda: set(seq.pop(0)) if len(seq) > 1 else set(seq[0]),
         hung_probe=lambda: hung,
+        dialog_probe=dialog_probe,
         activity=lambda: now - idle,
         exit_fn=_exit,
         clock=lambda: now,
@@ -130,6 +134,74 @@ def test_hung_recovery_closes_the_episode(monkeypatch: pytest.MonkeyPatch) -> No
     assert dog._hung_since is None
 
 
+_LOW_MEMORY = (
+    "Warning! Your system is running critically low on committed memory. "
+    "Executing this command might cause SOLIDWORKS to fail."
+)
+
+
+def test_modal_dialog_warns_first_then_is_fatal(monkeypatch: pytest.MonkeyPatch) -> None:
+    # 2026-09-02: the low-memory box blocked the seat mid top-assembly build; a
+    # first sighting only warns (a transient box must not kill a healthy build),
+    # the second consecutive poll aborts with its own exit code so dodo retries
+    # after a kill + relaunch.
+    warns: list[str] = []
+    monkeypatch.setattr(_watchdog, "_warn", lambda msg, **f: warns.append(msg))
+    dog, exits = _make(dialog_probe=lambda: (0x1234, _LOW_MEMORY))
+    assert dog.tick() == "modal-pending"
+    assert exits == [] and any("modal dialog up" in m for m in warns)
+    with pytest.raises(_Exit):
+        dog.tick()
+    assert exits == [EXIT_MODAL_DIALOG]
+
+
+def test_modal_dialog_that_clears_resets_the_count() -> None:
+    seen: list[tuple[int, str] | None] = [(0x1234, _LOW_MEMORY)]
+    dog, exits = _make(dialog_probe=lambda: seen[0])
+    assert dog.tick() == "modal-pending"
+    seen[0] = None
+    assert dog.tick() is None
+    seen[0] = (0x1234, _LOW_MEMORY)
+    assert dog.tick() == "modal-pending"
+    assert exits == []
+
+
+def test_two_different_transient_dialogs_are_not_one_persistent_one() -> None:
+    # CodeRabbit (#659): box A closes and box B opens between polls -- neither
+    # survived two polls, so the count restarts on the new window handle.
+    seen: list[tuple[int, str] | None] = [(0x1111, "box A")]
+    dog, exits = _make(dialog_probe=lambda: seen[0])
+    assert dog.tick() == "modal-pending"
+    seen[0] = (0x2222, "box B")
+    assert dog.tick() == "modal-pending"
+    assert exits == []
+    with pytest.raises(_Exit):
+        dog.tick()  # box B, second consecutive poll
+    assert exits == [EXIT_MODAL_DIALOG]
+
+
+def test_modal_dialog_abort_carries_the_dialog_text(monkeypatch: pytest.MonkeyPatch) -> None:
+    aborts: list[tuple[str, int, dict]] = []
+    monkeypatch.setattr(_watchdog, "_abort", lambda reason, msg, code, **f: aborts.append((reason, code, f)))
+    monkeypatch.setattr(_watchdog, "_warn", lambda msg, **f: None)
+    dog, _ = _make(dialog_probe=lambda: (0x1234, _LOW_MEMORY))
+    dog.tick()
+    with pytest.raises(_Exit):
+        dog.tick()
+    reason, code, fields = aborts[0]
+    assert (reason, code) == ("modal-dialog", EXIT_MODAL_DIALOG)
+    assert "committed memory" in fields["dialog_text"]
+    assert "last_op" in fields and "idle_s" in fields
+
+
+def test_crash_outranks_a_pending_modal_dialog() -> None:
+    # A crash dialog and a leftover modal can coexist; the crash wins immediately.
+    dog, exits = _make(baseline=set(), crash={4242}, dialog_probe=lambda: (0x1234, _LOW_MEMORY))
+    with pytest.raises(_Exit):
+        dog.tick()
+    assert exits == [EXIT_CRASH]
+
+
 def test_fatal_signals_carry_structured_context(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -203,7 +275,7 @@ def test_start_logs_the_armed_configuration(monkeypatch: pytest.MonkeyPatch) -> 
         assert _watchdog.start() is not None
     finally:
         _watchdog.stop()
-    assert any("watchdog armed" in m and "900s" in m for m in infos)
+    assert any("watchdog armed" in m and "900s" in m and "modal-dialog" in m for m in infos)
 
 
 def test_run_build_wires_the_watchdog() -> None:

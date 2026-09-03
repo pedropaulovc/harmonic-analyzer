@@ -66,6 +66,7 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
+import math
 import os
 import re
 import shutil
@@ -663,8 +664,20 @@ def _run_subprocess(cmd: list[str], label: str, log_stem: str | None = None) -> 
 _SW_ENSURED = False
 # Backoff between COM-failure retries: 1, 2, 4 minutes (=> up to 3 retries, 4 attempts).
 _COM_RETRY_BACKOFF_S: tuple[int, ...] = (60, 120, 240)
-# Watchdog exit codes that unambiguously mean SolidWorks itself broke (see _watchdog).
-_WATCHDOG_EXIT_CODES = frozenset({86, 87})
+# Watchdog exit codes that unambiguously mean SolidWorks itself broke (see _watchdog):
+# 86 crash, 87 op timeout, 88 a modal dialog blocking the seat (the 2026-09-02
+# low-committed-memory box) -- all three recover by kill + relaunch + retry.
+_WATCHDOG_EXIT_CODES = frozenset({86, 87, 88})
+# Pre-task memory preflight. SolidWorks' commit charge grows across a day of
+# builds (66 GB after ~10 h on 2026-09-02, on a 127 GB seat) until SolidWorks
+# itself pops "Warning! Your system is running critically low on committed
+# memory" mid-task -- a modal that blocks the seat (watchdog exit 88) and
+# precedes a crash. A fresh session sits at ~1.5 GB, so once the process is past
+# this budget it is restarted BEFORE the next task, under the seat lock, where
+# it costs one cold start (~7 min) instead of a lost task + the same restart.
+# 0 disables.
+_SW_MAX_COMMIT_GB_ENV = "HARMONIC_SW_MAX_COMMIT_GB"
+_SW_MAX_COMMIT_GB_DEFAULT = 40.0
 
 
 def _sw_autostart_enabled() -> bool:
@@ -690,8 +703,108 @@ def _com_retry_backoff() -> tuple[int, ...]:
     return parsed or _COM_RETRY_BACKOFF_S
 
 
+def _sw_max_commit_gb() -> float:
+    """The preflight budget in GB; a non-numeric or non-finite override (``nan``
+    would bypass both comparisons, ``inf`` would never restart) falls back to
+    the default. ``<= 0`` disables the preflight."""
+    try:
+        value = float(os.environ.get(_SW_MAX_COMMIT_GB_ENV, _SW_MAX_COMMIT_GB_DEFAULT))
+    except ValueError:
+        return _SW_MAX_COMMIT_GB_DEFAULT
+    return value if math.isfinite(value) else _SW_MAX_COMMIT_GB_DEFAULT
+
+
+def _sw_commit_gb() -> float | None:
+    """Committed (private) bytes of the SolidWorks main process, in GB -- the number
+    its own low-memory warning keys on. ``None`` when it is not running, off-Windows,
+    or on any probe error (the preflight then does nothing)."""
+    if os.name != "nt":
+        return None
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        from solidworks_mcp.adapters import sw_recovery
+
+        pids = sw_recovery.pids_of_image(sw_recovery.SW_MAIN_PROCESS)
+        if not pids:
+            return None
+
+        class _MemoryCountersEx(ctypes.Structure):
+            _fields_ = [
+                ("cb", wintypes.DWORD),
+                ("PageFaultCount", wintypes.DWORD),
+                ("PeakWorkingSetSize", ctypes.c_size_t),
+                ("WorkingSetSize", ctypes.c_size_t),
+                ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+                ("PagefileUsage", ctypes.c_size_t),
+                ("PeakPagefileUsage", ctypes.c_size_t),
+                ("PrivateUsage", ctypes.c_size_t),
+            ]
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        psapi = ctypes.WinDLL("psapi", use_last_error=True)
+        kernel32.OpenProcess.restype = wintypes.HANDLE
+        kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+        kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+        psapi.GetProcessMemoryInfo.argtypes = [
+            wintypes.HANDLE, ctypes.POINTER(_MemoryCountersEx), wintypes.DWORD,
+        ]
+        total = 0
+        for pid in pids:
+            handle = kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+            if not handle:
+                continue
+            try:
+                counters = _MemoryCountersEx()
+                counters.cb = ctypes.sizeof(counters)
+                if psapi.GetProcessMemoryInfo(handle, ctypes.byref(counters), counters.cb):
+                    total += int(counters.PrivateUsage)
+            finally:
+                kernel32.CloseHandle(handle)
+        return total / 1e9 if total else None
+    except Exception:  # noqa: BLE001 - a probe glitch must never fail a build
+        return None
+
+
+def _sw_preflight() -> None:
+    """Restart a bloated SolidWorks BEFORE a COM task (``_SW_MAX_COMMIT_GB_DEFAULT``).
+
+    Runs under the seat lock at every COM call site (after :func:`_sw_ensure_once`),
+    as a ``build-infra`` span so a trace answers "was this task's start a memory
+    restart?" in one filter. Best-effort like the rest of the lifecycle glue."""
+    budget = _sw_max_commit_gb()
+    if budget <= 0:
+        return
+    commit = _sw_commit_gb()
+    if commit is None or commit <= budget:
+        return
+    with _telemetry.span(
+        "sw.memory_restart",
+        service=_telemetry.BUILD_INFRA_SERVICE,
+        commit_gb=round(commit, 1),
+        budget_gb=budget,
+    ) as span:
+        _telemetry.warn(
+            f"[sw] SolidWorks commit {commit:.1f} GB > {budget:.0f} GB budget "
+            f"({_SW_MAX_COMMIT_GB_ENV}) -- restarting the seat before this task, "
+            "ahead of its own low-memory modal",
+            commit_gb=round(commit, 1),
+            budget_gb=budget,
+        )
+        _telemetry.event("sw.memory_restart", commit_gb=round(commit, 1), budget_gb=budget)
+        state = _sw_lifecycle.force_recover()
+        if state != _sw_lifecycle.CONNECTED_STATE:
+            state = _sw_lifecycle.wait_until_ready()
+        span.set_attribute("final_state", state)
+
+
 def _sw_ensure_once() -> None:
-    """Bring SolidWorks up once per doit worker, before this worker's first COM BUILD.
+    """Bring SolidWorks up once per doit worker, before this worker's first COM BUILD,
+    then run the per-task memory preflight (:func:`_sw_preflight`) every time.
 
     Called at each COM call site as a TOP-LEVEL ``build-infra`` span (a sibling of the
     ``task`` span, like the seat wait), NOT from inside ``_exec_com``/the task span --
@@ -701,16 +814,19 @@ def _sw_ensure_once() -> None:
     cache never starts SolidWorks. Best-effort (``ensure_ready`` swallows its own
     failures and proceeds to ``connect``)."""
     global _SW_ENSURED
-    if _SW_ENSURED or not _sw_autostart_enabled():
+    if not _sw_autostart_enabled():
         return
-    _sw_lifecycle.ensure_ready()
-    _SW_ENSURED = True
+    if not _SW_ENSURED:
+        _sw_lifecycle.ensure_ready()
+        _SW_ENSURED = True
+    _sw_preflight()
 
 
 def _exec_com(cmd: list[str], label: str, log_stem: str | None = None) -> None:
     """Run a COM subprocess with reactive SolidWorks recovery.
 
-    If the subprocess exits with a watchdog crash/op-timeout code (86/87) or leaves
+    If the subprocess exits with a watchdog crash/op-timeout/modal-dialog code
+    (86/87/88) or leaves
     SolidWorks not-connected, retry up to ``len(_COM_RETRY_BACKOFF_S)`` times, waiting
     1/2/4 min then force-recovering SW (kill→relaunch) between attempts. An ordinary
     failure (gate assertion, build error) with SolidWorks still healthy is NOT retried
