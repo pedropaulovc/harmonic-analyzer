@@ -408,19 +408,17 @@ def test_multi_sheet_assembly_is_one_cross_sheet_review(
         ],
         "minor": [],
     }
-    calls: list[list[str]] = []
+    captured: list[tuple[list[Path], str, list[bytes]]] = []
 
     def fake_run(command, **kwargs):
-        calls.append(command)
-        attached = [
+        attachments = [
             Path(command[index + 1])
             for index, value in enumerate(command)
             if value == "-i"
         ]
-        assert len(attached) == 2
-        assert all(path.read_bytes().startswith(b"\x89PNG") for path in attached)
-        assert "Compare every sheet against every other sheet" in kwargs["input"]
-        assert "every balloon against its BOM row" in kwargs["input"]
+        prompt = kwargs["input"]
+        signatures = [path.read_bytes()[:4] for path in attachments]
+        captured.append((attachments, prompt, signatures))
         output = Path(command[command.index("-o") + 1])
         output.write_text(json.dumps(verdict), encoding="utf-8")
         return subprocess.CompletedProcess(
@@ -436,7 +434,16 @@ def test_multi_sheet_assembly_is_one_cross_sheet_review(
         codex="codex-test",
     )
 
-    assert len(calls) == 1
+    assert review.error is None
+    assert review.verdict == verdict
+    assert len(captured) == 1
+    attachments, prompt, signatures = captured[0]
+    assert len(attachments) == 2
+    assert len(signatures) == 2
+    assert all(signature == b"\x89PNG" for signature in signatures)
+    prompt_text = " ".join(prompt.split())
+    assert "Compare every sheet against every other sheet" in prompt_text
+    assert "every balloon against its BOM row" in prompt_text
     assert review.sheet_count == 2
     assert review.sources == [str(source)]
     assert len(review.source_sha256) == 1
