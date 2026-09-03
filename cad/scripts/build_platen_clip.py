@@ -49,6 +49,7 @@ from _common import (
     volume_check,
 )
 from _holes import CLEARANCE_MM, HoleSpec, wizard_holes
+from fillister_screw_spec import HEAD_DIA as CLIP_SCREW_HEAD_DIA
 
 PART_NAME = "platen-clip"
 MATERIAL = "Brass"  # see _common.apply_material docstring
@@ -61,17 +62,22 @@ SHEET_T = 0.8  # photo-backed brass sheet thickness
 CLIP_THICKNESS = SHEET_T  # assembly stand-off: one sheet, not a face stack
 
 SCREW_RAIL_WIDTH = 4.0
-NOTCH_WIDTH = 0.6
-SPRING_RAIL_WIDTH = CLIP_WIDTH - SCREW_RAIL_WIDTH - NOTCH_WIDTH  # 4.388
+CLIP_SCREW_HEAD_CLEARANCE = 0.05
+NOTCH_WIDTH = (
+    CLIP_SCREW_HEAD_DIA / 2.0
+    - SCREW_RAIL_WIDTH / 2.0
+    + CLIP_SCREW_HEAD_CLEARANCE
+)
+SPRING_RAIL_WIDTH = CLIP_WIDTH - SCREW_RAIL_WIDTH - NOTCH_WIDTH
 SPRING_RAIL_Y0 = SCREW_RAIL_WIDTH + NOTCH_WIDTH
 CENTER_BRIDGE_LENGTH = 5.0
 NOTCH_LENGTH = (CLIP_LENGTH - CENTER_BRIDGE_LENGTH) / 2.0
 SPRING_END_RADIUS = SPRING_RAIL_WIDTH / 2.0
 ARCH_RISE = 1.5  # shallow outward bow; editable as ArchRise in Tools > Equations
 
-# The brass fillister clip screws (diameter 2.9 shank) retain their existing
-# lengthwise stations.  Their transverse station is explicit now because the
-# holes belong to the flat rail, not the overall two-lane width centre.
+# The brass fillister clip screws retain their existing lengthwise stations.
+# Their transverse station is explicit because the holes belong to the flat
+# rail; the adjacent notch clears each Ø5.5 head before the spring bows outward.
 HOLE_INSET = 7.1904  # ch30-p002 Pose Studio: 8 * 0.8988 from each end
 HOLE_Y = SCREW_RAIL_WIDTH / 2.0
 HOLE_DIA = CLEARANCE_MM[("#4", "normal")]
@@ -134,6 +140,12 @@ if not math.isclose(
     raise AssertionError("opposed platen clip notches must stop at one center bridge")
 if HOLE_Y - HOLE_DIA / 2.0 <= 0.0 or HOLE_Y + HOLE_DIA / 2.0 >= SCREW_RAIL_WIDTH:
     raise AssertionError("platen clip screw holes must stay wholly inside the flat rail")
+if not math.isclose(
+    SPRING_RAIL_Y0 - (HOLE_Y + CLIP_SCREW_HEAD_DIA / 2.0),
+    CLIP_SCREW_HEAD_CLEARANCE,
+    abs_tol=1e-9,
+):
+    raise AssertionError("platen clip notch must clear the fillister screw heads")
 if _ARCH_RUN <= 0.0 or ARCH_RISE <= 0.0:
     raise AssertionError("platen clip spring arches need positive run and rise")
 

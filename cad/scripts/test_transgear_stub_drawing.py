@@ -102,6 +102,12 @@ def test_cap_slot_volume_uses_the_cylindrical_intersection() -> None:
             )
 
 
+def test_cap_plane_and_depth_follow_editable_globals() -> None:
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert r'''("D1@CapPlane", '"BaseLen" + "SeatLen" + "CollarLen"')''' in source
+    assert r'''("D1@Cap", '"CapLen"')''' in source
+
+
 def test_lands_carry_true_diametric_dimensions() -> None:
     """The revolve profile dims the lathe-facing set: three doubled
     centerline (diameter) dims plus the three land lengths -- never the

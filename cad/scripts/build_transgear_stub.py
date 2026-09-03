@@ -328,12 +328,14 @@ async def build(adapter) -> dict[str, str]:
     # on a plane at the collar's end, then a CAP_SLOT_W x CAP_SLOT_D slot cut
     # across its face (Front-plane rectangle, mid-plane cut along Z).
     end_y = BASE_LEN + SEAT_LEN + COLLAR_LEN
-    cap_plane = check(
+    check(
         "create_plane collar end",
         await adapter.create_plane(CreatePlaneParameters(mode="offset", base_plane="Top Plane", offset=end_y)),
     )
+    name_last_feature(adapter, "CapPlane")
+    drive_jobs.append(("D1@CapPlane", '"BaseLen" + "SeatLen" + "CollarLen"'))
     cap = SketchDims()
-    check("create_sketch cap", await adapter.create_sketch(getattr(cap_plane, "name", cap_plane)))
+    check("create_sketch cap", await adapter.create_sketch("CapPlane"))
     await define_circle(
         adapter, 0.0, 0.0, CAP_DIA / 2.0, "cap", dims=cap,
         names=("CapCx", "CapCz", "CapDia"), drives=(None, None, '"CapDia"'),
@@ -344,6 +346,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += cap.apply(adapter, "CapProfile")
     check("extrude cap", await adapter.create_extrusion(ExtrusionParameters(depth=CAP_LEN)))
     name_last_feature(adapter, "Cap")
+    drive_jobs.append(("D1@Cap", '"CapLen"'))
     v_cap = math.pi * (CAP_DIA / 2.0) ** 2 * CAP_LEN
     got = await volume_check(adapter, "stub + cap", expected + v_cap, 0.02 * v_cap + 0.005 * expected)
     if got < expected + 0.5 * v_cap:

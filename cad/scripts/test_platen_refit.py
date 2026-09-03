@@ -91,6 +91,10 @@ def test_platen_clip_holes_and_handed_assembly_placements_follow_flat_rail() -> 
     assert clip.HOLE_Y - clip.HOLE_DIA / 2.0 > 0.0
     assert clip.HOLE_Y + clip.HOLE_DIA / 2.0 < clip.SCREW_RAIL_WIDTH
     assert tuple(row[3] for row in assembly.CLIP_PLACEMENTS) == (90.0, -90.0)
+    assert math.isclose(
+        clip.SPRING_RAIL_Y0 - (clip.HOLE_Y + clip.CLIP_SCREW_HEAD_DIA / 2.0),
+        clip.CLIP_SCREW_HEAD_CLEARANCE,
+    )
 
     plate_mid_x = assembly.PLATE_X0 + assembly.PLATE_WIDTH / 2.0
     expected_y = sorted(

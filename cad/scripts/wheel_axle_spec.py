@@ -23,19 +23,24 @@ NUT_BORE_DIA = 5.1  # slips the O5 stud (0.05 radial)
 # Geometric controls, authored on the model as plain annotations by the part build
 # (_part_pmi.author_part_pmi) and IMPORTED onto the sheet — the sheet types no
 # tolerance strings. Axis +Y from the flange's bar-side face: flange Ø35
-# y 0..3, stud Ø5 y 3..20, washer Ø9 y 13..14, so each face resolves by its
-# diameter (the flange seating face by its -Y normal at y=0).
+# y 0..3, stud Ø5 y 3..20, washer Ø9 y 13..14. The washer splits the stud's
+# exterior into two Ø5 faces, so the bearing selector names a station inside
+# the wheel-hub span (the flange seating face uses its -Y normal at y=0).
+STUD_BEARING_FACE = CylinderFace(
+    STUD_DIA,
+    contains_y_mm=FLANGE_LEN + WHEEL_HUB_RIDE / 2.0,
+)
 PART_DATUMS = (
     # The flange's bar-side seating face, then the stud bearing axis.
     PartDatum("A", PlanarFace((0, -1, 0), 0.0)),
-    PartDatum("B", CylinderFace(STUD_DIA)),
+    PartDatum("B", STUD_BEARING_FACE),
 )
 GEOMETRIC_CONTROLS = (
     GeometricControl(
         "stud_perpendicularity",
         "perpendicularity",
         "0.05",
-        CylinderFace(STUD_DIA),
+        STUD_BEARING_FACE,
         datums=("A",),
         tolerance_zone="diametral",
     ),
@@ -48,7 +53,7 @@ GEOMETRIC_CONTROLS = (
     ),
 )
 SURFACE_FINISHES = (
-    SurfaceFinishControl("stud_bearing", MACHINED_UM, CylinderFace(STUD_DIA)),
+    SurfaceFinishControl("stud_bearing", MACHINED_UM, STUD_BEARING_FACE),
 )
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
