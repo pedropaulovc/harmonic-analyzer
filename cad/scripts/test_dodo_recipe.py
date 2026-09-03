@@ -1667,3 +1667,12 @@ def test_sw_preflight_waits_out_a_slow_cold_start(monkeypatch):
     dodo._sw_preflight()
     assert calls == ["recover", "wait"]
 
+
+def test_sw_preflight_budget_rejects_non_finite_overrides(monkeypatch):
+    dodo = _load_dodo()
+    for raw in ("nan", "inf", "-inf", "banana"):
+        monkeypatch.setenv("HARMONIC_SW_MAX_COMMIT_GB", raw)
+        assert dodo._sw_max_commit_gb() == dodo._SW_MAX_COMMIT_GB_DEFAULT, raw
+    monkeypatch.setenv("HARMONIC_SW_MAX_COMMIT_GB", "12.5")
+    assert dodo._sw_max_commit_gb() == 12.5
+

@@ -66,6 +66,7 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
+import math
 import os
 import re
 import shutil
@@ -703,10 +704,14 @@ def _com_retry_backoff() -> tuple[int, ...]:
 
 
 def _sw_max_commit_gb() -> float:
+    """The preflight budget in GB; a non-numeric or non-finite override (``nan``
+    would bypass both comparisons, ``inf`` would never restart) falls back to
+    the default. ``<= 0`` disables the preflight."""
     try:
-        return float(os.environ.get(_SW_MAX_COMMIT_GB_ENV, _SW_MAX_COMMIT_GB_DEFAULT))
+        value = float(os.environ.get(_SW_MAX_COMMIT_GB_ENV, _SW_MAX_COMMIT_GB_DEFAULT))
     except ValueError:
         return _SW_MAX_COMMIT_GB_DEFAULT
+    return value if math.isfinite(value) else _SW_MAX_COMMIT_GB_DEFAULT
 
 
 def _sw_commit_gb() -> float | None:

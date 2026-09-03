@@ -147,7 +147,7 @@ def test_modal_dialog_warns_first_then_is_fatal(monkeypatch: pytest.MonkeyPatch)
     # after a kill + relaunch.
     warns: list[str] = []
     monkeypatch.setattr(_watchdog, "_warn", lambda msg, **f: warns.append(msg))
-    dog, exits = _make(dialog_probe=lambda: _LOW_MEMORY)
+    dog, exits = _make(dialog_probe=lambda: (0x1234, _LOW_MEMORY))
     assert dog.tick() == "modal-pending"
     assert exits == [] and any("modal dialog up" in m for m in warns)
     with pytest.raises(_Exit):
@@ -156,21 +156,35 @@ def test_modal_dialog_warns_first_then_is_fatal(monkeypatch: pytest.MonkeyPatch)
 
 
 def test_modal_dialog_that_clears_resets_the_count() -> None:
-    seen: list[str | None] = [_LOW_MEMORY]
+    seen: list[tuple[int, str] | None] = [(0x1234, _LOW_MEMORY)]
     dog, exits = _make(dialog_probe=lambda: seen[0])
     assert dog.tick() == "modal-pending"
     seen[0] = None
     assert dog.tick() is None
-    seen[0] = _LOW_MEMORY
+    seen[0] = (0x1234, _LOW_MEMORY)
     assert dog.tick() == "modal-pending"
     assert exits == []
+
+
+def test_two_different_transient_dialogs_are_not_one_persistent_one() -> None:
+    # CodeRabbit (#659): box A closes and box B opens between polls -- neither
+    # survived two polls, so the count restarts on the new window handle.
+    seen: list[tuple[int, str] | None] = [(0x1111, "box A")]
+    dog, exits = _make(dialog_probe=lambda: seen[0])
+    assert dog.tick() == "modal-pending"
+    seen[0] = (0x2222, "box B")
+    assert dog.tick() == "modal-pending"
+    assert exits == []
+    with pytest.raises(_Exit):
+        dog.tick()  # box B, second consecutive poll
+    assert exits == [EXIT_MODAL_DIALOG]
 
 
 def test_modal_dialog_abort_carries_the_dialog_text(monkeypatch: pytest.MonkeyPatch) -> None:
     aborts: list[tuple[str, int, dict]] = []
     monkeypatch.setattr(_watchdog, "_abort", lambda reason, msg, code, **f: aborts.append((reason, code, f)))
     monkeypatch.setattr(_watchdog, "_warn", lambda msg, **f: None)
-    dog, _ = _make(dialog_probe=lambda: _LOW_MEMORY)
+    dog, _ = _make(dialog_probe=lambda: (0x1234, _LOW_MEMORY))
     dog.tick()
     with pytest.raises(_Exit):
         dog.tick()
@@ -182,7 +196,7 @@ def test_modal_dialog_abort_carries_the_dialog_text(monkeypatch: pytest.MonkeyPa
 
 def test_crash_outranks_a_pending_modal_dialog() -> None:
     # A crash dialog and a leftover modal can coexist; the crash wins immediately.
-    dog, exits = _make(baseline=set(), crash={4242}, dialog_probe=lambda: _LOW_MEMORY)
+    dog, exits = _make(baseline=set(), crash={4242}, dialog_probe=lambda: (0x1234, _LOW_MEMORY))
     with pytest.raises(_Exit):
         dog.tick()
     assert exits == [EXIT_CRASH]

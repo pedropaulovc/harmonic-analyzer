@@ -257,7 +257,7 @@ cold build; the incremental/cache-hit common case keeps restores parallel.
 
 Every COM subprocess runs a daemon watchdog thread (`_watchdog.py`;
 `_common.run_build` starts it right before `sw.connect` and stops it after
-`sw.disconnect`) so a dead SolidWorks can never hold the seat forever. Three
+`sw.disconnect`) so a dead SolidWorks can never hold the seat forever. Four
 signals, three fatal, one log-only:
 
 - **Crash — fatal, exit 86.** A NEW `sldexitapp.exe` process (SolidWorks' own
@@ -296,7 +296,7 @@ A fatal signal logs `xx`, flushes telemetry, and hard-exits (`os._exit`) — the
 main thread is blocked inside the dead COM call, so only a process exit frees
 it. The doit parent then fails the task, and since the seat lock is held by the
 PARENT's `_com_seat`, the machine-global seat releases cleanly. Kill switch:
-`HARMONIC_COM_WATCHDOG=0`. Recovery after exit 86/88 is automatic
+`HARMONIC_COM_WATCHDOG=0`. Recovery after exit 86/87/88 is automatic
 (`_exec_com`: kill, relaunch, retry); by hand: clear the crash dialog,
 relaunch SolidWorks via the 3DEXPERIENCE Platform desktop shortcut (never
 COM-start it), rerun the build. The fatal/log-only contract is pinned by

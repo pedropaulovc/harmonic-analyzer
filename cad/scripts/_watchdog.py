@@ -147,8 +147,11 @@ def _sw_window_hung() -> bool:
     return _sw_recovery.is_sldworks_window_hung()
 
 
-def _seat_modal_dialog() -> str | None:
-    """Text of a modal message box blocking the SolidWorks seat, or ``None``.
+def _seat_modal_dialog() -> tuple[int, str] | None:
+    """``(hwnd, text)`` of a modal message box blocking the SolidWorks seat, or
+    ``None``. The hwnd lets the watchdog count consecutive sightings of the SAME
+    box (two different transient boxes on consecutive polls are not one
+    persistent one).
 
     Signature (Win32, no UI Automation): a visible ``#32770`` window titled
     exactly "SOLIDWORKS Design", owned by an ``sldworks.exe`` process, whose
@@ -193,7 +196,7 @@ def _seat_modal_dialog() -> str | None:
             user32.GetClassNameW(h, b, 256)
             return b.value
 
-        found: list[str] = []
+        found: list[tuple[int, str]] = []
 
         @enum_fn
         def on_window(h, _):
@@ -221,7 +224,7 @@ def _seat_modal_dialog() -> str | None:
                 return True
 
             user32.EnumChildWindows(h, on_child, 0)
-            found.append(" ".join(parts) or "(no readable text)")
+            found.append((int(h), " ".join(parts) or "(no readable text)"))
             return False
 
         user32.EnumWindows(on_window, 0)
@@ -245,7 +248,7 @@ class Watchdog:
         hung_warn_interval: float = _HUNG_WARN_INTERVAL,
         crash_pids: Callable[[], set[int]] = _crash_pids,
         hung_probe: Callable[[], bool] = _sw_window_hung,
-        dialog_probe: Callable[[], str | None] = _seat_modal_dialog,
+        dialog_probe: Callable[[], tuple[int, str] | None] = _seat_modal_dialog,
         modal_confirm_ticks: int = _MODAL_CONFIRM_TICKS,
         activity: Callable[[], float] = _telemetry.last_activity,
         exit_fn: Callable[[int], None] = os._exit,
@@ -259,6 +262,7 @@ class Watchdog:
         self._dialog_probe = dialog_probe
         self.modal_confirm_ticks = max(1, int(modal_confirm_ticks))
         self._modal_ticks = 0
+        self._modal_hwnd: int | None = None
         self._activity = activity
         self._exit = exit_fn
         self._clock = clock
@@ -299,6 +303,11 @@ class Watchdog:
 
         dialog = self._dialog_probe()
         if dialog is not None:
+            hwnd, dialog = dialog
+            if hwnd != self._modal_hwnd:
+                # a different box than last poll: start its own count
+                self._modal_hwnd = hwnd
+                self._modal_ticks = 0
             self._modal_ticks += 1
             if self._modal_ticks >= self.modal_confirm_ticks:
                 _abort(
@@ -324,6 +333,7 @@ class Watchdog:
             )
             return "modal-pending"
         self._modal_ticks = 0
+        self._modal_hwnd = None
 
         if self.op_timeout > 0 and idle > self.op_timeout:
             _abort(
