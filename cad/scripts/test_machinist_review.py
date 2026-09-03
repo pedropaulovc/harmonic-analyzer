@@ -303,9 +303,7 @@ def test_codex_blindness_fails_closed_on_every_tool_or_command() -> None:
 def test_both_structured_verdict_parsers(tmp_path: Path) -> None:
     verdict = _clean_verdict()
     assert (
-        mr.extract_claude_verdict(
-            [{"type": "result", "structured_output": verdict}]
-        )
+        mr.extract_claude_verdict([{"type": "result", "structured_output": verdict}])
         == verdict
     )
 
