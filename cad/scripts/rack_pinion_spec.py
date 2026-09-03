@@ -25,6 +25,8 @@ BORE_DIA = 5.0  # shares the stud's Ø5 front seat
 FACE_WIDTH = 3.0
 BORE_DIA_BAND = (0.05, 0.03)
 
+# The bore RUNS: the disc spins free on the transgear stud
+# (drawing-simplicity-policy.md rule 5).
 SURFACE_FINISHES = (SurfaceFinishControl("bore", MACHINED_UM, CylinderFace(BORE_DIA)),)
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
@@ -41,27 +43,15 @@ GEAR_DATA = gear_data_note(
     [
         ("NUMBER OF TEETH", f"{TEETH}"),
         ("DIAMETRAL PITCH", f"{DIAMETRAL_PITCH:.2f}"),
-        ("MODULE (mm, REF)", f"{MODULE_MM:.3f}"),
         ("PRESSURE ANGLE", f"{PRESSURE_ANGLE_DEG:.1f} DEG"),
-        ("PITCH DIAMETER (mm, REF)", f"{PITCH_DIA:.2f}"),
-        ("OUTSIDE DIAMETER (mm)", f"{OUTSIDE_DIA:.2f} +0/-0.10"),
-        ("WHOLE DEPTH (mm)", f"{WHOLE_DEPTH:.2f} REF"),
-        ("FACE WIDTH (mm)", f"{FACE_WIDTH:.2f}"),
+        ("PITCH DIAMETER (REF)", f"{PITCH_DIA:.2f}"),
+        ("OUTSIDE DIAMETER", f"{OUTSIDE_DIA:.2f} +0/-0.10"),
+        ("WHOLE DEPTH", f"{WHOLE_DEPTH:.2f}"),
+        ("FACE WIDTH", f"{FACE_WIDTH:.2f}"),
         ("TOOTH FORM", "INVOLUTE, FULL DEPTH"),
     ]
 )
 
-DRAWING_NOTES = "\n".join(
-    (
-        "CUT TEETH PER GEAR DATA.",
-        "THIN DISC GEAR; GEAR TEETH: CIRCULAR RUNOUT 0.05 MAX ABOUT DATUM A, MEASURED AT THE TOOTH TIPS.",
-        "DRIVEN 12:120 BY THE TRANSGEAR PINION (MHA-080).",
-        "LOCKED COAXIAL TO THE 12T FEED PINION (MHA-110).",
-    )
-)
-
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "disc face squareness to bore": "0.05",
-}
+# Notes: part-specific process facts only, never a tolerance, never the
+# title block (drawing-simplicity-policy.md rule 6).
+DRAWING_NOTES = "RUNS FREE ON THE STUD; MATES WITH THE 12T FEED PINION BEHIND IT."

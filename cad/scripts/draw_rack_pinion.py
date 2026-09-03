@@ -2,6 +2,11 @@ r"""Create the curated manufacturing drawing for the rack-pinion reduction disc.
 
 Follows the batch gear-drawing pattern (see ``draw_cylinder_gear``). Drawn 1:1;
 the 120T disc is large and thin.
+
+The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): a
+gear is not on the GD&T allowlist, so it carries no datums and no
+feature-control frames. The one roughness symbol is on the bore, which RUNS
+free on the transgear stud; its fit band rides the model dimension.
 """
 
 from __future__ import annotations
@@ -10,14 +15,10 @@ import argparse
 import sys
 from typing import Any
 
-from rack_pinion_spec import GEOMETRIC_TOLERANCES_MM
-
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_feature_control_frame,
     add_property_linked_note,
     add_surface_finish,
     curate_view_dimensions,
@@ -27,12 +28,13 @@ from _drawing_common import (
     set_dimension_callouts,
     set_dimension_precision,
     set_hidden_lines_removed,
+    set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
 from _surface_finish import surface_finish_by_key
-from rack_pinion_spec import BORE_DIA, FACE_WIDTH, OUTSIDE_DIA, SURFACE_FINISHES
+from rack_pinion_spec import BORE_DIA, SURFACE_FINISHES
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -57,21 +59,12 @@ FRONT_CENTER = (0.220, 0.175)
 RIGHT_CENTER = (0.320, 0.175)
 ISO_CENTER = (0.383, 0.210)  # 0.388 clipped the zone border right by 1.4 mm
 
-BORE_R = BORE_DIA * VIEW_SCALE[0] / 2000.0
-HALF_OD = OUTSIDE_DIA * VIEW_SCALE[0] / 2000.0
-FRONT_FACE_X = RIGHT_CENTER[0] - FACE_WIDTH * VIEW_SCALE[0] / 2000.0
-
 FRONT_KEEP = {
     "BoreDia": (FRONT_CENTER[0] - 0.062, FRONT_CENTER[1] - 0.038),
 }
-DIMENSION_CALLOUTS = {
-    # Reamed slip fit on the stud's turned Ø5 front seat (nominal-or-under, like
-    # the arbor journals): min 0.03 diametral clearance, inside the project's
-    # 0.025..0.075 shaft-in-bushing policy. Also settles which tolerance-block
-    # row governs the bore (neither .XX +/-0.51 nor DRILLED +0.10/0 -- the
-    # callout's own limits do).
-    "BoreDia": "THRU - REAM",
-}
+# Reamed slip fit on the stud's Ø5 seat; the band is on the model dimension
+# (build_rack_pinion), so the callout only names the process.
+DIMENSION_CALLOUTS = {"BoreDia": "REAM THRU"}
 DIMENSION_PRECISION = {"BoreDia": 2}
 
 
@@ -119,8 +112,10 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE)
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=VIEW_SCALE)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
-    for view in (front, right, iso):
-        set_hidden_lines_removed(adapter, view)
+    set_hidden_lines_removed(adapter, iso)
+    # Hidden lines stay ON in every orthographic view (policy rule 7).
+    for view in (front, right):
+        set_hidden_lines_visible(adapter, view)
 
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
@@ -131,27 +126,6 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add ASME center mark to disc bore")
     bore_edge = visible_circle_edge(adapter, front, BORE_DIA)
 
-    bore_top = (FRONT_CENTER[0], FRONT_CENTER[1] + BORE_R)
-    add_datum_feature(
-        adapter,
-        front,
-        edge_xy=bore_top,
-        symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.026),
-        datum="A",
-        label="rack pinion bore axis",
-        shoulder=True,
-        position_tolerance_m=0.0001,
-    )
-    add_feature_control_frame(
-        adapter,
-        right,
-        edge_xy=(FRONT_FACE_X, RIGHT_CENTER[1] + HALF_OD * 0.55),
-        frame_xy=(FRONT_FACE_X - 0.034, RIGHT_CENTER[1] + HALF_OD + 0.010),
-        characteristic="perpendicularity",
-        tolerance=GEOMETRIC_TOLERANCES_MM["disc face squareness to bore"],
-        datums=("A",),
-        label="disc face squareness to bore",
-    )
     add_surface_finish(
         adapter,
         front,

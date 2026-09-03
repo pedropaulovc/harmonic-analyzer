@@ -1,4 +1,10 @@
-r"""Create the curated machinist drawing for the transgear stud."""
+r"""Create the curated machinist drawing for the transgear stud.
+
+The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): a
+stepped stud turned in one setting carries no datums and no feature-control
+frames -- its two fits are the bands on the model diameters, plus one
+roughness symbol on the seat the feed pinion and disc turn on.
+"""
 
 from __future__ import annotations
 
@@ -10,28 +16,24 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    PmiDrawingPlacement,
     add_property_linked_note,
     add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
-    project_part_pmi,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
     set_dimension_precision,
     set_hidden_lines_removed,
+    set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from transgear_stub_spec import (
-    BASE_DIA,
     BASE_LEN,
     COLLAR_DIA as COLLAR_DIA,
     COLLAR_LEN,
-    GEOMETRIC_CONTROLS,
-    PART_DATUMS,
     SEAT_DIA,
     SEAT_LEN,
     SURFACE_FINISHES,
@@ -106,7 +108,8 @@ FRONT_KEEP = {
 # dimension by build_transgear_stub (transgear_stub_spec.BASE_DIA_BAND /
 # SEAT_DIA_BAND), so SolidWorks renders the limits natively.
 DIMENSION_CALLOUTS: dict[str, str] = {}
-# The base is a 3/8" conversion: display 9.525, not a false-precision 9.53.
+# The base is the fitted 3/8" conversion (BASE_DIA_BAND on the model
+# dimension): three decimals say "hold it" and match the exact 9.525.
 DIMENSION_PRECISION = {"BaseDia": 3}
 
 
@@ -152,8 +155,10 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(4, 1))
     end = place_view(adapter, str(SOURCE), "*Bottom", *END_CENTER, scale=(4, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(4, 1))
-    for view in (front, end, iso):
-        set_hidden_lines_removed(adapter, view)
+    set_hidden_lines_removed(adapter, iso)
+    # Hidden lines stay ON in every orthographic view (Harvey #30 / Lipton).
+    for view in (front, end):
+        set_hidden_lines_visible(adapter, view)
 
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
@@ -166,40 +171,9 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to stud end view")
 
-    base_circle = (END_CENTER[0] + BASE_DIA / 2.0 * VIEW_MM, END_CENTER[1])
-    seat_left = _fx(-SEAT_DIA / 2.0)
-
-    # GD&T is model PMI (transgear_stub_spec.PART_DATUMS/GEOMETRIC_CONTROLS,
-    # authored by build_transgear_stub) — project it and place it where the
-    # hand-authored symbols used to sit. Which VIEW receives each annotation
-    # depends on its attachment (a datum tag only lands in a view aligned
-    # with its face), and the projection fails loud on any mismatch.
-    project_part_pmi(
-        adapter,
-        placements={
-            "datum:A": PmiDrawingPlacement(
-                view=end,
-                position=(END_CENTER[0] + 0.040, END_CENTER[1] - 0.018),
-                attachment_xy=base_circle,
-                position_tolerance_m=0.003,
-            ),
-            "seat_cylindricity": PmiDrawingPlacement(
-                view=front,
-                position=(0.038, _fy(BASE_LEN + 9.0)),
-                attachment_xy=(seat_left, _fy(BASE_LEN + 9.0)),
-                attachment_type="SILHOUETTE",
-            ),
-            "seat_runout": PmiDrawingPlacement(
-                view=front,
-                position=(0.038, _fy(BASE_LEN + 12.0)),
-                attachment_xy=(seat_left, _fy(BASE_LEN + 12.0)),
-                attachment_type="SILHOUETTE",
-            ),
-        },
-        datums=PART_DATUMS,
-        controls=GEOMETRIC_CONTROLS,
-        label="transgear stud PMI",
-    )
+    # The gear seat is the one running surface (the feed pinion and disc turn
+    # on it), so it alone carries a roughness symbol, on the seat's silhouette
+    # in the front view.
     add_surface_finish(
         adapter,
         front,

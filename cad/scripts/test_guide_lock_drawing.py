@@ -1,4 +1,10 @@
-"""Offline contracts for the guide-lock drawing."""
+"""Offline contracts for the guide-lock drawing.
+
+The print follows cad/docs/drawing-simplicity-policy.md: a clamp plate
+carries no datums, frames, roughness symbols or basic dimensions; its hole
+locators are ordinary coordinate dimensions and its notes are two lines of
+process fact.
+"""
 
 from __future__ import annotations
 
@@ -9,6 +15,10 @@ import draw_guide_lock as drawing
 import guide_lock_spec
 from _drawing_registry import DRAWINGS_BY_NAME
 from _holes import CLEARANCE_MM
+
+
+def _source() -> str:
+    return Path(drawing.__file__).read_text(encoding="utf-8")
 
 
 def test_required_drawing_paths() -> None:
@@ -44,44 +54,70 @@ def test_spec_hole_diameter_matches_the_wizard_clearance_table() -> None:
 
 def test_sheet_runs_at_4_to_1_with_2_to_1_isometric() -> None:
     assert drawing.SHEET_SCALE == (4.0, 1.0)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    source = _source()
     assert source.count("scale=(4, 1)") == 2  # front + right
     assert source.count("scale=(2, 1)") == 1  # the isometric override
     assert guide_lock_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 2:1"
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
 
 
-def test_linked_notes_use_us_customary_fasteners_and_functional_tolerances() -> None:
+def test_notes_are_few_specific_and_never_the_title_block() -> None:
     notes = guide_lock_spec.DRAWING_NOTES
-    assert "#4 CLEARANCE DRILL THRU" in notes
-    assert "HOLE POSITION PER FCF" in notes
-    # General tolerances live in the title block ONLY -- a second general
-    # tolerance in the notes would conflict with it.
-    assert "LINEAR +/-" not in notes
-    assert "4 REQUIRED" in notes
-    # Pedro 2026-07-10: drawings spec the closest US-customary fastener, not
-    # the period British Association series; no display-zero tolerances.
-    assert "BA" not in notes
-    assert "X.XX" not in notes
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    lines = notes.split("\n")
+    assert len(lines) <= 4
+    assert "STOCK" in notes  # the cleanup-cut licence (Lipton)
+    assert "MATES WITH" in notes
+    # The hole size and process ride the native callout, not the notes; the
+    # quantity and finish live in the title block.
+    for banned in (
+        "DRILL",
+        "PER FCF",
+        "REQUIRED",
+        "BLACK OXIDE",
+        "UOS",
+        "+/-",
+        "DATUM",
+        "BA ",
+        "X.XX",
+    ):
+        assert banned not in notes, banned
+    source = _source()
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
     assert "_NOTES_" not in source
 
 
-def test_hole_locators_are_basic_dimensions_off_the_datum_edges() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
+def test_hole_locators_are_ordinary_dimensions_with_a_native_callout() -> None:
+    source = _source()
     assert source.count("add_edge_dimension(") == 3
-    assert source.count("set_basic_dimension(") == 3
-    assert "add_native_hole_callout(" in source
+    assert 'label="hole-1 X location"' in source
+    assert 'label="hole-2 X location"' in source
+    assert 'label="hole band height"' in source
+    assert source.count("add_native_hole_callout(") == 1
+    # Harvey #13: the callout says DRILL.
+    assert 'process="DRILL"' in source
 
 
-def test_native_gdt_replaces_form_orientation_notes() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 3
-    assert source.count("add_feature_control_frame(") == 2
-    assert 'characteristic="position"' in source
-    assert 'characteristic="flatness"' in source
-    assert 'quantity="2X"' in source
+def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:
+    # drawing-simplicity-policy.md rule 3-5: a clamp plate is not on the GD&T
+    # allowlist and nothing runs on it.
+    source = _source()
+    for helper in (
+        "add_datum_feature(",
+        "add_feature_control_frame(",
+        "add_surface_finish(",
+        "set_basic_dimension(",
+        "project_part_pmi(",
+    ):
+        assert helper not in source, helper
+    assert not hasattr(guide_lock_spec, "GEOMETRIC_TOLERANCES_MM")
+    assert not hasattr(guide_lock_spec, "GEOMETRIC_CONTROLS")
+
+
+def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
+    source = _source()
+    assert "for view in (front, right):\n        set_hidden_lines_visible" in source
+    assert "set_hidden_lines_removed(adapter, iso)" in source
+    assert source.count("set_hidden_lines_removed(") == 1
 
 
 def test_wizard_holes_are_not_fake_marked_dimensions() -> None:

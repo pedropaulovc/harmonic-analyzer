@@ -34,22 +34,14 @@ SEAT_DIA_BAND = SHAFT_H
 # _fit_limits class and specific to this stud, so it lives here beside BASE_DIA.
 BASE_DIA_BAND = (0.000, -0.050)
 
-# Geometric controls, authored on the model as plain annotations by the part build
-# (_part_pmi.author_part_pmi) and IMPORTED onto the sheet — the sheet types no
-# tolerance strings. The stud is one revolve, so each control's face resolves
-# by diameter alone.
-PART_DATUMS = (
-    # The stud base axis the seat runout is measured against.
-    PartDatum("A", CylinderFace(BASE_DIA)),
-)
-GEOMETRIC_CONTROLS = (
-    GeometricControl(
-        "seat_cylindricity", "cylindricity", "0.01", CylinderFace(SEAT_DIA)
-    ),
-    GeometricControl(
-        "seat_runout", "circular_runout", "0.03", CylinderFace(SEAT_DIA), datums=("A",)
-    ),
-)
+# No geometric controls: the stud is one revolve turned in one setting, and
+# its two fits are the bands on the model diameters
+# (cad/docs/drawing-simplicity-policy.md rule 3). The typed tuples stay so
+# build_transgear_stub's author_part_pmi call shape is unchanged.
+PART_DATUMS: tuple[PartDatum, ...] = ()
+GEOMETRIC_CONTROLS: tuple[GeometricControl, ...] = ()
+# The gear seat is the one running surface: the feed pinion and disc turn on
+# it (rule 5).
 SURFACE_FINISHES = (
     SurfaceFinishControl("gear_seat", MACHINED_UM, CylinderFace(SEAT_DIA)),
 )
@@ -65,9 +57,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     },
 }
 
-DRAWING_NOTES = "\n".join(
-    (
-        "TURN FROM 16 MM (5/8 IN) BAR IN ONE SETUP; SEAT AND COLLAR "
-        "CONCENTRIC WITH BASE.",
-    )
-)
+# Notes: part-specific process facts only, never a tolerance, never the
+# title block (drawing-simplicity-policy.md rule 6).
+DRAWING_NOTES = "TURN COMPLETE IN ONE SETUP FROM 5/8 IN BAR."
