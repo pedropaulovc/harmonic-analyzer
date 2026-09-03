@@ -560,7 +560,7 @@ from crank_pin_spec import (  # noqa: E402
     RING_HOLE_DIA as PIN_RING_HOLE_DIA,
     RING_HOLE_X as PIN_RING_HOLE_X,
 )
-from build_crank_pin_ring import RING_INNER_R as CRANK_RING_INNER_R  # noqa: E402
+from build_crank_pin_ring import WIRE_DIA as CRANK_RING_WIRE_DIA  # noqa: E402
 from build_crank_pin_eye import (  # noqa: E402
     LOOP_R as EYE_LOOP_R,
     TAIL_LEN as EYE_TAIL_LEN,
@@ -572,10 +572,15 @@ from fillister_screw_spec import (  # noqa: E402
     SHANK_LEN as ANCHOR_SCREW_SHANK_LEN,
 )
 
-PIN_PROUD = 3.0
+CRANK_RING_ARM_CLEARANCE = 0.25
+PIN_PROUD = PIN_RING_HOLE_X + CRANK_RING_WIRE_DIA / 2.0 + CRANK_RING_ARM_CLEARANCE
 CRANK_PIN_Z = CRANK_ARM_Z0 + ARM_THICKNESS / 2.0  # -171: hub mid-thickness
 CRANK_PIN_X0 = X_CRANK - ARM_WIDTH / 2.0 - PIN_PROUD  # big end, -X of the hub
-CRANK_RING_Y = Y_CRANK - (PIN_RING_HOLE_DIA / 2.0 + 0.25 + CRANK_RING_INNER_R)
+# The ring lies in machine YZ. Its straight local-Z leg is concentric with the
+# pin's machine-Z cross-hole; its bends and return hang toward machine -Y.
+CRANK_RING_Y = Y_CRANK
+if (PIN_RING_HOLE_DIA - CRANK_RING_WIRE_DIA) / 2.0 < 0.1:
+    raise AssertionError("keeper-ring wire does not clear the crank-pin cross-hole")
 if abs((CRANKSHAFT_Z0 + PIN_HOLE_HEIGHT) - CRANK_PIN_Z) > 1e-6:
     raise AssertionError("crankshaft cross-hole is not at the arm hub's mid-thickness")
 if CRANK_PIN_X0 + CRANK_PIN_LENGTH < X_CRANK + ARM_WIDTH / 2.0 + 2.0:
@@ -2467,8 +2472,8 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         "crank-pin-ring",
         [CRANK_PIN_X0 + PIN_RING_HOLE_X, CRANK_RING_Y, CRANK_PIN_Z],
-        [90.0, 0.0, 0.0],
-        ROT_X_POS90,
+        [0.0, 0.0, -90.0],
+        rot_z_rows(-90.0),
         ground=False,
         label="crank pin keeper ring",
     )

@@ -217,6 +217,7 @@ def test_drive_train_allows_only_the_modeled_press_fits() -> None:
         frozenset(("pinion-bracket-2", "pinion-cam-pin-2")),
     }
     assert set(allowed) == crank_pairs | cam_pairs
+    assert _interference_contracts._PIN_PROUD == 3.85
     assert all(60.0 < allowed[pair] < 65.0 for pair in crank_pairs)
     assert all(0.40 < allowed[pair] < 0.45 for pair in cam_pairs)
     assert _interference_contracts.allowed_interference_pairs("channel") == {}

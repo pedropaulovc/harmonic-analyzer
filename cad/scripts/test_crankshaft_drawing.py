@@ -9,6 +9,7 @@ import build_crankshaft as part
 import crankshaft_spec
 import draw_crankshaft as drawing
 from _drawing_registry import DRAWINGS_BY_NAME
+import _holes as hole_wizard
 from _holes import NUMBER_DRILL_MM
 
 
@@ -60,8 +61,13 @@ def test_cross_hole_matches_the_wizard_drill_and_build_station() -> None:
     assert part.PIN_HOLE_HEIGHT is crankshaft_spec.PIN_HOLE_HEIGHT
     assert crankshaft_spec.PIN_HOLE_HEIGHT == 4.0
     build_source = Path(part.__file__).read_text(encoding="utf-8")
+    assert 'await set_global(adapter, "PinHoleHeight"' in build_source
+    assert 'name_last_feature(adapter, "PinHoleStationPlane")' in build_source
     assert "[-SHAFT_DIA / 2.0, PIN_HOLE_HEIGHT, 0.0]" in build_source
-    assert "y_dim=" not in build_source
+    assert 'point_planes=("PinHoleStationPlane", "Front Plane")' in build_source
+    hole_source = Path(hole_wizard.__file__).read_text(encoding="utf-8")
+    assert "face_candidates.append(candidate)" in hole_source
+    assert '_add_sketch_constraint_impl(' in hole_source
     notes = crankshaft_spec.DRAWING_NOTES
     assert "#9" not in notes
     assert "TAPER PIN" in notes

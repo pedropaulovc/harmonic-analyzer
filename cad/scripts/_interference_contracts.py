@@ -27,7 +27,7 @@ from crank_pin_spec import BIG_END_DIA as _PIN_D0, PIN_LENGTH as _PIN_L, SMALL_E
 from crankshaft_spec import SHAFT_DIA as _CS_DIA  # noqa: E402
 
 _CS_PILOT = 4.978  # #9 drill (build_crankshaft's wizard cross-hole)
-_PIN_PROUD = 3.0  # build_drive_train_assembly.PIN_PROUD (kept in step by test)
+_PIN_PROUD = 3.85  # build_drive_train_assembly.PIN_PROUD (kept in step by test)
 
 
 def _pin_overlap(s0: float, s1: float, hole_dia: float) -> float:
