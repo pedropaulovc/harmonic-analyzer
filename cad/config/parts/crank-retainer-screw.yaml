@@ -1,0 +1,7 @@
+crank-retainer-screw:
+  number: MHA-132
+  material: Brass
+  finish: "bright"
+  tolerance_class: machined_block
+  quantity: 1
+  process: "machined #0-80 slotted brass fillister screw"

@@ -101,12 +101,10 @@ PEN_ROD_X = 3.0
 PEN_Z_MID = -157.0  # pen-rod axis plane (was -151.5: see the module docstring)
 ROD_SECTION = 5.0  # pen_rod_spec.ROD_SECTION (asserted below)
 HANGER_POS = (PEN_ROD_X, 505.0, PEN_Z_MID)
-# The rod's bottom end sits 13 into the v-block's 18-tall rod bore -- its end
-# face 0.5 above the groove roof (18 - 13 = 5.0 > GROOVE_DEPTH 4.5), clear of the
-# marker barrel that fills the groove below it (a 14 engagement dipped 0.5 into
-# the groove: interference-gate proven, 2.81 mm^3 rod/marker) -- putting the
-# marker axis (block bottom + 0.25) near paper mid-height: paper y 324.5..405
-# (build_paper_drive_assembly), centre 364.75 -> marker axis 363.25.
+# The rod's bottom end sits 13 into the v-block's 18-tall rod bore, leaving its
+# end face 0.5 above the groove roof.  The marker hangs in the open-bottom
+# groove with its axis near paper mid-height (paper y 324.5..405, centre
+# 364.75 -> marker axis near 359).
 ROD_BORE_ENGAGEMENT = 13.0
 BLOCK_BOTTOM_Y = 363.0
 PEN_ROD_POS = (PEN_ROD_X, BLOCK_BOTTOM_Y + 5.0, PEN_Z_MID - ROD_SECTION / 2.0)
@@ -126,7 +124,11 @@ from pen_v_block_spec import (  # noqa: E402
     GROOVE_DEPTH,
     GROOVE_WIDTH,
 )
-from pen_marker_spec import BARREL_DIA, BARREL_TOP_Y  # noqa: E402
+from pen_marker_spec import (  # noqa: E402
+    OVERALL_LENGTH,
+    PROFILE_STATIONS,
+    marker_radius_mm,
+)
 from build_pen_frame import (  # noqa: E402
     FRAME_DEPTH,
     OUTER_HEIGHT,
@@ -168,21 +170,40 @@ assert _REAR_CORNER_Z <= PAPER_FRONT_Z - 2 * CLEARANCE, (
     f"v-block rear corner z {_REAR_CORNER_Z:.2f} too close to the paper {PAPER_FRONT_Z}"
 )
 
-# --- marker in the groove --------------------------------------------------------
-# Barrel O8 in the 8.5 x 4.5 groove: axis CLEARANCE below the groove roof,
-# centred in Z; the nib (marker local origin, +Y along the barrel) reaches
-# past the block's rear end face to CLEARANCE off the paper front.
-MARKER_AXIS_LOCAL_Y = GROOVE_DEPTH - BARREL_DIA / 2.0 - CLEARANCE  # 0.25
-assert GROOVE_WIDTH >= BARREL_DIA + 2 * CLEARANCE
-# Solve the nib's block-local x from the paper stand-off: machine z of a
-# local (x, ., 8) point is VBLOCK_POS.z - x*cos + 8*sin.
+# --- marker in the groove ---------------------------------------------------
+# The 12.24 mm body is wider than the 8.5 mm open-bottom groove: it seats on
+# the two lower mouth edges instead of being incorrectly buried inside the
+# channel.  The writing point retains the existing paper stand-off datum.
 MARKER_TIP_LOCAL_X = -(
     (PAPER_FRONT_Z - CLEARANCE) - VBLOCK_POS[2] - (BLOCK_DEPTH / 2.0) * _S
 ) / _C
-assert MARKER_TIP_LOCAL_X < 0.0 < MARKER_TIP_LOCAL_X + BARREL_TOP_Y - BLOCK_LENGTH, (
-    "marker must pass right through the block: nib past the rear face, body past the front"
+_MARKER_BLOCK_AXIAL_MIN = -MARKER_TIP_LOCAL_X
+_MARKER_BLOCK_AXIAL_MAX = BLOCK_LENGTH - MARKER_TIP_LOCAL_X
+assert MARKER_TIP_LOCAL_X < 0.0 < MARKER_TIP_LOCAL_X + OVERALL_LENGTH - BLOCK_LENGTH, (
+    "marker must pass right through the block: point past the rear face, body past the front"
 )
-MARKER_POS = _block_to_machine((MARKER_TIP_LOCAL_X, MARKER_AXIS_LOCAL_Y, BLOCK_DEPTH / 2.0))
+_BLOCK_PROFILE_YS = (
+    _MARKER_BLOCK_AXIAL_MIN,
+    *(
+        axial_y
+        for axial_y, _radius in PROFILE_STATIONS
+        if _MARKER_BLOCK_AXIAL_MIN < axial_y < _MARKER_BLOCK_AXIAL_MAX
+    ),
+    _MARKER_BLOCK_AXIAL_MAX,
+)
+_MARKER_BLOCK_RADIUS = max(marker_radius_mm(y) for y in _BLOCK_PROFILE_YS)
+_GROOVE_HALF_CLEAR = GROOVE_WIDTH / 2.0 - CLEARANCE
+assert _MARKER_BLOCK_RADIUS > _GROOVE_HALF_CLEAR > 0.0
+MARKER_AXIS_LOCAL_Y = -math.sqrt(
+    _MARKER_BLOCK_RADIUS * _MARKER_BLOCK_RADIUS
+    - _GROOVE_HALF_CLEAR * _GROOVE_HALF_CLEAR
+)
+assert MARKER_AXIS_LOCAL_Y + _MARKER_BLOCK_RADIUS <= GROOVE_DEPTH - CLEARANCE, (
+    "marker crown must remain inside the open groove"
+)
+MARKER_POS = _block_to_machine(
+    (MARKER_TIP_LOCAL_X, MARKER_AXIS_LOCAL_Y, BLOCK_DEPTH / 2.0)
+)
 # Marker local +Y -> block local +X (the barrel runs forward along the groove):
 # spin -90 about Z (Y -> X) then the block's yaw.
 _YAW_ROWS = BLOCK_ROWS
@@ -224,7 +245,11 @@ FRAME_ROT = euler_from_rows(FRAME_ROWS)
 # +Y) on the frame's screw axis, its tip CLEARANCE under the marker barrel.
 SET_SCREW_ROWS = rot_z_rows(90.0)  # X -> +Y
 SET_SCREW_ROT = euler_from_rows(SET_SCREW_ROWS)
-_MARKER_BOTTOM_LOCAL_Y = MARKER_AXIS_LOCAL_Y - BARREL_DIA / 2.0
+_SET_SCREW_MARKER_Y = FRAME_X_CENTER_LOCAL - MARKER_TIP_LOCAL_X
+_MARKER_BOTTOM_LOCAL_Y = MARKER_AXIS_LOCAL_Y - marker_radius_mm(_SET_SCREW_MARKER_Y)
+assert _MARKER_BOTTOM_LOCAL_Y >= _FRAME_ORIGIN_LOCAL[1] + RAIL_END + CLEARANCE, (
+    "marker must clear the stirrup bottom rail"
+)
 _SCREW_TIP_LOCAL_Y = _MARKER_BOTTOM_LOCAL_Y - CLEARANCE
 SET_SCREW_POS = _block_to_machine(
     (FRAME_X_CENTER_LOCAL, _SCREW_TIP_LOCAL_Y - KNOB_LENGTH - SHANK_LEN, BLOCK_DEPTH / 2.0)
