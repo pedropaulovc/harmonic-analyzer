@@ -15,7 +15,7 @@ machined base carries no datums or frames; the native hole table gives every
 station under the title block's general tolerance.  The plan carries both
 plate footprints (marked), the rim width and the three concentric plan-corner
 radii; the front elevation carries the flange and pad thicknesses (marked),
-the rim's pocket depth, the reveal and the overall height.
+the reveal and overall height, with the deck depth stated beside the view.
 
 Run with SolidWorks open::
 
@@ -73,6 +73,7 @@ from harmonic_base_spec import (
     TOP_LENGTH,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     place_view,
     view_name,
@@ -155,7 +156,9 @@ SIDE_KEEP = {
 }
 # Drawing dimensions (text positions, sheet metres).
 OVERALL_TEXT_XY = (0.264, 0.0745)  # (53.30) reference, left of the elevation
-RIM_DEPTH_TEXT_XY = (0.4105, 0.0850)  # 2.50 rim/pocket depth, right of the elevation
+# The deck is hidden behind the front rim wall, and its derived-view edge is
+# not reliably selectable.  State the same spec-owned depth beside the view.
+DECK_DEPTH_NOTE = f"DECK {RIM_TOP - STACK_HEIGHT:.2f} BELOW RIM TOP"
 # Rim width and reveal chained above the plan's NE corner on one line: the
 # 7.00 spans rim inner edge -> pad edge (text outside, left), the (6.35)
 # reference spans pad edge -> flange edge (text outside, right), sharing the
@@ -175,6 +178,7 @@ _DATUM_XY = (
 )
 HOLE_TABLE_ANCHOR = (0.274, 0.256)
 SIDE_VIEW_NOTE_XY = (0.260, 0.098)
+DECK_DEPTH_NOTE_XY = (SIDE_CENTER[0], SIDE_VIEW_NOTE_XY[1])
 
 
 ALL_HOLES = (
@@ -581,15 +585,13 @@ async def build(adapter: Any) -> dict[str, str]:
         label="rim inner corner radius",
     )
 
-    # Elevation: the overall height (reference: flange + pad + rim) and the
-    # rim's pocket depth below its top.  The deck plane (STACK_HEIGHT) is
-    # behind the front rim wall, so the pad thickness and the pocket depth
-    # both terminate on its hidden edge -- a section would show it cleanly;
-    # flagged for the eye pass.
+    # Elevation: the overall height (reference: flange + pad + rim).  The deck
+    # plane is hidden behind the front rim wall and is not a reliable
+    # derived-view selection, so its spec-owned depth is stated beside the
+    # elevation rather than guessed from another edge.
     _side_circles, side_lines = _view_edges(adapter, side)
     underside = _line_edge(side_lines, label="underside edge", along="x", y_mm=0.0)
     rim_top = _line_edge(side_lines, label="rim top edge", along="x", y_mm=RIM_TOP)
-    deck = _line_edge(side_lines, label="deck edge", along="x", y_mm=STACK_HEIGHT)
     overall = _dimension_entities(
         adapter,
         side,
@@ -599,14 +601,8 @@ async def build(adapter: Any) -> dict[str, str]:
         label="overall height reference",
     )
     _reference(adapter, overall, label="overall height reference")
-    _dimension_entities(
-        adapter,
-        side,
-        (deck, rim_top),
-        text_xy=RIM_DEPTH_TEXT_XY,
-        orientation="vertical",
-        label="rim pocket depth",
-    )
+    if add_note(adapter, DECK_DEPTH_NOTE, *DECK_DEPTH_NOTE_XY) is None:
+        raise RuntimeError("failed to add harmonic-base deck-depth note")
 
     add_property_linked_note(
         adapter, "Manufacturing Notes", 0.016, 0.075, char_height=0.0025

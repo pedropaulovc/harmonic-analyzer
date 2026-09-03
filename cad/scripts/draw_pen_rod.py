@@ -37,6 +37,7 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from pen_rod_spec import ROD_LENGTH, ROD_SECTION, WIRE_HOLE_DIA, WIRE_HOLE_Y
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     place_view,
 )
@@ -69,6 +70,7 @@ ISO_CENTER = (0.340, 0.195)
 DETAIL_RADIUS = 0.006
 DETAIL_CENTER = (0.195, 0.175)
 DETAIL_SCALE = (4, 1)
+WIRE_HOLE_CENTER_NOTE = f"HOLE CL {ROD_SECTION / 2.0:.2f} FROM FACE"
 
 FRONT_KEEP = {
     "Length": (FRONT_CENTER[0] - 0.030, FRONT_CENTER[1]),
@@ -146,9 +148,8 @@ async def build(adapter: Any) -> dict[str, str]:
         set_hidden_lines_visible(adapter, view)
 
     # The front and top views are curated as before; the detail is NOT -- its
-    # circle takes in both rod faces, so a curation there could claim the
-    # Section dimension. It only receives the two coordinate-picked
-    # annotations below.
+    # circle takes in both rod faces, so curation there could claim Section.
+    # It receives a selection-free centring note and the native hole callout.
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
     )
@@ -192,20 +193,19 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, detail, (0.0, WIRE_HOLE_Y / 1000.0, 0.0), label="detail hole centre"
     )
     hole_r = WIRE_HOLE_DIA / 2000.0 * DETAIL_SCALE[0]
-    face_x = hole_cx - ROD_SECTION / 2000.0 * DETAIL_SCALE[0]
-    # Across the section: left slide face -> hole centre reads 2.50 of the
-    # 5.00 section = centred, so the cross-hole cannot drift off-centre.
-    # Horizontal so the value is the X component, text ABOVE the detail
-    # circle (SolidWorks puts the "DETAIL A SCALE 4:1" label below it).
-    add_edge_dimension(
-        adapter,
-        detail,
-        p0=(face_x, hole_cy - 0.010),
-        p1=(hole_cx + hole_r, hole_cy),
-        text_xy=(hole_cx - 0.005, hole_cy + DETAIL_RADIUS * DETAIL_SCALE[0] + 0.010),
-        label="wire-hole centerline location",
-        orientation="horizontal",
+    # Across the section, the hole axis is 2.50 from either 5.00 slide face.
+    # State that controlling value beside DETAIL A instead of dimensioning a
+    # short derived-view edge that is not stable across SolidWorks seats.
+    wire_hole_center_note_xy = (
+        hole_cx - 0.005,
+        hole_cy + DETAIL_RADIUS * DETAIL_SCALE[0] + 0.010,
     )
+    if add_note(
+        adapter,
+        WIRE_HOLE_CENTER_NOTE,
+        *wire_hole_center_note_xy,
+    ) is None:
+        raise RuntimeError("failed to add wire-hole centerline location note")
     # The size and process, leadered off the hole's rim down-right, the
     # callout text outside the circle and clear of the isometric.
     add_native_hole_callout(

@@ -23,22 +23,22 @@ def test_required_drawing_paths() -> None:
     assert DRAWINGS_BY_NAME["connecting_rod"].script == Path(drawing.__file__).resolve()
 
 
-def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
+def test_unavailable_ring_dimensions_are_replaced_by_a_spec_derived_note() -> None:
     assert rod.DRAWING_DIMENSIONS is connecting_rod_notes.DRAWING_DIMENSIONS
     marked = set().union(*connecting_rod_notes.DRAWING_DIMENSIONS.values())
-    kept = (
-        set(drawing.RING_DETAIL_KEEP)
-        | set(drawing.FRONT_KEEP)
-        | set(drawing.RIGHT_KEEP)
-        | set(drawing.TOP_KEEP)
-    )
-    assert kept == marked
-    # Every marked dimension lives in the ring detail, which is curated FIRST
-    # (a marked dimension imports into one view only); the front keeps none.
-    assert set(drawing.RING_DETAIL_KEEP) == marked
-    assert drawing.FRONT_KEEP == {}
+    assert marked == {"RingOuterDia", "StrapBoreDia", "ShankWidthDim"}
     source = _source()
-    assert source.index('view_label="ring detail"') < source.index('view_label="front"')
+    assert all(name not in source for name in marked)
+    assert "curate_view_dimensions" not in source
+    assert drawing.RING_GEOMETRY_NOTE == "\n".join(
+        (
+            "DETAIL A RING",
+            (f"OD <MOD-DIAM>{2.0 * connecting_rod_spec.RING_OUTER_RADIUS:.2f}"),
+            "BORE <MOD-DIAM>30.900 MAX / <MOD-DIAM>30.800 MIN",
+            f"SHANK WIDTH {connecting_rod_spec.SHANK_WIDTH:.2f}",
+        )
+    )
+    assert "add_note(adapter, RING_GEOMETRY_NOTE" in source
 
 
 def test_draw_view_math_matches_the_spec() -> None:
@@ -73,7 +73,10 @@ def test_sheet_runs_at_1_to_1_with_1_to_2_isometric() -> None:
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
     # The notes sit below the front view's lowest witness line (the (REF)
     # overall's ring-bottom extension), never across it.
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.036)' in source
+    assert (
+        'add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.036)'
+        in source
+    )
     assert drawing._sheet_xy(0.0, connecting_rod_spec.RING_BOTTOM_Y)[1] > 0.036
 
 
@@ -83,19 +86,35 @@ def test_notes_are_few_specific_and_never_the_title_block() -> None:
     assert len(lines) <= 4
     assert "RING, SHANK AND HEAD SHARE ONE MIDPLANE" in notes
     assert "RING WALL 4.50 MIN AFTER BORING" in notes
-    # The as-cast head, the ring and the thicknesses are view dimensions now;
-    # the pin hole rides its native callout, the bore its model tolerance and
-    # the centre distance a sheet dimension; notes never repeat those, and
-    # never repeat the finish field's "bore machined".
+    # The as-cast head and thicknesses are view dimensions; the ring sizes
+    # live in a separate geometry note, while manufacturing prose stays
+    # process-only.
     for moved in (
-        "PER PATTERN", "MACHINE THE", "DRILL", "#47", "3.00", "2.50", "163.10",
+        "PER PATTERN",
+        "MACHINE THE",
+        "DRILL",
+        "#47",
+        "3.00",
+        "2.50",
+        "163.10",
         "30.60",
     ):
         assert moved not in notes, moved
     # Nothing the title block or a dimension already says, no GD&T prose.
     for banned in (
-        "UOS", "DIMENSIONS IN", "LINEAR +/-", "+/-", "+0.10", "DATUM", "BASIC",
-        "WITHIN", "Ra ", "MHA-", "GRAY-IRON", "BA ", "DRAFT",
+        "UOS",
+        "DIMENSIONS IN",
+        "LINEAR +/-",
+        "+/-",
+        "+0.10",
+        "DATUM",
+        "BASIC",
+        "WITHIN",
+        "Ra ",
+        "MHA-",
+        "GRAY-IRON",
+        "BA ",
+        "DRAFT",
     ):
         assert banned not in notes, banned
     assert connecting_rod_notes.CROWN_CALLOUT == "FULL R"
@@ -124,8 +143,7 @@ def test_running_bore_keeps_its_finish_and_holes_state_the_process() -> None:
     source = _source()
     assert source.count("add_surface_finish(") == 1
     assert 'label="strap bore finish"' in source
-    assert drawing.DIMENSION_CALLOUTS == {"StrapBoreDia": "BORE"}
-    assert "+0.10/0" not in source
+    assert drawing.RING_GEOMETRY_NOTE is connecting_rod_notes.RING_GEOMETRY_NOTE
     assert source.count("add_native_hole_callout(") == 1
     assert 'process="#47 DRILL"' in source
     assert source.count("edge_xy=pin_rim") == 1
@@ -136,14 +154,12 @@ def test_running_bore_keeps_its_finish_and_holes_state_the_process() -> None:
     assert 'label="overall length"' in source
     assert source.count("set_reference_dimension(") == 1
     assert drawing.OVERALL_TEXT_XY[0] < drawing.CENTER_DISTANCE_TEXT_XY[0]
-    # The two ring diameters end their leaders on their circumferences.
-    assert drawing.DIAMETER_LEADERS_TO_RIM == ("RingOuterDia", "StrapBoreDia")
-    assert drawing._ARROWS_OUTSIDE == 1
+    assert "_leaders_to_circumference" not in source
 
 
 def test_details_carry_the_ring_head_and_thickness_step() -> None:
-    # Policy rule 7 (machinist review 2026-09-02): the ring callouts, the
-    # as-cast head and the 3.00/2.50 step are enlarged, not piled onto 1:1.
+    # Policy rule 7: the ring geometry, as-cast head and 3.00/2.50 step are
+    # enlarged, not piled onto the 1:1 view.
     source = _source()
     assert source.count("create_detail_view(") == 3
     for label in ('detail_label="A"', 'detail_label="B"', 'detail_label="C"'):
@@ -208,16 +224,17 @@ def test_strap_bore_tolerance_is_owned_by_the_named_model_dimension() -> None:
 
 
 def test_bore_finish_is_flagged_inside_the_enlarged_bore() -> None:
-    # The Ra symbol sits inside the 2:1 bore, up-right of its lower-left rim,
-    # so its leader crosses no ring line and no dimension.
-    edge_x, edge_y = drawing.BORE_FINISH_EDGE
+    # Resolve the bore by model geometry; the enlarged view's sheet-coordinate
+    # edge pick is not stable after replacing its marked dimensions with a note.
+    source = _source()
+    assert "visible_circle_edge(adapter, ring_detail, RING_BORE_DIA)" in source
+    assert "edge_entity=bore_edge" in source
     symbol_x, symbol_y = drawing.BORE_FINISH_SYMBOL
-    assert symbol_x > edge_x
-    assert symbol_y > edge_y
     bore_radius = connecting_rod_spec.RING_BORE_DIA / 2.0 * 2.0 / 1000.0
     center_x, center_y = drawing.RING_DETAIL_CENTER
-    assert ((symbol_x - center_x) ** 2 + (symbol_y - center_y) ** 2) ** 0.5 < bore_radius
-    assert ((edge_x - center_x) ** 2 + (edge_y - center_y) ** 2) ** 0.5 < bore_radius + 1e-6
+    assert (
+        (symbol_x - center_x) ** 2 + (symbol_y - center_y) ** 2
+    ) ** 0.5 < bore_radius
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:

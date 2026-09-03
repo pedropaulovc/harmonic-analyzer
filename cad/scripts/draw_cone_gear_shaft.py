@@ -4,11 +4,12 @@ The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): a
 stepped shaft carries no datums and no feature-control frames -- every land
 is a size tolerance on the model dimension, and the one roughness symbol
 sits on the bearing journal that turns in the pivot post.  It is dimensioned
-as it sits in the lathe (policy rule 7): every diameter reads as a linear
-diameter on its own cylindrical segment of the side view -- the journal and
-the 3/8 seat on the 1:1 silhouette, the three small tip lands in DETAIL A
-(3:1), where they are legible -- and every station chains from the big-end
-face.  There is no end view: from either end the shoulders hide each other,
+as it sits in the lathe (policy rule 7): the journal and 3/8 seat read as
+linear diameters on the 1:1 side view. The three small tip lands remain
+visible in DETAIL A (3:1), with a compact adjacent limits note because their
+profile dimensions are unavailable to the derived view. Every station chains
+from the big-end face. There is no end view: from either end the shoulders
+hide each other,
 and a diameter dimensioned to an occluded circle is exactly what the
 machinist review rejected.
 """
@@ -32,7 +33,6 @@ from _drawing_common import (
     model_point_in_view,
     new_project_drawing,
     read_required_properties,
-    set_dimension_callouts,
     set_dimension_precision,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
@@ -41,13 +41,15 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
+from cone_gear_shaft_notes import TIP_LANDS_NOTE
 from cone_gear_shaft_spec import (
     JOURNAL_DIA,
+    SECTION_DIA_BAND,
     SECTION_DIAS,
     SECTION_ENDS,
     SURFACE_FINISHES,
 )
-from solidworks_mcp.adapters.solidworks.drawing import place_view
+from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 
 
 SPEC = DRAWINGS_BY_NAME["cone_gear_shaft"]
@@ -98,23 +100,16 @@ SIDE_DIAMETER_STATIONS_MM = {
     "Sec1Dia": (SECTION_ENDS[0] + SECTION_ENDS[1]) / 2.0,
 }
 SIDE_DIAMETER_TEXT_Y = SIDE_CENTER[1] + 0.021
-# DETAIL A (3:1): the 1/4, 1/8 and 1/32 in lands, texts staggered so the
-# neighbouring two-line stacked-tolerance values never touch (model mm along
-# the axis, sheet metres above the axis).
-DETAIL_DIAMETER_STATIONS_MM = {
-    "Sec2Dia": ((SECTION_ENDS[1] + SECTION_ENDS[2]) / 2.0, 0.030),
-    "Sec3Dia": ((SECTION_ENDS[2] + SECTION_ENDS[3]) / 2.0, 0.018),
-    "Sec4Dia": (SECTION_ENDS[3] + 11.0, 0.030),
-}
-# No callout overrides: the shared fit band is toleranced on each model
-# dimension by build_cone_gear_shaft (cone_gear_shaft_spec.SECTION_DIA_BAND).
-DIMENSION_CALLOUTS: dict[str, str] = {}
-# Every land is a fitted diameter (h band on the model dimension): three
-# decimals say "hold it" -- the journal's 12.2308 nominal rounds to 12.231
-# beside the post bore's 12.281, the four inch seats are exact conversions.
-DIMENSION_PRECISION = {
-    name: 3 for name in (*SIDE_DIAMETER_STATIONS_MM, *DETAIL_DIAMETER_STATIONS_MM)
-}
+# DETAIL A retains the projected shape of the 1/4, 1/8 and 1/32 in lands; its
+# profile dimensions are unavailable from the derived view, so the part-owned
+# limits render as a compact adjacent note.
+TIP_LANDS_NOTE_XY = (
+    DETAIL_CENTER[0] + DETAIL_MODEL_RADIUS * DETAIL_SCALE[0] / 1000.0 + 0.007,
+    DETAIL_CENTER[1] + 0.038,
+)
+# The two side-view fitted diameters retain native model tolerances and print
+# three places; the three detail values print as explicit three-place limits.
+DIMENSION_PRECISION = {name: 3 for name in SIDE_DIAMETER_STATIONS_MM}
 # Roughness symbol at the big end, right of the journal's diameter
 # dimension, its leader down to the journal OD just inboard of the end face.
 JOURNAL_FINISH_SYMBOL_XY = (0.275, 0.245)
@@ -150,7 +145,9 @@ def _cylindrical_face(adapter: Any, view: Any, diameter_mm: float) -> Any:
     return face
 
 
-def _axis_point(adapter: Any, view: Any, z_mm: float, *, label: str) -> tuple[float, float]:
+def _axis_point(
+    adapter: Any, view: Any, z_mm: float, *, label: str
+) -> tuple[float, float]:
     """Sheet point of the shaft axis at station ``z_mm`` in ``view``."""
     return model_point_in_view(adapter, view, (0.0, 0.0, z_mm / 1000.0), label=label)
 
@@ -221,16 +218,6 @@ async def build(adapter: Any) -> dict[str, str]:
         entity=pivot_face,
     )
 
-    # The detail claims its three lands FIRST: SolidWorks imports each marked
-    # model dimension into one view only (draw_pinion_bracket, 2026-09-02).
-    # Positions come from the detail's own projection of the axis stations.
-    detail_keep = {}
-    for name, (station_mm, above) in DETAIL_DIAMETER_STATIONS_MM.items():
-        axis_xy = _axis_point(adapter, detail, station_mm, label=name)
-        detail_keep[name] = (axis_xy[0], axis_xy[1] + above)
-    detail_annotations = curate_view_dimensions(
-        adapter, detail, keep=detail_keep, view_label="detail"
-    )
     side_keep = dict(SIDE_STATION_KEEP)
     for name, station_mm in SIDE_DIAMETER_STATIONS_MM.items():
         axis_xy = _axis_point(adapter, side, station_mm, label=name)
@@ -238,9 +225,9 @@ async def build(adapter: Any) -> dict[str, str]:
     side_annotations = curate_view_dimensions(
         adapter, side, keep=side_keep, view_label="side"
     )
-    annotations = [*detail_annotations, *side_annotations]
-    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
-    set_dimension_precision(adapter, annotations, DIMENSION_PRECISION)
+    set_dimension_precision(adapter, side_annotations, DIMENSION_PRECISION)
+    if add_note(adapter, TIP_LANDS_NOTE, *TIP_LANDS_NOTE_XY) is None:
+        raise RuntimeError("failed to add tip-land limits note")
 
     # Leader anchor for the journal's surface-finish symbol: the journal OD
     # (top silhouette) just inboard of the big-end face.

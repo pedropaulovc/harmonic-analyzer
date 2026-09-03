@@ -7,6 +7,8 @@ import inspect
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 import _assembly_drawing
 import draw_channel_assembly
 import draw_drive_train_assembly
@@ -100,36 +102,66 @@ def test_shared_recipe_requires_exploded_bom_balloons_and_procedure_sheets() -> 
         assert token in source
     assert "HAS NO EXPLODED STATE" not in source
     assert "has no exploded view" in source
+    assert "descriptions=bom.description_fallbacks" in source
 
 
-def test_bom_metadata_comes_from_active_unsuppressed_components(monkeypatch) -> None:
-    def part(title: str, number: str):
+def test_bom_metadata_uses_native_descriptions_and_filename_fallbacks(
+    monkeypatch,
+) -> None:
+    def part(
+        *,
+        number: str,
+        configurations: dict[str, SimpleNamespace],
+    ) -> SimpleNamespace:
         return SimpleNamespace(
             GetCustomInfoValue=lambda configuration, name: {
-                "Title": title,
                 "Number": number,
-            }.get(name, "")
+            }.get(name, ""),
+            GetConfigurationByName=lambda name: configurations.get(name),
+        )
+
+    plain_configuration = SimpleNamespace(
+        UseDescriptionInBOM=False,
+        Description="",
+        UseAlternateNameInBOM=False,
+        AlternateName="",
+    )
+    native_description = "CHAIN SPROCKET, T12/T18/T24; 1 EACH"
+    native_configurations = {
+        name: SimpleNamespace(
+            UseDescriptionInBOM=True,
+            Description=native_description,
+            UseAlternateNameInBOM=True,
+            AlternateName="MHA-081",
+        )
+        for name in ("T12", "T18", "T24")
+    }
+    shaft = part(
+        number="MHA-101", configurations={"Default": plain_configuration}
+    )
+    transgear = part(number="MHA-081", configurations=native_configurations)
+
+    def component(
+        filename: str,
+        model: SimpleNamespace,
+        configuration: str,
+        *,
+        suppressed: bool = False,
+    ) -> SimpleNamespace:
+        return SimpleNamespace(
+            IsSuppressed=lambda: suppressed,
+            GetPathName=lambda: rf"C:\cad\parts\{filename}.SLDPRT",
+            GetModelDoc2=lambda: model,
+            ReferencedConfiguration=configuration,
         )
 
     components = (
-        SimpleNamespace(
-            IsSuppressed=lambda: False,
-            GetPathName=lambda: r"C:\cad\parts\shaft.SLDPRT",
-            GetModelDoc2=lambda: part("Drive Shaft", "MHA-101"),
-            ReferencedConfiguration="Default",
-        ),
-        SimpleNamespace(
-            IsSuppressed=lambda: False,
-            GetPathName=lambda: r"C:\cad\parts\shaft.SLDPRT",
-            GetModelDoc2=lambda: part("Drive Shaft", "MHA-101"),
-            ReferencedConfiguration="Default",
-        ),
-        SimpleNamespace(
-            IsSuppressed=lambda: True,
-            GetPathName=lambda: r"C:\cad\parts\hidden.SLDPRT",
-            GetModelDoc2=lambda: part("Hidden", "MHA-999"),
-            ReferencedConfiguration="Default",
-        ),
+        component("shaft", shaft, "Default"),
+        component("shaft", shaft, "Default"),
+        component("transgear-removable", transgear, "T12"),
+        component("transgear-removable", transgear, "T24"),
+        component("transgear-removable", transgear, "T18"),
+        component("hidden", shaft, "Default", suppressed=True),
     )
     model = SimpleNamespace(
         ConfigurationManager=SimpleNamespace(
@@ -139,17 +171,116 @@ def test_bom_metadata_comes_from_active_unsuppressed_components(monkeypatch) -> 
         GetComponents=lambda top_only: components,
         GetExplodedViewCount2=lambda configuration: 1,
     )
-    adapter = SimpleNamespace(
-        _attempt=lambda operation, default=None: operation(),
-    )
+    adapter = SimpleNamespace(_attempt=lambda operation, default=None: operation())
     monkeypatch.setattr(
         _assembly_drawing, "_early_bound", lambda value, interface: value
     )
 
     metadata = _assembly_drawing._read_bom_metadata(adapter, model)
 
-    assert metadata.components == ("shaft",)
-    assert metadata.descriptions == {"shaft": "Drive Shaft"}
-    assert metadata.aliases == {"mha-101": "shaft"}
+    assert metadata.components == ("shaft", "transgear-removable")
+    assert metadata.descriptions == {
+        "shaft": "Shaft",
+        "transgear-removable": native_description,
+    }
+    assert metadata.description_fallbacks == {"shaft": "Shaft"}
+    assert metadata.quantities == {"shaft": 2, "transgear-removable": 3}
+    assert metadata.aliases == {
+        "mha-101": "shaft",
+        "mha-081": "transgear-removable",
+    }
     assert metadata.configuration == "Default"
     assert metadata.exploded_views == 1
+
+
+def _table(cells: tuple[tuple[str, ...], ...]) -> SimpleNamespace:
+    return SimpleNamespace(
+        RowCount=len(cells),
+        ColumnCount=len(cells[0]),
+        DisplayedText=lambda row, column: cells[row][column],
+    )
+
+
+def _metadata_for_bom_validation() -> _assembly_drawing._BomMetadata:
+    native_description = "CHAIN SPROCKET, T12/T18/T24; 1 EACH"
+    return _assembly_drawing._BomMetadata(
+        components=("shaft", "transgear-removable"),
+        descriptions={
+            "shaft": "Shaft",
+            "transgear-removable": native_description,
+        },
+        description_fallbacks={"shaft": "Shaft"},
+        quantities={"shaft": 2, "transgear-removable": 3},
+        aliases={"mha-081": "transgear-removable"},
+        configuration="Default",
+        exploded_views=1,
+    )
+
+
+def test_bom_validation_accepts_fallback_and_native_description_rows(
+    monkeypatch,
+) -> None:
+    cells = (
+        ("ITEM NO.", "PART NUMBER", "DESCRIPTION", "QTY."),
+        ("1", "shaft", "Shaft", "2"),
+        ("2", "MHA-081", "CHAIN SPROCKET, T12/T18/T24; 1 EACH", "3"),
+    )
+    adapter = SimpleNamespace(
+        _attempt=lambda operation, default=None: operation(),
+        _get_attr_or_call=lambda target, name: getattr(target, name),
+    )
+    monkeypatch.setattr(
+        _assembly_drawing, "_early_bound", lambda value, interface: value
+    )
+
+    _assembly_drawing._validate_assembly_bom_columns(
+        adapter, _table(cells), _metadata_for_bom_validation(), label="paper drive"
+    )
+
+
+@pytest.mark.parametrize(
+    ("data_row", "message"),
+    (
+        (("1", "", "CHAIN SPROCKET, T12/T18/T24; 1 EACH", "3"), "blank required"),
+        (("1", "MHA-081", "", "3"), "blank required"),
+        (
+            ("1", "MHA-081", "CHAIN SPROCKET, T12/T18/T24; 1 EACH", ""),
+            "blank required",
+        ),
+        (
+            ("1", "wrong-component", "CHAIN SPROCKET, T12/T18/T24; 1 EACH", "3"),
+            "incorrect part identity",
+        ),
+        (
+            ("1", "MHA-081", "CHAIN SPROCKET, T12/T18/T24; 1 EACH", "2"),
+            "expected 3",
+        ),
+    ),
+)
+def test_bom_validation_fails_loud_for_blank_cells_wrong_identity_or_quantity(
+    monkeypatch, data_row: tuple[str, ...], message: str
+) -> None:
+    metadata = _assembly_drawing._BomMetadata(
+        components=("transgear-removable",),
+        descriptions={
+            "transgear-removable": "CHAIN SPROCKET, T12/T18/T24; 1 EACH"
+        },
+        description_fallbacks={},
+        quantities={"transgear-removable": 3},
+        aliases={"mha-081": "transgear-removable"},
+        configuration="Default",
+        exploded_views=1,
+    )
+    cells = (("ITEM NO.", "PART NUMBER", "DESCRIPTION", "QTY."), data_row)
+    adapter = SimpleNamespace(
+        _attempt=lambda operation, default=None: operation(),
+        _get_attr_or_call=lambda target, name: getattr(target, name),
+    )
+    monkeypatch.setattr(
+        _assembly_drawing, "_early_bound", lambda value, interface: value
+    )
+
+    with pytest.raises(RuntimeError, match=message):
+        _assembly_drawing._validate_assembly_bom_columns(
+            adapter, _table(cells), metadata, label="paper drive"
+        )

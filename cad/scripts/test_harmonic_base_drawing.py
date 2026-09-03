@@ -231,9 +231,10 @@ def test_plan_view_clears_top_border_and_lower_notes() -> None:
     assert drawing.TOP_KEEP["BottomWid"][0] < drawing.HOLE_TABLE_ANCHOR[0]
 
 
-def test_rim_reveal_heights_and_radii_are_drawing_dimensions() -> None:
-    # Every one of these used to be a number in the notes; each is now a
-    # dimension on topologically picked edges (no sheet-coordinate picks).
+def test_rim_reveal_heights_and_radii_are_drawing_annotations() -> None:
+    # The visible entities remain topologically dimensioned.  The hidden deck
+    # edge is unreliable in the derived elevation, so its depth is stated
+    # beside that view directly from the shared spec.
     source = _source()
     for label in (
         'label="rim width"',
@@ -241,12 +242,18 @@ def test_rim_reveal_heights_and_radii_are_drawing_dimensions() -> None:
         'label="pad corner radius"',
         'label="rim inner corner radius"',
         'label="overall height reference"',
-        'label="rim pocket depth"',
         'label="pad reveal reference"',
     ):
         assert label in source, label
-    assert source.count("_dimension_entities(") == 8  # definition + 7 calls
+    assert source.count("_dimension_entities(") == 7  # definition + 6 calls
     assert source.count("_reference(adapter, ") == 2
+    assert drawing.DECK_DEPTH_NOTE == (
+        f"DECK {harmonic_base_spec.RIM_TOP - harmonic_base_spec.STACK_HEIGHT:.2f} "
+        "BELOW RIM TOP"
+    )
+    assert "add_note(adapter, DECK_DEPTH_NOTE, *DECK_DEPTH_NOTE_XY)" in source
+    assert 'label="deck edge"' not in source
+    assert "(deck, rim_top)" not in source
     assert "set_reference_dimension(" in source
     assert "SelectByID2" not in source
     assert "view.SelectEntity(entity, index > 0)" in source
@@ -261,7 +268,10 @@ def test_rim_reveal_heights_and_radii_are_drawing_dimensions() -> None:
     assert drawing.RIM_WIDTH_TEXT_XY == (0.229, 0.2360)
     assert drawing.REVEAL_TEXT_XY == (0.2515, 0.2360)
     assert drawing.OVERALL_TEXT_XY == (0.264, 0.0745)
-    assert drawing.RIM_DEPTH_TEXT_XY == (0.4105, 0.0850)
+    assert drawing.DECK_DEPTH_NOTE_XY == (
+        drawing.SIDE_CENTER[0],
+        drawing.SIDE_VIEW_NOTE_XY[1],
+    )
     # No pick relies on a tangent edge: the reveal reads off the chamfers'
     # lower edges in the plan, not the end faces' fillet boundaries.
     assert 'label="flange right edge"' in source

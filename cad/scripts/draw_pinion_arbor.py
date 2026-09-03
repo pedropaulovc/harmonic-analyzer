@@ -5,10 +5,10 @@ plain bearing arbor carries no datums and no feature-control frames -- its
 running fit is the band on the model diameter, plus one roughness symbol on
 the OD that turns in the strap bores. The diameter, the shank length and the
 Ra all read on the side view (policy rule 7: a turned part is dimensioned as
-it sits in the lathe); the crowned back end is enlarged in DETAIL B so its
-sagitta and spherical radius are legible, and the true overall length is a
-conspicuous reference below the shank length (machinist review 2026-09-02:
-the 226.25 read as the overall).
+it sits in the lathe); the crowned back end is enlarged in DETAIL B, with a
+compact adjacent note stating its spec-derived sagitta and spherical radius.
+The true overall length is a conspicuous reference below the shank length
+(machinist review 2026-09-02: the 226.25 read as the overall).
 """
 
 from __future__ import annotations
@@ -48,6 +48,7 @@ from pinion_arbor_spec import (
     SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     place_view,
 )
@@ -99,23 +100,20 @@ DETAIL_CENTER = (0.160, 0.130)
 DETAIL_RADIUS = 0.008
 DETAIL_SCALE = (4, 1)
 
-# Marked dimensions by view. SolidWorks inserts each marked model dimension
-# into ONE view and a dimension one view's curation deleted does not come
-# back for another (draw_pinion_bracket, 2026-09-02 seat build), so the
-# detail is curated first (it claims the sagitta), then the side view (the
-# diameter at the flat right end, the shank length below); the end view keeps
-# nothing and is never asked.
-FRONT_KEEP: dict[str, tuple[float, float]] = {}
+# Marked dimensions by view. The crown's sketch dimension is unavailable from
+# the derived detail, so DETAIL B carries a spec-derived geometry note instead
+# of asking SolidWorks to import it. The end view keeps nothing and is never
+# asked for model annotations.
 RIGHT_KEEP = {
     "ShaftDia": (RIGHT_END_X + 0.024, RIGHT_CENTER[1]),
     "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.020),
 }
-DETAIL_KEEP_NAMES = ("CapSagDim",)
-# The shaft fit lives on the source-model dimension. The shank length says
-# where it stops (the crown root, not the apex); the crown descriptor rides
-# the sagitta in the detail.
 DIMENSION_CALLOUTS = {"Depth": "TO CROWN ROOT"}
-CAP_CALLOUTS = {"CapSagDim": f"SR{CAP_R:.2f} CROWN"}
+CROWN_GEOMETRY_NOTE = f"DETAIL B CROWN\nSR{CAP_R:.2f}; {CAP_SAG:.2f} HIGH"
+CROWN_GEOMETRY_NOTE_XY = (
+    DETAIL_CENTER[0] + 0.025,
+    DETAIL_CENTER[1] + 0.025,
+)
 # The diameter is the one fitted feature (SHAFT_H band on the model
 # dimension): three decimals say "hold it".
 DIMENSION_PRECISION = {"ShaftDia": 3}
@@ -184,8 +182,8 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     # DETAIL B around the crown root, enlarged 4:1 (policy rule 7: a feature
-    # too small to dimension legibly on the parent gets a detail). Curated
-    # FIRST so it claims the sagitta.
+    # too small to read legibly on the parent gets a detail). Its dimensions
+    # are stated by the adjacent spec-derived note below.
     detail = create_detail_view(
         adapter,
         right,
@@ -196,29 +194,13 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=DETAIL_SCALE,
         label="crown detail",
     )
-    detail_root = model_point_in_view(
-        adapter, detail, (0.0, 0.0, SHAFT_LEN / 1000.0), label="detail crown root"
-    )
-    detail_apex = model_point_in_view(
-        adapter, detail, (0.0, 0.0, OVERALL_LEN / 1000.0), label="detail crown apex"
-    )
-    # The sagitta (1.20, 4.8 mm at 4:1) stands above the crown, centred on it,
-    # its "SR7.27 CROWN" callout under the value.
-    detail_keep = {
-        "CapSagDim": (
-            (detail_root[0] + detail_apex[0]) / 2.0,
-            detail_root[1] + SHAFT_DIA * DETAIL_SCALE[0] / 2000.0 + 0.012,
-        ),
-    }
-    detail_annotations = curate_view_dimensions(
-        adapter, detail, keep=detail_keep, view_label="detail"
-    )
     right_annotations = curate_view_dimensions(
         adapter, right, keep=RIGHT_KEEP, view_label="right"
     )
     set_dimension_callouts(adapter, right_annotations, DIMENSION_CALLOUTS)
-    set_dimension_callouts(adapter, detail_annotations, CAP_CALLOUTS)
     set_dimension_precision(adapter, right_annotations, DIMENSION_PRECISION)
+    if add_note(adapter, CROWN_GEOMETRY_NOTE, *CROWN_GEOMETRY_NOTE_XY) is None:
+        raise RuntimeError("failed to add crown geometry note")
     # SolidWorks classifies a solid circular end silhouette under the same
     # AutoInsertCenterMarks2 "hole" bit as a bored circle; disabling that bit
     # makes the API a guaranteed no-op even though the end view is circular.

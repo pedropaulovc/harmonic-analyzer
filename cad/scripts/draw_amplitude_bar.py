@@ -10,17 +10,19 @@ full-length front view (overall length only), a 1:4 right view beside it, a
 working features are edge-on at 1:4, so they are dimensioned in three 4:1
 details (policy rule 7, machinist review 2026-09-02):
 
-* DETAIL A -- the top notch, from the front view: width, depth and the cheek's
-  offset from the stock face.
+* DETAIL A -- the top notch, from the front view: width and depth as sheet
+  dimensions, with the cheek offset stated beside the detail.
 * DETAIL B -- the bottom notch, from the front view: the same three, plus the
   roughness symbol on the floor that slides on the rocker.
 * DETAIL C -- the top pin hole, from the RIGHT view (the only projection where
   the hole, drilled along X, is a visible circle): its drop below the bar top,
   its station across the depth, and the ``#47 DRILL`` callout.
 
-The details carry sheet dimensions (edge picks), never a model-item import:
-a marked dimension imports into ONE view only, so an import into a detail
-could claim the front view's overall length.  The sheet runs at 1:4.
+The details carry sheet dimensions (edge picks) except for the top cheek
+offset, whose clipped outer edge is not a reliable derived-view selection and
+is therefore stated beside DETAIL A from the shared spec.  A marked dimension
+imports into ONE view only, so an import into a detail could claim the front
+view's overall length.  The sheet runs at 1:4.
 
 Run with SolidWorks open::
 
@@ -65,7 +67,7 @@ from amplitude_bar_spec import (
     TOP_PIN_DIA,
     TOP_PIN_Y,
 )
-from solidworks_mcp.adapters.solidworks.drawing import place_view
+from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 
 
 SPEC = DRAWINGS_BY_NAME["amplitude_bar"]
@@ -167,6 +169,14 @@ _INNER_CHEEK_X = NOTCH_OFFSET + TOP_NOTCH_WIDTH  # 4.7625 (both notches)
 _SLIDE_FLOOR_PICK_X = NOTCH_OFFSET + 0.6  # left part of the floor, clear of the depth pick
 _DEPTH_PICK_X = _INNER_CHEEK_X - 0.6
 
+# DETAIL A's clipped stock-face edge is not reliably selectable.  State the
+# same spec-owned offset beside the view instead of guessing a new pick.
+TOP_CHEEK_OFFSET_NOTE = f"CHEEK OFFSET {NOTCH_OFFSET:.4f}"
+TOP_CHEEK_OFFSET_NOTE_XY = (
+    _detail_a(NOTCH_OFFSET / 2.0, 0.0)[0],
+    _detail_a(_BBOX_CX, BAR_LENGTH)[1] + 0.014,
+)
+
 
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
@@ -255,18 +265,10 @@ async def build(adapter: Any) -> dict[str, str]:
     curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
     curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
 
-    # DETAIL A (top notch): cheek offset from the stock face and notch width
-    # chained above the end; depth from the end face to the floor at right.
-    a_row = _detail_a(_BBOX_CX, BAR_LENGTH)[1] + 0.014
-    add_edge_dimension(
-        adapter,
-        detail_a,
-        p0=_detail_a(0.0, _TOP_CHEEK_Y),
-        p1=_detail_a(NOTCH_OFFSET, _TOP_CHEEK_Y),
-        text_xy=(_detail_a(NOTCH_OFFSET / 2.0, 0.0)[0], a_row),
-        label="top notch cheek offset",
-        orientation="horizontal",
-    )
+    # DETAIL A (top notch): the clipped stock-face cheek is stated from the
+    # shared spec; width remains chained above the end and depth stays right.
+    if add_note(adapter, TOP_CHEEK_OFFSET_NOTE, *TOP_CHEEK_OFFSET_NOTE_XY) is None:
+        raise RuntimeError("failed to add top-notch cheek-offset note")
     add_edge_dimension(
         adapter,
         detail_a,

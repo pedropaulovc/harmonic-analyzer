@@ -1917,6 +1917,40 @@ async def _place_on_shaft(
     )
 
 
+def _force_rebuild_after_cone_replication(adapter, model) -> None:
+    """Regenerate all switched cone configurations, then reject real faults.
+
+    Assigning ``ReferencedConfiguration`` dirties the copied component model.
+    ``EditRebuild3`` only updates features already marked dirty in the active
+    assembly configuration and, since the cone-gear PMI regeneration sweep,
+    can report the temporary ``swFeatureErrorUnknown`` state on every copy.
+    One deep ``ForceRebuild3(False)`` after all 19 switches regenerates those
+    child configurations and solves the assembly in the proven health-gate
+    order.  Its boolean remains authoritative: a genuine rebuild failure is
+    diagnosed and rejected, never treated as the known transient.
+    """
+    rebuilt = adapter._attempt(lambda: model.ForceRebuild3(False), default=None)
+    if rebuilt is False or rebuilt is None:
+        faults = whats_wrong(adapter, model)
+        hard_faults = [
+            f"{name} [code={code}]" for name, code, warning in faults if not warning
+        ]
+        warnings = [
+            f"{name} [code={code}]" for name, code, warning in faults if warning
+        ]
+        _telemetry.error(
+            "cone-gear replication rebuild rejected",
+            rebuild_result=repr(rebuilt),
+            hard_faults=hard_faults,
+            warnings=warnings,
+        )
+        raise RuntimeError(
+            "ForceRebuild3 after cone-gear replication returned "
+            f"{rebuilt!r}; hard faults: {hard_faults or ['none reported']}; "
+            f"warnings: {warnings or ['none reported']}"
+        )
+
+
 async def build(adapter) -> dict[str, str]:
     # Reset the free-DOF manifest buffer before any *_driver(free_dof_key=...)
     # call: each freed DOF is recorded (never authored) and persisted below.
@@ -2879,29 +2913,11 @@ async def build(adapter) -> dict[str, str]:
             cone_gears.append((teeth, cg))
         # No post-copy flip heal: FlipDimension=seed_flip was honoured in each
         # copy call (Repeat=false on the axial-seat slot), so the copied dims
-        # already sit on the seed's side. The end-state validation below (pose
-        # + status + mate count) is the tripwire if any copy landed wrong.
+        # already sit on the seed's side. Every ReferencedConfiguration switch
+        # above is now complete; regenerate all changed cone-gear child models
+        # and solve the assembly once before the pose/status/mate-count scan.
         model = adapter.currentModel
-        rebuilt = adapter._attempt(lambda: model.EditRebuild3(), default=None)
-        if rebuilt is False or rebuilt is None:
-            faults = whats_wrong(adapter, model)
-            hard_faults = [
-                f"{name} [code={code}]" for name, code, warning in faults if not warning
-            ]
-            warnings = [
-                f"{name} [code={code}]" for name, code, warning in faults if warning
-            ]
-            _telemetry.error(
-                "cone-gear replication rebuild rejected",
-                rebuild_result=repr(rebuilt),
-                hard_faults=hard_faults,
-                warnings=warnings,
-            )
-            raise RuntimeError(
-                "EditRebuild3 after cone-gear replication returned "
-                f"{rebuilt!r}; hard faults: {hard_faults or ['none reported']}; "
-                f"warnings: {warnings or ['none reported']}"
-            )
+        _force_rebuild_after_cone_replication(adapter, model)
     # Validate the production way (CopyWithMates2's return LIES): pose on the
     # seed's transform translated one seat pitch per station, full mate set,
     # fully-defined status, the configuration actually taken; then re-anchor

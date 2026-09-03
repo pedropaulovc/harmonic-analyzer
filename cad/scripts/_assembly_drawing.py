@@ -33,6 +33,8 @@ _BOM_ANCHOR = (0.246, 0.257)
 class _BomMetadata:
     components: tuple[str, ...]
     descriptions: dict[str, str]
+    description_fallbacks: dict[str, str]
+    quantities: dict[str, int]
     aliases: dict[str, str]
     configuration: str
     exploded_views: int
@@ -52,14 +54,9 @@ def _required_lines(
     return cleaned
 
 
-def _component_property(adapter: Any, component: Any, name: str) -> str:
-    model = adapter._attempt(lambda: component.GetModelDoc2(), default=None)
-    if model is None:
-        return ""
-    model = _early_bound(model, "IModelDoc2")
-    configuration = str(
-        adapter._attempt(lambda: component.ReferencedConfiguration, default="") or ""
-    )
+def _component_property(
+    adapter: Any, model: Any, configuration: str, name: str
+) -> str:
     return str(
         adapter._attempt(
             lambda: model.GetCustomInfoValue(configuration, name), default=""
@@ -99,29 +96,103 @@ def _read_bom_metadata(adapter: Any, model: Any) -> _BomMetadata:
     )
 
     descriptions: dict[str, str] = {}
+    description_fallbacks: dict[str, str] = {}
+    native_descriptions: set[str] = set()
+    quantities: dict[str, int] = {}
     aliases: dict[str, str] = {}
     for raw_component in components:
         component = _early_bound(raw_component, "IComponent2")
         if bool(adapter._attempt(lambda: component.IsSuppressed(), default=False)):
             continue
         stem = _component_stem(adapter, component)
-        title = _component_property(adapter, component, "Title")
-        description = title or stem.replace("-", " ").replace("_", " ").title()
+        model = adapter._attempt(lambda: component.GetModelDoc2(), default=None)
+        referenced_configuration = str(
+            adapter._attempt(lambda: component.ReferencedConfiguration, default="")
+            or ""
+        )
+        native_description = ""
+        native_number = ""
+        if model is not None:
+            model = _early_bound(model, "IModelDoc2")
+            raw_configuration = adapter._attempt(
+                lambda: getattr(model, "GetConfigurationByName", lambda _name: None)(
+                    referenced_configuration
+                ),
+                default=None,
+            )
+            if raw_configuration is not None:
+                part_configuration = _early_bound(raw_configuration, "IConfiguration")
+                if bool(
+                    adapter._attempt(
+                        lambda: part_configuration.UseDescriptionInBOM, default=False
+                    )
+                ):
+                    native_description = str(
+                        adapter._attempt(
+                            lambda: part_configuration.Description, default=""
+                        )
+                        or ""
+                    ).strip()
+                    if not native_description:
+                        raise RuntimeError(
+                            f"component {stem!r} configuration "
+                            f"{referenced_configuration!r} uses a blank BOM description"
+                        )
+                if bool(
+                    adapter._attempt(
+                        lambda: part_configuration.UseAlternateNameInBOM, default=False
+                    )
+                ):
+                    native_number = str(
+                        adapter._attempt(
+                            lambda: part_configuration.AlternateName, default=""
+                        )
+                        or ""
+                    ).strip()
+                    if not native_number:
+                        raise RuntimeError(
+                            f"component {stem!r} configuration "
+                            f"{referenced_configuration!r} uses a blank BOM part number"
+                        )
+            native_description = native_description or _component_property(
+                adapter, model, referenced_configuration, "Description"
+            )
+            title = _component_property(
+                adapter, model, referenced_configuration, "Title"
+            )
+            number = _component_property(
+                adapter, model, referenced_configuration, "Number"
+            )
+        else:
+            title = ""
+            number = ""
+        description = (
+            native_description
+            or title
+            or stem.replace("-", " ").replace("_", " ").title()
+        )
         previous = descriptions.setdefault(stem, description)
         if previous != description:
             raise RuntimeError(
                 f"component {stem!r} has conflicting BOM descriptions "
                 f"{previous!r} and {description!r}"
             )
-        number = _component_property(adapter, component, "Number")
-        if number:
-            normalized = number.casefold()
+        if native_description:
+            native_descriptions.add(stem)
+            description_fallbacks.pop(stem, None)
+        elif stem not in native_descriptions:
+            description_fallbacks[stem] = description
+        quantities[stem] = quantities.get(stem, 0) + 1
+        for candidate_number in (number, native_number):
+            if not candidate_number:
+                continue
+            normalized = candidate_number.casefold()
             prior = aliases.setdefault(normalized, stem)
             if prior != stem:
                 raise RuntimeError(
-                    f"BOM part number {number!r} identifies both {prior!r} and {stem!r}"
+                    f"BOM part number {candidate_number!r} identifies both "
+                    f"{prior!r} and {stem!r}"
                 )
-
     expected = tuple(sorted(descriptions))
     if not expected:
         raise RuntimeError(
@@ -136,6 +207,8 @@ def _read_bom_metadata(adapter: Any, model: Any) -> _BomMetadata:
     return _BomMetadata(
         components=expected,
         descriptions=descriptions,
+        description_fallbacks=description_fallbacks,
+        quantities=quantities,
         aliases=aliases,
         configuration=configuration,
         exploded_views=exploded_views,
@@ -153,23 +226,27 @@ def _note(adapter: Any, text: str, x: float, y: float, *, label: str) -> None:
         raise RuntimeError(f"failed to add {label}")
 
 
-def _validate_assembly_bom_columns(adapter: Any, table: Any, *, label: str) -> None:
-    """Require populated item, part, description, and quantity cells."""
+def _validate_assembly_bom_columns(
+    adapter: Any, table: Any, metadata: _BomMetadata, *, label: str
+) -> None:
+    """Validate the native BOM's required cells, identities, descriptions, and counts."""
     table = _early_bound(table, "ITableAnnotation")
     columns = int(adapter._get_attr_or_call(table, "ColumnCount") or 0)
     rows = int(adapter._get_attr_or_call(table, "RowCount") or 0)
-    headers = [
-        str(
-            adapter._attempt(
-                lambda column=column: table.DisplayedText(0, column), default=""
-            )
-            or ""
-        )
-        .strip()
-        .upper()
-        .rstrip(".")
-        for column in range(columns)
+    contents = [
+        [
+            str(
+                adapter._attempt(
+                    lambda row=row, column=column: table.DisplayedText(row, column),
+                    default="",
+                )
+                or ""
+            ).strip()
+            for column in range(columns)
+        ]
+        for row in range(rows)
     ]
+    headers = [cell.upper().rstrip(".") for cell in (contents[0] if contents else ())]
     required = ("ITEM NO", "PART NUMBER", "DESCRIPTION")
     missing = [name for name in required if name not in headers]
     quantity_column = next(
@@ -187,16 +264,57 @@ def _validate_assembly_bom_columns(adapter: Any, table: Any, *, label: str) -> N
         (row, headers[column])
         for row in range(1, rows)
         for column in checked_columns
-        if not str(
-            adapter._attempt(
-                lambda row=row, column=column: table.DisplayedText(row, column),
-                default="",
-            )
-            or ""
-        ).strip()
+        if not contents[row][column]
     ]
     if blank_cells:
         raise RuntimeError(f"{label}: BOM has blank required cells: {blank_cells!r}")
+
+    part_column = headers.index("PART NUMBER")
+    description_column = headers.index("DESCRIPTION")
+    identities = {component.casefold(): component for component in metadata.components}
+    identities.update(
+        {alias.casefold(): component for alias, component in metadata.aliases.items()}
+    )
+    observed: set[str] = set()
+    for row in range(1, rows):
+        displayed_identity = contents[row][part_column]
+        component = identities.get(displayed_identity.casefold())
+        if component is None:
+            raise RuntimeError(
+                f"{label}: BOM row {row} has incorrect part identity "
+                f"{displayed_identity!r}"
+            )
+        if component in observed:
+            raise RuntimeError(
+                f"{label}: BOM has duplicate row identity {displayed_identity!r}"
+            )
+        observed.add(component)
+        expected_description = metadata.descriptions[component]
+        displayed_description = contents[row][description_column]
+        if displayed_description != expected_description:
+            raise RuntimeError(
+                f"{label}: BOM description for {displayed_identity!r} is "
+                f"{displayed_description!r}, expected {expected_description!r}"
+            )
+        displayed_quantity = contents[row][quantity_column]
+        try:
+            quantity = int(displayed_quantity)
+        except ValueError as exc:
+            raise RuntimeError(
+                f"{label}: BOM quantity for {displayed_identity!r} is not an integer: "
+                f"{displayed_quantity!r}"
+            ) from exc
+        expected_quantity = metadata.quantities[component]
+        if quantity != expected_quantity:
+            raise RuntimeError(
+                f"{label}: BOM quantity for {displayed_identity!r} is {quantity}, "
+                f"expected {expected_quantity}"
+            )
+    missing_components = sorted(set(metadata.components) - observed)
+    if missing_components:
+        raise RuntimeError(
+            f"{label}: BOM is missing component rows {missing_components!r}"
+        )
 
 
 def _place_hlr_view(
@@ -356,14 +474,14 @@ async def build_assembly_package(
         exploded,
         anchor_xy=_BOM_ANCHOR,
         expected_components=bom.components,
-        descriptions=bom.descriptions,
+        descriptions=bom.description_fallbacks,
         identity_aliases=bom.aliases,
         configuration_grouping="same-part",
         label=pdf_title,
     )
     if table is None:
         raise RuntimeError(f"{pdf_title}: associative BOM insertion returned no table")
-    _validate_assembly_bom_columns(adapter, table, label=pdf_title)
+    _validate_assembly_bom_columns(adapter, table, bom, label=pdf_title)
     add_auto_balloons_across_views(
         adapter,
         (exploded, reference_front, reference_right),
