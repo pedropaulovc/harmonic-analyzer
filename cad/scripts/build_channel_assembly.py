@@ -1041,6 +1041,7 @@ def _spring_spec_at_tilt(lever_tilt_deg: float, hole_x_0: float) -> dict[str, An
     _assert_spring_threading(hole_y, eye_y)
     _assert_hook_fastener(eye_y)
     return {
+        "hole_x_0": hole_x_0,
         "hole_y": hole_y,
         "eye_y": eye_y,
         "gap": gap,
@@ -1051,6 +1052,97 @@ def _spring_spec_at_tilt(lever_tilt_deg: float, hole_x_0: float) -> dict[str, An
     }
 
 
+def _saved_pose_spring_geometry(
+    amplitudes: list[float], hole_x_0: float
+) -> tuple[
+    list[float],
+    dict[int, dict[str, float]],
+    dict[int, dict[str, float]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+]:
+    """Solve the parallel and sinusoidal spring endpoints before CAD authoring."""
+    poses = _config.poses()
+    target_amplitude = float(poses["parallel"]["target_amplitude_mm"])
+    if target_amplitude < 0.0:
+        raise RuntimeError("poses.yaml parallel target_amplitude_mm must be >= 0")
+    parallel_amplitudes = [target_amplitude] * CHANNELS
+    crank_turns = float(poses["sinusoid"]["crank_turns"])
+    harmonics = [int(row["harmonic_n"]) for row in _config.channels()][:CHANNELS]
+    expect: dict[int, dict[str, float]] = {}
+    sin_foot: dict[int, dict[str, float]] = {}
+    for j, harmonic in enumerate(harmonics):
+        state = solve_cam_pose(crank_turns, harmonic)
+        expect[j] = state
+        sin_foot[j] = solve_sinusoid_foot(state, float(amplitudes[j]))
+    return (
+        parallel_amplitudes,
+        expect,
+        sin_foot,
+        [_spring_spec(a, hole_x_0) for a in parallel_amplitudes],
+        [
+            _spring_spec_at_tilt(sin_foot[j]["lever_tilt"], hole_x_0)
+            for j in range(CHANNELS)
+        ],
+    )
+
+
+def _spring_grounded_spec(
+    spec: dict[str, Any], j: int, bank: str
+) -> dict[str, Any]:
+    """Place one exact-length spring between its fixed and solved eye centres."""
+    ux, uy = spec["ux"], spec["uy"]
+    return {
+        "part": spec["part"],
+        "position": [
+            spec["hole_x_0"] + SPRING_BOTTOM_LEAD * ux,
+            PLATE_EYE_Y + SPRING_BOTTOM_LEAD * uy,
+            z_station(j) + ARM_MID_DZ,
+        ],
+        "rotation": [0.0, 0.0, 0.0],
+        "rows": [[0.0, 0.0, -1.0], [ux, uy, 0.0], [uy, -ux, 0.0]],
+        "kind": "spring",
+        "spring_bank": bank,
+        "theta": spec["theta"],
+        "label": (
+            f"channel-spring {bank} ch{j:02d} {spec['part'].rsplit('-', 1)[-1]} "
+            f"body={spec['body']:.2f} tilt={spec['theta']:+.2f}"
+        ),
+    }
+
+
+def _assign_spring_parts(
+    specs_by_bank: dict[str, list[dict[str, Any]]], neutral_body: float
+) -> dict[float, str]:
+    """Assign reusable part files without shortening a saved-pose spring.
+
+    Default retains its historical 0.01 mm variant grouping. Saved poses use the
+    canonical part only for the true neutral solve and otherwise build at the
+    solved body length; a rigid part can meet both endpoints only at that length.
+    """
+    variant_by_body: dict[float, str] = {}
+    for bank, specs in specs_by_bank.items():
+        for spec in specs:
+            body = float(spec["body"])
+            use_base = (
+                abs(body - SPRING_BASE_BODY) < 0.05
+                if bank == "default"
+                else abs(body - neutral_body) < 1e-9
+            )
+            if use_base:
+                spec["part"] = "channel-spring-installed"
+                spec["part_body"] = SPRING_BASE_BODY
+                continue
+            key = round(body, 2) if bank == "default" else body
+            name = variant_by_body.get(key)
+            if name is None:
+                name = f"channel-spring-installed-stretch{len(variant_by_body):02d}"
+                variant_by_body[key] = name
+            spec["part"] = name
+            spec["part_body"] = key
+    return variant_by_body
+
+
 # --- saved pose configurations (2026-09-02, cad/config/poses.yaml) ------------
 # Default stays the free photographed fan. Each saved configuration
 # unsuppresses the permanent POSE_<key> mates (authored from the Default DOF
@@ -1059,7 +1151,7 @@ from _pose_configs import (  # noqa: E402
     PoseConfiguration,
     author_pose_mates,
     install_pose_configurations,
-    repose_fixed_component,
+    set_components_suppressed_in_active_configuration,
     set_distance_mate_value_in_active_configuration,
 )
 
@@ -1069,51 +1161,28 @@ def _pose_tolerance_ok(got: float, want: float, tol: float) -> bool:
 
 
 async def _install_pose_configurations(
-    adapter, amplitudes, spring_specs, spring_instances, hole_x_0
+    adapter,
+    amplitudes,
+    spring_instances,
+    parallel_amplitudes,
+    expect,
+    sin_foot,
 ) -> None:
     poses = _config.poses()
     parallel = poses["parallel"]
     sinus = poses["sinusoid"]
     target_amplitude = float(parallel["target_amplitude_mm"])
-    if target_amplitude < 0.0:
-        raise RuntimeError("poses.yaml parallel target_amplitude_mm must be >= 0")
-    default_amplitudes = [float(a) for a in amplitudes]
-    parallel_amplitudes = [target_amplitude] * CHANNELS
     crank_turns = float(sinus["crank_turns"])
-    harmonics = [int(row["harmonic_n"]) for row in _config.channels()][:CHANNELS]
+    default_amplitudes = [float(a) for a in amplitudes]
 
     specs = collected_dof_specs()
     pose_mates = await author_pose_mates(adapter, specs)
     rest_values = {k: m.rest for k, m in pose_mates.items()}
-    rest_spring = {
-        j: component_transform(adapter, spring_instances[j]) for j in range(CHANNELS)
-    }
 
     # --- parallel bank: every bar returns to the common zero station
     parallel_values = dict(rest_values)
     for j, amplitude in enumerate(parallel_amplitudes):
         parallel_values[f"bar_amplitude_{j:02d}"] = PIVOT[0] + amplitude
-
-    async def repose_springs(adapter, lever_tilts: list[float]) -> None:
-        # Re-pose the cosmetic springs to the posed lever tips. Their cut
-        # lengths remain Default's; a configuration can only move each rigid
-        # spring instance.
-        for j, tilt in enumerate(lever_tilts):
-            new = _spring_spec_at_tilt(tilt, hole_x_0)
-            old = spring_specs[j]
-            ux, uy = new["ux"], new["uy"]
-            pos = [
-                hole_x_0 + SPRING_BOTTOM_LEAD * ux,
-                PLATE_EYE_Y + SPRING_BOTTOM_LEAD * uy,
-                z_station(j) + ARM_MID_DZ,
-            ]
-            delta = math.degrees(
-                math.atan2(
-                    old["ux"] * uy - old["uy"] * ux,
-                    old["ux"] * ux + old["uy"] * uy,
-                )
-            )
-            await repose_fixed_component(adapter, spring_instances[j], pos, delta)
 
     async def parallel_hook(adapter) -> None:
         for j, target in enumerate(parallel_amplitudes):
@@ -1128,9 +1197,11 @@ async def _install_pose_configurations(
                     f"a={target:.1f} r={target_radius:.3f}"
                 ),
             )
-        await repose_springs(
-            adapter,
-            [solve_state(target)["lever_tilt"] for target in parallel_amplitudes],
+        set_components_suppressed_in_active_configuration(
+            adapter, spring_instances["default"], True
+        )
+        set_components_suppressed_in_active_configuration(
+            adapter, spring_instances["parallel"], False
         )
 
     def parallel_verify(adapter) -> None:
@@ -1164,17 +1235,12 @@ async def _install_pose_configurations(
 
     # --- sinusoid: keep Default amplitudes while rods + rockers follow their cams
     sin_values = dict(rest_values)
-    expect = {}
     rest0 = _arc_geometry()
-    sin_foot = {}
-    for j, k in enumerate(harmonics):
-        st = solve_cam_pose(crank_turns, k)
+    for j, st in expect.items():
         sin_values[f"rocker_angle_{j:02d}"] = (
             rest_values[f"rocker_angle_{j:02d}"] + st["pin_y"] - rest0["pin_y"]
         )
         sin_values[f"rod_swing_{j:02d}"] = abs(st["ring_x"])
-        expect[j] = st
-        sin_foot[j] = solve_sinusoid_foot(st, default_amplitudes[j])
 
     async def sin_hook(adapter) -> None:
         # The bars keep their Default amplitude stations while their roof
@@ -1188,22 +1254,12 @@ async def _install_pose_configurations(
                 sf["foot_r"],
                 label=f"J5 bar-foot on rocker arc ch{j:02d} lifted r={sf['foot_r']:.3f}",
             )
-        # Each spring translates with its own lever hole from that channel's
-        # Default amplitude pose; orientation stays fixed.
-        for j in range(CHANNELS):
-            phi_default = math.radians(
-                solve_state(default_amplitudes[j])["lever_tilt"]
-            )
-            phi = math.radians(sin_foot[j]["lever_tilt"])
-            dx = -LEVER_SPRING_X * (math.cos(phi) - math.cos(phi_default))
-            dy = LEVER_SPRING_X * (math.sin(phi) - math.sin(phi_default))
-            t = rest_spring[j]
-            pos = [
-                t[9] * 1000.0 + dx,
-                t[10] * 1000.0 + dy,
-                t[11] * 1000.0,
-            ]
-            await repose_fixed_component(adapter, spring_instances[j], pos, 0.0)
+        set_components_suppressed_in_active_configuration(
+            adapter, spring_instances["default"], True
+        )
+        set_components_suppressed_in_active_configuration(
+            adapter, spring_instances["sinusoid"], False
+        )
 
     def sin_verify(adapter) -> None:
         # Sign-safe readback: the rocker's rod-pin bore must sit at the solved
@@ -1293,17 +1349,6 @@ async def _install_pose_configurations(
         ],
         interference=check_no_interference,
     )
-    # The spring bank in Default is exactly where the batch put it.
-    for j in range(CHANNELS):
-        t = component_transform(adapter, spring_instances[j])
-        if (
-            max(
-                abs(a - b)
-                for a, b in zip(t[:12], rest_spring[j][:12], strict=True)
-            )
-            > 1e-6
-        ):
-            raise RuntimeError(f"spring {spring_instances[j]} moved in Default")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -1351,16 +1396,25 @@ async def build(adapter) -> dict[str, str]:
     if bar_clearance < 5.5:
         raise RuntimeError(f"bar passes only {bar_clearance:.2f} above the shaft")
 
-    # Per-channel stretched springs: each spans the moving lever eye to the fixed
-    # plate hole at its Default amplitude. Equal amplitudes reuse a part; each
-    # distinct gap gets one stretched variant built here.
-    # (lean -- no PNG views; the canonical part renders its own). The variants are
-    # length variants of channel-spring-installed, so part_properties inherits its
-    # registry row (their placement is authored machine-handed here, no per-part
-    # symmetry declaration -- the #151 mirror layer is gone).
+    # Per-channel stretched springs: each spans its solved lever eye to the fixed
+    # plate hole. Default and both saved poses need exact-length rigid instances;
+    # each assembly configuration exposes only its own grounded spring bank. Equal
+    # lengths reuse one dynamically built part (lean -- no PNG views).
     phi_0 = math.radians(state["lever_tilt"])  # state = solve_state(0.0)
     hole_x_0 = FULCRUM[0] - LEVER_SPRING_X * math.cos(phi_0)  # lever reaches -X
     spring_specs = [_spring_spec(a, hole_x_0) for a in amplitudes]
+    (
+        parallel_amplitudes,
+        sin_expect,
+        sin_foot,
+        parallel_spring_specs,
+        sinusoid_spring_specs,
+    ) = _saved_pose_spring_geometry(amplitudes, hole_x_0)
+    spring_specs_by_bank = {
+        "default": spring_specs,
+        "parallel": parallel_spring_specs,
+        "sinusoid": sinusoid_spring_specs,
+    }
     # The canonical channel-spring-installed body MUST equal the zero-amplitude
     # gap so the first bar in the Default fan uses the canonical part. If the
     # lever anchor drifts they diverge -- fail loud here (and offline:
@@ -1373,17 +1427,7 @@ async def build(adapter) -> dict[str, str]:
             f"{neutral_body:.3f}: update LEVER_EYE_Y in "
             f"channel_spring_installed_spec.py to the re-anchored neutral eye"
         )
-    variant_by_body: dict[float, str] = {}
-    for spec in spring_specs:
-        if abs(spec["body"] - SPRING_BASE_BODY) < 0.05:
-            spec["part"] = "channel-spring-installed"
-            continue
-        key = round(spec["body"], 2)
-        name = variant_by_body.get(key)
-        if name is None:
-            name = f"channel-spring-installed-stretch{len(variant_by_body):02d}"
-            variant_by_body[key] = name
-        spec["part"] = name
+    variant_by_body = _assign_spring_parts(spring_specs_by_bank, neutral_body)
     log(
         f"spring variants: base {SPRING_BASE_BODY:.2f} + {len(variant_by_body)} "
         f"stretched bodies {sorted(variant_by_body)}"
@@ -2176,42 +2220,12 @@ async def build(adapter) -> dict[str, str]:
 
     for j in range(CHANNELS):
         z_mid = z_station(j) + ARM_MID_DZ
-        # Return spring (ground; cosmetic) -- placed PER CHANNEL spanning this
-        # channel's (moving) lever eye to the FIXED summing-plate hole, at the
-        # measured gap length (parametric-springs memory / task #10). NOT a fixed
-        # 63 mm body and NOT patterned: the lever tilts/lifts with the amplitude,
-        # so a fixed-length vertical spring lifts its bottom bodily into the plate
-        # (the F3 80 mm interference regression). `spec` carries the per-channel
-        # length variant + the unit span direction (coil axis, bottom->top).
-        # _assert_spring_threading is tilt-invariant (eye 3.37 below the hole),
-        # so the top eye threads the lever hole; the bottom eye lands on the fixed
-        # plate hole at (hole_x_0, PLATE_EYE_Y) by construction.
+        # Default's exact-length return spring. The local +Y coil axis follows
+        # the solved bottom-to-top span; both end-eye centres therefore land on
+        # the fixed plate hook and moving lever eye respectively.
         spec = spring_specs[j]
         _assert_spring_threading(spec["hole_y"], spec["eye_y"])
-        ux, uy = spec["ux"], spec["uy"]
-        # rows = Rz(theta).Ry90: local +Y (coil axis) -> the span direction,
-        # local +Z (eye axis) -> the in-plane normal, local +X -> world -Z for
-        # ANY theta (first row tilt-independent). The tilt is baked in here, so
-        # the grounded pose holds for every amplitude preset. theta=0 vertical.
-        spring_rows = [[0.0, 0.0, -1.0], [ux, uy, 0.0], [uy, -ux, 0.0]]
-        grounded_specs.append(
-            {
-                "part": spec["part"],
-                "position": [
-                    hole_x_0 + SPRING_BOTTOM_LEAD * ux,
-                    PLATE_EYE_Y + SPRING_BOTTOM_LEAD * uy,
-                    z_mid,
-                ],
-                "rotation": [0.0, 0.0, 0.0],
-                "rows": spring_rows,
-                "kind": "spring",
-                "theta": spec["theta"],
-                "label": (
-                    f"channel-spring ch{j:02d} {spec['part'].rsplit('-', 1)[-1]} "
-                    f"body={spec['body']:.2f} tilt={spec['theta']:+.2f}"
-                ),
-            }
-        )
+        grounded_specs.append(_spring_grounded_spec(spec, j, "default"))
 
         # Spring-hook fastener (ground; cosmetic) -- the SEPARATE little open J-hook
         # that connects this channel's spring to the plate (the spring no longer
@@ -2236,6 +2250,13 @@ async def build(adapter) -> dict[str, str]:
             }
         )
 
+    # Saved poses use separate exact-length banks. Insert all variants once, then
+    # suppress these two banks in Default; each pose config resolves only its own.
+    for bank in ("parallel", "sinusoid"):
+        for j, spec in enumerate(spring_specs_by_bank[bank]):
+            _assert_spring_threading(spec["hole_y"], spec["eye_y"])
+            grounded_specs.append(_spring_grounded_spec(spec, j, bank))
+
     # Insert the cosmetic bank (springs + spring-hooks; the bushings were
     # patterned before the loop) in ONE AddComponents3 + ONE FixComponent
     # (ground=True). GROUNDED, not semantically mated -- PURELY a
@@ -2247,19 +2268,48 @@ async def build(adapter) -> dict[str, str]:
     # joints have perpendicular axes, no faithful concentric), so the old
     # locate battery only re-pinned the already-computed insert pose at the
     # price of ~140 late-assembly mate solves (~4-5 s each, v0.18.0). A fixed
-    # exact-transform part also cannot flip. The per-channel amplitude tilt is
-    # baked into spring_rows, so grounding holds for every preset -- the #113
-    # vertical-only trap does not apply (nothing is re-derived from a mate).
+    # exact-transform part also cannot flip. Each bank's per-channel tilt is
+    # baked into its transform rows, so grounding holds in every pose -- the
+    # #113 vertical-only trap does not apply (nothing is re-derived from a mate).
     for spec in grounded_specs:
         spec["ground"] = True
-    bank_names = await place_components_batch(
-        adapter, grounded_specs, label="cosmetic bank (springs + hooks, grounded)"
+    # AddComponents3 may return components in arbitrary order; the batch helper
+    # disambiguates by origin. Springs from different poses share the same lower
+    # endpoint, so submit each pose bank separately rather than violating that
+    # one-origin-per-spec contract.
+    grouped_specs = {
+        "default": [
+            spec
+            for spec in grounded_specs
+            if spec.get("spring_bank") in (None, "default")
+        ],
+        "parallel": [
+            spec for spec in grounded_specs if spec.get("spring_bank") == "parallel"
+        ],
+        "sinusoid": [
+            spec for spec in grounded_specs if spec.get("spring_bank") == "sinusoid"
+        ],
+    }
+    placed: list[tuple[str, dict[str, Any]]] = []
+    for bank, specs_for_bank in grouped_specs.items():
+        names = await place_components_batch(
+            adapter, specs_for_bank, label=f"cosmetic {bank} bank (grounded)"
+        )
+        placed.extend(zip(names, specs_for_bank, strict=True))
+    spring_instances = {
+        bank: [name for name, spec in placed if spec.get("spring_bank") == bank]
+        for bank in spring_specs_by_bank
+    }
+    bad_banks = {
+        bank: len(names)
+        for bank, names in spring_instances.items()
+        if len(names) != CHANNELS
+    }
+    if bad_banks:
+        raise RuntimeError(f"expected {CHANNELS} spring instances per bank, got {bad_banks}")
+    set_components_suppressed_in_active_configuration(
+        adapter, spring_instances["parallel"] + spring_instances["sinusoid"], True
     )
-    spring_instances = [
-        n for n, spec in zip(bank_names, grounded_specs, strict=True) if spec.get("kind") == "spring"
-    ]
-    if len(spring_instances) != CHANNELS:
-        raise RuntimeError(f"expected {CHANNELS} spring instances, got {len(spring_instances)}")
 
     # Free kinematic model: the per-channel operational DOF (rocker swing +
     # rod follow + bar amplitude) are FREE -- their drivers were recorded into
@@ -2289,7 +2339,14 @@ async def build(adapter) -> dict[str, str]:
     check_no_interference(adapter)
     # Saved poses: an all-zero parallel bank and the rocker sinusoid, on top of
     # the free photographed Default fan the gates above just proved.
-    await _install_pose_configurations(adapter, amplitudes, spring_specs, spring_instances, hole_x_0)
+    await _install_pose_configurations(
+        adapter,
+        amplitudes,
+        spring_instances,
+        parallel_amplitudes,
+        sin_expect,
+        sin_foot,
+    )
     # Title-block identity for the assembly drawing (draw_channel_assembly.py):
     # assembly_title_properties supplies the Title/Generator and TOL_* cells
     # finalize_drawing requires without consulting the part registry;

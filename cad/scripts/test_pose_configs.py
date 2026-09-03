@@ -216,3 +216,110 @@ def test_sinusoid_foot_keeps_nonzero_default_stations_on_the_turned_arc():
         assert sinusoid["foot_r"] <= ch.foot_radius(amplitude) + 1e-6
         lifts.append(lift)
     assert 8.0 < max(lifts) < 8.3
+
+def test_every_pose_spring_keeps_both_eye_centres_on_its_endpoints():
+    amplitudes = [float(row["amplitude_mm"]) for row in _config.channels()]
+    neutral = ch.solve_state(0.0)
+    hole_x_0 = ch.FULCRUM[0] - ch.LEVER_SPRING_X * math.cos(
+        math.radians(neutral["lever_tilt"])
+    )
+    default_specs = [ch._spring_spec(a, hole_x_0) for a in amplitudes]
+    _, _, _, parallel_specs, sinusoid_specs = ch._saved_pose_spring_geometry(
+        amplitudes, hole_x_0
+    )
+    banks = {
+        "default": default_specs,
+        "parallel": parallel_specs,
+        "sinusoid": sinusoid_specs,
+    }
+    neutral_body = ch._spring_spec(0.0, hole_x_0)["body"]
+    ch._assign_spring_parts(banks, neutral_body)
+
+    def placed_point(placement, local):
+        rows = placement["rows"]
+        return [
+            placement["position"][axis]
+            + sum(local[i] * rows[i][axis] for i in range(3))
+            for axis in range(3)
+        ]
+
+    for bank, specs in banks.items():
+        assert len(specs) == ch.CHANNELS
+        for j, spec in enumerate(specs):
+            placement = ch._spring_grounded_spec(spec, j, bank)
+            bottom = placed_point(
+                placement, [0.0, -ch.SPRING_BOTTOM_LEAD, 0.0]
+            )
+            top = placed_point(
+                placement, [0.0, spec["part_body"] + ch.SPRING_TOP_LEAD, 0.0]
+            )
+            expected_bottom = [
+                hole_x_0,
+                ch.PLATE_EYE_Y,
+                ch.z_station(j) + ch.ARM_MID_DZ,
+            ]
+            expected_top = [
+                hole_x_0 + spec["gap"] * spec["ux"],
+                ch.PLATE_EYE_Y + spec["gap"] * spec["uy"],
+                expected_bottom[2],
+            ]
+            assert math.isclose(
+                spec["body"] + ch.SPRING_BOTTOM_LEAD + ch.SPRING_TOP_LEAD,
+                spec["gap"],
+                abs_tol=1e-9,
+            )
+            assert all(
+                math.isclose(got, want, abs_tol=1e-9)
+                for got, want in zip(bottom, expected_bottom, strict=True)
+            )
+            top_tolerance = 0.05 if bank == "default" else 5e-5
+            assert all(
+                math.isclose(got, want, abs_tol=top_tolerance)
+                for got, want in zip(top, expected_top, strict=True)
+            )
+
+    # The phase lift is real: reusing or translating Default-length springs
+    # cannot satisfy both endpoints in the sinusoidal configuration.
+    assert max(
+        abs(sinusoid_specs[j]["body"] - default_specs[j]["body"])
+        for j in range(ch.CHANNELS)
+    ) > 3.0
+
+def test_default_transform_snapshot_skips_suppressed_pose_banks():
+    class Transform:
+        ArrayData = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.1, 0.2, 0.3]
+
+    class Component:
+        def __init__(self, name, suppressed):
+            self.Name2 = name
+            self._suppressed = suppressed
+            self.Transform2 = None if suppressed else Transform()
+
+        def IsSuppressed(self):
+            return self._suppressed
+
+    class Model:
+        def __init__(self):
+            self.components = {
+                "live-1": Component("live-1", False),
+                "pose-spring-1": Component("pose-spring-1", True),
+            }
+
+        def GetComponents(self, top_level_only):
+            assert top_level_only
+            return list(self.components.values())
+
+        def GetComponentByName(self, name):
+            return self.components.get(name)
+
+    class Adapter:
+        currentModel = Model()
+
+        @staticmethod
+        def _attempt(call, default=None):
+            try:
+                return call()
+            except Exception:
+                return default
+
+    assert pc.snapshot_transforms(Adapter()) == {"live-1": Transform.ArrayData}

@@ -174,6 +174,65 @@ async def set_mates_suppressed_in(
         await activate_configuration(adapter, prior)
 
 
+@_telemetry.traced("pose.component_suppression")
+def set_components_suppressed_in_active_configuration(
+    adapter: Any, names: list[str], suppressed: bool
+) -> None:
+    """Suppress or resolve components in the active configuration only.
+
+    Pose-specific cosmetic banks coexist in the assembly tree.  SolidWorks'
+    ``IAssemblyDoc::SetComponentSuppression`` is explicitly active-config scoped,
+    so each saved pose can expose its exact-length bank without changing Default.
+    """
+    if not names:
+        return
+    from _common import _early_bound
+
+    model = adapter.currentModel
+    asm = _early_bound(model, "IAssemblyDoc")
+    adapter._attempt(lambda: model.ClearSelection2(True), default=None)
+    components = []
+    for index, name in enumerate(names):
+        component = asm.GetComponentByName(name)
+        if component is None:
+            raise RuntimeError(f"pose: component not found: {name!r}")
+        component = _early_bound(component, "IComponent2")
+        selected = adapter._attempt(
+            lambda c=component, append=index > 0: c.Select4(append, None, False),
+            default=False,
+        )
+        if not selected:
+            raise RuntimeError(f"pose: failed to select component {name!r}")
+        components.append(component)
+    # SetComponentSuppression accepts Suppressed (0), Lightweight (1), or
+    # Resolved (3), not FullyResolved (2); see swComponentSuppressionState_e.
+    state = 0 if suppressed else 3
+    changed = adapter._attempt(lambda: asm.SetComponentSuppression(state), default=False)
+    adapter._attempt(lambda: model.ClearSelection2(True), default=None)
+    if not changed:
+        raise RuntimeError(
+            f"pose: SetComponentSuppression({state}) rejected for {len(names)} component(s)"
+        )
+    _rebuild(adapter)
+    wrong = [
+        name
+        for name, component in zip(names, components, strict=True)
+        if bool(adapter._attempt(lambda c=component: c.IsSuppressed(), default=None))
+        != suppressed
+    ]
+    if wrong:
+        raise RuntimeError(
+            f"pose: {len(wrong)} component(s) did not become "
+            f"{'suppressed' if suppressed else 'resolved'}: {wrong[:5]}"
+        )
+    _telemetry.event(
+        "pose.component_suppression",
+        count=len(names),
+        suppressed=suppressed,
+        configuration=active_configuration(adapter),
+    )
+
+
 def set_pose_value_in_active_configuration(adapter: Any, mate: PoseMate, value: float) -> None:
     """Set ``mate``'s dimension (mm for distance, deg for angle) in the ACTIVE
     configuration only."""
@@ -248,7 +307,23 @@ def read_pose_value(adapter: Any, mate: PoseMate) -> float:
 
 
 def snapshot_transforms(adapter: Any) -> dict[str, list[float]]:
-    return {n: component_transform(adapter, n) for n in component_names(adapter)}
+    """Snapshot resolved top-level components in the active configuration.
+
+    Suppressed pose-bank components have no usable ``Transform2`` on a reopened
+    assembly and are intentionally absent from Default's rest-pose contract.
+    """
+    from _common import _early_bound
+
+    asm = _early_bound(adapter.currentModel, "IAssemblyDoc")
+    out = {}
+    for name in component_names(adapter):
+        component = asm.GetComponentByName(name)
+        if component is None:
+            raise RuntimeError(f"pose: component not found for snapshot: {name!r}")
+        if bool(adapter._attempt(lambda c=component: c.IsSuppressed(), default=False)):
+            continue
+        out[name] = component_transform(adapter, name)
+    return out
 
 
 def assert_transforms_unchanged(

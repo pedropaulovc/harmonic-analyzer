@@ -6,11 +6,12 @@
 # zero station. The sinusoid keeps those Default stations while turning the
 # rocker/cam train to the ch14 p.28 middle end view.
 #
-# A pose configuration never changes geometry: the build authors every freed
-# operational DOF's drive from the DOF manifest as a permanent `POSE_<key>` mate,
-# SUPPRESSED in Default and UNSUPPRESSED in each saved configuration with the
-# value listed here. The cosmetic channel-spring bank is re-posed rigidly per
-# configuration; its length variants remain those of Default.
+# A pose configuration never changes the mechanism geometry: the build authors
+# every freed operational DOF's drive from the DOF manifest as a permanent
+# `POSE_<key>` mate, SUPPRESSED in Default and UNSUPPRESSED in each saved
+# configuration with the value listed here. Each pose resolves its own
+# exact-length cosmetic spring bank so both spring eyes remain on their fixed
+# plate hook and moving lever endpoint; the other banks stay suppressed.
 source: ch15 p.30 (page001_img01, the fanned Default bank) + ch14 p.28 end views (0 / 6 / 14 / 40 cranks)
 confidence: low
 notes: >
