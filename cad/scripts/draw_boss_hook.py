@@ -1,9 +1,9 @@
 r"""Create the curated machinist drawing for the summing-lever boss hook.
 
 The SLDPRT remains authoritative.  This recipe supplies only the hook's views,
-the three form dimensions (wire diameter, rise, arm run), and the manufacturing
-notes; every shared sheet/template, import, curation, and export behavior lives
-in ``_drawing_common``.
+the three form dimensions (wire diameter, rise, arm run), the bend callout and
+the manufacturing note; every shared sheet/template, import, curation, and
+export behavior lives in ``_drawing_common``.
 
 The boss hook is a tiny Ø3 steel wire J-hook (12 rise, 90-degree R3 elbow,
 3.5 arm run), so the sheet runs 4:1; the front view carries the J profile, a
@@ -17,6 +17,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -24,15 +25,21 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_attached_note,
     add_property_linked_note,
     curate_view_dimensions,
     finalize_drawing,
+    find_edge_near,
     new_project_drawing,
     read_required_properties,
     set_hidden_lines_removed,
+    set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from boss_hook_geom import ELBOW_R, ROD_DIA, SHANK_RISE
+from boss_hook_spec import BEND_NOTE
+from build_boss_hook import ARM_RUN
 from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 
@@ -49,6 +56,7 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 SHEET_SCALE = (4.0, 1.0)  # 4:1 whole sheet (the hook is ~6.5 x 15 mm)
+VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]
 
 # Sheet layout (meters).  The front view (J profile) sits left; the top view
 # (round wire section + arm plan) rides above it; the isometric drops to 2:1.
@@ -56,15 +64,43 @@ FRONT_CENTER = (0.110, 0.150)
 TOP_CENTER = (0.110, 0.238)
 ISO_CENTER = (0.335, 0.170)
 
+# Front-view model bounding box (X-Y): shank Ø about x 0, arm tip at
+# ElbowR + ArmRun, wire from the flat shank end (y 0) to the arm's top
+# silhouette (rise + elbow + wire radius).
+_BBOX_X = (-ROD_DIA / 2.0, ELBOW_R + ARM_RUN)
+_BBOX_Y = (0.0, SHANK_RISE + ELBOW_R + ROD_DIA / 2.0)
+_BBOX_CX = (_BBOX_X[0] + _BBOX_X[1]) / 2.0
+_BBOX_CY = (_BBOX_Y[0] + _BBOX_Y[1]) / 2.0
+
+
+def _fx(model_x_mm: float) -> float:
+    return FRONT_CENTER[0] + (model_x_mm - _BBOX_CX) * VIEW_SCALE / 1000.0
+
+
+def _fy(model_y_mm: float) -> float:
+    return FRONT_CENTER[1] + (model_y_mm - _BBOX_CY) * VIEW_SCALE / 1000.0
+
+
+# The elbow's OUTER arc (centre (ElbowR, ShankRise), radius ElbowR + wire
+# radius) at its 135-degree point: the torus silhouette the bend callout lands
+# on, away from both tangent points.
+_OUTER_ELBOW_R = ELBOW_R + ROD_DIA / 2.0
+OUTER_ELBOW_XY = (
+    _fx(ELBOW_R - _OUTER_ELBOW_R * math.cos(math.radians(45.0))),
+    _fy(SHANK_RISE + _OUTER_ELBOW_R * math.sin(math.radians(45.0))),
+)
+BEND_NOTE_XY = (0.028, 0.212)
+
 # Per-view survivors of the marked-dimension import.  Rise + ArmRun live on the
 # Front-plane path (front view); the wire diameter lives on the Top-plane
-# profile (top view).
+# profile (top view), placed LEFT of the section so its leader lands on the
+# visible half of the wire circle (the right half is hidden under the arm).
 FRONT_KEEP = {
     "Rise": (0.076, 0.150),
     "ArmRun": (0.118, 0.196),
 }
 TOP_KEEP = {
-    "RodDia": (0.156, 0.238),
+    "RodDia": (0.070, 0.238),
 }
 
 
@@ -111,11 +147,33 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(4, 1))
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(4, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2, 1))
-    for view in (front, top, iso):
-        set_hidden_lines_removed(adapter, view)
+    set_hidden_lines_removed(adapter, iso)
+    for view in (front, top):
+        set_hidden_lines_visible(adapter, view)
 
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
     curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
+
+    # Bend callout on the elbow's outer arc: the centreline radius (one
+    # decimal, so the block's .X tolerance governs) and the crack check, both
+    # flagged from the feature they govern (policy rule 6).
+    elbow_xy = find_edge_near(
+        adapter,
+        front,
+        OUTER_ELBOW_XY,
+        axis="x",
+        label="boss-hook elbow outer arc",
+        entity_type="SILHOUETTE",
+    )
+    add_attached_note(
+        adapter,
+        front,
+        text=BEND_NOTE,
+        entity_xy=elbow_xy,
+        note_xy=BEND_NOTE_XY,
+        label="bend callout",
+        entity_type="SILHOUETTE",
+    )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
     add_property_linked_note(adapter, "Isometric View Note", 0.300, 0.150)

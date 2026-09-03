@@ -29,14 +29,15 @@ THREAD_LEN = 12.0  # threaded into the knife-mount top
 THREAD_DIA = 10.6  # modeled engagement dia: just under the mount's 10.716
 #   1/2-13 tap drill (repo convention: thread engagement modeled < tap drill,
 #   cf. the #10-24 screws at 3.45 vs 3.797), so the stud never interferes
-#   with the knife-mount's tapped hole.
+#   with the knife-mount's tapped hole.  Never dimensioned: the thread
+#   designation leadered to the neck owns that feature.
 MOUNT_GAP = 0.25  # knife-mount top (999.45) to casting underside (999.7)
 CROSSBAR_SPAN = 36.5  # through the casting crossbar (999.7 .. 1036.2)
 
 SHANK_DIA = _SPEC.model_diameter_mm  # 1/2-13 nominal major (rides O13.49)
 SHANK_LEN = _SPEC.length_mm  # 48.75 = THREAD_LEN + MOUNT_GAP + CROSSBAR_SPAN
 THREAD = _SPEC.thread  # "1/2-13"
-THREAD_DESIGNATION = f"{THREAD} UNC-2A"
+THREAD_DESIGNATION = f"{THREAD} UNC"  # leadered to the threaded neck
 
 # Above the casting top face (local y 48.75), bottom to top:
 WASHER_DIA = 28.0
@@ -47,58 +48,57 @@ COLLAR_DIA = 11.0
 COLLAR_H = 3.0
 TIP_DIA = 6.0
 TIP_LEN = 4.0
-CDRILL_DIA = 2.0  # cosmetic center-drill cut in the tip end face
+CDRILL_DIA = 2.0  # plain drilled centre in the tip end face
 CDRILL_DEPTH = 1.5
+SHOULDER_ROOT_R_MAX = 0.25  # permitted fillet at every turned shoulder root
 
 TOTAL_LEN = SHANK_LEN + WASHER_T + NUT_H + COLLAR_H + TIP_LEN  # 69.25
 
-# The end view carries the washer diameter (the outermost circle of the
-# concentric stack); the side view carries the thread/shank/nut/tip lengths
-# as the extrude DEPTH dimensions (named ThreadLg/ShankLg/NutHt/TipLg in the
-# build) -- an axis-along-Y stud projects edge-on circle silhouettes that
-# SolidWorks will not point-select, so drawing-native edge dimensions cannot
-# pick them.
+# The end view carries the washer and collar diameters (the concentric
+# stack's two larger circles) plus the hex across-flats as a drawing-native
+# linear; the side view carries every stack length as an extrude DEPTH
+# dimension (an axis-along-Y stud projects edge-on circle silhouettes that
+# SolidWorks will not point-select) and the shank and tip diameters as
+# linears across the profile.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "WasherProfile": {"WasherDia"},
+    "CollarProfile": {"CollarDia"},
+    "ShankProfile": {"ShankDia"},
+    "TipProfile": {"TipDia"},
     "Thread": {"ThreadLg"},
     "Shank": {"ShankLg"},
+    "Washer": {"WasherT"},
     "HexNut": {"NutHt"},
+    "Collar": {"CollarHt"},
     "Tip": {"TipLg"},
 }
 END_VIEW_DIMENSIONS: dict[str, set[str]] = {
     "WasherProfile": {"WasherDia"},
+    "CollarProfile": {"CollarDia"},
 }
 SIDE_VIEW_DIMENSIONS: dict[str, set[str]] = {
+    "ShankProfile": {"ShankDia"},
+    "TipProfile": {"TipDia"},
     "Thread": {"ThreadLg"},
     "Shank": {"ShankLg"},
+    "Washer": {"WasherT"},
     "HexNut": {"NutHt"},
+    "Collar": {"CollarHt"},
     "Tip": {"TipLg"},
 }
 
-# thread_control_notes assumes a full-length thread; this stud is threaded on
-# the lower THREAD_LEN only, so the thread contract is spelled out directly.
+# Leadered callouts on the views (the drilled centre is hidden in the
+# profile, so it is called out on the end view where its circle shows).
+CENTER_DRILL_CALLOUT = f"<MOD-DIAM>{CDRILL_DIA:.2f} DRILL X {CDRILL_DEPTH:.2f} DEEP"
+
+# Notes: every size is a dimension or a leadered callout, so the notes carry
+# only the thread extent, the one-piece fact and the shoulder-root allowance
+# (cad/docs/drawing-simplicity-policy.md rule 6).
 DRAWING_NOTES = "\n".join(
     (
-        f"{THREAD_DESIGNATION} PER ASME B1.1-2024, "
-        f"LOWER END X {THREAD_LEN:.2f} LONG.",
-        "ACCEPT THREADS USING SYSTEM 21 PER ASME B1.3-2007 (R2022).",
-        "DISTAL START CHAMFER C0.50 +/-0.05 X 45 DEG +/-1 DEG.",
-        "THREAD LIMITS APPLY AFTER FINISH.",
-        "THREADED END FACE PERPENDICULAR 0.05 TO THREAD "
-        "PITCH-DIAMETER AXIS.",
-        "THREAD GEOMETRY OMITTED IN VIEWS; SHANK OUTLINE REFERENCE ONLY.",
-        f"THREADED END MODELED AT REDUCED DIA {THREAD_DIA:.2f}, "
-        "UNDER 10.716 TAP DRILL.",
-        "PLAIN SHANK ABOVE THREAD RIDES A 13.49 CLOSE-CLEARANCE BORE.",
-        "INTEGRAL WASHER, HEX, COLLAR, AND TIP: TURN AND MILL FROM ONE BLANK.",
-        f"WASHER DIA {WASHER_DIA:.2f} +/-0.10 X {WASHER_T:.2f} +/-0.10 HIGH.",
-        f"HEX {NUT_AF:.2f} +/-0.10 ACROSS FLATS X {NUT_H:.2f} +/-0.10 HIGH.",
-        "HEX CENTER WITHIN DIA 0.10 OF SHANK AXIS.",
-        f"COLLAR DIA {COLLAR_DIA:.2f} +/-0.10 X {COLLAR_H:.2f} +/-0.10 HIGH.",
-        f"TIP DIA {TIP_DIA:.2f} +/-0.10 X {TIP_LEN:.2f} +/-0.10 LONG.",
-        f"CENTER DRILL TIP END FACE DIA {CDRILL_DIA:.2f} X "
-        f"{CDRILL_DEPTH:.2f} DEEP (COSMETIC).",
-        "WASHER BEARING FACE PERPENDICULAR 0.10 TO SHANK AXIS.",
+        "THREADED ON THE LOWER END ONLY; PLAIN SHANK ABOVE.",
+        "ONE PIECE; NOT A LOOSE NUT AND WASHER.",
+        f"TURNED SHOULDER ROOTS R{SHOULDER_ROOT_R_MAX:.2f} MAX.",
     )
 )
 END_VIEW_NOTE = "HEX-STACK END VIEW"

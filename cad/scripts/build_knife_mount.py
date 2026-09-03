@@ -121,7 +121,7 @@ BLK_TOP = CASTING_UNDERSIDE_Y - CONTACT_Y - MOUNT_GAP  # local top (14.62)
 
 THROUGH_CUT_DEPTH = SUPPORT_Z_THICK + 4.0  # > the block thickness, both directions
 
-# --- hanger-stud tap: 1/2-13 UNC-2B blind x12.0 in the block top -------------
+# --- hanger-stud tap: 1/2-13 UNC blind x12.0 in the block top -------------
 # On the trunnion-axis centreline (local x 0, z 0): the knife-hanger stud
 # threads STUD_TAP_DEPTH in and hangs the mount from the casting's integral
 # crossbar. Material above the bore crown is only BLK_TOP - TOP_CLEAR = 14.37,
