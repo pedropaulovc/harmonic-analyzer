@@ -73,6 +73,7 @@ def test_every_cone_configuration_persists_rebuilt_data() -> None:
     ]
     assert len(persistence_sweeps) == 1
     sweep = persistence_sweeps[0]
+    assert ast.dump(sweep.iter) == ast.dump(_expression("reversed(CONFIGS)"))
     assert _calls(sweep, "set_active_configuration")
     assert _calls(sweep, "ForceRebuild3")
 

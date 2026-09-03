@@ -845,7 +845,7 @@ async def build(adapter) -> dict[str, str]:
     # data for every non-active configuration. Reopen the saved document, then
     # revisit each configuration, rebuild it, and set its rebuild/save mark. The
     # normal in-place save below persists the complete configured family.
-    for name, _teeth in CONFIGS:
+    for name, _teeth in reversed(CONFIGS):
         activation = await adapter.set_active_configuration(name)
         check(f"persist {name}", activation)
         if not bool(activation.data.get("rebuilt")):
@@ -862,6 +862,7 @@ async def build(adapter) -> dict[str, str]:
         if not bool(configuration.AddRebuildSaveMark):
             raise RuntimeError(f"{name}: failed to set rebuild/save mark")
 
+    check("activate T120 for saved views", await adapter.set_active_configuration("T120"))
     grouped_spec = _config.parts(PART_NAME)
     description = str(grouped_spec.get("description", "")).strip()
     apply_grouped_bom_properties(
