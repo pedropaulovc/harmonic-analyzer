@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import math
 from itertools import pairwise
 
@@ -61,6 +62,10 @@ def test_native_dimensions_cover_diameter_and_overall_length() -> None:
     assert 'setattr(display, "Diametric", True)' in source
     assert source.count("_display_as_diameter(") == 2  # def + the barrel dim
     assert "_add_axis_centerline(adapter, front" in source
+    centerline_source = inspect.getsource(drawing._add_axis_centerline)
+    assert "EditSheet()" in centerline_source
+    assert "CreateCenterLine(" in centerline_source
+    assert "SILHOUETTE" not in centerline_source
 
 
 def test_authored_profile_matches_the_measured_envelope_and_silhouette() -> None:

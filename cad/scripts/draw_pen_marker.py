@@ -88,10 +88,6 @@ BARREL_TOP_EDGE = (
     _FLARE_PICK_X,
     FRONT_CENTER[1] + _FLARE_PICK_RADIUS * _RADIAL_SCALE,
 )
-BARREL_BOTTOM_EDGE = (
-    _FLARE_PICK_X,
-    FRONT_CENTER[1] - _FLARE_PICK_RADIUS * _RADIAL_SCALE,
-)
 _TIP_PICK_Y = (TIP_POINT_Y + TIP_NECK_Y) / 2.0
 _TIP_PICK_RADIUS = (TIP_POINT_DIAMETER + TIP_NECK_DIAMETER) / 4.0
 TIP_FLANK = (
@@ -170,29 +166,28 @@ def _display_as_diameter(adapter: Any, dimension: Any, *, label: str) -> None:
 
 
 def _add_axis_centerline(adapter: Any, view: Any, *, label: str) -> Any:
-    """Insert the turned-part axis centerline between the barrel silhouettes."""
+    """Author the turned-part axis without depending on silhouette selection."""
     draw = adapter.currentModel
     ddoc = _early_bound(
         draw, "IDrawingDoc"
     )  # IDrawingDoc view for drawing-only methods (same dispatch)
-    name = view_name(adapter, view)
-    if not ddoc.ActivateView(name):
-        raise RuntimeError(f"failed to activate drawing view {name!r}")
-    draw.ClearSelection2(True)
-    for index, (x, y) in enumerate((BARREL_TOP_EDGE, BARREL_BOTTOM_EDGE)):
-        selected = draw.Extension.SelectByID2(
-            "", "SILHOUETTE", x, y, 0.0, index > 0, 0, null_callout(), 0
-        )
-        if not selected:
-            raise RuntimeError(
-                f"failed to select {label} silhouette edge {index} at "
-                f"sheet ({x:g}, {y:g})"
-            )
-    centerline = ddoc.InsertCenterLine2()
+    outline = tuple(float(value) for value in view_outline(adapter, view))
+    position = tuple(float(value) for value in view.Position)
+    extension = 0.003
+    ddoc.EditSheet()
+    sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
+    centerline = sketch_manager.CreateCenterLine(
+        outline[0] - extension,
+        position[1],
+        0.0,
+        outline[2] + extension,
+        position[1],
+        0.0,
+    )
+    if centerline is None:
+        raise RuntimeError(f"failed to create the {label} axis centerline")
     draw.ClearSelection2(True)
     draw.EditRebuild3()
-    if centerline is None:
-        raise RuntimeError(f"failed to insert the {label} axis centerline")
     return centerline
 
 
@@ -274,8 +269,8 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         front,
-        edge_xy=BARREL_BOTTOM_EDGE,
-        symbol_xy=(BARREL_BOTTOM_EDGE[0], FRONT_CENTER[1] - 0.026),
+        edge_xy=BARREL_TOP_EDGE,
+        symbol_xy=(BARREL_TOP_EDGE[0], FRONT_CENTER[1] + 0.026),
         datum="A",
         label="pen-marker barrel axis",
         entity_type="SILHOUETTE",
