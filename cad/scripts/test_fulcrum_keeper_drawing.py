@@ -59,55 +59,47 @@ def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
     assert "add_native_hole_callout(" in source
 
 
-def test_outboard_lug_edge_resolver_filters_visible_geometry(monkeypatch) -> None:
-    wrong_x = object()
-    wrong_orientation = object()
-    expected = object()
-    endpoints = {
-        wrong_x: (0.002, 0.0048, 0.007, 0.002, 0.0252, 0.007),
-        wrong_orientation: (0.003, 0.0252, -0.007, 0.003, 0.0252, 0.007),
-        expected: (0.003, 0.0048, 0.007, 0.003, 0.0252, 0.007),
-    }
-
-    class FakeSpan:
-        def __init__(self) -> None:
-            self.attributes = {}
-
-        def set_attribute(self, key, value) -> None:
-            self.attributes[key] = value
-
-    span = FakeSpan()
-    monkeypatch.setattr(
-        drawing._telemetry.trace, "get_current_span", lambda context=None: span
-    )
-    resolver = drawing._visible_outboard_lug_edge.__wrapped__
-    monkeypatch.setattr(
-        drawing,
-        "visible_view_entities",
-        lambda view, entity_kind, *, label: [
-            wrong_x,
-            wrong_orientation,
-            expected,
-        ],
-    )
-    monkeypatch.setattr(drawing, "_early_bound", lambda entity, interface: entity)
-    monkeypatch.setattr(
-        drawing,
-        "_edge_endpoint_key",
-        lambda adapter, edge: endpoints[edge],
-    )
-
-    assert resolver(object(), object()) is expected
-    assert span.attributes["matched"] == 1
+def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:
+    # drawing-simplicity-policy.md rule 3: a screwed-down bracket is not on
+    # the allowlist, so the datum-B edge resolver went with the datums.
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    for helper in (
+        "add_datum_feature(",
+        "add_feature_control_frame(",
+        "add_surface_finish(",
+        "set_basic_dimension(",
+        "project_part_pmi(",
+        "_visible_outboard_lug_edge(",
+        "visible_view_entities(",
+    ):
+        assert helper not in source, helper
+    assert not hasattr(fulcrum_keeper_spec, "GEOMETRIC_TOLERANCES_MM")
+    assert not hasattr(fulcrum_keeper_spec, "GEOMETRIC_CONTROLS")
+    assert 'process="DRILL"' in source
 
 
-def test_notes_cover_the_ball_seat_and_the_boss_relief() -> None:
+def test_notes_are_few_specific_and_never_the_title_block() -> None:
     notes = fulcrum_keeper_spec.DRAWING_NOTES
-    assert "BLACK OXIDE" in notes
-    assert "Ø9.50 STEEL" in notes
-    assert "REAM" in notes
-    assert "CORNER-BOSS LAND" in notes
-    assert "2 REQUIRED" in notes
+    lines = notes.split("\n")
+    assert len(lines) <= 4
+    # The ball-seat process stack and the relief are prose by design.
+    assert "Ø9.50 STEEL BALL" in notes
+    assert "REAM THE BALL Ø6.50 THRU" in notes
+    assert "PRESS THE BALL AFTER BLACK OXIDE" in notes
+    assert "RELIEVED TO 4.80" in notes
+    # The marked ShaftAxisH owns 25.20; the title block owns material, the
+    # 2-off count and the screw's part number; no design-intent narration.
+    for banned in (
+        "25.20", "AISI", "1018", "2 REQUIRED", "MHA-", "CORNER-BOSS", "FLIPPED",
+        "UOS", "DIMENSIONS IN", "LINEAR +/-", "+/-", "DATUM", "BASIC", "WITHIN",
+    ):
+        assert banned not in notes, banned
+
+
+def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "for view in (front, top, right):\n        set_hidden_lines_visible" in source
+    assert "set_hidden_lines_removed(adapter, iso)" in source
 
 
 def test_ball_is_a_separate_pressed_body() -> None:

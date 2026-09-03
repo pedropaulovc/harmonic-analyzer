@@ -7,51 +7,39 @@ import the part build implementation.
 
 from __future__ import annotations
 
-from _gtol_spec import CylinderFace, GeometricControl, PartDatum, PlanarFace
-from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from _gtol_spec import GeometricControl, PartDatum
+from _surface_finish import SurfaceFinishControl
 
 
 OUTER_DIA = 10.0
 BORE_DIA = 6.5
 LENGTH = 4.5565
 BORE_DIA_BAND = (0.03, 0.00)
+# Nineteen of these stack between the twenty rocker arms on the pivot shaft
+# and SET the 7.0565 channel pitch, so the length is the one functional
+# dimension of the part: at the block's .XX +/-0.51 the stack could be 10 mm
+# out. The band stays (the machinist review of 2026-09-02 read it as an
+# ordinary bushing length; the MATES WITH note now says what the stack does).
 LENGTH_TOLERANCE_MM = 0.03
 
-# Geometric controls, authored on the model as plain annotations by the part build
-# (_part_pmi.author_part_pmi) and IMPORTED onto the sheet — the sheet types no
-# tolerance strings. The bushing is one annulus, axis along Z, mid-plane
-# extruded z ±(LENGTH/2), so each face resolves by diameter or end normal.
-PART_DATUMS = (
-    # The bore axis the OD runout is measured against, then the reference end.
-    PartDatum("A", CylinderFace(BORE_DIA)),
-    PartDatum("B", PlanarFace((0, 0, 1), LENGTH / 2.0)),
-)
-GEOMETRIC_CONTROLS = (
-    GeometricControl(
-        "od_runout", "circular_runout", "0.05", CylinderFace(OUTER_DIA), datums=("A",)
-    ),
-    GeometricControl(
-        "end_face_parallelism",
-        "parallelism",
-        "0.03",
-        PlanarFace((0, 0, -1), LENGTH / 2.0),
-        datums=("B",),
-    ),
-)
-SURFACE_FINISHES = (
-    SurfaceFinishControl("bore", MACHINED_UM, CylinderFace(BORE_DIA)),
-)
+# No geometric controls and no roughness callouts: the bushing is a stationary
+# spacer between the rocker arms on the pivot shaft, so nothing runs on its
+# bore and the reamed bore's fit band on the model dimension is the whole spec
+# (cad/docs/drawing-simplicity-policy.md rules 3 and 5). The typed tuples stay
+# so build_pivot_bushing's author_part_pmi call shape is unchanged.
+PART_DATUMS: tuple[PartDatum, ...] = ()
+GEOMETRIC_CONTROLS: tuple[GeometricControl, ...] = ()
+SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "AnnulusProfile": {"OuterDia", "BoreDia"},
     "Bushing": {"Depth"},
 }
 
-DRAWING_NOTES = "\n".join(
-    (
-        "AVOID BORE BELL-MOUTH.",
-        "TURN OD/FACES IN ONE SETUP; DRILL UNDERSIZE AND REAM BORE THRU.",
-        "19 PCS SET THE CHANNEL PITCH: MAKE AS ONE BATCH, ONE SETTING; LENGTHS "
-        "MATCHED WITHIN 0.03 ACROSS THE SET.",
-    )
-)
+# Notes: part-specific process facts only, never a tolerance, never the
+# title block (drawing-simplicity-policy.md rule 6). The REAM instruction
+# rides the bore callout; the matched-length band rides the Depth dimension;
+# how the OD, faces and bore are chucked and whether the 19 are made together
+# is the shop's call (machinist review, 2026-09-02) -- the print says what
+# the stack is for instead.
+DRAWING_NOTES = "MATES WITH MHA-065 PIVOT SHAFT; 19 STACKED BETWEEN THE ROCKER ARMS."

@@ -11,44 +11,42 @@ the offline drawing test.
 from __future__ import annotations
 
 from rocker_arm_spec import (
-    ARM_DEPTH,
-    BOT_ARC_LEN,
     CENTER_Y,
     PIVOT_MID_Y,
     R_BOTTOM,
     R_TOP,
-    TIP_FACE,
-    TOP_ARC_LEN,
 )
 
-# True free-text instructions only; geometry / datum structure / roughness live
-# in native dimensions / datum tags / FCFs / surface symbols.  Hole sizes ride
-# their native callouts (Ø6.50 dim, Ø1.99 THRU ALL) -- the notes state process,
-# fit and count, never a second copy of a sheet dimension.  16.00 depth is a
-# REF: it is fixed by the concentric R800/R816 edges.
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
-# print shows.  build_rocker_arm marks exactly these. ---
+# print shows.  build_rocker_arm marks exactly these.  The two large radii are
+# note-only (an imported R800 keeps an off-sheet centre witness); the arc
+# ENDPOINTS (each arc's end x from the pivot) and the radial tip face are
+# graphical, so the ends are dimensioned on the view (machinist review
+# 2026-09-02: the end lands were only in prose and read as impossible). ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "StrapProfile": {"TopRadius", "BottomRadius"},
+    "StrapProfile": {
+        "TopRadius",
+        "BottomRadius",
+        "TopRodX",
+        "BottomRodX",
+        "RodTipLen",
+    },
     "PivotHoleProfile": {"PivotDia"},
 }
 
+# Notes: part-specific facts the views cannot carry (drawing-simplicity-
+# policy.md rule 6).  The two large concentric radii are NOTE-ONLY marked
+# dimensions, so their values and common centre live here -- the centre is
+# fixed by the vertical centreline through the pivot bore (the seesaw's mirror
+# line) and its height above the pivot axis.  The arc ends, the tip face and
+# the overall length are view dimensions; the pivot bore's REAM and Ra ride
+# the dimension and its roughness symbol, the pin drill its callout.
 DRAWING_NOTES = "\n".join(
     (
-        "1. PROFILE MIRROR-SYMMETRIC ABOUT THE",
-        "   PIVOT-BORE AXIS; ROD-PIN HOLE AT ONE",
-        "   END ONLY (1X), THE END SHOWN.",
-        "2. STRAP 2.50 THICK; ALL HOLES THRU",
-        "   THE THICKNESS.",
-        f"3. TOP EDGE R{R_TOP:.2f}, BOTTOM EDGE R{R_BOTTOM:.2f},",
-        "   CONCENTRIC; COMMON CENTRE ON THE",
-        f"   MIRROR AXIS, {CENTER_Y - PIVOT_MID_Y:.2f} FROM THE PIVOT",
-        f"   AXIS (STRAP DEPTH {ARM_DEPTH:.2f} REF).",
-        f"4. ARC LENGTHS {TOP_ARC_LEN:.2f} TOP / {BOT_ARC_LEN:.2f} BOTTOM",
-        "   DEFINE THE ARC ENDPOINTS.",
-        f"5. EACH END: {TIP_FACE:.2f} RADIAL LAND PERP TO",
-        "   TOP EDGE; STRAIGHT TAPER TO BOTTOM ARC.",
-        "6. PIVOT HOLE: REAM +0.03/0, Ra 1.6.",
+        f"TOP EDGE R{R_TOP:.2f} / BOTTOM EDGE R{R_BOTTOM:.2f}, CONCENTRIC;",
+        "CENTRE ON THE VERTICAL C/L THROUGH THE PIVOT BORE,",
+        f"{CENTER_Y - PIVOT_MID_Y:.2f} ABOVE THE PIVOT AXIS. ENDS SYMMETRIC ABOUT THAT C/L.",
+        "ROD-PIN HOLE AT THE END SHOWN ONLY.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"

@@ -1,4 +1,17 @@
-r"""Create the curated machinist drawing for the rocker pivot spacer bushing."""
+r"""Create the curated machinist drawing for the rocker pivot spacer bushing.
+
+The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): a
+stationary spacer on the pivot shaft carries no datums, no feature-control
+frames and no roughness symbols -- the reamed bore keeps its fit band on the
+model dimension and the callout says REAM.
+
+The side view is SECTION A-A, cut through the end view's centre, so the OD,
+the bore and the length all read on one longitudinal view with the bore as
+visible (hatched) geometry -- a turned part dimensioned as it sits in the
+lathe (policy rule 7). The end view carries the cutting line and its centre
+marks and nothing else (machinist review 2026-09-02: the OD was dimensioned
+across the end view and its line met the bore leader at the bore edge).
+"""
 
 from __future__ import annotations
 
@@ -10,30 +23,21 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    PmiDrawingPlacement,
     add_property_linked_note,
-    add_surface_finish,
-    add_view_centerline,
+    create_section_view,
     curate_view_dimensions,
     finalize_drawing,
-    project_part_pmi,
+    model_point_in_view,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
+    set_dimension_precision,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import surface_finish_by_key
-from pivot_bushing_spec import (
-    BORE_DIA,
-    GEOMETRIC_CONTROLS,
-    LENGTH,
-    OUTER_DIA,
-    PART_DATUMS,
-    SURFACE_FINISHES,
-)
+from pivot_bushing_spec import LENGTH, OUTER_DIA
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -53,29 +57,41 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 SHEET_SCALE = (4.0, 1.0)
-FRONT_CENTER = (0.080, 0.205)
-RIGHT_CENTER = (
-    FRONT_CENTER[0] + (OUTER_DIA + LENGTH) * SHEET_SCALE[0] / 1000.0 + 0.045,
-    FRONT_CENTER[1],
+END_CENTER = (0.080, 0.205)
+END_RADIUS = OUTER_DIA * SHEET_SCALE[0] / 2000.0  # 20 mm on the sheet
+SECTION_CENTER = (
+    END_CENTER[0] + (OUTER_DIA + LENGTH) * SHEET_SCALE[0] / 1000.0 + 0.045,
+    END_CENTER[1],
 )
 ISO_CENTER = (0.315, 0.205)
+# The cutting line runs vertically through the end view's centre, 8 mm past
+# the OD each way, so the section shows the axis horizontal (the cut-line
+# direction stays vertical in the section; the bushing axis is its depth).
+SECTION_LINE = (
+    (END_CENTER[0], END_CENTER[1] + END_RADIUS + 0.008),
+    (END_CENTER[0], END_CENTER[1] - END_RADIUS - 0.008),
+)
 
-FRONT_KEEP = {
-    "OuterDia": (
-        FRONT_CENTER[0] - 0.035,
-        FRONT_CENTER[1] + 0.010,
-    ),
-    "BoreDia": (
-        FRONT_CENTER[0] + OUTER_DIA * SHEET_SCALE[0] / 1000.0 + 0.005,
-        FRONT_CENTER[1] - 0.010,
-    ),
+# Every marked dimension reads on the section, as offsets from the section's
+# projected geometry centre (the bushing is origin-centred): OD as a linear
+# diameter to the right, the reamed bore as a linear diameter to the left
+# (its two-line REAM callout has ~35 mm of clear sheet before the end view),
+# the length above. The end view keeps nothing -- SolidWorks inserts each
+# marked model dimension into ONE view, so the section is curated and the
+# end view is never asked (draw_pinion_bracket, 2026-09-02 seat build).
+END_KEEP: dict[str, tuple[float, float]] = {}
+SECTION_KEEP_OFFSETS = {
+    "OuterDia": (0.032, 0.0),
+    "BoreDia": (-0.032, 0.0),
+    "Depth": (0.0, END_RADIUS + 0.012),
 }
-RIGHT_KEEP = {
-    "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.040),
-}
-# Bore and length tolerances live on the source model; the linked note carries
-# the drill-under/ream-through manufacturing instruction.
-DIMENSION_CALLOUTS: dict[str, str] = {}
+# Bore and length tolerances live on the source model; the bore callout
+# carries the process (Harvey #13: say drill or ream).
+DIMENSION_CALLOUTS: dict[str, str] = {"BoreDia": "REAM THRU"}
+# The reamed bore is the one fitted feature (band on the model dimension):
+# three decimals say "hold it"; everything else stays at the two-place block
+# tolerance.
+DIMENSION_PRECISION = {"BoreDia": 3}
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -117,96 +133,42 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
 
-    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(4, 1))
-    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(4, 1))
+    end = place_view(adapter, str(SOURCE), "*Front", *END_CENTER, scale=(4, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(4, 1))
-    for view in (front, iso):
-        set_hidden_lines_removed(adapter, view)
-    set_hidden_lines_visible(adapter, right)
+    set_hidden_lines_removed(adapter, iso)
+    # SECTION A-A through the bushing axis: the bore becomes visible geometry,
+    # so no diameter is dimensioned to a hidden line (policy rule 7).
+    section = create_section_view(
+        adapter,
+        end,
+        line_start=SECTION_LINE[0],
+        line_end=SECTION_LINE[1],
+        view_xy=SECTION_CENTER,
+        section_label="A",
+        scale=(4, 1),
+        label="bushing axial section",
+    )
+    # Hidden lines stay ON in every orthographic view (Harvey #30 / Lipton).
+    for view in (end, section):
+        set_hidden_lines_visible(adapter, view)
 
-    front_annotations = curate_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="front"
+    # The section's mirror is SolidWorks' choice, so the dimension positions
+    # are laid out from the PROJECTED model origin (the bushing's centre), not
+    # from the requested view position.
+    centre = model_point_in_view(
+        adapter, section, (0.0, 0.0, 0.0), label="section centre"
     )
-    right_annotations = curate_view_dimensions(
-        adapter, right, keep=RIGHT_KEEP, view_label="right"
+    section_keep = {
+        name: (centre[0] + dx, centre[1] + dy)
+        for name, (dx, dy) in SECTION_KEEP_OFFSETS.items()
+    }
+    section_annotations = curate_view_dimensions(
+        adapter, section, keep=section_keep, view_label="section"
     )
-    annotations = [*front_annotations, *right_annotations]
-    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
-    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center marks to front view")
-    add_view_centerline(
-        adapter,
-        right,
-        face_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] + 0.012),
-        label="bushing axis centerline",
-    )
-
-    bore_edge = (
-        FRONT_CENTER[0] + BORE_DIA * SHEET_SCALE[0] / 2000.0,
-        FRONT_CENTER[1],
-    )
-    bore_top = (
-        FRONT_CENTER[0],
-        FRONT_CENTER[1] + BORE_DIA * SHEET_SCALE[0] / 2000.0,
-    )
-    outer_radius = OUTER_DIA * SHEET_SCALE[0] / 2000.0
-    outer_edge_upper = (
-        FRONT_CENTER[0] + outer_radius * 0.7071,
-        FRONT_CENTER[1] + outer_radius * 0.7071,
-    )
-    half_depth = LENGTH * SHEET_SCALE[0] / 2000.0
-    left_end = (RIGHT_CENTER[0] - half_depth, RIGHT_CENTER[1])
-    right_end = (RIGHT_CENTER[0] + half_depth, RIGHT_CENTER[1])
-    # GD&T is model PMI (pivot_bushing_spec.PART_DATUMS/GEOMETRIC_CONTROLS,
-    # authored by build_pivot_bushing) — project it and place it where the
-    # hand-authored symbols used to sit. Which VIEW receives each annotation
-    # depends on its attachment (a datum tag only lands in a view aligned
-    # with its face), and the projection fails loud on any mismatch.
-    project_part_pmi(
-        adapter,
-        placements={
-            "datum:A": PmiDrawingPlacement(
-                view=front,
-                position=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.037),
-                attachment_xy=bore_top,
-                position_tolerance_m=0.000005,
-            ),
-            "datum:B": PmiDrawingPlacement(
-                view=right,
-                position=(left_end[0] - 0.018, RIGHT_CENTER[1]),
-                attachment_xy=left_end,
-            ),
-            "od_runout": PmiDrawingPlacement(
-                view=front,
-                position=(0.115, 0.255),
-                attachment_xy=outer_edge_upper,
-            ),
-            "end_face_parallelism": PmiDrawingPlacement(
-                view=right,
-                position=(right_end[0] + 0.014, 0.180),
-                attachment_xy=right_end,
-            ),
-        },
-        datums=PART_DATUMS,
-        controls=GEOMETRIC_CONTROLS,
-        label="pivot bushing PMI",
-    )
-    # Held close to the bore it controls: at (0.160, 0.225) the leader ran back
-    # across the whole front view as a long shallow diagonal and converged on
-    # the bore with the two diameter leaders. Here it is a short, roughly
-    # horizontal pull into the gap between the two views. The symbol arm reaches
-    # ~6 mm LEFT of the anchor (clearing the OD circle at x=0.100) and the text
-    # renders ABOVE the arm and to its RIGHT, spanning ~0.131..0.157 at y~0.224:
-    # clear of the O6.50 callout below (its text tops out at y=0.201), of the
-    # runout frame above, and of the right view starting at x=0.174.
-    add_surface_finish(
-        adapter,
-        front,
-        edge_xy=bore_edge,
-        symbol_xy=(0.118, 0.210),
-        control=surface_finish_by_key(SURFACE_FINISHES, "bore"),
-        label="bushing bore finish",
-    )
+    set_dimension_callouts(adapter, section_annotations, DIMENSION_CALLOUTS)
+    set_dimension_precision(adapter, section_annotations, DIMENSION_PRECISION)
+    if not auto_center_marks(adapter, end, holes=True, size=0.0025):
+        raise RuntimeError("failed to add ASME center marks to end view")
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.095)
     return await finalize_drawing(

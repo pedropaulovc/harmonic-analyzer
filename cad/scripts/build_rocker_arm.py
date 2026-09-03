@@ -79,12 +79,14 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
 )
+from _fit_limits import deviations
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from rocker_arm_notes import DRAWING_NOTES, ISOMETRIC_VIEW_NOTE
 from rocker_arm_notes import DRAWING_DIMENSIONS
-from rocker_arm_spec import SURFACE_FINISHES
+from rocker_arm_spec import PIVOT_HOLE_BAND, SURFACE_FINISHES
 
 PART_NAME = "rocker-arm"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
@@ -370,6 +372,11 @@ async def build(adapter) -> dict[str, str]:
     check("exit_sketch pivot hole", await adapter.exit_sketch())
     name_last_feature(adapter, "PivotHoleProfile")
     drive_jobs += pivot.apply(adapter, "PivotHoleProfile")
+    # The reamed pivot bore's fit band rides the MODEL dimension so the sheet
+    # re-renders it natively (drawing-simplicity-policy.md rule 2).
+    set_dimension_bilateral_tolerance(
+        adapter, "PivotHoleProfile", "PivotDia", *deviations(PIVOT_HOLE_BAND)
+    )
     check(
         "cut pivot hole",
         await adapter.create_cut_extrude(
