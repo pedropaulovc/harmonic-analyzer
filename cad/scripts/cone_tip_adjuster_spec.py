@@ -7,8 +7,6 @@ a change rebuilds both the SLDPRT and SLDDRW recipes.
 
 from __future__ import annotations
 
-from _fit_limits import band_text
-
 from _fastener_catalog import fastener
 
 
@@ -43,26 +41,14 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "SlotProfile": {"SlotWDim"},
 }
 
+# Notes: part-specific process facts only, never a tolerance, never the
+# title block (drawing-simplicity-policy.md rule 6).  Every band is on its
+# model dimension; the thread designation rides the body-diameter callout.
 DRAWING_NOTES = "\n".join(
     (
-        "11.00 MIN USABLE FULL-FORM THREAD BETWEEN RUNOUTS.",
-        "CLASS 2A LIMITS APPLY AFTER FINISH.",
-        "DATUM A IS THE AXIS DERIVED FROM THE THREAD PITCH CYLINDER.",
-        f"CHAMFER BOTH THREAD STARTS {CHAMFER:.2f} +/-{GENERAL_TOL_MM:.2f} X 45 DEG +/-1 DEG.",
-        f"BLIND CUP DIA {CUP_DIA:.2f} {band_text(CUP_DIA_BAND)} X {CUP_DEPTH:.2f} "
-        f"+/-{GENERAL_TOL_MM:.2f} DEEP FROM",
-        "THE END OPPOSITE THE SLOT; FLAT FLOOR, BOTTOM R0.20 MAX.",
-        "CUP AXIS POSITION WITHIN DIA 0.05 OF DATUM A.",
-        f"DRIVER SLOT {SLOT_W:.2f} +/-{GENERAL_TOL_MM:.2f} WIDE X {SLOT_D:.2f} "
-        f"+/-{GENERAL_TOL_MM:.2f} DEEP,",
-        "POSITION FCF APPLIES TO THE SLOT MEDIAN PLANE.",
-        f"PARENTHETICAL DIA {BODY_DIA:.2f} IS THE REFERENCE THREAD ROOT ENVELOPE.",
+        "FULL-FORM THREAD 11.00 MIN BETWEEN RUNOUTS; 2A LIMITS APPLY AFTER FINISH.",
+        f"CHAMFER BOTH THREAD STARTS {CHAMFER:.2f} X 45 DEG; SLOT {SLOT_D:.2f} DEEP ACROSS THE HEAD.",
+        "CUP: FLAT FLOOR, FROM THE END OPPOSITE THE SLOT.",
+        f"({BODY_DIA:.2f}) IS THE MODELLED THREAD ROOT ENVELOPE, NOT A TURNED SIZE.",
     )
 )
-
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "cup axis position": "0.05",
-    "driver-slot median-plane position": "0.10",
-}

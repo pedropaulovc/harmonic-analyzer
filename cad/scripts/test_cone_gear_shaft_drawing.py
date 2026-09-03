@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import math
 from pathlib import Path
 
 import _fit_limits
@@ -90,55 +89,56 @@ def test_sections_are_a_monotonic_stepped_shaft() -> None:
     }
 
 
-def test_linked_notes_cover_the_remaining_shaft_operations() -> None:
+def test_notes_are_few_specific_and_never_the_title_block() -> None:
     notes = cone_gear_shaft_spec.DRAWING_NOTES
+    lines = notes.split("\n")
+    assert len(lines) <= 4
     assert "NO CENTRE HOLE" in notes
-    assert "LARGE-END FACE" in notes
+    assert "12.5 MIN ROUND BAR" in notes
     # The 0.79 mm tip journal is a documented, Phase-3-flagged design
     # characteristic -- the print warns the machinist instead of hiding it.
     assert "FRAGILE BY DESIGN" in notes
-    assert "FOLLOWER-REST" in notes
-    assert "12.2308 BEARING JOURNAL" in notes
-    assert "12.2808 POST BORE" in notes
-    assert "0.05 DIAMETRAL CLEARANCE" in notes
-    assert "DIA 12.5 MIN ROUND BAR" in notes
-    assert "X.XX" not in notes
-    assert "BREAK EXTERNAL EDGES" not in notes
+    assert "FOLLOWER REST" in notes
+    # Nothing the title block, a dimension or a deleted control used to say.
+    for banned in ("+/-", "DATUM", "RUNOUT", "CLEARANCE", "POST BORE", "X.XX", "UOS"):
+        assert banned not in notes, banned
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
     assert "def _manufacturing_notes" not in source
 
 
-def test_native_gdt_controls_shaft_form_coaxiality_and_finish() -> None:
-    """GD&T identity lives in the spec's PMI rows; the sheet only imports it."""
-    from cone_gear_shaft_spec import GEOMETRIC_CONTROLS, PART_DATUMS
+def test_print_carries_no_gdt_and_one_running_journal_ra() -> None:
+    """A shaft is not on the GD&T allowlist; the typed PMI rows stay empty."""
+    from cone_gear_shaft_spec import GEOMETRIC_CONTROLS, PART_DATUMS, SURFACE_FINISHES
 
-    by_key = {control.key: control for control in GEOMETRIC_CONTROLS}
-    assert set(by_key) == {"journal_cylindricity", "tip_runout"}
-    assert by_key["journal_cylindricity"].characteristic == "cylindricity"
-    assert by_key["journal_cylindricity"].tolerance == "0.01"
-    assert by_key["tip_runout"].characteristic == "circular_runout"
-    assert by_key["tip_runout"].tolerance == "0.05"
-    assert by_key["tip_runout"].datums == ("A",)
-    # Both controls resolve their face by diameter alone; the Ø0.79375 tip
-    # carries a tightened match tolerance so the pick stays unique.
-    assert by_key["journal_cylindricity"].face.diameter_mm == (
-        cone_gear_shaft_spec.JOURNAL_DIA
-    )
-    assert (
-        by_key["tip_runout"].face.diameter_mm == cone_gear_shaft_spec.SECTION_DIAS[-1]
-    )
-    assert by_key["tip_runout"].face.tolerance_mm == 0.01
-    assert tuple(datum.letter for datum in PART_DATUMS) == ("A",)
+    assert PART_DATUMS == ()
+    assert GEOMETRIC_CONTROLS == ()
+    assert not hasattr(cone_gear_shaft_spec, "GEOMETRIC_TOLERANCES_MM")
+    # One roughness symbol: the bearing journal that turns in the pivot post.
+    assert tuple(control.key for control in SURFACE_FINISHES) == ("pivot_journal",)
+    assert SURFACE_FINISHES[0].face.diameter_mm == cone_gear_shaft_spec.JOURNAL_DIA
 
     part_source = Path(part.__file__).read_text(encoding="utf-8")
     assert "author_part_pmi(" in part_source
+    assert "datums=PART_DATUMS" in part_source
+    assert "controls=GEOMETRIC_CONTROLS" in part_source
+    assert "surface_finishes=SURFACE_FINISHES" in part_source
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "project_part_pmi(" in source
-    assert "controls=GEOMETRIC_CONTROLS" in source
-    assert "add_feature_control_frame(" not in source
-    assert "add_datum_feature(" not in source
-    assert source.count("add_surface_finish(") == 2
+    for helper in (
+        "project_part_pmi(",
+        "add_feature_control_frame(",
+        "add_datum_feature(",
+        "set_basic_dimension(",
+    ):
+        assert helper not in source, helper
+    assert source.count("add_surface_finish(") == 1
+    assert 'surface_finish_by_key(SURFACE_FINISHES, "pivot_journal")' in source
+
+
+def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "for view in (side, end):\n        set_hidden_lines_visible" in source
+    assert "set_hidden_lines_removed(adapter, iso)" in source
 
 
 def test_view_scales_are_explicit() -> None:
@@ -150,18 +150,10 @@ def test_view_scales_are_explicit() -> None:
     assert drawing.END_VIEW_SCALE == 4.0
 
 
-def test_datum_symbol_requests_the_persisted_journal_boundary() -> None:
-    expected = (
-        drawing.SIDE_CENTER[0]
-        + drawing.SHAFT_LENGTH / 2000.0
-        - drawing.JOURNAL_END / 1000.0
-    )
-    assert math.isclose(expected, 0.21607859347280226, abs_tol=1e-12)
+def test_journal_finish_symbol_and_end_view_note_are_placed() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    # The imported datum tag's placement stays DERIVED from the journal's
-    # small-end station (JOURNAL_END), never a frozen sheet number.
-    assert "position=(big_end_x - JOURNAL_END / 1000.0, 0.252)" in source
     assert "symbol_xy=(0.255, 0.242)" in source
+    assert "leader_attach_xy=pivot_top" in source
     assert cone_gear_shaft_spec.END_VIEW_NOTE == "END VIEW SCALE 4:1"
     assert 'add_property_linked_note(adapter, "End View Note"' in source
 

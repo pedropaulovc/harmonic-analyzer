@@ -29,12 +29,15 @@ from pinion_cam_geometry import (
 # nominal, not the band midpoint.
 BORE_BAND = (0.005, -0.010)
 COLLAR_OD_TOLERANCE_MM = 0.05
-COLLAR_AXIS_TOLERANCE_MM = 0.05
+# CollarCy (the eccentricity) carries NO +/- band: it is the BASIC dimension
+# feeding the OD-axis position frame (drawing-simplicity-policy.md rule 4).
 COLLAR_DEPTH_TOLERANCE_MM = 0.05
 BOSS_DIA_TOLERANCE_MM = 0.05
 BOSS_PROJECTION_TOLERANCE_MM = 0.05
 
-SURFACE_FINISHES = (SurfaceFinishControl("bore", MACHINED_UM, CylinderFace(BORE)),)
+# The follower stud rides the OD (a cam_follower_contact face, rule 5); the
+# set-pinned bore does not run on the lift rod, so it takes the block Ra 3.2.
+SURFACE_FINISHES = (SurfaceFinishControl("od", MACHINED_UM, CylinderFace(CAM_OD)),)
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "CollarProfile": {"CollarOd", "CollarCy"},
@@ -44,26 +47,22 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "SetPinBossProjection": {"BossProjection"},
 }
 
+# Notes: the eccentricity fact and the set-screw lines only
+# (drawing-simplicity-policy.md rule 6).
 DRAWING_NOTES = "\n".join(
     (
-        f"BORE AND OD ARE NOT CONCENTRIC; {ECC:.2f} ECCENTRICITY APPLIES AT BOTH ENDS.",
-        "AXIS C IS PARALLEL TO AXIS B WITHIN 0.03; THE OFFSET DIRECTION IS",
-        "  COMMON TO BOTH ENDS (B AND C ARE COPLANAR WITH THE BOSS AXIS PLANE).",
-        "DATUM A IS THE FRONT END FACE; B IS THE FINAL REAMED BORE AXIS;",
-        f"  C IS THE <MOD-DIAM>{CAM_OD:.2f} OD AXIS; D IS THE BOSS OD AXIS.",
-        "THE SET-SCREW BOSS IS INTEGRAL WITH THE CAM BODY.",
-        "BASIC BOSS/TAP AXES EACH INTERSECT B PERPENDICULAR TO IT AND LIE IN",
-        "  THE PLANE CONTAINING B AND C.",
-        "POSITION BOSS OD AXIS TO A|B|C; POSITION TAP PITCH AXIS TO DATUM D.",
-        "DRILL/TAP M2.5 X 0.45-6H THROUGH BOSS TO BORE; 2.00 MIN FULL THREAD.",
-        "  SUPPLY ISO 4026 M2.5 X 5 A2-70 FLAT-POINT SET SCREW LOOSE.",
+        f"BORE AND <MOD-DIAM>{CAM_OD:.2f} OD ARE NOT CONCENTRIC: OFFSET {ECC:.2f}, IN THE BOSS PLANE.",
+        "DRILL AND TAP M2.5 X 0.45 THROUGH THE BOSS INTO THE BORE.",
+        "M2.5 X 5 FLAT-POINT SET SCREW SUPPLIED LOOSE.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1\n(SET-SCREW BOSS HIDDEN AT REAR)"
 
 
-# Manufacturing GD&T limits consumed by the part's drawing projection.
+# The one allowlisted frame (policy rule 3, "cams"): the OD axis to the bore
+# axis in a diametral zone equivalent to the retired +/-0.05 coordinate, in
+# the form a 4-jaw offset is actually checked (indicator on the OD, bore on
+# the spindle axis).
 GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "cam boss axis position": "0.03",
-    "cam tap pitch axis position": "0.03",
+    "cam OD axis position": "0.10",
 }

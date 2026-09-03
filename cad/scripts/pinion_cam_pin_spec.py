@@ -10,8 +10,7 @@ marked-dimension map keeps the part marks and drawing keeps in lockstep
 
 from __future__ import annotations
 
-from _gtol_spec import CylinderFace
-from _surface_finish import GROUND_UM, SurfaceFinishControl
+from _surface_finish import SurfaceFinishControl
 from pinion_cam_pin_geometry import (
     CAP_RADIUS as CAP_RADIUS,
     CAP_SAG as CAP_SAG,
@@ -34,26 +33,16 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "CapProfile": {"CapR"},
 }
 
-SURFACE_FINISHES = (
-    SurfaceFinishControl(
-        key="finished_shank",
-        roughness_um=GROUND_UM,
-        face=CylinderFace(diameter_mm=PIN_DIA),
-    ),
-)
+# No roughness callouts: the shank is pressed into the strap and the crown is
+# a turned dome; the title block's Ra 3.2 covers both
+# (cad/docs/drawing-simplicity-policy.md rule 5).
+SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
 
+# Notes: process facts only, never a tolerance (policy rule 6).
 DRAWING_NOTES = "\n".join(
     (
-        "SEATED END IS FLAT; OPPOSITE END HAS ONE SPHERICAL CROWN.",
-        "CROWN ROOT CIRCLE IS A SHARP PROFILE BREAK, R0.10 MAX; NO CHAMFER;",
-        "  EXEMPT FROM TITLE-BLOCK EDGE-BREAK REQUIREMENT.",
+        "SEATED END FLAT; OPPOSITE END ONE SPHERICAL CROWN.",
+        "CROWN ROOT CIRCLE STAYS SHARP: R0.10 MAX, NO CHAMFER.",
     )
 )
 END_VIEW_NOTE = "END VIEW SCALE 8:1"
-
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "cam-pin seated-end flatness": "0.05",
-    "pinion cam-pin crown profile": "0.05",
-}

@@ -342,7 +342,7 @@ async def build(adapter) -> dict[str, str]:
     volume = await volume_check(adapter, "pivot hole", volume - v_hole, 0.01 * v_hole)
 
     # The v2 casting's two Fillister-head attachment bores land on matching
-    # native 1/4-20 UNC-2B through taps in the platform.  One Hole Wizard
+    # native 1/4-20 UNC through taps in the platform.  One Hole Wizard
     # feature keeps the pair's thread metadata and 2X drawing callout together.
     post_mount_cut = wizard_holes(
         adapter,

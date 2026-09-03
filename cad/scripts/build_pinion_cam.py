@@ -75,7 +75,6 @@ from pinion_cam_spec import (
     BORE_BAND,
     BOSS_DIA_TOLERANCE_MM,
     BOSS_PROJECTION_TOLERANCE_MM,
-    COLLAR_AXIS_TOLERANCE_MM,
     COLLAR_DEPTH_TOLERANCE_MM,
     COLLAR_OD_TOLERANCE_MM,
     DRAWING_DIMENSIONS,
@@ -336,9 +335,6 @@ async def build(adapter) -> dict[str, str]:
     )
     set_dimension_symmetric_tolerance(
         adapter, "CollarProfile", "CollarOd", COLLAR_OD_TOLERANCE_MM
-    )
-    set_dimension_symmetric_tolerance(
-        adapter, "CollarProfile", "CollarCy", COLLAR_AXIS_TOLERANCE_MM
     )
     set_dimension_symmetric_tolerance(
         adapter, "Collar", "Depth", COLLAR_DEPTH_TOLERANCE_MM

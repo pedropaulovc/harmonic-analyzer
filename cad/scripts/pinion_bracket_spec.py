@@ -22,8 +22,7 @@ marks and the drawing keeps EXACTLY ``DRAWING_DIMENSIONS``.
 from __future__ import annotations
 
 from _fit_limits import REAM_H7, REAM_SLIDE
-from _gtol_spec import CylinderFace
-from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from _surface_finish import SurfaceFinishControl
 from pinion_bracket_geometry import (
     ARBOR_BORE as ARBOR_BORE,
     C2C as C2C,
@@ -53,55 +52,44 @@ PIN_SEAT_CZ_TOLERANCE_MM = 0.05
 # keeps exactly their union across its per-view ``keep`` maps. The offline test
 # enforces ``union(marks) == union(keeps)``. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
+    # Both end radii print (the top cap is concentric with the arbor bore, the
+    # bottom cap with the pivot bore); the (REF) overall is a drawing edge
+    # dimension between the two arc extremes.
     "StrapProfile": {
         "ArborBoreCz",
         "PivotBoreDia",
         "ArborBoreDia",
         "BottomCapRadius",
+        "TopCapRadius",
     },
     "Strap": {"Depth"},
+    # The two R6.90 cam scallops are fully located on DETAIL B: one diameter
+    # (2X) and each circle's centre from the pivot bore, in place of the old
+    # "PER MODEL" note (machinist review 2026-09-02).
+    "CamReliefParkProfile": {
+        "CamReliefParkDia",
+        "CamReliefParkX",
+        "CamReliefParkY",
+    },
+    "CamReliefEngagedProfile": {"CamReliefEngagedX", "CamReliefEngagedY"},
     # PinSeatCz locates the blind pin seat THROUGH the 5 mm thickness (mid-
     # thickness), so the seat is fully located, not just drawn centred.
     "PinSeatProfile": {"PinSeatDia", "PinSeatCy", "PinSeatCz"},
     "PinSeat": {"PinSeatDepth"},
 }
 
-SURFACE_FINISHES = (
-    SurfaceFinishControl(
-        key="pivot_bore",
-        roughness_um=MACHINED_UM,
-        face=CylinderFace(diameter_mm=PIVOT_BORE),
-    ),
-    SurfaceFinishControl(
-        key="arbor_bore",
-        roughness_um=MACHINED_UM,
-        face=CylinderFace(diameter_mm=ARBOR_BORE),
-    ),
-)
+# No roughness callouts (machinist review 2026-09-02): the arbor bore is a
+# reamed running fit whose size band is on the dimension; the title block's
+# Ra 3.2 covers it and every other face (drawing-simplicity-policy.md rule 5).
+SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
 
-# True free-text instructions only. Geometry, datum structure, form/orientation
-# live in native dimensions / datum tags / FCFs / surface symbols. The part
-# build stamps these strings into the SLDPRT; the drawing displays only
-# $PRPSHEET links, so the print cannot silently diverge from its source model.
+# Notes: process facts only (policy rule 6) -- the paired reaming setup and
+# the one part this strap is assembled with.  The scallops, the end arcs and
+# every bore are dimensions on the views.
 DRAWING_NOTES = "\n".join(
     (
-        f"STRAIGHT SIDES TANGENT TO R{R_END:.2f} END ARCS; R{R_END:.2f} IS BASIC",
-        "  FOR THE END-ARC PROFILE ZONES.",
-        "MACHINE TWO PARTS CLAMPED FACE-TO-FACE IN ONE SETUP; REAM BOTH",
-        "  PIVOT BORES TOGETHER AND BOTH ARBOR BORES TOGETHER.",
-        "PARTS ARE INTERCHANGEABLE; PAIRED MACHINING IS PROCESS",
-        "  GUIDANCE, NOT A MATCHED-PAIR REQUIREMENT.",
-        f"CAM CLEARANCE: 2X OPEN R{CAM_RELIEF_RADIUS:.2f} SCALLOPS PER MODEL;",
-        "  MAINTAIN 2.50 MIN LIGAMENT FROM THE PIVOT BORE.",
-        "PRESS FOLLOWER STUD TO SEAT BOTTOM, THEN SILVER-BRAZE AROUND THE",
-        "  EXPOSED MOUTH; THE SCALLOP OPENS PART OF THE ORIGINAL EDGE SEAT.",
+        "REAM THE BORES WITH THE TWO STRAPS CLAMPED FACE-TO-FACE.",
+        "MATES WITH MHA-116 CAM PIN, PRESSED INTO THE STUD SEAT.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
-
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "lower end-arc profile": "0.05",
-    "upper end-arc profile": "0.05",
-}

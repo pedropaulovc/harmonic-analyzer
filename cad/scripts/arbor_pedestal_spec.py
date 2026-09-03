@@ -76,34 +76,14 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "DomeProfile": {"DomeDia"},
 }
 
+# Notes: part-specific process facts only, never a tolerance, never the
+# title block (drawing-simplicity-policy.md rule 6).  The bore band rides
+# the model dimension; the block Ra 3.2 covers every face but the bore.
 DRAWING_NOTES = "\n".join(
     (
-        "MACHINE FROM CONTINUOUS-CAST STOCK; REMOVE AS-CAST SKIN.",
-        "DATUM A IS FOOT SEAT; DATUM B IS LEFT FOOT SIDE FACE SHOWN.",
-        f"MATING ARBOR LIMITS DIA {BORE_DIA - 0.02:.3f}-{BORE_DIA:.3f} (REF).",
-        f"2X STRAIGHT FLANKS JOIN BOXED {FOOT_WIDTH:.2f} X {FOOT_HEIGHT:.2f} "
-        "FOOT TOP CORNERS TO",
-        f"DIA {DOME_DIA:.2f} CROWN HORIZONTAL CL; NO TANGENCY; KEEP JUNCTIONS SHARP.",
-        "PROFILE 0.10 A | B: CROWN, 2X FLANKS, FOOT TOP + RIGHT SIDE.",
-        f"BOXED {FOOT_WIDTH / 2.0:.2f} LOCATES BOTH BORE AND FLANGE-HOLE AXES FROM DATUM B.",
-        f"BOXED {FOOT_DEPTH - STRAP_T:.2f}/{FOOT_DEPTH:.2f} LOCATE STRAP "
-        "NEAR/FAR FACES FROM D; PROFILE 0.10",
-        f"A | B | D; RESULTING STRAP THICKNESS {STRAP_T:.2f} REF.",
-        "DIMENSIONS AND GD&T APPLY BEFORE COATING; MASK ARBOR BORE, "
-        f"DIA {SCREW_CLEARANCE_DIA:.2f}",
-        "HOLE, FOOT SEAT A, LEFT SIDE B, AND PROFILE-CONTROLLED SURFACES.",
+        "MACHINE FROM CONTINUOUS-CAST STOCK; REMOVE THE AS-CAST SKIN ALL OVER.",
+        f"BORE RUNS ON THE DIA {BORE_DIA:.3f} CYLINDER ARBOR; BORE TO SIZE.",
+        "HOLD-DOWN HOLE ON THE BORE CENTRELINE.",
+        "JAPAN AFTER MACHINING; MASK THE BORE AND FOOT SEAT.",
     )
 )
-
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "datum-A seat flatness": "0.05",
-    "datum-B side perpendicularity": "0.05",
-    "arbor bore true position": "0.10",
-    "controlled exterior surface profile": "0.10",
-    "datum-D face perpendicularity": "0.05",
-    "flange-hole true position": "0.20",
-    "strap near-face profile": "0.10",
-    "coplanar far-face profile": "0.10",
-}

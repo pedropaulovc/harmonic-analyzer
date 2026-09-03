@@ -2,7 +2,8 @@ r"""Pure-data dimensional contract shared by the cone-tip-block part and drawing
 
 from __future__ import annotations
 
-from cone_tip_adjuster_spec import CUP_DIA as SHAFT_PASSAGE_DIA
+# Re-exported for build_cone_tip_block: the passage matches the adjuster cup.
+from cone_tip_adjuster_spec import CUP_DIA as SHAFT_PASSAGE_DIA  # noqa: F401
 
 
 MM_PER_IN = 25.4
@@ -13,7 +14,6 @@ MM_PER_IN = 25.4
 BLOCK_X = 14.0  # plan width across the shaft
 BLOCK_Z = 12.0  # plan depth along the shaft
 BLOCK_HEIGHT = 40.718  # v2 post cascade: preserve the 1.000-mm crown above slit
-BLOCK_HEIGHT_BAND = (0.05, 0.00)  # (upper, lower) deviations
 ADJUSTER_AXIS_HEIGHT = 33.368  # coaxial with cone-pivot-post-v2 journal
 ADJUSTER_THREAD = "5/16-18"  # blind tapped hole from the far (north) face
 ADJUSTER_DEPTH = 8.0
@@ -32,43 +32,24 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PassageProfile": {"PassageDiaDim", "PassageZ"},
     "PinchBore": {"PinchZ"},
     "SlitProfile": {"SlitW"},
+    "TopSlit": {"SlitDepth"},
 }
 
-DRAWING_NOTES = "\n".join(
-    (
-        f"DATUM A IS FOOT SEAT; B IS {BLOCK_X:.0f} WIDTH MEDIAN PLANE;",
-        f"C IS ADJUSTER-ENTRY FACE; D IS {BLOCK_Z:.0f} DEPTH MEDIAN PLANE;",
-        "E IS +X PINCH-ENTRY FACE IDENTIFIED IN FRONT + RIGHT VIEWS.",
-        f"ADJUSTER {ADJUSTER_THREAD} UNC-2B FROM C; 6.00 MIN AXIAL",
-        "FULL-FORM THREAD EACH JAW; INTERRUPTION BY SLOT IS INTENTIONAL;",
-        f"TAP-DRILL SHOULDER {ADJUSTER_DEPTH:.2f} +/-0.10 DEEP, STANDARD 118 DEG POINT.",
-        f"SHAFT CLEARANCE PASSAGE DIA {SHAFT_PASSAGE_DIA:.2f} THRU; MACHINE",
-        "PASSAGE + ADJUSTER TAP IN ONE SETUP FROM C; APPLY POSITION",
-        "FRAME TO BOTH COAXIAL FEATURES AS A SIMULTANEOUS REQUIREMENT;",
-        "PASSAGE IS NOT A SHAFT-BEARING SURFACE.",
-        f"DRILL DIA {PINCH_CLEARANCE_DIA:.3f} +0.10/-0.00 FROM E FACE TO SLOT;",
-        f"IN SAME SETUP TAP {PINCH_THREAD} UNC-2B THRU OPPOSITE JAW; APPLY",
-        "POSITION FRAME TO BOTH COAXIAL FEATURES AS A SIMULTANEOUS REQT.",
-        "PINCH FEATURE MAY OPEN INTO TOP SLOT; 0.25 MIN TOP LIGAMENT.",
-        # Machinist round-2 disposition: the 38.918/33.368 axis stack leaves only
-        # a 0.11 nominal wall between the pinch passage and the adjuster
-        # thread crest (5.55 - 2.946/2 - 7.938/2), which the stated tolerances
-        # cannot hold as "no breakthrough" — but the passage can never reach
-        # below the crest band (0.57 nominal to the pitch cylinder), so a
-        # crest graze is dispositioned as acceptable instead of forbidden.
-        "PASSAGE-TO-ADJUSTER-THREAD-CREST WALL 0.11 NOM: LOCAL CREST GRAZE",
-        "BY PASSAGE IS PERMITTED; PASSAGE CANNOT CUT BELOW CREST BAND",
-        "WITHIN STATED TOLS (0.57 NOM TO PITCH CYL); THREAD MUST GAGE 2B.",
-        f"SLOT {SLIT_W:.2f} +/-0.05 WIDE X {SLIT_DEPTH:.2f} +/-0.10 DEEP THRU {BLOCK_Z:.2f} DEPTH;",
-        "BOTTOM R0.20 MAX; SLOT MEDIAN PLANE BASIC 0 TO DATUM B;",
-        "POSITION TOLERANCE 0.10 TO B IS THE TOTAL MEDIAN-PLANE ZONE.",
-    )
+# The pinch cross-hole is flagged FROM the drawn +X face (the right view is
+# that face): a leader note on the clearance rim says which jaw is drilled
+# through and which is tapped.  The #3 normal clearance (2.946) is exactly
+# the #32 drill.
+PINCH_HOLE_NOTE = (
+    f"#32 DRILL <MOD-DIAM>{PINCH_CLEARANCE_DIA:.2f} THRU THIS JAW\n"
+    f"TAP {PINCH_THREAD} THRU FAR JAW"
 )
 
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "adjuster common-axis true position": "0.05",
-    "slot median-plane position": "0.10",
-    "pinch common-axis true position": "0.05",
-}
+# Notes: part-specific process facts only, never a tolerance, never the
+# title block (drawing-simplicity-policy.md rule 6).  The adjuster tap and
+# the pinch hole carry their own callouts on the views.
+DRAWING_NOTES = "\n".join(
+    (
+        "ADJUSTER: TAP AND DRILL THE PASSAGE IN ONE SETUP; PASSAGE MAY GRAZE THE THREAD CREST.",
+        "SLIT MAY BREAK INTO THE PINCH HOLE.",
+    )
+)

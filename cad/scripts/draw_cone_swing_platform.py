@@ -10,6 +10,12 @@ The platform is machined from black-oxide 5/16 in minimum steel stock to a
 lock notch through the west edge, and rounded plan corners. The main plan and
 end views run 1:2; the isometric runs 1:3.
 
+The print carries no datums, frames, roughness symbols or basic dimensions
+(cad/docs/drawing-simplicity-policy.md).  Only the overall length is a
+native dimension; the wedge widths, notch and hole stations are a plain
+coordinate note, so the notes run longer than the policy's four lines
+until those coordinates become native dimensions on the plan.
+
 Run with SolidWorks open::
 
     uv run python cad\scripts\draw_cone_swing_platform.py cone-swing-platform
@@ -32,6 +38,7 @@ from _drawing_common import (
     new_project_drawing,
     read_required_properties,
     set_hidden_lines_removed,
+    set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -238,8 +245,10 @@ async def build(adapter: Any) -> dict[str, str]:
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 2))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 3))
     end = place_view(adapter, str(SOURCE), "*Front", *END_CENTER, scale=(1, 2))
-    for view in (top, iso, end):
-        set_hidden_lines_removed(adapter, view)
+    set_hidden_lines_removed(adapter, iso)
+    # Hidden lines stay ON in every orthographic view (policy rule 7).
+    for view in (top, end):
+        set_hidden_lines_visible(adapter, view)
 
     curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
@@ -253,6 +262,8 @@ async def build(adapter: Any) -> dict[str, str]:
         callout_xy=(0.170, 0.135),
         label="pivot-hole size",
         edge=pivot_edge,
+        # 1/4 close clearance (6.756 = 0.266 in) is exactly the H drill.
+        process="H DRILL",
     )
     add_native_hole_callout(
         adapter,
@@ -266,15 +277,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="v2 post-mount tapped holes",
         edge=mount_edge,
     )
-    # NO GD&T on this sheet. The datum tags (A/B/C) and the straightness,
-    # perpendicularity, flatness and parallelism frames were removed: the
-    # plan-view cluster packs the pivot rim, the north-end plane and the south
-    # end of the long straight edge into ~1.4 mm of sheet space, so their
-    # leaders cross whenever the wedge is refitted -- and datum B cannot be
-    # moved out of the way (SolidWorks snaps the restricted cylindrical tag
-    # back to the rim, which trips the placement-persistence bound). Every
-    # tolerance those frames carried is now stated in the manufacturing notes
-    # instead, so the sheet keeps the intent without the fragile geometry.
+    # No GD&T on this sheet (policy rule 3); the block tolerances govern.
 
     add_property_linked_note(
         adapter, "Manufacturing Notes", 0.016, 0.100, char_height=0.0025

@@ -51,15 +51,12 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
-    set_dimension_bilateral_tolerance,
 )
-from _fit_limits import deviations
 from cone_tip_block_spec import (
     ADJUSTER_AXIS_HEIGHT,
     ADJUSTER_DEPTH,
     ADJUSTER_THREAD,
     BLOCK_HEIGHT,
-    BLOCK_HEIGHT_BAND,
     BLOCK_X,
     BLOCK_Z,
     DRAWING_DIMENSIONS,
@@ -294,6 +291,9 @@ async def build(adapter) -> dict[str, str]:
     check("cut slit", await adapter.create_cut_extrude(
         ExtrusionParameters(depth=SLIT_DEPTH)))  # default cut dir = down into the block
     name_last_feature(adapter, "TopSlit")
+    # Name the slit cut DEPTH so the print dimensions it natively in the
+    # elevation (the slit is open to the front face) instead of in a callout.
+    name_dimensions(adapter, "TopSlit", ["SlitDepth"])
     volume = await volume_check(
         adapter, "top slit", volume - _slit_removed(), 0.02 * _slit_removed()
     )
@@ -353,9 +353,8 @@ async def build(adapter) -> dict[str, str]:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
     await volume_check(adapter, "driven block (equations neutral)", volume, 0.01 * v_cb)
-    set_dimension_bilateral_tolerance(
-        adapter, "Block", "BlockHt", *deviations(BLOCK_HEIGHT_BAND)
-    )
+    # No band on the block height: nothing fits on it (the shaft tip has
+    # 0.6 mm radial air in the passage), so the title-block .XX governs.
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, PANEL_BLACK)

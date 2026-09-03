@@ -8,6 +8,7 @@ import build_cone_tip_block as part
 import cone_tip_block_spec
 import draw_cone_tip_block as drawing
 from _drawing_registry import DRAWINGS_BY_NAME
+from _holes import CLEARANCE_MM
 
 
 def test_required_drawing_paths() -> None:
@@ -26,7 +27,7 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     kept = set(drawing.FRONT_KEEP) | set(drawing.TOP_KEEP) | set(drawing.RIGHT_KEEP)
     # PinchZ is marked and remains part-owned, but SolidWorks does not import
     # that Hole Wizard placement dimension into the end view. The sheet creates
-    # its BASIC datum-to-hole locator natively instead.
+    # the foot-to-pinch-axis height natively instead.
     assert kept | {"PinchZ"} == marked
     assert marked == {
         "Width",
@@ -46,29 +47,25 @@ def test_non_bearing_tip_passage_replaces_the_fictional_journal() -> None:
     assert "BoreDiaDim" not in source
     assert 'name_last_feature(adapter, "ShaftPassage")' in source
     assert part.SHAFT_PASSAGE_DIA == cone_tip_block_spec.SHAFT_PASSAGE_DIA == 2.0
-    assert drawing.DIMENSION_CALLOUTS["PassageDiaDim"] == (
-        "THRU - CLEARANCE PASSAGE"
-    )
+    assert drawing.DIMENSION_CALLOUTS["PassageDiaDim"] == "DRILL THRU"
     assert "BlockHt" not in drawing.DIMENSION_CALLOUTS
-    assert "A SHAFT-BEARING SURFACE" in cone_tip_block_spec.DRAWING_NOTES
 
 
-def test_notes_specify_adjuster_and_functional_pinch_joint() -> None:
+def test_notes_are_few_specific_and_never_the_title_block() -> None:
     notes = cone_tip_block_spec.DRAWING_NOTES
-    assert "5/16-18" in notes  # the adjuster tapped hole
-    assert "#3-48" in notes  # the pinch tapped hole
-    assert "SLOT" in notes
-    assert "CLEARANCE" in notes
+    lines = notes.split("\n")
+    assert len(lines) <= 4
+    assert "5/16-18" in notes  # the adjuster tap
+    assert "#3-48" in notes  # the pinch tap
+    assert "#32 DRILL" in notes  # the pinch clearance has no callout of its own
     assert "OPPOSITE JAW" in notes
-    assert "E IS +X PINCH-ENTRY FACE" in notes
-    assert "SIMULTANEOUS REQUIREMENT" in notes
-    assert "TOTAL MEDIAN-PLANE ZONE" in notes
-    assert "DIA 2.946 +0.10/-0.00" in notes
-    assert "MATERIAL" not in notes
-    assert "OXIDE" not in notes
-    assert "DATUM A" in notes
-    assert "X.XX" not in notes
-    assert "BREAK EDGES" not in notes
+    assert "SLIT" in notes
+    # Nothing the title block, a dimension or a deleted frame used to say.
+    for banned in ("+/-", "DATUM", "FRAME", "SIMULTANEOUS", "MATERIAL", "OXIDE", "X.XX", "UOS"):
+        assert banned not in notes, banned
+    # #3 normal clearance (2.946 = 0.1160 in) is exactly the #32 drill.
+    assert cone_tip_block_spec.PINCH_CLEARANCE_DIA == CLEARANCE_MM[("#3", "normal")]
+    assert round(0.116 * 25.4, 3) == cone_tip_block_spec.PINCH_CLEARANCE_DIA
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'adapter, "Manufacturing Notes", 0.020, 0.088, char_height=0.0025' in source
     part_source = Path(part.__file__).read_text(encoding="utf-8")
@@ -77,25 +74,40 @@ def test_notes_specify_adjuster_and_functional_pinch_joint() -> None:
     assert "depth_mm=(BLOCK_X - SLIT_W) / 2.0" in part_source
 
 
-def test_datum_and_position_controls_are_present() -> None:
+def test_slit_callout_carries_the_depth_the_views_do_not_dimension() -> None:
+    assert drawing.DIMENSION_CALLOUTS["SlitW"] == "WIDE X 8.00 DEEP"
+    assert cone_tip_block_spec.SLIT_DEPTH == 8.0
+
+
+def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:
+    # drawing-simplicity-policy.md rules 3-5: a clamp block is not on the GD&T
+    # allowlist and nothing runs in its passage.
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'datum="A"' in source
-    assert 'datum="B"' in source
-    assert 'symbol_xy=(FRONT_CENTER[0], _front_y(0.0) + 0.024)' in source
-    assert source.count("position_tolerance_m=0.001") == 2
-    assert 'symbol_xy=TOP_KEEP["Depth"]' in source
-    assert 'datum="C"' in source
-    assert 'datum="D"' in source
-    assert 'datum="E"' in source
-    assert "shoulder=True" in source
-    assert source.count('characteristic="position"') == 3
-    assert source.count("set_basic_dimension(") == 2
+    for helper in (
+        "add_datum_feature(",
+        "add_feature_control_frame(",
+        "add_surface_finish(",
+        "set_basic_dimension(",
+        "project_part_pmi(",
+        "add_note(",
+    ):
+        assert helper not in source, helper
+    assert not hasattr(cone_tip_block_spec, "GEOMETRIC_TOLERANCES_MM")
+    assert not hasattr(cone_tip_block_spec, "SURFACE_FINISHES")
+    # The pinch-axis height survives as an ordinary entity-selected dimension.
     assert 'label="pinch-axis height"' in source
-    assert "CYLINDRICAL ZONE" not in cone_tip_block_spec.DRAWING_NOTES
-    assert "CONCENTRIC" not in cone_tip_block_spec.DRAWING_NOTES
-    assert 'quantity="2 COAXIAL FEATURES; SIM REQT"' in source
-    assert 'quantity="SLOT MEDIAN PLANE; BASIC 0 TO B"' in source
-    assert 'datums=("A", "D", "E")' in source
+    assert "draw.AddVerticalDimension2(" in source
+
+
+def test_only_the_fitted_block_height_prints_three_decimals() -> None:
+    assert drawing.DIMENSION_PRECISION == {"PassageZ": 2, "BlockHt": 3}
+    assert cone_tip_block_spec.BLOCK_HEIGHT_BAND == (0.05, 0.00)
+
+
+def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "for view in (front, top, right):\n        set_hidden_lines_visible" in source
+    assert "set_hidden_lines_removed(adapter, iso)" in source
 
 
 def test_view_scales_are_explicit() -> None:

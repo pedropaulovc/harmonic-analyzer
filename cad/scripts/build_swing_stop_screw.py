@@ -29,8 +29,10 @@ from _common import (
     define_circle,
     drive_dimension,
     ensure_fully_defined,
+    extrude_at_offset,
     force_rebuild,
     name_bore_axis,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -72,45 +74,21 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    # ProudLen/EmbedLen/ShankLen/HeadT are plane offsets and extrude DEPTHS
+    # (feature parameters) -- declared as knobs, nothing in drive_jobs
+    # references them.
     await set_global(adapter, "ShankDia", f"{SHANK_DIA}mm")
     await set_global(adapter, "ProudLen", f"{PROUD_LEN}mm")
     await set_global(adapter, "EmbedLen", f"{EMBED_LEN}mm")
+    await set_global(adapter, "ShankLen", f"{SHANK_LEN}mm")
     await set_global(adapter, "HeadDia", f"{HEAD_DIA}mm")
     await set_global(adapter, "HeadT", f"{HEAD_T}mm")
     drive_jobs: list[tuple[str, str]] = []
 
-    shank = SketchDims()
-    check("create_sketch shank", await adapter.create_sketch("Top"))
-    await define_circle(
-        adapter, 0.0, 0.0, SHANK_DIA / 2.0, "shank", dims=shank,
-        names=("ShankCx", "ShankCz", "ShankDiaDim"), drives=(None, None, '"ShankDia"'),
-    )
-    await ensure_fully_defined(adapter, "shank sketch")
-    check("exit_sketch shank", await adapter.exit_sketch())
-    name_last_feature(adapter, "ShankProfile")
-    drive_jobs += shank.apply(adapter, "ShankProfile")
-    check("extrude shank (up)", await adapter.create_extrusion(
-        ExtrusionParameters(depth=PROUD_LEN)))
-    name_last_feature(adapter, "ShankProud")
-    v = math.pi * (SHANK_DIA / 2.0) ** 2 * PROUD_LEN
-    volume = await volume_check(adapter, "shank proud", v, 0.005 * v)
-
-    embed = SketchDims()
-    check("create_sketch embed", await adapter.create_sketch("Top"))
-    await define_circle(
-        adapter, 0.0, 0.0, SHANK_DIA / 2.0, "embed", dims=embed,
-        names=("EmbedCx", "EmbedCz", "EmbedDiaDim"), drives=(None, None, '"ShankDia"'),
-    )
-    await ensure_fully_defined(adapter, "embed sketch")
-    check("exit_sketch embed", await adapter.exit_sketch())
-    name_last_feature(adapter, "EmbedProfile")
-    drive_jobs += embed.apply(adapter, "EmbedProfile")
-    check("extrude embed (down)", await adapter.create_extrusion(
-        ExtrusionParameters(depth=EMBED_LEN, reverse_direction=True)))
-    name_last_feature(adapter, "ShankEmbed")
-    v_e = math.pi * (SHANK_DIA / 2.0) ** 2 * EMBED_LEN
-    volume = await volume_check(adapter, "shank embed", volume + v_e, 0.005 * v_e)
-
+    # Head first, seated on the ShankTop plane (y = PROUD_LEN) and extruded up
+    # HEAD_T; the shank then grows from -EMBED_LEN up to the head's underside
+    # as ONE offset-start extrude, so its depth dim IS the under-head length
+    # the print carries (the old proud + embedded pair had no single length).
     check("create_plane ShankTop", await adapter.create_plane(
         CreatePlaneParameters(mode="offset", base_plane="Top Plane", offset=PROUD_LEN)))
     name_last_feature(adapter, "ShankTop")
@@ -127,8 +105,29 @@ async def build(adapter) -> dict[str, str]:
     check("extrude head", await adapter.create_extrusion(
         ExtrusionParameters(depth=HEAD_T)))
     name_last_feature(adapter, "Head")
+    # Name the extrude DEPTH dims so the drawing inserts them as the head-height
+    # and under-head-length model dimensions (the depth is the first display
+    # dim owned by a blind boss; the ShankTop plane's own offset dim is
+    # filtered out by owner).
+    name_dimensions(adapter, "Head", ["HeadHt"])
     v_h = math.pi * (HEAD_DIA / 2.0) ** 2 * HEAD_T
-    volume = await volume_check(adapter, "head", volume + v_h, 0.005 * v_h)
+    volume = await volume_check(adapter, "head", v_h, 0.005 * v_h)
+
+    shank = SketchDims()
+    check("create_sketch shank", await adapter.create_sketch("Top"))
+    await define_circle(
+        adapter, 0.0, 0.0, SHANK_DIA / 2.0, "shank", dims=shank,
+        names=("ShankCx", "ShankCz", "ShankDiaDim"), drives=(None, None, '"ShankDia"'),
+    )
+    await ensure_fully_defined(adapter, "shank sketch")
+    check("exit_sketch shank", await adapter.exit_sketch())
+    name_last_feature(adapter, "ShankProfile")
+    drive_jobs += shank.apply(adapter, "ShankProfile")
+    extrude_at_offset(adapter, SHANK_LEN, -EMBED_LEN)
+    name_last_feature(adapter, "Shank")
+    name_dimensions(adapter, "Shank", ["ShankLg"])
+    v = math.pi * (SHANK_DIA / 2.0) ** 2 * SHANK_LEN
+    volume = await volume_check(adapter, "shank", volume + v, 0.005 * v)
 
     check("create_plane HeadTop", await adapter.create_plane(
         CreatePlaneParameters(mode="offset", base_plane="Top Plane",
@@ -150,6 +149,9 @@ async def build(adapter) -> dict[str, str]:
     check("cut slot", await adapter.create_cut_extrude(
         ExtrusionParameters(depth=SLOT_D)))
     name_last_feature(adapter, "DriverSlot")
+    # Name the slot cut's DEPTH dim so the print dimensions the slot on the
+    # slot-profile view instead of carrying its size in a note.
+    name_dimensions(adapter, "DriverSlot", ["SlotDepth"])
     v_slot = _slot_strip_area(HEAD_DIA / 2.0, SLOT_W) * SLOT_D
     volume = await volume_check(adapter, "slot", volume - v_slot, 0.02 * v_slot)
 

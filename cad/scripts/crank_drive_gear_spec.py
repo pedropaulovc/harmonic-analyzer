@@ -9,8 +9,7 @@ from __future__ import annotations
 
 import math
 
-from _gtol_spec import CylinderFace
-from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from _surface_finish import SurfaceFinishControl
 
 
 MM_PER_IN = 25.4
@@ -26,13 +25,19 @@ WHOLE_DEPTH = 2.157 / DIAMETRAL_PITCH * MM_PER_IN
 ROOT_DIA = (TEETH - 2.0 * 1.157) / DIAMETRAL_PITCH * MM_PER_IN
 HELIX_ANGLE_DEG = 12.0  # recentered crossed-axis accommodation
 BACKLASH_MM = 0.15
+PAIR_SHAFT_ANGLE_DEG = 12.52  # crossed axes against the 16T spur pinion
 
 BORE_DIA = 0.375 * MM_PER_IN  # 9.525 (3/8" cone-shaft journal)
 BORE_DIA_BAND = (0.050, 0.030)  # (upper, lower) deviations
 FACE_WIDTH = 8.0
-SURFACE_FINISHES = (
-    SurfaceFinishControl("crank_drive_gear_bore", MACHINED_UM, CylinderFace(BORE_DIA)),
-)
+
+# No roughness callouts: the gear is keyed to the cone shaft (it drives it),
+# so nothing runs on the bore; the title block's Ra 3.2 covers every face
+# (cad/docs/drawing-simplicity-policy.md rule 5).
+SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
+
+# Derived tooth geometry -- kept as the analytic record the build's own
+# constants are checked against (test_crank_drive_gear_drawing).
 TOTAL_TWIST_DEG = math.degrees(
     FACE_WIDTH * math.tan(math.radians(HELIX_ANGLE_DEG)) / (PITCH_DIA / 2.0)
 )
@@ -42,14 +47,6 @@ NORMAL_PRESSURE_ANGLE_RAD = math.atan(
     math.tan(math.radians(PRESSURE_ANGLE_DEG)) * math.cos(math.radians(HELIX_ANGLE_DEG))
 )
 NORMAL_PRESSURE_ANGLE_DEG = math.degrees(NORMAL_PRESSURE_ANGLE_RAD)
-BASE_TANGENT_SPAN_TEETH = 6
-NORMAL_BASE_TANGENT_SPAN = NORMAL_MODULE_MM * math.cos(NORMAL_PRESSURE_ANGLE_RAD) * (
-    math.pi * (BASE_TANGENT_SPAN_TEETH - 0.5)
-    + TEETH
-    * (math.tan(math.radians(PRESSURE_ANGLE_DEG)) - math.radians(PRESSURE_ANGLE_DEG))
-) - BACKLASH_MM * math.cos(math.radians(HELIX_ANGLE_DEG)) * math.cos(
-    NORMAL_PRESSURE_ANGLE_RAD
-)
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BoreProfile": {"BoreDia"},
@@ -61,76 +58,34 @@ def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> 
     return "\n".join([title] + [f"{label}:  {value}" for label, value in rows])
 
 
+# The tooth system a machinist sets a cutter and a dividing head from.  The
+# helix hand and the thinned tooth (the pair's backlash is all on the 64T) are
+# the two facts the views cannot show.
 GEAR_DATA = gear_data_note(
     [
         ("NUMBER OF TEETH", f"{TEETH}"),
-        ("DIAMETRAL PITCH", f"{DIAMETRAL_PITCH:.2f}"),
-        ("MODULE (mm, REF)", f"{MODULE_MM:.3f}"),
-        ("TRANSVERSE PRESSURE ANGLE", f"{PRESSURE_ANGLE_DEG:.1f} DEG"),
-        ("NORMAL MODULE (mm, REF)", f"{NORMAL_MODULE_MM:.3f}"),
-        ("NORMAL PRESSURE ANGLE (REF)", f"{NORMAL_PRESSURE_ANGLE_DEG:.2f} DEG"),
-        ("PITCH DIAMETER (mm, REF)", f"{PITCH_DIA:.2f}"),
-        ("BASE CIRCLE DIAMETER (mm, BASIC)", f"{BASE_DIA:.3f}"),
-        ("OUTSIDE DIAMETER (mm)", f"{OUTSIDE_DIA:.2f} +0/-0.10"),
-        ("WHOLE DEPTH (mm)", f"{WHOLE_DEPTH:.2f} REF"),
-        ("ROOT DIAMETER (mm)", f"{ROOT_DIA:.2f} +0/-0.10"),
-        ("FACE WIDTH (mm)", f"{FACE_WIDTH:.2f}"),
-        ("TOOTH FORM", "14.5 DEG TRANSVERSE INVOLUTE, SWEPT"),
-        ("PROFILE SHIFT COEFFICIENT (BASIC)", "x = 0.000"),
-        ("ACTIVE FLANK DEFINITION", "ANALYTIC INVOLUTE, BASE CIRCLE TO OD"),
-        ("PROFILE / LEAD MODIFICATION", "NONE; THICKNESS PER CONTROLLED SPAN"),
-        ("HELIX ANGLE", f"+{HELIX_ANGLE_DEG:.2f} +/-0.10 DEG"),
-        ("HELIX TWIST (REF)", f"+{TOTAL_TWIST_DEG:.2f} DEG, -Z TO +Z"),
+        ("DIAMETRAL PITCH (TRANSVERSE)", f"{DIAMETRAL_PITCH:.2f}"),
+        ("PRESSURE ANGLE (TRANSVERSE)", f"{PRESSURE_ANGLE_DEG:.1f} DEG"),
+        ("HELIX ANGLE", f"{HELIX_ANGLE_DEG:.2f} DEG"),
+        ("PITCH DIAMETER (REF)", f"{PITCH_DIA:.2f}"),
+        ("OUTSIDE DIAMETER", f"{OUTSIDE_DIA:.2f} +0/-0.10"),
+        ("WHOLE DEPTH", f"{WHOLE_DEPTH:.2f}"),
+        ("FACE WIDTH", f"{FACE_WIDTH:.2f}"),
         (
-            "NORMAL BASE-TANGENT SPAN, EVERY 6 TEETH (mm)",
-            f"{NORMAL_BASE_TANGENT_SPAN:.3f} +0.000/-0.020",
+            "TRANSVERSE TOOTH THICKNESS",
+            f"{TRANSVERSE_CIRCULAR_TOOTH_THICKNESS:.3f} (THINNED {BACKLASH_MM:.2f})",
         ),
-        ("TRANSVERSE TOOTH THINNING FROM STANDARD (mm)", f"{BACKLASH_MM:.3f} REF"),
-        (
-            "TOOTH-FLANK ACCURACY",
-            "ISO 1328-1:2013 GRADE 10; PROFILE/LEAD/PITCH, EVERY ACTIVE FLANK",
-        ),
-        ("PAIR GEOMETRY", "CUSTOM NONCONJUGATE"),
-        ("PAIR SHAFT ANGLE", "12.52 +/-0.10 DEG"),
-        ("MID-FACE TRANSVERSE C2C (mm)", "39.735 +/-0.050"),
-        ("FACE MIDPLANE OFFSET (mm)", "0.000 +/-0.100"),
-        ("MATING PINION", "16T (MHA-025)"),
+        ("TOOTH FORM", "14.5 DEG TRANSVERSE INVOLUTE, HELICAL"),
+        ("MATES WITH", f"16T CRANK PINION, {PAIR_SHAFT_ANGLE_DEG:.2f} DEG CROSSED AXES"),
     ]
 )
 
+# Notes: part-specific process facts only, never a tolerance, never the
+# title block (drawing-simplicity-policy.md rule 6).
 DRAWING_NOTES = "\n".join(
     (
-        "CUT TEETH PER GEAR DATA; PART ACCEPTANCE IS BY INDIVIDUAL DRAWING LIMITS.",
-        "NORMAL SYSTEMS INTENTIONALLY DIFFER; DO NOT SUBSTITUTE EITHER MEMBER.",
-        "ISO CLASS APPLIES TO EACH MEMBER ONLY; SPECIFIC DRAWING LIMITS GOVERN.",
-        "HEAT TREATMENT: NONE; HARDNESS NOT CONTROLLED.",
-        "POSITIVE HELIX: GAP ADVANCES CCW -Z TO +Z, VIEWED FROM +Z.",
-        "+Z POINTS OUT OF THE END VIEW (TOWARD THE VIEWER).",
-        "ROOT FLOOR IS A CONCENTRIC ARC AT THE ROOT DIAMETER ABOVE.",
-        "TOOTH ROOT TRANSITIONS: R0.10 MAX, TANGENT TO FLANK AND ROOT FLOOR.",
-        "TOOTH FLANKS, TIPS, AND ROOTS: DO NOT CHAMFER OR BLEND.",
-        "MATES WITH 9.525 +0.000/-0.020 CONE-SHAFT JOURNAL.",
-        "DESIGN DIAMETRAL CLEARANCE: 0.030-0.070.",
-        "",
-        "PAIR ASSEMBLY COMMISSIONING - NOT INDIVIDUAL PART ACCEPTANCE:",
-        "TEST MHA-021 WITH MHA-025 ONLY AFTER BOTH PARTS PASS THEIR INDIVIDUAL LIMITS.",
-        "LOCATE BOTH BORES ON EXPANDING ARBORS; SET SHAFT ANGLE, C2C, AND OFFSET TO NOMINAL PAIR DATA.",
-        "FIXTURE SETTING ACCURACY: ANGLE +/-0.02 DEG; C2C AND OFFSET +/-0.010 mm.",
-        "FIXTURE SPINDLE RUNOUT 0.010 mm TIR MAX; AXIAL FLOAT 0.020 mm MAX.",
-        "APPLY 2.0 +/-0.2 mL ISO VG 32 OIL AT 20 +/-5 C UNIFORMLY TO BOTH MEMBERS' FLANKS.",
-        "PRECONDITION TWO 64T REVOLUTIONS EACH DIRECTION; WAIT 60 s BEFORE MEASUREMENT.",
-        "DRIVE 16T PINION AT 6 +/-1 RPM IN BOTH DIRECTIONS; 64T OUTPUT UNLOADED.",
-        "MEASURE ENGAGED 16T INPUT TORQUE OVER ONE FULL 64T REVOLUTION EACH DIRECTION.",
-        "SAMPLE RAW INLINE TORQUE AT 10 Hz MIN; TRANSDUCER ACCURACY +/-0.005 N*m, RESOLUTION 0.001 N*m.",
-        "GEARS DISENGAGED: MEASURE INPUT TARE AT 6 RPM AND OUTPUT TARE AT 1.5 RPM, EACH DIRECTION.",
-        "CORRECTED INPUT = ENGAGED INPUT - INPUT TARE - OUTPUT TARE/4.",
-        "CORRECTED MAGNITUDE 0.10 N*m MAX; PEAK-TO-PEAK 0.05 N*m MAX; NO FILTERING.",
+        "HELIX: GAP ADVANCES CCW FROM -Z TO +Z, VIEWED FROM +Z (+Z IS OUT OF THE END VIEW).",
+        "DO NOT CHAMFER OR BLEND TOOTH FLANKS, TIPS OR ROOTS.",
+        "FIXED TO THE CONE SHAFT AT ASSEMBLY.",
     )
 )
-
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "gear end-face squareness to bore": "0.05",
-    "gear tooth-tip circular runout": "0.05",
-}

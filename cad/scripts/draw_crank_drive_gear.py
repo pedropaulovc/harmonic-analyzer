@@ -1,8 +1,14 @@
 r"""Create the curated manufacturing drawing for the crank-drive gear (64T).
 
 Follows the batch gear-drawing pattern (see ``draw_cylinder_gear``). The helical
-crossed-axis accommodation is stated in the GEAR DATA note (helix angle,
-backlash, mating pinion).
+crossed-axis accommodation is stated in the GEAR DATA note (helix angle, thinned
+tooth, mating pinion).
+
+The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): a
+gear is not on the GD&T allowlist and this one is keyed to the cone shaft, so
+it carries no datums, no feature-control frames and no roughness symbols --
+the title block's general tolerances govern everything but the reamed bore,
+whose fit band rides the model dimension.
 """
 
 from __future__ import annotations
@@ -11,16 +17,11 @@ import argparse
 import sys
 from typing import Any
 
-from crank_drive_gear_spec import GEOMETRIC_TOLERANCES_MM
-
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_feature_control_frame,
     add_property_linked_note,
-    add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -28,12 +29,10 @@ from _drawing_common import (
     set_dimension_callouts,
     set_dimension_precision,
     set_hidden_lines_removed,
+    set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _gear_drawing_entities import visible_circle_edge, visible_tooth_tip_silhouette
-from _surface_finish import surface_finish_by_key
-from crank_drive_gear_spec import BORE_DIA, FACE_WIDTH, OUTSIDE_DIA, SURFACE_FINISHES
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -59,20 +58,13 @@ RIGHT_CENTER = (0.300, 0.175)
 ISO_CENTER = (0.375, 0.205)
 GEAR_DATA_POS = (0.025, 0.262)
 
-HALF_OD = OUTSIDE_DIA * VIEW_SCALE[0] / 2000.0
-FRONT_FACE_X = RIGHT_CENTER[0] - FACE_WIDTH * VIEW_SCALE[0] / 2000.0
-
 FRONT_KEEP = {
     "BoreDia": (FRONT_CENTER[0] - 0.055, FRONT_CENTER[1] - 0.030),
 }
-DIMENSION_CALLOUTS = {
-    # Reamed slip fit on the crankshaft journal (nominal-or-under, like the
-    # arbor journals): min 0.03 diametral clearance, inside the project's
-    # 0.025..0.075 shaft-in-bushing policy. Also settles which tolerance-block
-    # row governs the bore (neither .XX +/-0.51 nor DRILLED +0.10/0 -- the
-    # model dimension's own limits do).
-    "BoreDia": "THRU - REAM",
-}
+# Reamed fit on the cone-shaft journal; the 9.525 +0.03/+0.05 band is on the
+# model dimension (build_crank_drive_gear), so the callout names the process
+# and three decimals say "hold it".
+DIMENSION_CALLOUTS = {"BoreDia": "REAM THRU"}
 DIMENSION_PRECISION = {"BoreDia": 3}
 
 
@@ -120,8 +112,10 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE)
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=VIEW_SCALE)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
-    for view in (front, right, iso):
-        set_hidden_lines_removed(adapter, view)
+    set_hidden_lines_removed(adapter, iso)
+    # Hidden lines stay ON in every orthographic view (policy rule 7).
+    for view in (front, right):
+        set_hidden_lines_visible(adapter, view)
 
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
@@ -130,54 +124,6 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_precision(adapter, front_annotations, DIMENSION_PRECISION)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to gear bore")
-    bore_edge = visible_circle_edge(adapter, front, BORE_DIA)
-    tooth_tip_silhouette = visible_tooth_tip_silhouette(adapter, right, OUTSIDE_DIA)
-
-    add_datum_feature(
-        adapter,
-        front,
-        entity=bore_edge,
-        symbol_xy=(FRONT_CENTER[0] + 0.020, FRONT_CENTER[1] + 0.039),
-        datum="A",
-        label="crank-drive gear bore axis",
-        shoulder=True,
-        position_tolerance_m=0.080,
-    )
-    add_feature_control_frame(
-        adapter,
-        right,
-        edge_xy=(FRONT_FACE_X, RIGHT_CENTER[1] + HALF_OD * 0.55),
-        frame_xy=(FRONT_FACE_X - 0.034, RIGHT_CENTER[1] + HALF_OD + 0.010),
-        characteristic="perpendicularity",
-        tolerance=GEOMETRIC_TOLERANCES_MM["gear end-face squareness to bore"],
-        datums=("A",),
-        quantity="2X AXIAL END FACES",
-        label="gear end-face squareness to bore",
-    )
-    add_feature_control_frame(
-        adapter,
-        right,
-        entity=tooth_tip_silhouette,
-        frame_xy=(0.270, 0.260),
-        characteristic="circular_runout",
-        tolerance=GEOMETRIC_TOLERANCES_MM["gear tooth-tip circular runout"],
-        datums=("A",),
-        quantity="TOOTH TIPS",
-        label="gear tooth-tip circular runout",
-        entity_type="SILHOUETTE",
-    )
-    add_surface_finish(
-        adapter,
-        front,
-        symbol_xy=(FRONT_CENTER[0] + 0.015, FRONT_CENTER[1] - 0.052),
-        control=surface_finish_by_key(SURFACE_FINISHES, "crank_drive_gear_bore"),
-        label="crank-drive gear bore finish",
-        entity=bore_edge,
-        leader_attach_xy=(
-            FRONT_CENTER[0],
-            FRONT_CENTER[1] - BORE_DIA * VIEW_SCALE[0] / 2000.0,
-        ),
-    )
 
     add_property_linked_note(adapter, "Gear Data", *GEAR_DATA_POS, char_height=0.0025)
     add_property_linked_note(

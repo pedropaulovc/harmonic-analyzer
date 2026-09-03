@@ -8,8 +8,7 @@ family note. See the batch gear-drawing pattern in ``cylinder_gear_spec``.
 from __future__ import annotations
 
 import _config
-from _gtol_spec import CylinderFace
-from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from _surface_finish import SurfaceFinishControl
 
 
 MM_PER_IN = 25.4
@@ -38,14 +37,10 @@ FAMILY_BORES_MM = {
     24: 0.375 * MM_PER_IN,
 }
 
-SURFACE_FINISHES = (
-    SurfaceFinishControl(
-        "cone_gear_bore",
-        MACHINED_UM,
-        CylinderFace(BORE_DIA),
-        native_attachment="model",
-    ),
-)
+# No roughness callouts: every cone gear is soldered to its shaft seat, so
+# nothing runs on the bore; the title block's Ra 3.2 covers every face
+# (cad/docs/drawing-simplicity-policy.md rule 5).
+SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BoreProfile": {"BoreCutDia"},
@@ -57,41 +52,34 @@ def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> 
     return "\n".join([title] + [f"{label}:  {value}" for label, value in rows])
 
 
+# The tooth system plus the family bore table -- the one thing a machinist
+# cannot read off a T120 sheet is which bore goes with which tooth count.
 GEAR_DATA = gear_data_note(
     [
         ("NUMBER OF TEETH", f"{TEETH}"),
         ("DIAMETRAL PITCH", f"{DIAMETRAL_PITCH:.2f}"),
-        ("MODULE (mm, REF)", f"{MODULE_MM:.3f}"),
         ("PRESSURE ANGLE", f"{PRESSURE_ANGLE_DEG:.1f} DEG"),
-        ("PITCH DIAMETER (mm, REF)", f"{PITCH_DIA:.2f}"),
-        ("OUTSIDE DIAMETER (mm)", f"{OUTSIDE_DIA:.2f} +0/-0.10"),
-        ("WHOLE DEPTH (mm)", f"{WHOLE_DEPTH:.2f} REF"),
-        ("FACE WIDTH (mm)", f"{FACE_WIDTH:.2f}"),
+        ("PITCH DIAMETER (REF)", f"{PITCH_DIA:.2f}"),
+        ("OUTSIDE DIAMETER", f"{OUTSIDE_DIA:.2f} +0/-0.10"),
+        ("WHOLE DEPTH", f"{WHOLE_DEPTH:.2f}"),
+        ("FACE WIDTH", f"{FACE_WIDTH:.2f}"),
         ("TOOTH FORM", "INVOLUTE, FULL DEPTH"),
-        ("FAMILY T006", f"6T; BORE {FAMILY_BORES_MM[6]:.3f}"),
-        ("FAMILY T012", f"12T; BORE {FAMILY_BORES_MM[12]:.3f}"),
-        ("FAMILY T018", f"18T; BORE {FAMILY_BORES_MM[18]:.3f}"),
-        ("FAMILY T024-T120", f"24T TO 120T BY 6; BORE {FAMILY_BORES_MM[24]:.3f}"),
+        (
+            "FAMILY T006 / T012 / T018",
+            f"BORE {FAMILY_BORES_MM[6]:.3f} / {FAMILY_BORES_MM[12]:.3f} / "
+            f"{FAMILY_BORES_MM[18]:.3f}",
+        ),
+        ("FAMILY T024-T120 BY 6", f"BORE {FAMILY_BORES_MM[24]:.3f}"),
     ]
 )
 
+# Notes: part-specific process facts only, never a tolerance, never the
+# title block (drawing-simplicity-policy.md rule 6).
 DRAWING_NOTES = "\n".join(
     (
-        "CUT TEETH PER GEAR DATA.",
-        "GEAR TEETH: CIRCULAR RUNOUT 0.05 MAX ABOUT DATUM A, MEASURED AT THE TOOTH TIPS.",
-        "CONE SET: MAKE 1 OF EACH CONFIGURATION (T006-T120 BY 6; 20 GEARS TOTAL).",
-        "TITLE-BLOCK MATERIAL APPLIES TO T030-T120 ONLY.",
-        f"T006-T024 TIP GEARS: {TIP_MATERIAL_SPEC.upper()}, DRAWN ROD (HARDER ALLOY; FINEST TEETH WEAR MOST).",
-        "ALL 20 GEARS PLAIN-BORED (NO KEYWAY); SOLDER TO MATCHING SHAFT SEATS.",
-        "THIS SHEET SHOWS T120; FAMILY ROWS ABOVE GOVERN TOOTH COUNT AND BORE.",
-        "  PITCH DIA=N×25.4/DP; OUTSIDE DIA=(N+2)×25.4/DP.",
-        "SMALLEST TIP GEARS CUT STUB-FORM (GAP FLOOR AT THE BASE-CIRCLE CHORD)",
-        "  WHERE FULL DEPTH WOULD UNDERCUT.",
+        "MAKE 1 OF EACH CONFIGURATION, T006-T120 BY 6 (20 GEARS); SHEET SHOWS T120.",
+        "PLAIN BORE, NO KEYWAY; SOLDER TO THE SHAFT SEAT AT ASSEMBLY.",
+        f"T006-T024: {TIP_MATERIAL_SPEC.upper()} ROD (TITLE-BLOCK BRASS IS T030-T120).",
+        "SMALLEST TIP GEARS: CUT STUB DEPTH WHERE FULL DEPTH WOULD UNDERCUT.",
     )
 )
-
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "gear face squareness to bore": "0.05",
-}

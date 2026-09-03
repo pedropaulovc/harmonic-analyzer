@@ -1,4 +1,15 @@
-r"""Create the curated machinist drawing for the pinion lift rod."""
+r"""Create the curated machinist drawing for the pinion lift rod.
+
+The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): a
+plain bearing rod carries no datums and no feature-control frames -- its
+running fit is the band on the model diameter, plus one roughness symbol on
+the OD that spins in the pivot-block bores. The diameter, the shank length
+and the Ra all read on the side view (policy rule 7: a turned part is
+dimensioned as it sits in the lathe); the crown is a note leadered to the
+crowned end, and the true overall length is a conspicuous reference below
+the shank length (machinist review 2026-09-02: the 202.00 read as the
+overall and the crown note said "back end" from the block).
+"""
 
 from __future__ import annotations
 
@@ -6,27 +17,36 @@ import argparse
 import sys
 from typing import Any
 
-from pinion_lift_rod_spec import GEOMETRIC_TOLERANCES_MM
-
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_feature_control_frame,
+    add_attached_note,
+    add_edge_dimension,
     add_property_linked_note,
     add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
+    model_point_in_view,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
+    set_dimension_precision,
     set_hidden_lines_removed,
+    set_hidden_lines_visible,
+    set_reference_dimension,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
-from pinion_lift_rod_spec import CAP_SAG, ROD_DIA, ROD_LEN, SURFACE_FINISHES
+from pinion_lift_rod_spec import (
+    CAP_SAG,
+    CROWN_NOTE,
+    OVERALL_LEN,
+    ROD_DIA,
+    ROD_LEN,
+    SURFACE_FINISHES,
+)
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -49,37 +69,46 @@ SHEET_SCALE = (1.0, 1.0)
 END_VIEW_SCALE = 2.0
 # The crown adds CAP_SAG past the nominal length, so the side view's bounding
 # box (and its centre) span ROD_LEN + CAP_SAG.
-HALF_SPAN = (ROD_LEN + CAP_SAG) / 2000.0
+HALF_SPAN = OVERALL_LEN / 2000.0
 FRONT_CENTER = (0.055, 0.205)
+# 0.060 between the end circle and the side view's left end (was 0.045): the
+# crown note now sits above that end and needs the room.
 RIGHT_CENTER = (
-    FRONT_CENTER[0] + HALF_SPAN * SHEET_SCALE[0] + 0.045,
+    FRONT_CENTER[0] + HALF_SPAN * SHEET_SCALE[0] + 0.060,
     FRONT_CENTER[1],
 )
-# NOT (0.355, 0.205): up there the iso crowded the side view's right end and the
-# tip perpendicularity frame. The empty band below the side view and right of
-# the notes block takes it whole, clear of the 202 dimension line at y=0.180.
+# NOT (0.355, 0.205): up there the iso crowded the side view's right end. The
+# empty band below the side view and right of the notes block takes it whole,
+# clear of the length dimensions above it.
 ISO_CENTER = (0.345, 0.145)
 
-# The rod's flank in the *Right view: a 6.35-dia cylinder at 1:1, so its top
-# silhouette runs ~3.2 mm above the view centre. The cylindrical callouts anchor
-# HERE rather than on the front view's end circle -- see the GD&T block below.
+# Side-view landmarks (sheet meters): crown apex at the LEFT end, flat front
+# end at the RIGHT (the exact apex / rim points are projected from the model
+# at build time). The rod's top flank is a 6.35-dia cylinder at 1:1, so its
+# silhouette runs ~3.2 mm above the view centre.
+LEFT_END_X = RIGHT_CENTER[0] - HALF_SPAN * SHEET_SCALE[0]
+RIGHT_END_X = RIGHT_CENTER[0] + HALF_SPAN * SHEET_SCALE[0]
 ROD_FLANK_Y = RIGHT_CENTER[1] + ROD_DIA * SHEET_SCALE[0] / 2000.0
 
-FRONT_KEEP = {
-    # Offset kept tight (-0.010, not the fulcrum -0.025): the toleranced text
-    # is wide and a further-left anchor runs it across the sheet border.
-    "RodDia": (
-        FRONT_CENTER[0] - ROD_DIA * END_VIEW_SCALE / 1000.0 - 0.010,
-        FRONT_CENTER[1] + 0.008,
-    ),
-}
+# Every marked dimension reads on the side view: the diameter as a linear
+# diameter between the flank silhouettes at the flat right end, the shank
+# length below. The end view keeps nothing -- SolidWorks inserts each marked
+# model dimension into ONE view, so the side view is curated first and the
+# end view is never asked (draw_pinion_bracket, 2026-09-02 seat build).
+FRONT_KEEP: dict[str, tuple[float, float]] = {}
 RIGHT_KEEP = {
-    "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.025),
+    "RodDia": (RIGHT_END_X + 0.024, RIGHT_CENTER[1]),
+    "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.020),
 }
-DIMENSION_CALLOUTS: dict[str, str] = {}
-# The length tolerance rides its own dimension (codex machinist review: a
-# detached "LENGTH +/-0.25" UOS note is ambiguous about which length it bounds).
-RIGHT_CALLOUTS: dict[str, str] = {}
+# The shank length says where it stops (the crown root, not the apex); the
+# diameter and length bands ride their model dimensions.
+DIMENSION_CALLOUTS = {"Depth": "TO CROWN ROOT"}
+# The diameter is the one fitted feature (SHAFT_H band on the model
+# dimension): three decimals say "hold it".
+DIMENSION_PRECISION = {"RodDia": 3}
+# The crown note stands above-left of the crowned end, its leader down to the
+# apex; the Ra (x~0.26) and the end view (x<=0.068) both stay clear.
+CROWN_NOTE_XY = (LEFT_END_X - 0.012, 0.236)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -126,86 +155,67 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(1, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
-    for view in (front, right, iso):
-        set_hidden_lines_removed(adapter, view)
+    set_hidden_lines_removed(adapter, iso)
+    # Hidden lines stay ON in every orthographic view (Harvey #30 / Lipton).
+    for view in (front, right):
+        set_hidden_lines_visible(adapter, view)
 
-    front_annotations = curate_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="front"
-    )
     right_annotations = curate_view_dimensions(
         adapter, right, keep=RIGHT_KEEP, view_label="right"
     )
-    set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
-    set_dimension_callouts(adapter, right_annotations, RIGHT_CALLOUTS)
+    set_dimension_callouts(adapter, right_annotations, DIMENSION_CALLOUTS)
+    set_dimension_precision(adapter, right_annotations, DIMENSION_PRECISION)
     # SolidWorks classifies a solid circular end silhouette under the same
     # AutoInsertCenterMarks2 "hole" bit as a bored circle; disabling that bit
     # makes the API a guaranteed no-op even though the end view is circular.
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to rod end view")
 
-    # Pick the end circle at 12 o'clock, because the symbol goes straight ABOVE
-    # it. Picked at 3 o'clock (the +r,0 point) with the symbol at 12, the tag
-    # fought SetPosition2's along-the-edge rule -- on a CIRCLE the permitted set
-    # IS the circumference, so the symbol collapsed to the nearest circle point
-    # and its Y went inert: the requested 17.6 mm standoff rendered as ~1 mm,
-    # too little for the ~3 mm attachment triangle, which then overlapped the
-    # box and struck through the "A". Picking the clock position the symbol
-    # actually sits at lets the leader run radially out to it -- the same
-    # spelling draw_pivot_shaft.py / draw_pivot_bushing.py use. No gate sees
-    # this: a datum symbol exposes no GetExtent, so only the render shows it.
-    end_top = (
-        FRONT_CENTER[0],
-        FRONT_CENTER[1] + ROD_DIA * END_VIEW_SCALE / 2000.0,
+    # Side-view landmarks projected from the MODEL, not assumed from the view
+    # centre: the crown apex (a revolve apex is a VERTEX) and the top of the
+    # flat front end's edge-on circular edge.
+    apex = model_point_in_view(
+        adapter, right, (0.0, 0.0, OVERALL_LEN / 1000.0), label="crown apex"
     )
-    # In the *Right view the part's +Z (crowned back end) points screen-left,
-    # so the flat front end (z=0) is the RIGHT silhouette edge.
-    flat_end = (RIGHT_CENTER[0] + HALF_SPAN, RIGHT_CENTER[1])
-    add_datum_feature(
-        adapter,
-        front,
-        edge_xy=end_top,
-        symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.024),
-        datum="A",
-        label="lift rod axis",
-        # SolidWorks normalizes this circular-edge datum 16.83 um along the
-        # permitted circumference. Bound that measured API read-back locally;
-        # all unrestricted datum placements retain the 1 um default.
-        position_tolerance_m=0.00002,
+    front_end_top = model_point_in_view(
+        adapter, right, (0.0, ROD_DIA / 2000.0, 0.0), label="front end rim"
     )
-    # Cylindricity and the bearing finish both control the rod's CYLINDRICAL
-    # face, which the side view shows edge-on -- so both anchor to its flank
-    # there instead of to the front view's end circle. Anchored on the front
-    # circle they had to sit out at the side view's x to find free sheet, and
-    # the leader then ran the whole way back across the side view. Off the flank
-    # the leader is a short vertical drop into the empty band above the view. A
-    # cylinder carries no model edge along its side, so these picks are
-    # SILHOUETTE entities (as in draw_transgear_stub).
-    add_feature_control_frame(
+    # The true overall (crown apex to the flat front end), as a conspicuous
+    # reference below the shank length so nobody saws the stock short
+    # (Harvey #25): apex VERTEX to the end face's edge-on circular EDGE.
+    overall = add_edge_dimension(
         adapter,
         right,
-        edge_xy=(RIGHT_CENTER[0] - 0.045, ROD_FLANK_Y),
-        frame_xy=(RIGHT_CENTER[0] - 0.045, 0.236),
-        characteristic="cylindricity",
-        tolerance=GEOMETRIC_TOLERANCES_MM["lift rod bearing cylindricity"],
-        label="lift rod bearing cylindricity",
-        entity_type="SILHOUETTE",
+        p0=apex,
+        p1=front_end_top,
+        text_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.035),
+        label="overall length reference",
+        orientation="horizontal",
+        entity_types=("VERTEX", "EDGE"),
     )
-    # Only the flat front end gets a perpendicularity control -- the back end
-    # is the SR4.8 crown (a note), where a face-orientation callout is
-    # meaningless.
-    # Above the view, not below at y=0.180: the isometric now occupies that band.
-    add_feature_control_frame(
+    set_reference_dimension(
+        adapter,
+        _early_bound(overall, "IDisplayDimension").GetAnnotation(),
+        label="overall length reference",
+    )
+    # The crown, called out FROM the crowned end (its sketch dims live on the
+    # Top plane, outside every placed view).
+    add_attached_note(
         adapter,
         right,
-        edge_xy=flat_end,
-        frame_xy=(flat_end[0] + 0.018, 0.228),
-        characteristic="perpendicularity",
-        tolerance=GEOMETRIC_TOLERANCES_MM["front end perpendicularity"],
-        datums=("A",),
-        label="front end perpendicularity",
+        text=CROWN_NOTE,
+        entity_xy=apex,
+        note_xy=CROWN_NOTE_XY,
+        label="crown callout",
+        entity_type="VERTEX",
     )
-    # Sits right of the cylindricity frame, whose text ends near x=0.177; the
-    # Ra text renders ABOVE the arm (ASME Y14.36), reaching y~0.236.
+
+    # The rod OD is the one running surface (the rod spins in the pivot-block
+    # bores as the cam input), so it alone carries a roughness symbol,
+    # anchored on the rod's flank in the side view (a SILHOUETTE pick: a
+    # cylinder carries no model edge along its side, as in
+    # draw_transgear_stub). The Ra text renders ABOVE the arm (ASME Y14.36),
+    # reaching y~0.236.
     add_surface_finish(
         adapter,
         right,

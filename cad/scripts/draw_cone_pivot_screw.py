@@ -1,4 +1,15 @@
-r"""Create the curated cone-platform pivot shoulder-screw drawing."""
+r"""Create the curated cone-platform pivot shoulder-screw drawing.
+
+The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): a
+pivot screw is not on the rule-3 GD&T allowlist, so it carries no datums and
+no feature-control frames -- the two bands the block cannot express ride
+their model dimensions (build_cone_pivot_screw.py).  Both turned diameters
+and every length sit on the longitudinal side view with the thread
+designation, the thread-start chamfer and the under-head fillet leadered
+to their features; the slot is dimensioned on the slot-profile (*Right)
+view; the thread-end view carries the one roughness symbol, on the ground
+shoulder (rule 5).
+"""
 
 from __future__ import annotations
 
@@ -6,33 +17,33 @@ import argparse
 import sys
 from typing import Any
 
-from cone_pivot_screw_spec import GEOMETRIC_TOLERANCES_MM
-
 import _telemetry
-from _common import CAD_ROOT, _early_bound, run_build
+from _common import CAD_ROOT, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_feature_control_frame,
+    add_attached_note,
     add_surface_finish,
+    add_view_centerline,
     curate_view_dimensions,
-    import_cosmetic_threads,
-    set_hidden_lines_removed,
+    set_hidden_lines_visible,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _fastener_annotations import add_thread_leader
 from _fastener_drawing import FastenerSheet, build_fastener_sheet
 from _surface_finish import surface_finish_by_key
 from cone_pivot_screw_spec import (
     HEAD_DIA,
+    HEAD_T,
     SHOULDER_DIA,
     SHOULDER_LEN,
     SURFACE_FINISHES,
-    THREAD,
+    THREAD_CHAMFER_CALLOUT,
     THREAD_DESIGNATION,
     THREAD_SOLID_DIA,
+    UNDERHEAD_FILLET_CALLOUT,
     UNDERHEAD_LEN,
 )
-from solidworks_mcp.adapters.solidworks.drawing import place_view, remove_notes_matching
+from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 
 SPEC = DRAWINGS_BY_NAME["cone_pivot_screw"]
@@ -42,166 +53,117 @@ OUTPUTS = DrawingOutputs(**SPEC.outputs)
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
 SHEET_SCALE = (6.0, 1.0)
-END_KEEP = {
-    "HeadDiaDim": (0.028, 0.176),
-    "ShoulderDiaDim": (0.028, 0.124),
-}
-SIDE_KEEP = {
-    "HeadHt": (0.190, 0.240),
-    "ShoulderLg": (0.165, 0.185),
-    "ThreadLg": (0.238, 0.132),
-}
-SLOT_KEEP = {
-    "SlotWDim": (0.285, 0.242),
-    "SlotDepth": (0.325, 0.215),
-}
-SIDE_DIMENSION_CALLOUTS = {
-    "ThreadLg": THREAD_DESIGNATION,
-}
+_S = SHEET_SCALE[0] / 1000.0  # sheet meters per model mm
+
+# Stacked from the under-head datum (Top plane, y = 0): head up to HEAD_T,
+# shoulder down to -SHOULDER_LEN, tail on to -UNDERHEAD_LEN.  The profile
+# (axis VERTICAL, head up) in *Front; the slot notch in *Right, aligned with
+# it; the thread-end view in *Bottom.
+END_CENTER = (0.070, 0.150)
+SIDE_CENTER = (0.190, 0.170)
+RIGHT_CENTER = (0.285, 0.170)
+ISO_CENTER = (0.370, 0.170)
+
+_Y_MID = (HEAD_T - UNDERHEAD_LEN) / 2.0
+
+
+def _side_y(model_y: float) -> float:
+    return SIDE_CENTER[1] + (model_y - _Y_MID) * _S
+
+
+_HEAD_TOP_Y = _side_y(HEAD_T)
+_UNDERHEAD_Y = _side_y(0.0)
+_SHOULDER_END_Y = _side_y(-SHOULDER_LEN)
+_TIP_Y = _side_y(-UNDERHEAD_LEN)
+_HEAD_HALF = HEAD_DIA / 2.0 * _S
+_SHOULDER_HALF = SHOULDER_DIA / 2.0 * _S
+_TAIL_HALF = THREAD_SOLID_DIA / 2.0 * _S
+
+# Thread-end view: nothing but the ground shoulder's roughness symbol (the
+# diameters read on the side view, where a turned part's sizes belong).
+END_KEEP: dict[str, tuple[float, float]] = {}
 DIMENSION_CALLOUTS: dict[str, str] = {}
+SHOULDER_FINISH_EDGE_XY = (
+    END_CENTER[0] + _SHOULDER_HALF * 0.7071,
+    END_CENTER[1] - _SHOULDER_HALF * 0.7071,
+)
+SHOULDER_FINISH_SYMBOL_XY = (0.125, 0.136)
 
-
-def _circular_edge(
-    adapter: Any,
-    view: Any,
-    *,
-    center_y_mm: float,
-    radius_mm: float,
-    label: str,
-) -> Any:
-    """Return the unique visible circular edge matching model-space geometry."""
-    view = _early_bound(view, "IView")
-    components = adapter._attempt(lambda: view.GetVisibleComponents()) or (None,)
-    matches: list[Any] = []
-    seen: list[tuple[float, float]] = []
-    edge_count = 0
-    for component in components:
-        edges = (
-            adapter._attempt(lambda c=component: view.GetVisibleEntities2(c, 1)) or ()
-        )
-        edge_count += len(edges)
-        for edge in edges:
-            edge = _early_bound(edge, "IEdge")
-            curve = _early_bound(edge.GetCurve(), "ICurve")
-            if not curve.IsCircle():
-                continue
-            params = curve.CircleParams or ()
-            if len(params) != 7:
-                continue
-            center_y = float(params[1]) * 1000.0
-            radius = float(params[6]) * 1000.0
-            seen.append((center_y, radius))
-            if abs(center_y - center_y_mm) <= 0.02 and abs(radius - radius_mm) <= 0.02:
-                matches.append(edge)
-    if len(matches) != 1:
-        raise RuntimeError(
-            f"{label}: expected one visible circular edge at y={center_y_mm:g} "
-            f"r={radius_mm:g} mm, found {len(matches)}; "
-            f"components={len(components)} edges={edge_count} circles={seen}"
-        )
-    return matches[0]
+# Side view: head diameter above the head, head height right of it, shoulder
+# length and shoulder diameter on the left (the diameter's dimension line
+# sits below the shoulder, its extension lines running beside the narrower
+# tail), thread length right of the tail.
+SIDE_KEEP = {
+    "HeadDiaDim": (SIDE_CENTER[0], _HEAD_TOP_Y + 0.017),
+    "HeadHt": (SIDE_CENTER[0] + 0.042, (_HEAD_TOP_Y + _UNDERHEAD_Y) / 2.0),
+    "ShoulderLg": (SIDE_CENTER[0] - 0.040, (_UNDERHEAD_Y + _SHOULDER_END_Y) / 2.0),
+    "ShoulderDiaDim": (SIDE_CENTER[0] - 0.045, _SHOULDER_END_Y - 0.015),
+    "ThreadLg": (SIDE_CENTER[0] + 0.048, (_SHOULDER_END_Y + _TIP_Y) / 2.0),
+}
+SIDE_DIMENSION_CALLOUTS: dict[str, str] = {}
+# Slot-profile view: width across the notch above the head, depth down the
+# notch to the right of the head.
+SLOT_KEEP = {
+    "SlotWDim": (RIGHT_CENTER[0], _HEAD_TOP_Y + 0.019),
+    "SlotDepth": (RIGHT_CENTER[0] + _HEAD_HALF + 0.012, _HEAD_TOP_Y - 0.008),
+}
+# Leadered callouts: the thread designation to the tail's left outline
+# (text lower-left), the thread-start chamfer to the same outline near the
+# tip (text below the tip), the under-head fillet to the shoulder's right
+# outline just under the head (text right of the profile, under the
+# head-height dimension and left of the slot-profile view).
+THREAD_LEADER_XY = (SIDE_CENTER[0] - _TAIL_HALF, _TIP_Y + 0.018)
+THREAD_NOTE_XY = (SIDE_CENTER[0] - 0.058, _TIP_Y + 0.009)
+CHAMFER_LEADER_XY = (SIDE_CENTER[0] - _TAIL_HALF, _TIP_Y + 0.004)
+CHAMFER_NOTE_XY = (SIDE_CENTER[0] - 0.010, _TIP_Y - 0.017)
+FILLET_LEADER_XY = (SIDE_CENTER[0] + _SHOULDER_HALF, _UNDERHEAD_Y - 0.005)
+FILLET_NOTE_XY = (SIDE_CENTER[0] + 0.038, _UNDERHEAD_Y - 0.015)
+SIDE_AXIS_FACE_XY = (SIDE_CENTER[0], _TIP_Y + 0.028)
+SLOT_AXIS_FACE_XY = (RIGHT_CENTER[0], (_HEAD_TOP_Y + _UNDERHEAD_Y) / 2.0)
 
 
 def _decorate(adapter: Any, side: Any, end: Any, _iso: Any) -> None:
-    """Add the native GD&T and finish controls required by the shoulder joint."""
-    right = place_view(adapter, str(SOURCE), "*Right", 0.285, 0.170, scale=SHEET_SCALE)
-    set_hidden_lines_removed(adapter, right)
+    """Add the slot-profile view, the leadered callouts and the shoulder finish."""
+    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=SHEET_SCALE)
+    # Hidden lines ON in the slot-profile view (policy rule 7).
+    set_hidden_lines_visible(adapter, right)
     curate_view_dimensions(adapter, right, keep=SLOT_KEEP, view_label="slot profile")
-
-    thread_seeds, thread_instances = import_cosmetic_threads(adapter, side)
-    if thread_instances != 1:
-        raise RuntimeError(
-            f"side view has {thread_seeds} cosmetic-thread seed(s) / "
-            f"{thread_instances} instance(s); expected 1"
-        )
-    removed_thread_notes = remove_notes_matching(adapter, THREAD)
-    _telemetry.info(
-        f"side view imported {thread_seeds} cosmetic-thread seed(s) as "
-        f"{thread_instances} instance(s); removed {removed_thread_notes} "
-        "automatic callout note(s)"
+    add_view_centerline(
+        adapter, right, face_xy=SLOT_AXIS_FACE_XY, label="slot-profile axis centerline"
     )
 
-    thread_end = _circular_edge(
+    add_thread_leader(
         adapter,
         side,
-        center_y_mm=-UNDERHEAD_LEN,
-        radius_mm=THREAD_SOLID_DIA / 2.0,
-        label="thread datum edge",
+        designation=THREAD_DESIGNATION,
+        silhouette_xy=THREAD_LEADER_XY,
+        note_xy=THREAD_NOTE_XY,
+        label="tail thread designation",
     )
-    add_datum_feature(
+    add_attached_note(
         adapter,
         side,
-        edge_entity=thread_end,
-        symbol_xy=(0.115, 0.130),
-        datum="A",
-        label="thread pitch-diameter datum feature",
-        callout_below=f"{THREAD} THREAD",
+        text=THREAD_CHAMFER_CALLOUT,
+        entity_xy=CHAMFER_LEADER_XY,
+        note_xy=CHAMFER_NOTE_XY,
+        label="thread start chamfer",
+        entity_type="SILHOUETTE",
     )
-    for edge_xy, frame_xy, below_text, label in (
-        ((0.070, 0.16980), (0.108, 0.182), "SHOULDER OD", "shoulder total runout"),
-        ((0.070, 0.17850), (0.108, 0.204), "HEAD OD", "head total runout"),
-    ):
-        add_feature_control_frame(
-            adapter,
-            end,
-            edge_xy=edge_xy,
-            frame_xy=frame_xy,
-            characteristic="total_runout",
-            tolerance=GEOMETRIC_TOLERANCES_MM[label],
-            datums=("A",),
-            quantity=below_text,
-            label=label,
-        )
-    add_feature_control_frame(
+    add_attached_note(
         adapter,
         side,
-        edge_entity=_circular_edge(
-            adapter,
-            side,
-            center_y_mm=0.0,
-            radius_mm=HEAD_DIA / 2.0,
-            label="head bearing edge",
-        ),
-        frame_xy=(0.240, 0.212),
-        characteristic="perpendicularity",
-        tolerance=GEOMETRIC_TOLERANCES_MM["head bearing face perpendicularity"],
-        datums=("A",),
-        quantity="HEAD BEARING FACE",
-        label="head bearing face perpendicularity",
+        text=UNDERHEAD_FILLET_CALLOUT,
+        entity_xy=FILLET_LEADER_XY,
+        note_xy=FILLET_NOTE_XY,
+        label="under-head fillet",
+        entity_type="SILHOUETTE",
     )
-    add_feature_control_frame(
-        adapter,
-        side,
-        edge_entity=_circular_edge(
-            adapter,
-            side,
-            center_y_mm=-SHOULDER_LEN,
-            radius_mm=SHOULDER_DIA / 2.0,
-            label="shoulder end edge",
-        ),
-        frame_xy=(0.125, 0.170),
-        characteristic="perpendicularity",
-        tolerance=GEOMETRIC_TOLERANCES_MM["shoulder end perpendicularity"],
-        datums=("A",),
-        quantity="SHOULDER END FACE",
-        label="shoulder end perpendicularity",
-    )
-    add_feature_control_frame(
-        adapter,
-        right,
-        edge_xy=(0.2898, 0.219),
-        frame_xy=(0.325, 0.245),
-        characteristic="position",
-        tolerance=GEOMETRIC_TOLERANCES_MM["slot median-plane position"],
-        datums=("A",),
-        quantity="SLOT MEDIAN PLANE",
-        label="slot median-plane position",
-    )
+
     add_surface_finish(
         adapter,
         end,
-        edge_xy=(0.08400, 0.13600),
-        symbol_xy=(0.125, 0.136),
+        edge_xy=SHOULDER_FINISH_EDGE_XY,
+        symbol_xy=SHOULDER_FINISH_SYMBOL_XY,
         control=surface_finish_by_key(SURFACE_FINISHES, "ground_shoulder"),
         label="ground shoulder finish",
     )
@@ -212,19 +174,19 @@ RECIPE = FastenerSheet(
     keywords="cone pivot screw; slotted shoulder screw; made fastener",
     scale=SHEET_SCALE,
     side_view="*Front",
-    # Look from the threaded tail so the controlled ground shoulder is visible
-    # inside the larger head outline; the head-end view occludes that shoulder.
+    # Look from the threaded tail so the ground shoulder is visible inside the
+    # larger head outline; the head-end view occludes that shoulder.
     end_view="*Bottom",
-    side_center=(0.190, 0.170),
-    end_center=(0.070, 0.150),
-    iso_center=(0.370, 0.170),
+    side_center=SIDE_CENTER,
+    end_center=END_CENTER,
+    iso_center=ISO_CENTER,
     end_keep=END_KEEP,
     dimension_callouts=DIMENSION_CALLOUTS,
     side_keep=SIDE_KEEP,
     side_dimension_callouts=SIDE_DIMENSION_CALLOUTS,
     note_xy=(0.020, 0.105),
     end_note_xy=(0.020, 0.245),
-    side_centerline_face_xy=(0.190, 0.145),
+    side_centerline_face_xy=SIDE_AXIS_FACE_XY,
     decorate=_decorate,
 )
 

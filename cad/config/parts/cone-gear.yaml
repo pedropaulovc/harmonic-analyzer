@@ -8,7 +8,7 @@ cone-gear:
   # bronze, chosen because the finest teeth wear most). Manufacturing spec for
   # them; the title-block material above covers T030-T120 only.
   material_tip_specification: C67500 manganese bronze
-  finish: gear teeth cut; polished brass
+  finish: polished brass
   quantity: 1
   tolerance_class: machined_block
   fit_class: gear_mesh

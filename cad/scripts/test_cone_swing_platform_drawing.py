@@ -30,40 +30,30 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert kept == marked
 
 
-def test_notes_describe_pivot_notch_and_wedge() -> None:
+def test_notes_are_a_plain_coordinate_list_without_bands() -> None:
     notes = cone_swing_platform_spec.DRAWING_NOTES
-    assert "STEEL PLATE" not in notes
-    assert "BLACK OXIDE" not in notes
-    assert "DEBURR" not in notes
-    assert "UOS" not in notes
-    assert "PIVOT HOLE" in notes
-    assert "LOCK NOTCH" in notes
-    assert "PIVOT HOLE SIZE PER PLAN-VIEW CALLOUT" in notes
-    assert "HOLD THE AXIS PERPENDICULAR TO THE" in notes
-    assert "27.50 +/-0.10 WEST AND 175.00 +/-0.10 SOUTH" in notes
-    assert "2X 1/4-20 UNC-2B THRU" in notes
-    assert "192.174 +/-0.10 SOUTH OF PIVOT" in notes
-    assert "26.887" in notes
-    assert "12.5182 +/-0.10 DEG NORTH OF WEST" in notes
-    assert "8.23 +/-0.10 DEG NORTH" in notes
-    assert "FULL-R CLOSED END (R4.000 REF)" in notes
-    assert "VIRTUAL-SHARP INTERSECTIONS" in notes
-    assert "PIVOT-HOLE AXIS" in notes
-    assert "CENTRELINE THROUGH THE PIVOT-HOLE AXIS NORMAL TO THE NORTH END" in notes
-    assert "STRAIGHT WITHIN 0.25" in notes
-    # No GD&T on this sheet: the notes are the sole tolerance carrier, so
-    # nothing may point at a datum tag or a control frame.
-    assert "DATUM" not in notes
-    assert "FCF" not in notes
-    assert "OPEN THROUGH EDGE" in notes
-    assert "NE R10.00, NW R8.00, SW R10.00, SE R12.00" in notes
-    assert "CRANK-GEAR SWEPT OD CLEARS THE LOWER BROAD FACE" in notes
-    assert "KEEP THE PLATE FULL THICKNESS" in notes
-    assert "FINISHED THICKNESS 6.35 +/-0.10" in notes
-    assert "HOLD EACH BROAD FACE FLAT WITHIN 0.10 AND THE TWO PARALLEL WITHIN 0.10" in notes
-    assert "AS MODELLED" not in notes
-    assert "SEE PLAN" not in notes
-    assert "X.XX" not in notes
+    # The plan marks only the overall length, so the notes still define the
+    # wedge; they carry coordinates only -- no bands, no form/orientation
+    # prose, no design narration, nothing the title block says.
+    assert len(notes.split("\n")) <= 12
+    assert "PIVOT HOLE ON AXIS 7.00 SOUTH OF THE NORTH EDGE" in notes
+    assert "LOCK NOTCH 8.00 WIDE" in notes
+    assert "27.50 W / 175.00 S OF PIVOT" in notes
+    assert "192.174 SOUTH OF PIVOT" in notes
+    assert "26.887 PITCH" in notes
+    assert "12.518 DEG NORTH OF WEST" in notes
+    assert "8.23 DEG NORTH OF WEST" in notes
+    assert "NE R10, NW R8, SW R10, SE R12" in notes
+    assert "FINISHED THICKNESS 6.35" in notes
+    assert "VIRTUAL-SHARP" in notes
+    # The overall length is the marked PlateLenDim; the note must not repeat it.
+    assert "223.354" not in notes
+    for banned in (
+        "+/-", "WITHIN", "HOLD", "DATUM", "FCF", "REF", "CRANK-GEAR", "KEEP THE PLATE",
+        "STEEL PLATE", "BLACK OXIDE", "DEBURR", "UOS", "AS MODELLED", "SEE PLAN",
+        "X.XX", "PER PLAN-VIEW CALLOUT", "UNC",
+    ):
+        assert banned not in notes, banned
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'adapter, "Manufacturing Notes", 0.016, 0.100, char_height=0.0025' in source
     assert "_add_cone_axis_centerline(adapter, top)" in source
@@ -80,12 +70,37 @@ def test_notes_describe_pivot_notch_and_wedge() -> None:
     assert 'label="pivot-hole size"' in source and "edge=pivot_edge" in source
     assert 'label="v2 post-mount tapped holes"' in source
     assert "edge=mount_edge" in source
-    # GD&T removed from this sheet -- no datum tags, no control frames.
-    assert "add_datum_feature" not in source
-    assert "add_feature_control_frame" not in source
-    assert "datum=" not in source
-    assert "characteristic=" not in source
-    assert "set_dimension_callouts" not in source
+
+
+def test_hole_callouts_state_size_and_process() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    # Harvey #13: the pivot callout says DRILL; 1/4 close clearance is the H drill.
+    assert 'process="H DRILL"' in source
+    assert round(0.266 * 25.4, 3) == round(part.PIVOT_HOLE_DIA, 3)
+    assert source.count("add_native_hole_callout(") == 2
+
+
+def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    for helper in (
+        "add_datum_feature",
+        "add_feature_control_frame",
+        "add_surface_finish(",
+        "set_basic_dimension(",
+        "project_part_pmi(",
+        "datum=",
+        "characteristic=",
+        "set_dimension_callouts",
+    ):
+        assert helper not in source, helper
+    assert not hasattr(cone_swing_platform_spec, "GEOMETRIC_TOLERANCES_MM")
+    assert not hasattr(cone_swing_platform_spec, "SURFACE_FINISHES")
+
+
+def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "for view in (top, end):\n        set_hidden_lines_visible" in source
+    assert "set_hidden_lines_removed(adapter, iso)" in source
 
 
 def test_v2_post_foot_and_mount_pattern_cascade() -> None:

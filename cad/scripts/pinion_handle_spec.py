@@ -11,8 +11,7 @@ drawing keeps in lockstep (``test_pinion_handle_drawing.py``).
 from __future__ import annotations
 
 from _fit_limits import REAM_SLIDE
-from _gtol_spec import CylinderFace
-from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from _surface_finish import SurfaceFinishControl
 from pinion_handle_geometry import (
     CAP_RADIUS as CAP_RADIUS,
     CAP_SAG as CAP_SAG,
@@ -33,17 +32,19 @@ from pinion_handle_geometry import (
 # part-specific band lives beside the nominal it tolerances, not in the shared
 # fit-class table).  Symmetric about each nominal; rendered through
 # :func:`fit_limits` so a nominal retune can never leave the released MAX/MIN
-# text stale (codex #359).
+# text stale (codex #359).  The turned lengths (grip, bore depth, rod span)
+# carry NO band: the title block's .XX tolerance governs them -- the arbor's
+# flat tip seats on the bore floor, so the bore depth only shifts the grip
+# station along the arbor (machinist review 2026-09-02).
 ROD_PRESS_BAND = (0.0025, -0.0025)  # turned cross-rod OD tolerance
 ROD_HOLE_REAM_BAND = (0.005, -0.005)  # body cross-hole ream tolerance
 TUBE_ID_BAND = REAM_SLIDE
-GRIP_LENGTH_TOLERANCE_MM = 0.10
-TUBE_LENGTH_BAND = (0.10, 0.00)
-ROD_SPAN_TOLERANCE_MM = 0.10
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "GripProfile": {"GripDia"},
     "Grip": {"GripLen"},
+    # The crown is a size on the view: its sphere radius and (REF) height.
+    "CapProfile": {"CapR", "CapSagDim"},
     "TubeProfile": {"TubeOd", "TubeId"},
     "Tube": {"TubeLen"},
     "RodProfile": {"RodDia"},
@@ -51,34 +52,16 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "RodHoleProfile": {"RodHoleDia"},
 }
 
-SURFACE_FINISHES = (
-    SurfaceFinishControl(
-        key="final_bore",
-        roughness_um=MACHINED_UM,
-        face=CylinderFace(diameter_mm=TUBE_ID),
-    ),
-)
+# No roughness callouts: the hub is locked to its arbor stub, so nothing runs
+# on the bore; the title block's Ra 3.2 covers every face
+# (cad/docs/drawing-simplicity-policy.md rule 5).
+SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
 
+# Notes: process facts only, never a size (policy rule 6).  The crown, the
+# cross-hole station and the lower arm are all dimensions on the views.
 DRAWING_NOTES = "\n".join(
     (
-        "DATUM A IS FINAL REAMED BORE AXIS; DATUM B IS FLAT HUB END.",
-        "TURN GRIP, WALL AND HUB IN ONE SETUP. OPPOSITE GRIP FACE:",
-        f"  SPHERICAL CROWN SR{CAP_RADIUS:.2f}+/-0.10; {CAP_SAG:.2f} REF HIGH.",
-        "CROWN ROOT CIRCLE IS AN INTENTIONAL PROFILE BREAK; DO NOT BLEND.",
-        "BODY CROSS-HOLE AXIS POSITION IS CONTROLLED BY THE",
-        "  BOXED BASIC DIMENSION AND ATTACHED <MOD-DIAM>0.05 | A | B FRAME.",
-        f"PRESSED ROD AXIAL PLACEMENT: DATUM A TO LOWER END {ROD_DOWN:.2f}+/-0.10.",
-        f"HUB PROJECTION: DATUM B TO GRIP FACE {TUBE_LEN + WALL_T:.2f} +0.10/-0.00.",
-        "FINAL PART CONSISTS OF TURNED BODY AND PRESSED CROSS ROD.",
+        "PRESS THE CROSS ROD INTO THE REAMED BODY HOLE AFTER TURNING.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
-
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "handle grip OD runout": "0.05",
-    "handle hub OD runout": "0.05",
-    "handle flat-end perpendicularity": "0.05",
-    "handle transverse-axis position": "0.05",
-}

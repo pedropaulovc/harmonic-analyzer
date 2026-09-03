@@ -1,4 +1,11 @@
-"""Offline contracts for the pinion-torque-shaft drawing."""
+"""Offline contracts for the pinion-torque-shaft drawing.
+
+A plain shaft is not on the GD&T allowlist
+(cad/docs/drawing-simplicity-policy.md): no datums, no frames; one roughness
+symbol on the journal the swing straps rock on; diameter, body length, the
+overall reference and the crown callout all on the side view (rule 7); one
+line of notes.
+"""
 
 from __future__ import annotations
 
@@ -11,16 +18,25 @@ from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
-def test_surface_finish_is_part_owned_and_consumed_by_key() -> None:
+def _source() -> str:
+    return Path(drawing.__file__).read_text(encoding="utf-8")
+
+
+def test_surface_finish_is_on_the_journal_only() -> None:
     (control,) = pinion_pivot_shaft_spec.SURFACE_FINISHES
     assert control.key == "bearing"
     assert control.roughness_um == 1.6
     assert control.face.diameter_mm == pinion_pivot_shaft_spec.SHAFT_DIA
     part_source = Path(shaft.__file__).read_text(encoding="utf-8")
-    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    source = _source()
     assert "surface_finishes=SURFACE_FINISHES" in part_source
-    assert 'surface_finish_by_key(SURFACE_FINISHES, "bearing")' in drawing_source
-    assert "roughness_ra=" not in drawing_source
+    assert source.count("add_surface_finish(") == 1
+    assert 'surface_finish_by_key(SURFACE_FINISHES, "bearing")' in source
+    # Anchored on the flank silhouette like its sibling shafts, not a FACE
+    # pick whose leader ran across the body (2026-09-02 render).
+    assert 'entity_type="SILHOUETTE"' in source
+    assert 'entity_type="FACE"' not in source
+    assert "roughness_ra=" not in source
 
 
 def test_required_drawing_paths() -> None:
@@ -41,56 +57,87 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert set(drawing.DIMENSION_CALLOUTS) <= kept
     assert drawing.SHAFT_DIA == pinion_pivot_shaft_spec.SHAFT_DIA
     assert drawing.SHAFT_LEN == pinion_pivot_shaft_spec.SHAFT_LEN
+    assert pinion_pivot_shaft_spec.OVERALL_LEN == 194.4
 
 
-def test_sheet_runs_at_1_to_1_with_2_to_1_end_view_and_1_to_2_iso() -> None:
+def test_diameter_and_body_length_read_on_the_side_view() -> None:
+    # Policy rule 7: the diameter stands at the side view's right end, not on
+    # the end view; the end view keeps nothing and is never curated
+    # (SolidWorks inserts each marked dimension into one view only).
+    assert drawing.FRONT_KEEP == {}
+    assert set(drawing.RIGHT_KEEP) == {"ShaftDia", "Depth"}
+    assert drawing.RIGHT_KEEP["ShaftDia"][0] > drawing.RIGHT_END_X
+    source = _source()
+    assert "curate_view_dimensions(\n        adapter, front" not in source
+    assert "set_dimension_precision(adapter, right_annotations" in source
+    assert drawing.DIMENSION_PRECISION == {"ShaftDia": 3}
+
+
+def test_overall_reference_and_crown_callout_are_on_the_view() -> None:
+    # Review 2026-09-02: the overall had to be derived from both crowns, and
+    # the SR4.80 geometry was buried in the note block.
+    source = _source()
+    assert 'label="overall length reference"' in source
+    assert 'entity_types=("VERTEX", "VERTEX")' in source
+    assert '_early_bound(overall, "IDisplayDimension").GetAnnotation()' in source
+    assert "set_reference_dimension(" in source
+    assert source.count("model_point_in_view(") == 2
+    assert source.count("add_attached_note(") == 1
+    assert "text=CROWN_NOTE," in source
+    assert pinion_pivot_shaft_spec.CROWN_NOTE.split("\n") == [
+        "2X SPHERICAL CROWN SR4.80",
+        "(1.20) HIGH; ROOT CIRCLE SHARP, NO CHAMFER",
+    ]
+
+
+def test_sheet_runs_at_1_to_1_with_4_to_1_end_view_and_1_to_2_iso() -> None:
     assert drawing.SHEET_SCALE == (1.0, 1.0)
     assert drawing.ISO_SCALE == (1, 2)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    source = _source()
     assert "scale=(4, 1)" in source  # the end-view override
     assert pinion_pivot_shaft_spec.ISO_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:2"
     assert 'add_property_linked_note(adapter, "Iso View Note"' in source
     assert 'add_property_linked_note(adapter, "End View Note"' in source
 
 
-def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
+def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
+    source = _source()
+    assert "for view in (front, right):\n        set_hidden_lines_visible" in source
+    assert "set_hidden_lines_removed(adapter, iso)" in source
+
+
+def test_notes_are_few_specific_and_never_the_title_block() -> None:
     notes = pinion_pivot_shaft_spec.DRAWING_NOTES
-    assert "SPHERICAL CROWN" in notes
-    assert "DERIVED AXIS" in notes
-    assert "PROFILE 0.05, FORM ONLY (NO DATUM)" in notes
-    assert "EXEMPT FROM TITLE-BLOCK EDGE-BREAK" in notes
-    assert "(1.20) REF AXIAL HEIGHT" in notes
-    assert "1.20+/-0.05" not in notes
-    assert "194.40 OVERALL" not in notes
-    assert drawing.DIMENSION_CALLOUTS["ShaftDia"] == "FINAL SIZE"
+    lines = notes.split("\n")
+    assert len(lines) <= 4
+    assert "SHAFTING OK AS RECEIVED" in notes
+    # The crown geometry left the block for a leadered callout on the view.
+    assert "CROWN" not in notes
+    for banned in ("DATUM", "PROFILE", "EXEMPT", "TITLE-BLOCK", "+/-", "LINEAR", "X.XX"):
+        assert banned not in notes, banned
+    assert " BA " not in f" {notes} "
+    source = _source()
+    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+
+
+def test_print_carries_no_gdt_and_the_band_rides_the_model_diameter() -> None:
+    source = _source()
+    for helper in (
+        "add_datum_feature(",
+        "add_feature_control_frame(",
+        "set_basic_dimension(",
+        "project_part_pmi(",
+    ):
+        assert helper not in source, helper
+    assert "WITHIN" not in source
+    assert not hasattr(pinion_pivot_shaft_spec, "GEOMETRIC_TOLERANCES_MM")
+    assert not hasattr(pinion_pivot_shaft_spec, "GEOMETRIC_CONTROLS")
     assert model_toleranced_dimensions(shaft) == {
         ("ShaftProfile", "ShaftDia"): "*deviations(SHAFT_DIA_BAND)",
         ("Shaft", "Depth"): "SHAFT_LENGTH_TOLERANCE_MM",
     }
-    # General tolerances live in the title block ONLY.
-    assert "LINEAR +/-" not in notes
-    assert " BA " not in f" {notes} "
-    assert "X.XX" not in notes
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
-
-
-def test_direct_limits_and_native_cylindricity_control_the_body() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 1
-    assert "edge_xy=end_top" in source
-    assert "symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.024)" in source
-    assert "position_tolerance_m=0.0001" in source
-    assert source.count("add_feature_control_frame(") == 2
-    assert 'characteristic="profile_surface"' in source
-    assert 'quantity="BOTH CROWNS"' in source
-    assert 'entity_type="FACE"' in source
-    assert 'entity_type="SILHOUETTE"' not in source
-    assert "add_surface_finish(" in source
-    assert "CYLINDRICITY" not in drawing.DIMENSION_CALLOUTS["ShaftDia"]
-    assert "Ra 1.6" not in drawing.DIMENSION_CALLOUTS["ShaftDia"]
-    assert "CROWN ROOT CIRCLES" in drawing.DIMENSION_CALLOUTS["Depth"]
-    assert drawing.FRONT_KEEP["ShaftDia"] == (0.055, 0.167)
+    assert "ShaftDia" not in drawing.DIMENSION_CALLOUTS
+    assert "CROWN ROOT" in drawing.DIMENSION_CALLOUTS["Depth"]
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:
