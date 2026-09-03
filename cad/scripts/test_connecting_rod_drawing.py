@@ -88,9 +88,8 @@ def test_notes_are_few_specific_and_never_the_title_block() -> None:
     assert len(lines) <= 4
     assert "RING, SHANK AND HEAD SHARE ONE MIDPLANE" in notes
     assert "RING WALL 4.50 MIN AFTER BORING" in notes
-    # The as-cast head and ring geometry live in separate spec-derived notes;
-    # the thicknesses remain view dimensions, while manufacturing prose stays
-    # process-only.
+    # Ring, head and thickness geometry live in separate spec-derived notes;
+    # manufacturing prose stays process-only.
     for moved in (
         "PER PATTERN",
         "MACHINE THE",
@@ -202,9 +201,25 @@ def test_details_carry_the_ring_head_and_thickness_step() -> None:
         / 1000.0
     )
 
-    # No head-detail call may depend on selecting derived-view geometry.
+    assert drawing.STEP_THICKNESS_NOTE == "\n".join(
+        (
+            "DETAIL C THICKNESS STEP",
+            f"RING REGION THICKNESS {connecting_rod_spec.RING_THICKNESS:.2f}",
+            f"SHANK REGION THICKNESS {connecting_rod_spec.SHANK_THICKNESS:.2f}",
+        )
+    )
+    assert "add_note(\n            adapter,\n            STEP_THICKNESS_NOTE," in source
+    assert drawing.STEP_THICKNESS_NOTE_XY[1] < (
+        drawing.STEP_DETAIL_CENTER[1]
+        - drawing.STEP_DETAIL_MODEL_RADIUS
+        * drawing.STEP_DETAIL_SCALE[0]
+        / drawing.STEP_DETAIL_SCALE[1]
+        / 1000.0
+    )
+
+    # Neither derived detail may depend on selecting its unstable geometry.
     tree = ast.parse(source, filename=str(drawing.__file__))
-    brittle_head_calls = [
+    brittle_derived_calls = [
         node
         for node in ast.walk(tree)
         if isinstance(node, ast.Call)
@@ -212,14 +227,21 @@ def test_details_carry_the_ring_head_and_thickness_step() -> None:
         and node.func.id in {"add_edge_dimension", "add_attached_note"}
         and len(node.args) >= 2
         and isinstance(node.args[1], ast.Name)
-        and node.args[1].id == "head_detail"
+        and node.args[1].id in {"head_detail", "step_detail"}
     ]
-    assert brittle_head_calls == []
-    assert "_head_xy" not in source
+    assert brittle_derived_calls == []
+    for dead_pick_math in (
+        "_head_xy",
+        "_detail_xy",
+        "_step_xy",
+        "ring_pick_y",
+        "shank_pick_y",
+    ):
+        assert dead_pick_math not in source
 
-    assert source.count("add_edge_dimension(") == 5
-    for label in ("ring thickness", "shank thickness"):
-        assert f'label="{label}"' in source, label
+    assert source.count("add_edge_dimension(") == 3
+    for obsolete_label in ("ring thickness", "shank thickness"):
+        assert f'label="{obsolete_label}"' not in source, obsolete_label
     assert source.count("set_arc_endpoints_to_max(") == 1
     assert "add_attached_note(" not in source
     # The details stand clear of the title block and of each other.

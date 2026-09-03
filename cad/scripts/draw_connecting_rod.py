@@ -16,8 +16,8 @@ what is too small or too crowded at 1:1 (policy rule 7, machinist review
   the bore also carries its roughness symbol.
 * DETAIL B (3:1) -- the as-cast head: a complete spec-derived note states the
   cheek width, shoulder rise, shoulder-root height, and FULL R crown.
-* DETAIL C (3:1, from the left view) -- the stepped thickness where the 3.00
-  ring meets the 2.50 shank.
+* DETAIL C (3:1, from the left view) -- the enlarged stepped profile and a
+  spec-derived note distinguish the 3.00 ring from the 2.50 shank thickness.
 
 The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): the
 pin hole is a centre distance plus a centreline offset that the block
@@ -139,25 +139,6 @@ def _left_xy(mz: float, my: float) -> tuple[float, float]:
         LEFT_CENTER[1] + (my - _BBOX_CY) / 1000.0,
     )
 
-
-def _detail_xy(
-    center: tuple[float, float],
-    model_cy: float,
-    scale: tuple[int, int],
-    mu: float,
-    mv: float,
-) -> tuple[float, float]:
-    """Sheet (x, y) of a model point in a detail centred on ``(0, model_cy)``."""
-    factor = scale[0] / scale[1] / 1000.0
-    return (center[0] + mu * factor, center[1] + (mv - model_cy) * factor)
-
-
-def _step_xy(mz: float, my: float) -> tuple[float, float]:
-    return _detail_xy(
-        STEP_DETAIL_CENTER, STEP_DETAIL_MODEL_CY, STEP_DETAIL_SCALE, mz, my
-    )
-
-
 # These sketch dimensions are unavailable in a derived detail view. Keep the
 # useful enlarged ring geometry and render the part-owned manufacturing sizes
 # adjacent to it.
@@ -186,6 +167,27 @@ HEAD_GEOMETRY_NOTE_XY = (
         / HEAD_DETAIL_SCALE[1]
         / 1000.0
         + 0.014
+    ),
+)
+
+# DETAIL C also has no stable derived edges on this seat. Keep its enlarged
+# step profile and state both spec-owned axial thicknesses immediately below it.
+STEP_THICKNESS_NOTE = "\n".join(
+    (
+        "DETAIL C THICKNESS STEP",
+        f"RING REGION THICKNESS {RING_THICKNESS:.2f}",
+        f"SHANK REGION THICKNESS {SHANK_THICKNESS:.2f}",
+    )
+)
+STEP_THICKNESS_NOTE_XY = (
+    STEP_DETAIL_CENTER[0],
+    (
+        STEP_DETAIL_CENTER[1]
+        - STEP_DETAIL_MODEL_RADIUS
+        * STEP_DETAIL_SCALE[0]
+        / STEP_DETAIL_SCALE[1]
+        / 1000.0
+        - 0.014
     ),
 )
 # Ra on the strap bore, attached to the main front view's model rim because
@@ -383,29 +385,18 @@ async def build(adapter: Any) -> dict[str, str]:
     ):
         raise RuntimeError("failed to add as-cast head geometry note")
 
-    # DETAIL C, the thickness step: the ring's 3.00 across its flat faces
-    # (picked above the bore's projected span, so only the OD edge is there)
-    # and the shank's 2.50 just above the step.
-    ring_pick_y = RING_BORE_DIA / 2.0 + 1.6
-    shank_pick_y = RING_OUTER_RADIUS + 5.6
-    add_edge_dimension(
-        adapter,
-        step_detail,
-        p0=_step_xy(-RING_THICKNESS / 2.0, ring_pick_y),
-        p1=_step_xy(RING_THICKNESS / 2.0, ring_pick_y),
-        text_xy=(STEP_DETAIL_CENTER[0], _step_xy(0.0, ring_pick_y)[1] - 0.026),
-        label="ring thickness",
-        orientation="horizontal",
-    )
-    add_edge_dimension(
-        adapter,
-        step_detail,
-        p0=_step_xy(-SHANK_THICKNESS / 2.0, shank_pick_y),
-        p1=_step_xy(SHANK_THICKNESS / 2.0, shank_pick_y),
-        text_xy=(STEP_DETAIL_CENTER[0], _step_xy(0.0, shank_pick_y)[1] + 0.014),
-        label="shank thickness",
-        orientation="horizontal",
-    )
+    # DETAIL C, the thickness step: the derived view is useful visual context,
+    # but its edges are not selectable on this seat. State both region-specific
+    # thicknesses directly from the shared specification beside the profile.
+    if (
+        add_note(
+            adapter,
+            STEP_THICKNESS_NOTE,
+            *STEP_THICKNESS_NOTE_XY,
+        )
+        is None
+    ):
+        raise RuntimeError("failed to add thickness-step geometry note")
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.036)
     add_property_linked_note(adapter, "Isometric View Note", 0.365, 0.252)
