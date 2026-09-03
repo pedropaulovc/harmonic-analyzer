@@ -112,10 +112,9 @@ git submodule update --init --recursive
 A PR is not mergeable until ALL THREE hold — no exceptions, no partial
 credit:
 
-1. **Build green** — the full
-   `uv run python build.py -n 4 --reporter=error-only` pipeline (every part,
-   assembly and gate) passes on the PR's head. **One** successful build is the
-   bar.
+1. **Build green** — the full `uv run python build.py -n 4` pipeline (every
+   part, assembly and gate) passes on the PR's head. **One** successful build
+   is the bar.
 2. **Codex happy** — the Codex auto-review of the latest push found nothing
    (👍 reaction, or its findings were addressed and re-reviewed clean).
 3. **Visual inspection of renders** — an eye pass over the rendered PNGs of
@@ -137,7 +136,7 @@ deleting a parent branch auto-closes the children still targeting it.
 **Rebase on `main` proactively, not reactively.** Check the branch against
 `origin/main` (`git fetch origin main && git status`/`git log HEAD..origin/main`)
 before starting new work on it, and always before kicking off a full
-`uv run python build.py -n 4 --reporter=error-only` build — a stale branch
+`uv run python build.py -n 4` build — a stale branch
 risks a green build that still conflicts or drifts (config/digest/cache-key
 changes on `main` invalidate what you just built). Rebase
 (`git pull --rebase origin main`) as soon as you
@@ -184,18 +183,21 @@ path — every stage is a doit task. Run it through uv (SolidWorks already open 
 the COM tasks):
 
 ```
-uv run python build.py -n 4 --reporter=error-only  # full build; warnings/errors only
-uv run python -m doit                             # same graph with normal task status
-uv run python -m doit build_bare                  # quick: parts + assemblies only
-uv run python -m doit check:math                  # one SolidWorks-free gate (no SW needed)
+uv run python build.py -n 4                    # full build; warnings/errors only
+uv run python build.py --verbosity info -n 4   # include ordinary doit task events
+uv run python -m doit                          # direct entry; same warning default
+uv run python -m doit build_bare               # quick: parts + assemblies only
+uv run python -m doit check:math               # one SolidWorks-free gate (no SW needed)
 ```
 
-`build.py` defaults the human-facing telemetry threshold to `warning`; structured
-telemetry remains full-fidelity. The `. part:...` and `-- part:...` lines are not
-telemetry info records — they come from doit's console reporter — so warning
-verbosity alone does not hide them. Pass `--reporter=error-only` to suppress
-successful/skipped task-status lines while preserving warnings, errors, task
-failures, and tracebacks.
+`HARMONIC_VERBOSITY` applies one human-facing threshold to telemetry and doit
+lifecycle events; structured telemetry remains full-fidelity. `build.py` sets
+it from `--verbosity`, defaulting to `warning`; direct doit runs use that same
+default. Ordinary task events such as `. part:...`, `-- part:...`, successful
+assemblies, drawings, checks, and skips are treated as `info` and hidden.
+`--verbosity info` or `debug` shows them. Failures remain visible at every
+threshold. An explicit doit `--reporter`/`-r` overrides this automatic reporter
+selection.
 
 The SolidWorks-free `check:*` gates and the comparison/diff tooling run from this
 `.venv` with nothing else installed; the COM tasks (`part:`/`assembly:`/

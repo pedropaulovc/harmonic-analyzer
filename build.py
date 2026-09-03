@@ -1,11 +1,12 @@
-"""Run the doit graph with a human-facing console verbosity flag.
+"""Run the doit graph with one human-facing console verbosity threshold.
 
 Examples:
-    uv run python build.py --verbosity warning -n 4
-    uv run python build.py --verbosity debug check:math
+    uv run python build.py -n 4
+    uv run python build.py --verbosity info check:math
 
 The wrapper only consumes ``--verbosity``; every other argument is passed to
-``doit`` unchanged. Structured telemetry capture remains full-fidelity.
+``doit`` unchanged. ``dodo.py`` maps doit's ordinary lifecycle events to info
+using the same environment setting. Structured telemetry remains full-fidelity.
 """
 
 from __future__ import annotations

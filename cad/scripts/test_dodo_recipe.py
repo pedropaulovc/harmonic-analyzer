@@ -794,13 +794,19 @@ def test_task_span_carries_its_pipeline_stage_resource():
 
 
 def test_external_logs_follow_warning_default_and_explicit_verbosity(monkeypatch):
-    dodo = _load_dodo()
     monkeypatch.delenv("HARMONIC_VERBOSITY", raising=False)
+    dodo = _load_dodo()
     assert dodo._external_console_level() == "WARNING"
+    assert dodo._doit_reporter() == "error-only"
+    assert dodo.DOIT_CONFIG["reporter"] == "error-only"
     monkeypatch.setenv("HARMONIC_VERBOSITY", "debug")
     assert dodo._external_console_level() == "DEBUG"
+    assert dodo._doit_reporter() == "console"
+    monkeypatch.setenv("HARMONIC_VERBOSITY", "info")
+    assert dodo._doit_reporter() == "console"
     monkeypatch.setenv("HARMONIC_VERBOSITY", "success")
     assert dodo._external_console_level() == "SUCCESS"
+    assert dodo._doit_reporter() == "error-only"
 
 
 def test_tag_seat_wait_labels_the_task_span_only_when_a_seat_was_taken():

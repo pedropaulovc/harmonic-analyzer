@@ -41,9 +41,9 @@ Install (this repo is a uv project -- pyproject.toml + uv.lock at the root)::
 
 Run through uv (SolidWorks already open for the COM tasks)::
 
-    uv run python -m doit                       # = `build`: every part + assembly + every gate
+    uv run python -m doit                       # = `build`; warning/error console by default
     uv run python -m doit -n 4                  # same, fanning out the SolidWorks-free checks
-    uv run python build.py --verbosity warning -n 4  # concise console output
+    uv run python build.py --verbosity info -n 4  # include ordinary task lifecycle events
 
     uv run python -m doit build_bare            # quick: parts + assemblies only, no gates
     uv run python -m doit assembly:paper_drive  # just that assembly + its stale prereqs
@@ -465,6 +465,13 @@ def _save_success_checkpoint(self: Dependency, task, result_hash=None) -> None:
 
 Dependency.save_success = _save_success_checkpoint
 
+
+def _doit_reporter() -> str:
+    """Map ordinary doit lifecycle events to the shared info threshold."""
+    verbosity = os.environ.get("HARMONIC_VERBOSITY", "warning").strip().lower()
+    return "console" if verbosity in {"debug", "info"} else "error-only"
+
+
 DOIT_CONFIG = {
     "backend": "json",
     "dep_file": str(CAD_OUT / ".doit.db"),
@@ -476,6 +483,7 @@ DOIT_CONFIG = {
     # gate). `build_bare` is the quick parts+assemblies rebuild; export/release
     # are opt-in.
     "default_tasks": ["build"],
+    "reporter": _doit_reporter(),
 }
 
 
@@ -2168,6 +2176,9 @@ def task_check():
     pytest_cmd = [sys.executable, "-m", "pytest", "-q"]
     recipe_tests = [
         SCRIPTS_DIR / "test_dodo_recipe.py",
+        # The build wrapper maps ordinary doit lifecycle events to info, keeping
+        # its reporter output in lockstep with the telemetry verbosity threshold.
+        SCRIPTS_DIR / "test_build_entrypoint.py",
         SCRIPTS_DIR / "test_cut_release_version.py",
         SCRIPTS_DIR / "test_export_models.py",
         SCRIPTS_DIR / "test_pose_manifest.py",
@@ -2355,6 +2366,7 @@ def task_check():
             # (codex review #361).
             "file_dep": [
                 str((REPO_ROOT / "dodo.py").resolve()),
+                str((REPO_ROOT / "build.py").resolve()),
                 *recipe_test_deps,
                 *_CONFIG_YAMLS,
                 str(PROJECT_DRWDOT.resolve()),
