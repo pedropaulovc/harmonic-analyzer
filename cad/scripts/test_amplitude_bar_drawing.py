@@ -70,14 +70,16 @@ def test_end_features_are_documented_in_enlarged_details() -> None:
         (
             f"CHEEK OFFSET {amplitude_bar_spec.NOTCH_OFFSET:.4f}",
             f"NOTCH WIDTH {amplitude_bar_spec.TOP_NOTCH_WIDTH:.4f}",
+            f"NOTCH DEPTH {amplitude_bar_spec.TOP_NOTCH_HEIGHT:.4f}",
         )
     )
     assert "TOP_NOTCH_GEOMETRY_NOTE," in source
-    assert "p0=_detail_a(NOTCH_OFFSET, _TOP_CHEEK_Y)" not in source
+    assert "p0=_detail_a(" not in source
+    assert "p1=_detail_a(" not in source
     assert 'label="top notch width"' not in source
-    assert source.count("add_edge_dimension(") == 6
+    assert 'label="top notch depth"' not in source
+    assert source.count("add_edge_dimension(") == 5
     for label in (
-        "top notch depth",
         "bottom notch cheek offset",
         "bottom notch width",
         "bottom notch depth",

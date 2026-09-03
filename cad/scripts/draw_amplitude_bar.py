@@ -63,6 +63,7 @@ from amplitude_bar_spec import (
     NOTCH_OFFSET,
     SURFACE_FINISHES,
     TOP_NOTCH_FLOOR_Y,
+    TOP_NOTCH_HEIGHT,
     TOP_NOTCH_WIDTH,
     TOP_PIN_DIA,
     TOP_PIN_Y,
@@ -177,6 +178,7 @@ TOP_NOTCH_GEOMETRY_NOTE = "\n".join(
     (
         f"CHEEK OFFSET {NOTCH_OFFSET:.4f}",
         f"NOTCH WIDTH {TOP_NOTCH_WIDTH:.4f}",
+        f"NOTCH DEPTH {TOP_NOTCH_HEIGHT:.4f}",
     )
 )
 TOP_NOTCH_GEOMETRY_NOTE_XY = (
@@ -272,8 +274,9 @@ async def build(adapter: Any) -> dict[str, str]:
     curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
     curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
 
-    # DETAIL A (top notch): quote the two unreliable transverse edges from the
-    # shared spec; the depth remains a native edge dimension at right.
+    # DETAIL A (top notch): the derived view exposes no stable edges on this
+    # seat, so all three transverse sizes render from the shared spec beside
+    # the useful enlarged profile.
     if (
         add_note(
             adapter,
@@ -283,18 +286,6 @@ async def build(adapter: Any) -> dict[str, str]:
         is None
     ):
         raise RuntimeError("failed to add top-notch geometry note")
-    add_edge_dimension(
-        adapter,
-        detail_a,
-        p0=_detail_a(NOTCH_OFFSET / 2.0, BAR_LENGTH),
-        p1=_detail_a(_DEPTH_PICK_X, TOP_NOTCH_FLOOR_Y),
-        text_xy=(
-            DETAIL_A_CENTER[0] + 0.030,
-            _detail_a(0.0, (BAR_LENGTH + TOP_NOTCH_FLOOR_Y) / 2.0)[1],
-        ),
-        label="top notch depth",
-        orientation="vertical",
-    )
 
     # DETAIL B (bottom notch): the same chain below the end, the depth at
     # right, and the Ra on the floor that slides on the rocker's top edge.
