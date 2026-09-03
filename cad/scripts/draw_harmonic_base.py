@@ -614,11 +614,12 @@ async def build(adapter: Any) -> dict[str, str]:
         OUTPUTS,
         pdf_title="Harmonic Base Manufacturing Drawing",
         scale=SHEET_SCALE,
+        # Both curated views delete their unnamed Hole Wizard callouts during
+        # model-item import.  Keep this matcher as a zero-tolerance guard: if
+        # current view generation ever leaks a generic callout again,
+        # finalize_drawing removes it and fails because its default expected
+        # count is zero.
         redundant_note_substrings=("Tapped Hole",),
-        # Five Hole Wizard tapped groups (pivot, stop, block, foot, nameplate
-        # seats); all five imported generic notes are replaced by the native
-        # hole table.
-        expected_redundant_notes=5,
     )
 
 

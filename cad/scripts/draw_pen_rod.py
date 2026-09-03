@@ -35,6 +35,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _gear_drawing_entities import visible_circle_edge
 from pen_rod_spec import ROD_LENGTH, ROD_SECTION, WIRE_HOLE_DIA, WIRE_HOLE_Y
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
@@ -192,7 +193,7 @@ async def build(adapter: Any) -> dict[str, str]:
     hole_cx, hole_cy = model_point_in_view(
         adapter, detail, (0.0, WIRE_HOLE_Y / 1000.0, 0.0), label="detail hole centre"
     )
-    hole_r = WIRE_HOLE_DIA / 2000.0 * DETAIL_SCALE[0]
+    wire_hole_edge = visible_circle_edge(adapter, detail, WIRE_HOLE_DIA)
     # Across the section, the hole axis is 2.50 from either 5.00 slide face.
     # State that controlling value beside DETAIL A instead of dimensioning a
     # short derived-view edge that is not stable across SolidWorks seats.
@@ -206,12 +207,12 @@ async def build(adapter: Any) -> dict[str, str]:
         *wire_hole_center_note_xy,
     ) is None:
         raise RuntimeError("failed to add wire-hole centerline location note")
-    # The size and process, leadered off the hole's rim down-right, the
-    # callout text outside the circle and clear of the isometric.
+    # The size and process, leadered from the hole's model-identity rim
+    # down-right, with callout text outside the circle and clear of the isometric.
     add_native_hole_callout(
         adapter,
         detail,
-        edge_xy=(hole_cx + hole_r, hole_cy),
+        edge=wire_hole_edge,
         callout_xy=(hole_cx + 0.031, hole_cy - 0.018),
         label="pen-rod wire hole",
         process="#47 DRILL",
