@@ -2191,6 +2191,7 @@ def task_check():
         SCRIPTS_DIR / "test_drawing_marks.py",
         SCRIPTS_DIR / "test_cone_drawing_batch_contract.py",
         SCRIPTS_DIR / "test_fastener_catalog.py",
+        SCRIPTS_DIR / "test_crank_end_retainer.py",
         # Fleet-wide manufacturing ownership/validation contracts are standalone
         # tests rather than one-file-per-drawing tests, so the glob below cannot
         # discover them.  They must execute under the required recipe gate: these

@@ -24,14 +24,13 @@ above the 6.35-mm swing plate fixes the drive plane at y = 90.518):
   journal + crank pedestal, ONE casting riding the swing plate), ABOVE the
   64T (ch30 GT:
   the crank axle triangulates to y 144.8 -- a near-vertical 16T:64T mesh):
-  crank arm + handle at the front and the 16T pinion inboard. (The T12
-  removable crank chain wheel -- ch. 23, the roller chain rides its m2 teeth
-  -- is NOT placed here: paper-drive now owns the whole crank->paper chain
-  drive, so the single crank wheel lives there, avoiding a duplicate at the
-  top level -- codex #189 :605. MHA-024 is not inserted in this as-machined
-  assembly model: MHA-020 and MHA-026 retain their coaxial straight pilot
-  holes here, while the released drawings require their shared 1:48 taper to
-  be match-reamed at assembly.)
+  crank arm + handle at the front, the broad brass coaxial end cap and its
+  centred slotted screw outside the arm boss, and the 16T pinion inboard. The
+  transverse MHA-024 taper pin / ring / eye hardware remains a separate
+  cross-shaft stack. (The T12 removable crank chain wheel -- ch. 23, the roller
+  chain rides its m2 teeth -- is NOT placed here: paper-drive owns the whole
+  crank->paper chain drive, so the single crank wheel lives there, avoiding a
+  duplicate at the top level -- codex #189 :605.)
 * alignment pinion (ch. 25): the 42T zeroing drum + its swing rig, parked
   DISENGAGED, inboard of the drum and level with the drive axis (GT).
 
@@ -115,9 +114,10 @@ gears are inserted on their exact machine transforms (so mate
 flip-recovery has a clean reference and the tuned tooth phases are
 preserved) and joined by real kinematic joints. The crankshaft and the
 cone shaft each get a revolute (coincident axis-to-axis + an axial plane
-distance); the crank arm/handle/T12 wheel/16T pinion are keyed to the
-crankshaft and the 64T + 20 cone gears keyed to the cone shaft (lock
-mates); a 16T:64T gear mate drives the cone cluster from the crank, and
+distance); the crank arm, pinion and coaxial end-retainer stack are keyed or
+lock-mated to the crankshaft, while the handle rides the arm pivot. The 64T +
+20 cone gears are keyed to the cone shaft; a 16T:64T gear mate drives the
+cone cluster from the crank, and
 each cylinder gear meshes its cone gear k at ratio [120-6k : 120]. The
 gear mate is each cylinder gear's sole rotational constraint, so it
 holds the cosine-setup phase without nudging the gear. The whole train
@@ -472,7 +472,22 @@ CRANK_ARM_Z0 = CRANKSHAFT_Z0  # arm PLATE south face: the hub band is
 # Ry(180) (the plate's local +z extrusion runs machine -z), so the component
 # ORIGIN sits at the north face -- see CRANK_ARM_ORIGIN_Z.
 from crank_arm_spec import ARM_C2C, ARM_WIDTH  # noqa: E402
-from crankshaft_spec import PIN_HOLE_HEIGHT  # noqa: E402  # 75: handle pivot from the
+from crankshaft_spec import PIN_HOLE_HEIGHT  # noqa: E402
+from crank_end_retainer_spec import (  # noqa: E402
+    FINISHED_TAPER_BIG_END_TO_SHAFT_AXIS,
+    FINISHED_TAPER_AXIS_STATION,
+    FINISHED_TAPER_NEAR_END,
+    MIN_ENGAGED_TURNS,
+    MIN_SCREW_TO_TAPER_CLEARANCE,
+    SCREW_ENGAGED_TURNS as CRANK_RETAINER_ENGAGED_TURNS,
+    SCREW_ENGAGEMENT as CRANK_RETAINER_ENGAGEMENT,
+    SCREW_HEAD_DIA as CRANK_RETAINER_HEAD_DIA,
+    SCREW_SHANK_LEN as CRANK_RETAINER_SHANK_LEN,
+    SHAFT_THREAD_DEPTH as CRANK_RETAINER_THREAD_DEPTH,
+    WASHER_ID as CRANK_END_WASHER_ID,
+    WASHER_OD as CRANK_END_WASHER_OD,
+    WASHER_THICK as CRANK_END_WASHER_THICK,
+)
 
 # shaft axis (2026-09 front-view re-derive, see crank_arm_spec; was 66 from the
 # perspective-magnified side view, 150 before that)
@@ -583,6 +598,40 @@ if (PIN_RING_HOLE_DIA - CRANK_RING_WIRE_DIA) / 2.0 < 0.1:
     raise AssertionError("keeper-ring wire does not clear the crank-pin cross-hole")
 if abs((CRANKSHAFT_Z0 + PIN_HOLE_HEIGHT) - CRANK_PIN_Z) > 1e-6:
     raise AssertionError("crankshaft cross-hole is not at the arm hub's mid-thickness")
+
+# Photo-proven coaxial crank-end retainer.  The broad brass cap matches the
+# arm-boss OD and seats directly on the common arm/shaft outboard face.  Its
+# dedicated short #0-80 screw shares that outer seat, crosses the 1 mm cap,
+# and stops before the FINISHED 1:48 taper-pin envelope.  The stock #4-40
+# fillister screw is deliberately not reused here: its 4 mm shank would
+# intersect that pin after crossing the cap.
+CRANK_END_COMPONENT_STEMS = ("crank-end-washer", "crank-retainer-screw")
+CRANK_END_WASHER_Z0 = CRANK_ARM_Z0 - CRANK_END_WASHER_THICK
+CRANK_RETAINER_SCREW_Z0 = CRANK_END_WASHER_Z0
+CRANK_TAPER_NEAR_END_Z = CRANKSHAFT_Z0 + FINISHED_TAPER_NEAR_END
+CRANK_RETAINER_TIP_Z = CRANK_ARM_Z0 + CRANK_RETAINER_ENGAGEMENT
+if abs(CRANK_END_WASHER_OD - ARM_WIDTH) > 1e-9:
+    raise AssertionError("crank-end washer no longer matches the arm boss OD")
+if CRANK_END_WASHER_ID >= CRANK_RETAINER_HEAD_DIA:
+    raise AssertionError("retaining screw head does not cover the washer bore")
+if abs(
+    CRANK_RETAINER_SHANK_LEN
+    - CRANK_END_WASHER_THICK
+    - CRANK_RETAINER_ENGAGEMENT
+) > 1e-9:
+    raise AssertionError("crank-end screw engagement does not close the cap stack")
+if not 0.0 < CRANK_RETAINER_ENGAGEMENT <= CRANK_RETAINER_THREAD_DEPTH:
+    raise AssertionError("crank-end screw does not fit the shaft thread depth")
+if CRANK_RETAINER_ENGAGED_TURNS < MIN_ENGAGED_TURNS:
+    raise AssertionError("crank-end screw lacks real thread engagement")
+if abs(PIN_HOLE_HEIGHT - FINISHED_TAPER_AXIS_STATION) > 1e-9:
+    raise AssertionError("finished taper envelope is off the crankshaft pin station")
+if abs(
+    PIN_PROUD + ARM_WIDTH / 2.0 - FINISHED_TAPER_BIG_END_TO_SHAFT_AXIS
+) > 1e-9:
+    raise AssertionError("finished taper envelope is off the transverse pin placement")
+if CRANK_RETAINER_TIP_Z + MIN_SCREW_TO_TAPER_CLEARANCE > CRANK_TAPER_NEAR_END_Z:
+    raise AssertionError("coaxial retaining screw reaches the finished taper pin")
 if CRANK_PIN_X0 + CRANK_PIN_LENGTH < X_CRANK + ARM_WIDTH / 2.0 + 2.0:
     raise AssertionError("crank pin does not run out the far side of the hub")
 # Keeper-ring anchor (ch11 p.14): the arm's front (south, machine -z) face is
@@ -2469,8 +2518,8 @@ async def build(adapter) -> dict[str, str]:
     # single crank chain wheel lives in paper-drive (codex #189 :605). Placing it
     # here too made two coincident T12 wheels at the crank centre once both
     # subassemblies are inserted at the top level -> interference. drive-train keeps
-    # only the crankshaft, arm, handle and 16T pinion; the crank spin DOF is
-    # unchanged (crankshaft/arm, free_dof_key="crank_angle").
+    # the crankshaft, arm, coaxial end retainer, handle and 16T pinion; the crank
+    # spin DOF is unchanged (crankshaft/arm, free_dof_key="crank_angle").
     # Crank rest pose: the arm hangs straight DOWN (ch30 eight-views -- the
     # handle reads "down" in all eight roll angles, which only a -Y arm does,
     # since a downward vector lies on the views' vertical rotation axis). The
@@ -2485,6 +2534,53 @@ async def build(adapter) -> dict[str, str]:
         [180.0, 0.0, -90.0],
         compose_rows(rot_z_rows(-90.0), ROT_Y_180),
         ground=False,
+    )
+    # Coaxial crank-end cap (photo detail): the brass annulus sits outside the
+    # arm hub at z -176..-175 and the shallow slotted screw shares its outer
+    # face.  Both are separate from the transverse pin/ring/eye stack.  Locking
+    # the cap to the shaft and the screw to the cap makes the pair part of the
+    # existing crank rigid body without adding an operational DOF.
+    crank_end_washer = await place_component(
+        adapter,
+        CRANK_END_COMPONENT_STEMS[0],
+        [X_CRANK, Y_CRANK, CRANK_END_WASHER_Z0],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        ground=False,
+        label="broad brass crank-end annular cap",
+    )
+    await lock_mate(
+        adapter,
+        named_ref(f"Front Plane@{crank_end_washer}", "PLANE"),
+        named_ref(f"Top Plane@{crankshaft}", "PLANE"),
+        label="crank-end washer rigidly retained on shaft",
+    )
+    assert_component_placed(
+        adapter,
+        crank_end_washer,
+        [X_CRANK, Y_CRANK, CRANK_END_WASHER_Z0],
+        IDENTITY,
+    )
+    crank_retainer_screw = await place_component(
+        adapter,
+        CRANK_END_COMPONENT_STEMS[1],
+        [X_CRANK, Y_CRANK, CRANK_RETAINER_SCREW_Z0],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        ground=False,
+        label="centered slotted crank-end retaining screw",
+    )
+    await lock_mate(
+        adapter,
+        named_ref(f"Front Plane@{crank_retainer_screw}", "PLANE"),
+        named_ref(f"Front Plane@{crank_end_washer}", "PLANE"),
+        label="crank-end screw rigidly retained through washer",
+    )
+    assert_component_placed(
+        adapter,
+        crank_retainer_screw,
+        [X_CRANK, Y_CRANK, CRANK_RETAINER_SCREW_Z0],
+        IDENTITY,
     )
     # Taper pin (2026-09-02, ch11 p.14): through the arm hub + the crankshaft
     # cross-hole along machine X at the arm's mid-thickness, big end PIN_PROUD

@@ -43,8 +43,8 @@ modelled shank is the EXPOSED length (end face to head underside); the
 engaged thread sits inside a 6.0-deep end plug that caps the tube's O12
 bore (the end face is otherwise a 2 mm annulus with nothing on the axis
 for the shank to merge into), so plug + shank + head are ONE stepped
-revolve about the tube axis. The head slot is omitted (a 0.8 x 0.8 slot
-across the head face adds nothing the notes don't carry).
+revolve about the tube axis. The screw's outer face carries the
+photographically prominent diagonal driver cut (0.8 wide x 0.8 deep).
 
 Layout: part origin at the vertical leg's MID-height of the OLD 180 lay
 (machine (197, 1210, 0), placement preserved): leg y -330..+112.3, bend
@@ -74,12 +74,14 @@ from _common import (
     apply_material,
     check,
     define_circle,
+    define_polygon_chain,
     define_rectilinear_chain,
     dimension_between,
     drive_dimension,
     ensure_fully_defined,
     extrude_at_offset,
     force_rebuild,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -90,6 +92,7 @@ from _common import (
 )
 
 import _telemetry
+from _fastener_slot import slot_strip_area
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -111,6 +114,9 @@ from gooseneck_geom import (  # noqa: E402
     PLUG_T,
     SCREW_HEAD_DIA,
     SCREW_HEAD_T,
+    SCREW_SLOT_ANGLE_DEG,
+    SCREW_SLOT_D,
+    SCREW_SLOT_W,
     SCREW_SHANK_DIA,
     SCREW_SHANK_LEN,
     TUBE_DIA,
@@ -146,6 +152,7 @@ SHANK_R = SCREW_SHANK_DIA / 2.0
 HEAD_R = SCREW_HEAD_DIA / 2.0
 HEAD_X = ARM_END_X - SCREW_SHANK_LEN  # -103.25: head underside (shoulder)
 SCREW_TIP_X = HEAD_X - SCREW_HEAD_T  # -105.25: head outer face
+SCREW_SLOT_SPAN = SCREW_HEAD_DIA + 2.0  # profile clears both head rim edges
 
 
 async def _volume(adapter) -> float:
@@ -156,6 +163,7 @@ async def _volume(adapter) -> float:
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         CreatePlaneParameters,
+        ExtrusionParameters,
         RevolveParameters,
         SweepParameters,
     )
@@ -186,6 +194,10 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "ScrewShankLen", f"{SCREW_SHANK_LEN}mm")
     await set_global(adapter, "ScrewHeadDia", f"{SCREW_HEAD_DIA}mm")
     await set_global(adapter, "ScrewHeadT", f"{SCREW_HEAD_T}mm")
+    await set_global(adapter, "ScrewSlotW", f"{SCREW_SLOT_W}mm")
+    await set_global(adapter, "ScrewSlotD", f"{SCREW_SLOT_D}mm")
+    await set_global(adapter, "ScrewSlotAngle", f"{SCREW_SLOT_ANGLE_DEG:g}")
+    await set_global(adapter, "ScrewSlotSpan", '"ScrewHeadDia" + 2mm')
 
     # Per-sketch dim names + drive equations are declared inline at each define_*
     # / record call; their drive jobs collect here and apply in one deferred batch
@@ -442,7 +454,118 @@ async def build(adapter) -> dict[str, str]:
     )
     if abs(added - v_screw) > 0.02 * v_screw:
         raise RuntimeError(f"end screw: added {added:.1f}, expected ~{v_screw:.1f}")
-    final_vol = vol
+
+    # 4. Diagonal driver slot on the axial screw face. The screw points along
+    # -X, so its outer face is a negative-offset Right-plane copy; on that
+    # plane sketch (u, v) = (-model Z, model Y). A +45-degree rectangle in
+    # sketch space therefore makes the observed diagonal across the axial face,
+    # centred on the screw axis. Its span clears the circular rim at both ends,
+    # leaving the exact circle/strip intersection used by the volume equation.
+    check(
+        "create_plane screw driver face",
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset", base_plane="Right Plane", offset=SCREW_TIP_X
+            )
+        ),
+    )
+    name_last_feature(adapter, "ScrewDriverFace")
+    driver_face_offset = name_dimensions(
+        adapter, "ScrewDriverFace", ["DriverFaceOffset"]
+    )[0]
+    drive_jobs.append(
+        (
+            driver_face_offset,
+            '-"ArmEndX" + "ScrewShankLen" + "ScrewHeadT"',
+        )
+    )
+    angle = math.radians(SCREW_SLOT_ANGLE_DEG)
+    c_slot = math.cos(angle)
+    s_slot = math.sin(angle)
+    half_span = SCREW_SLOT_SPAN / 2.0
+    half_width = SCREW_SLOT_W / 2.0
+    # t follows the slot; n is its in-plane normal. Points wind around the
+    # rectangle from the lower-left corner in the negative-offset face sketch.
+    t_u, t_v = c_slot * half_span, s_slot * half_span
+    n_u, n_v = -s_slot * half_width, c_slot * half_width
+    slot_points = [
+        (-t_u + n_u, ARM_Y - t_v + n_v),
+        (t_u + n_u, ARM_Y + t_v + n_v),
+        (t_u - n_u, ARM_Y + t_v - n_v),
+        (-t_u - n_u, ARM_Y - t_v - n_v),
+    ]
+    slot_dims = SketchDims()
+    check(
+        "create_sketch diagonal driver slot",
+        await adapter.create_sketch("ScrewDriverFace"),
+    )
+    set_sketch_direct_db(adapter, True)
+    slot_lines = await add_line_chain(adapter, slot_points)
+    set_sketch_direct_db(adapter, False)
+    await define_polygon_chain(
+        adapter,
+        slot_lines,
+        slot_points,
+        label="diagonal driver slot",
+        dims=slot_dims,
+        names=[
+            "SlotAnchorU",
+            "SlotAnchorY",
+            "SlotRunU",
+            "SlotRunY",
+            "SlotWidthU",
+            "SlotWidthY",
+            "SlotBackU",
+            "SlotBackY",
+        ],
+        drives=[
+            'cos("ScrewSlotAngle") * "ScrewSlotSpan" / 2'
+            ' + sin("ScrewSlotAngle") * "ScrewSlotW" / 2',
+            '"ArmY" - sin("ScrewSlotAngle") * "ScrewSlotSpan" / 2'
+            ' + cos("ScrewSlotAngle") * "ScrewSlotW" / 2',
+            'cos("ScrewSlotAngle") * "ScrewSlotSpan"',
+            'sin("ScrewSlotAngle") * "ScrewSlotSpan"',
+            'sin("ScrewSlotAngle") * "ScrewSlotW"',
+            'cos("ScrewSlotAngle") * "ScrewSlotW"',
+            'cos("ScrewSlotAngle") * "ScrewSlotSpan"',
+            'sin("ScrewSlotAngle") * "ScrewSlotSpan"',
+        ],
+    )
+    await ensure_fully_defined(adapter, "diagonal driver slot sketch")
+    check("exit_sketch diagonal driver slot", await adapter.exit_sketch())
+    name_last_feature(adapter, "DriverSlotProfile")
+    drive_jobs += slot_dims.apply(adapter, "DriverSlotProfile")
+    # FeatureCut4 cuts opposite the sketch normal by default. Material is
+    # toward +X from this negative-X face, so reverse the cut into the head.
+    check(
+        "cut diagonal driver slot",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=SCREW_SLOT_D, reverse_direction=True)
+        ),
+    )
+    name_last_feature(adapter, "DriverSlot")
+    slot_depth_name = name_dimensions(adapter, "DriverSlot", ["SlotDepth"])[0]
+    drive_jobs.append((slot_depth_name, '"ScrewSlotD"'))
+    v_slot = slot_strip_area(HEAD_R, SCREW_SLOT_W) * SCREW_SLOT_D
+    final_vol = await volume_check(
+        adapter,
+        "diagonal driver slot",
+        vol - v_slot,
+        max(0.05 * v_slot, 0.1),
+    )
+
+    # Keep the construction plane out of the saved part and drawing renders.
+    # Match the repository's native slotted-fastener visibility pattern.
+    from solidworks_mcp.adapters.pywin32_adapter import null_callout
+
+    model = adapter.currentModel
+    model.ClearSelection2(True)
+    if not model.Extension.SelectByID2(
+        "ScrewDriverFace", "PLANE", 0, 0, 0, False, 0, null_callout(), 0
+    ):
+        raise RuntimeError("cannot select ScrewDriverFace plane for blanking")
+    model.BlankRefGeom()
+    model.ClearSelection2(True)
 
     # Apply the deferred drive equations now -- after the whole model + a rebuild
     # exists, so every target resolves. Each equation evaluates to the value just

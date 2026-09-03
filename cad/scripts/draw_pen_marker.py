@@ -1,10 +1,8 @@
-r"""Create the curated machinist drawing for the pen marker.
+r"""Create the curated drawing for the project-authored pen marker silhouette.
 
-A turned revolve (barrel + conical tip) whose model axis runs +Y, so the
-profile view is ROTATED 90 deg on the sheet to the lathe convention (axis
-horizontal, tip left).  The barrel diameter and overall length live on the
-silhouette as drawing-native picked dimensions (the revolve's sketch chain
-only carries radius / partial-length dims); the tip-cone height is the one
+The model axis runs +Y, so the profile view is rotated 90 degrees on the sheet
+with the writing point at left.  Overall length and maximum diameter are
+drawing-native picked dimensions; the narrow felt-point reach is the one
 marked model dimension.
 """
 
@@ -34,7 +32,16 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
-from pen_marker_spec import BARREL_DIA, BARREL_TOP_Y, CONE_H, SURFACE_FINISHES
+from pen_marker_spec import (
+    BARREL_FLARE_Y,
+    MAX_DIAMETER,
+    OVERALL_LENGTH,
+    SHOULDER_DIAMETER,
+    SHOULDER_Y,
+    SURFACE_FINISHES,
+    TIP_NECK_DIAMETER,
+    TIP_NECK_Y,
+)
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -61,22 +68,35 @@ SHEET_SCALE = (2.0, 1.0)
 FRONT_CENTER = (0.150, 0.180)
 ISO_CENTER = (0.330, 0.190)
 
-# Sheet-space geometry of the rotated profile (model +Y -> sheet -X: tip on
-# the LEFT, barrel top face on the RIGHT), all in meters at the 2:1 view scale.
-_HALF_LEN = BARREL_TOP_Y * SHEET_SCALE[0] / 2000.0
-_HALF_DIA = BARREL_DIA * SHEET_SCALE[0] / 2000.0
+# Sheet-space geometry of the rotated profile (model +Y -> sheet +X), all in
+# meters at the 2:1 view scale.
+_AXIAL_SCALE = SHEET_SCALE[0] / 1000.0
+_RADIAL_SCALE = SHEET_SCALE[0] / 1000.0
+_HALF_LEN = OVERALL_LENGTH * _AXIAL_SCALE / 2.0
+_HALF_DIA = MAX_DIAMETER * _RADIAL_SCALE / 2.0
 APEX = (FRONT_CENTER[0] - _HALF_LEN, FRONT_CENTER[1])
-CONE_BASE_X = APEX[0] + CONE_H * SHEET_SCALE[0] / 1000.0
-END_FACE = (FRONT_CENTER[0] + _HALF_LEN, FRONT_CENTER[1])
-BARREL_TOP_EDGE = (FRONT_CENTER[0] + 0.035, FRONT_CENTER[1] + _HALF_DIA)
-BARREL_BOTTOM_EDGE = (FRONT_CENTER[0] + 0.035, FRONT_CENTER[1] - _HALF_DIA)
-CONE_FLANK = (
-    (APEX[0] + CONE_BASE_X) / 2.0,
-    FRONT_CENTER[1] + _HALF_DIA / 2.0,
+TIP_NECK_X = APEX[0] + TIP_NECK_Y * _AXIAL_SCALE
+END_POINT = (FRONT_CENTER[0] + _HALF_LEN, FRONT_CENTER[1])
+BARREL_FLARE_X = APEX[0] + BARREL_FLARE_Y * _AXIAL_SCALE
+BARREL_MAX_TOP = (BARREL_FLARE_X, FRONT_CENTER[1] + _HALF_DIA)
+_FLARE_PICK_Y = (SHOULDER_Y + BARREL_FLARE_Y) / 2.0
+_FLARE_PICK_RADIUS = (SHOULDER_DIAMETER + MAX_DIAMETER) / 4.0
+_FLARE_PICK_X = APEX[0] + _FLARE_PICK_Y * _AXIAL_SCALE
+BARREL_TOP_EDGE = (
+    _FLARE_PICK_X,
+    FRONT_CENTER[1] + _FLARE_PICK_RADIUS * _RADIAL_SCALE,
+)
+BARREL_BOTTOM_EDGE = (
+    _FLARE_PICK_X,
+    FRONT_CENTER[1] - _FLARE_PICK_RADIUS * _RADIAL_SCALE,
+)
+TIP_FLANK = (
+    (APEX[0] + TIP_NECK_X) / 2.0,
+    FRONT_CENTER[1] + TIP_NECK_DIAMETER * _RADIAL_SCALE / 4.0,
 )
 
 FRONT_KEEP = {
-    "ConeH": (APEX[0] + 0.005, FRONT_CENTER[1] - 0.030),
+    "TipPointY": (APEX[0] + 0.005, FRONT_CENTER[1] - 0.030),
 }
 
 
@@ -130,10 +150,14 @@ def _add_picked_dimension(
 
 
 def _display_as_diameter(adapter: Any, dimension: Any, *, label: str) -> None:
-    """Prefix a silhouette-width dimension with the ASME diameter symbol."""
+    """Force a one-edge circular dimension to display as a true diameter."""
     display = _sw_type_info.early_bound_or_flag(
         dimension, "IDisplayDimension", "SetText", "GetText"
     )
+    # A circular edge can initially produce a radial display dimension.  The
+    # Diametric flag doubles the measured radius; the prefix supplies the ASME
+    # diameter glyph explicitly, matching the other turned-profile drawings.
+    adapter._attempt(lambda: setattr(display, "Diametric", True))
     adapter._attempt(lambda: display.SetText(1, "<MOD-DIAM>"))  # swDimensionTextPrefix
     applied = str(adapter._attempt(lambda: display.GetText(1)) or "")
     if "<MOD-DIAM>" not in applied:
@@ -204,7 +228,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Pen Marker Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "pen marker; marking pen; turned brass",
+            3: "pen marker; regular fine point; project-authored revolved profile",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
@@ -230,21 +254,18 @@ async def build(adapter: Any) -> dict[str, str]:
     _add_picked_dimension(
         adapter,
         front,
-        picks=(("VERTEX", APEX), ("EDGE", END_FACE)),
+        picks=(("VERTEX", APEX), ("VERTEX", END_POINT)),
         text_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.042),
         label="overall length",
     )
-    barrel_dia = _add_picked_dimension(
+    maximum_dia = _add_picked_dimension(
         adapter,
         front,
-        picks=(
-            ("SILHOUETTE", BARREL_TOP_EDGE),
-            ("SILHOUETTE", BARREL_BOTTOM_EDGE),
-        ),
-        text_xy=(END_FACE[0] + 0.030, FRONT_CENTER[1]),
-        label="barrel diameter",
+        picks=(("EDGE", BARREL_MAX_TOP),),
+        text_xy=(END_POINT[0] + 0.030, FRONT_CENTER[1]),
+        label="maximum barrel diameter",
     )
-    _display_as_diameter(adapter, barrel_dia, label="barrel diameter")
+    _display_as_diameter(adapter, maximum_dia, label="maximum barrel diameter")
 
     add_datum_feature(
         adapter,
@@ -255,50 +276,27 @@ async def build(adapter: Any) -> dict[str, str]:
         label="pen-marker barrel axis",
         entity_type="SILHOUETTE",
     )
-    # frame_xy is the frame's TOP-LEFT corner and the box grows RIGHT from it:
-    # measured, the anchor (APEX[0]-0.014 = 0.076) rendered the box at
-    # x 0.0759..0.1012, y 0.2062..0.2121 -- 25.3 mm wide. The overall-length
-    # dimension below picks the apex VERTEX, so its left extension line rises at
-    # exactly APEX[0] = 0.090, which fell 14 mm INSIDE that box and struck out
-    # the "0.10" tolerance cell. (The 60.00 is a GRAY reference dimension, so a
-    # crop thresholded at 128 cannot see the line at all -- only the render or a
-    # 200-threshold crop shows it.)
-    #
-    # -0.032 puts the box at 0.058..0.0833: its right edge clears APEX[0] by
-    # 6.7 mm, and it lands in empty sheet (the only ink measured in
-    # x 0.030..0.076, y 0.204..0.214 was the box's own left border). It may NOT
-    # go right instead: the Ra body's ink starts at x=0.1119, so a box left-
-    # anchored past the extension line would end at 0.1173 and run 5.4 mm into
-    # it -- the "x<=0.111" bound noted below is real and tight. The leader now
-    # crosses the gray extension line on its way to the cone flank, which is
-    # ordinary ASME routing; a struck-out tolerance value is not.
+    # Route the tip-runout frame above and just behind the narrow holder neck.
+    # Keeping it on the body side of the writing point avoids the sheet border
+    # now that the full 123.11 mm envelope occupies most of the profile view.
     add_feature_control_frame(
         adapter,
         front,
-        edge_xy=CONE_FLANK,
-        frame_xy=(APEX[0] - 0.032, FRONT_CENTER[1] + 0.032),
+        edge_xy=TIP_FLANK,
+        frame_xy=(TIP_NECK_X + 0.010, FRONT_CENTER[1] + 0.032),
         characteristic="circular_runout",
         tolerance=GEOMETRIC_TOLERANCES_MM["marker tip runout"],
         datums=("A",),
         label="marker tip runout",
         entity_type="SILHOUETTE",
     )
-    # In the band ABOVE the barrel, between the barrel top (0.188) and the 60.00
-    # dimension line (~0.221) -- NOT above that dimension, where an early pass
-    # ran the leader through the 60.00 text and struck it out.
-    #
-    # The leader leaves the anchor at the symbol's ▽ tip and the ▽ opens UPWARD,
-    # so a leader that has to CLIMB to its target is drawn through the glyph (or
-    # along its flank) unless it escapes sideways faster than the ▽'s ~1.8 flank
-    # slope. Anchoring to the TOP silhouette instead makes the leader run DOWN
-    # and away from the body entirely, so it stays short and unambiguous. The
-    # body draws up and RIGHT of the anchor (~x+0.039, y+0.019), which fixes the
-    # 0.196 ceiling here and keeps it clear of the tip-runout frame at x<=0.111.
+    # Anchor the finish to a stable point on the gently sloped barrel face,
+    # clear of the sharp maximum-diameter station vertex.
     add_surface_finish(
         adapter,
         front,
-        edge_xy=(FRONT_CENTER[0] - 0.024, FRONT_CENTER[1] + _HALF_DIA),
-        symbol_xy=(FRONT_CENTER[0] - 0.016, 0.196),
+        edge_xy=BARREL_TOP_EDGE,
+        symbol_xy=(BARREL_TOP_EDGE[0] + 0.008, 0.196),
         control=surface_finish_by_key(SURFACE_FINISHES, "barrel"),
         label="barrel bearing finish",
         entity_type="SILHOUETTE",

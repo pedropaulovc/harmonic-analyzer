@@ -4,6 +4,15 @@ from __future__ import annotations
 
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from crank_end_retainer_spec import (
+    FINISHED_TAPER_NEAR_END,
+    MIN_TAP_TO_TAPER_WEB,
+    SHAFT_TAP_DRILL_DEPTH,
+    SHAFT_TAP_POINT_END,
+    SHAFT_TAP_TO_FINISHED_TAPER_WEB,
+    SHAFT_THREAD_DEPTH,
+    SCREW_THREAD as RETAINER_THREAD,
+)
 
 
 MM_PER_IN = 25.4
@@ -46,6 +55,16 @@ SURFACE_FINISHES = (
 PIN_HOLE_DIA = 4.978
 PIN_HOLE_HEIGHT = 4.0  # arm mid-plane above the outboard end
 
+# Coaxial crank-end retainer: shallow #0-80 bottoming tap from the outboard
+# face.  The complete 118-degree drill point leaves a specified web before the
+# FINISHED 1:48 taper bore; checking only the smaller #9 pilot is insufficient.
+if SHAFT_TAP_POINT_END >= FINISHED_TAPER_NEAR_END:
+    raise AssertionError("crank-end tap drill reaches the finished taper bore")
+if SHAFT_TAP_TO_FINISHED_TAPER_WEB < MIN_TAP_TO_TAPER_WEB:
+    raise AssertionError("crank-end tap lacks its finished-taper web allowance")
+if SHAFT_THREAD_DEPTH > SHAFT_TAP_DRILL_DEPTH:
+    raise AssertionError("crank-end thread depth exceeds its tap-drill depth")
+
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ShaftProfile": {"ShaftDiaDim"},
     "Shaft": {"Depth"},
@@ -67,6 +86,9 @@ DRAWING_NOTES = "\n".join(
         f"DIA {JOURNAL_DIA:.3f} BEARING JOURNAL RUNS IN DIA",
         f"{JOURNAL_BORE_DIA:.3f} POST BORE: "
         f"{JOURNAL_CLEARANCE:.2f} DIAMETRAL CLEARANCE.",
+        f"{RETAINER_THREAD} UNF-2B BOTTOMING TAP IN CRANK END;",
+        f"{SHAFT_THREAD_DEPTH:.2f} MIN FULL THREAD.",
+        f"KEEP {MIN_TAP_TO_TAPER_WEB:.2f} MIN WEB TO FINISHED TAPER BORE.",
         "KEEP DIA 9.525 ON T12, PINION, AND CRANK-ARM SEATS.",
     )
 )

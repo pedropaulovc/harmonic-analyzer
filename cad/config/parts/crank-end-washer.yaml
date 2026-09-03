@@ -1,0 +1,7 @@
+crank-end-washer:
+  number: MHA-131
+  material: Brass
+  finish: "bright"
+  tolerance_class: visual_noncritical
+  quantity: 1
+  process: "machined annular brass cap"

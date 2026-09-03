@@ -41,6 +41,10 @@ def test_notes_describe_the_chrome_tube_and_bend() -> None:
     assert "END PLUG" in notes
     assert "#6-32" in notes
     assert "SLOTTED ROUND HEAD" in notes
+    assert (
+        f"DIAGONAL DRIVER SLOT {geom.SCREW_SLOT_W:.2f} WIDE"
+        f" X {geom.SCREW_SLOT_D:.2f} DEEP."
+    ) in notes
     assert not re.search(r"\bLUG\b", notes)  # \b: the end PLUG stays
     assert not re.search(r"\bPIN\b", notes)
     assert f"X {geom.PLUG_T:.2f}, FLUSH" in notes
@@ -59,7 +63,8 @@ def test_part_reimports_the_geometry_nominals_assemblies_read() -> None:
     # SAME objects so the hang proof and the geometry can never drift.
     for name in (
         "ARM_END_X", "ARM_Y", "PLUG_T", "SCREW_HEAD_DIA", "SCREW_HEAD_T",
-        "SCREW_SHANK_DIA", "SCREW_SHANK_LEN", "TUBE_DIA", "WALL_T",
+        "SCREW_SHANK_DIA", "SCREW_SHANK_LEN", "SCREW_SLOT_ANGLE_DEG",
+        "SCREW_SLOT_D", "SCREW_SLOT_W", "TUBE_DIA", "WALL_T",
     ):
         assert getattr(part, name) == getattr(geom, name), name
     assert abs(part.LEG_TOP - (geom.ARM_Y - part.BEND_R)) < 1e-6
@@ -72,12 +77,62 @@ def test_part_reimports_the_geometry_nominals_assemblies_read() -> None:
 
     assert geom.SCREW_HEAD_DIA > spring.COIL_ID
     assert geom.SCREW_SHANK_DIA + 2 * 0.25 <= spring.COIL_ID  # 0.25 radial air
+    assert 0.0 < geom.SCREW_SLOT_W < geom.SCREW_HEAD_DIA
+    assert 0.0 < geom.SCREW_SLOT_D < geom.SCREW_HEAD_T
+    assert geom.SCREW_SLOT_ANGLE_DEG == 45.0
     assert geom.PLUG_T > 0.0
     assert part.PLUG_DIA < geom.TUBE_DIA  # never coincident with the tube OD
     assert part.PLUG_DIA > geom.TUBE_DIA - 2.0 * geom.WALL_T  # real wall overlap
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
     assert '"Manufacturing Notes", 0.016, 0.114' in source
+
+
+def test_axial_end_screw_has_a_real_diagonal_driver_slot() -> None:
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    for global_name in (
+        "ScrewSlotW",
+        "ScrewSlotD",
+        "ScrewSlotAngle",
+        "ScrewSlotSpan",
+    ):
+        assert f'set_global(adapter, "{global_name}"' in source
+    slot_source = source.split("# 4. Diagonal driver slot", 1)[1].split(
+        "# Apply the deferred drive equations", 1
+    )[0]
+
+    # The profile belongs on the screw's negative-X axial face, not on the
+    # cylindrical head wall, and the cut must run inward toward +X.
+    assert 'base_plane="Right Plane", offset=SCREW_TIP_X' in slot_source
+    assert (
+        'name_dimensions(\n'
+        '        adapter, "ScrewDriverFace", ["DriverFaceOffset"]'
+    ) in slot_source
+    assert (
+        '\'-"ArmEndX" + "ScrewShankLen" + "ScrewHeadT"\''
+        in slot_source
+    )
+    assert 'await adapter.create_sketch("ScrewDriverFace")' in slot_source
+    assert 'name_last_feature(adapter, "DriverSlotProfile")' in slot_source
+    assert "adapter.create_cut_extrude(" in slot_source
+    assert "reverse_direction=True" in slot_source
+    assert 'name_last_feature(adapter, "DriverSlot")' in slot_source
+
+    # Both the 45-degree profile and blind depth remain equation-driven.
+    assert 'cos("ScrewSlotAngle")' in slot_source
+    assert 'sin("ScrewSlotAngle")' in slot_source
+    assert 'name_dimensions(adapter, "DriverSlot", ["SlotDepth"])' in slot_source
+    assert 'drive_jobs.append((slot_depth_name, \'"ScrewSlotD"\'))' in slot_source
+
+    # The final expected solid volume must lose the real circle/strip cut.
+    assert "slot_strip_area(HEAD_R, SCREW_SLOT_W) * SCREW_SLOT_D" in slot_source
+    assert "vol - v_slot" in slot_source
+
+    # The offset construction plane must not leak into saved part/drawing views.
+    assert '"ScrewDriverFace", "PLANE"' in slot_source
+    assert "null_callout()" in slot_source
+    assert "model.BlankRefGeom()" in slot_source
+    assert slot_source.count("model.ClearSelection2(True)") >= 2
 
 
 def test_view_scale_is_explicit() -> None:
