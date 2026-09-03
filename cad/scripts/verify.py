@@ -1592,7 +1592,7 @@ def verify_base_footprint(report: Report) -> None:
         import build_cone_pivot_screw as pscrew
         import build_cone_swing_platform as platform
         import build_drive_train_assembly as train
-        import build_harmonic_base as base
+        import harmonic_base_spec as base
         import build_swing_stop_screw as sscrew
 
         half_len = base.TOP_LENGTH / 2.0
