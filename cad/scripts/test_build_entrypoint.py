@@ -51,3 +51,20 @@ def test_main_defaults_to_warning(monkeypatch: pytest.MonkeyPatch) -> None:
     assert build_entrypoint.main(["check:config"]) == 0
     assert captured == [["check:config"]]
     assert build_entrypoint.os.environ["HARMONIC_VERBOSITY"] == "warning"
+
+
+def test_main_forwards_explicit_reporter_override(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: list[list[str]] = []
+
+    class FakeDoitMain:
+        def run(self, args: list[str]) -> int:
+            captured.append(args)
+            return 0
+
+    monkeypatch.setattr(build_entrypoint, "DoitMain", FakeDoitMain)
+    args = ["--reporter", "console", "check:config"]
+
+    assert build_entrypoint.main(["--verbosity", "warning", *args]) == 0
+    assert captured == [args]

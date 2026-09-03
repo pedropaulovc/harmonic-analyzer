@@ -809,6 +809,18 @@ def test_external_logs_follow_warning_default_and_explicit_verbosity(monkeypatch
     assert dodo._doit_reporter() == "error-only"
 
 
+def test_doit_reporter_is_selected_at_module_load(monkeypatch):
+    for verbosity, expected in (
+        ("debug", "console"),
+        ("info", "console"),
+        ("success", "error-only"),
+        ("warning", "error-only"),
+        ("error", "error-only"),
+    ):
+        monkeypatch.setenv("HARMONIC_VERBOSITY", verbosity)
+        assert _load_dodo().DOIT_CONFIG["reporter"] == expected
+
+
 def test_tag_seat_wait_labels_the_task_span_only_when_a_seat_was_taken():
     """``check:*`` gates take no seat (``_run`` yields None from nullcontext), so the
     task span must not grow a meaningless ``seat_wait_s=0``."""
@@ -1681,4 +1693,3 @@ def test_sw_preflight_budget_rejects_non_finite_overrides(monkeypatch):
         assert dodo._sw_max_commit_gb() == dodo._SW_MAX_COMMIT_GB_DEFAULT, raw
     monkeypatch.setenv("HARMONIC_SW_MAX_COMMIT_GB", "12.5")
     assert dodo._sw_max_commit_gb() == 12.5
-
