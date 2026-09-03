@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 import machinist_review as mr
 
 
@@ -40,6 +42,9 @@ def test_schema_is_strict_structured_output() -> None:
     assert finding["additionalProperties"] is False
     assert set(finding["required"]) == {"where", "issue", "fix"}
     assert schema["properties"]["verdict"]["enum"] == ["SHIP", "FIX"]
+    assert schema["properties"]["summary"]["minLength"] == 1
+    for key in ("where", "issue", "fix"):
+        assert finding["properties"][key]["minLength"] == 1
 
 
 def test_command_references_only_the_neutral_workdir(tmp_path: Path) -> None:
@@ -63,7 +68,14 @@ def test_command_references_only_the_neutral_workdir(tmp_path: Path) -> None:
 
 
 def test_pass_requires_ship_with_no_gating_findings() -> None:
-    clean = {"verdict": "SHIP", "summary": "", "blockers": [], "over_specification": [], "clarity": [], "minor": [{"where": "x", "issue": "y", "fix": "z"}]}
+    clean = {
+        "verdict": "SHIP",
+        "summary": "ready",
+        "blockers": [],
+        "over_specification": [],
+        "clarity": [],
+        "minor": [{"where": "x", "issue": "y", "fix": "z"}],
+    }
     assert mr.is_pass(clean)
     assert not mr.is_pass({**clean, "verdict": "FIX"})
     for key in mr.GATING_KEYS:
@@ -71,10 +83,129 @@ def test_pass_requires_ship_with_no_gating_findings() -> None:
     assert not mr.is_pass(None)
 
 
+def test_verdict_validation_rejects_every_schema_violation() -> None:
+    clean = {
+        "verdict": "SHIP",
+        "summary": "ready",
+        "blockers": [],
+        "over_specification": [],
+        "clarity": [],
+        "minor": [{"where": "x", "issue": "y", "fix": "z"}],
+    }
+    assert mr.validate_verdict(clean) is clean
+
+    invalid = [
+        {key: value for key, value in clean.items() if key != "summary"},
+        {**clean, "unexpected": True},
+        {**clean, "verdict": "MAYBE"},
+        {**clean, "verdict": 1},
+        {**clean, "summary": ""},
+        {**clean, "summary": 1},
+        {**clean, "blockers": {}},
+        {**clean, "minor": ["not an object"]},
+        {**clean, "minor": [{"where": "x", "issue": "y"}]},
+        {
+            **clean,
+            "minor": [
+                {"where": "x", "issue": "y", "fix": "z", "unexpected": True}
+            ],
+        },
+        {**clean, "minor": [{"where": "", "issue": "y", "fix": "z"}]},
+        {**clean, "minor": [{"where": "x", "issue": "", "fix": "z"}]},
+        {**clean, "minor": [{"where": "x", "issue": "y", "fix": ""}]},
+        {**clean, "minor": [{"where": "x", "issue": 1, "fix": "z"}]},
+    ]
+    for value in invalid:
+        with pytest.raises(ValueError):
+            mr.validate_verdict(value)
+        assert not mr.is_pass(value)
+
+
+def test_extract_verdict_validates_file_and_event_fallback(tmp_path: Path) -> None:
+    invalid = {
+        "verdict": "SHIP",
+        "summary": "ready",
+        "blockers": [],
+        "over_specification": [],
+        "clarity": [],
+        "minor": [],
+        "unexpected": True,
+    }
+    output = tmp_path / "verdict.json"
+    output.write_text(json.dumps(invalid), encoding="utf-8")
+    with pytest.raises(ValueError, match="keys must be exact"):
+        mr._extract_verdict(output, [])
+
+    output.unlink()
+    events = [{"type": "agent_message", "text": json.dumps(invalid)}]
+    with pytest.raises(ValueError, match="keys must be exact"):
+        mr._extract_verdict(output, events)
+
+
 def test_tool_events_are_detected_at_any_depth() -> None:
     assert mr.count_tool_events([{"type": "agent_message", "text": "{}"}]) == 0
     assert mr.count_tool_events([{"type": "item.completed", "item": {"type": "command_execution", "command": "ls"}}]) == 1
     assert mr.count_tool_events([{"type": "turn.started"}, {"type": "mcp_tool_call"}]) == 1
+
+
+def test_retry_persists_all_attempts_and_cannot_hide_tool_use(
+    tmp_path: Path, monkeypatch
+) -> None:
+    import subprocess
+
+    png = tmp_path / "source.png"
+    png.write_bytes(b"image")
+    verdict = {
+        "verdict": "SHIP",
+        "summary": "ready",
+        "blockers": [],
+        "over_specification": [],
+        "clarity": [],
+        "minor": [],
+    }
+    calls = 0
+
+    def fake_run(command, **_kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            event = {
+                "type": "item.completed",
+                "item": {
+                    "type": "command_execution",
+                    "command": "read something",
+                },
+            }
+            return subprocess.CompletedProcess(
+                command, 1, stdout=json.dumps(event), stderr="failed"
+            )
+        output = Path(command[command.index("-o") + 1])
+        output.write_text(json.dumps(verdict), encoding="utf-8")
+        event = {"type": "agent_message", "text": json.dumps(verdict)}
+        return subprocess.CompletedProcess(
+            command, 0, stdout=json.dumps(event), stderr=""
+        )
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    report_dir = tmp_path / "reports"
+    review = mr.review_sheet(
+        mr.Sheet("part", "part", png),
+        report_dir=report_dir,
+        retries=1,
+        codex="codex",
+    )
+
+    assert review.attempts == 2
+    assert review.tool_events == 1
+    assert not review.blind
+    assert not review.passed
+    records = [
+        json.loads(line)
+        for line in (report_dir / "part.events.jsonl").read_text().splitlines()
+    ]
+    assert [record["attempt"] for record in records] == [1, 2]
+    assert records[0]["event"]["item"]["type"] == "command_execution"
+    assert records[1]["event"]["type"] == "agent_message"
 
 
 def test_review_serialises_and_indexes(tmp_path: Path) -> None:
