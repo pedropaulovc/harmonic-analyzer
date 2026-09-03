@@ -3,11 +3,8 @@
 from __future__ import annotations
 
 import json
-import subprocess
 from pathlib import Path
 from typing import Any
-
-import pytest
 
 import pytest
 
@@ -101,7 +98,8 @@ def test_command_references_only_the_neutral_workdir(tmp_path: Path) -> None:
         "--tools",
         "Read",
         "--allowedTools",
-        "Read(sheet.png)",
+        "Read(sheet-1.png)",
+        "Read(sheet-2.png)",
         "--restricted",
         "--safe-mode",
         "--no-session-persistence",
@@ -273,6 +271,7 @@ def test_retry_persists_all_attempts_and_cannot_hide_tool_use(
     report_dir = tmp_path / "reports"
     review = mr.review_package(
         mr.ReviewPackage("part", "part", (png,)),
+        reviewer="claude",
         report_dir=report_dir,
         retries=1,
         claude="claude",
@@ -346,7 +345,11 @@ def test_arbitrary_png_reports_with_same_basename_do_not_collide(
         reviews = list(
             pool.map(
                 lambda package: mr.review_package(
-                    package, report_dir=report_dir, retries=0, codex="codex-test"
+                    package,
+                    reviewer="codex",
+                    report_dir=report_dir,
+                    retries=0,
+                    codex="codex-test",
                 ),
                 packages,
             )
@@ -508,6 +511,7 @@ def test_multi_sheet_assembly_is_one_cross_sheet_review(
     package = mr.ReviewPackage("gearbox", "assembly", (source,))
     review = mr.review_package(
         package,
+        reviewer="codex",
         report_dir=tmp_path / "reports",
         retries=0,
         codex="codex-test",
@@ -603,3 +607,66 @@ def test_every_registered_drawing_has_a_prompt_kind_and_package_source() -> None
             assert package.sources[0].name.endswith("_drawing.png")
         else:
             assert package.sources[0].parent.name == "pdf"
+
+
+def test_both_reviewers_receive_one_complete_package_invocation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    verdict = _clean_verdict()
+    sources = (tmp_path / "page-a.png", tmp_path / "page-b.png")
+    for source in sources:
+        source.write_bytes(b"png")
+    commands: list[list[str]] = []
+
+    def fake_run(command: list[str], **kwargs: object):
+        commands.append(command)
+        if command[0] == "codex-test":
+            output = Path(command[command.index("-o") + 1])
+            output.write_text(json.dumps(verdict), encoding="utf-8")
+            stdout = json.dumps({"type": "turn.completed"})
+        else:
+            reads = [
+                {
+                    "type": "assistant",
+                    "message": {
+                        "content": [
+                            {
+                                "type": "tool_use",
+                                "name": "Read",
+                                "input": {"file_path": f"sheet-{index}.png"},
+                            }
+                        ]
+                    },
+                }
+                for index in (1, 2)
+            ]
+            stdout = "\n".join(
+                [*(json.dumps(event) for event in reads), json.dumps(
+                    {"type": "result", "structured_output": verdict}
+                )]
+            )
+        return mr.subprocess.CompletedProcess(command, 0, stdout=stdout, stderr="")
+
+    monkeypatch.setattr(mr.subprocess, "run", fake_run)
+    package = mr.ReviewPackage("package", "assembly", sources)
+    claude_review = mr.review_package(
+        package,
+        reviewer="claude",
+        report_dir=tmp_path / "claude",
+        retries=0,
+        claude="claude-test",
+    )
+    codex_review = mr.review_package(
+        package,
+        reviewer="codex",
+        report_dir=tmp_path / "codex",
+        retries=0,
+        codex="codex-test",
+    )
+
+    assert claude_review.model == "fable"
+    assert codex_review.model == "gpt-5.6-sol"
+    assert claude_review.blind and codex_review.blind
+    assert claude_review.extra["images_read"] == ["sheet-1.png", "sheet-2.png"]
+    assert len(commands) == 2
+    assert sum(value == "-i" for value in commands[1]) == 2

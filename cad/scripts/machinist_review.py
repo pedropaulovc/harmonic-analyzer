@@ -270,7 +270,7 @@ def build_claude_command(
         "--tools",
         "Read",
         "--allowedTools",
-        f"Read({image.name})",
+        *(f"Read({image.name})" for image in images),
         "--restricted",
         "--safe-mode",
         "--no-session-persistence",
@@ -450,10 +450,13 @@ def _tag_events(attempt: int, events: Sequence[dict[str, Any]]) -> list[dict[str
 def _write_events(path: Path, events: Sequence[dict[str, Any]]) -> None:
     text = "\n".join(json.dumps(event) for event in events)
     path.write_text(f"{text}\n" if text else "", encoding="utf-8")
+
+
 def is_pass(verdict: dict[str, Any] | None) -> bool:
-    if not verdict or verdict.get("verdict") != "SHIP":
+    verdict = _valid_verdict(verdict)
+    if verdict is None or verdict["verdict"] != "SHIP":
         return False
-    return all(not verdict.get(key) for key in GATING_KEYS)
+    return all(not verdict[key] for key in GATING_KEYS)
 
 
 def _parse_events(stdout: str) -> list[dict[str, Any]]:
