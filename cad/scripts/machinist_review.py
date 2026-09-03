@@ -64,8 +64,12 @@ PROMPT_FILES = {
 SCHEMA_FILE = PROMPTS_DIR / "machinist_review_schema.json"
 REPORT_DIR = CAD_ROOT / "out" / "reports" / "machinist-review"
 
-DEFAULT_MODEL = "fable"
+DEFAULT_MODELS = {
+    "claude": "fable",
+    "codex": "gpt-5.6-sol",
+}
 DEFAULT_EFFORT = "high"
+REVIEWERS = tuple(DEFAULT_MODELS)
 FINDING_KEYS = ("blockers", "over_specification", "clarity", "minor")
 GATING_KEYS = ("blockers", "over_specification", "clarity")
 # PDFium's native API is process-global and not thread-safe.  Hold this only while
@@ -73,8 +77,8 @@ GATING_KEYS = ("blockers", "over_specification", "clarity")
 _PDFIUM_LOCK = threading.Lock()
 
 
-# Claude must use Read once to inspect the neutral ``sheet.png`` copy.  Any
-# other tool use in the stream means the review escaped the intended input.
+# Event/item types that indicate tool or command activity. Claude permits only
+# Read(sheet.png) and StructuredOutput; Codex permits none of these.
 _TOOL_EVENT_MARKERS = (
     "command_execution",
     "function_call",
@@ -105,6 +109,7 @@ class Review:
     passed: bool
     blind: bool
     tool_events: int
+    reviewer: str
     model: str
     effort: str
     prompt_sha256: str
@@ -230,7 +235,7 @@ def _review_prompt(package: ReviewPackage, sheet_count: int) -> str:
     return prompt
 
 
-def build_command(
+def build_claude_command(
     *,
     workdir: Path,
     images: Sequence[Path],
@@ -239,14 +244,10 @@ def build_command(
     effort: str,
     claude: str = "claude",
 ) -> list[str]:
-    """Return the exact isolated ``claude -p`` argv.
-
-    The prompt is sent on stdin rather than as a positional argument.  Claude
-    gets one restricted file tool so it can read only the copied image in the
-    neutral working directory; safe mode and strict empty MCP configuration
-    prevent repo instructions or external context from entering the review.
-    """
-    if schema.parent != workdir or not images or any(image.parent != workdir for image in images):
+    """Return the exact isolated ``claude -p`` argv for one package."""
+    if schema.parent != workdir or not images or any(
+        image.parent != workdir for image in images
+    ):
         raise ValueError("review inputs must be inside the neutral workdir")
     schema_json = json.dumps(
         json.loads(schema.read_text(encoding="utf-8")),
@@ -278,6 +279,52 @@ def build_command(
         "--strict-mcp-config",
         "--no-chrome",
     ]
+
+
+def build_codex_command(
+    *,
+    workdir: Path,
+    images: Sequence[Path],
+    schema: Path,
+    output: Path,
+    model: str,
+    effort: str,
+    codex: str = "codex",
+) -> list[str]:
+    """Return the exact isolated ``codex exec`` argv for one package."""
+    if not images or any(
+        path.parent != workdir for path in (*images, schema, output)
+    ):
+        raise ValueError("review inputs and output must be inside the neutral workdir")
+    command = [
+        codex,
+        "exec",
+        "--ignore-user-config",
+        "--ignore-rules",
+        "--skip-git-repo-check",
+        "--ephemeral",
+        "--sandbox",
+        "read-only",
+        "-C",
+        str(workdir),
+        "-m",
+        model,
+        "-c",
+        f"model_reasoning_effort={effort}",
+    ]
+    for image in images:
+        command.extend(("-i", str(image)))
+    command.extend(
+        (
+            "--output-schema",
+            str(schema),
+            "-o",
+            str(output),
+            "--json",
+            "-",
+        )
+    )
+    return command
 
 
 def _walk(obj: Any) -> Iterable[Any]:
@@ -386,7 +433,6 @@ def _tag_events(attempt: int, events: Sequence[dict[str, Any]]) -> list[dict[str
 def _write_events(path: Path, events: Sequence[dict[str, Any]]) -> None:
     text = "\n".join(json.dumps(event) for event in events)
     path.write_text(f"{text}\n" if text else "", encoding="utf-8")
-
 def is_pass(verdict: dict[str, Any] | None) -> bool:
     if not verdict or verdict.get("verdict") != "SHIP":
         return False
@@ -406,7 +452,7 @@ def _parse_events(stdout: str) -> list[dict[str, Any]]:
     return events
 
 
-def _extract_verdict(events: Sequence[dict[str, Any]]) -> dict[str, Any]:
+def extract_claude_verdict(events: Sequence[dict[str, Any]]) -> dict[str, Any]:
     """Extract Claude's schema-validated structured result."""
     verdict: dict[str, Any] | None = None
     text = ""
@@ -432,26 +478,55 @@ def _extract_verdict(events: Sequence[dict[str, Any]]) -> dict[str, Any]:
     return validate_verdict(verdict)
 
 
+def extract_codex_verdict(
+    output_file: Path, events: Sequence[dict[str, Any]]
+) -> dict[str, Any]:
+    """Extract Codex's output file, falling back to its last agent message."""
+    text = output_file.read_text(encoding="utf-8") if output_file.is_file() else ""
+    if not text.strip():
+        for event in reversed(events):
+            for node in _walk(event):
+                if isinstance(node, dict) and node.get("type") == "agent_message":
+                    text = str(node.get("text") or node.get("message") or "")
+                    if text.strip():
+                        break
+            if text.strip():
+                break
+    if not text.strip():
+        raise RuntimeError("codex produced no final message")
+    start, end = text.find("{"), text.rfind("}")
+    if start < 0 or end < 0:
+        raise RuntimeError(f"final message is not JSON: {text[:200]!r}")
+    return validate_verdict(json.loads(text[start : end + 1]))
+
+
 def review_package(
     package: ReviewPackage,
     *,
-    model: str = DEFAULT_MODEL,
+    reviewer: str,
+    model: str | None = None,
     effort: str = DEFAULT_EFFORT,
     report_dir: Path = REPORT_DIR,
     retries: int = 1,
     timeout_s: float = 1800.0,
     claude: str | None = None,
+    codex: str | None = None,
 ) -> Review:
+    if reviewer not in REVIEWERS:
+        raise ValueError(f"unknown reviewer {reviewer!r}; choose one of {REVIEWERS}")
     sheet_count = _validate_package(package)
-    claude_exe = claude or shutil.which("claude")
-    if not claude_exe:
-        raise RuntimeError("claude CLI not found on PATH")
-    prompt = (
-        f"Use the Read tool to inspect every copied sheet-1.png through "
-        f"sheet-{sheet_count}.png in order. Do not read any other file. "
-        "Then perform this blind review.\n\n"
-        + _review_prompt(package, sheet_count)
-    )
+    model = model or DEFAULT_MODELS[reviewer]
+    executable = (claude if reviewer == "claude" else codex) or shutil.which(reviewer)
+    if not executable:
+        raise RuntimeError(f"{reviewer} CLI not found on PATH")
+    prompt = _review_prompt(package, sheet_count)
+    if reviewer == "claude":
+        prompt = (
+            f"Use the Read tool to inspect every copied sheet-1.png through "
+            f"sheet-{sheet_count}.png in order. Do not read any other file. "
+            "Then perform this blind review.\n\n"
+            + prompt
+        )
     prompt_sha = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
     source_sha = [_sha256(source) for source in package.sources]
     report_dir.mkdir(parents=True, exist_ok=True)
@@ -477,13 +552,26 @@ def review_package(
                 )
             schema = workdir / "schema.json"
             shutil.copyfile(SCHEMA_FILE, schema)
-            cmd = build_command(
-                workdir=workdir,
-                images=images,
-                schema=schema,
-                model=model,
-                effort=effort,
-                claude=claude_exe,
+            output = workdir / "verdict.json"
+            cmd = (
+                build_claude_command(
+                    workdir=workdir,
+                    images=images,
+                    schema=schema,
+                    model=model,
+                    effort=effort,
+                    claude=executable,
+                )
+                if reviewer == "claude"
+                else build_codex_command(
+                    workdir=workdir,
+                    images=images,
+                    schema=schema,
+                    output=output,
+                    model=model,
+                    effort=effort,
+                    codex=executable,
+                )
             )
             proc = subprocess.run(
                 cmd,
@@ -498,9 +586,13 @@ def review_package(
             attempt_events = _parse_events(proc.stdout)
             if proc.returncode != 0:
                 raise RuntimeError(
-                    f"claude exit {proc.returncode}: {proc.stderr.strip()[-800:]}"
+                    f"{reviewer} exit {proc.returncode}: {proc.stderr.strip()[-800:]}"
                 )
-            verdict = _extract_verdict(attempt_events)
+            verdict = (
+                extract_claude_verdict(attempt_events)
+                if reviewer == "claude"
+                else extract_codex_verdict(output, attempt_events)
+            )
             error = None
             break
         except subprocess.TimeoutExpired as exc:
@@ -518,16 +610,21 @@ def review_package(
             shutil.rmtree(workdir, ignore_errors=True)
 
     _write_events(events_path, events)
-    tool_events = count_tool_events(events, allowed_images=allowed_images)
+    tool_events = count_tool_events(
+        events,
+        allowed_images=allowed_images if reviewer == "claude" else (),
+    )
+    blind = tool_events == 0
     review = Review(
         name=package.name,
         kind=package.kind,
         sources=[str(source) for source in package.sources],
         source_sha256=source_sha,
         verdict=verdict,
-        passed=is_pass(verdict) and tool_events == 0,
-        blind=tool_events == 0,
+        passed=is_pass(verdict) and blind,
+        blind=blind,
         tool_events=tool_events,
+        reviewer=reviewer,
         model=model,
         effort=effort,
         prompt_sha256=prompt_sha,
@@ -634,7 +731,10 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="review an arbitrary PNG; repeat to form one assembly package",
     )
     parser.add_argument("--kind", choices=("part", "assembly"), default="part")
-    parser.add_argument("--model", default=DEFAULT_MODEL)
+    parser.add_argument("--reviewer", choices=REVIEWERS)
+    parser.add_argument(
+        "--model", help="reviewer model (defaults to fable or gpt-5.6-sol)"
+    )
     parser.add_argument("--effort", default=DEFAULT_EFFORT)
     parser.add_argument("--jobs", type=int, default=3)
     parser.add_argument("--retries", type=int, default=1)
@@ -657,6 +757,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.index:
         print(write_index(report_dir))
         return 0
+    if args.reviewer is None:
+        print(
+            "--reviewer is required for review runs (choose claude or codex)",
+            file=sys.stderr,
+        )
+        return 2
 
     packages: list[ReviewPackage]
     if args.png:
@@ -695,6 +801,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             pool.submit(
                 review_package,
                 package,
+                reviewer=args.reviewer,
                 model=args.model,
                 effort=args.effort,
                 report_dir=report_dir,
