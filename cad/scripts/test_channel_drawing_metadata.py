@@ -64,3 +64,21 @@ def test_manufacturing_notes_have_no_placeholder_callouts() -> None:
         for note in sheet_notes:
             for placeholder in ("TBD", "TBC", "X.XX", "TO BE DETERMINED"):
                 assert placeholder not in note.upper(), (part_name, placeholder)
+
+
+# The two coil springs are spec sheets: their "notes" ARE the spring data
+# block, the rule-6 exception to the four-line cap.
+SPRING_DATA_SHEETS = {"channel-spring-installed", "counter-spring"}
+
+
+def test_notes_are_few_and_carry_no_gdt_prose() -> None:
+    # cad/docs/drawing-simplicity-policy.md rule 6: at most four short lines
+    # of process fact; never a datum explanation, a boxed-basic reference, a
+    # "within" limit or a tolerance band.
+    for part_name, module_name in CHANNEL_SPECS.items():
+        module = importlib.import_module(module_name)
+        notes = module.DRAWING_NOTES
+        if part_name not in SPRING_DATA_SHEETS:
+            assert len(notes.split("\n")) <= 4, part_name
+        for banned in ("DATUM", "BASIC", "FCF", "WITHIN", "+/-", "PER CALLOUT"):
+            assert banned not in notes.upper(), (part_name, banned)

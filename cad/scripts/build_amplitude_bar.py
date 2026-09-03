@@ -57,12 +57,14 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
+from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from amplitude_bar_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     END_VIEW_NOTE,
     ISOMETRIC_VIEW_NOTE,
+    SURFACE_FINISHES,
 )
 
 import _telemetry
@@ -323,6 +325,9 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    # The bottom-notch floor slides on the rocker: the part owns its roughness
+    # symbol (amplitude_bar_spec.SURFACE_FINISHES); the drawing only places it.
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,
         PART_NAME,

@@ -6,11 +6,17 @@ PURE DATA, no SolidWorks/COM imports (see ``crank_arm_spec`` for the pattern).
 The nominal geometry MUST match the constants in build_amplitude_bar.py.
 
 The bar is ~808 mm long but only 6.35 mm square, so the print shows a 1:4
-full-length front view (overall length + top pin hole), a right end view for the
-square section, and carries the two small end notches in the notes.
+full-length front view (overall length only) beside a 1:4 right view, and
+dimensions the two end notches and the top pin hole in three 4:1 details
+(machinist review 2026-09-02: at 1:4 the working features are edge-on, and a
+note is not a location).
 """
 
 from __future__ import annotations
+
+from _gtol_spec import PlanarFace
+from _holes import NUMBER_DRILL_MM
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 MM_PER_IN = 25.4
 
@@ -26,38 +32,45 @@ BOTTOM_NOTCH_HEIGHT = 0.09375 * MM_PER_IN  # 2.381
 TOP_NOTCH_WIDTH = 0.125 * MM_PER_IN  # 3.175
 TOP_NOTCH_HEIGHT = 0.5 * MM_PER_IN  # 12.7
 TOP_PIN_DROP = 0.25 * MM_PER_IN  # 6.35 hole centre below the bar top
+TOP_PIN_DIA = NUMBER_DRILL_MM["#47"]  # 1.994, the wizard's #47 number drill
 
 # --- Derived. ---
 TOP_PIN_Y = BAR_LENGTH - TOP_PIN_DROP  # 801.95
+NOTCH_OFFSET = (BAR_WIDTH - BOTTOM_NOTCH_WIDTH) / 2.0  # 1.5875: cheek from the face
+TOP_NOTCH_FLOOR_Y = BAR_LENGTH - TOP_NOTCH_HEIGHT  # 795.6
+
+# The bottom-notch floor slides on the rocker arm's top edge in service: the
+# one surface on the bar that runs, so the one roughness symbol
+# (cad/docs/drawing-simplicity-policy.md rule 5).  The floor faces DOWN into
+# the open bottom end; the plane offset is n . p along that outward normal.
+SURFACE_FINISHES = (
+    SurfaceFinishControl(
+        "slide_floor",
+        MACHINED_UM,
+        PlanarFace((0.0, -1.0, 0.0), -BOTTOM_NOTCH_HEIGHT),
+    ),
+)
 
 
-# --- Marked-dimension contract.  The bar is far too long to dimension the tiny
-# end notches on the 1:4 view, so only the overall length is a graphical marked
-# dim; the notch sizes are dimensioned in the notes. ---
+# --- Marked-dimension contract.  Only the overall length is a graphical marked
+# dim; the notch and pin-hole sizes/locations are sheet dimensions in the 4:1
+# end details (edge picks, so no detail-view model-item import is needed). ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BarProfile": {"BarLength"},
 }
 
-# The title-block QTY cell owns the 20-off count; notch orientation and
-# coplanarity are stated because no view resolves them at 1:4 (machinist
-# round 1): both notches live in ONE profile sketch cut thru the full depth,
-# so open-to-opposite-ends / common-plane / centred-on-width IS the model
-# truth, and the pin hole runs thru the top-notch cheeks at mid-depth.
+# Notes (drawing-simplicity-policy.md rule 6): process facts the views cannot
+# carry -- the stock, the plating allowance, the notch orientation (both
+# notches live in ONE profile sketch cut thru the full depth, so
+# open-to-opposite-ends / one-plane IS the model truth) and the root radius.
+# Sizes, locations, the drill and the floor's Ra are on the details now.
 DRAWING_NOTES = "\n".join(
     (
-        "1. BAR SECTION 6.35 SQUARE.",
-        "2. BOTTOM NOTCH 3.18 W x 2.38 DEEP;",
-        "   TOP NOTCH 3.18 W x 12.70 DEEP;",
-        "   BOTH THRU THE FULL DEPTH, OPEN TO",
-        "   OPPOSITE ENDS, CENTRED ON THE WIDTH",
-        "   WITHIN 0.10, IN ONE COMMON PLANE;",
-        "   ROOTS R0.40 MAX.",
-        "3. TOP PIN HOLE #47 DRILL THRU BOTH",
-        "   TOP-NOTCH CHEEKS AT MID-DEPTH,",
-        "   6.35 BELOW THE BAR TOP.",
-        "4. BOTTOM NOTCH FLOOR: Ra 0.8.",
-        "5. DIMS APPLY AFTER PLATING.",
+        f"{BAR_WIDTH:.2f} SQ BAR STOCK FACES OK AS RECEIVED; DIMS APPLY AFTER PLATING.",
+        "END NOTCHES THRU THE DEPTH, OPEN TO OPPOSITE ENDS, ON ONE PLANE; ROOTS R0.40 MAX.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:8"
-END_VIEW_NOTE = "END VIEW SCALE 4:1"
+# The 4:1 end view looks at the TOP end (the open top notch and the hidden pin
+# hole); say so -- "END VIEW" alone leaves the viewing direction to be inferred.
+END_VIEW_NOTE = "TOP END VIEW SCALE 4:1"

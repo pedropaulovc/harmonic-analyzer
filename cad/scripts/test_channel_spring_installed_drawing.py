@@ -55,6 +55,27 @@ def test_data_table_distinguishes_free_and_installed_length() -> None:
     assert "INSTALLED EYE C-C" in notes
     assert "MATERIAL" not in notes
     assert "MUSIC WIRE" not in notes
+    # The spring data block is the rule-6 exception to four lines; the one
+    # prose line says what the reader cannot know from a stretched view.
+    assert notes.startswith("EXTENSION SPRING DATA")
+    assert notes.endswith("SUPPLIED RELAXED.")
+    for banned in ("NOTE:", "DATUM", "BASIC", "WITHIN"):
+        assert banned not in notes, banned
+
+
+def test_spec_sheet_carries_no_gdt_or_finish() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    for helper in (
+        "add_datum_feature(",
+        "add_feature_control_frame(",
+        "add_surface_finish(",
+        "set_basic_dimension(",
+        "project_part_pmi(",
+    ):
+        assert helper not in source, helper
+    assert not hasattr(spec, "GEOMETRIC_TOLERANCES_MM")
+    assert "set_hidden_lines_visible(adapter, front)" in source
+    assert "set_hidden_lines_removed(adapter, iso)" in source
 
 
 def test_sheet_runs_at_1_to_1() -> None:

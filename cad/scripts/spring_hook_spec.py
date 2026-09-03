@@ -9,8 +9,7 @@ MUST match build_spring_hook.py.
 
 from __future__ import annotations
 
-from _gtol_spec import CylinderFace
-from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from _surface_finish import SurfaceFinishControl
 
 # --- Nominal geometry (DIMENSIONS.md "Chapter 17"; all LOW confidence). ---
 ROD_DIA = 1.4  # wire diameter
@@ -22,16 +21,10 @@ ARM_RUN = 2.5  # horizontal hook arm
 ARM_HEIGHT = SHANK_RISE + ELBOW_R  # 9.1 arm centreline above the shank base
 ARM_TIP_X = ELBOW_R + ARM_RUN  # 4.0 arm tip
 
-# The drawing's silhouette leader yielded no adjacent-face telemetry.  The
-# straight shank is nevertheless exact from the swept-wire construction: its
-# cylindrical face has ROD_DIA and alone spans the shank midpoint in Y.
-SURFACE_FINISHES = (
-    SurfaceFinishControl(
-        "shank_seating",
-        MACHINED_UM,
-        CylinderFace(ROD_DIA, contains_y_mm=SHANK_RISE / 2.0),
-    ),
-)
+# No roughness callouts: the shank SEATS in the coefficient-plate bore and
+# hangs there, nothing runs on it; the title block's Ra 3.2 covers every face
+# (cad/docs/drawing-simplicity-policy.md rule 5).
+SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
 
 
 # Drawing prose + marked-dimension contract (DRAWING_DIMENSIONS /

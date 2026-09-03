@@ -11,6 +11,10 @@ title block.  Four views: the side profile (front), the plan (top, which
 carries the counterbored screw-hole callout), the end view (right, which
 carries the width / shaft-axis-height / crown stack), and the isometric.
 
+The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): a
+screwed-down shaft-end bracket carries no datums, no feature-control frames
+and no roughness symbols; the block tolerances govern.
+
 Run with SolidWorks open::
 
     uv run python cad\scripts\draw_fulcrum_keeper.py fulcrum-keeper
@@ -23,12 +27,9 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    _edge_endpoint_key,
-    add_datum_feature,
-    add_feature_control_frame,
     add_native_hole_callout,
     add_property_linked_note,
     curate_view_dimensions,
@@ -36,17 +37,14 @@ from _drawing_common import (
     new_project_drawing,
     read_required_properties,
     set_hidden_lines_removed,
+    set_hidden_lines_visible,
     stamp_drawing_summary,
-    visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from fulcrum_keeper_spec import (
     CBORE_DIA_MM,
     FOOT_REACH,
-    GEOMETRIC_TOLERANCES_MM,
-    LUG_HALF_T,
     SCREW_X,
-    SHAFT_AXIS_H,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -77,9 +75,8 @@ TOP_CENTER = (0.110, 0.228)
 RIGHT_CENTER = (0.225, 0.130)
 ISO_CENTER = (0.330, 0.190)
 
-# Model bbox centres the projected views are laid out around.
+# Model bbox centre the projected views are laid out around.
 _X_MID = (-FOOT_REACH + 4.75) / 2.0  # -9.125 (ball cap at +4.75)
-_Y_MID = (SHAFT_AXIS_H + 7.0) / 2.0  # 16.1 (crown top 32.2)
 
 
 def _front_x(model_x_mm: float) -> float:
@@ -87,39 +84,7 @@ def _front_x(model_x_mm: float) -> float:
     return FRONT_CENTER[0] + (model_x_mm - _X_MID) * SHEET_SCALE[0] / 1000.0
 
 
-def _front_y(model_y_mm: float) -> float:
-    """Sheet Y of a model-Y point in the front view (2:1, bbox-centred)."""
-    return FRONT_CENTER[1] + (model_y_mm - _Y_MID) * SHEET_SCALE[0] / 1000.0
-
-
-@_telemetry.traced("drawing.pick_lug_edge")
-def _visible_outboard_lug_edge(adapter: Any, view: Any) -> Any:
-    """Return the deterministic front-view edge at the lug's outboard face."""
-    target_x = LUG_HALF_T / 1000.0
-    candidates: list[tuple[tuple[float, ...], Any]] = []
-    for raw_edge in visible_view_entities(view, 1, label="fulcrum front edges"):
-        edge = _early_bound(raw_edge, "IEdge")
-        endpoints = _edge_endpoint_key(adapter, edge)
-        if endpoints is None:
-            continue
-        x0, y0, z0, x1, y1, z1 = endpoints
-        if abs(x0 - target_x) > 1e-6 or abs(x1 - target_x) > 1e-6:
-            continue
-        if abs(y1 - y0) < 0.005 or abs(z1 - z0) > 1e-6:
-            continue
-        geometry = tuple(sorted((endpoints[:3], endpoints[3:])))
-        candidates.append((geometry[0] + geometry[1], edge))
-
-    span = _telemetry.trace.get_current_span()
-    span.set_attribute("matched", len(candidates))
-    if not candidates:
-        raise RuntimeError("front view has no vertical edge at the lug outboard face")
-    return min(candidates, key=lambda candidate: candidate[0])[1]
-
-
 # Handy picks derived from the layout above.
-SEAT_EDGE_Y = _front_y(0.0)  # the foot seating face (datum A)
-LUG_FACE_X = _front_x(LUG_HALF_T)  # outboard lug face (datum B)
 HOLE_X_SHEET = _front_x(SCREW_X)  # screw-hole station, shared by the top view
 CBORE_R_SHEET = CBORE_DIA_MM * SHEET_SCALE[0] / 2000.0
 
@@ -183,8 +148,9 @@ async def build(adapter: Any) -> dict[str, str]:
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(2, 1))
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(2, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
-    for view in (front, top, right, iso):
-        set_hidden_lines_removed(adapter, view)
+    for view in (front, top, right):
+        set_hidden_lines_visible(adapter, view)
+    set_hidden_lines_removed(adapter, iso)
 
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
     curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
@@ -192,59 +158,16 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to top view")
 
-    # Native datum/GD&T annotations.  Datum A is the foot seating face (the
-    # part sits on the rail top face and the screw clamps normal to it);
-    # datum B is the outboard lug face (the shaft-end locating plane).
-    add_datum_feature(
-        adapter,
-        front,
-        edge_xy=(_front_x(-18.0), SEAT_EDGE_Y),
-        symbol_xy=(_front_x(-18.0), SEAT_EDGE_Y - 0.010),
-        datum="A",
-        label="keeper seating face",
-    )
-    # Datum B is attached to the actual vertical model edge at x=+3 mm.  It is
-    # not a silhouette edge: the front-view outline scanner returns only the
-    # horizontal crown/foot transitions, while the locating edge is a visible
-    # model edge.  Resolve it by model-space endpoints so view projection drift
-    # cannot move the annotation to another edge.
-    lug_edge = _visible_outboard_lug_edge(adapter, front)
-    add_datum_feature(
-        adapter,
-        front,
-        edge_entity=lug_edge,
-        symbol_xy=(LUG_FACE_X + 0.014, _front_y(12.0)),
-        datum="B",
-        label="outboard lug face",
-    )
-    add_feature_control_frame(
-        adapter,
-        front,
-        edge_xy=(_front_x(-10.0), SEAT_EDGE_Y),
-        frame_xy=(0.150, 0.084),
-        characteristic="flatness",
-        tolerance=GEOMETRIC_TOLERANCES_MM["foot seating face flatness"],
-        label="seating face flatness",
-    )
-    add_feature_control_frame(
-        adapter,
-        top,
-        edge_xy=(HOLE_X_SHEET, TOP_CENTER[1] + CBORE_R_SHEET),
-        frame_xy=(0.052, 0.252),
-        characteristic="position",
-        tolerance=GEOMETRIC_TOLERANCES_MM["screw-hole position"],
-        datums=("A", "B"),
-        diameter=True,
-        label="screw-hole position",
-    )
     # Counterbored screw hole ships as the native wizard callout on the plan
-    # view, where it projects as its true circles.
+    # view, where it projects as its true circles; the drill rides as its
+    # prefix.
     add_native_hole_callout(
         adapter,
         top,
         edge_xy=(HOLE_X_SHEET, TOP_CENTER[1] + CBORE_R_SHEET),
         callout_xy=(0.040, 0.238),
         label="keeper foot screw hole",
+        process="DRILL",
     )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.062)
     add_property_linked_note(adapter, "Isometric View Note", 0.310, 0.150)

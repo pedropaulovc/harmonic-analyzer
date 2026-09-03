@@ -7,8 +7,19 @@ sheet/template, import, curation, and export behavior lives in
 
 The strap is a long thin curved seesaw (~292 mm tip to tip, 16 mm deep, 2.5 mm
 thick).  A projected side view of the curved strap is a messy band, so the
-16 x 2.5 section is carried in the notes and the print shows the profile (front)
-plus a 1:2 isometric.  The sheet runs at 1:2.
+strap section is dimensioned on a 1:1 right end view and the print shows the
+profile (front) plus a 1:4 isometric.  The sheet runs at 1:2.
+
+The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): the
+rod-pin hole is an X/Y coordinate pair from the pivot bore that the block
+tolerance holds identically on all 20 rockers, so the sheet carries no datums,
+no feature-control frames and no basic dimensions.  The pivot bore keeps its
+roughness symbol -- the rocker swings on the pivot shaft in service.
+
+The ends are view dimensions (machinist review 2026-09-02): each arc's end x
+from the pivot (``TopRodX`` / ``BottomRodX``), the radial tip face
+(``RodTipLen``) and a (REF) tip-to-tip overall; the two large radii stay in
+the notes with their common centre on the pivot's vertical centreline.
 
 Run with SolidWorks open::
 
@@ -18,20 +29,15 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
-import math
 import sys
 from typing import Any
 
 from _gear_drawing_entities import visible_circle_edge
-from rocker_arm_spec import ARM_DEPTH, GEOMETRIC_TOLERANCES_MM
-
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
     add_edge_dimension,
-    add_feature_control_frame,
     add_native_hole_callout,
     add_property_linked_note,
     add_surface_finish,
@@ -39,9 +45,11 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    set_basic_dimension,
+    set_dimension_callouts,
+    set_dimension_precision,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
+    set_reference_dimension,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -49,13 +57,11 @@ from _surface_finish import surface_finish_by_key
 from rocker_arm_spec import (
     ARM_THICKNESS,
     PIVOT_HOLE_DIA,
-    R_TOP,
     ROD_HOLE_X,
     ROD_HOLE_Y,
+    ROD_TIP_X,
+    ROD_TIP_Y,
     SURFACE_FINISHES,
-    TIP_FACE,
-    TOP_ARC_LEN,
-    TOP_END_X,
     TOP_END_Y,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -89,11 +95,6 @@ FRONT_CENTER = (0.180, 0.175)
 RIGHT_CENTER = (0.300, 0.165)
 ISO_CENTER = (0.345, 0.205)
 
-# Tip-face midpoint (model mm): the top-arc endpoint pushed half the tip face
-# outward along the end radius -- where datum C (clocking) attaches.
-_TIP_FACE_MID_X = TOP_END_X + (TIP_FACE / 2.0) * (TOP_END_X / R_TOP)
-_TIP_FACE_MID_Y = TOP_END_Y - (TIP_FACE / 2.0) * math.cos(TOP_ARC_LEN / 2.0 / R_TOP)
-
 
 def _sheet_xy(mx: float, my: float) -> tuple[float, float]:
     """Sheet (x, y) of a model point in the bbox-centred front view (1:2)."""
@@ -106,12 +107,25 @@ def _sheet_xy(mx: float, my: float) -> tuple[float, float]:
 # The large concentric radii are carried in the manufacturing note: imported
 # radius dimensions retain off-sheet centre witnesses even in shortened-radius
 # mode.  Keeping them as notes avoids clipped geometry without losing values.
+# The arc-end x dims run from the sketch origin (the strap's bottom centre, on
+# the pivot's vertical C/L): the bottom-arc end below the arm (nearer than the
+# rod-pin X it nearly equals), the top-arc end above; the radial tip face
+# sits right of the rod tip.
 FRONT_KEEP = {
     "PivotDia": (0.180, 0.120),
+    "TopRodX": (0.225, 0.202),
+    "BottomRodX": (0.215, 0.152),
+    "RodTipLen": (0.264, 0.196),
 }
 NOTE_ONLY_DIMENSIONS = {"TopRadius", "BottomRadius"}
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
 TOP_KEEP: dict[str, tuple[float, float]] = {}
+OVERALL_TEXT_XY = (0.180, 0.222)
+
+# Process text beneath the pivot-bore diameter (Harvey #13: say ream); the
+# reamed bore prints three decimals (its band rides the model dimension).
+DIMENSION_CALLOUTS = {"PivotDia": "REAM THRU"}
+DIMENSION_PRECISION = {"PivotDia": 3}
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -157,21 +171,44 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # Explicit per-view scale (an auto-scaled view shifts every coordinate pick).
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 2))
-    # 1:1 right end view: the 2.50 x ~29 strap section -- shows the section the
-    # profile notes describe, gives the through direction, and carries datum B
-    # (the broad face) so the rod-pin position frame has an orientation datum.
+    # 1:1 right end view: the 2.50 x ~29 strap section -- gives the through
+    # direction and carries the strap thickness.
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(1, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 4))
-    for view in (right, iso):
-        set_hidden_lines_removed(adapter, view)
-    set_hidden_lines_visible(adapter, front)
+    for view in (front, right):
+        set_hidden_lines_visible(adapter, view)
+    set_hidden_lines_removed(adapter, iso)
 
-    curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
+    front_annotations = curate_view_dimensions(
+        adapter, front, keep=FRONT_KEEP, view_label="front"
+    )
+    set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
+    set_dimension_precision(adapter, front_annotations, DIMENSION_PRECISION)
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
 
-    # Rod-pin hole native callout (the #47 wizard hole near the +X tip).
+    # Tip-to-tip overall: the two tip corners (radial tip face meets the
+    # tapered end face) are the strap's widest points.  REFERENCE -- the
+    # arc-end x dims and the tip face already fix each end.
+    overall = add_edge_dimension(
+        adapter,
+        front,
+        p0=_sheet_xy(-ROD_TIP_X, ROD_TIP_Y),
+        p1=_sheet_xy(ROD_TIP_X, ROD_TIP_Y),
+        text_xy=OVERALL_TEXT_XY,
+        label="overall length",
+        orientation="horizontal",
+        entity_types=("VERTEX", "VERTEX"),
+    )
+    set_reference_dimension(
+        adapter,
+        _early_bound(overall, "IDisplayDimension").GetAnnotation(),
+        label="overall length",
+    )
+
+    # Rod-pin hole native callout (the #47 wizard hole near the +X tip), the
+    # drill riding as its prefix.
     rod_rim = _sheet_xy(ROD_HOLE_X, ROD_HOLE_Y - _ROD_HOLE_DIA / 2.0)
     add_native_hole_callout(
         adapter,
@@ -179,15 +216,15 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=rod_rim,
         callout_xy=(0.300, 0.128),
         label="rod-pin hole",
+        process="#47 DRILL",
     )
 
-    # Locate the rod-pin hole from the pivot bore with X and Y BASIC coordinate
-    # components.  The rod-pin centre is NOT collinear with the pivot (7.30 mm
-    # above its mid-height), so a single slant centre distance would leave the
-    # angular component uninspectable; two component dimensions fully define
-    # the true position the FCF below controls.
+    # Locate the rod-pin hole from the pivot bore with X and Y coordinate
+    # components (one origin per view).  The rod-pin centre is NOT collinear
+    # with the pivot (7.30 mm above its mid-height), so a single slant centre
+    # distance would leave the angular component uninspectable.
     pivot_rim = _sheet_xy(0.0, _PIVOT_MID_Y - PIVOT_HOLE_DIA / 2.0)
-    rod_location_x = add_edge_dimension(
+    add_edge_dimension(
         adapter,
         front,
         p0=pivot_rim,
@@ -196,8 +233,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="rod-pin X location",
         orientation="horizontal",
     )
-    set_basic_dimension(adapter, rod_location_x, label="rod-pin X location")
-    rod_location_y = add_edge_dimension(
+    add_edge_dimension(
         adapter,
         front,
         p0=pivot_rim,
@@ -206,48 +242,12 @@ async def build(adapter: Any) -> dict[str, str]:
         label="rod-pin Y location",
         orientation="vertical",
     )
-    set_basic_dimension(adapter, rod_location_y, label="rod-pin Y location")
 
-    # Datum A identifies the pivot bore's cylindrical surface.  Keep its leader
-    # oblique to both centre-mark axes so the triangle unmistakably terminates
-    # on the circumference rather than appearing to identify the bore centre.
-    pivot_datum_angle = math.radians(135.0)
+    # The integral hub makes the pivot bore concentric with the hub rim, so
+    # select the bore by diameter rather than relying on a coordinate pick.
     pivot_radius = PIVOT_HOLE_DIA / 2.0
-    pivot_datum_rim = _sheet_xy(
-        pivot_radius * math.cos(pivot_datum_angle),
-        _PIVOT_MID_Y + pivot_radius * math.sin(pivot_datum_angle),
-    )
-    pivot_datum_standoff = 0.020
-    add_datum_feature(
-        adapter,
-        front,
-        edge_xy=pivot_datum_rim,
-        symbol_xy=(
-            pivot_datum_rim[0] + pivot_datum_standoff * math.cos(pivot_datum_angle),
-            pivot_datum_rim[1] + pivot_datum_standoff * math.sin(pivot_datum_angle),
-        ),
-        datum="A",
-        label="pivot bore cylindrical datum feature",
-        shoulder=True,
-        # SolidWorks snaps this circular bore attachment to its nearest legal
-        # anchor.  The live readback is 0.0109 mm from the requested point;
-        # allow that native normalization while retaining the shared strict
-        # persistence check for freely positioned annotations.
-        position_tolerance_m=0.0001,
-    )
-    # Ra on the bore rim at 7:30 -- oblique to both centre-mark axes like the
-    # datum above: since the integral hub (2026-09-02) the 6 o'clock point on
-    # the bore lies on the centre mark's vertical extension and the coordinate
-    # pick resolved to the hub's O10 rim instead of the O6.5 bore edge. Then a
-    # position FCF tying the rod-pin hole to the complete A-B-C frame.
-    pivot_finish_angle = math.radians(225.0)
-    pivot_bottom = _sheet_xy(
-        pivot_radius * math.cos(pivot_finish_angle),
-        _PIVOT_MID_Y + pivot_radius * math.sin(pivot_finish_angle),
-    )
-    # Pick the bore circle by DIAMETER (the visible-entity walk the cone-gear
-    # drawing uses): a coordinate pick on the concentric O6.5 / O10 rims
-    # resolves to the hub's outer circle within SolidWorks' tolerance.
+    pivot_offset = pivot_radius / 2.0**0.5
+    pivot_bottom = _sheet_xy(-pivot_offset, _PIVOT_MID_Y - pivot_offset)
     pivot_bore_edge = visible_circle_edge(adapter, front, PIVOT_HOLE_DIA)
     add_surface_finish(
         adapter,
@@ -257,43 +257,14 @@ async def build(adapter: Any) -> dict[str, str]:
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bore"),
         label="pivot bore finish",
     )
-    # Datum B (broad face, on the end view) orients the hole axes; datum C
-    # (the +X tip face) clocks rotation about the pivot axis, so the X/Y BASIC
-    # coordinates above have an inspectable direction.
-    # Datum B on the strap's broad face in the end view, picked ABOVE the hub
-    # band (the O10 hub hides the flank over y 3..13 since 2026-09-02); the
-    # end view is centred on the strap's mid-depth (_PIVOT_MID_Y).
-    broad_face = (
-        RIGHT_CENTER[0] - ARM_THICKNESS / 2000.0,
-        RIGHT_CENTER[1] + (ARM_DEPTH - 1.0 - _PIVOT_MID_Y) / 1000.0  # right view is 1:1,
-    )
-    add_datum_feature(
+    # Strap thickness (2.50) across the two broad faces on the right end view.
+    add_edge_dimension(
         adapter,
         right,
-        edge_xy=broad_face,
-        symbol_xy=(broad_face[0] - 0.016, broad_face[1] - 0.014),
-        datum="B",
-        label="broad face",
-    )
-    tip_face = _sheet_xy(_TIP_FACE_MID_X, _TIP_FACE_MID_Y)
-    add_datum_feature(
-        adapter,
-        front,
-        edge_xy=tip_face,
-        symbol_xy=(tip_face[0] + 0.012, tip_face[1] + 0.012),
-        datum="C",
-        label="rod-side tip face",
-    )
-    add_feature_control_frame(
-        adapter,
-        front,
-        edge_xy=rod_rim,
-        frame_xy=(0.300, 0.195),
-        characteristic="position",
-        tolerance=GEOMETRIC_TOLERANCES_MM["rod-pin hole position"],
-        datums=("A", "B", "C"),
-        diameter=True,
-        label="rod-pin hole position",
+        p0=(RIGHT_CENTER[0] - ARM_THICKNESS / 2000.0, RIGHT_CENTER[1]),
+        p1=(RIGHT_CENTER[0] + ARM_THICKNESS / 2000.0, RIGHT_CENTER[1]),
+        text_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] + 0.024),
+        label="strap thickness",
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.082)

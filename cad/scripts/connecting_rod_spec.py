@@ -25,12 +25,16 @@ HEAD_WIDTH = 10.0  # across the tombstone cheeks
 HEAD_HEIGHT = 10.5  # crown top -> shoulder root
 HEAD_CROWN_ABOVE_PIN = 2.4  # crown top above the pin centre
 HEAD_THICKNESS = 2.5
+HEAD_SHOULDER_RISE = 1.2  # shoulder taper height (width 8 -> 10)
 PIN_HOLE_DIA = 1.994  # rocker pin hole = #47 number drill
 
 # --- Derived spans (mirror build_connecting_rod). ---
 RING_OUTER_RADIUS = RING_BORE_DIA / 2.0 + RING_WALL  # 20.4
-HEAD_TOP_Y = CENTER_DISTANCE + HEAD_CROWN_ABOVE_PIN  # crown top (150.07)
+HEAD_TOP_Y = CENTER_DISTANCE + HEAD_CROWN_ABOVE_PIN  # crown top (165.50)
 RING_BOTTOM_Y = -RING_OUTER_RADIUS  # -20.4
+HEAD_START_Y = HEAD_TOP_Y - HEAD_HEIGHT  # shoulder root (155.00)
+SHOULDER_TOP_Y = HEAD_START_Y + HEAD_SHOULDER_RISE  # cheek bottom (156.20)
+HEAD_CROWN_CY = HEAD_TOP_Y - HEAD_WIDTH / 2.0  # full-round crown centre (160.50)
 
 SURFACE_FINISHES = (
     SurfaceFinishControl("strap_bore", MACHINED_UM, CylinderFace(RING_BORE_DIA)),
@@ -48,8 +52,5 @@ SURFACE_FINISHES = (
 # connecting_rod_notes.py so assemblies importing this spec never inherit a
 # notes edit into their rebuild closure (codex #354).
 
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "rocker pin hole position": "0.20",
-}
+# No GD&T: the pin hole is a centre distance plus a centreline offset that the
+# block tolerance holds (cad/docs/drawing-simplicity-policy.md rule 3).

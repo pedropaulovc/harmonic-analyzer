@@ -28,6 +28,9 @@ TOP_ARC_LEN = 292.1  # top edge arc length = 11.5" (ch.30 back view)
 BOT_ARC_LEN = 266.7  # bottom edge arc length = 10.5" (ch.30 back-view sketch)
 TIP_FACE = 5.588  # 0.22" tip face, perpendicular to the top edge
 PIVOT_HOLE_DIA = 6.5  # rides the 6.35 pivot shaft
+# Reamed running bore: (upper, lower) deviations on the model dimension
+# (the +0.03/0 that used to live in a note line).
+PIVOT_HOLE_BAND = (0.03, 0.00)
 ROD_HOLE_X = 127.3738 - MECHANISM_X_SHIFT
 ROD_HOLE_ABOVE_BOTTOM = 5.53312035905  # preserves the level-pose pin Y after X shift
 
@@ -46,9 +49,13 @@ TOP_END_X = R_TOP * math.sin(_ALPHA_TOP)
 TOP_END_Y = CENTER_Y - R_TOP * math.cos(_ALPHA_TOP)
 BOT_END_X = R_BOTTOM * math.sin(_ALPHA_BOT)
 
-# Rod tip: the top-arc endpoint pushed out along the radius by the tip face.
+# Rod tip: the top-arc endpoint pushed out along the radius by the tip face
+# (the corner where the radial tip face meets the tapered end face -- the
+# widest point of the strap, so the tip-to-tip overall is 2 x ROD_TIP_X).
 _RAD_X = TOP_END_X / R_TOP
+_RAD_Y = (TOP_END_Y - CENTER_Y) / R_TOP
 ROD_TIP_X = TOP_END_X + TIP_FACE * _RAD_X  # widest half-span (~146.25)
+ROD_TIP_Y = TOP_END_Y + TIP_FACE * _RAD_Y  # tip corner height (~23.8)
 
 # Rod-pin hole Y (low in the strap, ch14 fan photo).
 ROD_HOLE_Y = (
@@ -71,17 +78,12 @@ PIVOT_MID_Y = ARM_DEPTH / 2.0  # 8.0
 # Drawing prose (DRAWING_NOTES / ISOMETRIC_VIEW_NOTE) lives in
 # rocker_arm_notes.py -- see connecting_rod_notes for the rationale.
 
-
 # Integral pivot hub (2026-09-02 photo re-derive, ch14 p.28 page002_img02 +
 # ch17 p.40): every arm carries its own round boss on both faces at the
-# pivot; neighbouring hubs touch face to face and SET the 7.0565 station
-# pitch -- there are no loose spacer bushings (the 19 `pivot-bushing` parts
-# are retired). OD kept at the old bushing's O10: at d = 0 the amplitude
-# bar's foot cheeks pass 5.63 above the shaft axis, so OD < ~11.25.
+# pivot; neighbouring hubs touch face to face and set the 7.0565 station
+# pitch. The 19 `pivot-bushing` spacer parts are retired.
 HUB_DIA = 10.0
 HUB_LENGTH = 7.0565  # == machine channels.station_pitch_mm (asserted by the build)
 
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "rod-pin hole position": "0.20",
-}
+# No GD&T: the rod-pin hole is a coordinate pair from the pivot bore that the
+# block tolerance holds (cad/docs/drawing-simplicity-policy.md rule 3).
