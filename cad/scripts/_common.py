@@ -50,6 +50,7 @@ import asyncio
 import functools
 import math
 import os
+import shutil
 import sys
 import time
 from collections.abc import Awaitable, Callable, Iterable
@@ -1125,6 +1126,15 @@ _SW_PROP_REPLACE = 2  # swCustomPropertyAddOption_e.swCustomPropertyReplaceValue
 
 
 @functools.lru_cache(maxsize=1)
+def _git_executable() -> str:
+    """Absolute Git executable used by fixed, repository-internal commands."""
+    executable = shutil.which("git")
+    if executable is None:
+        raise FileNotFoundError("git executable not found on PATH")
+    return str(Path(executable).resolve())
+
+
+@functools.lru_cache(maxsize=1)
 def _git_sha() -> str:
     """Short HEAD sha (+ '-dirty'), for a reproducible Generator stamp.
 
@@ -1134,15 +1144,15 @@ def _git_sha() -> str:
     import subprocess
 
     try:
-        sha = subprocess.run(
-            ["git", "rev-parse", "--short", "HEAD"],
+        sha = subprocess.run(  # noqa: S603 -- resolved Git; fixed internal argv
+            [_git_executable(), "rev-parse", "--short", "HEAD"],
             cwd=str(CAD_ROOT),
             capture_output=True,
             text=True,
             check=True,
         ).stdout.strip()
-        dirty = subprocess.run(
-            ["git", "status", "--porcelain"],
+        dirty = subprocess.run(  # noqa: S603 -- resolved Git; fixed internal argv
+            [_git_executable(), "status", "--porcelain"],
             cwd=str(CAD_ROOT),
             capture_output=True,
             text=True,
@@ -1171,8 +1181,11 @@ def _build_id() -> str:
     import _config
 
     def _git(*args: str) -> str:
-        return subprocess.run(
-            ["git", *args], cwd=str(CAD_ROOT), capture_output=True, text=True,
+        return subprocess.run(  # noqa: S603 -- resolved Git; fixed internal argv
+            [_git_executable(), *args],
+            cwd=str(CAD_ROOT),
+            capture_output=True,
+            text=True,
             check=True,
         ).stdout.strip()
 
@@ -1202,8 +1215,8 @@ def _git_commit_year() -> str:
     """
     import subprocess
 
-    date = subprocess.run(
-        ["git", "log", "-1", "--format=%cs"],
+    date = subprocess.run(  # noqa: S603 -- resolved Git; fixed internal argv
+        [_git_executable(), "log", "-1", "--format=%cs"],
         cwd=str(CAD_ROOT),
         capture_output=True,
         text=True,

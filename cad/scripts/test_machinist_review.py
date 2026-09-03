@@ -284,6 +284,103 @@ def test_arbitrary_png_reports_with_same_basename_do_not_collide(
     assert all(f"]({name}.md)" in index for name in names)
 
 
+def test_pdfium_operations_share_one_module_lock(tmp_path: Path, monkeypatch) -> None:
+    import sys
+    import threading
+    import types
+    from concurrent.futures import ThreadPoolExecutor
+
+    class ObservedLock:
+        def __init__(self) -> None:
+            self._lock = threading.Lock()
+            self._state_lock = threading.Lock()
+            self.owner: int | None = None
+            self.active = 0
+            self.max_active = 0
+            self.acquisitions = 0
+
+        def __enter__(self):
+            self._lock.acquire()
+            with self._state_lock:
+                self.owner = threading.get_ident()
+                self.active += 1
+                self.max_active = max(self.max_active, self.active)
+                self.acquisitions += 1
+            return self
+
+        def __exit__(self, *_args) -> None:
+            with self._state_lock:
+                self.active -= 1
+                self.owner = None
+            self._lock.release()
+
+        def assert_held(self, operation: str) -> None:
+            assert self.owner == threading.get_ident(), (
+                f"PDFium operation escaped the shared lock: {operation}"
+            )
+
+    observed_lock = ObservedLock()
+
+    class FakeImage:
+        def save(self, path: Path, **_kwargs) -> None:
+            path.write_bytes(b"png")
+
+    class FakeBitmap:
+        def to_pil(self) -> FakeImage:
+            observed_lock.assert_held("bitmap.to_pil")
+            return FakeImage()
+
+    class FakePage:
+        def render(self, **_kwargs) -> FakeBitmap:
+            observed_lock.assert_held("page.render")
+            return FakeBitmap()
+
+        def close(self) -> None:
+            observed_lock.assert_held("page.close")
+
+    class FakeDocument:
+        def __init__(self, _path: str) -> None:
+            observed_lock.assert_held("PdfDocument")
+
+        def __len__(self) -> int:
+            observed_lock.assert_held("document length")
+            return 2
+
+        def __getitem__(self, _index: int) -> FakePage:
+            observed_lock.assert_held("document page")
+            return FakePage()
+
+        def close(self) -> None:
+            observed_lock.assert_held("document.close")
+
+    monkeypatch.setattr(mr, "_PDFIUM_LOCK", observed_lock)
+    monkeypatch.setitem(
+        sys.modules, "pypdfium2", types.SimpleNamespace(PdfDocument=FakeDocument)
+    )
+    barrier = threading.Barrier(2)
+    source = tmp_path / "assembly.pdf"
+    package = mr.ReviewPackage("assembly", "assembly", (source,))
+    workdir = tmp_path / "images"
+    workdir.mkdir()
+
+    def page_count() -> int:
+        barrier.wait()
+        return mr._pdf_page_count(source)
+
+    def materialize() -> list[Path]:
+        barrier.wait()
+        return mr._materialize_images(package, workdir)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        page_count_future = pool.submit(page_count)
+        materialize_future = pool.submit(materialize)
+        assert page_count_future.result() == 2
+        assert len(materialize_future.result()) == 2
+
+    assert observed_lock.acquisitions == 2
+    assert observed_lock.max_active == 1
+
+
 def test_multi_sheet_assembly_is_one_cross_sheet_review(
     tmp_path: Path, monkeypatch
 ) -> None:

@@ -44,6 +44,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass, field
@@ -68,6 +69,10 @@ DEFAULT_MODEL = "gpt-5.6-sol"
 DEFAULT_EFFORT = "high"
 FINDING_KEYS = ("blockers", "over_specification", "clarity", "minor")
 GATING_KEYS = ("blockers", "over_specification", "clarity")
+# PDFium's native API is process-global and not thread-safe.  Hold this only while
+# opening/counting/rendering/closing PDFs; Codex review subprocesses remain parallel.
+_PDFIUM_LOCK = threading.Lock()
+
 
 # Event/item types codex emits when the agent ran something.  Any of these in
 # the --json stream means the review read more than the attached image.
@@ -149,11 +154,12 @@ def _package_for_pngs(paths: Sequence[Path], kind: str) -> ReviewPackage:
 def _pdf_page_count(path: Path) -> int:
     import pypdfium2 as pdfium
 
-    document = pdfium.PdfDocument(str(path))
-    try:
-        page_count = len(document)
-    finally:
-        document.close()
+    with _PDFIUM_LOCK:
+        document = pdfium.PdfDocument(str(path))
+        try:
+            page_count = len(document)
+        finally:
+            document.close()
     if page_count < 1:
         raise ValueError(f"assembly PDF has no sheets: {path}")
     return page_count
@@ -195,19 +201,20 @@ def _materialize_images(package: ReviewPackage, workdir: Path) -> list[Path]:
             shutil.copyfile(source, image)
             images.append(image)
             continue
-        document = pdfium.PdfDocument(str(source))
-        try:
-            for page_index in range(len(document)):
-                page = document[page_index]
-                try:
-                    rendered = page.render(scale=300.0 / 72.0).to_pil()
-                    image = workdir / f"sheet-{len(images) + 1}.png"
-                    rendered.save(image, dpi=(300, 300))
-                    images.append(image)
-                finally:
-                    page.close()
-        finally:
-            document.close()
+        with _PDFIUM_LOCK:
+            document = pdfium.PdfDocument(str(source))
+            try:
+                for page_index in range(len(document)):
+                    page = document[page_index]
+                    try:
+                        rendered = page.render(scale=300.0 / 72.0).to_pil()
+                        image = workdir / f"sheet-{len(images) + 1}.png"
+                        rendered.save(image, dpi=(300, 300))
+                        images.append(image)
+                    finally:
+                        page.close()
+            finally:
+                document.close()
     return images
 
 
