@@ -56,6 +56,10 @@ def test_schema_is_strict_structured_output() -> None:
     assert finding["additionalProperties"] is False
     assert set(finding["required"]) == {"where", "issue", "fix"}
     assert schema["properties"]["verdict"]["enum"] == ["SHIP", "FIX"]
+    assert schema["properties"]["summary"]["minLength"] == 1
+    assert all(
+        finding["properties"][key]["minLength"] == 1 for key in finding["required"]
+    )
 
 
 def test_claude_command_is_exact_and_neutral(tmp_path: Path) -> None:
@@ -85,6 +89,8 @@ def test_claude_command_is_exact_and_neutral(tmp_path: Path) -> None:
         schema_json,
         "--tools",
         "Read",
+        "--allowedTools",
+        "Read(sheet.png)",
         "--restricted",
         "--safe-mode",
         "--no-session-persistence",
@@ -194,6 +200,10 @@ def test_claude_blindness_allows_only_neutral_image_read_and_output(
     assert mr.count_claude_tool_events(
         [image_read, structured], allowed_image=image
     ) == 0
+    assert mr.count_claude_image_reads(
+        [image_read, structured], allowed_image=image
+    ) == 1
+    assert mr.count_claude_image_reads([other_read], allowed_image=image) == 0
     assert mr.count_claude_tool_events([other_read], allowed_image=image) == 1
     assert mr.count_claude_tool_events([command], allowed_image=image) == 1
 
@@ -233,6 +243,34 @@ def test_both_structured_verdict_parsers(tmp_path: Path) -> None:
     assert mr.extract_codex_verdict(output, events) == verdict
 
 
+@pytest.mark.parametrize(
+    "malformed",
+    [
+        {**_clean_verdict(), "verdict": "MAYBE"},
+        {**_clean_verdict(), "unexpected": True},
+        {**_clean_verdict(), "blockers": [{}]},
+        {**_clean_verdict(), "summary": 7},
+        {**_clean_verdict(), "summary": ""},
+        {
+            **_clean_verdict(),
+            "minor": [{"where": "", "issue": "rough edge", "fix": "deburr"}],
+        },
+    ],
+)
+def test_structured_verdict_parsers_reject_schema_violations(
+    tmp_path: Path, malformed: dict[str, Any]
+) -> None:
+    with pytest.raises(RuntimeError):
+        mr.extract_claude_verdict(
+            [{"type": "result", "structured_output": malformed}]
+        )
+
+    output = tmp_path / "verdict.json"
+    output.write_text(json.dumps(malformed), encoding="utf-8")
+    with pytest.raises(RuntimeError):
+        mr.extract_codex_verdict(output, [])
+
+
 def test_review_execution_uses_provider_defaults_and_model_overrides(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -250,7 +288,20 @@ def test_review_execution_uses_provider_defaults_and_model_overrides(
             output.write_text(json.dumps(verdict), encoding="utf-8")
             stdout = json.dumps({"type": "turn.completed"})
         else:
-            stdout = json.dumps({"type": "result", "structured_output": verdict})
+            read_event = {
+                "type": "assistant",
+                "message": {
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "name": "Read",
+                            "input": {"file_path": "sheet.png"},
+                        }
+                    ]
+                },
+            }
+            result_event = {"type": "result", "structured_output": verdict}
+            stdout = "\n".join((json.dumps(read_event), json.dumps(result_event)))
         return subprocess.CompletedProcess(command, 0, stdout=stdout, stderr="")
 
     monkeypatch.setattr(mr.subprocess, "run", fake_run)
@@ -299,6 +350,115 @@ def test_review_execution_uses_provider_defaults_and_model_overrides(
     assert commands[3][commands[3].index("-m") + 1] == "codex-custom"
     assert prompts[0].startswith("Use the Read tool to inspect sheet.png")
     assert prompts[1] == mr.load_prompt("part")
+    assert claude_review.passed and claude_review.blind
+    assert claude_override.passed and claude_override.blind
+    assert claude_review.extra == {"image_read_events": 1}
+
+
+def test_claude_review_fails_without_an_allowed_image_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    verdict = _clean_verdict()
+
+    def fake_run(
+        command: list[str], **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        stdout = json.dumps({"type": "result", "structured_output": verdict})
+        return subprocess.CompletedProcess(command, 0, stdout=stdout, stderr="")
+
+    monkeypatch.setattr(mr.subprocess, "run", fake_run)
+    image = tmp_path / "input.png"
+    image.write_bytes(b"png")
+    review = mr.review_sheet(
+        mr.Sheet("uninspected", "part", image),
+        reviewer="claude",
+        report_dir=tmp_path / "report",
+        retries=0,
+        claude="claude-test",
+    )
+
+    assert review.verdict == verdict
+    assert not review.passed
+    assert not review.blind
+    assert review.tool_events == 0
+    assert review.extra == {"image_read_events": 0}
+
+
+def test_retry_cannot_erase_earlier_claude_blindness_violation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    verdict = _clean_verdict()
+    calls = 0
+
+    def fake_run(
+        command: list[str], **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            unauthorized = {
+                "type": "assistant",
+                "message": {
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "name": "Read",
+                            "input": {"file_path": "schema.json"},
+                        }
+                    ]
+                },
+            }
+            return subprocess.CompletedProcess(
+                command,
+                1,
+                stdout=json.dumps(unauthorized),
+                stderr="retry",
+            )
+        allowed = {
+            "type": "assistant",
+            "message": {
+                "content": [
+                    {
+                        "type": "tool_use",
+                        "name": "Read",
+                        "input": {"file_path": "sheet.png"},
+                    }
+                ]
+            },
+        }
+        result = {"type": "result", "structured_output": verdict}
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout="\n".join((json.dumps(allowed), json.dumps(result))),
+            stderr="",
+        )
+
+    monkeypatch.setattr(mr.subprocess, "run", fake_run)
+    image = tmp_path / "input.png"
+    image.write_bytes(b"png")
+    report_dir = tmp_path / "report"
+    review = mr.review_sheet(
+        mr.Sheet("retried", "part", image),
+        reviewer="claude",
+        report_dir=report_dir,
+        retries=1,
+        claude="claude-test",
+    )
+
+    assert review.verdict == verdict
+    assert review.attempts == 2
+    assert review.tool_events == 1
+    assert review.extra == {"image_read_events": 1}
+    assert not review.blind
+    assert not review.passed
+    saved_events = [
+        json.loads(line)
+        for line in (report_dir / "retried.events.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ]
+    assert [event["review_attempt"] for event in saved_events] == [1, 2, 2]
 
 
 def test_review_cli_requires_reviewer_except_for_index(

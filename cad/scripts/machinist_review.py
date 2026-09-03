@@ -174,6 +174,8 @@ def build_claude_command(
         schema_json,
         "--tools",
         "Read",
+        "--allowedTools",
+        f"Read({image.name})",
         "--restricted",
         "--safe-mode",
         "--no-session-persistence",
@@ -235,23 +237,23 @@ def _walk(obj: Any) -> Iterable[Any]:
             yield from _walk(value)
 
 
-def count_claude_tool_events(
+def _claude_event_counts(
     events: Sequence[dict[str, Any]], *, allowed_image: Path
-) -> int:
-    """Count Claude events other than Read(sheet.png) and StructuredOutput."""
-    hits = 0
+) -> tuple[int, int]:
+    """Return unauthorized-event and approved-image-read counts."""
+    unauthorized = 0
+    image_reads = 0
     for event in events:
-        matched = False
+        event_unauthorized = False
+        event_read_image = False
         for node in _walk(event):
             if not isinstance(node, dict):
                 continue
             kind = str(node.get("type", "")).lower()
-            if (
-                kind == "tool_use"
-                and str(node.get("name", "")).lower() == "structuredoutput"
-            ):
+            name = str(node.get("name", "")).lower()
+            if kind == "tool_use" and name == "structuredoutput":
                 continue
-            if kind == "tool_use" and str(node.get("name", "")).lower() == "read":
+            if kind == "tool_use" and name == "read":
                 tool_input = node.get("input")
                 raw_path = (
                     tool_input.get("file_path")
@@ -263,15 +265,32 @@ def count_claude_tool_events(
                     if not read_path.is_absolute():
                         read_path = allowed_image.parent / read_path
                     if read_path.resolve() == allowed_image.resolve():
+                        event_read_image = True
                         continue
+                event_unauthorized = True
+                continue
             if "command" in node and node.get("command"):
-                matched = True
-                break
+                event_unauthorized = True
+                continue
             if any(marker in kind for marker in _TOOL_EVENT_MARKERS):
-                matched = True
-                break
-        hits += int(matched)
-    return hits
+                event_unauthorized = True
+        unauthorized += int(event_unauthorized)
+        image_reads += int(event_read_image)
+    return unauthorized, image_reads
+
+
+def count_claude_tool_events(
+    events: Sequence[dict[str, Any]], *, allowed_image: Path
+) -> int:
+    """Count Claude events other than Read(sheet.png) and StructuredOutput."""
+    return _claude_event_counts(events, allowed_image=allowed_image)[0]
+
+
+def count_claude_image_reads(
+    events: Sequence[dict[str, Any]], *, allowed_image: Path
+) -> int:
+    """Count events proving that Claude read the neutral sheet image."""
+    return _claude_event_counts(events, allowed_image=allowed_image)[1]
 
 
 def count_codex_tool_events(events: Sequence[dict[str, Any]]) -> int:
@@ -312,12 +331,97 @@ def _parse_events(stdout: str) -> list[dict[str, Any]]:
     return events
 
 
+def _resolve_schema_ref(root: dict[str, Any], ref: str) -> dict[str, Any]:
+    """Resolve a local JSON Schema reference."""
+    if not ref.startswith("#/"):
+        raise RuntimeError(f"unsupported verdict schema reference {ref!r}")
+    target: Any = root
+    for raw_part in ref[2:].split("/"):
+        part = raw_part.replace("~1", "/").replace("~0", "~")
+        if not isinstance(target, dict) or part not in target:
+            raise RuntimeError(f"invalid verdict schema reference {ref!r}")
+        target = target[part]
+    if not isinstance(target, dict):
+        raise RuntimeError(f"verdict schema reference is not an object: {ref!r}")
+    return target
+
+
+def _validate_schema_value(
+    value: Any,
+    schema: dict[str, Any],
+    *,
+    root: dict[str, Any],
+    path: str,
+) -> None:
+    """Validate one value against every keyword used by the verdict schema."""
+    if "$ref" in schema:
+        ref = schema["$ref"]
+        if not isinstance(ref, str):
+            raise RuntimeError(f"{path}: verdict schema $ref is not a string")
+        _validate_schema_value(value, _resolve_schema_ref(root, ref), root=root, path=path)
+        return
+
+    expected_type = schema.get("type")
+    type_matches = {
+        "object": isinstance(value, dict),
+        "array": isinstance(value, list),
+        "string": isinstance(value, str),
+    }
+    if expected_type in type_matches and not type_matches[expected_type]:
+        raise RuntimeError(f"{path}: expected {expected_type}")
+    if expected_type not in (None, *type_matches):
+        raise RuntimeError(f"{path}: unsupported verdict schema type {expected_type!r}")
+
+    if "enum" in schema and value not in schema["enum"]:
+        raise RuntimeError(f"{path}: value is not one of {schema['enum']!r}")
+
+    if isinstance(value, str) and "minLength" in schema:
+        min_length = schema["minLength"]
+        if not isinstance(min_length, int) or min_length < 0:
+            raise RuntimeError(f"{path}: invalid minLength in verdict schema")
+        if len(value) < min_length:
+            raise RuntimeError(f"{path}: string is shorter than {min_length}")
+
+    if isinstance(value, dict):
+        required = schema.get("required", [])
+        if not isinstance(required, list) or not all(
+            isinstance(key, str) for key in required
+        ):
+            raise RuntimeError(f"{path}: invalid required list in verdict schema")
+        missing = [key for key in required if key not in value]
+        if missing:
+            raise RuntimeError(f"{path}: missing required properties {missing}")
+        properties = schema.get("properties", {})
+        if not isinstance(properties, dict):
+            raise RuntimeError(f"{path}: invalid properties in verdict schema")
+        if schema.get("additionalProperties") is False:
+            extra = sorted(set(value) - set(properties))
+            if extra:
+                raise RuntimeError(f"{path}: unexpected properties {extra}")
+        for key, child_schema in properties.items():
+            if key in value:
+                if not isinstance(child_schema, dict):
+                    raise RuntimeError(f"{path}.{key}: invalid verdict subschema")
+                _validate_schema_value(
+                    value[key], child_schema, root=root, path=f"{path}.{key}"
+                )
+
+    if isinstance(value, list) and "items" in schema:
+        item_schema = schema["items"]
+        if not isinstance(item_schema, dict):
+            raise RuntimeError(f"{path}: invalid items in verdict schema")
+        for index, item in enumerate(value):
+            _validate_schema_value(
+                item, item_schema, root=root, path=f"{path}[{index}]"
+            )
+
+
 def _validate_verdict(verdict: Any) -> dict[str, Any]:
+    """Validate a verdict against the complete repository JSON schema."""
+    schema = load_schema()
+    _validate_schema_value(verdict, schema, root=schema, path="$")
     if not isinstance(verdict, dict):
         raise RuntimeError("structured verdict is not an object")
-    missing = [k for k in ("verdict", "summary", *FINDING_KEYS) if k not in verdict]
-    if missing:
-        raise RuntimeError(f"verdict missing keys {missing}")
     return verdict
 
 
@@ -400,12 +504,15 @@ def review_sheet(
     verdict: dict[str, Any] | None = None
     events: list[dict[str, Any]] = []
     attempts = 0
-    image: Path | None = None
+    tool_events = 0
+    verdict_attempt_image_reads = 0
     for attempt in range(retries + 1):
         attempts = attempt + 1
         workdir = Path(tempfile.mkdtemp(prefix="machrev-"))
+        image = workdir / "sheet.png"
+        attempt_events: list[dict[str, Any]] = []
+        attempt_image_reads = 0
         try:
-            image = workdir / "sheet.png"
             shutil.copyfile(sheet.png, image)
             schema = workdir / "schema.json"
             shutil.copyfile(SCHEMA_FILE, schema)
@@ -439,41 +546,54 @@ def review_sheet(
                 timeout=timeout_s,
                 cwd=str(workdir),
             )
-            events = _parse_events(proc.stdout)
-            events_path.write_text(
-                "\n".join(json.dumps(e) for e in events) + "\n", encoding="utf-8"
-            )
+            attempt_events = _parse_events(proc.stdout)
             if proc.returncode != 0:
                 raise RuntimeError(
                     f"{reviewer} exit {proc.returncode}: {proc.stderr.strip()[-800:]}"
                 )
             verdict = (
-                extract_claude_verdict(events)
+                extract_claude_verdict(attempt_events)
                 if reviewer == "claude"
-                else extract_codex_verdict(output, events)
+                else extract_codex_verdict(output, attempt_events)
             )
             error = None
             break
         except Exception as exc:  # noqa: BLE001 - recorded, retried, reported
+            if isinstance(exc, subprocess.TimeoutExpired):
+                partial_stdout = exc.stdout
+                if isinstance(partial_stdout, bytes):
+                    partial_stdout = partial_stdout.decode("utf-8", errors="replace")
+                attempt_events = _parse_events(partial_stdout or "")
             error = f"{type(exc).__name__}: {exc}"
             verdict = None
         finally:
+            events.extend(
+                {"review_attempt": attempt + 1, "event": event}
+                for event in attempt_events
+            )
+            if reviewer == "claude":
+                unauthorized, attempt_image_reads = _claude_event_counts(
+                    attempt_events, allowed_image=image
+                )
+                tool_events += unauthorized
+                if verdict is not None:
+                    verdict_attempt_image_reads = attempt_image_reads
+            else:
+                tool_events += count_codex_tool_events(attempt_events)
             shutil.rmtree(workdir, ignore_errors=True)
 
-    if image is None:
-        raise RuntimeError("review attempt did not create its neutral image")
-    tool_events = (
-        count_claude_tool_events(events, allowed_image=image)
-        if reviewer == "claude"
-        else count_codex_tool_events(events)
+    events_path.write_text(
+        "".join(f"{json.dumps(event)}\n" for event in events), encoding="utf-8"
     )
+    inspection_proven = reviewer == "codex" or verdict_attempt_image_reads > 0
+    blind = tool_events == 0 and inspection_proven
     review = Review(
         name=sheet.name,
         kind=sheet.kind,
         png=str(sheet.png),
         verdict=verdict,
-        passed=is_pass(verdict) and tool_events == 0,
-        blind=tool_events == 0,
+        passed=is_pass(verdict) and blind,
+        blind=blind,
         tool_events=tool_events,
         reviewer=reviewer,
         model=model,
@@ -485,6 +605,11 @@ def review_sheet(
         error=error,
         events_file=str(events_path),
         attempts=attempts,
+        extra=(
+            {"image_read_events": verdict_attempt_image_reads}
+            if reviewer == "claude"
+            else {}
+        ),
     )
     write_review(review, report_dir)
     return review
