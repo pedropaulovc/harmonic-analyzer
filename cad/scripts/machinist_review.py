@@ -568,7 +568,7 @@ def review_sheet(
             verdict = None
         finally:
             events.extend(
-                {"review_attempt": attempt + 1, "event": event}
+                {"attempt": attempt + 1, "event": event}
                 for event in attempt_events
             )
             if reviewer == "claude":

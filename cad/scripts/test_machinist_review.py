@@ -197,12 +197,12 @@ def test_claude_blindness_allows_only_neutral_image_read_and_output(
             ]
         },
     }
-    assert mr.count_claude_tool_events(
-        [image_read, structured], allowed_image=image
-    ) == 0
-    assert mr.count_claude_image_reads(
-        [image_read, structured], allowed_image=image
-    ) == 1
+    assert (
+        mr.count_claude_tool_events([image_read, structured], allowed_image=image) == 0
+    )
+    assert (
+        mr.count_claude_image_reads([image_read, structured], allowed_image=image) == 1
+    )
     assert mr.count_claude_image_reads([other_read], allowed_image=image) == 0
     assert mr.count_claude_tool_events([other_read], allowed_image=image) == 1
     assert mr.count_claude_tool_events([command], allowed_image=image) == 1
@@ -223,9 +223,7 @@ def test_codex_blindness_fails_closed_on_every_tool_or_command() -> None:
 def test_both_structured_verdict_parsers(tmp_path: Path) -> None:
     verdict = _clean_verdict()
     assert (
-        mr.extract_claude_verdict(
-            [{"type": "result", "structured_output": verdict}]
-        )
+        mr.extract_claude_verdict([{"type": "result", "structured_output": verdict}])
         == verdict
     )
 
@@ -261,9 +259,7 @@ def test_structured_verdict_parsers_reject_schema_violations(
     tmp_path: Path, malformed: dict[str, Any]
 ) -> None:
     with pytest.raises(RuntimeError):
-        mr.extract_claude_verdict(
-            [{"type": "result", "structured_output": malformed}]
-        )
+        mr.extract_claude_verdict([{"type": "result", "structured_output": malformed}])
 
     output = tmp_path / "verdict.json"
     output.write_text(json.dumps(malformed), encoding="utf-8")
@@ -458,7 +454,7 @@ def test_retry_cannot_erase_earlier_claude_blindness_violation(
         .read_text(encoding="utf-8")
         .splitlines()
     ]
-    assert [event["review_attempt"] for event in saved_events] == [1, 2, 2]
+    assert [event["attempt"] for event in saved_events] == [1, 2, 2]
 
 
 def test_review_cli_requires_reviewer_except_for_index(
