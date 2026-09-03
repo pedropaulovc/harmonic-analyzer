@@ -1283,19 +1283,15 @@ LIFT_ROD_Z0 = -114.0 + MECHANISM_Z_SHIFT
 BLOCK_X = (PIVOT_X + LIFT_X) / 2.0  # block local origin midway the bores
 BLOCK_FRONT_Z0 = -104.0 + MECHANISM_Z_SHIFT
 BLOCK_BACK_Z0 = 76.0 + MECHANISM_Z_SHIFT
-LEVER_TILT_DEG = -40.0  # from vertical; NEGATIVE = leaning machine +X, away
-# from the drum and the pinion arbor (2026-09: with the lift rod now right
-# under the drum, the old +40 lean ran the rod into the arbor's front stub --
-# 40.8 mm^3 in the gate; 4/4 v4_pinion_004 shows the lever standing off to
-# the front-right, i.e. this side). The p002-fitted
-# 32 was measured with the lever rooted EAST of the pivot (pre-PR5); from the
-# west root that tilt swept the shaft through the pinion's front arbor stub
-# (117.9 mm^3), and 36 still grazed it (10.3 mm^3): the binding quantity is
-# the PERPENDICULAR distance from the stub's (x, y) to the rod line -- the
-# stub runs along z, so the 3D minimum is the 2D point-to-line distance, NOT
-# the vertical gap at the x-crossing (that mistake cost a build). 40 gives
-# 8.44 vs the 7.25 the Ø8 arbor requires, asserted below (PR7 replaced the
-# Ø6.35 stub with the arbor on the same axis).
+LEVER_TILT_DEG = 10.0  # parked, from vertical toward machine -X
+# ch25 p.68 page002_img08 is explicitly the FRONT side and shows the
+# disengaged lever only about 10 degrees from vertical, with its tip to image
+# right = machine -X.  The engaged page002_img07 folds the same lever toward
+# machine +X.  This sign also matches rot_z_rows: local +Y maps to
+# (-sin(theta), cos(theta)), so positive theta tips toward -X.  The prior
+# -40-degree seed put the parked lever on the photographed engaged side.
+# The arbor-clearance gate below proves the photo-derived +10-degree rest
+# pose, and the cam-contact solve proves its full swing to about -72 degrees.
 LEVER_LEN = LEVER_ROD_LEN  # 86: hub centre -> tip (img07 @9.37 px/mm,
 # PR7 -- the PR6 98 was img08's perspective-inflated read)
 LEVER_Z = -111.0 + MECHANISM_Z_SHIFT
@@ -1344,16 +1340,14 @@ if LEVER_Z + LEVER_HUB_LEN / 2.0 > BLOCK_FRONT_Z0 - 0.25:
     raise AssertionError("lever hub reaches the front pivot block")
 if abs((LEVER_Z - (LEVER_HUB_LEN / 2.0 - LEVER_WALL_T)) - LIFT_ROD_Z0) > 1e-9:
     raise AssertionError("lever hub bore floor off the lift rod's front end")
-# The east-leaning lever shaft passes under the pinion ARBOR (PR7: the Ø8
-# steel arbor replaced the drum's Ø6.35 stubs; it spans the lever's z band,
-# so the 3D clearance is the 2D distance from the arbor's (x, y) to the Ø6
-# rod-root axis line). Perpendicular form when the foot lands on the rod
-# segment, endpoint distance otherwise. Rod ROOT dia books the worst case
-# (the PR7 taper only thins toward the tip).
+# The parked lever shaft passes clear of the pinion ARBOR (PR7: the Ø8 steel
+# arbor replaced the drum's Ø6.35 stubs; it spans the lever's z band, so the
+# 3D clearance is the 2D distance from the arbor's (x, y) to the Ø6 rod-root
+# axis line). Perpendicular form when the foot lands on the rod segment,
+# endpoint distance otherwise. Rod ROOT dia books the worst case (the PR7
+# taper only thins toward the tip).
 _LEV_T = math.radians(LEVER_TILT_DEG)
-_LEV_U = (-math.sin(_LEV_T), math.cos(_LEV_T))  # up the rod: rot_z(+tilt) tips
-# the +Y rod toward -X (CCW), so the placement and this check agree (2026-09:
-# the old +sin let a +40 lean read as clear while the gate found it in the arbor)
+_LEV_U = (-math.sin(_LEV_T), math.cos(_LEV_T))  # positive tips machine -X
 _LEV_REL = (APINION_X - LIFT_X, APINION_Y - LIFT_Y)  # root -> arbor axis
 _LEV_FOOT = _LEV_REL[0] * _LEV_U[0] + _LEV_REL[1] * _LEV_U[1]
 if 0.0 <= _LEV_FOOT <= LEVER_LEN:
@@ -1582,6 +1576,42 @@ if _FPIN_TIP_S - _S_CAM_ENG < 1.0:
     raise AssertionError("engaged pin slides off the cam axis")
 
 
+# Solve the lever's photographed engaged angle from the real eccentric-cam
+# contact, rather than assuming the throw continues on the parked side.  The
+# cam starts eccentric-down at rotation 0 and turns clockwise until its OD
+# first reaches the follower in the engaged strap pose.  Bisection is bounded
+# by down (clear) and up (over-travel); the unique root is about -81.9 degrees,
+# so the +10-degree parked lever finishes near -71.9 degrees.  The ch25 front
+# pair independently reads about +10 parked and -76 engaged.
+def _engaged_cam_gap(rotation_deg: float) -> float:
+    a = math.radians(rotation_deg)
+    cam_centre = (
+        LIFT_X + CAM_ECC * math.sin(a),
+        LIFT_Y - CAM_ECC * math.cos(a),
+    )
+    dx = cam_centre[0] - _FPIN_C_ENG[0]
+    dy = cam_centre[1] - _FPIN_C_ENG[1]
+    axis_distance = abs(dx * (-_N_ENG[1]) - dy * (-_N_ENG[0]))
+    return axis_distance - (FPIN_DIA + CAM_OD) / 2.0
+
+
+_CAM_ROT_LO, _CAM_ROT_HI = -180.0, 0.0
+if not _engaged_cam_gap(_CAM_ROT_LO) < 0.0 < _engaged_cam_gap(_CAM_ROT_HI):
+    raise AssertionError("engaged cam-contact root is not bracketed by down/up")
+for _ in range(60):
+    _cam_mid = (_CAM_ROT_LO + _CAM_ROT_HI) / 2.0
+    if _engaged_cam_gap(_cam_mid) > 0.0:
+        _CAM_ROT_HI = _cam_mid
+    else:
+        _CAM_ROT_LO = _cam_mid
+CAM_ENGAGE_ROTATION_DEG = (_CAM_ROT_LO + _CAM_ROT_HI) / 2.0
+LEVER_ENGAGED_TILT_DEG = LEVER_TILT_DEG + CAM_ENGAGE_ROTATION_DEG
+if not -85.0 < CAM_ENGAGE_ROTATION_DEG < -75.0:
+    raise AssertionError("pinion cam engage rotation left the photo-backed range")
+if not -80.0 < LEVER_ENGAGED_TILT_DEG < -65.0:
+    raise AssertionError("engaged pinion lever left the photographed +X-side range")
+
+
 # Bracket scallop closure. The lift rod is base-fixed while the bracket swings,
 # so its centre traces an arc in the bracket's local frame. The part carries
 # two R6.90 open scallops at the parked/engaged endpoint centres; their overlap
@@ -1704,13 +1734,24 @@ if (
 if _TEE_HUB_Z[0] < CRANK_ARM_Z0 + ARM_THICKNESS + 0.25:
     raise AssertionError("tee-handle grip band reaches the crank arm sweep")
 
-# Lever full throw (parked 40 deg -> engaged ~51 deg, checked to 60): the
-# arbor distance grows monotonically past 37.6 deg, but prove it numerically,
-# and prove the swept tip annulus shares no z band with anything it could hit.
-for _step in range(0, 81):
-    _t = math.radians(LEVER_TILT_DEG + math.copysign(_step * 0.25, LEVER_TILT_DEG))
-    # rod direction (-sin t, cos t), the placement's rot_z convention (see _LEV_U)
-    _d = abs(_LEV_REL[0] * math.cos(_t) + _LEV_REL[1] * math.sin(_t))
+# Lever full throw: sample the solved cam-contact path from the photographed
+# +10-degree parked pose to about -72 degrees engaged.  Clearance improves
+# after the parked endpoint, but the complete crossing through vertical is
+# checked rather than inferred.
+_LEV_SWEEP_STEPS = math.ceil(abs(CAM_ENGAGE_ROTATION_DEG) / 0.25)
+for _step in range(_LEV_SWEEP_STEPS + 1):
+    _angle = LEVER_TILT_DEG + CAM_ENGAGE_ROTATION_DEG * _step / _LEV_SWEEP_STEPS
+    _t = math.radians(_angle)
+    _u = (-math.sin(_t), math.cos(_t))
+    _foot = _LEV_REL[0] * _u[0] + _LEV_REL[1] * _u[1]
+    if 0.0 <= _foot <= LEVER_LEN:
+        _d = abs(_LEV_REL[0] * _u[1] - _LEV_REL[1] * _u[0])
+    else:
+        _end = min(max(_foot, 0.0), LEVER_LEN)
+        _d = math.hypot(
+            _LEV_REL[0] - _end * _u[0],
+            _LEV_REL[1] - _end * _u[1],
+        )
     if _d < (ARBOR_DIA + max(LEVER_ROD_DIA, LEVER_ROD_TIP_DIA)) / 2.0 + 0.25:
         raise AssertionError("lever shaft crowds the arbor mid-throw")
 _LEV_Z = (LEVER_Z - 3.0, LEVER_Z + 3.0)  # rod plane through the throw
@@ -2287,7 +2328,7 @@ async def build(adapter) -> dict[str, str]:
         "pinion-lever",
         [LIFT_X, LIFT_Y, LEVER_Z],
         [0.0, 0.0, LEVER_TILT_DEG],
-        rot_z_rows(LEVER_TILT_DEG),  # +z spin tips east (-x)
+        rot_z_rows(LEVER_TILT_DEG),  # positive rest angle tips machine -X
         ground=False,
         label="pinion-lever (clamp hub on the lift rod front end)",
     )
@@ -3646,7 +3687,7 @@ async def build(adapter) -> dict[str, str]:
             verify=(cam, cam_o),
         )
     # Lever: clamped on the rod's front end -- coaxial + axial + an angle tie
-    # to the ROD (not the frame) at the inserted 40-deg dihedral, so it spins
+    # to the ROD at the photographed 10-degree parked dihedral, so it spins
     # WITH the rod: dragging the lever in the saved free model turns the cams.
     lev_o = _org(adapter, lever)
     await coincident_mate(
