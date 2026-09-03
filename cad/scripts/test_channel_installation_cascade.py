@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import math
+from pathlib import Path
 
 import pytest
 
 import _config
 import _cwm
 import build_channel_assembly as channel
+import clevis_pin_spec
 import connecting_rod_spec
 import fulcrum_shaft_spec
 import pivot_shaft_spec
@@ -35,6 +37,37 @@ def test_rocker_and_rod_reclose_the_level_plumb_neutral_pose() -> None:
     assert connecting_rod_spec.CENTER_DISTANCE == channel.ROD_C2C
     assert abs(channel._ARC["arm_tilt"]) < 0.02
     assert abs(channel._ARC["rod_tilt"]) < 0.02
+
+
+def test_adjacent_station_envelopes_have_positive_physical_clearance() -> None:
+    assert connecting_rod_spec.SHANK_THICKNESS == 1.0
+    assert set(channel._STATION_ENVELOPES) == {"arm", "clevis", "neck", "shank"}
+    assert set(channel._PREVIOUS_STATION_ENVELOPES) == set(channel._STATION_ENVELOPES)
+    assert all(value > 0.0 for value in channel._ADJACENT_STATION_CLEARANCES.values())
+    assert channel._ADJACENT_STATION_PAIR == ("shank", "clevis")
+    assert math.isclose(channel._ADJACENT_STATION_CLEARANCE, 0.0565, abs_tol=1e-12)
+    assert channel._SHANK_WORLD == (-3.75, -2.75)
+    assert channel._PREVIOUS_STATION_ENVELOPES["clevis"][1] == pytest.approx(-3.8065)
+
+
+def test_one_rigid_clevis_pin_closes_each_rod_and_component_inventory() -> None:
+    assert channel.ROD_CLEVIS_FRONT_LOCAL[:2] == channel.ROD_PIN_BORE_LOCAL[:2]
+    assert channel.ROD_CLEVIS_FAR_LOCAL[:2] == channel.ROD_PIN_BORE_LOCAL[:2]
+    assert math.isclose(
+        channel.ROD_CLEVIS_FRONT_LOCAL[2] - channel.ROD_CLEVIS_FAR_LOCAL[2],
+        clevis_pin_spec.GRIP_LENGTH,
+        abs_tol=1e-12,
+    )
+    assert channel.FIXED_COMPONENT_COUNT == 8
+    assert channel.PER_CHANNEL_COMPONENT_COUNT == len(channel.CHAIN_PARTS) + 5 == 9
+    assert channel.EXPECTED_COMPONENT_COUNT == 188
+    source = Path(channel.__file__).read_text(encoding="utf-8")
+    assert '            "clevis-pin",' in source
+    assert 'named_ref(f"Front Plane@{pin}", "PLANE")' in source
+    assert 'named_ref(f"Front Plane@{rod}", "PLANE")' in source
+    assert 'label=f"clevis-pin ch{j:02d} locked to {rod}"' in source
+    assert "len(clevis_pin_by_channel) != CHANNELS" in source
+    assert "tracked_component_count != EXPECTED_COMPONENT_COUNT" in source
 
 
 def test_existing_shafts_and_translated_mounts_cover_the_shifted_bank() -> None:
@@ -67,9 +100,7 @@ def test_existing_shafts_and_translated_mounts_cover_the_shifted_bank() -> None:
 
 
 def test_positive_fulcrum_station_uses_the_relearned_mate_side() -> None:
-    assert _seed_flip(
-        "fulcrum-shaft-1 datum z d=35.41", channel.FULCRUM_SHAFT_Z
-    )
+    assert _seed_flip("fulcrum-shaft-1 datum z d=35.41", channel.FULCRUM_SHAFT_Z)
 
 
 def test_copied_internal_rod_axial_mate_is_reset_to_the_seed_side(

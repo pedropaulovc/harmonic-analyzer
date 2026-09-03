@@ -5,7 +5,7 @@ views, dimension layout, hole callouts, and manufacturing notes; every shared
 sheet/template, import, curation, and export behavior lives in
 ``_drawing_common``.
 
-The rod is a tall thin lollipop (~170 mm ring-bottom to head-crown), so the
+The rod is a tall thin cam strap (~170 mm ring-bottom to clevis crown), so the
 sheet runs at 1:1 with a 1:2 isometric.
 
 Run with SolidWorks open::
@@ -45,7 +45,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from connecting_rod_spec import (
     CENTER_DISTANCE,
-    HEAD_TOP_Y,
+    CLEVIS_TOP_Y,
     PIN_HOLE_DIA,
     RING_BORE_DIA,
     RING_BOTTOM_Y,
@@ -72,8 +72,8 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (1.0, 1.0)  # 1:1
 
 # Front-view model bbox: X symmetric about 0, Y from the ring bottom up to the
-# head crown.
-_BBOX_CY = (RING_BOTTOM_Y + HEAD_TOP_Y) / 2.0
+# D-shaped clevis crown.
+_BBOX_CY = (RING_BOTTOM_Y + CLEVIS_TOP_Y) / 2.0
 
 FRONT_CENTER = (0.180, 0.135)
 LEFT_CENTER = (0.080, 0.171)  # stepped-thickness profile, inside the top zone
@@ -142,11 +142,10 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
-    # The 1:1 left view (third angle: placed LEFT of the front) shows the
-    # stepped thickness (ring 3.0 / shank+head 2.5) the notes describe -- a
-    # single orthographic view left the step geometry to prose (machinist
-    # round 2).  The right-hand column belongs to the title block, so the
-    # section lives on the left.
+    # The 1:1 left view (third angle: placed LEFT of the front) exposes the
+    # centred ring/shank, negative-Z offset neck, 4.9 mm clevis envelope, and
+    # 2.9 mm slot.  It is the topology-defining view; the right-hand column
+    # belongs to the title block, so the view remains on the left.
     left = place_view(adapter, str(SOURCE), "*Left", *LEFT_CENTER, scale=(1, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
     for view in (left, iso):
@@ -163,11 +162,9 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
 
-    # Centre distance: ring bore edge to the rocker-pin bore edge (SolidWorks
+    # Centre distance: ring bore edge to the clevis-pin bore edge (SolidWorks
     # dimensions circle edges centre-to-centre); box it BASIC.  Pick each bore's
-    # LEFT rim -- the pin bore is tiny and sits inside the head crown, so a TOP
-    # pick snapped to the crown arc (read 145.07); the left rim is unambiguously
-    # on the pin circle, clear of the wider crown.
+    # left rim to avoid the D-crown edge.
     ring_rim = _sheet_xy(-RING_BORE_DIA / 2.0, 0.0)
     pin_rim = _sheet_xy(-PIN_HOLE_DIA / 2.0, CENTER_DISTANCE)
     centre_distance = add_edge_dimension(
@@ -180,7 +177,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_basic_dimension(adapter, centre_distance, label="rod centre distance")
 
-    # Rocker pin hole native callout (the #47 wizard hole in the head).
+    # Clevis pin hole native callout (the #47 through-all across both prongs).
     add_native_hole_callout(
         adapter,
         front,
@@ -203,9 +200,9 @@ async def build(adapter: Any) -> dict[str, str]:
         position_tolerance_m=0.000005,
     )
     # Datum B: the shank's left flank.  A alone leaves rotation about the bore
-    # axis unconstrained, so the pin-hole position (and the 147.67 direction)
-    # could not be inspected; B clocks the rod and the 4.00 BASIC below ties
-    # the pin to the shank centreline.
+    # axis unconstrained, so the pin-hole position and rod-axis direction could
+    # not be inspected; B clocks the rod and the 4.00 BASIC below ties the pin
+    # to the shank centreline.
     shank_flank = _sheet_xy(-4.0, 100.0)
     add_datum_feature(
         adapter,

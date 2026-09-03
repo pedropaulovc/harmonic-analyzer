@@ -1,32 +1,26 @@
 r"""Reproduction script: connecting rod (book ch. 13 pp. 22-25 / ch. 14 p. 29; 20 used).
 
-Black rough-finished rod converting each cam's rotation into the rocker
-arm's see-saw: a full ring (strap) riding the Ø30.6 eccentric cam (cast
-integral with each cylinder gear), a thin flat shank, and a rounded
-TOMBSTONE head (the Y-shaped upper end of the ch14 fan photo) pinned (Ø2)
-to the rocker arm's rod-pin hole near the arm's rod-side tip. Centre
-distance 163.10103: the rod hangs PLUMB with the arm LEVEL after the fixed-post
-photos show every rod dropping vertically from the arm tip onto its cam,
-the ch14 end views show the 0-crank tip row dead level (cos-mode home =
-top of stroke, cam lobe UP), so the pin (127.37 out from the mid-seesaw
-pivot) sits directly above the phased lobe centre at machine
-(-54.474, 99.155) and the rod length closes that vertical link. The head
-is SHORTER than the 16 mm arm depth (10.5 crown-to-shoulder), 10 wide,
-crown 2.4 above the pin, angled shoulders narrowing into the 8 shank --
-proportions read off the ch14 fan photo against the 16 mm arm-depth
-callout. It matches the arm's 2.5 thickness so the pin joint stacks
-head-beside-arm inside the 7.06 channel pitch; the M2 "thick stepped tip
-blocks" read of p.29 was amplitude-bar feet, not these rods.
+Black rough-finished rod converting each cam's rotation into the rocker arm's
+see-saw: a full ring riding the Ø30.6 eccentric cam, a 1.0 mm flat shank, and a
+photo-backed two-prong clevis around the rocker's reduced tongue.  Each 1.0 mm
+D-shaped cheek is 8 mm wide by 12 mm high around the retained #47 pin axis; a
+2.9 mm slot gives the 2.5 mm tongue 0.20 mm nominal clearance per face.
 
-Dimensions: cad/DIMENSIONS.md "Chapter 13 - Connecting rods" - centre
-distance derived (high), ring bore derived from the cam OD + confirmed on
-the p.25 overlay (med), head proportions photo-scaled vs the 16 mm callout
-(med), everything else photo-scaled (low).
+The ring and shank remain on the cam plane.  The clevis is offset to local
+Z=-4.05 mm so the assembly's Ry180 places it on the rocker plane.  A shallow
+U-bottom web joins both cheeks, while a separate narrow neck overlaps the
+centred shank and near cheek; the resulting part is one connected solid.
+Centre distance 163.10103 mm preserves the photographed plumb rod / level arm
+closure and the existing J2 mates.
 
-Layout: ring centre at the origin, shank rising +Y to the head;
-thicknesses extruded mid-plane in Z. Build order matters: ring disc,
-shank and head are bossed first, then the bore is cut so the strap
-opening also trims the shank sliver that dips into it.
+Dimensions: cad/config/dimensions.yaml, Chapter 13.  The clevis topology and
+offset sign are fixed by the ch14 end views and page002_img02; its occluded
+prong, slot, and transition dimensions are photo-bounded nominals.
+
+Layout: ring centre at the origin, shank rising +Y to the clevis root; ring and
+shank straddle local Z=0, while every clevis boss uses an explicit negative-Z
+offset extrusion.  The strap bore is cut after the bosses so it also trims the
+shank sliver that overlaps the ring.
 
 Run (SolidWorks already open)::
 
@@ -46,10 +40,12 @@ from _common import (
     define_circle,
     define_rectilinear_chain,
     drive_dimension,
+    extrude_at_offset,
     ensure_fully_defined,
     force_rebuild,
     name_bore_axis,
     name_last_feature,
+    name_dimensions,
     report_mass_properties,
     run_build,
     save_part_and_images,
@@ -71,14 +67,36 @@ from connecting_rod_notes import DRAWING_NOTES, ISOMETRIC_VIEW_NOTE
 from connecting_rod_notes import DRAWING_DIMENSIONS
 from connecting_rod_spec import (
     CENTER_DISTANCE,
-    HEAD_CROWN_ABOVE_PIN,
-    HEAD_HEIGHT,
-    HEAD_THICKNESS,
-    HEAD_WIDTH,
+    CLEVIS_CENTER_Z_LOCAL,
+    CLEVIS_CROWN_CENTER_Y,
+    CLEVIS_ROOT_OVERLAP,
+    CLEVIS_ROOT_Y,
+    CLEVIS_SLOT_WIDTH,
+    CLEVIS_WEB_BOTTOM_Y,
+    CLEVIS_WEB_HEIGHT,
+    CLEVIS_WEB_TOP_Y,
+    CLEVIS_Z_MAX,
+    CLEVIS_Z_MIN,
+    FAR_PRONG_Z_MAX,
+    FAR_PRONG_Z_MIN,
+    NEAR_PRONG_Z_MAX,
+    NEAR_PRONG_Z_MIN,
+    OFFSET_NECK_HEIGHT,
+    OFFSET_NECK_PRONG_OVERLAP,
+    OFFSET_NECK_SHANK_OVERLAP,
+    OFFSET_NECK_Z_MAX,
+    OFFSET_NECK_Z_MIN,
+    PRONG_CROWN_CENTER_ABOVE_PIN,
+    PRONG_CROWN_RADIUS,
+    PRONG_HEIGHT,  # noqa: F401 -- re-exported for the spec/build contract test
+    PRONG_ROOT_BELOW_PIN,
+    PRONG_THICKNESS,
+    PRONG_WIDTH_X,
     RING_BORE_DIA,
     RING_BORE_DIA_BAND,
     RING_THICKNESS,
     RING_WALL,
+    SHANK_END_Y,
     SHANK_THICKNESS,
     SHANK_WIDTH,
     SURFACE_FINISHES,
@@ -89,34 +107,13 @@ import _telemetry
 PART_NAME = "connecting-rod"
 MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
 
-# Cam ring centre -> rocker pin, VERTICAL rod: the
-# pin rides the arm's rod-pin hole 133.067 out from the pivot -- directly
-# above the phased cam LOBE (installed machine centre (-60.167, 99.155) =
-# drum (-60.394, 90.518) + ECC 8.64 rotated by the +1.5 deg tooth phase,
-# lobe UP at the cos-mode home; the Ry180 axial flip preserves local +Y;
-# ch30 photos + GT rocker-corner triangulation put the arm's rod-side end over
-# the drum). Solved so the rocker rests LEVEL (arm tilt 0 -- the ch14 end views
-# show the 0-crank tip row flat at the TOP of the stroke) with the rod plumb
-# (rod tilt 0 by construction). Supersedes 144.75, the same closure at the
-# pre-ROM-fit lobe-down phase and -7.82 deg tilt. build_channel_assembly
-# imports this as ROD_C2C (imported, NOT copied). Nominal geometry lives in
-# connecting_rod_spec so the part, channel and drawing move as one recipe.
-# Tombstone head (the "Y" upper end): proportions from the ch14 fan photo
-# scaled by the 16 mm arm-depth callout in the same frame. Rounded crown
-# (radius = half width), short vertical cheeks, angled shoulders narrowing
-# into the shank. The head is SHORTER than the arm depth and the pin sits
-# HIGH in the head / LOW in the arm (crown only 2.4 above the pin).
-HEAD_SHOULDER_RISE = 1.2  # shoulder taper height (width 8 -> 10, photo ~1.2)
-# rocker-arm rod-end pin hole (ch14): was Ø2.0 drill, now #47 (Ø1.994) native
-# Hole Wizard feature; diameter is imported from connecting_rod_spec.
-THROUGH_CUT_DEPTH = 20.0  # mid-plane total; > any local thickness
+# Cam ring centre -> rocker pin, vertical rod.  The retained pin sits directly
+# above the phased cam lobe in the level pose; build_channel_assembly imports
+# the same pure-data CENTER_DISTANCE contract.
+THROUGH_CUT_DEPTH = 20.0  # > the complete 4.9 mm clevis outside envelope
 
-RING_OUTER_RADIUS = RING_BORE_DIA / 2.0 + RING_WALL  # 20.4
+RING_OUTER_RADIUS = RING_BORE_DIA / 2.0 + RING_WALL
 SHANK_START_Y = RING_BORE_DIA / 2.0 - 0.5  # overlaps the strap annulus
-HEAD_TOP_Y = CENTER_DISTANCE + HEAD_CROWN_ABOVE_PIN
-HEAD_START_Y = HEAD_TOP_Y - HEAD_HEIGHT
-HEAD_CROWN_CY = HEAD_TOP_Y - HEAD_WIDTH / 2.0
-SHOULDER_TOP_Y = HEAD_START_Y + HEAD_SHOULDER_RISE
 
 
 async def build(adapter) -> dict[str, str]:
@@ -124,34 +121,105 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
-    # Editable knobs (Tools > Equations) for every module constant; derived spans
-    # (ring outer radius, the shank/block start heights) are equations of those
-    # primitives, so a knob edit keeps the strap-to-pin geometry consistent. The
-    # mm suffix is load-bearing -- this is an INCH document and the equation
-    # manager reads BARE numbers in document units (an unsuffixed 127 = 127 in,
-    # blowing the part up 25.4x).
+    # Editable primitives and derived envelope equations.  Units are explicit
+    # because this is an inch document and bare equation values are inches.
     await set_global(adapter, "CenterDistance", f"{CENTER_DISTANCE}mm")
     await set_global(adapter, "RingBoreDia", f"{RING_BORE_DIA}mm")
     await set_global(adapter, "RingWall", f"{RING_WALL}mm")
     await set_global(adapter, "RingThickness", f"{RING_THICKNESS}mm")
     await set_global(adapter, "ShankWidth", f"{SHANK_WIDTH}mm")
     await set_global(adapter, "ShankThickness", f"{SHANK_THICKNESS}mm")
-    await set_global(adapter, "HeadWidth", f"{HEAD_WIDTH}mm")
-    await set_global(adapter, "HeadHeight", f"{HEAD_HEIGHT}mm")
-    await set_global(adapter, "HeadCrownAbovePin", f"{HEAD_CROWN_ABOVE_PIN}mm")
-    await set_global(adapter, "HeadShoulderRise", f"{HEAD_SHOULDER_RISE}mm")
-    await set_global(adapter, "HeadThickness", f"{HEAD_THICKNESS}mm")
-    # (The old PinHoleDia knob is gone: the rocker pin hole is now a native Hole
-    # Wizard #47 feature whose diameter comes from the drill standard.)
+    await set_global(adapter, "ProngWidth", f"{PRONG_WIDTH_X}mm")
+    await set_global(adapter, "ProngCrownRadius", f"{PRONG_CROWN_RADIUS}mm")
+    await set_global(
+        adapter,
+        "ProngCrownCenterAbovePin",
+        f"{PRONG_CROWN_CENTER_ABOVE_PIN}mm",
+    )
+    await set_global(adapter, "ProngRootBelowPin", f"{PRONG_ROOT_BELOW_PIN}mm")
+    await set_global(adapter, "ProngThickness", f"{PRONG_THICKNESS}mm")
+    await set_global(adapter, "ClevisSlotWidth", f"{CLEVIS_SLOT_WIDTH}mm")
+    await set_global(adapter, "ClevisCenterZ", f"{CLEVIS_CENTER_Z_LOCAL}mm")
+    await set_global(adapter, "ClevisRootOverlap", f"{CLEVIS_ROOT_OVERLAP}mm")
+    await set_global(adapter, "ClevisWebHeight", f"{CLEVIS_WEB_HEIGHT}mm")
+    await set_global(adapter, "OffsetNeckHeight", f"{OFFSET_NECK_HEIGHT}mm")
+    await set_global(
+        adapter,
+        "OffsetNeckProngOverlap",
+        f"{OFFSET_NECK_PRONG_OVERLAP}mm",
+    )
+    await set_global(
+        adapter,
+        "OffsetNeckShankOverlap",
+        f"{OFFSET_NECK_SHANK_OVERLAP}mm",
+    )
+    # The #47 diameter is owned by Hole Wizard, not a duplicate equation knob.
     await set_global(adapter, "RingOuterRadius", '"RingBoreDia" / 2 + "RingWall"')
     await set_global(adapter, "ShankStartY", '"RingBoreDia" / 2 - 0.5mm')
     await set_global(
-        adapter, "HeadStartY",
-        '"CenterDistance" + "HeadCrownAbovePin" - "HeadHeight"',
+        adapter,
+        "ClevisOutsideWidth",
+        '2 * "ProngThickness" + "ClevisSlotWidth"',
     )
     await set_global(
-        adapter, "HeadCrownCy",
-        '"CenterDistance" + "HeadCrownAbovePin" - "HeadWidth" / 2',
+        adapter,
+        "ClevisZMin",
+        '"ClevisCenterZ" - "ClevisOutsideWidth" / 2',
+    )
+    await set_global(
+        adapter,
+        "ClevisZMax",
+        '"ClevisCenterZ" + "ClevisOutsideWidth" / 2',
+    )
+    await set_global(
+        adapter,
+        "SlotZMin",
+        '"ClevisCenterZ" - "ClevisSlotWidth" / 2',
+    )
+    await set_global(
+        adapter,
+        "SlotZMax",
+        '"ClevisCenterZ" + "ClevisSlotWidth" / 2',
+    )
+    await set_global(adapter, "FarProngZMin", '"ClevisZMin"')
+    await set_global(adapter, "FarProngZMax", '"SlotZMin"')
+    await set_global(adapter, "NearProngZMin", '"SlotZMax"')
+    await set_global(adapter, "NearProngZMax", '"ClevisZMax"')
+    await set_global(
+        adapter,
+        "OffsetNeckZMin",
+        '"NearProngZMax" - "OffsetNeckProngOverlap"',
+    )
+    await set_global(
+        adapter,
+        "OffsetNeckZMax",
+        '-"ShankThickness" / 2 + "OffsetNeckShankOverlap"',
+    )
+    await set_global(
+        adapter,
+        "ClevisRootY",
+        '"CenterDistance" - "ProngRootBelowPin"',
+    )
+    await set_global(adapter, "ShankEndY", '"ClevisRootY"')
+    await set_global(
+        adapter,
+        "ClevisCrownCenterY",
+        '"CenterDistance" + "ProngCrownCenterAbovePin"',
+    )
+    await set_global(
+        adapter,
+        "ClevisTopY",
+        '"ClevisCrownCenterY" + "ProngCrownRadius"',
+    )
+    await set_global(
+        adapter,
+        "ClevisWebTopY",
+        '"ClevisRootY" + "ClevisRootOverlap"',
+    )
+    await set_global(
+        adapter,
+        "ClevisWebBottomY",
+        '"ClevisWebTopY" - "ClevisWebHeight"',
     )
 
     # Each sketch records its dim names + drive equations into a per-sketch
@@ -165,7 +233,12 @@ async def build(adapter) -> dict[str, str]:
     ring_disc = SketchDims()
     check("create_sketch ring disc", await adapter.create_sketch("Front"))
     await define_circle(
-        adapter, 0.0, 0.0, RING_OUTER_RADIUS, "ring outer", dims=ring_disc,
+        adapter,
+        0.0,
+        0.0,
+        RING_OUTER_RADIUS,
+        "ring outer",
+        dims=ring_disc,
         names=("RingCx", "RingCz", "RingOuterDia"),
         drives=(None, None, '2 * "RingOuterRadius"'),
     )
@@ -181,25 +254,32 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "RingDisc")
 
-    # Shank: flat bar from the strap up to the head's shoulder root. Rectilinear
-    # chain emits width, length, then the corner anchor (x, z) -- the corner sits
-    # at (-ShankWidth/2, ShankStartY); the anchor X dim is the unsigned half-width.
+    # Shank: flat bar from the strap to the clevis root.  The offset neck below
+    # overlaps its rear (-Z) face; the shank itself does not intrude into the slot.
     shank_sd = SketchDims()
     check("create_sketch shank", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     shank_rect = [
         (-SHANK_WIDTH / 2.0, SHANK_START_Y),
         (SHANK_WIDTH / 2.0, SHANK_START_Y),
-        (SHANK_WIDTH / 2.0, HEAD_START_Y),
-        (-SHANK_WIDTH / 2.0, HEAD_START_Y),
+        (SHANK_WIDTH / 2.0, SHANK_END_Y),
+        (-SHANK_WIDTH / 2.0, SHANK_END_Y),
     ]
     shank = await add_line_chain(adapter, shank_rect)
     set_sketch_direct_db(adapter, False)
     await define_rectilinear_chain(
-        adapter, shank, shank_rect, label="shank", dims=shank_sd,
+        adapter,
+        shank,
+        shank_rect,
+        label="shank",
+        dims=shank_sd,
         names=["ShankWidthDim", "ShankLength", "ShankCornerX", "ShankCornerZ"],
-        drives=['"ShankWidth"', '"HeadStartY" - "ShankStartY"',
-                '"ShankWidth" / 2', '"ShankStartY"'],
+        drives=[
+            '"ShankWidth"',
+            '"ShankEndY" - "ShankStartY"',
+            '"ShankWidth" / 2',
+            '"ShankStartY"',
+        ],
     )
     await ensure_fully_defined(adapter, "shank sketch")
     check("exit_sketch shank", await adapter.exit_sketch())
@@ -213,126 +293,202 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "Shank")
 
-    # Tombstone head, pinned beside the rocker arm at assembly (the ch14 fan
-    # photo's "Y" upper end): angled shoulders flare the 8 shank to the 10-wide
-    # cheeks, short vertical cheeks, and a semicircular crown (R = HeadWidth/2,
-    # tangent to the cheeks -- add_arc runs CCW start->end, so right-cheek-top ->
-    # left-cheek-top bows over the TOP). Because the crown centre sits on the
-    # sketch axis (x 0) with radius = the cheek half-width, each cheek-top lands
-    # at the crown's equator by construction (x = R forces y = centre y).
-    # Dim EMISSION ORDER (each recorded as its display dim is created): shoulder
-    # width (= ShankWidth), the shoulder-root corner anchor (X half-width, then
-    # Z = HeadStartY), crown radius, crown-centre height (x on-axis, so
-    # anchor_point_to_origin emits ONE dim), the two shoulder rises, the two
-    # cheek half-width offsets. Bottom horizontal + cheek verticals are
-    # RELATIONS, not dims -- exactly 14 coordinate constraints for the 7 free
-    # vertices, no redundancy.
-    head_sd = SketchDims()
-    check("create_sketch head", await adapter.create_sketch("Front"))
-    set_sketch_direct_db(adapter, True)
-    hw, sw = HEAD_WIDTH / 2.0, SHANK_WIDTH / 2.0
-    head_bottom = check(
-        "head bottom",
-        await adapter.add_line(-sw, HEAD_START_Y, sw, HEAD_START_Y),
+    @_telemetry.traced("connecting_rod.bridge", label_param="stem")
+    async def add_bridge(
+        stem: str,
+        *,
+        bottom_y: float,
+        top_y: float,
+        z_min: float,
+        z_max: float,
+        height_drive: str,
+        bottom_drive: str,
+        depth_drive: str,
+        offset_drive: str,
+    ) -> None:
+        """Add a rectangular transition boss toward negative local Z."""
+        if not z_min < z_max <= 0.0:
+            raise ValueError(
+                f"{stem} local-Z envelope must satisfy z_min < z_max <= 0"
+            )
+        dims = SketchDims()
+        check(f"create_sketch {stem}", await adapter.create_sketch("Front"))
+        set_sketch_direct_db(adapter, True)
+        rect = [
+            (-PRONG_WIDTH_X / 2.0, bottom_y),
+            (PRONG_WIDTH_X / 2.0, bottom_y),
+            (PRONG_WIDTH_X / 2.0, top_y),
+            (-PRONG_WIDTH_X / 2.0, top_y),
+        ]
+        entities = await add_line_chain(adapter, rect)
+        set_sketch_direct_db(adapter, False)
+        await define_rectilinear_chain(
+            adapter,
+            entities,
+            rect,
+            label=stem,
+            dims=dims,
+            names=[
+                f"{stem}Width",
+                f"{stem}Height",
+                f"{stem}CornerX",
+                f"{stem}BottomY",
+            ],
+            drives=[
+                '"ProngWidth"',
+                height_drive,
+                '"ProngWidth" / 2',
+                bottom_drive,
+            ],
+        )
+        await ensure_fully_defined(adapter, f"{stem} sketch")
+        check(f"exit_sketch {stem}", await adapter.exit_sketch())
+        profile_name = f"{stem}Profile"
+        name_last_feature(adapter, profile_name)
+        drive_jobs.extend(dims.apply(adapter, profile_name))
+        extrude_at_offset(adapter, z_max - z_min, -z_max, flip=True)
+        name_last_feature(adapter, stem)
+        depth_dim, offset_dim = name_dimensions(
+            adapter, stem, [f"{stem}Depth", f"{stem}Offset"]
+        )
+        drive_jobs.extend(((depth_dim, depth_drive), (offset_dim, offset_drive)))
+
+    # The narrow neck is first because it overlaps the existing centred shank.
+    # The U-bottom web then overlaps the neck and spans only the 4.9 mm clevis
+    # outside envelope.  Both reach 0.5 mm above the D-cheek roots.
+    await add_bridge(
+        "OffsetNeck",
+        bottom_y=CLEVIS_WEB_TOP_Y - OFFSET_NECK_HEIGHT,
+        top_y=CLEVIS_WEB_TOP_Y,
+        z_min=OFFSET_NECK_Z_MIN,
+        z_max=OFFSET_NECK_Z_MAX,
+        bottom_drive='"ClevisWebTopY" - "OffsetNeckHeight"',
+        height_drive='"OffsetNeckHeight"',
+        depth_drive='"OffsetNeckZMax" - "OffsetNeckZMin"',
+        offset_drive='-"OffsetNeckZMax"',
     )
-    head_sh_r = check(
-        "head shoulder right",
-        await adapter.add_line(sw, HEAD_START_Y, hw, SHOULDER_TOP_Y),
+    await add_bridge(
+        "ClevisWeb",
+        bottom_y=CLEVIS_WEB_BOTTOM_Y,
+        top_y=CLEVIS_WEB_TOP_Y,
+        z_min=CLEVIS_Z_MIN,
+        z_max=CLEVIS_Z_MAX,
+        bottom_drive='"ClevisWebBottomY"',
+        height_drive='"ClevisWebHeight"',
+        depth_drive='"ClevisOutsideWidth"',
+        offset_drive='-"ClevisZMax"',
     )
-    head_cheek_r = check(
-        "head cheek right",
-        await adapter.add_line(hw, SHOULDER_TOP_Y, hw, HEAD_CROWN_CY),
-    )
-    head_crown = check(
-        "head crown",
-        await adapter.add_arc(0.0, HEAD_CROWN_CY, hw, HEAD_CROWN_CY, -hw, HEAD_CROWN_CY),
-    )
-    head_cheek_l = check(
-        "head cheek left",
-        await adapter.add_line(-hw, HEAD_CROWN_CY, -hw, SHOULDER_TOP_Y),
-    )
-    check(
-        "head shoulder left",
-        await adapter.add_line(-hw, SHOULDER_TOP_Y, -sw, HEAD_START_Y),
-    )
-    set_sketch_direct_db(adapter, False)
-    for ent, relation in (
-        (head_bottom, "horizontal"),
-        (head_cheek_r, "vertical"),
-        (head_cheek_l, "vertical"),
-    ):
-        check(f"head {relation}", await adapter.add_sketch_constraint(ent, None, relation))
-    check(
-        "dimension head bottom width",
-        await adapter.add_sketch_dimension(head_bottom, None, "linear", SHANK_WIDTH),
-    )
-    head_sd.record("HeadBottomWidth", '"ShankWidth"')
-    await anchor_point_to_origin(
-        adapter, f"{head_bottom}.start", -sw, HEAD_START_Y, "head shoulder root"
-    )
-    head_sd.record("HeadAnchorX", '"ShankWidth" / 2')
-    head_sd.record("HeadAnchorZ", '"HeadStartY"')
-    check(
-        "dimension crown radius",
-        await adapter.add_sketch_dimension(head_crown, None, "radial", hw),
-    )
-    head_sd.record("HeadCrownR", '"HeadWidth" / 2')
-    await anchor_point_to_origin(
-        adapter, f"{head_crown}.center", 0.0, HEAD_CROWN_CY, "crown centre"
-    )
-    head_sd.record("HeadCrownCyDim", '"HeadCrownCy"')
-    check(
-        "dimension shoulder rise right",
-        await adapter.add_sketch_dimension(
-            f"{head_sh_r}.end", f"{head_bottom}.end", "vertical_distance",
-            HEAD_SHOULDER_RISE,
-        ),
-    )
-    head_sd.record("HeadShoulderRiseR", '"HeadShoulderRise"')
-    check(
-        "dimension shoulder rise left",
-        await adapter.add_sketch_dimension(
-            f"{head_cheek_l}.end", f"{head_bottom}.start", "vertical_distance",
-            HEAD_SHOULDER_RISE,
-        ),
-    )
-    head_sd.record("HeadShoulderRiseL", '"HeadShoulderRise"')
-    check(
-        "dimension cheek right x",
-        await adapter.add_sketch_dimension(
-            f"{head_cheek_r}.start", "origin", "horizontal_distance", hw
-        ),
-    )
-    head_sd.record("HeadCheekRX", '"HeadWidth" / 2')
-    check(
-        "dimension cheek left x",
-        await adapter.add_sketch_dimension(
-            f"{head_cheek_l}.start", "origin", "horizontal_distance", hw
-        ),
-    )
-    head_sd.record("HeadCheekLX", '"HeadWidth" / 2')
-    await ensure_fully_defined(adapter, "head sketch")
-    check("exit_sketch head", await adapter.exit_sketch())
-    name_last_feature(adapter, "HeadProfile")
-    drive_jobs += head_sd.apply(adapter, "HeadProfile")
-    check(
-        "extrude head",
-        await adapter.create_extrusion(
-            ExtrusionParameters(depth=HEAD_THICKNESS, both_directions=True)
-        ),
-    )
-    name_last_feature(adapter, "Head")
+
+    @_telemetry.traced("connecting_rod.prong", label_param="stem")
+    async def add_prong(stem: str, z_min: float, z_max: float) -> None:
+        """Add one fully-defined 8 x 12 D-shaped cheek toward negative local Z."""
+        if not z_min < z_max <= 0.0:
+            raise ValueError(
+                f"{stem} local-Z envelope must satisfy z_min < z_max <= 0"
+            )
+        dims = SketchDims()
+        half = PRONG_WIDTH_X / 2.0
+        check(f"create_sketch {stem}", await adapter.create_sketch("Front"))
+        set_sketch_direct_db(adapter, True)
+        bottom = check(
+            f"{stem} bottom",
+            await adapter.add_line(-half, CLEVIS_ROOT_Y, half, CLEVIS_ROOT_Y),
+        )
+        right = check(
+            f"{stem} right side",
+            await adapter.add_line(half, CLEVIS_ROOT_Y, half, CLEVIS_CROWN_CENTER_Y),
+        )
+        crown = check(
+            f"{stem} crown",
+            await adapter.add_arc(
+                0.0,
+                CLEVIS_CROWN_CENTER_Y,
+                half,
+                CLEVIS_CROWN_CENTER_Y,
+                -half,
+                CLEVIS_CROWN_CENTER_Y,
+            ),
+        )
+        left = check(
+            f"{stem} left side",
+            await adapter.add_line(-half, CLEVIS_CROWN_CENTER_Y, -half, CLEVIS_ROOT_Y),
+        )
+        set_sketch_direct_db(adapter, False)
+        check(
+            f"{stem} bottom horizontal",
+            await adapter.add_sketch_constraint(bottom, None, "horizontal"),
+        )
+        for label, entity in (("right", right), ("left", left)):
+            check(
+                f"{stem} {label} vertical",
+                await adapter.add_sketch_constraint(entity, None, "vertical"),
+            )
+        await anchor_point_to_origin(
+            adapter,
+            f"{crown}.center",
+            0.0,
+            CLEVIS_CROWN_CENTER_Y,
+            f"{stem} crown centre",
+        )
+        dims.record(f"{stem}CrownCenterY", '"ClevisCrownCenterY"')
+        check(
+            f"{stem} crown radius",
+            await adapter.add_sketch_dimension(
+                crown, None, "radial", PRONG_CROWN_RADIUS
+            ),
+        )
+        dims.record(f"{stem}CrownRadius", '"ProngCrownRadius"')
+        for end in ("start", "end"):
+            check(
+                f"{stem} crown {end} level",
+                await adapter.add_sketch_constraint(
+                    f"{crown}.{end}", f"{crown}.center", "horizontal_points"
+                ),
+            )
+        check(
+            f"{stem} root height",
+            await adapter.add_sketch_dimension(
+                f"{bottom}.start",
+                "origin",
+                "vertical_distance",
+                CLEVIS_ROOT_Y,
+            ),
+        )
+        dims.record(f"{stem}RootY", '"ClevisRootY"')
+        await ensure_fully_defined(adapter, f"{stem} sketch")
+        check(f"exit_sketch {stem}", await adapter.exit_sketch())
+        profile_name = f"{stem}Profile"
+        name_last_feature(adapter, profile_name)
+        drive_jobs.extend(dims.apply(adapter, profile_name))
+        extrude_at_offset(adapter, z_max - z_min, -z_max, flip=True)
+        name_last_feature(adapter, stem)
+        depth_dim, offset_dim = name_dimensions(
+            adapter, stem, [f"{stem}Thickness", f"{stem}Offset"]
+        )
+        offset_drive = (
+            '-"NearProngZMax"' if stem == "NearProng" else '-"FarProngZMax"'
+        )
+        drive_jobs.extend(
+            ((depth_dim, '"ProngThickness"'), (offset_dim, offset_drive))
+        )
+
+    # Two separated D-cheeks.  At nominal local Z:
+    # near -2.60..-1.60, slot -5.50..-2.60, far -6.50..-5.50.
+    await add_prong("NearProng", NEAR_PRONG_Z_MIN, NEAR_PRONG_Z_MAX)
+    await add_prong("FarProng", FAR_PRONG_Z_MIN, FAR_PRONG_Z_MAX)
     res = await adapter.get_mass_properties()
-    _telemetry.info(f"volume after bosses: {res.data.volume:.1f} mm^3")
-    # disc ~3922 + shank ~2467 + head ~233 (shoulder trapezoid 10.8 + cheeks
-    # 43.0 + crown semicircle 39.3 = 93.1 mm^2 x 2.5) - overlap; Phase 3
-    # rebuild confirms
+    _telemetry.info(f"volume after connected clevis bosses: {res.data.volume:.1f} mm^3")
 
     # Strap bore - rides the eccentric cam. On-axis circle: diameter only.
     bore_sd = SketchDims()
     check("create_sketch bore", await adapter.create_sketch("Front"))
     await define_circle(
-        adapter, 0.0, 0.0, RING_BORE_DIA / 2.0, "strap bore", dims=bore_sd,
+        adapter,
+        0.0,
+        0.0,
+        RING_BORE_DIA / 2.0,
+        "strap bore",
+        dims=bore_sd,
         names=("StrapBoreCx", "StrapBoreCz", "StrapBoreDia"),
         drives=(None, None, '"RingBoreDia"'),
     )
@@ -348,15 +504,13 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "StrapBore")
 
-    # Rocker pin hole through the head (high in the crown, 2.4 below the crown
-    # top): was a plain Ø2.0 cut, now a native Hole Wizard #47 number drill
-    # (Ø1.994) at (0, CENTER_DISTANCE) drilled +Z through the 2.5 mm head
-    # (memory/fastener-policy-us-customary). Through-all is geometrically
-    # identical to the old mid-plane both-directions cut.
+    # One native #47 through-all starts on the near prong's outer (+Z) face.
+    # Its inward drill direction crosses the near cheek, open 2.9 mm slot, and
+    # far cheek while preserving one coaxial Axis2 for the existing J2 mate.
     pin_cut = wizard_holes(
         adapter,
         HoleSpec("drilled_number", "#47"),
-        [[0.0, CENTER_DISTANCE, HEAD_THICKNESS / 2.0]],
+        [[0.0, CENTER_DISTANCE, NEAR_PRONG_Z_MAX]],
         (0.0, 0.0, 1.0),
         "rocker pin hole (#47)",
         name="PinHole",
@@ -369,7 +523,7 @@ async def build(adapter) -> dict[str, str]:
     # bore now -2234 (r 15.4 x 3) - sliver - pin; Phase 3 rebuild confirms
 
     # Named bore axes for assembly mates (view-independent name selection):
-    # Axis1 = strap bore on the cam (origin), Axis2 = rocker pin bore (0, 147.67).
+    # Axis1 = strap bore on the cam; Axis2 = retained clevis/rocker pin axis.
     await name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", 0.0, "strap bore")
     await name_bore_axis(
         adapter,
@@ -422,8 +576,12 @@ async def build(adapter) -> dict[str, str]:
     require_saved_drawing_properties(
         adapter,
         (
-            "Number", "Material Specification", "Finish", "Quantity",
-            "Manufacturing Notes", "Isometric View Note",
+            "Number",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Manufacturing Notes",
+            "Isometric View Note",
         ),
     )
     return artefacts

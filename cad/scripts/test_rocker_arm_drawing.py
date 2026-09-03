@@ -29,11 +29,10 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert kept | drawing.NOTE_ONLY_DIMENSIONS == marked
 
 
-def test_draw_view_math_matches_the_spec() -> None:
-    # The drawing's view math reads the spec's nominal spans, not a divergent
-    # copy; the spec's geometry must match the part the build actually builds.
-    assert (drawing.ROD_HOLE_X, drawing.TOP_END_Y) == (
+def test_draw_view_math_matches_the_stepped_profile_spec() -> None:
+    assert (drawing.ROD_HOLE_X, drawing.ROD_TONGUE_END_X, drawing.TOP_END_Y) == (
         rocker_arm_spec.ROD_HOLE_X,
+        rocker_arm_spec.ROD_TONGUE_END_X,
         rocker_arm_spec.TOP_END_Y,
     )
     assert rocker_arm_spec.CURVE_RADIUS == arm.CURVE_RADIUS
@@ -41,19 +40,40 @@ def test_draw_view_math_matches_the_spec() -> None:
     assert rocker_arm_spec.ARM_THICKNESS == arm.ARM_THICKNESS
     assert rocker_arm_spec.TOP_ARC_LEN == arm.TOP_ARC_LEN
     assert rocker_arm_spec.BOT_ARC_LEN == arm.BOT_ARC_LEN
-    assert rocker_arm_spec.TIP_FACE == arm.TIP_FACE
+    assert rocker_arm_spec.TAIL_TIP_FACE == arm.TAIL_TIP_FACE == 5.588
     assert rocker_arm_spec.ROD_HOLE_X == arm.ROD_HOLE_X
 
 
-def test_rod_pin_follows_the_recentered_cam_and_recloses_neutral_y() -> None:
+def test_rod_pin_and_reduced_tongue_keep_the_kinematic_closure() -> None:
+    spec = rocker_arm_spec
     assert math.isclose(
-        rocker_arm_spec.ROD_HOLE_X,
+        spec.ROD_HOLE_X,
         127.3738 - MECHANISM_X_SHIFT,
         abs_tol=1e-12,
     )
-    assert math.isclose(rocker_arm_spec.ROD_HOLE_Y, 16.456064115939025, abs_tol=1e-12)
-    assert rocker_arm_spec.ROD_HOLE_ABOVE_BOTTOM == arm.ROD_HOLE_ABOVE_BOTTOM
-    assert rocker_arm_spec.ROD_HOLE_Y == arm.ROD_HOLE_Y
+    assert math.isclose(spec.ROD_HOLE_Y, 16.456064115939025, abs_tol=1e-12)
+    assert spec.ROD_HOLE_ABOVE_BOTTOM == arm.ROD_HOLE_ABOVE_BOTTOM
+    assert spec.ROD_HOLE_Y == arm.ROD_HOLE_Y
+    assert math.isclose(spec.ROD_STEP_X, spec.ROD_HOLE_X - 5.0, abs_tol=1e-12)
+    assert math.isclose(spec.ROD_TONGUE_END_X, spec.ROD_HOLE_X + 6.0, abs_tol=1e-12)
+    assert math.isclose(
+        spec.ROD_TONGUE_TOP_Y - spec.ROD_TONGUE_BOTTOM_Y, 5.0, abs_tol=1e-12
+    )
+    assert math.isclose(
+        (spec.ROD_TONGUE_TOP_Y + spec.ROD_TONGUE_BOTTOM_Y) / 2.0,
+        spec.ROD_HOLE_Y,
+        abs_tol=1e-12,
+    )
+    source = Path(arm.__file__).read_text(encoding="utf-8")
+    for boundary in (
+        '"rod top shoulder"',
+        '"rod tongue top"',
+        '"rod free end"',
+        '"rod tongue bottom"',
+        '"rod bottom shoulder"',
+    ):
+        assert boundary in source
+    assert 'strap.record("TailTipLen", \'"TailTipFace"\')' in source
 
 
 def test_sheet_runs_at_1_to_2() -> None:
@@ -76,6 +96,11 @@ def test_linked_notes_are_functional_metric_and_not_title_block_duplicates() -> 
     assert "16.00 REF" in notes
     assert "11.5 IN" not in notes
     assert "0.22 IN" not in notes
+    assert "PROFILE IS ASYMMETRIC" in notes
+    assert "TAIL ONLY: 5.59 RADIAL LAND" in notes
+    assert "SQUARE SHOULDER 5.00 BEFORE PIN" in notes
+    assert "TONGUE 5.00 DEEP, CENTRED ON PIN" in notes
+    assert "SQUARE FREE FACE 6.00 BEYOND PIN" in notes
     # General tolerances live in the title block ONLY.
     assert "LINEAR +/-" not in notes
     assert "BA" not in notes
@@ -85,8 +110,7 @@ def test_linked_notes_are_functional_metric_and_not_title_block_duplicates() -> 
 
 def test_native_gdt_and_finish_present() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    # A = pivot bore axis, B = broad face (right end view), C = rod-side tip
-    # face; the rod-pin position frame references all three.
+    # A = pivot bore axis, B = broad face, C = reduced tongue free face.
     assert source.count("add_datum_feature(") == 3
     assert source.count("position_tolerance_m=0.0001") == 1
     assert "pivot_datum_angle = math.radians(135.0)" in source
@@ -98,6 +122,7 @@ def test_native_gdt_and_finish_present() -> None:
     assert "add_surface_finish(" in source
     assert "add_native_hole_callout(" in source
     assert source.count("edge_xy=rod_rim") == 2
+    assert 'label="rod-tongue free face"' in source
 
 
 def test_large_radius_values_are_note_only() -> None:

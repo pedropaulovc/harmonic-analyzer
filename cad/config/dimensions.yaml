@@ -655,11 +655,17 @@ sections:
         - ch.13 photos, strap proportion vs cam; wall kept 5 mm (structural), so OD drops to 40.8 with the smaller bore
         - scaled
         - low
-      - - Ring / shank / tip-strap thickness
-        - 3 / 2.5 / 2.5 mm
+      - - Ring / shank / clevis thickness
+        - ring 3.0; centred shank 1.0; clevis = 1.0 prong + 2.9 slot + 1.0 prong (4.9 outside)
         - —
-        - sandwich budget (7.5 axial pitch); tip strap = arm thickness so the pin joint is strap-beside-arm inside the 7.06 channel pitch (M6.3 — the "thick tip blocks" read of p.29 was wrong, see ch. 14 note)
-        - scaled/derived
+        - 'ch14 p.28 end views and page002_img02: the black rod owns a two-cheek clevis around the 2.5 mm silver rocker tongue. The 2.9 slot gives 0.20 nominal clearance per arm face. Clevis centre is rod-local Z = -4.05; assembly Ry180 maps CAM_DZ -3.25 minus local Z to the arm mid-plane +0.8. Outside faces are local -6.50/-1.60. At the 7.0565 station pitch, a 1.0 centred shank spans world Z -3.75..-2.75 and clears the previous clevis rear at -3.8065 by 0.0565.'
+        - photo topology + adjacent-station clearance derivation
+        - med
+      - - Separate clevis pin ×20
+        - bright steel; Ø1.8 shank × 4.9 grip; Ø3.0 × 0.6 flat head
+        - —
+        - 'ch14 page002_img02/page002_img01: one bright circular head appears on the near visible cheek of every black rod clevis. The 1.8 shank clears the existing #47 Ø1.994 holes; the 4.9 grip closes exactly on the clevis outside faces.'
+        - photo topology + fit/closure derivation
         - med
       - - Shank width
         - 8 mm
@@ -667,22 +673,21 @@ sections:
         - ch.13 p.23 rod silhouettes vs 7 mm gear face
         - scaled
         - low
-      - - Tip head (Y-shaped upper end)
-        - 10 wide × 10.5 tall tombstone (round crown R5, short shoulders), Ø2 pin hole 2.4 below the crown top
+      - - Upper clevis side profile and transition
+        - two D-shaped 8 wide × 12 high cheeks; pin vertically centred; R4 semicircular crown centred 2 above pin; 2-high U-bottom web and separate offset neck, each overlapping the cheek root 0.5
         - —
-        - 'ch14 fan photo (0.114 mm/px via the 16 mm arm-depth callout): head width ≈10, height ≈10.5 — SHORTER than the 16 arm depth, crown ~8 below the arm top edge; shoulders narrow into the 8 mm shank. Pin matches the rocker''s Ø2 rod-pin hole at +127.37 from the pivot, LOW in the strap (ch. 14). Supersedes the 10 × 18 full-depth strap read'
-        - measured
+        - 'ch14 page002_img02 and 0/6/14/40-crank end views: repeated black fork cheeks capture the bright arm tip; 7.0565 station pitch bounds the 4.9 outside width. The near cheek is local Z -2.60..-1.60, slot -5.50..-2.60, far cheek -6.50..-5.50. The centred shank joins the near cheek through a narrow neck below the prong root; the broad web stays inside the 4.9 clevis envelope.'
+        - photo-bounded nominal
         - med
   - prose: |2
 
-      M6.3 re-read of p.29: the stepped sawtooth blocks at the rocker-arm tips
-      are the AMPLITUDE BARS' notched feet parked near the arm ends (ch. 15
-      "slide along its rocker arm … can slide completely off"), NOT the rod
-      tops — that mapping stands. The rods themselves are thin straps ending in
-      a short Y-shaped head at the top and attach near the ROD-SIDE tip (rod
-      pin +127.37 from the pivot, ch30 GT vertical-rod closure; M6.3's "near
-      the pivot, +25.4" was tied to the pre-ch30 arbor-47.5 layout — see
-      ch. 14 layout).
+      The p.29 stepped sawtooth blocks remain the AMPLITUDE BARS' notched feet,
+      not rod tops.  A higher-resolution ch14 page002_img02 read plus the
+      0/6/14/40-crank end views resolves the rod joint itself: each black rod
+      ends in two prongs around a reduced silver rocker tongue.  This refutes
+      both the old 10 x 10.5 tombstone and PR #658's 5 x 15 x 2.9 solid block.
+      The #47 pin location and 163.101 mm centre distance remain unchanged; a
+      separate bright Ø1.8 steel pin crosses each clevis from its visible cheek.
 
       ---
 - heading: Chapter 14 — Rocker Arms (pp. 26–29)
@@ -721,16 +726,16 @@ sections:
         - photos/text
         - stated
         - high
-      - - Arm length (tapered profile)
-        - TOP edge arc 11.5" (292.1 mm), BOTTOM edge arc 10.5" (266.7 mm), symmetric about the pivot; 0.22" (5.588 mm) face PERPENDICULAR to the top edge at each tip (90° right-angle mark, cut into the front profile — not a 3D chamfer)
+      - - Arm tail master span / rod-side reduced tongue
+        - tail retains the R800/R816 arc endpoints and 5.588 mm radial land; rod-side arcs stop at X = pin - 5, then step to a 5 mm-deep tongue centred on the pin with square free face at X = pin + 6
         - '11.5'
-        - 'MEASURED MANUALLY from the ch. 30 back-view sketch. Top edge = R800 arc (11.5"); bottom edge = concentric R816 arc (10.5") — the differing arc lengths taper the ends inward (a shorter lower edge below a longer upper edge is only geometric with non-radial ends). The 0.22" tip face — square (90°) to the top edge, per the sketch''s right-angle marks — is from the same sketch, cut into the front profile as a short radial segment (perpendicular to the top arc) rather than a 3D chamfer feature. Supersedes the earlier p.29 broadside photo-scaled 4.5"/9" read (dual scale ~8.1–8.6 px/mm off the pivot ball / rod-pin hole / 16 mm depth callout, pivot→tip 113–119 mm rounded to a clean imperial half), the indirect M6.3 "80 mm bar travel + 8 mm margin" = 88 (never measured), and the M2 100/70 asymmetric read; ch. 15 symmetry retained. Perpendicular depth stays 16 mm; plate thickness 2.5 mm'
-        - manual (ch. 30 back view)
+        - 'The ch.30 back-view sketch retains the tail-side R800/R816 master endpoints and 0.22" radial land. ch14 page002_img02 shows the opposite, rod-side end stepped down inside the clevis, so the former symmetric-land interpretation is disproven. Nominal tongue: shoulder X 128.0674, end X 139.0674, Y 13.9561..18.9561.'
+        - manual tail geometry + photo-bounded tongue
         - med
       - - Rod-pin hole
-        - Ø2 at +127.37 from the pivot, rod side, LOW in the strap (5.3 above the bottom arc; 5.3 inboard of the bottom-arc end)
-        - '5.01'
-        - 'ch30 GT closure + ch14 ROM re-derive with the post fixed: the rods hang PLUMB onto the cam centre at machine x −60.167 from drum axis −60.394. The rocker support stays at its old location; the part-local rod hole moves to x 133.067 / y 16.456 so the arm remains level and the 163.101-mm rod remains plumb.'
+        - '#47 (Ø1.994) at part-local X 133.067402... / Y 16.456064..., centred in the reduced tongue'
+        - '5.24'
+        - 'Retained ch30 GT closure + ch14 ROM re-derive: installed pin world X = 72.9 - 133.0674 = -60.1674, directly above the phased cam. The rocker support, level rest pose, and 163.101-mm plumb rod are unchanged.'
         - derived
         - high
       - - Pivot pin hole

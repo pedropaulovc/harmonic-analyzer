@@ -1,0 +1,9 @@
+clevis-pin:
+  number: MHA-018
+  material: Plain Carbon Steel
+  material_specification: AISI 1018 cold-finished steel rod
+  finish: bright polished, deburred, oiled
+  quantity: 20
+  tolerance_class: machined_block
+  fit_class: fastener_clearance
+  process: "machined (steel)"

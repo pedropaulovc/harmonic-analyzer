@@ -1,48 +1,23 @@
 r"""Reproduction script: rocker arm (book ch. 14, pp. 26-29; 20 used).
 
-Thin matte-black steel strap that see-saws on its pivot shaft atop the
-tapered support castings. The FRONT PROFILE is now two concentric arcs of
-DIFFERENT arc length (a tapered curved strap), per the ch.30 back-view
-sketch:
+Thin matte-black steel strap on the common pivot shaft.  Its tail keeps the
+ch30-derived concentric R800/R816 edges, tapered closure, and 5.588 mm radial
+land.  The rod side is intentionally asymmetric: both arcs stop at a square
+full-depth shoulder 5 mm before the retained pin, then a 5 mm-deep tongue
+centred on that pin runs to a square free face 6 mm beyond it.  The tongue fits
+the connecting rod's photographed two-prong clevis with 0.20 mm clearance per
+broad face.
 
-  * Top edge  = concave-up arc, R = 800 mm (= amplitude-bar length, the book's
-    nonlinearity rationale), arc length 11.5" (292.1 mm).
-  * Bottom edge = concentric arc, R = 816 mm (top + 16 mm depth), arc length
-    10.5" (266.7 mm).
-  * Because the two arcs subtend DIFFERENT angles on their radii, the end faces
-    are NOT radial -- they slant inward, so the strap TAPERS toward each tip
-    (the "square ends" of the sketch are approximate; a shorter lower edge below
-    a longer upper edge is only possible with inward-tapering ends).
-  * Each tip has a 0.22" (5.588 mm) face PERPENDICULAR to the top edge (a radial
-    segment, the sketch's 90deg right-angle mark), cut into the front profile --
-    not a 3D chamfer feature.
+The 2.5 mm plate thickness, integral pivot hub, pivot bore, and #47 rod-pin
+bore remain unchanged.  ROD_HOLE_X/Y preserve the level-arm, plumb-rod closure;
+only the obsolete long rod-side taper/land boundary is replaced.
 
-The perpendicular top-to-bottom DEPTH stays 16 mm (p.29 end-face callout); the
-plate THICKNESS (Z) stays 2.5 mm (p.27 callout).
+Dimensions: cad/config/dimensions.yaml, Chapter 14.  Arc radii and source master
+spans come from the ch30 back view; the reduced tongue is photo-bounded by the
+ch14 joint views.
 
-Mid-pivot SEESAW, symmetric about the pivot. The 11.5" top span was measured
-manually from the ch.30 back view (supersedes the p.29 broadside photo-scaled
-4.5"/9" read and the indirect M6.3 "80 mm bar travel + 8 mm margin" = 88); the
-10.5" bottom arc + 0.22" perpendicular tip face come from the same ch.30 sketch.
-The connecting rod pins at +127.37 on the +X side, just inboard of the rod-side
-tip and LOW in the strap (5.3 above the bottom edge, ch14 fan photo) -- directly
-above the phased cam lobe, so the rod hangs PLUMB with the arm LEVEL (ch30
-photos + GT rocker-corner triangulation + the ch14 end views' flat 0-crank tip
-row; supersedes M6.3's "1 inch from the pivot", which was tied to the pre-ch30
-arbor-47.5 layout). The amplitude bar rides the top edge either side of the
-pivot (ch. 15: the bar "can slide completely off the rocker").
-
-This supersedes the legacy `oscilating-arms` part (no surviving source). M2's
-rod-at-tip reading is thus partially vindicated; its asymmetric 100/70 profile
-stays refuted (the strap is a symmetric mid-pivot seesaw).
-
-Dimensions: cad/DIMENSIONS.md "Chapter 14" - annotated thickness/depth, stated
-curvature, ch.30 back-view arc lengths + perpendicular tip face (med).
-
-Layout: pivot at the origin, arm along X (+X = connecting-rod side), arc center
-816 mm above, extruded mid-plane in Z; holes cut through Z. The pivot hole
-centre sits at local (0, 8) - assembly scripts must offset placements
-accordingly.
+Layout: pivot at the origin, tail at -X, connecting-rod tongue at +X, shared arc
+centre 816 mm above the bottom datum, and all bores along local Z.
 
 Run (SolidWorks already open)::
 
@@ -54,7 +29,6 @@ from __future__ import annotations
 import math
 import sys
 
-from cone_pivot_post_installation import MECHANISM_X_SHIFT
 
 from _common import (
     SketchDims,
@@ -84,65 +58,57 @@ from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from rocker_arm_notes import DRAWING_NOTES, ISOMETRIC_VIEW_NOTE
 from rocker_arm_notes import DRAWING_DIMENSIONS
-from rocker_arm_spec import ARM_THICKNESS as SPEC_ARM_THICKNESS, HUB_DIA, HUB_LENGTH, SURFACE_FINISHES
+from rocker_arm_spec import (
+    ARM_DEPTH,
+    ARM_THICKNESS,
+    BOT_ARC_LEN,
+    BOT_END_X,
+    BOT_END_Y,
+    CENTER_Y,
+    CURVE_RADIUS,
+    HUB_DIA,
+    HUB_LENGTH,
+    PIVOT_HOLE_DIA,
+    R_BOTTOM,
+    R_TOP,
+    ROD_HOLE_ABOVE_BOTTOM,  # noqa: F401 -- re-exported for contract tests
+    ROD_HOLE_X,
+    ROD_HOLE_Y,
+    ROD_STEP_BOTTOM_Y,
+    ROD_STEP_FROM_PIN,
+    ROD_STEP_TOP_Y,
+    ROD_STEP_X,
+    ROD_TONGUE_BEYOND_PIN,
+    ROD_TONGUE_BOTTOM_Y,
+    ROD_TONGUE_DEPTH,
+    ROD_TONGUE_END_X,
+    ROD_TONGUE_TOP_Y,
+    SURFACE_FINISHES,
+    TAIL_TIP_FACE,
+    TAIL_TIP_X,
+    TAIL_TIP_Y,
+    TOP_ARC_LEN,
+    TOP_END_X,
+    TOP_END_Y,
+)
 import _config
+
 
 PART_NAME = "rocker-arm"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
-CURVE_RADIUS = 800.0  # DIMENSIONS.md ch14: top edge R = amplitude bar length (stated)
-ARM_DEPTH = 16.0  # ch14: p.29 photo callout, perpendicular top-to-bottom depth
-ARM_THICKNESS = 2.5  # ch14: p.27 photo callout (plate thickness, Z)
-TOP_ARC_LEN = 292.1  # top edge arc length = 11.5" (ch.30 back view, manual)
-BOT_ARC_LEN = 266.7  # bottom edge arc length = 10.5" (ch.30 back-view sketch)
-TIP_FACE = 5.588  # 0.22" tip face, PERPENDICULAR to the top edge (ch.30 sketch)
-PIVOT_HOLE_DIA = 6.5  # rides the 6.35 pivot shaft (DIMENSIONS.md ch14, derived)
-# The hub length IS the station pitch: hub faces of neighbouring arms touch.
+# The hub length is the station pitch: neighbouring arm hubs touch face to face.
 if abs(HUB_LENGTH - _config.machine("channels", "station_pitch_mm")) > 1e-6:
-    raise AssertionError("rocker_arm_spec.HUB_LENGTH must equal the channel station pitch")
-HUB_PROUD = (HUB_LENGTH - ARM_THICKNESS) / 2.0  # 2.278 each face
-if ARM_THICKNESS != SPEC_ARM_THICKNESS:
-    raise AssertionError("rocker_arm_spec.ARM_THICKNESS drifted from the build")
-# rod pin hole: was Ø2.0 drill, now #47 (Ø1.994) native Hole Wizard feature
-ROD_HOLE_X = 127.3738 - MECHANISM_X_SHIFT
-# bottom-arc end (132.76): solved so the pin sits DIRECTLY ABOVE the phased cam
-# lobe (machine X is DRUM_X + ECC*sin(1.5 deg), lobe UP at the
-# cos-mode home pose) with the pivot at the seesaw mid-span (+72.9) and the arm
-# LEVEL -- the ch30 photos show every connecting rod hanging PLUMB from the arm
-# tip onto its cam, the ch14 end views show the 0-crank tip row dead level, and
-# the GT rocker-corner triangulation puts the rod-side arm end at machine x -60
-# (bottom-arc end predicts -59.9 at the level pose). Supersedes 127.49, the
-# same plumb solve at the pre-ROM-fit lobe-down phase (ring x 54.78), and
-# M6.3's 25.4 ("1 inch from the pivot", pre-ch30 arbor-47.5 layout).
-ROD_HOLE_ABOVE_BOTTOM = 5.53312035905  # preserves the old 15.302534 world/local Y
-# after the X re-anchor moves along the curved bottom edge. This keeps the
-# unchanged-length rod plumb and the neutral arm level.
-THROUGH_CUT_DEPTH = 20.0  # mid-plane total; > thickness
+    raise AssertionError(
+        "rocker_arm_spec.HUB_LENGTH must equal the channel station pitch"
+    )
+HUB_PROUD = (HUB_LENGTH - ARM_THICKNESS) / 2.0
+THROUGH_CUT_DEPTH = 20.0
 
-# Arc centre sits ARM_DEPTH above the pivot's bottom edge: bottom edge is an
-# R816 arc, top edge the concentric R800 arc through (0, 16).
-CENTER_Y = CURVE_RADIUS + ARM_DEPTH
-R_TOP = CURVE_RADIUS
-R_BOTTOM = CURVE_RADIUS + ARM_DEPTH
-
-# Half-angle each arc subtends (arc_len / 2 / radius); the two differ, which is
-# what tapers the ends. Endpoint coords: on the circle centred at (0, CENTER_Y).
 _ALPHA_TOP = (TOP_ARC_LEN / 2.0) / R_TOP
 _ALPHA_BOT = (BOT_ARC_LEN / 2.0) / R_BOTTOM
-TOP_END_X = R_TOP * math.sin(_ALPHA_TOP)
-TOP_END_Y = CENTER_Y - R_TOP * math.cos(_ALPHA_TOP)
-BOT_END_X = R_BOTTOM * math.sin(_ALPHA_BOT)
-BOT_END_Y = CENTER_Y - R_BOTTOM * math.cos(_ALPHA_BOT)
-
-# Each tip has a short face PERPENDICULAR to the top edge (the sketch's 90deg
-# right-angle mark): a radial segment (perpendicular to the arc = along the
-# radius) of length TIP_FACE, running from the top-arc endpoint outward (away
-# from the centre) to where the tapered end face begins. Outward radial unit at
-# the +X top endpoint = (endpoint - centre)/R_TOP.
-_RAD_X = TOP_END_X / R_TOP  # = sin(alpha_top)
-_RAD_Y = (TOP_END_Y - CENTER_Y) / R_TOP  # = -cos(alpha_top)
-ROD_TIP_X = TOP_END_X + TIP_FACE * _RAD_X
-ROD_TIP_Y = TOP_END_Y + TIP_FACE * _RAD_Y
+_ROD_ALPHA_TOP = math.asin(ROD_STEP_X / R_TOP)
+_ROD_ALPHA_BOT = math.asin(ROD_STEP_X / R_BOTTOM)
 
 
 def _bottom_point(x: float) -> tuple[float, float]:
@@ -155,31 +121,30 @@ def _mid_y(x: float) -> float:
     return (by + ty) / 2.0
 
 
-# Rod-pin hole centre: LOW in the strap (ch14 fan photo), not mid-depth like
-# the pivot. Assembly scripts import this (imported-not-copied, like _mid_y).
-ROD_HOLE_Y = _bottom_point(ROD_HOLE_X)[1] + ROD_HOLE_ABOVE_BOTTOM  # 15.303
-
-
 def _strap_area() -> float:
-    """Cross-section area of the tapered strap (two arcs + two perpendicular tip
-    faces + two tapered end faces) by shoelace over a densely-sampled boundary --
-    exact enough for the volume gate, and correct for the non-annular shape the
-    differing arc lengths + tip faces produce.
+    """Analytic profile area by shoelace over densely sampled circular edges.
 
-    Boundary order: bottom arc rod->tail, tail end face (up to tail_tip), tail
-    tip face (the transition into the top arc's first point = tail_t), top arc
-    tail->rod, rod tip face (rod_t -> rod_tip), then the wrap rod_tip -> rod_b is
-    the rod end face."""
+    Boundary: rod shoulder bottom -> bottom arc -> tail tapered face -> retained
+    tail radial land -> top arc -> rod shoulder top -> tongue top -> square free
+    face -> tongue bottom -> rod shoulder bottom.
+    """
     n = 200
     pts: list[tuple[float, float]] = []
-    for i in range(n + 1):  # bottom arc, rod (+alpha) -> tail (-alpha)
-        a = _ALPHA_BOT - 2.0 * _ALPHA_BOT * i / n
+    for i in range(n + 1):
+        a = _ROD_ALPHA_BOT + (-_ALPHA_BOT - _ROD_ALPHA_BOT) * i / n
         pts.append((R_BOTTOM * math.sin(a), CENTER_Y - R_BOTTOM * math.cos(a)))
-    pts.append((-ROD_TIP_X, ROD_TIP_Y))  # tail end face: tail_b -> tail_tip
-    for i in range(n + 1):  # top arc, tail (-alpha) -> rod (+alpha)
-        a = -_ALPHA_TOP + 2.0 * _ALPHA_TOP * i / n
+    pts.append((TAIL_TIP_X, TAIL_TIP_Y))
+    for i in range(n + 1):
+        a = -_ALPHA_TOP + (_ROD_ALPHA_TOP + _ALPHA_TOP) * i / n
         pts.append((R_TOP * math.sin(a), CENTER_Y - R_TOP * math.cos(a)))
-    pts.append((ROD_TIP_X, ROD_TIP_Y))  # rod tip face: rod_t -> rod_tip
+    pts.extend(
+        (
+            (ROD_STEP_X, ROD_TONGUE_TOP_Y),
+            (ROD_TONGUE_END_X, ROD_TONGUE_TOP_Y),
+            (ROD_TONGUE_END_X, ROD_TONGUE_BOTTOM_Y),
+            (ROD_STEP_X, ROD_TONGUE_BOTTOM_Y),
+        )
+    )
     area = 0.0
     for i in range(len(pts)):
         x1, y1 = pts[i]
@@ -193,40 +158,32 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
-    # Editable knobs: named globals in the equation manager that drive every
-    # sketch dimension below. A GUI fine-tune edits THESE (Tools > Equations) --
-    # e.g. TopEndX or CurveRadius -- never an auto "D3@Sketch1". The mm suffix is
-    # load-bearing: this is an INCH document and the equation manager evaluates
-    # BARE numbers in document units, so an unsuffixed "800" would read as 800
-    # inches and blow the part up 25.4x. The derived globals RTop/RBottom/CenterY
-    # (concentric arc radii + shared centre height) are equations of the
-    # primitives, so the two arcs stay concentric and ArmDepth-apart.
-    #
-    # TopEndX/BottomEndX are each arc's endpoint x = R*sin(arclen / 2 / R),
-    # computed HERE in Python (not as an SW equation): the tip x IS the editable
-    # knob. Trig lives in the equation manager unreliably -- a live
-    # sin("arclen"/2/"R") re-evaluates on rebuild to a geometry-breaking value
-    # (radians-vs-degrees + length/length dimensionality), so the arc length is a
-    # Python constant (TOP_ARC_LEN / BOT_ARC_LEN, = 11.5" / 10.5") folded into the
-    # tip x here. To re-cut to a different arc length, edit those constants.
+    # Editable primitives and derived boundary globals.  Units are explicit
+    # because the document is inch-based.  The arc endpoint trig remains folded
+    # in Python: live dimensionless trig is unreliable in the SW equation manager.
     await set_global(adapter, "CurveRadius", f"{CURVE_RADIUS}mm")
     await set_global(adapter, "ArmDepth", f"{ARM_DEPTH}mm")
     await set_global(adapter, "ArmThickness", f"{ARM_THICKNESS}mm")
-    await set_global(adapter, "TipFaceLen", f"{TIP_FACE}mm")
+    await set_global(adapter, "TailTipFace", f"{TAIL_TIP_FACE}mm")
     await set_global(adapter, "PivotHoleDia", f"{PIVOT_HOLE_DIA}mm")
     await set_global(adapter, "HubDia", f"{HUB_DIA}mm")
     await set_global(adapter, "HubLength", f"{HUB_LENGTH}mm")
     await set_global(adapter, "RodHoleX", f"{ROD_HOLE_X}mm")
-    # (The old RodHoleDia/RodHoleX knobs are gone: the rod pin hole is now a native
-    # Hole Wizard #47 feature whose diameter comes from the drill standard; its
-    # location rides the ROD_HOLE_X/ROD_HOLE_Y module constants that the channel
-    # assembly imports.)
+    await set_global(adapter, "RodHoleY", f"{ROD_HOLE_Y}mm")
+    await set_global(adapter, "RodStepFromPin", f"{ROD_STEP_FROM_PIN}mm")
+    await set_global(adapter, "RodTongueBeyondPin", f"{ROD_TONGUE_BEYOND_PIN}mm")
+    await set_global(adapter, "RodTongueDepth", f"{ROD_TONGUE_DEPTH}mm")
+    # Hole diameters remain owned by their native Hole Wizard/table features.
     await set_global(adapter, "ThroughCutDepth", f"{THROUGH_CUT_DEPTH}mm")
     await set_global(adapter, "RTop", '"CurveRadius"')
     await set_global(adapter, "RBottom", '"CurveRadius" + "ArmDepth"')
     await set_global(adapter, "CenterY", '"CurveRadius" + "ArmDepth"')
     await set_global(adapter, "TopEndX", f"{TOP_END_X}mm")
     await set_global(adapter, "BottomEndX", f"{BOT_END_X}mm")
+    await set_global(adapter, "RodStepX", '"RodHoleX" - "RodStepFromPin"')
+    await set_global(adapter, "RodTongueEndX", '"RodHoleX" + "RodTongueBeyondPin"')
+    await set_global(adapter, "RodTongueTopY", '"RodHoleY" + "RodTongueDepth" / 2')
+    await set_global(adapter, "RodTongueBottomY", '"RodHoleY" - "RodTongueDepth" / 2')
 
     # Each sketch DECLARES its dim names + drive equations as it records them; the
     # drive equations are collected here and applied in one deferred batch at the
@@ -234,11 +191,14 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs: list[tuple[str, str]] = []
 
     tail_b = (-BOT_END_X, BOT_END_Y)
-    rod_b = (BOT_END_X, BOT_END_Y)
+    rod_b = (ROD_STEP_X, ROD_STEP_BOTTOM_Y)
     tail_t = (-TOP_END_X, TOP_END_Y)
-    rod_t = (TOP_END_X, TOP_END_Y)
-    rod_tip = (ROD_TIP_X, ROD_TIP_Y)
-    tail_tip = (-ROD_TIP_X, ROD_TIP_Y)
+    rod_t = (ROD_STEP_X, ROD_STEP_TOP_Y)
+    tail_tip = (TAIL_TIP_X, TAIL_TIP_Y)
+    tongue_top_root = (ROD_STEP_X, ROD_TONGUE_TOP_Y)
+    tongue_top_end = (ROD_TONGUE_END_X, ROD_TONGUE_TOP_Y)
+    tongue_bottom_end = (ROD_TONGUE_END_X, ROD_TONGUE_BOTTOM_Y)
+    tongue_bottom_root = (ROD_STEP_X, ROD_TONGUE_BOTTOM_Y)
 
     strap = SketchDims()
     check("create_sketch strap", await adapter.create_sketch("Front"))
@@ -252,27 +212,38 @@ async def build(adapter) -> dict[str, str]:
             "strap top arc",
             await adapter.add_arc(0.0, CENTER_Y, *tail_t, *rod_t),
         ),
-        # Rod tip: a short radial face (rod_t -> rod_tip) square to the top edge,
-        # then the tapered end face down to the bottom arc (rod_tip -> rod_b).
-        check("strap rod tip", await adapter.add_line(*rod_t, *rod_tip)),
-        check("strap rod end", await adapter.add_line(*rod_tip, *rod_b)),
+        check("rod top shoulder", await adapter.add_line(*rod_t, *tongue_top_root)),
+        check(
+            "rod tongue top", await adapter.add_line(*tongue_top_root, *tongue_top_end)
+        ),
+        check(
+            "rod free end", await adapter.add_line(*tongue_top_end, *tongue_bottom_end)
+        ),
+        check(
+            "rod tongue bottom",
+            await adapter.add_line(*tongue_bottom_end, *tongue_bottom_root),
+        ),
+        check(
+            "rod bottom shoulder", await adapter.add_line(*tongue_bottom_root, *rod_b)
+        ),
         check("strap tail tip", await adapter.add_line(*tail_t, *tail_tip)),
         check("strap tail end", await adapter.add_line(*tail_tip, *tail_b)),
     ]
     set_sketch_direct_db(adapter, False)
-    bottom_arc, top_arc, rod_tip_line, _rod_end, tail_tip_line, _tail_end = entities
-    # Two concentric arcs (top R800, bottom R816), each tip a short face square to
-    # the top edge, then a tapered end face down to the bottom arc. The top arc
-    # (11.5" arc-len) and bottom arc (10.5") subtend DIFFERENT angles on their
-    # radii, so the end faces slant inward (the profile tapers). The tip faces are
-    # PERPENDICULAR to the top edge: each is made radial by a coincident relation
-    # pinning the top arc's CENTRE onto the tip line (a line through the centre is
-    # along the radius = normal to the arc), then a linear length dim = TipFaceLen.
-    # Dim EMISSION ORDER (record each as its display dim is created): the centre's
-    # vertical_distance (x on-axis, so anchor_point_to_origin emits ONE dim =
-    # CenterY), bottom radius, top radius, bottom-tail x, bottom-rod x, top-tail x,
-    # top-rod x, rod-tip length, tail-tip length -- NINE display dims. The
-    # ``coincident`` concentric + the two radial relations are RELATIONS, not dims.
+    (
+        bottom_arc,
+        top_arc,
+        rod_top_shoulder,
+        rod_tongue_top,
+        rod_free_end,
+        rod_tongue_bottom,
+        rod_bottom_shoulder,
+        tail_tip_line,
+        _tail_end,
+    ) = entities
+    # The tail retains the radial land and taper.  On the rod side both arcs
+    # terminate at RodStepX; vertical shoulders enter a centred 5 mm tongue with
+    # horizontal flanks and a square free-end datum face.
     await anchor_point_to_origin(
         adapter, f"{bottom_arc}.center", 0.0, CENTER_Y, "arc centre"
     )
@@ -294,9 +265,8 @@ async def build(adapter) -> dict[str, str]:
         await adapter.add_sketch_dimension(top_arc, None, "radial", R_TOP),
     )
     strap.record("TopRadius", '"RTop"')
-    # Endpoint x dims: horizontal_distance shows the MAGNITUDE, so each drives
-    # POSITIVE against its arc's endpoint global (both tips share one magnitude ->
-    # symmetric seesaw).
+    # Tail endpoint magnitudes retain their source master spans.  Both rod-side
+    # arc endpoints instead drive to the common square shoulder X.
     check(
         "bottom tail x",
         await adapter.add_sketch_dimension(
@@ -305,12 +275,12 @@ async def build(adapter) -> dict[str, str]:
     )
     strap.record("BottomTailX", '"BottomEndX"')
     check(
-        "bottom rod x",
+        "bottom rod shoulder x",
         await adapter.add_sketch_dimension(
-            f"{bottom_arc}.end", "origin", "horizontal_distance", BOT_END_X
+            f"{bottom_arc}.end", "origin", "horizontal_distance", ROD_STEP_X
         ),
     )
-    strap.record("BottomRodX", '"BottomEndX"')
+    strap.record("BottomRodStepX", '"RodStepX"')
     check(
         "top tail x",
         await adapter.add_sketch_dimension(
@@ -319,25 +289,13 @@ async def build(adapter) -> dict[str, str]:
     )
     strap.record("TopTailX", '"TopEndX"')
     check(
-        "top rod x",
+        "top rod shoulder x",
         await adapter.add_sketch_dimension(
-            f"{top_arc}.end", "origin", "horizontal_distance", TOP_END_X
+            f"{top_arc}.end", "origin", "horizontal_distance", ROD_STEP_X
         ),
     )
-    strap.record("TopRodX", '"TopEndX"')
-    # Tip faces square to the top edge: pin the top arc's centre onto each tip
-    # line (=> the line is radial => perpendicular to the arc), then a length dim.
-    check(
-        "rod tip radial",
-        await adapter.add_sketch_constraint(
-            f"{top_arc}.center", rod_tip_line, "coincident"
-        ),
-    )
-    check(
-        "rod tip length",
-        await adapter.add_sketch_dimension(rod_tip_line, None, "linear", TIP_FACE),
-    )
-    strap.record("RodTipLen", '"TipFaceLen"')
+    strap.record("TopRodStepX", '"RodStepX"')
+
     check(
         "tail tip radial",
         await adapter.add_sketch_constraint(
@@ -346,9 +304,50 @@ async def build(adapter) -> dict[str, str]:
     )
     check(
         "tail tip length",
-        await adapter.add_sketch_dimension(tail_tip_line, None, "linear", TIP_FACE),
+        await adapter.add_sketch_dimension(
+            tail_tip_line, None, "linear", TAIL_TIP_FACE
+        ),
     )
-    strap.record("TailTipLen", '"TipFaceLen"')
+    strap.record("TailTipLen", '"TailTipFace"')
+
+    for label, entity, relation in (
+        ("top shoulder", rod_top_shoulder, "vertical"),
+        ("tongue top", rod_tongue_top, "horizontal"),
+        ("free end", rod_free_end, "vertical"),
+        ("tongue bottom", rod_tongue_bottom, "horizontal"),
+        ("bottom shoulder", rod_bottom_shoulder, "vertical"),
+    ):
+        check(
+            f"rod {label} {relation}",
+            await adapter.add_sketch_constraint(entity, None, relation),
+        )
+    check(
+        "rod tongue top height",
+        await adapter.add_sketch_dimension(
+            f"{rod_tongue_top}.start",
+            "origin",
+            "vertical_distance",
+            ROD_TONGUE_TOP_Y,
+        ),
+    )
+    strap.record("RodTongueTopY", '"RodTongueTopY"')
+    check(
+        "rod tongue end x",
+        await adapter.add_sketch_dimension(
+            f"{rod_tongue_top}.end",
+            "origin",
+            "horizontal_distance",
+            ROD_TONGUE_END_X,
+        ),
+    )
+    strap.record("RodTongueEndX", '"RodTongueEndX"')
+    check(
+        "rod tongue depth",
+        await adapter.add_sketch_dimension(
+            rod_free_end, None, "linear", ROD_TONGUE_DEPTH
+        ),
+    )
+    strap.record("RodTongueDepth", '"RodTongueDepth"')
     await ensure_fully_defined(adapter, "strap sketch")
     check("exit_sketch strap", await adapter.exit_sketch())
     name_last_feature(adapter, "StrapProfile")
@@ -372,7 +371,11 @@ async def build(adapter) -> dict[str, str]:
     hub = SketchDims()
     check("create_sketch hub", await adapter.create_sketch("Front"))
     await define_circle(
-        adapter, 0.0, _mid_y(0.0), HUB_DIA / 2.0, "hub",
+        adapter,
+        0.0,
+        _mid_y(0.0),
+        HUB_DIA / 2.0,
+        "hub",
         dims=hub,
         names=("HubX", "HubZ", "HubDia"),
         drives=(None, '"ArmDepth" / 2', '"HubDia"'),
@@ -399,7 +402,11 @@ async def build(adapter) -> dict[str, str]:
     pivot = SketchDims()
     check("create_sketch pivot hole", await adapter.create_sketch("Front"))
     await define_circle(
-        adapter, 0.0, _mid_y(0.0), PIVOT_HOLE_DIA / 2.0, "pivot hole",
+        adapter,
+        0.0,
+        _mid_y(0.0),
+        PIVOT_HOLE_DIA / 2.0,
+        "pivot hole",
         dims=pivot,
         names=("PivotX", "PivotZ", "PivotDia"),
         drives=(None, '"ArmDepth" / 2', '"PivotHoleDia"'),
@@ -422,12 +429,10 @@ async def build(adapter) -> dict[str, str]:
         adapter, "Right Plane", 0.0, "Top Plane", _mid_y(0.0), "pivot bore"
     )
 
-    # Connecting-rod pin hole near the rod-side tip, LOW in the strap (5.3 above
-    # the bottom edge, ch14 fan photo -- the pivot hole stays mid-depth): was a
-    # plain Ø2.0 cut, now a native Hole Wizard #47 number drill (Ø1.994) drilled
-    # +Z through the 2.5 strap at (ROD_HOLE_X, ROD_HOLE_Y)
-    # (memory/fastener-policy-us-customary). The pivot hole stays a Ø6.5 circle
-    # cut. Through-all is geometrically identical to the old mid-plane cut.
+    # Connecting-rod pin hole centred in the reduced rod-side tongue.  The
+    # retained (ROD_HOLE_X, ROD_HOLE_Y) keeps the pin 5.533 mm above the curved
+    # bottom reference and preserves the level-arm/plumb-rod closure.  Native
+    # Hole Wizard starts on the +Z face and drills inward through the 2.5 mm plate.
     rod_cut = wizard_holes(
         adapter,
         HoleSpec("drilled_number", "#47"),
@@ -435,7 +440,7 @@ async def build(adapter) -> dict[str, str]:
         (0.0, 0.0, 1.0),
         "rod pin hole (#47)",
         name="RodHole",
-        placement_dims=[(("RodPinX", '"RodHoleX"'), (None, None))],
+        placement_dims=[(("RodPinX", '"RodHoleX"'), ("RodPinY", '"RodHoleY"'))],
     )
     drive_jobs += rod_cut.placement_drive_jobs
     # Named axis through the rod-pin bore (Axis2 = (Right+ROD_HOLE_X) ∩ (Top+hole_y)).
@@ -447,6 +452,7 @@ async def build(adapter) -> dict[str, str]:
         ROD_HOLE_Y,
         "rod bore",
         drive_a='"RodHoleX"',
+        drive_b='"RodHoleY"',
         drive_jobs=drive_jobs,
     )
     # Named axis on the R800 top-edge arc CENTRE (Axis3 = Right ∩ Top+816, a
@@ -456,16 +462,22 @@ async def build(adapter) -> dict[str, str]:
     # rocker drives the bar + channel lever. Tied to "CenterY" so a GUI edit
     # of the arc radius/depth moves the coupling with it.
     await name_bore_axis(
-        adapter, "Right Plane", 0.0, "Top Plane", CENTER_Y, "arc centre",
-        drive_b='"CenterY"', drive_jobs=drive_jobs,
+        adapter,
+        "Right Plane",
+        0.0,
+        "Top Plane",
+        CENTER_Y,
+        "arc centre",
+        drive_b='"CenterY"',
+        drive_jobs=drive_jobs,
     )
 
     # The pivot bore runs the full hub length; the rod bore only the 2.5 strap.
     rod_dia = NUMBER_DRILL_MM["#47"]
     v_pivot = math.pi * (PIVOT_HOLE_DIA / 2.0) ** 2 * HUB_LENGTH
     v_rod = math.pi * (rod_dia / 2.0) ** 2 * ARM_THICKNESS
-    # The tip faces are cut into the SKETCH profile (not a 3D chamfer feature), so
-    # _strap_area already accounts for them: the bored-strap volume is tight.
+    # _strap_area already includes the retained tail land and stepped tongue
+    # boundary, so the bored-strap volume gate remains analytic.
     v_measured = await volume_check(
         adapter, "bored strap + hub", v_strap + v_hub - v_pivot - v_rod, 0.01 * v_strap
     )
@@ -504,8 +516,12 @@ async def build(adapter) -> dict[str, str]:
     require_saved_drawing_properties(
         adapter,
         (
-            "Number", "Material Specification", "Finish", "Quantity",
-            "Manufacturing Notes", "Isometric View Note",
+            "Number",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Manufacturing Notes",
+            "Isometric View Note",
         ),
     )
     return artefacts

@@ -132,6 +132,13 @@ COMPONENT_COUNTS = {
 }
 
 
+def test_channel_component_reference_band_includes_the_twenty_clevis_pins() -> None:
+    expected = 7 * verify._N_CH + 8
+    lo, hi = verify._COMPONENT_BAND["channel"]
+    assert (lo, hi) == (expected - 6, expected + 6)
+    assert COMPONENT_COUNTS["channel"] == expected
+
+
 # --------------------------------------------------------------------------- #
 # Mock COM objects. Each method sleeps its calibrated duration, then returns    #
 # canned-healthy data, so every gate takes its real-shaped path and PASSES.     #

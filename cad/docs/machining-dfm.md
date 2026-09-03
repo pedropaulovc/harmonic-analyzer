@@ -33,19 +33,22 @@ geometry is casting-shaped, not milling-shaped.
   |---|---|---|
   | `cylinder-gear` (+ integral cam) | 20 | 120 teeth + eccentric cam + 0.4 mm index notch, all co-phased +Y — hand-repeating 20× scatters the phase |
   | `cone-gear` | 20 | involute teeth cut with a **self-made Eureka-generated form cutter** (cutters for these DP/tooth-counts don't exist — see "How to get this reviewed"), indexed on a dividing head; wire-EDM = outsource alt |
-  | `pivot-bushing` / `lever-bushing` | 19 each | turned spacers whose **length** sets channel pitch — length consistency across the set is the point |
-  | `rocker-arm` | 20 | flat R800 profile, one setup — ideal CNC profile part |
-  | `connecting-rod` | 20 | flat 2D outline → DXF/2.5D |
+  | `rocker-arm` | 20 | repeated R800/R816 strap profile plus the same integral Ø10 × 7.0565 pivot hub and reduced 5 mm rod tongue; CNC preserves the hub/bores/profile relationship across multi-level setups |
+  | `connecting-rod` | 20 | repeated gray-iron ring/shank/offset-clevis casting; fixture from the ring datum to machine the strap bore, then drill the two clevis-cheek openings coaxially and preserve every local-Z envelope |
+  | `clevis-pin` | 20 | Ø1.8 × 4.9 shank and Ø3.0 × 0.6 head turned identically from Ø3 stock |
   | `knife-mount` | 2 | trivial prismatic block, 2 identical |
 
 - **Casting-vs-bar substitution (3 T1 parts are castings in the registry):** `summing-lever`,
   `rocker-arm-support`, and `connecting-rod` carry `material: Gray Cast Iron` in
-  `cad/config/parts/*.yaml`. Two are **benign** substitutions — the support cuts fine from bar, and the
-  rod is a flat 2D profile that cuts trivially from plate (book: "rough-finished"). The **lever does
-  not** — its ribbed/leaf organic form is casting-native and hogging it from solid means 4–5 setups
-  around cantilevered plates. Decide **cast, fabricate (weld/silver-solder up from simple stock), or
-  accept the multi-setup hog** before you start; the support/rod are just a stock choice, the lever is a
-  real decision.
+  `cad/config/parts/*.yaml`. The support remains the benign substitution: its
+  relieved shell can be machined from bar. The rod is **not** a flat-plate
+  substitute: its 3.0 ring, 1.0 centred shank, offset neck/web, and 4.9 clevis
+  occupy multiple Z levels. Cutting it from solid requires repeatable ring-datum
+  fixturing and multiple setups; fabricating the offset clevis requires controlled
+  joining. The lever is still the hardest casting-native part because its ribbed/
+  leaf organic form means 4–5 setups around cantilevered plates. Decide **cast,
+  fabricate, or accept the multi-setup hog** for both rod and lever before stock
+  is ordered; only the support is merely a stock choice.
   - **`knife-mount` is a material *conflict*, not a settled casting:** its registry
     (`parts/knife-mount.yaml`) and assessment §6 say **Brass**, but `build_knife_mount.py` hardcodes
     `MATERIAL = "Gray Cast Iron"`. The registry value is what stamps the BOM/drawing custom property, so
@@ -67,12 +70,13 @@ geometry is casting-shaped, not milling-shaped.
 | **`summing-lever`** | modeled **Gray Cast Iron casting**; organic first-class lever ~120×28×196 | solid pivot cylinder Ø25.4×152.4 (**no bore**); 2× hex knife trunnions (edges = top-vertex ridges) protruding 21.717 each end; 20× Ø2.0 spring holes through 5.08 plate @ 7.0565 pitch (web ~5.06); Ø3.0 anchor bore | knife-edge ridge **delicate** (the precision line); trunnion slender cantilever → **chatter**; organic 3-pt-arc leaf/rib profiles hard to mill; turning Ø25.4 with cantilevered plates | **4–5 from bar** (2 sketch planes + turn) | **CAST or fabricate**, don't hog; knife edge → hardened insert (§6) |
 | **`knife-mount`** | rectangular block 34×43.77×14 (bar/plate); **2 identical** | Ø25.4 through bore (bearing bore for the trunnion), centre ~27.1 below the top face (`BORE_CY` −12.45 from the knife-edge origin, block top +14.62); tapped 1/2-13 blind hole ×12 in the block top (hanger-stud seat); walls 4.0 under bore, ~4.3 flanks | watch **bore breakout on the 4 mm floor**; otherwise trivial | 1–2 (square block, bore one axis) | **CNC-REPEAT** (×2) or trivial manual. Hangs from the top-frame casting's integral crossbar (the former separate top-crossbar part is merged into the top-frame) via a 1/2-13 knife-hanger stud |
 
-### Cylinder gear + cam, connecting rod (T1 — the 20 function generators)
+### Cylinder gear + cam, connecting rod + clevis pin (T1 — the 20 function generators)
 
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
 | **`cylinder-gear`** ×20 | round brass bar ~63; toothed disc OD62.2×3 + integral eccentric cam OD30.6×3.5 (offset +Y 8.64); total H 6.5 | Ø9.525 (3/8") through bore — **rides free on arbor, no keyway**; 120T involute DP49.82 PA14.5° (2.5D through-cut, patterned → **DXF/2.5D-machinable**); cam = plain eccentric circle (2.5D); **0.4 mm alignment notch** = the +Y co-phased timing datum | cam thin-side wall **1.90 mm**; notch kerf **0.4 mm** (slitting-saw, fragile crests); 3 mm slender disc; **double-sided** (teeth+notch front / cam boss far face) | **≥2** (flip for cam boss) | **CNC-REPEAT** — lathe bore+OD, teeth with a self-made form cutter indexed (wire-EDM = outsource), cam offset, notch by slitting saw; **hold the +Y phasing identical on all 20** |
-| **`connecting-rod`** ×20 | flat plate ~3 mm; 2D outline ~170×40.8; book: "rough-finished" (cosmetically forgiving) | Ø30.8 strap bore (rides Ø30.6 cam, 0.1/side); Ø2.0 pin hole in head | **~1.4 mm** material over the Ø2 pin (fragile crown); reentrant fillets at shoulder roots (fine — it's an outline); 2.5 mm shank | **1** (profile + 2 drills) | **DXF/2.5D profile** the outline + drill 2 bores; leave body rough |
+| **`connecting-rod`** ×20 | gray-iron multi-level blank: ring 3.0 thick, centred flat shank 1.0 thick, and offset 4.9-wide clevis; ~170×40.8 envelope; book: "rough-finished" | Ø30.8 strap bore (rides Ø30.6 cam, 0.1/side); 8×12 D-cheeks, each 1.0 thick, about a 2.9 slot; #47 Ø1.994 hole through both cheeks; 2-high U-web plus offset neck | **not a flat 2D plate**: the multiple local-Z levels must close as one solid; 1.0 shank/cheeks need support; preserve 0.0565 adjacent-station shank-to-clevis clearance | **≥2** (ring/shank datum, then offset web/neck/cheeks; machine the strap bore separately and drill the two clevis-cheek openings coaxially) | **CAST + MACHINE** — rough-cast the stepped ring/shank/clevis form, machine strap bore and #47 clevis hole; fixture from the ring datum and verify every Z envelope |
+| **`clevis-pin` MHA-018** ×20 | AISI 1018 cold-finished steel, turned from Ø3 stock; Ø1.8 shank × 4.9 grip with Ø3.0 × 0.6 flat head | shank clears the Ø1.994 #47 rod/rocker holes; grip closes on the 4.9 clevis outside faces; bright head seats on the near visible cheek | slender Ø1.8 shank and 0.6 head demand a sharp tool and light part-off cut; burrs would obstruct the running joint | **1** (turn shank/head and part off; deburr) | **LATHE-REPEAT ×20** — turn from Ø3 bar, part to head thickness, deburr without shortening the grip, polish bright, and oil |
 
 ### Cone gears + shaft (T1 — the DP-49.82 train, tip gears fragile)
 
@@ -81,20 +85,18 @@ geometry is casting-shaped, not milling-shaped.
 | **`cone-gear`** ×20 (T006→T120) | round brass bar, extruded disc, face 6.5, OD = (N+2)/DP·25.4 at DP 49.82 → **~4.08 (T006) → ~62.2 (T120)** (same DP/OD as the 120T cylinder gear it meshes); tip gears T006–T024 harder yellow metal | 1 central through-bore, **soldered, no key**; bore Ø by config (T006 **0.79**/1/32″, T012 3.18, T018 6.35, T024+ 9.53); 6–120 involute teeth PA14.5°, 2.5D through-cut (DXF profile) | **T006 wall 0.49 mm** (headline); all small gears sub-1 mm; T006 whole gear tiny → brutal workholding; sharp internal corner at flank↔base-chord (wire-EDM/broach = outsource, or accept a corner radius) | ~2 (lathe OD/face/bore; teeth) | **self-made Eureka form cutter, indexed** (in-house; wire-EDM = outsource); T006 = hardest part — on enlarging tip gears see gap #5 (DP caveat) |
 | **`cone-gear-shaft`** ×1 | stepped steel bar ~252; integral Ø12.2308 post journal then 3/8→1/4→1/8→1/32″ | 5 turned diameter steps; **no keyseat** (gears soldered); finish the Ø12.2308 journal for 0.05 diametral clearance in the v2 post bore | **Ø0.79×~34 tip journal in steel, 43:1** → whip; long slender overall | 1 (single-axis turn from one end) | manual lathe **+ steady/follower**; light finish on both bearing journals |
 
-### Pivots, bushings, shafts (T1 — the 19-channel stacks)
+### Pivot and fulcrum shafts (T1 — full channel stack)
 
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
 | **`pivot-shaft`** ×1 | plain steel bar Ø6.35×203.2 | solid, no bore/step/thread; 2 end faces | **L/D 32:1** → whip; steady-rest / between-centers | 1 | manual lathe + steady |
 | **`fulcrum-shaft`** ×1 | plain steel bar Ø6.35×182 | as pivot-shaft, only shorter | **L/D 29:1** → whip; **same stock as pivot-shaft — don't mix** | 1 | manual lathe + steady |
-| **`pivot-bushing`** ×19 | brass, OD Ø10.0×**4.5565** | Ø6.5 through bore (rides Ø6.35, **0.15 mm** clr); stubby L/D 0.46 | **length 4.5565 sets the 7.0565 channel pitch** → parting-length repeatability across all 19 is *the* critical dim | 1 (turn + bore + part) | **CNC-REPEAT** / collet stop for length consistency |
-| **`lever-bushing`** ×19 | brass, OD Ø12.0×**4.0565** | Ø6.5 through bore (rides Ø6.35, 0.15 mm clr); twin of pivot-bushing | same drill/ream as pivot-bushing; differs only OD (12 vs 10) + length (4.0565 vs 4.5565) — **don't mix the two sets** | 1 | **CNC-REPEAT** / collet stop |
 
-### Rocker arms + support (T1 — flat profile + cast bracket)
+### Rocker arms + support (T1 — multi-level arm + cast bracket)
 
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
-| **`rocker-arm`** ×20 | flat steel plate **2.5 mm** thick, ~270×21 | **top edge = R800 concave arc** (the amplitude-bar rides ON it) — it is the **2D OUTLINE of the plate, NOT a concave pocket/face**; bottom edge R816 concentric; Ø6.5 pivot bore + Ø2.0 rod-pin bore, both through the plate | none severe — pivot bore is **inherently square** (drilled through flat stock, one setup); no slot, no internal corner | **1** (all features one plane) | **CNC 2.5D profile** (×20 identical) or bandsaw+template; the R800 is profiled, not form-cut |
+| **`rocker-arm`** ×20 | AISI 1018 steel multi-level blank: 2.5-thick strap with integral Ø10 pivot hub spanning 7.0565; ~270×21 profile | top R800 concave and bottom R816 arcs; Ø6.5 pivot bore through the hub; rod end steps at a square shoulder to a 5 mm-deep tongue with Ø1.994 #47 pin hole; full-depth tail remains | **not one plane**: face both sides while leaving the hub concentric with the pivot bore; support the 2.5 web during second-side work; preserve the square tongue shoulder and thin reduced tip | **≥3** (face/pocket first side, flip on a hub/bore datum for second side, then profile; machine the pivot bore and #47 rod hole from the hub datum) | **CNC MULTI-LEVEL REPEAT ×20** — start from ≥7.0565 steel plate/bar, machine both broad faces to leave the integral hub around the 2.5 strap, then profile R800/R816 and the stepped 5 mm tongue; drill/ream the pivot and #47 holes from the hub datum |
 | **`rocker-arm-support`** | modeled **Gray Cast Iron casting**, trapezoidal wedge, 6.35 mm shell walls | square window/cavity cuts with **R12.7-relieved** internal corners; **4× 9/16-12 tapped foot holes** (tap drill Ø12.30, through-next); RimChamfer 1.27 | square internal corners already relieved to R12.7 — cannot be cut sharper; thin 6.35 shell | foot-hole drilling = **1 setup** normal to the seat face | **cast** body + machine foot holes/rim |
 
 ---
@@ -112,7 +114,9 @@ geometry is casting-shaped, not milling-shaped.
    block hangs from the top-frame casting's integral crossbar via a 1/2-13 hanger stud threaded
    into a tapped hole in the block top; both the stud and the tapped hole are modeled.
 4. **Reconcile the `rocker-arm` R800 vs book 812.8 mm** (already a §4 Finding) before it becomes a
-   drawing callout — but note the good news from this pass: it's a *profile* dimension, cheap to change.
+   drawing callout. Treat any radius decision as shared mechanism geometry: update the rocker arc
+   source, pose inputs, J5 foot-on-arc coupling, and analytic radius check, then rebuild and revalidate
+   the channel assembly. The integral hub and stepped 5 mm tongue keep either physical route multi-level.
 5. **Consider enlarging the tip cone gears** (T006–T012) — the model already flags them marginal and a
    period build used harder metal. **DP caveat:** enlarging OD at a *fixed tooth count* changes the
    DP/module and **breaks the shared DP-49.82 mesh** — tooth *counts* preserve the ratio, but DP/pitch
