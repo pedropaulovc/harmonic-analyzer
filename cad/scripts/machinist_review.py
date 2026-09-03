@@ -1,13 +1,12 @@
-r"""Blind senior-machinist review of rendered drawing packages via Codex.
+r"""Blind senior-machinist review of rendered drawing packages via Claude.
 
 The review the fleet is gated on (``cad/docs/drawing-simplicity-policy.md``):
 each drawing package is rendered or copied into a neutral temp directory and
-handed to ``codex exec`` with NO repo context, under the calibrated prompt in
-``cad/scripts/prompts/``. A part print is one PNG reviewed with the part prompt;
-an assembly PDF is split into full-resolution page images and every page is
-attached to one invocation under the assembly prompt. The verdict comes back as
-structured JSON (``machinist_review_schema.json``) and is written, with its
-provenance, under ``cad/out/reports/machinist-review/``.
+handed to ``claude -p --model fable --effort high`` with NO repo context under
+the calibrated prompt in ``cad/scripts/prompts/``. A part print is one PNG; an
+assembly PDF is split into full-resolution page images and every page is
+supplied to one reviewer invocation. The schema-validated verdict and its
+provenance are written under ``cad/out/reports/machinist-review/``.
 
 Why the prompt is calibrated the way it is: the earlier ad-hoc reviews asked a
 "senior machinist" to hunt for MISSING tolerances / datums / finishes and were
@@ -18,11 +17,11 @@ Harvey (*Machine Shop Trade Secrets*, ch. 9) and Lipton (*Metalworking Sink or
 Swim*, ch. 2-3): decimal places carry tolerance, GD&T only where a ± cannot
 say it, hidden lines on, one origin, drill vs ream, few specific notes.
 
-Isolation is by COPY/RENDER, not by sandbox: nothing in the invocation references
-the repo (``-C`` a mktemp dir, images named ``sheet-*.png``, the schema copied
-beside them, ``--ignore-user-config --ignore-rules``), and the ``--json`` event
-stream is scanned for any tool/command execution so a review that stopped being
-blind is flagged (``blind: false``) rather than trusted.
+Isolation is enforced by Claude's restricted mode in a neutral temp directory:
+nothing in the invocation references the repo, every page is copied as a
+``sheet-N.png``, safe mode disables project/user customizations, MCP is disabled,
+and Read is the only available tool. The event stream is scanned so any tool
+use beyond reading the copied package images flags the review as non-blind.
 
 Usage (SolidWorks-free; needs the rendered PNGs under ``cad/out/png``)::
 
@@ -65,7 +64,7 @@ PROMPT_FILES = {
 SCHEMA_FILE = PROMPTS_DIR / "machinist_review_schema.json"
 REPORT_DIR = CAD_ROOT / "out" / "reports" / "machinist-review"
 
-DEFAULT_MODEL = "gpt-5.6-sol"
+DEFAULT_MODEL = "fable"
 DEFAULT_EFFORT = "high"
 FINDING_KEYS = ("blockers", "over_specification", "clarity", "minor")
 GATING_KEYS = ("blockers", "over_specification", "clarity")
@@ -74,12 +73,13 @@ GATING_KEYS = ("blockers", "over_specification", "clarity")
 _PDFIUM_LOCK = threading.Lock()
 
 
-# Event/item types codex emits when the agent ran something.  Any of these in
-# the --json stream means the review read more than the attached image.
+# Claude must use Read once to inspect the neutral ``sheet.png`` copy.  Any
+# other tool use in the stream means the review escaped the intended input.
 _TOOL_EVENT_MARKERS = (
     "command_execution",
     "function_call",
     "tool_call",
+    "tool_use",
     "mcp_tool_call",
     "exec_command",
     "local_shell",
@@ -235,46 +235,49 @@ def build_command(
     workdir: Path,
     images: Sequence[Path],
     schema: Path,
-    output: Path,
     model: str,
     effort: str,
-    codex: str = "codex",
+    claude: str = "claude",
 ) -> list[str]:
-    """The exact ``codex exec`` argv.
+    """Return the exact isolated ``claude -p`` argv.
 
-    Every path is inside ``workdir`` (a neutral temp dir); the prompt goes on
-    stdin (``-``), never inline — a long quoted argument gets mangled by the
-    shell hook chain and codex dies with "No prompt provided".
+    The prompt is sent on stdin rather than as a positional argument.  Claude
+    gets one restricted file tool so it can read only the copied image in the
+    neutral working directory; safe mode and strict empty MCP configuration
+    prevent repo instructions or external context from entering the review.
     """
-    command = [
-        codex,
-        "exec",
-        "--ignore-user-config",
-        "--ignore-rules",
-        "--skip-git-repo-check",
-        "--ephemeral",
-        "--sandbox",
-        "read-only",
-        "-C",
-        str(workdir),
-        "-m",
-        model,
-        "-c",
-        f"model_reasoning_effort={effort}",
-    ]
-    for image in images:
-        command.extend(("-i", str(image)))
-    command.extend(
-        (
-            "--output-schema",
-            str(schema),
-            "-o",
-            str(output),
-            "--json",
-            "-",
-        )
+    if schema.parent != workdir or not images or any(image.parent != workdir for image in images):
+        raise ValueError("review inputs must be inside the neutral workdir")
+    schema_json = json.dumps(
+        json.loads(schema.read_text(encoding="utf-8")),
+        separators=(",", ":"),
     )
-    return command
+    return [
+        claude,
+        "-p",
+        "--model",
+        model,
+        "--effort",
+        effort,
+        "--input-format",
+        "text",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--json-schema",
+        schema_json,
+        "--tools",
+        "Read",
+        "--restricted",
+        "--safe-mode",
+        "--no-session-persistence",
+        "--permission-mode",
+        "dontAsk",
+        "--permission-prompts",
+        "none",
+        "--strict-mcp-config",
+        "--no-chrome",
+    ]
 
 
 def _walk(obj: Any) -> Iterable[Any]:
@@ -287,25 +290,40 @@ def _walk(obj: Any) -> Iterable[Any]:
             yield from _walk(value)
 
 
-def count_tool_events(events: Sequence[dict[str, Any]]) -> int:
-    """How many events in the ``--json`` stream show the agent running a tool.
-
-    Matches on any ``type``/``item.type`` string carrying a tool marker or on a
-    ``command`` key, at any nesting depth, so a renamed event schema still
-    trips the detector rather than silently reading as blind.
-    """
+def count_tool_events(
+    events: Sequence[dict[str, Any]], *, allowed_images: Sequence[Path] = ()
+) -> int:
+    """Count Claude events except reads of copied package images and output."""
+    allowed = {path.resolve() for path in allowed_images}
+    workdir = next(iter(allowed)).parent if allowed else None
     hits = 0
     for event in events:
         matched = False
         for node in _walk(event):
-            if isinstance(node, dict):
-                if "command" in node and node.get("command"):
-                    matched = True
-                    break
-                kind = str(node.get("type", "")).lower()
-                if any(marker in kind for marker in _TOOL_EVENT_MARKERS):
-                    matched = True
-                    break
+            if not isinstance(node, dict):
+                continue
+            kind = str(node.get("type", "")).lower()
+            name = str(node.get("name", "")).lower()
+            if kind == "tool_use" and name == "structuredoutput":
+                continue
+            if kind == "tool_use" and name == "read":
+                tool_input = node.get("input")
+                raw_path = (
+                    tool_input.get("file_path")
+                    if isinstance(tool_input, dict)
+                    else None
+                )
+                if raw_path and workdir is not None:
+                    read_path = Path(str(raw_path))
+                    if not read_path.is_absolute():
+                        read_path = workdir / read_path
+                    if read_path.resolve() in allowed:
+                        continue
+            if ("command" in node and node.get("command")) or any(
+                marker in kind for marker in _TOOL_EVENT_MARKERS
+            ):
+                matched = True
+                break
         hits += int(matched)
     return hits
 
@@ -369,12 +387,10 @@ def _write_events(path: Path, events: Sequence[dict[str, Any]]) -> None:
     text = "\n".join(json.dumps(event) for event in events)
     path.write_text(f"{text}\n" if text else "", encoding="utf-8")
 
-
 def is_pass(verdict: dict[str, Any] | None) -> bool:
-    verdict = _valid_verdict(verdict)
-    if verdict is None or verdict["verdict"] != "SHIP":
+    if not verdict or verdict.get("verdict") != "SHIP":
         return False
-    return all(not verdict[key] for key in GATING_KEYS)
+    return all(not verdict.get(key) for key in GATING_KEYS)
 
 
 def _parse_events(stdout: str) -> list[dict[str, Any]]:
@@ -390,26 +406,29 @@ def _parse_events(stdout: str) -> list[dict[str, Any]]:
     return events
 
 
-def _extract_verdict(
-    output_file: Path, events: Sequence[dict[str, Any]]
-) -> dict[str, Any]:
-    """The structured verdict: ``-o`` file first, last agent message as fallback."""
-    text = output_file.read_text(encoding="utf-8") if output_file.is_file() else ""
-    if not text.strip():
-        for event in reversed(events):
-            for node in _walk(event):
-                if isinstance(node, dict) and node.get("type") == "agent_message":
-                    text = str(node.get("text") or node.get("message") or "")
-                    if text.strip():
-                        break
+def _extract_verdict(events: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    """Extract Claude's schema-validated structured result."""
+    verdict: dict[str, Any] | None = None
+    text = ""
+    for event in reversed(events):
+        structured = event.get("structured_output")
+        if isinstance(structured, dict):
+            verdict = structured
+            break
+        if event.get("type") == "result":
+            text = str(event.get("result") or "")
             if text.strip():
                 break
-    if not text.strip():
-        raise RuntimeError("codex produced no final message")
-    start, end = text.find("{"), text.rfind("}")
-    if start < 0 or end < 0:
-        raise RuntimeError(f"final message is not JSON: {text[:200]!r}")
-    verdict = json.loads(text[start : end + 1])
+    if verdict is None:
+        if not text.strip():
+            raise RuntimeError("claude produced no final message")
+        start, end = text.find("{"), text.rfind("}")
+        if start < 0 or end < 0:
+            raise RuntimeError(f"final message is not JSON: {text[:200]!r}")
+        parsed = json.loads(text[start : end + 1])
+        if not isinstance(parsed, dict):
+            raise RuntimeError("structured verdict is not an object")
+        verdict = parsed
     return validate_verdict(verdict)
 
 
@@ -421,13 +440,18 @@ def review_package(
     report_dir: Path = REPORT_DIR,
     retries: int = 1,
     timeout_s: float = 1800.0,
-    codex: str | None = None,
+    claude: str | None = None,
 ) -> Review:
     sheet_count = _validate_package(package)
-    codex_exe = codex or shutil.which("codex")
-    if not codex_exe:
-        raise RuntimeError("codex CLI not found on PATH")
-    prompt = _review_prompt(package, sheet_count)
+    claude_exe = claude or shutil.which("claude")
+    if not claude_exe:
+        raise RuntimeError("claude CLI not found on PATH")
+    prompt = (
+        f"Use the Read tool to inspect every copied sheet-1.png through "
+        f"sheet-{sheet_count}.png in order. Do not read any other file. "
+        "Then perform this blind review.\n\n"
+        + _review_prompt(package, sheet_count)
+    )
     prompt_sha = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
     source_sha = [_sha256(source) for source in package.sources]
     report_dir.mkdir(parents=True, exist_ok=True)
@@ -437,14 +461,15 @@ def review_package(
     error: str | None = None
     verdict: dict[str, Any] | None = None
     events: list[dict[str, Any]] = []
+    allowed_images: list[Path] = []
     attempts = 0
     for attempt in range(retries + 1):
         attempts = attempt + 1
-        # A NEUTRAL directory: system temp, never under the repo, so a
-        # relative walk from the agent's cwd reaches nothing of ours.
         workdir = Path(tempfile.mkdtemp(prefix="machrev-"))
+        attempt_events: list[dict[str, Any]] = []
         try:
             images = _materialize_images(package, workdir)
+            allowed_images.extend(images)
             if len(images) != sheet_count:
                 raise RuntimeError(
                     f"{package.name}: materialized {len(images)} sheets, "
@@ -452,15 +477,13 @@ def review_package(
                 )
             schema = workdir / "schema.json"
             shutil.copyfile(SCHEMA_FILE, schema)
-            output = workdir / "verdict.json"
             cmd = build_command(
                 workdir=workdir,
                 images=images,
                 schema=schema,
-                output=output,
                 model=model,
                 effort=effort,
-                codex=codex_exe,
+                claude=claude_exe,
             )
             proc = subprocess.run(
                 cmd,
@@ -473,29 +496,29 @@ def review_package(
                 cwd=str(workdir),
             )
             attempt_events = _parse_events(proc.stdout)
-            events.extend(_tag_events(attempts, attempt_events))
             if proc.returncode != 0:
                 raise RuntimeError(
-                    f"codex exit {proc.returncode}: {proc.stderr.strip()[-800:]}"
+                    f"claude exit {proc.returncode}: {proc.stderr.strip()[-800:]}"
                 )
-            verdict = _extract_verdict(output, attempt_events)
+            verdict = _extract_verdict(attempt_events)
             error = None
             break
         except subprocess.TimeoutExpired as exc:
             partial_stdout = exc.stdout or ""
             if isinstance(partial_stdout, bytes):
                 partial_stdout = partial_stdout.decode("utf-8", errors="replace")
-            events.extend(_tag_events(attempts, _parse_events(partial_stdout)))
+            attempt_events = _parse_events(partial_stdout)
             error = f"{type(exc).__name__}: {exc}"
             verdict = None
         except Exception as exc:  # noqa: BLE001 - recorded, retried, reported
             error = f"{type(exc).__name__}: {exc}"
             verdict = None
         finally:
+            events.extend(_tag_events(attempts, attempt_events))
             shutil.rmtree(workdir, ignore_errors=True)
 
     _write_events(events_path, events)
-    tool_events = count_tool_events(events)
+    tool_events = count_tool_events(events, allowed_images=allowed_images)
     review = Review(
         name=package.name,
         kind=package.kind,

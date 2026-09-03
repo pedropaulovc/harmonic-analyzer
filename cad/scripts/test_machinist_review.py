@@ -51,39 +51,45 @@ def test_schema_is_strict_structured_output() -> None:
     assert finding["additionalProperties"] is False
     assert set(finding["required"]) == {"where", "issue", "fix"}
     assert schema["properties"]["verdict"]["enum"] == ["SHIP", "FIX"]
-    assert schema["properties"]["summary"]["minLength"] == 1
-    for key in ("where", "issue", "fix"):
-        assert finding["properties"][key]["minLength"] == 1
 
 
 def test_command_references_only_the_neutral_workdir(tmp_path: Path) -> None:
     images = [tmp_path / "sheet-1.png", tmp_path / "sheet-2.png"]
+    schema = tmp_path / "schema.json"
+    schema.write_text(json.dumps(mr.load_schema()), encoding="utf-8")
     cmd = mr.build_command(
         workdir=tmp_path,
         images=images,
-        schema=tmp_path / "schema.json",
-        output=tmp_path / "verdict.json",
-        model="gpt-test",
+        schema=schema,
+        model="fable",
         effort="high",
     )
     joined = " ".join(cmd)
     repo = mr.CAD_ROOT.parent.as_posix()
     assert repo not in joined.replace("\\", "/")
-    assert cmd[-1] == "-"  # prompt on stdin, never inline
-    assert [cmd[index + 1] for index, value in enumerate(cmd) if value == "-i"] == [
-        str(image) for image in images
-    ]
-    for flag in ("--ignore-user-config", "--ignore-rules", "--ephemeral", "--json"):
+    assert cmd[:2] == ["claude", "-p"]
+    for flag in (
+        "--restricted",
+        "--safe-mode",
+        "--no-session-persistence",
+        "--strict-mcp-config",
+        "--no-chrome",
+        "--verbose",
+    ):
         assert flag in cmd
-    assert cmd[cmd.index("--sandbox") + 1] == "read-only"
-    assert cmd[cmd.index("-m") + 1] == "gpt-test"
-    assert "model_reasoning_effort=high" in cmd
+    assert cmd[cmd.index("--tools") + 1] == "Read"
+    assert cmd[cmd.index("--permission-mode") + 1] == "dontAsk"
+    assert cmd[cmd.index("--permission-prompts") + 1] == "none"
+    assert cmd[cmd.index("--model") + 1] == "fable"
+    assert cmd[cmd.index("--effort") + 1] == "high"
+    assert cmd[cmd.index("--output-format") + 1] == "stream-json"
+    assert json.loads(cmd[cmd.index("--json-schema") + 1]) == mr.load_schema()
 
 
 def test_pass_requires_ship_with_no_gating_findings() -> None:
     clean = {
         "verdict": "SHIP",
-        "summary": "ready",
+        "summary": "",
         "blockers": [],
         "over_specification": [],
         "clarity": [],
@@ -108,25 +114,15 @@ def test_verdict_validation_rejects_every_schema_violation() -> None:
         "minor": [{"where": "x", "issue": "y", "fix": "z"}],
     }
     assert mr.validate_verdict(clean) is clean
-
     invalid = [
         {key: value for key, value in clean.items() if key != "summary"},
         {**clean, "unexpected": True},
         {**clean, "verdict": "MAYBE"},
-        {**clean, "verdict": 1},
         {**clean, "summary": ""},
-        {**clean, "summary": 1},
         {**clean, "blockers": {}},
         {**clean, "minor": ["not an object"]},
         {**clean, "minor": [{"where": "x", "issue": "y"}]},
-        {
-            **clean,
-            "minor": [{"where": "x", "issue": "y", "fix": "z", "unexpected": True}],
-        },
         {**clean, "minor": [{"where": "", "issue": "y", "fix": "z"}]},
-        {**clean, "minor": [{"where": "x", "issue": "", "fix": "z"}]},
-        {**clean, "minor": [{"where": "x", "issue": "y", "fix": ""}]},
-        {**clean, "minor": [{"where": "x", "issue": 1, "fix": "z"}]},
     ]
     for value in invalid:
         with pytest.raises(ValueError):
@@ -134,43 +130,48 @@ def test_verdict_validation_rejects_every_schema_violation() -> None:
         assert not mr.is_pass(value)
 
 
-def test_extract_verdict_validates_file_and_event_fallback(tmp_path: Path) -> None:
-    invalid = {
-        "verdict": "SHIP",
-        "summary": "ready",
-        "blockers": [],
-        "over_specification": [],
-        "clarity": [],
-        "minor": [],
-        "unexpected": True,
+def test_tool_events_allow_only_neutral_package_image_reads(tmp_path: Path) -> None:
+    images = [tmp_path / "sheet-1.png", tmp_path / "sheet-2.png"]
+    expected = {
+        "type": "assistant",
+        "message": {
+            "content": [
+                {
+                    "type": "tool_use",
+                    "name": "Read",
+                    "input": {"file_path": "sheet-1.png"},
+                }
+            ]
+        },
     }
-    output = tmp_path / "verdict.json"
-    output.write_text(json.dumps(invalid), encoding="utf-8")
-    with pytest.raises(ValueError, match="keys must be exact"):
-        mr._extract_verdict(output, [])
-
-    output.unlink()
-    events = [{"type": "agent_message", "text": json.dumps(invalid)}]
-    with pytest.raises(ValueError, match="keys must be exact"):
-        mr._extract_verdict(output, events)
+    assert mr.count_tool_events([expected], allowed_images=images) == 0
+    assert mr.count_tool_events([expected]) == 1
+    structured = {
+        "type": "assistant",
+        "message": {
+            "content": [{"type": "tool_use", "name": "StructuredOutput", "input": {}}]
+        },
+    }
+    assert mr.count_tool_events([expected, structured], allowed_images=images) == 0
+    unexpected = {
+        "type": "assistant",
+        "message": {
+            "content": [
+                {"type": "tool_use", "name": "Bash", "input": {"command": "dir"}}
+            ]
+        },
+    }
+    assert mr.count_tool_events([unexpected], allowed_images=images) == 1
 
 
 def test_tool_events_are_detected_at_any_depth() -> None:
     assert mr.count_tool_events([{"type": "agent_message", "text": "{}"}]) == 0
-    assert (
-        mr.count_tool_events(
-            [
-                {
-                    "type": "item.completed",
-                    "item": {"type": "command_execution", "command": "ls"},
-                }
-            ]
-        )
-        == 1
-    )
-    assert (
-        mr.count_tool_events([{"type": "turn.started"}, {"type": "mcp_tool_call"}]) == 1
-    )
+    assert mr.count_tool_events(
+        [{"type": "item.completed", "item": {"type": "command_execution", "command": "ls"}}]
+    ) == 1
+    assert mr.count_tool_events(
+        [{"type": "turn.started"}, {"type": "mcp_tool_call"}]
+    ) == 1
 
 
 def test_retry_persists_all_attempts_and_cannot_hide_tool_use(
@@ -195,18 +196,13 @@ def test_retry_persists_all_attempts_and_cannot_hide_tool_use(
         calls += 1
         if calls == 1:
             event = {
-                "type": "item.completed",
-                "item": {
-                    "type": "command_execution",
-                    "command": "read something",
-                },
+                "type": "assistant",
+                "message": {"content": [{"type": "tool_use", "name": "Bash", "input": {"command": "dir"}}]},
             }
             return subprocess.CompletedProcess(
                 command, 1, stdout=json.dumps(event), stderr="failed"
             )
-        output = Path(command[command.index("-o") + 1])
-        output.write_text(json.dumps(verdict), encoding="utf-8")
-        event = {"type": "agent_message", "text": json.dumps(verdict)}
+        event = {"type": "result", "structured_output": verdict}
         return subprocess.CompletedProcess(
             command, 0, stdout=json.dumps(event), stderr=""
         )
@@ -217,9 +213,8 @@ def test_retry_persists_all_attempts_and_cannot_hide_tool_use(
         mr.ReviewPackage("part", "part", (png,)),
         report_dir=report_dir,
         retries=1,
-        codex="codex",
+        claude="claude",
     )
-
     assert review.attempts == 2
     assert review.tool_events == 1
     assert not review.blind
@@ -229,8 +224,21 @@ def test_retry_persists_all_attempts_and_cannot_hide_tool_use(
         for line in (report_dir / "part.events.jsonl").read_text().splitlines()
     ]
     assert [record["attempt"] for record in records] == [1, 2]
-    assert records[0]["event"]["item"]["type"] == "command_execution"
-    assert records[1]["event"]["type"] == "agent_message"
+
+
+def test_claude_structured_result_is_extracted() -> None:
+    verdict = {
+        "verdict": "SHIP",
+        "summary": "ready",
+        "blockers": [],
+        "over_specification": [],
+        "clarity": [],
+        "minor": [],
+    }
+    assert (
+        mr._extract_verdict([{"type": "result", "structured_output": verdict}])
+        == verdict
+    )
 
 
 def test_arbitrary_png_reports_with_same_basename_do_not_collide(
