@@ -3,7 +3,7 @@
 Every COM subprocess (``_common.run_build`` is the single entry) blocks
 synchronously inside pywin32 COM calls, so a crashed or hung SolidWorks leaves
 the process -- and the machine-global seat it represents -- stuck forever with
-no Python-level exception. A daemon thread watches three signals, calibrated
+no Python-level exception. A daemon thread watches four signals, calibrated
 from the telemetry history (2026-07-18 audit of ~3 weeks of ``traces.jsonl``):
 
 * **CRASH (fatal).** ``sldexitapp.exe`` -- SolidWorks' own crash-report
@@ -15,6 +15,17 @@ from the telemetry history (2026-07-18 audit of ~3 weeks of ``traces.jsonl``):
   earliest reliable event. Pids already alive when the watchdog starts are a
   STALE dialog from a previous crash (the user may run a healthy new SolidWorks
   next to it) -- warned once, then ignored; only a NEW pid is fatal.
+* **MODAL DIALOG (fatal).** A visible ``#32770`` message box titled
+  "SOLIDWORKS Design", owned by ``sldworks.exe``, whose owner window (the main
+  frame) is DISABLED -- the Win32 modal contract. No COM call completes until a
+  human clicks, and the one that started this (2026-09-02, mid top-assembly
+  build: "Warning! Your system is running critically low on committed
+  memory... SOLIDWORKS strongly recommends that you do not continue") precedes
+  a crash -- so the safe recovery is kill + relaunch, never clicking Yes. Fatal
+  once the box has survived ``_MODAL_CONFIRM_TICKS`` consecutive polls (a
+  transient box is only warned about); ``dodo._exec_com`` treats exit 88 like
+  a crash: force-recover SolidWorks and retry the task. The start-up .NET splash
+  wedge (owner = the ``splash`` window) belongs to the lifecycle library.
 * **OP TIMEOUT (fatal).** No telemetry activity -- span boundary or log
   record -- for ``HARMONIC_COM_OP_TIMEOUT`` seconds (default 900). The longest
   single COM operation ever observed is ~230 s (``verify.rebuild``), so 15 min
@@ -32,7 +43,7 @@ A fatal signal logs ``xx``, flushes telemetry, and hard-exits via
 so only a process exit can release it. The doit parent then fails the task and
 its ``_com_seat`` context (the seat lock is held by the PARENT, not this
 process) releases the machine-global lock: the seat never leaks. Distinct exit
-codes make the two fatals diagnosable from the doit console alone.
+codes make the three fatals diagnosable from the doit console alone.
 
 Disable entirely with ``HARMONIC_COM_WATCHDOG=0``; disable just the idle
 timeout with ``HARMONIC_COM_OP_TIMEOUT=0``.
@@ -60,10 +71,16 @@ except Exception:  # noqa: BLE001 - lib is always present in the build venv; deg
 
 EXIT_CRASH = 86
 EXIT_OP_TIMEOUT = 87
+EXIT_MODAL_DIALOG = 88
 
 DEFAULT_OP_TIMEOUT = 900.0
 _POLL_INTERVAL = 15.0
 _HUNG_WARN_INTERVAL = 300.0
+# A modal box must survive this many consecutive polls before it is fatal.
+_MODAL_CONFIRM_TICKS = 2
+_MODAL_DIALOG_CLASS = "#32770"
+_MODAL_DIALOG_TITLE = "SOLIDWORKS Design"
+_SPLASH_TITLE = "splash"
 
 # Gate for the process-wide ``start()``: the probes are Win32-only. Module-level
 # so the offline gate can monkeypatch it and exercise start/stop off-Windows.
@@ -130,6 +147,89 @@ def _sw_window_hung() -> bool:
     return _sw_recovery.is_sldworks_window_hung()
 
 
+def _seat_modal_dialog() -> str | None:
+    """Text of a modal message box blocking the SolidWorks seat, or ``None``.
+
+    Signature (Win32, no UI Automation): a visible ``#32770`` window titled
+    exactly "SOLIDWORKS Design", owned by an ``sldworks.exe`` process, whose
+    OWNER window is disabled (a modal child is up) and is not the start-up
+    ``splash`` (the .NET wedge the lifecycle library recovers at start). The
+    crash-report dialog has the same class + title but belongs to
+    ``sldexitapp.exe``, so the pid test excludes it. The message text is read
+    off the box's ``Static`` children -- a plain MessageBox exposes it there
+    (the low-memory box did; a DirectUI body would read as no text, still
+    fatal). Best-effort: ``None`` off-Windows, without the lib, or on any error.
+    """
+    if not _WINDOWS or _sw_recovery is None:
+        return None
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        sw_pids = _sw_recovery.pids_of_image(_sw_recovery.SW_MAIN_PROCESS)
+        if not sw_pids:
+            return None
+        user32 = ctypes.WinDLL("user32", use_last_error=True)
+        enum_fn = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+        user32.EnumWindows.argtypes = [enum_fn, wintypes.LPARAM]
+        user32.EnumChildWindows.argtypes = [wintypes.HWND, enum_fn, wintypes.LPARAM]
+        user32.GetWindow.argtypes = [wintypes.HWND, wintypes.UINT]
+        user32.GetWindow.restype = wintypes.HWND
+        user32.IsWindowVisible.argtypes = [wintypes.HWND]
+        user32.IsWindowEnabled.argtypes = [wintypes.HWND]
+        user32.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+        user32.GetWindowTextLengthW.argtypes = [wintypes.HWND]
+        user32.GetWindowTextW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+        user32.GetClassNameW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+
+        def text(h) -> str:
+            n = user32.GetWindowTextLengthW(h)
+            b = ctypes.create_unicode_buffer(n + 1)
+            user32.GetWindowTextW(h, b, n + 1)
+            return b.value
+
+        def klass(h) -> str:
+            b = ctypes.create_unicode_buffer(256)
+            user32.GetClassNameW(h, b, 256)
+            return b.value
+
+        found: list[str] = []
+
+        @enum_fn
+        def on_window(h, _):
+            if (
+                not user32.IsWindowVisible(h)
+                or klass(h) != _MODAL_DIALOG_CLASS
+                or text(h) != _MODAL_DIALOG_TITLE
+            ):
+                return True
+            pid = wintypes.DWORD()
+            user32.GetWindowThreadProcessId(h, ctypes.byref(pid))
+            if pid.value not in sw_pids:
+                return True
+            owner = user32.GetWindow(h, 4)  # GW_OWNER
+            if not owner or user32.IsWindowEnabled(owner) or text(owner) == _SPLASH_TITLE:
+                return True
+            parts: list[str] = []
+
+            @enum_fn
+            def on_child(c, _):
+                if klass(c) == "Static":
+                    t = text(c).strip()
+                    if t:
+                        parts.append(t)
+                return True
+
+            user32.EnumChildWindows(h, on_child, 0)
+            found.append(" ".join(parts) or "(no readable text)")
+            return False
+
+        user32.EnumWindows(on_window, 0)
+        return found[0] if found else None
+    except Exception:  # noqa: BLE001 - a probe glitch must never take down a healthy build
+        return None
+
+
 # --------------------------------------------------------------------------- #
 # The watchdog proper. Probes/clock/exit are injectable so the offline gate    #
 # (check:watchdog, test_watchdog.py) drives every branch without SolidWorks.   #
@@ -145,6 +245,8 @@ class Watchdog:
         hung_warn_interval: float = _HUNG_WARN_INTERVAL,
         crash_pids: Callable[[], set[int]] = _crash_pids,
         hung_probe: Callable[[], bool] = _sw_window_hung,
+        dialog_probe: Callable[[], str | None] = _seat_modal_dialog,
+        modal_confirm_ticks: int = _MODAL_CONFIRM_TICKS,
         activity: Callable[[], float] = _telemetry.last_activity,
         exit_fn: Callable[[int], None] = os._exit,
         clock: Callable[[], float] = time.monotonic,
@@ -154,6 +256,9 @@ class Watchdog:
         self.hung_warn_interval = hung_warn_interval
         self._crash_pids = crash_pids
         self._hung_probe = hung_probe
+        self._dialog_probe = dialog_probe
+        self.modal_confirm_ticks = max(1, int(modal_confirm_ticks))
+        self._modal_ticks = 0
         self._activity = activity
         self._exit = exit_fn
         self._clock = clock
@@ -191,6 +296,34 @@ class Watchdog:
             )
             self._exit(EXIT_CRASH)
             return "crash"
+
+        dialog = self._dialog_probe()
+        if dialog is not None:
+            self._modal_ticks += 1
+            if self._modal_ticks >= self.modal_confirm_ticks:
+                _abort(
+                    "modal-dialog",
+                    f"SolidWorks MODAL DIALOG is blocking the seat: {dialog!r} -- no "
+                    "COM call completes until a human clicks, and SolidWorks' own "
+                    "low-memory warning precedes a crash, so the safe recovery is "
+                    "kill + relaunch (doit retries the task) -- aborting COM task "
+                    f"(exit {EXIT_MODAL_DIALOG}); last activity {idle:.0f}s ago: {last_op}",
+                    EXIT_MODAL_DIALOG,
+                    dialog_text=dialog,
+                    idle_s=round(idle),
+                    last_op=last_op,
+                )
+                self._exit(EXIT_MODAL_DIALOG)
+                return "modal-dialog"
+            _warn(
+                f"SolidWorks modal dialog up: {dialog!r} -- fatal if still up next "
+                f"poll ({self._modal_ticks}/{self.modal_confirm_ticks})",
+                dialog_text=dialog,
+                idle_s=round(idle),
+                last_op=last_op,
+            )
+            return "modal-pending"
+        self._modal_ticks = 0
 
         if self.op_timeout > 0 and idle > self.op_timeout:
             _abort(
@@ -281,7 +414,8 @@ def start() -> Watchdog | None:
     # One armed line per COM session so any post-hoc read of logs.jsonl can
     # tell whether -- and with what limits -- the session was protected.
     _info(
-        f"COM watchdog armed: crash detect (sldexitapp.exe), op timeout "
+        f"COM watchdog armed: crash detect (sldexitapp.exe), modal-dialog "
+        f"detect ({_active.modal_confirm_ticks} polls), op timeout "
         f"{timeout:.0f}s, poll {_active.poll_interval:.0f}s, hung-window "
         f"warns throttled to {_active.hung_warn_interval:.0f}s",
         timeout_s=round(timeout),
