@@ -207,10 +207,9 @@ def _add_radial_dimension(
 ) -> Any:
     """Radius-dimension one arc edge picked at a sheet point, with a prefix.
 
-    ``IModelDoc2.AddRadialDimension2`` only works inside an active sketch, so
-    a drawing radius is the smart dimension (``AddDimension2``) with a single
-    arc edge selected -- SolidWorks emits ``R<value>``; ``prefix`` ("4X ")
-    goes in front of it.
+    ``IModelDoc2.AddDimension2`` does not reliably emit the radius symbol for a
+    drawing arc.  The caller therefore includes ``R`` in ``prefix`` so the
+    resulting fabrication callout is unambiguously radial.
     """
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
@@ -234,7 +233,9 @@ def _add_radial_dimension(
     )
     display.SetText(1, prefix)  # swDimensionTextPrefix
     if str(display.GetText(1) or "") != prefix:
-        raise RuntimeError(f"{label} radius prefix did not persist: {display.GetText(1)!r}")
+        raise RuntimeError(
+            f"{label} radius prefix did not persist: {display.GetText(1)!r}"
+        )
     draw.EditRebuild3()
     return dimension
 
@@ -289,10 +290,6 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, right, bottom):
         set_hidden_lines_visible(adapter, view)
     set_hidden_lines_removed(adapter, iso)
-    removed_thread_notes = remove_notes_matching(adapter, "9/16-12")
-    _telemetry.info(
-        f"removed {removed_thread_notes} redundant automatic thread note(s)"
-    )
 
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
     curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
@@ -343,7 +340,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         edge_xy=_front_xy(-(CAV - fillet_mid), CAV - fillet_mid),
         text_xy=(0.045, 0.252),
-        prefix="4X ",
+        prefix="4X R",
         label="cavity corner fillet",
     )
 
@@ -430,10 +427,17 @@ async def build(adapter: Any) -> dict[str, str]:
         basic_locations=False,
         label="rocker-arm-support",
     )
+    removed_tap_notes = remove_notes_matching(adapter, "Tapped Hole")
+    _telemetry.info(
+        f"removed {removed_tap_notes} redundant automatic tapped-hole note(s)"
+    )
 
     # x=0.020: a note is left-aligned on its anchor, so the ink starts here. The
     # bound is the 12.7 mm zone margin (~0.0127), which the re-centred frame rule
-    # now matches (~0.0126); 0.020 clears both, and the audit enforces it.
+    # now matches (~0.0126); 0.020 clears both, and the audit enforces it. The
+    # hole table and this manufacturing note already carry the complete 4X tap
+    # requirement; the generic automatic cosmetic-thread description is
+    # removed above and guarded from rematerializing during finalization.
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
 
     return await finalize_drawing(
@@ -441,6 +445,7 @@ async def build(adapter: Any) -> dict[str, str]:
         OUTPUTS,
         pdf_title="Rocker-Arm Support Manufacturing Drawing",
         scale=SHEET_SCALE,
+        redundant_note_substrings=("Tapped Hole",),
     )
 
 

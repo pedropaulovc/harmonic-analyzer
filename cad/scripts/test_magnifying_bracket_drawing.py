@@ -126,27 +126,26 @@ def test_the_two_tens_are_labelled() -> None:
     assert drawing.FRONT_CALLOUTS == {"WallLen": "COLLAR LENGTH"}
 
 
-def test_collar_dimensions_and_stable_thickness_note_are_on_the_views() -> None:
-    # The arm's short projected edges are not stable selectable entities
-    # across SolidWorks seats, so its authoritative thickness is stated beside
-    # the right view.  The other collar/flange annotations remain dimensions.
+def test_collar_and_thickness_dimensions_are_tied_to_view_geometry() -> None:
+    # Every size is a dimension on selected geometry.  In particular, the arm
+    # thickness is no longer detached note text: its two picks are the arm's
+    # longitudinal edges in the collar-end view.
     source = _source()
     for label in (
         'label="collar OD"',
         'label="arm top face from collar OD"',
         'label="flange thickness"',
+        'label="arm thickness"',
         'label="collar bore"',
     ):
         assert label in source, label
-    assert source.count("add_edge_dimension(") == 3
+    assert source.count("add_edge_dimension(") == 4
     assert source.count("_add_circle_diameter(") == 2  # def + call
     assert "_display_as_diameter(adapter, collar_od" in source
-    assert drawing.ARM_THICKNESS_NOTE == (
-        f"ARM THICKNESS "
-        f"{magnifying_bracket_spec.ARM_Y[1] - magnifying_bracket_spec.ARM_Y[0]:.2f}"
-    )
-    assert "if add_note(adapter, ARM_THICKNESS_NOTE" in source
-    assert 'label="arm thickness"' not in source
+    assert "ARM_THICKNESS_NOTE" not in source
+    assert "if add_note(adapter, ARM_THICKNESS_NOTE" not in source
+    assert 'label="arm lower longitudinal edge"' in source
+    assert 'label="arm upper longitudinal edge"' in source
     # The bore reads on its visible circle (one pick: a second pick on the
     # same circle would deselect it) with the ASME centre mark.
     assert source.count("auto_center_marks(") == 1
@@ -167,11 +166,18 @@ def test_layout_is_third_angle_and_clear_of_the_title_block() -> None:
     assert drawing.TOP_CENTER[1] > drawing.FRONT_CENTER[1]
     assert drawing.RIGHT_CENTER[1] == drawing.FRONT_CENTER[1]
     assert drawing.RIGHT_CENTER[0] > drawing.FRONT_CENTER[0]
-    # The front-view lanes stay above the title block (x > ~0.218, y < 0.070).
-    assert drawing.FRONT_CENTER[1] - 0.006 > 0.070
-    # Plan lanes: the arm width nearest the arm end, the flange width outside
-    # it; the flange's far-edge station nearest, the arm's outside.
-    assert drawing.TOP_KEEP["ArmWidth"][1] > drawing.TOP_KEEP["FlangeWidth"][1]
+    # The increased plan/front gap gives the two width callouts complete lanes
+    # without dropping either into the front-view dimension cluster.
+    assert drawing.TOP_CENTER[1] - drawing.FRONT_CENTER[1] >= 0.095
+    assert (
+        drawing.TOP_KEEP["ArmWidth"][1] - drawing.TOP_KEEP["FlangeWidth"][1]
+        >= 0.015
+    )
+    assert drawing.TOP_KEEP["FlangeWidth"][1] - drawing.FRONT_CENTER[1] >= 0.040
+    collar_bottom = drawing._fy(-drawing.COLLAR_OD / 2.0)
+    assert drawing.FRONT_KEEP["WallLen"][1] <= collar_bottom - 0.008
+    assert drawing.ARM_TOP_DIMENSION_OFFSET <= 0.005
+    # Plan side lanes: the flange's far-edge station nearest, arm outside.
     assert drawing.TOP_KEEP["FlangeCornerZ"][0] > drawing.TOP_KEEP["ArmCornerZ"][0]
 
 

@@ -127,7 +127,11 @@ def test_shoulder_roots_carry_a_leadered_allowance() -> None:
     # the left where the note sits between the BaseDia and SeatDia lines.
     assert drawing.ROOT_PICK_XY[1] == drawing._fy(transgear_stub_spec.BASE_LEN)
     assert drawing.ROOT_PICK_XY[0] < drawing.FRONT_CENTER[0]
+    assert drawing.ROOT_NOTE_XY[0] == 0.046
     assert drawing.ROOT_NOTE_XY[0] < drawing.ROOT_PICK_XY[0]
+    # More than 50 mm of sheet-space separates the note anchor from the rim;
+    # this keeps the leader's text-side segment beyond the trailing "MAX".
+    assert drawing.ROOT_PICK_XY[0] - drawing.ROOT_NOTE_XY[0] > 0.050
     assert (
         drawing.FRONT_KEEP["BaseDia"][1]
         < drawing.ROOT_NOTE_XY[1]

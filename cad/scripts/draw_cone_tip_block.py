@@ -24,6 +24,7 @@ from _drawing_common import (
     add_property_linked_note,
     curate_view_dimensions,
     finalize_drawing,
+    import_cosmetic_threads,
     model_point_in_view,
     new_project_drawing,
     read_required_properties,
@@ -114,8 +115,10 @@ DIMENSION_CALLOUTS = {
 DIMENSION_PRECISION = {"PassageZ": 2, "BlockHt": 2}
 
 # Tap callout (front view = the north face the tap enters) and pinch flag note
-# (right view = the +X face the pinch is drilled from).
-TAP_CALLOUT_XY = (0.150, 0.215)
+# (right view = the +X face the pinch is drilled from).  The full tap block is
+# parked immediately to the front view's upper right: its leader stays within
+# that view instead of crossing the plan's 12.00 depth dimension.
+TAP_CALLOUT_XY = (0.175, 0.198)
 PINCH_NOTE_XY = (0.228, 0.205)
 # Hole-axis locations: the pinch from a depth face in the right view, the
 # passage/slit axis from a side face in the front view, both above the block.
@@ -309,13 +312,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # pinch bore into the slit.
     for view in (front, top, right):
         set_hidden_lines_visible(adapter, view)
-    # SolidWorks auto-inserts a generic "<thread> Tapped Hole" note per Hole
-    # Wizard tap normal to a placed view; the native callouts replace them
-    # (draw_top_frame idiom).
-    removed_tap_notes = remove_notes_matching(adapter, "Tapped Hole")
-    _telemetry.info(
-        f"removed {removed_tap_notes} redundant automatic tapped-hole note(s)"
-    )
 
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
@@ -334,6 +330,21 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_precision(
         adapter, [*front_annotations, *right_annotations], DIMENSION_PRECISION
     )
+    # Explicit cosmetic-thread import turns the model-owned generic
+    # "5/16-18 Tapped Hole" leader into an ordinary note.  Delete that one
+    # duplicate while retaining the cosmetic thread and the complete native
+    # callout below; otherwise it crosses the 7.00 / 1.20 dimension lanes.
+    tap_thread_seeds, tap_thread_instances = import_cosmetic_threads(
+        adapter, front
+    )
+    removed_tap_notes = remove_notes_matching(adapter, "Tapped Hole")
+    if removed_tap_notes != 1:
+        raise RuntimeError(
+            "cone-tip-block tap cleanup mismatch: "
+            f"seeds={tap_thread_seeds}, instances={tap_thread_instances}, "
+            f"removed={removed_tap_notes}"
+        )
+    _telemetry.info("removed the redundant cone-tip-block tap callout")
     for label, view in (("front", front), ("plan", top), ("right", right)):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME center mark to the {label} view")

@@ -43,9 +43,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # One line of forming fact the views cannot carry (policy rule 6): the hook
 # and the hub wrap are formed at assembly, so the wire is cut long.  Every
 # number is on a view.
-DRAWING_NOTES = "ONE PIECE. END HOOK AND HUB WRAP FORMED AT ASSEMBLY; CUT LONG AND TRIM."
-# The sheet runs 1:5 (title block), so the front and isometric captions do not
-# repeat the sheet scale; the enlarged end view states its own.
+DRAWING_NOTES = (
+    "ONE PIECE. END HOOK AND HUB WRAP FORMED AT ASSEMBLY; CUT LONG AND TRIM."
+)
+# The sheet runs 1:5 (title block), so the front caption does not repeat the
+# sheet scale; the enlarged end view states its own.
 FRONT_VIEW_NOTE = "FRONT VIEW"
 END_VIEW_NOTE = "END VIEW SCALE 10:1"
-ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW"

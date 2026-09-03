@@ -1120,6 +1120,64 @@ def active_configuration_name(adapter: Any, model: Any = None) -> str:
     return str(_read_member(active, "Name") or "") if active is not None else ""
 
 
+@_telemetry.traced("configuration.persist", label_param="model_path")
+async def persist_configurations(
+    adapter: Any,
+    model_path: str,
+    configuration_names: Iterable[str],
+    *,
+    active_name: str,
+) -> None:
+    """Rebuild and save every configuration after all model consumers settle."""
+    names = tuple(configuration_names)
+    if active_name not in names:
+        raise ValueError(f"active configuration {active_name!r} is not in {names!r}")
+
+    path = Path(model_path).resolve()
+    adapter.swApp.CloseAllDocuments(True)
+    adapter.currentModel = None
+    check("reopen finalized configured part", await adapter.open_model(str(path)))
+    for name in names:
+        actual = active_configuration_name(adapter, adapter.currentModel)
+        if actual != name:
+            activated = adapter._attempt(
+                lambda name=name: adapter.currentModel.ShowConfiguration2(name),
+                default=None,
+            )
+            actual = active_configuration_name(adapter, adapter.currentModel)
+            if not activated and actual != name:
+                raise RuntimeError(f"{name}: persistence activation failed")
+        rebuilt = adapter._attempt(
+            lambda: adapter.currentModel.ForceRebuild3(False), default=None
+        )
+        if not rebuilt:
+            raise RuntimeError(f"{name}: persistence rebuild failed")
+        configuration = _early_bound(
+            adapter.currentModel.GetConfigurationByName(name), "IConfiguration"
+        )
+        configuration.AddRebuildSaveMark = True
+        if not bool(configuration.AddRebuildSaveMark):
+            raise RuntimeError(f"{name}: failed to set rebuild/save mark")
+
+    actual = active_configuration_name(adapter, adapter.currentModel)
+    if actual != active_name:
+        activated = adapter._attempt(
+            lambda: adapter.currentModel.ShowConfiguration2(active_name),
+            default=None,
+        )
+        actual = active_configuration_name(adapter, adapter.currentModel)
+        if not activated and actual != active_name:
+            raise RuntimeError(
+                f"final active configuration is {actual!r}, expected {active_name!r}"
+            )
+    save_result = adapter._attempt(
+        lambda: adapter.currentModel.Save3(1 | 8, 0, 0), default=None
+    )
+    saved = save_result[0] if isinstance(save_result, tuple) else save_result
+    if not saved:
+        raise RuntimeError(f"failed to persist configured part: {save_result!r}")
+
+
 _SW_CUSTOM_TEXT = 30  # swCustomInfoType_e.swCustomInfoText
 _SW_PROP_REPLACE = 2  # swCustomPropertyAddOption_e.swCustomPropertyReplaceValue
 
@@ -1172,7 +1230,10 @@ def _build_id() -> str:
 
     def _git(*args: str) -> str:
         return subprocess.run(
-            ["git", *args], cwd=str(CAD_ROOT), capture_output=True, text=True,
+            ["git", *args],
+            cwd=str(CAD_ROOT),
+            capture_output=True,
+            text=True,
             check=True,
         ).stdout.strip()
 

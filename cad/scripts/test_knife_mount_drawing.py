@@ -159,6 +159,9 @@ def test_part_stamps_make_critical_properties() -> None:
     assert config["material"] == "Plain Carbon Steel"
     assert "O1 tool steel" in config["material_specification"]
     assert "58-60 HRC" in config["material_specification"]
+    # The process sentence remains in the manufacturing note; keep the
+    # title-block material cell to the compact alloy + delivered-hardness fact.
+    assert len(config["material_specification"]) <= 40
     assert "Brass" not in config["material_specification"]
     assert "unpainted" in str(config["finish"]).lower()
     assert int(config["quantity"]) == 2

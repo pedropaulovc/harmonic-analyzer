@@ -141,6 +141,14 @@ def test_view_scales_are_explicit() -> None:
     assert output_fixture_spec.END_VIEW_NOTE == "END VIEW SCALE 3:1"
 
 
+
+def test_isometric_caption_is_parked_below_the_isometric() -> None:
+    caption_x, caption_y = drawing.ISOMETRIC_NOTE_XY
+    assert caption_x > drawing.FRONT_CENTER[0] + 0.150
+    assert caption_x < drawing.ISO_CENTER[0]
+    assert 0.015 < drawing.ISO_CENTER[1] - caption_y < 0.035
+    assert 'add_property_linked_note(adapter, "Isometric View Note", *ISOMETRIC_NOTE_XY)' in _source()
+
 def test_part_stamps_make_critical_properties() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "apply_drawing_properties" in source

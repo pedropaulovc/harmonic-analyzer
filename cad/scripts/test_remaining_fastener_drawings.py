@@ -507,6 +507,10 @@ def test_cone_pivot_tail_view_exposes_the_ground_shoulder() -> None:
     assert drawing_source.count("set_basic_dimension(") == 0
     assert drawing_source.count("add_surface_finish(") == 1
     assert 'label="ground shoulder finish"' in drawing_source
+    # The wide native Ra graphic sits above-left of the end view, outside the
+    # side-view shoulder diameter and tolerance column.
+    assert drawing.SHOULDER_FINISH_SYMBOL_XY[0] < drawing.END_CENTER[0]
+    assert drawing.SHOULDER_FINISH_SYMBOL_XY[1] > drawing.END_CENTER[1]
     assert not hasattr(spec, "GEOMETRIC_TOLERANCES_MM")
     assert len(spec.SURFACE_FINISHES) == 1
     assert "import_cosmetic_threads(" not in drawing_source
@@ -663,11 +667,18 @@ def test_horizontal_axis_sheets_leave_room_for_the_thread_text(module_name: str)
     assert drawing._ROW_ABOVE_Y > drawing.SIDE_CENTER[1]
 
 
-def test_thumb_note_uses_short_lines_in_a_raised_lane() -> None:
+def test_thumb_annotations_stay_inside_the_left_border() -> None:
     drawing = importlib.import_module("draw_thumb_screw")
     spec = importlib.import_module("thumb_screw_spec")
     assert drawing.RECIPE.note_xy == (0.020, 0.110)
     assert max(map(len, spec.DRAWING_NOTES.splitlines())) < 80
+    # Centering the two-line diameter callout over the end view keeps its
+    # roughly 32 mm text width inside the 12.7 mm frame rule; raising it above
+    # the 60 mm rendered head keeps that text off the reeded silhouette.
+    assert drawing.END_KEEP["HeadDia"] == (drawing.END_CENTER[0], 0.194)
+    assert drawing.END_KEEP["HeadDia"][0] - 0.016 > 0.0127
+    head_top = drawing.END_CENTER[1] + drawing.HEAD_DIA * drawing._S / 2.0
+    assert drawing.END_KEEP["HeadDia"][1] - head_top >= 0.014
 
 
 @pytest.mark.parametrize(

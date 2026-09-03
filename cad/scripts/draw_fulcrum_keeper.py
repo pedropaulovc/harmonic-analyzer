@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import textwrap
 from typing import Any
 
 import _telemetry
@@ -77,7 +78,9 @@ from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     dimension_name,
+    null_callout,
     place_view,
+    view_name,
 )
 
 
@@ -103,7 +106,9 @@ _S = SHEET_SCALE[0] / SHEET_SCALE[1]  # sheet-mm per model-mm (2.0)
 FRONT_CENTER = (0.110, 0.130)
 TOP_CENTER = (0.110, 0.228)
 RIGHT_CENTER = (0.225, 0.130)
-SECTION_CENTER = (0.330, 0.112)
+# Lift the section enough to reserve a clean annotation lane above the title
+# block; its generated caption is parked in that lane explicitly below.
+SECTION_CENTER = (0.340, 0.132)
 ISO_CENTER = (0.335, 0.215)
 
 # Model bbox centre the projected views are laid out around.
@@ -145,8 +150,10 @@ CBORE_R_SHEET = CBORE_DIA_MM * _S / 2000.0
 # Per-view survivors of the marked-dimension import: parametric name ->
 # sheet position.  The profile pair stacks below the front view (each text
 # centred on its span, the shorter nearer the view), the relief height sits
-# right of the lug; the end view carries the width / shaft-axis / crown stack,
-# while section A-A carries the two fitted bores.
+# right of the lug; the end view carries the width / shaft-axis stack, while
+# section A-A carries the two fitted bores.  CrownDia is recreated directly
+# from the visible end-view circle: the imported display dimension emitted a
+# detached blue witness line at its text X coordinate.
 FRONT_KEEP = {
     "PadLen": (_front_x(SCREW_X), 0.088),
     "FootReach": (_front_x(-FOOT_REACH / 2.0), 0.078),
@@ -155,19 +162,19 @@ FRONT_KEEP = {
 RIGHT_KEEP = {
     "Depth": (RIGHT_CENTER[0], 0.172),
     "ShaftAxisH": (0.196, 0.126),
-    "CrownDia": (0.262, 0.166),
 }
 SECTION_KEEP = {
-    "SocketDia": (0.370, 0.125),
-    "BoreDia": (0.370, 0.103),
+    "SocketDia": (0.370, 0.164),
+    "BoreDia": (0.370, 0.132),
 }
 FRONT_CALLOUTS = {"FootReach": "TO BALL C/L"}
 SECTION_CALLOUTS = {"SocketDia": "BALL SEAT", "BoreDia": "REAM THRU"}
 # The two fitted bores print three decimals (their bands ride the model
 # dimensions); everything else two.
 SECTION_PRECISION = {"SocketDia": 3, "BoreDia": 3}
-RIGHT_DIAMETER_LEADERS_TO_RIM = ("CrownDia",)
 SECTION_DIAMETER_LEADERS_TO_RIM = ("SocketDia", "BoreDia")
+CROWN_DIAMETER_EDGE_XY = _right_xy(0.0, SHAFT_AXIS_H + CROWN_DIA / 2.0)
+CROWN_DIAMETER_TEXT_XY = (0.262, 0.160)
 
 # Side view sheet dimensions.
 PAD_HEIGHT_PICK_X = -21.0  # clear of the counterbore's hidden lines
@@ -196,20 +203,31 @@ SECTION_LINE = (
     _right_xy(0.0, -1.0),
     _right_xy(0.0, SHAFT_AXIS_H + CROWN_DIA / 2.0 + 1.0),
 )
-BALL_NOTE_XY = (0.300, 0.074)
+# Compact the source-owned seven-line process prose into five lines.  The
+# shorter block fits in the horizontal gap between the two orthographic views
+# and the section, above the title block.
+BALL_NOTE_TEXT = textwrap.fill(
+    " ".join(BALL_CALLOUT.splitlines()),
+    width=25,
+    break_long_words=False,
+    break_on_hyphens=False,
+)
+BALL_NOTE_XY = (0.240, 0.095)
+SECTION_LABEL_XY = (0.365, 0.086)
+ISO_NOTE_XY = (0.315, 0.185)
 
 _ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
+_DIAMETER_DIMENSION = 6  # swDimensionType_e.swDiameterDimension
 
 
 def _leaders_to_circumference(
-    adapter: Any, annotations: list[Any], names: tuple[str, ...], *, label: str
+    adapter: Any,
+    annotations: list[Any],
+    names: tuple[str, ...],
+    *,
+    label: str,
 ) -> None:
-    """End each named diameter leader at the nearest circumference.
-
-    SolidWorks' default runs a diameter dimension line across the circle
-    through its centre; with the arrows OUTSIDE the leader stops at the rim it
-    names (drawing-simplicity-policy.md rule 7: never through a bore).
-    """
+    """End each named diameter leader at the nearest circumference."""
     remaining = set(names)
     for annotation in annotations:
         annotation = _sw_type_info.early_bound_or_flag(
@@ -227,6 +245,115 @@ def _leaders_to_circumference(
         remaining.discard(name)
     if remaining:
         raise RuntimeError(f"{label}: diameter leaders not found: {sorted(remaining)}")
+    adapter.currentModel.ClearSelection2(True)
+    adapter.currentModel.EditRebuild3()
+
+
+def _add_crown_diameter(adapter: Any, view: Any) -> Any:
+    """Dimension the visible crown circle without an imported witness line."""
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    name = view_name(adapter, view)
+    if not ddoc.ActivateView(name):
+        raise RuntimeError(f"failed to activate crown end view {name!r}")
+    draw.ClearSelection2(True)
+    if not draw.Extension.SelectByID2(
+        "",
+        "EDGE",
+        CROWN_DIAMETER_EDGE_XY[0],
+        CROWN_DIAMETER_EDGE_XY[1],
+        0.0,
+        False,
+        0,
+        null_callout(),
+        0,
+    ):
+        raise RuntimeError("failed to select fulcrum-keeper crown circle")
+    dimension = adapter._attempt(
+        lambda: draw.AddDiameterDimension2(
+            CROWN_DIAMETER_TEXT_XY[0], CROWN_DIAMETER_TEXT_XY[1], 0.0
+        ),
+        default=None,
+    )
+    draw.ClearSelection2(True)
+    if dimension is None:
+        raise RuntimeError("failed to add fulcrum-keeper crown diameter")
+    display = _sw_type_info.early_bound_or_flag(
+        dimension, "IDisplayDimension", "Type2", "ArrowSide"
+    )
+    if int(display.Type2) != _DIAMETER_DIMENSION:
+        raise RuntimeError(
+            f"crown dimension type {int(display.Type2)} is not a diameter"
+        )
+    display.ArrowSide = _ARROWS_OUTSIDE
+    if int(display.ArrowSide) != _ARROWS_OUTSIDE:
+        raise RuntimeError("crown diameter arrows did not move outside")
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    return dimension
+
+
+def _move_view_label(
+    adapter: Any, view: Any, xy: tuple[float, float], *, keyword: str, label: str
+) -> None:
+    """Park a generated view label across both SolidWorks exposure paths."""
+    notes = list(adapter._attempt(lambda: view.GetNotes(), default=None) or ())
+    if not notes:
+        note = adapter._attempt(lambda: view.GetFirstNote2(), default=None)
+        while note is not None:
+            notes.append(note)
+            note = adapter._attempt(
+                lambda current=note: current.GetNext(), default=None
+            )
+    moved = False
+    for note in notes:
+        note = _sw_type_info.early_bound_or_flag(
+            note, "INote", "GetText", "GetAnnotation"
+        )
+        text = str(adapter._attempt(lambda item=note: item.GetText(), default="") or "")
+        if (
+            keyword not in text.upper()
+            and "<VIEW" not in text.upper()
+            and len(notes) != 1
+        ):
+            continue
+        annotation = _sw_type_info.early_bound_or_flag(
+            note.GetAnnotation(), "IAnnotation", "SetPosition2"
+        )
+        if not annotation.SetPosition2(float(xy[0]), float(xy[1]), 0.0):
+            raise RuntimeError(f"{label}: failed to move the {keyword} label")
+        moved = True
+    if not moved:
+        annotations = list(
+            adapter._attempt(lambda: view.GetAnnotations(), default=None) or ()
+        )
+        if not annotations:
+            annotation = adapter._attempt(
+                lambda: view.GetFirstAnnotation3(), default=None
+            )
+            while annotation is not None:
+                annotations.append(annotation)
+                annotation = adapter._attempt(
+                    lambda current=annotation: current.GetNext3(), default=None
+                )
+        for annotation in annotations:
+            specific = adapter._attempt(
+                lambda item=annotation: item.GetSpecificAnnotation(), default=None
+            )
+            text = str(
+                adapter._attempt(lambda item=specific: item.GetText(), default="") or ""
+            )
+            if keyword not in text.upper() and "<VIEW" not in text.upper():
+                continue
+            annotation = _sw_type_info.early_bound_or_flag(
+                annotation, "IAnnotation", "SetPosition2"
+            )
+            if not annotation.SetPosition2(float(xy[0]), float(xy[1]), 0.0):
+                raise RuntimeError(f"{label}: failed to move the {keyword} label")
+            moved = True
+    if not moved:
+        raise RuntimeError(f"{label}: {keyword} label annotation not found")
+    adapter.currentModel.ClearSelection2(True)
     adapter.currentModel.EditRebuild3()
 
 
@@ -302,16 +429,17 @@ async def build(adapter: Any) -> dict[str, str]:
         label="lug axial section",
     )
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
-    for view in (front, top, right, section):
+    for view in (front, top, right):
         set_hidden_lines_visible(adapter, view)
+    # A full section conventionally suppresses hidden lines; the helper's
+    # auto-hatch then reads as cut material instead of a second side view.
+    set_hidden_lines_removed(adapter, section)
     set_hidden_lines_removed(adapter, iso)
 
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
     )
-    right_annotations = curate_view_dimensions(
-        adapter, right, keep=RIGHT_KEEP, view_label="right"
-    )
+    curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
     section_annotations = curate_view_dimensions(
         adapter, section, keep=SECTION_KEEP, view_label="section A-A"
     )
@@ -319,12 +447,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, front_annotations, FRONT_CALLOUTS)
     set_dimension_callouts(adapter, section_annotations, SECTION_CALLOUTS)
     set_dimension_precision(adapter, section_annotations, SECTION_PRECISION)
-    _leaders_to_circumference(
-        adapter,
-        right_annotations,
-        RIGHT_DIAMETER_LEADERS_TO_RIM,
-        label="lug crown",
-    )
+    _add_crown_diameter(adapter, right)
     _leaders_to_circumference(
         adapter,
         section_annotations,
@@ -332,7 +455,6 @@ async def build(adapter: Any) -> dict[str, str]:
         label="sectioned lug bores",
     )
     _add_ball_midplane_centerline(adapter)
-
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to top view")
 
@@ -394,7 +516,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="screw hole from side face",
         orientation="vertical",
     )
-    set_arc_endpoints_to_center(adapter, hole_from_side, label="screw hole from side face")
+    set_arc_endpoints_to_center(
+        adapter, hole_from_side, label="screw hole from side face"
+    )
 
     # Counterbored screw hole ships as the native wizard callout on the plan
     # view, where it projects as true circles.  The semicolon makes the two
@@ -409,6 +533,13 @@ async def build(adapter: Any) -> dict[str, str]:
         process="#7 DRILL THRU; FLAT-BOTTOM COUNTERBORE",
     )
 
+    _move_view_label(
+        adapter,
+        section,
+        SECTION_LABEL_XY,
+        keyword="SECTION",
+        label="lug axial section",
+    )
     # Axial section: the complete bore/press/ream sequence, flagged from the
     # visible ball-seat cut edge rather than a hidden end-view circle.
     ball_seat = model_point_in_view(
@@ -424,14 +555,14 @@ async def build(adapter: Any) -> dict[str, str]:
     add_attached_note(
         adapter,
         section,
-        text=BALL_CALLOUT,
+        text=BALL_NOTE_TEXT,
         entity_xy=ball_seat,
         note_xy=BALL_NOTE_XY,
         label="ball callout",
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.050)
-    add_property_linked_note(adapter, "Isometric View Note", 0.315, 0.170)
+    add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     return await finalize_drawing(
         adapter,

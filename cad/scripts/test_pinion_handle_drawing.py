@@ -146,6 +146,26 @@ def test_axial_lengths_live_on_the_section_from_one_origin() -> None:
     assert drawing.FRONT_KEEP["RodSpan"] == (0.125, 0.245)
 
 
+def test_cylinder_length_and_crown_callout_have_disjoint_lanes() -> None:
+    grip_up, grip_along = drawing.SECTION_KEEP["GripLen"]
+    tube_up, tube_along = drawing.SECTION_KEEP["TubeLen"]
+    crown_up, crown_along = drawing.SECTION_KEEP["CapR"]
+    # The two axial dimensions occupy opposite ends of one row.
+    assert grip_up == tube_up
+    assert tube_along - grip_along >= 0.035
+    # The two-line spherical-crown note is both higher and farther crownward
+    # than 9.00 / CYL. LENGTH, rather than sharing its text box.
+    assert crown_up - grip_up >= 0.008
+    assert grip_along - crown_along >= 0.050
+    # The 4.50 and 16.50 station dimensions are on distinct rows above both.
+    assert drawing.CROSS_HOLE_SHOULDER_OFFSET[0] - grip_up >= 0.010
+    assert (
+        drawing.CROSS_HOLE_HUB_END_OFFSET[0]
+        - drawing.CROSS_HOLE_SHOULDER_OFFSET[0]
+        >= 0.008
+    )
+
+
 def test_diameter_leaders_end_at_the_circumference() -> None:
     source = _source()
     assert "_ARROWS_OUTSIDE = 1" in source

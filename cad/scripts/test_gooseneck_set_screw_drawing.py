@@ -111,9 +111,9 @@ def test_lengths_are_marked_extrude_depth_model_dims() -> None:
 
 
 def test_view_annotations_follow_the_machinist() -> None:
-    # The thread designation is leadered to the shank through the recipe's
-    # decorate hook; the profile carries the axis centerline.  A square head
-    # has no rim to center-mark or to end a diameter leader at.
+    # The square head needs no rim mark or diameter leader.  Its physically
+    # occluded shank is explicit as a hidden circle, and the side profile gets
+    # the conventional thin minor-diameter thread lines plus its designation.
     source = _source()
     assert drawing.RECIPE.decorate is drawing._decorate
     assert drawing.RECIPE.side_centerline_face_xy == drawing.SIDE_AXIS_FACE_XY
@@ -121,6 +121,14 @@ def test_view_annotations_follow_the_machinist() -> None:
     assert "end_diameter_leaders_at_rim(" not in source
     assert drawing.THREAD_NOTE_XY[0] < drawing.SIDE_CENTER[0]
     assert all(xy[0] > drawing.SIDE_CENTER[0] for xy in drawing.SIDE_KEEP.values())
+    assert "add_external_thread_depiction(" in source
+    assert drawing.THREAD_AXIS_XY == (
+        (drawing.SIDE_CENTER[0], drawing._JUNCTION_Y),
+        (drawing.SIDE_CENTER[0], drawing._SHANK_END_Y),
+    )
+    assert drawing.THREAD_MODEL_DIAMETER_SHEET == spec.SHANK_DIA * drawing._S
+    assert "add_hidden_shank_circle(" in source
+    assert drawing.HIDDEN_SHANK_RADIUS_SHEET == spec.SHANK_DIA * drawing._S / 2.0
 
 
 def test_notes_are_few_specific_and_never_the_title_block() -> None:

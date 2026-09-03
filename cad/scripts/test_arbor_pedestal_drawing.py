@@ -189,6 +189,10 @@ def test_print_carries_no_gdt_or_basic_dimensions_and_one_running_ra() -> None:
     assert drawing.SURFACE_FINISHES[0].roughness_ra == _surface_finish.MACHINED
     assert 'surface_finish_by_key(SURFACE_FINISHES, "arbor_bore")' in source
     assert "leader_attach_xy=(FRONT_CENTER[0], _front_y(BORE_HEIGHT) - _bore_r)" in source
+    # Keep the native symbol body right of the elevation and at least 20 mm
+    # below the Ø20/strap callout text.
+    assert drawing.FINISH_SYMBOL_XY[0] > drawing.FRONT_CENTER[0] + drawing.TOP_RADIUS * drawing._S
+    assert drawing.FINISH_SYMBOL_XY[1] <= drawing.FRONT_KEEP["DomeDia"][1] - 0.020
     # The bore, hold-down, strap and overall locations survive as ordinary
     # entity-selected dimensions (five calls plus the helper).
     assert source.count("_add_entity_dimension(") == 6
@@ -210,6 +214,19 @@ def test_view_scales_are_explicit() -> None:
     assert drawing.FRONT_CENTER == (0.100, 0.150)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("scale=(2, 1)") == 3  # elevation + plan + pictorial
+
+
+def test_plan_and_its_outer_dimension_clear_the_top_border() -> None:
+    # At 2:1 the 16 mm-deep foot is 32 mm tall on paper.  Keep another 12 mm
+    # for the outer 3.00 location dimension and its arrows below the ~273 mm
+    # printable top border.
+    assert drawing.TOP_CENTER == (0.100, 0.233)
+    plan_top = (
+        drawing.TOP_CENTER[1]
+        + drawing.FOOT_DEPTH / 2.0 * drawing._S
+        + 0.012
+    )
+    assert plan_top <= 0.261
 
 
 def test_part_stamps_make_critical_properties() -> None:

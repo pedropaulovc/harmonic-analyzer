@@ -17,8 +17,7 @@ def test_required_drawing_paths() -> None:
     assert drawing.PDF.as_posix().endswith("/pdf/cone-tip-adjuster.pdf")
     assert drawing.PNG.as_posix().endswith("/png/cone-tip-adjuster_drawing.png")
     assert (
-        DRAWINGS_BY_NAME["cone_tip_adjuster"].script
-        == Path(drawing.__file__).resolve()
+        DRAWINGS_BY_NAME["cone_tip_adjuster"].script == Path(drawing.__file__).resolve()
     )
 
 
@@ -52,16 +51,38 @@ def test_cup_and_slot_are_dimensioned_in_an_axial_section() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "create_section_view(" in source
     assert 'section_label="A"' in source
-    assert "line_start=(FRONT_CENTER[0], FRONT_CENTER[1] - half_len)" in source
+    assert "line_start=section_line_start" in source
+    assert "line_end=section_line_end" in source
+    # The cutting line is projected from the real model stations and extends
+    # beyond both body ends; FRONT_CENTER is not assumed to be the body centre.
+    assert "(0.0, -axis_overshoot_mm / 1000.0, 0.0)" in source
+    assert "(0.0, (BODY_LEN + axis_overshoot_mm) / 1000.0, 0.0)" in source
     # The section claims its dimensions before the parent view is curated.
     assert source.index('view_label="section"') < source.index('view_label="front"')
     assert "model_point_in_view(" in source
     # The cut is the x = 0 plane (a vertical line in the front view), so the
     # sideways offset is along model Z, never X (which projects onto the axis).
     assert "(0.0, y_mm / 1000.0, z_mm / 1000.0)" in source
-    assert drawing.SECTION_CENTER == (0.205, 0.180)
+    assert drawing.SECTION_CENTER == (0.205, 0.210)
+    assert drawing.SECTION_CENTER[1] - drawing.CUP_CENTER[1] >= 0.100
     assert drawing.SECTION_LINE_OVERSHOOT > 0.0
-    assert "for view in (front, end, cup, section):\n        set_hidden_lines_visible" in source
+
+
+def test_axial_section_cuts_the_fastener_with_hatch_and_no_hidden_cavity() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    include = "section_definition.ExcludeFasteners = False"
+    rebuild = 'check("rebuild adjuster axial section", drawing_model.EditRebuild3())'
+    hatch_readback = "section_view.GetFaceHatchCount()"
+    assert include in source
+    assert rebuild in source
+    assert hatch_readback in source
+    assert source.index(include) < source.index(rebuild)
+    assert source.index(rebuild) < source.index(hatch_readback)
+    assert "section_definition.SetAutoHatch" not in source
+    assert "if bool(section_definition.ExcludeFasteners):" in source
+    assert "if hatch_count <= 0:" in source
+    assert "set_hidden_lines_removed(adapter, section)" in source
+    assert "set_hidden_lines_visible(adapter, section)" not in source
 
 
 def test_thread_callout_is_the_catalog_thread() -> None:
@@ -92,9 +113,7 @@ def test_chamfers_are_flagged_from_the_rim_not_the_note_block() -> None:
 def test_slotted_south_rim_reduces_only_its_chamfer_arc() -> None:
     radius = part.BODY_DIA / 2.0
     full = math.pi * part.CHAMFER**2 * (radius - part.CHAMFER / 3.0)
-    slotted = part._slotted_rim_chamfer_volume(
-        radius, part.CHAMFER, part.SLOT_W
-    )
+    slotted = part._slotted_rim_chamfer_volume(radius, part.CHAMFER, part.SLOT_W)
     assert 0.80 * full < slotted < 0.90 * full
 
 
@@ -108,8 +127,18 @@ def test_notes_are_few_specific_and_never_the_title_block() -> None:
     assert "(6.20)" in notes  # why the reference diameter is not the thread OD
     # Chamfers, cup and slot ride the views; the thread class rides the block.
     for banned in (
-        "CHAMFER", "CUP", "SLOT", "2A LIMITS", "+/-", "DATUM", "FCF", "UOS",
-        "DIMENSIONS IN", "MATERIAL", "OXIDE", "X.XX",
+        "CHAMFER",
+        "CUP",
+        "SLOT",
+        "2A LIMITS",
+        "+/-",
+        "DATUM",
+        "FCF",
+        "UOS",
+        "DIMENSIONS IN",
+        "MATERIAL",
+        "OXIDE",
+        "X.XX",
     ):
         assert banned not in notes, banned
     source = Path(drawing.__file__).read_text(encoding="utf-8")
@@ -134,9 +163,10 @@ def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:
     assert 'add_note(adapter, "CUP END VIEW"' in source
 
 
-def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
+def test_hidden_lines_stay_on_only_in_the_ordinary_orthographic_views() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "for view in (front, end, cup, section):\n        set_hidden_lines_visible" in source
+    assert "for view in (front, end, cup):\n        set_hidden_lines_visible" in source
+    assert "set_hidden_lines_removed(adapter, section)" in source
     assert "set_hidden_lines_removed(adapter, iso)" in source
 
 

@@ -149,6 +149,12 @@ def test_section_replaces_the_drum_profile_and_states_the_face_length() -> None:
         drawing.DETAIL_CENTER[1] + drawing.DETAIL_RADIUS * 3
         < drawing.SECTION_CENTER[1] - spec.OUTSIDE_DIA / 2000.0
     )
+    # The moved section also leaves the enlarged detail clear horizontally.
+    detail_half = drawing.DETAIL_RADIUS * drawing.DETAIL_SCALE[0]
+    assert drawing.SECTION_CENTER[0] + half_len < drawing.DETAIL_CENTER[0] - detail_half
+    # SolidWorks puts the generated DETAIL/SCALE caption about 30 mm below
+    # the detail outline; retain a visible gap above the 65 mm title-block top.
+    assert drawing.DETAIL_CENTER[1] - detail_half - 0.030 > 0.065
 
 
 def test_hidden_lines_stay_on_in_the_end_view() -> None:

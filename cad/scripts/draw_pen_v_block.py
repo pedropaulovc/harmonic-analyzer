@@ -79,7 +79,7 @@ SHEET_SCALE = (4.0, 1.0)
 # stock section, the groove visible in its bottom edge) sits to its right.
 FRONT_CENTER = (0.130, 0.115)
 TOP_CENTER = (0.130, 0.215)
-RIGHT_CENTER = (0.265, 0.115)
+RIGHT_CENTER = (0.265, 0.130)
 ISO_CENTER = (0.360, 0.225)
 
 
@@ -137,8 +137,9 @@ RIGHT_RIGHT_X = RIGHT_CENTER[0] + RIGHT_HALF_Z
 # the bores' hidden lines (Z 4 / 12, 0.25 mm inside the walls), which start at
 # the groove floor.
 GROOVE_WALL_PICK_Y = RIGHT_BOTTOM_Y + _mm(GROOVE_DEPTH / 2.0)
-# One dimension lane fits between the right view's bottom edge and the title
-# block (top edge ~0.065): the groove width and its offset chain there.
+# Keep a full text-height clearance band between the chained groove dimensions
+# and the title block (top edge ~0.065).  The former 0.069 lane left the 3.75 /
+# 8.50 text and the 4.50 witness/arrow geometry entering that block.
 RIGHT_BELOW_LANE_Y = RIGHT_BOTTOM_Y - 0.010
 RIGHT_KEEP = {
     # The stock depth moves ABOVE the view: the lane below it belongs to the
@@ -156,6 +157,9 @@ HEIGHT_TEXT_XY = (RIGHT_RIGHT_X + 0.022, RIGHT_CENTER[1])
 DIMENSION_CALLOUTS = {
     "Bore0Dia": "2X DRILL THRU",
     "ScrewHoleDiaDim": "DRILL THRU",
+    # The bare 4.50 beside the end view can be mistaken for an overall or a
+    # station.  Name the visible notch feature directly on its depth dimension.
+    "GrooveDepth": "GROOVE DEPTH",
 }
 # The two end chamfers as one leader callout off the right chamfer edge, so no
 # dimension line runs through the text (a 24 mm dimension line cannot carry it).
@@ -164,10 +168,14 @@ CHAMFER_EDGE_XY = (
     _sheet_x(BLOCK_LENGTH - CHAMFER / 2.0),
     _front_y(BLOCK_HEIGHT - CHAMFER / 2.0),
 )
-# Above the block's top-right: right of the top view's Bore1X (26.00) arrow at
-# x~0.162, below the top view (bottom edge 0.183), left of the right view's
-# depth witness line at 0.233.
-CHAMFER_NOTE_XY = (_sheet_x(BLOCK_LENGTH - CHAMFER), RIGHT_TOP_Y + 0.015)
+# Above the front view's top-right: right of the top view's Bore1X (26.00)
+# arrow at x~0.162, below the top view (bottom edge 0.183), and left of the
+# right view's witness lines.  Derive this from the front view so lifting the
+# right view for title-block clearance does not drag the chamfer note upward.
+CHAMFER_NOTE_XY = (
+    _sheet_x(BLOCK_LENGTH - CHAMFER),
+    _front_y(BLOCK_HEIGHT) + 0.015,
+)
 
 
 async def build(adapter: Any) -> dict[str, str]:

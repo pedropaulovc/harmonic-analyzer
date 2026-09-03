@@ -94,11 +94,12 @@ def test_notes_are_few_specific_and_never_the_title_block() -> None:
     assert "_NOTES_" not in source
 
 
-def test_hole_callouts_state_size_and_process() -> None:
+def test_dimension_callouts_name_hole_processes_and_groove_depth() -> None:
     callouts = drawing.DIMENSION_CALLOUTS
     assert callouts["Bore0Dia"] == "2X DRILL THRU"
     assert callouts["ScrewHoleDiaDim"] == "DRILL THRU"
-    assert set(callouts) == {"Bore0Dia", "ScrewHoleDiaDim"}
+    assert callouts["GrooveDepth"] == "GROOVE DEPTH"
+    assert set(callouts) == {"Bore0Dia", "ScrewHoleDiaDim", "GrooveDepth"}
 
 
 def test_chamfers_are_one_leader_callout_off_the_chamfer_edge() -> None:
@@ -152,11 +153,14 @@ def test_groove_is_dimensioned_on_the_end_view_not_to_hidden_lines() -> None:
     assert depth_x > drawing.RIGHT_RIGHT_X
     assert depth_y == pytest.approx(drawing.GROOVE_WALL_PICK_Y)
     assert drawing.HEIGHT_TEXT_XY[0] > depth_x
-    # The stock depth vacated the single lane under the view for the groove
-    # width/offset chain (title block top ~0.065).
+    # Lifting the end view leaves both the horizontal 3.75 / 8.50 text lane
+    # and the bottom witness point of the vertical 4.50 dimension clear of the
+    # title-block top (~0.065), with a real annotation-height safety band.
     assert drawing.RIGHT_KEEP["Depth"][1] > drawing.RIGHT_TOP_Y
+    assert drawing.RIGHT_CENTER[1] > drawing.FRONT_CENTER[1]
     assert drawing.RIGHT_BELOW_LANE_Y < drawing.RIGHT_BOTTOM_Y
-    assert drawing.RIGHT_BELOW_LANE_Y > 0.065
+    assert drawing.RIGHT_BELOW_LANE_Y - 0.065 >= 0.015
+    assert drawing.RIGHT_BOTTOM_Y - 0.065 >= 0.025
 
 
 def test_set_screw_hole_annotations_sit_outside_the_profile() -> None:

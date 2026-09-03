@@ -101,6 +101,21 @@ def test_lengths_are_marked_extrude_depth_model_dims() -> None:
     assert spec.SIDE_VIEW_DIMENSIONS == {"Head": {"HeadHt"}, "Shank": {"ShankLg"}}
     assert 'keep=SIDE_KEEP, view_label="side"' in _source()
 
+def test_overall_is_a_conspicuous_reference_outside_controlled_lengths() -> None:
+    source = _source()
+    assert spec.HEAD_H == 2.5
+    assert spec.SHANK_LEN == 22.0
+    assert spec.HEAD_H + spec.SHANK_LEN == 24.5
+    assert "add_overall_reference(" in source
+    assert 'orientation="vertical"' in source
+    assert 'entity_types=("EDGE", "EDGE")' in source
+    assert drawing.OVERALL_END_POINTS_MM == (
+        (0.7 * spec.HEAD_DIA / 2.0, spec.HEAD_H, 0.0),
+        (0.7 * spec.SHANK_DIA / 2.0, -spec.SHANK_LEN, 0.0),
+    )
+    assert drawing.OVERALL_TEXT_XY[0] > drawing.SIDE_KEEP["ShankLg"][0]
+
+
 
 def test_slot_is_dimensioned_where_the_notch_is_visible() -> None:
     part_source = Path(part.__file__).read_text(encoding="utf-8")
@@ -128,6 +143,12 @@ def test_view_annotations_follow_the_machinist() -> None:
     assert "face_xy=SLOT_AXIS_FACE_XY" in source
     assert drawing.THREAD_NOTE_XY[0] < drawing.SIDE_CENTER[0]
     assert all(xy[0] > drawing.SIDE_CENTER[0] for xy in drawing.SIDE_KEEP.values())
+    assert "add_external_thread_depiction(" in source
+    assert drawing.THREAD_AXIS_XY == (
+        (drawing.SIDE_CENTER[0], drawing._JUNCTION_Y),
+        (drawing.SIDE_CENTER[0], drawing._SHANK_END_Y),
+    )
+    assert drawing.THREAD_MODEL_DIAMETER_SHEET == spec.SHANK_DIA * drawing._S
 
 
 def test_notes_are_few_specific_and_never_the_title_block() -> None:

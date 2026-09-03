@@ -58,7 +58,6 @@ from fulcrum_shaft_spec import (
     SHAFT_DIA,
     SHAFT_DIA_BAND,
     SHAFT_LENGTH,
-    SURFACE_FINISHES,
 )
 
 PART_NAME = "fulcrum-shaft"
@@ -124,12 +123,13 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
-    # GD&T lives on the MODEL as plain annotations; the drawing imports it.
+    # Keep the model free of a native surface-finish annotation.  The drawing
+    # creates the one qualified, view-owned Ra symbol from the shared spec;
+    # a second model-owned symbol exported as a detached horizontal stroke.
     author_part_pmi(
         adapter,
         datums=PART_DATUMS,
         controls=GEOMETRIC_CONTROLS,
-        surface_finishes=SURFACE_FINISHES,
     )
     apply_drawing_properties(
         adapter,

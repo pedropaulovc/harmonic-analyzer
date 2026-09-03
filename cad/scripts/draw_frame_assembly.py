@@ -7,7 +7,7 @@ import sys
 from typing import Any
 
 import _telemetry
-from _assembly_drawing import build_assembly_package
+from _assembly_drawing import AssemblyDrawingLayout, build_assembly_package
 from _common import run_build
 from _drawing_common import DrawingOutputs
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -26,10 +26,15 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 5.0)
-REFERENCE_SCALE = (1.0, 12.0)
-FRONT_CENTER = (0.105, 0.155)
-RIGHT_CENTER = (0.300, 0.155)
-ISO_CENTER = (0.335, 0.165)
+LAYOUT = AssemblyDrawingLayout(
+    working_scale=(1.0, 7.0),
+    exploded_scale=(1.0, 12.0),
+    procedure_scale=(1.0, 8.0),
+    reference_scale=(1.0, 22.0),
+    working_front_center=(0.100, 0.170),
+    working_right_center=(0.280, 0.170),
+    exploded_center=(0.135, 0.170),
+)
 
 ASSEMBLY_STEPS = (
     "Place the harmonic base on the surface plate with its machined top face up.",
@@ -58,10 +63,7 @@ async def build(adapter: Any) -> dict[str, str]:
         source=SOURCE,
         outputs=OUTPUTS,
         sheet_scale=SHEET_SCALE,
-        reference_scale=REFERENCE_SCALE,
-        front_center=FRONT_CENTER,
-        right_center=RIGHT_CENTER,
-        iso_center=ISO_CENTER,
+        layout=LAYOUT,
         pdf_title="Frame Assembly Drawing",
         assembly_steps=ASSEMBLY_STEPS,
         critical_checks=CRITICAL_CHECKS,

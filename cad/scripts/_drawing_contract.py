@@ -634,16 +634,28 @@ def drawing_specification_violations(
             limits = _LIMIT_FRAGMENT.search(rendered)
             bilateral = _BILATERAL_FRAGMENT.search(rendered)
             unilateral = _UNILATERAL_FRAGMENT.search(rendered)
-            catalog_ra = bool(ra and formatted) and all(
+            sourced_ra = bool(ra and formatted) and all(
                 _catalog_sourced(
                     expression,
                     direct=catalog_direct,
                     modules=catalog_modules,
                     assignments=assignments,
                 )
+                or (
+                    isinstance(expression, ast.Attribute)
+                    and expression.attr == "roughness_ra"
+                    and _part_spec_surface_control(
+                        expression.value,
+                        direct=part_spec_direct,
+                        modules=part_spec_modules,
+                        lookup_direct=finish_lookup_direct,
+                        lookup_modules=finish_lookup_modules,
+                        assignments=assignments,
+                    )
+                )
                 for expression in formatted
             )
-            if (ra and not catalog_ra) or limits or bilateral or unilateral:
+            if (ra and not sourced_ra) or limits or bilateral or unilateral:
                 match = ra or limits or bilateral or unilateral
                 assert match is not None
                 add(

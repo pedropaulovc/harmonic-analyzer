@@ -6,10 +6,10 @@ bore axis) shows them as circles: 2x #8 clamp-screw clearance holes flanking the
 column and 1x #6 pen-hanger hole at the free end.  The bar length + section ride
 the auto-imported profile marks; the depth is added across the right-view
 section; each bore carries a native DRILL callout and a horizontal station from
-the LEFT END (one origin), stacked below the bar with the shortest span nearest;
-the bores' common transverse station (5.00 from the bottom edge to the
-pen-hanger hole axis -- all three sit on the bar's centreline) is added at the
-left end, nested inside the 10.00 section height.
+the LEFT END (one origin), stacked below the bar with the shortest span nearest.
+All three bores share an explicit ``3X 5.00`` transverse station from the
+bottom edge.  The 2.5 mm end station displays as 2.500 so the title block's
+.XXX tolerance protects its thin end wall.
 
 The print is plain (cad/docs/drawing-simplicity-policy.md): a clamped support
 bar is not on the GD&T allowlist, so it carries no datum, no frame, no
@@ -27,7 +27,7 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_edge_dimension,
@@ -53,6 +53,7 @@ from wheel_bar_spec import (
     PEN_HANGER_HOLE_DIA,
     SCREW_HOLE_X,
 )
+from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -89,15 +90,15 @@ def _front_x(model_x: float) -> float:
 
 
 # The overall length moves down one row to make room for the three station
-# dimensions stacked between it and the bar.  The section height (10.00)
-# stands left of the left end, OUTSIDE the transverse hole station, with its
-# text lifted off the mid-height row: the pen-hanger hole's extended centre
-# mark runs along that row through the end face (review 2026-09-02).
+# dimensions stacked between it and the bar.  Put the 10.00 section height on
+# the uncluttered end view: its extension line previously crossed the short
+# transverse-station text at the left end of the front view.
 FRONT_KEEP = {
     "Length": (FRONT_CENTER[0], BAR_BOTTOM - 0.038),
-    "Side": (LEFT_END - 0.023, FRONT_CENTER[1] + 0.011),
 }
-RIGHT_KEEP: dict[str, tuple[float, float]] = {}
+RIGHT_KEEP = {
+    "Side": (RIGHT_CENTER[0] + BAR_DEPTH * _S / 2.0 + 0.014, RIGHT_CENTER[1]),
+}
 
 RIGHT_HALF_Z = BAR_DEPTH * _S / 2.0
 RIGHT_HALF_Y = BAR_SIDE * _S / 2.0
@@ -106,10 +107,14 @@ RIGHT_HALF_Y = BAR_SIDE * _S / 2.0
 # so that pick lands well above the bar's mid-height, clear of the circle.
 END_FACE_PICK = (LEFT_END, FRONT_CENTER[1] + 0.0035)
 # The bottom edge, picked just inboard of the left end, is the origin of the
-# transverse station (bottom edge -> pen-hanger hole axis); its text sits
-# left of the end, nearest the view, inside the 10.00 lane.
+# common transverse station (bottom edge -> shared bore axis).
 BOTTOM_EDGE_PICK = (LEFT_END + 0.006, BAR_BOTTOM)
-TRANSVERSE_STATION_TEXT_XY = (LEFT_END - 0.011, FRONT_CENTER[1] - 0.0025)
+TRANSVERSE_STATION_TEXT_XY = (LEFT_END - 0.005, FRONT_CENTER[1] - 0.0025)
+TRANSVERSE_STATION_PREFIX = "3X "
+END_STATION_DECIMALS = 3
+_DO_NOT_CHANGE_PRECISION = -1  # swDimensionPrecisionSettings_e
+_TEXT_PREFIX = 1  # swDimensionTextParts_e.swDimensionTextPrefix
+COMMON_CENTERLINE_X = (LEFT_END - 0.003, FRONT_CENTER[0] + _HALF_LEN + 0.003)
 
 # Station rows below the bar, shortest span nearest (so no extension line
 # crosses a shorter dimension's text): (model x, hole Ø, text sheet xy).  The
@@ -148,6 +153,64 @@ def _rim_pick(
         axis="y",
         label=label,
     )
+
+def _add_common_bore_centerline(adapter: Any) -> None:
+    """Draw the shared transverse station through all three bore axes."""
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    drawing.EditSheet()
+    sketch_manager = _early_bound(adapter.currentModel.SketchManager, "ISketchManager")
+    centerline = sketch_manager.CreateCenterLine(
+        COMMON_CENTERLINE_X[0],
+        FRONT_CENTER[1],
+        0.0,
+        COMMON_CENTERLINE_X[1],
+        FRONT_CENTER[1],
+        0.0,
+    )
+    if centerline is None:
+        raise RuntimeError("failed to create common wheel-bar bore centerline")
+    adapter.currentModel.ClearSelection2(True)
+    adapter.currentModel.EditRebuild3()
+
+
+def _set_dimension_precision(
+    adapter: Any, display: Any, decimals: int, *, label: str
+) -> None:
+    """Set and verify one drawing-native dimension's primary precision."""
+    display = _sw_type_info.early_bound_or_flag(
+        display, "IDisplayDimension", "SetPrecision3", "GetPrimaryPrecision2"
+    )
+    adapter._attempt(
+        lambda: display.SetPrecision3(
+            decimals,
+            _DO_NOT_CHANGE_PRECISION,
+            _DO_NOT_CHANGE_PRECISION,
+            _DO_NOT_CHANGE_PRECISION,
+        )
+    )
+    applied = adapter._attempt(lambda: display.GetPrimaryPrecision2())
+    if applied != decimals:
+        raise RuntimeError(
+            f"{label}: precision override did not take "
+            f"(requested {decimals}, got {applied})"
+        )
+    adapter.currentModel.EditRebuild3()
+
+
+def _set_dimension_prefix(
+    adapter: Any, display: Any, prefix: str, *, label: str
+) -> None:
+    """Set and verify a drawing-native dimension prefix."""
+    display = _sw_type_info.early_bound_or_flag(
+        display, "IDisplayDimension", "SetText", "GetText"
+    )
+    display.SetText(_TEXT_PREFIX, prefix)
+    applied = str(display.GetText(_TEXT_PREFIX) or "")
+    if applied != prefix:
+        raise RuntimeError(
+            f"{label}: prefix did not persist (requested {prefix!r}, got {applied!r})"
+        )
+    adapter.currentModel.EditRebuild3()
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -205,6 +268,10 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to wheel-bar bores")
 
+    # A single visible centreline makes the 3X transverse station geometric,
+    # rather than relying on the three bore circles merely looking collinear.
+    _add_common_bore_centerline(adapter)
+
     # Bar depth (9): dimension the right view's flat front/back faces.
     add_edge_dimension(
         adapter,
@@ -229,11 +296,14 @@ async def build(adapter: Any) -> dict[str, str]:
             orientation="horizontal",
         )
         set_arc_endpoints_to_center(adapter, station, label=label)
+        if model_x == SCREW_HOLE_X:
+            _set_dimension_precision(
+                adapter, station, END_STATION_DECIMALS, label=label
+            )
 
-    # Transverse station (5.00): bottom edge -> pen-hanger hole axis.  All
-    # three bores share the bar's centreline, so the one station at the free
-    # end locates every axis across the 10 width (review 2026-09-02: the
-    # midline was drawn, never dimensioned).
+    # Common transverse station (3X 5.00): bottom edge -> shared bore axis.
+    # The explicit quantity makes the dimension apply to both clamp holes as
+    # well as the pen-hanger hole; all three lie on the bar centreline.
     transverse = add_edge_dimension(
         adapter,
         front,
@@ -249,6 +319,12 @@ async def build(adapter: Any) -> dict[str, str]:
         orientation="vertical",
     )
     set_arc_endpoints_to_center(adapter, transverse, label="transverse hole station")
+    _set_dimension_prefix(
+        adapter,
+        transverse,
+        TRANSVERSE_STATION_PREFIX,
+        label="transverse hole station",
+    )
 
     # Hole sizes: native Hole Wizard callouts, DRILL as the process prefix.
     for label, model_x, dia, callout_xy in HOLE_CALLOUTS:

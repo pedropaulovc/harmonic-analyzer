@@ -6,8 +6,9 @@ import argparse
 import sys
 from typing import Any
 
+import _config
 import _telemetry
-from _assembly_drawing import build_assembly_package
+from _assembly_drawing import AssemblyDrawingLayout, build_assembly_package
 from _common import run_build
 from _drawing_common import DrawingOutputs
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -26,10 +27,19 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 SHEET_SCALE = (2.0, 5.0)
-REFERENCE_SCALE = (1.0, 6.0)
-FRONT_CENTER = (0.105, 0.155)
-RIGHT_CENTER = (0.300, 0.155)
-ISO_CENTER = (0.335, 0.160)
+LAYOUT = AssemblyDrawingLayout(
+    working_scale=(1.0, 3.0),
+    exploded_scale=(1.0, 10.0),
+    procedure_scale=(1.0, 6.0),
+    reference_scale=(1.0, 8.0),
+    working_front_center=(0.095, 0.168),
+    working_right_center=(0.278, 0.168),
+    exploded_center=(0.130, 0.180),
+    working_display_mode="shaded-with-edges",
+)
+INTERLEAVE_MIN_MM, INTERLEAVE_MAX_MM = (
+    float(value) for value in _config.fit("cone_drum_oblique_mesh", "tip_interleave_mm")
+)
 
 ASSEMBLY_STEPS = (
     "Seat the stationary cylinder arbor in both pedestals on the base reference.",
@@ -42,7 +52,7 @@ ASSEMBLY_STEPS = (
 )
 CRITICAL_CHECKS = (
     "Set cone-shaft tip end play to 0.79 mm (1/32 in) with a feeler at the tip spacer.",
-    "Engaged cone/drum tooth interleave shall remain within 0.00–1.14 mm.",
+    f"Engaged cone/drum tooth interleave: {INTERLEAVE_MIN_MM:.2f}–{INTERLEAVE_MAX_MM:.2f} mm.",
     "At zero, all cylinder notches and integral cam lobes point toward machine +Y.",
     "Hand-turn one crank revolution; all 20 stages rotate without bind or axial rub.",
 )
@@ -58,10 +68,7 @@ async def build(adapter: Any) -> dict[str, str]:
         source=SOURCE,
         outputs=OUTPUTS,
         sheet_scale=SHEET_SCALE,
-        reference_scale=REFERENCE_SCALE,
-        front_center=FRONT_CENTER,
-        right_center=RIGHT_CENTER,
-        iso_center=ISO_CENTER,
+        layout=LAYOUT,
         pdf_title="Drive-Train Assembly Drawing",
         assembly_steps=ASSEMBLY_STEPS,
         critical_checks=CRITICAL_CHECKS,

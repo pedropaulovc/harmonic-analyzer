@@ -98,6 +98,12 @@ def test_shared_recipe_requires_exploded_bom_balloons_and_procedure_sheets() -> 
         "HARDWARE / CONSUMABLES",
         "ORIENTATION / ADJUSTMENT / ACCEPTANCE",
         "expected_sheet_names=SHEET_NAMES",
+        "layout.working_scale",
+        "layout.exploded_scale",
+        "layout.procedure_scale",
+        "_size_bom_table",
+        "display_mode=layout.working_display_mode",
+        "_audit_package_layout",
     ):
         assert token in source
     assert "HAS NO EXPLODED STATE" not in source
@@ -284,3 +290,174 @@ def test_bom_validation_fails_loud_for_blank_cells_wrong_identity_or_quantity(
         _assembly_drawing._validate_assembly_bom_columns(
             adapter, _table(cells), metadata, label="paper drive"
         )
+
+
+def test_layout_defaults_reserve_sheet_two_title_block_and_borders() -> None:
+    for drawing in ASSEMBLY_DRAWINGS:
+        layout = drawing.LAYOUT
+        assert layout.reference_front_center[0] < 0.200
+        assert layout.reference_right_center[0] < 0.200
+        assert layout.bom_anchor[0] + sum(layout.bom_column_widths) <= 0.394
+        assert layout.bom_anchor[1] - 34 * layout.bom_row_height >= 0.068
+        assert layout.balloon_margin < layout.reference_front_center[0] - 0.012
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    (
+        {"working_right_center": (0.285, 0.052)},
+        {"reference_right_center": (0.210, 0.052)},
+        {"bom_anchor": (0.246, 0.257)},
+        {"bom_column_widths": (0.030, 0.060, 0.080, 0.020)},
+        {"balloon_margin": 0.0},
+        {"working_display_mode": "black-band"},
+    ),
+)
+def test_layout_rejects_title_block_border_and_display_mode_violations(kwargs) -> None:
+    with pytest.raises(ValueError):
+        _assembly_drawing.AssemblyDrawingLayout(
+            working_scale=(1.0, 4.0),
+            exploded_scale=(1.0, 8.0),
+            procedure_scale=(1.0, 5.0),
+            reference_scale=(1.0, 10.0),
+            **kwargs,
+        )
+
+
+def test_bom_sizing_applies_compact_rows_and_columns_above_title_block() -> None:
+    calls = []
+
+    class Table:
+        RowCount = 34
+        ColumnCount = 4
+
+        @staticmethod
+        def GetRowHeight(row):  # noqa: N802
+            return 0.014 if row == 10 else 0.007
+
+        @staticmethod
+        def SetRowHeight(row, height, option):  # noqa: N802
+            calls.append(("row", row, height, option))
+            return height
+
+        @staticmethod
+        def SetColumnWidth(column, width, option):  # noqa: N802
+            calls.append(("column", column, width, option))
+            return width
+
+    model = SimpleNamespace(EditRebuild3=lambda: calls.append(("rebuild",)))
+    adapter = SimpleNamespace(
+        currentModel=model,
+        _get_attr_or_call=lambda target, name: getattr(target, name),
+    )
+    layout = ASSEMBLY_DRAWINGS[0].LAYOUT
+
+    _assembly_drawing._size_bom_table(
+        adapter,
+        Table(),
+        anchor=layout.bom_anchor,
+        row_height=layout.bom_row_height,
+        column_widths=layout.bom_column_widths,
+        label="dense drive train",
+    )
+
+    assert len([call for call in calls if call[0] == "row"]) == 34
+    wrapped = [call for call in calls if call[:2] == ("row", 10)]
+    assert wrapped == [("row", 10, 0.009, 0)]
+    assert [call[2] for call in calls if call[0] == "column"] == list(
+        layout.bom_column_widths
+    )
+    assert calls[-1] == ("rebuild",)
+
+
+def test_bom_sizing_rejects_rows_that_reach_the_title_block() -> None:
+    table = SimpleNamespace(
+        RowCount=34,
+        ColumnCount=4,
+        GetRowHeight=lambda row: 0.007,
+        SetRowHeight=lambda row, height, option: height,
+        SetColumnWidth=lambda column, width, option: width,
+    )
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(EditRebuild3=lambda: None),
+        _get_attr_or_call=lambda target, name: getattr(target, name),
+    )
+    layout = ASSEMBLY_DRAWINGS[0].LAYOUT
+
+    with pytest.raises(RuntimeError, match="crosses reserved sheet geometry"):
+        _assembly_drawing._size_bom_table(
+            adapter,
+            table,
+            anchor=layout.bom_anchor,
+            row_height=0.006,
+            column_widths=layout.bom_column_widths,
+            label="oversize BOM",
+        )
+
+
+def test_shaded_working_view_requires_successful_mode_readback() -> None:
+    calls = []
+    view = SimpleNamespace(
+        SetDisplayMode4=lambda *args: calls.append(args) or True,
+        GetDisplayMode2=lambda: 3,
+        GetDisplayEdgesInShadedMode=lambda: True,
+    )
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(EditRebuild3=lambda: calls.append(("rebuild",))),
+        _attempt=lambda operation, default=None: operation(),
+    )
+
+    _assembly_drawing._set_view_display_mode(adapter, view, "shaded-with-edges")
+
+    assert calls == [(False, 3, False, True, True), ("rebuild",)]
+
+
+def test_shaded_working_view_rejects_wrong_mode_readback() -> None:
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(EditRebuild3=lambda: None),
+        _attempt=lambda operation, default=None: operation(),
+    )
+    view = SimpleNamespace(SetDisplayMode4=lambda *args: True, GetDisplayMode2=lambda: 2)
+
+    with pytest.raises(RuntimeError, match="read back display mode 2"):
+        _assembly_drawing._set_view_display_mode(adapter, view, "shaded-with-edges")
+
+
+def test_shaded_working_view_rejects_missing_edges() -> None:
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(EditRebuild3=lambda: None),
+        _attempt=lambda operation, default=None: operation(),
+    )
+    view = SimpleNamespace(
+        SetDisplayMode4=lambda *args: True,
+        GetDisplayMode2=lambda: 3,
+        GetDisplayEdgesInShadedMode=lambda: False,
+    )
+
+    with pytest.raises(RuntimeError, match="did not retain visible edges"):
+        _assembly_drawing._set_view_display_mode(adapter, view, "shaded-with-edges")
+
+
+def test_package_layout_audit_visits_every_sheet(monkeypatch) -> None:
+    calls = []
+    monkeypatch.setattr(
+        _assembly_drawing,
+        "_activate_sheet",
+        lambda adapter, sheet: calls.append(("activate", sheet)),
+    )
+    monkeypatch.setattr(
+        _assembly_drawing,
+        "check_drawing_layout",
+        lambda adapter, *, stem: calls.append(("audit", stem)),
+    )
+
+    _assembly_drawing._audit_package_layout(object(), "Frame")
+
+    assert calls == [
+        ("activate", "ASSEMBLED VIEWS"),
+        ("audit", "Frame / ASSEMBLED VIEWS"),
+        ("activate", "EXPLODED AND BOM"),
+        ("audit", "Frame / EXPLODED AND BOM"),
+        ("activate", "ASSEMBLY PROCEDURE"),
+        ("audit", "Frame / ASSEMBLY PROCEDURE"),
+    ]

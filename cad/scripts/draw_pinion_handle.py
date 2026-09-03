@@ -117,19 +117,20 @@ RIGHT_KEEP: dict[str, tuple[float, float]] = {}
 # projected model origin.  The section's mirror is SolidWorks' choice, so the
 # positions are derived at build time from the projected axes (``_section_frame``)
 # rather than assumed: "up" is whichever of +/-X points up the sheet, +Z runs
-# from the crown toward the hub end.  Lengths stack above the body, the crown
-# and rod callouts sit beyond the crown, the (REF) crown height and the section
-# label share the underside.
+# from the crown toward the hub end.  The axial lengths share a row but sit on
+# opposite ends of the body.  The spherical-crown leader is moved farther
+# crownward, outside the 9.00 / CYL. LENGTH text box, and the two cross-hole
+# station dimensions use higher, separate rows.
 SECTION_KEEP = {
-    "GripLen": (0.021, -0.004),
-    "TubeLen": (0.021, 0.030),
+    "GripLen": (0.026, -0.005),
+    "TubeLen": (0.026, 0.033),
     "RodDia": (0.004, -0.036),
     "RodHoleDia": (-0.012, -0.036),
-    "CapR": (0.022, -0.036),
+    "CapR": (0.034, -0.060),
     "CapSagDim": (-0.021, -0.012),
 }
-CROSS_HOLE_SHOULDER_OFFSET = (0.034, (GRIP_LEN / 2.0) / 2.0 * SHEET_SCALE[0] / 1000.0)
-CROSS_HOLE_HUB_END_OFFSET = (0.041, None)  # along-Z filled from z_max at runtime
+CROSS_HOLE_SHOULDER_OFFSET = (0.038, (GRIP_LEN / 2.0) / 2.0 * SHEET_SCALE[0] / 1000.0)
+CROSS_HOLE_HUB_END_OFFSET = (0.047, None)  # along-Z filled from z_max at runtime
 SECTION_LABEL_OFFSET = (-0.032, -0.005)
 # Process only; every band rides its model dimension (build_pinion_handle).
 DIMENSION_CALLOUTS = {

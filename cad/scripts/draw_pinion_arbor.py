@@ -68,18 +68,16 @@ SHEET_SCALE = (1.0, 1.0)
 END_VIEW_SCALE = 2.0
 # The part spans z 0..OVERALL_LEN (shaft + crown), so the side view is
 # OVERALL_LEN wide on the 1:1 sheet and its outline centre is the mid-span.
-# 0.060 between the end circle and the side view's left end (was 0.045): the
-# detail circle now sits around the crown at that end and needs the room.
+# The end circle and the side view retain enough room for the detail source
+# circle around the crowned left end.
 FRONT_CENTER = (0.055, 0.205)
 RIGHT_CENTER = (
     FRONT_CENTER[0] + OVERALL_LEN * SHEET_SCALE[0] / 2000.0 + 0.060,
     FRONT_CENTER[1],
 )
 # 226-long arbor: a 1:1 isometric would run off the ASME B sheet, so 1:2.
-# NOT (0.377, 0.205): even at 1:2 the iso is ~86 x 52, so up there it overran
-# the right zone margin (the border gate measured 2.1 mm) and crowded the side
-# view's right end. The empty band below the side view and right of the notes
-# block takes it whole, clear of the length dimensions above it.
+# The empty band below the side view and right of the notes block takes it
+# whole, clear of the length dimensions above it.
 ISO_CENTER = (0.345, 0.145)
 
 # Side-view landmark (sheet meters): the flat front end is at the RIGHT. The
@@ -89,10 +87,10 @@ RIGHT_END_X = RIGHT_CENTER[0] + OVERALL_LEN * SHEET_SCALE[0] / 2000.0
 SHAFT_FLANK_Y = RIGHT_CENTER[1] + SHAFT_DIA * SHEET_SCALE[0] / 2000.0
 
 # DETAIL B (4:1): the crown, circled on the side view around its root and
-# enlarged below-left, clear of the notes block (x<=0.12 at y~0.10..0.11) and
-# under the length dimensions (y>=0.170). At 4:1 the 8-dia crown is 32 mm
-# tall and the 1.2 sagitta reads as 4.8 mm.
-DETAIL_CENTER = (0.160, 0.130)
+# enlarged below-left.  At 4:1 the 8-dia crown is 32 mm tall and the 1.2
+# sagitta reads as 4.8 mm.  The note sits beyond the 64 mm detail boundary
+# rather than occupying the view's upper-right quadrant.
+DETAIL_CENTER = (0.145, 0.130)
 DETAIL_RADIUS = 0.008
 DETAIL_SCALE = (4, 1)
 
@@ -107,8 +105,8 @@ RIGHT_KEEP = {
 DIMENSION_CALLOUTS = {"Depth": "TO CROWN ROOT"}
 CROWN_GEOMETRY_NOTE = f"DETAIL B CROWN\nSR{CAP_R:.2f}; {CAP_SAG:.2f} HIGH"
 CROWN_GEOMETRY_NOTE_XY = (
-    DETAIL_CENTER[0] + 0.025,
-    DETAIL_CENTER[1] + 0.025,
+    DETAIL_CENTER[0] + 0.045,
+    DETAIL_CENTER[1] + 0.015,
 )
 OVERALL_NOTE = f"({OVERALL_LEN:.2f}) OVERALL REF"
 OVERALL_NOTE_XY = (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.035)
@@ -166,16 +164,13 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, right):
         set_hidden_lines_visible(adapter, view)
 
-    # The detail circle follows the crown root projected from the MODEL, not a
-    # sheet-coordinate guess. The overall reference note below selects no
-    # drawing geometry.
+    # DETAIL B is centred on the actual projected crown root.  The common
+    # detail helper converts this sheet point into parent-view sketch space;
+    # pre-compensating that conversion shifted the detail's sampled model
+    # region into the plain shaft and produced an empty detail.
     crown_root = model_point_in_view(
         adapter, right, (0.0, 0.0, SHAFT_LEN / 1000.0), label="crown root"
     )
-
-    # DETAIL B around the crown root, enlarged 4:1 (policy rule 7: a feature
-    # too small to read legibly on the parent gets a detail). Its dimensions
-    # are stated by the adjacent spec-derived note below.
     detail = create_detail_view(
         adapter,
         right,
@@ -186,6 +181,7 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=DETAIL_SCALE,
         label="crown detail",
     )
+    set_hidden_lines_visible(adapter, detail)
     right_annotations = curate_view_dimensions(
         adapter, right, keep=RIGHT_KEEP, view_label="right"
     )

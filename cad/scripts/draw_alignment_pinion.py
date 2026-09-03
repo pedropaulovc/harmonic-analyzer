@@ -72,21 +72,21 @@ SECTION_LINE = (
     (FRONT_CENTER[0], FRONT_CENTER[1] - SECTION_HALF_LINE),
     (FRONT_CENTER[0], FRONT_CENTER[1] + SECTION_HALF_LINE),
 )
-SECTION_CENTER = (0.285, 0.185)
+SECTION_CENTER = (0.245, 0.205)
 SECTION_NOTE = f"SECTION A-A\nFACE LENGTH {FACE_WIDTH:.1f}"
 SECTION_NOTE_XY = (
     SECTION_CENTER[0],
     SECTION_CENTER[1] + OUTSIDE_DIA / 2000.0 + 0.012,
 )
 
-# DETAIL B (3:1): the whole 22 mm end view, enlarged below the section so the
-# bore callout's arrow visibly sits on the 24 mm (3:1) bore. Its circle takes
-# in the tooth tips with a little air.
+# DETAIL B (3:1): the whole 22 mm end view, enlarged below-right of the
+# section.  The shifted section leaves room for the complete detail and its
+# generated two-line caption above the title-block field.
 DETAIL_RADIUS = OUTSIDE_DIA / 2000.0 + 0.0015
-DETAIL_CENTER = (0.340, 0.118)
+DETAIL_CENTER = (0.360, 0.140)
 DETAIL_SCALE = (3, 1)
 DETAIL_KEEP = {
-    "ArborBoreDia": (DETAIL_CENTER[0] - 0.064, DETAIL_CENTER[1] - 0.030),
+    "ArborBoreDia": (DETAIL_CENTER[0] - 0.064, DETAIL_CENTER[1] - 0.020),
 }
 # Light press under the arbor's Ø8 journal; the 7.96..7.98 band is on the
 # model dimension (build_alignment_pinion), so the callout names the process

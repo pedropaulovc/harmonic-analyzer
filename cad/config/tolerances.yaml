@@ -27,6 +27,7 @@ fits:
 
   cone_drum_oblique_mesh:  # the inclined cone partial engagement
     edge_slack_mm: 0.55              # PEN_EDGE_SLACK — deepest-tooth penetration guard
+    tip_interleave_mm: [0.00, 1.14]  # accepted cone/drum tip-depth window
     note: "oblique partial engagement; checker-arbitrated edge slacks 0.00..1.14"
 
   crank_mesh:              # 16T:64T crossed mesh (crank machine-z over the inclined 64T)

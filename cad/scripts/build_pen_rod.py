@@ -4,8 +4,8 @@ The square brass rod that carries the v-block; the wire from the
 magnifying wheel ties into the cross hole near its top, so the rod (and
 pen) mirror the summed motion vertically.
 
-Dimensions: cad/DIMENSIONS.md "Chapter 24" — ~5 mm square photo-scaled
-(low); length ~120 from the p.64 inset (low).
+Dimensions: 5 mm square drawn stock, 150 mm long, with the #47 cross hole
+145 mm from the bottom end (5 mm from the top).
 
 Layout: length along +Y from the origin (assembly orientation), section
 centred on the origin in X, extruded +Z; wire hole along Z near the top.
@@ -42,9 +42,7 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
-    set_dimension_bilateral_tolerance,
 )
-from _fit_limits import deviations
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from _holes import NUMBER_DRILL_MM, HoleSpec, wizard_holes
@@ -55,7 +53,6 @@ from pen_rod_spec import (
     PART_DATUMS,
     ROD_LENGTH,
     ROD_SECTION,
-    SECTION_BAND,
     SURFACE_FINISHES,
     TOP_VIEW_NOTE,
     WIRE_HOLE_Y,
@@ -166,12 +163,6 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
-    set_dimension_bilateral_tolerance(
-        adapter, "RodProfile", "Section", *deviations(SECTION_BAND)
-    )
-    set_dimension_bilateral_tolerance(
-        adapter, "Rod", "Depth", *deviations(SECTION_BAND)
-    )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

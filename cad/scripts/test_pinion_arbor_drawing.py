@@ -73,8 +73,26 @@ def test_crown_is_enlarged_and_its_unavailable_dimension_becomes_a_spec_note() -
     assert 'detail_label="B"' in source
     assert 'view_label="detail"' not in source
     assert "add_note(adapter, CROWN_GEOMETRY_NOTE" in source
+    assert "set_hidden_lines_visible(adapter, detail)" in source
     # The drawing note carries the geometry; manufacturing prose stays process-only.
     assert "SR7.27" not in pinion_arbor_spec.DRAWING_NOTES
+
+
+def test_detail_samples_the_projected_crown_instead_of_the_plain_shaft() -> None:
+    source = _source()
+    assert "center=crown_root" in source
+    assert "model_origin" not in source
+    assert "detail_source_center" not in source
+    assert "crown_root[0] +" not in source
+    # The detail note starts beyond the 4:1 detail boundary, leaving its
+    # enlarged crown outline usable rather than covering the upper-right.
+    enlarged_radius = drawing.DETAIL_RADIUS * (
+        drawing.DETAIL_SCALE[0] / drawing.DETAIL_SCALE[1]
+    )
+    assert (
+        drawing.CROWN_GEOMETRY_NOTE_XY[0]
+        >= drawing.DETAIL_CENTER[0] + enlarged_radius + 0.010
+    )
 
 
 def test_overall_length_uses_the_stable_view_adjacent_note_path() -> None:
@@ -97,7 +115,8 @@ def test_overall_length_uses_the_stable_view_adjacent_note_path() -> None:
     assert 'entity_types=("VERTEX", "EDGE")' not in source
     assert "set_reference_dimension(" not in source
     assert "add_edge_dimension(" not in source
-    # The one remaining projection locates DETAIL B at the crown root.
+    # DETAIL B is located by one direct projection of the crown root; applying
+    # a second origin compensation sampled the plain middle of the shaft.
     assert source.count("model_point_in_view(") == 1
 
 

@@ -124,22 +124,24 @@ FRONT_KEEP = {
     "PivotBoreDia": (0.187, 0.099),
     "BottomCapRadius": (0.175, 0.078),
 }
-# Left view: the seat mouth is a visible circle on the -X flank; its callouts
-# sit in the gap between the two views.
+# Left view: the seat mouth is a visible circle on the -X flank.  Its callout
+# sits above the cutting-plane arrows instead of sharing their identifier band.
 LEFT_KEEP = {
-    "PinSeatDia": (0.075, 0.150),
+    "PinSeatDia": (0.075, 0.178),
     "PinSeatCz": (0.060, 0.098),
 }
 # Section dimension positions are offsets from the projected model origin at
 # the y=6 seat-axis cut. SolidWorks chooses the section's mirror, so positions
-# derive from projected axes. The seat depth stands on the +Z side. The strap
-# thickness sits 10 mm down and 15 mm toward -Z, above the automatic label.
+# derive from projected axes.  The two-line seat-depth callout is parked high
+# and well to the +Z side of the narrow section instead of running through its
+# outline.  Strap thickness remains on the opposite side.
 SECTION_KEEP = {
-    "PinSeatDepth": (-0.011, 0.014),
+    "PinSeatDepth": (-0.025, 0.030),
     "Depth": (0.010, -0.015),
 }
-# Park the section label to the left if SolidWorks exposes it as a note.
-SECTION_LABEL_XY = (SECTION_CENTER[0] - 0.050, SECTION_CENTER[1])
+# Put the large section identifier in the open band below the section; neither
+# the depth dimension line nor its extension line crosses the label.
+SECTION_LABEL_XY = (SECTION_CENTER[0], SECTION_CENTER[1] - 0.030)
 # The scallops' marked model dimensions stay owned by one compact coordinate
 # block beside the front view. Its values come from the geometry constants,
 # and its origin and directions name the pivot-bore centreline explicitly.

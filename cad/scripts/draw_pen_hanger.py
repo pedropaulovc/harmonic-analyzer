@@ -40,6 +40,7 @@ from _drawing_common import (
     finalize_drawing,
     find_edge_near,
     model_point_in_view,
+    remove_notes_matching,
     new_project_drawing,
     read_required_properties,
     set_arc_endpoints_to_center,
@@ -77,12 +78,14 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (2.0, 1.0)   # 2:1 whole sheet (~82 mm tall part)
+SHEET_SCALE = (2.0, 1.0)  # 2:1 whole sheet (~82 mm tall part)
 VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]  # 2.0 sheet-mm per model-mm / 1000
 
 # Front-view model bounding box (X-Y profile of the strap + block).
-_BBOX_X = (min(STRAP_TOP_X[0], STRAP_BOT_X[0], -BLOCK_HALF),
-           max(STRAP_TOP_X[1], STRAP_BOT_X[1], BLOCK_HALF))
+_BBOX_X = (
+    min(STRAP_TOP_X[0], STRAP_BOT_X[0], -BLOCK_HALF),
+    max(STRAP_TOP_X[1], STRAP_BOT_X[1], BLOCK_HALF),
+)
 _BBOX_Y = (-BLOCK_HALF, STRAP_TOP_Y)
 _BBOX_CX = (_BBOX_X[0] + _BBOX_X[1]) / 2.0
 _BBOX_CY = (_BBOX_Y[0] + _BBOX_Y[1]) / 2.0
@@ -129,8 +132,14 @@ SCREW_CORNER_STATION = STRAP_TOP_X[1] - SCREW_X  # 8.50 from the top-right corne
 # strap rise (outer) with the hole's 5.00 top station nested inside it.
 # Right of the block: the block height.
 FRONT_KEEP = {
-    "StrapTopRun": (_fx((STRAP_TOP_X[0] + STRAP_TOP_X[1]) / 2.0), _fy(STRAP_TOP_Y) + 0.020),
-    "StrapTaperDx": (_fx((STRAP_BOT_X[1] + STRAP_TOP_X[1]) / 2.0), _fy(STRAP_TOP_Y) + 0.010),
+    "StrapTopRun": (
+        _fx((STRAP_TOP_X[0] + STRAP_TOP_X[1]) / 2.0),
+        _fy(STRAP_TOP_Y) + 0.020,
+    ),
+    "StrapTaperDx": (
+        _fx((STRAP_BOT_X[1] + STRAP_TOP_X[1]) / 2.0),
+        _fy(STRAP_TOP_Y) + 0.010,
+    ),
     "StrapTaperDy": (_fx(_BBOX_X[0]) - 0.018, FRONT_CENTER[1]),
     "StrapBotWidth": (_fx(0.0), _fy(-BLOCK_HALF) - 0.010),
     "BlockWidth": (_fx(0.0), _fy(-BLOCK_HALF) - 0.020),
@@ -170,7 +179,9 @@ def _model_frame(adapter: Any, view: Any, *, scale: float, label: str):
 
     def at(x_mm: float, y_mm: float, z_mm: float) -> tuple[float, float]:
         return model_point_in_view(
-            adapter, view, (x_mm / 1000.0, y_mm / 1000.0, z_mm / 1000.0),
+            adapter,
+            view,
+            (x_mm / 1000.0, y_mm / 1000.0, z_mm / 1000.0),
             label=f"{label} pick",
         )
 
@@ -290,7 +301,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_arc_endpoints_to_center(
         adapter, corner_station, label="hanger-screw corner station"
     )
-    add_native_hole_callout(
+    tap_callout = add_native_hole_callout(
         adapter,
         front,
         edge_xy=find_edge_near(
@@ -299,6 +310,21 @@ async def build(adapter: Any) -> dict[str, str]:
         callout_xy=SCREW_CALLOUT_XY,
         label="hanger-screw tap",
     )
+    # Dimension import creates SolidWorks' redundant generic "#6-32 Tapped
+    # Hole" note.  Remove it only after curation and the complete native
+    # callout have run; removing it before curation allowed the duplicate to be
+    # recreated across the 8.50 / 5.00 upper annotation lanes.
+    removed_tap_notes = remove_notes_matching(adapter, "Tapped Hole")
+    _telemetry.info(
+        f"removed {removed_tap_notes} redundant automatic tapped-hole note(s)"
+    )
+    if (
+        not bool(adapter._attempt(lambda: tap_callout.IsHoleCallout(), default=False))
+        or adapter._attempt(lambda: tap_callout.GetAnnotation(), default=None) is None
+    ):
+        raise RuntimeError(
+            "native hanger-screw tap callout was removed with generic note"
+        )
 
     # Top view: the block depth and strap thickness (extrude depths, so
     # drawing-added on real edges) and the channel's two stations from the
@@ -312,12 +338,18 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         p0=find_edge_near(
-            adapter, top, at_top(3.0, BLOCK_HALF, BLOCK_Z[0]),
-            axis="y", label="block front edge",
+            adapter,
+            top,
+            at_top(3.0, BLOCK_HALF, BLOCK_Z[0]),
+            axis="y",
+            label="block front edge",
         ),
         p1=find_edge_near(
-            adapter, top, at_top(3.0, BLOCK_HALF, BLOCK_Z[1]),
-            axis="y", label="block back edge",
+            adapter,
+            top,
+            at_top(3.0, BLOCK_HALF, BLOCK_Z[1]),
+            axis="y",
+            label="block back edge",
         ),
         text_xy=_offset(at_top(BLOCK_HALF, BLOCK_HALF, _TOP_CZ), top_x, 0.014),
         label="block depth",
@@ -328,16 +360,23 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         p0=find_edge_near(
-            adapter, top, at_top(strap_mid_x, STRAP_TOP_Y, STRAP_Z[0]),
-            axis="y", label="strap front face",
+            adapter,
+            top,
+            at_top(strap_mid_x, STRAP_TOP_Y, STRAP_Z[0]),
+            axis="y",
+            label="strap front face",
         ),
         p1=find_edge_near(
-            adapter, top, at_top(strap_mid_x, STRAP_TOP_Y, STRAP_Z[1]),
-            axis="y", label="strap back face",
+            adapter,
+            top,
+            at_top(strap_mid_x, STRAP_TOP_Y, STRAP_Z[1]),
+            axis="y",
+            label="strap back face",
         ),
         text_xy=_offset(
             at_top(STRAP_TOP_X[0], STRAP_TOP_Y, (STRAP_Z[0] + STRAP_Z[1]) / 2.0),
-            top_x, -0.012,
+            top_x,
+            -0.012,
         ),
         label="strap thickness",
         orientation="vertical",
@@ -348,16 +387,23 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         p0=find_edge_near(
-            adapter, top, at_top(0.0, BLOCK_HALF, BLOCK_Z[0]),
-            axis="y", label="block front edge",
+            adapter,
+            top,
+            at_top(0.0, BLOCK_HALF, BLOCK_Z[0]),
+            axis="y",
+            label="block front edge",
         ),
         p1=find_edge_near(
-            adapter, top, at_top(0.0, BLOCK_HALF, -GUIDE_HOLE_HALF),
-            axis="y", label="channel near wall",
+            adapter,
+            top,
+            at_top(0.0, BLOCK_HALF, -GUIDE_HOLE_HALF),
+            axis="y",
+            label="channel near wall",
         ),
         text_xy=_offset(
             at_top(-BLOCK_HALF, BLOCK_HALF, (BLOCK_Z[0] - GUIDE_HOLE_HALF) / 2.0),
-            top_x, -0.024,
+            top_x,
+            -0.024,
         ),
         label="channel front station",
         orientation="vertical",
@@ -368,16 +414,23 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         p0=find_edge_near(
-            adapter, top, at_top(-BLOCK_HALF, BLOCK_HALF, 0.0),
-            axis="x", label="block left edge",
+            adapter,
+            top,
+            at_top(-BLOCK_HALF, BLOCK_HALF, 0.0),
+            axis="x",
+            label="block left edge",
         ),
         p1=find_edge_near(
-            adapter, top, at_top(-GUIDE_HOLE_HALF, BLOCK_HALF, 0.0),
-            axis="x", label="channel left wall",
+            adapter,
+            top,
+            at_top(-GUIDE_HOLE_HALF, BLOCK_HALF, 0.0),
+            axis="x",
+            label="channel left wall",
         ),
         text_xy=_offset(
             at_top((-BLOCK_HALF - GUIDE_HOLE_HALF) / 2.0, BLOCK_HALF, BLOCK_Z[0]),
-            top_z, -0.020,
+            top_z,
+            -0.020,
         ),
         label="channel side station",
         orientation="horizontal",

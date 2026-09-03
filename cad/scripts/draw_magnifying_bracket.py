@@ -17,7 +17,7 @@ one origin per view -- the collar axis):
   face from the collar OD (the arm is NOT centred on the axis: y -3..+4.5)
   and the flange thickness on the flange's visible face;
 * RIGHT (collar end): the bore as a Ø on its visible circle (with the ASME
-  centre mark) and the arm thickness as a view-adjacent note.
+  centre mark) and the arm thickness on its two projected longitudinal edges.
 
 The print is plain: a bracket is not on the GD&T allowlist and it is
 lock-mated to the lever rod in service, so it carries no datum, frame,
@@ -68,7 +68,6 @@ from magnifying_bracket_spec import (
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
-    add_note,
     auto_center_marks,
     place_view,
     view_name,
@@ -90,10 +89,12 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (1.0, 1.0)
 VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]
 # Third angle: plan above the front view, the collar-end view beside the
-# front view at its height (review 2026-09-02: it sat beside the plan).
-TOP_CENTER = (0.115, 0.180)
-FRONT_CENTER = (0.115, 0.110)
-RIGHT_CENTER = (0.240, 0.110)
+# front view at its height.  The extra plan/front separation is deliberate:
+# the arm- and flange-width dimensions need two complete text lanes between
+# the views instead of stacking into the front-view dimensions.
+TOP_CENTER = (0.115, 0.205)
+FRONT_CENTER = (0.115, 0.105)
+RIGHT_CENTER = (0.240, 0.105)
 ISO_CENTER = (0.345, 0.160)
 
 # Model bounding boxes (mm) the views are centred on.
@@ -118,22 +119,21 @@ def _fy(model_y_mm: float) -> float:
     return FRONT_CENTER[1] + model_y_mm * VIEW_SCALE / 1000.0
 
 
-# Top view: the arm width under the arm's far end (nearest lane) with the
-# flange width outside it; the flange depth right of the arm; the two
-# far-edge stations from the collar axis left of the flange (the flange's
-# nearest, the arm's outside); the flange's far side from the axis above the
-# collar.
+# Top view: the arm and flange widths use separate lanes below the plan.  The
+# enlarged plan/front gap keeps both complete callouts clear of the front view;
+# the remaining stations stay on their original sides of the geometry.
 TOP_KEEP = {
-    "ArmWidth": (_tx(0.0), _tz(ARM_Z[1]) - 0.008),
-    "FlangeWidth": (_tx((FLANGE_X[0] + FLANGE_X[1]) / 2.0), _tz(ARM_Z[1]) - 0.018),
+    "ArmWidth": (_tx(0.0), _tz(ARM_Z[1]) - 0.004),
+    "FlangeWidth": (_tx((FLANGE_X[0] + FLANGE_X[1]) / 2.0), _tz(ARM_Z[1]) - 0.022),
     "FlangeDepth": (_tx(ARM_HALF_X) + 0.012, _tz((FLANGE_Z[0] + FLANGE_Z[1]) / 2.0)),
     "FlangeCornerZ": (_tx(FLANGE_X[0]) - 0.012, _tz(FLANGE_Z[1] / 2.0)),
     "ArmCornerZ": (_tx(FLANGE_X[0]) - 0.024, _tz(ARM_Z[1] / 2.0)),
     "FlangeCornerX": (_tx(FLANGE_X[0] / 2.0), _tz(-COLLAR_OD / 2.0) + 0.010),
 }
-# Front view: the collar length above the collar.
+# Front view: park the two-line collar-length callout below the collar, away
+# from the plan-view width lanes and the 1.50 collar-to-arm dimension.
 FRONT_KEEP = {
-    "WallLen": (_fx(0.0), _fy(COLLAR_OD / 2.0) + 0.010),
+    "WallLen": (_fx(0.0), _fy(-COLLAR_OD / 2.0) - 0.010),
 }
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
 # The arm is exactly as wide as the collar is long (both 10), so the two
@@ -152,7 +152,7 @@ _DIAMETER_DIMENSION = 6  # swDimensionType_e.swDiameterDimension
 ARM_THICKNESS = ARM_Y[1] - ARM_Y[0]  # 7.5
 FLANGE_THICKNESS = FLANGE_Y[1] - FLANGE_Y[0]  # 5.08
 ARM_TOP_FROM_COLLAR_OD = COLLAR_OD / 2.0 - ARM_Y[1]  # 1.5
-ARM_THICKNESS_NOTE = f"ARM THICKNESS {ARM_THICKNESS:.2f}"
+ARM_TOP_DIMENSION_OFFSET = 0.004
 
 
 def _model_frame(adapter: Any, view: Any, *, scale: float, label: str):
@@ -164,7 +164,9 @@ def _model_frame(adapter: Any, view: Any, *, scale: float, label: str):
 
     def at(x_mm: float, y_mm: float, z_mm: float) -> tuple[float, float]:
         return model_point_in_view(
-            adapter, view, (x_mm / 1000.0, y_mm / 1000.0, z_mm / 1000.0),
+            adapter,
+            view,
+            (x_mm / 1000.0, y_mm / 1000.0, z_mm / 1000.0),
             label=f"{label} pick",
         )
 
@@ -351,11 +353,16 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         p0=collar_top,
         p1=find_edge_near(
-            adapter, front, at_front(3.0, ARM_Y[1], ARM_Z[1]),
-            axis="y", label="arm top face",
+            adapter,
+            front,
+            at_front(3.0, ARM_Y[1], ARM_Z[1]),
+            axis="y",
+            label="arm top face",
         ),
         text_xy=_offset(
-            at_front(ARM_HALF_X, (COLLAR_OD / 2.0 + ARM_Y[1]) / 2.0, 0.0), front_x, 0.010
+            at_front(ARM_HALF_X, (COLLAR_OD / 2.0 + ARM_Y[1]) / 2.0, 0.0),
+            front_x,
+            ARM_TOP_DIMENSION_OFFSET,
         ),
         label="arm top face from collar OD",
         orientation="vertical",
@@ -365,33 +372,63 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         p0=find_edge_near(
-            adapter, front, at_front(-12.0, FLANGE_Y[1], FLANGE_Z[1]),
-            axis="y", label="flange top face",
+            adapter,
+            front,
+            at_front(-12.0, FLANGE_Y[1], FLANGE_Z[1]),
+            axis="y",
+            label="flange top face",
         ),
         p1=find_edge_near(
-            adapter, front, at_front(-12.0, FLANGE_Y[0], FLANGE_Z[1]),
-            axis="y", label="flange bottom face",
+            adapter,
+            front,
+            at_front(-12.0, FLANGE_Y[0], FLANGE_Z[1]),
+            axis="y",
+            label="flange bottom face",
         ),
         text_xy=_offset(at_front(FLANGE_X[0], 0.0, 0.0), front_x, -0.010),
         label="flange thickness",
         orientation="vertical",
     )
 
-    # RIGHT view: the arm thickness beside the arm's free end.  A
-    # view-adjacent note is deliberate: the short projected edges are not
-    # stable selectable entities across SolidWorks seats.
+    # RIGHT view: dimension the arm thickness between its two longitudinal
+    # visible edges.  This replaces the detached text note: the 7.50 now has
+    # extension lines to actual arm geometry and cannot be mistaken for a
+    # general note.
     at_right, (_rx, right_y, right_z) = _model_frame(
         adapter, right, scale=VIEW_SCALE, label="right view"
     )
-    arm_thickness_note_xy = _offset(
-        at_right(ARM_HALF_X, (ARM_Y[0] + ARM_Y[1]) / 2.0, ARM_Z[1]),
-        right_z,
-        0.012,
+    arm_pick_z = ARM_Z[1] - 10.0
+    add_edge_dimension(
+        adapter,
+        right,
+        p0=find_edge_near(
+            adapter,
+            right,
+            at_right(ARM_HALF_X, ARM_Y[0], arm_pick_z),
+            axis="y",
+            label="arm lower longitudinal edge",
+        ),
+        p1=find_edge_near(
+            adapter,
+            right,
+            at_right(ARM_HALF_X, ARM_Y[1], arm_pick_z),
+            axis="y",
+            label="arm upper longitudinal edge",
+        ),
+        text_xy=_offset(
+            at_right(ARM_HALF_X, (ARM_Y[0] + ARM_Y[1]) / 2.0, ARM_Z[1]),
+            right_z,
+            0.012,
+        ),
+        label="arm thickness",
+        orientation="vertical",
     )
-    if add_note(adapter, ARM_THICKNESS_NOTE, *arm_thickness_note_xy) is None:
-        raise RuntimeError("failed to add arm thickness note")
     bore_text = _offset(
-        _offset(at_right(COLLAR_HALF_LEN, -COLLAR_OD / 2.0, -COLLAR_OD / 2.0), right_z, -0.012),
+        _offset(
+            at_right(COLLAR_HALF_LEN, -COLLAR_OD / 2.0, -COLLAR_OD / 2.0),
+            right_z,
+            -0.012,
+        ),
         right_y,
         -0.010,
     )
@@ -399,8 +436,11 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         right,
         edge_xy=find_edge_near(
-            adapter, right, at_right(COLLAR_HALF_LEN, COLLAR_BORE / 2.0, 0.0),
-            axis="y", label="collar bore rim",
+            adapter,
+            right,
+            at_right(COLLAR_HALF_LEN, COLLAR_BORE / 2.0, 0.0),
+            axis="y",
+            label="collar bore rim",
         ),
         text_xy=bore_text,
         label="collar bore",

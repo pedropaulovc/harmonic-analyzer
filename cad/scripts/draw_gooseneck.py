@@ -55,9 +55,11 @@ SHEET_SCALE = (1.0, 3.0)   # 1:3 whole sheet (~506 mm tall post)
 
 # Sheet layout (meters).  The elevation (front) shows the goose-neck profile
 # (leg + bend + arm) right of centre so the notes clear it; the isometric (1:4)
-# sits far right; the notes fill the lower-left.
+# sits far right.  Its caption is parked to the left of the long stem rather
+# than underneath it.
 FRONT_CENTER = (0.180, 0.150)
 ISO_CENTER = (0.350, 0.150)
+ISO_VIEW_NOTE_XY = (0.260, 0.095)
 # NO end-screw detail view. Four attempts (three commits + a bbox-shift fix)
 # on the arm-end feature it replaced (a lug + cross-pin) left
 # CreateDetailViewAt4 rendering an empty or near-empty circle even with the
@@ -130,7 +132,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.114)
     add_property_linked_note(adapter, "Elevation View Note", 0.160, 0.022)
-    add_property_linked_note(adapter, "Isometric View Note", 0.300, 0.095)
+    add_property_linked_note(adapter, "Isometric View Note", *ISO_VIEW_NOTE_XY)
 
     return await finalize_drawing(
         adapter,

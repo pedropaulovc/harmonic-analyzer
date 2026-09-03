@@ -75,6 +75,17 @@ def test_view_scale_is_explicit() -> None:
     assert pen_wire_spec.ELEVATION_VIEW_NOTE == "ELEVATION SCALE 2:1"
 
 
+def test_length_dimension_and_isometric_caption_stay_with_their_views() -> None:
+    dimension_x, dimension_y = drawing.FRONT_KEEP["Depth"]
+    assert dimension_x == drawing.RUN_DIMENSION_X
+    assert 0.010 <= drawing.FRONT_CENTER[0] - dimension_x <= 0.020
+    assert dimension_y == drawing.FRONT_CENTER[1]
+    caption_x, caption_y = drawing.ISOMETRIC_NOTE_XY
+    assert abs((caption_x + 0.030) - drawing.ISO_CENTER[0]) < 1e-12
+    assert 0.055 <= drawing.ISO_CENTER[1] - caption_y <= 0.070
+    assert 'add_property_linked_note(adapter, "Isometric View Note", *ISOMETRIC_NOTE_XY)' in _source()
+
+
 def test_part_stamps_make_critical_properties() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "apply_drawing_properties" in source

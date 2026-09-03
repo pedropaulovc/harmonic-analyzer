@@ -137,8 +137,11 @@ def test_configuration_tables_are_stamped_and_placed() -> None:
     assert '"Configuration Table B",' in source
     assert 'add_property_linked_note(\n        adapter, "Configuration Table A"' in source
     assert 'add_property_linked_note(\n        adapter, "Configuration Table B"' in source
-    # Side by side under the gear data, left of the front view, above the notes.
+    # Side by side below the complete GEAR DATA note, left of the front view,
+    # above the manufacturing notes.  The 60 mm anchor gap prevents the last
+    # gear-data line from overprinting either table header.
     assert drawing.TABLE_A_POS[1] == drawing.TABLE_B_POS[1] < drawing.GEAR_DATA_POS[1]
+    assert drawing.GEAR_DATA_POS[1] - drawing.TABLE_A_POS[1] >= 0.060
     assert drawing.TABLE_A_POS[0] < drawing.TABLE_B_POS[0] < drawing.FRONT_CENTER[0] - 0.04
     assert drawing.NOTES_POS[1] < drawing.TABLE_A_POS[1] - 0.04
     assert drawing.TABLE_CHAR_HEIGHT == 0.0025

@@ -1,8 +1,8 @@
 """Offline contracts for the lever-wire drawing.
 
 The print follows cad/docs/drawing-simplicity-policy.md: the sheet runs 1:5
-(the scale of the front and isometric views), the wire diameter is a marked
-model dimension read on a 10:1 end view with the bought-wire band on the
+(the scale of the front view), the wire diameter is a marked model dimension
+read on a 10:1 end view with the bought-wire band on the
 model, the straight rest-run is the marked extrusion depth shown as a
 reference dimension, and the one note is the forming instruction.  No datum,
 frame, roughness or basic dimension.
@@ -127,24 +127,42 @@ def test_notes_are_the_forming_instruction_only() -> None:
 
 
 def test_sheet_scale_matches_the_views() -> None:
-    # Machinist review 2026-09-02: the title block said 1:1 while both views
-    # said 1:5.  The sheet is 1:5 now; the captions of the views AT the sheet
-    # scale do not repeat it, the enlarged end view states its own.
+    # Machinist review 2026-09-02: the title block said 1:1 while the principal
+    # view said 1:5.  The sheet is 1:5 now; the front-view caption does not
+    # repeat it, and the enlarged end view states its own scale.
     assert drawing.SHEET_SCALE == (1.0, 5.0)
     assert drawing.WIRE_SCALE == (1, 5)
     assert lever_wire_spec.FRONT_VIEW_NOTE == "FRONT VIEW"
-    assert lever_wire_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW"
     assert lever_wire_spec.END_VIEW_NOTE == "END VIEW SCALE 10:1"
     source = _source()
     assert "scale=WIRE_SCALE" in source
     assert "scale=END_SCALE" in source
 
 
+def test_noninformative_isometric_view_is_omitted() -> None:
+    # A straight cylinder projects as the same single hairline in front and
+    # isometric orientations.  Only the front and enlarged end views carry
+    # manufacturing information, so the redundant third view and label stay
+    # off the printable sheet.
+    sources = (
+        _source(),
+        Path(part.__file__).read_text(encoding="utf-8"),
+        Path(lever_wire_spec.__file__).read_text(encoding="utf-8"),
+    )
+    drawing_source = sources[0]
+    assert drawing_source.count("place_view(adapter") == 2
+    assert '"*Front"' in drawing_source
+    assert '"*Top"' in drawing_source
+    assert '"*Isometric"' not in drawing_source
+    assert "ISO_CENTER" not in drawing_source
+    assert not hasattr(lever_wire_spec, "ISOMETRIC_VIEW_NOTE")
+    assert all("Isometric View Note" not in source for source in sources)
+
+
 def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
     source = _source()
     assert "for view in (front, end):\n        set_hidden_lines_visible" in source
-    assert "set_hidden_lines_removed(adapter, iso)" in source
-    assert source.count("set_hidden_lines_removed(") == 1
+    assert "set_hidden_lines_removed" not in source
 
 
 def test_wire_geom_split_keeps_notes_out_of_consumer_recipes() -> None:
@@ -158,15 +176,15 @@ def test_wire_geom_split_keeps_notes_out_of_consumer_recipes() -> None:
         assert "from lever_wire_geom import" in source
         assert "from build_lever_wire import" not in source
 
-    verify_source = Path(part.__file__).with_name("verify.py").read_text(
-        encoding="utf-8"
+    verify_source = (
+        Path(part.__file__).with_name("verify.py").read_text(encoding="utf-8")
     )
     assert "import lever_wire_geom as _wire" in verify_source
     assert "import build_lever_wire as _hw" not in verify_source
     # The band constant lives in the import-pure spec, never in the geom the
     # assembly reads.
-    geom_source = Path(part.__file__).with_name("lever_wire_geom.py").read_text(
-        encoding="utf-8"
+    geom_source = (
+        Path(part.__file__).with_name("lever_wire_geom.py").read_text(encoding="utf-8")
     )
     assert "WIRE_DIA_TOLERANCE_MM" not in geom_source
 

@@ -59,7 +59,33 @@ def test_sheet_runs_at_1_to_1_with_1_to_1_isometric() -> None:
     assert 'place_view(adapter, str(SOURCE), "*Right"' not in source
     # The isometric and its caption sit above the title block (top ~0.0655).
     assert drawing.ISO_CENTER[1] >= 0.120
-    assert 'add_property_linked_note(adapter, "Isometric View Note", 0.320, 0.078)' in source
+    assert 'add_property_linked_note(adapter, "Isometric View Note", 0.350, 0.078)' in source
+
+
+def test_section_crown_and_caption_use_distinct_sheet_lanes() -> None:
+    # The long section is shifted right of the front-view half-angle note.
+    assert (
+        drawing.SECTION_CENTER[0] - drawing.FRONT_KEEP["GripHalfAngle"][0]
+        >= 0.100
+    )
+    bore_xy = drawing.SECTION_KEEP["BoreDepth"]
+    wall_xy = drawing.SECTION_KEEP["EndWall"]
+    sag_xy = drawing.SECTION_KEEP["CapSagDim"]
+    # Depth and caption own separate lower lanes; end-wall and crown-height
+    # own separated upper lanes.  These are direct sheet positions, not model
+    # axes accidentally treated as sheet-up.
+    assert bore_xy[1] - drawing.SECTION_LABEL_XY[1] >= 0.015
+    assert wall_xy[1] - bore_xy[1] >= 0.050
+    assert sag_xy[1] == wall_xy[1]
+    assert sag_xy[0] - wall_xy[0] >= 0.080
+    # The crown radius is below the top view, away from its section arrows.
+    assert drawing.TOP_KEEP["CapR"][1] < drawing.TOP_CENTER[1] - 0.020
+    source = _source()
+    assert "view.GetNotes()" in source
+    assert "view.GetFirstNote2()" in source
+    assert "view.GetAnnotations()" in source
+    assert "view.GetFirstAnnotation3()" in source
+    assert "section label annotation not found" in source
 
 
 def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
@@ -114,11 +140,20 @@ def test_hub_stations_run_from_the_flat_end_on_the_top_view() -> None:
     assert "add_attached_note(" not in source
     assert "add_view_centerline(" in source
     assert drawing.DIMENSION_CALLOUTS["CapR"] == "SPHERICAL CROWN"
-    assert 'set_reference_dimensions(adapter, section_annotations, ["EndWall", "CapSagDim"])' in source
+    assert (
+        'set_reference_dimensions(adapter, section_annotations, ["EndWall", "CapSagDim"])'
+        in source
+    )
     assert "GRIP_HALF_ANGLE_DEG" not in source
-    # Section positions are derived from the projected axes, never assumed.
-    assert "_section_frame(adapter, section" in source
-    assert drawing.GRIP_STATION_TEXT_XY[0] < drawing.TOP_CENTER[0] < drawing.HUB_LENGTH_TEXT_XY[0]
+    # Section dimension text is deliberately parked at direct surveyed sheet
+    # positions; its entity ownership still comes from the section view.
+    assert "_section_frame(" not in source
+    assert "model_point_in_view(" not in source
+    assert (
+        drawing.GRIP_STATION_TEXT_XY[0]
+        < drawing.TOP_CENTER[0]
+        < drawing.HUB_LENGTH_TEXT_XY[0]
+    )
 
 
 def test_diameter_leaders_end_at_the_circumference() -> None:

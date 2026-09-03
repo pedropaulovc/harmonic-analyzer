@@ -1,13 +1,12 @@
 r"""Create the curated machinist drawing for the pen square rod.
 
 The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): a
-length of drawn square bar carries no datums, no feature-control frames and
-no roughness symbol -- its slide fit is the band on the model section and the
-drawn faces pass as received. The wire hole is located along the rod on the
-front view; its size (#47 DRILL on the callout) and its 2.50 centring across
-the section read in DETAIL A at 4:1, where a 2.5 mm span is legible (policy
-rule 7: a feature too small to dimension at the sheet scale gets a detail;
-machinist review 2026-09-02: the 2.50 crowded the top view's 5.00).
+length of drawn square bar carries no datums, feature-control frames, surface
+finish symbols or owned machining tolerance because its faces pass as received.
+The main front view locates the #47 through hole 145 along the rod and explicitly
+centres it across the 5 mm square section; its size remains a native associative
+Hole Wizard callout. The top view confirms the through hole, while the isometric
+supplies shape context without a redundant right or empty detail view.
 """
 
 from __future__ import annotations
@@ -23,13 +22,10 @@ from _drawing_common import (
     add_edge_dimension,
     add_native_hole_callout,
     add_property_linked_note,
-    create_detail_view,
     curate_view_dimensions,
     finalize_drawing,
-    model_point_in_view,
     new_project_drawing,
     read_required_properties,
-    set_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
@@ -57,44 +53,22 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 1.0)
-TOP_VIEW_SCALE = 4.0
 FRONT_CENTER = (0.070, 0.150)
-RIGHT_CENTER = (0.140, 0.150)
 TOP_CENTER = (0.070, 0.245)
 ISO_CENTER = (0.340, 0.195)
 
-# DETAIL A (4:1): a circle around the wire hole on the front view -- 6 mm
-# radius takes in the hole and both rod faces -- enlarged right of the right
-# view and left of the isometric, under the top view's row. At 4:1 the
-# 5 mm section reads 20 mm across and the O1.99 hole 8 mm, so the 2.50
-# centring dimension and the hole callout both fit legibly.
-DETAIL_RADIUS = 0.006
-DETAIL_CENTER = (0.195, 0.175)
-DETAIL_SCALE = (4, 1)
-WIRE_HOLE_CENTER_NOTE = f"HOLE CL {ROD_SECTION / 2.0:.2f} FROM FACE"
+FRONT_BOTTOM = (FRONT_CENTER[0], FRONT_CENTER[1] - ROD_LENGTH / 2000.0)
+WIRE_HOLE_CENTER_Y = FRONT_BOTTOM[1] + WIRE_HOLE_Y / 1000.0
+# Keep both annotations right of the longitudinal dimensions. The native
+# callout sits above the hole so its leader crosses the 145 lane above that
+# dimension's upper endpoint; the selection-free centring note sits below it.
+WIRE_HOLE_CALLOUT_XY = (0.165, WIRE_HOLE_CENTER_Y + 0.018)
+WIRE_HOLE_CENTER_NOTE_XY = (0.120, WIRE_HOLE_CENTER_Y - 0.022)
+WIRE_HOLE_CENTER_NOTE = f"HOLE CENTERED ACROSS {ROD_SECTION:g} SQ SECTION"
 
 FRONT_KEEP = {
     "Length": (FRONT_CENTER[0] - 0.030, FRONT_CENTER[1]),
-    # x offset -0.034 (the Depth spelling below), NOT the view centre: Section
-    # measures the 5 mm square across, so at 1:1 its two extension lines land
-    # 4.7 mm apart (measured x=0.0679 and x=0.0726) while the toleranced text
-    # renders 24.5 mm wide. Centred on FRONT_CENTER[0] the text spanned
-    # 0.0580..0.0820, so BOTH extension lines ran through it and struck out
-    # "+0.00/-0.05". text_xy is the text CENTRE, so -0.034 puts the run at
-    # 0.0238..0.0483: clear of the left extension line by 19.6 mm and of the
-    # drawn border rule (gray, x=~0.0126) by ~11.2 mm. No gate sees this -- a
-    # dimension exposes no GetExtent, so only the render shows it.
-    "Section": (
-        FRONT_CENTER[0] - 0.034,
-        FRONT_CENTER[1] - ROD_LENGTH / 2000.0 - 0.012,
-    ),
 }
-TOP_KEEP = {
-    "Depth": (TOP_CENTER[0] - 0.034, TOP_CENTER[1]),
-}
-# No-oversize bands on both functional slide dimensions live on the source model.
-DIMENSION_CALLOUTS: dict[str, str] = {}
-TOP_DIMENSION_CALLOUTS: dict[str, str] = {}
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -139,96 +113,63 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
-    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(1, 1))
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(4, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
     set_hidden_lines_removed(adapter, iso)
-    # Hidden lines stay ON in every orthographic view (Harvey #30 / Lipton):
-    # the right view shows the #47 wire hole through the section.
-    for view in (front, right, top):
+    # Hidden lines stay ON in both orthographic views (Harvey #30 / Lipton):
+    # the top view confirms that the #47 hole passes through the square stock.
+    for view in (front, top):
         set_hidden_lines_visible(adapter, view)
 
-    # Curate the front and top model dimensions. DETAIL A receives only the
-    # selection-free centring note; its derived geometry exposes no model edges
-    # through SolidWorks, so the native hole callout stays on the main front.
-    front_annotations = curate_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="front"
-    )
-    top_annotations = curate_view_dimensions(
-        adapter, top, keep=TOP_KEEP, view_label="top"
-    )
-    set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
-    set_dimension_callouts(adapter, top_annotations, TOP_DIMENSION_CALLOUTS)
+    # Only overall length is imported from the model. The square drawn-stock
+    # size is governed once by the manufacturing note, not repeated as a
+    # machined dimension.
+    curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the wire hole")
 
-    front_bottom = (FRONT_CENTER[0], FRONT_CENTER[1] - ROD_LENGTH / 2000.0)
-    hole_center_y = front_bottom[1] + WIRE_HOLE_Y / 1000.0
-    hole_bottom = (FRONT_CENTER[0], hole_center_y - WIRE_HOLE_DIA / 2000.0)
+    hole_bottom = (
+        FRONT_CENTER[0],
+        WIRE_HOLE_CENTER_Y - WIRE_HOLE_DIA / 2000.0,
+    )
 
     # Along the rod: bottom face -> hole (line-to-circle, so the value is to
     # the hole centre), on the front view where the bottom face is.
     add_edge_dimension(
         adapter,
         front,
-        p0=front_bottom,
+        p0=FRONT_BOTTOM,
         p1=hole_bottom,
         text_xy=(FRONT_CENTER[0] + 0.032, FRONT_CENTER[1] + 0.030),
         label="wire-hole length location",
     )
 
-    # DETAIL A around the hole, enlarged 4:1. The hole centre and the rod's
-    # slide face are projected from the MODEL into the detail (the detail is
-    # positioned on its circle centre, but the projection is exact).
-    detail = create_detail_view(
-        adapter,
-        front,
-        center=(FRONT_CENTER[0], hole_center_y),
-        radius=DETAIL_RADIUS,
-        view_xy=DETAIL_CENTER,
-        detail_label="A",
-        scale=DETAIL_SCALE,
-        label="wire hole detail",
-    )
-    hole_cx, hole_cy = model_point_in_view(
-        adapter, detail, (0.0, WIRE_HOLE_Y / 1000.0, 0.0), label="detail hole centre"
-    )
     wire_hole_edge = visible_circle_edge(adapter, front, WIRE_HOLE_DIA)
-    # Across the section, the hole axis is 2.50 from either 5.00 slide face.
-    # State that controlling value beside DETAIL A instead of dimensioning a
-    # short derived-view edge that is not stable across SolidWorks seats.
-    wire_hole_center_note_xy = (
-        hole_cx - 0.005,
-        hole_cy + DETAIL_RADIUS * DETAIL_SCALE[0] + 0.010,
-    )
+    # The transverse location is explicit beside the main front view without
+    # selecting a short view edge or creating a derived detail view.
     if (
         add_note(
             adapter,
             WIRE_HOLE_CENTER_NOTE,
-            *wire_hole_center_note_xy,
+            *WIRE_HOLE_CENTER_NOTE_XY,
         )
         is None
     ):
         raise RuntimeError("failed to add wire-hole centerline location note")
-    # The derived detail exposes no model edge for the hole. Keep the native
-    # size/process callout on the front-view model rim, beside the hole.
+    # Place the native associative callout above and well right of both
+    # longitudinal dimension lanes. Its leader reaches the hole above the
+    # 145 mm dimension endpoint instead of crossing either extension line.
     add_native_hole_callout(
         adapter,
         front,
         edge=wire_hole_edge,
-        callout_xy=(FRONT_CENTER[0] + 0.028, hole_center_y - 0.006),
+        callout_xy=WIRE_HOLE_CALLOUT_XY,
         label="pen-rod wire hole",
         process="#47 DRILL",
     )
 
-    # No roughness symbol: the drawn-bar faces pass as received (rule 5).
-
-    # 0.015, centred in the corridor between the drawn frame rule (x~0.0128)
-    # and the title block's left edge (0.2658). Measured on the 2026-07-16
-    # sheet: the title block did NOT translate with the re-centred frame
-    # (Codex #334 re-anchored its right rules onto the border instead), so the
-    # corridor is governed by the block's unmoved left edge. The note is now
-    # far shorter than that corridor, but the anchor still reads as centred.
+    # The stock note owns the square size and as-received-face requirement;
+    # no duplicate width dimension or roughness symbol is added.
     add_property_linked_note(adapter, "Manufacturing Notes", 0.015, 0.058)
     add_property_linked_note(adapter, "Top View Note", 0.036, 0.266)
 

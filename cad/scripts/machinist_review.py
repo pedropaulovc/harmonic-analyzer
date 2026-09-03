@@ -142,6 +142,13 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _sheet_for_png(path: Path, kind: str) -> Sheet:
+    resolved = path.resolve()
+    identity = resolved.as_posix().casefold().encode("utf-8")
+    suffix = hashlib.sha256(identity).hexdigest()[:16]
+    return Sheet(name=f"{resolved.stem}-{suffix}", kind=kind, png=resolved)
+
+
 def build_claude_command(
     *,
     workdir: Path,
@@ -358,7 +365,9 @@ def _validate_schema_value(
         ref = schema["$ref"]
         if not isinstance(ref, str):
             raise RuntimeError(f"{path}: verdict schema $ref is not a string")
-        _validate_schema_value(value, _resolve_schema_ref(root, ref), root=root, path=path)
+        _validate_schema_value(
+            value, _resolve_schema_ref(root, ref), root=root, path=path
+        )
         return
 
     expected_type = schema.get("type")
@@ -491,8 +500,7 @@ def review_sheet(
     if reviewer == "claude":
         prompt = (
             "Use the Read tool to inspect sheet.png, the only drawing supplied. "
-            "Do not read any other file. Then perform this blind review.\n\n"
-            + prompt
+            "Do not read any other file. Then perform this blind review.\n\n" + prompt
         )
     prompt_sha = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
     png_sha = _sha256(sheet.png)
@@ -568,8 +576,7 @@ def review_sheet(
             verdict = None
         finally:
             events.extend(
-                {"attempt": attempt + 1, "event": event}
-                for event in attempt_events
+                {"attempt": attempt + 1, "event": event} for event in attempt_events
             )
             if reviewer == "claude":
                 unauthorized, attempt_image_reads = _claude_event_counts(
@@ -734,7 +741,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     sheets: list[Sheet]
     if args.png:
-        sheets = [Sheet(name=args.png.stem, kind=args.kind, png=args.png.resolve())]
+        sheets = [_sheet_for_png(args.png, args.kind)]
     elif args.all:
         sheets = all_sheets()
     else:

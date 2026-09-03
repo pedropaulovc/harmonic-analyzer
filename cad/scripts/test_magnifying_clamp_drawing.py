@@ -105,9 +105,15 @@ def test_thumb_screw_tap_is_a_native_hole_callout_with_the_tap_direction() -> No
     assert source.count("add_native_hole_callout(") == 1
     assert 'label="thumb-screw tap"' in source
     assert "THUMB_SCREW_TAP_DRILL_DIA * _S / 2.0" in source
-    # The breakthrough instruction is flagged from the callout, not a note.
+    # The concise wording retains both the entry face and destination.  Its
+    # anchor is eighteen millimetres farther right than the clipped rendering,
+    # leaving the longest callout line safely inside the sheet border without
+    # reaching the rod-bore callout lane.
+    assert drawing.THUMB_SCREW_PROCESS == "TOP-FACE TAP INTO LEVER BORE:"
+    assert len(drawing.THUMB_SCREW_PROCESS) <= 30
+    assert drawing.THUMB_SCREW_CALLOUT_XY == (0.080, 0.254)
+    assert "callout_xy=THUMB_SCREW_CALLOUT_XY" in source
     assert "process=THUMB_SCREW_PROCESS" in source
-    assert drawing.THUMB_SCREW_PROCESS == "TAP FROM THE TOP FACE INTO THE LEVER BORE:"
     build_source = Path(part.__file__).read_text(encoding="utf-8")
     assert 'HoleSpec("tapped", "#4-40")' in build_source
 
@@ -143,6 +149,8 @@ def test_layout_clears_the_title_block_and_the_view_gap() -> None:
     assert drawing.FRONT_KEEP["LeverBoreDiaDim"][1] >= front_top + 0.010
     top_top = drawing.TOP_CENTER[1] + drawing.BLOCK_DEPTH / 2.0 * drawing._S
     assert drawing.TOP_KEEP["RodBoreDiaDim"][1] >= top_top + 0.015
+    # Pull the 6.50 text left of the model-owned #4-40 annotation.
+    assert drawing.TOP_KEEP["RodBoreXDim"][0] <= drawing.TOP_CENTER[0] - 0.018
     # Notes drop under the 20.00 row, still above the sheet border.
     assert 'add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.032)' in source
 

@@ -1,8 +1,8 @@
 r"""Create the curated machinist drawing for the lever wire (WIRE 1).
 
-The lever wire is a Ø0.8 drawn-steel cylinder ~353 long.  The sheet runs 1:5
-(so the title-block scale is the scale of the front and isometric views); at
-that scale the wire is a hairline, so its diameter is read on a 10:1 END view
+The lever wire is a Ø0.8 drawn-steel cylinder ~353 long.  The sheet runs 1:5;
+at that scale the front view is a hairline, so its diameter is read on a 10:1
+END view
 (the *Top orientation, looking down the wire axis) carrying the marked profile
 circle ``WireDiaDim`` with the bought-wire band printed natively from the
 model.  The FRONT view carries the marked extrusion depth as a REFERENCE
@@ -34,7 +34,6 @@ from _drawing_common import (
     read_required_properties,
     set_dimension_callouts,
     set_dimension_precision,
-    set_hidden_lines_removed,
     set_hidden_lines_visible,
     set_reference_dimension,
     stamp_drawing_summary,
@@ -57,14 +56,13 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 # The sheet IS 1:5 (machinist review 2026-09-02: the title block said 1:1
-# while every view said 1:5); the front and isometric views ride that scale
-# explicitly, the end view is enlarged 10:1 so the Ø0.8 circle is 8 mm.
+# while its principal view said 1:5); the front view rides that scale
+# explicitly, and the end view is enlarged 10:1 so the Ø0.8 circle is 8 mm.
 SHEET_SCALE = (1.0, 5.0)
 WIRE_SCALE = (1, 5)  # ~353 long reduced to ~71 mm on the sheet
 END_SCALE = (10, 1)
 FRONT_CENTER = (0.135, 0.150)
 END_CENTER = (0.215, 0.150)
-ISO_CENTER = (0.320, 0.160)
 
 _HALF_RUN = WIRE_LEN * WIRE_SCALE[0] / WIRE_SCALE[1] / 2000.0  # sheet metres
 
@@ -104,7 +102,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Manufacturing Notes",
             "Front View Note",
             "End View Note",
-            "Isometric View Note",
         ),
         required=(
             "Number",
@@ -114,7 +111,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Manufacturing Notes",
             "Front View Note",
             "End View Note",
-            "Isometric View Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -134,8 +130,6 @@ async def build(adapter: Any) -> dict[str, str]:
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=WIRE_SCALE)
     end = place_view(adapter, str(SOURCE), "*Top", *END_CENTER, scale=END_SCALE)
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=WIRE_SCALE)
-    set_hidden_lines_removed(adapter, iso)
     # Hidden lines ON in every orthographic view (policy rule 7).
     for view in (front, end):
         set_hidden_lines_visible(adapter, view)
@@ -163,7 +157,6 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)
     add_property_linked_note(adapter, "Front View Note", 0.118, 0.100)
     add_property_linked_note(adapter, "End View Note", 0.196, 0.128)
-    add_property_linked_note(adapter, "Isometric View Note", 0.300, 0.100)
 
     return await finalize_drawing(
         adapter,

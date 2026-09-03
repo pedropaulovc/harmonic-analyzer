@@ -967,25 +967,25 @@ def add_view_centerline(
 def _sheet_to_view_sketch(
     adapter: Any, view: Any, xy: tuple[float, float], *, label: str
 ) -> tuple[float, float]:
-    """Convert a drawing-sheet point (m) into the activated view's SKETCH space.
+    """Convert a drawing-sheet point (m) into the activated view's sketch space.
 
-    Sketch geometry authored inside an activated drawing view (a section cut
-    line, a detail circle) is NOT in sheet meters: SolidWorks interprets it in
-    the view's own space -- model units, origin at the model origin's
-    projection.  Measured 2026-09-02 on rocker-arm-support: a section line
-    asked for at sheet (0.1125, 0.152..0.248) drew its "A" arrow above the
-    sheet's top edge and the section cut nothing (a hollow outline, no hatch),
-    so every pick on the "cut face" found only the view itself.  The origin
-    comes from ``ModelToViewTransform`` and the scale from ``ScaleRatio``.
-    (Rotated views -- ``IView.Angle`` != 0 -- would also need the axes turned;
-    no section or detail is cut on one today.)
+    ``ISketchManager`` interprets coordinates inside an activated drawing view
+    relative to ``IView.Position`` (the view's geometric center), scaled by
+    ``IView.ScaleRatio``. Measured 2026-09-03 on frame-side-screw: treating the
+    projected model origin as the sketch origin displaced an otherwise exact
+    thread profile by the model-origin-to-view-center offset. Rotated views
+    would also need the axes turned; no section, detail, or fastener profile is
+    authored on one today.
     """
-    origin = model_point_in_view(adapter, view, (0.0, 0.0, 0.0), label=label)
-    ratio = tuple(float(v) for v in (_early_bound(view, "IView").ScaleRatio or ()))
+    drawing_view = _early_bound(view, "IView")
+    position = tuple(float(value) for value in (drawing_view.Position or ()))
+    if len(position) < 2:
+        raise RuntimeError(f"view has no sheet position ({label}): {position!r}")
+    ratio = tuple(float(value) for value in (drawing_view.ScaleRatio or ()))
     if len(ratio) < 2 or ratio[1] == 0.0:
         raise RuntimeError(f"view has no scale ratio ({label}): {ratio!r}")
     scale = ratio[0] / ratio[1]
-    return ((xy[0] - origin[0]) / scale, (xy[1] - origin[1]) / scale)
+    return ((xy[0] - position[0]) / scale, (xy[1] - position[1]) / scale)
 
 
 @_telemetry.traced("drawing.section_view", label_param="label")
@@ -1371,9 +1371,7 @@ def add_native_hole_callout(
         )
         existing = str(display.GetText(1) or "")  # swDimensionTextPrefix
         if not existing.strip():
-            raise RuntimeError(
-                f"hole callout has no format text to prefix ({label})"
-            )
+            raise RuntimeError(f"hole callout has no format text to prefix ({label})")
         prefix = process.rstrip() + " " + existing.lstrip()
         display.SetText(1, prefix)
         if str(display.GetText(1) or "") != prefix:
@@ -1702,8 +1700,6 @@ def create_blank_drawing_sheets(
 
 
 @_telemetry.traced("drawing.normalize_edge_break")
-
-
 def set_hidden_lines_removed(adapter: Any, view: Any) -> None:
     ok = adapter._attempt(
         lambda: view.SetDisplayMode4(False, 2, False, False, True), default=False

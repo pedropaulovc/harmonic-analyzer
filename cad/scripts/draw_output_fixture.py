@@ -65,6 +65,9 @@ VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]
 FRONT_CENTER = (0.120, 0.130)
 TOP_CENTER = (0.120, 0.210)
 ISO_CENTER = (0.340, 0.175)
+# The caption is centred directly below the isometric.  Its former low sheet
+# position visually labelled the side view instead.
+ISOMETRIC_NOTE_XY = (ISO_CENTER[0] - 0.035, ISO_CENTER[1] - 0.027)
 
 # Side-view silhouette (sheet meters): the collar is Ø10 wide by 8 tall.
 _SIDE_HALF_W = COLLAR_DIA * VIEW_SCALE / 2000.0
@@ -172,7 +175,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.078)
     add_property_linked_note(adapter, "End View Note", 0.170, 0.246)
-    add_property_linked_note(adapter, "Isometric View Note", 0.300, 0.112)
+    add_property_linked_note(adapter, "Isometric View Note", *ISOMETRIC_NOTE_XY)
 
     return await finalize_drawing(
         adapter,

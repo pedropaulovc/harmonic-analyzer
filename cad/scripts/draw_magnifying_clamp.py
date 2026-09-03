@@ -100,14 +100,22 @@ FRONT_KEEP = {
     "LeverBoreYDim": (_front_x(BLOCK_WIDTH / 2.0) + 0.020, _front_y(LEVER_BORE_Y / 2.0)),
     "LeverBoreDiaDim": (_front_x(-11.0), _front_y(BLOCK_HEIGHT) + 0.010),
 }
-# Top view: the rod-bore width station sits nearest the view in the gap under
-# it (nothing else crosses that gap now that the 20.00 hangs under the front
-# view); the depth station stands right; the bore callout leads up-right, 17 mm
-# above the top outline.
+# Top view: the rod-bore station stays in the inter-view gap, but its text is
+# pulled left of the model-owned #4-40 callout.  The depth station stands
+# right; the bore callout leads up-right, 17 mm above the top outline.
 TOP_KEEP = {
-    "RodBoreXDim": (_front_x(ROD_BORE_X / 2.0), TOP_CENTER[1] - BLOCK_DEPTH / 2.0 * _S - 0.007),
-    "RodBoreZ": (_front_x(BLOCK_WIDTH / 2.0) + 0.016, TOP_CENTER[1] - BLOCK_DEPTH / 4.0 * _S),
-    "RodBoreDiaDim": (_front_x(ROD_BORE_X) + 0.040, TOP_CENTER[1] + BLOCK_DEPTH / 2.0 * _S + 0.017),
+    "RodBoreXDim": (
+        _front_x(-BLOCK_WIDTH / 4.0),
+        TOP_CENTER[1] - BLOCK_DEPTH / 2.0 * _S - 0.007,
+    ),
+    "RodBoreZ": (
+        _front_x(BLOCK_WIDTH / 2.0) + 0.016,
+        TOP_CENTER[1] - BLOCK_DEPTH / 4.0 * _S,
+    ),
+    "RodBoreDiaDim": (
+        _front_x(ROD_BORE_X) + 0.040,
+        TOP_CENTER[1] + BLOCK_DEPTH / 2.0 * _S + 0.017,
+    ),
 }
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
 
@@ -116,9 +124,11 @@ DIMENSION_CALLOUTS = {
     "LeverBoreDiaDim": "DRILL THRU",
     "RodBoreDiaDim": "DRILL THRU",
 }
-# The tap direction and breakthrough ride the hole callout itself (rule 6:
-# important process facts are flagged from the view, not buried in a note).
-THUMB_SCREW_PROCESS = "TAP FROM THE TOP FACE INTO THE LEVER BORE:"
+# Keep the directional process fact on the associative callout, but use the
+# concise shop wording and an anchor far enough right that the longest line
+# stays inside the upper-left sheet border.
+THUMB_SCREW_PROCESS = "TOP-FACE TAP INTO LEVER BORE:"
+THUMB_SCREW_CALLOUT_XY = (0.080, 0.254)
 
 RIGHT_HALF_Z = BLOCK_DEPTH / 2.0 * _S
 RIGHT_HALF_Y = BLOCK_HEIGHT / 2.0 * _S
@@ -236,7 +246,7 @@ async def build(adapter: Any) -> dict[str, str]:
             TOP_CENTER[0],
             TOP_CENTER[1] + THUMB_SCREW_TAP_DRILL_DIA * _S / 2.0,
         ),
-        callout_xy=(0.062, 0.254),
+        callout_xy=THUMB_SCREW_CALLOUT_XY,
         label="thumb-screw tap",
         process=THUMB_SCREW_PROCESS,
     )

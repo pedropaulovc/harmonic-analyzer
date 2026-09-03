@@ -90,10 +90,12 @@ from cone_gear_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     GEAR_DATA,
+    FAMILY_TEETH,
     SURFACE_FINISHES,
 )
 from _common import (
     OUT_PNG,
+    OUT_SLDPRT,
     SketchDims,
     _early_bound,
     _read_member,
@@ -105,6 +107,7 @@ from _common import (
     force_rebuild,
     name_last_feature,
     report_mass_properties,
+    persist_configurations,
     run_build,
     save_part_and_images,
     volume_check,
@@ -149,7 +152,7 @@ PI_LIT = "3.14159265358979"  # literal pi for equation-manager expressions
 # The full cone set: 20 gears, 6..120 teeth step 6 (DIMENSIONS.md ch. 12).
 # The 3-config prototype pass (6/60/120) validated regeneration first, per
 # plan risk #2; the same script now carries all 20 configurations.
-CONFIGS = [(f"T{n:03d}", n) for n in range(6, 121, 6)]
+CONFIGS = [(f"T{n:03d}", n) for n in FAMILY_TEETH]
 DEFAULT_TEETH = 120  # globals' all-configuration value at authoring time
 
 
@@ -869,6 +872,16 @@ async def build(adapter) -> dict[str, str]:
         },
     )
     artefacts.update(await save_part_and_images(adapter, PART_NAME))
+
+    # Drawing creation opens and rebuilds the source part again, so this same
+    # persistence contract is also repeated by ``draw_cone_gear`` after export.
+    part_path = OUT_SLDPRT / f"{PART_NAME}.SLDPRT"
+    await persist_configurations(
+        adapter,
+        str(part_path),
+        (name for name, _teeth in reversed(CONFIGS)),
+        active_name="T120",
+    )
 
     if findings:
         summary = "; ".join(findings)

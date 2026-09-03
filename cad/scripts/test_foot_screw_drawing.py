@@ -124,6 +124,12 @@ def test_view_annotations_follow_the_machinist() -> None:
     # Thread leader on the left of the vertical profile, dimensions on the right.
     assert drawing.THREAD_NOTE_XY[0] < drawing.SIDE_CENTER[0]
     assert all(xy[0] > drawing.SIDE_CENTER[0] for xy in drawing.SIDE_KEEP.values())
+    assert "add_external_thread_depiction(" in source
+    assert drawing.THREAD_AXIS_XY == (
+        (drawing.SIDE_CENTER[0], drawing._JUNCTION_Y),
+        (drawing.SIDE_CENTER[0], drawing._SHANK_END_Y),
+    )
+    assert drawing.THREAD_MODEL_DIAMETER_SHEET == spec.SHANK_DIA * drawing._S
 
 
 def test_notes_are_few_specific_and_never_the_title_block() -> None:

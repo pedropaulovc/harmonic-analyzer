@@ -169,10 +169,27 @@ def test_axial_facts_are_cut_edges_in_section_a_a() -> None:
     assert drawing.SECTION_LINE[0][0] < drawing.FRONT_CENTER[0] - drawing._RIM_R
     assert drawing.SECTION_LINE[1][0] > drawing.FRONT_CENTER[0] + drawing._RIM_R
     # The strip sits under the face, clear of the title block (x > ~0.218,
-    # y < 0.070) and its label is parked under the strip's dimensions.
+    # y < 0.070).  Its generated caption is moved through the complete view
+    # annotation collection into a band above and to the right of the strip.
     assert drawing.SECTION_CENTER[1] < drawing.FRONT_CENTER[1] - drawing._RIM_R
     assert drawing.SECTION_CENTER[0] + drawing._RIM_R < 0.218
-    assert drawing.SECTION_LABEL_XY[1] < drawing.SECTION_CENTER[1] - 0.025
+    assert drawing.SECTION_LABEL_XY[1] >= drawing.SECTION_CENTER[1] + 0.015
+    assert drawing.SECTION_LABEL_XY[0] >= drawing.SECTION_CENTER[0] + 0.070
+    assert "view.GetNotes()" in source
+    assert "view.GetFirstNote2()" in source
+    assert "view.GetAnnotations()" in source
+    assert "view.GetFirstAnnotation3()" in source
+    assert "label annotation not found" in source
+    # The hub callout is outboard in the lower-right spoke gap rather than
+    # sharing the narrow band above the section with the hub and bore leaders.
+    hub_xy = drawing.FRONT_KEEP["HubDiaDim"]
+    assert hub_xy[0] > drawing.FRONT_CENTER[0] + drawing._RIM_R
+    assert hub_xy[1] - drawing.SECTION_CENTER[1] >= 0.045
+    # The bore's three-line nominal/H7/process stack clears the cutting plane.
+    assert (
+        drawing.FRONT_CENTER[1] - drawing.FRONT_KEEP["BoreDiaDim"][1]
+        >= 0.025
+    )
     assert drawing.SECTION_KEEP == {}
     # Every face diameter leader ends on its circumference (arrows outside).
     assert "_leaders_to_circumference(" in source

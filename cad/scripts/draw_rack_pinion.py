@@ -63,15 +63,19 @@ FRONT_CENTER = (0.220, 0.175)
 ISO_CENTER = (0.383, 0.210)  # 0.388 clipped the zone border right by 1.4 mm
 
 # SECTION A-A: vertical cut through the axis, cut face only, where the side
-# view used to sit; a plain adjacent note states the face width without
-# relying on an imported edge dimension.
+# view used to sit.  The explicit scale and "axial disc profile" wording make
+# clear that the two hatched lands are the bore-interrupted edge profile, not
+# an incomplete tooth-form detail.
 SECTION_HALF_LINE = OUTSIDE_DIA / 2000.0 + 0.008
 SECTION_LINE = (
     (FRONT_CENTER[0], FRONT_CENTER[1] - SECTION_HALF_LINE),
     (FRONT_CENTER[0], FRONT_CENTER[1] + SECTION_HALF_LINE),
 )
 SECTION_CENTER = (0.320, 0.175)
-SECTION_NOTE = f"SECTION A-A\nFACE WIDTH {FACE_WIDTH:.2f}"
+SECTION_NOTE = (
+    f"SECTION A-A SCALE {VIEW_SCALE[0]}:{VIEW_SCALE[1]}\n"
+    f"AXIAL DISC PROFILE - FACE WIDTH {FACE_WIDTH:.2f}"
+)
 SECTION_NOTE_XY = (
     SECTION_CENTER[0] - 0.045,
     SECTION_CENTER[1] + OUTSIDE_DIA / 2000.0 + 0.009,

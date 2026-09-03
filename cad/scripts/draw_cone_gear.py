@@ -21,7 +21,7 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, check, persist_configurations, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
@@ -38,7 +38,7 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import show_only_cut_face
-from cone_gear_spec import FACE_WIDTH, OUTSIDE_DIA
+from cone_gear_spec import FACE_WIDTH, FAMILY_TEETH, OUTSIDE_DIA
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     auto_center_marks,
@@ -79,10 +79,12 @@ SECTION_NOTE_XY = (
 )
 
 # Notes column: GEAR DATA on top, the two configuration tables side by side
-# under it, the manufacturing notes at the bottom.
+# below its full eleven-line extent, and the manufacturing notes at the
+# bottom.  The table anchors deliberately leave more than one text line after
+# GEAR DATA so the linked-note bounding boxes cannot overprint each other.
 GEAR_DATA_POS = (0.018, 0.262)
-TABLE_A_POS = (0.018, 0.212)
-TABLE_B_POS = (0.095, 0.212)
+TABLE_A_POS = (0.018, 0.195)
+TABLE_B_POS = (0.095, 0.195)
 NOTES_POS = (0.018, 0.095)
 TABLE_CHAR_HEIGHT = 0.0025
 
@@ -176,12 +178,21 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, "Configuration Table B", *TABLE_B_POS, char_height=TABLE_CHAR_HEIGHT
     )
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_POS)
-    return await finalize_drawing(
+    artifacts = await finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Cone Gear Manufacturing Drawing",
         scale=SHEET_SCALE,
     )
+    # Creating the drawing activates and rebuilds T120 in the referenced source
+    # part. Re-persist the full family after the drawing has finished touching it.
+    await persist_configurations(
+        adapter,
+        str(SOURCE),
+        (f"T{teeth:03d}" for teeth in reversed(FAMILY_TEETH)),
+        active_name="T120",
+    )
+    return artifacts
 
 
 def _parse_args() -> argparse.Namespace:

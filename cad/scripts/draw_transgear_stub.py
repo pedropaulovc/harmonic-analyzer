@@ -118,10 +118,12 @@ DIMENSION_PRECISION = {"BaseDia": 3}
 
 # Shoulder-root callout: leadered onto the base shoulder's rim on the LEFT
 # (the base's top face seen edge-on, picked 1 mm inboard of its outer corner
-# so only the O9.525 rim is under the cursor), in the 30 mm band between the
-# BaseDia and SeatDia dimension lines. The right side is the baseline stack.
+# so only the O9.525 rim is under the cursor).  Its note is pulled left of the
+# rim far enough that SolidWorks starts the leader beyond the trailing "MAX"
+# instead of drawing the leader through that text.  The right side remains
+# reserved for the baseline stack.
 ROOT_PICK_XY = (_fx(-(BASE_DIA / 2.0 - 1.0)), _fy(BASE_LEN))
-ROOT_NOTE_XY = (0.056, _fy(BASE_LEN) - 0.006)
+ROOT_NOTE_XY = (0.046, _fy(BASE_LEN) - 0.006)
 
 
 async def build(adapter: Any) -> dict[str, str]:

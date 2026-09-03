@@ -85,6 +85,14 @@ def test_view_scale_is_explicit() -> None:
     source = _source()
     assert "scale=(1, 3)" in source
     assert "scale=(1, 4)" in source
+    assert drawing.ISO_VIEW_NOTE_XY == (0.260, 0.095)
+    # The rendered caption is about 70 mm wide; this 90 mm offset leaves its
+    # right edge clear of the isometric's long stem at the view centre.
+    assert drawing.ISO_CENTER[0] - drawing.ISO_VIEW_NOTE_XY[0] > 0.089
+    assert (
+        'add_property_linked_note(adapter, "Isometric View Note", *ISO_VIEW_NOTE_XY)'
+        in source
+    )
     # The arm-end detail view was intentionally dropped (see the "NO end-screw
     # detail view" rationale in draw_gooseneck.py): assert no detail-view CALL
     # exists, not the historical mention in the explanatory comment.

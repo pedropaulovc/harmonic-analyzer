@@ -70,12 +70,14 @@ _S = SHEET_SCALE[0] / 1000.0  # sheet meters per model mm
 
 # The casting spans model y 0 (foot seat) .. 64 (dome top); centre the front
 # elevation on that midpoint. Third-angle: the 24x16 foot plan sits ABOVE the
-# elevation, the isometric off to the right.
+# elevation, the isometric off to the right.  The plan is held 12 mm below its
+# former station so its outer 3.00 dimension and arrowheads clear the printable
+# top border rather than being clipped by it.
 _PART_MID_Y = (
     BORE_HEIGHT + TOP_RADIUS
 ) / 2.0  # foot 0 .. dome top (bore + dome radius)
 FRONT_CENTER = (0.100, 0.150)
-TOP_CENTER = (0.100, 0.245)
+TOP_CENTER = (0.100, 0.233)
 ISO_CENTER = (0.335, 0.150)
 
 
@@ -122,9 +124,10 @@ BORE_OFFSET_TEXT_Y = _front_y(0.0) - 0.010
 # Strap thickness (rear face flush with the foot): right of the plan, inside
 # the foot-depth dimension.
 STRAP_TEXT_XY = (TOP_CENTER[0] + 0.036, (_top_y(FOOT_DEPTH / 2.0 - STRAP_T) + _top_y(FOOT_DEPTH / 2.0)) / 2.0)
-# Roughness symbol below-right of the bore, its leader to the bore's bottom
-# so it passes under the head-diameter leader.
-FINISH_SYMBOL_XY = (0.150, 0.140)
+# Roughness symbol below-right of the elevation.  Its bore-bottom leader runs
+# beneath the head-diameter callout, while the symbol text stays in the open
+# field below both diameter callouts.
+FINISH_SYMBOL_XY = (0.160, 0.120)
 NOTES_XY = (0.020, 0.066)
 
 
