@@ -90,6 +90,7 @@ from cone_gear_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     GEAR_DATA,
+    FAMILY_TEETH,
     SURFACE_FINISHES,
 )
 from _common import (
@@ -98,7 +99,6 @@ from _common import (
     SketchDims,
     _early_bound,
     _read_member,
-    active_configuration_name,
     apply_custom_properties,
     apply_material,
     check,
@@ -107,6 +107,7 @@ from _common import (
     force_rebuild,
     name_last_feature,
     report_mass_properties,
+    persist_configurations,
     run_build,
     save_part_and_images,
     volume_check,
@@ -151,7 +152,7 @@ PI_LIT = "3.14159265358979"  # literal pi for equation-manager expressions
 # The full cone set: 20 gears, 6..120 teeth step 6 (DIMENSIONS.md ch. 12).
 # The 3-config prototype pass (6/60/120) validated regeneration first, per
 # plan risk #2; the same script now carries all 20 configurations.
-CONFIGS = [(f"T{n:03d}", n) for n in range(6, 121, 6)]
+CONFIGS = [(f"T{n:03d}", n) for n in FAMILY_TEETH]
 DEFAULT_TEETH = 120  # globals' all-configuration value at authoring time
 
 
@@ -872,45 +873,15 @@ async def build(adapter) -> dict[str, str]:
     )
     artefacts.update(await save_part_and_images(adapter, PART_NAME))
 
-    # All properties, tolerances, drawing marks, STL, and images must settle
-    # before this persistence pass: any later model mutation can invalidate the
-    # non-active configuration data. Reopen the finalized part, rebuild and mark
-    # every configuration, restore T120, then persist through Save3 in place.
-    part_path = (OUT_SLDPRT / f"{PART_NAME}.SLDPRT").resolve()
-    adapter.swApp.CloseAllDocuments(True)
-    adapter.currentModel = None
-    check("reopen finalized configured part", await adapter.open_model(str(part_path)))
-    for name, _teeth in reversed(CONFIGS):
-        actual = active_configuration_name(adapter, adapter.currentModel)
-        if actual != name:
-            activated = adapter._attempt(
-                lambda name=name: adapter.currentModel.ShowConfiguration2(name),
-                default=None,
-            )
-            actual = active_configuration_name(adapter, adapter.currentModel)
-            if not activated and actual != name:
-                raise RuntimeError(f"{name}: persistence activation failed")
-        rebuilt = adapter._attempt(
-            lambda: adapter.currentModel.ForceRebuild3(False), default=None
-        )
-        if not rebuilt:
-            raise RuntimeError(f"{name}: persistence rebuild failed")
-        configuration = _early_bound(
-            adapter.currentModel.GetConfigurationByName(name), "IConfiguration"
-        )
-        configuration.AddRebuildSaveMark = True
-        if not bool(configuration.AddRebuildSaveMark):
-            raise RuntimeError(f"{name}: failed to set rebuild/save mark")
-    adapter.currentModel.ShowConfiguration2("T120")
-    actual = active_configuration_name(adapter, adapter.currentModel)
-    if actual != "T120":
-        raise RuntimeError(f"final active configuration is {actual!r}, expected 'T120'")
-    save_result = adapter._attempt(
-        lambda: adapter.currentModel.Save3(1 | 8, 0, 0), default=None
+    # Drawing creation opens and rebuilds the source part again, so this same
+    # persistence contract is also repeated by ``draw_cone_gear`` after export.
+    part_path = OUT_SLDPRT / f"{PART_NAME}.SLDPRT"
+    await persist_configurations(
+        adapter,
+        str(part_path),
+        (name for name, _teeth in reversed(CONFIGS)),
+        active_name="T120",
     )
-    saved = save_result[0] if isinstance(save_result, tuple) else save_result
-    if not saved:
-        raise RuntimeError(f"failed to persist configured part: {save_result!r}")
 
     if findings:
         summary = "; ".join(findings)

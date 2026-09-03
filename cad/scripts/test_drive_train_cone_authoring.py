@@ -6,8 +6,10 @@ import inspect
 from types import SimpleNamespace
 
 import _assembly as assembly
+import _common as common
 import build_cone_gear as cone
 import build_drive_train_assembly as drive
+import draw_cone_gear as cone_drawing
 
 
 _SOURCE = inspect.getsource(drive)
@@ -51,51 +53,112 @@ def _expression(source: str) -> ast.expr:
     return ast.parse(source, mode="eval").body
 
 
-def test_every_cone_configuration_persists_rebuilt_data() -> None:
-    build = next(
+def test_every_cone_configuration_persists_rebuilt_data(monkeypatch) -> None:
+    events: list[object] = []
+
+    class Configuration:
+        AddRebuildSaveMark = False
+
+    class Model:
+        active_name = "T120"
+
+        def ShowConfiguration2(self, name):  # noqa: N802
+            self.active_name = name
+            events.append(("activate", name))
+            return -1
+
+        def ForceRebuild3(self, top_only):  # noqa: N802
+            events.append(("rebuild", self.active_name, top_only))
+            return -1
+
+        def GetConfigurationByName(self, name):  # noqa: N802
+            events.append(("configuration", name))
+            return Configuration()
+
+        def Save3(self, options, errors, warnings):  # noqa: N802
+            events.append(("save", options, errors, warnings))
+            return -1
+
+    model = Model()
+
+    class Application:
+        def CloseAllDocuments(self, include_unsaved):  # noqa: N802
+            events.append(("close", include_unsaved))
+
+    class Adapter:
+        swApp = Application()
+        currentModel = None
+
+        @staticmethod
+        def _attempt(operation, default=None):
+            try:
+                return operation()
+            except Exception:
+                return default
+
+        async def open_model(self, path):
+            events.append(("open", path))
+            self.currentModel = model
+            return SimpleNamespace(is_success=True, data=None)
+
+    monkeypatch.setattr(
+        common, "active_configuration_name", lambda _adapter, current: current.active_name
+    )
+    monkeypatch.setattr(common, "_early_bound", lambda value, _interface: value)
+
+    asyncio.run(
+        common.persist_configurations(
+            Adapter(),
+            "cone-gear.SLDPRT",
+            ("T006", "T120"),
+            active_name="T120",
+        )
+    )
+
+    assert events[0] == ("close", True)
+    assert events[1][0] == "open"
+    assert events[2:] == [
+        ("activate", "T006"),
+        ("rebuild", "T006", False),
+        ("configuration", "T006"),
+        ("activate", "T120"),
+        ("rebuild", "T120", False),
+        ("configuration", "T120"),
+        ("save", 9, 0, 0),
+    ]
+
+
+def test_part_and_drawing_persist_only_after_their_final_exports() -> None:
+    part_build = next(
         node
         for node in _CONE_TREE.body
         if isinstance(node, ast.AsyncFunctionDef) and node.name == "build"
     )
-    persistence_sweeps = [
-        node
-        for node in build.body
-        if isinstance(node, ast.For)
-        and any(
-            isinstance(item, ast.Assign)
-            and any(
-                isinstance(target, ast.Attribute)
-                and target.attr == "AddRebuildSaveMark"
-                for target in item.targets
-            )
-            for item in ast.walk(node)
-        )
-    ]
-    assert len(persistence_sweeps) == 1
-    sweep = persistence_sweeps[0]
-    assert ast.dump(sweep.iter) == ast.dump(_expression("reversed(CONFIGS)"))
-    assert _calls(sweep, "ShowConfiguration2")
-    assert _calls(sweep, "ForceRebuild3")
+    drawing_build = ast.parse(inspect.getsource(cone_drawing.build)).body[0]
 
-    finalized = next(
+    part_save = next(
         index
-        for index, node in enumerate(build.body)
+        for index, node in enumerate(part_build.body)
         if _calls(node, "save_part_and_images")
     )
-    close = next(
+    part_persist = next(
         index
-        for index, node in enumerate(build.body)
-        if _calls(node, "CloseAllDocuments")
+        for index, node in enumerate(part_build.body)
+        if _calls(node, "persist_configurations")
     )
-    reopen = next(
-        index for index, node in enumerate(build.body) if _calls(node, "open_model")
+    drawing_save = next(
+        index
+        for index, node in enumerate(drawing_build.body)
+        if _calls(node, "finalize_drawing")
     )
-    persistence = build.body.index(sweep)
-    final_save = next(
-        index for index, node in enumerate(build.body) if _calls(node, "Save3")
+    drawing_persist = next(
+        index
+        for index, node in enumerate(drawing_build.body)
+        if _calls(node, "persist_configurations")
     )
-    assert finalized < close < reopen < persistence < final_save
 
+    assert part_save < part_persist
+    assert drawing_save < drawing_persist
 
 def test_all_twenty_cones_are_inserted_directly_in_configuration() -> None:
     build = _function("build")
