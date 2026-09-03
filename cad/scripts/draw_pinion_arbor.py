@@ -18,10 +18,9 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_edge_dimension,
     add_property_linked_note,
     add_surface_finish,
     create_detail_view,
@@ -34,7 +33,6 @@ from _drawing_common import (
     set_dimension_precision,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
-    set_reference_dimension,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -84,11 +82,9 @@ RIGHT_CENTER = (
 # block takes it whole, clear of the length dimensions above it.
 ISO_CENTER = (0.345, 0.145)
 
-# Side-view landmarks (sheet meters): crown apex at the LEFT end, flat front
-# end at the RIGHT (the exact apex / root / rim points are projected from the
-# model at build time). The shaft's top flank is an 8-dia cylinder at 1:1, so
-# its silhouette runs 4 mm above the view centre.
-LEFT_END_X = RIGHT_CENTER[0] - OVERALL_LEN * SHEET_SCALE[0] / 2000.0
+# Side-view landmark (sheet meters): the flat front end is at the RIGHT. The
+# shaft's top flank is an 8-dia cylinder at 1:1, so its silhouette runs 4 mm
+# above the view centre.
 RIGHT_END_X = RIGHT_CENTER[0] + OVERALL_LEN * SHEET_SCALE[0] / 2000.0
 SHAFT_FLANK_Y = RIGHT_CENTER[1] + SHAFT_DIA * SHEET_SCALE[0] / 2000.0
 
@@ -114,6 +110,8 @@ CROWN_GEOMETRY_NOTE_XY = (
     DETAIL_CENTER[0] + 0.025,
     DETAIL_CENTER[1] + 0.025,
 )
+OVERALL_NOTE = f"({OVERALL_LEN:.2f}) OVERALL REF"
+OVERALL_NOTE_XY = (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.035)
 # The diameter is the one fitted feature (SHAFT_H band on the model
 # dimension): three decimals say "hold it".
 DIMENSION_PRECISION = {"ShaftDia": 3}
@@ -168,17 +166,11 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, right):
         set_hidden_lines_visible(adapter, view)
 
-    # Side-view landmarks projected from the MODEL, not assumed from the view
-    # centre: the crown apex (a revolve apex is a VERTEX) and the top of the
-    # flat front end's edge-on circular edge.
-    apex = model_point_in_view(
-        adapter, right, (0.0, 0.0, OVERALL_LEN / 1000.0), label="crown apex"
-    )
+    # The detail circle follows the crown root projected from the MODEL, not a
+    # sheet-coordinate guess. The overall reference note below selects no
+    # drawing geometry.
     crown_root = model_point_in_view(
         adapter, right, (0.0, 0.0, SHAFT_LEN / 1000.0), label="crown root"
-    )
-    front_end_top = model_point_in_view(
-        adapter, right, (0.0, SHAFT_DIA / 2000.0, 0.0), label="front end rim"
     )
 
     # DETAIL B around the crown root, enlarged 4:1 (policy rule 7: a feature
@@ -207,24 +199,12 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to arbor end view")
 
-    # The true overall (crown apex to the flat front end), as a conspicuous
-    # reference below the shank length so nobody saws the stock short
-    # (Harvey #25): apex VERTEX to the end face's edge-on circular EDGE.
-    overall = add_edge_dimension(
-        adapter,
-        right,
-        p0=apex,
-        p1=front_end_top,
-        text_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.035),
-        label="overall length reference",
-        orientation="horizontal",
-        entity_types=("VERTEX", "EDGE"),
-    )
-    set_reference_dimension(
-        adapter,
-        _early_bound(overall, "IDisplayDimension").GetAnnotation(),
-        label="overall length reference",
-    )
+    # The true overall is reference information derived from the same
+    # authoritative geometry contract as the model. A compact view-adjacent
+    # note is deliberate: the shallow revolved crown apex is not a stable
+    # selectable drawing vertex across SolidWorks seats.
+    if add_note(adapter, OVERALL_NOTE, *OVERALL_NOTE_XY) is None:
+        raise RuntimeError("failed to add pinion arbor overall reference note")
 
     # The bearing OD is the one running surface (the arbor turns in the strap
     # bores under the zeroing crank), so it alone carries a roughness symbol,

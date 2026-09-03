@@ -3,8 +3,8 @@
 A plain shaft is not on the GD&T allowlist
 (cad/docs/drawing-simplicity-policy.md): no datums, no frames; one roughness
 symbol on the journal the swing straps rock on; diameter, body length, the
-overall reference and the crown callout all on the side view (rule 7); one
-line of notes.
+overall reference and the adjacent crown note all on the side view (rule 7);
+one line of manufacturing notes.
 """
 
 from __future__ import annotations
@@ -56,7 +56,6 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert kept == marked
     assert set(drawing.DIMENSION_CALLOUTS) <= kept
     assert drawing.SHAFT_DIA == pinion_pivot_shaft_spec.SHAFT_DIA
-    assert drawing.SHAFT_LEN == pinion_pivot_shaft_spec.SHAFT_LEN
     assert pinion_pivot_shaft_spec.OVERALL_LEN == 194.4
 
 
@@ -74,9 +73,6 @@ def test_diameter_and_body_length_read_on_the_side_view() -> None:
 
 
 def test_overall_reference_uses_the_stable_view_adjacent_note_path() -> None:
-    # The two shallow crown apexes are not stable selectable drawing vertices
-    # across SolidWorks seats.  The note carries the same reference value from
-    # the authoritative geometry contract without making either vertex pick.
     source = _source()
     assert drawing.OVERALL_NOTE == (
         f"({pinion_pivot_shaft_spec.OVERALL_LEN:.2f}) OVERALL REF"
@@ -85,13 +81,20 @@ def test_overall_reference_uses_the_stable_view_adjacent_note_path() -> None:
     assert 'entity_types=("VERTEX", "VERTEX")' not in source
     assert "set_reference_dimension(" not in source
     assert "add_edge_dimension(" not in source
-    assert source.count("model_point_in_view(") == 2
-    assert source.count("add_attached_note(") == 1
-    assert "text=CROWN_NOTE," in source
-    assert pinion_pivot_shaft_spec.CROWN_NOTE.split("\n") == [
+
+
+def test_crown_definition_is_a_stable_adjacent_note() -> None:
+    source = _source()
+    assert drawing.CROWN_NOTE == pinion_pivot_shaft_spec.CROWN_NOTE
+    assert drawing.CROWN_NOTE.split("\n") == [
         "2X SPHERICAL CROWN SR4.80",
         "(1.20) HIGH; ROOT CIRCLE SHARP, NO CHAMFER",
     ]
+    assert drawing.CROWN_NOTE_XY == (0.103, 0.238)
+    assert "if add_note(adapter, CROWN_NOTE, *CROWN_NOTE_XY) is None:" in source
+    assert "add_attached_note(" not in source
+    assert "model_point_in_view(" not in source
+    assert 'entity_type="VERTEX"' not in source
 
 
 def test_sheet_runs_at_1_to_1_with_4_to_1_end_view_and_1_to_2_iso() -> None:
@@ -115,9 +118,18 @@ def test_notes_are_few_specific_and_never_the_title_block() -> None:
     lines = notes.split("\n")
     assert len(lines) <= 4
     assert "SHAFTING OK AS RECEIVED" in notes
-    # The crown geometry left the block for a leadered callout on the view.
+    # The crown geometry stays out of the manufacturing block and in its
+    # compact adjacent note.
     assert "CROWN" not in notes
-    for banned in ("DATUM", "PROFILE", "EXEMPT", "TITLE-BLOCK", "+/-", "LINEAR", "X.XX"):
+    for banned in (
+        "DATUM",
+        "PROFILE",
+        "EXEMPT",
+        "TITLE-BLOCK",
+        "+/-",
+        "LINEAR",
+        "X.XX",
+    ):
         assert banned not in notes, banned
     assert " BA " not in f" {notes} "
     source = _source()

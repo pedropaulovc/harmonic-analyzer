@@ -77,13 +77,28 @@ def test_crown_is_enlarged_and_its_unavailable_dimension_becomes_a_spec_note() -
     assert "SR7.27" not in pinion_arbor_spec.DRAWING_NOTES
 
 
-def test_overall_length_is_a_conspicuous_reference() -> None:
+def test_overall_length_uses_the_stable_view_adjacent_note_path() -> None:
+    # The shallow revolved apex is not a stable selectable drawing vertex
+    # across SolidWorks seats. The note carries the same reference value from
+    # the authoritative geometry contract without an apex or end-rim pick.
     source = _source()
-    assert 'label="overall length reference"' in source
-    assert 'entity_types=("VERTEX", "EDGE")' in source
-    assert '_early_bound(overall, "IDisplayDimension").GetAnnotation()' in source
-    assert "set_reference_dimension(" in source
-    assert "model_point_in_view(" in source
+    assert drawing.OVERALL_LEN is pinion_arbor_spec.OVERALL_LEN
+    assert drawing.OVERALL_NOTE == (
+        f"({pinion_arbor_spec.OVERALL_LEN:.2f}) OVERALL REF"
+    )
+    assert drawing.OVERALL_NOTE_XY == (
+        drawing.RIGHT_CENTER[0],
+        drawing.RIGHT_CENTER[1] - 0.035,
+    )
+    assert "if add_note(adapter, OVERALL_NOTE, *OVERALL_NOTE_XY) is None:" in source
+    assert "failed to add pinion arbor overall reference note" in source
+    assert 'label="crown apex"' not in source
+    assert 'label="front end rim"' not in source
+    assert 'entity_types=("VERTEX", "EDGE")' not in source
+    assert "set_reference_dimension(" not in source
+    assert "add_edge_dimension(" not in source
+    # The one remaining projection locates DETAIL B at the crown root.
+    assert source.count("model_point_in_view(") == 1
 
 
 def test_running_fit_is_the_band_on_the_model_diameter() -> None:

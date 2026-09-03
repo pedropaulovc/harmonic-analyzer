@@ -3,8 +3,8 @@
 The print follows cad/docs/drawing-simplicity-policy.md: a plain bearing rod
 carries no datums or frames; its running fit is the band on the model
 diameter, plus one Ra on the OD that spins in the pivot-block bores. Diameter,
-shank length and Ra read on the side view; the crown is a note leadered to
-the crowned end; the true overall is a conspicuous reference (rule 7).
+shank length and Ra read on the side view; the crown is a compact adjacent
+note; the true overall is a conspicuous reference (rule 7).
 """
 
 from __future__ import annotations
@@ -36,11 +36,7 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     marked = set().union(*pinion_lift_rod_spec.DRAWING_DIMENSIONS.values())
     kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
     assert kept == marked
-    assert (drawing.ROD_DIA, drawing.ROD_LEN, drawing.CAP_SAG) == (
-        pinion_lift_rod_spec.ROD_DIA,
-        pinion_lift_rod_spec.ROD_LEN,
-        pinion_lift_rod_spec.CAP_SAG,
-    )
+    assert drawing.ROD_DIA == pinion_lift_rod_spec.ROD_DIA
     assert pinion_lift_rod_spec.OVERALL_LEN == 203.2
 
 
@@ -69,29 +65,27 @@ def test_overall_length_uses_the_stable_view_adjacent_note_path() -> None:
     assert 'entity_types=("VERTEX", "EDGE")' not in source
     assert "set_reference_dimension(" not in source
     assert "add_edge_dimension(" not in source
-    # The one remaining apex projection supports only the attached crown
-    # process callout, not the overall reference.
-    assert source.count("model_point_in_view(") == 1
 
 
-def test_crown_is_called_out_from_the_crowned_end() -> None:
-    # The crown's sketch dims live on the Top plane, outside every placed
-    # view, so it is conveyed as a note -- ATTACHED to the apex with a leader
-    # (review 2026-09-02: "back end" in the block made the reader infer the
-    # left end). Spherical radius consistent with the sagitta/diameter pair,
-    # every number with a decimal, at the block tolerance.
+def test_crown_definition_is_a_stable_adjacent_note() -> None:
+    # The crown's sketch dimensions live on the Top plane, outside every
+    # placed view. Keep the exact spec-owned definition beside the crowned end
+    # without selecting its unstable shallow apex vertex.
     dome_radius = (
         pinion_lift_rod_spec.ROD_DIA**2 / 4.0 + pinion_lift_rod_spec.CAP_SAG**2
     ) / (2.0 * pinion_lift_rod_spec.CAP_SAG)
     assert round(dome_radius, 2) == pinion_lift_rod_spec.CAP_R == 4.8
-    assert pinion_lift_rod_spec.CROWN_NOTE.split("\n") == [
+    assert drawing.CROWN_NOTE == pinion_lift_rod_spec.CROWN_NOTE
+    assert drawing.CROWN_NOTE.split("\n") == [
         "CROWN SR4.80 X 1.20 HIGH",
         "BLEND SMOOTH, NO STEP",
     ]
+    assert drawing.CROWN_NOTE_XY == (0.103, 0.236)
     source = _source()
-    assert source.count("add_attached_note(") == 1
-    assert "text=CROWN_NOTE," in source
-    assert 'entity_type="VERTEX"' in source
+    assert "if add_note(adapter, CROWN_NOTE, *CROWN_NOTE_XY) is None:" in source
+    assert "add_attached_note(" not in source
+    assert "model_point_in_view(" not in source
+    assert 'entity_type="VERTEX"' not in source
     assert "CROWN" not in pinion_lift_rod_spec.DRAWING_NOTES
 
 
@@ -107,9 +101,8 @@ def test_notes_are_few_specific_and_never_the_title_block() -> None:
     lines = notes.split("\n")
     assert len(lines) <= 4
     assert "SHAFTING OK AS RECEIVED" in notes
-    # "Turn or grind the OD full length; no flats or steps" restated the
-    # title-block finish and the plain cylinder the views show (review
-    # 2026-09-02); the crown moved to a leadered callout on the view.
+    # The crown definition stays out of the manufacturing block and in its
+    # compact adjacent note.
     assert "TURN OR GRIND" not in notes
     assert "NO FLATS" not in notes
     for banned in ("REF", "LENGTH +/-", "+/-", "WITHIN", "UOS", "DATUM", "X.XX"):

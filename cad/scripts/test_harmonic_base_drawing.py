@@ -192,8 +192,17 @@ def test_hole_table_is_native_and_anchored_on_the_virtual_corner() -> None:
     # reported legitimately: a debug fact, never a hard failure.
     assert "counterbore rims reported in the plan view" in source
     assert "underside-only counterbore rims are visible" not in source
+
+def test_curated_views_make_final_note_cleanup_a_zero_tolerance_guard() -> None:
+    source = _source()
+    # Each view's model-item curation immediately deletes unnamed automatic
+    # Hole Wizard callouts, so there are no five "Tapped Hole" notes left for
+    # finalization.  The matcher remains with finalize_drawing's default
+    # expected count of zero, making any future leaked callout fail loud.
+    assert "curate_view_dimensions(adapter, top, keep=TOP_KEEP" in source
+    assert "curate_view_dimensions(adapter, side, keep=SIDE_KEEP" in source
     assert 'redundant_note_substrings=("Tapped Hole",)' in source
-    assert "expected_redundant_notes=5" in source
+    assert "expected_redundant_notes" not in source
 
 
 def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:

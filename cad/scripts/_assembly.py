@@ -2996,23 +2996,14 @@ def final_rebuild_before_save(adapter: Any, label: str, model: Any = None) -> No
 async def reconcile_saved_rebuild_state(
     adapter: Any, asm_name: str, asm_path: Any
 ) -> None:
-    """Reopen a just-saved assembly and, if it loads needing a rebuild, EditRebuild3
-    + in-place Save3 so the persisted artifact reopens clean (issue #267).
+    """Reopen a just-saved assembly and reconcile its persisted rebuild mark.
 
-    Root cause (proven by ``diagnostics/probe_rebuild_matrix.py`` /
-    ``probe_child_dirty.py``): ``final_rebuild_before_save`` and the deep health
-    gate each ``ForceRebuild3(False)`` -- a DEEP rebuild that descends into every
-    subassembly and marks every referenced child part document dirty IN MEMORY
-    (``GetSaveFlag`` -> True). The ensuing copy/in-place save then records rebuild
-    stamps that don't exist on the untouched on-disk parts, so a later fresh open
-    reports ``NeedsRebuild2 != 0`` even though geometry is correct and nothing is
-    faulted (``GetWhatsWrong`` clean, all components fully constrained). Neither
-    ``EditRebuild3`` nor ``ForceRebuild3(True)`` (TopOnly) dirties the children, so
-    reopening from disk (children clean) + ``EditRebuild3`` reconciles the assembly,
-    and the in-place ``Save3`` persists the clean mark WITHOUT rewriting any part
-    file. A post-``ForceRebuild3(False)`` rebuild in the SAME document instance
-    cannot un-dirty it -- the reopen is required. ``verify:soundness``'s
-    ``saved-rebuild-clean`` gate is the independent backstop that this held.
+    Start with ``EditRebuild3`` because it is the cheapest top-level rebuild.
+    Some large assemblies whose components reference many configurations reject
+    that call even though a top-only deep rebuild is valid; retry once with
+    ``ForceRebuild3(True)``. Both operations leave referenced children clean.
+    The in-place save persists the reconciled mark without rewriting part files.
+    ``verify:soundness`` independently checks the saved result.
     """
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
     with _telemetry.span("assembly.reconcile_rebuild", asm=asm_name) as sp:
@@ -3026,9 +3017,18 @@ async def reconcile_saved_rebuild_state(
             )
             return
         rebuilt = adapter._attempt(lambda: model.EditRebuild3(), default=None)
+        rebuild_method = "EditRebuild3"
+        if rebuilt is False or rebuilt is None:
+            _telemetry.warn(
+                f"{asm_name}: EditRebuild3 rejected reconciliation; "
+                "retrying top-only ForceRebuild3"
+            )
+            rebuilt = adapter._attempt(lambda: model.ForceRebuild3(True), default=None)
+            rebuild_method = "ForceRebuild3(True)"
+        sp.set_attribute("rebuild_method", rebuild_method)
         if rebuilt is False or rebuilt is None:
             raise RuntimeError(
-                f"{asm_name}: reconcile EditRebuild3 returned {rebuilt!r}"
+                f"{asm_name}: reconcile {rebuild_method} returned {rebuilt!r}"
             )
         result = adapter._attempt(
             lambda: model.Save3(1, 0, 0), default=None

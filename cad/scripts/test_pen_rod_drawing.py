@@ -50,9 +50,16 @@ def test_wire_hole_callout_states_size_and_process() -> None:
     # Harvey #13: the callout says DRILL; the drill number rides as its prefix.
     assert 'process="#47 DRILL"' in source
     # The along-rod location remains a dimension; the across-section location
-    # is a stable, view-adjacent note because the derived detail edge is not a
-    # reliable selectable entity.
+    # stays a view-adjacent note rather than depending on a short derived edge.
     assert source.count("add_edge_dimension(") == 1
+    # The native callout resolves the exact-diameter visible model edge; no
+    # sheet-coordinate edge pick can drift with detail-view placement.
+    assert (
+        "wire_hole_edge = visible_circle_edge(adapter, detail, WIRE_HOLE_DIA)"
+        in source
+    )
+    assert "edge=wire_hole_edge" in source
+    assert "edge_xy=" not in source
 
 
 def test_wire_hole_size_and_centring_read_in_a_detail() -> None:

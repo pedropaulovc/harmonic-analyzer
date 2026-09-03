@@ -1,9 +1,18 @@
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 from typing import Any, Callable
 
-from _assembly import _discard_copy_source, _save_new_assembly_as_copy
+import pytest
+
+import _assembly
+
+from _assembly import (
+    _discard_copy_source,
+    _save_new_assembly_as_copy,
+    reconcile_saved_rebuild_state,
+)
 
 
 class _Model:
@@ -44,11 +53,14 @@ class _Adapter:
             return default
 
 
-def test_new_assembly_save_is_silent_copy_without_references(tmp_path: Path) -> None:
+def test_new_assembly_save_is_silent_copy_without_references(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     target = tmp_path / "patterned.SLDASM"
     target.write_bytes(b"stale")
     adapter = _Adapter()
 
+    monkeypatch.setattr(_assembly, "_ensure_assembly_revision", lambda _adapter: None)
     _save_new_assembly_as_copy(adapter, target)
 
     assert adapter.currentModel.options == 1 | 2 | 8
@@ -62,3 +74,89 @@ def test_copy_source_is_discarded_by_document_title() -> None:
 
     assert adapter.swApp.closed == ["Assembly1"]
     assert adapter.currentModel is None
+
+
+class _RebuildExtension:
+    def __init__(self) -> None:
+        self.NeedsRebuild2 = 1
+
+
+class _RebuildModel:
+    def __init__(self, *, force_result: bool = True) -> None:
+        self.Extension = _RebuildExtension()
+        self.force_result = force_result
+        self.force_calls: list[bool] = []
+        self.save_calls: list[tuple[int, int, int]] = []
+
+    def EditRebuild3(self) -> bool:
+        return False
+
+    def ForceRebuild3(self, top_only: bool) -> bool:
+        self.force_calls.append(top_only)
+        if self.force_result:
+            self.Extension.NeedsRebuild2 = 0
+        return self.force_result
+
+    def Save3(self, options: int, errors: int, warnings: int) -> bool:
+        self.save_calls.append((options, errors, warnings))
+        return True
+
+
+class _RebuildApp:
+    @staticmethod
+    def CloseAllDocuments(include_unsaved: bool) -> None:
+        assert include_unsaved is True
+
+
+class _RebuildAdapter:
+    def __init__(self, model: _RebuildModel) -> None:
+        self.currentModel = model
+        self.swApp = _RebuildApp()
+
+    @staticmethod
+    def _attempt(call: Callable[[], Any], default: Any = None) -> Any:
+        try:
+            return call()
+        except Exception:
+            return default
+
+    async def open_model(self, path: str) -> None:
+        assert path.endswith(".SLDASM")
+
+
+def test_reconcile_falls_back_to_top_only_force_rebuild(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    model = _RebuildModel()
+    adapter = _RebuildAdapter(model)
+    monkeypatch.setattr(_assembly, "_early_bound", lambda value, _name: value)
+
+    asyncio.run(
+        reconcile_saved_rebuild_state(
+            adapter, "drive-train", tmp_path / "drive-train.SLDASM"
+        )
+    )
+
+    assert model.force_calls == [True]
+    assert model.save_calls == [(1, 0, 0)]
+    assert model.Extension.NeedsRebuild2 == 0
+
+
+def test_reconcile_fails_when_both_top_level_rebuilds_reject(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    model = _RebuildModel(force_result=False)
+    adapter = _RebuildAdapter(model)
+    monkeypatch.setattr(_assembly, "_early_bound", lambda value, _name: value)
+
+    with pytest.raises(
+        RuntimeError,
+        match=r"reconcile ForceRebuild3\(True\) returned False",
+    ):
+        asyncio.run(
+            reconcile_saved_rebuild_state(
+                adapter, "drive-train", tmp_path / "drive-train.SLDASM"
+            )
+        )
