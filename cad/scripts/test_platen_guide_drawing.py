@@ -1,4 +1,11 @@
-"""Offline contracts for the platen-guide manufacturing drawing."""
+"""Offline contracts for the platen-guide manufacturing drawing.
+
+The print follows cad/docs/drawing-simplicity-policy.md: a drilled and
+tapped guide bar carries no datums, frames, roughness symbols or basic
+dimensions; the native hole table gives every station under the title-block
+tolerance.  The shared-infrastructure contracts (contact preview, PDF
+metadata, release staging) also live here.
+"""
 
 from __future__ import annotations
 
@@ -17,7 +24,6 @@ import _drawing_common as drawing_common
 from _drawing_registry import DRAWINGS, PROJECT_DRWDOT
 from _drawing_common import (
     _contact_preview_grid,
-    _gtol_frame_xml,
     property_link,
     render_pdf_png,
     sanitize_pdf_metadata,
@@ -87,7 +93,7 @@ def test_five_page_contact_preview_preserves_aspect_and_unused_cell(
 
 
 def test_drawing_hole_sizes_follow_unc_policy() -> None:
-    assert drawing.THREAD_DESIGNATION == "#4-40 UNC-2B"
+    assert drawing.THREAD_DESIGNATION == "#4-40 UNC"
     assert drawing.THREAD_TAP_DRILL_MM == TAP_DRILL_MM["#4-40"]
     assert CLEARANCE_MM[("#4", "normal")] == 3.264
 
@@ -153,63 +159,70 @@ def test_drawing_uses_native_hole_table_and_sheet_scale() -> None:
     # rendered sheets.)
 
 
-def test_drawing_tolerances_follow_feature_function_not_display_zeros() -> None:
+def test_notes_are_few_specific_and_never_the_title_block() -> None:
     notes = guide.DRAWING_NOTES
-    assert "HOLE POSITION PER FCF" in notes
-    # General tolerances live in the title block ONLY -- a second general
-    # tolerance in the notes would conflict with it.
-    assert "LENGTH +/-" not in notes
-    assert "STOCK SECTION" not in notes
-    assert "X.XXX" not in notes
-
-
-def test_native_gdt_replaces_datum_flatness_parallelism_notes() -> None:
+    lines = notes.split("\n")
+    assert len(lines) <= 4
+    assert "STOCK" in notes  # the cleanup-cut licence (Lipton)
+    # Stations and sizes ride the hole table; nothing the title block or a
+    # dimension already says.
+    for banned in ("PER FCF", "DATUM", "LENGTH +/-", "+/-", "UOS", "X.XXX"):
+        assert banned not in notes, banned
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 3
-    assert (
-        'label="guide bottom edge",\n        position_tolerance_m=0.0001'
-        in source
-    )
-    assert source.count("position_tolerance_m=0.0001") == 1
-    assert source.count("add_feature_control_frame(") == 3
-    assert "characteristic=\"flatness\"" in source
-    assert "characteristic=\"parallelism\"" in source
-    assert "characteristic=\"position\"" in source
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
     assert "def _manufacturing_notes" not in source
 
 
-def test_datum_b_surface_symbol_is_clear_of_every_hole_axis() -> None:
-    hole_axis_x = {
-        drawing.FRONT_LEFT_X_M + station / 1000.0
-        for station in (*drawing.THROUGH_X, *drawing.BLIND_X)
-    }
-    assert drawing.DATUM_B_SYMBOL_X_M == pytest.approx(
-        drawing.FRONT_LEFT_X_M + guide.GUIDE_LENGTH * 0.6 / 1000.0
-    )
-    assert min(abs(drawing.DATUM_B_SYMBOL_X_M - x) for x in hole_axis_x) == pytest.approx(
-        (guide.GUIDE_LENGTH * 0.1 - guide.LOCK_SCREW_DX) / 1000.0
-    )
+def test_hole_table_states_the_process_once_under_the_table() -> None:
+    # The native SIZE cells are SolidWorks-generated from the Hole Wizard
+    # callout format ("Ø2.26 ↧ 4.00", "Ø3.26 THRU ALL") and insert_hole_table
+    # carries no process prefix, so ONE note directly under the table says
+    # drill for every row (machinist review 2026-09-02; policy rule 7).  It is
+    # a flag on the table, not a line in the general notes.
+    assert drawing.HOLE_TABLE_NOTE == "ALL HOLES DRILLED."
+    assert "DRILL" not in guide.DRAWING_NOTES
+    assert drawing.HOLE_TABLE_NOTE_Y_M < drawing.HOLE_TABLE_Y_M
+    # Below the table's ten rows (bottom ~0.169) and above the front view's
+    # overall-length dimension lane (0.135).
+    assert 0.135 < drawing.HOLE_TABLE_NOTE_Y_M < 0.169
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "def _bottom_surface_edge(" in source
-    assert 'visible_view_entities(view, 1, label="platen-guide bottom edge")' in source
-    assert "if span_mm < GUIDE_LENGTH - 0.1:" in source
-    assert "datum_b_entity = _bottom_surface_edge(front)" in source
-    assert "entity=datum_b_entity" in source
-    assert "symbol_xy=(DATUM_B_SYMBOL_X_M, 0.098)" in source
+    assert (
+        "add_note(adapter, HOLE_TABLE_NOTE, HOLE_TABLE_X_M, HOLE_TABLE_NOTE_Y_M)"
+        in source
+    )
+    assert source.count("add_note(") == 1
+    assert 'raise RuntimeError("failed to add the hole-table process note")' in source
+
+
+def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:
+    # drawing-simplicity-policy.md rule 3-5: a guide bar is not on the GD&T
+    # allowlist; the hole table's LOC columns are ordinary, not basic.
+    import platen_guide_spec
+
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    for helper in (
+        "add_datum_feature(",
+        "add_feature_control_frame(",
+        "add_surface_finish(",
+        "set_basic_dimension(",
+        "project_part_pmi(",
+    ):
+        assert helper not in source, helper
+    assert "basic_locations=False" in source
+    assert "_bottom_surface_edge(" not in source
+    assert "DATUM_B_SYMBOL_X_M" not in source
+    assert not hasattr(platen_guide_spec, "GEOMETRIC_TOLERANCES_MM")
+
+
+def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "for view in (front, right):\n        set_hidden_lines_visible" in source
+    assert "set_hidden_lines_removed(adapter, iso)" in source
+    assert source.count("set_hidden_lines_removed(") == 1
 
 
 def test_gdt_xml_and_note_links_use_native_drawing_contracts() -> None:
-    xml = _gtol_frame_xml(
-        "position", "0.20", datums=("A", "B", "C"), diameter=True
-    )
-    assert "GTOL-POSI" in xml
-    assert "<PrimaryRangeSymbol>phi</PrimaryRangeSymbol>" in xml
-    assert xml.count("<DatumCompartment>") == 3
     assert property_link("Manufacturing Notes") == '$PRPSHEET:"Manufacturing Notes"'
-    assert "GTOL-SPROF" in _gtol_frame_xml(
-        "profile_surface", "0.10", datums=("C",)
-    )
 
 
 def test_pdf_metadata_is_project_owned(tmp_path: Path) -> None:

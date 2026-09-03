@@ -37,30 +37,20 @@ HOLE_DIA_MM = 3.048
 # print shows. ``build_guide_lock`` marks exactly these; ``draw_guide_lock``
 # keeps exactly their union across its per-view ``keep`` maps. The wizard screw
 # holes are deliberately NOT here: their size ships as a native hole callout
-# and their locations as BASIC drawing dimensions tied to the datum edges. ---
+# and their locations as drawing-native coordinate dimensions off the plate
+# edges. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "LockProfile": {"Width", "Height"},
     "Lock": {"Depth"},
 }
 
-# True free-text instructions only. Geometry, datum structure, form, and
-# roughness live in native dimensions / datum tags / FCFs / surface symbols.
-# The part build stamps these strings into the SLDPRT; the drawing displays
-# only $PRPSHEET links, so the print cannot silently diverge from its model.
+# Notes: part-specific process facts only, never a tolerance, never the
+# title block (drawing-simplicity-policy.md rule 6).
 DRAWING_NOTES = "\n".join(
     (
-        "HOLE POSITION PER FCF.",
-        "SCREW HOLES: #4 CLEARANCE DRILL THRU, CLOSE FIT,",
-        "FOR #4 FILLISTER-HEAD SCREWS.",
-        "MAKE FROM 2.0 COLD-ROLLED STRIP; 4 REQUIRED (2 PER GUIDE RAIL).",
-        "BLACK OXIDE AFTER MACHINING.",
+        "2.0 STRIP STOCK FACES OK AS RECEIVED.",
+        "MATES WITH THE PLATEN GUIDE; 2 LOCKS PER GUIDE RAIL.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
 
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "screw-hole position": "0.10",
-    "rail-mating face flatness": "0.10",
-}

@@ -2,7 +2,7 @@ rack-pinion:
   number: MHA-070
   material: Brass
   material_specification: C36000 free-machining brass
-  finish: gear teeth cut; polished brass
+  finish: polished brass
   quantity: 1
   tolerance_class: machined_block
   fit_class: gear_mesh
