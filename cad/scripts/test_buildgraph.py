@@ -359,6 +359,20 @@ def test_build_id_is_source_derived_and_monotonic():
     assert _build_id() == build_id
 
 
+def test_git_executable_is_resolved_absolute(tmp_path, monkeypatch):
+    import _common
+
+    discovered = tmp_path / "bin" / "git"
+    monkeypatch.setattr(_common.shutil, "which", lambda command: str(discovered))
+    _common._git_executable.cache_clear()
+    try:
+        executable = Path(_common._git_executable())
+        assert executable == discovered.resolve()
+        assert executable.is_absolute()
+    finally:
+        _common._git_executable.cache_clear()
+
+
 def test_build_id_counts_from_release_tag_in_full_history(monkeypatch):
     import subprocess
 
