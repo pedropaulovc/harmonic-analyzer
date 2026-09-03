@@ -172,6 +172,7 @@ def _subassembly(name: str) -> str:
 # cross-subassembly fits there -- the sinusoid's rods must still ride the
 # drive-train's turned cams.
 from _pose_configs import (  # noqa: E402
+    REST_CONFIGURATION,
     PoseConfiguration,
     install_pose_configurations,
     set_component_referenced_configuration,
@@ -179,9 +180,16 @@ from _pose_configs import (  # noqa: E402
 
 
 async def _install_top_pose_configurations(adapter, sub_instances: dict[str, str]) -> None:
-    poses = _config.poses()
-    fan_name = poses["amplitude_fan"]["configuration"]
-    sin_name = poses["sinusoid"]["configuration"]
+    roles = _config.assembly_configuration_roles()
+    if list(roles) != ["default", "parallel", "sinusoid"]:
+        raise RuntimeError(f"unexpected assembly configuration role order: {list(roles)}")
+    if roles["default"] != REST_CONFIGURATION:
+        raise RuntimeError(
+            f"default assembly configuration must be {REST_CONFIGURATION!r}, "
+            f"got {roles['default']!r}"
+        )
+    parallel_name = roles["parallel"]
+    sin_name = roles["sinusoid"]
 
     def _selector(targets: dict[str, str]):
         async def hook(adapter) -> None:
@@ -193,7 +201,11 @@ async def _install_top_pose_configurations(adapter, sub_instances: dict[str, str
         adapter,
         {},
         [
-            PoseConfiguration(fan_name, "amplitude fan: channel posed (poses.yaml)", hook=_selector({"channel": fan_name})),
+            PoseConfiguration(
+                parallel_name,
+                "parallel amplitude-bar bank: channel posed (poses.yaml)",
+                hook=_selector({"channel": parallel_name}),
+            ),
             PoseConfiguration(
                 sin_name,
                 "rocker sinusoid: channel + drive-train posed (poses.yaml)",

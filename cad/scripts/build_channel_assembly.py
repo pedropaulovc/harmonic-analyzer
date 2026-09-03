@@ -684,10 +684,9 @@ def solve_state(amplitude: float = 0.0) -> dict[str, float]:
 
     def foot_y(beta: float) -> float:
         # Bar frame -> machine: the bar's up vector is (sin b, cos b) (the top
-        # pin below), so its +X edge runs (cos b, -sin b). 2026-09-02: this
-        # rotation was mirrored (R(+b) on the offset, R(-b) on the bar), which
-        # floated a fanned bar up to 0.64 mm off its arc at a = 80; a = 0 was
-        # unaffected (b = 0), so Default never saw it.
+        # pin below), so its +X edge runs (cos b, -sin b). This offset rotation
+        # is the one that keeps the photographed Default fan seated all the way
+        # through its 0..80 mm range.
         s, c = math.sin(beta), math.cos(beta)
         cx_c = fx + _CONTACT_OFF_X * c + _CONTACT_OFF_Y * s
         ky = -_CONTACT_OFF_X * s + _CONTACT_OFF_Y * c
@@ -722,20 +721,18 @@ def solve_state(amplitude: float = 0.0) -> dict[str, float]:
     }
 
 
-def solve_sinusoid_foot(st: dict[str, float]) -> dict[str, float]:
-    """Amplitude-0 bar pose on a rocker turned to cam state ``st`` (solve_cam_pose).
+def solve_sinusoid_foot(st: dict[str, float], amplitude: float) -> dict[str, float]:
+    """Bar pose at ``amplitude`` on a rocker turned to cam state ``st``.
 
     The rocker turns about its pivot, so the R800 arc centre swings ~808 mm
-    out with it, but the bar (foot X pinned at the pivot station, hanging
-    from the lever's crank) cannot follow the arc's tangent: its flat notch
-    roof rides the arc on its LOWER CORNER and the bar LIFTS -- up to ~0.4 mm
-    at the 7.4 deg stroke bottom. Default's J5 foot-on-arc radius (the
-    roof-centre-on-arc measure) would bury that corner 3.175 * tan(tilt) into
-    the arm (18 x ~1.6 mm^3 in the first seat run of sinusoid-6-cranks), so
-    the posed configuration carries this radius instead. Returns the foot-axis
-    Y, that foot->arc-centre radius, the bar/lever tilts (solve_state's
-    conventions) and the top-pin point; ``theta_deg`` is the arm's turn about
-    the pivot read off the rod-pin point (sign-safe).
+    out with it. The bar keeps its Default amplitude station while its flat
+    notch roof rides the turned arc on its LOWER CORNER. The posed
+    configuration therefore carries its solved foot-to-arc-centre radius
+    instead of Default's roof-centre measure.
+
+    Returns the foot-axis point and radius, the bar/lever tilts (using
+    solve_state's conventions), the top-pin point, and ``theta_deg``: the arm's
+    turn about the pivot read off the rod-pin point (sign-safe).
     """
     ox, oy = PIVOT
     acx, acy = _ARC["acx"], _ARC["acy"]
@@ -746,12 +743,12 @@ def solve_sinusoid_foot(st: dict[str, float]) -> dict[str, float]:
     ct, sn = math.cos(theta), math.sin(theta)
     ax = ox + (acx - ox) * ct - (acy - oy) * sn
     ay = oy + (acx - ox) * sn + (acy - oy) * ct
-    fx = ox  # amplitude 0: the foot stays at the pivot station
+    fx = ox + amplitude
 
     def foot_y(beta: float) -> float:
-        # the higher of the two corner-on-arc solutions: both roof corners
+        # The higher of the two corner-on-arc solutions: both roof corners
         # (+-CONTACT_OFF_X, CONTACT_OFF_Y in the bar frame, turned by the bar
-        # tilt) must clear the turned arc, so the lower corner rides it
+        # tilt) must clear the turned arc, so the lower corner rides it.
         s, c = math.sin(beta), math.cos(beta)
         best = -math.inf
         for side in (-1.0, 1.0):
@@ -759,7 +756,9 @@ def solve_sinusoid_foot(st: dict[str, float]) -> dict[str, float]:
             ky = -side * _CONTACT_OFF_X * s + _CONTACT_OFF_Y * c
             disc = ARM_TOP_RADIUS**2 - (fx + kx - ax) ** 2
             if disc <= 0.0:
-                raise RuntimeError("sinusoid foot: roof corner runs off the R800 arc")
+                raise RuntimeError(
+                    f"sinusoid foot: amplitude {amplitude:.1f} mm runs off the R800 arc"
+                )
             best = max(best, ay - ky - math.sqrt(disc))
         return best
 
@@ -1031,9 +1030,7 @@ def _spring_spec(amplitude: float, hole_x_0: float) -> dict[str, Any]:
 
 
 def _spring_spec_at_tilt(lever_tilt_deg: float, hole_x_0: float) -> dict[str, Any]:
-    """:func:`_spring_spec` for a lever at ``lever_tilt_deg`` (solve_state's
-    convention) -- the posed configurations tilt the lever without an
-    amplitude (the sinusoid's corner-riding lift)."""
+    """Spring placement for any solved lever tilt, including saved poses."""
     phi = math.radians(lever_tilt_deg)
     hole_x = FULCRUM[0] - LEVER_SPRING_X * math.cos(phi)  # lever reaches -X (machine)
     hole_y = FULCRUM[1] + LEVER_SPRING_X * math.sin(phi)
@@ -1041,6 +1038,8 @@ def _spring_spec_at_tilt(lever_tilt_deg: float, hole_x_0: float) -> dict[str, An
     dx = hole_x - hole_x_0
     dy = eye_y - PLATE_EYE_Y
     gap = math.hypot(dx, dy)
+    _assert_spring_threading(hole_y, eye_y)
+    _assert_hook_fastener(eye_y)
     return {
         "hole_y": hole_y,
         "eye_y": eye_y,
@@ -1053,9 +1052,9 @@ def _spring_spec_at_tilt(lever_tilt_deg: float, hole_x_0: float) -> dict[str, An
 
 
 # --- saved pose configurations (2026-09-02, cad/config/poses.yaml) ------------
-# Default stays the free rest model. Each pose configuration unsuppresses the
-# permanent POSE_<key> mates (authored from the DOF manifest at rest) and sets
-# their values IN THAT CONFIGURATION ONLY; see _pose_configs.
+# Default stays the free photographed fan. Each saved configuration
+# unsuppresses the permanent POSE_<key> mates (authored from the Default DOF
+# manifest values) and changes them in that configuration only; see _pose_configs.
 from _pose_configs import (  # noqa: E402
     PoseConfiguration,
     author_pose_mates,
@@ -1073,150 +1072,245 @@ async def _install_pose_configurations(
     adapter, amplitudes, spring_specs, spring_instances, hole_x_0
 ) -> None:
     poses = _config.poses()
-    fan = poses["amplitude_fan"]
+    parallel = poses["parallel"]
     sinus = poses["sinusoid"]
-    fan_amps = [float(a) for a in fan["amplitude_mm"]][:CHANNELS]
-    if len(fan_amps) != CHANNELS or any(a < 0.0 for a in fan_amps):
-        raise RuntimeError(f"poses.yaml amplitude_fan needs {CHANNELS} amplitudes >= 0")
+    target_amplitude = float(parallel["target_amplitude_mm"])
+    if target_amplitude < 0.0:
+        raise RuntimeError("poses.yaml parallel target_amplitude_mm must be >= 0")
+    default_amplitudes = [float(a) for a in amplitudes]
+    parallel_amplitudes = [target_amplitude] * CHANNELS
     crank_turns = float(sinus["crank_turns"])
     harmonics = [int(row["harmonic_n"]) for row in _config.channels()][:CHANNELS]
 
     specs = collected_dof_specs()
     pose_mates = await author_pose_mates(adapter, specs)
     rest_values = {k: m.rest for k, m in pose_mates.items()}
-    rest_bar_x = {j: component_transform(adapter, f"amplitude-bar-{j + 1}")[9] * 1000.0 for j in range(CHANNELS)}
-    rest_spring = {j: component_transform(adapter, spring_instances[j]) for j in range(CHANNELS)}
+    rest_spring = {
+        j: component_transform(adapter, spring_instances[j]) for j in range(CHANNELS)
+    }
 
-    # --- amplitude fan: the bars slide along the arcs, the levers + springs follow
-    fan_values = dict(rest_values)
-    for j, a in enumerate(fan_amps):
-        fan_values[f"bar_amplitude_{j:02d}"] = PIVOT[0] + a
+    # --- parallel bank: every bar returns to the common zero station
+    parallel_values = dict(rest_values)
+    for j, amplitude in enumerate(parallel_amplitudes):
+        parallel_values[f"bar_amplitude_{j:02d}"] = PIVOT[0] + amplitude
 
     async def repose_springs(adapter, lever_tilts: list[float]) -> None:
-        # Re-pose the cosmetic springs to the posed lever tips (Default's
-        # length variants: the bottom eye stays on its plate hook, the top eye
-        # follows the span direction -- the lift, <= ~6 mm at a = 80, is the
-        # stretch a config cannot re-cut; documented in poses.yaml).
+        # Re-pose the cosmetic springs to the posed lever tips. Their cut
+        # lengths remain Default's; a configuration can only move each rigid
+        # spring instance.
         for j, tilt in enumerate(lever_tilts):
             new = _spring_spec_at_tilt(tilt, hole_x_0)
             old = spring_specs[j]
             ux, uy = new["ux"], new["uy"]
-            pos = [hole_x_0 + SPRING_BOTTOM_LEAD * ux, PLATE_EYE_Y + SPRING_BOTTOM_LEAD * uy, z_station(j) + ARM_MID_DZ]
-            delta = math.degrees(math.atan2(old["ux"] * uy - old["uy"] * ux, old["ux"] * ux + old["uy"] * uy))
+            pos = [
+                hole_x_0 + SPRING_BOTTOM_LEAD * ux,
+                PLATE_EYE_Y + SPRING_BOTTOM_LEAD * uy,
+                z_station(j) + ARM_MID_DZ,
+            ]
+            delta = math.degrees(
+                math.atan2(
+                    old["ux"] * uy - old["uy"] * ux,
+                    old["ux"] * ux + old["uy"] * uy,
+                )
+            )
             await repose_fixed_component(adapter, spring_instances[j], pos, delta)
 
-    async def fan_hook(adapter) -> None:
-        # each bar's J5 radius at ITS amplitude (the contact offset turns with
-        # the bar tilt; a few hundredths over the rest measure)
-        for j, a in enumerate(fan_amps):
+    async def parallel_hook(adapter) -> None:
+        for j, target in enumerate(parallel_amplitudes):
+            target_radius = foot_radius(target)
             set_distance_mate_value_in_active_configuration(
                 adapter,
                 f"amplitude-bar-{j + 1}",
-                foot_radius(amplitudes[j]),
-                foot_radius(a),
-                label=f"J5 bar-foot on rocker arc ch{j:02d} a={a:.1f} r={foot_radius(a):.3f}",
+                foot_radius(default_amplitudes[j]),
+                target_radius,
+                label=(
+                    f"J5 bar-foot on rocker arc ch{j:02d} "
+                    f"a={target:.1f} r={target_radius:.3f}"
+                ),
             )
-        await repose_springs(adapter, [solve_state(a)["lever_tilt"] for a in fan_amps])
+        await repose_springs(
+            adapter,
+            [solve_state(target)["lever_tilt"] for target in parallel_amplitudes],
+        )
 
-    def fan_verify(adapter) -> None:
+    def parallel_verify(adapter) -> None:
         bad = []
-        for j, a in enumerate(fan_amps):
-            x = component_transform(adapter, f"amplitude-bar-{j + 1}")[9] * 1000.0
-            if not _pose_tolerance_ok(x, rest_bar_x[j] + a, 0.05):
-                bad.append((j, round(x - rest_bar_x[j], 3), a))
+        for j, target in enumerate(parallel_amplitudes):
+            transform = component_transform(adapter, f"amplitude-bar-{j + 1}")
+            got_x, got_y = transform[9] * 1000.0, transform[10] * 1000.0
+            want = solve_state(target)
+            if not (
+                _pose_tolerance_ok(got_x, want["bar_origin_x"], 0.05)
+                and _pose_tolerance_ok(got_y, want["bar_origin_y"], 0.05)
+            ):
+                bad.append(
+                    (
+                        j,
+                        round(got_x, 3),
+                        round(want["bar_origin_x"], 3),
+                        round(got_y, 3),
+                        round(want["bar_origin_y"], 3),
+                    )
+                )
         if bad:
-            raise RuntimeError(f"amplitude-fan: bars off their amplitudes (j, got, want): {bad[:5]}")
-        log(f"amplitude-fan: {CHANNELS} bars at their amplitudes (0..{max(fan_amps):.1f})")
+            raise RuntimeError(
+                f"{parallel['configuration']}: bar origins off solve_state targets "
+                f"(j, x, want, y, want): {bad[:5]}"
+            )
+        log(
+            f"{parallel['configuration']}: {CHANNELS} bar origins at "
+            f"amplitude {target_amplitude:.1f}"
+        )
 
-    # --- sinusoid: every cam turned N cranks, rods + rockers on their cams
+    # --- sinusoid: keep Default amplitudes while rods + rockers follow their cams
     sin_values = dict(rest_values)
     expect = {}
     rest0 = _arc_geometry()
     sin_foot = {}
     for j, k in enumerate(harmonics):
         st = solve_cam_pose(crank_turns, k)
-        sin_values[f"rocker_angle_{j:02d}"] = rest_values[f"rocker_angle_{j:02d}"] + (st["pin_y"] - rest0["pin_y"])
+        sin_values[f"rocker_angle_{j:02d}"] = (
+            rest_values[f"rocker_angle_{j:02d}"] + st["pin_y"] - rest0["pin_y"]
+        )
         sin_values[f"rod_swing_{j:02d}"] = abs(st["ring_x"])
         expect[j] = st
-        sin_foot[j] = solve_sinusoid_foot(st)
+        sin_foot[j] = solve_sinusoid_foot(st, default_amplitudes[j])
 
     async def sin_hook(adapter) -> None:
-        # The bars ride the turned arcs on their roof CORNERS (solve_sinusoid_foot):
-        # each channel's J5 foot-on-arc radius takes its lifted value in THIS
-        # configuration (Default keeps the roof-centre measure), then the
-        # springs follow the lifted lever tips.
+        # The bars keep their Default amplitude stations while their roof
+        # corners ride the turned arcs; the configuration-specific J5 radii
+        # carry the lifts and the springs follow the lifted lever tips.
         for j, sf in sin_foot.items():
             set_distance_mate_value_in_active_configuration(
                 adapter,
                 f"amplitude-bar-{j + 1}",
-                foot_radius(amplitudes[j]),
+                foot_radius(default_amplitudes[j]),
                 sf["foot_r"],
                 label=f"J5 bar-foot on rocker arc ch{j:02d} lifted r={sf['foot_r']:.3f}",
             )
-        # Springs FOLLOW their lever holes here (a rigid translation by the
-        # hole's displacement, orientation kept): the lift is <= ~0.7 mm at
-        # the spring hole, within the bottom eye's 1.55 radial clearance on
-        # the plate hook, while the fan's bottom-on-hook scheme would leave
-        # the top eye's wire 0.2 mm into the lever hole's wall (first seat
-        # run: 20 x 0.05 mm^3 lever/spring slivers).
-        phi_0 = math.radians(solve_state(0.0)["lever_tilt"])
+        # Each spring translates with its own lever hole from that channel's
+        # Default amplitude pose; orientation stays fixed.
         for j in range(CHANNELS):
+            phi_default = math.radians(
+                solve_state(default_amplitudes[j])["lever_tilt"]
+            )
             phi = math.radians(sin_foot[j]["lever_tilt"])
-            dx = -LEVER_SPRING_X * (math.cos(phi) - math.cos(phi_0))
-            dy = LEVER_SPRING_X * (math.sin(phi) - math.sin(phi_0))
+            dx = -LEVER_SPRING_X * (math.cos(phi) - math.cos(phi_default))
+            dy = LEVER_SPRING_X * (math.sin(phi) - math.sin(phi_default))
             t = rest_spring[j]
-            pos = [t[9] * 1000.0 + dx, t[10] * 1000.0 + dy, t[11] * 1000.0]
+            pos = [
+                t[9] * 1000.0 + dx,
+                t[10] * 1000.0 + dy,
+                t[11] * 1000.0,
+            ]
             await repose_fixed_component(adapter, spring_instances[j], pos, 0.0)
 
     def sin_verify(adapter) -> None:
         # Sign-safe readback: the rocker's rod-pin bore must sit at the solved
-        # pin point and the rod's ring at the turned cam centre (a yaw read of
-        # the Rz(tilt).Ry180 rows is sign-ambiguous; the first seat run read
-        # +7.43 for an arm posed at -7.43 with its rod exactly on the cam).
+        # pin point and the rod's ring at the turned cam centre.
         bad = []
         lifted = []
         for j, st in expect.items():
-            pin = world_point(adapter, f"rocker-arm-{j + 1}", ROCKER_ROD_BORE_LOCAL)
+            pin = world_point(
+                adapter, f"rocker-arm-{j + 1}", ROCKER_ROD_BORE_LOCAL
+            )
             rod = component_transform(adapter, f"connecting-rod-{j + 1}")
             rx, ry = rod[9] * 1000.0, rod[10] * 1000.0
-            if not (_pose_tolerance_ok(pin[0], st["pin_x"], 0.05)
-                    and _pose_tolerance_ok(pin[1], st["pin_y"], 0.05)
-                    and _pose_tolerance_ok(rx, st["ring_x"], 0.05)
-                    and _pose_tolerance_ok(ry, st["ring_y"], 0.05)):
-                bad.append((j, round(pin[0], 2), round(st["pin_x"], 2), round(pin[1], 2), round(st["pin_y"], 2), round(rx, 2), round(st["ring_x"], 2), round(ry, 2), round(st["ring_y"], 2)))
-            foot = world_point(adapter, f"amplitude-bar-{j + 1}", BAR_FOOT_LOCAL)
+            if not (
+                _pose_tolerance_ok(pin[0], st["pin_x"], 0.05)
+                and _pose_tolerance_ok(pin[1], st["pin_y"], 0.05)
+                and _pose_tolerance_ok(rx, st["ring_x"], 0.05)
+                and _pose_tolerance_ok(ry, st["ring_y"], 0.05)
+            ):
+                bad.append(
+                    (
+                        j,
+                        round(pin[0], 2),
+                        round(st["pin_x"], 2),
+                        round(pin[1], 2),
+                        round(st["pin_y"], 2),
+                        round(rx, 2),
+                        round(st["ring_x"], 2),
+                        round(ry, 2),
+                        round(st["ring_y"], 2),
+                    )
+                )
+            foot = world_point(
+                adapter, f"amplitude-bar-{j + 1}", BAR_FOOT_LOCAL
+            )
             sf = sin_foot[j]
-            if not (_pose_tolerance_ok(foot[0], sf["foot_x"], 0.05) and _pose_tolerance_ok(foot[1], sf["foot_y"], 0.02)):
-                lifted.append((j, round(foot[0], 3), round(sf["foot_x"], 3), round(foot[1], 3), round(sf["foot_y"], 3)))
+            if not (
+                _pose_tolerance_ok(foot[0], sf["foot_x"], 0.05)
+                and _pose_tolerance_ok(foot[1], sf["foot_y"], 0.02)
+            ):
+                lifted.append(
+                    (
+                        j,
+                        round(foot[0], 3),
+                        round(sf["foot_x"], 3),
+                        round(foot[1], 3),
+                        round(sf["foot_y"], 3),
+                    )
+                )
         if bad:
-            raise RuntimeError(f"{sinus['configuration']}: rockers/rods off their cams (j, pin x, want, pin y, want, ring x, want, ring y, want): {bad[:5]}")
+            raise RuntimeError(
+                f"{sinus['configuration']}: rockers/rods off their cams "
+                f"(j, pin x, want, pin y, want, ring x, want, ring y, want): {bad[:5]}"
+            )
         if lifted:
-            raise RuntimeError(f"{sinus['configuration']}: bar feet off their corner-riding lift (j, x, want, y, want): {lifted[:5]}")
-        max_lift = max(sf["foot_y"] for sf in sin_foot.values()) - solve_state(0.0)["bar_bottom"]
-        log(f"{sinus['configuration']}: {CHANNELS} rockers on their cams after {crank_turns:g} cranks, bars corner-riding (max lift {max_lift:.3f})")
+            raise RuntimeError(
+                f"{sinus['configuration']}: bar feet off their corner-riding lift "
+                f"(j, x, want, y, want): {lifted[:5]}"
+            )
+        max_lift = max(
+            sin_foot[j]["foot_y"] - solve_state(default_amplitudes[j])["bar_bottom"]
+            for j in range(CHANNELS)
+        )
+        log(
+            f"{sinus['configuration']}: {CHANNELS} rockers on their cams after "
+            f"{crank_turns:g} cranks, Default amplitudes retained, "
+            f"bars corner-riding (max lift {max_lift:.3f})"
+        )
 
     await install_pose_configurations(
         adapter,
         pose_mates,
         [
-            PoseConfiguration(fan["configuration"], "ch15 p.30 amplitude-bar fan (poses.yaml)", fan_values, hook=fan_hook, verify=fan_verify),
-            PoseConfiguration(sinus["configuration"], f"ch14 p.28 rocker sinusoid, {crank_turns:g} cranks (poses.yaml)", sin_values, hook=sin_hook, verify=sin_verify),
+            PoseConfiguration(
+                parallel["configuration"],
+                "parallel amplitude-bar bank at zero (poses.yaml)",
+                parallel_values,
+                hook=parallel_hook,
+                verify=parallel_verify,
+            ),
+            PoseConfiguration(
+                sinus["configuration"],
+                f"ch14 p.28 rocker sinusoid, {crank_turns:g} cranks (poses.yaml)",
+                sin_values,
+                hook=sin_hook,
+                verify=sin_verify,
+            ),
         ],
         interference=check_no_interference,
     )
-    # the spring bank in Default is exactly where the batch put it
+    # The spring bank in Default is exactly where the batch put it.
     for j in range(CHANNELS):
         t = component_transform(adapter, spring_instances[j])
-        if max(abs(a - b) for a, b in zip(t[:12], rest_spring[j][:12], strict=True)) > 1e-6:
+        if (
+            max(
+                abs(a - b)
+                for a, b in zip(t[:12], rest_spring[j][:12], strict=True)
+            )
+            > 1e-6
+        ):
             raise RuntimeError(f"spring {spring_instances[j]} moved in Default")
 
 
 async def build(adapter) -> dict[str, str]:
-    # The amplitude-bar station per channel IS the Fourier coefficient a_j
-    # (channels.yaml amplitude_mm, the square-wave preset). solve_state(a_j)
-    # repositions that channel's bar + lever; a_j = 0 is the neutral pose. The
-    # neutral state still anchors the amplitude-independent rocker/rod and the
-    # cosmetic spring/threading seed.
+    # The amplitude-bar station per channel is the photographed Default fan
+    # recorded in channels.yaml. solve_state(a_j) positions that channel's bar
+    # and lever; a_j = 0 is the parallel-bank target. The neutral solve still
+    # anchors the amplitude-independent rocker/rod and clearance checks.
     amplitudes = _config.amplitudes()
     if any(a < 0.0 for a in amplitudes):
         raise RuntimeError(
@@ -1238,15 +1332,14 @@ async def build(adapter) -> dict[str, str]:
         )
     )
     log(
-        "amplitude preset: a_j stations (mm) = %s"
+        "Default amplitude fan: a_j stations (mm) = %s"
         % ", ".join(f"{a:.2f}" for a in amplitudes)
     )
 
-    # Neutral reference design: the spring/plate threading is asserted at the
-    # neutral lever pose (the as-photographed installed length). Per-channel
-    # springs translate up with their levers (placed in the loop); their fit to
-    # the fixed summing plate is realised at the top level by the parametric
-    # spring length (parametric-springs memory).
+    # Neutral reference state: prove the spring/plate threading at the lowest
+    # lever pose before placing the per-channel Default spring bank. Each spring
+    # then follows its channel's solved lever, with its fixed-plate fit realised
+    # at the top level by the parametric spring length.
     phi = math.radians(state["lever_tilt"])
     spring_hole_y = FULCRUM[1] + LEVER_SPRING_X * math.sin(phi)
     eye_y = spring_hole_y - SPRING_EYE_DROP
@@ -1258,9 +1351,9 @@ async def build(adapter) -> dict[str, str]:
     if bar_clearance < 5.5:
         raise RuntimeError(f"bar passes only {bar_clearance:.2f} above the shaft")
 
-    # Per-channel stretched springs (task #10): each spans the moving lever eye to
-    # the fixed plate hole at its measured gap length. Even (a_j=0) channels reuse
-    # the base part; the rest get a distinct stretched variant, built ONCE here
+    # Per-channel stretched springs: each spans the moving lever eye to the fixed
+    # plate hole at its Default amplitude. Equal amplitudes reuse a part; each
+    # distinct gap gets one stretched variant built here.
     # (lean -- no PNG views; the canonical part renders its own). The variants are
     # length variants of channel-spring-installed, so part_properties inherits its
     # registry row (their placement is authored machine-handed here, no per-part
@@ -1268,11 +1361,11 @@ async def build(adapter) -> dict[str, str]:
     phi_0 = math.radians(state["lever_tilt"])  # state = solve_state(0.0)
     hole_x_0 = FULCRUM[0] - LEVER_SPRING_X * math.cos(phi_0)  # lever reaches -X
     spring_specs = [_spring_spec(a, hole_x_0) for a in amplitudes]
-    # The canonical channel-spring-installed body MUST equal the neutral gap so
-    # the neutral pose mates that ONE part x20 with no generated stretch variant.
-    # If the lever anchor drifts (another OD re-anchor) they diverge -- fail loud
-    # here (and offline: verify:math spring:neutral-body-canonical) rather than
-    # silently spawning a stretch00. Non-neutral a_j still get real variants.
+    # The canonical channel-spring-installed body MUST equal the zero-amplitude
+    # gap so the first bar in the Default fan uses the canonical part. If the
+    # lever anchor drifts they diverge -- fail loud here (and offline:
+    # verify:math spring:neutral-body-canonical) rather than silently spawning
+    # a redundant stretch00 variant.
     neutral_body = _spring_spec(0.0, hole_x_0)["body"]
     if abs(neutral_body - SPRING_BASE_BODY) >= 0.05:
         raise RuntimeError(
@@ -1785,9 +1878,8 @@ async def build(adapter) -> dict[str, str]:
     # SEED (its J1a anchors PITCH off the previous channel's rocker); every later
     # same-amplitude channel is ONE CopyWithMates2 of the seed's 4-part slice
     # with the J1a slot re-pointed (Repeat=false) to ITS previous rocker at the
-    # same local PITCH. With the current all-neutral preset that is 2 authored
-    # + (CHANNELS-2) copies; a restored square preset degrades gracefully (each
-    # distinct a_j authors once).
+    # same local PITCH. The photographed Default fan has one distinct amplitude
+    # per channel, while any repeated stations still share one authored seed.
     seed_by_amp: dict[float, tuple[int, dict[str, str]]] = {}
     slots_by_seed: dict[int, tuple[int, int, dict[str, list[float]]]] = {}
     copied: list[dict[str, Any]] = []
@@ -2195,8 +2287,8 @@ async def build(adapter) -> dict[str, str]:
     )
     write_dof_manifest(ASM_NAME)
     check_no_interference(adapter)
-    # Saved pose configurations (poses.yaml): the amplitude-bar fan and the
-    # rocker sinusoid, on top of the free Default the gates above just proved.
+    # Saved poses: an all-zero parallel bank and the rocker sinusoid, on top of
+    # the free photographed Default fan the gates above just proved.
     await _install_pose_configurations(adapter, amplitudes, spring_specs, spring_instances, hole_x_0)
     # Title-block identity for the assembly drawing (draw_channel_assembly.py):
     # assembly_title_properties supplies the Title/Generator and TOL_* cells

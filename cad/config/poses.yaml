@@ -1,33 +1,30 @@
-# Saved ASSEMBLY POSE CONFIGURATIONS (2026-09-02, user directive: the amplitude-bar
-# fan and the rocker-arm sinusoidal setup are separate SolidWorks configurations
-# of the built assemblies; Default stays the ch30 eight-view rest pose).
+# Saved ASSEMBLY POSE CONFIGURATIONS (2026-09-02).
+#
+# Default is the photographed ch15 p.30 amplitude-bar fan. Its per-channel
+# stations live in channels.yaml because they are the build pose, not a saved
+# override. The parallel configuration drives every amplitude bar to the common
+# zero station. The sinusoid keeps those Default stations while turning the
+# rocker/cam train to the ch14 p.28 middle end view.
 #
 # A pose configuration never changes geometry: the build authors every freed
-# operational DOF's drive from the DOF manifest as a PERMANENT `POSE_<key>` mate,
-# SUPPRESSED in Default (so the shipped Default stays the free kinematic model
-# the gates prove) and UNSUPPRESSED in the pose configuration with the value
-# listed here. The cosmetic channel-spring bank is re-posed rigidly per
-# configuration (its length variants are Default's -- see the fan note below).
-source: ch15 p.30 (page001_img01, the fanned bank) + ch14 p.28 end views (0 / 6 / 14 / 40 cranks)
+# operational DOF's drive from the DOF manifest as a permanent `POSE_<key>` mate,
+# SUPPRESSED in Default and UNSUPPRESSED in each saved configuration with the
+# value listed here. The cosmetic channel-spring bank is re-posed rigidly per
+# configuration; its length variants remain those of Default.
+source: ch15 p.30 (page001_img01, the fanned Default bank) + ch14 p.28 end views (0 / 6 / 14 / 40 cranks)
 confidence: low
 notes: >
-  Fan amplitudes are a linear ramp across the channels (the p.30 plate shows the
-  bars leaning progressively, tops together at the levers); the exact per-channel
-  values are not readable, so the ramp tops out at the square preset's 80 mm.
-  The sinusoid pose is the ch14 p.28 middle end view: 6 crank turns, so cylinder
-  gear k stands at 360 * 6 * k / 80 deg from notch-up (gear law, ch29).
-  With the arms turned under bars held at amplitude 0, each bar's flat notch
-  roof rides the arc on its lower CORNER and the bar lifts (<= ~0.5 mm at the
-  7.4 deg stroke bottom): the build sets every channel's J5 foot-on-arc radius
-  in that configuration to the corner-riding value (build_channel_assembly
-  .solve_sinusoid_foot); Default keeps the roof-centre measure.
+  The photographed Default amplitudes are a linear ramp because the individual
+  graduations are not readable; channels.yaml owns those interpreted stations.
+  Parallel-bank is the explicit all-zero comparison state. Sinusoid-6-cranks
+  retains each Default amplitude while cylinder gear k stands at
+  360 * 6 * k / 80 deg from notch-up (gear law, ch29). Each bar's flat notch
+  roof rides the turned arc on its lower corner, so the build solves the
+  configuration-specific foot radius and follows it with the lever and spring.
 
-amplitude_fan:
-  configuration: amplitude-fan
-  # a_j for channel j = 0..19 (mm along the rocker arc from the pivot, +X lifting side)
-  amplitude_mm: [0.0, 4.2105, 8.4211, 12.6316, 16.8421, 21.0526, 25.2632, 29.4737,
-                 33.6842, 37.8947, 42.1053, 46.3158, 50.5263, 54.7368, 58.9474,
-                 63.1579, 67.3684, 71.5789, 75.7895, 80.0]
+parallel:
+  configuration: parallel-bank
+  target_amplitude_mm: 0.0
 
 sinusoid:
   configuration: sinusoid-6-cranks

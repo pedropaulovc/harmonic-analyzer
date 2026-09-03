@@ -300,6 +300,7 @@ _FIXED_ACCESSOR_TOKENS: dict[str, frozenset[str]] = {
     "cone_teeth": frozenset({"channels.yaml"}),
     "amplitudes": frozenset({"channels.yaml"}),
     "poses": frozenset({"poses.yaml"}),
+    "assembly_configuration_roles": frozenset({"poses.yaml"}),
     "active_count": frozenset({"machine/channels.yaml"}),
     "active_channels": frozenset({"channels.yaml", "machine/channels.yaml"}),
     "fit": frozenset({"tolerances.yaml"}),
