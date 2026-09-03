@@ -39,4 +39,7 @@ part-way with no rollback.
   Git writes and reads the NUL-delimited pathspec file itself, so spaces and
   other shell-sensitive characters in filenames are preserved. Verify
   `git diff --stat 'stash@{0}'` is empty before dropping the stash.
-- Kill any seat build started in the window; its inputs were HEAD's.
+- Kill every build that was running at any point during the stash/reset window,
+  treat all of its outputs as untrusted, and rebuild from a restored, verified
+  working tree. Because the reset is partial and non-atomic, an overlapping
+  build may have consumed any mixture of pre-stash and reverted files.
