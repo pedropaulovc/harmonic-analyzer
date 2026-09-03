@@ -223,7 +223,7 @@ def test_configured_insert_uses_activated_source_configuration(
         def ShowConfiguration2(self, name):  # noqa: N802
             events.append(("activate", name))
             active.Name = name
-            return True
+            return -1  # COM VARIANT_BOOL true
 
     source = SourcePart()
 

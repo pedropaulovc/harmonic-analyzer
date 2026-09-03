@@ -1249,7 +1249,7 @@ def _prepare_component_configuration(
     activated = adapter._attempt(
         lambda: model.ShowConfiguration2(configuration), default=None
     )
-    if activated is not True:
+    if not activated:
         raise RuntimeError(
             f"failed to activate component configuration {configuration!r}: {path}"
         )
