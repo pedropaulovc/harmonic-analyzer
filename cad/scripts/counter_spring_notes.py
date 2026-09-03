@@ -13,15 +13,10 @@ from __future__ import annotations
 
 from counter_spring_spec import (
     BOTTOM_HOOK_LEAD,
-    COIL_BODY_LENGTH,
     COIL_COUNT,
-    COIL_ID,
     COIL_OD,
     FREE_EYE_C2C,
-    FREE_PITCH,
     HOOK_CL_RADIUS,
-    MEAN_DIA,
-    SPRING_RATE_REF,
     TOP_HOOK_LEAD,
     WIRE_DIA,
 )
@@ -32,29 +27,17 @@ from counter_spring_spec import (
 # kept set.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {}
 
-# The spec table (rendered as a property-linked note).  Columns are space-padded
-# for a monospace-style read.
-# The free pitch is stated (165 x 1.80 close-wound would be 297, not 325.3 --
-# the body is wound slightly OPEN and the table must say so); hook leads carry
-# their measurement endpoints; the rate is a REF functional requirement.
+# Compact purchase/manufacturing data.  Free length is measured eye-centre to
+# eye-centre; the end line carries the unusual unequal leads without expanding
+# the block back into a derived-geometry table.
 DRAWING_NOTES = "\n".join(
     (
         "EXTENSION SPRING DATA",
-        f"  WIRE DIA .......... {WIRE_DIA:.2f}",
-        f"  COIL OD ........... {COIL_OD:.2f}",
-        f"  COIL ID ........... {COIL_ID:.2f}",
-        f"  MEAN DIA .......... {MEAN_DIA:.2f}",
-        f"  FREE BODY LENGTH .. {COIL_BODY_LENGTH:.2f}",
-        f"  TOTAL COILS ....... {COIL_COUNT}",
-        f"  FREE PITCH ........ {FREE_PITCH:.2f} (OPEN-WOUND)",
-        "  WIND .............. RIGHT HAND",
-        f"  RATE .............. ~{SPRING_RATE_REF:.2f} N/MM (REF)",
-        f"  HOOK LEADS ......... {BOTTOM_HOOK_LEAD:.2f} BOTTOM / "
-        f"{TOP_HOOK_LEAD:.2f} TOP",
-        "    (BODY END TO EYE C/L, EACH)",
-        f"  ENDS .............. 270 DEG LOOP, R{HOOK_CL_RADIUS:.2f} CL;",
-        "    EYES COPLANAR (0 DEG CLOCKING)",
-        f"  FREE EYE C-C ...... {FREE_EYE_C2C:.2f}",
+        f"  WIRE Ø{WIRE_DIA:.2f}    OD {COIL_OD:.2f}",
+        f"  FREE LENGTH {FREE_EYE_C2C:.2f} EYE C-C",
+        f"  ACTIVE COILS {COIL_COUNT}    RIGHT HAND",
+        f"  ENDS 270.0 DEG LOOPS, R{HOOK_CL_RADIUS:.2f} C/L",
+        f"  LEADS {BOTTOM_HOOK_LEAD:.2f} BTM / {TOP_HOOK_LEAD:.2f} TOP; COPLANAR",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:3"

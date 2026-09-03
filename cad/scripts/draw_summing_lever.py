@@ -10,10 +10,8 @@ bore): a coefficients plate on the +X arm carrying the 20 channel-spring holes,
 a solid pivot cylinder (152.4 long, along Z), and a summation arm reaching to
 the counter-spring anchor eye on the -X arm.  The sheet runs at 1:2 and shows:
 
-* a 1:2 **front** profile (the rib outline around the pivot, the R15.24 rib
-  arc, the hex trunnion end face -- the parent of the knife-edge detail);
-* **DETAIL C** (2:1) of the hex trunnion end: across-flats, flat length and
-  the included angle at the knife-edge ridge;
+* a 1:2 **front** profile with the rib outline, R15.24 rib arc, the hex
+  trunnion end face, and a nearby three-value knife-edge geometry block;
 * a 1:2 **top** plan (plate width/length off the pivot axis, the summation
   arm's side-arc radii, the anchor eye, the 20-hole pattern);
 * a 1:2 **right** view (pivot diameter, coefficients-plate and rib
@@ -34,6 +32,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -50,7 +49,6 @@ from _drawing_common import (
     add_property_linked_note,
     add_surface_finish,
     add_view_centerline,
-    create_detail_view,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -65,6 +63,7 @@ from _surface_finish import surface_finish_by_key
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     place_view,
     view_name,
 )
@@ -104,8 +103,6 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 2.0)  # 1:2
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]  # sheet-mm per model-mm (0.5)
-DETAIL_SCALE = (2, 1)  # 2:1 on the sheet = 4x the 1:2 views
-_D = DETAIL_SCALE[0] / DETAIL_SCALE[1]  # sheet-mm per model-mm in the detail
 
 # Front (down -Z) and top (down -Y) share the same X extent: anchor eye
 # (TIP_X - ANCHOR_R) on the left to the plate right edge (PLATE_W).
@@ -121,18 +118,26 @@ RIB_OFFSET = PLATE_L / 2.0 - RIB_T  # 71.12: edge-rib inner face along Z
 # (TIP_X/2, PLATE_L/4 - 7.62) and (TIP_X, ANCHOR_R); R = 138.85 (both sides).
 SUM_ARC_MID = (TIP_X / 2.0, PLATE_L / 4.0 - 7.62)  # (-38.1, 30.48)
 
-# Third-angle layout: top plan under the front profile, right view beside it,
-# the knife-edge detail in the free upper-left field, the isometric top-right.
+# Third-angle layout: front and right views above the top plan, with the
+# knife-edge geometry block in the free upper-left field and the isometric
+# at the top-right.
 FRONT_CENTER = (0.155, 0.225)
 TOP_CENTER = (0.155, 0.125)
 RIGHT_CENTER = (0.265, 0.225)
-DETAIL_CENTER = (0.060, 0.170)
 ISO_CENTER = (0.380, 0.235)
-
-# Radius of the detail circle on the FRONT view (sheet metres): covers the
-# hex trunnion end (+-5.13 mm model = +-2.6 mm on the 1:2 parent) with margin
-# and stops short of the cylinder circle (6.35 mm on the parent).
-DETAIL_RADIUS = 0.0045
+HEX_FLAT_LENGTH = HEX_H / 2.0
+HEX_INCLUDED_ANGLE_DEG = 180.0 - 2.0 * math.degrees(
+    math.atan2(HEX_H / 4.0, HEX_W / 2.0)
+)
+KNIFE_EDGE_GEOMETRY_NOTE = "\n".join(
+    (
+        "BOTH HEX KNIFE EDGES AT PIVOT",
+        f"{HEX_W:.2f} ACROSS FLATS",
+        f"{HEX_FLAT_LENGTH:.2f} FLAT LENGTH",
+        f"{HEX_INCLUDED_ANGLE_DEG:.2f} DEG INCLUDED KNIFE ANGLE",
+    )
+)
+KNIFE_EDGE_NOTE_XY = (0.055, 0.205)
 
 
 def _front_xy(mx: float, my: float) -> tuple[float, float]:
@@ -169,19 +174,6 @@ def _right_xy(mz: float, my: float) -> tuple[float, float]:
     return (
         RIGHT_CENTER[0] + mz * _S / 1000.0,
         RIGHT_CENTER[1] + my * _S / 1000.0,
-    )
-
-
-def _detail_xy(mx: float, my: float) -> tuple[float, float]:
-    """Sheet (x, y) of a model (X, Y) point in DETAIL C (2:1).
-
-    The detail circle is centred on the pivot axis, so the detail's own
-    centre is the axis; the hex vertices are +-HEX_H/2 up and the flats
-    +-HEX_W/2 across.
-    """
-    return (
-        DETAIL_CENTER[0] + mx * _D / 1000.0,
-        DETAIL_CENTER[1] + my * _D / 1000.0,
     )
 
 
@@ -319,59 +311,13 @@ async def build(adapter: Any) -> dict[str, str]:
         label="rib arc radius",
     )
 
-    # --- DETAIL C (2:1): the hex trunnion end face on the pivot axis.  The
-    # trunnion is NOT a regular hexagon (8.653 across flats, 10.268 vertex to
-    # vertex; regular would be 9.99), so the detail carries across-flats, the
-    # flat length and the included angle at the knife-edge ridge -- the three
-    # values a machinist needs to file or mill the bevel.  Enlarged rather
-    # than piled onto the 1:2 parent (policy rule 7).
-    detail = create_detail_view(
-        adapter,
-        front,
-        center=_front_xy(0.0, 0.0),
-        radius=DETAIL_RADIUS,
-        view_xy=DETAIL_CENTER,
-        detail_label="C",
-        scale=DETAIL_SCALE,
-        label="knife-edge trunnion end",
-    )
-    half_w, half_h, quarter_h = HEX_W / 2.0, HEX_H / 2.0, HEX_H / 4.0
-    # Across flats just above the ridge (its extension lines stop under the
-    # included-angle arc, which is drawn at a larger radius from the ridge).
-    add_edge_dimension(
-        adapter,
-        detail,
-        p0=_detail_xy(-half_w, 0.0),
-        p1=_detail_xy(half_w, 0.0),
-        text_xy=(DETAIL_CENTER[0], DETAIL_CENTER[1] + 0.016),
-        label="hex across flats",
-        orientation="horizontal",
-    )
-    add_edge_dimension(
-        adapter,
-        detail,
-        p0=_detail_xy(half_w, quarter_h),
-        p1=_detail_xy(half_w, -quarter_h),
-        text_xy=(DETAIL_CENTER[0] + 0.024, DETAIL_CENTER[1]),
-        label="hex flat length",
-        orientation="vertical",
-        entity_types=("VERTEX", "VERTEX"),
-    )
-    # Included angle at the ridge: smart dimension between the two upper
-    # sloping edges (picked at their midpoints).  The text sits up-right of
-    # the vertex INSIDE the sector the extended edges open above it (30.7 to
-    # 149.3 deg from +X), so SolidWorks dimensions that vertical angle
-    # (118.64) outside the hex; its arc (r ~21 mm) clears the across-flats
-    # dimension below it and the flat-length text to the right.
-    add_edge_dimension(
-        adapter,
-        detail,
-        p0=_detail_xy(-half_w / 2.0, half_h - quarter_h / 2.0),
-        p1=_detail_xy(half_w / 2.0, half_h - quarter_h / 2.0),
-        text_xy=(DETAIL_CENTER[0] + 0.016, DETAIL_CENTER[1] + 0.024),
-        label="knife-edge included angle",
-        orientation="smart",
-    )
+    # The front projection shows the non-regular hex inside the larger pivot
+    # cylinder silhouette. State the three values needed to mill or file both
+    # knife edges in a compact block beside that view. An enlarged detail of
+    # the whole pivot projected the cylinder silhouette instead of clarifying
+    # the smaller trunnion, so it is intentionally omitted.
+    if add_note(adapter, KNIFE_EDGE_GEOMETRY_NOTE, *KNIFE_EDGE_NOTE_XY) is None:
+        raise RuntimeError("failed to add knife-edge geometry block")
 
     # --- Top plan.  Axis centerline of the pivot cylinder: the plate's X=0
     # edge is buried inside the cylinder's plan rectangle (plate +-2.54 <
@@ -495,7 +441,9 @@ async def build(adapter: Any) -> dict[str, str]:
         quantity="20X",
         label="spring-hole pattern position",
     )
-    fifth_rim_right = _top_xy(HOLE_X + HOLE_DIA / 2.0, end_hole_up + 4.0 * CHANNEL_PITCH)
+    fifth_rim_right = _top_xy(
+        HOLE_X + HOLE_DIA / 2.0, end_hole_up + 4.0 * CHANNEL_PITCH
+    )
     add_native_hole_callout(
         adapter,
         top,

@@ -2,10 +2,12 @@ r"""Drawing-view annotations shared by the made-fastener sheets.
 
 The fastener prints (cad/docs/drawing-simplicity-policy.md) put the thread
 designation ON the view as a leader to the shank, mark the screw axis with
-a centerline and the head rim with a center mark, and end every end-view
-diameter leader at the rim it names.  The recipe (``_fastener_drawing``)
-only hands its ``decorate`` hook the views, so these helpers re-read what
-they need from the view and fail loud when a pick misses.
+a centerline and the head rim with a center mark, end every end-view
+diameter leader at the rim it names, and stack the true overall length as a
+parenthesised reference outside the chained lengths.  The recipe
+(``_fastener_drawing``) only hands its ``decorate`` hook the views, so these
+helpers re-read what they need from the view and fail loud when a pick
+misses.
 """
 
 from __future__ import annotations
@@ -14,7 +16,13 @@ from typing import Any, Iterable
 
 import _telemetry
 from _common import _early_bound
-from _drawing_common import _select_view_entity, add_attached_note
+from _drawing_common import (
+    _select_view_entity,
+    add_attached_note,
+    add_edge_dimension,
+    model_point_in_view,
+    set_reference_dimension,
+)
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name
 
@@ -127,3 +135,64 @@ def end_diameter_leaders_at_rim(
             f"{label}: diameter dimensions not found: {sorted(remaining)}"
         )
     adapter.currentModel.EditRebuild3()
+
+
+@_telemetry.traced("drawing.overall_reference", label_param="label")
+def add_overall_reference(
+    adapter: Any,
+    view: Any,
+    *,
+    end_points_mm: tuple[tuple[float, float, float], tuple[float, float, float]],
+    entity_types: tuple[str, str],
+    text_xy: tuple[float, float],
+    orientation: str,
+    label: str,
+) -> Any:
+    """Dimension the true overall length between the two end faces as (REF).
+
+    Every fastener sheet chains its lengths from the under-head face (the
+    head height and the under-head length are the extrude-depth model
+    dimensions), so the overall is derived -- and the blind machinist review
+    read the longer segment as the overall on nine sheets.  ASME reference
+    notation (parenthesised, never toleranced) says "sum, not a third
+    control" (drawing-simplicity-policy.md rule 7: the overall is real and
+    conspicuous).
+
+    ``end_points_mm`` are MODEL points, one on each end face, projected into
+    the view (``model_point_in_view``, the pinion lift-rod pattern) rather
+    than assumed from the view centre.  A turned end face is a circle seen
+    EDGE-ON in the profile, which SolidWorks resolves as an EDGE at the
+    projected point; a polygon head hands over a corner VERTEX instead.  Pick
+    a round face inside its projected line, never at the extreme rim: a
+    driver-face rim is broken by the slot and a reeded face is scalloped,
+    but every edge on that line lies in the face plane, so a dimension
+    pinned to the axis direction reads the same axial distance whichever
+    edge the pick lands on.
+    """
+    if orientation not in ("horizontal", "vertical"):
+        raise ValueError(f"{label}: overall must be pinned to the axis, not {orientation!r}")
+    picks = tuple(
+        model_point_in_view(
+            adapter,
+            view,
+            tuple(float(v) / 1000.0 for v in xyz),
+            label=f"{label} end {index}",
+        )
+        for index, xyz in enumerate(end_points_mm)
+    )
+    dimension = add_edge_dimension(
+        adapter,
+        view,
+        p0=picks[0],
+        p1=picks[1],
+        text_xy=text_xy,
+        label=label,
+        orientation=orientation,
+        entity_types=entity_types,
+    )
+    set_reference_dimension(
+        adapter,
+        _early_bound(dimension, "IDisplayDimension").GetAnnotation(),
+        label=label,
+    )
+    return dimension

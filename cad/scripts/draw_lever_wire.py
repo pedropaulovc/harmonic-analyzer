@@ -1,15 +1,16 @@
 r"""Create the curated machinist drawing for the lever wire (WIRE 1).
 
-The lever wire is a Ø0.8 drawn-steel cylinder ~353 long -- a hair-thin
-silhouette with no flat face, no pickable end and no selectable silhouette edge,
-so the print is note-based: nothing is a marked dimension, and the diameter +
-straight rest-run length ride the notes (the build stamps the computed length).
-That chord is not a developed cut length: the source model does not define the
-formed hook or hub wrap, so the note has the maker form them at assembly.
-The print is plain (cad/docs/drawing-simplicity-policy.md): no datum, frame,
-roughness or basic dimension.
-The wire axis is local +Y, so the FRONT view is the straight run reduced to fit
-(1:5) and the isometric confirms it is a plain straight rod.
+The lever wire is a Ø0.8 drawn-steel cylinder ~353 long.  The sheet runs 1:5
+(so the title-block scale is the scale of the front and isometric views); at
+that scale the wire is a hairline, so its diameter is read on a 10:1 END view
+(the *Top orientation, looking down the wire axis) carrying the marked profile
+circle ``WireDiaDim`` with the bought-wire band printed natively from the
+model.  The FRONT view carries the marked extrusion depth as a REFERENCE
+dimension, captioned as the straight rest-run from the hub end to the hook
+end: it is not a cut length -- the source model defines neither the formed
+hook nor the hub wrap, so the note has the maker form them at assembly and
+cut long.  The print is plain (cad/docs/drawing-simplicity-policy.md): no
+datum, frame, roughness or basic dimension.
 
 Run with SolidWorks open::
 
@@ -31,12 +32,16 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    set_dimension_callouts,
+    set_dimension_precision,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
+    set_reference_dimension,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from solidworks_mcp.adapters.solidworks.drawing import place_view
+from lever_wire_geom import WIRE_LEN
+from solidworks_mcp.adapters.solidworks.drawing import dimension_name, place_view
 
 
 SPEC = DRAWINGS_BY_NAME["lever_wire"]
@@ -51,15 +56,35 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (1.0, 1.0)
+# The sheet IS 1:5 (machinist review 2026-09-02: the title block said 1:1
+# while every view said 1:5); the front and isometric views ride that scale
+# explicitly, the end view is enlarged 10:1 so the Ø0.8 circle is 8 mm.
+SHEET_SCALE = (1.0, 5.0)
 WIRE_SCALE = (1, 5)  # ~353 long reduced to ~71 mm on the sheet
+END_SCALE = (10, 1)
 FRONT_CENTER = (0.135, 0.150)
+END_CENTER = (0.215, 0.150)
 ISO_CENTER = (0.320, 0.160)
 
-# Note-based: the wire carries no marked model dimension, so every view keeps
-# nothing (the front view is curated with an empty keep to delete any stray
-# auto-import; the offline test asserts union(marks) == union(keeps) == {}).
-FRONT_KEEP: dict[str, tuple[float, float]] = {}
+_HALF_RUN = WIRE_LEN * WIRE_SCALE[0] / WIRE_SCALE[1] / 2000.0  # sheet metres
+
+# Front view: the rest-run length stands right of the hairline.  End view:
+# the diameter leads up-right of the circle.
+FRONT_KEEP = {
+    "Depth": (FRONT_CENTER[0] + 0.022, FRONT_CENTER[1]),
+}
+END_KEEP = {
+    "WireDiaDim": (END_CENTER[0] + 0.016, END_CENTER[1] + 0.012),
+}
+# The rest-run is a reference figure between two assembly-defined points,
+# never a cut length; its callout names both ends.
+REFERENCE_DIMENSIONS = ("Depth",)
+DIMENSION_CALLOUTS = {
+    "Depth": "STRAIGHT REST RUN, HUB END TO HOOK END",
+}
+# The banded wire diameter is a bought size, not a held one: two places, the
+# native +/- band printed beside it (policy rule 2).
+DIMENSION_PRECISION = {"WireDiaDim": 2}
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -78,6 +103,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Manufacturing Notes",
             "Front View Note",
+            "End View Note",
             "Isometric View Note",
         ),
         required=(
@@ -87,6 +113,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Manufacturing Notes",
             "Front View Note",
+            "End View Note",
             "Isometric View Note",
         ),
     )
@@ -106,15 +133,36 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=WIRE_SCALE)
+    end = place_view(adapter, str(SOURCE), "*Top", *END_CENTER, scale=END_SCALE)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=WIRE_SCALE)
     set_hidden_lines_removed(adapter, iso)
-    # Hidden lines ON in the orthographic view (policy rule 7).
-    set_hidden_lines_visible(adapter, front)
+    # Hidden lines ON in every orthographic view (policy rule 7).
+    for view in (front, end):
+        set_hidden_lines_visible(adapter, view)
 
-    curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
+    # The end view claims the profile circle's banded diameter FIRST (a
+    # Top-plane circle could otherwise import into the front view as a width
+    # across the hairline and be deleted there); the front view then claims
+    # the extrusion depth (the straight rest-run).
+    end_annotations = curate_view_dimensions(
+        adapter, end, keep=END_KEEP, view_label="end"
+    )
+    front_annotations = curate_view_dimensions(
+        adapter, front, keep=FRONT_KEEP, view_label="front"
+    )
+    set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
+    set_dimension_precision(adapter, end_annotations, DIMENSION_PRECISION)
+    # (352.80): the rest-run between the hub tangency and the hook mouth is
+    # informational -- the wire is cut long and formed at assembly.
+    for annotation in front_annotations:
+        if dimension_name(adapter, annotation) in REFERENCE_DIMENSIONS:
+            set_reference_dimension(
+                adapter, annotation, label="straight rest-run reference"
+            )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)
-    add_property_linked_note(adapter, "Front View Note", 0.100, 0.100)
+    add_property_linked_note(adapter, "Front View Note", 0.118, 0.100)
+    add_property_linked_note(adapter, "End View Note", 0.196, 0.128)
     add_property_linked_note(adapter, "Isometric View Note", 0.300, 0.100)
 
     return await finalize_drawing(

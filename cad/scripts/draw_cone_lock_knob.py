@@ -1,9 +1,14 @@
 r"""Create the curated machinist drawing for the cone platform lock knob.
 
 The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): a
-turned thumb knob carries no datums, no feature-control frames and no
-roughness symbols -- the title block's general tolerances govern everything
-except the washer thickness, whose band rides the model dimension.
+turned thumb knob carries no datums, no feature-control frames, no roughness
+symbols and no bands -- the title block's general tolerances govern
+everything.  It is dimensioned as it sits in the lathe (policy rule 7): the
+three turned diameters read on the ELEVATION as linear diameter dimensions
+(the washer and the threaded stud below the stud end, the body across its
+straight wall), the lengths chain from the washer seat on the right with the
+overall as a reference, and the dome radius is leadered from the left.  The
+end view carries only its centre marks.
 """
 
 from __future__ import annotations
@@ -13,17 +18,20 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_edge_dimension,
     add_property_linked_note,
     curate_view_dimensions,
     finalize_drawing,
+    find_edge_near,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
+    set_reference_dimension,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -57,9 +65,13 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (3.0, 1.0)
 _S = SHEET_SCALE[0] / 1000.0  # sheet meters per model mm
 
-FRONT_CENTER = (0.075, 0.150)
-TOP_CENTER = (0.075, 0.235)
-ISO_CENTER = (0.195, 0.190)
+# x=0.100: the body diameter and the dome radius sit on the LEFT of the
+# elevation (text out to x~0.030, inside the 0.020 frame margin) and the three
+# chained lengths plus the reference overall on the RIGHT, out to x~0.184,
+# short of the isometric at 0.220.
+FRONT_CENTER = (0.100, 0.150)
+TOP_CENTER = (0.100, 0.232)
+ISO_CENTER = (0.220, 0.190)
 
 # The front view centres on the part bounding box (dome apex at BODY_TOP,
 # stud end at -STUD_LEN below the washer seat / model origin), so a model
@@ -78,54 +90,38 @@ def _front_y(model_y: float) -> float:
     return FRONT_CENTER[1] + (model_y - _MID_Y) * _S + _FRONT_Y_OFFSET
 
 
+# Sheet landmarks of the elevation (before the measured view-centre shift).
+_STUD_END_Y = _front_y(-STUD_LEN)
+_WASHER_SEAT_Y = _front_y(0.0)
+_APEX_Y = _front_y(BODY_TOP)
+_WASHER_HALF_W = WASHER_DIA * _S / 2.0
+_BODY_HALF_W = BODY_DIA * _S / 2.0
+
+# Every marked dimension reads on the elevation (a turned part dimensioned
+# as it sits in the lathe).  SolidWorks inserts each marked model dimension
+# into ONE view, so the elevation is curated first and the end view is never
+# asked (draw_pivot_shaft, 2026-09-02 seat build).
+#
+# Diameters: the stud (with its thread callout below the value) and the
+# washer as linear diameters stacked BELOW the stud end -- their witness
+# lines drop from the flanks past nothing (the stud is narrower than the
+# washer, so the washer's witnesses clear it) -- and the body as a linear
+# diameter ACROSS its straight wall at mid-height, text out to the left.
+# Lengths: stud length and body height chained from the washer seat on the
+# right, the washer thickness between them with its text parked above the
+# 4.5 mm flange gap, the reference overall outermost.  The dome radius is
+# leadered from the upper left, where no witness line can cross it.
 FRONT_KEEP = {
-    # Anchored ABOVE the flange's top face, not at its mid-height.  The flange is
-    # 1.5 mm thick, so at 3:1 its two extension lines are just 4.5 mm apart
-    # (measured 2026-07-16 at x=0.115, clear of the text: y=0.1437 and y=0.1392).
-    # `_front_y(WASHER_T / 2.0)` put the text INSIDE that 4.5 mm gap, and the text
-    # is a two-line block ~9.4 mm tall ("1.50" over its native tolerance) -- it
-    # cannot fit, so the dimension printed through itself: at x=0.1305 the upper
-    # extension line reappears at y=0.1437..0.1439, dead through the middle of
-    # "1.50" (glyphs y=0.1417..0.1451), the lower line at y=0.1392 clips the top of
-    # tolerance text, and the vertical dim line at x=0.130 crosses both. SolidWorks has
-    # already flipped the arrows outside the gap (y=0.1472 / 0.1357); only the text
-    # was left behind.
-    #
-    # `_front_y(WASHER_T) + 0.013` tracks the flange's TOP FACE (y=0.14305, which
-    # the measured 0.1437 extension line confirms) rather than freezing a literal,
-    # and 13 mm of standoff clears the upper arrowhead by 4.1 mm.  The band above
-    # is empty: probed x=0.105..0.152 at y=0.152/0.156/0.160 -- no ink at all.
-    "WasherT": (
-        FRONT_CENTER[0] + WASHER_DIA * _S / 2.0 + 0.028,
-        _front_y(WASHER_T) + 0.013,
-    ),
-    "BodyTop": (
-        FRONT_CENTER[0] - WASHER_DIA * _S / 2.0 - 0.024,
-        _front_y(BODY_TOP / 2.0),
-    ),
-    "StudLen": (
-        FRONT_CENTER[0] - WASHER_DIA * _S / 2.0 - 0.024,
-        _front_y(-STUD_LEN / 2.0),
-    ),
-    "DomeR": (
-        FRONT_CENTER[0] + BODY_DIA * _S / 2.0 + 0.026,
-        _front_y(BODY_TOP) + 0.012,
-    ),
+    "StudDia": (FRONT_CENTER[0], _STUD_END_Y - 0.012),
+    "WasherDia": (FRONT_CENTER[0], _STUD_END_Y - 0.032),
+    "BodyDia": (0.052, _front_y((WASHER_T + BODY_TOP - DOME_R) / 2.0)),
+    "DomeR": (0.040, _APEX_Y + 0.013),
+    "StudLen": (FRONT_CENTER[0] + _WASHER_HALF_W + 0.015, _front_y(-STUD_LEN / 2.0)),
+    "WasherT": (FRONT_CENTER[0] + _WASHER_HALF_W + 0.023, _front_y(WASHER_T) + 0.013),
+    "BodyTop": (FRONT_CENTER[0] + _WASHER_HALF_W + 0.033, _front_y(BODY_TOP / 2.0)),
 }
-# x=0.030 for the two leadered diameters, not the old washer-derived 0.018: a
-# horizontal "O13.00" is ~19 mm wide and CENTRED on its anchor, so 0.018 ran its
-# text out to x=0.008 -- across the border rule at ~0.0126.  The layout audit
-# cannot see this: it boxes a dim as a nominal 4 mm half-square
-# (_NOMINAL_DIM_HALF_M), which at 0.018 still cleared the 12.7 mm zone margin.
-# 0.030 puts the text at ~0.021..0.039: inside the frame, outside the view.
-TOP_KEEP = {
-    "WasherDia": (0.030, TOP_CENTER[1] - 0.016),
-    "BodyDia": (0.030, TOP_CENTER[1] + 0.018),
-    "StudDia": (
-        TOP_CENTER[0] + WASHER_DIA * _S / 2.0 + 0.026,
-        TOP_CENTER[1] - 0.012,
-    ),
-}
+TOP_KEEP: dict[str, tuple[float, float]] = {}
+OVERALL_TEXT_XY = (FRONT_CENTER[0] + _WASHER_HALF_W + 0.049, _front_y(_MID_Y))
 DIMENSION_CALLOUTS = {
     "StudDia": f"{STUD_THREAD} UNC",
 }
@@ -200,32 +196,63 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # Measured before any annotation lands (dims would grow the outline).
     front_center = _outline_center(adapter, front)
-    top_center = _outline_center(adapter, top)
     front_delta = (
         front_center[0] - FRONT_CENTER[0],
         front_center[1] - FRONT_CENTER[1],
     )
-    top_delta = (top_center[0] - TOP_CENTER[0], top_center[1] - TOP_CENTER[1])
     _telemetry.info(
-        f"view-center deltas: front=({front_delta[0]:.4f}, {front_delta[1]:.4f}) "
-        f"top=({top_delta[0]:.4f}, {top_delta[1]:.4f})"
+        f"view-center delta: front=({front_delta[0]:.4f}, {front_delta[1]:.4f})"
     )
 
+    # The elevation claims every marked dimension; the end view keeps nothing.
     front_annotations = curate_view_dimensions(
         adapter, front, keep=_shifted(FRONT_KEEP, front_delta), view_label="front"
     )
-    top_annotations = curate_view_dimensions(
-        adapter, top, keep=_shifted(TOP_KEEP, top_delta), view_label="top"
-    )
-    annotations = [*front_annotations, *top_annotations]
-    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to top view")
+
+    # Overall length, stud end to dome apex, as a REFERENCE: the controlling
+    # lengths are the body height and stud length chained from the washer
+    # seat.  Both end faces are edge-on circles (the dome's O3 apex flat and
+    # the stud end); the picks are refined along the axis so the measured
+    # view offset cannot miss them.
+    stud_end = find_edge_near(
+        adapter,
+        front,
+        (front_center[0], _STUD_END_Y + front_delta[1]),
+        axis="y",
+        label="stud end face",
+    )
+    apex = find_edge_near(
+        adapter,
+        front,
+        (front_center[0], _APEX_Y + front_delta[1]),
+        axis="y",
+        label="dome apex flat",
+    )
+    overall = add_edge_dimension(
+        adapter,
+        front,
+        p0=stud_end,
+        p1=apex,
+        text_xy=(OVERALL_TEXT_XY[0] + front_delta[0], OVERALL_TEXT_XY[1] + front_delta[1]),
+        label="overall length",
+        orientation="vertical",
+    )
+    # add_edge_dimension hands back the IDisplayDimension (late-bound); bind
+    # it before reading the IAnnotation the reference helper wants.
+    set_reference_dimension(
+        adapter,
+        _early_bound(overall, "IDisplayDimension").GetAnnotation(),
+        label="overall length",
+    )
 
     # 0.020: the note is left-aligned on its anchor, so the ink starts here. The
     # left bound is the 12.7 mm zone margin (~0.0127), which the re-centred frame
     # rule now matches (~0.0126); 0.020 clears both, and the audit enforces it.
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.100)
+    # Parked under the washer-diameter dimension (its text sits at y~0.087).
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.072)
     return await finalize_drawing(
         adapter,
         OUTPUTS,

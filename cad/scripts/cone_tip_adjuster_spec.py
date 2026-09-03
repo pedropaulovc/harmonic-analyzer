@@ -20,13 +20,15 @@ CUP_DEPTH = 6.0  # from the far (north) end
 SLOT_W = 1.5  # driver slot width
 SLOT_D = 1.5  # driver slot depth
 CHAMFER = 0.4  # both thread starts, 45 degrees
+FULL_THREAD_MIN = 11.0  # full-form thread between runouts, a MIN on the print
 
 # Machining tolerances, applied to the MODEL dimension by
 # build_cone_tip_adjuster -- never typed as sheet callout text, which
 # SolidWorks freezes and never re-renders on a unit change.
 #
-# The general turned/milled class for this part: the body length and the driver
-# slot are ordinary machined features with no fit partner.
+# The driver slot takes a screwdriver blade, so its width carries a band; the
+# body length and cup depth of a hand-adjusted screw are ordinary machined
+# features under the title-block tolerance.
 GENERAL_TOL_MM = 0.10
 # The cup is a blind bore the cone-shaft tip rests in; it may run oversize (more
 # end-play takeup) but never under, so the band is unilateral.
@@ -39,16 +41,20 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "CupProfile": {"CupDiaDim"},
     "Cup": {"CupDepth"},
     "SlotProfile": {"SlotWDim"},
+    "DriverSlot": {"SlotDepth"},
 }
 
+# Both thread-start chamfers, flagged from the north chamfer rim on the
+# elevation (never buried in the note block).
+CHAMFER_NOTE = f"2X {CHAMFER:.2f} X 45<MOD-DEG>"
+
 # Notes: part-specific process facts only, never a tolerance, never the
-# title block (drawing-simplicity-policy.md rule 6).  Every band is on its
-# model dimension; the thread designation rides the body-diameter callout.
+# title block (drawing-simplicity-policy.md rule 6).  The cup and slot are
+# dimensioned in SECTION A-A; the thread designation rides the body-diameter
+# callout; the chamfers ride their own leader.
 DRAWING_NOTES = "\n".join(
     (
-        "FULL-FORM THREAD 11.00 MIN BETWEEN RUNOUTS; 2A LIMITS APPLY AFTER FINISH.",
-        f"CHAMFER BOTH THREAD STARTS {CHAMFER:.2f} X 45 DEG; SLOT {SLOT_D:.2f} DEEP ACROSS THE HEAD.",
-        "CUP: FLAT FLOOR, FROM THE END OPPOSITE THE SLOT.",
+        f"FULL-FORM THREAD {FULL_THREAD_MIN:.1f} MIN BETWEEN RUNOUTS.",
         f"({BODY_DIA:.2f}) IS THE MODELLED THREAD ROOT ENVELOPE, NOT A TURNED SIZE.",
     )
 )

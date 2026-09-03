@@ -9,9 +9,9 @@ stated diameter into diametrically opposite tooth spaces and read across them
 with an ordinary micrometer. Every gear-data block carries that one row; this
 module computes it so the specs never hand-type a derived number.
 
-Formulas (external gear, standard proportions, ISO/DIN 3960 form -- the same
-result as Machinery's Handbook for a spur gear, and it extends to a helical
-gear through the base helix angle):
+Formulas (external gear, standard proportions, the Machinery's Handbook form
+for a spur gear, extended to a helical gear through the base helix angle as
+DIN 3960 / AGMA do):
 
     inv(a)   = tan(a) - a
     d        = N * m_t                     transverse pitch diameter
@@ -26,6 +26,18 @@ with ``a_t`` the transverse pressure angle, ``b_b`` the base helix angle
 the transverse module.  Lengths are millimetres throughout; the diametral
 pitches this repo uses are inch-based, so ``m_t = 25.4 / DP``.
 
+Pin size.  Machinery's Handbook tabulates three wire sizes for external
+gears: 1.68/P, 1.728/P and 1.92/P (inches).  On this machine's 14.5 deg
+full-depth teeth the 1.68/P wire seats so deep that it stands only ~0.05 mm
+proud of the tooth tips (computed here for every sheet: 0.059 mm on the 120T
+DP 49.82 cone gear, 0.036 mm on the 12T DP 30 feed pinion), too little for a
+micrometer anvil to bear on the pin rather than the OD.  The 1.92/P wire
+clears every gear in the fleet by 0.2-0.5 mm and its contact still sits on
+the involute flank, so :func:`preferred_pin_dia_mm` uses it, rounded to the
+0.05 mm a drill blank or gauge pin comes in.  One 1.00 mm pin then serves all
+20 cone-gear configurations (T006..T120); the next size down, 0.90, is
+marginal on T006 (contact 0.04 mm above the base circle).
+
 Importable from both the part and the drawing tier (like ``_fit_limits`` /
 ``_surface_finish``): no adapter, no COM, nothing but ``math``.
 """
@@ -36,6 +48,11 @@ import math
 from dataclasses import dataclass
 
 MM_PER_IN = 25.4
+
+# Machinery's Handbook wire constant (inches x DP) -- see the module docstring
+# for why the 1.92/P size, not the 1.68/P one, is the fleet's pin.
+PREFERRED_PIN_WIRE_CONSTANT = 1.92
+PIN_STEP_MM = 0.05
 
 # Acceptance band on the over-pins reading, quoted the way the OD band is.
 # Minus only: an undersize reading means thinner teeth (backlash), the safe
@@ -59,9 +76,16 @@ def inverse_involute(value: float) -> float:
     """Pressure angle (rad) whose involute function equals ``value``."""
     if value <= 0.0:
         raise ValueError(f"involute function must be positive, got {value!r}")
-    angle = 0.3
+    # inv(a) ~ a^3 / 3 for small a, so the cube root lands within a few percent
+    # of the answer for anything a gear needs; Newton then converges
+    # quadratically.  A step is halved until it stays inside (0, 90 deg) -- from a
+    # fixed 0.3 rad start the undamped iteration overshoots past 90 deg for
+    # inv values above ~0.15 (a 40 deg+ angle) and diverges.
+    angle = min((3.0 * value) ** (1.0 / 3.0), 1.5)
     for _ in range(100):
         step = (involute(angle) - value) / math.tan(angle) ** 2
+        while not 0.0 < angle - step < math.pi / 2.0:
+            step /= 2.0
         angle -= step
         if abs(step) < 1e-15:
             break
@@ -73,6 +97,14 @@ def diametral_pitch_text(diametral_pitch: float) -> str:
     does not carry false decimals."""
     text = f"{diametral_pitch:.2f}".rstrip("0").rstrip(".")
     return text
+
+
+def preferred_pin_dia_mm(diametral_pitch: float) -> float:
+    """The Machinery's Handbook 1.92/P wire, rounded to the nearest 0.05 mm."""
+    if diametral_pitch <= 0.0:
+        raise ValueError(f"diametral pitch must be positive, got {diametral_pitch!r}")
+    raw = PREFERRED_PIN_WIRE_CONSTANT / diametral_pitch * MM_PER_IN
+    return round(raw / PIN_STEP_MM) * PIN_STEP_MM
 
 
 @dataclass(frozen=True)

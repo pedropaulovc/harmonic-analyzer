@@ -1,4 +1,4 @@
-r"""Create the one-sheet Front/Right/Isometric frame assembly drawing."""
+r"""Create the complete frame assembly drawing package."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import sys
 from typing import Any
 
 import _telemetry
-from _assembly_drawing import build_simple_three_view_drawing
+from _assembly_drawing import build_assembly_package
 from _common import run_build
 from _drawing_common import DrawingOutputs
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -25,22 +25,47 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (1.0, 6.0)
-FRONT_CENTER = (0.065, 0.155)
-RIGHT_CENTER = (0.150, 0.155)
-ISO_CENTER = (0.300, 0.145)
+SHEET_SCALE = (1.0, 5.0)
+REFERENCE_SCALE = (1.0, 12.0)
+FRONT_CENTER = (0.105, 0.155)
+RIGHT_CENTER = (0.300, 0.155)
+ISO_CENTER = (0.335, 0.165)
+
+ASSEMBLY_STEPS = (
+    "Place the harmonic base on the surface plate with its machined top face up.",
+    "Seat all four columns on the base, keeping the original corner pairing.",
+    "Turn the rocker support so its window faces ±X; seat its foot on the base.",
+    "Bring the top-frame casting down over all columns and seat every corner boss.",
+    "Tighten the four corner side screws evenly, then the gooseneck hub set screw.",
+    "Fit four 9/16-12 lag screws upward into the support foot and secure the nameplate.",
+)
+CRITICAL_CHECKS = (
+    "Rocker-support window faces ±X; its pivot is on the machine +X side.",
+    "All column tops are at Y=1044.8 mm; rail top is Y=1036.2 mm, leaving 8.6 mm proud.",
+    "Sweep the top rail with an indicator; correct seating before tightening any side screw.",
+    "Verify all four posts square from the base and every support foot fully seated.",
+)
+HARDWARE_NOTES = (
+    "Use four 9/16-12 support lags, four corner screws, and one gooseneck set screw.",
+    "Nameplate uses four #4-40 fillister screws from the decorated face; no locker specified.",
+    "No numeric torque is assigned; tighten only to full seating without casting distortion.",
+)
 
 
 async def build(adapter: Any) -> dict[str, str]:
-    return await build_simple_three_view_drawing(
+    return await build_assembly_package(
         adapter,
         source=SOURCE,
         outputs=OUTPUTS,
         sheet_scale=SHEET_SCALE,
+        reference_scale=REFERENCE_SCALE,
         front_center=FRONT_CENTER,
         right_center=RIGHT_CENTER,
         iso_center=ISO_CENTER,
         pdf_title="Frame Assembly Drawing",
+        assembly_steps=ASSEMBLY_STEPS,
+        critical_checks=CRITICAL_CHECKS,
+        hardware_notes=HARDWARE_NOTES,
     )
 
 

@@ -14,10 +14,14 @@ y 9.1..22.9 (feed pinion + disc), collar 22.9..26.9.
 Dimensions: memory/paper-drive-rework.md E7/E8.
 
 Dimension scheme: the three lands carry true DIAMETRIC dims (doubled
-centerline-to-outline dims, ``swDiametricLinearDimension``) plus a
-per-land length dim -- the machinist-facing set the manufacturing drawing
-inserts as marked model items (a plain chain dim would print the radius
-and the step drops, not the diameters a lathe operator works to).
+centerline-to-outline dims, ``swDiametricLinearDimension``) plus three
+axial stations every one measured from the base (faced) end -- 9.10 to the
+base shoulder, 22.90 to the collar shoulder, 26.90 overall -- the
+machinist-facing set the manufacturing drawing inserts as marked model
+items (a plain chain dim would print the radius and the step drops, not
+the diameters a lathe operator works to; a per-land length chain ran from
+three different faces and left no conspicuous overall -- machinist review
+2026-09-02, drawing-simplicity-policy.md rule 7).
 
 Run (SolidWorks already open)::
 
@@ -126,15 +130,24 @@ async def build(adapter) -> dict[str, str]:
             f"stub {direction} {line}",
             await adapter.add_sketch_constraint(line, None, direction),
         )
-    # Land lengths (the closing on-axis segment's span is closure-supplied).
-    for line, span, name, drive in (
-        (profile_lines[1], BASE_LEN, "BaseLength", '"BaseLen"'),
-        (profile_lines[3], SEAT_LEN, "SeatLength", '"SeatLen"'),
-        (profile_lines[5], COLLAR_LEN, "CollarLength", '"CollarLen"'),
+    # Axial stations, every one from the base (faced) end: the base corner is
+    # the shared origin and the seat and tip corners are picked OFF-axis (the
+    # collar's outer corners), so the merged centreline points are never
+    # grabbed. The seat and collar spans follow from the differences, and
+    # the closing on-axis segment's span is closure-supplied.
+    base_corner = f"{profile_lines[0]}.end"
+    for other, station, name, drive in (
+        (f"{profile_lines[1]}.end", BASE_LEN, "BaseLength", '"BaseLen"'),
+        (f"{profile_lines[5]}.start", y_seat, "SeatEnd", '"BaseLen" + "SeatLen"'),
+        (
+            f"{profile_lines[6]}.start",
+            y_tip,
+            "Overall",
+            '"BaseLen" + "SeatLen" + "CollarLen"',
+        ),
     ):
         await dimension_between(
-            adapter, f"{line}.start", f"{line}.end", "vertical_distance", span,
-            f"stub {name}",
+            adapter, base_corner, other, "vertical_distance", station, f"stub {name}"
         )
         profile.record(name, drive)
     # Land diameters: doubled centerline dims (value = the full diameter).

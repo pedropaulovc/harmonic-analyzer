@@ -27,6 +27,10 @@ PIN_DIA_BAND = (PIN_DIA_TOL, -PIN_DIA_TOL)
 PIN_LENGTH_TOLERANCE_MM = 0.05
 CAP_RADIUS_TOLERANCE_MM = 0.05
 
+# Seated flat end to the crown apex: the stock length nobody may saw short
+# (a REFERENCE sheet dimension; the 17.00 to the crown root controls).
+OVERALL_LEN = PIN_LEN + CAP_SAG  # 17.80
+
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PinProfile": {"PinDia"},
     "Pin": {"Depth"},

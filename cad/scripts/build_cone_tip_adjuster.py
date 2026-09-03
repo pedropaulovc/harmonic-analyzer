@@ -209,6 +209,9 @@ async def build(adapter) -> dict[str, str]:
     check("cut slot", await adapter.create_cut_extrude(
         ExtrusionParameters(depth=SLOT_D, reverse_direction=True)))
     name_last_feature(adapter, "DriverSlot")
+    # Name the slot cut DEPTH so the print dimensions it in the axial section
+    # (never from a hidden line).
+    name_dimensions(adapter, "DriverSlot", ["SlotDepth"])
     v_slot = _slot_strip_area(BODY_DIA / 2.0, SLOT_W) * SLOT_D
     volume = await volume_check(adapter, "slot", volume - v_slot, 0.02 * v_slot)
 
@@ -262,12 +265,13 @@ async def build(adapter) -> dict[str, str]:
     await report_mass_properties(adapter)
     # Tolerance the MODEL dimensions so SolidWorks renders (and re-renders)
     # them; the sheet used to append "+/-0.10" and "+0.05/-0.00" as frozen text.
-    set_dimension_symmetric_tolerance(adapter, "Body", "BodyLenDim", GENERAL_TOL_MM)
+    # Only the fitted features carry a band: the driver slot (a screwdriver
+    # blade) and the cup (the shaft tip's seat).  The body length and cup
+    # depth of a hand-adjusted screw ride the title-block tolerance.
     set_dimension_symmetric_tolerance(adapter, "SlotProfile", "SlotWDim", GENERAL_TOL_MM)
     set_dimension_bilateral_tolerance(
         adapter, "CupProfile", "CupDiaDim", *deviations(CUP_DIA_BAND)
     )
-    set_dimension_symmetric_tolerance(adapter, "Cup", "CupDepth", GENERAL_TOL_MM)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

@@ -7,8 +7,9 @@ from pathlib import Path
 import build_cone_tip_block as part
 import cone_tip_block_spec
 import draw_cone_tip_block as drawing
+from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
-from _holes import CLEARANCE_MM
+from _holes import CLEARANCE_MM, TAP_DRILL_MM
 
 
 def test_required_drawing_paths() -> None:
@@ -37,8 +38,14 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
         "PassageZ",
         "PinchZ",
         "SlitW",
+        "SlitDepth",
     }
     assert part.ADJUSTER_AXIS_HEIGHT == cone_tip_block_spec.ADJUSTER_AXIS_HEIGHT
+    # The slit depth is a named extrude depth the elevation shows natively.
+    assert 'name_dimensions(adapter, "TopSlit", ["SlitDepth"])' in Path(
+        part.__file__
+    ).read_text(encoding="utf-8")
+    assert "SlitDepth" in drawing.FRONT_KEEP
 
 
 def test_non_bearing_tip_passage_replaces_the_fictional_journal() -> None:
@@ -47,36 +54,70 @@ def test_non_bearing_tip_passage_replaces_the_fictional_journal() -> None:
     assert "BoreDiaDim" not in source
     assert 'name_last_feature(adapter, "ShaftPassage")' in source
     assert part.SHAFT_PASSAGE_DIA == cone_tip_block_spec.SHAFT_PASSAGE_DIA == 2.0
-    assert drawing.DIMENSION_CALLOUTS["PassageDiaDim"] == "DRILL THRU"
-    assert "BlockHt" not in drawing.DIMENSION_CALLOUTS
+    assert drawing.DIMENSION_CALLOUTS == {"PassageDiaDim": "DRILL THRU"}
 
 
 def test_notes_are_few_specific_and_never_the_title_block() -> None:
     notes = cone_tip_block_spec.DRAWING_NOTES
     lines = notes.split("\n")
     assert len(lines) <= 4
-    assert "5/16-18" in notes  # the adjuster tap
-    assert "#3-48" in notes  # the pinch tap
-    assert "#32 DRILL" in notes  # the pinch clearance has no callout of its own
-    assert "OPPOSITE JAW" in notes
-    assert "SLIT" in notes
-    # Nothing the title block, a dimension or a deleted frame used to say.
-    for banned in ("+/-", "DATUM", "FRAME", "SIMULTANEOUS", "MATERIAL", "OXIDE", "X.XX", "UOS"):
+    assert "ONE SETUP" in notes
+    assert "SLIT MAY BREAK INTO THE PINCH HOLE" in notes
+    # The taps and the pinch drill ride their own view callouts now; a note
+    # never restates a hole, a face direction or the title block.
+    for banned in (
+        "5/16-18", "#3-48", "#32 DRILL", "+X FACE", "+/-", "DATUM", "FRAME",
+        "SIMULTANEOUS", "MATERIAL", "OXIDE", "X.XX", "UOS",
+    ):
         assert banned not in notes, banned
-    # #3 normal clearance (2.946 = 0.1160 in) is exactly the #32 drill.
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'adapter, "Manufacturing Notes", 0.020, 0.088, char_height=0.0025' in source
+
+
+def test_pinch_hole_is_flagged_from_the_drawn_entry_face() -> None:
+    # The right view IS the +X face the pinch is drilled from: a leader note on
+    # the clearance rim names the through jaw and the tapped jaw, sourced from
+    # the spec (#3 normal clearance 2.946 = 0.1160 in is exactly the #32 drill).
+    note = cone_tip_block_spec.PINCH_HOLE_NOTE
+    assert note.startswith("#32 DRILL <MOD-DIAM>2.95 THRU THIS JAW")
+    assert "TAP #3-48 THRU FAR JAW" in note
     assert cone_tip_block_spec.PINCH_CLEARANCE_DIA == CLEARANCE_MM[("#3", "normal")]
     assert round(0.116 * 25.4, 3) == cone_tip_block_spec.PINCH_CLEARANCE_DIA
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'adapter, "Manufacturing Notes", 0.020, 0.088, char_height=0.0025' in source
+    assert "text=PINCH_HOLE_NOTE" in source
+    assert "entity=pinch_entity" in source
+    assert 'label="pinch hole"' in source
     part_source = Path(part.__file__).read_text(encoding="utf-8")
     assert 'name="PinchClearance"' in part_source
     assert '"clearance", "#3", end="blind"' in part_source
     assert "depth_mm=(BLOCK_X - SLIT_W) / 2.0" in part_source
 
 
-def test_slit_callout_carries_the_depth_the_views_do_not_dimension() -> None:
-    assert drawing.DIMENSION_CALLOUTS["SlitW"] == "WIDE X 8.00 DEEP"
-    assert cone_tip_block_spec.SLIT_DEPTH == 8.0
+def test_adjuster_tap_has_a_native_callout_on_its_entry_face() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    # One native Hole Wizard callout (thread, thread depth, tap-drill depth)
+    # attached by ENTITY to the tap rim in the front view (the north face).
+    assert source.count("add_native_hole_callout(") == 1
+    assert "edge=tap_entity" in source
+    assert "radius_mm=TAP_DRILL_MM[ADJUSTER_THREAD] / 2.0" in source
+    assert TAP_DRILL_MM[cone_tip_block_spec.ADJUSTER_THREAD] == 6.528
+    # The automatic "5/16-18 Tapped Hole" note duplicates it and is removed.
+    assert 'remove_notes_matching(adapter, "Tapped Hole")' in source
+
+
+def test_every_hole_axis_is_located_from_a_drawn_face() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    # Three entity-selected edge-to-centre dimensions: adjuster axis across the
+    # width (front), pinch height from the foot and pinch station across the
+    # depth (right).
+    assert source.count("    _entity_dimension(\n") == 3
+    for label in (
+        'label="adjuster-axis lateral location"',
+        'label="pinch-axis height"',
+        'label="pinch-axis depth station"',
+    ):
+        assert label in source, label
+    assert "set_arc_endpoints_to_center(adapter, display, label=label)" in source
 
 
 def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:
@@ -94,14 +135,16 @@ def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:
         assert helper not in source, helper
     assert not hasattr(cone_tip_block_spec, "GEOMETRIC_TOLERANCES_MM")
     assert not hasattr(cone_tip_block_spec, "SURFACE_FINISHES")
-    # The pinch-axis height survives as an ordinary entity-selected dimension.
-    assert 'label="pinch-axis height"' in source
-    assert "draw.AddVerticalDimension2(" in source
 
 
-def test_only_the_fitted_block_height_prints_three_decimals() -> None:
-    assert drawing.DIMENSION_PRECISION == {"PassageZ": 2, "BlockHt": 3}
-    assert cone_tip_block_spec.BLOCK_HEIGHT_BAND == (0.05, 0.00)
+def test_nothing_on_the_block_is_fitted() -> None:
+    # The block height used to carry +0.05/0 with three decimals; nothing fits
+    # on it (the shaft tip has 0.6 mm radial air in the passage), so every
+    # dimension prints two places under the title block and the model carries
+    # no band at all.
+    assert drawing.DIMENSION_PRECISION == {"PassageZ": 2, "BlockHt": 2}
+    assert not hasattr(cone_tip_block_spec, "BLOCK_HEIGHT_BAND")
+    assert model_toleranced_dimensions(part) == {}
 
 
 def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
@@ -114,6 +157,14 @@ def test_view_scales_are_explicit() -> None:
     assert drawing.SHEET_SCALE == (2.0, 1.0)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("scale=(2, 1)") == 4  # elevation + plan + side + pictorial
+
+
+def test_slit_width_sits_clear_of_the_plan_outline() -> None:
+    # The 1.20 slit width used to print on the slot's projected lines; it now
+    # sits below the plan with a bare value (the depth is native on the
+    # elevation, so the "WIDE X 8.00 DEEP" callout is gone).
+    assert drawing.TOP_KEEP["SlitW"] == (drawing.TOP_CENTER[0], 0.221)
+    assert "SlitW" not in drawing.DIMENSION_CALLOUTS
 
 
 def test_part_stamps_make_critical_properties() -> None:

@@ -1,9 +1,9 @@
 r"""Create the curated knife-hanger stud drawing.
 
 Profile side view with every stack length as an extrude-depth model
-dimension (chained from the threaded end), the shank and tip diameters as
-linears across the profile, the thread designation leadered to the
-threaded neck and the axis centerline; an end view with the washer and
+dimension (chained from the threaded end) and the (REF) overall outside
+them, the shank and tip diameters as linears across the profile, the
+thread designation leadered to the threaded neck and the axis centerline; an end view with the washer and
 collar diameters (leaders ending at their rims), the hex across-flats as a
 drawing-native linear and the drilled centre called out on its circle;
 plus an isometric.
@@ -20,6 +20,7 @@ from _common import CAD_ROOT, run_build
 from _drawing_common import DrawingOutputs, add_attached_note, add_edge_dimension
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fastener_annotations import (
+    add_overall_reference,
     add_thread_leader,
     end_diameter_leaders_at_rim,
     view_dimension_annotations,
@@ -35,6 +36,7 @@ from knife_hanger_stud_spec import (
     THREAD_DESIGNATION,
     THREAD_DIA,
     THREAD_LEN,
+    TIP_DIA,
     TIP_LEN,
     TOTAL_LEN,
     WASHER_T,
@@ -126,6 +128,17 @@ SIDE_KEEP = {
 THREAD_LEADER_XY = (SIDE_CENTER[0] - _THREAD_HALF, _THREAD_MID_Y)
 THREAD_NOTE_XY = (SIDE_CENTER[0] - 0.060, _THREAD_MID_Y - 0.005)
 SIDE_AXIS_FACE_XY = (SIDE_CENTER[0], _SHANK_MID_Y)
+# (REF) overall, threaded end to tip, in a column outside the four chained
+# lengths so the prominent 36.75 reads as the plain shank, not the overall
+# (text to ~0.274, clear of the isometric from ~0.295).  Model points on the
+# right half of each end face; the tip face is picked outside its drilled
+# centre.
+OVERALL_DIM_X = SIDE_CENTER[0] + 0.076
+OVERALL_END_POINTS_MM = (
+    (0.7 * THREAD_DIA / 2.0, 0.0, 0.0),
+    (0.7 * TIP_DIA / 2.0, TOTAL_LEN, 0.0),
+)
+OVERALL_TEXT_XY = (OVERALL_DIM_X, SIDE_CENTER[1])
 
 
 def _decorate(adapter: Any, side: Any, end: Any, _iso: Any) -> None:
@@ -159,6 +172,15 @@ def _decorate(adapter: Any, side: Any, end: Any, _iso: Any) -> None:
         silhouette_xy=THREAD_LEADER_XY,
         note_xy=THREAD_NOTE_XY,
         label="neck thread designation",
+    )
+    add_overall_reference(
+        adapter,
+        side,
+        end_points_mm=OVERALL_END_POINTS_MM,
+        entity_types=("EDGE", "EDGE"),
+        text_xy=OVERALL_TEXT_XY,
+        orientation="vertical",
+        label="overall length reference",
     )
 
 

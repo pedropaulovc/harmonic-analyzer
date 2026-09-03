@@ -2,8 +2,11 @@
 
 Every gear sheet follows cad/docs/drawing-simplicity-policy.md: gears are not
 on the GD&T allowlist (no datums, no frames, no basics), a roughness symbol
-appears only on a bore that RUNS in the assembly, and the notes are at most
-four part-specific lines beside a compact GEAR DATA block.
+appears only on a surface that RUNS in the assembly, the notes are at most
+four part-specific lines beside a compact GEAR DATA block, and (since the
+machinist review of 2026-09-02) that block carries the one thing a
+micrometer can check -- the measurement over two pins from ``_gear_inspection``
+-- while the dense gears show their axial stack in a cut-face-only section.
 """
 
 from __future__ import annotations
@@ -12,6 +15,7 @@ from pathlib import Path
 
 import _config
 import _gear_drawing_entities
+import _gear_inspection
 import alignment_pinion_spec
 import cone_gear_spec
 import crank_drive_gear_spec
@@ -41,11 +45,30 @@ SHEETS = (
     ("transgear-pinion", transgear_pinion_spec, draw_transgear_pinion),
 )
 
-# The bores that RUN in the assembly (policy rule 5): the cylinder gear spins
-# free on the cylinder-gear shaft; the reducer disc and the feed pinion locked
-# to it spin free on the transgear stud.  Every other gear is keyed, pressed,
-# soldered or locked to its shaft, so its bore carries no roughness symbol.
-RUNNING_BORE_SHEETS = {"cylinder-gear", "rack-pinion", "transgear-feed-pinion"}
+# Every gear in the fleet now carries the same computed over-pins acceptance
+# and treats whole depth as cutter-setting reference data.
+
+# Surfaces that RUN in the assembly (policy rule 5): the cylinder gear spins
+# free on the cylinder-gear shaft and its cam O.D. is the connecting-rod
+# ring's track; the reducer disc and the feed pinion locked to it spin free on
+# the transgear stud.  Every other gear is keyed, pressed, soldered or locked
+# to its shaft, so its bore carries no roughness symbol.
+RUNNING_SURFACE_SHEETS = {
+    "cylinder-gear": ("cylinder_gear_bore", "cam_track"),
+    "rack-pinion": ("bore",),
+    "transgear-feed-pinion": ("bore",),
+}
+
+# Sheets whose projected side view was a black band of tooth edges: the side
+# view is a cut-face-only SECTION A-A through the axis instead.
+SECTION_SHEETS = {
+    "alignment-pinion",
+    "cone-gear",
+    "crank-drive-gear",
+    "crank-pinion",
+    "cylinder-gear",
+    "rack-pinion",
+}
 
 GDT_HELPERS = (
     "add_datum_feature(",
@@ -72,12 +95,19 @@ TITLE_BLOCK_OWNED_NOTE_TEXT = (
 )
 
 # GD&T vocabulary and cross-references that a note must never carry (policy
-# rule 6): a datum letter, a runout, another part's number.
+# rule 6): a datum letter, a runout, another part's number.  A roughness
+# grade is a symbol on the view, never a note.
 GDT_NOTE_TEXT = ("DATUM", "RUNOUT", "PERPENDICULAR", "FCF", "MHA-")
 
 
 def _source(module) -> str:
     return Path(module.__file__).read_text(encoding="utf-8")
+
+
+def _bore_dimension(spec) -> str:
+    (feature,) = (name for name in spec.DRAWING_DIMENSIONS if name.endswith("BoreProfile"))
+    (dimension,) = spec.DRAWING_DIMENSIONS[feature]
+    return dimension
 
 
 def test_notes_do_not_repeat_title_block_metadata() -> None:
@@ -112,6 +142,7 @@ def test_notes_are_at_most_four_lines_and_carry_no_gdt() -> None:
         notes = spec.DRAWING_NOTES.upper()
         for word in GDT_NOTE_TEXT:
             assert word not in notes, f"{part_name}: {word}"
+        assert "Ra " not in spec.DRAWING_NOTES, f"{part_name}: a roughness grade in a note"
 
 
 def test_no_gear_sheet_carries_gdt() -> None:
@@ -126,20 +157,23 @@ def test_no_gear_sheet_carries_gdt() -> None:
         assert not hasattr(spec, "PART_DATUMS"), part_name
 
 
-def test_roughness_symbols_only_on_running_bores() -> None:
+def test_roughness_symbols_only_on_running_surfaces() -> None:
     for part_name, spec, module in SHEETS:
         source = _source(module)
-        if part_name in RUNNING_BORE_SHEETS:
-            (control,) = spec.SURFACE_FINISHES
-            assert control.roughness_um == 1.6, part_name
-            assert control.face.diameter_mm == spec.BORE_DIA, part_name
-            assert source.count("add_surface_finish(") == 1, part_name
+        keys = RUNNING_SURFACE_SHEETS.get(part_name)
+        if keys is not None:
+            controls = spec.SURFACE_FINISHES
+            assert tuple(control.key for control in controls) == keys, part_name
+            for control in controls:
+                assert control.roughness_um == 1.6, f"{part_name}: {control.key}"
+                assert (
+                    f'control=surface_finish_by_key(SURFACE_FINISHES, "{control.key}")'
+                    in source
+                ), f"{part_name}: {control.key}"
+            assert controls[0].face.diameter_mm == spec.BORE_DIA, part_name
+            assert source.count("add_surface_finish(") == len(controls), part_name
             assert "bore_edge = visible_circle_edge(" in source, part_name
             assert source.count("entity=bore_edge") == 1, part_name
-            assert (
-                f'control=surface_finish_by_key(SURFACE_FINISHES, "{control.key}")'
-                in source
-            ), part_name
             continue
         assert spec.SURFACE_FINISHES == (), part_name
         assert "add_surface_finish(" not in source, part_name
@@ -152,7 +186,7 @@ def test_gear_data_blocks_share_the_compact_row_vocabulary() -> None:
         data = spec.GEAR_DATA
         lines = data.split("\n")
         assert lines[0] == "GEAR DATA", part_name
-        assert len(lines) <= 12, f"{part_name}: {len(lines)} gear-data lines"
+        assert len(lines) <= 13, f"{part_name}: {len(lines)} gear-data lines"
         for field in (
             "NUMBER OF TEETH",
             "DIAMETRAL PITCH",
@@ -171,21 +205,74 @@ def test_gear_data_blocks_share_the_compact_row_vocabulary() -> None:
         assert 'adapter, "Manufacturing Notes"' in source, part_name
 
 
-def test_bore_callouts_name_the_process() -> None:
-    for part_name, spec, module in SHEETS:
-        (callout,) = module.DIMENSION_CALLOUTS.values()
-        assert callout.startswith("REAM THRU"), f"{part_name}: {callout!r}"
-        assert set(module.DIMENSION_CALLOUTS) == set().union(
-            *spec.DRAWING_DIMENSIONS.values()
+def test_gear_data_blocks_carry_a_computed_over_pins_acceptance() -> None:
+    """The one row a micrometer can check, never typed by hand.
+
+    Each spec's pin is the Handbook 1.92/P wire from ``_gear_inspection`` and
+    the reading is regenerated from DP / N / PA (and the helix + thinning on
+    the crank-drive gear), so the row on the sheet can only drift if the tooth
+    system does.  The whole depth reads as reference beside it: a cutter
+    setting is not an acceptance.
+    """
+    for part_name, spec, _module in SHEETS:
+        data = spec.GEAR_DATA
+        assert "WHOLE DEPTH (REF):" in data, part_name
+        assert spec.PIN_DIA_MM == _gear_inspection.preferred_pin_dia_mm(
+            spec.DIAMETRAL_PITCH
         ), part_name
+        assert spec.OVER_PINS.usable, part_name
+        assert spec.OVER_PINS.teeth == spec.TEETH, part_name
+        assert spec.OVER_PINS.pin_dia_mm == spec.PIN_DIA_MM, part_name
+        label, value = _gear_inspection.over_pins_row(spec.OVER_PINS)
+        assert f"{label}:  {value}" in data, part_name
+        assert value.endswith(_gear_inspection.OVER_PINS_BAND_TEXT), part_name
+        # The DP row carries the generated tooth spacing without false decimals.
+        assert (
+            f"DIAMETRAL PITCH:  {_gear_inspection.diametral_pitch_text(spec.DIAMETRAL_PITCH)}"
+            in data
+            or f"DIAMETRAL PITCH (TRANSVERSE):  "
+            f"{_gear_inspection.diametral_pitch_text(spec.DIAMETRAL_PITCH)}" in data
+        ), part_name
+
+
+def test_bore_callouts_name_the_process_and_hold_three_decimals() -> None:
+    for part_name, spec, module in SHEETS:
+        bore = _bore_dimension(spec)
+        callout = module.DIMENSION_CALLOUTS[bore]
+        assert callout.startswith("REAM THRU"), f"{part_name}: {callout!r}"
+        assert module.DIMENSION_PRECISION[bore] == 3, part_name
+        marked = set().union(*spec.DRAWING_DIMENSIONS.values())
+        assert set(module.DIMENSION_CALLOUTS) <= marked, part_name
+        assert set(module.DIMENSION_PRECISION) <= marked, part_name
+
+
+def test_side_views_are_cut_face_sections_where_the_tooth_ring_hid_the_bore() -> None:
+    for part_name, _spec, module in SHEETS:
+        source = _source(module)
+        if part_name in SECTION_SHEETS:
+            assert "create_section_view(" in source, part_name
+            assert "show_only_cut_face(adapter, section" in source, part_name
+            assert 'section_label="A"' in source, part_name
+            assert "RIGHT_CENTER" not in source, part_name
+            assert "set_hidden_lines_visible(adapter, front)" in source, part_name
+            # The cut runs vertically through the front view's axis.
+            assert module.SECTION_LINE[0][0] == module.SECTION_LINE[1][0], part_name
+            assert module.SECTION_LINE[0][0] == module.FRONT_CENTER[0], part_name
+            assert module.SECTION_LINE[0][1] < module.FRONT_CENTER[1] < module.SECTION_LINE[1][1]
+            continue
+        assert "create_section_view(" not in source, part_name
+        assert (
+            "for view in (front, right):\n        set_hidden_lines_visible" in source
+        ), part_name
+    helper = _source(_gear_drawing_entities)
+    assert "SetDisplayOnlySurfaceCut(True)" in helper
+    assert "GetDisplayOnlySurfaceCut()" in helper
 
 
 def test_hidden_lines_on_in_every_orthographic_view() -> None:
     for part_name, _spec, module in SHEETS:
         source = _source(module)
-        assert (
-            "for view in (front, right):\n        set_hidden_lines_visible" in source
-        ), part_name
+        assert "set_hidden_lines_visible(" in source, part_name
         if part_name == "alignment-pinion":
             assert "set_hidden_lines_removed" not in source, part_name  # no iso
             continue

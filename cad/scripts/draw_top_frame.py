@@ -38,7 +38,6 @@ from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_attached_note,
-    add_edge_dimension,
     add_native_hole_callout,
     add_property_linked_note,
     create_section_view,
@@ -166,20 +165,6 @@ def _front_xy(x_mm: float, y_mm: float) -> tuple[float, float]:
     )
 
 
-def _section_xy(x_mm: float, y_mm: float) -> tuple[float, float]:
-    """Sheet point for a model (|X|, Y) in the 1:4 section.
-
-    At z +50 the cut is the two side-rail T-sections and the crossbar, so
-    the section's bounding box is centred on the model origin in both axes;
-    the picks are on the +X rail, whose T is identical to the -X rail's, so
-    the section's viewing direction (which may mirror X) cannot matter.
-    """
-    return (
-        SECTION_CENTER[0] + x_mm * FRONT_SCALE / 1000.0,
-        SECTION_CENTER[1] + y_mm * FRONT_SCALE / 1000.0,
-    )
-
-
 if abs(SECTION_LINE[0][1] - _plan_xy(0.0, SECTION_CUT_Z)[1]) > 1e-9:
     raise AssertionError("section cut line does not sit at SECTION_CUT_Z on the plan")
 
@@ -245,9 +230,10 @@ STACK_TEXT_XY = (0.264, _front_xy(0.0, 0.0)[1])
 BOSS_ABOVE_TEXT_XY = (0.278, _front_xy(0.0, HALF_H + BOSS_ABOVE / 2.0)[1])
 RING_TEXT_XY = (_front_xy(92.0, 0.0)[0], _front_xy(0.0, 0.0)[1])
 FLANGE_TEXT_XY = (_front_xy(140.0, 0.0)[0], _front_xy(0.0, HALF_H - FLANGE / 2.0)[1])
-# Section: web thickness nearest, flange width outside, both below the +X T.
-WEB_TEXT_XY = (_section_xy(COLUMN_X, 0.0)[0], 0.0895)
-SIDE_RAIL_TEXT_XY = (_section_xy(COLUMN_X, 0.0)[0], 0.0835)
+# Section dimension text sits below the +X T; only the text placement is a
+# sheet literal.  Edge picks come from the section view's model transform.
+WEB_TEXT_XY = (0.39425, 0.0895)
+SIDE_RAIL_TEXT_XY = (0.39425, 0.0835)
 
 # Plan hole pattern, in hole-table order: 4X column bores, the gooseneck
 # bore, 2X hanger-stud holes, 2X keeper taps (the tap drill is the modeled
@@ -662,8 +648,9 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # SECTION A-A: the rails' T-section (the web sits under the flange in the
     # plan and behind the front rail in the elevation, so only a cut shows
-    # it).  The cut-face edges are section geometry, not model edges, so the
-    # web faces and flange sides are picked by sheet coordinate on the +X T.
+    # it).  Cut faces are section-generated entities: locate the four named
+    # vertical edges in model space, then select the concrete entities through
+    # IView instead of asking sheet-coordinate selection to infer them.
     section = create_section_view(
         adapter,
         top,
@@ -674,22 +661,47 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=(1, 4),
         label="rail T-section",
     )
-    web_pick_y = -HALF_H / 2.0
-    add_edge_dimension(
+    _section_circles, section_lines = _view_edges(adapter, section)
+    web_inner = _line_edge(
+        section_lines,
+        label="section +X web inner edge",
+        along="y",
+        x_mm=WEB_IN_X,
+        z_mm=SECTION_CUT_Z,
+    )
+    web_outer = _line_edge(
+        section_lines,
+        label="section +X web outer edge",
+        along="y",
+        x_mm=WEB_OUT_X,
+        z_mm=SECTION_CUT_Z,
+    )
+    _dimension_entities(
         adapter,
         section,
-        p0=_section_xy(WEB_IN_X, web_pick_y),
-        p1=_section_xy(WEB_OUT_X, web_pick_y),
+        (web_inner, web_outer),
         text_xy=WEB_TEXT_XY,
         label="web thickness",
         orientation="horizontal",
     )
-    flange_pick_y = FLANGE_BOT_Y + FLANGE / 2.0
-    add_edge_dimension(
+    rail_inner = _line_edge(
+        section_lines,
+        label="section +X flange inner edge",
+        along="y",
+        x_mm=INNER_X,
+        z_mm=SECTION_CUT_Z,
+    )
+    rail_outer = _line_edge(
+        section_lines,
+        label="section +X flange outer edge",
+        along="y",
+        x_mm=OUTER_X,
+        z_mm=SECTION_CUT_Z,
+    )
+    _dimension_entities(
         adapter,
         section,
-        p0=_section_xy(INNER_X, flange_pick_y),
-        p1=_section_xy(OUTER_X, flange_pick_y),
+        (rail_inner, rail_outer),
         text_xy=SIDE_RAIL_TEXT_XY,
         label="side rail width",
         orientation="horizontal",

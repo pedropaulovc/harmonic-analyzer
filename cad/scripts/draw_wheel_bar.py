@@ -6,7 +6,10 @@ bore axis) shows them as circles: 2x #8 clamp-screw clearance holes flanking the
 column and 1x #6 pen-hanger hole at the free end.  The bar length + section ride
 the auto-imported profile marks; the depth is added across the right-view
 section; each bore carries a native DRILL callout and a horizontal station from
-the LEFT END (one origin), stacked below the bar with the shortest span nearest.
+the LEFT END (one origin), stacked below the bar with the shortest span nearest;
+the bores' common transverse station (5.00 from the bottom edge to the
+pen-hanger hole axis -- all three sit on the bar's centreline) is added at the
+left end, nested inside the 10.00 section height.
 
 The print is plain (cad/docs/drawing-simplicity-policy.md): a clamped support
 bar is not on the GD&T allowlist, so it carries no datum, no frame, no
@@ -86,10 +89,13 @@ def _front_x(model_x: float) -> float:
 
 
 # The overall length moves down one row to make room for the three station
-# dimensions stacked between it and the bar.
+# dimensions stacked between it and the bar.  The section height (10.00)
+# stands left of the left end, OUTSIDE the transverse hole station, with its
+# text lifted off the mid-height row: the pen-hanger hole's extended centre
+# mark runs along that row through the end face (review 2026-09-02).
 FRONT_KEEP = {
     "Length": (FRONT_CENTER[0], BAR_BOTTOM - 0.038),
-    "Side": (LEFT_END - 0.020, FRONT_CENTER[1]),
+    "Side": (LEFT_END - 0.023, FRONT_CENTER[1] + 0.011),
 }
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
 
@@ -99,6 +105,11 @@ RIGHT_HALF_Y = BAR_SIDE * _S / 2.0
 # The left end face is the one origin; the pen-hanger hole sits 2.5 from it,
 # so that pick lands well above the bar's mid-height, clear of the circle.
 END_FACE_PICK = (LEFT_END, FRONT_CENTER[1] + 0.0035)
+# The bottom edge, picked just inboard of the left end, is the origin of the
+# transverse station (bottom edge -> pen-hanger hole axis); its text sits
+# left of the end, nearest the view, inside the 10.00 lane.
+BOTTOM_EDGE_PICK = (LEFT_END + 0.006, BAR_BOTTOM)
+TRANSVERSE_STATION_TEXT_XY = (LEFT_END - 0.011, FRONT_CENTER[1] - 0.0025)
 
 # Station rows below the bar, shortest span nearest (so no extension line
 # crosses a shorter dimension's text): (model x, hole Ø, text sheet xy).  The
@@ -125,12 +136,15 @@ HOLE_CALLOUTS = (
 )
 
 
-def _rim_pick(adapter: Any, view: Any, model_x: float, dia: float, label: str):
-    """Refine the top-rim point of a Ø``dia`` bore at ``model_x`` to a real edge."""
+def _rim_pick(
+    adapter: Any, view: Any, model_x: float, dia: float, label: str, *, side: int = 1
+):
+    """Refine the top (``side=1``) or bottom (``side=-1``) rim point of a
+    Ø``dia`` bore at ``model_x`` to a real edge."""
     return find_edge_near(
         adapter,
         view,
-        (_front_x(model_x), FRONT_CENTER[1] + dia * _S / 2.0),
+        (_front_x(model_x), FRONT_CENTER[1] + side * dia * _S / 2.0),
         axis="y",
         label=label,
     )
@@ -215,6 +229,26 @@ async def build(adapter: Any) -> dict[str, str]:
             orientation="horizontal",
         )
         set_arc_endpoints_to_center(adapter, station, label=label)
+
+    # Transverse station (5.00): bottom edge -> pen-hanger hole axis.  All
+    # three bores share the bar's centreline, so the one station at the free
+    # end locates every axis across the 10 width (review 2026-09-02: the
+    # midline was drawn, never dimensioned).
+    transverse = add_edge_dimension(
+        adapter,
+        front,
+        p0=find_edge_near(
+            adapter, front, BOTTOM_EDGE_PICK, axis="y", label="bar bottom edge"
+        ),
+        p1=_rim_pick(
+            adapter, front, SCREW_HOLE_X, PEN_HANGER_HOLE_DIA,
+            "transverse hole station", side=-1,
+        ),
+        text_xy=TRANSVERSE_STATION_TEXT_XY,
+        label="transverse hole station",
+        orientation="vertical",
+    )
+    set_arc_endpoints_to_center(adapter, transverse, label="transverse hole station")
 
     # Hole sizes: native Hole Wizard callouts, DRILL as the process prefix.
     for label, model_x, dia, callout_xy in HOLE_CALLOUTS:

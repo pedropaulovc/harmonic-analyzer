@@ -273,6 +273,10 @@ async def build(adapter) -> dict[str, str]:
     # (the dark bar the brass pen rod runs beside), not bright.
     await apply_color(adapter, PANEL_BLACK)
     await report_mass_properties(adapter)
+    # Manufacturing drawing support: mark exactly the print's model dimensions
+    # (the block's width AND height, the channel's two sides, the strap's two
+    # widths, rise and right-edge lean) and stamp the make-critical
+    # title-block properties.
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

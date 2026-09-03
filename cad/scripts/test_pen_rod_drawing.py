@@ -1,9 +1,9 @@
 """Offline contracts for the pen-rod drawing.
 
 The print follows cad/docs/drawing-simplicity-policy.md: a length of drawn
-square bar carries no datums or frames; its slide fit is the band on the model
-section, plus one Ra on the face that slides in the v-block, and the wire hole
-says DRILL on its callout.
+square bar carries no datums, frames or roughness symbols (the drawn faces
+pass as received); its slide fit is the band on the model section, and the
+wire hole says DRILL on its callout, sized and centred in DETAIL A at 4:1.
 """
 
 from __future__ import annotations
@@ -54,6 +54,30 @@ def test_wire_hole_callout_states_size_and_process() -> None:
     assert source.count("add_edge_dimension(") == 2
 
 
+def test_wire_hole_size_and_centring_read_in_a_detail() -> None:
+    # Machinist review 2026-09-02: the 2.50 across dimension crowded the top
+    # view's stacked 5.00. A 2.5 mm span is illegible at 1:1 anywhere, so
+    # DETAIL A (4:1) carries it and the hole callout (policy rule 7); the
+    # length location stays on the front view, where the bottom face is.
+    assert drawing.DETAIL_SCALE == (4, 1)
+    assert drawing.DETAIL_RADIUS > pen_rod_spec.ROD_SECTION / 2000.0
+    source = _source()
+    assert source.count("create_detail_view(") == 1
+    assert 'detail_label="A"' in source
+    assert "model_point_in_view(" in source
+    # The detail is never curated (its circle takes in both rod faces, so a
+    # curation could claim Section); it only receives the picked annotations.
+    assert 'view_label="detail"' not in source
+    assert "add_edge_dimension(\n        adapter,\n        detail," in source
+    assert "add_native_hole_callout(\n        adapter,\n        detail," in source
+    assert 'orientation="horizontal"' in source
+    # The front view keeps the along-the-rod location only.
+    assert "add_edge_dimension(\n        adapter,\n        front," in source
+    assert "add_native_hole_callout(\n        adapter,\n        front," not in source
+    # The detail sits right of the right view and left of the isometric.
+    assert drawing.RIGHT_CENTER[0] < drawing.DETAIL_CENTER[0] < drawing.ISO_CENTER[0]
+
+
 def test_slide_fit_rides_the_model_section() -> None:
     assert drawing.DIMENSION_CALLOUTS == {}
     assert drawing.TOP_DIMENSION_CALLOUTS == {}
@@ -78,26 +102,26 @@ def test_notes_are_few_specific_and_never_the_title_block() -> None:
     assert "def _manufacturing_notes" not in source
 
 
-def test_print_carries_no_gdt_and_one_sliding_finish() -> None:
+def test_print_carries_no_gdt_or_finish_symbols() -> None:
+    """Drawn bar passed as received: no datums, no frames, no Ra (rules 3, 5).
+
+    Machinist review 2026-09-02: the lone Ra 1.6 on a drawn face defeated the
+    as-received note and its leader crossed the 145.00 and the right view.
+    """
     source = _source()
     for helper in (
         "add_datum_feature(",
         "add_feature_control_frame(",
+        "add_surface_finish(",
         "set_basic_dimension(",
         "project_part_pmi(",
     ):
         assert helper not in source, helper
     assert pen_rod_spec.PART_DATUMS == ()
     assert pen_rod_spec.GEOMETRIC_CONTROLS == ()
+    assert pen_rod_spec.SURFACE_FINISHES == ()
     assert not hasattr(pen_rod_spec, "GEOMETRIC_TOLERANCES_MM")
-    # The -X face slides in the v-block, so it alone carries a roughness symbol.
-    (control,) = pen_rod_spec.SURFACE_FINISHES
-    assert control.key == "slide_face"
-    assert control.roughness_um == 1.6
-    assert control.face.normal == (-1, 0, 0)
-    assert control.face.offset_mm == pen_rod_spec.ROD_SECTION / 2.0
-    assert source.count("add_surface_finish(") == 1
-    assert 'surface_finish_by_key(SURFACE_FINISHES, "slide_face")' in source
+    assert "surface_finish_by_key" not in source
     assert "roughness_ra=" not in source
     # The part build keeps its author_part_pmi call shape on the empty tuples.
     part_source = Path(part.__file__).read_text(encoding="utf-8")
@@ -118,6 +142,7 @@ def test_view_scales_are_explicit() -> None:
     source = _source()
     assert source.count("scale=(1, 1)") == 3
     assert source.count("scale=(4, 1)") == 1
+    assert "scale=DETAIL_SCALE" in source
     assert pen_rod_spec.TOP_VIEW_NOTE == "TOP VIEW SCALE 4:1"
     assert 'add_property_linked_note(adapter, "Top View Note"' in source
 

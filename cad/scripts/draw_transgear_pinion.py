@@ -60,9 +60,10 @@ FRONT_KEEP = {
     "BoreDia": (FRONT_CENTER[0] - 0.060, FRONT_CENTER[1] - 0.035),
 }
 # Reamed fit on the knob shaft's Ø5 seat; the band is on the model dimension
-# (build_transgear_pinion), so the callout only names the process.
+# (build_transgear_pinion), so the callout only names the process and three
+# decimals say "hold it".
 DIMENSION_CALLOUTS = {"BoreDia": "REAM THRU"}
-DIMENSION_PRECISION = {"BoreDia": 2}
+DIMENSION_PRECISION = {"BoreDia": 3}
 
 
 async def build(adapter: Any) -> dict[str, str]:

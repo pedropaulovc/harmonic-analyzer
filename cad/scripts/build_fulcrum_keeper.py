@@ -62,11 +62,14 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
 )
+from _fit_limits import deviations
 from _holes import HoleSpec, wizard_holes
 from fulcrum_keeper_spec import (
     BALL_DIA,
     BORE_DIA,
+    BORE_DIA_BAND,
     CBORE_DEPTH_MM,
     CBORE_DIA_MM,
     CROWN_DIA,
@@ -82,6 +85,7 @@ from fulcrum_keeper_spec import (
     RELIEF_H,
     SCREW_X,
     SHAFT_AXIS_H,
+    SOCKET_DIA_BAND,
 )
 
 PART_NAME = "fulcrum-keeper"
@@ -405,8 +409,16 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven keeper (equations neutral)", volume, 0.005 * volume
     )
 
-    # Manufacturing drawing support: mark exactly the print's dimensions and
-    # stamp the make-critical title-block properties.
+    # Manufacturing drawing support: the two fitted bores carry their bands
+    # on the model dimensions (the ball-seat press band, the reamed shaft
+    # bore), then mark exactly the print's dimensions and stamp the
+    # make-critical title-block properties.
+    set_dimension_bilateral_tolerance(
+        adapter, "SocketProfile", "SocketDia", *deviations(SOCKET_DIA_BAND)
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "BoreProfile", "BoreDia", *deviations(BORE_DIA_BAND)
+    )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

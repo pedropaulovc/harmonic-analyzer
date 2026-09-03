@@ -13,9 +13,11 @@ ear holes) sits to its right.
 
 The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): a
 clamp casting carries no datums, no feature-control frames, no roughness
-symbols and no basic dimensions -- the title block's general tolerances
-govern everything, and the relief bore is finished as a pair with its back
-arc.
+symbols and no basic dimensions -- the slip-fit relief carries its band on
+the model dimension, the title block governs the rest, and the relief is
+finished as a pair with its back arc.  The bore and the ear-hole pattern are
+located from the block's own faces by entity-selected dimensions; the bar
+face is flagged from the view.
 
 Run with SolidWorks open::
 
@@ -29,27 +31,35 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_attached_note,
     add_edge_dimension,
     add_native_hole_callout,
     add_property_linked_note,
     curate_view_dimensions,
     finalize_drawing,
+    model_point_in_view,
     new_project_drawing,
     read_required_properties,
+    set_arc_endpoints_to_center,
     set_dimension_callouts,
     set_dimension_precision,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
+    view_name,
+    visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from column_clamp_front_spec import (
+    ARC_DEPTH,
     ARC_HEIGHT,
+    ARC_WIDTH,
+    BAR_FACE_FLAG,
+    BORE_RADIUS,
     EAR_HOLE_DIA,
-    EAR_HOLE_Z,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -96,6 +106,113 @@ RIGHT_KEEP = {}
 DIMENSION_CALLOUTS = {
     "BoreDia": "BORE THRU\nSLIP FIT ON <MOD-DIAM>25.4 COLUMN",
 }
+# The relief is the one fitted feature (slip-fit band on the model dimension,
+# build_column_clamp_front): three decimals say "hold it".
+DIMENSION_PRECISION = {"BoreDia": 3}
+# Bore axis along the 48 width, LEFT of the plan between the view and the
+# 48 width chain (on the right it sat under the bore-diameter leader, which
+# crossed it); ear-hole pattern origin (one hole from its end, both from the
+# bottom face) on the right view; the ear-hole callout parked under the
+# right view, clear of the bar-face flag.
+BORE_STATION_TEXT_X = TOP_CENTER[0] - ARC_DEPTH / 2.0 * _M - 0.014
+EAR_END_OFFSET_TEXT_Y = RIGHT_CENTER[1] + ARC_HEIGHT / 2.0 * _M + 0.013
+EAR_PITCH_TEXT_Y = RIGHT_CENTER[1] + ARC_HEIGHT / 2.0 * _M + 0.020
+EAR_HEIGHT_TEXT_X = RIGHT_CENTER[0] + ARC_WIDTH / 2.0 * _M + 0.010
+EAR_CALLOUT_XY = (0.180, 0.088)
+
+
+def _edge_points(edge: Any) -> tuple[tuple[float, ...], tuple[float, ...]] | None:
+    start = edge.GetStartVertex()
+    end = edge.GetEndVertex()
+    if start is None or end is None:
+        return None
+    p0 = tuple(float(v) * 1000.0 for v in _early_bound(start, "IVertex").GetPoint())
+    p1 = tuple(float(v) * 1000.0 for v in _early_bound(end, "IVertex").GetPoint())
+    return p0, p1
+
+
+def _straight_edge(
+    adapter: Any,
+    view: Any,
+    *,
+    fixed: dict[int, float],
+    span_axis: int,
+    label: str,
+) -> Any:
+    """Longest visible straight edge whose vertices sit at ``fixed`` {axis: mm}."""
+    candidates: list[tuple[float, Any]] = []
+    for raw_edge in visible_view_entities(view, 1, label=f"{label} edges"):
+        edge = _early_bound(raw_edge, "IEdge")
+        points = _edge_points(edge)
+        if points is None:
+            continue
+        if any(
+            abs(p[axis] - value) > 0.01 for p in points for axis, value in fixed.items()
+        ):
+            continue
+        candidates.append((abs(points[1][span_axis] - points[0][span_axis]), edge))
+    if not candidates:
+        raise RuntimeError(f"{label}: no straight edge at {fixed!r}")
+    return max(candidates, key=lambda item: item[0])[1]
+
+
+def _circles(
+    adapter: Any, view: Any, *, radius_mm: float, label: str
+) -> list[tuple[tuple[float, float, float], Any]]:
+    """Visible circular edges of one radius: (centre mm, edge)."""
+    found: list[tuple[tuple[float, float, float], Any]] = []
+    for raw_edge in visible_view_entities(view, 1, label=f"{label} circles"):
+        edge = _early_bound(raw_edge, "IEdge")
+        curve = edge.GetCurve()
+        if curve is None:
+            continue
+        curve = _early_bound(curve, "ICurve")
+        if not curve.IsCircle():
+            continue
+        params = tuple(float(value) * 1000.0 for value in curve.CircleParams)
+        if abs(params[6] - radius_mm) > 0.01:
+            continue
+        found.append(((params[0], params[1], params[2]), edge))
+    if not found:
+        raise RuntimeError(f"{label}: no circular edge of radius {radius_mm:.3f} mm")
+    return found
+
+
+@_telemetry.traced("drawing.entity_dimension", label_param="label")
+def _entity_dimension(
+    adapter: Any,
+    view: Any,
+    base_entity: Any,
+    circle_entity: Any,
+    *,
+    orientation: str,
+    position: tuple[float, float],
+    label: str,
+) -> Any:
+    """Entity-selected edge-to-circle-centre dimension (the arbor recipe)."""
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    if not drawing.ActivateView(view_name(adapter, view)):
+        raise RuntimeError(f"failed to activate view for {label}")
+    draw.ClearSelection2(True)
+    selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    for append, raw_entity in ((False, base_entity), (True, circle_entity)):
+        selection_data = selection_manager.CreateSelectData()
+        selection_data.View = view
+        entity = _early_bound(raw_entity, "IEntity")
+        if not entity.Select4(append, selection_data):
+            raise RuntimeError(f"failed to select {label} entity")
+    if orientation == "horizontal":
+        display = draw.AddHorizontalDimension2(*position, 0.0)
+    elif orientation == "vertical":
+        display = draw.AddVerticalDimension2(*position, 0.0)
+    else:
+        raise ValueError(f"unsupported dimension orientation: {orientation}")
+    draw.ClearSelection2(True)
+    if display is None:
+        raise RuntimeError(f"failed to create {label} dimension")
+    set_arc_endpoints_to_center(adapter, display, label=label)
+    return display
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -165,46 +282,139 @@ async def build(adapter: Any) -> dict[str, str]:
         [*top_annotations, *front_annotations, *right_annotations],
         DIMENSION_CALLOUTS,
     )
-    # The relief is a 25.6 single-decimal fit bore (the notes cite 25.6 on
-    # 25.4); two decimals would read as false precision against the note.
     set_dimension_precision(
         adapter,
         [*top_annotations, *front_annotations, *right_annotations],
-        {"BoreDia": 1},
+        DIMENSION_PRECISION,
     )
 
-    # Collar height (16): dimension the front view's flat top/bottom faces.
+    # Bore axis along the 48 width: from one end face (z = +24 on the top
+    # face) to the relief arc's centre.
+    top_end = _straight_edge(
+        adapter,
+        top,
+        fixed={1: ARC_HEIGHT / 2.0, 2: ARC_WIDTH / 2.0},
+        span_axis=0,
+        label="top-face end edge",
+    )
+    relief = _circles(adapter, top, radius_mm=BORE_RADIUS, label="relief arc")
+    relief_arc = max(relief, key=lambda item: item[0][1])[1]  # the top-face arc
+    end_xy = model_point_in_view(
+        adapter, top, (0.0, ARC_HEIGHT / 2000.0, ARC_WIDTH / 2000.0), label="top end"
+    )
+    _entity_dimension(
+        adapter,
+        top,
+        top_end,
+        relief_arc,
+        orientation="vertical",
+        position=(BORE_STATION_TEXT_X, (end_xy[1] + TOP_CENTER[1]) / 2.0),
+        label="bore axis station",
+    )
+
+    # The bar face (the flat x = ARC_DEPTH face the platen bar's back sits on,
+    # masked from the paint): flagged from its corner edge on the front view,
+    # with the collar-height dimension on the opposite side of the view.
+    bar_edge = _straight_edge(
+        adapter,
+        front,
+        fixed={0: ARC_DEPTH, 2: ARC_WIDTH / 2.0},
+        span_axis=1,
+        label="bar-face corner edge",
+    )
+    bar_xy = model_point_in_view(
+        adapter, front, (ARC_DEPTH / 1000.0, 0.0, ARC_WIDTH / 2000.0), label="bar face"
+    )
+    bar_on_right = bar_xy[0] > FRONT_CENTER[0]
+    collar_text_x = FRONT_CENTER[0] + (-0.033 if bar_on_right else 0.033)
     add_edge_dimension(
         adapter,
         front,
         p0=(FRONT_CENTER[0], FRONT_CENTER[1] - ARC_HEIGHT / 2.0 * _M),
         p1=(FRONT_CENTER[0], FRONT_CENTER[1] + ARC_HEIGHT / 2.0 * _M),
-        text_xy=(FRONT_CENTER[0] - 0.033, FRONT_CENTER[1]),
+        text_xy=(collar_text_x, FRONT_CENTER[1]),
         label="collar-height overall",
+    )
+    flag_x = bar_xy[0] + 0.012 if bar_on_right else bar_xy[0] - 0.030
+    add_attached_note(
+        adapter,
+        front,
+        text=BAR_FACE_FLAG,
+        entity=bar_edge,
+        note_xy=(flag_x, FRONT_CENTER[1] - ARC_HEIGHT / 2.0 * _M - 0.011),
+        label="bar face flag",
     )
 
     if not auto_center_marks(adapter, right, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the right view")
 
-    # Ear-hole span (35 c-c); both ears show round in the right view.
-    ear_top = EAR_HOLE_DIA / 2.0 * _M
-    add_edge_dimension(
+    # Ear-hole pattern on the right view (the bar face): the pitch between
+    # the two rims, one hole from its own end face, and the pair's height
+    # from the bottom face -- all entity-selected to the rim centres.
+    rims = [
+        (model_point_in_view(adapter, right, tuple(v / 1000.0 for v in center), label="ear rim")[0], center, edge)
+        for center, edge in _circles(adapter, right, radius_mm=EAR_HOLE_DIA / 2.0, label="ear rims")
+        if abs(center[0] - ARC_DEPTH) <= 0.01
+    ]
+    if len(rims) != 2:
+        raise RuntimeError(f"right view shows {len(rims)} ear rims on the bar face, expected 2")
+    rims.sort(key=lambda item: item[0])
+    left_rim_x, left_center, left_rim = rims[0]
+    right_rim_x, _right_center, right_rim = rims[-1]
+    _entity_dimension(
         adapter,
         right,
-        p0=(RIGHT_CENTER[0] - EAR_HOLE_Z * _M, RIGHT_CENTER[1] + ear_top),
-        p1=(RIGHT_CENTER[0] + EAR_HOLE_Z * _M, RIGHT_CENTER[1] + ear_top),
-        text_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] + 0.028),
+        left_rim,
+        right_rim,
+        orientation="horizontal",
+        position=(RIGHT_CENTER[0], EAR_PITCH_TEXT_Y),
         label="ear-hole spacing",
+    )
+    end_sign = 1.0 if left_center[2] > 0.0 else -1.0
+    near_end = _straight_edge(
+        adapter,
+        right,
+        fixed={0: ARC_DEPTH, 2: end_sign * ARC_WIDTH / 2.0},
+        span_axis=1,
+        label="bar-face end edge",
+    )
+    end_x = model_point_in_view(
+        adapter,
+        right,
+        (ARC_DEPTH / 1000.0, 0.0, end_sign * ARC_WIDTH / 2000.0),
+        label="bar-face end",
+    )[0]
+    _entity_dimension(
+        adapter,
+        right,
+        near_end,
+        left_rim,
+        orientation="horizontal",
+        position=((end_x + left_rim_x) / 2.0, EAR_END_OFFSET_TEXT_Y),
+        label="ear-hole end offset",
+    )
+    bottom = _straight_edge(
+        adapter,
+        right,
+        fixed={0: ARC_DEPTH, 1: -ARC_HEIGHT / 2.0},
+        span_axis=2,
+        label="bar-face bottom edge",
+    )
+    _entity_dimension(
+        adapter,
+        right,
+        bottom,
+        right_rim,
+        orientation="vertical",
+        position=(EAR_HEIGHT_TEXT_X, RIGHT_CENTER[1] - ARC_HEIGHT / 4.0 * _M),
+        label="ear-hole height",
     )
     add_native_hole_callout(
         adapter,
         right,
-        edge_xy=(
-            RIGHT_CENTER[0] - EAR_HOLE_Z * _M,
-            RIGHT_CENTER[1] - ear_top,
-        ),
-        callout_xy=(0.170, 0.093),
+        callout_xy=EAR_CALLOUT_XY,
         label="ear holes",
+        edge=left_rim,
         process="#9 DRILL",
     )
 

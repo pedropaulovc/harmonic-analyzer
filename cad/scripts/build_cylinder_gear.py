@@ -83,6 +83,10 @@ from _common import (
     check,
     define_circle,
     drive_dimension,
+    _dim_value_mm,
+    _display_dimensions,
+    _feature_by_name,
+    _name_dimensions_feature,
     ensure_fully_defined,
     force_rebuild,
     name_bore_axis,
@@ -247,6 +251,36 @@ async def _name_lobe_axis(adapter) -> str:
     return axis_name
 
 
+def _name_cam_dimensions(adapter) -> None:
+    """Name the cam sketch's diameter and +Y offset dims by VALUE.
+
+    The cam circle sits on an offset reference plane, where the x=0 anchor
+    still emits a dimension (three dims, not the two an origin circle on a
+    base plane gets), so the creation-order recorder the other sketches use
+    cannot be trusted here.  The drawing keeps both as marked model dimensions
+    (``DRAWING_DIMENSIONS``: the front view's cam diameter and its 8.640
+    offset from the bore), so they need stable names; matching each dim's
+    value to the constant it was drawn from is order-independent, and the
+    check below fails loud if either is missing.
+    """
+    feature = _feature_by_name(adapter, "CamProfile")
+    names: list[str | None] = []
+    for idim in _display_dimensions(feature, "CamProfile"):
+        value = _dim_value_mm(idim)
+        if abs(value - CAM_DIAMETER) < 0.01:
+            names.append("CamDia")
+        elif abs(value - ECCENTRICITY) < 0.01:
+            names.append("CamOffset")
+        else:
+            names.append(None)
+    named = _name_dimensions_feature(feature, "CamProfile", names)
+    expected = {"CamDia@CamProfile", "CamOffset@CamProfile"}
+    if set(named) != expected:
+        raise RuntimeError(
+            f"cam sketch dims not found by value: named {named}, expected {sorted(expected)}"
+        )
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         CreatePlaneParameters,
@@ -305,6 +339,7 @@ async def build(adapter) -> dict[str, str]:
     await ensure_fully_defined(adapter, "cam sketch")
     check("exit_sketch cam", await adapter.exit_sketch())
     name_last_feature(adapter, "CamProfile")
+    _name_cam_dimensions(adapter)
     check(
         "extrude cam",
         await adapter.create_extrusion(ExtrusionParameters(depth=CAM_THICKNESS)),
@@ -455,8 +490,8 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
 
-    # Mark the bore as the single manufacturing model dimension and stamp the
-    # title-block + gear-data properties the curated drawing reads.
+    # Mark the bore and cam manufacturing dimensions; the kerf is specified by
+    # one complete plain note adjacent to DETAIL B.
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

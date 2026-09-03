@@ -25,9 +25,11 @@ from _drawing_common import (
     new_project_drawing,
     read_required_properties,
     set_arc_endpoints_to_center,
+    set_arc_endpoints_to_max,
     set_dimension_callouts,
     set_dimension_precision,
     set_hidden_lines_visible,
+    set_reference_dimension,
     stamp_drawing_summary,
     visible_view_entities,
 )
@@ -40,6 +42,7 @@ from arbor_pedestal_spec import (
     FOOT_HEIGHT,
     FOOT_WIDTH,
     SCREW_CLEARANCE_DIA,
+    STRAP_T,
     SURFACE_FINISHES,
     TOP_RADIUS,
 )
@@ -81,24 +84,48 @@ def _front_y(model_y: float) -> float:
     return FRONT_CENTER[1] + (model_y - _PART_MID_Y) * _S
 
 
-# Front elevation carries the foot width + flange height, the arbor-bore station
-# and diameter, and the dome diameter; the plan carries the 16 foot depth.
+def _top_y(model_z: float) -> float:
+    """Sheet Y of a model-Z station in the plan (+Z is DOWN in a Top view)."""
+    return TOP_CENTER[1] - model_z * _S
+
+
+# Front elevation: the foot width BELOW the seat (so it terminates on the foot,
+# not across the strap flanks), the bore station and diameter, the dome
+# diameter (the strap flanks run up to its equator), and the flange height.
+# Plan: the 16 foot depth and the strap thickness against the flush rear face.
 FRONT_KEEP = {
-    "Width": (FRONT_CENTER[0], _front_y(0.0) + 0.032),
+    "Width": (FRONT_CENTER[0], _front_y(0.0) - 0.020),
     "FootHt": (FRONT_CENTER[0] - 0.030, _front_y(FOOT_HEIGHT / 2.0)),
     "BoreDia": (FRONT_CENTER[0] + 0.068, _front_y(BORE_HEIGHT) - 0.004),
-    "DomeDia": (FRONT_CENTER[0] + 0.066, _front_y(BORE_HEIGHT + 9.0)),
+    "DomeDia": (FRONT_CENTER[0] + 0.066, _front_y(BORE_HEIGHT) - 0.020),
 }
 TOP_KEEP = {
-    "Depth": (TOP_CENTER[0] + 0.040, TOP_CENTER[1]),
+    "Depth": (TOP_CENTER[0] + 0.052, TOP_CENTER[1]),
 }
 DIMENSION_CALLOUTS = {
     "BoreDia": "BORE THRU",
+    # The tapered strap sides are defined by the 24 foot width and this head:
+    # they meet its circle at the bore height.
+    "DomeDia": "STRAP SIDES RUN TO IT",
 }
 # The arbor bore is the one fitted feature (running-fit band on the model
 # dimension): three decimals say "hold it"; everything else stays at the
 # two-place block tolerance.
 DIMENSION_PRECISION = {"BoreDia": 3}
+# Left of the elevation, outside the bore height (0.060) and flange height
+# (0.070) chain: the overall as a REFERENCE.
+OVERALL_TEXT_X = 0.048
+BORE_HEIGHT_TEXT_X = 0.060
+# Below the foot seat, nested inside the foot width: the bore's offset from
+# the left foot side (the second DRO coordinate).
+BORE_OFFSET_TEXT_Y = _front_y(0.0) - 0.010
+# Strap thickness (rear face flush with the foot): right of the plan, inside
+# the foot-depth dimension.
+STRAP_TEXT_XY = (TOP_CENTER[0] + 0.036, (_top_y(FOOT_DEPTH / 2.0 - STRAP_T) + _top_y(FOOT_DEPTH / 2.0)) / 2.0)
+# Roughness symbol below-right of the bore, its leader to the bore's bottom
+# so it passes under the head-diameter leader.
+FINISH_SYMBOL_XY = (0.150, 0.140)
+NOTES_XY = (0.020, 0.066)
 
 
 @_telemetry.traced("drawing.front_entity_scan")
@@ -189,31 +216,36 @@ def _circle_entity(adapter: Any, view: Any, radius_mm: float, *, label: str) -> 
             continue
         radius = float(curve.CircleParams[6]) * 1000.0
         candidates.append((abs(radius - radius_mm), edge))
-    if not candidates or candidates[0][0] > 0.01:
-        candidates.sort(key=lambda item: item[0])
     if not candidates or min(candidates, key=lambda item: item[0])[0] > 0.01:
         raise RuntimeError(f"{label} has no circle of radius {radius_mm:.3f} mm")
     return min(candidates, key=lambda item: item[0])[1]
 
 
-@_telemetry.traced("drawing.circle_dimension", label_param="label")
-def _add_circle_dimension(
+@_telemetry.traced("drawing.entity_dimension", label_param="label")
+def _add_entity_dimension(
     adapter: Any,
     view: Any,
     base_entity: Any,
-    circle_entity: Any,
+    target_entity: Any,
     *,
     orientation: str,
     position: tuple[float, float],
     label: str,
+    arc: str | None = "center",
 ) -> Any:
+    """Entity-selected dimension between two view entities.
+
+    ``arc`` re-anchors a circular target: ``"center"`` for a hole location,
+    ``"max"`` for an overall to an arc's far tangent, ``None`` for two
+    straight edges.
+    """
     draw = adapter.currentModel
     drawing = _early_bound(draw, "IDrawingDoc")
     if not drawing.ActivateView(view_name(adapter, view)):
         raise RuntimeError(f"failed to activate view for {label}")
     draw.ClearSelection2(True)
     selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
-    for append, raw_entity in ((False, base_entity), (True, circle_entity)):
+    for append, raw_entity in ((False, base_entity), (True, target_entity)):
         selection_data = selection_manager.CreateSelectData()
         selection_data.View = view
         entity = _early_bound(raw_entity, "IEntity")
@@ -224,11 +256,16 @@ def _add_circle_dimension(
     elif orientation == "vertical":
         display = draw.AddVerticalDimension2(*position, 0.0)
     else:
-        raise ValueError(f"unsupported circle-dimension orientation: {orientation}")
+        raise ValueError(f"unsupported dimension orientation: {orientation}")
     draw.ClearSelection2(True)
     if display is None:
         raise RuntimeError(f"failed to create {label} dimension")
-    set_arc_endpoints_to_center(adapter, display, label=label)
+    if arc == "center":
+        set_arc_endpoints_to_center(adapter, display, label=label)
+    elif arc == "max":
+        set_arc_endpoints_to_max(adapter, display, label=label)
+    elif arc is not None:
+        raise ValueError(f"unsupported arc condition: {arc}")
     return display
 
 
@@ -297,35 +334,57 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add ASME center mark to the plan view")
 
     # Bore axis from the left foot side and the foot seat: the two coordinates
-    # a machinist sets the DRO to (one origin per view).
+    # a machinist sets the DRO to (one origin per view).  The offset sits
+    # under the foot, nested inside the foot width, so neither dimension
+    # runs across the strap flanks.
     _bore_r = BORE_DIA / 2.0 * _S
     foot_entity, side_entity, bore_entity = _front_entities(adapter, front)
-    _add_circle_dimension(
+    _add_entity_dimension(
         adapter,
         front,
         side_entity,
         bore_entity,
         orientation="horizontal",
-        position=(FRONT_CENTER[0], _front_y(BORE_HEIGHT + TOP_RADIUS) + 0.010),
+        position=(FRONT_CENTER[0], BORE_OFFSET_TEXT_Y),
         label="bore horizontal location",
     )
-    _add_circle_dimension(
+    _add_entity_dimension(
         adapter,
         front,
         foot_entity,
         bore_entity,
         orientation="vertical",
-        position=(0.060, FRONT_CENTER[1]),
+        position=(BORE_HEIGHT_TEXT_X, FRONT_CENTER[1]),
         label="bore vertical location",
+    )
+    # Overall height, foot seat to the dome's crown, as a REFERENCE beside
+    # the controlling bore height: outermost on the left.
+    dome_entity = _circle_entity(adapter, front, TOP_RADIUS, label="dome circle")
+    overall = _add_entity_dimension(
+        adapter,
+        front,
+        foot_entity,
+        dome_entity,
+        orientation="vertical",
+        position=(OVERALL_TEXT_X, FRONT_CENTER[1]),
+        label="overall height",
+        arc="max",
+    )
+    # Add*Dimension2 hands back the IDisplayDimension (late-bound); bind it
+    # before reading the IAnnotation the reference helper wants.
+    set_reference_dimension(
+        adapter,
+        _early_bound(overall, "IDisplayDimension").GetAnnotation(),
+        label="overall height",
     )
     add_surface_finish(
         adapter,
         front,
-        symbol_xy=(0.155, 0.225),
+        symbol_xy=FINISH_SYMBOL_XY,
         control=surface_finish_by_key(SURFACE_FINISHES, "arbor_bore"),
         label="arbor bore finish",
         entity=bore_entity,
-        leader_attach_xy=(FRONT_CENTER[0] + _bore_r, _front_y(BORE_HEIGHT)),
+        leader_attach_xy=(FRONT_CENTER[0], _front_y(BORE_HEIGHT) - _bore_r),
     )
     screw_entity = _circle_entity(
         adapter,
@@ -339,7 +398,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # Hold-down hole from the near foot edge; its across-foot coordinate is
     # the bore's own (the views are projection-aligned, so a second 12.00
     # would print directly over the front view's).
-    _add_circle_dimension(
+    _add_entity_dimension(
         adapter,
         top,
         near_foot_entity,
@@ -347,6 +406,24 @@ async def build(adapter: Any) -> dict[str, str]:
         orientation="vertical",
         position=(0.060, TOP_CENTER[1]),
         label="flange-hole location from near foot edge",
+    )
+    # Upright (strap) thickness: its near face to the foot's rear edge, which
+    # the strap's rear face is flush with.
+    strap_face_entity = _top_depth_edge(
+        adapter, top, FOOT_DEPTH / 2.0 - STRAP_T, label="strap near face"
+    )
+    rear_foot_entity = _top_depth_edge(
+        adapter, top, FOOT_DEPTH / 2.0, label="rear foot edge"
+    )
+    _add_entity_dimension(
+        adapter,
+        top,
+        rear_foot_entity,
+        strap_face_entity,
+        orientation="vertical",
+        position=STRAP_TEXT_XY,
+        label="strap thickness",
+        arc=None,
     )
     _screw_r = SCREW_CLEARANCE_DIA / 2.0 * _S
     add_native_hole_callout(
@@ -358,7 +435,7 @@ async def build(adapter: Any) -> dict[str, str]:
         # #4 normal clearance (3.264 = 0.1285 in) is exactly the #30 drill.
         process="#30 DRILL",
     )
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)
+    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
 
     return await finalize_drawing(
         adapter,

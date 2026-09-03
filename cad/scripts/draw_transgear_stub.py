@@ -3,7 +3,11 @@ r"""Create the curated machinist drawing for the transgear stud.
 The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): a
 stepped stud turned in one setting carries no datums and no feature-control
 frames -- its two fits are the bands on the model diameters, plus one
-roughness symbol on the seat the feed pinion and disc turn on.
+roughness symbol on the seat the feed pinion and disc turn on. The three
+diameters stack left of the profile, the three axial stations baseline
+from the base (faced) end on its right (policy rule 7: lengths from one
+faced end, with a conspicuous overall), and the shoulder roots carry one
+leadered R MAX allowance (machinist review 2026-09-02).
 """
 
 from __future__ import annotations
@@ -16,10 +20,12 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_attached_note,
     add_property_linked_note,
     add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
+    find_edge_near,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
@@ -31,9 +37,11 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from transgear_stub_spec import (
+    BASE_DIA,
     BASE_LEN,
     COLLAR_DIA as COLLAR_DIA,
     COLLAR_LEN,
+    ROOT_NOTE,
     SEAT_DIA,
     SEAT_LEN,
     SURFACE_FINISHES,
@@ -63,7 +71,11 @@ VIEW_MM = SHEET_SCALE[0] / 1000.0  # sheet meters per model mm in the views
 TOTAL_LEN = BASE_LEN + SEAT_LEN + COLLAR_LEN
 
 FRONT_CENTER = (0.115, 0.185)
-END_CENTER = (0.115, 0.068)  # base-end view, third-angle: below the front
+# Base-end view, third-angle: below the front (the template's projection
+# symbol is third-angle, _drawing_common). Looking at the base end, the
+# O9.525 base is the NEAR circle and the O14 collar shows solid outside it,
+# which is what the view draws.
+END_CENTER = (0.115, 0.068)
 ISO_CENTER = (0.320, 0.190)
 
 
@@ -77,32 +89,24 @@ def _fy(y_mm: float) -> float:
     return FRONT_CENTER[1] + (y_mm - TOTAL_LEN / 2.0) * VIEW_MM
 
 
-# Diameters stack on the left, land lengths chain on the right; the callout
-# texts sit clear of each other's extension lines (steps at different y).
+# Diameters stack on the left; the axial stations baseline from the base end
+# on the right, one lane each, longest outermost.
 #
-# The chain runs at x=0.176 rather than 0.162: the Ra symbol beside the gear
-# seat throws its text out to x~0.171 (the text starts ~13 mm right of the
-# anchor and runs ~26 mm), and at 0.162 the chain's dimension line printed
-# straight through "Ra 1.6". The seat silhouette at x=0.125 leaves too little
-# room to walk the symbol left instead, so the chain moves right; ~7 mm of gap.
-#
-# CAVEAT (measured 2026-07-16): that "~7 mm of gap" is TEXT-only, and the text is
-# not the symbol's rightmost ink. Verified against the render: the text does end
-# at x=0.1703 (so 5.6 mm to the chain line, which sits at x=0.1759..0.1760), but
-# the Ra symbol's horizontal ARM extends 6.1 mm PAST its own text, to x=0.1764 --
-# it crosses the chain line by ~0.5 mm. Left as-is: a 0.5 mm hairline does not
-# justify a rebuild. Recorded so the next reader does not "confirm" this clearance
-# by measuring the text and miss the arm. Do not treat text extent as symbol
-# extent for ANY Ra placement -- and note text is not a COM primitive, so
-# GetLineAtIndex will not show it to you either; only the render will.
-_LENGTH_CHAIN_X = 0.176
+# The Ra symbol beside the gear seat throws its text out to x~0.171 and its
+# horizontal ARM 6 mm past that, to x=0.1764 (measured 2026-07-16 on the
+# render: text extent is NOT symbol extent, and note text is not a COM
+# primitive, so only the render shows it). The 9.10 lane ends at the base
+# shoulder (y~0.168), below the symbol (y~0.199), so it may sit inboard of
+# the arm; the 22.90 and 26.90 lines run the symbol's full height, so both
+# lanes sit clear to the RIGHT of the arm end.
+_BASELINE_X = (0.160, 0.186, 0.206)
 FRONT_KEEP = {
     "BaseDia": (0.052, _fy(BASE_LEN / 2.0)),
     "SeatDia": (0.052, _fy(BASE_LEN + 3.0)),
     "CollarDia": (0.052, _fy(TOTAL_LEN - COLLAR_LEN / 2.0)),
-    "BaseLength": (_LENGTH_CHAIN_X, _fy(BASE_LEN / 2.0)),
-    "SeatLength": (_LENGTH_CHAIN_X, _fy(BASE_LEN + SEAT_LEN / 2.0)),
-    "CollarLength": (_LENGTH_CHAIN_X, _fy(TOTAL_LEN - COLLAR_LEN / 2.0)),
+    "BaseLength": (_BASELINE_X[0], _fy(BASE_LEN / 2.0)),
+    "SeatEnd": (_BASELINE_X[1], _fy((BASE_LEN + SEAT_LEN) / 2.0)),
+    "Overall": (_BASELINE_X[2], _fy(TOTAL_LEN / 2.0)),
 }
 # No callout overrides: both diameter bands are toleranced on the MODEL
 # dimension by build_transgear_stub (transgear_stub_spec.BASE_DIA_BAND /
@@ -111,6 +115,13 @@ DIMENSION_CALLOUTS: dict[str, str] = {}
 # The base is the fitted 3/8" conversion (BASE_DIA_BAND on the model
 # dimension): three decimals say "hold it" and match the exact 9.525.
 DIMENSION_PRECISION = {"BaseDia": 3}
+
+# Shoulder-root callout: leadered onto the base shoulder's rim on the LEFT
+# (the base's top face seen edge-on, picked 1 mm inboard of its outer corner
+# so only the O9.525 rim is under the cursor), in the 30 mm band between the
+# BaseDia and SeatDia dimension lines. The right side is the baseline stack.
+ROOT_PICK_XY = (_fx(-(BASE_DIA / 2.0 - 1.0)), _fy(BASE_LEN))
+ROOT_NOTE_XY = (0.056, _fy(BASE_LEN) - 0.006)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -182,6 +193,24 @@ async def build(adapter: Any) -> dict[str, str]:
         control=surface_finish_by_key(SURFACE_FINISHES, "gear_seat"),
         label="gear seat finish",
         entity_type="SILHOUETTE",
+    )
+
+    # Shoulder roots: the base shoulder's rim carries the 2X root allowance
+    # for both steps (policy rule 7: every shoulder fillet has a size).
+    root_xy = find_edge_near(
+        adapter,
+        front,
+        ROOT_PICK_XY,
+        axis="y",
+        label="transgear stud base shoulder",
+    )
+    add_attached_note(
+        adapter,
+        front,
+        text=ROOT_NOTE,
+        entity_xy=root_xy,
+        note_xy=ROOT_NOTE_XY,
+        label="stud shoulder roots",
     )
 
     # x=0.020: a note is left-aligned on its anchor, so the ink starts here. The

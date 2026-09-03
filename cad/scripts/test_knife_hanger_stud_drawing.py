@@ -1,9 +1,14 @@
 """Offline contracts for the knife-hanger-stud drawing.
 
 A 1/2-13 stud with an integral washer, hex, collar and tip on the shared
-fastener recipe: no datums, frames, roughness symbols or basic dimensions
-(cad/docs/drawing-simplicity-policy.md rules 3-5) and four lines of note that
-carry only the stack sizes the views do not dimension (rule 6).
+fastener recipe after the 2026-09-02 blind machinist review: no datums,
+frames, roughness symbols or basic dimensions
+(cad/docs/drawing-simplicity-policy.md rules 3-5); every stack size is a
+dimension or a leadered callout on a view (the thread designation on the
+neck, the hex across-flats and the drilled centre on the end view), the
+(REF) overall stands outside the chained lengths, and the profile carries
+the axis centerline (rule 7); three lines of note that carry only what the
+views cannot say (rule 6).
 """
 
 from __future__ import annotations
@@ -17,6 +22,35 @@ import knife_hanger_stud_spec as spec
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fastener_catalog import DriveStyle, HeadStyle, fastener
 from _holes import TAP_DRILL_MM
+
+BANNED_NOTE_PHRASES = (
+    "UOS",
+    "DIMENSIONS IN",
+    "+/-",
+    "DATUM",
+    "PERPENDICULAR",
+    "RUNOUT",
+    "WITHIN",
+    "ASME",
+    "SYSTEM 21",
+    "TAP DRILL",
+    "13.49",
+    "COSMETIC",
+    "DEBURR",
+    "BREAK SHARP",
+    "TITLE BLOCK",
+    "COMMERCIAL",
+    "THREAD NOT MODELED",
+    "REFERENCE ONLY",
+    "TURN AND MILL",
+    "-2A",
+    " A/F",
+    " THICK",
+    " DIA X ",
+    " DIA ABOVE",
+    "CENTER DRILL",
+    "DRAWN AT",
+)
 
 
 def _source() -> str:
@@ -35,15 +69,26 @@ def test_required_drawing_paths() -> None:
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    # The end view carries the washer diameter (the stack's outermost circle),
-    # the side view the four stack lengths; together they cover exactly the
-    # marked set.
+    # The end view carries the washer and collar diameters (the stack's two
+    # larger circles), the side view every stack length plus the shank and
+    # tip diameters; together they cover exactly the marked set.
     assert set(drawing.END_KEEP) == set().union(*spec.END_VIEW_DIMENSIONS.values())
     assert set(drawing.SIDE_KEEP) == set().union(*spec.SIDE_VIEW_DIMENSIONS.values())
     assert set(drawing.END_KEEP) | set(drawing.SIDE_KEEP) == marked
     assert spec.END_VIEW_DIMENSIONS.keys() | spec.SIDE_VIEW_DIMENSIONS.keys() == (
         spec.DRAWING_DIMENSIONS.keys()
     )
+    assert set(drawing.END_KEEP) == {"WasherDia", "CollarDia"}
+    assert set(drawing.SIDE_KEEP) == {
+        "ThreadLg",
+        "ShankLg",
+        "NutHt",
+        "TipLg",
+        "WasherT",
+        "CollarHt",
+        "ShankDia",
+        "TipDia",
+    }
 
 
 def test_catalog_is_the_single_source_of_the_thread() -> None:
@@ -51,8 +96,14 @@ def test_catalog_is_the_single_source_of_the_thread() -> None:
     assert spec.THREAD == catalog.thread == "1/2-13"
     assert spec.SHANK_DIA == catalog.model_diameter_mm == 12.7
     assert spec.SHANK_LEN == catalog.length_mm
+    # Blind review: "1/2-13 UNC" -- the 2A class is the title block's -- as
+    # a leader to the threaded neck, never a note line.
     assert spec.THREAD_DESIGNATION == f"{catalog.thread} UNC"
-    assert spec.THREAD_DESIGNATION in spec.DRAWING_NOTES
+    source = _source()
+    assert "add_thread_leader(" in source
+    assert "designation=THREAD_DESIGNATION" in source
+    assert '"1/2-13' not in source
+    assert spec.THREAD_DESIGNATION not in spec.DRAWING_NOTES
     assert catalog.head is HeadStyle.HEX_STACK
     assert catalog.drive is DriveStyle.EXTERNAL_HEX
     assert drawing.DIMENSION_CALLOUTS == {}
@@ -90,65 +141,103 @@ def test_stack_arithmetic_matches_the_top_frame_rederive_contract() -> None:
 
 def test_lengths_are_marked_extrude_depth_model_dims() -> None:
     # The vertical (axis +Y) profile cannot point-select the edge-on stack
-    # steps, so the four lengths ship as extrude-DEPTH model dimensions:
-    # the build names them, the drawing inserts them in the side view.
+    # steps, so every stack length ships as an extrude-DEPTH model
+    # dimension: the build names them, the drawing inserts them in the side
+    # view (four in a right column, the two thin ones on the left).
     part_source = Path(part.__file__).read_text(encoding="utf-8")
-    assert 'name_dimensions(adapter, "Thread", ["ThreadLg"])' in part_source
-    assert 'name_dimensions(adapter, "Shank", ["ShankLg"])' in part_source
-    assert 'name_dimensions(adapter, "HexNut", ["NutHt"])' in part_source
-    assert 'name_dimensions(adapter, "Tip", ["TipLg"])' in part_source
-    assert spec.SIDE_VIEW_DIMENSIONS == {
-        "Thread": {"ThreadLg"},
-        "Shank": {"ShankLg"},
-        "HexNut": {"NutHt"},
-        "Tip": {"TipLg"},
-    }
+    for feature, dim in (
+        ("Thread", "ThreadLg"),
+        ("Shank", "ShankLg"),
+        ("Washer", "WasherT"),
+        ("HexNut", "NutHt"),
+        ("Collar", "CollarHt"),
+        ("Tip", "TipLg"),
+    ):
+        assert f'name_dimensions(adapter, "{feature}", ["{dim}"])' in part_source
+        assert spec.SIDE_VIEW_DIMENSIONS[feature] == {dim}
     assert "side_keep=SIDE_KEEP" in _source()
+    right_column = {"ThreadLg", "ShankLg", "NutHt", "TipLg"}
+    assert all(drawing.SIDE_KEEP[d][0] > drawing.SIDE_CENTER[0] for d in right_column)
+    assert all(
+        drawing.SIDE_KEEP[d][0] < drawing.SIDE_CENTER[0]
+        for d in ("WasherT", "CollarHt", "ShankDia", "TipDia")
+    )
 
 
-def test_notes_carry_only_the_undimensioned_stack_sizes() -> None:
-    # The stack LENGTHS are dimensions; the stack diameters, washer
-    # thickness, reduced thread neck and centre drill are not, so they ride
-    # the four note lines -- never a tolerance, never the mating bore.
+def test_overall_is_a_conspicuous_reference_outside_the_chain() -> None:
+    # Blind review: "36.75 can read as the overall; add (69.25 REF)".  A
+    # drawing-native vertical between the threaded end face and the tip face
+    # (model points on the right half of each, the tip picked outside its
+    # drilled centre), parenthesised, in a column outside the four lengths.
+    source = _source()
+    assert "add_overall_reference(" in source
+    assert 'orientation="vertical"' in source
+    assert 'entity_types=("EDGE", "EDGE")' in source
+    assert drawing.OVERALL_END_POINTS_MM == (
+        (0.7 * spec.THREAD_DIA / 2.0, 0.0, 0.0),
+        (0.7 * spec.TIP_DIA / 2.0, spec.TOTAL_LEN, 0.0),
+    )
+    assert 0.7 * spec.TIP_DIA / 2.0 > spec.CDRILL_DIA / 2.0
+    right_column_x = {drawing.SIDE_KEEP[d][0] for d in ("ThreadLg", "ShankLg", "NutHt", "TipLg")}
+    assert drawing.OVERALL_DIM_X - max(right_column_x) >= 0.020
+    assert drawing.OVERALL_TEXT_XY[0] + 0.010 < drawing.ISO_CENTER[0] - 0.025
+
+
+def test_end_view_carries_the_flats_and_the_drilled_centre() -> None:
+    # The hex is a polygon with no marked diameter, so its across-flats is a
+    # drawing-native vertical between the two flats; the drilled centre is
+    # hidden in the profile, so it is called out on the circle it shows as
+    # ("DRILL", not an undefined center-drill form -- blind review blocker).
+    source = _source()
+    half = spec.NUT_AF / 2.0 * drawing._S
+    assert drawing.END_FLAT_PICKS == (
+        (drawing.END_CENTER[0] + 0.004, drawing.END_CENTER[1] + half),
+        (drawing.END_CENTER[0] + 0.004, drawing.END_CENTER[1] - half),
+    )
+    assert drawing.END_FLATS_TEXT_XY[0] > drawing.END_CENTER[0] + half
+    assert 'label="hex across-flats"' in source
+    assert 'orientation="vertical"' in source
+    assert source.count("add_edge_dimension(") == 1
+    assert spec.CENTER_DRILL_CALLOUT == "<MOD-DIAM>2.00 DRILL X 1.50 DEEP"
+    assert "text=CENTER_DRILL_CALLOUT" in source
+    assert 'label="tip centre drill"' in source
+    assert "end_diameter_leaders_at_rim(" in source
+    assert drawing.END_DIAMETERS == ("WasherDia", "CollarDia")
+    assert drawing.RECIPE.decorate is drawing._decorate
+    assert drawing.RECIPE.side_centerline_face_xy == drawing.SIDE_AXIS_FACE_XY
+
+
+def test_notes_carry_only_what_the_views_cannot_say() -> None:
+    # Every size is a dimension or a leadered callout; the notes keep the
+    # thread extent, the one-piece fact and the shoulder-root allowance
+    # (blind review blocker: the turned roots had no permissible fillet).
     notes = spec.DRAWING_NOTES
     lines = notes.split("\n")
-    assert len(lines) <= 4
+    assert lines == [
+        "THREADED ON THE LOWER END ONLY; PLAIN SHANK ABOVE.",
+        "ONE PIECE; NOT A LOOSE NUT AND WASHER.",
+        f"TURNED SHOULDER ROOTS R{spec.SHOULDER_ROOT_R_MAX:.2f} MAX.",
+    ]
+    assert spec.SHOULDER_ROOT_R_MAX == 0.25
     assert max(map(len, lines)) < 80
-    assert lines[0] == (
-        f"{spec.THREAD_DESIGNATION} ON LOWER END ONLY; PLAIN SHANK "
-        f"{spec.SHANK_DIA:.2f} DIA ABOVE."
-    )
-    assert f"THREADED NECK DRAWN AT {spec.THREAD_DIA:.2f}, REFERENCE ONLY." in notes
-    assert f"HEX {spec.NUT_AF:.2f} A/F" in notes
-    assert f"WASHER {spec.WASHER_T:.2f} THICK" in notes
-    assert f"COLLAR {spec.COLLAR_DIA:.2f} DIA X {spec.COLLAR_H:.2f}" in notes
-    assert f"TIP {spec.TIP_DIA:.2f} DIA" in notes
-    assert f"CENTER DRILL TIP END {spec.CDRILL_DIA:.2f} DIA X {spec.CDRILL_DEPTH:.2f} DEEP" in (
-        notes
-    )
-    assert "TURN AND MILL" in notes
-    # Dimensioned lengths never repeat in the note.
-    assert f"{spec.THREAD_LEN:.2f}" not in notes
-    assert f"X {spec.NUT_H:.2f}" not in notes
-    for banned in (
-        "UOS",
-        "DIMENSIONS IN",
-        "+/-",
-        "DATUM",
-        "PERPENDICULAR",
-        "RUNOUT",
-        "WITHIN",
-        "ASME",
-        "SYSTEM 21",
-        "TAP DRILL",
-        "13.49",
-        "COSMETIC",
-        "DEBURR",
-        "BREAK SHARP",
-        "TITLE BLOCK",
-        "COMMERCIAL",
+    for value in (
+        spec.THREAD_LEN,
+        spec.THREAD_DIA,
+        spec.SHANK_DIA,
+        spec.SHANK_LEN,
+        spec.WASHER_T,
+        spec.NUT_AF,
+        spec.NUT_H,
+        spec.COLLAR_DIA,
+        spec.COLLAR_H,
+        spec.TIP_DIA,
+        spec.CDRILL_DIA,
+        spec.CDRILL_DEPTH,
     ):
+        assert f"{value:.2f}" not in notes, value
+    for banned in BANNED_NOTE_PHRASES:
         assert banned not in notes, banned
+    assert spec.END_VIEW_NOTE == "HEX-STACK END VIEW"
 
 
 def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:
@@ -164,7 +253,7 @@ def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:
     assert not hasattr(spec, "GEOMETRIC_TOLERANCES_MM")
     assert not hasattr(spec, "SURFACE_FINISHES")
     assert "build_fastener_sheet(" in source
-    assert drawing.RECIPE.decorate is None
+    assert drawing.RECIPE.scale == drawing.SHEET_SCALE == (2.0, 1.0)
 
 
 def test_part_stamps_make_critical_properties() -> None:

@@ -7,6 +7,7 @@ from pathlib import Path
 import build_cone_lock_knob as part
 import cone_lock_knob_spec
 import draw_cone_lock_knob as drawing
+from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fastener_catalog import fastener
 
@@ -54,18 +55,71 @@ def test_notes_are_few_specific_and_never_the_title_block() -> None:
     notes = cone_lock_knob_spec.DRAWING_NOTES
     lines = notes.split("\n")
     assert len(lines) <= 4
-    assert "ONE SETUP" in notes
     assert "THREAD RELIEF" in notes
     assert "MASK THE THREAD" in notes
-    # The thread designation rides the stud diameter callout, the plating
-    # spec the title block's finish field, the blanket tolerance the block.
+    # Setup and tooling are the machinist's call: the "one setup / radius
+    # tool" line is gone.  The thread designation rides the stud diameter
+    # callout, the plating spec the title block's finish field.
+    assert "ONE SETUP" not in notes
+    assert "RADIUS TOOL" not in notes
     assert "1/4-20" not in notes
     assert "ASTM" not in notes
     for banned in ("UOS", "DIMENSIONS IN", "+/-", "DATUM", "MHA-", "X.XX"):
         assert banned not in notes, banned
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+    assert 'add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.072)' in source
     assert "def _manufacturing_notes" not in source
+
+
+def test_nothing_on_the_knob_is_fitted() -> None:
+    # The washer used to carry +/-0.1: an ordinary clamp flange under the
+    # title block .XX now, and the model carries no band at all.
+    assert not hasattr(cone_lock_knob_spec, "WASHER_THICKNESS_TOLERANCE_MM")
+    assert model_toleranced_dimensions(part) == {}
+
+
+def test_turned_part_is_dimensioned_on_the_elevation() -> None:
+    # Policy rule 7: a turned part reads as it sits in the lathe -- every
+    # marked dimension on the elevation, the end view never curated (each
+    # marked model dimension inserts into ONE view; draw_pivot_shaft).
+    assert drawing.TOP_KEEP == {}
+    assert set(drawing.FRONT_KEEP) == {
+        "StudDia", "WasherDia", "BodyDia", "DomeR", "StudLen", "WasherT", "BodyTop",
+    }
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'view_label="top"' not in source
+    assert "DisplayAsLinear" not in source  # no unproven display toggles
+    # The stud and washer diameters stack below the stud end (stud nearer);
+    # the body diameter reads across its straight wall, text on the left;
+    # the dome radius is leadered from the upper left.
+    assert drawing.FRONT_KEEP["StudDia"][0] == drawing.FRONT_CENTER[0]
+    assert drawing.FRONT_KEEP["WasherDia"][0] == drawing.FRONT_CENTER[0]
+    assert drawing.FRONT_KEEP["WasherDia"][1] < drawing.FRONT_KEEP["StudDia"][1] < drawing._STUD_END_Y
+    assert drawing.FRONT_KEEP["BodyDia"][0] < drawing.FRONT_CENTER[0] - drawing._WASHER_HALF_W
+    assert drawing._front_y(drawing.WASHER_T) < drawing.FRONT_KEEP["BodyDia"][1] < drawing._front_y(
+        drawing.BODY_TOP - drawing.DOME_R
+    )
+    assert drawing.FRONT_KEEP["DomeR"][0] >= 0.030
+    assert drawing.FRONT_KEEP["DomeR"][1] > drawing._APEX_Y
+    # Lengths chain on the right from the washer seat, shortest nearest.
+    right = drawing.FRONT_CENTER[0] + drawing._WASHER_HALF_W
+    assert right < drawing.FRONT_KEEP["StudLen"][0] < drawing.FRONT_KEEP["WasherT"][0]
+    assert drawing.FRONT_KEEP["WasherT"][0] < drawing.FRONT_KEEP["BodyTop"][0]
+    assert drawing.FRONT_KEEP["BodyTop"][0] < drawing.OVERALL_TEXT_XY[0] < drawing.ISO_CENTER[0] - 0.030
+
+
+def test_overall_length_is_a_reference_beside_the_chained_lengths() -> None:
+    assert cone_lock_knob_spec.OVERALL_LENGTH == 13.5 + 6.35
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'label="stud end face"' in source
+    assert 'label="dome apex flat"' in source
+    # add_edge_dimension hands back the late-bound IDisplayDimension; the
+    # reference helper wants its IAnnotation (draw_crank_arm precedent).
+    assert (
+        'set_reference_dimension(\n        adapter,\n'
+        '        _early_bound(overall, "IDisplayDimension").GetAnnotation(),\n'
+        '        label="overall length",\n    )'
+    ) in source
 
 
 def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:
@@ -95,6 +149,9 @@ def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
 
 def test_view_scales_are_explicit() -> None:
     assert drawing.SHEET_SCALE == (3.0, 1.0)
+    assert drawing.FRONT_CENTER == (0.100, 0.150)
+    assert drawing.TOP_CENTER == (0.100, 0.232)
+    assert drawing.ISO_CENTER == (0.220, 0.190)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("scale=(3, 1)") == 3
 

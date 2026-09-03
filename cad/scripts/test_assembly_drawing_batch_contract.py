@@ -1,9 +1,9 @@
-"""Cross-drawing contract for the eight simple assembly drawings."""
+"""Cross-drawing contracts for the eight three-sheet assembly packages."""
 
 from __future__ import annotations
 
-import asyncio
 import importlib.util
+import inspect
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -16,21 +16,10 @@ import draw_magnifier_assembly
 import draw_paper_drive_assembly
 import draw_pen_assembly
 import draw_summing_assembly
-from _drawing_common import DrawingOutputs
 from _drawing_registry import DRAWINGS
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-
-
-def _load_dodo():
-    spec = importlib.util.spec_from_file_location("dodo", REPO_ROOT / "dodo.py")
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
 ASSEMBLY_DRAWINGS = (
     draw_pen_assembly,
     draw_channel_assembly,
@@ -43,14 +32,22 @@ ASSEMBLY_DRAWINGS = (
 )
 
 
-def test_registry_contains_exactly_the_eight_simple_assembly_drawings() -> None:
+def _load_dodo():
+    spec = importlib.util.spec_from_file_location("dodo", REPO_ROOT / "dodo.py")
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_registry_contains_exactly_the_eight_assembly_packages() -> None:
     registered = tuple(spec for spec in DRAWINGS if spec.source_kind == "assembly")
     assert {spec.script for spec in registered} == {
         Path(drawing.__file__).resolve() for drawing in ASSEMBLY_DRAWINGS
     }
 
 
-def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -> None:
+def test_registry_tasks_keep_source_tokens_and_package_helper_as_dependencies() -> None:
     dodo = _load_dodo()
     tasks = {task["name"]: task for task in dodo.task_drawing()}
     for drawing in ASSEMBLY_DRAWINGS:
@@ -65,123 +62,94 @@ def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -
         assert str(Path(_assembly_drawing.__file__).resolve()) in deps
 
 
-def test_each_recipe_is_only_a_precomputed_shared_builder_call() -> None:
-    prohibited = (
-        "add_auto_balloons",
-        "add_component_bom_balloons",
-        "add_note(",
+def test_each_entry_point_supplies_real_package_content() -> None:
+    for drawing in ASSEMBLY_DRAWINGS:
+        source = inspect.getsource(drawing)
+        assert "return await build_assembly_package(" in source
+        assert "build_simple_three_view_drawing" not in source
+        assert len(drawing.ASSEMBLY_STEPS) >= 4
+        assert len(drawing.CRITICAL_CHECKS) >= 2
+        assert len(drawing.HARDWARE_NOTES) >= 1
+        lines = (
+            *drawing.ASSEMBLY_STEPS,
+            *drawing.CRITICAL_CHECKS,
+            *drawing.HARDWARE_NOTES,
+        )
+        assert all(line.strip() and len(line) <= 96 for line in lines)
+
+
+def test_shared_recipe_requires_exploded_bom_balloons_and_procedure_sheets() -> None:
+    assert _assembly_drawing.SHEET_NAMES == (
+        "ASSEMBLED VIEWS",
+        "EXPLODED AND BOM",
+        "ASSEMBLY PROCEDURE",
+    )
+    source = inspect.getsource(_assembly_drawing.build_assembly_package)
+    for token in (
         "create_blank_drawing_sheets",
         "insert_bom_table",
-        "insert_identified_bom_table",
-        "set_hidden_lines_",
-        "stamp_drawing_summary",
-        "ViewDisplay",
-    )
-    for drawing in ASSEMBLY_DRAWINGS:
-        source = Path(drawing.__file__).read_text(encoding="utf-8")
-        assert "return await build_simple_three_view_drawing(" in source
-        assert "place_view(" not in source
-        assert "SHEET_NAMES" not in source
-        assert "BOM_" not in source
-        assert "ASSEMBLY_NOTES" not in source
-        assert not any(token in source for token in prohibited), drawing.ARTIFACT_STEM
-
-
-def test_each_three_view_layout_has_distinct_left_to_right_centers() -> None:
-    for drawing in ASSEMBLY_DRAWINGS:
-        front_x, _front_y = drawing.FRONT_CENTER
-        right_x, _right_y = drawing.RIGHT_CENTER
-        iso_x, _iso_y = drawing.ISO_CENTER
-        assert front_x < right_x < iso_x, drawing.ARTIFACT_STEM
-        assert right_x - front_x >= 0.065, drawing.ARTIFACT_STEM
-        assert iso_x - right_x >= 0.065, drawing.ARTIFACT_STEM
-
-
-def test_shared_builder_uses_default_visuals_and_three_named_views() -> None:
-    source = Path(_assembly_drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("place_view(") == 1
-    assert '("*Front", front_center)' in source
-    assert '("*Right", right_center)' in source
-    assert '("*Isometric", iso_center)' in source
-    assert "scale=sheet_scale" in source
-    for token in (
-        "set_hidden_lines_",
-        "ViewDisplay",
-        "DisplayMode",
-        "add_note(",
-        "balloon",
-        "bom_table",
-        "create_blank_drawing_sheets",
+        "_validate_assembly_bom_columns",
+        "add_auto_balloons_across_views",
+        "ShowExploded(True)",
+        "IsExploded()",
+        "ORDERED ASSEMBLY",
+        "HARDWARE / CONSUMABLES",
+        "ORIENTATION / ADJUSTMENT / ACCEPTANCE",
+        "expected_sheet_names=SHEET_NAMES",
     ):
-        assert token not in source
+        assert token in source
+    assert "HAS NO EXPLODED STATE" not in source
+    assert "has no exploded view" in source
 
 
-def test_shared_builder_places_exactly_front_right_and_isometric(
-    monkeypatch, tmp_path: Path
-) -> None:
-    source = tmp_path / "assembly.SLDASM"
-    source.touch()
-    outputs = DrawingOutputs(
-        slddrw=tmp_path / "assembly.SLDDRW",
-        pdf=tmp_path / "assembly.pdf",
-        png=tmp_path / "assembly.png",
-    )
-    adapter = SimpleNamespace(open_model=lambda _path: None, currentModel=object())
+def test_bom_metadata_comes_from_active_unsuppressed_components(monkeypatch) -> None:
+    def part(title: str, number: str):
+        return SimpleNamespace(
+            GetCustomInfoValue=lambda configuration, name: {
+                "Title": title,
+                "Number": number,
+            }.get(name, "")
+        )
 
-    async def open_model(path: str) -> bool:
-        calls.append(("open", path))
-        return True
-
-    calls: list[tuple[object, ...]] = []
-    adapter.open_model = open_model
-    monkeypatch.setattr(
-        _assembly_drawing,
-        "check",
-        lambda _label, result: result,
-    )
-    monkeypatch.setattr(
-        _assembly_drawing,
-        "read_required_properties",
-        lambda model, names, *, required: calls.append(("props", names, required)),
-    )
-    monkeypatch.setattr(
-        _assembly_drawing,
-        "new_project_drawing",
-        lambda _adapter, *, scale: calls.append(("new", scale)),
-    )
-    monkeypatch.setattr(
-        _assembly_drawing,
-        "place_view",
-        lambda _adapter, path, name, x, y, *, scale: calls.append(
-            ("view", path, name, x, y, scale)
+    components = (
+        SimpleNamespace(
+            IsSuppressed=lambda: False,
+            GetPathName=lambda: r"C:\cad\parts\shaft.SLDPRT",
+            GetModelDoc2=lambda: part("Drive Shaft", "MHA-101"),
+            ReferencedConfiguration="Default",
+        ),
+        SimpleNamespace(
+            IsSuppressed=lambda: False,
+            GetPathName=lambda: r"C:\cad\parts\shaft.SLDPRT",
+            GetModelDoc2=lambda: part("Drive Shaft", "MHA-101"),
+            ReferencedConfiguration="Default",
+        ),
+        SimpleNamespace(
+            IsSuppressed=lambda: True,
+            GetPathName=lambda: r"C:\cad\parts\hidden.SLDPRT",
+            GetModelDoc2=lambda: part("Hidden", "MHA-999"),
+            ReferencedConfiguration="Default",
         ),
     )
-
-    async def finalize(_adapter, actual_outputs, *, pdf_title, scale):
-        calls.append(("finalize", actual_outputs, pdf_title, scale))
-        return {"pdf": str(actual_outputs.pdf)}
-
-    monkeypatch.setattr(_assembly_drawing, "finalize_drawing", finalize)
-
-    result = asyncio.run(
-        _assembly_drawing.build_simple_three_view_drawing(
-            adapter,
-            source=source,
-            outputs=outputs,
-            sheet_scale=(1.0, 4.0),
-            front_center=(0.1, 0.2),
-            right_center=(0.2, 0.2),
-            iso_center=(0.3, 0.2),
-            pdf_title="Assembly Drawing",
-        )
+    model = SimpleNamespace(
+        ConfigurationManager=SimpleNamespace(
+            ActiveConfiguration=SimpleNamespace(Name="Default")
+        ),
+        ResolveAllLightWeightComponents=lambda top_only: 0,
+        GetComponents=lambda top_only: components,
+        GetExplodedViewCount2=lambda configuration: 1,
+    )
+    adapter = SimpleNamespace(
+        _attempt=lambda operation, default=None: operation(),
+    )
+    monkeypatch.setattr(
+        _assembly_drawing, "_early_bound", lambda value, interface: value
     )
 
-    view_calls = [call for call in calls if call[0] == "view"]
-    assert [call[2] for call in view_calls] == ["*Front", "*Right", "*Isometric"]
-    assert [call[3:5] for call in view_calls] == [
-        (0.1, 0.2),
-        (0.2, 0.2),
-        (0.3, 0.2),
-    ]
-    assert all(call[5] == (1.0, 4.0) for call in view_calls)
-    assert result == {"pdf": str(outputs.pdf)}
+    metadata = _assembly_drawing._read_bom_metadata(adapter, model)
+
+    assert metadata.components == ("shaft",)
+    assert metadata.descriptions == {"shaft": "Drive Shaft"}
+    assert metadata.aliases == {"mha-101": "shaft"}
+    assert metadata.configuration == "Default"
+    assert metadata.exploded_views == 1

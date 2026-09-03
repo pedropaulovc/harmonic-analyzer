@@ -690,7 +690,7 @@ def write_index(report_dir: Path = REPORT_DIR) -> Path:
 
 
 def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser = argparse.ArgumentParser(description=(__doc__ or "").split("\n\n")[0])
     parser.add_argument(
         "names", nargs="*", help="registry drawing names (e.g. crank_arm)"
     )

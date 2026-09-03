@@ -195,6 +195,8 @@ async def build(adapter) -> dict[str, str]:
     extrude_at_offset(adapter, COLLAR_LEN, FLANGE_LEN + STUD_LEN - COLLAR_LEN)
     name_last_feature(adapter, "Collar")
     # dim[0] = blind depth (CollarLen); dim[1] = start offset (stud tip - collar).
+    # Both are marked for the drawing: CollarStart IS the 13.00 station from
+    # the bar-side face the print baselines from (wheel_axle_spec).
     collar_dims = name_dimensions(adapter, "Collar", ["CollarLength", "CollarStart"])
     drive_jobs += [
         (collar_dims[0], '"CollarLen"'),

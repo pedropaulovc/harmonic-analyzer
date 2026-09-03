@@ -77,7 +77,9 @@ def test_notes_are_few_specific_and_never_the_title_block() -> None:
     # treat is a process fact the machinist needs, the old release hold
     # is gone.
     assert "HARDEN AND TEMPER TO 58-60 HRC" in notes
-    assert "LEAVE UNPAINTED" in notes
+    # The FINISH cell says "unpainted"; a note never restates the title block
+    # (policy rule 1, magnifier metadata contract).
+    assert "UNPAINTED" not in notes
     # The tap rides its callout; the finish its symbol; release holds stay
     # off the print.
     for banned in (

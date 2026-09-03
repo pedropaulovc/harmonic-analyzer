@@ -8,14 +8,12 @@ import arbor_pedestal_spec
 import build_arbor_pedestal
 import build_cone_gear_shaft
 import build_cone_pivot_screw
-import build_cone_tip_bushing
 import build_connecting_rod
 import build_crankshaft
 import build_cylinder_gear
 import build_cylinder_gear_shaft
 import cone_gear_shaft_spec
 import cone_pivot_screw_spec
-import cone_tip_bushing_spec
 import connecting_rod_spec
 import crankshaft_spec
 import cylinder_gear_shaft_spec
@@ -23,7 +21,6 @@ import cylinder_gear_spec
 import draw_arbor_pedestal
 import draw_cone_gear_shaft
 import draw_cone_pivot_screw
-import draw_cone_tip_bushing
 import draw_connecting_rod
 import draw_crankshaft
 import draw_cylinder_gear
@@ -77,21 +74,9 @@ CASES = (
             ),
         ),
     ),
-    (
-        cone_tip_bushing_spec,
-        build_cone_tip_bushing,
-        draw_cone_tip_bushing,
-        (
-            SurfaceFinishControl(
-                "bushing_bore",
-                MACHINED_UM,
-                CylinderFace(
-                    cone_tip_bushing_spec.BORE_DIA,
-                    contains_y_mm=cone_tip_bushing_spec.LENGTH / 2.0,
-                ),
-            ),
-        ),
-    ),
+    # cone_tip_bushing: no finish controls -- its 1/32 in bore is a plain
+    # drill, an axial spacer rather than a bearing (machinist review
+    # 2026-09-02); the empty tuple is pinned by test_cone_tip_bushing_drawing.
     (
         connecting_rod_spec,
         build_connecting_rod,
@@ -135,6 +120,11 @@ CASES = (
                 "cylinder_gear_bore",
                 MACHINED_UM,
                 CylinderFace(cylinder_gear_spec.BORE_DIA),
+            ),
+            SurfaceFinishControl(
+                "cam_track",
+                MACHINED_UM,
+                CylinderFace(cylinder_gear_spec.CAM_DIA),
             ),
         ),
     ),

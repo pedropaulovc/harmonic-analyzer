@@ -46,16 +46,30 @@ SURFACE_FINISHES = (
     SurfaceFinishControl("gear_seat", MACHINED_UM, CylinderFace(SEAT_DIA)),
 )
 
+# Marked model dimensions: the three land diameters plus three axial
+# stations, every one from the base (faced) end -- 9.10 to the base
+# shoulder, 22.90 to the collar shoulder, 26.90 overall -- so the machinist
+# sets the DRO once (policy rule 7; machinist review 2026-09-02: the old
+# per-land chain ran from three faces and left no conspicuous overall).
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "StubProfile": {
         "BaseDia",
         "SeatDia",
         "CollarDia",
         "BaseLength",
-        "SeatLength",
-        "CollarLength",
+        "SeatEnd",
+        "Overall",
     },
 }
+
+# The two concave shoulder roots (base -> seat, seat -> collar) are modelled
+# sharp; the print allows the turning tool's nose radius as a leadered note
+# on one shoulder rather than a fillet feature (policy rule 7: every
+# shoulder fillet on a turned part has a size; machinist review 2026-09-02:
+# an unspecified root is a bench question). Nothing butts hard against
+# either root -- the feed pinion sits on the seat with slack -- so R0.25 MAX
+# is a clearance, not a fit.
+ROOT_NOTE = "2X ROOT R0.25 MAX"
 
 # Notes: part-specific process facts only, never a tolerance, never the
 # title block (drawing-simplicity-policy.md rule 6).

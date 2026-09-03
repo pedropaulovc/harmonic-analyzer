@@ -201,7 +201,7 @@ def test_side_taps_and_heights_ride_the_elevation() -> None:
     # drawing dimensions on topologically picked edges (the elevation's bbox
     # is asymmetric, so nothing is picked by sheet coordinate); front/rear
     # rail width and crossbar width the same way on the plan.
-    assert source.count("_dimension_entities(") == 7  # definition + 6 calls
+    assert source.count("_dimension_entities(") == 9  # definition + 8 calls
     for label in (
         'label="boss stack height"',
         'label="boss proud of the rail top"',
@@ -243,29 +243,36 @@ def test_side_taps_and_heights_ride_the_elevation() -> None:
 def test_web_thickness_rides_section_a_a() -> None:
     # The web sits under the flange in the plan and behind the front rail in
     # the elevation, so the T-section is cut across the plan at z +50 (clear
-    # of the hub, its gussets and every hole) -- the fleet's first
-    # create_section_view user.  Cut-face edges are section geometry, not
-    # model edges, so the two section dimensions pick by sheet coordinate.
+    # of the hub, its gussets and every hole).  The two dimensions select four
+    # distinct section-generated line entities through IView; neither a bbox
+    # mapper nor coordinate-pick tolerance participates.
     source = _source()
     assert source.count("create_section_view(") == 1
     assert 'section_label="A"' in source
     assert "scale=(1, 4),\n        label=\"rail T-section\"" in source
-    assert source.count("add_edge_dimension(") == 2
+    assert "add_edge_dimension(" not in source
+    assert "_section_circles, section_lines = _view_edges(adapter, section)" in source
+    assert "view.SelectEntity(entity, index > 0)" in source
+    assert "model_point_in_view(" not in source
+    assert "def _section_xy" not in source
     assert 'label="web thickness"' in source
     assert 'label="side rail width"' in source
+    for anchor in (
+        "section +X web inner edge",
+        "section +X web outer edge",
+        "section +X flange inner edge",
+        "section +X flange outer edge",
+    ):
+        assert f'label="{anchor}"' in source, anchor
     assert drawing.SECTION_CUT_Z == 50.0
     assert drawing.SECTION_LINE == ((0.019, 0.150), (0.2485, 0.150))
     assert drawing.SECTION_CENTER == (0.345, 0.099)
-    assert abs(drawing.WEB_TEXT_XY[0] - 0.39425) < 1e-9
-    assert drawing.WEB_TEXT_XY[1] == 0.0895
-    assert drawing.SIDE_RAIL_TEXT_XY[1] == 0.0835
+    assert drawing.WEB_TEXT_XY == (0.39425, 0.0895)
+    assert drawing.SIDE_RAIL_TEXT_XY == (0.39425, 0.0835)
     assert abs(drawing.WEB_IN_X - 190.65) < 1e-9
     assert abs(drawing.WEB_OUT_X - 203.35) < 1e-9
-    # Section picks: the +X T's web faces and flange sides are 2.7 mm apart
-    # on the sheet, well past the pick tolerance.
-    web = drawing._section_xy(drawing.WEB_IN_X, 0.0)[0]
-    flange = drawing._section_xy(part.INNER_X, 0.0)[0]
-    assert web - flange > 0.0025
+    assert abs(drawing.WEB_OUT_X - drawing.WEB_IN_X - part.WEB_T) < 1e-9
+    assert abs(part.OUTER_X - part.INNER_X - 34.2) < 1e-9
     # The cut clears the hub gussets (z <= 33.1) and the nearest hole rim
     # (keeper tap at z 77.1, stud at 90.1 minus its radius).
     assert part.HUB_GUSSET_HALF_OUT + part.GOOSENECK_Z < drawing.SECTION_CUT_Z

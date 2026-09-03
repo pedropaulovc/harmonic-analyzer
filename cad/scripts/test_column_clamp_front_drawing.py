@@ -8,6 +8,7 @@ import column_clamp_front_spec as spec
 import draw_column_clamp_front as drawing
 import build_column_clamp_front as part
 import _clamp_arc
+from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _holes import NUMBER_DRILL_MM, blind_cut_dia_mm
 
@@ -64,11 +65,13 @@ def test_notes_are_few_specific_and_never_the_title_block() -> None:
     assert len(lines) <= 4
     assert "AS A PAIR" in notes  # the relief is bored clamped to its back arc
     assert "MATES WITH MHA-106" in notes  # the only way a part number appears
-    assert "MASK" in notes
-    # The drill size rides the ear-hole callout; nothing the title block says.
-    assert "DRILL" not in notes
-    assert "#8" not in notes
-    for banned in ("LINEAR +/-", "+/-", "HOLE CENTRES", "DATUM", "UOS", "X.XX"):
+    # Material, "machine all surfaces" and paint/masking are the title block's
+    # (material cell, default roughness, finish field); the bar face is a
+    # flag on the view, not a word in the notes.
+    for banned in (
+        "GRAY IRON", "CASTING", "MACHINE ALL", "PAINT", "MASK", "BAR FACE",
+        "DRILL", "#8", "LINEAR +/-", "+/-", "HOLE CENTRES", "DATUM", "UOS", "X.XX",
+    ):
         assert banned not in notes, banned
     # Pedro 2026-07-10: drawings spec the closest US-customary fastener, not
     # the period British Association series ("BACK ARC" is not a BA thread).
@@ -78,15 +81,55 @@ def test_notes_are_few_specific_and_never_the_title_block() -> None:
     assert "_NOTES_" not in source
 
 
-def test_hole_callouts_state_size_and_process() -> None:
+def test_bar_face_is_flagged_from_the_view() -> None:
+    assert spec.BAR_FACE_FLAG == "BAR FACE"
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "text=BAR_FACE_FLAG" in source
+    assert "entity=bar_edge" in source
+    # The flag hangs off the x = ARC_DEPTH corner edge, found by model
+    # coordinates, so it is right whichever way the view projects.
+    assert "fixed={0: ARC_DEPTH, 2: ARC_WIDTH / 2.0}" in source
+    assert "bar_on_right = bar_xy[0] > FRONT_CENTER[0]" in source
+
+
+def test_relief_bore_carries_a_slip_fit_band_on_the_model() -> None:
     callouts = drawing.DIMENSION_CALLOUTS
     assert callouts["BoreDia"].startswith("BORE THRU")
     assert "25.4" in callouts["BoreDia"]  # the column the relief slips on
+    # The band rides the model dimension (build_column_clamp_front, after the
+    # shared builder): the bore can never read 24.8-26.4 under the .X row.
+    assert spec.COLUMN_BORE_BAND == (0.05, 0.00)
+    assert model_toleranced_dimensions(part) == {
+        ("BoreProfile", "BoreDia"): "*deviations(COLUMN_BORE_BAND)"
+    }
+    assert drawing.DIMENSION_PRECISION == {"BoreDia": 3}
+    assert spec.COLUMN_BORE + spec.COLUMN_BORE_BAND[1] > 25.4
+
+
+def test_hole_callouts_state_size_and_process() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     # Harvey #13: the ear-hole callout says DRILL; the #8 normal clearance
     # (4.978) is exactly the #9 drill, which rides as the callout prefix.
     assert 'process="#9 DRILL"' in source
     assert spec.EAR_HOLE_DIA == NUMBER_DRILL_MM["#9"]
+    assert "edge=left_rim" in source
+
+
+def test_bore_and_ear_pattern_are_located_from_the_faces() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    # Four entity-selected dimensions: bore axis from an end face (top view),
+    # ear pitch, one ear from its end face and the pair's height from the
+    # bottom face (right view), every one to the arc/rim CENTRE.
+    assert source.count("    _entity_dimension(\n") == 4
+    for label in (
+        'label="bore axis station"',
+        'label="ear-hole spacing"',
+        'label="ear-hole end offset"',
+        'label="ear-hole height"',
+    ):
+        assert label in source, label
+    assert "set_arc_endpoints_to_center(adapter, display, label=label)" in source
+    assert 'label="collar-height overall"' in source
 
 
 def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:
@@ -103,9 +146,6 @@ def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:
         assert helper not in source, helper
     assert not hasattr(spec, "GEOMETRIC_TOLERANCES_MM")
     assert not hasattr(spec, "SURFACE_FINISHES")
-    # The ear-hole spacing and collar height stay as ordinary dimensions.
-    assert 'label="ear-hole spacing"' in source
-    assert 'label="collar-height overall"' in source
 
 
 def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:

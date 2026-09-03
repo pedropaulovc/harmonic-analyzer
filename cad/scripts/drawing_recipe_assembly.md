@@ -1,14 +1,23 @@
-# Recipe: assembly drawings
+# Recipe: assembly drawing packages
 
-Every assembly drawing is a single ASME B sheet with three model views:
-`*Front`, `*Right`, and `*Isometric`. Assembly drawings intentionally use the
-SolidWorks/template defaults for view display. They do not add BOMs, balloons,
-assembly notes, extra sheets, component isolation, or per-view display-mode
-overrides.
+Each registered assembly produces a three-sheet ASME B package:
 
-The shared implementation is `_assembly_drawing.py`. An assembly entry point is
-only responsible for preserving its registry identity, output paths, measured
-sheet scale, and precomputed view centers:
+1. `ASSEMBLED VIEWS` shows enlarged Front and Right working-position views.
+2. `EXPLODED AND BOM` shows a native exploded isometric, an associative BOM,
+   balloons, and two small reference projections used for balloon coverage.
+3. `ASSEMBLY PROCEDURE` shows the assembled isometric beside ordered steps,
+   hardware and consumables, and measurable orientation and acceptance checks.
+
+The source assembly must contain a persisted exploded view. Assembly saves
+create one with SolidWorks `AutoExplode` when the active configuration has
+none, then collapse it before the final solve and save. The drawing fails if
+the exploded state cannot be displayed. It never substitutes a collapsed view
+under an exploded-view label.
+
+`_assembly_drawing.py` owns sheet creation, view display, active-configuration
+pinning, BOM insertion and validation, balloon coverage, note placement, sheet
+markers, and export. An entry point supplies its registry identity, layout
+scales and centers, and assembly-specific procedure text:
 
 ```python
 SPEC = DRAWINGS_BY_NAME["<stem>_assembly"]
@@ -20,36 +29,45 @@ OUTPUTS = DrawingOutputs(
 )
 
 SHEET_SCALE = (1.0, 4.0)
-FRONT_CENTER = (0.070, 0.150)
-RIGHT_CENTER = (0.150, 0.150)
-ISO_CENTER = (0.225, 0.140)
+REFERENCE_SCALE = (1.0, 8.0)
+FRONT_CENTER = (0.080, 0.145)
+RIGHT_CENTER = (0.280, 0.145)
+ISO_CENTER = (0.280, 0.145)
+
+ASSEMBLY_STEPS = ("...", "...", "...", "...")
+CRITICAL_CHECKS = ("...", "...")
+HARDWARE_NOTES = ("...",)
 
 
 async def build(adapter):
-    return await build_simple_three_view_drawing(
+    return await build_assembly_package(
         adapter,
         source=SOURCE,
         outputs=OUTPUTS,
         sheet_scale=SHEET_SCALE,
+        reference_scale=REFERENCE_SCALE,
         front_center=FRONT_CENTER,
         right_center=RIGHT_CENTER,
         iso_center=ISO_CENTER,
         pdf_title="<Title> Assembly Drawing",
+        assembly_steps=ASSEMBLY_STEPS,
+        critical_checks=CRITICAL_CHECKS,
+        hardware_notes=HARDWARE_NOTES,
     )
 ```
 
-The builder explicitly pins every view to `SHEET_SCALE`. SolidWorks can
-otherwise auto-scale a newly inserted view according to the seat preference,
-which makes the saved placement nondeterministic. Explicit scale is placement
-determinism, not a visual-style override.
+The BOM reads unsuppressed top-level components from the active assembly
+configuration. Native quantities stay authoritative. Component `Number` and
+`Title` properties supply the released part number and description; filenames
+are only the fallback description.
 
 Registry rows, task names, CLI arguments, and output stems remain unchanged.
-The normal build command is:
+Build one package with:
 
 ```powershell
 uv run python -m doit drawing:<stem>_assembly
 ```
 
-Offline coverage lives in `test_assembly_drawing_batch_contract.py` plus one
-small per-assembly contract file. The batch contract owns the shared invariants;
-the per-assembly files pin each registry row, output mapping, scale, and centers.
+`test_assembly_drawing_batch_contract.py` owns the shared package invariants.
+The per-assembly tests pin the procedure content and layout forwarded by each
+entry point.

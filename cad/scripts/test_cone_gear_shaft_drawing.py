@@ -45,11 +45,43 @@ def test_required_drawing_paths() -> None:
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert part.DRAWING_DIMENSIONS is cone_gear_shaft_spec.DRAWING_DIMENSIONS
     marked = set().union(*cone_gear_shaft_spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.SIDE_KEEP) | set(drawing.END_KEEP)
+    kept = (
+        set(drawing.SIDE_STATION_KEEP)
+        | set(drawing.SIDE_DIAMETER_STATIONS_MM)
+        | set(drawing.DETAIL_DIAMETER_STATIONS_MM)
+    )
     assert kept == marked
     assert part.SECTIONS is cone_gear_shaft_spec.SECTIONS
-    assert drawing.SHAFT_LENGTH == cone_gear_shaft_spec.SHAFT_LENGTH
     assert drawing.SECTION_DIAS == cone_gear_shaft_spec.SECTION_DIAS
+    assert drawing.SECTION_ENDS == cone_gear_shaft_spec.SECTION_ENDS
+
+
+def test_diameters_read_on_their_own_lands_not_an_end_view() -> None:
+    # Policy rule 7 / machinist review 2026-09-02: a turned part's diameters
+    # sit on the side view's cylindrical segments, never on an end view whose
+    # circles occlude one another.  The journal and the 3/8 in seat read on
+    # the 1:1 silhouette; the 1/4, 1/8 and 1/32 in tip lands in DETAIL A
+    # (3:1), curated BEFORE the side view (one view per marked dimension).
+    assert set(drawing.SIDE_DIAMETER_STATIONS_MM) == {"Sec0Dia", "Sec1Dia"}
+    assert set(drawing.DETAIL_DIAMETER_STATIONS_MM) == {"Sec2Dia", "Sec3Dia", "Sec4Dia"}
+    ends = cone_gear_shaft_spec.SECTION_ENDS
+    assert 0.0 < drawing.SIDE_DIAMETER_STATIONS_MM["Sec0Dia"] < ends[0]
+    assert ends[0] < drawing.SIDE_DIAMETER_STATIONS_MM["Sec1Dia"] < ends[1]
+    assert ends[1] < drawing.DETAIL_DIAMETER_STATIONS_MM["Sec2Dia"][0] < ends[2]
+    assert ends[2] < drawing.DETAIL_DIAMETER_STATIONS_MM["Sec3Dia"][0] < ends[3]
+    assert ends[3] < drawing.DETAIL_DIAMETER_STATIONS_MM["Sec4Dia"][0] < ends[4]
+    # Every detail land lies inside the detail boundary.
+    for station, _above in drawing.DETAIL_DIAMETER_STATIONS_MM.values():
+        assert abs(station - drawing.DETAIL_MODEL_CENTER_Z) < drawing.DETAIL_MODEL_RADIUS
+    assert drawing.DETAIL_SCALE == (3, 1)
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'detail_label="A"' in source
+    assert source.index('view_label="detail"') < source.index('view_label="side"')
+    assert "model_point_in_view(" in source
+    assert '"*Front"' not in source  # no end view
+    assert "End View Note" not in source
+    assert not hasattr(cone_gear_shaft_spec, "END_VIEW_NOTE")
+    assert "End View Note" not in Path(part.__file__).read_text(encoding="utf-8")
 
 
 def test_sections_are_a_monotonic_stepped_shaft() -> None:
@@ -82,10 +114,11 @@ def test_sections_are_a_monotonic_stepped_shaft() -> None:
         + (cone_gear_shaft_spec.FRONT_STUB + cone_gear_shaft_spec.T006_TIP_STATION,)
     )
     # Every seat diameter carries the snug fit as a NATIVE model tolerance --
-    # see test_section_fits_are_toleranced_on_the_model. Display precision stays
-    # a sheet decision (an exact-conversion nominal needs its decimals shown).
+    # see test_section_fits_are_toleranced_on_the_model.  Every land is a
+    # fitted diameter, so all five print three places (the journal's 12.2308
+    # rounds to 12.231; the title block tolerances three places, not four).
     assert drawing.DIMENSION_PRECISION == {
-        name: 4 if name == "Sec0Dia" else 3 for name in drawing.END_KEEP
+        name: 3 for name in ("Sec0Dia", "Sec1Dia", "Sec2Dia", "Sec3Dia", "Sec4Dia")
     }
 
 
@@ -102,8 +135,9 @@ def test_notes_are_few_specific_and_never_the_title_block() -> None:
     # Nothing the title block, a dimension or a deleted control used to say.
     for banned in ("+/-", "DATUM", "RUNOUT", "CLEARANCE", "POST BORE", "X.XX", "UOS"):
         assert banned not in notes, banned
+    assert drawing.NOTES_XY == (0.225, 0.110)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+    assert 'add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)' in source
     assert "def _manufacturing_notes" not in source
 
 
@@ -137,7 +171,7 @@ def test_print_carries_no_gdt_and_one_running_journal_ra() -> None:
 
 def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "for view in (side, end):\n        set_hidden_lines_visible" in source
+    assert "for view in (side, detail):\n        set_hidden_lines_visible" in source
     assert "set_hidden_lines_removed(adapter, iso)" in source
 
 
@@ -145,17 +179,21 @@ def test_view_scales_are_explicit() -> None:
     assert drawing.SHEET_SCALE == (1.0, 1.0)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("scale=(1, 1)") == 1  # side silhouette at sheet scale
-    assert source.count("scale=(4, 1)") == 1  # enlarged end view
+    assert source.count("scale=(4, 1)") == 0  # the enlarged end view is gone
     assert source.count("scale=(1, 2)") == 1  # reduced pictorial
-    assert drawing.END_VIEW_SCALE == 4.0
+    assert "scale=DETAIL_SCALE" in source
+    assert drawing.DETAIL_CENTER == (0.110, 0.098)
+    assert drawing.ISO_CENTER == (0.360, 0.200)
 
 
-def test_journal_finish_symbol_and_end_view_note_are_placed() -> None:
+def test_journal_finish_symbol_is_placed_clear_of_the_journal_diameter() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "symbol_xy=(0.255, 0.242)" in source
+    # The Ra symbol stands right of the journal's diameter dimension (which
+    # crosses the journal at mid-land) and leads down to the OD near the end.
+    assert drawing.JOURNAL_FINISH_SYMBOL_XY == (0.275, 0.245)
+    assert drawing.JOURNAL_FINISH_ATTACH_INBOARD_MM < drawing.SIDE_DIAMETER_STATIONS_MM["Sec0Dia"]
     assert "leader_attach_xy=pivot_top" in source
-    assert cone_gear_shaft_spec.END_VIEW_NOTE == "END VIEW SCALE 4:1"
-    assert 'add_property_linked_note(adapter, "End View Note"' in source
+    assert "symbol_xy=JOURNAL_FINISH_SYMBOL_XY" in source
 
 
 def test_part_stamps_make_critical_properties() -> None:
