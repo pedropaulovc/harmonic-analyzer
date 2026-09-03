@@ -21,20 +21,23 @@ def test_alignment_pinion_mesh_gap_stays_at_the_proven_axis() -> None:
 def test_support_rig_keeps_its_proven_outboard_topology() -> None:
     assert drive.X_DRUM < drive.APINION_X < drive.PIVOT_X < drive.LIFT_X
     assert drive.BLOCK_X > drive.APINION_X
-    # c557005e: the lever leans -40 (machine +X, off the arbor's front stub)
-    # while the pivot/lift/block rig itself stays outboard of the pinion.
-    assert drive.LEVER_TILT_DEG < 0.0
+    assert drive.LEVER_TILT_DEG == 10.0
     assert drive.HANDLE_TILT_DEG > 0.0
 
     block_near_edge = drive.BLOCK_X - drive.BLOCK_WIDTH / 2.0
     cylinder_outboard_tip = drive.X_DRUM + drive.TIP_DRUM120
     assert block_near_edge - cylinder_outboard_tip >= 0.25
-    throw_angles = (
-        drive.LEVER_TILT_DEG
-        + math.copysign(step * 0.25, drive.LEVER_TILT_DEG)
-        for step in range(81)
+
+
+def test_lever_sweeps_from_photographed_park_to_cam_solved_engagement() -> None:
+    assert -85.0 < drive.CAM_ENGAGE_ROTATION_DEG < -75.0
+    assert -80.0 < drive.LEVER_ENGAGED_TILT_DEG < -65.0
+    assert math.isclose(
+        drive._engaged_cam_gap(drive.CAM_ENGAGE_ROTATION_DEG),
+        0.0,
+        abs_tol=1e-12,
     )
-    assert all(abs(angle) >= abs(drive.LEVER_TILT_DEG) for angle in throw_angles)
+    assert drive.LEVER_ENGAGED_TILT_DEG < 0.0 < drive.LEVER_TILT_DEG
 
 
 def test_rederived_cam_and_return_leaf_clearances_are_positive() -> None:
@@ -58,9 +61,7 @@ def test_return_spring_foot_clears_the_fixed_rocker_support() -> None:
     spring_foot_end = drive.SPRING_X - drive.SPR_FOOT_END_L[0]
     assert rocker_near_face - spring_foot_end >= 0.25
     assert (
-        rocker_near_face
-        - (drive.SPRING_HOLE_X + drive.FSCREW_HEAD_DIA / 2.0)
-        >= 0.25
+        rocker_near_face - (drive.SPRING_HOLE_X + drive.FSCREW_HEAD_DIA / 2.0) >= 0.25
     )
 
 

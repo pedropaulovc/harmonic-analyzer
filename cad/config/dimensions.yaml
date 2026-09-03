@@ -1835,6 +1835,12 @@ sections:
         - 'ch25 p.68: a ~Ø15 ball on a ~65 rod — SUPERSEDES the Ø23 × 14 drum on an 85 rod (`pinion_handle_geometry.py`)'
         - scaled
         - med
+      - - Engage lever rest and throw (2026-09 photo correction)
+        - Ø6 × 86 lever; parked +10° from vertical toward machine −X; the −81.871° eccentric-cam contact rotation carries it through vertical to −71.871° toward machine +X at engagement
+        - —
+        - 'ch25 p.68 front-side pair: page002_img08 is disengaged and puts the lever about 10° from vertical toward image-right = machine −X; page002_img07 is engaged and folds it about 76° toward image-left = machine +X. The linkage independently solves −81.871° cam rotation and a −71.871° engaged lever, within the photo perspective band. Supersedes the −40° parked seed, which put the rest pose on the photographed engaged side.'
+        - scaled + derived
+        - med
       - - Cam-follower pin (per strap)
         - Ø4 × 17 steel stud, seated 4.0 in a blind edge bore 6.0 ABOVE the pivot axis (2026-09 re-solve); 13 proud reaches the lift cam
         - —
@@ -1862,31 +1868,29 @@ sections:
       exact v2 journal now overrides the image-derived height and keeps the rig LEVEL with
       the drive line and INBOARD of the cylinder drum (between drum and machine
       centreline), not in the frustum/64T channel at all. Modeled layout
-      (`APINION_*` constants): axis at machine (−8.900, 90.518) =
-      X_DRUM + (drum tip 31.10 + pinion tip 11.22 + 2.0 disengaged gap); drum z −39.585..+103.615 (face 143.2,
-      spans all 20 stations); the front stub and tee
-      handle likewise move to z −99.585 and −108.585, while the back stub ends
-      at +126.665. Straps: 18 wide (0.8× the 42T tip
-      Ø22.4, `v4_pinion_018` — the teeth stand proud of both flanks), pivot
-      y 62.8, bore-to-bore c2c 43.0, parked at a −49.864° west lean after the v2 post moved the drive line; the swing rides the torque shaft as
-      the p2 setup DOF (a freed operational DOF, its angle drive spec recorded
-      in the DOF manifest; articulated by the mobility probe / motion drives). The brass
-      return spring (table row above) stands east of the back strap, foot on
-      the base, and presses the swing west to the disengaged rest —
+      (`APINION_*` constants): axis at machine (−16.077, 90.518) =
+      X_DRUM + (drum tip 31.10 + pinion tip 11.22 + 2.0 disengaged gap);
+      drum z −71.912..+71.288 (face 143.2, spanning all 20 stations), steel
+      arbor z −131.912..+94.338, and tee-handle hub at z −138.412. Straps:
+      15 wide × 5 thick with R7.5 ends (`v4_pinion_018` — the teeth stand
+      proud of both flanks), pivot (−12.113, 62.8), bore-to-bore c2c 28.0,
+      parked at an 8.139° lean; the swing rides the torque shaft as the p2
+      setup DOF (a freed operational DOF, its angle drive spec recorded in
+      the DOF manifest; articulated by the mobility probe / motion drives).
+      The brass return spring (table row above) stands beside the back strap,
+      foot on the base, and presses the swing to the disengaged rest —
       parked-pose clearances asserted in `build_drive_train_assembly`
-      (`SPRING_*`). The engage path (PR5) is the p.69 cam: the lift rod rides
-      the blocks' WEST bores at (34.991, 64.570), 12.5 west and 1.770 above the
-      torque-shaft bore after the v2 closure, and each strap
-      tail carries a Ø4 follower pin (table row above) the rod's radial cam
-      pin lifts. The cam eccentricity is 1.4 and its v2-reclosed Ø10.32 OD
-      restores the documented 0.575-mm thin-side wall that the transient Ø9.2
-      cascade reduced to 0.015. Parked surface gap is 0.150, engaged surface
-      authority is >0.25 and the 17-mm follower retains 2.047 on the cam
-      station. Two open R6.90 bracket scallops cover the collar's complete
-      parked-to-engaged swept envelope with 0.25 air and >2.5 pivot-bore
-      ligament; the partially exposed follower-stud mouth is silver-brazed
-      after pressing. All are asserted analytically (`CAM_*` + the
-      segment-distance scan). At DP 49.82
+      (`SPRING_*`). The engage path is the p.69 cam: the lift rod rides the
+      blocks' other bores at (0.387, 64.656), and each strap tail carries a
+      Ø4 follower pin (table row above) that the rod's radial cam lifts. The
+      cam eccentricity is 1.4 and its Ø10.32 OD retains a 0.575-mm thin-side
+      wall. Parked surface gap is 0.150; the solved −81.871° cam rotation
+      gives 1.202 mm engaged authority and leaves 7.015 mm of follower pin
+      beyond the contact station. Two open R6.90 bracket scallops cover the
+      collar's complete parked-to-engaged swept envelope with 0.25 air and
+      >2.5 pivot-bore ligament; the partially exposed follower-stud mouth is
+      silver-brazed after pressing. All are asserted analytically (`CAM_*` +
+      the segment-distance scan). At DP 49.82
       the drum is 42T Ø22.4 (same DP as the cylinder train it must mesh); the
       table above records the book-vintage DP 30 readings.
 
