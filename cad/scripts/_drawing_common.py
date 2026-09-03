@@ -20,7 +20,7 @@ from typing import Any, Iterable, Literal, Sequence
 
 import _config
 import _telemetry
-from _common import _early_bound
+from _common import _build_id, _early_bound, apply_custom_properties
 from _gtol_spec import GTOL_SYMBOLS as _GTOL_SYMBOLS
 from _gtol_spec import gtol_frame_xml as _gtol_frame_xml
 from _surface_finish import SurfaceFinishControl
@@ -126,8 +126,6 @@ _SF_BOX_DOWN_M = 0.0
 _ANNOT_DIM = 4
 _NOMINAL_DIM_HALF_M = 0.004
 
-_OLD_EDGE_BREAK_NOTE = "REMOVE BURRS AND BREAK SHARP EDGES R.01 OR CHAMFER .01 MAX"
-_METRIC_EDGE_BREAK_NOTE = "REMOVE BURRS AND BREAK SHARP EDGES R0.25 OR CHAMFER 0.25 MAX"
 
 # swLeaderStyle_e.swBENT / swLeaderSide_e.swLS_SMART. Every leadered annotation
 # is bent: a straight leader runs at whatever angle its anchor-to-text vector
@@ -1213,8 +1211,15 @@ def add_native_hole_callout(
     callout_xy: tuple[float, float],
     label: str,
     edge: Any | None = None,
+    process: str | None = None,
 ) -> Any:
     """Insert an associative Hole Wizard callout on a selected drawing edge.
+
+    ``process`` is the shop instruction a machinist reads first -- ``"DRILL"``,
+    ``"15/64 DRILL"``, ``"REAM"`` -- written into the callout's PREFIX
+    compartment so the sheet reads ``15/64 DRILL <MOD-DIAM>5.95 THRU ALL``
+    (Harvey #13: say drill or ream; drawing-simplicity-policy.md rule 7).  The
+    size and depth stay native and associative; only the prefix is text.
 
     The callout DISPLAYS the part's hole tolerance; it does not own one. Set the
     fit on the hole feature in the SLDPRT (``_holes.wizard_holes``'s
@@ -1246,6 +1251,27 @@ def add_native_hole_callout(
     )
     if not annotation.SetPosition2(callout_xy[0], callout_xy[1], 0.0):
         raise RuntimeError(f"failed to position native hole callout ({label})")
+    if process:
+        # A Hole Wizard callout keeps its whole format string
+        # (``<MOD-DIAM><DIM> THRU ALL``) in the PREFIX compartment, so the
+        # process is PREPENDED to what is there -- replacing it silently drops
+        # the size and depth (measured 2026-09-02: the sheet read "#14 DRILL").
+        display = _sw_type_info.early_bound_or_flag(
+            display, "IDisplayDimension", "SetText", "GetText"
+        )
+        existing = str(display.GetText(1) or "")  # swDimensionTextPrefix
+        if not existing.strip():
+            raise RuntimeError(
+                f"hole callout has no format text to prefix ({label})"
+            )
+        prefix = process.rstrip() + " " + existing.lstrip()
+        display.SetText(1, prefix)
+        if str(display.GetText(1) or "") != prefix:
+            raise RuntimeError(
+                f"hole callout process prefix did not persist ({label}): "
+                f"{display.GetText(1)!r}"
+            )
+        _telemetry.debug(f"hole callout {label}: prefix {prefix!r}")
     draw.ClearSelection2(True)
     draw.EditRebuild3()
     return display
@@ -1256,6 +1282,7 @@ def add_native_hole_callout(
 # template's title block reads via $PRPSHEET. finalize_drawing requires them on
 # the linked model so a stale part can't ship blank tolerance cells.
 TITLE_BLOCK_TOLERANCE_PROPERTIES = (
+    "TOL_LIN_X",
     "TOL_LIN_XX",
     "TOL_LIN_XXX",
     "TOL_ANG",
@@ -1266,8 +1293,20 @@ TITLE_BLOCK_TOLERANCE_PROPERTIES = (
     # that predates the TOL_HOLE_* stamp must fail loud here, not ship blank.
     "TOL_HOLE_MINUS",
     "TOL_HOLE_PLUS",
+    # Edge-break and thread rows (2026-09 template): $PRPSHEET links, so a
+    # source part that predates the stamp would print "REMOVE BURRS AND BREAK
+    # SHARP EDGES  OR CHAMFER  MAX" -- fail loud instead.
+    "TOL_EDGE_BREAK_R",
+    "TOL_CHAMFER_MAX",
+    "THREAD_TYPE",
+    "THREAD_CLASS",
 )
 TITLE_BLOCK_REVISION_PROPERTY = "Revision"
+# The copyright line's year ($PRPSHEET:{COPYRIGHT_YEAR}); required like the
+# tolerance rows so a stale source model cannot print "(c)  Pedro ...".
+TITLE_BLOCK_COPYRIGHT_PROPERTY = "COPYRIGHT_YEAR"
+# Stamped on the drawing document itself at finalize (see _common._build_id).
+DRAWING_BUILD_ID_PROPERTY = "BUILD_ID"
 
 
 def read_required_properties(
@@ -1345,6 +1384,39 @@ def import_cosmetic_threads(adapter: Any, view: Any) -> tuple[int, int]:
     return seed_count, instance_count
 
 
+# swUserPreferenceIntegerValue_e system colours, read off swconst.tlb R2026x
+# (the docs print no integer).  A drawing-ADDED dimension or callout is a
+# "non-imported annotation" and SolidWorks draws it in a grey that exports at
+# ~level 128 -- the 75.00 / (93.00) / hole callouts read pale beside the black
+# model-imported dimensions (machinist review 2026-09-02: "plotted in very
+# pale gray ... reducing arm's-length readability"; Lipton: faint lines are
+# for accountants).  Both books want every line on the print pressed hard.
+_PREF_COLOR_NON_IMPORTED_ANNOTATION = 232
+_PREF_COLOR_IMPORTED_DRIVEN_ANNOTATION = 113
+_COLORREF_BLACK = 0
+
+
+def _pin_annotation_ink(adapter: Any) -> None:
+    """Pin the seat's driven / non-imported annotation colours to black.
+
+    System (seat) preferences, so every sheet the seat exports gets the same
+    ink; read back after each write so a rejected write fails loud instead of
+    shipping pale dimensions.
+    """
+    sw = _early_bound(adapter.swApp, "ISldWorks")
+    for pref in (
+        _PREF_COLOR_NON_IMPORTED_ANNOTATION,
+        _PREF_COLOR_IMPORTED_DRIVEN_ANNOTATION,
+    ):
+        if int(sw.GetUserPreferenceIntegerValue(pref)) == _COLORREF_BLACK:
+            continue
+        if not sw.SetUserPreferenceIntegerValue(pref, _COLORREF_BLACK):
+            raise RuntimeError(f"failed to set annotation colour pref {pref}")
+        if int(sw.GetUserPreferenceIntegerValue(pref)) != _COLORREF_BLACK:
+            raise RuntimeError(f"annotation colour pref {pref} did not persist")
+        _telemetry.debug(f"annotation colour pref {pref} pinned to black")
+
+
 def _pin_dimension_text_and_leader_style(draw: Any) -> None:
     """Force every dimension on ``draw`` to a bent leader with HORIZONTAL text.
 
@@ -1418,7 +1490,6 @@ def new_project_drawing(
     # format and view geometry is inert (all typed SelectByID2 picks fail).
     # EditSheet() drops back to the sheet layer; idempotent when already there.
     ddoc.EditSheet()
-    _normalize_metric_edge_break_note(adapter, ddoc)
     sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
     if sheet is None:
         raise RuntimeError("project drawing template has no current sheet")
@@ -1427,6 +1498,7 @@ def new_project_drawing(
     # display (an exact inch conversion like 9.525) can pass decimals=3.
     set_units_mm(adapter, decimals=decimals)
     _pin_dimension_text_and_leader_style(draw)
+    _pin_annotation_ink(adapter)
     if not sheet.SetScale(float(scale[0]), float(scale[1]), True, False):
         raise RuntimeError(f"failed to force ASME B sheet to {scale[0]:g}:{scale[1]:g}")
     assert_asme_b_sheet(adapter, sheet, phase="initial setup", scale=scale)
@@ -1520,57 +1592,6 @@ def create_blank_drawing_sheets(
 
 
 @_telemetry.traced("drawing.normalize_edge_break")
-def _normalize_metric_edge_break_note(adapter: Any, ddoc: Any) -> None:
-    """Replace the template's inch-origin edge break with its metric value."""
-    sheet_view = adapter._attempt(lambda: ddoc.GetFirstView())
-    if sheet_view is None:
-        raise RuntimeError("drawing template has no sheet view for note normalization")
-    annotations = (
-        adapter._attempt(
-            lambda: adapter._get_attr_or_call(sheet_view, "GetAnnotations")
-        )
-        or []
-    )
-    matched = 0
-    for annotation in annotations:
-        annotation = _sw_type_info.early_bound_or_flag(
-            annotation, "IAnnotation", "GetType", "GetSpecificAnnotation"
-        )
-        if int(adapter._get_attr_or_call(annotation, "GetType") or 0) != _ANNOT_NOTE:
-            continue
-        specific = adapter._attempt(
-            lambda a=annotation: adapter._get_attr_or_call(a, "GetSpecificAnnotation")
-        )
-        if specific is None:
-            continue
-        note = _sw_type_info.early_bound_or_flag(
-            specific, "INote", "GetText", "SetText"
-        )
-        raw = str(adapter._get_attr_or_call(note, "GetText") or "")
-        normalized = " ".join(raw.upper().split())
-        if normalized not in {_OLD_EDGE_BREAK_NOTE, _METRIC_EDGE_BREAK_NOTE}:
-            continue
-        matched += 1
-        if normalized == _METRIC_EDGE_BREAK_NOTE:
-            continue
-        changed = adapter._attempt(
-            lambda n=note: n.SetText(_METRIC_EDGE_BREAK_NOTE), default=False
-        )
-        if not changed:
-            raise RuntimeError("failed to replace drawing edge-break note")
-        applied = " ".join(
-            str(adapter._get_attr_or_call(note, "GetText") or "").upper().split()
-        )
-        if applied != _METRIC_EDGE_BREAK_NOTE:
-            raise RuntimeError(
-                f"drawing edge-break note replacement did not persist: {applied!r}"
-            )
-    if matched != 1:
-        raise RuntimeError(
-            "drawing template must contain exactly one recognized edge-break "
-            f"note, found {matched}"
-        )
-    _telemetry.event("drawing.edge_break_normalized", value_mm=0.25)
 
 
 def set_hidden_lines_removed(adapter: Any, view: Any) -> None:
@@ -2338,15 +2359,13 @@ def visible_view_entities(view: Any, entity_kind: int, *, label: str) -> list[An
     return entities
 
 
-@_telemetry.traced("drawing.arc_center_endpoints", label_param="label")
-def set_arc_endpoints_to_center(adapter: Any, dimension: Any, *, label: str) -> Any:
-    """Re-anchor a dimension's circular endpoint(s) to the arc CENTER.
+_ARC_END_CENTER = 1  # swArcEndCondition_e.swArcEndConditionCenter
+_ARC_END_MAX = 3  # swArcEndCondition_e.swArcEndConditionMax (furthest point)
 
-    A line-to-circle dimension keeps SolidWorks' default tangent/min-max arc
-    condition, so the value locates the rim instead of the axis — off by the
-    hole radius. Verify each flipped endpoint sticks; fail loud when the
-    dimension has no circular endpoint at all.
-    """
+
+def _set_arc_endpoints(
+    adapter: Any, dimension: Any, *, condition: int, label: str
+) -> Any:
     display = _sw_type_info.early_bound_or_flag(
         dimension, "IDisplayDimension", "GetDimension"
     )
@@ -2356,21 +2375,46 @@ def set_arc_endpoints_to_center(adapter: Any, dimension: Any, *, label: str) -> 
     for index in (1, 2):
         if int(model_dimension.GetArcEndCondition(index)) == 0:
             continue
-        result = int(
-            model_dimension.SetArcEndCondition(index, 1)  # swArcEndConditionCenter
-        )
+        result = int(model_dimension.SetArcEndCondition(index, condition))
         if result != 0:
             raise RuntimeError(
-                f"failed to set {label} endpoint {index} to arc center "
-                f"(SolidWorks result {result})"
+                f"failed to set {label} endpoint {index} to arc condition "
+                f"{condition} (SolidWorks result {result})"
             )
         draw.GraphicsRedraw2()
-        if int(model_dimension.GetArcEndCondition(index)) != 1:
-            raise RuntimeError(f"{label} did not retain center arc condition")
+        if int(model_dimension.GetArcEndCondition(index)) != condition:
+            raise RuntimeError(f"{label} did not retain arc condition {condition}")
         arc_end_set = True
     if not arc_end_set:
         raise RuntimeError(f"{label} has no circular endpoint")
     return dimension
+
+
+@_telemetry.traced("drawing.arc_center_endpoints", label_param="label")
+def set_arc_endpoints_to_center(adapter: Any, dimension: Any, *, label: str) -> Any:
+    """Re-anchor a dimension's circular endpoint(s) to the arc CENTER.
+
+    A line-to-circle dimension keeps SolidWorks' default tangent/min-max arc
+    condition, so the value locates the rim instead of the axis — off by the
+    hole radius. Verify each flipped endpoint sticks; fail loud when the
+    dimension has no circular endpoint at all.
+    """
+    return _set_arc_endpoints(
+        adapter, dimension, condition=_ARC_END_CENTER, label=label
+    )
+
+
+@_telemetry.traced("drawing.arc_max_endpoints", label_param="label")
+def set_arc_endpoints_to_max(adapter: Any, dimension: Any, *, label: str) -> Any:
+    """Re-anchor a dimension's circular endpoint(s) to the arc's FURTHEST point.
+
+    The overall length of a part with a rounded end runs to the arc's extreme,
+    not its centre (a centre-anchored "overall" reads short by the radius and
+    gets the stock sawn short -- Harvey #25).  SolidWorks resolves a
+    line-to-arc pick to the centre by default, so the far-tangent condition is
+    set explicitly and verified.
+    """
+    return _set_arc_endpoints(adapter, dimension, condition=_ARC_END_MAX, label=label)
 
 
 def set_basic_dimension(adapter: Any, dimension: Any, *, label: str) -> Any:
@@ -4513,6 +4557,12 @@ async def finalize_drawing(
         drawing_model, "IDrawingDoc"
     )  # IDrawingDoc view for drawing-only methods (same dispatch)
     drawing_model.ClearSelection2(True)
+    # The sheet's own build identifier (title block "BUILD $PRP:{BUILD_ID}"):
+    # a DRAWING-document property, not a $PRPSHEET link, so it names the build
+    # that made this sheet even when the part it shows is older.
+    apply_custom_properties(
+        adapter, {DRAWING_BUILD_ID_PROPERTY: _build_id()}, model=drawing_model
+    )
     sheet_names = tuple(adapter._get_attr_or_call(ddoc, "GetSheetNames") or ())
     if not sheet_names:
         raise RuntimeError("finished drawing has no sheets")
@@ -4599,10 +4649,15 @@ async def finalize_drawing(
         )
         read_required_properties(
             linked_model,
-            (*TITLE_BLOCK_TOLERANCE_PROPERTIES, TITLE_BLOCK_REVISION_PROPERTY),
+            (
+                *TITLE_BLOCK_TOLERANCE_PROPERTIES,
+                TITLE_BLOCK_REVISION_PROPERTY,
+                TITLE_BLOCK_COPYRIGHT_PROPERTY,
+            ),
             required=(
                 *TITLE_BLOCK_TOLERANCE_PROPERTIES,
                 TITLE_BLOCK_REVISION_PROPERTY,
+                TITLE_BLOCK_COPYRIGHT_PROPERTY,
             ),
         )
 
@@ -4611,8 +4666,6 @@ async def finalize_drawing(
     # always tracks what set_units_mm actually configured. Flip to "IN" with
     # the inch migration (#290) -- a hardcoded IN cell over mm dimensions would
     # read as inch values and get machined at the wrong scale (Codex P1).
-    from _common import apply_custom_properties
-
     apply_custom_properties(adapter, {"UNIT_DISPLAY": "MM"})
 
     # Explicit recipe-requested cleanup remains sheet-scoped. Layout and view

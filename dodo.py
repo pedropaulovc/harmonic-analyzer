@@ -2217,6 +2217,18 @@ def task_check():
         # attributes the sheet no longer defines, and every check:* gate stayed
         # green (codex #416). Enrolled so the cross-sheet contracts are covered.
         SCRIPTS_DIR / "test_assembly_drawing_batch_contract.py",
+        # The blind machinist-review runner (cad/docs/drawing-simplicity-policy.md):
+        # prompt calibration, strict output schema, neutral-workdir command, pass
+        # logic and the blind-review tool-event detector are pinned offline.
+        SCRIPTS_DIR / "test_machinist_review.py",
+    ]
+    # These are runtime-read rather than imported, so module_deps_of cannot
+    # discover them. A prompt/schema edit must invalidate check:recipe and rerun
+    # the offline machinist-review contract.
+    machinist_review_contract_deps = [
+        SCRIPTS_DIR / "prompts" / "machinist_review_part.md",
+        SCRIPTS_DIR / "prompts" / "machinist_review_assembly.md",
+        SCRIPTS_DIR / "prompts" / "machinist_review_schema.json",
     ]
     # test_out_param_binding SCANS sources instead of importing them (it reads
     # every top-level build script and every diagnostics/*.py looking for
@@ -2234,6 +2246,7 @@ def task_check():
         {
             *(str(path.resolve()) for path in recipe_tests),
             *(dep for path in recipe_tests for dep in module_deps_of(path)),
+            *(str(path.resolve()) for path in machinist_review_contract_deps),
             *scanned_by_binding_gate,
             str(
                 (REPO_ROOT / "cad" / "comparisons" / "tools" / "composite.py").resolve()

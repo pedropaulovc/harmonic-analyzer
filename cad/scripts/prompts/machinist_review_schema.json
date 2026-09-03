@@ -1,0 +1,28 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["verdict", "summary", "blockers", "over_specification", "clarity", "minor"],
+  "properties": {
+    "verdict": { "type": "string", "enum": ["SHIP", "FIX"], "minLength": 1 },
+    "summary": { "type": "string", "minLength": 1 },
+    "blockers": { "$ref": "#/$defs/findings" },
+    "over_specification": { "$ref": "#/$defs/findings" },
+    "clarity": { "$ref": "#/$defs/findings" },
+    "minor": { "$ref": "#/$defs/findings" }
+  },
+  "$defs": {
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["where", "issue", "fix"],
+        "properties": {
+          "where": { "type": "string", "minLength": 1, "description": "view and feature, e.g. 'front view, shaft bore'" },
+          "issue": { "type": "string", "minLength": 1 },
+          "fix": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

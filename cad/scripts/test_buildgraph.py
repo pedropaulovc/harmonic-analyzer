@@ -346,18 +346,99 @@ def test_part_and_title_property_stampers_are_distinct():
     assert stamps_title_block_properties(leaf)
 
 
+def test_build_id_is_source_derived_and_monotonic():
+    import re
+
+    import _config
+    from _common import _build_id
+
+    build_id = _build_id()
+    assert re.fullmatch(r"v\d+-b\d+(-dirty)?", build_id), build_id
+    assert build_id.startswith(_config.release_revision() + "-b")
+    # Deterministic per source state: two reads agree.
+    assert _build_id() == build_id
+
+
+def test_git_executable_is_resolved_absolute(tmp_path, monkeypatch):
+    import _common
+
+    discovered = tmp_path / "bin" / "git"
+    monkeypatch.setattr(_common.shutil, "which", lambda command: str(discovered))
+    _common._git_executable.cache_clear()
+    try:
+        executable = Path(_common._git_executable())
+        assert executable == discovered.resolve()
+        assert executable.is_absolute()
+    finally:
+        _common._git_executable.cache_clear()
+
+
+def test_build_id_counts_from_release_tag_in_full_history(monkeypatch):
+    import subprocess
+
+    import _common
+    import _config
+
+    outputs = {
+        ("rev-parse", "--is-shallow-repository"): "false\n",
+        ("describe", "--tags", "--abbrev=0", "--match", "v*"): "v8\n",
+        ("rev-list", "v8..HEAD", "--count"): "7\n",
+        ("status", "--porcelain"): "",
+    }
+    calls = []
+
+    def fake_run(command, **_kwargs):
+        args = tuple(command[1:])
+        calls.append(args)
+        return subprocess.CompletedProcess(command, 0, stdout=outputs[args])
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(_config, "release_revision", lambda: "v9")
+
+    assert _common._build_id() == "v9-b7"
+    assert _common._build_id() == "v9-b7"
+    assert calls.count(("rev-list", "v8..HEAD", "--count")) == 2
+
+
+def test_build_id_rejects_shallow_history_before_count(monkeypatch):
+    import subprocess
+
+    import pytest
+
+    import _common
+
+    calls = []
+
+    def fake_run(command, **_kwargs):
+        args = tuple(command[1:])
+        calls.append(args)
+        assert args == ("rev-parse", "--is-shallow-repository")
+        return subprocess.CompletedProcess(command, 0, stdout="true\n")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    with pytest.raises(RuntimeError, match="shallow Git repository"):
+        _common._build_id()
+    assert calls == [("rev-parse", "--is-shallow-repository")]
+
+
 def test_assembly_title_properties_never_read_part_registry_fields():
     props = assembly_title_properties("frame")
     assert set(props) == {
         "Title",
         "Revision",
         "Generator",
+        "COPYRIGHT_YEAR",
+        "TOL_LIN_X",
         "TOL_LIN_XX",
         "TOL_LIN_XXX",
         "TOL_ANG",
         "TOL_SURFACE",
         "TOL_HOLE_MINUS",
         "TOL_HOLE_PLUS",
+        "TOL_EDGE_BREAK_R",
+        "TOL_CHAMFER_MAX",
+        "THREAD_TYPE",
+        "THREAD_CLASS",
     }
     assert props["Title"] == "frame"
     import _config

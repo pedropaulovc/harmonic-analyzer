@@ -50,6 +50,7 @@ import asyncio
 import functools
 import math
 import os
+import shutil
 import sys
 import time
 from collections.abc import Awaitable, Callable, Iterable
@@ -1125,6 +1126,15 @@ _SW_PROP_REPLACE = 2  # swCustomPropertyAddOption_e.swCustomPropertyReplaceValue
 
 
 @functools.lru_cache(maxsize=1)
+def _git_executable() -> str:
+    """Absolute Git executable used by fixed, repository-internal commands."""
+    executable = shutil.which("git")
+    if executable is None:
+        raise FileNotFoundError("git executable not found on PATH")
+    return str(Path(executable).resolve())
+
+
+@functools.lru_cache(maxsize=1)
 def _git_sha() -> str:
     """Short HEAD sha (+ '-dirty'), for a reproducible Generator stamp.
 
@@ -1134,15 +1144,15 @@ def _git_sha() -> str:
     import subprocess
 
     try:
-        sha = subprocess.run(
-            ["git", "rev-parse", "--short", "HEAD"],
+        sha = subprocess.run(  # noqa: S603 -- resolved Git; fixed internal argv
+            [_git_executable(), "rev-parse", "--short", "HEAD"],
             cwd=str(CAD_ROOT),
             capture_output=True,
             text=True,
             check=True,
         ).stdout.strip()
-        dirty = subprocess.run(
-            ["git", "status", "--porcelain"],
+        dirty = subprocess.run(  # noqa: S603 -- resolved Git; fixed internal argv
+            [_git_executable(), "status", "--porcelain"],
             cwd=str(CAD_ROOT),
             capture_output=True,
             text=True,
@@ -1151,6 +1161,71 @@ def _git_sha() -> str:
         return f"{sha}{'-dirty' if dirty else ''}"
     except Exception:  # noqa: BLE001 -- not in a git checkout / no git
         return "unknown"
+
+
+def _build_id() -> str:
+    """``<next release>-b<N>[-dirty]`` -- N = commits since the last release tag.
+
+    The title block's REV cell stays the formal release designator
+    (``release.yaml``); this is the between-releases build identifier a sheet
+    stamps on itself (``$PRP:{BUILD_ID}``) so two prints of the same part can be
+    told apart by eye.  Source-derived like :func:`_git_sha` (no wall clock):
+    the count is deterministic per commit, monotonic between releases, and the
+    release commit is simply the last candidate.  Stamped only when a drawing
+    task actually runs -- git state is in no cache key or file_dep, so a commit
+    never rebuilds anything; a restored sheet keeps the id of the build that
+    made it.
+    """
+    import subprocess
+
+    import _config
+
+    def _git(*args: str) -> str:
+        return subprocess.run(  # noqa: S603 -- resolved Git; fixed internal argv
+            [_git_executable(), *args],
+            cwd=str(CAD_ROOT),
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+
+    shallow = _git("rev-parse", "--is-shallow-repository").lower()
+    if shallow != "false":
+        raise RuntimeError(
+            "cannot compute a release-relative build id from a shallow Git "
+            f"repository (git reported {shallow!r}); fetch the full history"
+        )
+    try:
+        last_tag = _git("describe", "--tags", "--abbrev=0", "--match", "v*")
+        count = _git("rev-list", f"{last_tag}..HEAD", "--count")
+    except subprocess.CalledProcessError:  # no release tag reachable
+        count = _git("rev-list", "HEAD", "--count")
+    dirty = "-dirty" if _git("status", "--porcelain") else ""
+    return f"{_config.release_revision()}-b{int(count)}{dirty}"
+
+
+def _git_commit_year() -> str:
+    """Year of the HEAD commit, for the title block's copyright line.
+
+    Same determinism rule as :func:`_git_sha`: derived from the source state,
+    never the wall clock, so a rebuild from the same commit stamps the same
+    year and a cache restore cannot disagree with a fresh build.  Outside a
+    git checkout there is no source-derived year, so fail loud rather than
+    stamp a guess into every part.
+    """
+    import subprocess
+
+    date = subprocess.run(  # noqa: S603 -- resolved Git; fixed internal argv
+        [_git_executable(), "log", "-1", "--format=%cs"],
+        cwd=str(CAD_ROOT),
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    year = date[:4]
+    if not (len(year) == 4 and year.isdigit()):
+        raise RuntimeError(f"HEAD commit date is not ISO-dated: {date!r}")
+    return year
 
 
 def part_properties(part_name: str) -> dict[str, str]:
@@ -1166,14 +1241,25 @@ def part_properties(part_name: str) -> dict[str, str]:
         "Title": part_name,
         "Revision": _config.release_revision(),
         "Generator": f"harmonic-analyzer @ {_git_sha()}",
+        # The title block's "(c) <year> <holder>" line reads this via
+        # $PRPSHEET:{COPYRIGHT_YEAR}; SolidWorks has no built-in year-only
+        # property and its date built-ins change on every rebuild.
+        "COPYRIGHT_YEAR": _git_commit_year(),
     }
     # Title-block general tolerances (title_block.yaml) — read by the drawing
     # template's title block via $PRPSHEET, so EVERY part carries them,
     # registered in the parts registry or not.
+    props["TOL_LIN_X"] = str(_config.title_block("linear_1pl")["display"])
     props["TOL_LIN_XX"] = str(_config.title_block("linear_2pl")["display"])
     props["TOL_LIN_XXX"] = str(_config.title_block("linear_3pl")["display"])
     props["TOL_ANG"] = str(_config.title_block("angular")["display"])
     props["TOL_SURFACE"] = str(_config.title_block("surface")["display"])
+    # Edge-break and thread-class rows (2026-09 template): the sheet-format
+    # notes are $PRPSHEET links, so the numbers live here, not in the DRWDOT.
+    props["TOL_EDGE_BREAK_R"] = str(_config.title_block("edge_break")["display_r"])
+    props["TOL_CHAMFER_MAX"] = str(_config.title_block("edge_break")["display_chamfer"])
+    props["THREAD_TYPE"] = str(_config.title_block("thread")["type"])
+    props["THREAD_CLASS"] = str(_config.title_block("thread")["class"])
     # DRILLED HOLES general tolerance (unilateral); the title block's DRILLED
     # HOLES row reads these via $PRPSHEET and supplies the +/- around them.
     props["TOL_HOLE_MINUS"] = str(_config.title_block("drilled_hole")["display_minus"])

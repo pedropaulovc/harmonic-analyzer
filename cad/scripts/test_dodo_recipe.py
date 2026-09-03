@@ -1454,6 +1454,19 @@ def test_recipe_gate_tracks_sources_imported_by_its_tests():
     ), "the pen/summing metadata contract must execute under check:recipe"
 
 
+def test_recipe_gate_tracks_machinist_prompt_and_schema_contract() -> None:
+    """Runtime-read review inputs must invalidate the offline contract stamp."""
+    dodo = _load_dodo()
+    recipe = next(task for task in dodo.task_check() if task["name"] == "recipe")
+    prompt_dir = (dodo.SCRIPTS_DIR / "prompts").resolve()
+    expected = {
+        str(prompt_dir / "machinist_review_part.md"),
+        str(prompt_dir / "machinist_review_assembly.md"),
+        str(prompt_dir / "machinist_review_schema.json"),
+    }
+    assert expected <= set(recipe["file_dep"])
+
+
 def test_submodule_digest_is_checkout_eol_independent(tmp_path):
     """Issue #255 also covers the synthetic submodule sidecars: raw hashing here
     would move every COM key when core.autocrlf rematerialises vendored Python."""
