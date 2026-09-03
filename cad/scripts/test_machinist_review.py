@@ -208,6 +208,58 @@ def test_retry_persists_all_attempts_and_cannot_hide_tool_use(
     assert records[1]["event"]["type"] == "agent_message"
 
 
+def test_arbitrary_png_reports_with_same_basename_do_not_collide(
+    tmp_path: Path, monkeypatch
+) -> None:
+    import subprocess
+    from concurrent.futures import ThreadPoolExecutor
+
+    verdict = {
+        "verdict": "SHIP",
+        "summary": "ready",
+        "blockers": [],
+        "over_specification": [],
+        "clarity": [],
+        "minor": [],
+    }
+
+    def fake_run(command, **_kwargs):
+        output = Path(command[command.index("-o") + 1])
+        output.write_text(json.dumps(verdict), encoding="utf-8")
+        return subprocess.CompletedProcess(
+            command, 0, stdout=json.dumps({"type": "turn.completed"}), stderr=""
+        )
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    inputs = [tmp_path / "left" / "part.png", tmp_path / "right" / "part.png"]
+    for index, image in enumerate(inputs):
+        image.parent.mkdir()
+        image.write_bytes(f"png-{index}".encode())
+    sheets = [mr._sheet_for_png(image, "part") for image in inputs]
+    assert sheets[0].name != sheets[1].name
+
+    report_dir = tmp_path / "reports"
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        reviews = list(
+            pool.map(
+                lambda sheet: mr.review_sheet(
+                    sheet, report_dir=report_dir, retries=0, codex="codex-test"
+                ),
+                sheets,
+            )
+        )
+
+    names = {review.name for review in reviews}
+    assert len(names) == 2
+    assert {path.stem for path in report_dir.glob("*.json")} == names
+    assert {path.stem for path in report_dir.glob("*.md")} == names
+    assert {Path(review.events_file or "").name for review in reviews} == {
+        f"{name}.events.jsonl" for name in names
+    }
+    index = mr.write_index(report_dir).read_text(encoding="utf-8")
+    assert all(f"]({name}.md)" in index for name in names)
+
+
 def test_review_serialises_and_indexes(tmp_path: Path) -> None:
     verdict = {
         "verdict": "FIX",

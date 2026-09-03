@@ -39,7 +39,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
 import shutil
 import subprocess
 import sys
@@ -130,6 +129,13 @@ def load_schema() -> dict[str, Any]:
 
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _sheet_for_png(path: Path, kind: str) -> Sheet:
+    resolved = path.resolve()
+    identity = resolved.as_posix().casefold().encode("utf-8")
+    suffix = hashlib.sha256(identity).hexdigest()[:16]
+    return Sheet(name=f"{resolved.stem}-{suffix}", kind=kind, png=resolved)
 
 
 def build_command(
@@ -517,7 +523,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     sheets: list[Sheet]
     if args.png:
-        sheets = [Sheet(name=args.png.stem, kind=args.kind, png=args.png.resolve())]
+        sheets = [_sheet_for_png(args.png, args.kind)]
     elif args.all:
         sheets = all_sheets()
     else:
