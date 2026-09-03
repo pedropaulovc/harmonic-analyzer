@@ -138,6 +138,20 @@ def test_views_follow_the_machinist() -> None:
     assert "_section_frame(adapter, section" in source
 
 
+def test_section_markers_depth_note_and_label_have_separate_bands() -> None:
+    cut_y = drawing._front_y(-drawing.PIN_DROP)
+    # The left-view seat callout is well above both A identifiers.
+    assert drawing.LEFT_KEEP["PinSeatDia"][1] - cut_y >= 0.040
+    # The two-line full-diameter-depth callout is displaced both above and to
+    # the side of the narrow section outline.
+    depth_up, depth_side = drawing.SECTION_KEEP["PinSeatDepth"]
+    assert abs(depth_up) >= 0.020
+    assert depth_side >= 0.025
+    # The automatic SECTION A-A note has its own band below the view.
+    assert drawing.SECTION_LABEL_XY[1] <= drawing.SECTION_CENTER[1] - 0.025
+    assert 0.0127 < drawing.SECTION_LABEL_XY[0] < 0.4191
+
+
 def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
     source = _source()
     assert (

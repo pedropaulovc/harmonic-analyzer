@@ -80,14 +80,16 @@ _SHOULDER_HALF = SHOULDER_DIA / 2.0 * _S
 _TAIL_HALF = THREAD_SOLID_DIA / 2.0 * _S
 
 # Thread-end view: nothing but the ground shoulder's roughness symbol (the
-# diameters read on the side view, where a turned part's sizes belong).
+# diameters read on the side view, where a turned part's sizes belong).  Its
+# native symbol is wide, so park it above-left of the end view instead of in
+# the shoulder-diameter/tolerance column between the end and side views.
 END_KEEP: dict[str, tuple[float, float]] = {}
 DIMENSION_CALLOUTS: dict[str, str] = {}
 SHOULDER_FINISH_EDGE_XY = (
     END_CENTER[0] + _SHOULDER_HALF * 0.7071,
     END_CENTER[1] - _SHOULDER_HALF * 0.7071,
 )
-SHOULDER_FINISH_SYMBOL_XY = (0.125, 0.136)
+SHOULDER_FINISH_SYMBOL_XY = (0.020, 0.195)
 
 # Side view: head diameter above the head, head height right of it, shoulder
 # length and shoulder diameter on the left (the diameter's dimension line

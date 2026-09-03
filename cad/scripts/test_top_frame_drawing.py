@@ -129,7 +129,9 @@ def test_notes_are_few_specific_and_never_a_dimension() -> None:
     assert not hasattr(top_frame_spec, "INSPECTION_NOTES")
     source = _source()
     assert (
-        'add_property_linked_note(\n        adapter, "Manufacturing Notes", 0.016, 0.102, char_height=0.0025\n    )'
+        'add_property_linked_note(\n'
+        '        adapter, "Manufacturing Notes", 0.016, 0.090, char_height=0.0025\n'
+        "    )"
         in source
     )
     assert "Manufacturing Notes B" not in source
@@ -185,8 +187,12 @@ def test_hole_table_is_native_and_anchored_on_the_virtual_rear_left_corner() -> 
     assert all(0.0 < y < 2 * part.OUTER_Z for _x, y in locations)
     assert abs(locations[0][0] - 17.1) < 1e-9 and abs(locations[0][1] - 243.0) < 1e-9
     assert abs(locations[3][0] - 411.1) < 1e-9 and abs(locations[3][1] - 19.0) < 1e-9
-    # The generic auto tapped-hole notes are replaced by the table/callout.
-    assert 'remove_notes_matching(adapter, "Tapped Hole")' in source
+    # Remove only after all view annotations have materialized; an early pass
+    # allowed the generated "#10-24 Tapped Hole" note to overprint A3/A4.
+    remover = 'remove_notes_matching(adapter, "Tapped Hole")'
+    assert remover in source
+    assert source.index(remover) > source.index("insert_hole_table(")
+    assert source.index(remover) > source.index("add_native_hole_callout(")
 
 
 def test_side_taps_and_heights_ride_the_elevation() -> None:
@@ -196,8 +202,14 @@ def test_side_taps_and_heights_ride_the_elevation() -> None:
     assert "edge=side_tap" in source
     # A tapped callout carries thread + depth natively; no process prefix.
     assert "process=" not in source
-    assert drawing.SIDE_TAP_CALLOUT_XY == (0.318, 0.114)
-    # Boss stack, boss proud of the rail, rail band, top flange: four vertical
+    assert drawing.SIDE_TAP_CALLOUT_XY == (0.326, 0.114)
+    # The smaller front caption occupies its own lane between the 262 depth
+    # dimension and the side-tap callout.
+    assert drawing.FRONT_VIEW_NOTE_XY == (0.264, 0.116)
+    assert (
+        'adapter, "Front View Note", *FRONT_VIEW_NOTE_XY, char_height=0.0025'
+        in source
+    )
     # drawing dimensions on topologically picked edges (the elevation's bbox
     # is asymmetric, so nothing is picked by sheet coordinate); front/rear
     # rail width and crossbar width the same way on the plan.
@@ -237,12 +249,12 @@ def test_side_taps_and_heights_ride_the_elevation() -> None:
     assert drawing.TOP_KEEP["WinDepth"] == (0.205, 0.175)
     assert drawing.TOP_KEEP["GussetRunE"] == (0.160, 0.205)
     assert drawing.TOP_KEEP["GussetRiseE"] == (0.150, 0.217)
-    assert drawing.FRONT_VIEW_NOTE_XY == (0.250, 0.116)
+    assert drawing.FRONT_VIEW_NOTE_XY[0] > drawing.TOP_KEEP["Depth"][0]
 
 
 def test_web_thickness_rides_section_a_a() -> None:
     # The web sits under the flange in the plan and behind the front rail in
-    # the elevation, so the T-section is cut across the plan at z +50 (clear
+    # the elevation, so the T-section is cut across the plan at z +36 (clear
     # of the hub, its gussets and every hole).  The two dimensions select four
     # distinct section-generated line entities through IView; neither a bbox
     # mapper nor coordinate-pick tolerance participates.
@@ -264,8 +276,9 @@ def test_web_thickness_rides_section_a_a() -> None:
         "section +X flange outer edge",
     ):
         assert f'label="{anchor}"' in source, anchor
-    assert drawing.SECTION_CUT_Z == 50.0
-    assert drawing.SECTION_LINE == ((0.019, 0.150), (0.2485, 0.150))
+    assert drawing.SECTION_CUT_Z == 36.0
+    assert drawing.SECTION_LINE == ((0.019, 0.157), (0.2485, 0.157))
+    assert drawing.SECTION_LINE[0][1] > drawing.SET_SCREW_NOTE_XY[1]
     assert drawing.SECTION_CENTER == (0.345, 0.099)
     assert drawing.WEB_TEXT_XY == (0.39425, 0.0895)
     assert drawing.SIDE_RAIL_TEXT_XY == (0.39425, 0.0835)
@@ -354,7 +367,10 @@ def test_view_scales_are_explicit() -> None:
     assert drawing.TOP_VIEW_NOTE_XY == (0.262, 0.259)
     assert 'add_property_linked_note(adapter, "Top View Note", *TOP_VIEW_NOTE_XY)' in source
     assert top_frame_spec.FRONT_VIEW_NOTE == "FRONT VIEW SCALE 1:4"
-    assert 'add_property_linked_note(adapter, "Front View Note", *FRONT_VIEW_NOTE_XY)' in source
+    assert (
+        'adapter, "Front View Note", *FRONT_VIEW_NOTE_XY, char_height=0.0025'
+        in source
+    )
 
 
 def test_part_stamps_make_critical_properties() -> None:

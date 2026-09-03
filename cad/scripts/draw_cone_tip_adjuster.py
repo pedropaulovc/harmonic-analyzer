@@ -68,11 +68,12 @@ _S = SHEET_SCALE[0] / 1000.0  # sheet meters per model mm
 
 # The screw is 14 mm long x nominal Ø6.2: at 4:1 the elevation is compact.
 # Third angle: the slotted head and cup-end views sit below the elevation;
-# SECTION A-A (through the axis) stands beside the elevation.
+# SECTION A-A stands higher beside the elevation so its generated two-line
+# caption cannot overprint the CUP END VIEW label below.
 FRONT_CENTER = (0.095, 0.180)
 END_CENTER = (0.095, 0.100)
 CUP_CENTER = (0.190, 0.100)
-SECTION_CENTER = (0.205, 0.180)
+SECTION_CENTER = (0.205, 0.210)
 ISO_CENTER = (0.300, 0.160)
 # Cutting line through the axis, past both ends of the 14 mm (56 mm sheet)
 # elevation.

@@ -68,8 +68,10 @@ _SHANK_BOTTOM_Y = SIDE_CENTER[1] - SHANK_DIA / 2.0 * _S  # lower shank silhouett
 _SHANK_MID_X = (_SHOULDER_X + _TIP_X) / 2.0
 
 # Shank-end view: the marked head diameter (the turned blank, before the
-# reeding scallops it), leadered from upper-left with its arrow on the rim.
-END_KEEP = {"HeadDia": (0.028, 0.176)}
+# reeding scallops it), leadered from above with its arrow on the rim.  The
+# two-line "BEFORE REEDING" callout sits wholly inside the 12.7 mm frame rule
+# and above the reeded silhouette instead of entering the C-zone border.
+END_KEEP = {"HeadDia": (END_CENTER[0], 0.194)}
 END_DIAMETERS = ("HeadDia",)
 DIMENSION_CALLOUTS = {"HeadDia": "BEFORE REEDING"}
 

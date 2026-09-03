@@ -106,12 +106,14 @@ def test_print_carries_no_gdt_and_one_running_finish() -> None:
     assert source.count("add_surface_finish(") == 1
     assert 'surface_finish_by_key(SURFACE_FINISHES, "bearing")' in source
     assert "roughness_ra=" not in source
-    # The part build keeps its author_part_pmi call shape on the empty tuples.
+    # The source model deliberately does not persist a native finish symbol:
+    # that symbol exported as a detached horizontal stroke beside the one
+    # complete, view-owned Ra callout below.
     part_source = Path(part.__file__).read_text(encoding="utf-8")
     assert "author_part_pmi(" in part_source
     assert "datums=PART_DATUMS" in part_source
     assert "controls=GEOMETRIC_CONTROLS" in part_source
-    assert "surface_finishes=SURFACE_FINISHES" in part_source
+    assert "surface_finishes=" not in part_source
 
 
 def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:

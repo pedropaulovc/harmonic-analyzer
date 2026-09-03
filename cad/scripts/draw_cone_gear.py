@@ -79,10 +79,12 @@ SECTION_NOTE_XY = (
 )
 
 # Notes column: GEAR DATA on top, the two configuration tables side by side
-# under it, the manufacturing notes at the bottom.
+# below its full eleven-line extent, and the manufacturing notes at the
+# bottom.  The table anchors deliberately leave more than one text line after
+# GEAR DATA so the linked-note bounding boxes cannot overprint each other.
 GEAR_DATA_POS = (0.018, 0.262)
-TABLE_A_POS = (0.018, 0.212)
-TABLE_B_POS = (0.095, 0.212)
+TABLE_A_POS = (0.018, 0.195)
+TABLE_B_POS = (0.095, 0.195)
 NOTES_POS = (0.018, 0.095)
 TABLE_CHAR_HEIGHT = 0.0025
 

@@ -196,19 +196,29 @@ SECTION_LINE = (
     _right_xy(0.0, -1.0),
     _right_xy(0.0, SHAFT_AXIS_H + CROWN_DIA / 2.0 + 1.0),
 )
-BALL_NOTE_XY = (0.300, 0.074)
+# Seven short lines occupy the clear lane left of section A-A and finish above
+# the title block.  The leader still terminates on the visible ball-seat edge.
+BALL_NOTE_XY = (0.235, 0.112)
 
 _ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
+_BROKEN_LEADER_HORIZONTAL = 2  # swDisplayDimensionLeaderText_e
 
 
 def _leaders_to_circumference(
-    adapter: Any, annotations: list[Any], names: tuple[str, ...], *, label: str
+    adapter: Any,
+    annotations: list[Any],
+    names: tuple[str, ...],
+    *,
+    label: str,
+    broken_horizontal: bool = False,
 ) -> None:
     """End each named diameter leader at the nearest circumference.
 
     SolidWorks' default runs a diameter dimension line across the circle
     through its centre; with the arrows OUTSIDE the leader stops at the rim it
     names (drawing-simplicity-policy.md rule 7: never through a bore).
+    ``broken_horizontal`` cuts the leader around horizontal value/callout text
+    so the vertical section dimensions cannot print through their own labels.
     """
     remaining = set(names)
     for annotation in annotations:
@@ -219,11 +229,27 @@ def _leaders_to_circumference(
         if name not in remaining:
             continue
         display = _sw_type_info.early_bound_or_flag(
-            annotation.GetSpecificAnnotation(), "IDisplayDimension", "ArrowSide"
+            annotation.GetSpecificAnnotation(),
+            "IDisplayDimension",
+            "ArrowSide",
+            "SetBrokenLeader2",
+            "GetBrokenLeader2",
         )
         display.ArrowSide = _ARROWS_OUTSIDE
         if int(display.ArrowSide) != _ARROWS_OUTSIDE:
             raise RuntimeError(f"{label}: {name} arrows did not move outside")
+        if broken_horizontal:
+            status = int(
+                display.SetBrokenLeader2(False, _BROKEN_LEADER_HORIZONTAL)
+            )
+            if status != 0:
+                raise RuntimeError(
+                    f"{label}: {name} broken-leader status {status}"
+                )
+            if int(display.GetBrokenLeader2()) != _BROKEN_LEADER_HORIZONTAL:
+                raise RuntimeError(
+                    f"{label}: {name} leader did not break around its text"
+                )
         remaining.discard(name)
     if remaining:
         raise RuntimeError(f"{label}: diameter leaders not found: {sorted(remaining)}")
@@ -330,9 +356,9 @@ async def build(adapter: Any) -> dict[str, str]:
         section_annotations,
         SECTION_DIAMETER_LEADERS_TO_RIM,
         label="sectioned lug bores",
+        broken_horizontal=True,
     )
     _add_ball_midplane_centerline(adapter)
-
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to top view")
 

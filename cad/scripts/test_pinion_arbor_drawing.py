@@ -77,6 +77,17 @@ def test_crown_is_enlarged_and_its_unavailable_dimension_becomes_a_spec_note() -
     assert "SR7.27" not in pinion_arbor_spec.DRAWING_NOTES
 
 
+def test_detail_source_circle_is_compensated_inside_the_left_border() -> None:
+    source = _source()
+    assert "crown_root[0] + model_origin[0] - RIGHT_CENTER[0]" in source
+    assert "crown_root[1] + model_origin[1] - RIGHT_CENTER[1]" in source
+    assert "center=detail_source_center" in source
+    # The rendered crown root is one shank length left of the flat end.  Its
+    # complete 8 mm detail circle remains far inside the 12.7 mm zone margin.
+    rendered_root_x = drawing.RIGHT_END_X - drawing.SHAFT_LEN / 1000.0
+    assert rendered_root_x - drawing.DETAIL_RADIUS > 0.0127
+
+
 def test_overall_length_uses_the_stable_view_adjacent_note_path() -> None:
     # The shallow revolved apex is not a stable selectable drawing vertex
     # across SolidWorks seats. The note carries the same reference value from
@@ -97,8 +108,9 @@ def test_overall_length_uses_the_stable_view_adjacent_note_path() -> None:
     assert 'entity_types=("VERTEX", "EDGE")' not in source
     assert "set_reference_dimension(" not in source
     assert "add_edge_dimension(" not in source
-    # The one remaining projection locates DETAIL B at the crown root.
-    assert source.count("model_point_in_view(") == 1
+    # The crown-root projection locates DETAIL B; the origin projection
+    # compensates SolidWorks' activated-view sketch origin.
+    assert source.count("model_point_in_view(") == 2
 
 
 def test_running_fit_is_the_band_on_the_model_diameter() -> None:

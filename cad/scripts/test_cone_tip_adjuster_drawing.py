@@ -59,7 +59,8 @@ def test_cup_and_slot_are_dimensioned_in_an_axial_section() -> None:
     # The cut is the x = 0 plane (a vertical line in the front view), so the
     # sideways offset is along model Z, never X (which projects onto the axis).
     assert "(0.0, y_mm / 1000.0, z_mm / 1000.0)" in source
-    assert drawing.SECTION_CENTER == (0.205, 0.180)
+    assert drawing.SECTION_CENTER == (0.205, 0.210)
+    assert drawing.SECTION_CENTER[1] - drawing.CUP_CENTER[1] >= 0.100
     assert drawing.SECTION_LINE_OVERSHOOT > 0.0
     assert "for view in (front, end, cup, section):\n        set_hidden_lines_visible" in source
 

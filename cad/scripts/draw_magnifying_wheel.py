@@ -99,8 +99,8 @@ SECTION_LINE = (
 # Face-view survivors.  Every diameter leader is aimed down a 60-degree GAP
 # between spokes (spokes at 30/90/150/210/270/330 deg): the rim OD up-left
 # (144 deg), the rim ID right (10 deg), the hub down (300 deg), the bore left
-# (190 deg -- off the horizontal centreline and 12 mm clear of the
-# cutting-plane line's end letter); the spoke width stands above the rim.
+# and 30 mm below the cutting plane so its stacked H7 limits and REAM THRU
+# never meet the section marker; the spoke width stands above the rim.
 FRONT_KEEP = {
     "RimOuterDiaDim": (
         FRONT_CENTER[0] - _RIM_R - 0.028,
@@ -108,7 +108,7 @@ FRONT_KEEP = {
     ),
     "RimInnerDiaDim": (FRONT_CENTER[0] + _RIM_R + 0.026, FRONT_CENTER[1] + 0.014),
     "HubDiaDim": (FRONT_CENTER[0] + 0.030, FRONT_CENTER[1] - _RIM_R - 0.002),
-    "BoreDiaDim": (FRONT_CENTER[0] - _RIM_R - 0.015, FRONT_CENTER[1] - 0.012),
+    "BoreDiaDim": (FRONT_CENTER[0] - _RIM_R - 0.010, FRONT_CENTER[1] - 0.030),
     "SpokeWidthDim": (FRONT_CENTER[0] + 0.015, FRONT_CENTER[1] + _RIM_R + 0.012),
 }
 SECTION_KEEP: dict[str, tuple[float, float]] = {}
@@ -133,8 +133,8 @@ _HUB_PICK_X = (BORE_DIA / 2.0 + HUB_DIA / 2.0) / 2.0 + 0.75  # 7, mid hub wall
 _RIM_HALF = RIM_AXIAL / 2.0
 _HUB_HALF = HUB_AXIAL / 2.0
 _SPOKE_HALF = SPOKE_AXIAL / 2.0
-# Section label parked under the strip's dimensions.
-SECTION_LABEL_XY = (SECTION_CENTER[0], SECTION_CENTER[1] - 0.032)
+# Section label parked to the right of the strip dimensions, below the strip.
+SECTION_LABEL_XY = (0.180, SECTION_CENTER[1] - 0.031)
 
 _ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
 
@@ -196,10 +196,17 @@ def _move_view_label(
     adapter: Any, view: Any, xy: tuple[float, float], *, keyword: str, label: str
 ) -> None:
     """Park the view's SECTION label where no dimension will sit under it."""
-    notes = adapter._attempt(lambda: view.GetNotes(), default=None) or ()
+    notes = list(adapter._attempt(lambda: view.GetNotes(), default=None) or ())
+    if not notes:
+        note = adapter._attempt(lambda: view.GetFirstNote2(), default=None)
+        while note is not None:
+            notes.append(note)
+            note = adapter._attempt(lambda n=note: n.GetNext(), default=None)
     moved = False
     for note in notes:
-        note = _sw_type_info.early_bound_or_flag(note, "INote", "GetText", "GetAnnotation")
+        note = _sw_type_info.early_bound_or_flag(
+            note, "INote", "GetText", "GetAnnotation"
+        )
         text = str(adapter._attempt(lambda n=note: n.GetText(), default="") or "")
         if keyword not in text.upper():
             continue

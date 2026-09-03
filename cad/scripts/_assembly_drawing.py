@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, Literal, Sequence
 
 import _telemetry
 from _common import _early_bound, check
@@ -13,6 +13,7 @@ from _drawing_common import (
     add_auto_balloons_across_views,
     add_note,
     create_blank_drawing_sheets,
+    check_drawing_layout,
     finalize_drawing,
     insert_bom_table,
     new_project_drawing,
@@ -23,10 +24,92 @@ from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 
 SHEET_NAMES = ("ASSEMBLED VIEWS", "EXPLODED AND BOM", "ASSEMBLY PROCEDURE")
-_EXPLODED_CENTER = (0.120, 0.170)
-_REFERENCE_FRONT_CENTER = (0.050, 0.055)
-_REFERENCE_RIGHT_CENTER = (0.210, 0.055)
-_BOM_ANCHOR = (0.246, 0.257)
+_BORDER_LEFT = 0.012
+_BORDER_RIGHT = 0.394
+_BORDER_BOTTOM = 0.012
+_BORDER_TOP = 0.267
+_TITLE_BLOCK_LEFT = 0.200
+_TITLE_BLOCK_TOP = 0.068
+
+
+@dataclass(frozen=True)
+class AssemblyDrawingLayout:
+    """View and table geometry for one three-sheet assembly package."""
+
+    working_scale: tuple[float, float]
+    exploded_scale: tuple[float, float]
+    procedure_scale: tuple[float, float]
+    reference_scale: tuple[float, float]
+    working_front_center: tuple[float, float] = (0.100, 0.165)
+    working_right_center: tuple[float, float] = (0.285, 0.165)
+    exploded_center: tuple[float, float] = (0.130, 0.178)
+    reference_front_center: tuple[float, float] = (0.055, 0.052)
+    reference_right_center: tuple[float, float] = (0.145, 0.052)
+    procedure_center: tuple[float, float] = (0.305, 0.170)
+    bom_anchor: tuple[float, float] = (0.222, 0.257)
+    bom_row_height: float = 0.0045
+    bom_column_widths: tuple[float, ...] = (0.025, 0.050, 0.080, 0.015)
+    balloon_margin: float = 0.008
+    working_display_mode: Literal[
+        "hidden-lines-removed", "shaded-with-edges"
+    ] = "hidden-lines-removed"
+
+    def __post_init__(self) -> None:
+        for name in (
+            "working_scale",
+            "exploded_scale",
+            "procedure_scale",
+            "reference_scale",
+        ):
+            scale = getattr(self, name)
+            if len(scale) != 2 or min(scale) <= 0.0:
+                raise ValueError(f"{name} must contain two positive values")
+        for name in (
+            "working_front_center",
+            "working_right_center",
+            "exploded_center",
+            "reference_front_center",
+            "reference_right_center",
+            "procedure_center",
+        ):
+            x, y = getattr(self, name)
+            if not (_BORDER_LEFT < x < _BORDER_RIGHT):
+                raise ValueError(f"{name} x-coordinate lies outside the sheet border")
+            if not (_BORDER_BOTTOM < y < _BORDER_TOP):
+                raise ValueError(f"{name} y-coordinate lies outside the sheet border")
+        for name in (
+            "working_front_center",
+            "working_right_center",
+            "exploded_center",
+            "procedure_center",
+        ):
+            if getattr(self, name)[1] <= _TITLE_BLOCK_TOP:
+                raise ValueError(f"{name} must stay above the title-block band")
+        for name in ("reference_front_center", "reference_right_center"):
+            if getattr(self, name)[0] >= _TITLE_BLOCK_LEFT:
+                raise ValueError("sheet-2 reference views must stay left of the title block")
+        if not (
+            _TITLE_BLOCK_LEFT < self.bom_anchor[0] < _BORDER_RIGHT
+            and _TITLE_BLOCK_TOP < self.bom_anchor[1] <= _BORDER_TOP
+        ):
+            raise ValueError("BOM anchor must lie above the sheet-2 title block")
+        if (
+            self.bom_row_height <= 0.0
+            or not self.bom_column_widths
+            or min(self.bom_column_widths) <= 0.0
+        ):
+            raise ValueError("BOM row height and column widths must be positive")
+        if self.bom_anchor[0] + sum(self.bom_column_widths) > _BORDER_RIGHT:
+            raise ValueError("BOM columns extend through the right sheet border")
+        if self.balloon_margin <= 0.0:
+            raise ValueError("balloon margin must be positive")
+        if self.working_display_mode not in (
+            "hidden-lines-removed",
+            "shaded-with-edges",
+        ):
+            raise ValueError(
+                f"unsupported working-view display mode {self.working_display_mode!r}"
+            )
 
 
 @dataclass(frozen=True)
@@ -317,7 +400,35 @@ def _validate_assembly_bom_columns(
         )
 
 
-def _place_hlr_view(
+def _set_view_display_mode(
+    adapter: Any,
+    view: Any,
+    mode: Literal["hidden-lines-removed", "shaded-with-edges"],
+) -> None:
+    if mode == "hidden-lines-removed":
+        set_hidden_lines_removed(adapter, view)
+        return
+    ok = adapter._attempt(
+        lambda: view.SetDisplayMode4(
+            False,  # local view setting
+            7,  # swDisplayMode_e.swSHADED_EDGES
+            False,  # precision geometry
+            True,  # retain edges in shaded mode
+            True,  # precision cosmetic threads
+        ),
+        default=False,
+    )
+    if not ok:
+        raise RuntimeError("failed to set shaded-with-edges drawing view")
+    adapter.currentModel.EditRebuild3()
+    actual = int(adapter._attempt(lambda: view.GetDisplayMode2(), default=-1))
+    if actual != 7:
+        raise RuntimeError(
+            f"shaded-with-edges drawing view read back display mode {actual}, expected 7"
+        )
+
+
+def _place_drawing_view(
     adapter: Any,
     source: Path,
     view_name: str,
@@ -325,6 +436,9 @@ def _place_hlr_view(
     *,
     scale: tuple[float, float],
     configuration: str,
+    display_mode: Literal[
+        "hidden-lines-removed", "shaded-with-edges"
+    ] = "hidden-lines-removed",
 ) -> Any:
     view = place_view(adapter, str(source), view_name, *center, scale=scale)
     view = _early_bound(view, "IView")
@@ -335,8 +449,58 @@ def _place_hlr_view(
         raise RuntimeError(
             f"{view_name} view configuration {applied!r} != {configuration!r}"
         )
-    set_hidden_lines_removed(adapter, view)
+    _set_view_display_mode(adapter, view, display_mode)
     return view
+
+
+def _size_bom_table(
+    adapter: Any,
+    table: Any,
+    *,
+    anchor: tuple[float, float],
+    row_height: float,
+    column_widths: tuple[float, ...],
+    label: str,
+) -> None:
+    """Compact the BOM proportionally, preserving rows expanded for wrapped text."""
+    rows = int(adapter._get_attr_or_call(table, "RowCount") or 0)
+    columns = int(adapter._get_attr_or_call(table, "ColumnCount") or 0)
+    if rows <= 1 or columns != len(column_widths):
+        raise RuntimeError(
+            f"{label} BOM sizing expects {len(column_widths)} columns and data rows; "
+            f"got {rows}x{columns}"
+        )
+    actual_widths = []
+    for column, width in enumerate(column_widths):
+        actual = float(table.SetColumnWidth(column, width, 0))
+        if actual <= 0.0:
+            raise RuntimeError(f"{label} BOM column {column} has no readable width")
+        actual_widths.append(actual)
+    adapter.currentModel.EditRebuild3()
+    original_heights = [
+        float(table.GetRowHeight(row))
+        for row in range(rows)
+    ]
+    if not original_heights or min(original_heights) <= 0.0:
+        raise RuntimeError(f"{label} BOM has no readable row heights")
+    baseline = min(original_heights)
+    actual_heights = []
+    for row, original in enumerate(original_heights):
+        target = row_height * original / baseline
+        actual = float(table.SetRowHeight(row, target, 0))
+        if actual + 1e-6 < target:
+            raise RuntimeError(
+                f"{label} BOM row {row} height {actual:g} clipped below {target:g}"
+            )
+        actual_heights.append(actual)
+    adapter.currentModel.EditRebuild3()
+    bottom = anchor[1] - sum(actual_heights)
+    right = anchor[0] + sum(actual_widths)
+    if bottom < _TITLE_BLOCK_TOP or right > _BORDER_RIGHT:
+        raise RuntimeError(
+            f"{label} BOM crosses reserved sheet geometry: "
+            f"bottom={bottom:g}, right={right:g}"
+        )
 
 
 def _sheet_marker(adapter: Any, number: int) -> None:
@@ -349,6 +513,12 @@ def _sheet_marker(adapter: Any, number: int) -> None:
     )
 
 
+def _audit_package_layout(adapter: Any, pdf_title: str) -> None:
+    for sheet_name in SHEET_NAMES:
+        _activate_sheet(adapter, sheet_name)
+        check_drawing_layout(adapter, stem=f"{pdf_title} / {sheet_name}")
+
+
 @_telemetry.traced("drawing.assembly_package", label_param="pdf_title")
 async def build_assembly_package(
     adapter: Any,
@@ -356,10 +526,7 @@ async def build_assembly_package(
     source: Path,
     outputs: DrawingOutputs,
     sheet_scale: tuple[float, float],
-    reference_scale: tuple[float, float],
-    front_center: tuple[float, float],
-    right_center: tuple[float, float],
-    iso_center: tuple[float, float],
+    layout: AssemblyDrawingLayout,
     pdf_title: str,
     assembly_steps: Sequence[str],
     critical_checks: Sequence[str],
@@ -398,41 +565,47 @@ async def build_assembly_package(
     create_blank_drawing_sheets(adapter, SHEET_NAMES, label=pdf_title)
 
     _activate_sheet(adapter, SHEET_NAMES[0])
-    _place_hlr_view(
+    _place_drawing_view(
         adapter,
         source,
         "*Front",
-        front_center,
-        scale=sheet_scale,
+        layout.working_front_center,
+        scale=layout.working_scale,
         configuration=bom.configuration,
+        display_mode=layout.working_display_mode,
     )
-    _place_hlr_view(
+    _place_drawing_view(
         adapter,
         source,
         "*Right",
-        right_center,
-        scale=sheet_scale,
+        layout.working_right_center,
+        scale=layout.working_scale,
         configuration=bom.configuration,
+        display_mode=layout.working_display_mode,
     )
     _note(
-        adapter, "FRONT — WORKING POSITION", front_center[0], 0.252, label="front label"
+        adapter,
+        "FRONT — WORKING POSITION",
+        layout.working_front_center[0],
+        0.252,
+        label="front label",
     )
     _note(
         adapter,
         "RIGHT SIDE — WORKING POSITION",
-        right_center[0],
+        layout.working_right_center[0],
         0.252,
         label="right label",
     )
     _sheet_marker(adapter, 1)
 
     _activate_sheet(adapter, SHEET_NAMES[1])
-    exploded = _place_hlr_view(
+    exploded = _place_drawing_view(
         adapter,
         source,
         "*Isometric",
-        _EXPLODED_CENTER,
-        scale=sheet_scale,
+        layout.exploded_center,
+        scale=layout.exploded_scale,
         configuration=bom.configuration,
     )
     if not bom.exploded_views:
@@ -449,30 +622,30 @@ async def build_assembly_package(
     _note(
         adapter,
         "EXPLODED ISOMETRIC — INSTALLATION ORDER",
-        _EXPLODED_CENTER[0],
+        layout.exploded_center[0],
         0.252,
         label="exploded label",
     )
-    reference_front = _place_hlr_view(
+    reference_front = _place_drawing_view(
         adapter,
         source,
         "*Front",
-        _REFERENCE_FRONT_CENTER,
-        scale=reference_scale,
+        layout.reference_front_center,
+        scale=layout.reference_scale,
         configuration=bom.configuration,
     )
-    reference_right = _place_hlr_view(
+    reference_right = _place_drawing_view(
         adapter,
         source,
         "*Right",
-        _REFERENCE_RIGHT_CENTER,
-        scale=reference_scale,
+        layout.reference_right_center,
+        scale=layout.reference_scale,
         configuration=bom.configuration,
     )
     table = insert_bom_table(
         adapter,
         exploded,
-        anchor_xy=_BOM_ANCHOR,
+        anchor_xy=layout.bom_anchor,
         expected_components=bom.components,
         descriptions=bom.description_fallbacks,
         identity_aliases=bom.aliases,
@@ -482,37 +655,47 @@ async def build_assembly_package(
     if table is None:
         raise RuntimeError(f"{pdf_title}: associative BOM insertion returned no table")
     _validate_assembly_bom_columns(adapter, table, bom, label=pdf_title)
+    _size_bom_table(
+        adapter,
+        table,
+        anchor=layout.bom_anchor,
+        row_height=layout.bom_row_height,
+        column_widths=layout.bom_column_widths,
+        label=pdf_title,
+    )
     add_auto_balloons_across_views(
         adapter,
         (exploded, reference_front, reference_right),
         expected=len(bom.components),
         label=pdf_title,
-        margin=0.012,
+        margin=layout.balloon_margin,
         layout=1,
     )
     _note(
         adapter,
-        f"FRONT REFERENCE — SCALE {reference_scale[0]:g}:{reference_scale[1]:g}",
-        _REFERENCE_FRONT_CENTER[0],
+        f"FRONT REFERENCE — SCALE {layout.reference_scale[0]:g}:"
+        f"{layout.reference_scale[1]:g}",
+        layout.reference_front_center[0],
         0.018,
         label="front reference label",
     )
     _note(
         adapter,
-        f"RIGHT REFERENCE — SCALE {reference_scale[0]:g}:{reference_scale[1]:g}",
-        _REFERENCE_RIGHT_CENTER[0],
+        f"RIGHT REFERENCE — SCALE {layout.reference_scale[0]:g}:"
+        f"{layout.reference_scale[1]:g}",
+        layout.reference_right_center[0],
         0.018,
         label="right reference label",
     )
     _sheet_marker(adapter, 2)
 
     _activate_sheet(adapter, SHEET_NAMES[2])
-    _place_hlr_view(
+    _place_drawing_view(
         adapter,
         source,
         "*Isometric",
-        iso_center,
-        scale=sheet_scale,
+        layout.procedure_center,
+        scale=layout.procedure_scale,
         configuration=bom.configuration,
     )
     numbered_steps = "\n".join(
@@ -538,6 +721,7 @@ async def build_assembly_package(
         label="assembled isometric label",
     )
     _sheet_marker(adapter, 3)
+    _audit_package_layout(adapter, pdf_title)
 
     return await finalize_drawing(
         adapter,

@@ -131,6 +131,9 @@ def test_lug_bores_carry_model_bands_and_live_on_the_axial_section() -> None:
     source = _source()
     assert "set_dimension_precision(adapter, section_annotations, SECTION_PRECISION)" in source
     assert source.count("_leaders_to_circumference(") == 3  # def + two calls
+    assert "_BROKEN_LEADER_HORIZONTAL = 2" in source
+    assert "SetBrokenLeader2(False, _BROKEN_LEADER_HORIZONTAL)" in source
+    assert "broken_horizontal=True" in source
 
 
 def test_every_number_is_on_a_view() -> None:
@@ -161,6 +164,12 @@ def test_every_number_is_on_a_view() -> None:
     assert f"PRESS Ø{fulcrum_keeper_spec.BALL_DIA:.3f}" in (
         fulcrum_keeper_spec.BALL_CALLOUT
     )
+    # The process flag is wrapped into the clear lane left of section A-A.
+    # Its seven rows finish above the title block instead of overprinting it.
+    assert len(fulcrum_keeper_spec.BALL_CALLOUT.splitlines()) == 7
+    assert max(map(len, fulcrum_keeper_spec.BALL_CALLOUT.splitlines())) <= 20
+    assert drawing.BALL_NOTE_XY[0] < drawing.SECTION_CENTER[0] - 0.08
+    assert drawing.BALL_NOTE_XY[1] >= 0.110
     # Text placement: the profile stack below the view, each row centred on
     # its span, the shorter nearer; the overall lowest, above the notes.
     assert drawing.FRONT_KEEP["PadLen"][1] > drawing.FRONT_KEEP["FootReach"][1]
@@ -176,14 +185,18 @@ def test_every_number_is_on_a_view() -> None:
 
 def test_lug_sequence_is_flagged_and_remote_note_is_only_the_mating_contract() -> None:
     callout = fulcrum_keeper_spec.BALL_CALLOUT
-    lines = callout.split("\n")
-    assert len(lines) == 3
+    lines = callout.splitlines()
+    assert len(lines) == 7
     assert "BORE BALL SEAT THRU" in lines[0]
-    assert f"Ø{fulcrum_keeper_spec.BALL_DIA:.3f}" in lines[1]
-    assert "PRESS" in lines[1]
-    assert "REAM SHAFT BORE THRU AFTER PRESSING" in lines[2]
+    assert "SHAFT AXIS" in lines[1]
+    assert f"Ø{fulcrum_keeper_spec.BALL_DIA:.3f}" in lines[2]
+    assert "PRESS" in lines[2]
+    assert "HARDENED STEEL BALL" in lines[3]
+    assert "CENTRED" in lines[4]
+    assert "REAM SHAFT BORE THRU" in lines[5]
+    assert "AFTER PRESSING" in lines[6]
     assert "BLACK OXIDE" not in callout
-    assert max(len(line) for line in lines) <= 62
+    assert max(len(line) for line in lines) <= 20
 
     # The allowed MATES WITH note is the only remote prose; every operation
     # and every manufacturing number remains attached to a view.

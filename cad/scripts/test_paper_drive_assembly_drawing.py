@@ -19,7 +19,13 @@ def test_paper_drive_package_forwards_domain_instructions(monkeypatch) -> None:
     assert captured["source"] == spec.source
     assert captured["outputs"] == drawing.OUTPUTS
     assert captured["sheet_scale"] == (1.0, 4.0)
-    assert captured["reference_scale"] == (1.0, 10.0)
+    assert captured["layout"] is drawing.LAYOUT
+    assert drawing.LAYOUT == drawing.AssemblyDrawingLayout(
+        working_scale=(1.0, 4.0),
+        exploded_scale=(1.0, 14.0),
+        procedure_scale=(1.0, 5.0),
+        reference_scale=(1.0, 12.0),
+    )
     assert captured["assembly_steps"] is drawing.ASSEMBLY_STEPS
     assert captured["critical_checks"] is drawing.CRITICAL_CHECKS
     assert captured["hardware_notes"] is drawing.HARDWARE_NOTES

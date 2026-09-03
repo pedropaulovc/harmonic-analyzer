@@ -244,6 +244,15 @@ RIGHT_KEEP: dict[str, tuple[float, float]] = {}
 TOP_LANE_CHAIN_Y = 0.178
 TOP_LANE_WIDTH_Y = TOP_KEEP["PlateWidth"][1]
 
+# Lower-right top-view annotation lanes.  The callout and FCF attach to holes
+# near their own text so their leaders stay short; the tiny BASIC dimensions
+# get separate X lanes; the surface-finish body grows up/right from its anchor.
+SPRING_START_DIM_XY = (0.204, 0.093)
+SPRING_PITCH_DIM_XY = (0.228, 0.104)
+SPRING_FCF_XY = (0.214, 0.130)
+SPRING_CALLOUT_XY = (0.231, 0.154)
+KNIFE_FINISH_XY = (0.225, 0.070)
+
 
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
@@ -385,8 +394,8 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # Sheet-bottom (+Z) end: datum B on the plate end face, the BASIC end
     # offset and pitch off it, the 20X frame and the #47 callout, and the
-    # knife-edge roughness on the +Z ridge -- each attached to a DIFFERENT
-    # hole or edge so no leader crosses another leader or an extension line.
+    # knife-edge roughness on the +Z ridge.  Their sheet lanes and attachment
+    # holes are separated below so neither text nor leaders form a cluster.
     plate_end_edge = _top_xy(PLATE_W - 0.45, -PLATE_L / 2.0)
     add_datum_feature(
         adapter,
@@ -401,7 +410,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         edge_xy=knife_edge,
-        symbol_xy=(0.182, 0.079),
+        symbol_xy=KNIFE_FINISH_XY,
         control=surface_finish_by_key(SURFACE_FINISHES, "knife_edge_ridge"),
         label="knife-edge ridge finish",
     )
@@ -412,7 +421,7 @@ async def build(adapter: Any) -> dict[str, str]:
         top,
         p0=_top_xy(PLATE_W - 20.0, -PLATE_L / 2.0),
         p1=end_hole_rim_top,
-        text_xy=(0.212, 0.0955),
+        text_xy=SPRING_START_DIM_XY,
         label="spring-hole start Z",
         orientation="vertical",
     )
@@ -423,17 +432,19 @@ async def build(adapter: Any) -> dict[str, str]:
         top,
         p0=end_hole_rim_top,
         p1=second_rim_bottom,
-        text_xy=(0.224, 0.1035),
+        text_xy=SPRING_PITCH_DIM_XY,
         label="spring-hole pitch",
         orientation="vertical",
     )
     set_basic_dimension(adapter, pitch, label="spring-hole pitch")
-    third_rim_top = _top_xy(HOLE_X, end_hole_up + 2.0 * CHANNEL_PITCH + HOLE_DIA / 2.0)
+    ninth_rim_top = _top_xy(
+        HOLE_X, end_hole_up + 8.0 * CHANNEL_PITCH + HOLE_DIA / 2.0
+    )
     add_feature_control_frame(
         adapter,
         top,
-        edge_xy=third_rim_top,
-        frame_xy=(0.204, 0.112),
+        edge_xy=ninth_rim_top,
+        frame_xy=SPRING_FCF_XY,
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["spring-hole pattern position"],
         datums=("A", "B"),
@@ -441,14 +452,14 @@ async def build(adapter: Any) -> dict[str, str]:
         quantity="20X",
         label="spring-hole pattern position",
     )
-    fifth_rim_right = _top_xy(
-        HOLE_X + HOLE_DIA / 2.0, end_hole_up + 4.0 * CHANNEL_PITCH
+    fifteenth_rim_right = _top_xy(
+        HOLE_X + HOLE_DIA / 2.0, end_hole_up + 14.0 * CHANNEL_PITCH
     )
     add_native_hole_callout(
         adapter,
         top,
-        edge_xy=fifth_rim_right,
-        callout_xy=(0.232, 0.126),
+        edge_xy=fifteenth_rim_right,
+        callout_xy=SPRING_CALLOUT_XY,
         label="spring-hole seed",
         process="#47 DRILL",
     )

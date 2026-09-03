@@ -81,6 +81,12 @@ _HALF_LEN = BAR_LENGTH * _S / 2.0
 _HALF_SIDE = BAR_SIDE * _S / 2.0
 LEFT_END = FRONT_CENTER[0] - _HALF_LEN
 BAR_BOTTOM = FRONT_CENTER[1] - _HALF_SIDE
+# The ASME B frame begins 12.7 mm from the sheet edge. SolidWorks places the
+# horizontal "10.00" text immediately left of its vertical dimension lane;
+# the regenerated print shows a 15 mm leftward ink extent.
+PRINTABLE_LEFT_X = 0.0127
+SIDE_TEXT_LEFT_EXTENT = 0.015
+SIDE_DIMENSION_X = LEFT_END - 0.009
 
 
 def _front_x(model_x: float) -> float:
@@ -89,13 +95,15 @@ def _front_x(model_x: float) -> float:
 
 
 # The overall length moves down one row to make room for the three station
-# dimensions stacked between it and the bar.  The section height (10.00)
-# stands left of the left end, OUTSIDE the transverse hole station, with its
-# text lifted off the mid-height row: the pen-hanger hole's extended centre
-# mark runs along that row through the end face (review 2026-09-02).
+# dimensions stacked between it and the bar. The section height (10.00)
+# stands left of the left end, OUTSIDE the transverse hole station. A vertical
+# dimension renders its text to the left of its x position, so this lane keeps
+# the full 10.00 ink inside the 12.7 mm printable border. Its text remains
+# lifted off the mid-height row that the pen-hanger hole's extended centre
+# mark runs along.
 FRONT_KEEP = {
     "Length": (FRONT_CENTER[0], BAR_BOTTOM - 0.038),
-    "Side": (LEFT_END - 0.023, FRONT_CENTER[1] + 0.011),
+    "Side": (SIDE_DIMENSION_X, FRONT_CENTER[1] + 0.011),
 }
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
 
@@ -106,10 +114,10 @@ RIGHT_HALF_Y = BAR_SIDE * _S / 2.0
 # so that pick lands well above the bar's mid-height, clear of the circle.
 END_FACE_PICK = (LEFT_END, FRONT_CENTER[1] + 0.0035)
 # The bottom edge, picked just inboard of the left end, is the origin of the
-# transverse station (bottom edge -> pen-hanger hole axis); its text sits
-# left of the end, nearest the view, inside the 10.00 lane.
+# transverse station (bottom edge -> pen-hanger hole axis); its text remains
+# between the 10.00 lane and the end face.
 BOTTOM_EDGE_PICK = (LEFT_END + 0.006, BAR_BOTTOM)
-TRANSVERSE_STATION_TEXT_XY = (LEFT_END - 0.011, FRONT_CENTER[1] - 0.0025)
+TRANSVERSE_STATION_TEXT_XY = (LEFT_END - 0.005, FRONT_CENTER[1] - 0.0025)
 
 # Station rows below the bar, shortest span nearest (so no extension line
 # crosses a shorter dimension's text): (model x, hole Ø, text sheet xy).  The

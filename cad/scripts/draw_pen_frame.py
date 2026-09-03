@@ -38,6 +38,7 @@ from _drawing_common import (
     finalize_drawing,
     find_edge_near,
     model_point_in_view,
+    remove_notes_matching,
     new_project_drawing,
     read_required_properties,
     set_arc_endpoints_to_center,
@@ -87,6 +88,11 @@ FRONT_KEEP = {
 }
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
 BOTTOM_KEEP: dict[str, tuple[float, float]] = {}
+
+# Native callout text is centred on its annotation anchor.  Park the long
+# bottom-rail process/thread line wholly to the right of the bottom view rather
+# than over its outline, centre mark, and 5.00 station lane.
+BOTTOM_CALLOUT_XY = (0.215, BOTTOM_CENTER[1])
 
 # The set-screw hole (model mm): mid-width, mid-depth, tapped up the bottom
 # rail.  Its stations read from the TRIMMED left face (the one the machinist
@@ -193,6 +199,14 @@ async def build(adapter: Any) -> dict[str, str]:
     # show the set-screw thread path up the bottom rail into the window.
     for view in (front, right, bottom):
         set_hidden_lines_visible(adapter, view)
+    # Hole Wizard places a redundant generic "#4-40 Tapped Hole" note on the
+    # front view.  The native bottom-view callout below carries the complete
+    # drill/thread/end-condition instruction, so retaining the automatic note
+    # only duplicates the requirement and lets the front-view outline cross it.
+    removed_tap_notes = remove_notes_matching(adapter, "Tapped Hole")
+    _telemetry.info(
+        f"removed {removed_tap_notes} redundant automatic tapped-hole note(s)"
+    )
 
     # The front view claims the envelope marks; the other views keep none.
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
@@ -267,7 +281,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         bottom,
         edge_xy=screw_rim,
-        callout_xy=_offset(at_bottom(OUTER_WIDTH, 0.0, SCREW_Z), bottom_x, 0.016),
+        callout_xy=BOTTOM_CALLOUT_XY,
         label="set-screw tap",
         process=SET_SCREW_PROCESS,
     )

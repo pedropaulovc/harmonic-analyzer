@@ -104,9 +104,10 @@ _OVERALL_LANE_X = _FLANGE_RIGHT_X + 0.030
 
 # Every marked dimension reads on the profile view. The axis is vertical, so
 # each diameter's dimension line runs HORIZONTALLY at its text height: the
-# O35 below the flange, the O9 above the tip (between the two views), the O5
-# across the stud mid-span with its toleranced text out to the right, clear
-# of the Ra symbol on the left. The end view keeps nothing -- SolidWorks
+# O35 below the flange, the O9 above the tip, and the O5 across the stud
+# mid-span with its toleranced text out to the right. The shoulder-root note
+# lives above the collar, in the gap below O9, so its ink cannot merge with
+# either line of the O5 tolerance. The end view keeps nothing -- SolidWorks
 # inserts each marked model dimension into ONE view, so the profile is
 # curated first and the end view is never asked (draw_pinion_bracket,
 # 2026-09-02 seat build).
@@ -130,13 +131,14 @@ REFERENCE_DIMENSIONS = ("CollarLength",)
 
 # Shoulder-root callout: leadered onto the collar's bar-side rim (the O9
 # step face seen edge-on, picked midway across the 2 mm annulus right of
-# the stud so only that rim is under the cursor), the note down-right of it
-# under the collar and above the O5 text, inboard of the station lane.
+# the stud so only that rim is under the cursor). Its note is above the
+# collar, between the collar outline and O9 dimension, leaving the two-line
+# O5 unilateral tolerance unobstructed below.
 ROOT_PICK_XY = (
     FRONT_CENTER[0] + (STUD_DIA / 2.0 + (COLLAR_DIA - STUD_DIA) / 4.0) * _K,
     _front_y(COLLAR_START),
 )
-ROOT_NOTE_XY = (0.128, _front_y(COLLAR_START) - 0.0105)
+ROOT_NOTE_XY = (0.128, _TIP_Y + 0.005)
 
 
 def _view_center_delta(

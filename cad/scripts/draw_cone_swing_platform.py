@@ -53,7 +53,6 @@ from _drawing_common import (
     view_name,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     auto_center_marks,
@@ -67,7 +66,6 @@ from build_cone_swing_platform import (
     NORTH_OVERHANG,
     PIVOT_HOLE_SPEC,
     PLATE_LEN,
-    PLATE_T,
     POST_MOUNT_EAST_XZ,
     POST_MOUNT_SPEC,
     POST_MOUNT_WEST_XZ,
@@ -143,21 +141,19 @@ DETAIL_BOUNDARY = (
 # Plan dimensions.  Left: the axial length outermost, the east mount's
 # station from the pivot nearer.  Right: the notch closed-end station and the
 # west mount's station from the pivot (shorter nearer).  Above the south end,
-# nearest first: the east mount's offset from the axis (text parked left of
-# its span), the mount pitch across the axis, the notch closed-end offset,
-# the south edge.  Below the north end: the west taper run (its south
-# witness runs down the west side, outside the plate).  The notch diameter
-# and the two south corner radii are leadered from the upper right, above
-# the station dimensions, where no leader crosses a dimension line.
+# nearest first: the east mount's offset from the axis, the mount pitch across
+# the axis, the notch closed-end offset, and the south edge.  The notch-width
+# leader and east corner radius occupy separate rows to the right; the native
+# two-line tap callout has its own row nearest the top border.
 TOP_KEEP = {
     "PlateLenDim": (0.035, (_NORTH_Y + _SOUTH_Y) / 2.0),
     "WestTaperDx": ((_NW[0] + _SW[0]) / 2.0, _NORTH_Y - 0.012),
     "SouthEdge": ((_SE[0] + _SW[0]) / 2.0, _SOUTH_Y + 0.033),
     "CapECx": (_AXIS_X + (LOCK_NOTCH_SEAT_X / 2.0) * _P, _SOUTH_Y + 0.024),
     "CapECz": (_SW[0] + 0.016, (_PIVOT[1] + _CAP[1]) / 2.0),
-    "CapEDia": (0.180, _SOUTH_Y - 0.002),
+    "CapEDia": (0.220, _SOUTH_Y - 0.006),
     "CornerSWR": (_SW[0] + 0.024, _SOUTH_Y + 0.0065),
-    "CornerSER": (_SE[0] - 0.022, _SOUTH_Y + 0.006),
+    "CornerSER": (_SE[0] - 0.022, _SOUTH_Y + 0.014),
 }
 # The five marked sketch/fillet dimensions are unavailable from the derived
 # detail. State the same values from build constants beside the retained
@@ -196,34 +192,13 @@ EAST_OFFSET_TEXT_XY = (_AXIS_X - 0.017, _SOUTH_Y + 0.009)
 PITCH_TEXT_XY = (_AXIS_X, _SOUTH_Y + 0.016)
 WEST_STATION_TEXT_XY = (_SW[0] + 0.030, (_PIVOT[1] + _W_HOLE[1]) / 2.0)
 EAST_STATION_TEXT_XY = (_SE[0] - 0.016, (_PIVOT[1] + _E_HOLE[1]) / 2.0)
-MOUNT_CALLOUT_XY = (0.195, _SOUTH_Y + 0.014)
+MOUNT_CALLOUT_XY = (0.225, _SOUTH_Y + 0.030)
 NOTES_XY = (0.016, 0.088)
 PLAN_NOTE_XY = (0.030, 0.258)
 ISO_NOTE_XY = (0.325, 0.190)
 END_NOTE_XY = (0.310, 0.112)
 
 
-def _view_xy_mapper(adapter: Any, view: Any) -> Any:
-    """Return a model-XYZ -> sheet-XY mapper for ``view``.
-
-    Sheet coordinates are what every annotation placement is expressed in, so
-    anything derived from model geometry (a rim centre, a leader attachment on
-    an edge) has to come through this transform rather than a hand-measured
-    literal -- a literal silently goes stale the next time the part is refitted.
-    """
-    math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-    transform = _early_bound(view.ModelToViewTransform, "IMathTransform")
-
-    def _view_xy(point_xyz: tuple[float, float, float]) -> tuple[float, float]:
-        point = _early_bound(
-            math_utility.CreatePoint(double_array(point_xyz)),
-            "IMathPoint",
-        )
-        mapped = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
-        values = tuple(float(value) for value in mapped.ArrayData)
-        return values[0], values[1]
-
-    return _view_xy
 
 
 def _plan_circles(
@@ -249,57 +224,6 @@ def _plan_circles(
     return circles
 
 
-def _add_cone_axis_centerline(adapter: Any, view: Any) -> tuple[float, float]:
-    """Draw the plan-view cone axis through the modeled pivot-hole center."""
-    _view_xy = _view_xy_mapper(adapter, view)
-
-    expected_radius_m = blind_cut_dia_mm(PIVOT_HOLE_SPEC) / 2000.0
-    pivot_centers = [
-        _view_xy(center)
-        for radius, center, _edge in _plan_circles(adapter, view)
-        if abs(radius - expected_radius_m) <= 1e-6
-    ]
-    if not pivot_centers:
-        raise RuntimeError(
-            "cone-platform plan view has no visible pivot-hole rim at "
-            f"radius {expected_radius_m:g} m"
-        )
-
-    pivot = pivot_centers[0]
-    if any(
-        abs(center[0] - pivot[0]) > 1e-6 or abs(center[1] - pivot[1]) > 1e-6
-        for center in pivot_centers[1:]
-    ):
-        raise RuntimeError(
-            f"cone-platform plan view has conflicting pivot centers: {pivot_centers!r}"
-        )
-    outline = tuple(float(value) for value in view.GetOutline())
-    margin = 0.001
-    if not (
-        outline[0] - margin <= pivot[0] <= outline[2] + margin
-        and outline[1] - margin <= pivot[1] <= outline[3] + margin
-    ):
-        raise RuntimeError(
-            f"projected pivot center {pivot!r} falls outside plan-view outline "
-            f"{outline!r}"
-        )
-    north = (pivot[0], outline[3])
-    south = (pivot[0], outline[1])
-    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
-    model = adapter.currentModel
-    # IDrawingDoc.EditSheet explicitly makes subsequently created geometry
-    # sheet-owned. The endpoints are already transformed into sheet space, so
-    # this keeps the centerline coincident with the projected model axis.
-    drawing.EditSheet()
-    sketch_manager = _early_bound(model.SketchManager, "ISketchManager")
-    centerline = sketch_manager.CreateCenterLine(
-        north[0], north[1], 0.0, south[0], south[1], 0.0
-    )
-    if centerline is None:
-        raise RuntimeError("failed to create cone-axis centerline in plan view")
-    adapter.currentModel.ClearSelection2(True)
-    adapter.currentModel.EditRebuild3()
-    return pivot
 
 
 def _pivot_rim(adapter: Any, view: Any) -> Any:
@@ -441,12 +365,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # Hidden lines stay ON in every orthographic view (policy rule 7).
     for view in (top, end, detail):
         set_hidden_lines_visible(adapter, view)
-    # SolidWorks auto-inserts a generic "1/4-20 Tapped Hole" note for the
-    # wizard taps; the native callout below replaces it.
-    removed_tap_notes = remove_notes_matching(adapter, "Tapped Hole")
-    _telemetry.info(
-        f"removed {removed_tap_notes} redundant automatic tapped-hole note(s)"
-    )
 
     pivot_edge, west_edge, east_edge = _visible_plan_controls(adapter, top)
     top_annotations = curate_view_dimensions(
@@ -459,12 +377,17 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, [*top_annotations, *end_annotations], DIMENSION_CALLOUTS
     )
     set_dimension_precision(adapter, top_annotations, DIMENSION_PRECISION)
+    # SolidWorks auto-inserts a generic "1/4-20 Tapped Hole" note for the
+    # wizard taps; the native callout below replaces it.
+    removed_tap_notes = remove_notes_matching(adapter, "Tapped Hole")
+    _telemetry.info(
+        f"removed {removed_tap_notes} redundant automatic tapped-hole note(s)"
+    )
     if add_note(adapter, PIVOT_END_GEOMETRY_NOTE, *PIVOT_END_GEOMETRY_NOTE_XY) is None:
         raise RuntimeError("failed to add pivot-end geometry note")
     for label, view in (("plan", top), ("detail", detail)):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME center marks to the {label} view")
-    _add_cone_axis_centerline(adapter, top)
 
     # The derived detail does not expose the pivot-hole rim reliably. Keep
     # DETAIL A for the end profile, and attach the native hole callout to the

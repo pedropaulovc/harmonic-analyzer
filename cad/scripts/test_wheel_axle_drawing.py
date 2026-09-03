@@ -113,11 +113,12 @@ def test_shoulder_roots_carry_a_leadered_allowance() -> None:
     assert "text=ROOT_NOTE" in source
     assert "find_edge_near(" in source
     # Picked on the collar shoulder (y = COLLAR_START) across the annulus
-    # right of the stud, the note under the collar and above the O5 text,
-    # inboard of the station lane.
+    # right of the stud. The note now occupies the open band above the collar
+    # and below O9, vertically remote from both lines of the O5 tolerance.
     assert drawing.ROOT_PICK_XY[1] == drawing._front_y(wheel_axle_spec.COLLAR_START)
     assert drawing._STUD_RIGHT_X < drawing.ROOT_PICK_XY[0] < drawing._COLLAR_RIGHT_X
-    assert drawing.FRONT_KEEP["StudDia"][1] < drawing.ROOT_NOTE_XY[1] < drawing.ROOT_PICK_XY[1]
+    assert drawing._TIP_Y < drawing.ROOT_NOTE_XY[1] < drawing.FRONT_KEEP["CollarDia"][1]
+    assert drawing.ROOT_NOTE_XY[1] - drawing.FRONT_KEEP["StudDia"][1] > 0.030
     assert drawing.ROOT_NOTE_XY[0] < drawing._STATION_LANE_X
 
 

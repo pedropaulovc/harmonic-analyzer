@@ -32,6 +32,19 @@ def test_tapped_holes_use_customary_us_thread() -> None:
     assert support.HOLE_THREAD_CLASS == "2B"
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "insert_hole_table(" in source
+    # The imported Hole Wizard description remains on the sheet, but is moved
+    # into the blank cavity instead of straddling its lower edge and dimensions.
+    cavity_left = drawing._front_xy(-support.CAV, 0.0)[0]
+    cavity_right = drawing._front_xy(support.CAV, 0.0)[0]
+    cavity_bottom = drawing._front_xy(0.0, -support.CAV)[1]
+    cavity_top = drawing._front_xy(0.0, support.CAV)[1]
+    assert cavity_left < drawing.TAP_NOTE_XY[0] < cavity_right
+    assert cavity_bottom < drawing.TAP_NOTE_XY[1] < cavity_top
+    assert drawing.TAP_NOTE_XY[0] + 0.050 < drawing._front_xy(
+        drawing.SECTION_CUT_X, 0.0
+    )[0]
+    assert 'keyword="Tapped Hole"' in source
+    assert 'xy=TAP_NOTE_XY' in source
 
 
 def test_hole_table_covers_every_foot_hole_with_ordinary_locations() -> None:
@@ -130,8 +143,8 @@ def test_window_and_cavity_are_located_from_outside_faces() -> None:
     assert drawing.FRONT_KEEP["CavDepth"][0] == drawing.FRONT_LANE_X["cavity"]
     assert drawing.FRONT_KEEP["WinHeight"][0] == drawing.FRONT_LANE_X["window"]
     assert 'text_xy=(FRONT_LANE_X["cavity"], 0.162)' in source
-    # Nothing sits inside the window any more: every marked horizontal is on
-    # a lane below the outline, every marked vertical on a lane to the right.
+    # No marked dimension sits inside the window: every marked horizontal is
+    # on a lane below the outline, every marked vertical on a lane to the right.
     for name in ("Depth", "WinWidth", "CavWidth"):
         assert drawing.FRONT_KEEP[name][1] < front_bottom, name
     assert 'prefix="4X "' in source

@@ -44,6 +44,7 @@ from _drawing_common import (
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
+    model_point_in_view,
     read_required_properties,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
@@ -89,11 +90,11 @@ _D = DETAIL_SCALE[0] / DETAIL_SCALE[1]  # sheet-mm per model-mm in a detail (4.0
 # 1:8 isometric fill the right-hand field above the title block.
 FRONT_CENTER = (0.110, 0.140)
 RIGHT_CENTER = (0.140, 0.140)
-END_CENTER = (0.300, 0.105)  # square-section top end view (4:1)
+END_CENTER = (0.330, 0.105)  # square-section top end view (4:1)
 ISO_CENTER = (0.385, 0.150)
 DETAIL_A_CENTER = (0.200, 0.190)  # top notch (from the front view)
-DETAIL_B_CENTER = (0.180, 0.104)  # bottom notch (from the front view)
-DETAIL_C_CENTER = (0.300, 0.190)  # top pin hole (from the right view)
+DETAIL_B_CENTER = (0.180, 0.095)  # bottom notch (from the front view)
+DETAIL_C_CENTER = (0.285, 0.190)  # top pin hole (from the right view)
 
 # Detail boundaries in model mm: each circle is centred on the bar's width
 # (or depth) mid-line, 8 mm in from the end it enlarges, and reaches 9 mm --
@@ -102,47 +103,30 @@ DETAIL_MODEL_RADIUS = 9.0
 TOP_DETAIL_Y = BAR_LENGTH - 8.0
 BOTTOM_DETAIL_Y = 8.0
 
-_BBOX_CX = BAR_WIDTH / 2.0  # the front view is bbox-centred on the bar
-_BBOX_CY = BAR_LENGTH / 2.0
-_BBOX_CZ = BAR_DEPTH / 2.0  # the right view likewise across the depth
+_BBOX_CX = BAR_WIDTH / 2.0
 
 
-def _front_xy(mx: float, my: float) -> tuple[float, float]:
-    """Sheet (x, y) of a model (X, Y) point in the 1:4 front view."""
-    return (
-        FRONT_CENTER[0] + (mx - _BBOX_CX) * _S / 1000.0,
-        FRONT_CENTER[1] + (my - _BBOX_CY) * _S / 1000.0,
-    )
-
-
-def _right_xy(mz: float, my: float) -> tuple[float, float]:
-    """Sheet (x, y) of a model (Z, Y) point in the 1:4 right view.
-
-    The pin hole and the two side faces are symmetric about the depth
-    mid-line, so the view's Z mirror (SolidWorks' choice) cannot matter.
-    """
-    return (
-        RIGHT_CENTER[0] + (mz - _BBOX_CZ) * _S / 1000.0,
-        RIGHT_CENTER[1] + (my - _BBOX_CY) * _S / 1000.0,
-    )
-
-
-def _detail_xy(
-    center: tuple[float, float],
-    model_center: tuple[float, float],
-    mu: float,
-    mv: float,
+def _detail_source_center(
+    adapter: Any,
+    view: Any,
+    *,
+    x_mm: float,
+    y_mm: float,
+    z_mm: float,
+    label: str,
 ) -> tuple[float, float]:
-    """Sheet (x, y) of a model point in a 4:1 detail centred on ``model_center``."""
-    return (
-        center[0] + (mu - model_center[0]) * _D / 1000.0,
-        center[1] + (mv - model_center[1]) * _D / 1000.0,
+    """Project an actual model point to the parent drawing view.
+
+    A placed SolidWorks view is not guaranteed to be centred on its model
+    bounding box.  Detail-circle centres therefore come from the view's
+    ModelToViewTransform rather than from hand-derived sheet offsets.
+    """
+    return model_point_in_view(
+        adapter,
+        view,
+        (x_mm / 1000.0, y_mm / 1000.0, z_mm / 1000.0),
+        label=label,
     )
-
-
-def _detail_a(mx: float, my: float) -> tuple[float, float]:
-    return _detail_xy(DETAIL_A_CENTER, (_BBOX_CX, TOP_DETAIL_Y), mx, my)
-
 FRONT_KEEP = {
     "BarLength": (0.075, FRONT_CENTER[1]),
 }
@@ -175,18 +159,12 @@ TOP_PIN_GEOMETRY_NOTE = "\n".join(
         f"#47 DRILL <MOD-DIAM>{TOP_PIN_DIA:.3f} THRU",
     )
 )
-BOTTOM_NOTCH_GEOMETRY_NOTE_XY = (
-    DETAIL_B_CENTER[0] + DETAIL_MODEL_RADIUS * _D / 1000.0 + 0.008,
-    DETAIL_B_CENTER[1] - 0.010,
-)
-TOP_PIN_GEOMETRY_NOTE_XY = (
-    DETAIL_C_CENTER[0] + DETAIL_MODEL_RADIUS * _D / 1000.0 + 0.008,
-    DETAIL_C_CENTER[1] - 0.010,
-)
-TOP_NOTCH_GEOMETRY_NOTE_XY = (
-    _detail_a(NOTCH_OFFSET / 2.0, 0.0)[0],
-    _detail_a(_BBOX_CX, BAR_LENGTH)[1] + 0.014,
-)
+BOTTOM_NOTCH_GEOMETRY_NOTE_XY = (0.220, 0.145)
+TOP_PIN_GEOMETRY_NOTE_XY = (0.255, 0.242)
+TOP_NOTCH_GEOMETRY_NOTE_XY = (0.150, 0.242)
+MANUFACTURING_NOTES_XY = (0.150, 0.265)
+END_VIEW_NOTE_XY = (0.300, 0.074)
+ISOMETRIC_VIEW_NOTE_XY = (0.325, 0.088)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -238,11 +216,37 @@ async def build(adapter: Any) -> dict[str, str]:
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 8))
     set_hidden_lines_removed(adapter, iso)
 
-    # The three enlarged end details (policy rule 7).
+    # Use the model-to-view transforms for the three source circles.  Hand
+    # centring against an assumed bounding box can leave a valid detail view
+    # pointed at blank sheet space when SolidWorks shifts a placed view.
+    top_notch_source = _detail_source_center(
+        adapter,
+        front,
+        x_mm=_BBOX_CX,
+        y_mm=TOP_DETAIL_Y,
+        z_mm=0.0,
+        label="top notch detail source",
+    )
+    bottom_notch_source = _detail_source_center(
+        adapter,
+        front,
+        x_mm=_BBOX_CX,
+        y_mm=BOTTOM_DETAIL_Y,
+        z_mm=0.0,
+        label="bottom notch detail source",
+    )
+    top_pin_source = _detail_source_center(
+        adapter,
+        right,
+        x_mm=_BBOX_CX,
+        y_mm=TOP_DETAIL_Y,
+        z_mm=BAR_DEPTH / 2.0,
+        label="top pin detail source",
+    )
     detail_a = create_detail_view(
         adapter,
         front,
-        center=_front_xy(_BBOX_CX, TOP_DETAIL_Y),
+        center=top_notch_source,
         radius=DETAIL_MODEL_RADIUS * _S / 1000.0,
         view_xy=DETAIL_A_CENTER,
         detail_label="A",
@@ -252,7 +256,7 @@ async def build(adapter: Any) -> dict[str, str]:
     detail_b = create_detail_view(
         adapter,
         front,
-        center=_front_xy(_BBOX_CX, BOTTOM_DETAIL_Y),
+        center=bottom_notch_source,
         radius=DETAIL_MODEL_RADIUS * _S / 1000.0,
         view_xy=DETAIL_B_CENTER,
         detail_label="B",
@@ -262,7 +266,7 @@ async def build(adapter: Any) -> dict[str, str]:
     detail_c = create_detail_view(
         adapter,
         right,
-        center=_right_xy(_BBOX_CZ, TOP_DETAIL_Y),
+        center=top_pin_source,
         radius=DETAIL_MODEL_RADIUS * _S / 1000.0,
         view_xy=DETAIL_C_CENTER,
         detail_label="C",
@@ -314,12 +318,11 @@ async def build(adapter: Any) -> dict[str, str]:
     ):
         raise RuntimeError("failed to add top-pin geometry note")
 
-    # Notes along the top; the end-view and isometric captions under their
-    # views (the end view runs 16x the sheet scale -- label it or "do not
-    # scale drawing" leaves its size unreadable).
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.150, 0.258)
-    add_property_linked_note(adapter, "End View Note", 0.272, 0.084)
-    add_property_linked_note(adapter, "Isometric View Note", 0.360, 0.088)
+    # Property notes occupy their own bands: feature notes above/between the
+    # details, captions below their views, and neither in the title block.
+    add_property_linked_note(adapter, "Manufacturing Notes", *MANUFACTURING_NOTES_XY)
+    add_property_linked_note(adapter, "End View Note", *END_VIEW_NOTE_XY)
+    add_property_linked_note(adapter, "Isometric View Note", *ISOMETRIC_VIEW_NOTE_XY)
 
     return await finalize_drawing(
         adapter,

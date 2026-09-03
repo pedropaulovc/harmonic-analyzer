@@ -65,7 +65,6 @@ from harmonic_base_spec import (
     BOTTOM_FRONT_Z,
     BOTTOM_LENGTH,
     BOTTOM_REAR_Z,
-    BOTTOM_THICKNESS,
     BOTTOM_WIDTH,
     LIP_W,
     RIM_TOP,
@@ -76,6 +75,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     auto_center_marks,
     place_view,
+    remove_notes_matching,
     view_name,
 )
 
@@ -100,11 +100,11 @@ if abs((BOTTOM_REAR_Z - BOTTOM_FRONT_Z) - BOTTOM_WIDTH) > 1e-12:
     raise AssertionError("base drawing extents disagree with the overall depth")
 
 # Sheet layout (meters).  The plan (top) carries the footprint + the hole
-# pattern; the front elevation (1:4) shows the stepped stack; the hole
-# table sits upper-right and the notes fill the lower-left.  The plan runs at the
-# sheet's 1:2; only the 1:4 elevation carries a scale note.
+# pattern; the hole table sits upper-right and the notes fill the lower-left.
+# The 1:4 front elevation occupies the remaining strip below those notes,
+# wholly left of the title block.  The plan runs at the sheet's 1:2.
 TOP_CENTER = (0.130, 0.163)
-SIDE_CENTER = (0.345, 0.075)
+SIDE_CENTER = (0.145, 0.031)
 # The elevation is placed on its bounding box (y 0..RIM_TOP): model y 0 sits
 # half the overall height below the view centre.
 SIDE_BBOX_MID_Y = RIM_TOP / 2.0  # 26.65
@@ -143,19 +143,20 @@ def _hole_rim(x_mm: float, z_mm: float, diameter_mm: float) -> tuple[float, floa
 # position (meters).  Plan: the pad outline nearest the plate, the flange
 # envelope outside it (smallest span nearest); the two vertical texts sit at
 # different heights so their horizontal texts cannot touch.  Elevation: the
-# flange and pad thicknesses stacked on the LEFT of the view, thinnest nearest.
+# flange and pad thicknesses are stacked on the LEFT of the view, which now
+# occupies the open strip below the notes and wholly left of the title block.
 TOP_KEEP = {
-    "TopLen": (TOP_CENTER[0], 0.2428),
-    "BottomLen": (TOP_CENTER[0], 0.2518),
+    "TopLen": (0.130, 0.2428),
+    "BottomLen": (0.130, 0.2518),
     "TopWid": (0.2513, 0.150),
     "BottomWid": (0.2643, 0.178),
 }
 SIDE_KEEP = {
-    "FlangeT": (0.280, _side_xy(0.0, BOTTOM_THICKNESS / 2.0)[1]),  # y 0.0699
-    "PadT": (0.272, _side_xy(0.0, STACK_HEIGHT - 8.0)[1]),  # y 0.0790
+    "FlangeT": (0.080, 0.025925),
+    "PadT": (0.072, 0.0350375),
 }
 # Drawing dimensions (text positions, sheet metres).
-OVERALL_TEXT_XY = (0.264, 0.0745)  # (53.30) reference, left of the elevation
+OVERALL_TEXT_XY = (0.064, 0.0305)  # (53.30) reference, left of the elevation
 # The deck is hidden behind the front rim wall, and its derived-view edge is
 # not reliably selectable.  State the same spec-owned depth beside the view.
 DECK_DEPTH_NOTE = f"DECK {RIM_TOP - STACK_HEIGHT:.2f} BELOW RIM TOP"
@@ -170,14 +171,16 @@ PAD_RADIUS_TEXT_XY = (0.2555, 0.0880)  # R15.88 at the SE corner arc
 RIM_RADIUS_TEXT_XY = (0.2470, 0.0790)  # R8.88 at the SE corner arc
 
 # Hole-table origin corner (the plate's lower-left plan corner) + the four
-# mounting-hole rim picks, all in sheet meters.  The native table reads each
-# hole's real Ø13 THRU / counterbore callout and its X/Y station from the datum.
+# mounting-hole rim picks, all in sheet meters.  Its anchor uses the narrow
+# margin below the top border so the complete 17-hole table ends above the
+# title block.  The native table reads each hole's real Ø13 THRU / counterbore
+# callout and its X/Y station from the datum.
 _DATUM_XY = (
     TOP_CENTER[0] - BOTTOM_LENGTH * VIEW_SCALE / 2000.0,
     TOP_CENTER[1] - BOTTOM_REAR_Z * VIEW_SCALE / 1000.0,
 )
-HOLE_TABLE_ANCHOR = (0.274, 0.256)
-SIDE_VIEW_NOTE_XY = (0.260, 0.098)
+HOLE_TABLE_ANCHOR = (0.274, 0.265)
+SIDE_VIEW_NOTE_XY = (0.060, 0.046)
 DECK_DEPTH_NOTE_XY = (SIDE_CENTER[0], SIDE_VIEW_NOTE_XY[1])
 
 
@@ -465,6 +468,15 @@ async def build(adapter: Any) -> dict[str, str]:
     # counterbores and the blind seats' depths, the elevation the hole depths.
     for view in (top, side):
         set_hidden_lines_visible(adapter, view)
+
+    # Placing the tapped-hole views creates generic Hole Wizard callouts before
+    # model-item curation runs.  The native hole table below owns every thread,
+    # drill, and depth requirement, so remove these duplicate leaders before
+    # they can cover the table's D rows.
+    removed_tap_notes = remove_notes_matching(adapter, "Tapped Hole")
+    _telemetry.info(
+        f"removed {removed_tap_notes} redundant automatic tapped-hole note(s)"
+    )
 
     curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
     curate_view_dimensions(adapter, side, keep=SIDE_KEEP, view_label="side")

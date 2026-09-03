@@ -167,18 +167,20 @@ def test_running_bore_and_cam_track_carry_the_two_finish_symbols() -> None:
     assert 'control=surface_finish_by_key(SURFACE_FINISHES, "cam_track")' in source
 
 
-def test_leaders_are_radial_and_on_opposite_quadrants() -> None:
+def test_finish_symbols_have_a_dedicated_column_outside_the_gear() -> None:
     cx, cy = drawing.FRONT_CENTER
     bore_text = drawing.FRONT_KEEP["BoreDia"]
     assert bore_text[0] < cx and bore_text[1] > cy  # upper-left
     bore_ra = drawing.BORE_FINISH_SYMBOL
-    assert bore_ra[0] < cx and bore_ra[1] < cy  # lower-left
     cam_ra = drawing.CAM_FINISH_SYMBOL
-    assert cam_ra[0] < cx and cam_ra[1] < cy  # left, below the cam's lower-left vertex
-    assert cam_ra[1] > bore_ra[1]
+    gear_left = cx - spec.OUTSIDE_DIA / 2000.0
+    assert bore_ra[0] < gear_left - 0.025
+    assert cam_ra[0] < gear_left - 0.025
+    assert bore_ra[1] < cy < cam_ra[1]
+    assert cam_ra[1] - bore_ra[1] >= 0.050
     for name in ("CamDia", "CamOffset"):
         assert drawing.FRONT_KEEP[name][0] > cx  # right
-    # Everything stays clear of the A-A cut line at x = cx.
+    # Symbols and dimensions stay clear of the A-A cut line at x = cx.
     for x, _y in (*drawing.FRONT_KEEP.values(), bore_ra, cam_ra):
         assert abs(x - cx) >= 0.030
 

@@ -41,6 +41,7 @@ from _drawing_common import (
     curate_view_dimensions,
     finalize_drawing,
     insert_hole_table,
+    import_cosmetic_threads,
     new_project_drawing,
     read_required_properties,
     set_hidden_lines_removed,
@@ -65,7 +66,6 @@ from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
-    remove_notes_matching,
     view_name,
 )
 
@@ -159,6 +159,54 @@ CHAMFER_CALLOUT_TEXT = f"CHAMFER {CHAMFER:.2f} X 45 DEG\nWINDOW RIM, BOTH SIDES"
 
 # 9/16-12 tap drill (the modeled hole) — the edge pick must land ON the rim.
 _TAP_DRILL_DIA_MM = 12.30376
+
+# SolidWorks imports this leaderless Hole Wizard description with the front
+# view.  Keep it inside the otherwise empty cavity, away from the window's
+# lower edge, the dimension lanes, and the A-A cutting-plane line.
+TAP_NOTE_XY = (0.048, 0.205)
+
+
+def _move_thread_callout(
+    adapter: Any,
+    view: Any,
+    *,
+    keyword: str,
+    xy: tuple[float, float],
+    label: str,
+) -> None:
+    """Move a cosmetic-thread callout note without changing its text."""
+    view = _sw_type_info.early_bound_or_flag(view, "IView", "GetFirstCThread")
+    thread = adapter._attempt(lambda: view.GetFirstCThread(), default=None)
+    moved = False
+    while thread is not None:
+        thread = _sw_type_info.early_bound_or_flag(
+            thread, "ICThread", "ThreadCallout", "GetNext"
+        )
+        note = adapter._attempt(lambda t=thread: t.ThreadCallout, default=None)
+        if note is not None:
+            note = _sw_type_info.early_bound_or_flag(
+                note, "INote", "GetText", "GetAnnotation"
+            )
+            text = str(
+                adapter._attempt(lambda n=note: n.GetText(), default="") or ""
+            )
+            if keyword.lower() in text.lower():
+                annotation = _sw_type_info.early_bound_or_flag(
+                    note.GetAnnotation(), "IAnnotation", "SetPosition2", "GetPosition"
+                )
+                if not annotation.SetPosition2(xy[0], xy[1], 0.0):
+                    raise RuntimeError(f"failed to move {label}")
+                actual = tuple(annotation.GetPosition() or ())
+                if (
+                    len(actual) < 2
+                    or max(abs(actual[i] - xy[i]) for i in range(2)) > 0.0005
+                ):
+                    raise RuntimeError(f"{label} did not persist at {xy}: {actual}")
+                moved = True
+        thread = adapter._attempt(lambda t=thread: t.GetNext(), default=None)
+    if not moved:
+        raise RuntimeError(f"{label} cosmetic-thread note was not found")
+    adapter.currentModel.EditRebuild3()
 
 
 def _front_xy(x_mm: float, y_mm: float) -> tuple[float, float]:
@@ -289,10 +337,6 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, right, bottom):
         set_hidden_lines_visible(adapter, view)
     set_hidden_lines_removed(adapter, iso)
-    removed_thread_notes = remove_notes_matching(adapter, "9/16-12")
-    _telemetry.info(
-        f"removed {removed_thread_notes} redundant automatic thread note(s)"
-    )
 
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
     curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
@@ -435,6 +479,14 @@ async def build(adapter: Any) -> dict[str, str]:
     # bound is the 12.7 mm zone margin (~0.0127), which the re-centred frame rule
     # now matches (~0.0126); 0.020 clears both, and the audit enforces it.
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
+    import_cosmetic_threads(adapter, front)
+    _move_thread_callout(
+        adapter,
+        front,
+        keyword="Tapped Hole",
+        xy=TAP_NOTE_XY,
+        label="9/16-12 tapped-hole callout",
+    )
 
     return await finalize_drawing(
         adapter,

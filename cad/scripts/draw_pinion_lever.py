@@ -82,9 +82,9 @@ FRONT_BBOX_CY = (ROD_LEN - HUB_OD / 2.0) / 2.0
 # At 1:1 the full 86 mm rod leaves enough room for the hub callouts without
 # crowding the orthographic views.
 FRONT_CENTER = (0.078, 0.170)
-# The section's bore-depth callout is ~67 mm wide, centred on the hub: keep
-# its box clear of the front view's half-angle callout (ends near x 0.165).
-SECTION_CENTER = (0.205, 0.185)
+# Shift the long axial section right of the front-view half-angle note.  Its
+# left edge now clears that note instead of sharing the upper-centre text band.
+SECTION_CENTER = (0.240, 0.185)
 # Top view (XZ, looking down the grip): the hub square with the crown up
 # (SolidWorks' *Top puts model +Z down the sheet).  bbox z runs
 # -(HUB_LEN/2 + CAP_SAG)..HUB_LEN/2.
@@ -122,18 +122,18 @@ FRONT_KEEP = {
 TOP_KEEP = {"CapR": (0.318, 0.158)}
 # Section: parametric name -> (up, along +Z) offsets in metres from the
 # projected model origin (the hub centre).  The section's mirror is
-# SolidWorks' choice, so the positions are derived at build time from the
-# projected axes (``_section_frame``): "up" is whichever of +/-Y points up the
-# sheet (the rod side), +Z runs from the crown to the flat end.  The bore
-# depth hangs under the hub (the rod is above it); the two (REF) sizes stack
-# above on the crown side, clear of the rod; the section label is parked
-# under the bore depth.
+# SolidWorks' choice, so positions are derived at build time from the projected
+# axes (``_section_frame``): "up" is whichever of +/-Y points up the sheet,
+# +Z runs from the crown to the flat end.  Bore depth has its own lower lane;
+# the two (REF) sizes use widely separated upper lanes; and the section label
+# is lower still.  This keeps every two-line machining note off the rod-angle
+# callout, section outline, and neighboring note.
 SECTION_KEEP = {
-    "BoreDepth": (-0.018, 0.001),
-    "EndWall": (0.016, -0.016),
-    "CapSagDim": (0.024, -0.018),
+    "BoreDepth": (-0.024, 0.010),
+    "EndWall": (0.022, -0.012),
+    "CapSagDim": (0.038, -0.020),
 }
-SECTION_LABEL_OFFSET = (-0.030, -0.006)
+SECTION_LABEL_OFFSET = (-0.045, 0.000)
 # Process only; every band rides its model dimension (build_pinion_lever).
 DIMENSION_CALLOUTS = {
     "HubBore": "BORE",

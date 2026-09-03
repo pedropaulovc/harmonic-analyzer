@@ -40,6 +40,7 @@ from _drawing_common import (
     finalize_drawing,
     find_edge_near,
     model_point_in_view,
+    remove_notes_matching,
     new_project_drawing,
     read_required_properties,
     set_arc_endpoints_to_center,
@@ -250,6 +251,13 @@ async def build(adapter: Any) -> dict[str, str]:
     # square rod channel through the block and the tapped hole in the strap.
     for view in (front, top):
         set_hidden_lines_visible(adapter, view)
+    # Hole Wizard contributes a redundant generic "#6-32 Tapped Hole" note at
+    # the strap top.  The native callout below is complete; remove the generic
+    # note instead of letting the 8.50 and 5.00 dimension lanes cross its text.
+    removed_tap_notes = remove_notes_matching(adapter, "Tapped Hole")
+    _telemetry.info(
+        f"removed {removed_tap_notes} redundant automatic tapped-hole note(s)"
+    )
 
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
     curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")

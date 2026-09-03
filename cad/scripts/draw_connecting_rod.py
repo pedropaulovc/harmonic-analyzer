@@ -67,7 +67,6 @@ from connecting_rod_spec import (
     HEAD_WIDTH,
     PIN_HOLE_DIA,
     RING_BORE_DIA,
-    RING_BORE_DIA_BAND,
     RING_BOTTOM_Y,
     RING_OUTER_RADIUS,
     RING_THICKNESS,
@@ -105,11 +104,13 @@ FRONT_CENTER = (0.180, 0.135)
 LEFT_CENTER = (0.080, 0.171)  # stepped-thickness profile, inside the top zone
 ISO_CENTER = (0.385, 0.200)
 
-# Details: the ring at 2:1 in the field right of the front view, the head at
-# 3:1 above it, the thickness step at 3:1 left of the left view.
+# Details: the ring at 2:1 in the field right of the front view, lifted enough
+# that its generated DETAIL A / SCALE 2:1 caption clears the title block; the
+# head at 3:1 above-right of it; the thickness step at 3:1 left of the left
+# view.  The small diagonal separation between A and B retains both outlines.
 RING_DETAIL_SCALE = (2, 1)
 RING_DETAIL_MODEL_RADIUS = 24.0  # encloses the ring and the shank's root
-RING_DETAIL_CENTER = (0.290, 0.120)
+RING_DETAIL_CENTER = (0.250, 0.170)
 HEAD_DETAIL_SCALE = (3, 1)
 HEAD_DETAIL_MODEL_CY = 160.0
 HEAD_DETAIL_MODEL_RADIUS = 8.0  # shoulder root (155.0) to crown top (165.5)
@@ -141,10 +142,10 @@ def _left_xy(mz: float, my: float) -> tuple[float, float]:
 
 # These sketch dimensions are unavailable in a derived detail view. Keep the
 # useful enlarged ring geometry and render the part-owned manufacturing sizes
-# adjacent to it.
+# beside it, between DETAIL A and the pictorial rather than over DETAIL B.
 RING_GEOMETRY_NOTE_XY = (
     RING_DETAIL_CENTER[0] + RING_DETAIL_MODEL_RADIUS * 2.0 / 1000.0 + 0.007,
-    RING_DETAIL_CENTER[1] + 0.040,
+    RING_DETAIL_CENTER[1] + 0.010,
 )
 
 # DETAIL B's derived view likewise exposes no stable selectable edges on this

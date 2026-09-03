@@ -244,7 +244,9 @@ def test_details_carry_the_ring_head_and_thickness_step() -> None:
         assert f'label="{obsolete_label}"' not in source, obsolete_label
     assert source.count("set_arc_endpoints_to_max(") == 1
     assert "add_attached_note(" not in source
-    # The details stand clear of the title block and of each other.
+    # The detail geometry and generated captions stand clear of the title
+    # block. A and B are diagonally separated rather than forced into one
+    # vertical column.
     for center, model_radius, scale in (
         (drawing.RING_DETAIL_CENTER, drawing.RING_DETAIL_MODEL_RADIUS, 2.0),
         (drawing.HEAD_DETAIL_CENTER, drawing.HEAD_DETAIL_MODEL_RADIUS, 3.0),
@@ -253,10 +255,14 @@ def test_details_carry_the_ring_head_and_thickness_step() -> None:
         radius = model_radius * scale / 1000.0
         assert center[1] - radius > 0.066 or center[0] + radius < 0.217
         assert center[0] - radius > 0.013
-    assert (
-        drawing.HEAD_DETAIL_CENTER[1] - drawing.HEAD_DETAIL_MODEL_RADIUS * 0.003
-        > drawing.RING_DETAIL_CENTER[1] + drawing.RING_DETAIL_MODEL_RADIUS * 0.002
-    )
+    ring_radius = drawing.RING_DETAIL_MODEL_RADIUS * 0.002
+    head_radius = drawing.HEAD_DETAIL_MODEL_RADIUS * 0.003
+    dx = drawing.HEAD_DETAIL_CENTER[0] - drawing.RING_DETAIL_CENTER[0]
+    dy = drawing.HEAD_DETAIL_CENTER[1] - drawing.RING_DETAIL_CENTER[1]
+    assert dx * dx + dy * dy > (ring_radius + head_radius) ** 2
+    # Detail A's two-line generated caption has a conservative 40 mm strip
+    # below the circular outline and still clears the title-block top.
+    assert drawing.RING_DETAIL_CENTER[1] - ring_radius - 0.040 > 0.066
 
 
 def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:

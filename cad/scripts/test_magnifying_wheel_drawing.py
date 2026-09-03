@@ -169,10 +169,18 @@ def test_axial_facts_are_cut_edges_in_section_a_a() -> None:
     assert drawing.SECTION_LINE[0][0] < drawing.FRONT_CENTER[0] - drawing._RIM_R
     assert drawing.SECTION_LINE[1][0] > drawing.FRONT_CENTER[0] + drawing._RIM_R
     # The strip sits under the face, clear of the title block (x > ~0.218,
-    # y < 0.070) and its label is parked under the strip's dimensions.
+    # y < 0.070).  Its label sits to the right of the 4.00/10.00 dimension
+    # lanes and is found through the single-note fallback when GetNotes is empty.
     assert drawing.SECTION_CENTER[1] < drawing.FRONT_CENTER[1] - drawing._RIM_R
     assert drawing.SECTION_CENTER[0] + drawing._RIM_R < 0.218
     assert drawing.SECTION_LABEL_XY[1] < drawing.SECTION_CENTER[1] - 0.025
+    assert drawing.SECTION_LABEL_XY[0] >= drawing.SECTION_CENTER[0] + 0.050
+    assert "view.GetFirstNote2()" in source
+    # The bore's three-line nominal/H7/process stack clears the cutting plane.
+    assert (
+        drawing.FRONT_CENTER[1] - drawing.FRONT_KEEP["BoreDiaDim"][1]
+        >= 0.025
+    )
     assert drawing.SECTION_KEEP == {}
     # Every face diameter leader ends on its circumference (arrows outside).
     assert "_leaders_to_circumference(" in source

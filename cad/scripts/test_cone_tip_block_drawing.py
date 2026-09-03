@@ -103,6 +103,11 @@ def test_adjuster_tap_has_a_native_callout_on_its_entry_face() -> None:
     assert TAP_DRILL_MM[cone_tip_block_spec.ADJUSTER_THREAD] == 6.528
     # The automatic "5/16-18 Tapped Hole" note duplicates it and is removed.
     assert 'remove_notes_matching(adapter, "Tapped Hole")' in source
+    assert source.index('view_label="front"') < source.index(
+        'remove_notes_matching(adapter, "Tapped Hole")'
+    )
+    assert drawing.TAP_CALLOUT_XY[0] > drawing.FRONT_CENTER[0] + 0.060
+    assert drawing.TAP_CALLOUT_XY[1] > drawing.AXIS_LOCATION_Y + 0.025
 
 
 def test_every_hole_axis_is_located_from_a_drawn_face() -> None:

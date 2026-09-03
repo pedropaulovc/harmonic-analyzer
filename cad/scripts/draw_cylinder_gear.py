@@ -114,10 +114,11 @@ KERF_DISPLAY_NOTE = KERF_CALLOUT.replace(", 3.0", "\n3.0").replace(
 )
 KERF_NOTE_XY = (0.325, 0.120)
 
-# Front-view marked dimensions. The bore callout sits upper-left so its leader
-# lands on the bore's upper-left; the two roughness symbols take the lower-left
-# and left so every leader is radial and none crosses another (rule 8). The
-# cam diameter and its 8.640 offset from the bore go to the right.
+# Front-view marked dimensions. The bore callout sits upper-left. The two
+# native roughness symbols occupy their own left-hand column, fully outside
+# the toothed outline; their long bent leaders may enter the view, but the
+# oversized symbol graphics and Ra text may not cover the bore, cam, section
+# arrows, or dimensions. The cam diameter and its 8.640 offset remain right.
 FRONT_KEEP = {
     "BoreDia": (FRONT_CENTER[0] - 0.055, FRONT_CENTER[1] + 0.042),
     "CamDia": (FRONT_CENTER[0] + 0.055, FRONT_CENTER[1] + 0.030),
@@ -128,8 +129,8 @@ FRONT_KEEP = {
 # decimals on the bore and cam offset say "hold it".
 DIMENSION_CALLOUTS = {"BoreDia": "REAM THRU"}
 DIMENSION_PRECISION = {"BoreDia": 3, "CamOffset": 3, "CamDia": 2}
-BORE_FINISH_SYMBOL = (FRONT_CENTER[0] - 0.030, FRONT_CENTER[1] - 0.055)
-CAM_FINISH_SYMBOL = (FRONT_CENTER[0] - 0.052, FRONT_CENTER[1] - 0.012)
+BORE_FINISH_SYMBOL = (0.135, 0.128)
+CAM_FINISH_SYMBOL = (0.135, 0.182)
 
 
 async def build(adapter: Any) -> dict[str, str]:

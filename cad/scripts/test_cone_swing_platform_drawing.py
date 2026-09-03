@@ -140,23 +140,18 @@ def test_manufacturing_notes_orient_the_reader_and_carry_no_dimension() -> None:
     assert 'adapter, "Manufacturing Notes", *NOTES_XY, char_height=0.0025' in source
 
 
-def test_axis_centerline_and_controls_come_from_the_model() -> None:
+def test_plan_controls_come_from_model_edges_without_sheet_owned_stray_geometry() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "_add_cone_axis_centerline(adapter, top)" in source
-    assert "view.ModelToViewTransform" in source
+    assert "_add_cone_axis_centerline" not in source
+    assert "CreateCenterLine" not in source
+    assert "drawing.EditSheet()" not in source
     assert "view.GetVisibleEntities2" in source
     assert "blind_cut_dia_mm(PIVOT_HOLE_SPEC)" in source
     assert "curve.CircleParams" in source
-    assert "pivot_centers" in source
-    assert "view.GetOutline()" in source
-    assert "projected pivot center" in source
-    assert "drawing.EditSheet()" in source
-    assert "drawing.EditSketch()" not in source
     assert (
         "pivot_edge, west_edge, east_edge = _visible_plan_controls(adapter, top)"
         in source
     )
-
 
 def test_hole_callouts_state_size_and_process() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
@@ -168,6 +163,9 @@ def test_hole_callouts_state_size_and_process() -> None:
     assert source.count("add_native_hole_callout(") == 2
     assert 'label="v2 post-mount tapped holes"' in source and "edge=west_edge" in source
     assert 'remove_notes_matching(adapter, "Tapped Hole")' in source
+    assert source.index('view_label="top"') < source.index(
+        'remove_notes_matching(adapter, "Tapped Hole")'
+    )
     # No hole table: it anchors only on a vertex, and the pivot is a hole.
     assert "insert_hole_table" not in source
 
@@ -312,6 +310,8 @@ def test_plan_layout_stays_inside_the_sheet_zones() -> None:
     assert drawing.TOP_KEEP["PlateLenDim"][0] >= 0.020  # inside the frame margin
     assert drawing.TOP_KEEP["WestTaperDx"][1] < drawing._NORTH_Y
     assert drawing.MOUNT_CALLOUT_XY[0] > drawing.WEST_STATION_TEXT_XY[0]
+    assert drawing.MOUNT_CALLOUT_XY[1] > drawing.TOP_KEEP["CornerSER"][1]
+    assert drawing.TOP_KEEP["CapEDia"][0] > drawing._SW[0]
     assert cone_swing_platform_spec.PLAN_VIEW_NOTE == "PLAN VIEW SCALE 1:2"
     assert cone_swing_platform_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:3"
     assert cone_swing_platform_spec.END_VIEW_NOTE == "END VIEW SCALE 1:2"

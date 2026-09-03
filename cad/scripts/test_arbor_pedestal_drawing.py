@@ -189,6 +189,10 @@ def test_print_carries_no_gdt_or_basic_dimensions_and_one_running_ra() -> None:
     assert drawing.SURFACE_FINISHES[0].roughness_ra == _surface_finish.MACHINED
     assert 'surface_finish_by_key(SURFACE_FINISHES, "arbor_bore")' in source
     assert "leader_attach_xy=(FRONT_CENTER[0], _front_y(BORE_HEIGHT) - _bore_r)" in source
+    # Keep the native symbol body right of the elevation and at least 20 mm
+    # below the Ø20/strap callout text.
+    assert drawing.FINISH_SYMBOL_XY[0] > drawing.FRONT_CENTER[0] + drawing.TOP_RADIUS * drawing._S
+    assert drawing.FINISH_SYMBOL_XY[1] <= drawing.FRONT_KEEP["DomeDia"][1] - 0.020
     # The bore, hold-down, strap and overall locations survive as ordinary
     # entity-selected dimensions (five calls plus the helper).
     assert source.count("_add_entity_dimension(") == 6

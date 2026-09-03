@@ -95,6 +95,9 @@ def test_hanger_hole_has_a_native_callout_and_two_stations() -> None:
     assert 'label="hanger-screw top station"' in source
     assert 'label="hanger-screw corner station"' in source
     assert "auto_center_marks(adapter, front" in source
+    # SolidWorks' generic top-of-strap note is redundant with the native
+    # callout and would otherwise be crossed by the 8.50 / 5.00 lanes.
+    assert 'remove_notes_matching(adapter, "Tapped Hole")' in source
 
 
 def test_block_strap_and_channel_facts_are_dimensions_on_the_top_view() -> None:

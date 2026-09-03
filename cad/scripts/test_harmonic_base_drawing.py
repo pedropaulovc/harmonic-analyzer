@@ -158,7 +158,7 @@ def test_notes_are_few_specific_and_never_a_dimension() -> None:
         assert banned not in notes, banned
     source = _source()
     assert 'adapter, "Manufacturing Notes", 0.016, 0.075, char_height=0.0025' in source
-    assert drawing.SIDE_VIEW_NOTE_XY == (0.260, 0.098)
+    assert drawing.SIDE_VIEW_NOTE_XY == (0.060, 0.046)
     assert 'add_property_linked_note(adapter, "Side View Note", *SIDE_VIEW_NOTE_XY)' in source
 
 
@@ -193,15 +193,15 @@ def test_hole_table_is_native_and_anchored_on_the_virtual_corner() -> None:
     assert "counterbore rims reported in the plan view" in source
     assert "underside-only counterbore rims are visible" not in source
 
-def test_curated_views_make_final_note_cleanup_a_zero_tolerance_guard() -> None:
+def test_automatic_tap_notes_are_removed_before_final_guard() -> None:
     source = _source()
-    # Each view's model-item curation immediately deletes unnamed automatic
-    # Hole Wizard callouts, so there are no five "Tapped Hole" notes left for
-    # finalization.  The matcher remains with finalize_drawing's default
-    # expected count of zero, making any future leaked callout fail loud.
+    # View placement creates duplicate generic Hole Wizard leaders.  Remove
+    # those before curation/table insertion; the final matcher remains a
+    # zero-tolerance guard so any later leaked callout still fails loud.
     assert "curate_view_dimensions(adapter, top, keep=TOP_KEEP" in source
     assert "curate_view_dimensions(adapter, side, keep=SIDE_KEEP" in source
     assert 'redundant_note_substrings=("Tapped Hole",)' in source
+    assert 'remove_notes_matching(adapter, "Tapped Hole")' in source
     assert "expected_redundant_notes" not in source
 
 
@@ -226,7 +226,7 @@ def test_hole_table_covers_mounting_holes_and_every_hardware_seat() -> None:
     assert '"*Front"' in source
     assert len(drawing.TOP_KEEP) == 4
     assert drawing._plan_xy(0.0, 10.0)[1] < drawing.TOP_CENTER[1]
-    assert drawing.HOLE_TABLE_ANCHOR[0] >= 0.274
+    assert drawing.HOLE_TABLE_ANCHOR == (0.274, 0.265)
 
 
 def test_plan_view_clears_top_border_and_lower_notes() -> None:
@@ -276,22 +276,32 @@ def test_rim_reveal_heights_and_radii_are_drawing_annotations() -> None:
     # Rim width and reveal chained on one line above the plan's NE corner.
     assert drawing.RIM_WIDTH_TEXT_XY == (0.229, 0.2360)
     assert drawing.REVEAL_TEXT_XY == (0.2515, 0.2360)
-    assert drawing.OVERALL_TEXT_XY == (0.264, 0.0745)
+    assert drawing.OVERALL_TEXT_XY == (0.064, 0.0305)
     assert drawing.DECK_DEPTH_NOTE_XY == (
         drawing.SIDE_CENTER[0],
         drawing.SIDE_VIEW_NOTE_XY[1],
     )
+    # The elevation and all its annotations occupy the strip below the notes,
+    # wholly left of the title block (which begins at x ~= 0.218).  Its two
+    # captions sit above the geometry instead of crossing it.
+    side_half_width = harmonic_base_spec.BOTTOM_LENGTH * drawing.SIDE_SCALE / 2000.0
+    side_half_height = harmonic_base_spec.RIM_TOP * drawing.SIDE_SCALE / 2000.0
+    assert drawing.SIDE_CENTER == (0.145, 0.031)
+    assert drawing.SIDE_CENTER[0] + side_half_width < 0.218
+    assert drawing.SIDE_CENTER[1] - side_half_height > 0.010
+    assert drawing.SIDE_CENTER[1] + side_half_height < drawing.SIDE_VIEW_NOTE_XY[1]
+    assert drawing.OVERALL_TEXT_XY[0] < drawing.SIDE_CENTER[0] - side_half_width
     # No pick relies on a tangent edge: the reveal reads off the chamfers'
     # lower edges in the plan, not the end faces' fillet boundaries.
     assert 'label="flange right edge"' in source
     assert "flange left end" not in source
     # Elevation thickness stack on the left, thinnest nearest the view.
-    assert drawing.SIDE_KEEP["FlangeT"][0] == 0.280
-    assert drawing.SIDE_KEEP["PadT"][0] == 0.272
-    assert abs(drawing.SIDE_KEEP["FlangeT"][1] - 0.069925) < 1e-9
-    assert abs(drawing.SIDE_KEEP["PadT"][1] - 0.0790375) < 1e-9
+    assert drawing.SIDE_KEEP["FlangeT"][0] == 0.080
+    assert drawing.SIDE_KEEP["PadT"][0] == 0.072
+    assert abs(drawing.SIDE_KEEP["FlangeT"][1] - 0.025925) < 1e-9
+    assert abs(drawing.SIDE_KEEP["PadT"][1] - 0.0350375) < 1e-9
     assert drawing.SIDE_BBOX_MID_Y == 26.65
-    assert abs(drawing._side_xy(0.0, 0.0)[1] - 0.0683375) < 1e-9
+    assert abs(drawing._side_xy(0.0, 0.0)[1] - 0.0243375) < 1e-9
 
 
 def test_blind_taps_have_drill_and_tap_runout_clearance() -> None:

@@ -114,8 +114,10 @@ DIMENSION_CALLOUTS = {
 DIMENSION_PRECISION = {"PassageZ": 2, "BlockHt": 2}
 
 # Tap callout (front view = the north face the tap enters) and pinch flag note
-# (right view = the +X face the pinch is drilled from).
-TAP_CALLOUT_XY = (0.150, 0.215)
+# (right view = the +X face the pinch is drilled from).  The tap's multi-line
+# countersink/thread/depth block gets the open field between plan and right
+# views instead of stacking on the front-view axis dimensions.
+TAP_CALLOUT_XY = (0.175, 0.245)
 PINCH_NOTE_XY = (0.228, 0.205)
 # Hole-axis locations: the pinch from a depth face in the right view, the
 # passage/slit axis from a side face in the front view, both above the block.
@@ -309,13 +311,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # pinch bore into the slit.
     for view in (front, top, right):
         set_hidden_lines_visible(adapter, view)
-    # SolidWorks auto-inserts a generic "<thread> Tapped Hole" note per Hole
-    # Wizard tap normal to a placed view; the native callouts replace them
-    # (draw_top_frame idiom).
-    removed_tap_notes = remove_notes_matching(adapter, "Tapped Hole")
-    _telemetry.info(
-        f"removed {removed_tap_notes} redundant automatic tapped-hole note(s)"
-    )
 
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
@@ -333,6 +328,13 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_dimension_precision(
         adapter, [*front_annotations, *right_annotations], DIMENSION_PRECISION
+    )
+    # SolidWorks auto-inserts a generic "<thread> Tapped Hole" note per Hole
+    # Wizard tap normal to a placed view; the native callouts replace them
+    # (draw_top_frame idiom).
+    removed_tap_notes = remove_notes_matching(adapter, "Tapped Hole")
+    _telemetry.info(
+        f"removed {removed_tap_notes} redundant automatic tapped-hole note(s)"
     )
     for label, view in (("front", front), ("plan", top), ("right", right)):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):

@@ -60,7 +60,16 @@ def test_top_level_package_forwards_domain_instructions(monkeypatch) -> None:
     assert captured["source"] == spec.source
     assert captured["outputs"] == drawing.OUTPUTS
     assert captured["sheet_scale"] == (1.0, 7.0)
-    assert captured["reference_scale"] == (1.0, 16.0)
+    assert captured["layout"] is drawing.LAYOUT
+    assert drawing.LAYOUT == drawing.AssemblyDrawingLayout(
+        working_scale=(1.0, 8.0),
+        exploded_scale=(1.0, 24.0),
+        procedure_scale=(1.0, 12.0),
+        reference_scale=(1.0, 22.0),
+        working_front_center=(0.100, 0.167),
+        working_right_center=(0.275, 0.167),
+        exploded_center=(0.130, 0.175),
+    )
     assert captured["assembly_steps"] is drawing.ASSEMBLY_STEPS
     assert captured["critical_checks"] is drawing.CRITICAL_CHECKS
     assert captured["hardware_notes"] is drawing.HARDWARE_NOTES

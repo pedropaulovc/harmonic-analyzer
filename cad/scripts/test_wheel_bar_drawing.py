@@ -156,6 +156,12 @@ def test_transverse_hole_station_locates_the_common_axis() -> None:
     assert drawing.BOTTOM_EDGE_PICK[0] > drawing.LEFT_END
     # Nearest lane inside the section height's lane; both left of the end.
     assert drawing.LEFT_END > drawing.TRANSVERSE_STATION_TEXT_XY[0] > drawing.FRONT_KEEP["Side"][0]
+    # The rendered 10.00 text extends left of its lane, but not through the
+    # printable frame. The external Maker watermark is intentionally irrelevant.
+    assert (
+        drawing.FRONT_KEEP["Side"][0] - drawing.SIDE_TEXT_LEFT_EXTENT
+        > drawing.PRINTABLE_LEFT_X
+    )
     assert drawing.FRONT_KEEP["Side"][1] > drawing.FRONT_CENTER[1] + 0.008
     assert drawing.TRANSVERSE_STATION_TEXT_XY[1] < drawing.FRONT_CENTER[1]
 

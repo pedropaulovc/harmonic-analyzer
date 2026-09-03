@@ -65,6 +65,9 @@ def test_tip_lands_remain_visible_without_brittle_detail_dimension_imports() -> 
     assert 0.0 < drawing.SIDE_DIAMETER_STATIONS_MM["Sec0Dia"] < ends[0]
     assert ends[0] < drawing.SIDE_DIAMETER_STATIONS_MM["Sec1Dia"] < ends[1]
     assert drawing.DETAIL_SCALE == (3, 1)
+    assert drawing.DETAIL_MODEL_CENTER_Z == ends[3]
+    assert ends[2] > drawing.DETAIL_MODEL_CENTER_Z - drawing.DETAIL_MODEL_RADIUS
+    assert ends[3] < drawing.DETAIL_MODEL_CENTER_Z + drawing.DETAIL_MODEL_RADIUS
     assert drawing.TIP_LANDS_NOTE.startswith("DETAIL A TIP LANDS\n")
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'detail_label="A"' in source

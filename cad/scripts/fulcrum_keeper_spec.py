@@ -80,15 +80,19 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BoreProfile": {"BoreDia"},
 }
 
-# Flagged from the socket rim in the lug end view: the complete concentric
-# feature sequence stays with the circles it governs.  The seat and ream bands
-# remain on their model dimensions; the flag supplies the actual ball size and
-# the order that cannot be inferred from the finished views.
+# Flagged from the socket rim in the axial section: the complete concentric
+# feature sequence stays with the cut edges it governs.  Keep the lines short
+# enough to live in the clear lane left of section A-A; one long three-line
+# paragraph overprinted both itself and the title block.
 BALL_CALLOUT = "\n".join(
     (
-        "BORE BALL SEAT THRU ON THE SHAFT AXIS;",
-        f"PRESS Ø{BALL_DIA:.3f} HARDENED STEEL BALL, CENTRED;",
-        "REAM SHAFT BORE THRU AFTER PRESSING.",
+        "BORE BALL SEAT THRU",
+        "ON THE SHAFT AXIS;",
+        f"PRESS Ø{BALL_DIA:.3f}",
+        "HARDENED STEEL BALL,",
+        "CENTRED;",
+        "REAM SHAFT BORE THRU",
+        "AFTER PRESSING.",
     )
 )
 

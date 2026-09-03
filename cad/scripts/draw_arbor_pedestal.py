@@ -122,9 +122,10 @@ BORE_OFFSET_TEXT_Y = _front_y(0.0) - 0.010
 # Strap thickness (rear face flush with the foot): right of the plan, inside
 # the foot-depth dimension.
 STRAP_TEXT_XY = (TOP_CENTER[0] + 0.036, (_top_y(FOOT_DEPTH / 2.0 - STRAP_T) + _top_y(FOOT_DEPTH / 2.0)) / 2.0)
-# Roughness symbol below-right of the bore, its leader to the bore's bottom
-# so it passes under the head-diameter leader.
-FINISH_SYMBOL_XY = (0.150, 0.140)
+# Roughness symbol below-right of the elevation.  Its bore-bottom leader runs
+# beneath the head-diameter callout, while the symbol text stays in the open
+# field below both diameter callouts.
+FINISH_SYMBOL_XY = (0.160, 0.120)
 NOTES_XY = (0.020, 0.066)
 
 

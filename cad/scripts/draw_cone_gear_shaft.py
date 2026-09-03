@@ -44,7 +44,6 @@ from _surface_finish import surface_finish_by_key
 from cone_gear_shaft_notes import TIP_LANDS_NOTE
 from cone_gear_shaft_spec import (
     JOURNAL_DIA,
-    SECTION_DIA_BAND,
     SECTION_DIAS,
     SECTION_ENDS,
     SURFACE_FINISHES,
@@ -76,10 +75,12 @@ SIDE_CENTER = (0.155, 0.215)
 DETAIL_CENTER = (0.110, 0.098)
 ISO_CENTER = (0.360, 0.200)
 
-# DETAIL A boundary on the side view: centred on the axis at the middle of
-# the 1/8 in land, wide enough to take in the end of the 1/4 in land and 23
-# mm of the 1/32 in tip (model mm / metres on the 1:1 side view).
-DETAIL_MODEL_CENTER_Z = (SECTION_ENDS[2] + SECTION_ENDS[3]) / 2.0 + 7.0
+# DETAIL A boundary on the side view: centred on the shoulder between the
+# 1/8 in and 1/32 in lands.  Anchoring the detail circle on visible shoulder
+# geometry (rather than in the middle of the hairline tip) keeps SolidWorks
+# from producing an empty derived view while retaining the end of the 1/4 in
+# land and a useful length of the 1/32 in tip.
+DETAIL_MODEL_CENTER_Z = SECTION_ENDS[3]
 DETAIL_MODEL_RADIUS = 16.0
 DETAIL_RADIUS = DETAIL_MODEL_RADIUS * SHEET_SCALE[0] / 1000.0
 

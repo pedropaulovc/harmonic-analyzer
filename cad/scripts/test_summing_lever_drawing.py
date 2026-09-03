@@ -141,22 +141,40 @@ def test_print_keeps_only_the_allowlisted_spring_pattern_frame() -> None:
     assert 'label="knife-edge pivot axis"' in source
 
 
-def test_pattern_annotations_attach_to_distinct_holes() -> None:
-    # Every pattern annotation hangs off a DIFFERENT hole of the column so no
-    # leader crosses another leader or the basics' extension lines: end
-    # offset and pitch on the end hole, the frame on the third, the callout
-    # on the fifth; the row X runs to the hole at the OTHER end.
+def test_pattern_annotations_attach_to_separated_holes() -> None:
+    # End offset and pitch use the first two holes, the FCF attaches near the
+    # middle of the column, and the long #47 callout attaches near its own
+    # upper lane.  Short, disjoint leaders replace the former lower-end knot.
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "end_hole_up = -HOLE_Z_LAST" in source
     assert "top_hole_up = -HOLE_Z_FIRST" in source
-    assert (
-        "third_rim_top = _top_xy(HOLE_X, end_hole_up + 2.0 * CHANNEL_PITCH + HOLE_DIA / 2.0)"
-        in source
-    )
-    assert "fifth_rim_right = _top_xy(" in source
-    assert "HOLE_X + HOLE_DIA / 2.0, end_hole_up + 4.0 * CHANNEL_PITCH" in source
-    assert "edge_xy=third_rim_top" in source
-    assert "edge_xy=fifth_rim_right" in source
+    assert "ninth_rim_top = _top_xy(" in source
+    assert "end_hole_up + 8.0 * CHANNEL_PITCH + HOLE_DIA / 2.0" in source
+    assert "fifteenth_rim_right = _top_xy(" in source
+    assert "HOLE_X + HOLE_DIA / 2.0, end_hole_up + 14.0 * CHANNEL_PITCH" in source
+    assert "edge_xy=ninth_rim_top" in source
+    assert "edge_xy=fifteenth_rim_right" in source
+
+
+def test_lower_right_annotation_lanes_do_not_overlap() -> None:
+    # Measured envelopes from the generated sheet: the one-line #47 callout is
+    # about 68 mm wide, while the Ra body grows 39 mm right and 18 mm upward
+    # from the surface-symbol anchor.
+    callout_x, callout_y = drawing.SPRING_CALLOUT_XY
+    overall_x, overall_y = drawing.TOP_KEEP["PlateLength"]
+    assert callout_x + 0.034 < overall_x
+    assert callout_y > overall_y + 0.020
+
+    start_x, start_y = drawing.SPRING_START_DIM_XY
+    pitch_x, pitch_y = drawing.SPRING_PITCH_DIM_XY
+    frame_x, frame_y = drawing.SPRING_FCF_XY
+    finish_x, finish_y = drawing.KNIFE_FINISH_XY
+    assert pitch_x - start_x >= 0.020
+    assert pitch_y < frame_y - 0.020
+    assert frame_y < callout_y - 0.020
+    assert finish_x + 0.039 < overall_x
+    assert finish_y + 0.018 < start_y
+    assert start_x < frame_x < pitch_x < callout_x
 
 
 def test_station_origin_is_the_pivot_axis_with_a_centerline() -> None:
@@ -231,10 +249,11 @@ def test_knife_edge_keeps_its_finish_and_holes_state_the_process() -> None:
     assert source.count("add_native_hole_callout(") == 2
     assert 'process="#47 DRILL"' in source
     assert 'process="DRILL"' in source
-    # The seed callout sits in clear space above the title block (whose top
-    # rule is at y ~0.0645 for x >= 0.218) and left of the plate-length lane.
-    assert "callout_xy=(0.232, 0.126)" in source
-    assert drawing.TOP_KEEP["PlateLength"][0] > 0.232 + 0.030
+    # The seed callout has its own high lane, vertically clear of the 152.40
+    # overall text, and its measured 68 mm width ends left of that dimension.
+    assert drawing.SPRING_CALLOUT_XY == (0.231, 0.154)
+    assert drawing.SPRING_CALLOUT_XY[0] + 0.034 < drawing.TOP_KEEP["PlateLength"][0]
+    assert drawing.SPRING_CALLOUT_XY[1] > drawing.TOP_CENTER[1] + 0.020
 
 
 def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:

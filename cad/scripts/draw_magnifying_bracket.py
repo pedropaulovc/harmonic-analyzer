@@ -118,22 +118,21 @@ def _fy(model_y_mm: float) -> float:
     return FRONT_CENTER[1] + model_y_mm * VIEW_SCALE / 1000.0
 
 
-# Top view: the arm width under the arm's far end (nearest lane) with the
-# flange width outside it; the flange depth right of the arm; the two
-# far-edge stations from the collar axis left of the flange (the flange's
-# nearest, the arm's outside); the flange's far side from the axis above the
-# collar.
+# Top view: the arm-width callout needs a full two-line lane of its own;
+# the flange width sits 18 mm farther out.  The remaining stations stay on
+# their original sides of the view.
 TOP_KEEP = {
-    "ArmWidth": (_tx(0.0), _tz(ARM_Z[1]) - 0.008),
-    "FlangeWidth": (_tx((FLANGE_X[0] + FLANGE_X[1]) / 2.0), _tz(ARM_Z[1]) - 0.018),
+    "ArmWidth": (_tx(0.0), _tz(ARM_Z[1]) - 0.004),
+    "FlangeWidth": (_tx((FLANGE_X[0] + FLANGE_X[1]) / 2.0), _tz(ARM_Z[1]) - 0.022),
     "FlangeDepth": (_tx(ARM_HALF_X) + 0.012, _tz((FLANGE_Z[0] + FLANGE_Z[1]) / 2.0)),
     "FlangeCornerZ": (_tx(FLANGE_X[0]) - 0.012, _tz(FLANGE_Z[1] / 2.0)),
     "ArmCornerZ": (_tx(FLANGE_X[0]) - 0.024, _tz(ARM_Z[1] / 2.0)),
     "FlangeCornerX": (_tx(FLANGE_X[0] / 2.0), _tz(-COLLAR_OD / 2.0) + 0.010),
 }
-# Front view: the collar length above the collar.
+# Front view: park the two-line collar-length callout below the collar, away
+# from both plan-view width lanes and the 1.50 collar-to-arm dimension.
 FRONT_KEEP = {
-    "WallLen": (_fx(0.0), _fy(COLLAR_OD / 2.0) + 0.010),
+    "WallLen": (_fx(0.0), _fy(-COLLAR_OD / 2.0) - 0.010),
 }
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
 # The arm is exactly as wide as the collar is long (both 10), so the two
@@ -153,6 +152,7 @@ ARM_THICKNESS = ARM_Y[1] - ARM_Y[0]  # 7.5
 FLANGE_THICKNESS = FLANGE_Y[1] - FLANGE_Y[0]  # 5.08
 ARM_TOP_FROM_COLLAR_OD = COLLAR_OD / 2.0 - ARM_Y[1]  # 1.5
 ARM_THICKNESS_NOTE = f"ARM THICKNESS {ARM_THICKNESS:.2f}"
+ARM_TOP_DIMENSION_OFFSET = 0.004
 
 
 def _model_frame(adapter: Any, view: Any, *, scale: float, label: str):
@@ -355,7 +355,9 @@ async def build(adapter: Any) -> dict[str, str]:
             axis="y", label="arm top face",
         ),
         text_xy=_offset(
-            at_front(ARM_HALF_X, (COLLAR_OD / 2.0 + ARM_Y[1]) / 2.0, 0.0), front_x, 0.010
+            at_front(ARM_HALF_X, (COLLAR_OD / 2.0 + ARM_Y[1]) / 2.0, 0.0),
+            front_x,
+            ARM_TOP_DIMENSION_OFFSET,
         ),
         label="arm top face from collar OD",
         orientation="vertical",

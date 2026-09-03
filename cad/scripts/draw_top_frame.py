@@ -129,17 +129,17 @@ WEB_OUT_X = COLUMN_X + WEB_T / 2.0  # 203.35
 # Sheet layout (meters). The plan defines the profile and carries the hole
 # table; the front elevation makes the 36.5 rail band, the 47.3 boss stack,
 # the top flange, the spot-faced side-screw seats and their taps visible;
-# SECTION A-A (cut across the plan at z +50, clear of every hole, the hub
+# SECTION A-A (cut across the plan at z +36, clear of every hole, the hub
 # and its gussets) shows the rails' T-section for the web thickness.
 TOP_CENTER = (0.135, 0.175)
 FRONT_CENTER = (0.345, 0.130)
-SECTION_CUT_Z = 50.0
+SECTION_CUT_Z = 36.0
 SECTION_CENTER = (0.345, 0.099)
 # The cut line runs the plan's width on the sheet: from just inside the left
 # zone margin (the plan's outline at this height is the east rail at x 0.028)
-# to just past the west rail; the Depth dimension moved to the right flank,
-# clear of the line's end letters.
-SECTION_LINE = ((0.019, 0.150), (0.2485, 0.150))
+# to just past the west rail.  Raising it above the set-screw note keeps the
+# cutting plane readable; the Depth dimension remains on the right flank.
+SECTION_LINE = ((0.019, 0.157), (0.2485, 0.157))
 
 if not (
     HUB_GUSSET_HALF_OUT + GOOSENECK_Z + 1.0
@@ -213,12 +213,13 @@ DIMENSION_CALLOUTS = {
 # two outer rail edges.
 HOLE_TABLE_ANCHOR = (0.256, 0.250)
 TOP_VIEW_NOTE_XY = (0.262, 0.259)
-# The elevation's scale note sits left of it, under the boss-stack dimension.
-FRONT_VIEW_NOTE_XY = (0.250, 0.116)
+# The elevation's smaller scale note occupies the narrow lane between the
+# plan-depth dimension and side-tap callout.
+FRONT_VIEW_NOTE_XY = (0.264, 0.116)
 # Set-screw flag note, inside the east half-window, arrow on the gooseneck bore.
 SET_SCREW_NOTE_XY = (0.056, 0.152)
 # Side-tap Hole Wizard callout, between the elevation and the section.
-SIDE_TAP_CALLOUT_XY = (0.318, 0.114)
+SIDE_TAP_CALLOUT_XY = (0.326, 0.114)
 # Plan drawing dimensions: front rail width above the front rail (clear of
 # the Width dimension), crossbar width beside the crossbar in the west window.
 FR_RAIL_TEXT_XY = (_plan_xy(100.0, 0.0)[0], 0.2475)
@@ -486,14 +487,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # column bores through the bosses and the webbed panels' recesses.
     for view in (top, front):
         set_hidden_lines_visible(adapter, view)
-    # SolidWorks auto-inserts a generic "<thread> Tapped Hole" note per Hole
-    # Wizard tap normal to a placed view (the keeper taps in the plan, the
-    # side taps in the elevation); the hole table's SIZE column and the native
-    # callout replace them (draw_rocker_arm_support idiom).
-    removed_tap_notes = remove_notes_matching(adapter, "Tapped Hole")
-    _telemetry.info(
-        f"removed {removed_tap_notes} redundant automatic tapped-hole note(s)"
-    )
 
     top_annotations = curate_view_dimensions(
         adapter, top, keep=TOP_KEEP, view_label="top"
@@ -707,11 +700,24 @@ async def build(adapter: Any) -> dict[str, str]:
         orientation="horizontal",
     )
 
+    # Keep the process block below the plan's lowest boss, center marks and
+    # projected leaders instead of letting those lines strike through it.
     add_property_linked_note(
-        adapter, "Manufacturing Notes", 0.016, 0.102, char_height=0.0025
+        adapter, "Manufacturing Notes", 0.016, 0.090, char_height=0.0025
     )
     add_property_linked_note(adapter, "Top View Note", *TOP_VIEW_NOTE_XY)
-    add_property_linked_note(adapter, "Front View Note", *FRONT_VIEW_NOTE_XY)
+    add_property_linked_note(
+        adapter, "Front View Note", *FRONT_VIEW_NOTE_XY, char_height=0.0025
+    )
+
+    # Curating marked dimensions and inserting the hole table can materialize
+    # Hole Wizard's redundant descriptive notes after the views are placed.
+    # Remove them only after every annotation has been created so the table's
+    # A3/A4 rows cannot be overprinted by "#10-24 Tapped Hole".
+    removed_tap_notes = remove_notes_matching(adapter, "Tapped Hole")
+    _telemetry.info(
+        f"removed {removed_tap_notes} redundant automatic tapped-hole note(s)"
+    )
 
     return await finalize_drawing(
         adapter,

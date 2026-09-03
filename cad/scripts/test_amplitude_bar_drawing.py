@@ -193,6 +193,28 @@ def test_details_stand_clear_of_each_other_and_the_title_block() -> None:
     assert drawing.DETAIL_B_CENTER[0] - radius > drawing.RIGHT_CENTER[0]
 
 
+def test_detail_sources_and_authored_notes_use_separate_sheet_regions() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    # Detail source circles are projected from real model coordinates instead
+    # of assuming that SolidWorks centred each parent view on its bounding box.
+    assert "model_point_in_view(" in source
+    assert "_front_xy" not in source
+    assert "_right_xy" not in source
+
+    radius = drawing.DETAIL_MODEL_RADIUS * drawing._D / 1000.0
+    # The two upper feature notes sit above their respective detail outlines.
+    assert drawing.TOP_NOTCH_GEOMETRY_NOTE_XY[1] > drawing.DETAIL_A_CENTER[1] + radius
+    assert drawing.TOP_PIN_GEOMETRY_NOTE_XY[1] > drawing.DETAIL_C_CENTER[1] + radius
+    # The bottom-note block is right of DETAIL B and below DETAIL C.
+    assert drawing.BOTTOM_NOTCH_GEOMETRY_NOTE_XY[0] > drawing.DETAIL_B_CENTER[0] + radius
+    assert drawing.BOTTOM_NOTCH_GEOMETRY_NOTE_XY[1] < drawing.DETAIL_C_CENTER[1] - radius
+    # Captions remain above the title block and the long isometric caption is
+    # authored leftward rather than against the 418 mm right sheet border.
+    assert drawing.END_VIEW_NOTE_XY[1] > 0.065
+    assert drawing.ISOMETRIC_VIEW_NOTE_XY == (0.325, 0.088)
+    assert drawing.TOP_PIN_GEOMETRY_NOTE_XY[1] > drawing.ISO_CENTER[1] + 0.080
+
+
 def test_notes_are_few_specific_and_never_the_title_block() -> None:
     # Sizes, locations, the drill and the floor's Ra moved onto the details;
     # the notes keep the stock, the plating allowance, the notch orientation

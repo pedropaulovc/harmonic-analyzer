@@ -87,6 +87,18 @@ def test_set_screw_hole_is_dimensioned_where_it_is_visible() -> None:
     # Picks are projected through the view's own transform, scale-checked.
     assert "model_point_in_view(" in source
     assert source.count("= _model_frame(") == 2
+    # SolidWorks also emits a generic "#4-40 Tapped Hole" note on the front
+    # view.  It is redundant with the complete native bottom-view callout and
+    # must be removed before the front outline can cross it.
+    assert 'remove_notes_matching(adapter, "Tapped Hole")' in source
+    # The complete two-line callout is parked well right of the bottom view,
+    # with its anchor safely above the title-block top (~0.065 m).
+    bottom_right = (
+        drawing.BOTTOM_CENTER[0]
+        + drawing.OUTER_WIDTH * drawing.VIEW_SCALE / 2000.0
+    )
+    assert drawing.BOTTOM_CALLOUT_XY[0] >= bottom_right + 0.045
+    assert drawing.BOTTOM_CALLOUT_XY[1] >= 0.080
 
 
 def test_frame_thickness_is_a_real_dimension_on_the_right_view() -> None:

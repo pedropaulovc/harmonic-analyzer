@@ -91,7 +91,9 @@ SHAFT_FLANK_Y = RIGHT_CENTER[1] + SHAFT_DIA * SHEET_SCALE[0] / 2000.0
 # DETAIL B (4:1): the crown, circled on the side view around its root and
 # enlarged below-left, clear of the notes block (x<=0.12 at y~0.10..0.11) and
 # under the length dimensions (y>=0.170). At 4:1 the 8-dia crown is 32 mm
-# tall and the 1.2 sagitta reads as 4.8 mm.
+# tall and the 1.2 sagitta reads as 4.8 mm.  The source-circle radius leaves
+# more than the 12.7 mm zone margin once its activated-view sketch coordinates
+# are compensated in ``build``.
 DETAIL_CENTER = (0.160, 0.130)
 DETAIL_RADIUS = 0.008
 DETAIL_SCALE = (4, 1)
@@ -166,20 +168,30 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, right):
         set_hidden_lines_visible(adapter, view)
 
-    # The detail circle follows the crown root projected from the MODEL, not a
-    # sheet-coordinate guess. The overall reference note below selects no
-    # drawing geometry.
+    # SolidWorks creates a detail boundary in the activated view's sketch
+    # space, whose origin is the view centre rather than the projected model
+    # origin used by _sheet_to_view_sketch.  Compensate that origin delta here:
+    # after the common helper converts back to sketch space, the circle is
+    # rendered at the actual projected crown root instead of one half-length
+    # to its left (where it crossed the sheet border).
     crown_root = model_point_in_view(
         adapter, right, (0.0, 0.0, SHAFT_LEN / 1000.0), label="crown root"
+    )
+    model_origin = model_point_in_view(
+        adapter, right, (0.0, 0.0, 0.0), label="arbor model origin"
+    )
+    detail_source_center = (
+        crown_root[0] + model_origin[0] - RIGHT_CENTER[0],
+        crown_root[1] + model_origin[1] - RIGHT_CENTER[1],
     )
 
     # DETAIL B around the crown root, enlarged 4:1 (policy rule 7: a feature
     # too small to read legibly on the parent gets a detail). Its dimensions
     # are stated by the adjacent spec-derived note below.
-    detail = create_detail_view(
+    create_detail_view(
         adapter,
         right,
-        center=crown_root,
+        center=detail_source_center,
         radius=DETAIL_RADIUS,
         view_xy=DETAIL_CENTER,
         detail_label="B",

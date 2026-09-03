@@ -62,6 +62,23 @@ def test_sheet_runs_at_1_to_1_with_1_to_1_isometric() -> None:
     assert 'add_property_linked_note(adapter, "Isometric View Note", 0.320, 0.078)' in source
 
 
+def test_angle_end_wall_depth_and_section_label_use_distinct_lanes() -> None:
+    # The long section is shifted right of the front-view half-angle note.
+    assert (
+        drawing.SECTION_CENTER[0] - drawing.FRONT_KEEP["GripHalfAngle"][0]
+        >= 0.100
+    )
+    bore_up, _ = drawing.SECTION_KEEP["BoreDepth"]
+    wall_up, _ = drawing.SECTION_KEEP["EndWall"]
+    crown_up, _ = drawing.SECTION_KEEP["CapSagDim"]
+    # Each multi-line annotation owns a vertical lane with useful text height
+    # between it and its neighbors.
+    assert wall_up - bore_up >= 0.040
+    assert crown_up - wall_up >= 0.015
+    assert bore_up - drawing.SECTION_LABEL_OFFSET[0] >= 0.020
+    assert drawing.SECTION_LABEL_OFFSET[0] <= -0.040
+
+
 def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
     source = _source()
     assert "for view in (front, section, top):\n        set_hidden_lines_visible" in source

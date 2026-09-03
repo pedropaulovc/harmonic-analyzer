@@ -169,9 +169,16 @@ def test_layout_is_third_angle_and_clear_of_the_title_block() -> None:
     assert drawing.RIGHT_CENTER[0] > drawing.FRONT_CENTER[0]
     # The front-view lanes stay above the title block (x > ~0.218, y < 0.070).
     assert drawing.FRONT_CENTER[1] - 0.006 > 0.070
-    # Plan lanes: the arm width nearest the arm end, the flange width outside
-    # it; the flange's far-edge station nearest, the arm's outside.
-    assert drawing.TOP_KEEP["ArmWidth"][1] > drawing.TOP_KEEP["FlangeWidth"][1]
+    # Give ARM WIDTH's second line a dedicated lane, and park COLLAR LENGTH
+    # below the collar instead of in the plan/front inter-view pileup.
+    assert (
+        drawing.TOP_KEEP["ArmWidth"][1] - drawing.TOP_KEEP["FlangeWidth"][1]
+        >= 0.015
+    )
+    collar_bottom = drawing._fy(-drawing.COLLAR_OD / 2.0)
+    assert drawing.FRONT_KEEP["WallLen"][1] <= collar_bottom - 0.008
+    assert drawing.ARM_TOP_DIMENSION_OFFSET <= 0.005
+    # Plan side lanes: the flange's far-edge station nearest, arm outside.
     assert drawing.TOP_KEEP["FlangeCornerZ"][0] > drawing.TOP_KEEP["ArmCornerZ"][0]
 
 
