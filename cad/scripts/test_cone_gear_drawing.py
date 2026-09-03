@@ -1,4 +1,9 @@
-"""Offline contracts for the cone-gear drawing (batch gear-drawing pattern)."""
+"""Offline contracts for the cone-gear drawing (batch gear-drawing pattern).
+
+The print follows cad/docs/drawing-simplicity-policy.md: a soldered-on gear
+carries no datums, frames or roughness symbols; the GEAR DATA block and four
+lines of family/process notes are the whole specification beyond the bore.
+"""
 
 from __future__ import annotations
 
@@ -8,6 +13,10 @@ import build_cone_gear as part
 import cone_gear_spec as spec
 import draw_cone_gear as drawing
 from _drawing_registry import DRAWINGS_BY_NAME
+
+
+def _source() -> str:
+    return Path(drawing.__file__).read_text(encoding="utf-8")
 
 
 def test_required_drawing_paths() -> None:
@@ -22,58 +31,85 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     kept = set(drawing.FRONT_KEEP)
     assert kept == marked == {"BoreCutDia"}
+    assert set(drawing.DIMENSION_CALLOUTS) <= kept
 
 
-def test_gear_data_block_specifies_the_tooth_system() -> None:
+def test_gear_data_block_is_the_compact_tooth_system_and_family_table() -> None:
     data = spec.GEAR_DATA
+    lines = data.split("\n")
+    assert lines[0] == "GEAR DATA"
+    assert len(lines) <= 11
     for field in (
-        "GEAR DATA",
         "NUMBER OF TEETH",
         "DIAMETRAL PITCH",
-        "MODULE (mm",
         "PRESSURE ANGLE",
-        "PITCH DIAMETER (mm",
-        "OUTSIDE DIAMETER (mm)",
-        "WHOLE DEPTH (mm)",
+        "PITCH DIAMETER (REF)",
+        "OUTSIDE DIAMETER",
+        "WHOLE DEPTH",
+        "FACE WIDTH",
         "TOOTH FORM",
-        "INVOLUTE, FULL DEPTH",
-        "FAMILY T006",
-        "FAMILY T012",
-        "FAMILY T018",
-        "FAMILY T024-T120",
+        "FAMILY T006 / T012 / T018",
+        "FAMILY T024-T120 BY 6",
     ):
         assert field in data, field
     assert "120" in data
     assert "X.XX" not in data
+    # Dropped rows: the module restates the DP and the datum-based runout is gone.
+    assert "MODULE" not in data
+    assert "RUNOUT" not in data
     for teeth, bore_mm in spec.FAMILY_BORES_MM.items():
         assert bore_mm == part.bore_dia_in(teeth) * spec.MM_PER_IN
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
+        assert f"{bore_mm:.3f}" in data
+    source = _source()
     assert 'add_property_linked_note(adapter, "Gear Data"' in source
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 
 
-def test_manufacturing_notes_cover_teeth_and_family() -> None:
+def test_notes_are_few_specific_and_never_the_title_block() -> None:
     notes = spec.DRAWING_NOTES
-    assert "CUT TEETH PER GEAR DATA" in notes
-    assert "CONE SET" in notes
+    lines = notes.split("\n")
+    assert len(lines) <= 4
     assert "1 OF EACH CONFIGURATION" in notes
-    assert "20 GEARS TOTAL" in notes
     assert "NO KEYWAY" in notes
-    assert "SOLDER TO MATCHING SHAFT SEATS" in notes
-    assert "TITLE-BLOCK MATERIAL APPLIES TO T030-T120 ONLY" in notes
-    assert "T006-T024 TIP GEARS: C67500 MANGANESE BRONZE" in notes
-    assert "X.XX" not in notes
-    assert "SET TABLE" not in notes
-    assert "CONE-SHAFT DRAWING" not in notes
-    assert "DEBUR" not in notes
+    assert "SOLDER" in notes
+    assert "C67500 MANGANESE BRONZE" in notes
+    assert "STUB DEPTH" in notes
+    for banned in ("DATUM", "RUNOUT", "+/-", "MHA-", "DEBUR", "X.XX", "UOS"):
+        assert banned not in notes, banned
 
 
-def test_native_gdt_controls_bore_datum_and_finish() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 1
-    assert source.count("add_feature_control_frame(") == 1
-    assert source.count("add_surface_finish(") == 1
-    assert spec.SURFACE_FINISHES[0].native_attachment == "model"
+def test_print_carries_no_gdt_or_finish_symbols() -> None:
+    # drawing-simplicity-policy.md rules 3-5: gears are not on the GD&T
+    # allowlist and a soldered bore does not run.
+    source = _source()
+    for helper in (
+        "add_datum_feature(",
+        "add_feature_control_frame(",
+        "add_surface_finish(",
+        "set_basic_dimension(",
+        "project_part_pmi(",
+        "visible_circle_edge(",
+    ):
+        assert helper not in source, helper
+    assert not hasattr(spec, "GEOMETRIC_TOLERANCES_MM")
+    assert not hasattr(spec, "GEOMETRIC_CONTROLS")
+    assert spec.SURFACE_FINISHES == ()
+    assert "surface_finishes=SURFACE_FINISHES" in Path(part.__file__).read_text(
+        encoding="utf-8"
+    )
+
+
+def test_bore_callout_names_the_reamer_and_keeps_three_decimals() -> None:
+    assert drawing.DIMENSION_CALLOUTS == {"BoreCutDia": "REAM THRU (3/8 IN)"}
+    assert drawing.DIMENSION_PRECISION == {"BoreCutDia": 3}
+    assert spec.BORE_DIA == 0.375 * spec.MM_PER_IN
+
+
+def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
+    source = _source()
+    assert "for view in (front, right):\n        set_hidden_lines_visible" in source
+    assert "set_hidden_lines_removed(adapter, iso)" in source
+    assert source.count("set_hidden_lines_removed(") == 1
 
 
 def test_part_stamps_make_critical_properties() -> None:
@@ -87,5 +123,5 @@ def test_part_stamps_make_critical_properties() -> None:
     assert config["material_specification"] == "C36000 free-machining brass"
     assert config["material_tip_specification"] == "C67500 manganese bronze"
     assert spec.TIP_MATERIAL_SPEC == config["material_tip_specification"]
-    assert config["finish"] == "gear teeth cut; polished brass"
+    assert config["finish"] == "polished brass"
     assert int(config["quantity"]) == 1

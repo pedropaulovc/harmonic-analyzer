@@ -1,9 +1,15 @@
 r"""Create the curated manufacturing drawing for the alignment pinion drum (42T).
 
 Follows the batch gear-drawing pattern (see ``draw_cylinder_gear``), adapted for
-a long drum: the *Front end view carries the bore + tooth datum, and the *Right
-profile view shows the full 143 mm face length. Drawn 1:1; no isometric (a long
-thin drum is fully described by the two orthographic views).
+a long drum: the *Front end view carries the bore, and the *Right profile view
+shows the full 143 mm face length. Drawn 1:1; no isometric (a long thin drum
+is fully described by the two orthographic views).
+
+The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): a
+gear is not on the GD&T allowlist and this drum is pressed onto its arbor, so
+it carries no datums, no feature-control frames and no roughness symbols --
+the title block's general tolerances govern everything but the reamed bore,
+whose press band rides the model dimension.
 """
 
 from __future__ import annotations
@@ -12,29 +18,21 @@ import argparse
 import sys
 from typing import Any
 
-from alignment_pinion_spec import GEOMETRIC_TOLERANCES_MM
-
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_feature_control_frame,
     add_property_linked_note,
-    add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
     set_dimension_precision,
-    set_hidden_lines_removed,
+    set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _gear_drawing_entities import visible_circle_edge
-from _surface_finish import surface_finish_by_key
-from alignment_pinion_spec import BORE_DIA, FACE_WIDTH, OUTSIDE_DIA, SURFACE_FINISHES
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -58,22 +56,12 @@ VIEW_SCALE = (1, 1)
 FRONT_CENTER = (0.150, 0.185)  # toothed end view
 RIGHT_CENTER = (0.285, 0.185)  # long drum profile (143 mm face)
 
-BORE_R = BORE_DIA * VIEW_SCALE[0] / 2000.0
-HALF_OD = OUTSIDE_DIA * VIEW_SCALE[0] / 2000.0
-HALF_FACE = FACE_WIDTH * VIEW_SCALE[0] / 2000.0
-LEFT_END_X = RIGHT_CENTER[0] - HALF_FACE
-RIGHT_END_X = RIGHT_CENTER[0] + HALF_FACE
-
 FRONT_KEEP = {
     "ArborBoreDia": (FRONT_CENTER[0] - 0.050, FRONT_CENTER[1] - 0.030),
 }
-DIMENSION_CALLOUTS = {
-    # Light press under the MHA-102 arbor's Ø8.00 +0.00/-0.02 journal: bore
-    # 7.96..7.98 vs shaft 7.98..8.00 guarantees 0.00..0.04 interference. Also
-    # settles which tolerance-block row governs (neither .XX +/-0.51 nor
-    # DRILLED +0.10/0 -- the model dimension's own limits do).
-    "ArborBoreDia": "THRU - REAM\nPRESS FIT",
-}
+# Light press under the arbor's Ø8 journal; the 7.96..7.98 band is on the
+# model dimension (build_alignment_pinion), so the callout names the process.
+DIMENSION_CALLOUTS = {"ArborBoreDia": "REAM THRU\nPRESS ON ARBOR"}
 DIMENSION_PRECISION = {"ArborBoreDia": 2}
 
 
@@ -120,8 +108,10 @@ async def build(adapter: Any) -> dict[str, str]:
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE)
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=VIEW_SCALE)
+    # Hidden lines stay ON in every orthographic view (policy rule 7): the
+    # profile view then shows the through-bore along the drum.
     for view in (front, right):
-        set_hidden_lines_removed(adapter, view)
+        set_hidden_lines_visible(adapter, view)
 
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
@@ -130,43 +120,12 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_precision(adapter, front_annotations, DIMENSION_PRECISION)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to drum bore")
-    bore_edge = visible_circle_edge(adapter, front, BORE_DIA)
 
     # No coordinate-picked face-length dimension on the drum profile: every
     # pick pair tried snaps to the long horizontal tooth silhouettes (exact
     # end-edge x picks select the same edge; 0.2 mm inset picks pair a
     # vertical with a horizontal line and emit a stray 90-degree ANGLE dim).
-    # FACE WIDTH 143.2 is owned by the GEAR DATA block and the drum note.
-
-    bore_top = (FRONT_CENTER[0], FRONT_CENTER[1] + BORE_R)
-    add_datum_feature(
-        adapter,
-        front,
-        edge_xy=bore_top,
-        symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.025),
-        datum="A",
-        label="drum bore axis",
-        shoulder=True,
-        position_tolerance_m=0.0001,
-    )
-    add_feature_control_frame(
-        adapter,
-        right,
-        edge_xy=(LEFT_END_X, RIGHT_CENTER[1] + HALF_OD * 0.55),
-        frame_xy=(LEFT_END_X - 0.030, RIGHT_CENTER[1] + HALF_OD + 0.014),
-        characteristic="perpendicularity",
-        tolerance=GEOMETRIC_TOLERANCES_MM["drum end squareness to bore"],
-        datums=("A",),
-        label="drum end squareness to bore",
-    )
-    add_surface_finish(
-        adapter,
-        front,
-        symbol_xy=(FRONT_CENTER[0] + 0.014, FRONT_CENTER[1] - 0.050),
-        control=surface_finish_by_key(SURFACE_FINISHES, "drum_bore"),
-        label="drum bore finish",
-        entity=bore_edge,
-    )
+    # FACE WIDTH 143.2 is owned by the GEAR DATA block.
 
     add_property_linked_note(adapter, "Gear Data", 0.018, 0.262)
     add_property_linked_note(adapter, "Manufacturing Notes", 0.018, 0.085)

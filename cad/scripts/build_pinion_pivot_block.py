@@ -50,6 +50,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
 )
 from _fit_limits import deviations
 from _holes import NUMBER_DRILL_MM, HoleSpec, wizard_holes
@@ -67,6 +68,8 @@ from pinion_pivot_block_spec import (
     DRAWING_NOTES,
     ISOMETRIC_VIEW_NOTE,
     LIFT_BORE_RISE,
+    LIFT_BORE_RISE_TOLERANCE_MM,
+    PIVOT_BORE_HEIGHT_TOLERANCE_MM,
     SCREW_HALF_SPACING,
     SURFACE_FINISHES,
 )
@@ -235,6 +238,16 @@ async def build(adapter) -> dict[str, str]:
     )
     set_dimension_bilateral_tolerance(
         adapter, "BlockProfile", "LiftBoreDia", *deviations(BORE_DIA_BAND)
+    )
+    # Bore heights: the torque shaft and lift rod each pass through BOTH
+    # blocks, so the pivot bore's height above the base and the lift bore's
+    # rise above the pivot carry bands instead of a "matched pair" note
+    # (machinist review 2026-09-02).
+    set_dimension_symmetric_tolerance(
+        adapter, "BlockProfile", "AnchorZ", PIVOT_BORE_HEIGHT_TOLERANCE_MM
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "BlockProfile", "LiftBoreCz", LIFT_BORE_RISE_TOLERANCE_MM
     )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

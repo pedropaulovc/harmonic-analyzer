@@ -1,4 +1,10 @@
-r"""Create the curated machinist drawing for the cone tip adjuster set screw."""
+r"""Create the curated machinist drawing for the cone tip adjuster set screw.
+
+The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): a
+slotted set screw carries no datums, no feature-control frames and no
+roughness symbols -- every band rides its model dimension and the title
+block's general tolerances govern the rest.
+"""
 
 from __future__ import annotations
 
@@ -6,14 +12,10 @@ import argparse
 import sys
 from typing import Any
 
-from cone_tip_adjuster_spec import GEOMETRIC_TOLERANCES_MM
-
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_feature_control_frame,
     add_property_linked_note,
     curate_view_dimensions,
     finalize_drawing,
@@ -25,15 +27,10 @@ from _drawing_common import (
     set_hidden_lines_visible,
     set_reference_dimensions,
     stamp_drawing_summary,
-    visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from cone_tip_adjuster_spec import (
-    BODY_DIA,
-    BODY_LEN,
     CHAMFER as CHAMFER,
-    CUP_DIA,
-    SLOT_W,
     THREAD,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -83,36 +80,9 @@ CUP_KEEP = {
 #   BodyDiaDim - the thread designation, already derived from the spec's THREAD.
 #   CupDepth   - the machining instruction for the marked blind-hole depth.
 DIMENSION_CALLOUTS = {
-    "BodyDiaDim": f"{THREAD} UNC-2A",
+    "BodyDiaDim": f"{THREAD} UNC",
     "CupDepth": "DEEP",
 }
-
-
-def _circular_edge(view: Any, *, radius_mm: float, center_y_mm: float) -> Any:
-    """Return the visible circular model edge at the requested axis station."""
-    candidates: list[tuple[float, float, Any]] = []
-    for raw_edge in visible_view_entities(view, 1, label="tip-adjuster edges"):
-        edge = _early_bound(raw_edge, "IEdge")
-        curve = edge.GetCurve()
-        if curve is None:
-            continue
-        curve = _early_bound(curve, "ICurve")
-        if not curve.IsCircle():
-            continue
-        params = tuple(float(value) * 1000.0 for value in curve.CircleParams)
-        candidates.append((params[6], params[1], edge))
-    if not candidates:
-        raise RuntimeError("drawing view has no circular model edges")
-    radius, center_y, edge = min(
-        candidates,
-        key=lambda item: abs(item[0] - radius_mm) + abs(item[1] - center_y_mm),
-    )
-    if abs(radius - radius_mm) > 0.01 or abs(center_y - center_y_mm) > 0.01:
-        raise RuntimeError(
-            f"no circular edge matches radius {radius_mm:.4f} mm at "
-            f"axis station {center_y_mm:.3f} mm"
-        )
-    return edge
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -200,48 +170,6 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, cup, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the cup-end view")
 
-    # Identify the complete threaded cylindrical datum feature on its visible
-    # outline.  The manufacturing note defines A as the axis derived from the
-    # thread pitch cylinder; the symbol therefore names the feature of size,
-    # not a tangent plane on this one silhouette.
-    add_datum_feature(
-        adapter,
-        front,
-        edge_xy=(
-            FRONT_CENTER[0] + BODY_DIA / 2.0 * SHEET_SCALE[0] / 1000.0,
-            FRONT_CENTER[1],
-        ),
-        symbol_xy=(0.145, 0.230),
-        datum="A",
-        label="thread pitch-cylinder axis",
-        entity_type="SILHOUETTE",
-    )
-    cup_edge = _circular_edge(cup, radius_mm=CUP_DIA / 2.0, center_y_mm=BODY_LEN)
-    add_feature_control_frame(
-        adapter,
-        cup,
-        frame_xy=(CUP_CENTER[0] + 0.050, CUP_CENTER[1] + 0.032),
-        characteristic="position",
-        tolerance=GEOMETRIC_TOLERANCES_MM["cup axis position"],
-        datums=("A",),
-        diameter=True,
-        label="cup axis position",
-        entity=cup_edge,
-    )
-    add_feature_control_frame(
-        adapter,
-        end,
-        edge_xy=(
-            END_CENTER[0],
-            END_CENTER[1] + SLOT_W / 2.0 * SHEET_SCALE[0] / 1000.0,
-        ),
-        frame_xy=(END_CENTER[0] + 0.065, END_CENTER[1] - 0.025),
-        characteristic="position",
-        tolerance=GEOMETRIC_TOLERANCES_MM["driver-slot median-plane position"],
-        datums=("A",),
-        quantity="SLOT MEDIAN PLANE",
-        label="driver-slot median-plane position",
-    )
     if add_note(adapter, "SLOT END VIEW", 0.070, 0.132) is None:
         raise RuntimeError("failed to label slot end view")
     if add_note(adapter, "CUP END VIEW", 0.165, 0.132) is None:

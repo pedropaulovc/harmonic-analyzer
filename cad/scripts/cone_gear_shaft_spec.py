@@ -53,35 +53,18 @@ SHAFT_LENGTH = SECTION_ENDS[-1]
 # "+0.00/-0.02" typed as sheet callout text.
 SECTION_DIA_BAND = SHAFT_H
 
-# Geometric controls, authored on the model as plain annotations by the part build
-# (_part_pmi.author_part_pmi) and IMPORTED onto the sheet — the sheet types no
-# tolerance strings. The shaft is five distinct-diameter lands, so each
-# control's face resolves by diameter alone; the Ø0.79375 tip needs the
-# tightened match tolerance to stay unique against nothing else that small.
-PART_DATUMS = (
-    # The integral v2-post bearing journal the tip runout is measured against.
-    PartDatum("A", CylinderFace(JOURNAL_DIA)),
-)
-GEOMETRIC_CONTROLS = (
-    GeometricControl(
-        "journal_cylindricity", "cylindricity", "0.01", CylinderFace(JOURNAL_DIA)
-    ),
-    GeometricControl(
-        "tip_runout",
-        "circular_runout",
-        "0.05",
-        CylinderFace(SECTION_DIAS[-1], tolerance_mm=0.01),
-        datums=("A",),
-    ),
-)
+# No geometric controls (cad/docs/drawing-simplicity-policy.md rule 3): a
+# shaft is not on the GD&T allowlist -- every land is a size tolerance on its
+# model dimension.  The typed tuples stay empty so build_cone_gear_shaft's
+# author_part_pmi call keeps its shape.
+PART_DATUMS: tuple[PartDatum, ...] = ()
+GEOMETRIC_CONTROLS: tuple[GeometricControl, ...] = ()
+# One roughness symbol, on the bearing journal that turns in the pivot post
+# (rule 5).  The 1/32 in tip is finish-turned last under a follower rest;
+# a symbol on it would change nothing the note does not already force.
 SURFACE_FINISHES = (
     SurfaceFinishControl(
         "pivot_journal", MACHINED_UM, CylinderFace(JOURNAL_DIA)
-    ),
-    SurfaceFinishControl(
-        "tip_journal",
-        MACHINED_UM,
-        CylinderFace(SECTION_DIAS[-1], tolerance_mm=0.01),
     ),
 )
 
@@ -98,28 +81,15 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Sec4": {"Sec4End"},
 }
 
-# Kept to short lines so the block sits clear of the bottom-right title block
-# (a single ~130-char line reached x~0.33 m and overlapped it -- Codex/layout
-# audit). Substrings the test pins (CENTRE MARKS / LARGE-END FACE / FOLLOWER-REST
-# / FRAGILE BY DESIGN) each stay intact on one line.
+# Notes: part-specific process facts only, never a tolerance, never the
+# title block (drawing-simplicity-policy.md rule 6).  Short lines keep the
+# block clear of the bottom-right title block.
 DRAWING_NOTES = "\n".join(
     (
-        "ALL AXIAL STATION DIMENSIONS +/-0.25.",
-        "STEP STATIONS ARE MEASURED FROM THE LARGE-END FACE.",
-        f"DIA {JOURNAL_DIA:.4f} BEARING JOURNAL IS DATUM A.",
-        f"RUNNING FIT IN DIA {JOURNAL_BORE_DIA:.4f} POST BORE: "
-        f"{JOURNAL_CLEARANCE:.2f} DIAMETRAL CLEARANCE.",
-        f"DIA {SECTION_DIAS[1]:.3f}, {SECTION_DIAS[2]:.3f}, "
-        f"{SECTION_DIAS[3]:.3f}, AND {SECTION_DIAS[4]:.3f}",
-        "GEAR-SEAT CYLINDERS HAVE CIRCULAR RUNOUT 0.05 MAX TO A",
-        "AT EVERY CROSS SECTION.",
-        "SHOULDER ROOTS R0.10 MAX OR RELIEF 0.20 WIDE X 0.20 DEEP MAX.",
-        "START FROM DIA 12.5 MIN ROUND BAR; TURN BETWEEN TEMPORARY",
-        "CENTRE EXTENSIONS, THEN REMOVE THEM TO FINISHED LENGTH.",
-        "NO CENTRE HOLE MAY REMAIN ON EITHER FINISHED END.",
-        f"FINISH-TURN THE DIA {SECTION_DIAS[-1]:.3f} TIP LAST "
-        "WITH FOLLOWER-REST SUPPORT --",
-        "SECTION IS FRAGILE BY DESIGN.",
+        "12.5 MIN ROUND BAR. TURN BETWEEN CENTRES ON TEMPORARY EXTENSIONS;",
+        "PART OFF TO LENGTH: NO CENTRE HOLE MAY REMAIN ON EITHER END.",
+        "SHOULDER ROOTS R0.10 MAX OR UNDERCUT 0.20 X 0.20 MAX.",
+        f"TURN THE DIA {SECTION_DIAS[-1]:.3f} TIP LAST UNDER A FOLLOWER REST; FRAGILE BY DESIGN.",
     )
 )
 END_VIEW_NOTE = "END VIEW SCALE 4:1"

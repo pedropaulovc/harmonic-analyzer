@@ -2,7 +2,7 @@ crank-pinion:
   number: MHA-025
   material: SAE 1018 CF bar, ASTM A108-24
   material_specification: SAE 1018 CF bar, ASTM A108-24
-  finish: gear teeth cut, oiled
+  finish: bright, oiled
   quantity: 1
   tolerance_class: machined_block
   fit_class: gear_mesh

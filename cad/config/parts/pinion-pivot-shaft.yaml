@@ -2,7 +2,7 @@ pinion-pivot-shaft:
   number: MHA-062
   material: AISI 1018 cold-finished steel shafting
   material_specification: AISI 1018 cold-finished steel shafting
-  finish: precision turned or ground; protect with ISO VG 32 machine-oil film
+  finish: bright; ISO VG 32 oil film
   quantity: 1
   tolerance_class: machined_block
   fit_class: shaft_in_bushing

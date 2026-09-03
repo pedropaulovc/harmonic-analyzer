@@ -3,7 +3,7 @@ r"""Reproduction script: cone platform pivot screw (item 2, p.18 "pivot").
 The slotted shoulder screw the swing platform rotates on.  Its ground shoulder
 is 0.25 mm longer than the plate thickness, so tightening the threaded tail
 against the base leaves running axial clearance instead of clamping the plate.
-The distinct #10-24 UNC-2A tail engages the base's blind UNC-2B seat.
+The distinct #10-24 UNC tail engages the base's blind UNC seat.
 
 Stacked extrudes from the under-head datum (origin, Top plane): head up,
 shoulder and thread tail down; one rectangular cut across the head top forms
@@ -57,6 +57,7 @@ from cone_pivot_screw_spec import (
     HEAD_T,
     SHOULDER_DIA,
     SHOULDER_LEN,
+    SHOULDER_LENGTH_TOL,
     SLOT_D,
     SLOT_W,
     SURFACE_FINISHES,
@@ -110,10 +111,6 @@ def _slot_strip_area(r: float, w: float) -> float:
 
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
-    from solidworks_mcp.adapters.solidworks.features import (
-        _flag_feature_methods,
-        _select_edges_geometric,
-    )
 
     check("create_part", await adapter.create_part())
     await set_global(adapter, "HeadDia", f"{HEAD_DIA}mm")
@@ -209,28 +206,10 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(adapter, "driven screw (equations neutral)", volume, 0.02 * v_slot)
 
-    thread_edge_point = [THREAD_SOLID_DIA / 2.0, -UNDERHEAD_LEN, 0.0]
-    if not _select_edges_geometric(adapter, [thread_edge_point], tol_mm=0.05):
-        raise RuntimeError(
-            f"cannot select external-thread start edge at {thread_edge_point}"
-        )
-    feature_manager = _flag_feature_methods(
-        adapter.currentModel.FeatureManager,
-        "IFeatureManager",
-        "InsertCosmeticThread3",
-    )
-    cosmetic_thread = feature_manager.InsertCosmeticThread3(
-        0,  # swCosmeticStandardType_e.swStandardAnsiInch
-        "",
-        SPEC.thread,
-        0.0,  # standard/size table owns the nominal diameter
-        0,  # swCosmeticEndConditions_e.swEndConditionBlind
-        THREAD_TAIL_LEN / 1000.0,
-        f"{SPEC.thread} UNC-2A",
-    )
-    if cosmetic_thread is None:
-        raise RuntimeError("InsertCosmeticThread3 rejected the selected tail edge")
-    _telemetry.success(f"cosmetic external thread {SPEC.thread} UNC-2A")
+    # No cosmetic thread: on the print it drew a dashed 60-degree cone at the
+    # shoulder/tail junction (blind-end cosmetic thread rendering, 2026-09-02
+    # machinist review blocker) and no thread lines at all; the drawing
+    # carries the thread as a leadered designation on the tail instead.
 
     pivot_axis = await name_bore_axis(
         adapter, "Front Plane", 0.0, "Right Plane", 0.0, "pivot axis"
@@ -239,17 +218,16 @@ async def build(adapter) -> dict[str, str]:
     _blank_ref_geometry(adapter, pivot_axis, "AXIS")
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
-    set_dimension_symmetric_tolerance(adapter, "HeadProfile", "HeadDiaDim", 0.10)
-    set_dimension_symmetric_tolerance(adapter, "Head", "HeadHt", 0.10)
+    # Only the two bands the block cannot express (drawing-simplicity-policy.md
+    # rule 2): the ground shoulder's running fit, and the shoulder length that
+    # sets the plate's 0.25 axial clearance (block .XX +-0.51 could clamp the
+    # plate).  Head, slot and tail lengths ride the title block.
     set_dimension_bilateral_tolerance(
         adapter, "ShoulderProfile", "ShoulderDiaDim", -0.05, -0.02
     )
-    set_dimension_bilateral_tolerance(
-        adapter, "Shoulder", "ShoulderLg", 0.00, 0.05
+    set_dimension_symmetric_tolerance(
+        adapter, "Shoulder", "ShoulderLg", SHOULDER_LENGTH_TOL
     )
-    set_dimension_symmetric_tolerance(adapter, "ThreadTail", "ThreadLg", 0.10)
-    set_dimension_symmetric_tolerance(adapter, "SlotProfile", "SlotWDim", 0.10)
-    set_dimension_symmetric_tolerance(adapter, "DriverSlot", "SlotDepth", 0.10)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

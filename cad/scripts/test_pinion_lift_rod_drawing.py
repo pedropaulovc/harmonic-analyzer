@@ -1,4 +1,11 @@
-"""Offline contracts for the pinion-lift-rod drawing."""
+"""Offline contracts for the pinion-lift-rod drawing.
+
+The print follows cad/docs/drawing-simplicity-policy.md: a plain bearing rod
+carries no datums or frames; its running fit is the band on the model
+diameter, plus one Ra on the OD that spins in the pivot-block bores. Diameter,
+shank length and Ra read on the side view; the crown is a note leadered to
+the crowned end; the true overall is a conspicuous reference (rule 7).
+"""
 
 from __future__ import annotations
 
@@ -11,16 +18,8 @@ from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
-def test_surface_finish_is_part_owned_and_consumed_by_key() -> None:
-    (control,) = pinion_lift_rod_spec.SURFACE_FINISHES
-    assert control.key == "bearing"
-    assert control.roughness_um == 1.6
-    assert control.face.diameter_mm == pinion_lift_rod_spec.ROD_DIA
-    part_source = Path(part.__file__).read_text(encoding="utf-8")
-    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "surface_finishes=SURFACE_FINISHES" in part_source
-    assert 'surface_finish_by_key(SURFACE_FINISHES, "bearing")' in drawing_source
-    assert "roughness_ra=" not in drawing_source
+def _source() -> str:
+    return Path(drawing.__file__).read_text(encoding="utf-8")
 
 
 def test_required_drawing_paths() -> None:
@@ -42,62 +41,114 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
         pinion_lift_rod_spec.ROD_LEN,
         pinion_lift_rod_spec.CAP_SAG,
     )
+    assert pinion_lift_rod_spec.OVERALL_LEN == 203.2
 
 
-def test_linked_notes_define_remaining_bearing_rod_operations() -> None:
-    notes = pinion_lift_rod_spec.DRAWING_NOTES
-    assert drawing.DIMENSION_CALLOUTS == {}
-    # The length tolerance rides the 202.00 dimension, not a detached UOS note
-    # (codex machinist review finding).
-    assert drawing.RIGHT_CALLOUTS == {}
-    assert model_toleranced_dimensions(part) == {
-        ("RodProfile", "RodDia"): "*deviations(ROD_DIA_BAND)",
-        ("Rod", "Depth"): "ROD_LENGTH_TOLERANCE_MM",
-    }
-    assert "LENGTH +/-" not in notes
-    # The crown is conveyed as a note (its sketch dims live on the Top plane,
-    # outside every placed view): spherical radius consistent with the
-    # sagitta/diameter pair, SR controlled, sagitta/OAL reference-only so the
-    # dome is not doubly toleranced (codex machinist review finding).
+def test_diameter_and_shank_length_read_on_the_side_view() -> None:
+    # Policy rule 7: the diameter stands at the flat right end of the side
+    # view, not on the end view; the end view keeps nothing and is never
+    # curated (SolidWorks inserts each marked dimension into one view only).
+    assert drawing.FRONT_KEEP == {}
+    assert set(drawing.RIGHT_KEEP) == {"RodDia", "Depth"}
+    assert drawing.RIGHT_KEEP["RodDia"][0] > drawing.RIGHT_END_X
+    source = _source()
+    assert "curate_view_dimensions(\n        adapter, front" not in source
+    assert "set_dimension_precision(adapter, right_annotations" in source
+    assert drawing.DIMENSION_PRECISION == {"RodDia": 3}
+    # 202.00 stops at the crown root, and says so (review 2026-09-02: it
+    # read like the overall).
+    assert drawing.DIMENSION_CALLOUTS == {"Depth": "TO CROWN ROOT"}
+
+
+def test_overall_length_is_a_conspicuous_reference() -> None:
+    source = _source()
+    assert 'label="overall length reference"' in source
+    assert 'entity_types=("VERTEX", "EDGE")' in source
+    assert '_early_bound(overall, "IDisplayDimension").GetAnnotation()' in source
+    assert "set_reference_dimension(" in source
+    assert "model_point_in_view(" in source
+
+
+def test_crown_is_called_out_from_the_crowned_end() -> None:
+    # The crown's sketch dims live on the Top plane, outside every placed
+    # view, so it is conveyed as a note -- ATTACHED to the apex with a leader
+    # (review 2026-09-02: "back end" in the block made the reader infer the
+    # left end). Spherical radius consistent with the sagitta/diameter pair,
+    # every number with a decimal, at the block tolerance.
     dome_radius = (
         pinion_lift_rod_spec.ROD_DIA**2 / 4.0 + pinion_lift_rod_spec.CAP_SAG**2
     ) / (2.0 * pinion_lift_rod_spec.CAP_SAG)
     assert round(dome_radius, 2) == pinion_lift_rod_spec.CAP_R == 4.8
-    assert f"SR{pinion_lift_rod_spec.CAP_R} +/-0.25" in notes
-    assert "CROWN BACK END" in notes
-    assert f"{pinion_lift_rod_spec.CAP_SAG} REF PROUD" in notes
-    assert "OAL 203.2 REF" in notes
-    # The grind note is scoped to the cylindrical OD so it cannot be read as
-    # conflicting with the crowned end.
-    assert "CYLINDRICAL OD" in notes
-    assert "X.XX" not in notes
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert pinion_lift_rod_spec.CROWN_NOTE.split("\n") == [
+        "CROWN SR4.80 X 1.20 HIGH",
+        "BLEND SMOOTH, NO STEP",
+    ]
+    source = _source()
+    assert source.count("add_attached_note(") == 1
+    assert "text=CROWN_NOTE," in source
+    assert 'entity_type="VERTEX"' in source
+    assert "CROWN" not in pinion_lift_rod_spec.DRAWING_NOTES
+
+
+def test_running_fit_and_length_band_ride_the_model_dimensions() -> None:
+    assert model_toleranced_dimensions(part) == {
+        ("RodProfile", "RodDia"): "*deviations(ROD_DIA_BAND)",
+        ("Rod", "Depth"): "ROD_LENGTH_TOLERANCE_MM",
+    }
+
+
+def test_notes_are_few_specific_and_never_the_title_block() -> None:
+    notes = pinion_lift_rod_spec.DRAWING_NOTES
+    lines = notes.split("\n")
+    assert len(lines) <= 4
+    assert "SHAFTING OK AS RECEIVED" in notes
+    # "Turn or grind the OD full length; no flats or steps" restated the
+    # title-block finish and the plain cylinder the views show (review
+    # 2026-09-02); the crown moved to a leadered callout on the view.
+    assert "TURN OR GRIND" not in notes
+    assert "NO FLATS" not in notes
+    for banned in ("REF", "LENGTH +/-", "+/-", "WITHIN", "UOS", "DATUM", "X.XX"):
+        assert banned not in notes, banned
+    source = _source()
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
     assert "def _manufacturing_notes" not in source
 
 
-def test_native_gdt_controls_rod_form_orientation_and_finish() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 1
-    datum_a = source[source.index("add_datum_feature(") :]
-    datum_a = datum_a[: datum_a.index("    )")]
-    assert "edge_xy=end_top" in datum_a
-    assert "symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.024)" in datum_a
-    assert 'datum="A"' in datum_a
-    assert 'label="lift rod axis"' in datum_a
-    assert "position_tolerance_m=0.00002" in datum_a
-    assert source.count("position_tolerance_m=0.00002") == 1
-    assert source.count("add_feature_control_frame(") == 2
-    assert source.count('characteristic="cylindricity"') == 1
-    # Only the flat front end -- the crowned back end carries no
-    # face-orientation control.
-    assert source.count('characteristic="perpendicularity"') == 1
+def test_print_carries_no_gdt_and_one_running_finish() -> None:
+    source = _source()
+    for helper in (
+        "add_datum_feature(",
+        "add_feature_control_frame(",
+        "set_basic_dimension(",
+        "project_part_pmi(",
+    ):
+        assert helper not in source, helper
+    assert not hasattr(pinion_lift_rod_spec, "GEOMETRIC_TOLERANCES_MM")
+    assert not hasattr(pinion_lift_rod_spec, "GEOMETRIC_CONTROLS")
+    # The rod spins in the pivot-block bores, so its OD alone carries a
+    # roughness symbol, on the side view's flank silhouette.
+    (control,) = pinion_lift_rod_spec.SURFACE_FINISHES
+    assert control.key == "bearing"
+    assert control.roughness_um == 1.6
+    assert control.face.diameter_mm == pinion_lift_rod_spec.ROD_DIA
     assert source.count("add_surface_finish(") == 1
+    assert 'surface_finish_by_key(SURFACE_FINISHES, "bearing")' in source
+    assert 'entity_type="SILHOUETTE"' in source
+    assert "roughness_ra=" not in source
+    assert "author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)" in Path(
+        part.__file__
+    ).read_text(encoding="utf-8")
+
+
+def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
+    source = _source()
+    assert "for view in (front, right):\n        set_hidden_lines_visible" in source
+    assert "set_hidden_lines_removed(adapter, iso)" in source
 
 
 def test_view_scales_are_explicit() -> None:
     assert drawing.SHEET_SCALE == (1.0, 1.0)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    source = _source()
     assert "scale=(2, 1)" in source  # end view 2:1
     assert "scale=(1, 1)" in source  # side view true scale
     assert "scale=(1, 2)" in source  # iso reduced so the long rod clears

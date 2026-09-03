@@ -7,6 +7,11 @@ bend up to a blade following the parked strap lean, then a subtle R1.5 kink
 every marked dimension (foot length, both bend radii, the flat) imports into the
 front profile view; the top view shows the 4.0-wide foot and the screw hole.
 
+The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): a
+formed brass leaf carries no datums, frames or roughness symbols; the notes
+are the spring's form data (strip, blade, hole) a maker cannot read off the
+views.
+
 Run with SolidWorks open::
 
     uv run python cad\scripts\draw_pinion_spring.py pinion-spring
@@ -18,14 +23,11 @@ import argparse
 import sys
 from typing import Any
 
-from pinion_spring_spec import GEOMETRIC_TOLERANCES_MM
-
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_attached_note,
-    add_feature_control_frame,
     add_native_hole_callout,
     add_property_linked_note,
     curate_view_dimensions,
@@ -183,22 +185,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=(hole_center_x + HOLE_DIA * SHEET_SCALE[0] / 2000.0, TOP_CENTER[1]),
         callout_xy=(0.235, 0.135),
         label="spring foot clearance hole",
-    )
-
-    # Pick the rectangular screw-down foot face away from its hole so the
-    # leader cannot attach to the cylindrical hole wall. Flatness needs no
-    # datum reference and remains valid after the in-plane forming bends.
-    top_face = (TOP_CENTER[0] + 0.020, TOP_CENTER[1])
-    add_feature_control_frame(
-        adapter,
-        top,
-        edge_xy=top_face,
-        frame_xy=(0.305, 0.122),
-        characteristic="flatness",
-        tolerance=GEOMETRIC_TOLERANCES_MM["spring screw-down foot flatness"],
-        quantity="FOOT BROAD FACE",
-        label="spring screw-down foot flatness",
-        entity_type="FACE",
+        process="DRILL",
     )
     if add_note(adapter, "FORMED PROFILE - FRONT VIEW SCALE 2:1", 0.085, 0.078) is None:
         raise RuntimeError("failed to label spring front view")

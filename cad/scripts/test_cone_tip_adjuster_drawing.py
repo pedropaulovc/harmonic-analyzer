@@ -42,7 +42,7 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
 
 def test_thread_callout_is_the_catalog_thread() -> None:
     assert cone_tip_adjuster_spec.THREAD == "5/16-18"
-    assert drawing.DIMENSION_CALLOUTS["BodyDiaDim"] == "5/16-18 UNC-2A"
+    assert drawing.DIMENSION_CALLOUTS["BodyDiaDim"] == "5/16-18 UNC"
     part_source = Path(part.__file__).read_text(encoding="utf-8")
     drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "InsertCosmeticThread3" in part_source
@@ -66,34 +66,44 @@ def test_slotted_south_rim_reduces_only_its_chamfer_arc() -> None:
     assert 0.80 * full < slotted < 0.90 * full
 
 
-def test_notes_specify_thread_cup_and_slot_without_title_block_duplicates() -> None:
+def test_notes_are_few_specific_and_never_the_title_block() -> None:
     notes = cone_tip_adjuster_spec.DRAWING_NOTES
-    assert "5/16-18" not in notes
-    assert "11.00 MIN USABLE FULL-FORM THREAD" in notes
-    assert "CUP" in notes  # the shaft-tip seating cup
-    assert "SLOT" in notes  # the driver slot
-    assert "MATERIAL" not in notes
-    assert "OXIDE" not in notes
-    assert "X.XX" not in notes
-    assert "BREAK EDGES" not in notes
-    assert "OVERALL LENGTH" not in notes
+    lines = notes.split("\n")
+    assert len(lines) <= 4
+    assert "5/16-18" not in notes  # rides the body-diameter callout
+    assert "11.00 MIN" in notes  # the usable thread length
+    assert "CHAMFER BOTH THREAD STARTS 0.40 X 45 DEG" in notes
+    assert "CUP" in notes and "SLOT" in notes
+    assert "(6.20)" in notes  # why the reference diameter is not the thread OD
+    # Every band is on its model dimension; nothing the title block says.
+    for banned in ("+/-", "DATUM", "FCF", "UOS", "DIMENSIONS IN", "MATERIAL", "OXIDE", "X.XX"):
+        assert banned not in notes, banned
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
-    assert "POSITION FCF APPLIES TO THE SLOT MEDIAN PLANE" in notes
-    assert "REFERENCE THREAD ROOT ENVELOPE" in notes
 
 
-def test_thread_axis_datum_and_slot_position_are_native_controls() -> None:
+def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:
+    # drawing-simplicity-policy.md rules 3-5: a set screw is not on the GD&T
+    # allowlist and nothing runs on it.
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'label="thread pitch-cylinder axis"' in source
-    assert 'entity_type="SILHOUETTE"' in source
-    assert "BODY_DIA / 2.0" in source
-    assert 'label="driver-slot median-plane position"' in source
-    assert 'quantity="SLOT MEDIAN PLANE"' in source
-    assert 'characteristic="position"' in source
-    assert 'datums=("A",)' in source
+    for helper in (
+        "add_datum_feature(",
+        "add_feature_control_frame(",
+        "add_surface_finish(",
+        "set_basic_dimension(",
+        "project_part_pmi(",
+    ):
+        assert helper not in source, helper
+    assert not hasattr(cone_tip_adjuster_spec, "GEOMETRIC_TOLERANCES_MM")
+    assert not hasattr(cone_tip_adjuster_spec, "SURFACE_FINISHES")
     assert 'add_note(adapter, "SLOT END VIEW"' in source
     assert 'add_note(adapter, "CUP END VIEW"' in source
+
+
+def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "for view in (front, end, cup):\n        set_hidden_lines_visible" in source
+    assert "set_hidden_lines_removed(adapter, iso)" in source
 
 
 def test_view_scales_are_explicit() -> None:

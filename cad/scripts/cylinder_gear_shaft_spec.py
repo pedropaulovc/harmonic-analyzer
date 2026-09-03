@@ -3,7 +3,7 @@ r"""Pure-data dimensional contract shared by the cylinder-gear arbor and drawing
 from __future__ import annotations
 
 from _fit_limits import SHAFT_H
-from _gtol_spec import CylinderFace, GeometricControl, PartDatum, PlanarFace
+from _gtol_spec import CylinderFace, GeometricControl, PartDatum
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 
@@ -22,34 +22,14 @@ LENGTH_TOLERANCE_MM = 0.25
 # as a unit; the south end still stops inside its pedestal bore. See
 # build_drive_train_assembly.ARBOR_LENGTH / ARBOR_SOUTH_Z.
 
-# Geometric controls, authored on the model as plain annotations by the part build
-# (_part_pmi.author_part_pmi) and IMPORTED onto the sheet — the sheet types no
-# tolerance strings. The arbor is one plain cylinder extruded +Y from the
-# origin (y 0..SHAFT_LENGTH, NOT mid-plane), so the bearing face resolves by
-# diameter alone and each end face by its outward normal + offset.
-PART_DATUMS = (
-    # The arbor axis the end squareness is measured against.
-    PartDatum("A", CylinderFace(SHAFT_DIA)),
-)
-GEOMETRIC_CONTROLS = (
-    GeometricControl(
-        "bearing_cylindricity", "cylindricity", "0.01", CylinderFace(SHAFT_DIA)
-    ),
-    GeometricControl(
-        "y0_end_perpendicularity",
-        "perpendicularity",
-        "0.05",
-        PlanarFace((0, -1, 0), 0.0),
-        datums=("A",),
-    ),
-    GeometricControl(
-        "y187_end_perpendicularity",
-        "perpendicularity",
-        "0.05",
-        PlanarFace((0, 1, 0), SHAFT_LENGTH),
-        datums=("A",),
-    ),
-)
+# No geometric controls: the arbor is one plain cylinder whose running fit is
+# the SHAFT_H band on the model diameter (cad/docs/drawing-simplicity-policy.md
+# rule 3). The typed tuples stay so build_cylinder_gear_shaft's
+# author_part_pmi call shape is unchanged.
+PART_DATUMS: tuple[PartDatum, ...] = ()
+GEOMETRIC_CONTROLS: tuple[GeometricControl, ...] = ()
+# The arbor OD is the one running surface: the 20 cylinder gears run free on
+# it (rule 5).
 SURFACE_FINISHES = (
     SurfaceFinishControl(
         "arbor_bearing",
@@ -63,11 +43,18 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Shaft": {"Depth"},
 }
 
+# Notes: part-specific process facts only, never a tolerance, never the
+# title block (drawing-simplicity-policy.md rule 6). "NO KEYSEAT" is the M6.2
+# keyway refutation: the legacy drawings show a keyseat on this arbor, but the
+# gears run free on it at different speeds, so the print must forbid cutting
+# one -- a specific guard against a documented trap, not a restatement of the
+# plain cylinder. The turned-or-ground finish and "no flats or steps" were
+# what the title block and the views already say (machinist review,
+# 2026-09-02).
 DRAWING_NOTES = "\n".join(
     (
-        "TURN OR CENTRELESS-GRIND FULL LENGTH; NO FLATS, STEPS OR KEYSEAT.",
-        "STATIONARY ARBOR: 20 CYLINDER GEARS RUN FREE ON THE FULL O.D.; "
-        "CLAMPED IN PEDESTALS AT BOTH ENDS.",
+        "NO KEYSEAT.",
+        "CENTRES OK.",
     )
 )
 END_VIEW_NOTE = "END VIEW SCALE 2:1"

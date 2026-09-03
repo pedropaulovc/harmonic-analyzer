@@ -2,7 +2,7 @@ cylinder-gear:
   number: MHA-027
   material: Brass
   material_specification: C36000 free-machining brass
-  finish: gear teeth cut; polished brass
+  finish: polished brass
   quantity: 20
   tolerance_class: machined_block
   # Gear+cam composite: this part absorbs the former standalone eccentric-cam

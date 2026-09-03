@@ -56,7 +56,6 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_tolerance,
 )
 from _fit_limits import deviations
 from _part_pmi import author_part_pmi
@@ -66,7 +65,6 @@ from pinion_handle_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     GRIP_DIA,
-    GRIP_LENGTH_TOLERANCE_MM,
     GRIP_LEN,
     ISOMETRIC_VIEW_NOTE,
     ROD_DIA,
@@ -74,13 +72,11 @@ from pinion_handle_spec import (
     ROD_HOLE_REAM_BAND,
     ROD_HOLE_DIA,
     ROD_PRESS_BAND,
-    ROD_SPAN_TOLERANCE_MM,
     ROD_UP,
     SURFACE_FINISHES,
     TUBE_ID,
     TUBE_ID_BAND,
     TUBE_LEN,
-    TUBE_LENGTH_BAND,
     TUBE_OD,
     WALL_T,
 )
@@ -371,20 +367,16 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # Manufacturing drawing support: mark exactly the print's dimensions and
-    # stamp the make-critical title-block properties.
+    # stamp the make-critical title-block properties.  Only the fits carry a
+    # band; the turned lengths (grip, bore depth, rod span) take the title
+    # block's .XX tolerance (machinist review 2026-09-02: the arbor tip seats
+    # on the bore floor, so the depth only shifts the grip station).
     set_dimension_bilateral_tolerance(
         adapter, "TubeProfile", "TubeId", *deviations(TUBE_ID_BAND)
-    )
-    set_dimension_symmetric_tolerance(
-        adapter, "Grip", "GripLen", GRIP_LENGTH_TOLERANCE_MM
-    )
-    set_dimension_bilateral_tolerance(
-        adapter, "Tube", "TubeLen", *deviations(TUBE_LENGTH_BAND)
     )
     set_dimension_bilateral_tolerance(
         adapter, "RodProfile", "RodDia", *deviations(ROD_PRESS_BAND)
     )
-    set_dimension_symmetric_tolerance(adapter, "Rod", "RodSpan", ROD_SPAN_TOLERANCE_MM)
     set_dimension_bilateral_tolerance(
         adapter, "RodHoleProfile", "RodHoleDia", *deviations(ROD_HOLE_REAM_BAND)
     )

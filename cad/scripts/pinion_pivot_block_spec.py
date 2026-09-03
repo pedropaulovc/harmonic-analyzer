@@ -23,8 +23,7 @@ part marks and the drawing keeps EXACTLY ``DRAWING_DIMENSIONS``.
 
 from __future__ import annotations
 
-from _gtol_spec import CylinderFace
-from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from _surface_finish import SurfaceFinishControl
 
 # --- Nominal geometry (cad/DIMENSIONS.md "Chapter 25", photo-scaled low).
 # These drive the part's named equation globals AND the drawing's coordinate
@@ -51,62 +50,51 @@ SCREW_HOLE_DIA = 4.216  # #19 drill; mirrors _holes.NUMBER_DRILL_MM["#19"]
 # (the offline test asserts they match) -- drawing view math only
 
 # Derived spans (equations of the primitives above).
-BLOCK_TOP_Y = BLOCK_HEIGHT - BORE_UP  # +4.0: block top above the pivot axis
+BLOCK_TOP_Y = BLOCK_HEIGHT - BORE_UP  # +6.75: block top above the pivot axis
 BLOCK_BOTTOM_Y = -BORE_UP  # -12.0: the base seat
-FRONT_BBOX_CY = (BLOCK_TOP_Y + BLOCK_BOTTOM_Y) / 2.0  # -4.0: front-view centre
-BORE_SPACING = 2.0 * BORE_HALF_SPACING  # 15.0
+FRONT_BBOX_CY = (BLOCK_TOP_Y + BLOCK_BOTTOM_Y) / 2.0  # -2.625: front-view centre
+BORE_SPACING = 2.0 * BORE_HALF_SPACING  # 12.5
 SCREW_SPACING = 2.0 * SCREW_HALF_SPACING  # 27.0
+LIFT_BORE_FROM_END = BLOCK_WIDTH / 2.0 - BORE_HALF_SPACING  # 11.75
+SCREW_FROM_END = BLOCK_WIDTH / 2.0 - SCREW_HALF_SPACING  # 4.5
 BORE_DIA_BAND = (0.05, 0.00)
+# The two blocks are interchangeable parts, not a matched pair: the torque
+# shaft and the lift rod each pass through BOTH, so the bore heights carry a
+# band on the model dimensions instead of a "matched heights" note
+# (machinist review 2026-09-02).
+PIVOT_BORE_HEIGHT_TOLERANCE_MM = 0.05
+LIFT_BORE_RISE_TOLERANCE_MM = 0.05
 
-# The two reamed bores share a diameter.  The harvested pivot-bore cylinder
-# spans y=-BORE_DIA/2..+BORE_DIA/2, while the raised lift bore does not reach
-# the pivot bore's lower generator; that point makes this selector exact.
-SURFACE_FINISHES = (
-    SurfaceFinishControl(
-        "pivot_bore",
-        MACHINED_UM,
-        CylinderFace(BORE_DIA, contains_y_mm=-BORE_DIA / 2.0),
-    ),
-)
+# No roughness callouts: the torque shaft is static in the pivot bore and the
+# lift rod only turns in the lift bore at engage; the title block's Ra 3.2
+# covers both reamed bores (cad/docs/drawing-simplicity-policy.md rule 5).
+SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows. ``build_pinion_pivot_block`` marks exactly these;
 # ``draw_pinion_pivot_block`` keeps exactly their union across its per-view
-# ``keep`` maps. The offline test enforces ``union(marks) == union(keeps)``. ---
+# ``keep`` maps. The offline test enforces ``union(marks) == union(keeps)``.
+# The bores' longitudinal stations (PivotBoreX / LiftBoreX, unsigned distances
+# to the sketch origin, i.e. the invisible mid-plane) are NOT marked: the print
+# locates the lift bore from the end face and the pivot bore from the lift bore
+# with drawing edge dimensions (machinist review 2026-09-02). ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BlockProfile": {
         "BlockWidth",
         "BlockHeight",
         "AnchorZ",
-        "PivotBoreX",
         "PivotBoreDia",
-        "LiftBoreX",
         "LiftBoreCz",
         "LiftBoreDia",
     },
     "Block": {"Depth"},
 }
 
-# True free-text instructions only. Geometry, datum structure, form/orientation
-# live in native dimensions / datum tags / FCFs / surface symbols. The part
-# build stamps these strings into the SLDPRT; the drawing displays only
-# $PRPSHEET links, so the print cannot silently diverge from its source model.
+# Notes: process facts only (drawing-simplicity-policy.md rule 6).  Drill and
+# ream ride the hole callouts; every location is a dimension from a face.
 DRAWING_NOTES = "\n".join(
     (
-        "BORES AND HOLD-DOWN HOLES SYMMETRIC ABOUT THE BLOCK MID-PLANE.",
-        "PIVOT AND LIFT BORES: 1/4 IN REAM THRU;",
-        "RUNNING FIT ON THE <MOD-DIAM>6.35 TORQUE SHAFT / LIFT ROD.",
-        "HOLD-DOWN HOLES: #19 DRILL THRU, 2 PLACES,",
-        "MATCHING THE MACHINE BED SCREW SEATS.",
-        "2 BLOCKS REQUIRED; MACHINE IN ONE SETUP FOR MATCHED BORE HEIGHTS.",
-        "FINISH: BLACK OXIDE AFTER MACHINING.",
+        "REAM BOTH BORES IN ONE SETUP.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
-
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "lift-bore parallelism": "0.10",
-    "hold-down hole position": "0.25",
-}

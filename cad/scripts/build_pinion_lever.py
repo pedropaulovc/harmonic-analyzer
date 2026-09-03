@@ -74,7 +74,6 @@ from pinion_lever_spec import (
     CAP_SAG,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
-    END_WALL_TOLERANCE_MM,
     GRIP_HALF_ANGLE_DEG,
     GRIP_HALF_ANGLE_TOLERANCE_DEG,
     HUB_LEN,
@@ -395,7 +394,9 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "Barrel", "BoreDepth", *deviations(BORE_DEPTH_BAND)
     )
-    set_dimension_symmetric_tolerance(adapter, "Wall", "EndWall", END_WALL_TOLERANCE_MM)
+    # EndWall carries no band: it prints as a REFERENCE size (the bore depth
+    # and the hub length both run from the flat end -- machinist review
+    # 2026-09-02).
     set_dimension_symmetric_tolerance(
         adapter, "RodProfile", "RodTipY", ROD_TIP_Y_TOLERANCE_MM
     )

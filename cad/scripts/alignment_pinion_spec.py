@@ -7,8 +7,7 @@ pattern in ``cylinder_gear_spec``.
 
 from __future__ import annotations
 
-from _gtol_spec import CylinderFace
-from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from _surface_finish import SurfaceFinishControl
 
 
 MM_PER_IN = 25.4
@@ -25,9 +24,10 @@ BORE_DIA = 8.0  # Ø8 arbor through-bore (build_pinion_arbor.py)
 ARBOR_BORE_BAND = (-0.020, -0.040)  # light press; (upper, lower) deviations
 FACE_WIDTH = 143.2  # spans all 20 drum stations
 
-SURFACE_FINISHES = (
-    SurfaceFinishControl("drum_bore", MACHINED_UM, CylinderFace(BORE_DIA)),
-)
+# No roughness callouts: the drum is pressed onto its steel arbor, so nothing
+# runs on the bore; the title block's Ra 3.2 covers every face
+# (cad/docs/drawing-simplicity-policy.md rule 5).
+SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ArborBoreProfile": {"ArborBoreDia"},
@@ -43,29 +43,20 @@ GEAR_DATA = gear_data_note(
     [
         ("NUMBER OF TEETH", f"{TEETH}"),
         ("DIAMETRAL PITCH", f"{DIAMETRAL_PITCH:.2f}"),
-        ("MODULE (mm, REF)", f"{MODULE_MM:.3f}"),
         ("PRESSURE ANGLE", f"{PRESSURE_ANGLE_DEG:.1f} DEG"),
-        ("PITCH DIAMETER (mm, REF)", f"{PITCH_DIA:.2f}"),
-        ("OUTSIDE DIAMETER (mm)", f"{OUTSIDE_DIA:.2f} +0/-0.10"),
-        ("WHOLE DEPTH (mm)", f"{WHOLE_DEPTH:.2f} REF"),
-        ("FACE WIDTH (mm)", f"{FACE_WIDTH:.1f}"),
+        ("PITCH DIAMETER (REF)", f"{PITCH_DIA:.2f}"),
+        ("OUTSIDE DIAMETER", f"{OUTSIDE_DIA:.2f} +0/-0.10"),
+        ("WHOLE DEPTH", f"{WHOLE_DEPTH:.2f}"),
+        ("FACE WIDTH", f"{FACE_WIDTH:.1f}"),
         ("TOOTH FORM", "INVOLUTE, FULL DEPTH"),
     ]
 )
 
+# Notes: part-specific process facts only, never a tolerance, never the
+# title block (drawing-simplicity-policy.md rule 6).
 DRAWING_NOTES = "\n".join(
     (
-        "SPUR GEAR: 0 DEG HELIX. CUT TEETH FULL LENGTH PER GEAR DATA.",
-        "GEAR TEETH: CIRCULAR RUNOUT 0.05 MAX ABOUT DATUM A, MEASURED AT THE TOOTH TIPS.",
-        f"LONG PINION DRUM: FACE {FACE_WIDTH:.1f} +/-0.5; SPANS ALL 20 CYLINDER-GEAR STATIONS.",
-        "Ø8 STEEL ARBOR (MHA-102, Ø8.00 +0.00/-0.02) LIGHT-PRESSES THRU THE BORE.",
-        "FIT GOVERNS: FINISH BORE FOR 0.01-0.03 PRESS ON THE AS-MADE ARBOR;",
-        "  TABULATED BORE LIMITS ARE THE PRE-FIT TARGET.",
+        "SPUR TEETH CUT THE FULL LENGTH OF THE DRUM.",
+        "BORE: LIGHT PRESS ON THE AS-MADE <MOD-DIAM>8 STEEL ARBOR; FINISH TO FIT.",
     )
 )
-
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "drum end squareness to bore": "0.05",
-}

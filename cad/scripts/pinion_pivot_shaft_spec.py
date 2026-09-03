@@ -18,6 +18,7 @@ SHAFT_DIA = 6.35  # 1/4 in: rides both pivot blocks' east bores and the straps
 SHAFT_LEN = 192.0  # ends flush with the pivot blocks' outer faces
 CAP_SAG = 1.2  # shallow spherical crown height at each end
 CAP_RADIUS = ((SHAFT_DIA / 2.0) ** 2 + CAP_SAG**2) / (2.0 * CAP_SAG)
+OVERALL_LEN = SHAFT_LEN + 2.0 * CAP_SAG  # 194.4 crown apex to crown apex
 SHAFT_DIA_BAND = SHAFT_H
 SHAFT_LENGTH_TOLERANCE_MM = 0.25
 
@@ -30,27 +31,25 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Shaft": {"Depth"},
 }
 
-DRAWING_NOTES = "\n".join(
+# The crowns, as the leadered note on one crown spells them (their sketch
+# dims live on the Top plane, outside every placed view, so the crown is
+# conveyed by a note ATTACHED to a crowned end rather than buried in the
+# block -- machinist review 2026-09-02). The height is a REF (the 192.00
+# between root circles plus two crowns is the overall); the root circle stays
+# sharp so the crown seats flush in the strap bore.
+CROWN_NOTE = "\n".join(
     (
-        "CYLINDRICAL BODY HAS NO FLATS OR STEPS.",
-        "DATUM A IS THE CYLINDRICAL BODY'S DERIVED AXIS.",
-        "BOTH SPHERICAL CROWN SURFACES: PROFILE 0.05, FORM ONLY (NO DATUM);",
-        "  EACH CROWN IS INSPECTED INDEPENDENTLY.",
-        f"  SR{CAP_RADIUS:.2f}+/-0.05 GOVERNS SIZE; ({CAP_SAG:.2f}) REF AXIAL HEIGHT",
-        "  FROM EACH CROWN ROOT CIRCLE.",
-        "CROWN ROOT CIRCLES ARE SHARP THEORETICAL PROFILE BREAKS;",
-        "  EXEMPT FROM TITLE-BLOCK EDGE-BREAK REQUIREMENT.",
+        f"2X SPHERICAL CROWN SR{CAP_RADIUS:.2f}",
+        f"({CAP_SAG:.2f}) HIGH; ROOT CIRCLE SHARP, NO CHAMFER",
     )
 )
+
+# Notes: process facts only, never a tolerance
+# (drawing-simplicity-policy.md rule 6).  The body diameter's band rides the
+# model dimension; the crowns are called out from the view.
+DRAWING_NOTES = "GROUND 1/4 IN SHAFTING OK AS RECEIVED."
 END_VIEW_NOTE = "END VIEW SCALE 4:1"
 # The isometric renders at ISO_SCALE (1, 2) while the sheet/title block reads
 # 1:1, so without this the pictorial is silently half scale.  Mirrors
 # fulcrum-shaft / cylinder-gear-shaft, whose identical 1:2 iso carry the note.
 ISO_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
-
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "pinion pivot cylindrical body": "0.01",
-    "pinion pivot crown profile": "0.05",
-}

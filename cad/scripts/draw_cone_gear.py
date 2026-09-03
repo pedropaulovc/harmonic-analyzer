@@ -4,6 +4,11 @@ Follows the batch gear-drawing pattern (see ``draw_cylinder_gear``): the bore is
 the marked model dimension; the GEAR DATA note carries the tooth system; the
 cone gear is a 20-member configured family, documented here at its fundamental
 T120 configuration with a family note.
+
+The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): a
+gear is not on the GD&T allowlist and this one is soldered to its shaft, so it
+carries no datums, no feature-control frames and no roughness symbols -- the
+title block's general tolerances govern everything but the reamed bore.
 """
 
 from __future__ import annotations
@@ -12,28 +17,22 @@ import argparse
 import sys
 from typing import Any
 
-from cone_gear_spec import GEOMETRIC_TOLERANCES_MM
-
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_feature_control_frame,
     add_property_linked_note,
-    add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    set_dimension_callouts,
     set_dimension_precision,
     set_hidden_lines_removed,
+    set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _gear_drawing_entities import visible_circle_edge
-from _surface_finish import surface_finish_by_key
-from cone_gear_spec import BORE_DIA, FACE_WIDTH, OUTSIDE_DIA, SURFACE_FINISHES
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -58,13 +57,13 @@ FRONT_CENTER = (0.225, 0.175)
 RIGHT_CENTER = (0.300, 0.175)
 ISO_CENTER = (0.375, 0.205)
 
-BORE_R = BORE_DIA * VIEW_SCALE[0] / 2000.0
-HALF_OD = OUTSIDE_DIA * VIEW_SCALE[0] / 2000.0
-FRONT_FACE_X = RIGHT_CENTER[0] - FACE_WIDTH * VIEW_SCALE[0] / 2000.0
-
 FRONT_KEEP = {
     "BoreCutDia": (FRONT_CENTER[0] - 0.055, FRONT_CENTER[1] - 0.030),
 }
+# The bore is a 3/8 in reamer size (9.525): say so on the callout and keep
+# three decimals so it matches the family rows in the GEAR DATA block.
+DIMENSION_CALLOUTS = {"BoreCutDia": "REAM THRU (3/8 IN)"}
+DIMENSION_PRECISION = {"BoreCutDia": 3}
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -111,48 +110,19 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE)
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=VIEW_SCALE)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
-    for view in (front, right, iso):
-        set_hidden_lines_removed(adapter, view)
+    set_hidden_lines_removed(adapter, iso)
+    # Hidden lines stay ON in every orthographic view (policy rule 7): the
+    # right view shows the bore through the 6.5 face.
+    for view in (front, right):
+        set_hidden_lines_visible(adapter, view)
 
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
     )
-    # 3 decimals so the displayed bore matches the family rows' 9.525 (a
-    # 2-decimal 9.53 reads as a conflicting definition).
-    set_dimension_precision(adapter, front_annotations, {"BoreCutDia": 3})
+    set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
+    set_dimension_precision(adapter, front_annotations, DIMENSION_PRECISION)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to gear bore")
-    bore_edge = visible_circle_edge(adapter, front, BORE_DIA)
-
-    bore_top = (FRONT_CENTER[0], FRONT_CENTER[1] + BORE_R)
-    add_datum_feature(
-        adapter,
-        front,
-        edge_xy=bore_top,
-        symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.028),
-        datum="A",
-        label="cone gear bore axis",
-        shoulder=True,
-        position_tolerance_m=0.0001,
-    )
-    add_feature_control_frame(
-        adapter,
-        right,
-        edge_xy=(FRONT_FACE_X, RIGHT_CENTER[1] + HALF_OD * 0.55),
-        frame_xy=(FRONT_FACE_X - 0.034, RIGHT_CENTER[1] + HALF_OD + 0.010),
-        characteristic="perpendicularity",
-        tolerance=GEOMETRIC_TOLERANCES_MM["gear face squareness to bore"],
-        datums=("A",),
-        label="gear face squareness to bore",
-    )
-    add_surface_finish(
-        adapter,
-        front,
-        symbol_xy=(FRONT_CENTER[0] + 0.015, FRONT_CENTER[1] - 0.052),
-        control=surface_finish_by_key(SURFACE_FINISHES, "cone_gear_bore"),
-        label="cone gear bore finish",
-        entity=bore_edge,
-    )
 
     add_property_linked_note(adapter, "Gear Data", 0.018, 0.262)
     add_property_linked_note(adapter, "Manufacturing Notes", 0.018, 0.095)

@@ -9,8 +9,7 @@ fastener catalog row (also pure data) so the knob keeps one thread source.
 from __future__ import annotations
 
 from _fastener_catalog import fastener
-from _gtol_spec import TorusFace
-from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from _surface_finish import SurfaceFinishControl
 
 
 _STUD = fastener("cone-lock-knob")
@@ -27,17 +26,10 @@ STUD_DIA = _STUD.model_diameter_mm  # 1/4" clamp stud
 STUD_LEN = _STUD.length_mm  # plate thickness exactly: stud ends flush with base top
 STUD_THREAD = _STUD.thread  # 1/4-20
 
-SURFACE_FINISHES = (
-    SurfaceFinishControl(
-        "dome_crown",
-        MACHINED_UM,
-        TorusFace(
-            DOME_MAJOR_R,
-            DOME_R,
-            center_mm=(0.0, DOME_CENTER_Y, 0.0),
-        ),
-    ),
-)
+# No roughness callouts: nothing runs on the knob -- the dome is a hand grip
+# and the stud is a clamp thread -- so the title block's Ra 3.2 covers every
+# face (cad/docs/drawing-simplicity-policy.md rule 5).
+SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "WasherProfile": {"WasherDia"},
@@ -49,20 +41,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Stud": {"StudLen"},
 }
 
+# Notes: part-specific process facts only, never a tolerance, never the
+# title block (drawing-simplicity-policy.md rule 6).
 DRAWING_NOTES = "\n".join(
     (
-        "TURN COMPLETE IN ONE SETUP; FORM DOME R5 BY RADIUS TOOL OR CNC;",
-        "  DOME TANGENT TO BODY OD, O3 FLAT AT APEX (REF).",
-        f"THREAD STUD {STUD_THREAD} UNC-2A; THREAD RELIEF AT SHOULDER",
-        "  PERMITTED, 1.0 WIDE X 0.4 DEEP MAX.",
-        "CHROME PLATE PER ASTM B456 SC2 AFTER MACHINING; MASK THREAD;",
-        "  DIMENSIONS APPLY BEFORE PLATING.",
+        "TURN COMPLETE IN ONE SETUP; FORM THE DOME WITH A RADIUS TOOL.",
+        "THREAD RELIEF AT THE STUD SHOULDER PERMITTED, 1.0 WIDE X 0.4 DEEP MAX.",
+        "MASK THE THREAD FOR PLATING; DIMENSIONS APPLY BEFORE PLATING.",
     )
 )
-
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "washer flange runout": "0.10",
-    "clamp seat perpendicularity": "0.05",
-}

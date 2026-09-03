@@ -12,8 +12,7 @@ from __future__ import annotations
 
 import math
 
-from _gtol_spec import CylinderFace
-from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from _surface_finish import SurfaceFinishControl
 from pinion_lever_geometry import (
     BORE as BORE,
     CAP_RADIUS as CAP_RADIUS,
@@ -27,14 +26,18 @@ from pinion_lever_geometry import (
     WALL_T as WALL_T,
 )
 
-# Symmetric ream band about the 6.3675 mid nominal: 6.375 MAX / 6.360 MIN
-# (running fit on the Ø6.35 pivot shaft).
+# Symmetric band about the 6.3675 mid nominal: 6.375 MAX / 6.360 MIN (running
+# fit on the Ø6.35 pivot shaft).  The blind bore is BORED, not reamed: the
+# print asks for a flat bottom at full diameter, which a reamer cannot leave
+# (machinist review 2026-09-02).
 BORE_BAND = (0.0075, -0.0075)
 BORE_DEPTH_BAND = (0.10, 0.00)
-END_WALL_TOLERANCE_MM = 0.05
 ROD_TIP_Y_TOLERANCE_MM = 0.25
 ROD_TIP_DIAMETER_TOLERANCE_MM = 0.05
-GRIP_HALF_ANGLE_TOLERANCE_DEG = 0.05
+# The taper half-angle is 0.69 deg, so the title block's +/-1 deg would allow
+# a reverse taper; a relaxed explicit band keeps the grip a grip without
+# asking anyone to set a sine bar to 0.05 deg (machinist review 2026-09-02).
+GRIP_HALF_ANGLE_TOLERANCE_DEG = 0.25
 CAP_RADIUS_TOLERANCE_MM = 0.10
 GRIP_HALF_ANGLE_DEG = math.degrees(
     math.atan((ROD_TIP_DIA - ROD_ROOT_DIA) / (2.0 * (ROD_LEN - ROD_Y0)))
@@ -43,43 +46,25 @@ GRIP_HALF_ANGLE_DEG = math.degrees(
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BarrelProfile": {"HubOd", "HubBore"},
     "Barrel": {"BoreDepth"},
+    # The end wall is REFERENCE on the print: the bore depth and the hub
+    # length are both measured from the flat end, so the wall is derived.
     "Wall": {"EndWall"},
     "RodProfile": {"RodTipY", "RodTipDia", "GripHalfAngle"},
-    "CapProfile": {"CapR"},
+    # The crown is a size on the views: its sphere radius and (REF) height.
+    "CapProfile": {"CapR", "CapSagDim"},
 }
 
-SURFACE_FINISHES = (
-    SurfaceFinishControl(
-        key="hub_bore",
-        roughness_um=MACHINED_UM,
-        face=CylinderFace(diameter_mm=BORE),
-    ),
-)
+# No roughness callouts: the hub turns WITH the lift rod (the lever is the
+# rod's input), so nothing runs on the bore; the title block's Ra 3.2 covers
+# every face (cad/docs/drawing-simplicity-policy.md rule 5).
+SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
 
+# Notes: process facts only, never a size (policy rule 6).  The grip station,
+# the hub length and the crown are dimensions on the views.
 DRAWING_NOTES = "\n".join(
     (
-        "DATUM A IS FINISHED BORE AXIS;",
-        "  DATUM B IS FLAT END FACE.",
-        "BORE AND FINISH TO LIMITS IN THE",
-        "  HUB-TURNING SETUP. BLIND BORE BOTTOM",
-        "  MAY HAVE R0.15 MAX CORNER RADIUS.",
-        f"CROWN BREAK AT THE CROWN ROOT PLANE ({HUB_LEN:.2f} REF)",
-        "  SHALL BE R0.10 MAX AND IS EXEMPT FROM THE",
-        "  TITLE-BLOCK EDGE-BREAK REQUIREMENT.",
-        f"GRIP AXIS: {HUB_LEN / 2.0:.2f}+/-0.10 FROM B, MEASURED AT THE",
-        "  POINT OF THE GRIP AXIS NEAREST A; 90+/-0.5 DEG TO A.",
-        "SHORTEST DISTANCE BETWEEN GRIP AXIS AND A:",
-        "  0.00 TO 0.10. GRIP-TO-HUB JUNCTION R0.25 MAX.",
+        "BORE AND FACE THE HUB IN ONE SETUP; FLAT BORE BOTTOM, CORNER R0.15 MAX.",
+        "GRIP AXIS 90 DEG TO THE BORE AXIS; AXES INTERSECT.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
-
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "lever hub OD runout": "0.05",
-    "lever flat-face perpendicularity": "0.05",
-    "lever crown profile": "0.05",
-    "grip tip face flatness": "0.05",
-    "grip tip face perpendicularity": "0.10",
-}

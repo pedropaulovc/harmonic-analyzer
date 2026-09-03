@@ -66,7 +66,6 @@ from crankshaft_spec import (
     JOURNAL_START,
     PIN_HOLE_HEIGHT,
     SHAFT_DIA,
-    SHAFT_DIA_BAND,
     SHAFT_LENGTH,
     SURFACE_FINISHES,
 )
@@ -247,9 +246,10 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
-    set_dimension_bilateral_tolerance(
-        adapter, "ShaftProfile", "ShaftDiaDim", *deviations(SHAFT_DIA_BAND)
-    )
+    # The one running fit -- the journal in the v2 post bore -- carries its band
+    # on the MODEL dimension (drawing-spec-purity).  The 3/8 shaft seats are
+    # pinned / set-screwed, so they stay under the block tolerance
+    # (drawing-simplicity-policy.md rule 2; machinist review 2026-09-02).
     set_dimension_bilateral_tolerance(
         adapter,
         "JournalProfile",

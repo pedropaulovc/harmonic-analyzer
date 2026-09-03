@@ -137,6 +137,9 @@ async def build(adapter) -> dict[str, str]:
         expected_volume_mm3=expected,
     )
     drive_jobs += slot_jobs
+    # Name the slot cut's DEPTH dim so the print dimensions the slot on the
+    # slot-profile view instead of carrying its size in a note.
+    name_dimensions(adapter, "DriverSlot", ["SlotDepth"])
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).

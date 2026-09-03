@@ -9,7 +9,9 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 MM_PER_IN = 25.4
 
 SHAFT_DIA = 0.375 * MM_PER_IN  # 9.525: ch11 legacy ShaftDiameter, uncontradicted
-SHAFT_DIA_BAND = (0.00, -0.02)  # (upper, lower) deviations
+# No band on the 3/8 shaft: every part on it (T12 wheel, 16T pinion, crank
+# arm) is pinned or set-screwed, not running, so the three-place block
+# tolerance holds it (drawing-simplicity-policy.md rule 2; review 2026-09-02).
 SHAFT_LENGTH = 122.0  # 2026-09 re-derive: ends 6.2 past the 16T pinion's north
 # face (ch12 page002_img02 shows a short capped end right behind the pinion,
 # not the 34 mm bare stub the 150 left poking out the column's back)
@@ -24,7 +26,7 @@ SHAFT_LENGTH = 122.0  # 2026-09 re-derive: ends 6.2 past the 16T pinion's north
 JOURNAL_BORE_DIA = 11.438
 JOURNAL_CLEARANCE = 0.05
 JOURNAL_DIA = JOURNAL_BORE_DIA - JOURNAL_CLEARANCE
-JOURNAL_DIA_BAND = (0.00, -0.02)  # (upper, lower) deviations
+JOURNAL_DIA_BAND = (0.00, -0.02)  # (upper, lower) deviations: the one running fit
 JOURNAL_START = 32.755105572
 JOURNAL_END = 104.789505572
 JOURNAL_LENGTH = JOURNAL_END - JOURNAL_START
@@ -39,6 +41,13 @@ SURFACE_FINISHES = (
         production_method="BEARING JOURNAL",
     ),
 )
+# The journal's two turned shoulder roots are drawn sharp; a machinist cannot
+# produce a dead-sharp internal corner, so the print allows a small tool-nose
+# root on both (machinist review 2026-09-02).  Leadered onto the shoulder
+# rather than noted: nothing on the shaft butts hard against either root
+# (the pinion seat sits 0.25 past the upper shoulder; the T12 seat is 15 mm
+# short of the lower one).
+JOURNAL_ROOT_NOTE = "2X ROOT R0.25 MAX"
 # Tapered-pin cross-hole: a native Hole Wizard #9 number drill radially through
 # the crank seat (axis along Z). The diameter comes from the wizard drill table
 # (_holes.NUMBER_DRILL_MM["#9"]); the value is mirrored here so the drawing's
@@ -54,28 +63,18 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Journal": {"JournalLength"},
 }
 # The cross-hole's Ø/THRU callout comes from the associative native Hole Wizard
-# annotation. Its axial station is a drawing-native basic dimension from the
+# annotation. Its axial station is a drawing-native dimension from the
 # crank-end face to the hole axis.
 
-# Lines kept short (<~66 chars) so the left-anchored block stays clear of the
-# title block (x >= 0.264 m); it grows DOWNWARD from its anchor.
+# Notes: part-specific process facts only, never a tolerance (the journal's
+# fit band rides the model dimension), never the title block
+# (drawing-simplicity-policy.md rule 6).
 DRAWING_NOTES = "\n".join(
     (
-        "THE CROSS-HOLE CALLOUT IS THE FINISHED SIZE FOR THIS PART.",
-        "MATCH-REAM WITH CRANK ARM MHA-020 TO FIT CUSTOM TAPER PIN",
-        "MHA-024; ASSEMBLY OPERATION OUTSIDE THIS PART DRAWING.",
-        f"DIA {JOURNAL_DIA:.3f} BEARING JOURNAL RUNS IN DIA",
-        f"{JOURNAL_BORE_DIA:.3f} POST BORE: "
-        f"{JOURNAL_CLEARANCE:.2f} DIAMETRAL CLEARANCE.",
-        "KEEP DIA 9.525 ON T12, PINION, AND CRANK-ARM SEATS.",
+        "TURN BETWEEN CENTRES IN ONE SETTING; CENTRES OK.",
+        "CROSS-HOLE: MATCH-REAM AT ASSEMBLY WITH CRANK ARM MHA-020",
+        "FOR TAPER PIN MHA-024.",
     )
 )
 END_VIEW_NOTE = "CRANK-END VIEW SCALE 2:1"
 CRANK_END_NOTE = "CRANK / OUTBOARD END = LOWER END OF LENGTH VIEW"
-
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "end-face perpendicularity": "0.05",
-    "cross-hole true position": "0.20",
-}

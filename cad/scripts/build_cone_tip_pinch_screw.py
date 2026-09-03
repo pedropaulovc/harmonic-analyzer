@@ -30,6 +30,7 @@ from _common import (
     ensure_fully_defined,
     force_rebuild,
     name_bore_axis,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -87,6 +88,10 @@ async def build(adapter) -> dict[str, str]:
     check("extrude head", await adapter.create_extrusion(
         ExtrusionParameters(depth=HEAD_T)))
     name_last_feature(adapter, "Head")
+    # Name the extrude DEPTH dims so the drawing inserts them as the head-height
+    # and under-head-length model dimensions (the depth is the first display
+    # dim of a blind boss).
+    name_dimensions(adapter, "Head", ["HeadHt"])
     v = math.pi * (HEAD_DIA / 2.0) ** 2 * HEAD_T
     volume = await volume_check(adapter, "head", v, 0.01 * v)
 
@@ -103,6 +108,7 @@ async def build(adapter) -> dict[str, str]:
     check("extrude shank (down)", await adapter.create_extrusion(
         ExtrusionParameters(depth=SHANK_LEN, reverse_direction=True)))
     name_last_feature(adapter, "Shank")
+    name_dimensions(adapter, "Shank", ["ShankLg"])
     v_s = math.pi * (SHANK_DIA / 2.0) ** 2 * SHANK_LEN
     volume = await volume_check(adapter, "shank", volume + v_s, 0.01 * v_s)
 
@@ -125,6 +131,9 @@ async def build(adapter) -> dict[str, str]:
     check("cut slot", await adapter.create_cut_extrude(
         ExtrusionParameters(depth=SLOT_D)))
     name_last_feature(adapter, "DriverSlot")
+    # Name the slot cut's DEPTH dim so the print dimensions the slot on the
+    # slot-profile view instead of carrying its size in a note.
+    name_dimensions(adapter, "DriverSlot", ["SlotDepth"])
     v_slot = _slot_strip_area(HEAD_DIA / 2.0, SLOT_W) * SLOT_D
     volume = await volume_check(adapter, "slot", volume - v_slot, 0.05 * v_slot)
 

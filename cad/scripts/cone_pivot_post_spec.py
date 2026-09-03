@@ -11,8 +11,6 @@ the exact dimensions harvested from v2's feature tree.
 
 from __future__ import annotations
 
-import math
-
 
 MM_PER_IN = 25.4
 
@@ -63,30 +61,9 @@ ATTACHMENT_CBORE_DEPTH = 6.0198
 HARVESTED_VOLUME_MM3 = 112_302.9406
 HARVESTED_MASS_KG = 0.808581173
 
-# Datum-coordinate definition of the inclined journal axis.  The bore passes
-# through the body axis at y=BORE_HEIGHT and points toward +X/+Z.
-_JOURNAL_SIN = math.sin(math.radians(INCLINE_DEG))
-_JOURNAL_COS = math.cos(math.radians(INCLINE_DEG))
-JOURNAL_AXIS_SECOND_POINT_DISTANCE = 100.0
-JOURNAL_AXIS_POINTS = (
-    ("P", 0.0, BORE_HEIGHT, 0.0),
-    (
-        "Q",
-        JOURNAL_AXIS_SECOND_POINT_DISTANCE * _JOURNAL_SIN,
-        BORE_HEIGHT,
-        JOURNAL_AXIS_SECOND_POINT_DISTANCE * _JOURNAL_COS,
-    ),
-)
-JOURNAL_AXIS_ORIENTATION_NOTE = "\n".join(
-    (
-        "O = A/B INTERSECTION; +Y ALONG B AWAY FROM A",
-        "+X RIGHT; +Z DOWN IN UPPER PLAN",
-    )
-)
-
 # Only dimensions that exist natively on the authored model are marked for the
-# curated print.  Boss, journal and counterbore callouts are sourced from these
-# same constants as attached notes, so the drawing cannot drift from the part.
+# curated print.  The inclined journal's leader note is sourced from these
+# same constants, so the drawing cannot drift from the part.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "MainBodyProfile": {"MainBodyDia"},
     "MainBody": {"MainBodyHt"},
@@ -96,26 +73,14 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "CrankBoreProfile": {"CrankBoreDia"},
 }
 
+# Notes: part-specific process facts only, never a tolerance, never the
+# title block (drawing-simplicity-policy.md rule 6).  Material, paint and
+# masking live in the title block; the journal is defined by its leader
+# note; the attachment holes by their native callout.
 DRAWING_NOTES = "\n".join(
     (
-        "CAST ASTM A48 CLASS 30; MACHINE FOOT, BOSSES, BORES AND MOUNTING HOLES.",
-        "DATUM A IS FOOT SEAT; B IS MAIN-BODY OD; C IS INCLINED JOURNAL AXIS.",
-        f"CONE BOSS DIA {CONE_BOSS_DIA:.3f}; JOURNAL BORE DIA {BORE_DIA:.4f} THRU.",
-        f"JOURNAL AXIS INTERSECTS B AT BASIC {BORE_HEIGHT:.3f} ABOVE A; "
-        f"ANGLE {INCLINE_DEG:.4f} DEG ABOUT +Y.",
-        f"CRANK BOSS DIA {CRANK_BOSS_DIA:.3f}; BORE DIA {CRANK_BORE_DIA:.3f} THRU "
-        f"AT BASIC {CRANK_BORE_HEIGHT:.3f} ABOVE A.",
-        f"2X 1/4 FILLISTER C'BORE DIA {ATTACHMENT_CBORE_DIA:.5f} X "
-        f"{ATTACHMENT_CBORE_DEPTH:.4f} DEEP; THRU DIA {ATTACHMENT_THRU_DIA:.5f}; "
-        f"C-C {ATTACHMENT_SPACING:.5f}.",
+        "MACHINE THE FOOT SEAT, BOTH BOSS END FACES, BOTH BORES AND THE TOP FACE;",
+        "AS-CAST ELSEWHERE.",
+        "BORE THE CRANK BORE AND THE INCLINED JOURNAL FROM THE FINISHED FOOT SEAT.",
     )
 )
-
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "datum-A seat flatness": "0.05",
-    "datum-B outside-diameter form": "0.05",
-    "journal-axis true position": "0.05",
-    "crank-bore true position": "0.10",
-}
