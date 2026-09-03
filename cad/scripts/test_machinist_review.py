@@ -348,6 +348,8 @@ def test_review_execution_uses_provider_defaults_and_model_overrides(
     assert prompts[1] == mr.load_prompt("part")
     assert claude_review.passed and claude_review.blind
     assert claude_override.passed and claude_override.blind
+    assert codex_review.passed and codex_review.blind
+    assert codex_override.passed and codex_override.blind
     assert claude_review.extra == {"image_read_events": 1}
 
 
