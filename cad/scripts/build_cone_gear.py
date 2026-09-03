@@ -754,6 +754,16 @@ async def build(adapter) -> dict[str, str]:
         adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
         adapter._attempt(lambda: adapter.currentModel.EditRebuild3(), default=None)
 
+        # Assembly references must survive close/reopen for every member of this
+        # family, not only the last-saved configuration. SolidWorks persists
+        # each configuration's rebuilt data on save only when this mark is set.
+        configuration = _early_bound(
+            adapter.currentModel.GetConfigurationByName(name), "IConfiguration"
+        )
+        configuration.AddRebuildSaveMark = True
+        if not bool(configuration.AddRebuildSaveMark):
+            raise RuntimeError(f"{name}: failed to set rebuild/save mark")
+
         count = read_dimension(adapter, count_dim)
         if abs(count - teeth) > 1e-9:
             raise RuntimeError(

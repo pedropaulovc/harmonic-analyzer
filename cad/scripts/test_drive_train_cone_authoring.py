@@ -6,11 +6,13 @@ import inspect
 from types import SimpleNamespace
 
 import _assembly as assembly
+import build_cone_gear as cone
 import build_drive_train_assembly as drive
 
 
 _SOURCE = inspect.getsource(drive)
 _TREE = ast.parse(_SOURCE)
+_CONE_TREE = ast.parse(inspect.getsource(cone))
 
 
 def _function(name: str) -> ast.FunctionDef | ast.AsyncFunctionDef:
@@ -47,6 +49,31 @@ def _named_call(node: ast.AST, name: str) -> ast.Call:
 
 def _expression(source: str) -> ast.expr:
     return ast.parse(source, mode="eval").body
+
+
+def test_every_cone_configuration_persists_rebuilt_data() -> None:
+    build = next(
+        node
+        for node in _CONE_TREE.body
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "build"
+    )
+    sweep = next(
+        node
+        for node in build.body
+        if isinstance(node, ast.For) and _calls(node, "set_active_configuration")
+    )
+    marks = [
+        node
+        for node in ast.walk(sweep)
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Attribute) and target.attr == "AddRebuildSaveMark"
+            for target in node.targets
+        )
+    ]
+    assert len(marks) == 1
+    assert isinstance(marks[0].value, ast.Constant)
+    assert marks[0].value.value is True
 
 
 def test_all_twenty_cones_are_inserted_directly_in_configuration() -> None:
