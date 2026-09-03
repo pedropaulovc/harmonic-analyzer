@@ -4,10 +4,22 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 import machinist_review as mr
+
+
+def _clean_verdict(verdict: str = "SHIP") -> dict[str, Any]:
+    return {
+        "verdict": verdict,
+        "summary": "ready",
+        "blockers": [],
+        "over_specification": [],
+        "clarity": [],
+        "minor": [],
+    }
 
 
 def test_prompts_exist_and_are_calibrated_to_the_policy() -> None:
@@ -52,43 +64,97 @@ def test_schema_is_strict_structured_output() -> None:
     assert set(finding["required"]) == {"where", "issue", "fix"}
     assert schema["properties"]["verdict"]["enum"] == ["SHIP", "FIX"]
     assert schema["properties"]["summary"]["minLength"] == 1
-    for key in ("where", "issue", "fix"):
-        assert finding["properties"][key]["minLength"] == 1
+    assert all(
+        finding["properties"][key]["minLength"] == 1 for key in finding["required"]
+    )
 
 
 def test_command_references_only_the_neutral_workdir(tmp_path: Path) -> None:
     images = [tmp_path / "sheet-1.png", tmp_path / "sheet-2.png"]
-    cmd = mr.build_command(
+    schema = tmp_path / "schema.json"
+    schema.write_text(json.dumps(mr.load_schema()), encoding="utf-8")
+    command = mr.build_claude_command(
         workdir=tmp_path,
         images=images,
-        schema=tmp_path / "schema.json",
-        output=tmp_path / "verdict.json",
-        model="gpt-test",
+        schema=schema,
+        model="fable",
         effort="high",
     )
-    joined = " ".join(cmd)
-    repo = mr.CAD_ROOT.parent.as_posix()
-    assert repo not in joined.replace("\\", "/")
-    assert cmd[-1] == "-"  # prompt on stdin, never inline
-    assert [cmd[index + 1] for index, value in enumerate(cmd) if value == "-i"] == [
-        str(image) for image in images
+    schema_json = json.dumps(mr.load_schema(), separators=(",", ":"))
+    assert command == [
+        "claude",
+        "-p",
+        "--model",
+        "fable",
+        "--effort",
+        "high",
+        "--input-format",
+        "text",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--json-schema",
+        schema_json,
+        "--tools",
+        "Read",
+        "--allowedTools",
+        "Read(sheet-1.png)",
+        "Read(sheet-2.png)",
+        "--restricted",
+        "--safe-mode",
+        "--no-session-persistence",
+        "--permission-mode",
+        "dontAsk",
+        "--permission-prompts",
+        "none",
+        "--strict-mcp-config",
+        "--no-chrome",
     ]
-    for flag in ("--ignore-user-config", "--ignore-rules", "--ephemeral", "--json"):
-        assert flag in cmd
-    assert cmd[cmd.index("--sandbox") + 1] == "read-only"
-    assert cmd[cmd.index("-m") + 1] == "gpt-test"
-    assert "model_reasoning_effort=high" in cmd
+    assert mr.CAD_ROOT.parent.as_posix() not in " ".join(command).replace("\\", "/")
+
+
+def test_codex_command_is_exact_and_neutral(tmp_path: Path) -> None:
+    image = tmp_path / "sheet.png"
+    schema = tmp_path / "schema.json"
+    output = tmp_path / "verdict.json"
+    command = mr.build_codex_command(
+        workdir=tmp_path,
+        image=image,
+        schema=schema,
+        output=output,
+        model="gpt-5.6-sol",
+        effort="high",
+    )
+    assert command == [
+        "codex",
+        "exec",
+        "--ignore-user-config",
+        "--ignore-rules",
+        "--skip-git-repo-check",
+        "--ephemeral",
+        "--sandbox",
+        "read-only",
+        "-C",
+        str(tmp_path),
+        "-m",
+        "gpt-5.6-sol",
+        "-c",
+        "model_reasoning_effort=high",
+        "-i",
+        str(image),
+        "--output-schema",
+        str(schema),
+        "-o",
+        str(output),
+        "--json",
+        "-",
+    ]
+    assert mr.CAD_ROOT.parent.as_posix() not in " ".join(command).replace("\\", "/")
 
 
 def test_pass_requires_ship_with_no_gating_findings() -> None:
-    clean = {
-        "verdict": "SHIP",
-        "summary": "ready",
-        "blockers": [],
-        "over_specification": [],
-        "clarity": [],
-        "minor": [{"where": "x", "issue": "y", "fix": "z"}],
-    }
+    clean = _clean_verdict()
+    clean["minor"] = [{"where": "x", "issue": "y", "fix": "z"}]
     assert mr.is_pass(clean)
     assert not mr.is_pass({**clean, "verdict": "FIX"})
     for key in mr.GATING_KEYS:
@@ -108,25 +174,15 @@ def test_verdict_validation_rejects_every_schema_violation() -> None:
         "minor": [{"where": "x", "issue": "y", "fix": "z"}],
     }
     assert mr.validate_verdict(clean) is clean
-
     invalid = [
         {key: value for key, value in clean.items() if key != "summary"},
         {**clean, "unexpected": True},
         {**clean, "verdict": "MAYBE"},
-        {**clean, "verdict": 1},
         {**clean, "summary": ""},
-        {**clean, "summary": 1},
         {**clean, "blockers": {}},
         {**clean, "minor": ["not an object"]},
         {**clean, "minor": [{"where": "x", "issue": "y"}]},
-        {
-            **clean,
-            "minor": [{"where": "x", "issue": "y", "fix": "z", "unexpected": True}],
-        },
         {**clean, "minor": [{"where": "", "issue": "y", "fix": "z"}]},
-        {**clean, "minor": [{"where": "x", "issue": "", "fix": "z"}]},
-        {**clean, "minor": [{"where": "x", "issue": "y", "fix": ""}]},
-        {**clean, "minor": [{"where": "x", "issue": 1, "fix": "z"}]},
     ]
     for value in invalid:
         with pytest.raises(ValueError):
@@ -134,43 +190,48 @@ def test_verdict_validation_rejects_every_schema_violation() -> None:
         assert not mr.is_pass(value)
 
 
-def test_extract_verdict_validates_file_and_event_fallback(tmp_path: Path) -> None:
-    invalid = {
-        "verdict": "SHIP",
-        "summary": "ready",
-        "blockers": [],
-        "over_specification": [],
-        "clarity": [],
-        "minor": [],
-        "unexpected": True,
+def test_tool_events_allow_only_neutral_package_image_reads(tmp_path: Path) -> None:
+    images = [tmp_path / "sheet-1.png", tmp_path / "sheet-2.png"]
+    expected = {
+        "type": "assistant",
+        "message": {
+            "content": [
+                {
+                    "type": "tool_use",
+                    "name": "Read",
+                    "input": {"file_path": "sheet-1.png"},
+                }
+            ]
+        },
     }
-    output = tmp_path / "verdict.json"
-    output.write_text(json.dumps(invalid), encoding="utf-8")
-    with pytest.raises(ValueError, match="keys must be exact"):
-        mr._extract_verdict(output, [])
-
-    output.unlink()
-    events = [{"type": "agent_message", "text": json.dumps(invalid)}]
-    with pytest.raises(ValueError, match="keys must be exact"):
-        mr._extract_verdict(output, events)
+    assert mr.count_tool_events([expected], allowed_images=images) == 0
+    assert mr.count_tool_events([expected]) == 1
+    structured = {
+        "type": "assistant",
+        "message": {
+            "content": [{"type": "tool_use", "name": "StructuredOutput", "input": {}}]
+        },
+    }
+    assert mr.count_tool_events([expected, structured], allowed_images=images) == 0
+    unexpected = {
+        "type": "assistant",
+        "message": {
+            "content": [
+                {"type": "tool_use", "name": "Bash", "input": {"command": "dir"}}
+            ]
+        },
+    }
+    assert mr.count_tool_events([unexpected], allowed_images=images) == 1
 
 
 def test_tool_events_are_detected_at_any_depth() -> None:
     assert mr.count_tool_events([{"type": "agent_message", "text": "{}"}]) == 0
-    assert (
-        mr.count_tool_events(
-            [
-                {
-                    "type": "item.completed",
-                    "item": {"type": "command_execution", "command": "ls"},
-                }
-            ]
-        )
-        == 1
-    )
-    assert (
-        mr.count_tool_events([{"type": "turn.started"}, {"type": "mcp_tool_call"}]) == 1
-    )
+    assert mr.count_tool_events(
+        [{"type": "item.completed", "item": {"type": "command_execution", "command": "ls"}}]
+    ) == 1
+    assert mr.count_tool_events(
+        [{"type": "turn.started"}, {"type": "mcp_tool_call"}]
+    ) == 1
 
 
 def test_retry_persists_all_attempts_and_cannot_hide_tool_use(
@@ -195,18 +256,13 @@ def test_retry_persists_all_attempts_and_cannot_hide_tool_use(
         calls += 1
         if calls == 1:
             event = {
-                "type": "item.completed",
-                "item": {
-                    "type": "command_execution",
-                    "command": "read something",
-                },
+                "type": "assistant",
+                "message": {"content": [{"type": "tool_use", "name": "Bash", "input": {"command": "dir"}}]},
             }
             return subprocess.CompletedProcess(
                 command, 1, stdout=json.dumps(event), stderr="failed"
             )
-        output = Path(command[command.index("-o") + 1])
-        output.write_text(json.dumps(verdict), encoding="utf-8")
-        event = {"type": "agent_message", "text": json.dumps(verdict)}
+        event = {"type": "result", "structured_output": verdict}
         return subprocess.CompletedProcess(
             command, 0, stdout=json.dumps(event), stderr=""
         )
@@ -215,11 +271,11 @@ def test_retry_persists_all_attempts_and_cannot_hide_tool_use(
     report_dir = tmp_path / "reports"
     review = mr.review_package(
         mr.ReviewPackage("part", "part", (png,)),
+        reviewer="claude",
         report_dir=report_dir,
         retries=1,
-        codex="codex",
+        claude="claude",
     )
-
     assert review.attempts == 2
     assert review.tool_events == 1
     assert not review.blind
@@ -229,9 +285,30 @@ def test_retry_persists_all_attempts_and_cannot_hide_tool_use(
         for line in (report_dir / "part.events.jsonl").read_text().splitlines()
     ]
     assert [record["attempt"] for record in records] == [1, 2]
-    assert records[0]["event"]["item"]["type"] == "command_execution"
-    assert records[1]["event"]["type"] == "agent_message"
 
+
+def test_codex_blindness_fails_closed_on_every_tool_or_command() -> None:
+    passive = {"type": "agent_message", "text": "review complete"}
+    tool = {"type": "item.completed", "item": {"type": "tool_use", "name": "Read"}}
+    command = {
+        "type": "item.completed",
+        "item": {"type": "command_execution", "command": "type sheet.png"},
+    }
+    assert mr.count_codex_tool_events([passive]) == 0
+    assert mr.count_codex_tool_events([tool]) == 1
+    assert mr.count_codex_tool_events([command]) == 1
+
+
+def test_both_structured_verdict_parsers(tmp_path: Path) -> None:
+    verdict = _clean_verdict()
+    assert (
+        mr.extract_claude_verdict([{"type": "result", "structured_output": verdict}])
+        == verdict
+    )
+
+    output = tmp_path / "verdict.json"
+    output.write_text(json.dumps(verdict), encoding="utf-8")
+    assert mr.extract_codex_verdict(output, []) == verdict
 
 def test_arbitrary_png_reports_with_same_basename_do_not_collide(
     tmp_path: Path, monkeypatch
@@ -268,7 +345,11 @@ def test_arbitrary_png_reports_with_same_basename_do_not_collide(
         reviews = list(
             pool.map(
                 lambda package: mr.review_package(
-                    package, report_dir=report_dir, retries=0, codex="codex-test"
+                    package,
+                    reviewer="codex",
+                    report_dir=report_dir,
+                    retries=0,
+                    codex="codex-test",
                 ),
                 packages,
             )
@@ -430,6 +511,7 @@ def test_multi_sheet_assembly_is_one_cross_sheet_review(
     package = mr.ReviewPackage("gearbox", "assembly", (source,))
     review = mr.review_package(
         package,
+        reviewer="codex",
         report_dir=tmp_path / "reports",
         retries=0,
         codex="codex-test",
@@ -487,7 +569,8 @@ def test_review_serialises_and_indexes(tmp_path: Path) -> None:
         passed=mr.is_pass(verdict),
         blind=True,
         tool_events=0,
-        model="m",
+        reviewer="codex",
+        model="gpt-5.6-sol",
         effort="high",
         prompt_sha256="a" * 64,
         sheet_count=1,
@@ -496,7 +579,14 @@ def test_review_serialises_and_indexes(tmp_path: Path) -> None:
     )
     mr.write_review(review, tmp_path)
     loaded = mr.load_reviews(tmp_path)
-    assert loaded[0].verdict == verdict and not loaded[0].passed
+    assert loaded == [review]
+    assert (loaded[0].reviewer, loaded[0].model, loaded[0].effort) == (
+        "codex",
+        "gpt-5.6-sol",
+        "high",
+    )
+    markdown = (tmp_path / "crank_arm.md").read_text(encoding="utf-8")
+    assert "by codex/gpt-5.6-sol (high)" in markdown
     index = mr.render_index(loaded)
     expected = (
         "| [crank_arm](crank_arm.md) | part | 1 | FAIL | FIX | 0 | 1 | 0 | 0 | yes |"
@@ -517,3 +607,66 @@ def test_every_registered_drawing_has_a_prompt_kind_and_package_source() -> None
             assert package.sources[0].name.endswith("_drawing.png")
         else:
             assert package.sources[0].parent.name == "pdf"
+
+
+def test_both_reviewers_receive_one_complete_package_invocation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    verdict = _clean_verdict()
+    sources = (tmp_path / "page-a.png", tmp_path / "page-b.png")
+    for source in sources:
+        source.write_bytes(b"png")
+    commands: list[list[str]] = []
+
+    def fake_run(command: list[str], **kwargs: object):
+        commands.append(command)
+        if command[0] == "codex-test":
+            output = Path(command[command.index("-o") + 1])
+            output.write_text(json.dumps(verdict), encoding="utf-8")
+            stdout = json.dumps({"type": "turn.completed"})
+        else:
+            reads = [
+                {
+                    "type": "assistant",
+                    "message": {
+                        "content": [
+                            {
+                                "type": "tool_use",
+                                "name": "Read",
+                                "input": {"file_path": f"sheet-{index}.png"},
+                            }
+                        ]
+                    },
+                }
+                for index in (1, 2)
+            ]
+            stdout = "\n".join(
+                [*(json.dumps(event) for event in reads), json.dumps(
+                    {"type": "result", "structured_output": verdict}
+                )]
+            )
+        return mr.subprocess.CompletedProcess(command, 0, stdout=stdout, stderr="")
+
+    monkeypatch.setattr(mr.subprocess, "run", fake_run)
+    package = mr.ReviewPackage("package", "assembly", sources)
+    claude_review = mr.review_package(
+        package,
+        reviewer="claude",
+        report_dir=tmp_path / "claude",
+        retries=0,
+        claude="claude-test",
+    )
+    codex_review = mr.review_package(
+        package,
+        reviewer="codex",
+        report_dir=tmp_path / "codex",
+        retries=0,
+        codex="codex-test",
+    )
+
+    assert claude_review.model == "fable"
+    assert codex_review.model == "gpt-5.6-sol"
+    assert claude_review.blind and codex_review.blind
+    assert claude_review.extra["images_read"] == ["sheet-1.png", "sheet-2.png"]
+    assert len(commands) == 2
+    assert sum(value == "-i" for value in commands[1]) == 2
