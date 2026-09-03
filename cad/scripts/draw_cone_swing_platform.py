@@ -17,8 +17,8 @@ sketch dimensions from the pivot (the sketch origin): west taper run, axial
 length and south edge; the lock notch by its closed-end cap (centre from the
 pivot, full-radius diameter) plus the axis angle in the notes; the south
 corners by their fillet radii; the post-mount taps by entity dimensions from
-the pivot hole (across the axis and along it) and a native callout. DETAIL A
-retains the narrow pivot-end geometry and native hole callout. Its unavailable
+the pivot hole in the main plan view and a native callout.
+DETAIL A retains the narrow pivot-end geometry; its unavailable
 overhang, north widths and north radii are stated in a compact adjacent note
 derived from the same build constants.
 
@@ -42,7 +42,6 @@ from _drawing_common import (
     create_detail_view,
     curate_view_dimensions,
     finalize_drawing,
-    model_point_in_view,
     new_project_drawing,
     read_required_properties,
     set_arc_endpoints_to_center,
@@ -91,7 +90,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (1.0, 3.0)   # 1:2 plan keeps the 266 mm envelope in-zone
+SHEET_SCALE = (1.0, 3.0)  # 1:2 plan keeps the 266 mm envelope in-zone
 _P = 0.5 / 1000.0  # sheet metres per model mm in the 1:2 plan
 
 # Sheet layout (meters).  The 1:2 plan is the main definition view, low
@@ -164,17 +163,12 @@ TOP_KEEP = {
 # detail. State the same values from build constants beside the retained
 # pivot-end geometry instead of introducing fresh selection coordinates.
 _NORTH_CORNER_RADII = {
-    label: radius
-    for label, _x, _z, radius in _CORNERS
-    if label in {"NE", "NW"}
+    label: radius for label, _x, _z, radius in _CORNERS if label in {"NE", "NW"}
 }
 PIVOT_END_GEOMETRY_NOTE = "\n".join(
     (
         "DETAIL A PIVOT-END PROFILE",
-        (
-            f"FROM PIVOT C/L: EAST {HALF_WIDTH_N:.2f}; "
-            f"NORTH {NORTH_OVERHANG:.2f}"
-        ),
+        (f"FROM PIVOT C/L: EAST {HALF_WIDTH_N:.2f}; NORTH {NORTH_OVERHANG:.2f}"),
         (
             f"NORTH EDGE {HALF_WIDTH_N + WEST_HALF_N:.2f}; "
             f"NE R{_NORTH_CORNER_RADII['NE']:.1f}; "
@@ -186,7 +180,7 @@ PIVOT_END_GEOMETRY_NOTE_XY = (
     DETAIL_CENTER[0] + DETAIL_MODEL_RADIUS / 1000.0 + 0.008,
     DETAIL_CENTER[1] - 0.010,
 )
-PIVOT_CALLOUT_OFFSET = (0.030, 0.040)  # from the NW corner, in the detail
+PIVOT_CALLOUT_XY = (_PIVOT[0] + 0.035, _PIVOT[1] + 0.015)
 END_KEEP = {
     "PlateT": (END_CENTER[0] + 0.026, END_CENTER[1]),
 }
@@ -232,14 +226,19 @@ def _view_xy_mapper(adapter: Any, view: Any) -> Any:
     return _view_xy
 
 
-def _plan_circles(adapter: Any, view: Any) -> list[tuple[float, tuple[float, float, float], Any]]:
+def _plan_circles(
+    adapter: Any, view: Any
+) -> list[tuple[float, tuple[float, float, float], Any]]:
     """Every visible circular edge in a plan-family view: (radius m, centre m, edge)."""
     circles: list[tuple[float, tuple[float, float, float], Any]] = []
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
     for component in components:
-        edges = adapter._attempt(
-            lambda c=component: view.GetVisibleEntities2(c, 1), default=()
-        ) or ()
+        edges = (
+            adapter._attempt(
+                lambda c=component: view.GetVisibleEntities2(c, 1), default=()
+            )
+            or ()
+        )
         for raw_edge in edges:
             edge = _early_bound(raw_edge, "IEdge")
             curve = _early_bound(edge.GetCurve(), "ICurve")
@@ -379,8 +378,6 @@ def _entity_dimension(
     return display
 
 
-
-
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -451,12 +448,7 @@ async def build(adapter: Any) -> dict[str, str]:
         f"removed {removed_tap_notes} redundant automatic tapped-hole note(s)"
     )
 
-    detail_nw = model_point_in_view(
-        adapter,
-        detail,
-        (WEST_HALF_N / 1000.0, PLATE_T / 1000.0, NORTH_OVERHANG / 1000.0),
-        label="detail NW corner",
-    )
+    pivot_edge, west_edge, east_edge = _visible_plan_controls(adapter, top)
     top_annotations = curate_view_dimensions(
         adapter, top, keep=TOP_KEEP, view_label="top"
     )
@@ -467,26 +459,22 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, [*top_annotations, *end_annotations], DIMENSION_CALLOUTS
     )
     set_dimension_precision(adapter, top_annotations, DIMENSION_PRECISION)
-    if (
-        add_note(adapter, PIVOT_END_GEOMETRY_NOTE, *PIVOT_END_GEOMETRY_NOTE_XY)
-        is None
-    ):
+    if add_note(adapter, PIVOT_END_GEOMETRY_NOTE, *PIVOT_END_GEOMETRY_NOTE_XY) is None:
         raise RuntimeError("failed to add pivot-end geometry note")
     for label, view in (("plan", top), ("detail", detail)):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME center marks to the {label} view")
     _add_cone_axis_centerline(adapter, top)
 
-    # Pivot hole: the native callout in DETAIL A, on the rim it enlarges.
+    # The derived detail does not expose the pivot-hole rim reliably. Keep
+    # DETAIL A for the end profile, and attach the native hole callout to the
+    # model rim in the main plan view.
     add_native_hole_callout(
         adapter,
-        detail,
-        callout_xy=(
-            detail_nw[0] + PIVOT_CALLOUT_OFFSET[0],
-            detail_nw[1] + PIVOT_CALLOUT_OFFSET[1],
-        ),
+        top,
+        callout_xy=PIVOT_CALLOUT_XY,
         label="pivot-hole size",
-        edge=_pivot_rim(adapter, detail),
+        edge=pivot_edge,
         # 1/4 close clearance (6.756 = 0.266 in) is exactly the H drill.
         process="H DRILL",
     )
@@ -495,7 +483,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # name): the east hole's offset across the axis, the pair's pitch across
     # the axis, and each hole's station along the axis -- every one an
     # entity dimension between rim centres -- plus the native 2X callout.
-    pivot_edge, west_edge, east_edge = _visible_plan_controls(adapter, top)
     _entity_dimension(
         adapter,
         top,

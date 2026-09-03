@@ -49,20 +49,15 @@ def test_unavailable_detail_dimensions_are_replaced_by_build_derived_note() -> N
     }
     part_source = Path(part.__file__).read_text(encoding="utf-8")
     assert 'name_dimensions(adapter, "Plate", ["PlateT"])' in part_source
-    assert (
-        'name_dimensions(adapter, f"Corner{lbl}", [f"Corner{lbl}R"])'
-        in part_source
-    )
+    assert 'name_dimensions(adapter, f"Corner{lbl}", [f"Corner{lbl}R"])' in part_source
 
 
 def test_pivot_end_detail_retains_geometry_and_uses_a_spec_note() -> None:
-    # DETAIL A remains because it clarifies the pivot profile and carries the
-    # native pivot-hole callout, but it never imports the unavailable marks.
+    # DETAIL A remains because it clarifies the pivot profile, but the native
+    # hole callout stays on the main plan's model rim: the derived detail does
+    # not expose that rim through SolidWorks' visible-entity API.
     assert drawing.DETAIL_SCALE == (1, 1)
-    assert (
-        drawing.DETAIL_MODEL_RADIUS
-        > part.HALF_WIDTH_N + part.NORTH_OVERHANG
-    )
+    assert drawing.DETAIL_MODEL_RADIUS > part.HALF_WIDTH_N + part.NORTH_OVERHANG
     north_radii = {
         label: radius
         for label, _x, _z, radius in part._CORNERS
@@ -83,11 +78,11 @@ def test_pivot_end_detail_retains_geometry_and_uses_a_spec_note() -> None:
     )
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'detail_label="A"' in source
-    assert (
-        "for view in (top, end, detail):\n        set_hidden_lines_visible" in source
-    )
+    assert "for view in (top, end, detail):\n        set_hidden_lines_visible" in source
     assert "add_note(adapter, PIVOT_END_GEOMETRY_NOTE" in source
-    assert "edge=_pivot_rim(adapter, detail)" in source
+    assert "edge=pivot_edge" in source
+    assert "adapter,\n        top,\n        callout_xy=PIVOT_CALLOUT_XY" in source
+    assert "edge=_pivot_rim(adapter, detail)" not in source
 
 
 def test_manufacturing_notes_orient_the_reader_and_carry_no_dimension() -> None:
@@ -109,11 +104,35 @@ def test_manufacturing_notes_orient_the_reader_and_carry_no_dimension() -> None:
     # The separate pivot-end geometry note owns only the five unavailable
     # values.
     for banned in (
-        "12.00 E", "16.00 E", "8.00 W", "24.00 E", "37.00 W", "7.00 SOUTH",
-        "192.174", "26.887", "12.518", "8.23", "R10", "R8", "R12", "6.35",
-        "HOLE TABLE", "MACHINE BOTH BROAD FACES", "VIRTUAL-SHARP", "+/-",
-        "WITHIN", "HOLD", "DATUM", "FCF", "REF", "STEEL PLATE", "BLACK OXIDE",
-        "DEBURR", "UOS", "X.XX", "UNC",
+        "12.00 E",
+        "16.00 E",
+        "8.00 W",
+        "24.00 E",
+        "37.00 W",
+        "7.00 SOUTH",
+        "192.174",
+        "26.887",
+        "12.518",
+        "8.23",
+        "R10",
+        "R8",
+        "R12",
+        "6.35",
+        "HOLE TABLE",
+        "MACHINE BOTH BROAD FACES",
+        "VIRTUAL-SHARP",
+        "+/-",
+        "WITHIN",
+        "HOLD",
+        "DATUM",
+        "FCF",
+        "REF",
+        "STEEL PLATE",
+        "BLACK OXIDE",
+        "DEBURR",
+        "UOS",
+        "X.XX",
+        "UNC",
     ):
         assert banned not in notes, banned
     assert drawing.NOTES_XY == (0.016, 0.088)
@@ -133,7 +152,10 @@ def test_axis_centerline_and_controls_come_from_the_model() -> None:
     assert "projected pivot center" in source
     assert "drawing.EditSheet()" in source
     assert "drawing.EditSketch()" not in source
-    assert "pivot_edge, west_edge, east_edge = _visible_plan_controls(adapter, top)" in source
+    assert (
+        "pivot_edge, west_edge, east_edge = _visible_plan_controls(adapter, top)"
+        in source
+    )
 
 
 def test_hole_callouts_state_size_and_process() -> None:
@@ -182,7 +204,9 @@ def test_notch_closed_end_is_dimensioned_beside_the_notch() -> None:
     assert "CapECx" in drawing.TOP_KEEP and "CapECz" in drawing.TOP_KEEP
     assert "CapEDia" in drawing.TOP_KEEP
     # The notch station reads on the west side, nearer than the west mount's.
-    assert drawing._SW[0] < drawing.TOP_KEEP["CapECz"][0] < drawing.WEST_STATION_TEXT_XY[0]
+    assert (
+        drawing._SW[0] < drawing.TOP_KEEP["CapECz"][0] < drawing.WEST_STATION_TEXT_XY[0]
+    )
     # The notch diameter and the south radii are leadered from above the
     # station dimensions' spans (their tops are at the features), never
     # across them.
@@ -258,7 +282,7 @@ def test_v2_post_foot_and_mount_pattern_cascade() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert 'name="PostMountHoles"' in source
     assert 'name_last_feature(adapter, "CrankGearRelief")' not in source
-    assert 'name_last_feature(adapter, axis_name)' in source
+    assert "name_last_feature(adapter, axis_name)" in source
     assert '("post mount west", POST_MOUNT_WEST_XZ)' in source
     assert '("post mount east", POST_MOUNT_EAST_XZ)' in source
 
@@ -289,10 +313,7 @@ def test_plan_layout_stays_inside_the_sheet_zones() -> None:
     assert drawing.TOP_KEEP["WestTaperDx"][1] < drawing._NORTH_Y
     assert drawing.MOUNT_CALLOUT_XY[0] > drawing.WEST_STATION_TEXT_XY[0]
     assert cone_swing_platform_spec.PLAN_VIEW_NOTE == "PLAN VIEW SCALE 1:2"
-    assert (
-        cone_swing_platform_spec.ISOMETRIC_VIEW_NOTE
-        == "ISOMETRIC VIEW SCALE 1:3"
-    )
+    assert cone_swing_platform_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:3"
     assert cone_swing_platform_spec.END_VIEW_NOTE == "END VIEW SCALE 1:2"
 
 
@@ -304,9 +325,10 @@ def test_part_stamps_make_critical_properties() -> None:
 
     config = _config.parts("cone-swing-platform")
     assert config["material"] == config["material_specification"]
-    assert "astm a830/a830m gr 1018 hr steel plate" in str(
-        config["material_specification"]
-    ).lower()
+    assert (
+        "astm a830/a830m gr 1018 hr steel plate"
+        in str(config["material_specification"]).lower()
+    )
     assert "5/16 in minimum stock" in str(config["material_specification"]).lower()
     finish = str(config["finish"]).lower()
     assert "mil-dtl-13924 class 1" in finish

@@ -166,7 +166,9 @@ TOP_KEEP: dict[str, tuple[float, float]] = {}
 _TOP_CHEEK_Y = TOP_NOTCH_FLOOR_Y + 3.0
 _BOTTOM_CHEEK_Y = BOTTOM_NOTCH_HEIGHT / 2.0
 _INNER_CHEEK_X = NOTCH_OFFSET + TOP_NOTCH_WIDTH  # 4.7625 (both notches)
-_SLIDE_FLOOR_PICK_X = NOTCH_OFFSET + 0.6  # left part of the floor, clear of the depth pick
+_SLIDE_FLOOR_PICK_X = (
+    NOTCH_OFFSET + 0.6
+)  # left part of the floor, clear of the depth pick
 _DEPTH_PICK_X = _INNER_CHEEK_X - 0.6
 
 # DETAIL A's clipped stock-face edge is not reliably selectable.  State the
@@ -176,6 +178,7 @@ TOP_CHEEK_OFFSET_NOTE_XY = (
     _detail_a(NOTCH_OFFSET / 2.0, 0.0)[0],
     _detail_a(_BBOX_CX, BAR_LENGTH)[1] + 0.014,
 )
+TOP_NOTCH_WIDTH_TEXT_Y = _detail_a(_BBOX_CX, BAR_LENGTH)[1] + 0.007
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -274,7 +277,7 @@ async def build(adapter: Any) -> dict[str, str]:
         detail_a,
         p0=_detail_a(NOTCH_OFFSET, _TOP_CHEEK_Y),
         p1=_detail_a(_INNER_CHEEK_X, _TOP_CHEEK_Y),
-        text_xy=(_detail_a(_BBOX_CX, 0.0)[0], a_row),
+        text_xy=(_detail_a(_BBOX_CX, 0.0)[0], TOP_NOTCH_WIDTH_TEXT_Y),
         label="top notch width",
         orientation="horizontal",
     )
