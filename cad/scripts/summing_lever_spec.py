@@ -80,8 +80,9 @@ HEX_Z_OUTER = HEX_Z_INNER + HEX_DEPTH  # outboard face overhangs the body (97.92
 # closures (codex #354).
 
 
-# Manufacturing GD&T limits consumed by the part's drawing projection.
+# Manufacturing GD&T limits consumed by the part's drawing projection -- the
+# ONE frame the print keeps (drawing-simplicity-policy.md rule 3: the 20-hole
+# spring pattern).  The anchor bore is an ordinary toleranced coordinate.
 GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "summation anchor position": "0.30",
     "spring-hole pattern position": "0.30",
 }

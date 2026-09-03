@@ -11,32 +11,38 @@ mount.  Imported ONLY by ``build_summing_lever`` and the offline drawing test.
 
 from __future__ import annotations
 
-from summing_lever_spec import HEX_DEPTH, HEX_H, HEX_W, PLATE_L, PLATE_T
+from summing_lever_spec import HOLE_X, PLATE_T, PLATE_W
 
-# --- Marked-dimension contract.  build_summing_lever marks exactly these. ---
+# --- Marked-dimension contract.  build_summing_lever marks exactly these.
+# The pivot diameter is NOT marked: every leader to the cylinder's circle in
+# the front view crosses the edge-rib outline that wraps it, so the sheet
+# dimensions the cylinder on its right view instead (silhouette to
+# silhouette, diameter-prefixed). ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PlateProfile": {"PlateWidth", "PlateLength"},
-    "CylinderProfile": {"CylDia"},
     "SummationAnchorProfile": {"AnchorOuterDia"},
 }
 
-# The spring-hole pattern (count, size, row X, start offset, pitch) and the
-# anchor-eye size/location are dimensioned NATIVELY on the sheet (basic
-# coordinates + position frames); the notes must not repeat those numbers.
-# Note 4 lists the machined features explicitly -- the sheet also carries the
-# 20X controlled spring-hole pattern, so "only knife edges and anchor bore"
-# would contradict it (codex #354).
+# The middle rib stops short of the coefficients plate's free edge so the
+# spring-hole column stays clear (build_summing_lever.MID_RIB_PLATE_REACH =
+# HOLE_X - 4.1; the offline test pins the two equal).
+MID_RIB_REACH = HOLE_X - 4.1  # 35.75 from the pivot axis
+MID_RIB_SHORT_OF_EDGE = PLATE_W - MID_RIB_REACH  # 8.70
+
+# Notes: part-specific process facts only (drawing-simplicity-policy.md rule
+# 6).  The spring-hole pattern, anchor bore, coefficients plate, pivot,
+# trunnions and ribs are dimensioned natively on the sheet (top / right /
+# detail views).  Two casting facts the views cannot carry legibly stay here:
+# the summation arm's as-cast thickness (its faces are hidden in every
+# orthographic view) and where the middle rib ends (its end edge sits
+# between two spring holes).  Lines stay under ~38 characters: the block
+# anchors at (0.020, 0.075) and shares its band with the top view's anchor.
 DRAWING_NOTES = "\n".join(
     (
-        f"1. HEX TRUNNIONS {HEX_W:.2f} W x {HEX_H:.2f} HIGH,",
-        f"   {HEX_DEPTH:.2f} LONG EACH END; VERTEX UP IS",
-        "   THE KNIFE EDGE.",
-        f"2. COEFFICIENT PLATE {PLATE_T:.2f} THICK.",
-        f"3. PIVOT CYLINDER {PLATE_L:.2f} LONG; NO BORE.",
-        "4. CAST PART: UNDIMENSIONED CONTOURS",
-        "   PER SUPPLIED MODEL/PATTERN. MACHINE",
-        "   THE KNIFE EDGES, SPRING HOLES,",
-        "   AND ANCHOR BORE ONLY.",
+        "HEX VERTEX-UP RIDGE IS THE KNIFE EDGE.",
+        f"SUMMATION ARM {PLATE_T:.2f} THICK AS CAST.",
+        f"MID RIB ENDS {MID_RIB_SHORT_OF_EDGE:.2f} SHORT OF PLATE EDGE.",
+        "AS CAST; MACHINE KNIFE EDGES + HOLES.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"

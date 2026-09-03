@@ -20,34 +20,17 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BendPath": {"BendRadius", "ArmRun"},
 }
 
-# Lines kept short (<~60 chars) so the left-anchored block clears both the tall
-# tube elevation and the title block (x >= 0.264 m); it grows DOWNWARD. The
-# screw is the book's p.45 "slotted screw" in the arm end: the spring's top
-# eye rides its exposed shank, so the screw is set once and never removed --
-# the part model carries it integral (build_gooseneck), the notes carry it as
-# the fastener it is.
+# Notes: part-specific process facts only, never a tolerance, never the
+# title block (drawing-simplicity-policy.md rule 6).  The end plug and the
+# axial spring screw (book p.45; 2026-09-02 pass-3 re-derive) are a
+# brazed-then-tapped sub-operation the notes schedule; the screw is set once
+# and never removed, so the part model carries it integral (build_gooseneck).
 DRAWING_NOTES = "\n".join(
     (
-        "1. TUBE <MOD-DIAM>16.00 +/-0.10 X 2.0 WALL; CUT ENDS",
-        "   SQUARE.",
-        "2. FORM CENTERLINE (R51 = CENTERLINE RADIUS):",
-        "   442.3 STRAIGHT LEG TO BEND TANGENT, R51 90-DEG",
-        "   BEND, 44.25 STRAIGHT ARM TO END FACE. LINEAR",
-        "   +/-0.5; RADIUS +/-0.5; ANGLE +/-1 DEG. LEG + ARM",
-        "   CENTERLINES COPLANAR (ELEVATION PLANE) WITHIN 1.0.",
-        "3. END PLUG: AISI 1018 <MOD-DIAM>12.00 (LIGHT PRESS IN",
-        "   BORE) X 6.00, FLUSH WITH ARM END FACE +/-0.10.",
-        "   SILVER-BRAZE BAg-7 PER AWS A5.8, FULL",
-        "   FAYING-SURFACE PENETRATION; EXPOSED GAP 0.10 MAX.",
-        "4. AFTER BRAZE: DRILL + TAP #6-32 UNC X 6.0 DEEP ON",
-        "   THE TUBE AXIS +/-0.15, SQUARE TO THE END FACE.",
-        "5. SPRING SCREW: AISI 1018 SLOTTED ROUND HEAD #6-32",
-        "   X 14 UNDER HEAD; HEAD <MOD-DIAM>10.00 X 2.00; SLOT",
-        "   0.80 WIDE X 0.80 DEEP. SEAT ON END FACE: 8.00",
-        "   +/-0.25 SHANK EXPOSED (SPRING EYE RIDES HERE).",
-        "   NOT REMOVED IN SERVICE; MODELED INTEGRAL.",
-        "6. BEND OVALITY 5% MAX; NO FLATS, KINKS OR CRACKS.",
-        "7. PLATE ALL SURFACES; NO MASKING. DIMS PRE-PLATE.",
+        "TUBE 16.00 OD X 2.0 WALL; R51 BEND, 442.3 LEG AND 44.25 ARM.",
+        "END PLUG 12.00 DIA X 6.00 STEEL, LIGHT PRESS, BRAZED FLUSH.",
+        "AFTER BRAZING, DRILL AND TAP #6-32 X 6.0 DEEP ON THE TUBE AXIS.",
+        "SPRING SCREW #6-32 X 14 SLOTTED HEAD; 8.00 SHANK EXPOSED, LEFT IN.",
     )
 )
 ELEVATION_VIEW_NOTE = "ELEVATION SCALE 1:3"

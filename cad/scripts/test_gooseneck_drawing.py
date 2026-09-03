@@ -1,4 +1,9 @@
-"""Offline contracts for the gooseneck drawing."""
+"""Offline contracts for the gooseneck drawing.
+
+The print follows cad/docs/drawing-simplicity-policy.md: a bent tube with a
+brazed lug carries no datums, frames or roughness symbols, and its notes are
+four lines of forming and brazing fact.
+"""
 
 from __future__ import annotations
 
@@ -10,6 +15,10 @@ import draw_gooseneck as drawing
 import gooseneck_geom as geom
 import gooseneck_spec
 from _drawing_registry import DRAWINGS_BY_NAME
+
+
+def _source() -> str:
+    return Path(drawing.__file__).read_text(encoding="utf-8")
 
 
 def test_required_drawing_paths() -> None:
@@ -26,31 +35,76 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert kept == marked
 
 
-def test_notes_describe_the_chrome_tube_and_bend() -> None:
+def test_notes_are_few_specific_and_never_the_title_block() -> None:
     notes = gooseneck_spec.DRAWING_NOTES
+    lines = notes.split("\n")
+    assert len(lines) <= 4
+    # The block sits left of the tall elevation; keep the lines short.
+    assert max(len(line) for line in lines) <= 68
+    # The tube wall, the leg length (an extrude offset, not a sketch dim) and
+    # the brazed plug/screw are the facts the views cannot carry.
     assert "2.0 WALL" in notes
-    assert "SILVER-BRAZE" in notes
-    assert "AISI 1018" in notes
-    assert "FAYING-SURFACE PENETRATION" in notes
-    assert "CHROME" not in notes
-    assert "X.XX" not in notes
-    # 2026-09-02 photo re-derive (ch19 p.45 close-up): the spring hangs on a
-    # slotted screw driven axially into the plugged arm end, not on a lug +
-    # cross-pin. The notes must schedule plug, tap and screw -- and must
-    # match the modelled nominals so the print and the part cannot drift.
+    assert "BRAZED" in notes
+    # Pass-3 geometry: end plug + axial spring screw, no lug or cross-pin.
     assert "END PLUG" in notes
     assert "#6-32" in notes
-    assert "SLOTTED ROUND HEAD" in notes
-    assert not re.search(r"\bLUG\b", notes)  # \b: the end PLUG stays
+    assert "SLOTTED HEAD" in notes
+    assert f"{part.LEG_TOP - part.LEG_BOTTOM:g} LEG" in notes
+    assert f"{part.ARM_RUN:g} ARM" in notes
+    assert not re.search(r"\bLUG\b", notes)
     assert not re.search(r"\bPIN\b", notes)
-    assert f"X {geom.PLUG_T:.2f}, FLUSH" in notes
-    assert f"HEAD <MOD-DIAM>{geom.SCREW_HEAD_DIA:.2f} X {geom.SCREW_HEAD_T:.2f}" in notes
-    assert f"{geom.SCREW_SHANK_LEN:.2f}\n   +/-0.25 SHANK EXPOSED" in notes
-    leg = part.LEG_TOP - part.LEG_BOTTOM
-    assert f"{leg:g} STRAIGHT LEG" in notes
-    assert f"{part.ARM_RUN:g} STRAIGHT ARM" in notes
-    assert len(notes.splitlines()) <= 22
-    assert max(len(line) for line in notes.splitlines()) <= 60
+    for banned in ("UOS", "DIMENSIONS IN", "+/-", "WITHIN", "MAX", "CHROME", "AISI", "X.XX"):
+        assert banned not in notes, banned
+    source = _source()
+    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+    assert '"Manufacturing Notes", 0.016, 0.114' in source
+
+
+def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:
+    source = _source()
+    for helper in (
+        "add_datum_feature(",
+        "add_feature_control_frame(",
+        "add_surface_finish(",
+        "set_basic_dimension(",
+        "project_part_pmi(",
+    ):
+        assert helper not in source, helper
+    assert not hasattr(gooseneck_spec, "GEOMETRIC_TOLERANCES_MM")
+
+
+def test_hidden_lines_stay_on_in_the_elevation() -> None:
+    source = _source()
+    assert "set_hidden_lines_visible(adapter, front)" in source
+    assert "set_hidden_lines_removed(adapter, iso)" in source
+    assert source.count("set_hidden_lines_removed(") == 1
+
+
+def test_view_scale_is_explicit() -> None:
+    assert drawing.SHEET_SCALE == (1.0, 3.0)
+    source = _source()
+    assert "scale=(1, 3)" in source
+    assert "scale=(1, 4)" in source
+    # The arm-end detail view was intentionally dropped (see the "NO end-screw
+    # detail view" rationale in draw_gooseneck.py): assert no detail-view CALL
+    # exists, not the historical mention in the explanatory comment.
+    assert "CreateDetailViewAt4(" not in source
+    assert "NO end-screw detail view" in source
+    assert gooseneck_spec.ELEVATION_VIEW_NOTE == "ELEVATION SCALE 1:3"
+
+
+def test_part_stamps_make_critical_properties() -> None:
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "apply_drawing_properties" in source
+    assert "clear_dimensions_for_drawing" in source
+    import _config
+
+    config = _config.parts("gooseneck")
+    assert config["material"] == "AISI 1010 seamless steel tube"
+    assert config["material"] == config["material_specification"]
+    assert "chrome" not in str(config["material_specification"]).lower()
+    assert "ASTM B456 SC2" in str(config["finish"])
+    assert int(config["quantity"]) == 1
 
 
 def test_part_reimports_the_geometry_nominals_assemblies_read() -> None:
@@ -75,33 +129,3 @@ def test_part_reimports_the_geometry_nominals_assemblies_read() -> None:
     assert geom.PLUG_T > 0.0
     assert part.PLUG_DIA < geom.TUBE_DIA  # never coincident with the tube OD
     assert part.PLUG_DIA > geom.TUBE_DIA - 2.0 * geom.WALL_T  # real wall overlap
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
-    assert '"Manufacturing Notes", 0.016, 0.114' in source
-
-
-def test_view_scale_is_explicit() -> None:
-    assert drawing.SHEET_SCALE == (1.0, 3.0)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "scale=(1, 3)" in source
-    assert "scale=(1, 4)" in source
-    # The arm-end detail view was intentionally dropped (see the "NO end-screw
-    # detail view" rationale in draw_gooseneck.py): assert no detail-view CALL
-    # exists, not the historical mention in the explanatory comment.
-    assert "CreateDetailViewAt4(" not in source
-    assert "NO end-screw detail view" in source
-    assert gooseneck_spec.ELEVATION_VIEW_NOTE == "ELEVATION SCALE 1:3"
-
-
-def test_part_stamps_make_critical_properties() -> None:
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_properties" in source
-    assert "clear_dimensions_for_drawing" in source
-    import _config
-
-    config = _config.parts("gooseneck")
-    assert config["material"] == "AISI 1010 seamless steel tube"
-    assert config["material"] == config["material_specification"]
-    assert "chrome" not in str(config["material_specification"]).lower()
-    assert "ASTM B456 SC2" in str(config["finish"])
-    assert int(config["quantity"]) == 1

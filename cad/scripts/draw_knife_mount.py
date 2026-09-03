@@ -8,6 +8,12 @@ and the bore are real edges, so
 the block dimensions ride the auto-imported profile marks (block + bore) with the
 depth added across the right-view section.
 
+The knife mount is on the GD&T allowlist (cad/docs/drawing-simplicity-policy.md
+rule 3, knife-edge system): the print keeps exactly ONE position frame on the
+bore to the top-seat datum A, the BASIC bore height that feeds it, the ground
+finish on the bore, and nothing else.  The 1/2-13 hanger-stud tap is a native
+hole callout on the top view.
+
 Run with SolidWorks open::
 
     uv run python cad\scripts\draw_knife_mount.py knife-mount
@@ -28,12 +34,15 @@ from _drawing_common import (
     add_datum_feature,
     add_edge_dimension,
     add_feature_control_frame,
+    add_native_hole_callout,
     add_property_linked_note,
     add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    set_arc_endpoints_to_center,
+    set_basic_dimension,
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
@@ -43,9 +52,11 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from knife_mount_spec import (
     BLK_BOT,
+    BLK_HALF_X,
     BLK_TOP,
     BORE_CY,
     R_BORE,
+    STUD_TAP_DRILL_DIA,
     SUPPORT_Z_THICK,
     SURFACE_FINISHES,
 )
@@ -83,8 +94,18 @@ def _front_y(model_y_mm: float) -> float:
 FRONT_KEEP = {
     "BlockWidth": (FRONT_CENTER[0], _front_y(BLK_BOT) - 0.016),
     "BlockHeight": (FRONT_CENTER[0] - 0.052, FRONT_CENTER[1]),
-    "BoreDia": (FRONT_CENTER[0] - 0.048, _front_y(BORE_CY) + 0.026),
+    # Right of the block, between the position frame above and the Ra symbol
+    # below: the left side carries the stacked block-height + basic bore-height
+    # dimensions, and a leader there would cross the inner dimension line.
+    "BoreDia": (FRONT_CENTER[0] + 0.037, _front_y(BORE_CY) + 0.021),
 }
+# Vertical basic dimension (bore centre to the datum-A top seat) stacked
+# inside the block-height dimension: 13 mm off the block's left edge, the
+# block-height line a further 15 mm out (smaller span nearest the geometry).
+BORE_HEIGHT_TEXT = (
+    FRONT_CENTER[0] - BLK_HALF_X * SHEET_SCALE[0] / 1000.0 - 0.013,
+    (_front_y(BORE_CY) + _front_y(BLK_TOP)) / 2.0,
+)
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
 DIMENSION_CALLOUTS = {
     "BoreDia": "THRU",
@@ -164,9 +185,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="block-depth overall",
     )
 
-    # Datum A = the block top seat (hangs 0.25 under the top-frame casting
-    # underside; carries the 1/2-13 knife-hanger-stud tap); Ra 0.8 on the
-    # bore's working upper wall, tagged on the bore rim (a real circular edge).
+    # The one allowlisted frame: bore position to datum A, the block top seat
+    # the hanger stud hangs it from.  Ra 0.8 on the bore's working upper wall,
+    # tagged on the bore rim (a real circular edge).
     add_datum_feature(
         adapter,
         front,
@@ -193,6 +214,40 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(FRONT_CENTER[0] + 0.052, _front_y(BORE_CY) - 0.020),
         control=surface_finish_by_key(SURFACE_FINISHES, "knife_bore"),
         label="knife bore finish",
+    )
+    # The basic dimension the position frame needs: bore centre to the datum-A
+    # top seat, vertical.  The seat edge is picked 9 mm left of centre, clear
+    # of the datum tag's pick and of the tap's hidden lines (x = +/-5.4 mm);
+    # the bore is picked at 12 o'clock (the frame's own attachment) and the
+    # endpoint is moved to the centre, then the value is boxed.
+    bore_height = add_edge_dimension(
+        adapter,
+        front,
+        p0=(FRONT_CENTER[0] - 0.018, _front_y(BLK_TOP)),
+        p1=(FRONT_CENTER[0], _front_y(BORE_CY) + R_BORE * SHEET_SCALE[0] / 1000.0),
+        text_xy=BORE_HEIGHT_TEXT,
+        label="knife-bore height from datum A",
+        orientation="vertical",
+        entity_types=("EDGE", "EDGE"),
+    )
+    set_arc_endpoints_to_center(
+        adapter, bore_height, label="knife-bore height from datum A"
+    )
+    set_basic_dimension(adapter, bore_height, label="knife-bore height from datum A")
+    # The 1/2-13 hanger-stud tap: a native Hole Wizard callout picked on its
+    # drawn tap-drill circle in the top view.  The tap sits on the block's X
+    # centreline at mid-depth, so the circle is centred on the top view (a
+    # Ø21 circle at 2:1).  Text to the right of the view, clear of the front
+    # view's dimensions below it.
+    add_native_hole_callout(
+        adapter,
+        top,
+        edge_xy=(
+            TOP_CENTER[0] + STUD_TAP_DRILL_DIA * SHEET_SCALE[0] / 2000.0,
+            TOP_CENTER[1],
+        ),
+        callout_xy=(0.165, 0.255),
+        label="hanger-stud tap",
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)

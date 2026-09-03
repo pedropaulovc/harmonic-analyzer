@@ -174,6 +174,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += washer_dims.apply(adapter, "WasherProfile")
     extrude_at_offset(adapter, WASHER_T, WASHER_Y)
     name_last_feature(adapter, "Washer")
+    name_dimensions(adapter, "Washer", ["WasherT"])
     v_washer = math.pi * (WASHER_DIA / 2.0) ** 2 * WASHER_T
     expected += v_washer
     await volume_check(adapter, "washer", expected, 0.005 * v_washer)
@@ -230,6 +231,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += collar_dims.apply(adapter, "CollarProfile")
     extrude_at_offset(adapter, COLLAR_H, COLLAR_Y)
     name_last_feature(adapter, "Collar")
+    name_dimensions(adapter, "Collar", ["CollarHt"])
     v_collar = math.pi * (COLLAR_DIA / 2.0) ** 2 * COLLAR_H
     expected += v_collar
     await volume_check(adapter, "collar", expected, 0.005 * v_collar)
