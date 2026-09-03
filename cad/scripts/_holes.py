@@ -879,11 +879,6 @@ def wizard_hole_on_cylinder(
         str(sub.Name), "SKETCH", 0, 0, 0, False, 0, null_callout(), 0
     ):
         raise RuntimeError(f"hole wizard {label}: cannot edit {sub.Name}")
-    model.EditSketch()
-    pt = (sk.GetSketchPoints2() or [None])[0]
-    pt = _early_bound(pt, "ISketchPoint")
-    pt.SetCoords(point_mm[0] / 1000.0, point_mm[1] / 1000.0, point_mm[2] / 1000.0)
-
     from _common import check
     from solidworks_mcp.adapters.solidworks.sketch import (
         _add_sketch_constraint_impl,
@@ -893,7 +888,18 @@ def wizard_hole_on_cylinder(
     part = _early_bound(adapter.currentModel, "IPartDoc")
     previous_sketch_manager = adapter.currentSketchManager
     adapter.currentSketchManager = sketch_manager
+    editing_sketch = False
+    active_error: BaseException | None = None
     try:
+        model.EditSketch()
+        editing_sketch = True
+        pt = (sk.GetSketchPoints2() or [None])[0]
+        pt = _early_bound(pt, "ISketchPoint")
+        pt.SetCoords(
+            point_mm[0] / 1000.0,
+            point_mm[1] / 1000.0,
+            point_mm[2] / 1000.0,
+        )
         point_id = adapter._register_sketch_entity("Point", pt)
         for plane_name in point_planes:
             plane = part.FeatureByName(plane_name)
@@ -910,9 +916,21 @@ def wizard_hole_on_cylinder(
                     adapter, point_id, plane_id, "coincident"
                 ),
             )
+    except BaseException as error:
+        active_error = error
+        raise
     finally:
         adapter.currentSketchManager = previous_sketch_manager
-    model.EditSketch()
+        if editing_sketch:
+            try:
+                model.EditSketch()
+            except BaseException as cleanup_error:
+                if active_error is None:
+                    raise
+                active_error.add_note(
+                    f"hole wizard {label}: failed to exit placement sketch: "
+                    f"{cleanup_error!r}"
+                )
     _telemetry.debug(f"hole wizard {label}: point constrained, rebuilding")
     model.EditRebuild3()
 

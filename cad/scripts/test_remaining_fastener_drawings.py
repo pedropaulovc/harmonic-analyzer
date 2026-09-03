@@ -430,8 +430,13 @@ def test_crank_keeper_ring_threads_the_pin_hole_clear_of_the_arm() -> None:
         pin.RING_HOLE_X + ring.WIRE_DIA / 2.0 + drive.CRANK_RING_ARM_CLEARANCE
     )
     assert drive.CRANK_RING_Y == pytest.approx(drive.Y_CRANK)
-    assert "[0.0, 0.0, -90.0]" in source
-    assert "rot_z_rows(-90.0)" in source
+    placement_start = source.index("    ring = await place_component(")
+    placement_end = source.index(
+        '        label="crank pin keeper ring",', placement_start
+    )
+    ring_placement = source[placement_start:placement_end]
+    assert "[0.0, 0.0, -90.0]" in ring_placement
+    assert "rot_z_rows(-90.0)" in ring_placement
     ring_source = Path(ring.__file__).read_text(encoding="utf-8")
     assert 'await adapter.create_sweep(SweepParameters(path="KeeperPath"))' in ring_source
     assert "create_revolve" not in ring_source
