@@ -9,6 +9,11 @@ The sheet runs at 4:1 (the plate is 22 x 15 x 2); the isometric carries an
 explicit 2:1 override so it stays clear of the title block.  A flat plate
 needs only the face view (front), one thickness view (right) and the iso.
 
+The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): a
+clamp plate carries no datums, frames, roughness symbols or basic
+dimensions; the hole locators are ordinary coordinate dimensions under the
+title block's general tolerance.
+
 Run with SolidWorks open::
 
     uv run python cad\scripts\draw_guide_lock.py guide-lock
@@ -20,15 +25,11 @@ import argparse
 import sys
 from typing import Any
 
-from guide_lock_spec import GEOMETRIC_TOLERANCES_MM
-
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
     add_edge_dimension,
-    add_feature_control_frame,
     add_native_hole_callout,
     add_property_linked_note,
     curate_view_dimensions,
@@ -37,7 +38,6 @@ from _drawing_common import (
     read_required_properties,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
-    set_basic_dimension,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -94,9 +94,6 @@ HOLE_R_SHEET = HOLE_DIA_MM * SHEET_SCALE[0] / 2000.0
 HOLE_Y_SHEET = _sheet_y(HOLE_XY[0][1])
 HOLE_1_X_SHEET = _sheet_x(HOLE_XY[0][0])
 HOLE_2_X_SHEET = _sheet_x(HOLE_XY[1][0])
-# The right view is seen along -X, so model +Z points screen-LEFT: the z=0
-# screw-entry face (datum A) is the section's right-hand silhouette edge.
-DATUM_FACE_X = RIGHT_CENTER[0] + LOCK_THICK * SHEET_SCALE[0] / 2000.0
 
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
 # position.  Width stacks below the front view (under the hole locators),
@@ -153,11 +150,11 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(4, 1))
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(4, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2, 1))
-    for view in (front, iso):
-        set_hidden_lines_removed(adapter, view)
-    # The right view shows the 2-thick strip edge-on; HLV exposes the screw
-    # holes' through extents.
-    set_hidden_lines_visible(adapter, right)
+    set_hidden_lines_removed(adapter, iso)
+    # Hidden lines ON in every orthographic view: the right view shows the
+    # screw holes' through extents in the 2-thick strip edge-on.
+    for view in (front, right):
+        set_hidden_lines_visible(adapter, view)
 
     # No callout/precision overrides: the imported Width/Height/Depth read
     # fine at the document default, and the hole size ships as a native
@@ -168,10 +165,10 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
 
-    # Hole locators as BASIC dimensions off the datum edges (position tolerance
-    # is carried by the FCF below): each hole's X from the left edge (datum C)
-    # and the shared 2.5 band height from the guide-side edge (datum B).
-    hole_1_x = add_edge_dimension(
+    # Hole locators as ordinary coordinate dimensions off the plate edges: each
+    # hole's X from the left edge and the shared band height from the
+    # guide-side edge (one origin per view).
+    add_edge_dimension(
         adapter,
         front,
         p0=(LEFT_EDGE_X, FRONT_CENTER[1] + 0.010),
@@ -179,8 +176,7 @@ async def build(adapter: Any) -> dict[str, str]:
         text_xy=(0.088, 0.104),
         label="hole-1 X location",
     )
-    set_basic_dimension(adapter, hole_1_x, label="hole-1 X location")
-    hole_2_x = add_edge_dimension(
+    add_edge_dimension(
         adapter,
         front,
         p0=(LEFT_EDGE_X, FRONT_CENTER[1] + 0.020),
@@ -188,8 +184,7 @@ async def build(adapter: Any) -> dict[str, str]:
         text_xy=(0.112, 0.096),
         label="hole-2 X location",
     )
-    set_basic_dimension(adapter, hole_2_x, label="hole-2 X location")
-    hole_band_y = add_edge_dimension(
+    add_edge_dimension(
         adapter,
         front,
         p0=(FRONT_CENTER[0] - 0.014, BOTTOM_EDGE_Y),
@@ -197,92 +192,19 @@ async def build(adapter: Any) -> dict[str, str]:
         text_xy=(0.056, 0.118),
         label="hole band height",
     )
-    set_basic_dimension(adapter, hole_band_y, label="hole band height")
 
-    # Native datum/GD&T/surface annotations.  Right view is the 2-thick strip
-    # section: its z=0 screw-entry face (against the guide rail) is datum A.
-    add_datum_feature(
-        adapter,
-        right,
-        edge_xy=(DATUM_FACE_X, RIGHT_CENTER[1] + 0.006),
-        symbol_xy=(DATUM_FACE_X + 0.016, RIGHT_CENTER[1] + 0.024),
-        datum="A",
-        label="lock rail-mating face",
-    )
-    # The standoff MUST be perpendicular to the attached edge: this is the
-    # plate's horizontal bottom edge, so the symbol offsets in Y. An X offset
-    # runs ALONG the edge, leaving zero room for the attachment triangle, which
-    # then renders inside the box on top of the letter (measured: a symbol at
-    # bottom-edge height put the triangle in the "B"'s bowl).
-    #
-    # X=0.156 drops it into the one pocket the locator chain leaves: the
-    # 22.00/18.00 dimension lines (y 0.0851/0.0932) span only x 0.076..0.164 and
-    # the 4.00 (y 0.1013) stops at x=0.096, so x 0.148..0.164 is clear from the
-    # 18.00 line up to the plate edge -- an 18.6 mm gap, centred here. The 7.1 mm
-    # box hangs 8 mm below the edge, clearing the 18.00 line by 3.7 mm.
-    add_datum_feature(
-        adapter,
-        front,
-        edge_xy=(FRONT_CENTER[0] + 0.036, BOTTOM_EDGE_Y),
-        symbol_xy=(FRONT_CENTER[0] + 0.036, BOTTOM_EDGE_Y - 0.008),
-        datum="B",
-        label="lock guide-side edge",
-    )
-    add_datum_feature(
-        adapter,
-        front,
-        edge_xy=(LEFT_EDGE_X, FRONT_CENTER[1] + 0.018),
-        symbol_xy=(LEFT_EDGE_X - 0.016, FRONT_CENTER[1] + 0.018),
-        datum="C",
-        label="lock end edge",
-    )
-    add_feature_control_frame(
-        adapter,
-        front,
-        edge_xy=(HOLE_2_X_SHEET + HOLE_R_SHEET, HOLE_Y_SHEET),
-        frame_xy=(0.176, 0.134),
-        characteristic="position",
-        # Fixed-fastener stack (codex machinist review): close-fit Ø3.048 over
-        # the #4 screws' Ø2.845 majors leaves ~Ø0.20 of position TOTAL across
-        # the plate + rail pair, so this plate's share is Ø0.10 -- Ø0.20 here
-        # would consume the whole stack alone.
-        tolerance=GEOMETRIC_TOLERANCES_MM["screw-hole position"],
-        datums=("A", "B", "C"),
-        diameter=True,
-        quantity="2X",
-        label="screw-hole position",
-    )
-    add_feature_control_frame(
-        adapter,
-        right,
-        # Pick on datum face A CLEAR of the screw-hole band.  Seen edge-on in
-        # the right view the Ø3.048 holes read as hidden edges at y = 0.122 +-
-        # 0.0061 (0.1159..0.1281 sheet); a pick at the old -0.022 (=0.128)
-        # landed on the hole-edge/datum-face intersection, so the FCF could
-        # attach to the hole edge instead.  -0.006 sits above the band (like
-        # the +0.006/+0.030 datum and finish picks), on a clean face point.
-        edge_xy=(DATUM_FACE_X, RIGHT_CENTER[1] - 0.006),
-        frame_xy=(0.248, 0.124),
-        characteristic="flatness",
-        tolerance=GEOMETRIC_TOLERANCES_MM["rail-mating face flatness"],
-        label="rail-mating face flatness",
-    )
     # The bent leader elbows at the text's LEFT end, so the text must start just
-    # RIGHT of the hole it points at or the tail rakes back across the view: the
-    # old (0.094, 0.198) centred the ~45 mm wide "2X Ø3.05 THRU ALL" so its
-    # elbow fell at x=0.071, left of hole 1 at x=0.093, and the tail ran as one
-    # long diagonal down across the whole plate face. Centred at 0.117 the text
-    # starts at ~0.094 and the tail drops nearly vertically into the bore.
+    # RIGHT of the hole it points at or the tail rakes back across the view.
     add_native_hole_callout(
         adapter,
         front,
         edge_xy=(HOLE_1_X_SHEET, HOLE_Y_SHEET + HOLE_R_SHEET),
         callout_xy=(0.117, 0.196),
         label="guide-lock screw holes",
+        process="DRILL",
     )
-    # x=0.020: the note anchor IS the text's left edge, so the ink starts here.
-    # The 0.0127 margin ISheet::GetZoneMargin declares and the re-centred border
-    # rule (~0.0126) now agree; 0.020 clears both, and the audit enforces it.
+    # x=0.020: the note anchor IS the text's left edge; it clears the 12.7 mm
+    # zone margin the audit enforces.
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
     add_property_linked_note(adapter, "Isometric View Note", 0.315, 0.160)
 

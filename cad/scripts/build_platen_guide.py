@@ -77,7 +77,9 @@ HOLE_X = tuple(s + d for s in LOCK_STATION_X for d in (-LOCK_SCREW_DX, LOCK_SCRE
 SCREW_STATION_X = (26.964, 80.892, 134.82, 188.748, 242.676)
 SCREW_HOLE_DEPTH = 4.0
 
-DRAWING_NOTES = "HOLE POSITION PER FCF."
+# Part-specific process facts only (drawing-simplicity-policy.md rule 6):
+# the hole table carries every station and wizard callout.
+DRAWING_NOTES = "10 X 5 BAR STOCK FACES OK AS RECEIVED; TAP FROM THE FACE SHOWN."
 
 
 def _apply_drawing_properties(adapter) -> None:
