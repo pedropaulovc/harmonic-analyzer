@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import ast
+
 from pathlib import Path
 
 import connecting_rod_notes
@@ -56,7 +58,7 @@ def test_draw_view_math_matches_the_spec() -> None:
     assert connecting_rod_spec.HEAD_HEIGHT == rod.HEAD_HEIGHT
     assert connecting_rod_spec.HEAD_CROWN_ABOVE_PIN == rod.HEAD_CROWN_ABOVE_PIN
     assert connecting_rod_spec.HEAD_THICKNESS == rod.HEAD_THICKNESS
-    # The head detail's picks read the build's head stations.
+    # The head note and part build read the same spec-owned profile values.
     assert connecting_rod_spec.HEAD_SHOULDER_RISE == rod.HEAD_SHOULDER_RISE
     assert connecting_rod_spec.HEAD_START_Y == rod.HEAD_START_Y
     assert connecting_rod_spec.SHOULDER_TOP_Y == rod.SHOULDER_TOP_Y
@@ -86,8 +88,8 @@ def test_notes_are_few_specific_and_never_the_title_block() -> None:
     assert len(lines) <= 4
     assert "RING, SHANK AND HEAD SHARE ONE MIDPLANE" in notes
     assert "RING WALL 4.50 MIN AFTER BORING" in notes
-    # The as-cast head and thicknesses are view dimensions; the ring sizes
-    # live in a separate geometry note, while manufacturing prose stays
+    # The as-cast head and ring geometry live in separate spec-derived notes;
+    # the thicknesses remain view dimensions, while manufacturing prose stays
     # process-only.
     for moved in (
         "PER PATTERN",
@@ -181,18 +183,45 @@ def test_details_carry_the_ring_head_and_thickness_step() -> None:
         > connecting_rod_spec.HEAD_TOP_Y
     )
     assert drawing.STEP_DETAIL_MODEL_CY == connecting_rod_spec.RING_OUTER_RADIUS
-    assert source.count("add_edge_dimension(") == 8
-    for label in (
-        "head width",
-        "head shoulder rise",
-        "head height",
-        "ring thickness",
-        "shank thickness",
-    ):
+
+    assert drawing.HEAD_GEOMETRY_NOTE == "\n".join(
+        (
+            "DETAIL B AS-CAST HEAD",
+            f"WIDTH {connecting_rod_spec.HEAD_WIDTH:.2f}",
+            f"HEIGHT {connecting_rod_spec.HEAD_HEIGHT:.2f} FROM SHOULDER ROOT",
+            f"SHOULDER RISE {connecting_rod_spec.HEAD_SHOULDER_RISE:.2f}",
+            f"CROWN {connecting_rod_notes.CROWN_CALLOUT}",
+        )
+    )
+    assert "add_note(\n            adapter,\n            HEAD_GEOMETRY_NOTE," in source
+    assert drawing.HEAD_GEOMETRY_NOTE_XY[1] > (
+        drawing.HEAD_DETAIL_CENTER[1]
+        + drawing.HEAD_DETAIL_MODEL_RADIUS
+        * drawing.HEAD_DETAIL_SCALE[0]
+        / drawing.HEAD_DETAIL_SCALE[1]
+        / 1000.0
+    )
+
+    # No head-detail call may depend on selecting derived-view geometry.
+    tree = ast.parse(source, filename=str(drawing.__file__))
+    brittle_head_calls = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id in {"add_edge_dimension", "add_attached_note"}
+        and len(node.args) >= 2
+        and isinstance(node.args[1], ast.Name)
+        and node.args[1].id == "head_detail"
+    ]
+    assert brittle_head_calls == []
+    assert "_head_xy" not in source
+
+    assert source.count("add_edge_dimension(") == 5
+    for label in ("ring thickness", "shank thickness"):
         assert f'label="{label}"' in source, label
-    assert source.count("set_arc_endpoints_to_max(") == 2
-    assert source.count("add_attached_note(") == 1
-    assert "text=CROWN_CALLOUT" in source
+    assert source.count("set_arc_endpoints_to_max(") == 1
+    assert "add_attached_note(" not in source
     # The details stand clear of the title block and of each other.
     for center, model_radius, scale in (
         (drawing.RING_DETAIL_CENTER, drawing.RING_DETAIL_MODEL_RADIUS, 2.0),

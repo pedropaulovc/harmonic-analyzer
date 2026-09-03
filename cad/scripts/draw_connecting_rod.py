@@ -14,8 +14,8 @@ what is too small or too crowded at 1:1 (policy rule 7, machinist review
 * DETAIL A (2:1) -- the ring: a compact spec-derived note states the outer
   diameter, strap-bore limits and shank width beside the enlarged geometry;
   the bore also carries its roughness symbol.
-* DETAIL B (3:1) -- the as-cast head: width across the cheeks, shoulder rise,
-  height from the shoulder root, and the FULL R crown flag.
+* DETAIL B (3:1) -- the as-cast head: a complete spec-derived note states the
+  cheek width, shoulder rise, shoulder-root height, and FULL R crown.
 * DETAIL C (3:1, from the left view) -- the stepped thickness where the 3.00
   ring meets the 2.50 shank.
 
@@ -41,7 +41,6 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_attached_note,
     add_edge_dimension,
     add_native_hole_callout,
     add_property_linked_note,
@@ -62,8 +61,8 @@ from _surface_finish import surface_finish_by_key
 from connecting_rod_notes import CROWN_CALLOUT, RING_GEOMETRY_NOTE
 from connecting_rod_spec import (
     CENTER_DISTANCE,
-    HEAD_CROWN_CY,
-    HEAD_START_Y,
+    HEAD_HEIGHT,
+    HEAD_SHOULDER_RISE,
     HEAD_TOP_Y,
     HEAD_WIDTH,
     PIN_HOLE_DIA,
@@ -74,7 +73,6 @@ from connecting_rod_spec import (
     RING_THICKNESS,
     SHANK_THICKNESS,
     SHANK_WIDTH,
-    SHOULDER_TOP_Y,
     SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
@@ -154,12 +152,6 @@ def _detail_xy(
     return (center[0] + mu * factor, center[1] + (mv - model_cy) * factor)
 
 
-def _head_xy(mx: float, my: float) -> tuple[float, float]:
-    return _detail_xy(
-        HEAD_DETAIL_CENTER, HEAD_DETAIL_MODEL_CY, HEAD_DETAIL_SCALE, mx, my
-    )
-
-
 def _step_xy(mz: float, my: float) -> tuple[float, float]:
     return _detail_xy(
         STEP_DETAIL_CENTER, STEP_DETAIL_MODEL_CY, STEP_DETAIL_SCALE, mz, my
@@ -172,6 +164,29 @@ def _step_xy(mz: float, my: float) -> tuple[float, float]:
 RING_GEOMETRY_NOTE_XY = (
     RING_DETAIL_CENTER[0] + RING_DETAIL_MODEL_RADIUS * 2.0 / 1000.0 + 0.007,
     RING_DETAIL_CENTER[1] + 0.040,
+)
+
+# DETAIL B's derived view likewise exposes no stable selectable edges on this
+# seat. State the complete, spec-owned head profile beside the enlarged shape.
+HEAD_GEOMETRY_NOTE = "\n".join(
+    (
+        "DETAIL B AS-CAST HEAD",
+        f"WIDTH {HEAD_WIDTH:.2f}",
+        f"HEIGHT {HEAD_HEIGHT:.2f} FROM SHOULDER ROOT",
+        f"SHOULDER RISE {HEAD_SHOULDER_RISE:.2f}",
+        f"CROWN {CROWN_CALLOUT}",
+    )
+)
+HEAD_GEOMETRY_NOTE_XY = (
+    HEAD_DETAIL_CENTER[0],
+    (
+        HEAD_DETAIL_CENTER[1]
+        + HEAD_DETAIL_MODEL_RADIUS
+        * HEAD_DETAIL_SCALE[0]
+        / HEAD_DETAIL_SCALE[1]
+        / 1000.0
+        + 0.014
+    ),
 )
 # Ra on the strap bore, attached to the main front view's model rim because
 # SolidWorks exposes no model edges through the derived detail on this seat.
@@ -355,56 +370,18 @@ async def build(adapter: Any) -> dict[str, str]:
         orientation="horizontal",
     )
 
-    # DETAIL B, the as-cast head: width across the cheeks (above the crown),
-    # shoulder rise (right), height from the shoulder root to the crown top
-    # (left), and the crown flagged FULL R.
-    half_head = HEAD_WIDTH / 2.0
-    half_shank = SHANK_WIDTH / 2.0
-    cheek_y = (SHOULDER_TOP_Y + HEAD_CROWN_CY) / 2.0
-    add_edge_dimension(
-        adapter,
-        head_detail,
-        p0=_head_xy(-half_head, cheek_y),
-        p1=_head_xy(half_head, cheek_y),
-        text_xy=(HEAD_DETAIL_CENTER[0], _head_xy(0.0, HEAD_TOP_Y)[1] + 0.012),
-        label="head width",
-        orientation="horizontal",
-    )
-    add_edge_dimension(
-        adapter,
-        head_detail,
-        p0=_head_xy(half_shank, HEAD_START_Y),
-        p1=_head_xy(half_head, SHOULDER_TOP_Y),
-        text_xy=(
-            _head_xy(half_head, 0.0)[0] + 0.016,
-            _head_xy(0.0, (HEAD_START_Y + SHOULDER_TOP_Y) / 2.0)[1],
-        ),
-        label="head shoulder rise",
-        orientation="vertical",
-        entity_types=("VERTEX", "VERTEX"),
-    )
-    head_height = add_edge_dimension(
-        adapter,
-        head_detail,
-        p0=_head_xy(-half_shank, HEAD_START_Y),
-        p1=_head_xy(0.0, HEAD_TOP_Y),
-        text_xy=(
-            _head_xy(-half_head, 0.0)[0] - 0.014,
-            _head_xy(0.0, (HEAD_START_Y + HEAD_TOP_Y) / 2.0)[1],
-        ),
-        label="head height",
-        orientation="vertical",
-        entity_types=("VERTEX", "EDGE"),
-    )
-    set_arc_endpoints_to_max(adapter, head_height, label="head height")
-    add_attached_note(
-        adapter,
-        head_detail,
-        text=CROWN_CALLOUT,
-        entity_xy=_head_xy(half_head * 0.6, HEAD_CROWN_CY + half_head * 0.8),
-        note_xy=(HEAD_DETAIL_CENTER[0] + 0.020, _head_xy(0.0, HEAD_TOP_Y)[1] + 0.004),
-        label="head crown full round",
-    )
+    # DETAIL B, the as-cast head: the derived view exposes no stable edges on
+    # this seat, so every head-profile size renders from the shared spec beside
+    # the useful enlarged geometry.
+    if (
+        add_note(
+            adapter,
+            HEAD_GEOMETRY_NOTE,
+            *HEAD_GEOMETRY_NOTE_XY,
+        )
+        is None
+    ):
+        raise RuntimeError("failed to add as-cast head geometry note")
 
     # DETAIL C, the thickness step: the ring's 3.00 across its flat faces
     # (picked above the bore's projected span, so only the OD edge is there)
