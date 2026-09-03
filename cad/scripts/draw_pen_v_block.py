@@ -157,6 +157,9 @@ HEIGHT_TEXT_XY = (RIGHT_RIGHT_X + 0.022, RIGHT_CENTER[1])
 DIMENSION_CALLOUTS = {
     "Bore0Dia": "2X DRILL THRU",
     "ScrewHoleDiaDim": "DRILL THRU",
+    # The bare 4.50 beside the end view can be mistaken for an overall or a
+    # station.  Name the visible notch feature directly on its depth dimension.
+    "GrooveDepth": "GROOVE DEPTH",
 }
 # The two end chamfers as one leader callout off the right chamfer edge, so no
 # dimension line runs through the text (a 24 mm dimension line cannot carry it).

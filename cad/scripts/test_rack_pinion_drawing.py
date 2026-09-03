@@ -114,7 +114,7 @@ def test_bore_leaders_land_on_opposite_sides_of_the_bore() -> None:
         assert abs(x - cx) >= 0.030
 
 
-def test_section_replaces_the_side_view_and_states_the_face_width() -> None:
+def test_section_replaces_side_view_and_disambiguates_scale_and_profile() -> None:
     source = _source()
     assert "create_section_view(" in source
     assert "show_only_cut_face(adapter, section" in source
@@ -126,7 +126,10 @@ def test_section_replaces_the_side_view_and_states_the_face_width() -> None:
         == drawing.FRONT_CENTER[0]
     )
     assert drawing.SECTION_HALF_LINE > spec.OUTSIDE_DIA / 2000.0
-    assert drawing.SECTION_NOTE == f"SECTION A-A\nFACE WIDTH {spec.FACE_WIDTH:.2f}"
+    assert drawing.SECTION_NOTE == (
+        f"SECTION A-A SCALE {drawing.VIEW_SCALE[0]}:{drawing.VIEW_SCALE[1]}\n"
+        f"AXIAL DISC PROFILE - FACE WIDTH {spec.FACE_WIDTH:.2f}"
+    )
     assert "add_note(adapter, SECTION_NOTE, *SECTION_NOTE_XY)" in source
     assert drawing.SECTION_NOTE_XY[0] < drawing.SECTION_CENTER[0]
     assert "add_edge_dimension(" not in source

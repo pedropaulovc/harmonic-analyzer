@@ -21,7 +21,6 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
-import math
 import sys
 from typing import Any
 
@@ -35,7 +34,6 @@ from _drawing_common import (
     create_section_view,
     curate_view_dimensions,
     finalize_drawing,
-    model_point_in_view,
     new_project_drawing,
     read_required_properties,
     set_arc_endpoints_to_center,
@@ -82,17 +80,17 @@ FRONT_BBOX_CY = (ROD_LEN - HUB_OD / 2.0) / 2.0
 # At 1:1 the full 86 mm rod leaves enough room for the hub callouts without
 # crowding the orthographic views.
 FRONT_CENTER = (0.078, 0.170)
-# Shift the long axial section right of the front-view half-angle note.  Its
-# left edge now clears that note instead of sharing the upper-centre text band.
+# The long axial section stays right of the front-view half-angle note.  Its
+# dimension text uses fixed, surveyed sheet lanes below and above the cut.
 SECTION_CENTER = (0.240, 0.185)
 # Top view (XZ, looking down the grip): the hub square with the crown up
 # (SolidWorks' *Top puts model +Z down the sheet).  bbox z runs
 # -(HUB_LEN/2 + CAP_SAG)..HUB_LEN/2.
 TOP_BBOX_CZ = (HUB_LEN / 2.0 - (HUB_LEN / 2.0 + CAP_SAG)) / 2.0
 TOP_CENTER = (0.290, 0.135)
-# The isometric and its caption sit clear of the title block (top edge at
-# sheet y ~0.0655).
-ISO_CENTER = (0.345, 0.125)
+# Shift the isometric right so the crown-radius annotation can use a dedicated
+# lane below the top view without crossing the isometric rod.
+ISO_CENTER = (0.370, 0.125)
 
 
 def _front_x(model_x_mm: float) -> float:
@@ -119,21 +117,17 @@ FRONT_KEEP = {
     "RodTipDia": (0.125, 0.250),
     "GripHalfAngle": (0.135, 0.205),
 }
-TOP_KEEP = {"CapR": (0.318, 0.158)}
-# Section: parametric name -> (up, along +Z) offsets in metres from the
-# projected model origin (the hub centre).  The section's mirror is
-# SolidWorks' choice, so positions are derived at build time from the projected
-# axes (``_section_frame``): "up" is whichever of +/-Y points up the sheet,
-# +Z runs from the crown to the flat end.  Bore depth has its own lower lane;
-# the two (REF) sizes use widely separated upper lanes; and the section label
-# is lower still.  This keeps every two-line machining note off the rod-angle
-# callout, section outline, and neighboring note.
+TOP_KEEP = {"CapR": (0.305, 0.110)}
+# The section dimensions remain imported model dimensions, while their text
+# positions are direct sheet lanes surveyed around the section outline.  This
+# avoids treating model +Y (the horizontal rod axis in this view) as sheet-up,
+# which previously stacked the depth, end-wall and crown-height annotations.
 SECTION_KEEP = {
-    "BoreDepth": (-0.024, 0.010),
-    "EndWall": (0.022, -0.012),
-    "CapSagDim": (0.038, -0.020),
+    "BoreDepth": (0.260, 0.158),
+    "EndWall": (0.205, 0.215),
+    "CapSagDim": (0.290, 0.215),
 }
-SECTION_LABEL_OFFSET = (-0.045, 0.000)
+SECTION_LABEL_XY = (0.220, 0.142)
 # Process only; every band rides its model dimension (build_pinion_lever).
 DIMENSION_CALLOUTS = {
     "HubBore": "BORE",
@@ -181,41 +175,19 @@ def _leaders_to_circumference(
     adapter.currentModel.EditRebuild3()
 
 
-def _section_frame(
-    adapter: Any, section: Any, *, label: str
-) -> tuple[tuple[float, float], tuple[float, float], tuple[float, float]]:
-    """Sheet origin and unit directions of model +Y and +Z in ``section``."""
-    origin = model_point_in_view(adapter, section, (0.0, 0.0, 0.0), label=f"{label} origin")
-
-    def unit(xyz: tuple[float, float, float]) -> tuple[float, float]:
-        point = model_point_in_view(adapter, section, xyz, label=f"{label} axis")
-        dx, dy = point[0] - origin[0], point[1] - origin[1]
-        norm = math.hypot(dx, dy)
-        if norm < 1e-6:
-            raise RuntimeError(f"{label}: model axis {xyz} projects to a point")
-        return (dx / norm, dy / norm)
-
-    return origin, unit((0.0, 0.01, 0.0)), unit((0.0, 0.0, 0.01))
-
-
-def _at(
-    origin: tuple[float, float],
-    up: tuple[float, float],
-    along: tuple[float, float],
-    offsets: tuple[float, float],
-) -> tuple[float, float]:
-    u, a = offsets
-    return (origin[0] + up[0] * u + along[0] * a, origin[1] + up[1] * u + along[1] * a)
-
-
 def _move_view_label(adapter: Any, view: Any, xy: tuple[float, float], *, label: str) -> None:
-    """Park the view's SECTION label where no dimension will sit under it."""
-    notes = adapter._attempt(lambda: view.GetNotes(), default=None) or ()
+    """Move the generated SECTION caption across both API exposure paths."""
+    notes = list(adapter._attempt(lambda: view.GetNotes(), default=None) or ())
+    if not notes:
+        note = adapter._attempt(lambda: view.GetFirstNote2(), default=None)
+        while note is not None:
+            notes.append(note)
+            note = adapter._attempt(lambda current=note: current.GetNext(), default=None)
+
     moved = False
     for note in notes:
-        note = _sw_type_info.early_bound_or_flag(note, "INote", "GetText", "GetAnnotation")
-        text = str(adapter._attempt(lambda n=note: n.GetText(), default="") or "")
-        if "SECTION" not in text.upper():
+        text = str(adapter._attempt(lambda item=note: item.GetText(), default="") or "")
+        if "SECTION" not in text.upper() and "<VIEW" not in text.upper() and len(notes) != 1:
             continue
         annotation = _sw_type_info.early_bound_or_flag(
             note.GetAnnotation(), "IAnnotation", "SetPosition2"
@@ -223,8 +195,35 @@ def _move_view_label(adapter: Any, view: Any, xy: tuple[float, float], *, label:
         if not annotation.SetPosition2(float(xy[0]), float(xy[1]), 0.0):
             raise RuntimeError(f"{label}: failed to move the section label")
         moved = True
+
     if not moved:
-        _telemetry.warn(f"{label}: section label note not found; left at its default spot")
+        annotations = list(
+            adapter._attempt(lambda: view.GetAnnotations(), default=None) or ()
+        )
+        if not annotations:
+            annotation = adapter._attempt(lambda: view.GetFirstAnnotation3(), default=None)
+            while annotation is not None:
+                annotations.append(annotation)
+                annotation = adapter._attempt(
+                    lambda current=annotation: current.GetNext3(), default=None
+                )
+        for annotation in annotations:
+            specific = adapter._attempt(
+                lambda item=annotation: item.GetSpecificAnnotation(), default=None
+            )
+            text = str(
+                adapter._attempt(lambda item=specific: item.GetText(), default="") or ""
+            )
+            if "SECTION" not in text.upper() and "<VIEW" not in text.upper():
+                continue
+            annotation = _sw_type_info.early_bound_or_flag(
+                annotation, "IAnnotation", "SetPosition2"
+            )
+            if not annotation.SetPosition2(float(xy[0]), float(xy[1]), 0.0):
+                raise RuntimeError(f"{label}: failed to move the section label")
+            moved = True
+    if not moved:
+        raise RuntimeError(f"{label}: section label annotation not found")
     adapter.currentModel.EditRebuild3()
 
 
@@ -290,12 +289,7 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, section, top):
         set_hidden_lines_visible(adapter, view)
 
-    origin, y_axis, z_axis = _section_frame(adapter, section, label="lever section")
-    y_sign = 1.0 if y_axis[1] >= 0.0 else -1.0
-    up = (y_axis[0] * y_sign, y_axis[1] * y_sign)
-    section_keep = {
-        name: _at(origin, up, z_axis, offsets) for name, offsets in SECTION_KEEP.items()
-    }
+    section_keep = dict(SECTION_KEEP)
 
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
@@ -355,12 +349,12 @@ async def build(adapter: Any) -> dict[str, str]:
     _move_view_label(
         adapter,
         section,
-        _at(origin, up, z_axis, SECTION_LABEL_OFFSET),
+        SECTION_LABEL_XY,
         label="lever section",
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
-    add_property_linked_note(adapter, "Isometric View Note", 0.320, 0.078)
+    add_property_linked_note(adapter, "Isometric View Note", 0.350, 0.078)
 
     return await finalize_drawing(
         adapter,

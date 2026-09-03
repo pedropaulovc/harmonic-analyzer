@@ -129,10 +129,9 @@ def test_notes_are_few_specific_and_never_a_dimension() -> None:
     assert not hasattr(top_frame_spec, "INSPECTION_NOTES")
     source = _source()
     assert (
-        'add_property_linked_note(\n'
+        "add_property_linked_note(\n"
         '        adapter, "Manufacturing Notes", 0.016, 0.090, char_height=0.0025\n'
-        "    )"
-        in source
+        "    )" in source
     )
     assert "Manufacturing Notes B" not in source
     assert "Inspection Notes" not in source
@@ -187,12 +186,17 @@ def test_hole_table_is_native_and_anchored_on_the_virtual_rear_left_corner() -> 
     assert all(0.0 < y < 2 * part.OUTER_Z for _x, y in locations)
     assert abs(locations[0][0] - 17.1) < 1e-9 and abs(locations[0][1] - 243.0) < 1e-9
     assert abs(locations[3][0] - 411.1) < 1e-9 and abs(locations[3][1] - 19.0) < 1e-9
-    # Remove only after all view annotations have materialized; an early pass
-    # allowed the generated "#10-24 Tapped Hole" note to overprint A3/A4.
+    # Materialize the cosmetic thread explicitly, then remove its one generic
+    # callout only after the table and native side-tap callout exist.  The table
+    # remains the complete keeper-tap authority without an overprinted A3/A4.
+    importer = re.search(r"import_cosmetic_threads\(\s*adapter,\s*top\s*\)", source)
     remover = 'remove_notes_matching(adapter, "Tapped Hole")'
+    assert importer is not None
     assert remover in source
-    assert source.index(remover) > source.index("insert_hole_table(")
+    assert importer.start() > source.index("insert_hole_table(")
+    assert source.index(remover) > importer.start()
     assert source.index(remover) > source.index("add_native_hole_callout(")
+    assert "if removed_tap_notes != 1:" in source
 
 
 def test_side_taps_and_heights_ride_the_elevation() -> None:
@@ -207,8 +211,7 @@ def test_side_taps_and_heights_ride_the_elevation() -> None:
     # dimension and the side-tap callout.
     assert drawing.FRONT_VIEW_NOTE_XY == (0.264, 0.116)
     assert (
-        'adapter, "Front View Note", *FRONT_VIEW_NOTE_XY, char_height=0.0025'
-        in source
+        'adapter, "Front View Note", *FRONT_VIEW_NOTE_XY, char_height=0.0025' in source
     )
     # drawing dimensions on topologically picked edges (the elevation's bbox
     # is asymmetric, so nothing is picked by sheet coordinate); front/rear
@@ -261,7 +264,7 @@ def test_web_thickness_rides_section_a_a() -> None:
     source = _source()
     assert source.count("create_section_view(") == 1
     assert 'section_label="A"' in source
-    assert "scale=(1, 4),\n        label=\"rail T-section\"" in source
+    assert 'scale=(1, 4),\n        label="rail T-section"' in source
     assert "add_edge_dimension(" not in source
     assert "_section_circles, section_lines = _view_edges(adapter, section)" in source
     assert "view.SelectEntity(entity, index > 0)" in source
@@ -289,7 +292,9 @@ def test_web_thickness_rides_section_a_a() -> None:
     # The cut clears the hub gussets (z <= 33.1) and the nearest hole rim
     # (keeper tap at z 77.1, stud at 90.1 minus its radius).
     assert part.HUB_GUSSET_HALF_OUT + part.GOOSENECK_Z < drawing.SECTION_CUT_Z
-    assert drawing.SECTION_CUT_Z < part.KEEPER_TAP_Z_REAR - part.KEEPER_TAP_SPEC.depth_mm
+    assert (
+        drawing.SECTION_CUT_Z < part.KEEPER_TAP_Z_REAR - part.KEEPER_TAP_SPEC.depth_mm
+    )
 
 
 def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:
@@ -365,11 +370,13 @@ def test_view_scales_are_explicit() -> None:
     # The plan-scale note moved above the hole table that now fills the
     # sheet's upper right.
     assert drawing.TOP_VIEW_NOTE_XY == (0.262, 0.259)
-    assert 'add_property_linked_note(adapter, "Top View Note", *TOP_VIEW_NOTE_XY)' in source
+    assert (
+        'add_property_linked_note(adapter, "Top View Note", *TOP_VIEW_NOTE_XY)'
+        in source
+    )
     assert top_frame_spec.FRONT_VIEW_NOTE == "FRONT VIEW SCALE 1:4"
     assert (
-        'adapter, "Front View Note", *FRONT_VIEW_NOTE_XY, char_height=0.0025'
-        in source
+        'adapter, "Front View Note", *FRONT_VIEW_NOTE_XY, char_height=0.0025' in source
     )
 
 

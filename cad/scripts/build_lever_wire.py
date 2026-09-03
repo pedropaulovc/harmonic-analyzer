@@ -77,7 +77,6 @@ from lever_wire_spec import (
     DRAWING_NOTES,
     END_VIEW_NOTE,
     FRONT_VIEW_NOTE,
-    ISOMETRIC_VIEW_NOTE,
     WIRE_DIA_TOLERANCE_MM,
 )
 
@@ -117,7 +116,12 @@ async def build(adapter) -> dict[str, str]:
     body = SketchDims()
     check("create_sketch wire", await adapter.create_sketch("Top"))
     await define_circle(
-        adapter, 0.0, 0.0, WIRE_DIA / 2.0, "wire", dims=body,
+        adapter,
+        0.0,
+        0.0,
+        WIRE_DIA / 2.0,
+        "wire",
+        dims=body,
         names=("WireCx", "WireCz", "WireDiaDim"),
         drives=(None, None, '"WireDia"'),
     )
@@ -150,15 +154,20 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_symmetric_tolerance(
         adapter, "WireProfile", "WireDiaDim", WIRE_DIA_TOLERANCE_MM
     )
-    await volume_check(adapter, "driven lever wire (equations neutral)", v_wire, 0.005 * v_wire)
+    await volume_check(
+        adapter, "driven lever wire (equations neutral)", v_wire, 0.005 * v_wire
+    )
 
     # YokePlane: the WIRE-1 coupling plane, parallel to Top (perpendicular to
     # the wire axis) through the wheel's hub-pitch yoke point -- see module
     # docstring. Blanked so the infinite plane never renders in assemblies.
     check(
         "create_plane YokePlane",
-        await adapter.create_plane(CreatePlaneParameters(
-            mode="offset", base_plane="Top Plane", offset=YOKE_PLANE_OFFSET)),
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset", base_plane="Top Plane", offset=YOKE_PLANE_OFFSET
+            )
+        ),
     )
     name_last_feature(adapter, "YokePlane")
     _blank_ref_plane(adapter, "YokePlane")
@@ -169,8 +178,11 @@ async def build(adapter) -> dict[str, str]:
     # PIVOTS at the hook instead of sweeping rigidly with the lever group.
     check(
         "ref point HookPoint",
-        await adapter.create_reference_point(CreateReferencePointParameters(
-            mode="arc_center", edge_point=[WIRE_DIA / 2.0, WIRE_LEN, 0.0])),
+        await adapter.create_reference_point(
+            CreateReferencePointParameters(
+                mode="arc_center", edge_point=[WIRE_DIA / 2.0, WIRE_LEN, 0.0]
+            )
+        ),
     )
     name_last_feature(adapter, "HookPoint")
 
@@ -183,8 +195,11 @@ async def build(adapter) -> dict[str, str]:
     # closure, 2026-07-05.
     check(
         "ref point HubPoint",
-        await adapter.create_reference_point(CreateReferencePointParameters(
-            mode="arc_center", edge_point=[WIRE_DIA / 2.0, 0.0, 0.0])),
+        await adapter.create_reference_point(
+            CreateReferencePointParameters(
+                mode="arc_center", edge_point=[WIRE_DIA / 2.0, 0.0, 0.0]
+            )
+        ),
     )
     name_last_feature(adapter, "HubPoint")
 
@@ -212,7 +227,6 @@ async def build(adapter) -> dict[str, str]:
             "Manufacturing Notes": DRAWING_NOTES,
             "Front View Note": FRONT_VIEW_NOTE,
             "End View Note": END_VIEW_NOTE,
-            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
     return await save_part_and_images(adapter, PART_NAME)
@@ -225,7 +239,9 @@ def _blank_ref_plane(adapter, name: str) -> None:
 
     model = adapter.currentModel
     model.ClearSelection2(True)
-    if not model.Extension.SelectByID2(name, "PLANE", 0, 0, 0, False, 0, null_callout(), 0):
+    if not model.Extension.SelectByID2(
+        name, "PLANE", 0, 0, 0, False, 0, null_callout(), 0
+    ):
         raise RuntimeError(f"blank ref plane: cannot select {name!r}")
     model.BlankRefGeom()
     model.ClearSelection2(True)

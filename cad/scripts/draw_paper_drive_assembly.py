@@ -28,9 +28,10 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (1.0, 4.0)
 LAYOUT = AssemblyDrawingLayout(
     working_scale=(1.0, 4.0),
-    exploded_scale=(1.0, 14.0),
+    exploded_scale=(1.0, 22.0),
     procedure_scale=(1.0, 5.0),
     reference_scale=(1.0, 12.0),
+    exploded_center=(0.105, 0.155),
 )
 
 ASSEMBLY_STEPS = (

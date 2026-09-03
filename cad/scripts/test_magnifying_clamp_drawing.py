@@ -105,10 +105,14 @@ def test_thumb_screw_tap_is_a_native_hole_callout_with_the_tap_direction() -> No
     assert source.count("add_native_hole_callout(") == 1
     assert 'label="thumb-screw tap"' in source
     assert "THUMB_SCREW_TAP_DRILL_DIA * _S / 2.0" in source
-    # The concise wording retains both the entry face and destination while
-    # keeping the associative callout inside the sheet border.
+    # The concise wording retains both the entry face and destination.  Its
+    # anchor is eighteen millimetres farther right than the clipped rendering,
+    # leaving the longest callout line safely inside the sheet border without
+    # reaching the rod-bore callout lane.
     assert drawing.THUMB_SCREW_PROCESS == "TOP-FACE TAP INTO LEVER BORE:"
     assert len(drawing.THUMB_SCREW_PROCESS) <= 30
+    assert drawing.THUMB_SCREW_CALLOUT_XY == (0.080, 0.254)
+    assert "callout_xy=THUMB_SCREW_CALLOUT_XY" in source
     assert "process=THUMB_SCREW_PROCESS" in source
     build_source = Path(part.__file__).read_text(encoding="utf-8")
     assert 'HoleSpec("tapped", "#4-40")' in build_source

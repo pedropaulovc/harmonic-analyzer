@@ -111,6 +111,12 @@ def test_view_annotations_follow_the_machinist() -> None:
     assert "face_xy=SIDE_AXIS_FACE_XY" in source
     assert drawing.THREAD_LEADER_XY[1] > drawing.SIDE_CENTER[1]
     assert drawing.THREAD_NOTE_XY[0] < drawing.SIDE_CENTER[0]
+    assert "add_external_thread_depiction(" in source
+    assert drawing.THREAD_AXIS_XY == (
+        (drawing._JUNCTION_X, drawing.SIDE_CENTER[1]),
+        (drawing._TIP_X, drawing.SIDE_CENTER[1]),
+    )
+    assert drawing.THREAD_MODEL_DIAMETER_SHEET == spec.SHANK_DIA * drawing._S
 
 
 def test_notes_are_few_specific_and_never_the_title_block() -> None:

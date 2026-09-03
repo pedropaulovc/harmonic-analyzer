@@ -43,6 +43,7 @@ from _drawing_common import (
     create_section_view,
     curate_view_dimensions,
     finalize_drawing,
+    import_cosmetic_threads,
     insert_hole_table,
     new_project_drawing,
     read_required_properties,
@@ -710,14 +711,21 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, "Front View Note", *FRONT_VIEW_NOTE_XY, char_height=0.0025
     )
 
-    # Curating marked dimensions and inserting the hole table can materialize
-    # Hole Wizard's redundant descriptive notes after the views are placed.
-    # Remove them only after every annotation has been created so the table's
-    # A3/A4 rows cannot be overprinted by "#10-24 Tapped Hole".
-    removed_tap_notes = remove_notes_matching(adapter, "Tapped Hole")
-    _telemetry.info(
-        f"removed {removed_tap_notes} redundant automatic tapped-hole note(s)"
+    # Cosmetic-thread import materializes the model-owned keeper-tap leader as
+    # an ordinary note.  Remove that one redundant description only after the
+    # hole table and every other annotation exist; the table retains its thread,
+    # drill, depth and location while rows A3/A4 stay unobstructed.
+    keeper_thread_seeds, keeper_thread_instances = import_cosmetic_threads(
+        adapter, top
     )
+    removed_tap_notes = remove_notes_matching(adapter, "Tapped Hole")
+    if removed_tap_notes != 1:
+        raise RuntimeError(
+            "top-frame keeper-tap cleanup mismatch: "
+            f"seeds={keeper_thread_seeds}, instances={keeper_thread_instances}, "
+            f"removed={removed_tap_notes}"
+        )
+    _telemetry.info("removed the redundant top-frame keeper-tap callout")
 
     return await finalize_drawing(
         adapter,

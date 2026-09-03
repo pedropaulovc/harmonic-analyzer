@@ -56,10 +56,10 @@ def test_sheet_runs_at_1_to_4_with_1_to_8_isometric() -> None:
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
 
 
-def test_end_features_are_documented_in_enlarged_details() -> None:
+def test_end_features_are_documented_in_deterministic_model_crops() -> None:
     # Policy rule 7: at 1:4 the notches and pin hole are edge-on, so three
-    # 4:1 details carry them.  Every detail is selection-free because this
-    # seat exposes no stable derived-view model edges.
+    # directly placed 4:1 model views are translated onto their actual feature
+    # points and cropped without the empty derived-detail outlines.
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     tree = ast.parse(source)
     calls = tuple(node for node in ast.walk(tree) if isinstance(node, ast.Call))
@@ -72,16 +72,19 @@ def test_end_features_are_documented_in_enlarged_details() -> None:
             or (isinstance(call.func, ast.Attribute) and call.func.attr == name)
         )
 
-    assert len(named_calls("create_detail_view")) == 3
-    detail_labels = {
-        keyword.value.value
-        for call in named_calls("create_detail_view")
-        for keyword in call.keywords
-        if keyword.arg == "detail_label"
-        and isinstance(keyword.value, ast.Constant)
-        and isinstance(keyword.value.value, str)
+    assert len(named_calls("_place_feature_crop")) == 3
+    assert not named_calls("create_detail_view")
+    crop_orientations = {
+        call.args[1].value
+        for call in named_calls("_place_feature_crop")
+        if len(call.args) > 1
+        and isinstance(call.args[1], ast.Constant)
+        and isinstance(call.args[1].value, str)
     }
-    assert detail_labels == {"A", "B", "C"}
+    assert crop_orientations == {"*Front", "*Right"}
+    assert source.count("model_radius_mm=DETAIL_MODEL_RADIUS") == 3
+    assert "sw_view.SetViewPosition(double_array(list(translated)), False)" in source
+    assert "sw_view.Crop2(False, True, 5)" in source
     assert drawing.DETAIL_SCALE == (4, 1)
     assert (
         'place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(1, 4))'
@@ -90,6 +93,7 @@ def test_end_features_are_documented_in_enlarged_details() -> None:
     assert len(named_calls("curate_view_dimensions")) == 3
     assert drawing.TOP_NOTCH_GEOMETRY_NOTE == "\n".join(
         (
+            "DETAIL A — TOP NOTCH — SCALE 4:1",
             f"CHEEK OFFSET {amplitude_bar_spec.NOTCH_OFFSET:.4f}",
             f"NOTCH WIDTH {amplitude_bar_spec.TOP_NOTCH_WIDTH:.4f}",
             f"NOTCH DEPTH {amplitude_bar_spec.TOP_NOTCH_HEIGHT:.4f}",
@@ -97,6 +101,7 @@ def test_end_features_are_documented_in_enlarged_details() -> None:
     )
     assert drawing.BOTTOM_NOTCH_GEOMETRY_NOTE == "\n".join(
         (
+            "DETAIL B — BOTTOM NOTCH — SCALE 4:1",
             f"CHEEK OFFSET {amplitude_bar_spec.NOTCH_OFFSET:.4f}",
             f"NOTCH WIDTH {amplitude_bar_spec.BOTTOM_NOTCH_WIDTH:.4f}",
             f"NOTCH DEPTH {amplitude_bar_spec.BOTTOM_NOTCH_HEIGHT:.4f}",
@@ -106,6 +111,7 @@ def test_end_features_are_documented_in_enlarged_details() -> None:
     )
     assert drawing.TOP_PIN_GEOMETRY_NOTE == "\n".join(
         (
+            "DETAIL C — TOP PIN — SCALE 4:1",
             (
                 "PIN C/L "
                 f"{amplitude_bar_spec.BAR_DEPTH / 2.0:.4f} FROM SIDE FACE"
@@ -180,7 +186,7 @@ def test_end_features_are_documented_in_enlarged_details() -> None:
     assert drawing.BOTTOM_DETAIL_Y - drawing.DETAIL_MODEL_RADIUS < 0.0
 
 
-def test_details_stand_clear_of_each_other_and_the_title_block() -> None:
+def test_feature_crops_stand_clear_of_each_other_and_the_title_block() -> None:
     radius = drawing.DETAIL_MODEL_RADIUS * drawing._D / 1000.0
     for center in (
         drawing.DETAIL_A_CENTER,
@@ -193,13 +199,14 @@ def test_details_stand_clear_of_each_other_and_the_title_block() -> None:
     assert drawing.DETAIL_B_CENTER[0] - radius > drawing.RIGHT_CENTER[0]
 
 
-def test_detail_sources_and_authored_notes_use_separate_sheet_regions() -> None:
+def test_feature_crops_and_authored_notes_use_separate_sheet_regions() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    # Detail source circles are projected from real model coordinates instead
-    # of assuming that SolidWorks centred each parent view on its bounding box.
+    # Every close-up repositions a real model projection before applying its
+    # outline-free crop; no parent-view-derived detail circle remains.
     assert "model_point_in_view(" in source
-    assert "_front_xy" not in source
-    assert "_right_xy" not in source
+    assert "SetViewPosition(" in source
+    assert "Crop2(False, True, 5)" in source
+    assert "create_detail_view" not in source
 
     radius = drawing.DETAIL_MODEL_RADIUS * drawing._D / 1000.0
     # The two upper feature notes sit above their respective detail outlines.

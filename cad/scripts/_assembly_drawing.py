@@ -408,10 +408,12 @@ def _set_view_display_mode(
     if mode == "hidden-lines-removed":
         set_hidden_lines_removed(adapter, view)
         return
+    # R2026x accepts enum 7 but reads it back as HLR (2).  The official API
+    # example uses shaded (3) plus Edges=True; validate both independent states.
     ok = adapter._attempt(
         lambda: view.SetDisplayMode4(
             False,  # local view setting
-            7,  # swDisplayMode_e.swSHADED_EDGES
+            3,  # swDisplayMode_e.swSHADED; Edges carries the with-edges state
             False,  # precision geometry
             True,  # retain edges in shaded mode
             True,  # precision cosmetic threads
@@ -422,10 +424,15 @@ def _set_view_display_mode(
         raise RuntimeError("failed to set shaded-with-edges drawing view")
     adapter.currentModel.EditRebuild3()
     actual = int(adapter._attempt(lambda: view.GetDisplayMode2(), default=-1))
-    if actual != 7:
+    if actual != 3:
         raise RuntimeError(
-            f"shaded-with-edges drawing view read back display mode {actual}, expected 7"
+            f"shaded-with-edges drawing view read back display mode {actual}, expected 3"
         )
+    edges = bool(
+        adapter._attempt(lambda: view.GetDisplayEdgesInShadedMode(), default=False)
+    )
+    if not edges:
+        raise RuntimeError("shaded drawing view did not retain visible edges")
 
 
 def _place_drawing_view(
@@ -587,14 +594,14 @@ async def build_assembly_package(
         adapter,
         "FRONT — WORKING POSITION",
         layout.working_front_center[0],
-        0.252,
+        0.264,
         label="front label",
     )
     _note(
         adapter,
         "RIGHT SIDE — WORKING POSITION",
         layout.working_right_center[0],
-        0.252,
+        0.264,
         label="right label",
     )
     _sheet_marker(adapter, 1)
@@ -623,7 +630,7 @@ async def build_assembly_package(
         adapter,
         "EXPLODED ISOMETRIC — INSTALLATION ORDER",
         layout.exploded_center[0],
-        0.252,
+        0.264,
         label="exploded label",
     )
     reference_front = _place_drawing_view(

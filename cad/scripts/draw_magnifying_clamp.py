@@ -125,8 +125,10 @@ DIMENSION_CALLOUTS = {
     "RodBoreDiaDim": "DRILL THRU",
 }
 # Keep the directional process fact on the associative callout, but use the
-# concise shop wording that fits wholly inside the upper-left sheet margin.
+# concise shop wording and an anchor far enough right that the longest line
+# stays inside the upper-left sheet border.
 THUMB_SCREW_PROCESS = "TOP-FACE TAP INTO LEVER BORE:"
+THUMB_SCREW_CALLOUT_XY = (0.080, 0.254)
 
 RIGHT_HALF_Z = BLOCK_DEPTH / 2.0 * _S
 RIGHT_HALF_Y = BLOCK_HEIGHT / 2.0 * _S
@@ -244,7 +246,7 @@ async def build(adapter: Any) -> dict[str, str]:
             TOP_CENTER[0],
             TOP_CENTER[1] + THUMB_SCREW_TAP_DRILL_DIA * _S / 2.0,
         ),
-        callout_xy=(0.062, 0.254),
+        callout_xy=THUMB_SCREW_CALLOUT_XY,
         label="thumb-screw tap",
         process=THUMB_SCREW_PROCESS,
     )

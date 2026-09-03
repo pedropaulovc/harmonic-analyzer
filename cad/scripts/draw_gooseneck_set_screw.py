@@ -15,7 +15,11 @@ import _telemetry
 from _common import CAD_ROOT, run_build
 from _drawing_common import DrawingOutputs
 from _drawing_registry import DRAWINGS_BY_NAME
-from _fastener_annotations import add_thread_leader
+from _fastener_annotations import (
+    add_external_thread_depiction,
+    add_hidden_shank_circle,
+    add_thread_leader,
+)
 from _fastener_drawing import FastenerSheet, build_fastener_sheet
 from gooseneck_set_screw_spec import HEAD_H, SHANK_DIA, SHANK_LEN, THREAD_DESIGNATION
 
@@ -71,9 +75,33 @@ SIDE_KEEP = {
 THREAD_LEADER_XY = (SIDE_CENTER[0] - _SHANK_HALF, _SHANK_MID_Y)
 THREAD_NOTE_XY = (SIDE_CENTER[0] - 0.064, _SHANK_MID_Y - 0.006)
 SIDE_AXIS_FACE_XY = (SIDE_CENTER[0], _SHANK_MID_Y - 0.012)
+THREAD_AXIS_XY = (
+    (SIDE_CENTER[0], _JUNCTION_Y),
+    (SIDE_CENTER[0], _SHANK_END_Y),
+)
+THREAD_MODEL_DIAMETER_SHEET = SHANK_DIA * _S
+HIDDEN_SHANK_RADIUS_SHEET = SHANK_DIA * _S / 2.0
 
 
-def _decorate(adapter: Any, side: Any, _end: Any, _iso: Any) -> None:
+
+def _decorate(adapter: Any, side: Any, end: Any, _iso: Any) -> None:
+    add_hidden_shank_circle(
+        adapter,
+        end,
+        center_xy=END_CENTER,
+        radius_sheet=HIDDEN_SHANK_RADIUS_SHEET,
+        label="wrench-flats hidden shank",
+    )
+    add_external_thread_depiction(
+        adapter,
+        side,
+        axis_start_xy=THREAD_AXIS_XY[0],
+        axis_end_xy=THREAD_AXIS_XY[1],
+        model_diameter_sheet=THREAD_MODEL_DIAMETER_SHEET,
+        sheet_scale_per_mm=_S,
+        designation=THREAD_DESIGNATION,
+        label="shank external thread",
+    )
     add_thread_leader(
         adapter,
         side,

@@ -330,10 +330,10 @@ def test_bom_sizing_applies_compact_rows_and_columns_above_title_block() -> None
     class Table:
         RowCount = 34
         ColumnCount = 4
+
         @staticmethod
         def GetRowHeight(row):  # noqa: N802
             return 0.014 if row == 10 else 0.007
-
 
         @staticmethod
         def SetRowHeight(row, height, option):  # noqa: N802
@@ -399,7 +399,8 @@ def test_shaded_working_view_requires_successful_mode_readback() -> None:
     calls = []
     view = SimpleNamespace(
         SetDisplayMode4=lambda *args: calls.append(args) or True,
-        GetDisplayMode2=lambda: 7,
+        GetDisplayMode2=lambda: 3,
+        GetDisplayEdgesInShadedMode=lambda: True,
     )
     adapter = SimpleNamespace(
         currentModel=SimpleNamespace(EditRebuild3=lambda: calls.append(("rebuild",))),
@@ -408,7 +409,7 @@ def test_shaded_working_view_requires_successful_mode_readback() -> None:
 
     _assembly_drawing._set_view_display_mode(adapter, view, "shaded-with-edges")
 
-    assert calls == [(False, 7, False, True, True), ("rebuild",)]
+    assert calls == [(False, 3, False, True, True), ("rebuild",)]
 
 
 def test_shaded_working_view_rejects_wrong_mode_readback() -> None:
@@ -419,6 +420,21 @@ def test_shaded_working_view_rejects_wrong_mode_readback() -> None:
     view = SimpleNamespace(SetDisplayMode4=lambda *args: True, GetDisplayMode2=lambda: 2)
 
     with pytest.raises(RuntimeError, match="read back display mode 2"):
+        _assembly_drawing._set_view_display_mode(adapter, view, "shaded-with-edges")
+
+
+def test_shaded_working_view_rejects_missing_edges() -> None:
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(EditRebuild3=lambda: None),
+        _attempt=lambda operation, default=None: operation(),
+    )
+    view = SimpleNamespace(
+        SetDisplayMode4=lambda *args: True,
+        GetDisplayMode2=lambda: 3,
+        GetDisplayEdgesInShadedMode=lambda: False,
+    )
+
+    with pytest.raises(RuntimeError, match="did not retain visible edges"):
         _assembly_drawing._set_view_display_mode(adapter, view, "shaded-with-edges")
 
 

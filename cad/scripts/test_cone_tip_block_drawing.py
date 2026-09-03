@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import build_cone_tip_block as part
@@ -16,10 +17,7 @@ def test_required_drawing_paths() -> None:
     assert drawing.SLDDRW.as_posix().endswith("/slddrw/cone-tip-block.SLDDRW")
     assert drawing.PDF.as_posix().endswith("/pdf/cone-tip-block.pdf")
     assert drawing.PNG.as_posix().endswith("/png/cone-tip-block_drawing.png")
-    assert (
-        DRAWINGS_BY_NAME["cone_tip_block"].script
-        == Path(drawing.__file__).resolve()
-    )
+    assert DRAWINGS_BY_NAME["cone_tip_block"].script == Path(drawing.__file__).resolve()
 
 
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
@@ -66,8 +64,18 @@ def test_notes_are_few_specific_and_never_the_title_block() -> None:
     # The taps and the pinch drill ride their own view callouts now; a note
     # never restates a hole, a face direction or the title block.
     for banned in (
-        "5/16-18", "#3-48", "#32 DRILL", "+X FACE", "+/-", "DATUM", "FRAME",
-        "SIMULTANEOUS", "MATERIAL", "OXIDE", "X.XX", "UOS",
+        "5/16-18",
+        "#3-48",
+        "#32 DRILL",
+        "+X FACE",
+        "+/-",
+        "DATUM",
+        "FRAME",
+        "SIMULTANEOUS",
+        "MATERIAL",
+        "OXIDE",
+        "X.XX",
+        "UOS",
     ):
         assert banned not in notes, banned
     source = Path(drawing.__file__).read_text(encoding="utf-8")
@@ -101,13 +109,24 @@ def test_adjuster_tap_has_a_native_callout_on_its_entry_face() -> None:
     assert "edge=tap_entity" in source
     assert "radius_mm=TAP_DRILL_MM[ADJUSTER_THREAD] / 2.0" in source
     assert TAP_DRILL_MM[cone_tip_block_spec.ADJUSTER_THREAD] == 6.528
-    # The automatic "5/16-18 Tapped Hole" note duplicates it and is removed.
-    assert 'remove_notes_matching(adapter, "Tapped Hole")' in source
-    assert source.index('view_label="front"') < source.index(
-        'remove_notes_matching(adapter, "Tapped Hole")'
+    # Explicit import exposes the redundant generic thread note so exactly one
+    # is removed before annotation placement can cross the plan dimensions.
+    importer = re.search(r"import_cosmetic_threads\(\s*adapter,\s*front\s*\)", source)
+    remover = 'remove_notes_matching(adapter, "Tapped Hole")'
+    assert importer is not None
+    assert remover in source
+    assert source.index(remover) > importer.start()
+    assert "if removed_tap_notes != 1:" in source
+    # The complete native callout is beside the front view, below the plan's
+    # axis-location lane, so its leader never crosses the 12.00 plan depth.
+    assert drawing.TAP_CALLOUT_XY == (0.175, 0.198)
+    front_right = drawing.FRONT_CENTER[0] + drawing.BLOCK_X / 2.0 * drawing._S
+    assert drawing.TAP_CALLOUT_XY[0] >= front_right + 0.060
+    assert (
+        drawing._front_y(drawing.ADJUSTER_AXIS_HEIGHT)
+        < drawing.TAP_CALLOUT_XY[1]
+        < drawing.AXIS_LOCATION_Y
     )
-    assert drawing.TAP_CALLOUT_XY[0] > drawing.FRONT_CENTER[0] + 0.060
-    assert drawing.TAP_CALLOUT_XY[1] > drawing.AXIS_LOCATION_Y + 0.025
 
 
 def test_every_hole_axis_is_located_from_a_drawn_face() -> None:
@@ -154,7 +173,9 @@ def test_nothing_on_the_block_is_fitted() -> None:
 
 def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "for view in (front, top, right):\n        set_hidden_lines_visible" in source
+    assert (
+        "for view in (front, top, right):\n        set_hidden_lines_visible" in source
+    )
     assert "set_hidden_lines_removed(adapter, iso)" in source
 
 

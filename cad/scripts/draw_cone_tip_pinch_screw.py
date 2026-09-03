@@ -25,6 +25,7 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fastener_annotations import (
     add_circle_center_mark,
+    add_external_thread_depiction,
     add_overall_reference,
     add_thread_leader,
     end_diameter_leaders_at_rim,
@@ -119,6 +120,12 @@ THREAD_LEADER_XY = (SIDE_CENTER[0] - _SHANK_HALF, _SHANK_MID_Y)
 THREAD_NOTE_XY = (SIDE_CENTER[0] - 0.062, _SHANK_MID_Y - 0.006)
 SIDE_AXIS_FACE_XY = (SIDE_CENTER[0], _SHANK_MID_Y - 0.010)
 SLOT_AXIS_FACE_XY = (RIGHT_CENTER[0], (_HEAD_END_Y + _JUNCTION_Y) / 2.0)
+THREAD_AXIS_XY = (
+    (SIDE_CENTER[0], _JUNCTION_Y),
+    (SIDE_CENTER[0], _SHANK_END_Y),
+)
+THREAD_MODEL_DIAMETER_SHEET = SHANK_DIA * _S
+
 
 
 def _decorate(adapter: Any, side: Any, end: Any, _iso: Any) -> None:
@@ -130,6 +137,16 @@ def _decorate(adapter: Any, side: Any, end: Any, _iso: Any) -> None:
     )
     add_circle_center_mark(
         adapter, end, edge_xy=END_CENTER_MARK_XY, label="head rim center mark"
+    )
+    add_external_thread_depiction(
+        adapter,
+        side,
+        axis_start_xy=THREAD_AXIS_XY[0],
+        axis_end_xy=THREAD_AXIS_XY[1],
+        model_diameter_sheet=THREAD_MODEL_DIAMETER_SHEET,
+        sheet_scale_per_mm=_S,
+        designation=THREAD_DESIGNATION,
+        label="shank external thread",
     )
     add_thread_leader(
         adapter,

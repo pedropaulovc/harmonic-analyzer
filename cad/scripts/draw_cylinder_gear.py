@@ -50,6 +50,7 @@ from cylinder_gear_spec import (
     BORE_DIA,
     CAM_DIA,
     CAM_THICKNESS,
+    ECCENTRICITY,
     KERF_CALLOUT,
     OUTSIDE_DIA,
     SURFACE_FINISHES,
@@ -83,24 +84,9 @@ FRONT_CENTER = (0.225, 0.175)
 ISO_CENTER = (0.385, 0.175)
 GEAR_DATA_POS = (0.040, 0.262)
 
-# SECTION A-A: a vertical cut through the gear axis (the +Y cam lobe side is
-# then the top of the strip), placed where the projected side view used to
-# sit. Cut face only -- the projected tooth ring behind the plane would
-# otherwise bury the bore and the cam step under ~480 tooth edges.
-SECTION_HALF_LINE = OUTSIDE_DIA / 2000.0 + 0.008
-SECTION_LINE = (
-    (FRONT_CENTER[0], FRONT_CENTER[1] - SECTION_HALF_LINE),
-    (FRONT_CENTER[0], FRONT_CENTER[1] + SECTION_HALF_LINE),
-)
-SECTION_CENTER = (0.310, 0.245)
-# The cut face makes the axial step visible. Its thickness is stated beside
-# that view instead of depending on seat-specific derived-view edge picks.
-CAM_THICKNESS_NOTE = f"CAM THICKNESS {CAM_THICKNESS:.2f}"
-CAM_THICKNESS_NOTE_XY = (0.330, 0.230)
-
 # DETAIL B (4:1) around the alignment kerf at +Y. The circle is centred 3 mm
-# left of the kerf so it clears the A-A cut line at x = 0 while still taking
-# in the saw cut and two neighbouring teeth.
+# left of the kerf so it takes in the saw cut and two neighbouring teeth.
+FRONT_RADIUS = OUTSIDE_DIA / 2000.0
 DETAIL_MODEL_CENTER_MM = (-3.0, OUTSIDE_DIA / 2.0 - 1.5)
 DETAIL_CENTER_ON_FRONT = (
     FRONT_CENTER[0] + DETAIL_MODEL_CENTER_MM[0] / 1000.0,
@@ -113,6 +99,30 @@ KERF_DISPLAY_NOTE = KERF_CALLOUT.replace(", 3.0", "\n3.0").replace(
     ", FULL FACE", "; FULL FACE"
 )
 KERF_NOTE_XY = (0.325, 0.120)
+
+# SECTION A-A is a vertical cut through the gear axis. Its top marker must
+# clear the model-derived DETAIL B boundary and label rather than merely clear
+# the tooth tips; otherwise B and the upper A marker print on top of each other.
+CUTTING_PLANE_DETAIL_CLEARANCE = 0.014
+DETAIL_TOP_FROM_FRONT_CENTER = DETAIL_MODEL_CENTER_MM[1] / 1000.0 + DETAIL_RADIUS
+SECTION_HALF_LINE = (
+    max(FRONT_RADIUS, DETAIL_TOP_FROM_FRONT_CENTER) + CUTTING_PLANE_DETAIL_CLEARANCE
+)
+SECTION_LINE = (
+    (FRONT_CENTER[0], FRONT_CENTER[1] - SECTION_HALF_LINE),
+    (FRONT_CENTER[0], FRONT_CENTER[1] + SECTION_HALF_LINE),
+)
+# Keep the section and its automatic caption in a separate upper-right lane,
+# measured from the front-view model envelope instead of the sheet origin.
+SECTION_VIEW_CLEARANCE = (0.084, 0.039)
+SECTION_CENTER = (
+    FRONT_CENTER[0] + FRONT_RADIUS + SECTION_VIEW_CLEARANCE[0],
+    FRONT_CENTER[1] + FRONT_RADIUS + SECTION_VIEW_CLEARANCE[1],
+)
+# The cut face makes the axial step visible. Its thickness is stated beside
+# that view instead of depending on seat-specific derived-view edge picks.
+CAM_THICKNESS_NOTE = f"CAM THICKNESS {CAM_THICKNESS:.2f}"
+CAM_THICKNESS_NOTE_XY = (SECTION_CENTER[0] + 0.020, SECTION_CENTER[1] - 0.015)
 
 # Front-view marked dimensions. The bore callout sits upper-left. The two
 # native roughness symbols occupy their own left-hand column, fully outside
@@ -129,8 +139,18 @@ FRONT_KEEP = {
 # decimals on the bore and cam offset say "hold it".
 DIMENSION_CALLOUTS = {"BoreDia": "REAM THRU"}
 DIMENSION_PRECISION = {"BoreDia": 3, "CamOffset": 3, "CamDia": 2}
-BORE_FINISH_SYMBOL = (0.135, 0.128)
-CAM_FINISH_SYMBOL = (0.135, 0.182)
+
+# Both symbols attach at the canonical bottom point of their model-derived
+# circles. The bore target is above the eccentric cam target, so keeping that
+# same vertical order in the annotation column prevents their leaders crossing.
+BORE_FINISH_TARGET_Y = FRONT_CENTER[1] - BORE_DIA / 2000.0
+CAM_FINISH_TARGET_Y = FRONT_CENTER[1] + ECCENTRICITY / 1000.0 - CAM_DIA / 2000.0
+FINISH_SYMBOL_X = FRONT_CENTER[0] - FRONT_RADIUS - 0.059
+BORE_FINISH_SYMBOL = (FINISH_SYMBOL_X, FRONT_CENTER[1] + 0.007)
+CAM_FINISH_SYMBOL = (
+    FINISH_SYMBOL_X,
+    FRONT_CENTER[1] - FRONT_RADIUS - 0.016,
+)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -206,8 +226,8 @@ async def build(adapter: Any) -> dict[str, str]:
     bore_edge = visible_circle_edge(adapter, front, BORE_DIA)
     cam_edge = visible_circle_edge(adapter, front, CAM_DIA)
 
-    # Both finishes attach by model identity (the batch contract) at each
-    # circle edge's canonical vertex, its lower-left, invariant across runs.
+    # Select each machined cylinder by model identity, then pin its leader to
+    # the model-derived bottom point so the two bent leaders cannot cross.
     add_surface_finish(
         adapter,
         front,
@@ -215,6 +235,7 @@ async def build(adapter: Any) -> dict[str, str]:
         control=surface_finish_by_key(SURFACE_FINISHES, "cylinder_gear_bore"),
         label="cylinder gear bore finish",
         entity=bore_edge,
+        leader_attach_xy=(FRONT_CENTER[0], BORE_FINISH_TARGET_Y),
     )
     add_surface_finish(
         adapter,
@@ -223,6 +244,7 @@ async def build(adapter: Any) -> dict[str, str]:
         control=surface_finish_by_key(SURFACE_FINISHES, "cam_track"),
         label="cam track finish",
         entity=cam_edge,
+        leader_attach_xy=(FRONT_CENTER[0], CAM_FINISH_TARGET_Y),
     )
 
     section = create_section_view(

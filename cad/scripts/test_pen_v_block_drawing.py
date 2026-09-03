@@ -94,11 +94,12 @@ def test_notes_are_few_specific_and_never_the_title_block() -> None:
     assert "_NOTES_" not in source
 
 
-def test_hole_callouts_state_size_and_process() -> None:
+def test_dimension_callouts_name_hole_processes_and_groove_depth() -> None:
     callouts = drawing.DIMENSION_CALLOUTS
     assert callouts["Bore0Dia"] == "2X DRILL THRU"
     assert callouts["ScrewHoleDiaDim"] == "DRILL THRU"
-    assert set(callouts) == {"Bore0Dia", "ScrewHoleDiaDim"}
+    assert callouts["GrooveDepth"] == "GROOVE DEPTH"
+    assert set(callouts) == {"Bore0Dia", "ScrewHoleDiaDim", "GrooveDepth"}
 
 
 def test_chamfers_are_one_leader_callout_off_the_chamfer_edge() -> None:

@@ -73,6 +73,12 @@ SCALE_LABEL_Y = 0.201
 SCALE_LABEL_X0 = FRONT_CENTER[0] + (part.SCALE_START_X - part.BODY_LENGTH / 2.0) / 1000.0
 SCALE_LABEL_PITCH = part.DIVISION_SPACING / 1000.0
 
+# The broad-face view cannot expose the 3 mm stock edge.  State that remaining
+# envelope axis explicitly rather than asking the machinist to infer it from the
+# isometric.
+STOCK_THICKNESS_NOTE = f"STOCK THICKNESS {part.BODY_THICKNESS:.2f}"
+STOCK_THICKNESS_NOTE_XY = (0.040, 0.168)
+
 
 def _rotate_ruled_face(adapter: Any, view: Any) -> None:
     """Orient tick zero at the left and the grooves from the lower edge."""
@@ -145,6 +151,8 @@ async def build(adapter: Any) -> dict[str, str]:
 
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
     _add_scale_labels(adapter)
+    if add_note(adapter, STOCK_THICKNESS_NOTE, *STOCK_THICKNESS_NOTE_XY) is None:
+        raise RuntimeError("failed to add measuring-stick stock-thickness note")
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.110)
     add_property_linked_note(adapter, "Front View Note", 0.040, 0.184)

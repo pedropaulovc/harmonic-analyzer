@@ -75,8 +75,10 @@ END_CENTER = (0.095, 0.100)
 CUP_CENTER = (0.190, 0.100)
 SECTION_CENTER = (0.205, 0.210)
 ISO_CENTER = (0.300, 0.160)
-# Cutting line through the axis, past both ends of the 14 mm (56 mm sheet)
-# elevation.
+# Cutting line projected from the model-axis endpoints, then extended past both
+# ends of the 14 mm elevation.  IView position is the model origin, not the
+# body's bounding-box centre, so a sheet-space half-span about FRONT_CENTER
+# does not reliably cross the whole part.
 SECTION_LINE_OVERSHOOT = 0.011
 
 FRONT_KEEP = {
@@ -130,7 +132,9 @@ def _chamfer_rim(adapter: Any, view: Any) -> Any:
         if not curve.IsCircle():
             continue
         params = tuple(float(value) * 1000.0 for value in curve.CircleParams)
-        candidates.append((abs(params[6] - radius_mm) + abs(params[1] - center_y_mm), edge))
+        candidates.append(
+            (abs(params[6] - radius_mm) + abs(params[1] - center_y_mm), edge)
+        )
     if not candidates or min(candidates, key=lambda item: item[0])[0] > 0.02:
         raise RuntimeError(
             f"elevation has no chamfer rim of radius {radius_mm:.3f} mm at "
@@ -183,24 +187,60 @@ async def build(adapter: Any) -> dict[str, str]:
     cup = place_view(adapter, str(SOURCE), "*Top", *CUP_CENTER, scale=(4, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2, 1))
     set_hidden_lines_removed(adapter, iso)
-    # SECTION A-A: cut the elevation along the screw axis so the blind cup
-    # (flat floor) and the driver slot are open geometry -- neither depth is
-    # dimensioned to a hidden line.
-    half_len = BODY_LEN / 2.0 * _S + SECTION_LINE_OVERSHOOT
+    # SECTION A-A: project the actual axial endpoints into the placed view and
+    # extend them in model space.  This makes the cutting line cross the whole
+    # screw instead of assuming that FRONT_CENTER is the body's mid-length.
+    # A complete cut exposes the blind cup's walls and flat floor as visible
+    # profile geometry; no duplicate sketch geometry is drawn over the view.
+    axis_overshoot_mm = SECTION_LINE_OVERSHOOT / _S
+    section_line_start = model_point_in_view(
+        adapter,
+        front,
+        (0.0, -axis_overshoot_mm / 1000.0, 0.0),
+        label="adjuster section start",
+    )
+    section_line_end = model_point_in_view(
+        adapter,
+        front,
+        (0.0, (BODY_LEN + axis_overshoot_mm) / 1000.0, 0.0),
+        label="adjuster section end",
+    )
     section = create_section_view(
         adapter,
         front,
-        line_start=(FRONT_CENTER[0], FRONT_CENTER[1] - half_len),
-        line_end=(FRONT_CENTER[0], FRONT_CENTER[1] + half_len),
+        line_start=section_line_start,
+        line_end=section_line_end,
         view_xy=SECTION_CENTER,
         section_label="A",
         scale=(4, 1),
         label="adjuster axial section",
     )
-    # Hidden lines stay ON in every orthographic view (policy rule 7); the
-    # head end view exposes the driver slot across the OD.
-    for view in (front, end, cup, section):
+    # A set screw is a fastener by project/catalog intent, but this is its part
+    # drawing: the section must cut it.  Rebuild after explicit inclusion, then
+    # verify both that inclusion persisted and that the resulting section owns
+    # real face hatches.
+    section_view = _early_bound(section, "IView")
+    section_definition = section_view.GetSection()
+    if section_definition is None:
+        raise RuntimeError("adjuster axial section has no section definition")
+    section_definition = _early_bound(section_definition, "IDrSection")
+    section_definition.ExcludeFasteners = False
+    check("rebuild adjuster axial section", drawing_model.EditRebuild3())
+    if bool(section_definition.ExcludeFasteners):
+        raise RuntimeError("adjuster axial section still excludes fasteners")
+    hatch_count = int(
+        adapter._attempt(lambda: section_view.GetFaceHatchCount(), default=-1)
+    )
+    if hatch_count <= 0:
+        raise RuntimeError(
+            f"adjuster axial section has no visible face hatch (count={hatch_count})"
+        )
+    # Hidden lines remain useful in the three ordinary orthographic views.
+    # SECTION A-A is HLR so the newly exposed cup walls/floor are solid cut
+    # edges, with no dashed hidden cavity competing with the hatch.
+    for view in (front, end, cup):
         set_hidden_lines_visible(adapter, view)
+    set_hidden_lines_removed(adapter, section)
     thread_seeds, thread_instances = import_cosmetic_threads(adapter, front)
     if (thread_seeds, thread_instances) != (1, 1):
         raise RuntimeError(

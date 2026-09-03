@@ -33,6 +33,8 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fastener_annotations import (
     add_circle_center_mark,
+    add_external_thread_depiction,
+    add_hidden_shank_circle,
     add_thread_leader,
     end_diameter_leaders_at_rim,
 )
@@ -112,6 +114,13 @@ SIDE_KEEP = {
 THREAD_LEADER_XY = (_JUNCTION_X - 0.010, SIDE_CENTER[1] + _SHANK_HALF)
 THREAD_NOTE_XY = (SIDE_CENTER[0] - 0.060, SIDE_CENTER[1] + _HEAD_HALF + 0.014)
 SIDE_AXIS_FACE_XY = (_SHANK_MID_X, SIDE_CENTER[1])
+THREAD_AXIS_XY = (
+    (_JUNCTION_X, SIDE_CENTER[1]),
+    (_TIP_X, SIDE_CENTER[1]),
+)
+THREAD_MODEL_DIAMETER_SHEET = SHANK_DIA * _S
+HIDDEN_SHANK_RADIUS_SHEET = SHANK_DIA * _S / 2.0
+
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -158,8 +167,8 @@ async def build(adapter: Any) -> dict[str, str]:
     side = place_view(adapter, str(SOURCE), "*Right", *SIDE_CENTER, scale=(8, 1))
     end = place_view(adapter, str(SOURCE), "*Back", *END_CENTER, scale=(8, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(8, 1))
-    # Hidden lines ON in the profile (policy rule 7).  The tiny end view keeps
-    # HLR -- the shank-behind-head circle would read as a hole.
+    # Hidden lines ON in the profile (policy rule 7).  The end view stays HLR;
+    # its physically occluded shank is added explicitly as one hidden circle.
     set_hidden_lines_visible(adapter, side)
     set_hidden_lines_removed(adapter, iso)
     set_hidden_lines_removed(adapter, end)
@@ -174,10 +183,27 @@ async def build(adapter: Any) -> dict[str, str]:
     add_circle_center_mark(
         adapter, end, edge_xy=END_CENTER_MARK_XY, label="head rim center mark"
     )
+    add_hidden_shank_circle(
+        adapter,
+        end,
+        center_xy=END_CENTER,
+        radius_sheet=HIDDEN_SHANK_RADIUS_SHEET,
+        label="driver-face hidden shank",
+    )
 
     curate_view_dimensions(adapter, side, keep=SIDE_KEEP, view_label="side")
     add_view_centerline(
         adapter, side, face_xy=SIDE_AXIS_FACE_XY, label="screw axis centerline"
+    )
+    add_external_thread_depiction(
+        adapter,
+        side,
+        axis_start_xy=THREAD_AXIS_XY[0],
+        axis_end_xy=THREAD_AXIS_XY[1],
+        model_diameter_sheet=THREAD_MODEL_DIAMETER_SHEET,
+        sheet_scale_per_mm=_S,
+        designation=THREAD_DESIGNATION,
+        label="shank external thread",
     )
     add_thread_leader(
         adapter,

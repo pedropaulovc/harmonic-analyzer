@@ -3,15 +3,15 @@ r"""Create the curated machinist drawing for the stepped cone gear shaft.
 The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): a
 stepped shaft carries no datums and no feature-control frames -- every land
 is a size tolerance on the model dimension, and the one roughness symbol
-sits on the bearing journal that turns in the pivot post.  It is dimensioned
-as it sits in the lathe (policy rule 7): the journal and 3/8 seat read as
-linear diameters on the 1:1 side view. The three small tip lands remain
-visible in DETAIL A (3:1), with a compact adjacent limits note because their
-profile dimensions are unavailable to the derived view. Every station chains
-from the big-end face. There is no end view: from either end the shoulders
-hide each other,
-and a diameter dimensioned to an occluded circle is exactly what the
-machinist review rejected.
+sits on the bearing journal that turns in the pivot post.  The 0.79 mm tip is
+too small to read in the full-length view.  DETAIL A is a directly placed 3:1
+``*Right`` model view translated onto its tip-land model point and circularly
+cropped with no decorative outline.  This avoids the SolidWorks derived-detail
+failure mode where a crop circle survives but the shaft geometry is displaced
+outside it.  The three tiny fitted diameters keep their part-owned limit note
+beside the actual enlarged profile.  The full side view imports the five axial
+stations and two readable fitted diameters.  The single running-journal Ra
+symbol is explicit.
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ from _drawing_common import (
     add_property_linked_note,
     add_surface_finish,
     add_view_centerline,
-    create_detail_view,
+    _sheet_to_view_sketch,
     curate_view_dimensions,
     finalize_drawing,
     model_point_in_view,
@@ -38,6 +38,7 @@ from _drawing_common import (
     set_hidden_lines_visible,
     stamp_drawing_summary,
     visible_view_entities,
+    view_name,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
@@ -48,6 +49,7 @@ from cone_gear_shaft_spec import (
     SECTION_ENDS,
     SURFACE_FINISHES,
 )
+from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 
 
@@ -75,14 +77,12 @@ SIDE_CENTER = (0.155, 0.215)
 DETAIL_CENTER = (0.110, 0.098)
 ISO_CENTER = (0.360, 0.200)
 
-# DETAIL A boundary on the side view: centred on the shoulder between the
-# 1/8 in and 1/32 in lands.  Anchoring the detail circle on visible shoulder
-# geometry (rather than in the middle of the hairline tip) keeps SolidWorks
-# from producing an empty derived view while retaining the end of the 1/4 in
-# land and a useful length of the 1/32 in tip.
+# DETAIL A's crop is centred on the shoulder between the 1/8 in and 1/32 in
+# lands.  Its model-space radius retains the end of the 1/4 in land and a
+# useful length of the 1/32 in tip.
 DETAIL_MODEL_CENTER_Z = SECTION_ENDS[3]
 DETAIL_MODEL_RADIUS = 16.0
-DETAIL_RADIUS = DETAIL_MODEL_RADIUS * SHEET_SCALE[0] / 1000.0
+TIP_DETAIL_NOTE = f"{TIP_LANDS_NOTE}\nSCALE {DETAIL_SCALE[0]}:{DETAIL_SCALE[1]}"
 
 # Axial step stations (extrude depths Sec{i}End), all measured from the
 # large-end datum face: baseline dimensioning, shortest nearest the part.
@@ -101,9 +101,9 @@ SIDE_DIAMETER_STATIONS_MM = {
     "Sec1Dia": (SECTION_ENDS[0] + SECTION_ENDS[1]) / 2.0,
 }
 SIDE_DIAMETER_TEXT_Y = SIDE_CENTER[1] + 0.021
-# DETAIL A retains the projected shape of the 1/4, 1/8 and 1/32 in lands; its
-# profile dimensions are unavailable from the derived view, so the part-owned
-# limits render as a compact adjacent note.
+# DETAIL A retains the projected shape of the 1/4, 1/8 and 1/32 in lands.  Its
+# profile dimensions are unavailable from the cropped view, so the part-owned
+# limits and explicit scale render as one compact adjacent note.
 TIP_LANDS_NOTE_XY = (
     DETAIL_CENTER[0] + DETAIL_MODEL_RADIUS * DETAIL_SCALE[0] / 1000.0 + 0.007,
     DETAIL_CENTER[1] + 0.038,
@@ -118,6 +118,62 @@ JOURNAL_FINISH_ATTACH_INBOARD_MM = 10.0
 # Notes right of DETAIL A, above the title block; the isometric stays above
 # them.
 NOTES_XY = (0.225, 0.110)
+
+
+def _place_tip_crop(adapter: Any) -> Any:
+    """Place a real 3:1 side view with the tip shoulder at ``DETAIL_CENTER``."""
+    view = place_view(
+        adapter,
+        str(SOURCE),
+        "*Right",
+        *DETAIL_CENTER,
+        scale=DETAIL_SCALE,
+    )
+    draw = adapter.currentModel
+    sw_view = _early_bound(view, "IView")
+    model_xyz = (0.0, 0.0, DETAIL_MODEL_CENTER_Z / 1000.0)
+    projected = model_point_in_view(adapter, view, model_xyz, label="tip crop")
+    position = tuple(float(value) for value in (sw_view.Position or ()))
+    if len(position) < 2:
+        raise RuntimeError("tip crop has no view position")
+    translated = (
+        position[0] + DETAIL_CENTER[0] - projected[0],
+        position[1] + DETAIL_CENTER[1] - projected[1],
+    )
+    if not sw_view.SetViewPosition(double_array(list(translated)), False):
+        raise RuntimeError("failed to position tip crop")
+    draw.EditRebuild3()
+
+    crop_center = model_point_in_view(adapter, view, model_xyz, label="tip crop")
+    drawing = _early_bound(draw, "IDrawingDoc")
+    if not drawing.ActivateView(view_name(adapter, view)):
+        raise RuntimeError("failed to activate tip crop")
+    draw.ClearSelection2(True)
+    sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
+    centre = _sheet_to_view_sketch(adapter, view, crop_center, label="tip crop")
+    rim = _sheet_to_view_sketch(
+        adapter,
+        view,
+        (crop_center[0] + DETAIL_MODEL_RADIUS * DETAIL_SCALE[0] / 1000.0, crop_center[1]),
+        label="tip crop",
+    )
+    if (
+        sketch_manager.CreateCircle(
+            float(centre[0]),
+            float(centre[1]),
+            0.0,
+            float(rim[0]),
+            float(rim[1]),
+            0.0,
+        )
+        is None
+    ):
+        raise RuntimeError("failed to create tip crop")
+    if int(sw_view.Crop2(False, True, 5)) != 1:
+        raise RuntimeError("failed to crop tip view")
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    return view
 
 
 @_telemetry.traced("drawing.cylindrical_face_scan")
@@ -195,18 +251,9 @@ async def build(adapter: Any) -> dict[str, str]:
     side = place_view(adapter, str(SOURCE), "*Right", *SIDE_CENTER, scale=(1, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
     set_hidden_lines_removed(adapter, iso)
-    # DETAIL A: the three tip lands at 3:1, where the 0.79 mm tip is a
-    # dimensionable land instead of a hairline (policy rule 7).
-    detail = create_detail_view(
-        adapter,
-        side,
-        center=_axis_point(adapter, side, DETAIL_MODEL_CENTER_Z, label="detail centre"),
-        radius=DETAIL_RADIUS,
-        view_xy=DETAIL_CENTER,
-        detail_label="A",
-        scale=DETAIL_SCALE,
-        label="tip lands detail",
-    )
+    # DETAIL A is a directly placed and cropped model view: the real three tip
+    # lands remain centred instead of leaving an empty derived-detail circle.
+    detail = _place_tip_crop(adapter)
     # Hidden lines stay ON in every orthographic view (policy rule 7).
     for view in (side, detail):
         set_hidden_lines_visible(adapter, view)
@@ -227,8 +274,8 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, side, keep=side_keep, view_label="side"
     )
     set_dimension_precision(adapter, side_annotations, DIMENSION_PRECISION)
-    if add_note(adapter, TIP_LANDS_NOTE, *TIP_LANDS_NOTE_XY) is None:
-        raise RuntimeError("failed to add tip-land limits note")
+    if add_note(adapter, TIP_DETAIL_NOTE, *TIP_LANDS_NOTE_XY) is None:
+        raise RuntimeError("failed to add tip-land detail note")
 
     # Leader anchor for the journal's surface-finish symbol: the journal OD
     # (top silhouette) just inboard of the big-end face.

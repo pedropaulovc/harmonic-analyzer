@@ -41,7 +41,6 @@ from _drawing_common import (
     curate_view_dimensions,
     finalize_drawing,
     insert_hole_table,
-    import_cosmetic_threads,
     new_project_drawing,
     read_required_properties,
     set_hidden_lines_removed,
@@ -66,6 +65,7 @@ from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
+    remove_notes_matching,
     view_name,
 )
 
@@ -160,54 +160,6 @@ CHAMFER_CALLOUT_TEXT = f"CHAMFER {CHAMFER:.2f} X 45 DEG\nWINDOW RIM, BOTH SIDES"
 # 9/16-12 tap drill (the modeled hole) — the edge pick must land ON the rim.
 _TAP_DRILL_DIA_MM = 12.30376
 
-# SolidWorks imports this leaderless Hole Wizard description with the front
-# view.  Keep it inside the otherwise empty cavity, away from the window's
-# lower edge, the dimension lanes, and the A-A cutting-plane line.
-TAP_NOTE_XY = (0.048, 0.205)
-
-
-def _move_thread_callout(
-    adapter: Any,
-    view: Any,
-    *,
-    keyword: str,
-    xy: tuple[float, float],
-    label: str,
-) -> None:
-    """Move a cosmetic-thread callout note without changing its text."""
-    view = _sw_type_info.early_bound_or_flag(view, "IView", "GetFirstCThread")
-    thread = adapter._attempt(lambda: view.GetFirstCThread(), default=None)
-    moved = False
-    while thread is not None:
-        thread = _sw_type_info.early_bound_or_flag(
-            thread, "ICThread", "ThreadCallout", "GetNext"
-        )
-        note = adapter._attempt(lambda t=thread: t.ThreadCallout, default=None)
-        if note is not None:
-            note = _sw_type_info.early_bound_or_flag(
-                note, "INote", "GetText", "GetAnnotation"
-            )
-            text = str(
-                adapter._attempt(lambda n=note: n.GetText(), default="") or ""
-            )
-            if keyword.lower() in text.lower():
-                annotation = _sw_type_info.early_bound_or_flag(
-                    note.GetAnnotation(), "IAnnotation", "SetPosition2", "GetPosition"
-                )
-                if not annotation.SetPosition2(xy[0], xy[1], 0.0):
-                    raise RuntimeError(f"failed to move {label}")
-                actual = tuple(annotation.GetPosition() or ())
-                if (
-                    len(actual) < 2
-                    or max(abs(actual[i] - xy[i]) for i in range(2)) > 0.0005
-                ):
-                    raise RuntimeError(f"{label} did not persist at {xy}: {actual}")
-                moved = True
-        thread = adapter._attempt(lambda t=thread: t.GetNext(), default=None)
-    if not moved:
-        raise RuntimeError(f"{label} cosmetic-thread note was not found")
-    adapter.currentModel.EditRebuild3()
-
 
 def _front_xy(x_mm: float, y_mm: float) -> tuple[float, float]:
     """Sheet point of a model (X, Y) in the 1:2 front view (bbox on the origin)."""
@@ -255,10 +207,9 @@ def _add_radial_dimension(
 ) -> Any:
     """Radius-dimension one arc edge picked at a sheet point, with a prefix.
 
-    ``IModelDoc2.AddRadialDimension2`` only works inside an active sketch, so
-    a drawing radius is the smart dimension (``AddDimension2``) with a single
-    arc edge selected -- SolidWorks emits ``R<value>``; ``prefix`` ("4X ")
-    goes in front of it.
+    ``IModelDoc2.AddDimension2`` does not reliably emit the radius symbol for a
+    drawing arc.  The caller therefore includes ``R`` in ``prefix`` so the
+    resulting fabrication callout is unambiguously radial.
     """
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
@@ -282,7 +233,9 @@ def _add_radial_dimension(
     )
     display.SetText(1, prefix)  # swDimensionTextPrefix
     if str(display.GetText(1) or "") != prefix:
-        raise RuntimeError(f"{label} radius prefix did not persist: {display.GetText(1)!r}")
+        raise RuntimeError(
+            f"{label} radius prefix did not persist: {display.GetText(1)!r}"
+        )
     draw.EditRebuild3()
     return dimension
 
@@ -387,7 +340,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         edge_xy=_front_xy(-(CAV - fillet_mid), CAV - fillet_mid),
         text_xy=(0.045, 0.252),
-        prefix="4X ",
+        prefix="4X R",
         label="cavity corner fillet",
     )
 
@@ -474,25 +427,25 @@ async def build(adapter: Any) -> dict[str, str]:
         basic_locations=False,
         label="rocker-arm-support",
     )
+    removed_tap_notes = remove_notes_matching(adapter, "Tapped Hole")
+    _telemetry.info(
+        f"removed {removed_tap_notes} redundant automatic tapped-hole note(s)"
+    )
 
     # x=0.020: a note is left-aligned on its anchor, so the ink starts here. The
     # bound is the 12.7 mm zone margin (~0.0127), which the re-centred frame rule
-    # now matches (~0.0126); 0.020 clears both, and the audit enforces it.
+    # now matches (~0.0126); 0.020 clears both, and the audit enforces it. The
+    # hole table and this manufacturing note already carry the complete 4X tap
+    # requirement; the generic automatic cosmetic-thread description is
+    # removed above and guarded from rematerializing during finalization.
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
-    import_cosmetic_threads(adapter, front)
-    _move_thread_callout(
-        adapter,
-        front,
-        keyword="Tapped Hole",
-        xy=TAP_NOTE_XY,
-        label="9/16-12 tapped-hole callout",
-    )
 
     return await finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Rocker-Arm Support Manufacturing Drawing",
         scale=SHEET_SCALE,
+        redundant_note_substrings=("Tapped Hole",),
     )
 
 

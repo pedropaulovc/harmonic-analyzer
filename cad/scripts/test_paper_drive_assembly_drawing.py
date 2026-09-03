@@ -22,9 +22,10 @@ def test_paper_drive_package_forwards_domain_instructions(monkeypatch) -> None:
     assert captured["layout"] is drawing.LAYOUT
     assert drawing.LAYOUT == drawing.AssemblyDrawingLayout(
         working_scale=(1.0, 4.0),
-        exploded_scale=(1.0, 14.0),
+        exploded_scale=(1.0, 22.0),
         procedure_scale=(1.0, 5.0),
         reference_scale=(1.0, 12.0),
+        exploded_center=(0.105, 0.155),
     )
     assert captured["assembly_steps"] is drawing.ASSEMBLY_STEPS
     assert captured["critical_checks"] is drawing.CRITICAL_CHECKS

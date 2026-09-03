@@ -199,8 +199,6 @@ ISO_NOTE_XY = (0.325, 0.190)
 END_NOTE_XY = (0.310, 0.112)
 
 
-
-
 def _plan_circles(
     adapter: Any, view: Any
 ) -> list[tuple[float, tuple[float, float, float], Any]]:
@@ -222,8 +220,6 @@ def _plan_circles(
             values = tuple(float(value) for value in curve.CircleParams)
             circles.append((values[6], values[:3], edge))
     return circles
-
-
 
 
 def _pivot_rim(adapter: Any, view: Any) -> Any:
@@ -377,12 +373,6 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, [*top_annotations, *end_annotations], DIMENSION_CALLOUTS
     )
     set_dimension_precision(adapter, top_annotations, DIMENSION_PRECISION)
-    # SolidWorks auto-inserts a generic "1/4-20 Tapped Hole" note for the
-    # wizard taps; the native callout below replaces it.
-    removed_tap_notes = remove_notes_matching(adapter, "Tapped Hole")
-    _telemetry.info(
-        f"removed {removed_tap_notes} redundant automatic tapped-hole note(s)"
-    )
     if add_note(adapter, PIVOT_END_GEOMETRY_NOTE, *PIVOT_END_GEOMETRY_NOTE_XY) is None:
         raise RuntimeError("failed to add pivot-end geometry note")
     for label, view in (("plan", top), ("detail", detail)):
@@ -442,13 +432,32 @@ async def build(adapter: Any) -> dict[str, str]:
         position=EAST_STATION_TEXT_XY,
         label="east mount station from the pivot",
     )
-    add_native_hole_callout(
+    # The imported model items also materialize a generic note matching the
+    # post-mount thread size. The associative 2X Hole Wizard callout is
+    # authoritative for thread, depth and quantity, while the four dimensions
+    # above own both hole locations.  Create and read back that replacement
+    # before deleting exactly the duplicate note.
+    mount_callout = add_native_hole_callout(
         adapter,
         top,
         callout_xy=MOUNT_CALLOUT_XY,
         label="v2 post-mount tapped holes",
         edge=west_edge,
     )
+    if not bool(mount_callout.IsHoleCallout()):
+        raise RuntimeError("post-mount replacement is not a native hole callout")
+    redundant_tap_note = f"{POST_MOUNT_SPEC.size} Tapped Hole"
+    removed_tap_notes = remove_notes_matching(adapter, redundant_tap_note)
+    if removed_tap_notes != 1:
+        raise RuntimeError(
+            "cone-swing-platform tap cleanup mismatch: "
+            f"removed={removed_tap_notes}, expected=1"
+        )
+    if remove_notes_matching(adapter, redundant_tap_note) != 0:
+        raise RuntimeError("redundant post-mount tap note remained after deletion")
+    if not bool(mount_callout.IsHoleCallout()):
+        raise RuntimeError("native post-mount hole callout was lost during cleanup")
+    _telemetry.info("removed the redundant cone-swing-platform tap note")
 
     add_property_linked_note(
         adapter, "Manufacturing Notes", *NOTES_XY, char_height=0.0025

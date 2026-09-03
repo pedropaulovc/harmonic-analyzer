@@ -16,7 +16,11 @@ import _telemetry
 from _common import CAD_ROOT, run_build
 from _drawing_common import DrawingOutputs, add_edge_dimension
 from _drawing_registry import DRAWINGS_BY_NAME
-from _fastener_annotations import add_overall_reference, add_thread_leader
+from _fastener_annotations import (
+    add_external_thread_depiction,
+    add_overall_reference,
+    add_thread_leader,
+)
 from _fastener_drawing import FastenerSheet, build_fastener_sheet
 from hanger_screw_spec import HEAD_AF, HEAD_H, SHANK_DIA, SHANK_LEN, THREAD_DESIGNATION
 
@@ -88,9 +92,25 @@ OVERALL_END_POINTS_MM = (
     (0.0, 0.7 * SHANK_DIA / 2.0, -SHANK_LEN),
 )
 OVERALL_TEXT_XY = (SIDE_CENTER[0], _ROW_ABOVE_Y + 0.016)
+THREAD_AXIS_XY = (
+    (_JUNCTION_X, SIDE_CENTER[1]),
+    (_SHANK_END_X, SIDE_CENTER[1]),
+)
+THREAD_MODEL_DIAMETER_SHEET = SHANK_DIA * _S
+
 
 
 def _decorate(adapter: Any, side: Any, end: Any, _iso: Any) -> None:
+    add_external_thread_depiction(
+        adapter,
+        side,
+        axis_start_xy=THREAD_AXIS_XY[0],
+        axis_end_xy=THREAD_AXIS_XY[1],
+        model_diameter_sheet=THREAD_MODEL_DIAMETER_SHEET,
+        sheet_scale_per_mm=_S,
+        designation=THREAD_DESIGNATION,
+        label="shank external thread",
+    )
     add_thread_leader(
         adapter,
         side,

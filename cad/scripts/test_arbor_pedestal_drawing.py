@@ -216,6 +216,19 @@ def test_view_scales_are_explicit() -> None:
     assert source.count("scale=(2, 1)") == 3  # elevation + plan + pictorial
 
 
+def test_plan_and_its_outer_dimension_clear_the_top_border() -> None:
+    # At 2:1 the 16 mm-deep foot is 32 mm tall on paper.  Keep another 12 mm
+    # for the outer 3.00 location dimension and its arrows below the ~273 mm
+    # printable top border.
+    assert drawing.TOP_CENTER == (0.100, 0.233)
+    plan_top = (
+        drawing.TOP_CENTER[1]
+        + drawing.FOOT_DEPTH / 2.0 * drawing._S
+        + 0.012
+    )
+    assert plan_top <= 0.261
+
+
 def test_part_stamps_make_critical_properties() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "apply_drawing_properties" in source

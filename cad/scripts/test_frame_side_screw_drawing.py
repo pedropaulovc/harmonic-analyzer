@@ -132,6 +132,14 @@ def test_view_annotations_follow_the_machinist() -> None:
     assert "face_xy=SLOT_AXIS_FACE_XY" in source
     assert drawing.THREAD_NOTE_XY[0] < drawing.SIDE_CENTER[0]
     assert all(xy[0] > drawing.SIDE_CENTER[0] for xy in drawing.SIDE_KEEP.values())
+    assert "add_external_thread_depiction(" in source
+    assert drawing.THREAD_AXIS_XY == (
+        (drawing.SIDE_CENTER[0], drawing._JUNCTION_Y),
+        (drawing.SIDE_CENTER[0], drawing._SHANK_END_Y),
+    )
+    assert drawing.THREAD_MODEL_DIAMETER_SHEET == spec.SHANK_DIA * drawing._S
+    # Keep the driver-face label left of the end view and away from its mark.
+    assert drawing.RECIPE.end_note_xy == (0.020, 0.220)
 
 
 def test_notes_are_few_specific_and_never_the_title_block() -> None:

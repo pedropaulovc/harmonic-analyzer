@@ -87,6 +87,15 @@ def test_view_scales_are_explicit() -> None:
     assert "_add_scale_labels(adapter)" in source
 
 
+def test_stock_thickness_is_explicit_on_the_sheet() -> None:
+    assert drawing.STOCK_THICKNESS_NOTE == (
+        f"STOCK THICKNESS {part.BODY_THICKNESS:.2f}"
+    )
+    assert part.BODY_THICKNESS == 3.0
+    source = _source()
+    assert "add_note(adapter, STOCK_THICKNESS_NOTE, *STOCK_THICKNESS_NOTE_XY)" in source
+
+
 def test_part_stamps_make_critical_properties() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "apply_drawing_properties" in source

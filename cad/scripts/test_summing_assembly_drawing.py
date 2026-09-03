@@ -26,6 +26,8 @@ def test_summing_package_forwards_domain_instructions(monkeypatch) -> None:
         procedure_scale=(1.0, 5.0),
         reference_scale=(1.0, 12.0),
         exploded_center=(0.135, 0.180),
+        reference_front_center=(0.080, 0.052),
+        reference_right_center=(0.170, 0.052),
     )
     assert captured["assembly_steps"] is drawing.ASSEMBLY_STEPS
     assert captured["critical_checks"] is drawing.CRITICAL_CHECKS

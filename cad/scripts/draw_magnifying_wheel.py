@@ -97,17 +97,17 @@ SECTION_LINE = (
 )
 
 # Face-view survivors.  Every diameter leader is aimed down a 60-degree GAP
-# between spokes (spokes at 30/90/150/210/270/330 deg): the rim OD up-left
-# (144 deg), the rim ID right (10 deg), the hub down (300 deg), the bore left
-# and 30 mm below the cutting plane so its stacked H7 limits and REAM THRU
-# never meet the section marker; the spoke width stands above the rim.
+# between spokes (spokes at 30/90/150/210/270/330 deg): the rim OD up-left,
+# the rim ID right, the hub in the lower-right gap, and the bore lower-left.
+# Moving the hub callout outboard keeps its leader and text clear of both the
+# bore stack and the section strip; the spoke width stands above the rim.
 FRONT_KEEP = {
     "RimOuterDiaDim": (
         FRONT_CENTER[0] - _RIM_R - 0.028,
         FRONT_CENTER[1] + _RIM_R + 0.006,
     ),
     "RimInnerDiaDim": (FRONT_CENTER[0] + _RIM_R + 0.026, FRONT_CENTER[1] + 0.014),
-    "HubDiaDim": (FRONT_CENTER[0] + 0.030, FRONT_CENTER[1] - _RIM_R - 0.002),
+    "HubDiaDim": (FRONT_CENTER[0] + _RIM_R + 0.010, FRONT_CENTER[1] - 0.037),
     "BoreDiaDim": (FRONT_CENTER[0] - _RIM_R - 0.010, FRONT_CENTER[1] - 0.030),
     "SpokeWidthDim": (FRONT_CENTER[0] + 0.015, FRONT_CENTER[1] + _RIM_R + 0.012),
 }
@@ -133,8 +133,11 @@ _HUB_PICK_X = (BORE_DIA / 2.0 + HUB_DIA / 2.0) / 2.0 + 0.75  # 7, mid hub wall
 _RIM_HALF = RIM_AXIAL / 2.0
 _HUB_HALF = HUB_AXIAL / 2.0
 _SPOKE_HALF = SPOKE_AXIAL / 2.0
-# Section label parked to the right of the strip dimensions, below the strip.
-SECTION_LABEL_XY = (0.180, SECTION_CENTER[1] - 0.031)
+# The native SECTION A-A caption gets an annotation band to the strip's
+# upper-right: clear of the 4/10 dimensions below and the title block below
+# y~0.070.  SolidWorks exposes generated captions as notes on some seats and
+# only through the broader annotation collection on others.
+SECTION_LABEL_XY = (SECTION_CENTER[0] + _RIM_R + 0.025, SECTION_CENTER[1] + 0.017)
 
 _ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
 
@@ -195,20 +198,20 @@ def _section_frame(
 def _move_view_label(
     adapter: Any, view: Any, xy: tuple[float, float], *, keyword: str, label: str
 ) -> None:
-    """Park the view's SECTION label where no dimension will sit under it."""
+    """Move a generated view caption across both SolidWorks exposure paths."""
     notes = list(adapter._attempt(lambda: view.GetNotes(), default=None) or ())
     if not notes:
         note = adapter._attempt(lambda: view.GetFirstNote2(), default=None)
         while note is not None:
             notes.append(note)
-            note = adapter._attempt(lambda n=note: n.GetNext(), default=None)
+            note = adapter._attempt(lambda current=note: current.GetNext(), default=None)
+
     moved = False
     for note in notes:
-        note = _sw_type_info.early_bound_or_flag(
-            note, "INote", "GetText", "GetAnnotation"
-        )
-        text = str(adapter._attempt(lambda n=note: n.GetText(), default="") or "")
-        if keyword not in text.upper():
+        text = str(adapter._attempt(lambda item=note: item.GetText(), default="") or "")
+        # A generated label can read back as its formatting token rather than
+        # the resolved "SECTION A-A"; a section view contains only this note.
+        if keyword not in text.upper() and "<VIEW" not in text.upper() and len(notes) != 1:
             continue
         annotation = _sw_type_info.early_bound_or_flag(
             note.GetAnnotation(), "IAnnotation", "SetPosition2"
@@ -216,8 +219,35 @@ def _move_view_label(
         if not annotation.SetPosition2(float(xy[0]), float(xy[1]), 0.0):
             raise RuntimeError(f"{label}: failed to move the {keyword} label")
         moved = True
+
     if not moved:
-        _telemetry.warn(f"{label}: {keyword} label note not found; left at its default spot")
+        annotations = list(
+            adapter._attempt(lambda: view.GetAnnotations(), default=None) or ()
+        )
+        if not annotations:
+            annotation = adapter._attempt(lambda: view.GetFirstAnnotation3(), default=None)
+            while annotation is not None:
+                annotations.append(annotation)
+                annotation = adapter._attempt(
+                    lambda current=annotation: current.GetNext3(), default=None
+                )
+        for annotation in annotations:
+            specific = adapter._attempt(
+                lambda item=annotation: item.GetSpecificAnnotation(), default=None
+            )
+            text = str(
+                adapter._attempt(lambda item=specific: item.GetText(), default="") or ""
+            )
+            if keyword not in text.upper() and "<VIEW" not in text.upper():
+                continue
+            annotation = _sw_type_info.early_bound_or_flag(
+                annotation, "IAnnotation", "SetPosition2"
+            )
+            if not annotation.SetPosition2(float(xy[0]), float(xy[1]), 0.0):
+                raise RuntimeError(f"{label}: failed to move the {keyword} label")
+            moved = True
+    if not moved:
+        raise RuntimeError(f"{label}: {keyword} label annotation not found")
     adapter.currentModel.EditRebuild3()
 
 

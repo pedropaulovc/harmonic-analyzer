@@ -98,6 +98,12 @@ def test_hanger_hole_has_a_native_callout_and_two_stations() -> None:
     # SolidWorks' generic top-of-strap note is redundant with the native
     # callout and would otherwise be crossed by the 8.50 / 5.00 lanes.
     assert 'remove_notes_matching(adapter, "Tapped Hole")' in source
+    remover = 'remove_notes_matching(adapter, "Tapped Hole")'
+    assert source.index(remover) > source.index("curate_view_dimensions(adapter, front")
+    assert source.index(remover) > source.index("add_native_hole_callout(")
+    assert "tap_callout.IsHoleCallout()" in source
+    assert "tap_callout.GetAnnotation()" in source
+    assert "native hanger-screw tap callout was removed" in source
 
 
 def test_block_strap_and_channel_facts_are_dimensions_on_the_top_view() -> None:
@@ -123,11 +129,21 @@ def test_front_view_lanes_nest_shortest_nearest() -> None:
     top = drawing._fy(drawing.STRAP_TOP_Y)
     # Above the strap top: the 8.50 hole station and the 5.00 lean chained
     # through the top-right corner (nearest), the 16.00 top run outside.
-    assert drawing.SCREW_CORNER_STATION_TEXT_XY[1] == drawing.FRONT_KEEP["StrapTaperDx"][1]
-    assert drawing.FRONT_KEEP["StrapTopRun"][1] > drawing.FRONT_KEEP["StrapTaperDx"][1] > top
+    assert (
+        drawing.SCREW_CORNER_STATION_TEXT_XY[1] == drawing.FRONT_KEEP["StrapTaperDx"][1]
+    )
+    assert (
+        drawing.FRONT_KEEP["StrapTopRun"][1]
+        > drawing.FRONT_KEEP["StrapTaperDx"][1]
+        > top
+    )
     # Under the block: the 10.00 strap foot nearest, the 12.00 block outside.
     bottom = drawing._fy(-drawing.BLOCK_HALF)
-    assert bottom > drawing.FRONT_KEEP["StrapBotWidth"][1] > drawing.FRONT_KEEP["BlockWidth"][1]
+    assert (
+        bottom
+        > drawing.FRONT_KEEP["StrapBotWidth"][1]
+        > drawing.FRONT_KEEP["BlockWidth"][1]
+    )
     # Left: the hole's top station nested inside the strap rise.
     assert drawing.FRONT_KEEP["StrapTaperDy"][0] < drawing.SCREW_TOP_STATION_TEXT_XY[0]
     # Block height right of the block.

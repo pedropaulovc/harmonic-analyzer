@@ -70,12 +70,14 @@ _S = SHEET_SCALE[0] / 1000.0  # sheet meters per model mm
 
 # The casting spans model y 0 (foot seat) .. 64 (dome top); centre the front
 # elevation on that midpoint. Third-angle: the 24x16 foot plan sits ABOVE the
-# elevation, the isometric off to the right.
+# elevation, the isometric off to the right.  The plan is held 12 mm below its
+# former station so its outer 3.00 dimension and arrowheads clear the printable
+# top border rather than being clipped by it.
 _PART_MID_Y = (
     BORE_HEIGHT + TOP_RADIUS
 ) / 2.0  # foot 0 .. dome top (bore + dome radius)
 FRONT_CENTER = (0.100, 0.150)
-TOP_CENTER = (0.100, 0.245)
+TOP_CENTER = (0.100, 0.233)
 ISO_CENTER = (0.335, 0.150)
 
 

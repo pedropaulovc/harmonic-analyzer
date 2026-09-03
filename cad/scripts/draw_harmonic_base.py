@@ -35,6 +35,7 @@ from _drawing_common import (
     add_property_linked_note,
     curate_view_dimensions,
     finalize_drawing,
+    import_cosmetic_threads,
     insert_hole_table,
     new_project_drawing,
     read_required_properties,
@@ -469,17 +470,21 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (top, side):
         set_hidden_lines_visible(adapter, view)
 
-    # Placing the tapped-hole views creates generic Hole Wizard callouts before
-    # model-item curation runs.  The native hole table below owns every thread,
-    # drill, and depth requirement, so remove these duplicate leaders before
-    # they can cover the table's D rows.
-    removed_tap_notes = remove_notes_matching(adapter, "Tapped Hole")
-    _telemetry.info(
-        f"removed {removed_tap_notes} redundant automatic tapped-hole note(s)"
-    )
-
     curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
     curate_view_dimensions(adapter, side, keep=SIDE_KEEP, view_label="side")
+    # Cosmetic-thread import materializes the five model-owned generic tap
+    # leaders as ordinary notes.  The native table below owns the same thread,
+    # drill, depth and station data, so removing only those duplicate notes
+    # preserves every manufacturing requirement and clears its left edge.
+    tap_thread_seeds, tap_thread_instances = import_cosmetic_threads(adapter, top)
+    removed_tap_notes = remove_notes_matching(adapter, "Tapped Hole")
+    if removed_tap_notes != 5:
+        raise RuntimeError(
+            "harmonic-base tap cleanup mismatch: "
+            f"seeds={tap_thread_seeds}, instances={tap_thread_instances}, "
+            f"removed={removed_tap_notes}"
+        )
+    _telemetry.info("removed five redundant harmonic-base tap callouts")
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the base hole pattern")
 

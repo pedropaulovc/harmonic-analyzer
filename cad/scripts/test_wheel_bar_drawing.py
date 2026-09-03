@@ -47,8 +47,10 @@ def test_drawing_contract_is_split_from_the_assembly_nominals() -> None:
 
     assert (geom.BAR_SIDE, geom.BAR_DEPTH, geom.BAR_LENGTH) == (10.0, 9.0, 234.0)
     assert geom.CLAMP_HOLE_X == (70.5, 105.5)
-    assembly = Path(part.__file__).with_name("build_magnifier_assembly.py").read_text(
-        encoding="utf-8"
+    assembly = (
+        Path(part.__file__)
+        .with_name("build_magnifier_assembly.py")
+        .read_text(encoding="utf-8")
     )
     assert "from wheel_bar_geom import" in assembly
     assert "from build_wheel_bar import" not in assembly
@@ -137,33 +139,45 @@ def test_bores_carry_native_drill_callouts_and_stations_from_the_left_end() -> N
         assert drawing.END_FACE_PICK[1] > rim_y  # end-face pick clears the circle
     # The rim picks are refined to a real edge rather than trusted blind.
     assert "find_edge_near(" in source
+    # The thin-wall end hole remains geometrically 2.5 mm from the end, but
+    # displays at .XXX precision so the title-block tolerance yields 2.500.
+    assert wheel_bar_spec.SCREW_HOLE_X + wheel_bar_spec.BAR_LENGTH / 2.0 == 2.5
+    assert drawing.END_STATION_DECIMALS == 3
+    assert "if model_x == SCREW_HOLE_X:" in source
+    assert "adapter, station, END_STATION_DECIMALS, label=label" in source
     # The bar depth stays across the right-view section.
     assert 'label="bar-depth overall"' in source
 
 
-def test_transverse_hole_station_locates_the_common_axis() -> None:
-    # Review 2026-09-02: the holes sat on a drawn midline with no dimension.
-    # One vertical station, bottom edge -> pen-hanger hole axis (arc centre),
-    # locates every bore across the 10 width; it nests inside the 10.00
-    # section height, whose text is lifted off the mid-height row the hole's
-    # extended centre mark runs along.
+def test_transverse_hole_station_locates_the_common_axis_without_crossed_text() -> None:
+    # One vertical station, bottom edge -> shared bore axis (arc centre),
+    # explicitly applies 5.00 to all three bores.  This removes any inference
+    # that the two clamp holes only happen to look centred.
     source = _source()
     assert 'label="transverse hole station"' in source
     assert 'orientation="vertical"' in source
     assert "set_arc_endpoints_to_center(adapter, transverse" in source
+    assert drawing.TRANSVERSE_STATION_PREFIX == "3X "
+    assert "transverse,\n        TRANSVERSE_STATION_PREFIX," in source
+    assert "_add_common_bore_centerline(adapter)" in source
+    assert drawing.COMMON_CENTERLINE_X[0] < drawing._front_x(
+        wheel_bar_spec.SCREW_HOLE_X
+    )
+    assert drawing.COMMON_CENTERLINE_X[1] > drawing._front_x(
+        wheel_bar_spec.CLAMP_HOLE_X[-1]
+    )
     assert source.count("add_edge_dimension(") == 3
     assert drawing.BOTTOM_EDGE_PICK[1] == drawing.BAR_BOTTOM
     assert drawing.BOTTOM_EDGE_PICK[0] > drawing.LEFT_END
-    # Nearest lane inside the section height's lane; both left of the end.
-    assert drawing.LEFT_END > drawing.TRANSVERSE_STATION_TEXT_XY[0] > drawing.FRONT_KEEP["Side"][0]
-    # The rendered 10.00 text extends left of its lane, but not through the
-    # printable frame. The external Maker watermark is intentionally irrelevant.
-    assert (
-        drawing.FRONT_KEEP["Side"][0] - drawing.SIDE_TEXT_LEFT_EXTENT
-        > drawing.PRINTABLE_LEFT_X
-    )
-    assert drawing.FRONT_KEEP["Side"][1] > drawing.FRONT_CENTER[1] + 0.008
+    assert drawing.TRANSVERSE_STATION_TEXT_XY[0] < drawing.LEFT_END
     assert drawing.TRANSVERSE_STATION_TEXT_XY[1] < drawing.FRONT_CENTER[1]
+
+    # The 10.00 section height now belongs to the end view, so its former
+    # extension line cannot cross the front-view 3X 5.00 text.
+    assert set(drawing.FRONT_KEEP) == {"Length"}
+    assert set(drawing.RIGHT_KEEP) == {"Side"}
+    right_edge = drawing.RIGHT_CENTER[0] + drawing.RIGHT_HALF_Z
+    assert drawing.RIGHT_KEEP["Side"][0] > right_edge
 
 
 def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:

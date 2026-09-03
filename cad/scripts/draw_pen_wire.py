@@ -57,11 +57,16 @@ SHEET_SCALE = (2.0, 1.0)   # 2:1 whole sheet (hair-thin 62.7 mm wire)
 FRONT_CENTER = (0.110, 0.155)
 ISO_CENTER = (0.300, 0.170)
 
-# Per-view survivor of the marked-dimension import: the run length only (the
-# Ø0.8 diameter is a note -- a 0.8 mm circle is below the view's ink width).
+# Keep the length dimension close enough to the hairline view that its extension
+# lines read as attached, while retaining room for the 62.70 text.
+RUN_DIMENSION_X = FRONT_CENTER[0] - 0.018
 FRONT_KEEP = {
-    "Depth": (0.078, 0.155),
+    "Depth": (RUN_DIMENSION_X, FRONT_CENTER[1]),
 }
+
+# Centre the caption in X and hold it just below the long isometric's lower
+# endpoint instead of leaving it in the unrelated lower sheet band.
+ISOMETRIC_NOTE_XY = (ISO_CENTER[0] - 0.030, ISO_CENTER[1] - 0.062)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -115,7 +120,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.086)
     add_property_linked_note(adapter, "Elevation View Note", 0.040, 0.036)
-    add_property_linked_note(adapter, "Isometric View Note", 0.270, 0.100)
+    add_property_linked_note(adapter, "Isometric View Note", *ISOMETRIC_NOTE_XY)
 
     return await finalize_drawing(
         adapter,

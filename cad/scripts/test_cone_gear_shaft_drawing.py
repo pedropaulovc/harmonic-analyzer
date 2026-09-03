@@ -56,10 +56,10 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert drawing.SECTION_ENDS == cone_gear_shaft_spec.SECTION_ENDS
 
 
-def test_tip_lands_remain_visible_without_brittle_detail_dimension_imports() -> None:
+def test_tip_lands_remain_visible_in_a_deterministic_model_crop() -> None:
     # The journal and 3/8 seat keep native dimensions on the 1:1 silhouette;
-    # DETAIL A retains useful tip geometry and states the three land limits in
-    # a spec-derived note.
+    # DETAIL A is a real 3:1 side view translated onto the tip shoulder before
+    # an outline-free crop, with the three land limits beside it.
     assert set(drawing.SIDE_DIAMETER_STATIONS_MM) == {"Sec0Dia", "Sec1Dia"}
     ends = cone_gear_shaft_spec.SECTION_ENDS
     assert 0.0 < drawing.SIDE_DIAMETER_STATIONS_MM["Sec0Dia"] < ends[0]
@@ -68,11 +68,14 @@ def test_tip_lands_remain_visible_without_brittle_detail_dimension_imports() -> 
     assert drawing.DETAIL_MODEL_CENTER_Z == ends[3]
     assert ends[2] > drawing.DETAIL_MODEL_CENTER_Z - drawing.DETAIL_MODEL_RADIUS
     assert ends[3] < drawing.DETAIL_MODEL_CENTER_Z + drawing.DETAIL_MODEL_RADIUS
-    assert drawing.TIP_LANDS_NOTE.startswith("DETAIL A TIP LANDS\n")
+    assert drawing.TIP_DETAIL_NOTE == f"{drawing.TIP_LANDS_NOTE}\nSCALE 3:1"
+    assert drawing.TIP_DETAIL_NOTE.startswith("DETAIL A TIP LANDS\n")
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'detail_label="A"' in source
-    assert 'view_label="detail"' not in source
-    assert "add_note(adapter, TIP_LANDS_NOTE" in source
+    assert "detail = _place_tip_crop(adapter)" in source
+    assert "create_detail_view" not in source
+    assert "sw_view.SetViewPosition(double_array(list(translated)), False)" in source
+    assert "sw_view.Crop2(False, True, 5)" in source
+    assert "add_note(adapter, TIP_DETAIL_NOTE" in source
     assert "model_point_in_view(" in source
     assert '"*Front"' not in source  # no end view
     assert "End View Note" not in source
@@ -169,7 +172,7 @@ def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
     assert "set_hidden_lines_removed(adapter, iso)" in source
 
 
-def test_view_scales_are_explicit() -> None:
+def test_view_scales_and_crop_layout_are_explicit() -> None:
     assert drawing.SHEET_SCALE == (1.0, 1.0)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("scale=(1, 1)") == 1  # side silhouette at sheet scale
@@ -178,6 +181,15 @@ def test_view_scales_are_explicit() -> None:
     assert "scale=DETAIL_SCALE" in source
     assert drawing.DETAIL_CENTER == (0.110, 0.098)
     assert drawing.ISO_CENTER == (0.360, 0.200)
+    crop_radius = (
+        drawing.DETAIL_MODEL_RADIUS
+        * drawing.DETAIL_SCALE[0]
+        / drawing.DETAIL_SCALE[1]
+        / 1000.0
+    )
+    assert drawing.DETAIL_CENTER[0] - crop_radius > 0.013
+    assert drawing.DETAIL_CENTER[1] - crop_radius > 0.013
+    assert drawing.TIP_LANDS_NOTE_XY[0] > drawing.DETAIL_CENTER[0] + crop_radius
 
 
 def test_journal_finish_symbol_is_placed_clear_of_the_journal_diameter() -> None:

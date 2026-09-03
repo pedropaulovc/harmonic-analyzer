@@ -165,19 +165,28 @@ def test_running_bore_and_cam_track_carry_the_two_finish_symbols() -> None:
         in source
     )
     assert 'control=surface_finish_by_key(SURFACE_FINISHES, "cam_track")' in source
+    assert "leader_attach_xy=(FRONT_CENTER[0], BORE_FINISH_TARGET_Y)" in source
+    assert "leader_attach_xy=(FRONT_CENTER[0], CAM_FINISH_TARGET_Y)" in source
 
 
-def test_finish_symbols_have_a_dedicated_column_outside_the_gear() -> None:
+def test_finish_leaders_follow_the_model_target_order_in_the_left_lane() -> None:
     cx, cy = drawing.FRONT_CENTER
     bore_text = drawing.FRONT_KEEP["BoreDia"]
     assert bore_text[0] < cx and bore_text[1] > cy  # upper-left
     bore_ra = drawing.BORE_FINISH_SYMBOL
     cam_ra = drawing.CAM_FINISH_SYMBOL
-    gear_left = cx - spec.OUTSIDE_DIA / 2000.0
-    assert bore_ra[0] < gear_left - 0.025
-    assert cam_ra[0] < gear_left - 0.025
-    assert bore_ra[1] < cy < cam_ra[1]
-    assert cam_ra[1] - bore_ra[1] >= 0.050
+    gear_left = cx - drawing.FRONT_RADIUS
+    assert drawing.FRONT_RADIUS == spec.OUTSIDE_DIA / 2000.0
+    assert bore_ra[0] == cam_ra[0] == drawing.FINISH_SYMBOL_X
+    assert drawing.FINISH_SYMBOL_X < gear_left - 0.025
+    assert drawing.BORE_FINISH_TARGET_Y == cy - spec.BORE_DIA / 2000.0
+    assert (
+        drawing.CAM_FINISH_TARGET_Y
+        == cy + spec.ECCENTRICITY / 1000.0 - spec.CAM_DIA / 2000.0
+    )
+    assert drawing.BORE_FINISH_TARGET_Y > drawing.CAM_FINISH_TARGET_Y
+    assert cam_ra[1] < cy < bore_ra[1]
+    assert bore_ra[1] - cam_ra[1] >= 0.050
     for name in ("CamDia", "CamOffset"):
         assert drawing.FRONT_KEEP[name][0] > cx  # right
     # Symbols and dimensions stay clear of the A-A cut line at x = cx.
@@ -198,6 +207,17 @@ def test_section_shows_only_the_cut_face_and_carries_the_cam_thickness() -> None
         == drawing.FRONT_CENTER[0]
     )
     assert drawing.SECTION_HALF_LINE > spec.OUTSIDE_DIA / 2000.0
+    detail_top = drawing.DETAIL_CENTER_ON_FRONT[1] + drawing.DETAIL_RADIUS
+    assert drawing.SECTION_LINE[1][1] - detail_top == pytest.approx(
+        drawing.CUTTING_PLANE_DETAIL_CLEARANCE
+    )
+    front_right = drawing.FRONT_CENTER[0] + drawing.FRONT_RADIUS
+    front_top = drawing.FRONT_CENTER[1] + drawing.FRONT_RADIUS
+    assert drawing.SECTION_CENTER == (
+        front_right + drawing.SECTION_VIEW_CLEARANCE[0],
+        front_top + drawing.SECTION_VIEW_CLEARANCE[1],
+    )
+    assert drawing.SECTION_VIEW_CLEARANCE[0] >= 0.080
     assert drawing.CAM_THICKNESS_NOTE == f"CAM THICKNESS {spec.CAM_THICKNESS:.2f}"
     assert "add_note(adapter, CAM_THICKNESS_NOTE, *CAM_THICKNESS_NOTE_XY)" in source
     assert "CAM_THICKNESS_PICKS" not in source

@@ -26,12 +26,14 @@ def test_required_drawing_paths() -> None:
 
 
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
-    # The drift alarm: the part-side mark set and all drawing-side keep sets
-    # are the shared spec's map.
+    # CrownDia remains part-owned, but the drawing recreates it associatively
+    # from the visible circle because the imported display dimension emitted a
+    # detached witness line.  Every other marked dimension is imported once.
     assert part.DRAWING_DIMENSIONS is fulcrum_keeper_spec.DRAWING_DIMENSIONS
     marked = set().union(*fulcrum_keeper_spec.DRAWING_DIMENSIONS.values())
     kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) | set(drawing.SECTION_KEEP)
-    assert kept == marked
+    assert kept | {"CrownDia"} == marked
+    assert "CrownDia" not in kept
     assert set(drawing.FRONT_CALLOUTS) <= set(drawing.FRONT_KEEP)
     assert set(drawing.SECTION_CALLOUTS) <= set(drawing.SECTION_KEEP)
     assert set(drawing.SECTION_PRECISION) <= set(drawing.SECTION_KEEP)
@@ -103,9 +105,7 @@ def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:
 def test_counterbore_callout_separates_the_two_operations() -> None:
     # The wizard counterbore is flat-bottomed; the semicolon binds DRILL THRU
     # only to the Ø5.105 hole and names the recess as a counterbore.
-    assert (
-        'process="#7 DRILL THRU; FLAT-BOTTOM COUNTERBORE"' in _source()
-    )
+    assert 'process="#7 DRILL THRU; FLAT-BOTTOM COUNTERBORE"' in _source()
     assert fulcrum_keeper_spec.HOLE_DIA_MM == 5.105
 
 
@@ -126,14 +126,16 @@ def test_lug_bores_carry_model_bands_and_live_on_the_axial_section() -> None:
     assert drawing.SECTION_PRECISION == {"SocketDia": 3, "BoreDia": 3}
     assert drawing.SECTION_CALLOUTS["BoreDia"] == "REAM THRU"
     assert drawing.SECTION_CALLOUTS["SocketDia"] == "BALL SEAT"
-    assert drawing.RIGHT_DIAMETER_LEADERS_TO_RIM == ("CrownDia",)
     assert drawing.SECTION_DIAMETER_LEADERS_TO_RIM == ("SocketDia", "BoreDia")
+    assert drawing.SECTION_KEEP["SocketDia"][1] > drawing.SECTION_KEEP["BoreDia"][1]
     source = _source()
-    assert "set_dimension_precision(adapter, section_annotations, SECTION_PRECISION)" in source
-    assert source.count("_leaders_to_circumference(") == 3  # def + two calls
-    assert "_BROKEN_LEADER_HORIZONTAL = 2" in source
-    assert "SetBrokenLeader2(False, _BROKEN_LEADER_HORIZONTAL)" in source
-    assert "broken_horizontal=True" in source
+    assert (
+        "set_dimension_precision(adapter, section_annotations, SECTION_PRECISION)"
+        in source
+    )
+    assert source.count("_leaders_to_circumference(") == 2  # def + section call
+    assert "_BROKEN_LEADER_HORIZONTAL" not in source
+    assert "SetBrokenLeader2(" not in source
 
 
 def test_every_number_is_on_a_view() -> None:
@@ -159,25 +161,25 @@ def test_every_number_is_on_a_view() -> None:
     assert "CreateCenterLine(x, y0, 0.0, x, y1, 0.0)" in source
     assert "ReliefRise" in fulcrum_keeper_spec.DRAWING_DIMENSIONS["FootProfile"]
     assert source.count("add_attached_note(") == 1
-    assert "section,\n        text=BALL_CALLOUT" in source
+    assert "section,\n        text=BALL_NOTE_TEXT" in source
     assert 'label="sectioned ball seat"' in source
     assert f"PRESS Ø{fulcrum_keeper_spec.BALL_DIA:.3f}" in (
         fulcrum_keeper_spec.BALL_CALLOUT
     )
-    # The process flag is wrapped into the clear lane left of section A-A.
-    # Its seven rows finish above the title block instead of overprinting it.
-    assert len(fulcrum_keeper_spec.BALL_CALLOUT.splitlines()) == 7
-    assert max(map(len, fulcrum_keeper_spec.BALL_CALLOUT.splitlines())) <= 20
-    assert drawing.BALL_NOTE_XY[0] < drawing.SECTION_CENTER[0] - 0.08
-    assert drawing.BALL_NOTE_XY[1] >= 0.110
+    # The process flag is compacted without changing its source-owned words,
+    # then parked in the reserved lane below the views and above the block.
+    assert " ".join(drawing.BALL_NOTE_TEXT.split()) == " ".join(
+        fulcrum_keeper_spec.BALL_CALLOUT.split()
+    )
+    assert len(drawing.BALL_NOTE_TEXT.splitlines()) == 5
+    assert max(map(len, drawing.BALL_NOTE_TEXT.splitlines())) <= 25
+    assert drawing.RIGHT_CENTER[0] < drawing.BALL_NOTE_XY[0] < drawing.SECTION_CENTER[0]
+    assert 0.090 <= drawing.BALL_NOTE_XY[1] < drawing.SECTION_CENTER[1]
     # Text placement: the profile stack below the view, each row centred on
     # its span, the shorter nearer; the overall lowest, above the notes.
     assert drawing.FRONT_KEEP["PadLen"][1] > drawing.FRONT_KEEP["FootReach"][1]
     assert drawing.FRONT_KEEP["FootReach"][1] > drawing.OVERALL_TEXT_XY[1] > 0.050
     assert math.isclose(drawing.FRONT_KEEP["PadLen"][0], drawing._front_x(-14.75))
-    # The Ø14 crown text sits right of the lug, off the 14.00 width's line.
-    assert drawing.RIGHT_KEEP["CrownDia"][0] > drawing.RIGHT_CENTER[0] + 0.02
-    assert drawing.RIGHT_KEEP["CrownDia"][1] < drawing.RIGHT_KEEP["Depth"][1]
     # The hole callout left the left-hand field the 7.00 location now uses.
     assert drawing.HOLE_CALLOUT_XY[0] > drawing.HOLE_CALLOUT_RIM_XY[0]
     assert drawing.HOLE_SIDE_TEXT_XY[0] < drawing._front_x(-23.0)
@@ -204,16 +206,54 @@ def test_lug_sequence_is_flagged_and_remote_note_is_only_the_mating_contract() -
     assert notes == "MATES WITH FULCRUM SHAFT."
     assert not any(character.isdigit() for character in notes)
     for banned in (
-        "25.20", "AISI", "1018", "2 REQUIRED", "MHA-", "CORNER-BOSS", "FLIPPED",
-        "UOS", "DIMENSIONS IN", "LINEAR +/-", "+/-", "DATUM", "BASIC", "WITHIN",
+        "25.20",
+        "AISI",
+        "1018",
+        "2 REQUIRED",
+        "MHA-",
+        "CORNER-BOSS",
+        "FLIPPED",
+        "UOS",
+        "DIMENSIONS IN",
+        "LINEAR +/-",
+        "+/-",
+        "DATUM",
+        "BASIC",
+        "WITHIN",
     ):
         assert banned not in notes, banned
 
 
-def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
+def test_section_is_conventional_and_clear_of_the_title_block() -> None:
     source = _source()
-    assert "for view in (front, top, right, section):\n        set_hidden_lines_visible" in source
+    assert drawing.SECTION_CENTER[1] >= 0.130
+    assert drawing.SECTION_LABEL_XY[1] >= 0.085
+    assert drawing.SECTION_LABEL_XY[0] > drawing.SECTION_CENTER[0]
+    assert source.count("_move_view_label(") == 2  # def + SECTION call
+    assert 'keyword="SECTION"' in source
+    assert '"<VIEW"' in source
+    assert "view.GetAnnotations()" in source
+    assert "view.GetFirstAnnotation3()" in source
+    label_call = source.rindex("_move_view_label(")
+    ball_note_call = source.index("text=BALL_NOTE_TEXT")
+    assert label_call < ball_note_call
+    assert (
+        "for view in (front, top, right):\n        set_hidden_lines_visible" in source
+    )
+    assert "set_hidden_lines_removed(adapter, section)" in source
     assert "set_hidden_lines_removed(adapter, iso)" in source
+
+
+def test_crown_diameter_uses_the_visible_circle_without_a_detached_witness() -> None:
+    assert drawing.CROWN_DIAMETER_EDGE_XY == drawing._right_xy(
+        0.0,
+        fulcrum_keeper_spec.SHAFT_AXIS_H + fulcrum_keeper_spec.CROWN_DIA / 2.0,
+    )
+    source = _source()
+    assert source.count("_add_crown_diameter(") == 2  # def + call
+    assert source.count("AddDiameterDimension2(") == 1
+    assert "_DIAMETER_DIMENSION = 6" in source
+    assert "CrownDia" not in drawing.RIGHT_KEEP
 
 
 def test_ball_is_a_separate_pressed_body() -> None:

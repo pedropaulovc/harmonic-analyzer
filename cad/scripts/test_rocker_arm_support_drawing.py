@@ -26,25 +26,19 @@ def test_drawing_keeps_exactly_the_marked_dimension_set() -> None:
     assert kept == marked
 
 
-def test_tapped_holes_use_customary_us_thread() -> None:
+def test_tapped_holes_use_customary_us_thread_without_duplicate_callout() -> None:
     # Pedro 2026-07-10: closest customary US thread, not the period series.
     assert support.HOLE_SSIZE == "9/16-12"
     assert support.HOLE_THREAD_CLASS == "2B"
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "insert_hole_table(" in source
-    # The imported Hole Wizard description remains on the sheet, but is moved
-    # into the blank cavity instead of straddling its lower edge and dimensions.
-    cavity_left = drawing._front_xy(-support.CAV, 0.0)[0]
-    cavity_right = drawing._front_xy(support.CAV, 0.0)[0]
-    cavity_bottom = drawing._front_xy(0.0, -support.CAV)[1]
-    cavity_top = drawing._front_xy(0.0, support.CAV)[1]
-    assert cavity_left < drawing.TAP_NOTE_XY[0] < cavity_right
-    assert cavity_bottom < drawing.TAP_NOTE_XY[1] < cavity_top
-    assert drawing.TAP_NOTE_XY[0] + 0.050 < drawing._front_xy(
-        drawing.SECTION_CUT_X, 0.0
-    )[0]
-    assert 'keyword="Tapped Hole"' in source
-    assert 'xy=TAP_NOTE_XY' in source
+    assert "import_cosmetic_threads" not in source
+    assert "_move_thread_callout" not in source
+    remover = 'remove_notes_matching(adapter, "Tapped Hole")'
+    assert remover in source
+    assert source.index(remover) > source.index("insert_hole_table(")
+    assert 'redundant_note_substrings=("Tapped Hole",)' in source
+    assert "TAP 4X 9/16-12 FROM THE FOOT FACE." in support.DRAWING_NOTES
 
 
 def test_hole_table_covers_every_foot_hole_with_ordinary_locations() -> None:
@@ -132,7 +126,9 @@ def test_window_and_cavity_are_located_from_outside_faces() -> None:
     front_bottom = drawing._front_xy(0.0, -support.HALF_Y)[1]
     bottom_top = drawing.BOTTOM_CENTER[1] + support.WIDE * drawing.VIEW_SCALE / 1000.0
     assert front_bottom > lanes["locate_window"] > lanes["locate_cavity"]
-    assert lanes["locate_cavity"] > lanes["window"] > lanes["overall"] > bottom_top + 0.010
+    assert (
+        lanes["locate_cavity"] > lanes["window"] > lanes["overall"] > bottom_top + 0.010
+    )
     # Vertical lanes stand right of the front outline and left of the taper
     # view's foot, cavity (chained under the marked cavity height) inside the
     # window lane.
@@ -147,8 +143,11 @@ def test_window_and_cavity_are_located_from_outside_faces() -> None:
     # on a lane below the outline, every marked vertical on a lane to the right.
     for name in ("Depth", "WinWidth", "CavWidth"):
         assert drawing.FRONT_KEEP[name][1] < front_bottom, name
-    assert 'prefix="4X "' in source
+    assert 'prefix="4X R"' in source
     assert 'label="cavity corner fillet"' in source
+    # The regenerated sheet proved AddDimension2 can omit its implicit radius
+    # symbol; the authored prefix must carry it explicitly.
+    assert 'prefix="4X "' not in source
 
 
 def test_web_is_dimensioned_on_a_section_not_to_hidden_lines() -> None:
@@ -170,23 +169,33 @@ def test_web_is_dimensioned_on_a_section_not_to_hidden_lines() -> None:
     # x = 0.075) and its end letters land where no lane runs.
     assert x0 > drawing.FRONT_CENTER[0] + 0.030
     assert y0 > drawing.FRONT_LANE_Y["locate_window"]
-    for label in ("web thickness", "web face off foot flat end", "window Y off foot face"):
+    for label in (
+        "web thickness",
+        "web face off foot flat end",
+        "window Y off foot face",
+    ):
         assert f'label="{label}"' in source, label
     assert 'entity_types=("VERTEX", "EDGE")' in source
-    assert "label=\"window rim chamfer\"" in source
-    assert drawing.CHAMFER_CALLOUT_TEXT == "CHAMFER 1.27 X 45 DEG\nWINDOW RIM, BOTH SIDES"
+    assert 'label="window rim chamfer"' in source
+    assert (
+        drawing.CHAMFER_CALLOUT_TEXT == "CHAMFER 1.27 X 45 DEG\nWINDOW RIM, BOTH SIDES"
+    )
     assert "add_attached_note(" in source
     # The section stands between the taper view and the isometric, above the
     # hole table.
     assert drawing.RIGHT_CENTER[0] < drawing.SECTION_CENTER[0] < drawing.ISO_CENTER[0]
-    assert drawing.SECTION_CENTER[1] - support.HALF_Y * drawing.VIEW_SCALE / 1000.0 > (
-        drawing.HOLE_TABLE_ANCHOR[1]
+    assert (
+        drawing.SECTION_CENTER[1] - support.HALF_Y * drawing.VIEW_SCALE / 1000.0
+        > (drawing.HOLE_TABLE_ANCHOR[1])
     )
 
 
 def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "for view in (front, right, bottom):\n        set_hidden_lines_visible" in source
+    assert (
+        "for view in (front, right, bottom):\n        set_hidden_lines_visible"
+        in source
+    )
     assert "set_hidden_lines_removed(adapter, iso)" in source
 
 

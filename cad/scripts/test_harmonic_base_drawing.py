@@ -193,15 +193,23 @@ def test_hole_table_is_native_and_anchored_on_the_virtual_corner() -> None:
     assert "counterbore rims reported in the plan view" in source
     assert "underside-only counterbore rims are visible" not in source
 
-def test_automatic_tap_notes_are_removed_before_final_guard() -> None:
+def test_automatic_tap_callouts_are_removed_before_the_table() -> None:
     source = _source()
-    # View placement creates duplicate generic Hole Wizard leaders.  Remove
-    # those before curation/table insertion; the final matcher remains a
-    # zero-tolerance guard so any later leaked callout still fails loud.
-    assert "curate_view_dimensions(adapter, top, keep=TOP_KEEP" in source
-    assert "curate_view_dimensions(adapter, side, keep=SIDE_KEEP" in source
+    # Explicit import materializes the five generic thread descriptions as
+    # notes; removing exactly those before table insertion prevents the F3
+    # leader/text from crossing the table while its rows retain all hole data.
+    importer = "import_cosmetic_threads(adapter, top)"
+    remover = 'remove_notes_matching(adapter, "Tapped Hole")'
+    assert importer in source
+    assert remover in source
+    assert source.index(importer) > source.index(
+        "curate_view_dimensions(adapter, top, keep=TOP_KEEP"
+    )
+    assert source.index(remover) > source.index(importer)
+    assert source.index(remover) < source.index("insert_hole_table(")
+    assert "if removed_tap_notes != 5:" in source
+    # The final zero-tolerance guard catches any callout rematerialized later.
     assert 'redundant_note_substrings=("Tapped Hole",)' in source
-    assert 'remove_notes_matching(adapter, "Tapped Hole")' in source
     assert "expected_redundant_notes" not in source
 
 

@@ -7,24 +7,14 @@ sheet/template, import, curation, and export behavior lives in
 
 The rod is a tall thin lollipop (~186 mm ring-bottom to head-crown), so the
 sheet runs at 1:1 with a 1:2 isometric.  The front view carries the centre
-distance, the (REF) overall and the pin hole; three enlarged details carry
-what is too small or too crowded at 1:1 (policy rule 7, machinist review
-2026-09-02):
-
-* DETAIL A (2:1) -- the ring: a compact spec-derived note states the outer
-  diameter, strap-bore limits and shank width beside the enlarged geometry;
-  the bore also carries its roughness symbol.
-* DETAIL B (3:1) -- the as-cast head: a complete spec-derived note states the
-  cheek width, shoulder rise, shoulder-root height, and FULL R crown.
-* DETAIL C (3:1, from the left view) -- the enlarged stepped profile and a
-  spec-derived note distinguish the 3.00 ring from the 2.50 shank thickness.
-
-The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): the
-pin hole is a centre distance plus a centreline offset that the block
-tolerance holds identically on all 20 rods, so the sheet carries no datums,
-no feature-control frames and no basic dimensions. The strap-bore limits come
-from the same spec band as the model, and its roughness symbol remains on the
-enlarged bore because it runs on the eccentric cam.
+distance, the (REF) overall and the pin hole.  The ring, as-cast head, and
+3.00/2.50 thickness transition are shown in directly placed cropped model
+views.  Each view is translated by its actual model point before cropping, so
+the enlarged ring/head/step geometry cannot drift out of an otherwise empty
+SolidWorks derived-detail circle.  Decorative crop outlines and generated
+captions are suppressed; adjacent specification-derived notes identify each
+detail and its explicit scale.  The one finish symbol remains on the main
+view's enlarged bore because it runs on the eccentric cam.
 
 Run with SolidWorks open::
 
@@ -41,12 +31,13 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    _sheet_to_view_sketch,
     add_edge_dimension,
     add_native_hole_callout,
     add_property_linked_note,
     add_surface_finish,
-    create_detail_view,
     finalize_drawing,
+    model_point_in_view,
     new_project_drawing,
     read_required_properties,
     set_arc_endpoints_to_max,
@@ -54,11 +45,15 @@ from _drawing_common import (
     set_hidden_lines_visible,
     set_reference_dimension,
     stamp_drawing_summary,
+    view_name,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
 from _surface_finish import surface_finish_by_key
-from connecting_rod_notes import CROWN_CALLOUT, RING_GEOMETRY_NOTE
+from connecting_rod_notes import (
+    CROWN_CALLOUT,
+    RING_GEOMETRY_NOTE as RING_GEOMETRY_SPEC_NOTE,
+)
 from connecting_rod_spec import (
     CENTER_DISTANCE,
     HEAD_HEIGHT,
@@ -75,6 +70,7 @@ from connecting_rod_spec import (
     SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
+from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     auto_center_marks,
@@ -104,21 +100,21 @@ FRONT_CENTER = (0.180, 0.135)
 LEFT_CENTER = (0.080, 0.171)  # stepped-thickness profile, inside the top zone
 ISO_CENTER = (0.385, 0.200)
 
-# Details: the ring at 2:1 in the field right of the front view, lifted enough
-# that its generated DETAIL A / SCALE 2:1 caption clears the title block; the
-# head at 3:1 above-right of it; the thickness step at 3:1 left of the left
-# view.  The small diagonal separation between A and B retains both outlines.
+# Cropped model views use only enough model-space context to show the complete
+# feature.  With no decorative outline, these compact centres keep the actual
+# enlarged profiles and their notes disjoint.
 RING_DETAIL_SCALE = (2, 1)
-RING_DETAIL_MODEL_RADIUS = 24.0  # encloses the ring and the shank's root
-RING_DETAIL_CENTER = (0.250, 0.170)
+RING_DETAIL_MODEL_RADIUS = 22.0  # ring OD plus the shank root line
+RING_DETAIL_CENTER = (0.255, 0.150)
 HEAD_DETAIL_SCALE = (3, 1)
 HEAD_DETAIL_MODEL_CY = 160.0
-HEAD_DETAIL_MODEL_RADIUS = 8.0  # shoulder root (155.0) to crown top (165.5)
-HEAD_DETAIL_CENTER = (0.310, 0.212)
+HEAD_DETAIL_MODEL_RADIUS = 7.0  # shoulder root through crown top
+HEAD_DETAIL_CENTER = (0.320, 0.215)
 STEP_DETAIL_SCALE = (3, 1)
 STEP_DETAIL_MODEL_CY = RING_OUTER_RADIUS  # the 3.00 -> 2.50 step
-STEP_DETAIL_MODEL_RADIUS = 8.0
-STEP_DETAIL_CENTER = (0.045, 0.125)
+STEP_DETAIL_MODEL_RADIUS = 6.0
+STEP_DETAIL_CENTER = (0.045, 0.145)
+ISOMETRIC_VIEW_NOTE_XY = (0.345, 0.105)
 
 
 def _sheet_xy(mx: float, my: float) -> tuple[float, float]:
@@ -129,53 +125,91 @@ def _sheet_xy(mx: float, my: float) -> tuple[float, float]:
     )
 
 
-def _left_xy(mz: float, my: float) -> tuple[float, float]:
-    """Sheet (x, y) of a model (Z, Y) point in the 1:1 left view.
-
-    Every thickness is symmetric about the midplane, so the view's Z mirror
-    (SolidWorks' choice) cannot matter.
-    """
-    return (
-        LEFT_CENTER[0] + mz / 1000.0,
-        LEFT_CENTER[1] + (my - _BBOX_CY) / 1000.0,
+def _place_feature_crop(
+    adapter: Any,
+    orientation: str,
+    *,
+    model_xyz: tuple[float, float, float],
+    model_radius_mm: float,
+    view_xy: tuple[float, float],
+    scale: tuple[int, int],
+    label: str,
+) -> Any:
+    """Place a real model view with ``model_xyz`` fixed at ``view_xy``."""
+    view = place_view(adapter, str(SOURCE), orientation, *view_xy, scale=scale)
+    draw = adapter.currentModel
+    sw_view = _early_bound(view, "IView")
+    projected = model_point_in_view(adapter, view, model_xyz, label=label)
+    position = tuple(float(value) for value in (sw_view.Position or ()))
+    if len(position) < 2:
+        raise RuntimeError(f"feature crop has no view position ({label})")
+    translated = (
+        position[0] + view_xy[0] - projected[0],
+        position[1] + view_xy[1] - projected[1],
     )
+    if not sw_view.SetViewPosition(double_array(list(translated)), False):
+        raise RuntimeError(f"failed to position feature crop ({label})")
+    draw.EditRebuild3()
 
-# These sketch dimensions are unavailable in a derived detail view. Keep the
-# useful enlarged ring geometry and render the part-owned manufacturing sizes
-# beside it, between DETAIL A and the pictorial rather than over DETAIL B.
+    crop_center = model_point_in_view(adapter, view, model_xyz, label=label)
+    crop_radius = model_radius_mm * scale[0] / scale[1] / 1000.0
+    drawing = _early_bound(draw, "IDrawingDoc")
+    if not drawing.ActivateView(view_name(adapter, view)):
+        raise RuntimeError(f"failed to activate feature crop ({label})")
+    draw.ClearSelection2(True)
+    sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
+    centre = _sheet_to_view_sketch(adapter, view, crop_center, label=label)
+    rim = _sheet_to_view_sketch(
+        adapter,
+        view,
+        (crop_center[0] + crop_radius, crop_center[1]),
+        label=label,
+    )
+    if (
+        sketch_manager.CreateCircle(
+            float(centre[0]),
+            float(centre[1]),
+            0.0,
+            float(rim[0]),
+            float(rim[1]),
+            0.0,
+        )
+        is None
+    ):
+        raise RuntimeError(f"failed to create feature crop ({label})")
+    if int(sw_view.Crop2(False, True, 5)) != 1:
+        raise RuntimeError(f"failed to crop feature view ({label})")
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    return view
+
+# The ring crop exposes no stable selectable sketch dimensions.  Its adjacent
+# note names the detail and scale and carries the part-owned manufacturing sizes.
+RING_GEOMETRY_NOTE = f"{RING_GEOMETRY_SPEC_NOTE}\nSCALE 2:1"
 RING_GEOMETRY_NOTE_XY = (
-    RING_DETAIL_CENTER[0] + RING_DETAIL_MODEL_RADIUS * 2.0 / 1000.0 + 0.007,
-    RING_DETAIL_CENTER[1] + 0.010,
+    RING_DETAIL_CENTER[0]
+    + RING_DETAIL_MODEL_RADIUS * RING_DETAIL_SCALE[0] / 1000.0
+    + 0.006,
+    RING_DETAIL_CENTER[1] - 0.005,
 )
 
-# DETAIL B's derived view likewise exposes no stable selectable edges on this
-# seat. State the complete, spec-owned head profile beside the enlarged shape.
+# The head crop likewise exposes no stable selectable edges on this seat.
 HEAD_GEOMETRY_NOTE = "\n".join(
     (
-        "DETAIL B AS-CAST HEAD",
+        "DETAIL B AS-CAST HEAD — SCALE 3:1",
         f"WIDTH {HEAD_WIDTH:.2f}",
         f"HEIGHT {HEAD_HEIGHT:.2f} FROM SHOULDER ROOT",
         f"SHOULDER RISE {HEAD_SHOULDER_RISE:.2f}",
         f"CROWN {CROWN_CALLOUT}",
     )
 )
-HEAD_GEOMETRY_NOTE_XY = (
-    HEAD_DETAIL_CENTER[0],
-    (
-        HEAD_DETAIL_CENTER[1]
-        + HEAD_DETAIL_MODEL_RADIUS
-        * HEAD_DETAIL_SCALE[0]
-        / HEAD_DETAIL_SCALE[1]
-        / 1000.0
-        + 0.014
-    ),
-)
+HEAD_GEOMETRY_NOTE_XY = (0.285, 0.262)
 
-# DETAIL C also has no stable derived edges on this seat. Keep its enlarged
-# step profile and state both spec-owned axial thicknesses immediately below it.
+# The step crop has no stable derived edges either.  Keep its enlarged model
+# profile and state both spec-owned axial thicknesses immediately below it.
 STEP_THICKNESS_NOTE = "\n".join(
     (
-        "DETAIL C THICKNESS STEP",
+        "DETAIL C THICKNESS STEP — SCALE 3:1",
         f"RING REGION THICKNESS {RING_THICKNESS:.2f}",
         f"SHANK REGION THICKNESS {SHANK_THICKNESS:.2f}",
     )
@@ -265,33 +299,30 @@ async def build(adapter: Any) -> dict[str, str]:
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
     set_hidden_lines_removed(adapter, iso)
 
-    ring_detail = create_detail_view(
+    ring_detail = _place_feature_crop(
         adapter,
-        front,
-        center=_sheet_xy(0.0, 0.0),
-        radius=RING_DETAIL_MODEL_RADIUS / 1000.0,
+        "*Front",
+        model_xyz=(0.0, 0.0, 0.0),
+        model_radius_mm=RING_DETAIL_MODEL_RADIUS,
         view_xy=RING_DETAIL_CENTER,
-        detail_label="A",
         scale=RING_DETAIL_SCALE,
         label="strap ring detail",
     )
-    head_detail = create_detail_view(
+    head_detail = _place_feature_crop(
         adapter,
-        front,
-        center=_sheet_xy(0.0, HEAD_DETAIL_MODEL_CY),
-        radius=HEAD_DETAIL_MODEL_RADIUS / 1000.0,
+        "*Front",
+        model_xyz=(0.0, HEAD_DETAIL_MODEL_CY / 1000.0, 0.0),
+        model_radius_mm=HEAD_DETAIL_MODEL_RADIUS,
         view_xy=HEAD_DETAIL_CENTER,
-        detail_label="B",
         scale=HEAD_DETAIL_SCALE,
         label="as-cast head detail",
     )
-    step_detail = create_detail_view(
+    step_detail = _place_feature_crop(
         adapter,
-        left,
-        center=_left_xy(0.0, STEP_DETAIL_MODEL_CY),
-        radius=STEP_DETAIL_MODEL_RADIUS / 1000.0,
+        "*Left",
+        model_xyz=(0.0, STEP_DETAIL_MODEL_CY / 1000.0, 0.0),
+        model_radius_mm=STEP_DETAIL_MODEL_RADIUS,
         view_xy=STEP_DETAIL_CENTER,
-        detail_label="C",
         scale=STEP_DETAIL_SCALE,
         label="ring-to-shank thickness step detail",
     )
@@ -386,9 +417,8 @@ async def build(adapter: Any) -> dict[str, str]:
     ):
         raise RuntimeError("failed to add as-cast head geometry note")
 
-    # DETAIL C, the thickness step: the derived view is useful visual context,
-    # but its edges are not selectable on this seat. State both region-specific
-    # thicknesses directly from the shared specification beside the profile.
+    # DETAIL C's cropped model view keeps the actual step visible while both
+    # region-specific thicknesses remain in the shared-spec note below it.
     if (
         add_note(
             adapter,
@@ -400,7 +430,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add thickness-step geometry note")
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.036)
-    add_property_linked_note(adapter, "Isometric View Note", 0.365, 0.252)
+    add_property_linked_note(adapter, "Isometric View Note", *ISOMETRIC_VIEW_NOTE_XY)
 
     return await finalize_drawing(
         adapter,
