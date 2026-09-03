@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
+
+import pytest
 
 import _fit_limits
 import build_transgear_stub as part
@@ -53,6 +56,56 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     ) == nominals[1:]
     # The base is machine-standard 3/8" stock carried in mm.
     assert transgear_stub_spec.BASE_DIA == 0.375 * transgear_stub_spec.MM_PER_IN
+
+
+def test_brass_face_regions_require_nonzero_axial_span_proof() -> None:
+    collar_start = transgear_stub_spec.BASE_LEN + transgear_stub_spec.SEAT_LEN
+    cap_start = collar_start + transgear_stub_spec.COLLAR_LEN
+    cap_end = cap_start + transgear_stub_spec.CAP_LEN
+    classify = part._brass_region_from_stations
+    prove = part._brass_span_evidence_region
+
+    assert classify((0.0, collar_start), collar_start, cap_start) is None
+    assert classify((collar_start,), collar_start, cap_start) == "collar"
+    assert prove((collar_start,), collar_start, cap_start, cap_end) is None
+    assert classify((cap_start,), collar_start, cap_start) == "cap"
+    assert prove((cap_start,), collar_start, cap_start, cap_end) is None
+
+    collar_span = (collar_start, cap_start)
+    assert classify(collar_span, collar_start, cap_start) == "collar"
+    assert prove(collar_span, collar_start, cap_start, cap_end) == "collar"
+    cap_span = (cap_start, cap_end)
+    assert classify(cap_span, collar_start, cap_start) == "cap"
+    assert prove(cap_span, collar_start, cap_start, cap_end) == "cap"
+
+    assert classify((), collar_start, cap_start) is None
+    assert prove((), collar_start, cap_start, cap_end) is None
+
+
+def test_cap_slot_volume_uses_the_cylindrical_intersection() -> None:
+    full_circle = part._circular_strip_area_mm2(
+        transgear_stub_spec.CAP_DIA, transgear_stub_spec.CAP_DIA
+    )
+    assert full_circle == pytest.approx(
+        math.pi * (transgear_stub_spec.CAP_DIA / 2.0) ** 2
+    )
+    strip = part._circular_strip_area_mm2(
+        transgear_stub_spec.CAP_DIA, transgear_stub_spec.CAP_SLOT_W
+    )
+    assert 0.0 < strip < (
+        transgear_stub_spec.CAP_DIA * transgear_stub_spec.CAP_SLOT_W
+    )
+    for invalid_width in (0.0, -0.1, transgear_stub_spec.CAP_DIA + 0.1):
+        with pytest.raises(ValueError, match="strip width"):
+            part._circular_strip_area_mm2(
+                transgear_stub_spec.CAP_DIA, invalid_width
+            )
+
+
+def test_cap_plane_and_depth_follow_editable_globals() -> None:
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert r'''("D1@CapPlane", '"BaseLen" + "SeatLen" + "CollarLen"')''' in source
+    assert r'''("D1@Cap", '"CapLen"')''' in source
 
 
 def test_lands_carry_true_diametric_dimensions() -> None:
@@ -113,6 +166,8 @@ def test_native_gdt_controls_seat_form_runout_and_finish() -> None:
     assert by_key["seat_runout"].characteristic == "circular_runout"
     assert by_key["seat_runout"].tolerance == "0.03"
     assert by_key["seat_runout"].datums == ("A",)
+    seat_y = transgear_stub_spec.BASE_LEN + transgear_stub_spec.SEAT_LEN / 2.0
+    assert all(control.face.contains_y_mm == seat_y for control in by_key.values())
     assert tuple(datum.letter for datum in PART_DATUMS) == ("A",)
 
     part_source = Path(part.__file__).read_text(encoding="utf-8")
@@ -149,6 +204,9 @@ def test_surface_finish_is_part_owned_authored_and_consumed() -> None:
     assert control.key == "gear_seat"
     assert control.roughness_um == 1.6
     assert control.face.diameter_mm == transgear_stub_spec.SEAT_DIA
+    assert control.face.contains_y_mm == (
+        transgear_stub_spec.BASE_LEN + transgear_stub_spec.SEAT_LEN / 2.0
+    )
     part_source = "".join(Path(part.__file__).read_text(encoding="utf-8").split())
     assert "surface_finishes=SURFACE_FINISHES" in part_source
     sheet_source = "".join(Path(drawing.__file__).read_text(encoding="utf-8").split())

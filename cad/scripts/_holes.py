@@ -773,8 +773,8 @@ def wizard_hole_on_cylinder(
     label: str,
     *,
     name: str = "",
-    y_dim: PlacementDimension | None = None,
-) -> list[tuple[str, str]]:
+    point_planes: tuple[str, ...],
+) -> None:
     """ONE through wizard hole drilled RADIALLY into a cylindrical face at
     ``point_mm`` (a model point ON the face; the drill axis is the surface
     normal there, through the shaft axis).
@@ -789,10 +789,10 @@ def wizard_hole_on_cylinder(
     would each need their own feature anyway (one 3D-sketch point per face
     parameterization is untested).
 
-    The face picked is the LARGEST cylindrical face of the body -- callers
-    with several cylinder faces (stepped shafts) must cut the hole while the
-    target section is the dominant cylinder, or extend this to face-pick by
-    the point.
+    The face is selected by exact geometric containment of ``point_mm``:
+    radial distance to the cylinder axis must equal the cylinder radius and
+    the point must lie inside the trimmed face's bounding box. This prevents
+    stepped shafts from silently drilling the largest, wrong-diameter land.
     """
     if spec.end != "through_all":
         raise ValueError("wizard_hole_on_cylinder supports through_all only")
@@ -805,17 +805,38 @@ def wizard_hole_on_cylinder(
 
     body = (_early_bound(model, "IPartDoc").GetBodies2(0, False) or [None])[0]
     body = _early_bound(body, "IBody2")
-    face = None
-    for f in body.GetFaces() or []:
-        f = _early_bound(f, "IFace2")
-        surf = f.GetSurface()
-        surf = _early_bound(surf, "ISurface")
-        if not surf.IsCylinder():
+    point_m = tuple(float(value) / 1000.0 for value in point_mm)
+    face_candidates = []
+    tolerance_m = 1e-6
+    for raw_face in body.GetFaces() or []:
+        candidate = _early_bound(raw_face, "IFace2")
+        surface = _early_bound(candidate.GetSurface(), "ISurface")
+        if not surface.IsCylinder():
             continue
-        if face is None or f.GetArea() > face.GetArea():
-            face = f
-    if face is None:
-        raise RuntimeError(f"hole wizard {label}: no cylindrical face")
+        params = tuple(float(value) for value in surface.CylinderParams)
+        origin = params[:3]
+        axis = params[3:6]
+        radius = params[6]
+        relative = tuple(point_m[i] - origin[i] for i in range(3))
+        axial = sum(relative[i] * axis[i] for i in range(3))
+        radial = tuple(relative[i] - axial * axis[i] for i in range(3))
+        radial_distance = sum(value * value for value in radial) ** 0.5
+        if abs(radial_distance - radius) > tolerance_m:
+            continue
+        box = tuple(float(value) for value in candidate.GetBox())
+        if any(
+            point_m[i] < box[i] - tolerance_m
+            or point_m[i] > box[i + 3] + tolerance_m
+            for i in range(3)
+        ):
+            continue
+        face_candidates.append(candidate)
+    if len(face_candidates) != 1:
+        raise RuntimeError(
+            f"hole wizard {label}: expected one cylindrical face containing "
+            f"{point_mm}, found {len(face_candidates)}"
+        )
+    face = face_candidates[0]
     model.ClearSelection2(True)
     if not _early_bound(face, "IEntity").Select2(False, 0):
         raise RuntimeError(f"hole wizard {label}: cylinder Select2 failed")
@@ -858,42 +879,60 @@ def wizard_hole_on_cylinder(
         str(sub.Name), "SKETCH", 0, 0, 0, False, 0, null_callout(), 0
     ):
         raise RuntimeError(f"hole wizard {label}: cannot edit {sub.Name}")
-    model.EditSketch()
-    pt = (sk.GetSketchPoints2() or [None])[0]
-    pt = _early_bound(pt, "ISketchPoint")
-    pt.SetCoords(point_mm[0] / 1000.0, point_mm[1] / 1000.0, point_mm[2] / 1000.0)
+    from _common import check
+    from solidworks_mcp.adapters.solidworks.sketch import (
+        _add_sketch_constraint_impl,
+    )
 
-    placement_drive_jobs: list[tuple[str, str]] = []
-    if y_dim is not None:
-        from _common import SketchDims, check
-        from solidworks_mcp.adapters.solidworks.sketch import (
-            _add_sketch_dimension_impl,
+    sketch_manager = _early_bound(model.SketchManager, "ISketchManager")
+    part = _early_bound(adapter.currentModel, "IPartDoc")
+    previous_sketch_manager = adapter.currentSketchManager
+    adapter.currentSketchManager = sketch_manager
+    editing_sketch = False
+    active_error: BaseException | None = None
+    try:
+        model.EditSketch()
+        editing_sketch = True
+        pt = (sk.GetSketchPoints2() or [None])[0]
+        pt = _early_bound(pt, "ISketchPoint")
+        pt.SetCoords(
+            point_mm[0] / 1000.0,
+            point_mm[1] / 1000.0,
+            point_mm[2] / 1000.0,
         )
-
-        dims = SketchDims()
-        previous_sketch_manager = adapter.currentSketchManager
-        adapter.currentSketchManager = model.SketchManager
-        adapter._sketch_origin_point = None
-        try:
-            point_id = adapter._register_sketch_entity("Point", pt)
+        point_id = adapter._register_sketch_entity("Point", pt)
+        for plane_name in point_planes:
+            plane = part.FeatureByName(plane_name)
+            if plane is None:
+                raise RuntimeError(
+                    f"hole wizard {label}: point plane {plane_name!r} not found"
+                )
+            plane_id = adapter._register_sketch_entity(
+                "Plane", _early_bound(plane, "IFeature")
+            )
             check(
-                f"dimension radial hole placement {label} y",
-                _add_sketch_dimension_impl(
-                    adapter,
-                    point_id,
-                    "origin",
-                    "vertical_distance",
-                    abs(point_mm[1]),
+                f"constrain radial hole placement {label} to {plane_name}",
+                _add_sketch_constraint_impl(
+                    adapter, point_id, plane_id, "coincident"
                 ),
             )
-            dims.record(*y_dim)
-        finally:
-            adapter.currentSketchManager = previous_sketch_manager
-    model.EditSketch()
-    _telemetry.debug(f"hole wizard {label}: point placed, rebuilding")
+    except BaseException as error:
+        active_error = error
+        raise
+    finally:
+        adapter.currentSketchManager = previous_sketch_manager
+        if editing_sketch:
+            try:
+                model.EditSketch()
+            except BaseException as cleanup_error:
+                if active_error is None:
+                    raise
+                active_error.add_note(
+                    f"hole wizard {label}: failed to exit placement sketch: "
+                    f"{cleanup_error!r}"
+                )
+    _telemetry.debug(f"hole wizard {label}: point constrained, rebuilding")
     model.EditRebuild3()
-    if y_dim is not None:
-        placement_drive_jobs = dims.apply_feature(adapter, sub, str(sub.Name))
 
     if name:
         try:
@@ -911,4 +950,4 @@ def wizard_hole_on_cylinder(
     _telemetry.success(
         f"hole wizard {label}: radial {spec.size} {spec.kind} through cylinder"
     )
-    return placement_drive_jobs
+    return None

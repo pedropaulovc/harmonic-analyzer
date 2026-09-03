@@ -471,7 +471,9 @@ CRANK_ARM_Z0 = CRANKSHAFT_Z0  # arm PLATE south face: the hub band is
 # the chain when the crank turns (user, book p005). The placed pose composes a
 # Ry(180) (the plate's local +z extrusion runs machine -z), so the component
 # ORIGIN sits at the north face -- see CRANK_ARM_ORIGIN_Z.
-from crank_arm_spec import ARM_C2C  # noqa: E402  # 75: handle pivot from the
+from crank_arm_spec import ARM_C2C, ARM_WIDTH  # noqa: E402
+from crankshaft_spec import PIN_HOLE_HEIGHT  # noqa: E402  # 75: handle pivot from the
+
 # shaft axis (2026-09 front-view re-derive, see crank_arm_spec; was 66 from the
 # perspective-magnified side view, 150 before that)
 REMOVABLE_Z0 = -157.5  # mounted T12 (face 5.0): band -157.5..-152.5, mid -155 =
@@ -519,7 +521,10 @@ END_DISC_SOUTH_Z0 = (
 END_DISC_NORTH_Z0 = Z_DRUM0 + 19 * Z_PITCH + DRUM_FACE / 2.0 + END_DISC_AIR
 if END_DISC_SOUTH_Z0 < -ARBOR_PEDESTAL_Z + ARBOR_PED_DEPTH / 2.0 + 0.25:
     raise AssertionError("south end disc reaches the south pedestal strap")
-if END_DISC_NORTH_Z0 + END_DISC_THICK > ARBOR_PEDESTAL_NORTH_Z - ARBOR_PED_DEPTH / 2.0 - 0.25:
+if (
+    END_DISC_NORTH_Z0 + END_DISC_THICK
+    > ARBOR_PEDESTAL_NORTH_Z - ARBOR_PED_DEPTH / 2.0 - 0.25
+):
     raise AssertionError("north end disc reaches the north pedestal strap")
 # (also imported with the main block below; repeated here because these
 # asserts run before it)
@@ -547,6 +552,59 @@ from build_crankshaft import (  # noqa: E402
 )
 
 CRANK_ARM_ORIGIN_Z = CRANK_ARM_Z0 + ARM_THICKNESS  # the arm origin's world z
+# Crank taper pin + keeper ring (ch11 p.14): pin axis along machine X through
+# the arm hub's mid-thickness (= the crankshaft's PIN_HOLE_HEIGHT above its
+# outboard end), big end PIN_PROUD outside the hub's -X face.
+from crank_pin_spec import (  # noqa: E402
+    PIN_LENGTH as CRANK_PIN_LENGTH,
+    RING_HOLE_DIA as PIN_RING_HOLE_DIA,
+    RING_HOLE_X as PIN_RING_HOLE_X,
+)
+from build_crank_pin_ring import WIRE_DIA as CRANK_RING_WIRE_DIA  # noqa: E402
+from build_crank_pin_eye import (  # noqa: E402
+    LOOP_R as EYE_LOOP_R,
+    TAIL_LEN as EYE_TAIL_LEN,
+    WIRE_DIA as EYE_WIRE_DIA,
+)
+from crank_arm_spec import ANCHOR_SCREW_X, ANCHOR_SCREW_Y, ANCHOR_THREAD_DEPTH  # noqa: E402
+from fillister_screw_spec import (  # noqa: E402
+    SHANK_DIA as ANCHOR_SCREW_SHANK_DIA,
+    SHANK_LEN as ANCHOR_SCREW_SHANK_LEN,
+)
+
+CRANK_RING_ARM_CLEARANCE = 0.25
+PIN_PROUD = PIN_RING_HOLE_X + CRANK_RING_WIRE_DIA / 2.0 + CRANK_RING_ARM_CLEARANCE
+CRANK_PIN_Z = CRANK_ARM_Z0 + ARM_THICKNESS / 2.0  # -171: hub mid-thickness
+CRANK_PIN_X0 = X_CRANK - ARM_WIDTH / 2.0 - PIN_PROUD  # big end, -X of the hub
+# The ring lies in machine YZ. Its straight local-Z leg is concentric with the
+# pin's machine-Z cross-hole; its bends and return hang toward machine -Y.
+CRANK_RING_Y = Y_CRANK
+if (PIN_RING_HOLE_DIA - CRANK_RING_WIRE_DIA) / 2.0 < 0.1:
+    raise AssertionError("keeper-ring wire does not clear the crank-pin cross-hole")
+if abs((CRANKSHAFT_Z0 + PIN_HOLE_HEIGHT) - CRANK_PIN_Z) > 1e-6:
+    raise AssertionError("crankshaft cross-hole is not at the arm hub's mid-thickness")
+if CRANK_PIN_X0 + CRANK_PIN_LENGTH < X_CRANK + ARM_WIDTH / 2.0 + 2.0:
+    raise AssertionError("crank pin does not run out the far side of the hub")
+# Keeper-ring anchor (ch11 p.14): the arm's front (south, machine -z) face is
+# CRANK_ARM_Z0; arm local (x, y) -> machine (X_CRANK - y, Y_CRANK - x) (the
+# placed rows: local +x -> -Y, local +y -> -X). The brass eyelet lies flat on
+# that face (wire centre a wire radius + air south of it), its tail pointing
+# UP the arm at the screw and ending at the shank; the fillister-screw's
+# under-head plane rides on the wire (one wire diameter + air off the face),
+# shank pointing +z into the arm's #4-40 tap.
+ANCHOR_AIR = 0.02
+ANCHOR_SCREW_XY = (X_CRANK - ANCHOR_SCREW_Y, Y_CRANK - ANCHOR_SCREW_X)
+ANCHOR_HEAD_Z = CRANK_ARM_Z0 - EYE_WIRE_DIA - ANCHOR_AIR
+EYE_Z = CRANK_ARM_Z0 - EYE_WIRE_DIA / 2.0 - ANCHOR_AIR
+# the tail's end touches the shank: loop centre (tail root) sits LOOP_R + TAIL_LEN
+# + shank radius + air below the screw axis
+EYE_CENTER_Y = ANCHOR_SCREW_XY[1] - (
+    ANCHOR_SCREW_SHANK_DIA / 2.0 + ANCHOR_AIR + EYE_TAIL_LEN + EYE_LOOP_R
+)
+if ANCHOR_SCREW_SHANK_LEN - EYE_WIRE_DIA - ANCHOR_AIR > ANCHOR_THREAD_DEPTH:
+    raise AssertionError("anchor screw bottoms in the crank arm's tap")
+if ANCHOR_SCREW_SHANK_LEN - EYE_WIRE_DIA - ANCHOR_AIR < 2.0:
+    raise AssertionError("anchor screw has under 2.0 thread engagement in the arm")
 # = the plate's NORTH face (-167): the placed rows compose a Ry(180), so the
 # +z-extruded plate fills CRANK_ARM_Z0..here running machine -z from the
 # origin. Both the place_component z and the crankshaft's SeatArm datum
@@ -1987,7 +2045,12 @@ async def build(adapter) -> dict[str, str]:
     # Dome cap screws: crown base on each strap's outer face, spigot into the
     # blind bore (+Y turned outward: -Z south, +Z north).
     for _cap_z, _euler, _rows, _end in (
-        (CAP_SOUTH_Z, [-90.0, 0.0, 0.0], [[1.0, 0.0, 0.0], [0.0, 0.0, -1.0], [0.0, 1.0, 0.0]], "south"),
+        (
+            CAP_SOUTH_Z,
+            [-90.0, 0.0, 0.0],
+            [[1.0, 0.0, 0.0], [0.0, 0.0, -1.0], [0.0, 1.0, 0.0]],
+            "south",
+        ),
         (CAP_NORTH_Z, [90.0, 0.0, 0.0], ROT_X_POS90, "north"),
     ):
         cap = await place_component(
@@ -2381,6 +2444,76 @@ async def build(adapter) -> dict[str, str]:
         [180.0, 0.0, -90.0],
         compose_rows(rot_z_rows(-90.0), ROT_Y_180),
         ground=False,
+    )
+    # Taper pin (2026-09-02, ch11 p.14): through the arm hub + the crankshaft
+    # cross-hole along machine X at the arm's mid-thickness, big end PIN_PROUD
+    # proud of the hub's outer (-X) face, the small end running out the far
+    # side; the brass keeper ring hangs from the head's cross-hole (0.25 air
+    # under the hole's bottom edge). Both lock to the arm so they spin with the
+    # crank. The pin's nominal taper is larger than the arm's #14 / shaft's #9
+    # pilot holes (they are taper-reamed together at assembly), so the two
+    # overlaps are volume-bounded allowed pairs in _interference_contracts.
+    pin = await place_component(
+        adapter,
+        "crank-pin",
+        [CRANK_PIN_X0, Y_CRANK, CRANK_PIN_Z],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        ground=False,
+        label="crank taper pin",
+    )
+    await lock_mate(
+        adapter,
+        named_ref(f"Front Plane@{pin}", "PLANE"),
+        named_ref(f"Front Plane@{arm}", "PLANE"),
+        label="crank pin locked to the arm",
+    )
+    ring = await place_component(
+        adapter,
+        "crank-pin-ring",
+        [CRANK_PIN_X0 + PIN_RING_HOLE_X, CRANK_RING_Y, CRANK_PIN_Z],
+        [0.0, 0.0, -90.0],
+        rot_z_rows(-90.0),
+        ground=False,
+        label="crank pin keeper ring",
+    )
+    await lock_mate(
+        adapter,
+        named_ref(f"Front Plane@{ring}", "PLANE"),
+        named_ref(f"Front Plane@{pin}", "PLANE"),
+        label="keeper ring locked to the pin",
+    )
+    # Keeper-ring anchor screw + brass eyelet on the arm's front face (ch11
+    # p.14); both lock to the arm so they turn with the crank.
+    eye = await place_component(
+        adapter,
+        "crank-pin-eye",
+        [ANCHOR_SCREW_XY[0], EYE_CENTER_Y, EYE_Z],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        ground=False,
+        label="keeper-ring anchor eyelet",
+    )
+    await lock_mate(
+        adapter,
+        named_ref(f"Front Plane@{eye}", "PLANE"),
+        named_ref(f"Front Plane@{arm}", "PLANE"),
+        label="anchor eyelet locked to the arm",
+    )
+    anchor = await place_component(
+        adapter,
+        "fillister-screw",
+        [ANCHOR_SCREW_XY[0], ANCHOR_SCREW_XY[1], ANCHOR_HEAD_Z],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        ground=False,
+        label="keeper-ring anchor screw",
+    )
+    await lock_mate(
+        adapter,
+        named_ref(f"Front Plane@{anchor}", "PLANE"),
+        named_ref(f"Front Plane@{arm}", "PLANE"),
+        label="anchor screw locked to the arm",
     )
     # Handle pivot rides the arm tip, now ARM_C2C below the crankshaft. Its grip
     # axis stays parallel to the crankshaft (ROT_Y_POS90 -> assembly -Z).

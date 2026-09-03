@@ -20,6 +20,12 @@ SEAT_DIA = 5.0  # turned-down gear seat (feed pinion + disc bores)
 SEAT_LEN = 13.8  # feed pinion 9.5 + disc 3 + slack (z -135..-148.8)
 COLLAR_DIA = 14.0
 COLLAR_LEN = 4.0
+# Slotted cap screw in the collar's face (ch23 p.59 page002_img04: a brass
+# collar with a small slotted round head in its centre; modelled integral).
+CAP_DIA = 5.0
+CAP_LEN = 1.5  # proud of the collar face
+CAP_SLOT_W = 0.8
+CAP_SLOT_D = 0.6
 
 # Fit bands, (upper, lower) deviations in mm off the nominal above.  These
 # tolerance the MODEL dimension (build_transgear_stub applies them via
@@ -36,22 +42,26 @@ BASE_DIA_BAND = (0.000, -0.050)
 
 # Geometric controls, authored on the model as plain annotations by the part build
 # (_part_pmi.author_part_pmi) and IMPORTED onto the sheet — the sheet types no
-# tolerance strings. The stud is one revolve, so each control's face resolves
-# by diameter alone.
+# tolerance strings. The slotted cap shares the seat diameter, so the seat
+# selector also names an axial station inside its span.
+SEAT_FACE = CylinderFace(
+    SEAT_DIA,
+    contains_y_mm=BASE_LEN + SEAT_LEN / 2.0,
+)
 PART_DATUMS = (
     # The stud base axis the seat runout is measured against.
     PartDatum("A", CylinderFace(BASE_DIA)),
 )
 GEOMETRIC_CONTROLS = (
     GeometricControl(
-        "seat_cylindricity", "cylindricity", "0.01", CylinderFace(SEAT_DIA)
+        "seat_cylindricity", "cylindricity", "0.01", SEAT_FACE
     ),
     GeometricControl(
-        "seat_runout", "circular_runout", "0.03", CylinderFace(SEAT_DIA), datums=("A",)
+        "seat_runout", "circular_runout", "0.03", SEAT_FACE, datums=("A",)
     ),
 )
 SURFACE_FINISHES = (
-    SurfaceFinishControl("gear_seat", MACHINED_UM, CylinderFace(SEAT_DIA)),
+    SurfaceFinishControl("gear_seat", MACHINED_UM, SEAT_FACE),
 )
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
@@ -69,5 +79,7 @@ DRAWING_NOTES = "\n".join(
     (
         "TURN FROM 16 MM (5/8 IN) BAR IN ONE SETUP; SEAT AND COLLAR "
         "CONCENTRIC WITH BASE.",
+        f"COLLAR AND CAP BRIGHT BRASS; CAP DIA {CAP_DIA:.2f} X {CAP_LEN:.2f} PROUD OF THE "
+        f"COLLAR FACE WITH A {CAP_SLOT_W:.2f} X {CAP_SLOT_D:.2f} SLOT (MODELLED INTEGRAL).",
     )
 )

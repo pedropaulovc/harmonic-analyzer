@@ -136,7 +136,7 @@ def test_assembly_fastener_quantities_are_pinned() -> None:
     assert int(_config.parts("foot-screw")["quantity"]) == 3
     # 22 on the paper-drive platen (4 clip + 10 guide + 8 lock) + 4 holding the
     # maker's nameplate to the base (build_frame_assembly).
-    assert int(_config.parts("fillister-screw")["quantity"]) == 26
+    assert int(_config.parts("fillister-screw")["quantity"]) == 27  # 22 paper-drive + 4 nameplate + 1 crank anchor
 
 
 @pytest.mark.parametrize(
@@ -413,3 +413,30 @@ def test_reeded_builder_uses_spec_groove_count(
     assert "BEARING FACE PERPENDICULAR 0.10 TO THREAD PITCH-DIAMETER AXIS" in (
         spec.DRAWING_NOTES
     )
+
+
+def test_crank_keeper_ring_threads_the_pin_hole_clear_of_the_arm() -> None:
+    drive = importlib.import_module("build_drive_train_assembly")
+    ring = importlib.import_module("build_crank_pin_ring")
+    pin = importlib.import_module("crank_pin_spec")
+    source = Path(drive.__file__).read_text(encoding="utf-8")
+
+    radial_clearance = (pin.RING_HOLE_DIA - ring.WIRE_DIA) / 2.0
+    pin_radius = ring.PIN_DIA_AT_HOLE / 2.0
+    assert radial_clearance >= 0.1
+    assert ring.STRAIGHT_HALF - pin_radius - ring.WIRE_DIA / 2.0 >= 0.25
+    assert ring.LOOP_WIDTH - pin_radius - ring.WIRE_DIA / 2.0 >= 0.25
+    assert drive.PIN_PROUD == pytest.approx(
+        pin.RING_HOLE_X + ring.WIRE_DIA / 2.0 + drive.CRANK_RING_ARM_CLEARANCE
+    )
+    assert drive.CRANK_RING_Y == pytest.approx(drive.Y_CRANK)
+    placement_start = source.index("    ring = await place_component(")
+    placement_end = source.index(
+        '        label="crank pin keeper ring",', placement_start
+    )
+    ring_placement = source[placement_start:placement_end]
+    assert "[0.0, 0.0, -90.0]" in ring_placement
+    assert "rot_z_rows(-90.0)" in ring_placement
+    ring_source = Path(ring.__file__).read_text(encoding="utf-8")
+    assert 'await adapter.create_sweep(SweepParameters(path="KeeperPath"))' in ring_source
+    assert "create_revolve" not in ring_source

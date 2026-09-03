@@ -182,8 +182,8 @@ from build_guide_lock import LOCK_WIDTH  # noqa: E402
 from build_platen_clip import (  # noqa: E402
     CLIP_LENGTH,
     CLIP_THICKNESS,
-    CLIP_WIDTH,
     HOLE_INSET as CLIP_HOLE_INSET,
+    HOLE_Y as CLIP_HOLE_Y,
 )
 from build_platen_rack import (  # noqa: E402
     ADDENDUM as RACK_ADDENDUM,
@@ -417,6 +417,46 @@ CLIP_SCREW_XY = tuple((PLATE_X0 + sx, PLATE_Y0 + sy) for sx, sy in PLATEN_SOCKET
 _CLIP_Y0_LOCAL = PLATE_HEIGHT - CLIP_LENGTH  # 51.32
 assert math.isclose(PLATEN_SOCKET_XY[0][1], _CLIP_Y0_LOCAL + CLIP_HOLE_INSET, abs_tol=1e-6)
 assert math.isclose(PLATEN_SOCKET_XY[1][1], PLATE_HEIGHT - CLIP_HOLE_INSET, abs_tol=1e-6)
+# The machine reflection swaps the platen's two local edge rows.  The right
+# holder uses Rz(+90) from the lower end; the left holder uses Rz(-90) from the
+# upper end.  Thus both spring rails (local +Y) point inward over the paper.
+_CLIP_RIGHT_SX = PLATEN_SOCKET_XY[0][0]
+_CLIP_LEFT_SX = PLATEN_SOCKET_XY[2][0]
+_CLIP_BOTTOM_Y = PLATE_Y0 + _CLIP_Y0_LOCAL
+_CLIP_TOP_Y = PLATE_Y0 + PLATE_HEIGHT
+CLIP_PLACEMENTS = (
+    (
+        _CLIP_RIGHT_SX,
+        PLATE_X0 + PLATE_WIDTH - _CLIP_RIGHT_SX + CLIP_HOLE_Y,
+        _CLIP_BOTTOM_Y,
+        90.0,
+    ),
+    (
+        _CLIP_LEFT_SX,
+        PLATE_X0 + PLATE_WIDTH - _CLIP_LEFT_SX - CLIP_HOLE_Y,
+        _CLIP_TOP_Y,
+        -90.0,
+    ),
+)
+_clip_expected_y = sorted(
+    (PLATE_Y0 + PLATEN_SOCKET_XY[0][1], PLATE_Y0 + PLATEN_SOCKET_XY[1][1])
+)
+_plate_mid_x = PLATE_X0 + PLATE_WIDTH / 2.0
+for _sx, _origin_x, _origin_y, _rz in CLIP_PLACEMENTS:
+    _sin_rz = math.sin(math.radians(_rz))
+    _socket_x = PLATE_X0 + PLATE_WIDTH - _sx
+    assert math.isclose(
+        _origin_x - _sin_rz * CLIP_HOLE_Y, _socket_x, abs_tol=1e-9
+    )
+    _clip_hole_y = sorted(
+        _origin_y + _sin_rz * local_x
+        for local_x in (CLIP_HOLE_INSET, CLIP_LENGTH - CLIP_HOLE_INSET)
+    )
+    assert all(
+        math.isclose(actual, expected, abs_tol=1e-9)
+        for actual, expected in zip(_clip_hole_y, _clip_expected_y, strict=True)
+    )
+    assert (_socket_x - _plate_mid_x) * (-_sin_rz) < 0.0
 # Guide screws: 2 rows of 5, heads counterbored 0.2 sub-flush of the platen
 # front (ch22 front photo shows the slotted heads; the paper lies flat over
 # them), shanks threading 2.4 into the rails' blind holes.
@@ -979,26 +1019,22 @@ async def build(adapter) -> dict[str, str]:
             label=f"guide-lock (bottom x{x_c:.0f})",
         )
         await _lock_to_platen(bot, f"guide-lock bottom x{x_c:.0f}")
-    # Paper clips: bright brass strips hugging the platen's left/right edges
-    # from the top edge down (ch22 front photo). Rz(-90) stands the +X-authored
-    # strip vertical (the machine reflection of the pre-mirror Rz+90); each lands
-    # 1 inside its edge with its holes on the platen's edge sockets.
-    for sx in (PLATEN_SOCKET_XY[0][0], PLATEN_SOCKET_XY[2][0]):
-        # Preserve the historical right-then-left instance order while mapping
-        # each local socket line into the now-asymmetric machine placement.
-        clip_x = PLATE_X0 + PLATE_WIDTH - sx - CLIP_WIDTH / 2.0
-        # Rz(-90) hangs the strip from its top-edge origin (the pre-mirror Rz+90
-        # rose from the bottom; the reflection swaps the origin end).
+    # Paper holders: mirrored one-piece brass sheets hugging the platen edges.
+    # Opposite Z rotations keep each 4 mm flat rail on its screw sockets while
+    # both adjacent spring rails point inward over the recording paper.
+    for _sx, clip_x, clip_y, rz in CLIP_PLACEMENTS:
         clip = await place_component(
             adapter,
             "platen-clip",
-            [clip_x, PLATE_Y0 + PLATE_HEIGHT, PLATE_FRONT_Z - CLIP_THICKNESS],
-            [0.0, 0.0, -90.0],
-            rot_z_rows(-90.0),
+            [clip_x, clip_y, PLATE_FRONT_Z - CLIP_THICKNESS],
+            [0.0, 0.0, rz],
+            rot_z_rows(rz),
             ground=False,
-            label=f"platen-clip (x{clip_x:+.0f})",
+            label=f"platen-clip (x{clip_x:+.0f}, Rz{rz:+.0f})",
         )
-        await _lock_to_platen(clip, f"platen-clip x{clip_x:+.0f}")
+        await _lock_to_platen(
+            clip, f"platen-clip x{clip_x:+.0f} Rz{rz:+.0f}"
+        )
     # Recording paper over the platen front face: front 0.5 proud, clear of the
     # edge clips, with the fitted side/top margins. The 0.25-thick sheet leaves 0.25 air
     # behind it (build_platen_paper) so no face lands coplanar on the platen.

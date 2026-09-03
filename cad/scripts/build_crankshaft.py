@@ -111,8 +111,8 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
-    # Editable knobs (Tools > Equations): the shaft diameter/length and the
-    # cross-hole diameter/height. The mm suffix is load-bearing -- this is an
+    # Editable knobs (Tools > Equations): shaft and journal dimensions. The
+    # mm suffix is load-bearing -- this is an
     # INCH document and the equation manager reads BARE numbers in document units
     # (an unsuffixed 120 = 120 in, blowing the part up 25.4x). SHAFT_DIA is
     # already mm (0.375 * IN), so it serialises as its mm value.
@@ -121,11 +121,8 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "JournalDia", f"{JOURNAL_DIA}mm")
     await set_global(adapter, "JournalStart", f"{JOURNAL_START}mm")
     await set_global(adapter, "JournalLength", f"{JOURNAL_LENGTH}mm")
-    # PinHoleHeight is deliberately the COM-free spec constant used below.
-    # On the local-X radial point, assigning the same 4 mm value through a
-    # 3D-sketch equation built the hole but made ForceRebuild3 fail on both
-    # +X and -X probes (2026-07-22).  The released drawing owns the native
-    # associative end-face-to-axis dimension; no unstable equation is saved.
+    # The cross-hole station plane remains an editable equation below.
+    await set_global(adapter, "PinHoleHeight", f"{PIN_HOLE_HEIGHT}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -209,20 +206,32 @@ async def build(adapter) -> dict[str, str]:
         0.005 * v_with_journal,
     )
 
+    check(
+        "create_plane PinHoleStationPlane",
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset", base_plane="Top Plane", offset=PIN_HOLE_HEIGHT
+            )
+        ),
+    )
+    name_last_feature(adapter, "PinHoleStationPlane")
+    pin_station_dim = name_dimensions(
+        adapter, "PinHoleStationPlane", ["PinHoleHeight"]
+    )
+    drive_jobs += [(pin_station_dim[0], '"PinHoleHeight"')]
+
     # Tapered-pin cross-hole through the crank seat: a native Hole Wizard #9
-    # drill placed RADIALLY on the shaft's cylindrical face (3D-sketch
-    # placement; no planar face carries the drill axis). The placement point
-    # sits on the surface at the crank-seat height, -X side; through-all
-    # drills diametrally out the +X wall.  The circle's parameter seam lies
-    # on +X and rejects the otherwise-neutral station equation on rebuild;
-    # -X defines the identical finished bore axis away from that seam.
-    # ROT_X_POS90 preserves local X as machine X, matching the arm pilot.
-    drive_jobs += wizard_hole_on_cylinder(
+    # drill placed radially on the shaft's -X side, away from the +X seam.
+    # Exact host-face selection keeps the hole on the intended Ø9.525 crank
+    # seat. Coincidence to the driven station plane and Front Plane constrains
+    # only axial station and clocking; the radial coordinate follows ShaftDia.
+    wizard_hole_on_cylinder(
         adapter,
         HoleSpec("drilled_number", "#9"),
         [-SHAFT_DIA / 2.0, PIN_HOLE_HEIGHT, 0.0],
         "tapered-pin cross-hole (#9)",
         name="PinHole",
+        point_planes=("PinHoleStationPlane", "Front Plane"),
     )
     # Cross-drill removal = the perpendicular cylinder-cylinder intersection,
     # integrated numerically (probe-exact; replaces the old ~178 as-built

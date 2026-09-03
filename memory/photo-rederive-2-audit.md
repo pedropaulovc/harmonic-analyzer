@@ -45,8 +45,8 @@ ch25/ch13/ch23/ch14/ch16 close-ups re-rendered from the export match the plates.
   bent strap in the crop is the channel-spring bank's anchor strip, not a
   hanger. Remaining delta is only a hex-head screw on the block's front face
   (small; not worth a part until the spring anchor itself is re-derived).
-- Magnifying wheel hub nut (ch21 p.51): hex nut on the axle tip vs a round
-  collar (blocked on the axle drawing's CollarDia contract).
+- Magnifying wheel hub nut (ch21 p.51): DONE 2026-09-02 -- the collar became
+  the washer (COLLAR_LEN 1) and a separate hex nut sits on the lengthened stud.
 - Crank column ~8 mm taller than the plate reads (within the photo-scale
   error band; the harvested `cone_pivot_post_spec` v2 post pins Y_CRANK, so
   not worth the cascade without a better read); pedestal foot bolts on top

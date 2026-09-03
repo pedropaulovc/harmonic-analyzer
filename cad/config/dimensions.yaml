@@ -174,6 +174,12 @@ sections:
         - '2026-09 re-derive from the ch30 FRONT view (p002 registered pair: 107 px hub-to-pivot vs the model''s 92 px at 66 -> 77, less ~2% perspective) cross-checked on the ch11 p.13 studio photo (~78 at the arm-width scale). The earlier 66 was scaled on the angle-90 side view, where the crank is the closest object to the camera and the base depth it was scaled against sits ~200 mm behind it. The crank hangs straight DOWN; with cone-pivot-post-v2 fixing Y_CRANK = 129.850 the handle axis sits 4.05 mm above the base top, the grip hanging in front of the base. SUPERSEDES 66 and the former ~150.'
         - scaled
         - med
+      - - Taper pin + keeper ring (placed 2026-09-02)
+        - 'the 45-long 1:48 pin (MHA-024) now sits through the arm hub + crankshaft cross-hole along machine X, big end 3 proud of the hub''s outer face; a Ø9 brass wire ring (Ø1.2 wire, `crank-pin-ring` MHA-128) hangs from a Ø1.5 cross-hole 3 from the big end'
+        - —
+        - 'ch11 p.14 page002_img01 (pin head with its brass ring) + ch30 p002; the ring''s anchor screw + chain on the arm face are NOT modelled -- 2026-09-02: the anchor screw (a brass fillister-screw in a #4-40 tap on the arm''s front face, x 20 from the shaft) and its brass wire eye (`crank-pin-eye` MHA-130, Ø5 loop, Ø1 wire) are now placed; the chain stays lost. The dimple moved to that same front face'
+        - scaled
+        - low
       - - Handle length
         - '58 mm (slim egg grip; Ø15 × 7 collar at the arm; 2026-09-02 user re-read: the 44 egg was too stubby)'
         - '2.28'
@@ -1387,7 +1393,7 @@ sections:
         - stated
         - high
       - - Wheel axle (M6.4)
-        - flange Ø35 × 3 seated on the bar front face; Ø5 stud × 14 the wheel bore rides; Ø9 × 4 retaining collar (photo's washer + hex nut collapsed to a collar — simplification)
+        - flange Ø35 × 3 seated on the bar front face; Ø5 stud × 14 the wheel bore rides; Ø9 × 4 retaining collar (photo's washer + hex nut collapsed to a collar — simplification) -- 2026-09-02 (ch21 p.51): the tip collar is now a Ø9 x 1 WASHER under a separate AF 8 x 3 hex nut (`wheel-axle-nut` MHA-129); stud 17 long, tip 3 proud
         - —
         - p.50–51
         - scaled
@@ -1481,11 +1487,11 @@ sections:
         - 'ch22 p.54: the locks read low against the rail (`guide_lock_spec.py`)'
         - scaled
         - low
-      - - Paper clip strips (×2)
-        - 83.5 × 8.988 × 1.2, #4 clearance end-screw holes, bright brass (NOT blackened)
+      - - Paper holder springs (×2)
+        - 'ONE formed brass sheet per holder, 83.5 × 8.988 × 0.8: a 4.0-wide flat rail carries the two #4 clearance holes; opposed 39.25-long open-ended notches, 0.6 wide, stop at a 5.0 intact centre bridge and free the adjacent 4.388-wide spring rail; each centre-to-end half bows 1.5 away from the platen and returns at its rounded free end to clamp the paper'
         - —
-        - ch30-p002 Pose Studio scale fit (the strips read bright against the darkened platen)
-        - scaled
+        - 'ch22 p.54 page001_img02/03: one slotted sheet with the middle left intact; user topology clarification 2026-09-03; hole stations retain the ch30-p002 scale fit'
+        - scaled + derived
         - low
       - - Material
         - heavy brass (darkened)
@@ -1499,11 +1505,11 @@ sections:
         - 'ch30-p002 Pose Studio delta fit: current-model origin translated (+116.787,+20.122), width scaled 0.8988, then height corrected to H:W = 1:2 while preserving the fitted top-left corner; z delta rejected as front-view depth leakage'
         - derived
         - med
-      - - Paper clips position (rework E4)
-        - 'two vertical strips hugging the resized platen''s extreme left/right edges from the TOP edge down (y 295.704..408.054): left x −32.314..−23.326, right +226.540..+235.528, on the paper face (z −144.1..−142.9)'
+      - - Paper holder positions (rework E4)
+        - 'two handed vertical holders from y 324.554..408.054: left origin (−29.8202, 408.054), Rz −90°, envelope x −29.8202..−20.8322; right origin (+233.0342, 324.554), Rz +90°, envelope x +224.0462..+233.0342. The flat rails seat at z −143.7..−142.9 against the platen; each local +Y spring rail points inward over the paper and bows to z −145.2 at peak'
         - —
-        - 'ch22 front photo: the bright strips run at the edges from the top edge down; the p.55 rear photo (140 mm callout) scales them to 86.7 of 140 = 0.619 of the plate height -> 83.5 on the 134.82 plate (the old ch30-p002 fit of 112.35 ran them 83% down, hiding the bare lower band the ch30 front plates show); REFUTES the M6.4 inboard bottom-anchored bands'
-        - scaled
+        - 'ch22 front photo: bright holders hug opposite platen edges with their spring lanes inward; #4 holes remain on the platen socket rows, while opposite handed rotations preserve the asymmetric one-sheet topology'
+        - scaled + derived
         - med
       - - Clip screws ×4 + platen sockets
         - brass fillister Ø5.5 × 2.2 head + Ø2.9 × 4 shank through each clip's #4 clearance end holes (machine x −27.820/+231.034, y 331.744/400.864) into #4-40 bottoming-tapped sockets in the platen front face; under-head faces on the clip fronts (z −144.1); ALL platen-riding screws lock-mated to the platen (rework E5 — grounded screws floated while the platen fed); slots below render resolution — omitted
@@ -1626,7 +1632,7 @@ sections:
         - scaled
         - med
       - - Transgear stud (rework E8)
-        - 'stepped: Ø9.525 (3/8") base × 9.1 (bracket plug + latch big hub, z −125.9..−135) + Ø5 gear seat × 13.8 (feed pinion + disc, z −135..−148.8) + Ø14 × 4 retaining collar (to −152.8); the 12T DP30 feed pinion''s base circle (r 4.92) cannot take a 3/8" bore, hence the turned-down seat'
+        - 'stepped: Ø9.525 (3/8") base × 9.1 (bracket plug + latch big hub, z −125.9..−135) + Ø5 gear seat × 13.8 (feed pinion + disc, z −135..−148.8) + Ø14 × 4 retaining collar (to −152.8); the 12T DP30 feed pinion''s base circle (r 4.92) cannot take a 3/8" bore, hence the turned-down seat (2026-09-02: the Ø14 x 4 collar carries a Ø5 x 1.5 slotted cap screw in its face, collar + cap bright brass -- ch23 p.59 page002_img04)'
         - —
         - 'derived: carries the disc (z −148.4..−145.4), feed pinion (−145.4..−135.9) and latch big hub (−132.75..−130.15); end hardware collapsed to a collar'
         - derived

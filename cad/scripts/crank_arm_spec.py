@@ -55,6 +55,16 @@ PIN_HOLE_DIA = 4.623  # ANSI #14 drill table value used by Hole Wizard
 DIMPLE_DIA = 8.0  # fiducial indentation (low)
 DIMPLE_DEPTH = 0.5  # fiducial indentation (low)
 DIMPLE_X = 30.0  # on the arm near the boss (low)
+# Keeper-ring anchor (2026-09-02, ch11 p.14 page001_img02): a small slotted
+# screw in the arm's FRONT (operator) face between the hub and the dimple,
+# near one edge, clamping a brass wire eyelet that hangs toward the handle
+# (the chain to the pin's ring is lost -- only the eye remains). The dimple
+# is on that same face in the photo.
+ANCHOR_SCREW_X = 20.0  # along the arm from the shaft axis (low)
+ANCHOR_SCREW_Y = 4.5  # off the arm centreline toward the local +y edge (machine -X
+# once placed; low). Kept POSITIVE: a driven placement dim is a magnitude.
+ANCHOR_THREAD_DEPTH = 5.0  # #4-40 tap thread in the 8 plate
+ANCHOR_DRILL_DEPTH = 6.5  # tap-drill depth: 1.5 wall left on the back face
 
 SURFACE_FINISHES = (
     SurfaceFinishControl("shaft_bore", MACHINED_UM, CylinderFace(SHAFT_BORE_DIA)),
@@ -87,6 +97,8 @@ DRAWING_NOTES = "\n".join(
         "THE CROSS-HOLE CALLOUT IS THE FINISHED SIZE FOR THIS PART.",
         "CROSS-HOLE AXIS INTERSECTS DATUM AXIS B.",
         "DIMPLE: <MOD-DIAM>8 FLAT-BOTTOM, 0.50 +0.20/-0.10 DEEP; LOCATION +/-0.25.",
+        "DIMPLE AND ANCHOR TAP ON THE HANDLE-SIDE (FRONT) FACE.",
+        "ANCHOR TAP: #4-40 UNC-2B X 5.0 DEEP, DRILL 6.5 DEEP (DO NOT BREAK THROUGH).",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

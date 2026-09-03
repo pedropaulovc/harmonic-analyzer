@@ -1,0 +1,7 @@
+wheel-axle-nut:
+  number: MHA-129
+  material: Plain Carbon Steel
+  finish: "bright"
+  tolerance_class: visual_noncritical
+  quantity: 1
+  process: "commercial hex nut (thread not modelled)"

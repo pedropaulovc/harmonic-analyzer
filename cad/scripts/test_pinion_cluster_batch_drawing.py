@@ -206,13 +206,20 @@ def test_intentional_fit_allowance_is_pair_and_volume_bounded(monkeypatch) -> No
         )
 
 
-def test_drive_train_allows_only_the_two_modeled_cam_pin_press_fits() -> None:
+def test_drive_train_allows_only_the_modeled_press_fits() -> None:
     allowed = _interference_contracts.allowed_interference_pairs("drive-train")
-    assert set(allowed) == {
+    crank_pairs = {
+        frozenset(("crank-pin-1", "crank-arm-1")),
+        frozenset(("crank-pin-1", "crankshaft-1")),
+    }
+    cam_pairs = {
         frozenset(("pinion-bracket-1", "pinion-cam-pin-1")),
         frozenset(("pinion-bracket-2", "pinion-cam-pin-2")),
     }
-    assert 0.40 < set(allowed.values()).pop() < 0.45
+    assert set(allowed) == crank_pairs | cam_pairs
+    assert _interference_contracts._PIN_PROUD == 3.85
+    assert all(60.0 < allowed[pair] < 65.0 for pair in crank_pairs)
+    assert all(0.40 < allowed[pair] < 0.45 for pair in cam_pairs)
     assert _interference_contracts.allowed_interference_pairs("channel") == {}
     assert _interference_contracts.allowed_interference_pairs(
         "harmonic-analyzer"

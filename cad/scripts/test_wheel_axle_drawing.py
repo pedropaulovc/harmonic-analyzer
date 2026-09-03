@@ -41,6 +41,15 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     )
 
 
+def test_washer_and_nut_stack_stays_at_the_wheel_hub_end() -> None:
+    spec = wheel_axle_spec
+    assert spec.WASHER_START == spec.FLANGE_LEN + spec.WHEEL_HUB_RIDE == 13.0
+    nut_start = spec.WASHER_START + spec.COLLAR_LEN
+    assert nut_start == 14.0
+    assert nut_start + spec.NUT_H == 17.0
+    assert spec.FLANGE_LEN + spec.STUD_LEN - (nut_start + spec.NUT_H) == 3.0
+
+
 def test_stud_callout_keeps_wheel_bore_running_clearance() -> None:
     # The magnifying wheel's bore is nominal-on-nominal with the stud, so the
     # running clearance comes entirely from the stud's model-owned band.
@@ -76,6 +85,9 @@ def test_native_gdt_controls_axle_orientation_coaxiality_and_finish() -> None:
     assert by_key["collar_runout"].characteristic == "circular_runout"
     assert by_key["collar_runout"].tolerance == "0.05"
     assert by_key["collar_runout"].datums == ("B",)
+    bearing_y = wheel_axle_spec.FLANGE_LEN + wheel_axle_spec.WHEEL_HUB_RIDE / 2.0
+    assert by_key["stud_perpendicularity"].face.contains_y_mm == bearing_y
+    assert PART_DATUMS[1].face.contains_y_mm == bearing_y
     assert tuple(datum.letter for datum in PART_DATUMS) == ("A", "B")
 
     part_source = Path(part.__file__).read_text(encoding="utf-8")
@@ -111,6 +123,9 @@ def test_surface_finish_is_part_owned_authored_and_consumed() -> None:
     assert control.key == "stud_bearing"
     assert control.roughness_um == 1.6
     assert control.face.diameter_mm == wheel_axle_spec.STUD_DIA
+    assert control.face.contains_y_mm == (
+        wheel_axle_spec.FLANGE_LEN + wheel_axle_spec.WHEEL_HUB_RIDE / 2.0
+    )
     part_source = "".join(Path(part.__file__).read_text(encoding="utf-8").split())
     assert "surface_finishes=SURFACE_FINISHES" in part_source
     sheet_source = "".join(Path(drawing.__file__).read_text(encoding="utf-8").split())

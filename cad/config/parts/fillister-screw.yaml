@@ -3,7 +3,7 @@ fillister-screw:
   material: UNS C36000 per ASTM B16/B16M-24
   material_specification: UNS C36000 per ASTM B16/B16M-24
   finish: uncoated, bright
-  quantity: 26
+  quantity: 27
   tolerance_class: machined_block
   fit_class: fastener_clearance
   process: "machined (brass)"

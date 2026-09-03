@@ -50,6 +50,7 @@ from _common import (
     extrude_at_offset,
     force_rebuild,
     name_last_feature,
+    REFERENCES_DIR,
     report_mass_properties,
     run_build,
     save_part_and_images,
@@ -63,9 +64,7 @@ from _drawing_marks import (
 )
 from _holes import HoleSpec, blind_cut_dia_mm, blind_hole_volume_mm3, wizard_holes
 from harmonic_base_spec import (
-    BOTTOM_FRONT_Z,
     BOTTOM_LENGTH,
-    BOTTOM_REAR_Z,
     BOTTOM_THICKNESS,
     BOTTOM_WIDTH,
     DRAWING_DIMENSIONS,
@@ -74,9 +73,7 @@ from harmonic_base_spec import (
     DRAWING_NOTES,
     SIDE_VIEW_NOTE,
     STACK_HEIGHT,
-    TOP_FRONT_Z,
     TOP_LENGTH,
-    TOP_REAR_Z,
     TOP_THICKNESS,
     TOP_WIDTH,
 )
@@ -148,6 +145,19 @@ PAD_ROOT_R = 0.5  # pad-to-flange root fillet (note 1: R0.50 MAX)
 # LIP_W / LIP_H live in harmonic_base_spec (the drawing's side view needs the
 # rim top for its silhouette pick).
 RIM_INNER_R = PAD_CORNER_R - LIP_W  # 8.875: the deck pocket's plan corners
+
+# Stamped serial number (2026-09-02, ch26 p.70 page001_img02/03): a hand-stamped
+# "2" on the bright machined rim top beside the nameplate's +Z end. Cut from
+# the vendored closed-region DXF (gen_base_serial_dxf.py regenerates it from
+# these constants) on a plane at the rim top, SERIAL_DEPTH deep. It sits on
+# the +X lip (the long-side rim the nameplate hugs), centred across LIP_W.
+SERIAL_TEXT = "2"
+SERIAL_HEIGHT_MM = 3.5  # p.70 macro: ~half the lip width (low)
+SERIAL_DEPTH = 0.3  # a stamp, not an engraving
+SERIAL_XZ = (TOP_LENGTH / 2.0 - LIP_W / 2.0, 62.0)  # (218.75, 62): lip centre, 12 past the plate end
+SERIAL_MIRROR_Y = False  # flip if the seat's rim-top sketch frame reads the glyph mirrored
+SERIAL_DXF = REFERENCES_DIR / "base-serial.dxf"
+SERIAL_AREA_MM2 = 3.1029  # pinned from gen_base_serial_dxf's summary (net glyph area)
 RIM_OVERLAP = 1.0  # the ring starts this far below the pad top so it merges
 
 # Cone swing hardware, blind from the TOP face. MACHINE-handed part coords,
@@ -434,7 +444,11 @@ async def _paint_deck_black(adapter, deck_y_mm: float) -> None:
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import ExtrusionParameters
+    from solidworks_mcp.adapters.base import (
+        CreatePlaneParameters,
+        ExtrusionParameters,
+        ImportDxfDwgParameters,
+    )
 
     check("create_part", await adapter.create_part())
 
@@ -778,6 +792,46 @@ async def build(adapter) -> dict[str, str]:
     after = await volume_check(
         adapter, "pad root fillet", after + v_root, 0.05 * v_root + 3.0
     )
+
+    # Stamped serial "2" on the rim top: import the closed-region DXF onto a
+    # plane at the rim top (STACK_HEIGHT + LIP_H) and cut it mid-plane both ways
+    # (the up side cuts air), removing net-area x SERIAL_DEPTH -- bounded like
+    # the nameplate engraving (no closed form for the traced glyph).
+    if not SERIAL_DXF.is_file():
+        raise RuntimeError(f"serial DXF not found: {SERIAL_DXF}")
+    serial_plane = check(
+        "create_plane rim top",
+        await adapter.create_plane(
+            CreatePlaneParameters(mode="offset", base_plane="Top Plane", offset=STACK_HEIGHT + LIP_H)
+        ),
+    )
+    pre_serial = float((await adapter.get_mass_properties()).data.volume)
+    check(
+        "import serial DXF",
+        await adapter.import_dxf_dwg(
+            ImportDxfDwgParameters(
+                file_path=str(SERIAL_DXF),
+                plane=getattr(serial_plane, "name", serial_plane),
+                scale=1.0,
+                position=[0.0, 0.0],
+                merge_points=True,
+            )
+        ),
+    )
+    name_last_feature(adapter, "SerialSketch")
+    check(
+        "cut serial",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=2.0 * SERIAL_DEPTH, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "Serial")
+    removed = pre_serial - float((await adapter.get_mass_properties()).data.volume)
+    v_serial = SERIAL_AREA_MM2 * SERIAL_DEPTH
+    _telemetry.info(f"serial stamp removed {removed:.3f} mm^3 (DXF net area {SERIAL_AREA_MM2} x {SERIAL_DEPTH} = {v_serial:.3f})")
+    if not 0.75 * v_serial <= removed <= 1.25 * v_serial:
+        raise RuntimeError(f"serial stamp removed {removed:.3f} mm^3, expected ~{v_serial:.3f}")
+    after -= removed
 
     # Apply the deferred drive equations after the whole model exists, then
     # re-check neutrality against the as-built volume. Frame components are

@@ -17,9 +17,9 @@ gear") and keyframes `v4_transgear_001..013`.
 |---|---|---|---|
 | 1 | spring latch for the transgear | a SHORT CURVED spring-steel hook (~27 x 4.5 x 0.8) hanging from the support bar's front between the pivot ball and the disc (keyframe 001 latched, 011 released) -- not a strip on the bar | `build_latch_hook` replaces `build_latch_strip` |
 | 2 | nameplate screws | four brass slotted screws at the plate corners (ch26 p.70); the model had holes and NO screws, and the holes were #2 while the catalog fillister is #4-40 | #4 holes, base taps, 4 fillister screws in frame.SLDASM |
-| 3 | serial number stamp | a stamped "2" on the base's machined rim beside the nameplate (ch26 p.70) | DXF numeral cut on the base |
+| 3 | serial number stamp | a stamped "2" on the base's machined rim beside the nameplate (ch26 p.70) | DONE (PR #656): `gen_base_serial_dxf` -> 3.5-high "2" cut 0.3 into the +X lip top, 12 past the plate's end |
 | 4 | transgear knob in front of the removable gear | knurled brass thumbnut Ø26 outermost on the knob shaft (ch23 p.58/59; the video calls it "the nut") | `build_transgear_thumbnut`, shaft front stub |
-| 5 | platen paper holder spring | two overlapping slotted brass strips + a round knurled screw at each end (ch22 p.54) | open -- `build_platen_clip` rework |
+| 5 | platen paper holder spring | two overlapping slotted brass strips + a round knurled screw at each end (ch22 p.54) | DONE (PR #656): base strip + slotted strip with a bent lip, one merged part (the knurled screw beside it is the guide lock's) |
 | 6 | knife mounts: unpainted heat-treated steel | ch18 p.42: bare hardened steel blocks | material + colour + notes |
 | 7 | knife mount holes too big | Ø16 bore around a 8.7 x 10.3 hex | bore Ø12 |
 | 8 | no bushings between rocker arms; integral hubs | ch14 p.28 `page002_img02`: every arm carries a stepped hub each side | DONE (PR B): O10 x 7.0565 hub on every arm, O12 on every lever; both bushing parts retired; rockers seat PITCH off the previous rocker |
@@ -33,9 +33,14 @@ gear") and keyframes `v4_transgear_001..013`.
 | 16 | stop block | ch16 p.34: square block, knurled thumbscrew UNDERNEATH | `build_measuring_stick_stop` rework |
 | 17 | amplitude-bar fan / rocker sinusoidal setup as configurations | ch14 p.28-29 fan; end views at 0/6/14/40 cranks | PR C -- user decision 2026-09-02: DEFAULT = fanned arms + level bars (matches the ch30 eight views); a second config poses the sinusoidal setup (ch14 end views at a chosen crank count); a third keeps today's parallel bank for comparison |
 
-Also seen, not yet listed by the user: the crank taper pin's brass keeper
-ring hanging from a screw on the crank arm (ch11 p.14); the transgear stud's
-brass collar with a slotted cap (ch23 p.59). The support-bar vs platen
+Also seen, not listed by the user: the crank taper pin was never PLACED in
+the drive-train and its brass keeper ring did not exist (ch11 p.14) -- both
+added 2026-09-02 (`crank-pin` through the arm hub + shaft cross-hole,
+`crank-pin-ring` MHA-128 hanging from a new hole in the pin's head; the ring's
+anchor screw + chain on the arm face stay unmodelled); the transgear stud's
+brass collar with a slotted cap (ch23 p.59) -- added 2026-09-02 as a O5 x
+1.5 slotted cap on the collar face, collar + cap painted bright brass. The
+support-bar vs platen
 "mismatch" seen while placing the latch hook is NOT a geometry error: the
 platen slides vertically with the paper feed, so keyframe `v4_transgear_001`
 (platen fed UP, the bar's front exposed below its black band, latch at x ~
@@ -44,3 +49,14 @@ same machine in two feed states; the model matches the ch30 rest state
 (checked 2026-09-02 on the p002 photo/render pair: bar top ~15 px under
 the paper's bottom edge in both). At rest a hook at +52 would sit behind
 the platen, so it stays at LATCH_HOOK_X = -50 where it is visible.
+
+Still open after PR #656 (2026-09-02): the amplitude-bar foot TABS (ch15
+p.31: each bar ends in a tab wider than the bar, offset to alternating sides
+so neighbours clear) -- the tab is the bar's bearing surface on the arm, so
+it changes `solve_state`'s foot contact and needs a left/right part
+configuration selected per channel through the CopyWithMates slice;
+the summing-lever hub diameter -- CHECKED 2026-09-02 against ch18 p.42
+page001_img01: the CAD's Ø25.4 pivot cylinder on the 5 plate matches the
+cast boss proportion, no change; the keeper ring's anchor screw + eye --
+DONE 2026-09-02 (fillister-screw in a front-face #4-40 tap + `crank-pin-eye`
+MHA-130; the dimple moved to the same front face, it faced the chain wheel).
