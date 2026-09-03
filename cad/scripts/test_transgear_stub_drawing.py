@@ -160,6 +160,8 @@ def test_native_gdt_controls_seat_form_runout_and_finish() -> None:
     assert by_key["seat_runout"].characteristic == "circular_runout"
     assert by_key["seat_runout"].tolerance == "0.03"
     assert by_key["seat_runout"].datums == ("A",)
+    seat_y = transgear_stub_spec.BASE_LEN + transgear_stub_spec.SEAT_LEN / 2.0
+    assert all(control.face.contains_y_mm == seat_y for control in by_key.values())
     assert tuple(datum.letter for datum in PART_DATUMS) == ("A",)
 
     part_source = Path(part.__file__).read_text(encoding="utf-8")
@@ -196,6 +198,9 @@ def test_surface_finish_is_part_owned_authored_and_consumed() -> None:
     assert control.key == "gear_seat"
     assert control.roughness_um == 1.6
     assert control.face.diameter_mm == transgear_stub_spec.SEAT_DIA
+    assert control.face.contains_y_mm == (
+        transgear_stub_spec.BASE_LEN + transgear_stub_spec.SEAT_LEN / 2.0
+    )
     part_source = "".join(Path(part.__file__).read_text(encoding="utf-8").split())
     assert "surface_finishes=SURFACE_FINISHES" in part_source
     sheet_source = "".join(Path(drawing.__file__).read_text(encoding="utf-8").split())
