@@ -55,28 +55,20 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "LugCrownProfile": {"ShaftAxisH", "CrownDia"},
 }
 
-# True free-text instructions only (native dims/datums/FCFs carry the rest).
+# Notes: part-specific process facts only (drawing-simplicity-policy.md rule
+# 6).  The ball/socket/bore stack ships as prose by design (it is not a
+# marked dimension), as does the underside relief; the shaft-axis height is
+# the marked ShaftAxisH, the screw hole rides its callout, the title block
+# owns material, finish and the 2-off count.
 DRAWING_NOTES = "\n".join(
     (
-        "1. MAKE FROM AISI 1018 BAR; BLACK OXIDE AFTER MACHINING",
-        "   (BALL STAYS BRIGHT: PRESS AFTER FINISH).",
-        "2. SPHERICAL SEAT: BORE THE LUG Ø9.50 THRU ON THE SHAFT",
-        "   AXIS 25.20 ABOVE THE FOOT SEAT; PRESS A Ø9.50 STEEL",
-        "   BALL FLUSH-CENTERED (PROUD 1.75 EACH FACE); REAM THE",
-        "   BALL Ø6.50 THRU FOR THE Ø6.35 FULCRUM-SHAFT END.",
-        "3. SCREW HOLE PER CALLOUT: FOR THE #10-24 SLOTTED",
-        "   CHEESE-HEAD FRAME-SIDE SCREW (MHA-117); HEAD SEATS",
-        "   FLUSH IN THE CBORE.",
-        "4. UNDERSIDE OUTBOARD OF THE PAD RELIEVED TO 4.80:",
-        "   CLEARS THE TOP-FRAME CORNER-BOSS LAND (4.5 PROUD).",
-        "5. 2 REQUIRED, ONE PER FULCRUM-SHAFT END (SECOND IS",
-        "   THIS PART FLIPPED 180 DEG ABOUT VERTICAL).",
+        "BORE THE LUG Ø9.50 THRU ON THE SHAFT AXIS; PRESS A Ø9.50 STEEL BALL",
+        "CENTRED (PROUD 1.75 EACH FACE); REAM THE BALL Ø6.50 THRU.",
+        "PRESS THE BALL AFTER BLACK OXIDE; BALL STAYS BRIGHT.",
+        "UNDERSIDE OUTBOARD OF THE PAD RELIEVED TO 4.80 ABOVE THE SEAT.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
 
-# Manufacturing GD&T limits consumed by the drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "screw-hole position": "0.25",
-    "foot seating face flatness": "0.05",
-}
+# No GD&T: a screwed-down bracket is not on the allowlist
+# (cad/docs/drawing-simplicity-policy.md rule 3).

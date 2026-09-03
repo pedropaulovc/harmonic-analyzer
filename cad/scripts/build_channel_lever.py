@@ -64,7 +64,9 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
 )
+from _fit_limits import deviations
 from _saved_part_guard import require_saved_drawing_properties
 from channel_lever_spec import (
     DRAWING_DIMENSIONS,
@@ -72,6 +74,7 @@ from channel_lever_spec import (
     ISOMETRIC_VIEW_NOTE,
     HUB_DIA,
     HUB_LENGTH,
+    PIVOT_HOLE_BAND,
 )
 
 PART_NAME = "channel-lever"
@@ -283,6 +286,12 @@ async def build(adapter) -> dict[str, str]:
     check("exit_sketch fulcrum hole", await adapter.exit_sketch())
     name_last_feature(adapter, "FulcrumProfile")
     drive_jobs += fulcrum.apply(adapter, "FulcrumProfile")
+    # The reamed fulcrum bore's fit band rides the MODEL dimension so the sheet
+    # re-renders it natively (drawing-simplicity-policy.md rule 2; same
+    # treatment as build_rocker_arm.py's pivot bore on the same 6.35 shaft).
+    set_dimension_bilateral_tolerance(
+        adapter, "FulcrumProfile", "FulcrumDia", *deviations(PIVOT_HOLE_BAND)
+    )
     check(
         "cut fulcrum hole",
         await adapter.create_cut_extrude(

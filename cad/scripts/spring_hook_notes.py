@@ -16,17 +16,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "WireProfile": {"RodDia"},
 }
 
+# Notes: process facts only (drawing-simplicity-policy.md rule 6).  The rise,
+# arm and wire diameter are sheet dimensions; the elbow radius is not.
 DRAWING_NOTES = "\n".join(
     (
-        "1. OPEN J-HOOK: SHANK, 90 DEG ELBOW",
-        "   R1.50 CL, THEN A 2.50 ARM.",
-        "2. SHANK SEATS IN THE SUMMING-LEVER",
-        "   PLATE BORE; ARM CATCHES THE",
-        "   CHANNEL-SPRING BOTTOM EYE.",
-        "3. Ra SYMBOL APPLIES TO THE STRAIGHT",
-        "   SHANK OD (PLATE SEAT).",
-        "4. FORM COLD FROM ANNEALED WIRE;",
-        "   NO SHARP KINKS AT THE ELBOW.",
+        "OPEN J-HOOK: 90 DEG ELBOW, R1.50 ON THE WIRE CENTRELINE.",
+        "FORM COLD; NO KINKS AT THE ELBOW.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 5:1"

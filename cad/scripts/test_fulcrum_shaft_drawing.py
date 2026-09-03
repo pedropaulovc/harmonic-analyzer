@@ -1,4 +1,11 @@
-"""Offline contracts for the fulcrum-shaft drawing."""
+"""Offline contracts for the fulcrum-shaft drawing.
+
+The print follows cad/docs/drawing-simplicity-policy.md: a plain bearing shaft
+carries no datums or frames; its running fit is the band on the model
+diameter, plus one Ra on the OD the channel levers rock on. Diameter, length
+and Ra all read on the side view (rule 7: a turned part as it sits in the
+lathe).
+"""
 
 from __future__ import annotations
 
@@ -12,16 +19,8 @@ from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
-def test_surface_finish_is_part_owned_and_consumed_by_key() -> None:
-    (control,) = fulcrum_shaft_spec.SURFACE_FINISHES
-    assert control.key == "bearing"
-    assert control.roughness_um == 1.6
-    assert control.face.diameter_mm == fulcrum_shaft_spec.SHAFT_DIA
-    part_source = Path(part.__file__).read_text(encoding="utf-8")
-    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "surface_finishes=SURFACE_FINISHES" in part_source
-    assert 'surface_finish_by_key(SURFACE_FINISHES, "bearing")' in drawing_source
-    assert "roughness_ra=" not in drawing_source
+def _source() -> str:
+    return Path(drawing.__file__).read_text(encoding="utf-8")
 
 
 def test_required_drawing_paths() -> None:
@@ -42,8 +41,24 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     )
 
 
-def test_linked_notes_define_remaining_bearing_shaft_operations() -> None:
-    notes = fulcrum_shaft_spec.DRAWING_NOTES
+def test_diameter_length_and_finish_read_on_the_side_view() -> None:
+    # Machinist review 2026-09-02: the principal turned feature was only
+    # called out on the end view. Policy rule 7 puts the diameter on the side
+    # view; the end view keeps nothing and is never curated (SolidWorks
+    # inserts each marked dimension into one view only).
+    assert drawing.FRONT_KEEP == {}
+    assert set(drawing.RIGHT_KEEP) == {"ShaftDia", "Depth"}
+    assert drawing.RIGHT_KEEP["ShaftDia"][0] < drawing.LEFT_END_X
+    source = _source()
+    assert "curate_view_dimensions(\n        adapter, front" not in source
+    assert "set_dimension_precision(adapter, right_annotations" in source
+    assert drawing.DIMENSION_PRECISION == {"ShaftDia": 3}
+    # The Ra anchors on the side view's flank silhouette, not the end circle.
+    assert "add_surface_finish(\n        adapter,\n        right," in source
+    assert 'entity_type="SILHOUETTE"' in source
+
+
+def test_running_fit_is_the_band_on_the_model_diameter() -> None:
     assert drawing.DIMENSION_CALLOUTS == {}
     assert fulcrum_shaft_spec.SHAFT_DIA_BAND is _fit_limits.SHAFT_H
     assert model_toleranced_dimensions(part) == {
@@ -53,45 +68,62 @@ def test_linked_notes_define_remaining_bearing_shaft_operations() -> None:
     clearance_max = clearance_min + 0.02 + 0.03
     assert round(clearance_min, 2) == 0.15
     assert round(clearance_max, 2) == 0.20
-    assert "CENTRE MARKS" in notes
-    assert "X.XX" not in notes
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
+
+
+def test_notes_are_few_specific_and_never_the_title_block() -> None:
+    notes = fulcrum_shaft_spec.DRAWING_NOTES
+    lines = notes.split("\n")
+    assert len(lines) <= 4
+    assert "CENTRES OK" in notes  # a between-centres shaft (Harvey)
+    # "Turn or grind full length; no flats or steps" restated the title-block
+    # finish and the plain cylinder the views show (review 2026-09-02).
+    assert "TURN OR GRIND" not in notes
+    assert "NO FLATS" not in notes
+    for banned in ("WITHIN", "+/-", "UOS", "DATUM", "MHA-", "X.XX", "DEEP MAX"):
+        assert banned not in notes, banned
+    source = _source()
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
     assert "def _manufacturing_notes" not in source
 
 
-def test_native_gdt_controls_shaft_form_orientation_and_finish() -> None:
-    """GD&T identity lives in the spec's PMI rows; the sheet only imports it."""
-    from fulcrum_shaft_spec import GEOMETRIC_CONTROLS, PART_DATUMS
-
-    by_key = {control.key: control for control in GEOMETRIC_CONTROLS}
-    assert set(by_key) == {
-        "bearing_cylindricity",
-        "plus_z_end_perpendicularity",
-        "minus_z_end_perpendicularity",
-    }
-    assert by_key["bearing_cylindricity"].characteristic == "cylindricity"
-    assert by_key["bearing_cylindricity"].tolerance == "0.01"
-    for key in ("plus_z_end_perpendicularity", "minus_z_end_perpendicularity"):
-        assert by_key[key].characteristic == "perpendicularity"
-        assert by_key[key].tolerance == "0.05"
-        assert by_key[key].datums == ("A",)
-    assert tuple(datum.letter for datum in PART_DATUMS) == ("A",)
-
+def test_print_carries_no_gdt_and_one_running_finish() -> None:
+    source = _source()
+    for helper in (
+        "add_datum_feature(",
+        "add_feature_control_frame(",
+        "set_basic_dimension(",
+        "project_part_pmi(",
+    ):
+        assert helper not in source, helper
+    assert fulcrum_shaft_spec.PART_DATUMS == ()
+    assert fulcrum_shaft_spec.GEOMETRIC_CONTROLS == ()
+    assert not hasattr(fulcrum_shaft_spec, "GEOMETRIC_TOLERANCES_MM")
+    # The levers rock on the OD, so it alone carries a roughness symbol.
+    (control,) = fulcrum_shaft_spec.SURFACE_FINISHES
+    assert control.key == "bearing"
+    assert control.roughness_um == 1.6
+    assert control.face.diameter_mm == fulcrum_shaft_spec.SHAFT_DIA
+    assert source.count("add_surface_finish(") == 1
+    assert 'surface_finish_by_key(SURFACE_FINISHES, "bearing")' in source
+    assert "roughness_ra=" not in source
+    # The part build keeps its author_part_pmi call shape on the empty tuples.
     part_source = Path(part.__file__).read_text(encoding="utf-8")
     assert "author_part_pmi(" in part_source
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "project_part_pmi(" in source
-    assert "controls=GEOMETRIC_CONTROLS" in source
-    assert "add_feature_control_frame(" not in source
-    assert "add_datum_feature(" not in source
-    assert source.count("add_surface_finish(") == 1
+    assert "datums=PART_DATUMS" in part_source
+    assert "controls=GEOMETRIC_CONTROLS" in part_source
+    assert "surface_finishes=SURFACE_FINISHES" in part_source
+
+
+def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
+    source = _source()
+    assert "for view in (front, right):\n        set_hidden_lines_visible" in source
+    assert "set_hidden_lines_removed(adapter, iso)" in source
 
 
 def test_view_scales_are_explicit() -> None:
     assert drawing.SHEET_SCALE == (1.0, 1.0)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    # Only the side view is 1:1 now; the isometric renders at ISO_SCALE so its
+    source = _source()
+    # Only the side view is 1:1; the isometric renders at ISO_SCALE so its
     # outline stays inside the right zone border (see draw_fulcrum_shaft).
     assert source.count("scale=(1, 1)") == 1
     assert "scale=(2, 1)" in source
@@ -100,8 +132,7 @@ def test_view_scales_are_explicit() -> None:
     assert fulcrum_shaft_spec.END_VIEW_NOTE == "END VIEW SCALE 2:1"
     assert 'add_property_linked_note(adapter, "End View Note"' in source
     # An off-sheet-scale view needs its OWN scale label or the title block's 1:1
-    # misstates it. cylinder-gear-shaft got this from a codex machinist review;
-    # this sibling shipped the same 1:2 iso unlabelled until codex #334.
+    # misstates it (codex #334).
     assert fulcrum_shaft_spec.ISO_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:2"
     assert 'add_property_linked_note(adapter, "Iso View Note"' in source
 

@@ -5,8 +5,28 @@ views, dimension layout, hole callouts, and manufacturing notes; every shared
 sheet/template, import, curation, and export behavior lives in
 ``_drawing_common``.
 
-The rod is a tall thin lollipop (~170 mm ring-bottom to head-crown), so the
-sheet runs at 1:1 with a 1:2 isometric.
+The rod is a tall thin lollipop (~186 mm ring-bottom to head-crown), so the
+sheet runs at 1:1 with a 1:2 isometric.  The front view carries the centre
+distance, the (REF) overall and the pin hole; three enlarged details carry
+what is too small or too crowded at 1:1 (policy rule 7, machinist review
+2026-09-02):
+
+* DETAIL A (2:1) -- the ring: the outer diameter, the strap bore with its
+  model band and BORE callout, its roughness symbol, and the shank width where
+  the shank leaves the ring.  Curated FIRST with every marked dimension whose
+  geometry lies inside its boundary (a marked dimension imports into ONE view
+  only); the front view then keeps none.
+* DETAIL B (3:1) -- the as-cast head: width across the cheeks, shoulder rise,
+  height from the shoulder root, and the FULL R crown flag.
+* DETAIL C (3:1, from the left view) -- the stepped thickness where the 3.00
+  ring meets the 2.50 shank.
+
+The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): the
+pin hole is a centre distance plus a centreline offset that the block
+tolerance holds identically on all 20 rods, so the sheet carries no datums,
+no feature-control frames and no basic dimensions.  The strap bore keeps its
+fit band (on the model dimension) and its roughness symbol -- it runs on the
+eccentric cam.
 
 Run with SolidWorks open::
 
@@ -19,40 +39,50 @@ import argparse
 import sys
 from typing import Any
 
-from connecting_rod_spec import GEOMETRIC_TOLERANCES_MM
-
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
+    add_attached_note,
     add_edge_dimension,
-    add_feature_control_frame,
     add_native_hole_callout,
     add_property_linked_note,
     add_surface_finish,
+    create_detail_view,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    set_basic_dimension,
+    set_arc_endpoints_to_max,
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
+    set_reference_dimension,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
+from connecting_rod_notes import CROWN_CALLOUT
 from connecting_rod_spec import (
     CENTER_DISTANCE,
+    HEAD_CROWN_CY,
+    HEAD_START_Y,
     HEAD_TOP_Y,
+    HEAD_WIDTH,
     PIN_HOLE_DIA,
     RING_BORE_DIA,
     RING_BOTTOM_Y,
+    RING_OUTER_RADIUS,
+    RING_THICKNESS,
+    SHANK_THICKNESS,
+    SHANK_WIDTH,
+    SHOULDER_TOP_Y,
     SURFACE_FINISHES,
 )
+from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
+    dimension_name,
     place_view,
 )
 
@@ -77,7 +107,21 @@ _BBOX_CY = (RING_BOTTOM_Y + HEAD_TOP_Y) / 2.0
 
 FRONT_CENTER = (0.180, 0.135)
 LEFT_CENTER = (0.080, 0.171)  # stepped-thickness profile, inside the top zone
-ISO_CENTER = (0.360, 0.140)
+ISO_CENTER = (0.385, 0.200)
+
+# Details: the ring at 2:1 in the field right of the front view, the head at
+# 3:1 above it, the thickness step at 3:1 left of the left view.
+RING_DETAIL_SCALE = (2, 1)
+RING_DETAIL_MODEL_RADIUS = 24.0  # encloses the ring and the shank's root
+RING_DETAIL_CENTER = (0.290, 0.120)
+HEAD_DETAIL_SCALE = (3, 1)
+HEAD_DETAIL_MODEL_CY = 160.0
+HEAD_DETAIL_MODEL_RADIUS = 8.0  # shoulder root (155.0) to crown top (165.5)
+HEAD_DETAIL_CENTER = (0.310, 0.212)
+STEP_DETAIL_SCALE = (3, 1)
+STEP_DETAIL_MODEL_CY = RING_OUTER_RADIUS  # the 3.00 -> 2.50 step
+STEP_DETAIL_MODEL_RADIUS = 8.0
+STEP_DETAIL_CENTER = (0.045, 0.125)
 
 
 def _sheet_xy(mx: float, my: float) -> tuple[float, float]:
@@ -88,16 +132,108 @@ def _sheet_xy(mx: float, my: float) -> tuple[float, float]:
     )
 
 
-FRONT_KEEP = {
-    "RingOuterDia": (0.185, 0.070),
-    "StrapBoreDia": (0.190, 0.052),
-    "ShankWidthDim": (0.180, 0.150),
+def _left_xy(mz: float, my: float) -> tuple[float, float]:
+    """Sheet (x, y) of a model (Z, Y) point in the 1:1 left view.
+
+    Every thickness is symmetric about the midplane, so the view's Z mirror
+    (SolidWorks' choice) cannot matter.
+    """
+    return (
+        LEFT_CENTER[0] + mz / 1000.0,
+        LEFT_CENTER[1] + (my - _BBOX_CY) / 1000.0,
+    )
+
+
+def _detail_xy(
+    center: tuple[float, float],
+    model_cy: float,
+    scale: tuple[int, int],
+    mu: float,
+    mv: float,
+) -> tuple[float, float]:
+    """Sheet (x, y) of a model point in a detail centred on ``(0, model_cy)``."""
+    factor = scale[0] / scale[1] / 1000.0
+    return (center[0] + mu * factor, center[1] + (mv - model_cy) * factor)
+
+
+def _ring_xy(mx: float, my: float) -> tuple[float, float]:
+    return _detail_xy(RING_DETAIL_CENTER, 0.0, RING_DETAIL_SCALE, mx, my)
+
+
+def _head_xy(mx: float, my: float) -> tuple[float, float]:
+    return _detail_xy(HEAD_DETAIL_CENTER, HEAD_DETAIL_MODEL_CY, HEAD_DETAIL_SCALE, mx, my)
+
+
+def _step_xy(mz: float, my: float) -> tuple[float, float]:
+    return _detail_xy(STEP_DETAIL_CENTER, STEP_DETAIL_MODEL_CY, STEP_DETAIL_SCALE, mz, my)
+
+
+# Every marked dimension lives in the ring detail: the two ring diameters and
+# the shank width at its root (its sketch line sits inside the ring disc).
+RING_DETAIL_KEEP = {
+    "RingOuterDia": (0.345, 0.155),
+    "StrapBoreDia": (0.345, 0.088),
+    "ShankWidthDim": (RING_DETAIL_CENTER[0], 0.178),
 }
+FRONT_KEEP: dict[str, tuple[float, float]] = {}
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
 TOP_KEEP: dict[str, tuple[float, float]] = {}
+# The strap-bore tolerance imports with the named model dimension.  The
+# drawing owns only this descriptive text beneath the native value/band.
+DIMENSION_CALLOUTS = {"StrapBoreDia": "BORE"}
+DIAMETER_LEADERS_TO_RIM = ("RingOuterDia", "StrapBoreDia")
 
-BORE_FINISH_EDGE = _sheet_xy(RING_BORE_DIA / 2.0, 0.0)
-BORE_FINISH_SYMBOL = (BORE_FINISH_EDGE[0] + 0.025, BORE_FINISH_EDGE[1] + 0.015)
+# Ra on the strap bore, flagged INSIDE the bore (the detail's bore is 62 mm
+# across) from its lower-left rim, so the leader crosses nothing.
+BORE_FINISH_EDGE = _ring_xy(-RING_BORE_DIA / 2.0 * 0.7071, -RING_BORE_DIA / 2.0 * 0.7071)
+BORE_FINISH_SYMBOL = (BORE_FINISH_EDGE[0] + 0.012, BORE_FINISH_EDGE[1] + 0.010)
+
+CENTER_DISTANCE_TEXT_XY = (0.125, FRONT_CENTER[1])
+OVERALL_TEXT_XY = (0.105, FRONT_CENTER[1])
+PIN_CALLOUT_XY = (0.222, 0.246)
+
+_ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
+_TEXT_CALLOUT_BELOW = 4  # swDimensionTextParts_e.swDimensionTextCalloutBelow
+
+
+def _leaders_to_circumference(
+    adapter: Any, annotations: list[Any], names: tuple[str, ...], *, label: str
+) -> None:
+    """End each named diameter leader at the nearest circumference.
+
+    SolidWorks' default runs a diameter dimension line across the circle
+    through its centre; with the arrows OUTSIDE the leader stops at the rim it
+    names (drawing-simplicity-policy.md rule 7: never through a bore).
+    """
+    remaining = set(names)
+    for annotation in annotations:
+        annotation = _sw_type_info.early_bound_or_flag(
+            annotation, "IAnnotation", "GetSpecificAnnotation"
+        )
+        name = dimension_name(adapter, annotation)
+        if name not in remaining:
+            continue
+        display = _sw_type_info.early_bound_or_flag(
+            annotation.GetSpecificAnnotation(), "IDisplayDimension", "ArrowSide"
+        )
+        display.ArrowSide = _ARROWS_OUTSIDE
+        if int(display.ArrowSide) != _ARROWS_OUTSIDE:
+            raise RuntimeError(f"{label}: {name} arrows did not move outside")
+        remaining.discard(name)
+    if remaining:
+        raise RuntimeError(f"{label}: diameter leaders not found: {sorted(remaining)}")
+    adapter.currentModel.EditRebuild3()
+
+
+def _set_below_text(adapter: Any, display: Any, text: str, *, label: str) -> None:
+    """Append callout text beneath a drawing-added dimension's value."""
+    display = _sw_type_info.early_bound_or_flag(
+        display, "IDisplayDimension", "SetText", "GetText"
+    )
+    display.SetText(_TEXT_CALLOUT_BELOW, text)
+    if str(display.GetText(_TEXT_CALLOUT_BELOW) or "") != text:
+        raise RuntimeError(f"{label}: below-text {text!r} did not persist")
+    adapter.currentModel.EditRebuild3()
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -143,31 +279,73 @@ async def build(adapter: Any) -> dict[str, str]:
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
     # The 1:1 left view (third angle: placed LEFT of the front) shows the
-    # stepped thickness (ring 3.0 / shank+head 2.5) the notes describe -- a
-    # single orthographic view left the step geometry to prose (machinist
-    # round 2).  The right-hand column belongs to the title block, so the
-    # section lives on the left.
+    # stepped thickness (ring 3.0 / shank+head 2.5); the right-hand column
+    # belongs to the title block, so it lives on the left.
     left = place_view(adapter, str(SOURCE), "*Left", *LEFT_CENTER, scale=(1, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
-    for view in (left, iso):
-        set_hidden_lines_removed(adapter, view)
-    set_hidden_lines_visible(adapter, front)
+    set_hidden_lines_removed(adapter, iso)
 
-    front_annotations = curate_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="front"
+    ring_detail = create_detail_view(
+        adapter,
+        front,
+        center=_sheet_xy(0.0, 0.0),
+        radius=RING_DETAIL_MODEL_RADIUS / 1000.0,
+        view_xy=RING_DETAIL_CENTER,
+        detail_label="A",
+        scale=RING_DETAIL_SCALE,
+        label="strap ring detail",
     )
-    # The strap-bore tolerance imports with the named model dimension.  The
-    # drawing owns only this descriptive text beneath the native value/band.
-    set_dimension_callouts(adapter, front_annotations, {"StrapBoreDia": "BORE"})
+    head_detail = create_detail_view(
+        adapter,
+        front,
+        center=_sheet_xy(0.0, HEAD_DETAIL_MODEL_CY),
+        radius=HEAD_DETAIL_MODEL_RADIUS / 1000.0,
+        view_xy=HEAD_DETAIL_CENTER,
+        detail_label="B",
+        scale=HEAD_DETAIL_SCALE,
+        label="as-cast head detail",
+    )
+    step_detail = create_detail_view(
+        adapter,
+        left,
+        center=_left_xy(0.0, STEP_DETAIL_MODEL_CY),
+        radius=STEP_DETAIL_MODEL_RADIUS / 1000.0,
+        view_xy=STEP_DETAIL_CENTER,
+        detail_label="C",
+        scale=STEP_DETAIL_SCALE,
+        label="ring-to-shank thickness step detail",
+    )
+    for view in (front, left, ring_detail, head_detail, step_detail):
+        set_hidden_lines_visible(adapter, view)
+
+    # Ring detail FIRST: it claims every marked dimension (see the module
+    # docstring); the front keeps none.
+    ring_annotations = curate_view_dimensions(
+        adapter, ring_detail, keep=RING_DETAIL_KEEP, view_label="ring detail"
+    )
+    curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
+    set_dimension_callouts(adapter, ring_annotations, DIMENSION_CALLOUTS)
+    _leaders_to_circumference(
+        adapter, ring_annotations, DIAMETER_LEADERS_TO_RIM, label="ring diameters"
+    )
+    # Ra on the strap bore: it runs on the eccentric cam.
+    add_surface_finish(
+        adapter,
+        ring_detail,
+        edge_xy=BORE_FINISH_EDGE,
+        symbol_xy=BORE_FINISH_SYMBOL,
+        control=surface_finish_by_key(SURFACE_FINISHES, "strap_bore"),
+        label="strap bore finish",
+    )
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
 
     # Centre distance: ring bore edge to the rocker-pin bore edge (SolidWorks
-    # dimensions circle edges centre-to-centre); box it BASIC.  Pick each bore's
-    # LEFT rim -- the pin bore is tiny and sits inside the head crown, so a TOP
-    # pick snapped to the crown arc (read 145.07); the left rim is unambiguously
-    # on the pin circle, clear of the wider crown.
+    # dimensions circle edges centre-to-centre).  Pick each bore's LEFT rim --
+    # the pin bore is tiny and sits inside the head crown, so a TOP pick
+    # snapped to the crown arc (read 145.07); the left rim is unambiguously on
+    # the pin circle, clear of the wider crown.  "C-C" says what it is.
     ring_rim = _sheet_xy(-RING_BORE_DIA / 2.0, 0.0)
     pin_rim = _sheet_xy(-PIN_HOLE_DIA / 2.0, CENTER_DISTANCE)
     centre_distance = add_edge_dimension(
@@ -175,47 +353,43 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         p0=ring_rim,
         p1=pin_rim,
-        text_xy=(0.125, FRONT_CENTER[1]),
+        text_xy=CENTER_DISTANCE_TEXT_XY,
         label="rod centre distance",
     )
-    set_basic_dimension(adapter, centre_distance, label="rod centre distance")
+    _set_below_text(adapter, centre_distance, "C-C", label="rod centre distance")
 
-    # Rocker pin hole native callout (the #47 wizard hole in the head).
+    # (REF) overall: ring bottom to crown top, both arc extremes.
+    overall = add_edge_dimension(
+        adapter,
+        front,
+        p0=_sheet_xy(0.0, RING_BOTTOM_Y),
+        p1=_sheet_xy(0.0, HEAD_TOP_Y),
+        text_xy=OVERALL_TEXT_XY,
+        label="overall length",
+        orientation="vertical",
+    )
+    set_arc_endpoints_to_max(adapter, overall, label="overall length")
+    set_reference_dimension(
+        adapter,
+        _early_bound(overall, "IDisplayDimension").GetAnnotation(),
+        label="overall length",
+    )
+
+    # Rocker pin hole native callout (the #47 wizard hole in the head), the
+    # drill riding as its prefix.
     add_native_hole_callout(
         adapter,
         front,
         edge_xy=pin_rim,
-        callout_xy=(0.235, 0.208),
+        callout_xy=PIN_CALLOUT_XY,
         label="rocker pin hole",
+        process="#47 DRILL",
     )
 
-    # Datum A on the strap bore axis (picked at 9 o'clock so the tag stands off
-    # to the LEFT), Ra on the bore at 6 o'clock, and a position FCF tying the
-    # rocker pin hole to A.
-    bore_left = _sheet_xy(-RING_BORE_DIA / 2.0, 0.0)
-    add_datum_feature(
-        adapter,
-        front,
-        edge_xy=bore_left,
-        symbol_xy=(bore_left[0] - 0.020, bore_left[1]),
-        datum="A",
-        label="strap bore axis",
-        position_tolerance_m=0.000005,
-    )
-    # Datum B: the shank's left flank.  A alone leaves rotation about the bore
-    # axis unconstrained, so the pin-hole position (and the 147.67 direction)
-    # could not be inspected; B clocks the rod and the 4.00 BASIC below ties
-    # the pin to the shank centreline.
-    shank_flank = _sheet_xy(-4.0, 100.0)
-    add_datum_feature(
-        adapter,
-        front,
-        edge_xy=shank_flank,
-        symbol_xy=(shank_flank[0] - 0.016, shank_flank[1] - 0.010),
-        datum="B",
-        label="shank left flank",
-    )
-    pin_offset = add_edge_dimension(
+    # Pin centreline offset from the shank's left flank: ties the pin hole to
+    # the shank centreline as an ordinary coordinate.
+    shank_flank = _sheet_xy(-SHANK_WIDTH / 2.0, 100.0)
+    add_edge_dimension(
         adapter,
         front,
         p0=shank_flank,
@@ -224,34 +398,84 @@ async def build(adapter: Any) -> dict[str, str]:
         label="pin C/L from shank flank",
         orientation="horizontal",
     )
-    set_basic_dimension(adapter, pin_offset, label="pin C/L from shank flank")
-    add_surface_finish(
+
+    # DETAIL B, the as-cast head: width across the cheeks (above the crown),
+    # shoulder rise (right), height from the shoulder root to the crown top
+    # (left), and the crown flagged FULL R.
+    half_head = HEAD_WIDTH / 2.0
+    half_shank = SHANK_WIDTH / 2.0
+    cheek_y = (SHOULDER_TOP_Y + HEAD_CROWN_CY) / 2.0
+    add_edge_dimension(
         adapter,
-        front,
-        edge_xy=BORE_FINISH_EDGE,
-        symbol_xy=BORE_FINISH_SYMBOL,
-        control=surface_finish_by_key(SURFACE_FINISHES, "strap_bore"),
-        label="strap bore finish",
+        head_detail,
+        p0=_head_xy(-half_head, cheek_y),
+        p1=_head_xy(half_head, cheek_y),
+        text_xy=(HEAD_DETAIL_CENTER[0], _head_xy(0.0, HEAD_TOP_Y)[1] + 0.012),
+        label="head width",
+        orientation="horizontal",
     )
-    # The hole callout owns the 9-o'clock rim and routes down-right to its
-    # text; anchoring the FCF at the same point crossed the two leaders (layout
-    # audit).  Attach the frame at 3 o'clock and keep it in a higher lane so
-    # its whole leader stays clear of the callout path.
-    pin_fcf_rim = _sheet_xy(PIN_HOLE_DIA / 2.0, CENTER_DISTANCE)
-    add_feature_control_frame(
+    add_edge_dimension(
         adapter,
-        front,
-        edge_xy=pin_fcf_rim,
-        frame_xy=(0.222, 0.222),
-        characteristic="position",
-        tolerance=GEOMETRIC_TOLERANCES_MM["rocker pin hole position"],
-        datums=("A", "B"),
-        diameter=True,
-        label="rocker pin hole position",
+        head_detail,
+        p0=_head_xy(half_shank, HEAD_START_Y),
+        p1=_head_xy(half_head, SHOULDER_TOP_Y),
+        text_xy=(
+            _head_xy(half_head, 0.0)[0] + 0.016,
+            _head_xy(0.0, (HEAD_START_Y + SHOULDER_TOP_Y) / 2.0)[1],
+        ),
+        label="head shoulder rise",
+        orientation="vertical",
+        entity_types=("VERTEX", "VERTEX"),
+    )
+    head_height = add_edge_dimension(
+        adapter,
+        head_detail,
+        p0=_head_xy(-half_shank, HEAD_START_Y),
+        p1=_head_xy(0.0, HEAD_TOP_Y),
+        text_xy=(
+            _head_xy(-half_head, 0.0)[0] - 0.014,
+            _head_xy(0.0, (HEAD_START_Y + HEAD_TOP_Y) / 2.0)[1],
+        ),
+        label="head height",
+        orientation="vertical",
+        entity_types=("VERTEX", "EDGE"),
+    )
+    set_arc_endpoints_to_max(adapter, head_height, label="head height")
+    add_attached_note(
+        adapter,
+        head_detail,
+        text=CROWN_CALLOUT,
+        entity_xy=_head_xy(half_head * 0.6, HEAD_CROWN_CY + half_head * 0.8),
+        note_xy=(HEAD_DETAIL_CENTER[0] + 0.020, _head_xy(0.0, HEAD_TOP_Y)[1] + 0.004),
+        label="head crown full round",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
-    add_property_linked_note(adapter, "Isometric View Note", 0.325, 0.205)
+    # DETAIL C, the thickness step: the ring's 3.00 across its flat faces
+    # (picked above the bore's projected span, so only the OD edge is there)
+    # and the shank's 2.50 just above the step.
+    ring_pick_y = RING_BORE_DIA / 2.0 + 1.6
+    shank_pick_y = RING_OUTER_RADIUS + 5.6
+    add_edge_dimension(
+        adapter,
+        step_detail,
+        p0=_step_xy(-RING_THICKNESS / 2.0, ring_pick_y),
+        p1=_step_xy(RING_THICKNESS / 2.0, ring_pick_y),
+        text_xy=(STEP_DETAIL_CENTER[0], _step_xy(0.0, ring_pick_y)[1] - 0.026),
+        label="ring thickness",
+        orientation="horizontal",
+    )
+    add_edge_dimension(
+        adapter,
+        step_detail,
+        p0=_step_xy(-SHANK_THICKNESS / 2.0, shank_pick_y),
+        p1=_step_xy(SHANK_THICKNESS / 2.0, shank_pick_y),
+        text_xy=(STEP_DETAIL_CENTER[0], _step_xy(0.0, shank_pick_y)[1] + 0.014),
+        label="shank thickness",
+        orientation="horizontal",
+    )
+
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.036)
+    add_property_linked_note(adapter, "Isometric View Note", 0.365, 0.252)
 
     return await finalize_drawing(
         adapter,

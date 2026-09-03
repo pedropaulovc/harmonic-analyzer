@@ -39,18 +39,45 @@ def test_sheet_runs_at_5_to_1() -> None:
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
 
 
-def test_linked_notes_describe_the_form() -> None:
+def test_notes_are_few_specific_and_never_the_title_block() -> None:
     notes = spring_hook_notes.DRAWING_NOTES
-    assert "R1.5" in notes
-    assert "LINEAR +/-" not in notes
-    assert "STEEL WIRE" not in notes
-    assert "DEHORN" not in notes
+    lines = notes.split("\n")
+    assert len(lines) <= 4
+    assert "R1.50" in notes
+    assert "FORM COLD" in notes
+    # No design-intent narration, no GD&T prose, nothing the title block says.
+    for banned in (
+        "SUMMING-LEVER", "CHANNEL-SPRING", "Ra ", "ANNEALED", "STEEL WIRE",
+        "DEHORN", "UOS", "DIMENSIONS IN", "LINEAR +/-", "+/-", "DATUM", "BASIC",
+        "WITHIN", "MHA-",
+    ):
+        assert banned not in notes, banned
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
-    assert "add_surface_finish(" in source
-    assert "_shank_silhouette(adapter, front)" in source
-    assert "edge_entity=shank_edge" in source
-    assert 'entity_type="SILHOUETTE"' in source
+
+
+def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:
+    # drawing-simplicity-policy.md rule 5: the shank seats in the plate bore
+    # and hangs there; nothing runs on it, so the silhouette-hunting Ra went.
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    for helper in (
+        "add_datum_feature(",
+        "add_feature_control_frame(",
+        "add_surface_finish(",
+        "set_basic_dimension(",
+        "project_part_pmi(",
+        "_shank_silhouette(",
+        "visible_view_entities(",
+    ):
+        assert helper not in source, helper
+    assert not hasattr(spring_hook_spec, "GEOMETRIC_TOLERANCES_MM")
+    assert not hasattr(spring_hook_spec, "GEOMETRIC_CONTROLS")
+
+
+def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "for view in (front, top):\n        set_hidden_lines_visible" in source
+    assert "set_hidden_lines_removed(adapter, iso)" in source
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:
@@ -65,21 +92,10 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     assert int(spec["quantity"]) == 20
 
 
-def test_surface_finish_is_part_owned_authored_and_consumed() -> None:
-    (control,) = spring_hook_spec.SURFACE_FINISHES
-    assert control.key == "shank_seating"
-    assert control.roughness_um == 1.6
-    assert control.face.diameter_mm == spring_hook_spec.ROD_DIA
-    assert control.face.contains_y_mm == spring_hook_spec.SHANK_RISE / 2.0
-    assert (hook.ROD_DIA, hook.SHANK_RISE) == (
-        spring_hook_spec.ROD_DIA,
-        spring_hook_spec.SHANK_RISE,
-    )
+def test_surface_finish_set_is_empty_and_still_wired_to_the_part() -> None:
+    assert spring_hook_spec.SURFACE_FINISHES == ()
     part_source = "".join(Path(hook.__file__).read_text(encoding="utf-8").split())
     assert "surface_finishes=SURFACE_FINISHES" in part_source
-    sheet_source = "".join(Path(drawing.__file__).read_text(encoding="utf-8").split())
-    assert (
-        'control=surface_finish_by_key(SURFACE_FINISHES,"shank_seating")'
-        in sheet_source
-    )
+    sheet_source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "roughness_ra=" not in sheet_source
+    assert "surface_finish_by_key" not in sheet_source
