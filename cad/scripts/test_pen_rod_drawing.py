@@ -1,9 +1,9 @@
 """Offline contracts for the pen-rod drawing.
 
-The print follows cad/docs/drawing-simplicity-policy.md: a length of drawn
-square bar carries no datums, frames or roughness symbols (the drawn faces
-pass as received); its slide fit is the band on the model section, and the
-wire hole says DRILL on its callout, sized and centred in DETAIL A at 4:1.
+The print follows cad/docs/drawing-simplicity-policy.md: drawn 5 mm square
+stock carries no datums, frames, roughness symbols or machining tolerance
+because its faces pass as received. The #47 through hole stays associative and
+is explicitly centred across the section on the main front view.
 """
 
 from __future__ import annotations
@@ -32,8 +32,8 @@ def test_required_drawing_paths() -> None:
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert part.DRAWING_DIMENSIONS is pen_rod_spec.DRAWING_DIMENSIONS
     marked = set().union(*pen_rod_spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP) | set(drawing.TOP_KEEP)
-    assert kept == marked
+    assert set(drawing.FRONT_KEEP) == marked == {"Length"}
+    assert not hasattr(drawing, "TOP_KEEP")
     assert (part.ROD_SECTION, part.ROD_LENGTH, part.WIRE_HOLE_Y) == (
         pen_rod_spec.ROD_SECTION,
         pen_rod_spec.ROD_LENGTH,
@@ -44,65 +44,72 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
 def test_wire_hole_callout_states_size_and_process() -> None:
     assert pen_rod_spec.WIRE_HOLE_DIA == NUMBER_DRILL_MM[pen_rod_spec.WIRE_HOLE_DRILL]
     assert pen_rod_spec.WIRE_HOLE_DRILL == "#47"
-    assert pen_rod_spec.WIRE_HOLE_Y < pen_rod_spec.ROD_LENGTH
+    assert (
+        pen_rod_spec.ROD_SECTION,
+        pen_rod_spec.ROD_LENGTH,
+        pen_rod_spec.WIRE_HOLE_Y,
+    ) == (5.0, 150.0, 145.0)
+    assert pen_rod_spec.ROD_LENGTH - pen_rod_spec.WIRE_HOLE_Y == 5.0
     source = _source()
     assert source.count("add_native_hole_callout(") == 1
     # Harvey #13: the callout says DRILL; the drill number rides as its prefix.
     assert 'process="#47 DRILL"' in source
-    # The along-rod location remains a dimension; the across-section location
-    # stays a view-adjacent note rather than depending on a short derived edge.
+    # Both hole locations stay on the main front view: one associative
+    # line-to-circle dimension and one selection-free centring note.
     assert source.count("add_edge_dimension(") == 1
-    # The native callout resolves the exact-diameter visible model edge in the
-    # main front view; the derived detail exposes no model edges on this seat.
     assert (
         "wire_hole_edge = visible_circle_edge(adapter, front, WIRE_HOLE_DIA)" in source
     )
     assert "edge=wire_hole_edge" in source
     assert "edge_xy=" not in source
+    # The native callout occupies the free upper-right area. Its leader crosses
+    # the 145 dimension's x lane only above that dimension's hole endpoint.
+    assert drawing.WIRE_HOLE_CALLOUT_XY[0] > drawing.FRONT_CENTER[0] + 0.070
+    assert drawing.WIRE_HOLE_CALLOUT_XY[1] > drawing.WIRE_HOLE_CENTER_Y
+    assert "callout_xy=WIRE_HOLE_CALLOUT_XY" in source
 
 
-def test_wire_hole_centring_reads_in_a_detail() -> None:
-    # Machinist review 2026-09-02: the 2.50 across value crowded the top
-    # view's stacked 5.00. DETAIL A (4:1) carries a compact centring note
-    # derived from the authoritative rod section; the native size/process and
-    # length location stay on the main front view.
-    assert drawing.DETAIL_SCALE == (4, 1)
-    assert drawing.DETAIL_RADIUS > pen_rod_spec.ROD_SECTION / 2000.0
+def test_wire_hole_centring_is_selection_free_on_main_front() -> None:
     assert drawing.WIRE_HOLE_CENTER_NOTE == (
-        f"HOLE CL {pen_rod_spec.ROD_SECTION / 2.0:.2f} FROM FACE"
+        f"HOLE CENTERED ACROSS {pen_rod_spec.ROD_SECTION:g} SQ SECTION"
     )
+    assert drawing.WIRE_HOLE_CENTER_NOTE_XY[0] > drawing.FRONT_CENTER[0] + 0.040
+    assert drawing.WIRE_HOLE_CENTER_NOTE_XY[1] < drawing.WIRE_HOLE_CENTER_Y
     source = _source()
-    assert source.count("create_detail_view(") == 1
-    assert 'detail_label="A"' in source
-    assert "model_point_in_view(" in source
-    # The detail is never curated (its circle takes in both rod faces, so a
-    # curation could claim Section); its centring note makes no entity pick.
-    assert 'view_label="detail"' not in source
-    assert "WIRE_HOLE_CENTER_NOTE,\n            *wire_hole_center_note_xy" in source
-    assert "add_edge_dimension(\n        adapter,\n        detail," not in source
-    assert "add_native_hole_callout(\n        adapter,\n        detail," not in source
-    # The front view carries both the along-rod location and native callout.
+    assert source.count("add_note(") == 1
+    assert "WIRE_HOLE_CENTER_NOTE,\n            *WIRE_HOLE_CENTER_NOTE_XY" in source
     assert "add_edge_dimension(\n        adapter,\n        front," in source
     assert "add_native_hole_callout(\n        adapter,\n        front," in source
-    # The detail sits right of the right view and left of the isometric.
-    assert drawing.RIGHT_CENTER[0] < drawing.DETAIL_CENTER[0] < drawing.ISO_CENTER[0]
+    for removed in (
+        "create_detail_view",
+        "model_point_in_view",
+        'detail_label="A"',
+        '"*Right"',
+    ):
+        assert removed not in source
+    for removed_constant in (
+        "DETAIL_CENTER",
+        "DETAIL_RADIUS",
+        "DETAIL_SCALE",
+        "RIGHT_CENTER",
+    ):
+        assert not hasattr(drawing, removed_constant)
 
 
-def test_slide_fit_rides_the_model_section() -> None:
-    assert drawing.DIMENSION_CALLOUTS == {}
-    assert drawing.TOP_DIMENSION_CALLOUTS == {}
-    assert pen_rod_spec.SECTION_BAND == (0.00, -0.05)
-    assert model_toleranced_dimensions(part) == {
-        ("RodProfile", "Section"): "*deviations(SECTION_BAND)",
-        ("Rod", "Depth"): "*deviations(SECTION_BAND)",
-    }
+def test_drawn_stock_has_no_owned_machining_tolerance() -> None:
+    assert not hasattr(pen_rod_spec, "SECTION_BAND")
+    assert model_toleranced_dimensions(part) == {}
+    part_source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "set_dimension_bilateral_tolerance" not in part_source
+    assert "deviations(SECTION_BAND)" not in part_source
+    assert pen_rod_spec.DRAWING_DIMENSIONS == {"RodProfile": {"Length"}}
 
 
 def test_notes_are_few_specific_and_never_the_title_block() -> None:
     notes = pen_rod_spec.DRAWING_NOTES
     lines = notes.split("\n")
     assert len(lines) <= 4
-    assert "OK AS RECEIVED" in notes  # the cleanup-cut licence (Lipton)
+    assert notes == "5 SQ DRAWN BRASS BAR FACES OK AS RECEIVED."
     # The drill rides the hole callout; deburr is a title-block row; the
     # v-block role is design intent.
     for banned in ("DRILL", "#47", "DEBURR", "V-BLOCK", "WITHIN", "+/-", "UOS", "X.XX"):
@@ -141,20 +148,21 @@ def test_print_carries_no_gdt_or_finish_symbols() -> None:
     assert "surface_finishes=SURFACE_FINISHES" in part_source
 
 
-def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
+def test_hidden_lines_stay_on_in_both_orthographic_views() -> None:
     source = _source()
-    assert (
-        "for view in (front, right, top):\n        set_hidden_lines_visible" in source
-    )
+    assert "for view in (front, top):\n        set_hidden_lines_visible" in source
     assert "set_hidden_lines_removed(adapter, iso)" in source
 
 
 def test_view_scales_are_explicit() -> None:
     assert drawing.SHEET_SCALE == (1.0, 1.0)
     source = _source()
-    assert source.count("scale=(1, 1)") == 3
+    assert source.count("place_view(") == 3
+    for orientation in ('"*Front"', '"*Top"', '"*Isometric"'):
+        assert source.count(orientation) == 1
+    assert source.count("scale=(1, 1)") == 2
     assert source.count("scale=(4, 1)") == 1
-    assert "scale=DETAIL_SCALE" in source
+    assert "DETAIL_SCALE" not in source
     assert pen_rod_spec.TOP_VIEW_NOTE == "TOP VIEW SCALE 4:1"
     assert 'add_property_linked_note(adapter, "Top View Note"' in source
 
