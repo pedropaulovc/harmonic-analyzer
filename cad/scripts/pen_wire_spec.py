@@ -17,21 +17,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Wire": {"Depth"},
 }
 
-# Lines kept short (<~66 chars) so the left-anchored block stays clear of the
-# title block (x >= 0.264 m); it grows DOWNWARD from its anchor.
+# Notes: part-specific process facts only, never a tolerance, never the
+# title block (drawing-simplicity-policy.md rule 6).
 DRAWING_NOTES = "\n".join(
     (
-        "1. SUPPLY STRAIGHT CUT-WIRE BLANK <MOD-DIAM>0.80 +/-0.02 X",
-        "   62.70 +/-0.20 LONG. LENGTH IS BEFORE ASSEMBLY FORMING.",
-        "2. EACH END FACE: 0.05 MAX GAP TO A REFERENCE SQUARE",
-        "   REGISTERED ON THE ADJACENT STRAIGHT RUN (THE",
-        "   SQUARENESS ACCEPTANCE TEST). THE TITLE-BLOCK",
-        "   R0.25/CHAMFER 0.25 LIMIT DOES NOT APPLY TO WIRE",
-        "   ENDS; END EDGE R0.05 MAX.",
-        "3. STRAIGHTNESS ACCEPTANCE TEST (THE ONLY CRITERION):",
-        "   LAY FREE WIRE ON A FLAT SURFACE PLATE AND ROLL",
-        "   THROUGH ONE FULL TURN; 0.50 MAX GAP AT ANY",
-        "   ORIENTATION. FORM + TERMINATE ENDS AT ASSEMBLY.",
+        "STRAIGHT CUT-WIRE BLANK, <MOD-DIAM>0.80; ENDS CUT SQUARE.",
+        "FORM AND TERMINATE THE ENDS AT ASSEMBLY.",
     )
 )
 ELEVATION_VIEW_NOTE = "ELEVATION SCALE 2:1"

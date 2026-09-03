@@ -1,4 +1,9 @@
-"""Offline contracts for the pen-hanger drawing."""
+"""Offline contracts for the pen-hanger drawing.
+
+The print follows cad/docs/drawing-simplicity-policy.md: a brazed strap and
+guide block carries no datums, frames or roughness symbols, and its notes are
+four lines of process fact.
+"""
 
 from __future__ import annotations
 
@@ -8,6 +13,10 @@ import build_pen_hanger as part
 import draw_pen_hanger as drawing
 import pen_hanger_spec
 from _drawing_registry import DRAWINGS_BY_NAME
+
+
+def _source() -> str:
+    return Path(drawing.__file__).read_text(encoding="utf-8")
 
 
 def test_required_drawing_paths() -> None:
@@ -24,28 +33,45 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert kept == marked
 
 
-def test_notes_describe_the_strap_channel_and_screw() -> None:
+def test_notes_are_few_specific_and_never_the_title_block() -> None:
     notes = pen_hanger_spec.DRAWING_NOTES
-    assert "SQUARE HOLE THRU" in notes
-    assert "INTERNAL R0.25 MAX" in notes
-    assert "WALL-THICKNESS DIFFERENCE 0.10 MAX" in notes
-    assert "HOLE CENTER 4.00 +/-0.05 FROM FRONT DEPTH FACE" in notes
-    assert "AWS A5.8 BAg-7" in notes
-    assert "FLUSH WITH BLOCK BACK DEPTH FACE WITHIN 0.10" in notes
-    assert "FULL 3.00 X 10.00 FAYING SURFACE" in notes
-    assert "1.0 MIN LEG" in notes
-    assert "CUMULATIVE VOID LENGTH 0.50 MAX" in notes
-    assert "HORIZONTALLY RIGHT OF FRONT-VIEW TOP-LEFT CORNER" in notes
+    lines = notes.split("\n")
+    assert len(lines) <= 4
+    # The mid-band block must stay clear of the isometric to its right.
+    assert max(len(line) for line in lines) <= 68
+    assert "SLIDING FIT ON THE PEN ROD" in notes  # the one fit, made at the bench
+    assert "SILVER-BRAZE" in notes
+    assert "DO NOT MIRROR" in notes
     assert "#6-32" in notes
-    assert "AISI" not in notes
-    assert "X.XX" not in notes
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    for banned in ("UOS", "DIMENSIONS IN", "+/-", "MAX", "WITHIN", "AISI", "X.XX"):
+        assert banned not in notes, banned
+    source = _source()
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+
+
+def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:
+    source = _source()
+    for helper in (
+        "add_datum_feature(",
+        "add_feature_control_frame(",
+        "add_surface_finish(",
+        "set_basic_dimension(",
+        "project_part_pmi(",
+    ):
+        assert helper not in source, helper
+    assert not hasattr(pen_hanger_spec, "GEOMETRIC_TOLERANCES_MM")
+
+
+def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
+    source = _source()
+    assert "for view in (front, top):\n        set_hidden_lines_visible" in source
+    assert "set_hidden_lines_removed(adapter, iso)" in source
+    assert source.count("set_hidden_lines_removed(") == 1
 
 
 def test_view_scales_are_explicit() -> None:
     assert drawing.SHEET_SCALE == (2.0, 1.0)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    source = _source()
     assert "scale=(2, 1)" in source
     assert "scale=(1, 1)" in source
     assert pen_hanger_spec.FRONT_VIEW_NOTE == "FRONT VIEW SCALE 2:1"

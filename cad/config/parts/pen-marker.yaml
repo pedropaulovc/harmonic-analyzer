@@ -2,7 +2,7 @@ pen-marker:
   number: MHA-050
   material: Brass
   material_specification: UNS C36000 free-machining brass rod
-  finish: smooth turned, bright; polished tip
+  finish: bright; polished tip
   quantity: 1
   tolerance_class: machined_block
   process: "machined (brass)"
