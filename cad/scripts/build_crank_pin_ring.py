@@ -20,6 +20,7 @@ import sys
 
 from _common import (
     SketchDims,
+    anchor_point_to_origin,
     apply_material,
     check,
     define_circle,
@@ -58,7 +59,10 @@ async def build(adapter) -> dict[str, str]:
     centerline = check("axis", await adapter.add_centerline(0.0, -RING_R, 0.0, RING_R))
     set_sketch_direct_db(adapter, False)
     check("axis vertical", await adapter.add_sketch_constraint(centerline, None, "vertical"))
-    check("axis on origin", await adapter.add_sketch_constraint(f"{centerline}.start", "origin", "vertical_points"))
+    await anchor_point_to_origin(
+        adapter, f"{centerline}.start", 0.0, -RING_R, "axis start"
+    )
+    prof.record("AxisStartY", '"RingR"')
     check("axis length", await adapter.add_sketch_dimension(centerline, None, "linear", 2.0 * RING_R))
     prof.record("AxisLen", '2 * "RingR"')
     await define_circle(

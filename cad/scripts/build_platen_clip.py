@@ -61,13 +61,17 @@ from _holes import CLEARANCE_MM, HoleSpec, wizard_holes
 PART_NAME = "platen-clip"
 MATERIAL = "Brass"  # see _common.apply_material docstring
 
-CLIP_LENGTH = 83.5  # ch22 p.55 rear photo: 86.7 of the 140 mm plate (0.619) x PLATE_HEIGHT 134.82
+CLIP_LENGTH = (
+    83.5  # ch22 p.55 rear photo: 86.7 of the 140 mm plate (0.619) x PLATE_HEIGHT 134.82
+)
 CLIP_WIDTH = 8.988  # ch30-p002 Pose Studio: 10 * 0.8988
 BASE_T = 1.0  # base strip thickness (against the platen)
 UPPER_T = 0.8  # slotted strip thickness (in front of the base strip)
-CLIP_THICKNESS = BASE_T + UPPER_T  # 1.8: the assembly's front-face stand-off from the platen
+CLIP_THICKNESS = (
+    BASE_T + UPPER_T
+)  # 1.8: the assembly's front-face stand-off from the platen
 # End screws: the brass fillister clip screws (Ø2.9 shank) pass THROUGH, so
-# each end hole is a #4 clearance Hole Wizard hole (normal fit Ø3.251; was a
+# each end hole is a #4 clearance Hole Wizard hole (normal fit Ø3.264; was a
 # plain Ø3.0 cut) -- memory/fastener-policy-us-customary.
 HOLE_INSET = 7.1904  # ch30-p002 Pose Studio: 8 * 0.8988 from each end
 # Slotted upper strip (page001_img03): starts UPPER_X0 in from the top end
@@ -78,7 +82,14 @@ UPPER_X0 = 3.0
 UPPER_LENGTH = CLIP_LENGTH - 2.0 * UPPER_X0  # 77.5
 SLOT_W = 3.4
 SLOT_MARGIN = 0.5
-SLOT_X0 = HOLE_INSET - CLEARANCE_MM[("#4", "normal")] / 2.0 - SLOT_MARGIN  # 5.06
+_SLOT_END_ALLOWANCE = CLEARANCE_MM[("#4", "normal")] / 2.0 + SLOT_MARGIN
+SLOT_X0 = 5.0584  # authored initial slot station; equation-driven in the model
+if not math.isclose(
+    SLOT_X0,
+    HOLE_INSET - _SLOT_END_ALLOWANCE,
+    abs_tol=1e-9,
+):
+    raise AssertionError("platen clip SlotX0 must follow the hole inset and clearance")
 SLOT_X1 = CLIP_LENGTH - SLOT_X0  # 78.44
 SLOT_LENGTH = SLOT_X1 - SLOT_X0
 # Lip: the upper strip's top end bent away from the platen (-Z), LIP_H high.
@@ -88,19 +99,33 @@ V_BASE = CLIP_LENGTH * CLIP_WIDTH * BASE_T
 V_UPPER = UPPER_LENGTH * CLIP_WIDTH * UPPER_T
 V_SLOT = SLOT_LENGTH * SLOT_W * UPPER_T
 V_LIP = UPPER_T * CLIP_WIDTH * LIP_H
-V_HOLES = 2.0 * math.pi * (CLEARANCE_MM[("#4", "normal")] / 2.0) ** 2 * BASE_T  # the slot already opens the upper strip
+V_HOLES = (
+    2.0 * math.pi * (CLEARANCE_MM[("#4", "normal")] / 2.0) ** 2 * BASE_T
+)  # the slot already opens the upper strip
 V_FINAL = V_BASE + V_UPPER - V_SLOT + V_LIP - V_HOLES
 
 if not (SLOT_X0 > UPPER_X0 + 1.0 and SLOT_X1 < UPPER_X0 + UPPER_LENGTH - 1.0):
-    raise AssertionError("platen clip slot must stay inside the upper strip with a 1 mm end land")
+    raise AssertionError(
+        "platen clip slot must stay inside the upper strip with a 1 mm end land"
+    )
 if SLOT_W <= CLEARANCE_MM[("#4", "normal")]:
     raise AssertionError("platen clip slot must be wider than the screw clearance hole")
 
 
-async def _rect(adapter, label: str, name: str, rect: list[tuple[float, float]], dims: SketchDims, names, drives):
+async def _rect(
+    adapter,
+    label: str,
+    name: str,
+    rect: list[tuple[float, float]],
+    dims: SketchDims,
+    names,
+    drives,
+):
     check(f"create_sketch {label}", await adapter.create_sketch("Front"))
     lines = await add_line_chain(adapter, rect)
-    await define_rectilinear_chain(adapter, lines, rect, label=label, dims=dims, names=names, drives=drives)
+    await define_rectilinear_chain(
+        adapter, lines, rect, label=label, dims=dims, names=names, drives=drives
+    )
     await ensure_fully_defined(adapter, label)
     check(f"exit_sketch {label}", await adapter.exit_sketch())
     name_last_feature(adapter, name)
@@ -125,7 +150,11 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "HoleFarX", '"ClipLength" - "HoleInset"')
     await set_global(adapter, "UpperX0", f"{UPPER_X0}mm")
     await set_global(adapter, "UpperLength", '"ClipLength" - 2 * "UpperX0"')
-    await set_global(adapter, "SlotX0", f"{SLOT_X0}mm")
+    await set_global(
+        adapter,
+        "SlotX0",
+        f'"HoleInset" - {_SLOT_END_ALLOWANCE}mm',
+    )
     await set_global(adapter, "SlotLength", '"ClipLength" - 2 * "SlotX0"')
     await set_global(adapter, "SlotW", f"{SLOT_W}mm")
     await set_global(adapter, "SlotY0", '("ClipWidth" - "SlotW") / 2')
@@ -138,9 +167,13 @@ async def build(adapter) -> dict[str, str]:
     # strip; the back face at CLIP_THICKNESS bears on the platen).
     outline = SketchDims()
     await _rect(
-        adapter, "base outline", "BaseProfile",
+        adapter,
+        "base outline",
+        "BaseProfile",
         [(0.0, 0.0), (CLIP_LENGTH, 0.0), (CLIP_LENGTH, CLIP_WIDTH), (0.0, CLIP_WIDTH)],
-        outline, ["Length", "Width"], ['"ClipLength"', '"ClipWidth"'],
+        outline,
+        ["Length", "Width"],
+        ['"ClipLength"', '"ClipWidth"'],
     )
     drive_jobs += outline.apply(adapter, "BaseProfile")
     extrude_at_offset(adapter, BASE_T, UPPER_T)
@@ -152,12 +185,24 @@ async def build(adapter) -> dict[str, str]:
     # anchor x as a dim (y = 0 is a relation).
     upper = SketchDims()
     await _rect(
-        adapter, "upper outline", "UpperProfile",
-        [(UPPER_X0, 0.0), (UPPER_X0 + UPPER_LENGTH, 0.0), (UPPER_X0 + UPPER_LENGTH, CLIP_WIDTH), (UPPER_X0, CLIP_WIDTH)],
-        upper, ["UpperLength", "UpperWidth", "UpperX0"], ['"UpperLength"', '"ClipWidth"', '"UpperX0"'],
+        adapter,
+        "upper outline",
+        "UpperProfile",
+        [
+            (UPPER_X0, 0.0),
+            (UPPER_X0 + UPPER_LENGTH, 0.0),
+            (UPPER_X0 + UPPER_LENGTH, CLIP_WIDTH),
+            (UPPER_X0, CLIP_WIDTH),
+        ],
+        upper,
+        ["UpperLength", "UpperWidth", "UpperX0"],
+        ['"UpperLength"', '"ClipWidth"', '"UpperX0"'],
     )
     drive_jobs += upper.apply(adapter, "UpperProfile")
-    check("extrude upper strip", await adapter.create_extrusion(ExtrusionParameters(depth=UPPER_T)))
+    check(
+        "extrude upper strip",
+        await adapter.create_extrusion(ExtrusionParameters(depth=UPPER_T)),
+    )
     name_last_feature(adapter, "UpperStrip")
     await volume_check(adapter, "base + upper strips", V_BASE + V_UPPER, 0.005 * V_BASE)
 
@@ -166,14 +211,25 @@ async def build(adapter) -> dict[str, str]:
     slot = SketchDims()
     slot_y0 = (CLIP_WIDTH - SLOT_W) / 2.0
     await _rect(
-        adapter, "slot", "SlotProfile",
-        [(SLOT_X0, slot_y0), (SLOT_X1, slot_y0), (SLOT_X1, slot_y0 + SLOT_W), (SLOT_X0, slot_y0 + SLOT_W)],
-        slot, ["SlotLength", "SlotW", "SlotX0", "SlotY0"], ['"SlotLength"', '"SlotW"', '"SlotX0"', '"SlotY0"'],
+        adapter,
+        "slot",
+        "SlotProfile",
+        [
+            (SLOT_X0, slot_y0),
+            (SLOT_X1, slot_y0),
+            (SLOT_X1, slot_y0 + SLOT_W),
+            (SLOT_X0, slot_y0 + SLOT_W),
+        ],
+        slot,
+        ["SlotLength", "SlotW", "SlotX0", "SlotY0"],
+        ['"SlotLength"', '"SlotW"', '"SlotX0"', '"SlotY0"'],
     )
     drive_jobs += slot.apply(adapter, "SlotProfile")
     check(
         "cut slot",
-        await adapter.create_cut_extrude(ExtrusionParameters(depth=2.0 * UPPER_T, both_directions=True)),
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=2.0 * UPPER_T, both_directions=True)
+        ),
     )
     name_last_feature(adapter, "Slot")
     await volume_check(adapter, "slotted", V_BASE + V_UPPER - V_SLOT, 0.005 * V_BASE)
@@ -183,14 +239,25 @@ async def build(adapter) -> dict[str, str]:
     # from the front face (start offset -LIP_H, depth LIP_H, merging at z 0).
     lip = SketchDims()
     await _rect(
-        adapter, "lip", "LipProfile",
-        [(UPPER_X0, 0.0), (UPPER_X0 + UPPER_T, 0.0), (UPPER_X0 + UPPER_T, CLIP_WIDTH), (UPPER_X0, CLIP_WIDTH)],
-        lip, ["LipT", "LipWidth", "LipX0"], ['"UpperT"', '"ClipWidth"', '"UpperX0"'],
+        adapter,
+        "lip",
+        "LipProfile",
+        [
+            (UPPER_X0, 0.0),
+            (UPPER_X0 + UPPER_T, 0.0),
+            (UPPER_X0 + UPPER_T, CLIP_WIDTH),
+            (UPPER_X0, CLIP_WIDTH),
+        ],
+        lip,
+        ["LipT", "LipWidth", "LipX0"],
+        ['"UpperT"', '"ClipWidth"', '"UpperX0"'],
     )
     drive_jobs += lip.apply(adapter, "LipProfile")
     extrude_at_offset(adapter, LIP_H, -LIP_H)
     name_last_feature(adapter, "Lip")
-    await volume_check(adapter, "with lip", V_BASE + V_UPPER - V_SLOT + V_LIP, 0.005 * V_BASE)
+    await volume_check(
+        adapter, "with lip", V_BASE + V_UPPER - V_SLOT + V_LIP, 0.005 * V_BASE
+    )
 
     # 5. End screw holes: ONE native Hole Wizard #4 clearance feature (2 points)
     # from the front face (local z 0, outward normal -Z), through both strips;
@@ -204,7 +271,8 @@ async def build(adapter) -> dict[str, str]:
             [CLIP_LENGTH - HOLE_INSET, CLIP_WIDTH / 2.0, 0.0],
         ],
         (0.0, 0.0, -1.0),
-        "end screw holes (#4 clearance)", name="ScrewHoles",
+        "end screw holes (#4 clearance)",
+        name="ScrewHoles",
         placement_dims=[
             (("LeftX", '"HoleInset"'), ("LeftZ", '"HoleY"')),
             (("RightX", '"HoleFarX"'), ("RightZ", '"HoleY"')),
@@ -219,7 +287,9 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
-    await volume_check(adapter, "driven clip (equations neutral)", V_FINAL, 0.005 * V_BASE)
+    await volume_check(
+        adapter, "driven clip (equations neutral)", V_FINAL, 0.005 * V_BASE
+    )
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

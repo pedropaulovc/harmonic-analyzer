@@ -20,8 +20,9 @@ def test_glyph_sits_on_the_lip_top_beside_the_nameplate():
     lip_x0, lip_x1 = TOP_LENGTH / 2.0 - LIP_W, TOP_LENGTH / 2.0
     assert lip_x0 + 0.5 <= s["x0"] and s["x1"] <= lip_x1 - 0.5, s
     plate_z_end = max(z for _x, _y, z in (nameplate_spec.mount_point(p) for p in ((0, 0, 0), (100, 0, 0))))
-    assert s["y0"] > plate_z_end + 5.0, (s, plate_z_end)
-    assert 0.9 * base.SERIAL_HEIGHT_MM <= (s["y1"] - s["y0"]) <= 1.1 * base.SERIAL_HEIGHT_MM
+    physical_z0, physical_z1 = -s["y1"], -s["y0"]
+    assert physical_z0 > plate_z_end + 5.0, (s, plate_z_end)
+    assert 0.9 * base.SERIAL_HEIGHT_MM <= (physical_z1 - physical_z0) <= 1.1 * base.SERIAL_HEIGHT_MM
     assert abs(base.SERIAL_AREA_MM2 - s["area_mm2"]) < 1e-3, (base.SERIAL_AREA_MM2, s["area_mm2"])
     assert STACK_HEIGHT + LIP_H > STACK_HEIGHT  # the rim top is above the deck
 

@@ -4,9 +4,9 @@ The museum machine carries a hand-stamped "2" on the bright machined top of the
 base rim beside the nameplate. The build imports this DXF onto a plane at the
 rim top (build_harmonic_base.SERIAL_*) and cuts it SERIAL_DEPTH deep, the same
 closed-region import the nameplate engraving and the measuring-stick numerals
-use. Coordinates are ABSOLUTE part mm in the rim-top sketch frame (sketch x =
-part X, sketch y = part Z; the Makers seat ignores SetPosition), so the file is
-regenerated whenever a SERIAL_* constant moves::
+use. Coordinates are ABSOLUTE part mm converted into the rim-top Top-sketch
+frame (sketch x = part X, sketch y = -part Z; the Makers seat ignores
+SetPosition), so the file is regenerated whenever a SERIAL_* constant moves::
 
     uv run python cad/scripts/gen_base_serial_dxf.py
 
@@ -28,12 +28,12 @@ from build_harmonic_base import (
 
 
 def rings() -> list[dxf.Ring]:
-    """The glyph rings centred on SERIAL_XZ, height SERIAL_HEIGHT_MM, glyph up = +Z."""
+    """Glyph rings centred on SERIAL_XZ after the part-Z to sketch-Y mapping."""
     raw = dxf.glyph_polylines(SERIAL_TEXT, SERIAL_HEIGHT_MM)
     x0, y0, x1, y1 = dxf.bbox(raw)
     cx, cy = (x0 + x1) / 2.0, (y0 + y1) / 2.0
     sy = -1.0 if SERIAL_MIRROR_Y else 1.0
-    return [[(SERIAL_XZ[0] + (x - cx), SERIAL_XZ[1] + sy * (y - cy)) for x, y in ring] for ring in raw]
+    return [[(SERIAL_XZ[0] + (x - cx), -SERIAL_XZ[1] - sy * (y - cy)) for x, y in ring] for ring in raw]
 
 
 def render() -> bytes:
@@ -50,8 +50,9 @@ def main() -> int:
     data = render()
     SERIAL_DXF.write_bytes(data)
     s = summary()
+    physical_z0, physical_z1 = -s["y1"], -s["y0"]
     print(f"wrote {SERIAL_DXF} ({len(data)} bytes); loops {s['loops']}; net area {s['area_mm2']:.4f} mm^2;"
-          f" bbox x {s['x0']:.3f}..{s['x1']:.3f} z {s['y0']:.3f}..{s['y1']:.3f}")
+          f" bbox x {s['x0']:.3f}..{s['x1']:.3f} part z {physical_z0:.3f}..{physical_z1:.3f}")
     return 0
 
 

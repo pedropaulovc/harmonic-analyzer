@@ -259,9 +259,23 @@ async def build(adapter) -> dict[str, str]:
     check("exit_sketch cap slot", await adapter.exit_sketch())
     name_last_feature(adapter, "CapSlotProfile")
     drive_jobs += slot.apply(adapter, "CapSlotProfile")
+    before_slot = check(
+        "measure volume before cap slot", await adapter.get_mass_properties()
+    ).volume
     check("cut cap slot", await adapter.create_cut_extrude(ExtrusionParameters(depth=CAP_SLOT_W, both_directions=True)))
+    after_slot = check(
+        "measure volume after cap slot", await adapter.get_mass_properties()
+    ).volume
     name_last_feature(adapter, "CapSlot")
     v_slot = CAP_DIA * CAP_SLOT_D * CAP_SLOT_W  # the slot spans the cap's full diameter
+    removed_slot = before_slot - after_slot
+    if abs(removed_slot - v_slot) > 0.02 * v_slot:
+        raise RuntimeError(
+            f"cap slot removed {removed_slot:.3f} mm^3, expected {v_slot:.3f} mm^3"
+        )
+    _telemetry.success(
+        f"cap slot removed {removed_slot:.3f} mm^3 (analytic {v_slot:.3f})"
+    )
     expected = expected + v_cap - v_slot
     await volume_check(adapter, "stub + slotted cap", expected, 0.02 * v_cap + 0.005 * expected)
 

@@ -98,7 +98,7 @@ async def _volume(adapter) -> float:
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import ExtrusionParameters
+    from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
     check("create_part", await adapter.create_part())
 
@@ -334,7 +334,7 @@ async def build(adapter) -> dict[str, str]:
     # collar butts flush against it (its Right/origin plane mates COINCIDENT
     # here, the flip-free seat idiom; seating on Front@arm instead buried the
     # collar inside the plate, 502 mm^3, 2026-07-05).
-    from solidworks_mcp.adapters.base import CreatePlaneParameters
+
 
     # Manufacturing drawing support: mark exactly the print's dimensions (the
     # drawing recipe imports the marked set and must find every one of these),

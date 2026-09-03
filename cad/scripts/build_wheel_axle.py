@@ -2,8 +2,9 @@ r"""Reproduction script: magnifying-wheel axle (book ch. 21, pp. 50-51).
 
 The stud that mounts the magnifying wheel on its support bar: a flange
 seated on the bar's front face, a O5 stud the wheel's bore rides, and a
-washer at the stud tip under a hex nut (2026-09-02, ch21 p.51: the nut is
-the separate wheel-axle-nut part; the O9 x 1 collar here is the washer).
+washer at the wheel hub's outboard face under a hex nut (2026-09-02, ch21
+p.51: the nut is the separate wheel-axle-nut part; the O9 x 1 collar here
+is the washer).
 
 Layout: axle axis +Y from the origin at the flange's bar-side face; the
 assembly rotates it so +Y points -Z (machine front). Flange y 0..3,
@@ -11,7 +12,7 @@ stud 3..20, wheel hub rides 3..13, washer 13..14, nut 14..17 (assembly), tip 3 p
 cad/DIMENSIONS.md ch. 21 (M6.4, low).
 
 Built as three coaxial extrusions off the Top plane (flange disc, stud,
-tip collar) rather than one revolved profile, so every manufacturing
+washer) rather than one revolved profile, so every manufacturing
 diameter and length is a first-class named dimension the curated drawing
 inserts as a model item (see wheel_axle_spec.DRAWING_DIMENSIONS).
 
@@ -62,6 +63,8 @@ from wheel_axle_spec import (
     PART_DATUMS,
     STUD_DIA,
     STUD_DIA_BAND,
+    WASHER_START,
+    WHEEL_HUB_RIDE,
     STUD_LEN,
     SURFACE_FINISHES,
 )
@@ -89,7 +92,7 @@ async def _assert_axle_com(adapter, label: str) -> None:
     com_y = (
         _V_FLANGE * FLANGE_LEN / 2.0
         + _V_STUD * (FLANGE_LEN + STUD_LEN / 2.0)
-        + _V_COLLAR * (FLANGE_LEN + STUD_LEN - COLLAR_LEN / 2.0)
+        + _V_COLLAR * (WASHER_START + COLLAR_LEN / 2.0)
     ) / _V_TOTAL
     if abs(com[0]) > 0.05 or abs(com[2]) > 0.05 or abs(com[1] - com_y) > 0.2:
         raise RuntimeError(
@@ -114,6 +117,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "StudLen", f"{STUD_LEN}mm")
     await set_global(adapter, "CollarDia", f"{COLLAR_DIA}mm")
     await set_global(adapter, "CollarLen", f"{COLLAR_LEN}mm")
+    await set_global(adapter, "WheelHubRide", f"{WHEEL_HUB_RIDE}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -144,7 +148,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += [(flange_dims[0], '"FlangeLen"')]
     await volume_check(adapter, "flange", _V_FLANGE, 0.005 * _V_FLANGE)
 
-    # Stud: O5 bearing run from the flange face to the tip (y 3..17), started
+    # Stud: O5 bearing run from the flange face to the tip (y 3..20), started
     # at an offset so its length dim IS the flange-face -> tip length. The
     # start offset is a NAMED dim driven from "FlangeLen" (not a baked-in
     # literal), so editing FlangeLen in SolidWorks keeps the stud rooted on
@@ -172,10 +176,9 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += [(stud_dims[0], '"StudLen"'), (stud_dims[1], '"FlangeLen"')]
     await volume_check(adapter, "flange+stud", _V_FLANGE + _V_STUD, 0.005 * _V_STUD)
 
-    # Collar: O9 retainer around the stud tip (y 13..17). Its start offset is a
-    # NAMED dim driven from the length globals ("FlangeLen" + "StudLen" -
-    # "CollarLen"), so the collar top stays flush with the stud tip when any
-    # length global changes -- no baked-in literal to drift.
+    # Washer: O9 retainer at the wheel-hub end (y 13..14). Its start offset is
+    # driven from "FlangeLen" + "WheelHubRide", independently of the stud tip,
+    # so lengthening the stud cannot move the washer away from the wheel.
     collar = SketchDims()
     check("create_sketch collar", await adapter.create_sketch("Top"))
     await define_circle(
@@ -192,13 +195,13 @@ async def build(adapter) -> dict[str, str]:
     check("exit_sketch collar", await adapter.exit_sketch())
     name_last_feature(adapter, "CollarProfile")
     drive_jobs += collar.apply(adapter, "CollarProfile")
-    extrude_at_offset(adapter, COLLAR_LEN, FLANGE_LEN + STUD_LEN - COLLAR_LEN)
+    extrude_at_offset(adapter, COLLAR_LEN, WASHER_START)
     name_last_feature(adapter, "Collar")
-    # dim[0] = blind depth (CollarLen); dim[1] = start offset (stud tip - collar).
+    # dim[0] = blind depth (CollarLen); dim[1] = start offset (hub ride end).
     collar_dims = name_dimensions(adapter, "Collar", ["CollarLength", "CollarStart"])
     drive_jobs += [
         (collar_dims[0], '"CollarLen"'),
-        (collar_dims[1], '"FlangeLen" + "StudLen" - "CollarLen"'),
+        (collar_dims[1], '"FlangeLen" + "WheelHubRide"'),
     ]
     await volume_check(adapter, "axle", _V_TOTAL, 0.005 * _V_TOTAL)
     await _assert_axle_com(adapter, "axle")

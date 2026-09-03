@@ -41,6 +41,15 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     )
 
 
+def test_washer_and_nut_stack_stays_at_the_wheel_hub_end() -> None:
+    spec = wheel_axle_spec
+    assert spec.WASHER_START == spec.FLANGE_LEN + spec.WHEEL_HUB_RIDE == 13.0
+    nut_start = spec.WASHER_START + spec.COLLAR_LEN
+    assert nut_start == 14.0
+    assert nut_start + spec.NUT_H == 17.0
+    assert spec.FLANGE_LEN + spec.STUD_LEN - (nut_start + spec.NUT_H) == 3.0
+
+
 def test_stud_callout_keeps_wheel_bore_running_clearance() -> None:
     # The magnifying wheel's bore is nominal-on-nominal with the stud, so the
     # running clearance comes entirely from the stud's model-owned band.
