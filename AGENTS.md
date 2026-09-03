@@ -112,9 +112,10 @@ git submodule update --init --recursive
 A PR is not mergeable until ALL THREE hold — no exceptions, no partial
 credit:
 
-1. **Build green** — the full `uv run python -m doit -n 4` pipeline (every
-   part, assembly and gate) passes on the PR's head. **One** successful build
-   is the bar.
+1. **Build green** — the full
+   `uv run python build.py -n 4 --reporter=error-only` pipeline (every part,
+   assembly and gate) passes on the PR's head. **One** successful build is the
+   bar.
 2. **Codex happy** — the Codex auto-review of the latest push found nothing
    (👍 reaction, or its findings were addressed and re-reviewed clean).
 3. **Visual inspection of renders** — an eye pass over the rendered PNGs of
@@ -136,9 +137,10 @@ deleting a parent branch auto-closes the children still targeting it.
 **Rebase on `main` proactively, not reactively.** Check the branch against
 `origin/main` (`git fetch origin main && git status`/`git log HEAD..origin/main`)
 before starting new work on it, and always before kicking off a full
-`uv run python -m doit -n 4` build — a stale branch risks a green build that
-still conflicts or drifts (config/digest/cache-key changes on `main` invalidate
-what you just built). Rebase (`git pull --rebase origin main`) as soon as you
+`uv run python build.py -n 4 --reporter=error-only` build — a stale branch
+risks a green build that still conflicts or drifts (config/digest/cache-key
+changes on `main` invalidate what you just built). Rebase
+(`git pull --rebase origin main`) as soon as you
 find `main` has moved, rather than waiting for a merge conflict or a failed
 gate to force it.
 
@@ -182,11 +184,18 @@ path — every stage is a doit task. Run it through uv (SolidWorks already open 
 the COM tasks):
 
 ```
-uv run python -m doit             # = `build`: everything + every gate
-uv run python -m doit -n 4        # same, check:* fanned out in parallel
-uv run python -m doit build_bare  # quick: parts + assemblies only
-uv run python -m doit check:math  # one SolidWorks-free gate (no SW needed)
+uv run python build.py -n 4 --reporter=error-only  # full build; warnings/errors only
+uv run python -m doit                             # same graph with normal task status
+uv run python -m doit build_bare                  # quick: parts + assemblies only
+uv run python -m doit check:math                  # one SolidWorks-free gate (no SW needed)
 ```
+
+`build.py` defaults the human-facing telemetry threshold to `warning`; structured
+telemetry remains full-fidelity. The `. part:...` and `-- part:...` lines are not
+telemetry info records — they come from doit's console reporter — so warning
+verbosity alone does not hide them. Pass `--reporter=error-only` to suppress
+successful/skipped task-status lines while preserving warnings, errors, task
+failures, and tracebacks.
 
 The SolidWorks-free `check:*` gates and the comparison/diff tooling run from this
 `.venv` with nothing else installed; the COM tasks (`part:`/`assembly:`/
@@ -602,6 +611,13 @@ its own part family.
 Gates produce no CAD artefact, so each writes a stamp under `cad/out/reports/`
 (`verify-*.ok` / `check-*.ok`) as its doit target — re-runs only when a `file_dep`
 changes. `cad/out/` is gitignored.
+
+**Builds resume after aborts.** `dodo.py` atomically checkpoints `.doit.db` after
+every successful task instead of waiting for a clean process exit. If Ctrl-C, a
+harness deadline, a crash, or a SolidWorks hang stops a run, rerun the same build
+command: doit skips the checkpointed targets, reruns the interrupted target, and
+continues the graph. Do not clean or `forget` first, and do not run `reset-dep`
+as an abort-recovery ritual; a plain rerun already consumes the durable checkpoint.
 
 ## Observability — OpenTelemetry (do not `print`)
 
