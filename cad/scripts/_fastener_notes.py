@@ -1,16 +1,18 @@
 r"""Pure-data manufacturing-note builders for made fasteners.
 
-The title block owns units, material, finish, surface texture, and blanket
-tolerances.  These helpers add only feature-specific controls which override
-that blanket where the fastener's function needs a tighter, inspectable limit.
-They deliberately have no SolidWorks imports so part builders and drawing
-recipes can share the exact same product definition.
+The title block owns units, material, finish, surface texture and the blanket
+tolerances; a tighter band rides the model dimension in the build script; the
+thread designation is a leader on the shank (``_fastener_annotations``).
+These helpers return only the few part-specific facts a machinist cannot
+read off the views (cad/docs/drawing-simplicity-policy.md rule 6): how far
+the thread runs, where a slot sits, what a reeded grip is -- never a size,
+which belongs on a dimension.  They deliberately have no SolidWorks imports
+so part builders and drawing recipes share the exact same product definition.
 """
 
 from __future__ import annotations
 
 import re
-from typing import Literal
 
 
 _TPI_RE = re.compile(r"-(?P<tpi>[1-9][0-9]*)$")
@@ -23,118 +25,60 @@ def _thread_pitch_mm(thread: str) -> float:
     return 25.4 / int(match.group("tpi"))
 
 
-def thread_control_notes(
+def thread_length_note(
     *,
     thread: str,
-    thread_designation: str,
     underhead_length_mm: float,
-    end_face_control: Literal["direct", "fcf"] = "direct",
-    length_control: Literal["dimension", "note"] = "dimension",
+    head_name: str = "HEAD",
 ) -> tuple[str, ...]:
-    """Return the common, measurable external-thread manufacturing contract."""
-    if end_face_control not in ("direct", "fcf"):
-        raise ValueError(f"unsupported end-face control style: {end_face_control!r}")
-    if length_control not in ("dimension", "note"):
-        raise ValueError(f"unsupported length control style: {length_control!r}")
+    """Return the thread-extent line for a shank threaded up to its head.
+
+    The designation itself is leadered to the shank on the view, and every
+    sheet dimensions its under-head length, so the line carries neither;
+    ``underhead_length_mm`` only feeds the full-form sanity check.
+    """
     pitch = _thread_pitch_mm(thread)
-    min_full_form = underhead_length_mm - 4.0 * pitch
-    if min_full_form <= 0.0:
+    if underhead_length_mm - 4.0 * pitch <= 0.0:
         raise ValueError(
-            f"{thread_designation} length {underhead_length_mm:g} leaves no "
-            "full-form thread after two-pitch runout at each end"
+            f"{thread} length {underhead_length_mm:g} leaves no full-form "
+            "thread after two-pitch runout at each end"
         )
-    lead_chamfer = min(0.50, max(0.25, pitch / 2.0))
-    underhead_radius = min(0.25, max(0.10, pitch / 4.0))
-    end_face_note = (
-        "DISTAL END FACE PERPENDICULAR 0.05 TO THREAD "
-        "PITCH-DIAMETER AXIS."
-    )
-    if end_face_control == "fcf":
-        end_face_note = "DISTAL END FACE SQUARE TO THREAD AXIS; CONTROL PER FCF."
-    length_note = ()
-    if length_control == "note":
-        length_note = (f"UNDERHEAD LENGTH {underhead_length_mm:.2f}.",)
-    return (
-        f"{thread_designation} PER ASME B1.1-2024.",
-        "ACCEPT THREADS USING SYSTEM 21 PER ASME B1.3-2007 (R2022).",
-        "THREAD EXTENT FROM UNDERHEAD FILLET TO DISTAL START CHAMFER.",
-        *length_note,
-        f"{min_full_form:.2f} MIN FULL THREAD FORM BETWEEN RUNOUT ZONES.",
-        "UNDERHEAD INCOMPLETE THREAD 2P MAX FROM FILLET TANGENCY.",
-        "DISTAL INCOMPLETE THREAD 2P MAX FROM CHAMFER END.",
-        f"DISTAL START CHAMFER C{lead_chamfer:.2f} +/-0.05 X 45 DEG +/-1 DEG.",
-        f"UNDERHEAD FILLET R{underhead_radius:.2f} MAX, TANGENT TO SHANK AND "
-        "BEARING FACE.",
-        "THREAD LIMITS APPLY AFTER FINISH.",
-        end_face_note,
-        "THREAD GEOMETRY OMITTED IN VIEWS; SHANK OUTLINE REFERENCE ONLY.",
-    )
+    return (f"THREADED TO THE {head_name}; LAST 2 PITCHES MAY BE INCOMPLETE.",)
 
 
-def slotted_round_head_notes(
-    *,
-    head_dia_mm: float,
-    head_height_mm: float,
-    slot_width_mm: float,
-    slot_depth_mm: float,
-    axis_control_style: Literal["notes", "native"] = "notes",
-    size_control_style: Literal["notes", "dimensions"] = "notes",
-) -> tuple[str, ...]:
-    """Return controls for a cylindrical head with a straight driver slot."""
-    sizes = ()
-    if size_control_style == "notes":
-        sizes = (
-            f"HEAD DIA {head_dia_mm:.2f} +/-0.10 X "
-            f"{head_height_mm:.2f} +/-0.10 HIGH.",
-        )
-    controls = ()
-    if axis_control_style == "notes":
-        controls = (
-            "HEAD OD TOTAL RUNOUT 0.10 RELATIVE TO THREAD PITCH-DIAMETER AXIS.",
-            "BEARING FACE PERPENDICULAR 0.10 TO THREAD PITCH-DIAMETER AXIS.",
-        )
-    return (
-        *sizes,
-        *controls,
-        f"DRIVER SLOT {slot_width_mm:.2f} +/-0.10 WIDE X "
-        f"{slot_depth_mm:.2f} +/-0.10 DEEP.",
-        "SLOT EXTENDS ACROSS FULL HEAD DIAMETER; OPEN AT BOTH SIDES.",
-        "SLOT FLAT BOTTOM; DEPTH FROM TOP; MIDPLANE OFFSET FROM HEAD OD AXIS "
-        "0.00 +/-0.05.",
-    )
+def slotted_head_notes() -> tuple[str, ...]:
+    """Return the driver-slot line for a slotted cylindrical head.
+
+    The slot width and depth are dimensions on the slot-profile view; the
+    one fact the views only imply is that the slot is centred on the axis.
+    """
+    return ("SLOT CENTERED ON THE HEAD AXIS, FULL WIDTH OF HEAD.",)
 
 
-def hex_head_notes(*, across_flats_mm: float, head_height_mm: float) -> tuple[str, ...]:
-    """Return controls for a custom regular-hex head."""
-    return (
-        f"CUSTOM REGULAR HEX HEAD {across_flats_mm:.2f} +/-0.10 ACROSS FLATS X "
-        f"{head_height_mm:.2f} +/-0.10 HIGH.",
-        "B18 HEAD DIMENSIONS DO NOT APPLY.",
-    )
+def square_head_notes(*, point: str) -> tuple[str, ...]:
+    """Return the head-style line for a square-head set screw.
 
-
-def square_head_notes(
-    *, across_flats_mm: float, head_height_mm: float
-) -> tuple[str, ...]:
-    """Return controls for a custom square head (period wrench-driven style)."""
-    return (
-        f"CUSTOM SQUARE HEAD {across_flats_mm:.2f} +/-0.10 ACROSS FLATS X "
-        f"{head_height_mm:.2f} +/-0.10 HIGH.",
-        "B18 HEAD DIMENSIONS DO NOT APPLY.",
-    )
+    The across-flats and height ride the sheet's dimensions; only the head
+    form and the point form need saying.
+    """
+    return (f"SQUARE HEAD; {point} POINT.",)
 
 
 def reeded_head_notes(
-    *, head_name: str, head_dia_mm: float, head_length_mm: float, groove_count: int
+    *, head_name: str, groove_count: int, groove_dia_mm: float = 1.0
 ) -> tuple[str, ...]:
-    """Return direct, inspectable geometry for the modeled axial reeding."""
-    groove_radius = 0.50
-    root_dia = head_dia_mm - 2.0 * groove_radius
+    """Return the reeding lines for a knurled thumb head.
+
+    The head diameter and length ride the sheet's dimensions.  The grooves
+    are a ball-nose cut centred on the OD (``_features.add_reeded_head_and_
+    thread``), so radius and depth are both half the cutter diameter; they
+    are a grip, not a gauged size -- the second line says so, because the
+    title block's .XX band would otherwise put a negative lower limit on
+    a 0.50 groove.
+    """
+    half = groove_dia_mm / 2.0
     return (
-        f"{head_name} DIA {head_dia_mm:.2f} +/-0.10 X "
-        f"{head_length_mm:.2f} +/-0.10 LONG.",
-        f"{head_name} OD TOTAL RUNOUT 0.10 RELATIVE TO THREAD PITCH-DIAMETER AXIS.",
-        "BEARING FACE PERPENDICULAR 0.10 TO THREAD PITCH-DIAMETER AXIS.",
-        f"{groove_count}X R{groove_radius:.2f} +/-0.05 AXIAL GROOVES, EQUALLY SPACED.",
-        f"GROOVE ROOT DIA {root_dia:.2f} +/-0.10; FULL {head_name} LENGTH.",
+        f"{head_name} REEDED: {groove_count}X EQUALLY SPACED AXIAL GROOVES, "
+        f"R{half:.2f} BALL NOSE {half:.2f} DEEP.",
+        "GROOVES ARE A GRIP; RADIUS AND DEPTH NOT GAUGED.",
     )

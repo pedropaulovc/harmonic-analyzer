@@ -476,7 +476,12 @@ def wizard_holes(
                 try:
                     setattr(data, prop, val)
                 except Exception:  # noqa: BLE001
-                    pass
+                    # A rejected pre-create set is caught by the post-create
+                    # read-back below, which re-applies it through
+                    # ModifyDefinition and fails loud if it still disagrees.
+                    _telemetry.debug(
+                        f"hole wizard {label}: pre-create {prop} rejected"
+                    )
         feat = fm.CreateFeature(data)
         if feat is None:
             raise RuntimeError(
@@ -665,6 +670,21 @@ def wizard_holes(
                 initialized_mm=round(initialized_dia_mm, 4),
                 pinned_mm=round(pinned_dia_mm, 4),
             )
+    if hole_type == 4 and spec.end != "blind":
+        # A through tap whose ThreadEndCondition stayed BLIND (the pre-create
+        # set was silently rejected) ships a thread depth of 0.00, and the
+        # native callout prints "1/4-20 UNC [depth] 0.00" instead of THRU
+        # (machinist review 2026-09-02, magnifying-clamp and cone-swing-
+        # platform). Re-apply it through the edit flow and verify below.
+        stored_end = int(getattr(defn, "ThreadEndCondition", -1))
+        if stored_end != end:
+            _telemetry.event(
+                "hole_wizard.thread_end_reapplied",
+                label=label,
+                stored=stored_end,
+                wanted=end,
+            )
+            edits.append(("ThreadEndCondition", end))
     for k, v in spec.overrides_mm.items():
         edits.append((k, v / 1000.0))
         if k == "HoleDiameter":
@@ -693,6 +713,15 @@ def wizard_holes(
             raise RuntimeError(f"hole wizard {label}: ModifyDefinition failed")
         model.EditRebuild3()
         defn = _early_bound(feat.GetDefinition(), "IWizardHoleFeatureData2")
+
+    if hole_type == 4 and spec.end != "blind":
+        stored_end = int(getattr(defn, "ThreadEndCondition", -1))
+        if stored_end != end:
+            raise RuntimeError(
+                f"hole wizard {label}: thread end condition {stored_end} != "
+                f"{end} after ModifyDefinition -- the through tap would print a "
+                f"0.00 thread depth"
+            )
 
     def _dim(prop: str) -> float:
         try:

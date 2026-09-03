@@ -113,6 +113,9 @@ async def build_flat_screw(
         expected_volume_mm3=expected,
     )
     drive_jobs += slot_jobs
+    # Name the slot cut's DEPTH dim so a curated print can dimension the slot
+    # on the profile view instead of carrying its size in a note.
+    name_dimensions(adapter, "DriverSlot", ["SlotDepth"])
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).

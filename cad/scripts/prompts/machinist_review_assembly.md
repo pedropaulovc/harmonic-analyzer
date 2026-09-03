@@ -49,6 +49,10 @@ values for every screw where a general note covers them, or a production
 routing. Do not invent a requirement from a mechanism you cannot see; judge
 the package as drawn.
 
+Work from the attached image alone: do not run commands, scripts or tools
+and do not look for OCR or other software; if a piece of text is too small to
+read with certainty, say so in a clarity finding instead.
+
 Inspect the whole package at full resolution before answering: every view,
 every balloon, every list row, every note, the title block.
 

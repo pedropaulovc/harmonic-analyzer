@@ -82,6 +82,14 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
    - Hole callouts state the decimal Ø and the process (`Ø9.525 REAM THRU`,
      `Ø5.95 DRILL THRU`); clearance holes state the size, not the screw;
      taps are `1/4-20 ↧ 12` unless the tap-drill depth matters.
+   - **Sections and details before clutter.** When a feature is hidden,
+     internal, or too small to dimension legibly at the sheet scale, cut a
+     section (`_drawing_common.create_section_view`) or add an enlarged
+     detail (`create_detail_view`) and dimension it there, rather than
+     dimensioning to hidden lines, piling leaders into a small view, or
+     packing text between extension lines. A crowded view is a clarity
+     defect in the review; a second view is the fix (Lipton: add a sheet or
+     a breakout detail instead of a million overlapping details).
 8. **Layout is clean.** No leader crosses another leader, a view it does not
    annotate, or a dimension line; no text sits on a line. The layout audit
    (`_drawing_layout_check`) fails the build on crossings it can see; the eye

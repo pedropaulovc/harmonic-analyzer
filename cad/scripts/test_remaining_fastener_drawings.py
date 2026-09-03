@@ -1,4 +1,11 @@
-"""Offline contracts for the six remaining PR 358 fastener sheets."""
+"""Offline contracts for the six remaining PR 358 fastener sheets.
+
+These sheets follow cad/docs/drawing-simplicity-policy.md: no datums or
+frames on any screw, one GROUND roughness symbol on the cone pivot screw's
+running shoulder, every head and shank size on a view as a native marked
+dimension (rule 6: a note is never a dimension), and notes of at most four
+short lines.
+"""
 
 from __future__ import annotations
 
@@ -39,6 +46,7 @@ CASES = (
         "cone_tip_pinch_screw_spec",
         "build_cone_tip_pinch_screw",
         "ShankDiaDim",
+        thread_on_dimension=True,
     ),
     Case(
         "hanger-screw",
@@ -46,6 +54,7 @@ CASES = (
         "hanger_screw_spec",
         "build_hanger_screw",
         "ShankDia",
+        thread_on_dimension=True,
     ),
     Case(
         "pen-set-screw",
@@ -53,6 +62,7 @@ CASES = (
         "pen_set_screw_spec",
         "build_pen_set_screw",
         "ShankDia",
+        thread_on_dimension=True,
     ),
     Case(
         "swing-stop-screw",
@@ -60,6 +70,7 @@ CASES = (
         "swing_stop_screw_spec",
         "build_swing_stop_screw",
         "ShankDiaDim",
+        thread_on_dimension=True,
     ),
     Case(
         "thumb-screw",
@@ -67,8 +78,20 @@ CASES = (
         "thumb_screw_spec",
         "build_thumb_screw",
         "ShankDia",
+        thread_on_dimension=True,
     ),
 )
+
+# The five formerly note-only sheets: each side view now carries the head
+# height/length and the under-head length as the extrude-depth model dims
+# (feature -> dim name), plus the shank diameter relabelled with the thread.
+SIDE_LENGTH_MARKS = {
+    "cone_tip_pinch_screw_spec": {"Head": "HeadHt", "Shank": "ShankLg"},
+    "hanger_screw_spec": {"HexHead": "HeadHt", "Shank": "ShankLg"},
+    "pen_set_screw_spec": {"Knob": "KnobLg", "Shank": "ShankLg"},
+    "swing_stop_screw_spec": {"Head": "HeadHt", "Shank": "ShankLg"},
+    "thumb_screw_spec": {"Head": "HeadLg", "Shank": "ShankLg"},
+}
 
 
 @pytest.mark.parametrize("case", CASES, ids=lambda case: case.part_name)
@@ -100,9 +123,20 @@ def test_catalog_thread_and_dimension_callout_are_not_invented(case: Case) -> No
     catalog = fastener(case.part_name)
 
     assert spec.THREAD == catalog.thread
-    assert spec.THREAD_DESIGNATION == f"{catalog.thread} UNC-2A"
+    assert spec.THREAD_DESIGNATION == f"{catalog.thread} UNC"
     assert spec.THREAD_DESIGNATION in spec.DRAWING_NOTES
     assert drawing.DIMENSION_CALLOUTS == {}
+    if case.thread_on_dimension:
+        # The marked shank Ø is the modeled thread MINOR, so the side view
+        # relabels it with the catalog designation (the fillister pattern)
+        # through the recipe's decorate hook, never a bare diameter.
+        assert case.shank_dim in drawing.SIDE_KEEP
+        assert drawing.SIDE_DIMENSION_TEXT == {case.shank_dim: spec.THREAD_DESIGNATION}
+        assert drawing.RECIPE.decorate is drawing._decorate
+        assert drawing.RECIPE.side_keep is drawing.SIDE_KEEP
+        source = Path(drawing.__file__).read_text(encoding="utf-8")
+        assert "label_shank_thread(" in source
+        assert "dimensions=SIDE_DIMENSION_TEXT" in source
     if case.part_name == "cone-pivot-screw":
         assert spec.SHOULDER_DIA == catalog.model_diameter_mm
         assert spec.UNDERHEAD_LEN == catalog.length_mm
@@ -116,11 +150,8 @@ def test_catalog_thread_and_dimension_callout_are_not_invented(case: Case) -> No
     assert part.SHANK_DIA == spec.SHANK_DIA
     assert part.SHANK_LEN == spec.SHANK_LEN
     assert "REFERENCE ONLY" in spec.DRAWING_NOTES
-    assert "FULL THREAD" in spec.DRAWING_NOTES
-    assert (
-        "DISTAL END FACE PERPENDICULAR 0.05 TO THREAD PITCH-DIAMETER AXIS"
-        in spec.DRAWING_NOTES
-    )
+    assert "THREADED TO THE" in spec.DRAWING_NOTES
+    assert "PERPENDICULAR" not in spec.DRAWING_NOTES
 
 
 @pytest.mark.parametrize("case", CASES, ids=lambda case: case.part_name)
@@ -142,40 +173,58 @@ def test_assembly_fastener_quantities_are_pinned() -> None:
 @pytest.mark.parametrize(
     "spec_name",
     (
-        "cone_tip_pinch_screw_spec",
-        "hanger_screw_spec",
-        "pen_set_screw_spec",
-        "swing_stop_screw_spec",
-        "thumb_screw_spec",
-    ),
-)
-def test_sheets_without_length_dimensions_state_catalog_underhead_length(
-    spec_name: str,
-) -> None:
-    spec = importlib.import_module(spec_name)
-    assert spec.DRAWING_DIMENSIONS.get("Shank", set()).isdisjoint(
-        {"ShankLg", "ThreadLg"}
-    )
-    assert f"UNDERHEAD LENGTH {spec.SHANK_LEN:.2f}." in spec.DRAWING_NOTES
-
-
-@pytest.mark.parametrize(
-    "spec_name",
-    (
         "bracket_screw_spec",
         "clamp_screw_spec",
+        "cone_tip_pinch_screw_spec",
         "fillister_screw_spec",
         "foot_screw_spec",
+        "hanger_screw_spec",
         "lag_screw_spec",
+        "pen_set_screw_spec",
         "slotted_screw_spec",
+        "swing_stop_screw_spec",
+        "thumb_screw_spec",
     ),
 )
 def test_dimensioned_sheets_do_not_duplicate_underhead_length_note(
     spec_name: str,
 ) -> None:
     spec = importlib.import_module(spec_name)
+    head = "KNOB" if spec_name == "pen_set_screw_spec" else "HEAD"
     assert "ShankLg" in set().union(*spec.DRAWING_DIMENSIONS.values())
-    assert "UNDERHEAD LENGTH" not in spec.DRAWING_NOTES
+    assert "UNDER HEAD" not in spec.DRAWING_NOTES
+    assert "UNDER KNOB" not in spec.DRAWING_NOTES
+    assert f"{spec.SHANK_LEN:.2f}" not in spec.DRAWING_NOTES
+    assert f"{spec.THREAD_DESIGNATION} THREADED TO THE {head}; LAST 2 PITCHES MAY BE INCOMPLETE." in spec.DRAWING_NOTES
+
+
+@pytest.mark.parametrize("spec_name", sorted(SIDE_LENGTH_MARKS))
+def test_side_views_carry_head_and_shank_lengths_as_marked_depths(
+    spec_name: str,
+) -> None:
+    # Policy rule 6 / blind machinist review: the head height and under-head
+    # length are extrude DEPTH dims the build names and marks (the vertical
+    # profiles cannot point-select the edge-on shoulder/tip), the spec is the
+    # single source of the marked set, and the drawing keeps them in its side
+    # view.  The build script's marks come straight from DRAWING_DIMENSIONS.
+    spec = importlib.import_module(spec_name)
+    stem = spec_name.removesuffix("_spec")
+    build = importlib.import_module(f"build_{stem}")
+    drawing = importlib.import_module(f"draw_{stem}")
+    build_source = Path(build.__file__).read_text(encoding="utf-8")
+    for feature, dim in SIDE_LENGTH_MARKS[spec_name].items():
+        assert spec.DRAWING_DIMENSIONS[feature] == {dim}, (feature, dim)
+        assert f'name_dimensions(adapter, "{feature}", ["{dim}"])' in build_source
+        assert dim in drawing.SIDE_KEEP, dim
+    assert build.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
+    assert "mark_dimensions_for_drawing(adapter, feature_name, dimension_names)" in (
+        build_source
+    )
+    # No size survives in the notes once it is on a view.
+    for value in (spec.SHANK_LEN, spec.SHANK_DIA):
+        assert f"{value:.2f}" not in spec.DRAWING_NOTES, value
+    for banned in (" DIA X ", " HIGH.", " LONG,", "ACROSS FLATS", "UNDER "):
+        assert banned not in spec.DRAWING_NOTES, banned
 
 
 @pytest.mark.parametrize(
@@ -196,11 +245,15 @@ def test_slotted_screw_slot_dimensions_live_in_the_pure_contract(
     assert spec.SLOT_W > 0
     assert spec.SLOT_D > 0
     if spec_name == "cone_pivot_screw_spec":
+        # The slot is dimensioned (bands on the model dims), so the note
+        # never repeats its size.
         assert spec.DRAWING_DIMENSIONS["SlotProfile"] == {"SlotWDim"}
         assert spec.DRAWING_DIMENSIONS["DriverSlot"] == {"SlotDepth"}
+        assert f"{spec.SLOT_W:.2f}" not in spec.DRAWING_NOTES
     else:
-        assert f"{spec.SLOT_W:.2f} +/-0.10 WIDE" in spec.DRAWING_NOTES
-        assert f"{spec.SLOT_D:.2f} +/-0.10 DEEP" in spec.DRAWING_NOTES
+        assert f"SLOT {spec.SLOT_W:.2f} WIDE X {spec.SLOT_D:.2f} DEEP" in (
+            spec.DRAWING_NOTES
+        )
     assert "SLOT_W," in build_source
     assert "SLOT_D," in build_source
 
@@ -236,10 +289,7 @@ def test_cone_pivot_defines_shoulder_clearance_and_thread_engagement() -> None:
     assert "THREAD_SOLID_DIA / 2.0" in build_source
     assert "THREAD_MAJOR_DIA / 2.0" not in build_source
     assert base.PIVOT_HOLE_DEPTH - spec.THREAD_TAIL_LEN >= 1.5
-    assert "DO NOT RELEASE" not in spec.DRAWING_NOTES
-    assert "THREAD LENGTH 8.00" not in spec.DRAWING_NOTES
-    assert f"{spec.MIN_FULL_FORM:.2f} MIN FULL-FORM THREAD" in spec.DRAWING_NOTES
-    assert "INCOMPLETE THREAD/RUNOUT AT SHOULDER 1P MAX" in spec.DRAWING_NOTES
+    # The full-form margin stays a spec-level sanity check, not a note.
     assert (
         spec.THREAD_TAIL_LEN
         - spec.THREAD_LENGTH_TOL
@@ -247,11 +297,25 @@ def test_cone_pivot_defines_shoulder_clearance_and_thread_engagement() -> None:
         - spec.DISTAL_CHAMFER
         >= spec.MIN_FULL_FORM
     )
-    assert "SLOT CENTERPLANE OFFSET" not in spec.DRAWING_NOTES
-    assert "SLOT FLOOR CORNERS R0.05-0.15" in spec.DRAWING_NOTES
-    assert "TITLE-BLOCK EDGE OVERRIDE" in spec.DRAWING_NOTES
-    assert "MANDATORY UNDERHEAD FILLET R0.10-0.25" in spec.DRAWING_NOTES
-    assert "MANDATORY DISTAL START CHAMFER 0.25-0.50 X 45°" in spec.DRAWING_NOTES
+    notes = spec.DRAWING_NOTES
+    assert notes.split("\n")[0] == f"{spec.THREAD_DESIGNATION} ON THE TAIL ONLY; SHOULDER PLAIN."
+    assert "SHOULDER GROUND TO SIZE" in notes
+    assert "SLOT FULL WIDTH OF HEAD" in notes
+    assert f"THREAD START CHAMFER C{spec.DISTAL_CHAMFER:.2f}" in notes
+    assert "UNDERHEAD FILLET R0.25 MAX" in notes
+    # policy rules 1, 3 and 6: no title-block override, no datum lore, no
+    # acceptance limits that belong on a dimension.
+    for banned in (
+        "DATUM",
+        "TITLE-BLOCK",
+        "MIN FULL-FORM",
+        "RUNOUT",
+        "FLOOR CORNERS",
+        "MANDATORY",
+        "DO NOT RELEASE",
+        "THREAD LENGTH 8.00",
+    ):
+        assert banned not in notes, banned
 
 
 def test_cone_pivot_tail_view_exposes_the_ground_shoulder() -> None:
@@ -271,14 +335,18 @@ def test_cone_pivot_tail_view_exposes_the_ground_shoulder() -> None:
     assert '"1/4-20' not in drawing_source
     assert drawing.RECIPE.decorate is drawing._decorate
     assert drawing.RECIPE.side_centerline_face_xy == (0.190, 0.145)
-    assert drawing_source.count("add_datum_feature(") == 1
-    assert drawing_source.count("add_feature_control_frame(") == 4
+    # policy rules 3-5: no datum, no frames; the ONE roughness symbol marks
+    # the ground shoulder, the pivot's running surface.
+    assert drawing_source.count("add_datum_feature(") == 0
+    assert drawing_source.count("add_feature_control_frame(") == 0
+    assert drawing_source.count("set_basic_dimension(") == 0
     assert drawing_source.count("add_surface_finish(") == 1
-    assert 'label="head bearing edge"' in drawing_source
-    assert "edge_entity=_circular_edge(" in drawing_source
+    assert 'label="ground shoulder finish"' in drawing_source
+    assert not hasattr(spec, "GEOMETRIC_TOLERANCES_MM")
     assert "import_cosmetic_threads(adapter, side)" in drawing_source
     assert 'place_view(adapter, str(SOURCE), "*Right"' in drawing_source
-    assert 'quantity="SLOT MEDIAN PLANE"' in drawing_source
+    # Hidden lines ON in the slot-profile view (policy rule 7).
+    assert "set_hidden_lines_visible(adapter, right)" in drawing_source
     assert build_source.count("set_dimension_symmetric_tolerance(") == 5
     assert build_source.count("set_dimension_bilateral_tolerance(") == 2
     assert "InsertCosmeticThread3(" in build_source
@@ -348,39 +416,74 @@ def test_cone_pivot_producer_rejects_missing_persisted_drawing_property() -> Non
         asyncio.run(build._assert_saved_drawing_properties(adapter, "exact.SLDPRT"))
 
 
-def test_cone_tip_pinch_sheet_defines_a_flat_end_without_duplicate_head_diameter() -> None:
+def test_cone_tip_pinch_sheet_dimensions_the_head_once_and_keeps_a_flat_end() -> None:
     drawing = importlib.import_module("draw_cone_tip_pinch_screw")
     spec = importlib.import_module("cone_tip_pinch_screw_spec")
-    assert drawing.END_KEEP == {}
+    # The head diameter lives on the driver-face view ONLY; the side view
+    # carries the lengths and the thread, so no size is printed twice.
+    assert set(drawing.END_KEEP) == {"HeadDiaDim"}
+    assert set(drawing.SIDE_KEEP) == {"HeadHt", "ShankLg", "ShankDiaDim"}
+    assert spec.DRAWING_DIMENSIONS == {
+        "HeadProfile": {"HeadDiaDim"},
+        "Head": {"HeadHt"},
+        "ShankProfile": {"ShankDiaDim"},
+        "Shank": {"ShankLg"},
+    }
     assert drawing.RECIPE.side_center == (0.190, 0.190)
-    assert spec.DRAWING_DIMENSIONS == {}
-    assert "FLAT-END PINCH SCREW; NO CONICAL POINT" in spec.DRAWING_NOTES
-    assert "DISTAL START CHAMFER" in spec.DRAWING_NOTES
-    assert "MIDPLANE OFFSET FROM HEAD OD AXIS 0.00 +/-0.05" in spec.DRAWING_NOTES
-    assert "HEAD OD TOTAL RUNOUT 0.10 RELATIVE TO THREAD PITCH-DIAMETER AXIS" in (
-        spec.DRAWING_NOTES
-    )
-    assert "BEARING FACE PERPENDICULAR 0.10 TO THREAD PITCH-DIAMETER AXIS" in (
-        spec.DRAWING_NOTES
-    )
+    assert drawing.RECIPE.end_center_mark == "required"
+    # The head sizes are dimensions now; only the slot rides the note.  The
+    # flat end is the title's job ("Flat-End Pinch Screw"), not a note's.
+    notes = spec.DRAWING_NOTES
+    assert f"SLOTTED HEAD; SLOT {spec.SLOT_W:.2f} WIDE X {spec.SLOT_D:.2f} DEEP" in notes
+    assert f"{spec.HEAD_DIA:.2f}" not in notes
+    assert f"{spec.HEAD_T:.2f}" not in notes
+    assert "CONICAL" not in notes
+    assert "MIDPLANE" not in notes
 
 
 @pytest.mark.parametrize("spec_name", ("hanger_screw_spec", "thumb_screw_spec"))
 def test_long_reference_note_is_split_for_readable_rendering(spec_name: str) -> None:
     spec = importlib.import_module(spec_name)
-    assert "THREAD GEOMETRY OMITTED IN VIEWS; SHANK OUTLINE REFERENCE ONLY." in (
-        spec.DRAWING_NOTES
-    )
+    assert "THREAD NOT MODELED; SHANK OUTLINE REFERENCE ONLY." in spec.DRAWING_NOTES
 
 
-def test_hanger_hex_head_is_controlled_to_thread_axis() -> None:
+def test_hanger_hex_across_flats_is_a_native_end_view_dimension() -> None:
+    # The hex head is a polygon with no marked diameter, so its across-flats
+    # is a drawing-native vertical between the two flats on the hex-head view
+    # (the hexagon sits flats top and bottom in *Front); its height is the
+    # marked extrude depth.  The note keeps only the drive style.
+    drawing = importlib.import_module("draw_hanger_screw")
     spec = importlib.import_module("hanger_screw_spec")
-    assert "HEX CENTER WITHIN DIA 0.10 OF THREAD PITCH-DIAMETER AXIS" in (
-        spec.DRAWING_NOTES
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    half = spec.HEAD_AF / 2.0 * drawing.SHEET_SCALE[0] / 1000.0
+    assert drawing.END_FLAT_PICKS == (
+        (drawing.END_CENTER[0], drawing.END_CENTER[1] + half),
+        (drawing.END_CENTER[0], drawing.END_CENTER[1] - half),
     )
-    assert "BEARING FACE PERPENDICULAR 0.10 TO THREAD PITCH-DIAMETER AXIS" in (
-        spec.DRAWING_NOTES
-    )
+    assert drawing.END_FLATS_TEXT_XY[0] < drawing.END_CENTER[0] - half
+    assert 'label="hex across-flats"' in source
+    assert 'orientation="vertical"' in source
+    assert source.count("add_edge_dimension(") == 1
+    assert drawing.END_KEEP == {}
+    assert spec.DRAWING_NOTES.split("\n")[-1] == "HEX HEAD, WRENCH DRIVEN."
+    assert "ACROSS FLATS" not in spec.DRAWING_NOTES
+    assert "WITHIN" not in spec.DRAWING_NOTES
+    assert "PERPENDICULAR" not in spec.DRAWING_NOTES
+
+
+@pytest.mark.parametrize(
+    "module_name", ("draw_hanger_screw", "draw_pen_set_screw", "draw_thumb_screw")
+)
+def test_horizontal_axis_sheets_leave_room_for_the_thread_text(module_name: str) -> None:
+    # The thread designation hangs off the shank tip as a vertical linear Ø;
+    # the recipe's usual iso centre (0.310) put the isometric's leftmost point
+    # ~17 mm from the tip, less than the text is wide, so these sheets carry
+    # the isometric further right.
+    drawing = importlib.import_module(module_name)
+    assert drawing.ISO_CENTER[0] >= 0.325
+    assert drawing.RECIPE.iso_center == drawing.ISO_CENTER
+    shank_dim = next(name for name in drawing.SIDE_KEEP if name.startswith("ShankDia"))
+    assert drawing.SIDE_KEEP[shank_dim][0] > drawing.SIDE_CENTER[0]
 
 
 def test_thumb_note_uses_short_lines_in_a_raised_lane() -> None:
@@ -406,10 +509,17 @@ def test_reeded_builder_uses_spec_groove_count(
     assert build.GROOVE_COUNT == spec.GROOVE_COUNT
     assert "groove_count=GROOVE_COUNT" in source
     head_name = "KNOB" if spec_name == "pen_set_screw_spec" else "HEAD"
+    length = spec.KNOB_LENGTH if head_name == "KNOB" else spec.HEAD_LENGTH
+    # The head length is the marked extrude depth now, so the reeding line
+    # carries only the groove form.
     assert (
-        f"{head_name} OD TOTAL RUNOUT 0.10 RELATIVE TO THREAD PITCH-DIAMETER AXIS"
-        in spec.DRAWING_NOTES
+        f"{head_name} REEDED: {spec.GROOVE_COUNT}X R0.50 GROOVES 0.50 DEEP, "
+        "EQUALLY SPACED." in spec.DRAWING_NOTES
     )
-    assert "BEARING FACE PERPENDICULAR 0.10 TO THREAD PITCH-DIAMETER AXIS" in (
-        spec.DRAWING_NOTES
-    )
+    assert f"{length:.2f} LONG" not in spec.DRAWING_NOTES
+    assert f" THREADED TO THE {head_name}; LAST 2 PITCHES MAY BE INCOMPLETE." in spec.DRAWING_NOTES
+    assert "RUNOUT" not in spec.DRAWING_NOTES
+    # The shank is an offset-start extrude off the head's outer face, so its
+    # depth dim IS the under-head length rather than head + shank.
+    assert "extrude_at_offset(adapter, SHANK_LEN, " in source
+    assert "ShankExtent" not in source
