@@ -86,13 +86,16 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
    annotate, or a dimension line; no text sits on a line. The layout audit
    (`_drawing_layout_check`) fails the build on crossings it can see; the eye
    pass and the machinist review catch the rest.
-9. **Assembly drawings are judged as assembly packages.** The review asks
-   for what a fitter needs: assembled views, an exploded view, a parts list
-   with balloons, ordered assembly steps, the assembly-level fits and checks,
-   and the parked/engaged setup. The current three-view sheets
+9. **Assembly drawings are judged as complete assembly packages.** Every PDF
+   sheet is rendered at full resolution and attached to one blind-review
+   invocation. Acceptance cross-checks BOM rows, balloons, setup and assembly
+   steps, and contradictions across all sheets. The review also asks for what
+   a fitter needs: assembled views, an exploded view, a parts list with
+   balloons, ordered assembly steps, the assembly-level fits and checks, and
+   the parked/engaged setup. The current three-view sheets
    (`drawing_recipe_assembly.md`) are orientation placeholders and are
-   EXPECTED to fail that review until they are built out; part sheets are the
-   gate this policy enforces today.
+   EXPECTED to fail that review until they are built out; single-sheet part
+   prints are the gate this policy enforces today.
 10. **Inspection assumes a hobby shop, not a CMM.** Surface plate, height
    gauge, indicators, V-blocks, sine bar and gauge blocks are fair game, so a
    geometric control is never rejected as uninspectable, only as
@@ -102,9 +105,11 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
 ## The gate
 
 `uv run cad/scripts/machinist_review.py <name>...` (or `--all`) renders the
-verdict a blind senior machinist gives the sheet PNG under the calibrated
-prompt in `cad/scripts/prompts/`. A sheet passes when the verdict is `SHIP`
-with no blocker, no over-specification and no clarity finding. Minor findings
-are recorded, not gating. Each sheet's `test_<part>_drawing.py` pins the
-simplified state (no frames unless allowlisted, note line count, hidden lines
-on) so the fleet cannot regrow the complexity between reviews.
+verdict a blind senior machinist gives each drawing package under the calibrated
+prompt in `cad/scripts/prompts/`. Parts use their single PNG; assemblies render
+every PDF page and submit all sheet images to one review. A package passes when
+the verdict is `SHIP` with no blocker, no over-specification and no clarity
+finding. Minor findings are recorded, not gating. Each part's
+`test_<part>_drawing.py` pins the simplified state (no frames unless allowlisted,
+note line count, hidden lines on) so the fleet cannot regrow the complexity
+between reviews.

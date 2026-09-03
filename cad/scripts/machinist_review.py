@@ -1,12 +1,13 @@
-r"""Blind senior-machinist review of rendered drawing sheets via Codex.
+r"""Blind senior-machinist review of rendered drawing packages via Codex.
 
 The review the fleet is gated on (``cad/docs/drawing-simplicity-policy.md``):
-each sheet PNG is copied into a neutral temp directory and handed to
-``codex exec`` with NO repo context, under the calibrated prompt in
-``cad/scripts/prompts/`` — a part print gets the part prompt, an assembly
-orientation sheet the assembly prompt.  The verdict comes back as structured
-JSON (``machinist_review_schema.json``) and is written, with its provenance,
-under ``cad/out/reports/machinist-review/``.
+each drawing package is rendered or copied into a neutral temp directory and
+handed to ``codex exec`` with NO repo context, under the calibrated prompt in
+``cad/scripts/prompts/``. A part print is one PNG reviewed with the part prompt;
+an assembly PDF is split into full-resolution page images and every page is
+attached to one invocation under the assembly prompt. The verdict comes back as
+structured JSON (``machinist_review_schema.json``) and is written, with its
+provenance, under ``cad/out/reports/machinist-review/``.
 
 Why the prompt is calibrated the way it is: the earlier ad-hoc reviews asked a
 "senior machinist" to hunt for MISSING tolerances / datums / finishes and were
@@ -17,20 +18,20 @@ Harvey (*Machine Shop Trade Secrets*, ch. 9) and Lipton (*Metalworking Sink or
 Swim*, ch. 2-3): decimal places carry tolerance, GD&T only where a ± cannot
 say it, hidden lines on, one origin, drill vs ream, few specific notes.
 
-Isolation is by COPY, not by sandbox: nothing in the invocation references the
-repo (``-C`` a mktemp dir, the PNG copied as ``sheet.png``, the schema copied
-beside it, ``--ignore-user-config --ignore-rules``), and the ``--json`` event
-stream is scanned for any tool/command execution so a review that stopped
-being blind is flagged (``blind: false``) rather than trusted.
+Isolation is by COPY/RENDER, not by sandbox: nothing in the invocation references
+the repo (``-C`` a mktemp dir, images named ``sheet-*.png``, the schema copied
+beside them, ``--ignore-user-config --ignore-rules``), and the ``--json`` event
+stream is scanned for any tool/command execution so a review that stopped being
+blind is flagged (``blind: false``) rather than trusted.
 
 Usage (SolidWorks-free; needs the rendered PNGs under ``cad/out/png``)::
 
     uv run cad/scripts/machinist_review.py crank_arm pivot_shaft
     uv run cad/scripts/machinist_review.py --all --jobs 4
-    uv run cad/scripts/machinist_review.py --png some/sheet.png --kind part
+    uv run cad/scripts/machinist_review.py --png sheet-1.png --png sheet-2.png --kind assembly
     uv run cad/scripts/machinist_review.py --index      # rebuild index.md only
 
-Exit status is 0 only when every reviewed sheet passes (``SHIP`` with no
+Exit status is 0 only when every reviewed package passes (``SHIP`` with no
 blocker, over-specification or clarity finding).
 """
 
@@ -83,17 +84,18 @@ _TOOL_EVENT_MARKERS = (
 
 
 @dataclass(frozen=True)
-class Sheet:
+class ReviewPackage:
     name: str
     kind: str  # "part" | "assembly"
-    png: Path
+    sources: tuple[Path, ...]
 
 
 @dataclass
 class Review:
     name: str
     kind: str
-    png: str
+    sources: list[str]
+    source_sha256: list[str]
     verdict: dict[str, Any] | None
     passed: bool
     blind: bool
@@ -101,7 +103,7 @@ class Review:
     model: str
     effort: str
     prompt_sha256: str
-    png_sha256: str
+    sheet_count: int
     duration_s: float
     reviewed_at: str
     error: str | None = None
@@ -110,13 +112,14 @@ class Review:
     extra: dict[str, Any] = field(default_factory=dict)
 
 
-def sheet_for(name: str) -> Sheet:
+def package_for(name: str) -> ReviewPackage:
     spec = DRAWINGS_BY_NAME[name]
-    return Sheet(name=name, kind=spec.source_kind, png=spec.outputs["png"])
+    source = spec.outputs["pdf" if spec.source_kind == "assembly" else "png"]
+    return ReviewPackage(name=name, kind=spec.source_kind, sources=(source,))
 
 
-def all_sheets() -> list[Sheet]:
-    return [sheet_for(spec.name) for spec in DRAWINGS]
+def all_packages() -> list[ReviewPackage]:
+    return [package_for(spec.name) for spec in DRAWINGS]
 
 
 def load_prompt(kind: str) -> str:
@@ -131,17 +134,99 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _sheet_for_png(path: Path, kind: str) -> Sheet:
-    resolved = path.resolve()
-    identity = resolved.as_posix().casefold().encode("utf-8")
+def _package_for_pngs(paths: Sequence[Path], kind: str) -> ReviewPackage:
+    resolved = tuple(path.resolve() for path in paths)
+    identity = "\0".join(path.as_posix().casefold() for path in resolved).encode()
     suffix = hashlib.sha256(identity).hexdigest()[:16]
-    return Sheet(name=f"{resolved.stem}-{suffix}", kind=kind, png=resolved)
+    stem = resolved[0].stem if len(resolved) == 1 else "assembly-package"
+    return ReviewPackage(
+        name=f"{stem}-{suffix}",
+        kind=kind,
+        sources=resolved,
+    )
+
+
+def _pdf_page_count(path: Path) -> int:
+    import pypdfium2 as pdfium
+
+    document = pdfium.PdfDocument(str(path))
+    try:
+        page_count = len(document)
+    finally:
+        document.close()
+    if page_count < 1:
+        raise ValueError(f"assembly PDF has no sheets: {path}")
+    return page_count
+
+
+def _sheet_count(package: ReviewPackage) -> int:
+    return sum(
+        _pdf_page_count(source) if source.suffix.casefold() == ".pdf" else 1
+        for source in package.sources
+    )
+
+
+def _validate_package(package: ReviewPackage) -> int:
+    if package.kind not in PROMPT_FILES:
+        raise ValueError(f"{package.name}: unknown review kind {package.kind!r}")
+    if not package.sources:
+        raise ValueError(f"{package.name}: review package has no sheets")
+    for source in package.sources:
+        if not source.is_file():
+            raise FileNotFoundError(f"{package.name}: review source missing: {source}")
+        suffix = source.suffix.casefold()
+        if suffix not in {".pdf", ".png"}:
+            raise ValueError(f"{package.name}: expected PNG or PDF source: {source}")
+        if suffix == ".pdf" and package.kind != "assembly":
+            raise ValueError(f"{package.name}: part review requires one PNG sheet")
+    sheet_count = _sheet_count(package)
+    if package.kind == "part" and sheet_count != 1:
+        raise ValueError(f"{package.name}: part review requires exactly one PNG sheet")
+    return sheet_count
+
+
+def _materialize_images(package: ReviewPackage, workdir: Path) -> list[Path]:
+    import pypdfium2 as pdfium
+
+    images: list[Path] = []
+    for source in package.sources:
+        if source.suffix.casefold() != ".pdf":
+            image = workdir / f"sheet-{len(images) + 1}.png"
+            shutil.copyfile(source, image)
+            images.append(image)
+            continue
+        document = pdfium.PdfDocument(str(source))
+        try:
+            for page_index in range(len(document)):
+                page = document[page_index]
+                try:
+                    rendered = page.render(scale=300.0 / 72.0).to_pil()
+                    image = workdir / f"sheet-{len(images) + 1}.png"
+                    rendered.save(image, dpi=(300, 300))
+                    images.append(image)
+                finally:
+                    page.close()
+        finally:
+            document.close()
+    return images
+
+
+def _review_prompt(package: ReviewPackage, sheet_count: int) -> str:
+    prompt = load_prompt(package.kind)
+    if package.kind == "assembly":
+        prompt += (
+            "\n\nPACKAGE INPUT\n"
+            f"This invocation includes all {sheet_count} sheet images in order. "
+            "Return one verdict for the package as a whole. Compare every sheet "
+            "against every other sheet before accepting SHIP.\n"
+        )
+    return prompt
 
 
 def build_command(
     *,
     workdir: Path,
-    image: Path,
+    images: Sequence[Path],
     schema: Path,
     output: Path,
     model: str,
@@ -154,7 +239,7 @@ def build_command(
     stdin (``-``), never inline — a long quoted argument gets mangled by the
     shell hook chain and codex dies with "No prompt provided".
     """
-    return [
+    command = [
         codex,
         "exec",
         "--ignore-user-config",
@@ -169,15 +254,20 @@ def build_command(
         model,
         "-c",
         f"model_reasoning_effort={effort}",
-        "-i",
-        str(image),
-        "--output-schema",
-        str(schema),
-        "-o",
-        str(output),
-        "--json",
-        "-",
     ]
+    for image in images:
+        command.extend(("-i", str(image)))
+    command.extend(
+        (
+            "--output-schema",
+            str(schema),
+            "-o",
+            str(output),
+            "--json",
+            "-",
+        )
+    )
+    return command
 
 
 def _walk(obj: Any) -> Iterable[Any]:
@@ -248,8 +338,7 @@ def validate_verdict(value: Any) -> dict[str, Any]:
                 missing = sorted(finding_keys - actual_finding_keys)
                 extra = sorted(actual_finding_keys - finding_keys)
                 raise ValueError(
-                    f"{location} keys must be exact "
-                    f"(missing={missing}, extra={extra})"
+                    f"{location} keys must be exact (missing={missing}, extra={extra})"
                 )
             for key in finding_keys:
                 text = finding[key]
@@ -265,9 +354,7 @@ def _valid_verdict(value: Any) -> dict[str, Any] | None:
         return None
 
 
-def _tag_events(
-    attempt: int, events: Sequence[dict[str, Any]]
-) -> list[dict[str, Any]]:
+def _tag_events(attempt: int, events: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
     return [{"attempt": attempt, "event": event} for event in events]
 
 
@@ -296,7 +383,9 @@ def _parse_events(stdout: str) -> list[dict[str, Any]]:
     return events
 
 
-def _extract_verdict(output_file: Path, events: Sequence[dict[str, Any]]) -> dict[str, Any]:
+def _extract_verdict(
+    output_file: Path, events: Sequence[dict[str, Any]]
+) -> dict[str, Any]:
     """The structured verdict: ``-o`` file first, last agent message as fallback."""
     text = output_file.read_text(encoding="utf-8") if output_file.is_file() else ""
     if not text.strip():
@@ -317,8 +406,8 @@ def _extract_verdict(output_file: Path, events: Sequence[dict[str, Any]]) -> dic
     return validate_verdict(verdict)
 
 
-def review_sheet(
-    sheet: Sheet,
+def review_package(
+    package: ReviewPackage,
     *,
     model: str = DEFAULT_MODEL,
     effort: str = DEFAULT_EFFORT,
@@ -327,16 +416,15 @@ def review_sheet(
     timeout_s: float = 1800.0,
     codex: str | None = None,
 ) -> Review:
-    if not sheet.png.is_file():
-        raise FileNotFoundError(f"{sheet.name}: sheet PNG missing: {sheet.png}")
+    sheet_count = _validate_package(package)
     codex_exe = codex or shutil.which("codex")
     if not codex_exe:
         raise RuntimeError("codex CLI not found on PATH")
-    prompt = load_prompt(sheet.kind)
+    prompt = _review_prompt(package, sheet_count)
     prompt_sha = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
-    png_sha = _sha256(sheet.png)
+    source_sha = [_sha256(source) for source in package.sources]
     report_dir.mkdir(parents=True, exist_ok=True)
-    events_path = report_dir / f"{sheet.name}.events.jsonl"
+    events_path = report_dir / f"{package.name}.events.jsonl"
 
     started = time.monotonic()
     error: str | None = None
@@ -349,14 +437,18 @@ def review_sheet(
         # relative walk from the agent's cwd reaches nothing of ours.
         workdir = Path(tempfile.mkdtemp(prefix="machrev-"))
         try:
-            image = workdir / "sheet.png"
-            shutil.copyfile(sheet.png, image)
+            images = _materialize_images(package, workdir)
+            if len(images) != sheet_count:
+                raise RuntimeError(
+                    f"{package.name}: materialized {len(images)} sheets, "
+                    f"expected {sheet_count}"
+                )
             schema = workdir / "schema.json"
             shutil.copyfile(SCHEMA_FILE, schema)
             output = workdir / "verdict.json"
             cmd = build_command(
                 workdir=workdir,
-                image=image,
+                images=images,
                 schema=schema,
                 output=output,
                 model=model,
@@ -398,9 +490,10 @@ def review_sheet(
     _write_events(events_path, events)
     tool_events = count_tool_events(events)
     review = Review(
-        name=sheet.name,
-        kind=sheet.kind,
-        png=str(sheet.png),
+        name=package.name,
+        kind=package.kind,
+        sources=[str(source) for source in package.sources],
+        source_sha256=source_sha,
         verdict=verdict,
         passed=is_pass(verdict) and tool_events == 0,
         blind=tool_events == 0,
@@ -408,7 +501,7 @@ def review_sheet(
         model=model,
         effort=effort,
         prompt_sha256=prompt_sha,
-        png_sha256=png_sha,
+        sheet_count=sheet_count,
         duration_s=round(time.monotonic() - started, 1),
         reviewed_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
         error=error,
@@ -430,14 +523,16 @@ def write_review(review: Review, report_dir: Path) -> None:
 
 
 def render_markdown(review: Review) -> str:
+    source_hashes = ", ".join(value[:12] for value in review.source_sha256)
     lines = [
         f"# {review.name} — {'PASS' if review.passed else 'FAIL'}",
         "",
         f"- kind: {review.kind}",
+        f"- sheets: {review.sheet_count}",
         f"- reviewed: {review.reviewed_at} by {review.model} ({review.effort}), "
         f"{review.duration_s}s, attempts {review.attempts}",
         f"- blind: {review.blind} (tool events: {review.tool_events})",
-        f"- png sha256: {review.png_sha256[:12]}  prompt sha256: {review.prompt_sha256[:12]}",
+        f"- source sha256: {source_hashes}  prompt sha256: {review.prompt_sha256[:12]}",
     ]
     if review.error:
         lines += ["", f"**error:** {review.error}"]
@@ -471,23 +566,24 @@ def render_index(reviews: Sequence[Review]) -> str:
     lines = [
         "# Machinist review index",
         "",
-        f"{passed}/{len(reviews)} sheets pass. Generated {datetime.now(timezone.utc).isoformat(timespec='seconds')}.",
+        f"{passed}/{len(reviews)} packages pass. Generated {datetime.now(timezone.utc).isoformat(timespec='seconds')}.",
         "",
-        "| sheet | kind | result | verdict | blockers | over-spec | clarity | minor | blind | reviewed |",
-        "|---|---|---|---|---|---|---|---|---|---|",
+        "| package | kind | sheets | result | verdict | blockers | over-spec | clarity | minor | blind | reviewed |",
+        "|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for r in sorted(reviews, key=lambda r: (r.passed, r.name)):
         verdict = (r.verdict or {}).get("verdict", "ERROR" if r.error else "?")
         lines.append(
-            f"| [{r.name}]({r.name}.md) | {r.kind} | {'PASS' if r.passed else 'FAIL'} | "
-            f"{verdict} | {_n(r, 'blockers')} | {_n(r, 'over_specification')} | "
-            f"{_n(r, 'clarity')} | {_n(r, 'minor')} | {'yes' if r.blind else 'NO'} | "
-            f"{r.reviewed_at} |"
+            f"| [{r.name}]({r.name}.md) | {r.kind} | {r.sheet_count} | "
+            f"{'PASS' if r.passed else 'FAIL'} | {verdict} | {_n(r, 'blockers')} | "
+            f"{_n(r, 'over_specification')} | {_n(r, 'clarity')} | "
+            f"{_n(r, 'minor')} | {'yes' if r.blind else 'NO'} | {r.reviewed_at} |"
         )
     return "\n".join(lines) + "\n"
 
 
 def write_index(report_dir: Path = REPORT_DIR) -> Path:
+    report_dir.mkdir(parents=True, exist_ok=True)
     index = report_dir / "index.md"
     index.write_text(render_index(load_reviews(report_dir)), encoding="utf-8")
     return index
@@ -495,21 +591,32 @@ def write_index(report_dir: Path = REPORT_DIR) -> Path:
 
 def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("names", nargs="*", help="registry drawing names (e.g. crank_arm)")
-    parser.add_argument("--all", action="store_true", help="review every registered drawing")
-    parser.add_argument("--png", type=Path, help="review one arbitrary sheet PNG")
+    parser.add_argument(
+        "names", nargs="*", help="registry drawing names (e.g. crank_arm)"
+    )
+    parser.add_argument(
+        "--all", action="store_true", help="review every registered drawing"
+    )
+    parser.add_argument(
+        "--png",
+        type=Path,
+        action="append",
+        help="review an arbitrary PNG; repeat to form one assembly package",
+    )
     parser.add_argument("--kind", choices=("part", "assembly"), default="part")
     parser.add_argument("--model", default=DEFAULT_MODEL)
     parser.add_argument("--effort", default=DEFAULT_EFFORT)
     parser.add_argument("--jobs", type=int, default=3)
     parser.add_argument("--retries", type=int, default=1)
-    parser.add_argument("--timeout", type=float, default=1800.0, help="seconds per sheet")
+    parser.add_argument(
+        "--timeout", type=float, default=1800.0, help="seconds per package"
+    )
     parser.add_argument("--report-dir", type=Path, default=REPORT_DIR)
     parser.add_argument("--index", action="store_true", help="only rebuild index.md")
     parser.add_argument(
         "--missing-ok",
         action="store_true",
-        help="skip sheets whose PNG is not rendered instead of failing",
+        help="skip packages with an unrendered source instead of failing",
     )
     return parser.parse_args(argv)
 
@@ -521,43 +628,57 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(write_index(report_dir))
         return 0
 
-    sheets: list[Sheet]
+    packages: list[ReviewPackage]
     if args.png:
-        sheets = [_sheet_for_png(args.png, args.kind)]
+        if args.kind == "part" and len(args.png) != 1:
+            print("part review requires exactly one --png", file=sys.stderr)
+            return 2
+        packages = [_package_for_pngs(args.png, args.kind)]
     elif args.all:
-        sheets = all_sheets()
+        packages = all_packages()
     else:
         unknown = [n for n in args.names if n not in DRAWINGS_BY_NAME]
         if unknown or not args.names:
             print(f"unknown or missing drawing names: {unknown}", file=sys.stderr)
             return 2
-        sheets = [sheet_for(n) for n in args.names]
+        packages = [package_for(n) for n in args.names]
     if args.missing_ok:
-        skipped = [s.name for s in sheets if not s.png.is_file()]
+        skipped = [
+            package.name
+            for package in packages
+            if not all(source.is_file() for source in package.sources)
+        ]
         if skipped:
-            print(f"skipping {len(skipped)} unrendered sheets: {skipped}", file=sys.stderr)
-        sheets = [s for s in sheets if s.png.is_file()]
+            print(
+                f"skipping {len(skipped)} packages with unrendered sources: {skipped}",
+                file=sys.stderr,
+            )
+        packages = [
+            package
+            for package in packages
+            if all(source.is_file() for source in package.sources)
+        ]
 
     reviews: list[Review] = []
     with ThreadPoolExecutor(max_workers=max(1, args.jobs)) as pool:
         futures = {
             pool.submit(
-                review_sheet,
-                sheet,
+                review_package,
+                package,
                 model=args.model,
                 effort=args.effort,
                 report_dir=report_dir,
                 retries=args.retries,
                 timeout_s=args.timeout,
-            ): sheet
-            for sheet in sheets
+            ): package
+            for package in packages
         }
         for future in as_completed(futures):
-            sheet = futures[future]
+            package = futures[future]
             try:
                 review = future.result()
-            except Exception as exc:  # noqa: BLE001 - one sheet must not sink the run
-                print(f"{sheet.name}: {type(exc).__name__}: {exc}", file=sys.stderr)
+            except Exception as exc:  # noqa: BLE001 - one package must not sink the run
+                print(f"{package.name}: {type(exc).__name__}: {exc}", file=sys.stderr)
                 continue
             reviews.append(review)
             verdict = (review.verdict or {}).get("verdict", "ERROR")
@@ -571,9 +692,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
     index = write_index(report_dir)
     failed = [r.name for r in reviews if not r.passed]
-    errored = len(sheets) - len(reviews)
+    errored = len(packages) - len(reviews)
     print(
-        f"{len(reviews) - len(failed)}/{len(sheets)} pass; index: {index}",
+        f"{len(reviews) - len(failed)}/{len(packages)} pass; index: {index}",
         file=sys.stderr,
     )
     return 0 if not failed and not errored else 1
