@@ -15,14 +15,14 @@ details (policy rule 7, machinist review 2026-09-02):
 * DETAIL B -- the bottom notch, from the front view: the same three values,
   plus the sliding floor's finish, in a specification-derived note.
 * DETAIL C -- the top pin hole, from the RIGHT view (the only projection where
-  the hole, drilled along X, is a visible circle): its drop below the bar top,
-  its station across the depth, and the ``#47 DRILL`` callout.
+  the hole, drilled along X, is a visible circle): a specification-derived
+  note gives its transverse centre station, drop below the top, nominal
+  diameter, drill process, and through condition.
 
-The two notch details expose no stable selectable derived-view edges on this
-seat, so their manufacturing callouts come directly from the shared part spec.
-DETAIL C retains sheet dimensions against its visible circular geometry.  A
-marked dimension imports into ONE view only, so an import into a detail could
-claim the front view's overall length.  The sheet runs at 1:4.
+All three derived details expose no stable selectable model edges on this seat,
+so their complete manufacturing callouts come directly from the shared part
+spec.  A marked dimension imports into ONE view only, so an import into a
+detail could claim the front view's overall length.  The sheet runs at 1:4.
 
 Run with SolidWorks open::
 
@@ -39,8 +39,6 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_edge_dimension,
-    add_native_hole_callout,
     add_property_linked_note,
     create_detail_view,
     curate_view_dimensions,
@@ -61,11 +59,10 @@ from amplitude_bar_spec import (
     BOTTOM_NOTCH_WIDTH,
     NOTCH_OFFSET,
     SURFACE_FINISHES,
-    TOP_NOTCH_FLOOR_Y,
     TOP_NOTCH_HEIGHT,
     TOP_NOTCH_WIDTH,
     TOP_PIN_DIA,
-    TOP_PIN_Y,
+    TOP_PIN_DROP,
 )
 from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 
@@ -146,11 +143,6 @@ def _detail_xy(
 def _detail_a(mx: float, my: float) -> tuple[float, float]:
     return _detail_xy(DETAIL_A_CENTER, (_BBOX_CX, TOP_DETAIL_Y), mx, my)
 
-
-def _detail_c(mz: float, my: float) -> tuple[float, float]:
-    return _detail_xy(DETAIL_C_CENTER, (_BBOX_CZ, TOP_DETAIL_Y), mz, my)
-
-
 FRONT_KEEP = {
     "BarLength": (0.075, FRONT_CENTER[1]),
 }
@@ -158,8 +150,8 @@ RIGHT_KEEP: dict[str, tuple[float, float]] = {}
 TOP_KEEP: dict[str, tuple[float, float]] = {}
 
 
-# The notch details expose no reliable selectable edges on this seat.  State
-# each complete, spec-owned manufacturing definition beside its enlarged profile.
+# The derived details expose no reliable selectable model edges on this seat.
+# State each complete, spec-owned manufacturing definition beside its profile.
 TOP_NOTCH_GEOMETRY_NOTE = "\n".join(
     (
         f"CHEEK OFFSET {NOTCH_OFFSET:.4f}",
@@ -176,9 +168,20 @@ BOTTOM_NOTCH_GEOMETRY_NOTE = "\n".join(
         f"BOTTOM FLOOR FINISH Ra {_SLIDE_FLOOR_FINISH.roughness_ra}",
     )
 )
+TOP_PIN_GEOMETRY_NOTE = "\n".join(
+    (
+        f"PIN C/L {BAR_DEPTH / 2.0:.4f} FROM SIDE FACE",
+        f"PIN C/L {TOP_PIN_DROP:.2f} BELOW TOP",
+        f"#47 DRILL <MOD-DIAM>{TOP_PIN_DIA:.3f} THRU",
+    )
+)
 BOTTOM_NOTCH_GEOMETRY_NOTE_XY = (
     DETAIL_B_CENTER[0] + DETAIL_MODEL_RADIUS * _D / 1000.0 + 0.008,
     DETAIL_B_CENTER[1] - 0.010,
+)
+TOP_PIN_GEOMETRY_NOTE_XY = (
+    DETAIL_C_CENTER[0] + DETAIL_MODEL_RADIUS * _D / 1000.0 + 0.008,
+    DETAIL_C_CENTER[1] - 0.010,
 )
 TOP_NOTCH_GEOMETRY_NOTE_XY = (
     _detail_a(NOTCH_OFFSET / 2.0, 0.0)[0],
@@ -298,43 +301,18 @@ async def build(adapter: Any) -> dict[str, str]:
     ):
         raise RuntimeError("failed to add bottom-notch geometry note")
 
-    # DETAIL C (top pin hole, right view): drop below the bar top, station
-    # from the side face (mid-depth), and the native #47 callout.
-    pin_rim_left = _detail_c(_BBOX_CZ - TOP_PIN_DIA / 2.0, TOP_PIN_Y)
-    pin_rim_top = _detail_c(_BBOX_CZ, TOP_PIN_Y + TOP_PIN_DIA / 2.0)
-    pin_rim_bottom = _detail_c(_BBOX_CZ, TOP_PIN_Y - TOP_PIN_DIA / 2.0)
-    add_edge_dimension(
-        adapter,
-        detail_c,
-        p0=_detail_c(0.0, TOP_PIN_Y + 2.0),
-        p1=pin_rim_left,
-        text_xy=(
-            _detail_c(_BBOX_CZ / 2.0, 0.0)[0],
-            _detail_c(0.0, TOP_NOTCH_FLOOR_Y)[1] - 0.016,
-        ),
-        label="top pin station across the depth",
-        orientation="horizontal",
-    )
-    add_edge_dimension(
-        adapter,
-        detail_c,
-        p0=_detail_c(_BBOX_CZ + 2.0, BAR_LENGTH),
-        p1=pin_rim_top,
-        text_xy=(
-            DETAIL_C_CENTER[0] + 0.028,
-            _detail_c(0.0, (BAR_LENGTH + TOP_PIN_Y) / 2.0)[1],
-        ),
-        label="top pin drop",
-        orientation="vertical",
-    )
-    add_native_hole_callout(
-        adapter,
-        detail_c,
-        edge_xy=pin_rim_bottom,
-        callout_xy=(DETAIL_C_CENTER[0] + 0.040, DETAIL_C_CENTER[1] - 0.014),
-        label="top pin hole",
-        process="#47 DRILL",
-    )
+    # DETAIL C (top pin hole, right view): the derived view's circular profile
+    # is useful context, but its edges are not selectable on this seat.  Give
+    # the complete, spec-owned location, size, process and extent beside it.
+    if (
+        add_note(
+            adapter,
+            TOP_PIN_GEOMETRY_NOTE,
+            *TOP_PIN_GEOMETRY_NOTE_XY,
+        )
+        is None
+    ):
+        raise RuntimeError("failed to add top-pin geometry note")
 
     # Notes along the top; the end-view and isometric captions under their
     # views (the end view runs 16x the sheet scale -- label it or "do not

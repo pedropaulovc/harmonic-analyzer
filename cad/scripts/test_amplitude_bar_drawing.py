@@ -58,8 +58,8 @@ def test_sheet_runs_at_1_to_4_with_1_to_8_isometric() -> None:
 
 def test_end_features_are_documented_in_enlarged_details() -> None:
     # Policy rule 7: at 1:4 the notches and pin hole are edge-on, so three
-    # 4:1 details carry them.  Both notch details are selection-free because
-    # this seat exposes no stable derived-view edges for either profile.
+    # 4:1 details carry them.  Every detail is selection-free because this
+    # seat exposes no stable derived-view model edges.
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     tree = ast.parse(source)
     calls = tuple(node for node in ast.walk(tree) if isinstance(node, ast.Call))
@@ -104,6 +104,19 @@ def test_end_features_are_documented_in_enlarged_details() -> None:
             f"Ra {amplitude_bar_spec.SURFACE_FINISHES[0].roughness_ra}",
         )
     )
+    assert drawing.TOP_PIN_GEOMETRY_NOTE == "\n".join(
+        (
+            (
+                "PIN C/L "
+                f"{amplitude_bar_spec.BAR_DEPTH / 2.0:.4f} FROM SIDE FACE"
+            ),
+            f"PIN C/L {amplitude_bar_spec.TOP_PIN_DROP:.2f} BELOW TOP",
+            (
+                "#47 DRILL "
+                f"<MOD-DIAM>{amplitude_bar_spec.TOP_PIN_DIA:.3f} THRU"
+            ),
+        )
+    )
     note_arguments = {
         call.args[1].id
         for call in named_calls("add_note")
@@ -112,35 +125,26 @@ def test_end_features_are_documented_in_enlarged_details() -> None:
     assert note_arguments == {
         "TOP_NOTCH_GEOMETRY_NOTE",
         "BOTTOM_NOTCH_GEOMETRY_NOTE",
+        "TOP_PIN_GEOMETRY_NOTE",
     }
-
-    edge_dimensions = named_calls("add_edge_dimension")
-    assert len(edge_dimensions) == 2
-    assert all(
-        not any(
-            isinstance(node, ast.Name) and node.id == "detail_b"
-            for node in ast.walk(call)
-        )
-        for call in edge_dimensions
-    )
-    edge_labels = {
-        keyword.value.value
-        for call in edge_dimensions
-        for keyword in call.keywords
-        if keyword.arg == "label"
-        and isinstance(keyword.value, ast.Constant)
-        and isinstance(keyword.value.value, str)
-    }
-    assert edge_labels == {
-        "top pin station across the depth",
-        "top pin drop",
-    }
-    removed_detail_b_selection_names = {
+    # No DETAIL C annotation may select a derived edge: its complete
+    # location/process callout is the specification-derived note above.
+    assert not named_calls("add_edge_dimension")
+    assert not named_calls("add_native_hole_callout")
+    removed_detail_selection_names = {
         "_detail_b",
+        "_detail_c",
         "_BOTTOM_CHEEK_Y",
         "_INNER_CHEEK_X",
         "_SLIDE_FLOOR_PICK_X",
         "_DEPTH_PICK_X",
+        "pin_rim_left",
+        "pin_rim_top",
+        "pin_rim_bottom",
+        "add_edge_dimension",
+        "add_native_hole_callout",
+        "TOP_NOTCH_FLOOR_Y",
+        "TOP_PIN_Y",
         "add_surface_finish",
     }
     identifiers = {
@@ -154,14 +158,8 @@ def test_end_features_are_documented_in_enlarged_details() -> None:
         for node in ast.walk(tree)
         if isinstance(node, ast.alias)
     }
-    assert not removed_detail_b_selection_names.intersection(identifiers)
+    assert not removed_detail_selection_names.intersection(identifiers)
     assert not named_calls("add_surface_finish")
-
-    # The pin hole callout says the drill, on the detail where the hole is a
-    # visible circle.
-    assert len(named_calls("add_native_hole_callout")) == 1
-    assert 'process="#47 DRILL"' in source
-    assert "edge_xy=pin_rim_bottom" in source
     # Each detail boundary reaches past the feature it enlarges.
     assert (
         drawing.DETAIL_MODEL_RADIUS
