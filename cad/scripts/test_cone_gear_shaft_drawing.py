@@ -14,23 +14,23 @@ from _drawing_registry import DRAWINGS_BY_NAME
 
 
 def test_section_fits_are_toleranced_on_the_model() -> None:
-    """All five turned lands ride ONE shared fit class, applied to the model.
-
-    Spelled as callout text the band is frozen: SolidWorks prints it verbatim
-    and never re-renders it, so the mm->inch flip in issue #290 would leave
-    "+0.00/-0.02" reading as inches on every land. The identity assertion also
-    stops a local retype from silently forking the shared class.
-    """
-    assert drawing.DIMENSION_CALLOUTS == {}
+    """All five turned lands derive from one shared fit class."""
     assert cone_gear_shaft_spec.SECTION_DIA_BAND is _fit_limits.SHAFT_H
-    # Applied in a loop over the five sections, so the AST reports the f-string
-    # source rather than five literal keys.
     assert model_toleranced_dimensions(part) == {
         ("f'Sec{section}Profile'", "f'Sec{section}Dia'"): (
             "*deviations(SECTION_DIA_BAND)"
         )
     }
-    assert "for section in range(5)" in Path(part.__file__).read_text(encoding="utf-8")
+    part_source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "for section in range(5)" in part_source
+    assert drawing.TIP_LANDS_NOTE.splitlines()[1:] == [
+        _fit_limits.fit_limits(
+            diameter,
+            cone_gear_shaft_spec.SECTION_DIA_BAND,
+            diameter=True,
+        )
+        for diameter in cone_gear_shaft_spec.SECTION_DIAS[2:]
+    ]
 
 
 def test_required_drawing_paths() -> None:
@@ -45,38 +45,31 @@ def test_required_drawing_paths() -> None:
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert part.DRAWING_DIMENSIONS is cone_gear_shaft_spec.DRAWING_DIMENSIONS
     marked = set().union(*cone_gear_shaft_spec.DRAWING_DIMENSIONS.values())
-    kept = (
-        set(drawing.SIDE_STATION_KEEP)
-        | set(drawing.SIDE_DIAMETER_STATIONS_MM)
-        | set(drawing.DETAIL_DIAMETER_STATIONS_MM)
+    imported = set(drawing.SIDE_STATION_KEEP) | set(
+        drawing.SIDE_DIAMETER_STATIONS_MM
     )
-    assert kept == marked
+    assert imported == marked - {"Sec2Dia", "Sec3Dia", "Sec4Dia"}
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert all(name not in source for name in ("Sec2Dia", "Sec3Dia", "Sec4Dia"))
     assert part.SECTIONS is cone_gear_shaft_spec.SECTIONS
     assert drawing.SECTION_DIAS == cone_gear_shaft_spec.SECTION_DIAS
     assert drawing.SECTION_ENDS == cone_gear_shaft_spec.SECTION_ENDS
 
 
-def test_diameters_read_on_their_own_lands_not_an_end_view() -> None:
-    # Policy rule 7 / machinist review 2026-09-02: a turned part's diameters
-    # sit on the side view's cylindrical segments, never on an end view whose
-    # circles occlude one another.  The journal and the 3/8 in seat read on
-    # the 1:1 silhouette; the 1/4, 1/8 and 1/32 in tip lands in DETAIL A
-    # (3:1), curated BEFORE the side view (one view per marked dimension).
+def test_tip_lands_remain_visible_without_brittle_detail_dimension_imports() -> None:
+    # The journal and 3/8 seat keep native dimensions on the 1:1 silhouette;
+    # DETAIL A retains useful tip geometry and states the three land limits in
+    # a spec-derived note.
     assert set(drawing.SIDE_DIAMETER_STATIONS_MM) == {"Sec0Dia", "Sec1Dia"}
-    assert set(drawing.DETAIL_DIAMETER_STATIONS_MM) == {"Sec2Dia", "Sec3Dia", "Sec4Dia"}
     ends = cone_gear_shaft_spec.SECTION_ENDS
     assert 0.0 < drawing.SIDE_DIAMETER_STATIONS_MM["Sec0Dia"] < ends[0]
     assert ends[0] < drawing.SIDE_DIAMETER_STATIONS_MM["Sec1Dia"] < ends[1]
-    assert ends[1] < drawing.DETAIL_DIAMETER_STATIONS_MM["Sec2Dia"][0] < ends[2]
-    assert ends[2] < drawing.DETAIL_DIAMETER_STATIONS_MM["Sec3Dia"][0] < ends[3]
-    assert ends[3] < drawing.DETAIL_DIAMETER_STATIONS_MM["Sec4Dia"][0] < ends[4]
-    # Every detail land lies inside the detail boundary.
-    for station, _above in drawing.DETAIL_DIAMETER_STATIONS_MM.values():
-        assert abs(station - drawing.DETAIL_MODEL_CENTER_Z) < drawing.DETAIL_MODEL_RADIUS
     assert drawing.DETAIL_SCALE == (3, 1)
+    assert drawing.TIP_LANDS_NOTE.startswith("DETAIL A TIP LANDS\n")
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'detail_label="A"' in source
-    assert source.index('view_label="detail"') < source.index('view_label="side"')
+    assert 'view_label="detail"' not in source
+    assert "add_note(adapter, TIP_LANDS_NOTE" in source
     assert "model_point_in_view(" in source
     assert '"*Front"' not in source  # no end view
     assert "End View Note" not in source
@@ -113,12 +106,10 @@ def test_sections_are_a_monotonic_stepped_shaft() -> None:
         )
         + (cone_gear_shaft_spec.FRONT_STUB + cone_gear_shaft_spec.T006_TIP_STATION,)
     )
-    # Every seat diameter carries the snug fit as a NATIVE model tolerance --
-    # see test_section_fits_are_toleranced_on_the_model.  Every land is a
-    # fitted diameter, so all five print three places (the journal's 12.2308
-    # rounds to 12.231; the title block tolerances three places, not four).
+    # Side-view native dimensions print three places; the tip-note limits are
+    # already formatted to three places by fit_limits.
     assert drawing.DIMENSION_PRECISION == {
-        name: 3 for name in ("Sec0Dia", "Sec1Dia", "Sec2Dia", "Sec3Dia", "Sec4Dia")
+        name: 3 for name in ("Sec0Dia", "Sec1Dia")
     }
 
 

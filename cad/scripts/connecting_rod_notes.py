@@ -11,6 +11,14 @@ the part + drawing and leaves the assembly to its cheap token refresh.
 
 from __future__ import annotations
 
+from _fit_limits import fit_limits
+from connecting_rod_spec import (
+    RING_BORE_DIA,
+    RING_BORE_DIA_BAND,
+    RING_OUTER_RADIUS,
+    SHANK_WIDTH,
+)
+
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  build_connecting_rod marks exactly these. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
@@ -35,4 +43,12 @@ DRAWING_NOTES = "\n".join(
 # Flagged from the crown arc in the head detail: the crown is a full round
 # on the head width, so the width dimension sizes it.
 CROWN_CALLOUT = "FULL R"
+RING_GEOMETRY_NOTE = "\n".join(
+    (
+        "DETAIL A RING",
+        f"OD <MOD-DIAM>{2.0 * RING_OUTER_RADIUS:.2f}",
+        f"BORE {fit_limits(RING_BORE_DIA, RING_BORE_DIA_BAND, diameter=True)}",
+        f"SHANK WIDTH {SHANK_WIDTH:.2f}",
+    )
+)
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"

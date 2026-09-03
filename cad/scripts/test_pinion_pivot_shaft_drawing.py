@@ -73,14 +73,18 @@ def test_diameter_and_body_length_read_on_the_side_view() -> None:
     assert drawing.DIMENSION_PRECISION == {"ShaftDia": 3}
 
 
-def test_overall_reference_and_crown_callout_are_on_the_view() -> None:
-    # Review 2026-09-02: the overall had to be derived from both crowns, and
-    # the SR4.80 geometry was buried in the note block.
+def test_overall_reference_uses_the_stable_view_adjacent_note_path() -> None:
+    # The two shallow crown apexes are not stable selectable drawing vertices
+    # across SolidWorks seats.  The note carries the same reference value from
+    # the authoritative geometry contract without making either vertex pick.
     source = _source()
-    assert 'label="overall length reference"' in source
-    assert 'entity_types=("VERTEX", "VERTEX")' in source
-    assert '_early_bound(overall, "IDisplayDimension").GetAnnotation()' in source
-    assert "set_reference_dimension(" in source
+    assert drawing.OVERALL_NOTE == (
+        f"({pinion_pivot_shaft_spec.OVERALL_LEN:.2f}) OVERALL REF"
+    )
+    assert "if add_note(adapter, OVERALL_NOTE, *OVERALL_NOTE_XY) is None:" in source
+    assert 'entity_types=("VERTEX", "VERTEX")' not in source
+    assert "set_reference_dimension(" not in source
+    assert "add_edge_dimension(" not in source
     assert source.count("model_point_in_view(") == 2
     assert source.count("add_attached_note(") == 1
     assert "text=CROWN_NOTE," in source

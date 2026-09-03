@@ -24,56 +24,73 @@ def test_required_drawing_paths() -> None:
     )
 
 
-def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
+def test_unavailable_detail_dimensions_are_replaced_by_build_derived_note() -> None:
     assert part.DRAWING_DIMENSIONS is cone_swing_platform_spec.DRAWING_DIMENSIONS
     marked = set().union(*cone_swing_platform_spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.TOP_KEEP) | set(drawing.DETAIL_OFFSETS) | set(drawing.END_KEEP)
-    assert kept == marked
-    # The wedge is its own sketch dimensions from the pivot (the sketch
-    # origin), the notch its cap circle (centre both ways, diameter), the
-    # corners their fillet radii, the thickness the plate extrude -- all
-    # native, none in a note.
-    assert cone_swing_platform_spec.DRAWING_DIMENSIONS["PlateProfile"] == {
+    unavailable = {
         "NorthHalfW",
         "NorthOverhangDim",
         "NorthEdge",
-        "WestTaperDx",
-        "PlateLenDim",
-        "SouthEdge",
+        "CornerNER",
+        "CornerNWR",
     }
+    imported = set(drawing.TOP_KEEP) | set(drawing.END_KEEP)
+    assert imported == marked - unavailable
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert all(name not in source for name in unavailable)
+    assert 'view_label="detail"' not in source
     assert cone_swing_platform_spec.DRAWING_DIMENSIONS["LockNotchCapEProfile"] == {
         "CapECx",
         "CapECz",
         "CapEDia",
     }
-    assert drawing.END_KEEP == {"PlateT": (drawing.END_CENTER[0] + 0.026, drawing.END_CENTER[1])}
+    assert drawing.END_KEEP == {
+        "PlateT": (drawing.END_CENTER[0] + 0.026, drawing.END_CENTER[1])
+    }
     part_source = Path(part.__file__).read_text(encoding="utf-8")
     assert 'name_dimensions(adapter, "Plate", ["PlateT"])' in part_source
-    assert 'name_dimensions(adapter, f"Corner{lbl}", [f"Corner{lbl}R"])' in part_source
+    assert (
+        'name_dimensions(adapter, f"Corner{lbl}", [f"Corner{lbl}R"])'
+        in part_source
+    )
 
 
-def test_pivot_end_is_dimensioned_in_a_detail() -> None:
-    # Policy rule 7: the 24 mm north end is too small at 1:2 for the pivot
-    # hole, the 7 overhang, the two north widths and the two north radii, so
-    # DETAIL A (1:1) carries them, curated BEFORE the plan (each marked model
-    # dimension inserts into ONE view; draw_pinion_bracket).
-    assert set(drawing.DETAIL_OFFSETS) == {
-        "NorthHalfW", "NorthEdge", "NorthOverhangDim", "CornerNER", "CornerNWR",
-    }
+def test_pivot_end_detail_retains_geometry_and_uses_a_spec_note() -> None:
+    # DETAIL A remains because it clarifies the pivot profile and carries the
+    # native pivot-hole callout, but it never imports the unavailable marks.
     assert drawing.DETAIL_SCALE == (1, 1)
-    assert drawing.DETAIL_MODEL_RADIUS > part.HALF_WIDTH_N + part.NORTH_OVERHANG
+    assert (
+        drawing.DETAIL_MODEL_RADIUS
+        > part.HALF_WIDTH_N + part.NORTH_OVERHANG
+    )
+    north_radii = {
+        label: radius
+        for label, _x, _z, radius in part._CORNERS
+        if label in {"NE", "NW"}
+    }
+    assert drawing.PIVOT_END_GEOMETRY_NOTE == "\n".join(
+        (
+            "DETAIL A PIVOT-END PROFILE",
+            (
+                f"FROM PIVOT C/L: EAST {part.HALF_WIDTH_N:.2f}; "
+                f"NORTH {part.NORTH_OVERHANG:.2f}"
+            ),
+            (
+                f"NORTH EDGE {part.HALF_WIDTH_N + part.WEST_HALF_N:.2f}; "
+                f"NE R{north_radii['NE']:.1f}; NW R{north_radii['NW']:.1f}"
+            ),
+        )
+    )
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'detail_label="A"' in source
-    assert source.index('view_label="detail"') < source.index('view_label="top"')
-    assert "for view in (top, end, detail):\n        set_hidden_lines_visible" in source
-    # Every detail position is an offset from a projected model point.
-    assert "def _detail_keep(" in source
-    assert "model_point_in_view(adapter, detail, (0.0, top_y, 0.0)" in source
-    # The pivot callout lives in the detail, on the rim it enlarges.
+    assert (
+        "for view in (top, end, detail):\n        set_hidden_lines_visible" in source
+    )
+    assert "add_note(adapter, PIVOT_END_GEOMETRY_NOTE" in source
     assert "edge=_pivot_rim(adapter, detail)" in source
 
 
-def test_notes_orient_the_reader_and_carry_no_dimension() -> None:
+def test_manufacturing_notes_orient_the_reader_and_carry_no_dimension() -> None:
     notes = cone_swing_platform_spec.DRAWING_NOTES
     lines = notes.split("\n")
     assert len(lines) <= 4
@@ -88,7 +105,9 @@ def test_notes_orient_the_reader_and_carry_no_dimension() -> None:
     )
     assert part.SLOT_E_X == cone_swing_platform_spec.LOCK_NOTCH_SEAT_X == 27.5
     assert part.SLOT_E_Z == cone_swing_platform_spec.LOCK_NOTCH_SEAT_Z == -175.0
-    # Every station, offset, radius and the thickness is a native dimension.
+    # Imported stations, offsets, south radii and thickness remain native.
+    # The separate pivot-end geometry note owns only the five unavailable
+    # values.
     for banned in (
         "12.00 E", "16.00 E", "8.00 W", "24.00 E", "37.00 W", "7.00 SOUTH",
         "192.174", "26.887", "12.518", "8.23", "R10", "R8", "R12", "6.35",
@@ -175,10 +194,8 @@ def test_notch_closed_end_is_dimensioned_beside_the_notch() -> None:
     assert drawing.TOP_KEEP["CornerSWR"][0] > drawing._SW[0]
 
 
-def test_radii_print_one_place_and_nothing_is_banded() -> None:
+def test_south_radii_print_one_place_and_nothing_is_banded() -> None:
     assert drawing.DIMENSION_PRECISION == {
-        "CornerNER": 1,
-        "CornerNWR": 1,
         "CornerSWR": 1,
         "CornerSER": 1,
     }

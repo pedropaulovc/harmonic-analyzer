@@ -33,12 +33,9 @@ def test_required_drawing_paths() -> None:
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert part.DRAWING_DIMENSIONS is pinion_arbor_spec.DRAWING_DIMENSIONS
     marked = set().union(*pinion_arbor_spec.DRAWING_DIMENSIONS.values())
-    kept = (
-        set(drawing.FRONT_KEEP)
-        | set(drawing.RIGHT_KEEP)
-        | set(drawing.DETAIL_KEEP_NAMES)
-    )
-    assert kept == marked
+    imported = set(drawing.RIGHT_KEEP)
+    assert imported == marked - {"CapSagDim"}
+    assert "CapSagDim" not in _source()
     assert (drawing.SHAFT_DIA, drawing.SHAFT_LEN, drawing.CAP_SAG) == (
         pinion_arbor_spec.SHAFT_DIA,
         pinion_arbor_spec.SHAFT_LEN,
@@ -51,7 +48,6 @@ def test_diameter_and_shank_length_read_on_the_side_view() -> None:
     # Policy rule 7: the diameter stands at the flat right end of the side
     # view, not on the end view; the end view keeps nothing and is never
     # curated (SolidWorks inserts each marked dimension into one view only).
-    assert drawing.FRONT_KEEP == {}
     assert set(drawing.RIGHT_KEEP) == {"ShaftDia", "Depth"}
     assert drawing.RIGHT_KEEP["ShaftDia"][0] > drawing.RIGHT_END_X
     source = _source()
@@ -63,22 +59,21 @@ def test_diameter_and_shank_length_read_on_the_side_view() -> None:
     assert drawing.DIMENSION_CALLOUTS == {"Depth": "TO CROWN ROOT"}
 
 
-def test_crown_is_enlarged_in_a_detail_and_dimensioned_there() -> None:
-    # The crown radius derives from the marked sagitta: R = (r^2 + s^2) / 2s.
+def test_crown_is_enlarged_and_its_unavailable_dimension_becomes_a_spec_note() -> None:
+    # The crown radius derives from the sagitta: R = (r^2 + s^2) / 2s.
     r, s = pinion_arbor_spec.SHAFT_DIA / 2.0, pinion_arbor_spec.CAP_SAG
     assert abs(pinion_arbor_spec.CAP_R - (r * r + s * s) / (2.0 * s)) < 1e-9
-    # The 1.20 crown is too small to read at 1:1, so DETAIL B (4:1) carries
-    # the sagitta and its SR callout (policy rule 7). The detail is curated
-    # first so it claims the sagitta.
-    assert drawing.DETAIL_KEEP_NAMES == ("CapSagDim",)
     assert drawing.DETAIL_SCALE == (4, 1)
-    assert drawing.CAP_CALLOUTS["CapSagDim"] == "SR7.27 CROWN"
+    assert drawing.CROWN_GEOMETRY_NOTE == (
+        f"DETAIL B CROWN\nSR{pinion_arbor_spec.CAP_R:.2f}; "
+        f"{pinion_arbor_spec.CAP_SAG:.2f} HIGH"
+    )
     source = _source()
     assert source.count("create_detail_view(") == 1
     assert 'detail_label="B"' in source
-    assert source.index("view_label=\"detail\"") < source.index("view_label=\"right\"")
-    assert "set_dimension_callouts(adapter, detail_annotations, CAP_CALLOUTS)" in source
-    # The view carries the SR; the note only says how to finish it.
+    assert 'view_label="detail"' not in source
+    assert "add_note(adapter, CROWN_GEOMETRY_NOTE" in source
+    # The drawing note carries the geometry; manufacturing prose stays process-only.
     assert "SR7.27" not in pinion_arbor_spec.DRAWING_NOTES
 
 

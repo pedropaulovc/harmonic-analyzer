@@ -126,21 +126,27 @@ def test_the_two_tens_are_labelled() -> None:
     assert drawing.FRONT_CALLOUTS == {"WallLen": "COLLAR LENGTH"}
 
 
-def test_collar_thicknesses_and_stations_are_on_the_views() -> None:
-    # Review 2026-09-02: the collar OD/bore/length, both thicknesses and the
-    # arm/flange stations were notes; they are dimensions now.
+def test_collar_dimensions_and_stable_thickness_note_are_on_the_views() -> None:
+    # The arm's short projected edges are not stable selectable entities
+    # across SolidWorks seats, so its authoritative thickness is stated beside
+    # the right view.  The other collar/flange annotations remain dimensions.
     source = _source()
     for label in (
         'label="collar OD"',
         'label="arm top face from collar OD"',
         'label="flange thickness"',
-        'label="arm thickness"',
         'label="collar bore"',
     ):
         assert label in source, label
-    assert source.count("add_edge_dimension(") == 4
+    assert source.count("add_edge_dimension(") == 3
     assert source.count("_add_circle_diameter(") == 2  # def + call
     assert "_display_as_diameter(adapter, collar_od" in source
+    assert drawing.ARM_THICKNESS_NOTE == (
+        f"ARM THICKNESS "
+        f"{magnifying_bracket_spec.ARM_Y[1] - magnifying_bracket_spec.ARM_Y[0]:.2f}"
+    )
+    assert "if add_note(adapter, ARM_THICKNESS_NOTE" in source
+    assert 'label="arm thickness"' not in source
     # The bore reads on its visible circle (one pick: a second pick on the
     # same circle would deselect it) with the ASME centre mark.
     assert source.count("auto_center_marks(") == 1
@@ -150,7 +156,7 @@ def test_collar_thicknesses_and_stations_are_on_the_views() -> None:
     assert drawing._DIAMETER_DIMENSION == 6
     # The plan's stations read against the collar-axis centreline.
     assert source.count("add_view_centerline(") == 1
-    # Non-front picks are projected through each view's own transform.
+    # Non-front geometry is projected through each view's own transform.
     assert "model_point_in_view(" in source
     assert source.count("= _model_frame(") == 2
 

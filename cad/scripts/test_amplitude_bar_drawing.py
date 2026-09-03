@@ -50,10 +50,11 @@ def test_sheet_runs_at_1_to_4_with_1_to_8_isometric() -> None:
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
 
 
-def test_end_features_are_dimensioned_in_enlarged_details() -> None:
+def test_end_features_are_documented_in_enlarged_details() -> None:
     # Policy rule 7: at 1:4 the notches and pin hole are edge-on, so three
-    # 4:1 details carry them -- sheet dimensions by edge pick, never a
-    # model-item import (which could claim the front view's overall length).
+    # 4:1 details carry them.  The clipped top stock-face edge is not stable
+    # enough to pick; its offset is stated beside DETAIL A from the shared
+    # spec while the remaining feature dimensions keep semantic edge picks.
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("create_detail_view(") == 3
     for label in ('detail_label="A"', 'detail_label="B"', 'detail_label="C"'):
@@ -62,9 +63,14 @@ def test_end_features_are_dimensioned_in_enlarged_details() -> None:
     assert 'place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(1, 4))' in source
     assert source.count("curate_view_dimensions(") == 3
     assert "curate_view_dimensions(adapter, detail" not in source
-    assert source.count("add_edge_dimension(") == 8
+    assert drawing.TOP_CHEEK_OFFSET_NOTE == (
+        f"CHEEK OFFSET {amplitude_bar_spec.NOTCH_OFFSET:.4f}"
+    )
+    assert "add_note(adapter, TOP_CHEEK_OFFSET_NOTE, *TOP_CHEEK_OFFSET_NOTE_XY)" in source
+    assert "p0=_detail_a(0.0, _TOP_CHEEK_Y)" not in source
+    assert 'label="top notch cheek offset"' not in source
+    assert source.count("add_edge_dimension(") == 7
     for label in (
-        "top notch cheek offset",
         "top notch width",
         "top notch depth",
         "bottom notch cheek offset",

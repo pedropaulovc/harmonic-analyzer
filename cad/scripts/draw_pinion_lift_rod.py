@@ -18,11 +18,10 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_attached_note,
-    add_edge_dimension,
     add_property_linked_note,
     add_surface_finish,
     curate_view_dimensions,
@@ -34,7 +33,6 @@ from _drawing_common import (
     set_dimension_precision,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
-    set_reference_dimension,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -48,6 +46,7 @@ from pinion_lift_rod_spec import (
     SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     place_view,
 )
@@ -109,6 +108,8 @@ DIMENSION_PRECISION = {"RodDia": 3}
 # The crown note stands above-left of the crowned end, its leader down to the
 # apex; the Ra (x~0.26) and the end view (x<=0.068) both stay clear.
 CROWN_NOTE_XY = (LEFT_END_X - 0.012, 0.236)
+OVERALL_NOTE = f"({OVERALL_LEN:.2f}) OVERALL REF"
+OVERALL_NOTE_XY = (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.035)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -171,33 +172,17 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to rod end view")
 
-    # Side-view landmarks projected from the MODEL, not assumed from the view
-    # centre: the crown apex (a revolve apex is a VERTEX) and the top of the
-    # flat front end's edge-on circular edge.
+    # The crown apex is projected from the MODEL for the attached process
+    # callout below; the overall reference note itself selects no geometry.
     apex = model_point_in_view(
         adapter, right, (0.0, 0.0, OVERALL_LEN / 1000.0), label="crown apex"
     )
-    front_end_top = model_point_in_view(
-        adapter, right, (0.0, ROD_DIA / 2000.0, 0.0), label="front end rim"
-    )
-    # The true overall (crown apex to the flat front end), as a conspicuous
-    # reference below the shank length so nobody saws the stock short
-    # (Harvey #25): apex VERTEX to the end face's edge-on circular EDGE.
-    overall = add_edge_dimension(
-        adapter,
-        right,
-        p0=apex,
-        p1=front_end_top,
-        text_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.035),
-        label="overall length reference",
-        orientation="horizontal",
-        entity_types=("VERTEX", "EDGE"),
-    )
-    set_reference_dimension(
-        adapter,
-        _early_bound(overall, "IDisplayDimension").GetAnnotation(),
-        label="overall length reference",
-    )
+    # The true overall is reference information derived from the same geometry
+    # contract as the model.  A view-adjacent note is deliberate: the shallow
+    # revolved crown apex is not a stable selectable drawing vertex across
+    # SolidWorks seats.
+    if add_note(adapter, OVERALL_NOTE, *OVERALL_NOTE_XY) is None:
+        raise RuntimeError("failed to add pinion lift rod overall reference note")
     # The crown, called out FROM the crowned end (its sketch dims live on the
     # Top plane, outside every placed view).
     add_attached_note(

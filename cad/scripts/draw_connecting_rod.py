@@ -11,11 +11,9 @@ distance, the (REF) overall and the pin hole; three enlarged details carry
 what is too small or too crowded at 1:1 (policy rule 7, machinist review
 2026-09-02):
 
-* DETAIL A (2:1) -- the ring: the outer diameter, the strap bore with its
-  model band and BORE callout, its roughness symbol, and the shank width where
-  the shank leaves the ring.  Curated FIRST with every marked dimension whose
-  geometry lies inside its boundary (a marked dimension imports into ONE view
-  only); the front view then keeps none.
+* DETAIL A (2:1) -- the ring: a compact spec-derived note states the outer
+  diameter, strap-bore limits and shank width beside the enlarged geometry;
+  the bore also carries its roughness symbol.
 * DETAIL B (3:1) -- the as-cast head: width across the cheeks, shoulder rise,
   height from the shoulder root, and the FULL R crown flag.
 * DETAIL C (3:1, from the left view) -- the stepped thickness where the 3.00
@@ -24,9 +22,9 @@ what is too small or too crowded at 1:1 (policy rule 7, machinist review
 The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): the
 pin hole is a centre distance plus a centreline offset that the block
 tolerance holds identically on all 20 rods, so the sheet carries no datums,
-no feature-control frames and no basic dimensions.  The strap bore keeps its
-fit band (on the model dimension) and its roughness symbol -- it runs on the
-eccentric cam.
+no feature-control frames and no basic dimensions. The strap-bore limits come
+from the same spec band as the model, and its roughness symbol remains on the
+enlarged bore because it runs on the eccentric cam.
 
 Run with SolidWorks open::
 
@@ -49,20 +47,19 @@ from _drawing_common import (
     add_property_linked_note,
     add_surface_finish,
     create_detail_view,
-    curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
     set_arc_endpoints_to_max,
-    set_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     set_reference_dimension,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _gear_drawing_entities import visible_circle_edge
 from _surface_finish import surface_finish_by_key
-from connecting_rod_notes import CROWN_CALLOUT
+from connecting_rod_notes import CROWN_CALLOUT, RING_GEOMETRY_NOTE
 from connecting_rod_spec import (
     CENTER_DISTANCE,
     HEAD_CROWN_CY,
@@ -71,6 +68,7 @@ from connecting_rod_spec import (
     HEAD_WIDTH,
     PIN_HOLE_DIA,
     RING_BORE_DIA,
+    RING_BORE_DIA_BAND,
     RING_BOTTOM_Y,
     RING_OUTER_RADIUS,
     RING_THICKNESS,
@@ -81,8 +79,8 @@ from connecting_rod_spec import (
 )
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
-    dimension_name,
     place_view,
 )
 
@@ -161,68 +159,35 @@ def _ring_xy(mx: float, my: float) -> tuple[float, float]:
 
 
 def _head_xy(mx: float, my: float) -> tuple[float, float]:
-    return _detail_xy(HEAD_DETAIL_CENTER, HEAD_DETAIL_MODEL_CY, HEAD_DETAIL_SCALE, mx, my)
+    return _detail_xy(
+        HEAD_DETAIL_CENTER, HEAD_DETAIL_MODEL_CY, HEAD_DETAIL_SCALE, mx, my
+    )
 
 
 def _step_xy(mz: float, my: float) -> tuple[float, float]:
-    return _detail_xy(STEP_DETAIL_CENTER, STEP_DETAIL_MODEL_CY, STEP_DETAIL_SCALE, mz, my)
+    return _detail_xy(
+        STEP_DETAIL_CENTER, STEP_DETAIL_MODEL_CY, STEP_DETAIL_SCALE, mz, my
+    )
 
 
-# Every marked dimension lives in the ring detail: the two ring diameters and
-# the shank width at its root (its sketch line sits inside the ring disc).
-RING_DETAIL_KEEP = {
-    "RingOuterDia": (0.345, 0.155),
-    "StrapBoreDia": (0.345, 0.088),
-    "ShankWidthDim": (RING_DETAIL_CENTER[0], 0.178),
-}
-FRONT_KEEP: dict[str, tuple[float, float]] = {}
-RIGHT_KEEP: dict[str, tuple[float, float]] = {}
-TOP_KEEP: dict[str, tuple[float, float]] = {}
-# The strap-bore tolerance imports with the named model dimension.  The
-# drawing owns only this descriptive text beneath the native value/band.
-DIMENSION_CALLOUTS = {"StrapBoreDia": "BORE"}
-DIAMETER_LEADERS_TO_RIM = ("RingOuterDia", "StrapBoreDia")
+# These sketch dimensions are unavailable in a derived detail view. Keep the
+# useful enlarged ring geometry and render the part-owned manufacturing sizes
+# adjacent to it.
+RING_GEOMETRY_NOTE_XY = (
+    RING_DETAIL_CENTER[0] + RING_DETAIL_MODEL_RADIUS * 2.0 / 1000.0 + 0.007,
+    RING_DETAIL_CENTER[1] + 0.040,
+)
 
 # Ra on the strap bore, flagged INSIDE the bore (the detail's bore is 62 mm
 # across) from its lower-left rim, so the leader crosses nothing.
-BORE_FINISH_EDGE = _ring_xy(-RING_BORE_DIA / 2.0 * 0.7071, -RING_BORE_DIA / 2.0 * 0.7071)
+BORE_FINISH_EDGE = _ring_xy(
+    -RING_BORE_DIA / 2.0 * 0.7071, -RING_BORE_DIA / 2.0 * 0.7071
+)
 BORE_FINISH_SYMBOL = (BORE_FINISH_EDGE[0] + 0.012, BORE_FINISH_EDGE[1] + 0.010)
 
 CENTER_DISTANCE_TEXT_XY = (0.125, FRONT_CENTER[1])
 OVERALL_TEXT_XY = (0.105, FRONT_CENTER[1])
 PIN_CALLOUT_XY = (0.222, 0.246)
-
-_ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
-_TEXT_CALLOUT_BELOW = 4  # swDimensionTextParts_e.swDimensionTextCalloutBelow
-
-
-def _leaders_to_circumference(
-    adapter: Any, annotations: list[Any], names: tuple[str, ...], *, label: str
-) -> None:
-    """End each named diameter leader at the nearest circumference.
-
-    SolidWorks' default runs a diameter dimension line across the circle
-    through its centre; with the arrows OUTSIDE the leader stops at the rim it
-    names (drawing-simplicity-policy.md rule 7: never through a bore).
-    """
-    remaining = set(names)
-    for annotation in annotations:
-        annotation = _sw_type_info.early_bound_or_flag(
-            annotation, "IAnnotation", "GetSpecificAnnotation"
-        )
-        name = dimension_name(adapter, annotation)
-        if name not in remaining:
-            continue
-        display = _sw_type_info.early_bound_or_flag(
-            annotation.GetSpecificAnnotation(), "IDisplayDimension", "ArrowSide"
-        )
-        display.ArrowSide = _ARROWS_OUTSIDE
-        if int(display.ArrowSide) != _ARROWS_OUTSIDE:
-            raise RuntimeError(f"{label}: {name} arrows did not move outside")
-        remaining.discard(name)
-    if remaining:
-        raise RuntimeError(f"{label}: diameter leaders not found: {sorted(remaining)}")
-    adapter.currentModel.EditRebuild3()
 
 
 def _set_below_text(adapter: Any, display: Any, text: str, *, label: str) -> None:
@@ -318,21 +283,15 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, left, ring_detail, head_detail, step_detail):
         set_hidden_lines_visible(adapter, view)
 
-    # Ring detail FIRST: it claims every marked dimension (see the module
-    # docstring); the front keeps none.
-    ring_annotations = curate_view_dimensions(
-        adapter, ring_detail, keep=RING_DETAIL_KEEP, view_label="ring detail"
-    )
-    curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
-    set_dimension_callouts(adapter, ring_annotations, DIMENSION_CALLOUTS)
-    _leaders_to_circumference(
-        adapter, ring_annotations, DIAMETER_LEADERS_TO_RIM, label="ring diameters"
-    )
-    # Ra on the strap bore: it runs on the eccentric cam.
+    if add_note(adapter, RING_GEOMETRY_NOTE, *RING_GEOMETRY_NOTE_XY) is None:
+        raise RuntimeError("failed to add ring geometry note")
+    # Ra on the strap bore: it runs on the eccentric cam. Resolve the bore by
+    # model geometry because enlarged-view sheet picks shift with note layout.
+    bore_edge = visible_circle_edge(adapter, ring_detail, RING_BORE_DIA)
     add_surface_finish(
         adapter,
         ring_detail,
-        edge_xy=BORE_FINISH_EDGE,
+        edge_entity=bore_edge,
         symbol_xy=BORE_FINISH_SYMBOL,
         control=surface_finish_by_key(SURFACE_FINISHES, "strap_bore"),
         label="strap bore finish",

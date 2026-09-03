@@ -49,28 +49,32 @@ def test_wire_hole_callout_states_size_and_process() -> None:
     assert source.count("add_native_hole_callout(") == 1
     # Harvey #13: the callout says DRILL; the drill number rides as its prefix.
     assert 'process="#47 DRILL"' in source
-    # Two located dims for the wire hole: along the rod (length) AND across the
-    # section (centerline), so the cross-hole cannot drift off-centre.
-    assert source.count("add_edge_dimension(") == 2
+    # The along-rod location remains a dimension; the across-section location
+    # is a stable, view-adjacent note because the derived detail edge is not a
+    # reliable selectable entity.
+    assert source.count("add_edge_dimension(") == 1
 
 
 def test_wire_hole_size_and_centring_read_in_a_detail() -> None:
-    # Machinist review 2026-09-02: the 2.50 across dimension crowded the top
-    # view's stacked 5.00. A 2.5 mm span is illegible at 1:1 anywhere, so
-    # DETAIL A (4:1) carries it and the hole callout (policy rule 7); the
-    # length location stays on the front view, where the bottom face is.
+    # Machinist review 2026-09-02: the 2.50 across value crowded the top
+    # view's stacked 5.00.  DETAIL A (4:1) carries the native hole callout and
+    # a compact centring note derived from the authoritative rod section; the
+    # length location stays dimensioned on the front view.
     assert drawing.DETAIL_SCALE == (4, 1)
     assert drawing.DETAIL_RADIUS > pen_rod_spec.ROD_SECTION / 2000.0
+    assert drawing.WIRE_HOLE_CENTER_NOTE == (
+        f"HOLE CL {pen_rod_spec.ROD_SECTION / 2.0:.2f} FROM FACE"
+    )
     source = _source()
     assert source.count("create_detail_view(") == 1
     assert 'detail_label="A"' in source
     assert "model_point_in_view(" in source
     # The detail is never curated (its circle takes in both rod faces, so a
-    # curation could claim Section); it only receives the picked annotations.
+    # curation could claim Section); its centring note makes no entity pick.
     assert 'view_label="detail"' not in source
-    assert "add_edge_dimension(\n        adapter,\n        detail," in source
+    assert "if add_note(\n        adapter,\n        WIRE_HOLE_CENTER_NOTE," in source
+    assert "add_edge_dimension(\n        adapter,\n        detail," not in source
     assert "add_native_hole_callout(\n        adapter,\n        detail," in source
-    assert 'orientation="horizontal"' in source
     # The front view keeps the along-the-rod location only.
     assert "add_edge_dimension(\n        adapter,\n        front," in source
     assert "add_native_hole_callout(\n        adapter,\n        front," not in source

@@ -60,13 +60,18 @@ def test_diameter_and_shank_length_read_on_the_side_view() -> None:
     assert drawing.DIMENSION_CALLOUTS == {"Depth": "TO CROWN ROOT"}
 
 
-def test_overall_length_is_a_conspicuous_reference() -> None:
+def test_overall_length_uses_the_stable_view_adjacent_note_path() -> None:
     source = _source()
-    assert 'label="overall length reference"' in source
-    assert 'entity_types=("VERTEX", "EDGE")' in source
-    assert '_early_bound(overall, "IDisplayDimension").GetAnnotation()' in source
-    assert "set_reference_dimension(" in source
-    assert "model_point_in_view(" in source
+    assert drawing.OVERALL_NOTE == (
+        f"({pinion_lift_rod_spec.OVERALL_LEN:.2f}) OVERALL REF"
+    )
+    assert "if add_note(adapter, OVERALL_NOTE, *OVERALL_NOTE_XY) is None:" in source
+    assert 'entity_types=("VERTEX", "EDGE")' not in source
+    assert "set_reference_dimension(" not in source
+    assert "add_edge_dimension(" not in source
+    # The one remaining apex projection supports only the attached crown
+    # process callout, not the overall reference.
+    assert source.count("model_point_in_view(") == 1
 
 
 def test_crown_is_called_out_from_the_crowned_end() -> None:

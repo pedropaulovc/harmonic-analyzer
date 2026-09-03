@@ -17,7 +17,7 @@ one origin per view -- the collar axis):
   face from the collar OD (the arm is NOT centred on the axis: y -3..+4.5)
   and the flange thickness on the flange's visible face;
 * RIGHT (collar end): the bore as a Ø on its visible circle (with the ASME
-  centre mark) and the arm thickness at the arm's free end.
+  centre mark) and the arm thickness as a view-adjacent note.
 
 The print is plain: a bracket is not on the GD&T allowlist and it is
 lock-mated to the lever rod in service, so it carries no datum, frame,
@@ -68,6 +68,7 @@ from magnifying_bracket_spec import (
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     place_view,
     view_name,
@@ -151,6 +152,7 @@ _DIAMETER_DIMENSION = 6  # swDimensionType_e.swDiameterDimension
 ARM_THICKNESS = ARM_Y[1] - ARM_Y[0]  # 7.5
 FLANGE_THICKNESS = FLANGE_Y[1] - FLANGE_Y[0]  # 5.08
 ARM_TOP_FROM_COLLAR_OD = COLLAR_OD / 2.0 - ARM_Y[1]  # 1.5
+ARM_THICKNESS_NOTE = f"ARM THICKNESS {ARM_THICKNESS:.2f}"
 
 
 def _model_frame(adapter: Any, view: Any, *, scale: float, label: str):
@@ -375,30 +377,19 @@ async def build(adapter: Any) -> dict[str, str]:
         orientation="vertical",
     )
 
-    # RIGHT view (projected picks): the arm thickness at the arm's free end
-    # (short witness lines, text beyond the end) and the bore Ø on its
-    # visible circle, leadered down-right of the collar.
+    # RIGHT view: the arm thickness beside the arm's free end.  A
+    # view-adjacent note is deliberate: the short projected edges are not
+    # stable selectable entities across SolidWorks seats.
     at_right, (_rx, right_y, right_z) = _model_frame(
         adapter, right, scale=VIEW_SCALE, label="right view"
     )
-    arm_pick_z = ARM_Z[1] - 1.3
-    add_edge_dimension(
-        adapter,
-        right,
-        p0=find_edge_near(
-            adapter, right, at_right(ARM_HALF_X, ARM_Y[1], arm_pick_z),
-            axis="y", label="arm top face",
-        ),
-        p1=find_edge_near(
-            adapter, right, at_right(ARM_HALF_X, ARM_Y[0], arm_pick_z),
-            axis="y", label="arm bottom face",
-        ),
-        text_xy=_offset(
-            at_right(ARM_HALF_X, (ARM_Y[0] + ARM_Y[1]) / 2.0, ARM_Z[1]), right_z, 0.012
-        ),
-        label="arm thickness",
-        orientation="vertical",
+    arm_thickness_note_xy = _offset(
+        at_right(ARM_HALF_X, (ARM_Y[0] + ARM_Y[1]) / 2.0, ARM_Z[1]),
+        right_z,
+        0.012,
     )
+    if add_note(adapter, ARM_THICKNESS_NOTE, *arm_thickness_note_xy) is None:
+        raise RuntimeError("failed to add arm thickness note")
     bore_text = _offset(
         _offset(at_right(COLLAR_HALF_LEN, -COLLAR_OD / 2.0, -COLLAR_OD / 2.0), right_z, -0.012),
         right_y,

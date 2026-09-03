@@ -13,14 +13,14 @@ end views run 1:2; DETAIL A (the pivot end) runs 1:1; the isometric runs 1:3.
 
 The print carries no datums, frames, roughness symbols or basic dimensions
 (cad/docs/drawing-simplicity-policy.md).  The wedge is defined by its own
-sketch dimensions from the pivot (the sketch origin): north-east corner from
-the pivot, north edge, west taper run, axial length, south edge; the lock
-notch by its closed-end cap (centre from the pivot, full-radius diameter) plus
-the axis angle in the notes; the corners by their fillet radii; the post-mount
-taps by entity dimensions from the pivot hole (across the axis and along it)
-and a native callout.  The narrow pivot end -- pivot hole, 7 overhang, 16/24
-north widths and the two north radii -- is dimensioned in DETAIL A, where the
-1:2 plan is too small to hold it legibly (policy rule 7).
+sketch dimensions from the pivot (the sketch origin): west taper run, axial
+length and south edge; the lock notch by its closed-end cap (centre from the
+pivot, full-radius diameter) plus the axis angle in the notes; the south
+corners by their fillet radii; the post-mount taps by entity dimensions from
+the pivot hole (across the axis and along it) and a native callout. DETAIL A
+retains the narrow pivot-end geometry and native hole callout. Its unavailable
+overhang, north widths and north radii are stated in a compact adjacent note
+derived from the same build constants.
 
 Run with SolidWorks open::
 
@@ -56,6 +56,7 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     place_view,
     remove_notes_matching,
@@ -73,6 +74,7 @@ from build_cone_swing_platform import (
     POST_MOUNT_WEST_XZ,
     WEST_HALF_N,
     WEST_HALF_S,
+    _CORNERS,
 )
 from cone_swing_platform_spec import LOCK_NOTCH_SEAT_X, LOCK_NOTCH_SEAT_Z
 
@@ -158,17 +160,32 @@ TOP_KEEP = {
     "CornerSWR": (_SW[0] + 0.024, _SOUTH_Y + 0.0065),
     "CornerSER": (_SE[0] - 0.022, _SOUTH_Y + 0.006),
 }
-# DETAIL A dimensions, as offsets (sheet metres) from the projected corner /
-# pivot points: the pivot-to-corner width and the north edge under the north
-# end, the 7 overhang on the left, the two radii leadered from either side
-# above the pivot level, the pivot hole callout upper right.
-DETAIL_OFFSETS = {
-    "NorthHalfW": ("mid_pivot_ne", (0.0, -0.009)),
-    "NorthEdge": ("mid_ne_nw", (0.0, -0.018)),
-    "NorthOverhangDim": ("ne", (-0.014, 0.0035)),
-    "CornerNER": ("ne", (-0.030, 0.012)),
-    "CornerNWR": ("nw", (0.030, 0.010)),
+# The five marked sketch/fillet dimensions are unavailable from the derived
+# detail. State the same values from build constants beside the retained
+# pivot-end geometry instead of introducing fresh selection coordinates.
+_NORTH_CORNER_RADII = {
+    label: radius
+    for label, _x, _z, radius in _CORNERS
+    if label in {"NE", "NW"}
 }
+PIVOT_END_GEOMETRY_NOTE = "\n".join(
+    (
+        "DETAIL A PIVOT-END PROFILE",
+        (
+            f"FROM PIVOT C/L: EAST {HALF_WIDTH_N:.2f}; "
+            f"NORTH {NORTH_OVERHANG:.2f}"
+        ),
+        (
+            f"NORTH EDGE {HALF_WIDTH_N + WEST_HALF_N:.2f}; "
+            f"NE R{_NORTH_CORNER_RADII['NE']:.1f}; "
+            f"NW R{_NORTH_CORNER_RADII['NW']:.1f}"
+        ),
+    )
+)
+PIVOT_END_GEOMETRY_NOTE_XY = (
+    DETAIL_CENTER[0] + DETAIL_MODEL_RADIUS / 1000.0 + 0.008,
+    DETAIL_CENTER[1] - 0.010,
+)
 PIVOT_CALLOUT_OFFSET = (0.030, 0.040)  # from the NW corner, in the detail
 END_KEEP = {
     "PlateT": (END_CENTER[0] + 0.026, END_CENTER[1]),
@@ -176,9 +193,8 @@ END_KEEP = {
 DIMENSION_CALLOUTS = {
     "CapEDia": "NOTCH WIDTH",
 }
-# Radii print one place so the title block's .X row governs them; every
-# station and offset prints two.
-DIMENSION_PRECISION = {name: 1 for name in ("CornerNER", "CornerNWR", "CornerSWR", "CornerSER")}
+# Only the south radii remain imported; the north pair is explicit in the note.
+DIMENSION_PRECISION = {name: 1 for name in ("CornerSWR", "CornerSER")}
 # Post-mount stations from the pivot: the east hole's offset across the axis
 # (text left of its span), the pair's pitch across the axis, and each hole's
 # station along the axis on its own side of the plate.
@@ -363,38 +379,6 @@ def _entity_dimension(
     return display
 
 
-def _detail_keep(adapter: Any, detail: Any) -> dict[str, tuple[float, float]]:
-    """DETAIL A dimension positions from the detail's own projection.
-
-    The detail keeps the plan's orientation, but its centre and scale are
-    SolidWorks' to settle, so every position is an offset from a projected
-    model point (the pivot, the north-east and north-west sharp corners).
-    """
-    top_y = PLATE_T / 1000.0
-    pivot = model_point_in_view(adapter, detail, (0.0, top_y, 0.0), label="detail pivot")
-    ne = model_point_in_view(
-        adapter,
-        detail,
-        (-HALF_WIDTH_N / 1000.0, top_y, NORTH_OVERHANG / 1000.0),
-        label="detail NE corner",
-    )
-    nw = model_point_in_view(
-        adapter,
-        detail,
-        (WEST_HALF_N / 1000.0, top_y, NORTH_OVERHANG / 1000.0),
-        label="detail NW corner",
-    )
-    anchors = {
-        "pivot": pivot,
-        "ne": ne,
-        "nw": nw,
-        "mid_pivot_ne": ((pivot[0] + ne[0]) / 2.0, ne[1]),
-        "mid_ne_nw": ((ne[0] + nw[0]) / 2.0, ne[1]),
-    }
-    return {
-        name: (anchors[anchor][0] + dx, anchors[anchor][1] + dy)
-        for name, (anchor, (dx, dy)) in DETAIL_OFFSETS.items()
-    } | {"__nw": nw}
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -467,19 +451,27 @@ async def build(adapter: Any) -> dict[str, str]:
         f"removed {removed_tap_notes} redundant automatic tapped-hole note(s)"
     )
 
-    # The detail claims its dimensions FIRST: SolidWorks imports each marked
-    # model dimension into one view only (draw_pinion_bracket, 2026-09-02).
-    detail_positions = _detail_keep(adapter, detail)
-    detail_nw = detail_positions.pop("__nw")
-    detail_annotations = curate_view_dimensions(
-        adapter, detail, keep=detail_positions, view_label="detail"
+    detail_nw = model_point_in_view(
+        adapter,
+        detail,
+        (WEST_HALF_N / 1000.0, PLATE_T / 1000.0, NORTH_OVERHANG / 1000.0),
+        label="detail NW corner",
     )
-    top_annotations = curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
-    end_annotations = curate_view_dimensions(adapter, end, keep=END_KEEP, view_label="end")
-    set_dimension_callouts(adapter, [*top_annotations, *end_annotations], DIMENSION_CALLOUTS)
-    set_dimension_precision(
-        adapter, [*detail_annotations, *top_annotations], DIMENSION_PRECISION
+    top_annotations = curate_view_dimensions(
+        adapter, top, keep=TOP_KEEP, view_label="top"
     )
+    end_annotations = curate_view_dimensions(
+        adapter, end, keep=END_KEEP, view_label="end"
+    )
+    set_dimension_callouts(
+        adapter, [*top_annotations, *end_annotations], DIMENSION_CALLOUTS
+    )
+    set_dimension_precision(adapter, top_annotations, DIMENSION_PRECISION)
+    if (
+        add_note(adapter, PIVOT_END_GEOMETRY_NOTE, *PIVOT_END_GEOMETRY_NOTE_XY)
+        is None
+    ):
+        raise RuntimeError("failed to add pivot-end geometry note")
     for label, view in (("plan", top), ("detail", detail)):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME center marks to the {label} view")

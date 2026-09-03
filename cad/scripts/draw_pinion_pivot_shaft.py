@@ -24,11 +24,10 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_attached_note,
-    add_edge_dimension,
     add_property_linked_note,
     add_surface_finish,
     curate_view_dimensions,
@@ -40,7 +39,6 @@ from _drawing_common import (
     set_dimension_precision,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
-    set_reference_dimension,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -54,6 +52,7 @@ from pinion_pivot_shaft_spec import (
     SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     place_view,
 )
@@ -120,6 +119,8 @@ DIMENSION_PRECISION = {"ShaftDia": 3}
 # The crown note stands above-left of the left crown, its leader down to that
 # apex; the Ra (x~0.26) and the end view (x<=0.068) both stay clear.
 CROWN_NOTE_XY = (LEFT_END_X - 0.012, 0.238)
+OVERALL_NOTE = f"({OVERALL_LEN:.2f}) OVERALL REF"
+OVERALL_NOTE_XY = (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.040)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -194,24 +195,12 @@ async def build(adapter: Any) -> dict[str, str]:
         (0.0, 0.0, (SHAFT_LEN + CAP_SAG) / 1000.0),
         label="back crown apex",
     )
-    # The true overall (apex to apex), as a conspicuous reference below the
-    # body length so nobody saws the stock short (Harvey #25) -- review
-    # 2026-09-02: the overall had to be derived from both crowns.
-    overall = add_edge_dimension(
-        adapter,
-        right,
-        p0=front_apex,
-        p1=back_apex,
-        text_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.040),
-        label="overall length reference",
-        orientation="horizontal",
-        entity_types=("VERTEX", "VERTEX"),
-    )
-    set_reference_dimension(
-        adapter,
-        _early_bound(overall, "IDisplayDimension").GetAnnotation(),
-        label="overall length reference",
-    )
+    # The true overall is reference information derived from the same geometry
+    # contract as the model.  A view-adjacent note is deliberate: the shallow
+    # revolved crown apexes are not stable selectable drawing vertices across
+    # SolidWorks seats.
+    if add_note(adapter, OVERALL_NOTE, *OVERALL_NOTE_XY) is None:
+        raise RuntimeError("failed to add pinion pivot shaft overall reference note")
     # The crowns, called out FROM the left crown (whichever apex projects
     # left) rather than from the remote note block.
     left_apex = min((front_apex, back_apex), key=lambda point: point[0])
