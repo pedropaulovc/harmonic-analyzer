@@ -1215,6 +1215,51 @@ async def rack_pinion_mate(
     )
 
 
+def _prepare_component_configuration(
+    adapter: Any, path: str, configuration: str
+) -> None:
+    """Load and activate a part configuration before direct component insertion.
+
+    ``AddComponent5`` requires its source document to be loaded. Its documented
+    named-configuration route additionally assumes that configuration is usable
+    in the loaded model. Opening the source with the requested configuration and
+    then calling ``ShowConfiguration2`` handles both the first insertion and
+    later instances of the same already-loaded part. Without that activation,
+    every non-saved-current cone configuration persisted with
+    ``swFeatureErrorUnknown`` even though the component's
+    ``ReferencedConfiguration`` string was correct.
+    """
+    app = _early_bound(adapter.swApp, "ISldWorks")
+    adapter._attempt(lambda: app.DocumentVisible(False, 1), default=None)
+    try:
+        result = adapter._attempt(
+            lambda: app.OpenDoc6(path, 1, 1, configuration, 0, 0),
+            default=None,
+        )
+        model = result[0] if isinstance(result, tuple) else result
+    finally:
+        adapter._attempt(lambda: app.DocumentVisible(True, 1), default=None)
+    if not model:
+        model = adapter._attempt(lambda: app.GetOpenDocumentByName(path), default=None)
+    if not model:
+        raise RuntimeError(
+            f"failed to preload component configuration {configuration!r}: {path}"
+        )
+    model = _early_bound(model, "IModelDoc2")
+    activated = adapter._attempt(
+        lambda: model.ShowConfiguration2(configuration), default=None
+    )
+    if activated is not True:
+        raise RuntimeError(
+            f"failed to activate component configuration {configuration!r}: {path}"
+        )
+    actual = active_configuration_name(adapter, model)
+    if actual != configuration:
+        raise RuntimeError(
+            f"component source activated {actual!r}, expected {configuration!r}: {path}"
+        )
+
+
 async def place_component(
     adapter: Any,
     part: str,
@@ -1235,10 +1280,12 @@ async def place_component(
     ``ground=True`` fixes the component (structure: shafts, mounts, bushings,
     supports, frame, fasteners, cosmetic springs). ``ground=False`` leaves it
     free for the caller's mates to constrain -- the moving parts whose DOF are
-    driven from the crank. ``configuration`` selects a part configuration (the
-    cone-gear tooth counts, the transgear-removable wheels). Either way the
-    part is inserted on-solution so mate flip-recovery has a clean reference
-    and the read-back assert holds.
+    driven from the crank. For ``configuration``, the source part is opened and
+    activated in that configuration before insertion through AddComponent5's
+    documented named-configuration path; the inserted component's referenced
+    configuration is then read back exactly. Either way the part is inserted
+    on-solution so mate flip-recovery has a clean reference and the pose assert
+    holds.
     """
     from solidworks_mcp.adapters.base import (
         ComponentRefParameters,
@@ -1260,6 +1307,8 @@ async def place_component(
             raise RuntimeError(
                 f"missing part {path}; run build_{part.replace('-', '_')}.py first"
             )
+        if configuration:
+            _prepare_component_configuration(adapter, str(path), configuration)
         data = check(
             f"insert {label} @ ({position[0]:.2f}, {position[1]:.2f}, {position[2]:.2f})",
             await adapter.insert_component(
@@ -1267,11 +1316,20 @@ async def place_component(
                     file_path=str(path),
                     position=position,
                     rotation=rotation,
+                    # Resolve the requested source configuration before using
+                    # AddComponent5's documented ExistingConfigName route.
                     configuration=configuration,
                 )
             ),
         )
         name = data["name"]
+        if configuration:
+            actual_configuration = str(data.get("configuration", ""))
+            if actual_configuration != configuration:
+                raise RuntimeError(
+                    f"{name}: inserted configuration {actual_configuration!r}, "
+                    f"expected {configuration!r}"
+                )
         psp.set_attribute("component", name)
         if ground and not data.get("fixed"):
             check(

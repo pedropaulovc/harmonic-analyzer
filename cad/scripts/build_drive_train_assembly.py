@@ -2298,8 +2298,9 @@ async def build(adapter) -> dict[str, str]:
     # followers downstream follow active_count -- the build-speed knob (see
     # machine.yaml channels.active_count / _config.active_count; 20 = full).
     # Each configured cone gear is inserted directly at its authored station.
-    # Configuration selection happens in AddComponent5, never by mutating
-    # ReferencedConfiguration on an already inserted component.
+    # place_component activates the named source-part configuration, then uses
+    # AddComponent5's current-selected-configuration form and verifies the new
+    # component's ReferencedConfiguration. No inserted component is switched.
     cone_gears: list[tuple[int, str]] = []
     for j in range(20):
         teeth = _config.cone_teeth(j)

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import ast
+import asyncio
 import inspect
+from types import SimpleNamespace
 
+import _assembly as assembly
 import build_drive_train_assembly as drive
 
 
@@ -134,9 +137,10 @@ def test_every_authored_cone_is_keyed_before_downstream_gear_coupling() -> None:
     key_loop = build.body[key_index]
     assert isinstance(key_loop, ast.For)
     assert isinstance(key_loop.target, ast.Tuple)
-    assert [
-        item.id for item in key_loop.target.elts if isinstance(item, ast.Name)
-    ] == ["teeth", "cg"]
+    assert [item.id for item in key_loop.target.elts if isinstance(item, ast.Name)] == [
+        "teeth",
+        "cg",
+    ]
     key_call = _named_call(key_loop, "_key_to_shaft")
     assert isinstance(key_call.args[1], ast.Name) and key_call.args[1].id == "cg"
 
@@ -198,5 +202,86 @@ def test_cone_key_bank_is_force_rebuilt_before_cylinder_mesh_batch() -> None:
     assert key_index < rebuild_index < crank_mesh_index < cylinder_batch_index
     batch = build.body[cylinder_batch_index]
     assert isinstance(batch, ast.Expr) and isinstance(batch.value, ast.Call)
-    label = next(keyword.value for keyword in batch.value.keywords if keyword.arg == "label")
+    label = next(
+        keyword.value for keyword in batch.value.keywords if keyword.arg == "label"
+    )
     assert isinstance(label, ast.Constant) and label.value == "cylinder.mesh_bank"
+
+
+def test_configured_insert_uses_activated_source_configuration(
+    monkeypatch, tmp_path
+) -> None:
+    """The named insert must use an activated, loaded source configuration."""
+    part_path = tmp_path / "cone-gear.SLDPRT"
+    part_path.write_bytes(b"")
+    active = SimpleNamespace(Name="T120")
+    events: list[tuple] = []
+
+    class SourcePart:
+        ConfigurationManager = SimpleNamespace(ActiveConfiguration=active)
+
+        def ShowConfiguration2(self, name):  # noqa: N802
+            events.append(("activate", name))
+            active.Name = name
+            return True
+
+    source = SourcePart()
+
+    class Application:
+        def DocumentVisible(self, visible, doc_type):  # noqa: N802
+            events.append(("visible", visible, doc_type))
+
+        def OpenDoc6(  # noqa: N802
+            self, path, doc_type, options, configuration, errors, warnings
+        ):
+            events.append(
+                ("open", path, doc_type, options, configuration, errors, warnings)
+            )
+            return source
+
+        def GetOpenDocumentByName(self, path):  # noqa: N802
+            return source
+
+    class Adapter:
+        currentModel = object()
+        swApp = Application()
+
+        @staticmethod
+        def _attempt(operation, default=None):
+            try:
+                return operation()
+            except Exception:
+                return default
+
+        async def insert_component(self, params):
+            events.append(("insert", params.configuration, active.Name))
+            return SimpleNamespace(
+                is_success=True,
+                error=None,
+                data={
+                    "name": "cone-gear-2",
+                    "configuration": active.Name,
+                    "fixed": False,
+                },
+            )
+
+    monkeypatch.setattr(assembly, "OUT_SLDPRT", tmp_path)
+    monkeypatch.setattr(assembly, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(assembly, "assert_component_placed", lambda *_args: None)
+    monkeypatch.setattr(assembly, "_ledger_record", lambda *_args: None)
+
+    name = asyncio.run(
+        assembly.place_component(
+            Adapter(),
+            "cone-gear",
+            [0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0],
+            [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+            ground=False,
+            configuration="T114",
+        )
+    )
+
+    assert name == "cone-gear-2"
+    assert ("activate", "T114") in events
+    assert ("insert", "T114", "T114") in events
