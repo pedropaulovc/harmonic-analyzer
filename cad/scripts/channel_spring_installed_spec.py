@@ -5,8 +5,9 @@ manufacturing drawing (``draw_channel_spring_installed.py``).
 PURE DATA, no SolidWorks/COM imports.  Like the counter spring this is a SPEC
 SHEET (side view + data table, NO graphical marked dimensions).  This is the
 SAME spring as the free channel spring, drawn at its INSTALLED (stretched)
-length, so the table states BOTH the free body length and the installed body
-length distinctly.  Values MUST match ``_spring`` / build_channel_spring_installed.
+length, so the compact block states the relaxed free eye-centre length and the
+stretched view eye-centre length distinctly.  Values MUST match ``_spring`` /
+``build_channel_spring_installed``.
 """
 
 from __future__ import annotations
@@ -19,7 +20,7 @@ FREE_BODY_LENGTH = float(
 )  # relaxed body (the ch.17 p.41 inset callout)
 COIL_OD = 6.5
 WIRE_DIA = 1.0
-COIL_COUNT = 28
+COIL_COUNT = 28  # active body coils
 
 # Installed (in-machine) eye anchor heights -- the assembly-facing placement
 # contract (build_channel_assembly imports these; moved here from
@@ -50,8 +51,8 @@ FREE_EYE_C2C = FREE_BODY_LENGTH + 2.0 * HOOK_LEAD
 INSTALLED_BODY_LENGTH = LEVER_EYE_Y - PLATE_EYE_Y - 2.0 * HOOK_LEAD
 INSTALLED_EYE_C2C = round(INSTALLED_BODY_LENGTH + 2.0 * HOOK_LEAD, 2)
 FREE_PITCH = FREE_BODY_LENGTH / COIL_COUNT  # 1.14 -- NOT close-wound
-# Nominal rate k = G d^4 / (8 Dm^3 n), ASTM A228 G = 79.3 GPa -- stated REF so
-# the table carries a functional requirement, not just geometry.
+# Retained as derived engineering data for design checks; the compact shop
+# block carries only the manufacturing inputs and the view/supply lengths.
 SPRING_RATE_REF = 79300.0 * WIRE_DIA**4 / (8.0 * MEAN_DIA**3 * COIL_COUNT)
 
 # The spec-sheet data table + marked-dimension contract (DRAWING_DIMENSIONS /

@@ -2,8 +2,8 @@ r"""Pure-data dimensional contract shared by the pen rod and drawing."""
 
 from __future__ import annotations
 
-from _gtol_spec import GeometricControl, PartDatum, PlanarFace
-from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from _gtol_spec import GeometricControl, PartDatum
+from _surface_finish import SurfaceFinishControl
 
 
 ROD_SECTION = 5.0  # DIMENSIONS.md ch24: square section (low)
@@ -20,13 +20,11 @@ WIRE_HOLE_DIA = 1.994
 # is unchanged.
 PART_DATUMS: tuple[PartDatum, ...] = ()
 GEOMETRIC_CONTROLS: tuple[GeometricControl, ...] = ()
-# The -X slide face is the one running surface: the rod slides in the v-block
-# guide (rule 5).
-SURFACE_FINISHES = (
-    SurfaceFinishControl(
-        "slide_face", MACHINED_UM, PlanarFace((-1, 0, 0), ROD_SECTION / 2.0)
-    ),
-)
+# No roughness callouts either (machinist review 2026-09-02): the rod slides
+# in the v-block on its drawn-bar faces, which the note passes as received --
+# an Ra 1.6 on one of them contradicted that licence, and the block's Ra 3.2
+# covers a drawn brass face anyway (rule 5).
+SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "RodProfile": {"Section", "Length"},

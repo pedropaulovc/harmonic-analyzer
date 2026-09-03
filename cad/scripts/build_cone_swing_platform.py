@@ -59,6 +59,7 @@ from _common import (
     ensure_fully_defined,
     force_rebuild,
     name_bore_axis,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -71,7 +72,6 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
-    set_dimension_symmetric_tolerance,
 )
 from _holes import HoleSpec, blind_cut_dia_mm, wizard_holes
 from _visibility import blank_reference_geometry
@@ -80,8 +80,9 @@ from cone_swing_platform_spec import (
     DRAWING_NOTES,
     END_VIEW_NOTE,
     ISOMETRIC_VIEW_NOTE,
+    LOCK_NOTCH_SEAT_X,
+    LOCK_NOTCH_SEAT_Z,
     PLATE_THICKNESS,
-    PLATE_LENGTH_TOLERANCE_MM,
     PLAN_VIEW_NOTE,
     POST_MOUNT_THREAD,
 )
@@ -171,7 +172,9 @@ if POST_MOUNT_HALF_PITCH + POST_MOUNT_TAP_DIA / 2.0 > _POST_R:
 # at the engaged pose -- every west-side feature below (the flare, the lock
 # notch) is authored at local +x, east-side features at local -x.
 SLOT_W = 8.0  # notch width: O6.35 stud + chord-vs-arc slack (see above)
-SLOT_E_X, SLOT_E_Z = 27.5, -175.0  # engaged stud centre (part-local frame).
+SLOT_E_X, SLOT_E_Z = LOCK_NOTCH_SEAT_X, LOCK_NOTCH_SEAT_Z  # engaged stud centre
+# (part-local frame; the spec owns the pair so the print's notch angle derives
+# from the same numbers).
 # An exact rotating-solid sweep against T114 proves this 3 mm outward move
 # clears the cone gear through a full tooth pitch while retaining the notch
 # seat on the west flare.
@@ -322,6 +325,9 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=PLATE_T)),
     )
     name_last_feature(adapter, "Plate")
+    # Name the plate extrude DEPTH so the print dimensions the finished
+    # thickness natively on the end view.
+    name_dimensions(adapter, "Plate", ["PlateT"])
     v_plate = ((HALF_WIDTH_N + WEST_HALF_N) + (WEST_HALF_S + EAST_HALF_S)) / 2.0 \
         * PLATE_LEN * PLATE_T
     volume = await volume_check(adapter, "plate", v_plate, 0.005 * v_plate)
@@ -511,6 +517,8 @@ async def build(adapter) -> dict[str, str]:
             await adapter.add_fillet(r, [[cx_a, PLATE_T / 2.0, cz_l]]),
         )
         name_last_feature(adapter, f"Corner{lbl}")
+        # Name each fillet RADIUS so the plan dimensions the corners natively.
+        name_dimensions(adapter, f"Corner{lbl}", [f"Corner{lbl}R"])
         v_fillets += _corner_fillet_area(lbl, r) * PLATE_T
     volume = await volume_check(
         adapter, "rounded corners", volume - v_fillets, 0.01 * v_fillets
@@ -523,12 +531,8 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
-    set_dimension_symmetric_tolerance(
-        adapter,
-        "PlateProfile",
-        "PlateLenDim",
-        PLATE_LENGTH_TOLERANCE_MM,
-    )
+    # No bands: the wedge outline is a non-mating extent under the title
+    # block's tolerances (the pivot hole's fit rides its wizard feature).
     await volume_check(
         adapter, "driven platform (equations neutral)", volume, 0.01 * v_hole
     )

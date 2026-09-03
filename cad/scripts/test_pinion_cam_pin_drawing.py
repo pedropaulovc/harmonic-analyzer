@@ -38,6 +38,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert drawing.PIN_DIA == pinion_cam_pin_spec.PIN_DIA
     assert drawing.PIN_DIA == 4.016
     assert drawing.PIN_LEN == pinion_cam_pin_spec.PIN_LEN
+    assert pinion_cam_pin_spec.OVERALL_LEN == 17.8
 
 
 def test_sheet_runs_at_4_to_1_with_8_to_1_end_view() -> None:
@@ -54,10 +55,15 @@ def test_sheet_runs_at_4_to_1_with_8_to_1_end_view() -> None:
     assert pinion_cam_pin_spec.END_VIEW_NOTE == "END VIEW SCALE 8:1"
 
 
-def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
+def test_view_display_exposes_the_crown_root_edge() -> None:
     source = _source()
     assert "for view in (front, right):\n        set_hidden_lines_visible" in source
     assert "set_hidden_lines_removed(adapter, iso)" in source
+    assert drawing._TANGENT_EDGES_VISIBLE == 2
+    assert "iso.SetDisplayTangentEdges2(_TANGENT_EDGES_VISIBLE)" in source
+    assert "iso.GetDisplayTangentEdges2()" in source
+    assert "failed to show cam-pin crown-root edge" in source
+    assert "iso.UpdateViewDisplayGeometry()" in source
 
 
 def test_notes_are_few_specific_and_never_the_title_block() -> None:
@@ -106,10 +112,40 @@ def test_only_the_press_diameter_prints_three_decimals() -> None:
         ("CapProfile", "CapR"): "CAP_RADIUS_TOLERANCE_MM",
     }
     assert "PinDia" not in drawing.DIMENSION_CALLOUTS
-    assert "SEATED FLAT END TO CROWN ROOT" in drawing.DIMENSION_CALLOUTS["Depth"]
+    assert drawing.DIMENSION_CALLOUTS["Depth"] == "TO CROWN ROOT"
     assert "CapR" in drawing.RIGHT_KEEP
     assert "+/-" not in "\n".join(drawing.DIMENSION_CALLOUTS.values())
+
+
+def test_crown_reads_as_a_spherical_radius() -> None:
+    # SR2.92 on the view (machinist review 2026-09-02: the note had to be
+    # consulted to learn the R was a sphere): the imported radius prefix is
+    # rewritten to SR and the callout beneath says SPHERICAL CROWN.
+    source = _source()
+    assert drawing.SPHERICAL_RADIUS_DIMENSION == "CapR"
+    assert drawing.DIMENSION_CALLOUTS["CapR"] == "SPHERICAL CROWN"
+    assert source.count("_spherical_radius_prefix(") == 2  # def + call
+    assert 'prefix = "SR"' in source
+    assert "unexpected radius prefix" in source
+
+
+def test_overall_is_a_geometry_derived_view_adjacent_reference_note() -> None:
+    # The shallow revolved apex proved unreliable as a selectable drawing
+    # vertex.  Keep the conspicuous reference information without a geometry
+    # pick: the note is formatted from OVERALL_LEN and sits left/above the
+    # side view, opposite the 17.00 crown-root dimension.
+    source = _source()
+    assert drawing.OVERALL_NOTE == f"({pinion_cam_pin_spec.OVERALL_LEN:.2f}) OVERALL REF"
+    assert "add_note(adapter, OVERALL_NOTE, *OVERALL_NOTE_XY)" in source
+    assert "failed to add cam-pin overall reference note" in source
+    assert "add_edge_dimension(" not in source
     assert "set_reference_dimension(" not in source
+    assert "label=\"crown apex\"" not in source
+    assert drawing.OVERALL_NOTE_XY[0] < drawing.RIGHT_CENTER[0]
+    assert drawing.OVERALL_NOTE_XY[1] > drawing.RIGHT_CENTER[1]
+    assert drawing.RIGHT_KEEP["Depth"][0] > drawing.RIGHT_CENTER[0]
+    assert drawing.RIGHT_KEEP["CapR"][1] < drawing.RIGHT_CENTER[1] - 0.03
+    assert drawing.RIGHT_KEEP["CapR"][0] > drawing.RIGHT_CENTER[0]
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:
@@ -122,6 +158,8 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     assert spec["number"] == "MHA-116"
     assert spec["material"] == spec["material_specification"]
     assert spec["material_specification"]
-    assert spec["finish"]
+    # The FINISH cell no longer dictates "smooth turned" (the block's Ra 3.2
+    # governs); only the oil-film protection remains.
+    assert spec["finish"] == "bright; ISO VG 32 oil film"
     assert "fit_class" not in spec
     assert int(spec["quantity"]) == 2

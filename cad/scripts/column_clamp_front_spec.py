@@ -28,6 +28,12 @@ from column_clamp_front_geom import (  # noqa: F401
     EAR_SPACING,
 )
 
+# The relief slips on the O25.4 column: it may run over its 25.6 nominal but
+# never under (the title block's .X row would let it read 24.8).  (upper,
+# lower) deviations, applied to the model dimension by
+# build_column_clamp_front after the shared builder's gated save.
+COLUMN_BORE_BAND = (0.05, 0.00)
+
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  ``build_column_clamp_front`` marks exactly these;
 # ``draw_column_clamp_front`` keeps exactly their union across its per-view
@@ -39,14 +45,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BoreProfile": {"BoreDia"},
 }
 
-# Notes: part-specific process facts only, never a tolerance, never the
-# title block (drawing-simplicity-policy.md rule 6).
-DRAWING_NOTES = "\n".join(
-    (
-        "GRAY IRON CASTING; MACHINE ALL SURFACES SHOWN.",
-        "BORE THE COLUMN RELIEF CLAMPED TO ITS BACK ARC AS A PAIR (MATES WITH MHA-106).",
-        "PAINT AFTER MACHINING; MASK THE BORE, BAR FACE AND EAR HOLES.",
-    )
-)
-ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
+# The face the platen bar's back sits on, flagged from the view: the title
+# block's finish field masks it, so the print has to say which face it is.
+BAR_FACE_FLAG = "BAR FACE"
 
+# Notes: part-specific process facts only, never a tolerance, never the
+# title block (drawing-simplicity-policy.md rule 6).  Material, machining
+# and paint/masking live in the title block.
+DRAWING_NOTES = "BORE THE COLUMN RELIEF CLAMPED TO ITS BACK ARC AS A PAIR (MATES WITH MHA-106)."
+ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

@@ -66,12 +66,16 @@ SURFACE_FINISHES = (
     ),
 )
 
+# The overall height (foot seat to dome top) is derived: a REFERENCE on the
+# print beside the controlling bore height and head diameter.
+OVERALL_HEIGHT = BORE_HEIGHT + TOP_RADIUS
+
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "FootProfile": {"Width", "Depth"},
     "Foot": {"FootHt"},
-    # BoreHeight is recreated in the drawing between the actual datum-A foot
-    # edge and the bore circle so its BASIC witness cannot collapse onto the
-    # visually adjacent top of the flange.
+    # The bore location is recreated in the drawing between the foot seat /
+    # foot side and the bore circle (entity-selected), never to the visually
+    # adjacent top of the flange.
     "BoreProfile": {"BoreDia"},
     "DomeProfile": {"DomeDia"},
 }

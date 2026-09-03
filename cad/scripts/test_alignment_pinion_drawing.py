@@ -2,13 +2,18 @@
 
 The print follows cad/docs/drawing-simplicity-policy.md: a drum pressed onto
 its arbor carries no datums, frames or roughness symbols; the GEAR DATA block
-and two lines of notes are the whole specification beyond the bore.
+(with the over-pins acceptance), the bore callout in DETAIL B (3:1), the face
+length on a cut-face-only SECTION A-A and one line of notes are the whole
+specification.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
+import _gear_inspection
 import alignment_pinion_spec as spec
 import build_alignment_pinion as part
 import draw_alignment_pinion as drawing
@@ -29,25 +34,30 @@ def test_required_drawing_paths() -> None:
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    assert set(drawing.FRONT_KEEP) == marked == {"ArborBoreDia"}
-    assert set(drawing.DIMENSION_CALLOUTS) <= marked
+    assert set(drawing.DETAIL_KEEP) == marked == {"ArborBoreDia"}
 
 
-def test_gear_data_block_is_the_compact_tooth_system() -> None:
+def test_gear_data_block_is_the_compact_tooth_system_with_over_pins() -> None:
     data = spec.GEAR_DATA
     lines = data.split("\n")
     assert lines[0] == "GEAR DATA"
-    assert len(lines) <= 9
+    assert len(lines) <= 10
     for field in (
         "NUMBER OF TEETH", "DIAMETRAL PITCH", "PRESSURE ANGLE",
-        "PITCH DIAMETER (REF)", "OUTSIDE DIAMETER", "WHOLE DEPTH",
-        "FACE WIDTH", "TOOTH FORM",
+        "PITCH DIAMETER (REF)", "OUTSIDE DIAMETER", "WHOLE DEPTH (REF)",
+        "FACE WIDTH", "OVER 2 PINS", "TOOTH FORM",
     ):
         assert field in data, field
     assert "42" in data
-    assert "143.2" in data  # the only place the drum length is stated
+    assert "143.2" in data
+    assert "DIAMETRAL PITCH:  49.82" in data
     assert "X.XX" not in data
     assert "MODULE" not in data
+    # 42T, DP 49.82, 14.5 deg, the 1.00 pin -> 23.15 over two pins.
+    assert spec.PIN_DIA_MM == pytest.approx(1.00)
+    assert spec.PIN_DIA_MM == _gear_inspection.preferred_pin_dia_mm(spec.DIAMETRAL_PITCH)
+    assert spec.OVER_PINS.usable
+    assert "OVER 2 PINS 1.00 DIA:  23.15 +0/-0.10" in data
     source = _source()
     assert 'add_property_linked_note(adapter, "Gear Data"' in source
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
@@ -57,20 +67,38 @@ def test_notes_are_few_specific_and_never_the_title_block() -> None:
     notes = spec.DRAWING_NOTES
     lines = notes.split("\n")
     assert len(lines) <= 4
-    assert "FULL LENGTH OF THE DRUM" in notes
-    assert "LIGHT PRESS" in notes
-    assert "FINISH TO FIT" in notes
+    assert "MATES WITH THE 20 CYLINDER GEARS" in notes
+    # The full-length-teeth line (the views show it) and the second fit
+    # wording (now at the bore leader) are gone.
+    assert "FULL LENGTH" not in notes
+    assert "FINISH TO FIT" not in notes
     for banned in ("DATUM", "RUNOUT", "+/-", "MHA-", "DEBUR", "X.XX", "UOS"):
         assert banned not in notes, banned
 
 
-def test_press_bore_states_the_process_and_keeps_its_band_on_the_model() -> None:
-    assert drawing.DIMENSION_CALLOUTS == {"ArborBoreDia": "REAM THRU\nPRESS ON ARBOR"}
-    assert drawing.DIMENSION_PRECISION == {"ArborBoreDia": 2}
+def test_press_bore_states_the_whole_fit_at_the_leader_in_the_detail() -> None:
+    assert drawing.DIMENSION_CALLOUTS == {
+        "ArborBoreDia": "REAM THRU\nLIGHT PRESS ON ARBOR, FINISH TO FIT"
+    }
+    assert drawing.DIMENSION_PRECISION == {"ArborBoreDia": 3}
     assert spec.ARBOR_BORE_BAND == (-0.020, -0.040)
     build_source = Path(part.__file__).read_text(encoding="utf-8")
     assert "set_dimension_bilateral_tolerance(" in build_source
     assert "deviations(ARBOR_BORE_BAND)" in build_source
+    source = _source()
+    # Only the detail is curated (it claims the bore); the end view is never
+    # asked for model items, matching the pinion_arbor precedent.
+    assert source.count("curate_view_dimensions(") == 1
+    assert 'view_label="detail"' in source
+    assert 'view_label="front"' not in source
+    assert "set_dimension_callouts(adapter, detail_annotations" in source
+    assert drawing.DETAIL_SCALE == (3, 1)
+    assert drawing.DETAIL_RADIUS > spec.OUTSIDE_DIA / 2000.0
+    # The callout text sits outside the enlarged detail circle.
+    text = drawing.DETAIL_KEEP["ArborBoreDia"]
+    dx = text[0] - drawing.DETAIL_CENTER[0]
+    dy = text[1] - drawing.DETAIL_CENTER[1]
+    assert (dx * dx + dy * dy) ** 0.5 > drawing.DETAIL_RADIUS * drawing.DETAIL_SCALE[0]
 
 
 def test_print_carries_no_gdt_or_finish_symbols() -> None:
@@ -94,10 +122,40 @@ def test_print_carries_no_gdt_or_finish_symbols() -> None:
     )
 
 
-def test_hidden_lines_stay_on_in_both_orthographic_views() -> None:
-    # Two views, no isometric: nothing on this sheet removes hidden lines.
+def test_section_replaces_the_drum_profile_and_states_the_face_length() -> None:
     source = _source()
-    assert "for view in (front, right):\n        set_hidden_lines_visible" in source
+    assert "create_section_view(" in source
+    assert "show_only_cut_face(adapter, section" in source
+    assert 'section_label="A"' in source
+    assert "RIGHT_CENTER" not in source
+    assert (
+        drawing.SECTION_LINE[0][0]
+        == drawing.SECTION_LINE[1][0]
+        == drawing.FRONT_CENTER[0]
+    )
+    assert drawing.SECTION_HALF_LINE > spec.OUTSIDE_DIA / 2000.0
+    assert drawing.SECTION_NOTE == f"SECTION A-A\nFACE LENGTH {spec.FACE_WIDTH:.1f}"
+    assert "add_note(adapter, SECTION_NOTE, *SECTION_NOTE_XY)" in source
+    assert "add_edge_dimension(" not in source
+    # The 143 mm section fits between the end view and the right zone border.
+    half_len = spec.FACE_WIDTH / 2000.0
+    assert (
+        drawing.SECTION_CENTER[0] - half_len
+        > drawing.FRONT_CENTER[0] + spec.OUTSIDE_DIA / 2000.0
+    )
+    assert drawing.SECTION_CENTER[0] + half_len < 0.41
+    # The detail sits under the section, clear of it.
+    assert (
+        drawing.DETAIL_CENTER[1] + drawing.DETAIL_RADIUS * 3
+        < drawing.SECTION_CENTER[1] - spec.OUTSIDE_DIA / 2000.0
+    )
+
+
+def test_hidden_lines_stay_on_in_the_end_view() -> None:
+    # One orthographic view (the end view), no isometric: nothing on this
+    # sheet removes hidden lines.
+    source = _source()
+    assert "set_hidden_lines_visible(adapter, front)" in source
     assert "set_hidden_lines_removed" not in source
 
 

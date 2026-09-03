@@ -41,24 +41,27 @@ def test_spring_data_matches_the_build() -> None:
     )
 
 
-def test_data_table_distinguishes_free_and_installed_length() -> None:
+def test_data_block_is_compact_and_distinguishes_supply_from_view_length() -> None:
     notes = csi_notes.DRAWING_NOTES
-    assert "FREE BODY LENGTH" in notes
-    assert "INSTALLED BODY" in notes
-    assert f"{spec.FREE_BODY_LENGTH:.2f}" in notes
-    assert f"{spec.INSTALLED_BODY_LENGTH:.2f}" in notes
-    assert "RELAXED" in notes
-    assert "STRETCHED" in notes
-    assert "HOOK LEADS" in notes
-    assert "270 DEG LOOP" in notes
-    assert "FREE EYE C-C" in notes
-    assert "INSTALLED EYE C-C" in notes
+    lines = notes.split("\n")
+    assert lines[0] == "EXTENSION SPRING DATA"
+    assert len(lines) == 8
+    for token in ("WIRE Ø", "OD", "FREE LENGTH", "ACTIVE COILS", "RIGHT HAND", "ENDS"):
+        assert token in notes
+    assert f"{spec.WIRE_DIA:.2f}" in notes
+    assert f"{spec.COIL_OD:.2f}" in notes
+    assert f"{spec.FREE_EYE_C2C:.2f} EYE C-C" in notes
+    assert f"{spec.INSTALLED_EYE_C2C:.2f} EYE C-C (STRETCHED)" in notes
+    assert str(spec.COIL_COUNT) in notes
+    assert "270.0 DEG LOOPS" in notes
+    assert "LEADS" in notes
+    assert "EYES COPLANAR" in notes
+    assert lines[-1].strip() == "SUPPLY RELAXED"
+    assert max(len(line) for line in lines) <= 52
     assert "MATERIAL" not in notes
     assert "MUSIC WIRE" not in notes
-    # The spring data block is the rule-6 exception to four lines; the one
-    # prose line says what the reader cannot know from a stretched view.
-    assert notes.startswith("EXTENSION SPRING DATA")
-    assert notes.endswith("SUPPLIED RELAXED.")
+    for removed in ("COIL ID", "MEAN DIA", "FREE PITCH", "RATE"):
+        assert removed not in notes
     for banned in ("NOTE:", "DATUM", "BASIC", "WITHIN"):
         assert banned not in notes, banned
 
@@ -92,6 +95,9 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     import _config
 
     cfg = _config.parts("channel-spring-installed")
+    # MATERIAL is the music-wire spec (the "Alloy Steel" review finding was
+    # against the registry's material name, which the title block no longer
+    # shows); FINISH keeps the bright, oiled supply condition.
     assert cfg["material_specification"] == "ASTM A228 music-wire spring steel"
     assert cfg["finish"] == "bright (plain music wire, light oil)"
     assert int(cfg["quantity"]) == 20

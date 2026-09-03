@@ -60,13 +60,18 @@ FRONT_CENTER = (0.190, 0.175)
 RIGHT_CENTER = (0.295, 0.175)
 ISO_CENTER = (0.385, 0.210)
 
+# The bore callout sits upper-left and the roughness symbol lower-left, so
+# each leader lands radially on its own side of the 15 mm (3:1) bore and the
+# finish reads as the bore's, not a tooth's (machinist review 2026-09-02).
 FRONT_KEEP = {
-    "BoreDia": (FRONT_CENTER[0] - 0.055, FRONT_CENTER[1] - 0.030),
+    "BoreDia": (FRONT_CENTER[0] - 0.055, FRONT_CENTER[1] + 0.040),
 }
+BORE_FINISH_SYMBOL = (FRONT_CENTER[0] - 0.028, FRONT_CENTER[1] - 0.052)
 # Reamed slip fit on the stud's Ø5 seat; the band is on the model dimension
-# (build_transgear_feed_pinion), so the callout only names the process.
+# (build_transgear_feed_pinion), so the callout only names the process and
+# three decimals say "hold it".
 DIMENSION_CALLOUTS = {"BoreDia": "REAM THRU"}
-DIMENSION_PRECISION = {"BoreDia": 2}
+DIMENSION_PRECISION = {"BoreDia": 3}
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -130,7 +135,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         front,
-        symbol_xy=(FRONT_CENTER[0] + 0.016, FRONT_CENTER[1] - 0.058),
+        symbol_xy=BORE_FINISH_SYMBOL,
         control=surface_finish_by_key(SURFACE_FINISHES, "bore"),
         label="feed pinion bore finish",
         entity=bore_edge,

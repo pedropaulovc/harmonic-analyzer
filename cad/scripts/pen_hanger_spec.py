@@ -10,26 +10,30 @@ from __future__ import annotations
 
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
-# print shows.  The guide-block width and the tapered strap (bottom width, top
-# run, rise) are marked -- all Front-plane sketch dims, so they import cleanly
-# into the single front profile view.  The 5.4 square pen-rod channel, the block
-# depth/reach and the #6-32 hanger hole are carried in the notes / native callout
-# (the channel dim lives on a Top-plane sketch and the hole is a native Hole
-# Wizard feature, neither a clean front-view import). ---
+# print shows.  FRONT view (Front-plane sketches): the guide block's width and
+# height, the tapered strap's bottom width, top run, rise and the right edge's
+# lean (StrapTaperDx -- with the two widths it fixes both sloping edges).  TOP
+# view (Top-plane sketch): the 5.4 square pen-rod channel's two sides.  The
+# block depth, the strap thickness, the channel's two stations and the #6-32
+# hanger hole's stations are drawing-added on real edges; the hole size is a
+# native Hole Wizard callout. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "BlockProfile": {"BlockWidth"},
-    "StrapProfile": {"StrapBotWidth", "StrapTopRun", "StrapTaperDy"},
+    "BlockProfile": {"BlockWidth", "BlockDepth"},
+    "ChannelProfile": {"ChannelWidth", "ChannelDepth"},
+    "StrapProfile": {"StrapBotWidth", "StrapTaperDx", "StrapTaperDy", "StrapTopRun"},
 }
 
 # Notes: part-specific process facts only, never a tolerance, never the
 # title block (drawing-simplicity-policy.md rule 6).  Lines kept short
-# (<~60 chars) so the mid-band block stays clear of the isometric.
+# (<~68 chars) so the mid-band block stays clear of the isometric.  Every
+# number is on a view; the three lines are the bench fit (naming the mating
+# rod), the brazed joint's registration (the two faces that are flush) and
+# the strap foot's centring, the one relationship no single dimension states.
 DRAWING_NOTES = "\n".join(
     (
-        "5.40 SQ CHANNEL THRU BLOCK, 4.00 FROM THE FRONT FACE;",
-        "FILE TO A SLIDING FIT ON THE PEN ROD.",
-        "SILVER-BRAZE STRAP TO BLOCK BACK FACE, FLUSH. DO NOT MIRROR.",
-        "DRILL + TAP #6-32 UNC THRU STRAP FROM BACK, 5.00 BELOW TOP EDGE.",
+        "CHANNEL: FILE TO A SLIDING FIT ON THE PEN ROD (MATES WITH MHA-051).",
+        "SILVER-BRAZE THE STRAP TO THE BLOCK, BACK FACES FLUSH.",
+        "STRAP FOOT CENTRED ON THE BLOCK WIDTH.",
     )
 )
 FRONT_VIEW_NOTE = "FRONT VIEW SCALE 2:1"

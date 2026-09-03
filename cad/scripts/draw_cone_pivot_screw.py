@@ -4,11 +4,11 @@ The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): a
 pivot screw is not on the rule-3 GD&T allowlist, so it carries no datums and
 no feature-control frames -- the two bands the block cannot express ride
 their model dimensions (build_cone_pivot_screw.py).  Both turned diameters
-and every length sit on the longitudinal side view with the thread
-designation, the thread-start chamfer and the under-head fillet leadered
-to their features; the slot is dimensioned on the slot-profile (*Right)
-view; the thread-end view carries the one roughness symbol, on the ground
-shoulder (rule 5).
+and every length sit on the longitudinal side view, the (REF) overall
+outside them, with the thread designation, the thread-start chamfer and
+the under-head fillet leadered to their features; the slot is dimensioned
+on the slot-profile (*Right) view; the thread-end view carries the one
+roughness symbol, on the ground shoulder (rule 5).
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ from _drawing_common import (
     set_hidden_lines_visible,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _fastener_annotations import add_thread_leader
+from _fastener_annotations import add_overall_reference, add_thread_leader
 from _fastener_drawing import FastenerSheet, build_fastener_sheet
 from _surface_finish import surface_finish_by_key
 from cone_pivot_screw_spec import (
@@ -108,18 +108,32 @@ SLOT_KEEP = {
     "SlotDepth": (RIGHT_CENTER[0] + _HEAD_HALF + 0.012, _HEAD_TOP_Y - 0.008),
 }
 # Leadered callouts: the thread designation to the tail's left outline
-# (text lower-left), the thread-start chamfer to the same outline near the
-# tip (text below the tip), the under-head fillet to the shoulder's right
-# outline just under the head (text right of the profile, under the
-# head-height dimension and left of the slot-profile view).
+# (text lower-left), the thread-start chamfer to the tail's end-face edge
+# just right of the axis (text below the tip -- the overall's witness line
+# runs LEFT from that face's centre, so the leader lands clear of it), the
+# under-head fillet to the shoulder's right outline just under the head
+# (text right of the profile, under the head-height dimension and left of
+# the slot-profile view).
 THREAD_LEADER_XY = (SIDE_CENTER[0] - _TAIL_HALF, _TIP_Y + 0.018)
 THREAD_NOTE_XY = (SIDE_CENTER[0] - 0.058, _TIP_Y + 0.009)
-CHAMFER_LEADER_XY = (SIDE_CENTER[0] - _TAIL_HALF, _TIP_Y + 0.004)
-CHAMFER_NOTE_XY = (SIDE_CENTER[0] - 0.010, _TIP_Y - 0.017)
+CHAMFER_LEADER_XY = (SIDE_CENTER[0] + 0.004, _TIP_Y)
+CHAMFER_NOTE_XY = (SIDE_CENTER[0] - 0.006, _TIP_Y - 0.017)
 FILLET_LEADER_XY = (SIDE_CENTER[0] + _SHOULDER_HALF, _UNDERHEAD_Y - 0.005)
 FILLET_NOTE_XY = (SIDE_CENTER[0] + 0.038, _UNDERHEAD_Y - 0.015)
 SIDE_AXIS_FACE_XY = (SIDE_CENTER[0], _TIP_Y + 0.028)
 SLOT_AXIS_FACE_XY = (RIGHT_CENTER[0], (_HEAD_TOP_Y + _UNDERHEAD_Y) / 2.0)
+# (REF) overall, head top to tail tip, in a column LEFT of the profile (the
+# right side holds the head/thread lengths and the fillet callout up to the
+# slot-profile view): model points on the left half of each end face (the
+# head-top rim is whole there; the slot breaks it beside the axis), text
+# beside the tail below the shoulder-diameter callout and clear of the
+# thread-end view.
+OVERALL_DIM_X = SIDE_CENTER[0] - 0.066
+OVERALL_END_POINTS_MM = (
+    (-0.7 * HEAD_DIA / 2.0, HEAD_T, 0.0),
+    (-0.7 * THREAD_SOLID_DIA / 2.0, -UNDERHEAD_LEN, 0.0),
+)
+OVERALL_TEXT_XY = (OVERALL_DIM_X, 0.140)
 
 
 def _decorate(adapter: Any, side: Any, end: Any, _iso: Any) -> None:
@@ -147,7 +161,16 @@ def _decorate(adapter: Any, side: Any, end: Any, _iso: Any) -> None:
         entity_xy=CHAMFER_LEADER_XY,
         note_xy=CHAMFER_NOTE_XY,
         label="thread start chamfer",
-        entity_type="SILHOUETTE",
+        entity_type="EDGE",
+    )
+    add_overall_reference(
+        adapter,
+        side,
+        end_points_mm=OVERALL_END_POINTS_MM,
+        entity_types=("EDGE", "EDGE"),
+        text_xy=OVERALL_TEXT_XY,
+        orientation="vertical",
+        label="overall length reference",
     )
     add_attached_note(
         adapter,

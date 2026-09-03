@@ -89,7 +89,6 @@ from _part_pmi import author_part_pmi
 from cone_gear_shaft_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
-    END_VIEW_NOTE,
     GEOMETRIC_CONTROLS,
     PART_DATUMS,
     SECTION_DIA_BAND,
@@ -212,10 +211,9 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_properties(
         adapter,
         PART_NAME,
-        {
-            "Manufacturing Notes": DRAWING_NOTES,
-            "End View Note": END_VIEW_NOTE,
-        },
+        # No end-view label: the print has no end view (every diameter reads
+        # on its land of the side view or DETAIL A).
+        {"Manufacturing Notes": DRAWING_NOTES},
     )
     return await save_part_and_images(adapter, PART_NAME)
 

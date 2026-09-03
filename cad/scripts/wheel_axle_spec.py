@@ -13,12 +13,14 @@ STUD_LEN = 17.0  # 2026-09-02: runs through the washer + hex nut (ch21 p.51), ti
 STUD_DIA_BAND = (-0.02, -0.05)
 WHEEL_HUB_RIDE = 10.0
 WASHER_START = FLANGE_LEN + WHEEL_HUB_RIDE
+COLLAR_START = WASHER_START
 COLLAR_DIA = 9.0  # the WASHER under the nut (2026-09-02: the collar was the photo's
 # washer + hex nut collapsed; the nut is now its own part, wheel-axle-nut)
 COLLAR_LEN = 1.0
 NUT_AF = 8.0  # hex nut across flats (ch21 p.51, low)
 NUT_H = 3.0
 NUT_BORE_DIA = 5.1  # slips the O5 stud (0.05 radial)
+OVERALL_LEN = FLANGE_LEN + STUD_LEN
 
 # The washer splits the stud exterior into two diameter-5 faces. Select the
 # running surface at a station inside the wheel-hub span.
@@ -39,14 +41,27 @@ SURFACE_FINISHES = (
     SurfaceFinishControl("stud_bearing", MACHINED_UM, STUD_BEARING_FACE),
 )
 
+# Marked model dimensions: the three diameters plus the axial stations from
+# the flange's bar-side (faced) end -- 3.00 to the flange top, 13.00 to the
+# collar (the extrusion's named start offset), with the collar's own 4.00 a
+# reference; the drawing adds the 17.00 overall between the end faces
+# (policy rule 7; machinist review 2026-09-02: the 14.00 stud length read as
+# the overall and the dims ran from several faces).
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "FlangeProfile": {"FlangeDia"},
     "StudProfile": {"StudDia"},
     "CollarProfile": {"CollarDia"},
     "Flange": {"FlangeLength"},
-    "Stud": {"StudLength"},
-    "Collar": {"CollarLength"},
+    "Collar": {"CollarStart", "CollarLength"},
 }
+
+# The two concave shoulder roots (flange -> stud, stud -> collar) are
+# modelled sharp; the print allows the turning tool's nose radius as a
+# leadered note on one shoulder rather than a fillet feature (policy rule 7:
+# every shoulder fillet on a turned part has a size; machinist review
+# 2026-09-02: an unspecified root is a bench question). The wheel hub rides
+# the stud mid-span, so R0.25 MAX at either root is a clearance, not a fit.
+ROOT_NOTE = "2X ROOT R0.25 MAX"
 
 # Notes: part-specific process facts only, never a tolerance, never the
 # title block (drawing-simplicity-policy.md rule 6).

@@ -27,6 +27,15 @@ SHANK_LEN = _SPEC.length_mm  # full shank (proud + embedded), the nominal length
 THREAD = _SPEC.thread  # "#8-32"
 THREAD_DESIGNATION = f"{THREAD} UNC"  # leadered to the shank on the side view
 
+# The part is authored with its origin at the BASE TOP (build_swing_stop_
+# screw.py): the shank runs EMBED_LEN down into the base's stop hole and
+# PROUD_LEN up past the 6.35 plate band, the head sitting on top of that.
+# The drawing projects its overall picks from these true model extents.
+EMBED_LEN = 6.0  # into the base's stop hole
+PROUD_LEN = 8.0  # above the base top: covers the 6.35 plate band + margin
+if EMBED_LEN + PROUD_LEN != SHANK_LEN:
+    raise ValueError("swing-stop shank segments must sum to the catalog length")
+
 # The head-end view carries the head diameter; the side view the two
 # extrude-depth lengths; the slot-profile (*Right) view the slot width and
 # depth, where the notch is visible rather than a hidden line.  The shank

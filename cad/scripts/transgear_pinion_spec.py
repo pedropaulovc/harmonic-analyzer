@@ -7,6 +7,12 @@ gear-drawing pattern in ``cylinder_gear_spec``.
 
 from __future__ import annotations
 
+from _gear_inspection import (
+    diametral_pitch_text,
+    over_pins_row,
+    pin_measurement,
+    preferred_pin_dia_mm,
+)
 from _surface_finish import SurfaceFinishControl
 
 
@@ -22,7 +28,7 @@ WHOLE_DEPTH = 2.157 / DIAMETRAL_PITCH * MM_PER_IN
 
 BORE_DIA = 5.0  # rides the knob shaft's turned-down Ø5 seat
 FACE_WIDTH = 4.0
-BORE_DIA_BAND = (0.05, 0.03)
+BORE_DIA_BAND = (0.05, 0.00)  # admits a nominal 5 mm reamer
 
 # No roughness callouts: the pinion is locked to the knob shaft (the knob
 # cluster turns as one body), so nothing runs on the bore; the title block's
@@ -33,6 +39,17 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BoreProfile": {"BoreDia"},
 }
 
+# Over-pins acceptance (Machinery's Handbook 1.92/P wire, see _gear_inspection):
+# the tooth-to-bore relationship the review asked for is checked with the
+# same pin walked round the tooth spaces against the reamed bore.
+PIN_DIA_MM = preferred_pin_dia_mm(DIAMETRAL_PITCH)
+OVER_PINS = pin_measurement(
+    teeth=TEETH,
+    diametral_pitch=DIAMETRAL_PITCH,
+    pressure_angle_deg=PRESSURE_ANGLE_DEG,
+    pin_dia_mm=PIN_DIA_MM,
+)
+
 
 def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> str:
     """Render an aligned gear/sprocket data block for a property-linked note."""
@@ -42,12 +59,13 @@ def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> 
 GEAR_DATA = gear_data_note(
     [
         ("NUMBER OF TEETH", f"{TEETH}"),
-        ("DIAMETRAL PITCH", f"{DIAMETRAL_PITCH:.2f}"),
+        ("DIAMETRAL PITCH", diametral_pitch_text(DIAMETRAL_PITCH)),
         ("PRESSURE ANGLE", f"{PRESSURE_ANGLE_DEG:.1f} DEG"),
         ("PITCH DIAMETER (REF)", f"{PITCH_DIA:.2f}"),
         ("OUTSIDE DIAMETER", f"{OUTSIDE_DIA:.2f} +0/-0.10"),
-        ("WHOLE DEPTH", f"{WHOLE_DEPTH:.2f}"),
+        ("WHOLE DEPTH (REF)", f"{WHOLE_DEPTH:.2f}"),
         ("FACE WIDTH", f"{FACE_WIDTH:.2f}"),
+        over_pins_row(OVER_PINS),
         ("TOOTH FORM", "INVOLUTE, FULL DEPTH"),
     ]
 )

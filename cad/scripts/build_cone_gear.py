@@ -1,7 +1,8 @@
 r"""Reproduction script: cone gear (book ch. 12, pp. 16-21) -- parametric prototype.
 
-One part, configuration-driven tooth count (plan M4: prototype 3 configs
-before committing to the full 6..120-step-6 set of 20). All config-varying
+One part, configuration-driven tooth count. A 3-configuration prototype
+validated regeneration before the build expanded to the full 6..120-step-6
+set of 20. All config-varying
 geometry is equation-driven so a configuration switch regenerates the gear
 from ``ToothCount``/``DP``/``PA`` alone:
 
@@ -35,13 +36,13 @@ circle, ``inv`` the involute function), the gap between tooth 0 (centred on
 involute starting at angle ``+Delta``) and above by tooth 1's lower flank
 (the involute starting at ``Gamma - Delta``, ``Gamma = 2*pi/N``).
 
-Prototype scope notes:
+Geometry notes:
 
-* **Configured bore, no keyway** (Appendix C #7 resolution): at DP 30 the
-  small gears cannot clear the 9.5 mm shaft (6T OD is 6.77 mm), so the
+* **Configured bore, no keyway** (Appendix C #7 resolution): at DP 49.82 the
+  small gears cannot clear the 9.5 mm shaft (T006 OD is 4.08 mm), so the
   shaft steps down at the tip (`build_cone_gear_shaft.py`) and the bore
-  diameter is a configured global ``BoreDia``: 3/8" for T024..T120, then
-  1/4" (T018), 3/16" (T012), 1/8" (T006) -- the 6T wall comes out 0.8 mm,
+  diameter is a configured global ``BoreDia``: 3/8" for T024..T120, 1/4"
+  for T018, 1/8" for T012, and 1/32" for T006. The T006 wall is 0.49 mm,
   matching the visibly thin tip rod in the p.18 photos. The bore circle is
   origin-centred with a DRIVING diameter dimension equation-linked to
   ``BoreDia`` (an origin-snapped circle + driving dim is fully defined and
@@ -53,9 +54,10 @@ Prototype scope notes:
   circle is slightly inside root, for small N teeth come out stub-form --
   the 6T gear is severely undercut at standard proportions anyway).
 
-Dimensions: cad/DIMENSIONS.md "Chapter 12" -- DP 30 / PA 14.5 deg (module
-resolved M4 prep), face width 6.5 mm (M6.7 mesh packing; annotated 7 is
-inconsistent with the drum grid, see FACE_WIDTH comment), tooth counts 6k.
+Dimensions: cad/DIMENSIONS.md "Chapter 12" -- DP 49.82 / PA 14.5 deg
+(the cone and cylinder trains share the same tooth system), face width
+6.5 mm (M6.7 mesh packing; annotated 7 is inconsistent with the drum grid,
+see FACE_WIDTH comment), tooth counts 6k.
 
 Layout: gear axis = Z through the origin, blank extruded +Z from the Front
 plane (z = 0..7 mm).
@@ -76,10 +78,15 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
 )
 from _grouped_bom_properties import apply_grouped_bom_properties
+from _fit_limits import deviations
 from _part_pmi import author_part_pmi
 from cone_gear_spec import (
+    BORE_DIA_BAND,
+    CONFIGURATION_TABLE_A,
+    CONFIGURATION_TABLE_B,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     GEAR_DATA,
@@ -162,7 +169,7 @@ def bore_dia_in(teeth: int) -> float:
     drawn rod and SOLDERED to the shaft (p.21 macro shows solder blobs) --
     no keyway. WARNING: the 1/32" (0.79 mm) tip journal carrying T006 is
     mechanically marginal; it follows directly from the 62.2 OD anchor
-    (low confidence) and is flagged for Phase 3 rebuild validation.
+    (low confidence) and remains a documented design risk.
     """
     if teeth <= 6:
         return 0.03125  # 0.79 mm -- T006 root r 0.89 mm leaves a 0.49 mm wall (marginal)
@@ -836,6 +843,12 @@ async def build(adapter) -> dict[str, str]:
     )
     apply_custom_properties(adapter, {"Description": description})
     await report_mass_properties(adapter)
+    # Every configured bore is reamed for 0.03..0.05 mm diametral solder
+    # clearance on its matching shaft step. The native tolerance follows the
+    # configured BoreCutDia nominal; the family table states the common band.
+    set_dimension_bilateral_tolerance(
+        adapter, "BoreProfile", "BoreCutDia", *deviations(BORE_DIA_BAND)
+    )
 
     # Mark the bore as the single manufacturing model dimension (on the drawn
     # T120 config) and stamp the title-block + gear-data properties the curated
@@ -846,7 +859,14 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_properties(
         adapter,
         PART_NAME,
-        {"Gear Data": GEAR_DATA, "Manufacturing Notes": DRAWING_NOTES},
+        {
+            "Gear Data": GEAR_DATA,
+            "Manufacturing Notes": DRAWING_NOTES,
+            # The 20-member family, ten per note (OD / whole depth / bore /
+            # over-pins), so the sheet orders every configuration explicitly.
+            "Configuration Table A": CONFIGURATION_TABLE_A,
+            "Configuration Table B": CONFIGURATION_TABLE_B,
+        },
     )
     artefacts.update(await save_part_and_images(adapter, PART_NAME))
 

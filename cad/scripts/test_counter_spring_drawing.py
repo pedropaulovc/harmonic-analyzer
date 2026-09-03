@@ -40,22 +40,25 @@ def test_spring_data_matches_the_build() -> None:
     )
 
 
-def test_data_table_carries_the_spring_parameters() -> None:
+def test_data_block_is_compact_and_carries_the_spring_parameters() -> None:
     notes = counter_spring_notes.DRAWING_NOTES
-    for token in ("WIRE DIA", "COIL OD", "FREE BODY LENGTH", "TOTAL COILS", "WIND", "ENDS"):
+    lines = notes.split("\n")
+    assert lines[0] == "EXTENSION SPRING DATA"
+    assert len(lines) == 6
+    for token in ("WIRE Ø", "OD", "FREE LENGTH", "ACTIVE COILS", "RIGHT HAND", "ENDS"):
         assert token in notes
     assert f"{counter_spring_spec.WIRE_DIA:.2f}" in notes
     assert f"{counter_spring_spec.COIL_OD:.2f}" in notes
-    assert f"{counter_spring_spec.COIL_BODY_LENGTH:.2f}" in notes
+    assert f"{counter_spring_spec.FREE_EYE_C2C:.2f} EYE C-C" in notes
     assert str(counter_spring_spec.COIL_COUNT) in notes
-    assert "HOOK LEADS" in notes
-    assert "270 DEG LOOP" in notes
-    assert "FREE EYE C-C" in notes
+    assert "270.0 DEG LOOPS" in notes
+    assert "LEADS" in notes
+    assert "COPLANAR" in notes
+    assert max(len(line) for line in lines) <= 52
     assert "MATERIAL" not in notes
     assert "MUSIC WIRE" not in notes
-    # The spring data block is the rule-6 exception to four lines; it carries
-    # data only -- no assembly narration (the gooseneck post is another part).
-    assert notes.startswith("EXTENSION SPRING DATA")
+    for removed in ("COIL ID", "MEAN DIA", "FREE PITCH", "RATE"):
+        assert removed not in notes
     for banned in ("NOTE:", "GOOSENECK", "TOWERS", "DATUM", "BASIC", "WITHIN"):
         assert banned not in notes, banned
 

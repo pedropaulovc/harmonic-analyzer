@@ -1,9 +1,13 @@
 r"""Create the curated machinist drawing for the pen square rod.
 
 The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): a
-length of drawn square bar carries no datums and no feature-control frames --
-its slide fit is the band on the model section, plus one roughness symbol on
-the face that slides in the v-block; the wire hole says DRILL on its callout.
+length of drawn square bar carries no datums, no feature-control frames and
+no roughness symbol -- its slide fit is the band on the model section and the
+drawn faces pass as received. The wire hole is located along the rod on the
+front view; its size (#47 DRILL on the callout) and its 2.50 centring across
+the section read in DETAIL A at 4:1, where a 2.5 mm span is legible (policy
+rule 7: a feature too small to dimension at the sheet scale gets a detail;
+machinist review 2026-09-02: the 2.50 crowded the top view's 5.00).
 """
 
 from __future__ import annotations
@@ -19,9 +23,10 @@ from _drawing_common import (
     add_edge_dimension,
     add_native_hole_callout,
     add_property_linked_note,
-    add_surface_finish,
+    create_detail_view,
     curate_view_dimensions,
     finalize_drawing,
+    model_point_in_view,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
@@ -30,8 +35,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import surface_finish_by_key
-from pen_rod_spec import ROD_LENGTH, SURFACE_FINISHES, WIRE_HOLE_DIA, WIRE_HOLE_Y
+from pen_rod_spec import ROD_LENGTH, ROD_SECTION, WIRE_HOLE_DIA, WIRE_HOLE_Y
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -56,6 +60,15 @@ FRONT_CENTER = (0.070, 0.150)
 RIGHT_CENTER = (0.140, 0.150)
 TOP_CENTER = (0.070, 0.245)
 ISO_CENTER = (0.340, 0.195)
+
+# DETAIL A (4:1): a circle around the wire hole on the front view -- 6 mm
+# radius takes in the hole and both rod faces -- enlarged right of the right
+# view and left of the isometric, under the top view's row. At 4:1 the
+# 5 mm section reads 20 mm across and the O1.99 hole 8 mm, so the 2.50
+# centring dimension and the hole callout both fit legibly.
+DETAIL_RADIUS = 0.006
+DETAIL_CENTER = (0.195, 0.175)
+DETAIL_SCALE = (4, 1)
 
 FRONT_KEEP = {
     "Length": (FRONT_CENTER[0] - 0.030, FRONT_CENTER[1]),
@@ -132,6 +145,10 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, right, top):
         set_hidden_lines_visible(adapter, view)
 
+    # The front and top views are curated as before; the detail is NOT -- its
+    # circle takes in both rod faces, so a curation there could claim the
+    # Section dimension. It only receives the two coordinate-picked
+    # annotations below.
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
     )
@@ -144,11 +161,11 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add ASME center mark to the wire hole")
 
     front_bottom = (FRONT_CENTER[0], FRONT_CENTER[1] - ROD_LENGTH / 2000.0)
-    front_side = (FRONT_CENTER[0] - 0.0025, FRONT_CENTER[1])
     hole_center_y = front_bottom[1] + WIRE_HOLE_Y / 1000.0
     hole_bottom = (FRONT_CENTER[0], hole_center_y - WIRE_HOLE_DIA / 2000.0)
-    hole_side = (FRONT_CENTER[0] + WIRE_HOLE_DIA / 2000.0, hole_center_y)
 
+    # Along the rod: bottom face -> hole (line-to-circle, so the value is to
+    # the hole centre), on the front view where the bottom face is.
     add_edge_dimension(
         adapter,
         front,
@@ -157,43 +174,50 @@ async def build(adapter: Any) -> dict[str, str]:
         text_xy=(FRONT_CENTER[0] + 0.032, FRONT_CENTER[1] + 0.030),
         label="wire-hole length location",
     )
-    # Locate the wire hole ACROSS the square section too: the native callout gives
-    # only the drill size, so without this the cross-hole could sit off-centre and
-    # still satisfy every shown dimension. Left slide face -> hole (line-to-circle,
-    # so the value is to the hole centre) reads 2.50 of the 5.00 section = centred.
+
+    # DETAIL A around the hole, enlarged 4:1. The hole centre and the rod's
+    # slide face are projected from the MODEL into the detail (the detail is
+    # positioned on its circle centre, but the projection is exact).
+    detail = create_detail_view(
+        adapter,
+        front,
+        center=(FRONT_CENTER[0], hole_center_y),
+        radius=DETAIL_RADIUS,
+        view_xy=DETAIL_CENTER,
+        detail_label="A",
+        scale=DETAIL_SCALE,
+        label="wire hole detail",
+    )
+    hole_cx, hole_cy = model_point_in_view(
+        adapter, detail, (0.0, WIRE_HOLE_Y / 1000.0, 0.0), label="detail hole centre"
+    )
+    hole_r = WIRE_HOLE_DIA / 2000.0 * DETAIL_SCALE[0]
+    face_x = hole_cx - ROD_SECTION / 2000.0 * DETAIL_SCALE[0]
+    # Across the section: left slide face -> hole centre reads 2.50 of the
+    # 5.00 section = centred, so the cross-hole cannot drift off-centre.
+    # Horizontal so the value is the X component, text ABOVE the detail
+    # circle (SolidWorks puts the "DETAIL A SCALE 4:1" label below it).
     add_edge_dimension(
         adapter,
-        front,
-        p0=front_side,
-        p1=hole_side,
-        text_xy=(FRONT_CENTER[0] - 0.030, hole_center_y + 0.020),
+        detail,
+        p0=(face_x, hole_cy - 0.010),
+        p1=(hole_cx + hole_r, hole_cy),
+        text_xy=(hole_cx - 0.005, hole_cy + DETAIL_RADIUS * DETAIL_SCALE[0] + 0.010),
         label="wire-hole centerline location",
+        orientation="horizontal",
     )
+    # The size and process, leadered off the hole's rim down-right, the
+    # callout text outside the circle and clear of the isometric.
     add_native_hole_callout(
         adapter,
-        front,
-        edge_xy=hole_side,
-        callout_xy=(FRONT_CENTER[0] + 0.034, hole_center_y + 0.017),
+        detail,
+        edge_xy=(hole_cx + hole_r, hole_cy),
+        callout_xy=(hole_cx + 0.031, hole_cy - 0.018),
         label="pen-rod wire hole",
         process="#47 DRILL",
     )
 
-    # The slide face is the one running surface (the rod slides in the v-block
-    # guide), so it alone carries a roughness symbol. It sits RIGHT of the rod
-    # and BELOW the right view, reaching back up-left to the slide face: the
-    # leader leaves the triangle tip AT the anchor and the ~46 mm body draws
-    # up-RIGHT of it, so a target up-LEFT keeps the leader clear of the body.
-    # y=0.068 keeps the run under the right view (its box starts at y=0.090,
-    # and a leader through a view it does not annotate fails the crossing
-    # gate) and above the notes.
-    add_surface_finish(
-        adapter,
-        front,
-        edge_xy=(front_side[0], FRONT_CENTER[1] - 0.050),
-        symbol_xy=(0.170, 0.068),
-        control=surface_finish_by_key(SURFACE_FINISHES, "slide_face"),
-        label="pen-rod slide face finish",
-    )
+    # No roughness symbol: the drawn-bar faces pass as received (rule 5).
 
     # 0.015, centred in the corridor between the drawn frame rule (x~0.0128)
     # and the title block's left edge (0.2658). Measured on the 2026-07-16

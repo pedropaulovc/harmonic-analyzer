@@ -2,7 +2,10 @@
 
 The print follows cad/docs/drawing-simplicity-policy.md: a flanged stud turned
 in one setting carries no datums or frames; the stud's running fit is the band
-on the model diameter, plus one Ra on the OD the wheel spins on.
+on the model diameter, plus one Ra on the OD the wheel spins on. Diameters and
+axial stations all read on the profile view, the stations from the bar-side
+face with a conspicuous overall, and the shoulder roots carry one leadered
+R MAX allowance (rule 7).
 """
 
 from __future__ import annotations
@@ -48,6 +51,74 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
         wheel_axle_spec.COLLAR_DIA,
         wheel_axle_spec.COLLAR_LEN,
     )
+    assert wheel_axle_spec.OVERALL_LEN == 17.0
+    assert wheel_axle_spec.COLLAR_START == 13.0
+
+
+def test_diameters_read_on_the_profile_view() -> None:
+    # Machinist review 2026-09-02: the three turning diameters were crowded
+    # into the end view, the O5 to a hidden circle. Policy rule 7 puts them on
+    # the profile; the end view keeps nothing and is never curated
+    # (SolidWorks inserts each marked dimension into one view only).
+    assert drawing.END_KEEP == {}
+    assert {"FlangeDia", "StudDia", "CollarDia"} <= set(drawing.FRONT_KEEP)
+    source = _source()
+    assert "curate_view_dimensions(\n        adapter, end" not in source
+    assert "end_annotations" not in source
+    # The axis is vertical, so each diameter line is horizontal at its text
+    # height: O35 under the flange, O9 above the tip, O5 out to the right.
+    assert drawing.FRONT_KEEP["FlangeDia"][1] < drawing._BOTTOM_Y
+    assert drawing.FRONT_KEEP["CollarDia"][1] > drawing._TIP_Y
+    assert drawing.FRONT_KEEP["StudDia"][0] > drawing._COLLAR_RIGHT_X
+    assert (
+        drawing._front_y(wheel_axle_spec.FLANGE_LEN)
+        < drawing.FRONT_KEEP["StudDia"][1]
+        < drawing._front_y(wheel_axle_spec.COLLAR_START)
+    )
+
+
+def test_axial_stations_baseline_from_the_bar_side_face() -> None:
+    # Review 2026-09-02: the 14.00 stud length read as the overall and the
+    # dims ran from several faces. Now 3.00 (flange) and 13.00 (the collar's
+    # named start offset) measure from the bar-side face, the collar's 4.00
+    # chains off as a reference, and a drawn 17.00 overall spans the end
+    # faces as the controlling dimension.
+    assert wheel_axle_spec.DRAWING_DIMENSIONS["Collar"] == {"CollarStart", "CollarLength"}
+    assert "Stud" not in wheel_axle_spec.DRAWING_DIMENSIONS
+    part_source = Path(part.__file__).read_text(encoding="utf-8")
+    assert 'name_dimensions(adapter, "Collar", ["CollarLength", "CollarStart"])' in part_source
+    assert drawing.REFERENCE_DIMENSIONS == ("CollarLength",)
+    assert drawing.FRONT_KEEP["CollarStart"][0] == drawing.FRONT_KEEP["CollarLength"][0]
+    assert drawing._OVERALL_LANE_X > drawing._STATION_LANE_X > drawing._FLANGE_RIGHT_X
+    source = _source()
+    assert source.count("add_edge_dimension(") == 1
+    assert 'label="overall length"' in source
+    assert 'orientation="vertical"' in source
+    assert "set_reference_dimension(" in source
+    # An unmatched reference name fails loud (the batch helper's contract):
+    # an unparenthesized 4.00 beside 13.00 and 17.00 is an over-constrained
+    # chain nobody would see.
+    assert 'raise RuntimeError(f"reference dimensions not applied: ' in source
+    # The overall is controlling, never parenthesized.
+    assert 'label="overall length reference"' not in source
+    assert drawing._TOTAL_LEN == wheel_axle_spec.OVERALL_LEN
+
+
+def test_shoulder_roots_carry_a_leadered_allowance() -> None:
+    # Review 2026-09-02 blocker: both concave shoulder roots were undefined.
+    # One attached note on the collar's bar-side rim sizes both (rule 7).
+    assert wheel_axle_spec.ROOT_NOTE == "2X ROOT R0.25 MAX"
+    source = _source()
+    assert source.count("add_attached_note(") == 1
+    assert "text=ROOT_NOTE" in source
+    assert "find_edge_near(" in source
+    # Picked on the collar shoulder (y = COLLAR_START) across the annulus
+    # right of the stud, the note under the collar and above the O5 text,
+    # inboard of the station lane.
+    assert drawing.ROOT_PICK_XY[1] == drawing._front_y(wheel_axle_spec.COLLAR_START)
+    assert drawing._STUD_RIGHT_X < drawing.ROOT_PICK_XY[0] < drawing._COLLAR_RIGHT_X
+    assert drawing.FRONT_KEEP["StudDia"][1] < drawing.ROOT_NOTE_XY[1] < drawing.ROOT_PICK_XY[1]
+    assert drawing.ROOT_NOTE_XY[0] < drawing._STATION_LANE_X
 
 
 def test_washer_and_nut_stack_stays_at_the_wheel_hub_end() -> None:
@@ -80,8 +151,9 @@ def test_notes_are_few_specific_and_never_the_title_block() -> None:
     assert len(lines) <= 4
     assert "ONE SETUP" in notes
     # Deburr/edge-break is a title-block row; "no tool marks" is what the Ra
-    # symbol says; the bearing role is design intent, not a process fact.
-    for banned in ("DEBURR", "BEARING", "TOOL MARKS", "WITHIN", "+/-", "UOS", "X.XX"):
+    # symbol says; the bearing role is design intent, not a process fact; the
+    # root radius rides its leadered note on the view.
+    for banned in ("DEBURR", "BEARING", "TOOL MARKS", "ROOT", "WITHIN", "+/-", "UOS", "X.XX"):
         assert banned not in notes, banned
     source = _source()
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
@@ -95,13 +167,13 @@ def test_print_carries_no_gdt_and_one_running_finish() -> None:
         "add_feature_control_frame(",
         "set_basic_dimension(",
         "project_part_pmi(",
-        "find_edge_near(",
     ):
         assert helper not in source, helper
     assert wheel_axle_spec.PART_DATUMS == ()
     assert wheel_axle_spec.GEOMETRIC_CONTROLS == ()
     assert not hasattr(wheel_axle_spec, "GEOMETRIC_TOLERANCES_MM")
-    # The wheel spins on the stud, so its OD alone carries a roughness symbol.
+    # The wheel spins on the stud, so its OD alone carries a roughness symbol,
+    # on the profile's flank silhouette.
     (control,) = wheel_axle_spec.SURFACE_FINISHES
     assert control.key == "stud_bearing"
     assert control.roughness_um == 1.6
@@ -112,6 +184,7 @@ def test_print_carries_no_gdt_and_one_running_finish() -> None:
         'control=surface_finish_by_key(SURFACE_FINISHES,"stud_bearing")'
         in sheet_source
     )
+    assert 'entity_type="SILHOUETTE"' in source
     assert "roughness_ra=" not in source
     # The part build keeps its author_part_pmi call shape on the empty tuples.
     part_source = "".join(Path(part.__file__).read_text(encoding="utf-8").split())

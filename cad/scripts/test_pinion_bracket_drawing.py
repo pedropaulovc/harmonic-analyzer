@@ -33,34 +33,36 @@ def test_required_drawing_paths() -> None:
 
 
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
-    # The drift alarm: the part-side mark set and the drawing-side keep set are
-    # BOTH the shared spec's map.
+    # Orthographic views import their marked model dimensions.  The five
+    # scallop values are still named by the shared spec, but DETAIL B states
+    # them in one geometry-derived coordinate block because SolidWorks does
+    # not import those dimensions into the detail.
     assert bracket.DRAWING_DIMENSIONS is pinion_bracket_spec.DRAWING_DIMENSIONS
     assert bracket.SURFACE_FINISHES is pinion_bracket_spec.SURFACE_FINISHES
     marked = set().union(*pinion_bracket_spec.DRAWING_DIMENSIONS.values())
-    kept = (
-        set(drawing.FRONT_KEEP)
-        | set(drawing.LEFT_KEEP)
-        | set(drawing.SECTION_KEEP)
-        | set(drawing.DETAIL_KEEP)
+    imported = (
+        set(drawing.FRONT_KEEP) | set(drawing.LEFT_KEEP) | set(drawing.SECTION_KEEP)
     )
-    assert kept == marked
-    assert set(drawing.DIMENSION_CALLOUTS) <= kept
+    noted = set(drawing.CAM_SCALLOP_NOTE_DIMENSIONS)
+    assert imported | noted == marked
+    assert imported.isdisjoint(noted)
+    assert set(drawing.DIMENSION_CALLOUTS) <= imported
     # The seat's diameter and through-thickness station are visible circles on
     # the -X flank (LEFT view); its depth and the strap thickness are section
     # edges; the seat's rise above the pivot stays on the face view.
     assert set(drawing.LEFT_KEEP) == {"PinSeatDia", "PinSeatCz"}
     assert set(drawing.SECTION_KEEP) == {"PinSeatDepth", "Depth"}
     assert "PinSeatCy" in drawing.FRONT_KEEP
-    # Both end radii print; the scallops live on the detail.
     assert {"BottomCapRadius", "TopCapRadius"} <= set(drawing.FRONT_KEEP)
-    assert set(drawing.DETAIL_KEEP) == {
+    assert noted == {
         "CamReliefParkDia",
         "CamReliefParkX",
         "CamReliefParkY",
         "CamReliefEngagedX",
         "CamReliefEngagedY",
     }
+    assert not hasattr(drawing, "DETAIL_KEEP")
+    assert not hasattr(drawing, "DIRECT_DETAIL_DIMENSIONS")
     assert (drawing.C2C, drawing.OVERALL_LENGTH, drawing.R_END) == (
         pinion_bracket_spec.C2C,
         pinion_bracket_spec.OVERALL_LENGTH,
@@ -85,14 +87,16 @@ def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
     # The isometric and its caption sit above the title block (top ~0.0655).
     assert drawing.ISO_CENTER[1] >= 0.100
-    assert 'add_property_linked_note(adapter, "Isometric View Note", 0.345, 0.088)' in source
+    assert (
+        'add_property_linked_note(adapter, "Isometric View Note", 0.345, 0.088)'
+        in source
+    )
 
 
 def test_views_follow_the_machinist() -> None:
-    # Third angle: the LEFT view (the flank the seat enters) sits left of the
-    # front; the section is cut on it through the seat axis; the detail is a
-    # 4:1 enlargement of the scalloped flank enclosing the pivot-bore origin
-    # and both scallop centres its imported dimensions reference.
+    # Third angle: the LEFT view sits left of the front; the seat-axis section
+    # occupies the free upper-right field. The front already shows both open
+    # cam scallops, so a coordinate block replaces a redundant enlargement.
     source = _source()
     assert 'place_view(adapter, str(SOURCE), "*Left", *LEFT_CENTER' in source
     assert 'place_view(adapter, str(SOURCE), "*Right"' not in source
@@ -100,16 +104,28 @@ def test_views_follow_the_machinist() -> None:
     assert source.count("create_section_view(") == 1
     assert 'section_label="A"' in source
     assert "seat_axis_y = _front_y(-PIN_DROP)" in source
-    assert source.count("create_detail_view(") == 1
-    assert 'detail_label="B"' in source
-    assert drawing.DETAIL_SCALE == (4, 1)
-    centre, radius = drawing.DETAIL_MODEL_CENTER, drawing.DETAIL_MODEL_RADIUS
-    for point in (
-        (0.0, 0.0),
-        pinion_bracket_geometry.CAM_RELIEF_PARK_CENTER,
-        pinion_bracket_geometry.CAM_RELIEF_ENGAGED_CENTER,
-    ):
-        assert math.hypot(point[0] - centre[0], point[1] - centre[1]) < radius, point
+    assert "create_detail_view(" not in source
+    assert "detail_boundary_center" not in source
+    assert (
+        "add_note(adapter, CAM_SCALLOP_COORDINATE_NOTE, *CAM_SCALLOP_NOTE_XY)" in source
+    )
+    assert "+X RIGHT, +Y UP" in drawing.CAM_SCALLOP_COORDINATE_NOTE
+    assert (
+        f"PARK X {pinion_bracket_geometry.CAM_RELIEF_PARK_CENTER[0]:+.2f} "
+        f"Y {pinion_bracket_geometry.CAM_RELIEF_PARK_CENTER[1]:+.2f}"
+        in drawing.CAM_SCALLOP_COORDINATE_NOTE
+    )
+    assert (
+        f"ENG X {pinion_bracket_geometry.CAM_RELIEF_ENGAGED_CENTER[0]:+.2f} "
+        f"Y {pinion_bracket_geometry.CAM_RELIEF_ENGAGED_CENTER[1]:+.2f}"
+        in drawing.CAM_SCALLOP_COORDINATE_NOTE
+    )
+    assert (
+        f"2X <MOD-DIAM>{2.0 * pinion_bracket_geometry.CAM_RELIEF_RADIUS:.2f}"
+        in drawing.CAM_SCALLOP_COORDINATE_NOTE
+    )
+    assert "entity_xy=" not in source
+    assert drawing.CAM_SCALLOP_NOTE_XY == (0.230, 0.170)
     # The scallops have not reached the flank at the seat-axis cut.
     y_cut = -pinion_bracket_geometry.PIN_DROP
     for cx, cy in (
@@ -124,7 +140,10 @@ def test_views_follow_the_machinist() -> None:
 
 def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
     source = _source()
-    assert "for view in (left, front, section):\n        set_hidden_lines_visible" in source
+    assert (
+        "for view in (left, front, section):\n        set_hidden_lines_visible"
+        in source
+    )
     assert "set_hidden_lines_removed(adapter, iso)" in source
 
 
@@ -178,7 +197,7 @@ def test_bands_ride_the_model_dimensions_and_callouts_say_the_process() -> None:
     assert callouts["ArborBoreDia"] == "REAM THRU"
     assert callouts["PinSeatDia"] == "REAM; FLAT BOTTOM"
     assert callouts["PinSeatDepth"] == "FULL-DIAMETER DEPTH"
-    assert callouts["CamReliefParkDia"] == "2X CAM SCALLOP"
+    assert set(callouts).isdisjoint(drawing.CAM_SCALLOP_NOTE_DIMENSIONS)
     joined = "\n".join(callouts.values())
     for banned in ("H7", "+/-", "DATUM", "1/4 IN", "5/16"):
         assert banned not in joined, banned
@@ -187,15 +206,20 @@ def test_bands_ride_the_model_dimensions_and_callouts_say_the_process() -> None:
 def test_outside_profile_is_fully_defined_with_a_reference_overall() -> None:
     # Both end radii are model dimensions; the overall runs arc extreme to arc
     # extreme (REF) outboard of the controlling 28.00 bore-to-bore distance.
+    # DETAIL B's scallop coordinates are the adjacent coordinate block.
     source = _source()
     assert source.count("add_edge_dimension(") == 1
     assert 'label="strap overall length"' in source
     assert "set_arc_endpoints_to_max(adapter, overall" in source
-    assert '_parenthesize(adapter, overall' in source
+    assert "_parenthesize(adapter, overall" in source
     # The overall stands alone left of the strap; the rise and bore-to-bore
     # distance stack on the right, every leader text beyond both.
     assert drawing.OVERALL_TEXT_XY[0] < drawing.FRONT_CENTER[0]
-    assert drawing.FRONT_KEEP["ArborBoreCz"][0] > drawing.FRONT_KEEP["PinSeatCy"][0] > drawing.FRONT_CENTER[0]
+    assert (
+        drawing.FRONT_KEEP["ArborBoreCz"][0]
+        > drawing.FRONT_KEEP["PinSeatCy"][0]
+        > drawing.FRONT_CENTER[0]
+    )
     for name in ("ArborBoreDia", "TopCapRadius", "PivotBoreDia", "BottomCapRadius"):
         assert drawing.FRONT_KEEP[name][0] > drawing.FRONT_CENTER[0], name
 
@@ -203,10 +227,10 @@ def test_outside_profile_is_fully_defined_with_a_reference_overall() -> None:
 def test_diameter_leaders_end_at_the_circumference() -> None:
     source = _source()
     assert "_ARROWS_OUTSIDE = 1" in source
-    assert source.count("_leaders_to_circumference(") >= 4  # def + three calls
+    assert source.count("_leaders_to_circumference(") == 3  # definition + two calls
     assert drawing.FRONT_DIAMETERS == ("ArborBoreDia", "PivotBoreDia")
     assert drawing.LEFT_DIAMETERS == ("PinSeatDia",)
-    assert drawing.DETAIL_DIAMETERS == ("CamReliefParkDia",)
+    assert not hasattr(drawing, "DETAIL_DIAMETERS")
 
 
 def test_blind_seat_depth_uses_the_marked_drawing_name() -> None:
@@ -220,9 +244,16 @@ def test_cam_scallops_cover_both_linkage_extremes() -> None:
     source = Path(bracket.__file__).read_text(encoding="utf-8")
     assert 'name_last_feature(adapter, f"CamRelief{label}")' in source
     assert "_cam_relief_area(centers)" in source
-    # The scallop dimensions the detail imports are the build's own named
-    # circle dimensions (centre X/Y to the pivot-bore origin + diameter).
-    assert 'names=(f"CamRelief{label}X", f"CamRelief{label}Y", f"CamRelief{label}Dia")' in source
+    # The model still names the five scallop dimensions for source traceability;
+    # the drawing states them in one coordinate block next to the front view.
+    assert (
+        'names=(f"CamRelief{label}X", f"CamRelief{label}Y", f"CamRelief{label}Dia")'
+        in source
+    )
+    drawing_source = _source()
+    assert "create_detail_view(" not in drawing_source
+    assert "CAM_SCALLOP_COORDINATE_NOTE" in drawing_source
+    assert "detail pivot-bore left rim" not in drawing_source
 
 
 def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:

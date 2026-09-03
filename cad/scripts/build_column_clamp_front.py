@@ -22,10 +22,13 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
 )
+from _fit_limits import deviations
 from _holes import HoleSpec
 from column_clamp_front_spec import (
     ARC_DEPTH,
+    COLUMN_BORE_BAND,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     ISOMETRIC_VIEW_NOTE,
@@ -44,10 +47,14 @@ async def build(adapter) -> dict[str, str]:
         adapter, part_name=PART_NAME, depth=DEPTH, front=True, hole_spec=HOLE_SPEC
     )
     # Manufacturing drawing support, applied AFTER the shared builder's gated
-    # save (the marks live only in this front arc, so the shared _clamp_arc
-    # stays untouched and the back arc's recipe digest never moves): mark
-    # exactly the print's dimensions, stamp the make-critical title-block
-    # properties, then re-save so the shipped SLDPRT carries both.
+    # save (the marks and the relief band live only in this front arc, so the
+    # shared _clamp_arc stays untouched and the back arc's recipe digest never
+    # moves): band the slip-fit relief on its model dimension, mark exactly
+    # the print's dimensions, stamp the make-critical title-block properties,
+    # then re-save so the shipped SLDPRT carries all of it.
+    set_dimension_bilateral_tolerance(
+        adapter, "BoreProfile", "BoreDia", *deviations(COLUMN_BORE_BAND)
+    )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

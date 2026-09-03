@@ -1,9 +1,13 @@
 r"""Create the curated manufacturing drawing for the alignment pinion drum (42T).
 
 Follows the batch gear-drawing pattern (see ``draw_cylinder_gear``), adapted for
-a long drum: the *Front end view carries the bore, and the *Right profile view
-shows the full 143 mm face length. Drawn 1:1; no isometric (a long thin drum
-is fully described by the two orthographic views).
+a long drum: the *Front end view is the parent of DETAIL B (3:1), which carries
+the bore callout so its leader lands unmistakably on the 8 mm bore rather than
+on the 22 mm tooth ring, and of SECTION A-A (cut face only, through the axis),
+which shows the bore along the whole 143 mm drum and carries the face length --
+42 teeth projected edge-on over 143 mm were a black band. Drawn 1:1; no
+isometric (a long thin drum is fully described by the end view and the
+section).
 
 The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): a
 gear is not on the GD&T allowlist and this drum is pressed onto its arbor, so
@@ -23,6 +27,8 @@ from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
+    create_detail_view,
+    create_section_view,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -33,7 +39,10 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _gear_drawing_entities import show_only_cut_face
+from alignment_pinion_spec import BORE_CALLOUT, FACE_WIDTH, OUTSIDE_DIA
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     place_view,
 )
@@ -53,16 +62,37 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 1.0)
 VIEW_SCALE = (1, 1)
-FRONT_CENTER = (0.150, 0.185)  # toothed end view
-RIGHT_CENTER = (0.285, 0.185)  # long drum profile (143 mm face)
+FRONT_CENTER = (0.150, 0.185)  # toothed end view (parent of A-A and B)
 
-FRONT_KEEP = {
-    "ArborBoreDia": (FRONT_CENTER[0] - 0.050, FRONT_CENTER[1] - 0.030),
+# SECTION A-A: vertical cut through the axis, cut face only, in the long drum
+# profile's place; a plain adjacent note states the 143.2 face length without
+# relying on an imported edge dimension.
+SECTION_HALF_LINE = OUTSIDE_DIA / 2000.0 + 0.008
+SECTION_LINE = (
+    (FRONT_CENTER[0], FRONT_CENTER[1] - SECTION_HALF_LINE),
+    (FRONT_CENTER[0], FRONT_CENTER[1] + SECTION_HALF_LINE),
+)
+SECTION_CENTER = (0.285, 0.185)
+SECTION_NOTE = f"SECTION A-A\nFACE LENGTH {FACE_WIDTH:.1f}"
+SECTION_NOTE_XY = (
+    SECTION_CENTER[0],
+    SECTION_CENTER[1] + OUTSIDE_DIA / 2000.0 + 0.012,
+)
+
+# DETAIL B (3:1): the whole 22 mm end view, enlarged below the section so the
+# bore callout's arrow visibly sits on the 24 mm (3:1) bore. Its circle takes
+# in the tooth tips with a little air.
+DETAIL_RADIUS = OUTSIDE_DIA / 2000.0 + 0.0015
+DETAIL_CENTER = (0.340, 0.118)
+DETAIL_SCALE = (3, 1)
+DETAIL_KEEP = {
+    "ArborBoreDia": (DETAIL_CENTER[0] - 0.064, DETAIL_CENTER[1] - 0.030),
 }
 # Light press under the arbor's Ø8 journal; the 7.96..7.98 band is on the
-# model dimension (build_alignment_pinion), so the callout names the process.
-DIMENSION_CALLOUTS = {"ArborBoreDia": "REAM THRU\nPRESS ON ARBOR"}
-DIMENSION_PRECISION = {"ArborBoreDia": 2}
+# model dimension (build_alignment_pinion), so the callout names the process
+# and the fit instruction, and three decimals say "hold it".
+DIMENSION_CALLOUTS = {"ArborBoreDia": BORE_CALLOUT}
+DIMENSION_PRECISION = {"ArborBoreDia": 3}
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -107,25 +137,45 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE)
-    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=VIEW_SCALE)
-    # Hidden lines stay ON in every orthographic view (policy rule 7): the
-    # profile view then shows the through-bore along the drum.
-    for view in (front, right):
-        set_hidden_lines_visible(adapter, view)
+    # Hidden lines stay ON in the orthographic view (policy rule 7).
+    set_hidden_lines_visible(adapter, front)
 
-    front_annotations = curate_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="front"
+    # DETAIL B claims the bore (draw_pinion_arbor: the detail is curated and
+    # the end view is never asked, so no other view can consume the mark).
+    detail = create_detail_view(
+        adapter,
+        front,
+        center=FRONT_CENTER,
+        radius=DETAIL_RADIUS,
+        view_xy=DETAIL_CENTER,
+        detail_label="B",
+        scale=DETAIL_SCALE,
+        label="end view detail",
     )
-    set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
-    set_dimension_precision(adapter, front_annotations, DIMENSION_PRECISION)
-    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center mark to drum bore")
+    detail_annotations = curate_view_dimensions(
+        adapter, detail, keep=DETAIL_KEEP, view_label="detail"
+    )
+    set_dimension_callouts(adapter, detail_annotations, DIMENSION_CALLOUTS)
+    set_dimension_precision(adapter, detail_annotations, DIMENSION_PRECISION)
+    # The end view is never asked for model items (the pinion_arbor
+    # precedent): it carries only its centre mark and the A-A / B marks.
+    for view, label in ((front, "drum bore"), (detail, "detail bore")):
+        if not auto_center_marks(adapter, view, holes=True, size=0.0025):
+            raise RuntimeError(f"failed to add ASME center mark to {label}")
 
-    # No coordinate-picked face-length dimension on the drum profile: every
-    # pick pair tried snaps to the long horizontal tooth silhouettes (exact
-    # end-edge x picks select the same edge; 0.2 mm inset picks pair a
-    # vertical with a horizontal line and emit a stray 90-degree ANGLE dim).
-    # FACE WIDTH 143.2 is owned by the GEAR DATA block.
+    section = create_section_view(
+        adapter,
+        front,
+        line_start=SECTION_LINE[0],
+        line_end=SECTION_LINE[1],
+        view_xy=SECTION_CENTER,
+        section_label="A",
+        scale=VIEW_SCALE,
+        label="drum",
+    )
+    show_only_cut_face(adapter, section, label="drum")
+    if add_note(adapter, SECTION_NOTE, *SECTION_NOTE_XY) is None:
+        raise RuntimeError("failed to add alignment-pinion section geometry note")
 
     add_property_linked_note(adapter, "Gear Data", 0.018, 0.262)
     add_property_linked_note(adapter, "Manufacturing Notes", 0.018, 0.085)

@@ -1,9 +1,10 @@
 r"""Create the curated magnifier thumb-screw drawing.
 
 Profile side view with the head length and under-head length in one row
-above the profile, the thread designation leadered to the shank below it
-and the axis centerline; a shank-end view with the head diameter (before
-reeding, leader ending at the rim); plus an isometric.
+above the profile, the (REF) overall above that row, the thread designation
+leadered to the shank below it and the axis centerline; a shank-end view
+with the head diameter (before reeding, leader ending at the rim); plus an
+isometric.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ from _common import CAD_ROOT, run_build
 from _drawing_common import DrawingOutputs
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fastener_annotations import (
+    add_overall_reference,
     add_thread_leader,
     end_diameter_leaders_at_rim,
     view_dimension_annotations,
@@ -83,6 +85,16 @@ SIDE_KEEP = {
 THREAD_LEADER_XY = (_SHANK_MID_X + 0.010, _SHANK_BOTTOM_Y)
 THREAD_NOTE_XY = (_SHANK_MID_X, _SHANK_BOTTOM_Y - 0.026)
 SIDE_AXIS_FACE_XY = (_SHANK_MID_X, SIDE_CENTER[1])
+# (REF) overall, head face to tip, stacked above the length row (the border
+# rule sits at ~0.2665; this lands at ~0.250).  Model points on the upper
+# half of each end face: the head face is scalloped by the reeding, but every
+# edge on that face line lies in the face plane, so the horizontal reads the
+# same axial distance whichever edge the pick lands on.
+OVERALL_END_POINTS_MM = (
+    (0.0, 0.7 * HEAD_DIA / 2.0, 0.0),
+    (HEAD_LENGTH + SHANK_LEN, 0.7 * SHANK_DIA / 2.0, 0.0),
+)
+OVERALL_TEXT_XY = (SIDE_CENTER[0], _ROW_ABOVE_Y + 0.016)
 
 
 def _decorate(adapter: Any, side: Any, end: Any, _iso: Any) -> None:
@@ -99,6 +111,15 @@ def _decorate(adapter: Any, side: Any, end: Any, _iso: Any) -> None:
         silhouette_xy=THREAD_LEADER_XY,
         note_xy=THREAD_NOTE_XY,
         label="shank thread designation",
+    )
+    add_overall_reference(
+        adapter,
+        side,
+        end_points_mm=OVERALL_END_POINTS_MM,
+        entity_types=("EDGE", "EDGE"),
+        text_xy=OVERALL_TEXT_XY,
+        orientation="horizontal",
+        label="overall length reference",
     )
 
 

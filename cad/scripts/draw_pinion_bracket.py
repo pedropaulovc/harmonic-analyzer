@@ -11,9 +11,9 @@ front view and carries the seat's diameter and its station through the
 thickness as visible circles; the front view carries the face (both bores,
 both end radii, the (REF) overall, the seat's rise above the pivot); SECTION
 A-A (cut on the left view through the seat axis) opens the seat so its
-full-diameter depth and the strap thickness are real edges; DETAIL B (4:1)
-locates the two R6.90 cam scallops from the pivot bore.  The isometric carries
-an explicit 1:1 override so it stays clear of the title block.
+full-diameter depth and strap thickness are real edges. A compact coordinate
+block beside the front locates both R6.90 cam scallops from the pivot bore.
+The isometric carries a 1:1 override to stay clear of the title block.
 
 The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): a
 swing strap carries no datums, frames, basics or roughness symbols; the bore
@@ -38,7 +38,6 @@ from _drawing_common import (
     DrawingOutputs,
     add_edge_dimension,
     add_property_linked_note,
-    create_detail_view,
     create_section_view,
     curate_view_dimensions,
     finalize_drawing,
@@ -52,6 +51,11 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from pinion_bracket_geometry import (
+    CAM_RELIEF_ENGAGED_CENTER,
+    CAM_RELIEF_PARK_CENTER,
+    CAM_RELIEF_RADIUS,
+)
 from pinion_bracket_spec import (
     C2C as C2C,
     OVERALL_LENGTH,
@@ -60,6 +64,7 @@ from pinion_bracket_spec import (
 )
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     dimension_name,
     place_view,
@@ -88,11 +93,9 @@ FRONT_BBOX_CY = (OVERALL_LENGTH / 2.0) - R_END  # 14.0: (35.5 + -7.5) / 2
 # view's outermost left-hand dimension, so the front stands 105 mm right.
 LEFT_CENTER = (0.045, 0.150)
 FRONT_CENTER = (0.150, 0.150)
-# Above the front view: its lowest annotation (the thickness, 21 mm under the
-# section origin) clears the front's outline top (~0.209).
-SECTION_CENTER = (0.150, 0.238)
-DETAIL_CENTER = (0.300, 0.200)
-DETAIL_SCALE = (4, 1)
+# The section occupies the free upper-right field above the isometric, well
+# clear of the front-view dimensions and the scallop coordinate block.
+SECTION_CENTER = (0.290, 0.235)
 # The isometric and its caption sit clear of the title block (top ~0.0655).
 ISO_CENTER = (0.365, 0.120)
 
@@ -105,18 +108,6 @@ def _front_x(model_x_mm: float) -> float:
 def _front_y(model_y_mm: float) -> float:
     """Sheet Y of a model-Y point in the front/left views (2:1, bbox-centred)."""
     return FRONT_CENTER[1] + (model_y_mm - FRONT_BBOX_CY) * SHEET_SCALE[0] / 1000.0
-
-
-# DETAIL B boundary on the front view: centred on the scalloped flank, wide
-# enough to enclose the pivot-bore origin AND both scallop centres (12.6 mm
-# outboard of the flank), which the imported centre dimensions reference;
-# raised 1 mm so the circle clears the (REF) overall's bottom extension line.
-DETAIL_MODEL_CENTER = (-6.5, 1.0)
-DETAIL_MODEL_RADIUS = 7.5
-DETAIL_BOUNDARY = (
-    (_front_x(DETAIL_MODEL_CENTER[0]), _front_y(DETAIL_MODEL_CENTER[1])),
-    DETAIL_MODEL_RADIUS * SHEET_SCALE[0] / 1000.0,
-)
 
 
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
@@ -139,32 +130,37 @@ LEFT_KEEP = {
     "PinSeatDia": (0.075, 0.150),
     "PinSeatCz": (0.060, 0.098),
 }
-# Section: parametric name -> offsets in metres from the projected model
-# origin of the y = 6 cut (the seat axis plane).  The section's mirror is
-# SolidWorks' choice, so the positions are derived at build time from the
-# projected axes (``_section_frame``).  The seat depth stands beside the
-# notch (which is on the -X flank) on the +Z side: (along +X, along +Z).  The
-# thickness spans whichever X end faces DOWN the sheet, so it can never be
-# pushed off the sheet's top: (along sheet-down, along +Z).
+# Section dimension positions are offsets from the projected model origin at
+# the y=6 seat-axis cut. SolidWorks chooses the section's mirror, so positions
+# derive from projected axes. The seat depth stands on the +Z side. The strap
+# thickness sits 10 mm down and 15 mm toward -Z, above the automatic label.
 SECTION_KEEP = {
     "PinSeatDepth": (-0.011, 0.014),
-    "Depth": (0.021, 0.0025),
+    "Depth": (0.010, -0.015),
 }
-# The section label parks LEFT of the section (absolute sheet point): under
-# the section it would sit on the front view's outline.
+# Park the section label to the left if SolidWorks exposes it as a note.
 SECTION_LABEL_XY = (SECTION_CENTER[0] - 0.050, SECTION_CENTER[1])
-# Detail: the (2X) scallop diameter leads up-right (its leader meets the
-# drawn arc, which spans +/-42 deg about the pivot-ward direction from the
-# scallop centre); both centre X locations hang under the detail, both centre
-# Y locations stand to its left; the label is parked under the X locations.
-DETAIL_KEEP = {
-    "CamReliefParkDia": (0.345, 0.225),
-    "CamReliefParkX": (0.301, 0.156),
-    "CamReliefEngagedX": (0.301, 0.148),
-    "CamReliefParkY": (0.250, 0.203),
-    "CamReliefEngagedY": (0.242, 0.188),
-}
-DETAIL_LABEL_XY = (0.282, 0.134)
+# The scallops' marked model dimensions stay owned by one compact coordinate
+# block beside the front view. Its values come from the geometry constants,
+# and its origin and directions name the pivot-bore centreline explicitly.
+CAM_SCALLOP_NOTE_DIMENSIONS = frozenset(
+    {
+        "CamReliefParkDia",
+        "CamReliefParkX",
+        "CamReliefParkY",
+        "CamReliefEngagedX",
+        "CamReliefEngagedY",
+    }
+)
+CAM_SCALLOP_COORDINATE_NOTE = "\n".join(
+    (
+        "ORIGIN PIVOT BORE C/L; +X RIGHT, +Y UP",
+        f"PARK X {CAM_RELIEF_PARK_CENTER[0]:+.2f} Y {CAM_RELIEF_PARK_CENTER[1]:+.2f}",
+        f"ENG X {CAM_RELIEF_ENGAGED_CENTER[0]:+.2f} Y {CAM_RELIEF_ENGAGED_CENTER[1]:+.2f}",
+        f"2X <MOD-DIAM>{2.0 * CAM_RELIEF_RADIUS:.2f} CAM SCALLOPS",
+    )
+)
+CAM_SCALLOP_NOTE_XY = (0.230, 0.170)
 OVERALL_TEXT_XY = (0.115, _front_y(C2C / 2.0))
 # Process only; every band rides its model dimension (build_pinion_bracket).
 DIMENSION_CALLOUTS = {
@@ -172,11 +168,9 @@ DIMENSION_CALLOUTS = {
     "ArborBoreDia": "REAM THRU",
     "PinSeatDia": "REAM; FLAT BOTTOM",
     "PinSeatDepth": "FULL-DIAMETER DEPTH",
-    "CamReliefParkDia": "2X CAM SCALLOP",
 }
 FRONT_DIAMETERS = ("ArborBoreDia", "PivotBoreDia")
 LEFT_DIAMETERS = ("PinSeatDia",)
-DETAIL_DIAMETERS = ("CamReliefParkDia",)
 
 _ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
 
@@ -206,7 +200,9 @@ def _leaders_to_circumference(
             raise RuntimeError(f"{label}: {name} arrows did not move outside")
         remaining.discard(name)
     if remaining:
-        raise RuntimeError(f"{label}: diameter dimensions not found: {sorted(remaining)}")
+        raise RuntimeError(
+            f"{label}: diameter dimensions not found: {sorted(remaining)}"
+        )
     adapter.currentModel.EditRebuild3()
 
 
@@ -214,7 +210,9 @@ def _section_frame(
     adapter: Any, section: Any, *, label: str
 ) -> tuple[tuple[float, float], tuple[float, float], tuple[float, float]]:
     """Sheet origin and unit directions of model +X and +Z in ``section``."""
-    origin = model_point_in_view(adapter, section, (0.0, 0.0, 0.0), label=f"{label} origin")
+    origin = model_point_in_view(
+        adapter, section, (0.0, 0.0, 0.0), label=f"{label} origin"
+    )
 
     def unit(xyz: tuple[float, float, float]) -> tuple[float, float]:
         point = model_point_in_view(adapter, section, xyz, label=f"{label} axis")
@@ -243,11 +241,18 @@ def _at(
 def _move_view_label(
     adapter: Any, view: Any, xy: tuple[float, float], *, keyword: str, label: str
 ) -> None:
-    """Park the view's SECTION/DETAIL label where no dimension will sit under it."""
-    notes = adapter._attempt(lambda: view.GetNotes(), default=None) or ()
+    """Park the view's SECTION label where no dimension sits beneath it."""
+    notes = list(adapter._attempt(lambda: view.GetNotes(), default=None) or ())
+    if not notes:
+        note = adapter._attempt(lambda: view.GetFirstNote(), default=None)
+        while note is not None:
+            notes.append(note)
+            note = adapter._attempt(lambda n=note: n.GetNext(), default=None)
     moved = False
     for note in notes:
-        note = _sw_type_info.early_bound_or_flag(note, "INote", "GetText", "GetAnnotation")
+        note = _sw_type_info.early_bound_or_flag(
+            note, "INote", "GetText", "GetAnnotation"
+        )
         text = str(adapter._attempt(lambda n=note: n.GetText(), default="") or "")
         if keyword not in text.upper():
             continue
@@ -258,7 +263,9 @@ def _move_view_label(
             raise RuntimeError(f"{label}: failed to move the {keyword} label")
         moved = True
     if not moved:
-        _telemetry.warn(f"{label}: {keyword} label note not found; left at its default spot")
+        _telemetry.warn(
+            f"{label}: {keyword} label note not found; left at its default spot"
+        )
     adapter.currentModel.EditRebuild3()
 
 
@@ -352,26 +359,9 @@ async def build(adapter: Any) -> dict[str, str]:
         "Depth": _at(origin, down, z_axis, SECTION_KEEP["Depth"]),
     }
 
-    # DETAIL B (4:1): the two R6.90 cam scallops, each circle's centre located
-    # from the pivot bore, one (2X) diameter.  Curated BEFORE the front view:
-    # SolidWorks imports each marked model dimension into one view only, and a
-    # dimension the front's curation deleted does not come back for the detail
-    # (2026-09-02 seat build: "detail view is missing model dimensions ...
-    # available=[]").  The detail claims its five first; the front then keeps
-    # its own set out of what remains.
-    detail = create_detail_view(
-        adapter,
-        front,
-        center=DETAIL_BOUNDARY[0],
-        radius=DETAIL_BOUNDARY[1],
-        view_xy=DETAIL_CENTER,
-        detail_label="B",
-        scale=DETAIL_SCALE,
-        label="cam scallop detail",
-    )
-    detail_annotations = curate_view_dimensions(
-        adapter, detail, keep=DETAIL_KEEP, view_label="detail"
-    )
+    # The front projection already shows both open cam scallops clearly.
+    # State their signed centres and common diameter in one coordinate block;
+    # an enlargement of their open boundary adds no manufacturing information.
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
     )
@@ -381,6 +371,8 @@ async def build(adapter: Any) -> dict[str, str]:
     section_annotations = curate_view_dimensions(
         adapter, section, keep=section_keep, view_label="section"
     )
+    if add_note(adapter, CAM_SCALLOP_COORDINATE_NOTE, *CAM_SCALLOP_NOTE_XY) is None:
+        raise RuntimeError("failed to add cam scallop coordinate block")
 
     # (REF) overall: bottom arc extreme to top arc extreme, alone on the left
     # so no leader has to cross its extension lines.  The bore-to-bore 28.00
@@ -400,7 +392,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     set_dimension_callouts(
         adapter,
-        [*front_annotations, *left_annotations, *section_annotations, *detail_annotations],
+        [*front_annotations, *left_annotations, *section_annotations],
         DIMENSION_CALLOUTS,
     )
     _leaders_to_circumference(
@@ -408,9 +400,6 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _leaders_to_circumference(
         adapter, left_annotations, LEFT_DIAMETERS, label="left diameters"
-    )
-    _leaders_to_circumference(
-        adapter, detail_annotations, DETAIL_DIAMETERS, label="detail diameters"
     )
 
     for view, label in ((front, "front"), (left, "left")):
@@ -423,9 +412,6 @@ async def build(adapter: Any) -> dict[str, str]:
         SECTION_LABEL_XY,
         keyword="SECTION",
         label="stud seat section",
-    )
-    _move_view_label(
-        adapter, detail, DETAIL_LABEL_XY, keyword="DETAIL", label="cam scallop detail"
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)

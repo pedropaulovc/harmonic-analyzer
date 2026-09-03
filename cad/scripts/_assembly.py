@@ -2155,8 +2155,14 @@ _ALLOWED_FREE_STEMS: dict[str, tuple[str, ...]] = {
     "summing": ("summing-lever", "boss-hook"),
     # The carriage riders (v-block, marker, stirrup frame, thumb screw) are
     # lock-mated to the free rod and read under-constrained with it.
-    "pen": ("pen-rod", "pen-marker", "pen-wire", "pen-v-block", "pen-frame",
-            "pen-set-screw"),
+    "pen": (
+        "pen-rod",
+        "pen-marker",
+        "pen-wire",
+        "pen-v-block",
+        "pen-frame",
+        "pen-set-screw",
+    ),
     "drive-train": (
         "alignment-pinion",
         "cone-gear",
@@ -2782,10 +2788,56 @@ async def _export_assembly_images(
     return artefacts
 
 
+def _exploded_view_names(raw: Any) -> tuple[str, ...]:
+    """Normalize the COM SAFEARRAY returned by GetExplodedViewNames2."""
+    if isinstance(raw, str):
+        return (raw,) if raw else ()
+    if not raw:
+        return ()
+    return tuple(str(name) for name in raw if str(name))
+
+
+@_telemetry.traced("assembly.ensure_exploded_view", label_param="asm_name")
+def _ensure_exploded_view(adapter: Any, asm_name: str) -> str:
+    """Persist one native exploded view, then restore the assembled pose.
+
+    Assembly drawings require a real exploded state. ``AutoExplode`` is the
+    native mate-aware baseline; the per-assembly procedure sheet supplies the
+    exact order and checks that automatic spatial separation cannot encode.
+    """
+    model = adapter.currentModel
+    assembly = _early_bound(model, "IAssemblyDoc")
+    configuration = active_configuration_name(adapter, model)
+    count = int(assembly.GetExplodedViewCount2(configuration) or 0)
+    created = count == 0
+    if created:
+        if not bool(assembly.AutoExplode()):
+            raise RuntimeError(f"{asm_name}: AutoExplode failed")
+        model.EditRebuild3()
+
+    names = _exploded_view_names(assembly.GetExplodedViewNames2(configuration))
+    if not names:
+        raise RuntimeError(
+            f"{asm_name}: active configuration {configuration!r} has no exploded view"
+        )
+    name = names[-1] if created else names[0]
+    if not bool(assembly.ShowExploded2(False, name)):
+        raise RuntimeError(f"{asm_name}: failed to collapse exploded view {name!r}")
+    _telemetry.event(
+        "assembly.exploded_view_ready",
+        assembly=asm_name,
+        configuration=configuration,
+        exploded_view=name,
+        created=created,
+    )
+    return name
+
+
 async def save_assembly_and_images(
     adapter: Any, asm_name: str, views: Iterable[str] = DEFAULT_VIEWS
 ) -> dict[str, str]:
     """Save the assembly to ``cad/out/sldasm`` and PNG views to ``cad/out/png``."""
+    _ensure_exploded_view(adapter, asm_name)
     # Establish a clean solved state for the health and pose gates.
     final_rebuild_before_save(adapter, asm_name)
     # Fail fast: never save a broken assembly. Catches mate errors (e.g. a gear

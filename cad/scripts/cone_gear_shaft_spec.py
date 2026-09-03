@@ -92,4 +92,5 @@ DRAWING_NOTES = "\n".join(
         f"TURN THE DIA {SECTION_DIAS[-1]:.3f} TIP LAST UNDER A FOLLOWER REST; FRAGILE BY DESIGN.",
     )
 )
-END_VIEW_NOTE = "END VIEW SCALE 4:1"
+# No end view: every diameter reads on its own land of the side view (the
+# three tip lands in DETAIL A), so the sheet carries no end-view label.

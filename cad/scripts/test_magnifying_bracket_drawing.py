@@ -2,9 +2,11 @@
 
 The print follows cad/docs/drawing-simplicity-policy.md: a bracket is not on
 the GD&T allowlist and it is lock-mated to the lever rod in service, so it
-carries no datum, frame, roughness or basic dimension; the notes are three
-lines carrying the collar and thicknesses the marked set cannot, plus the
-match-drill instruction for the unmodelled mounting pattern.
+carries no datum, frame, roughness or basic dimension; every size is on a
+view (the collar diameters, the thicknesses and the axis-based stations the
+review of 2026-09-02 found buried in the notes), and the two note lines are
+the match-drill instruction for the unmodelled mounting pattern and the
+flange's centring on the collar axis.
 """
 
 from __future__ import annotations
@@ -36,7 +38,21 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     marked = set().union(*magnifying_bracket_spec.DRAWING_DIMENSIONS.values())
     kept = set(drawing.TOP_KEEP) | set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
     assert kept == marked
-    assert marked == {"ArmWidth", "ArmDepth", "FlangeWidth", "FlangeDepth"}
+    # Plan: the two rectangles' widths/depth and their far corners from the
+    # collar axis (one origin per view); front: the collar length.
+    assert set(drawing.TOP_KEEP) == {
+        "ArmWidth",
+        "ArmCornerZ",
+        "FlangeWidth",
+        "FlangeDepth",
+        "FlangeCornerZ",
+        "FlangeCornerX",
+    }
+    assert set(drawing.FRONT_KEEP) == {"WallLen"}
+    assert drawing.RIGHT_KEEP == {}
+    assert set(drawing.DIMENSION_CALLOUTS) <= kept
+    assert set(drawing.TOP_CALLOUTS) <= set(drawing.TOP_KEEP)
+    assert set(drawing.FRONT_CALLOUTS) <= set(drawing.FRONT_KEEP)
 
 
 def test_arm_and_flange_dim_names_are_disambiguated() -> None:
@@ -46,6 +62,16 @@ def test_arm_and_flange_dim_names_are_disambiguated() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert '"ArmWidth", "ArmDepth"' in source
     assert '"FlangeWidth", "FlangeDepth"' in source
+
+
+def test_nominals_live_in_the_spec_and_the_drawing_reads_them() -> None:
+    # The build and the drawing aim their picks off ONE set of nominals.
+    for name in ("COLLAR_OD", "COLLAR_BORE", "COLLAR_HALF_LEN", "ARM_Y", "FLANGE_Y"):
+        assert getattr(drawing, name) == getattr(magnifying_bracket_spec, name)
+        assert getattr(part, name) == getattr(magnifying_bracket_spec, name)
+    assert drawing.ARM_THICKNESS == 7.5
+    assert drawing.FLANGE_THICKNESS == 5.08
+    assert drawing.ARM_TOP_FROM_COLLAR_OD == 1.5
 
 
 def test_bracket_is_uncoupled_from_the_assembly_nominals() -> None:
@@ -62,14 +88,18 @@ def test_bracket_is_uncoupled_from_the_assembly_nominals() -> None:
 def test_notes_are_few_specific_and_never_the_title_block() -> None:
     notes = magnifying_bracket_spec.DRAWING_NOTES
     lines = notes.split("\n")
-    assert len(lines) <= 4
-    # The collar and the thicknesses have no marked dimension: the note is
-    # their only carrier.
-    assert "COLLAR Ø12 OD X 10 LONG, BORE Ø6.2 DRILL THRU" in notes
-    assert "ARM 7.5 THICK; FLANGE 5 THICK." in notes
-    # The unmodelled mounting pattern is a process instruction, not a hold.
+    assert len(lines) == 2
+    # The unmodelled mounting pattern is a process instruction, not a hold;
+    # the flange's centring on the axis is the one relationship no single
+    # dimension states.
     assert "MATCH-DRILL TO THE SUMMING PLATE AT ASSEMBLY" in notes
+    assert "FLANGE CENTRED ON THE COLLAR AXIS" in notes
+    # Every size is on a view: no collar, no thickness, no bare integer.
+    assert not any(character.isdigit() for character in notes)
     for banned in (
+        "COLLAR Ø",
+        "THICK",
+        "SLIP",
         "DO NOT RELEASE",
         "UNDRILLED BLANK",
         "NOT DEFINED",
@@ -86,21 +116,57 @@ def test_notes_are_few_specific_and_never_the_title_block() -> None:
     ):
         assert banned not in notes, banned
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in _source()
+    # The isometric caption no longer repeats the sheet scale.
+    assert magnifying_bracket_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW"
 
 
-def test_plan_dimensions_are_labelled() -> None:
-    assert drawing.DIMENSION_CALLOUTS == {
-        "ArmWidth": "ARM WIDTH",
-        "ArmDepth": "ARM LENGTH",
-        "FlangeWidth": "FLANGE WIDTH",
-        "FlangeDepth": "FLANGE DEPTH",
-    }
+def test_the_two_tens_are_labelled() -> None:
+    # The arm is exactly as wide as the collar is long.
+    assert drawing.TOP_CALLOUTS == {"ArmWidth": "ARM WIDTH"}
+    assert drawing.FRONT_CALLOUTS == {"WallLen": "COLLAR LENGTH"}
 
 
-def test_collar_bore_takes_the_center_mark() -> None:
+def test_collar_thicknesses_and_stations_are_on_the_views() -> None:
+    # Review 2026-09-02: the collar OD/bore/length, both thicknesses and the
+    # arm/flange stations were notes; they are dimensions now.
     source = _source()
+    for label in (
+        'label="collar OD"',
+        'label="arm top face from collar OD"',
+        'label="flange thickness"',
+        'label="arm thickness"',
+        'label="collar bore"',
+    ):
+        assert label in source, label
+    assert source.count("add_edge_dimension(") == 4
+    assert source.count("_add_circle_diameter(") == 2  # def + call
+    assert "_display_as_diameter(adapter, collar_od" in source
+    # The bore reads on its visible circle (one pick: a second pick on the
+    # same circle would deselect it) with the ASME centre mark.
     assert source.count("auto_center_marks(") == 1
-    assert source.count("add_edge_dimension(") == 0
+    assert "AddDiameterDimension2(" in source
+    # ...and the created type is verified: a radius would print half the bore.
+    assert "dimension_type != _DIAMETER_DIMENSION" in source
+    assert drawing._DIAMETER_DIMENSION == 6
+    # The plan's stations read against the collar-axis centreline.
+    assert source.count("add_view_centerline(") == 1
+    # Non-front picks are projected through each view's own transform.
+    assert "model_point_in_view(" in source
+    assert source.count("= _model_frame(") == 2
+
+
+def test_layout_is_third_angle_and_clear_of_the_title_block() -> None:
+    # Plan above the front view, collar-end view beside the front view.
+    assert drawing.TOP_CENTER[0] == drawing.FRONT_CENTER[0]
+    assert drawing.TOP_CENTER[1] > drawing.FRONT_CENTER[1]
+    assert drawing.RIGHT_CENTER[1] == drawing.FRONT_CENTER[1]
+    assert drawing.RIGHT_CENTER[0] > drawing.FRONT_CENTER[0]
+    # The front-view lanes stay above the title block (x > ~0.218, y < 0.070).
+    assert drawing.FRONT_CENTER[1] - 0.006 > 0.070
+    # Plan lanes: the arm width nearest the arm end, the flange width outside
+    # it; the flange's far-edge station nearest, the arm's outside.
+    assert drawing.TOP_KEEP["ArmWidth"][1] > drawing.TOP_KEEP["FlangeWidth"][1]
+    assert drawing.TOP_KEEP["FlangeCornerZ"][0] > drawing.TOP_KEEP["ArmCornerZ"][0]
 
 
 def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:

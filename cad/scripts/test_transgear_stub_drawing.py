@@ -2,7 +2,9 @@
 
 The print follows cad/docs/drawing-simplicity-policy.md: a stepped stud turned
 in one setting carries no datums or frames; its two fits are the bands on the
-model diameters, plus one Ra on the seat the feed pinion and disc turn on.
+model diameters, plus one Ra on the seat the feed pinion and disc turn on. The
+axial stations baseline from the base end with a conspicuous overall, and the
+shoulder roots carry one leadered R MAX allowance (rule 7).
 """
 
 from __future__ import annotations
@@ -22,6 +24,10 @@ from _drawing_registry import DRAWINGS_BY_NAME
 
 def _source() -> str:
     return Path(drawing.__file__).read_text(encoding="utf-8")
+
+
+def _part_source() -> str:
+    return Path(part.__file__).read_text(encoding="utf-8")
 
 
 def test_required_drawing_paths() -> None:
@@ -54,15 +60,16 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
         part.COLLAR_DIA,
         part.COLLAR_LEN,
     ) == nominals
-    # The drawing types nothing from BASE_DIA (its only consumer was the
-    # retired datum tag); the base reaches the sheet as a marked dimension.
+    # The drawing types BASE_DIA only to place the root-note pick on the
+    # base shoulder's rim; the base reaches the sheet as a marked dimension.
     assert (
+        drawing.BASE_DIA,
         drawing.BASE_LEN,
         drawing.SEAT_DIA,
         drawing.SEAT_LEN,
         drawing.COLLAR_DIA,
         drawing.COLLAR_LEN,
-    ) == nominals[1:]
+    ) == nominals
     # The base is machine-standard 3/8" stock carried in mm.
     assert transgear_stub_spec.BASE_DIA == 0.375 * transgear_stub_spec.MM_PER_IN
 
@@ -119,16 +126,66 @@ def test_cap_plane_and_depth_follow_editable_globals() -> None:
 
 def test_lands_carry_true_diametric_dimensions() -> None:
     """The revolve profile dims the lathe-facing set: three doubled
-    centerline (diameter) dims plus the three land lengths -- never the
-    radius/step chain a rectilinear-chain recipe would emit."""
-    source = Path(part.__file__).read_text(encoding="utf-8")
+    centerline (diameter) dims plus the three base-end axial stations --
+    never the radius/step chain a rectilinear-chain recipe would emit."""
+    source = _part_source()
     assert source.count("await add_diametric_linear_dimension(") == 1
     assert "swDiametricLinearDimension" in source
     imports = source.split("PART_NAME =", 1)[0]
     assert "define_rectilinear_chain" not in imports  # not even imported
     marked = transgear_stub_spec.DRAWING_DIMENSIONS["StubProfile"]
     assert {"BaseDia", "SeatDia", "CollarDia"} <= marked
-    assert {"BaseLength", "SeatLength", "CollarLength"} <= marked
+    assert {"BaseLength", "SeatEnd", "Overall"} <= marked
+
+
+def test_axial_stations_baseline_from_the_base_end() -> None:
+    """Machinist review 2026-09-02: the per-land chain ran from three faces
+    and left no conspicuous overall. Every axial station now measures from
+    the base (faced) end -- 9.10, 22.90, 26.90 -- off one shared corner."""
+    source = _part_source()
+    assert "SeatLength" not in source
+    assert "CollarLength" not in source
+    assert 'base_corner = f"{profile_lines[0]}.end"' in source
+    assert "\"SeatEnd\", '\"BaseLen\" + \"SeatLen\"'" in source
+    assert "'\"BaseLen\" + \"SeatLen\" + \"CollarLen\"'" in source
+    stations = (
+        transgear_stub_spec.BASE_LEN,
+        transgear_stub_spec.BASE_LEN + transgear_stub_spec.SEAT_LEN,
+        drawing.TOTAL_LEN,
+    )
+    assert [round(s, 2) for s in stations] == [9.1, 22.9, 26.9]
+    # One lane per station on the profile's right, longest outermost, and
+    # the two lanes that span the Ra symbol's height sit clear of its arm
+    # (measured to x=0.1764).
+    lanes = [
+        drawing.FRONT_KEEP[name][0] for name in ("BaseLength", "SeatEnd", "Overall")
+    ]
+    assert lanes == sorted(lanes)
+    assert lanes[1] > 0.1764 and lanes[2] > 0.1764
+    assert all(x > drawing._fx(transgear_stub_spec.COLLAR_DIA / 2.0) for x in lanes)
+    # The diameters keep their left-hand stack.
+    for name in ("BaseDia", "SeatDia", "CollarDia"):
+        assert drawing.FRONT_KEEP[name][0] < drawing._fx(-transgear_stub_spec.COLLAR_DIA / 2.0)
+
+
+def test_shoulder_roots_carry_a_leadered_allowance() -> None:
+    # Review 2026-09-02 blocker: both concave shoulder roots were undefined.
+    # One attached note on the base shoulder's rim sizes both (rule 7).
+    assert transgear_stub_spec.ROOT_NOTE == "2X ROOT R0.25 MAX"
+    source = _source()
+    assert source.count("add_attached_note(") == 1
+    assert "text=ROOT_NOTE" in source
+    assert "find_edge_near(" in source
+    # Picked on the base shoulder (y = BASE_LEN), 1 mm inboard of the rim, on
+    # the left where the note sits between the BaseDia and SeatDia lines.
+    assert drawing.ROOT_PICK_XY[1] == drawing._fy(transgear_stub_spec.BASE_LEN)
+    assert drawing.ROOT_PICK_XY[0] < drawing.FRONT_CENTER[0]
+    assert drawing.ROOT_NOTE_XY[0] < drawing.ROOT_PICK_XY[0]
+    assert (
+        drawing.FRONT_KEEP["BaseDia"][1]
+        < drawing.ROOT_NOTE_XY[1]
+        < drawing.FRONT_KEEP["SeatDia"][1]
+    )
 
 
 def test_diameter_bands_are_toleranced_on_the_model_not_the_sheet() -> None:
@@ -158,8 +215,9 @@ def test_notes_are_few_specific_and_never_the_title_block() -> None:
     lines = notes.split("\n")
     assert len(lines) <= 4
     assert "ONE SETUP" in notes
-    # Deburr/edge-break is a title-block row; concentricity is a GD&T note.
-    for banned in ("DEBURR", "CONCENTRIC", "WITHIN", "+/-", "UOS", "DATUM", "X.XX"):
+    # Deburr/edge-break is a title-block row; concentricity is a GD&T note;
+    # the root radius rides its leadered note on the view.
+    for banned in ("DEBURR", "CONCENTRIC", "ROOT", "WITHIN", "+/-", "UOS", "DATUM", "X.XX"):
         assert banned not in notes, banned
     source = _source()
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
@@ -192,7 +250,7 @@ def test_print_carries_no_gdt_and_one_running_finish() -> None:
     )
     assert "roughness_ra=" not in source
     # The part build keeps its author_part_pmi call shape on the empty tuples.
-    part_source = "".join(Path(part.__file__).read_text(encoding="utf-8").split())
+    part_source = "".join(_part_source().split())
     assert "author_part_pmi(" in part_source
     assert "datums=PART_DATUMS" in part_source
     assert "controls=GEOMETRIC_CONTROLS" in part_source
@@ -212,7 +270,7 @@ def test_view_scales_are_explicit() -> None:
 
 
 def test_part_stamps_make_critical_properties() -> None:
-    source = Path(part.__file__).read_text(encoding="utf-8")
+    source = _part_source()
     assert "apply_drawing_properties" in source
     assert "clear_dimensions_for_drawing" in source
     import _config

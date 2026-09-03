@@ -2,9 +2,9 @@ r"""Create the curated machinist SPEC SHEET for the channel spring (installed).
 
 A coil spring is documented by a data table, not by graphical dimensions on the
 helix, so this print is a single 1:1 side view (drawn at the INSTALLED length),
-a 1:1 isometric, and the spring data table (a property-linked note stating BOTH
-the free and installed body lengths).  Shared behavior lives in
-``_drawing_common``.
+a 1:1 isometric, and a compact spring-data block.  The block specifies the
+relaxed free eye-centre length and identifies the stretched eye-centre length
+shown by the views.  Shared behavior lives in ``_drawing_common``.
 
 Run with SolidWorks open::
 

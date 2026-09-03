@@ -1,20 +1,26 @@
 r"""Create the curated machinist drawing for the cone swing platform.
 
 The SLDPRT remains authoritative.  This recipe supplies only the platform's
-views, the wedge envelope dimensions, and the machining notes; every shared
-sheet/template, import, curation, and export behavior lives in ``_drawing_common``.
+views, the wedge's native plan dimensions, the pivot-keyed hole stations and
+the machining notes; every shared sheet/template, import, curation, and export
+behavior lives in ``_drawing_common``.
 
 The platform is machined from black-oxide 5/16 in minimum steel stock to a
-6.35 mm finished plate: an asymmetric wedge (223.35 long, 20 -> 61 wide) with a
+6.35 mm finished plate: an asymmetric wedge (223.35 long, 24 -> 61 wide) with a
 Ø6.76 pivot hole at the narrow tip, paired 1/4-20 post-mount taps, an open
 lock notch through the west edge, and rounded plan corners. The main plan and
-end views run 1:2; the isometric runs 1:3.
+end views run 1:2; DETAIL A (the pivot end) runs 1:1; the isometric runs 1:3.
 
 The print carries no datums, frames, roughness symbols or basic dimensions
-(cad/docs/drawing-simplicity-policy.md).  Only the overall length is a
-native dimension; the wedge widths, notch and hole stations are a plain
-coordinate note, so the notes run longer than the policy's four lines
-until those coordinates become native dimensions on the plan.
+(cad/docs/drawing-simplicity-policy.md).  The wedge is defined by its own
+sketch dimensions from the pivot (the sketch origin): north-east corner from
+the pivot, north edge, west taper run, axial length, south edge; the lock
+notch by its closed-end cap (centre from the pivot, full-radius diameter) plus
+the axis angle in the notes; the corners by their fillet radii; the post-mount
+taps by entity dimensions from the pivot hole (across the axis and along it)
+and a native callout.  The narrow pivot end -- pivot hole, 7 overhang, 16/24
+north widths and the two north radii -- is dimensioned in DETAIL A, where the
+1:2 plan is too small to hold it legibly (policy rule 7).
 
 Run with SolidWorks open::
 
@@ -33,25 +39,42 @@ from _drawing_common import (
     DrawingOutputs,
     add_native_hole_callout,
     add_property_linked_note,
+    create_detail_view,
     curate_view_dimensions,
     finalize_drawing,
+    model_point_in_view,
     new_project_drawing,
     read_required_properties,
+    set_arc_endpoints_to_center,
+    set_dimension_callouts,
+    set_dimension_precision,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
+    view_name,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
+    remove_notes_matching,
 )
 from _holes import blind_cut_dia_mm
 from build_cone_swing_platform import (
+    EAST_HALF_S,
+    HALF_WIDTH_N,
+    NORTH_OVERHANG,
     PIVOT_HOLE_SPEC,
+    PLATE_LEN,
+    PLATE_T,
+    POST_MOUNT_EAST_XZ,
     POST_MOUNT_SPEC,
+    POST_MOUNT_WEST_XZ,
+    WEST_HALF_N,
+    WEST_HALF_S,
 )
+from cone_swing_platform_spec import LOCK_NOTCH_SEAT_X, LOCK_NOTCH_SEAT_Z
 
 
 SPEC = DRAWINGS_BY_NAME["cone_swing_platform"]
@@ -67,18 +90,107 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 3.0)   # 1:2 plan keeps the 266 mm envelope in-zone
+_P = 0.5 / 1000.0  # sheet metres per model mm in the 1:2 plan
 
-# Sheet layout (meters).  The 1:2 plan is the main definition view; the
-# isometric and an end view occupy the open right-hand field.
-TOP_CENTER = (0.115, 0.195)
-ISO_CENTER = (0.330, 0.175)
-END_CENTER = (0.330, 0.095)
+# Sheet layout (meters).  The 1:2 plan is the main definition view, low
+# enough that four stacked dimensions above its south end stay under the top
+# border; DETAIL A (the pivot end at 1:1) stands right of it; the isometric
+# and the end view occupy the open right-hand field above the title block.
+TOP_CENTER = (0.115, 0.172)
+DETAIL_CENTER = (0.240, 0.150)
+DETAIL_SCALE = (1, 1)
+ISO_CENTER = (0.355, 0.225)
+END_CENTER = (0.340, 0.095)
 
-# Per-view survivor: overall axis length only. Axis-relative end offsets in the
-# notes define both asymmetric end widths without redundant chained dimensions.
+# The plan view centres on the plate's bounding box; +X (west) is to the
+# right, +Z (north) is DOWN (the SolidWorks Top view), so the pivot end is at
+# the bottom of the sheet.
+_PLAN_CX = (WEST_HALF_S - EAST_HALF_S) / 2.0
+_PLAN_CZ = NORTH_OVERHANG - PLATE_LEN / 2.0
+
+
+def _plan_xy(x_mm: float, z_mm: float) -> tuple[float, float]:
+    """Sheet (x, y) of a part-local plan point (x west, z north) in the plan."""
+    return (
+        TOP_CENTER[0] + (x_mm - _PLAN_CX) * _P,
+        TOP_CENTER[1] - (z_mm - _PLAN_CZ) * _P,
+    )
+
+
+_PIVOT = _plan_xy(0.0, 0.0)
+_AXIS_X = _PIVOT[0]
+_NE = _plan_xy(-HALF_WIDTH_N, NORTH_OVERHANG)
+_NW = _plan_xy(WEST_HALF_N, NORTH_OVERHANG)
+_SW = _plan_xy(WEST_HALF_S, NORTH_OVERHANG - PLATE_LEN)
+_SE = _plan_xy(-EAST_HALF_S, NORTH_OVERHANG - PLATE_LEN)
+_SOUTH_Y = _SW[1]
+_NORTH_Y = _NE[1]
+_W_HOLE = _plan_xy(*POST_MOUNT_WEST_XZ)
+_E_HOLE = _plan_xy(*POST_MOUNT_EAST_XZ)
+_CAP = _plan_xy(LOCK_NOTCH_SEAT_X, LOCK_NOTCH_SEAT_Z)
+
+# DETAIL A boundary on the plan: centred on the axis 12 mm south of the pivot,
+# 26 mm (model) radius, so the whole 24 mm north end, the pivot hole and both
+# north corner radii are inside it.
+DETAIL_MODEL_CENTER_Z = -12.0
+DETAIL_MODEL_RADIUS = 26.0
+DETAIL_BOUNDARY = (
+    _plan_xy(0.0, DETAIL_MODEL_CENTER_Z),
+    DETAIL_MODEL_RADIUS * _P,
+)
+
+# Plan dimensions.  Left: the axial length outermost, the east mount's
+# station from the pivot nearer.  Right: the notch closed-end station and the
+# west mount's station from the pivot (shorter nearer).  Above the south end,
+# nearest first: the east mount's offset from the axis (text parked left of
+# its span), the mount pitch across the axis, the notch closed-end offset,
+# the south edge.  Below the north end: the west taper run (its south
+# witness runs down the west side, outside the plate).  The notch diameter
+# and the two south corner radii are leadered from the upper right, above
+# the station dimensions, where no leader crosses a dimension line.
 TOP_KEEP = {
-    "PlateLenDim": (0.048, TOP_CENTER[1]),
+    "PlateLenDim": (0.035, (_NORTH_Y + _SOUTH_Y) / 2.0),
+    "WestTaperDx": ((_NW[0] + _SW[0]) / 2.0, _NORTH_Y - 0.012),
+    "SouthEdge": ((_SE[0] + _SW[0]) / 2.0, _SOUTH_Y + 0.033),
+    "CapECx": (_AXIS_X + (LOCK_NOTCH_SEAT_X / 2.0) * _P, _SOUTH_Y + 0.024),
+    "CapECz": (_SW[0] + 0.016, (_PIVOT[1] + _CAP[1]) / 2.0),
+    "CapEDia": (0.180, _SOUTH_Y - 0.002),
+    "CornerSWR": (_SW[0] + 0.024, _SOUTH_Y + 0.0065),
+    "CornerSER": (_SE[0] - 0.022, _SOUTH_Y + 0.006),
 }
+# DETAIL A dimensions, as offsets (sheet metres) from the projected corner /
+# pivot points: the pivot-to-corner width and the north edge under the north
+# end, the 7 overhang on the left, the two radii leadered from either side
+# above the pivot level, the pivot hole callout upper right.
+DETAIL_OFFSETS = {
+    "NorthHalfW": ("mid_pivot_ne", (0.0, -0.009)),
+    "NorthEdge": ("mid_ne_nw", (0.0, -0.018)),
+    "NorthOverhangDim": ("ne", (-0.014, 0.0035)),
+    "CornerNER": ("ne", (-0.030, 0.012)),
+    "CornerNWR": ("nw", (0.030, 0.010)),
+}
+PIVOT_CALLOUT_OFFSET = (0.030, 0.040)  # from the NW corner, in the detail
+END_KEEP = {
+    "PlateT": (END_CENTER[0] + 0.026, END_CENTER[1]),
+}
+DIMENSION_CALLOUTS = {
+    "CapEDia": "NOTCH WIDTH",
+}
+# Radii print one place so the title block's .X row governs them; every
+# station and offset prints two.
+DIMENSION_PRECISION = {name: 1 for name in ("CornerNER", "CornerNWR", "CornerSWR", "CornerSER")}
+# Post-mount stations from the pivot: the east hole's offset across the axis
+# (text left of its span), the pair's pitch across the axis, and each hole's
+# station along the axis on its own side of the plate.
+EAST_OFFSET_TEXT_XY = (_AXIS_X - 0.017, _SOUTH_Y + 0.009)
+PITCH_TEXT_XY = (_AXIS_X, _SOUTH_Y + 0.016)
+WEST_STATION_TEXT_XY = (_SW[0] + 0.030, (_PIVOT[1] + _W_HOLE[1]) / 2.0)
+EAST_STATION_TEXT_XY = (_SE[0] - 0.016, (_PIVOT[1] + _E_HOLE[1]) / 2.0)
+MOUNT_CALLOUT_XY = (0.195, _SOUTH_Y + 0.014)
+NOTES_XY = (0.016, 0.088)
+PLAN_NOTE_XY = (0.030, 0.258)
+ISO_NOTE_XY = (0.325, 0.190)
+END_NOTE_XY = (0.310, 0.112)
 
 
 def _view_xy_mapper(adapter: Any, view: Any) -> Any:
@@ -104,12 +216,9 @@ def _view_xy_mapper(adapter: Any, view: Any) -> Any:
     return _view_xy
 
 
-def _add_cone_axis_centerline(adapter: Any, view: Any) -> tuple[float, float]:
-    """Draw the plan-view cone axis through the modeled pivot-hole center."""
-    _view_xy = _view_xy_mapper(adapter, view)
-
-    expected_radius_m = blind_cut_dia_mm(PIVOT_HOLE_SPEC) / 2000.0
-    pivot_centers: list[tuple[float, float]] = []
+def _plan_circles(adapter: Any, view: Any) -> list[tuple[float, tuple[float, float, float], Any]]:
+    """Every visible circular edge in a plan-family view: (radius m, centre m, edge)."""
+    circles: list[tuple[float, tuple[float, float, float], Any]] = []
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
     for component in components:
         edges = adapter._attempt(
@@ -120,10 +229,21 @@ def _add_cone_axis_centerline(adapter: Any, view: Any) -> tuple[float, float]:
             curve = _early_bound(edge.GetCurve(), "ICurve")
             if not curve.IsCircle():
                 continue
-            parameters = tuple(float(value) for value in curve.CircleParams)
-            if abs(parameters[6] - expected_radius_m) > 1e-6:
-                continue
-            pivot_centers.append(_view_xy(parameters[:3]))
+            values = tuple(float(value) for value in curve.CircleParams)
+            circles.append((values[6], values[:3], edge))
+    return circles
+
+
+def _add_cone_axis_centerline(adapter: Any, view: Any) -> tuple[float, float]:
+    """Draw the plan-view cone axis through the modeled pivot-hole center."""
+    _view_xy = _view_xy_mapper(adapter, view)
+
+    expected_radius_m = blind_cut_dia_mm(PIVOT_HOLE_SPEC) / 2000.0
+    pivot_centers = [
+        _view_xy(center)
+        for radius, center, _edge in _plan_circles(adapter, view)
+        if abs(radius - expected_radius_m) <= 1e-6
+    ]
     if not pivot_centers:
         raise RuntimeError(
             "cone-platform plan view has no visible pivot-hole rim at "
@@ -167,35 +287,114 @@ def _add_cone_axis_centerline(adapter: Any, view: Any) -> tuple[float, float]:
     return pivot
 
 
-def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any]:
-    """Return the pivot and post-mount rims from the plan view.
-
-    The north-end and long-straight-side edges were dropped with the GD&T that
-    referenced them (see ``build``) -- nothing else on this sheet attaches to
-    them.
-    """
+def _pivot_rim(adapter: Any, view: Any) -> Any:
+    """The pivot hole's rim in a plan-family view (the plan or its detail)."""
     expected_radius_m = blind_cut_dia_mm(PIVOT_HOLE_SPEC) / 2000.0
+    rims = [
+        edge
+        for radius, _center, edge in _plan_circles(adapter, view)
+        if abs(radius - expected_radius_m) <= 1e-6
+    ]
+    if not rims:
+        raise RuntimeError(f"{view_name(adapter, view)} shows no pivot-hole rim")
+    return rims[0]
+
+
+def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any, Any]:
+    """Return the pivot rim and the west and east post-mount rims.
+
+    Rims are matched by radius; the two mount rims are told apart by model X
+    (part-local +x is west).
+    """
     expected_mount_radius_m = blind_cut_dia_mm(POST_MOUNT_SPEC) / 2000.0
-    pivot_edges: list[Any] = []
-    mount_edges: list[Any] = []
-    components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
-    for component in components:
-        edges = adapter._attempt(
-            lambda c=component: view.GetVisibleEntities2(c, 1), default=()
-        ) or ()
-        for raw_edge in edges:
-            edge = _early_bound(raw_edge, "IEdge")
-            curve = _early_bound(edge.GetCurve(), "ICurve")
-            if not curve.IsCircle():
-                continue
-            values = tuple(float(value) for value in curve.CircleParams)
-            if abs(values[6] - expected_radius_m) <= 1e-6:
-                pivot_edges.append(edge)
-            if abs(values[6] - expected_mount_radius_m) <= 1e-6:
-                mount_edges.append(edge)
-    if not pivot_edges or len(mount_edges) < 2:
-        raise RuntimeError("cone-platform plan view is missing pivot/mount controls")
-    return pivot_edges[0], mount_edges[0]
+    mount_edges: list[tuple[float, Any]] = [
+        (center[0], edge)
+        for radius, center, edge in _plan_circles(adapter, view)
+        if abs(radius - expected_mount_radius_m) <= 1e-6
+    ]
+    if len(mount_edges) < 2:
+        raise RuntimeError(
+            f"cone-platform plan view shows {len(mount_edges)} post-mount rims, expected 2"
+        )
+    mount_edges.sort(key=lambda item: item[0], reverse=True)  # west (+x) first
+    return _pivot_rim(adapter, view), mount_edges[0][1], mount_edges[-1][1]
+
+
+@_telemetry.traced("drawing.entity_dimension", label_param="label")
+def _entity_dimension(
+    adapter: Any,
+    view: Any,
+    base_entity: Any,
+    circle_entity: Any,
+    *,
+    orientation: str,
+    position: tuple[float, float],
+    label: str,
+) -> Any:
+    """Entity-selected circle-centre-to-circle-centre dimension (the arbor recipe).
+
+    A sheet-picked dimension re-anchored to a circle centre was found to
+    DANGLE on the tip-block sheet (rendered gray on the eye pass); entity
+    selection does not.  Both picks are circular rims, so both endpoints are
+    re-anchored to their centres.
+    """
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    if not drawing.ActivateView(view_name(adapter, view)):
+        raise RuntimeError(f"failed to activate view for {label}")
+    draw.ClearSelection2(True)
+    selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    for append, raw_entity in ((False, base_entity), (True, circle_entity)):
+        selection_data = selection_manager.CreateSelectData()
+        selection_data.View = view
+        entity = _early_bound(raw_entity, "IEntity")
+        if not entity.Select4(append, selection_data):
+            raise RuntimeError(f"failed to select {label} entity")
+    if orientation == "horizontal":
+        display = draw.AddHorizontalDimension2(*position, 0.0)
+    elif orientation == "vertical":
+        display = draw.AddVerticalDimension2(*position, 0.0)
+    else:
+        raise ValueError(f"unsupported dimension orientation: {orientation}")
+    draw.ClearSelection2(True)
+    if display is None:
+        raise RuntimeError(f"failed to create {label} dimension")
+    set_arc_endpoints_to_center(adapter, display, label=label)
+    return display
+
+
+def _detail_keep(adapter: Any, detail: Any) -> dict[str, tuple[float, float]]:
+    """DETAIL A dimension positions from the detail's own projection.
+
+    The detail keeps the plan's orientation, but its centre and scale are
+    SolidWorks' to settle, so every position is an offset from a projected
+    model point (the pivot, the north-east and north-west sharp corners).
+    """
+    top_y = PLATE_T / 1000.0
+    pivot = model_point_in_view(adapter, detail, (0.0, top_y, 0.0), label="detail pivot")
+    ne = model_point_in_view(
+        adapter,
+        detail,
+        (-HALF_WIDTH_N / 1000.0, top_y, NORTH_OVERHANG / 1000.0),
+        label="detail NE corner",
+    )
+    nw = model_point_in_view(
+        adapter,
+        detail,
+        (WEST_HALF_N / 1000.0, top_y, NORTH_OVERHANG / 1000.0),
+        label="detail NW corner",
+    )
+    anchors = {
+        "pivot": pivot,
+        "ne": ne,
+        "nw": nw,
+        "mid_pivot_ne": ((pivot[0] + ne[0]) / 2.0, ne[1]),
+        "mid_ne_nw": ((ne[0] + nw[0]) / 2.0, ne[1]),
+    }
+    return {
+        name: (anchors[anchor][0] + dx, anchors[anchor][1] + dy)
+        for name, (anchor, (dx, dy)) in DETAIL_OFFSETS.items()
+    } | {"__nw": nw}
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -246,45 +445,115 @@ async def build(adapter: Any) -> dict[str, str]:
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 3))
     end = place_view(adapter, str(SOURCE), "*Front", *END_CENTER, scale=(1, 2))
     set_hidden_lines_removed(adapter, iso)
-    # Hidden lines stay ON in every orthographic view (policy rule 7).
-    for view in (top, end):
-        set_hidden_lines_visible(adapter, view)
-
-    curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
-    if not auto_center_marks(adapter, top, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center mark to the pivot hole")
-    _add_cone_axis_centerline(adapter, top)
-
-    pivot_edge, mount_edge = _visible_plan_controls(adapter, top)
-    add_native_hole_callout(
+    # DETAIL A: the pivot end at 1:1, where the pivot hole, the 7 overhang,
+    # the 16/24 north widths and the two north radii have room (rule 7).
+    detail = create_detail_view(
         adapter,
         top,
-        callout_xy=(0.170, 0.135),
+        center=DETAIL_BOUNDARY[0],
+        radius=DETAIL_BOUNDARY[1],
+        view_xy=DETAIL_CENTER,
+        detail_label="A",
+        scale=DETAIL_SCALE,
+        label="pivot-end detail",
+    )
+    # Hidden lines stay ON in every orthographic view (policy rule 7).
+    for view in (top, end, detail):
+        set_hidden_lines_visible(adapter, view)
+    # SolidWorks auto-inserts a generic "1/4-20 Tapped Hole" note for the
+    # wizard taps; the native callout below replaces it.
+    removed_tap_notes = remove_notes_matching(adapter, "Tapped Hole")
+    _telemetry.info(
+        f"removed {removed_tap_notes} redundant automatic tapped-hole note(s)"
+    )
+
+    # The detail claims its dimensions FIRST: SolidWorks imports each marked
+    # model dimension into one view only (draw_pinion_bracket, 2026-09-02).
+    detail_positions = _detail_keep(adapter, detail)
+    detail_nw = detail_positions.pop("__nw")
+    detail_annotations = curate_view_dimensions(
+        adapter, detail, keep=detail_positions, view_label="detail"
+    )
+    top_annotations = curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
+    end_annotations = curate_view_dimensions(adapter, end, keep=END_KEEP, view_label="end")
+    set_dimension_callouts(adapter, [*top_annotations, *end_annotations], DIMENSION_CALLOUTS)
+    set_dimension_precision(
+        adapter, [*detail_annotations, *top_annotations], DIMENSION_PRECISION
+    )
+    for label, view in (("plan", top), ("detail", detail)):
+        if not auto_center_marks(adapter, view, holes=True, size=0.0025):
+            raise RuntimeError(f"failed to add ASME center marks to the {label} view")
+    _add_cone_axis_centerline(adapter, top)
+
+    # Pivot hole: the native callout in DETAIL A, on the rim it enlarges.
+    add_native_hole_callout(
+        adapter,
+        detail,
+        callout_xy=(
+            detail_nw[0] + PIVOT_CALLOUT_OFFSET[0],
+            detail_nw[1] + PIVOT_CALLOUT_OFFSET[1],
+        ),
         label="pivot-hole size",
-        edge=pivot_edge,
+        edge=_pivot_rim(adapter, detail),
         # 1/4 close clearance (6.756 = 0.266 in) is exactly the H drill.
         process="H DRILL",
     )
+
+    # Post-mount taps from the pivot hole (the coordinate frame the notes
+    # name): the east hole's offset across the axis, the pair's pitch across
+    # the axis, and each hole's station along the axis -- every one an
+    # entity dimension between rim centres -- plus the native 2X callout.
+    pivot_edge, west_edge, east_edge = _visible_plan_controls(adapter, top)
+    _entity_dimension(
+        adapter,
+        top,
+        pivot_edge,
+        east_edge,
+        orientation="horizontal",
+        position=EAST_OFFSET_TEXT_XY,
+        label="east mount offset from the axis",
+    )
+    _entity_dimension(
+        adapter,
+        top,
+        west_edge,
+        east_edge,
+        orientation="horizontal",
+        position=PITCH_TEXT_XY,
+        label="mount pitch across the axis",
+    )
+    _entity_dimension(
+        adapter,
+        top,
+        pivot_edge,
+        west_edge,
+        orientation="vertical",
+        position=WEST_STATION_TEXT_XY,
+        label="west mount station from the pivot",
+    )
+    _entity_dimension(
+        adapter,
+        top,
+        pivot_edge,
+        east_edge,
+        orientation="vertical",
+        position=EAST_STATION_TEXT_XY,
+        label="east mount station from the pivot",
+    )
     add_native_hole_callout(
         adapter,
         top,
-        # Below the pair, not level with it: the model's own "1/4-20 Tapped
-        # Hole" note drops a leader onto the east hole, and a callout placed
-        # level with the holes routes its leader straight across that descent
-        # (fail-loud layout gate, 2 leader crossings). Coming up from below
-        # keeps this leader clear of the note for the whole span.
-        callout_xy=(0.175, 0.225),
+        callout_xy=MOUNT_CALLOUT_XY,
         label="v2 post-mount tapped holes",
-        edge=mount_edge,
+        edge=west_edge,
     )
-    # No GD&T on this sheet (policy rule 3); the block tolerances govern.
 
     add_property_linked_note(
-        adapter, "Manufacturing Notes", 0.016, 0.100, char_height=0.0025
+        adapter, "Manufacturing Notes", *NOTES_XY, char_height=0.0025
     )
-    add_property_linked_note(adapter, "Plan View Note", 0.190, 0.205)
-    add_property_linked_note(adapter, "Isometric View Note", 0.290, 0.135)
-    add_property_linked_note(adapter, "End View Note", 0.300, 0.125)
+    add_property_linked_note(adapter, "Plan View Note", *PLAN_NOTE_XY)
+    add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
+    add_property_linked_note(adapter, "End View Note", *END_NOTE_XY)
 
     return await finalize_drawing(
         adapter,

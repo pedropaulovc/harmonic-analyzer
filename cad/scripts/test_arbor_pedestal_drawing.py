@@ -128,8 +128,10 @@ def test_notes_are_few_specific_and_never_the_title_block() -> None:
         "X.XX", "UOS", "25-50 um", "TWO COATS", "(REF)",
     ):
         assert banned not in notes, banned
+    # Parked under the foot-width dimension, above the border.
+    assert drawing.NOTES_XY == (0.020, 0.066)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)' in source
+    assert 'add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)' in source
 
 
 def test_hole_callout_states_size_and_process() -> None:
@@ -141,6 +143,31 @@ def test_hole_callout_states_size_and_process() -> None:
     assert 'process="#30 DRILL"' in source
     assert round(0.1285 * 25.4, 3) == _holes.CLEARANCE_MM[("#4", "normal")]
     assert 'label="flange-hole location from near foot edge"' in source
+
+
+def test_upright_taper_and_depth_are_defined() -> None:
+    # The 24.00 foot width sits BELOW the seat (it used to cross the strap
+    # flanks at mid-height); the head diameter's callout says the flanks run
+    # up to it; the strap thickness is dimensioned in the plan against the
+    # flush rear face; the overall is a reference beside the bore height.
+    assert drawing.FRONT_KEEP["Width"][1] < drawing._front_y(0.0)
+    assert drawing.BORE_OFFSET_TEXT_Y < drawing._front_y(0.0)
+    assert drawing.BORE_OFFSET_TEXT_Y > drawing.FRONT_KEEP["Width"][1]
+    assert drawing.DIMENSION_CALLOUTS["DomeDia"] == "STRAP SIDES RUN TO IT"
+    assert arbor_pedestal_spec.STRAP_T == 10.0
+    assert arbor_pedestal_spec.OVERALL_HEIGHT == 49.718
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'label="strap thickness"' in source
+    assert 'label="overall height"' in source
+    # Add*Dimension2 hands back the late-bound IDisplayDimension; the
+    # reference helper wants its IAnnotation (draw_crank_arm precedent).
+    assert (
+        'set_reference_dimension(\n        adapter,\n'
+        '        _early_bound(overall, "IDisplayDimension").GetAnnotation(),\n'
+        '        label="overall height",\n    )'
+    ) in source
+    assert 'arc="max"' in source
+    assert drawing.OVERALL_TEXT_X < drawing.BORE_HEIGHT_TEXT_X < drawing.FRONT_KEEP["FootHt"][0]
 
 
 def test_print_carries_no_gdt_or_basic_dimensions_and_one_running_ra() -> None:
@@ -161,10 +188,10 @@ def test_print_carries_no_gdt_or_basic_dimensions_and_one_running_ra() -> None:
     assert len(drawing.SURFACE_FINISHES) == 1
     assert drawing.SURFACE_FINISHES[0].roughness_ra == _surface_finish.MACHINED
     assert 'surface_finish_by_key(SURFACE_FINISHES, "arbor_bore")' in source
-    assert "leader_attach_xy=" in source
-    # The bore and hold-down locations survive as ordinary entity-selected
-    # dimensions (three calls plus the helper).
-    assert source.count("_add_circle_dimension(") == 4
+    assert "leader_attach_xy=(FRONT_CENTER[0], _front_y(BORE_HEIGHT) - _bore_r)" in source
+    # The bore, hold-down, strap and overall locations survive as ordinary
+    # entity-selected dimensions (five calls plus the helper).
+    assert source.count("_add_entity_dimension(") == 6
     assert 'orientation="horizontal"' in source
     assert 'orientation="vertical"' in source
     assert "set_arc_endpoints_to_center(" in source

@@ -65,20 +65,16 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
-    set_dimension_symmetric_tolerance,
 )
 from _saved_part_guard import require_saved_drawing_properties
 from pinion_spring_spec import (
-    BEND_RADIUS_TOLERANCE_MM,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     FLAT_LEN,
     FOOT_LEN,
-    FOOT_LENGTH_TOLERANCE_MM,
     ISOMETRIC_VIEW_NOTE,
     R_BEND,
     R_KINK,
-    KINK_RADIUS_TOLERANCE_MM,
     THICK,
     WIDTH,
 )
@@ -285,16 +281,9 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # Manufacturing drawing support: mark exactly the print's dimensions and
-    # stamp the make-critical title-block properties.
-    set_dimension_symmetric_tolerance(
-        adapter, "SpringProfile", "FootLen", FOOT_LENGTH_TOLERANCE_MM
-    )
-    set_dimension_symmetric_tolerance(
-        adapter, "SpringProfile", "BendR", BEND_RADIUS_TOLERANCE_MM
-    )
-    set_dimension_symmetric_tolerance(
-        adapter, "SpringProfile", "KinkR", KINK_RADIUS_TOLERANCE_MM
-    )
+    # stamp the make-critical title-block properties.  No explicit bands: the
+    # title block's two-place and angular tolerances govern a hand-formed
+    # strip (machinist review 2026-09-02).
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

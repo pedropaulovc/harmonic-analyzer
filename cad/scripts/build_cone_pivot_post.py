@@ -51,8 +51,10 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
     set_dimension_symmetric_tolerance,
 )
+from _fit_limits import deviations
 from _holes import HoleSpec, wizard_holes
 from cone_pivot_post_spec import (
     ATTACHMENT_CBORE_DEPTH,
@@ -79,7 +81,7 @@ from cone_pivot_post_spec import (
     HEAD_DIA,
     HEAD_HEIGHT,
     INCLINE_DEG,
-    TURNED_DIAMETER_TOLERANCE_MM,
+    JOURNAL_BORE_BAND,
 )
 
 PART_NAME = "cone-pivot-post"
@@ -344,6 +346,9 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "ConeShaftBoss")
+    # Name the mid-plane boss LENGTH so the plan dimensions both machined
+    # boss end faces natively (they sit on the body's tangent planes).
+    name_dimensions(adapter, "ConeShaftBoss", ["ConeBossLen"])
 
     journal_bore = SketchDims()
     check(
@@ -383,29 +388,19 @@ async def build(adapter: Any) -> dict[str, str]:
         HARVESTED_VOLUME_MM3,
         0.001 * HARVESTED_VOLUME_MM3,
     )
-    set_dimension_symmetric_tolerance(
-        adapter,
-        "MainBodyProfile",
-        "MainBodyDia",
-        TURNED_DIAMETER_TOLERANCE_MM,
-    )
-    set_dimension_symmetric_tolerance(
-        adapter,
-        "HeadProfile",
-        "HeadDia",
-        TURNED_DIAMETER_TOLERANCE_MM,
-    )
-    set_dimension_symmetric_tolerance(
-        adapter,
-        "CrankBossProfile",
-        "CrankBossDia",
-        TURNED_DIAMETER_TOLERANCE_MM,
-    )
+    # Bands ride only the two running bores; the body, collar and boss outside
+    # diameters are as-cast (drawing notes) and carry none.
     set_dimension_symmetric_tolerance(
         adapter,
         "CrankBoreProfile",
         "CrankBoreDia",
         CRANK_BORE_TOLERANCE_MM,
+    )
+    set_dimension_bilateral_tolerance(
+        adapter,
+        "JournalBoreProfile",
+        "JournalBoreDia",
+        *deviations(JOURNAL_BORE_BAND),
     )
 
     # Semantic, name-selected assembly references.  The journal axis is taken

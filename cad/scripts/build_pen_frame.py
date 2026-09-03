@@ -48,6 +48,7 @@ from _drawing_marks import (
 )
 from _holes import TAP_DRILL_MM, HoleSpec, wizard_holes
 from pen_frame_spec import (
+    BOTTOM_VIEW_NOTE,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     FRONT_VIEW_NOTE,
@@ -210,6 +211,7 @@ async def build(adapter) -> dict[str, str]:
             "Manufacturing Notes": DRAWING_NOTES,
             "Front View Note": FRONT_VIEW_NOTE,
             "Right View Note": RIGHT_VIEW_NOTE,
+            "Bottom View Note": BOTTOM_VIEW_NOTE,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
