@@ -184,6 +184,7 @@ BORE_FINISH_SYMBOL = (
 CENTER_DISTANCE_TEXT_XY = (0.125, FRONT_CENTER[1])
 OVERALL_TEXT_XY = (0.105, FRONT_CENTER[1])
 PIN_CALLOUT_XY = (0.222, 0.246)
+_TEXT_CALLOUT_BELOW = 4  # swDimensionTextParts_e.swDimensionTextCalloutBelow
 
 
 def _set_below_text(adapter: Any, display: Any, text: str, *, label: str) -> None:

@@ -141,6 +141,7 @@ def test_print_carries_no_gdt_or_basic_dimensions() -> None:
 
 def test_running_bore_keeps_its_finish_and_holes_state_the_process() -> None:
     source = _source()
+    assert drawing._TEXT_CALLOUT_BELOW == 4
     assert source.count("add_surface_finish(") == 1
     assert 'label="strap bore finish"' in source
     assert drawing.RING_GEOMETRY_NOTE is connecting_rod_notes.RING_GEOMETRY_NOTE
