@@ -207,10 +207,74 @@ def count_tool_events(events: Sequence[dict[str, Any]]) -> int:
     return hits
 
 
+def validate_verdict(value: Any) -> dict[str, Any]:
+    """Validate the complete repository verdict contract without extra packages."""
+    if not isinstance(value, dict):
+        raise ValueError("verdict must be an object")
+
+    expected = {"verdict", "summary", *FINDING_KEYS}
+    actual = set(value)
+    if actual != expected:
+        missing = sorted(expected - actual)
+        extra = sorted(actual - expected)
+        raise ValueError(
+            f"verdict keys must be exact (missing={missing}, extra={extra})"
+        )
+
+    verdict = value["verdict"]
+    if not isinstance(verdict, str) or verdict not in {"SHIP", "FIX"}:
+        raise ValueError("verdict.verdict must be 'SHIP' or 'FIX'")
+    summary = value["summary"]
+    if not isinstance(summary, str) or not summary.strip():
+        raise ValueError("verdict.summary must be a non-empty string")
+
+    finding_keys = {"where", "issue", "fix"}
+    for category in FINDING_KEYS:
+        findings = value[category]
+        if not isinstance(findings, list):
+            raise ValueError(f"verdict.{category} must be an array")
+        for index, finding in enumerate(findings):
+            location = f"verdict.{category}[{index}]"
+            if not isinstance(finding, dict):
+                raise ValueError(f"{location} must be an object")
+            actual_finding_keys = set(finding)
+            if actual_finding_keys != finding_keys:
+                missing = sorted(finding_keys - actual_finding_keys)
+                extra = sorted(actual_finding_keys - finding_keys)
+                raise ValueError(
+                    f"{location} keys must be exact "
+                    f"(missing={missing}, extra={extra})"
+                )
+            for key in finding_keys:
+                text = finding[key]
+                if not isinstance(text, str) or not text.strip():
+                    raise ValueError(f"{location}.{key} must be a non-empty string")
+    return value
+
+
+def _valid_verdict(value: Any) -> dict[str, Any] | None:
+    try:
+        return validate_verdict(value)
+    except ValueError:
+        return None
+
+
+def _tag_events(
+    attempt: int, events: Sequence[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    return [{"attempt": attempt, "event": event} for event in events]
+
+
+def _write_events(path: Path, events: Sequence[dict[str, Any]]) -> None:
+    text = "\n".join(json.dumps(event) for event in events)
+    path.write_text(f"{text}\n" if text else "", encoding="utf-8")
+
+
 def is_pass(verdict: dict[str, Any] | None) -> bool:
-    if not verdict or verdict.get("verdict") != "SHIP":
+    verdict = _valid_verdict(verdict)
+    if verdict is None or verdict["verdict"] != "SHIP":
         return False
-    return all(not verdict.get(key) for key in GATING_KEYS)
+    return all(not verdict[key] for key in GATING_KEYS)
 
 
 def _parse_events(stdout: str) -> list[dict[str, Any]]:
@@ -244,10 +308,7 @@ def _extract_verdict(output_file: Path, events: Sequence[dict[str, Any]]) -> dic
     if start < 0 or end < 0:
         raise RuntimeError(f"final message is not JSON: {text[:200]!r}")
     verdict = json.loads(text[start : end + 1])
-    missing = [k for k in ("verdict", "summary", *FINDING_KEYS) if k not in verdict]
-    if missing:
-        raise RuntimeError(f"verdict missing keys {missing}")
-    return verdict
+    return validate_verdict(verdict)
 
 
 def review_sheet(
@@ -306,23 +367,29 @@ def review_sheet(
                 timeout=timeout_s,
                 cwd=str(workdir),
             )
-            events = _parse_events(proc.stdout)
-            events_path.write_text(
-                "\n".join(json.dumps(e) for e in events) + "\n", encoding="utf-8"
-            )
+            attempt_events = _parse_events(proc.stdout)
+            events.extend(_tag_events(attempts, attempt_events))
             if proc.returncode != 0:
                 raise RuntimeError(
                     f"codex exit {proc.returncode}: {proc.stderr.strip()[-800:]}"
                 )
-            verdict = _extract_verdict(output, events)
+            verdict = _extract_verdict(output, attempt_events)
             error = None
             break
+        except subprocess.TimeoutExpired as exc:
+            partial_stdout = exc.stdout or ""
+            if isinstance(partial_stdout, bytes):
+                partial_stdout = partial_stdout.decode("utf-8", errors="replace")
+            events.extend(_tag_events(attempts, _parse_events(partial_stdout)))
+            error = f"{type(exc).__name__}: {exc}"
+            verdict = None
         except Exception as exc:  # noqa: BLE001 - recorded, retried, reported
             error = f"{type(exc).__name__}: {exc}"
             verdict = None
         finally:
             shutil.rmtree(workdir, ignore_errors=True)
 
+    _write_events(events_path, events)
     tool_events = count_tool_events(events)
     review = Review(
         name=sheet.name,
