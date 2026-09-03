@@ -9,6 +9,11 @@ collar length, peak station) in the front profile view and gives the diameters
 as a turning-schedule note.  The profile sketches on the Front plane, so every
 marked dimension imports into the front view (handle axis horizontal).
 
+The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): a
+turned wooden grip carries no datums, frames, basics or roughness symbols;
+the reamed bore's band rides the model dimension and the turning schedule is
+the note.
+
 Run with SolidWorks open::
 
     uv run python cad\scripts\draw_crank_handle.py crank-handle
@@ -20,35 +25,23 @@ import argparse
 import sys
 from typing import Any
 
-from crank_handle_spec import GEOMETRIC_TOLERANCES_MM
-
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_feature_control_frame,
     add_property_linked_note,
     add_view_centerline,
     curate_view_dimensions,
-    dimension_name,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    set_basic_dimension,
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from crank_handle_spec import (
-    COLLAR_DIA,
-    HANDLE_LENGTH,
-    HANDLE_MAX_DIA,
-    PEAK_X,
-    PIVOT_BORE_DIA,
-)
+from crank_handle_spec import HANDLE_LENGTH
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -76,8 +69,6 @@ FRONT_CENTER = (0.150, 0.178)
 RIGHT_CENTER = (0.285, 0.205)
 ISO_CENTER = (0.350, 0.150)
 
-COLLAR_R = COLLAR_DIA / 2.0
-
 
 def _front_x(model_x_mm: float) -> float:
     return FRONT_CENTER[0] + (model_x_mm - FRONT_BBOX_CX) * SHEET_SCALE[0] / 1000.0
@@ -87,8 +78,6 @@ def _front_y(model_y_mm: float) -> float:
     return FRONT_CENTER[1] + model_y_mm * SHEET_SCALE[0] / 1000.0
 
 
-COLLAR_R_SHEET = COLLAR_R * SHEET_SCALE[0] / 1000.0
-
 FRONT_KEEP = {
     "HandleLength": (0.150, 0.128),
     "CollarLength": (0.070, 0.222),
@@ -97,11 +86,10 @@ FRONT_KEEP = {
 RIGHT_KEEP = {
     "PivotBoreDia": (0.360, 0.220),
 }
-# The HandleLength band moved onto the model dimension in build_crank_handle
-# (crank_handle_spec.HANDLE_LENGTH_BAND). The pivot-bore tolerance now also
-# renders from its model dimension; the callout retains only process intent.
+# The HandleLength and pivot-bore bands ride their model dimensions
+# (build_crank_handle); the callout carries only the process.
 DIMENSION_CALLOUTS = {
-    "PivotBoreDia": "THRU - REAM",
+    "PivotBoreDia": "REAM THRU",
 }
 
 
@@ -165,13 +153,6 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(
         adapter, [*front_annotations, *right_annotations], DIMENSION_CALLOUTS
     )
-    front_by_name = {dimension_name(adapter, a): a for a in front_annotations}
-    for station in ("CollarLength", "PeakStation"):
-        annotation = front_by_name[station]
-        display = adapter._attempt(lambda a=annotation: a.GetSpecificAnnotation())
-        if display is None:
-            raise RuntimeError(f"{station} has no display dimension to box")
-        set_basic_dimension(adapter, display, label=f"{station} profile station")
     add_view_centerline(
         adapter,
         front,
@@ -180,67 +161,6 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     if not auto_center_marks(adapter, right, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to crank-handle end view")
-
-    collar_od_top = (RIGHT_CENTER[0], RIGHT_CENTER[1] + COLLAR_R_SHEET)
-    bore_top = (
-        RIGHT_CENTER[0],
-        RIGHT_CENTER[1] + PIVOT_BORE_DIA * SHEET_SCALE[0] / 2000.0,
-    )
-    collar_face = (_front_x(0.0), _front_y(COLLAR_R * 0.55))
-    profile_peak = (
-        _front_x(PEAK_X),
-        _front_y(HANDLE_MAX_DIA / 2.0),
-    )
-    add_datum_feature(
-        adapter,
-        right,
-        edge_xy=collar_od_top,
-        symbol_xy=(RIGHT_CENTER[0], 0.245),
-        datum="A",
-        label="collar OD datum axis",
-    )
-    add_datum_feature(
-        adapter,
-        front,
-        edge_xy=collar_face,
-        symbol_xy=(0.040, 0.198),
-        datum="B",
-        label="flat collar face",
-    )
-    add_feature_control_frame(
-        adapter,
-        front,
-        edge_xy=collar_face,
-        frame_xy=(0.020, 0.155),
-        characteristic="perpendicularity",
-        tolerance=GEOMETRIC_TOLERANCES_MM["flat collar end perpendicularity"],
-        datums=("A",),
-        quantity="DATUM B FACE",
-        label="flat collar end perpendicularity",
-    )
-    add_feature_control_frame(
-        adapter,
-        right,
-        edge_xy=bore_top,
-        frame_xy=(0.350, 0.263),
-        characteristic="total_runout",
-        tolerance=GEOMETRIC_TOLERANCES_MM["full-length bore total runout"],
-        datums=("A",),
-        quantity="FULL BORE LENGTH",
-        label="full-length bore total runout",
-    )
-    add_feature_control_frame(
-        adapter,
-        front,
-        edge_xy=profile_peak,
-        frame_xy=(0.180, 0.263),
-        characteristic="profile_surface",
-        tolerance=GEOMETRIC_TOLERANCES_MM["turned handle profile"],
-        datums=("A", "B"),
-        quantity="TURNED GRIP PROFILE - SEE NOTE",
-        label="turned handle profile",
-        entity_type="SILHOUETTE",
-    )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.080)
     add_property_linked_note(adapter, "Isometric View Note", 0.325, 0.116)

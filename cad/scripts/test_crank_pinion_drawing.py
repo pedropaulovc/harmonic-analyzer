@@ -1,4 +1,10 @@
-"""Offline contracts for the crank-pinion drawing (batch gear pattern)."""
+"""Offline contracts for the crank-pinion drawing (batch gear pattern).
+
+The print follows cad/docs/drawing-simplicity-policy.md: a pinion keyed to the
+crankshaft carries no datums, frames or roughness symbols; the compact GEAR
+DATA block and two lines of notes replace the former pair-commissioning
+package.
+"""
 
 from __future__ import annotations
 
@@ -10,7 +16,12 @@ import pytest
 import build_crank_pinion as part
 import crank_pinion_spec as spec
 import draw_crank_pinion as drawing
+from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+
+
+def _source() -> str:
+    return Path(drawing.__file__).read_text(encoding="utf-8")
 
 
 def test_required_drawing_paths() -> None:
@@ -24,24 +35,32 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert set(drawing.FRONT_KEEP) == marked == {"BoreDia"}
-    assert drawing.DIMENSION_PRECISION["BoreDia"] == 3
-    assert drawing.DIMENSION_CALLOUTS["BoreDia"] == "THRU - REAM"
+    assert set(drawing.DIMENSION_CALLOUTS) <= marked
 
 
-def test_gear_data_block_specifies_the_tooth_system() -> None:
+def test_gear_data_block_is_the_compact_tooth_system() -> None:
     data = spec.GEAR_DATA
+    lines = data.split("\n")
+    assert lines[0] == "GEAR DATA"
+    assert len(lines) <= 11
     for field in (
-        "GEAR DATA", "NUMBER OF TEETH", "DIAMETRAL PITCH", "MODULE (mm",
-        "TRANSVERSE PRESSURE ANGLE", "PITCH DIAMETER (mm", "OUTSIDE DIAMETER (mm)",
-        "WHOLE DEPTH (mm)", "FACE WIDTH (mm)", "TOOTH FORM",
-        "ROOT DIAMETER (mm)", "BASE-TANGENT SPAN", "TOOTH-FLANK ACCURACY",
-        "PAIR GEOMETRY", "PAIR SHAFT ANGLE", "MID-FACE TRANSVERSE C2C",
-        "FACE MIDPLANE OFFSET",
-        "BASE CIRCLE DIAMETER", "PROFILE SHIFT COEFFICIENT",
-        "ACTIVE FLANK DEFINITION", "PROFILE / LEAD MODIFICATION",
+        "NUMBER OF TEETH", "DIAMETRAL PITCH", "PRESSURE ANGLE",
+        "PITCH DIAMETER (REF)", "OUTSIDE DIAMETER", "WHOLE DEPTH",
+        "FACE WIDTH", "CIRCULAR TOOTH THICKNESS", "TOOTH FORM", "MATES WITH",
     ):
         assert field in data, field
     assert "16" in data
+    assert "SPUR INVOLUTE, FULL DEPTH" in data
+    assert "64T HELICAL CRANK-DRIVE GEAR, 12.52 DEG CROSSED AXES" in data
+    assert "X.XX" not in data
+    for banned in ("ISO 1328", "BASE-TANGENT", "NONCONJUGATE", "BASIC", "+/-", "MHA-"):
+        assert banned not in data, banned
+    source = _source()
+    assert 'adapter, "Gear Data"' in source
+    assert 'adapter, "Manufacturing Notes"' in source
+
+
+def test_spec_tooth_math_matches_the_build() -> None:
     assert spec.ROOT_DIA == pytest.approx((
         part.TEETH / part.DP - 2.0 * 1.157 / part.DP
     ) * spec.MM_PER_IN)
@@ -52,57 +71,58 @@ def test_gear_data_block_specifies_the_tooth_system() -> None:
     assert spec.BASE_DIA == pytest.approx(
         spec.PITCH_DIA * math.cos(math.radians(spec.PRESSURE_ANGLE_DEG))
     )
-    assert f"{spec.BASE_TANGENT_SPAN:.3f} +0.000/-0.020" in data
-    assert "ISO 1328-1:2013 GRADE 10" in data
-    assert "NONCONJUGATE" in data
-    assert "ANALYTIC INVOLUTE, BASE CIRCLE TO OD" in data
-    assert "NONE; THICKNESS PER CONTROLLED SPAN" in data
-    assert "EVERY 2 TEETH" in data
-    assert "PROFILE/LEAD/PITCH, EVERY ACTIVE FLANK" in data
-    assert "X.XX" not in data
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'adapter, "Gear Data"' in source
-    assert 'adapter, "Manufacturing Notes"' in source
 
 
-def test_manufacturing_notes_present() -> None:
+def test_notes_are_few_specific_and_never_the_title_block() -> None:
     notes = spec.DRAWING_NOTES
-    assert "CUT TEETH PER GEAR DATA" in notes
-    assert "ROOT DIAMETER" in notes
-    assert "DO NOT SUBSTITUTE" in notes
-    assert "PART ACCEPTANCE IS BY INDIVIDUAL DRAWING LIMITS" in notes
-    assert "PAIR ASSEMBLY COMMISSIONING - NOT INDIVIDUAL PART ACCEPTANCE" in notes
-    assert "LOCATE BOTH BORES ON EXPANDING ARBORS" in notes
-    assert "APPLY 2.0 +/-0.2 mL ISO VG 32 OIL AT 20 +/-5 C" in notes
-    assert "DRIVE 16T PINION AT 6 +/-1 RPM IN BOTH DIRECTIONS" in notes
-    assert "64T OUTPUT UNLOADED" in notes
-    assert "SAMPLE RAW INLINE TORQUE AT 10 Hz MIN" in notes
-    assert "MEASURE ENGAGED 16T INPUT TORQUE OVER ONE FULL 64T REVOLUTION" in notes
-    assert "INPUT TARE AT 6 RPM AND OUTPUT TARE AT 1.5 RPM" in notes
-    assert "CORRECTED INPUT = ENGAGED INPUT - INPUT TARE - OUTPUT TARE/4" in notes
-    assert "CORRECTED MAGNITUDE 0.10 N*m MAX" in notes
-    assert "PEAK-TO-PEAK 0.05 N*m MAX" in notes
-    assert "MATCH-MARK" not in notes
-    assert "R0.10 MAX" in notes
-    assert "TOOTH FLANKS, TIPS, AND ROOTS: DO NOT CHAMFER OR BLEND" in notes
-    assert "HARDNESS NOT CONTROLLED" in notes
-    assert "DESIGN DIAMETRAL CLEARANCE: 0.030-0.070" in notes
-    assert "DEBUR" not in notes
-    assert "X.XX" not in notes
+    lines = notes.split("\n")
+    assert len(lines) <= 4
+    assert "DO NOT CHAMFER OR BLEND TOOTH FLANKS, TIPS OR ROOTS" in notes
+    assert "FIXED TO THE CRANKSHAFT" in notes
+    for banned in (
+        "DATUM", "RUNOUT", "+/-", "MHA-", "DEBUR", "X.XX", "UOS",
+        "COMMISSIONING", "TORQUE", "ISO", "HEAT TREATMENT", "HARDNESS",
+        "CLEARANCE",
+    ):
+        assert banned not in notes, banned
 
 
-def test_native_gdt_controls_bore_datum_and_finish() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 1
-    assert "entity=bore_edge" in source
-    assert "shoulder=True" in source
-    assert "position_tolerance_m=0.080" in source
-    assert 'quantity="2X AXIAL END FACES"' in source
-    assert source.count('characteristic="perpendicularity"') == 1
-    assert source.count("add_feature_control_frame(") == 2
-    assert 'characteristic="circular_runout"' in source
-    assert source.count("add_surface_finish(") == 1
-    assert source.count("char_height=0.0025") == 2
+def test_print_carries_no_gdt_or_finish_symbols() -> None:
+    # drawing-simplicity-policy.md rules 3-5: gears are not on the GD&T
+    # allowlist and a keyed bore does not run.
+    source = _source()
+    for helper in (
+        "add_datum_feature(",
+        "add_feature_control_frame(",
+        "add_surface_finish(",
+        "set_basic_dimension(",
+        "project_part_pmi(",
+        "visible_circle_edge(",
+        "visible_tooth_tip_silhouette(",
+    ):
+        assert helper not in source, helper
+    assert not hasattr(spec, "GEOMETRIC_TOLERANCES_MM")
+    assert not hasattr(spec, "GEOMETRIC_CONTROLS")
+    assert spec.SURFACE_FINISHES == ()
+    assert "surface_finishes=SURFACE_FINISHES" in Path(part.__file__).read_text(
+        encoding="utf-8"
+    )
+
+
+def test_reamed_bore_keeps_its_band_on_the_model_and_three_decimals() -> None:
+    assert drawing.DIMENSION_CALLOUTS == {"BoreDia": "REAM THRU"}
+    assert drawing.DIMENSION_PRECISION == {"BoreDia": 3}
+    assert spec.BORE_DIA_BAND == (0.050, 0.030)
+    assert model_toleranced_dimensions(part) == {
+        ("BoreProfile", "BoreDia"): "*deviations(BORE_DIA_BAND)"
+    }
+
+
+def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
+    source = _source()
+    assert "for view in (front, right):\n        set_hidden_lines_visible" in source
+    assert "set_hidden_lines_removed(adapter, iso)" in source
+    assert source.count("set_hidden_lines_removed(") == 1
 
 
 def test_part_stamps_make_critical_properties() -> None:
@@ -115,5 +135,5 @@ def test_part_stamps_make_critical_properties() -> None:
     material = "SAE 1018 CF bar, ASTM A108-24"
     assert config["material"] == material
     assert config["material_specification"] == material
-    assert config["finish"] == "gear teeth cut, oiled"
+    assert config["finish"] == "bright, oiled"
     assert int(config["quantity"]) == 1

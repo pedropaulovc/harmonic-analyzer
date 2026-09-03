@@ -10,7 +10,7 @@ Body O6.2 x 14 cosmetic-thread envelope authored along +Y from the SOUTH head fa
 blind bore O2 x 6 from the NORTH (far) end, driver slot across the head.
 
 The physical cylinder is the interference-safe thread-minor envelope; the
-cosmetic thread and UNC-2A drawing callout carry the standard major diameter,
+cosmetic thread and UNC drawing callout carry the standard major diameter,
 thread form, and limits.
 
 Run (SolidWorks already open)::

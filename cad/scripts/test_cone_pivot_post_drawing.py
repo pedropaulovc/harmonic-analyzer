@@ -76,42 +76,54 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     )
 
 
-def test_journal_axis_table_matches_the_inclined_v2_bore() -> None:
-    assert spec.JOURNAL_AXIS_ORIENTATION_NOTE == (
-        "O = A/B INTERSECTION; +Y ALONG B AWAY FROM A\n"
-        "+X RIGHT; +Z DOWN IN UPPER PLAN"
-    )
-    assert tuple(
-        (point, *(round(value, 3) for value in coordinates))
-        for point, *coordinates in spec.JOURNAL_AXIS_POINTS
-    ) == (
-        ("P", 0.0, 33.368, 0.0),
-        ("Q", 21.675, 33.368, 97.623),
-    )
+def test_inclined_journal_is_defined_by_a_leader_note_from_its_rim() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "JOURNAL AXIS COORDINATES (mm)" in source
-    assert "AXIS = LINE THROUGH P AND Q" in source
-    assert "JOURNAL_AXIS_POINTS" in source
-    assert '("POINT", "X", "Y", "Z")' in source
-    assert "note.SetBalloon(4, 0)" in source
+    assert "journal_entity = _bore_rim_edge(adapter, front, diameter_mm=BORE_DIA)" in source
+    assert "add_attached_note(" in source
+    assert "entity=journal_entity" in source
+    # Sizes, axis height and swing angle all come from the spec constants.
+    for constant in ("CONE_BOSS_DIA", "BORE_DIA", "BORE_HEIGHT", "INCLINE_DEG"):
+        assert f"{{{constant}:" in source, constant
+    assert "BORE THRU" in source
+    # The boxed journal-axis coordinate table is gone with the position frame.
+    assert not hasattr(spec, "JOURNAL_AXIS_POINTS")
+    assert not hasattr(spec, "JOURNAL_AXIS_ORIENTATION_NOTE")
+    assert "SetBalloon" not in source
+    assert "JOURNAL AXIS COORDINATES" not in source
 
 
-def test_manufacturing_notes_describe_the_bossed_casting() -> None:
+def test_notes_are_few_specific_and_never_the_title_block() -> None:
     notes = spec.DRAWING_NOTES
-    assert "CAST ASTM A48 CLASS 30" in notes
-    assert "MACHINE FOOT, BOSSES, BORES AND MOUNTING HOLES" in notes
-    assert "MAIN-BODY OD" in notes
-    assert "INCLINED JOURNAL AXIS" in notes
-    assert "12.2808" in notes
-    assert "11.438" in notes
-    assert "11.50874" in notes
-    assert "26.88704" in notes
-    assert "CONTINUOUS-CAST ROUND STOCK" not in notes
+    lines = notes.split("\n")
+    assert len(lines) <= 4
+    assert "MACHINE THE FOOT SEAT" in notes
+    assert "AS-CAST ELSEWHERE" in notes
+    assert "BORE THE CRANK BORE" in notes
+    # Material and paint/masking are title-block fields; sizes ride the views.
+    for banned in (
+        "A48", "CAST ASTM", "MASK", "DATUM", "BASIC", "+/-", "12.2808", "11.438",
+        "11.50874", "26.88704", "X.XX", "UOS",
+    ):
+        assert banned not in notes, banned
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
-    assert "ATTACHMENT_CBORE_DIA" in source
-    assert "ATTACHMENT_THRU_DIA" in source
-    assert "ATTACHMENT_SPACING" in source
+
+
+def test_attachment_holes_use_a_native_callout_and_a_spacing_dimension() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "west_rim, east_rim = _attachment_thru_rims(adapter, top)" in source
+    assert "add_native_hole_callout(" in source
+    assert "edge=east_rim" in source
+    # Harvey #13: the callout says DRILL; 0.28125 in (9/32) is the 7.142 through.
+    assert 'process="9/32 DRILL"' in source
+    assert abs(spec.ATTACHMENT_THRU_DIA - 9.0 / 32.0 * 25.4) < 0.01
+    assert "_add_attachment_spacing(adapter, top, west_rim, east_rim)" in source
+    assert "draw.AddHorizontalDimension2(TOP_CENTER[0], TOP_CENTER[1] - 0.026, 0.0)" in source
+    assert 'set_arc_endpoints_to_center(adapter, display, label="attachment spacing")' in source
+    # The rims are picked by entity at the counterbore floor, never by sheet xy.
+    assert "center_y_mm = BLOCK_HEIGHT - ATTACHMENT_CBORE_DEPTH" in source
+    assert "ATTACHMENT_CBORE_DIA" not in source
+    assert "ATTACHMENT_SPACING" not in source
 
 
 def test_source_records_exact_manual_photo_provenance() -> None:
@@ -169,16 +181,39 @@ def test_v2_feature_topology_uses_midplane_extrusions_and_hole_wizard() -> None:
     assert 'name="AttachmentScrewHoles"' in source
 
 
-def test_native_datums_and_controls_are_present() -> None:
+def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:
+    # drawing-simplicity-policy.md rules 3-5: a machined casting is not on the
+    # GD&T allowlist.
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 3
-    assert source.count("add_feature_control_frame(") == 4
-    assert 'datums=("A", "B")' in source
-    assert 'datums=("A", "B", "C")' in source
-    assert 'characteristic="flatness"' in source
-    assert 'characteristic="cylindricity"' in source
-    assert 'characteristic="position"' in source
-    assert "add_surface_finish(" not in source
+    for helper in (
+        "add_datum_feature(",
+        "add_feature_control_frame(",
+        "add_surface_finish(",
+        "set_basic_dimension(",
+        "project_part_pmi(",
+        "_add_basic_value(",
+    ):
+        assert helper not in source, helper
+    assert not hasattr(spec, "GEOMETRIC_TOLERANCES_MM")
+    assert not hasattr(spec, "SURFACE_FINISHES")
+
+
+def test_only_the_fitted_diameters_print_three_decimals() -> None:
+    assert drawing.DIMENSION_PRECISION == {
+        "MainBodyDia": 3,
+        "HeadDia": 3,
+        "CrankBossDia": 3,
+        "CrankBoreDia": 3,
+    }
+    assert drawing.DIMENSION_CALLOUTS == {"CrankBoreDia": "BORE THRU"}
+    assert spec.TURNED_DIAMETER_TOLERANCE_MM == 0.05
+    assert spec.CRANK_BORE_TOLERANCE_MM == 0.025
+
+
+def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "for view in (front, top):\n        set_hidden_lines_visible" in source
+    assert "set_hidden_lines_removed(adapter, iso)" in source
 
 
 def test_view_scales_are_explicit() -> None:
@@ -197,12 +232,8 @@ def test_bore_rim_com_scan_is_traced() -> None:
     ) in source
 
 
-def test_inclined_journal_datum_uses_projected_axis_center() -> None:
+def test_plan_view_label_is_placed() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "journal_center = model_point_in_view(" in source
-    assert "symbol_xy=(journal_center[0], journal_center[1] - 0.018)" in source
-    assert "position_tolerance_m=0.0009" in source
-    assert "frame_xy=(0.185, journal_center[1] - 0.023)" in source
     assert (
         '"UPPER PLAN SCALE 1:2 (+X RIGHT, +Z DOWN)",\n'
         "        0.070,\n        0.263,"

@@ -2,7 +2,7 @@ cone-tip-bushing:
   number: MHA-096
   material: Brass
   material_specification: C36000 free-machining brass
-  finish: turned, deburred, oiled
+  finish: bright, oiled
   quantity: 1
   tolerance_class: machined_block
   fit_class: shaft_in_bushing

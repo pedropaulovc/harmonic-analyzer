@@ -1,4 +1,10 @@
-r"""Create the curated machinist drawing for the cone platform lock knob."""
+r"""Create the curated machinist drawing for the cone platform lock knob.
+
+The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): a
+turned thumb knob carries no datums, no feature-control frames and no
+roughness symbols -- the title block's general tolerances govern everything
+except the washer thickness, whose band rides the model dimension.
+"""
 
 from __future__ import annotations
 
@@ -6,16 +12,11 @@ import argparse
 import sys
 from typing import Any
 
-from cone_lock_knob_spec import GEOMETRIC_TOLERANCES_MM
-
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_feature_control_frame,
     add_property_linked_note,
-    add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -26,15 +27,12 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import surface_finish_by_key
 from cone_lock_knob_spec import (
     BODY_DIA,
     BODY_TOP,
     DOME_R as DOME_R,
-    STUD_DIA,
     STUD_LEN,
     STUD_THREAD,
-    SURFACE_FINISHES,
     WASHER_DIA,
     WASHER_T,
 )
@@ -129,7 +127,7 @@ TOP_KEEP = {
     ),
 }
 DIMENSION_CALLOUTS = {
-    "StudDia": f"{STUD_THREAD} UNC-2A",
+    "StudDia": f"{STUD_THREAD} UNC",
 }
 
 
@@ -195,9 +193,10 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(3, 1))
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(3, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(3, 1))
-    for view in (front, iso):
-        set_hidden_lines_removed(adapter, view)
-    set_hidden_lines_visible(adapter, top)
+    set_hidden_lines_removed(adapter, iso)
+    # Hidden lines stay ON in every orthographic view (policy rule 7).
+    for view in (front, top):
+        set_hidden_lines_visible(adapter, view)
 
     # Measured before any annotation lands (dims would grow the outline).
     front_center = _outline_center(adapter, front)
@@ -222,90 +221,6 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to top view")
-
-    # Every GD&T anchor is a REAL model edge seen edge-on or as a circle (a
-    # face boundary).  A cylinder's side outline is an HLR silhouette, not a
-    # model edge, so it is NOT selectable via SelectByID2("EDGE", ...).
-    #
-    # Datum A is the turned AXIS (from the body OD circle in the top view,
-    # the fulcrum-shaft/lever-bushing convention); the clamp seat is held
-    # perpendicular to it and the washer OD holds runout to it, so the
-    # thread line, body and flange are tied to one inspectable axis.
-    fdx, fdy = front_delta
-    tdx, tdy = top_delta
-    seat_y = _front_y(0.0) + fdy
-    seat_half_x = (STUD_DIA / 2.0 + WASHER_DIA / 2.0) / 2.0 * _S
-    seat_right = (FRONT_CENTER[0] + fdx + seat_half_x, seat_y)
-    crown_flat = (FRONT_CENTER[0] + fdx, _front_y(BODY_TOP) + fdy)
-    _diag = 2.0**-0.5
-    body_circle = (
-        TOP_CENTER[0] + tdx + BODY_DIA * _S / 2.0 * _diag,
-        TOP_CENTER[1] + tdy + BODY_DIA * _S / 2.0 * _diag,
-    )
-    washer_circle = (
-        TOP_CENTER[0] + tdx + WASHER_DIA * _S / 2.0,
-        TOP_CENTER[1] + tdy,
-    )
-    # Both top-view symbols sit RIGHT of the view, not above it: the washer OD
-    # is 18 at 3:1, so the top view already reaches y=0.262 against the zone
-    # margin at 0.2667 and nothing clears above it.  (Their old +0.014/+0.024
-    # offsets stacked on the 45-deg body-circle anchor put them at y=0.2628 and
-    # 0.259, whose 8 mm half-boxes overran the top border by 4.1 and 0.3 mm.)
-    #
-    # STALE ARITHMETIC, placement still good: the "8 mm half-box" was the audit's
-    # old model, so those two top-border overruns were false alarms -- an FCF's
-    # anchor is its frame's TOP-LEFT corner and a datum tag's is its box top, so
-    # neither reaches more than ~0.1 mm above its anchor. Kept as-is: the Y bands
-    # below are what keep these three annotations off each other, which is a real
-    # constraint independent of the box model. The side that under-read was the
-    # RIGHT (a frame grows right by its full 20-30 mm width).
-    #
-    # The right side carries THREE annotations, so each gets its own Y band:
-    # datum A at 0.255, this frame at 0.238, and the StudDia callout, whose
-    # drawn text occupies x=0.111..0.145 / y=0.218..0.228.  None of that is
-    # mechanically checked -- GD&T and dims both carry CollisionScope.NONE, so
-    # a frame printed straight through a callout (which 0.228 did) is invisible
-    # to the audit and only shows up on the render.
-    # SolidWorks restricts this circular-axis tag and live readback normalizes
-    # the requested sheet point by 3.335 mm.  Bound that annotation placement
-    # behavior without changing any part dimension or geometric tolerance.
-    add_datum_feature(
-        adapter,
-        top,
-        edge_xy=body_circle,
-        symbol_xy=(0.128, 0.255),
-        datum="A",
-        label="knob body axis",
-        position_tolerance_m=0.0036,
-    )
-    add_feature_control_frame(
-        adapter,
-        top,
-        edge_xy=washer_circle,
-        frame_xy=(0.140, 0.238),
-        characteristic="circular_runout",
-        tolerance=GEOMETRIC_TOLERANCES_MM["washer flange runout"],
-        datums=("A",),
-        label="washer flange runout",
-    )
-    add_feature_control_frame(
-        adapter,
-        front,
-        edge_xy=seat_right,
-        frame_xy=(seat_right[0] + 0.026, seat_y - 0.020),
-        characteristic="perpendicularity",
-        tolerance=GEOMETRIC_TOLERANCES_MM["clamp seat perpendicularity"],
-        datums=("A",),
-        label="clamp seat perpendicularity",
-    )
-    add_surface_finish(
-        adapter,
-        front,
-        edge_xy=crown_flat,
-        symbol_xy=(crown_flat[0] + 0.024, crown_flat[1] + 0.012),
-        control=surface_finish_by_key(SURFACE_FINISHES, "dome_crown"),
-        label="dome crown finish",
-    )
 
     # 0.020: the note is left-aligned on its anchor, so the ink starts here. The
     # left bound is the 12.7 mm zone margin (~0.0127), which the re-centred frame

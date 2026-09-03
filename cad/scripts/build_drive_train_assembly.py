@@ -983,7 +983,7 @@ if BASE_PIVOT_SEAT_SPEC.kind != "tapped":
 if BASE_PIVOT_SEAT_SPEC.size != PSCREW_THREAD:
     raise AssertionError("base pivot thread does not match the pivot screw")
 if BASE_PIVOT_SEAT_SPEC.thread_class != "2B":
-    raise AssertionError("base pivot thread is not UNC-2B")
+    raise AssertionError("base pivot thread is not UNC")
 if abs(PSCREW_THREAD_SOLID_DIA - PSCREW_THREAD_TAP_DRILL_DIA) > 1e-9:
     raise AssertionError("pivot screw solid envelope does not match the tap drill")
 if abs(BASE_PIVOT_HOLE_DIA - PSCREW_THREAD_SOLID_DIA) > 1e-9:
@@ -2091,7 +2091,7 @@ async def build(adapter) -> dict[str, str]:
     # The platform pivot screw (item 2, p.18 "pivot"): a base-threaded STATIC.
     # Its shoulder bottoms on the base top, placing the head 0.25 above the
     # plate and leaving the plate free to swing; the threaded tail enters the
-    # matching blind #10-24 UNC-2B seat.
+    # matching blind #10-24 UNC seat.
     pivot_screw = await place_component(
         adapter,
         "cone-pivot-screw",

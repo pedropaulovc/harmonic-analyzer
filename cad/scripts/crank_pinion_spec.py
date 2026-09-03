@@ -9,8 +9,7 @@ from __future__ import annotations
 
 import math
 
-from _gtol_spec import CylinderFace
-from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from _surface_finish import SurfaceFinishControl
 
 
 MM_PER_IN = 25.4
@@ -24,29 +23,21 @@ BASE_DIA = PITCH_DIA * math.cos(math.radians(PRESSURE_ANGLE_DEG))
 OUTSIDE_DIA = (TEETH + 2) / DIAMETRAL_PITCH * MM_PER_IN
 WHOLE_DEPTH = 2.157 / DIAMETRAL_PITCH * MM_PER_IN
 ROOT_DIA = (TEETH - 2.0 * 1.157) / DIAMETRAL_PITCH * MM_PER_IN
+PAIR_SHAFT_ANGLE_DEG = 12.52  # crossed axes against the 64T helical gear
 
 BORE_DIA = 0.375 * MM_PER_IN  # 9.525 (3/8" crankshaft)
 BORE_DIA_BAND = (0.050, 0.030)  # (upper, lower) deviations
 FACE_WIDTH = 10.8
-SURFACE_FINISHES = (
-    SurfaceFinishControl("crank_pinion_bore", MACHINED_UM, CylinderFace(BORE_DIA)),
-)
-NORMAL_MODULE_MM = MODULE_MM
-NORMAL_PRESSURE_ANGLE_DEG = PRESSURE_ANGLE_DEG
+
+# No roughness callouts: the pinion is keyed to the crankshaft (it is the
+# crank's drive), so nothing runs on the bore; the title block's Ra 3.2 covers
+# every face (cad/docs/drawing-simplicity-policy.md rule 5).
+SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
+
+# Derived tooth geometry -- the analytic record the build's constants are
+# checked against (test_crank_pinion_drawing).  The pinion is a standard
+# tooth: all the pair's backlash is thinned off the 64T.
 TRANSVERSE_CIRCULAR_TOOTH_THICKNESS = math.pi * MODULE_MM / 2.0
-BASE_TANGENT_SPAN_TEETH = 2
-BASE_TANGENT_SPAN = (
-    MODULE_MM
-    * math.cos(math.radians(PRESSURE_ANGLE_DEG))
-    * (
-        math.pi * (BASE_TANGENT_SPAN_TEETH - 0.5)
-        + TEETH
-        * (
-            math.tan(math.radians(PRESSURE_ANGLE_DEG))
-            - math.radians(PRESSURE_ANGLE_DEG)
-        )
-    )
-)
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BoreProfile": {"BoreDia"},
@@ -62,67 +53,25 @@ GEAR_DATA = gear_data_note(
     [
         ("NUMBER OF TEETH", f"{TEETH}"),
         ("DIAMETRAL PITCH", f"{DIAMETRAL_PITCH:.2f}"),
-        ("MODULE (mm, REF)", f"{MODULE_MM:.3f}"),
-        ("TRANSVERSE PRESSURE ANGLE", f"{PRESSURE_ANGLE_DEG:.1f} DEG"),
-        ("NORMAL MODULE (mm, REF)", f"{NORMAL_MODULE_MM:.3f}"),
-        ("NORMAL PRESSURE ANGLE (REF)", f"{NORMAL_PRESSURE_ANGLE_DEG:.2f} DEG"),
-        ("PITCH DIAMETER (mm, REF)", f"{PITCH_DIA:.2f}"),
-        ("BASE CIRCLE DIAMETER (mm, BASIC)", f"{BASE_DIA:.3f}"),
-        ("OUTSIDE DIAMETER (mm)", f"{OUTSIDE_DIA:.2f} +0/-0.10"),
-        ("WHOLE DEPTH (mm)", f"{WHOLE_DEPTH:.2f} REF"),
-        ("ROOT DIAMETER (mm)", f"{ROOT_DIA:.2f} +0/-0.10"),
-        ("FACE WIDTH (mm)", f"{FACE_WIDTH:.2f}"),
+        ("PRESSURE ANGLE", f"{PRESSURE_ANGLE_DEG:.1f} DEG"),
+        ("PITCH DIAMETER (REF)", f"{PITCH_DIA:.2f}"),
+        ("OUTSIDE DIAMETER", f"{OUTSIDE_DIA:.2f} +0/-0.10"),
+        ("WHOLE DEPTH", f"{WHOLE_DEPTH:.2f}"),
+        ("FACE WIDTH", f"{FACE_WIDTH:.2f}"),
+        ("CIRCULAR TOOTH THICKNESS", f"{TRANSVERSE_CIRCULAR_TOOTH_THICKNESS:.3f}"),
         ("TOOTH FORM", "SPUR INVOLUTE, FULL DEPTH"),
-        ("PROFILE SHIFT COEFFICIENT (BASIC)", "x = 0.000"),
-        ("ACTIVE FLANK DEFINITION", "ANALYTIC INVOLUTE, BASE CIRCLE TO OD"),
-        ("PROFILE / LEAD MODIFICATION", "NONE; THICKNESS PER CONTROLLED SPAN"),
         (
-            "BASE-TANGENT SPAN, EVERY 2 TEETH (mm)",
-            f"{BASE_TANGENT_SPAN:.3f} +0.000/-0.020",
+            "MATES WITH",
+            f"64T HELICAL CRANK-DRIVE GEAR, {PAIR_SHAFT_ANGLE_DEG:.2f} DEG CROSSED AXES",
         ),
-        (
-            "TOOTH-FLANK ACCURACY",
-            "ISO 1328-1:2013 GRADE 10; PROFILE/LEAD/PITCH, EVERY ACTIVE FLANK",
-        ),
-        ("PAIR GEOMETRY", "CUSTOM NONCONJUGATE"),
-        ("PAIR SHAFT ANGLE", "12.52 +/-0.10 DEG"),
-        ("MID-FACE TRANSVERSE C2C (mm)", "39.735 +/-0.050"),
-        ("FACE MIDPLANE OFFSET (mm)", "0.000 +/-0.100"),
-        ("MATING GEAR", "64T (MHA-021)"),
     ]
 )
 
+# Notes: part-specific process facts only, never a tolerance, never the
+# title block (drawing-simplicity-policy.md rule 6).
 DRAWING_NOTES = "\n".join(
     (
-        "CUT TEETH PER GEAR DATA; PART ACCEPTANCE IS BY INDIVIDUAL DRAWING LIMITS.",
-        "NORMAL SYSTEMS INTENTIONALLY DIFFER; DO NOT SUBSTITUTE EITHER MEMBER.",
-        "ISO CLASS APPLIES TO EACH MEMBER ONLY; SPECIFIC DRAWING LIMITS GOVERN.",
-        "HEAT TREATMENT: NONE; HARDNESS NOT CONTROLLED.",
-        "ROOT FLOOR IS A CONCENTRIC ARC AT THE ROOT DIAMETER ABOVE.",
-        "TOOTH ROOT TRANSITIONS: R0.10 MAX, TANGENT TO FLANK AND ROOT FLOOR.",
-        "TOOTH FLANKS, TIPS, AND ROOTS: DO NOT CHAMFER OR BLEND.",
-        "MATES WITH 9.525 +0.000/-0.020 CRANKSHAFT.",
-        "DESIGN DIAMETRAL CLEARANCE: 0.030-0.070.",
-        "",
-        "PAIR ASSEMBLY COMMISSIONING - NOT INDIVIDUAL PART ACCEPTANCE:",
-        "TEST MHA-021 WITH MHA-025 ONLY AFTER BOTH PARTS PASS THEIR INDIVIDUAL LIMITS.",
-        "LOCATE BOTH BORES ON EXPANDING ARBORS; SET SHAFT ANGLE, C2C, AND OFFSET TO NOMINAL PAIR DATA.",
-        "FIXTURE SETTING ACCURACY: ANGLE +/-0.02 DEG; C2C AND OFFSET +/-0.010 mm.",
-        "FIXTURE SPINDLE RUNOUT 0.010 mm TIR MAX; AXIAL FLOAT 0.020 mm MAX.",
-        "APPLY 2.0 +/-0.2 mL ISO VG 32 OIL AT 20 +/-5 C UNIFORMLY TO BOTH MEMBERS' FLANKS.",
-        "PRECONDITION TWO 64T REVOLUTIONS EACH DIRECTION; WAIT 60 s BEFORE MEASUREMENT.",
-        "DRIVE 16T PINION AT 6 +/-1 RPM IN BOTH DIRECTIONS; 64T OUTPUT UNLOADED.",
-        "MEASURE ENGAGED 16T INPUT TORQUE OVER ONE FULL 64T REVOLUTION EACH DIRECTION.",
-        "SAMPLE RAW INLINE TORQUE AT 10 Hz MIN; TRANSDUCER ACCURACY +/-0.005 N*m, RESOLUTION 0.001 N*m.",
-        "GEARS DISENGAGED: MEASURE INPUT TARE AT 6 RPM AND OUTPUT TARE AT 1.5 RPM, EACH DIRECTION.",
-        "CORRECTED INPUT = ENGAGED INPUT - INPUT TARE - OUTPUT TARE/4.",
-        "CORRECTED MAGNITUDE 0.10 N*m MAX; PEAK-TO-PEAK 0.05 N*m MAX; NO FILTERING.",
+        "DO NOT CHAMFER OR BLEND TOOTH FLANKS, TIPS OR ROOTS.",
+        "FIXED TO THE CRANKSHAFT AT ASSEMBLY.",
     )
 )
-
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "pinion end-face squareness to bore": "0.05",
-    "pinion tooth-tip circular runout": "0.05",
-}

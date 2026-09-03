@@ -2,7 +2,7 @@ pinion-lift-rod:
   number: MHA-060
   material: Plain Carbon Steel
   material_specification: AISI 1018 cold-finished steel shafting
-  finish: precision turned or ground, oiled
+  finish: bright, oiled
   quantity: 1
   tolerance_class: machined_block
   fit_class: shaft_in_bushing

@@ -1,4 +1,15 @@
-r"""Create the curated machinist drawing for the alignment-pinion arbor."""
+r"""Create the curated machinist drawing for the alignment-pinion arbor.
+
+The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): a
+plain bearing arbor carries no datums and no feature-control frames -- its
+running fit is the band on the model diameter, plus one roughness symbol on
+the OD that turns in the strap bores. The diameter, the shank length and the
+Ra all read on the side view (policy rule 7: a turned part is dimensioned as
+it sits in the lathe); the crowned back end is enlarged in DETAIL B so its
+sagitta and spherical radius are legible, and the true overall length is a
+conspicuous reference below the shank length (machinist review 2026-09-02:
+the 226.25 read as the overall).
+"""
 
 from __future__ import annotations
 
@@ -7,19 +18,23 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    PmiDrawingPlacement,
+    add_edge_dimension,
     add_property_linked_note,
     add_surface_finish,
+    create_detail_view,
     curate_view_dimensions,
     finalize_drawing,
-    project_part_pmi,
+    model_point_in_view,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
+    set_dimension_precision,
     set_hidden_lines_removed,
+    set_hidden_lines_visible,
+    set_reference_dimension,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -27,8 +42,7 @@ from _surface_finish import surface_finish_by_key
 from pinion_arbor_spec import (
     CAP_R,
     CAP_SAG,
-    GEOMETRIC_CONTROLS,
-    PART_DATUMS,
+    OVERALL_LEN,
     SHAFT_DIA,
     SHAFT_LEN,
     SURFACE_FINISHES,
@@ -53,47 +67,58 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 1.0)
 END_VIEW_SCALE = 2.0
-# The part spans z 0..SHAFT_LEN+CAP_SAG (shaft + crown), so the side view is
+# The part spans z 0..OVERALL_LEN (shaft + crown), so the side view is
 # OVERALL_LEN wide on the 1:1 sheet and its outline centre is the mid-span.
-OVERALL_LEN = SHAFT_LEN + CAP_SAG
+# 0.060 between the end circle and the side view's left end (was 0.045): the
+# detail circle now sits around the crown at that end and needs the room.
 FRONT_CENTER = (0.055, 0.205)
 RIGHT_CENTER = (
-    FRONT_CENTER[0] + OVERALL_LEN * SHEET_SCALE[0] / 2000.0 + 0.045,
+    FRONT_CENTER[0] + OVERALL_LEN * SHEET_SCALE[0] / 2000.0 + 0.060,
     FRONT_CENTER[1],
 )
 # 226-long arbor: a 1:1 isometric would run off the ASME B sheet, so 1:2.
 # NOT (0.377, 0.205): even at 1:2 the iso is ~86 x 52, so up there it overran
 # the right zone margin (the border gate measured 2.1 mm) and crowded the side
 # view's right end. The empty band below the side view and right of the notes
-# block takes it whole, clear of the 226.25 dimension line at y=0.180.
+# block takes it whole, clear of the length dimensions above it.
 ISO_CENTER = (0.345, 0.145)
 
-# The shaft's flank in the *Right view: an 8-dia cylinder at 1:1, so its top
-# silhouette runs 4 mm above the view centre. The cylindrical callouts anchor
-# HERE rather than on the front view's end circle -- see the GD&T block below.
+# Side-view landmarks (sheet meters): crown apex at the LEFT end, flat front
+# end at the RIGHT (the exact apex / root / rim points are projected from the
+# model at build time). The shaft's top flank is an 8-dia cylinder at 1:1, so
+# its silhouette runs 4 mm above the view centre.
+LEFT_END_X = RIGHT_CENTER[0] - OVERALL_LEN * SHEET_SCALE[0] / 2000.0
+RIGHT_END_X = RIGHT_CENTER[0] + OVERALL_LEN * SHEET_SCALE[0] / 2000.0
 SHAFT_FLANK_Y = RIGHT_CENTER[1] + SHAFT_DIA * SHEET_SCALE[0] / 2000.0
 
-FRONT_KEEP = {
-    # x=0.030, not the bbox-derived 0.014: horizontal text made this callout
-    # ~25 mm wide ("+0.00/-0.02"), so centred on 0.014 it ran over the 12.7 mm
-    # zone margin (the border gate measured 2.7 mm). 0.030 clears the margin on
-    # the left and stops short of the end circle at x=0.047 on the right.
-    "ShaftDia": (0.030, 0.220),
-}
+# DETAIL B (4:1): the crown, circled on the side view around its root and
+# enlarged below-left, clear of the notes block (x<=0.12 at y~0.10..0.11) and
+# under the length dimensions (y>=0.170). At 4:1 the 8-dia crown is 32 mm
+# tall and the 1.2 sagitta reads as 4.8 mm.
+DETAIL_CENTER = (0.160, 0.130)
+DETAIL_RADIUS = 0.008
+DETAIL_SCALE = (4, 1)
+
+# Marked dimensions by view. SolidWorks inserts each marked model dimension
+# into ONE view and a dimension one view's curation deleted does not come
+# back for another (draw_pinion_bracket, 2026-09-02 seat build), so the
+# detail is curated first (it claims the sagitta), then the side view (the
+# diameter at the flat right end, the shank length below); the end view keeps
+# nothing and is never asked.
+FRONT_KEEP: dict[str, tuple[float, float]] = {}
 RIGHT_KEEP = {
-    "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.025),
-    # Held 20 mm clear of the view's left end, not the old 4 mm: horizontal text
-    # makes "SR7.27 CROWN" ~35 mm wide, so a 4 mm offset ran the text's right
-    # half back over the crown dimension's own extension lines.
-    "CapSagDim": (
-        RIGHT_CENTER[0] - OVERALL_LEN / 2000.0 - 0.020,
-        RIGHT_CENTER[1] + 0.022,
-    ),
+    "ShaftDia": (RIGHT_END_X + 0.024, RIGHT_CENTER[1]),
+    "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.020),
 }
-# The shaft fit lives on the source-model dimension. The crown descriptor is
-# still a sheet layout annotation, not a tolerance override.
-DIMENSION_CALLOUTS: dict[str, str] = {}
+DETAIL_KEEP_NAMES = ("CapSagDim",)
+# The shaft fit lives on the source-model dimension. The shank length says
+# where it stops (the crown root, not the apex); the crown descriptor rides
+# the sagitta in the detail.
+DIMENSION_CALLOUTS = {"Depth": "TO CROWN ROOT"}
 CAP_CALLOUTS = {"CapSagDim": f"SR{CAP_R:.2f} CROWN"}
+# The diameter is the one fitted feature (SHAFT_H band on the model
+# dimension): three decimals say "hold it".
+DIMENSION_PRECISION = {"ShaftDia": 3}
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -140,63 +165,90 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(1, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
-    for view in (front, right, iso):
-        set_hidden_lines_removed(adapter, view)
+    set_hidden_lines_removed(adapter, iso)
+    # Hidden lines stay ON in every orthographic view (Harvey #30 / Lipton).
+    for view in (front, right):
+        set_hidden_lines_visible(adapter, view)
 
-    front_annotations = curate_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="front"
+    # Side-view landmarks projected from the MODEL, not assumed from the view
+    # centre: the crown apex (a revolve apex is a VERTEX) and the top of the
+    # flat front end's edge-on circular edge.
+    apex = model_point_in_view(
+        adapter, right, (0.0, 0.0, OVERALL_LEN / 1000.0), label="crown apex"
+    )
+    crown_root = model_point_in_view(
+        adapter, right, (0.0, 0.0, SHAFT_LEN / 1000.0), label="crown root"
+    )
+    front_end_top = model_point_in_view(
+        adapter, right, (0.0, SHAFT_DIA / 2000.0, 0.0), label="front end rim"
+    )
+
+    # DETAIL B around the crown root, enlarged 4:1 (policy rule 7: a feature
+    # too small to dimension legibly on the parent gets a detail). Curated
+    # FIRST so it claims the sagitta.
+    detail = create_detail_view(
+        adapter,
+        right,
+        center=crown_root,
+        radius=DETAIL_RADIUS,
+        view_xy=DETAIL_CENTER,
+        detail_label="B",
+        scale=DETAIL_SCALE,
+        label="crown detail",
+    )
+    detail_root = model_point_in_view(
+        adapter, detail, (0.0, 0.0, SHAFT_LEN / 1000.0), label="detail crown root"
+    )
+    detail_apex = model_point_in_view(
+        adapter, detail, (0.0, 0.0, OVERALL_LEN / 1000.0), label="detail crown apex"
+    )
+    # The sagitta (1.20, 4.8 mm at 4:1) stands above the crown, centred on it,
+    # its "SR7.27 CROWN" callout under the value.
+    detail_keep = {
+        "CapSagDim": (
+            (detail_root[0] + detail_apex[0]) / 2.0,
+            detail_root[1] + SHAFT_DIA * DETAIL_SCALE[0] / 2000.0 + 0.012,
+        ),
+    }
+    detail_annotations = curate_view_dimensions(
+        adapter, detail, keep=detail_keep, view_label="detail"
     )
     right_annotations = curate_view_dimensions(
         adapter, right, keep=RIGHT_KEEP, view_label="right"
     )
-    set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
-    set_dimension_callouts(adapter, right_annotations, CAP_CALLOUTS)
+    set_dimension_callouts(adapter, right_annotations, DIMENSION_CALLOUTS)
+    set_dimension_callouts(adapter, detail_annotations, CAP_CALLOUTS)
+    set_dimension_precision(adapter, right_annotations, DIMENSION_PRECISION)
     # SolidWorks classifies a solid circular end silhouette under the same
     # AutoInsertCenterMarks2 "hole" bit as a bored circle; disabling that bit
     # makes the API a guaranteed no-op even though the end view is circular.
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to arbor end view")
 
-    # Screen-right in *Right is model -Z: the flat front tip (z 0) lands on the
-    # RIGHT end of the side view, the crowned back end on the LEFT.
-    flat_end = (RIGHT_CENTER[0] + OVERALL_LEN / 2000.0, RIGHT_CENTER[1])
-    end_top = (
-        FRONT_CENTER[0],
-        FRONT_CENTER[1] + SHAFT_DIA * END_VIEW_SCALE / 2000.0,
-    )
-    # GD&T is model PMI (pinion_arbor_spec.PART_DATUMS/GEOMETRIC_CONTROLS,
-    # authored by build_pinion_arbor) — project it and place it where the
-    # hand-authored symbols used to sit. Which VIEW receives each annotation
-    # depends on its attachment (a datum tag only lands in a view aligned
-    # with its face), and the projection fails loud on any mismatch. Only the flat FRONT tip carries perpendicularity
-    # -- the back end is the SR crown, which has no face to square to the axis.
-    project_part_pmi(
+    # The true overall (crown apex to the flat front end), as a conspicuous
+    # reference below the shank length so nobody saws the stock short
+    # (Harvey #25): apex VERTEX to the end face's edge-on circular EDGE.
+    overall = add_edge_dimension(
         adapter,
-        placements={
-            "datum:A": PmiDrawingPlacement(
-                view=front,
-                position=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.024),
-                attachment_xy=end_top,
-                position_tolerance_m=0.00002,
-            ),
-            "bearing_cylindricity": PmiDrawingPlacement(
-                view=right,
-                position=(RIGHT_CENTER[0] - 0.050, 0.236),
-                attachment_xy=(RIGHT_CENTER[0] - 0.050, SHAFT_FLANK_Y),
-                attachment_type="SILHOUETTE",
-            ),
-            "flat_tip_perpendicularity": PmiDrawingPlacement(
-                view=right,
-                position=(flat_end[0] + 0.018, 0.228),
-                attachment_xy=flat_end,
-            ),
-        },
-        datums=PART_DATUMS,
-        controls=GEOMETRIC_CONTROLS,
-        label="pinion arbor PMI",
+        right,
+        p0=apex,
+        p1=front_end_top,
+        text_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.035),
+        label="overall length reference",
+        orientation="horizontal",
+        entity_types=("VERTEX", "EDGE"),
     )
-    # Sits right of the cylindricity frame, whose text ends near x=0.184; the
-    # Ra text renders ABOVE the arm (ASME Y14.36), reaching y~0.236.
+    set_reference_dimension(
+        adapter,
+        _early_bound(overall, "IDisplayDimension").GetAnnotation(),
+        label="overall length reference",
+    )
+
+    # The bearing OD is the one running surface (the arbor turns in the strap
+    # bores under the zeroing crank), so it alone carries a roughness symbol,
+    # anchored on the shaft's flank in the side view (a SILHOUETTE pick: a
+    # cylinder carries no model edge along its side). The Ra text renders
+    # ABOVE the arm (ASME Y14.36), reaching y~0.236.
     add_surface_finish(
         adapter,
         right,

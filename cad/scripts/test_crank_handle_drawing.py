@@ -1,4 +1,10 @@
-"""Offline contracts for the crank-handle drawing."""
+"""Offline contracts for the crank-handle drawing.
+
+A turned wooden grip is not on the GD&T allowlist
+(cad/docs/drawing-simplicity-policy.md): no datums, frames, basics or
+roughness symbols; the reamed bore's band rides the model dimension and the
+notes are a four-line turning schedule.
+"""
 
 from __future__ import annotations
 
@@ -8,6 +14,10 @@ import crank_handle_spec
 import draw_crank_handle as drawing
 import build_crank_handle as handle
 from _drawing_registry import DRAWINGS_BY_NAME
+
+
+def _source() -> str:
+    return Path(drawing.__file__).read_text(encoding="utf-8")
 
 
 def test_required_drawing_paths() -> None:
@@ -31,6 +41,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
         crank_handle_spec.COLLAR_LENGTH,
         crank_handle_spec.PEAK_X,
     )
+    assert drawing.HANDLE_LENGTH == crank_handle_spec.HANDLE_LENGTH
 
 
 def test_diameters_are_a_turning_schedule_not_marked_dims() -> None:
@@ -39,15 +50,17 @@ def test_diameters_are_a_turning_schedule_not_marked_dims() -> None:
     marked = set().union(*crank_handle_spec.DRAWING_DIMENSIONS.values())
     assert marked == {"HandleLength", "CollarLength", "PeakStation", "PivotBoreDia"}
     notes = crank_handle_spec.DRAWING_NOTES
-    assert "BASIC TRUE GRIP PROFILE" in notes
-    assert "ALL VALUES BASIC" in notes
-    assert f"R{crank_handle_spec.FRONT_PROFILE_R:.6f}" in notes
-    assert f"R{crank_handle_spec.REAR_PROFILE_R:.6f}" in notes
+    assert f"<MOD-DIAM>{crank_handle_spec.COLLAR_DIA:.2f}" in notes
+    assert f"<MOD-DIAM>{2.0 * crank_handle_spec.NECK_R:.2f} NECK" in notes
+    assert f"<MOD-DIAM>{crank_handle_spec.HANDLE_MAX_DIA:.2f} SWELL" in notes
+    assert f"<MOD-DIAM>{2.0 * crank_handle_spec.CAP_R:.2f} CAP" in notes
+    assert f"R{crank_handle_spec.FRONT_PROFILE_R:.2f}" in notes
+    assert f"R{crank_handle_spec.REAR_PROFILE_R:.2f}" in notes
 
 
 def test_peak_station_uses_visible_construction_geometry() -> None:
     build_source = Path(handle.__file__).read_text(encoding="utf-8")
-    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    drawing_source = _source()
     assert 'profile.record("PeakStation",' in build_source
     assert 'profile.record("FrontArcCx",' in build_source
     assert '"PeakStation":' in drawing_source
@@ -56,64 +69,71 @@ def test_peak_station_uses_visible_construction_geometry() -> None:
 
 
 def test_bored_profile_has_end_view_center_marks() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    source = _source()
     assert "auto_center_marks" in source
     assert "add_view_centerline" in source
 
 
 def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
     assert drawing.SHEET_SCALE == (2.0, 1.0)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    source = _source()
     assert "scale=(1, 1)" in source  # the isometric override
     assert crank_handle_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:1"
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
 
 
-def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
+def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
+    source = _source()
+    assert "for view in (front, right):\n        set_hidden_lines_visible" in source
+    assert "set_hidden_lines_removed(adapter, iso)" in source
+
+
+def test_notes_are_few_specific_and_never_the_title_block() -> None:
     notes = crank_handle_spec.DRAWING_NOTES
-    assert "CDA 260" not in notes
+    lines = notes.split("\n")
+    assert len(lines) <= 4
     assert "TURN COLLAR INTEGRAL" in notes
-    assert "COIL" not in notes
-    assert "LINEAR +/-" not in notes
-    assert "BRASS" not in notes
-    assert "X.XX" not in notes
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "STRAIGHT GRAIN" in notes
+    for banned in (
+        "DATUM",
+        "BASIC",
+        "PROFILE 0.",
+        "+/-",
+        "+0.00",
+        "LINEAR",
+        "X.XX",
+        "COIL",
+        "CDA 260",
+        "BRASS",
+        "Ra ",
+    ):
+        assert banned not in notes, banned
+    source = _source()
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 
 
-def test_pivot_interface_is_fully_released_for_manufacture() -> None:
-    notes = crank_handle_spec.DRAWING_NOTES
-    assert "RELEASE HOLD" not in notes
-    assert "BORE AXIS CONCENTRIC" not in notes
-    assert "NO BLEND, RADIUS, OR CHAMFER" in notes
-    assert "FINAL BORE LIMITS APPLY FULL LENGTH" in notes
-    assert "STRAIGHT GRAIN PARALLEL TO TURNING AXIS" in notes
-    assert f"X{crank_handle_spec.HANDLE_LENGTH:.2f}" in notes
-    assert (
-        f"ACTUAL BUTT FACE AT {crank_handle_spec.HANDLE_LENGTH:.2f}+0.00/-0.25 TRIMS"
-        in notes
-    )
-    assert "ACTUAL BUTT TRIM FACE" in notes
-    assert "GENERAL Ra 3.2" not in notes
-    assert "PROFILE 0.50 | A | B APPLIES" in notes
-    assert drawing.DIMENSION_CALLOUTS["PivotBoreDia"] == "THRU - REAM"
+def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:
+    source = _source()
+    for helper in (
+        "add_datum_feature(",
+        "add_feature_control_frame(",
+        "add_surface_finish(",
+        "set_basic_dimension(",
+        "project_part_pmi(",
+    ):
+        assert helper not in source, helper
+    assert "WITHIN" not in source
+    assert not hasattr(crank_handle_spec, "GEOMETRIC_TOLERANCES_MM")
+    assert not hasattr(crank_handle_spec, "GEOMETRIC_CONTROLS")
+    assert not hasattr(crank_handle_spec, "SURFACE_FINISHES")
 
 
-def test_feature_requirements_use_datum_based_full_length_controls() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 2
-    assert source.count("add_feature_control_frame(") == 3
-    assert 'characteristic="perpendicularity"' in source
-    assert 'quantity="DATUM B FACE"' in source
-    assert 'characteristic="total_runout"' in source
-    assert 'characteristic="profile_surface"' in source
-    assert 'quantity="FULL BORE LENGTH"' in source
-    assert 'quantity="TURNED GRIP PROFILE - SEE NOTE"' in source
-    assert "set_basic_dimension(" in source
-    assert "add_surface_finish(" not in source
-    assert drawing.RIGHT_KEEP["PivotBoreDia"] == (0.360, 0.220)
-    assert "frame_xy=(0.350, 0.263)" in source
-    assert "frame_xy=(0.180, 0.263)" in source
+def test_bore_and_length_bands_ride_the_model_dimensions() -> None:
+    assert drawing.DIMENSION_CALLOUTS["PivotBoreDia"] == "REAM THRU"
+    assert crank_handle_spec.PIVOT_BORE_BAND == (0.025, -0.025)
+    assert crank_handle_spec.HANDLE_LENGTH_BAND == (0.000, -0.250)
+    build_source = Path(handle.__file__).read_text(encoding="utf-8")
+    assert build_source.count("set_dimension_bilateral_tolerance(") == 2
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:

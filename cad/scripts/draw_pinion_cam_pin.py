@@ -5,6 +5,11 @@ A short Ø4 turned steel stud with a shallow domed outer end.  The sheet runs at
 side view carries the length, and a 4:1 isometric (matching the sheet scale)
 sits clear of the title block.
 
+The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): a
+pressed stud carries no datums, frames or roughness symbols -- the press band
+rides the model diameter at three decimals and the crown is a size (SR) plus
+its REF height.
+
 Run with SolidWorks open::
 
     uv run python cad\scripts\draw_pinion_cam_pin.py pinion-cam-pin
@@ -17,17 +22,12 @@ import math
 import sys
 from typing import Any
 
-from pinion_cam_pin_spec import GEOMETRIC_TOLERANCES_MM
-
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_attached_note,
-    add_datum_feature,
-    add_feature_control_frame,
     add_property_linked_note,
-    add_surface_finish,
     add_view_centerline,
     curate_view_dimensions,
     finalize_drawing,
@@ -37,16 +37,15 @@ from _drawing_common import (
     set_dimension_callouts,
     set_dimension_precision,
     set_hidden_lines_removed,
+    set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import surface_finish_by_key
 from pinion_cam_pin_spec import (
     CAP_RADIUS,
     CAP_SAG,
     PIN_DIA as PIN_DIA,
     PIN_LEN,
-    SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -83,7 +82,6 @@ RIGHT_KEEP = {
     "CapR": (RIGHT_CENTER[0] + 0.035, RIGHT_CENTER[1] + 0.040),
 }
 DIMENSION_CALLOUTS = {
-    "PinDia": "FINAL SIZE",
     "Depth": "SEATED FLAT END TO CROWN ROOT",
     "CapR": "OUTER CROWN",
 }
@@ -133,8 +131,9 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(8, 1))
     right = place_view(adapter, str(SOURCE), "*Top", *RIGHT_CENTER, scale=(4, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(4, 1))
-    for view in (front, right, iso):
-        set_hidden_lines_removed(adapter, view)
+    set_hidden_lines_removed(adapter, iso)
+    for view in (front, right):
+        set_hidden_lines_visible(adapter, view)
 
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
@@ -155,44 +154,7 @@ async def build(adapter: Any) -> dict[str, str]:
         face_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] + 0.004),
         label="pinion cam-pin shank axis centerline",
     )
-    end_radius = PIN_DIA * END_VIEW_SCALE / 2000.0
-    # SolidWorks restricts this axis-attached tag and live readback normalizes
-    # the intended sheet point by 6.187 mm.  Bound only annotation placement;
-    # part dimensions and GD&T remain unchanged.
-    add_datum_feature(
-        adapter,
-        front,
-        edge_xy=(FRONT_CENTER[0] + end_radius, FRONT_CENTER[1]),
-        symbol_xy=(0.105, 0.228),
-        datum="A",
-        label="cam-pin cylindrical-shank datum axis",
-        position_tolerance_m=0.0065,
-    )
-    add_surface_finish(
-        adapter,
-        front,
-        edge_xy=(FRONT_CENTER[0] + end_radius, FRONT_CENTER[1]),
-        symbol_xy=(0.115, 0.180),
-        control=surface_finish_by_key(SURFACE_FINISHES, "finished_shank"),
-        label="cam-pin finished shank",
-    )
-    seated_flat_face = model_point_in_view(
-        adapter,
-        right,
-        (PIN_DIA / 2000.0, 0.0, 0.0),
-        label="cam-pin seated flat end",
-    )
-    add_feature_control_frame(
-        adapter,
-        right,
-        edge_xy=seated_flat_face,
-        frame_xy=(0.220, 0.210),
-        characteristic="flatness",
-        tolerance=GEOMETRIC_TOLERANCES_MM["cam-pin seated-end flatness"],
-        quantity="SEATED END",
-        label="cam-pin seated-end flatness",
-        entity_type="SILHOUETTE",
-    )
+    # The crown's REF height, flagged from the crown itself.
     crown_axial = CAP_SAG / 2.0
     crown_radial = math.sqrt(CAP_RADIUS**2 - (CAP_RADIUS - CAP_SAG + crown_axial) ** 2)
     outer_crown_face = model_point_in_view(
@@ -205,24 +167,10 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         label="pinion cam-pin outer crown face",
     )
-    add_feature_control_frame(
-        adapter,
-        right,
-        edge_xy=outer_crown_face,
-        frame_xy=(0.245, 0.235),
-        characteristic="profile_surface",
-        tolerance=GEOMETRIC_TOLERANCES_MM["pinion cam-pin crown profile"],
-        datums=(),
-        quantity="OUTER CROWN",
-        label="pinion cam-pin crown profile",
-        entity_type="SILHOUETTE",
-    )
     add_attached_note(
         adapter,
         right,
-        text=(
-            f"OUTER CROWN\n({CAP_SAG:.2f}) REF AXIAL HEIGHT\nCROWN ROOT PLANE TO APEX"
-        ),
+        text=f"CROWN ({CAP_SAG:.2f}) HIGH\nROOT PLANE TO APEX",
         entity_xy=outer_crown_face,
         note_xy=(0.250, 0.175),
         label="cam-pin crown size and height",

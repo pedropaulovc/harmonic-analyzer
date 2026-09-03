@@ -1,4 +1,10 @@
-r"""Create the curated machinist drawing for the crank tapered pin."""
+r"""Create the curated machinist drawing for the crank tapered pin.
+
+The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): a
+hand-fitted taper pin carries no datums, no feature-control frames and no
+roughness symbol -- its taper is a drive fit, not a running surface, and the
+two end diameters plus the length are the whole spec.
+"""
 
 from __future__ import annotations
 
@@ -11,17 +17,16 @@ from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
-    add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
     set_hidden_lines_removed,
+    set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import surface_finish_by_key
-from crank_pin_spec import PIN_LENGTH, SURFACE_FINISHES
+from crank_pin_spec import PIN_LENGTH
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -153,8 +158,10 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(4, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2, 1))
-    for view in (front, right, iso):
-        set_hidden_lines_removed(adapter, view)
+    set_hidden_lines_removed(adapter, iso)
+    # Hidden lines stay ON in every orthographic view (Harvey #30 / Lipton).
+    for view in (front, right):
+        set_hidden_lines_visible(adapter, view)
 
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
     _add_end_diameter(
@@ -179,17 +186,8 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, right, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to pin end view")
 
-    # The cone's side-view outline is a SILHOUETTE, not a selectable model
-    # edge, so the taper-seat finish symbol attaches to the big-end circle —
-    # the taper surface's own boundary edge.
-    add_surface_finish(
-        adapter,
-        front,
-        edge_xy=BIG_END_EDGE,
-        symbol_xy=(FRONT_CENTER[0] - 0.018, FRONT_CENTER[1] + 0.022),
-        control=surface_finish_by_key(SURFACE_FINISHES, "taper_seat"),
-        label="taper seating finish",
-    )
+    # No roughness symbol: the taper is a drive fit in the crank arm, not a
+    # running surface (drawing-simplicity-policy.md rule 5).
 
     # 0.020: the note is left-aligned on its anchor, so the ink starts here. The
     # left bound is the 12.7 mm zone margin (~0.0127), which the re-centred frame

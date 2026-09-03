@@ -37,30 +37,23 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "SpringProfile": {"FootLen", "BendR", "KinkR"},
 }
 
+# Flagged from the short terminal in the front view: its true length and its
+# path angle.  No band -- the title block's linear and angular tolerances
+# govern a formed leaf (drawing-simplicity-policy.md rules 1-2).
 TERMINAL_CALLOUT = "\n".join(
     (
-        f"{FLAT_LEN:.2f}+/-0.10 TRUE LENGTH - SHORT TERMINAL INSIDE EDGE",
-        f"{90.0 - BLADE_TILT_DEG + KINK_DEG:.2f}+/-1 DEG CCW FROM FOOT INSIDE PATH",
+        f"{FLAT_LEN:.2f} TERMINAL, INSIDE EDGE",
+        f"{90.0 - BLADE_TILT_DEG + KINK_DEG:.2f} DEG CCW FROM FOOT INSIDE PATH",
     )
 )
 
+# Notes: the spring's form data -- what a maker cannot read off the views
+# (policy rule 6).  Radii and the foot length are native dimensions.
 DRAWING_NOTES = "\n".join(
     (
-        f"FORM FROM {THICK:.2f}+/-0.05 THK X {WIDTH:.2f}+/-0.05 WIDE STRIP.",
-        "ALL FORMED-PROFILE RADII APPLY TO THE INSIDE SURFACE; TANGENT",
-        "  LENGTHS AND ANGLES APPLY TO THE INSIDE-SURFACE PATH IN FRONT VIEW.",
-        f"STRAIGHT BLADE TANGENT LENGTH {BLADE_STRAIGHT_LEN:.2f}+/-0.10; PATH ANGLE",
-        f"  {90.0 - BLADE_TILT_DEG:.2f}+/-1.00 DEG CCW FROM FOOT PATH, LEFT FREE END TOWARD BEND.",
-        f"FORM SHORT TERMINAL INSIDE EDGE FROM R{R_KINK:.2f} KINK EXIT TO FREE TIP;",
-        f"  THE LINE ACROSS ITS TIP IS THE {THICK:.2f} STRIP END FACE.",
-        f"FOOT HOLE AXIS {HOLE_FROM_END:.2f}+/-0.10 FROM LEFT FREE END AND {WIDTH / 2.0:.2f}+/-0.05",
-        "  FROM THE LOWER LONG EDGE SHOWN IN TOP VIEW; SIZE PER NATIVE CALLOUT.",
+        f"FORM FROM {THICK:.2f} X {WIDTH:.2f} STRIP; RADII, LENGTHS AND ANGLES ARE ON THE INSIDE SURFACE.",
+        f"BLADE STRAIGHT {BLADE_STRAIGHT_LEN:.2f} AT {90.0 - BLADE_TILT_DEG:.2f} DEG CCW FROM THE FOOT PATH.",
+        f"FOOT HOLE ON THE STRIP CENTRELINE, {HOLE_FROM_END:.2f} FROM THE FREE END.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
-
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "spring screw-down foot flatness": "0.10",
-}

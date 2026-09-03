@@ -1,4 +1,11 @@
-"""Offline contracts for the pinion-arbor drawing."""
+"""Offline contracts for the pinion-arbor drawing.
+
+The print follows cad/docs/drawing-simplicity-policy.md: a plain bearing arbor
+carries no datums or frames; its running fit is the band on the model
+diameter, plus one Ra on the OD that turns in the strap bores. Diameter, shank
+length and Ra read on the side view; the crown is enlarged in DETAIL B; the
+true overall is a conspicuous reference (rule 7).
+"""
 
 from __future__ import annotations
 
@@ -12,16 +19,8 @@ from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
-def test_surface_finish_is_part_owned_and_consumed_by_key() -> None:
-    (control,) = pinion_arbor_spec.SURFACE_FINISHES
-    assert control.key == "bearing"
-    assert control.roughness_um == 1.6
-    assert control.face.diameter_mm == pinion_arbor_spec.SHAFT_DIA
-    part_source = Path(part.__file__).read_text(encoding="utf-8")
-    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "surface_finishes=SURFACE_FINISHES" in part_source
-    assert 'surface_finish_by_key(SURFACE_FINISHES, "bearing")' in drawing_source
-    assert "roughness_ra=" not in drawing_source
+def _source() -> str:
+    return Path(drawing.__file__).read_text(encoding="utf-8")
 
 
 def test_required_drawing_paths() -> None:
@@ -34,71 +33,131 @@ def test_required_drawing_paths() -> None:
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert part.DRAWING_DIMENSIONS is pinion_arbor_spec.DRAWING_DIMENSIONS
     marked = set().union(*pinion_arbor_spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
+    kept = (
+        set(drawing.FRONT_KEEP)
+        | set(drawing.RIGHT_KEEP)
+        | set(drawing.DETAIL_KEEP_NAMES)
+    )
     assert kept == marked
     assert (drawing.SHAFT_DIA, drawing.SHAFT_LEN, drawing.CAP_SAG) == (
         pinion_arbor_spec.SHAFT_DIA,
         pinion_arbor_spec.SHAFT_LEN,
         pinion_arbor_spec.CAP_SAG,
     )
+    assert pinion_arbor_spec.OVERALL_LEN == 227.45
 
 
-def test_crown_is_dimensioned_and_annotated() -> None:
+def test_diameter_and_shank_length_read_on_the_side_view() -> None:
+    # Policy rule 7: the diameter stands at the flat right end of the side
+    # view, not on the end view; the end view keeps nothing and is never
+    # curated (SolidWorks inserts each marked dimension into one view only).
+    assert drawing.FRONT_KEEP == {}
+    assert set(drawing.RIGHT_KEEP) == {"ShaftDia", "Depth"}
+    assert drawing.RIGHT_KEEP["ShaftDia"][0] > drawing.RIGHT_END_X
+    source = _source()
+    assert "curate_view_dimensions(\n        adapter, front" not in source
+    assert "set_dimension_precision(adapter, right_annotations" in source
+    assert drawing.DIMENSION_PRECISION == {"ShaftDia": 3}
+    # 226.25 stops at the crown root, and says so (review 2026-09-02: it
+    # visually read as the overall).
+    assert drawing.DIMENSION_CALLOUTS == {"Depth": "TO CROWN ROOT"}
+
+
+def test_crown_is_enlarged_in_a_detail_and_dimensioned_there() -> None:
     # The crown radius derives from the marked sagitta: R = (r^2 + s^2) / 2s.
     r, s = pinion_arbor_spec.SHAFT_DIA / 2.0, pinion_arbor_spec.CAP_SAG
     assert abs(pinion_arbor_spec.CAP_R - (r * r + s * s) / (2.0 * s)) < 1e-9
-    assert "CapSagDim" in drawing.RIGHT_KEEP
+    # The 1.20 crown is too small to read at 1:1, so DETAIL B (4:1) carries
+    # the sagitta and its SR callout (policy rule 7). The detail is curated
+    # first so it claims the sagitta.
+    assert drawing.DETAIL_KEEP_NAMES == ("CapSagDim",)
+    assert drawing.DETAIL_SCALE == (4, 1)
     assert drawing.CAP_CALLOUTS["CapSagDim"] == "SR7.27 CROWN"
-    assert "CROWN BACK END SR7.27" in pinion_arbor_spec.DRAWING_NOTES
+    source = _source()
+    assert source.count("create_detail_view(") == 1
+    assert 'detail_label="B"' in source
+    assert source.index("view_label=\"detail\"") < source.index("view_label=\"right\"")
+    assert "set_dimension_callouts(adapter, detail_annotations, CAP_CALLOUTS)" in source
+    # The view carries the SR; the note only says how to finish it.
+    assert "SR7.27" not in pinion_arbor_spec.DRAWING_NOTES
 
 
-def test_linked_notes_define_remaining_arbor_operations() -> None:
-    notes = pinion_arbor_spec.DRAWING_NOTES
-    assert drawing.DIMENSION_CALLOUTS == {}
+def test_overall_length_is_a_conspicuous_reference() -> None:
+    source = _source()
+    assert 'label="overall length reference"' in source
+    assert 'entity_types=("VERTEX", "EDGE")' in source
+    assert '_early_bound(overall, "IDisplayDimension").GetAnnotation()' in source
+    assert "set_reference_dimension(" in source
+    assert "model_point_in_view(" in source
+
+
+def test_running_fit_is_the_band_on_the_model_diameter() -> None:
     assert pinion_arbor_spec.SHAFT_DIA_BAND is _fit_limits.SHAFT_H
     assert model_toleranced_dimensions(part) == {
         ("ShaftProfile", "ShaftDia"): "*deviations(SHAFT_DIA_BAND)"
     }
-    assert "CENTRE MARKS" in notes
-    assert "X.XX" not in notes
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
+
+
+def test_notes_are_few_specific_and_never_the_title_block() -> None:
+    notes = pinion_arbor_spec.DRAWING_NOTES
+    lines = notes.split("\n")
+    assert len(lines) <= 4
+    assert "CENTRES OK" in notes
+    assert "CROWN" in notes
+    # "Turn or grind full length; no flats or steps" restated the title-block
+    # finish and the continuous cylinder the view shows (review 2026-09-02).
+    assert "TURN OR GRIND" not in notes
+    assert "NO FLATS" not in notes
+    for banned in ("WITHIN", "+/-", "UOS", "DATUM", "MHA-", "X.XX", "DEEP MAX"):
+        assert banned not in notes, banned
+    source = _source()
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
     assert "def _manufacturing_notes" not in source
 
 
-def test_native_gdt_controls_arbor_form_orientation_and_finish() -> None:
-    """GD&T identity lives in the spec's PMI rows; the sheet only imports it."""
-    from pinion_arbor_spec import GEOMETRIC_CONTROLS, PART_DATUMS
-
-    by_key = {control.key: control for control in GEOMETRIC_CONTROLS}
-    assert set(by_key) == {"bearing_cylindricity", "flat_tip_perpendicularity"}
-    assert by_key["bearing_cylindricity"].characteristic == "cylindricity"
-    assert by_key["bearing_cylindricity"].tolerance == "0.01"
-    # Only the flat front tip is squared to the axis -- the back end is the crown.
-    assert by_key["flat_tip_perpendicularity"].characteristic == "perpendicularity"
-    assert by_key["flat_tip_perpendicularity"].tolerance == "0.05"
-    assert by_key["flat_tip_perpendicularity"].datums == ("A",)
-    assert by_key["flat_tip_perpendicularity"].face.normal == (0, 0, -1)
-    assert by_key["flat_tip_perpendicularity"].face.offset_mm == 0.0
-    assert tuple(datum.letter for datum in PART_DATUMS) == ("A",)
-    assert PART_DATUMS[0].face.diameter_mm == pinion_arbor_spec.SHAFT_DIA
-
+def test_print_carries_no_gdt_and_one_running_finish() -> None:
+    source = _source()
+    for helper in (
+        "add_datum_feature(",
+        "add_feature_control_frame(",
+        "set_basic_dimension(",
+        "project_part_pmi(",
+    ):
+        assert helper not in source, helper
+    assert pinion_arbor_spec.PART_DATUMS == ()
+    assert pinion_arbor_spec.GEOMETRIC_CONTROLS == ()
+    assert not hasattr(pinion_arbor_spec, "GEOMETRIC_TOLERANCES_MM")
+    # The arbor turns in the strap bores, so its OD alone carries a roughness
+    # symbol, on the side view's flank silhouette.
+    (control,) = pinion_arbor_spec.SURFACE_FINISHES
+    assert control.key == "bearing"
+    assert control.roughness_um == 1.6
+    assert control.face.diameter_mm == pinion_arbor_spec.SHAFT_DIA
+    assert source.count("add_surface_finish(") == 1
+    assert 'surface_finish_by_key(SURFACE_FINISHES, "bearing")' in source
+    assert 'entity_type="SILHOUETTE"' in source
+    assert "roughness_ra=" not in source
+    # The part build keeps its author_part_pmi call shape on the empty tuples.
     part_source = Path(part.__file__).read_text(encoding="utf-8")
     assert "author_part_pmi(" in part_source
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "project_part_pmi(" in source
-    assert "controls=GEOMETRIC_CONTROLS" in source
-    assert "add_feature_control_frame(" not in source
-    assert "add_datum_feature(" not in source
-    assert source.count("add_surface_finish(") == 1
+    assert "datums=PART_DATUMS" in part_source
+    assert "controls=GEOMETRIC_CONTROLS" in part_source
+    assert "surface_finishes=SURFACE_FINISHES" in part_source
+
+
+def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
+    source = _source()
+    assert "for view in (front, right):\n        set_hidden_lines_visible" in source
+    assert "set_hidden_lines_removed(adapter, iso)" in source
 
 
 def test_view_scales_are_explicit() -> None:
     assert drawing.SHEET_SCALE == (1.0, 1.0)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    source = _source()
     assert "scale=(2, 1)" in source
     assert source.count("scale=(1, 1)") == 1
     assert "scale=(1, 2)" in source  # 226-long arbor: half-scale isometric
+    assert "scale=DETAIL_SCALE" in source
     assert pinion_arbor_spec.END_VIEW_NOTE == "END VIEW SCALE 2:1"
     assert 'add_property_linked_note(adapter, "End View Note"' in source
 

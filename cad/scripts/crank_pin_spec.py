@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import math
 
-from _gtol_spec import ConeFace
-from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from _surface_finish import SurfaceFinishControl
 
 PIN_LENGTH = 45.0
 # CUSTOM 1:48 self-holding taper (0.9375 on diameter over the 45 mm length),
@@ -21,24 +20,25 @@ TAPER_HALF_ANGLE_DEGREES = math.degrees(
     math.atan((BIG_END_DIA - SMALL_END_DIA) / (2.0 * PIN_LENGTH))
 )
 
-SURFACE_FINISHES = (
-    SurfaceFinishControl(
-        "taper_seat",
-        MACHINED_UM,
-        ConeFace(TAPER_HALF_ANGLE_DEGREES, contains_x_mm=PIN_LENGTH / 2.0),
-    ),
-)
+# No roughness callouts: the taper is a drive fit in the crank arm, not a
+# running surface, so the title block's Ra 3.2 covers every face
+# (cad/docs/drawing-simplicity-policy.md rule 5).
+SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PinProfile": {"Length"},
 }
 
+# Notes: part-specific process facts only, never a tolerance, never the
+# title block (drawing-simplicity-policy.md rule 6). The end diameters and
+# the length are on the views; the taper ratio is what the compound is set
+# to. How the taper is cut (one pass, roughed and finished, ground) is the
+# machinist's call -- the ends, the ratio and the hand fit already control it
+# (machinist review, 2026-09-02).
 DRAWING_NOTES = "\n".join(
     (
-        "CUSTOM 1:48 SELF-HOLDING TAPER (0.9375 ON DIA OVER 45.0) BETWEEN THE END "
-        "DIAMETERS SHOWN: TURN IN ONE CONTINUOUS PASS; NO STEPS.",
-        "HAND-FIT TO THE CRANK-ARM CROSS-HOLE, TAPER-REAMED WITH THE SHAFT AT "
-        "ASSEMBLY TO THE SAME 1:48; LIGHT DRIVE FIT, REMOVABLE BY TAP ON SMALL END.",
+        "TAPER 1:48 ON DIA BETWEEN THE END DIAMETERS SHOWN.",
+        "HAND-FIT TO THE CRANK ARM CROSS-HOLE AT ASSEMBLY; LIGHT DRIVE FIT.",
     )
 )
 END_VIEW_NOTE = "END VIEW SCALE 4:1"

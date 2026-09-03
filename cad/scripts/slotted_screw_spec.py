@@ -9,7 +9,7 @@ source; the drawing never invents a thread the part does not build.
 from __future__ import annotations
 
 from _fastener_catalog import fastener
-from _fastener_notes import slotted_round_head_notes, thread_control_notes
+from _fastener_notes import slotted_head_notes, thread_length_note
 
 
 _SPEC = fastener("slotted-screw")
@@ -22,17 +22,19 @@ SLOT_D = 1.0
 SHANK_DIA = _SPEC.model_diameter_mm  # #8-32 modeled thread minor diameter
 SHANK_LEN = _SPEC.length_mm  # nominal under-head length
 THREAD = _SPEC.thread  # "#8-32"
-THREAD_DESIGNATION = f"{THREAD} UNC-2A"
+THREAD_DESIGNATION = f"{THREAD} UNC"  # leadered to the shank on the side view
 
-# The head-end view carries the two diameters; the side view carries the two
-# lengths.  The lengths are the head/shank extrude DEPTH dimensions (named
-# HeadHt/ShankLg in the build) inserted as model dims -- an axis-along-Y screw
-# projects edge-on circle silhouettes for the shoulder and tip that SolidWorks
-# will not point-select, so a drawing-native edge dimension cannot pick them.
+# The head-end view carries the head diameter; the side view the two lengths
+# (the head/shank extrude DEPTH dimensions HeadHt/ShankLg -- an axis-along-Y
+# screw projects edge-on circle silhouettes for the shoulder and tip that
+# SolidWorks will not point-select); the slot-profile (*Right) view the slot
+# width and depth, where the notch is visible rather than a hidden line.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "HeadProfile": {"HeadDia"},
     "Head": {"HeadHt"},
     "Shank": {"ShankLg"},
+    "DriverSlotProfile": {"SlotWidth"},
+    "DriverSlot": {"SlotDepth"},
 }
 END_VIEW_DIMENSIONS: dict[str, set[str]] = {
     "HeadProfile": {"HeadDia"},
@@ -41,20 +43,15 @@ SIDE_VIEW_DIMENSIONS: dict[str, set[str]] = {
     "Head": {"HeadHt"},
     "Shank": {"ShankLg"},
 }
+SLOT_VIEW_DIMENSIONS: dict[str, set[str]] = {
+    "DriverSlotProfile": {"SlotWidth"},
+    "DriverSlot": {"SlotDepth"},
+}
 
 DRAWING_NOTES = "\n".join(
     (
-        *thread_control_notes(
-            thread=THREAD,
-            thread_designation=THREAD_DESIGNATION,
-            underhead_length_mm=SHANK_LEN,
-        ),
-        *slotted_round_head_notes(
-            head_dia_mm=HEAD_DIA,
-            head_height_mm=HEAD_H,
-            slot_width_mm=SLOT_W,
-            slot_depth_mm=SLOT_D,
-        ),
+        *thread_length_note(thread=THREAD, underhead_length_mm=SHANK_LEN),
+        *slotted_head_notes(),
     )
 )
 END_VIEW_NOTE = "DRIVER-FACE VIEW"

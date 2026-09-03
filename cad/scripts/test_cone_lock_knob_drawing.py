@@ -9,7 +9,6 @@ import cone_lock_knob_spec
 import draw_cone_lock_knob as drawing
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fastener_catalog import fastener
-from _gtol_spec import TorusFace
 
 
 def test_required_drawing_paths() -> None:
@@ -32,7 +31,6 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
         drawing.BODY_DIA,
         drawing.BODY_TOP,
         drawing.DOME_R,
-        drawing.STUD_DIA,
         drawing.STUD_LEN,
     ) == (
         cone_lock_knob_spec.WASHER_DIA,
@@ -40,7 +38,6 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
         cone_lock_knob_spec.BODY_DIA,
         cone_lock_knob_spec.BODY_TOP,
         cone_lock_knob_spec.DOME_R,
-        cone_lock_knob_spec.STUD_DIA,
         cone_lock_knob_spec.STUD_LEN,
     )
 
@@ -53,37 +50,47 @@ def test_stud_nominals_track_the_fastener_catalog() -> None:
     assert drawing.DIMENSION_CALLOUTS["StudDia"].startswith(stud.thread)
 
 
-def test_linked_notes_define_remaining_knob_operations() -> None:
+def test_notes_are_few_specific_and_never_the_title_block() -> None:
     notes = cone_lock_knob_spec.DRAWING_NOTES
-    assert "1/4-20" in notes
+    lines = notes.split("\n")
+    assert len(lines) <= 4
+    assert "ONE SETUP" in notes
     assert "THREAD RELIEF" in notes
-    assert "CHROME PLATE PER ASTM B456" in notes
-    assert "DOME R5" in notes
-    # The blanket tolerance lives in the title block ONLY -- a second general
-    # tolerance in the notes would conflict with it (codex machinist review).
-    assert "+/-0.25" not in notes
-    assert "X.XX" not in notes
+    assert "MASK THE THREAD" in notes
+    # The thread designation rides the stud diameter callout, the plating
+    # spec the title block's finish field, the blanket tolerance the block.
+    assert "1/4-20" not in notes
+    assert "ASTM" not in notes
+    for banned in ("UOS", "DIMENSIONS IN", "+/-", "DATUM", "MHA-", "X.XX"):
+        assert banned not in notes, banned
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
     assert "def _manufacturing_notes" not in source
 
 
-def test_native_gdt_ties_seat_and_flange_to_the_turned_axis() -> None:
+def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:
+    # drawing-simplicity-policy.md rules 3-5: a turned thumb knob is not on
+    # the GD&T allowlist and nothing runs on its dome or stud.
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 1
-    assert source.count("add_feature_control_frame(") == 2
-    assert source.count('characteristic="perpendicularity"') == 1
-    assert source.count('characteristic="circular_runout"') == 1
-    assert source.count("add_surface_finish(") == 1
-    assert isinstance(cone_lock_knob_spec.SURFACE_FINISHES[0].face, TorusFace)
-    assert 'surface_finish_by_key(SURFACE_FINISHES, "dome_crown")' in source
-    assert (
-        'symbol_xy=(0.128, 0.255),\n        datum="A",\n'
-        '        label="knob body axis",\n'
-        "        position_tolerance_m=0.0036,"
-        in source
-    )
-    assert source.count("position_tolerance_m=0.0036") == 1
+    for helper in (
+        "add_datum_feature(",
+        "add_feature_control_frame(",
+        "add_surface_finish(",
+        "set_basic_dimension(",
+        "project_part_pmi(",
+    ):
+        assert helper not in source, helper
+    assert not hasattr(cone_lock_knob_spec, "GEOMETRIC_TOLERANCES_MM")
+    assert cone_lock_knob_spec.SURFACE_FINISHES == ()
+    assert "author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)" in Path(
+        part.__file__
+    ).read_text(encoding="utf-8")
+
+
+def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "for view in (front, top):\n        set_hidden_lines_visible" in source
+    assert "set_hidden_lines_removed(adapter, iso)" in source
 
 
 def test_view_scales_are_explicit() -> None:

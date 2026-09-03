@@ -1,4 +1,11 @@
-r"""Create the curated machinist drawing for the cylinder-arbor pedestal."""
+r"""Create the curated machinist drawing for the cylinder-arbor pedestal.
+
+The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): a
+small bearing casting carries no datums, no feature-control frames and no
+basic dimensions -- the title block's general tolerances govern everything
+except the arbor bore, whose running-fit band rides the model dimension
+and which, as the one surface a shaft turns in, keeps its roughness symbol.
+"""
 
 from __future__ import annotations
 
@@ -6,14 +13,10 @@ import argparse
 import sys
 from typing import Any
 
-from arbor_pedestal_spec import GEOMETRIC_TOLERANCES_MM
-
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_feature_control_frame,
     add_native_hole_callout,
     add_property_linked_note,
     add_surface_finish,
@@ -22,7 +25,6 @@ from _drawing_common import (
     new_project_drawing,
     read_required_properties,
     set_arc_endpoints_to_center,
-    set_basic_dimension,
     set_dimension_callouts,
     set_dimension_precision,
     set_hidden_lines_visible,
@@ -38,13 +40,11 @@ from arbor_pedestal_spec import (
     FOOT_HEIGHT,
     FOOT_WIDTH,
     SCREW_CLEARANCE_DIA,
-    STRAP_T,
     SURFACE_FINISHES,
     TOP_RADIUS,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
-    dimension_name,
     place_view,
     view_name,
 )
@@ -93,19 +93,23 @@ TOP_KEEP = {
     "Depth": (TOP_CENTER[0] + 0.040, TOP_CENTER[1]),
 }
 DIMENSION_CALLOUTS = {
-    "BoreDia": "THRU",
+    "BoreDia": "BORE THRU",
 }
-# 3/8 in = 9.525 exactly; show 3 places so the view matches the note (else the
-# 2-decimal sheet default prints 9.53 against the DIA 9.525 the note cites).
+# The arbor bore is the one fitted feature (running-fit band on the model
+# dimension): three decimals say "hold it"; everything else stays at the
+# two-place block tolerance.
 DIMENSION_PRECISION = {"BoreDia": 3}
 
 
 @_telemetry.traced("drawing.front_entity_scan")
-def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any, Any]:
-    """Return the datum-A foot, datum-B side, right flank, bore, and crown."""
+def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any]:
+    """Return the foot-seat edge, the left foot-side edge and the bore circle.
+
+    The bore location dimensions run from the first two to the third, so
+    every one of them is entity-selected rather than sheet-picked.
+    """
     foot_candidates: list[tuple[float, Any]] = []
     side_candidates: list[tuple[float, Any]] = []
-    flank_candidates: list[tuple[float, Any]] = []
     bore_candidates: list[tuple[float, float, Any]] = []
     for raw_edge in visible_view_entities(view, 1, label="pedestal front edges"):
         edge = _early_bound(raw_edge, "IEdge")
@@ -130,14 +134,6 @@ def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any, Any]:
             and abs(p1[0] + FOOT_WIDTH / 2.0) <= 0.01
         ):
             side_candidates.append((abs(p1[1] - p0[1]), edge))
-        flank_rise = BORE_HEIGHT - FOOT_HEIGHT
-        flank_run = (FOOT_WIDTH / 2.0 - TOP_RADIUS) * flank_rise / BORE_HEIGHT
-        if (
-            min(p0[0], p1[0]) > 0.0
-            and abs(abs(p1[1] - p0[1]) - flank_rise) <= 0.01
-            and abs(abs(p1[0] - p0[0]) - flank_run) <= 0.01
-        ):
-            flank_candidates.append((abs(p1[1] - p0[1]), edge))
     if not foot_candidates:
         raise RuntimeError("front view has no model edge on the foot-seat plane")
     foot_span, foot_edge = max(foot_candidates, key=lambda item: item[0])
@@ -148,11 +144,6 @@ def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any, Any]:
     side_span, side_edge = max(side_candidates, key=lambda item: item[0])
     if side_span < FOOT_HEIGHT - 0.1:
         raise RuntimeError(f"left foot-side edge span is only {side_span:.3f} mm")
-    if not flank_candidates:
-        raise RuntimeError("front view has no right taper-flank edge")
-    flank_span, flank_edge = max(flank_candidates, key=lambda item: item[0])
-    if flank_span < BORE_HEIGHT - FOOT_HEIGHT - 0.01:
-        raise RuntimeError(f"right taper-flank span is only {flank_span:.3f} mm")
     if not bore_candidates:
         raise RuntimeError("front view has no circular model edges")
     radius, height, bore_edge = min(
@@ -163,13 +154,7 @@ def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any, Any]:
         raise RuntimeError(
             f"no circular edge matches arbor bore at {BORE_HEIGHT:.3f} mm"
         )
-    dome_radius, dome_height, dome_edge = min(
-        bore_candidates,
-        key=lambda item: abs(item[0] - TOP_RADIUS) + abs(item[1] - BORE_HEIGHT),
-    )
-    if abs(dome_radius - TOP_RADIUS) > 0.01 or abs(dome_height - BORE_HEIGHT) > 0.01:
-        raise RuntimeError("front view has no circular dome edge")
-    return foot_edge, side_edge, flank_edge, bore_edge, dome_edge
+    return foot_edge, side_edge, bore_edge
 
 
 def _top_depth_edge(adapter: Any, view: Any, z_mm: float, *, label: str) -> Any:
@@ -211,11 +196,11 @@ def _circle_entity(adapter: Any, view: Any, radius_mm: float, *, label: str) -> 
     return min(candidates, key=lambda item: item[0])[1]
 
 
-@_telemetry.traced("drawing.circle_basic", label_param="label")
-def _add_circle_basic(
+@_telemetry.traced("drawing.circle_dimension", label_param="label")
+def _add_circle_dimension(
     adapter: Any,
     view: Any,
-    datum_entity: Any,
+    base_entity: Any,
     circle_entity: Any,
     *,
     orientation: str,
@@ -228,7 +213,7 @@ def _add_circle_basic(
         raise RuntimeError(f"failed to activate view for {label}")
     draw.ClearSelection2(True)
     selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
-    for append, raw_entity in ((False, datum_entity), (True, circle_entity)):
+    for append, raw_entity in ((False, base_entity), (True, circle_entity)):
         selection_data = selection_manager.CreateSelectData()
         selection_data.View = view
         entity = _early_bound(raw_entity, "IEntity")
@@ -244,7 +229,7 @@ def _add_circle_basic(
     if display is None:
         raise RuntimeError(f"failed to create {label} dimension")
     set_arc_endpoints_to_center(adapter, display, label=label)
-    return set_basic_dimension(adapter, display, label=label)
+    return display
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -294,6 +279,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hidden_lines_visible(adapter, iso)
     # The elevation carries the arbor bore as a hidden circle and the flange
     # hold-down hole; the plan shows the foot with the bore + screw crossing it.
+    # Hidden lines stay ON in every orthographic view (policy rule 7).
     for view in (front, top):
         set_hidden_lines_visible(adapter, view)
 
@@ -307,44 +293,14 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, [*front_annotations, *top_annotations], DIMENSION_CALLOUTS
     )
     set_dimension_precision(adapter, front_annotations, DIMENSION_PRECISION)
-    front_by_name = {
-        dimension_name(adapter, annotation): annotation
-        for annotation in front_annotations
-    }
-    # These two dimensions are true-profile coordinates for the straight
-    # flanks, not ordinary size tolerances: each flank runs from a BASIC foot
-    # top corner to the BASIC crown at its horizontal centreline.
-    for name in ("Width", "FootHt"):
-        annotation = front_by_name[name]
-        display = adapter._attempt(lambda a=annotation: a.GetSpecificAnnotation())
-        if display is None:
-            raise RuntimeError(f"{name} has no display dimension to box")
-        set_basic_dimension(adapter, display, label=f"flank {name} coordinate")
-    top_by_name = {
-        dimension_name(adapter, annotation): annotation
-        for annotation in top_annotations
-    }
-    depth_annotation = top_by_name["Depth"]
-    depth_display = adapter._attempt(lambda: depth_annotation.GetSpecificAnnotation())
-    if depth_display is None:
-        raise RuntimeError("Depth has no display dimension to box")
-    set_basic_dimension(adapter, depth_display, label="far-face depth coordinate")
-    dome_annotation = front_by_name["DomeDia"]
-    dome_display = adapter._attempt(lambda: dome_annotation.GetSpecificAnnotation())
-    if dome_display is None:
-        raise RuntimeError("DomeDia has no display dimension to box")
-    set_basic_dimension(adapter, dome_display, label="crown true-profile diameter")
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the plan view")
 
-    # Datum A = the foot seat face (the base-seat datum the bore/dome heights
-    # measure from). The arbor bore is toleranced parallel to it and carries the
-    # clamp-fit finish.
+    # Bore axis from the left foot side and the foot seat: the two coordinates
+    # a machinist sets the DRO to (one origin per view).
     _bore_r = BORE_DIA / 2.0 * _S
-    foot_entity, side_entity, flank_entity, bore_entity, dome_entity = _front_entities(
-        adapter, front
-    )
-    _add_circle_basic(
+    foot_entity, side_entity, bore_entity = _front_entities(adapter, front)
+    _add_circle_dimension(
         adapter,
         front,
         side_entity,
@@ -353,7 +309,7 @@ async def build(adapter: Any) -> dict[str, str]:
         position=(FRONT_CENTER[0], _front_y(BORE_HEIGHT + TOP_RADIUS) + 0.010),
         label="bore horizontal location",
     )
-    _add_circle_basic(
+    _add_circle_dimension(
         adapter,
         front,
         foot_entity,
@@ -361,68 +317,6 @@ async def build(adapter: Any) -> dict[str, str]:
         orientation="vertical",
         position=(0.060, FRONT_CENTER[1]),
         label="bore vertical location",
-    )
-    add_datum_feature(
-        adapter,
-        front,
-        symbol_xy=(FRONT_CENTER[0] + 0.050, _front_y(0.0) + 0.010),
-        datum="A",
-        label="foot seat face",
-        entity=foot_entity,
-    )
-    add_datum_feature(
-        adapter,
-        front,
-        # Keep the tag on the inboard side of the datum edge.  Its short
-        # rightward leader stays clear of the datum-B perpendicularity frame.
-        symbol_xy=(0.086, _front_y(2.5)),
-        datum="B",
-        label="left foot side",
-        entity=side_entity,
-    )
-    add_feature_control_frame(
-        adapter,
-        front,
-        frame_xy=(0.185, 0.080),
-        characteristic="flatness",
-        tolerance=GEOMETRIC_TOLERANCES_MM["datum-A seat flatness"],
-        label="datum-A seat flatness",
-        entity=foot_entity,
-    )
-    add_feature_control_frame(
-        adapter,
-        front,
-        frame_xy=(0.020, 0.105),
-        characteristic="perpendicularity",
-        tolerance=GEOMETRIC_TOLERANCES_MM["datum-B side perpendicularity"],
-        datums=("A",),
-        quantity="DATUM B SIDE",
-        label="datum-B side perpendicularity",
-        entity=side_entity,
-    )
-    # The two BASIC coordinates locate the bore axis from datum A and the left
-    # foot side B. Position controls both location and axis orientation.
-    add_feature_control_frame(
-        adapter,
-        front,
-        frame_xy=(0.020, _front_y(BORE_HEIGHT) + 0.006),
-        characteristic="position",
-        tolerance=GEOMETRIC_TOLERANCES_MM["arbor bore true position"],
-        datums=("A", "B"),
-        diameter=True,
-        label="arbor bore true position",
-        entity=bore_entity,
-    )
-    add_feature_control_frame(
-        adapter,
-        front,
-        frame_xy=(0.245, _front_y(BORE_HEIGHT) + 0.014),
-        characteristic="profile_surface",
-        tolerance=GEOMETRIC_TOLERANCES_MM["controlled exterior surface profile"],
-        datums=("A", "B"),
-        quantity="CROWN + 2 FLANKS + FOOT TOP + RIGHT SIDE",
-        label="controlled exterior surface profile",
-        entity=flank_entity,
     )
     add_surface_finish(
         adapter,
@@ -439,50 +333,20 @@ async def build(adapter: Any) -> dict[str, str]:
         SCREW_CLEARANCE_DIA / 2.0,
         label="flange hold-down hole",
     )
-    datum_d_entity = _top_depth_edge(
-        adapter, top, -FOOT_DEPTH / 2.0, label="datum-D near-foot"
+    near_foot_entity = _top_depth_edge(
+        adapter, top, -FOOT_DEPTH / 2.0, label="near foot edge"
     )
-    strap_near_entity = _top_depth_edge(
+    # Hold-down hole from the near foot edge; its across-foot coordinate is
+    # the bore's own (the views are projection-aligned, so a second 12.00
+    # would print directly over the front view's).
+    _add_circle_dimension(
         adapter,
         top,
-        FOOT_DEPTH / 2.0 - STRAP_T,
-        label="strap near-face",
-    )
-    far_face_entity = _top_depth_edge(
-        adapter, top, FOOT_DEPTH / 2.0, label="coplanar far-face"
-    )
-    # The top and front views are projection-aligned, so a second horizontal
-    # 12 BASIC dimension would print directly over the bore's 12 BASIC. The
-    # property-linked note explicitly assigns that existing datum-B coordinate
-    # to the flange-hole axis; only the independent datum-D coordinate belongs
-    # on this view.
-    _add_circle_basic(
-        adapter,
-        top,
-        datum_d_entity,
+        near_foot_entity,
         screw_entity,
         orientation="vertical",
         position=(0.060, TOP_CENTER[1]),
-        label="flange-hole location from datum D",
-    )
-    add_datum_feature(
-        adapter,
-        top,
-        symbol_xy=(0.145, 0.260),
-        datum="D",
-        label="exposed flange edge",
-        entity=datum_d_entity,
-    )
-    add_feature_control_frame(
-        adapter,
-        top,
-        frame_xy=(0.020, 0.235),
-        characteristic="perpendicularity",
-        tolerance=GEOMETRIC_TOLERANCES_MM["datum-D face perpendicularity"],
-        datums=("A", "B"),
-        quantity="DATUM D FACE",
-        label="datum-D face perpendicularity",
-        entity=datum_d_entity,
+        label="flange-hole location from near foot edge",
     )
     _screw_r = SCREW_CLEARANCE_DIA / 2.0 * _S
     add_native_hole_callout(
@@ -491,41 +355,9 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=(TOP_CENTER[0] + _screw_r, TOP_CENTER[1] + 0.010),
         callout_xy=(0.180, 0.260),
         label="flange hold-down hole",
+        # #4 normal clearance (3.264 = 0.1285 in) is exactly the #30 drill.
+        process="#30 DRILL",
     )
-    add_feature_control_frame(
-        adapter,
-        top,
-        frame_xy=(0.300, 0.250),
-        characteristic="position",
-        tolerance=GEOMETRIC_TOLERANCES_MM["flange-hole true position"],
-        datums=("A", "B", "D"),
-        diameter=True,
-        label="flange-hole true position",
-        entity=screw_entity,
-    )
-    add_feature_control_frame(
-        adapter,
-        top,
-        frame_xy=(0.245, 0.242),
-        characteristic="profile_surface",
-        tolerance=GEOMETRIC_TOLERANCES_MM["strap near-face profile"],
-        datums=("A", "B", "D"),
-        quantity=f"STRAP NEAR FACE @ BASIC {FOOT_DEPTH - STRAP_T:.2f}",
-        label="strap near-face profile",
-        entity=strap_near_entity,
-    )
-    add_feature_control_frame(
-        adapter,
-        top,
-        frame_xy=(0.300, 0.220),
-        characteristic="profile_surface",
-        tolerance=GEOMETRIC_TOLERANCES_MM["coplanar far-face profile"],
-        datums=("A", "B", "D"),
-        quantity=f"FOOT + STRAP FAR FACES @ BASIC {FOOT_DEPTH:.2f}",
-        label="coplanar far-face profile",
-        entity=far_face_entity,
-    )
-
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)
 
     return await finalize_drawing(

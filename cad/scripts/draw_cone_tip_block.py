@@ -1,4 +1,13 @@
-r"""Create the curated machinist drawing for the cone tip block."""
+r"""Create the curated machinist drawing for the cone tip block.
+
+The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): a
+small clamp block carries no datums, no feature-control frames, no
+roughness symbols and no basic dimensions -- the title block's general
+tolerances govern everything.  The adjuster tap carries its own native
+callout on the face it is tapped from; the pinch cross-hole is flagged from
+the drawn +X face with a leader note; every hole axis is located from an
+edge of the view it is drilled in.
+"""
 
 from __future__ import annotations
 
@@ -6,23 +15,21 @@ import argparse
 import sys
 from typing import Any
 
-from cone_tip_block_spec import GEOMETRIC_TOLERANCES_MM
-
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_feature_control_frame,
+    add_attached_note,
+    add_native_hole_callout,
     add_property_linked_note,
     curate_view_dimensions,
     finalize_drawing,
+    model_point_in_view,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
     set_dimension_precision,
     set_arc_endpoints_to_center,
-    set_basic_dimension,
     view_name,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
@@ -30,21 +37,23 @@ from _drawing_common import (
     visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _holes import TAP_DRILL_MM
 from cone_tip_block_spec import (
     ADJUSTER_AXIS_HEIGHT,
+    ADJUSTER_THREAD,
     BLOCK_HEIGHT,
     BLOCK_X,
     BLOCK_Z,
     PINCH_CLEARANCE_DIA,
     PINCH_HEIGHT,
+    PINCH_HOLE_NOTE,
     SHAFT_PASSAGE_DIA,
-    SLIT_W,
+    SLIT_DEPTH,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
-    add_note,
     auto_center_marks,
-    dimension_name,
     place_view,
+    remove_notes_matching,
 )
 
 
@@ -76,28 +85,41 @@ def _front_y(model_y: float) -> float:
     return FRONT_CENTER[1] + (model_y - BLOCK_HEIGHT / 2.0) * _S
 
 
-# Front elevation carries the standing block width, height, shaft passage, and
-# top clamp slit. The plan carries the 12 depth.
+# Front elevation carries the standing block width, height, shaft passage, top
+# clamp slit depth and the adjuster tap; the plan carries the 12 depth and the
+# slit width; the right view (the +X face) carries the pinch hole.
 FRONT_KEEP = {
     "Width": (FRONT_CENTER[0], _front_y(0.0) - 0.014),
     "BlockHt": (FRONT_CENTER[0] - 0.028, FRONT_CENTER[1]),
-    "PassageDiaDim": (FRONT_CENTER[0] + 0.048, _front_y(ADJUSTER_AXIS_HEIGHT)),
+    # Leadered from below-right so it stays under the slit-depth dimension.
+    "PassageDiaDim": (FRONT_CENTER[0] + 0.048, _front_y(ADJUSTER_AXIS_HEIGHT) - 0.014),
     "PassageZ": (FRONT_CENTER[0] - 0.050, _front_y(ADJUSTER_AXIS_HEIGHT / 2.0)),
-    # Keep the slit width directly above the slot; the native 5/16-18 thread
-    # callout routes rightward below it.
-    "SlitW": (FRONT_CENTER[0], 0.232),
+    # The slit is open to the front face, so its depth is a visible edge
+    # dimension here (never to a hidden line).
+    "SlitDepth": (FRONT_CENTER[0] + 0.030, _front_y(BLOCK_HEIGHT - SLIT_DEPTH / 2.0)),
 }
 TOP_KEEP = {
-    # Text far enough east that the dimension's arrows and the dim-attached
-    # datum-D tag (which SolidWorks snaps to the text) sit clear of the view
-    # and of each other (eye-pass catch: box/arrow through the 12.00 digits).
+    # Text east of the plan so the arrows sit clear of the view.
     "Depth": (TOP_CENTER[0] + 0.052, TOP_CENTER[1]),
+    # Below the plan, clear of the view outline (its text used to sit on the
+    # slot's projected lines).
+    "SlitW": (TOP_CENTER[0], 0.221),
 }
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
 DIMENSION_CALLOUTS = {
-    "PassageDiaDim": "THRU - CLEARANCE PASSAGE",
+    "PassageDiaDim": "DRILL THRU",
 }
-DIMENSION_PRECISION = {"PassageZ": 2}
+# Nothing on this block is fitted: every dimension prints two places under the
+# title-block tolerance.
+DIMENSION_PRECISION = {"PassageZ": 2, "BlockHt": 2}
+
+# Tap callout (front view = the north face the tap enters) and pinch flag note
+# (right view = the +X face the pinch is drilled from).
+TAP_CALLOUT_XY = (0.150, 0.215)
+PINCH_NOTE_XY = (0.228, 0.205)
+# Hole-axis locations: the pinch from a depth face in the right view, the
+# passage/slit axis from a side face in the front view, both above the block.
+AXIS_LOCATION_Y = 0.212
 
 
 def _circle_entity(
@@ -134,6 +156,18 @@ def _circle_entity(
     return edge
 
 
+def _edge_vertices(edge: Any) -> tuple[tuple[float, ...], tuple[float, ...]] | None:
+    start = edge.GetStartVertex()
+    end = edge.GetEndVertex()
+    if start is None or end is None:
+        return None
+    start = _early_bound(start, "IVertex")
+    end = _early_bound(end, "IVertex")
+    p0 = tuple(float(value) * 1000.0 for value in start.GetPoint())
+    p1 = tuple(float(value) * 1000.0 for value in end.GetPoint())
+    return p0, p1
+
+
 def _foot_edge(adapter: Any, view: Any, *, min_span_mm: float = 13.9) -> Any:
     """Return the real bottom edge of the block's foot seat in ``view``.
 
@@ -143,14 +177,10 @@ def _foot_edge(adapter: Any, view: Any, *, min_span_mm: float = 13.9) -> Any:
     candidates: list[tuple[float, float, Any]] = []
     for edge in visible_view_entities(view, 1, label="tip-block foot edges"):
         edge = _early_bound(edge, "IEdge")
-        start = edge.GetStartVertex()
-        end = edge.GetEndVertex()
-        if start is None or end is None:
+        points = _edge_vertices(edge)
+        if points is None:
             continue
-        start = _early_bound(start, "IVertex")
-        end = _early_bound(end, "IVertex")
-        p0 = tuple(float(value) * 1000.0 for value in start.GetPoint())
-        p1 = tuple(float(value) * 1000.0 for value in end.GetPoint())
+        p0, p1 = points
         if abs(p0[1]) > 0.01 or abs(p1[1]) > 0.01:
             continue
         # The foot's bottom edges run along model X in the front view and
@@ -163,6 +193,70 @@ def _foot_edge(adapter: Any, view: Any, *, min_span_mm: float = 13.9) -> Any:
     if span_x < min_span_mm:
         raise RuntimeError(f"foot-seat edge span is only {span_x:.3f} mm")
     return edge
+
+
+def _vertical_side_edge(
+    adapter: Any, view: Any, *, x_mm: float, z_mm: float, label: str
+) -> Any:
+    """Return the tallest vertical block edge at plan station (x, z)."""
+    candidates: list[tuple[float, Any]] = []
+    for edge in visible_view_entities(view, 1, label=f"{label} side edges"):
+        edge = _early_bound(edge, "IEdge")
+        points = _edge_vertices(edge)
+        if points is None:
+            continue
+        p0, p1 = points
+        if any(abs(p[0] - x_mm) > 0.01 or abs(p[2] - z_mm) > 0.01 for p in (p0, p1)):
+            continue
+        candidates.append((abs(p1[1] - p0[1]), edge))
+    if not candidates:
+        raise RuntimeError(f"{label}: no vertical edge at x={x_mm:g}, z={z_mm:g}")
+    span, edge = max(candidates, key=lambda item: item[0])
+    if span < BLOCK_HEIGHT - 0.1:
+        raise RuntimeError(f"{label}: side edge spans only {span:.3f} mm")
+    return edge
+
+
+@_telemetry.traced("drawing.entity_dimension", label_param="label")
+def _entity_dimension(
+    adapter: Any,
+    view: Any,
+    base_entity: Any,
+    circle_entity: Any,
+    *,
+    orientation: str,
+    position: tuple[float, float],
+    label: str,
+) -> Any:
+    """Entity-selected edge-to-circle-centre dimension (the arbor recipe).
+
+    A sheet-picked dimension re-anchored to a circle centre was found to
+    DANGLE on this sheet (rendered gray on the eye pass); entity selection
+    does not.
+    """
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    if not drawing.ActivateView(view_name(adapter, view)):
+        raise RuntimeError(f"failed to activate view for {label}")
+    draw.ClearSelection2(True)
+    selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    for append, raw_entity in ((False, base_entity), (True, circle_entity)):
+        selection_data = selection_manager.CreateSelectData()
+        selection_data.View = view
+        entity = _early_bound(raw_entity, "IEntity")
+        if not entity.Select4(append, selection_data):
+            raise RuntimeError(f"failed to select {label} entity")
+    if orientation == "horizontal":
+        display = draw.AddHorizontalDimension2(*position, 0.0)
+    elif orientation == "vertical":
+        display = draw.AddVerticalDimension2(*position, 0.0)
+    else:
+        raise ValueError(f"unsupported dimension orientation: {orientation}")
+    draw.ClearSelection2(True)
+    if display is None:
+        raise RuntimeError(f"failed to create {label} dimension")
+    set_arc_endpoints_to_center(adapter, display, label=label)
+    return display
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -208,12 +302,20 @@ async def build(adapter: Any) -> dict[str, str]:
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(2, 1))
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(2, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2, 1))
-    for view in (right, iso):
-        set_hidden_lines_removed(adapter, view)
-    # The elevation carries the journal as a hidden circle and the adjuster/slit
-    # detail; the plan shows the footprint with the bore and holes crossing it.
-    for view in (front, top):
+    set_hidden_lines_removed(adapter, iso)
+    # Hidden lines stay ON in every orthographic view (policy rule 7): the
+    # elevation shows the passage as a hidden circle and the slit, the plan
+    # the footprint with the bore and holes crossing it, the right view the
+    # pinch bore into the slit.
+    for view in (front, top, right):
         set_hidden_lines_visible(adapter, view)
+    # SolidWorks auto-inserts a generic "<thread> Tapped Hole" note per Hole
+    # Wizard tap normal to a placed view; the native callouts replace them
+    # (draw_top_frame idiom).
+    removed_tap_notes = remove_notes_matching(adapter, "Tapped Hole")
+    _telemetry.info(
+        f"removed {removed_tap_notes} redundant automatic tapped-hole note(s)"
+    )
 
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
@@ -232,109 +334,54 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_precision(
         adapter, [*front_annotations, *right_annotations], DIMENSION_PRECISION
     )
-    by_name = {
-        dimension_name(adapter, annotation): annotation
-        for annotation in front_annotations
-    }
-    for name, label in (("PassageZ", "adjuster common-axis height"),):
-        display = adapter._attempt(lambda n=name: by_name[n].GetSpecificAnnotation())
-        if display is None:
-            raise RuntimeError(f"{name} has no display dimension to box")
-        set_basic_dimension(adapter, display, label=label)
     for label, view in (("front", front), ("plan", top), ("right", right)):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME center mark to the {label} view")
 
-    # Datum A = the foot seat face (the platform-seat datum the adjuster and
-    # pinch-axis heights measure from).
-    # Attach datum A to the RIGHT of the foot-bottom edge so its symbol clears
-    # the centred 14.00 Width dimension (which sits at x=FRONT_CENTER[0]).
-    foot_entity = _foot_edge(adapter, front)
-    add_datum_feature(
+    # Adjuster tap: the native Hole Wizard callout (thread, thread depth and
+    # tap-drill depth) on the tap rim in the front view -- the north face the
+    # tap enters is the face toward the front camera.
+    tap_entity = _circle_entity(
         adapter,
         front,
-        symbol_xy=(FRONT_CENTER[0] + 0.024, _front_y(0.0) - 0.010),
-        datum="A",
-        label="foot seat face",
-        entity=foot_entity,
+        radius_mm=TAP_DRILL_MM[ADJUSTER_THREAD] / 2.0,
+        center_y_mm=ADJUSTER_AXIS_HEIGHT,
+        label="adjuster tap",
     )
-    add_datum_feature(
+    add_native_hole_callout(
         adapter,
         front,
-        edge_xy=FRONT_KEEP["Width"],
-        symbol_xy=(FRONT_CENTER[0], _front_y(0.0) + 0.024),
-        datum="B",
-        label="block-width median plane",
-        entity_type="DIMENSION",
-        position_tolerance_m=0.001,
+        callout_xy=TAP_CALLOUT_XY,
+        label="adjuster tapped hole",
+        edge=tap_entity,
     )
-    add_datum_feature(
-        adapter,
-        front,
-        edge_xy=(FRONT_CENTER[0] + BLOCK_X / 2.0 * _S, _front_y(20.0)),
-        symbol_xy=(FRONT_CENTER[0] + BLOCK_X / 2.0 * _S + 0.018, _front_y(20.0)),
-        datum="E",
-        label="positive-X pinch-entry face",
-        # The tag is offset 18 mm off the +X edge (symbol_xy) to clear the
-        # crowded lane; keep the accepted placement error well below that gap so
-        # a SolidWorks snap-back onto the edge is caught rather than silently
-        # passing (a 20 mm tolerance admitted the full 18 mm collapse).
-        position_tolerance_m=0.010,
-    )
-    add_datum_feature(
-        adapter,
-        top,
-        edge_xy=(TOP_CENTER[0], TOP_CENTER[1] + BLOCK_Z / 2.0 * _S),
-        symbol_xy=(0.065, TOP_CENTER[1] + BLOCK_Z / 2.0 * _S),
-        datum="C",
-        label="adjuster entry face",
-    )
-    add_datum_feature(
-        adapter,
-        top,
-        edge_xy=TOP_KEEP["Depth"],
-        symbol_xy=TOP_KEEP["Depth"],
-        datum="D",
-        label="block-depth median plane",
-        entity_type="DIMENSION",
-        shoulder=True,
-        position_tolerance_m=0.001,
-    )
+    # Slit / adjuster axis across the 14 width: from the drawn -X side face.
     passage_entity = _circle_entity(
         adapter,
         front,
         radius_mm=SHAFT_PASSAGE_DIA / 2.0,
         center_y_mm=ADJUSTER_AXIS_HEIGHT,
-        label="adjuster passage",
+        label="shaft passage",
     )
-    add_feature_control_frame(
+    front_side = _vertical_side_edge(
+        adapter, front, x_mm=-BLOCK_X / 2.0, z_mm=BLOCK_Z / 2.0, label="front side"
+    )
+    side_xy = model_point_in_view(
+        adapter, front, (-BLOCK_X / 2000.0, 0.0, BLOCK_Z / 2000.0), label="front side"
+    )
+    axis_xy = model_point_in_view(
+        adapter, front, (0.0, ADJUSTER_AXIS_HEIGHT / 1000.0, 0.0), label="adjuster axis"
+    )
+    _entity_dimension(
         adapter,
         front,
-        frame_xy=(0.245, _front_y(ADJUSTER_AXIS_HEIGHT) - 0.058),
-        characteristic="position",
-        tolerance=GEOMETRIC_TOLERANCES_MM["adjuster common-axis true position"],
-        datums=("A", "B", "C"),
-        diameter=True,
-        quantity="2 COAXIAL FEATURES; SIM REQT",
-        label="adjuster common-axis true position",
-        entity=passage_entity,
+        front_side,
+        passage_entity,
+        orientation="horizontal",
+        position=((side_xy[0] + axis_xy[0]) / 2.0, AXIS_LOCATION_Y),
+        label="adjuster-axis lateral location",
     )
-    add_feature_control_frame(
-        adapter,
-        front,
-        edge_xy=(
-            FRONT_CENTER[0] + SLIT_W / 2.0 * _S,
-            _front_y(BLOCK_HEIGHT - 4.0),
-        ),
-        # Below the y=0.245 row so the leader down to the slit edge never
-        # crosses the datum-D tag leader east of the plan-view depth text.
-        frame_xy=(0.170, 0.239),
-        characteristic="position",
-        tolerance=GEOMETRIC_TOLERANCES_MM["slot median-plane position"],
-        datums=("B",),
-        quantity="SLOT MEDIAN PLANE; BASIC 0 TO B",
-        label="slot median-plane position",
-    )
+
     pinch_entity = _circle_entity(
         adapter,
         right,
@@ -342,46 +389,45 @@ async def build(adapter: Any) -> dict[str, str]:
         center_y_mm=PINCH_HEIGHT,
         label="pinch clearance",
     )
-    # Entity-selected vertical dimension (the sheet-pick + arc-center recipe
-    # left the dimension DANGLING after the re-anchor — it rendered gray on the
-    # eye-pass; the arbor sheet's entity-selected circle basics do not).
-    with _telemetry.span("drawing.pinch_axis_height"):
-        base_edge = _foot_edge(adapter, right, min_span_mm=11.9)
-        draw = adapter.currentModel
-        drawing = _early_bound(draw, "IDrawingDoc")
-        if not drawing.ActivateView(view_name(adapter, right)):
-            raise RuntimeError("failed to activate right view for pinch-axis height")
-        draw.ClearSelection2(True)
-        selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
-        for append, raw_entity in ((False, base_edge), (True, pinch_entity)):
-            selection_data = selection_manager.CreateSelectData()
-            selection_data.View = right
-            entity = _early_bound(raw_entity, "IEntity")
-            if not entity.Select4(append, selection_data):
-                raise RuntimeError("failed to select pinch-axis height entity")
-        pinch_height = draw.AddVerticalDimension2(
-            RIGHT_CENTER[0] - 0.036, _front_y(PINCH_HEIGHT / 2.0), 0.0
-        )
-        draw.ClearSelection2(True)
-        if pinch_height is None:
-            raise RuntimeError("failed to create pinch-axis height dimension")
-        set_arc_endpoints_to_center(adapter, pinch_height, label="pinch-axis height")
-        set_basic_dimension(adapter, pinch_height, label="pinch-axis height")
-    add_feature_control_frame(
+    # Pinch-axis height from the foot seat and its station across the 12
+    # depth, both from a face drawn in the right view.
+    base_edge = _foot_edge(adapter, right, min_span_mm=11.9)
+    _entity_dimension(
         adapter,
         right,
-        frame_xy=(0.245, _front_y(PINCH_HEIGHT) - 0.030),
-        characteristic="position",
-        tolerance=GEOMETRIC_TOLERANCES_MM["pinch common-axis true position"],
-        datums=("A", "D", "E"),
-        diameter=True,
-        quantity="2 COAXIAL FEATURES; SIM REQT",
-        label="pinch common-axis true position",
-        entity=pinch_entity,
+        base_edge,
+        pinch_entity,
+        orientation="vertical",
+        position=(RIGHT_CENTER[0] - 0.036, _front_y(PINCH_HEIGHT / 2.0)),
+        label="pinch-axis height",
     )
-    entry_face_label = add_note(adapter, "PINCH ENTRY FACE E (+X)", 0.180, 0.225)
-    if entry_face_label is None:
-        raise RuntimeError("failed to add datum-E pinch-entry face label")
+    depth_face = _vertical_side_edge(
+        adapter, right, x_mm=BLOCK_X / 2.0, z_mm=-BLOCK_Z / 2.0, label="right side"
+    )
+    depth_xy = model_point_in_view(
+        adapter, right, (BLOCK_X / 2000.0, 0.0, -BLOCK_Z / 2000.0), label="depth face"
+    )
+    pinch_xy = model_point_in_view(
+        adapter, right, (BLOCK_X / 2000.0, PINCH_HEIGHT / 1000.0, 0.0), label="pinch axis"
+    )
+    _entity_dimension(
+        adapter,
+        right,
+        depth_face,
+        pinch_entity,
+        orientation="horizontal",
+        position=((depth_xy[0] + pinch_xy[0]) / 2.0, AXIS_LOCATION_Y),
+        label="pinch-axis depth station",
+    )
+    # The entry face is the drawn face: flag the pinch process from its rim.
+    add_attached_note(
+        adapter,
+        right,
+        text=PINCH_HOLE_NOTE,
+        entity=pinch_entity,
+        note_xy=PINCH_NOTE_XY,
+        label="pinch hole",
+    )
     add_property_linked_note(
         adapter, "Manufacturing Notes", 0.020, 0.088, char_height=0.0025
     )
