@@ -174,6 +174,14 @@ async def set_mates_suppressed_in(
         await activate_configuration(adapter, prior)
 
 
+def _component_is_suppressed(adapter: Any, component: Any, name: str) -> bool:
+    """Read suppression without converting a failed COM call into ``False``."""
+    state = adapter._attempt(lambda: component.IsSuppressed(), default=None)
+    if state is None:
+        raise RuntimeError(f"pose: could not read suppression state for {name!r}")
+    return bool(state)
+
+
 @_telemetry.traced("pose.component_suppression")
 def set_components_suppressed_in_active_configuration(
     adapter: Any, names: list[str], suppressed: bool
@@ -217,8 +225,7 @@ def set_components_suppressed_in_active_configuration(
     wrong = [
         name
         for name, component in zip(names, components, strict=True)
-        if bool(adapter._attempt(lambda c=component: c.IsSuppressed(), default=None))
-        != suppressed
+        if _component_is_suppressed(adapter, component, name) != suppressed
     ]
     if wrong:
         raise RuntimeError(
@@ -320,7 +327,7 @@ def snapshot_transforms(adapter: Any) -> dict[str, list[float]]:
         component = asm.GetComponentByName(name)
         if component is None:
             raise RuntimeError(f"pose: component not found for snapshot: {name!r}")
-        if bool(adapter._attempt(lambda c=component: c.IsSuppressed(), default=False)):
+        if _component_is_suppressed(adapter, component, name):
             continue
         out[name] = component_transform(adapter, name)
     return out

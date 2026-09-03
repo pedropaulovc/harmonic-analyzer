@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import math
 
+import pytest
+
 import _buildgraph
 import _config
 import _pose_configs as pc
@@ -323,3 +325,87 @@ def test_default_transform_snapshot_skips_suppressed_pose_banks():
                 return default
 
     assert pc.snapshot_transforms(Adapter()) == {"live-1": Transform.ArrayData}
+
+
+def test_snapshot_rejects_unknown_suppression_state():
+    class Component:
+        Name2 = "unknown-1"
+
+        @staticmethod
+        def IsSuppressed():
+            raise RuntimeError("COM read failed")
+
+    class Model:
+        component = Component()
+
+        def GetComponents(self, top_level_only):
+            assert top_level_only
+            return [self.component]
+
+        def GetComponentByName(self, name):
+            assert name == "unknown-1"
+            return self.component
+
+    class Adapter:
+        currentModel = Model()
+
+        @staticmethod
+        def _attempt(call, default=None):
+            try:
+                return call()
+            except Exception:
+                return default
+
+    with pytest.raises(RuntimeError, match="could not read suppression state"):
+        pc.snapshot_transforms(Adapter())
+
+
+def test_component_suppression_rejects_unknown_readback():
+    class Component:
+        @staticmethod
+        def Select4(append, selection_data, mark):
+            assert not append
+            assert selection_data is None
+            assert not mark
+            return True
+
+        @staticmethod
+        def IsSuppressed():
+            raise RuntimeError("COM read failed")
+
+    class Model:
+        component = Component()
+
+        @staticmethod
+        def ClearSelection2(clear_all):
+            assert clear_all
+            return True
+
+        def GetComponentByName(self, name):
+            assert name == "spring-1"
+            return self.component
+
+        @staticmethod
+        def SetComponentSuppression(state):
+            assert state == 0
+            return True
+
+        @staticmethod
+        def ForceRebuild3(top_only):
+            assert not top_only
+            return True
+
+    class Adapter:
+        currentModel = Model()
+
+        @staticmethod
+        def _attempt(call, default=None):
+            try:
+                return call()
+            except Exception:
+                return default
+
+    with pytest.raises(RuntimeError, match="could not read suppression state"):
+        pc.set_components_suppressed_in_active_configuration(
+            Adapter(), ["spring-1"], suppressed=True
+        )
