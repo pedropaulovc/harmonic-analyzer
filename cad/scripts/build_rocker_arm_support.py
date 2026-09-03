@@ -135,10 +135,14 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 DRAWING_NOTES = "\n".join(
     (
-        "GRAY-IRON CASTING; AS-CAST SURFACES +/-0.8.",
-        "WINDOW: CHAMFER 1.27 X 45 DEG ALL AROUND; FILLET R12.7, 4X.",
-        "WINDOW AND CAVITY CENTRED.",
-        "CENTRAL WEB 6.35 THICK AND CENTRED.",
+        # Process facts only (drawing-simplicity-policy.md rule 6): the
+        # window/cavity are located from the outside faces on the front
+        # view, the web is dimensioned on SECTION A-A, the window-rim chamfer
+        # is flagged from that section and the cavity fillet is a radius on
+        # the front view -- no note carries a size, a location or "centred".
+        "AS-CAST SURFACES OK EXCEPT WHERE DIMENSIONED.",
+        "CAVITY RIM (BOTH SIDES) AND ALL OUTSIDE EDGES: SAME CHAMFER AS WINDOW RIM.",
+        "TAP 4X 9/16-12 FROM THE FOOT FACE.",
     )
 )
 # Hole Wizard constants (resolved from the SW type library on this seat):
@@ -505,7 +509,7 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "CornerFillet", 246_685, 200)
 
     # 6. FootTappedHoles: ONE Hole Wizard (HoleWzd) feature with four placement
-    #    points, 9/16-12 UNC-2B straight tapped holes drilled up through the
+    #    points, 9/16-12 UNC straight tapped holes drilled up through the
     #    foot from the bottom face (Y=-HALF_Y) at (X ±60.32, Z ±17.46),
     #    through-all. Only the 6.35 mm foot tip (Y -88.9..-82.55) carries
     #    material along the bore -- the window cuts opened everything above -- so

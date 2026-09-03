@@ -38,7 +38,10 @@ from _common import (
     CASTING_GREEN,
     PANEL_BLACK,
     SketchDims,
+    _dim_value_mm,
+    _display_dimensions,
     _early_bound,
+    _feature_by_name,
     add_line_chain,
     apply_color,
     apply_material,
@@ -57,6 +60,7 @@ from _common import (
     volume_check,
 )
 from _drawing_marks import (
+    _named_dimension,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
@@ -163,7 +167,7 @@ PIVOT_SCREW_XZ = (
     _FORMER_PIVOT_SCREW_XZ[0] + POST_X_SHIFT,
     _FORMER_PIVOT_SCREW_XZ[1] + POST_Z_SHIFT,
 )
-# pivot seat: blind #10-24 UNC-2B tap.  The screw's ground shoulder stops on
+# pivot seat: blind #10-24 UNC tap.  The screw's ground shoulder stops on
 # the base top; only its distinct threaded tail enters this seat.
 _FORMER_STOP_SCREW_XZ = (-141.14905420183916, -33.08089452405298)
 STOP_SCREW_XZ = (
@@ -384,6 +388,42 @@ async def _define_fixed_edge_rectangle(
     )
 
 
+def _name_depth_dimension(
+    adapter, feature_name: str, name: str, depth_mm: float
+) -> None:
+    """Rename an extrude's DEPTH display dimension to ``name`` and prove it.
+
+    The two plate thicknesses are feature parameters (extrude depths), not
+    sketch dimensions, and the drawing's keep map is keyed on the bare
+    dimension name -- two features both called ``D1`` cannot be told apart
+    there.  ``TopPlate`` is a ``FeatureExtrusion3`` with a start offset, so
+    the depth is not guaranteed to be the FIRST display dimension; the depth
+    is picked by VALUE, renamed, then read back by its new name (unique on the
+    feature) and re-checked against ``depth_mm`` so a wrong pick fails the
+    build loud instead of printing the offset as a thickness.
+    """
+    feature = _feature_by_name(adapter, feature_name)
+    matches = [
+        dimension
+        for dimension in _display_dimensions(feature, feature_name)
+        if abs(_dim_value_mm(dimension) - depth_mm) <= 1e-6
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"{feature_name}: expected exactly one {depth_mm:g} mm depth "
+            f"dimension to rename to {name!r}, found {len(matches)}"
+        )
+    matches[0].Name = name
+    _display, dimension = _named_dimension(adapter, feature_name, name)
+    value = _dim_value_mm(dimension)
+    if abs(value - depth_mm) > 1e-6:
+        raise RuntimeError(
+            f"{name}@{feature_name} reads {value:.4f} mm after the rename, "
+            f"expected the {depth_mm:.4f} mm depth"
+        )
+    _telemetry.success(f"depth dim {name}@{feature_name} = {value:.4g} mm")
+
+
 def _com_get(obj, name: str):
     """Read a zero-argument COM member that pywin32's late-bound dispatch may
     expose either as a method (``GetBox()``) or as a property value (the
@@ -486,6 +526,9 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=BOTTOM_THICKNESS)),
     )
     name_last_feature(adapter, "BottomPlate")
+    # The flange thickness is the print's marked FlangeT (harmonic_base_spec
+    # DRAWING_DIMENSIONS), shown on the front elevation.
+    _name_depth_dimension(adapter, "BottomPlate", "FlangeT", BOTTOM_THICKNESS)
     _telemetry.info(f"volume after bottom plate: {await _volume(adapter):.1f} mm^3")
     # Top plate shares the centred legacy footprint and starts on the flange.
     top = SketchDims()
@@ -510,6 +553,9 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += top.apply(adapter, "TopProfile")
     extrude_at_offset(adapter, TOP_THICKNESS, BOTTOM_THICKNESS)
     name_last_feature(adapter, "TopPlate")
+    # The pad thickness is the print's marked PadT: the offset extrude carries
+    # both the depth and the 12.7 start offset, so the depth is found by value.
+    _name_depth_dimension(adapter, "TopPlate", "PadT", TOP_THICKNESS)
     _telemetry.info(f"volume after top plate: {await _volume(adapter):.1f} mm^3")
 
     # M6.10 fastener holes + lag-head recesses: ONE native Hole Wizard
@@ -575,7 +621,7 @@ async def build(adapter) -> dict[str, str]:
             "PivotSeat",
             PIVOT_SEAT_SPEC,
             (PIVOT_SCREW_XZ,),
-            f"cone-pivot screw tapped seat ({PIVOT_THREAD} UNC-2B)",
+            f"cone-pivot screw tapped seat ({PIVOT_THREAD} UNC)",
         ),
         (
             "StopSeat",

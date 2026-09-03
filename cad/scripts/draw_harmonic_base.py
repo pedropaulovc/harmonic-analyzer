@@ -1,7 +1,7 @@
 r"""Create the curated machinist drawing for the two-plate harmonic base.
 
 The SLDPRT remains authoritative.  This recipe supplies only the base's views,
-overall footprint dimensions, the mounting-hole table, and manufacturing notes; every
+plate dimensions, the mounting-hole table, and manufacturing notes; every
 shared sheet/template, import, curation, and export behavior lives in
 ``_drawing_common``.
 
@@ -9,6 +9,13 @@ The base is machined from one-piece gray-iron stock: the legacy lower flange and
 upper pad retain their front edges and extend 35.415 mm rearward, with four counterbored
 lag-screw mounting holes, and nine assembly-drilled hardware seats.  The plate
 is 457 mm long, so the whole sheet runs 1:2; the front elevation drops to 1:4.
+
+The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): a
+machined base carries no datums or frames; the native hole table gives every
+station under the title block's general tolerance.  The plan carries both
+plate footprints (marked), the rim width and the three concentric plan-corner
+radii; the front elevation carries the flange and pad thicknesses (marked),
+the rim's pocket depth, the reveal and the overall height.
 
 Run with SolidWorks open::
 
@@ -21,21 +28,18 @@ import argparse
 import sys
 from typing import Any
 
-from harmonic_base_spec import GEOMETRIC_TOLERANCES_MM
-
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_feature_control_frame,
     add_property_linked_note,
     curate_view_dimensions,
     finalize_drawing,
     insert_hole_table,
     new_project_drawing,
     read_required_properties,
-    set_hidden_lines_removed,
+    set_hidden_lines_visible,
+    set_reference_dimension,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -43,14 +47,17 @@ from build_harmonic_base import (
     BLOCK_SCREW_HOLE_DIA,
     BLOCK_SCREW_XZ,
     CBORE_DIA,
+    FLANGE_CORNER_R,
     FOOT_SCREW_HOLE_DIA,
     FOOT_SCREW_XZ,
     HOLE_DIA,
     HOLE_XZ,
     NAMEPLATE_SCREW_HOLE_DIA,
     NAMEPLATE_SCREW_XZ,
+    PAD_CORNER_R,
     PIVOT_SCREW_HOLE_DIA,
     PIVOT_SCREW_XZ,
+    RIM_INNER_R,
     STOP_SCREW_HOLE_DIA,
     STOP_SCREW_XZ,
 )
@@ -58,13 +65,17 @@ from harmonic_base_spec import (
     BOTTOM_FRONT_Z,
     BOTTOM_LENGTH,
     BOTTOM_REAR_Z,
+    BOTTOM_THICKNESS,
     BOTTOM_WIDTH,
+    LIP_W,
     RIM_TOP,
     STACK_HEIGHT,
+    TOP_LENGTH,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
+    view_name,
 )
 
 
@@ -82,6 +93,7 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 2.0)  # 1:2 whole sheet (457 mm plate)
 VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]  # 0.5 plan/front sheet-metres-per-mm
+SIDE_SCALE = 0.25  # the 1:4 front elevation
 
 if abs((BOTTOM_REAR_Z - BOTTOM_FRONT_Z) - BOTTOM_WIDTH) > 1e-12:
     raise AssertionError("base drawing extents disagree with the overall depth")
@@ -89,33 +101,20 @@ if abs((BOTTOM_REAR_Z - BOTTOM_FRONT_Z) - BOTTOM_WIDTH) > 1e-12:
 # Sheet layout (meters).  The plan (top) carries the footprint + the hole
 # pattern; the front elevation (1:4) shows the stepped stack; the hole
 # table sits upper-right and the notes fill the lower-left.  The plan runs at the
-# sheet's 1:2; only the 1:4 isometric carries a scale note.
+# sheet's 1:2; only the 1:4 elevation carries a scale note.
 TOP_CENTER = (0.130, 0.163)
 SIDE_CENTER = (0.345, 0.075)
+# The elevation is placed on its bounding box (y 0..RIM_TOP): model y 0 sits
+# half the overall height below the view centre.
+SIDE_BBOX_MID_Y = RIM_TOP / 2.0  # 26.65
+# Straight plan runs end where the concentric corner arcs begin.
+CORNER_CENTER_X = BOTTOM_LENGTH / 2.0 - FLANGE_CORNER_R  # 206.375
+CORNER_CENTER_Z = BOTTOM_WIDTH / 2.0 - FLANGE_CORNER_R  # 117.475
 
-# Per-view survivors of the marked-dimension import: parametric name -> sheet
-# position (meters).  Only the bottom plate's overall footprint is marked.
-TOP_KEEP = {
-    "BottomLen": (
-        TOP_CENTER[0],
-        TOP_CENTER[1]
-        + max(abs(BOTTOM_FRONT_Z), abs(BOTTOM_REAR_Z)) * VIEW_SCALE / 1000.0
-        + 0.008,
-    ),
-    "BottomWid": (
-        TOP_CENTER[0] + BOTTOM_LENGTH * VIEW_SCALE / 2000.0 + 0.017,
-        TOP_CENTER[1],
-    ),
-}
-
-# Hole-table origin corner (the plate's lower-left plan corner) + the four
-# mounting-hole rim picks, all in sheet meters.  The native table reads each
-# hole's real Ø13 THRU / counterbore callout and its X/Y station from the datum.
-_DATUM_XY = (
-    TOP_CENTER[0] - BOTTOM_LENGTH * VIEW_SCALE / 2000.0,
-    TOP_CENTER[1] - BOTTOM_REAR_Z * VIEW_SCALE / 1000.0,
-)
-HOLE_TABLE_ANCHOR = (0.274, 0.256)
+if abs((TOP_LENGTH / 2.0 - PAD_CORNER_R) - CORNER_CENTER_X) > 1e-9:
+    raise AssertionError("pad corner arcs are not concentric with the flange's")
+if abs((TOP_LENGTH / 2.0 - LIP_W - RIM_INNER_R) - CORNER_CENTER_X) > 1e-9:
+    raise AssertionError("rim inner corner arcs are not concentric with the flange's")
 
 
 def _plan_xy(x_mm: float, z_mm: float) -> tuple[float, float]:
@@ -126,9 +125,56 @@ def _plan_xy(x_mm: float, z_mm: float) -> tuple[float, float]:
     )
 
 
+def _side_xy(x_mm: float, y_mm: float) -> tuple[float, float]:
+    """Sheet point for a model (X, Y) in the 1:4 front elevation."""
+    return (
+        SIDE_CENTER[0] + x_mm * SIDE_SCALE / 1000.0,
+        SIDE_CENTER[1] + (y_mm - SIDE_BBOX_MID_Y) * SIDE_SCALE / 1000.0,
+    )
+
+
 def _hole_rim(x_mm: float, z_mm: float, diameter_mm: float) -> tuple[float, float]:
     """Sheet pick on a plan-view hole rim, offset in machine +X."""
     return _plan_xy(x_mm + diameter_mm / 2.0, z_mm)
+
+
+# Per-view survivors of the marked-dimension import: parametric name -> sheet
+# position (meters).  Plan: the pad outline nearest the plate, the flange
+# envelope outside it (smallest span nearest); the two vertical texts sit at
+# different heights so their horizontal texts cannot touch.  Elevation: the
+# flange and pad thicknesses stacked on the LEFT of the view, thinnest nearest.
+TOP_KEEP = {
+    "TopLen": (TOP_CENTER[0], 0.2428),
+    "BottomLen": (TOP_CENTER[0], 0.2518),
+    "TopWid": (0.2513, 0.150),
+    "BottomWid": (0.2643, 0.178),
+}
+SIDE_KEEP = {
+    "FlangeT": (0.280, _side_xy(0.0, BOTTOM_THICKNESS / 2.0)[1]),  # y 0.0699
+    "PadT": (0.272, _side_xy(0.0, STACK_HEIGHT - 8.0)[1]),  # y 0.0790
+}
+# Drawing dimensions (text positions, sheet metres).
+OVERALL_TEXT_XY = (0.264, 0.0745)  # (53.30) reference, left of the elevation
+RIM_DEPTH_TEXT_XY = (0.4105, 0.0850)  # 2.50 rim/pocket depth, right of the elevation
+# Rim width and reveal chained above the plan's NE corner on one line: the
+# 7.00 spans rim inner edge -> pad edge (text outside, left), the (6.35)
+# reference spans pad edge -> flange edge (text outside, right), sharing the
+# pad edge's extension line with TopLen and the flange's with BottomLen.
+RIM_WIDTH_TEXT_XY = (0.229, 0.2360)
+REVEAL_TEXT_XY = (0.2515, 0.2360)
+FLANGE_RADIUS_TEXT_XY = (0.2555, 0.2270)  # R22.23 at the NE corner arc
+PAD_RADIUS_TEXT_XY = (0.2555, 0.0880)  # R15.88 at the SE corner arc
+RIM_RADIUS_TEXT_XY = (0.2470, 0.0790)  # R8.88 at the SE corner arc
+
+# Hole-table origin corner (the plate's lower-left plan corner) + the four
+# mounting-hole rim picks, all in sheet meters.  The native table reads each
+# hole's real Ø13 THRU / counterbore callout and its X/Y station from the datum.
+_DATUM_XY = (
+    TOP_CENTER[0] - BOTTOM_LENGTH * VIEW_SCALE / 2000.0,
+    TOP_CENTER[1] - BOTTOM_REAR_Z * VIEW_SCALE / 1000.0,
+)
+HOLE_TABLE_ANCHOR = (0.274, 0.256)
+SIDE_VIEW_NOTE_XY = (0.260, 0.098)
 
 
 ALL_HOLES = (
@@ -143,19 +189,19 @@ ALL_HOLES = (
 )
 
 
-def _visible_hole_table_entities(
+def _view_edges(
     adapter: Any, view: Any
-) -> tuple[tuple[Any, ...], Any, Any]:
-    """Return hole rims and the B/C datum edges in the top view.
+) -> tuple[list[tuple[float, float, float, float, Any]], list[tuple[tuple[float, ...], Any]]]:
+    """Every model edge shown in ``view`` (hidden lines included).
 
-    The plan corners are broken (CornerFillets R3.18), so no B-C corner
-    vertex exists to anchor the hole table; the caller passes the two datum
-    edges as ``datum_axes`` and the table origin lands on their VIRTUAL
-    intersection -- the theoretical sharp corner, keeping every LOC value
-    measured from B-C exactly as note 3 states.
+    Returns ``(circles, lines)``: circles as ``(cx, cy, cz, radius, edge)`` and
+    lines as ``(LineParams, edge)``, all in model metres.  Topological picks
+    keep every dimension off the sheet-coordinate tolerance: the plate rims'
+    chamfer edges and the pad root fillet's tangent edges all lie within a
+    millimetre of the edges the print dimensions.
     """
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
-    circles: list[tuple[float, float, float, Any]] = []
+    circles: list[tuple[float, float, float, float, Any]] = []
     lines: list[tuple[tuple[float, ...], Any]] = []
 
     for component in components:
@@ -173,11 +219,140 @@ def _visible_hole_table_entities(
             curve = _early_bound(edge.GetCurve(), "ICurve")
             if curve.IsCircle():
                 parameters = tuple(float(value) for value in curve.CircleParams)
-                circles.append((parameters[0], parameters[2], parameters[6], edge))
+                circles.append(
+                    (parameters[0], parameters[1], parameters[2], parameters[6], edge)
+                )
                 continue
             if curve.IsLine():
                 parameters = tuple(float(value) for value in curve.LineParams)
                 lines.append((parameters, edge))
+    return circles, lines
+
+
+def _line_edge(
+    lines: list[tuple[tuple[float, ...], Any]],
+    *,
+    label: str,
+    along: str,
+    x_mm: float | None = None,
+    y_mm: float | None = None,
+    z_mm: float | None = None,
+) -> Any:
+    """One straight edge running ``along`` an axis through the given station.
+
+    ``LineParams`` is ``(point xyz, direction xyz)``; an edge matches when its
+    direction is the requested axis and its point lies on every axis station
+    given.  Coincident candidates (both ends of a face, the deck's front and
+    rear edges) project to the same sheet line; the top-most is taken so a
+    plan pick lands on the visible rim, never on a hidden one below it.
+    """
+    axis = {"x": 3, "y": 4, "z": 5}[along]
+    matches = [
+        (parameters[1], edge)
+        for parameters, edge in lines
+        if abs(parameters[axis]) >= 0.99
+        and (x_mm is None or abs(parameters[0] - x_mm / 1000.0) <= 2e-6)
+        and (y_mm is None or abs(parameters[1] - y_mm / 1000.0) <= 2e-6)
+        and (z_mm is None or abs(parameters[2] - z_mm / 1000.0) <= 2e-6)
+    ]
+    if not matches:
+        raise RuntimeError(
+            f"harmonic-base view has no straight edge for {label} "
+            f"(along {along}, x={x_mm!r}, y={y_mm!r}, z={z_mm!r})"
+        )
+    matches.sort(key=lambda item: -item[0])
+    return matches[0][1]
+
+
+def _corner_arc(
+    circles: list[tuple[float, float, float, float, Any]],
+    *,
+    radius_mm: float,
+    x_sign: float,
+    z_sign: float,
+    label: str,
+) -> Any:
+    """The top-most plan-corner arc of ``radius_mm`` at one concentric corner."""
+    matches = [
+        (cy, edge)
+        for cx, cy, cz, radius, edge in circles
+        if abs(radius - radius_mm / 1000.0) <= 5e-5
+        and abs(cx - x_sign * CORNER_CENTER_X / 1000.0) <= 5e-5
+        and abs(cz - z_sign * CORNER_CENTER_Z / 1000.0) <= 5e-5
+    ]
+    if not matches:
+        raise RuntimeError(
+            f"harmonic-base plan has no R{radius_mm:g} corner arc for {label}"
+        )
+    matches.sort(key=lambda item: -item[0])
+    return matches[0][1]
+
+
+def _dimension_entities(
+    adapter: Any,
+    view: Any,
+    entities: tuple[Any, ...],
+    *,
+    text_xy: tuple[float, float],
+    orientation: str,
+    label: str,
+) -> Any:
+    """Dimension across topologically selected drawing-view entities.
+
+    ``IView::SelectEntity`` puts each model entity into the drawing selection
+    (the same call ``_drawing_common._select_view_entity`` makes for callouts
+    and attached notes), then the matching ``IModelDoc2.Add*Dimension2``
+    creates the dimension with its text at ``text_xy`` (sheet metres).  A
+    single arc selected with ``"smart"`` yields its radius dimension.
+    """
+    draw = adapter.currentModel
+    ddoc = _early_bound(
+        draw, "IDrawingDoc"
+    )  # IDrawingDoc view for drawing-only methods (same dispatch)
+    name = view_name(adapter, view)
+    if not ddoc.ActivateView(name):
+        raise RuntimeError(f"failed to activate drawing view {name!r} ({label})")
+    draw.ClearSelection2(True)
+    for index, entity in enumerate(entities):
+        if not view.SelectEntity(entity, index > 0):
+            raise RuntimeError(f"failed to select {label} entity {index}")
+    if orientation == "horizontal":
+        dimension = draw.AddHorizontalDimension2(text_xy[0], text_xy[1], 0.0)
+    elif orientation == "vertical":
+        dimension = draw.AddVerticalDimension2(text_xy[0], text_xy[1], 0.0)
+    elif orientation == "smart":
+        dimension = draw.AddDimension2(text_xy[0], text_xy[1], 0.0)
+    else:
+        raise ValueError(f"unknown dimension orientation {orientation!r}")
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    if dimension is None:
+        raise RuntimeError(f"failed to add the {label} {orientation} dimension")
+    return dimension
+
+
+def _reference(adapter: Any, dimension: Any, *, label: str) -> Any:
+    """Parenthesize a drawing-added dimension (ASME reference notation)."""
+    # Add*Dimension2 hands back the IDisplayDimension (late-bound); bind it
+    # before reading the IAnnotation the reference helper wants.
+    return set_reference_dimension(
+        adapter,
+        _early_bound(dimension, "IDisplayDimension").GetAnnotation(),
+        label=label,
+    )
+
+
+def _visible_hole_table_entities(
+    adapter: Any, view: Any
+) -> tuple[tuple[Any, ...], Any, Any]:
+    """Return hole rims and the rear/left outer edges in the top view.
+
+    The plan corners are broken (CornerFillets R3.18), so no corner vertex
+    exists to anchor the hole table; the caller passes the two outer edges as
+    ``datum_axes`` and the table origin lands on their VIRTUAL intersection --
+    the theoretical sharp corner every LOC value is measured from.
+    """
+    circles, lines = _view_edges(adapter, view)
 
     visible_counterbores = [
         (x_mm, z_mm)
@@ -187,13 +362,17 @@ def _visible_hole_table_entities(
             + abs(z - z_mm / 1000.0)
             + abs(radius - CBORE_DIA / 2000.0)
             <= 5e-5
-            for x, z, radius, _edge in circles
+            for x, _y, z, radius, _edge in circles
         )
     ]
+    # With hidden lines shown in the plan view (drawing-simplicity-policy.md
+    # rule 7) the underside counterbore rims are legitimately reported; the
+    # radius-keyed match below (5e-5 m on a 5 mm radius difference) cannot
+    # confuse them with the through-hole rims, so this is a debug fact, not
+    # the hard failure it was under hidden-lines-removed.
     if visible_counterbores:
-        raise RuntimeError(
-            "underside-only counterbore rims are visible in the top view: "
-            f"{visible_counterbores!r}"
+        _telemetry.debug(
+            f"counterbore rims reported in the plan view: {visible_counterbores!r}"
         )
 
     selected_edges: list[Any] = []
@@ -210,7 +389,7 @@ def _visible_hole_table_entities(
                 index,
                 edge,
             )
-            for index, (x, z, radius, edge) in enumerate(circles)
+            for index, (x, _y, z, radius, edge) in enumerate(circles)
             if index not in used
         )
         if not candidates or candidates[0][0] > 5e-5:
@@ -224,66 +403,14 @@ def _visible_hole_table_entities(
         used.add(index)
         selected_edges.append(edge)
 
-    datum_b_candidates = [
-        edge
-        for parameters, edge in lines
-        if abs(parameters[2] - BOTTOM_REAR_Z / 1000.0) <= 2e-6
-        and abs(parameters[3]) >= 0.99
-    ]
-    datum_c_candidates = [
-        edge
-        for parameters, edge in lines
-        if abs(parameters[0] + BOTTOM_LENGTH / 2000.0) <= 2e-6
-        and abs(parameters[5]) >= 0.99
-    ]
-    if not datum_b_candidates or not datum_c_candidates:
-        raise RuntimeError(
-            "harmonic-base plan is missing a visible outer B/C datum edge"
-        )
-
-    return (
-        tuple(selected_edges),
-        datum_b_candidates[0],
-        datum_c_candidates[0],
+    rear_edge = _line_edge(
+        lines, label="rear outer edge", along="x", z_mm=BOTTOM_REAR_Z
+    )
+    left_edge = _line_edge(
+        lines, label="left outer edge", along="z", x_mm=-BOTTOM_LENGTH / 2.0
     )
 
-
-def _visible_side_datum_edges(adapter: Any, view: Any) -> tuple[Any, Any]:
-    """Return the finished underside A and top-pad face edges in the side view."""
-    components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
-    candidates: list[tuple[float, Any]] = []
-    for component in components:
-        edges = (
-            adapter._attempt(
-                lambda c=component: view.GetVisibleEntities2(c, 1),
-                default=(),
-            )
-            or ()
-        )
-        for edge in edges:
-            edge = _early_bound(edge, "IEdge")
-            curve = _early_bound(edge.GetCurve(), "ICurve")
-            if not curve.IsLine():
-                continue
-            parameters = tuple(float(value) for value in curve.LineParams)
-            if abs(parameters[3]) < 0.99:
-                continue
-            candidates.append((parameters[1], edge))
-
-    def _at_height(height_m: float, label: str) -> Any:
-        matching = [edge for y, edge in candidates if abs(y - height_m) <= 2e-6]
-        if not matching:
-            raise RuntimeError(
-                f"harmonic-base side view has no visible {label} edge at "
-                f"model Y={height_m:g} m"
-            )
-        return matching[0]
-
-    # The side silhouette's top edge is the raised rim's top (RIM_TOP), not the
-    # deck: the deck sits LIP_H below it inside the rim.
-    return _at_height(0.0, "underside datum A"), _at_height(
-        RIM_TOP / 1000.0, "rim top"
-    )
+    return (tuple(selected_edges), rear_edge, left_edge)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -330,133 +457,161 @@ async def build(adapter: Any) -> dict[str, str]:
     # which shifts every coordinate-based pick on it.
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 2))
     side = place_view(adapter, str(SOURCE), "*Front", *SIDE_CENTER, scale=(1, 4))
+    # Hidden lines ON in every orthographic view: the plan shows the underside
+    # counterbores and the blind seats' depths, the elevation the hole depths.
     for view in (top, side):
-        set_hidden_lines_removed(adapter, view)
+        set_hidden_lines_visible(adapter, view)
 
     curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
+    curate_view_dimensions(adapter, side, keep=SIDE_KEEP, view_label="side")
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the base hole pattern")
 
-    hole_entities, datum_b_edge, datum_c_edge = _visible_hole_table_entities(
+    hole_entities, rear_edge, left_edge = _visible_hole_table_entities(
         adapter, top
     )
-    datum_a_edge, top_pad_edge = _visible_side_datum_edges(adapter, side)
 
     # One complete hole table: four underside counterbores followed by every
-    # top-side blind swing/pinion seat. Non-basic X/Y headers let the title-block
-    # tolerance govern A1-A4; note 4 supplies the tighter seat-only tolerance.
+    # top-side blind swing/pinion seat, every station under the title-block
+    # tolerance (ordinary X LOC / Y LOC headers, no position frame to feed).
     insert_hole_table(
         adapter,
         top,
         datum_xy=_DATUM_XY,
         hole_points=tuple(_hole_rim(x, z, diameter) for x, z, diameter in ALL_HOLES),
-        datum_axes=(datum_b_edge, datum_c_edge),
+        datum_axes=(rear_edge, left_edge),
         hole_entities=hole_entities,
         # Every printed LOC is re-derived from the shared stations: X from the
-        # C face (x = -L/2), Y from the B face (z = +W/2) -- proven against
-        # the seat (A1 stop, B1 pivot, E1-E4 lags all exact).
+        # left end (x = -L/2), Y from the rear face (z = +W/2) -- proven
+        # against the seat (A1 stop, B1 pivot, E1-E4 lags all exact).
         expected_locations_mm=tuple(
             (x + BOTTOM_LENGTH / 2.0, BOTTOM_WIDTH / 2.0 - z)
             for x, z, _diameter in ALL_HOLES
         ),
         anchor_xy=HOLE_TABLE_ANCHOR,
-        basic_locations=True,
+        basic_locations=False,
         label="harmonic-base mounting",
     )
-    add_datum_feature(
+
+    # Plan: the rim width between the pad's right edge and the rim's inner
+    # edge (text outside, left of the pad's extension line so no dimension
+    # line sits under the TopLen/BottomLen extension lines), and the three
+    # concentric corner radii on the two corners with sheet room outside the
+    # plate (each text inside its arc's own quadrant, distinct angles).
+    plan_circles, plan_lines = _view_edges(adapter, top)
+    pad_right = _line_edge(
+        plan_lines, label="pad right edge", along="z", x_mm=TOP_LENGTH / 2.0
+    )
+    rim_inner_right = _line_edge(
+        plan_lines,
+        label="rim inner right edge",
+        along="z",
+        x_mm=TOP_LENGTH / 2.0 - LIP_W,
+    )
+    _dimension_entities(
+        adapter,
+        top,
+        (rim_inner_right, pad_right),
+        text_xy=RIM_WIDTH_TEXT_XY,
+        orientation="horizontal",
+        label="rim width",
+    )
+    # The reveal off the flange end, chained onto the rim width (reference:
+    # the pad outline is the controlling size, note 1 centres it).  Picked in
+    # the plan on the chamfers' lower edges -- the elevation's end faces are
+    # bounded only by tangent edges to the corner fillets.
+    flange_right = _line_edge(
+        plan_lines, label="flange right edge", along="z", x_mm=BOTTOM_LENGTH / 2.0
+    )
+    reveal = _dimension_entities(
+        adapter,
+        top,
+        (pad_right, flange_right),
+        text_xy=REVEAL_TEXT_XY,
+        orientation="horizontal",
+        label="pad reveal reference",
+    )
+    _reference(adapter, reveal, label="pad reveal reference")
+    _dimension_entities(
+        adapter,
+        top,
+        (
+            _corner_arc(
+                plan_circles,
+                radius_mm=FLANGE_CORNER_R,
+                x_sign=1.0,
+                z_sign=-1.0,
+                label="flange NE corner",
+            ),
+        ),
+        text_xy=FLANGE_RADIUS_TEXT_XY,
+        orientation="smart",
+        label="flange corner radius",
+    )
+    _dimension_entities(
+        adapter,
+        top,
+        (
+            _corner_arc(
+                plan_circles,
+                radius_mm=PAD_CORNER_R,
+                x_sign=1.0,
+                z_sign=1.0,
+                label="pad SE corner",
+            ),
+        ),
+        text_xy=PAD_RADIUS_TEXT_XY,
+        orientation="smart",
+        label="pad corner radius",
+    )
+    _dimension_entities(
+        adapter,
+        top,
+        (
+            _corner_arc(
+                plan_circles,
+                radius_mm=RIM_INNER_R,
+                x_sign=1.0,
+                z_sign=1.0,
+                label="rim inner SE corner",
+            ),
+        ),
+        text_xy=RIM_RADIUS_TEXT_XY,
+        orientation="smart",
+        label="rim inner corner radius",
+    )
+
+    # Elevation: the overall height (reference: flange + pad + rim) and the
+    # rim's pocket depth below its top.  The deck plane (STACK_HEIGHT) is
+    # behind the front rim wall, so the pad thickness and the pocket depth
+    # both terminate on its hidden edge -- a section would show it cleanly;
+    # flagged for the eye pass.
+    _side_circles, side_lines = _view_edges(adapter, side)
+    underside = _line_edge(side_lines, label="underside edge", along="x", y_mm=0.0)
+    rim_top = _line_edge(side_lines, label="rim top edge", along="x", y_mm=RIM_TOP)
+    deck = _line_edge(side_lines, label="deck edge", along="x", y_mm=STACK_HEIGHT)
+    overall = _dimension_entities(
         adapter,
         side,
-        # Keep the native datum triangle directly on the visible underside
-        # edge.  The former far-left position produced a long leader that read
-        # like an unattached free-standing tag at print scale.
-        symbol_xy=(0.310, SIDE_CENTER[1] - STACK_HEIGHT / 8000.0),
-        datum="A",
-        label="machined underside datum",
-        entity=datum_a_edge,
-        shoulder=True,
+        (underside, rim_top),
+        text_xy=OVERALL_TEXT_XY,
+        orientation="vertical",
+        label="overall height reference",
     )
-    add_datum_feature(
-        adapter,
-        top,
-        symbol_xy=(0.060, _DATUM_XY[1] - 0.010),
-        datum="B",
-        label="machined long-side datum",
-        entity=datum_b_edge,
-        shoulder=True,
-    )
-    add_datum_feature(
-        adapter,
-        top,
-        symbol_xy=(_DATUM_XY[0] + 0.013, 0.190),
-        datum="C",
-        label="machined left-end datum",
-        entity=datum_c_edge,
-        shoulder=True,
-    )
-    add_feature_control_frame(
-        adapter,
-        top,
-        frame_xy=(0.165, 0.125),
-        characteristic="position",
-        tolerance=GEOMETRIC_TOLERANCES_MM["through-hole true position"],
-        datums=("A", "B", "C"),
-        diameter=True,
-        quantity="E1-E4 DIA 13 THRU",
-        label="through-hole true position",
-        entity=hole_entities[2],
-    )
-    add_feature_control_frame(
-        adapter,
-        top,
-        frame_xy=(0.085, 0.147),
-        characteristic="position",
-        tolerance=GEOMETRIC_TOLERANCES_MM["tapped-hole true position"],
-        datums=("A", "B", "C"),
-        diameter=True,
-        # Tag letters follow each wizard group's first hole in XY order
-        # (swHoleTableTagOrder_XY): A stop, B pivot, C foot, D block, E lags,
-        # F the nameplate seats at x 163.75/209.75 (the east-most group).
-        quantity="A1, B1, C1-C3, D1-D4, F1-F4",
-        label="tapped-hole true position",
-        entity=hole_entities[8],
-    )
-    add_feature_control_frame(
-        adapter,
-        top,
-        frame_xy=(0.075, 0.105),
-        characteristic="perpendicularity",
-        tolerance=GEOMETRIC_TOLERANCES_MM["datum B perpendicularity to A"],
-        datums=("A",),
-        quantity="DATUM B LONG SIDE",
-        label="datum B perpendicularity to A",
-        entity=datum_b_edge,
-    )
-    add_feature_control_frame(
-        adapter,
-        top,
-        frame_xy=(0.022, 0.135),
-        characteristic="perpendicularity",
-        tolerance=GEOMETRIC_TOLERANCES_MM["datum C perpendicularity to A and B"],
-        datums=("A", "B"),
-        quantity="DATUM C LEFT END",
-        label="datum C perpendicularity to A and B",
-        entity=datum_c_edge,
-    )
-    add_feature_control_frame(
+    _reference(adapter, overall, label="overall height reference")
+    _dimension_entities(
         adapter,
         side,
-        frame_xy=(0.365, 0.093),
-        characteristic="parallelism",
-        tolerance=GEOMETRIC_TOLERANCES_MM["top-pad parallelism to A"],
-        datums=("A",),
-        label="top-pad parallelism to A",
-        entity=top_pad_edge,
+        (deck, rim_top),
+        text_xy=RIM_DEPTH_TEXT_XY,
+        orientation="vertical",
+        label="rim pocket depth",
     )
 
     add_property_linked_note(
         adapter, "Manufacturing Notes", 0.016, 0.075, char_height=0.0025
     )
-    add_property_linked_note(adapter, "Side View Note", 0.260, 0.095)
+    add_property_linked_note(adapter, "Side View Note", *SIDE_VIEW_NOTE_XY)
 
     return await finalize_drawing(
         adapter,

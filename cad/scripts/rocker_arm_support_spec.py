@@ -35,9 +35,6 @@ SUPPORT_HOLD_DOWN_XZ = (
     ),
 )
 
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "support mounting-seat flatness": "0.10",
-    "support hole-pattern position": "0.40",
-}
+# No GD&T on the print: a bracket casting is not on the allowlist
+# (cad/docs/drawing-simplicity-policy.md rule 3); the hole table and the
+# block tolerances locate the four taps.
