@@ -163,8 +163,9 @@ _FEED_GEAR_RATIO = (1, 10)  # 12T third gear : 120T reducer disc
 # flattened parts. Bands measured live on a green build, with margin.
 # The channel + drive-train bands scale with the built channel count N (the
 # active_count build-speed knob): channel = 7N + 4 (N×{rocker,rod,bar,lever,spring} + 2
-# shafts + 2 rocker ball-mounts + 2 fulcrum keepers + 2 keeper foot screws
-# + 2 bushings per inter-channel gap), drive-train = 61 + N
+# shafts + 2 rocker brackets + 2 fulcrum keepers + 2 keeper foot screws;
+# 2026-09-02: the 2 spacer bushings per gap are gone -- integral hubs),
+# drive-train = 61 + N
 # (full 20-gear cone stack + crank/structure ≈ 33 -- including the cone swing
 # platform + tip block that joined the pivot post in the p1 swing rework, and
 # the NORTH arbor pedestal + its foot screw (PR8, ch12 img09) -- + the ch25
@@ -182,7 +183,7 @@ _COMPONENT_BAND = {
     # + 4 #10-24 frame-side screws + 1 gooseneck set screw — 2026-08-02 top-frame
     # rederive; plain capped column stubs, NO column nuts)
     "drive-train": (61 + _N_CH - 4, 61 + _N_CH + 4),  # N=20 -> (77,85), expected 81
-    "channel": (8 * _N_CH + 6 - 6, 8 * _N_CH + 6 + 6),  # N=20 -> (160,172), expected 166
+    "channel": (6 * _N_CH + 8 - 6, 6 * _N_CH + 8 + 6),  # N=20 -> (122,134), expected 128
     # (measured 164 pre-remount; 2026-08-02: -2 lever ball-mounts +2 fulcrum
     # keepers +2 keeper foot screws nets +2)
     # The former monolithic output split by function (no per-channel parts here);

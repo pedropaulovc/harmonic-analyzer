@@ -22,7 +22,8 @@ import math
 import sys
 from typing import Any
 
-from rocker_arm_spec import GEOMETRIC_TOLERANCES_MM
+from _gear_drawing_entities import visible_circle_edge
+from rocker_arm_spec import ARM_DEPTH, GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
 from _common import CAD_ROOT, check, run_build
@@ -234,21 +235,38 @@ async def build(adapter: Any) -> dict[str, str]:
         # persistence check for freely positioned annotations.
         position_tolerance_m=0.0001,
     )
-    # Ra on the bore at 6 o'clock, and a position FCF tying the rod-pin hole
-    # to the complete A-B-C datum reference frame.
-    pivot_bottom = _sheet_xy(0.0, _PIVOT_MID_Y - PIVOT_HOLE_DIA / 2.0)
+    # Ra on the bore rim at 7:30 -- oblique to both centre-mark axes like the
+    # datum above: since the integral hub (2026-09-02) the 6 o'clock point on
+    # the bore lies on the centre mark's vertical extension and the coordinate
+    # pick resolved to the hub's O10 rim instead of the O6.5 bore edge. Then a
+    # position FCF tying the rod-pin hole to the complete A-B-C frame.
+    pivot_finish_angle = math.radians(225.0)
+    pivot_bottom = _sheet_xy(
+        pivot_radius * math.cos(pivot_finish_angle),
+        _PIVOT_MID_Y + pivot_radius * math.sin(pivot_finish_angle),
+    )
+    # Pick the bore circle by DIAMETER (the visible-entity walk the cone-gear
+    # drawing uses): a coordinate pick on the concentric O6.5 / O10 rims
+    # resolves to the hub's outer circle within SolidWorks' tolerance.
+    pivot_bore_edge = visible_circle_edge(adapter, front, PIVOT_HOLE_DIA)
     add_surface_finish(
         adapter,
         front,
-        edge_xy=pivot_bottom,
-        symbol_xy=(pivot_bottom[0] + 0.010, pivot_bottom[1] - 0.020),
+        edge_entity=pivot_bore_edge,
+        symbol_xy=(pivot_bottom[0] - 0.012, pivot_bottom[1] - 0.020),
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bore"),
         label="pivot bore finish",
     )
     # Datum B (broad face, on the end view) orients the hole axes; datum C
     # (the +X tip face) clocks rotation about the pivot axis, so the X/Y BASIC
     # coordinates above have an inspectable direction.
-    broad_face = (RIGHT_CENTER[0] - ARM_THICKNESS / 2000.0, RIGHT_CENTER[1])
+    # Datum B on the strap's broad face in the end view, picked ABOVE the hub
+    # band (the O10 hub hides the flank over y 3..13 since 2026-09-02); the
+    # end view is centred on the strap's mid-depth (_PIVOT_MID_Y).
+    broad_face = (
+        RIGHT_CENTER[0] - ARM_THICKNESS / 2000.0,
+        RIGHT_CENTER[1] + (ARM_DEPTH - 1.0 - _PIVOT_MID_Y) / 1000.0  # right view is 1:1,
+    )
     add_datum_feature(
         adapter,
         right,

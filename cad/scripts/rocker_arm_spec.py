@@ -72,6 +72,15 @@ PIVOT_MID_Y = ARM_DEPTH / 2.0  # 8.0
 # rocker_arm_notes.py -- see connecting_rod_notes for the rationale.
 
 
+# Integral pivot hub (2026-09-02 photo re-derive, ch14 p.28 page002_img02 +
+# ch17 p.40): every arm carries its own round boss on both faces at the
+# pivot; neighbouring hubs touch face to face and SET the 7.0565 station
+# pitch -- there are no loose spacer bushings (the 19 `pivot-bushing` parts
+# are retired). OD kept at the old bushing's O10: at d = 0 the amplitude
+# bar's foot cheeks pass 5.63 above the shaft axis, so OD < ~11.25.
+HUB_DIA = 10.0
+HUB_LENGTH = 7.0565  # == machine channels.station_pitch_mm (asserted by the build)
+
 # Manufacturing GD&T limits consumed by the part's drawing projection.
 GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
     "rod-pin hole position": "0.20",

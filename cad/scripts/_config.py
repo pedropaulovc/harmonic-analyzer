@@ -105,6 +105,13 @@ def amplitudes() -> list[float]:
     return [ch["amplitude_mm"] for ch in channels()]
 
 
+def poses() -> dict[str, Any]:
+    """The saved assembly pose configurations (poses.yaml): ``amplitude_fan``
+    (per-channel amplitude_mm + configuration name) and ``sinusoid``
+    (crank_turns + configuration name). Default is never listed here."""
+    return _doc("poses")
+
+
 def machine(*keys: str) -> Any:
     """Walk machine.yaml, e.g. ``machine('gear_train', 'diametral_pitch')``."""
     node: Any = _doc("machine")

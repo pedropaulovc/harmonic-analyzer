@@ -1,9 +1,0 @@
-lever-bushing:
-  number: MHA-040
-  material: UNS C36000 H02 per ASTM B16/B16M-24
-  material_specification: UNS C36000 H02 per ASTM B16/B16M-24
-  finish: turned, deburred, oiled
-  quantity: 19
-  tolerance_class: machined_block
-  fit_class: shaft_in_bushing
-  process: "machined (brass)"

@@ -771,8 +771,8 @@ sections:
         - 'ch14 p.27 (2026-09 re-derive): the shaft rides in two black cast brackets bolted to the support rail, not chrome ball pillars; seated on the support at stack-mid z ±78 so the pivot axis stays 228.6 + 25.2 = 253.8 (`build_pivot_bracket.py`)'
         - scaled
         - med
-      - - Pivot spacer bushings ×19
-        - Ø10 OD × 4.5565 long × Ø6.5 bore (pitch 7.0565 − arm 2.5)
+      - - Rocker-arm pivot hubs (integral; the ×19 spacer bushings are retired 2026-09-02)
+        - Ø10 boss × 7.0565 long on each arm's pivot bore, proud 2.278 of each face; neighbouring hubs touch and set the station pitch (ch14 p.28 page002_img02 + ch17 p.40: no loose bushings anywhere in the stack). Lever fulcrum hubs likewise Ø12 × 7.0565, proud 2.028
         - 'M6.3 geometric ceiling: at d = 0 the bar-foot cheeks pass 5.63 above the shaft axis (contact 261.81 − notch 2.381 − axis 253.8; level rest pose), so OD < ~11.25 — REFUTES the p.27 "Ø~25 barrel" read (those barrels are something else); Ø10 keeps 0.63 clearance'
         - derived
         - med (OD low)

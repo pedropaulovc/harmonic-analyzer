@@ -80,6 +80,7 @@ _BAR_PIN_DIA = 1.994  # #47 drill
 
 FRONT_CENTER = (0.150, 0.155)
 RIGHT_CENTER = (0.295, 0.155)
+TOP_CENTER = (0.150, 0.205)  # above the profile: plate thickness + datum A live here
 ISO_CENTER = (0.360, 0.210)
 
 
@@ -88,6 +89,15 @@ def _sheet_xy(mx: float, my: float) -> tuple[float, float]:
     return (
         FRONT_CENTER[0] + (mx - _BBOX_CX) / 1000.0,
         FRONT_CENTER[1] + my / 1000.0,
+    )
+
+
+def _top_xy(mx: float, mz: float) -> tuple[float, float]:
+    """Sheet (x, y) of a model (x, z) point in the top view (1:1, x aligned
+    with the front view, centred on the plate's mid-thickness)."""
+    return (
+        TOP_CENTER[0] + (mx - _BBOX_CX) / 1000.0,
+        TOP_CENTER[1] + mz / 1000.0,
     )
 
 
@@ -184,8 +194,12 @@ async def build(adapter: Any) -> dict[str, str]:
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(1, 1))
+    # Top view (2026-09-02): the integral O12 x 7.06 fulcrum hub hides the whole
+    # 3 x 9.5 plate section in the end view, so the plate thickness and the
+    # broad-face datum are read here, along the length clear of the hub.
+    top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 4))
-    for view in (right, iso):
+    for view in (right, top, iso):
         set_hidden_lines_removed(adapter, view)
     set_hidden_lines_visible(adapter, front)
 
@@ -202,6 +216,7 @@ async def build(adapter: Any) -> dict[str, str]:
             raise RuntimeError(f"profile dimension {name!r} has no display annotation")
         set_basic_dimension(adapter, display, label=f"profile {name}")
     curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
+    curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
@@ -233,22 +248,26 @@ async def build(adapter: Any) -> dict[str, str]:
     set_basic_dimension(adapter, spring_c2c, label="fulcrum-to-spring c2c")
     _force_dimension_black(spring_c2c, label="fulcrum-to-spring c2c")
 
-    # Section thickness (3.0) + bar height (9.5) on the right end view.
+    # Section thickness (3.0) in the top view at mid-length (clear of the hub);
+    # bar height (9.5) on the front profile at the same station.
+    _mid_x = (BAR_PIN_X + LEVER_SPRING_X) / 2.0 - 60.0  # ~92: between the hub and the tab
     add_edge_dimension(
         adapter,
-        right,
-        p0=(RIGHT_CENTER[0] - LEVER_THICKNESS / 2000.0, RIGHT_CENTER[1]),
-        p1=(RIGHT_CENTER[0] + LEVER_THICKNESS / 2000.0, RIGHT_CENTER[1]),
-        text_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] + 0.028),
+        top,
+        p0=_top_xy(_mid_x, -LEVER_THICKNESS / 2.0),
+        p1=_top_xy(_mid_x, LEVER_THICKNESS / 2.0),
+        text_xy=(_top_xy(_mid_x, 0.0)[0], TOP_CENTER[1] + 0.020),
         label="lever thickness",
+        orientation="vertical",
     )
     bar_height = add_edge_dimension(
         adapter,
-        right,
-        p0=(RIGHT_CENTER[0], RIGHT_CENTER[1] - BAR_TALL / 2000.0),
-        p1=(RIGHT_CENTER[0], RIGHT_CENTER[1] + BAR_TALL / 2000.0),
-        text_xy=(RIGHT_CENTER[0] + 0.024, RIGHT_CENTER[1]),
+        front,
+        p0=_sheet_xy(_mid_x, -BAR_TALL / 2.0),
+        p1=_sheet_xy(_mid_x, BAR_TALL / 2.0),
+        text_xy=(_sheet_xy(_mid_x, 0.0)[0] + 0.022, FRONT_CENTER[1]),
         label="bar height",
+        orientation="vertical",
     )
     set_basic_dimension(adapter, bar_height, label="bar height from datum C")
 
@@ -280,15 +299,12 @@ async def build(adapter: Any) -> dict[str, str]:
     # Complete datum reference frame: A is a broad machined face (primary), B
     # is the functional fulcrum-bore axis (secondary), and C is the top narrow
     # face (tertiary clocking).  The two BASIC hole locations reference A|B|C.
-    broad_face = (
-        RIGHT_CENTER[0] - LEVER_THICKNESS / 2000.0,
-        RIGHT_CENTER[1],
-    )
+    broad_face = _top_xy(_mid_x - 25.0, LEVER_THICKNESS / 2.0)  # the broad face's edge line, top view
     add_datum_feature(
         adapter,
-        right,
+        top,
         edge_xy=broad_face,
-        symbol_xy=(broad_face[0] - 0.018, broad_face[1] - 0.018),
+        symbol_xy=(broad_face[0] - 0.018, broad_face[1] + 0.016),
         datum="A",
         label="broad machined face",
     )
