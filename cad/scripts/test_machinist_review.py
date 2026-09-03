@@ -17,6 +17,7 @@ def test_prompts_exist_and_are_calibrated_to_the_policy() -> None:
     # the title block is the general spec, and over-specification is a defect.
     for text in (part, assembly):
         assert "TITLE BLOCK FIRST" in text
+        assert "do not run commands" in text  # keeps the review blind
         assert "over_specification" in text
         assert "Never pad a category" in text
     assert "loaded gun" in part

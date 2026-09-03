@@ -1,4 +1,10 @@
-"""Cross-sheet offline contracts for the eight current gear drawings."""
+"""Cross-sheet offline contracts for the eight current gear drawings.
+
+Every gear sheet follows cad/docs/drawing-simplicity-policy.md: gears are not
+on the GD&T allowlist (no datums, no frames, no basics), a roughness symbol
+appears only on a bore that RUNS in the assembly, and the notes are at most
+four part-specific lines beside a compact GEAR DATA block.
+"""
 
 from __future__ import annotations
 
@@ -25,30 +31,28 @@ import transgear_pinion_spec
 
 
 SHEETS = (
-    ("alignment-pinion", alignment_pinion_spec),
-    ("cone-gear", cone_gear_spec),
-    ("crank-drive-gear", crank_drive_gear_spec),
-    ("crank-pinion", crank_pinion_spec),
-    ("cylinder-gear", cylinder_gear_spec),
-    ("rack-pinion", rack_pinion_spec),
-    ("transgear-feed-pinion", transgear_feed_pinion_spec),
-    ("transgear-pinion", transgear_pinion_spec),
+    ("alignment-pinion", alignment_pinion_spec, draw_alignment_pinion),
+    ("cone-gear", cone_gear_spec, draw_cone_gear),
+    ("crank-drive-gear", crank_drive_gear_spec, draw_crank_drive_gear),
+    ("crank-pinion", crank_pinion_spec, draw_crank_pinion),
+    ("cylinder-gear", cylinder_gear_spec, draw_cylinder_gear),
+    ("rack-pinion", rack_pinion_spec, draw_rack_pinion),
+    ("transgear-feed-pinion", transgear_feed_pinion_spec, draw_transgear_feed_pinion),
+    ("transgear-pinion", transgear_pinion_spec, draw_transgear_pinion),
 )
 
-DRAWING_MODULES = (
-    draw_alignment_pinion,
-    draw_cone_gear,
-    draw_crank_drive_gear,
-    draw_crank_pinion,
-    draw_cylinder_gear,
-    draw_rack_pinion,
-    draw_transgear_feed_pinion,
-    draw_transgear_pinion,
-)
+# The bores that RUN in the assembly (policy rule 5): the cylinder gear spins
+# free on the cylinder-gear shaft; the reducer disc and the feed pinion locked
+# to it spin free on the transgear stud.  Every other gear is keyed, pressed,
+# soldered or locked to its shaft, so its bore carries no roughness symbol.
+RUNNING_BORE_SHEETS = {"cylinder-gear", "rack-pinion", "transgear-feed-pinion"}
 
-CRANK_PAIR_MODULES = (
-    draw_crank_drive_gear,
-    draw_crank_pinion,
+GDT_HELPERS = (
+    "add_datum_feature(",
+    "add_feature_control_frame(",
+    "set_basic_dimension(",
+    "project_part_pmi(",
+    "visible_tooth_tip_silhouette(",
 )
 
 TITLE_BLOCK_OWNED_NOTE_TEXT = (
@@ -67,16 +71,24 @@ TITLE_BLOCK_OWNED_NOTE_TEXT = (
     " UOS",
 )
 
+# GD&T vocabulary and cross-references that a note must never carry (policy
+# rule 6): a datum letter, a runout, another part's number.
+GDT_NOTE_TEXT = ("DATUM", "RUNOUT", "PERPENDICULAR", "FCF", "MHA-")
+
+
+def _source(module) -> str:
+    return Path(module.__file__).read_text(encoding="utf-8")
+
 
 def test_notes_do_not_repeat_title_block_metadata() -> None:
-    for part_name, spec in SHEETS:
+    for part_name, spec, _module in SHEETS:
         notes = spec.DRAWING_NOTES.upper()
         for duplicate in TITLE_BLOCK_OWNED_NOTE_TEXT:
             assert duplicate not in notes, f"{part_name}: {duplicate}"
 
 
 def test_finish_field_does_not_repeat_generic_edge_break_instruction() -> None:
-    for part_name, _spec in SHEETS:
+    for part_name, _spec, _module in SHEETS:
         finish = str(_config.parts(part_name)["finish"]).upper()
         assert "DEBUR" not in finish, part_name
         assert "REMOVE BURR" not in finish, part_name
@@ -84,7 +96,7 @@ def test_finish_field_does_not_repeat_generic_edge_break_instruction() -> None:
 
 
 def test_notes_do_not_repeat_title_block_quantity() -> None:
-    for part_name, spec in SHEETS:
+    for part_name, spec, _module in SHEETS:
         if part_name == "cone-gear":
             # One of each configuration is essential family-table scope, not a
             # repeat of the per-configuration title-block quantity.
@@ -92,57 +104,93 @@ def test_notes_do_not_repeat_title_block_quantity() -> None:
         assert " REQUIRED" not in spec.DRAWING_NOTES.upper(), part_name
 
 
-def test_bore_annotations_use_explicit_nonconflicting_selectors() -> None:
-    for module in DRAWING_MODULES:
-        source = Path(module.__file__).read_text(encoding="utf-8")
-        assert "bore_edge = visible_circle_edge(" in source, module.__name__
-        if module in CRANK_PAIR_MODULES:
-            assert "edge_xy=bore_top" not in source, module.__name__
-            assert source.count("entity=bore_edge") == 2, module.__name__
-            assert source.count("leader_attach_xy=(") == 1, module.__name__
-            assert "position_tolerance_m=0.080" in source, module.__name__
-            assert "shoulder=True" in source, module.__name__
-            continue
-        assert "edge_xy=bore_top" in source, module.__name__
-        assert "edge_xy=bore_bottom" not in source, module.__name__
-        assert source.count("entity=bore_edge") == 1, module.__name__
-        expected_tolerance = (
-            "position_tolerance_m=0.008"
-            if module.__name__ == "draw_cylinder_gear"
-            else "position_tolerance_m=0.0001"
-        )
-        assert expected_tolerance in source, module.__name__
-        assert "shoulder=True" in source, module.__name__
-
-
-def test_crank_pair_runout_uses_tooth_tip_silhouette_topology() -> None:
-    helper_source = Path(_gear_drawing_entities.__file__).read_text(
-        encoding="utf-8"
-    )
-    # Silhouette kind (4), reached through the shared traced chokepoint rather
-    # than a private GetVisibleEntities2 walk -- see
-    # test_every_gear_sweep_goes_through_the_traced_chokepoint.
-    assert "visible_view_entities(\n        view, 4," in helper_source
-    for module in CRANK_PAIR_MODULES:
-        source = Path(module.__file__).read_text(encoding="utf-8")
-        assert "tooth_tip_silhouette = visible_tooth_tip_silhouette(" in source
-        assert "entity=tooth_tip_silhouette" in source
-
-
-def test_tooth_runout_is_stated_against_the_bore_axis_datum() -> None:
-    for (part_name, spec), module in zip(SHEETS, DRAWING_MODULES, strict=True):
-        if module in CRANK_PAIR_MODULES:
-            source = Path(module.__file__).read_text(encoding="utf-8")
-            assert 'characteristic="circular_runout"' in source, part_name
-            assert 'datums=("A",)' in source, part_name
-            assert 'quantity="TOOTH TIPS"' in source, part_name
-            continue
+def test_notes_are_at_most_four_lines_and_carry_no_gdt() -> None:
+    for part_name, spec, _module in SHEETS:
+        lines = spec.DRAWING_NOTES.split("\n")
+        assert 1 <= len(lines) <= 4, f"{part_name}: {len(lines)} note lines"
+        assert all(line.strip() for line in lines), f"{part_name}: blank note line"
         notes = spec.DRAWING_NOTES.upper()
-        assert (
-            "GEAR TEETH: CIRCULAR RUNOUT 0.05 MAX ABOUT DATUM A, "
-            "MEASURED AT THE TOOTH TIPS" in notes
+        for word in GDT_NOTE_TEXT:
+            assert word not in notes, f"{part_name}: {word}"
+
+
+def test_no_gear_sheet_carries_gdt() -> None:
+    # Gears are not on the drawing-simplicity-policy.md rule-3 allowlist.
+    for part_name, spec, module in SHEETS:
+        source = _source(module)
+        for helper in GDT_HELPERS:
+            assert helper not in source, f"{part_name}: {helper}"
+        assert "GEOMETRIC_TOLERANCES_MM" not in source, part_name
+        assert not hasattr(spec, "GEOMETRIC_TOLERANCES_MM"), part_name
+        assert not hasattr(spec, "GEOMETRIC_CONTROLS"), part_name
+        assert not hasattr(spec, "PART_DATUMS"), part_name
+
+
+def test_roughness_symbols_only_on_running_bores() -> None:
+    for part_name, spec, module in SHEETS:
+        source = _source(module)
+        if part_name in RUNNING_BORE_SHEETS:
+            (control,) = spec.SURFACE_FINISHES
+            assert control.roughness_um == 1.6, part_name
+            assert control.face.diameter_mm == spec.BORE_DIA, part_name
+            assert source.count("add_surface_finish(") == 1, part_name
+            assert "bore_edge = visible_circle_edge(" in source, part_name
+            assert source.count("entity=bore_edge") == 1, part_name
+            assert (
+                f'control=surface_finish_by_key(SURFACE_FINISHES, "{control.key}")'
+                in source
+            ), part_name
+            continue
+        assert spec.SURFACE_FINISHES == (), part_name
+        assert "add_surface_finish(" not in source, part_name
+        assert "visible_circle_edge(" not in source, part_name
+        assert "surface_finish_by_key(" not in source, part_name
+
+
+def test_gear_data_blocks_share_the_compact_row_vocabulary() -> None:
+    for part_name, spec, module in SHEETS:
+        data = spec.GEAR_DATA
+        lines = data.split("\n")
+        assert lines[0] == "GEAR DATA", part_name
+        assert len(lines) <= 12, f"{part_name}: {len(lines)} gear-data lines"
+        for field in (
+            "NUMBER OF TEETH",
+            "DIAMETRAL PITCH",
+            "PRESSURE ANGLE",
+            "PITCH DIAMETER (REF)",
+            "OUTSIDE DIAMETER",
+            "WHOLE DEPTH",
+            "FACE WIDTH",
+            "TOOTH FORM",
+        ):
+            assert field in data, f"{part_name}: {field}"
+        for banned in ("MODULE", "ISO 1328", "BASE-TANGENT", "DATUM", "RUNOUT"):
+            assert banned not in data, f"{part_name}: {banned}"
+        source = _source(module)
+        assert 'adapter, "Gear Data"' in source, part_name
+        assert 'adapter, "Manufacturing Notes"' in source, part_name
+
+
+def test_bore_callouts_name_the_process() -> None:
+    for part_name, spec, module in SHEETS:
+        (callout,) = module.DIMENSION_CALLOUTS.values()
+        assert callout.startswith("REAM THRU"), f"{part_name}: {callout!r}"
+        assert set(module.DIMENSION_CALLOUTS) == set().union(
+            *spec.DRAWING_DIMENSIONS.values()
         ), part_name
-        assert "WITHIN 0.05 TIR" not in notes, part_name
+
+
+def test_hidden_lines_on_in_every_orthographic_view() -> None:
+    for part_name, _spec, module in SHEETS:
+        source = _source(module)
+        assert (
+            "for view in (front, right):\n        set_hidden_lines_visible" in source
+        ), part_name
+        if part_name == "alignment-pinion":
+            assert "set_hidden_lines_removed" not in source, part_name  # no iso
+            continue
+        assert "set_hidden_lines_removed(adapter, iso)" in source, part_name
+        assert source.count("set_hidden_lines_removed(") == 1, part_name
 
 
 def test_every_gear_sweep_goes_through_the_traced_chokepoint() -> None:

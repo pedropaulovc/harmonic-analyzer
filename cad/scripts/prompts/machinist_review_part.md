@@ -62,7 +62,10 @@ WHAT A GOOD PRINT LOOKS LIKE (the standard you hold it to)
   dimension never hurt anyone; a missing one does.
 - Important process facts are flagged from the view, not buried in a note
   block. Notes are few and specific (drill vs ream, stock allowance,
-  centres OK, match-drill at assembly, a loose-supplied set screw).
+  centres OK, match-drill at assembly, a loose-supplied set screw). One
+  line naming the mating part ("MATES WITH ...") is welcome context, not
+  clutter: knowing what a bore receives tells the machinist how careful to
+  be with it.
 - Leaders do not cross each other, cross another view, or cross a dimension
   line; text does not sit on a line; the sheet is readable at arm's length.
 
@@ -79,6 +82,10 @@ Do not invent a requirement because the part "might" need it in a mating
 assembly you cannot see; judge the part as drawn. If the part is
 manufacturable as a blank to be finished at assembly and the print says so,
 that is a valid print.
+
+Work from the attached image alone: do not run commands, scripts or tools
+and do not look for OCR or other software; if a piece of text is too small to
+read with certainty, say so in a clarity finding instead.
 
 Inspect the whole sheet at full resolution before answering: every view, every
 dimension, every callout, every note, the title block and the isometric.

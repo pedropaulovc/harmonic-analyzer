@@ -1286,6 +1286,14 @@ def part_properties(part_name: str) -> dict[str, str]:
     for prop, key in field_map.items():
         if key in reg and reg[key] is not None:
             props[prop] = str(reg[key])
+    # The title block's MATERIAL cell reads $PRPSHEET:"Material". The registry's
+    # ``material`` is the SolidWorks LIBRARY name ("Plain Carbon Steel" on ~30
+    # parts -- fine for rendering, useless for buying stock); the purchasable
+    # grade is ``material_specification``, so the cell shows that when a row
+    # has one (machinist review 2026-09-02: "spans materially different grades
+    # and does not tell the shop what stock to buy").
+    if reg.get("material_specification"):
+        props["Material"] = str(reg["material_specification"])
     return props
 
 
