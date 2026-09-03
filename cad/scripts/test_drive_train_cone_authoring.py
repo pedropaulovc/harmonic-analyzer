@@ -79,13 +79,21 @@ def test_every_cone_configuration_persists_rebuilt_data() -> None:
     initial_save = next(
         index for index, node in enumerate(build.body) if _calls(node, "save_file")
     )
+    close = next(
+        index
+        for index, node in enumerate(build.body)
+        if _calls(node, "CloseAllDocuments")
+    )
+    reopen = next(
+        index for index, node in enumerate(build.body) if _calls(node, "open_model")
+    )
     persistence = build.body.index(sweep)
     final_save = next(
         index
         for index, node in enumerate(build.body)
         if _calls(node, "save_part_and_images")
     )
-    assert initial_save < persistence < final_save
+    assert initial_save < close < reopen < persistence < final_save
 
 
 def test_all_twenty_cones_are_inserted_directly_in_configuration() -> None:

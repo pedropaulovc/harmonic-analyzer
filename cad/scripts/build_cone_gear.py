@@ -837,11 +837,14 @@ async def build(adapter) -> dict[str, str]:
     part_path = (OUT_SLDPRT / f"{PART_NAME}.SLDPRT").resolve()
     part_path.parent.mkdir(parents=True, exist_ok=True)
     check(f"initial save -> {part_path}", await adapter.save_file(str(part_path)))
+    adapter.swApp.CloseAllDocuments(True)
+    adapter.currentModel = None
+    check("reopen configured part", await adapter.open_model(str(part_path)))
 
     # The first Save-As creates the document path but does not preserve rebuilt
-    # data for every non-active configuration. Revisit each configuration after
-    # that boundary, rebuild it, set its rebuild/save mark, then let the normal
-    # in-place save below persist the complete configured family.
+    # data for every non-active configuration. Reopen the saved document, then
+    # revisit each configuration, rebuild it, and set its rebuild/save mark. The
+    # normal in-place save below persists the complete configured family.
     for name, _teeth in CONFIGS:
         activation = await adapter.set_active_configuration(name)
         check(f"persist {name}", activation)
