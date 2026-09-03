@@ -270,7 +270,7 @@ def build_claude_command(
         "--tools",
         "Read",
         "--allowedTools",
-        f"Read({image.name})",
+        *(f"Read({image.name})" for image in images),
         "--restricted",
         "--safe-mode",
         "--no-session-persistence",
@@ -392,6 +392,11 @@ def count_tool_events(
     return _claude_event_evidence(events, allowed_images=allowed_images)[0]
 
 
+def count_codex_tool_events(events: Sequence[dict[str, Any]]) -> int:
+    """Count every Codex tool or command event; blind reviews permit none."""
+    return _claude_event_evidence(events, allowed_images=())[0]
+
+
 def validate_verdict(value: Any) -> dict[str, Any]:
     """Validate the complete repository verdict contract without extra packages."""
     if not isinstance(value, dict):
@@ -450,10 +455,13 @@ def _tag_events(attempt: int, events: Sequence[dict[str, Any]]) -> list[dict[str
 def _write_events(path: Path, events: Sequence[dict[str, Any]]) -> None:
     text = "\n".join(json.dumps(event) for event in events)
     path.write_text(f"{text}\n" if text else "", encoding="utf-8")
+
+
 def is_pass(verdict: dict[str, Any] | None) -> bool:
-    if not verdict or verdict.get("verdict") != "SHIP":
+    verdict = _valid_verdict(verdict)
+    if verdict is None or verdict["verdict"] != "SHIP":
         return False
-    return all(not verdict.get(key) for key in GATING_KEYS)
+    return all(not verdict[key] for key in GATING_KEYS)
 
 
 def _parse_events(stdout: str) -> list[dict[str, Any]]:
@@ -640,7 +648,7 @@ def review_package(
             "images_read": sorted(path.name for path in read_images),
         }
     else:
-        tool_events = count_tool_events(events)
+        tool_events = count_codex_tool_events(events)
         inspection_proven = True
         extra = {}
     blind = tool_events == 0 and inspection_proven
@@ -686,8 +694,8 @@ def render_markdown(review: Review) -> str:
         "",
         f"- kind: {review.kind}",
         f"- sheets: {review.sheet_count}",
-        f"- reviewed: {review.reviewed_at} by {review.model} ({review.effort}), "
-        f"{review.duration_s}s, attempts {review.attempts}",
+        f"- reviewed: {review.reviewed_at} by {review.reviewer}/{review.model} "
+        f"({review.effort}), {review.duration_s}s, attempts {review.attempts}",
         f"- blind: {review.blind} (tool events: {review.tool_events})",
         f"- source sha256: {source_hashes}  prompt sha256: {review.prompt_sha256[:12]}",
     ]
