@@ -146,10 +146,13 @@ Run (SolidWorks already open)::
 from __future__ import annotations
 
 import math
+import os
 import sys
 
 import _config
+import _telemetry
 from _common import (
+    _early_bound,
     apply_custom_properties,
     apply_summary_info,
     check,
@@ -190,13 +193,22 @@ from _assembly import (
     reset_dof_manifest,
     save_assembly_and_images,
     suspend_automatic_assembly_rebuilds,
+    whats_wrong,
     write_dof_manifest,
 )
 from _interference_contracts import allowed_interference_pairs
+
+# CopyWithMates2 helpers for the cylinder-gear ladder. Importing _cwm folds
+# it into THIS assembly's recipe/cache key -- intended.
 from _cwm import (  # noqa: E402
     component_constrained_status,
     component_mate_count,
+    component_mate_dump,
+    copy_with_mates,
+    external_mate_rows,
+    mates_with_owners,
     put_component_pose,
+    resolve_entity,
 )
 
 ASM_NAME = "drive-train"
@@ -2310,26 +2322,29 @@ async def build(adapter) -> dict[str, str]:
     # debugging iterations (20 = the full machine, the default). Cone gears
     # 0..19 above stay; cone gears active_count..19 simply mesh nothing (they
     # remain keyed to the cone shaft, fully defined, harmless).
-    #
-    # Author every cylinder directly. CopyWithMates2 produced an assembly that
-    # rebuilt in memory but reopened with swFeatureErrorUnknown on every
-    # non-T120 cone component. Direct components with the same locator and gear
-    # mates survive the save/close/reopen reconciliation.
+    # Only the station-0 SEED is inserted here; stations 1..19 are REPLICATED
+    # from it in the mate section below with 2-mate CopyWithMates2 (the
+    # fresh-mesh ladder, diagnostics/diag_cwm_cylinder.py): a copy CARRYING
+    # the gear-mesh mate parks 9.12 deg off in the mesh's stored phase
+    # (measured, stable across rebuilds, and uncorrectable -- through the
+    # coupling any post-copy spin fix would crank the whole free train), so
+    # the mesh is never copied; each station's is authored fresh instead.
+    # Flip the asymmetric gear/cam sandwich about its already-phased local Y
+    # diameter.  Local +Z becomes machine -Z while local +Y (the cam-lobe
+    # phase) is unchanged.  Translating the origin from face centre -1.5 to
+    # face centre +1.5 keeps the 3-mm toothed slab centred on station z_j.
     cylinder_rows = compose_rows(ROT_Y_180, rot_z_rows(-1.5))
-    cyl_gears: list[str] = []
-    for j in range(_config.active_count()):
-        z_j = Z_DRUM0 + Z_PITCH * j
-        cyl_gears.append(
-            await place_component(
-                adapter,
-                "cylinder-gear",
-                [X_DRUM, Y_DRIVE, z_j + DRUM_FACE / 2.0],
-                euler_from_rows(cylinder_rows),
-                cylinder_rows,
-                ground=False,
-                label=f"cylinder-gear {j} (face-centred local-Y flip)",
-            )
+    cyl_gears: list[str] = [
+        await place_component(
+            adapter,
+            "cylinder-gear",
+            [X_DRUM, Y_DRIVE, Z_DRUM0 + DRUM_FACE / 2.0],
+            euler_from_rows(cylinder_rows),
+            cylinder_rows,
+            ground=False,
+            label="cylinder-gear 0 (face-centred local-Y flip seed)",
         )
+    ]
 
     # =================== crank (driven, on-solution) ===========================
     crankshaft = await place_component(
@@ -2874,38 +2889,169 @@ async def build(adapter) -> dict[str, str]:
     # black connecting rods, each riding a cam attached to the gear on its right.
     # Those rods/cams live in the channel subassembly, so on the bare arbor each
     # gear sits one stack PITCH from its neighbour (gear face 3 mm + cam to 6.5 ->
-    # Z_PITCH ~= 7.06). Every cylinder is directly authored and receives fresh
-    # radial, axial, and gear mates. The axial locators retain the star topology:
-    # one world anchor at station 0, then each station j * Z_PITCH from the seed.
-    # Radially each runs free and its cone mesh is the sole rotational constraint.
+    # Z_PITCH ~= 7.06). The axial locators ladder each station j * Z_PITCH off
+    # the SEED's Front Plane -- one anchored reference + one meaningful pitch
+    # constant; only gear 0 anchors the stack's reference end to the world
+    # datum. Radially each runs free (coincident, leaving its spin) and meshes
+    # its cone gear k at ratio [120-6k : 120] -- the gear mate is the sole
+    # rotational constraint, so it holds the tuned tooth phase without nudging
+    # the gear (validated keystone, M6).
+    # Station 0 (the seed) gets its two authored locators; stations 1..19 are
+    # 2-mate COPIES of it laddered off its anchor plane via Repeat=False +
+    # NewEntityToMateTo, then their spin PUT at design -- the copy parks
+    # ~9.12 deg off (parked-pose wander), and with no spin-referencing mate
+    # copied a plain Transform2 put holds through rebuilds. Every station's
+    # gear mesh (the seed's included) is authored FRESH afterwards: it records
+    # the tuned tooth phase from the current pose and carries its per-station
+    # ratio natively -- no tree walk, no ratio edit. (Measured: copy ~1.2 s +
+    # put ~0.1 s + fresh mesh ~2.5 s vs ~7.8 s per authored station --
+    # diagnostics/diag_cwm_cylinder.py + the 2026-07-10 validation build.)
     seed_cyl = cyl_gears[0]
-    for j, cyl in enumerate(cyl_gears):
-        cyl_o = _org(adapter, cyl)
-        await coincident_mate(
-            adapter,
-            named_ref(f"Axis2@{cyl}", "AXIS"),
-            named_ref(f"Axis1@{arbor}", "AXIS"),
-            label=f"cylinder-gear {j} radial",
-            verify=(cyl, cyl_o),
+    seed_cyl_o = _org(adapter, seed_cyl)
+    await coincident_mate(
+        adapter,
+        named_ref(f"Axis2@{seed_cyl}", "AXIS"),
+        named_ref(f"Axis1@{arbor}", "AXIS"),
+        label="cylinder-gear 0 radial",
+        verify=(seed_cyl, seed_cyl_o),
+    )
+    await distance_driver(  # anchor the stack's reference end once
+        adapter,
+        named_ref(f"Front Plane@{seed_cyl}", "PLANE"),
+        named_ref("Front Plane", "PLANE"),
+        seed_cyl_o[2],
+        label=f"cylinder-gear 0 axial anchor d={abs(seed_cyl_o[2]):.2f}",
+        verify=(seed_cyl, seed_cyl_o),
+    )
+    # Slot audit, two layers (codex #240; a full MateGroup tree walk here
+    # would cost ~100 s, more than the cylinder ladder saves). Layer 1, SHAPE
+    # (cheap, one IComponent2::GetMates): the
+    # seed slice must be exactly the two mates above with the dim second.
+    # GetMates order is not the CopyWithMates2 slot contract (that is
+    # MateGroup tree order), so layer 2 validates the ACTUAL slot source at
+    # runtime: every copy's pre-put translation is checked in the loop below
+    # -- a mis-slotted Values array re-values the live dim to 0.0 (the _cwm
+    # contract) and the copy lands on station 0, failing copy 1 immediately.
+    dump = component_mate_dump(adapter, seed_cyl)
+    if len(dump) != 2 or dump[0]["mm"] is not None or dump[1]["mm"] is None:
+        raise RuntimeError(
+            f"cylinder seed slice drifted: {dump} -- expected"
+            " [dimension-less radial, axial dim]; re-derive the ladder's"
+            " slot map before replicating"
         )
-        if j == 0:
-            await distance_driver(
-                adapter,
-                named_ref(f"Front Plane@{cyl}", "PLANE"),
-                named_ref("Front Plane", "PLANE"),
-                cyl_o[2],
-                label=f"cylinder-gear 0 axial anchor d={abs(cyl_o[2]):.2f}",
-                verify=(cyl, cyl_o),
+    cylinder_dim_slot = 1
+    if os.environ.get("HARMONIC_CYLINDER_SLOT_DEBUG"):
+        rows = mates_with_owners(adapter, {"cylinder-gear", "cylinder-gear-shaft"})
+        seed_rows = [row for row in rows if seed_cyl in row["instances"]]
+        external = external_mate_rows(seed_rows, {seed_cyl})
+        dim_slots = [
+            i for i, row in enumerate(external) if row["type"] == "MateDistanceDim"
+        ]
+        log(
+            "  DEBUG cylinder external slots: "
+            f"{[(row['name'], row['type'], sorted(row['owners'])) for row in external]}"
+        )
+        if len(external) != 2 or len(dim_slots) != 1:
+            raise RuntimeError(
+                "cylinder debug slot survey expected two external mates and one dim;"
+                f" got {[(row['name'], row['type']) for row in external]}"
             )
-            continue
-        await distance_driver(
-            adapter,
-            named_ref(f"Front Plane@{cyl}", "PLANE"),
-            named_ref(f"Front Plane@{seed_cyl}", "PLANE"),
-            j * Z_PITCH,
-            label=f"cylinder-gear {j} axial from seed d={j * Z_PITCH:.2f}",
-            verify=(cyl, cyl_o),
-        )
+        cylinder_dim_slot = dim_slots[0]
+    seed_cyl_arr = list(component_transform(adapter, seed_cyl))
+    # Every copy's axial slot re-points at the SEED's Front Plane, laddered
+    # j * Z_PITCH -- ONE resolve_entity for the whole drum (re-resolving the
+    # previous station per copy measured ~1.5 s x 19, half the ladder's win)
+    # The face-centred Ry180 changes the distance side: with alignment repaired,
+    # FlipDimension=True lands copy 1 at seed-Z - pitch instead of + pitch, so
+    # this ladder's measured side is False. The authored seed mate references
+    # the assembly Front Plane (+Z), while each copy re-points that slot to the
+    # Ry180 seed's Front Plane (-Z). The reference normal changed, so
+    # CopyWithMates2 also needs FlipAlignment=True.
+    # Without it SolidWorks creates red Distance32, code 47, reporting reversed
+    # plane alignment; changing FlipDimension alone leaves the same 5.597 mm miss.
+    seed_front = resolve_entity(adapter, named_ref(f"Front Plane@{seed_cyl}", "PLANE"))
+    pending_cylinder_puts: list[tuple[str, list[float]]] = []
+    with _telemetry.span("cylinder.replicate", copies=_config.active_count() - 1):
+        for j in range(1, _config.active_count()):
+            values = [0.0, 0.0]
+            values[cylinder_dim_slot] = j * Z_PITCH / 1000.0
+            repeat = [True, True]
+            repeat[cylinder_dim_slot] = False
+            new_entities: list = [None, None]
+            new_entities[cylinder_dim_slot] = seed_front
+            flips = [False, False]
+            flip_alignments = [False, False]
+            flip_alignments[cylinder_dim_slot] = True
+            copy_with_mates(
+                adapter,
+                [seed_cyl],
+                2,
+                values,
+                flips=flips,
+                flip_alignments=flip_alignments,
+                repeat=repeat,
+                new_entities=new_entities,
+            )
+            new_name = f"cylinder-gear-{j + 1}"
+            if (
+                _early_bound(adapter.currentModel, "IAssemblyDoc").GetComponentByName(
+                    new_name
+                )
+                is None
+            ):
+                raise RuntimeError(
+                    f"cylinder-gear copy {j}: expected deterministic instance"
+                    f" {new_name!r} after CopyWithMates2, but it is absent"
+                )
+            # Layer-2 slot validation, BEFORE the put (which would mask the
+            # translation until the closing solve snapped it back): the copy
+            # must land translation-exact on its station off the re-valued
+            # axial dim alone. A wrong slot/side lands it on station 0 or
+            # 2 * the dim off -- fail on copy 1, naming the cause.
+            got = list(component_transform(adapter, new_name))
+            want = [
+                seed_cyl_arr[9] * 1000.0,
+                seed_cyl_arr[10] * 1000.0,
+                seed_cyl_arr[11] * 1000.0 + j * Z_PITCH,
+            ]
+            err = math.dist([v * 1000.0 for v in got[9:12]], want)
+            if err > 0.05:
+                # CopyWithMates2 returns no usable status. Ask the same API
+                # behind What's Wrong only on the failure path, so the build
+                # names a red mate and its swFeatureError_e immediately without
+                # adding a document scan to every successful copy. IMate2's
+                # state dump distinguishes alignment from dimension-side errors.
+                hard_errors = [
+                    (name, code)
+                    for name, code, is_warning in whats_wrong(
+                        adapter, adapter.currentModel
+                    )
+                    if not is_warning
+                ]
+                mate_state = component_mate_dump(adapter, new_name)
+                raise RuntimeError(
+                    f"cylinder-gear copy {j} landed {err:.3f} mm off its"
+                    f" station pre-put: got {[round(v * 1000.0, 3) for v in got[9:12]]},"
+                    f" want {[round(v, 3) for v in want]}, dim slot"
+                    f" {cylinder_dim_slot}; SolidWorks hard errors"
+                    f" {hard_errors or 'none'}, copied mate state {mate_state} --"
+                    " the CopyWithMates2 slot order on"
+                    " this seat/model does not match the audited"
+                    " [radial, axial dim] map (or the flip side moved);"
+                    " re-derive the slot map (external_mate_rows)"
+                )
+            put = list(seed_cyl_arr)
+            put[11] += j * Z_PITCH / 1000.0
+            pending_cylinder_puts.append((new_name, put))
+            cyl_gears.append(new_name)
+        # Let every CopyWithMates2 call finish before correcting the copies'
+        # unconstrained spin. A later copy used to wake the solver and wander
+        # earlier transforms, so the v0.20.0 ladder paid for repeated corrections.
+        # Transform the complete bank once, then author the fresh gear mates below.
+        with _telemetry.span("cylinder.pose_bank", copies=len(pending_cylinder_puts)):
+            with suspend_automatic_assembly_rebuilds(adapter):
+                for name, put in pending_cylinder_puts:
+                    put_component_pose(adapter, name, put)
     gear_mates_batch(
         adapter,
         (
@@ -2919,18 +3065,21 @@ async def build(adapter) -> dict[str, str]:
         ),
         label="cylinder.mesh_bank",
     )
-    seed_cyl_arr = list(component_transform(adapter, seed_cyl))
-    # Validate the directly authored star topology: pose, complete mate set,
-    # and the seed's constrained reading (the drum rides the freed crank train).
-    # Every station carries three mates (radial + axial + mesh); each non-seed
-    # axial mate also references the seed, so the seed sees one mate per station.
+    # Validate the production way and re-anchor the pose ledger (copies were
+    # never place_component'd): pose on the seed's transform one stack pitch
+    # per station -- rotation included, the put-held tooth phase -- full mate
+    # set, and the seed's own constrained reading (the drum rides the freed
+    # crank train, so a correctly mated copy reads whatever the seed reads).
+    # Mate-count expectation follows the STAR topology: every copy carries
+    # its own 3 mates (radial + axial + mesh), each copy's axial references
+    # the SEED's anchor plane -- so the seed reads 3 + one per copy.
     want_seed = 3 + (len(cyl_gears) - 1)
     seed_cyl_mates = component_mate_count(adapter, seed_cyl)
     if seed_cyl_mates != want_seed:
         raise RuntimeError(
             f"{seed_cyl}: {seed_cyl_mates} mates, expected {want_seed}"
             " (radial + axial anchor + fresh mesh + one laddered axial"
-            " per station)"
+            " per copy)"
         )
     seed_cyl_status = component_constrained_status(adapter, seed_cyl)
     for j, cyl in enumerate(cyl_gears):
@@ -2951,13 +3100,13 @@ async def build(adapter) -> dict[str, str]:
         if got != 3:
             raise RuntimeError(
                 f"{cyl}: {got} mates, expected 3 (radial + laddered axial"
-                " + fresh mesh) -- the direct authoring dropped or grew mates"
+                " + fresh mesh) -- the copy dropped or grew mates"
             )
         status = component_constrained_status(adapter, cyl)
         if status != seed_cyl_status:
             raise RuntimeError(
                 f"{cyl}: constrained status {status}, seed reads"
-                f" {seed_cyl_status} -- a direct mate is unsolvable"
+                f" {seed_cyl_status} -- a copied or fresh mate is unsolvable"
                 " or over-defining"
             )
         reledger_to_solved(adapter, cyl)

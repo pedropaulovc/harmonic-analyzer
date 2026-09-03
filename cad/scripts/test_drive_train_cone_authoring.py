@@ -112,28 +112,31 @@ def test_all_twenty_cones_are_inserted_directly_in_configuration() -> None:
     assert ast.dump(append.args[0]) == ast.dump(_expression("(teeth, cg)"))
 
 
-def test_cones_and_cylinders_never_use_copy_with_mates_or_config_switches() -> None:
+def test_cones_never_use_copy_with_mates_or_configuration_switching() -> None:
     build = _function("build")
     assert not any(
         isinstance(node, ast.Attribute) and node.attr == "ReferencedConfiguration"
         for node in ast.walk(build)
     )
     assert not any(
-        isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Name)
-        and node.func.id == "copy_with_mates"
-        for node in ast.walk(build)
+        isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name == "_force_rebuild_after_cone_replication"
+        for node in _TREE.body
     )
 
-    cylinder_loop = next(
+    copy_calls = [
         node
-        for node in build.body
-        if isinstance(node, ast.For)
-        and ast.dump(node.iter) == ast.dump(_expression("range(_config.active_count())"))
-        and _calls(node, "place_component")
+        for node in ast.walk(build)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "copy_with_mates"
+    ]
+    assert copy_calls, "the unchanged cylinder replication contract disappeared"
+    assert all(
+        len(call.args) > 1
+        and ast.dump(call.args[1]) == ast.dump(_expression("[seed_cyl]"))
+        for call in copy_calls
     )
-    placement = _named_call(cylinder_loop, "place_component")
-    assert ast.dump(placement.args[1]) == ast.dump(_expression("'cylinder-gear'"))
 
 
 def test_every_authored_cone_is_keyed_before_downstream_gear_coupling() -> None:
