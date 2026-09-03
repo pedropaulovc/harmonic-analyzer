@@ -3027,8 +3027,14 @@ async def reconcile_saved_rebuild_state(
             rebuild_method = "ForceRebuild3(True)"
         sp.set_attribute("rebuild_method", rebuild_method)
         if rebuilt is False or rebuilt is None:
+            in_mem = saved_rebuild_status(adapter, model)
+            faults = [
+                f"{name} [code={code}, warning={warning}]"
+                for name, code, warning in whats_wrong(adapter, model)
+            ]
             raise RuntimeError(
-                f"{asm_name}: reconcile {rebuild_method} returned {rebuilt!r}"
+                f"{asm_name}: reconcile {rebuild_method} returned {rebuilt!r}; "
+                f"NeedsRebuild2={in_mem}; faults={faults or ['none reported']}"
             )
         result = adapter._attempt(
             lambda: model.Save3(1, 0, 0), default=None

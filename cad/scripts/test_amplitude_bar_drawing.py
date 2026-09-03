@@ -52,26 +52,31 @@ def test_sheet_runs_at_1_to_4_with_1_to_8_isometric() -> None:
 
 def test_end_features_are_documented_in_enlarged_details() -> None:
     # Policy rule 7: at 1:4 the notches and pin hole are edge-on, so three
-    # 4:1 details carry them.  The clipped top stock-face edge is not stable
-    # enough to pick; its offset is stated beside DETAIL A from the shared
-    # spec while the remaining feature dimensions keep semantic edge picks.
+    # 4:1 details carry them. The clipped top stock-face and notch-cheek edges
+    # are not stable enough to pick; their two sizes render beside DETAIL A
+    # from the shared spec while the remaining features keep semantic picks.
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("create_detail_view(") == 3
     for label in ('detail_label="A"', 'detail_label="B"', 'detail_label="C"'):
         assert label in source, label
     assert drawing.DETAIL_SCALE == (4, 1)
-    assert 'place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(1, 4))' in source
+    assert (
+        'place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(1, 4))'
+        in source
+    )
     assert source.count("curate_view_dimensions(") == 3
     assert "curate_view_dimensions(adapter, detail" not in source
-    assert drawing.TOP_CHEEK_OFFSET_NOTE == (
-        f"CHEEK OFFSET {amplitude_bar_spec.NOTCH_OFFSET:.4f}"
+    assert drawing.TOP_NOTCH_GEOMETRY_NOTE == "\n".join(
+        (
+            f"CHEEK OFFSET {amplitude_bar_spec.NOTCH_OFFSET:.4f}",
+            f"NOTCH WIDTH {amplitude_bar_spec.TOP_NOTCH_WIDTH:.4f}",
+        )
     )
-    assert "add_note(adapter, TOP_CHEEK_OFFSET_NOTE, *TOP_CHEEK_OFFSET_NOTE_XY)" in source
-    assert "p0=_detail_a(0.0, _TOP_CHEEK_Y)" not in source
-    assert 'label="top notch cheek offset"' not in source
-    assert source.count("add_edge_dimension(") == 7
+    assert "TOP_NOTCH_GEOMETRY_NOTE," in source
+    assert "p0=_detail_a(NOTCH_OFFSET, _TOP_CHEEK_Y)" not in source
+    assert 'label="top notch width"' not in source
+    assert source.count("add_edge_dimension(") == 6
     for label in (
-        "top notch width",
         "top notch depth",
         "bottom notch cheek offset",
         "bottom notch width",
@@ -86,16 +91,32 @@ def test_end_features_are_documented_in_enlarged_details() -> None:
     assert 'process="#47 DRILL"' in source
     assert "edge_xy=pin_rim_bottom" in source
     # Each detail boundary reaches past the feature it enlarges.
-    assert drawing.DETAIL_MODEL_RADIUS > amplitude_bar_spec.BAR_LENGTH - drawing.TOP_DETAIL_Y
-    assert drawing.TOP_DETAIL_Y - drawing.DETAIL_MODEL_RADIUS < amplitude_bar_spec.TOP_NOTCH_FLOOR_Y
-    assert drawing.TOP_DETAIL_Y - drawing.DETAIL_MODEL_RADIUS < amplitude_bar_spec.TOP_PIN_Y
-    assert drawing.BOTTOM_DETAIL_Y + drawing.DETAIL_MODEL_RADIUS > amplitude_bar_spec.BOTTOM_NOTCH_HEIGHT
+    assert (
+        drawing.DETAIL_MODEL_RADIUS
+        > amplitude_bar_spec.BAR_LENGTH - drawing.TOP_DETAIL_Y
+    )
+    assert (
+        drawing.TOP_DETAIL_Y - drawing.DETAIL_MODEL_RADIUS
+        < amplitude_bar_spec.TOP_NOTCH_FLOOR_Y
+    )
+    assert (
+        drawing.TOP_DETAIL_Y - drawing.DETAIL_MODEL_RADIUS
+        < amplitude_bar_spec.TOP_PIN_Y
+    )
+    assert (
+        drawing.BOTTOM_DETAIL_Y + drawing.DETAIL_MODEL_RADIUS
+        > amplitude_bar_spec.BOTTOM_NOTCH_HEIGHT
+    )
     assert drawing.BOTTOM_DETAIL_Y - drawing.DETAIL_MODEL_RADIUS < 0.0
 
 
 def test_details_stand_clear_of_each_other_and_the_title_block() -> None:
     radius = drawing.DETAIL_MODEL_RADIUS * drawing._D / 1000.0
-    for center in (drawing.DETAIL_A_CENTER, drawing.DETAIL_B_CENTER, drawing.DETAIL_C_CENTER):
+    for center in (
+        drawing.DETAIL_A_CENTER,
+        drawing.DETAIL_B_CENTER,
+        drawing.DETAIL_C_CENTER,
+    ):
         assert center[1] - radius > 0.066 or center[0] + radius < 0.217
     assert drawing.DETAIL_A_CENTER[1] - radius > drawing.DETAIL_B_CENTER[1] + radius
     assert drawing.DETAIL_C_CENTER[0] - radius > drawing.DETAIL_A_CENTER[0] + radius
@@ -119,8 +140,17 @@ def test_notes_are_few_specific_and_never_the_title_block() -> None:
         assert moved not in notes, moved
     # No tolerance in a note, no title-block content, no GD&T prose.
     for banned in (
-        "WITHIN", "UOS", "DIMENSIONS IN", "LINEAR +/-", "+/-", "DATUM", "BASIC",
-        "STEEL", "CHROME", "MHA-", "CENTRED",
+        "WITHIN",
+        "UOS",
+        "DIMENSIONS IN",
+        "LINEAR +/-",
+        "+/-",
+        "DATUM",
+        "BASIC",
+        "STEEL",
+        "CHROME",
+        "MHA-",
+        "CENTRED",
     ):
         assert banned not in notes, banned
     source = Path(drawing.__file__).read_text(encoding="utf-8")
@@ -154,8 +184,7 @@ def test_slide_floor_finish_is_part_owned_authored_and_consumed() -> None:
     assert "author_part_pmi(adapter,surface_finishes=SURFACE_FINISHES)" in part_source
     sheet_source = "".join(Path(drawing.__file__).read_text(encoding="utf-8").split())
     assert (
-        'control=surface_finish_by_key(SURFACE_FINISHES,"slide_floor")'
-        in sheet_source
+        'control=surface_finish_by_key(SURFACE_FINISHES,"slide_floor")' in sheet_source
     )
     assert "roughness_ra=" not in sheet_source
     source = Path(drawing.__file__).read_text(encoding="utf-8")

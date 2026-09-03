@@ -171,14 +171,18 @@ _SLIDE_FLOOR_PICK_X = (
 )  # left part of the floor, clear of the depth pick
 _DEPTH_PICK_X = _INNER_CHEEK_X - 0.6
 
-# DETAIL A's clipped stock-face edge is not reliably selectable.  State the
-# same spec-owned offset beside the view instead of guessing a new pick.
-TOP_CHEEK_OFFSET_NOTE = f"CHEEK OFFSET {NOTCH_OFFSET:.4f}"
-TOP_CHEEK_OFFSET_NOTE_XY = (
+# DETAIL A's stock-face and notch-cheek edges are not reliably selectable.
+# State both spec-owned transverse sizes beside the enlarged geometry.
+TOP_NOTCH_GEOMETRY_NOTE = "\n".join(
+    (
+        f"CHEEK OFFSET {NOTCH_OFFSET:.4f}",
+        f"NOTCH WIDTH {TOP_NOTCH_WIDTH:.4f}",
+    )
+)
+TOP_NOTCH_GEOMETRY_NOTE_XY = (
     _detail_a(NOTCH_OFFSET / 2.0, 0.0)[0],
     _detail_a(_BBOX_CX, BAR_LENGTH)[1] + 0.014,
 )
-TOP_NOTCH_WIDTH_TEXT_Y = _detail_a(_BBOX_CX, BAR_LENGTH)[1] + 0.007
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -268,19 +272,17 @@ async def build(adapter: Any) -> dict[str, str]:
     curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
     curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
 
-    # DETAIL A (top notch): the clipped stock-face cheek is stated from the
-    # shared spec; width remains chained above the end and depth stays right.
-    if add_note(adapter, TOP_CHEEK_OFFSET_NOTE, *TOP_CHEEK_OFFSET_NOTE_XY) is None:
-        raise RuntimeError("failed to add top-notch cheek-offset note")
-    add_edge_dimension(
-        adapter,
-        detail_a,
-        p0=_detail_a(NOTCH_OFFSET, _TOP_CHEEK_Y),
-        p1=_detail_a(_INNER_CHEEK_X, _TOP_CHEEK_Y),
-        text_xy=(_detail_a(_BBOX_CX, 0.0)[0], TOP_NOTCH_WIDTH_TEXT_Y),
-        label="top notch width",
-        orientation="horizontal",
-    )
+    # DETAIL A (top notch): quote the two unreliable transverse edges from the
+    # shared spec; the depth remains a native edge dimension at right.
+    if (
+        add_note(
+            adapter,
+            TOP_NOTCH_GEOMETRY_NOTE,
+            *TOP_NOTCH_GEOMETRY_NOTE_XY,
+        )
+        is None
+    ):
+        raise RuntimeError("failed to add top-notch geometry note")
     add_edge_dimension(
         adapter,
         detail_a,

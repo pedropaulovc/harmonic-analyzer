@@ -223,15 +223,16 @@ def test_strap_bore_tolerance_is_owned_by_the_named_model_dimension() -> None:
     }
 
 
-def test_bore_finish_is_flagged_inside_the_enlarged_bore() -> None:
-    # Resolve the bore by model geometry; the enlarged view's sheet-coordinate
-    # edge pick is not stable after replacing its marked dimensions with a note.
+def test_bore_finish_is_flagged_inside_the_front_view_bore() -> None:
+    # The derived detail exposes no model edges on this seat. Resolve the bore
+    # by geometry in the main view and keep the symbol inside that bore.
     source = _source()
-    assert "visible_circle_edge(adapter, ring_detail, RING_BORE_DIA)" in source
+    assert "visible_circle_edge(adapter, front, RING_BORE_DIA)" in source
     assert "edge_entity=bore_edge" in source
+    assert "visible_circle_edge(adapter, ring_detail" not in source
     symbol_x, symbol_y = drawing.BORE_FINISH_SYMBOL
-    bore_radius = connecting_rod_spec.RING_BORE_DIA / 2.0 * 2.0 / 1000.0
-    center_x, center_y = drawing.RING_DETAIL_CENTER
+    bore_radius = connecting_rod_spec.RING_BORE_DIA / 2.0 / 1000.0
+    center_x, center_y = drawing._FRONT_RING_CENTER
     assert (
         (symbol_x - center_x) ** 2 + (symbol_y - center_y) ** 2
     ) ** 0.5 < bore_radius

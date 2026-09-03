@@ -198,8 +198,8 @@ from _assembly import (
 )
 from _interference_contracts import allowed_interference_pairs
 
-# CopyWithMates2 helpers for the cone-gear ladder (#228). NB importing _cwm
-# folds it into THIS assembly's recipe/cache key -- intended.
+# CopyWithMates2 helpers for the cylinder-gear ladder. Importing _cwm folds
+# it into THIS assembly's recipe/cache key -- intended.
 from _cwm import (  # noqa: E402
     component_constrained_status,
     component_mate_count,
@@ -1917,40 +1917,6 @@ async def _place_on_shaft(
     )
 
 
-def _force_rebuild_after_cone_replication(adapter, model) -> None:
-    """Regenerate all switched cone configurations, then reject real faults.
-
-    Assigning ``ReferencedConfiguration`` dirties the copied component model.
-    ``EditRebuild3`` only updates features already marked dirty in the active
-    assembly configuration and, since the cone-gear PMI regeneration sweep,
-    can report the temporary ``swFeatureErrorUnknown`` state on every copy.
-    One deep ``ForceRebuild3(False)`` after all 19 switches regenerates those
-    child configurations and solves the assembly in the proven health-gate
-    order.  Its boolean remains authoritative: a genuine rebuild failure is
-    diagnosed and rejected, never treated as the known transient.
-    """
-    rebuilt = adapter._attempt(lambda: model.ForceRebuild3(False), default=None)
-    if rebuilt is False or rebuilt is None:
-        faults = whats_wrong(adapter, model)
-        hard_faults = [
-            f"{name} [code={code}]" for name, code, warning in faults if not warning
-        ]
-        warnings = [
-            f"{name} [code={code}]" for name, code, warning in faults if warning
-        ]
-        _telemetry.error(
-            "cone-gear replication rebuild rejected",
-            rebuild_result=repr(rebuilt),
-            hard_faults=hard_faults,
-            warnings=warnings,
-        )
-        raise RuntimeError(
-            "ForceRebuild3 after cone-gear replication returned "
-            f"{rebuilt!r}; hard faults: {hard_faults or ['none reported']}; "
-            f"warnings: {warnings or ['none reported']}"
-        )
-
-
 async def build(adapter) -> dict[str, str]:
     # Reset the free-DOF manifest buffer before any *_driver(free_dof_key=...)
     # call: each freed DOF is recorded (never authored) and persisted below.
@@ -2331,20 +2297,23 @@ async def build(adapter) -> dict[str, str]:
     # derived from the full channel table); only the cylinder drum + its cam
     # followers downstream follow active_count -- the build-speed knob (see
     # machine.yaml channels.active_count / _config.active_count; 20 = full).
-    # Only the T120 SEED is inserted here; stations 1..19 are REPLICATED from
-    # it with CopyWithMates2 in the keying section below (#228) -- the slice is
-    # fully defined (the vendor-blessed copy case, no free-DOF attractor), and
-    # each copy is re-pointed at its own T-configuration post-copy.
-    seed_teeth = _config.cone_teeth(0)
-    seed_cg = await _place_on_shaft(
-        adapter,
-        "cone-gear",
-        SHAFT_T120_STATION + GEAR_AXIS_SHIFT,
-        CONE_FACE,
-        configuration=f"T{seed_teeth:03d}",
-        label=f"cone-gear T{seed_teeth:03d}",
-    )
-    cone_gears: list[tuple[int, str]] = [(seed_teeth, seed_cg)]
+    # Each configured cone gear is inserted directly at its authored station.
+    # Configuration selection happens in AddComponent5, never by mutating
+    # ReferencedConfiguration on an already inserted component.
+    cone_gears: list[tuple[int, str]] = []
+    for j in range(20):
+        teeth = _config.cone_teeth(j)
+        cg = await _place_on_shaft(
+            adapter,
+            "cone-gear",
+            SHAFT_T120_STATION + j * SEAT_PITCH + GEAR_AXIS_SHIFT,
+            CONE_FACE,
+            configuration=f"T{teeth:03d}",
+            label=f"cone-gear T{teeth:03d}",
+        )
+        if teeth in TIP_TEETH:  # the four hard yellow tip gears
+            await apply_component_color(adapter, cg, MUNTZ_YELLOW)
+        cone_gears.append((teeth, cg))
 
     # =================== cylinder drum (driven, free on the arbor) =============
     # Only the first active_count cylinder gears (and, via the channel assembly,
@@ -2782,193 +2751,31 @@ async def build(adapter) -> dict[str, str]:
         cone_axis_dir,
         "64T",
     )
-    # Key the T120 seed, then REPLICATE stations 1..19 from it (#228): one
-    # CopyWithMates2 per station with the axial-seat slot laddered by
-    # SEAT_PITCH, then re-point the copy at its own T-configuration. The
-    # slice is fully defined (3 mates, all external to the shared shaft), so
-    # copies land ON the mates -- no landing recipe needed (contrast the
-    # channel's free-DOF put+driver dance). Measured ~0.7 s/copy vs ~8.7 s
-    # authored (memory/v018-perf-review.md, cone-gear ladder GO).
-    await _key_to_shaft(
-        adapter,
-        seed_cg,
-        "Axis1",
-        cone_axis,
-        cone_shaft,
-        cone_o,
-        cone_axis_dir,
-        f"cone-gear T{seed_teeth:03d}",
-    )
-    # Cheap slot-shape audit (one IComponent2::GetMates, not a 48-second full
-    # MateGroup tree walk): _key_to_shaft just authored [coaxial, axial dim,
-    # anti-spin], all external to the shared shaft.  GetMates order is not by
-    # itself the CopyWithMates2 slot contract, so the first copy's pre-config
-    # landing below is the decisive runtime tripwire for the slot/side map.
-    seed_dump = component_mate_dump(adapter, seed_cg)
-    if len(seed_dump) != 3:
-        raise RuntimeError(
-            f"cone seed slice carries {len(seed_dump)} mates, expected 3: {seed_dump}"
-        )
-    dims = [(i, row) for i, row in enumerate(seed_dump) if row["mm"] is not None]
-    if len(dims) != 1 or dims[0][0] != 1:
-        raise RuntimeError(
-            "cone seed slice drifted: expected [coaxial, axial dim, anti-spin],"
-            f" got {seed_dump}; re-derive the CopyWithMates2 slot map"
-        )
-    dim_slot, seed_dim = dims[0]
-    seed_arr = list(component_transform(adapter, seed_cg))
-    d_seed = sum(
-        (seed_arr[9 + k] * 1000.0 - cone_o[k]) * cone_axis_dir[k] for k in range(3)
-    )
-    if abs(seed_dim["mm"] - abs(d_seed)) > 0.01:
-        raise RuntimeError(
-            f"cone seed axial dim {seed_dim['mm']:.3f} != measured"
-            f" |d|={abs(d_seed):.3f} -- the seat formulation moved"
-        )
-    if d_seed <= 0:
-        raise RuntimeError(
-            f"cone seed axial seat d={d_seed:.2f} -- the ladder assumes"
-            " positive stations marching one way off the shaft's Front"
-            " plane (copies land on the seed's side)"
-        )
-    # The seed authors flip=True on the inclined frame (measured: the first
-    # epoch-3 build failed the old flip=False assert at d=37.30). The Repeat
-    # path RESETS a re-valued dim to flip=False, but the CORRECT idiom re-points
-    # the axial-seat slot with Repeat=false + NewEntityToMateTo (the shared
-    # shaft's Front plane, the same reference the seed's seat uses) and honours
-    # FlipDimension=seed_flip on that slot directly -- so each copy lands on the
-    # seed's side in the copy call itself, no post-copy ModifyDefinition heal
-    # (measured 2026-07-10, MIXED Repeat array; _cwm.py module doc).
-    seed_flip = bool(seed_dim["flipped"])
-    shaft_front = resolve_entity(
-        adapter, named_ref(f"Front Plane@{cone_shaft}", "PLANE")
-    )
-    seed_mates = component_mate_count(adapter, seed_cg)
-    # The status REFERENCE is the seed's own reading, NOT fully-defined: the
-    # cone cluster deliberately rides freed DOF (crank spin, platform swing --
-    # cone-gear is in verify's drive-train allowed-under-constrained set), so
-    # at this build point a correctly keyed gear reads whatever the seed
-    # reads. A copy must merely MATCH it (an unsolvable copied mate flips a
-    # component to over/no-solution without moving it, which a pose read
-    # alone misses).
-    seed_status = component_constrained_status(adapter, seed_cg)
-    with _telemetry.span("cone.replicate", copies=19):
-        for j in range(1, 20):
-            teeth = _config.cone_teeth(j)
-            cfg = f"T{teeth:03d}"
-            values = [0.0] * 3
-            values[dim_slot] = (d_seed + j * SEAT_PITCH) / 1000.0
-            # Re-point ONLY the axial-seat slot to the shared shaft's Front
-            # plane (Repeat=false) so FlipDimension=seed_flip is honoured on it;
-            # the coaxial + anti-spin slots keep the seed's shaft references
-            # (Repeat=true) untouched -- the measured mixed-array idiom.
-            repeat = [True] * 3
-            repeat[dim_slot] = False
-            new_ents: list = [None] * 3
-            new_ents[dim_slot] = shaft_front
-            flips = [False] * 3
-            flips[dim_slot] = seed_flip
-            copy_with_mates(
-                adapter,
-                [seed_cg],
-                3,
-                values,
-                flips=flips,
-                repeat=repeat,
-                new_entities=new_ents,
-            )
-            cg = f"cone-gear-{j + 1}"
-            if (
-                _early_bound(adapter.currentModel, "IAssemblyDoc").GetComponentByName(
-                    cg
-                )
-                is None
-            ):
-                raise RuntimeError(
-                    f"cone-gear copy {j}: expected deterministic instance {cg!r}"
-                    " after CopyWithMates2, but it is absent"
-                )
-            # Validate the CopyWithMates2 slot map before a configuration swap
-            # or later solve can obscure its landing.  Wrong slot/side maps put
-            # copy 1 at the seed station or two axial distances away.
-            got = list(component_transform(adapter, cg))
-            target = [
-                seed_arr[9 + k] * 1000.0 + j * SEAT_PITCH * cone_axis_dir[k]
-                for k in range(3)
-            ]
-            err = math.dist([v * 1000.0 for v in got[9:12]], target)
-            if err > 0.05:
-                raise RuntimeError(
-                    f"cone-gear copy {j} landed {err:.3f} mm off its station"
-                    " pre-config -- the CopyWithMates2 slot order on this"
-                    " seat/model does not match [coaxial, axial dim, anti-spin]"
-                    " (or the flip side moved); re-derive the slot map"
-                )
-            model = adapter.currentModel
-            _early_bound(model, "IAssemblyDoc").GetComponentByName(
-                cg
-            ).ReferencedConfiguration = cfg
-            if teeth in TIP_TEETH:  # the four hard yellow tip gears
-                await apply_component_color(adapter, cg, MUNTZ_YELLOW)
-            cone_gears.append((teeth, cg))
-        # No post-copy flip heal: FlipDimension=seed_flip was honoured in each
-        # copy call (Repeat=false on the axial-seat slot), so the copied dims
-        # already sit on the seed's side. Every ReferencedConfiguration switch
-        # above is now complete; regenerate all changed cone-gear child models
-        # and solve the assembly once before the pose/status/mate-count scan.
-        model = adapter.currentModel
-        _force_rebuild_after_cone_replication(adapter, model)
-    # Validate the production way (CopyWithMates2's return LIES): pose on the
-    # seed's transform translated one seat pitch per station, full mate set,
-    # fully-defined status, the configuration actually taken; then re-anchor
-    # the pose ledger (copies were never place_component'd).
-    for j, (teeth, cg) in enumerate(cone_gears):
-        if j == 0:
-            continue
-        tgt = [
-            seed_arr[9 + k] * 1000.0 + j * SEAT_PITCH * cone_axis_dir[k]
-            for k in range(3)
-        ]
-        assert_component_placed(
+    # Every cone gear was inserted directly in its final configuration and at
+    # its authored station. Key each instance with fresh semantic mates; do not
+    # copy a seed or switch configurations after insertion.
+    for teeth, cg in cone_gears:
+        await _key_to_shaft(
             adapter,
             cg,
-            tgt,
-            [list(seed_arr[0:3]), list(seed_arr[3:6]), list(seed_arr[6:9])],
+            "Axis1",
+            cone_axis,
+            cone_shaft,
+            cone_o,
+            cone_axis_dir,
+            f"cone-gear T{teeth:03d}",
         )
-        got_cfg = str(
-            _early_bound(model, "IAssemblyDoc")
-            .GetComponentByName(cg)
-            .ReferencedConfiguration
-        )
-        if got_cfg != f"T{teeth:03d}":
-            raise RuntimeError(
-                f"{cg}: configuration {got_cfg!r}, expected T{teeth:03d}"
-            )
-        got = component_mate_count(adapter, cg)
-        if got != seed_mates:
-            raise RuntimeError(
-                f"{cg}: {got} mates, seed has {seed_mates} -- the copy dropped mates"
-            )
-        status = component_constrained_status(adapter, cg)
-        if status != seed_status:
-            raise RuntimeError(
-                f"{cg}: constrained status {status}, seed reads"
-                f" {seed_status} -- a copied mate is unsolvable or"
-                " over-defining"
-            )
-        reledger_to_solved(adapter, cg)
     # 16T pinion (keyed to the crank) drives the 64T -> the cone cluster turns.
-    # The cone keying above replicated 19 gears with CopyWithMates2, and a
-    # copy's solve can WANDER the free cone train's spin off its inserted
-    # phase (the cylinder ladder below documents the same parked-pose
-    # wander). The gear mate authored NEXT records the CURRENT relative
-    # phase forever -- and through the 64:16 ratio a 0.5 deg cone wander
-    # misregisters the mesh by 2 deg of pinion seed (2026-07-14
-    # interference-gate catch: 1.1 mm^3, an effective +1.9 deg seed error).
-    # Measure both spins against design and rotate the cone train back so
-    # the mate freezes the DESIGNED phase. The rigid family rotation keeps
-    # every kept mate satisfied (all are family-internal), and the train's
-    # world spin is the deliberately-free DOF, so the solve holds the put.
+    # Solving the 20 freshly authored keyed mate sets can WANDER the free cone
+    # train's spin off its inserted phase. The gear mate authored NEXT records
+    # the CURRENT relative phase forever -- and through the 64:16 ratio a
+    # 0.5 deg cone wander misregisters the mesh by 2 deg of pinion seed
+    # (2026-07-14 interference-gate catch: 1.1 mm^3, an effective +1.9 deg
+    # seed error). Measure both spins against design and rotate the cone train
+    # back so the mate freezes the DESIGNED phase. The rigid family rotation
+    # keeps every authored mate satisfied (all are family-internal), and the
+    # train's world spin is the deliberately-free DOF, so the solve holds the
+    # put.
     _u = (SIN_I, 0.0, COS_I)  # cone axis (world)
     _exd = (COS_I, 0.0, -SIN_I)  # design image of the 64T's part +X
 
@@ -3057,10 +2864,10 @@ async def build(adapter) -> dict[str, str]:
                 f" {_err2:+.4f} deg after the cone-train put (was"
                 f" {_err:+.4f}) -- the free train reverted the pose"
             )
-        # The puts spun the family AFTER its ledger entries were recorded
-        # (insert / the reledger_to_solved above); a correction big enough
-        # to matter (>~0.06 deg of cone spin) would fail the save-time
-        # assert_pose_ledger rotation check as pose drift. Re-anchor them.
+        # The puts spun the family AFTER its direct-insertion ledger entries
+        # were recorded; a correction big enough to matter (>~0.06 deg of cone
+        # spin) would fail the save-time assert_pose_ledger rotation check as
+        # pose drift. Re-anchor them.
         for _nm in [cone_shaft, gear64] + [n for _, n in cone_gears]:
             reledger_to_solved(adapter, _nm)
     await gear_mate(
@@ -3109,9 +2916,9 @@ async def build(adapter) -> dict[str, str]:
         label=f"cylinder-gear 0 axial anchor d={abs(seed_cyl_o[2]):.2f}",
         verify=(seed_cyl, seed_cyl_o),
     )
-    # Slot audit, two layers (codex #240; a MateGroup tree walk here -- the
-    # cone path's external_mate_rows -- would cost ~100 s, more than the
-    # ladder saves). Layer 1, SHAPE (cheap, one IComponent2::GetMates): the
+    # Slot audit, two layers (codex #240; a full MateGroup tree walk here
+    # would cost ~100 s, more than the cylinder ladder saves). Layer 1, SHAPE
+    # (cheap, one IComponent2::GetMates): the
     # seed slice must be exactly the two mates above with the dim second.
     # GetMates order is not the CopyWithMates2 slot contract (that is
     # MateGroup tree order), so layer 2 validates the ACTUAL slot source at

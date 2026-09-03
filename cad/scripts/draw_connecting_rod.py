@@ -154,10 +154,6 @@ def _detail_xy(
     return (center[0] + mu * factor, center[1] + (mv - model_cy) * factor)
 
 
-def _ring_xy(mx: float, my: float) -> tuple[float, float]:
-    return _detail_xy(RING_DETAIL_CENTER, 0.0, RING_DETAIL_SCALE, mx, my)
-
-
 def _head_xy(mx: float, my: float) -> tuple[float, float]:
     return _detail_xy(
         HEAD_DETAIL_CENTER, HEAD_DETAIL_MODEL_CY, HEAD_DETAIL_SCALE, mx, my
@@ -177,13 +173,13 @@ RING_GEOMETRY_NOTE_XY = (
     RING_DETAIL_CENTER[0] + RING_DETAIL_MODEL_RADIUS * 2.0 / 1000.0 + 0.007,
     RING_DETAIL_CENTER[1] + 0.040,
 )
-
-# Ra on the strap bore, flagged INSIDE the bore (the detail's bore is 62 mm
-# across) from its lower-left rim, so the leader crosses nothing.
-BORE_FINISH_EDGE = _ring_xy(
-    -RING_BORE_DIA / 2.0 * 0.7071, -RING_BORE_DIA / 2.0 * 0.7071
+# Ra on the strap bore, attached to the main front view's model rim because
+# SolidWorks exposes no model edges through the derived detail on this seat.
+_FRONT_RING_CENTER = _sheet_xy(0.0, 0.0)
+BORE_FINISH_SYMBOL = (
+    _FRONT_RING_CENTER[0] + 0.008,
+    _FRONT_RING_CENTER[1] + 0.008,
 )
-BORE_FINISH_SYMBOL = (BORE_FINISH_EDGE[0] + 0.012, BORE_FINISH_EDGE[1] + 0.010)
 
 CENTER_DISTANCE_TEXT_XY = (0.125, FRONT_CENTER[1])
 OVERALL_TEXT_XY = (0.105, FRONT_CENTER[1])
@@ -285,12 +281,12 @@ async def build(adapter: Any) -> dict[str, str]:
 
     if add_note(adapter, RING_GEOMETRY_NOTE, *RING_GEOMETRY_NOTE_XY) is None:
         raise RuntimeError("failed to add ring geometry note")
-    # Ra on the strap bore: it runs on the eccentric cam. Resolve the bore by
-    # model geometry because enlarged-view sheet picks shift with note layout.
-    bore_edge = visible_circle_edge(adapter, ring_detail, RING_BORE_DIA)
+    # Ra on the running strap bore. Resolve the rim from the model geometry in
+    # the main front view; the derived detail exposes no model edges.
+    bore_edge = visible_circle_edge(adapter, front, RING_BORE_DIA)
     add_surface_finish(
         adapter,
-        ring_detail,
+        front,
         edge_entity=bore_edge,
         symbol_xy=BORE_FINISH_SYMBOL,
         control=surface_finish_by_key(SURFACE_FINISHES, "strap_bore"),
