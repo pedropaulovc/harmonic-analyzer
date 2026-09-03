@@ -107,9 +107,7 @@ from _holes import (
 from top_frame_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
-    DRAWING_NOTES_B,
     FRONT_VIEW_NOTE,
-    INSPECTION_NOTES,
     OUTER_PROFILE_TOLERANCE_MM,
     TOP_VIEW_NOTE,
 )
@@ -1205,8 +1203,6 @@ async def build(adapter) -> dict[str, str]:
         PART_NAME,
         {
             "Manufacturing Notes": DRAWING_NOTES,
-            "Manufacturing Notes B": DRAWING_NOTES_B,
-            "Inspection Notes": INSPECTION_NOTES,
             "Top View Note": TOP_VIEW_NOTE,
             "Front View Note": FRONT_VIEW_NOTE,
         },

@@ -11,7 +11,7 @@ a thread it does not build.
 from __future__ import annotations
 
 from _fastener_catalog import fastener
-from _fastener_notes import slotted_round_head_notes, thread_control_notes
+from _fastener_notes import slotted_head_notes, thread_length_note
 
 
 _SPEC = fastener("fillister-screw")
@@ -27,39 +27,28 @@ SLOT_D = 0.7
 SHANK_DIA = _SPEC.model_diameter_mm  # #4-40 modeled thread minor diameter
 SHANK_LEN = _SPEC.length_mm  # nominal under-head length
 THREAD = _SPEC.thread  # "#4-40"
-THREAD_DESIGNATION = f"{THREAD} UNC-2A"  # external screw thread, class 2A
+THREAD_DESIGNATION = f"{THREAD} UNC"  # leadered to the shank on the side view
 
-# Two named model diameters, marked for the head-end view; the head-height and
-# under-head length are drawing-native linear dimensions on the side view (the
-# extrude depths carry no named display dim, exactly as the crank-pin slice adds
-# its end diameters natively).
+# The head diameter on the driver-face view; the head height, under-head
+# length and the driver slot (width across the notch, depth into the face)
+# on the profile view, all as marked model dimensions.  The shank cylinder is
+# the modeled thread minor, so it is never dimensioned: the thread leader
+# owns it.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "HeadProfile": {"HeadDia"},
-    "ShankProfile": {"ShankDia"},
     "Head": {"HeadHt"},
     "Shank": {"ShankLg"},
+    "DriverSlotProfile": {"SlotWidth"},
+    "DriverSlot": {"SlotDepth"},
 }
 
+# Notes: thread extent and slot location only -- every size is a dimension
+# and the title block carries every tolerance (cad/docs/
+# drawing-simplicity-policy.md rule 6).
 DRAWING_NOTES = "\n".join(
     (
-        *thread_control_notes(
-            thread=THREAD,
-            thread_designation=THREAD_DESIGNATION,
-            underhead_length_mm=SHANK_LEN,
-            end_face_control="direct",
-        ),
-        *slotted_round_head_notes(
-            head_dia_mm=HEAD_DIA,
-            head_height_mm=HEAD_H,
-            slot_width_mm=SLOT_W,
-            slot_depth_mm=SLOT_D,
-            axis_control_style="native",
-            size_control_style="dimensions",
-        ),
-        "HEAD OD TOTAL RUNOUT 0.10 TIR TO #4-40 THREAD PITCH-DIAMETER AXIS.",
-        "HEAD BEARING FACE PERPENDICULAR 0.10 TO #4-40 THREAD PITCH-DIAMETER AXIS.",
-        "CUSTOM CYLINDRICAL SLOTTED HEAD; B18.6.3 HEAD DIMENSIONS DO NOT APPLY.",
-        "ALL UNSPECIFIED HEAD EDGES PER TITLE BLOCK.",
+        *thread_length_note(thread=THREAD, underhead_length_mm=SHANK_LEN),
+        *slotted_head_notes(),
     )
 )
 END_VIEW_NOTE = "DRIVER-FACE VIEW"

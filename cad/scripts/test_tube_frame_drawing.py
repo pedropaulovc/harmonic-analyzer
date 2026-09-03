@@ -1,4 +1,9 @@
-"""Offline contracts for the tube-frame drawing."""
+"""Offline contracts for the tube-frame drawing.
+
+The print follows cad/docs/drawing-simplicity-policy.md: a tube column
+carries no datum or frame; its OD band and overall-length tolerance ride the
+model dimensions, and its notes are three lines of process fact.
+"""
 
 from __future__ import annotations
 
@@ -8,6 +13,10 @@ import build_tube_frame as part
 import draw_tube_frame as drawing
 import tube_frame_spec
 from _drawing_registry import DRAWINGS_BY_NAME
+
+
+def _source() -> str:
+    return Path(drawing.__file__).read_text(encoding="utf-8")
 
 
 def test_required_drawing_paths() -> None:
@@ -41,47 +50,61 @@ def test_tube_nominals_are_single_sourced() -> None:
     assert abs(tube_frame_spec.CAP_SPHERE_RADIUS - 26.08787878787879) < 1e-9
 
 
-def test_notes_and_native_gdt() -> None:
+def test_notes_are_few_specific_and_never_the_title_block() -> None:
     notes = tube_frame_spec.DRAWING_NOTES
-    assert "STEEL TUBE" not in notes
-    assert "POLISH" not in notes
-    assert "DEBURR" not in notes
-    assert "UOS" not in notes
-    assert "AS-PROCURED STOCK RESULT" in notes
-    assert "NOT AN ACCEPTANCE DIMENSION" in notes
-    assert "DO NOT MACHINE THE ID" in notes
-    assert "FULL-LENGTH CYLINDRICITY CONTROL" in notes
-    assert "ASME RULE 1" in notes
-    assert "FORM DOES NOT OVERRIDE SIZE" in notes
-    assert "AS-RECEIVED OD 25.40 MIN" in notes
-    # Domed top (2026-08-02): orientation is now functional -- cap up; only
-    # the bottom end face keeps a perpendicularity control.
-    assert "ORIENT DOMED (CAPPED) END UP" in notes
-    assert "ONLY THE BOTTOM END FACE" in notes
-    assert "SR26.09 X 3.3 SPHERICAL CAP" in notes
-    assert "TOP/BOTTOM ORIENTATION IS NONFUNCTIONAL" not in notes
-    assert "BORE" not in notes
-    assert "X.XX" not in notes
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    lines = notes.split("\n")
+    assert len(lines) <= 4
+    # Stock allowance, what NOT to machine, and the dome cap: the facts the
+    # views cannot carry.
+    assert "STOCK OD 25.40 MIN" in notes
+    assert "DO NOT MACHINE" in notes
+    assert "SR26.09 X 3.3" in notes
+    assert "CAPPED END UP" in notes
+    for banned in (
+        "STEEL TUBE",
+        "POLISH",
+        "DEBURR",
+        "UOS",
+        "+/-",
+        "TITLE-BLOCK",
+        "ASME RULE",
+        "CYLINDRICITY",
+        "PERPENDICULARITY",
+        "BORE",
+        "X.XX",
+    ):
+        assert banned not in notes, banned
+    source = _source()
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
-    assert source.count("add_datum_feature(") == 1
-    assert source.count("add_feature_control_frame(") == 2
-    assert 'characteristic="cylindricity"' in source
-    assert (
-        tube_frame_spec.GEOMETRIC_TOLERANCES_MM["full-length OD cylindricity"] == "0.03"
-    )
-    assert "tolerance=GEOMETRIC_TOLERANCES_MM['full-length OD cylindricity']" in source
-    assert '"BOTTOM END FACE"' in source
-    assert '"TOP END FACE"' not in source
-    assert "top end perpendicularity" not in tube_frame_spec.GEOMETRIC_TOLERANCES_MM
-    assert source.count('characteristic="perpendicularity"') == 1
+
+
+def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:
+    # drawing-simplicity-policy.md rule 3-5: a tube column is not on the GD&T
+    # allowlist; the OD band is a size tolerance on the model dimension.
+    source = _source()
+    for helper in (
+        "add_datum_feature(",
+        "add_feature_control_frame(",
+        "add_surface_finish(",
+        "set_basic_dimension(",
+        "project_part_pmi(",
+    ):
+        assert helper not in source, helper
+    assert not hasattr(tube_frame_spec, "GEOMETRIC_TOLERANCES_MM")
+    assert tube_frame_spec.OUTER_DIA_BAND == (0.00, -0.05)
+    assert tube_frame_spec.COLUMN_LENGTH_TOLERANCE_MM == 0.25
     assert "set_dimension_callouts" not in source
-    assert source.count("add_surface_finish(") == 0
+
+
+def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
+    source = _source()
+    assert "for view in (length, end):\n        set_hidden_lines_visible" in source
+    assert "set_hidden_lines_removed(" not in source
 
 
 def test_view_scales_are_explicit() -> None:
     assert drawing.SHEET_SCALE == (1.0, 5.0)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    source = _source()
     assert "scale=(1, 5)" in source
     assert "scale=(2, 1)" in source
     assert tube_frame_spec.END_VIEW_NOTE == "END VIEW SCALE 2:1"

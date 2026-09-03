@@ -12,6 +12,10 @@ legible.  A plain polished tube with a domed top is fully described by the
 length view + annulus end view + notes, so no isometric is drawn (it would only
 crowd the tall length view).
 
+The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): a
+tube column carries no datum or frame; the OD band and the overall length
+tolerance ride their model dimensions.
+
 Run with SolidWorks open::
 
     uv run python cad\scripts\draw_tube_frame.py tube-frame
@@ -23,21 +27,16 @@ import argparse
 import sys
 from typing import Any
 
-from tube_frame_spec import GEOMETRIC_TOLERANCES_MM
-
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_feature_control_frame,
     add_property_linked_note,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
     set_dimension_precision,
-    set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
 )
@@ -46,7 +45,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
 )
-from tube_frame_spec import COLUMN_LENGTH, OUTER_DIA
+from tube_frame_spec import OUTER_DIA
 
 
 SPEC = DRAWINGS_BY_NAME["tube_frame"]
@@ -127,9 +126,10 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     length = place_view(adapter, str(SOURCE), "*Front", *LENGTH_CENTER, scale=(1, 5))
     end = place_view(adapter, str(SOURCE), "*Top", *END_CENTER, scale=(2, 1))
-    set_hidden_lines_removed(adapter, end)
-    # The length view carries the bore as greyed hidden lines, so the wall shows.
-    set_hidden_lines_visible(adapter, length)
+    # Hidden lines ON in every orthographic view: the length view carries the
+    # bore as greyed hidden lines, so the wall shows.
+    for view in (length, end):
+        set_hidden_lines_visible(adapter, view)
 
     end_annotations = curate_view_dimensions(
         adapter, end, keep=END_KEEP, view_label="end"
@@ -138,46 +138,6 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_precision(adapter, end_annotations, {"OuterDia": 2})
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the annulus end view")
-
-    end_top = (
-        END_CENTER[0],
-        END_CENTER[1] + OUTER_DIA * END_VIEW_SCALE / 2000.0,
-    )
-    add_datum_feature(
-        adapter,
-        end,
-        edge_xy=end_top,
-        symbol_xy=(END_CENTER[0], END_CENTER[1] + 0.038),
-        datum="A",
-        label="finished OD derived axis",
-    )
-    flank_x = LENGTH_CENTER[0] + OUTER_DIA / 10000.0
-    add_feature_control_frame(
-        adapter,
-        length,
-        edge_xy=(flank_x, LENGTH_CENTER[1]),
-        frame_xy=(0.115, 0.205),
-        characteristic="cylindricity",
-        tolerance=GEOMETRIC_TOLERANCES_MM['full-length OD cylindricity'],
-        quantity="FULL OD LENGTH",
-        label="full-length OD cylindricity",
-        entity_type="SILHOUETTE",
-    )
-    # Only the BOTTOM end face survives as a perpendicularity target: the top
-    # end is the integral dome cap (no planar top face; the notes own the
-    # cap's finish/blend requirement).
-    half_length_on_sheet = COLUMN_LENGTH / 10000.0
-    add_feature_control_frame(
-        adapter,
-        length,
-        edge_xy=(LENGTH_CENTER[0], LENGTH_CENTER[1] - half_length_on_sheet),
-        frame_xy=(0.090, 0.045),
-        characteristic="perpendicularity",
-        tolerance=GEOMETRIC_TOLERANCES_MM["bottom end perpendicularity"],
-        datums=("A",),
-        quantity="BOTTOM END FACE",
-        label="bottom end perpendicularity",
-    )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.115, 0.125)
     add_property_linked_note(adapter, "End View Note", 0.275, 0.162)

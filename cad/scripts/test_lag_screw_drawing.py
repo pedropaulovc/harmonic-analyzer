@@ -1,4 +1,9 @@
-"""Offline contracts for the lag-screw drawing."""
+"""Offline contracts for the lag-screw drawing.
+
+A 9/16-12 black-steel hold-down screw: no datums, frames, roughness symbols
+or basic dimensions (cad/docs/drawing-simplicity-policy.md rules 3-5), three
+lines of note (rule 6), hidden lines on in the profile (rule 7).
+"""
 
 from __future__ import annotations
 
@@ -9,6 +14,10 @@ import draw_lag_screw as drawing
 import lag_screw_spec as spec
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fastener_catalog import fastener
+
+
+def _source() -> str:
+    return Path(drawing.__file__).read_text(encoding="utf-8")
 
 
 def test_required_drawing_paths() -> None:
@@ -35,7 +44,7 @@ def test_catalog_is_the_single_source_of_the_thread() -> None:
     assert spec.THREAD == catalog.thread
     assert spec.SHANK_DIA == catalog.model_diameter_mm
     assert spec.SHANK_LEN == catalog.length_mm
-    assert spec.THREAD_DESIGNATION == f"{catalog.thread} UNC-2A"
+    assert spec.THREAD_DESIGNATION == f"{catalog.thread} UNC"
     assert spec.THREAD_DESIGNATION in spec.DRAWING_NOTES
     assert drawing.DIMENSION_CALLOUTS == {}
 
@@ -52,16 +61,53 @@ def test_lengths_are_marked_extrude_depth_model_dims() -> None:
     assert 'name_dimensions(adapter, "Head", ["HeadHt"])' in part_source
     assert 'name_dimensions(adapter, "Shank", ["ShankLg"])' in part_source
     assert spec.SIDE_VIEW_DIMENSIONS == {"Head": {"HeadHt"}, "Shank": {"ShankLg"}}
-    draw_source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'keep=SIDE_KEEP, view_label="side"' in draw_source
+    assert 'keep=SIDE_KEEP, view_label="side"' in _source()
 
 
-def test_custom_hold_down_note_completely_defines_the_unmodeled_features() -> None:
+def test_notes_are_few_specific_and_never_the_title_block() -> None:
     notes = spec.DRAWING_NOTES
-    assert "FULL THREAD" in notes
-    assert "DRIVER SLOT 2.00 +/-0.10 WIDE X 2.00 +/-0.10 DEEP" in notes
-    assert "COMMERCIAL" not in notes
-    assert "DEBURR" not in notes and "BREAK SHARP" not in notes
+    lines = notes.split("\n")
+    assert len(lines) <= 4
+    assert max(map(len, lines)) < 80
+    assert lines[0] == f"{spec.THREAD_DESIGNATION} THREADED TO THE HEAD; LAST 2 PITCHES MAY BE INCOMPLETE."
+    assert f"SLOT {spec.SLOT_W:.2f} WIDE X {spec.SLOT_D:.2f} DEEP" in notes
+    assert f"{spec.HEAD_DIA:.2f}" not in notes  # a dimension, not a note
+    for banned in (
+        "UOS",
+        "DIMENSIONS IN",
+        "+/-",
+        "DATUM",
+        "PERPENDICULAR",
+        "RUNOUT",
+        "ASME",
+        "B18",
+        "DEBURR",
+        "BREAK SHARP",
+        "TITLE BLOCK",
+        "COMMERCIAL",
+    ):
+        assert banned not in notes, banned
+
+
+def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:
+    source = _source()
+    for helper in (
+        "add_datum_feature(",
+        "add_feature_control_frame(",
+        "add_surface_finish(",
+        "set_basic_dimension(",
+        "project_part_pmi(",
+    ):
+        assert helper not in source, helper
+    assert not hasattr(spec, "GEOMETRIC_TOLERANCES_MM")
+    assert not hasattr(spec, "SURFACE_FINISHES")
+
+
+def test_hidden_lines_stay_on_in_the_profile_view() -> None:
+    source = _source()
+    assert "set_hidden_lines_visible(adapter, side)" in source
+    assert "set_hidden_lines_removed(adapter, end)" in source  # tiny end view
+    assert "set_hidden_lines_removed(adapter, iso)" in source
 
 
 def test_part_stamps_make_critical_properties() -> None:

@@ -1,10 +1,12 @@
 r"""Create the curated machinist drawing for the fillister-head machine screw.
 
-Uniform fastener slice: a side (profile) view carrying the head-height and
-under-head length as inserted model dimensions, a head-end view carrying
-the two marked model diameters (the head OD and the shank/thread minor Ø with
-its UNC-2A designation), plus an isometric.  The thread designation and shank
-nominals come from the fastener catalog via ``fillister_screw_spec``.
+Uniform fastener slice: a side (profile) view carrying the head height, the
+under-head length and the driver slot (visible as a notch in the driver
+face) as inserted model dimensions, the thread designation leadered to the
+shank and the screw axis as a centerline; a driver-face view carrying the
+head diameter (leader ending at the rim) and a center mark; plus an
+isometric.  The thread designation and shank nominals come from the
+fastener catalog via ``fillister_screw_spec``.
 """
 
 from __future__ import annotations
@@ -18,18 +20,30 @@ from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
+    add_view_centerline,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
-    set_dimension_text,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from fillister_screw_spec import THREAD_DESIGNATION
+from _fastener_annotations import (
+    add_circle_center_mark,
+    add_thread_leader,
+    end_diameter_leaders_at_rim,
+)
+from fillister_screw_spec import (
+    HEAD_DIA,
+    HEAD_H,
+    SHANK_DIA,
+    SHANK_LEN,
+    SLOT_D,
+    THREAD_DESIGNATION,
+)
 from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 
@@ -48,30 +62,56 @@ PNG = OUTPUTS.png
 # A #4-40 x 4 mm screw is tiny; 8:1 draws the head OD (5.5) as ~44 mm and the
 # whole length (~6.2) as ~50 mm -- big enough to pick edges and read text.
 SHEET_SCALE = (8.0, 1.0)
+_S = SHEET_SCALE[0] / 1000.0  # sheet meters per model mm
 # The screw is authored on the Front plane, axis along +Z: head at z in
 # [-HEAD_H, 0], shank at z in [0, SHANK_LEN].  The head-end circle projects in
-# the *Front view; the profile (axis horizontal) projects in the *Right view.
+# the *Back view; the profile (axis horizontal) projects in the *Right view,
+# which MIRRORS z (driver face at HIGH-x, shank tip at LOW-x).
 END_CENTER = (0.070, 0.150)
 SIDE_CENTER = (0.185, 0.190)
 ISO_CENTER = (0.300, 0.170)
 
-# Head-end view: the two concentric marked diameters, leadered clear to the left.
-# Head diameter text sits in the gap between the end view and the side view:
-# straight above the circle it shared the corridor with the DRIVER-FACE VIEW
-# label and its leader crossed the label (2026-09-02 render).
+_Z_MID = (SHANK_LEN - HEAD_H) / 2.0
+
+
+def _side_x(model_z: float) -> float:
+    return SIDE_CENTER[0] + (_Z_MID - model_z) * _S
+
+
+_DRIVER_FACE_X = _side_x(-HEAD_H)  # head outer (driver) face, right end
+_JUNCTION_X = _side_x(0.0)  # head/shank step
+_TIP_X = _side_x(SHANK_LEN)  # shank tip, left end
+_HEAD_HALF = HEAD_DIA / 2.0 * _S
+_SHANK_HALF = SHANK_DIA / 2.0 * _S
+_SHANK_MID_X = (_JUNCTION_X + _TIP_X) / 2.0
+
+# Head-end view: the head diameter, leadered from upper-right with its arrow
+# on the near rim (never across the slot); the center mark picks the rim at
+# lower-right, clear of the slot lines and the diameter arrow.
 END_KEEP = {
     "HeadDia": (END_CENTER[0] + 0.050, END_CENTER[1] + 0.042),
 }
+END_DIAMETERS = ("HeadDia",)
+END_CENTER_MARK_XY = (
+    END_CENTER[0] + _HEAD_HALF * 0.7071,
+    END_CENTER[1] - _HEAD_HALF * 0.7071,
+)
 DIMENSION_CALLOUTS: dict[str, str] = {}
-SIDE_DIMENSION_CALLOUTS = {"ShankLg": "UNDERHEAD LENGTH"}
+
+# Side view: head height above the head, under-head length below the shank,
+# slot width as a vertical across the driver-face notch (text right of the
+# head) and slot depth as a horizontal below the head.
 SIDE_KEEP = {
-    "HeadHt": (SIDE_CENTER[0], SIDE_CENTER[1] + 0.034),
-    # The two-line "UNDERHEAD LENGTH" callout is wider than the 32 mm shank
-    # span, so it goes wholly LEFT of the span rather than between the
-    # extension lines (where the left one struck through it).
-    "ShankLg": (SIDE_CENTER[0] - 0.065, SIDE_CENTER[1] - 0.040),
-    "ShankDia": (SIDE_CENTER[0] - 0.050, SIDE_CENTER[1] + 0.016),
+    "HeadHt": ((_DRIVER_FACE_X + _JUNCTION_X) / 2.0, SIDE_CENTER[1] + _HEAD_HALF + 0.012),
+    "ShankLg": (_SHANK_MID_X, SIDE_CENTER[1] - _HEAD_HALF - 0.018),
+    "SlotWidth": (_DRIVER_FACE_X + 0.018, SIDE_CENTER[1]),
+    "SlotDepth": (_DRIVER_FACE_X - SLOT_D * _S / 2.0, SIDE_CENTER[1] - _HEAD_HALF - 0.010),
 }
+# Thread designation: a leader to the shank's upper outline, text upper-left
+# of the profile, clear of the head-height dimension.
+THREAD_LEADER_XY = (_JUNCTION_X - 0.010, SIDE_CENTER[1] + _SHANK_HALF)
+THREAD_NOTE_XY = (SIDE_CENTER[0] - 0.060, SIDE_CENTER[1] + _HEAD_HALF + 0.014)
+SIDE_AXIS_FACE_XY = (_SHANK_MID_X, SIDE_CENTER[1])
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -118,9 +158,8 @@ async def build(adapter: Any) -> dict[str, str]:
     side = place_view(adapter, str(SOURCE), "*Right", *SIDE_CENTER, scale=(8, 1))
     end = place_view(adapter, str(SOURCE), "*Back", *END_CENTER, scale=(8, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(8, 1))
-    # Hidden lines ON in the profile (policy rule 7): the slot floor reads
-    # through the head.  The tiny end view keeps HLR -- the shank-behind-head
-    # circle would read as a hole.
+    # Hidden lines ON in the profile (policy rule 7).  The tiny end view keeps
+    # HLR -- the shank-behind-head circle would read as a hole.
     set_hidden_lines_visible(adapter, side)
     set_hidden_lines_removed(adapter, iso)
     set_hidden_lines_removed(adapter, end)
@@ -129,12 +168,25 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, end, keep=END_KEEP, view_label="head-end"
     )
     set_dimension_callouts(adapter, end_annotations, DIMENSION_CALLOUTS)
-
-    side_annotations = curate_view_dimensions(
-        adapter, side, keep=SIDE_KEEP, view_label="side"
+    end_diameter_leaders_at_rim(
+        adapter, end_annotations, END_DIAMETERS, label="head-end diameters"
     )
-    set_dimension_callouts(adapter, side_annotations, SIDE_DIMENSION_CALLOUTS)
-    set_dimension_text(adapter, side_annotations, {"ShankDia": THREAD_DESIGNATION})
+    add_circle_center_mark(
+        adapter, end, edge_xy=END_CENTER_MARK_XY, label="head rim center mark"
+    )
+
+    curate_view_dimensions(adapter, side, keep=SIDE_KEEP, view_label="side")
+    add_view_centerline(
+        adapter, side, face_xy=SIDE_AXIS_FACE_XY, label="screw axis centerline"
+    )
+    add_thread_leader(
+        adapter,
+        side,
+        designation=THREAD_DESIGNATION,
+        silhouette_xy=THREAD_LEADER_XY,
+        note_xy=THREAD_NOTE_XY,
+        label="shank thread designation",
+    )
 
     # 0.020: the note is left-aligned on its anchor, clearing the 12.7 mm zone
     # margin / re-centred frame rule (~0.0126), which the layout audit enforces.

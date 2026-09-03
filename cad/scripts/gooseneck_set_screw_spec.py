@@ -14,7 +14,7 @@ clamp.  Black oxide, wrench-driven square head -- no driver slot.
 from __future__ import annotations
 
 from _fastener_catalog import fastener
-from _fastener_notes import square_head_notes, thread_control_notes
+from _fastener_notes import square_head_notes, thread_length_note
 
 
 _SPEC = fastener("gooseneck-set-screw")
@@ -25,7 +25,7 @@ HEAD_H = 6.0  # square head height
 SHANK_DIA = _SPEC.model_diameter_mm  # 1/4-20 modeled thread minor diameter
 SHANK_LEN = _SPEC.length_mm  # nominal under-head length (16)
 THREAD = _SPEC.thread  # "1/4-20"
-THREAD_DESIGNATION = f"{THREAD} UNC-2A"
+THREAD_DESIGNATION = f"{THREAD} UNC"  # leadered to the shank on the side view
 
 # The square head is a polygon (no single diameter), so the end view carries
 # the sketch across-flats width; the side view carries the two lengths as the
@@ -47,15 +47,8 @@ SIDE_VIEW_DIMENSIONS: dict[str, set[str]] = {
 
 DRAWING_NOTES = "\n".join(
     (
-        *thread_control_notes(
-            thread=THREAD,
-            thread_designation=THREAD_DESIGNATION,
-            underhead_length_mm=SHANK_LEN,
-        ),
-        *square_head_notes(across_flats_mm=HEAD_AF, head_height_mm=HEAD_H),
-        "SQUARE CENTER WITHIN DIA 0.10 OF THREAD PITCH-DIAMETER AXIS.",
-        "BEARING FACE PERPENDICULAR 0.10 TO THREAD PITCH-DIAMETER AXIS.",
-        "PLAIN FLAT POINT; POINT FACE BEARS ON THE GOOSENECK POST.",
+        *thread_length_note(thread=THREAD, underhead_length_mm=SHANK_LEN),
+        *square_head_notes(point="PLAIN FLAT"),
     )
 )
 END_VIEW_NOTE = "WRENCH-FLATS VIEW"
