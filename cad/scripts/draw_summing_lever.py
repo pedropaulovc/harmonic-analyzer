@@ -8,9 +8,23 @@ sheet/template, import, curation, and export behavior lives in
 A large green cast-iron first-class lever hung on hex knife-edge trunnions (no
 bore): a coefficients plate on the +X arm carrying the 20 channel-spring holes,
 a solid pivot cylinder (152.4 long, along Z), and a summation arm reaching to
-the counter-spring anchor eye on the -X arm.  The print shows a 1:2 front
-profile (pivot Ø), a 1:2 top plan (plate width/length + anchor eye), and a 1:4
-isometric.  The sheet runs at 1:2.
+the counter-spring anchor eye on the -X arm.  The sheet runs at 1:2 and shows:
+
+* a 1:2 **front** profile (the rib outline around the pivot, the R15.24 rib
+  arc, the hex trunnion end face -- the parent of the knife-edge detail);
+* **DETAIL C** (2:1) of the hex trunnion end: across-flats, flat length and
+  the included angle at the knife-edge ridge;
+* a 1:2 **top** plan (plate width/length off the pivot axis, the summation
+  arm's side-arc radii, the anchor eye, the 20-hole pattern);
+* a 1:2 **right** view (pivot diameter, coefficients-plate and rib
+  thicknesses, trunnion length and vertex height, datum A on the ridge);
+* a 1:4 isometric.
+
+GD&T is limited to the rule-3 allowlist (cad/docs/drawing-simplicity-policy.md):
+ONE position frame on the 20-hole spring pattern, with the two datums it
+references (A = knife-edge pivot axis, B = plate -Z end) and the three basic
+coordinates that feed it.  The knife edge keeps its roughness symbol; the
+anchor bore is an ordinary toleranced coordinate.
 
 Run with SolidWorks open::
 
@@ -26,7 +40,7 @@ from typing import Any
 from summing_lever_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
@@ -35,31 +49,44 @@ from _drawing_common import (
     add_native_hole_callout,
     add_property_linked_note,
     add_surface_finish,
+    add_view_centerline,
+    create_detail_view,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
     set_basic_dimension,
     set_hidden_lines_removed,
+    set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
+from solidworks_mcp.adapters import sw_type_info as _sw_type_info
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
+from solidworks_mcp.adapters.solidworks.drawing import (
+    place_view,
+    view_name,
+)
 from summing_lever_spec import (
     ANCHOR_BORE_R,
     ANCHOR_R,
     CHANNEL_PITCH,
+    CYL_R,
     HEX_DEPTH,
+    HEX_H,
+    HEX_W,
+    HEX_Z_INNER,
+    HEX_Z_OUTER,
     HOLE_DIA,
     HOLE_X,
     HOLE_Z_FIRST,
+    HOLE_Z_LAST,
     PLATE_L,
+    PLATE_T,
     PLATE_W,
     SURFACE_FINISHES,
     TIP_X,
-)
-from solidworks_mcp.adapters.solidworks.drawing import (
-    place_view,
 )
 
 
@@ -77,14 +104,35 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 2.0)  # 1:2
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]  # sheet-mm per model-mm (0.5)
+DETAIL_SCALE = (2, 1)  # 2:1 on the sheet = 4x the 1:2 views
+_D = DETAIL_SCALE[0] / DETAIL_SCALE[1]  # sheet-mm per model-mm in the detail
 
 # Front (down -Z) and top (down -Y) share the same X extent: anchor eye
 # (TIP_X - ANCHOR_R) on the left to the plate right edge (PLATE_W).
 _BBOX_CX = (TIP_X - ANCHOR_R + PLATE_W) / 2.0
 
-FRONT_CENTER = (0.155, 0.205)
-TOP_CENTER = (0.155, 0.105)  # third-angle: plan below the front profile
-ISO_CENTER = (0.335, 0.195)
+# Rib geometry the front view dimensions (build_summing_lever: the edge ribs'
+# semicircle and the middle rib's coradial arcs share ARC_R = CYL_R + RIB_PAD).
+RIB_PAD = 2.54
+RIB_T = 5.08
+RIB_ARC_R = CYL_R + RIB_PAD  # 15.24
+RIB_OFFSET = PLATE_L / 2.0 - RIB_T  # 71.12: edge-rib inner face along Z
+# Summation-arm side arcs: three-point arcs through (0, PLATE_L/2),
+# (TIP_X/2, PLATE_L/4 - 7.62) and (TIP_X, ANCHOR_R); R = 138.85 (both sides).
+SUM_ARC_MID = (TIP_X / 2.0, PLATE_L / 4.0 - 7.62)  # (-38.1, 30.48)
+
+# Third-angle layout: top plan under the front profile, right view beside it,
+# the knife-edge detail in the free upper-left field, the isometric top-right.
+FRONT_CENTER = (0.155, 0.225)
+TOP_CENTER = (0.155, 0.125)
+RIGHT_CENTER = (0.265, 0.225)
+DETAIL_CENTER = (0.060, 0.170)
+ISO_CENTER = (0.380, 0.235)
+
+# Radius of the detail circle on the FRONT view (sheet metres): covers the
+# hex trunnion end (+-5.13 mm model = +-2.6 mm on the 1:2 parent) with margin
+# and stops short of the cylinder circle (6.35 mm on the parent).
+DETAIL_RADIUS = 0.0045
 
 
 def _front_xy(mx: float, my: float) -> tuple[float, float]:
@@ -95,25 +143,114 @@ def _front_xy(mx: float, my: float) -> tuple[float, float]:
     )
 
 
-def _top_xy(mx: float, mz: float) -> tuple[float, float]:
-    """Sheet (x, y) of a model (X, Z) point in the top plan view (1:2)."""
+def _top_xy(mx: float, up_mm: float) -> tuple[float, float]:
+    """Sheet (x, y) of a plan point in the top view (1:2).
+
+    ``up_mm`` is the SHEET-UP offset from the pivot axis in model mm.  A
+    SolidWorks Top view reverses model Z on the sheet, so sheet-up is model
+    -Z: ``up_mm = +82`` is the -Z trunnion ridge, ``up_mm = -HOLE_Z_LAST`` the
+    spring hole nearest the +Z plate end (the 8.43 end offset the sheet
+    shows).  The lever is symmetric in Z, so every pick below is described
+    by its sheet side.
+    """
     return (
         TOP_CENTER[0] + (mx - _BBOX_CX) * _S / 1000.0,
-        TOP_CENTER[1] + mz * _S / 1000.0,
+        TOP_CENTER[1] + up_mm * _S / 1000.0,
     )
 
 
-FRONT_KEEP = {
-    "CylDia": (0.075, 0.230),
-}
+def _right_xy(mz: float, my: float) -> tuple[float, float]:
+    """Sheet (x, y) of a model (Z, Y) point in the right view (1:2).
+
+    The view's bounding box (trunnion tips +-HEX_Z_OUTER, rib crowns
+    +-RIB_ARC_R) is centred on the pivot axis in both directions, and the
+    lever is symmetric in Z, so a mirrored Z cannot move a pick.
+    """
+    return (
+        RIGHT_CENTER[0] + mz * _S / 1000.0,
+        RIGHT_CENTER[1] + my * _S / 1000.0,
+    )
+
+
+def _detail_xy(mx: float, my: float) -> tuple[float, float]:
+    """Sheet (x, y) of a model (X, Y) point in DETAIL C (2:1).
+
+    The detail circle is centred on the pivot axis, so the detail's own
+    centre is the axis; the hex vertices are +-HEX_H/2 up and the flats
+    +-HEX_W/2 across.
+    """
+    return (
+        DETAIL_CENTER[0] + mx * _D / 1000.0,
+        DETAIL_CENTER[1] + my * _D / 1000.0,
+    )
+
+
+def _add_radial_dimension(
+    adapter: Any,
+    view: Any,
+    *,
+    edge_xy: tuple[float, float],
+    text_xy: tuple[float, float],
+    label: str,
+) -> Any:
+    """Radius-dimension one arc edge picked at a sheet point.
+
+    ``IModelDoc2.AddRadialDimension2`` only works inside an active sketch, so
+    a drawing radius is the smart dimension (``AddDimension2``) with a single
+    arc edge selected -- SolidWorks emits ``R<value>`` for an arc.
+    """
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    name = view_name(adapter, view)
+    if not ddoc.ActivateView(name):
+        raise RuntimeError(f"failed to activate drawing view {name!r} ({label})")
+    draw.ClearSelection2(True)
+    selected = draw.Extension.SelectByID2(
+        "", "EDGE", edge_xy[0], edge_xy[1], 0.0, False, 0, null_callout(), 0
+    )
+    if not selected:
+        raise RuntimeError(
+            f"failed to select {label} arc at sheet ({edge_xy[0]:g}, {edge_xy[1]:g})"
+        )
+    dimension = draw.AddDimension2(text_xy[0], text_xy[1], 0.0)
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    if dimension is None:
+        raise RuntimeError(f"failed to add the {label} radius dimension")
+    return dimension
+
+
+def _display_as_diameter(adapter: Any, dimension: Any, *, label: str) -> None:
+    """Prefix a silhouette-to-silhouette width with the ASME diameter symbol."""
+    display = _sw_type_info.early_bound_or_flag(
+        dimension, "IDisplayDimension", "SetText", "GetText"
+    )
+    adapter._attempt(lambda: display.SetText(1, "<MOD-DIAM>"))  # swDimensionTextPrefix
+    applied = str(adapter._attempt(lambda: display.GetText(1)) or "")
+    if "<MOD-DIAM>" not in applied:
+        raise RuntimeError(f"{label} dimension did not take the diameter prefix")
+    adapter.currentModel.EditRebuild3()
+
+
+FRONT_KEEP: dict[str, tuple[float, float]] = {}
 TOP_KEEP = {
-    "PlateWidth": (0.230, 0.135),
-    "PlateLength": (0.245, TOP_CENTER[1]),
-    # Left of the anchor eye, above the notes block -- the old (0.055, 0.070)
-    # planted the Ø19.05 text inside the Manufacturing Notes paragraph.
-    "AnchorOuterDia": (0.052, 0.132),
+    # Plate width off the pivot axis: the plate's X=0 edge lies inside the
+    # cylinder's plan rectangle, so the view carries the axis centerline
+    # (below) as that extension line's terminus; lane above the 76.20/39.85
+    # lane that shares the same origin.
+    "PlateWidth": (0.176, 0.186),
+    "PlateLength": (0.268, TOP_CENTER[1]),
+    # Left of the anchor eye with a horizontal leader to its leftmost point
+    # (the part's -X extreme), so the leader crosses no arm outline.
+    "AnchorOuterDia": (0.098, TOP_CENTER[1]),
 }
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
+
+# Sheet-top lanes of the top view, above the -Z trunnion tip (0.174):
+# 0.178 carries the anchor X (left of the axis) and the BASIC hole-row X
+# (right of it) as one chain through the origin; 0.186 the plate width.
+TOP_LANE_CHAIN_Y = 0.178
+TOP_LANE_WIDTH_Y = TOP_KEEP["PlateWidth"][1]
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -159,142 +296,198 @@ async def build(adapter: Any) -> dict[str, str]:
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 2))
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 2))
+    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(1, 2))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 4))
-    for view in (top, iso):
-        set_hidden_lines_removed(adapter, view)
+    for view in (front, top, right):
+        set_hidden_lines_visible(adapter, view)
+    set_hidden_lines_removed(adapter, iso)
 
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
     curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
+    curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
 
-    # Anchor bore (Ø3.0) native callout in the top plan.  Pick a point on the
-    # bore rim (not its centre) so SolidWorks catches the circular edge.
-    anchor_bore_edge = _top_xy(TIP_X, ANCHOR_BORE_R)
+    # --- Front profile: the rib arc that wraps the pivot.  Both ribs' arcs
+    # are coradial (R15.24) and coincide in this view; pick the edge rib's
+    # semicircle on its -X side at ~135 deg, where the frontmost edge rib
+    # owns the outline (its tangent lines leave the arc near 12 o'clock).
+    rib_arc = _front_xy(-RIB_ARC_R * 0.7071, RIB_ARC_R * 0.7071)
+    _add_radial_dimension(
+        adapter,
+        front,
+        edge_xy=rib_arc,
+        text_xy=(0.135, 0.250),
+        label="rib arc radius",
+    )
+
+    # --- DETAIL C (2:1): the hex trunnion end face on the pivot axis.  The
+    # trunnion is NOT a regular hexagon (8.653 across flats, 10.268 vertex to
+    # vertex; regular would be 9.99), so the detail carries across-flats, the
+    # flat length and the included angle at the knife-edge ridge -- the three
+    # values a machinist needs to file or mill the bevel.  Enlarged rather
+    # than piled onto the 1:2 parent (policy rule 7).
+    detail = create_detail_view(
+        adapter,
+        front,
+        center=_front_xy(0.0, 0.0),
+        radius=DETAIL_RADIUS,
+        view_xy=DETAIL_CENTER,
+        detail_label="C",
+        scale=DETAIL_SCALE,
+        label="knife-edge trunnion end",
+    )
+    half_w, half_h, quarter_h = HEX_W / 2.0, HEX_H / 2.0, HEX_H / 4.0
+    # Across flats just above the ridge (its extension lines stop under the
+    # included-angle arc, which is drawn at a larger radius from the ridge).
+    add_edge_dimension(
+        adapter,
+        detail,
+        p0=_detail_xy(-half_w, 0.0),
+        p1=_detail_xy(half_w, 0.0),
+        text_xy=(DETAIL_CENTER[0], DETAIL_CENTER[1] + 0.016),
+        label="hex across flats",
+        orientation="horizontal",
+    )
+    add_edge_dimension(
+        adapter,
+        detail,
+        p0=_detail_xy(half_w, quarter_h),
+        p1=_detail_xy(half_w, -quarter_h),
+        text_xy=(DETAIL_CENTER[0] + 0.024, DETAIL_CENTER[1]),
+        label="hex flat length",
+        orientation="vertical",
+        entity_types=("VERTEX", "VERTEX"),
+    )
+    # Included angle at the ridge: smart dimension between the two upper
+    # sloping edges (picked at their midpoints).  The text sits up-right of
+    # the vertex INSIDE the sector the extended edges open above it (30.7 to
+    # 149.3 deg from +X), so SolidWorks dimensions that vertical angle
+    # (118.64) outside the hex; its arc (r ~21 mm) clears the across-flats
+    # dimension below it and the flat-length text to the right.
+    add_edge_dimension(
+        adapter,
+        detail,
+        p0=_detail_xy(-half_w / 2.0, half_h - quarter_h / 2.0),
+        p1=_detail_xy(half_w / 2.0, half_h - quarter_h / 2.0),
+        text_xy=(DETAIL_CENTER[0] + 0.016, DETAIL_CENTER[1] + 0.024),
+        label="knife-edge included angle",
+        orientation="smart",
+    )
+
+    # --- Top plan.  Axis centerline of the pivot cylinder: the plate's X=0
+    # edge is buried inside the cylinder's plan rectangle (plate +-2.54 <
+    # R12.7), so without the centerline the marked 44.45 has one extension
+    # line landing on nothing.  Picked on the cylinder face above the
+    # coefficients plate, clear of both ribs.
+    add_view_centerline(
+        adapter, top, face_xy=_top_xy(5.0, 30.0), label="pivot axis centerline"
+    )
+
+    # Anchor bore (Ø3.0) native callout, lower-left of the eye, terminating on
+    # the bore's sheet-bottom rim so its leader stays clear of the Ø19.05
+    # leader (which comes in horizontally from the left).
+    anchor_bore_edge = _top_xy(TIP_X, -ANCHOR_BORE_R)
     add_native_hole_callout(
         adapter,
         top,
         edge_xy=anchor_bore_edge,
-        callout_xy=(0.060, 0.125),
+        callout_xy=(0.090, 0.107),
         label="anchor bore",
+        process="DRILL",
     )
 
-    # Datum A is the actual knife-edge pivot ridge, not the merged cylinder
-    # silhouette hidden by the ribs in the front view.  A SolidWorks Top view
-    # reverses model Z on the sheet: the positive sheet offset selects the -Z
-    # ridge, while the negative offset selects the part-owned +Z finish face.
-    # Keep datum and finish on opposite ridges so their leaders stay distinct.
-    knife_edge_datum = _top_xy(0.0, PLATE_L / 2.0 + HEX_DEPTH / 2.0)
+    # Summation-arm side arcs (R138.85 each): radius dimensions with the text
+    # on the arc's concave (outside) side, so the leader reaches the arc from
+    # clear space.  One per side -- the plan is symmetric about the axis but
+    # the print says so with two radii, not a note.
+    for side, text_y in ((1.0, 0.165), (-1.0, 0.085)):
+        _add_radial_dimension(
+            adapter,
+            top,
+            edge_xy=_top_xy(SUM_ARC_MID[0], side * SUM_ARC_MID[1]),
+            text_xy=(0.140, text_y),
+            label=f"summation arc radius ({'upper' if side > 0 else 'lower'})",
+        )
+
+    # Sheet-top lanes: the sheet-top (-Z) trunnion ridge line at X=0 is the
+    # ONE origin of every X station in this view (it is collinear with the
+    # centerline).  76.20 to the anchor bore runs left, the BASIC 39.85 hole
+    # row runs right -- one chain through the origin on lane 0.178; the
+    # marked 44.45 plate width sits on lane 0.186 above it.
+    ridge_dim_edge = _top_xy(0.0, PLATE_L / 2.0 + 0.3 * HEX_DEPTH)
+    anchor_bore_top = _top_xy(TIP_X, ANCHOR_BORE_R)
+    add_edge_dimension(
+        adapter,
+        top,
+        p0=ridge_dim_edge,
+        p1=anchor_bore_top,
+        text_xy=(0.146, TOP_LANE_CHAIN_Y),
+        label="anchor bore X location",
+        orientation="horizontal",
+    )
+    top_hole_up = -HOLE_Z_FIRST  # the spring hole nearest the sheet-top end
+    top_hole_rim_right = _top_xy(HOLE_X + HOLE_DIA / 2.0, top_hole_up)
+    row_x = add_edge_dimension(
+        adapter,
+        top,
+        p0=ridge_dim_edge,
+        p1=top_hole_rim_right,
+        text_xy=(0.1758, TOP_LANE_CHAIN_Y),
+        label="spring-hole row X",
+        orientation="horizontal",
+    )
+    set_basic_dimension(adapter, row_x, label="spring-hole row X")
+
+    # Sheet-bottom (+Z) end: datum B on the plate end face, the BASIC end
+    # offset and pitch off it, the 20X frame and the #47 callout, and the
+    # knife-edge roughness on the +Z ridge -- each attached to a DIFFERENT
+    # hole or edge so no leader crosses another leader or an extension line.
+    plate_end_edge = _top_xy(PLATE_W - 0.45, -PLATE_L / 2.0)
     add_datum_feature(
         adapter,
         top,
-        edge_xy=knife_edge_datum,
-        symbol_xy=(knife_edge_datum[0] + 0.020, knife_edge_datum[1] - 0.012),
-        datum="A",
-        label="knife-edge pivot axis",
+        edge_xy=plate_end_edge,
+        symbol_xy=(0.198, 0.068),
+        datum="B",
+        label="plate -Z end face",
     )
     knife_edge = _top_xy(0.0, -(PLATE_L / 2.0 + HEX_DEPTH / 2.0))
     add_surface_finish(
         adapter,
         top,
         edge_xy=knife_edge,
-        symbol_xy=(knife_edge[0] + 0.015, knife_edge[1] + 0.015),
+        symbol_xy=(0.182, 0.079),
         control=surface_finish_by_key(SURFACE_FINISHES, "knife_edge_ridge"),
         label="knife-edge ridge finish",
     )
-    # Use a separate point on the bore rim so the position-frame leader does
-    # not stack on the hole-callout leader at the bore's 12-o'clock point.
-    anchor_bore_fcf_edge = _top_xy(TIP_X - ANCHOR_BORE_R, 0.0)
-    add_feature_control_frame(
-        adapter,
-        top,
-        edge_xy=anchor_bore_fcf_edge,
-        frame_xy=(
-            anchor_bore_fcf_edge[0] - 0.010,
-            anchor_bore_fcf_edge[1] + 0.026,
-        ),
-        characteristic="position",
-        tolerance=GEOMETRIC_TOLERANCES_MM["summation anchor position"],
-        datums=("A",),
-        diameter=True,
-        label="summation anchor position",
-    )
-    # BASIC X coordinate backing the anchor position frame: knife-edge pivot
-    # axis (datum A, the -Z trunnion ridge line) to the anchor bore centre.
-    ridge_dim_edge = _top_xy(0.0, -(PLATE_L / 2.0 + 0.3 * HEX_DEPTH))
-    anchor_bore_bottom = _top_xy(TIP_X, -ANCHOR_BORE_R)
-    anchor_location = add_edge_dimension(
-        adapter,
-        top,
-        p0=ridge_dim_edge,
-        p1=anchor_bore_bottom,
-        text_xy=(0.146, 0.050),
-        label="anchor bore X location",
-        orientation="horizontal",
-    )
-    set_basic_dimension(adapter, anchor_location, label="anchor bore X location")
-
-    # Spring-hole pattern control: datum B on the -Z plate end, BASIC row-X /
-    # start-Z / pitch coordinates off A|B, a native #47 callout, and a 20X
-    # position frame -- the inspectable pattern definition (the notes no longer
-    # carry these numbers as prose).
-    # Pick B toward the plate's -X side and hang its tag down-LEFT: the seed
-    # hole's callout leader sweeps down-right from the hole and crossed a
-    # right-hung tag (layout audit).
-    plate_end_edge = _top_xy(10.0, -PLATE_L / 2.0)
-    add_datum_feature(
-        adapter,
-        top,
-        edge_xy=plate_end_edge,
-        symbol_xy=(plate_end_edge[0] - 0.013, plate_end_edge[1] - 0.011),
-        datum="B",
-        label="plate -Z end face",
-    )
-    seed_rim_right = _top_xy(HOLE_X + HOLE_DIA / 2.0, HOLE_Z_FIRST)
-    row_x = add_edge_dimension(
-        adapter,
-        top,
-        p0=ridge_dim_edge,
-        p1=seed_rim_right,
-        text_xy=(0.178, 0.042),
-        label="spring-hole row X",
-        orientation="horizontal",
-    )
-    set_basic_dimension(adapter, row_x, label="spring-hole row X")
-    seed_rim_top = _top_xy(HOLE_X, HOLE_Z_FIRST + HOLE_DIA / 2.0)
+    end_hole_up = -HOLE_Z_LAST  # the spring hole nearest the sheet-bottom end
+    end_hole_rim_top = _top_xy(HOLE_X, end_hole_up + HOLE_DIA / 2.0)
     start_z = add_edge_dimension(
         adapter,
         top,
-        p0=plate_end_edge,
-        p1=seed_rim_top,
-        text_xy=(0.196, 0.069),
+        p0=_top_xy(PLATE_W - 20.0, -PLATE_L / 2.0),
+        p1=end_hole_rim_top,
+        text_xy=(0.212, 0.0955),
         label="spring-hole start Z",
         orientation="vertical",
     )
     set_basic_dimension(adapter, start_z, label="spring-hole start Z")
-    second_rim_bottom = _top_xy(HOLE_X, HOLE_Z_FIRST + CHANNEL_PITCH - HOLE_DIA / 2.0)
+    second_rim_bottom = _top_xy(HOLE_X, end_hole_up + CHANNEL_PITCH - HOLE_DIA / 2.0)
     pitch = add_edge_dimension(
         adapter,
         top,
-        p0=seed_rim_top,
+        p0=end_hole_rim_top,
         p1=second_rim_bottom,
-        text_xy=(0.205, 0.0765),
+        text_xy=(0.224, 0.1035),
         label="spring-hole pitch",
         orientation="vertical",
     )
     set_basic_dimension(adapter, pitch, label="spring-hole pitch")
-    seed_rim_bottom = _top_xy(HOLE_X, HOLE_Z_FIRST - HOLE_DIA / 2.0)
-    add_native_hole_callout(
-        adapter,
-        top,
-        edge_xy=seed_rim_bottom,
-        callout_xy=(0.222, 0.052),
-        label="spring-hole seed",
-    )
-    seed_rim_left = _top_xy(HOLE_X - HOLE_DIA / 2.0, HOLE_Z_FIRST)
+    third_rim_top = _top_xy(HOLE_X, end_hole_up + 2.0 * CHANNEL_PITCH + HOLE_DIA / 2.0)
     add_feature_control_frame(
         adapter,
         top,
-        edge_xy=seed_rim_left,
-        frame_xy=(0.222, 0.088),
+        edge_xy=third_rim_top,
+        frame_xy=(0.204, 0.112),
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["spring-hole pattern position"],
         datums=("A", "B"),
@@ -302,9 +495,96 @@ async def build(adapter: Any) -> dict[str, str]:
         quantity="20X",
         label="spring-hole pattern position",
     )
+    fifth_rim_right = _top_xy(HOLE_X + HOLE_DIA / 2.0, end_hole_up + 4.0 * CHANNEL_PITCH)
+    add_native_hole_callout(
+        adapter,
+        top,
+        edge_xy=fifth_rim_right,
+        callout_xy=(0.232, 0.126),
+        label="spring-hole seed",
+        process="#47 DRILL",
+    )
+
+    # --- Right view (looking down -X): the pivot cylinder's silhouettes,
+    # the coefficients plate's end face, both rib kinds as bands proud of the
+    # cylinder, and the hex trunnions overhanging each end.
+    pivot_dia = add_edge_dimension(
+        adapter,
+        right,
+        p0=_right_xy(-40.0, CYL_R),
+        p1=_right_xy(-40.0, -CYL_R),
+        text_xy=(0.208, 0.243),
+        label="pivot diameter",
+        orientation="vertical",
+        entity_type="SILHOUETTE",
+    )
+    _display_as_diameter(adapter, pivot_dia, label="pivot diameter")
+    add_edge_dimension(
+        adapter,
+        right,
+        p0=_right_xy(50.0, PLATE_T / 2.0),
+        p1=_right_xy(50.0, -PLATE_T / 2.0),
+        text_xy=(0.320, 0.212),
+        label="coefficients plate thickness",
+        orientation="vertical",
+    )
+    # Rib bands picked on their LOWER crowns with the texts below the view:
+    # above it, the edge rib's Z=76.2 extension line would run through datum
+    # A's box on the trunnion ridge.
+    add_edge_dimension(
+        adapter,
+        right,
+        p0=_right_xy(-RIB_T / 2.0, -14.0),
+        p1=_right_xy(RIB_T / 2.0, -14.0),
+        text_xy=(0.252, 0.190),
+        label="middle rib thickness",
+        orientation="horizontal",
+    )
+    add_edge_dimension(
+        adapter,
+        right,
+        p0=_right_xy(RIB_OFFSET, -14.0),
+        p1=_right_xy(PLATE_L / 2.0, -14.0),
+        text_xy=(0.290, 0.190),
+        label="edge rib thickness",
+        orientation="horizontal",
+    )
+    add_edge_dimension(
+        adapter,
+        right,
+        p0=_right_xy(HEX_Z_INNER, 8.0),
+        p1=_right_xy(HEX_Z_OUTER, 0.0),
+        text_xy=(0.326, 0.203),
+        label="trunnion length",
+        orientation="horizontal",
+    )
+    trunnion_mid_z = HEX_Z_INNER + 0.72 * HEX_DEPTH
+    add_edge_dimension(
+        adapter,
+        right,
+        p0=_right_xy(trunnion_mid_z, HEX_H / 2.0),
+        p1=_right_xy(trunnion_mid_z, -HEX_H / 2.0),
+        text_xy=(0.332, 0.243),
+        label="hex vertex height",
+        orientation="vertical",
+    )
+    # Datum A = the knife-edge pivot axis, tagged on the +Z trunnion's top
+    # ridge line here, where it is a clean visible edge with clear space
+    # above it (the top view's ridges carry the station origin and the
+    # roughness symbol).  Kept ONLY as the primary datum of the spring-pattern
+    # position frame (policy rule 3 allowlist).
+    knife_edge_datum = _right_xy(HEX_Z_INNER + 0.2 * HEX_DEPTH, HEX_H / 2.0)
+    add_datum_feature(
+        adapter,
+        right,
+        edge_xy=knife_edge_datum,
+        symbol_xy=(knife_edge_datum[0], 0.240),
+        datum="A",
+        label="knife-edge pivot axis",
+    )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)
-    add_property_linked_note(adapter, "Isometric View Note", 0.305, 0.150)
+    add_property_linked_note(adapter, "Isometric View Note", 0.345, 0.205)
 
     return await finalize_drawing(
         adapter,

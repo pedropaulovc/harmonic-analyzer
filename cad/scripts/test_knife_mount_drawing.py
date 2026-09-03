@@ -1,4 +1,10 @@
-"""Offline contracts for the knife-mount drawing."""
+"""Offline contracts for the knife-mount drawing.
+
+The knife mount is on the GD&T allowlist (cad/docs/drawing-simplicity-policy.md
+rule 3, knife-edge system): the print keeps exactly one position frame on the
+bore to the top-seat datum, the ground finish on the bore, a native callout for
+the hanger-stud tap, and four lines of process notes.
+"""
 
 from __future__ import annotations
 
@@ -8,6 +14,11 @@ import build_knife_mount as part
 import draw_knife_mount as drawing
 import knife_mount_spec
 from _drawing_registry import DRAWINGS_BY_NAME
+from _holes import TAP_DRILL_MM
+
+
+def _source() -> str:
+    return Path(drawing.__file__).read_text(encoding="utf-8")
 
 
 def test_ground_bore_finish_is_part_owned_and_consumed_by_key() -> None:
@@ -16,9 +27,10 @@ def test_ground_bore_finish_is_part_owned_and_consumed_by_key() -> None:
     assert control.roughness_um == knife_mount_spec.GROUND_UM == 0.8
     assert control.face.diameter_mm == 2.0 * knife_mount_spec.R_BORE
     part_source = Path(part.__file__).read_text(encoding="utf-8")
-    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    drawing_source = _source()
     assert "surface_finishes=SURFACE_FINISHES" in part_source
     assert 'surface_finish_by_key(SURFACE_FINISHES, "knife_bore")' in drawing_source
+    assert drawing_source.count("add_surface_finish(") == 1
     assert "roughness_ra=" not in drawing_source
 
 
@@ -46,38 +58,91 @@ def test_spec_geometry_mirrors_the_build_source() -> None:
     assert abs(knife_mount_spec.BLK_TOP - part.BLK_TOP) < 0.05
     assert abs(knife_mount_spec.BLK_BOT - part.BLK_BOT) < 0.05
     assert abs(knife_mount_spec.BORE_CY - part.BORE_CY) < 0.05
+    assert knife_mount_spec.STUD_TAP_DRILL_DIA == part.STUD_TAP_DIA
+    assert knife_mount_spec.STUD_TAP_DRILL_DIA == TAP_DRILL_MM["1/2-13"]
 
 
-def test_linked_notes_expose_the_stud_tap_and_hardened_knife_seat() -> None:
+def test_notes_are_few_specific_and_never_the_title_block() -> None:
     notes = knife_mount_spec.DRAWING_NOTES
-    assert f"BORE Ø{2.0 * knife_mount_spec.R_BORE:.1f} THRU, CENTRED IN THE {2.0 * knife_mount_spec.BLK_HALF_X:.2f} WIDTH" in notes
-    assert "BORE Ø12.0 THRU" in notes
-    assert "TAP 1/2-13 UNC-2B X 12.0 DEEP" in notes
-    assert "KNIFE-HANGER STUD" in notes
+    lines = notes.split("\n")
+    assert len(lines) <= 4
+    # The bore height from the top seat is a BASIC sheet dimension now, not a
+    # note line.
+    assert "BELOW THE TOP SEAT" not in notes
+    assert f"{knife_mount_spec.BLK_TOP - knife_mount_spec.BORE_CY:.2f}" not in notes
+    assert "RIDES THE BORE'S UPPER WALL" in notes
     assert "TAP-DRILL POINT BREAKS INTO THE BORE CROWN" in notes
-    # ch18 p.42 (2026-09-02): the block IS the hardened knife seat -- the old
-    # "no hardened seat / do not release" hold is gone.
-    assert "HARDEN AND TEMPER TO 58-60 HRC AFTER MACHINING" in notes
+    assert "TWO BLOCKS USED" in notes
+    # ch18 p.42 (pass 3): the block IS the hardened knife seat; the heat
+    # treat is a process fact the machinist needs, the old release hold
+    # is gone.
+    assert "HARDEN AND TEMPER TO 58-60 HRC" in notes
     assert "LEAVE UNPAINTED" in notes
-    assert "NO HARDENED KNIFE SEAT" not in notes
-    assert "DO NOT RELEASE" not in notes
-    # Title block owns the alloy callout (test_magnifier_drawing_metadata).
-    assert "MATERIAL:" not in notes
-    assert "Ra 0.8" not in notes
-    assert "GRAY IRON" not in notes and "PAINT BLACK" not in notes
-    assert "DEBURR" not in notes and "BREAK SHARP" not in notes
-    assert "X.XX" not in notes
-    assert "LINEAR +/-" not in notes
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+    # The tap rides its callout; the finish its symbol; release holds stay
+    # off the print.
+    for banned in (
+        "1/2-13",
+        "TAP 1/2",
+        "Ra ",
+        "DO NOT RELEASE",
+        "DATUM",
+        "UOS",
+        "DIMENSIONS IN",
+        "+/-",
+        "MHA-",
+        "GRAY IRON",
+        "PAINT BLACK",
+        "DEBURR",
+        "BREAK SHARP",
+        "X.XX",
+    ):
+        assert banned not in notes, banned
+    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in _source()
 
 
-def test_native_gdt_and_bore_geometry() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
+def test_only_the_allowlisted_knife_bore_frame_survives() -> None:
+    # Policy rule 3: one position frame on the bore, referencing the one datum
+    # (the top seat); nothing else.
+    source = _source()
     assert source.count("add_datum_feature(") == 1
     assert source.count("add_feature_control_frame(") == 1
     assert 'characteristic="position"' in source
-    assert source.count("add_edge_dimension(") == 1
+    assert 'label="knife-bore position"' in source
+    assert 'datums=("A",)' in source
+    assert "project_part_pmi(" not in source
+    assert knife_mount_spec.GEOMETRIC_TOLERANCES_MM == {"knife-bore position": "0.20"}
+    # Block depth across the right-view section + the basic bore height.
+    assert source.count("add_edge_dimension(") == 2
+
+
+def test_position_frame_is_fed_by_one_basic_bore_height() -> None:
+    # Policy rule 4: the only boxed dimension is the one the surviving frame
+    # needs -- bore centre to the datum-A top seat, vertical, arc endpoint
+    # moved to the centre so it reads to the axis.
+    source = _source()
+    assert source.count('label="knife-bore height from datum A"') == 3
+    assert source.count("set_basic_dimension(") == 1
+    assert source.count("set_arc_endpoints_to_center(") == 1
+    assert 'orientation="vertical"' in source
+    assert "bore_height = add_edge_dimension(" in source
+    # Stacked inside the block-height dimension on the block's left.
+    assert drawing.BORE_HEIGHT_TEXT[0] < drawing.FRONT_CENTER[0]
+    assert drawing.BORE_HEIGHT_TEXT[0] > drawing.FRONT_KEEP["BlockHeight"][0]
+
+
+def test_hanger_stud_tap_is_a_native_hole_callout() -> None:
+    source = _source()
+    assert source.count("add_native_hole_callout(") == 1
+    assert 'label="hanger-stud tap"' in source
+    assert "STUD_TAP_DRILL_DIA * SHEET_SCALE[0] / 2000.0" in source
+    build_source = Path(part.__file__).read_text(encoding="utf-8")
+    assert 'HoleSpec("tapped", "1/2-13", end="blind"' in build_source
+
+
+def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
+    source = _source()
+    assert "for view in (front, right, top):\n        set_hidden_lines_visible" in source
+    assert "set_hidden_lines_removed(adapter, iso)" in source
 
 
 def test_part_stamps_make_critical_properties() -> None:

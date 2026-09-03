@@ -55,8 +55,6 @@ DRAWING_NOTES = "\n".join(
         f"  ENDS .............. 270 DEG LOOP, R{HOOK_CL_RADIUS:.2f} CL;",
         "    EYES COPLANAR (0 DEG CLOCKING)",
         f"  FREE EYE C-C ...... {FREE_EYE_C2C:.2f}",
-        "NOTE: TOWERS ABOVE THE MACHINE;",
-        "TENSION SET BY SLIDING THE GOOSENECK POST.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:3"
