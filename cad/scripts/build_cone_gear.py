@@ -98,6 +98,7 @@ from _common import (
     SketchDims,
     _early_bound,
     _read_member,
+    active_configuration_name,
     apply_custom_properties,
     apply_material,
     check,
@@ -833,35 +834,6 @@ async def build(adapter) -> dict[str, str]:
         )
     _telemetry.success(f"{first_name} volume reproduced on revisit: {revisit:.1f} mm^3")
 
-    check("activate T120 for initial save", await adapter.set_active_configuration("T120"))
-    part_path = (OUT_SLDPRT / f"{PART_NAME}.SLDPRT").resolve()
-    part_path.parent.mkdir(parents=True, exist_ok=True)
-    check(f"initial save -> {part_path}", await adapter.save_file(str(part_path)))
-    adapter.swApp.CloseAllDocuments(True)
-    adapter.currentModel = None
-    check("reopen configured part", await adapter.open_model(str(part_path)))
-
-    # The first Save-As creates the document path but does not preserve rebuilt
-    # data for every non-active configuration. Reopen the saved document, then
-    # revisit each configuration, rebuild it, and set its rebuild/save mark. The
-    # normal in-place save below persists the complete configured family.
-    for name, _teeth in reversed(CONFIGS):
-        activation = await adapter.set_active_configuration(name)
-        check(f"persist {name}", activation)
-        if not bool(activation.data.get("rebuilt")):
-            raise RuntimeError(f"{name}: persistence activation did not rebuild")
-        rebuilt = adapter._attempt(
-            lambda: adapter.currentModel.ForceRebuild3(False), default=None
-        )
-        if not rebuilt:
-            raise RuntimeError(f"{name}: persistence rebuild failed")
-        configuration = _early_bound(
-            adapter.currentModel.GetConfigurationByName(name), "IConfiguration"
-        )
-        configuration.AddRebuildSaveMark = True
-        if not bool(configuration.AddRebuildSaveMark):
-            raise RuntimeError(f"{name}: failed to set rebuild/save mark")
-
     check("activate T120 for saved views", await adapter.set_active_configuration("T120"))
     grouped_spec = _config.parts(PART_NAME)
     description = str(grouped_spec.get("description", "")).strip()
@@ -899,6 +871,46 @@ async def build(adapter) -> dict[str, str]:
         },
     )
     artefacts.update(await save_part_and_images(adapter, PART_NAME))
+
+    # All properties, tolerances, drawing marks, STL, and images must settle
+    # before this persistence pass: any later model mutation can invalidate the
+    # non-active configuration data. Reopen the finalized part, rebuild and mark
+    # every configuration, restore T120, then persist through Save3 in place.
+    part_path = (OUT_SLDPRT / f"{PART_NAME}.SLDPRT").resolve()
+    adapter.swApp.CloseAllDocuments(True)
+    adapter.currentModel = None
+    check("reopen finalized configured part", await adapter.open_model(str(part_path)))
+    for name, _teeth in reversed(CONFIGS):
+        actual = active_configuration_name(adapter, adapter.currentModel)
+        if actual != name:
+            activated = adapter._attempt(
+                lambda name=name: adapter.currentModel.ShowConfiguration2(name),
+                default=None,
+            )
+            actual = active_configuration_name(adapter, adapter.currentModel)
+            if not activated and actual != name:
+                raise RuntimeError(f"{name}: persistence activation failed")
+        rebuilt = adapter._attempt(
+            lambda: adapter.currentModel.ForceRebuild3(False), default=None
+        )
+        if not rebuilt:
+            raise RuntimeError(f"{name}: persistence rebuild failed")
+        configuration = _early_bound(
+            adapter.currentModel.GetConfigurationByName(name), "IConfiguration"
+        )
+        configuration.AddRebuildSaveMark = True
+        if not bool(configuration.AddRebuildSaveMark):
+            raise RuntimeError(f"{name}: failed to set rebuild/save mark")
+    adapter.currentModel.ShowConfiguration2("T120")
+    actual = active_configuration_name(adapter, adapter.currentModel)
+    if actual != "T120":
+        raise RuntimeError(f"final active configuration is {actual!r}, expected 'T120'")
+    save_result = adapter._attempt(
+        lambda: adapter.currentModel.Save3(1 | 8, 0, 0), default=None
+    )
+    saved = save_result[0] if isinstance(save_result, tuple) else save_result
+    if not saved:
+        raise RuntimeError(f"failed to persist configured part: {save_result!r}")
 
     if findings:
         summary = "; ".join(findings)

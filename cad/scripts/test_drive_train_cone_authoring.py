@@ -74,11 +74,13 @@ def test_every_cone_configuration_persists_rebuilt_data() -> None:
     assert len(persistence_sweeps) == 1
     sweep = persistence_sweeps[0]
     assert ast.dump(sweep.iter) == ast.dump(_expression("reversed(CONFIGS)"))
-    assert _calls(sweep, "set_active_configuration")
+    assert _calls(sweep, "ShowConfiguration2")
     assert _calls(sweep, "ForceRebuild3")
 
-    initial_save = next(
-        index for index, node in enumerate(build.body) if _calls(node, "save_file")
+    finalized = next(
+        index
+        for index, node in enumerate(build.body)
+        if _calls(node, "save_part_and_images")
     )
     close = next(
         index
@@ -90,11 +92,9 @@ def test_every_cone_configuration_persists_rebuilt_data() -> None:
     )
     persistence = build.body.index(sweep)
     final_save = next(
-        index
-        for index, node in enumerate(build.body)
-        if _calls(node, "save_part_and_images")
+        index for index, node in enumerate(build.body) if _calls(node, "Save3")
     )
-    assert initial_save < close < reopen < persistence < final_save
+    assert finalized < close < reopen < persistence < final_save
 
 
 def test_all_twenty_cones_are_inserted_directly_in_configuration() -> None:
