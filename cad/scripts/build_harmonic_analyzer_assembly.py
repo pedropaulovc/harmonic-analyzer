@@ -44,6 +44,7 @@ import sys
 from _common import (
     OUT_PNG,
     OUT_SLDASM,
+    _early_bound,
     apply_custom_properties,
     apply_summary_info,
     check,
@@ -59,6 +60,7 @@ from _assembly import (
     place_component,
     remap_front_to_machine_front,
     save_assembly_and_images,
+    whats_wrong,
 )
 from _transforms import IDENTITY
 from _interference_contracts import allowed_interference_pairs
@@ -104,7 +106,6 @@ SUBASSEMBLIES = (
 # (STOP_DECK_GAP above it) and the bar rides SLOT_FLOOR + half the window
 # clearance above the block bottom. STICK_POS.y (the graduated top face) is
 # therefore derived from the stop's constants, never a literal.
-import _telemetry  # noqa: E402
 from build_measuring_stick import (  # noqa: E402
     BODY_THICKNESS as STICK_THICK,
     BODY_WIDTH as STICK_WIDTH,
@@ -165,6 +166,32 @@ def _subassembly(name: str) -> str:
     return str(path)
 
 
+@_telemetry.traced("assembly.prepare_source", label_param="path")
+def _prepare_subassembly_document(adapter, path: str) -> None:
+    """Load and deeply resolve a source assembly before AddComponent5."""
+    app = _early_bound(adapter.swApp, "ISldWorks")
+    adapter._attempt(lambda: app.DocumentVisible(False, 2), default=None)
+    try:
+        result = adapter._attempt(
+            lambda: app.OpenDoc6(path, 2, 1, "", 0, 0), default=None
+        )
+        model = result[0] if isinstance(result, tuple) else result
+    finally:
+        adapter._attempt(lambda: app.DocumentVisible(True, 2), default=None)
+    if not model:
+        model = adapter._attempt(lambda: app.GetOpenDocumentByName(path), default=None)
+    if not model:
+        raise RuntimeError(f"failed to preload subassembly: {path}")
+    model = _early_bound(model, "IModelDoc2")
+    rebuilt = adapter._attempt(lambda: model.ForceRebuild3(True), default=None)
+    faults = whats_wrong(adapter, model)
+    if not rebuilt or faults:
+        raise RuntimeError(
+            f"source subassembly failed deep rebuild: {path}; "
+            f"rebuilt={rebuilt!r}, faults={faults}"
+        )
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         ComponentRefParameters,
@@ -174,11 +201,13 @@ async def build(adapter) -> dict[str, str]:
     check("create_assembly", await adapter.create_assembly())
 
     for name in SUBASSEMBLIES:
+        path = _subassembly(name)
+        _prepare_subassembly_document(adapter, path)
         data = check(
             f"insert {name}.SLDASM",
             await adapter.insert_component(
                 InsertComponentParameters(
-                    file_path=_subassembly(name),
+                    file_path=path,
                     position=[0.0, 0.0, 0.0],
                     rotation=[0.0, 0.0, 0.0],
                 )
