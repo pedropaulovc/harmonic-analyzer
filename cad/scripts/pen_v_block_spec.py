@@ -24,8 +24,7 @@ run without SolidWorks in ~1 s.
 
 from __future__ import annotations
 
-from _gtol_spec import CylinderFace
-from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from _surface_finish import SurfaceFinishControl
 
 # --- Nominal geometry (DIMENSIONS.md "Chapter 24", all scaled from the p.65
 # close-up vs the ~5 mm square rod, low).  These drive the part's named
@@ -50,19 +49,11 @@ GROOVE_Z0 = (BLOCK_DEPTH - GROOVE_WIDTH) / 2.0  # 3.75: centred across the depth
 SCREW_HOLE_DIA = 2.5  # front-face rod set-screw hole, over the rod bore
 SCREW_HOLE_XY = (BORE_X[0], 11.0)
 
-_UPPER_BORE_Y = (GROOVE_DEPTH + BLOCK_HEIGHT) / 2.0
-SURFACE_FINISHES = tuple(
-    SurfaceFinishControl(
-        f"pen_bore_{index}",
-        MACHINED_UM,
-        CylinderFace(
-            BORE_DIA,
-            contains_x_mm=x,
-            contains_y_mm=_UPPER_BORE_Y,
-        ),
-    )
-    for index, x in enumerate(BORE_X)
-)
+# No roughness callouts: the block is set-screwed to the pen rod (the rod
+# slides in the HANGER's square channel, not here) and the spare bore only
+# seats a pen, so nothing runs on either bore; the title block's Ra 3.2 covers
+# every face (cad/docs/drawing-simplicity-policy.md rule 5).
+SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
 
 # Derived spans (equations of the primitives above).
 
@@ -70,35 +61,32 @@ SURFACE_FINISHES = tuple(
 # print shows.  ``build_pen_v_block`` marks exactly these; ``draw_pen_v_block``
 # keeps exactly their union across its per-view ``keep`` maps.  The offline test
 # enforces ``union(marks) == union(keeps)`` so a rename in one script that isn't
-# mirrored in the other fails before any SolidWorks build. ---
+# mirrored in the other fails before any SolidWorks build.
+#
+# NOT marked, by design (machinist review 2026-09-02):
+# - the groove's width and lateral offset (``GrooveProfile``): a Top-plane
+#   sketch, so its model dimensions can only land in the top view, where the
+#   groove is hidden and the witness lines ran the full length of the sketch
+#   entities over the hidden edges.  The print dimensions them on the END view
+#   instead, as drawing-added dimensions across the visible groove walls;
+# - the chamfer leg (``Chamfer2dx``): a 24 mm dimension line cannot carry the
+#   "2X ... X 45" text without running through it, so the print uses a leader
+#   callout off the chamfer edge (``draw_pen_v_block.CHAMFER_CALLOUT``). ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "OutlineProfile": {"Length", "Chamfer2dx"},
+    "OutlineProfile": {"Length"},
     "Block": {"Depth"},
     "BoreProfile": {"Bore0X", "Bore1X", "Bore0Dia"},
-    "GrooveProfile": {"GrooveWidth", "GrooveZ0"},
     "Groove": {"GrooveDepth"},
     "ScrewHoleProfile": {"ScrewHoleCx", "ScrewHoleCz", "ScrewHoleDiaDim"},
 }
 
-# True free-text instructions only.  Geometry, datum structure, form/orientation,
-# and roughness live in native dimensions / datum tags / FCFs / surface symbols.
-# The part build stamps these strings into the SLDPRT; the drawing displays only
-# $PRPSHEET links, so the print cannot silently diverge from its source model.
+# Notes: part-specific process facts only, never a tolerance, never the
+# title block (drawing-simplicity-policy.md rule 6).
 DRAWING_NOTES = "\n".join(
     (
-        "PEN BORES: 2X <MOD-DIAM>8 THRU (VERTICAL), CENTRED ACROSS 16 DEPTH.",
-        "MARKER GROOVE: MILL 8.5 WIDE X 4.5 DEEP ALONG THE FULL LENGTH OF",
-        "THE BOTTOM FACE, CENTRED ACROSS THE 16 DEPTH; FLOOR FLAT.",
-        "ROD SET-SCREW HOLE <MOD-DIAM>2.5 DRILL THRU (FRONT TO BACK) ON THE",
-        "LEFT BORE AXIS; THREAD/FIT TO SUIT SET SCREW AT ASSEMBLY.",
-        "FINISH: BRIGHT BRASS, DEBURR ALL EDGES; DO NOT PAINT.",
+        "MARKER GROOVE RUNS THE FULL LENGTH OF THE BOTTOM FACE; FLOOR FLAT.",
+        "SET-SCREW HOLE: TAP TO SUIT THE ROD SET SCREW AT ASSEMBLY.",
+        "16 X 18 BAR STOCK FACES OK AS RECEIVED.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
-
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "pen bore position": "0.20",
-    "block top-face parallelism": "0.10",
-}

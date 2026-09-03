@@ -19,17 +19,14 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "RingProfile": {"OuterSpanX", "OuterHeightDim"},
 }
 
-# Lines kept short (<~66 chars) so the left-anchored block stays clear of the
-# title block; it grows DOWNWARD from its anchor.
+# Notes: part-specific process facts only, never a tolerance, never the
+# title block (drawing-simplicity-policy.md rule 6).  Short lines keep the
+# left-anchored block clear of the title block.
 DRAWING_NOTES = "\n".join(
     (
-        "1. FINISHED DEPTH 10.00 +/-0.10. FRONT VIEW AS SHOWN: LEFT",
-        "   RAIL 3.25 WIDE, RIGHT RAIL 4.00 WIDE, END RAILS 5.00;",
-        "   DO NOT MIRROR. WINDOW IS THROUGH THE FULL 10.00 DEPTH.",
-        "2. DRILL + TAP #4-40 UNC-2B THRU BOTTOM RAIL INTO WINDOW.",
-        "   AXIS 12.25 +/-0.05 FROM LEFT OUTER FACE, WITHIN 0.05 OF",
-        "   MID-DEPTH CENTER PLANE, AND NORMAL TO BOTTOM OUTER FACE.",
-        "   TOP RAIL MUST REMAIN INTACT.",
+        "RAILS: LEFT 3.25, RIGHT 4.00, ENDS 5.00 WIDE; WINDOW THRU. DO NOT MIRROR.",
+        "DRILL AND TAP #4-40 UNC UP THE BOTTOM RAIL INTO THE WINDOW,",
+        "12.25 FROM THE LEFT OUTER FACE, ON THE MID-DEPTH PLANE.",
     )
 )
 FRONT_VIEW_NOTE = "FRONT VIEW SCALE 2:1"

@@ -33,7 +33,9 @@ from _common import (
     define_circle,
     drive_dimension,
     ensure_fully_defined,
+    extrude_at_offset,
     force_rebuild,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -52,6 +54,7 @@ from pen_set_screw_spec import (
     DRAWING_NOTES,
     END_VIEW_NOTE,
     GROOVE_COUNT,
+    GROOVE_DIA,
     KNOB_DIA,
     KNOB_LENGTH,
     SHANK_DIA,
@@ -70,39 +73,57 @@ async def build(adapter) -> dict[str, str]:
     # Editable knobs (Tools > Equations): the two step diameters + lengths. The
     # mm suffix is load-bearing -- this is an INCH document and the equation
     # manager reads BARE numbers in document units (an unsuffixed 9 = 9 in).
-    # ShankExtent is the second extrude's depth (knob + shank), a derived global
-    # so it tracks both knobs; it is a feature parameter, so nothing drives it.
+    # KnobLength/ShankLength are extrude DEPTHS (feature parameters) --
+    # declared as knobs, but nothing in drive_jobs references them.
     await set_global(adapter, "KnobDia", f"{KNOB_DIA}mm")
     await set_global(adapter, "KnobLength", f"{KNOB_LENGTH}mm")
     await set_global(adapter, "ShankDia", f"{SHANK_DIA}mm")
     await set_global(adapter, "ShankLength", f"{SHANK_LEN}mm")
-    await set_global(adapter, "ShankExtent", '"KnobLength" + "ShankLength"')
 
     drive_jobs: list[tuple[str, str]] = []
 
     # Stepped blank: two coaxial on-axis circles (centre at the origin), so each
     # define_circle records ONLY its diameter dim -- the centre X/Z slots are
     # ignored. Name + record each sketch BEFORE its extrude absorbs it.
-    for label, dia, length, dia_name, dia_drive in (
-        ("knob", KNOB_DIA, KNOB_LENGTH, "KnobDia", '"KnobDia"'),
-        ("shank", SHANK_DIA, KNOB_LENGTH + SHANK_LEN, "ShankDia", '"ShankDia"'),
-    ):
-        sd = SketchDims()
-        check(f"create_sketch {label}", await adapter.create_sketch("Right"))
-        await define_circle(
-            adapter, 0.0, 0.0, dia / 2.0, label, dims=sd,
-            names=(f"{label}Cx", f"{label}Cz", dia_name),
-            drives=(None, None, dia_drive),
-        )
-        await ensure_fully_defined(adapter, f"{label} sketch")
-        check(f"exit_sketch {label}", await adapter.exit_sketch())
-        name_last_feature(adapter, f"{label.capitalize()}Profile")
-        drive_jobs += sd.apply(adapter, f"{label.capitalize()}Profile")
-        check(
-            f"extrude {label}",
-            await adapter.create_extrusion(ExtrusionParameters(depth=length)),
-        )
-        name_last_feature(adapter, label.capitalize())
+    # Knob 0..KNOB_LENGTH (+X off the Right plane).
+    knob = SketchDims()
+    check("create_sketch knob", await adapter.create_sketch("Right"))
+    await define_circle(
+        adapter, 0.0, 0.0, KNOB_DIA / 2.0, "knob", dims=knob,
+        names=("knobCx", "knobCz", "KnobDia"),
+        drives=(None, None, '"KnobDia"'),
+    )
+    await ensure_fully_defined(adapter, "knob sketch")
+    check("exit_sketch knob", await adapter.exit_sketch())
+    name_last_feature(adapter, "KnobProfile")
+    drive_jobs += knob.apply(adapter, "KnobProfile")
+    check(
+        "extrude knob",
+        await adapter.create_extrusion(ExtrusionParameters(depth=KNOB_LENGTH)),
+    )
+    name_last_feature(adapter, "Knob")
+    # Name the extrude DEPTH dims so the drawing inserts them as the knob-length
+    # and under-knob-length model dimensions (the depth is the first display
+    # dim of a blind boss).
+    name_dimensions(adapter, "Knob", ["KnobLg"])
+
+    # Shank KNOB_LENGTH..KNOB_LENGTH+SHANK_LEN: an offset-start extrude off the
+    # knob's outer face, so its depth dim IS the under-knob length the print
+    # carries (a plane-to-tip extrude would read knob + shank).
+    shank = SketchDims()
+    check("create_sketch shank", await adapter.create_sketch("Right"))
+    await define_circle(
+        adapter, 0.0, 0.0, SHANK_DIA / 2.0, "shank", dims=shank,
+        names=("shankCx", "shankCz", "ShankDia"),
+        drives=(None, None, '"ShankDia"'),
+    )
+    await ensure_fully_defined(adapter, "shank sketch")
+    check("exit_sketch shank", await adapter.exit_sketch())
+    name_last_feature(adapter, "ShankProfile")
+    drive_jobs += shank.apply(adapter, "ShankProfile")
+    extrude_at_offset(adapter, SHANK_LEN, KNOB_LENGTH)
+    name_last_feature(adapter, "Shank")
+    name_dimensions(adapter, "Shank", ["ShankLg"])
     v_blank = math.pi * (
         (KNOB_DIA / 2.0) ** 2 * KNOB_LENGTH + (SHANK_DIA / 2.0) ** 2 * SHANK_LEN
     )
@@ -125,6 +146,7 @@ async def build(adapter) -> dict[str, str]:
         SHANK_DIA,
         SHANK_LEN,
         groove_count=GROOVE_COUNT,
+        groove_dia=GROOVE_DIA,
     )
 
     from solidworks_mcp.adapters.base import CreateAxisParameters

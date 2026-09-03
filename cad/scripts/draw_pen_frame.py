@@ -120,11 +120,11 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(2, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
-    for view in (front, iso):
-        set_hidden_lines_removed(adapter, view)
-    # The third-angle right-side view makes the 10 mm depth and the upward
-    # set-screw axis explicit; hidden lines show the blind-to-window thread path.
-    set_hidden_lines_visible(adapter, right)
+    set_hidden_lines_removed(adapter, iso)
+    # Hidden lines ON in every orthographic view: the right view shows the
+    # set-screw thread path up the bottom rail into the window.
+    for view in (front, right):
+        set_hidden_lines_visible(adapter, view)
 
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
 

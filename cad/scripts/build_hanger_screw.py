@@ -38,6 +38,7 @@ from _common import (
     ensure_fully_defined,
     extrude_at_offset,
     force_rebuild,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -122,6 +123,10 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += head_dims.apply(adapter, "HexHeadProfile")
     extrude_at_offset(adapter, HEAD_H, 0.0)
     name_last_feature(adapter, "HexHead")
+    # Name the extrude DEPTH dims so the drawing inserts them as the head-height
+    # and under-head-length model dimensions (the depth is the first display
+    # dim of a blind boss).
+    name_dimensions(adapter, "HexHead", ["HeadHt"])
     v_head = math.sqrt(3.0) / 2.0 * HEAD_AF**2 * HEAD_H
     expected = v_head
     await volume_check(adapter, "head", expected, 0.005 * v_head)
@@ -140,6 +145,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += shank_dims.apply(adapter, "ShankProfile")
     extrude_at_offset(adapter, SHANK_LEN, -SHANK_LEN)
     name_last_feature(adapter, "Shank")
+    name_dimensions(adapter, "Shank", ["ShankLg"])
     v_shank = math.pi * (SHANK_DIA / 2.0) ** 2 * SHANK_LEN
     expected += v_shank
     await volume_check(adapter, "shank", expected, 0.005 * v_shank)
