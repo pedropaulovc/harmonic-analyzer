@@ -1487,11 +1487,11 @@ sections:
         - 'ch22 p.54: the locks read low against the rail (`guide_lock_spec.py`)'
         - scaled
         - low
-      - - Paper clip strips (×2)
-        - 'TWO-strip holder (2026-09-02, ch22 p.54 page001_img02/03): base strip 83.5 × 8.988 × 1.0 with #4 clearance end-screw holes, plus a 77.5 × 8.988 × 0.8 slotted strip riding on it (slot 73.4 × 3.4 spanning both screws) whose top end is bent 1.5 away from the platen as the paper mouth; one merged part, bright brass (NOT blackened)'
+      - - Paper holder springs (×2)
+        - 'ONE formed brass sheet per holder, 83.5 × 8.988 × 0.8: a 4.0-wide flat rail carries the two #4 clearance holes; opposed 39.25-long open-ended notches, 0.6 wide, stop at a 5.0 intact centre bridge and free the adjacent 4.388-wide spring rail; each centre-to-end half bows 1.5 away from the platen and returns at its rounded free end to clamp the paper'
         - —
-        - 'ch22 p.54 back plate + end close-up (two overlapping slotted strips); base strip from the ch30-p002 Pose Studio scale fit'
-        - scaled
+        - 'ch22 p.54 page001_img02/03: one slotted sheet with the middle left intact; user topology clarification 2026-09-03; hole stations retain the ch30-p002 scale fit'
+        - scaled + derived
         - low
       - - Material
         - heavy brass (darkened)
@@ -1505,11 +1505,11 @@ sections:
         - 'ch30-p002 Pose Studio delta fit: current-model origin translated (+116.787,+20.122), width scaled 0.8988, then height corrected to H:W = 1:2 while preserving the fitted top-left corner; z delta rejected as front-view depth leakage'
         - derived
         - med
-      - - Paper clips position (rework E4)
-        - 'two vertical strips hugging the resized platen''s extreme left/right edges from the TOP edge down (y 295.704..408.054): left x −32.314..−23.326, right +226.540..+235.528, on the paper face (z −144.1..−142.9)'
+      - - Paper holder positions (rework E4)
+        - 'two handed vertical holders from y 324.554..408.054: left origin (−29.8202, 408.054), Rz −90°, envelope x −29.8202..−20.8322; right origin (+233.0342, 324.554), Rz +90°, envelope x +224.0462..+233.0342. The flat rails seat at z −143.7..−142.9 against the platen; each local +Y spring rail points inward over the paper and bows to z −145.2 at peak'
         - —
-        - 'ch22 front photo: the bright strips run at the edges from the top edge down; the p.55 rear photo (140 mm callout) scales them to 86.7 of 140 = 0.619 of the plate height -> 83.5 on the 134.82 plate (the old ch30-p002 fit of 112.35 ran them 83% down, hiding the bare lower band the ch30 front plates show); REFUTES the M6.4 inboard bottom-anchored bands'
-        - scaled
+        - 'ch22 front photo: bright holders hug opposite platen edges with their spring lanes inward; #4 holes remain on the platen socket rows, while opposite handed rotations preserve the asymmetric one-sheet topology'
+        - scaled + derived
         - med
       - - Clip screws ×4 + platen sockets
         - brass fillister Ø5.5 × 2.2 head + Ø2.9 × 4 shank through each clip's #4 clearance end holes (machine x −27.820/+231.034, y 331.744/400.864) into #4-40 bottoming-tapped sockets in the platen front face; under-head faces on the clip fronts (z −144.1); ALL platen-riding screws lock-mated to the platen (rework E5 — grounded screws floated while the platen fed); slots below render resolution — omitted

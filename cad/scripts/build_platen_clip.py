@@ -1,33 +1,21 @@
-r"""Reproduction script: platen paper clip (book ch. 22, pp. 54-55).
+r"""Reproduction script: one-piece platen paper holder (book ch. 22, pp. 54-55).
 
-One of the two bright brass paper holders hugging the platen front's extreme
-left/right edges, running from the TOP edge down ~84. 2026-09-02 photo
-re-derive (ch22 page001_img02 -- both holders on the platen back plate --
-and page001_img03, the end close-up): each holder is TWO strips, not one:
+One of the two bright brass holders hugging the platen front's extreme
+left/right edges, running from the TOP edge down about 84 mm.  The reference
+photos show one slotted sheet: a flat screw rail and an
+adjacent spring rail are separated by open-ended lengthwise notches.  The
+notches stop before the middle, leaving one intact bridge between the rails.
+Each free half of the spring rail bows shallowly away from the platen and
+returns to the sheet plane at its rounded paper-contact end.
 
-* a BASE strip screwed to the platen at both ends (the two #4 fillister
-  clip screws through its end holes, unchanged from the first pass);
-* a thinner SLOTTED strip riding ON the base strip, the same screws passing
-  through its long central slot so it can slide along the edge; its top end
-  is bent up into a short LIP that flares away from the platen -- the paper's
-  edge tucks under the strip through that mouth.
+The model is one merged brass body with no added end flange or independent
+motion.  The two existing #4 clearance holes lie only in the 4 mm flat rail.
+The 0.8 mm sheet thickness and 1.5 mm arch rise retain the photo-proportioned
+values from the earlier interpretation while correcting its topology.
 
-Modelled as ONE merged part (the two strips never come apart in use; the
-sliding freedom is not a modelled DOF). Natural brass, no paint (they read
-bright against the blackened platen). Used twice in paper-drive.SLDASM
-(vertical: the assembly turns the +X-authored holder -90 about Z, origin at
-the platen's top edge, so local +X runs DOWN the platen).
-
-Layout: length along +X, width along +Y from the origin corner; thickness
-along +Z with the FRONT face at z 0 (the screw heads seat there) and the
-platen face at z CLIP_THICKNESS: base strip z BASE_T..CLIP_THICKNESS
-(against the platen), slotted strip z 0..UPPER_T in front of it, lip rising
-from the slotted strip's top end to z -LIP_H (away from the platen).
-
-Dimensions: base strip as before (ch30-p002 Pose Studio fit, 0.8988 scale,
-low); the upper strip, slot and lip are photo proportions off page001_img03
-(strip width ~1:1 with the base, slot ~2/3 of the strip length and ~1/3 of
-its width, lip ~1.5 high) -- low.
+Used twice in paper-drive.SLDASM.  Length is local +X, total width is local +Y,
+and the flat rail's outward face is local z = 0.  The assembly turns the holder
+-90 degrees about Z and places local z = SHEET_T against the platen.
 
 Run (SolidWorks already open)::
 
@@ -44,16 +32,20 @@ from _common import (
     add_line_chain,
     apply_material,
     check,
+    define_circle,
+    define_polygon_chain,
     define_rectilinear_chain,
     drive_dimension,
     ensure_fully_defined,
     extrude_at_offset,
     force_rebuild,
     name_last_feature,
+    name_dimensions,
     report_mass_properties,
     run_build,
     save_part_and_images,
     set_global,
+    set_sketch_direct_db,
     volume_check,
 )
 from _holes import CLEARANCE_MM, HoleSpec, wizard_holes
@@ -65,51 +57,85 @@ CLIP_LENGTH = (
     83.5  # ch22 p.55 rear photo: 86.7 of the 140 mm plate (0.619) x PLATE_HEIGHT 134.82
 )
 CLIP_WIDTH = 8.988  # ch30-p002 Pose Studio: 10 * 0.8988
-BASE_T = 1.0  # base strip thickness (against the platen)
-UPPER_T = 0.8  # slotted strip thickness (in front of the base strip)
-CLIP_THICKNESS = (
-    BASE_T + UPPER_T
-)  # 1.8: the assembly's front-face stand-off from the platen
-# End screws: the brass fillister clip screws (Ø2.9 shank) pass THROUGH, so
-# each end hole is a #4 clearance Hole Wizard hole (normal fit Ø3.264; was a
-# plain Ø3.0 cut) -- memory/fastener-policy-us-customary.
+SHEET_T = 0.8  # photo-backed brass sheet thickness
+CLIP_THICKNESS = SHEET_T  # assembly stand-off: one sheet, not a face stack
+
+SCREW_RAIL_WIDTH = 4.0
+NOTCH_WIDTH = 0.6
+SPRING_RAIL_WIDTH = CLIP_WIDTH - SCREW_RAIL_WIDTH - NOTCH_WIDTH  # 4.388
+SPRING_RAIL_Y0 = SCREW_RAIL_WIDTH + NOTCH_WIDTH
+CENTER_BRIDGE_LENGTH = 5.0
+NOTCH_LENGTH = (CLIP_LENGTH - CENTER_BRIDGE_LENGTH) / 2.0
+SPRING_END_RADIUS = SPRING_RAIL_WIDTH / 2.0
+ARCH_RISE = 1.5  # shallow outward bow; editable as ArchRise in Tools > Equations
+
+# The brass fillister clip screws (diameter 2.9 shank) retain their existing
+# lengthwise stations.  Their transverse station is explicit now because the
+# holes belong to the flat rail, not the overall two-lane width centre.
 HOLE_INSET = 7.1904  # ch30-p002 Pose Studio: 8 * 0.8988 from each end
-# Slotted upper strip (page001_img03): starts UPPER_X0 in from the top end
-# (local x 0) and stops the same short of the bottom; its slot spans both
-# screw stations with SLOT_MARGIN past each hole edge, SLOT_W wide (clears
-# the Ø2.9 shank, narrower than the ~Ø4.6 fillister head that clamps it).
-UPPER_X0 = 3.0
-UPPER_LENGTH = CLIP_LENGTH - 2.0 * UPPER_X0  # 77.5
-SLOT_W = 3.4
-SLOT_MARGIN = 0.5
-_SLOT_END_ALLOWANCE = CLEARANCE_MM[("#4", "normal")] / 2.0 + SLOT_MARGIN
-SLOT_X0 = 5.0584  # authored initial slot station; equation-driven in the model
+HOLE_Y = SCREW_RAIL_WIDTH / 2.0
+HOLE_DIA = CLEARANCE_MM[("#4", "normal")]
+
+# The rounded tips occupy one end-radius of flat tangent run before each arch.
+# The four equal sloped runs form two symmetric shallow bows.  Between them,
+# the spring rail lies in the sheet plane for the full 5 mm middle bridge,
+# making that connection both photo-visible and robustly merged.  Physical
+# coordinates are (local X, local Z) on the spring rail's outward face;
+# negative Z is away from the platen.
+_BRIDGE_X0 = (CLIP_LENGTH - CENTER_BRIDGE_LENGTH) / 2.0
+_BRIDGE_X1 = _BRIDGE_X0 + CENTER_BRIDGE_LENGTH
+_ARCH_RUN = (_BRIDGE_X0 - 2.0 * SPRING_END_RADIUS) / 2.0
+ARCH_FRONT_XZ = (
+    (SPRING_END_RADIUS, 0.0),
+    (2.0 * SPRING_END_RADIUS, 0.0),
+    (2.0 * SPRING_END_RADIUS + _ARCH_RUN, -ARCH_RISE),
+    (_BRIDGE_X0, 0.0),
+    (_BRIDGE_X1, 0.0),
+    (CLIP_LENGTH - 2.0 * SPRING_END_RADIUS - _ARCH_RUN, -ARCH_RISE),
+    (CLIP_LENGTH - 2.0 * SPRING_END_RADIUS, 0.0),
+    (CLIP_LENGTH - SPRING_END_RADIUS, 0.0),
+)
+
+MODEL_FEATURES = (
+    "FlatRail",
+    "CenterBridge",
+    "SpringArch",
+    "RoundedSpringEnds",
+    "ScrewHoles",
+)
+BOSS_DRIVES = {
+    "FlatRail": ('"SheetT"',),
+    "CenterBridge": ('"SheetT"',),
+    "SpringArch": ('"SpringRailW"', '"SpringRailY0"'),
+    "RoundedSpringEnds": ('"SheetT"',),
+}
+
+
+V_FLAT_RAIL = CLIP_LENGTH * SCREW_RAIL_WIDTH * SHEET_T
+V_CENTER_BRIDGE = CENTER_BRIDGE_LENGTH * NOTCH_WIDTH * SHEET_T
+V_SPRING_CORE = (
+    (CLIP_LENGTH - 2.0 * SPRING_END_RADIUS) * SPRING_RAIL_WIDTH * SHEET_T
+)
+# Each full end circle overlaps one half-circle of the flat tangent run, leaving
+# exactly two outer half-circles of additional material.
+V_ROUNDED_ENDS = math.pi * SPRING_END_RADIUS**2 * SHEET_T
+V_HOLES = 2.0 * math.pi * (HOLE_DIA / 2.0) ** 2 * SHEET_T
+V_FINAL = V_FLAT_RAIL + V_CENTER_BRIDGE + V_SPRING_CORE + V_ROUNDED_ENDS - V_HOLES
+
 if not math.isclose(
-    SLOT_X0,
-    HOLE_INSET - _SLOT_END_ALLOWANCE,
+    SCREW_RAIL_WIDTH + NOTCH_WIDTH + SPRING_RAIL_WIDTH,
+    CLIP_WIDTH,
     abs_tol=1e-9,
 ):
-    raise AssertionError("platen clip SlotX0 must follow the hole inset and clearance")
-SLOT_X1 = CLIP_LENGTH - SLOT_X0  # 78.44
-SLOT_LENGTH = SLOT_X1 - SLOT_X0
-# Lip: the upper strip's top end bent away from the platen (-Z), LIP_H high.
-LIP_H = 1.5
-
-V_BASE = CLIP_LENGTH * CLIP_WIDTH * BASE_T
-V_UPPER = UPPER_LENGTH * CLIP_WIDTH * UPPER_T
-V_SLOT = SLOT_LENGTH * SLOT_W * UPPER_T
-V_LIP = UPPER_T * CLIP_WIDTH * LIP_H
-V_HOLES = (
-    2.0 * math.pi * (CLEARANCE_MM[("#4", "normal")] / 2.0) ** 2 * BASE_T
-)  # the slot already opens the upper strip
-V_FINAL = V_BASE + V_UPPER - V_SLOT + V_LIP - V_HOLES
-
-if not (SLOT_X0 > UPPER_X0 + 1.0 and SLOT_X1 < UPPER_X0 + UPPER_LENGTH - 1.0):
-    raise AssertionError(
-        "platen clip slot must stay inside the upper strip with a 1 mm end land"
-    )
-if SLOT_W <= CLEARANCE_MM[("#4", "normal")]:
-    raise AssertionError("platen clip slot must be wider than the screw clearance hole")
+    raise AssertionError("platen clip lane widths must close to ClipWidth")
+if not math.isclose(
+    2.0 * NOTCH_LENGTH + CENTER_BRIDGE_LENGTH, CLIP_LENGTH, abs_tol=1e-9
+):
+    raise AssertionError("opposed platen clip notches must stop at one center bridge")
+if HOLE_Y - HOLE_DIA / 2.0 <= 0.0 or HOLE_Y + HOLE_DIA / 2.0 >= SCREW_RAIL_WIDTH:
+    raise AssertionError("platen clip screw holes must stay wholly inside the flat rail")
+if _ARCH_RUN <= 0.0 or ARCH_RISE <= 0.0:
+    raise AssertionError("platen clip spring arches need positive run and rise")
 
 
 async def _rect(
@@ -136,142 +162,228 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
-    # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
-    # is an INCH document and the equation manager reads BARE numbers in
-    # document units. Thicknesses are extrude DEPTHS (feature parameters), so
-    # their globals are editable knobs that drive nothing -- matching the
-    # exemplars.
+    # Editable knobs (Tools > Equations).  The mm suffix is load-bearing because
+    # the template is IPS and bare equation-manager numbers are document units.
     await set_global(adapter, "ClipLength", f"{CLIP_LENGTH}mm")
     await set_global(adapter, "ClipWidth", f"{CLIP_WIDTH}mm")
-    await set_global(adapter, "BaseT", f"{BASE_T}mm")
-    await set_global(adapter, "UpperT", f"{UPPER_T}mm")
-    await set_global(adapter, "HoleInset", f"{HOLE_INSET}mm")
-    await set_global(adapter, "HoleY", '"ClipWidth" / 2')
-    await set_global(adapter, "HoleFarX", '"ClipLength" - "HoleInset"')
-    await set_global(adapter, "UpperX0", f"{UPPER_X0}mm")
-    await set_global(adapter, "UpperLength", '"ClipLength" - 2 * "UpperX0"')
+    await set_global(adapter, "SheetT", f"{SHEET_T}mm")
+    await set_global(adapter, "ScrewRailW", f"{SCREW_RAIL_WIDTH}mm")
+    await set_global(adapter, "NotchW", f"{NOTCH_WIDTH}mm")
+    await set_global(
+        adapter, "SpringRailW", '"ClipWidth" - "ScrewRailW" - "NotchW"'
+    )
+    await set_global(adapter, "SpringRailY0", '"ScrewRailW" + "NotchW"')
+    await set_global(adapter, "CenterBridgeL", f"{CENTER_BRIDGE_LENGTH}mm")
+    await set_global(adapter, "BridgeX0", '("ClipLength" - "CenterBridgeL") / 2')
+    await set_global(adapter, "SpringEndR", '"SpringRailW" / 2')
+    await set_global(adapter, "ArchRise", f"{ARCH_RISE}mm")
     await set_global(
         adapter,
-        "SlotX0",
-        f'"HoleInset" - {_SLOT_END_ALLOWANCE}mm',
+        "ArchRun",
+        '(("ClipLength" - "CenterBridgeL") / 2 - 2 * "SpringEndR") / 2',
     )
-    await set_global(adapter, "SlotLength", '"ClipLength" - 2 * "SlotX0"')
-    await set_global(adapter, "SlotW", f"{SLOT_W}mm")
-    await set_global(adapter, "SlotY0", '("ClipWidth" - "SlotW") / 2')
-    await set_global(adapter, "LipH", f"{LIP_H}mm")
+    await set_global(adapter, "HoleInset", f"{HOLE_INSET}mm")
+    await set_global(adapter, "HoleY", '"ScrewRailW" / 2')
+    await set_global(adapter, "HoleFarX", '"ClipLength" - "HoleInset"')
 
     drive_jobs: list[tuple[str, str]] = []
 
-    # 1. Base strip: corner-at-origin rectangle, length along X, width along Y,
-    # extruded BASE_T from z BASE_T (the front face stays at z 0 for the upper
-    # strip; the back face at CLIP_THICKNESS bears on the platen).
-    outline = SketchDims()
+    # Flat rail: the only full-length planar lane and the only lane drilled for
+    # the two retaining screws.
+    flat = SketchDims()
     await _rect(
         adapter,
-        "base outline",
-        "BaseProfile",
-        [(0.0, 0.0), (CLIP_LENGTH, 0.0), (CLIP_LENGTH, CLIP_WIDTH), (0.0, CLIP_WIDTH)],
-        outline,
+        "flat rail outline",
+        "FlatRailProfile",
+        [
+            (0.0, 0.0),
+            (CLIP_LENGTH, 0.0),
+            (CLIP_LENGTH, SCREW_RAIL_WIDTH),
+            (0.0, SCREW_RAIL_WIDTH),
+        ],
+        flat,
         ["Length", "Width"],
-        ['"ClipLength"', '"ClipWidth"'],
+        ['"ClipLength"', '"ScrewRailW"'],
     )
-    drive_jobs += outline.apply(adapter, "BaseProfile")
-    extrude_at_offset(adapter, BASE_T, UPPER_T)
-    name_last_feature(adapter, "BaseStrip")
-    await volume_check(adapter, "base strip", V_BASE, 0.005 * V_BASE)
+    drive_jobs += flat.apply(adapter, "FlatRailProfile")
+    check(
+        "extrude flat rail",
+        await adapter.create_extrusion(ExtrusionParameters(depth=SHEET_T)),
+    )
+    name_last_feature(adapter, "FlatRail")
+    flat_dims = name_dimensions(adapter, "FlatRail", ["SheetDepth"])
+    drive_jobs += [(flat_dims[0], BOSS_DRIVES["FlatRail"][0])]
+    await volume_check(adapter, "flat rail", V_FLAT_RAIL, 0.005 * V_FLAT_RAIL)
 
-    # 2. Slotted upper strip in front of it (z 0..UPPER_T), inset UPPER_X0 from
-    # both ends. Its anchor corner is off the origin, so the chain emits the
-    # anchor x as a dim (y = 0 is a relation).
-    upper = SketchDims()
+    # The two open-ended notches are the absence of material between lanes from
+    # each outer end to this one intact 5 mm middle bridge.
+    bridge_x0 = _BRIDGE_X0
+    bridge = SketchDims()
     await _rect(
         adapter,
-        "upper outline",
-        "UpperProfile",
+        "center bridge outline",
+        "CenterBridgeProfile",
         [
-            (UPPER_X0, 0.0),
-            (UPPER_X0 + UPPER_LENGTH, 0.0),
-            (UPPER_X0 + UPPER_LENGTH, CLIP_WIDTH),
-            (UPPER_X0, CLIP_WIDTH),
+            (bridge_x0, SCREW_RAIL_WIDTH),
+            (bridge_x0 + CENTER_BRIDGE_LENGTH, SCREW_RAIL_WIDTH),
+            (bridge_x0 + CENTER_BRIDGE_LENGTH, SPRING_RAIL_Y0),
+            (bridge_x0, SPRING_RAIL_Y0),
         ],
-        upper,
-        ["UpperLength", "UpperWidth", "UpperX0"],
-        ['"UpperLength"', '"ClipWidth"', '"UpperX0"'],
+        bridge,
+        ["BridgeLength", "BridgeWidth", "BridgeX0", "BridgeY0"],
+        ['"CenterBridgeL"', '"NotchW"', '"BridgeX0"', '"ScrewRailW"'],
     )
-    drive_jobs += upper.apply(adapter, "UpperProfile")
+    drive_jobs += bridge.apply(adapter, "CenterBridgeProfile")
     check(
-        "extrude upper strip",
-        await adapter.create_extrusion(ExtrusionParameters(depth=UPPER_T)),
+        "extrude center bridge",
+        await adapter.create_extrusion(ExtrusionParameters(depth=SHEET_T)),
     )
-    name_last_feature(adapter, "UpperStrip")
-    await volume_check(adapter, "base + upper strips", V_BASE + V_UPPER, 0.005 * V_BASE)
+    name_last_feature(adapter, "CenterBridge")
+    bridge_dims = name_dimensions(adapter, "CenterBridge", ["SheetDepth"])
+    drive_jobs += [(bridge_dims[0], BOSS_DRIVES["CenterBridge"][0])]
+    volume = V_FLAT_RAIL + V_CENTER_BRIDGE
+    await volume_check(adapter, "flat rail and center bridge", volume, 0.005 * volume)
 
-    # 3. Slot through the upper strip only (mid-plane cut about z 0 reaching
-    # +-UPPER_T: the front half cuts air, the back half stops at the base strip).
-    slot = SketchDims()
-    slot_y0 = (CLIP_WIDTH - SLOT_W) / 2.0
-    await _rect(
+    # Spring rail longitudinal section on Top: sketch (x, y) maps to part
+    # (X, -Z).  Its outward and platen-side boundaries use the same station
+    # ordinates, separated vertically by SheetT.  This keeps the part one merged
+    # body while the ArchRise equation drives both symmetric free halves.
+    front_sketch = [(x, -z) for x, z in ARCH_FRONT_XZ]
+    back_sketch = [(x, -z - SHEET_T) for x, z in reversed(ARCH_FRONT_XZ)]
+    arch_points = front_sketch + back_sketch
+    arch = SketchDims()
+    check("create_sketch spring arch", await adapter.create_sketch("Top"))
+    set_sketch_direct_db(adapter, True)
+    arch_lines = await add_line_chain(adapter, arch_points)
+    set_sketch_direct_db(adapter, False)
+    run_expr = '"ArchRun"'
+    rise_expr = '"ArchRise"'
+    await define_polygon_chain(
         adapter,
-        "slot",
-        "SlotProfile",
-        [
-            (SLOT_X0, slot_y0),
-            (SLOT_X1, slot_y0),
-            (SLOT_X1, slot_y0 + SLOT_W),
-            (SLOT_X0, slot_y0 + SLOT_W),
+        arch_lines,
+        arch_points,
+        label="spring arch section",
+        dims=arch,
+        names=[
+            "SpringStartX",
+            "TipRunL",
+            "FrontRunL1",
+            "FrontRiseL",
+            "FrontRunL2",
+            "FrontFallL",
+            "CenterReturn",
+            "FrontRunR1",
+            "FrontRiseR",
+            "FrontRunR2",
+            "FrontFallR",
+            "TipRunR",
+            "SectionT",
+            "BackTipRunR",
+            "BackRunR1",
+            "BackRiseR",
+            "BackRunR2",
+            "BackFallR",
+            "BackCenterReturn",
+            "BackRunL1",
+            "BackRiseL",
+            "BackRunL2",
+            "BackFallL",
+            "BackTipRunL",
         ],
-        slot,
-        ["SlotLength", "SlotW", "SlotX0", "SlotY0"],
-        ['"SlotLength"', '"SlotW"', '"SlotX0"', '"SlotY0"'],
+        drives=[
+            '"SpringEndR"',
+            '"SpringEndR"',
+            run_expr,
+            rise_expr,
+            run_expr,
+            rise_expr,
+            '"CenterBridgeL"',
+            run_expr,
+            rise_expr,
+            run_expr,
+            rise_expr,
+            '"SpringEndR"',
+            '"SheetT"',
+            '"SpringEndR"',
+            run_expr,
+            rise_expr,
+            run_expr,
+            rise_expr,
+            '"CenterBridgeL"',
+            run_expr,
+            rise_expr,
+            run_expr,
+            rise_expr,
+            '"SpringEndR"',
+        ],
     )
-    drive_jobs += slot.apply(adapter, "SlotProfile")
-    check(
-        "cut slot",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=2.0 * UPPER_T, both_directions=True)
+    await ensure_fully_defined(adapter, "spring arch section")
+    check("exit_sketch spring arch", await adapter.exit_sketch())
+    name_last_feature(adapter, "SpringArchProfile")
+    drive_jobs += arch.apply(adapter, "SpringArchProfile")
+    extrude_at_offset(adapter, SPRING_RAIL_WIDTH, SPRING_RAIL_Y0)
+    name_last_feature(adapter, "SpringArch")
+    # Offset bosses expose depth first and start offset second.
+    spring_dims = name_dimensions(
+        adapter, "SpringArch", ["RailWidth", "RailStart"]
+    )
+    drive_jobs += list(zip(spring_dims, BOSS_DRIVES["SpringArch"], strict=True))
+    volume += V_SPRING_CORE
+    await volume_check(adapter, "spring arch", volume, 0.005 * volume)
+
+    # Full circles overlap the flat tangent portion of the spring core by one
+    # half each.  Their exposed halves give both free ends a rounded planform.
+    ends = SketchDims()
+    check("create_sketch rounded spring ends", await adapter.create_sketch("Front"))
+    spring_y = SPRING_RAIL_Y0 + SPRING_RAIL_WIDTH / 2.0
+    define_jobs = (
+        (
+            SPRING_END_RADIUS,
+            ("LeftEndX", "EndY", "LeftEndDia"),
+            ('"SpringEndR"', '"SpringRailY0" + "SpringEndR"', '2 * "SpringEndR"'),
+        ),
+        (
+            CLIP_LENGTH - SPRING_END_RADIUS,
+            ("RightEndX", "RightEndY", "RightEndDia"),
+            ('"ClipLength" - "SpringEndR"', '"SpringRailY0" + "SpringEndR"', '2 * "SpringEndR"'),
         ),
     )
-    name_last_feature(adapter, "Slot")
-    await volume_check(adapter, "slotted", V_BASE + V_UPPER - V_SLOT, 0.005 * V_BASE)
-
-    # 4. Lip: the upper strip's top end (x UPPER_X0..UPPER_X0 + UPPER_T) bent away
-    # from the platen: a UPPER_T x CLIP_WIDTH rectangle extruded LIP_H toward -Z
-    # from the front face (start offset -LIP_H, depth LIP_H, merging at z 0).
-    lip = SketchDims()
-    await _rect(
-        adapter,
-        "lip",
-        "LipProfile",
-        [
-            (UPPER_X0, 0.0),
-            (UPPER_X0 + UPPER_T, 0.0),
-            (UPPER_X0 + UPPER_T, CLIP_WIDTH),
-            (UPPER_X0, CLIP_WIDTH),
-        ],
-        lip,
-        ["LipT", "LipWidth", "LipX0"],
-        ['"UpperT"', '"ClipWidth"', '"UpperX0"'],
+    for x, names, drives in define_jobs:
+        await define_circle(
+            adapter,
+            x,
+            spring_y,
+            SPRING_END_RADIUS,
+            "rounded spring end",
+            dims=ends,
+            names=names,
+            drives=drives,
+        )
+    await ensure_fully_defined(adapter, "rounded spring ends")
+    check("exit_sketch rounded spring ends", await adapter.exit_sketch())
+    name_last_feature(adapter, "SpringEndProfiles")
+    drive_jobs += ends.apply(adapter, "SpringEndProfiles")
+    check(
+        "extrude rounded spring ends",
+        await adapter.create_extrusion(ExtrusionParameters(depth=SHEET_T)),
     )
-    drive_jobs += lip.apply(adapter, "LipProfile")
-    extrude_at_offset(adapter, LIP_H, -LIP_H)
-    name_last_feature(adapter, "Lip")
-    await volume_check(
-        adapter, "with lip", V_BASE + V_UPPER - V_SLOT + V_LIP, 0.005 * V_BASE
-    )
+    name_last_feature(adapter, "RoundedSpringEnds")
+    end_dims = name_dimensions(adapter, "RoundedSpringEnds", ["SheetDepth"])
+    drive_jobs += [(end_dims[0], BOSS_DRIVES["RoundedSpringEnds"][0])]
+    volume += V_ROUNDED_ENDS
+    await volume_check(adapter, "rounded spring ends", volume, 0.005 * volume)
 
-    # 5. End screw holes: ONE native Hole Wizard #4 clearance feature (2 points)
-    # from the front face (local z 0, outward normal -Z), through both strips;
-    # in the upper strip they land inside the slot, so only the base strip loses
-    # material.
+    # One native Hole Wizard #4 clearance feature, two points, both wholly in
+    # the flat rail.  No opening or hole crosses the spring lane.
     hole_cut = wizard_holes(
         adapter,
         HoleSpec("clearance", "#4"),
         [
-            [HOLE_INSET, CLIP_WIDTH / 2.0, 0.0],
-            [CLIP_LENGTH - HOLE_INSET, CLIP_WIDTH / 2.0, 0.0],
+            [HOLE_INSET, HOLE_Y, 0.0],
+            [CLIP_LENGTH - HOLE_INSET, HOLE_Y, 0.0],
         ],
         (0.0, 0.0, -1.0),
-        "end screw holes (#4 clearance)",
+        "flat-rail screw holes (#4 clearance)",
         name="ScrewHoles",
         placement_dims=[
             (("LeftX", '"HoleInset"'), ("LeftZ", '"HoleY"')),
@@ -279,16 +391,16 @@ async def build(adapter) -> dict[str, str]:
         ],
     )
     drive_jobs += hole_cut.placement_drive_jobs
-    await volume_check(adapter, "clip", V_FINAL, 0.005 * V_BASE)
+    await volume_check(adapter, "one-piece clip", V_FINAL, 0.005 * V_FLAT_RAIL)
 
-    # Apply the deferred drive equations after the whole model exists, then
-    # re-check neutrality.
+    # Apply deferred equations after every target exists.  Their initial values
+    # are neutral, so the second volume check also catches a mis-bound arch knob.
     await force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
     await volume_check(
-        adapter, "driven clip (equations neutral)", V_FINAL, 0.005 * V_BASE
+        adapter, "driven one-piece clip (equations neutral)", V_FINAL, 0.005 * V_FLAT_RAIL
     )
 
     await apply_material(adapter, MATERIAL)

@@ -315,11 +315,15 @@ for i, x_c in enumerate(p.LOCK_STATION_X):
     expect(PD, f"guide-lock-{2 * i + 2}",
            [station - p.LOCK_WIDTH / 2.0, p.GUIDE_Y[0], p.LOCK_Z0],
            IDENTITY, f"guide-lock bottom x{x_c:.0f}", **_SOLV)
-for i, sx in enumerate((p.PLATEN_SOCKET_XY[0][0], p.PLATEN_SOCKET_XY[2][0])):
-    clip_x = p.PLATE_X0 + p.PLATE_WIDTH - sx - p.CLIP_WIDTH / 2.0
-    expect(PD, f"platen-clip-{i + 1}",
-           [clip_x, p.PLATE_Y0 + p.PLATE_HEIGHT, p.PLATE_FRONT_Z - p.CLIP_THICKNESS],
-           _rz(-90.0), f"platen-clip x{clip_x:+.0f}", **_SOLV)
+for i, (_sx, clip_x, clip_y, rz) in enumerate(p.CLIP_PLACEMENTS):
+    expect(
+        PD,
+        f"platen-clip-{i + 1}",
+        [clip_x, clip_y, p.PLATE_FRONT_Z - p.CLIP_THICKNESS],
+        _rz(rz),
+        f"platen-clip x{clip_x:+.0f} Rz{rz:+.0f}",
+        **_SOLV,
+    )
 _paper_side = (p.PLATE_WIDTH - p.PAPER_WIDTH) / 2.0
 _paper_y = p.PLATE_Y0 + p.PLATE_HEIGHT - p.PAPER_HEIGHT - 3.0
 expect(PD, "platen-paper-1", [p.PLATE_X0 + _paper_side, _paper_y, p.PLATE_FRONT_Z - 0.5],

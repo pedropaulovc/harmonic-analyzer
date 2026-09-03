@@ -2,4 +2,4 @@ platen-clip:
   number: MHA-067
   material: Brass
   tolerance_class: machined_block
-  process: "sheet brass, two strips silver-soldered at the lip end (modelled merged)"
+  process: "one-piece 0.8 mm sheet brass; opposed open-ended notches leave a formed center-bridged spring rail"
