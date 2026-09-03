@@ -4,8 +4,10 @@ The lever wire is a Ø0.8 drawn-steel cylinder ~353 long -- a hair-thin
 silhouette with no flat face, no pickable end and no selectable silhouette edge,
 so the print is note-based: nothing is a marked dimension, and the diameter +
 straight rest-run length ride the notes (the build stamps the computed length).
-That chord is not represented as a developed cut length because the source model
-does not define the formed hook or hub-wrap allowance.
+That chord is not a developed cut length: the source model does not define the
+formed hook or hub wrap, so the note has the maker form them at assembly.
+The print is plain (cad/docs/drawing-simplicity-policy.md): no datum, frame,
+roughness or basic dimension.
 The wire axis is local +Y, so the FRONT view is the straight run reduced to fit
 (1:5) and the isometric confirms it is a plain straight rod.
 
@@ -30,6 +32,7 @@ from _drawing_common import (
     new_project_drawing,
     read_required_properties,
     set_hidden_lines_removed,
+    set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -104,8 +107,9 @@ async def build(adapter: Any) -> dict[str, str]:
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=WIRE_SCALE)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=WIRE_SCALE)
-    for view in (front, iso):
-        set_hidden_lines_removed(adapter, view)
+    set_hidden_lines_removed(adapter, iso)
+    # Hidden lines ON in the orthographic view (policy rule 7).
+    set_hidden_lines_visible(adapter, front)
 
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
 

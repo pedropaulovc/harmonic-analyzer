@@ -39,27 +39,14 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BoreProfile": {"BoreDia"},
 }
 
-# True free-text instructions only.  Geometry, datum structure,
-# form/orientation, and roughness live in native dimensions / datum tags /
-# FCFs / surface symbols.  The part build stamps these strings into the SLDPRT;
-# the drawing displays only $PRPSHEET links, so the print cannot silently
-# diverge from its source model.
+# Notes: part-specific process facts only, never a tolerance, never the
+# title block (drawing-simplicity-policy.md rule 6).
 DRAWING_NOTES = "\n".join(
     (
         "GRAY IRON CASTING; MACHINE ALL SURFACES SHOWN.",
-        "EAR HOLES: #8 CLEARANCE DRILL THRU, 2 PLACES, AT MID-HEIGHT;",
-        "PASS THE #8-32 CLAMP SCREWS (TAPPED IN BACK ARC, MHA-106).",
-        "COLUMN RELIEF: FINISH-BORE <MOD-DIAM>25.6 CLAMPED TO BACK ARC",
-        "MHA-106 AS A PAIR; SLIP FIT ON THE <MOD-DIAM>25.4 COLUMN.",
-        "PAINT BLACK AFTER MACHINING; BORE, BAR FACE",
-        "AND EAR HOLES MASKED.",
+        "BORE THE COLUMN RELIEF CLAMPED TO ITS BACK ARC AS A PAIR (MATES WITH MHA-106).",
+        "PAINT AFTER MACHINING; MASK THE BORE, BAR FACE AND EAR HOLES.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
 
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "ear-hole position": "0.25",
-    "mating-face parallelism": "0.10",
-}

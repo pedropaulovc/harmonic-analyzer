@@ -1,4 +1,11 @@
-"""Offline contracts for the magnifying-bracket drawing."""
+"""Offline contracts for the magnifying-bracket drawing.
+
+The print follows cad/docs/drawing-simplicity-policy.md: a bracket is not on
+the GD&T allowlist and it is lock-mated to the lever rod in service, so it
+carries no datum, frame, roughness or basic dimension; the notes are three
+lines carrying the collar and thicknesses the marked set cannot, plus the
+match-drill instruction for the unmodelled mounting pattern.
+"""
 
 from __future__ import annotations
 
@@ -8,6 +15,10 @@ import build_magnifying_bracket as part
 import draw_magnifying_bracket as drawing
 import magnifying_bracket_spec
 from _drawing_registry import DRAWINGS_BY_NAME
+
+
+def _source() -> str:
+    return Path(drawing.__file__).read_text(encoding="utf-8")
 
 
 def test_required_drawing_paths() -> None:
@@ -48,25 +59,68 @@ def test_bracket_is_uncoupled_from_the_assembly_nominals() -> None:
     assert "from build_magnifying_bracket import" not in assembly
 
 
-def test_notes_carry_the_collar_and_fit_that_have_no_marked_dim() -> None:
+def test_notes_are_few_specific_and_never_the_title_block() -> None:
     notes = magnifying_bracket_spec.DRAWING_NOTES
-    assert "Ø12 OD" in notes
-    assert "Ø6.2" in notes
-    assert "AISI 1018" not in notes
-    assert "BLACK-OXIDE" not in notes
-    assert "DEBURR" not in notes and "BREAK SHARP" not in notes
-    assert "X.XX" not in notes and "X.XXX" not in notes
-    assert "MATCH-DRILLED" not in notes
-    assert "UNDRILLED BLANK" in notes
-    assert "AXIS AND PATTERN ARE NOT DEFINED" in notes
-    assert "DO NOT RELEASE" in notes
+    lines = notes.split("\n")
+    assert len(lines) <= 4
+    # The collar and the thicknesses have no marked dimension: the note is
+    # their only carrier.
+    assert "COLLAR Ø12 OD X 10 LONG, BORE Ø6.2 DRILL THRU" in notes
+    assert "ARM 7.5 THICK; FLANGE 5 THICK." in notes
+    # The unmodelled mounting pattern is a process instruction, not a hold.
+    assert "MATCH-DRILL TO THE SUMMING PLATE AT ASSEMBLY" in notes
+    for banned in (
+        "DO NOT RELEASE",
+        "UNDRILLED BLANK",
+        "NOT DEFINED",
+        "AISI 1018",
+        "BLACK-OXIDE",
+        "UOS",
+        "DIMENSIONS IN",
+        "+/-",
+        "DATUM",
+        "MHA-",
+        "DEBURR",
+        "BREAK SHARP",
+        "X.XX",
+    ):
+        assert banned not in notes, banned
+    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in _source()
+
+
+def test_plan_dimensions_are_labelled() -> None:
+    assert drawing.DIMENSION_CALLOUTS == {
+        "ArmWidth": "ARM WIDTH",
+        "ArmDepth": "ARM LENGTH",
+        "FlangeWidth": "FLANGE WIDTH",
+        "FlangeDepth": "FLANGE DEPTH",
+    }
 
 
 def test_collar_bore_takes_the_center_mark() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    source = _source()
     assert source.count("auto_center_marks(") == 1
-    # First draft leans on marked plan dims + notes; no coordinate-picked GD&T.
     assert source.count("add_edge_dimension(") == 0
+
+
+def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:
+    source = _source()
+    for helper in (
+        "add_datum_feature(",
+        "add_feature_control_frame(",
+        "add_surface_finish(",
+        "set_basic_dimension(",
+        "project_part_pmi(",
+    ):
+        assert helper not in source, helper
+    assert not hasattr(magnifying_bracket_spec, "GEOMETRIC_TOLERANCES_MM")
+    assert not hasattr(magnifying_bracket_spec, "SURFACE_FINISHES")
+
+
+def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
+    source = _source()
+    assert "for view in (top, front, right):\n        set_hidden_lines_visible" in source
+    assert "set_hidden_lines_removed(adapter, iso)" in source
 
 
 def test_unresolved_mounting_pattern_is_not_encoded_as_fake_geometry() -> None:
@@ -82,6 +136,9 @@ def test_part_stamps_make_critical_properties() -> None:
     import _config
 
     config = _config.parts("magnifying-bracket")
-    assert config["material"] == config["material_specification"]
+    # The library material renders the model; the spec is what the shop buys
+    # (the title block's MATERIAL cell shows the spec).
+    assert config["material_specification"] == "AISI 1018 cold-finished steel bar"
+    assert config["material_specification"] != config["material"]
     assert config["finish"]
     assert int(config["quantity"]) == 1

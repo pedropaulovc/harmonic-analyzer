@@ -5,7 +5,12 @@ Three bores run along the depth (front-back), so the FRONT view (looking down th
 bore axis) shows them as circles: 2x #8 clamp-screw clearance holes flanking the
 column and 1x #6 pen-hanger hole at the free end.  The bar length + section ride
 the auto-imported profile marks; the depth is added across the right-view
-section, the holes carry native callouts + location dimensions from the left end.
+section; each bore carries a native DRILL callout and a horizontal station from
+the LEFT END (one origin), stacked below the bar with the shortest span nearest.
+
+The print is plain (cad/docs/drawing-simplicity-policy.md): a clamped support
+bar is not on the GD&T allowlist, so it carries no datum, no frame, no
+roughness symbol and no basic dimension.
 
 Run with SolidWorks open::
 
@@ -22,13 +27,15 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
     add_edge_dimension,
+    add_native_hole_callout,
     add_property_linked_note,
     curate_view_dimensions,
     finalize_drawing,
+    find_edge_near,
     new_project_drawing,
     read_required_properties,
+    set_arc_endpoints_to_center,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
@@ -38,6 +45,10 @@ from wheel_bar_spec import (
     BAR_DEPTH,
     BAR_LENGTH,
     BAR_SIDE,
+    CLAMP_HOLE_DIA,
+    CLAMP_HOLE_X,
+    PEN_HANGER_HOLE_DIA,
+    SCREW_HOLE_X,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -58,21 +69,71 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 1.0)
+_S = SHEET_SCALE[0] / 1000.0  # sheet meters per model mm
 FRONT_CENTER = (0.155, 0.175)
 RIGHT_CENTER = (0.320, 0.175)
 ISO_CENTER = (0.320, 0.095)
 
-_HALF_LEN = BAR_LENGTH * SHEET_SCALE[0] / 2000.0
+_HALF_LEN = BAR_LENGTH * _S / 2.0
+_HALF_SIDE = BAR_SIDE * _S / 2.0
 LEFT_END = FRONT_CENTER[0] - _HALF_LEN
+BAR_BOTTOM = FRONT_CENTER[1] - _HALF_SIDE
 
+
+def _front_x(model_x: float) -> float:
+    """Sheet x of a model x station in the origin-centred front view."""
+    return FRONT_CENTER[0] + model_x * _S
+
+
+# The overall length moves down one row to make room for the three station
+# dimensions stacked between it and the bar.
 FRONT_KEEP = {
-    "Length": (FRONT_CENTER[0], FRONT_CENTER[1] - 0.030),
+    "Length": (FRONT_CENTER[0], BAR_BOTTOM - 0.038),
     "Side": (LEFT_END - 0.020, FRONT_CENTER[1]),
 }
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
 
-RIGHT_HALF_Z = BAR_DEPTH * SHEET_SCALE[0] / 2000.0
-RIGHT_HALF_Y = BAR_SIDE * SHEET_SCALE[0] / 2000.0
+RIGHT_HALF_Z = BAR_DEPTH * _S / 2.0
+RIGHT_HALF_Y = BAR_SIDE * _S / 2.0
+
+# The left end face is the one origin; the pen-hanger hole sits 2.5 from it,
+# so that pick lands well above the bar's mid-height, clear of the circle.
+END_FACE_PICK = (LEFT_END, FRONT_CENTER[1] + 0.0035)
+
+# Station rows below the bar, shortest span nearest (so no extension line
+# crosses a shorter dimension's text): (model x, hole Ø, text sheet xy).  The
+# 2.5 station is far narrower than its text, so the text sits right of the
+# span rather than between the extension lines.
+_ROW_Y = (BAR_BOTTOM - 0.008, BAR_BOTTOM - 0.018, BAR_BOTTOM - 0.028)
+
+
+def _span_mid_x(model_x: float) -> float:
+    return (LEFT_END + _front_x(model_x)) / 2.0
+
+
+HOLE_STATIONS = (
+    (SCREW_HOLE_X, PEN_HANGER_HOLE_DIA, (LEFT_END + 0.016, _ROW_Y[0])),
+    (CLAMP_HOLE_X[0], CLAMP_HOLE_DIA, (_span_mid_x(CLAMP_HOLE_X[0]), _ROW_Y[1])),
+    (CLAMP_HOLE_X[1], CLAMP_HOLE_DIA, (_span_mid_x(CLAMP_HOLE_X[1]), _ROW_Y[2])),
+)
+
+# Native DRILL callouts above the bar, one per Hole Wizard feature (the clamp
+# pair reads 2X from its own instance count): (model x, hole Ø, callout xy).
+HOLE_CALLOUTS = (
+    ("pen-hanger hole", SCREW_HOLE_X, PEN_HANGER_HOLE_DIA, (0.062, 0.204)),
+    ("clamp-screw holes", CLAMP_HOLE_X[0], CLAMP_HOLE_DIA, (0.236, 0.204)),
+)
+
+
+def _rim_pick(adapter: Any, view: Any, model_x: float, dia: float, label: str):
+    """Refine the top-rim point of a Ø``dia`` bore at ``model_x`` to a real edge."""
+    return find_edge_near(
+        adapter,
+        view,
+        (_front_x(model_x), FRONT_CENTER[1] + dia * _S / 2.0),
+        axis="y",
+        label=label,
+    )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -140,24 +201,33 @@ async def build(adapter: Any) -> dict[str, str]:
         label="bar-depth overall",
     )
 
-    # The three Z-bores show as circles in the front view and take the ASME
-    # centre marks above; their small clearance diameters + X-stations from the
-    # left end are not dependable associative-callout picks at this 1:1 scale, so
-    # they ride the notes (spec DRAWING_NOTES lists the sizes + stations) rather
-    # than fragile per-hole callouts + location dimensions.
+    # Hole stations: left end face -> each bore axis, re-anchored to the arc
+    # CENTRE so the value locates the axis, not the rim.
+    for model_x, dia, text_xy in HOLE_STATIONS:
+        label = f"hole station at {model_x:g}"
+        station = add_edge_dimension(
+            adapter,
+            front,
+            p0=END_FACE_PICK,
+            p1=_rim_pick(adapter, front, model_x, dia, label),
+            text_xy=text_xy,
+            label=label,
+            orientation="horizontal",
+        )
+        set_arc_endpoints_to_center(adapter, station, label=label)
 
-    # Datum A = the bar back face (seats on the clamp arc); tagged on the right
-    # view's back edge.
-    add_datum_feature(
-        adapter,
-        right,
-        edge_xy=(RIGHT_CENTER[0] + RIGHT_HALF_Z, RIGHT_CENTER[1]),
-        symbol_xy=(RIGHT_CENTER[0] + RIGHT_HALF_Z + 0.016, RIGHT_CENTER[1]),
-        datum="A",
-        label="bar back seat face",
-    )
+    # Hole sizes: native Hole Wizard callouts, DRILL as the process prefix.
+    for label, model_x, dia, callout_xy in HOLE_CALLOUTS:
+        add_native_hole_callout(
+            adapter,
+            front,
+            edge_xy=_rim_pick(adapter, front, model_x, dia, label),
+            callout_xy=callout_xy,
+            label=label,
+            process="DRILL",
+        )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.125)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.112)
     # x <= 0.235 keeps the ~55 mm label fully left of the title-block keep-out
     # (x >= 0.264) -- the first run landed it 25.6 x 4.5 mm into the block.
     add_property_linked_note(adapter, "Isometric View Note", 0.180, 0.070)

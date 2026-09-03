@@ -93,10 +93,12 @@ async def build(adapter) -> dict[str, str]:
         await adapter.add_arc(R, 0.0, R, R, 0.0, 0.0),
     )
     set_sketch_direct_db(adapter, False)
-    # Same scheme as build_magnifying_lever: origin corner + dome centres
-    # anchored, one radial dim (the left dome's radius is forced by its
-    # anchored centre + the anchored origin end), top edge horizontal and
-    # aligned over the left centre; merged centerline unconstrained.
+    # Same scheme as build_magnifying_lever: origin corner anchored, both dome
+    # centres held on the axis, the OVERALL length dimensioned on the axis
+    # line (tip to tip -- the print's controlling length), one radial dim (the
+    # left dome's radius is forced by its anchored centre + the anchored origin
+    # end; the right centre by the axis end + that radius), top edge horizontal
+    # and aligned over the left centre; merged centerline unconstrained.
     check(
         "anchor origin corner",
         await adapter.add_sketch_constraint(
@@ -108,17 +110,25 @@ async def build(adapter) -> dict[str, str]:
         await adapter.add_sketch_constraint(axis_line, None, "horizontal"),
     )
     # Record each manual dim into SketchDims as it is emitted (creation order):
-    # the two on-axis dome-centre X distances (one dim each -- y is 0, a relation),
-    # then the right dome's radius. Three display dims; the left dome's radius is
-    # forced by its anchored centre + the anchored origin end, so it is not a dim.
+    # the left dome-centre X distance (y is 0, a relation), the overall length
+    # on the axis line, then the right dome's radius. Three display dims; the
+    # left dome's radius is forced by its anchored centre + the anchored origin
+    # end, so it is not a dim.
     await anchor_point_to_origin(
         adapter, f"{cap_left}.center", R, 0.0, "left dome centre"
     )
     profile.record("LeftDomeCentre", '"RodDia" / 2')
-    await anchor_point_to_origin(
-        adapter, f"{cap_right}.center", ROD_LENGTH - R, 0.0, "right dome centre"
+    check(
+        "right dome centre on axis",
+        await adapter.add_sketch_constraint(
+            f"{cap_right}.center", "origin", "horizontal_points"
+        ),
     )
-    profile.record("RightDomeCentre", '"RodLength" - "RodDia" / 2')
+    check(
+        "rod overall length",
+        await adapter.add_sketch_dimension(axis_line, None, "linear", ROD_LENGTH),
+    )
+    profile.record("RodOverall", '"RodLength"')
     check(
         "right dome radius",
         await adapter.add_sketch_dimension(cap_right, None, "radial", R),

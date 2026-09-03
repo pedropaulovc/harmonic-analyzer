@@ -30,11 +30,14 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    set_dimension_callouts,
+    set_dimension_precision,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from output_fixture_spec import COLLAR_DIA, COLLAR_HEIGHT, CROSS_HOLE_TAP
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -54,23 +57,43 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 SHEET_SCALE = (3.0, 1.0)   # 3:1 whole sheet (Ø10 collar)
+VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]
 
-# Sheet layout (meters).  The side (front) view carries the cross hole + height;
-# the end (top) view above it carries the two concentric diameters; the
-# isometric (2:1) sits to the right.
+# Sheet layout (meters).  The side (front) view carries the cross hole, the
+# collar length and the hole station; the end (top) view above it carries the
+# two concentric diameters; the isometric (2:1) sits to the right.
 FRONT_CENTER = (0.120, 0.130)
 TOP_CENTER = (0.120, 0.210)
 ISO_CENTER = (0.340, 0.175)
 
+# Side-view silhouette (sheet meters): the collar is Ø10 wide by 8 tall.
+_SIDE_HALF_W = COLLAR_DIA * VIEW_SCALE / 2000.0
+_SIDE_HALF_H = COLLAR_HEIGHT * VIEW_SCALE / 2000.0
+
 # Per-view survivors of the marked-dimension import.  The end (top) view carries
-# the collar OD + rod bore; the side (front) view carries the cross-hole
-# diameter and its mid-height station.  The keep union == the marked set.
+# the collar OD + rod bore; the side (front) view carries the collar length
+# (left), the cross-hole station from the bottom faced end (right) and the
+# cross-hole diameter callout (below right).  The keep union == the marked set.
 TOP_KEEP = {
     "CollarDiaDim": (0.070, 0.238),
     "RodBoreDiaDim": (0.185, 0.210),
 }
 FRONT_KEEP = {
-    "CrossHoleDiaDim": (0.185, 0.110),
+    "CollarHeightDim": (FRONT_CENTER[0] - _SIDE_HALF_W - 0.014, FRONT_CENTER[1]),
+    "CrossHeight": (
+        FRONT_CENTER[0] + _SIDE_HALF_W + 0.014,
+        FRONT_CENTER[1] - _SIDE_HALF_H / 2.0,
+    ),
+    # Callout text low and right so its leader clears the CrossHeight lane.
+    "CrossHoleDiaDim": (0.150, 0.088),
+}
+# The callout says the process (Harvey #13); the rod bore's slip-fit band
+# rides the model dimension, so it prints natively beside the reamed Ø.  The
+# cross hole is drilled through both walls and tapped on the entry wall only
+# -- said once, at the feature, not in a note.
+DIMENSION_CALLOUTS = {
+    "RodBoreDiaDim": "REAM THRU",
+    "CrossHoleDiaDim": f"DRILL THRU BOTH WALLS; TAP {CROSS_HOLE_TAP} ENTRY WALL ONLY",
 }
 
 
@@ -122,12 +145,26 @@ async def build(adapter: Any) -> dict[str, str]:
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(3, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2, 1))
     set_hidden_lines_removed(adapter, iso)
-    set_hidden_lines_removed(adapter, top)
-    # The side view shows the vertical rod bore as hidden lines through the body.
-    set_hidden_lines_visible(adapter, front)
+    # Hidden lines ON in every orthographic view: the side view shows the rod
+    # bore through the body, the end view the cross hole through both walls.
+    for view in (front, top):
+        set_hidden_lines_visible(adapter, view)
 
-    curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
-    curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
+    top_annotations = curate_view_dimensions(
+        adapter, top, keep=TOP_KEEP, view_label="top"
+    )
+    front_annotations = curate_view_dimensions(
+        adapter, front, keep=FRONT_KEEP, view_label="front"
+    )
+    set_dimension_callouts(
+        adapter, [*top_annotations, *front_annotations], DIMENSION_CALLOUTS
+    )
+    # The rod bore is the one fitted feature (reamed, band on the model
+    # dimension): three decimals say "hold it"; everything else stays at the
+    # two-place block tolerance.
+    set_dimension_precision(
+        adapter, [*top_annotations, *front_annotations], {"RodBoreDiaDim": 3}
+    )
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the end view")
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):

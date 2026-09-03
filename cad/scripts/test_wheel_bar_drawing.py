@@ -1,4 +1,11 @@
-"""Offline contracts for the wheel-bar drawing."""
+"""Offline contracts for the wheel-bar drawing.
+
+The print follows cad/docs/drawing-simplicity-policy.md: a clamped support bar
+is not on the GD&T allowlist and nothing runs on it, so it carries no datum,
+frame, roughness symbol or basic dimension; every bore has a native DRILL
+callout and a station from the left end on the front view (rule 6: a note is
+never a dimension), and the one note is the stock licence.
+"""
 
 from __future__ import annotations
 
@@ -8,6 +15,10 @@ import build_wheel_bar as part
 import draw_wheel_bar as drawing
 import wheel_bar_spec
 from _drawing_registry import DRAWINGS_BY_NAME
+
+
+def _source() -> str:
+    return Path(drawing.__file__).read_text(encoding="utf-8")
 
 
 def test_required_drawing_paths() -> None:
@@ -43,10 +54,13 @@ def test_drawing_contract_is_split_from_the_assembly_nominals() -> None:
     assert "from build_wheel_bar import" not in assembly
 
 
-def test_linked_notes_specify_the_bores_and_stock() -> None:
+def test_notes_are_few_specific_and_never_the_title_block() -> None:
     notes = wheel_bar_spec.DRAWING_NOTES
-    assert "#8 NORMAL CLEARANCE Ø4.978" in notes
-    assert "#6 CLOSE CLEARANCE Ø3.912" in notes
+    # Every hole size and station is on the front view now; the one note is
+    # the stock licence.
+    assert notes == "10 X 9 BAR STOCK FACES OK AS RECEIVED."
+    # The callouts DISPLAY the Hole Wizard cut, so the geom's quoted diameters
+    # must be the wizard's exact clearance cuts.
     assert wheel_bar_spec.CLAMP_HOLE_DIA == 4.978
     assert wheel_bar_spec.PEN_HANGER_HOLE_DIA == 3.912
     assert part.blind_cut_dia_mm(part.CLAMP_HOLE_SPEC) == wheel_bar_spec.CLAMP_HOLE_DIA
@@ -54,25 +68,83 @@ def test_linked_notes_specify_the_bores_and_stock() -> None:
         part.blind_cut_dia_mm(part.SCREW_HOLE_SPEC)
         == wheel_bar_spec.PEN_HANGER_HOLE_DIA
     )
-    assert "STEEL" not in notes and "AISI 1018" not in notes
-    assert "DEBURR" not in notes and "BREAK SHARP" not in notes
-    assert "X.XX" not in notes
-    assert "LINEAR +/-" not in notes
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+    for banned in (
+        "#8",
+        "#6",
+        "Ø",
+        "FROM THE LEFT END",
+        "DRILLED",
+        "CLEARANCE",
+        "DATUM",
+        "MHA-",
+        "UOS",
+        "DIMENSIONS IN",
+        "+/-",
+        "STEEL",
+        "AISI 1018",
+        "DEBURR",
+        "BREAK SHARP",
+        "X.XX",
+    ):
+        assert banned not in notes, banned
+    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in _source()
 
 
-def test_bores_are_note_based_with_center_marks() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    # The small clearance-hole circles are not dependable associative picks at
-    # 1:1, so there is no per-hole callout / location dim; the notes carry the
-    # sizes + X-stations and the front-view centre marks locate them.
-    assert source.count("add_native_hole_callout(") == 0
-    assert source.count("add_datum_feature(") == 1
-    assert source.count("add_edge_dimension(") == 1  # bar depth only
+def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:
+    # Policy rules 3-5: not on the allowlist; nothing runs on the bar.
+    source = _source()
+    for helper in (
+        "add_datum_feature(",
+        "add_feature_control_frame(",
+        "add_surface_finish(",
+        "set_basic_dimension(",
+        "project_part_pmi(",
+    ):
+        assert helper not in source, helper
+    assert not hasattr(wheel_bar_spec, "GEOMETRIC_TOLERANCES_MM")
+    assert not hasattr(wheel_bar_spec, "SURFACE_FINISHES")
+
+
+def test_bores_carry_native_drill_callouts_and_stations_from_the_left_end() -> None:
+    source = _source()
+    # One native Hole Wizard callout per hole FEATURE (the clamp pair reads 2X
+    # from its instance count), DRILL as the process prefix, plus the ASME
+    # centre marks.
+    assert source.count("add_native_hole_callout(") == 1  # inside the loop
+    assert 'process="DRILL"' in source
     assert "auto_center_marks(" in source
-    # The station note is computed from the geom constants, never duplicated.
-    assert "HOLE STATIONS FROM THE LEFT END" in wheel_bar_spec.DRAWING_NOTES
+    assert [(x, dia) for _, x, dia, _ in drawing.HOLE_CALLOUTS] == [
+        (wheel_bar_spec.SCREW_HOLE_X, wheel_bar_spec.PEN_HANGER_HOLE_DIA),
+        (wheel_bar_spec.CLAMP_HOLE_X[0], wheel_bar_spec.CLAMP_HOLE_DIA),
+    ]
+    # Every station is a horizontal linear from the ONE origin (the left end
+    # face) to the bore axis (arc endpoint re-anchored to the centre), stacked
+    # below the bar shortest span nearest so no extension line crosses a
+    # shorter dimension's text.
+    assert 'orientation="horizontal"' in source
+    assert "set_arc_endpoints_to_center(adapter, station" in source
+    assert "p0=END_FACE_PICK" in source
+    assert drawing.END_FACE_PICK[0] == drawing.LEFT_END
+    stations = [x for x, _, _ in drawing.HOLE_STATIONS]
+    assert stations == sorted(stations)
+    assert stations == [wheel_bar_spec.SCREW_HOLE_X, *wheel_bar_spec.CLAMP_HOLE_X]
+    rows = [xy[1] for _, _, xy in drawing.HOLE_STATIONS]
+    assert rows == sorted(rows, reverse=True)
+    assert rows[0] < drawing.BAR_BOTTOM
+    assert drawing.FRONT_KEEP["Length"][1] < rows[-1]
+    for x, dia, _ in drawing.HOLE_STATIONS:
+        rim_y = drawing.FRONT_CENTER[1] + dia * drawing._S / 2.0
+        assert drawing.END_FACE_PICK[1] > rim_y  # end-face pick clears the circle
+    # The rim picks are refined to a real edge rather than trusted blind.
+    assert "find_edge_near(" in source
+    # The bar depth stays across the right-view section.
+    assert 'label="bar-depth overall"' in source
+
+
+def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
+    source = _source()
+    assert "for view in (front, right):\n        set_hidden_lines_visible" in source
+    assert "set_hidden_lines_removed(adapter, iso)" in source
 
 
 def test_part_stamps_make_critical_properties() -> None:
@@ -82,6 +154,9 @@ def test_part_stamps_make_critical_properties() -> None:
     import _config
 
     config = _config.parts("wheel-bar")
-    assert config["material"] == config["material_specification"]
+    # The library material renders the model; the spec is what the shop buys
+    # (the title block's MATERIAL cell shows the spec).
+    assert config["material_specification"] == "AISI 1018 cold-finished steel bar"
+    assert config["material_specification"] != config["material"]
     assert config["finish"]
     assert int(config["quantity"]) == 1

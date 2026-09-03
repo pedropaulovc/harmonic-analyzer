@@ -2,7 +2,7 @@ magnifying-vertical-rod:
   number: MHA-044
   material: Brass
   material_specification: Brass
-  finish: machined
+  finish: bright
   quantity: 1
   tolerance_class: machined_block
   fit_class: shaft_in_bushing
