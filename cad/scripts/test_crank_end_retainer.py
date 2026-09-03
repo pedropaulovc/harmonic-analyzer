@@ -53,9 +53,9 @@ def test_dedicated_screw_is_the_registered_short_slotted_hardware() -> None:
 
 def test_shaft_tap_and_screw_stop_before_the_finished_taper() -> None:
     assert retainer.SHAFT_TAP_DRILL_DIA == TAP_DRILL_MM["#0-80"]
-    assert abs(retainer.FINISHED_TAPER_NEAR_END - 1.1458333333333335) < 1e-12
+    assert abs(retainer.FINISHED_TAPER_NEAR_END - 1.1546875) < 1e-12
     assert retainer.SHAFT_TAP_TO_FINISHED_TAPER_WEB >= retainer.MIN_TAP_TO_TAPER_WEB
-    assert abs(retainer.SHAFT_TAP_TO_FINISHED_TAPER_WEB - 0.20802120333333352) < 1e-12
+    assert abs(retainer.SHAFT_TAP_TO_FINISHED_TAPER_WEB - 0.21687537000000012) < 1e-12
     assert retainer.SHAFT_TAP_POINT_END == (
         retainer.SHAFT_TAP_DRILL_DEPTH
         + retainer.SHAFT_TAP_DRILL_DIA / 2.0 * DRILL_POINT_H
@@ -88,7 +88,7 @@ def test_shaft_tap_and_screw_stop_before_the_finished_taper() -> None:
         retainer.SCREW_ENGAGEMENT + retainer.MIN_SCREW_TO_TAPER_CLEARANCE
         < retainer.FINISHED_TAPER_NEAR_END
     )
-    assert abs(retainer.SCREW_TO_FINISHED_TAPER_CLEARANCE - 0.5958333333333334) < 1e-12
+    assert abs(retainer.SCREW_TO_FINISHED_TAPER_CLEARANCE - 0.6046875) < 1e-12
     assert (
         drive.CRANK_RETAINER_TIP_Z + retainer.MIN_SCREW_TO_TAPER_CLEARANCE
         < drive.CRANK_TAPER_NEAR_END_Z

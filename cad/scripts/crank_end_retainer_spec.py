@@ -38,11 +38,13 @@ SHAFT_TAP_DRILL_DEPTH = 0.58
 SHAFT_THREAD_DEPTH = 0.55
 THREAD_PITCH = 25.4 / 80.0
 
-# Finished 1:48 pin envelope at the crankshaft axis.  The pin's Ø5.9375 big
-# end starts 3 mm proud of the Ø16 arm boss, putting the shaft axis 11 mm from
-# that end; its local axial centre remains 4 mm from the crank end.
+# Finished 1:48 pin envelope at the crankshaft axis. The pin's Ø5.9375 big
+# end starts 3.85 mm proud of the Ø16 arm boss: its Ø1.2 keeper wire is
+# centred 3 mm from the big end with 0.25 mm air to the boss. This puts the
+# shaft axis 11.85 mm from that end; its local axial centre remains 4 mm from
+# the crank end.
 FINISHED_TAPER_BIG_END_DIA = BIG_END_DIA
-FINISHED_TAPER_BIG_END_TO_SHAFT_AXIS = 11.0
+FINISHED_TAPER_BIG_END_TO_SHAFT_AXIS = 11.85
 FINISHED_TAPER_AXIS_STATION = 4.0
 FINISHED_TAPER_DIA_AT_SHAFT_AXIS = (
     FINISHED_TAPER_BIG_END_DIA
