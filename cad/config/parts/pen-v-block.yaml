@@ -2,7 +2,7 @@ pen-v-block:
   number: MHA-053
   material: Brass
   material_specification: C360 free-machining brass
-  finish: machined; bright brass, deburred
+  finish: bright brass
   quantity: 1
   tolerance_class: machined_block
   process: "machined (brass)"

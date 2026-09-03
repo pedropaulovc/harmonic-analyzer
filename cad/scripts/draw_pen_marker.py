@@ -6,6 +6,12 @@ horizontal, tip left).  The barrel diameter and overall length live on the
 silhouette as drawing-native picked dimensions (the revolve's sketch chain
 only carries radius / partial-length dims); the tip-cone height is the one
 marked model dimension.
+
+The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): the
+marker is clamped in the v-block groove, so it carries no datum, frame or
+roughness symbol; the title block's general tolerances govern.  The tip
+allowance is a leader note on the apex, so the two dimensions that end there
+are read as running to the theoretical sharp.
 """
 
 from __future__ import annotations
@@ -15,26 +21,22 @@ import math
 import sys
 from typing import Any
 
-from pen_marker_spec import GEOMETRIC_TOLERANCES_MM
-
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_feature_control_frame,
+    add_attached_note,
     add_property_linked_note,
-    add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
     set_hidden_lines_removed,
+    set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import surface_finish_by_key
-from pen_marker_spec import BARREL_DIA, BARREL_TOP_Y, CONE_H, SURFACE_FINISHES
+from pen_marker_spec import BARREL_DIA, BARREL_TOP_Y, CONE_H, TIP_NOTE
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -66,18 +68,19 @@ ISO_CENTER = (0.330, 0.190)
 _HALF_LEN = BARREL_TOP_Y * SHEET_SCALE[0] / 2000.0
 _HALF_DIA = BARREL_DIA * SHEET_SCALE[0] / 2000.0
 APEX = (FRONT_CENTER[0] - _HALF_LEN, FRONT_CENTER[1])
-CONE_BASE_X = APEX[0] + CONE_H * SHEET_SCALE[0] / 1000.0
 END_FACE = (FRONT_CENTER[0] + _HALF_LEN, FRONT_CENTER[1])
 BARREL_TOP_EDGE = (FRONT_CENTER[0] + 0.035, FRONT_CENTER[1] + _HALF_DIA)
 BARREL_BOTTOM_EDGE = (FRONT_CENTER[0] + 0.035, FRONT_CENTER[1] - _HALF_DIA)
-CONE_FLANK = (
-    (APEX[0] + CONE_BASE_X) / 2.0,
-    FRONT_CENTER[1] + _HALF_DIA / 2.0,
-)
 
+# The tip-cone height sits ABOVE the barrel (between the silhouette and the
+# 110.00 lane), text offset right of its short span, so the region under the
+# apex stays clear for the tip-flat leader note.
 FRONT_KEEP = {
-    "ConeH": (APEX[0] + 0.005, FRONT_CENTER[1] - 0.030),
+    "ConeH": (APEX[0] + 0.016, FRONT_CENTER[1] + 0.030),
 }
+# Tip-flat note anchored under the apex; its leader rises straight to the
+# apex vertex with nothing between (the 5.00 lane is above the barrel).
+TIP_NOTE_XY = (0.020, 0.145)
 
 
 def _rotate_view(adapter: Any, view: Any, angle: float, *, label: str) -> None:
@@ -211,8 +214,8 @@ async def build(adapter: Any) -> dict[str, str]:
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
-    for view in (front, iso):
-        set_hidden_lines_removed(adapter, view)
+    set_hidden_lines_removed(adapter, iso)
+    set_hidden_lines_visible(adapter, front)
     # Lathe convention: axis horizontal. Model +Y (the pen axis) points up in
     # *Front; -90 deg turns it to +X so the tip apex lands on the LEFT. The
     # rotation does not pivot about the geometry center, so re-pin the center
@@ -246,62 +249,16 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _display_as_diameter(adapter, barrel_dia, label="barrel diameter")
 
-    add_datum_feature(
+    # The tip allowance flagged from the view (policy rule 6): the leader lands
+    # on the apex vertex the 110.00 and 5.00 both run to.
+    add_attached_note(
         adapter,
         front,
-        edge_xy=BARREL_BOTTOM_EDGE,
-        symbol_xy=(BARREL_BOTTOM_EDGE[0], FRONT_CENTER[1] - 0.026),
-        datum="A",
-        label="pen-marker barrel axis",
-        entity_type="SILHOUETTE",
-    )
-    # frame_xy is the frame's TOP-LEFT corner and the box grows RIGHT from it:
-    # measured, the anchor (APEX[0]-0.014 = 0.076) rendered the box at
-    # x 0.0759..0.1012, y 0.2062..0.2121 -- 25.3 mm wide. The overall-length
-    # dimension below picks the apex VERTEX, so its left extension line rises at
-    # exactly APEX[0] = 0.090, which fell 14 mm INSIDE that box and struck out
-    # the "0.10" tolerance cell. (The 60.00 is a GRAY reference dimension, so a
-    # crop thresholded at 128 cannot see the line at all -- only the render or a
-    # 200-threshold crop shows it.)
-    #
-    # -0.032 puts the box at 0.058..0.0833: its right edge clears APEX[0] by
-    # 6.7 mm, and it lands in empty sheet (the only ink measured in
-    # x 0.030..0.076, y 0.204..0.214 was the box's own left border). It may NOT
-    # go right instead: the Ra body's ink starts at x=0.1119, so a box left-
-    # anchored past the extension line would end at 0.1173 and run 5.4 mm into
-    # it -- the "x<=0.111" bound noted below is real and tight. The leader now
-    # crosses the gray extension line on its way to the cone flank, which is
-    # ordinary ASME routing; a struck-out tolerance value is not.
-    add_feature_control_frame(
-        adapter,
-        front,
-        edge_xy=CONE_FLANK,
-        frame_xy=(APEX[0] - 0.032, FRONT_CENTER[1] + 0.032),
-        characteristic="circular_runout",
-        tolerance=GEOMETRIC_TOLERANCES_MM["marker tip runout"],
-        datums=("A",),
-        label="marker tip runout",
-        entity_type="SILHOUETTE",
-    )
-    # In the band ABOVE the barrel, between the barrel top (0.188) and the 60.00
-    # dimension line (~0.221) -- NOT above that dimension, where an early pass
-    # ran the leader through the 60.00 text and struck it out.
-    #
-    # The leader leaves the anchor at the symbol's ▽ tip and the ▽ opens UPWARD,
-    # so a leader that has to CLIMB to its target is drawn through the glyph (or
-    # along its flank) unless it escapes sideways faster than the ▽'s ~1.8 flank
-    # slope. Anchoring to the TOP silhouette instead makes the leader run DOWN
-    # and away from the body entirely, so it stays short and unambiguous. The
-    # body draws up and RIGHT of the anchor (~x+0.039, y+0.019), which fixes the
-    # 0.196 ceiling here and keeps it clear of the tip-runout frame at x<=0.111.
-    add_surface_finish(
-        adapter,
-        front,
-        edge_xy=(FRONT_CENTER[0] - 0.024, FRONT_CENTER[1] + _HALF_DIA),
-        symbol_xy=(FRONT_CENTER[0] - 0.016, 0.196),
-        control=surface_finish_by_key(SURFACE_FINISHES, "barrel"),
-        label="barrel bearing finish",
-        entity_type="SILHOUETTE",
+        text=TIP_NOTE,
+        entity_xy=APEX,
+        note_xy=TIP_NOTE_XY,
+        label="tip flat allowance",
+        entity_type="VERTEX",
     )
 
     # x=0.020: the anchor is the text's left edge, so the ink starts here. The
