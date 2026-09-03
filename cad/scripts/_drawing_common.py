@@ -964,6 +964,30 @@ def add_view_centerline(
     return centerline
 
 
+def _sheet_to_view_sketch(
+    adapter: Any, view: Any, xy: tuple[float, float], *, label: str
+) -> tuple[float, float]:
+    """Convert a drawing-sheet point (m) into the activated view's SKETCH space.
+
+    Sketch geometry authored inside an activated drawing view (a section cut
+    line, a detail circle) is NOT in sheet meters: SolidWorks interprets it in
+    the view's own space -- model units, origin at the model origin's
+    projection.  Measured 2026-09-02 on rocker-arm-support: a section line
+    asked for at sheet (0.1125, 0.152..0.248) drew its "A" arrow above the
+    sheet's top edge and the section cut nothing (a hollow outline, no hatch),
+    so every pick on the "cut face" found only the view itself.  The origin
+    comes from ``ModelToViewTransform`` and the scale from ``ScaleRatio``.
+    (Rotated views -- ``IView.Angle`` != 0 -- would also need the axes turned;
+    no section or detail is cut on one today.)
+    """
+    origin = model_point_in_view(adapter, view, (0.0, 0.0, 0.0), label=label)
+    ratio = tuple(float(v) for v in (_early_bound(view, "IView").ScaleRatio or ()))
+    if len(ratio) < 2 or ratio[1] == 0.0:
+        raise RuntimeError(f"view has no scale ratio ({label}): {ratio!r}")
+    scale = ratio[0] / ratio[1]
+    return ((xy[0] - origin[0]) / scale, (xy[1] - origin[1]) / scale)
+
+
 @_telemetry.traced("drawing.section_view", label_param="label")
 def create_section_view(
     adapter: Any,
@@ -990,12 +1014,14 @@ def create_section_view(
     if not ddoc.ActivateView(name):
         raise RuntimeError(f"failed to activate section parent view {name!r} ({label})")
     draw.ClearSelection2(True)
+    start = _sheet_to_view_sketch(adapter, parent_view, line_start, label=label)
+    end = _sheet_to_view_sketch(adapter, parent_view, line_end, label=label)
     segment = sketch_manager.CreateLine(
-        float(line_start[0]),
-        float(line_start[1]),
+        float(start[0]),
+        float(start[1]),
         0.0,
-        float(line_end[0]),
-        float(line_end[1]),
+        float(end[0]),
+        float(end[1]),
         0.0,
     )
     if segment is None:
@@ -1032,6 +1058,90 @@ def create_section_view(
     draw.ClearSelection2(True)
     draw.EditRebuild3()
     return section
+
+
+# swDetViewStyle_e / swDetCircleShowType_e (read off the docs bundle enums).
+_DETAIL_VIEW_STANDARD = 0  # swDetViewSTANDARD
+_DETAIL_CIRCLE_CIRCLE = 1  # swDetCircleCIRCLE: the sketch circle IS the boundary
+
+
+@_telemetry.traced("drawing.detail_view", label_param="label")
+def create_detail_view(
+    adapter: Any,
+    parent_view: Any,
+    *,
+    center: tuple[float, float],
+    radius: float,
+    view_xy: tuple[float, float],
+    detail_label: str,
+    scale: tuple[int, int],
+    label: str,
+) -> Any:
+    """Create an enlarged detail of a circular region of ``parent_view``.
+
+    ``center``/``radius``/``view_xy`` are drawing-sheet meters.  The documented
+    sequence (Create Detail Circle and Detail View example) is: activate the
+    parent view, ``ISketchManager.CreateCircle`` (centre + a point on the
+    circumference), which leaves the circle selected, then
+    ``CreateDetailViewAt4`` with the circle as the boundary.  The detail is
+    positioned and scaled explicitly like every other view (auto-scale would
+    make later coordinate picks nondeterministic).
+
+    Policy rule 7 (drawing-simplicity-policy.md): a feature too small to
+    dimension legibly at the sheet scale is dimensioned in a detail like this
+    one, not by piling leaders into the parent view.
+    """
+    if radius <= 0.0:
+        raise ValueError(f"detail radius must be positive ({label})")
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
+    name = view_name(adapter, parent_view)
+    if not ddoc.ActivateView(name):
+        raise RuntimeError(f"failed to activate detail parent view {name!r} ({label})")
+    draw.ClearSelection2(True)
+    centre = _sheet_to_view_sketch(adapter, parent_view, center, label=label)
+    rim = _sheet_to_view_sketch(
+        adapter, parent_view, (center[0] + radius, center[1]), label=label
+    )
+    circle = sketch_manager.CreateCircle(
+        float(centre[0]),
+        float(centre[1]),
+        0.0,
+        float(rim[0]),
+        float(rim[1]),
+        0.0,
+    )
+    if circle is None:
+        raise RuntimeError(f"failed to create detail circle ({label})")
+    detail = ddoc.CreateDetailViewAt4(
+        float(view_xy[0]),
+        float(view_xy[1]),
+        0.0,
+        _DETAIL_VIEW_STANDARD,
+        float(scale[0]),
+        float(scale[1]),
+        detail_label,
+        _DETAIL_CIRCLE_CIRCLE,
+        True,  # FullOutline
+        False,  # JaggedOutline
+        False,  # NoOutline
+        5,  # ShapeIntensity (unused without a jagged outline)
+    )
+    if detail is None:
+        raise RuntimeError(f"failed to create detail view ({label})")
+    detail = _sw_type_info.early_bound_or_flag(detail, "IView", "SetViewPosition")
+    detail.ScaleRatio = double_array([float(scale[0]), float(scale[1])])
+    if not detail.SetViewPosition(
+        double_array([float(view_xy[0]), float(view_xy[1])]), False
+    ):
+        raise RuntimeError(f"failed to position detail view ({label})")
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    _telemetry.event(
+        "drawing.detail_view", detail=detail_label, scale=f"{scale[0]}:{scale[1]}"
+    )
+    return detail
 
 
 @_telemetry.traced("drawing.model_point_projection", label_param="label")
