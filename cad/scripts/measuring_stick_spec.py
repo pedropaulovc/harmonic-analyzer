@@ -18,36 +18,14 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BodyProfile": {"BodyLength", "BodyWidth"},
 }
 
-# Lines kept short (<~66 chars) so the left-anchored block stays clear of the
-# title block (x >= 0.264 m); it grows DOWNWARD from its anchor.
+# Notes: part-specific process facts only, never a tolerance, never the
+# title block (drawing-simplicity-policy.md rule 6).
 DRAWING_NOTES = "\n".join(
     (
-        "1. FINISHED BAR 200.00 X 8.00 X 3.00; RULE THE BROAD FACE",
-        "   SHOWN. SCALE SPAN 142.00; THE 10 TICK 0.50 +/-0.25 FROM",
-        "   THE FAR END.",
-        "2. ENGRAVE 11 FULL TICKS (VALUES 0 THRU 10). THE 0 TICK",
-        "   IS THE DATUM: TICK N AT 14.20 X N FROM THE 0 TICK,",
-        "   EACH WITHIN +/-0.05 OF ITS OWN POSITION",
-        "   (NONCUMULATIVE; 0-TO-10 SPAN 142.00 REF). NINE MINOR",
-        "   TICKS PER DIVISION AT 1.42 PITCH, 1.80 +/-0.10 UP FROM",
-        "   THE BOTTOM EDGE SHOWN, SAME SLOT SECTION.",
-        "   SLOTS: SQUARE BOTTOM, 0.40 +/-0.05 WIDE, 0.50 +/-0.05",
-        "   DEEP NORMAL TO THE RULED FACE; EACH FULL TICK RUNS",
-        "   3.00 +/-0.10 UP FROM THE BOTTOM EDGE SHOWN. ONE",
-        "   HALF-DIVISION TICK BETWEEN 0 + 1: SAME SLOT SECTION,",
-        "   4.00 +/-0.10 UP FROM THE BOTTOM EDGE.",
-        "3. ENGRAVE 2.00 +/-0.10 HIGH ASME Y14.2 VERTICAL GOTHIC",
-        "   NUMERALS 0 THRU 10, STROKE WIDTH 0.30 +/-0.10, TURNED",
-        "   90 DEG: DIGIT TOPS TOWARD THE 10 END (READ WITH THE",
-        "   10 END UP). NUMERALS 0-9 START 0.60 +/-0.10 PAST THEIR",
-        "   FULL TICK TOWARD 10; THE 10 NUMERAL ENDS 0.60 +/-0.10",
-        "   SHORT OF ITS TICK. TICK-SIDE END OF EACH NUMERAL",
-        "   3.60 +/-0.10 ABOVE THE BOTTOM EDGE SHOWN (0.60 BEYOND",
-        "   THE FULL-TICK ENDS). DEPTH 0.50 +/-0.05, SAME SLOT",
-        "   SECTION AS THE TICKS. BLACK-FILL ALL ENGRAVING: FLAT",
-        "   BLACK ENAMEL WIPE-FILLED, CURED BEFORE FINAL POLISH.",
-        "4. TICK VALUES ARE ALSO SHOWN OFFSET BELOW THE BAR FOR",
-        "   LEGIBILITY; THE ENGRAVED NUMERALS ARE PER NOTE 3.",
+        "ENGRAVE 0-10: 11 FULL TICKS AT 14.20 PITCH, 9 MINOR TICKS PER DIVISION,",
+        "ONE HALF TICK BETWEEN 0 AND 1. SLOTS 0.40 WIDE X 0.50 DEEP, SQUARE BOTTOM;",
+        "FULL 3.00 / HALF 4.00 / MINOR 1.80 LONG FROM THE BOTTOM EDGE SHOWN.",
+        "NUMERALS 2.00 HIGH X 0.50 DEEP, TURNED 90 DEG, 0.60 PAST THEIR TICK; BLACK-FILL.",
     )
 )
 FRONT_VIEW_NOTE = "RULED FACE SCALE 1:1"

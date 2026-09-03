@@ -1,4 +1,9 @@
-"""Offline contracts for the measuring-stick drawing."""
+"""Offline contracts for the measuring-stick drawing.
+
+The print follows cad/docs/drawing-simplicity-policy.md: a ruled brass bar
+carries no datums, frames or roughness symbols, and its notes are four lines
+of engraving fact (the graduation swarm is not dimensioned tick by tick).
+"""
 
 from __future__ import annotations
 
@@ -8,6 +13,10 @@ import build_measuring_stick as part
 import draw_measuring_stick as drawing
 import measuring_stick_spec
 from _drawing_registry import DRAWINGS_BY_NAME
+
+
+def _source() -> str:
+    return Path(drawing.__file__).read_text(encoding="utf-8")
 
 
 def test_required_drawing_paths() -> None:
@@ -26,32 +35,50 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert kept == marked
 
 
-def test_notes_cover_the_scale_and_graduations() -> None:
+def test_notes_are_few_specific_and_never_the_title_block() -> None:
     notes = measuring_stick_spec.DRAWING_NOTES
-    assert "FINISHED BAR" in notes
+    lines = notes.split("\n")
+    assert len(lines) <= 4
+    # The scale is defined by pitch + slot section + numeral size; the ticks
+    # themselves are shown, not dimensioned one by one.
     assert "11 FULL TICKS" in notes
-    assert "HALF-DIVISION" in notes
+    assert "14.20 PITCH" in notes
+    assert "HALF TICK" in notes
     assert "SQUARE BOTTOM" in notes
-    assert "NONCUMULATIVE" in notes
-    assert "STROKE WIDTH 0.30" in notes
-    assert "ASME Y14.2 VERTICAL GOTHIC" in notes
-    # Numeral note tracks the build (build_measuring_stick.NUMERAL_*): height,
-    # depth (== TICK_DEPTH), tick gap and the 90-degree turn read off the photo.
-    assert f"ENGRAVE {part.NUMERAL_HEIGHT_MM:.2f} +/-0.10 HIGH" in notes
-    assert f"DEPTH {part.TICK_DEPTH:.2f} +/-0.05" in notes
-    assert f"START {part.NUMERAL_GAP_MM:.2f} +/-0.10 PAST THEIR" in notes
-    assert part.NUMERAL_ROTATION_DEG == 90 and "TURNED\n   90 DEG" in notes
-    tick_side_end = part.TICK_LENGTH + part.NUMERAL_GAP_MM  # from the edge the ticks hang from
-    assert f"{tick_side_end:.2f} +/-0.10 ABOVE THE BOTTOM EDGE SHOWN" in notes
-    assert "CDA" not in notes
-    assert "X.XX" not in notes
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "BLACK-FILL" in notes
+    # Numeral facts track the build (pass-3 photo re-derive).
+    assert f"NUMERALS {part.NUMERAL_HEIGHT_MM:.2f} HIGH X {part.TICK_DEPTH:.2f} DEEP" in notes
+    assert f"TURNED {part.NUMERAL_ROTATION_DEG} DEG" in notes
+    assert f"{part.NUMERAL_GAP_MM:.2f} PAST THEIR TICK" in notes
+    for banned in ("UOS", "DIMENSIONS IN", "+/-", "NONCUMULATIVE", "ASME Y14.2", "CDA", "X.XX"):
+        assert banned not in notes, banned
+    source = _source()
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+
+
+def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:
+    source = _source()
+    for helper in (
+        "add_datum_feature(",
+        "add_feature_control_frame(",
+        "add_surface_finish(",
+        "set_basic_dimension(",
+        "project_part_pmi(",
+    ):
+        assert helper not in source, helper
+    assert not hasattr(measuring_stick_spec, "GEOMETRIC_TOLERANCES_MM")
+
+
+def test_hidden_lines_stay_on_in_the_ruled_face_view() -> None:
+    source = _source()
+    assert "set_hidden_lines_visible(adapter, front)" in source
+    assert "set_hidden_lines_removed(adapter, iso)" in source
+    assert source.count("set_hidden_lines_removed(") == 1
 
 
 def test_view_scales_are_explicit() -> None:
     assert drawing.SHEET_SCALE == (1.0, 1.0)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    source = _source()
     assert "scale=(1, 1)" in source
     assert "scale=(1, 2)" in source
     assert measuring_stick_spec.FRONT_VIEW_NOTE == "RULED FACE SCALE 1:1"
