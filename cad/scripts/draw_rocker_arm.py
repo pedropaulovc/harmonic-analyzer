@@ -5,10 +5,10 @@ views, dimension layout, hole callouts, and manufacturing notes; every shared
 sheet/template, import, curation, and export behavior lives in
 ``_drawing_common``.
 
-The strap is a long thin curved seesaw (~292 mm tip to tip, 16 mm deep, 2.5 mm
-thick).  A projected side view of the curved strap is a messy band, so the
-16 x 2.5 section is carried in the notes and the print shows the profile (front)
-plus a 1:2 isometric.  The sheet runs at 1:2.
+The strap is a long thin asymmetric seesaw: the tail keeps its radial land,
+while the rod side ends in a reduced 5 mm tongue.  A projected side view is a
+messy band, so the 16 x 2.5 section is carried in the notes and the print shows
+the profile (front) plus a 1:2 isometric.  The sheet runs at 1:2.
 
 Run with SolidWorks open::
 
@@ -49,13 +49,10 @@ from _surface_finish import surface_finish_by_key
 from rocker_arm_spec import (
     ARM_THICKNESS,
     PIVOT_HOLE_DIA,
-    R_TOP,
     ROD_HOLE_X,
     ROD_HOLE_Y,
+    ROD_TONGUE_END_X,
     SURFACE_FINISHES,
-    TIP_FACE,
-    TOP_ARC_LEN,
-    TOP_END_X,
     TOP_END_Y,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -79,8 +76,8 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (1.0, 2.0)  # 1:2
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]  # sheet-mm per model-mm (0.5)
 
-# Front-view model bbox: X symmetric about 0, Y from the centre bottom (0) up to
-# the top-arc tip (TOP_END_Y).
+# Front-view model bbox: Y from the centre bottom (0) to the retained tail-side
+# top-arc endpoint (TOP_END_Y); the reduced rod tongue lies inside that height.
 _PIVOT_MID_Y = 8.0  # pivot bore centre = ArmDepth / 2
 _ROD_HOLE_DIA = 1.994  # #47 drill
 _BBOX_CY = TOP_END_Y / 2.0
@@ -89,10 +86,9 @@ FRONT_CENTER = (0.180, 0.175)
 RIGHT_CENTER = (0.300, 0.165)
 ISO_CENTER = (0.345, 0.205)
 
-# Tip-face midpoint (model mm): the top-arc endpoint pushed half the tip face
-# outward along the end radius -- where datum C (clocking) attaches.
-_TIP_FACE_MID_X = TOP_END_X + (TIP_FACE / 2.0) * (TOP_END_X / R_TOP)
-_TIP_FACE_MID_Y = TOP_END_Y - (TIP_FACE / 2.0) * math.cos(TOP_ARC_LEN / 2.0 / R_TOP)
+# Datum C clocks the profile from the new square rod-tongue free face.
+_ROD_FREE_FACE_MID_X = ROD_TONGUE_END_X
+_ROD_FREE_FACE_MID_Y = ROD_HOLE_Y
 
 
 def _sheet_xy(mx: float, my: float) -> tuple[float, float]:
@@ -157,9 +153,8 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # Explicit per-view scale (an auto-scaled view shifts every coordinate pick).
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 2))
-    # 1:1 right end view: the 2.50 x ~29 strap section -- shows the section the
-    # profile notes describe, gives the through direction, and carries datum B
-    # (the broad face) so the rod-pin position frame has an orientation datum.
+    # 1:1 right view shows the thickness and through-hole direction and carries
+    # datum B (the broad face) for the rod-pin position frame.
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(1, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 4))
     for view in (right, iso):
@@ -182,10 +177,10 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     # Locate the rod-pin hole from the pivot bore with X and Y BASIC coordinate
-    # components.  The rod-pin centre is NOT collinear with the pivot (7.30 mm
-    # above its mid-height), so a single slant centre distance would leave the
-    # angular component uninspectable; two component dimensions fully define
-    # the true position the FCF below controls.
+    # components.  The rod-pin centre is 8.456 mm above the pivot's mid-height,
+    # so a single slant centre distance would leave the angular component
+    # uninspectable; two component dimensions fully define the true position the
+    # FCF below controls.
     pivot_rim = _sheet_xy(0.0, _PIVOT_MID_Y - PIVOT_HOLE_DIA / 2.0)
     rod_location_x = add_edge_dimension(
         adapter,
@@ -258,14 +253,15 @@ async def build(adapter: Any) -> dict[str, str]:
         label="pivot bore finish",
     )
     # Datum B (broad face, on the end view) orients the hole axes; datum C
-    # (the +X tip face) clocks rotation about the pivot axis, so the X/Y BASIC
-    # coordinates above have an inspectable direction.
+    # (the reduced tongue's square +X free face) clocks rotation about the pivot
+    # axis, so the X/Y BASIC coordinates above have an inspectable direction.
     # Datum B on the strap's broad face in the end view, picked ABOVE the hub
     # band (the O10 hub hides the flank over y 3..13 since 2026-09-02); the
     # end view is centred on the strap's mid-depth (_PIVOT_MID_Y).
     broad_face = (
         RIGHT_CENTER[0] - ARM_THICKNESS / 2000.0,
-        RIGHT_CENTER[1] + (ARM_DEPTH - 1.0 - _PIVOT_MID_Y) / 1000.0  # right view is 1:1,
+        RIGHT_CENTER[1]
+        + (ARM_DEPTH - 1.0 - _PIVOT_MID_Y) / 1000.0,  # right view is 1:1,
     )
     add_datum_feature(
         adapter,
@@ -275,14 +271,14 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="B",
         label="broad face",
     )
-    tip_face = _sheet_xy(_TIP_FACE_MID_X, _TIP_FACE_MID_Y)
+    rod_free_face = _sheet_xy(_ROD_FREE_FACE_MID_X, _ROD_FREE_FACE_MID_Y)
     add_datum_feature(
         adapter,
         front,
-        edge_xy=tip_face,
-        symbol_xy=(tip_face[0] + 0.012, tip_face[1] + 0.012),
+        edge_xy=rod_free_face,
+        symbol_xy=(rod_free_face[0] + 0.012, rod_free_face[1] + 0.012),
         datum="C",
-        label="rod-side tip face",
+        label="rod-tongue free face",
     )
     add_feature_control_frame(
         adapter,

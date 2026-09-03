@@ -45,28 +45,26 @@ same machine in two feed states; the model matches the ch30 rest state
 the paper's bottom edge in both). At rest a hook at +52 would sit behind
 the platen, so it stays at LATCH_HOOK_X = -50 where it is visible.
 
-2026-09-02 (pass-3 reread, PR E scoping): the "amplitude-bar foot TABS" item
-was a MISREAD. ch15 p.33 page002_img01 shows the bank from the rod (-X) side:
-the rusty 6.35 bars are the amplitude bars standing at their pivots, and the
-bright blocks hanging below their ends are the CONNECTING-ROD HEADS at the
-arm tips, lower where the arm has dipped (the heights trace one 13.3-channel
-wave = the 6-crank sinusoid, 360/27 deg). The apparent near/far alternation
-of the heads in the 6/14/40-crank end views is KINEMATIC (at 40 cranks the
-even harmonics stand at the stroke top and the odd at the bottom); the
-0-crank end view (ch14 page002_img08) shows ONE level, evenly spaced row, so
-the rod-pin station is NOT staggered. What the end views do fix is the head's
-shape: a ~5-wide block with a flat bright top, ~15 tall, thicker than the
-2.5 shank -- not the 10-wide x 2.5 tombstone (PR E: rod head reshape; the
-arm-to-arm gap of 4.56 bounds the thickness at 2.9 symmetric). The bars'
-feet are plain (page001_img02: the notch in the bar itself straddles the arm).
+2026-09-02 (pass-3 reread, PR E correction): the "amplitude-bar foot TABS"
+item remains a misread -- ch15 p.33 shows the bars' own notched feet.  However,
+the earlier follow-on judgment that the connecting rod ended in a 5 x 15 x 2.9
+flat block is also disproven.  The high-resolution ch14 `page002_img02` and the
+0/6/14/40-crank end views show a black two-cheek clevis owned by each rod,
+capturing a reduced silver rocker tongue.  The repeated bright rectangle is
+the tongue/end face seen between the dark cheeks, not a solid rod-head top.
 
-Open after PR #658 (2026-09-02): the ROD HEAD IS A CLEVIS. ch14 page002_img02
-zoomed 4x at the arm tips: every rod ends in a bright U-shaped yoke whose two
-prongs straddle the arm's tip (pin through prongs + arm), and the arm's top
-edge steps DOWN ~2 mm over the last ~6 mm so the prong tops sit flush with
-it. The end views' bright square tops are those prongs + the arm between
-(~6 wide). PR #658's 5 x 15 block beside the arm is closer than the tombstone
-but still not this. Before modelling: the CAD rod plane sits 4.05 off the arm
-plane (CAM_DZ -3.25 vs ARM_MID_DZ 0.8, the cam on the gear's far face), so a
-clevis centred on the arm needs a cranked shank -- or CAM_DZ re-read from
-the ch13 photos. Also the arm tip's top-edge step (rocker_arm_spec outline).
+Photo-bounded nominal adopted for PR E: two D-shaped cheeks 8 mm wide x 12 mm
+high, each 1.0 mm thick, around a 2.9 mm slot (4.9 mm outside).  The pin stays
+at rocker local X 133.067402... / Y 16.456064... and uses the existing #47
+through bore.  The clevis centre is connecting-rod local Z = -4.05 mm:
+near cheek -2.60..-1.60, slot -5.50..-2.60, far cheek -6.50..-5.50.  With the
+rod's assembly Ry180 this maps the cam-plane shank at CAM_DZ -3.25 onto the
+rocker plane ARM_MID_DZ +0.8.  A 2 mm-high U-bottom web spans the 4.9 mm
+outside envelope and a separate narrow offset neck joins the centred shank to
+the near cheek; both overlap the cheek root by 0.5 mm.
+
+The rocker is no longer symmetric at its ends.  The tail alone keeps the
+5.588 mm radial land.  On the rod side both R800/R816 arcs stop at the square
+shoulder X = pin - 5; a 5 mm-deep tongue centred on the retained pin ends at
+X = pin + 6 with a square free face.  The arm thickness, hub, pivot/hole,
+cam/rod planes, centre distance, and J2 mate geometry remain unchanged.

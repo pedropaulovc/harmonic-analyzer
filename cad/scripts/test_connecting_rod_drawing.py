@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import connecting_rod_notes
@@ -26,10 +27,10 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert kept == marked
 
 
-def test_draw_view_math_matches_the_spec() -> None:
-    assert (drawing.CENTER_DISTANCE, drawing.HEAD_TOP_Y) == (
+def test_draw_view_math_matches_the_clevis_spec() -> None:
+    assert (drawing.CENTER_DISTANCE, drawing.CLEVIS_TOP_Y) == (
         connecting_rod_spec.CENTER_DISTANCE,
-        connecting_rod_spec.HEAD_TOP_Y,
+        connecting_rod_spec.CLEVIS_TOP_Y,
     )
     assert connecting_rod_spec.CENTER_DISTANCE == rod.CENTER_DISTANCE
     assert connecting_rod_spec.RING_BORE_DIA == rod.RING_BORE_DIA
@@ -37,10 +38,31 @@ def test_draw_view_math_matches_the_spec() -> None:
     assert connecting_rod_spec.SHANK_WIDTH == rod.SHANK_WIDTH
     assert connecting_rod_spec.RING_THICKNESS == rod.RING_THICKNESS
     assert connecting_rod_spec.SHANK_THICKNESS == rod.SHANK_THICKNESS
-    assert connecting_rod_spec.HEAD_WIDTH == rod.HEAD_WIDTH
-    assert connecting_rod_spec.HEAD_HEIGHT == rod.HEAD_HEIGHT
-    assert connecting_rod_spec.HEAD_CROWN_ABOVE_PIN == rod.HEAD_CROWN_ABOVE_PIN
-    assert connecting_rod_spec.HEAD_THICKNESS == rod.HEAD_THICKNESS
+    assert connecting_rod_spec.PRONG_WIDTH_X == rod.PRONG_WIDTH_X == 8.0
+    assert connecting_rod_spec.PRONG_HEIGHT == rod.PRONG_HEIGHT == 12.0
+    assert connecting_rod_spec.PRONG_THICKNESS == rod.PRONG_THICKNESS == 1.0
+    assert connecting_rod_spec.CLEVIS_SLOT_WIDTH == rod.CLEVIS_SLOT_WIDTH == 2.9
+    assert connecting_rod_spec.CLEVIS_OUTSIDE_WIDTH == 4.9
+
+
+def test_clevis_local_z_envelopes_and_connected_transition() -> None:
+    spec = connecting_rod_spec
+    assert math.isclose(spec.NEAR_PRONG_Z_MIN, -2.6, abs_tol=1e-12)
+    assert math.isclose(spec.NEAR_PRONG_Z_MAX, -1.6, abs_tol=1e-12)
+    assert math.isclose(spec.SLOT_Z_MIN, -5.5, abs_tol=1e-12)
+    assert math.isclose(spec.SLOT_Z_MAX, -2.6, abs_tol=1e-12)
+    assert math.isclose(spec.FAR_PRONG_Z_MIN, -6.5, abs_tol=1e-12)
+    assert math.isclose(spec.FAR_PRONG_Z_MAX, -5.5, abs_tol=1e-12)
+    assert math.isclose(spec.CLEVIS_CENTER_Z_LOCAL, -4.05, abs_tol=1e-12)
+    assert spec.OFFSET_NECK_Z_MIN < spec.NEAR_PRONG_Z_MAX
+    assert spec.OFFSET_NECK_Z_MAX > -spec.SHANK_THICKNESS / 2.0
+    assert spec.CLEVIS_WEB_TOP_Y - spec.CLEVIS_ROOT_Y == 0.5
+    source = Path(rod.__file__).read_text(encoding="utf-8")
+    assert source.count("await add_prong(") == 2
+    assert 'await add_bridge(\n        "ClevisWeb"' in source
+    assert 'await add_bridge(\n        "OffsetNeck"' in source
+    assert "[[0.0, CENTER_DISTANCE, NEAR_PRONG_Z_MAX]]" in source
+    assert "(0.0, 0.0, 1.0)" in source
 
 
 def test_sheet_runs_at_1_to_1_with_1_to_2_isometric() -> None:
@@ -59,16 +81,16 @@ def test_linked_notes_are_functional_and_not_title_block_duplicates() -> None:
     # imported model tolerance; notes never repeat a sheet dimension.
     assert "#47" not in notes
     assert "1X" in notes
-    assert "RING 3.00 THICK, STEP AT THE RING OD" in notes
-    assert "SHANK 2.50, HEAD 2.90" in notes
-    assert "ONE MIDPLANE" in notes
+    assert "RING 3.00 THICK; SHANK 2.50 THICK" in notes
+    assert "EXTENDS ONLY TO THE CLEVIS ROOT" in notes
     assert "0.10 MIN CLR/SIDE" in notes
     assert "RING WALL 4.50 MIN AFTER BORING" in notes
     assert "NO DRAFT REQUIRED" in notes
     assert "HANGS PLUMB" not in notes  # not an inspectable requirement
     assert "SHANK C/L" not in notes  # the 4.00 BASIC from datum B owns it
-    assert "HEAD 5.00 W x 15.00 HIGH, FLAT TOP" in notes
-    assert "PIN C/L 2.40 BELOW THE TOP" in notes  # one line, with the 1X count
+    assert "TWO D-SHAPED PRONGS, 8.00 W x 12.00 HIGH" in notes
+    assert "PRONGS 1.00 THICK ABOUT A 2.90 SLOT" in notes
+    assert "PIN HOLE 1X THRU BOTH PRONGS" in notes
     assert "AS CAST" in notes
     assert "147.67" not in notes  # the BASIC sheet dimension owns it
     assert "LINEAR +/-" not in notes

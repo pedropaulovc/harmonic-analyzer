@@ -18,24 +18,25 @@ from cone_pivot_post_installation import MECHANISM_X_SHIFT
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
-# --- Nominal geometry (DIMENSIONS.md "Chapter 14"). These MUST match the
-# constants in build_rocker_arm.py (the test cross-checks the load-bearing
-# ones), so the drawing's view math reads the same solid the part builds. ---
-CURVE_RADIUS = 800.0  # top-edge arc radius = amplitude-bar length (stated)
-ARM_DEPTH = 16.0  # perpendicular top-to-bottom depth (p.29 callout)
-ARM_THICKNESS = 2.5  # plate thickness, Z (p.27 callout)
-TOP_ARC_LEN = 292.1  # top edge arc length = 11.5" (ch.30 back view)
-BOT_ARC_LEN = 266.7  # bottom edge arc length = 10.5" (ch.30 back-view sketch)
-TIP_FACE = 5.588  # 0.22" tip face, perpendicular to the top edge
-PIVOT_HOLE_DIA = 6.5  # rides the 6.35 pivot shaft
+# --- Nominal geometry (DIMENSIONS.md "Chapter 14"). ---
+CURVE_RADIUS = 800.0  # top-edge radius = amplitude-bar length (stated)
+ARM_DEPTH = 16.0
+ARM_THICKNESS = 2.5
+TOP_ARC_LEN = 292.1  # source master span used to locate the tail endpoint
+BOT_ARC_LEN = 266.7
+TAIL_TIP_FACE = 5.588  # the photographed/ch30 radial land survives only at tail
+PIVOT_HOLE_DIA = 6.5
 ROD_HOLE_X = 127.3738 - MECHANISM_X_SHIFT
-ROD_HOLE_ABOVE_BOTTOM = 5.53312035905  # preserves the level-pose pin Y after X shift
+ROD_HOLE_ABOVE_BOTTOM = 5.53312035905
+ROD_STEP_FROM_PIN = 5.0
+ROD_TONGUE_BEYOND_PIN = 6.0
+ROD_TONGUE_DEPTH = 5.0
 
 SURFACE_FINISHES = (
     SurfaceFinishControl("pivot_bore", MACHINED_UM, CylinderFace(PIVOT_HOLE_DIA)),
 )
 
-# --- Derived spans (equations of the primitives; mirror build_rocker_arm). ---
+# --- Derived profile boundary (shared with build_rocker_arm). ---
 R_TOP = CURVE_RADIUS
 R_BOTTOM = CURVE_RADIUS + ARM_DEPTH
 CENTER_Y = CURVE_RADIUS + ARM_DEPTH
@@ -45,15 +46,26 @@ _ALPHA_BOT = (BOT_ARC_LEN / 2.0) / R_BOTTOM
 TOP_END_X = R_TOP * math.sin(_ALPHA_TOP)
 TOP_END_Y = CENTER_Y - R_TOP * math.cos(_ALPHA_TOP)
 BOT_END_X = R_BOTTOM * math.sin(_ALPHA_BOT)
+BOT_END_Y = CENTER_Y - R_BOTTOM * math.cos(_ALPHA_BOT)
 
-# Rod tip: the top-arc endpoint pushed out along the radius by the tip face.
-_RAD_X = TOP_END_X / R_TOP
-ROD_TIP_X = TOP_END_X + TIP_FACE * _RAD_X  # widest half-span (~146.25)
+# Tail boundary: retain the old 5.588 mm radial land and tapered closure.
+_TAIL_RAD_X = TOP_END_X / R_TOP
+_TAIL_RAD_Y = (TOP_END_Y - CENTER_Y) / R_TOP
+TAIL_TIP_X = -TOP_END_X - TAIL_TIP_FACE * _TAIL_RAD_X
+TAIL_TIP_Y = TOP_END_Y + TAIL_TIP_FACE * _TAIL_RAD_Y
 
-# Rod-pin hole Y (low in the strap, ch14 fan photo).
+# Rod-side boundary: both concentric arcs terminate at one square full-depth
+# shoulder, then step to a 5 mm tongue centred on the retained pin.  The square
+# free-end face is 6 mm beyond the pin.
+ROD_STEP_X = ROD_HOLE_X - ROD_STEP_FROM_PIN
+ROD_STEP_TOP_Y = CENTER_Y - math.sqrt(R_TOP**2 - ROD_STEP_X**2)
+ROD_STEP_BOTTOM_Y = CENTER_Y - math.sqrt(R_BOTTOM**2 - ROD_STEP_X**2)
 ROD_HOLE_Y = (
     CENTER_Y - math.sqrt(R_BOTTOM**2 - ROD_HOLE_X * ROD_HOLE_X)
 ) + ROD_HOLE_ABOVE_BOTTOM
+ROD_TONGUE_END_X = ROD_HOLE_X + ROD_TONGUE_BEYOND_PIN
+ROD_TONGUE_TOP_Y = ROD_HOLE_Y + ROD_TONGUE_DEPTH / 2.0
+ROD_TONGUE_BOTTOM_Y = ROD_HOLE_Y - ROD_TONGUE_DEPTH / 2.0
 
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
