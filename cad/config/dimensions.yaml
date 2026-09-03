@@ -656,10 +656,16 @@ sections:
         - scaled
         - low
       - - Ring / shank / clevis thickness
-        - ring 3.0; centred shank 2.5; clevis = 1.0 prong + 2.9 slot + 1.0 prong (4.9 outside)
+        - ring 3.0; centred shank 1.0; clevis = 1.0 prong + 2.9 slot + 1.0 prong (4.9 outside)
         - —
-        - 'ch14 p.28 end views and page002_img02: the black rod owns a two-cheek clevis around the 2.5 mm silver rocker tongue. The 2.9 slot gives 0.20 nominal clearance per arm face. Clevis centre is rod-local Z = -4.05; assembly Ry180 maps CAM_DZ -3.25 minus local Z to the arm mid-plane +0.8. Outside faces are local -6.50/-1.60.'
-        - photo topology + pitch/clearance derivation
+        - 'ch14 p.28 end views and page002_img02: the black rod owns a two-cheek clevis around the 2.5 mm silver rocker tongue. The 2.9 slot gives 0.20 nominal clearance per arm face. Clevis centre is rod-local Z = -4.05; assembly Ry180 maps CAM_DZ -3.25 minus local Z to the arm mid-plane +0.8. Outside faces are local -6.50/-1.60. At the 7.0565 station pitch, a 1.0 centred shank spans world Z -3.75..-2.75 and clears the previous clevis rear at -3.8065 by 0.0565.'
+        - photo topology + adjacent-station clearance derivation
+        - med
+      - - Separate clevis pin ×20
+        - bright steel; Ø1.8 shank × 4.9 grip; Ø3.0 × 0.6 flat head
+        - —
+        - 'ch14 page002_img02/page002_img01: one bright circular head appears on the near visible cheek of every black rod clevis. The 1.8 shank clears the existing #47 Ø1.994 holes; the 4.9 grip closes exactly on the clevis outside faces.'
+        - photo topology + fit/closure derivation
         - med
       - - Shank width
         - 8 mm
@@ -680,7 +686,8 @@ sections:
       0/6/14/40-crank end views resolves the rod joint itself: each black rod
       ends in two prongs around a reduced silver rocker tongue.  This refutes
       both the old 10 x 10.5 tombstone and PR #658's 5 x 15 x 2.9 solid block.
-      The #47 pin location and 163.101 mm centre distance remain unchanged.
+      The #47 pin location and 163.101 mm centre distance remain unchanged; a
+      separate bright Ø1.8 steel pin crosses each clevis from its visible cheek.
 
       ---
 - heading: Chapter 14 — Rocker Arms (pp. 26–29)

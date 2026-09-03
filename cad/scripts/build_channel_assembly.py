@@ -5,7 +5,7 @@ output: connecting rods riding the integral cams, the rocker-arm seesaw
 bank on its pivot shaft, the amplitude bars running UP the spine, and the
 top-lever bank on its fulcrum shaft with the channel springs hanging from
 the lever tips, each caught at the plate by a little open hook fastener.
-128 components:
+148 components:
 
 Coordinates are machine frame (#151: crank at machine -X, output side -Z;
 the M6.8 mirror layer is gone).
@@ -24,13 +24,14 @@ the M6.8 mirror layer is gone).
   ball centres (199.9, 1061.4, 3.088 +- 88.75), foot screws down into the
   rail's tapped #10-24 holes at z 3.088 +- 74.0; replaces the photo-refuted
   chrome baluster lever pair, 2026-08-02)
-* rocker-arm x20, connecting-rod x20, amplitude-bar x20, channel-lever
-  x20 (2026-09-02: the arms and levers carry INTEGRAL hubs whose faces
-  set the station pitch -- the 19 + 19 spacer bushings are retired),
-  channel-spring-installed x20 (M6.4: the stretched in-machine spring --
-  the free 32 mm part stays for the ch. 17 table-top inset),
-  spring-hook x20 (the open J-hook fastener seating each spring's bottom
-  eye in the plate bore -- the spring no longer threads the plate itself)
+* rocker-arm x20, connecting-rod x20, clevis-pin x20, amplitude-bar x20,
+  channel-lever x20 (2026-09-02: the arms and levers carry INTEGRAL hubs whose
+  faces set the station pitch -- the 19 + 19 spacer bushings are retired;
+  ch14 page002_img02/page002_img01 show one bright pin head on every rod clevis),
+  channel-spring-installed x20 (M6.4: the stretched in-machine spring -- the
+  free 32 mm part stays for the ch. 17 table-top inset), spring-hook x20 (the
+  open J-hook fastener seating each spring's bottom eye in the plate bore --
+  the spring no longer threads the plate itself)
 
 Default mechanism state (DIMENSIONS.md "Channel & top-frame layout"):
 cylinder-gear notches +Y (cosine alignment), integral cam lobes +Y (UP,
@@ -151,6 +152,7 @@ from _assembly import (
     concentric_mate,
     delete_assembly_feature,
     distance_driver,
+    lock_mate,
     named_ref,
     place_component,
     place_components_batch,
@@ -204,7 +206,9 @@ from connecting_rod_spec import (
     NEAR_PRONG_Z_MIN,
     OFFSET_NECK_Z_MAX,
     OFFSET_NECK_Z_MIN,
+    SHANK_THICKNESS,
 )
+from clevis_pin_spec import GRIP_LENGTH as CLEVIS_PIN_GRIP_LENGTH
 
 # Rocker pin geometry is imported, not copied, so the part and assembly keep the
 # same level-pose closure and the clevis clearance checks use the actual tongue.
@@ -274,13 +278,34 @@ if PITCH - CLEVIS_OUTSIDE_WIDTH < 1.0:
 
 _CLEVIS_WORLD = tuple(sorted((CAM_DZ - CLEVIS_Z_MIN, CAM_DZ - CLEVIS_Z_MAX)))
 _NECK_WORLD = tuple(sorted((CAM_DZ - OFFSET_NECK_Z_MIN, CAM_DZ - OFFSET_NECK_Z_MAX)))
-_PREVIOUS_CLEVIS_REAR = -PITCH + _CLEVIS_WORLD[1]
-_PREVIOUS_ARM_REAR = -PITCH + _ARM_REAR
-if _NECK_WORLD[0] <= max(_PREVIOUS_CLEVIS_REAR, _PREVIOUS_ARM_REAR):
+_SHANK_WORLD = (
+    CAM_DZ - SHANK_THICKNESS / 2.0,
+    CAM_DZ + SHANK_THICKNESS / 2.0,
+)
+_STATION_ENVELOPES = {
+    "arm": (_ARM_FRONT, _ARM_REAR),
+    "clevis": _CLEVIS_WORLD,
+    "neck": _NECK_WORLD,
+    "shank": _SHANK_WORLD,
+}
+_PREVIOUS_STATION_ENVELOPES = {
+    name: (envelope[0] - PITCH, envelope[1] - PITCH)
+    for name, envelope in _STATION_ENVELOPES.items()
+}
+_ADJACENT_STATION_CLEARANCES = {
+    (current_name, previous_name): current[0] - previous[1]
+    for current_name, current in _STATION_ENVELOPES.items()
+    for previous_name, previous in _PREVIOUS_STATION_ENVELOPES.items()
+}
+_ADJACENT_STATION_PAIR, _ADJACENT_STATION_CLEARANCE = min(
+    _ADJACENT_STATION_CLEARANCES.items(), key=lambda item: item[1]
+)
+if _ADJACENT_STATION_CLEARANCE <= 0.0:
     raise RuntimeError(
-        "connecting-rod offset-neck envelope overlaps the previous channel: "
-        f"neck {_NECK_WORLD}, previous clevis rear {_PREVIOUS_CLEVIS_REAR:.3f}, "
-        f"previous arm rear {_PREVIOUS_ARM_REAR:.3f}"
+        "adjacent channel envelopes overlap: current "
+        f"{_ADJACENT_STATION_PAIR[0]} after previous "
+        f"{_ADJACENT_STATION_PAIR[1]} has "
+        f"{_ADJACENT_STATION_CLEARANCE:.4f} mm clearance"
     )
 
 # --- rocker bank ------------------------------------------------------------
@@ -456,6 +481,8 @@ ROCKER_ROD_BORE_LOCAL = [
 ]  # rocker Axis2 (rod pin)
 ROD_STRAP_BORE_LOCAL = [0.0, 0.0, 0.0]  # rod Axis1 (cam ring centre = origin)
 ROD_PIN_BORE_LOCAL = [0.0, ROD_C2C, 0.0]  # rod Axis2 (rocker pin = swing pivot)
+ROD_CLEVIS_FRONT_LOCAL = [0.0, ROD_C2C, NEAR_PRONG_Z_MAX]
+ROD_CLEVIS_FAR_LOCAL = [0.0, ROD_C2C, FAR_PRONG_Z_MIN]
 LEVER_BAR_PIN_BORE_LOCAL = [127.0, 0.0, 0.0]  # lever Axis2 (bar pin)
 BAR_TOP_PIN_LOCAL = [3.175, 801.95, 3.175]  # bar Axis1 (swing pivot; 808.3 - 6.35)
 BAR_FOOT_LOCAL = [3.175, 0.0, 3.175]  # bar Axis2 (foot, ~802 mm arm)
@@ -466,6 +493,13 @@ BAR_FOOT_LOCAL = [3.175, 0.0, 3.175]  # bar Axis2 (foot, ~802 mm arm)
 # channel with ONE native CopyWithMates2 call (~1-2 s) instead of re-authoring
 # (~12-20 s of per-mate solves). Contract + pinned rules live in _cwm.py.
 CHAIN_PARTS = ("rocker-arm", "connecting-rod", "amplitude-bar", "channel-lever")
+FIXED_COMPONENT_COUNT = 8  # 2 shafts + 2 pivot brackets + 2 keepers + 2 screws
+PER_CHANNEL_COMPONENT_COUNT = (
+    len(CHAIN_PARTS) + 5
+)  # pin + 3 pose spring banks + spring hook
+EXPECTED_COMPONENT_COUNT = (
+    FIXED_COMPONENT_COUNT + CHANNELS * PER_CHANNEL_COMPONENT_COUNT
+)
 # Every part a slice mate can reference, for owner classification (anything
 # else -- root planes -- maps to "ROOT" in mates_with_owners).
 _CWM_PREFIXES = set(CHAIN_PARTS) | {
@@ -1138,9 +1172,7 @@ def _saved_pose_spring_geometry(
     )
 
 
-def _spring_grounded_spec(
-    spec: dict[str, Any], j: int, bank: str
-) -> dict[str, Any]:
+def _spring_grounded_spec(spec: dict[str, Any], j: int, bank: str) -> dict[str, Any]:
     """Place one exact-length spring between its fixed and solved eye centres."""
     ux, uy = spec["ux"], spec["uy"]
     return {
@@ -1230,7 +1262,6 @@ async def _install_pose_configurations(
     pose_mates = await author_pose_mates(adapter, specs)
     rest_values = {k: m.rest for k, m in pose_mates.items()}
 
-
     # --- parallel bank: every bar returns to the common zero station
     parallel_values = dict(rest_values)
     for j, amplitude in enumerate(parallel_amplitudes):
@@ -1319,9 +1350,7 @@ async def _install_pose_configurations(
         bad = []
         lifted = []
         for j, st in expect.items():
-            pin = world_point(
-                adapter, f"rocker-arm-{j + 1}", ROCKER_ROD_BORE_LOCAL
-            )
+            pin = world_point(adapter, f"rocker-arm-{j + 1}", ROCKER_ROD_BORE_LOCAL)
             rod = component_transform(adapter, f"connecting-rod-{j + 1}")
             rx, ry = rod[9] * 1000.0, rod[10] * 1000.0
             if not (
@@ -1343,9 +1372,7 @@ async def _install_pose_configurations(
                         round(st["ring_y"], 2),
                     )
                 )
-            foot = world_point(
-                adapter, f"amplitude-bar-{j + 1}", BAR_FOOT_LOCAL
-            )
+            foot = world_point(adapter, f"amplitude-bar-{j + 1}", BAR_FOOT_LOCAL)
             sf = sin_foot[j]
             if not (
                 _pose_tolerance_ok(foot[0], sf["foot_x"], 0.05)
@@ -1601,6 +1628,7 @@ async def build(adapter) -> dict[str, str]:
     # lever rides coincident to its own rocker. rocker_by_channel[j] is the
     # rocker instance every later neighbour seat refers to.
     rocker_by_channel: dict[int, str] = {}
+    rod_by_channel: dict[int, str] = {}
     if abs(ROCKER_HUB_LENGTH - PITCH) > 1e-6 or abs(LEVER_HUB_LENGTH - PITCH) > 1e-6:
         raise RuntimeError("hub lengths must equal the station pitch")
     _hub_bottom = PIVOT[1] - ROCKER_HUB_DIA / 2.0
@@ -1984,6 +2012,7 @@ async def build(adapter) -> dict[str, str]:
         if seed is None:
             comps = await _author_channel(j, st)
             rocker_by_channel[j] = comps["rocker-arm"]
+            rod_by_channel[j] = comps["connecting-rod"]
             if j >= 1:
                 seed_by_amp[amp_key] = (j, comps)
             continue
@@ -2022,6 +2051,7 @@ async def build(adapter) -> dict[str, str]:
         )
         comps = _copied_chain_instances(adapter, j)
         rocker_by_channel[j] = comps["rocker-arm"]
+        rod_by_channel[j] = comps["connecting-rod"]
         ensure_component_distance_mate_flip(
             adapter,
             comps["connecting-rod"],
@@ -2268,6 +2298,61 @@ async def build(adapter) -> dict[str, str]:
             )
             free_dof_keys.append(f"bar_amplitude_{j:02d}")
 
+    # The bright round fastener in the ch. 14 close-ups is a separate pin, not
+    # implied empty bore geometry.  Insert it only after every copied chain has
+    # settled onto its saved solver branch.  The pin part is authored local-Z
+    # with its origin on the visible front cheek: the rod's fixed Ry180 maps
+    # local NEAR_PRONG_Z_MAX to the lower (machine-front) world-Z outer face,
+    # while local FAR_PRONG_Z_MIN lands exactly one 4.9 mm grip farther in +Z.
+    clevis_pin_by_channel: dict[int, str] = {}
+    for j in range(CHANNELS):
+        rod = rod_by_channel[j]
+        bore = world_point(adapter, rod, ROD_PIN_BORE_LOCAL)
+        front = world_point(adapter, rod, ROD_CLEVIS_FRONT_LOCAL)
+        far = world_point(adapter, rod, ROD_CLEVIS_FAR_LOCAL)
+        if max(abs(bore[k] - front[k]) for k in (0, 1)) > 1e-6:
+            raise RuntimeError(
+                f"ch{j:02d} clevis-pin front face is not coaxial with the rod bore"
+            )
+        if (
+            max(abs(bore[k] - far[k]) for k in (0, 1)) > 1e-6
+            or abs((far[2] - front[2]) - CLEVIS_PIN_GRIP_LENGTH) > 1e-6
+        ):
+            raise RuntimeError(
+                f"ch{j:02d} transformed clevis front-to-far closure "
+                f"{far[2] - front[2]:.6f} != pin grip {CLEVIS_PIN_GRIP_LENGTH:.6f}"
+            )
+        pin_position = [bore[0], bore[1], front[2]]
+        pin = await place_component(
+            adapter,
+            "clevis-pin",
+            pin_position,
+            [0.0, 0.0, 0.0],
+            IDENTITY,
+            ground=False,
+            label=f"clevis-pin ch{j:02d} front-head seat",
+        )
+        await lock_mate(
+            adapter,
+            named_ref(f"Front Plane@{pin}", "PLANE"),
+            named_ref(f"Front Plane@{rod}", "PLANE"),
+            label=f"clevis-pin ch{j:02d} locked to {rod}",
+        )
+        assert_component_placed(adapter, pin, pin_position, IDENTITY)
+        shank_end = world_point(adapter, pin, [0.0, 0.0, CLEVIS_PIN_GRIP_LENGTH])
+        if max(abs(a - b) for a, b in zip(shank_end, far, strict=True)) > 1e-6:
+            raise RuntimeError(
+                f"ch{j:02d} clevis-pin shank end {shank_end} does not close "
+                f"on transformed far outer face {far}"
+            )
+        clevis_pin_by_channel[j] = pin
+    clevis_pin_count = len(set(clevis_pin_by_channel.values()))
+    if len(clevis_pin_by_channel) != CHANNELS or clevis_pin_count != CHANNELS:
+        raise RuntimeError(
+            f"expected {CHANNELS} distinct clevis-pin instances, got "
+            f"{clevis_pin_count} across {len(clevis_pin_by_channel)} channels"
+        )
+
     for j in range(CHANNELS):
         z_mid = z_station(j) + ARM_MID_DZ
         # Default's exact-length return spring. The local +Y coil axis follows
@@ -2356,11 +2441,24 @@ async def build(adapter) -> dict[str, str]:
         if len(names) != CHANNELS
     }
     if bad_banks:
-        raise RuntimeError(f"expected {CHANNELS} spring instances per bank, got {bad_banks}")
+        raise RuntimeError(
+            f"expected {CHANNELS} spring instances per bank, got {bad_banks}"
+        )
     set_components_suppressed_in_active_configuration(
         adapter, spring_instances["parallel"] + spring_instances["sinusoid"], True
     )
 
+    tracked_component_count = (
+        FIXED_COMPONENT_COUNT
+        + CHANNELS * len(CHAIN_PARTS)
+        + clevis_pin_count
+        + len(placed)
+    )
+    if tracked_component_count != EXPECTED_COMPONENT_COUNT:
+        raise RuntimeError(
+            f"tracked {tracked_component_count} channel components, expected "
+            f"{EXPECTED_COMPONENT_COUNT}"
+        )
 
     # Free kinematic model: the per-channel operational DOF (rocker swing +
     # rod follow + bar amplitude) are FREE -- their drivers were recorded into

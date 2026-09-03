@@ -168,9 +168,10 @@ _FEED_GEAR_RATIO = (1, 10)  # 12T third gear : 120T reducer disc
 # measuring-stick; the spare gear rides inside paper-drive) -- NOT the ~340
 # flattened parts. Bands measured live on a green build, with margin.
 # The channel + drive-train bands scale with the built channel count N (the
-# active_count build-speed knob): channel = 7N + 4 (N×{rocker,rod,bar,lever,spring} + 2
-# shafts + 2 rocker brackets + 2 fulcrum keepers + 2 keeper foot screws;
-# 2026-09-02: the 2 spacer bushings per gap are gone -- integral hubs),
+# active_count build-speed knob): channel = 7N + 8
+# (N×{rocker,rod,clevis pin,bar,lever,spring,spring hook} + 2 shafts +
+# 2 rocker brackets + 2 fulcrum keepers + 2 keeper foot screws; 2026-09-02:
+# spacer bushings are gone; one photographed retaining pin is explicit per rod),
 # drive-train = 61 + N
 # (full 20-gear cone stack + crank/structure ≈ 33 -- including the cone swing
 # platform + tip block that joined the pivot post in the p1 swing rework, and
@@ -190,11 +191,11 @@ _COMPONENT_BAND = {
     # rederive; plain capped column stubs, NO column nuts)
     "drive-train": (61 + _N_CH - 4, 61 + _N_CH + 4),  # N=20 -> (77,85), expected 81
     "channel": (
-        6 * _N_CH + 8 - 6,
-        6 * _N_CH + 8 + 6,
-    ),  # N=20 -> (122,134), expected 128
-    # (measured 164 pre-remount; 2026-08-02: -2 lever ball-mounts +2 fulcrum
-    # keepers +2 keeper foot screws nets +2)
+        7 * _N_CH + 8 - 6,
+        7 * _N_CH + 8 + 6,
+    ),  # N=20 -> (142,154), expected 148
+    # The ±6 reference margin follows the other measured subsystem bands; the
+    # exact 7N+8 inventory is hard-gated in build_channel_assembly.
     # The former monolithic output split by function (no per-channel parts here);
     # bands tightened to the measured green-build counts (verify:subsystems).
     "summing": (7, 9),  # ch 18-19, measured 8 (knife-stay removed: never in

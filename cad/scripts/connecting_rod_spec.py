@@ -19,11 +19,13 @@ RING_BORE_DIA_BAND = (0.10, 0.00)  # running bore; (upper, lower) deviations
 RING_WALL = 5.0  # radial strap wall
 RING_THICKNESS = 3.0
 SHANK_WIDTH = 8.0
-SHANK_THICKNESS = 2.5
+SHANK_THICKNESS = 1.0
 # Photo-backed upper joint (ch14 p.28 end views and page002_img02): a two-prong
 # clevis owned by the rod captures the reduced 2.5 mm rocker tongue.  Dimensions
 # are nominal because the slot and far cheek are occluded, but the topology,
-# machine-front sign, and station-pitch envelope are unambiguous.
+# machine-front sign, and 7.0565 mm station-pitch envelope are unambiguous.  The
+# flat shank is 1.0 mm thick at the root so its world-Z envelope clears the
+# previous station's 4.9 mm clevis by 0.0565 mm.
 PRONG_WIDTH_X = 8.0
 PRONG_HEIGHT = 12.0
 PRONG_CROWN_RADIUS = 4.0

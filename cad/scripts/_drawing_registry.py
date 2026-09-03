@@ -250,6 +250,12 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         script_name="draw_connecting_rod.py",
     ),
     DrawingSpec(
+        name="clevis_pin",
+        part="clevis_pin",
+        artifact_stem="clevis-pin",
+        script_name="draw_clevis_pin.py",
+    ),
+    DrawingSpec(
         name="channel_lever",
         part="channel_lever",
         artifact_stem="channel-lever",

@@ -1,7 +1,7 @@
 r"""Reproduction script: connecting rod (book ch. 13 pp. 22-25 / ch. 14 p. 29; 20 used).
 
 Black rough-finished rod converting each cam's rotation into the rocker arm's
-see-saw: a full ring riding the Ø30.6 eccentric cam, a 2.5 mm flat shank, and a
+see-saw: a full ring riding the Ø30.6 eccentric cam, a 1.0 mm flat shank, and a
 photo-backed two-prong clevis around the rocker's reduced tongue.  Each 1.0 mm
 D-shaped cheek is 8 mm wide by 12 mm high around the retained #47 pin axis; a
 2.9 mm slot gives the 2.5 mm tongue 0.20 mm nominal clearance per face.
@@ -306,7 +306,11 @@ async def build(adapter) -> dict[str, str]:
         depth_drive: str,
         offset_drive: str,
     ) -> None:
-        """Add one fully-defined rectangular transition boss at a local-Z offset."""
+        """Add a rectangular transition boss toward negative local Z."""
+        if not z_min < z_max <= 0.0:
+            raise ValueError(
+                f"{stem} local-Z envelope must satisfy z_min < z_max <= 0"
+            )
         dims = SketchDims()
         check(f"create_sketch {stem}", await adapter.create_sketch("Front"))
         set_sketch_direct_db(adapter, True)
@@ -342,7 +346,7 @@ async def build(adapter) -> dict[str, str]:
         profile_name = f"{stem}Profile"
         name_last_feature(adapter, profile_name)
         drive_jobs.extend(dims.apply(adapter, profile_name))
-        extrude_at_offset(adapter, z_max - z_min, z_min)
+        extrude_at_offset(adapter, z_max - z_min, -z_max, flip=True)
         name_last_feature(adapter, stem)
         depth_dim, offset_dim = name_dimensions(
             adapter, stem, [f"{stem}Depth", f"{stem}Offset"]
@@ -361,7 +365,7 @@ async def build(adapter) -> dict[str, str]:
         bottom_drive='"ClevisWebTopY" - "OffsetNeckHeight"',
         height_drive='"OffsetNeckHeight"',
         depth_drive='"OffsetNeckZMax" - "OffsetNeckZMin"',
-        offset_drive='"OffsetNeckZMin"',
+        offset_drive='-"OffsetNeckZMax"',
     )
     await add_bridge(
         "ClevisWeb",
@@ -372,12 +376,16 @@ async def build(adapter) -> dict[str, str]:
         bottom_drive='"ClevisWebBottomY"',
         height_drive='"ClevisWebHeight"',
         depth_drive='"ClevisOutsideWidth"',
-        offset_drive='"ClevisZMin"',
+        offset_drive='-"ClevisZMax"',
     )
 
     @_telemetry.traced("connecting_rod.prong", label_param="stem")
     async def add_prong(stem: str, z_min: float, z_max: float) -> None:
-        """Add one fully-defined 8 x 12 D-shaped clevis cheek."""
+        """Add one fully-defined 8 x 12 D-shaped cheek toward negative local Z."""
+        if not z_min < z_max <= 0.0:
+            raise ValueError(
+                f"{stem} local-Z envelope must satisfy z_min < z_max <= 0"
+            )
         dims = SketchDims()
         half = PRONG_WIDTH_X / 2.0
         check(f"create_sketch {stem}", await adapter.create_sketch("Front"))
@@ -452,13 +460,17 @@ async def build(adapter) -> dict[str, str]:
         profile_name = f"{stem}Profile"
         name_last_feature(adapter, profile_name)
         drive_jobs.extend(dims.apply(adapter, profile_name))
-        extrude_at_offset(adapter, z_max - z_min, z_min)
+        extrude_at_offset(adapter, z_max - z_min, -z_max, flip=True)
         name_last_feature(adapter, stem)
         depth_dim, offset_dim = name_dimensions(
             adapter, stem, [f"{stem}Thickness", f"{stem}Offset"]
         )
-        offset_drive = '"NearProngZMin"' if stem == "NearProng" else '"FarProngZMin"'
-        drive_jobs.extend(((depth_dim, '"ProngThickness"'), (offset_dim, offset_drive)))
+        offset_drive = (
+            '-"NearProngZMax"' if stem == "NearProng" else '-"FarProngZMax"'
+        )
+        drive_jobs.extend(
+            ((depth_dim, '"ProngThickness"'), (offset_dim, offset_drive))
+        )
 
     # Two separated D-cheeks.  At nominal local Z:
     # near -2.60..-1.60, slot -5.50..-2.60, far -6.50..-5.50.

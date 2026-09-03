@@ -32,6 +32,7 @@ gear") and keyframes `v4_transgear_001..013`.
 | 15 | gooseneck attaches the spring via an end screw | ch19 p.45 `page001_img02`: slotted screw axially in the arm end, eye on the shank | lug + X-pin -> end screw |
 | 16 | stop block | ch16 p.34: square block, knurled thumbscrew UNDERNEATH | `build_measuring_stick_stop` rework |
 | 17 | amplitude-bar fan / rocker sinusoidal setup as configurations | ch14 p.28-29 fan; end views at 0/6/14/40 cranks | PR C -- user decision 2026-09-02: DEFAULT = fanned arms + level bars (matches the ch30 eight views); a second config poses the sinusoidal setup (ch14 end views at a chosen crank count); a third keeps today's parallel bank for comparison |
+| 18 | bright fasteners on connecting-rod clevises | ch14 `page002_img02` / `page002_img01`: one circular steel head on the near visible cheek of every black clevis | `build_clevis_pin`; 20 rigid rod-carried instances in `channel.SLDASM` |
 
 Also seen, not yet listed by the user: the crank taper pin's brass keeper
 ring hanging from a screw on the crank arm (ch11 p.14); the transgear stud's
@@ -62,6 +63,22 @@ rod's assembly Ry180 this maps the cam-plane shank at CAM_DZ -3.25 onto the
 rocker plane ARM_MID_DZ +0.8.  A 2 mm-high U-bottom web spans the 4.9 mm
 outside envelope and a separate narrow offset neck joins the centred shank to
 the near cheek; both overlap the cheek root by 0.5 mm.
+
+Follow-on image review (user-confirmed 2026-09-02) resolves the repeated bright
+circles as twenty separate polished-steel clevis pins, one at the near visible
+cheek of each rod: Ø1.8 shank through the Ø1.994 #47 holes, 4.9 grip closing on
+the far outer cheek, and a Ø3.0 x 0.6 flat head.  They are independent
+`clevis-pin` parts, rigidly carried by their rods rather than painted or implied
+bore faces.
+
+The same adjacent-station recheck found the old 2.5 mm flat shank physically
+overlapped the preceding 4.9 mm clevis.  The corrected shank is 1.0 mm thick
+(ring remains 3.0): at CAM_DZ -3.25 its world-Z envelope is -3.75..-2.75,
+leaving 0.0565 mm to the preceding clevis rear at -3.8065.  The offset neck
+therefore re-closes at local Z -2.10..0.00, retaining 0.5 mm overlap into both
+the near cheek and shank.  The negative-local-Z bridge and prong envelopes are
+unchanged; their SolidWorks offset extrusions now express the start as a
+non-negative magnitude with the direction explicitly flipped.
 
 The rocker is no longer symmetric at its ends.  The tail alone keeps the
 5.588 mm radial land.  On the rod side both R800/R816 arcs stop at the square
