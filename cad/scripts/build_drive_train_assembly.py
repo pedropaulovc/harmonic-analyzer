@@ -473,6 +473,7 @@ CRANK_ARM_Z0 = CRANKSHAFT_Z0  # arm PLATE south face: the hub band is
 # ORIGIN sits at the north face -- see CRANK_ARM_ORIGIN_Z.
 from crank_arm_spec import ARM_C2C, ARM_WIDTH  # noqa: E402
 from crankshaft_spec import PIN_HOLE_HEIGHT  # noqa: E402  # 75: handle pivot from the
+
 # shaft axis (2026-09 front-view re-derive, see crank_arm_spec; was 66 from the
 # perspective-magnified side view, 150 before that)
 REMOVABLE_Z0 = -157.5  # mounted T12 (face 5.0): band -157.5..-152.5, mid -155 =
@@ -520,7 +521,10 @@ END_DISC_SOUTH_Z0 = (
 END_DISC_NORTH_Z0 = Z_DRUM0 + 19 * Z_PITCH + DRUM_FACE / 2.0 + END_DISC_AIR
 if END_DISC_SOUTH_Z0 < -ARBOR_PEDESTAL_Z + ARBOR_PED_DEPTH / 2.0 + 0.25:
     raise AssertionError("south end disc reaches the south pedestal strap")
-if END_DISC_NORTH_Z0 + END_DISC_THICK > ARBOR_PEDESTAL_NORTH_Z - ARBOR_PED_DEPTH / 2.0 - 0.25:
+if (
+    END_DISC_NORTH_Z0 + END_DISC_THICK
+    > ARBOR_PEDESTAL_NORTH_Z - ARBOR_PED_DEPTH / 2.0 - 0.25
+):
     raise AssertionError("north end disc reaches the north pedestal strap")
 # (also imported with the main block below; repeated here because these
 # asserts run before it)
@@ -557,9 +561,16 @@ from crank_pin_spec import (  # noqa: E402
     RING_HOLE_X as PIN_RING_HOLE_X,
 )
 from build_crank_pin_ring import RING_INNER_R as CRANK_RING_INNER_R  # noqa: E402
-from build_crank_pin_eye import LOOP_R as EYE_LOOP_R, TAIL_LEN as EYE_TAIL_LEN, WIRE_DIA as EYE_WIRE_DIA  # noqa: E402
+from build_crank_pin_eye import (  # noqa: E402
+    LOOP_R as EYE_LOOP_R,
+    TAIL_LEN as EYE_TAIL_LEN,
+    WIRE_DIA as EYE_WIRE_DIA,
+)
 from crank_arm_spec import ANCHOR_SCREW_X, ANCHOR_SCREW_Y, ANCHOR_THREAD_DEPTH  # noqa: E402
-from fillister_screw_spec import SHANK_DIA as ANCHOR_SCREW_SHANK_DIA, SHANK_LEN as ANCHOR_SCREW_SHANK_LEN  # noqa: E402
+from fillister_screw_spec import (  # noqa: E402
+    SHANK_DIA as ANCHOR_SCREW_SHANK_DIA,
+    SHANK_LEN as ANCHOR_SCREW_SHANK_LEN,
+)
 
 PIN_PROUD = 3.0
 CRANK_PIN_Z = CRANK_ARM_Z0 + ARM_THICKNESS / 2.0  # -171: hub mid-thickness
@@ -582,7 +593,9 @@ ANCHOR_HEAD_Z = CRANK_ARM_Z0 - EYE_WIRE_DIA - ANCHOR_AIR
 EYE_Z = CRANK_ARM_Z0 - EYE_WIRE_DIA / 2.0 - ANCHOR_AIR
 # the tail's end touches the shank: loop centre (tail root) sits LOOP_R + TAIL_LEN
 # + shank radius + air below the screw axis
-EYE_CENTER_Y = ANCHOR_SCREW_XY[1] - (ANCHOR_SCREW_SHANK_DIA / 2.0 + ANCHOR_AIR + EYE_TAIL_LEN + EYE_LOOP_R)
+EYE_CENTER_Y = ANCHOR_SCREW_XY[1] - (
+    ANCHOR_SCREW_SHANK_DIA / 2.0 + ANCHOR_AIR + EYE_TAIL_LEN + EYE_LOOP_R
+)
 if ANCHOR_SCREW_SHANK_LEN - EYE_WIRE_DIA - ANCHOR_AIR > ANCHOR_THREAD_DEPTH:
     raise AssertionError("anchor screw bottoms in the crank arm's tap")
 if ANCHOR_SCREW_SHANK_LEN - EYE_WIRE_DIA - ANCHOR_AIR < 2.0:
@@ -2027,7 +2040,12 @@ async def build(adapter) -> dict[str, str]:
     # Dome cap screws: crown base on each strap's outer face, spigot into the
     # blind bore (+Y turned outward: -Z south, +Z north).
     for _cap_z, _euler, _rows, _end in (
-        (CAP_SOUTH_Z, [-90.0, 0.0, 0.0], [[1.0, 0.0, 0.0], [0.0, 0.0, -1.0], [0.0, 1.0, 0.0]], "south"),
+        (
+            CAP_SOUTH_Z,
+            [-90.0, 0.0, 0.0],
+            [[1.0, 0.0, 0.0], [0.0, 0.0, -1.0], [0.0, 1.0, 0.0]],
+            "south",
+        ),
         (CAP_NORTH_Z, [90.0, 0.0, 0.0], ROT_X_POS90, "north"),
     ):
         cap = await place_component(
