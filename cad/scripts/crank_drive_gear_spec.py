@@ -9,6 +9,12 @@ from __future__ import annotations
 
 import math
 
+from _gear_inspection import (
+    diametral_pitch_text,
+    over_pins_row,
+    pin_measurement,
+    preferred_pin_dia_mm,
+)
 from _surface_finish import SurfaceFinishControl
 
 
@@ -24,11 +30,17 @@ OUTSIDE_DIA = (TEETH + 2) / DIAMETRAL_PITCH * MM_PER_IN
 WHOLE_DEPTH = 2.157 / DIAMETRAL_PITCH * MM_PER_IN
 ROOT_DIA = (TEETH - 2.0 * 1.157) / DIAMETRAL_PITCH * MM_PER_IN
 HELIX_ANGLE_DEG = 12.0  # recentered crossed-axis accommodation
+# The build sweeps the tooth with a positive (CCW about +Z) twist as it
+# advances +Z (_gear._TWIST_CCW): a helix that turns counter-clockwise while
+# advancing along its axis is RIGHT-HAND, the standard designation a machinist
+# sets the dividing-head gearing from (test_crank_drive_gear_drawing pins the
+# sign).  The old "+Z" sentence stays in the notes only as confirmation.
+HELIX_HAND = "RIGHT-HAND"
 BACKLASH_MM = 0.15
 PAIR_SHAFT_ANGLE_DEG = 12.52  # crossed axes against the 16T spur pinion
 
 BORE_DIA = 0.375 * MM_PER_IN  # 9.525 (3/8" cone-shaft journal)
-BORE_DIA_BAND = (0.050, 0.030)  # (upper, lower) deviations
+BORE_DIA_BAND = (0.050, 0.000)  # admits a nominal 3/8 in reamer
 FACE_WIDTH = 8.0
 
 # No roughness callouts: the gear is keyed to the cone shaft (it drives it),
@@ -48,6 +60,19 @@ NORMAL_PRESSURE_ANGLE_RAD = math.atan(
 )
 NORMAL_PRESSURE_ANGLE_DEG = math.degrees(NORMAL_PRESSURE_ANGLE_RAD)
 
+# Over-pins acceptance on the helical, thinned tooth (see _gear_inspection:
+# the pin sits across the base helix, the thinning is the transverse backlash
+# cut into this gear).
+PIN_DIA_MM = preferred_pin_dia_mm(DIAMETRAL_PITCH)
+OVER_PINS = pin_measurement(
+    teeth=TEETH,
+    diametral_pitch=DIAMETRAL_PITCH,
+    pressure_angle_deg=PRESSURE_ANGLE_DEG,
+    pin_dia_mm=PIN_DIA_MM,
+    helix_angle_deg=HELIX_ANGLE_DEG,
+    tooth_thinning_mm=BACKLASH_MM,
+)
+
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BoreProfile": {"BoreDia"},
 }
@@ -64,27 +89,30 @@ def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> 
 GEAR_DATA = gear_data_note(
     [
         ("NUMBER OF TEETH", f"{TEETH}"),
-        ("DIAMETRAL PITCH (TRANSVERSE)", f"{DIAMETRAL_PITCH:.2f}"),
+        ("DIAMETRAL PITCH (TRANSVERSE)", diametral_pitch_text(DIAMETRAL_PITCH)),
         ("PRESSURE ANGLE (TRANSVERSE)", f"{PRESSURE_ANGLE_DEG:.1f} DEG"),
-        ("HELIX ANGLE", f"{HELIX_ANGLE_DEG:.2f} DEG"),
+        ("HELIX ANGLE", f"{HELIX_ANGLE_DEG:.2f} DEG {HELIX_HAND}"),
         ("PITCH DIAMETER (REF)", f"{PITCH_DIA:.2f}"),
         ("OUTSIDE DIAMETER", f"{OUTSIDE_DIA:.2f} +0/-0.10"),
-        ("WHOLE DEPTH", f"{WHOLE_DEPTH:.2f}"),
+        ("WHOLE DEPTH (REF)", f"{WHOLE_DEPTH:.2f}"),
         ("FACE WIDTH", f"{FACE_WIDTH:.2f}"),
         (
             "TRANSVERSE TOOTH THICKNESS",
             f"{TRANSVERSE_CIRCULAR_TOOTH_THICKNESS:.3f} (THINNED {BACKLASH_MM:.2f})",
         ),
+        over_pins_row(OVER_PINS),
         ("TOOTH FORM", "14.5 DEG TRANSVERSE INVOLUTE, HELICAL"),
         ("MATES WITH", f"16T CRANK PINION, {PAIR_SHAFT_ANGLE_DEG:.2f} DEG CROSSED AXES"),
     ]
 )
 
 # Notes: part-specific process facts only, never a tolerance, never the
-# title block (drawing-simplicity-policy.md rule 6).
+# title block (drawing-simplicity-policy.md rule 6).  The hand sentence is
+# the plain-language confirmation of the RIGHT-HAND designation above: the
+# end view looks along the axis, so "toward you" is +Z.
 DRAWING_NOTES = "\n".join(
     (
-        "HELIX: GAP ADVANCES CCW FROM -Z TO +Z, VIEWED FROM +Z (+Z IS OUT OF THE END VIEW).",
+        "RIGHT-HAND HELIX: ON THE END VIEW A TOOTH TURNS CCW AS IT COMES TOWARD YOU.",
         "DO NOT CHAMFER OR BLEND TOOTH FLANKS, TIPS OR ROOTS.",
         "FIXED TO THE CONE SHAFT AT ASSEMBLY.",
     )

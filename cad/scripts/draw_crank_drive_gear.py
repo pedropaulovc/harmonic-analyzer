@@ -1,8 +1,10 @@
 r"""Create the curated manufacturing drawing for the crank-drive gear (64T).
 
 Follows the batch gear-drawing pattern (see ``draw_cylinder_gear``). The helical
-crossed-axis accommodation is stated in the GEAR DATA note (helix angle, thinned
-tooth, mating pinion).
+crossed-axis accommodation is stated in the GEAR DATA note (helix angle and
+hand, thinned tooth, over-pins acceptance, mating pinion). SECTION A-A (cut
+face only, through the axis) replaces the projected side view -- 64 helical
+teeth projected edge-on were a black band -- and carries the 8.00 face width.
 
 The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): a
 gear is not on the GD&T allowlist and this one is keyed to the cone shaft, so
@@ -22,6 +24,7 @@ from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
+    create_section_view,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -33,7 +36,10 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _gear_drawing_entities import show_only_cut_face
+from crank_drive_gear_spec import FACE_WIDTH, OUTSIDE_DIA
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     place_view,
 )
@@ -54,16 +60,30 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (1.0, 1.0)
 VIEW_SCALE = (1, 1)
 FRONT_CENTER = (0.225, 0.175)
-RIGHT_CENTER = (0.300, 0.175)
 ISO_CENTER = (0.375, 0.205)
 GEAR_DATA_POS = (0.025, 0.262)
+
+# SECTION A-A: vertical cut through the axis, cut face only, where the side
+# view used to sit; a plain adjacent note states the face width without
+# relying on an imported edge dimension.
+SECTION_HALF_LINE = OUTSIDE_DIA / 2000.0 + 0.008
+SECTION_LINE = (
+    (FRONT_CENTER[0], FRONT_CENTER[1] - SECTION_HALF_LINE),
+    (FRONT_CENTER[0], FRONT_CENTER[1] + SECTION_HALF_LINE),
+)
+SECTION_CENTER = (0.300, 0.175)
+SECTION_NOTE = f"SECTION A-A\nFACE WIDTH {FACE_WIDTH:.2f}"
+SECTION_NOTE_XY = (
+    SECTION_CENTER[0],
+    SECTION_CENTER[1] + OUTSIDE_DIA / 2000.0 + 0.009,
+)
 
 FRONT_KEEP = {
     "BoreDia": (FRONT_CENTER[0] - 0.055, FRONT_CENTER[1] - 0.030),
 }
-# Reamed fit on the cone-shaft journal; the 9.525 +0.03/+0.05 band is on the
-# model dimension (build_crank_drive_gear), so the callout names the process
-# and three decimals say "hold it".
+# A nominal 3/8 in reamer is inside the 9.525 +0.05/0.00 model band
+# (build_crank_drive_gear); the callout names the process and three decimals
+# say "hold it".
 DIMENSION_CALLOUTS = {"BoreDia": "REAM THRU"}
 DIMENSION_PRECISION = {"BoreDia": 3}
 
@@ -110,12 +130,10 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE)
-    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=VIEW_SCALE)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
     set_hidden_lines_removed(adapter, iso)
-    # Hidden lines stay ON in every orthographic view (policy rule 7).
-    for view in (front, right):
-        set_hidden_lines_visible(adapter, view)
+    # Hidden lines stay ON in the orthographic view (policy rule 7).
+    set_hidden_lines_visible(adapter, front)
 
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
@@ -124,6 +142,20 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_precision(adapter, front_annotations, DIMENSION_PRECISION)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to gear bore")
+
+    section = create_section_view(
+        adapter,
+        front,
+        line_start=SECTION_LINE[0],
+        line_end=SECTION_LINE[1],
+        view_xy=SECTION_CENTER,
+        section_label="A",
+        scale=VIEW_SCALE,
+        label="gear blank",
+    )
+    show_only_cut_face(adapter, section, label="gear blank")
+    if add_note(adapter, SECTION_NOTE, *SECTION_NOTE_XY) is None:
+        raise RuntimeError("failed to add crank-drive section geometry note")
 
     add_property_linked_note(adapter, "Gear Data", *GEAR_DATA_POS, char_height=0.0025)
     add_property_linked_note(

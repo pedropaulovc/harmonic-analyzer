@@ -201,6 +201,69 @@ def test_in_place_save_restamps_stale_revision(monkeypatch) -> None:
     assert writes == [({"Revision": expected}, model)]
 
 
+def test_fresh_build_creates_and_collapses_native_exploded_view(monkeypatch) -> None:
+    import _assembly
+
+    calls: list[tuple[object, ...]] = []
+    assembly = SimpleNamespace(
+        GetExplodedViewCount2=lambda configuration: (
+            calls.append(("count", configuration)) or 0
+        ),
+        AutoExplode=lambda: calls.append(("auto",)) or True,
+        GetExplodedViewNames2=lambda configuration: (
+            calls.append(("names", configuration)) or ("ExplView1",)
+        ),
+        ShowExploded2=lambda shown, name: calls.append(("show", shown, name)) or True,
+    )
+    model = SimpleNamespace(EditRebuild3=lambda: calls.append(("rebuild",)) or True)
+    adapter = SimpleNamespace(currentModel=model)
+    monkeypatch.setattr(
+        _assembly,
+        "_early_bound",
+        lambda value, interface: assembly if interface == "IAssemblyDoc" else value,
+    )
+    monkeypatch.setattr(
+        _assembly,
+        "active_configuration_name",
+        lambda _adapter, _model: "Default",
+    )
+
+    assert _assembly._ensure_exploded_view(adapter, "channel") == "ExplView1"
+    assert calls == [
+        ("count", "Default"),
+        ("auto",),
+        ("rebuild",),
+        ("names", "Default"),
+        ("show", False, "ExplView1"),
+    ]
+
+
+def test_existing_exploded_view_is_reused_without_auto_explode(monkeypatch) -> None:
+    import _assembly
+
+    calls: list[tuple[object, ...]] = []
+    assembly = SimpleNamespace(
+        GetExplodedViewCount2=lambda configuration: 1,
+        AutoExplode=lambda: (_ for _ in ()).throw(AssertionError("duplicate explode")),
+        GetExplodedViewNames2=lambda configuration: ("ExplView1",),
+        ShowExploded2=lambda shown, name: calls.append(("show", shown, name)) or True,
+    )
+    adapter = SimpleNamespace(currentModel=SimpleNamespace())
+    monkeypatch.setattr(
+        _assembly,
+        "_early_bound",
+        lambda value, interface: assembly if interface == "IAssemblyDoc" else value,
+    )
+    monkeypatch.setattr(
+        _assembly,
+        "active_configuration_name",
+        lambda _adapter, _model: "Default",
+    )
+
+    assert _assembly._ensure_exploded_view(adapter, "channel") == "ExplView1"
+    assert calls == [("show", False, "ExplView1")]
+
+
 def test_fresh_build_checks_solve_state_after_gates_and_view_setup() -> None:
     source = inspect.getsource(save_assembly_and_images)
     assert source.count("final_rebuild_before_save(adapter, asm_name)") == 1
@@ -208,6 +271,9 @@ def test_fresh_build_checks_solve_state_after_gates_and_view_setup() -> None:
     assert source.index(
         "rebuild_if_needed_before_save(adapter, asm_name)"
     ) < source.index("_save_new_assembly_as_copy(adapter, asm_path)")
+    assert source.index("_ensure_exploded_view(adapter, asm_name)") < source.index(
+        "final_rebuild_before_save(adapter, asm_name)"
+    )
 
 
 def test_refresh_dof_gate_uses_saved_manifest(tmp_path, monkeypatch) -> None:

@@ -1,8 +1,11 @@
 """Offline contracts for the lever-wire drawing.
 
-The print follows cad/docs/drawing-simplicity-policy.md: a wire carries wire
-data only (diameter, the forming instruction, and the build-stamped straight
-rest-run length), no datum, frame, roughness or basic dimension.
+The print follows cad/docs/drawing-simplicity-policy.md: the sheet runs 1:5
+(the scale of the front and isometric views), the wire diameter is a marked
+model dimension read on a 10:1 end view with the bought-wire band on the
+model, the straight rest-run is the marked extrusion depth shown as a
+reference dimension, and the one note is the forming instruction.  No datum,
+frame, roughness or basic dimension.
 """
 
 from __future__ import annotations
@@ -12,6 +15,7 @@ from pathlib import Path
 import build_lever_wire as part
 import draw_lever_wire as drawing
 import lever_wire_spec
+from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -28,18 +32,54 @@ def test_required_drawing_paths() -> None:
 
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert part.DRAWING_DIMENSIONS is lever_wire_spec.DRAWING_DIMENSIONS
-    marked = set().union(*lever_wire_spec.DRAWING_DIMENSIONS.values()) if (
-        lever_wire_spec.DRAWING_DIMENSIONS
-    ) else set()
-    kept = set(drawing.FRONT_KEEP)
-    # Note-based wire: nothing is marked, nothing is kept.
-    assert marked == set()
-    assert kept == marked
+    marked = set().union(*lever_wire_spec.DRAWING_DIMENSIONS.values())
+    kept = set(drawing.FRONT_KEEP) | set(drawing.END_KEEP)
+    assert kept == marked == {"WireDiaDim", "Depth"}
+    # The Ø reads on the enlarged end view, the rest-run on the front view.
+    assert set(drawing.END_KEEP) == {"WireDiaDim"}
+    assert set(drawing.FRONT_KEEP) == {"Depth"}
+    assert set(drawing.DIMENSION_CALLOUTS) <= kept
+    assert set(drawing.DIMENSION_PRECISION) <= kept
+    assert set(drawing.REFERENCE_DIMENSIONS) <= kept
+    # The extrusion depth is renamed Depth in the build (the shaft idiom) so
+    # the mark resolves.
+    part_source = Path(part.__file__).read_text(encoding="utf-8")
+    assert 'name_dimensions(adapter, "Wire", ["Depth"])' in part_source
+
+
+def test_wire_diameter_band_rides_the_model_dimension() -> None:
+    # Policy rule 2: neither title-block band (+/-0.8, +/-0.51) fits a 0.8
+    # wire, so the bought-wire band is a native symmetric tolerance on
+    # WireDiaDim, printed on the 10:1 end view at two places.
+    assert lever_wire_spec.WIRE_DIA_TOLERANCE_MM == 0.02
+    assert model_toleranced_dimensions(part) == {
+        ("WireProfile", "WireDiaDim"): "WIRE_DIA_TOLERANCE_MM"
+    }
+    assert drawing.DIMENSION_PRECISION == {"WireDiaDim": 2}
+    assert drawing.END_SCALE == (10, 1)
+    source = _source()
+    assert '"*Top"' in source
+    # The end view is curated before the front view so it claims the circle.
+    assert source.index("keep=END_KEEP") < source.index("keep=FRONT_KEEP")
+
+
+def test_rest_run_is_a_reference_dimension_between_named_ends() -> None:
+    # The straight rest-run is informational (the wire is cut long and formed
+    # at assembly), so it prints parenthesised with both ends named -- never
+    # as a cut length, never in a note.
+    assert drawing.REFERENCE_DIMENSIONS == ("Depth",)
+    assert drawing.DIMENSION_CALLOUTS == {
+        "Depth": "STRAIGHT REST RUN, HUB END TO HOOK END"
+    }
+    source = _source()
+    assert "set_reference_dimension(" in source
+    assert "set_reference_dimensions(" not in source  # the plural adds a Ø
+    part_source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "STRAIGHT REST-RUN LENGTH" not in part_source
+    assert "NOT A CUT LENGTH" not in part_source
 
 
 def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:
-    # A Ø0.8 silhouette cylinder has no dependable pick, and the policy wants
-    # none of these on a wire anyway -- only the property-linked notes.
     source = _source()
     for helper in (
         "add_datum_feature(",
@@ -56,14 +96,17 @@ def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 
 
-def test_notes_are_wire_data_and_the_stamped_rest_run_stays_honest() -> None:
+def test_notes_are_the_forming_instruction_only() -> None:
     notes = lever_wire_spec.DRAWING_NOTES
-    lines = notes.split("\n")
-    # Two spec lines + the build-appended rest-run line = three on the sheet.
-    assert len(lines) <= 3
-    assert "Ø0.8 WIRE, ONE PIECE." in notes
-    assert "END HOOK AND HUB WRAP FORMED AT ASSEMBLY" in notes
+    assert notes.split("\n") == [
+        "ONE PIECE. END HOOK AND HUB WRAP FORMED AT ASSEMBLY; CUT LONG AND TRIM."
+    ]
+    # Every number is on a view: no diameter, no length, no tolerance.
+    assert not any(character.isdigit() for character in notes)
     for banned in (
+        "Ø",
+        "CUT LENGTH",
+        "REST-RUN",
         "DO NOT RELEASE",
         "NOT DEFINED",
         "SOURCE MODEL",
@@ -80,20 +123,28 @@ def test_notes_are_wire_data_and_the_stamped_rest_run_stays_honest() -> None:
         "X.XX",
     ):
         assert banned not in notes, banned
-    # The endpoint chord is computed in the build and labelled only as the
-    # straight rest-run length.  The unmodeled hook/wrap cannot be assigned a
-    # fabricated cut length without inventing an allowance.
     assert lever_wire_spec.WIRE_DIA == part.WIRE_DIA == 0.8
-    part_source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "STRAIGHT REST-RUN LENGTH {WIRE_LEN" in part_source
-    assert "NOT A CUT LENGTH" in part_source
 
 
-def test_hidden_lines_stay_on_in_the_orthographic_view() -> None:
-    source = _source()
-    assert "set_hidden_lines_visible(adapter, front)" in source
-    assert "set_hidden_lines_removed(adapter, iso)" in source
+def test_sheet_scale_matches_the_views() -> None:
+    # Machinist review 2026-09-02: the title block said 1:1 while both views
+    # said 1:5.  The sheet is 1:5 now; the captions of the views AT the sheet
+    # scale do not repeat it, the enlarged end view states its own.
+    assert drawing.SHEET_SCALE == (1.0, 5.0)
     assert drawing.WIRE_SCALE == (1, 5)
+    assert lever_wire_spec.FRONT_VIEW_NOTE == "FRONT VIEW"
+    assert lever_wire_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW"
+    assert lever_wire_spec.END_VIEW_NOTE == "END VIEW SCALE 10:1"
+    source = _source()
+    assert "scale=WIRE_SCALE" in source
+    assert "scale=END_SCALE" in source
+
+
+def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
+    source = _source()
+    assert "for view in (front, end):\n        set_hidden_lines_visible" in source
+    assert "set_hidden_lines_removed(adapter, iso)" in source
+    assert source.count("set_hidden_lines_removed(") == 1
 
 
 def test_wire_geom_split_keeps_notes_out_of_consumer_recipes() -> None:
@@ -112,12 +163,19 @@ def test_wire_geom_split_keeps_notes_out_of_consumer_recipes() -> None:
     )
     assert "import lever_wire_geom as _wire" in verify_source
     assert "import build_lever_wire as _hw" not in verify_source
+    # The band constant lives in the import-pure spec, never in the geom the
+    # assembly reads.
+    geom_source = Path(part.__file__).with_name("lever_wire_geom.py").read_text(
+        encoding="utf-8"
+    )
+    assert "WIRE_DIA_TOLERANCE_MM" not in geom_source
 
 
 def test_part_stamps_make_critical_properties() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "apply_drawing_properties" in source
     assert "clear_dimensions_for_drawing" in source
+    assert '"End View Note": END_VIEW_NOTE' in source
     import _config
 
     config = _config.parts("lever-wire")

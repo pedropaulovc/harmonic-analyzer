@@ -9,6 +9,12 @@ from __future__ import annotations
 
 import math
 
+from _gear_inspection import (
+    diametral_pitch_text,
+    over_pins_row,
+    pin_measurement,
+    preferred_pin_dia_mm,
+)
 from _surface_finish import SurfaceFinishControl
 
 
@@ -26,8 +32,9 @@ ROOT_DIA = (TEETH - 2.0 * 1.157) / DIAMETRAL_PITCH * MM_PER_IN
 PAIR_SHAFT_ANGLE_DEG = 12.52  # crossed axes against the 64T helical gear
 
 BORE_DIA = 0.375 * MM_PER_IN  # 9.525 (3/8" crankshaft)
-BORE_DIA_BAND = (0.050, 0.030)  # (upper, lower) deviations
+BORE_DIA_BAND = (0.050, 0.000)  # admits a nominal 3/8 in reamer
 FACE_WIDTH = 10.8
+OUTSIDE_DIA_CALLOUT = f"{OUTSIDE_DIA:.2f} +0/-0.10"
 
 # No roughness callouts: the pinion is keyed to the crankshaft (it is the
 # crank's drive), so nothing runs on the bore; the title block's Ra 3.2 covers
@@ -38,6 +45,16 @@ SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
 # checked against (test_crank_pinion_drawing).  The pinion is a standard
 # tooth: all the pair's backlash is thinned off the 64T.
 TRANSVERSE_CIRCULAR_TOOTH_THICKNESS = math.pi * MODULE_MM / 2.0
+
+# Over-pins acceptance for the standard spur tooth.  The stock cutter is
+# nominally 26 DP; tooth spacing follows the recentered pair's true 25.7311 DP.
+PIN_DIA_MM = preferred_pin_dia_mm(DIAMETRAL_PITCH)
+OVER_PINS = pin_measurement(
+    teeth=TEETH,
+    diametral_pitch=DIAMETRAL_PITCH,
+    pressure_angle_deg=PRESSURE_ANGLE_DEG,
+    pin_dia_mm=PIN_DIA_MM,
+)
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BoreProfile": {"BoreDia"},
@@ -52,13 +69,22 @@ def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> 
 GEAR_DATA = gear_data_note(
     [
         ("NUMBER OF TEETH", f"{TEETH}"),
-        ("DIAMETRAL PITCH", f"{DIAMETRAL_PITCH:.2f}"),
+        (
+            "DIAMETRAL PITCH",
+            f"{diametral_pitch_text(DIAMETRAL_PITCH)} TEETH/IN PITCH DIA",
+        ),
+        (
+            "CUTTER",
+            "26 DP NO. 7 STOCK CUTTER; SPACE AT "
+            f"{diametral_pitch_text(DIAMETRAL_PITCH)} DP",
+        ),
         ("PRESSURE ANGLE", f"{PRESSURE_ANGLE_DEG:.1f} DEG"),
         ("PITCH DIAMETER (REF)", f"{PITCH_DIA:.2f}"),
-        ("OUTSIDE DIAMETER", f"{OUTSIDE_DIA:.2f} +0/-0.10"),
-        ("WHOLE DEPTH", f"{WHOLE_DEPTH:.2f}"),
+        ("OUTSIDE DIAMETER", OUTSIDE_DIA_CALLOUT),
+        ("WHOLE DEPTH (REF)", f"{WHOLE_DEPTH:.2f}"),
         ("FACE WIDTH", f"{FACE_WIDTH:.2f}"),
         ("CIRCULAR TOOTH THICKNESS", f"{TRANSVERSE_CIRCULAR_TOOTH_THICKNESS:.3f}"),
+        over_pins_row(OVER_PINS),
         ("TOOTH FORM", "SPUR INVOLUTE, FULL DEPTH"),
         (
             "MATES WITH",

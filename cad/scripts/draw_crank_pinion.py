@@ -1,7 +1,9 @@
 r"""Create the curated manufacturing drawing for the crank pinion (16T).
 
 Follows the batch gear-drawing pattern (see ``draw_cylinder_gear``). Drawn 3:1
-so the small 17 mm pinion reads clearly.
+so the small 17 mm pinion reads clearly.  A plain note adjacent to the front
+and cut-face-only SECTION A-A states the outside diameter and face width
+without relying on imported or coordinate-picked dimensions.
 
 The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): a
 gear is not on the GD&T allowlist and this pinion is keyed to the crankshaft,
@@ -21,6 +23,7 @@ from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
+    create_section_view,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -32,7 +35,10 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _gear_drawing_entities import show_only_cut_face
+from crank_pinion_spec import FACE_WIDTH, OUTSIDE_DIA, OUTSIDE_DIA_CALLOUT
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     place_view,
 )
@@ -53,15 +59,26 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (3.0, 1.0)
 VIEW_SCALE = (3, 1)
 FRONT_CENTER = (0.215, 0.175)
-RIGHT_CENTER = (0.300, 0.175)
+SECTION_CENTER = (0.300, 0.175)
 ISO_CENTER = (0.385, 0.210)
+DRAWN_RADIUS = OUTSIDE_DIA / 2000.0 * VIEW_SCALE[0] / VIEW_SCALE[1]
+SECTION_HALF_LINE = DRAWN_RADIUS + 0.008
+SECTION_LINE = (
+    (FRONT_CENTER[0], FRONT_CENTER[1] - SECTION_HALF_LINE),
+    (FRONT_CENTER[0], FRONT_CENTER[1] + SECTION_HALF_LINE),
+)
+VIEW_GEOMETRY_NOTE = (
+    f"FRONT VIEW: OUTSIDE DIA {OUTSIDE_DIA_CALLOUT}\n"
+    f"SECTION A-A: FACE WIDTH {FACE_WIDTH:.2f}"
+)
+VIEW_GEOMETRY_NOTE_XY = (0.260, 0.095)
 
 FRONT_KEEP = {
     "BoreDia": (FRONT_CENTER[0] - 0.060, FRONT_CENTER[1] - 0.035),
 }
-# Reamed fit on the crankshaft journal; the 9.525 +0.03/+0.05 band is on the
-# model dimension (build_crank_pinion), so the callout names the process and
-# three decimals say "hold it".
+# A nominal 3/8 in reamer is inside the 9.525 +0.05/0.00 model band
+# (build_crank_pinion); the callout names the process and three decimals say
+# "hold it".
 DIMENSION_CALLOUTS = {"BoreDia": "REAM THRU"}
 DIMENSION_PRECISION = {"BoreDia": 3}
 
@@ -108,12 +125,10 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE)
-    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=VIEW_SCALE)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
     set_hidden_lines_removed(adapter, iso)
-    # Hidden lines stay ON in every orthographic view (policy rule 7).
-    for view in (front, right):
-        set_hidden_lines_visible(adapter, view)
+    # Hidden lines stay ON in the orthographic parent view (policy rule 7).
+    set_hidden_lines_visible(adapter, front)
 
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
@@ -122,6 +137,20 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_precision(adapter, front_annotations, DIMENSION_PRECISION)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to pinion bore")
+
+    section = create_section_view(
+        adapter,
+        front,
+        line_start=SECTION_LINE[0],
+        line_end=SECTION_LINE[1],
+        view_xy=SECTION_CENTER,
+        section_label="A",
+        scale=VIEW_SCALE,
+        label="pinion blank",
+    )
+    show_only_cut_face(adapter, section, label="pinion blank")
+    if add_note(adapter, VIEW_GEOMETRY_NOTE, *VIEW_GEOMETRY_NOTE_XY) is None:
+        raise RuntimeError("failed to add crank-pinion view geometry note")
 
     add_property_linked_note(adapter, "Gear Data", 0.018, 0.262, char_height=0.0025)
     add_property_linked_note(

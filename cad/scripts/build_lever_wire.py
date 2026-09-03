@@ -58,6 +58,7 @@ from _common import (
     ensure_fully_defined,
     force_rebuild,
     name_bore_axis,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -69,12 +70,15 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_symmetric_tolerance,
 )
 from lever_wire_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
+    END_VIEW_NOTE,
     FRONT_VIEW_NOTE,
     ISOMETRIC_VIEW_NOTE,
+    WIRE_DIA_TOLERANCE_MM,
 )
 
 PART_NAME = "lever-wire"
@@ -126,7 +130,11 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=WIRE_LEN)),
     )
     name_last_feature(adapter, "Wire")
-    drive_jobs.append(("D1@Wire", '"WireLength"'))
+    # The extrusion depth IS the straight rest-run: named ``Depth`` so the
+    # print can mark it (the fleet's shaft idiom) and shown there as a
+    # reference dimension.
+    depth_dim = name_dimensions(adapter, "Wire", ["Depth"])
+    drive_jobs.append((depth_dim[0], '"WireLength"'))
     v_wire = math.pi * (WIRE_DIA / 2.0) ** 2 * WIRE_LEN
     await volume_check(adapter, "wire", v_wire, 0.005 * v_wire)
 
@@ -137,6 +145,11 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
+    # The bought wire's diameter band rides the MODEL dimension (policy rule
+    # 2), so the 10:1 end view prints it natively -- never a note figure.
+    set_dimension_symmetric_tolerance(
+        adapter, "WireProfile", "WireDiaDim", WIRE_DIA_TOLERANCE_MM
+    )
     await volume_check(adapter, "driven lever wire (equations neutral)", v_wire, 0.005 * v_wire)
 
     # YokePlane: the WIRE-1 coupling plane, parallel to Top (perpendicular to
@@ -184,26 +197,21 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
 
-    # Manufacturing drawing support: the Ø0.8 wire carries NO marked model
-    # dimension (nothing on it is a dependable pick), so the mark loop is a no-op
-    # over an empty contract; only the make-critical properties are stamped.  The
-    # straight rest-run length is COMPUTED here and APPENDED to the notes, so
-    # the derived value is never duplicated in the (import-pure) spec.  It is
-    # deliberately NOT called a cut length: hook + wrap development is absent.
+    # Manufacturing drawing support: mark exactly the print's two model
+    # dimensions (the banded Ø on the profile circle, the straight rest-run as
+    # the extrusion depth) and stamp the make-critical properties.  The
+    # rest-run is a REFERENCE dimension on the sheet, not a cut length: hook
+    # + wrap development is absent from the model.
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
-    notes = (
-        DRAWING_NOTES
-        + f"\nSTRAIGHT REST-RUN LENGTH {WIRE_LEN:.1f} END FACE TO END FACE;"
-        + " NOT A CUT LENGTH."
-    )
     apply_drawing_properties(
         adapter,
         PART_NAME,
         {
-            "Manufacturing Notes": notes,
+            "Manufacturing Notes": DRAWING_NOTES,
             "Front View Note": FRONT_VIEW_NOTE,
+            "End View Note": END_VIEW_NOTE,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )

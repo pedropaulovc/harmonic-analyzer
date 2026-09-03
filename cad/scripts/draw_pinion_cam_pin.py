@@ -1,14 +1,23 @@
 r"""Create the curated machinist drawing for the pinion cam-follower pin.
 
 A short Ø4 turned steel stud with a shallow domed outer end.  The sheet runs at
-4:1 (the pin is only 15 mm long): an 8:1 end view carries the diameter, the 4:1
-side view carries the length, and a 4:1 isometric (matching the sheet scale)
-sits clear of the title block.
+4:1 (the pin is only 17.8 mm long): an 8:1 end view carries the diameter, the
+4:1 side view carries the lengths, and a 4:1 isometric (matching the sheet
+scale) sits clear of the title block.
+
+The side view is the ``*Top`` named view (the crown radius belongs to a sketch
+on the Top plane, and only a view facing that plane imports ``CapR``
+natively), so the pin's axis reads VERTICAL on the sheet: seated end up, crown
+down.  The 17.00 to the crown root sits right of the pin, and a view-adjacent
+geometry-derived ``(17.80) OVERALL REF`` note makes the seated-end-to-apex
+envelope conspicuous without depending on the crown apex as a selectable
+drawing vertex (machinist review 2026-09-02).  The crown radius is called out
+as a spherical radius (``SR``) below the crown, its REF height is flagged from
+the crown itself, and the isometric explicitly shows the crown-root edge.
 
 The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): a
 pressed stud carries no datums, frames or roughness symbols -- the press band
-rides the model diameter at three decimals and the crown is a size (SR) plus
-its REF height.
+rides the model diameter at three decimals.
 
 Run with SolidWorks open::
 
@@ -44,11 +53,15 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from pinion_cam_pin_spec import (
     CAP_RADIUS,
     CAP_SAG,
+    OVERALL_LEN,
     PIN_DIA as PIN_DIA,
     PIN_LEN,
 )
+from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
+    dimension_name,
     place_view,
 )
 
@@ -77,14 +90,61 @@ ISO_CENTER = (0.320, 0.200)
 FRONT_KEEP = {
     "PinDia": (0.030, 0.235),
 }
+# The pin stands vertical in the side view: the length to the crown root
+# right of the pin, the crown radius just below-right of the apex (a radial
+# leader runs toward the sphere centre, so the text must sit within the
+# dome's 43-degree half-span or the leader lands on the virtual circle).
 RIGHT_KEEP = {
-    "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.040),
-    "CapR": (RIGHT_CENTER[0] + 0.035, RIGHT_CENTER[1] + 0.040),
+    "Depth": (RIGHT_CENTER[0] + 0.040, RIGHT_CENTER[1]),
+    "CapR": (RIGHT_CENTER[0] + 0.012, RIGHT_CENTER[1] - 0.052),
 }
 DIMENSION_CALLOUTS = {
-    "Depth": "SEATED FLAT END TO CROWN ROOT",
-    "CapR": "OUTER CROWN",
+    "Depth": "TO CROWN ROOT",
+    "CapR": "SPHERICAL CROWN",
 }
+SPHERICAL_RADIUS_DIMENSION = "CapR"
+OVERALL_NOTE = f"({OVERALL_LEN:.2f}) OVERALL REF"
+OVERALL_NOTE_XY = (RIGHT_CENTER[0] - 0.030, RIGHT_CENTER[1] + 0.040)
+# Flag note right of the crown, low enough that its leader passes under the
+# 17.00's dimension line and over the SR text.
+CROWN_NOTE_XY = (0.250, 0.150)
+
+_TEXT_PREFIX = 1  # swDimensionTextParts_e.swDimensionTextPrefix
+_TANGENT_EDGES_VISIBLE = 2  # swDisplayTangentEdges_e.swTangentEdgesVisible
+
+
+
+def _spherical_radius_prefix(
+    adapter: Any, annotations: list[Any], name: str, *, label: str
+) -> None:
+    """Make one imported radius read ``SR`` (a spherical radius, ASME Y14.5).
+
+    A custom prefix REPLACES the automatic glyph (the same mechanism
+    ``_drawing_common.set_reference_dimensions`` documents for the diameter's
+    ``<MOD-DIAM>``), so the prefix is rewritten to ``SR`` whether SolidWorks
+    reports the radial ``R`` there or an empty compartment; any other text is
+    something this sheet does not know how to spell, so it fails loud instead
+    of printing ``SRR``.
+    """
+    for annotation in annotations:
+        annotation = _sw_type_info.early_bound_or_flag(
+            annotation, "IAnnotation", "GetSpecificAnnotation"
+        )
+        if dimension_name(adapter, annotation) != name:
+            continue
+        display = _sw_type_info.early_bound_or_flag(
+            annotation.GetSpecificAnnotation(), "IDisplayDimension", "SetText", "GetText"
+        )
+        existing = str(display.GetText(_TEXT_PREFIX) or "").strip()
+        if existing not in ("R", ""):
+            raise RuntimeError(f"{label}: unexpected radius prefix {existing!r}")
+        prefix = "SR"
+        display.SetText(_TEXT_PREFIX, prefix)
+        if str(display.GetText(_TEXT_PREFIX) or "") != prefix:
+            raise RuntimeError(f"{label}: prefix {prefix!r} did not persist")
+        adapter.currentModel.EditRebuild3()
+        return
+    raise RuntimeError(f"{label}: dimension {name!r} not found")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -132,6 +192,12 @@ async def build(adapter: Any) -> dict[str, str]:
     right = place_view(adapter, str(SOURCE), "*Top", *RIGHT_CENTER, scale=(4, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(4, 1))
     set_hidden_lines_removed(adapter, iso)
+    # Force the crown-root transition circle into the isometric instead of
+    # letting the view style visually blend the spherical cap into the shank.
+    iso.SetDisplayTangentEdges2(_TANGENT_EDGES_VISIBLE)
+    if int(iso.GetDisplayTangentEdges2()) != _TANGENT_EDGES_VISIBLE:
+        raise RuntimeError("failed to show cam-pin crown-root edge")
+    iso.UpdateViewDisplayGeometry()
     for view in (front, right):
         set_hidden_lines_visible(adapter, view)
 
@@ -145,8 +211,17 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, [*front_annotations, *right_annotations], DIMENSION_CALLOUTS
     )
     set_dimension_precision(adapter, front_annotations, {"PinDia": 3})
+    _spherical_radius_prefix(
+        adapter, right_annotations, SPHERICAL_RADIUS_DIMENSION, label="crown SR"
+    )
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to pin end view")
+
+    # The overall is reference information derived from the same geometry
+    # contract as the model.  A view-adjacent note is deliberate: the shallow
+    # revolved apex is not a stable selectable drawing vertex.
+    if add_note(adapter, OVERALL_NOTE, *OVERALL_NOTE_XY) is None:
+        raise RuntimeError("failed to add cam-pin overall reference note")
 
     add_view_centerline(
         adapter,
@@ -172,7 +247,7 @@ async def build(adapter: Any) -> dict[str, str]:
         right,
         text=f"CROWN ({CAP_SAG:.2f}) HIGH\nROOT PLANE TO APEX",
         entity_xy=outer_crown_face,
-        note_xy=(0.250, 0.175),
+        note_xy=CROWN_NOTE_XY,
         label="cam-pin crown size and height",
         entity_type="SILHOUETTE",
     )

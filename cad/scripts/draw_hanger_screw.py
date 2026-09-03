@@ -1,9 +1,9 @@
 r"""Create the curated pen-hanger hex-screw drawing.
 
 Profile side view with the head height and under-head length in one row
-above the profile, the thread designation leadered to the shank below it
-and the axis centerline; a hex-head view carrying the across-flats as a
-drawing-native linear; plus an isometric.
+above the profile, the (REF) overall above that row, the thread designation
+leadered to the shank below it and the axis centerline; a hex-head view
+carrying the across-flats as a drawing-native linear; plus an isometric.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ import _telemetry
 from _common import CAD_ROOT, run_build
 from _drawing_common import DrawingOutputs, add_edge_dimension
 from _drawing_registry import DRAWINGS_BY_NAME
-from _fastener_annotations import add_thread_leader
+from _fastener_annotations import add_overall_reference, add_thread_leader
 from _fastener_drawing import FastenerSheet, build_fastener_sheet
 from hanger_screw_spec import HEAD_AF, HEAD_H, SHANK_DIA, SHANK_LEN, THREAD_DESIGNATION
 
@@ -79,6 +79,15 @@ SIDE_KEEP = {
 THREAD_LEADER_XY = (_SHANK_MID_X + 0.010, _SHANK_BOTTOM_Y)
 THREAD_NOTE_XY = (_SHANK_MID_X + 0.005, _SHANK_BOTTOM_Y - 0.024)
 SIDE_AXIS_FACE_XY = (_SHANK_MID_X, SIDE_CENTER[1])
+# (REF) overall, hex face to tip, stacked above the length row: the hex head
+# hands over its upper-left corner VERTEX (flats top and bottom, so the
+# corner (r/2, AF/2) sits on the head's top silhouette); the tip is the
+# shank end-face rim, picked on its upper half.
+OVERALL_END_POINTS_MM = (
+    (HEAD_AF / (2.0 * 3.0**0.5), HEAD_AF / 2.0, HEAD_H),
+    (0.0, 0.7 * SHANK_DIA / 2.0, -SHANK_LEN),
+)
+OVERALL_TEXT_XY = (SIDE_CENTER[0], _ROW_ABOVE_Y + 0.016)
 
 
 def _decorate(adapter: Any, side: Any, end: Any, _iso: Any) -> None:
@@ -98,6 +107,15 @@ def _decorate(adapter: Any, side: Any, end: Any, _iso: Any) -> None:
         text_xy=END_FLATS_TEXT_XY,
         label="hex across-flats",
         orientation="vertical",
+    )
+    add_overall_reference(
+        adapter,
+        side,
+        end_points_mm=OVERALL_END_POINTS_MM,
+        entity_types=("VERTEX", "EDGE"),
+        text_xy=OVERALL_TEXT_XY,
+        orientation="horizontal",
+        label="overall length reference",
     )
 
 

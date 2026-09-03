@@ -2155,8 +2155,14 @@ _ALLOWED_FREE_STEMS: dict[str, tuple[str, ...]] = {
     "summing": ("summing-lever", "boss-hook"),
     # The carriage riders (v-block, marker, stirrup frame, thumb screw) are
     # lock-mated to the free rod and read under-constrained with it.
-    "pen": ("pen-rod", "pen-marker", "pen-wire", "pen-v-block", "pen-frame",
-            "pen-set-screw"),
+    "pen": (
+        "pen-rod",
+        "pen-marker",
+        "pen-wire",
+        "pen-v-block",
+        "pen-frame",
+        "pen-set-screw",
+    ),
     "drive-train": (
         "alignment-pinion",
         "cone-gear",
@@ -2782,10 +2788,56 @@ async def _export_assembly_images(
     return artefacts
 
 
+def _exploded_view_names(raw: Any) -> tuple[str, ...]:
+    """Normalize the COM SAFEARRAY returned by GetExplodedViewNames2."""
+    if isinstance(raw, str):
+        return (raw,) if raw else ()
+    if not raw:
+        return ()
+    return tuple(str(name) for name in raw if str(name))
+
+
+@_telemetry.traced("assembly.ensure_exploded_view", label_param="asm_name")
+def _ensure_exploded_view(adapter: Any, asm_name: str) -> str:
+    """Persist one native exploded view, then restore the assembled pose.
+
+    Assembly drawings require a real exploded state. ``AutoExplode`` is the
+    native mate-aware baseline; the per-assembly procedure sheet supplies the
+    exact order and checks that automatic spatial separation cannot encode.
+    """
+    model = adapter.currentModel
+    assembly = _early_bound(model, "IAssemblyDoc")
+    configuration = active_configuration_name(adapter, model)
+    count = int(assembly.GetExplodedViewCount2(configuration) or 0)
+    created = count == 0
+    if created:
+        if not bool(assembly.AutoExplode()):
+            raise RuntimeError(f"{asm_name}: AutoExplode failed")
+        model.EditRebuild3()
+
+    names = _exploded_view_names(assembly.GetExplodedViewNames2(configuration))
+    if not names:
+        raise RuntimeError(
+            f"{asm_name}: active configuration {configuration!r} has no exploded view"
+        )
+    name = names[-1] if created else names[0]
+    if not bool(assembly.ShowExploded2(False, name)):
+        raise RuntimeError(f"{asm_name}: failed to collapse exploded view {name!r}")
+    _telemetry.event(
+        "assembly.exploded_view_ready",
+        assembly=asm_name,
+        configuration=configuration,
+        exploded_view=name,
+        created=created,
+    )
+    return name
+
+
 async def save_assembly_and_images(
     adapter: Any, asm_name: str, views: Iterable[str] = DEFAULT_VIEWS
 ) -> dict[str, str]:
     """Save the assembly to ``cad/out/sldasm`` and PNG views to ``cad/out/png``."""
+    _ensure_exploded_view(adapter, asm_name)
     # Establish a clean solved state for the health and pose gates.
     final_rebuild_before_save(adapter, asm_name)
     # Fail fast: never save a broken assembly. Catches mate errors (e.g. a gear
@@ -2946,23 +2998,14 @@ def final_rebuild_before_save(adapter: Any, label: str, model: Any = None) -> No
 async def reconcile_saved_rebuild_state(
     adapter: Any, asm_name: str, asm_path: Any
 ) -> None:
-    """Reopen a just-saved assembly and, if it loads needing a rebuild, EditRebuild3
-    + in-place Save3 so the persisted artifact reopens clean (issue #267).
+    """Reopen a just-saved assembly and reconcile its persisted rebuild mark.
 
-    Root cause (proven by ``diagnostics/probe_rebuild_matrix.py`` /
-    ``probe_child_dirty.py``): ``final_rebuild_before_save`` and the deep health
-    gate each ``ForceRebuild3(False)`` -- a DEEP rebuild that descends into every
-    subassembly and marks every referenced child part document dirty IN MEMORY
-    (``GetSaveFlag`` -> True). The ensuing copy/in-place save then records rebuild
-    stamps that don't exist on the untouched on-disk parts, so a later fresh open
-    reports ``NeedsRebuild2 != 0`` even though geometry is correct and nothing is
-    faulted (``GetWhatsWrong`` clean, all components fully constrained). Neither
-    ``EditRebuild3`` nor ``ForceRebuild3(True)`` (TopOnly) dirties the children, so
-    reopening from disk (children clean) + ``EditRebuild3`` reconciles the assembly,
-    and the in-place ``Save3`` persists the clean mark WITHOUT rewriting any part
-    file. A post-``ForceRebuild3(False)`` rebuild in the SAME document instance
-    cannot un-dirty it -- the reopen is required. ``verify:soundness``'s
-    ``saved-rebuild-clean`` gate is the independent backstop that this held.
+    Start with ``EditRebuild3`` because it is the cheapest top-level rebuild.
+    Some large assemblies whose components reference many configurations reject
+    that call even though a top-only deep rebuild is valid; retry once with
+    ``ForceRebuild3(True)``. Both operations leave referenced children clean.
+    The in-place save persists the reconciled mark without rewriting part files.
+    ``verify:soundness`` independently checks the saved result.
     """
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
     with _telemetry.span("assembly.reconcile_rebuild", asm=asm_name) as sp:
@@ -2976,9 +3019,18 @@ async def reconcile_saved_rebuild_state(
             )
             return
         rebuilt = adapter._attempt(lambda: model.EditRebuild3(), default=None)
+        rebuild_method = "EditRebuild3"
+        if rebuilt is False or rebuilt is None:
+            _telemetry.warn(
+                f"{asm_name}: EditRebuild3 rejected reconciliation; "
+                "retrying top-only ForceRebuild3"
+            )
+            rebuilt = adapter._attempt(lambda: model.ForceRebuild3(True), default=None)
+            rebuild_method = "ForceRebuild3(True)"
+        sp.set_attribute("rebuild_method", rebuild_method)
         if rebuilt is False or rebuilt is None:
             raise RuntimeError(
-                f"{asm_name}: reconcile EditRebuild3 returned {rebuilt!r}"
+                f"{asm_name}: reconcile {rebuild_method} returned {rebuilt!r}"
             )
         result = adapter._attempt(
             lambda: model.Save3(1, 0, 0), default=None

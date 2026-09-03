@@ -3,10 +3,10 @@ r"""Create the curated machinist drawing for the transgear-bracket screw.
 Uniform fastener slice (see draw_fillister_screw.py): a profile side view
 with the head height, under-head length and the driver slot (visible as a
 notch in the driver face) as inserted model dimensions, the thread
-designation leadered to the shank and the axis centerline; a head-end view
-with the head diameter (leader ending at the rim) and a center mark; plus
-an isometric.  Built on the Front plane (axis +Z), so the profile lies
-HORIZONTAL with the head at the right end.
+designation leadered to the shank, the (REF) overall below the lengths and
+the axis centerline; a head-end view with the head diameter (leader ending
+at the rim) and a center mark; plus an isometric.  Built on the Front plane
+(axis +Z), so the profile lies HORIZONTAL with the head at the right end.
 """
 
 from __future__ import annotations
@@ -33,6 +33,7 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fastener_annotations import (
     add_circle_center_mark,
+    add_overall_reference,
     add_thread_leader,
     end_diameter_leaders_at_rim,
 )
@@ -111,6 +112,15 @@ SIDE_KEEP = {
 THREAD_LEADER_XY = (_SHANK_MID_X, SIDE_CENTER[1] + _SHANK_HALF)
 THREAD_NOTE_XY = (SIDE_CENTER[0] - 0.055, SIDE_CENTER[1] + _HEAD_HALF + 0.010)
 SIDE_AXIS_FACE_XY = (_SHANK_MID_X, SIDE_CENTER[1])
+# (REF) overall, driver face to tip, stacked below the under-head length:
+# model points on the lower half of each end face (the driver-face rim is
+# whole there; the slot breaks it beside the axis), horizontal like the
+# lengths above it.
+OVERALL_END_POINTS_MM = (
+    (0.0, -0.7 * HEAD_DIA / 2.0, -HEAD_H),
+    (0.0, -0.7 * SHANK_DIA / 2.0, SHANK_LEN),
+)
+OVERALL_TEXT_XY = (SIDE_CENTER[0], SIDE_CENTER[1] - _HEAD_HALF - 0.038)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -185,6 +195,15 @@ async def build(adapter: Any) -> dict[str, str]:
         silhouette_xy=THREAD_LEADER_XY,
         note_xy=THREAD_NOTE_XY,
         label="shank thread designation",
+    )
+    add_overall_reference(
+        adapter,
+        side,
+        end_points_mm=OVERALL_END_POINTS_MM,
+        entity_types=("EDGE", "EDGE"),
+        text_xy=OVERALL_TEXT_XY,
+        orientation="horizontal",
+        label="overall length reference",
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.115)

@@ -1,8 +1,12 @@
 """Offline contracts for the fillister-screw drawing.
 
-A brass #4-40 machine screw: no datums, frames, roughness symbols or basic
-dimensions (cad/docs/drawing-simplicity-policy.md rules 3-5), three lines of
-thread and head-style note (rule 6), hidden lines on in the profile (rule 7).
+A brass #4-40 machine screw after the 2026-09-02 blind machinist review: no
+datums, frames, roughness symbols or basic dimensions
+(cad/docs/drawing-simplicity-policy.md rules 3-5); the thread designation is
+a leader on the shank, the head diameter leader ends at the rim, the slot is
+dimensioned on the profile and the screw axis carries a centerline (rule 7);
+two lines of note that say only where the thread runs and that the slot is
+centred (rule 6); hidden lines on in the profile.
 """
 
 from __future__ import annotations
@@ -14,6 +18,25 @@ import draw_fillister_screw as drawing
 import fillister_screw_spec as spec
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fastener_catalog import fastener
+
+BANNED_NOTE_PHRASES = (
+    "UOS",
+    "DIMENSIONS IN",
+    "+/-",
+    "DATUM",
+    "PERPENDICULAR",
+    "RUNOUT",
+    "ASME",
+    "B18",
+    "DEBURR",
+    "BREAK SHARP",
+    "TITLE BLOCK",
+    "COMMERCIAL",
+    "THREAD NOT MODELED",
+    "REFERENCE ONLY",
+    "WIDE X",
+    "UNDER HEAD",
+)
 
 
 def _source() -> str:
@@ -31,6 +54,10 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert set(drawing.END_KEEP) | set(drawing.SIDE_KEEP) == marked
+    # The head diameter is the ONLY end-view dimension; every length and the
+    # slot ride the profile.
+    assert set(drawing.END_KEEP) == {"HeadDia"}
+    assert set(drawing.SIDE_KEEP) == {"HeadHt", "ShankLg", "SlotWidth", "SlotDepth"}
 
 
 def test_catalog_is_the_single_source_of_the_thread() -> None:
@@ -40,48 +67,61 @@ def test_catalog_is_the_single_source_of_the_thread() -> None:
     assert spec.SHANK_DIA == catalog.model_diameter_mm
     assert spec.SHANK_LEN == catalog.length_mm
     assert spec.THREAD_DESIGNATION == f"{catalog.thread} UNC"
-    assert spec.THREAD_DESIGNATION in spec.DRAWING_NOTES
-    assert drawing.DIMENSION_CALLOUTS == {}
-    assert drawing.SIDE_DIMENSION_CALLOUTS == {"ShankLg": "UNDERHEAD LENGTH"}
-    assert "THREADED TO THE" in spec.DRAWING_NOTES
-
-
-def test_lengths_are_inserted_from_named_model_dimensions() -> None:
-    assert set(drawing.SIDE_KEEP) == {"HeadHt", "ShankLg", "ShankDia"}
-    part_source = Path(part.__file__).read_text(encoding="utf-8")
-    assert part_source.count("set_dimension_symmetric_tolerance(") == 3
-    # The shank diameter reads as the thread designation, sourced from the
-    # spec -- never a thread literal frozen in the drawing script.
+    # The designation rides the view as a leader to the shank silhouette,
+    # sourced from the spec -- never a literal in the drawing, never repeated
+    # in the notes, and the modeled thread-minor shank is never dimensioned.
     source = _source()
-    assert '{"ShankDia": THREAD_DESIGNATION}' in source
+    assert "add_thread_leader(" in source
+    assert "designation=THREAD_DESIGNATION" in source
     assert '"#4-40' not in source
+    assert spec.THREAD_DESIGNATION not in spec.DRAWING_NOTES
+    assert "ShankDia" not in drawing.SIDE_KEEP
+    assert drawing.DIMENSION_CALLOUTS == {}
+
+
+def test_lengths_and_slot_are_marked_model_dimensions() -> None:
+    # The two lengths are the head/shank extrude-DEPTH model dims; the slot
+    # width is the slot sketch dim and its depth the cut depth, all named by
+    # the build and inserted on the profile, where the notch is visible.
+    part_source = Path(part.__file__).read_text(encoding="utf-8")
+    assert 'name_dimensions(adapter, "Head", ["HeadHt"])' in part_source
+    assert 'name_dimensions(adapter, "Shank", ["ShankLg"])' in part_source
+    assert 'name_dimensions(adapter, "DriverSlot", ["SlotDepth"])' in part_source
+    assert "width_mm=SLOT_W" in part_source
+    assert spec.DRAWING_DIMENSIONS["DriverSlotProfile"] == {"SlotWidth"}
+    assert spec.DRAWING_DIMENSIONS["DriverSlot"] == {"SlotDepth"}
+    # No explicit bands: the block's decimal places govern a plain screw.
+    assert "set_dimension_symmetric_tolerance(" not in part_source
+    assert "set_dimension_bilateral_tolerance(" not in part_source
+
+
+def test_view_annotations_follow_the_machinist() -> None:
+    source = _source()
+    # Head diameter leader ends at the rim, never across the slot; the rim
+    # gets a center mark and the profile its axis centerline.
+    assert "end_diameter_leaders_at_rim(" in source
+    assert drawing.END_DIAMETERS == ("HeadDia",)
+    assert "add_circle_center_mark(" in source
+    assert 'add_view_centerline(\n        adapter, side, face_xy=SIDE_AXIS_FACE_XY' in source
+    # The thread leader lands on the shank silhouette, text clear of the head
+    # dimension above the profile.
+    assert drawing.THREAD_LEADER_XY[1] > drawing.SIDE_CENTER[1]
+    assert drawing.THREAD_NOTE_XY[0] < drawing.SIDE_CENTER[0]
 
 
 def test_notes_are_few_specific_and_never_the_title_block() -> None:
     notes = spec.DRAWING_NOTES
     lines = notes.split("\n")
-    assert len(lines) <= 4
+    assert len(lines) == 2
     assert max(map(len, lines)) < 80
-    assert lines[0] == f"{spec.THREAD_DESIGNATION} THREADED TO THE HEAD; LAST 2 PITCHES MAY BE INCOMPLETE."
-    assert f"SLOT {spec.SLOT_W:.2f} WIDE X {spec.SLOT_D:.2f} DEEP" in notes
-    # Head diameter, height and under-head length are dimensions, so the
-    # note never repeats them; nothing the title block already says.
-    assert f"{spec.HEAD_DIA:.2f}" not in notes
-    for banned in (
-        "UOS",
-        "DIMENSIONS IN",
-        "+/-",
-        "DATUM",
-        "PERPENDICULAR",
-        "RUNOUT",
-        "ASME",
-        "B18",
-        "DEBURR",
-        "BREAK SHARP",
-        "TITLE BLOCK",
-        "COMMERCIAL",
-    ):
+    assert lines[0] == "THREADED TO THE HEAD; LAST 2 PITCHES MAY BE INCOMPLETE."
+    assert lines[1] == "SLOT CENTERED ON THE HEAD AXIS, FULL WIDTH OF HEAD."
+    # Every size is a dimension, so the note never repeats one.
+    for value in (spec.HEAD_DIA, spec.HEAD_H, spec.SHANK_LEN, spec.SLOT_W, spec.SLOT_D):
+        assert f"{value:.2f}" not in notes, value
+    for banned in BANNED_NOTE_PHRASES:
         assert banned not in notes, banned
+    assert spec.END_VIEW_NOTE == "DRIVER-FACE VIEW"
 
 
 def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:
@@ -107,6 +147,7 @@ def test_hidden_lines_stay_on_in_the_profile_view() -> None:
     # circle would read as a hole.
     assert "set_hidden_lines_removed(adapter, end)" in source
     assert "set_hidden_lines_removed(adapter, iso)" in source
+    assert drawing.SHEET_SCALE == (8.0, 1.0)
 
 
 def test_part_stamps_make_critical_properties() -> None:

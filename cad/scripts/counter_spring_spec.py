@@ -18,7 +18,7 @@ COIL_BODY_LENGTH = 325.3  # INSTALLED coil body length. The ch. 19 read was
 # stretched +10.3. The part models the installed hang, as it always has.
 COIL_OD = 12.5  # coil outer diameter
 WIRE_DIA = 1.8  # music-wire diameter
-COIL_COUNT = 165  # total coils (close-wound)
+COIL_COUNT = 165  # active body coils
 
 COIL_ID = COIL_OD - 2.0 * WIRE_DIA  # 8.9 inner diameter
 MEAN_DIA = COIL_OD - WIRE_DIA  # 10.7 mean coil diameter
@@ -27,8 +27,8 @@ TOP_HOOK_LEAD = 2.0 * WIRE_DIA
 HOOK_CL_RADIUS = MEAN_DIA / 2.0
 FREE_EYE_C2C = COIL_BODY_LENGTH + BOTTOM_HOOK_LEAD + TOP_HOOK_LEAD
 FREE_PITCH = COIL_BODY_LENGTH / COIL_COUNT  # 1.97 -- NOT close-wound
-# Nominal rate k = G d^4 / (8 Dm^3 n), ASTM A228 G = 79.3 GPa -- stated REF so
-# the table carries a functional requirement, not just geometry.
+# Retained as derived engineering data for design checks; the compact shop
+# block needs only wire, OD, free length, active coils, hand, and ends.
 SPRING_RATE_REF = 79300.0 * WIRE_DIA**4 / (8.0 * MEAN_DIA**3 * COIL_COUNT)
 
 # The spec-sheet data table + marked-dimension contract (DRAWING_DIMENSIONS /

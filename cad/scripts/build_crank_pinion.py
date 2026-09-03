@@ -12,7 +12,7 @@ Dimensions: cad/config/dimensions.yaml ch12 crank-drive gear row +
 Appendix C #9. Face slightly wider than the drive gear's (meshing-pair
 practice, axial alignment slack).
 
-Layout: gear axis = Z through the origin, disc z = 0..12 mm.
+Layout: gear axis = Z through the origin, disc z = 0..10.8 mm.
 
 Run (SolidWorks already open)::
 

@@ -1,4 +1,4 @@
-"""Cross-sheet offline contracts for the six cone-cluster drawings.
+"""Cross-sheet offline contracts for the eight cone-cluster drawings.
 
 Every sheet here is a plain print under cad/docs/drawing-simplicity-policy.md:
 none is on the GD&T allowlist, so no datums, frames, basics or drawing-owned
@@ -11,24 +11,30 @@ from pathlib import Path
 
 import _config
 import arbor_pedestal_spec
+import column_clamp_front_spec
 import cone_gear_shaft_spec
 import cone_lock_knob_spec
 import cone_pivot_post_spec
+import cone_swing_platform_spec
 import cone_tip_adjuster_spec
 import cone_tip_block_spec
 import draw_arbor_pedestal
+import draw_column_clamp_front
 import draw_cone_gear_shaft
 import draw_cone_lock_knob
 import draw_cone_pivot_post
+import draw_cone_swing_platform
 import draw_cone_tip_adjuster
 import draw_cone_tip_block
 
 
 SHEETS = (
     ("arbor-pedestal", arbor_pedestal_spec, draw_arbor_pedestal),
+    ("column-clamp-front", column_clamp_front_spec, draw_column_clamp_front),
     ("cone-gear-shaft", cone_gear_shaft_spec, draw_cone_gear_shaft),
     ("cone-lock-knob", cone_lock_knob_spec, draw_cone_lock_knob),
     ("cone-pivot-post", cone_pivot_post_spec, draw_cone_pivot_post),
+    ("cone-swing-platform", cone_swing_platform_spec, draw_cone_swing_platform),
     ("cone-tip-adjuster", cone_tip_adjuster_spec, draw_cone_tip_adjuster),
     ("cone-tip-block", cone_tip_block_spec, draw_cone_tip_block),
 )

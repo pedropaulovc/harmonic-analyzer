@@ -1,9 +1,9 @@
 """Offline contracts for the pen-rod drawing.
 
 The print follows cad/docs/drawing-simplicity-policy.md: a length of drawn
-square bar carries no datums or frames; its slide fit is the band on the model
-section, plus one Ra on the face that slides in the v-block, and the wire hole
-says DRILL on its callout.
+square bar carries no datums, frames or roughness symbols (the drawn faces
+pass as received); its slide fit is the band on the model section, and the
+wire hole says DRILL on its callout, sized and centred in DETAIL A at 4:1.
 """
 
 from __future__ import annotations
@@ -49,9 +49,43 @@ def test_wire_hole_callout_states_size_and_process() -> None:
     assert source.count("add_native_hole_callout(") == 1
     # Harvey #13: the callout says DRILL; the drill number rides as its prefix.
     assert 'process="#47 DRILL"' in source
-    # Two located dims for the wire hole: along the rod (length) AND across the
-    # section (centerline), so the cross-hole cannot drift off-centre.
-    assert source.count("add_edge_dimension(") == 2
+    # The along-rod location remains a dimension; the across-section location
+    # stays a view-adjacent note rather than depending on a short derived edge.
+    assert source.count("add_edge_dimension(") == 1
+    # The native callout resolves the exact-diameter visible model edge in the
+    # main front view; the derived detail exposes no model edges on this seat.
+    assert (
+        "wire_hole_edge = visible_circle_edge(adapter, front, WIRE_HOLE_DIA)" in source
+    )
+    assert "edge=wire_hole_edge" in source
+    assert "edge_xy=" not in source
+
+
+def test_wire_hole_centring_reads_in_a_detail() -> None:
+    # Machinist review 2026-09-02: the 2.50 across value crowded the top
+    # view's stacked 5.00. DETAIL A (4:1) carries a compact centring note
+    # derived from the authoritative rod section; the native size/process and
+    # length location stay on the main front view.
+    assert drawing.DETAIL_SCALE == (4, 1)
+    assert drawing.DETAIL_RADIUS > pen_rod_spec.ROD_SECTION / 2000.0
+    assert drawing.WIRE_HOLE_CENTER_NOTE == (
+        f"HOLE CL {pen_rod_spec.ROD_SECTION / 2.0:.2f} FROM FACE"
+    )
+    source = _source()
+    assert source.count("create_detail_view(") == 1
+    assert 'detail_label="A"' in source
+    assert "model_point_in_view(" in source
+    # The detail is never curated (its circle takes in both rod faces, so a
+    # curation could claim Section); its centring note makes no entity pick.
+    assert 'view_label="detail"' not in source
+    assert "WIRE_HOLE_CENTER_NOTE,\n            *wire_hole_center_note_xy" in source
+    assert "add_edge_dimension(\n        adapter,\n        detail," not in source
+    assert "add_native_hole_callout(\n        adapter,\n        detail," not in source
+    # The front view carries both the along-rod location and native callout.
+    assert "add_edge_dimension(\n        adapter,\n        front," in source
+    assert "add_native_hole_callout(\n        adapter,\n        front," in source
+    # The detail sits right of the right view and left of the isometric.
+    assert drawing.RIGHT_CENTER[0] < drawing.DETAIL_CENTER[0] < drawing.ISO_CENTER[0]
 
 
 def test_slide_fit_rides_the_model_section() -> None:
@@ -78,26 +112,26 @@ def test_notes_are_few_specific_and_never_the_title_block() -> None:
     assert "def _manufacturing_notes" not in source
 
 
-def test_print_carries_no_gdt_and_one_sliding_finish() -> None:
+def test_print_carries_no_gdt_or_finish_symbols() -> None:
+    """Drawn bar passed as received: no datums, no frames, no Ra (rules 3, 5).
+
+    Machinist review 2026-09-02: the lone Ra 1.6 on a drawn face defeated the
+    as-received note and its leader crossed the 145.00 and the right view.
+    """
     source = _source()
     for helper in (
         "add_datum_feature(",
         "add_feature_control_frame(",
+        "add_surface_finish(",
         "set_basic_dimension(",
         "project_part_pmi(",
     ):
         assert helper not in source, helper
     assert pen_rod_spec.PART_DATUMS == ()
     assert pen_rod_spec.GEOMETRIC_CONTROLS == ()
+    assert pen_rod_spec.SURFACE_FINISHES == ()
     assert not hasattr(pen_rod_spec, "GEOMETRIC_TOLERANCES_MM")
-    # The -X face slides in the v-block, so it alone carries a roughness symbol.
-    (control,) = pen_rod_spec.SURFACE_FINISHES
-    assert control.key == "slide_face"
-    assert control.roughness_um == 1.6
-    assert control.face.normal == (-1, 0, 0)
-    assert control.face.offset_mm == pen_rod_spec.ROD_SECTION / 2.0
-    assert source.count("add_surface_finish(") == 1
-    assert 'surface_finish_by_key(SURFACE_FINISHES, "slide_face")' in source
+    assert "surface_finish_by_key" not in source
     assert "roughness_ra=" not in source
     # The part build keeps its author_part_pmi call shape on the empty tuples.
     part_source = Path(part.__file__).read_text(encoding="utf-8")
@@ -109,7 +143,9 @@ def test_print_carries_no_gdt_and_one_sliding_finish() -> None:
 
 def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
     source = _source()
-    assert "for view in (front, right, top):\n        set_hidden_lines_visible" in source
+    assert (
+        "for view in (front, right, top):\n        set_hidden_lines_visible" in source
+    )
     assert "set_hidden_lines_removed(adapter, iso)" in source
 
 
@@ -118,6 +154,7 @@ def test_view_scales_are_explicit() -> None:
     source = _source()
     assert source.count("scale=(1, 1)") == 3
     assert source.count("scale=(4, 1)") == 1
+    assert "scale=DETAIL_SCALE" in source
     assert pen_rod_spec.TOP_VIEW_NOTE == "TOP VIEW SCALE 4:1"
     assert 'add_property_linked_note(adapter, "Top View Note"' in source
 

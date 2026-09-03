@@ -3,7 +3,15 @@ r"""Create the curated machinist drawing for the stepped cone gear shaft.
 The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): a
 stepped shaft carries no datums and no feature-control frames -- every land
 is a size tolerance on the model dimension, and the one roughness symbol
-sits on the bearing journal that turns in the pivot post.
+sits on the bearing journal that turns in the pivot post.  It is dimensioned
+as it sits in the lathe (policy rule 7): the journal and 3/8 seat read as
+linear diameters on the 1:1 side view. The three small tip lands remain
+visible in DETAIL A (3:1), with a compact adjacent limits note because their
+profile dimensions are unavailable to the derived view. Every station chains
+from the big-end face. There is no end view: from either end the shoulders
+hide each other,
+and a diameter dimensioned to an occluded circle is exactly what the
+machinist review rejected.
 """
 
 from __future__ import annotations
@@ -19,11 +27,12 @@ from _drawing_common import (
     add_property_linked_note,
     add_surface_finish,
     add_view_centerline,
+    create_detail_view,
     curate_view_dimensions,
     finalize_drawing,
+    model_point_in_view,
     new_project_drawing,
     read_required_properties,
-    set_dimension_callouts,
     set_dimension_precision,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
@@ -32,16 +41,15 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
+from cone_gear_shaft_notes import TIP_LANDS_NOTE
 from cone_gear_shaft_spec import (
     JOURNAL_DIA,
+    SECTION_DIA_BAND,
     SECTION_DIAS,
-    SHAFT_LENGTH,
+    SECTION_ENDS,
     SURFACE_FINISHES,
 )
-from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
-    place_view,
-)
+from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 
 
 SPEC = DRAWINGS_BY_NAME["cone_gear_shaft"]
@@ -57,41 +65,58 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 1.0)
-END_VIEW_SCALE = 4.0
-# Side (silhouette) view: the full 251.91 mm stepped profile at 1:1, axis
-# horizontal. The end view shows the journal and four seat diameters as
-# concentric circles (the tip is nearest the *Front camera), enlarged so the
-# 0.79 mm tip circle is legible. SIDE_CENTER x is 0.155: the
-# profile spans +/-0.127 m about its centre.  At x=0.155 it lands at
-# x~0.028..0.282, clear of the left border and high enough to stay above the
-# bottom-right title block.  The end view enlarges the tiny tip diameter.
+DETAIL_SCALE = (3, 1)
+# Side (silhouette) view: the full 208 mm stepped profile at 1:1, axis
+# horizontal, big end on the right.  SIDE_CENTER x is 0.155: the profile
+# spans +/-0.104 m about its centre, clear of the left border and high enough
+# to stay above the bottom-right title block.  DETAIL A (3:1) of the tip
+# lands sits under the side view's station chain, left of the title block;
+# the isometric top right.
 SIDE_CENTER = (0.155, 0.215)
-END_CENTER = (0.055, 0.105)
+DETAIL_CENTER = (0.110, 0.098)
 ISO_CENTER = (0.360, 0.200)
+
+# DETAIL A boundary on the side view: centred on the axis at the middle of
+# the 1/8 in land, wide enough to take in the end of the 1/4 in land and 23
+# mm of the 1/32 in tip (model mm / metres on the 1:1 side view).
+DETAIL_MODEL_CENTER_Z = (SECTION_ENDS[2] + SECTION_ENDS[3]) / 2.0 + 7.0
+DETAIL_MODEL_RADIUS = 16.0
+DETAIL_RADIUS = DETAIL_MODEL_RADIUS * SHEET_SCALE[0] / 1000.0
 
 # Axial step stations (extrude depths Sec{i}End), all measured from the
 # large-end datum face: baseline dimensioning, shortest nearest the part.
-SIDE_KEEP = {
+SIDE_STATION_KEEP = {
     "Sec0End": (0.205, 0.208),
     "Sec1End": (0.190, 0.196),
     "Sec2End": (0.175, 0.184),
     "Sec3End": (0.160, 0.172),
     "Sec4End": (0.145, 0.160),
 }
-# Section seat/journal diameters, staggered right of the end view.
-END_KEEP = {
-    "Sec0Dia": (0.105, 0.144),
-    "Sec1Dia": (0.105, 0.132),
-    "Sec2Dia": (0.105, 0.120),
-    "Sec3Dia": (0.105, 0.108),
-    "Sec4Dia": (0.105, 0.096),
+# Diameters on their own lands as linear diameters: the dimension line
+# crosses the land at the given station, the text stands above the shaft.
+# Side view (1:1): the journal and the 3/8 in seat.
+SIDE_DIAMETER_STATIONS_MM = {
+    "Sec0Dia": SECTION_ENDS[0] / 2.0,
+    "Sec1Dia": (SECTION_ENDS[0] + SECTION_ENDS[1]) / 2.0,
 }
-# No callout overrides: the shared fit band is toleranced on each model
-# dimension by build_cone_gear_shaft (cone_gear_shaft_spec.SECTION_DIA_BAND).
-DIMENSION_CALLOUTS: dict[str, str] = {}
-# The bearing journal is a metric 12.2308 fit dimension and needs four decimal
-# places; the other four are exact inch conversions and display three.
-DIMENSION_PRECISION = {name: 4 if name == "Sec0Dia" else 3 for name in END_KEEP}
+SIDE_DIAMETER_TEXT_Y = SIDE_CENTER[1] + 0.021
+# DETAIL A retains the projected shape of the 1/4, 1/8 and 1/32 in lands; its
+# profile dimensions are unavailable from the derived view, so the part-owned
+# limits render as a compact adjacent note.
+TIP_LANDS_NOTE_XY = (
+    DETAIL_CENTER[0] + DETAIL_MODEL_RADIUS * DETAIL_SCALE[0] / 1000.0 + 0.007,
+    DETAIL_CENTER[1] + 0.038,
+)
+# The two side-view fitted diameters retain native model tolerances and print
+# three places; the three detail values print as explicit three-place limits.
+DIMENSION_PRECISION = {name: 3 for name in SIDE_DIAMETER_STATIONS_MM}
+# Roughness symbol at the big end, right of the journal's diameter
+# dimension, its leader down to the journal OD just inboard of the end face.
+JOURNAL_FINISH_SYMBOL_XY = (0.275, 0.245)
+JOURNAL_FINISH_ATTACH_INBOARD_MM = 10.0
+# Notes right of DETAIL A, above the title block; the isometric stays above
+# them.
+NOTES_XY = (0.225, 0.110)
 
 
 @_telemetry.traced("drawing.cylindrical_face_scan")
@@ -120,6 +145,13 @@ def _cylindrical_face(adapter: Any, view: Any, diameter_mm: float) -> Any:
     return face
 
 
+def _axis_point(
+    adapter: Any, view: Any, z_mm: float, *, label: str
+) -> tuple[float, float]:
+    """Sheet point of the shaft axis at station ``z_mm`` in ``view``."""
+    return model_point_in_view(adapter, view, (0.0, 0.0, z_mm / 1000.0), label=label)
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -135,7 +167,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
-            "End View Note",
         ),
         required=(
             "Number",
@@ -143,7 +174,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
-            "End View Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -162,17 +192,23 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     side = place_view(adapter, str(SOURCE), "*Right", *SIDE_CENTER, scale=(1, 1))
-    end = place_view(adapter, str(SOURCE), "*Front", *END_CENTER, scale=(4, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
     set_hidden_lines_removed(adapter, iso)
+    # DETAIL A: the three tip lands at 3:1, where the 0.79 mm tip is a
+    # dimensionable land instead of a hairline (policy rule 7).
+    detail = create_detail_view(
+        adapter,
+        side,
+        center=_axis_point(adapter, side, DETAIL_MODEL_CENTER_Z, label="detail centre"),
+        radius=DETAIL_RADIUS,
+        view_xy=DETAIL_CENTER,
+        detail_label="A",
+        scale=DETAIL_SCALE,
+        label="tip lands detail",
+    )
     # Hidden lines stay ON in every orthographic view (policy rule 7).
-    for view in (side, end):
+    for view in (side, detail):
         set_hidden_lines_visible(adapter, view)
-    for label, view in (("side", side), ("end", end), ("iso", iso)):
-        outline = adapter._attempt(
-            lambda v=view: adapter._get_attr_or_call(v, "GetOutline")
-        )
-        _telemetry.info(f"PROBE {label} outline={outline}")
     pivot_face = _cylindrical_face(adapter, side, JOURNAL_DIA)
     add_view_centerline(
         adapter,
@@ -181,25 +217,28 @@ async def build(adapter: Any) -> dict[str, str]:
         label="shaft longitudinal axis",
         entity=pivot_face,
     )
-    curate_view_dimensions(adapter, side, keep=SIDE_KEEP, view_label="side")
-    end_annotations = curate_view_dimensions(
-        adapter, end, keep=END_KEEP, view_label="end"
-    )
-    set_dimension_callouts(adapter, end_annotations, DIMENSION_CALLOUTS)
-    set_dimension_precision(adapter, end_annotations, DIMENSION_PRECISION)
-    # SolidWorks classifies a solid circular end silhouette under the same
-    # AutoInsertCenterMarks2 "hole" bit as a bored circle; disabling that bit
-    # makes the API a guaranteed no-op even though the end view is circular.
-    if not auto_center_marks(adapter, end, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center mark to shaft end view")
 
-    # Leader anchor for the journal's surface-finish symbol (sheet meters).
-    big_end_x = SIDE_CENTER[0] + SHAFT_LENGTH / 2000.0
-    pivot_top = (big_end_x - 0.020, SIDE_CENTER[1] + SECTION_DIAS[0] / 2000.0)
+    side_keep = dict(SIDE_STATION_KEEP)
+    for name, station_mm in SIDE_DIAMETER_STATIONS_MM.items():
+        axis_xy = _axis_point(adapter, side, station_mm, label=name)
+        side_keep[name] = (axis_xy[0], SIDE_DIAMETER_TEXT_Y)
+    side_annotations = curate_view_dimensions(
+        adapter, side, keep=side_keep, view_label="side"
+    )
+    set_dimension_precision(adapter, side_annotations, DIMENSION_PRECISION)
+    if add_note(adapter, TIP_LANDS_NOTE, *TIP_LANDS_NOTE_XY) is None:
+        raise RuntimeError("failed to add tip-land limits note")
+
+    # Leader anchor for the journal's surface-finish symbol: the journal OD
+    # (top silhouette) just inboard of the big-end face.
+    journal_top = _axis_point(
+        adapter, side, JOURNAL_FINISH_ATTACH_INBOARD_MM, label="journal finish attach"
+    )
+    pivot_top = (journal_top[0], journal_top[1] + SECTION_DIAS[0] / 2000.0)
     add_surface_finish(
         adapter,
         side,
-        symbol_xy=(0.255, 0.242),
+        symbol_xy=JOURNAL_FINISH_SYMBOL_XY,
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_journal"),
         label="pivot journal finish",
         entity_type="FACE",
@@ -207,11 +246,7 @@ async def build(adapter: Any) -> dict[str, str]:
         leader_attach_xy=pivot_top,
     )
 
-    # Notes block sits lower-left, below the enlarged end view (its bottom
-    # ~0.086) and clear of the bottom-right title block; the lines are kept
-    # short (spec) so none reaches the title-block x-band.
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.072)
-    add_property_linked_note(adapter, "End View Note", 0.030, 0.140)
+    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
 
     return await finalize_drawing(
         adapter,

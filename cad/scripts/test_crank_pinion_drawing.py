@@ -2,8 +2,8 @@
 
 The print follows cad/docs/drawing-simplicity-policy.md: a pinion keyed to the
 crankshaft carries no datums, frames or roughness symbols; the compact GEAR
-DATA block and two lines of notes replace the former pair-commissioning
-package.
+DATA block includes computed over-pins acceptance and clear stock-cutter
+guidance, while the front and cut-face section carry the O.D. and face width.
 """
 
 from __future__ import annotations
@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 
+import _gear_inspection
 import build_crank_pinion as part
 import crank_pinion_spec as spec
 import draw_crank_pinion as drawing
@@ -42,30 +43,55 @@ def test_gear_data_block_is_the_compact_tooth_system() -> None:
     data = spec.GEAR_DATA
     lines = data.split("\n")
     assert lines[0] == "GEAR DATA"
-    assert len(lines) <= 11
+    assert len(lines) <= 13
     for field in (
-        "NUMBER OF TEETH", "DIAMETRAL PITCH", "PRESSURE ANGLE",
-        "PITCH DIAMETER (REF)", "OUTSIDE DIAMETER", "WHOLE DEPTH",
-        "FACE WIDTH", "CIRCULAR TOOTH THICKNESS", "TOOTH FORM", "MATES WITH",
+        "NUMBER OF TEETH", "DIAMETRAL PITCH", "CUTTER", "PRESSURE ANGLE",
+        "PITCH DIAMETER (REF)", "OUTSIDE DIAMETER", "WHOLE DEPTH (REF)",
+        "FACE WIDTH", "CIRCULAR TOOTH THICKNESS", "OVER 2 PINS",
+        "TOOTH FORM", "MATES WITH",
     ):
         assert field in data, field
     assert "16" in data
     assert "SPUR INVOLUTE, FULL DEPTH" in data
+    assert "DIAMETRAL PITCH:  25.73 TEETH/IN PITCH DIA" in data
+    assert "CUTTER:  26 DP NO. 7 STOCK CUTTER; SPACE AT 25.73 DP" in data
     assert "64T HELICAL CRANK-DRIVE GEAR, 12.52 DEG CROSSED AXES" in data
     assert "X.XX" not in data
-    for banned in ("ISO 1328", "BASE-TANGENT", "NONCONJUGATE", "BASIC", "+/-", "MHA-"):
+    for banned in (
+        "ISO 1328",
+        "BASE-TANGENT",
+        "NONCONJUGATE",
+        "BASIC",
+        "+/-",
+        "MHA-",
+    ):
         assert banned not in data, banned
     source = _source()
     assert 'adapter, "Gear Data"' in source
     assert 'adapter, "Manufacturing Notes"' in source
 
 
+def test_over_pins_row_is_computed_from_the_tooth_system() -> None:
+    assert spec.PIN_DIA_MM == _gear_inspection.preferred_pin_dia_mm(
+        spec.DIAMETRAL_PITCH
+    )
+    assert spec.OVER_PINS.usable
+    assert spec.OVER_PINS.teeth == spec.TEETH
+    assert spec.OVER_PINS.over_pins_mm == pytest.approx(18.83, abs=0.005)
+    label, value = _gear_inspection.over_pins_row(spec.OVER_PINS)
+    assert f"{label}:  {value}" in spec.GEAR_DATA
+    assert "OVER 2 PINS 1.90 DIA:  18.83 +0/-0.10" in spec.GEAR_DATA
+    assert value.endswith(_gear_inspection.OVER_PINS_BAND_TEXT)
+
+
 def test_spec_tooth_math_matches_the_build() -> None:
-    assert spec.ROOT_DIA == pytest.approx((
-        part.TEETH / part.DP - 2.0 * 1.157 / part.DP
-    ) * spec.MM_PER_IN)
+    assert spec.ROOT_DIA == pytest.approx(
+        (part.TEETH / part.DP - 2.0 * 1.157 / part.DP) * spec.MM_PER_IN
+    )
     circular_thickness = math.pi * spec.MODULE_MM / 2.0
-    assert spec.TRANSVERSE_CIRCULAR_TOOTH_THICKNESS == pytest.approx(circular_thickness)
+    assert spec.TRANSVERSE_CIRCULAR_TOOTH_THICKNESS == pytest.approx(
+        circular_thickness
+    )
     assert spec.DIAMETRAL_PITCH == pytest.approx(part.DP)
     assert spec.PRESSURE_ANGLE_DEG == pytest.approx(part.PA_DEG)
     assert spec.BASE_DIA == pytest.approx(
@@ -112,15 +138,34 @@ def test_print_carries_no_gdt_or_finish_symbols() -> None:
 def test_reamed_bore_keeps_its_band_on_the_model_and_three_decimals() -> None:
     assert drawing.DIMENSION_CALLOUTS == {"BoreDia": "REAM THRU"}
     assert drawing.DIMENSION_PRECISION == {"BoreDia": 3}
-    assert spec.BORE_DIA_BAND == (0.050, 0.030)
+    assert spec.BORE_DIA_BAND == (0.050, 0.000)
     assert model_toleranced_dimensions(part) == {
         ("BoreProfile", "BoreDia"): "*deviations(BORE_DIA_BAND)"
     }
 
 
-def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
+def test_section_replaces_the_tooth_line_side_view_and_note_states_geometry() -> None:
     source = _source()
-    assert "for view in (front, right):\n        set_hidden_lines_visible" in source
+    assert "create_section_view(" in source
+    assert "show_only_cut_face(adapter, section" in source
+    assert 'section_label="A"' in source
+    assert "RIGHT_CENTER" not in source
+    assert drawing.SECTION_LINE[0][0] == drawing.SECTION_LINE[1][0]
+    assert drawing.SECTION_LINE[0][0] == drawing.FRONT_CENTER[0]
+    assert drawing.SECTION_HALF_LINE > drawing.DRAWN_RADIUS
+    assert (
+        drawing.VIEW_GEOMETRY_NOTE
+        == f"FRONT VIEW: OUTSIDE DIA {spec.OUTSIDE_DIA:.2f} +0/-0.10\n"
+        f"SECTION A-A: FACE WIDTH {spec.FACE_WIDTH:.2f}"
+    )
+    assert "add_note(adapter, VIEW_GEOMETRY_NOTE, *VIEW_GEOMETRY_NOTE_XY)" in source
+    assert "add_edge_dimension(" not in source
+    assert "model_point_in_view(" not in source
+
+
+def test_hidden_lines_stay_on_in_the_orthographic_parent_view() -> None:
+    source = _source()
+    assert "set_hidden_lines_visible(adapter, front)" in source
     assert "set_hidden_lines_removed(adapter, iso)" in source
     assert source.count("set_hidden_lines_removed(") == 1
 

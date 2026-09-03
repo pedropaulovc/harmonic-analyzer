@@ -1,7 +1,9 @@
 r"""Create the curated manufacturing drawing for the rack-pinion reduction disc.
 
 Follows the batch gear-drawing pattern (see ``draw_cylinder_gear``). Drawn 1:1;
-the 120T disc is large and thin.
+the 120T disc is large and thin. SECTION A-A (cut face only, through the axis)
+replaces the projected side view -- 120 teeth projected edge-on were a black
+band hiding the bore -- and carries the 3.00 face width.
 
 The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): a
 gear is not on the GD&T allowlist, so it carries no datums and no
@@ -21,6 +23,7 @@ from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
     add_surface_finish,
+    create_section_view,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -32,10 +35,11 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _gear_drawing_entities import visible_circle_edge
+from _gear_drawing_entities import show_only_cut_face, visible_circle_edge
 from _surface_finish import surface_finish_by_key
-from rack_pinion_spec import BORE_DIA, SURFACE_FINISHES
+from rack_pinion_spec import BORE_DIA, FACE_WIDTH, OUTSIDE_DIA, SURFACE_FINISHES
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     place_view,
 )
@@ -56,16 +60,35 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (1.0, 1.0)
 VIEW_SCALE = (1, 1)
 FRONT_CENTER = (0.220, 0.175)
-RIGHT_CENTER = (0.320, 0.175)
 ISO_CENTER = (0.383, 0.210)  # 0.388 clipped the zone border right by 1.4 mm
 
+# SECTION A-A: vertical cut through the axis, cut face only, where the side
+# view used to sit; a plain adjacent note states the face width without
+# relying on an imported edge dimension.
+SECTION_HALF_LINE = OUTSIDE_DIA / 2000.0 + 0.008
+SECTION_LINE = (
+    (FRONT_CENTER[0], FRONT_CENTER[1] - SECTION_HALF_LINE),
+    (FRONT_CENTER[0], FRONT_CENTER[1] + SECTION_HALF_LINE),
+)
+SECTION_CENTER = (0.320, 0.175)
+SECTION_NOTE = f"SECTION A-A\nFACE WIDTH {FACE_WIDTH:.2f}"
+SECTION_NOTE_XY = (
+    SECTION_CENTER[0] - 0.045,
+    SECTION_CENTER[1] + OUTSIDE_DIA / 2000.0 + 0.009,
+)
+
+# The bore callout sits upper-left and the roughness symbol lower-left, so
+# each leader lands radially on its own side of the bore and neither runs
+# through the centre mark (machinist review 2026-09-02).
 FRONT_KEEP = {
-    "BoreDia": (FRONT_CENTER[0] - 0.062, FRONT_CENTER[1] - 0.038),
+    "BoreDia": (FRONT_CENTER[0] - 0.062, FRONT_CENTER[1] + 0.045),
 }
+BORE_FINISH_SYMBOL = (FRONT_CENTER[0] - 0.036, FRONT_CENTER[1] - 0.066)
 # Reamed slip fit on the stud's Ø5 seat; the band is on the model dimension
-# (build_rack_pinion), so the callout only names the process.
+# (build_rack_pinion), so the callout only names the process and three
+# decimals say "hold it".
 DIMENSION_CALLOUTS = {"BoreDia": "REAM THRU"}
-DIMENSION_PRECISION = {"BoreDia": 2}
+DIMENSION_PRECISION = {"BoreDia": 3}
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -110,12 +133,10 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE)
-    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=VIEW_SCALE)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
     set_hidden_lines_removed(adapter, iso)
-    # Hidden lines stay ON in every orthographic view (policy rule 7).
-    for view in (front, right):
-        set_hidden_lines_visible(adapter, view)
+    # Hidden lines stay ON in the orthographic view (policy rule 7).
+    set_hidden_lines_visible(adapter, front)
 
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
@@ -129,11 +150,25 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         front,
-        symbol_xy=(FRONT_CENTER[0] + 0.014, FRONT_CENTER[1] - 0.055),
+        symbol_xy=BORE_FINISH_SYMBOL,
         control=surface_finish_by_key(SURFACE_FINISHES, "bore"),
         label="rack pinion bore finish",
         entity=bore_edge,
     )
+
+    section = create_section_view(
+        adapter,
+        front,
+        line_start=SECTION_LINE[0],
+        line_end=SECTION_LINE[1],
+        view_xy=SECTION_CENTER,
+        section_label="A",
+        scale=VIEW_SCALE,
+        label="disc blank",
+    )
+    show_only_cut_face(adapter, section, label="disc blank")
+    if add_note(adapter, SECTION_NOTE, *SECTION_NOTE_XY) is None:
+        raise RuntimeError("failed to add rack-pinion section geometry note")
 
     add_property_linked_note(adapter, "Gear Data", 0.018, 0.262)
     add_property_linked_note(adapter, "Manufacturing Notes", 0.018, 0.095)

@@ -52,15 +52,19 @@ from _common import (
 )
 
 from _drawing_marks import (
+    add_angular_reference_dimension,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_symmetric_angular_tolerance,
 )
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from spring_hook_notes import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
+    ELBOW_ANGLE_DEG,
+    ELBOW_ANGLE_TOLERANCE_DEG,
     ISOMETRIC_VIEW_NOTE,
 )
 from spring_hook_spec import SURFACE_FINISHES
@@ -152,6 +156,18 @@ async def build(adapter) -> dict[str, str]:
         adapter, f"{arm}.start", f"{arm}.end", "horizontal_distance", ARM_RUN, "arm run"
     )
     path.record("ArmRun", '"ArmRun"')
+    # The elbow angle as a DRIVEN reference dimension between the shank and
+    # arm lines (the pinion-lever grip half-angle idiom): the print carries it
+    # with a loose forming band instead of the title block's +/-1 degree.
+    await add_angular_reference_dimension(
+        adapter,
+        rise,
+        arm,
+        (ELBOW_R + 1.1, SHANK_RISE - 1.2),
+        "elbow angle",
+        expected_degrees=ELBOW_ANGLE_DEG,
+    )
+    path.record("ElbowAngle")
     await ensure_fully_defined(adapter, "hook path")
     check("exit_sketch hook path", await adapter.exit_sketch())
     name_last_feature(adapter, "HookPath")
@@ -199,8 +215,16 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
 
-    # Manufacturing drawing support: mark exactly the print's dimensions and
+    # Manufacturing drawing support: the elbow angle's loose forming band on
+    # the driven model dimension, then mark exactly the print's dimensions and
     # stamp the make-critical title-block properties.
+    set_dimension_symmetric_angular_tolerance(
+        adapter,
+        "HookPath",
+        "ElbowAngle",
+        ELBOW_ANGLE_TOLERANCE_DEG,
+        require_driven=True,
+    )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

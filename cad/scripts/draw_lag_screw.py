@@ -1,8 +1,9 @@
 r"""Create the curated machinist drawing for the rocker-support hold-down screw.
 
 Uniform fastener slice (see draw_fillister_screw.py): a profile side view
-with the head height and under-head length, the thread designation
-leadered to the shank and the axis centerline; a slot-profile (*Right) view
+with the head height and under-head length, the (REF) overall outside them,
+the thread designation leadered to the shank and the axis centerline; a
+slot-profile (*Right) view
 where the driver slot is a visible notch, carrying its width and depth; a
 head-end view with the round head diameter (leader ending at the rim) and
 a center mark; plus an isometric.  Authored on the Top plane (axis +Y)
@@ -38,6 +39,7 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fastener_annotations import (
     add_circle_center_mark,
+    add_overall_reference,
     add_thread_leader,
     end_diameter_leaders_at_rim,
 )
@@ -108,11 +110,22 @@ END_CENTER_MARK_XY = (
 DIMENSION_CALLOUTS: dict[str, str] = {}
 
 # Side view: the head-height and under-head length as the extrude-depth model
-# dims (the vertical profile cannot point-select the edge-on shoulder/tip).
+# dims, chained in an inner column right of the profile; the (REF) overall
+# stands in the outer column so the conspicuous 63.00 reads as the under-head
+# length, not the overall.  Both columns clear the slot-profile view at 0.263.
+SIDE_DIM_X = SIDE_CENTER[0] + 0.034
+OVERALL_DIM_X = SIDE_CENTER[0] + 0.054
 SIDE_KEEP = {
-    "HeadHt": (SIDE_CENTER[0] + 0.052, (_HEAD_END_Y + _JUNCTION_Y) / 2.0),
-    "ShankLg": (SIDE_CENTER[0] + 0.052, _SHANK_MID_Y),
+    "HeadHt": (SIDE_DIM_X, (_HEAD_END_Y + _JUNCTION_Y) / 2.0),
+    "ShankLg": (SIDE_DIM_X, _SHANK_MID_Y),
 }
+# Overall picks: model points on the right half of each end face (the
+# driver-face rim is whole there; the slot breaks it beside the axis).
+OVERALL_END_POINTS_MM = (
+    (0.7 * HEAD_DIA / 2.0, -HEAD_H, 0.0),
+    (0.7 * SHANK_DIA / 2.0, SHANK_LEN, 0.0),
+)
+OVERALL_TEXT_XY = (OVERALL_DIM_X, SIDE_CENTER[1])
 # Slot-profile view: the notch is in the head's BOTTOM face, so its width
 # sits below the head and its depth to the right of the head.
 SLOT_KEEP = {
@@ -205,6 +218,15 @@ async def build(adapter: Any) -> dict[str, str]:
         silhouette_xy=THREAD_LEADER_XY,
         note_xy=THREAD_NOTE_XY,
         label="shank thread designation",
+    )
+    add_overall_reference(
+        adapter,
+        side,
+        end_points_mm=OVERALL_END_POINTS_MM,
+        entity_types=("EDGE", "EDGE"),
+        text_xy=OVERALL_TEXT_XY,
+        orientation="vertical",
+        label="overall length reference",
     )
 
     curate_view_dimensions(adapter, right, keep=SLOT_KEEP, view_label="slot profile")

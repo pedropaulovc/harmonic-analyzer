@@ -15,6 +15,7 @@ from typing import Any
 import _telemetry
 from _common import _early_bound
 from _drawing_common import visible_view_entities
+from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 
 
 def _span_attrs(**attributes: float) -> None:
@@ -210,3 +211,36 @@ def visible_tooth_tip_silhouette(
             f"{target_radius_m * 1000.0:.4f} mm"
         )
     return max(candidates, key=lambda candidate: candidate[0])[1]
+
+
+@_telemetry.traced("drawing.section_cut_face_only", label_param="label")
+def show_only_cut_face(adapter: Any, section: Any, *, label: str) -> None:
+    """Make a section view display ONLY the face the cutting plane cuts.
+
+    A gear's projected side view is a black band: every tooth edge lands
+    within the OD, ~480 lines over 62 mm on the 120T gears, so the bore's
+    hidden lines and the face width are unreadable (machinist review,
+    2026-09-02, five sheets).  A section through the axis is the conventional
+    gear side view, but SolidWorks still projects the half of the tooth ring
+    BEHIND the cutting plane into it -- the same band.  ``IDrSection::
+    SetDisplayOnlySurfaceCut`` leaves just the hatched cut face: the blank's
+    width, the bore channel and (cylinder gear) the cam step, which is what a
+    machinist dimensions.  First fleet use of that flag; the setter returns
+    nothing, so the state is read back and a refusal fails loud.
+    """
+    view = _sw_type_info.early_bound_or_flag(section, "IView", "GetSection")
+    dr_section = view.GetSection()
+    if dr_section is None:
+        raise RuntimeError(f"section view has no section definition ({label})")
+    dr_section = _sw_type_info.early_bound_or_flag(
+        dr_section,
+        "IDrSection",
+        "SetDisplayOnlySurfaceCut",
+        "GetDisplayOnlySurfaceCut",
+    )
+    dr_section.SetDisplayOnlySurfaceCut(True)
+    adapter.currentModel.EditRebuild3()
+    if not bool(dr_section.GetDisplayOnlySurfaceCut()):
+        raise RuntimeError(
+            f"section view did not accept display-only-cut-face ({label})"
+        )

@@ -1,22 +1,28 @@
-"""Offline contract for the simple channel assembly drawing."""
+"""Offline package contract for the channel assembly drawing."""
 
-from pathlib import Path
+import asyncio
 
 import draw_channel_assembly as drawing
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
-def test_channel_assembly_keeps_registry_outputs_and_precomputed_placement() -> None:
+def test_channel_package_forwards_domain_instructions(monkeypatch) -> None:
     spec = DRAWINGS_BY_NAME["channel_assembly"]
-    assert spec.source_kind == "assembly"
-    assert spec.part == "channel"
-    assert drawing.SOURCE == spec.source
-    assert drawing.OUTPUTS == drawing.OUTPUTS.__class__(
-        spec.outputs["slddrw"], spec.outputs["pdf"], spec.outputs["png"]
-    )
-    assert drawing.SHEET_SCALE == (1.0, 7.0)
-    assert drawing.FRONT_CENTER == (0.060, 0.150)
-    assert drawing.RIGHT_CENTER == (0.130, 0.150)
-    assert drawing.ISO_CENTER == (0.225, 0.140)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "return await build_simple_three_view_drawing(" in source
+    captured = {}
+
+    async def build_package(adapter, **kwargs):
+        captured.update(kwargs)
+        return {"pdf": "channel"}
+
+    monkeypatch.setattr(drawing, "build_assembly_package", build_package)
+    assert asyncio.run(drawing.build(object())) == {"pdf": "channel"}
+    assert captured["source"] == spec.source
+    assert captured["outputs"] == drawing.OUTPUTS
+    assert captured["sheet_scale"] == (1.0, 6.0)
+    assert captured["reference_scale"] == (1.0, 14.0)
+    assert captured["assembly_steps"] is drawing.ASSEMBLY_STEPS
+    assert captured["critical_checks"] is drawing.CRITICAL_CHECKS
+    assert captured["hardware_notes"] is drawing.HARDWARE_NOTES
+    assert any("20 rockers" in step for step in drawing.ASSEMBLY_STEPS)
+    assert any("7.0565 mm" in check for check in drawing.CRITICAL_CHECKS)
+    assert any("J-hooks" in note for note in drawing.HARDWARE_NOTES)

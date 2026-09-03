@@ -118,17 +118,20 @@ def test_make_critical_free_text_is_formatted_from_geometry_constants() -> None:
             "{2.0 * CAP_R:.2f}",
         ),
         pinion_cam_spec: ("{ECC:.2f}", "{CAM_OD:.2f}"),
-        draw_pinion_cam_pin: ("{CAP_SAG:.2f}",),
+        draw_pinion_cam_pin: ("{CAP_SAG:.2f}", "{OVERALL_LEN:.2f}"),
         # The handle, lever and bracket sheets carry their crown, station and
         # scallop sizes as view dimensions now (machinist review 2026-09-02),
         # so their notes quote no geometry; the handle's hub-end station pick
         # is the one remaining computed free-text input.
         draw_pinion_handle: ("z_max / 1000.0",),
         pinion_pivot_shaft_spec: ("{CAP_SAG:.2f}",),
+        # The spring's blade length/angle and hole location are view
+        # dimensions now (machinist review 2026-09-02); the terminal flag
+        # and the strip stock line remain formatted from the geometry.
         pinion_spring_spec: (
             "{FLAT_LEN:.2f}",
             "{90.0 - BLADE_TILT_DEG + KINK_DEG:.2f}",
-            "{HOLE_FROM_END:.2f}",
+            "{THICK:.2f} X {WIDTH:.2f}",
         ),
     }
     for module, tokens in source_tokens.items():

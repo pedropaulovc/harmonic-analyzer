@@ -58,9 +58,8 @@ def test_draw_view_math_matches_the_spec() -> None:
     assert math.isclose(drawing.SUM_ARC_MID[1], lever.SUM_BASE / 2.0 - lever.SUM_CURV)
 
 
-def test_sheet_runs_at_1_to_2_with_1_to_4_isometric_and_2_to_1_detail() -> None:
+def test_sheet_runs_at_1_to_2_with_1_to_4_isometric() -> None:
     assert drawing.SHEET_SCALE == (1.0, 2.0)
-    assert drawing.DETAIL_SCALE == (2, 1)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "scale=(1, 4)" in source  # the isometric override
     assert source.count("scale=(1, 2)") == 3  # front, top, right
@@ -74,9 +73,8 @@ def test_notes_are_few_specific_and_never_the_title_block() -> None:
     assert len(lines) <= 4
     assert "KNIFE EDGE" in notes
     assert "AS CAST" in notes
-    # The hex trunnion is dimensioned on DETAIL C (across flats, flat length,
-    # included angle) and the right view (length, vertex height): no hex
-    # numbers in prose, and never "regular" -- it is not a regular hexagon.
+    # The hex trunnion is specified in the knife-edge geometry block and
+    # right view. The general manufacturing note does not repeat dimensions.
     assert "8.65" not in notes and "10.27" not in notes and "21.72" not in notes
     assert "REGULAR" not in notes
     # The block shares its band with the top view: keep every line short.
@@ -89,8 +87,17 @@ def test_notes_are_few_specific_and_never_the_title_block() -> None:
     assert "25.40" not in notes
     # Nothing the title block or a dimension already says, no GD&T prose.
     for banned in (
-        "UOS", "DIMENSIONS IN", "LINEAR +/-", "+/-", "DATUM", "BASIC",
-        "WITHIN", "MHA-", "GRAY-IRON", "GREEN ENAMEL", "Ra ",
+        "UOS",
+        "DIMENSIONS IN",
+        "LINEAR +/-",
+        "+/-",
+        "DATUM",
+        "BASIC",
+        "WITHIN",
+        "MHA-",
+        "GRAY-IRON",
+        "GREEN ENAMEL",
+        "Ra ",
     ):
         assert banned not in notes, banned
     source = Path(drawing.__file__).read_text(encoding="utf-8")
@@ -123,11 +130,14 @@ def test_print_keeps_only_the_allowlisted_spring_pattern_frame() -> None:
     for basic in ("spring-hole row X", "spring-hole start Z", "spring-hole pitch"):
         assert f'label="{basic}"' in source, basic
     assert 'label="anchor bore X location"' in source
-    assert 'set_basic_dimension(adapter, anchor_location' not in source
+    assert "set_basic_dimension(adapter, anchor_location" not in source
     # Datum A rides the +Z trunnion's top ridge in the RIGHT view (a clean
     # visible edge with clear space above); the top view's ridges carry the
     # station origin and the roughness symbol instead.
-    assert "knife_edge_datum = _right_xy(HEX_Z_INNER + 0.2 * HEX_DEPTH, HEX_H / 2.0)" in source
+    assert (
+        "knife_edge_datum = _right_xy(HEX_Z_INNER + 0.2 * HEX_DEPTH, HEX_H / 2.0)"
+        in source
+    )
     assert 'label="knife-edge pivot axis"' in source
 
 
@@ -139,8 +149,12 @@ def test_pattern_annotations_attach_to_distinct_holes() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "end_hole_up = -HOLE_Z_LAST" in source
     assert "top_hole_up = -HOLE_Z_FIRST" in source
-    assert "third_rim_top = _top_xy(HOLE_X, end_hole_up + 2.0 * CHANNEL_PITCH + HOLE_DIA / 2.0)" in source
-    assert "fifth_rim_right = _top_xy(HOLE_X + HOLE_DIA / 2.0, end_hole_up + 4.0 * CHANNEL_PITCH)" in source
+    assert (
+        "third_rim_top = _top_xy(HOLE_X, end_hole_up + 2.0 * CHANNEL_PITCH + HOLE_DIA / 2.0)"
+        in source
+    )
+    assert "fifth_rim_right = _top_xy(" in source
+    assert "HOLE_X + HOLE_DIA / 2.0, end_hole_up + 4.0 * CHANNEL_PITCH" in source
     assert "edge_xy=third_rim_top" in source
     assert "edge_xy=fifth_rim_right" in source
 
@@ -159,16 +173,16 @@ def test_station_origin_is_the_pivot_axis_with_a_centerline() -> None:
     # Both lanes clear the sheet-top trunnion tip.
     trunnion_tip_y = drawing._top_xy(0.0, summing_lever_spec.HEX_Z_OUTER)[1]
     assert drawing.TOP_LANE_CHAIN_Y > trunnion_tip_y + 0.003
-    assert 'text_xy=(0.146, TOP_LANE_CHAIN_Y)' in source
-    assert 'text_xy=(0.1758, TOP_LANE_CHAIN_Y)' in source
+    assert "text_xy=(0.146, TOP_LANE_CHAIN_Y)" in source
+    assert "text_xy=(0.1758, TOP_LANE_CHAIN_Y)" in source
 
 
 def test_cast_body_is_dimensioned_on_the_views_not_in_prose() -> None:
     # The casting's arms, web and junctions carry real dimensions: the rib
     # arc radius (front), both summation-arm side radii (top), and the
     # coefficients plate, both rib bands, trunnion length and vertex height
-    # (right).  The pivot diameter is a silhouette width with the diameter
-    # prefix.  DETAIL C enlarges the knife-edge trunnion end.
+    # (right). The pivot diameter is a silhouette width with the diameter
+    # prefix. A compact block beside the front view specifies the knife edges.
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("_add_radial_dimension(") >= 3
     assert 'label="rib arc radius"' in source
@@ -180,22 +194,29 @@ def test_cast_body_is_dimensioned_on_the_views_not_in_prose() -> None:
         "edge rib thickness",
         "trunnion length",
         "hex vertex height",
-        "hex across flats",
-        "hex flat length",
-        "knife-edge included angle",
     ):
         assert f'label="{label}"' in source, label
     assert '_display_as_diameter(adapter, pivot_dia, label="pivot diameter")' in source
     assert 'entity_type="SILHOUETTE"' in source
-    assert source.count("create_detail_view(") == 1
-    assert 'detail_label="C"' in source
-    assert 'entity_types=("VERTEX", "VERTEX")' in source
-    # The detail circle covers the hex (+-HEX_H/2 on the 1:2 parent) but not
-    # the cylinder circle.
-    half_hex_on_parent = summing_lever_spec.HEX_H / 2.0 * drawing._S / 1000.0
-    cyl_on_parent = summing_lever_spec.CYL_R * drawing._S / 1000.0
-    assert half_hex_on_parent < drawing.DETAIL_RADIUS < cyl_on_parent
-    # The included angle the detail shows is the non-regular hexagon's.
+    assert "create_detail_view(" not in source
+    assert "model_point_in_view(" not in source
+    assert "visible_view_entities(" not in source
+    assert "view.SelectEntity(" not in source
+    assert "add_note(adapter, KNIFE_EDGE_GEOMETRY_NOTE, *KNIFE_EDGE_NOTE_XY)" in source
+    assert drawing.HEX_FLAT_LENGTH == summing_lever_spec.HEX_H / 2.0
+    assert drawing.KNIFE_EDGE_NOTE_XY == (0.055, 0.205)
+    assert (
+        f"{summing_lever_spec.HEX_W:.2f} ACROSS FLATS"
+        in drawing.KNIFE_EDGE_GEOMETRY_NOTE
+    )
+    assert (
+        f"{drawing.HEX_FLAT_LENGTH:.2f} FLAT LENGTH" in drawing.KNIFE_EDGE_GEOMETRY_NOTE
+    )
+    assert (
+        f"{drawing.HEX_INCLUDED_ANGLE_DEG:.2f} DEG INCLUDED KNIFE ANGLE"
+        in drawing.KNIFE_EDGE_GEOMETRY_NOTE
+    )
+    # The included angle is derived from the non-regular hexagon.
     included = 180.0 - 2.0 * math.degrees(
         math.atan2(summing_lever_spec.HEX_H / 4.0, summing_lever_spec.HEX_W / 2.0)
     )
@@ -212,13 +233,15 @@ def test_knife_edge_keeps_its_finish_and_holes_state_the_process() -> None:
     assert 'process="DRILL"' in source
     # The seed callout sits in clear space above the title block (whose top
     # rule is at y ~0.0645 for x >= 0.218) and left of the plate-length lane.
-    assert 'callout_xy=(0.232, 0.126)' in source
+    assert "callout_xy=(0.232, 0.126)" in source
     assert drawing.TOP_KEEP["PlateLength"][0] > 0.232 + 0.030
 
 
 def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "for view in (front, top, right):\n        set_hidden_lines_visible" in source
+    assert (
+        "for view in (front, top, right):\n        set_hidden_lines_visible" in source
+    )
     assert "set_hidden_lines_removed(adapter, iso)" in source
 
 

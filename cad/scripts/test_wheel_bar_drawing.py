@@ -141,6 +141,25 @@ def test_bores_carry_native_drill_callouts_and_stations_from_the_left_end() -> N
     assert 'label="bar-depth overall"' in source
 
 
+def test_transverse_hole_station_locates_the_common_axis() -> None:
+    # Review 2026-09-02: the holes sat on a drawn midline with no dimension.
+    # One vertical station, bottom edge -> pen-hanger hole axis (arc centre),
+    # locates every bore across the 10 width; it nests inside the 10.00
+    # section height, whose text is lifted off the mid-height row the hole's
+    # extended centre mark runs along.
+    source = _source()
+    assert 'label="transverse hole station"' in source
+    assert 'orientation="vertical"' in source
+    assert "set_arc_endpoints_to_center(adapter, transverse" in source
+    assert source.count("add_edge_dimension(") == 3
+    assert drawing.BOTTOM_EDGE_PICK[1] == drawing.BAR_BOTTOM
+    assert drawing.BOTTOM_EDGE_PICK[0] > drawing.LEFT_END
+    # Nearest lane inside the section height's lane; both left of the end.
+    assert drawing.LEFT_END > drawing.TRANSVERSE_STATION_TEXT_XY[0] > drawing.FRONT_KEEP["Side"][0]
+    assert drawing.FRONT_KEEP["Side"][1] > drawing.FRONT_CENTER[1] + 0.008
+    assert drawing.TRANSVERSE_STATION_TEXT_XY[1] < drawing.FRONT_CENTER[1]
+
+
 def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
     source = _source()
     assert "for view in (front, right):\n        set_hidden_lines_visible" in source

@@ -2,13 +2,17 @@
 
 The print follows cad/docs/drawing-simplicity-policy.md: no datums or frames;
 one roughness symbol on the bore because the pinion (locked to the disc) RUNS
-free on the stud; a compact GEAR DATA block; two lines of notes.
+free on the stud; a compact GEAR DATA block with the over-pins acceptance;
+one line of notes.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
+import _gear_inspection
 import build_transgear_feed_pinion as part
 import draw_transgear_feed_pinion as drawing
 import transgear_feed_pinion_spec as spec
@@ -37,25 +41,34 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert set(drawing.DIMENSION_CALLOUTS) <= marked
 
 
-def test_gear_data_block_is_the_compact_tooth_system() -> None:
+def test_gear_data_block_is_the_compact_tooth_system_with_over_pins() -> None:
     data = spec.GEAR_DATA
     lines = data.split("\n")
     assert lines[0] == "GEAR DATA"
-    assert len(lines) <= 9
+    assert len(lines) <= 10
     for field in (
         "NUMBER OF TEETH",
         "DIAMETRAL PITCH",
         "PRESSURE ANGLE",
         "PITCH DIAMETER (REF)",
         "OUTSIDE DIAMETER",
-        "WHOLE DEPTH",
+        "WHOLE DEPTH (REF)",
         "FACE WIDTH",
+        "OVER 2 PINS",
         "TOOTH FORM",
     ):
         assert field in data, field
     assert "12" in data
+    # A standard cutter designation carries no false decimals.
+    assert "DIAMETRAL PITCH:  30\n" in data
+    assert "30.00" not in data
     assert "X.XX" not in data
     assert "MODULE" not in data
+    # 12T, 30 DP, 14.5 deg, the 1.65 pin -> 12.78 over two pins.
+    assert spec.PIN_DIA_MM == pytest.approx(1.65)
+    assert spec.PIN_DIA_MM == _gear_inspection.preferred_pin_dia_mm(spec.DIAMETRAL_PITCH)
+    assert spec.OVER_PINS.usable
+    assert "OVER 2 PINS 1.65 DIA:  12.78 +0/-0.10" in data
     source = _source()
     assert 'add_property_linked_note(adapter, "Gear Data"' in source
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
@@ -65,8 +78,9 @@ def test_notes_are_few_specific_and_never_the_title_block() -> None:
     notes = spec.DRAWING_NOTES
     lines = notes.split("\n")
     assert len(lines) <= 4
-    assert "FULL FACE" in notes
     assert "RUNS FREE ON THE STUD" in notes
+    # The full-face tooth line repeated the 9.50 face width the views show.
+    assert "FULL FACE" not in notes
     for banned in ("DATUM", "RUNOUT", "+/-", "MHA-", "DEBUR", "X.XX", "UOS"):
         assert banned not in notes, banned
 
@@ -85,12 +99,21 @@ def test_print_carries_no_gdt() -> None:
     assert not hasattr(spec, "GEOMETRIC_CONTROLS")
 
 
-def test_running_bore_keeps_its_fit_and_finish() -> None:
+def test_running_bore_keeps_its_fit_finish_and_three_decimals() -> None:
     assert drawing.DIMENSION_CALLOUTS == {"BoreDia": "REAM THRU"}
-    assert drawing.DIMENSION_PRECISION == {"BoreDia": 2}
+    assert drawing.DIMENSION_PRECISION == {"BoreDia": 3}
+    assert spec.BORE_DIA_BAND == (0.05, 0.00)
     assert model_toleranced_dimensions(part) == {
         ("BoreProfile", "BoreDia"): "*deviations(BORE_DIA_BAND)"
     }
+
+
+def test_bore_leaders_land_on_opposite_sides_of_the_bore() -> None:
+    cx, cy = drawing.FRONT_CENTER
+    text = drawing.FRONT_KEEP["BoreDia"]
+    assert text[0] < cx and text[1] > cy  # callout upper-left
+    symbol = drawing.BORE_FINISH_SYMBOL
+    assert symbol[0] < cx and symbol[1] < cy  # roughness lower-left, radial
 
 
 def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:

@@ -49,9 +49,11 @@ from _drawing_marks import (
 from swing_stop_screw_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
+    EMBED_LEN,
     END_VIEW_NOTE,
     HEAD_DIA,
     HEAD_T,
+    PROUD_LEN,
     SHANK_DIA,
     SHANK_LEN,
     SLOT_D,
@@ -62,9 +64,7 @@ PART_NAME = "swing-stop-screw"
 SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material
 
-EMBED_LEN = 6.0  # into the base's stop hole
-PROUD_LEN = 8.0  # above the base top: covers the 6.35 plate band + margin
-assert EMBED_LEN + PROUD_LEN == SHANK_LEN
+
 def _slot_strip_area(r: float, w: float) -> float:
     h = w / 2.0
     return 2.0 * (h * math.sqrt(r * r - h * h) + r * r * math.asin(h / r))

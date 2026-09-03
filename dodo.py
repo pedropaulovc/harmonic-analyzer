@@ -2190,6 +2190,10 @@ def task_check():
         # per-sheet test_*_drawing.py suffix, so enroll them explicitly.
         SCRIPTS_DIR / "test_drawing_marks.py",
         SCRIPTS_DIR / "test_cone_drawing_batch_contract.py",
+        # The measurement-over-pins math every gear-data block prints
+        # (_gear_inspection): the formula is pinned against an independent
+        # geometric tangency check, so a drift in it fails the gate, not a sheet.
+        SCRIPTS_DIR / "test_gear_inspection.py",
         SCRIPTS_DIR / "test_fastener_catalog.py",
         # Fleet-wide manufacturing ownership/validation contracts are standalone
         # tests rather than one-file-per-drawing tests, so the glob below cannot

@@ -82,3 +82,21 @@ def test_notes_are_few_and_carry_no_gdt_prose() -> None:
             assert len(notes.split("\n")) <= 4, part_name
         for banned in ("DATUM", "BASIC", "FCF", "WITHIN", "+/-", "PER CALLOUT"):
             assert banned not in notes.upper(), (part_name, banned)
+
+
+def test_spring_data_blocks_are_compact_shop_contracts() -> None:
+    for part_name in SPRING_DATA_SHEETS:
+        module = importlib.import_module(CHANNEL_SPECS[part_name])
+        lines = module.DRAWING_NOTES.splitlines()
+        assert 6 <= len(lines) <= 8, part_name
+        assert lines[0] == "EXTENSION SPRING DATA", part_name
+        for field in (
+            "WIRE Ø",
+            "OD",
+            "FREE LENGTH",
+            "ACTIVE COILS",
+            "RIGHT HAND",
+            "ENDS",
+        ):
+            assert field in module.DRAWING_NOTES, (part_name, field)
+        assert max(map(len, lines)) <= 52, part_name
