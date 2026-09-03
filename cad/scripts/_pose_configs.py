@@ -216,6 +216,31 @@ def set_distance_mate_value_in_active_configuration(
     _telemetry.event("pose.distance_mate", component=component, rest_mm=rest_mm, value_mm=value_mm, label=label)
 
 
+def set_component_referenced_configuration(adapter: Any, component: str, configuration: str) -> None:
+    """Point a sub-assembly instance at one of ITS configurations, in the ACTIVE
+    top configuration only (``IComponent2::ReferencedConfiguration`` + rebuild,
+    read back). The adapter's ``set_component_configuration``
+    (``CompConfigProperties5``) reads back 'Default' on this seat in both
+    Default and a fresh configuration (probe 2026-09-02); the documented
+    property takes, per configuration (readback proves both)."""
+    from _common import _early_bound
+
+    def _comp():
+        c = _early_bound(adapter.currentModel, "IAssemblyDoc").GetComponentByName(component)
+        if c is None:
+            raise RuntimeError(f"pose: component not found: {component!r}")
+        return _early_bound(c, "IComponent2")
+
+    _comp().ReferencedConfiguration = configuration
+    _rebuild(adapter)
+    got = str(_comp().ReferencedConfiguration)
+    if got != configuration:
+        raise RuntimeError(
+            f"pose: {component} -> configuration {configuration!r} did not take (reads {got!r})"
+        )
+    _telemetry.event("pose.component_configuration", component=component, configuration=configuration)
+
+
 def read_pose_value(adapter: Any, mate: PoseMate) -> float:
     dim = adapter.currentModel.Parameter(pose_dim_name(mate.key))
     si = float(adapter._attempt(lambda: dim.SystemValue, default=float("nan")))

@@ -171,12 +171,14 @@ def _subassembly(name: str) -> str:
 # referenced configuration, CompConfigProperties5) and re-proves the
 # cross-subassembly fits there -- the sinusoid's rods must still ride the
 # drive-train's turned cams.
-from _pose_configs import PoseConfiguration, install_pose_configurations  # noqa: E402
+from _pose_configs import (  # noqa: E402
+    PoseConfiguration,
+    install_pose_configurations,
+    set_component_referenced_configuration,
+)
 
 
 async def _install_top_pose_configurations(adapter, sub_instances: dict[str, str]) -> None:
-    from solidworks_mcp.adapters.base import SetComponentConfigurationParameters
-
     poses = _config.poses()
     fan_name = poses["amplitude_fan"]["configuration"]
     sin_name = poses["sinusoid"]["configuration"]
@@ -184,12 +186,7 @@ async def _install_top_pose_configurations(adapter, sub_instances: dict[str, str
     def _selector(targets: dict[str, str]):
         async def hook(adapter) -> None:
             for sub, cfg in targets.items():
-                check(
-                    f"{sub_instances[sub]} -> configuration {cfg!r}",
-                    await adapter.set_component_configuration(
-                        SetComponentConfigurationParameters(name=sub_instances[sub], configuration=cfg)
-                    ),
-                )
+                set_component_referenced_configuration(adapter, sub_instances[sub], cfg)
         return hook
 
     await install_pose_configurations(
