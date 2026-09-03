@@ -31,6 +31,14 @@ def test_prompts_exist_and_are_calibrated_to_the_policy() -> None:
     # expected to FAIL this until they are built out.
     for item in ("exploded view", "parts list (BOM)", "Assembly steps in order"):
         assert item in assembly, item
+    assembly_text = " ".join(assembly.split())
+    for item in (
+        "return one verdict for the package as a whole",
+        "every balloon against its BOM row",
+        "setup and assembly steps across sheet boundaries",
+        "SHIP requires those cross-sheet checks",
+    ):
+        assert item in assembly_text, item
 
 
 def test_schema_is_strict_structured_output() -> None:
@@ -48,9 +56,10 @@ def test_schema_is_strict_structured_output() -> None:
 
 
 def test_command_references_only_the_neutral_workdir(tmp_path: Path) -> None:
+    images = [tmp_path / "sheet-1.png", tmp_path / "sheet-2.png"]
     cmd = mr.build_command(
         workdir=tmp_path,
-        image=tmp_path / "sheet.png",
+        images=images,
         schema=tmp_path / "schema.json",
         output=tmp_path / "verdict.json",
         model="gpt-test",
@@ -60,6 +69,9 @@ def test_command_references_only_the_neutral_workdir(tmp_path: Path) -> None:
     repo = mr.CAD_ROOT.parent.as_posix()
     assert repo not in joined.replace("\\", "/")
     assert cmd[-1] == "-"  # prompt on stdin, never inline
+    assert [cmd[index + 1] for index, value in enumerate(cmd) if value == "-i"] == [
+        str(image) for image in images
+    ]
     for flag in ("--ignore-user-config", "--ignore-rules", "--ephemeral", "--json"):
         assert flag in cmd
     assert cmd[cmd.index("--sandbox") + 1] == "read-only"
@@ -79,7 +91,9 @@ def test_pass_requires_ship_with_no_gating_findings() -> None:
     assert mr.is_pass(clean)
     assert not mr.is_pass({**clean, "verdict": "FIX"})
     for key in mr.GATING_KEYS:
-        assert not mr.is_pass({**clean, key: [{"where": "x", "issue": "y", "fix": "z"}]})
+        assert not mr.is_pass(
+            {**clean, key: [{"where": "x", "issue": "y", "fix": "z"}]}
+        )
     assert not mr.is_pass(None)
 
 
@@ -106,9 +120,7 @@ def test_verdict_validation_rejects_every_schema_violation() -> None:
         {**clean, "minor": [{"where": "x", "issue": "y"}]},
         {
             **clean,
-            "minor": [
-                {"where": "x", "issue": "y", "fix": "z", "unexpected": True}
-            ],
+            "minor": [{"where": "x", "issue": "y", "fix": "z", "unexpected": True}],
         },
         {**clean, "minor": [{"where": "", "issue": "y", "fix": "z"}]},
         {**clean, "minor": [{"where": "x", "issue": "", "fix": "z"}]},
@@ -144,8 +156,20 @@ def test_extract_verdict_validates_file_and_event_fallback(tmp_path: Path) -> No
 
 def test_tool_events_are_detected_at_any_depth() -> None:
     assert mr.count_tool_events([{"type": "agent_message", "text": "{}"}]) == 0
-    assert mr.count_tool_events([{"type": "item.completed", "item": {"type": "command_execution", "command": "ls"}}]) == 1
-    assert mr.count_tool_events([{"type": "turn.started"}, {"type": "mcp_tool_call"}]) == 1
+    assert (
+        mr.count_tool_events(
+            [
+                {
+                    "type": "item.completed",
+                    "item": {"type": "command_execution", "command": "ls"},
+                }
+            ]
+        )
+        == 1
+    )
+    assert (
+        mr.count_tool_events([{"type": "turn.started"}, {"type": "mcp_tool_call"}]) == 1
+    )
 
 
 def test_retry_persists_all_attempts_and_cannot_hide_tool_use(
@@ -188,8 +212,8 @@ def test_retry_persists_all_attempts_and_cannot_hide_tool_use(
 
     monkeypatch.setattr(subprocess, "run", fake_run)
     report_dir = tmp_path / "reports"
-    review = mr.review_sheet(
-        mr.Sheet("part", "part", png),
+    review = mr.review_package(
+        mr.ReviewPackage("part", "part", (png,)),
         report_dir=report_dir,
         retries=1,
         codex="codex",
@@ -235,17 +259,17 @@ def test_arbitrary_png_reports_with_same_basename_do_not_collide(
     for index, image in enumerate(inputs):
         image.parent.mkdir()
         image.write_bytes(f"png-{index}".encode())
-    sheets = [mr._sheet_for_png(image, "part") for image in inputs]
-    assert sheets[0].name != sheets[1].name
+    packages = [mr._package_for_pngs([image], "part") for image in inputs]
+    assert packages[0].name != packages[1].name
 
     report_dir = tmp_path / "reports"
     with ThreadPoolExecutor(max_workers=2) as pool:
         reviews = list(
             pool.map(
-                lambda sheet: mr.review_sheet(
-                    sheet, report_dir=report_dir, retries=0, codex="codex-test"
+                lambda package: mr.review_package(
+                    package, report_dir=report_dir, retries=0, codex="codex-test"
                 ),
-                sheets,
+                packages,
             )
         )
 
@@ -260,29 +284,131 @@ def test_arbitrary_png_reports_with_same_basename_do_not_collide(
     assert all(f"]({name}.md)" in index for name in names)
 
 
+def test_multi_sheet_assembly_is_one_cross_sheet_review(
+    tmp_path: Path, monkeypatch
+) -> None:
+    import subprocess
+
+    from pypdf import PdfWriter
+
+    source = tmp_path / "assembly.pdf"
+    writer = PdfWriter()
+    writer.add_blank_page(width=72, height=72)
+    writer.add_blank_page(width=72, height=72)
+    with source.open("wb") as stream:
+        writer.write(stream)
+    verdict = {
+        "verdict": "SHIP",
+        "summary": "BOM conflict remains",
+        "blockers": [],
+        "over_specification": [],
+        "clarity": [
+            {
+                "where": "sheets 1 and 2",
+                "issue": "balloon 4 maps to conflicting BOM rows",
+                "fix": "make item 4 consistent across the package",
+            }
+        ],
+        "minor": [],
+    }
+    calls: list[list[str]] = []
+
+    def fake_run(command, **kwargs):
+        calls.append(command)
+        attached = [
+            Path(command[index + 1])
+            for index, value in enumerate(command)
+            if value == "-i"
+        ]
+        assert len(attached) == 2
+        assert all(path.read_bytes().startswith(b"\x89PNG") for path in attached)
+        assert "Compare every sheet against every other sheet" in kwargs["input"]
+        assert "every balloon against its BOM row" in kwargs["input"]
+        output = Path(command[command.index("-o") + 1])
+        output.write_text(json.dumps(verdict), encoding="utf-8")
+        return subprocess.CompletedProcess(
+            command, 0, stdout=json.dumps({"type": "turn.completed"}), stderr=""
+        )
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    package = mr.ReviewPackage("gearbox", "assembly", (source,))
+    review = mr.review_package(
+        package,
+        report_dir=tmp_path / "reports",
+        retries=0,
+        codex="codex-test",
+    )
+
+    assert len(calls) == 1
+    assert review.sheet_count == 2
+    assert review.sources == [str(source)]
+    assert len(review.source_sha256) == 1
+    assert not review.passed
+
+    part_sheets = (tmp_path / "part-a.png", tmp_path / "part-b.png")
+    for sheet in part_sheets:
+        sheet.write_bytes(b"part")
+    with pytest.raises(ValueError, match="part review requires exactly one"):
+        mr._validate_package(mr.ReviewPackage("part", "part", part_sheets))
+
+
+def test_write_index_creates_missing_report_directory(tmp_path: Path) -> None:
+    report_dir = tmp_path / "missing" / "nested"
+
+    index = mr.write_index(report_dir)
+
+    assert index == report_dir / "index.md"
+    assert index.is_file()
+    assert "0/0 packages pass" in index.read_text(encoding="utf-8")
+
+
 def test_review_serialises_and_indexes(tmp_path: Path) -> None:
     verdict = {
         "verdict": "FIX",
         "summary": "over-toleranced",
         "blockers": [],
-        "over_specification": [{"where": "front view", "issue": "datum B", "fix": "drop"}],
+        "over_specification": [
+            {"where": "front view", "issue": "datum B", "fix": "drop"}
+        ],
         "clarity": [],
         "minor": [],
     }
     review = mr.Review(
-        name="crank_arm", kind="part", png="x.png", verdict=verdict,
-        passed=mr.is_pass(verdict), blind=True, tool_events=0, model="m", effort="high",
-        prompt_sha256="a" * 64, png_sha256="b" * 64, duration_s=1.0, reviewed_at="now",
+        name="crank_arm",
+        kind="part",
+        sources=["x.png"],
+        source_sha256=["b" * 64],
+        verdict=verdict,
+        passed=mr.is_pass(verdict),
+        blind=True,
+        tool_events=0,
+        model="m",
+        effort="high",
+        prompt_sha256="a" * 64,
+        sheet_count=1,
+        duration_s=1.0,
+        reviewed_at="now",
     )
     mr.write_review(review, tmp_path)
     loaded = mr.load_reviews(tmp_path)
     assert loaded[0].verdict == verdict and not loaded[0].passed
     index = mr.render_index(loaded)
-    assert "| [crank_arm](crank_arm.md) | part | FAIL | FIX | 0 | 1 | 0 | 0 | yes |" in index
-    assert json.loads((tmp_path / "crank_arm.json").read_text())["name"] == "crank_arm"
+    expected = (
+        "| [crank_arm](crank_arm.md) | part | 1 | FAIL | FIX | 0 | 1 | 0 | 0 | yes |"
+    )
+    assert expected in index
+    data = json.loads((tmp_path / "crank_arm.json").read_text())
+    assert data["name"] == "crank_arm"
+    assert data["sources"] == ["x.png"]
 
 
-def test_every_registered_drawing_has_a_prompt_kind() -> None:
-    for sheet in mr.all_sheets():
-        assert sheet.kind in mr.PROMPT_FILES
-        assert sheet.png.name.endswith("_drawing.png")
+def test_every_registered_drawing_has_a_prompt_kind_and_package_source() -> None:
+    for package in mr.all_packages():
+        assert package.kind in mr.PROMPT_FILES
+        assert len(package.sources) == 1
+        expected_suffix = ".pdf" if package.kind == "assembly" else ".png"
+        assert package.sources[0].suffix.casefold() == expected_suffix
+        if package.kind == "part":
+            assert package.sources[0].name.endswith("_drawing.png")
+        else:
+            assert package.sources[0].parent.name == "pdf"
