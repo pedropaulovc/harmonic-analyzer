@@ -94,6 +94,7 @@ from cone_gear_spec import (
 )
 from _common import (
     OUT_PNG,
+    OUT_SLDPRT,
     SketchDims,
     _early_bound,
     _read_member,
@@ -754,16 +755,6 @@ async def build(adapter) -> dict[str, str]:
         adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
         adapter._attempt(lambda: adapter.currentModel.EditRebuild3(), default=None)
 
-        # Assembly references must survive close/reopen for every member of this
-        # family, not only the last-saved configuration. SolidWorks persists
-        # each configuration's rebuilt data on save only when this mark is set.
-        configuration = _early_bound(
-            adapter.currentModel.GetConfigurationByName(name), "IConfiguration"
-        )
-        configuration.AddRebuildSaveMark = True
-        if not bool(configuration.AddRebuildSaveMark):
-            raise RuntimeError(f"{name}: failed to set rebuild/save mark")
-
         count = read_dimension(adapter, count_dim)
         if abs(count - teeth) > 1e-9:
             raise RuntimeError(
@@ -842,7 +833,32 @@ async def build(adapter) -> dict[str, str]:
         )
     _telemetry.success(f"{first_name} volume reproduced on revisit: {revisit:.1f} mm^3")
 
-    check("activate T120 for saved views", await adapter.set_active_configuration("T120"))
+    check("activate T120 for initial save", await adapter.set_active_configuration("T120"))
+    part_path = (OUT_SLDPRT / f"{PART_NAME}.SLDPRT").resolve()
+    part_path.parent.mkdir(parents=True, exist_ok=True)
+    check(f"initial save -> {part_path}", await adapter.save_file(str(part_path)))
+
+    # The first Save-As creates the document path but does not preserve rebuilt
+    # data for every non-active configuration. Revisit each configuration after
+    # that boundary, rebuild it, set its rebuild/save mark, then let the normal
+    # in-place save below persist the complete configured family.
+    for name, _teeth in CONFIGS:
+        activation = await adapter.set_active_configuration(name)
+        check(f"persist {name}", activation)
+        if not bool(activation.data.get("rebuilt")):
+            raise RuntimeError(f"{name}: persistence activation did not rebuild")
+        rebuilt = adapter._attempt(
+            lambda: adapter.currentModel.ForceRebuild3(False), default=None
+        )
+        if not rebuilt:
+            raise RuntimeError(f"{name}: persistence rebuild failed")
+        configuration = _early_bound(
+            adapter.currentModel.GetConfigurationByName(name), "IConfiguration"
+        )
+        configuration.AddRebuildSaveMark = True
+        if not bool(configuration.AddRebuildSaveMark):
+            raise RuntimeError(f"{name}: failed to set rebuild/save mark")
+
     grouped_spec = _config.parts(PART_NAME)
     description = str(grouped_spec.get("description", "")).strip()
     apply_grouped_bom_properties(

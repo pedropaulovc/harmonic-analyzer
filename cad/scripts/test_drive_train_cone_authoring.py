@@ -57,23 +57,35 @@ def test_every_cone_configuration_persists_rebuilt_data() -> None:
         for node in _CONE_TREE.body
         if isinstance(node, ast.AsyncFunctionDef) and node.name == "build"
     )
-    sweep = next(
+    persistence_sweeps = [
         node
         for node in build.body
-        if isinstance(node, ast.For) and _calls(node, "set_active_configuration")
-    )
-    marks = [
-        node
-        for node in ast.walk(sweep)
-        if isinstance(node, ast.Assign)
+        if isinstance(node, ast.For)
         and any(
-            isinstance(target, ast.Attribute) and target.attr == "AddRebuildSaveMark"
-            for target in node.targets
+            isinstance(item, ast.Assign)
+            and any(
+                isinstance(target, ast.Attribute)
+                and target.attr == "AddRebuildSaveMark"
+                for target in item.targets
+            )
+            for item in ast.walk(node)
         )
     ]
-    assert len(marks) == 1
-    assert isinstance(marks[0].value, ast.Constant)
-    assert marks[0].value.value is True
+    assert len(persistence_sweeps) == 1
+    sweep = persistence_sweeps[0]
+    assert _calls(sweep, "set_active_configuration")
+    assert _calls(sweep, "ForceRebuild3")
+
+    initial_save = next(
+        index for index, node in enumerate(build.body) if _calls(node, "save_file")
+    )
+    persistence = build.body.index(sweep)
+    final_save = next(
+        index
+        for index, node in enumerate(build.body)
+        if _calls(node, "save_part_and_images")
+    )
+    assert initial_save < persistence < final_save
 
 
 def test_all_twenty_cones_are_inserted_directly_in_configuration() -> None:
