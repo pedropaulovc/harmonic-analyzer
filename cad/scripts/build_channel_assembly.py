@@ -5,7 +5,8 @@ output: connecting rods riding the integral cams, the rocker-arm seesaw
 bank on its pivot shaft, the amplitude bars running UP the spine, and the
 top-lever bank on its fulcrum shaft with the channel springs hanging from
 the lever tips, each caught at the plate by a little open hook fastener.
-148 components:
+188 components (Default resolves 148; its two saved-pose spring banks are
+suppressed):
 
 Coordinates are machine frame (#151: crank at machine -X, output side -Z;
 the M6.8 mirror layer is gone).
@@ -28,10 +29,12 @@ the M6.8 mirror layer is gone).
   channel-lever x20 (2026-09-02: the arms and levers carry INTEGRAL hubs whose
   faces set the station pitch -- the 19 + 19 spacer bushings are retired;
   ch14 page002_img02/page002_img01 show one bright pin head on every rod clevis),
-  channel-spring-installed x20 (M6.4: the stretched in-machine spring -- the
-  free 32 mm part stays for the ch. 17 table-top inset), spring-hook x20 (the
-  open J-hook fastener seating each spring's bottom eye in the plate bore --
-  the spring no longer threads the plate itself)
+  channel-spring-installed x20 in each of Default, parallel-bank, and
+  sinusoid-6-cranks (60 instances total; exactly one bank resolves per pose;
+  M6.4: the stretched in-machine spring -- the free 32 mm part stays for the
+  ch. 17 table-top inset), spring-hook x20 (the open J-hook fastener seating
+  each spring's bottom eye in the plate bore -- the spring no longer threads
+  the plate itself)
 
 Default mechanism state (DIMENSIONS.md "Channel & top-frame layout"):
 cylinder-gear notches +Y (cosine alignment), integral cam lobes +Y (UP,
