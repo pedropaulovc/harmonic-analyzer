@@ -10,19 +10,19 @@ full-length front view (overall length only), a 1:4 right view beside it, a
 working features are edge-on at 1:4, so they are dimensioned in three 4:1
 details (policy rule 7, machinist review 2026-09-02):
 
-* DETAIL A -- the top notch, from the front view: width and depth as sheet
-  dimensions, with the cheek offset stated beside the detail.
-* DETAIL B -- the bottom notch, from the front view: the same three, plus the
-  roughness symbol on the floor that slides on the rocker.
+* DETAIL A -- the top notch, from the front view: offset, width, and depth in
+  a specification-derived note beside the enlarged profile.
+* DETAIL B -- the bottom notch, from the front view: the same three values,
+  plus the sliding floor's finish, in a specification-derived note.
 * DETAIL C -- the top pin hole, from the RIGHT view (the only projection where
   the hole, drilled along X, is a visible circle): its drop below the bar top,
   its station across the depth, and the ``#47 DRILL`` callout.
 
-The details carry sheet dimensions (edge picks) except for the top cheek
-offset, whose clipped outer edge is not a reliable derived-view selection and
-is therefore stated beside DETAIL A from the shared spec.  A marked dimension
-imports into ONE view only, so an import into a detail could claim the front
-view's overall length.  The sheet runs at 1:4.
+The two notch details expose no stable selectable derived-view edges on this
+seat, so their manufacturing callouts come directly from the shared part spec.
+DETAIL C retains sheet dimensions against its visible circular geometry.  A
+marked dimension imports into ONE view only, so an import into a detail could
+claim the front view's overall length.  The sheet runs at 1:4.
 
 Run with SolidWorks open::
 
@@ -42,7 +42,6 @@ from _drawing_common import (
     add_edge_dimension,
     add_native_hole_callout,
     add_property_linked_note,
-    add_surface_finish,
     create_detail_view,
     curate_view_dimensions,
     finalize_drawing,
@@ -148,10 +147,6 @@ def _detail_a(mx: float, my: float) -> tuple[float, float]:
     return _detail_xy(DETAIL_A_CENTER, (_BBOX_CX, TOP_DETAIL_Y), mx, my)
 
 
-def _detail_b(mx: float, my: float) -> tuple[float, float]:
-    return _detail_xy(DETAIL_B_CENTER, (_BBOX_CX, BOTTOM_DETAIL_Y), mx, my)
-
-
 def _detail_c(mz: float, my: float) -> tuple[float, float]:
     return _detail_xy(DETAIL_C_CENTER, (_BBOX_CZ, TOP_DETAIL_Y), mz, my)
 
@@ -162,24 +157,28 @@ FRONT_KEEP = {
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
 TOP_KEEP: dict[str, tuple[float, float]] = {}
 
-# Detail pick stations (model mm): the cheeks are picked clear of the floors
-# and of the hidden pin-hole band; the floors at their mid-width.
-_TOP_CHEEK_Y = TOP_NOTCH_FLOOR_Y + 3.0
-_BOTTOM_CHEEK_Y = BOTTOM_NOTCH_HEIGHT / 2.0
-_INNER_CHEEK_X = NOTCH_OFFSET + TOP_NOTCH_WIDTH  # 4.7625 (both notches)
-_SLIDE_FLOOR_PICK_X = (
-    NOTCH_OFFSET + 0.6
-)  # left part of the floor, clear of the depth pick
-_DEPTH_PICK_X = _INNER_CHEEK_X - 0.6
 
-# DETAIL A's stock-face and notch-cheek edges are not reliably selectable.
-# State both spec-owned transverse sizes beside the enlarged geometry.
+# The notch details expose no reliable selectable edges on this seat.  State
+# each complete, spec-owned manufacturing definition beside its enlarged profile.
 TOP_NOTCH_GEOMETRY_NOTE = "\n".join(
     (
         f"CHEEK OFFSET {NOTCH_OFFSET:.4f}",
         f"NOTCH WIDTH {TOP_NOTCH_WIDTH:.4f}",
         f"NOTCH DEPTH {TOP_NOTCH_HEIGHT:.4f}",
     )
+)
+_SLIDE_FLOOR_FINISH = surface_finish_by_key(SURFACE_FINISHES, "slide_floor")
+BOTTOM_NOTCH_GEOMETRY_NOTE = "\n".join(
+    (
+        f"CHEEK OFFSET {NOTCH_OFFSET:.4f}",
+        f"NOTCH WIDTH {BOTTOM_NOTCH_WIDTH:.4f}",
+        f"NOTCH DEPTH {BOTTOM_NOTCH_HEIGHT:.4f}",
+        f"BOTTOM FLOOR FINISH Ra {_SLIDE_FLOOR_FINISH.roughness_ra}",
+    )
+)
+BOTTOM_NOTCH_GEOMETRY_NOTE_XY = (
+    DETAIL_B_CENTER[0] + DETAIL_MODEL_RADIUS * _D / 1000.0 + 0.008,
+    DETAIL_B_CENTER[1] - 0.010,
 )
 TOP_NOTCH_GEOMETRY_NOTE_XY = (
     _detail_a(NOTCH_OFFSET / 2.0, 0.0)[0],
@@ -287,48 +286,17 @@ async def build(adapter: Any) -> dict[str, str]:
     ):
         raise RuntimeError("failed to add top-notch geometry note")
 
-    # DETAIL B (bottom notch): the same chain below the end, the depth at
-    # right, and the Ra on the floor that slides on the rocker's top edge.
-    b_row = _detail_b(_BBOX_CX, 0.0)[1] - 0.014
-    add_edge_dimension(
-        adapter,
-        detail_b,
-        p0=_detail_b(0.0, _BOTTOM_CHEEK_Y),
-        p1=_detail_b(NOTCH_OFFSET, _BOTTOM_CHEEK_Y),
-        text_xy=(_detail_b(NOTCH_OFFSET / 2.0, 0.0)[0], b_row),
-        label="bottom notch cheek offset",
-        orientation="horizontal",
-    )
-    add_edge_dimension(
-        adapter,
-        detail_b,
-        p0=_detail_b(NOTCH_OFFSET, _BOTTOM_CHEEK_Y),
-        p1=_detail_b(_INNER_CHEEK_X, _BOTTOM_CHEEK_Y),
-        text_xy=(_detail_b(_BBOX_CX, 0.0)[0], b_row),
-        label="bottom notch width",
-        orientation="horizontal",
-    )
-    add_edge_dimension(
-        adapter,
-        detail_b,
-        p0=_detail_b(NOTCH_OFFSET / 2.0, 0.0),
-        p1=_detail_b(_DEPTH_PICK_X, BOTTOM_NOTCH_HEIGHT),
-        text_xy=(
-            DETAIL_B_CENTER[0] + 0.030,
-            _detail_b(0.0, BOTTOM_NOTCH_HEIGHT / 2.0)[1],
-        ),
-        label="bottom notch depth",
-        orientation="vertical",
-    )
-    slide_floor = _detail_b(_SLIDE_FLOOR_PICK_X, BOTTOM_NOTCH_HEIGHT)
-    add_surface_finish(
-        adapter,
-        detail_b,
-        edge_xy=slide_floor,
-        symbol_xy=(DETAIL_B_CENTER[0] - 0.032, slide_floor[1] + 0.020),
-        control=surface_finish_by_key(SURFACE_FINISHES, "slide_floor"),
-        label="slide floor finish",
-    )
+    # DETAIL B (bottom notch): as for DETAIL A, keep the enlarged profile
+    # useful without depending on unselectable derived-view edges.
+    if (
+        add_note(
+            adapter,
+            BOTTOM_NOTCH_GEOMETRY_NOTE,
+            *BOTTOM_NOTCH_GEOMETRY_NOTE_XY,
+        )
+        is None
+    ):
+        raise RuntimeError("failed to add bottom-notch geometry note")
 
     # DETAIL C (top pin hole, right view): drop below the bar top, station
     # from the side face (mid-depth), and the native #47 callout.

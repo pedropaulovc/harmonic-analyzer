@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import ast
 from pathlib import Path
 
 import amplitude_bar_spec
 import draw_amplitude_bar as drawing
 import build_amplitude_bar as bar
+from _drawing_contract import drawing_specification_violations
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gtol_spec import PlanarFace
 
@@ -29,12 +31,16 @@ def test_part_geometry_matches_the_spec() -> None:
     assert amplitude_bar_spec.BAR_LENGTH == bar.BAR_LENGTH
     assert amplitude_bar_spec.BAR_WIDTH == bar.BAR_WIDTH
     assert amplitude_bar_spec.BAR_DEPTH == bar.BAR_DEPTH
-    assert amplitude_bar_spec.BOTTOM_NOTCH_WIDTH == bar.BOTTOM_NOTCH_WIDTH
-    assert amplitude_bar_spec.BOTTOM_NOTCH_HEIGHT == bar.BOTTOM_NOTCH_HEIGHT
+    assert amplitude_bar_spec.BOTTOM_NOTCH_WIDTH == bar.BOTTOM_NOTCH_WIDTH == 3.175
+    assert (
+        round(amplitude_bar_spec.BOTTOM_NOTCH_HEIGHT, 5)
+        == round(bar.BOTTOM_NOTCH_HEIGHT, 5)
+        == 2.38125
+    )
     assert amplitude_bar_spec.TOP_NOTCH_WIDTH == bar.TOP_NOTCH_WIDTH
     assert amplitude_bar_spec.TOP_NOTCH_HEIGHT == bar.TOP_NOTCH_HEIGHT
     assert amplitude_bar_spec.TOP_PIN_DROP == bar.TOP_PIN_DROP
-    assert amplitude_bar_spec.NOTCH_OFFSET == bar.NOTCH_OFFSET
+    assert amplitude_bar_spec.NOTCH_OFFSET == bar.NOTCH_OFFSET == 1.5875
     assert amplitude_bar_spec.TOP_PIN_DIA == 1.994
 
 
@@ -52,20 +58,36 @@ def test_sheet_runs_at_1_to_4_with_1_to_8_isometric() -> None:
 
 def test_end_features_are_documented_in_enlarged_details() -> None:
     # Policy rule 7: at 1:4 the notches and pin hole are edge-on, so three
-    # 4:1 details carry them. The clipped top stock-face and notch-cheek edges
-    # are not stable enough to pick; their two sizes render beside DETAIL A
-    # from the shared spec while the remaining features keep semantic picks.
+    # 4:1 details carry them.  Both notch details are selection-free because
+    # this seat exposes no stable derived-view edges for either profile.
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("create_detail_view(") == 3
-    for label in ('detail_label="A"', 'detail_label="B"', 'detail_label="C"'):
-        assert label in source, label
+    tree = ast.parse(source)
+    calls = tuple(node for node in ast.walk(tree) if isinstance(node, ast.Call))
+
+    def named_calls(name: str) -> tuple[ast.Call, ...]:
+        return tuple(
+            call
+            for call in calls
+            if (isinstance(call.func, ast.Name) and call.func.id == name)
+            or (isinstance(call.func, ast.Attribute) and call.func.attr == name)
+        )
+
+    assert len(named_calls("create_detail_view")) == 3
+    detail_labels = {
+        keyword.value.value
+        for call in named_calls("create_detail_view")
+        for keyword in call.keywords
+        if keyword.arg == "detail_label"
+        and isinstance(keyword.value, ast.Constant)
+        and isinstance(keyword.value.value, str)
+    }
+    assert detail_labels == {"A", "B", "C"}
     assert drawing.DETAIL_SCALE == (4, 1)
     assert (
         'place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(1, 4))'
         in source
     )
-    assert source.count("curate_view_dimensions(") == 3
-    assert "curate_view_dimensions(adapter, detail" not in source
+    assert len(named_calls("curate_view_dimensions")) == 3
     assert drawing.TOP_NOTCH_GEOMETRY_NOTE == "\n".join(
         (
             f"CHEEK OFFSET {amplitude_bar_spec.NOTCH_OFFSET:.4f}",
@@ -73,23 +95,71 @@ def test_end_features_are_documented_in_enlarged_details() -> None:
             f"NOTCH DEPTH {amplitude_bar_spec.TOP_NOTCH_HEIGHT:.4f}",
         )
     )
-    assert "TOP_NOTCH_GEOMETRY_NOTE," in source
-    assert "p0=_detail_a(" not in source
-    assert "p1=_detail_a(" not in source
-    assert 'label="top notch width"' not in source
-    assert 'label="top notch depth"' not in source
-    assert source.count("add_edge_dimension(") == 5
-    for label in (
-        "bottom notch cheek offset",
-        "bottom notch width",
-        "bottom notch depth",
+    assert drawing.BOTTOM_NOTCH_GEOMETRY_NOTE == "\n".join(
+        (
+            f"CHEEK OFFSET {amplitude_bar_spec.NOTCH_OFFSET:.4f}",
+            f"NOTCH WIDTH {amplitude_bar_spec.BOTTOM_NOTCH_WIDTH:.4f}",
+            f"NOTCH DEPTH {amplitude_bar_spec.BOTTOM_NOTCH_HEIGHT:.4f}",
+            "BOTTOM FLOOR FINISH "
+            f"Ra {amplitude_bar_spec.SURFACE_FINISHES[0].roughness_ra}",
+        )
+    )
+    note_arguments = {
+        call.args[1].id
+        for call in named_calls("add_note")
+        if len(call.args) > 1 and isinstance(call.args[1], ast.Name)
+    }
+    assert note_arguments == {
+        "TOP_NOTCH_GEOMETRY_NOTE",
+        "BOTTOM_NOTCH_GEOMETRY_NOTE",
+    }
+
+    edge_dimensions = named_calls("add_edge_dimension")
+    assert len(edge_dimensions) == 2
+    assert all(
+        not any(
+            isinstance(node, ast.Name) and node.id == "detail_b"
+            for node in ast.walk(call)
+        )
+        for call in edge_dimensions
+    )
+    edge_labels = {
+        keyword.value.value
+        for call in edge_dimensions
+        for keyword in call.keywords
+        if keyword.arg == "label"
+        and isinstance(keyword.value, ast.Constant)
+        and isinstance(keyword.value.value, str)
+    }
+    assert edge_labels == {
         "top pin station across the depth",
         "top pin drop",
-    ):
-        assert f'label="{label}"' in source, label
+    }
+    removed_detail_b_selection_names = {
+        "_detail_b",
+        "_BOTTOM_CHEEK_Y",
+        "_INNER_CHEEK_X",
+        "_SLIDE_FLOOR_PICK_X",
+        "_DEPTH_PICK_X",
+        "add_surface_finish",
+    }
+    identifiers = {
+        node.id for node in ast.walk(tree) if isinstance(node, ast.Name)
+    } | {
+        node.name
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    } | {
+        node.asname or node.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.alias)
+    }
+    assert not removed_detail_b_selection_names.intersection(identifiers)
+    assert not named_calls("add_surface_finish")
+
     # The pin hole callout says the drill, on the detail where the hole is a
     # visible circle.
-    assert source.count("add_native_hole_callout(") == 1
+    assert len(named_calls("add_native_hole_callout")) == 1
     assert 'process="#47 DRILL"' in source
     assert "edge_xy=pin_rim_bottom" in source
     # Each detail boundary reaches past the feature it enlarges.
@@ -174,8 +244,8 @@ def test_print_carries_no_gdt_or_basic_dimensions() -> None:
 
 def test_slide_floor_finish_is_part_owned_authored_and_consumed() -> None:
     # The bottom-notch floor slides on the rocker arm's top edge: the one
-    # running surface, the one roughness symbol (policy rule 5); it faces down
-    # into the open bottom end (offset = n . p along the outward normal).
+    # running surface, whose part-owned Ra now renders in DETAIL B's
+    # selection-free specification note.
     (control,) = amplitude_bar_spec.SURFACE_FINISHES
     assert control.key == "slide_floor"
     assert control.roughness_um == 1.6
@@ -184,14 +254,25 @@ def test_slide_floor_finish_is_part_owned_authored_and_consumed() -> None:
     )
     part_source = "".join(Path(bar.__file__).read_text(encoding="utf-8").split())
     assert "author_part_pmi(adapter,surface_finishes=SURFACE_FINISHES)" in part_source
-    sheet_source = "".join(Path(drawing.__file__).read_text(encoding="utf-8").split())
-    assert (
-        'control=surface_finish_by_key(SURFACE_FINISHES,"slide_floor")' in sheet_source
+    assert drawing._SLIDE_FLOOR_FINISH is control
+    assert f"BOTTOM FLOOR FINISH Ra {control.roughness_ra}" in (
+        drawing.BOTTOM_NOTCH_GEOMETRY_NOTE
     )
-    assert "roughness_ra=" not in sheet_source
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_surface_finish(") == 1
-    assert "detail_b,\n        edge_xy=slide_floor" in source
+    tree = ast.parse(source)
+    assert not any(
+        isinstance(node, ast.Call)
+        and (
+            (isinstance(node.func, ast.Name) and node.func.id == "add_surface_finish")
+            or (
+                isinstance(node.func, ast.Attribute)
+                and node.func.attr == "add_surface_finish"
+            )
+        )
+        for node in ast.walk(tree)
+    )
+    assert "roughness_ra=" not in source
+    assert drawing_specification_violations(source, filename=drawing.__file__) == ()
 
 
 def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
