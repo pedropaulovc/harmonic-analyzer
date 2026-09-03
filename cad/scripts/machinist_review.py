@@ -1,11 +1,11 @@
-r"""Blind senior-machinist review of rendered drawing sheets via Codex.
+r"""Blind senior-machinist review of rendered drawing sheets via Claude.
 
 The review the fleet is gated on (``cad/docs/drawing-simplicity-policy.md``):
 each sheet PNG is copied into a neutral temp directory and handed to
-``codex exec`` with NO repo context, under the calibrated prompt in
-``cad/scripts/prompts/`` — a part print gets the part prompt, an assembly
-orientation sheet the assembly prompt.  The verdict comes back as structured
-JSON (``machinist_review_schema.json``) and is written, with its provenance,
+``claude -p --model fable --effort high`` with NO repo context, under the
+calibrated prompt in ``cad/scripts/prompts/`` — a part print gets the part
+prompt, an assembly orientation sheet the assembly prompt.  The verdict comes
+back as structured JSON (``machinist_review_schema.json``) and is written,
 under ``cad/out/reports/machinist-review/``.
 
 Why the prompt is calibrated the way it is: the earlier ad-hoc reviews asked a
@@ -17,11 +17,11 @@ Harvey (*Machine Shop Trade Secrets*, ch. 9) and Lipton (*Metalworking Sink or
 Swim*, ch. 2-3): decimal places carry tolerance, GD&T only where a ± cannot
 say it, hidden lines on, one origin, drill vs ream, few specific notes.
 
-Isolation is by COPY, not by sandbox: nothing in the invocation references the
-repo (``-C`` a mktemp dir, the PNG copied as ``sheet.png``, the schema copied
-beside it, ``--ignore-user-config --ignore-rules``), and the ``--json`` event
-stream is scanned for any tool/command execution so a review that stopped
-being blind is flagged (``blind: false``) rather than trusted.
+Isolation is enforced by Claude's restricted mode in a neutral temp directory:
+nothing in the invocation references the repo, the PNG is copied as
+``sheet.png``, safe mode disables project/user customizations, MCP is disabled,
+and Read is the only available tool.  The event stream is scanned so any tool
+use beyond reading that copied image flags the review as non-blind.
 
 Usage (SolidWorks-free; needs the rendered PNGs under ``cad/out/png``)::
 
@@ -64,17 +64,18 @@ PROMPT_FILES = {
 SCHEMA_FILE = PROMPTS_DIR / "machinist_review_schema.json"
 REPORT_DIR = CAD_ROOT / "out" / "reports" / "machinist-review"
 
-DEFAULT_MODEL = "gpt-5.6-sol"
+DEFAULT_MODEL = "fable"
 DEFAULT_EFFORT = "high"
 FINDING_KEYS = ("blockers", "over_specification", "clarity", "minor")
 GATING_KEYS = ("blockers", "over_specification", "clarity")
 
-# Event/item types codex emits when the agent ran something.  Any of these in
-# the --json stream means the review read more than the attached image.
+# Claude must use Read once to inspect the neutral ``sheet.png`` copy.  Any
+# other tool use in the stream means the review escaped the intended input.
 _TOOL_EVENT_MARKERS = (
     "command_execution",
     "function_call",
     "tool_call",
+    "tool_use",
     "mcp_tool_call",
     "exec_command",
     "local_shell",
@@ -137,40 +138,48 @@ def build_command(
     workdir: Path,
     image: Path,
     schema: Path,
-    output: Path,
     model: str,
     effort: str,
-    codex: str = "codex",
+    claude: str = "claude",
 ) -> list[str]:
-    """The exact ``codex exec`` argv.
+    """Return the exact isolated ``claude -p`` argv.
 
-    Every path is inside ``workdir`` (a neutral temp dir); the prompt goes on
-    stdin (``-``), never inline — a long quoted argument gets mangled by the
-    shell hook chain and codex dies with "No prompt provided".
+    The prompt is sent on stdin rather than as a positional argument.  Claude
+    gets one restricted file tool so it can read only the copied image in the
+    neutral working directory; safe mode and strict empty MCP configuration
+    prevent repo instructions or external context from entering the review.
     """
+    if image.parent != workdir or schema.parent != workdir:
+        raise ValueError("review inputs must be inside the neutral workdir")
+    schema_json = json.dumps(
+        json.loads(schema.read_text(encoding="utf-8")),
+        separators=(",", ":"),
+    )
     return [
-        codex,
-        "exec",
-        "--ignore-user-config",
-        "--ignore-rules",
-        "--skip-git-repo-check",
-        "--ephemeral",
-        "--sandbox",
-        "read-only",
-        "-C",
-        str(workdir),
-        "-m",
+        claude,
+        "-p",
+        "--model",
         model,
-        "-c",
-        f"model_reasoning_effort={effort}",
-        "-i",
-        str(image),
-        "--output-schema",
-        str(schema),
-        "-o",
-        str(output),
-        "--json",
-        "-",
+        "--effort",
+        effort,
+        "--input-format",
+        "text",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--json-schema",
+        schema_json,
+        "--tools",
+        "Read",
+        "--restricted",
+        "--safe-mode",
+        "--no-session-persistence",
+        "--permission-mode",
+        "dontAsk",
+        "--permission-prompts",
+        "none",
+        "--strict-mcp-config",
+        "--no-chrome",
     ]
 
 
@@ -184,97 +193,55 @@ def _walk(obj: Any) -> Iterable[Any]:
             yield from _walk(value)
 
 
-def count_tool_events(events: Sequence[dict[str, Any]]) -> int:
-    """How many events in the ``--json`` stream show the agent running a tool.
+def count_tool_events(
+    events: Sequence[dict[str, Any]], *, allowed_image: Path | None = None
+) -> int:
+    """Count tool-bearing events outside the two allowed review operations.
 
-    Matches on any ``type``/``item.type`` string carrying a tool marker or on a
-    ``command`` key, at any nesting depth, so a renamed event schema still
-    trips the detector rather than silently reading as blind.
+    Restricted mode confines Read to the neutral working directory.  The
+    expected ``Read(sheet.png)`` delivers the input and ``StructuredOutput``
+    returns the schema-validated verdict; neither escapes blind review.  Any
+    other tool invocation fails closed.
     """
     hits = 0
     for event in events:
         matched = False
         for node in _walk(event):
-            if isinstance(node, dict):
-                if "command" in node and node.get("command"):
-                    matched = True
-                    break
-                kind = str(node.get("type", "")).lower()
-                if any(marker in kind for marker in _TOOL_EVENT_MARKERS):
-                    matched = True
-                    break
+            if not isinstance(node, dict):
+                continue
+            kind = str(node.get("type", "")).lower()
+            if (
+                kind == "tool_use"
+                and str(node.get("name", "")).lower() == "structuredoutput"
+            ):
+                continue
+            if kind == "tool_use" and str(node.get("name", "")).lower() == "read":
+                tool_input = node.get("input")
+                raw_path = (
+                    tool_input.get("file_path")
+                    if isinstance(tool_input, dict)
+                    else None
+                )
+                if raw_path and allowed_image is not None:
+                    read_path = Path(str(raw_path))
+                    if not read_path.is_absolute():
+                        read_path = allowed_image.parent / read_path
+                    if read_path.resolve() == allowed_image.resolve():
+                        continue
+            if "command" in node and node.get("command"):
+                matched = True
+                break
+            if any(marker in kind for marker in _TOOL_EVENT_MARKERS):
+                matched = True
+                break
         hits += int(matched)
     return hits
 
 
-def validate_verdict(value: Any) -> dict[str, Any]:
-    """Validate the complete repository verdict contract without extra packages."""
-    if not isinstance(value, dict):
-        raise ValueError("verdict must be an object")
-
-    expected = {"verdict", "summary", *FINDING_KEYS}
-    actual = set(value)
-    if actual != expected:
-        missing = sorted(expected - actual)
-        extra = sorted(actual - expected)
-        raise ValueError(
-            f"verdict keys must be exact (missing={missing}, extra={extra})"
-        )
-
-    verdict = value["verdict"]
-    if not isinstance(verdict, str) or verdict not in {"SHIP", "FIX"}:
-        raise ValueError("verdict.verdict must be 'SHIP' or 'FIX'")
-    summary = value["summary"]
-    if not isinstance(summary, str) or not summary.strip():
-        raise ValueError("verdict.summary must be a non-empty string")
-
-    finding_keys = {"where", "issue", "fix"}
-    for category in FINDING_KEYS:
-        findings = value[category]
-        if not isinstance(findings, list):
-            raise ValueError(f"verdict.{category} must be an array")
-        for index, finding in enumerate(findings):
-            location = f"verdict.{category}[{index}]"
-            if not isinstance(finding, dict):
-                raise ValueError(f"{location} must be an object")
-            actual_finding_keys = set(finding)
-            if actual_finding_keys != finding_keys:
-                missing = sorted(finding_keys - actual_finding_keys)
-                extra = sorted(actual_finding_keys - finding_keys)
-                raise ValueError(
-                    f"{location} keys must be exact "
-                    f"(missing={missing}, extra={extra})"
-                )
-            for key in finding_keys:
-                text = finding[key]
-                if not isinstance(text, str) or not text.strip():
-                    raise ValueError(f"{location}.{key} must be a non-empty string")
-    return value
-
-
-def _valid_verdict(value: Any) -> dict[str, Any] | None:
-    try:
-        return validate_verdict(value)
-    except ValueError:
-        return None
-
-
-def _tag_events(
-    attempt: int, events: Sequence[dict[str, Any]]
-) -> list[dict[str, Any]]:
-    return [{"attempt": attempt, "event": event} for event in events]
-
-
-def _write_events(path: Path, events: Sequence[dict[str, Any]]) -> None:
-    text = "\n".join(json.dumps(event) for event in events)
-    path.write_text(f"{text}\n" if text else "", encoding="utf-8")
-
-
 def is_pass(verdict: dict[str, Any] | None) -> bool:
-    verdict = _valid_verdict(verdict)
-    if verdict is None or verdict["verdict"] != "SHIP":
+    if not verdict or verdict.get("verdict") != "SHIP":
         return False
-    return all(not verdict[key] for key in GATING_KEYS)
+    return all(not verdict.get(key) for key in GATING_KEYS)
 
 
 def _parse_events(stdout: str) -> list[dict[str, Any]]:
@@ -290,25 +257,33 @@ def _parse_events(stdout: str) -> list[dict[str, Any]]:
     return events
 
 
-def _extract_verdict(output_file: Path, events: Sequence[dict[str, Any]]) -> dict[str, Any]:
-    """The structured verdict: ``-o`` file first, last agent message as fallback."""
-    text = output_file.read_text(encoding="utf-8") if output_file.is_file() else ""
-    if not text.strip():
-        for event in reversed(events):
-            for node in _walk(event):
-                if isinstance(node, dict) and node.get("type") == "agent_message":
-                    text = str(node.get("text") or node.get("message") or "")
-                    if text.strip():
-                        break
+def _extract_verdict(events: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    """Extract Claude's schema-validated structured result."""
+    verdict: dict[str, Any] | None = None
+    text = ""
+    for event in reversed(events):
+        structured = event.get("structured_output")
+        if isinstance(structured, dict):
+            verdict = structured
+            break
+        if event.get("type") == "result":
+            text = str(event.get("result") or "")
             if text.strip():
                 break
-    if not text.strip():
-        raise RuntimeError("codex produced no final message")
-    start, end = text.find("{"), text.rfind("}")
-    if start < 0 or end < 0:
-        raise RuntimeError(f"final message is not JSON: {text[:200]!r}")
-    verdict = json.loads(text[start : end + 1])
-    return validate_verdict(verdict)
+    if verdict is None:
+        if not text.strip():
+            raise RuntimeError("claude produced no final message")
+        start, end = text.find("{"), text.rfind("}")
+        if start < 0 or end < 0:
+            raise RuntimeError(f"final message is not JSON: {text[:200]!r}")
+        parsed = json.loads(text[start : end + 1])
+        if not isinstance(parsed, dict):
+            raise RuntimeError("structured verdict is not an object")
+        verdict = parsed
+    missing = [k for k in ("verdict", "summary", *FINDING_KEYS) if k not in verdict]
+    if missing:
+        raise RuntimeError(f"verdict missing keys {missing}")
+    return verdict
 
 
 def review_sheet(
@@ -319,14 +294,18 @@ def review_sheet(
     report_dir: Path = REPORT_DIR,
     retries: int = 1,
     timeout_s: float = 1800.0,
-    codex: str | None = None,
+    claude: str | None = None,
 ) -> Review:
     if not sheet.png.is_file():
         raise FileNotFoundError(f"{sheet.name}: sheet PNG missing: {sheet.png}")
-    codex_exe = codex or shutil.which("codex")
-    if not codex_exe:
-        raise RuntimeError("codex CLI not found on PATH")
-    prompt = load_prompt(sheet.kind)
+    claude_exe = claude or shutil.which("claude")
+    if not claude_exe:
+        raise RuntimeError("claude CLI not found on PATH")
+    prompt = (
+        "Use the Read tool to inspect sheet.png, the only drawing supplied. "
+        "Do not read any other file. Then perform this blind review.\n\n"
+        + load_prompt(sheet.kind)
+    )
     prompt_sha = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
     png_sha = _sha256(sheet.png)
     report_dir.mkdir(parents=True, exist_ok=True)
@@ -337,25 +316,24 @@ def review_sheet(
     verdict: dict[str, Any] | None = None
     events: list[dict[str, Any]] = []
     attempts = 0
+    image: Path | None = None
     for attempt in range(retries + 1):
         attempts = attempt + 1
-        # A NEUTRAL directory: system temp, never under the repo, so a
-        # relative walk from the agent's cwd reaches nothing of ours.
+        # A NEUTRAL directory: system temp, never under the repo, so restricted
+        # Read can reach only this copied image and schema.
         workdir = Path(tempfile.mkdtemp(prefix="machrev-"))
         try:
             image = workdir / "sheet.png"
             shutil.copyfile(sheet.png, image)
             schema = workdir / "schema.json"
             shutil.copyfile(SCHEMA_FILE, schema)
-            output = workdir / "verdict.json"
             cmd = build_command(
                 workdir=workdir,
                 image=image,
                 schema=schema,
-                output=output,
                 model=model,
                 effort=effort,
-                codex=codex_exe,
+                claude=claude_exe,
             )
             proc = subprocess.run(
                 cmd,
@@ -367,30 +345,24 @@ def review_sheet(
                 timeout=timeout_s,
                 cwd=str(workdir),
             )
-            attempt_events = _parse_events(proc.stdout)
-            events.extend(_tag_events(attempts, attempt_events))
+            events = _parse_events(proc.stdout)
+            events_path.write_text(
+                "\n".join(json.dumps(e) for e in events) + "\n", encoding="utf-8"
+            )
             if proc.returncode != 0:
                 raise RuntimeError(
-                    f"codex exit {proc.returncode}: {proc.stderr.strip()[-800:]}"
+                    f"claude exit {proc.returncode}: {proc.stderr.strip()[-800:]}"
                 )
-            verdict = _extract_verdict(output, attempt_events)
+            verdict = _extract_verdict(events)
             error = None
             break
-        except subprocess.TimeoutExpired as exc:
-            partial_stdout = exc.stdout or ""
-            if isinstance(partial_stdout, bytes):
-                partial_stdout = partial_stdout.decode("utf-8", errors="replace")
-            events.extend(_tag_events(attempts, _parse_events(partial_stdout)))
-            error = f"{type(exc).__name__}: {exc}"
-            verdict = None
         except Exception as exc:  # noqa: BLE001 - recorded, retried, reported
             error = f"{type(exc).__name__}: {exc}"
             verdict = None
         finally:
             shutil.rmtree(workdir, ignore_errors=True)
 
-    _write_events(events_path, events)
-    tool_events = count_tool_events(events)
+    tool_events = count_tool_events(events, allowed_image=image)
     review = Review(
         name=sheet.name,
         kind=sheet.kind,
@@ -489,15 +461,21 @@ def write_index(report_dir: Path = REPORT_DIR) -> Path:
 
 def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("names", nargs="*", help="registry drawing names (e.g. crank_arm)")
-    parser.add_argument("--all", action="store_true", help="review every registered drawing")
+    parser.add_argument(
+        "names", nargs="*", help="registry drawing names (e.g. crank_arm)"
+    )
+    parser.add_argument(
+        "--all", action="store_true", help="review every registered drawing"
+    )
     parser.add_argument("--png", type=Path, help="review one arbitrary sheet PNG")
     parser.add_argument("--kind", choices=("part", "assembly"), default="part")
     parser.add_argument("--model", default=DEFAULT_MODEL)
     parser.add_argument("--effort", default=DEFAULT_EFFORT)
     parser.add_argument("--jobs", type=int, default=3)
     parser.add_argument("--retries", type=int, default=1)
-    parser.add_argument("--timeout", type=float, default=1800.0, help="seconds per sheet")
+    parser.add_argument(
+        "--timeout", type=float, default=1800.0, help="seconds per sheet"
+    )
     parser.add_argument("--report-dir", type=Path, default=REPORT_DIR)
     parser.add_argument("--index", action="store_true", help="only rebuild index.md")
     parser.add_argument(
@@ -529,7 +507,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.missing_ok:
         skipped = [s.name for s in sheets if not s.png.is_file()]
         if skipped:
-            print(f"skipping {len(skipped)} unrendered sheets: {skipped}", file=sys.stderr)
+            print(
+                f"skipping {len(skipped)} unrendered sheets: {skipped}", file=sys.stderr
+            )
         sheets = [s for s in sheets if s.png.is_file()]
 
     reviews: list[Review] = []
