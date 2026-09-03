@@ -7,6 +7,7 @@ from pathlib import Path
 import _config
 import build_drive_train_assembly as drive
 import crank_end_retainer_spec as retainer
+from _assembly import _ALLOWED_FREE_STEMS
 from _fastener_catalog import DriveStyle, HeadStyle, fastener
 from _holes import (
     DRILL_POINT_H,
@@ -109,6 +110,10 @@ def test_assembly_inventory_and_exact_coaxial_seats_are_pinned() -> None:
     assert drive.CRANK_RETAINER_TIP_Z == (
         drive.CRANK_ARM_Z0 + retainer.SCREW_ENGAGEMENT
     )
+
+    allowed_free = _ALLOWED_FREE_STEMS["drive-train"]
+    assert "crank-end-washer" in allowed_free
+    assert "crank-retainer-screw" in allowed_free
 
 
 def test_assembly_rigidly_locks_both_retainer_components_without_a_new_dof() -> None:
