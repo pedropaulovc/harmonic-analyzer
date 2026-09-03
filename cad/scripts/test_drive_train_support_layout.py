@@ -21,9 +21,7 @@ def test_alignment_pinion_mesh_gap_stays_at_the_proven_axis() -> None:
 def test_support_rig_keeps_its_proven_outboard_topology() -> None:
     assert drive.X_DRUM < drive.APINION_X < drive.PIVOT_X < drive.LIFT_X
     assert drive.BLOCK_X > drive.APINION_X
-    # c557005e: the lever leans -40 (machine +X, off the arbor's front stub)
-    # while the pivot/lift/block rig itself stays outboard of the pinion.
-    assert drive.LEVER_TILT_DEG < 0.0
+    assert drive.LEVER_TILT_DEG == 10.0
     assert drive.HANDLE_TILT_DEG > 0.0
 
     block_near_edge = drive.BLOCK_X - drive.BLOCK_WIDTH / 2.0

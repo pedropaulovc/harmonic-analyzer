@@ -3712,6 +3712,7 @@ async def build(adapter) -> dict[str, str]:
         abs(LEVER_TILT_DEG),
         label=f"lever clamp phase (a={abs(LEVER_TILT_DEG):.2f})",
         verify=(lever, lev_o),
+        witness_local=[0.0, LEVER_LEN, 0.0],
     )
     # Pinion drum: journaled in the straps' top bores -- coaxial on the front
     # strap's Axis2 + an axial seat. Its free spin (real: the zeroing input) is
