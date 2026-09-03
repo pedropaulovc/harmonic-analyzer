@@ -285,3 +285,81 @@ def test_configured_insert_uses_activated_source_configuration(
     assert name == "cone-gear-2"
     assert ("activate", "T114") in events
     assert ("insert", "T114", "T114") in events
+
+
+def test_configured_insert_accepts_configuration_activated_by_open(
+    monkeypatch, tmp_path
+) -> None:
+    """OpenDoc6 can satisfy the requested configuration without a second switch."""
+    part_path = tmp_path / "cone-gear.SLDPRT"
+    part_path.write_bytes(b"")
+    active = SimpleNamespace(Name="T120")
+    events: list[tuple] = []
+
+    class SourcePart:
+        ConfigurationManager = SimpleNamespace(ActiveConfiguration=active)
+
+        def ShowConfiguration2(self, name):  # noqa: N802
+            events.append(("activate", name))
+            return False
+
+    source = SourcePart()
+
+    class Application:
+        @staticmethod
+        def DocumentVisible(_visible, _doc_type):  # noqa: N802
+            return None
+
+        @staticmethod
+        def OpenDoc6(  # noqa: N802
+            _path, _doc_type, _options, _configuration, _errors, _warnings
+        ):
+            return source
+
+        @staticmethod
+        def GetOpenDocumentByName(_path):  # noqa: N802
+            return source
+
+    class Adapter:
+        currentModel = object()
+        swApp = Application()
+
+        @staticmethod
+        def _attempt(operation, default=None):
+            try:
+                return operation()
+            except Exception:
+                return default
+
+        async def insert_component(self, params):
+            events.append(("insert", params.configuration, active.Name))
+            return SimpleNamespace(
+                is_success=True,
+                error=None,
+                data={
+                    "name": "cone-gear-1",
+                    "configuration": active.Name,
+                    "fixed": False,
+                },
+            )
+
+    monkeypatch.setattr(assembly, "OUT_SLDPRT", tmp_path)
+    monkeypatch.setattr(assembly, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(assembly, "assert_component_placed", lambda *_args: None)
+    monkeypatch.setattr(assembly, "_ledger_record", lambda *_args: None)
+
+    name = asyncio.run(
+        assembly.place_component(
+            Adapter(),
+            "cone-gear",
+            [0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0],
+            [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+            ground=False,
+            configuration="T120",
+        )
+    )
+
+    assert name == "cone-gear-1"
+    assert not any(event[0] == "activate" for event in events)
+    assert ("insert", "T120", "T120") in events

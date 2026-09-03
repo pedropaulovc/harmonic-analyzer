@@ -1218,16 +1218,15 @@ async def rack_pinion_mate(
 def _prepare_component_configuration(
     adapter: Any, path: str, configuration: str
 ) -> None:
-    """Load and activate a part configuration before direct component insertion.
+    """Load a part and make the requested configuration active before insertion.
 
-    ``AddComponent5`` requires its source document to be loaded. Its documented
-    named-configuration route additionally assumes that configuration is usable
-    in the loaded model. Opening the source with the requested configuration and
-    then calling ``ShowConfiguration2`` handles both the first insertion and
-    later instances of the same already-loaded part. Without that activation,
-    every non-saved-current cone configuration persisted with
-    ``swFeatureErrorUnknown`` even though the component's
-    ``ReferencedConfiguration`` string was correct.
+    ``AddComponent5`` requires its source document to be loaded. ``OpenDoc6`` may
+    already activate the requested configuration; in that case
+    ``ShowConfiguration2`` reports false because no switch occurred. Read the
+    authoritative active configuration first, switch only when necessary, and
+    verify the final state. Without source activation, every non-saved-current
+    cone configuration persisted with ``swFeatureErrorUnknown`` even though the
+    component's ``ReferencedConfiguration`` string was correct.
     """
     app = _early_bound(adapter.swApp, "ISldWorks")
     adapter._attempt(lambda: app.DocumentVisible(False, 1), default=None)
@@ -1246,14 +1245,16 @@ def _prepare_component_configuration(
             f"failed to preload component configuration {configuration!r}: {path}"
         )
     model = _early_bound(model, "IModelDoc2")
-    activated = adapter._attempt(
-        lambda: model.ShowConfiguration2(configuration), default=None
-    )
-    if not activated:
-        raise RuntimeError(
-            f"failed to activate component configuration {configuration!r}: {path}"
-        )
     actual = active_configuration_name(adapter, model)
+    if actual != configuration:
+        activated = adapter._attempt(
+            lambda: model.ShowConfiguration2(configuration), default=None
+        )
+        actual = active_configuration_name(adapter, model)
+        if not activated and actual != configuration:
+            raise RuntimeError(
+                f"failed to activate component configuration {configuration!r}: {path}"
+            )
     if actual != configuration:
         raise RuntimeError(
             f"component source activated {actual!r}, expected {configuration!r}: {path}"
