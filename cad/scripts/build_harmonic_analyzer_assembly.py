@@ -262,6 +262,11 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         allowed_pairs=allowed_interference_pairs(ASM_NAME),
     )
+    # The machine is authored output-side -Z, so SolidWorks' native Front view
+    # shows the BACK. Redefine the standard views before creating pose
+    # configurations so every configuration inherits the same machine-facing
+    # Front/isometric cameras. Geometry is untouched.
+    remap_front_to_machine_front(adapter)
     await _install_top_pose_configurations(adapter, sub_instances)
 
     # Title-block identity for the top assembly drawing
@@ -285,11 +290,6 @@ async def build(adapter) -> dict[str, str]:
     )
     apply_summary_info(adapter, title=f"{ASM_NAME} assembly")
 
-    # The machine is authored output-side -Z, so SolidWorks' native Front view
-    # shows the BACK. Redefine the document's standard views so Front (and the
-    # eight-views gallery below, which goes through ShowNamedView2) shows the
-    # machine front, and the file opens on it. Geometry is untouched.
-    remap_front_to_machine_front(adapter)
     artefacts = await save_assembly_and_images(adapter, ASM_NAME)
     # save_assembly_and_images deliberately discards the dirty anonymous source
     # after its SaveAsCopy.  Reopen the clean copy for the top-only gallery/BOM;
