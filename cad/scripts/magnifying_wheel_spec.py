@@ -11,6 +11,7 @@ lockstep test, which asserts the part marks and the drawing keeps EXACTLY
 
 from __future__ import annotations
 
+from _fit_limits import REAM_H7
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from magnifying_wheel_geom import (  # noqa: F401 (re-export)
@@ -25,43 +26,34 @@ from magnifying_wheel_geom import (  # noqa: F401 (re-export)
     SPOKE_WIDTH,
 )
 
+# The axle bore is the one surface that runs in service: the wheel turns on its
+# axle stud (magnifier assembly, "magnifying-wheel pivot").  The hub drum only
+# carries the wrapped lever wire, so it stays at the block Ra
+# (cad/docs/drawing-simplicity-policy.md rule 5).
 SURFACE_FINISHES = (
-    SurfaceFinishControl("hub_drum", MACHINED_UM, CylinderFace(HUB_DIA)),
+    SurfaceFinishControl("axle_bore", MACHINED_UM, CylinderFace(BORE_DIA)),
 )
+
+# The reamed axle bore's band, ON the model dimension (policy rule 2): an H7
+# hole over the wheel-axle stud's h band (wheel_axle_spec.STUD_DIA_BAND
+# -0.02/-0.05) keeps a 0.02-0.06 running clearance.  (upper, lower).
+BORE_DIA_BAND = REAM_H7
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows (all Front-plane circle/spoke dims, so they auto-import to the face
-# view).  The three axial widths (rim 8 / hub 10 / spoke 4) are added on the
-# sheet across the right-view section; the 6-spoke count is a note. ---
+# view).  The rim ID is controlling (the 6 wall is derived); the rim + hub axial
+# widths, the spoke thickness and the axial stations are dimensioned on the
+# sheet in SECTION A-A. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "RimProfile": {"RimOuterDiaDim"},
+    "RimProfile": {"RimOuterDiaDim", "RimInnerDiaDim"},
     "HubProfile": {"HubDiaDim"},
     "SpokeProfile": {"SpokeWidthDim"},
     "BoreProfile": {"BoreDiaDim"},
 }
 
-DRAWING_NOTES = "\n".join(
-    (
-        "6 STRAIGHT SPOKES, EQUALLY SPACED (60 DEG); SPOKE SECTION 5 WIDE x 4 THICK.",
-        f"RIM RING Ø{RIM_OUTER_DIA:.0f} OD / Ø{RIM_INNER_DIA:.0f} ID "
-        f"({(RIM_OUTER_DIA - RIM_INNER_DIA) / 2:.0f} WALL) x {RIM_AXIAL:.0f} WIDE; "
-        f"SPOKE {SPOKE_AXIAL:.0f} THICK CENTRED IN THE RIM.",
-        "RIM Ø100 / HUB Ø20 GIVE THE 5X WHEEL RATIO: THE LEVER WIRE WRAPS THE",
-        "HUB, THE PEN WIRE LEAVES THE RIM.",
-        "Ø5 AXLE BORE THRU, REAMED; RUNNING FIT ON THE AXLE STUD.",
-        "THE REFERENCE REQUIRES A GROOVED BRASS HUB DRUM AND AN OUTER WIRE",
-        "GROOVE; THE CURRENT ONE-PIECE SOURCE MODEL DEFINES NEITHER. DO NOT",
-        "RELEASE UNTIL HUB MATERIAL, GROOVES, AND RETENTION ARE SPECIFIED.",
-    )
-)
-# The right view is a plain side elevation (hidden lines), NOT a cutting-plane
-# section -- labelled honestly so the sheet does not promise section geometry it
-# does not carry (a true rim/spoke/hub section is a deferred enrichment).
-SECTION_VIEW_NOTE = "SIDE VIEW SCALE 1:1"
-ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
-
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "rim runout to the bore": "0.10",
-}
+# Notes: the one process fact no view carries -- which faces of the casting are
+# machined (policy rule 6).  Every size and station is on a view.
+DRAWING_NOTES = "CASTING. MACHINE THE RIM OD, BOTH RIM FACES AND THE HUB DRUM."
+# The side elevation is SECTION A-A (its native label); the isometric caption
+# carries no scale because it is the sheet scale (title block).
+ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW"

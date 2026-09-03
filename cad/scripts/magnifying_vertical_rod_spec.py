@@ -18,20 +18,17 @@ ROD_DIA = 5.0
 # The rod is a REVOLVED capsule (hemispherical ends): a smooth tangent-continuous
 # body with NO flat face, no end-face circle and no pickable silhouette edge, so
 # coordinate picks are unreliable and ONLY the auto-imported profile marks are
-# dependable.  The far dome-centre station (from the left end) plus the dome
-# radius fully define the Ø5 x 150 rod; the outside diameter and the overall
-# length ride the dome-radius callout + the note.
+# dependable.  The profile's axis line runs tip to tip, so its length dim IS the
+# overall length (the controlling dimension, shown conventionally between the
+# two tips); with the dome radius it fully defines the Ø5 x 150 rod.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "RodProfile": {"RightDomeCentre", "DomeRadius"},
+    "RodProfile": {"RodOverall", "DomeRadius"},
 }
 
-DRAWING_NOTES = "\n".join(
-    (
-        "Ø5 ROUND BAR, ONE PIECE; OVERALL LENGTH (150) REF.",
-        "FORM BOTH ENDS TO A FULL HEMISPHERE (R2.5 = ROD RADIUS).",
-        "OD STRAIGHT AND SMOOTH, Ra 1.6.",
-        "THE CLAMP BLOCK AND OUTPUT FIXTURE SLIDE ALONG IT.",
-    )
-)
+# Notes: the stock licence only (policy rule 6) -- the overall rides the axis
+# dimension, the dome the radius callout.  No roughness: the rod is lock-mated
+# in the clamp block and the output fixture in service (magnifier assembly), so
+# nothing runs on it and the block Ra covers the OD (rule 5).
+DRAWING_NOTES = f"Ø{ROD_DIA:.1f} ROUND BAR STOCK; OD OK AS RECEIVED."
 END_VIEW_NOTE = "END VIEW SCALE 4:1"
 ISO_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"

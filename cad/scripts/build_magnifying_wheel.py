@@ -55,7 +55,9 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
 )
+from _fit_limits import deviations
 from _part_pmi import author_part_pmi
 from magnifying_wheel_geom import (
     BORE_DIA,
@@ -71,10 +73,10 @@ from magnifying_wheel_geom import (
     SPOKE_WIDTH,
 )
 from magnifying_wheel_spec import (
+    BORE_DIA_BAND,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     ISOMETRIC_VIEW_NOTE,
-    SECTION_VIEW_NOTE,
     SURFACE_FINISHES,
 )
 
@@ -377,6 +379,11 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
+    # The reamed axle bore's running band rides the MODEL dimension (policy
+    # rule 2), so the sheet renders it natively -- never as callout text.
+    set_dimension_bilateral_tolerance(
+        adapter, "BoreProfile", "BoreDiaDim", *deviations(BORE_DIA_BAND)
+    )
     await volume_check(
         adapter, "driven magnifying wheel (equations neutral)", v_built, 0.001 * v_built
     )
@@ -395,7 +402,6 @@ async def build(adapter) -> dict[str, str]:
         PART_NAME,
         {
             "Manufacturing Notes": DRAWING_NOTES,
-            "Section View Note": SECTION_VIEW_NOTE,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )

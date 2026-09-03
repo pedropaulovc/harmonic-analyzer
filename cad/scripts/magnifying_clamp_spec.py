@@ -11,8 +11,7 @@ test, which asserts the part marks and the drawing keeps EXACTLY
 
 from __future__ import annotations
 
-from _gtol_spec import CylinderFace
-from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from _surface_finish import SurfaceFinishControl
 from magnifying_clamp_geom import (  # noqa: F401 (re-export)
     BLOCK_DEPTH,
     BLOCK_HEIGHT,
@@ -23,39 +22,32 @@ from magnifying_clamp_geom import (  # noqa: F401 (re-export)
     ROD_BORE_X,
 )
 
-SURFACE_FINISHES = (
-    SurfaceFinishControl(
-        "lever_bore",
-        MACHINED_UM,
-        CylinderFace(LEVER_BORE_DIA, contains_y_mm=LEVER_BORE_Y),
-    ),
-)
+# ANSI #4-40 tap-drill diameter (mirrors ``_holes.TAP_DRILL_MM``; the spec pulls
+# in NO COM module, and the offline test pins the two equal).  The drawing
+# picks the thumb-screw hole's drawn circle at this radius for its callout.
+THUMB_SCREW_TAP_DRILL_DIA = 2.261
+
+# No roughness callouts: the clamp is thumb-screwed to the lever rod in service
+# and only slides along it when the magnification is set, so nothing runs on
+# either bore -- the title block's Ra 3.2 covers every face
+# (cad/docs/drawing-simplicity-policy.md rule 5).
+SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
-# print shows.  The block depth (12) is added on the sheet across the right-view
-# section; the #4-40 thumb-screw hole is a native Hole Wizard callout, never a
-# fake marked dimension. ---
+# print shows.  The rod bore's depth station (RodBoreZ, 6 from the front face)
+# locates the common rod-bore / tap centreline through the 12 thickness; the
+# lever bore's width station (10 from the side face) is drawing-added on the
+# front view (its sketch centre sits on the X axis, so no model dim exists).
+# The block depth (12) is added across the right view; the #4-40 thumb-screw
+# hole is a native Hole Wizard callout, never a fake marked dimension. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BlockProfile": {"Width", "Height"},
     "LeverBoreProfile": {"LeverBoreYDim", "LeverBoreDiaDim"},
-    "RodBoreProfile": {"RodBoreXDim", "RodBoreDiaDim"},
+    "RodBoreProfile": {"RodBoreXDim", "RodBoreZ", "RodBoreDiaDim"},
 }
 
-DRAWING_NOTES = "\n".join(
-    (
-        "LEVER BORE Ø6.2 THRU (ALONG DEPTH), ON THE BLOCK VERTICAL CENTRELINE",
-        "(CENTRED IN THE 20.00 WIDTH): SLIP FIT ON THE Ø6 MAGNIFYING LEVER.",
-        "ROD BORE Ø5.2 THRU (VERTICAL), SKEW 6.5 FROM THE LEVER BORE SO THE",
-        "TWO RODS PASS WITHOUT TOUCHING: SLIP FIT ON THE Ø5 VERTICAL ROD.",
-        "THUMB-SCREW HOLE #4-40 UNC-2B, TAPPED FROM THE TOP FACE, BREAKING",
-        "INTO THE LEVER BORE (FULL THREADS TO THE BORE); THE SCREW CLAMPS",
-        "THE BLOCK AT THE SET MAGNIFICATION.",
-    )
-)
+# Notes: the one fact the views cannot show -- what the two bores slip over
+# (policy rule 6, a MATES WITH line).  The bore sizes and stations ride the
+# dimensions; the tap direction rides its hole callout.
+DRAWING_NOTES = "MATES WITH THE Ø6.0 LEVER ROD AND THE Ø5.0 VERTICAL ROD (SLIP FITS)."
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
-
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "block top-face parallelism": "0.10",
-}
