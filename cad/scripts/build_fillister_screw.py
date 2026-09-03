@@ -48,7 +48,6 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
-    set_dimension_symmetric_tolerance,
 )
 from fillister_screw_spec import (
     DRAWING_DIMENSIONS,
@@ -130,6 +129,9 @@ async def build(adapter) -> dict[str, str]:
         expected_volume_mm3=expected,
     )
     drive_jobs += slot_jobs
+    # Name the slot cut's DEPTH dim so the print dimensions the slot on the
+    # profile view instead of carrying its size in a note.
+    name_dimensions(adapter, "DriverSlot", ["SlotDepth"])
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
@@ -141,9 +143,8 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
-    set_dimension_symmetric_tolerance(adapter, "HeadProfile", "HeadDia", 0.10)
-    set_dimension_symmetric_tolerance(adapter, "Head", "HeadHt", 0.10)
-    set_dimension_symmetric_tolerance(adapter, "Shank", "ShankLg", 0.20)
+    # No explicit bands: the title block's decimal-place tolerances govern a
+    # plain machine screw (cad/docs/drawing-simplicity-policy.md rules 1-2).
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

@@ -1,4 +1,12 @@
-"""Offline contracts for the harmonic-base drawing."""
+"""Offline contracts for the harmonic-base drawing.
+
+The print follows cad/docs/drawing-simplicity-policy.md: a machined base
+carries no datums, frames or basic dimensions; the native hole table gives
+every station under the title-block tolerance; both plate footprints, the two
+plate thicknesses, the rim width and pocket depth, the reveal and the three
+concentric plan-corner radii ride the views; the notes are four lines of
+process fact that carry no feature dimension.
+"""
 
 from __future__ import annotations
 
@@ -23,6 +31,10 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from swing_stop_screw_spec import SHANK_DIA as STOP_SHANK_DIA
 
 
+def _source() -> str:
+    return Path(drawing.__file__).read_text(encoding="utf-8")
+
+
 def test_required_drawing_paths() -> None:
     assert drawing.SLDDRW.as_posix().endswith("/slddrw/harmonic-base.SLDDRW")
     assert drawing.PDF.as_posix().endswith("/pdf/harmonic-base.pdf")
@@ -31,14 +43,47 @@ def test_required_drawing_paths() -> None:
 
 
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
+    # The drift alarm: the part-side mark set and the drawing-side keep set are
+    # BOTH the shared spec's map.
     assert part.DRAWING_DIMENSIONS is harmonic_base_spec.DRAWING_DIMENSIONS
+    assert set(harmonic_base_spec.DRAWING_DIMENSIONS) == {
+        "BottomProfile",
+        "TopProfile",
+        "BottomPlate",
+        "TopPlate",
+    }
     marked = set().union(*harmonic_base_spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.TOP_KEEP)
+    assert marked == {"BottomLen", "BottomWid", "TopLen", "TopWid", "FlangeT", "PadT"}
+    kept = set(drawing.TOP_KEEP) | set(drawing.SIDE_KEEP)
     assert kept == marked
+    assert set(drawing.TOP_KEEP) == {"BottomLen", "BottomWid", "TopLen", "TopWid"}
+    assert set(drawing.SIDE_KEEP) == {"FlangeT", "PadT"}
     assert (drawing.BOTTOM_LENGTH, drawing.BOTTOM_WIDTH) == (
         harmonic_base_spec.BOTTOM_LENGTH,
         harmonic_base_spec.BOTTOM_WIDTH,
     )
+
+
+def test_plate_thicknesses_are_renamed_depth_dimensions() -> None:
+    # The thicknesses are extrude depths (auto "D1" on two features), renamed
+    # in the build so the drawing's name-keyed keep map can tell them apart;
+    # the rename picks the depth by VALUE and reads it back by name.
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "def _name_depth_dimension(" in source
+    assert (
+        '_name_depth_dimension(adapter, "BottomPlate", "FlangeT", BOTTOM_THICKNESS)'
+        in source
+    )
+    assert '_name_depth_dimension(adapter, "TopPlate", "PadT", TOP_THICKNESS)' in source
+    assert "_named_dimension(adapter, feature_name, name)" in source
+    assert "_dim_value_mm(dimension) - depth_mm" in source
+    assert harmonic_base_spec.BOTTOM_THICKNESS == 12.7
+    assert math.isclose(harmonic_base_spec.TOP_THICKNESS, 38.1)
+    assert math.isclose(harmonic_base_spec.STACK_HEIGHT, 50.8)
+    assert math.isclose(harmonic_base_spec.RIM_TOP, 53.3)
+    assert harmonic_base_spec.LIP_H == 2.5
+    assert harmonic_base_spec.LIP_W == 7.0
+    assert math.isclose(harmonic_base_spec.REVEAL, 6.35)
 
 
 def test_plate_geometry_is_single_sourced() -> None:
@@ -57,60 +102,104 @@ def test_plate_geometry_is_single_sourced() -> None:
     assert "measure_check(" not in source
 
 
-def test_notes_cover_the_top_plate_reveal_and_seats() -> None:
+_DIMENSION_NUMBER = re.compile(r"\d+\.\d{2,}")
+# The all-round rim chamfer and pad-root fillet cannot be drawn on a 1:4
+# elevation. The stamped serial's height and depth are likewise process
+# requirements rather than redundant feature dimensions.
+_NOTE_SIZE_ALLOWLIST = ("1/16 X 45 DEG", "R0.50", "3.50 HIGH X 0.30 DEEP")
+
+
+def test_notes_are_few_specific_and_limit_dimensions_to_process_requirements() -> None:
     notes = harmonic_base_spec.DRAWING_NOTES
-    assert "GRAY IRON" not in notes
-    assert "ASTM A48" not in notes
-    assert "GREEN ENAMEL" not in notes
-    assert "DEBURR" not in notes
-    assert "UOS" not in notes
-    assert "JOINED" not in notes
-    assert "MACHINE FROM SOLID STOCK" in notes
+    lines = notes.split("\n")
+    assert len(lines) <= 4
+    assert all(len(line) <= 95 for line in lines)
+    # Which faces are machined (Harvey #34), how the deck is made, which side
+    # each hole opens from, and what to mask: facts the views cannot show.
+    assert "ALL FACES MACHINED" in notes
     assert "NO DRAFT" in notes
-    assert "PAD-TO-FLANGE ROOT R0.50 MAX" in notes
-    assert "UPPER PAD 444.50 X 266.70" in notes
-    assert "REAR EXTENSION" not in notes
-    assert "NEAR LONG SIDE 6.35 +/-0.10 FROM B" in notes
-    assert "NEAR LEFT END 6.35 +/-0.10 FROM C" in notes
-    assert "B = LONG-SIDE FACE; C = LEFT-END FACE" in notes
-    assert "PLAN RIMS AT E1-E4 ARE THE DIA 13.00 THRU FEATURES" in notes
-    assert "LEAST-SQUARES CYLINDER FITS OVER" in notes
-    assert "SEPARATION AT C'BORE MOUTH/BOTTOM: 0.05 MAX" in notes
-    assert "PROCESS DATA" not in notes
-    assert "A1/B1/C1-C3/D1-D4/F1-F4 ARE BLIND TAPPED" in notes
-    assert "MASK DATUM A/B/C FACES AND ALL BORES/THREADS" in notes
-    assert "COAT PAD SIDES, ROOTS AND RIM" in notes
-    assert "DECK INSIDE THE RIM: BLACK" in notes
-    assert "VERTICAL PLAN CORNERS: FLANGE R22.22, PAD AND RIM R15.88" in notes
-    assert "RIM INNER CORNERS R8.88" in notes
-    assert "FLANGE TOP RIM" in notes
-    assert "RAISED RIM 7.00 WIDE X 2.50 HIGH" in notes
-    assert "AND UNDERSIDE RIM C1.59 X 45 DEG" in notes
-    assert "A1-A4" not in notes
-    assert "FOUR DIA 13.00 THRU / DIA 23.00 X 6.50 DEEP C'BORES" in notes
-    assert "LOCATIONS ARE BASIC" in notes
-    assert re.search(r"\d+\.\d(?!\d)", notes) is None
-    assert "X.XX" not in notes
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "CENTRED ON THE FLANGE" in notes
+    assert "POCKET MILLED INSIDE THE RIM" in notes
+    assert "BLACK ENAMEL" in notes
+    assert "C'BORED FROM UNDERSIDE" in notes
+    assert "BLIND TAPPED" in notes
+    assert "MASK" in notes
+    stripped = notes
+    for allowed in _NOTE_SIZE_ALLOWLIST:
+        assert allowed in notes, allowed
+        stripped = stripped.replace(allowed, "")
+    # Rule 6: every plate size, height, reveal, rim width, corner radius and
+    # station rides the views now.
+    assert _DIMENSION_NUMBER.findall(stripped) == []
+    for banned in (
+        "12.70",
+        "50.80",
+        "53.30",
+        "444.50",
+        "266.70",
+        "6.35",
+        "7.00",
+        "2.50",
+        "R22",
+        "R15",
+        "R8",
+        "GRAY IRON",
+        "ASTM A48",
+        "GREEN ENAMEL",
+        "DEBURR",
+        "UOS",
+        "+/-",
+        "DATUM",
+        "BASIC",
+        "LEAST-SQUARES",
+        "MAX",
+        "X.XX",
+    ):
+        assert banned not in notes, banned
+    source = _source()
     assert 'adapter, "Manufacturing Notes", 0.016, 0.075, char_height=0.0025' in source
-    assert 'add_property_linked_note(adapter, "Side View Note", 0.260, 0.095)' in source
+    assert drawing.SIDE_VIEW_NOTE_XY == (0.260, 0.098)
+    assert 'add_property_linked_note(adapter, "Side View Note", *SIDE_VIEW_NOTE_XY)' in source
+
+
+def test_print_carries_no_gdt_or_basic_dimensions() -> None:
+    # drawing-simplicity-policy.md rule 3-4: a base is not on the GD&T
+    # allowlist; the hole table's LOC columns are ordinary, not basic.
+    source = _source()
+    for helper in (
+        "add_datum_feature(",
+        "add_feature_control_frame(",
+        "add_surface_finish(",
+        "set_basic_dimension(",
+        "project_part_pmi(",
+    ):
+        assert helper not in source, helper
+    assert "_visible_side_datum_edges(" not in source
+    assert "basic_locations=False" in source
+    assert not hasattr(harmonic_base_spec, "GEOMETRIC_TOLERANCES_MM")
+
+
+def test_hole_table_is_native_and_anchored_on_the_virtual_corner() -> None:
+    source = _source()
     assert "insert_hole_table(" in source
     assert "_visible_hole_table_entities(" in source
-    assert "datum_axes=(datum_b_edge, datum_c_edge)" in source
+    assert "datum_axes=(rear_edge, left_edge)" in source
     assert "hole_entities=hole_entities" in source
     assert "expected_locations_mm=tuple(" in source
-    assert "GetVisibleEntities2(c, 1)" in source
-    assert "GetVisibleEntities2(c, 2)" not in source
-    assert source.count("add_datum_feature(") == 3
-    assert source.count("add_feature_control_frame(") == 5
-    assert 'quantity="E1-E4 DIA 13 THRU"' in source
-    assert 'quantity="DATUM B LONG SIDE"' in source
-    assert 'quantity="DATUM C LEFT END"' in source
-    assert 'quantity="A1, B1, C1-C3, D1-D4, F1-F4"' in source
-    assert "6.53 BLIND HOLE" not in source
-    assert "underside-only counterbore rims are visible" in source
+    assert re.search(r"GetVisibleEntities2\(\s*c,\s*1\s*\)", source)
+    assert not re.search(r"GetVisibleEntities2\(\s*c,\s*2\s*\)", source)
+    # Hidden lines are shown in the plan, so underside counterbore rims are
+    # reported legitimately: a debug fact, never a hard failure.
+    assert "counterbore rims reported in the plan view" in source
+    assert "underside-only counterbore rims are visible" not in source
     assert 'redundant_note_substrings=("Tapped Hole",)' in source
     assert "expected_redundant_notes=5" in source
+
+
+def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
+    source = _source()
+    assert "for view in (top, side):\n        set_hidden_lines_visible" in source
+    assert "set_hidden_lines_removed(" not in source
 
 
 def test_hole_table_covers_mounting_holes_and_every_hardware_seat() -> None:
@@ -120,21 +209,70 @@ def test_hole_table_covers_mounting_holes_and_every_hardware_seat() -> None:
     assert drawing.ALL_HOLES[:4] == tuple(
         (x, z, part.HOLE_DIA) for x, z in part.HOLE_XZ
     )
-    # The nameplate seats are appended LAST so hole_entities[8] (the tapped
-    # position FCF's block-hole anchor) keeps its index.
+    # Pass 3 appended the nameplate screw seats LAST in ALL_HOLES.
     assert drawing.ALL_HOLES[13:] == tuple(
         (x, z, part.NAMEPLATE_SCREW_HOLE_DIA) for x, z in part.NAMEPLATE_SCREW_XZ
     )
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "basic_locations=True" in source
+    source = _source()
     assert '"*Front"' in source
-    assert len(drawing.TOP_KEEP) == 2
+    assert len(drawing.TOP_KEEP) == 4
     assert drawing._plan_xy(0.0, 10.0)[1] < drawing.TOP_CENTER[1]
     assert drawing.HOLE_TABLE_ANCHOR[0] >= 0.274
 
 
 def test_plan_view_clears_top_border_and_lower_notes() -> None:
     assert drawing.TOP_CENTER == (0.130, 0.163)
+    # Pad outline nearest the plate, flange envelope outside it; the two
+    # vertical dimensions' horizontal texts sit at different heights.
+    assert drawing.TOP_KEEP["TopLen"] == (0.130, 0.2428)
+    assert drawing.TOP_KEEP["BottomLen"] == (0.130, 0.2518)
+    assert drawing.TOP_KEEP["TopWid"] == (0.2513, 0.150)
+    assert drawing.TOP_KEEP["BottomWid"] == (0.2643, 0.178)
+    assert drawing.TOP_KEEP["BottomWid"][0] < drawing.HOLE_TABLE_ANCHOR[0]
+
+
+def test_rim_reveal_heights_and_radii_are_drawing_dimensions() -> None:
+    # Every one of these used to be a number in the notes; each is now a
+    # dimension on topologically picked edges (no sheet-coordinate picks).
+    source = _source()
+    for label in (
+        'label="rim width"',
+        'label="flange corner radius"',
+        'label="pad corner radius"',
+        'label="rim inner corner radius"',
+        'label="overall height reference"',
+        'label="rim pocket depth"',
+        'label="pad reveal reference"',
+    ):
+        assert label in source, label
+    assert source.count("_dimension_entities(") == 8  # definition + 7 calls
+    assert source.count("_reference(adapter, ") == 2
+    assert "set_reference_dimension(" in source
+    assert "SelectByID2" not in source
+    assert "view.SelectEntity(entity, index > 0)" in source
+    # The three corner arcs are concentric, so each radius text sits in its
+    # own quadrant at a distinct angle: flange NE, pad and rim inner SE.
+    assert math.isclose(drawing.CORNER_CENTER_X, 206.375)
+    assert math.isclose(drawing.CORNER_CENTER_Z, 117.475)
+    assert drawing.FLANGE_RADIUS_TEXT_XY == (0.2555, 0.2270)
+    assert drawing.PAD_RADIUS_TEXT_XY == (0.2555, 0.0880)
+    assert drawing.RIM_RADIUS_TEXT_XY == (0.2470, 0.0790)
+    # Rim width and reveal chained on one line above the plan's NE corner.
+    assert drawing.RIM_WIDTH_TEXT_XY == (0.229, 0.2360)
+    assert drawing.REVEAL_TEXT_XY == (0.2515, 0.2360)
+    assert drawing.OVERALL_TEXT_XY == (0.264, 0.0745)
+    assert drawing.RIM_DEPTH_TEXT_XY == (0.4105, 0.0850)
+    # No pick relies on a tangent edge: the reveal reads off the chamfers'
+    # lower edges in the plan, not the end faces' fillet boundaries.
+    assert 'label="flange right edge"' in source
+    assert "flange left end" not in source
+    # Elevation thickness stack on the left, thinnest nearest the view.
+    assert drawing.SIDE_KEEP["FlangeT"][0] == 0.280
+    assert drawing.SIDE_KEEP["PadT"][0] == 0.272
+    assert abs(drawing.SIDE_KEEP["FlangeT"][1] - 0.069925) < 1e-9
+    assert abs(drawing.SIDE_KEEP["PadT"][1] - 0.0790375) < 1e-9
+    assert drawing.SIDE_BBOX_MID_Y == 26.65
+    assert abs(drawing._side_xy(0.0, 0.0)[1] - 0.0683375) < 1e-9
 
 
 def test_blind_taps_have_drill_and_tap_runout_clearance() -> None:

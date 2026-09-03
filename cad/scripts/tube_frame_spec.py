@@ -47,27 +47,16 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "CapProfile": {"CapApexY"},
 }
 
-# Lines kept short (<~66 chars) so the left-anchored block stays clear of the
-# title block; it grows DOWNWARD from its anchor.
+# Notes: part-specific process facts only, never a tolerance (the OD band
+# and the length tolerance ride the model dimensions), never the title block
+# (drawing-simplicity-policy.md rule 6).
 DRAWING_NOTES = "\n".join(
     (
-        "1. ID IS THE AS-PROCURED STOCK RESULT; NOT AN ACCEPTANCE DIMENSION;",
-        "   DO NOT MACHINE THE ID EXCEPT THE TITLE-BLOCK EDGE BREAK.",
-        "2. OD ACCEPTANCE REQUIRES THE SIZE LIMITS / ASME RULE 1 AND THE",
-        "   FULL-LENGTH CYLINDRICITY CONTROL; FORM DOES NOT OVERRIDE SIZE.",
-        "3. SELECT STOCK WITH AS-RECEIVED OD 25.40 MIN; FINISH TO SIZE/FORM.",
-        "4. ORIENT DOMED (CAPPED) END UP; ONLY THE BOTTOM END FACE IS",
-        "   PERPENDICULARITY-CONTROLLED.",
-        "5. TOP DOME IS THE INTEGRAL SR26.09 X 3.3 SPHERICAL CAP; TURN",
-        "   AND BLEND FLUSH WITH THE OD; TITLE-BLOCK FINISH APPLIES.",
+        "STOCK OD 25.40 MIN AS RECEIVED; ID AS RECEIVED, DO NOT MACHINE.",
+        "FINISH OD TO SIZE FULL LENGTH; FACE BOTTOM END SQUARE.",
+        "DOME CAP SR26.09 X 3.3: TURN AND BLEND FLUSH WITH THE OD. CAPPED END UP.",
     )
 )
 END_VIEW_NOTE = "END VIEW SCALE 2:1"
 LENGTH_VIEW_NOTE = "LENGTH VIEW SCALE 1:5"
 
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "full-length OD cylindricity": "0.03",
-    "bottom end perpendicularity": "0.10",
-}

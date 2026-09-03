@@ -1,4 +1,9 @@
-r"""Create the curated gooseneck set-screw drawing."""
+r"""Create the curated gooseneck set-screw drawing.
+
+Profile side view with the head height and under-head length, the thread
+designation leadered to the shank and the axis centerline; a wrench-flats
+view with the across-flats; plus an isometric.
+"""
 
 from __future__ import annotations
 
@@ -10,8 +15,9 @@ import _telemetry
 from _common import CAD_ROOT, run_build
 from _drawing_common import DrawingOutputs
 from _drawing_registry import DRAWINGS_BY_NAME
+from _fastener_annotations import add_thread_leader
 from _fastener_drawing import FastenerSheet, build_fastener_sheet
-from gooseneck_set_screw_spec import HEAD_H, SHANK_LEN
+from gooseneck_set_screw_spec import HEAD_H, SHANK_DIA, SHANK_LEN, THREAD_DESIGNATION
 
 
 SPEC = DRAWINGS_BY_NAME["gooseneck_set_screw"]
@@ -43,6 +49,8 @@ def _side_y(model_y: float) -> float:
 _HEAD_END_Y = _side_y(HEAD_H)  # head outer face (top)
 _JUNCTION_Y = _side_y(0.0)  # head/shank step
 _SHANK_END_Y = _side_y(-SHANK_LEN)  # shank tip (bottom)
+_SHANK_HALF = SHANK_DIA / 2.0 * _S
+_SHANK_MID_Y = (_JUNCTION_Y + _SHANK_END_Y) / 2.0
 
 # Head-end view: the marked across-flats width, leadered clear to the left.
 END_DIM_X = 0.030
@@ -56,8 +64,25 @@ DIMENSION_CALLOUTS: dict[str, str] = {}
 # stacked to the right of the profile clear of the geometry.
 SIDE_KEEP = {
     "HeadHt": (SIDE_CENTER[0] + 0.052, (_HEAD_END_Y + _JUNCTION_Y) / 2.0),
-    "ShankLg": (SIDE_CENTER[0] + 0.052, (_JUNCTION_Y + _SHANK_END_Y) / 2.0),
+    "ShankLg": (SIDE_CENTER[0] + 0.052, _SHANK_MID_Y),
 }
+# Thread designation: leader to the shank's left outline, text left of the
+# profile (the dimensions live on the right).
+THREAD_LEADER_XY = (SIDE_CENTER[0] - _SHANK_HALF, _SHANK_MID_Y)
+THREAD_NOTE_XY = (SIDE_CENTER[0] - 0.064, _SHANK_MID_Y - 0.006)
+SIDE_AXIS_FACE_XY = (SIDE_CENTER[0], _SHANK_MID_Y - 0.012)
+
+
+def _decorate(adapter: Any, side: Any, _end: Any, _iso: Any) -> None:
+    add_thread_leader(
+        adapter,
+        side,
+        designation=THREAD_DESIGNATION,
+        silhouette_xy=THREAD_LEADER_XY,
+        note_xy=THREAD_NOTE_XY,
+        label="shank thread designation",
+    )
+
 
 RECIPE = FastenerSheet(
     title="Gooseneck Set Screw Manufacturing Drawing",
@@ -71,6 +96,8 @@ RECIPE = FastenerSheet(
     end_keep=END_KEEP,
     dimension_callouts=DIMENSION_CALLOUTS,
     side_keep=SIDE_KEEP,
+    side_centerline_face_xy=SIDE_AXIS_FACE_XY,
+    decorate=_decorate,
 )
 
 

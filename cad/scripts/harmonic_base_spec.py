@@ -31,59 +31,37 @@ STACK_HEIGHT = BOTTOM_THICKNESS + TOP_THICKNESS  # 50.8: the deck (pad top)
 LIP_W = 7.0  # raised rim width, in from the pad outline (2026-09 photo re-derive)
 LIP_H = 2.5  # raised rim height above the deck
 RIM_TOP = STACK_HEIGHT + LIP_H  # 53.3: the casting's overall height
+REVEAL = (BOTTOM_LENGTH - TOP_LENGTH) / 2.0  # 6.35 per side, both axes
 
 if abs(BOTTOM_CENTER_Z) > 1e-12 or abs(TOP_CENTER_Z) > 1e-12:
     raise AssertionError("base plates are not centred")
+if abs((BOTTOM_WIDTH - TOP_WIDTH) / 2.0 - REVEAL) > 1e-12:
+    raise AssertionError("pad reveal differs between the two plan axes")
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows. ``build_harmonic_base`` marks exactly these; ``draw_harmonic_base``
-# keeps exactly their union. Only the BOTTOM plate's plan footprint is a marked
-# sketch dimension -- it is the overall envelope; the top plate is fixed by the
-# side reveal note (note 2), and the plate THICKNESSES are
-# parameters (not sketch dims) carried in note 2 as well. Keeping the marked set
-# to the two overalls avoids stacking four dimensions on a 457 mm plan that
-# barely fits the sheet. ---
+# keeps exactly their union.  The plan carries both plates' footprints (the
+# flange envelope + the pad outline); the front elevation carries the two
+# plate thicknesses -- the extrude depths, renamed in the build from their
+# auto ``D1`` so the two features cannot collide in the drawing's keep map. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BottomProfile": {"BottomLen", "BottomWid"},
+    "TopProfile": {"TopLen", "TopWid"},
+    "BottomPlate": {"FlangeT"},
+    "TopPlate": {"PadT"},
 }
 
-# Lines kept short (<~68 chars) so the left-anchored block stays clear of the
-# title block (x >= 0.264 m); it grows DOWNWARD from its anchor.
+# Notes: at most four lines of part-specific process fact (drawing-simplicity-
+# policy.md rule 6).  Every plate size, height, reveal, rim width, corner
+# radius and hole station rides the views; what stays here is process: how
+# the deck is made, the all-round rim chamfer and root fillet that a 1:4
+# elevation cannot carry, which side each hole opens from, and the masking.
 DRAWING_NOTES = "\n".join(
     (
-        "1. MACHINE FROM SOLID STOCK TO THE FINISHED PROFILE SHOWN; NO DRAFT.",
-        "   PAD-TO-FLANGE ROOT R0.50 MAX; LOWER FLANGE 12.70 THICK;",
-        "   DECK 50.80, TOTAL HEIGHT 53.30 OVER THE RIM.",
-        "2. UPPER PAD 444.50 X 266.70;",
-        "   NEAR LONG SIDE 6.35 +/-0.10 FROM B;",
-        "   NEAR LEFT END 6.35 +/-0.10 FROM C.",
-        "3. DATUM A = UNDERSIDE FACE; B = LONG-SIDE FACE; C = LEFT-END FACE;",
-        "   HOLE-TABLE ORIGIN = B-C. LOCATIONS ARE BASIC.",
-        "4. FOUR DIA 13.00 THRU / DIA 23.00 X 6.50 DEEP C'BORES OPEN FROM",
-        "   UNDERSIDE. PLAN RIMS AT E1-E4 ARE THE DIA 13.00 THRU FEATURES.",
-        "   C'BORE AND THRU-HOLE AXES: LEAST-SQUARES CYLINDER FITS OVER",
-        "   FULL SURFACES; SEPARATION AT C'BORE MOUTH/BOTTOM: 0.05 MAX.",
-        "5. A1/B1/C1-C3/D1-D4/F1-F4 ARE BLIND TAPPED.",
-        "5A. STAMP SERIAL \"2\" 3.50 HIGH X 0.30 DEEP ON THE RIM TOP",
-        "   BESIDE THE NAMEPLATE (SEE MODEL); BRIGHT, UNPAINTED.",
-        "6. DURING COATING, MASK DATUM A/B/C FACES AND ALL BORES/THREADS;",
-        "   COAT PAD SIDES, ROOTS AND RIM. DECK INSIDE THE RIM: BLACK",
-        "   ENAMEL, SAME SYSTEM AND DFT AS THE FINISH CALLOUT.",
-        "7. VERTICAL PLAN CORNERS: FLANGE R22.22, PAD AND RIM R15.88",
-        "   (CONCENTRIC), RIM INNER CORNERS R8.88, ALL FULL HEIGHT.",
-        "   FLANGE TOP RIM, RIM TOP AND UNDERSIDE RIM C1.59 X 45 DEG.",
-        "8. RAISED RIM 7.00 WIDE X 2.50 HIGH, OUTER FACES FLUSH WITH THE",
-        "   PAD SIDES; DECK STAYS AT 50.80.",
+        "MACHINED FROM SOLID, NO DRAFT; ALL FACES MACHINED. PAD AND RIM CENTRED ON THE FLANGE.",
+        "DECK IS POCKET MILLED INSIDE THE RIM, BLACK ENAMEL; RIM FLUSH WITH PAD. MASK UNDERSIDE + HOLES.",
+        "RIMS 1/16 X 45 DEG; PAD ROOT R0.50; PLAN CORNERS CONCENTRIC. E1-E4 C'BORED FROM UNDERSIDE.",
+        "STAMP SERIAL \"2\" 3.50 HIGH X 0.30 DEEP ON BRIGHT RIM TOP BESIDE NAMEPLATE; OTHERS BLIND TAPPED.",
     )
 )
 SIDE_VIEW_NOTE = "FRONT VIEW 1:4"
-
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "through-hole true position": "0.20",
-    "tapped-hole true position": "0.50",
-    "datum B perpendicularity to A": "0.10",
-    "datum C perpendicularity to A and B": "0.10",
-    "top-pad parallelism to A": "0.10",
-}

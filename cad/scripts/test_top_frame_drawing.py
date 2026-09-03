@@ -1,8 +1,18 @@
-"""Offline contracts for the top-frame drawing."""
+"""Offline contracts for the top-frame drawing.
+
+The print follows cad/docs/drawing-simplicity-policy.md: a casting carries
+no datums or frames; its rail profile tolerance rides the model dimensions;
+every hole size and station is native (plan hole table, Hole Wizard callout);
+the profile, window, boss, gusset and spot-face sizes are marked model
+dimensions; the rail widths, crossbar, boss stack heights and top flange are
+drawing dimensions; the web thickness rides SECTION A-A; and the notes are
+four lines of process fact that carry no feature dimension.
+"""
 
 from __future__ import annotations
 
 from pathlib import Path
+import re
 
 import build_top_frame as part
 import draw_top_frame as drawing
@@ -13,6 +23,11 @@ from cone_pivot_post_installation import (
     SUMMING_Z,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _holes import TAP_DRILL_MM
+
+
+def _source() -> str:
+    return Path(drawing.__file__).read_text(encoding="utf-8")
 
 
 def test_required_drawing_paths() -> None:
@@ -23,110 +38,265 @@ def test_required_drawing_paths() -> None:
 
 
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
+    # The drift alarm: the part-side mark set and the drawing-side keep set are
+    # BOTH the shared spec's map.
     assert part.DRAWING_DIMENSIONS is top_frame_spec.DRAWING_DIMENSIONS
-    assert set(top_frame_spec.DRAWING_DIMENSIONS) == {"OuterProfile"}
-    marked = set().union(*top_frame_spec.DRAWING_DIMENSIONS.values())
-    assert marked == {"Width", "Depth"}
-    kept = set(drawing.TOP_KEEP)
-    assert kept == marked
-
-
-def test_notes_carry_the_casting_rails_bosses_and_holes() -> None:
-    notes = top_frame_spec.DRAWING_NOTES + "\n" + top_frame_spec.DRAWING_NOTES_B
-    notes_flat = " ".join(notes.split())
-    inspection = top_frame_spec.INSPECTION_NOTES
-    inspection_flat = " ".join(inspection.split())
-    assert "GREEN-PAINTED GRAY IRON CASTING" in notes
-    assert "MACHINE DATUM FACES, BORES" in notes
-    assert "1.5 MAX DRAFT. T-ROOT FILLETS R3; TOP-FACE RIM EDGES" in notes_flat
-    assert (
-        "C2.00 X 45 DEG; ALL OTHER CAST EDGES (BAND BOTTOM, BOSSES) SHARP" in notes_flat
-    )
-    assert "UNLESS NOTED" not in notes
-    assert "MACHINE FROM SOLID STOCK" not in notes
-    assert "ASTM A48" not in notes
-    assert "GREEN ENAMEL" not in notes
-    assert "UOS" not in notes
-    assert "CLEAR OPENING" not in notes
-    assert "428.20 X 262.00 OUTER RAIL RING" in notes
-    assert "SIDE RAILS 34.20 WIDE" in notes
-    assert "FRONT/REAR RAILS 38.00 WIDE" in notes
-    assert "CLEAR WINDOW 359.80 X 186.00" in notes
-    assert "INTEGRAL CROSSBAR 22.00 WIDE AT X -26.00..-4.00" in notes
-    assert "18X18 GUSSETS AT ALL FOUR" in notes
-    assert "RING BAND 36.50 TALL" in notes
-    assert "ENVELOPE 446.20 +/-0.25 X 276.20" in notes_flat
-    assert "+/-0.25 X 47.30" in notes_flat
-    assert "4X CORNER BOSSES DIA52.20, 47.30 TALL" in notes
-    assert "PROUD 4.50 ABOVE / 6.30 BELOW" in notes
-    assert "BORED DIA25.50 +0.05/0 THRU" in notes
-    assert "POSITION <MOD-DIAM>0.20 A|B|C ON 394.00 X 224.00 BASIC PITCH" in notes_flat
-    assert "DATUM A = RAIL BOTTOM FACE" in notes
-    assert "B = EAST (-X) OUTER RAIL FACE; C = REAR OUTER RAIL FACE" in notes_flat
-    assert "12.70 WEB CENTRED ON EACH RAIL" in notes
-    assert "PANELS RECESSED 10.75 INTO THE SIDE-RAIL FACES" in notes_flat
-    assert "12.65 INTO THE FRONT/REAR-RAIL FACES" in notes_flat
-    assert "THROUGH THE BOTTOM EDGE" in notes_flat
-    assert "WEB THINS AND STAYS THIN" in notes_flat
-    assert "CAST FINISH INSIDE PANELS" in notes
-    assert "GOOSENECK HUB, EAST RAIL AT Z +3.09" in notes
-    assert "RIB 27.00 WIDE FULL HEIGHT" in notes
-    assert "BORE <MOD-DIAM>17.00 +0.20/0 THRU" in notes
-    assert "UNDERSIDE BOSS DIA30 X 8.00" in notes
-    assert "DRILL + TAP 1/4-20 UNC-2B THRU RIB TO BORE" in notes_flat
-    assert "16X16X2 SPOT POCKET" in notes
-    assert "4X DRILL + TAP #10-24 UNC-2B X 14.00 DEEP" in notes
-    assert "DIA9.00 X 0.90 SPOT-FACE EACH" in notes
-    assert (
-        "2X <MOD-DIAM>13.49 (1/2 CLOSE) HANGER-STUD HOLES THRU THE CROSSBAR AT"
-        " Z -83.97 / +90.15; POSITION <MOD-DIAM>0.20 A|B|C" in notes_flat
-    )
-    assert "2X DRILL + TAP #10-24 UNC-2B X 10.00 DEEP INTO THE WEST RAIL TOP" in notes
-    assert "FULCRUM-KEEPER FEET" in notes
-    assert "ALL BORES Ra 1.6" in notes
-    assert "TOP ENDS BROKEN C1.00 X 45 DEG" in notes
-    assert "MASK DATUMS, BORES, BOSS END LANDS AND TAPPED HOLES" in notes_flat
-    assert "DIMENSIONS/GD&T APPLY BEFORE COATING" in notes
-    assert "MAX-MIN RADIAL WALL THICKNESS" in inspection_flat
-    assert "SHALL NOT EXCEED 0.10" in inspection_flat
-    assert "FIT LEAST-SQUARES CYLINDERS" in inspection_flat
-    assert "8 EQUALLY SPACED AXIAL SECTIONS OVER 47.30" in inspection_flat
-    assert "AXIS OFFSET 0.05 MAX" in inspection_flat
-    assert "GREATEST AXIS SEPARATION AT EITHER END PLANE" in inspection_flat
-    assert "64 OD POINTS" in inspection_flat
-    assert "ADDITIONAL TO NATIVE SIZE/POSITION CONTROLS" in inspection_flat
-    assert "TIR" not in notes
-    assert "-0.00" not in notes
-    assert "X.XX" not in notes
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes B"' in source
-    assert (
-        'add_property_linked_note(adapter, "Inspection Notes", 0.2965, 0.260)' in source
-    )
-    assert source.count("add_datum_feature(") == 3
-    assert source.count("add_feature_control_frame(") == 4
-    source_flat = " ".join(source.split())
-    assert 'symbol_xy=DATUM_C_SYMBOL_XY, datum="C"' in source_flat
-    assert 'label="rear outer rail-face datum", entity=datum_c_edge' in source_flat
-    assert 'label="east outer rail-face datum"' in source
-    assert drawing.DATUM_C_SYMBOL_XY[0] < drawing.TOP_CENTER[0] + part.OUTER_X / 2000.0
-    assert set(top_frame_spec.GEOMETRIC_TOLERANCES_MM) == {
-        "column-bore true position",
-        "column-boss true position",
-        "gooseneck-bore true position",
-        "hanger-stud-hole true position",
+    assert set(top_frame_spec.DRAWING_DIMENSIONS) == {
+        "OuterProfile",
+        "BossUpProfile",
+        "SpotFaceFrontProfile",
+        "BarProfile",
     }
-    for key in top_frame_spec.GEOMETRIC_TOLERANCES_MM:
-        assert f'GEOMETRIC_TOLERANCES_MM["{key}"]' in source
-    assert 'quantity="4X COLUMN BORES"' in source
-    assert 'quantity="4X BOSS ODS"' in source
-    assert 'quantity="GOOSENECK BORE"' in source
-    assert 'quantity="2X HANGER-STUD HOLES"' in source
-    assert "allow_coincident=True" in source
-    assert "FRONT_COLUMN_Z" in source
-    assert "STUD_Z_REAR" in source and "STUD_HOLE_DIA" in source
-    assert "set_dimension_callouts" not in source
+    marked = set().union(*top_frame_spec.DRAWING_DIMENSIONS.values())
+    assert marked == {
+        "Width",
+        "Depth",
+        "WinWidth",
+        "WinDepth",
+        "C0Dia",
+        "S0Dia",
+        "GussetRunE",
+        "GussetRiseE",
+    }
+    kept = set(drawing.TOP_KEEP) | set(drawing.FRONT_KEEP)
+    assert kept == marked
+    assert set(drawing.TOP_KEEP) == marked - {"S0Dia"}
+    assert set(drawing.FRONT_KEEP) == {"S0Dia"}
+    assert set(drawing.DIMENSION_CALLOUTS) == {"C0Dia", "S0Dia", "GussetRunE"}
+    assert drawing.DIMENSION_CALLOUTS["C0Dia"].startswith("4X")
+    assert drawing.DIMENSION_CALLOUTS["GussetRunE"].startswith("4X")
+    assert "SPOT-FACE" in drawing.DIMENSION_CALLOUTS["S0Dia"]
+    # The marked names resolve on the features the build names.
+    build_source = Path(part.__file__).read_text(encoding="utf-8")
+    assert 'names=(f"C{n}X", f"C{n}Z", f"C{n}Dia")' in build_source
+    assert 'names=(f"S{k}X", None, f"S{k}Dia")' in build_source
+    assert 'name_width="WinWidth"' in build_source
+    assert 'name_depth="WinDepth"' in build_source
+    assert '"GussetRunE",\n            "GussetRiseE",' in build_source
+    assert 'name_last_feature(adapter, "BarProfile")' in build_source
+    assert 'f"Boss{updown.capitalize()}Profile"' in build_source
+    assert 'f"SpotFace{side.capitalize()}Profile"' in build_source
+
+
+_DIMENSION_NUMBER = re.compile(r"\d+\.\d{2,}")
+
+
+def test_notes_are_few_specific_and_never_a_dimension() -> None:
+    notes = top_frame_spec.DRAWING_NOTES
+    lines = notes.split("\n")
+    assert len(lines) <= 4
+    assert all(len(line) <= 110 for line in lines)
+    # Casting draft and rim breaks, which faces are MACHINED (Harvey #34), and
+    # which face each hole family opens from: the facts the views cannot show.
+    assert "GRAY IRON CASTING" in notes
+    assert "MAX DRAFT" in notes
+    assert "CAST FINISH INSIDE THE WEB PANELS" in notes
+    assert "MACHINE THE RAIL BOTTOM FACE AND BOSS END LANDS" in notes
+    assert "BORE COLUMN AND GOOSENECK HOLES" in notes
+    assert "FRONT PAIR FROM THE FRONT, REAR PAIR FROM THE REAR" in notes
+    assert "STUD HOLES DRILLED FROM THE UNDERSIDE" in notes
+    assert "KEEPER TAPS FROM THE WEST RAIL TOP" in notes
+    assert "MASK" in notes
+    # Rule 6: a note never carries a dimension.  Every size and station that
+    # used to ride here is native now (hole table, callout, marked dimension).
+    assert _DIMENSION_NUMBER.findall(notes) == []
+    for banned in (
+        "25.5",
+        "394",
+        "224",
+        "17.0",
+        "13.49",
+        "#10-24",
+        "1/4-20",
+        "52.2",
+        "47.3",
+        "36.5",
+        "UNLESS NOTED",
+        "UOS",
+        "+/-",
+        "DATUM",
+        "POSITION",
+        "BASIC",
+        "A|B|C",
+        "Ra ",
+        "GD&T",
+        "ASTM A48",
+        "GREEN ENAMEL",
+        "X.XX",
+    ):
+        assert banned not in notes, banned
+    assert not hasattr(top_frame_spec, "DRAWING_NOTES_B")
+    assert not hasattr(top_frame_spec, "INSPECTION_NOTES")
+    source = _source()
+    assert (
+        'add_property_linked_note(\n        adapter, "Manufacturing Notes", 0.016, 0.102, char_height=0.0025\n    )'
+        in source
+    )
+    assert "Manufacturing Notes B" not in source
+    assert "Inspection Notes" not in source
+    build_source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "Manufacturing Notes B" not in build_source
+    assert "Inspection Notes" not in build_source
+
+
+def test_set_screw_tap_is_flagged_from_the_bore_without_a_dimension() -> None:
+    note = top_frame_spec.SET_SCREW_TAP_NOTE
+    assert note.startswith("1/4-20 SET-SCREW TAP")
+    assert "POCKET" in note and "BORE" in note
+    assert _DIMENSION_NUMBER.findall(note) == []
+    assert len(note.split("\n")) == 3
+    source = _source()
+    assert "add_attached_note(" in source
+    assert "text=SET_SCREW_TAP_NOTE" in source
+    assert "entity=gooseneck_edge" in source
+    assert drawing.SET_SCREW_NOTE_XY == (0.056, 0.152)
+
+
+def test_hole_table_is_native_and_anchored_on_the_virtual_rear_left_corner() -> None:
+    source = _source()
+    assert "insert_hole_table(" in source
+    assert "_plan_hole_table_entities(" in source
+    assert "datum_axes=(rear_edge, left_edge)" in source
+    assert "hole_entities=hole_entities" in source
+    assert "expected_locations_mm=tuple(" in source
+    assert "basic_locations=False" in source
+    assert re.search(r"GetVisibleEntities2\(\s*c,\s*1\s*\)", source)
+    assert drawing.HOLE_TABLE_ANCHOR == (0.256, 0.250)
+    # 4X column bores, the gooseneck bore, 2X hanger studs, 2X keeper taps.
+    assert len(drawing.ALL_HOLES) == 9
+    assert [diameter for _x, _z, diameter in drawing.ALL_HOLES] == [
+        part.BORE_DIA,
+        part.BORE_DIA,
+        part.BORE_DIA,
+        part.BORE_DIA,
+        part.GOOSENECK_BORE_DIA,
+        part.STUD_HOLE_DIA,
+        part.STUD_HOLE_DIA,
+        drawing.KEEPER_TAP_DIA,
+        drawing.KEEPER_TAP_DIA,
+    ]
+    assert drawing.KEEPER_TAP_DIA == TAP_DRILL_MM["#10-24"]
+    assert drawing.SIDE_TAP_DIA == TAP_DRILL_MM["#10-24"]
+    # Every station is measured from the rear-left outer rail corner.
+    locations = [
+        (x + part.OUTER_X, part.OUTER_Z - z) for x, z, _diameter in drawing.ALL_HOLES
+    ]
+    assert all(0.0 < x < 2 * part.OUTER_X for x, _y in locations)
+    assert all(0.0 < y < 2 * part.OUTER_Z for _x, y in locations)
+    assert abs(locations[0][0] - 17.1) < 1e-9 and abs(locations[0][1] - 243.0) < 1e-9
+    assert abs(locations[3][0] - 411.1) < 1e-9 and abs(locations[3][1] - 19.0) < 1e-9
+    # The generic auto tapped-hole notes are replaced by the table/callout.
+    assert 'remove_notes_matching(adapter, "Tapped Hole")' in source
+
+
+def test_side_taps_and_heights_ride_the_elevation() -> None:
+    source = _source()
+    assert source.count("add_native_hole_callout(") == 1
+    assert 'label="side-screw taps"' in source
+    assert "edge=side_tap" in source
+    # A tapped callout carries thread + depth natively; no process prefix.
+    assert "process=" not in source
+    assert drawing.SIDE_TAP_CALLOUT_XY == (0.318, 0.114)
+    # Boss stack, boss proud of the rail, rail band, top flange: four vertical
+    # drawing dimensions on topologically picked edges (the elevation's bbox
+    # is asymmetric, so nothing is picked by sheet coordinate); front/rear
+    # rail width and crossbar width the same way on the plan.
+    assert source.count("_dimension_entities(") == 7  # definition + 6 calls
+    for label in (
+        'label="boss stack height"',
+        'label="boss proud of the rail top"',
+        'label="rail band height"',
+        'label="top flange height"',
+        'label="front/rear rail width"',
+        'label="crossbar width"',
+    ):
+        assert label in source, label
+    assert "SelectByID2" not in source
+    assert "view.SelectEntity(entity, index > 0)" in source
+    assert abs(drawing.FRONT_BBOX_MID_Y - -1.75) < 1e-9
+    assert abs(drawing.BOSS_TOP_Y - 22.75) < 1e-9
+    assert abs(drawing.BOSS_BOTTOM_Y - -24.55) < 1e-9
+    assert abs(drawing.HUB_BOTTOM_Y - -26.25) < 1e-9
+    assert drawing.STACK_TEXT_XY[0] == 0.264
+    assert drawing.BOSS_ABOVE_TEXT_XY[0] == 0.278
+    assert abs(drawing.RING_TEXT_XY[0] - 0.368) < 1e-9
+    assert abs(drawing.FLANGE_TEXT_XY[0] - 0.380) < 1e-9
+    assert abs(drawing.FLANGE_TEXT_XY[1] - 0.134) < 1e-9
+    assert abs(drawing.STACK_TEXT_XY[1] - 0.1304375) < 1e-9
+    assert abs(drawing.FR_RAIL_TEXT_XY[0] - 0.185) < 1e-9
+    assert drawing.FR_RAIL_TEXT_XY[1] == 0.2475
+    assert abs(drawing.BAR_TEXT_XY[1] - 0.160) < 1e-9
+    assert drawing.BAR_TEXT_XY[0] == 0.150
+    # Spot-face callout on the elevation's centreline (the sketch's negative
+    # plane offset may mirror S0 to either boss).
+    assert drawing.FRONT_KEEP["S0Dia"] == (0.345, 0.152)
+    assert drawing.TOP_KEEP["C0Dia"] == (0.075, 0.2495)
+    # Depth moved to the right flank (the section cut line runs off the left).
+    assert drawing.TOP_KEEP["Depth"] == (0.2566, 0.120)
+    assert drawing.TOP_KEEP["WinWidth"] == (0.170, 0.1255)
+    assert drawing.TOP_KEEP["WinDepth"] == (0.205, 0.175)
+    assert drawing.TOP_KEEP["GussetRunE"] == (0.160, 0.205)
+    assert drawing.TOP_KEEP["GussetRiseE"] == (0.150, 0.217)
+    assert drawing.FRONT_VIEW_NOTE_XY == (0.250, 0.116)
+
+
+def test_web_thickness_rides_section_a_a() -> None:
+    # The web sits under the flange in the plan and behind the front rail in
+    # the elevation, so the T-section is cut across the plan at z +50 (clear
+    # of the hub, its gussets and every hole) -- the fleet's first
+    # create_section_view user.  Cut-face edges are section geometry, not
+    # model edges, so the two section dimensions pick by sheet coordinate.
+    source = _source()
+    assert source.count("create_section_view(") == 1
+    assert 'section_label="A"' in source
+    assert "scale=(1, 4),\n        label=\"rail T-section\"" in source
+    assert source.count("add_edge_dimension(") == 2
+    assert 'label="web thickness"' in source
+    assert 'label="side rail width"' in source
+    assert drawing.SECTION_CUT_Z == 50.0
+    assert drawing.SECTION_LINE == ((0.019, 0.150), (0.2485, 0.150))
+    assert drawing.SECTION_CENTER == (0.345, 0.099)
+    assert abs(drawing.WEB_TEXT_XY[0] - 0.39425) < 1e-9
+    assert drawing.WEB_TEXT_XY[1] == 0.0895
+    assert drawing.SIDE_RAIL_TEXT_XY[1] == 0.0835
+    assert abs(drawing.WEB_IN_X - 190.65) < 1e-9
+    assert abs(drawing.WEB_OUT_X - 203.35) < 1e-9
+    # Section picks: the +X T's web faces and flange sides are 2.7 mm apart
+    # on the sheet, well past the pick tolerance.
+    web = drawing._section_xy(drawing.WEB_IN_X, 0.0)[0]
+    flange = drawing._section_xy(part.INNER_X, 0.0)[0]
+    assert web - flange > 0.0025
+    # The cut clears the hub gussets (z <= 33.1) and the nearest hole rim
+    # (keeper tap at z 77.1, stud at 90.1 minus its radius).
+    assert part.HUB_GUSSET_HALF_OUT + part.GOOSENECK_Z < drawing.SECTION_CUT_Z
+    assert drawing.SECTION_CUT_Z < part.KEEPER_TAP_Z_REAR - part.KEEPER_TAP_SPEC.depth_mm
+
+
+def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:
+    # drawing-simplicity-policy.md rule 3-5: a frame casting is not on the
+    # GD&T allowlist; the rail profile tolerance rides the model dimensions.
+    source = _source()
+    for helper in (
+        "add_datum_feature(",
+        "add_feature_control_frame(",
+        "add_surface_finish(",
+        "set_basic_dimension(",
+        "project_part_pmi(",
+    ):
+        assert helper not in source, helper
+    assert "_visible_plan_controls(" not in source
+    assert "_visible_front_datum_a(" not in source
+    assert "DATUM_C_SYMBOL_XY" not in source
+    assert not hasattr(top_frame_spec, "GEOMETRIC_TOLERANCES_MM")
+    assert top_frame_spec.OUTER_PROFILE_TOLERANCE_MM == 0.25
+    build_source = Path(part.__file__).read_text(encoding="utf-8")
+    assert build_source.count("set_dimension_symmetric_tolerance(") == 2
+
+
+def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
+    source = _source()
+    assert "for view in (top, front):\n        set_hidden_lines_visible" in source
+    assert "set_hidden_lines_removed(" not in source
 
 
 def test_ring_envelope_and_hole_stations_are_single_sourced() -> None:
@@ -146,14 +316,16 @@ def test_ring_envelope_and_hole_stations_are_single_sourced() -> None:
     assert part.GOOSENECK_BORE_DIA == 17.0
     assert (part.BAR_X0, part.BAR_X1) == (-26.0, -4.0)
     assert drawing.STUD_X == -15.0
+    assert drawing.STUD_X == part.BAR_X0 + 11.0  # the wizard placement station
     # SUMMING_Z is the derived +3.08759 recentered residual, so the stud
-    # stations land at the note-rounded -83.97 / +90.15 within half a micron.
+    # stations land at -83.97 / +90.15 within half a micron.
     assert part.STUD_Z_FRONT == SUMMING_Z - part.HEX_Z_MID
     assert part.STUD_Z_REAR == SUMMING_Z + part.HEX_Z_MID
     assert part.HEX_Z_MID == 87.06
     assert abs(part.STUD_Z_FRONT - -83.972) < 5e-3
     assert abs(part.STUD_Z_REAR - 90.148) < 5e-3
     assert part.STUD_HOLE_DIA == 13.492
+    assert part.KEEPER_TAP_X == 199.9
     assert abs(drawing.PLAN_HALF_X - 223.1) < 1e-9
     assert abs(drawing.PLAN_HALF_Z - 138.1) < 1e-9
     assert abs(2.0 * drawing.PLAN_HALF_X - 446.2) < 1e-9
@@ -165,13 +337,17 @@ def test_ring_envelope_and_hole_stations_are_single_sourced() -> None:
 
 def test_view_scales_are_explicit() -> None:
     assert drawing.SHEET_SCALE == (1.0, 2.0)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    source = _source()
     assert "scale=(1, 2)" in source
     assert '"*Front"' in source
     assert "scale=(1, 4)" in source
     assert top_frame_spec.TOP_VIEW_NOTE == "PLAN VIEW SCALE 1:2"
-    assert '"Top View Note", 0.280, 0.2055' in source
+    # The plan-scale note moved above the hole table that now fills the
+    # sheet's upper right.
+    assert drawing.TOP_VIEW_NOTE_XY == (0.262, 0.259)
+    assert 'add_property_linked_note(adapter, "Top View Note", *TOP_VIEW_NOTE_XY)' in source
     assert top_frame_spec.FRONT_VIEW_NOTE == "FRONT VIEW SCALE 1:4"
+    assert 'add_property_linked_note(adapter, "Front View Note", *FRONT_VIEW_NOTE_XY)' in source
 
 
 def test_part_stamps_make_critical_properties() -> None:
