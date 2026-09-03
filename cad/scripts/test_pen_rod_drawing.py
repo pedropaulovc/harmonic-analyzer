@@ -52,21 +52,20 @@ def test_wire_hole_callout_states_size_and_process() -> None:
     # The along-rod location remains a dimension; the across-section location
     # stays a view-adjacent note rather than depending on a short derived edge.
     assert source.count("add_edge_dimension(") == 1
-    # The native callout resolves the exact-diameter visible model edge; no
-    # sheet-coordinate edge pick can drift with detail-view placement.
+    # The native callout resolves the exact-diameter visible model edge in the
+    # main front view; the derived detail exposes no model edges on this seat.
     assert (
-        "wire_hole_edge = visible_circle_edge(adapter, detail, WIRE_HOLE_DIA)"
-        in source
+        "wire_hole_edge = visible_circle_edge(adapter, front, WIRE_HOLE_DIA)" in source
     )
     assert "edge=wire_hole_edge" in source
     assert "edge_xy=" not in source
 
 
-def test_wire_hole_size_and_centring_read_in_a_detail() -> None:
+def test_wire_hole_centring_reads_in_a_detail() -> None:
     # Machinist review 2026-09-02: the 2.50 across value crowded the top
-    # view's stacked 5.00.  DETAIL A (4:1) carries the native hole callout and
-    # a compact centring note derived from the authoritative rod section; the
-    # length location stays dimensioned on the front view.
+    # view's stacked 5.00. DETAIL A (4:1) carries a compact centring note
+    # derived from the authoritative rod section; the native size/process and
+    # length location stay on the main front view.
     assert drawing.DETAIL_SCALE == (4, 1)
     assert drawing.DETAIL_RADIUS > pen_rod_spec.ROD_SECTION / 2000.0
     assert drawing.WIRE_HOLE_CENTER_NOTE == (
@@ -79,12 +78,12 @@ def test_wire_hole_size_and_centring_read_in_a_detail() -> None:
     # The detail is never curated (its circle takes in both rod faces, so a
     # curation could claim Section); its centring note makes no entity pick.
     assert 'view_label="detail"' not in source
-    assert "if add_note(\n        adapter,\n        WIRE_HOLE_CENTER_NOTE," in source
+    assert "WIRE_HOLE_CENTER_NOTE,\n            *wire_hole_center_note_xy" in source
     assert "add_edge_dimension(\n        adapter,\n        detail," not in source
-    assert "add_native_hole_callout(\n        adapter,\n        detail," in source
-    # The front view keeps the along-the-rod location only.
+    assert "add_native_hole_callout(\n        adapter,\n        detail," not in source
+    # The front view carries both the along-rod location and native callout.
     assert "add_edge_dimension(\n        adapter,\n        front," in source
-    assert "add_native_hole_callout(\n        adapter,\n        front," not in source
+    assert "add_native_hole_callout(\n        adapter,\n        front," in source
     # The detail sits right of the right view and left of the isometric.
     assert drawing.RIGHT_CENTER[0] < drawing.DETAIL_CENTER[0] < drawing.ISO_CENTER[0]
 
@@ -144,7 +143,9 @@ def test_print_carries_no_gdt_or_finish_symbols() -> None:
 
 def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
     source = _source()
-    assert "for view in (front, right, top):\n        set_hidden_lines_visible" in source
+    assert (
+        "for view in (front, right, top):\n        set_hidden_lines_visible" in source
+    )
     assert "set_hidden_lines_removed(adapter, iso)" in source
 
 

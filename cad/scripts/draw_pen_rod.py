@@ -148,9 +148,9 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, right, top):
         set_hidden_lines_visible(adapter, view)
 
-    # The front and top views are curated as before; the detail is NOT -- its
-    # circle takes in both rod faces, so curation there could claim Section.
-    # It receives a selection-free centring note and the native hole callout.
+    # Curate the front and top model dimensions. DETAIL A receives only the
+    # selection-free centring note; its derived geometry exposes no model edges
+    # through SolidWorks, so the native hole callout stays on the main front.
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
     )
@@ -193,7 +193,7 @@ async def build(adapter: Any) -> dict[str, str]:
     hole_cx, hole_cy = model_point_in_view(
         adapter, detail, (0.0, WIRE_HOLE_Y / 1000.0, 0.0), label="detail hole centre"
     )
-    wire_hole_edge = visible_circle_edge(adapter, detail, WIRE_HOLE_DIA)
+    wire_hole_edge = visible_circle_edge(adapter, front, WIRE_HOLE_DIA)
     # Across the section, the hole axis is 2.50 from either 5.00 slide face.
     # State that controlling value beside DETAIL A instead of dimensioning a
     # short derived-view edge that is not stable across SolidWorks seats.
@@ -201,19 +201,22 @@ async def build(adapter: Any) -> dict[str, str]:
         hole_cx - 0.005,
         hole_cy + DETAIL_RADIUS * DETAIL_SCALE[0] + 0.010,
     )
-    if add_note(
-        adapter,
-        WIRE_HOLE_CENTER_NOTE,
-        *wire_hole_center_note_xy,
-    ) is None:
+    if (
+        add_note(
+            adapter,
+            WIRE_HOLE_CENTER_NOTE,
+            *wire_hole_center_note_xy,
+        )
+        is None
+    ):
         raise RuntimeError("failed to add wire-hole centerline location note")
-    # The size and process, leadered from the hole's model-identity rim
-    # down-right, with callout text outside the circle and clear of the isometric.
+    # The derived detail exposes no model edge for the hole. Keep the native
+    # size/process callout on the front-view model rim, beside the hole.
     add_native_hole_callout(
         adapter,
-        detail,
+        front,
         edge=wire_hole_edge,
-        callout_xy=(hole_cx + 0.031, hole_cy - 0.018),
+        callout_xy=(FRONT_CENTER[0] + 0.028, hole_center_y - 0.006),
         label="pen-rod wire hole",
         process="#47 DRILL",
     )
