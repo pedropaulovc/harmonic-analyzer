@@ -63,6 +63,7 @@ from _assembly import (
 from _transforms import IDENTITY
 from _interference_contracts import allowed_interference_pairs
 
+import _config
 import _telemetry
 
 ASM_NAME = "harmonic-analyzer"
@@ -104,7 +105,6 @@ SUBASSEMBLIES = (
 # (STOP_DECK_GAP above it) and the bar rides SLOT_FLOOR + half the window
 # clearance above the block bottom. STICK_POS.y (the graduated top face) is
 # therefore derived from the stop's constants, never a literal.
-import _telemetry  # noqa: E402
 from build_measuring_stick import (  # noqa: E402
     BODY_THICKNESS as STICK_THICK,
     BODY_WIDTH as STICK_WIDTH,
@@ -165,6 +165,57 @@ def _subassembly(name: str) -> str:
     return str(path)
 
 
+# --- saved pose configurations at the top (2026-09-02, poses.yaml) -------------
+# The top carries no pose mates of its own: each pose configuration points the
+# posed subassemblies at THEIR same-named configuration (per-configuration
+# referenced configuration, CompConfigProperties5) and re-proves the
+# cross-subassembly fits there -- the sinusoid's rods must still ride the
+# drive-train's turned cams.
+from _pose_configs import (  # noqa: E402
+    REST_CONFIGURATION,
+    PoseConfiguration,
+    install_pose_configurations,
+    set_component_referenced_configuration,
+)
+
+
+async def _install_top_pose_configurations(adapter, sub_instances: dict[str, str]) -> None:
+    roles = _config.assembly_configuration_roles()
+    if list(roles) != ["default", "parallel", "sinusoid"]:
+        raise RuntimeError(f"unexpected assembly configuration role order: {list(roles)}")
+    if roles["default"] != REST_CONFIGURATION:
+        raise RuntimeError(
+            f"default assembly configuration must be {REST_CONFIGURATION!r}, "
+            f"got {roles['default']!r}"
+        )
+    parallel_name = roles["parallel"]
+    sin_name = roles["sinusoid"]
+
+    def _selector(targets: dict[str, str]):
+        async def hook(adapter) -> None:
+            for sub, cfg in targets.items():
+                set_component_referenced_configuration(adapter, sub_instances[sub], cfg)
+        return hook
+
+    await install_pose_configurations(
+        adapter,
+        {},
+        [
+            PoseConfiguration(
+                parallel_name,
+                "parallel amplitude-bar bank: channel posed (poses.yaml)",
+                hook=_selector({"channel": parallel_name}),
+            ),
+            PoseConfiguration(
+                sin_name,
+                "rocker sinusoid: channel + drive-train posed (poses.yaml)",
+                hook=_selector({"channel": sin_name, "drive-train": sin_name}),
+            ),
+        ],
+        interference=lambda a: check_no_interference(a, allowed_pairs=allowed_interference_pairs(ASM_NAME)),
+    )
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         ComponentRefParameters,
@@ -172,6 +223,7 @@ async def build(adapter) -> dict[str, str]:
     )
 
     check("create_assembly", await adapter.create_assembly())
+    sub_instances: dict[str, str] = {}
 
     for name in SUBASSEMBLIES:
         data = check(
@@ -185,6 +237,7 @@ async def build(adapter) -> dict[str, str]:
             ),
         )
         comp = data["name"]
+        sub_instances[name] = comp
         if not data.get("fixed"):
             check(
                 f"fix {name}",
@@ -209,6 +262,12 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         allowed_pairs=allowed_interference_pairs(ASM_NAME),
     )
+    # The machine is authored output-side -Z, so SolidWorks' native Front view
+    # shows the BACK. Redefine the standard views before creating pose
+    # configurations so every configuration inherits the same machine-facing
+    # Front/isometric cameras. Geometry is untouched.
+    remap_front_to_machine_front(adapter)
+    await _install_top_pose_configurations(adapter, sub_instances)
 
     # Title-block identity for the top assembly drawing
     # (draw_harmonic_analyzer_assembly.py): assembly_title_properties supplies
@@ -231,11 +290,6 @@ async def build(adapter) -> dict[str, str]:
     )
     apply_summary_info(adapter, title=f"{ASM_NAME} assembly")
 
-    # The machine is authored output-side -Z, so SolidWorks' native Front view
-    # shows the BACK. Redefine the document's standard views so Front (and the
-    # eight-views gallery below, which goes through ShowNamedView2) shows the
-    # machine front, and the file opens on it. Geometry is untouched.
-    remap_front_to_machine_front(adapter)
     artefacts = await save_assembly_and_images(adapter, ASM_NAME)
     # save_assembly_and_images deliberately discards the dirty anonymous source
     # after its SaveAsCopy.  Reopen the clean copy for the top-only gallery/BOM;

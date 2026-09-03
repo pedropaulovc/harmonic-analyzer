@@ -106,10 +106,20 @@ def amplitudes() -> list[float]:
 
 
 def poses() -> dict[str, Any]:
-    """The saved assembly pose configurations (poses.yaml): ``amplitude_fan``
-    (per-channel amplitude_mm + configuration name) and ``sinusoid``
-    (crank_turns + configuration name). Default is never listed here."""
+    """Saved assembly overrides from poses.yaml: ``parallel`` drives every bar
+    to a common target amplitude, while ``sinusoid`` retains the Default
+    per-channel amplitudes and turns the cam train."""
     return _doc("poses")
+
+
+def assembly_configuration_roles() -> dict[str, str]:
+    """Assembly configuration names in their presentation order."""
+    saved = poses()
+    return {
+        "default": "Default",
+        "parallel": str(saved["parallel"]["configuration"]),
+        "sinusoid": str(saved["sinusoid"]["configuration"]),
+    }
 
 
 def machine(*keys: str) -> Any:

@@ -20,13 +20,11 @@
 # FIRST machine.yaml channels.active_count channels get a physical cylinder gear,
 # cam follower, rocker, amplitude bar, top lever and spring built.
 #
-# TEMPORARY (2026-06-19): every amplitude_mm has been RESET TO NEUTRAL (0.0) —
-# all amplitude bars sit at their neutral position, so the synthesised pen trace
-# is flat. This pairs with the temporary channels.active_count reduction and was
-# done ONLY to speed the build while the remaining parts are certified. RECOVER by
-# restoring machine.yaml amplitude:preset to `square` and regenerating these
-# amplitude_mm by the square law (a_j = 80 / harmonic_n on ODD harmonics, 0 on
-# even), together with setting channels.active_count back to 20.
+# The photographed ch15 p.30 machine state is the Default build pose: its
+# amplitude bars form a monotonic fan from 0 to 80 mm across the twenty-channel
+# bank. These measured/interpreted stations are the per-channel design inputs;
+# the explicit parallel saved configuration in poses.yaml drives them all to
+# zero without changing Default.
 units: mm
 source: "DIMENSIONS.md ch8/ch12/ch29 gear law"
 confidence: high
@@ -36,9 +34,9 @@ notes: >-
   harmonic_n = cone_teeth/6 = 20 - index, ratio = [cone_teeth, 120]. The
   [120-6k : 120] mesh law is annotated in the book (ch.29 p.99) and stated ch.8 —
   high confidence. phase_deg / amplitude_mm are the SETTABLE inputs (the cam
-  phase and amplitude-bar station per channel); amplitude_mm is currently the
-  NEUTRAL pose (all 0.0, see the temporary note above — the square-wave preset is
-  restored on recovery per machine.yaml amplitude.notes).
+  phase and amplitude-bar station per channel); amplitude_mm is the photographed
+  Default fan from ch15 p.30, interpreted as a linear 0..80 mm ramp because the
+  individual graduations are not readable.
 channels:
   - index: 0
     cone_teeth: 120
@@ -53,130 +51,130 @@ channels:
     harmonic_n: 19
     ratio: [114, 120]
     phase_deg: 0.0
-    amplitude_mm: 0.0   # TEMP neutral (square preset would be 80/19 = 4.2105)
+    amplitude_mm: 4.2105
   - index: 2
     cone_teeth: 108
     cylinder_teeth: 120
     harmonic_n: 18
     ratio: [108, 120]
     phase_deg: 0.0
-    amplitude_mm: 0.0
+    amplitude_mm: 8.4211
   - index: 3
     cone_teeth: 102
     cylinder_teeth: 120
     harmonic_n: 17
     ratio: [102, 120]
     phase_deg: 0.0
-    amplitude_mm: 0.0   # TEMP neutral (square preset would be 80/17 = 4.7059)
+    amplitude_mm: 12.6316
   - index: 4
     cone_teeth: 96
     cylinder_teeth: 120
     harmonic_n: 16
     ratio: [96, 120]
     phase_deg: 0.0
-    amplitude_mm: 0.0
+    amplitude_mm: 16.8421
   - index: 5
     cone_teeth: 90
     cylinder_teeth: 120
     harmonic_n: 15
     ratio: [90, 120]
     phase_deg: 0.0
-    amplitude_mm: 0.0   # TEMP neutral (square preset would be 80/15 = 5.3333)
+    amplitude_mm: 21.0526
   - index: 6
     cone_teeth: 84
     cylinder_teeth: 120
     harmonic_n: 14
     ratio: [84, 120]
     phase_deg: 0.0
-    amplitude_mm: 0.0
+    amplitude_mm: 25.2632
   - index: 7
     cone_teeth: 78
     cylinder_teeth: 120
     harmonic_n: 13
     ratio: [78, 120]
     phase_deg: 0.0
-    amplitude_mm: 0.0   # TEMP neutral (square preset would be 80/13 = 6.1538)
+    amplitude_mm: 29.4737
   - index: 8
     cone_teeth: 72
     cylinder_teeth: 120
     harmonic_n: 12
     ratio: [72, 120]
     phase_deg: 0.0
-    amplitude_mm: 0.0
+    amplitude_mm: 33.6842
   - index: 9
     cone_teeth: 66
     cylinder_teeth: 120
     harmonic_n: 11
     ratio: [66, 120]
     phase_deg: 0.0
-    amplitude_mm: 0.0   # TEMP neutral (square preset would be 80/11 = 7.2727)
+    amplitude_mm: 37.8947
   - index: 10
     cone_teeth: 60
     cylinder_teeth: 120
     harmonic_n: 10
     ratio: [60, 120]
     phase_deg: 0.0
-    amplitude_mm: 0.0
+    amplitude_mm: 42.1053
   - index: 11
     cone_teeth: 54
     cylinder_teeth: 120
     harmonic_n: 9
     ratio: [54, 120]
     phase_deg: 0.0
-    amplitude_mm: 0.0   # TEMP neutral (square preset would be 80/9 = 8.8889)
+    amplitude_mm: 46.3158
   - index: 12
     cone_teeth: 48
     cylinder_teeth: 120
     harmonic_n: 8
     ratio: [48, 120]
     phase_deg: 0.0
-    amplitude_mm: 0.0
+    amplitude_mm: 50.5263
   - index: 13
     cone_teeth: 42
     cylinder_teeth: 120
     harmonic_n: 7
     ratio: [42, 120]
     phase_deg: 0.0
-    amplitude_mm: 0.0   # TEMP neutral (square preset would be 80/7 = 11.4286)
+    amplitude_mm: 54.7368
   - index: 14
     cone_teeth: 36
     cylinder_teeth: 120
     harmonic_n: 6
     ratio: [36, 120]
     phase_deg: 0.0
-    amplitude_mm: 0.0
+    amplitude_mm: 58.9474
   - index: 15
     cone_teeth: 30
     cylinder_teeth: 120
     harmonic_n: 5
     ratio: [30, 120]
     phase_deg: 0.0
-    amplitude_mm: 0.0   # TEMP neutral (square preset would be 80/5 = 16.0)
+    amplitude_mm: 63.1579
   - index: 16
     cone_teeth: 24
     cylinder_teeth: 120
     harmonic_n: 4
     ratio: [24, 120]
     phase_deg: 0.0
-    amplitude_mm: 0.0
+    amplitude_mm: 67.3684
   - index: 17
     cone_teeth: 18
     cylinder_teeth: 120
     harmonic_n: 3
     ratio: [18, 120]
     phase_deg: 0.0
-    amplitude_mm: 0.0   # TEMP neutral (square preset would be 80/3 = 26.6667)
+    amplitude_mm: 71.5789
   - index: 18
     cone_teeth: 12
     cylinder_teeth: 120
     harmonic_n: 2
     ratio: [12, 120]
     phase_deg: 0.0
-    amplitude_mm: 0.0
+    amplitude_mm: 75.7895
   - index: 19
     cone_teeth: 6
     cylinder_teeth: 120
     harmonic_n: 1
     ratio: [6, 120]
     phase_deg: 0.0
-    amplitude_mm: 0.0   # TEMP neutral (square preset would be 80/1 = 80.0)
+    amplitude_mm: 80.0

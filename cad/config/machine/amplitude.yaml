@@ -1,18 +1,18 @@
 
 amplitude:                         # ch15 — the amplitude bars set the Fourier coefficients
-  preset: neutral                  # all amplitude bars at rest (a_j = 0) — matches the neutral-state photos
-  fundamental_station_mm: 80.0     # a_1 bar station; a_j = this / harmonic_n (odd j), 0 (even j)
+  preset: fan                      # photographed Default: evenly fanned bars from 0 to 80 mm
+  fundamental_station_mm: 80.0     # outer fan station; row j uses j / (channel_count - 1)
   max_travel_mm: 88.0              # ±88 mm amplitude-bar seesaw range (ch.15)
   source: "DIMENSIONS.md ch15; truth_model.py"
   confidence: med
   notes: >-
     The amplitude bar station along the rocker IS the Fourier coefficient a_j.
-    The `neutral` preset parks every bar at rest (a_j = 0), so channels.yaml
-    amplitude_mm is all zeros and every channel return spring sits at the same
-    rest length — one shared spring geometry across all 20 channels (the
-    reference photos show the machine in this neutral state). The `square`
-    preset (a_j = fundamental_station_mm / harmonic_n on the ODD harmonics, 0
-    on the even ones — the textbook square-wave partial sum, odd terms ∝ 1/n) is
-    the alternative. truth_model.py reads the same amplitude_mm vector, so the
-    computed pen curve always matches the as-built bar stations; verify.py --suite
-    config asserts channels.yaml obeys whichever preset is set here.
+    The photographed Default uses the `fan` preset: the 20 channel rows divide
+    the 0..fundamental_station_mm span evenly, producing the monotonic bar fan
+    visible in the ch14/ch30 plates. The saved `parallel-bank` configuration
+    drives every bar to zero without changing this build-time source of truth.
+    `neutral` remains the all-zero law and `square` remains the textbook
+    square-wave law (fundamental_station_mm / harmonic_n on odd harmonics, zero
+    on even harmonics). truth_model.py reads the same amplitude_mm vector, so
+    the computed pen curve always matches the as-built bar stations; verify.py
+    --suite config asserts channels.yaml obeys the selected preset.
