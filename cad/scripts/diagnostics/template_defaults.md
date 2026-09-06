@@ -90,23 +90,28 @@ of every export. The retained PDFs/PNGs still need a human eye pass.
 
 ## Native API provenance and untested boundary
 
-The bundled SolidWorks 2026 reference documents `IModelDocExtension.SaveAs3` as a
-Boolean result plus error/warning output masks, and requires advanced options
-from `GetAdvancedSaveAsOptions` before the call. The prepared-template save uses
-current version 0, silent 1, normal-reference options 0, null export data, and
-clears selection first. It requires `True`, zero errors and a fresh nonempty file;
-warnings remain recorded. A failed save with a partial file is rejected. The
-older `IModelDoc2.SaveAs3` integer result has no defined meaning in the bundled
-method page, so this diagnostic does not invent one.
+The prepared-template save now uses the proven production native call
+`IModelDoc2.SaveAs3(path,0,0)` after clearing selection. It requires a fresh
+nonempty file, an exact owned native path, and full new-from-template defaults
+readback; its raw integer is recorded without inventing an undocumented status
+meaning. The four-cell native positive control below supports that choice.
+
+The bundled SolidWorks 2026 reference documents the alternative
+`IModelDocExtension.SaveAs3` as a Boolean plus error/warning masks, with advanced
+options from `GetAdvancedSaveAsOptions`. Its attempted current-version0,
+silent1, normal-reference0, null-export-data shape is retained in the diagnostic
+control, as are the original strict Boolean/error/partial-file regression tests.
+Those checks were not removed to make preparation pass; the benchmark uses a
+separately proven native path.
 
 Relevant bundled references are `types/IModelDocExtension/SaveAs3.md`,
 `GetAdvancedSaveAsOptions.md`, `types/ISheet/GetProperties2.md`,
 `types/INote/GetText.md`, `PropertyLinkedText.md`, `GetExtent.md`, and
 `examples/Get_All_Notes_in_Drawing_Template_Example_VB.md`. The checked-in 2026
-pywin32 wrapper specifies the exact seven-argument SaveAs3 call and three-value
-return. Offline tests prove that shape's acceptance/rejection logic, not native
-DRWDOT persistence or cross-arm equivalence. Those remain the first live control's
-explicit acceptance gates; no production path is changed before that evidence.
+pywin32 wrapper specifies both the three-argument model call and the seven-argument
+extension call. Full styled-template inheritance and cross-arm equivalence remain
+the benchmark's acceptance gates; the separate blank-template control only
+establishes native save and sheet-property persistence for its tested shape.
 
 ## First native preparation observation
 
@@ -166,4 +171,19 @@ different option values, and therefore cannot isolate a method-only cause.
 The legacy integer result is retained without inventing an undocumented meaning;
 file plus exact native persistence must independently prove a successful cell.
 No unsupported-template or incorrect-guard conclusion follows from the first
-modern result. This follow-up needs separate source review and a seat grant.
+modern result.
+
+The reviewed four-cell run at `282bb9e7` completed on PID37136. In
+`template-save-74ytw6wb/save.json`, production ModelDoc2.SaveAs3 persisted a normal
+drawing (88,700 bytes, 1.149 seconds) and DRWDOT (88,701 bytes, 0.643 seconds), with
+exact updated native paths and unchanged sheet properties after reopen or
+new-from-template instantiation. Both advanced-silent cells returned True/0/0
+but produced no file and retained blank native paths (0.249/0.174 seconds); they
+remain rejected, not successful fast saves. The result rules out a template-only
+restriction under these tested shapes. Untried: modern options0 or other advanced
+option configuration. It does not establish that the modern API never works.
+
+All owned documents closed, the original template hash stayed unchanged, and
+the visible baseline part plus dirty Draw2 were preserved with no cleanup error.
+Using the proven legacy call changes only one-time preparation; both timed recipe
+arms retain the production save/export implementation unchanged.
