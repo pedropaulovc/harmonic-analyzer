@@ -7,6 +7,10 @@ target derived from the measured dimension body. ``--mode shoulder_false``
 tests the existing edge datum separately. ``--mode paired_selectors`` instead
 compares named DIMENSION selection with exact IAnnotation.Select2(False, 0),
 leaving insertion/label/clear/rebuild identical. Export insertion before a derived
+nonzero outboard move. ``--mode paired_attachments`` reattaches the original A
+to its exact edge, then independently tests attaching a new A to the exact bore
+display dimension with a typed dispatch array. Immediate and rebuilt attachment
+witnesses are mandatory even when the native setter returns false. Export before a
 nonzero outboard move and save/reopen. Capture both
 IDatumTag primitives and IAnnotation.GetDisplayData without assuming that their
 coordinate frames agree. Original part/drawing hashes are checked on all exits.
@@ -45,6 +49,7 @@ from diagnostics import probe_drawing_attachments as attachments  # noqa: E402
 from diagnostics.probe_datum_sheet_z import guard_sources  # noqa: E402
 from diagnostics.probe_native_model_pmi import file_digest, render_pdf_png  # noqa: E402
 import _telemetry  # noqa: E402
+from solidworks_mcp.adapters.com_variant import dispatch_array  # noqa: E402
 
 EPSILON = 1e-8
 
@@ -410,6 +415,77 @@ def replace_on_dimension(
     return annotation
 
 
+def exact_attachment(app, state, handles, target, kind):
+    if (
+        state["attachment_types"] != (kind,)
+        or len(handles) != 4
+        or handles[3] is None
+        or int(app.IsSame(handles[3], target)) != 1
+    ):
+        raise RuntimeError(
+            "explicit attachment is not the exact requested native entity"
+        )
+
+
+def explicit_attach(adapter, bore, annotation, target, kind, observations):
+    """Capture both outcomes, then let the route gate reject any failed witness."""
+    payload = dispatch_array([target])
+    # pywin32's typed array mirrors the official DispatchWrapper[] example.
+    if getattr(payload, "varianttype", None) != 8201:  # VT_ARRAY | VT_DISPATCH
+        raise RuntimeError("explicit attachment requires a typed VT_DISPATCH array")
+    observations["payload_vartype"] = int(payload.varianttype)
+    observations["target_type"] = kind
+    original, original_handles = datum_state(adapter, bore, annotation)
+    observations["before"] = original
+    observations["returned"] = bool(annotation.SetAttachedEntities(payload))
+    for stage in ("immediate", "rebuilt"):
+        if stage == "rebuilt":
+            observations["rebuild_returned"] = bool(adapter.currentModel.EditRebuild3())
+            if not observations["rebuild_returned"]:
+                raise RuntimeError("explicit attachment rebuild failed")
+        state, handles = datum_state(adapter, bore, annotation)
+        observations[stage] = state
+        # The annotation/tag/view must stay exact even if attachment is rejected.
+        same_handles(adapter.swApp, original_handles[:3], handles[:3])
+        current = bore_target(adapter)
+        if (
+            int(adapter.swApp.IsSame(current["display"], bore["display"])) != 1
+            or int(adapter.swApp.IsSame(current["dimension"], bore["dimension"])) != 1
+            or any(
+                current[key] != bore[key]
+                for key in (
+                    "full_name",
+                    "value_m",
+                    "configuration",
+                    "source",
+                    "view_key",
+                )
+            )
+        ):
+            raise RuntimeError("explicit attachment changed the bore source dimension")
+        observations[f"{stage}_source_dimension"] = "exact_unchanged"
+        try:
+            exact_attachment(adapter.swApp, state, handles, target, kind)
+            if kind == 1:
+                same_semantics(original, state)
+            observations[f"{stage}_identity"] = "exact"
+        except RuntimeError as error:
+            observations[f"{stage}_identity_error"] = str(error)
+    return observations["returned"]
+
+
+def require_explicit_attachment(observations):
+    if not observations["returned"]:
+        raise RuntimeError(
+            "SetAttachedEntities returned false; native observations captured"
+        )
+    for stage in ("immediate", "rebuilt"):
+        if observations.get(f"{stage}_identity") != "exact":
+            raise RuntimeError(
+                f"SetAttachedEntities {stage} exact-entity witness failed"
+            )
+
+
 async def probe(adapter, source, directory, mode="paired_dimensions"):
     from solidworks_mcp.adapters.solidworks.drawing import save_drawing
 
@@ -439,6 +515,7 @@ async def probe(adapter, source, directory, mode="paired_dimensions"):
         modes = {
             "paired_dimensions": ("dimension", "dimension_placed"),
             "paired_selectors": ("dimension", "dimension_select2"),
+            "paired_attachments": ("edge_reattach", "dimension_attach"),
             "shoulder_false": ("shoulder_false",),
         }[mode]
         for mode in modes:
@@ -471,14 +548,19 @@ async def probe(adapter, source, directory, mode="paired_dimensions"):
                     )
                 }
                 annotation = datum_a(adapter, bore)
-                before, _ = datum_state(adapter, bore, annotation)
+                before, before_handles = datum_state(adapter, bore, annotation)
                 trial["before"] = before
                 original_key = f"{bore['view_key']}/{before['name']}/2"
                 manufacturing = without_datum(
                     attachments.snapshot(adapter.currentModel), original_key
                 )
                 trial["before_export"] = export(f"{mode}-before")
-                if mode in {"dimension", "dimension_placed", "dimension_select2"}:
+                if mode in {
+                    "dimension",
+                    "dimension_placed",
+                    "dimension_select2",
+                    "dimension_attach",
+                }:
                     target = None
                     if mode == "dimension_placed":
                         dimension_bounds = annotation_box(adapter, bore["annotation"])
@@ -507,13 +589,36 @@ async def probe(adapter, source, directory, mode="paired_dimensions"):
                         if mode == "dimension_select2"
                         else BoreSelector.NAMED_DIMENSION,
                     )
-                else:
+                elif mode == "shoulder_false":
                     _early_bound(
                         annotation.GetSpecificAnnotation(), "IDatumTag"
                     ).Shoulder = False
+                if mode in {"edge_reattach", "dimension_attach"}:
+                    target = bore["display"]
+                    kind = 14
+                    if mode == "edge_reattach":
+                        if (
+                            before["attachment_types"] != (1,)
+                            or len(before_handles) != 4
+                        ):
+                            raise RuntimeError(
+                                "positive control requires one original native edge"
+                            )
+                        target, kind = before_handles[3], 1
+                    trial["explicit_attachment"] = {}
+                    explicit_attach(
+                        adapter,
+                        bore,
+                        annotation,
+                        target,
+                        kind,
+                        trial["explicit_attachment"],
+                    )
                 native, native_handles = datum_state(adapter, bore, annotation)
                 trial["native"] = native
                 trial["native_export"] = export(f"{mode}-native")
+                if "explicit_attachment" in trial:
+                    require_explicit_attachment(trial["explicit_attachment"])
                 if (
                     native["frame_witness"] != "rectangle"
                     or native["measurement"] is None
@@ -524,7 +629,13 @@ async def probe(adapter, source, directory, mode="paired_dimensions"):
                 if native["binding_error"]:
                     raise RuntimeError(native["binding_error"])
                 if (
-                    mode in {"dimension", "dimension_placed", "dimension_select2"}
+                    mode
+                    in {
+                        "dimension",
+                        "dimension_placed",
+                        "dimension_select2",
+                        "dimension_attach",
+                    }
                     and native["binding"] != "exact_display_dimension"
                 ):
                     raise RuntimeError(
@@ -540,13 +651,20 @@ async def probe(adapter, source, directory, mode="paired_dimensions"):
                     without_datum(attachments.snapshot(adapter.currentModel), key),
                     "native mechanism",
                 )
-                target, direction = outboard_target(
-                    native["position"],
-                    Rect(**native["measurement"]["body"]),
-                    Rect(*bore["view"].GetOutline()),
+                target, direction = native["position"], "unchanged_positive_control"
+                if mode != "edge_reattach":
+                    target, direction = outboard_target(
+                        native["position"],
+                        Rect(**native["measurement"]["body"]),
+                        Rect(*bore["view"].GetOutline()),
+                    )
+                    trial["placement"] = {"requested": target, "direction": direction}
+                    trial["placement"]["returned"] = bool(
+                        annotation.SetPosition2(*target)
+                    )
+                trial.setdefault(
+                    "placement", {"requested": target, "direction": direction}
                 )
-                trial["placement"] = {"requested": target, "direction": direction}
-                trial["placement"]["returned"] = bool(annotation.SetPosition2(*target))
                 after, after_handles = datum_state(adapter, bore, annotation)
                 trial["after"] = after
                 trial["placement"]["xy_error_m"] = math.dist(
@@ -604,7 +722,12 @@ def main():
     parser.add_argument("drawing", type=Path)
     parser.add_argument(
         "--mode",
-        choices=("paired_dimensions", "paired_selectors", "shoulder_false"),
+        choices=(
+            "paired_dimensions",
+            "paired_selectors",
+            "paired_attachments",
+            "shoulder_false",
+        ),
         default="paired_dimensions",
     )
     parser.add_argument("--worker", action="store_true")
