@@ -34,6 +34,7 @@ def repair_project_drawing_layout(
     geometry or substitute for measured final fit. An unfit sheet is not exported.
     """
     from _drawing_annotation_bounds import annotation_box
+    from _drawing_native_callouts import GtolPlacement, arrange_native_callouts
     from _drawing_native_gtol import arrange_native_gtol_columns
     from _drawing_measurement_handoff import AnnotationMeasurementHandoff
     from _drawing_native_layout import NativeLayoutStatus, repair_native_layout
@@ -53,6 +54,13 @@ def repair_project_drawing_layout(
         adapter, views=views, measure_annotation=annotation_box
     )
     try:
+        arrange_native_callouts(
+            adapter,
+            views=views,
+            measure_annotation=annotation_box,
+            gtol_placement=GtolPlacement.ARRANGED_NEXT,
+            deferred_notes=tuple(note.annotation for note in notes),
+        )
         arrange_native_gtol_columns(
             adapter,
             views=views,
@@ -82,6 +90,7 @@ def repair_project_drawing_layout(
         layout_report=json.dumps(asdict(report), default=lambda value: value.value),
     )
     if report.status in (NativeLayoutStatus.NO_FIT, NativeLayoutStatus.SEARCH_LIMIT):
-        raise RuntimeError(f"native drawing layout {report.status.value}: {report.reason}")
+        raise RuntimeError(
+            f"native drawing layout {report.status.value}: {report.reason}"
+        )
     return report
-
