@@ -393,3 +393,128 @@ def test_live_worker_preserves_source_hashes_even_if_cleanup_refuses(tmp_path):
         )
     assert report["source_hashes"] == report["source_hashes_after"]
     assert Path(report_path).is_file()
+
+
+def test_sf_scope_writes_only_sf_defaults_and_no_annotation_property(monkeypatch):
+    monkeypatch.setattr(
+        probe.shoulder,
+        "_installed_swconst",
+        lambda: SimpleNamespace(
+            swDetailingNoOptionSpecified=0,
+            swDetailingSFSymbolUseDocBentLeaderLength=1002,
+            swDetailingSFSymbolBentLeaderLength=2002,
+        ),
+    )
+    state = {"toggle": True, "length": probe.DOCUMENT_LENGTH_M}
+    calls = []
+
+    def toggle(pref, option, value):
+        assert (pref, option) == (1002, 0)
+        calls.append(("toggle", value))
+        state["toggle"] = value
+        return True
+
+    def length(pref, option, value):
+        assert (pref, option) == (2002, 0)
+        calls.append(("length", value))
+        state["length"] = value
+        return True
+
+    extension = SimpleNamespace(
+        GetUserPreferenceDouble=lambda pref, option: state["length"],
+        GetUserPreferenceToggle=lambda pref, option: state["toggle"],
+        SetUserPreferenceToggle=toggle,
+        SetUserPreferenceDouble=length,
+    )
+    probe.apply_length_scope(object(), extension, probe.LengthScope.SF_DEFAULT)
+    assert calls == [("toggle", False), ("length", 0.00635)]
+    assert state == {"toggle": False, "length": 0.00635}
+
+
+def sf_observed(length):
+    # Native saved rocker: SF leader starts1.75mm left of GetPosition, with
+    # document length from symbol anchor to elbow. These are observed fixture
+    # values only, not constants used by the production/control geometry reader.
+    anchor = (0.12394376819090107, 0.19889662958647428, -0.003528249992)
+    start = (0.12219376819090107, anchor[1], anchor[2])
+    elbow = (anchor[0] + length, anchor[1], anchor[2])
+    endpoint = (0.1239437681909011, 0.17853977139432853, anchor[2])
+    return {
+        **observed(length),
+        "kind": 7,
+        "position": anchor,
+        "key": "Sheet1/Drawing View1/DetailItem350",
+        "inventory_key": "Drawing View1/DetailItem350",
+        "sf_properties": {"symbol": 9, "orientation": 1, "texts": ("Ra 1.6",)},
+        "length_readback_m": -1.0,
+        "horizontal_length_m": length + 0.00175,
+        "effective_length_m": length,
+        "symbol_stub_m": 0.00175,
+        "leader_points": (*start, *elbow, *endpoint),
+    }
+
+
+def test_sf_effective_length_preserves_actual_symbol_stub_and_exact_endpoints():
+    probe.verify_override(
+        sf_observed(probe.DOCUMENT_LENGTH_M),
+        sf_observed(0.00635),
+        probe.DOCUMENT_LENGTH_M,
+        scope=probe.LengthScope.SF_DEFAULT,
+    )
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("symbol_stub_m", 0.002),
+        ("effective_length_m", 0.073),
+        ("horizontal_length_m", 0.00635),
+        ("effective_length_m", float("nan")),
+        ("sf_properties", {"symbol": 0, "orientation": 3, "texts": ("Ra 3.2",)}),
+    ],
+)
+def test_sf_body_stub_or_value_change_cannot_be_hidden_by_document_getter(field, value):
+    with pytest.raises(RuntimeError):
+        probe.verify_override(
+            sf_observed(probe.DOCUMENT_LENGTH_M),
+            {**sf_observed(0.00635), field: value},
+            probe.DOCUMENT_LENGTH_M,
+            scope=probe.LengthScope.SF_DEFAULT,
+        )
+
+
+@pytest.mark.parametrize(
+    "key",
+    ["Sheet1/DetailItem324", "Sheet1/DetailItem325", "Drawing View1/DetailItem353"],
+)
+def test_sf_allowance_does_not_include_template_or_gtol_layout_changes(key):
+    with pytest.raises(RuntimeError, match="other annotation"):
+        probe.verify_layout_changes({key: {}}, sf_observed(0.00635))
+
+
+@pytest.mark.parametrize("owner_type", [1, 2])
+def test_sf_target_rejects_sheet_or_template_ownership(
+    monkeypatch, tmp_path, owner_type
+):
+    monkeypatch.setattr(probe, "_early_bound", lambda value, _: value)
+    part = tmp_path / "rocker-arm.SLDPRT"
+    source = SimpleNamespace(GetPathName=lambda: str(part))
+    view = SimpleNamespace(
+        ReferencedDocument=source,
+        Position=(0, 0),
+        ScaleDecimal=1,
+        GetOutline=lambda: (0, 0, 0.1, 0.1),
+        ReferencedConfiguration="Default",
+    )
+    annotation = SimpleNamespace(
+        GetType=lambda: 7, Visible=1, OwnerType=owner_type, Owner=view
+    )
+    specific = SimpleNamespace(GetAnnotation=lambda: annotation)
+    annotation.GetSpecificAnnotation = lambda: specific
+    view.GetAnnotationsByType = lambda kind: (annotation,)
+    monkeypatch.setattr(probe.attachments, "views", lambda _: {"view": view})
+    adapter = SimpleNamespace(
+        swApp=SimpleNamespace(IsSame=lambda a, b: int(a is b)), currentModel=object()
+    )
+    with pytest.raises(RuntimeError, match="owner roundtrip"):
+        probe.capture_target(adapter, part, probe.LengthScope.SF_DEFAULT)

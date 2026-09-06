@@ -1,4 +1,4 @@
-"""One native GTol length override on a coherent saved rocker drawing COPY.
+"""One native annotation-family length control on a saved rocker drawing COPY.
 
 The documented Insert_GTol C# example sets IAnnotation.BentLeaderLength after
 SetLeader3(swBENT). This control starts with an existing swBENT GTol and changes
@@ -32,6 +32,13 @@ leader was 6.35 mm immediately and after rebuild/reopen while its getter stayed
 identical to the positive individual-override control; no production route is
 changed by this diagnostic. The native toggle setter returned True with an OFF
 getter, contrary to its reference page's resulting-state return description.
+
+--length-scope sf_default is the independent surface-finish-family control:
+one visible model-view symbol, no annotation or GTol-default writes. Its native
+symbol-side horizontal extension is measured, preserved, and reported separately
+from the configured anchor-to-elbow length. Other view and sheet-format symbols
+remain in the exact unchanged full-inventory gate; they are never implicitly
+included in the intended-change allowance.
 """
 
 from __future__ import annotations
@@ -73,17 +80,28 @@ class UpdateBoundary(StrEnum):
 class LengthScope(StrEnum):
     ANNOTATION = "annotation"
     GTOL_DEFAULT = "gtol_default"
+    SF_DEFAULT = "sf_default"
 
 
 def gtol_defaults(extension):
+    return family_defaults(extension, LengthScope.GTOL_DEFAULT)
+
+
+def family_defaults(extension, scope):
     constants = shoulder._installed_swconst()
     option = int(constants.swDetailingNoOptionSpecified)
-    toggle = int(constants.swDetailingGtolUseDocBentLeaderLength)
-    length = int(constants.swDetailingGtolBentLeaderLength)
+    if scope is LengthScope.GTOL_DEFAULT:
+        toggle = int(constants.swDetailingGtolUseDocBentLeaderLength)
+        length = int(constants.swDetailingGtolBentLeaderLength)
+    elif scope is LengthScope.SF_DEFAULT:
+        toggle = int(constants.swDetailingSFSymbolUseDocBentLeaderLength)
+        length = int(constants.swDetailingSFSymbolBentLeaderLength)
+    else:
+        raise ValueError("document-default getter needs one explicit annotation family")
     value = float(extension.GetUserPreferenceDouble(length, option))
     if not math.isfinite(value) or value <= 0:
         raise RuntimeError(
-            "GTol-family native default length must be positive and finite"
+            "annotation-family native default length must be positive and finite"
         )
     return {
         "use_global_document_length": bool(
@@ -96,14 +114,14 @@ def gtol_defaults(extension):
     }
 
 
-def verify_gtol_defaults(state):
+def verify_family_defaults(state):
     if (
         state["use_global_document_length"]
         or not math.isfinite(state["length_m"])
         or abs(state["length_m"] - OVERRIDE_LENGTH_M) > EPSILON
     ):
         raise RuntimeError(
-            "native GTol-family default did not retain its independent 6.35mm policy"
+            "native annotation-family default did not retain its independent 6.35mm policy"
         )
 
 
@@ -111,9 +129,9 @@ def apply_length_scope(annotation, extension, scope):
     if scope is LengthScope.ANNOTATION:
         annotation.BentLeaderLength = OVERRIDE_LENGTH_M
         return {"operation": scope.value}
-    if scope is not LengthScope.GTOL_DEFAULT:
+    if scope not in {LengthScope.GTOL_DEFAULT, LengthScope.SF_DEFAULT}:
         raise ValueError("unknown native length scope")
-    before = gtol_defaults(extension)
+    before = family_defaults(extension, scope)
     toggle_returned = bool(
         extension.SetUserPreferenceToggle(
             before["toggle_enum"], before["option_enum"], False
@@ -127,7 +145,7 @@ def apply_length_scope(annotation, extension, scope):
     )
     if toggle_actual:
         raise RuntimeError(
-            "GTol-family default still inherits the global document length"
+            "annotation-family default still inherits the global document length"
         )
     length_returned = bool(
         extension.SetUserPreferenceDouble(
@@ -136,10 +154,10 @@ def apply_length_scope(annotation, extension, scope):
     )
     if not length_returned:
         raise RuntimeError(
-            "native GTol-family default length setter rejected its value"
+            "native annotation-family default length setter rejected its value"
         )
-    after = gtol_defaults(extension)
-    verify_gtol_defaults(after)
+    after = family_defaults(extension, scope)
+    verify_family_defaults(after)
     return {
         "operation": scope.value,
         "before": before,
@@ -163,7 +181,7 @@ def update_boundary(model, boundary):
 
 def verify_layout_changes(changes, target):
     if set(changes) - {target["inventory_key"]}:
-        raise RuntimeError("one GTol setter changed other annotation native layout")
+        raise RuntimeError("one family control changed other annotation native layout")
 
 
 def document_state(document):
@@ -264,13 +282,16 @@ class ExistingSessionCopy(shoulder.OwnedDrawingCopy):
         self.paths, self.titles = {self.expected}, {}
 
 
-def capture_target(adapter, part):
+def capture_target(adapter, part, scope=LengthScope.ANNOTATION):
     app = adapter.swApp
+    kind, interface = (
+        (7, "ISFSymbol") if scope is LengthScope.SF_DEFAULT else (5, "IGtol")
+    )
     candidates, contexts, handles = {}, {}, {}
     for view_key, view in attachments.views(adapter.currentModel).items():
         source = _early_bound(view.ReferencedDocument, "IModelDoc2")
         if source is None or Path(source.GetPathName()).resolve() != part:
-            raise RuntimeError("GTol control view has an unguarded source reference")
+            raise RuntimeError("length control view has an unguarded source reference")
         contexts[view_key] = {
             "position": tuple(view.Position),
             "scale": float(view.ScaleDecimal),
@@ -279,25 +300,74 @@ def capture_target(adapter, part):
             "source": str(part),
         }
         handles[view_key] = (view, source)
-        for raw in view.GetAnnotationsByType(5) or ():
+        for raw in view.GetAnnotationsByType(kind) or ():
             annotation = _early_bound(raw, "IAnnotation")
-            gtol = _early_bound(annotation.GetSpecificAnnotation(), "IGtol")
+            specific = _early_bound(annotation.GetSpecificAnnotation(), interface)
             if (
-                int(annotation.GetType()) != 5
+                int(annotation.GetType()) != kind
                 or int(annotation.Visible) != 1
                 or int(annotation.OwnerType) != 0
                 or int(app.IsSame(annotation.Owner, view)) != 1
-                or int(app.IsSame(gtol.GetAnnotation(), annotation)) != 1
+                or int(app.IsSame(specific.GetAnnotation(), annotation)) != 1
             ):
-                raise RuntimeError("GTol exact annotation/owner roundtrip failed")
+                raise RuntimeError("target exact annotation/owner roundtrip failed")
+            if kind == 7:
+                entities = tuple(annotation.GetAttachedEntities3() or ())
+                kinds = tuple(annotation.GetAttachedEntityTypes() or ())
+                if (
+                    len(entities) != 1
+                    or kinds not in {(1,), (2,)}
+                    or entities[0] is None
+                    or int(annotation.GetAttachedEntityCount3()) != 1
+                ):
+                    raise RuntimeError(
+                        "SF target must retain one exact model edge or face attachment"
+                    )
             key = f"{view_key}/{annotation.GetName()}"
             if key in candidates:
-                raise RuntimeError("GTol native name is duplicated")
+                raise RuntimeError("target native name is duplicated")
             candidates[key] = (annotation, f"{view.GetName2()}/{annotation.GetName()}")
     if len(candidates) != 1:
-        raise RuntimeError("bounded rocker control requires exactly one visible GTol")
+        raise RuntimeError(
+            f"bounded rocker control requires exactly one visible view-owned kind {kind} target"
+        )
     key, (annotation, inventory_key) = next(iter(candidates.items()))
     record = leader_record(annotation)
+    record["kind"] = kind
+    if kind == 7:
+        symbol = _early_bound(annotation.GetSpecificAnnotation(), "ISFSymbol")
+        symbol_kind = int(symbol.GetSymbol())
+        if symbol_kind not in {0, 2, 9}:
+            raise RuntimeError(
+                "bounded SF control requires a supported non-JIS native symbol"
+            )
+        count = int(symbol.GetTextCount())
+        if count < 1 or count > 10000:
+            raise RuntimeError("native SF target must have supported nonempty text")
+        record["sf_properties"] = {
+            "symbol": symbol_kind,
+            "orientation": int(symbol.Orientation),
+            "angle": float(symbol.GetAngle()),
+            "lay": int(symbol.GetDirectionOfLay()),
+            "all_around": bool(symbol.GetSymbolAllAround()),
+            "semantic_text_fields": tuple(
+                str(symbol.GetText(index)) for index in range(1, 11)
+            ),
+        }
+        # Existing native evidence has a 1.75mm symbol-side stub preceding the
+        # anchor; document length runs from symbol GetPosition to the elbow.
+        if abs(record["position"][1] - record["leader_points"][4]) > EPSILON:
+            raise RuntimeError(
+                "SF native anchor is not on its horizontal leader segment"
+            )
+        record["effective_length_m"] = abs(
+            record["leader_points"][3] - record["position"][0]
+        )
+        record["symbol_stub_m"] = (
+            record["horizontal_length_m"] - record["effective_length_m"]
+        )
+        if record["symbol_stub_m"] < 0:
+            raise RuntimeError("SF anchor lies outside the measured shoulder segment")
     record.update(
         {
             "key": key,
@@ -357,16 +427,30 @@ def verify_override(before, after, document_after, *, scope=LengthScope.ANNOTATI
     ):
         if before[field] != after[field]:
             raise RuntimeError(f"per-GTol override changed {field}")
+    expected_horizontal = OVERRIDE_LENGTH_M
+    if scope is LengthScope.SF_DEFAULT:
+        if before["sf_properties"] != after["sf_properties"]:
+            raise RuntimeError("surface-finish native symbol/text properties changed")
+        if (
+            not math.isfinite(after["effective_length_m"])
+            or abs(after["effective_length_m"] - OVERRIDE_LENGTH_M) > EPSILON
+            or not math.isfinite(after["symbol_stub_m"])
+            or abs(before["symbol_stub_m"] - after["symbol_stub_m"]) > EPSILON
+        ):
+            raise RuntimeError(
+                "surface-finish effective leader length or symbol stub changed unexpectedly"
+            )
+        expected_horizontal += before["symbol_stub_m"]
     if (
         not math.isfinite(after["horizontal_length_m"])
-        or abs(after["horizontal_length_m"] - OVERRIDE_LENGTH_M) > EPSILON
+        or abs(after["horizontal_length_m"] - expected_horizontal) > EPSILON
     ):
         raise RuntimeError(
             "per-GTol override did not retain requested horizontal_length_m"
         )
     expected_getter = OVERRIDE_LENGTH_M
-    if scope is LengthScope.GTOL_DEFAULT:
-        # This is still a document-driven length, only at the GTol-family level.
+    if scope in {LengthScope.GTOL_DEFAULT, LengthScope.SF_DEFAULT}:
+        # This is still a document-driven length at the chosen family level.
         # IAnnotation.BentLeaderLength documents -1 for a document-driven default.
         expected_getter = -1.0
     if (
@@ -438,17 +522,33 @@ async def probe(
         )
         if abs(report["document_before_m"] - DOCUMENT_LENGTH_M) > EPSILON:
             raise RuntimeError("source is not the freshly passed global-length rocker")
-        report["before"], annotation, view_handles = capture_target(adapter, part)
+        report["before"], annotation, view_handles = capture_target(
+            adapter, part, scope
+        )
         report["gtol_defaults_before"] = gtol_defaults(adapter.currentModel.Extension)
-        if scope is LengthScope.GTOL_DEFAULT and (
-            not report["gtol_defaults_before"]["use_global_document_length"]
-            or report["before"]["length_readback_m"] != -1.0
-        ):
+        report["sf_defaults_before"] = family_defaults(
+            adapter.currentModel.Extension, LengthScope.SF_DEFAULT
+        )
+        active_defaults = (
+            "sf_defaults" if scope is LengthScope.SF_DEFAULT else "gtol_defaults"
+        )
+        if scope in {LengthScope.GTOL_DEFAULT, LengthScope.SF_DEFAULT}:
+            if (
+                not report[f"{active_defaults}_before"]["use_global_document_length"]
+                or report["before"]["length_readback_m"] != -1.0
+            ):
+                raise RuntimeError(
+                    "fresh source target does not inherit the global document default"
+                )
+        measured_length = (
+            "effective_length_m"
+            if scope is LengthScope.SF_DEFAULT
+            else "horizontal_length_m"
+        )
+        if abs(report["before"][measured_length] - DOCUMENT_LENGTH_M) > EPSILON:
             raise RuntimeError(
-                "fresh source GTol does not inherit the global document default"
+                "source target does not use the witnessed document length"
             )
-        if abs(report["before"]["horizontal_length_m"] - DOCUMENT_LENGTH_M) > EPSILON:
-            raise RuntimeError("source GTol does not use the witnessed document length")
         report["annotations_before"], all_handles = shoulder.all_annotation_layout(
             adapter
         )
@@ -473,7 +573,7 @@ async def probe(
         ):
             report["update"] = update_boundary(adapter.currentModel, boundary)
         report["after"], after_annotation, after_view_handles = capture_target(
-            adapter, part
+            adapter, part, scope
         )
         if int(app.IsSame(annotation, after_annotation)) != 1:
             raise RuntimeError("target annotation identity changed")
@@ -501,6 +601,9 @@ async def probe(
             adapter.currentModel.Extension
         )
         report["gtol_defaults_after"] = gtol_defaults(adapter.currentModel.Extension)
+        report["sf_defaults_after"] = family_defaults(
+            adapter.currentModel.Extension, LengthScope.SF_DEFAULT
+        )
         report["after_export"] = export("after")
         await owned.close()
         owned.expect_open(Path(report["after_export"]["drawing"]))
@@ -509,7 +612,7 @@ async def probe(
             await adapter.open_model(report["after_export"]["drawing"]),
         )
         owned.claim()
-        report["reopened"], _, _ = capture_target(adapter, part)
+        report["reopened"], _, _ = capture_target(adapter, part, scope)
         report["annotations_reopened"], _ = shoulder.all_annotation_layout(adapter)
         report["reopen_layout_changes"] = shoulder.compare_all_annotation_layout(
             app, report["annotations_after"], report["annotations_reopened"]
@@ -526,6 +629,9 @@ async def probe(
             adapter.currentModel.Extension
         )
         report["gtol_defaults_reopened"] = gtol_defaults(adapter.currentModel.Extension)
+        report["sf_defaults_reopened"] = family_defaults(
+            adapter.currentModel.Extension, LengthScope.SF_DEFAULT
+        )
         report["reopened_export"] = export("reopened")
         verify_override(
             report["before"], report["after"], report["document_after_m"], scope=scope
@@ -537,12 +643,15 @@ async def probe(
             scope=scope,
         )
         for phase in ("after", "reopened"):
-            if scope is LengthScope.GTOL_DEFAULT:
-                verify_gtol_defaults(report[f"gtol_defaults_{phase}"])
-            elif report[f"gtol_defaults_{phase}"] != report["gtol_defaults_before"]:
-                raise RuntimeError(
-                    "individual GTol override changed its family defaults"
-                )
+            if scope in {LengthScope.GTOL_DEFAULT, LengthScope.SF_DEFAULT}:
+                verify_family_defaults(report[f"{active_defaults}_{phase}"])
+            for family in ("gtol_defaults", "sf_defaults"):
+                if scope is not LengthScope.ANNOTATION and family == active_defaults:
+                    continue
+                if report[f"{family}_{phase}"] != report[f"{family}_before"]:
+                    raise RuntimeError(
+                        "length control changed another family's defaults"
+                    )
         verify_layout_changes(report["layout_changes"], report["before"])
         if report["reopen_layout_changes"]:
             raise RuntimeError("saved GTol copy changed native layout on reopen")
@@ -584,11 +693,11 @@ def main():
         raise ValueError("this control is bounded to the coherent rocker drawing/part")
     require_owned_diagnostic_environment()
     if (
-        args.length_scope is LengthScope.GTOL_DEFAULT
+        args.length_scope in {LengthScope.GTOL_DEFAULT, LengthScope.SF_DEFAULT}
         and args.update_boundary is not UpdateBoundary.EDIT_REBUILD
     ):
         raise ValueError(
-            "GTol-family default control requires one explicit edit_rebuild boundary"
+            "annotation-family default control requires one explicit edit_rebuild boundary"
         )
     if not args.worker:
         sys.path.insert(0, str(ROOT))
