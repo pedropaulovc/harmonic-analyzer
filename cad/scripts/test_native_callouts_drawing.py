@@ -183,6 +183,9 @@ class NativeAnnotation:
     def GetAttachedEntities3(self):
         return self.entities
 
+    def GetAttachedEntityCount3(self):
+        return len(self.entities)
+
     def GetAttachedEntityTypes(self):
         return (2,)
 
@@ -358,6 +361,14 @@ def test_full_final_measurement_still_runs_when_already_clear(monkeypatch):
     setup[2].position = (0.05, 0.15, 0)
     run_native(setup)
     assert len(setup[4][setup[2].GetName()]) == 2
+
+
+def test_native_attachment_count_cannot_hide_truncated_return_arrays(monkeypatch):
+    setup = native_setup(monkeypatch)
+    setup[2].GetAttachedEntityCount3 = lambda: 2
+    with pytest.raises(RuntimeError, match="exact callout attachments"):
+        run_native(setup)
+    assert not setup[2].moves
 
 
 def test_witnessed_native_datum_frame_flip_is_not_mistaken_for_deformation():
