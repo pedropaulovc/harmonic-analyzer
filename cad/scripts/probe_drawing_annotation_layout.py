@@ -9,6 +9,7 @@ individual rejected call shapes remain in layout.json, including no-op successes
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 from dataclasses import fields
 import hashlib
 import json
@@ -88,6 +89,18 @@ def _validate_reopened_surface(before: dict[str, Any], after: dict[str, Any]) ->
         raise RuntimeError("saved SF rendered glyphs do not match requested typography")
 
 
+def _validate_surface_inventory(before: list[dict[str, Any]], after: list[dict[str, Any]]) -> None:
+    """Require every saved symbol exactly once before indexing by its name."""
+    expected = Counter(item["name"] for item in before)
+    actual = Counter(item["name"] for item in after)
+    if not expected or any(not name or count != 1 for name, count in expected.items()):
+        raise RuntimeError(f"SF inventory baseline is empty or ambiguous: {dict(expected)}")
+    if actual != expected:
+        raise RuntimeError(
+            f"saved SF inventory changed after reopen: expected={dict(expected)}, actual={dict(actual)}"
+        )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("drawing", type=Path)
@@ -147,6 +160,8 @@ def main() -> int:
                 )
             surfaces.append(_early_bound(explicit.GetAnnotation(), "IAnnotation"))
             report["explicit_control"] = _surface(surfaces[-1])
+            baseline = [_surface(annotation) for annotation in surfaces]
+            _validate_surface_inventory(baseline, baseline)
             originals = {annotation.GetName(): tuple(annotation.GetAttachedEntities3()) for annotation in surfaces}
             geometries = {annotation.GetName(): _attachment_geometry(annotation) for annotation in surfaces}
             report["attachment_geometry_before"] = geometries
@@ -174,7 +189,9 @@ def main() -> int:
                 raise RuntimeError(f"layout copy export failed: {outputs}")
             render_pdf_png(pdf, folder / "layout.png")
             report["stage"] = "reopen"
-            expected = {annotation.GetName(): _surface(annotation) for annotation in surfaces}
+            saved = [_surface(annotation) for annotation in surfaces]
+            _validate_surface_inventory(baseline, saved)
+            expected = {state["name"]: state for state in saved}
             check("close styled layout copy", await adapter.close_model(save=False))
             check("reopen styled layout copy", await adapter.open_model(str(copy)))
             if Path(adapter.currentModel.GetPathName()).resolve() != copy:
@@ -183,6 +200,7 @@ def main() -> int:
             views = [_early_bound(view, "IView") for sheet in reopened.GetViews() or () for view in sheet[1:]]
             surfaces = [_early_bound(annotation, "IAnnotation") for view in views for annotation in view.GetAnnotationsByType(7) or ()]
             report["surface_reopened"] = [_surface(annotation) for annotation in surfaces]
+            _validate_surface_inventory(list(expected.values()), report["surface_reopened"])
             for annotation in surfaces:
                 state = _surface(annotation)
                 before = expected[state["name"]]

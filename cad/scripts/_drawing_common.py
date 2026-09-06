@@ -2043,6 +2043,11 @@ def retain_view_dimensions(
     callouts. Import-time coordinate writes would be both redundant and dependent
     on an earlier view layout. Validate multiplicity, not just set membership:
     two imported dimensions with the same short name are ambiguous.
+
+    Read the actual view back after curation: the adapter's returned survivor
+    list is not evidence that deletion succeeded. Individual visibility is
+    required too; IAnnotation.Visible does not certify layer visibility or the
+    final rendered ink, which remain drawing-layout validation concerns.
     """
     expected = tuple(keep)
     if any(not isinstance(name, str) or not name for name in expected):
@@ -2061,7 +2066,27 @@ def retain_view_dimensions(
             f"{view_label} view model dimension mismatch: "
             f"expected={sorted(expected)}, actual={dict(present)}"
         )
-    return curated
+    view = _early_bound(view, "IView")
+    observed = []
+    for raw in view.GetAnnotationsByType(_ANNOT_DIM) or ():
+        if raw is None:
+            raise RuntimeError(f"{view_label} view model dimension mismatch: missing annotation")
+        observed.append(_early_bound(raw, "IAnnotation"))
+    present = Counter(dimension_name(adapter, annotation) for annotation in observed)
+    if present != Counter(expected):
+        raise RuntimeError(
+            f"{view_label} view model dimension mismatch after curation: "
+            f"expected={sorted(expected)}, actual={dict(present)}"
+        )
+    for annotation in observed:
+        # swAnnotationVisibilityState_e.swAnnotationVisible=1. Hidden and
+        # half-hidden annotations must not silently satisfy a print contract.
+        if int(annotation.Visible) != 1:
+            raise RuntimeError(
+                f"{view_label} retained dimension {dimension_name(adapter, annotation)!r} "
+                "is not individually visible"
+            )
+    return observed
 
 
 @_telemetry.traced("drawing.curate_dimensions", label_param="view_label")
