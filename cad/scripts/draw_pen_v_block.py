@@ -26,7 +26,7 @@ from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
-    add_edge_dimension,
+    add_entity_dimension,
     add_feature_control_frame,
     add_property_linked_note,
     add_surface_finish,
@@ -42,12 +42,15 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_entities import CircleEdge, LineEdge, ModelEntities
+from _gtol_spec import PlanarFace
 from _surface_finish import surface_finish_by_key
 from pen_v_block_spec import (
     BLOCK_DEPTH,
     BLOCK_HEIGHT,
     BLOCK_LENGTH,
     BORE_X,
+    BORE_DIA,
     CHAMFER,
     SCREW_HOLE_XY,
     GROOVE_DEPTH,
@@ -228,12 +231,20 @@ async def build(adapter: Any) -> dict[str, str]:
     # around the view center. The bottom edge is interrupted by the marker
     # groove (GROOVE_Z0..GROOVE_Z0 + GROOVE_WIDTH across the depth), so pick
     # it on the remaining land beside the groove, not at mid-depth.
-    _bottom_land_x = RIGHT_CENTER[0] - RIGHT_HALF_Z + GROOVE_Z0 / 2.0 * SHEET_SCALE[0] / 1000.0
-    add_edge_dimension(
+    entities = ModelEntities(front.ReferencedDocument).resolve({
+        "bottom_front": LineEdge((BLOCK_LENGTH / 2.0, 0, 0), (1, 0, 0)),
+        "bottom_land": LineEdge((BLOCK_LENGTH, 0, GROOVE_Z0 / 2.0), (0, 0, 1)),
+        "top_end": LineEdge((BLOCK_LENGTH - CHAMFER, BLOCK_HEIGHT, GROOVE_Z0 / 2.0), (0, 0, 1)),
+        "left_end": PlanarFace((-1, 0, 0), 0),
+        "broad": PlanarFace((0, 0, -1), 0),
+        "top": PlanarFace((0, 1, 0), BLOCK_HEIGHT),
+        "bore0": CircleEdge(BORE_DIA / 2.0, (BORE_X[0], BLOCK_HEIGHT, BLOCK_DEPTH / 2.0), (0, 1, 0)),
+        "bore1": CircleEdge(BORE_DIA / 2.0, (BORE_X[1], BLOCK_HEIGHT, BLOCK_DEPTH / 2.0), (0, 1, 0)),
+    })
+    add_entity_dimension(
         adapter,
         right,
-        p0=(_bottom_land_x, RIGHT_CENTER[1] - RIGHT_HALF_Y),
-        p1=(RIGHT_CENTER[0], RIGHT_CENTER[1] + RIGHT_HALF_Y),
+        entities=(entities["bottom_land"], entities["top_end"]),
         text_xy=(RIGHT_CENTER[0] + RIGHT_HALF_Z + 0.014, RIGHT_CENTER[1]),
         label="block-height overall",
     )
@@ -255,7 +266,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         front,
-        edge_xy=(_sheet_x(30.0), _front_y(0.0)),
+        entity=entities["bottom_front"],
         symbol_xy=(_sheet_x(30.0), _front_y(0.0) - 0.008),
         datum="A",
         label="block bottom face",
@@ -263,7 +274,8 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         top,
-        edge_xy=(_sheet_x(0.0), TOP_CENTER[1]),
+        entity=entities["left_end"],
+        entity_type="FACE",
         symbol_xy=(_sheet_x(0.0) - 0.018, TOP_CENTER[1]),
         datum="B",
         label="block left end",
@@ -271,7 +283,8 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         right,
-        edge_xy=(RIGHT_CENTER[0] - RIGHT_HALF_Z, RIGHT_CENTER[1]),
+        entity=entities["broad"],
+        entity_type="FACE",
         # -0.010, not -0.016: symbol_xy is the box's RIGHT edge here (the leader
         # arrives from the right), so the 7.1 mm box grows LEFT -- at -0.016 it
         # spanned x 0.2097..0.2168 and the ScrewHoleCz dimension line, vertical at
@@ -281,11 +294,10 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="C",
         label="block broad face",
     )
-    bore0_edge = (_sheet_x(BORE_X[0]) + 0.016, TOP_CENTER[1])
     add_feature_control_frame(
         adapter,
         top,
-        edge_xy=bore0_edge,
+        entity=entities["bore0"],
         frame_xy=(0.198, 0.196),
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["pen bore position"],
@@ -297,7 +309,8 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         right,
-        edge_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] + RIGHT_HALF_Y),
+        entity=entities["top"],
+        entity_type="FACE",
         frame_xy=(0.300, 0.165),
         characteristic="parallelism",
         tolerance=GEOMETRIC_TOLERANCES_MM["block top-face parallelism"],
@@ -327,7 +340,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         top,
-        edge_xy=(_sheet_x(BORE_X[0]), TOP_CENTER[1] + 0.016),  # bore 0, top edge
+        entity=entities["bore0"],
         symbol_xy=(0.205, 0.244),
         control=surface_finish_by_key(SURFACE_FINISHES, "pen_bore_0"),
         label="pen bore finish (bore 0)",
@@ -335,11 +348,10 @@ async def build(adapter: Any) -> dict[str, str]:
     # Bore 1's RIGHT silhouette point (x 30) now coincides with the top chamfer's
     # start line in the top view (BLOCK_LENGTH - CHAMFER = 30), so the pick
     # grabbed that edge instead of the circle; pick the LEFT point (x 22).
-    bore1_edge = (_sheet_x(BORE_X[1]) - 0.016, TOP_CENTER[1])
     add_surface_finish(
         adapter,
         top,
-        edge_xy=bore1_edge,
+        entity=entities["bore1"],
         symbol_xy=(0.205, 0.220),
         control=surface_finish_by_key(SURFACE_FINISHES, "pen_bore_1"),
         label="pen bore finish (bore 1)",

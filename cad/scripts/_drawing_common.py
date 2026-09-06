@@ -2214,6 +2214,8 @@ def add_entity_dimension(
     Use horizontal/vertical for directed distances and smart for unambiguous
     circle-centre distances. Angular endpoint choices need their own contract.
     """
+    if len(entities) != 2:
+        raise ValueError(f"{label} requires exactly two model entities")
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
     if not ddoc.ActivateView(view_name(adapter, view)):
