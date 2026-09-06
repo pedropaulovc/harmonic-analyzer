@@ -148,13 +148,13 @@ class _Line:
         return math.dist(nearest, spec.point_mm) <= spec.tolerance_mm
 
 
-def _edge_geometry(raw_edge: Any, *, circles: bool, lines: bool) -> _Circle | _Line | None:
+def _edge_geometry(raw_edge: Any, *, kinds: frozenset[type]) -> _Circle | _Line | None:
     edge = _early_bound(raw_edge, "IEdge")
     curve = _early_bound(edge.GetCurve(), "ICurve")
-    if circles and curve.IsCircle():
+    if CircleEdge in kinds and curve.IsCircle():
         params = tuple(curve.CircleParams)
         return _Circle(edge, tuple(v * 1000 for v in params[:3]), tuple(params[3:6]), params[6] * 1000)
-    if lines and curve.IsLine():
+    if LineEdge in kinds and curve.IsLine():
         start, end = edge.GetStartVertex(), edge.GetEndVertex()
         if start is None or end is None:
             return None
@@ -231,11 +231,12 @@ class _ScopedEntities:
             )["face"]
         face = _early_bound(self.resolve(spec.face), "IFace2")
         matches = []
+        kinds = frozenset({type(spec.edge)})
         with _telemetry.span("drawing.collect_edges", scope=f"boundary of {spec.face!r}", roles=1) as span:
             edges = tuple(face.GetEdges() or ())
             span.set_attribute("edges", len(edges))
             for edge in edges:
-                geometry = _edge_geometry(edge, circles=isinstance(spec.edge, CircleEdge), lines=isinstance(spec.edge, LineEdge))
+                geometry = _edge_geometry(edge, kinds=kinds)
                 if geometry is not None and geometry.matches(spec.edge):
                     matches.append(geometry.entity)
         if len(matches) != 1:
@@ -262,8 +263,7 @@ class ModelEntities:
         if not edge_roles and not vertex_roles:
             return resolved
 
-        circles_needed = any(isinstance(spec, CircleEdge) for spec in edge_roles.values())
-        lines_needed = any(isinstance(spec, LineEdge) for spec in edge_roles.values())
+        edge_kinds = frozenset(type(spec) for spec in edge_roles.values())
         matches: dict[str, list[Any]] = {key: [] for key in edge_roles}
         vertex_matches: dict[str, list[Any]] = {key: [] for key in vertex_roles}
         part = _early_bound(self.model, "IPartDoc")
@@ -286,7 +286,7 @@ class ModelEntities:
                 edge_count += len(raw_edges)
                 edge_span.set_attribute("edges", len(raw_edges))
                 for raw_edge in raw_edges:
-                    geometry = _edge_geometry(raw_edge, circles=circles_needed, lines=lines_needed)
+                    geometry = _edge_geometry(raw_edge, kinds=edge_kinds)
                     if geometry is None:
                         continue
                     for key, spec in edge_roles.items():

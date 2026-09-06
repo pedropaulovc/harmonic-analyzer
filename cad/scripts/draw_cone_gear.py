@@ -22,6 +22,7 @@ from _drawing_common import (
     add_feature_control_frame,
     add_property_linked_note,
     add_surface_finish,
+    auto_arrange_view_dimensions,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -163,6 +164,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     add_property_linked_note(adapter, "Gear Data", 0.018, 0.262)
     add_property_linked_note(adapter, "Manufacturing Notes", 0.018, 0.095)
+    auto_arrange_view_dimensions(adapter, (front, right, iso))
     return await finalize_drawing(
         adapter,
         OUTPUTS,
