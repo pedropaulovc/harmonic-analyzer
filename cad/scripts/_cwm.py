@@ -49,6 +49,8 @@ so a change here re-keys those assemblies alone, not the whole fleet.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+from dataclasses import dataclass
 from typing import Any
 
 import _telemetry
@@ -570,6 +572,55 @@ def ensure_component_distance_mate_flip(
         to_flip=expected,
     )
     return True
+
+
+@dataclass(frozen=True)
+class PreparedComponentPoses:
+    """Component handles and target transforms for one live assembly document.
+
+    Prepare only after the copied components exist. The caller may change mates
+    between resets, but must keep these components and the source document open.
+    A reset performs the same ordered Transform2 writes as put_component_pose;
+    it does not rebuild, add constraints, or change which DOF remain free.
+    """
+
+    _adapter: Any
+    _model: Any
+    _poses: tuple[tuple[Any, Any], ...]
+
+    def apply(self) -> None:
+        with _telemetry.span("cwm.pose_reset", components=len(self._poses)) as sp:
+            if self._adapter.currentModel is not self._model:
+                raise RuntimeError("prepared component poses: assembly document changed")
+            written = 0
+            try:
+                for component, transform in self._poses:
+                    component.Transform2 = transform
+                    written += 1
+            finally:
+                sp.set_attribute("pose_writes", written)
+
+
+def prepare_component_poses(
+    adapter: Any, targets: Iterable[tuple[str, list[float]]]
+) -> PreparedComponentPoses:
+    """Resolve each component and allocate its target transform once, without moving it.
+
+    Repeated resets between transient drivers previously looked up every component
+    and allocated the identical IMathTransform again. Keeping these handles within
+    the current document preserves the solver sequence while removing that work.
+    """
+    from solidworks_mcp.adapters.solidworks.assembly import _create_math_transform
+
+    rows = list(targets)
+    poses = []
+    with _telemetry.span("cwm.pose_prepare", components=len(rows)) as sp:
+        for name, array16 in rows:
+            component = _component(adapter, name)
+            transform = _create_math_transform(adapter, list(array16))
+            poses.append((component, transform))
+        sp.set_attribute("transform_allocations", len(poses))
+    return PreparedComponentPoses(adapter, adapter.currentModel, tuple(poses))
 
 
 def put_component_pose(adapter: Any, name: str, array16: list[float]) -> None:

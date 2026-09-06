@@ -170,7 +170,7 @@ from _cwm import (
     ensure_component_distance_mate_flip,
     external_mate_rows,
     mates_with_owners,
-    put_component_pose,
+    prepare_component_poses,
     resolve_entity,
 )
 from _transforms import (
@@ -1611,10 +1611,17 @@ async def build(adapter) -> dict[str, str]:
     # trace spent 173 s across those repeated pose-drive spans. Re-putting the
     # complete copied bank before each transient driver keeps every still-free
     # chain on its design branch while the current channel is committed.
-    def _put_all_copies() -> None:
-        for rec in copied:
-            for part in CHAIN_PARTS:
-                put_component_pose(adapter, rec["comps"][part], rec["targets"][part])
+    # Each driver's reset still writes every copy, in the same order. Resolve the
+    # component handles and allocate their identical target transforms once: at
+    # 18 copied channels the 54 resets otherwise repeat this work 3,888 times.
+    copied_poses = prepare_component_poses(
+        adapter,
+        (
+            (rec["comps"][part], rec["targets"][part])
+            for rec in copied
+            for part in CHAIN_PARTS
+        ),
+    )
 
     for rec in copied:
         j = rec["j"]
@@ -1637,7 +1644,7 @@ async def build(adapter) -> dict[str, str]:
         try:
             with _telemetry.span("cwm.pose_drive", channel=j):
                 drives: list[str] = []
-                _put_all_copies()
+                copied_poses.apply()
                 mate = await spin_driver(
                     adapter,
                     component_named_ref(rocker_c, "Axis2"),
@@ -1647,7 +1654,7 @@ async def build(adapter) -> dict[str, str]:
                     verify=(rocker_c, _tgt_mm("rocker-arm")),
                 )
                 drives.append(mate["name"])
-                _put_all_copies()
+                copied_poses.apply()
                 mate = await distance_driver(
                     adapter,
                     component_named_ref(bar_c, "Axis2"),
@@ -1661,7 +1668,7 @@ async def build(adapter) -> dict[str, str]:
                     verify=(bar_c, _tgt_mm("amplitude-bar")),
                 )
                 drives.append(mate["name"])
-                _put_all_copies()
+                copied_poses.apply()
                 if _CWM_DEBUG and j == copied[0]["j"]:
                     seed_comps = seed_by_amp[round(amplitudes[j], 6)][1]
                     for part in CHAIN_PARTS:
