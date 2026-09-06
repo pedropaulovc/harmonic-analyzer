@@ -10,9 +10,10 @@ SF leader style intentionally changes before placement. Its semantic/attachment
 witness must survive that change; its freshly measured post-style body supplies
 the placement seed. Candidate trials read only positions. Fresh final native
 bodies must match the predicted translations and clear all other measured bodies.
-Datums have two witnessed native body sides: crossing the attachment flips their
-frame above/below its anchor without changing text. Their placement envelope is
-the union of those two measured orientations; final ink must equal one of them.
+Datums have two witnessed native frame sides: crossing the attachment shifts the
+frame and its upright text above/below the anchor by the measured frame height.
+Their placement envelope is the union of those two translations; reflecting the
+whole text box is wrong when a datum carries below-frame callout text.
 Planning clearance (3 mm) is separate from final clearance (2 mm), not a claimed
 measurement error bound. Leader routing/crossings and sheet fit are NOT certified
 here; decorated-view packing follows this operation.
@@ -115,6 +116,7 @@ class _Symbol:
     properties: tuple[Any, ...]
     text: tuple[Any, ...]
     format: tuple[Any, ...]
+    frame: Rect | None = None
 
 
 @dataclass(frozen=True)
@@ -184,6 +186,36 @@ def _properties(kind: int, specific: Any) -> tuple[Any, ...]:
     return symbol, int(specific.GetDirectionOfLay()), all_around, orientation, texts
 
 
+def _datum_frame(measured: Any, position: tuple[float, float, float]) -> Rect:
+    from _drawing_annotation_bounds import _frame_lines
+
+    lines = _frame_lines(tuple(measured.native_strokes))
+    if len(lines) != 4:
+        raise RuntimeError("datum needs exactly one measured native rectangular frame")
+    points = tuple(point for line in lines for point in (line.start, line.end))
+    frame = Rect(
+        min(p[0] for p in points),
+        min(p[1] for p in points),
+        max(p[0] for p in points),
+        max(p[1] for p in points),
+    )
+    if any(
+        abs(line.start[0] - line.end[0]) > _EPSILON_M
+        and abs(line.start[1] - line.end[1]) > _EPSILON_M
+        for line in lines
+    ) or (
+        frame.xmax - frame.xmin <= _EPSILON_M
+        or frame.ymax - frame.ymin <= _EPSILON_M
+        or abs(position[0] - (frame.xmin + frame.xmax) / 2) > _EPSILON_M
+        or min(abs(position[1] - frame.ymin), abs(position[1] - frame.ymax))
+        > _EPSILON_M
+    ):
+        raise RuntimeError(
+            "datum frame must be upright with its native anchor on a horizontal side"
+        )
+    return frame
+
+
 def _read_symbol(
     adapter: Any, view: Any, annotation: Any, measure: Callable
 ) -> _Symbol:
@@ -236,6 +268,7 @@ def _read_symbol(
         properties,
         (text, _ink_content(measured)),
         tuple(measured.format_signature),
+        _datum_frame(measured, position) if kind == 2 else None,
     )
 
 
@@ -585,25 +618,21 @@ def _same_obstacles(app: Any, before: Mapping, after: Mapping) -> None:
             raise RuntimeError(f"{name}: obstacle native dimension identity changed")
 
 
-def _reflected_datum_body(symbol: _Symbol) -> Rect:
-    y = symbol.position[1]
-    return Rect(
-        symbol.body.xmin,
-        2 * y - symbol.body.ymax,
-        symbol.body.xmax,
-        2 * y - symbol.body.ymin,
-    )
+def _datum_side_delta(symbol: _Symbol) -> tuple[float, float]:
+    if symbol.frame is None:
+        raise RuntimeError("datum side change requires its measured native frame")
+    return 0.0, 2 * symbol.position[1] - symbol.frame.ymin - symbol.frame.ymax
 
 
 def _placement_body(symbol: _Symbol) -> Rect:
     if symbol.kind != 2:
         return symbol.body
-    reflected = _reflected_datum_body(symbol)
+    alternate = symbol.body.translated(_datum_side_delta(symbol))
     return Rect(
         symbol.body.xmin,
-        min(symbol.body.ymin, reflected.ymin),
+        min(symbol.body.ymin, alternate.ymin),
         symbol.body.xmax,
-        max(symbol.body.ymax, reflected.ymax),
+        max(symbol.body.ymax, alternate.ymax),
     )
 
 
@@ -622,7 +651,12 @@ def _place(symbol: _Symbol, outline: Rect, obstacles: Sequence[Rect], gap_m: flo
             raise RuntimeError(f"{symbol.name}: native callout position rejected")
         actual = _position(symbol.annotation)
         delta = actual[0] - symbol.position[0], actual[1] - symbol.position[1]
-        predicted = replace(symbol, position=actual, body=symbol.body.translated(delta))
+        predicted = replace(
+            symbol,
+            position=actual,
+            body=symbol.body.translated(delta),
+            frame=symbol.frame.translated(delta) if symbol.frame is not None else None,
+        )
         attempts.append(
             {"direction": candidate.direction.value, "target": target, "actual": actual}
         )
@@ -650,12 +684,28 @@ def _final_symbol(
     app: Any, initial: _Symbol, predicted: _Symbol, actual: _Symbol
 ) -> None:
     _same_symbol(app, initial, actual)
-    allowed_bodies = (predicted.body,)
+    allowed = ((predicted.body, predicted.frame),)
     if actual.kind == 2:
-        allowed_bodies += (_reflected_datum_body(predicted),)
+        side_delta = _datum_side_delta(predicted)
+        allowed += (
+            (
+                predicted.body.translated(side_delta),
+                predicted.frame.translated(side_delta),
+            ),
+        )
     body_matches = any(
         all(abs(a - b) <= _EPSILON_M for a, b in zip(body.bounds, actual.body.bounds))
-        for body in allowed_bodies
+        and (
+            frame is None
+            and actual.frame is None
+            or frame is not None
+            and actual.frame is not None
+            and all(
+                abs(a - b) <= _EPSILON_M
+                for a, b in zip(frame.bounds, actual.frame.bounds)
+            )
+        )
+        for body, frame in allowed
     )
     if (
         math.dist(predicted.position[:2], actual.position[:2]) > _EPSILON_M
@@ -669,8 +719,12 @@ def _final_symbol(
             predicted_position=predicted.position,
             actual_position=actual.position,
             initial_body=initial.body.bounds,
-            allowed_bodies=tuple(body.bounds for body in allowed_bodies),
+            allowed_bodies=tuple(body.bounds for body, _ in allowed),
             actual_body=actual.body.bounds,
+            allowed_frames=tuple(
+                frame.bounds if frame is not None else None for _, frame in allowed
+            ),
+            actual_frame=actual.frame.bounds if actual.frame is not None else None,
         )
         raise RuntimeError(
             f"{initial.name}: final native body did not match its post-style translation"
