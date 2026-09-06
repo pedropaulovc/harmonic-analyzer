@@ -72,7 +72,10 @@ def serial(symbol, data):
 def assert_witness(app, before, before_data, after, after_data):
     delta = tuple(b - a for a, b in zip(before.position[:2], after.position[:2]))
     predicted = replace(
-        before, position=after.position, body=before.body.translated(delta)
+        before,
+        position=after.position,
+        body=before.body.translated(delta),
+        frame=before.frame.translated(delta) if before.frame is not None else None,
     )
     callouts._final_symbol(app, before, predicted, after)
     if before_data["geometry"] != after_data["geometry"]:
