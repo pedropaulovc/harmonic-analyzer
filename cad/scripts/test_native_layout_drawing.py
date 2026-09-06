@@ -479,6 +479,84 @@ def test_already_fitting_layout_has_no_native_writes(monkeypatch):
     assert result.before_outlines == result.after_outlines
 
 
+@pytest.mark.parametrize("xmin", [-1, 1])
+def test_initial_measurement_handoff_is_used_once_then_always_fresh(monkeypatch, xmin):
+    front = View("front", Rect(xmin, 2, xmin + 2, 4))
+    annotation = Annotation("frame", Rect(xmin, 2, xmin + 1, 3), owner=front, kind=5)
+    front.annotations = [annotation]
+    adapter, options, _ = scene(monkeypatch, {"front": front})
+    calls, rebuilds = [], []
+
+    def initial(adapter, value):
+        calls.append(("initial", value))
+        return measure(adapter, value)
+
+    def fresh(adapter, value):
+        calls.append(("fresh", value))
+        return measure(adapter, value)
+
+    def rebuild():
+        rebuilds.append(True)
+        return True
+
+    adapter.currentModel.EditRebuild3 = rebuild
+    options["measure_annotation"] = fresh
+    result = native.repair_native_layout(
+        adapter, **options, initial_measure_annotation=initial
+    )
+    assert calls == [("initial", annotation), ("fresh", annotation)]
+    expected = (
+        native.NativeLayoutStatus.APPLIED
+        if xmin < 0
+        else native.NativeLayoutStatus.UNCHANGED
+    )
+    assert result.status is expected
+    assert len(rebuilds) == len(front.moves) == (1 if xmin < 0 else 0)
+
+
+@pytest.mark.parametrize("change", ["text", "bounds", "identity"])
+def test_unchanged_plan_does_not_accept_stale_initial_handoff(monkeypatch, change):
+    front = View("front", Rect(1, 2, 3, 4))
+    annotation = Annotation("frame", Rect(1, 2, 2, 3), owner=front, kind=5)
+    front.annotations = [annotation]
+    adapter, options, _ = scene(monkeypatch, {"front": front})
+
+    def initial(adapter, value):
+        cached = measure(adapter, value)
+        if change == "text":
+            annotation.text = "changed text after initial capture"
+        if change == "bounds":
+            annotation.rectangle = Rect(-1, 2, 2, 3)
+        if change == "identity":
+            front.annotations = [
+                Annotation("frame", Rect(1, 2, 2, 3), owner=front, kind=5)
+            ]
+        return cached
+
+    with pytest.raises(
+        RuntimeError, match="changed annotation|replaced annotation|remeasured native"
+    ):
+        native.repair_native_layout(
+            adapter, **options, initial_measure_annotation=initial
+        )
+    assert front.moves == []
+
+
+def test_initial_handoff_rejection_is_not_hidden_by_a_fresh_fallback(monkeypatch):
+    front = View("front", Rect(1, 2, 3, 4))
+    front.annotations = [Annotation("frame", Rect(1, 2, 2, 3), owner=front, kind=5)]
+    adapter, options, _ = scene(monkeypatch, {"front": front})
+
+    def initial(_adapter, _annotation):
+        raise RuntimeError("transaction-local witness changed")
+
+    with pytest.raises(RuntimeError, match="transaction-local witness changed"):
+        native.repair_native_layout(
+            adapter, **options, initial_measure_annotation=initial
+        )
+    assert front.moves == []
+
+
 def test_hidden_sheet_symbol_has_no_footprint_but_remains_in_manifest(monkeypatch):
     front = View("front", Rect(1, 2, 3, 4))
     hidden = Annotation("hidden-sf", Rect(-1, -1, 1, 1), kind=7)
