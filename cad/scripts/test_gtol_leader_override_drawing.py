@@ -149,6 +149,7 @@ def test_exact_owned_path_cannot_close_a_colliding_native_title(monkeypatch, tmp
 def observed(length):
     return {
         "key": "Drawing View1/GTol1",
+        "inventory_key": "Drawing View1/GTol1",
         "views": {"front": {"scale": 3}},
         "style": 2,
         "side": 1,
@@ -203,6 +204,35 @@ def test_document_policy_must_not_change():
             observed(probe.DOCUMENT_LENGTH_M),
             observed(probe.OVERRIDE_LENGTH_M),
             0.00635,
+        )
+
+
+def test_full_inventory_allowance_uses_native_view_key_not_sheet_qualified_key():
+    target = {
+        "key": "Sheet1/Drawing View1/GTol1",
+        "inventory_key": "Drawing View1/GTol1",
+    }
+    probe.verify_layout_changes({"Drawing View1/GTol1": {}}, target)
+    with pytest.raises(RuntimeError, match="other annotation"):
+        probe.verify_layout_changes({"Drawing View1/GTol2": {}}, target)
+
+
+def test_update_boundary_keeps_original_control_and_runs_one_checked_rebuild():
+    calls = []
+    model = SimpleNamespace(EditRebuild3=lambda: calls.append("rebuild") or True)
+    assert probe.update_boundary(model, probe.UpdateBoundary.IMMEDIATE) == {
+        "operation": "immediate"
+    }
+    assert calls == []
+    assert probe.update_boundary(model, probe.UpdateBoundary.EDIT_REBUILD) == {
+        "operation": "edit_rebuild",
+        "returned": True,
+    }
+    assert calls == ["rebuild"]
+    with pytest.raises(RuntimeError, match="rejected"):
+        probe.update_boundary(
+            SimpleNamespace(EditRebuild3=lambda: False),
+            probe.UpdateBoundary.EDIT_REBUILD,
         )
 
 
