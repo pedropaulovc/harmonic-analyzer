@@ -221,6 +221,35 @@ the final readback took 7.260 seconds. The build body took 44.695 seconds, versu
 observations under changing seat load, not a controlled net-speedup estimate.
 The handoff cannot survive the transaction or supply the final measurement.
 
+Datum and surface-finish placement now precedes GTol columns. Candidates come
+from measured view and annotation bodies; native `SetPosition2` readback decides
+where a symbol actually moved. Final attachment, content and body checks still
+run, followed by whole-sheet packing. The first integrated marker run at
+`116f2395` passed and moved the datum/finish text out of the part silhouette.
+Gear and rocker stopped before export because their datum could not return to
+its insertion position after a clamped trial. That restore requirement is under
+test; these failures do not show that subsequent absolute targets cannot work.
+
+Save/reopen controls exposed a separate specification bug: drawing-only BASIC
+edits on four imported lever dimensions disappeared when the source refreshed.
+`diagnostics/probe_source_basic_dimensions.py` authored BASIC on a unique copy of
+the source part, saved/reopened it, and relinked a copied drawing. All four BASIC
+boxes persisted, all eleven dimension values and supported attachment geometry
+were unchanged, and both original hashes matched. Ten imported dimensions across
+the lever, pedestal and pen v-block now declare BASIC in their source recipes;
+drawings check it read-only. Drawing-created reference dimensions remain local.
+The shared copy probe now checks tolerance type as well as value, including after
+save/reopen. Production rebuild checks for this wiring are still pending.
+
+The screw's cosmetic-thread coverage remains unresolved. Readback of its saved
+native feature found diameter zero and no stored standard or size, contradicting
+the builder's comment that the standard table supplies the diameter. Empty
+annotation display data therefore cannot establish that a correctly defined
+thread has no drawing ink. A suppression/restoration control also created a new
+thread-callout note on restoration, so its unequal A/A output is not a valid
+no-ink witness. `probe_drawing_thread_view.py` retains both controls. No projected
+face-box substitute or unsupported-thread omission has been accepted.
+
 The current bounds implementation is calibrated for SolidWorks 2026 (major
 revision 34) and the tested native font profile. It uses conservative GDI text
 cells, actual native frame/stroke geometry and native note extents, not nominal
