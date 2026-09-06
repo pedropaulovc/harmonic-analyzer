@@ -52,10 +52,11 @@ def revision(ref):
     ).stdout.strip()
 
 
-def redirected_tree(code, filename):
+def redirected_tree(code, filename, *, source=None):
     """Replace the recipe's output assignments before any code executes."""
     tree = ast.parse(code, filename)
-    declarations = 0
+    declarations = source_declarations = 0
+    redirected_names = _OUTPUT_NAMES | ({"SOURCE"} if source is not None else set())
     for node in tree.body:
         targets = (
             node.targets
@@ -70,9 +71,9 @@ def redirected_tree(code, filename):
             for part in ast.walk(target)
             if isinstance(part, ast.Name)
         }
-        if not names & _OUTPUT_NAMES:
+        if not names & redirected_names:
             continue
-        if not names <= _OUTPUT_NAMES:
+        if not names <= redirected_names:
             raise ValueError(f"mixed output declaration cannot be isolated: {names}")
         if len(targets) != 1:
             raise ValueError("chained output declarations cannot be isolated")
@@ -86,6 +87,8 @@ def redirected_tree(code, filename):
             raise ValueError("output declaration requires an assigned value")
         if "OUTPUTS" in names:
             declarations += 1
+        if "SOURCE" in names:
+            source_declarations += 1
         if isinstance(target, ast.Name):
             value = ast.Subscript(
                 ast.Name("_benchmark_paths", ast.Load()),
@@ -108,6 +111,10 @@ def redirected_tree(code, filename):
     if declarations != 1:
         raise ValueError(
             "benchmark requires exactly one module-level OUTPUTS declaration"
+        )
+    if source is not None and source_declarations != 1:
+        raise ValueError(
+            "explicit input requires exactly one module-level SOURCE declaration"
         )
     for node in ast.walk(tree):
         if isinstance(node, ast.Attribute) and node.attr == "outputs":
@@ -150,10 +157,14 @@ def recipe_source(commit, target):
     ).stdout
 
 
-def load_recipe(commit, target, directory):
+def load_recipe(commit, target, directory, *, source=None):
     code = recipe_source(commit, target)
     source_path = directory / "recipe-source.py"
-    tree = redirected_tree(code, str(source_path))
+    if source is not None:
+        source = Path(source).resolve(strict=True)
+        if source.suffix.upper() != ".SLDPRT":
+            raise ValueError("explicit recipe source must be a native part")
+    tree = redirected_tree(code, str(source_path), source=source)
     source_path.write_text(code, encoding="utf-8")
     stem = DRAWINGS_BY_NAME[target].artifact_stem
     basename = f"{stem}-{directory.parent.name}-{directory.name}"
@@ -172,10 +183,14 @@ def load_recipe(commit, target, directory):
         "PDF": outputs.pdf,
         "PNG": outputs.png,
     }
+    if source is not None:
+        module._benchmark_paths["SOURCE"] = source
     sys.modules[module.__name__] = module
     exec(compile(tree, str(source_path), "exec"), module.__dict__)
     if module.OUTPUTS != outputs:
         raise RuntimeError("recipe rebound OUTPUTS after its redirected declaration")
+    if source is not None and module.SOURCE != source:
+        raise RuntimeError("recipe rebound SOURCE after its redirected declaration")
     if Path(module.SOURCE).suffix.upper() != ".SLDPRT":
         raise ValueError(
             "benchmark supports part drawings only; assemblies need dependency snapshots"
