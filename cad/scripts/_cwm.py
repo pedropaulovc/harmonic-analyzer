@@ -588,6 +588,17 @@ class PreparedComponentPoses:
     _model: Any
     _poses: tuple[tuple[Any, Any], ...]
 
+    def groups(self, component_count: int) -> tuple[PreparedComponentPoses, ...]:
+        """Partition ordered component slices without another COM lookup/allocation."""
+        if component_count <= 0 or len(self._poses) % component_count:
+            raise ValueError("prepared component poses require complete groups")
+        return tuple(
+            PreparedComponentPoses(
+                self._adapter, self._model, self._poses[start:start + component_count]
+            )
+            for start in range(0, len(self._poses), component_count)
+        )
+
     def apply(self) -> None:
         with _telemetry.span("cwm.pose_reset", components=len(self._poses)) as sp:
             if self._adapter.currentModel is not self._model:
