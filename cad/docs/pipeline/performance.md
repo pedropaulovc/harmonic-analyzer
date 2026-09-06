@@ -227,8 +227,13 @@ where a symbol actually moved. Final attachment, content and body checks still
 run, followed by whole-sheet packing. The first integrated marker run at
 `116f2395` passed and moved the datum/finish text out of the part silhouette.
 Gear and rocker stopped before export because their datum could not return to
-its insertion position after a clamped trial. That restore requirement is under
-test; these failures do not show that subsequent absolute targets cannot work.
+its insertion position after a clamped trial. Removing intermediate restores
+allowed all four absolute candidates to run; neither drawing cleared the measured
+view/annotation bodies. Eight copied datum controls also produced identical XY
+and PNG output with returned Z versus sheet Z=0. Neither a restore nor Z=0 is a
+solution to the observed clamping. Dimension-selected insertion remains under
+test: the shapes tried so far inserted a visible but unattached tag. An existing
+edge-attached gear datum refused `Shoulder=False` and reported `ForcedShoulder`.
 
 Save/reopen controls exposed a separate specification bug: drawing-only BASIC
 edits on four imported lever dimensions disappeared when the source refreshed.
@@ -239,16 +244,46 @@ were unchanged, and both original hashes matched. Ten imported dimensions across
 the lever, pedestal and pen v-block now declare BASIC in their source recipes;
 drawings check it read-only. Drawing-created reference dimensions remain local.
 The shared copy probe now checks tolerance type as well as value, including after
-save/reopen. Production rebuild checks for this wiring are still pending.
+save/reopen. All three source builders completed at `8cc55ebd`. Pedestal and pen
+v-block drawings also completed and their renders show the required BASIC boxes;
+lever passed its read-only BASIC checks but stopped at datum placement. The
+final-head copy/move/scale/save/reopen fleet check remains outstanding.
 
-The screw's cosmetic-thread coverage remains unresolved. Readback of its saved
+Readback of the screw's old saved
 native feature found diameter zero and no stored standard or size, contradicting
 the builder's comment that the standard table supplies the diameter. Empty
 annotation display data therefore cannot establish that a correctly defined
 thread has no drawing ink. A suppression/restoration control also created a new
 thread-callout note on restoration, so its unequal A/A output is not a valid
-no-ink witness. `probe_drawing_thread_view.py` retains both controls. No projected
-face-box substitute or unsupported-thread omission has been accepted.
+no-ink witness. `probe_drawing_thread_view.py` retains both controls.
+
+The corrected definition explicitly supplies ANSI Inch/Machine Threads, size
+`#10-24`, and its 3.56616 mm minor diameter. Native creation and exact definition
+readback after the production part's disk reopen passed at `8cc55ebd`. A copied
+definition control exposed native lines, an arc and isometric polylines through
+`IAnnotation.GetDisplayData`; matching PDF paths confirm projected sheet XY and
+0.18 mm line width. All four native thread annotations reported empty layer and
+Width=0. Bounds now use actual annotation widths 0–7 and fail on unverified
+layer/custom overrides; the former document-custom unit test did not establish
+those annotation behaviors. No projected face-box substitute or omitted thread
+ink is accepted.
+
+This does not change the simplified 3.797 mm male solid diameter. Its missing
+4.826 mm nominal major outline is a separate modeling/fit-policy limitation; a
+correct minor-diameter cosmetic thread cannot restore that outline.
+
+The screw drawing subsequently exposed a datum-with-below-text case: its native
+frame switches sides by translating the upright frame/text body by the measured
+frame height, not by reflecting the entire body rectangle. The correction uses
+the actual closed native frame and checks both frame and complete body against
+the same translation. The fresh native rerun remains required.
+
+At `8cc55ebd`, pedestal and pen v-block integrated layout took 66.380 and 45.206
+seconds respectively. These are successful layout phases, not complete drawing
+times or evidence of a speedup. The new callout stage adds measurements and the
+remaining internal leader/text crossing work is not complete. The bounded native
+GTol reader now shares geometry parsers with full bounds and rejects unsupported
+multi-jog leaders; copied native parity/timing checks are pending.
 
 The current bounds implementation is calibrated for SolidWorks 2026 (major
 revision 34) and the tested native font profile. It uses conservative GDI text
