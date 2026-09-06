@@ -1605,15 +1605,13 @@ async def build(adapter) -> dict[str, str]:
             }
         )
 
-    # Copy every free chain first, then settle their solver-state attractors in
-    # one post-copy phase. Driving each copy immediately made every later
-    # CopyWithMates2 addition re-wander already-settled free siblings; the v0.20.0
-    # trace spent 173 s across those repeated pose-drive spans. Re-putting the
-    # complete copied bank before each transient driver keeps every still-free
-    # chain on its design branch while the current channel is committed.
-    # Each driver's reset still writes every copy, in the same order. Resolve the
-    # component handles and allocate their identical target transforms once: at
-    # 18 copied channels the 54 resets otherwise repeat this work 3,888 times.
+    # Experimental retained-driver strategy: copy every free chain first, then
+    # retain each channel's three temporary drivers while the remaining channels
+    # settle. Reset only the current four-part slice before each driver; its
+    # already-driven siblings retain their constraints until the complete bank
+    # is ready to release. The closing pose/mate/DOF checks below are unchanged.
+    # This reduces 18 copies' pose writes from 3,888 to 216, but requires live
+    # proof that retaining then releasing the bank preserves every stored branch.
     copied_poses = prepare_component_poses(
         adapter,
         (
@@ -1623,7 +1621,10 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
 
-    for rec in copied:
+    retained_drives: list[str] = []
+    for rec, channel_poses in zip(
+        copied, copied_poses.groups(len(CHAIN_PARTS)), strict=True
+    ):
         j = rec["j"]
         seed_j = rec["seed_j"]
         comps = rec["comps"]
@@ -1644,7 +1645,7 @@ async def build(adapter) -> dict[str, str]:
         try:
             with _telemetry.span("cwm.pose_drive", channel=j):
                 drives: list[str] = []
-                copied_poses.apply()
+                channel_poses.apply()
                 mate = await spin_driver(
                     adapter,
                     component_named_ref(rocker_c, "Axis2"),
@@ -1654,7 +1655,7 @@ async def build(adapter) -> dict[str, str]:
                     verify=(rocker_c, _tgt_mm("rocker-arm")),
                 )
                 drives.append(mate["name"])
-                copied_poses.apply()
+                channel_poses.apply()
                 mate = await distance_driver(
                     adapter,
                     component_named_ref(bar_c, "Axis2"),
@@ -1668,7 +1669,7 @@ async def build(adapter) -> dict[str, str]:
                     verify=(bar_c, _tgt_mm("amplitude-bar")),
                 )
                 drives.append(mate["name"])
-                copied_poses.apply()
+                channel_poses.apply()
                 if _CWM_DEBUG and j == copied[0]["j"]:
                     seed_comps = seed_by_amp[round(amplitudes[j], 6)][1]
                     for part in CHAIN_PARTS:
@@ -1691,8 +1692,7 @@ async def build(adapter) -> dict[str, str]:
                     verify=(rod_c, _tgt_mm("connecting-rod")),
                 )
                 drives.append(mate["name"])
-                for name in reversed(drives):
-                    delete_assembly_feature(adapter, name)
+                retained_drives.extend(drives)
         except Exception:
             if _CWM_DEBUG:
                 for part in CHAIN_PARTS:
@@ -1711,8 +1711,14 @@ async def build(adapter) -> dict[str, str]:
         log(
             f"ch{j:02d} <- CopyWithMates2 of ch{seed_j:02d}"
             f" (J1a {j * PITCH:.2f} mm <- channel 0 rocker"
-            f" {rec['prev_rocker']}, driven to pose + freed)"
+            f" {rec['prev_rocker']}, driven to pose; temporary drivers retained)"
         )
+
+    with _telemetry.span(
+        "cwm.release_pose_drivers", channels=len(copied), drivers=len(retained_drives)
+    ):
+        for name in reversed(retained_drives):
+            delete_assembly_feature(adapter, name)
 
     # End-state validation of the replicated channels: ONE closing solve, then
     # prove each copy from the model (the CopyWithMates2 return value LIES):
