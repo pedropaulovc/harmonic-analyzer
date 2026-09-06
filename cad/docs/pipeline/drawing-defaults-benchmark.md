@@ -128,12 +128,25 @@ report rather than being treated as displayed content.
 The first unchanged arbor baseline then stopped before save/export: its source
 part changed from clean to dirty in memory during drawing construction. The
 source file hash stayed unchanged. The source-preservation guard refused both
-the save and ordinary cleanup; scoped diagnostic recovery and a first-transition
-repro are required before another trial. This is not a template-candidate
+the save and ordinary cleanup. Scoped no-save recovery subsequently restored
+the two original open documents, preserving all source hashes. This is not a template-candidate
 failure: no candidate ran. The failed baseline reached that guard in 97.693
 seconds, with 4.627 seconds in setup. Neither is a completed drawing timing or
 evidence of a template speedup. Evidence is in the isolated template worktree's
 `template-abba-bn33bcg_/measurements.json` and `ownership.json`.
+
+The owned-copy first-transition control at `99eadbe7` found the part stayed clean
+through template setup, three view insertions, dimension import and curation.
+The `set_dimension_callouts` group then changed the source BoreDia display text
+from empty to `THRU` and marked the copy dirty. All 20 observed source dimension
+identities, values and tolerances were unchanged; source and copy disk hashes
+matched, and cleanup preserved the original open documents. This identifies
+the operation group, not an inner setter-versus-rebuild boundary or the effects
+of later recipe operations. The report is
+`C:/src/ha-perf-datum-functional/cad/out/reports/source-dirty-9cbdz77u/source-dirty.json`.
+Subsequent drawing controls must use owned part copies; the generic protection
+for borrowed originals remains unchanged. No completed template timing comparison
+is available yet.
 
 ## Trial isolation
 
