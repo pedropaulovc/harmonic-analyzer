@@ -267,6 +267,32 @@ def test_creation_scope_claims_one_exact_new_native_document(native):
     assert native.app.closes == [model]
 
 
+def test_recipe_creation_scope_witnesses_first_save_to_exact_declared_output(native):
+    adapter = facade(native)
+    with adapter.ownership.creating_document(owned.DocumentKind.DRAWING, native.copy):
+        model = Model(None)
+        native.app.documents.append(model)
+        native.app.ActiveDoc = model
+        adapter.currentModel = model
+        model.path, model.title = str(native.copy), native.copy.name
+    asyncio.run(adapter.close_owned_documents())
+    assert native.app.closes == [model]
+
+
+def test_recipe_creation_scope_rejects_save_to_an_undeclared_path(native):
+    adapter = facade(native)
+    with pytest.raises(RuntimeError, match="creation.*path"):
+        with adapter.ownership.creating_document(
+            owned.DocumentKind.DRAWING, native.copy
+        ):
+            model = Model(None)
+            native.app.documents.append(model)
+            native.app.ActiveDoc = model
+            adapter.currentModel = model
+            model.path = str(native.directory / "not-declared.SLDDRW")
+    assert not native.app.closes
+
+
 def test_creation_scope_rejects_an_ambiguous_native_inventory(native):
     adapter = facade(native)
     with pytest.raises(RuntimeError, match="unexpected|ambiguous"):

@@ -308,6 +308,7 @@ class DiagnosticDocuments:
             self.current = None
             return
         record = self._record(model)
+        created_now = False
         if (
             record is not None
             and self.creation is not None
@@ -332,7 +333,7 @@ class DiagnosticDocuments:
                 )
             record = NativeDocument(model, Ownership.COPY, _state(model), {output})
             self.records.append(record)
-            self.creation = kind, output, record
+            created_now = True
             self._add_references(model)
         if record is None:
             raise RuntimeError(
@@ -340,6 +341,8 @@ class DiagnosticDocuments:
             )
         self.inventory()
         self.adapter.currentModel, self.current = model, record
+        if created_now:
+            self.creation = kind, output, record
 
     def assert_current_owned(self):
         if self.current is None or self.current.ownership is not Ownership.COPY:
@@ -364,10 +367,28 @@ class DiagnosticDocuments:
             yield
             if self.creation[2] is None:
                 raise RuntimeError("creation scope produced no owned native document")
-            self.inventory()
         finally:
-            self.creation = None
-            self.checkpoint()
+            try:
+                record = self.creation[2]
+                if record is not None:
+                    if not self._same(self.adapter.currentModel, record.handle):
+                        raise RuntimeError(
+                            "creation replaced the exact newly owned native handle"
+                        )
+                    actual = _state(record.handle)
+                    path = Path(actual["path"]).resolve() if actual["path"] else None
+                    if actual["kind"] != int(kind) or (
+                        path is not None and path not in record.paths
+                    ):
+                        raise RuntimeError(
+                            "creation saved to an undeclared native output path"
+                        )
+                    record.state = actual
+                    self._add_references(record.handle)
+                    self.inventory()
+            finally:
+                self.creation = None
+                self.checkpoint()
 
     @contextmanager
     def saving_as(self, output):
@@ -557,3 +578,11 @@ async def owned_callback(adapter, callback):
 
 def run_copy_diagnostic(callback):
     return run_owned_diagnostic(lambda adapter: owned_callback(adapter, callback))
+
+
+def save_drawing(adapter, path, *args, **kwargs):
+    """Preserve native drawing/PDF export call shapes within one SaveAs scope."""
+    from solidworks_mcp.adapters.solidworks.drawing import save_drawing as native_save
+
+    with adapter.ownership.saving_as(path):
+        return native_save(adapter, path, *args, **kwargs)
