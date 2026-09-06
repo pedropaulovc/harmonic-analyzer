@@ -36,6 +36,7 @@ from _drawing_common import (
     add_native_hole_callout,
     add_property_linked_note,
     add_surface_finish,
+    auto_arrange_view_dimensions,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -157,7 +158,7 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
 
-    # Explicit per-view scale (an auto-scaled view shifts every coordinate pick).
+    # Explicit view scales establish the sheet layout, not attachment identity.
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 2))
     # 1:1 right end view: the 2.50 x ~29 strap section -- shows the section the
     # profile notes describe, gives the through direction, and carries datum B
@@ -267,6 +268,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.082)
     add_property_linked_note(adapter, "Isometric View Note", 0.315, 0.150)
 
+    auto_arrange_view_dimensions(adapter, (front, right, iso))
     return await finalize_drawing(
         adapter,
         OUTPUTS,
