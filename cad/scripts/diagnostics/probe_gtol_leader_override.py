@@ -21,6 +21,10 @@ subsequent display-data measurement already had the correct 6.35 mm geometry.
 The strict pre-export length assertion deliberately failed. --update-boundary
 edit_rebuild tests one explicit EditRebuild3 before that exact read, preserving
 the original immediate control and every final assertion.
+That variant passed at 108fe65a (gtol-leader-override-fd4f_eux): exact before-export
+and reopened 6.35 mm geometry, unchanged body/attachments and identical PNGs.
+--length-scope gtol_default independently tests the document's GTol-family
+defaults on a fresh source copy; it never writes an individual annotation length.
 """
 
 from __future__ import annotations
@@ -57,6 +61,86 @@ EPSILON = 1e-8
 class UpdateBoundary(StrEnum):
     IMMEDIATE = "immediate"
     EDIT_REBUILD = "edit_rebuild"
+
+
+class LengthScope(StrEnum):
+    ANNOTATION = "annotation"
+    GTOL_DEFAULT = "gtol_default"
+
+
+def gtol_defaults(extension):
+    constants = shoulder._installed_swconst()
+    option = int(constants.swDetailingNoOptionSpecified)
+    toggle = int(constants.swDetailingGtolUseDocBentLeaderLength)
+    length = int(constants.swDetailingGtolBentLeaderLength)
+    value = float(extension.GetUserPreferenceDouble(length, option))
+    if not math.isfinite(value) or value <= 0:
+        raise RuntimeError(
+            "GTol-family native default length must be positive and finite"
+        )
+    return {
+        "use_global_document_length": bool(
+            extension.GetUserPreferenceToggle(toggle, option)
+        ),
+        "length_m": value,
+        "toggle_enum": toggle,
+        "length_enum": length,
+        "option_enum": option,
+    }
+
+
+def verify_gtol_defaults(state):
+    if (
+        state["use_global_document_length"]
+        or not math.isfinite(state["length_m"])
+        or abs(state["length_m"] - OVERRIDE_LENGTH_M) > EPSILON
+    ):
+        raise RuntimeError(
+            "native GTol-family default did not retain its independent 6.35mm policy"
+        )
+
+
+def apply_length_scope(annotation, extension, scope):
+    if scope is LengthScope.ANNOTATION:
+        annotation.BentLeaderLength = OVERRIDE_LENGTH_M
+        return {"operation": scope.value}
+    if scope is not LengthScope.GTOL_DEFAULT:
+        raise ValueError("unknown native length scope")
+    before = gtol_defaults(extension)
+    toggle_returned = bool(
+        extension.SetUserPreferenceToggle(
+            before["toggle_enum"], before["option_enum"], False
+        )
+    )
+    # SetUserPreferenceToggle documents its Boolean as the resulting state;
+    # False is legitimate for the requested OFF value. Preserve that return and
+    # require the explicit getter, rather than treating False as failed success.
+    toggle_actual = bool(
+        extension.GetUserPreferenceToggle(before["toggle_enum"], before["option_enum"])
+    )
+    if toggle_actual:
+        raise RuntimeError(
+            "GTol-family default still inherits the global document length"
+        )
+    length_returned = bool(
+        extension.SetUserPreferenceDouble(
+            before["length_enum"], before["option_enum"], OVERRIDE_LENGTH_M
+        )
+    )
+    if not length_returned:
+        raise RuntimeError(
+            "native GTol-family default length setter rejected its value"
+        )
+    after = gtol_defaults(extension)
+    verify_gtol_defaults(after)
+    return {
+        "operation": scope.value,
+        "before": before,
+        "after": after,
+        "toggle_returned": toggle_returned,
+        "toggle_actual": toggle_actual,
+        "length_returned": length_returned,
+    }
 
 
 def update_boundary(model, boundary):
@@ -248,8 +332,11 @@ def leader_record(annotation):
     }
 
 
-def verify_override(before, after, document_after):
-    if abs(document_after - DOCUMENT_LENGTH_M) > EPSILON:
+def verify_override(before, after, document_after, *, scope=LengthScope.ANNOTATION):
+    if (
+        not math.isfinite(document_after)
+        or abs(document_after - DOCUMENT_LENGTH_M) > EPSILON
+    ):
         raise RuntimeError("per-GTol override changed the document leader preference")
     for field in (
         "key",
@@ -263,12 +350,25 @@ def verify_override(before, after, document_after):
     ):
         if before[field] != after[field]:
             raise RuntimeError(f"per-GTol override changed {field}")
-    for field in ("horizontal_length_m", "length_readback_m"):
-        if (
-            not math.isfinite(after[field])
-            or abs(after[field] - OVERRIDE_LENGTH_M) > EPSILON
-        ):
-            raise RuntimeError(f"per-GTol override did not retain requested {field}")
+    if (
+        not math.isfinite(after["horizontal_length_m"])
+        or abs(after["horizontal_length_m"] - OVERRIDE_LENGTH_M) > EPSILON
+    ):
+        raise RuntimeError(
+            "per-GTol override did not retain requested horizontal_length_m"
+        )
+    expected_getter = OVERRIDE_LENGTH_M
+    if scope is LengthScope.GTOL_DEFAULT:
+        # This is still a document-driven length, only at the GTol-family level.
+        # IAnnotation.BentLeaderLength documents -1 for a document-driven default.
+        expected_getter = -1.0
+    if (
+        not math.isfinite(after["length_readback_m"])
+        or abs(after["length_readback_m"] - expected_getter) > EPSILON
+    ):
+        raise RuntimeError(
+            "native length getter did not match its explicit property scope"
+        )
     for initial, actual in (
         (before["position"], after["position"]),
         (before["leader_points"][:3], after["leader_points"][:3]),
@@ -292,6 +392,7 @@ async def probe(
     guard_paths=(),
     *,
     boundary=UpdateBoundary.IMMEDIATE,
+    scope=LengthScope.ANNOTATION,
 ):
     from solidworks_mcp.adapters.solidworks.drawing import save_drawing
 
@@ -299,7 +400,7 @@ async def probe(
     report_path = directory / "gtol-leader-override.json"
     report = {
         "source_hashes": {str(p): file_digest(p) for p in (source, part, *guard_paths)},
-        "operation": "one existing GTol.BentLeaderLength setter",
+        "operation": scope.value,
         "requested_m": OVERRIDE_LENGTH_M,
         "update_boundary": boundary.value,
     }
@@ -331,6 +432,14 @@ async def probe(
         if abs(report["document_before_m"] - DOCUMENT_LENGTH_M) > EPSILON:
             raise RuntimeError("source is not the freshly passed global-length rocker")
         report["before"], annotation, view_handles = capture_target(adapter, part)
+        report["gtol_defaults_before"] = gtol_defaults(adapter.currentModel.Extension)
+        if scope is LengthScope.GTOL_DEFAULT and (
+            not report["gtol_defaults_before"]["use_global_document_length"]
+            or report["before"]["length_readback_m"] != -1.0
+        ):
+            raise RuntimeError(
+                "fresh source GTol does not inherit the global document default"
+            )
         if abs(report["before"]["horizontal_length_m"] - DOCUMENT_LENGTH_M) > EPSILON:
             raise RuntimeError("source GTol does not use the witnessed document length")
         report["annotations_before"], all_handles = shoulder.all_annotation_layout(
@@ -346,8 +455,10 @@ async def probe(
             adapter.currentModel, app=app
         )
         owned._validate_active()
-        with _telemetry.span("diagnostic.gtol_length_override"):
-            annotation.BentLeaderLength = OVERRIDE_LENGTH_M
+        with _telemetry.span("diagnostic.gtol_length_override", scope=scope.value):
+            report["length_scope"] = apply_length_scope(
+                annotation, adapter.currentModel.Extension, scope
+            )
         report["immediate"] = leader_record(annotation)
         owned._validate_active()
         with _telemetry.span(
@@ -382,6 +493,7 @@ async def probe(
         report["document_after_m"], _, _ = shoulder.document_length(
             adapter.currentModel.Extension
         )
+        report["gtol_defaults_after"] = gtol_defaults(adapter.currentModel.Extension)
         report["after_export"] = export("after")
         await owned.close()
         owned.expect_open(Path(report["after_export"]["drawing"]))
@@ -406,11 +518,24 @@ async def probe(
         report["document_reopened_m"], _, _ = shoulder.document_length(
             adapter.currentModel.Extension
         )
+        report["gtol_defaults_reopened"] = gtol_defaults(adapter.currentModel.Extension)
         report["reopened_export"] = export("reopened")
-        verify_override(report["before"], report["after"], report["document_after_m"])
         verify_override(
-            report["before"], report["reopened"], report["document_reopened_m"]
+            report["before"], report["after"], report["document_after_m"], scope=scope
         )
+        verify_override(
+            report["before"],
+            report["reopened"],
+            report["document_reopened_m"],
+            scope=scope,
+        )
+        for phase in ("after", "reopened"):
+            if scope is LengthScope.GTOL_DEFAULT:
+                verify_gtol_defaults(report[f"gtol_defaults_{phase}"])
+            elif report[f"gtol_defaults_{phase}"] != report["gtol_defaults_before"]:
+                raise RuntimeError(
+                    "individual GTol override changed its family defaults"
+                )
         verify_layout_changes(report["layout_changes"], report["before"])
         if report["reopen_layout_changes"]:
             raise RuntimeError("saved GTol copy changed native layout on reopen")
@@ -436,6 +561,12 @@ def main():
         default=UpdateBoundary.IMMEDIATE,
     )
     parser.add_argument("--worker", action="store_true")
+    parser.add_argument(
+        "--length-scope",
+        type=LengthScope,
+        choices=tuple(LengthScope),
+        default=LengthScope.ANNOTATION,
+    )
     args = parser.parse_args()
     source, part = args.drawing.resolve(strict=True), args.part.resolve(strict=True)
     guards = tuple(path.resolve(strict=True) for path in args.guard_source)
@@ -445,6 +576,13 @@ def main():
     ):
         raise ValueError("this control is bounded to the coherent rocker drawing/part")
     require_owned_diagnostic_environment()
+    if (
+        args.length_scope is LengthScope.GTOL_DEFAULT
+        and args.update_boundary is not UpdateBoundary.EDIT_REBUILD
+    ):
+        raise ValueError(
+            "GTol-family default control requires one explicit edit_rebuild boundary"
+        )
     if not args.worker:
         sys.path.insert(0, str(ROOT))
         import dodo
@@ -459,6 +597,8 @@ def main():
                 "--worker",
                 "--update-boundary",
                 args.update_boundary.value,
+                "--length-scope",
+                args.length_scope.value,
                 *(value for path in guards for value in ("--guard-source", str(path))),
             ],
             "one GTol leader override",
@@ -471,7 +611,13 @@ def main():
     directory = Path(tempfile.mkdtemp(prefix="gtol-leader-override-", dir=reports))
     return run_owned_diagnostic(
         lambda adapter: probe(
-            adapter, source, part, directory, guards, boundary=args.update_boundary
+            adapter,
+            source,
+            part,
+            directory,
+            guards,
+            boundary=args.update_boundary,
+            scope=args.length_scope,
         )
     )
 
