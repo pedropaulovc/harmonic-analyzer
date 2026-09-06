@@ -52,7 +52,8 @@ The last deletion spent 1.143 seconds inside `DeleteSelection2(0)`; the remainin
 passed their construction gates. Reference and prepared-handle DOF manifests are
 byte-identical. The individual-deletion experiment preserves all manifest keys,
 component identities and state, with a maximum numeric difference of
-1.055e-9 mm. These three builds have the same rounded mass-properties/pose
+1.055e-9 mm. The batch-deletion manifest likewise preserves identities and state,
+with a maximum numeric difference of 1.050e-9 mm. All four builds have the same rounded mass-properties/pose
 fingerprint; that fingerprint is not raw CAD-byte equality or a substitute for
 independent saved-model verification.
 
@@ -63,6 +64,20 @@ The corresponding task trace IDs, in table order, are
 `0xe96bc142669b5cd06495cf34a62b3d18` in
 `cad/out/reports/telemetry/traces.jsonl`. Logs and preserved native artifacts for
 the experiment are under `cad/out/reports/performance-audit-20260905/`.
+
+### Scheduler startup
+
+A `doit list` profile found repeated parsing and walking of identical helper
+source in config-dependency discovery. The bounded syntax cache keys immutable
+references by source text and config-module names, not modification time or
+checkout path. Accessor and family mappings are still resolved afresh; unknown
+config uses retain the conservative dependency behavior.
+
+Generating all 208 part, assembly and drawing task definitions took 15.645 seconds
+before the change, then 6.848 and 6.027 seconds after it. The complete dependency,
+task-edge and target snapshots were byte-identical (SHA-256
+`24a2050d818acb6ee345fe3251fb839950b899bea45b5122b939a57653e1d904`).
+These are local startup observations, not elapsed full-build measurements.
 
 ## Drawing attachments
 
@@ -87,6 +102,16 @@ behavior after a source-part topology change. Changed source parts must also be
 rebuilt and their drawing recipes rerun. Check annotation values and visual
 placement: successful API calls alone do not make a sheet usable for machining.
 
+The seven semantic pilots passed the copy/move/scale/save/reopen experiment with
+61 supported geometry-attached annotations and 48 dimension annotations checked.
+No dimension was excluded from the value comparison. Unsupported geometry
+annotation kinds are separately enumerated in each report; they are not counted
+as proven attachments. The reports also retain qualified dimension identities,
+referenced configurations and SI values. Native reference dimensions use the
+documented `GetSystemValue2` call shape established by the diagnostic's positive
+control; the tested `GetSystemValue3` shapes returned no value for those dimensions.
+Imported model dimensions use `GetSystemValue3`.
+
 The native dimension arrangement API has a positive control in
 `probe_drawing_dimension_selection.py`: a saved screw drawing selected all seven
 dimensions by their returned `GetNameForSelection()` identifiers and completed one
@@ -98,6 +123,26 @@ Treat historical API limitations as hypotheses with a recorded reproduction,
 including a working control and the variants not tried. In particular, a failure
 to force an imported annotation to a prescribed position does not establish that
 native model-annotation import is unsuitable when layout is free to change.
+
+Two copy-only positive controls qualify that direction:
+
+- `diagnostics/probe_native_model_pmi.py` created native third-angle views of a
+  copied transgear stub and imported model datums/FCFs in 0.182 seconds. All eight
+  instances retained their specified face geometry through save/reopen. Importing
+  into all views duplicated annotations, and existing coincident model-annotation
+  positions produced overlapping frames. Correct attachment and fast import do
+  not yet make that layout publishable.
+- `probe_drawing_annotation_layout.py` traced oversized roughness symbols to the
+  template's 6.35 mm surface-finish font, versus its 3.5 mm dimension font. Native
+  circular attachments also chose entity-perpendicular orientation. Applying the
+  actual document dimension text format and native upright orientation produced
+  horizontal, correctly sized text with unchanged attachment geometry through
+  save/reopen. The implementation copies the document setting, not those measured
+  font sizes.
+
+The native pilots still require a separate visual acceptance pass after callout
+spacing and view layout are complete. These experiments do not establish that the
+remaining coordinate-based drawing fleet has been migrated.
 
 ## Measurement and release checks
 
