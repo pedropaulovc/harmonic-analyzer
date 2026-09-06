@@ -22,7 +22,8 @@ import math
 import sys
 from typing import Any
 
-from _gear_drawing_entities import visible_circle_edge
+from _drawing_entities import CircleEdge, LineEdge, ModelEntities
+from _gtol_spec import PlanarFace
 from rocker_arm_spec import ARM_DEPTH, GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
@@ -30,7 +31,7 @@ from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
-    add_edge_dimension,
+    add_entity_dimension,
     add_feature_control_frame,
     add_native_hole_callout,
     add_property_linked_note,
@@ -48,6 +49,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from rocker_arm_spec import (
     ARM_THICKNESS,
+    HUB_LENGTH,
     PIVOT_HOLE_DIA,
     R_TOP,
     ROD_HOLE_X,
@@ -171,12 +173,21 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
 
+    entities = ModelEntities(front.ReferencedDocument).resolve({
+        "pivot": CircleEdge(PIVOT_HOLE_DIA / 2.0, (0, _PIVOT_MID_Y, -HUB_LENGTH / 2.0), (0, 0, 1)),
+        "rod": CircleEdge(_ROD_HOLE_DIA / 2.0, (ROD_HOLE_X, ROD_HOLE_Y, -ARM_THICKNESS / 2.0), (0, 0, 1)),
+        "broad": PlanarFace((0, 0, 1), ARM_THICKNESS / 2.0),
+        "tip": LineEdge(
+            (_TIP_FACE_MID_X, _TIP_FACE_MID_Y, -ARM_THICKNESS / 2.0),
+            (TOP_END_X / R_TOP, -math.cos(TOP_ARC_LEN / 2.0 / R_TOP), 0),
+        ),
+    })
+
     # Rod-pin hole native callout (the #47 wizard hole near the +X tip).
-    rod_rim = _sheet_xy(ROD_HOLE_X, ROD_HOLE_Y - _ROD_HOLE_DIA / 2.0)
     add_native_hole_callout(
         adapter,
         front,
-        edge_xy=rod_rim,
+        edge=entities["rod"],
         callout_xy=(0.300, 0.128),
         label="rod-pin hole",
     )
@@ -186,22 +197,19 @@ async def build(adapter: Any) -> dict[str, str]:
     # above its mid-height), so a single slant centre distance would leave the
     # angular component uninspectable; two component dimensions fully define
     # the true position the FCF below controls.
-    pivot_rim = _sheet_xy(0.0, _PIVOT_MID_Y - PIVOT_HOLE_DIA / 2.0)
-    rod_location_x = add_edge_dimension(
+    rod_location_x = add_entity_dimension(
         adapter,
         front,
-        p0=pivot_rim,
-        p1=rod_rim,
+        entities=(entities["pivot"], entities["rod"]),
         text_xy=(0.180, 0.138),
         label="rod-pin X location",
         orientation="horizontal",
     )
     set_basic_dimension(adapter, rod_location_x, label="rod-pin X location")
-    rod_location_y = add_edge_dimension(
+    rod_location_y = add_entity_dimension(
         adapter,
         front,
-        p0=pivot_rim,
-        p1=rod_rim,
+        entities=(entities["pivot"], entities["rod"]),
         text_xy=(0.267, 0.162),
         label="rod-pin Y location",
         orientation="vertical",
@@ -221,7 +229,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         front,
-        edge_xy=pivot_datum_rim,
+        entity=entities["pivot"],
         symbol_xy=(
             pivot_datum_rim[0] + pivot_datum_standoff * math.cos(pivot_datum_angle),
             pivot_datum_rim[1] + pivot_datum_standoff * math.sin(pivot_datum_angle),
@@ -245,10 +253,9 @@ async def build(adapter: Any) -> dict[str, str]:
         pivot_radius * math.cos(pivot_finish_angle),
         _PIVOT_MID_Y + pivot_radius * math.sin(pivot_finish_angle),
     )
-    # Pick the bore circle by DIAMETER (the visible-entity walk the cone-gear
-    # drawing uses): a coordinate pick on the concentric O6.5 / O10 rims
-    # resolves to the hub's outer circle within SolidWorks' tolerance.
-    pivot_bore_edge = visible_circle_edge(adapter, front, PIVOT_HOLE_DIA)
+    # Reuse the resolved bore, including its hub-end station; the concentric
+    # hub rim can never satisfy this role's centre/radius constraints.
+    pivot_bore_edge = entities["pivot"]
     add_surface_finish(
         adapter,
         front,
@@ -270,7 +277,8 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         right,
-        edge_xy=broad_face,
+        entity=entities["broad"],
+        entity_type="FACE",
         symbol_xy=(broad_face[0] - 0.016, broad_face[1] - 0.014),
         datum="B",
         label="broad face",
@@ -279,7 +287,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         front,
-        edge_xy=tip_face,
+        entity=entities["tip"],
         symbol_xy=(tip_face[0] + 0.012, tip_face[1] + 0.012),
         datum="C",
         label="rod-side tip face",
@@ -287,7 +295,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         front,
-        edge_xy=rod_rim,
+        entity=entities["rod"],
         frame_xy=(0.300, 0.195),
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["rod-pin hole position"],

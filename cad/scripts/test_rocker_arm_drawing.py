@@ -97,7 +97,8 @@ def test_native_gdt_and_finish_present() -> None:
     assert 'characteristic="position"' in source
     assert "add_surface_finish(" in source
     assert "add_native_hole_callout(" in source
-    assert source.count("edge_xy=rod_rim") == 2
+    assert 'edge=entities["rod"]' in source
+    assert 'entity=entities["rod"]' in source
 
 
 def test_large_radius_values_are_note_only() -> None:

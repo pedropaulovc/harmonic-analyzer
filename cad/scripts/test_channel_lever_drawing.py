@@ -62,7 +62,7 @@ def test_linked_notes_are_functional_and_not_title_block_duplicates() -> None:
 
 def test_native_gdt_and_finish_present() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'bar_height = add_edge_dimension(' in source
+    assert 'bar_height = add_entity_dimension(' in source
     assert 'set_basic_dimension(adapter, bar_height, label="bar height from datum C")' in source
     assert source.count("add_datum_feature(") == 3
     assert (
@@ -74,7 +74,7 @@ def test_native_gdt_and_finish_present() -> None:
     assert source.count("annotation.Color = 0") == 1
     assert "annotation.LayerOverride" in source
     assert "InsertCenterMark3(2, False, False)" in source
-    assert "tip_edge = _sheet_xy(TIP_END_X, 0.0)" in source
+    assert 'view.SelectEntity(tip_arc, False)' in source
     assert source.count("add_feature_control_frame(") == 5
     assert source.count('characteristic="position"') == 2
     assert source.count('datums=("A", "B", "C")') == 3
@@ -83,9 +83,9 @@ def test_native_gdt_and_finish_present() -> None:
     assert 'characteristic="parallelism"' in source
     assert source.count('datums=("A",)') == 2
     assert "all_around=True" in source
-    assert 'edge_xy=bar_pin_edge' in source
+    assert 'entity=entities["bar_pin"]' in source
     assert 'label="bar-pin hole position"' in source
-    assert 'edge_xy=spring_fcf_edge' in source
+    assert 'entity=entities["spring"]' in source
     assert 'label="spring-eye hole position"' in source
     assert "bar_pin_edge[0] - 0.045, 0.174" in source
     assert "spring_fcf_edge[0] + 0.020, 0.174" in source
