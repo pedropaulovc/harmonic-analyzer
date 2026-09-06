@@ -304,6 +304,81 @@ def test_diagnostic_never_calls_close_all_documents():
     assert "CloseAllDocuments" not in inspect.getsource(probe)
 
 
+@pytest.mark.parametrize("stage", ["normal", "failure"])
+def test_native_runner_never_clears_existing_documents(monkeypatch, stage):
+    import asyncio
+    from diagnostics import _owned_native_session as session
+
+    documents = [object()]
+    original = documents[0]
+    calls = []
+
+    async def connect():
+        calls.append("connect")
+
+    async def disconnect():
+        calls.append("disconnect")
+
+    async def callback(adapter):
+        assert documents == [original]
+        calls.append("probe")
+        if stage == "failure":
+            raise ValueError("probe failed")
+
+    adapter = SimpleNamespace(connect=connect, disconnect=disconnect)
+    monkeypatch.setattr(session._watchdog, "start", lambda: calls.append("start"))
+    monkeypatch.setattr(session._watchdog, "stop", lambda: calls.append("stop"))
+    if stage == "failure":
+        with pytest.raises(ValueError, match="probe failed"):
+            asyncio.run(session.connected_probe(adapter, callback))
+    else:
+        asyncio.run(session.connected_probe(adapter, callback))
+    assert calls == ["start", "connect", "probe", "disconnect", "stop"]
+    assert documents == [original]
+
+
+def test_datum_main_uses_connect_only_runner():
+    import inspect
+
+    assert "run_build" not in inspect.getsource(probe)
+    assert "return run_owned_diagnostic(" in inspect.getsource(probe.main)
+
+
+def test_connect_only_entrypoint_preserves_docs_before_owned_guards(monkeypatch):
+    from diagnostics import _owned_native_session as session
+    import _common
+    from solidworks_mcp.adapters import pywin32_adapter
+
+    original = object()
+    documents = [original]
+    observed = []
+
+    async def nothing():
+        pass
+
+    adapter = SimpleNamespace(
+        swApp=SimpleNamespace(CloseAllDocuments=lambda _: documents.clear()),
+        connect=nothing,
+        disconnect=nothing,
+        _attempt=lambda callback, **_: callback(),
+    )
+
+    async def owned_guards(_adapter):
+        observed.append(tuple(documents))
+        assert documents == [original]
+        return {}
+
+    monkeypatch.setattr(pywin32_adapter, "PyWin32Adapter", lambda _: adapter)
+    monkeypatch.setattr(_common, "_pin_default_part_template", lambda _: None)
+    monkeypatch.setattr(session._watchdog, "start", lambda: None)
+    monkeypatch.setattr(session._watchdog, "stop", lambda: None)
+    monkeypatch.setattr(session._telemetry, "shutdown", lambda: None)
+    monkeypatch.setenv("HARMONIC_COM_SEAT", "test")
+    monkeypatch.setenv("HARMONIC_SW_AUTOSTART", "0")
+    assert session.run_owned_diagnostic(owned_guards) == 0
+    assert documents == [original] and observed == [(original,)]
+
+
 def row():
     return {
         "label": "B",
