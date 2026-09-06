@@ -39,7 +39,9 @@ def test_worker_requires_explicit_seat_before_run_build(monkeypatch, tmp_path):
     monkeypatch.setattr(control.sys, "argv", ["probe", str(source), "--worker"])
     monkeypatch.delenv("HARMONIC_COM_SEAT", raising=False)
     monkeypatch.setattr(
-        control, "run_build", lambda *_: pytest.fail("worker reached COM without seat")
+        control,
+        "run_copy_diagnostic",
+        lambda *_: pytest.fail("worker reached COM without seat"),
     )
     with pytest.raises(RuntimeError, match="machine-global COM seat"):
         control.main()
@@ -69,7 +71,18 @@ async def test_ab_copies_preserve_originals_and_retain_failed_checkpoints(
     source_hash = control.hashlib.sha256(source.read_bytes()).hexdigest()
     paths, comparisons = [], []
     state = {"phase": "open"}
-    adapter = SimpleNamespace(currentModel=None, swApp=object())
+    from contextlib import nullcontext
+    from unittest.mock import Mock
+
+    adapter = SimpleNamespace(
+        currentModel=None,
+        swApp=object(),
+        ownership=SimpleNamespace(
+            register_directory=Mock(),
+            register_source=Mock(),
+            saving_as=lambda _: nullcontext(),
+        ),
+    )
 
     async def open_model(path):
         resolved = Path(path).resolve()

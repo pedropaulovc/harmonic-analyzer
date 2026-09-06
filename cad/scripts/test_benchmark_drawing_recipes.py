@@ -1,9 +1,11 @@
 """Output routing and provenance controls for the recipe-only ABBA runner."""
 
 import ast
+from contextlib import nullcontext
 import json
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 
@@ -152,9 +154,18 @@ class Adapter:
     def __init__(self, mode):
         self.mode = mode
         self.drawn = []
+        self.scoped_closes = []
+        self.ownership = SimpleNamespace(
+            register_directory=Mock(),
+            register_source=Mock(),
+            creating_document=Mock(side_effect=lambda *_: nullcontext()),
+        )
         self.swApp = SimpleNamespace(
             CloseAllDocuments=lambda _: True, GetFirstDocument=lambda: None
         )
+
+    async def close_owned_documents(self):
+        self.scoped_closes.append(len(self.drawn))
 
     async def draw(self, outputs, source):
         self.drawn.append(outputs)
@@ -188,6 +199,13 @@ async def test_abba_reports_actual_scope_and_rejects_input_drift(
 
     monkeypatch.setattr(bench, "helper_fingerprints", helpers)
     adapter = Adapter(mode)
+    monkeypatch.setattr(
+        bench,
+        "close_documents",
+        Mock(
+            side_effect=AssertionError("legacy global-close helper must remain unused")
+        ),
+    )
     reports = tmp_path / "reports"
     if mode == "normal":
         result = await bench.benchmark(
@@ -209,6 +227,12 @@ async def test_abba_reports_actual_scope_and_rejects_input_drift(
     assert "observed paired recipe timings" in report["timing_scope"]
     assert report["status"] == ("passed" if mode == "normal" else "failed")
     assert len(adapter.drawn) == (4 if mode == "normal" else 1)
+    assert adapter.scoped_closes == list(range(len(adapter.drawn)))
+    assert adapter.ownership.creating_document.call_count == len(adapter.drawn)
+    for call, outputs in zip(
+        adapter.ownership.creating_document.call_args_list, adapter.drawn, strict=True
+    ):
+        assert call.args == (bench.DocumentKind.DRAWING, outputs.slddrw)
     assert len({outputs.slddrw for outputs in adapter.drawn}) == len(adapter.drawn)
     assert all(trial["seconds"] >= 0 for trial in report["trials"])
     if mode == "normal":

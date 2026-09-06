@@ -22,13 +22,15 @@ import tempfile
 from typing import Any
 from unittest.mock import patch
 
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, _early_bound, check
+from diagnostics._owned_native_documents import run_copy_diagnostic
+from diagnostics._owned_native_session import require_owned_diagnostic_environment
 from _drawing_common import add_surface_finish, render_pdf_png
 import _drawing_common
 from _drawing_entities import CircleEdge, LineEdge, _edge_geometry
 from _part_pmi import _face_geometry
 from solidworks_mcp.adapters import sw_type_info
-from solidworks_mcp.adapters.solidworks.drawing import save_drawing
+from diagnostics._owned_native_documents import save_drawing
 import _telemetry
 
 
@@ -108,6 +110,7 @@ def main() -> int:
     args = parser.parse_args()
     source = args.drawing.resolve(strict=True)
     if not args.worker:
+        require_owned_diagnostic_environment()
         sys.path.insert(0, str(CAD_ROOT.parent))
         import dodo
         dodo._run([sys.executable, str(Path(__file__).resolve()), str(source), "--worker"],
@@ -120,6 +123,8 @@ def main() -> int:
         root = CAD_ROOT / "out/reports"
         root.mkdir(parents=True, exist_ok=True)
         folder = Path(tempfile.mkdtemp(prefix="annotation-layout-", dir=root))
+        adapter.ownership.register_directory(folder)
+        adapter.ownership.register_source(source)
         copy = folder / f"probe-{folder.name}-{source.name}"
         report: dict[str, Any] = {"source": str(source), "copy": str(copy), "stage": "open"}
         hashes = {source: hashlib.sha256(source.read_bytes()).hexdigest()}
@@ -228,7 +233,7 @@ def main() -> int:
         return {"report": str(folder / "layout.json")}
 
     _telemetry.set_service("drawing-annotation-layout-probe")
-    return run_build(probe)
+    return run_copy_diagnostic(probe)
 
 
 if __name__ == "__main__":

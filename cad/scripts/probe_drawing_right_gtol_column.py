@@ -32,7 +32,9 @@ import tempfile
 import time
 from typing import Any
 
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, _early_bound, check
+from diagnostics._owned_native_documents import run_copy_diagnostic
+from diagnostics._owned_native_session import require_owned_diagnostic_environment
 from _drawing_annotation_bounds import (
     Segment,
     annotation_box,
@@ -275,13 +277,15 @@ def _measure_view(adapter, view):
 async def probe(adapter: Any, source: Path, requested_view: str | None):
     import _drawing_native_gtol as gtol
     from diagnostics.probe_drawing_attachments import snapshot, compare
-    from solidworks_mcp.adapters.solidworks.drawing import save_drawing
+    from diagnostics._owned_native_documents import save_drawing
 
     reports = CAD_ROOT / "out/reports"
     reports.mkdir(parents=True, exist_ok=True)
     directory = Path(
         tempfile.mkdtemp(prefix="gtol-right-column-", dir=reports)
     ).resolve()
+    adapter.ownership.register_directory(directory)
+    adapter.ownership.register_source(source)
     copy = directory / f"{directory.name}-source.SLDDRW"
     shutil.copy2(source, copy)
     owned = {copy}
@@ -598,6 +602,7 @@ def main():
     if source.suffix.upper() != ".SLDDRW":
         raise ValueError("right-column probe needs a native drawing")
     if not args.worker:
+        require_owned_diagnostic_environment()
         sys.path.insert(0, str(CAD_ROOT.parent))
         import dodo
 
@@ -614,7 +619,7 @@ def main():
     if not os.environ.get("HARMONIC_COM_SEAT"):
         raise RuntimeError("--worker requires the machine-global COM seat")
     _telemetry.set_service("drawing-right-gtol-column-probe")
-    return run_build(lambda adapter: probe(adapter, source, args.view))
+    return run_copy_diagnostic(lambda adapter: probe(adapter, source, args.view))
 
 
 if __name__ == "__main__":

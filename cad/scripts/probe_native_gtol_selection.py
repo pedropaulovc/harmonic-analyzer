@@ -25,7 +25,9 @@ import sys
 import tempfile
 from typing import Any
 
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, _early_bound, check
+from diagnostics._owned_native_documents import run_copy_diagnostic
+from diagnostics._owned_native_session import require_owned_diagnostic_environment
 from _drawing_common import add_feature_control_frame
 from _drawing_entities import ModelEntities
 from draw_cone_gear import ENTITY_ROLES
@@ -73,6 +75,7 @@ def main() -> int:
     if source.suffix.upper() != ".SLDDRW":
         raise ValueError("probe requires a native cone-gear drawing")
     if not args.worker:
+        require_owned_diagnostic_environment()
         sys.path.insert(0, str(CAD_ROOT.parent))
         import dodo
         dodo._run(
@@ -88,6 +91,8 @@ def main() -> int:
         report_root = CAD_ROOT / "out/reports"
         report_root.mkdir(parents=True, exist_ok=True)
         folder = Path(tempfile.mkdtemp(prefix="native-gtol-selection-", dir=report_root))
+        adapter.ownership.register_directory(folder)
+        adapter.ownership.register_source(source)
         copy = folder / f"probe-{folder.name}-{source.name}"
         report_path = folder / "projection.json"
         report: dict[str, Any] = {"source": str(source), "copy": str(copy), "stage": "copy"}
@@ -120,6 +125,7 @@ def main() -> int:
                 before[role] = _annotation_state(adapter, annotation, entities[role])
             report["before"] = before
             report["stage"] = "save"
+            adapter.ownership.assert_current_owned()
             saved = model.Save3(1, 0, 0)  # swSaveAsOptions_Silent, only this drawing copy
             if not (saved[0] if isinstance(saved, tuple) else saved):
                 raise RuntimeError(f"diagnostic copy save failed: {saved}")
@@ -159,7 +165,7 @@ def main() -> int:
         return {"report": str(report_path), "copy": str(copy)}
 
     _telemetry.set_service("native-gtol-selection-probe")
-    return run_build(probe)
+    return run_copy_diagnostic(probe)
 
 
 if __name__ == "__main__":

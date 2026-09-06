@@ -19,7 +19,9 @@ import sys
 import tempfile
 from typing import Any
 
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, _early_bound, check
+from diagnostics._owned_native_documents import run_copy_diagnostic
+from diagnostics._owned_native_session import require_owned_diagnostic_environment
 from _drawing_common import _style_surface_finish, render_pdf_png
 from _drawing_annotation_bounds import (
     annotation_box,
@@ -28,7 +30,7 @@ from _drawing_annotation_bounds import (
     font_cell_extent,
     _text_box,
 )
-from solidworks_mcp.adapters.solidworks.drawing import save_drawing
+from diagnostics._owned_native_documents import save_drawing
 import _telemetry
 
 
@@ -219,6 +221,7 @@ def main() -> int:
     args = parser.parse_args()
     source = args.drawing.resolve(strict=True)
     if not args.worker:
+        require_owned_diagnostic_environment()
         sys.path.insert(0, str(CAD_ROOT.parent))
         import dodo
 
@@ -236,6 +239,8 @@ def main() -> int:
         root = CAD_ROOT / "out/reports"
         root.mkdir(parents=True, exist_ok=True)
         folder = Path(tempfile.mkdtemp(prefix="annotation-bounds-", dir=root))
+        adapter.ownership.register_directory(folder)
+        adapter.ownership.register_source(source)
         copy = folder / f"{folder.name}-{source.name}"
         observed = folder / f"{folder.name}-observed.SLDDRW"
         shutil.copy2(source, copy)
@@ -366,7 +371,7 @@ def main() -> int:
         return {"report": str(folder / "bounds.json")}
 
     _telemetry.set_service("drawing-annotation-bounds-probe")
-    return run_build(probe)
+    return run_copy_diagnostic(probe)
 
 
 if __name__ == "__main__":
