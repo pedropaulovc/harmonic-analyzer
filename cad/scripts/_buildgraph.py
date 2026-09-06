@@ -17,6 +17,7 @@ from __future__ import annotations
 import ast
 import functools
 import re
+from enum import Enum
 from pathlib import Path
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
@@ -399,23 +400,6 @@ def _family_tokens(accessor: str, arg: str | None) -> frozenset[str]:
 _CONFIG_MODULES: frozenset[str] = frozenset({"_config"})
 
 
-def _config_aliases(tree: ast.AST) -> set[str]:
-    """Local names bound to a config-accessor module (:data:`_CONFIG_MODULES`).
-
-    Always includes the canonical names; adds any ``import _config as X`` /
-    ``import _config_asm as Y`` alias so ``X.machine(...)`` is still tracked. A
-    ``from _config import name`` binds a BARE name we don't follow -- handled
-    separately as a hard fallback.
-    """
-    names = set(_CONFIG_MODULES)
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            for a in node.names:
-                if a.name in _CONFIG_MODULES and a.asname:
-                    names.add(a.asname)
-    return names
-
-
 def _literal_first_arg(call: ast.Call) -> str | None:
     """The first positional arg of ``call`` if it is a string literal, else None
     (no arg, or a non-literal/dynamic arg)."""
@@ -425,52 +409,72 @@ def _literal_first_arg(call: ast.Call) -> str | None:
     return None
 
 
-def _config_tokens_in_source(path: Path) -> frozenset[str]:
-    """Config FILE tokens read by ONE source via ``_config.<accessor>(...)``.
+class _ConfigUse(Enum):
+    CALL = "call"
+    REFERENCE = "reference"
 
-    Raises ``_UnknownConfigUse`` if the file touches ``_config`` in a way we can't
-    classify, so the caller conservatively depends on the whole config.
+
+@functools.lru_cache(maxsize=512)
+def _config_references_in_text(
+    text: str, config_modules: frozenset[str]
+) -> tuple[tuple[str, _ConfigUse, str | None], ...] | None:
+    """Extract immutable syntax facts once per source content, not per consumer.
+
+    Shared helpers occur in many task closures. Repeating their AST walks made
+    config analysis dominate task loading. Do not cache resolved config tokens
+    here: family membership and accessor mappings are evaluated by the caller.
+    None denotes an unclassifiable bare-name import, never an empty read set.
     """
-    tree = ast.parse(path.read_text(encoding="utf-8"))
-    aliases = _config_aliases(tree)
-
-    # A bare-name import (`from _config import channels`) would need whole-program
-    # name tracking; none exists in this codebase, so treat it as unknown.
-    for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom) and node.module in _CONFIG_MODULES:
-            raise _UnknownConfigUse
-
-    tokens: set[str] = set()
-    # Resolve family accessors at their CALL sites (need the literal arg, not just
-    # the attribute). Record which attribute nodes we resolved so a family accessor
-    # used in any OTHER position trips the fallback below.
-    resolved_family: set[int] = set()
-    for node in ast.walk(tree):
+    nodes = tuple(ast.walk(ast.parse(text)))
+    aliases = set(config_modules)
+    for node in nodes:
+        if isinstance(node, ast.ImportFrom) and node.module in config_modules:
+            return None
+        if isinstance(node, ast.Import):
+            aliases.update(
+                alias.asname for alias in node.names
+                if alias.name in config_modules and alias.asname
+            )
+    calls: dict[int, str | None] = {}
+    for node in nodes:
         if (
             isinstance(node, ast.Call)
             and isinstance(node.func, ast.Attribute)
             and isinstance(node.func.value, ast.Name)
             and node.func.value.id in aliases
-            and node.func.attr in _FAMILY_ACCESSORS
         ):
-            tokens |= _family_tokens(node.func.attr, _literal_first_arg(node))
-            resolved_family.add(id(node.func))
-
-    # Every `<alias>.<attr>` access must be a classified accessor.
-    for node in ast.walk(tree):
+            calls[id(node.func)] = _literal_first_arg(node)
+    references = []
+    for node in nodes:
         if (
             isinstance(node, ast.Attribute)
             and isinstance(node.value, ast.Name)
             and node.value.id in aliases
         ):
-            attr = node.attr
-            if attr in _FIXED_ACCESSOR_TOKENS:
-                tokens |= _FIXED_ACCESSOR_TOKENS[attr]
-            elif attr in _FAMILY_ACCESSORS:
-                if id(node) not in resolved_family:
-                    raise _UnknownConfigUse  # family accessor not used as a literal call
-            else:
-                raise _UnknownConfigUse  # unmapped accessor -> conservative
+            use = _ConfigUse.CALL if id(node) in calls else _ConfigUse.REFERENCE
+            references.append((node.attr, use, calls.get(id(node))))
+    return tuple(references)
+
+
+def _config_tokens_in_source(path: Path) -> frozenset[str]:
+    """Resolve ONE source's config reads; reject every unclassified use.
+
+    Only syntax is reused. Reading source content on each call detects edits even
+    when timestamps are unchanged; accessor/family resolution is not memoized by
+    this function. Callers retain their existing per-invocation graph snapshot.
+    """
+    references = _config_references_in_text(path.read_text(encoding="utf-8"), _CONFIG_MODULES)
+    if references is None:
+        raise _UnknownConfigUse
+    tokens: set[str] = set()
+    for attr, use, argument in references:
+        if attr in _FIXED_ACCESSOR_TOKENS:
+            tokens |= _FIXED_ACCESSOR_TOKENS[attr]
+            continue
+        if attr in _FAMILY_ACCESSORS and use is _ConfigUse.CALL:
+            tokens |= _family_tokens(attr, argument)
+            continue
+        raise _UnknownConfigUse
     return frozenset(tokens)
 
 
