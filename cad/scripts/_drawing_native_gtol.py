@@ -195,7 +195,9 @@ def _read_gtols(adapter: Any, view: Any, measure: Callable) -> dict[str, _Gtol]:
             raise RuntimeError(f"{name}: GTol attachment cannot be proven exactly")
         owner_type = int(annotation.OwnerType)
         owner = annotation.Owner
-        expected_owner = {0: view, 3: view.ReferencedDocument}.get(owner_type)
+        expected_owner = view if owner_type == 0 else None
+        if owner_type == 3:
+            expected_owner = view.ReferencedDocument
         if (
             expected_owner is None
             or int(adapter.swApp.IsSame(owner, expected_owner)) != 1
