@@ -53,6 +53,7 @@ def native_annotation(monkeypatch):
         GetName=Mock(return_value="native-frame"),
         GetDisplayData=Mock(return_value=data),
         GetLeaderCount=lambda: 1,
+        GetMultiJogLeaderCount=lambda: 0,
         GetLeaderPointsAtIndex=lambda _: (
             0.1,
             0.15625,
@@ -169,3 +170,14 @@ def test_non_elbow_arc_is_not_reclassified_as_leader_decoration(monkeypatch):
     after = bounds.annotation_leader_geometry(annotation)
     assert len(after.decorations) == len(before.decorations) - 1
     assert after.segments == before.segments
+
+
+@pytest.mark.parametrize("reader", ["_native_snapshot", "annotation_leader_geometry"])
+@pytest.mark.parametrize("count", [1, -1, 0.5, float("nan"), float("inf")])
+def test_separate_multijog_inventory_cannot_hide_behind_bent_leader_points(
+    monkeypatch, reader, count
+):
+    annotation, _ = native_annotation(monkeypatch)
+    annotation.GetMultiJogLeaderCount = lambda: count
+    with pytest.raises(ValueError, match="multi-jog leader count"):
+        getattr(bounds, reader)(annotation)
