@@ -63,6 +63,23 @@ The report is
 This establishes one annotation override and its update boundary, not a
 type-level default, a completed lever drawing, or an end-to-end speedup.
 
+The subsequent `--length-scope gtol_default --update-boundary edit_rebuild`
+control at `4a28d4e0` used only the two GTol-family document settings. It also
+passed: the actual 6.35 mm leader, unchanged 73.30296548 mm global datum setting,
+annotation semantics and source hashes persisted through reopening. Its
+`BentLeaderLength` getter remained -1, as expected for a document-driven length.
+The settings/readback phase took 0.094 seconds and the rebuild 0.164 seconds;
+the full evidence run took 100.864 seconds, including repeated inventories and
+three exports. Those are diagnostic costs, not a full-recipe speed comparison.
+Report: `gtol-leader-override-y228ca9f/gtol-leader-override.json` in the same
+worktree's reports directory. The output pixels match the individual-override
+control. Surface-finish defaults are not covered by this result.
+
+The live toggle setter returned true while its explicit getter read false,
+contrary to the bundled method page's resulting-state return description. The
+control records both and checks the getter; it does not infer the setting from
+the setter's Boolean alone.
+
 ## Trial isolation
 
 All native trials require the machine-global seat, an explicitly identified
