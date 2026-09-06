@@ -244,7 +244,7 @@ def validate_gtol_leader_clearance(measurements_by_view):
         )
         if crossings:
             raise RuntimeError(
-                f"{view}: final measured GTol leader/text-cell crossings: {json.dumps(crossings)}"
+                f"{view}: final measured GTol leader/text-cell crossings: {json.dumps({'crossings': crossings, 'native_geometry': {name: asdict(row) for name, row in geometry.items()}})}"
             )
         report[view] = {
             "gtol_count": len(geometry),

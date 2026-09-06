@@ -86,6 +86,11 @@ def test_clearance_order_requires_every_body_once(order):
 
 def native_context(monkeypatch, count=2):
     monkeypatch.setattr(layout, "_early_bound", lambda item, name: item)
+    monkeypatch.setattr(
+        layout,
+        "annotation_leader_geometry",
+        lambda annotation: layout.LeaderGeometry((), ()),
+    )
     app, model, view = Mock(), Mock(), Mock()
     adapter = SimpleNamespace(swApp=app, currentModel=model)
     app.IsSame.side_effect = lambda first, second: int(first is second)
@@ -151,9 +156,15 @@ def native_context(monkeypatch, count=2):
         x, y, _ = annotation.position
         width, height = annotation.size
         return SimpleNamespace(
+            kind=5,
             body=Rect(x, y - height, x + width, y),
             anchor=(x, y),
             format_signature=("Century Gothic", 0.0035),
+            text_boxes=(),
+            text_runs=(),
+            native_leader_segments=(),
+            leader_segments=(),
+            leader_decorations=(),
         )
 
     return adapter, view, rows, measure
@@ -183,12 +194,20 @@ def test_native_commands_clearance_and_outboard_shift_keep_exact_entities(monkey
     assert result["body_after"][0] == pytest.approx(0.802)
 
 
-@pytest.mark.parametrize("count,commands", [(0, []), (1, []), (2, [307]), (3, [317, 307])])
-def test_native_spacing_uses_the_observed_minimum_bank_cardinality(monkeypatch, count, commands):
+@pytest.mark.parametrize(
+    "count,commands", [(0, []), (1, []), (2, [307]), (3, [317, 307])]
+)
+def test_native_spacing_uses_the_observed_minimum_bank_cardinality(
+    monkeypatch, count, commands
+):
     adapter, view, rows, measure = native_context(monkeypatch, count=count)
-    adapter.swApp.IsCommandEnabled.side_effect = lambda command: command != 317 or count >= 3
+    adapter.swApp.IsCommandEnabled.side_effect = lambda command: (
+        command != 317 or count >= 3
+    )
     arrange(adapter, view, measure)
-    assert [call.args[0] for call in adapter.swApp.RunCommand.call_args_list] == commands
+    assert [
+        call.args[0] for call in adapter.swApp.RunCommand.call_args_list
+    ] == commands
 
 
 @pytest.mark.parametrize("count", [0, 1])
