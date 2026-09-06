@@ -125,6 +125,60 @@ def test_empty_thread_data_does_not_prove_zero_ink(monkeypatch):
         bounds._native_snapshot(annotation(native_data()), object())
 
 
+@pytest.mark.parametrize("value", [float("nan"), float("inf")])
+@pytest.mark.parametrize("coordinate", range(4, 10))
+def test_thread_line_rejects_nonfinite_xyz_before_projection(
+    monkeypatch, value, coordinate
+):
+    monkeypatch.setattr(bounds, "_thread_line_width", lambda extension: 0.00018)
+    line = [0, 32, 1, 0, 0.1, 0.2, 0, 0.3, 0.4, 0]
+    line[coordinate] = value
+    with pytest.raises(ValueError, match="XYZ geometry must be finite"):
+        bounds._native_snapshot(annotation(native_data(lines=(line,))), object())
+
+
+@pytest.mark.parametrize("normal", [(float("nan"), 0, 1), (0, 0, 0)])
+def test_thread_arc_requires_finite_nonzero_sheet_normal(monkeypatch, normal):
+    monkeypatch.setattr(bounds, "_thread_line_width", lambda extension: 0.00018)
+    arc = (0, 32, -1, -1, 0.08, 0.15, 0, 0.08, 0.15, 0, 0.07, 0.15, 0, *normal, 1)
+    with pytest.raises(ValueError, match="normal geometry|drawing sheet plane"):
+        bounds._native_snapshot(annotation(native_data(arcs=(arc,))), object())
+
+
+@pytest.mark.parametrize("value", [-1, 1.5, float("nan"), float("inf")])
+@pytest.mark.parametrize(
+    "kind",
+    [
+        "Text",
+        "Line",
+        "Arc",
+        "PolyLine",
+        "Triangle",
+        "ArrowHead",
+        "Polygon",
+        "Ellipse",
+        "Parabola",
+        "Point",
+    ],
+)
+def test_native_primitive_counts_cannot_silently_drop_records(monkeypatch, value, kind):
+    monkeypatch.setattr(bounds, "_thread_line_width", lambda extension: 0.00018)
+    data = native_data(lines=((0, 32, 1, 0, 0.1, 0.2, 0, 0.3, 0.4, 0),))
+    setattr(data, f"Get{kind}Count", lambda: value)
+    with pytest.raises(ValueError, match="invalid.*count"):
+        bounds._native_snapshot(annotation(data), object())
+
+
+@pytest.mark.parametrize("count", [2.5, -1, float("nan")])
+def test_polyline_embedded_count_cannot_truncate(monkeypatch, count):
+    monkeypatch.setattr(bounds, "_thread_line_width", lambda extension: 0.00018)
+    polyline = (0, 0, 0, 32, -1, -1, count, 0.1, 0.2, 0, 0.3, 0.4, 0)
+    with pytest.raises(ValueError, match="integral point count"):
+        bounds._native_snapshot(
+            annotation(native_data(polylines=(polyline,))), object()
+        )
+
+
 @pytest.mark.parametrize("weight,preference", [(0, 100), (3, 103), (10, 901)])
 def test_native_thread_weight_uses_actual_standard_or_custom_preference(
     monkeypatch, weight, preference
