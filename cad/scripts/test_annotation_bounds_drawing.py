@@ -53,6 +53,13 @@ def test_native_stroke_witness_preserves_internal_geometry_and_print_width():
     assert translated.native_strokes == shifted
 
 
+def test_leader_decoration_boxes_remain_available_for_text_collision_checks():
+    decoration = Rect(0.045, 0.015, 0.049, 0.019)
+    measured = bounds_from_snapshot(snapshot(leader_boxes=(decoration,)))
+    assert measured.leader_decorations == (decoration,)
+    assert measured.envelope.xmax >= decoration.xmax
+
+
 def _all_around_snapshot(
     monkeypatch,
     *,

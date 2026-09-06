@@ -37,7 +37,7 @@ _GEOMETRY_EPSILON_M = 1e-8  # Native duplicate frame vertices differ by ~0.7nm.
 _FONT_EM_PIXELS = 10000
 _SW2026_CENTURY_GOTHIC_EM_PER_HEIGHT = 4 / 3
 _SYMBOL = re.compile(r"<[^<>]+-[^<>]+>\Z")
-_KINDS = frozenset({2, 4, 5, 6, 7, 13, 15})
+_KINDS = frozenset({1, 2, 4, 5, 6, 7, 13, 15})
 
 
 @dataclass(frozen=True)
@@ -84,6 +84,7 @@ class AnnotationBounds:
     leader_segments: tuple[Segment, ...]
     format_signature: tuple[Any, ...]
     native_strokes: tuple[Segment, ...]
+    leader_decorations: tuple[Rect, ...] = ()
 
 
 def _rectangle(points: list[Point]) -> Rect:
@@ -418,6 +419,7 @@ def bounds_from_snapshot(
         leaders,
         snapshot.format_signature,
         snapshot.lines,
+        snapshot.leader_boxes,
     )
 
 
@@ -456,8 +458,8 @@ def _native_symbol_extent(
 
 
 @lru_cache(maxsize=1)
-def _line_weight_preferences() -> tuple[int, ...]:
-    """Read installed swconst values; documentation lists names, not integers."""
+def _installed_swconst():
+    """Read installed values; the reference lists some names without integers."""
     import pythoncom
     from win32com.client import gencache
     from solidworks_mcp.adapters import sw_type_info
@@ -468,7 +470,12 @@ def _line_weight_preferences() -> tuple[int, ...]:
     iid, lcid, _system, major, minor, _flags = pythoncom.LoadTypeLib(
         str(path)
     ).GetLibAttr()
-    constants = gencache.EnsureModule(str(iid), lcid, major, minor).constants
+    return gencache.EnsureModule(str(iid), lcid, major, minor).constants
+
+
+@lru_cache(maxsize=1)
+def _line_weight_preferences() -> tuple[int, ...]:
+    constants = _installed_swconst()
     return tuple(
         int(getattr(constants, f"swPageSetupPrinter{name}LineWeight"))
         for name in (
@@ -482,6 +489,28 @@ def _line_weight_preferences() -> tuple[int, ...]:
             "Thick6",
         )
     )
+
+
+def _thread_line_width(extension: Any) -> float:
+    """Native document cosmetic-thread print width, including custom weights."""
+    if extension is None:
+        raise ValueError("cosmetic-thread bounds require native document line weight")
+    constants = _installed_swconst()
+    weight = int(
+        extension.GetUserPreferenceInteger(
+            constants.swLineFontCosmeticThreadThickness, 0
+        )
+    )
+    if weight == 10:  # swLW_CUSTOM; DP_LineFont documents this preference pair.
+        preference = constants.swLineFontCosmeticThreadThicknessCustom
+    elif weight in range(8):
+        preference = _line_weight_preferences()[weight]
+    else:
+        raise ValueError(f"unsupported cosmetic-thread print weight {weight}")
+    width = float(extension.GetUserPreferenceDouble(preference, 0))
+    if not math.isfinite(width) or width <= 0:
+        raise ValueError("native cosmetic-thread print width must be positive")
+    return width
 
 
 def _native_snapshot(annotation: Any, extension: Any = None) -> NativeSnapshot:
@@ -498,6 +527,10 @@ def _native_snapshot(annotation: Any, extension: Any = None) -> NativeSnapshot:
     }
     if any(count != 0 for count in unsupported.values()):
         raise ValueError(f"unsupported native primitive inventory: {unsupported}")
+    # A valid copied screw thread exposed lines, a circle and projected polylines
+    # through this very IAnnotation API. The old zero-diameter feature exposed
+    # nothing. Never infer thread ink from its smaller simplified solid face.
+    thread_width = _thread_line_width(extension) if kind == 1 else 0.0
     runs = []
     for index in range(int(data.GetTextCount())):
         if tuple(data.GetTextPlaneAtIndex(index) or ()):
@@ -519,7 +552,7 @@ def _native_snapshot(annotation: Any, extension: Any = None) -> NativeSnapshot:
         raw = tuple(data.GetLineAtIndex3(index))
         if len(raw) != 10:
             raise ValueError("native line array must contain ten values")
-        width = 0.0
+        width = thread_width
         if kind in {13, 15}:
             weight = int(raw[3])
             if weight not in range(8) or extension is None:
@@ -540,7 +573,7 @@ def _native_snapshot(annotation: Any, extension: Any = None) -> NativeSnapshot:
         raw = tuple(data.GetArcAtIndex2(index))
         if len(raw) != 17 or abs(raw[13]) > 1e-8 or abs(raw[14]) > 1e-8:
             raise ValueError("native arc is not in the drawing sheet plane")
-        radius = math.dist(raw[4:6], raw[10:12])
+        radius = math.dist(raw[4:6], raw[10:12]) + thread_width / 2
         boxes.append(
             Rect(raw[10] - radius, raw[11] - radius, raw[10] + radius, raw[11] + radius)
         )
@@ -554,7 +587,7 @@ def _native_snapshot(annotation: Any, extension: Any = None) -> NativeSnapshot:
         if len(raw) != 7 + count * 3:
             raise ValueError("native polyline point count mismatch")
         points = tuple((raw[7 + i * 3], raw[8 + i * 3]) for i in range(count))
-        lines.extend(Segment(a, b) for a, b in zip(points, points[1:]))
+        lines.extend(Segment(a, b, thread_width) for a, b in zip(points, points[1:]))
     leaders = []
     elbows = []
     for index in range(int(annotation.GetLeaderCount())):
@@ -631,11 +664,14 @@ def _native_snapshot(annotation: Any, extension: Any = None) -> NativeSnapshot:
             raise ValueError("native note extent must expose two XYZ points")
         extent = raw[0], raw[1], raw[3], raw[4]
     position = tuple(annotation.GetPosition() or ())
-    if not position and kind in {13, 15}:
+    if not position and kind in {1, 13, 15}:
         # CenterLine.GetAnnotation().GetPosition returned None in the saved
         # screw positive control. This is a derived witness anchor only, never
         # an annotation SetPosition target; its parent view owns movement.
-        measured = _rectangle([p for line in lines for p in _stroke_points(line)])
+        measured = _rectangle(
+            [p for line in lines for p in _stroke_points(line)]
+            + [p for box in boxes for p in _corners(box)]
+        )
         position = (
             (measured.xmin + measured.xmax) / 2,
             (measured.ymin + measured.ymax) / 2,
