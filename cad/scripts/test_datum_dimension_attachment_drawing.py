@@ -12,15 +12,20 @@ def context(monkeypatch):
     monkeypatch.setattr(probe, "_early_bound", lambda obj, _: obj)
     monkeypatch.setattr(probe, "null_callout", lambda: None)
     view = SimpleNamespace(GetName2=lambda: "Front")
-    annotation = SimpleNamespace(OwnerType=0, Owner=view)
+    annotation = SimpleNamespace(
+        OwnerType=0, Owner=view, Select2=Mock(return_value=True)
+    )
+    dimension = object()
     display = SimpleNamespace(
         GetNameForSelection=lambda: "BoreCutDia@DrawingView1",
         GetAnnotation=lambda: annotation,
+        GetDimension2=lambda _: dimension,
     )
     selection = SimpleNamespace(
         GetSelectedObjectCount2=lambda _: 1,
         GetSelectedObjectType3=lambda *_: 14,
         GetSelectedObject6=lambda *_: display,
+        GetSelectionPoint2=lambda *_: (0.1, 0.2, 0.0),
     )
     extension = SimpleNamespace(SelectByID2=Mock(return_value=True))
     model = SimpleNamespace(
@@ -32,7 +37,12 @@ def context(monkeypatch):
     adapter = SimpleNamespace(
         currentModel=model, swApp=SimpleNamespace(IsSame=lambda a, b: int(a is b))
     )
-    bore = {"view": view, "annotation": annotation, "display": display}
+    bore = {
+        "view": view,
+        "annotation": annotation,
+        "display": display,
+        "dimension": dimension,
+    }
     return adapter, bore
 
 
@@ -42,6 +52,47 @@ def test_named_selection_uses_no_coordinate_feature_pick(monkeypatch):
     adapter.currentModel.Extension.SelectByID2.assert_called_once_with(
         "BoreCutDia@DrawingView1", "DIMENSION", 0.0, 0.0, 0.0, False, 0, None, 0
     )
+
+
+def test_annotation_select2_is_the_only_selection_delta(monkeypatch):
+    adapter, bore = context(monkeypatch)
+    observed = probe.select_bore(adapter, bore, probe.BoreSelector.ANNOTATION_SELECT2)
+    bore["annotation"].Select2.assert_called_once_with(False, 0)
+    adapter.currentModel.Extension.SelectByID2.assert_not_called()
+    assert observed == {
+        "selector": "annotation_select2",
+        "count": 1,
+        "type": 14,
+        "selected_interface": "IDisplayDimension",
+        "display_identity": "exact",
+        "source_dimension_identity": "exact",
+        "annotation_owner_identity": "exact",
+        "selection_point": (0.1, 0.2, 0.0),
+    }
+
+
+def test_annotation_select2_false_is_not_retried_with_another_selector(monkeypatch):
+    adapter, bore = context(monkeypatch)
+    bore["annotation"].Select2.return_value = False
+    with pytest.raises(RuntimeError, match="selection rejected: annotation_select2"):
+        probe.select_bore(adapter, bore, probe.BoreSelector.ANNOTATION_SELECT2)
+    adapter.currentModel.Extension.SelectByID2.assert_not_called()
+
+
+@pytest.mark.parametrize("selector", tuple(probe.BoreSelector))
+@pytest.mark.parametrize("change", ["annotation_returned", "source_dimension"])
+def test_selector_preserves_display_and_source_dimension_distinction(
+    monkeypatch, selector, change
+):
+    adapter, bore = context(monkeypatch)
+    if change == "annotation_returned":
+        adapter.currentModel.SelectionManager.GetSelectedObject6 = lambda *_: bore[
+            "annotation"
+        ]
+    else:
+        bore["display"].GetDimension2 = lambda _: object()
+    with pytest.raises(RuntimeError):
+        probe.select_bore(adapter, bore, selector)
 
 
 @pytest.mark.parametrize("change", ["false", "count", "type", "display", "owner"])
@@ -182,7 +233,8 @@ def test_insertion_target_is_relative_to_measured_dimension_body():
 
 
 @pytest.mark.parametrize("target", [None, (0.1535, 0.110, 0.0)])
-def test_position_is_the_only_paired_insertion_delta(monkeypatch, target):
+@pytest.mark.parametrize("selector", tuple(probe.BoreSelector))
+def test_position_is_the_only_paired_insertion_delta(monkeypatch, target, selector):
     adapter, bore = context(monkeypatch)
     events = []
     old = SimpleNamespace(Select2=lambda *_: True)
@@ -202,14 +254,17 @@ def test_position_is_the_only_paired_insertion_delta(monkeypatch, target):
     selection.GetSelectedObject6 = lambda *_: SimpleNamespace(GetAnnotation=lambda: old)
     adapter.currentModel.Extension.DeleteSelection2 = lambda _: True
     bore["view"].GetAnnotationsByType = lambda _: ()
-    monkeypatch.setattr(probe, "select_bore", lambda *_: None)
+    select_bore = Mock(return_value={"selector": selector.value})
+    monkeypatch.setattr(probe, "select_bore", select_bore)
     observed = {}
     assert (
         probe.replace_on_dimension(
-            adapter, bore, old, target=target, observations=observed
+            adapter, bore, old, target=target, observations=observed, selector=selector
         )
         is new
     )
+    select_bore.assert_called_once_with(adapter, bore, selector)
+    assert observed["selection"] == {"selector": selector.value}
     expected = [("clear",), ("insert",), ("label", "A")]
     if target is not None:
         expected.append(("position", target))
