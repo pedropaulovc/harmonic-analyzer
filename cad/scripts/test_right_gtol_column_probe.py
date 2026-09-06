@@ -5,15 +5,14 @@ from types import SimpleNamespace
 import pytest
 
 from _drawing_annotation_bounds import Segment
+from _drawing_leader_clearance import intersects_cell, VerticalDirection
 from _drawing_view_packing import Rect
 from probe_drawing_right_gtol_column import (
-    intersects_cell,
     right_translation,
     crossing_records,
     _same_native,
     _same_saved_frames,
     vertical_candidates,
-    VerticalDirection,
     _candidate_trials,
     prove_narrow_reader,
     displayed_leader_coverage,
