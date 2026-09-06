@@ -93,11 +93,19 @@ async def test_one_fresh_recipe_each_in_order_and_stop_first_failure(
     monkeypatch.setattr(
         probe,
         "source_dimensions",
-        lambda *_: ({"source": "same"}, {"dimension": source_handle}),
+        lambda *_: (
+            {"source": "same", "configuration": "Default"},
+            {"dimension": source_handle},
+        ),
     )
     snapshots = []
 
-    def drawing_witness(adapter):
+    def drawing_witness(adapter, *, source, configuration):
+        assert source.is_relative_to(tmp_path / "reports")
+        assert source.name.startswith("rocker-arm-source-") or source.name.startswith(
+            "channel-lever-source-"
+        )
+        assert configuration == "Default"
         snapshots.append(adapter.currentModel)
         return {"observed": len(snapshots) if mode == "reopen_drift" else "same"}
 
@@ -296,6 +304,45 @@ def test_source_missing_basic_designation_fails_instead_of_reauthoring(
         probe.source_dimensions(model, "channel_lever", path)
 
 
+@pytest.mark.parametrize(
+    "variant", ["correct", "wrong_path", "wrong_configuration", "empty_models"]
+)
+def test_drawing_witness_requires_every_view_to_reference_expected_owned_source(
+    tmp_path, monkeypatch, variant
+):
+    source = tmp_path / "owned-copy.SLDPRT"
+    model = {"path": str(source), "configuration": "Default"}
+    models = {"front": dict(model), "top": dict(model)}
+    if variant == "wrong_path":
+        models["top"]["path"] = str(tmp_path / "original.SLDPRT")
+    if variant == "wrong_configuration":
+        models["top"]["configuration"] = "Different"
+    if variant == "empty_models":
+        models = {}
+    # Matching values/attachments must not disguise a wrong native model owner.
+    semantics = {
+        "models": models,
+        "checked": {"edge": "same"},
+        "dimensions": {"Width": {"value_system": 0.024}},
+        "dimensions_excluded": {},
+    }
+    snapshot = Mock(return_value=semantics)
+    all_annotations = Mock(return_value=({}, {}))
+    monkeypatch.setattr(probe.attachments, "snapshot", snapshot)
+    monkeypatch.setattr(probe.shoulder, "all_annotation_layout", all_annotations)
+    monkeypatch.setattr(probe.attachments, "layout", lambda _: {})
+    adapter = SimpleNamespace(currentModel=object(), swApp=object())
+    if variant == "correct":
+        actual = probe.drawing_witness(adapter, source=source, configuration="Default")
+        assert actual["semantics"] is semantics
+        all_annotations.assert_called_once_with(adapter)
+    else:
+        with pytest.raises(RuntimeError, match="owned source|view models"):
+            probe.drawing_witness(adapter, source=source, configuration="Default")
+        all_annotations.assert_not_called()
+    snapshot.assert_called_once_with(adapter.currentModel, app=adapter.swApp)
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("mode", ["normal", "build_failure", "copy_saved"])
 async def test_owned_dirty_part_copies_preserve_real_baseline_lifecycle(
@@ -330,7 +377,9 @@ async def test_owned_dirty_part_copies_preserve_real_baseline_lifecycle(
     monkeypatch.setattr(
         probe,
         "drawing_witness",
-        lambda adapter: {"reference": adapter.currentModel.references[0].path},
+        lambda adapter, *, source, configuration: {
+            "reference": adapter.currentModel.references[0].path
+        },
     )
 
     def compare(_app, before, after):
