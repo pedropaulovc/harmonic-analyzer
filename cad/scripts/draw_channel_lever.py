@@ -26,7 +26,7 @@ from channel_lever_spec import GEOMETRIC_TOLERANCES_MM
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _basic_dimensions import require_basic_dimension
-from _drawing_project_layout import repair_project_drawing_layout
+from _drawing_project_layout import DatumLeaderPolicy, repair_project_drawing_layout
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
@@ -411,6 +411,7 @@ async def build(
 
     layout(
         adapter,
+        datum_leader_policy=DatumLeaderPolicy.BENT_DOCUMENT,
         views={"front": front, "right": right, "top": top, "iso": iso},
         alignments=(
             AxisLink(Axis.X, "front", "top"),

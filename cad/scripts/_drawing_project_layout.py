@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, Mapping, Sequence
 
 from _common import _early_bound
 from _drawing_common import _TITLE_BLOCK_LEFT_M, _TITLE_BLOCK_TOP_M
+from _drawing_native_callouts import DatumLeaderPolicy
 import _telemetry
 
 if TYPE_CHECKING:
@@ -25,6 +26,7 @@ def repair_project_drawing_layout(
     alignments: Sequence[AxisLink] = (),
     orderings: Sequence[AxisOrder] = (),
     notes: Sequence[LayoutNote] = (),
+    datum_leader_policy: DatumLeaderPolicy = DatumLeaderPolicy.EXISTING,
 ) -> NativeLayoutReport:
     """Space native callouts and pack the complete measured single-sheet drawing.
 
@@ -84,6 +86,7 @@ def repair_project_drawing_layout(
             record_measurement=obstacle_handoff.record,
             gtol_placement=GtolPlacement.ARRANGED_NEXT,
             deferred_notes=tuple(note.annotation for note in notes),
+            datum_leader_policy=datum_leader_policy,
         )
         obstacle_handoff.seal()
         arrange_native_gtol_columns(
