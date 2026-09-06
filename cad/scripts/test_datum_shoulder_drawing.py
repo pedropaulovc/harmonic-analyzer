@@ -65,6 +65,21 @@ def test_cleanup_closes_only_exact_owned_copy_without_saving(monkeypatch, tmp_pa
     assert state.documents == [reference]  # never explicitly close the source
 
 
+def test_owned_title_is_native_window_title_not_inferred_filename(monkeypatch, tmp_path):
+    import asyncio
+
+    adapter, state, directory, source, document, activate = owned_setup(monkeypatch, tmp_path)
+    owned = probe.OwnedDrawingCopy(adapter, directory, source)
+    path = directory / "trial.SLDDRW"
+    owned.expect_open(path)
+    copy = document(path)
+    copy.GetTitle = lambda: "trial - Sheet1"
+    activate(copy)
+    owned.claim()
+    asyncio.run(owned.close())
+    assert state.closes == [(copy, False)]
+
+
 @pytest.mark.parametrize("stage", ["normal", "failure"])
 def test_unrelated_active_document_survives_normal_and_failed_cleanup(
     monkeypatch, tmp_path, stage
