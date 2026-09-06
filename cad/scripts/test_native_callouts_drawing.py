@@ -252,7 +252,9 @@ def native_setup(monkeypatch, kind=2, outline=(0.02, 0.04, 0.1, 0.08)):
         ),
     )
     annotation.Owner = view
-    sheet_view = SimpleNamespace(GetAnnotations=lambda: ())
+    sheet_view = SimpleNamespace(
+        GetAnnotations=lambda: (), GetAnnotationsByType=lambda kind: ()
+    )
     model = SimpleNamespace(
         GetType=lambda: 3,
         GetViews=lambda: ((sheet_view, view),),
@@ -464,6 +466,7 @@ def test_sheet_owned_declared_note_has_valid_drawing_membership(monkeypatch):
     setup[3].remove(note)
     sheet_view = setup[0].currentModel.GetViews()[0][0]
     sheet_view.GetAnnotations = lambda: (note,)
+    sheet_view.GetAnnotationsByType = lambda kind: (note,) if kind == 6 else ()
     note.Owner = sheet_view
     result = run_native(setup, deferred_notes=(note,))
     assert result["front"]["deferred_annotations"] == {}
@@ -486,6 +489,62 @@ def test_raw_dispatch_declared_note_is_bound_before_typed_access(monkeypatch):
     run_native(setup, deferred_notes=(raw,))
     assert (raw, "IAnnotation") in bindings
     assert note.GetName() not in setup[4]
+
+
+def test_declared_notes_shortlist_native_names_but_still_check_exact_identity(
+    monkeypatch,
+):
+    import _drawing_native_callouts as module
+
+    setup = native_setup(monkeypatch)
+    note = unattached_note(setup)
+    adapter, view = setup[:2]
+    calls = []
+    for index in range(40):
+        unrelated = NativeAnnotation(6)
+        unrelated.GetName = lambda index=index: f"Unrelated{index}"
+        setup[3].append(unrelated)
+    adapter.swApp.IsSame = lambda first, second: (
+        calls.append((first, second)) or int(first is second)
+    )
+    result = module._declared_notes(
+        adapter, adapter.currentModel, {"front": view}, (note,)
+    )
+    assert result[note.GetName()].annotation is note
+    assert calls == [(note, note)]
+
+
+def test_same_name_replacement_cannot_establish_declared_note_membership(monkeypatch):
+    import _drawing_native_callouts as module
+
+    setup = native_setup(monkeypatch)
+    note = unattached_note(setup)
+    setup[3].remove(note)
+    replacement = NativeAnnotation(6)
+    replacement.GetName = note.GetName
+    setup[3].append(replacement)
+    with pytest.raises(ValueError, match="absent from the planned drawing inventory"):
+        module._declared_notes(
+            setup[0], setup[0].currentModel, {"front": setup[1]}, (note,)
+        )
+
+
+def test_deferred_annotations_do_not_compare_unrelated_dimensions_to_notes(monkeypatch):
+    import _drawing_native_callouts as module
+
+    setup = native_setup(monkeypatch)
+    note = unattached_note(setup)
+    dimension = extra_annotation(setup, 4)
+    calls = []
+    app = SimpleNamespace(IsSame=lambda a, b: calls.append((a, b)) or int(a is b))
+    result = module._deferred_annotations(
+        app,
+        {note.GetName(): note, dimension.GetName(): dimension},
+        module.GtolPlacement.FIXED,
+        {note.GetName(): module._Deferred(note, 6, 1)},
+    )
+    assert result.keys() == {note.GetName()}
+    assert calls == [(note, note)]
 
 
 def test_undeclared_note_remains_a_measured_obstacle(monkeypatch):

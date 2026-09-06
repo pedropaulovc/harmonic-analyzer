@@ -417,6 +417,7 @@ def _read_obstacles(
     return result
 
 
+@_telemetry.traced("drawing.callouts.declared_notes")
 def _declared_notes(
     adapter: Any, drawing: Any, views: Mapping[str, Any], notes: Sequence[Any]
 ) -> dict[str, _Deferred]:
@@ -428,11 +429,15 @@ def _declared_notes(
         views.values()
     )
     inventory = tuple(
-        raw
+        _early_bound(raw, "IAnnotation")
         for view in owners
-        for raw in _early_bound(view, "IView").GetAnnotations() or ()
+        for raw in _early_bound(view, "IView").GetAnnotationsByType(6) or ()
     )
+    by_name: dict[str, list[Any]] = {}
+    for candidate in inventory:
+        by_name.setdefault(str(candidate.GetName()), []).append(candidate)
     result = {}
+    comparisons = 0
     for raw_note in notes:
         note = _early_bound(raw_note, "IAnnotation")
         name = str(note.GetName())
@@ -445,9 +450,13 @@ def _declared_notes(
             raise ValueError(
                 "deferred packing notes need unique visible native note identities"
             )
-        if not any(
-            int(adapter.swApp.IsSame(note, actual)) == 1 for actual in inventory
-        ):
+        matched = False
+        for actual in by_name.get(name, ()):
+            comparisons += 1
+            if int(adapter.swApp.IsSame(note, actual)) == 1:
+                matched = True
+                break
+        if not matched:
             raise ValueError(
                 "deferred note is absent from the planned drawing inventory"
             )
@@ -460,6 +469,12 @@ def _declared_notes(
                 "only explicitly declared unattached packing notes may be deferred"
             )
         result[name] = _Deferred(note, 6, int(note.Visible))
+    _telemetry.info(
+        "declared packing notes matched",
+        declared_note_count=len(result),
+        native_note_count=len(inventory),
+        exact_identity_comparisons=comparisons,
+    )
     return result
 
 
@@ -475,9 +490,8 @@ def _deferred_annotations(
         if kind == 5 and gtol_placement is GtolPlacement.ARRANGED_NEXT:
             result[name] = _Deferred(annotation, kind, int(annotation.Visible))
             continue
-        if any(
-            int(app.IsSame(annotation, note.annotation)) == 1 for note in notes.values()
-        ):
+        note = notes.get(name)
+        if note is not None and int(app.IsSame(annotation, note.annotation)) == 1:
             result[name] = _Deferred(annotation, kind, int(annotation.Visible))
     return result
 
