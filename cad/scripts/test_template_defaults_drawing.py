@@ -28,6 +28,25 @@ def test_invalid_template_variant_fails_before_native_work(scale, decimals):
         probe.TemplateSpec(scale, decimals)
 
 
+def test_unit_contract_preserves_observed_custom_mm_terminal_state():
+    probe.validate_units(
+        {"system": 4, "linear": 0, "decimals": 2}, probe.TemplateSpec((2, 1), 2)
+    )
+
+
+@pytest.mark.parametrize(
+    "units",
+    [
+        {"system": 5, "linear": 0, "decimals": 2},
+        {"system": 4, "linear": 3, "decimals": 2},
+        {"system": 4, "linear": 0, "decimals": 3},
+    ],
+)
+def test_unit_contract_does_not_wildcard_system_length_or_precision(units):
+    with pytest.raises(RuntimeError, match="units/precision differ"):
+        probe.validate_units(units, probe.TemplateSpec((2, 1), 2))
+
+
 def test_candidate_omits_all_setters_and_blank_rebuilds(monkeypatch, tmp_path):
     calls = []
     template = tmp_path / "owned.DRWDOT"
