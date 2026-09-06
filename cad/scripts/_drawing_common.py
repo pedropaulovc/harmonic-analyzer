@@ -913,6 +913,41 @@ def project_part_pmi(
     return projected
 
 
+def _style_surface_finish(adapter: Any, symbol: Any, annotation: Any, *, label: str) -> None:
+    """Use the drawing's dimension typography and native upright orientation.
+
+    The template's SF default is 6.35 mm while dimensions/notes are 3.5 mm.
+    Both native and old bent-leader insertions inherit that oversized default.
+    Copy the actual document dimension format rather than hardcoding a font or
+    size. The copy-only probe_drawing_annotation_layout diagnostic proves this
+    style remains attached, horizontal and correctly sized after save/reopen.
+    """
+    extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
+    # swDetailingDimensionTextFormat=1, swDetailingNoOptionSpecified=0,
+    # read from the installed R2026x swconst.tlb by the committed diagnostic.
+    raw = extension.GetUserPreferenceTextFormat(1, 0)
+    if raw is None:
+        raise RuntimeError(f"{label}: drawing has no dimension text standard")
+    desired = _early_bound(raw, "ITextFormat")
+
+    def signature(value: Any) -> tuple[float, str, float, bool]:
+        return (float(value.CharHeight), str(value.TypeFaceName), float(value.WidthFactor), bool(value.Italic))
+
+    expected = signature(desired)
+    if not math.isfinite(expected[0]) or expected[0] <= 0 or not expected[1]:
+        raise RuntimeError(f"{label}: drawing dimension text standard is invalid: {expected}")
+    if not annotation.SetTextFormat(0, False, desired):
+        raise RuntimeError(f"{label}: surface finish rejected dimension text standard")
+    symbol = _early_bound(symbol, "ISFSymbol")
+    symbol.Orientation = 1  # swSFOrientation_Upright: horizontal, not entity-perpendicular
+    applied = annotation.GetTextFormat(0)
+    if applied is None or signature(_early_bound(applied, "ITextFormat")) != expected:
+        raise RuntimeError(f"{label}: surface finish text standard did not persist")
+    angle = float(symbol.GetAngle())
+    if int(symbol.Orientation) != 1 or not math.isfinite(angle) or abs(math.remainder(angle, 2 * math.pi)) > 1e-9:
+        raise RuntimeError(f"{label}: surface finish native upright orientation did not persist")
+
+
 @_telemetry.traced("drawing.surface_finish", label_param="label")
 def add_surface_finish(
     adapter: Any,
@@ -1047,6 +1082,7 @@ def add_surface_finish(
         0, leader_attach_xy[0], leader_attach_xy[1], 0.0
     ):
         raise RuntimeError(f"failed to position surface-finish leader ({label})")
+    _style_surface_finish(adapter, symbol, annotation, label=label)
     draw.ClearSelection2(True)
     draw.EditRebuild3()
     if symbol_xy is None:

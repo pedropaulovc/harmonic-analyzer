@@ -61,6 +61,7 @@ def native_context(monkeypatch):
     # Selection projection has its own geometry/context tests below; these
     # insertion tests isolate annotation value and attachment validation.
     monkeypatch.setattr(drawing, "_project_native_gtol_selection", Mock())
+    monkeypatch.setattr(drawing, "_style_surface_finish", Mock())
     return adapter, view, entity, annotation
 
 
@@ -108,6 +109,13 @@ def test_native_placement_keeps_created_position_and_validates_attachment(
     adapter.swApp.IsSame.assert_called_once_with(entity, entity)
     adapter.currentModel.Extension.SelectByID2.assert_not_called()
     adapter.currentModel.SelectionManager.SetSelectionPoint2.assert_not_called()
+    if kind == "surface":
+        drawing._style_surface_finish.assert_called_once_with(
+            adapter, adapter.currentModel.Extension.InsertSurfaceFinishSymbol3.return_value,
+            annotation, label="bore",
+        )
+    else:
+        drawing._style_surface_finish.assert_not_called()
     if kind == "frame":
         drawing._project_native_gtol_selection.assert_called_once_with(
             adapter, view, entity, entity_type="EDGE", label="bore"
