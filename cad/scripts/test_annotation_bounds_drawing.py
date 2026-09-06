@@ -17,6 +17,40 @@ from _drawing_annotation_bounds import (
 )
 
 
+def test_native_stroke_witness_preserves_internal_geometry_and_print_width():
+    lines = (
+        Segment((0.01, 0.02), (0.03, 0.02), 0.00018),
+        Segment((0.02, 0.01), (0.02, 0.03), 0.00018),
+    )
+    measured = bounds_from_snapshot(snapshot(kind=15, text_runs=(), lines=lines))
+    assert measured.native_strokes == lines
+    # Moving an interior endpoint leaves the bounding rectangle unchanged but
+    # must be detectable by a native geometry witness.
+    interior = Segment((0.014, 0.025), (0.025, 0.025), 0.00018)
+    before = bounds_from_snapshot(
+        snapshot(kind=15, text_runs=(), lines=(*lines, interior))
+    )
+    after = bounds_from_snapshot(
+        snapshot(
+            kind=15,
+            text_runs=(),
+            lines=(*lines, replace(interior, start=(0.015, 0.025))),
+        )
+    )
+    assert before.body == after.body
+    assert before.native_strokes != after.native_strokes
+    shifted = tuple(
+        Segment(
+            (line.start[0] + 0.006, line.start[1] - 0.004),
+            (line.end[0] + 0.006, line.end[1] - 0.004),
+            line.width_m,
+        )
+        for line in lines
+    )
+    translated = bounds_from_snapshot(snapshot(kind=15, text_runs=(), lines=shifted))
+    assert translated.native_strokes == shifted
+
+
 def text(value="LONG QUANTITY BELOW FRAME", position=(0.05, 0.04), angle=0):
     return TextRun(value, position, 0.0035, "Century Gothic", angle, 1, 0)
 
