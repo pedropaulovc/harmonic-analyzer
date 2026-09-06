@@ -9,7 +9,9 @@ from unittest.mock import Mock
 import pytest
 
 from diagnostics import probe_datum_policy_recipes as probe
+from diagnostics import _owned_native_documents as owned
 from test_benchmark_drawing_recipes import recipe
+from test_owned_native_documents_drawing import Model, native  # noqa: F401
 
 
 def fixture_sources(tmp_path, monkeypatch):
@@ -121,9 +123,20 @@ async def test_one_fresh_recipe_each_in_order_and_stop_first_failure(
         (report_path,) = output_root.glob("*/pilot.json")
     report = json.loads(report_path.read_text())
     assert len(adapter.drawn) == (2 if mode == "normal" else 1)
-    assert [path.name for _, path in adapter.drawn] == [
-        name.replace("_", "-") + ".SLDPRT" for name in probe.ORDER[: len(adapter.drawn)]
-    ]
+    # Source files are now unique owned copies. Reusing the original source
+    # would mutate an already-visible user's model dimension callout text.
+    for target, (outputs, source) in zip(probe.ORDER, adapter.drawn):
+        assert source.parent == outputs.slddrw.parent
+        assert source.name.startswith(target.replace("_", "-") + "-source-")
+        assert source.name != target.replace("_", "-") + ".SLDPRT"
+        assert source_root not in source.parents and guard_root not in source.parents
+    assert all(
+        probe.attachments.file_digest(
+            source_root / (target.replace("_", "-") + ".SLDPRT")
+        )
+        == probe.EXPECTED_PART_HASHES[target]
+        for target in probe.ORDER
+    )
     assert report["status"] == ("passed" if mode == "normal" else "failed")
     assert len(report["sources_after"]) == 4
     assert all(
@@ -131,6 +144,16 @@ async def test_one_fresh_recipe_each_in_order_and_stop_first_failure(
     )
     assert len({outputs.slddrw for outputs, _ in adapter.drawn}) == len(adapter.drawn)
     assert adapter.ownership.creating_document.call_count == len(adapter.drawn)
+    registered_sources = {
+        call.args[0] for call in adapter.ownership.register_source.call_args_list
+    }
+    assert not registered_sources.intersection(source for _, source in adapter.drawn)
+    assert len(registered_sources) == 4
+    if mode == "normal":
+        assert all(
+            trial["copy_final"] == probe.EXPECTED_PART_HASHES[trial["target"]]
+            for trial in report["trials"]
+        )
 
 
 @pytest.mark.asyncio
@@ -271,3 +294,121 @@ def test_source_missing_basic_designation_fails_instead_of_reauthoring(
     monkeypatch.setattr(probe, "part_dimensions", lambda *args, **kwargs: (rows, {}))
     with pytest.raises(RuntimeError, match="BASIC designation missing"):
         probe.source_dimensions(model, "channel_lever", path)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("mode", ["normal", "build_failure", "copy_saved"])
+async def test_owned_dirty_part_copies_preserve_real_baseline_lifecycle(
+    native,  # noqa: F811 - imported pytest fixture
+    tmp_path,
+    monkeypatch,
+    mode,
+):
+    source_root, guard_root = fixture_sources(tmp_path, monkeypatch)
+    original_lever = Model(source_root / "channel-lever.SLDPRT", kind=1)
+    drawing2 = Model(None, title="Draw2 - Sheet1", dirty=True)
+    native.app.documents.extend((original_lever, drawing2))
+    native.app.ActiveDoc = drawing2
+    monkeypatch.setattr(
+        probe.benchmark, "recipe_source", lambda *_: recipe(Path("unused.SLDPRT"))
+    )
+    monkeypatch.setattr(probe.benchmark, "revision", lambda _: "frozen")
+    monkeypatch.setattr(probe, "helper_fingerprints", lambda: {"helper": "same"})
+    monkeypatch.setattr(probe, "adapter_fingerprints", lambda: {"adapter": "same"})
+    monkeypatch.setattr(
+        probe,
+        "source_dimensions",
+        lambda model, target, path: (
+            {
+                "configuration": "Default",
+                "values_tolerances_basic": "same",
+                "owner": str(path),
+            },
+            {"dimension": model},
+        ),
+    )
+    monkeypatch.setattr(
+        probe,
+        "drawing_witness",
+        lambda adapter: {"reference": adapter.currentModel.references[0].path},
+    )
+
+    def compare(_app, before, after):
+        assert before == after
+
+    monkeypatch.setattr(probe, "compare_drawing", compare)
+    references, built = {}, []
+    initial_open = native.adapter.open_model
+
+    async def opening(path):
+        result = await initial_open(path)
+        if Path(path).suffix.upper() == ".SLDDRW":
+            source = references[path]
+            part = native.app.GetOpenDocumentByName(source)
+            if part is None:
+                part = Model(source, kind=1)
+                native.app.documents.append(part)
+            native.adapter.currentModel.references = [part]
+        return result
+
+    native.adapter.open_model = opening
+
+    async def callback(adapter):
+        async def draw(outputs, source):
+            built.append(source)
+            part = native.app.GetOpenDocumentByName(str(source))
+            assert part is not original_lever
+            part.dirty = True  # Reproduced imported source-display mutation.
+            drawing = Model(None, title=f"Owned drawing {len(built)}", dirty=True)
+            drawing.references = [part]
+            native.app.documents.append(drawing)
+            native.app.ActiveDoc = drawing
+            adapter.currentModel = drawing
+            if mode == "build_failure":
+                raise RuntimeError("production final gate failed")
+            with adapter.ownership.saving_as(outputs.slddrw):
+                drawing.path = str(outputs.slddrw)
+                drawing.title = outputs.slddrw.name
+                drawing.dirty = False
+                outputs.slddrw.write_bytes(b"saved drawing only")
+            if mode == "copy_saved":
+                source.write_bytes(b"unintended source save")
+            outputs.pdf.write_bytes(b"pdf")
+            outputs.png.write_bytes(b"png")
+            references[str(outputs.slddrw)] = str(source)
+            return {
+                "drawing": str(outputs.slddrw),
+                "pdf": str(outputs.pdf),
+                "png": str(outputs.png),
+            }
+
+        native.adapter.draw = draw
+        return await probe.pilot(
+            adapter, "frozen", source_root, guard_root, tmp_path / "reports"
+        )
+
+    if mode == "normal":
+        await owned.owned_callback(native.adapter, callback)
+    else:
+        with pytest.raises(
+            RuntimeError, match="production final gate|source copy changed"
+        ):
+            await owned.owned_callback(native.adapter, callback)
+    assert len(built) == (2 if mode == "normal" else 1)
+    assert native.app.documents == [original_lever, drawing2]
+    assert not original_lever.dirty and original_lever.Visible
+    assert drawing2.dirty and drawing2.Visible and drawing2.GetPathName() == ""
+    assert all(
+        source_root not in Path(path).parents and guard_root not in Path(path).parents
+        for path in native.adapter.opens
+    )
+    assert all(item not in (original_lever, drawing2) for item in native.app.closes)
+    (receipt,) = (tmp_path / "reports").glob("*/pilot.json")
+    report = json.loads(receipt.read_text())
+    assert report["sources_before"] == report["sources_after"]
+    assert report["status"] == ("passed" if mode == "normal" else "failed")
+    if mode == "copy_saved":
+        assert (
+            report["trials"][0]["copy_final"]
+            != probe.EXPECTED_PART_HASHES["rocker_arm"]
+        )
