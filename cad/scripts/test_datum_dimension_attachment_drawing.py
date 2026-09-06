@@ -355,3 +355,40 @@ def test_explicit_attachment_cannot_change_the_source_parameter(monkeypatch):
     monkeypatch.setattr(probe, "bore_target", lambda _: {**bore, "value_m": 99})
     with pytest.raises(RuntimeError, match="changed the bore source dimension"):
         probe.explicit_attach(adapter, bore, annotation, target, kind, {})
+
+
+def test_stationary_native_placement_never_calls_position_setter(monkeypatch):
+    annotation = SimpleNamespace(
+        SetPosition2=Mock(side_effect=AssertionError("unexpected move"))
+    )
+    monkeypatch.setattr(
+        probe,
+        "outboard_target",
+        Mock(side_effect=AssertionError("unexpected planning")),
+    )
+    result = probe.place_datum_control(
+        annotation, (0.1, 0.2, -0.00315), None, None, probe.DatumPlacement.STATIONARY
+    )
+    assert result == {
+        "requested": (0.1, 0.2, -0.00315),
+        "direction": "native_stationary",
+    }
+    annotation.SetPosition2.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "texts,label", [([], "A"), (["B"], "A"), (["A"], "B"), (["A", " "], "A")]
+)
+def test_generic_datum_label_or_render_mutation_fails(texts, label):
+    with pytest.raises(RuntimeError, match="exact label"):
+        probe.rendered_datum_text({"texts": [{"value": text} for text in texts]}, label)
+
+
+def test_stale_specific_text_remains_diagnostic_not_semantic():
+    rendered = probe.rendered_datum_text({"texts": [{"value": "A"}]}, "A")
+    before = {"label": "A", "text": rendered, "specific_data": {"texts": ("B",)}}
+    after = {**before, "specific_data": {"texts": ("A",)}}
+    probe.same_semantics(before, after)
+    assert before["specific_data"]["texts"] == ("B",)
+    with pytest.raises(RuntimeError, match="text changed"):
+        probe.same_semantics(before, {**after, "text": ("A", "changed quantity")})

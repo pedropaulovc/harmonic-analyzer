@@ -14,6 +14,9 @@ witnesses are mandatory even when the native setter returns false. Export before
 nonzero outboard move and save/reopen. Capture both
 IDatumTag primitives and IAnnotation.GetDisplayData without assuming that their
 coordinate frames agree. Original part/drawing hashes are checked on all exits.
+``--mode stationary_attachment`` preserves native dimension-attached placement
+without SetPosition2. Generic rendered text and GetLabel are authoritative;
+datum-specific text/primitives remain diagnostic after proven stale readback.
 """
 
 from __future__ import annotations
@@ -57,6 +60,11 @@ EPSILON = 1e-8
 class BoreSelector(StrEnum):
     NAMED_DIMENSION = "named_dimension"
     ANNOTATION_SELECT2 = "annotation_select2"
+
+
+class DatumPlacement(StrEnum):
+    STATIONARY = "stationary"
+    OUTBOARD_CONTROL = "outboard_control"
 
 
 def select_bore(adapter, bore, selector=BoreSelector.NAMED_DIMENSION):
@@ -221,6 +229,20 @@ def raw_display_data(annotation):
     }
 
 
+def rendered_datum_text(raw_display, label):
+    texts = tuple(row["value"] for row in raw_display["texts"])
+    if (
+        not label
+        or not texts
+        or any(not text.strip() for text in texts)
+        or label not in texts
+    ):
+        raise RuntimeError(
+            "native rendered datum text does not contain its exact label"
+        )
+    return texts
+
+
 def datum_state(adapter, bore, annotation):
     app, view = adapter.swApp, bore["view"]
     tag = _early_bound(annotation.GetSpecificAnnotation(), "IDatumTag")
@@ -248,6 +270,11 @@ def datum_state(adapter, bore, annotation):
         # This is an observation, never an accepted attachment fallback.
         tag_binding, binding_error = "unverified", str(error)
     raw_display = raw_display_data(annotation)
+    label = str(tag.GetLabel())
+    rendered_text = rendered_datum_text(raw_display, label)
+    specific_text_count = int(tag.GetTextCount())
+    if not 0 <= specific_text_count <= 10000:
+        raise RuntimeError("unbounded datum-specific text count")
     measurement_error = None
     try:
         snapshot = _native_snapshot(annotation, adapter.currentModel.Extension)
@@ -260,7 +287,7 @@ def datum_state(adapter, bore, annotation):
         raise RuntimeError("datum has no finite native position")
     state = {
         "name": str(annotation.GetName()),
-        "label": str(tag.GetLabel()),
+        "label": label,
         "shoulder": bool(tag.Shoulder),
         "forced_shoulder": bool(tag.ForcedShoulder),
         "style": int(tag.GetDisplayStyle()),
@@ -273,9 +300,7 @@ def datum_state(adapter, bore, annotation):
             for e, k in zip(entities, kinds)
             if k in {1, 2, 3} and e is not None
         ),
-        "text": tuple(
-            str(tag.GetTextAtIndex(i)) for i in range(int(tag.GetTextCount()))
-        ),
+        "text": rendered_text,
         "frame_edge_lengths_m": tuple(
             sorted(round(math.dist(line.start, line.end), 10) for line in frame)
         ),
@@ -283,12 +308,14 @@ def datum_state(adapter, bore, annotation):
         "format": tuple(snapshot.format_signature) if snapshot is not None else (),
         "position": point,
         "specific_data": {
+            "texts": tuple(
+                str(tag.GetTextAtIndex(i)) for i in range(specific_text_count)
+            ),
             "lines": [
                 tuple(tag.GetLineAtIndex(i)) for i in range(int(tag.GetLineCount()))
             ],
             "text_positions": [
-                tuple(tag.GetTextPositionAtIndex(i))
-                for i in range(int(tag.GetTextCount()))
+                tuple(tag.GetTextPositionAtIndex(i)) for i in range(specific_text_count)
             ],
         },
         "raw_display_data": raw_display,
@@ -347,6 +374,18 @@ def outboard_target(position, body, outline):
         position[1] + candidate.delta[1],
         0.0,
     ), candidate.direction.value
+
+
+def place_datum_control(annotation, position, body, outline, policy):
+    policy = DatumPlacement(policy)
+    if policy is DatumPlacement.STATIONARY:
+        return {"requested": position, "direction": "native_stationary"}
+    target, direction = outboard_target(position, body, outline)
+    return {
+        "requested": target,
+        "direction": direction,
+        "returned": bool(annotation.SetPosition2(*target)),
+    }
 
 
 def dimension_target_xy(position, dimension_body, datum_body):
@@ -516,6 +555,7 @@ async def probe(adapter, source, directory, mode="paired_dimensions"):
             "paired_dimensions": ("dimension", "dimension_placed"),
             "paired_selectors": ("dimension", "dimension_select2"),
             "paired_attachments": ("edge_reattach", "dimension_attach"),
+            "stationary_attachment": ("dimension_stationary",),
             "shoulder_false": ("shoulder_false",),
         }[mode]
         for mode in modes:
@@ -560,6 +600,7 @@ async def probe(adapter, source, directory, mode="paired_dimensions"):
                     "dimension_placed",
                     "dimension_select2",
                     "dimension_attach",
+                    "dimension_stationary",
                 }:
                     target = None
                     if mode == "dimension_placed":
@@ -593,7 +634,11 @@ async def probe(adapter, source, directory, mode="paired_dimensions"):
                     _early_bound(
                         annotation.GetSpecificAnnotation(), "IDatumTag"
                     ).Shoulder = False
-                if mode in {"edge_reattach", "dimension_attach"}:
+                if mode in {
+                    "edge_reattach",
+                    "dimension_attach",
+                    "dimension_stationary",
+                }:
                     target = bore["display"]
                     kind = 14
                     if mode == "edge_reattach":
@@ -635,6 +680,7 @@ async def probe(adapter, source, directory, mode="paired_dimensions"):
                         "dimension_placed",
                         "dimension_select2",
                         "dimension_attach",
+                        "dimension_stationary",
                     }
                     and native["binding"] != "exact_display_dimension"
                 ):
@@ -651,20 +697,16 @@ async def probe(adapter, source, directory, mode="paired_dimensions"):
                     without_datum(attachments.snapshot(adapter.currentModel), key),
                     "native mechanism",
                 )
-                target, direction = native["position"], "unchanged_positive_control"
-                if mode != "edge_reattach":
-                    target, direction = outboard_target(
-                        native["position"],
-                        Rect(**native["measurement"]["body"]),
-                        Rect(*bore["view"].GetOutline()),
-                    )
-                    trial["placement"] = {"requested": target, "direction": direction}
-                    trial["placement"]["returned"] = bool(
-                        annotation.SetPosition2(*target)
-                    )
-                trial.setdefault(
-                    "placement", {"requested": target, "direction": direction}
+                trial["placement"] = place_datum_control(
+                    annotation,
+                    native["position"],
+                    Rect(**native["measurement"]["body"]),
+                    Rect(*bore["view"].GetOutline()),
+                    DatumPlacement.STATIONARY
+                    if mode in {"edge_reattach", "dimension_stationary"}
+                    else DatumPlacement.OUTBOARD_CONTROL,
                 )
+                target = trial["placement"]["requested"]
                 after, after_handles = datum_state(adapter, bore, annotation)
                 trial["after"] = after
                 trial["placement"]["xy_error_m"] = math.dist(
@@ -726,6 +768,7 @@ def main():
             "paired_dimensions",
             "paired_selectors",
             "paired_attachments",
+            "stationary_attachment",
             "shoulder_false",
         ),
         default="paired_dimensions",
