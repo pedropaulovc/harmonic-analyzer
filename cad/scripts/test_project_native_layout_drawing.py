@@ -1,6 +1,7 @@
 """Project layout must run native spacing before measured fit and fail unsaved."""
 
 from dataclasses import dataclass
+import json
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -11,6 +12,8 @@ import _drawing_native_callouts as callouts
 import _drawing_native_gtol as gtol
 import _drawing_native_layout as native
 import _drawing_measurement_handoff as handoff_module
+import _drawing_annotation_bounds as bounds_module
+import _drawing_leader_clearance as clearance_module
 
 
 @dataclass
@@ -22,7 +25,6 @@ class Report:
 @pytest.mark.parametrize("status", list(native.NativeLayoutStatus))
 def test_project_layout_orders_spacing_and_rejects_unfit_sheet(monkeypatch, status):
     from _drawing_annotation_bounds import annotation_box
-    from _drawing_leader_clearance import validate_gtol_leader_clearance
 
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
     sheet = SimpleNamespace(GetProperties2=lambda: (8, 12, 1, 1, 0, 0.4318, 0.2794, 0))
@@ -78,7 +80,9 @@ def test_project_layout_orders_spacing_and_rejects_unfit_sheet(monkeypatch, stat
         measure_annotation=annotation_box,
         record_measurement=handoff.record,
     )
-    assert repair.call_args.kwargs == {
+    arguments = dict(repair.call_args.kwargs)
+    assert callable(arguments.pop("final_annotation_validation"))
+    assert arguments == {
         "views": views,
         "title_block": native.Rect(
             drawing._TITLE_BLOCK_LEFT_M, 0, 0.4318, drawing._TITLE_BLOCK_TOP_M
@@ -89,7 +93,6 @@ def test_project_layout_orders_spacing_and_rejects_unfit_sheet(monkeypatch, stat
         "alignments": alignments,
         "orderings": orderings,
         "notes": notes,
-        "final_annotation_validation": validate_gtol_leader_clearance,
     }
 
 
@@ -135,3 +138,68 @@ def test_project_layout_expires_handoff_after_native_failure(monkeypatch, stage)
         repair.assert_not_called()
     if stage == "callouts":
         arrange.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "status", [native.NativeLayoutStatus.APPLIED, native.NativeLayoutStatus.UNCHANGED]
+)
+@pytest.mark.parametrize("outcome", ["clear", "crossing"])
+def test_final_clearance_logs_fresh_report_once_without_remeasurement(
+    monkeypatch, status, outcome
+):
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _: value)
+    sheet = SimpleNamespace(GetProperties2=lambda: (8, 12, 1, 1, 0, 0.4318, 0.2794, 0))
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(GetCurrentSheet=lambda: sheet)
+    )
+    handoff = Mock()
+    monkeypatch.setattr(
+        handoff_module, "AnnotationMeasurementHandoff", Mock(return_value=handoff)
+    )
+    monkeypatch.setattr(callouts, "arrange_native_callouts", Mock())
+    monkeypatch.setattr(gtol, "arrange_native_gtol_columns", Mock())
+    measure = Mock(side_effect=AssertionError("final callback must not remeasure"))
+    monkeypatch.setattr(bounds_module, "annotation_box", measure)
+    measurements = {"front": {"native-frame": object()}, "side": {}}
+    result = {
+        "front": {"gtol_count": 1, "displayed_stroke_count": 2, "crossings": []},
+        "side": {"gtol_count": 0, "displayed_stroke_count": 0, "crossings": []},
+    }
+    validator = Mock(return_value=result)
+    if outcome == "crossing":
+        validator.side_effect = RuntimeError("exact final crossing coordinates")
+    monkeypatch.setattr(clearance_module, "validate_gtol_leader_clearance", validator)
+    log = Mock()
+    monkeypatch.setattr(drawing._telemetry, "info", log)
+    report = Report(status=status, reason="fresh final witness")
+
+    def pack(*args, **kwargs):
+        kwargs["final_annotation_validation"](measurements)
+        return report
+
+    monkeypatch.setattr(native, "repair_native_layout", Mock(side_effect=pack))
+    if outcome == "crossing":
+        with pytest.raises(RuntimeError, match="exact final crossing coordinates"):
+            drawing.repair_project_drawing_layout(adapter, views={"front": object()})
+    else:
+        assert (
+            drawing.repair_project_drawing_layout(adapter, views={"front": object()})
+            is report
+        )
+    validator.assert_called_once_with(measurements)
+    assert validator.call_args.args[0] is measurements
+    measure.assert_not_called()
+    handoff.close.assert_called_once_with()
+    records = [
+        call.kwargs
+        for call in log.call_args_list
+        if call.args[0] == "final native GTol clearance witnessed"
+    ]
+    if outcome == "crossing":
+        assert records == []
+        return
+    assert len(records) == len(result)
+    assert {
+        row["view"]: json.loads(row["clearance_report"]) for row in records
+    } == result
+    assert all(row["measurement_source"] == "fresh_final_packing" for row in records)
