@@ -2198,6 +2198,45 @@ def offset_dimension_text(
     adapter.currentModel.EditRebuild3()
 
 
+@_telemetry.traced("drawing.entity_dimension", label_param="label")
+def add_entity_dimension(
+    adapter: Any,
+    view: Any,
+    *,
+    entities: tuple[Any, Any],
+    text_xy: tuple[float, float],
+    label: str,
+    orientation: str = "smart",
+) -> Any:
+    """Dimension two resolved model entities; coordinates only place the text.
+
+    IView.SelectEntity maps each source-model entity into this drawing view.
+    Use horizontal/vertical for directed distances and smart for unambiguous
+    circle-centre distances. Angular endpoint choices need their own contract.
+    """
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    if not ddoc.ActivateView(view_name(adapter, view)):
+        raise RuntimeError(f"failed to activate drawing view for {label}")
+    if orientation not in {"smart", "horizontal", "vertical"}:
+        raise ValueError(f"unknown dimension orientation: {orientation!r}")
+    draw.ClearSelection2(True)
+    for index, entity in enumerate(entities):
+        if entity is None or not view.SelectEntity(entity, index > 0):
+            raise RuntimeError(f"failed to select {label} model entity {index}")
+    creators = {
+        "smart": draw.AddDimension2,
+        "horizontal": draw.AddHorizontalDimension2,
+        "vertical": draw.AddVerticalDimension2,
+    }
+    dimension = creators[orientation](*text_xy, 0.0)
+    draw.ClearSelection2(True)
+    if dimension is None:
+        raise RuntimeError(f"failed to add the {label} {orientation} dimension")
+    draw.EditRebuild3()
+    return dimension
+
+
 def add_edge_dimension(
     adapter: Any,
     view: Any,
