@@ -160,6 +160,49 @@ The native pilots still require a separate visual acceptance pass after callout
 spacing and view layout are complete. These experiments do not establish that the
 remaining coordinate-based drawing fleet has been migrated.
 
+### Measured native layout
+
+The seven pilots arrange dimensions natively, use native annotation alignment for
+GTol banks, then pack measured decorated view footprints and linked notes. Feature
+selection stays model-based; initial sheet locations are placement seeds only.
+The pen v-block orthographic views now use 3:1, with the isometric still at 2:1:
+the measured 4:1 footprints could not clear both the title block and top border
+while preserving the specified projection relationships. No text or dimension
+content was reduced to make that fit.
+
+Live controls distinguish native API behavior from implementation mistakes:
+
+- A bare Python tuple assigned to `IView.Position` did not reach the requested
+  position. Typed `VT_R8` arrays through `SetViewPosition` reached it exactly.
+  `probe_drawing_annotation_performance.py` records both call shapes.
+- The lever's all-around circle follows the native leader elbow when alignment
+  switches leader sides. Its frame lines and text translate rigidly; the circle
+  belongs to the full decorated envelope, not the rigid frame body. The copied
+  drawing control is `diagnostics/probe_gtol_rigid_body.py`.
+- The marker's view-owned centerline exposes one unsupported attachment slot
+  (`type=0`, null entity), while its specific interface, owning view and measured
+  strokes survive native movement and rebuild. Those witnesses are checked;
+  underlying model-entity identity is explicitly not claimed for that slot.
+- Native note extents can change after an exact anchor move. The pedestal's
+  measured extent shifted about 0.010 mm in X; the rocker's changed by 0.143 mm in
+  Y. Detailed failures are retained under `cad/out/reports/native-layout/`, with
+  before, predicted and observed footprints and actual clearance deficits.
+
+These layout checks have a cost. At `5d863bb9`, the pedestal's measured-layout
+phase took 30.474 seconds, versus 42.061 seconds before reducing repeated GTol
+witnesses. That is layout time, not an end-to-end drawing speedup. The successful
+lever, pen v-block and marker build bodies took 40.498, 36.595 and 16.274 seconds
+in the same five-pilot run; pedestal and rocker failed their final fit checks and
+did not publish new drawing outputs. The gear's earlier recipe-only speedup must
+not be presented as including this added measurement work.
+
+The current bounds implementation is calibrated for SolidWorks 2026 (major
+revision 34) and the tested native font profile. It uses conservative GDI text
+cells, actual native frame/stroke geometry and native note extents, not nominal
+symbol boxes. Unsupported measurement cases fail explicitly. This is not yet a
+general annotation renderer or proof that every internal leader/text collision
+is absent; rendered sheets still require inspection.
+
 ## Measurement and release checks
 
 Separate cache transfer, COM-seat waiting, process startup, construction and
