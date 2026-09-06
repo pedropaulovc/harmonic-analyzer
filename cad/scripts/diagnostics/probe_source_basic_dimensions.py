@@ -69,10 +69,10 @@ def tolerance(dimension):
     }
 
 
-def part_dimensions(adapter, path, configuration):
+def part_dimensions(adapter, path, configuration, *, targets=TARGETS):
     exact_document(adapter.currentModel, path)
     rows, handles = {}, {}
-    for feature, names in TARGETS.items():
+    for feature, names in targets.items():
         for name in names:
             _, dimension = _named_dimension(adapter, feature, name)
             full_name = str(dimension.FullName)
