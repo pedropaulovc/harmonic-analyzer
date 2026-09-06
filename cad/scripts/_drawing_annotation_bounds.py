@@ -517,26 +517,9 @@ def _thread_line_width(extension: Any) -> float:
     return width
 
 
-def _native_snapshot(annotation: Any, extension: Any = None) -> NativeSnapshot:
-    kind = int(annotation.GetType())
-    if kind not in _KINDS:
-        raise ValueError(f"unsupported annotation kind {kind}: {annotation.GetName()}")
-    data = _early_bound(annotation.GetDisplayData(), "IDisplayData")
-    if data is None:
-        raise ValueError("native annotation exposes no display data")
+def _native_counts(data: Any, primitives: tuple[str, ...]) -> dict[str, int]:
     counts = {}
-    for primitive in (
-        "Text",
-        "Line",
-        "Arc",
-        "PolyLine",
-        "Triangle",
-        "ArrowHead",
-        "Polygon",
-        "Ellipse",
-        "Parabola",
-        "Point",
-    ):
+    for primitive in primitives:
         value = getattr(data, f"Get{primitive}Count")()
         if not math.isfinite(value) or value < 0 or int(value) != value:
             raise ValueError(
@@ -552,6 +535,162 @@ def _native_snapshot(annotation: Any, extension: Any = None) -> NativeSnapshot:
     }
     if any(count != 0 for count in unsupported.values()):
         raise ValueError(f"unsupported native primitive inventory: {unsupported}")
+    return counts
+
+
+def _native_arcs(data: Any, count: int, stroke_width: float = 0.0):
+    arcs = []
+    for index in range(count):
+        raw = tuple(data.GetArcAtIndex2(index))
+        if len(raw) != 17 or not all(math.isfinite(value) for value in raw[4:]):
+            raise ValueError("native arc XYZ/normal geometry must be finite")
+        if abs(raw[13]) > 1e-8 or abs(raw[14]) > 1e-8 or abs(raw[15]) < 1e-8:
+            raise ValueError("native arc is not in the drawing sheet plane")
+        radius = math.dist(raw[4:6], raw[10:12]) + stroke_width / 2
+        box = Rect(
+            raw[10] - radius, raw[11] - radius, raw[10] + radius, raw[11] + radius
+        )
+        arcs.append((box, raw[10:12], math.dist(raw[4:7], raw[7:10])))
+    return tuple(arcs)
+
+
+def _native_leaders(annotation: Any):
+    count = annotation.GetLeaderCount()
+    if not math.isfinite(count) or count < 0 or int(count) != count:
+        raise ValueError(
+            f"native leader count must be finite/nonnegative/integral: {count}"
+        )
+    leaders, elbows = [], []
+    for index in range(int(count)):
+        raw = tuple(annotation.GetLeaderPointsAtIndex(index) or ())
+        if len(raw) not in {6, 9}:
+            raise ValueError("native leader must expose two or three XYZ points")
+        if not all(math.isfinite(value) for value in raw):
+            raise ValueError("native leader XYZ geometry must be finite")
+        points = tuple((raw[i], raw[i + 1]) for i in range(0, len(raw), 3))
+        leaders.extend(Segment(a, b) for a, b in zip(points, points[1:]))
+        if len(points) == 3:
+            elbows.append(points[1])
+    return tuple(leaders), tuple(elbows)
+
+
+def _split_all_around(annotation: Any, kind: int, arcs, elbows):
+    if kind != 5 or not arcs or not elbows or not annotation.GetLeaderAllAround():
+        return tuple(row[0] for row in arcs), ()
+    body_boxes, leader_boxes = [], []
+    for box, center, closure_distance in arcs:
+        if closure_distance <= _GEOMETRY_EPSILON_M and any(
+            math.dist(center, elbow) <= _GEOMETRY_EPSILON_M for elbow in elbows
+        ):
+            # Live channel-lever witness: the complete all-around circle follows
+            # the native elbow on side switches, not the rigid GTol body.
+            leader_boxes.append(box)
+            continue
+        body_boxes.append(box)
+    return tuple(body_boxes), tuple(leader_boxes)
+
+
+def _native_adornments(data: Any, counts: dict[str, int]) -> tuple[Rect, ...]:
+    boxes = []
+    for index in range(counts["Triangle"]):
+        raw = tuple(data.GetTriangleAtIndex(index))
+        if len(raw) != 11:
+            raise ValueError("native triangle must contain eleven values")
+        if not all(math.isfinite(value) for value in raw[:9]):
+            raise ValueError("native triangle XYZ geometry must be finite")
+        boxes.append(_rectangle([(raw[i], raw[i + 1]) for i in (0, 3, 6)]))
+    for index in range(counts["ArrowHead"]):
+        raw = tuple(data.GetArrowHeadAtIndex2(index))
+        if (
+            len(raw) != 12
+            or not all(math.isfinite(v) for v in raw)
+            or raw[6] < 0
+            or raw[7] < 0
+        ):
+            raise ValueError("native arrowhead geometry is invalid")
+        # Native-size radius conservatively encloses every arrow style and
+        # projected direction; shared with the complete annotation reader.
+        radius = math.hypot(raw[6], raw[7])
+        if radius:
+            boxes.append(
+                Rect(raw[0] - radius, raw[1] - radius, raw[0] + radius, raw[1] + radius)
+            )
+    for index in range(counts["Polygon"]):
+        raw = tuple(data.GetPolygonAtIndex(index))
+        if (
+            len(raw) < 5
+            or not math.isfinite(raw[4])
+            or raw[4] < 3
+            or int(raw[4]) != raw[4]
+        ):
+            raise ValueError(
+                "native polygon needs an integral point count of at least three"
+            )
+        count = int(raw[4])
+        if len(raw) != 5 + count * 3:
+            raise ValueError("native polygon point count mismatch")
+        if not all(math.isfinite(value) for value in raw[5:]):
+            raise ValueError("native polygon XYZ geometry must be finite")
+        boxes.append(
+            _rectangle([(raw[5 + i * 3], raw[6 + i * 3]) for i in range(count)])
+        )
+    return tuple(boxes)
+
+
+@dataclass(frozen=True)
+class LeaderGeometry:
+    segments: tuple[Segment, ...]
+    decorations: tuple[Rect, ...]
+
+
+def annotation_leader_geometry(annotation: Any) -> LeaderGeometry:
+    """Read native GTol leader geometry for bounded intermediate layout trials.
+
+    Uses the complete snapshot's parsers without text/font/symbol, frame-line or
+    polyline enumeration. The caller must keep measured initial text/body seeds
+    and run a fresh full annotation witness before accepting any final layout.
+    This result is NOT a complete annotation envelope or semantic witness.
+    """
+    annotation = _early_bound(annotation, "IAnnotation")
+    kind = int(annotation.GetType())
+    if kind != 5:
+        raise ValueError("narrow leader geometry currently supports native GTols only")
+    data = _early_bound(annotation.GetDisplayData(), "IDisplayData")
+    if data is None:
+        raise ValueError("native annotation exposes no display data")
+    counts = _native_counts(
+        data,
+        ("Arc", "Triangle", "ArrowHead", "Polygon", "Ellipse", "Parabola", "Point"),
+    )
+    leaders, elbows = _native_leaders(annotation)
+    _, circles = _split_all_around(
+        annotation, kind, _native_arcs(data, counts["Arc"]), elbows
+    )
+    return LeaderGeometry(leaders, (*circles, *_native_adornments(data, counts)))
+
+
+def _native_snapshot(annotation: Any, extension: Any = None) -> NativeSnapshot:
+    kind = int(annotation.GetType())
+    if kind not in _KINDS:
+        raise ValueError(f"unsupported annotation kind {kind}: {annotation.GetName()}")
+    data = _early_bound(annotation.GetDisplayData(), "IDisplayData")
+    if data is None:
+        raise ValueError("native annotation exposes no display data")
+    counts = _native_counts(
+        data,
+        (
+            "Text",
+            "Line",
+            "Arc",
+            "PolyLine",
+            "Triangle",
+            "ArrowHead",
+            "Polygon",
+            "Ellipse",
+            "Parabola",
+            "Point",
+        ),
+    )
     # A valid copied screw thread exposed lines, a circle and projected polylines
     # through this very IAnnotation API. The old zero-diameter feature exposed
     # nothing. Never infer thread ink from its smaller simplified solid face.
@@ -594,22 +733,7 @@ def _native_snapshot(annotation: Any, extension: Any = None) -> NativeSnapshot:
             if not math.isfinite(width) or width <= 0:
                 raise ValueError("native print line weight must be positive")
         lines.append(Segment(raw[4:6], raw[7:9], width))
-    boxes = []
-    arc_leader_candidates = []
-    for index in range(counts["Arc"]):
-        raw = tuple(data.GetArcAtIndex2(index))
-        if len(raw) != 17 or not all(math.isfinite(value) for value in raw[4:]):
-            raise ValueError("native arc XYZ/normal geometry must be finite")
-        if abs(raw[13]) > 1e-8 or abs(raw[14]) > 1e-8 or abs(raw[15]) < 1e-8:
-            raise ValueError("native arc is not in the drawing sheet plane")
-        radius = math.dist(raw[4:6], raw[10:12]) + thread_width / 2
-        boxes.append(
-            Rect(raw[10] - radius, raw[11] - radius, raw[10] + radius, raw[11] + radius)
-        )
-        # Only a complete native circle can be an all-around leader adornment.
-        arc_leader_candidates.append(
-            (raw[10:12], math.dist(raw[4:7], raw[7:10]) <= _GEOMETRY_EPSILON_M)
-        )
+    arcs = _native_arcs(data, counts["Arc"], thread_width)
     for index in range(counts["PolyLine"]):
         raw = tuple(data.GetPolylineAtIndex2(index))
         if (
@@ -628,76 +752,9 @@ def _native_snapshot(annotation: Any, extension: Any = None) -> NativeSnapshot:
             raise ValueError("native polyline XYZ geometry must be finite")
         points = tuple((raw[7 + i * 3], raw[8 + i * 3]) for i in range(count))
         lines.extend(Segment(a, b, thread_width) for a, b in zip(points, points[1:]))
-    leaders = []
-    elbows = []
-    for index in range(int(annotation.GetLeaderCount())):
-        raw = tuple(annotation.GetLeaderPointsAtIndex(index) or ())
-        if len(raw) not in {6, 9}:
-            raise ValueError("native leader must expose two or three XYZ points")
-        if not all(math.isfinite(value) for value in raw):
-            raise ValueError("native leader XYZ geometry must be finite")
-        points = tuple((raw[i], raw[i + 1]) for i in range(0, len(raw), 3))
-        leaders.extend(Segment(a, b) for a, b in zip(points, points[1:]))
-        if len(points) == 3:
-            elbows.append(points[1])
-    leader_boxes = []
-    if kind == 5 and boxes and elbows and annotation.GetLeaderAllAround():
-        body_boxes = []
-        for box, (center, complete_circle) in zip(
-            boxes, arc_leader_candidates, strict=True
-        ):
-            if complete_circle and any(
-                math.dist(center, elbow) <= _GEOMETRY_EPSILON_M for elbow in elbows
-            ):
-                # Live channel-lever witness: the all-around circle moves with
-                # the native elbow when the leader switches side. Its bounds
-                # belong to the decorated envelope, never the rigid GTol body.
-                leader_boxes.append(box)
-                continue
-            body_boxes.append(box)
-        boxes = body_boxes
-    for index in range(counts["Triangle"]):
-        raw = tuple(data.GetTriangleAtIndex(index))
-        if len(raw) != 11:
-            raise ValueError("native triangle must contain eleven values")
-        if not all(math.isfinite(value) for value in raw[:9]):
-            raise ValueError("native triangle XYZ geometry must be finite")
-        leader_boxes.append(_rectangle([(raw[i], raw[i + 1]) for i in (0, 3, 6)]))
-    for index in range(counts["ArrowHead"]):
-        raw = tuple(data.GetArrowHeadAtIndex2(index))
-        if (
-            len(raw) != 12
-            or not all(math.isfinite(v) for v in raw)
-            or raw[6] < 0
-            or raw[7] < 0
-        ):
-            raise ValueError("native arrowhead geometry is invalid")
-        # Full native-size radius conservatively encloses every arrow style
-        # and projected direction; no guessed arrow dimensions or winding.
-        radius = math.hypot(raw[6], raw[7])
-        if radius:
-            leader_boxes.append(
-                Rect(raw[0] - radius, raw[1] - radius, raw[0] + radius, raw[1] + radius)
-            )
-    for index in range(counts["Polygon"]):
-        raw = tuple(data.GetPolygonAtIndex(index))
-        if (
-            len(raw) < 5
-            or not math.isfinite(raw[4])
-            or raw[4] < 3
-            or int(raw[4]) != raw[4]
-        ):
-            raise ValueError(
-                "native polygon needs an integral point count of at least three"
-            )
-        count = int(raw[4])
-        if len(raw) != 5 + count * 3:
-            raise ValueError("native polygon point count mismatch")
-        if not all(math.isfinite(value) for value in raw[5:]):
-            raise ValueError("native polygon XYZ geometry must be finite")
-        leader_boxes.append(
-            _rectangle([(raw[5 + i * 3], raw[6 + i * 3]) for i in range(count)])
-        )
+    leaders, elbows = _native_leaders(annotation)
+    boxes, circles = _split_all_around(annotation, kind, arcs, elbows)
+    leader_boxes = (*circles, *_native_adornments(data, counts))
     signature: tuple[Any, ...] = ()
     if runs:
         fmt = _early_bound(annotation.GetTextFormat(0), "ITextFormat")
