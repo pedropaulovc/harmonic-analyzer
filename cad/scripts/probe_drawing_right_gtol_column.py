@@ -137,17 +137,79 @@ def prove_narrow_reader(bank, measurements):
         name: annotation_leader_geometry(row.annotation) for name, row in bank.items()
     }
     elapsed = time.perf_counter() - started
+    coverage = {}
     for name, actual in geometry.items():
         expected = measurements[name]
         if (
-            actual.segments != expected.leader_segments
+            actual.segments != expected.native_leader_segments
             or actual.decorations != expected.leader_decorations
         ):
-            raise RuntimeError(f"{name}: narrow/full native leader geometry differs")
+            raise RuntimeError(
+                f"{name}: narrow/full RAW native leader geometry differs: actual={actual}, expected_native={expected.native_leader_segments}, expected_decorations={expected.leader_decorations}"
+            )
+        coverage[name] = displayed_leader_coverage(actual, expected.leader_segments)
+    if any(row["uncovered_display_indices"] for row in coverage.values()):
+        raise RuntimeError(
+            f"native reader does not cover every displayed open leader: {json.dumps(coverage)}"
+        )
     return {
         "count": len(bank),
         "elapsed_s": elapsed,
         "native_geometry": "exactly_equal_to_full_snapshot",
+        "display_coverage": coverage,
+    }
+
+
+def displayed_leader_coverage(native, displayed):
+    """Conservative complete-segment containment map; no dropped display ink."""
+    epsilon = 1e-8  # Same native duplicate-vertex precision as bounds extraction.
+
+    def on_segment(point, segment):
+        length = math.dist(segment.start, segment.end)
+        if length <= epsilon:
+            return math.dist(point, segment.start) <= epsilon
+        dx, dy = segment.end[0] - segment.start[0], segment.end[1] - segment.start[1]
+        px, py = point[0] - segment.start[0], point[1] - segment.start[1]
+        station = (px * dx + py * dy) / length
+        return (
+            abs(px * dy - py * dx) / length <= epsilon
+            and -epsilon <= station <= length + epsilon
+        )
+
+    matches = []
+    for index, line in enumerate(displayed):
+        native_indices = [
+            i
+            for i, segment in enumerate(native.segments)
+            if on_segment(line.start, segment) and on_segment(line.end, segment)
+        ]
+        decoration_indices = [
+            i
+            for i, box in enumerate(native.decorations)
+            if all(
+                box.xmin - epsilon <= point[0] <= box.xmax + epsilon
+                and box.ymin - epsilon <= point[1] <= box.ymax + epsilon
+                for point in (line.start, line.end)
+            )
+        ]
+        matches.append(
+            {
+                "display_index": index,
+                "native_container_indices": native_indices,
+                "decoration_container_indices": decoration_indices,
+            }
+        )
+    return {
+        "native_segments": [asdict(row) for row in native.segments],
+        "display_segments": [asdict(row) for row in displayed],
+        "native_decorations": [box.bounds for box in native.decorations],
+        "coverage": matches,
+        "uncovered_display_indices": [
+            row["display_index"]
+            for row in matches
+            if not row["native_container_indices"]
+            and not row["decoration_container_indices"]
+        ],
     }
 
 
