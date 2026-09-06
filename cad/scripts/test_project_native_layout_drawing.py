@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 import json
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, call
 
 import pytest
 
@@ -32,10 +32,12 @@ def test_project_layout_orders_spacing_and_rejects_unfit_sheet(monkeypatch, stat
         currentModel=SimpleNamespace(GetCurrentSheet=lambda: sheet)
     )
     calls = []
-    handoff = Mock()
-    handoff.seal.side_effect = lambda: calls.append("seal")
-    handoff.close.side_effect = lambda: calls.append("close")
-    factory = Mock(return_value=handoff)
+    handoff, obstacle = Mock(), Mock()
+    handoff.seal.side_effect = lambda: calls.append("packing-seal")
+    handoff.close.side_effect = lambda: calls.append("packing-close")
+    obstacle.seal.side_effect = lambda: calls.append("obstacle-seal")
+    obstacle.close.side_effect = lambda: calls.append("obstacle-close")
+    factory = Mock(side_effect=(handoff, obstacle))
     monkeypatch.setattr(handoff_module, "AnnotationMeasurementHandoff", factory)
     position = Mock(side_effect=lambda *args, **kwargs: calls.append("callouts"))
     monkeypatch.setattr(callouts, "arrange_native_callouts", position)
@@ -63,21 +65,42 @@ def test_project_layout_orders_spacing_and_rejects_unfit_sheet(monkeypatch, stat
             drawing.repair_project_drawing_layout(adapter, views=views, notes=notes)
             is report
         )
-    assert calls == ["callouts", "spacing", "seal", "packing", "close"]
+    assert calls == [
+        "callouts",
+        "obstacle-seal",
+        "spacing",
+        "packing-seal",
+        "packing",
+        "obstacle-close",
+        "packing-close",
+    ]
     position.assert_called_once_with(
         adapter,
         views=views,
         measure_annotation=annotation_box,
+        record_measurement=obstacle.record,
         gtol_placement=callouts.GtolPlacement.ARRANGED_NEXT,
         deferred_notes=(notes[0].annotation,),
     )
-    factory.assert_called_once_with(
-        adapter, views=views, measure_annotation=annotation_box
-    )
+    assert factory.call_args_list == [
+        call(
+            adapter,
+            views=views,
+            measure_annotation=annotation_box,
+            purpose=handoff_module.HandoffPurpose.INITIAL_PACKING,
+        ),
+        call(
+            adapter,
+            views=views,
+            measure_annotation=annotation_box,
+            purpose=handoff_module.HandoffPurpose.GTOL_OBSTACLES,
+        ),
+    ]
     arrange.assert_called_once_with(
         adapter,
         views=views,
         measure_annotation=annotation_box,
+        measure_obstacle=obstacle.initial_measure,
         record_measurement=handoff.record,
     )
     arguments = dict(repair.call_args.kwargs)
@@ -119,9 +142,11 @@ def test_project_layout_expires_handoff_after_native_failure(monkeypatch, stage)
     adapter = SimpleNamespace(
         currentModel=SimpleNamespace(GetCurrentSheet=lambda: sheet)
     )
-    handoff = Mock()
+    handoff, obstacle = Mock(), Mock()
     monkeypatch.setattr(
-        handoff_module, "AnnotationMeasurementHandoff", Mock(return_value=handoff)
+        handoff_module,
+        "AnnotationMeasurementHandoff",
+        Mock(side_effect=(handoff, obstacle)),
     )
     position, arrange, repair = Mock(), Mock(), Mock()
     {"callouts": position, "spacing": arrange, "packing": repair}[
@@ -133,6 +158,7 @@ def test_project_layout_expires_handoff_after_native_failure(monkeypatch, stage)
     with pytest.raises(RuntimeError, match="native failure"):
         drawing.repair_project_drawing_layout(adapter, views={"front": object()})
     handoff.close.assert_called_once_with()
+    obstacle.close.assert_called_once_with()
     if stage != "packing":
         handoff.seal.assert_not_called()
         repair.assert_not_called()
@@ -152,9 +178,11 @@ def test_final_clearance_logs_fresh_report_once_without_remeasurement(
     adapter = SimpleNamespace(
         currentModel=SimpleNamespace(GetCurrentSheet=lambda: sheet)
     )
-    handoff = Mock()
+    handoff, obstacle = Mock(), Mock()
     monkeypatch.setattr(
-        handoff_module, "AnnotationMeasurementHandoff", Mock(return_value=handoff)
+        handoff_module,
+        "AnnotationMeasurementHandoff",
+        Mock(side_effect=(handoff, obstacle)),
     )
     monkeypatch.setattr(callouts, "arrange_native_callouts", Mock())
     monkeypatch.setattr(gtol, "arrange_native_gtol_columns", Mock())
@@ -190,6 +218,7 @@ def test_final_clearance_logs_fresh_report_once_without_remeasurement(
     assert validator.call_args.args[0] is measurements
     measure.assert_not_called()
     handoff.close.assert_called_once_with()
+    obstacle.close.assert_called_once_with()
     records = [
         call.kwargs
         for call in log.call_args_list
