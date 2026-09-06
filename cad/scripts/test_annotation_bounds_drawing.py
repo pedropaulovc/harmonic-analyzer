@@ -129,6 +129,7 @@ def _all_around_snapshot(
         GetName=lambda: "DetailItem350",
         GetDisplayData=lambda: data,
         GetLeaderCount=lambda: 1,
+        GetMultiJogLeaderCount=lambda: 0,
         GetLeaderPointsAtIndex=lambda index: tuple(
             value for point in leader for value in point
         ),
