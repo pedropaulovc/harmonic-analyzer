@@ -5,6 +5,10 @@ GTol bank is used unless explicitly named. Translate its complete measured body
 bank to the first clear RIGHT outboard position, keeping native Y/order/leaders.
 Compare actual native leader segments against conservative native text cells;
 these are potential text-cell crossings, not exact glyph-ink intersections.
+If RIGHT still crosses text, try at most two absolute vertical candidates (UP,
+then DOWN), derived from the crossed cells and native elbow stations. Reuse text
+cells only for candidate screening; remeasure all native bodies/text at the final
+witness before exporting the first clear candidate. No leader segment is edited.
 Record both PNGs and final saved/reopened geometry, frame and dimension witnesses.
 The original drawing and referenced native parts must remain byte-unchanged.
 
@@ -15,7 +19,8 @@ No production recipe/helper is patched and nothing is published by this probe.
 from __future__ import annotations
 
 import argparse
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
+from enum import Enum
 import hashlib
 import json
 import math
@@ -106,6 +111,130 @@ def crossing_records(leader_banks, measurements):
                         }
                     )
     return result
+
+
+class VerticalDirection(Enum):
+    UP = "up"
+    DOWN = "down"
+
+
+@dataclass(frozen=True)
+class VerticalCandidate:
+    direction: VerticalDirection
+    dy_m: float
+
+
+@dataclass(frozen=True)
+class _TextCells:
+    kind: int
+    text_boxes: tuple[Rect, ...]
+    text_runs: tuple[Any, ...]
+
+
+def vertical_candidates(crossings, leaders, *, clearance_m=0.001):
+    """Two finite native-column hypotheses, never a computed leader route."""
+    if not math.isfinite(clearance_m) or clearance_m < 0:
+        raise ValueError("vertical candidate clearance must be finite/nonnegative")
+    if not crossings:
+        return ()
+    up, down = [], []
+    for crossing in crossings:
+        chain = leaders[crossing["leader_annotation"]]
+        if len(chain) != 2 or math.dist(chain[0].end, chain[1].start) > 1e-8:
+            raise ValueError(
+                "vertical control requires one native three-point bent leader"
+            )
+        elbow_y = chain[0].end[1]
+        cell = Rect(*crossing["text_cell"])
+        up.append(max(0.0, cell.ymax + clearance_m - elbow_y))
+        down.append(min(0.0, cell.ymin - clearance_m - elbow_y))
+    return (
+        VerticalCandidate(VerticalDirection.UP, max(up)),
+        VerticalCandidate(VerticalDirection.DOWN, min(down)),
+    )
+
+
+def _candidate_text_cells(measured, right_seed, predicted):
+    """Only bank text cells translate; every other measured cell stays fixed."""
+    result = {}
+    for name, bounds in measured.items():
+        delta = (0.0, 0.0)
+        if name in right_seed:
+            delta = tuple(
+                predicted[name].position[i] - right_seed[name].position[i]
+                for i in (0, 1)
+            )
+        result[name] = _TextCells(
+            bounds.kind,
+            tuple(cell.translated(delta) for cell in bounds.text_boxes),
+            tuple(bounds.text_runs),
+        )
+    return result
+
+
+def _candidate_trials(
+    right_seed,
+    measured,
+    leaders,
+    crossings,
+    outline,
+    obstacles,
+    *,
+    move_bank,
+    read_leaders,
+    attempts,
+    gap_m=0.003,
+):
+    """Screen at most two absolute candidates; caller MUST run fresh final witness."""
+    if attempts:
+        raise ValueError("candidate attempt log must start empty")
+    last = right_seed
+    for candidate in vertical_candidates(crossings, leaders):
+        delta = (0.0, candidate.dy_m)
+        attempt = {
+            "direction": candidate.direction.value,
+            "absolute_delta_from_right_m": delta,
+            "status": "started",
+        }
+        attempts.append(attempt)
+        # Pass the same immutable right seed every time, never the previous trial.
+        last = move_bank(
+            right_seed,
+            {name: delta for name in right_seed},
+            f"diagnostic right column {candidate.direction.value}",
+        )
+        actual_leaders = read_leaders(last)
+        actual_crossings = crossing_records(
+            actual_leaders, _candidate_text_cells(measured, right_seed, last)
+        )
+        body_clear = all(
+            _clear(row.body, obstacle, gap_m)
+            for row in last.values()
+            for obstacle in (outline, *obstacles)
+        )
+        attempt.update(
+            {
+                "direction": candidate.direction.value,
+                "absolute_delta_from_right_m": delta,
+                "body_clearance": "clear" if body_clear else "blocked",
+                "crossings": actual_crossings,
+                "native_leaders": {
+                    name: [asdict(segment) for segment in rows]
+                    for name, rows in actual_leaders.items()
+                },
+                "predicted_positions": {
+                    name: row.position for name, row in last.items()
+                },
+                "predicted_bodies": {
+                    name: row.body.bounds for name, row in last.items()
+                },
+                "body_text_basis": "derived_from_measured_right_seed_and_actual_native_position",
+                "status": "screened",
+            }
+        )
+        if body_clear and not actual_crossings:
+            return candidate.direction, last, attempts
+    return None, last, attempts
 
 
 def _leaders(annotation):
@@ -234,6 +363,11 @@ async def probe(adapter: Any, source: Path, requested_view: str | None):
         if not path.with_suffix(".pdf").is_file():
             raise RuntimeError(f"right-column diagnostic PDF missing: {outputs}")
         render_pdf_png(path.with_suffix(".pdf"), path.with_suffix(".png"))
+        report.setdefault("exports", {})[stage] = {
+            "drawing": str(path),
+            "pdf": str(path.with_suffix(".pdf")),
+            "png": str(path.with_suffix(".png")),
+        }
         return path
 
     try:
@@ -338,6 +472,78 @@ async def probe(adapter: Any, source: Path, requested_view: str | None):
             "semantics": semantics_after,
         }
         saved = export("right")
+        saved_bank = after
+        right_crossings = report["phases"]["after"]["crossings"]
+        if right_crossings:
+            report["vertical_attempts"] = []
+            direction, trial, attempts = _candidate_trials(
+                after,
+                measured_after,
+                leaders_after,
+                right_crossings,
+                outline,
+                obstacles,
+                move_bank=gtol._move_bank,
+                read_leaders=lambda bank: {
+                    name: _leaders(row.annotation) for name, row in bank.items()
+                },
+                attempts=report["vertical_attempts"],
+            )
+            report["vertical_attempts"] = attempts
+            final_bank = gtol._read_gtols(adapter, view, annotation_box)
+            if any(
+                int(row.annotation.GetLeaderStyle()) != 2 for row in final_bank.values()
+            ):
+                raise RuntimeError(
+                    "vertical candidate changed native bent GTol leader style"
+                )
+            gtol._unchanged(
+                adapter.swApp, before, final_bank, "right-column vertical final witness"
+            )
+            gtol._assert_measured_prediction(trial, final_bank)
+            _same_native(adapter.swApp, native_before, _native_entities(adapter, view))
+            final_semantics = snapshot(adapter.currentModel)
+            compare(
+                semantics_before, final_semantics, "right-column vertical final witness"
+            )
+            final_measured = _measure_view(adapter, view)
+            final_leaders = {
+                name: _leaders(row.annotation) for name, row in final_bank.items()
+            }
+            final_crossings = crossing_records(final_leaders, final_measured)
+            final_obstacles = tuple(
+                bounds.body
+                for name, bounds in final_measured.items()
+                if name not in final_bank and bounds.kind in {2, 4, 7}
+            )
+            final_outline = Rect(*view.GetOutline())
+            body_clear = all(
+                _clear(row.body, obstacle, 0.003)
+                for row in final_bank.values()
+                for obstacle in (final_outline, *final_obstacles)
+            )
+            report["phases"]["vertical_final"] = {
+                "bank": _records(final_bank),
+                "crossings": final_crossings,
+                "semantics": final_semantics,
+                "body_clearance": "clear" if body_clear else "blocked",
+                "selected_direction": direction.value
+                if direction is not None
+                else None,
+            }
+            if direction is not None:
+                if final_crossings or not body_clear:
+                    raise RuntimeError(
+                        "fresh final native measurement rejected the screened column candidate"
+                    )
+                saved = export(f"clear-{direction.value}")
+                saved_bank = final_bank
+                report["vertical_outcome"] = "fresh_native_witness_clear"
+            if direction is None:
+                report["vertical_outcome"] = "no_clear_candidate_within_two_trial_bound"
+        if not right_crossings:
+            report["vertical_attempts"] = []
+            report["vertical_outcome"] = "right_column_already_clear"
         check(
             "close right-column copy for persistence witness",
             await adapter.close_model(save=False),
@@ -360,7 +566,7 @@ async def probe(adapter: Any, source: Path, requested_view: str | None):
         if len(matches) != 1:
             raise RuntimeError("saved/reopened right-column view identity changed")
         reopened_bank = gtol._read_gtols(adapter, matches[0], annotation_box)
-        _same_saved_frames(_records(after), _records(reopened_bank))
+        _same_saved_frames(_records(saved_bank), _records(reopened_bank))
         report["reopened_bank"] = _records(reopened_bank)
         report["outcome"] = "captured_alternative_not_production_layout"
     except Exception as error:
