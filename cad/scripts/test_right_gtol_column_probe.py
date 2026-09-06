@@ -52,7 +52,9 @@ def test_crossing_report_excludes_intentional_own_frame_join():
         text_runs=(SimpleNamespace(value="127"),),
     )
     rows = crossing_records(
-        {"frame": (Segment((0, 0.5), (1, 0.5)),)}, {"frame": box, "dim": box}
+        {"frame": (Segment((0, 0.5), (1, 0.5)),)},
+        {"frame": box, "dim": box},
+        {"frame": ()},
     )
     assert len(rows) == 1
     assert rows[0]["target_annotation"] == "dim"
@@ -114,12 +116,12 @@ def lever_crossing_fixture():
             kind=4, text_boxes=(cell,), text_runs=(SimpleNamespace(value="9.50"),)
         )
     }
-    return leaders, measured, crossing_records(leaders, measured)
+    return leaders, measured, crossing_records(leaders, measured, {"frame": ()})
 
 
 def test_vertical_candidates_come_from_native_elbow_and_measured_text_cell():
     leaders, _measured, crossings = lever_crossing_fixture()
-    candidates = vertical_candidates(crossings, leaders)
+    candidates = vertical_candidates(crossings, leaders, {"frame": ()})
     assert [row.direction for row in candidates] == [
         VerticalDirection.UP,
         VerticalDirection.DOWN,
@@ -150,9 +152,11 @@ def test_vertical_candidate_offsets_do_not_depend_on_sheet_translation():
         )
         for name, value in measured.items()
     }
-    first = vertical_candidates(crossings, leaders)
+    first = vertical_candidates(crossings, leaders, {"frame": ()})
     second = vertical_candidates(
-        crossing_records(shifted_leaders, shifted_measured), shifted_leaders
+        crossing_records(shifted_leaders, shifted_measured, {"frame": ()}),
+        shifted_leaders,
+        {"frame": ()},
     )
     assert [row.dy_m for row in first] == pytest.approx([row.dy_m for row in second])
 
@@ -160,7 +164,136 @@ def test_vertical_candidate_offsets_do_not_depend_on_sheet_translation():
 def test_unproven_leader_chain_shape_does_not_get_a_nominal_elbow():
     leaders, _, crossings = lever_crossing_fixture()
     with pytest.raises(ValueError, match="three-point"):
-        vertical_candidates(crossings, {"frame": leaders["frame"][:1]})
+        vertical_candidates(crossings, {"frame": leaders["frame"][:1]}, {"frame": ()})
+
+
+def native_all_around_fixture():
+    # Captured native RIGHT-column all-around circle bounds, not a nominal radius.
+    return {
+        "frame": (
+            Rect(
+                0.2919792987771776,
+                0.15998271196879385,
+                0.2954792987771776,
+                0.16348271196879385,
+            ),
+        )
+    }
+
+
+def test_leader_decoration_inventory_cannot_be_silently_omitted():
+    leaders, measured, _ = lever_crossing_fixture()
+    with pytest.raises(ValueError, match="explicit decoration inventory"):
+        crossing_records(leaders, measured, {})
+
+
+def test_native_circle_requires_more_lift_than_its_leader_centerline():
+    leaders, measured, lines_only = lever_crossing_fixture()
+    decorations = native_all_around_fixture()
+    crossings = crossing_records(leaders, measured, decorations)
+    assert crossings[0]["segments"] == [0, 1]
+    assert crossings[0]["decorations"] == [0]
+    line_lift = vertical_candidates(lines_only, leaders, {"frame": ()})[0].dy_m
+    lifted_decoration = {
+        "frame": tuple(box.translated((0, line_lift)) for box in decorations["frame"])
+    }
+    remaining = crossing_records({"frame": ()}, measured, lifted_decoration)
+    assert remaining[0]["segments"] == []
+    assert remaining[0]["decorations"] == [0]
+    candidates = vertical_candidates(crossings, leaders, decorations)
+    assert [row.dy_m for row in candidates] == pytest.approx(
+        [0.0054029914697259, -0.0056768751969408]
+    )
+    for candidate in candidates:
+        moved = {
+            "frame": tuple(
+                box.translated((0, candidate.dy_m)) for box in decorations["frame"]
+            )
+        }
+        assert crossing_records({"frame": ()}, measured, moved) == []
+
+
+def test_decoration_only_crossing_uses_its_native_bounds_without_inventing_elbow():
+    _, measured, _ = lever_crossing_fixture()
+    decorations = native_all_around_fixture()
+    leaders = {"frame": ()}
+    crossings = crossing_records(leaders, measured, decorations)
+    assert crossings[0]["segments"] == []
+    assert [
+        row.dy_m for row in vertical_candidates(crossings, leaders, decorations)
+    ] == pytest.approx([0.0054029914697259, -0.0056768751969408])
+
+
+def test_decoration_offsets_are_translation_independent():
+    leaders, measured, _ = lever_crossing_fixture()
+    decorations = native_all_around_fixture()
+    delta = (0.2, -0.06)
+    shifted_decorations = {
+        name: tuple(box.translated(delta) for box in boxes)
+        for name, boxes in decorations.items()
+    }
+    shifted_cells = {
+        name: SimpleNamespace(
+            kind=row.kind,
+            text_boxes=tuple(box.translated(delta) for box in row.text_boxes),
+            text_runs=row.text_runs,
+        )
+        for name, row in measured.items()
+    }
+    original = vertical_candidates(
+        crossing_records({"frame": ()}, measured, decorations),
+        {"frame": ()},
+        decorations,
+    )
+    shifted = vertical_candidates(
+        crossing_records({"frame": ()}, shifted_cells, shifted_decorations),
+        {"frame": ()},
+        shifted_decorations,
+    )
+    assert [row.dy_m for row in original] == pytest.approx(
+        [row.dy_m for row in shifted]
+    )
+
+
+def test_native_decoration_readback_rejects_line_clear_candidate():
+    leaders, measured, _ = lever_crossing_fixture()
+    decorations = native_all_around_fixture()
+    crossings = crossing_records(leaders, measured, decorations)
+    original = {
+        "frame": SimpleNamespace(
+            position=(0.3, 0.165, 0), body=Rect(0.3, 0.158, 0.34, 0.165)
+        )
+    }
+    attempts = []
+
+    def move(seed, deltas, _stage):
+        assert seed is original
+        dy = deltas["frame"][1]
+        return {
+            "frame": SimpleNamespace(
+                position=(0.3, 0.165 + dy, 0),
+                body=seed["frame"].body.translated((0, dy)),
+            )
+        }
+
+    direction, _, rows = _candidate_trials(
+        original,
+        measured,
+        leaders,
+        decorations,
+        crossings,
+        Rect(0.08, 0.148, 0.287, 0.172),
+        (),
+        move_bank=move,
+        read_leaders=lambda _: {"frame": ()},
+        # Actual native rerouting remains blocked despite clear open segments.
+        read_decorations=lambda _: decorations,
+        attempts=attempts,
+    )
+    assert direction is None
+    assert len(rows) == 2
+    assert all(row["crossings"][0]["segments"] == [] for row in rows)
+    assert all(row["crossings"][0]["decorations"] == [0] for row in rows)
 
 
 @pytest.mark.parametrize("clear_at", [1, 2, 3])
@@ -220,11 +353,13 @@ def test_native_candidate_screen_is_bounded_and_uses_original_right_seed(
         original,
         measured,
         leaders,
+        {"frame": ()},
         crossings,
         Rect(0.08, 0.148, 0.287, 0.172),
         (),
         move_bank=move,
         read_leaders=read,
+        read_decorations=lambda _: {"frame": ()},
         attempts=[],
     )
     assert len(moves) == min(clear_at, 2)
@@ -256,11 +391,13 @@ def test_failed_native_move_leaves_its_bounded_attempt_checkpoint():
             seed,
             measured,
             leaders,
+            {"frame": ()},
             crossings,
             Rect(0.08, 0.148, 0.287, 0.172),
             (),
             move_bank=reject,
             read_leaders=lambda _: pytest.fail("read after failed movement"),
+            read_decorations=lambda _: pytest.fail("read after failed movement"),
             attempts=attempts,
         )
     assert attempts == [
@@ -293,11 +430,13 @@ def test_text_clear_candidate_still_rejected_when_frame_body_hits_dimension():
         seed,
         measured,
         leaders,
+        {"frame": ()},
         crossings,
         Rect(0.08, 0.148, 0.287, 0.172),
         (Rect(0.305, 0.167, 0.33, 0.18),),
         move_bank=move,
         read_leaders=lambda _: {"frame": ()},
+        read_decorations=lambda _: {"frame": ()},
         attempts=[],
     )
     assert direction is VerticalDirection.DOWN
