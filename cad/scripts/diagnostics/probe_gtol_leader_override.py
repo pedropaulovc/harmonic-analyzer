@@ -13,12 +13,21 @@ witnessed before opening, before mutations/close, and after owned-copy close.
 Hidden pre-existing documents are refused: documented CloseDoc can close hidden
 documents too. No pre-existing document, original drawing or source reference
 is ever a close target. Unknown/replaced documents cause a fail-loud refusal.
+
+Control 9eef747b (gtol-leader-override-h_wiopl4, 2026-09-06) positively retained
+6.35 mm through save/reopen, unchanged document default, XML/geometry/values and
+source hashes. Its first immediate GetLeaderPoints read remained stale; the
+subsequent display-data measurement already had the correct 6.35 mm geometry.
+The strict pre-export length assertion deliberately failed. --update-boundary
+edit_rebuild tests one explicit EditRebuild3 before that exact read, preserving
+the original immediate control and every final assertion.
 """
 
 from __future__ import annotations
 
 import argparse
 from dataclasses import asdict
+from enum import StrEnum
 import math
 from pathlib import Path
 import shutil
@@ -43,6 +52,27 @@ import _telemetry  # noqa: E402
 DOCUMENT_LENGTH_M = 0.07330296548073768
 OVERRIDE_LENGTH_M = 0.00635
 EPSILON = 1e-8
+
+
+class UpdateBoundary(StrEnum):
+    IMMEDIATE = "immediate"
+    EDIT_REBUILD = "edit_rebuild"
+
+
+def update_boundary(model, boundary):
+    if boundary is UpdateBoundary.IMMEDIATE:
+        return {"operation": boundary.value}
+    if boundary is not UpdateBoundary.EDIT_REBUILD:
+        raise ValueError("unknown native update boundary")
+    returned = bool(model.EditRebuild3())
+    if not returned:
+        raise RuntimeError("explicit native EditRebuild3 rejected the update")
+    return {"operation": boundary.value, "returned": returned}
+
+
+def verify_layout_changes(changes, target):
+    if set(changes) - {target["inventory_key"]}:
+        raise RuntimeError("one GTol setter changed other annotation native layout")
 
 
 def document_state(document):
@@ -172,14 +202,15 @@ def capture_target(adapter, part):
             key = f"{view_key}/{annotation.GetName()}"
             if key in candidates:
                 raise RuntimeError("GTol native name is duplicated")
-            candidates[key] = annotation
+            candidates[key] = (annotation, f"{view.GetName2()}/{annotation.GetName()}")
     if len(candidates) != 1:
         raise RuntimeError("bounded rocker control requires exactly one visible GTol")
-    key, annotation = next(iter(candidates.items()))
+    key, (annotation, inventory_key) = next(iter(candidates.items()))
     record = leader_record(annotation)
     record.update(
         {
             "key": key,
+            "inventory_key": inventory_key,
             "views": contexts,
             "measurement": asdict(annotation_box(adapter, annotation)),
         }
@@ -222,6 +253,7 @@ def verify_override(before, after, document_after):
         raise RuntimeError("per-GTol override changed the document leader preference")
     for field in (
         "key",
+        "inventory_key",
         "views",
         "style",
         "side",
@@ -252,7 +284,15 @@ def verify_override(before, after, document_after):
             )
 
 
-async def probe(adapter, source, part, directory, guard_paths=()):
+async def probe(
+    adapter,
+    source,
+    part,
+    directory,
+    guard_paths=(),
+    *,
+    boundary=UpdateBoundary.IMMEDIATE,
+):
     from solidworks_mcp.adapters.solidworks.drawing import save_drawing
 
     started = time.perf_counter()
@@ -261,6 +301,7 @@ async def probe(adapter, source, part, directory, guard_paths=()):
         "source_hashes": {str(p): file_digest(p) for p in (source, part, *guard_paths)},
         "operation": "one existing GTol.BentLeaderLength setter",
         "requested_m": OVERRIDE_LENGTH_M,
+        "update_boundary": boundary.value,
     }
     owned = None
     app = _early_bound(adapter.swApp, "ISldWorks")
@@ -295,6 +336,12 @@ async def probe(adapter, source, part, directory, guard_paths=()):
         report["annotations_before"], all_handles = shoulder.all_annotation_layout(
             adapter
         )
+        native_key = report["before"]["inventory_key"]
+        if (
+            native_key not in all_handles
+            or int(app.IsSame(all_handles[native_key][0], annotation)) != 1
+        ):
+            raise RuntimeError("GTol target is not the exact full-inventory annotation")
         report["manufacturing_before"] = attachments.snapshot(
             adapter.currentModel, app=app
         )
@@ -302,6 +349,11 @@ async def probe(adapter, source, part, directory, guard_paths=()):
         with _telemetry.span("diagnostic.gtol_length_override"):
             annotation.BentLeaderLength = OVERRIDE_LENGTH_M
         report["immediate"] = leader_record(annotation)
+        owned._validate_active()
+        with _telemetry.span(
+            "diagnostic.gtol_update_boundary", boundary=boundary.value
+        ):
+            report["update"] = update_boundary(adapter.currentModel, boundary)
         report["after"], after_annotation, after_view_handles = capture_target(
             adapter, part
         )
@@ -359,8 +411,7 @@ async def probe(adapter, source, part, directory, guard_paths=()):
         verify_override(
             report["before"], report["reopened"], report["document_reopened_m"]
         )
-        if set(report["layout_changes"]) - {report["before"]["key"]}:
-            raise RuntimeError("one GTol setter changed other annotation native layout")
+        verify_layout_changes(report["layout_changes"], report["before"])
         if report["reopen_layout_changes"]:
             raise RuntimeError("saved GTol copy changed native layout on reopen")
         report["result"] = "passed"
@@ -378,6 +429,12 @@ def main():
     parser.add_argument("drawing", type=Path)
     parser.add_argument("--part", required=True, type=Path)
     parser.add_argument("--guard-source", action="append", type=Path, default=[])
+    parser.add_argument(
+        "--update-boundary",
+        type=UpdateBoundary,
+        choices=tuple(UpdateBoundary),
+        default=UpdateBoundary.IMMEDIATE,
+    )
     parser.add_argument("--worker", action="store_true")
     args = parser.parse_args()
     source, part = args.drawing.resolve(strict=True), args.part.resolve(strict=True)
@@ -400,6 +457,8 @@ def main():
                 "--part",
                 str(part),
                 "--worker",
+                "--update-boundary",
+                args.update_boundary.value,
                 *(value for path in guards for value in ("--guard-source", str(path))),
             ],
             "one GTol leader override",
@@ -411,7 +470,9 @@ def main():
     reports.mkdir(parents=True, exist_ok=True)
     directory = Path(tempfile.mkdtemp(prefix="gtol-leader-override-", dir=reports))
     return run_owned_diagnostic(
-        lambda adapter: probe(adapter, source, part, directory, guards)
+        lambda adapter: probe(
+            adapter, source, part, directory, guards, boundary=args.update_boundary
+        )
     )
 
 
