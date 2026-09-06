@@ -12,6 +12,9 @@ from probe_drawing_right_gtol_column import (
     crossing_records,
     _same_native,
     _same_saved_frames,
+    vertical_candidates,
+    VerticalDirection,
+    _candidate_trials,
 )
 
 
@@ -85,3 +88,218 @@ def test_saved_frame_witness_rejects_content_or_layout_change(field, value):
     _same_saved_frames({"frame": row}, {"frame": row})
     with pytest.raises(RuntimeError, match="saved/reopened"):
         _same_saved_frames({"frame": row}, {"frame": {**row, field: value}})
+
+
+def lever_crossing_fixture():
+    leaders = {
+        "frame": (
+            Segment(
+                (0.30007929877717765, 0.16173271196879385),
+                (0.2937292987771776, 0.16173271196879385),
+            ),
+            Segment(
+                (0.2937292987771776, 0.16173271196879385),
+                (0.26468719797395834, 0.16523271196879386),
+            ),
+        )
+    }
+    cell = Rect(
+        0.28695150348791637,
+        0.15880583677185306,
+        0.29602250348791637,
+        0.16438570343851974,
+    )
+    measured = {
+        "RD3": SimpleNamespace(
+            kind=4, text_boxes=(cell,), text_runs=(SimpleNamespace(value="9.50"),)
+        )
+    }
+    return leaders, measured, crossing_records(leaders, measured)
+
+
+def test_vertical_candidates_come_from_native_elbow_and_measured_text_cell():
+    leaders, _measured, crossings = lever_crossing_fixture()
+    candidates = vertical_candidates(crossings, leaders)
+    assert [row.direction for row in candidates] == [
+        VerticalDirection.UP,
+        VerticalDirection.DOWN,
+    ]
+    assert [row.dy_m for row in candidates] == pytest.approx(
+        [0.0036529914697259, -0.0039268751969408]
+    )
+
+
+def test_vertical_candidate_offsets_do_not_depend_on_sheet_translation():
+    leaders, measured, crossings = lever_crossing_fixture()
+    delta = (0.1, -0.04)
+    shifted_leaders = {
+        name: tuple(
+            Segment(
+                (s.start[0] + delta[0], s.start[1] + delta[1]),
+                (s.end[0] + delta[0], s.end[1] + delta[1]),
+            )
+            for s in segments
+        )
+        for name, segments in leaders.items()
+    }
+    shifted_measured = {
+        name: SimpleNamespace(
+            kind=value.kind,
+            text_boxes=tuple(cell.translated(delta) for cell in value.text_boxes),
+            text_runs=value.text_runs,
+        )
+        for name, value in measured.items()
+    }
+    first = vertical_candidates(crossings, leaders)
+    second = vertical_candidates(
+        crossing_records(shifted_leaders, shifted_measured), shifted_leaders
+    )
+    assert [row.dy_m for row in first] == pytest.approx([row.dy_m for row in second])
+
+
+def test_unproven_leader_chain_shape_does_not_get_a_nominal_elbow():
+    leaders, _, crossings = lever_crossing_fixture()
+    with pytest.raises(ValueError, match="three-point"):
+        vertical_candidates(crossings, {"frame": leaders["frame"][:1]})
+
+
+@pytest.mark.parametrize("clear_at", [1, 2, 3])
+def test_native_candidate_screen_is_bounded_and_uses_original_right_seed(
+    monkeypatch, clear_at
+):
+    import probe_drawing_right_gtol_column as module
+
+    leaders, measured, crossings = lever_crossing_fixture()
+    original = {
+        "frame": SimpleNamespace(
+            position=(0.30007929877717765, 0.16523271196879386, 0),
+            body=Rect(
+                0.30007929877717765,
+                0.15823271196879385,
+                0.3388272168707547,
+                0.16523271196879386,
+            ),
+        )
+    }
+    measured["frame"] = SimpleNamespace(
+        kind=5, text_boxes=(original["frame"].body,), text_runs=()
+    )
+    moves, reads = [], []
+    monkeypatch.setattr(
+        module,
+        "annotation_box",
+        lambda *_: pytest.fail("candidate did a full annotation measurement"),
+    )
+
+    def move(seed, deltas, stage):
+        assert seed is original
+        moves.append(deltas["frame"])
+        point = (
+            seed["frame"].position[0],
+            seed["frame"].position[1] + deltas["frame"][1],
+            0,
+        )
+        return {
+            "frame": SimpleNamespace(
+                position=point, body=seed["frame"].body.translated(deltas["frame"])
+            )
+        }
+
+    def read(bank):
+        reads.append(bank)
+        if len(reads) >= clear_at:
+            return {
+                "frame": (
+                    Segment((0.3, 0.2), (0.29, 0.2)),
+                    Segment((0.29, 0.2), (0.26, 0.2)),
+                )
+            }
+        return leaders  # native reroute remains blocked despite derived body move
+
+    direction, final, attempts = _candidate_trials(
+        original,
+        measured,
+        leaders,
+        crossings,
+        Rect(0.08, 0.148, 0.287, 0.172),
+        (),
+        move_bank=move,
+        read_leaders=read,
+        attempts=[],
+    )
+    assert len(moves) == min(clear_at, 2)
+    assert (
+        direction
+        == {1: VerticalDirection.UP, 2: VerticalDirection.DOWN, 3: None}[clear_at]
+    )
+    assert final["frame"].position[1] == pytest.approx(
+        original["frame"].position[1] + moves[-1][1]
+    )
+    assert len(attempts) == min(clear_at, 2)
+    assert len(attempts[0]["crossings"]) == (0 if clear_at == 1 else 1)
+
+
+def test_failed_native_move_leaves_its_bounded_attempt_checkpoint():
+    leaders, measured, crossings = lever_crossing_fixture()
+    seed = {
+        "frame": SimpleNamespace(
+            position=(0.3, 0.165, 0), body=Rect(0.3, 0.158, 0.34, 0.165)
+        )
+    }
+    attempts = []
+
+    def reject(*_args):
+        raise RuntimeError("native position rejected")
+
+    with pytest.raises(RuntimeError, match="native position rejected"):
+        _candidate_trials(
+            seed,
+            measured,
+            leaders,
+            crossings,
+            Rect(0.08, 0.148, 0.287, 0.172),
+            (),
+            move_bank=reject,
+            read_leaders=lambda _: pytest.fail("read after failed movement"),
+            attempts=attempts,
+        )
+    assert attempts == [
+        {
+            "direction": "up",
+            "absolute_delta_from_right_m": (0, pytest.approx(0.0036529914697259)),
+            "status": "started",
+        }
+    ]
+
+
+def test_text_clear_candidate_still_rejected_when_frame_body_hits_dimension():
+    leaders, measured, crossings = lever_crossing_fixture()
+    seed = {
+        "frame": SimpleNamespace(
+            position=(0.3, 0.165, 0), body=Rect(0.3, 0.158, 0.34, 0.165)
+        )
+    }
+
+    def move(original, deltas, _stage):
+        dy = deltas["frame"][1]
+        return {
+            "frame": SimpleNamespace(
+                position=(0.3, 0.165 + dy, 0),
+                body=original["frame"].body.translated((0, dy)),
+            )
+        }
+
+    direction, _bank, attempts = _candidate_trials(
+        seed,
+        measured,
+        leaders,
+        crossings,
+        Rect(0.08, 0.148, 0.287, 0.172),
+        (Rect(0.305, 0.167, 0.33, 0.18),),
+        move_bank=move,
+        read_leaders=lambda _: {"frame": ()},
+        attempts=[],
+    )
+    assert direction is VerticalDirection.DOWN
+    assert attempts[0]["crossings"] == []
+    assert attempts[0]["body_clearance"] == "blocked"
