@@ -74,7 +74,8 @@ with a fresh native source instance. It then repeats the unchanged values,
 tolerances, text, attachments, defaults and layout comparisons. A lost THRU callout,
 BASIC designation or precision after cold reopen fails; keeping a dirty source
 open is not a persistence witness. Both owned documents close after every trial.
-This new variant is offline-tested only until an explicitly granted native run.
+The native run of this immutable-copy variant is recorded below; do not repeat
+the blocked shape or change its retained copy to satisfy the hash check.
 
 ## Evidence and timing boundaries
 
@@ -113,6 +114,60 @@ quantization: a differing final witness fails for investigation.
 One ABBA block supports only its observed paired timing differences. It does not
 establish a fleet speedup, a conflict probability below 5%, or visual equivalence
 of every export. The retained PDFs/PNGs still need a human eye pass.
+
+## Owned-copy native result and the next design decision
+
+The reviewed arbor-only run at `ab264db8` (parent session 84016, existing PID
+37136, AUTOSTART=0, remote cache off) stopped on its first baseline. Retained
+bundle: `cad/out/reports/template-defaults/template-abba-ykoh1l_z/`.
+Preparation passed in 36.3289 s; source copying took 0.1180 s. Baseline setup was
+5.56874 s and its recipe reached finalization in 104.64125 s. Native drawing,
+PDF and PNG files were produced, but the copied-source hash gate failed before
+cold persisted checks. No candidate ran; there is no accepted ABBA timing delta.
+
+The exact copied part remained the same native handle/configuration, but changed
+dirty-to-clean across finalization. Its disk SHA changed from
+`dbb991437aea105ca5352b8b76468874077aeed0a74906413a1cc56fb7ca769e` to
+`04eabd7157a43ee5f956191e7137f37f3cca1570997ff9c6830098cd20afe303`.
+The source hash brackets the complete finalizer, not the individual native/PDF
+save calls. Split telemetry records native save 1.50548 s and PDF export
+0.696532 s; those timings do not independently identify which call wrote the
+part. The changed copy and all outputs remain untouched as evidence.
+
+Original arbor, original project template and derived-template disk hashes all
+remained unchanged. Scoped cleanup succeeded without saving: the exact original
+visible clean lever and dirty unsaved Draw2 were preserved, with no diagnostic
+documents left open. `measurements.json` and `ownership.json` retain the failed
+phase, before/after source state, hashes and cleanup evidence.
+
+The falsified assumption was that an owned recipe source could remain byte-wise
+immutable throughout the current mutating pipeline. Original-input immutability
+remains required. The narrowest next proposal is one fresh byte-copy **per arm**,
+with the same unique basename in separate owned arm directories, each starting
+from the same original digest. Treat the resulting part as that arm's retained
+output; never reset it. Compare observed source native dimension identities,
+values/tolerances/BASIC before/after in the same open document, preserve explicit
+presentation deltas, and require cold source-plus-drawing semantic readback.
+Across arms, map only the independently verified source path/owner to its pinned
+original digest. This proposal is not implemented or native-validated.
+
+Pre-authoring THRU/precision once on a copied part is a different starting recipe
+condition. It also needs a positive control showing that repeated setters do not
+dirty/save the source again; it is not a demonstrated shortcut to matched inputs.
+Drawing-local callout authoring could avoid shared source presentation writes,
+but would change the recipe and requires its own attachment/value/format and
+cold-reopen proof. Neither change belongs in the first template-only comparison.
+
+Local official `IModelDoc2/SaveAs3.md` documents only the obsolete integer-return
+signature; its option parameters have no described semantics. Do not interpret
+legacy `Options=0` using newer enum documentation. `IModelDocExtension/SaveAs.md`
+and `SaveAs3.md` explicitly use `swSaveAsOptions_e`, whose `SaveReferenced=4`
+includes drawing references and `Silent=1` is independent. A separate minimal
+owned-copy control could contrast documented extension-save options 1 and 5,
+retaining exact file/path/return/error/source hashes and cold readbacks; omission
+of flag 4 is not yet proof that unsaved source presentation persists correctly.
+The earlier advanced `SaveAs3` True/no-file result remains specific to that tested
+call shape. No save API, option, shared preference or production recipe changed.
 
 ## Native API provenance and untested boundary
 
