@@ -108,6 +108,10 @@ def _corners(rect: Rect) -> list[Point]:
 
 
 def _stroke_points(line: Segment) -> list[Point]:
+    if not all(
+        math.isfinite(value) for point in (line.start, line.end) for value in point
+    ):
+        raise ValueError("native stroke endpoints must be finite")
     if line.width_m == 0:
         return [line.start, line.end]
     if not math.isfinite(line.width_m) or line.width_m < 0:
@@ -518,12 +522,33 @@ def _native_snapshot(annotation: Any, extension: Any = None) -> NativeSnapshot:
     if kind not in _KINDS:
         raise ValueError(f"unsupported annotation kind {kind}: {annotation.GetName()}")
     data = _early_bound(annotation.GetDisplayData(), "IDisplayData")
+    if data is None:
+        raise ValueError("native annotation exposes no display data")
+    counts = {}
+    for primitive in (
+        "Text",
+        "Line",
+        "Arc",
+        "PolyLine",
+        "Triangle",
+        "ArrowHead",
+        "Polygon",
+        "Ellipse",
+        "Parabola",
+        "Point",
+    ):
+        value = getattr(data, f"Get{primitive}Count")()
+        if not math.isfinite(value) or value < 0 or int(value) != value:
+            raise ValueError(
+                f"unsupported native primitive inventory: invalid {primitive} count {value}"
+            )
+        counts[primitive] = int(value)
     # Documented inventories exist for these primitives, but this reader has
     # no bounded representation for them yet. Never certify an incomplete box.
     unsupported = {
-        "ellipses": int(data.GetEllipseCount()),
-        "parabolas": int(data.GetParabolaCount()),
-        "points": int(data.GetPointCount()),
+        "ellipses": counts["Ellipse"],
+        "parabolas": counts["Parabola"],
+        "points": counts["Point"],
     }
     if any(count != 0 for count in unsupported.values()):
         raise ValueError(f"unsupported native primitive inventory: {unsupported}")
@@ -532,7 +557,7 @@ def _native_snapshot(annotation: Any, extension: Any = None) -> NativeSnapshot:
     # nothing. Never infer thread ink from its smaller simplified solid face.
     thread_width = _thread_line_width(extension) if kind == 1 else 0.0
     runs = []
-    for index in range(int(data.GetTextCount())):
+    for index in range(counts["Text"]):
         if tuple(data.GetTextPlaneAtIndex(index) or ()):
             raise ValueError("uncalibrated nonempty native drawing text plane")
         runs.append(
@@ -548,10 +573,12 @@ def _native_snapshot(annotation: Any, extension: Any = None) -> NativeSnapshot:
         )
     lines = []
     widths: dict[int, float] = {}
-    for index in range(int(data.GetLineCount())):
+    for index in range(counts["Line"]):
         raw = tuple(data.GetLineAtIndex3(index))
         if len(raw) != 10:
             raise ValueError("native line array must contain ten values")
+        if not all(math.isfinite(value) for value in raw[4:]):
+            raise ValueError("native line XYZ geometry must be finite")
         width = thread_width
         if kind in {13, 15}:
             weight = int(raw[3])
@@ -569,9 +596,11 @@ def _native_snapshot(annotation: Any, extension: Any = None) -> NativeSnapshot:
         lines.append(Segment(raw[4:6], raw[7:9], width))
     boxes = []
     arc_leader_candidates = []
-    for index in range(int(data.GetArcCount())):
+    for index in range(counts["Arc"]):
         raw = tuple(data.GetArcAtIndex2(index))
-        if len(raw) != 17 or abs(raw[13]) > 1e-8 or abs(raw[14]) > 1e-8:
+        if len(raw) != 17 or not all(math.isfinite(value) for value in raw[4:]):
+            raise ValueError("native arc XYZ/normal geometry must be finite")
+        if abs(raw[13]) > 1e-8 or abs(raw[14]) > 1e-8 or abs(raw[15]) < 1e-8:
             raise ValueError("native arc is not in the drawing sheet plane")
         radius = math.dist(raw[4:6], raw[10:12]) + thread_width / 2
         boxes.append(
@@ -581,11 +610,22 @@ def _native_snapshot(annotation: Any, extension: Any = None) -> NativeSnapshot:
         arc_leader_candidates.append(
             (raw[10:12], math.dist(raw[4:7], raw[7:10]) <= _GEOMETRY_EPSILON_M)
         )
-    for index in range(int(data.GetPolyLineCount())):
+    for index in range(counts["PolyLine"]):
         raw = tuple(data.GetPolylineAtIndex2(index))
+        if (
+            len(raw) < 7
+            or not math.isfinite(raw[6])
+            or raw[6] < 2
+            or int(raw[6]) != raw[6]
+        ):
+            raise ValueError(
+                "native polyline needs an integral point count of at least two"
+            )
         count = int(raw[6])
         if len(raw) != 7 + count * 3:
             raise ValueError("native polyline point count mismatch")
+        if not all(math.isfinite(value) for value in raw[7:]):
+            raise ValueError("native polyline XYZ geometry must be finite")
         points = tuple((raw[7 + i * 3], raw[8 + i * 3]) for i in range(count))
         lines.extend(Segment(a, b, thread_width) for a, b in zip(points, points[1:]))
     leaders = []
@@ -594,6 +634,8 @@ def _native_snapshot(annotation: Any, extension: Any = None) -> NativeSnapshot:
         raw = tuple(annotation.GetLeaderPointsAtIndex(index) or ())
         if len(raw) not in {6, 9}:
             raise ValueError("native leader must expose two or three XYZ points")
+        if not all(math.isfinite(value) for value in raw):
+            raise ValueError("native leader XYZ geometry must be finite")
         points = tuple((raw[i], raw[i + 1]) for i in range(0, len(raw), 3))
         leaders.extend(Segment(a, b) for a, b in zip(points, points[1:]))
         if len(points) == 3:
@@ -614,12 +656,14 @@ def _native_snapshot(annotation: Any, extension: Any = None) -> NativeSnapshot:
                 continue
             body_boxes.append(box)
         boxes = body_boxes
-    for index in range(int(data.GetTriangleCount())):
+    for index in range(counts["Triangle"]):
         raw = tuple(data.GetTriangleAtIndex(index))
         if len(raw) != 11:
             raise ValueError("native triangle must contain eleven values")
+        if not all(math.isfinite(value) for value in raw[:9]):
+            raise ValueError("native triangle XYZ geometry must be finite")
         leader_boxes.append(_rectangle([(raw[i], raw[i + 1]) for i in (0, 3, 6)]))
-    for index in range(int(data.GetArrowHeadCount())):
+    for index in range(counts["ArrowHead"]):
         raw = tuple(data.GetArrowHeadAtIndex2(index))
         if (
             len(raw) != 12
@@ -635,11 +679,22 @@ def _native_snapshot(annotation: Any, extension: Any = None) -> NativeSnapshot:
             leader_boxes.append(
                 Rect(raw[0] - radius, raw[1] - radius, raw[0] + radius, raw[1] + radius)
             )
-    for index in range(int(data.GetPolygonCount())):
+    for index in range(counts["Polygon"]):
         raw = tuple(data.GetPolygonAtIndex(index))
+        if (
+            len(raw) < 5
+            or not math.isfinite(raw[4])
+            or raw[4] < 3
+            or int(raw[4]) != raw[4]
+        ):
+            raise ValueError(
+                "native polygon needs an integral point count of at least three"
+            )
         count = int(raw[4])
         if len(raw) != 5 + count * 3:
             raise ValueError("native polygon point count mismatch")
+        if not all(math.isfinite(value) for value in raw[5:]):
+            raise ValueError("native polygon XYZ geometry must be finite")
         leader_boxes.append(
             _rectangle([(raw[5 + i * 3], raw[6 + i * 3]) for i in range(count)])
         )
