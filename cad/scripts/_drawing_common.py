@@ -2279,32 +2279,58 @@ def auto_arrange_view_dimensions(
     to view-owned display dimensions; datum tags, FCFs and surface finishes
     are never selected for the dimension-only AlignDimensions API. There is
     one native arrange call for the whole bank and no manual-position retry.
+    Dimension names come from the actual display annotations, never recipes.
     """
     if not math.isfinite(spacing_m) or spacing_m <= 0:
         raise ValueError("dimension auto-arrange spacing must be finite and positive")
     views = tuple(views)
     draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    selection = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    extension = _early_bound(draw.Extension, "IModelDocExtension")
     count = 0
     draw.ClearSelection2(True)
     try:
         for raw_view in views:
             view = _early_bound(raw_view, "IView")
-            for raw_annotation in view.GetAnnotationsByType(_ANNOT_DIM) or ():
+            annotations = tuple(view.GetAnnotationsByType(_ANNOT_DIM) or ())
+            if not annotations:
+                continue
+            name = view_name(adapter, view)
+            if not drawing.ActivateView(name):
+                raise RuntimeError(f"failed to activate dimension view {name!r} for auto-arrange")
+            for raw_annotation in annotations:
                 if raw_annotation is None:
                     raise RuntimeError("auto-arrange received a missing dimension annotation")
                 annotation = _early_bound(raw_annotation, "IAnnotation")
-                if not annotation.Select3(True, null_callout()):
-                    raise RuntimeError(f"failed to select dimension {count + 1} for auto-arrange")
+                display = annotation.GetSpecificAnnotation()
+                if display is None:
+                    raise RuntimeError(f"auto-arrange dimension in {name!r} has no display dimension")
+                display = _early_bound(display, "IDisplayDimension")
+                selection_name = str(display.GetNameForSelection() or "")
+                if not selection_name:
+                    raise RuntimeError(f"auto-arrange dimension in {name!r} has no selection name")
+                # Live positive control: imported drawing dimensions reject
+                # Select3(None/SelectData.View) on this seat, while their own
+                # GetNameForSelection names select the complete bank. This is
+                # name identity; the coordinate fields are ignored. See the
+                # copy-only probe_drawing_dimension_selection.py diagnostic.
+                if not extension.SelectByID2(
+                    selection_name, "DIMENSION", 0.0, 0.0, 0.0, True, 0, null_callout(), 0
+                ):
+                    raise RuntimeError(
+                        f"failed to select dimension {count + 1} for auto-arrange: "
+                        f"view={name!r}, annotation={annotation.GetName()!r}, "
+                        f"type={annotation.GetType()}, visibility={annotation.Visible}"
+                    )
                 count += 1
         if count == 0:
             return 0
-        selection = _early_bound(draw.SelectionManager, "ISelectionMgr")
         selected_count = int(selection.GetSelectedObjectCount2(-1))
         if selected_count != count:
             raise RuntimeError(
                 f"dimension auto-arrange selection count mismatch: {selected_count} != {count}"
             )
-        extension = _early_bound(draw.Extension, "IModelDocExtension")
         if not extension.AlignDimensions(0, spacing_m):  # swAlignDimensionType_AutoArrange
             raise RuntimeError(f"SolidWorks rejected native auto-arrange for {count} dimensions")
         return count
