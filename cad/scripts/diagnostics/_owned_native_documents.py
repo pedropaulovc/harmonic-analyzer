@@ -82,7 +82,7 @@ class DiagnosticDocuments:
             state = _state(document)
             if state["visible"] is DocumentState.HIDDEN:
                 raise RuntimeError(
-                    "hidden pre-existing document prevents safe scoped CloseDoc"
+                    f"hidden pre-existing document prevents safe scoped CloseDoc: {state}"
                 )
             self.records.append(NativeDocument(document, Ownership.BASELINE, state))
         self.inventory()
@@ -119,6 +119,10 @@ class DiagnosticDocuments:
         path = Path(directory).resolve(strict=True)
         if not path.is_dir():
             raise RuntimeError("diagnostic output directory does not exist")
+        if any(source.is_relative_to(path) for source in self.sources):
+            raise RuntimeError(
+                f"diagnostic directory overlaps a registered source: {path}"
+            )
         if (path / "ownership.json").exists() and path not in self.directories:
             raise RuntimeError(
                 "diagnostic directory already contains ownership evidence"
@@ -128,6 +132,10 @@ class DiagnosticDocuments:
 
     def register_source(self, source):
         path = Path(source).resolve(strict=True)
+        if any(path.is_relative_to(directory) for directory in self.directories):
+            raise RuntimeError(
+                f"registered source overlaps diagnostic output directory: {path}"
+            )
         for record in self.records:
             if record.ownership is not Ownership.BASELINE or not record.state["path"]:
                 continue
@@ -148,6 +156,15 @@ class DiagnosticDocuments:
             raise RuntimeError(
                 "native output must belong to an exact registered diagnostic directory"
             )
+        if path in self.sources or any(
+            record.ownership is Ownership.BASELINE
+            and record.state["path"]
+            and Path(record.state["path"]).resolve() == path
+            for record in self.records
+        ):
+            raise RuntimeError(
+                f"native output aliases a protected source/baseline document: {path}"
+            )
         if path.suffix.lower() not in {".slddrw", ".sldprt", ".sldasm", ".drwdot"}:
             raise RuntimeError(
                 "diagnostic native output has an unsupported document extension"
@@ -163,18 +180,20 @@ class DiagnosticDocuments:
             )
             title = state["title"].casefold()
             if not title or title in titles or (path and path in paths):
-                raise RuntimeError("ambiguous native title or document path")
+                raise RuntimeError(f"ambiguous native title or document path: {state}")
             titles.add(title)
             if path:
                 paths.add(path)
             record = self._record(document)
             if record is None:
                 raise RuntimeError(
-                    "unexpected native document prevents isolated cleanup"
+                    f"unexpected native document prevents isolated cleanup: {state}"
                 )
             seen.append(record)
             if record.ownership is not Ownership.COPY and state != record.state:
-                raise RuntimeError(f"{record.ownership.value} document state changed")
+                raise RuntimeError(
+                    f"{record.ownership.value} document state changed: initial={record.state}, actual={state}"
+                )
             if record.ownership is Ownership.COPY:
                 if (
                     state["path"] != record.state["path"]
@@ -196,7 +215,9 @@ class DiagnosticDocuments:
             if any(record is item for item in may_unload):
                 self.records.remove(record)
                 continue
-            raise RuntimeError("native document disappeared or was replaced")
+            raise RuntimeError(
+                f"native document disappeared or was replaced: {record.state}"
+            )
         return documents
 
     def _add_references(self, model):
@@ -351,6 +372,8 @@ class DiagnosticDocuments:
             )
         if not self._same(self.adapter.currentModel, self.current.handle):
             raise RuntimeError("current native document identity was replaced")
+        if not self._same(self.app.ActiveDoc, self.current.handle):
+            raise RuntimeError("native write requires the exact owned active document")
         self.inventory()
         return self.current
 
@@ -474,7 +497,8 @@ class DiagnosticDocuments:
             candidates = [
                 record
                 for record in self.records
-                if record.ownership in (Ownership.COPY, Ownership.SOURCE)
+                if record.ownership
+                in (Ownership.COPY, Ownership.SOURCE, Ownership.REFERENCE)
             ]
             if not candidates:
                 break
@@ -502,18 +526,47 @@ class DiagnosticDocuments:
                     "unchanged": False,
                     "error": repr(error),
                 }
+        baseline = [
+            dict(record.state)
+            for record in self.records
+            if record.ownership is Ownership.BASELINE
+        ]
+        try:
+            documents = self._documents()
+            final_inventory = [_state(document) for document in documents]
+            preserved = all(
+                len(
+                    matches := [
+                        document
+                        for document in documents
+                        if self._same(document, record.handle)
+                    ]
+                )
+                == 1
+                and _state(matches[0]) == record.state
+                for record in self.records
+                if record.ownership is Ownership.BASELINE
+            )
+            preservation = {"status": "preserved" if preserved else "changed"}
+        except Exception as error:
+            final_inventory = []
+            preservation = {"status": "unreadable", "error": repr(error)}
         return {
             "events": self.events,
             "source_hashes": hashes,
             "probe_error": self.failure,
             "cleanup_error": self.cleanup_error,
+            "baseline_initial": baseline,
+            "final_inventory": final_inventory,
+            "baseline_preservation": preservation,
         }
 
     def checkpoint(self):
         evidence = self.evidence()
         for directory in self.directories:
             (directory / "ownership.json").write_text(
-                json.dumps(evidence, indent=2), encoding="utf-8"
+                json.dumps(evidence, indent=2, default=lambda value: value.value),
+                encoding="utf-8",
             )
 
 
@@ -543,6 +596,30 @@ class DiagnosticAdapter:
 
     async def close_owned_documents(self):
         await self.ownership.close_owned_documents()
+
+    async def _create_document(self, operation, kind, *args, **kwargs):
+        creation = self.ownership.creation
+        if creation is None or creation[0] is not kind or creation[2] is not None:
+            raise RuntimeError(
+                "adapter document creation requires its explicit creation scope"
+            )
+        self.ownership.inventory()
+        try:
+            return await getattr(self._delegate, operation)(*args, **kwargs)
+        finally:
+            model = self._delegate.currentModel
+            if model is not None and self.ownership._record(model) is None:
+                self.ownership.assign_current(model)
+
+    async def create_part(self, *args, **kwargs):
+        return await self._create_document(
+            "create_part", DocumentKind.PART, *args, **kwargs
+        )
+
+    async def create_assembly(self, *args, **kwargs):
+        return await self._create_document(
+            "create_assembly", DocumentKind.ASSEMBLY, *args, **kwargs
+        )
 
 
 async def owned_callback(adapter, callback):
