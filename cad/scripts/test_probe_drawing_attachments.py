@@ -11,6 +11,24 @@ import pytest
 from diagnostics import probe_drawing_attachments as probe
 
 
+def dimension(name="Length", full_name="Length@Sketch@part.Part", value=0.03):
+    return SimpleNamespace(
+        Name=name,
+        FullName=full_name,
+        GetType=lambda: 0,
+        GetSystemValue3=Mock(return_value=(value,)),
+        GetSystemValue2=Mock(return_value=value),
+    )
+
+
+def display_dimension(*dimensions, kind=2, reference="model"):
+    return SimpleNamespace(
+        Type2=kind,
+        IsReferenceDim=lambda: reference == "drawing",
+        GetDimension2=Mock(side_effect=lambda index: dimensions[index]),
+    )
+
+
 class Annotation:
     def __init__(
         self, name="dimension", kind=4, entities=None, kinds=(3,), state="attached"
@@ -21,6 +39,7 @@ class Annotation:
             if entities is None
             else entities
         )
+        self.display = display_dimension(dimension())
 
     def GetName(self):
         return self.name
@@ -36,6 +55,9 @@ class Annotation:
 
     def GetAttachedEntityTypes(self):
         return self.kinds
+
+    def GetSpecificAnnotation(self):
+        return self.display
 
 
 class View:
@@ -200,17 +222,207 @@ def test_face_signature_distinguishes_opposite_outward_normals(monkeypatch):
     assert probe.geometry(object(), 2) != before
 
 
-@pytest.mark.parametrize("section", ["checked", "excluded", "models"])
+@pytest.mark.parametrize(
+    "section", ["checked", "excluded", "models", "dimensions", "dimensions_excluded"]
+)
 def test_comparison_detects_changed_inventory_and_model_reference(section):
     before = {
         "checked": {"A": ("vertex", (0, 0, 0))},
         "excluded": {},
         "models": {"view": "part"},
+        "dimensions": {},
+        "dimensions_excluded": {},
     }
     after = deepcopy(before)
     after[section]["changed"] = "different"
     with pytest.raises(RuntimeError, match="attachment snapshot changed"):
         probe.compare(before, after, "reopen")
+
+
+@pytest.mark.parametrize("attachment", ["none", "sketch_segment", "sketch_point"])
+def test_imported_dimensions_have_semantics_without_supported_geometry(
+    source_model, attachment
+):
+    kinds = {"none": (), "sketch_segment": (10,), "sketch_point": (11,)}[attachment]
+    annotation = Annotation(entities=tuple(object() for _ in kinds), kinds=kinds)
+    actual = dimension("BoreDia", "BoreDia@Bore@part.Part", 0.009525)
+    annotation.display = display_dimension(actual, kind=6)
+    view = View("Front", source_model, (annotation,))
+    view.ReferencedConfiguration = "FineBore"
+    result = probe.snapshot(Model([view]))
+    key = "Sheet1/Front/dimension/4"
+    assert result["checked"] == {}
+    assert key in result["excluded"]
+    assert result["dimensions"][key] == {
+        "kind": "model_dimension",
+        "display_type": 6,
+        "view_configuration": "FineBore",
+        "components": [
+            {
+                "name": "BoreDia",
+                "qualified_name": "BoreDia@Bore@part.Part",
+                "parameter_type": 0,
+                "value_system": 0.009525,
+                "value_api": "GetSystemValue3",
+            }
+        ],
+    }
+    assert result["dimension_observations"][key] == [{"full_name": actual.FullName}]
+    actual.GetSystemValue3.assert_called_once_with(3, "FineBore")
+    actual.GetSystemValue2.assert_not_called()
+
+
+def circular_edge(center_x=0.0):
+    curve = SimpleNamespace(
+        IsCircle=lambda: True,
+        CircleParams=(center_x, 0, 0, 0, 0, 1, 0.005),
+    )
+    trim = SimpleNamespace(
+        UMinValue=0,
+        UMaxValue=6.28318530718,
+        StartPoint=(center_x + 0.005, 0, 0),
+        EndPoint=(center_x + 0.005, 0, 0),
+    )
+    return SimpleNamespace(GetCurve=lambda: curve, GetCurveParams3=lambda: trim)
+
+
+@pytest.mark.parametrize("case", ["diameter", "c2c"])
+def test_native_dimensions_keep_geometry_and_values_separate_across_drawing_copies(
+    source_model, case
+):
+    edges = (
+        (circular_edge(),)
+        if case == "diameter"
+        else (circular_edge(), circular_edge(0.02))
+    )
+    annotation = Annotation(entities=edges, kinds=tuple(1 for _ in edges))
+    actual = dimension(
+        "RD1", "RD1@Front@source.Drawing", 0.01 if case == "diameter" else 0.02
+    )
+    annotation.display = display_dimension(
+        actual, kind=6 if case == "diameter" else 2, reference="drawing"
+    )
+    model = Model([View("Front", source_model, (annotation,))])
+    model.GetPathName = lambda: "source.SLDDRW"
+    before = probe.snapshot(model)
+    model.GetPathName = lambda: "copy.SLDDRW"
+    actual.FullName = "RD1@Front@copy.Drawing"
+    after = probe.snapshot(model)
+    probe.compare(before, after, "copy")
+    key = "Sheet1/Front/dimension/4"
+    assert len(after["checked"][key]) == len(edges)
+    semantic = after["dimensions"][key]["components"][0]
+    assert semantic["qualified_name"] == "RD1@Front@<drawing>"
+    assert semantic["value_api"] == "GetSystemValue2"
+    assert after["dimension_observations"][key][0]["full_name"] == actual.FullName
+    assert before["dimension_observations"] != after["dimension_observations"]
+    actual.GetSystemValue3.assert_not_called()
+    assert actual.GetSystemValue2.call_args.args == ("",)
+    actual.GetSystemValue2.return_value += 0.001
+    with pytest.raises(RuntimeError, match="dimensions.*dimension/4"):
+        probe.compare(before, probe.snapshot(model), "value changed")
+
+
+@pytest.mark.parametrize("mutation", ["name", "configuration", "value"])
+def test_dimension_semantic_changes_fail_snapshot_comparison(source_model, mutation):
+    annotation = Annotation(entities=(), kinds=())
+    actual = annotation.display.GetDimension2(0)
+    view = View("Front", source_model, (annotation,))
+    model = Model([view])
+    before = probe.snapshot(model)
+    if mutation == "name":
+        actual.Name, actual.FullName = "Wrong", "Wrong@Sketch@part.Part"
+    if mutation == "configuration":
+        view.ReferencedConfiguration = "WrongConfiguration"
+    if mutation == "value":
+        actual.GetSystemValue3.return_value = (0.09,)
+    with pytest.raises(RuntimeError, match="dimensions.*dimension/4"):
+        probe.compare(before, probe.snapshot(model), "changed semantics")
+
+
+@pytest.mark.parametrize("reference", ["model", "drawing"])
+def test_dimension_owner_identity_is_not_globally_stripped(source_model, reference):
+    annotation = Annotation()
+    actual = dimension(
+        "D1",
+        "D1@Front@foreign.Drawing"
+        if reference == "drawing"
+        else "D1@Sketch@foreign.Part",
+    )
+    annotation.display = display_dimension(actual, reference=reference)
+    model = Model([View("Front", source_model, (annotation,))])
+    model.GetPathName = lambda: "source.SLDDRW"
+    with pytest.raises(RuntimeError, match="does not match.*owner"):
+        probe.snapshot(model)
+
+
+def test_chamfer_semantics_read_both_underlying_dimensions(source_model):
+    distance = dimension("ChamferLength", "ChamferLength@Chamfer@part.Part", 0.001)
+    angle = dimension("ChamferAngle", "ChamferAngle@Chamfer@part.Part", 0.785398163397)
+    angle.GetType = lambda: 1
+    annotation = Annotation()
+    annotation.display = display_dimension(distance, angle, kind=10)
+    result = probe.snapshot(Model([View("Front", source_model, (annotation,))]))
+    items = result["dimensions"]["Sheet1/Front/dimension/4"]["components"]
+    assert [row["parameter_type"] for row in items] == [0, 1]
+    assert [row["value_system"] for row in items] == [0.001, 0.785398163397]
+    assert [call.args for call in annotation.display.GetDimension2.call_args_list] == [
+        (0,),
+        (1,),
+    ]
+
+
+@pytest.mark.parametrize(
+    "failure", ["missing_dimension", "empty_value", "many_values", "nonfinite"]
+)
+def test_unreadable_model_dimensions_fail_loud(source_model, failure):
+    annotation = Annotation()
+    actual = annotation.display.GetDimension2(0)
+    if failure == "missing_dimension":
+        annotation.display.GetDimension2.side_effect = lambda _: None
+    if failure == "empty_value":
+        actual.GetSystemValue3.return_value = None
+    if failure == "many_values":
+        actual.GetSystemValue3.return_value = (1, 2)
+    if failure == "nonfinite":
+        actual.GetSystemValue3.return_value = (float("nan"),)
+    with pytest.raises(RuntimeError, match="dimension|system value"):
+        probe.snapshot(Model([View("Front", source_model, (annotation,))]))
+
+
+def test_pmi_only_dimension_semantics_are_explicitly_excluded(source_model):
+    annotation = Annotation(entities=(), kinds=())
+    annotation.display = None
+    result = probe.snapshot(Model([View("Front", source_model, (annotation,))]))
+    key = "Sheet1/Front/dimension/4"
+    assert not result["dimensions"]
+    assert (
+        result["dimensions_excluded"][key]["reason"]
+        == "annotation has no concrete display dimension"
+    )
+    assert key in result["excluded"]
+
+
+def test_api_capture_records_failed_current_shapes_without_using_them(source_model):
+    annotation = Annotation()
+    actual = dimension("RD1", "RD1@Front@source.Drawing", 0.012)
+    actual.GetSystemValue3.return_value = None
+    annotation.display = display_dimension(actual, reference="drawing")
+    model = Model([View("Front", source_model, (annotation,))])
+    model.GetPathName = lambda: "source.SLDDRW"
+    result = probe.snapshot(model, dimension_values="api-capture")
+    key = "Sheet1/Front/dimension/4"
+    assert result["dimensions"][key]["components"][0]["value_system"] == 0.012
+    calls = result["dimension_observations"][key][0]["value_api_calls"]
+    assert calls["GetSystemValue3(1,empty)"] == {"status": "returned", "value": None}
+    assert calls["GetSystemValue3(3,view_configuration)"]["value"] is None
+    assert calls["GetSystemValue3(1,None)"]["value"] is None
+    assert calls["GetSystemValue2(empty)"]["value"] == 0.012
+    assert [call.args for call in actual.GetSystemValue3.call_args_list] == [
+        (1, ""),
+        (3, "Default"),
+        (1, None),
+    ]
 
 
 def test_view_order_does_not_change_snapshot(source_model):
@@ -256,10 +468,28 @@ class Adapter:
         view = View("Front", self.source_model, (Annotation(),))
         if self.mode == "no_supported":
             view.annotations = (Annotation(kind=6),)
+        if self.mode == "dimension_only":
+            view.annotations = (Annotation(entities=(), kinds=()),)
+        if self.mode in {"native_dimension", "native_wrong_value"}:
+            value = (
+                0.09
+                if path in self.saved and self.mode == "native_wrong_value"
+                else 0.02
+            )
+            native = dimension("RD1", f"RD1@Front@{Path(path).stem}.Drawing", value)
+            annotation = Annotation(
+                entities=(circular_edge(), circular_edge(0.02)), kinds=(1, 1)
+            )
+            annotation.display = display_dimension(native, reference="drawing")
+            view.annotations = (annotation,)
         if path in self.saved and self.mode != "lost_layout":
             view.Position, view._scale = self.saved[path]
         if path in self.saved and self.mode == "wrong_model_config":
             view.ReferencedConfiguration = "Other"
+        if path in self.saved and self.mode == "wrong_dimension_value":
+            view.annotations[0].display.GetDimension2(
+                0
+            ).GetSystemValue3.return_value = (0.09,)
         model = Model([view])
         model.GetPathName = lambda: path
 
@@ -279,7 +509,9 @@ class Adapter:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("mode", ["normal", "lost_layout", "wrong_model_config"])
+@pytest.mark.parametrize(
+    "mode", ["normal", "lost_layout", "wrong_model_config", "wrong_dimension_value"]
+)
 async def test_source_copy_change_reopen_workflow(tmp_path, source_model, mode):
     drawing = tmp_path / "source.SLDDRW"
     drawing.write_bytes(b"original drawing")
@@ -302,6 +534,49 @@ async def test_source_copy_change_reopen_workflow(tmp_path, source_model, mode):
     assert drawing.read_bytes() == b"original drawing"
     assert source_model.read_bytes() == b"source part"
     assert adapter.currentModel is None
+
+
+@pytest.mark.asyncio
+async def test_value_only_probe_reports_zero_geometry_coverage(tmp_path, source_model):
+    drawing = tmp_path / "source.SLDDRW"
+    drawing.write_bytes(b"original drawing")
+    adapter = Adapter(source_model, "dimension_only")
+    result = await probe.probe(adapter, drawing, tmp_path / "reports")
+    report = json.loads(Path(result["probe"]).read_text())
+    assert report["status"] == "passed"
+    assert report["coverage"] == {
+        "geometry_annotations_checked": 0,
+        "geometry_annotations_excluded": 1,
+        "dimension_annotations_checked": 1,
+        "dimension_annotations_excluded": 0,
+    }
+    assert len(adapter.opened) == 3
+    assert (
+        report["snapshots"]["source"]["dimensions"]
+        == report["snapshots"]["reopened"]["dimensions"]
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("mode", ["native_dimension", "native_wrong_value"])
+async def test_native_two_entity_dimension_values_are_checked_after_reopen(
+    tmp_path, source_model, mode
+):
+    drawing = tmp_path / "source.SLDDRW"
+    drawing.write_bytes(b"original drawing")
+    adapter = Adapter(source_model, mode)
+    reports = tmp_path / "reports"
+    if mode == "native_wrong_value":
+        with pytest.raises(RuntimeError, match="saved and reopened.*dimensions"):
+            await probe.probe(adapter, drawing, reports)
+    if mode == "native_dimension":
+        await probe.probe(adapter, drawing, reports)
+    (report_path,) = reports.glob("*/attachments.json")
+    report = json.loads(report_path.read_text())
+    assert report["status"] == ("passed" if mode == "native_dimension" else "failed")
+    assert report["coverage"]["geometry_annotations_checked"] == 1
+    assert report["coverage"]["dimension_annotations_checked"] == 1
+    assert len(adapter.opened) == len(adapter.closed) == 3
 
 
 @pytest.mark.asyncio
@@ -400,13 +675,17 @@ async def test_probe_cannot_pass_without_supported_attachments(tmp_path, source_
     assert adapter.currentModel is None
 
 
-def test_parent_uses_pipeline_lock_for_the_worker(tmp_path, monkeypatch):
+@pytest.mark.parametrize("dimension_values", ["system", "api-capture"])
+def test_parent_uses_pipeline_lock_for_the_worker(
+    tmp_path, monkeypatch, dimension_values
+):
     drawing = tmp_path / "source.SLDDRW"
     drawing.write_bytes(b"source")
     launch = Mock()
     monkeypatch.setitem(probe.sys.modules, "dodo", SimpleNamespace(_run=launch))
-    assert probe.main([str(drawing)]) == 0
+    assert probe.main([str(drawing), "--dimension-values", dimension_values]) == 0
     command = launch.call_args.args[0]
     assert command[-1] == "--worker"
     assert str(drawing) in command
+    assert command[command.index("--dimension-values") + 1] == dimension_values
     assert launch.call_args.kwargs["com"] is True
