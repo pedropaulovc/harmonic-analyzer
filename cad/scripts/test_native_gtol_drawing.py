@@ -5,7 +5,7 @@ from dataclasses import replace
 import math
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, PropertyMock
 
 import pytest
 
@@ -174,6 +174,36 @@ def arrange(adapter, view, measure):
     return layout.arrange_native_gtol_columns(
         adapter, views={"front": view}, measure_annotation=measure
     )
+
+
+@pytest.mark.parametrize("owner_type", [0, 1, 3])
+def test_gtol_owner_reads_source_only_for_source_owned_annotations(
+    monkeypatch, owner_type
+):
+    adapter, view, rows, measure = native_context(monkeypatch, count=1)
+    source = object()
+    reference = PropertyMock(return_value=source)
+    monkeypatch.setattr(type(view), "ReferencedDocument", reference, raising=False)
+    rows[0].OwnerType = owner_type
+    rows[0].Owner = source if owner_type == 3 else view
+    if owner_type == 1:
+        with pytest.raises(RuntimeError, match="owner does not match"):
+            layout._read_gtols(adapter, view, measure)
+    else:
+        bank = layout._read_gtols(adapter, view, measure)
+        assert bank["GTol0"].owner is rows[0].Owner
+        assert bank["GTol0"].owner_type == owner_type
+    assert reference.call_count == (1 if owner_type == 3 else 0)
+
+
+def test_gtol_wrong_source_owner_still_rejected_after_lazy_reference_read(monkeypatch):
+    adapter, view, rows, measure = native_context(monkeypatch, count=1)
+    reference = PropertyMock(return_value=object())
+    monkeypatch.setattr(type(view), "ReferencedDocument", reference, raising=False)
+    rows[0].OwnerType, rows[0].Owner = 3, object()
+    with pytest.raises(RuntimeError, match="owner does not match"):
+        layout._read_gtols(adapter, view, measure)
+    reference.assert_called_once_with()
 
 
 def test_native_commands_clearance_and_outboard_shift_keep_exact_entities(monkeypatch):
