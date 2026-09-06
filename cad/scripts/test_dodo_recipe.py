@@ -210,6 +210,93 @@ def test_assembly_depends_on_exact_child_execution_identities():
             assert token in deps, f"assembly:{stem} lacks exact identity for {ref}"
 
 
+def test_assembly_file_deps_drop_only_non_inserted_source_targets():
+    dodo = _load_dodo()
+    removed = {
+        "frame": ("gooseneck", "rocker_arm"),
+        "drive_train": ("harmonic_base", "channel"),
+        "channel": ("cylinder_gear", "frame"),
+    }
+    for assembly, sources in removed.items():
+        dependencies = set(dodo._assembly_file_deps(assembly))
+        for source in sources:
+            if source in dodo.ASSEMBLY_ORDER:
+                target = dodo._sldasm(source)
+                token = dodo._assembly_execution_token(source)
+            else:
+                target = dodo._sldprt(source)
+                token = dodo._part_execution_token(source)
+            assert target not in dependencies, (assembly, source)
+            assert token not in dependencies, (assembly, source)
+
+
+def test_source_graph_cache_keys_preserve_real_transitive_identity_edges(
+    tmp_path, monkeypatch
+):
+    """Actual DAG, isolated recipe bytes/tokens: never read a live builder's files."""
+    dodo = _load_dodo()
+    monkeypatch.setattr(dodo, "CAD_OUT", tmp_path / "out")
+    recipes = {}
+    part_tokens = {}
+    assembly_tokens = {}
+    for kind, stems in (("part", dodo.part_stems()), ("assembly", dodo.ASSEMBLY_ORDER)):
+        for stem in stems:
+            recipe = tmp_path / f"{kind}-{stem}.input"
+            recipe.write_text(f"source recipe for {kind}:{stem}\n")
+            recipes[kind, stem] = str(recipe)
+            target = Path(dodo._sldprt(stem) if kind == "part" else dodo._sldasm(stem))
+            token = Path(
+                dodo._part_execution_token(stem)
+                if kind == "part"
+                else dodo._assembly_execution_token(stem)
+            )
+            target.parent.mkdir(parents=True, exist_ok=True)
+            token.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(b"CAD identity A")
+            token.write_text("a" * 64 + "\n")
+            (part_tokens if kind == "part" else assembly_tokens)[stem] = token
+    monkeypatch.setattr(dodo, "_recipe_files", lambda stem: [recipes["assembly", stem]])
+    monkeypatch.setattr(
+        dodo, "_part_file_deps", lambda _script, stem: [recipes["part", stem]]
+    )
+
+    def keys():
+        dodo._ARTEFACT_DIGEST_MEMO.clear()
+        return {
+            stem: dodo._cache_key(dodo._assembly_file_deps(stem))
+            for stem in dodo.ASSEMBLY_ORDER
+        }
+
+    def changed(before, after):
+        return {stem for stem in before if before[stem] != after[stem]}
+
+    baseline = keys()
+    cases = {
+        "rocker_arm": {"channel"},
+        "gooseneck": {"summing"},
+        "harmonic_base": {"frame"},
+        "cylinder_gear": {"drive_train"},
+        "frame_side_screw": {"frame", "channel"},
+    }
+    for source, expected in cases.items():
+        part_tokens[source].write_text("b" * 64 + "\n")
+        assert changed(baseline, keys()) == expected, source
+        part_tokens[source].write_text("a" * 64 + "\n")
+
+    # A real channel-child identity refresh restamps channel, then invalidates
+    # top-level CAD. It must never traverse the removed channel->drive edge.
+    part_tokens["rocker_arm"].write_text("b" * 64 + "\n")
+    channel_dirty = keys()
+    assembly_tokens["channel"].write_text("c" * 64 + "\n")
+    assert changed(channel_dirty, keys()) == {"harmonic_analyzer"}
+    assembly_tokens["channel"].write_text("a" * 64 + "\n")
+    part_tokens["rocker_arm"].write_text("a" * 64 + "\n")
+
+    # Recipe changes propagate recursively even before execution tokens change.
+    Path(recipes["part", "rocker_arm"]).write_text("changed rocker geometry recipe\n")
+    assert changed(baseline, keys()) == {"channel", "harmonic_analyzer"}
+
+
 def test_verify_gates_depend_on_exact_assembly_identities():
     """An identity-only refresh must invalidate persisted verify stamps."""
     dodo = _load_dodo()
