@@ -2269,6 +2269,52 @@ def offset_dimension_text(
     adapter.currentModel.EditRebuild3()
 
 
+@_telemetry.traced("drawing.auto_arrange_dimensions")
+def auto_arrange_view_dimensions(
+    adapter: Any, views: Iterable[Any], *, spacing_m: float = 0.001
+) -> int:
+    """Let SolidWorks arrange the existing dimensions in the supplied views.
+
+    Call once after the annotation phase. GetAnnotationsByType limits the scan
+    to view-owned display dimensions; datum tags, FCFs and surface finishes
+    are never selected for the dimension-only AlignDimensions API. There is
+    one native arrange call for the whole bank and no manual-position retry.
+    """
+    if not math.isfinite(spacing_m) or spacing_m <= 0:
+        raise ValueError("dimension auto-arrange spacing must be finite and positive")
+    views = tuple(views)
+    draw = adapter.currentModel
+    count = 0
+    draw.ClearSelection2(True)
+    try:
+        for raw_view in views:
+            view = _early_bound(raw_view, "IView")
+            for raw_annotation in view.GetAnnotationsByType(_ANNOT_DIM) or ():
+                if raw_annotation is None:
+                    raise RuntimeError("auto-arrange received a missing dimension annotation")
+                annotation = _early_bound(raw_annotation, "IAnnotation")
+                if not annotation.Select3(True, null_callout()):
+                    raise RuntimeError(f"failed to select dimension {count + 1} for auto-arrange")
+                count += 1
+        if count == 0:
+            return 0
+        selection = _early_bound(draw.SelectionManager, "ISelectionMgr")
+        selected_count = int(selection.GetSelectedObjectCount2(-1))
+        if selected_count != count:
+            raise RuntimeError(
+                f"dimension auto-arrange selection count mismatch: {selected_count} != {count}"
+            )
+        extension = _early_bound(draw.Extension, "IModelDocExtension")
+        if not extension.AlignDimensions(0, spacing_m):  # swAlignDimensionType_AutoArrange
+            raise RuntimeError(f"SolidWorks rejected native auto-arrange for {count} dimensions")
+        return count
+    finally:
+        draw.ClearSelection2(True)
+        span = _telemetry.trace.get_current_span()
+        span.set_attribute("views", len(views))
+        span.set_attribute("dimensions", count)
+
+
 @_telemetry.traced("drawing.entity_dimension", label_param="label")
 def add_entity_dimension(
     adapter: Any,
