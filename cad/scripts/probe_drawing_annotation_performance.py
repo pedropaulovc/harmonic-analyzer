@@ -2,8 +2,10 @@
 
 Run through ``uv run python cad/scripts/probe_drawing_annotation_performance.py
 DRAWING``. One uninstrumented and one profiled measurement of unchanged native
-annotations distinguish COM cost from profiler overhead. Small view-position,
-GTol-cardinality and outline observations run afterwards, then restore the copy.
+annotations distinguish COM cost from profiler overhead. Manual timers isolate
+the invoking thread's makepy dispatch and returned-object wrapping costs; cProfile
+may also capture background threads. Optional ``--scope layout-controls`` runs
+small view-position, GTol-cardinality and outline observations afterwards.
 No document is saved. Source drawing and referenced model hashes are guarded.
 """
 
@@ -14,6 +16,7 @@ from collections import defaultdict
 from contextlib import contextmanager
 import cProfile
 from dataclasses import asdict
+from enum import Enum
 import hashlib
 import io
 import json
@@ -24,6 +27,7 @@ import pstats
 import shutil
 import sys
 import tempfile
+import threading
 import time
 from typing import Any
 from unittest.mock import patch
@@ -34,14 +38,31 @@ from solidworks_mcp.adapters.com_variant import double_array
 import _telemetry
 
 
+class ProbeScope(Enum):
+    MEASUREMENTS = "measurements"
+    LAYOUT_CONTROLS = "layout-controls"
+
+
 @contextmanager
 def dispatch_timings(base: type, rows: dict, *, clock=time.perf_counter):
-    """Time actual makepy method/property dispatch without replacing any COM object."""
+    """Time invoking-thread makepy dispatch without replacing any COM object."""
     original = base._ApplyTypes_
+    thread_id = threading.get_ident()
 
     def timed(
         instance, dispid, flags, return_type, argument_types, member, clsid, *args
     ):
+        if threading.get_ident() != thread_id:
+            return original(
+                instance,
+                dispid,
+                flags,
+                return_type,
+                argument_types,
+                member,
+                clsid,
+                *args,
+            )
         key = f"{type(instance).__name__}.{member}"
         started = clock()
         try:
@@ -66,6 +87,39 @@ def dispatch_timings(base: type, rows: dict, *, clock=time.perf_counter):
         return result
 
     with patch.object(base, "_ApplyTypes_", timed):
+        yield
+
+
+@contextmanager
+def return_wrapping_timings(client, rows: dict, *, clock=time.perf_counter):
+    """Measure pywin32's returned-dispatch wrapping on this thread only.
+
+    This includes native type discovery and Python wrapper lookup/construction,
+    not the native call that returned the object. It can overlap _ApplyTypes_
+    timings, so the two categories must not be added together. No COM object or
+    return value is substituted. Missing pywin32 internals fail explicitly.
+    """
+    original = client.__WrapDispatch
+    thread_id = threading.get_ident()
+
+    def timed(*args, **kwargs):
+        if threading.get_ident() != thread_id:
+            return original(*args, **kwargs)
+        member = kwargs.get("userName", args[1] if len(args) > 1 else None)
+        key = str(member or "<unnamed>")
+        started = clock()
+        try:
+            return original(*args, **kwargs)
+        except Exception:
+            rows[key]["errors"] += 1
+            raise
+        finally:
+            elapsed = clock() - started
+            rows[key]["calls"] += 1
+            rows[key]["seconds"] += elapsed
+            rows[key]["max_seconds"] = max(rows[key]["max_seconds"], elapsed)
+
+    with patch.object(client, "__WrapDispatch", timed):
         yield
 
 
@@ -222,18 +276,39 @@ def _small_controls(adapter: Any, views: list[Any]) -> dict[str, Any]:
         model.ClearSelection2(True)
 
 
+def scope_controls(adapter, views, scope):
+    if scope is ProbeScope.MEASUREMENTS:
+        return {"status": "not_requested"}
+    if scope is ProbeScope.LAYOUT_CONTROLS:
+        return _small_controls(adapter, views)
+    raise ValueError("annotation profile requires an explicit probe scope")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("drawing", type=Path)
+    parser.add_argument(
+        "--scope",
+        choices=[scope.value for scope in ProbeScope],
+        default=ProbeScope.MEASUREMENTS.value,
+    )
     parser.add_argument("--worker", action="store_true")
     args = parser.parse_args()
+    scope = ProbeScope(args.scope)
     source = args.drawing.resolve(strict=True)
     if not args.worker:
         sys.path.insert(0, str(CAD_ROOT.parent))
         import dodo
 
         dodo._run(
-            [sys.executable, str(Path(__file__).resolve()), str(source), "--worker"],
+            [
+                sys.executable,
+                str(Path(__file__).resolve()),
+                str(source),
+                "--scope",
+                scope.value,
+                "--worker",
+            ],
             "annotation measurement profile",
             log_stem="annotation-measurement-profile",
             com=True,
@@ -254,6 +329,7 @@ def main() -> int:
         report: dict[str, Any] = {
             "source": str(source),
             "copy": str(copy),
+            "scope": scope.value,
             "stage": "open",
             "helper_sha256": hashlib.sha256(
                 (CAD_ROOT / "scripts/_drawing_annotation_bounds.py").read_bytes()
@@ -305,8 +381,15 @@ def main() -> int:
             report["stage"] = "uninstrumented"
             expected, report["uninstrumented"] = _measure(adapter, annotations)
             report["stage"] = "profiled"
-            profiler, dispatch = cProfile.Profile(), _dispatch_rows()
-            with dispatch_timings(win32com.client.DispatchBaseClass, dispatch):
+            profiler, dispatch, wrapping = (
+                cProfile.Profile(),
+                _dispatch_rows(),
+                _dispatch_rows(),
+            )
+            with (
+                dispatch_timings(win32com.client.DispatchBaseClass, dispatch),
+                return_wrapping_timings(win32com.client, wrapping),
+            ):
                 try:
                     profiler.enable()
                     measured, report["profiled"] = _measure(adapter, annotations)
@@ -322,13 +405,29 @@ def main() -> int:
                         key=lambda row: row["seconds"],
                         reverse=True,
                     )
+                    report["main_thread_return_wrapping"] = sorted(
+                        (
+                            {"member": name, **values}
+                            for name, values in wrapping.items()
+                        ),
+                        key=lambda row: row["seconds"],
+                        reverse=True,
+                    )
+                    report["manual_timer_scope"] = {
+                        "thread_id": threading.get_ident(),
+                        "categories_overlap": [
+                            "dispatch",
+                            "main_thread_return_wrapping",
+                        ],
+                        "cprofile_threads": "not_isolated",
+                    }
             if expected != measured:
                 raise RuntimeError(
                     "profiling changed measured native annotation bounds"
                 )
             report["bounds"] = [asdict(value) for value in measured]
             report["stage"] = "small_controls"
-            report["controls"] = _small_controls(adapter, views)
+            report["controls"] = scope_controls(adapter, views, scope)
             report["stage"] = "passed"
         except Exception as error:
             report["error"] = repr(error)
