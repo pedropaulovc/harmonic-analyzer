@@ -6,6 +6,10 @@ envelope, name, kind, text_runs and format_signature. Unsupported annotations
 must raise; this module never substitutes nominal symbol sizes or drops them.
 The unsupported-entity centerline witness additionally requires native_strokes
 (each stroke's measured start, end and width_m), without another COM pass.
+An optional initial_measure_annotation callback may supply transaction-local
+measurements for the first snapshot only. It owns freshness validation and must
+raise if its witness changed. Final measurement always calls measure_annotation
+afresh, including a no-movement plan; this module has no persistent bounds cache.
 
 Pass every drawing view explicitly. Projection alignment/order and free-note
 associations are recipe metadata, never inferred from nearby XY coordinates.
@@ -787,6 +791,24 @@ def _readback_evidence(
     }
 
 
+@_telemetry.traced("drawing.native_layout.apply")
+def _apply_targets(adapter, views, order, targets, notes, note_targets):
+    for key in order:
+        # Native Position expects doubles, not a Python tuple marshalled as
+        # an array of VARIANTs. The method also gives an explicit success
+        # result. Keep parent propagation, then apply each child's original
+        # absolute target exactly once.
+        if not views[key].SetViewPosition(double_array(targets[key]), True):
+            raise RuntimeError(
+                f"{key}: native view rejected layout target {targets[key]}"
+            )
+    for note in notes:
+        if not note.annotation.SetPosition2(*note_targets[note.key]):
+            raise RuntimeError(f"{note.key}: native free-note movement was rejected")
+    if not adapter.currentModel.EditRebuild3():
+        raise RuntimeError("native layout rebuild failed")
+
+
 @_telemetry.traced("drawing.native_layout")
 def repair_native_layout(
     adapter: Any,
@@ -794,6 +816,7 @@ def repair_native_layout(
     views: Mapping[str, Any],
     title_block: Rect,
     measure_annotation: Callable[[Any, Any], Any],
+    initial_measure_annotation: Callable[[Any, Any], Any] | None = None,
     parents: Mapping[str, str] | None = None,
     alignments: Sequence[AxisLink] = (),
     orderings: Sequence[AxisOrder] = (),
@@ -844,7 +867,14 @@ def repair_native_layout(
             raise ValueError("native layout ordering refers to an invalid axis/view")
     order = _parent_order(views, parents or {})
     with _telemetry.span("drawing.native_layout.measure"):
-        before = _snapshot(adapter, views, notes, measure_annotation)
+        before = _snapshot(
+            adapter,
+            views,
+            notes,
+            measure_annotation
+            if initial_measure_annotation is None
+            else initial_measure_annotation,
+        )
     planning_drawable = _inset_drawable(before.drawable, planning_headroom_m)
     if planning_drawable is None:
         reason = "planning headroom leaves no positive drawable area"
@@ -898,17 +928,7 @@ def repair_native_layout(
             gap_m,
             planning_headroom_m,
         )
-    if not any(any(delta) for delta in result.translations.values()):
-        return _report(
-            NativeLayoutStatus.UNCHANGED,
-            result,
-            before,
-            before,
-            title_block,
-            "measured sheet already fits",
-            gap_m,
-            planning_headroom_m,
-        )
+    movement_required = any(any(delta) for delta in result.translations.values())
     targets = {
         key: tuple(
             a + b
@@ -917,6 +937,15 @@ def repair_native_layout(
         for key in views
     }
     note_targets = {}
+    for note in notes:
+        group = (
+            f"view:{note.follows_view}"
+            if note.follows_view is not None
+            else f"note:{note.key}"
+        )
+        dx, dy = result.translations[group]
+        x, y, z = before.note_positions[note.key]
+        note_targets[note.key] = (x + dx, y + dy, z)
     _telemetry.info(
         "native layout translation plan",
         view_targets=json.dumps(targets),
@@ -926,32 +955,8 @@ def repair_native_layout(
         validation_gap_m=gap_m,
         planning_drawable=json.dumps(planning_drawable.bounds),
     )
-    with _telemetry.span("drawing.native_layout.apply"):
-        for key in order:
-            # Native Position expects doubles, not a Python tuple marshalled as
-            # an array of VARIANTs. The method also gives an explicit success
-            # result. Keep parent propagation, then apply each child's original
-            # absolute target exactly once.
-            if not views[key].SetViewPosition(double_array(targets[key]), True):
-                raise RuntimeError(
-                    f"{key}: native view rejected layout target {targets[key]}"
-                )
-        for note in notes:
-            group = (
-                f"view:{note.follows_view}"
-                if note.follows_view is not None
-                else f"note:{note.key}"
-            )
-            dx, dy = result.translations[group]
-            x, y, z = before.note_positions[note.key]
-            target = (x + dx, y + dy, z)
-            note_targets[note.key] = target
-            if not note.annotation.SetPosition2(*target):
-                raise RuntimeError(
-                    f"{note.key}: native free-note movement was rejected"
-                )
-        if not adapter.currentModel.EditRebuild3():
-            raise RuntimeError("native layout rebuild failed")
+    if movement_required:
+        _apply_targets(adapter, views, order, targets, notes, note_targets)
     with _telemetry.span("drawing.native_layout.readback"):
         after = _snapshot(adapter, views, notes, measure_annotation)
 
@@ -1057,7 +1062,9 @@ def repair_native_layout(
             validation,
         )
     return _report(
-        NativeLayoutStatus.APPLIED,
+        NativeLayoutStatus.APPLIED
+        if movement_required
+        else NativeLayoutStatus.UNCHANGED,
         result,
         before,
         after,
