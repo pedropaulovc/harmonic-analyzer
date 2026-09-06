@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -286,3 +287,83 @@ def test_distance_mate_lookup_is_traced() -> None:
         '@_telemetry.traced("copy_with_mates.distance_mate_lookup", '
         'label_param="name")\ndef _component_distance_mate(' in source
     )
+
+
+@pytest.fixture
+def pose_bank(monkeypatch):
+    """Record the COM boundary of repeated resets without simulating a solver."""
+    lookups = []
+    transforms = []
+    writes = []
+
+    class PoseComponent:
+        def __init__(self, name):
+            self.name = name
+
+        @property
+        def Transform2(self):
+            raise AssertionError("pose reset must only write the target transform")
+
+        @Transform2.setter
+        def Transform2(self, transform):
+            writes.append((self.name, transform))
+
+    components = {name: PoseComponent(name) for name in ("rocker-1", "rod-1")}
+
+    def lookup(name):
+        lookups.append(name)
+        return components.get(name)
+
+    def create_transform(adapter, values):
+        transform = SimpleNamespace(values=tuple(values))
+        transforms.append(transform)
+        return transform
+
+    module = sys.modules["solidworks_mcp.adapters.solidworks.assembly"]
+    module._create_math_transform = create_transform
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(GetComponentByName=lookup))
+    return SimpleNamespace(
+        adapter=adapter, lookups=lookups, transforms=transforms, writes=writes,
+    )
+
+
+def _pose_at(z):
+    return [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0,
+            0.0, 0.0, z, 1.0, 0.0, 0.0, 0.0]
+
+
+def test_prepared_pose_resets_reuse_handles_and_transforms_in_order(pose_bank):
+    """Repeated driver resets must not repeat component lookup or allocation."""
+    targets = [("rocker-1", _pose_at(0.01)), ("rod-1", _pose_at(0.02))]
+    prepared = _cwm.prepare_component_poses(pose_bank.adapter, iter(targets))
+    assert pose_bank.writes == []  # preparation cannot change the solver's input
+
+    for _ in range(6):  # three resets for each of two copied channels
+        prepared.apply()
+
+    assert pose_bank.lookups == ["rocker-1", "rod-1"]
+    assert len(pose_bank.transforms) == 2
+    expected = list(zip([name for name, _ in targets], pose_bank.transforms))
+    assert pose_bank.writes == expected * 6
+    assert [transform.values for transform in pose_bank.transforms] == [
+        tuple(values) for _, values in targets
+    ]
+
+
+def test_prepare_missing_component_fails_before_any_pose_write(pose_bank):
+    with pytest.raises(RuntimeError, match="component not found.*missing-1"):
+        _cwm.prepare_component_poses(
+            pose_bank.adapter,
+            [("rocker-1", _pose_at(0.01)), ("missing-1", _pose_at(0.02))],
+        )
+    assert pose_bank.writes == []
+
+
+def test_prepared_poses_cannot_be_applied_after_switching_documents(pose_bank):
+    prepared = _cwm.prepare_component_poses(
+        pose_bank.adapter, [("rocker-1", _pose_at(0.01))]
+    )
+    pose_bank.adapter.currentModel = object()
+    with pytest.raises(RuntimeError, match="document changed"):
+        prepared.apply()
+    assert pose_bank.writes == []
