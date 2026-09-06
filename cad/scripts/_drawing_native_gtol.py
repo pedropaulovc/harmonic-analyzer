@@ -250,17 +250,44 @@ def _native_command(
                 raise RuntimeError("failed to select a GTol in the native bank")
         if int(selection.GetSelectedObjectCount2(-1)) != len(bank):
             raise RuntimeError("selected GTol bank count is not exact")
+        missing_view_context = 0
         for index, state in enumerate(bank.values(), 1):
             if int(selection.GetSelectedObjectType3(index, -1)) != 13:  # swSelGTOLS
                 raise RuntimeError("selected bank contains a non-GTol object")
             selected_view = selection.GetSelectedObjectsDrawingView2(index, -1)
-            if selected_view is None or int(app.IsSame(selected_view, view)) != 1:
+            if selected_view is not None and int(app.IsSame(selected_view, view)) != 1:
                 raise RuntimeError("selected GTol belongs to a different drawing view")
             selected = _early_bound(selection.GetSelectedObject6(index, -1), "IGtol")
-            if int(app.IsSame(selected.GetAnnotation(), state.annotation)) != 1:
+            annotation = _early_bound(selected.GetAnnotation(), "IAnnotation")
+            if int(app.IsSame(annotation, state.annotation)) != 1:
                 raise RuntimeError(
                     "selected GTol identity differs from the native bank"
                 )
+            if (
+                int(annotation.OwnerType) != state.owner_type
+                or int(app.IsSame(annotation.Owner, state.owner)) != 1
+            ):
+                raise RuntimeError("selected GTol owner differs from the native bank")
+            if selected_view is None:
+                # The copy-only probe records None for all 24 real Select2 GTol
+                # selections, despite exact selected annotation/owning-view IDs.
+                # Source-owned imports cannot use this drawing-owner witness.
+                if (
+                    state.owner_type != 0
+                    or int(app.IsSame(annotation.Owner, view)) != 1
+                ):
+                    raise RuntimeError(
+                        "source-owned GTol selection has no exact drawing-view context"
+                    )
+                missing_view_context += 1
+        if missing_view_context:
+            _telemetry.info(
+                "GTol selection view context supplied by exact annotation owner",
+                view=str(view.GetName2()),
+                command=command,
+                missing_selection_view_count=missing_view_context,
+                count=len(bank),
+            )
         if not app.IsCommandEnabled(command):
             raise RuntimeError(f"native annotation command {command} is disabled")
         with _telemetry.span(

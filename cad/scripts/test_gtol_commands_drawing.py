@@ -15,6 +15,22 @@ def command_context(monkeypatch):
     monkeypatch.setattr(probe, "_early_bound", lambda item, name: item)
     app, model, drawing = Mock(), Mock(), Mock()
     bank = [("view", Mock()), ("view", Mock())]
+    view = Mock()
+    view.GetName2.return_value = "view"
+    drawing.GetViews.return_value = [(Mock(), view)]
+    app.IsSame.side_effect = lambda first, second: int(first is second)
+    selection = model.SelectionManager
+    selection.GetSelectedObjectType3.return_value = 13
+    selection.GetSelectedObjectsDrawingView2.return_value = None
+    selection.GetSelectedObject6.side_effect = lambda index, mark: bank[index - 1][
+        1
+    ].GetSpecificAnnotation()
+    for index, (_, annotation) in enumerate(bank):
+        annotation.GetName.return_value = f"GTol{index}"
+        annotation.OwnerType, annotation.Owner = 0, view
+        annotation.GetSpecificAnnotation.return_value.GetAnnotation.return_value = (
+            annotation
+        )
     model.SelectionManager.GetSelectedObjectCount2.return_value = len(bank)
     return app, model, drawing, bank
 
@@ -28,6 +44,12 @@ def test_native_command_selects_one_exact_bank(monkeypatch, command):
     assert result["enabled"] is False
     assert result["return"] is True
     assert result["selected"] == 2
+    assert all(
+        row["selected_view"] is None
+        and row["owner_view_same"] == 1
+        and row["selected_annotation_same"] == 1
+        for row in result["selection_context"]
+    )
     assert result["seconds"] >= 0
     drawing.ActivateView.assert_called_once_with("view")
     for _, item in bank:
@@ -177,3 +199,27 @@ def test_diagnostic_never_positions_or_recreates_annotations():
         "SelectByRay",
     }
     assert {"RunCommand", "IsCommandEnabled", "GetObjectByPersistReference3"} <= calls
+
+
+def test_sheet_symbol_probe_records_hidden_state_without_mutation(monkeypatch):
+    monkeypatch.setattr(probe, "_early_bound", lambda item, name: item)
+    monkeypatch.setattr(
+        probe, "metrics", lambda item: {"position": (0, 0, 0), "text": []}
+    )
+    drawing, sheet_view, annotation = Mock(), Mock(), Mock()
+    drawing.GetViews.return_value = [(sheet_view,)]
+    sheet_view.ReferencedDocument = None
+    sheet_view.GetName2.return_value = "Sheet1"
+    sheet_view.GetAnnotations.return_value = [annotation]
+    annotation.GetName.return_value = "DetailItem324"
+    annotation.GetType.return_value = 7
+    annotation.Visible, annotation.OwnerType, annotation.Layer = 3, 1, ""
+    annotation.Owner.GetName.return_value = "Sheet1"
+    annotation.GetAttachedEntityCount3.return_value = 0
+    annotation.GetAttachedEntityTypes.return_value = ()
+    result = probe.sheet_symbol_context(drawing, {})
+    assert result[0]["visible"] == 3
+    assert result[0]["owner_type"] == 1
+    assert result[0]["attachment_count"] == 0
+    annotation.Select2.assert_not_called()
+    annotation.SetPosition2.assert_not_called()

@@ -245,6 +245,42 @@ def test_rejected_native_command_has_no_manual_fallback(monkeypatch):
         item.SetPosition2.assert_not_called()
 
 
+def test_real_gtol_selection_with_null_manager_view_uses_exact_annotation_owner(
+    monkeypatch,
+):
+    adapter, view, rows, measure = native_context(monkeypatch)
+    adapter.currentModel.SelectionManager.GetSelectedObjectsDrawingView2.return_value = None
+    report = arrange(adapter, view, measure)["front"]
+    assert report["count"] == 2
+    assert [call.args[0] for call in adapter.swApp.RunCommand.call_args_list] == [
+        317,
+        307,
+    ]
+
+
+def test_source_owned_gtol_cannot_use_null_selection_view_as_a_view_identity_witness(
+    monkeypatch,
+):
+    adapter, view, rows, measure = native_context(monkeypatch)
+    for annotation in rows:
+        annotation.OwnerType, annotation.Owner = 3, view.ReferencedDocument
+    adapter.currentModel.SelectionManager.GetSelectedObjectsDrawingView2.return_value = None
+    with pytest.raises(RuntimeError, match="no exact drawing-view context"):
+        arrange(adapter, view, measure)
+    adapter.swApp.RunCommand.assert_not_called()
+
+
+def test_owner_changed_during_selection_rejects_even_exact_selected_annotation(
+    monkeypatch,
+):
+    adapter, view, rows, measure = native_context(monkeypatch)
+    bank = layout._read_gtols(adapter, view, measure)
+    rows[0].Owner = Mock()
+    with pytest.raises(RuntimeError, match="selected GTol owner differs"):
+        layout._native_command(adapter, adapter.currentModel, view, bank, 317)
+    adapter.swApp.RunCommand.assert_not_called()
+
+
 @pytest.mark.parametrize(
     "failure", ["coverage", "text", "frame", "entity", "dangling", "hidden", "owner"]
 )
