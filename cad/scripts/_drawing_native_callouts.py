@@ -41,6 +41,11 @@ class Direction(Enum):
     RIGHT = "right"
 
 
+class GtolPlacement(Enum):
+    FIXED = "fixed"
+    ARRANGED_NEXT = "arranged_next"
+
+
 @dataclass(frozen=True)
 class Placement:
     direction: Direction
@@ -114,6 +119,13 @@ class _Obstacle:
     owner_type: int
     body: Rect
     content: tuple[Any, ...]
+
+
+@dataclass(frozen=True)
+class _Deferred:
+    annotation: Any
+    kind: int
+    visibility: int
 
 
 def _position(annotation: Any) -> tuple[float, float, float]:
@@ -235,10 +247,15 @@ def _visible_annotations(view: Any) -> dict[str, Any]:
     return result
 
 
-def _read_obstacles(adapter: Any, annotations: Mapping[str, Any], measure: Callable):
+def _read_obstacles(
+    adapter: Any,
+    annotations: Mapping[str, Any],
+    measure: Callable,
+    deferred: Mapping[str, _Deferred],
+):
     result = {}
     for name, annotation in annotations.items():
-        if int(annotation.GetType()) in _INTERFACES:
+        if int(annotation.GetType()) in _INTERFACES or name in deferred:
             continue
         measured = measure(adapter, annotation)  # unsupported kinds fail explicitly
         result[name] = _Obstacle(
@@ -250,6 +267,85 @@ def _read_obstacles(adapter: Any, annotations: Mapping[str, Any], measure: Calla
             (tuple(measured.format_signature), _ink_content(measured)),
         )
     return result
+
+
+def _declared_notes(
+    adapter: Any, drawing: Any, views: Mapping[str, Any], notes: Sequence[Any]
+) -> dict[str, _Deferred]:
+    if not notes:
+        return {}
+    # Sheet-owned unattached notes are legitimate packing groups, not view-only
+    # obstacles. Validate membership in sheet views plus the explicitly planned views.
+    owners = tuple(sheet[0] for sheet in drawing.GetViews() or ()) + tuple(
+        views.values()
+    )
+    inventory = tuple(
+        raw
+        for view in owners
+        for raw in _early_bound(view, "IView").GetAnnotations() or ()
+    )
+    result = {}
+    for note in notes:
+        name = str(note.GetName())
+        if (
+            not name
+            or name in result
+            or int(note.GetType()) != 6
+            or int(note.Visible) != 1
+        ):
+            raise ValueError(
+                "deferred packing notes need unique visible native note identities"
+            )
+        if not any(
+            int(adapter.swApp.IsSame(note, actual)) == 1 for actual in inventory
+        ):
+            raise ValueError(
+                "deferred note is absent from the planned drawing inventory"
+            )
+        if (
+            int(note.GetAttachedEntityCount3()) != 0
+            or tuple(note.GetAttachedEntities3() or ())
+            or tuple(note.GetAttachedEntityTypes() or ())
+        ):
+            raise ValueError(
+                "only explicitly declared unattached packing notes may be deferred"
+            )
+        result[name] = _Deferred(note, 6, int(note.Visible))
+    return result
+
+
+def _deferred_annotations(
+    app: Any,
+    annotations: Mapping[str, Any],
+    gtol_placement: GtolPlacement,
+    notes: Mapping[str, _Deferred],
+) -> dict[str, _Deferred]:
+    result = {}
+    for name, annotation in annotations.items():
+        kind = int(annotation.GetType())
+        if kind == 5 and gtol_placement is GtolPlacement.ARRANGED_NEXT:
+            result[name] = _Deferred(annotation, kind, int(annotation.Visible))
+            continue
+        if any(
+            int(app.IsSame(annotation, note.annotation)) == 1 for note in notes.values()
+        ):
+            result[name] = _Deferred(annotation, kind, int(annotation.Visible))
+    return result
+
+
+def _same_deferred(
+    app: Any, before: Mapping[str, _Deferred], after: Mapping[str, _Deferred]
+) -> None:
+    if before.keys() != after.keys():
+        raise RuntimeError("deferred native annotation inventory changed")
+    for name, old in before.items():
+        actual = after[name]
+        if (old.kind, old.visibility) != (actual.kind, actual.visibility) or int(
+            app.IsSame(old.annotation, actual.annotation)
+        ) != 1:
+            raise RuntimeError(
+                f"{name}: deferred native annotation identity/type/visibility changed"
+            )
 
 
 def _same_obstacles(app: Any, before: Mapping, after: Mapping) -> None:
@@ -363,6 +459,8 @@ def arrange_native_callouts(
     measure_annotation: Callable | None = None,
     planning_gap_m: float = 0.003,
     gap_m: float = 0.002,
+    gtol_placement: GtolPlacement = GtolPlacement.FIXED,
+    deferred_notes: Sequence[Any] = (),
 ) -> dict[str, dict[str, Any]]:
     """Clear native datum/SF bodies before GTol columns and decorated-view packing.
 
@@ -370,6 +468,11 @@ def arrange_native_callouts(
     measurement per trial. Active view membership and final actual clearance
     are strict. Nothing is saved here. Unsupported source-owned callouts or
     annotation footprints fail rather than being omitted from collision checks.
+    ARRANGED_NEXT is an explicit caller contract: native GTol columns run next
+    and clear these final callout bodies. Exact declared unattached notes move in
+    subsequent whole-sheet packing, whose final measurement includes every note.
+    Deferred annotations retain inventory/identity/type/visibility witnesses but
+    do not contribute temporary obstacle glyph measurements.
     """
     if (
         not all(math.isfinite(v) and v >= 0 for v in (planning_gap_m, gap_m))
@@ -379,6 +482,8 @@ def arrange_native_callouts(
             "planning clearance must be finite and at least final clearance"
         )
     model, app = adapter.currentModel, adapter.swApp
+    if not isinstance(gtol_placement, GtolPlacement):
+        raise ValueError("GTol placement must use the explicit placement policy enum")
     if int(model.GetType()) != 3:
         raise ValueError("native callout layout requires the active drawing")
     if measure_annotation is None:
@@ -400,6 +505,7 @@ def arrange_native_callouts(
                 "callout views must be unique members of the active drawing"
             )
         names.add(name)
+    declared_notes = _declared_notes(adapter, drawing, views, deferred_notes)
     report = {}
     for label, view in views.items():
         if not any(view.GetAnnotationsByType(kind) for kind in _INTERFACES):
@@ -415,7 +521,12 @@ def arrange_native_callouts(
                 for name, annotation in annotations.items()
                 if int(annotation.GetType()) in _INTERFACES
             }
-            obstacles = _read_obstacles(adapter, annotations, measure_annotation)
+            deferred = _deferred_annotations(
+                app, annotations, gtol_placement, declared_notes
+            )
+            obstacles = _read_obstacles(
+                adapter, annotations, measure_annotation, deferred
+            )
             outline = Rect(*view.GetOutline())
         bank, attempts = dict(before), {}
         for name in sorted(bank, key=lambda key: (bank[key].kind, key)):
@@ -461,8 +572,12 @@ def arrange_native_callouts(
                 for name, annotation in final_annotations.items()
                 if int(annotation.GetType()) in _INTERFACES
             }
+            final_deferred = _deferred_annotations(
+                app, final_annotations, gtol_placement, declared_notes
+            )
+            _same_deferred(app, deferred, final_deferred)
             final_obstacles = _read_obstacles(
-                adapter, final_annotations, measure_annotation
+                adapter, final_annotations, measure_annotation, final_deferred
             )
             _same_obstacles(app, obstacles, final_obstacles)
             final_outline = Rect(*view.GetOutline())
@@ -486,5 +601,9 @@ def arrange_native_callouts(
             "attempts": attempts,
             "bodies_after": {name: row.body.bounds for name, row in after.items()},
             "positions_after": {name: row.position for name, row in after.items()},
+            "deferred_annotations": {name: row.kind for name, row in deferred.items()},
         }
+    _same_deferred(
+        app, declared_notes, _declared_notes(adapter, drawing, views, deferred_notes)
+    )
     return report
