@@ -20,6 +20,19 @@ IFeature.GetFirst/GetNextDisplayDimension enumerate feature/subfeature dimension
 in unspecified order. No display-toggle prerequisite is written by this probe;
 coverage is reported as the observed inventory and must include all five arbor
 manufacturing dimensions. Missing support fails rather than claiming completeness.
+
+R2026x observation, 2026-09-06, frozen 99eadbe7, trace
+0x8d83b3f3456fe76a203b3f0b2b6c84e4: baseline getters, new drawing, three view
+inserts, dimension insertion/deletion/curation all left the copied source clean.
+The first dirty boundary was AFTER recipe.set_dimension_callouts, before precision
+formatting. Among 20 exact IDimensions, only BoreDia's display text changed:
+GetText(4)/GetText(8), empty -> THRU; all model values/tolerances and native
+dimension identities stayed unchanged. Original and copied disk SHA-256 stayed
+dbb991437aea105ca5352b8b76468874077aeed0a74906413a1cc56fb7ca769e.
+No save/export occurred; both owned documents closed, original visible lever and
+unsaved Draw2 states survived. Receipt: source-dirty-9cbdz77u/source-dirty.json.
+This is group-level attribution, not a separated SetText-versus-rebuild trial,
+and says nothing yet about later precision operations or other recipes/releases.
 """
 
 from __future__ import annotations
