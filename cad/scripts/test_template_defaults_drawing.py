@@ -48,6 +48,167 @@ def test_unit_contract_does_not_wildcard_system_length_or_precision(units):
         probe.validate_units(units, probe.TemplateSpec((2, 1), 2))
 
 
+@pytest.fixture
+def blank_note(monkeypatch):
+    counts = {
+        name: 0
+        for name in (
+            "Text",
+            "Line",
+            "Arc",
+            "PolyLine",
+            "Triangle",
+            "ArrowHead",
+            "Polygon",
+            "Ellipse",
+            "Parabola",
+            "Point",
+        )
+    }
+    data = SimpleNamespace(
+        **{f"Get{name}Count": lambda name=name: counts[name] for name in counts}
+    )
+    fmt = SimpleNamespace(
+        TypeFaceName="Century Gothic",
+        CharHeight=0.0035,
+        CharHeightInPts=13,
+        IsHeightSpecifiedInPts=lambda: False,
+        WidthFactor=1.0,
+        Bold=False,
+        Italic=False,
+    )
+    note = SimpleNamespace(
+        GetText=lambda: "",
+        PropertyLinkedText='$PRPSHEET:"Material"',
+        HasMultipleFonts=False,
+        GetExtent=lambda: (0.1, 0.2, 0, 0.16, 0.21, 0),
+    )
+    annotation = SimpleNamespace(
+        GetType=lambda: 6,
+        GetName=lambda: "generated-note",
+        GetDisplayData=lambda: data,
+        GetLeaderCount=lambda: 0,
+        GetMultiJogLeaderCount=lambda: 0,
+        GetTextFormatCount=lambda: 1,
+        GetTextFormat=lambda index: fmt,
+        GetUseDocTextFormat=lambda index: True,
+        GetPosition=lambda: (0.1, 0.21, 0),
+        GetSpecificAnnotation=lambda: note,
+        Visible=1,
+    )
+    monkeypatch.setattr(probe, "_early_bound", lambda raw, kind: raw)
+    return SimpleNamespace(annotation=annotation, note=note, counts=counts, fmt=fmt)
+
+
+def test_blank_link_requires_native_zero_ink_and_keeps_anchor_font(blank_note):
+    witness = probe.blank_linked_note_witness(blank_note.annotation, blank_note.note)
+    assert set(witness["native_counts"].values()) == {0}
+    assert witness["anchor"] == [0.1, 0.21, 0]
+    assert witness["font_definition"]["font"] == "Century Gothic"
+    assert witness["font_definition"]["height_m"] == 0.0035
+
+
+@pytest.mark.parametrize(
+    "kind",
+    [
+        "Text",
+        "Line",
+        "Arc",
+        "PolyLine",
+        "Triangle",
+        "ArrowHead",
+        "Polygon",
+        "Ellipse",
+        "Parabola",
+        "Point",
+    ],
+)
+def test_empty_gettext_never_hides_native_display_ink(blank_note, kind):
+    blank_note.counts[kind] = 1
+    with pytest.raises((RuntimeError, ValueError), match="primitive"):
+        probe.blank_linked_note_witness(blank_note.annotation, blank_note.note)
+
+
+@pytest.mark.parametrize("field", ["GetLeaderCount", "GetMultiJogLeaderCount"])
+def test_blank_link_exclusion_refuses_native_leaders(blank_note, field):
+    setattr(blank_note.annotation, field, lambda: 1)
+    with pytest.raises(RuntimeError, match="leaders"):
+        probe.blank_linked_note_witness(blank_note.annotation, blank_note.note)
+
+
+def test_blank_link_exclusion_requires_the_documented_font_scope(blank_note):
+    blank_note.note.HasMultipleFonts = True
+    with pytest.raises(RuntimeError, match="formatting"):
+        probe.blank_linked_note_witness(blank_note.annotation, blank_note.note)
+
+
+def test_blank_linked_extents_are_raw_only_after_native_proof(monkeypatch, blank_note):
+    @dataclass
+    class Bounds:
+        name: str
+        kind: int = 6
+
+    edge_note = SimpleNamespace(
+        GetText=lambda: probe.common._METRIC_EDGE_BREAK_NOTE,
+        PropertyLinkedText="",
+        GetExtent=lambda: (0.2, 0.3, 0, 0.25, 0.31, 0),
+    )
+    edge_annotation = SimpleNamespace(
+        GetType=lambda: 6, GetSpecificAnnotation=lambda: edge_note, Visible=1
+    )
+    sheet = SimpleNamespace(GetProperties2=lambda: (2, 12, 2, 1, 0, 0.4318, 0.2794, 1))
+    view = SimpleNamespace(
+        GetAnnotations=lambda: [edge_annotation, blank_note.annotation]
+    )
+    model = SimpleNamespace(
+        GetCurrentSheet=lambda: sheet,
+        GetFirstView=lambda: view,
+        GetEditSheet=lambda: True,
+        GetUserPreferenceIntegerValue=lambda key: {263: 4, 47: 0, 49: 2}[key],
+        Extension=SimpleNamespace(GetUserPreferenceInteger=lambda pref, scope: 2),
+    )
+    monkeypatch.setattr(
+        probe.common, "assert_asme_b_sheet", lambda *args, **kwargs: None
+    )
+    monkeypatch.setattr(probe, "annotation_box", lambda *args: Bounds("edge-break"))
+    adapter = SimpleNamespace(currentModel=model)
+    spec = probe.TemplateSpec((2, 1), 2)
+    before = probe.defaults_snapshot(adapter, spec)
+    blank_note.note.GetExtent = lambda: (0.1, 0.2, 0, 0.1, 0.21, 0)
+    after = probe.defaults_snapshot(adapter, spec)
+    assert before != after
+    assert probe.defaults_semantics(before) == probe.defaults_semantics(after)
+    assert before["blank_linked_extent_observations"][0]["extent"][3] == 0.16
+    assert after["blank_linked_extent_observations"][0]["extent"][3] == 0.1
+    blank_note.fmt.Bold = True
+    changed_font = probe.defaults_snapshot(adapter, spec)
+    assert probe.defaults_semantics(changed_font) != probe.defaults_semantics(after)
+    blank_note.fmt.Bold = False
+    blank_note.annotation.GetPosition = lambda: (0.101, 0.21, 0)
+    changed_anchor = probe.defaults_snapshot(adapter, spec)
+    assert probe.defaults_semantics(changed_anchor) != probe.defaults_semantics(after)
+    blank_note.annotation.GetPosition = lambda: (0.1, 0.21, 0)
+    blank_note.note.PropertyLinkedText = '$PRPSHEET:"Finish"'
+    changed_expression = probe.defaults_snapshot(adapter, spec)
+    assert probe.defaults_semantics(changed_expression) != probe.defaults_semantics(
+        after
+    )
+
+
+def test_nonempty_note_extent_is_still_a_strict_semantic_witness():
+    first = {
+        "sheet_notes": probe.semantic_multiset(
+            [{"text": "Material: steel", "extent": [0.1, 0.2, 0, 0.16, 0.21, 0]}]
+        )
+    }
+    second = {
+        "sheet_notes": probe.semantic_multiset(
+            [{"text": "Material: steel", "extent": [0.1, 0.2, 0, 0.17, 0.21, 0]}]
+        )
+    }
+    assert probe.defaults_semantics(first) != probe.defaults_semantics(second)
+
+
 def test_candidate_omits_all_setters_and_blank_rebuilds(monkeypatch, tmp_path):
     calls = []
     template = tmp_path / "owned.DRWDOT"
