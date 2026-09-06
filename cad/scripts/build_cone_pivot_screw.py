@@ -22,6 +22,7 @@ import sys
 import _telemetry
 from _fastener_catalog import fastener
 from _common import (
+    _early_bound,
     SketchDims,
     apply_material,
     check,
@@ -60,6 +61,8 @@ from cone_pivot_screw_spec import (
     SLOT_D,
     SLOT_W,
     SURFACE_FINISHES,
+    THREAD_COSMETIC_MINOR_DIA,
+    THREAD_COSMETIC_TYPE,
     THREAD_SOLID_DIA,
     THREAD_TAIL_LEN,
     UNDERHEAD_LEN,
@@ -77,6 +80,82 @@ _DRAWING_REQUIRED_PROPERTIES = (
     "Manufacturing Notes",
     "End View Note",
 )
+
+
+def _assert_cosmetic_thread(feature) -> str:
+    """Reject silent creation/defaulting errors, including after disk reopen.
+
+    The positive native ModifyDefinition/save/reopen control is committed in
+    probe_drawing_thread_view.py --mode corrected. It found the old zero-diameter
+    input persisted as StandardNone, empty type/size, and no thread-owned native
+    display primitives. This does not infer missing ink from empty API data.
+    """
+    feature = _early_bound(feature, "IFeature")
+    if feature is None:
+        raise RuntimeError("cone pivot cosmetic thread is missing")
+    name = str(feature.Name or "")
+    if not name or feature.GetTypeName2() != "CosmeticThread":
+        raise RuntimeError(f"invalid cone pivot cosmetic thread feature: {name!r}")
+    code, warning = feature.GetErrorCode2()
+    if code != 0:
+        raise RuntimeError(
+            f"cone pivot cosmetic thread feature status: {code}, warning={warning}"
+        )
+    definition = _early_bound(feature.GetDefinition(), "ICosmeticThreadFeatureData")
+    if definition is None:
+        raise RuntimeError("cone pivot cosmetic thread definition is missing")
+    expected = {
+        "Standard": 0,  # swStandardType_StandardAnsiInch
+        "StandardType": THREAD_COSMETIC_TYPE,
+        "Size": SPEC.thread,
+        "DiameterType": 3,  # swCosmeticThread_MinorDiameter (boss)
+        "ApplyThread": 0,  # swApplyCosmeticThread_Blind
+    }
+    for field, wanted in expected.items():
+        observed = getattr(definition, field)
+        if observed != wanted:
+            raise RuntimeError(
+                f"cone pivot cosmetic thread {field}: {observed!r}, expected {wanted!r}"
+            )
+    for field, wanted in {
+        "Diameter": THREAD_COSMETIC_MINOR_DIA / 1000.0,
+        "BlindDepth": THREAD_TAIL_LEN / 1000.0,
+    }.items():
+        observed = float(getattr(definition, field))
+        # Numeric serialization witness (1 pm), not a manufacturing tolerance.
+        if not math.isclose(observed, wanted, rel_tol=0.0, abs_tol=1e-12):
+            raise RuntimeError(
+                f"cone pivot cosmetic thread {field}: {observed!r}, expected {wanted!r} m"
+            )
+    return name
+
+
+async def _create_cosmetic_thread(adapter, feature_manager) -> str:
+    """Create one explicit vendor-backed minor-diameter annotation, then verify."""
+    feature = feature_manager.InsertCosmeticThread3(
+        Standard=0,  # swStandardType_StandardAnsiInch
+        StandardType=THREAD_COSMETIC_TYPE,
+        Size=SPEC.thread,
+        Diameter=THREAD_COSMETIC_MINOR_DIA / 1000.0,
+        EndType=0,  # swEndConditionBlind
+        Depth=THREAD_TAIL_LEN / 1000.0,
+        Note=f"{SPEC.thread} UNC-2A",
+    )
+    if feature is None:
+        raise RuntimeError("InsertCosmeticThread3 rejected the selected tail edge")
+    await force_rebuild(adapter)
+    name = _assert_cosmetic_thread(feature)
+    _telemetry.success(f"verified cosmetic external thread {SPEC.thread} UNC-2A")
+    return name
+
+
+def _assert_saved_cosmetic_thread(adapter, name: str) -> None:
+    """Use the actual creation name to resolve the feature in the reopened part."""
+    part = _early_bound(adapter.currentModel, "IPartDoc")
+    observed_name = _assert_cosmetic_thread(part.FeatureByName(name))
+    if observed_name != name:
+        raise RuntimeError(f"saved cosmetic thread name changed: {name!r}, {observed_name!r}")
+    _telemetry.success("saved cone pivot cosmetic thread definition persisted")
 
 
 async def _assert_saved_drawing_properties(adapter, part_path: str) -> None:
@@ -219,18 +298,7 @@ async def build(adapter) -> dict[str, str]:
         "IFeatureManager",
         "InsertCosmeticThread3",
     )
-    cosmetic_thread = feature_manager.InsertCosmeticThread3(
-        0,  # swCosmeticStandardType_e.swStandardAnsiInch
-        "",
-        SPEC.thread,
-        0.0,  # standard/size table owns the nominal diameter
-        0,  # swCosmeticEndConditions_e.swEndConditionBlind
-        THREAD_TAIL_LEN / 1000.0,
-        f"{SPEC.thread} UNC-2A",
-    )
-    if cosmetic_thread is None:
-        raise RuntimeError("InsertCosmeticThread3 rejected the selected tail edge")
-    _telemetry.success(f"cosmetic external thread {SPEC.thread} UNC-2A")
+    cosmetic_thread_name = await _create_cosmetic_thread(adapter, feature_manager)
 
     pivot_axis = await name_bore_axis(
         adapter, "Front Plane", 0.0, "Right Plane", 0.0, "pivot axis"
@@ -264,6 +332,7 @@ async def build(adapter) -> dict[str, str]:
     )
     artefacts = await save_part_and_images(adapter, PART_NAME)
     await _assert_saved_drawing_properties(adapter, artefacts["part"])
+    _assert_saved_cosmetic_thread(adapter, cosmetic_thread_name)
     return artefacts
 
 
