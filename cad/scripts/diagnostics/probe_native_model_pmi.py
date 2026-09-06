@@ -35,7 +35,6 @@ sys.path.insert(0, str(ROOT / "cad/scripts"))
 
 import _telemetry  # noqa: E402
 from _common import _early_bound, check, run_build  # noqa: E402
-from _drawing_common import render_pdf_png  # noqa: E402
 from _gtol_spec import gtol_frame_signature  # noqa: E402
 from _part_pmi import _face_geometry, _face_matches, _resolve_faces  # noqa: E402
 from transgear_stub_spec import GEOMETRIC_CONTROLS, PART_DATUMS  # noqa: E402
@@ -49,6 +48,33 @@ _OWNER_VIEW, _OWNER_PART = 0, 3  # swAnnotationOwner_e
 def file_digest(path: Path) -> str:
     with path.open("rb") as stream:
         return hashlib.file_digest(stream, "sha256").hexdigest()
+
+
+def render_pdf_png(pdf: Path, png: Path) -> None:
+    """Rasterize the native sheet size, without the recipes' ASME B constraint."""
+    import pypdfium2 as pdfium
+
+    document = pdfium.PdfDocument(str(pdf))
+    try:
+        if len(document) != 1:
+            raise RuntimeError(
+                f"native control PDF has {len(document)} pages, expected 1"
+            )
+        page = document[0]
+        try:
+            bitmap = page.render(scale=300 / 72)
+            try:
+                picture = bitmap.to_pil()
+                try:
+                    picture.save(png, dpi=(300, 300))
+                finally:
+                    picture.close()
+            finally:
+                bitmap.close()
+        finally:
+            page.close()
+    finally:
+        document.close()
 
 
 def _expected_signature(row: Any) -> Any:
