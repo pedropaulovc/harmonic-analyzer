@@ -4538,6 +4538,16 @@ def check_drawing_layout(adapter: Any, *, stem: str = "") -> None:
 
 
 @_telemetry.traced("drawing.finalize")
+def _drawing_artifact_span(kind: Literal["drawing", "pdf", "png"], path: str):
+    """Observe each actual save/export call without splitting or repeating it."""
+    names = {
+        "drawing": "drawing.save_native",
+        "pdf": "drawing.export_pdf",
+        "png": "drawing.export_png",
+    }
+    return _telemetry.span(names[kind], output_path=path)
+
+
 async def finalize_drawing(
     adapter: Any,
     outputs: DrawingOutputs,
@@ -4685,7 +4695,8 @@ async def finalize_drawing(
     # path; the template and precomputed recipe placements own the layout.
     with _telemetry.span("drawing.save_and_export_pdf"):
         artifacts = save_drawing(
-            adapter, str(outputs.slddrw), pdf_path=str(outputs.pdf)
+            adapter, str(outputs.slddrw), pdf_path=str(outputs.pdf),
+            artifact_context=_drawing_artifact_span,
         )
     if set(artifacts) != {"drawing", "pdf"}:
         raise RuntimeError(f"drawing save/export incomplete: {artifacts!r}")

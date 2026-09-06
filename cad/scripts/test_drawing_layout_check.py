@@ -91,6 +91,29 @@ def test_finalize_exports_once_without_layout_or_reopen_cycles():
     assert "GetSaveFlag" not in source
     assert "sanitize_pdf_metadata" in source
     assert "render_pdf_png" in source
+    assert "artifact_context=_drawing_artifact_span" in source
+
+
+@pytest.mark.parametrize("kind,name", [
+    ("drawing", "drawing.save_native"),
+    ("pdf", "drawing.export_pdf"),
+    ("png", "drawing.export_png"),
+])
+def test_export_context_observes_the_actual_artifact(monkeypatch, kind, name):
+    from contextlib import contextmanager
+
+    observed = []
+
+    @contextmanager
+    def span(span_name, **attributes):
+        observed.append((span_name, attributes))
+        yield
+
+    monkeypatch.setattr(drawing_common._telemetry, "span", span)
+    with pytest.raises(RuntimeError, match="save failed"):
+        with drawing_common._drawing_artifact_span(kind, "C:/output/artifact"):
+            raise RuntimeError("save failed")
+    assert observed == [(name, {"output_path": "C:/output/artifact"})]
 
 
 def _el(label, x0, y0, x1, y1, kind="view", scope=CollisionScope.ALL, owner=""):
