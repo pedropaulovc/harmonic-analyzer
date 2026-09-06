@@ -2202,6 +2202,7 @@ def task_check():
         SCRIPTS_DIR / "test_gtol_spec.py",
         SCRIPTS_DIR / "test_part_owned_geometric_tolerances.py",
         SCRIPTS_DIR / "test_probe_surface_finish_pmi_telemetry.py",
+        SCRIPTS_DIR / "test_probe_drawing_attachments.py",
         SCRIPTS_DIR / "test_surface_finish.py",
         SCRIPTS_DIR / "test_surface_finish_ownership_a.py",
         # One offline contract file per manufacturing drawing (test_*_drawing.py),
