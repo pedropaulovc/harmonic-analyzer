@@ -100,7 +100,13 @@ def canonical_semantics(snapshot, part):
         if Path(reference["path"]).resolve() != part:
             raise RuntimeError(f"drawing unexpectedly references {reference['path']}")
         reference["path"] = "<source-part>"
-    for semantic in result["dimensions"].values():
+    dimensions = list(result["dimensions"].values())
+    for attachment in result["semantic_attachments"].values():
+        if Path(attachment["source"]["path"]).resolve() != part:
+            raise RuntimeError("datum attachment has the wrong verified source owner")
+        attachment["source"]["path"] = "<source-part>"
+        dimensions.append(attachment["dimension"])
+    for semantic in dimensions:
         if semantic["kind"] != "model_dimension":
             continue
         for component in semantic["components"]:
@@ -115,7 +121,7 @@ def canonical_semantics(snapshot, part):
 
 def drawing_dimensions(adapter, part):
     model = adapter.currentModel
-    semantic = canonical_semantics(attachments.snapshot(model), part)
+    semantic = canonical_semantics(attachments.snapshot(model, app=adapter.swApp), part)
     rows = {}
     for view_key, view in attachments.views(model).items():
         for raw in view.GetAnnotationsByType(4) or ():

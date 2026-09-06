@@ -5,6 +5,9 @@ The parent takes the pipeline's COM seat lock. Only a uniquely named drawing
 copy under cad/out/reports/drawing-attachments is modified. The JSON report
 records every phase and excludes unsupported annotation/geometry kinds from
 the checked count. This compares geometry signatures, not persistent entity IDs.
+Datums attached to one model IDisplayDimension have a separate semantic attachment
+witness: exact native view/target identity, source feature/parameter identity,
+configuration, value and tolerance. They are not counted as checked geometry.
 Only drawings referencing native parts are supported. Assembly drawings are
 rejected before copying or movement: their component ownership and transitive
 model dependencies need a separate snapshot contract.
@@ -256,17 +259,86 @@ def dimension_semantics(annotation, model, reference, *, observation="system"):
     }, observations
 
 
+def datum_dimension_attachment(
+    app, model, view, view_key, datum, display, reference, inventory
+):
+    """Prove a datum's native dimension link without inventing entity geometry."""
+    if display is None:
+        raise RuntimeError("dimension-attached datum has a null display dimension")
+    if int(datum.OwnerType) != 0 or int(app.IsSame(datum.Owner, view)) != 1:
+        raise RuntimeError("dimension-attached datum has the wrong native view owner")
+    display = _early_bound(display, "IDisplayDimension")
+    target = _early_bound(display.GetAnnotation(), "IAnnotation")
+    if target is None or int(target.GetType()) != 4:
+        raise RuntimeError("datum display dimension has no dimension annotation")
+    if target.IsDangling() or int(target.Visible) != 1:
+        raise RuntimeError("datum target dimension must be visible and non-dangling")
+    if int(target.OwnerType) != 0 or int(app.IsSame(target.Owner, view)) != 1:
+        raise RuntimeError("datum target dimension has the wrong native view owner")
+    target_name = str(target.GetName())
+    matches = [
+        candidate
+        for candidate in inventory
+        if str(candidate.GetName()) == target_name and int(candidate.GetType()) == 4
+    ]
+    if len(matches) != 1 or int(app.IsSame(matches[0], target)) != 1:
+        raise RuntimeError("datum target is not exactly one native view dimension")
+    if int(app.IsSame(target.GetSpecificAnnotation(), display)) != 1:
+        raise RuntimeError("datum target dimension failed its exact native roundtrip")
+    semantic, _ = dimension_semantics(target, model, reference)
+    if semantic is None or semantic["kind"] != "model_dimension":
+        raise RuntimeError(
+            "datum attachment currently requires a source model dimension"
+        )
+    source = _early_bound(view.ReferencedDocument, "IModelDoc2")
+    if source is None or Path(source.GetPathName()).resolve(strict=True) != Path(
+        reference["path"]
+    ):
+        raise RuntimeError("datum target has the wrong resolved source part")
+    for index, component in enumerate(semantic["components"]):
+        # IDimension.FullName includes dimension, feature and verified model.
+        # IModelDoc2.Parameter takes the dimension@feature portion.
+        local_name = component["qualified_name"].rsplit("@", 1)[0]
+        if (
+            not local_name.startswith(component["name"] + "@")
+            or not local_name.split("@", 1)[1]
+        ):
+            raise RuntimeError("datum target lacks a complete source feature identity")
+        native_parameter = source.Parameter(local_name)
+        if (
+            native_parameter is None
+            or int(app.IsSame(native_parameter, display.GetDimension2(index))) != 1
+        ):
+            raise RuntimeError("datum target is not the exact source feature parameter")
+    tag = _early_bound(datum.GetSpecificAnnotation(), "IDatumTag")
+    return {
+        "kind": "datum_to_model_display_dimension",
+        "owner_view": view_key,
+        "target_annotation": target_name,
+        "source": dict(reference),
+        "dimension": semantic,
+        "datum": {
+            "label": str(tag.GetLabel()),
+            "shoulder": bool(tag.Shoulder),
+            "display_style": int(tag.GetDisplayStyle()),
+        },
+    }
+
+
 @_telemetry.traced("diagnostic.drawing_attachments.snapshot")
-def snapshot(model, *, dimension_values="system"):
+def snapshot(model, *, app, dimension_values="system"):
     checked, excluded, models = {}, {}, {}
     dimensions, dimensions_excluded, dimension_observations = {}, {}, {}
+    semantic_attachments = {}
     for view_key, view in views(model).items():
         models[view_key] = referenced_model(view)
-        for raw in view.GetAnnotations() or ():
-            annotation = _early_bound(raw, "IAnnotation")
+        inventory = tuple(
+            _early_bound(raw, "IAnnotation") for raw in view.GetAnnotations() or ()
+        )
+        for annotation in inventory:
             annotation_kind = int(annotation.GetType())
             key = f"{view_key}/{annotation.GetName()}/{annotation_kind}"
-            if key in checked or key in excluded:
+            if key in checked or key in excluded or key in semantic_attachments:
                 raise RuntimeError(f"duplicate annotation key: {key}")
             if annotation_kind not in _ANNOTATIONS:
                 excluded[key] = {
@@ -293,6 +365,22 @@ def snapshot(model, *, dimension_values="system"):
             )
             if len(entities) != len(kinds):
                 raise RuntimeError(f"{key}: attachment arrays have different lengths")
+            if annotation_kind == 2 and 14 in kinds:
+                if kinds != (14,) or int(annotation.GetAttachedEntityCount3()) != 1:
+                    raise RuntimeError(
+                        f"{key}: datum needs exactly one complete dimension attachment"
+                    )
+                semantic_attachments[key] = datum_dimension_attachment(
+                    app,
+                    model,
+                    view,
+                    view_key,
+                    annotation,
+                    entities[0],
+                    models[view_key],
+                    inventory,
+                )
+                continue
             for entity, kind in zip(entities, kinds, strict=True):
                 if entity is None and kind in _ENTITY_KINDS:
                     raise RuntimeError(f"{key}: supported attachment is null")
@@ -322,6 +410,7 @@ def snapshot(model, *, dimension_values="system"):
         "dimensions": dimensions,
         "dimensions_excluded": dimensions_excluded,
         "dimension_observations": dimension_observations,
+        "semantic_attachments": semantic_attachments,
     }
 
 
@@ -333,6 +422,7 @@ def compare(before, after, phase):
         "models",
         "dimensions",
         "dimensions_excluded",
+        "semantic_attachments",
     ):
         differences[section] = sorted(
             key
@@ -444,17 +534,24 @@ async def probe(adapter, source, report_root, *, dimension_values="system"):
     try:
         source_digests = {str(source): file_digest(source)}
         async with open_drawing(adapter, source) as model:
-            before = snapshot(model, dimension_values=dimension_values)
+            before = snapshot(
+                model, app=adapter.swApp, dimension_values=dimension_values
+            )
             report["snapshots"]["source"] = before
             report["coverage"] = {
                 "geometry_annotations_checked": len(before["checked"]),
                 "geometry_annotations_excluded": len(before["excluded"]),
                 "dimension_annotations_checked": len(before["dimensions"]),
                 "dimension_annotations_excluded": len(before["dimensions_excluded"]),
+                "semantic_attachments_checked": len(before["semantic_attachments"]),
             }
             report["source_layout"] = layout(model)
             checkpoint()
-        if not before["checked"] and not before["dimensions"]:
+        if (
+            not before["checked"]
+            and not before["dimensions"]
+            and not before["semantic_attachments"]
+        ):
             raise RuntimeError(
                 "probe found no supported model-geometry attachments or dimension semantics"
             )
@@ -465,7 +562,7 @@ async def probe(adapter, source, report_root, *, dimension_values="system"):
         shutil.copy2(source, copy)
         async with open_drawing(adapter, copy) as model:
             report["snapshots"]["copy"] = snapshot(
-                model, dimension_values=dimension_values
+                model, app=adapter.swApp, dimension_values=dimension_values
             )
             compare(before, report["snapshots"]["copy"], "untouched drawing copy")
             check_layout(
@@ -474,7 +571,7 @@ async def probe(adapter, source, report_root, *, dimension_values="system"):
             checkpoint()
             report["layout"] = move_and_scale(model)
             report["snapshots"]["moved_scaled"] = snapshot(
-                model, dimension_values=dimension_values
+                model, app=adapter.swApp, dimension_values=dimension_values
             )
             compare(before, report["snapshots"]["moved_scaled"], "move and scale")
             checkpoint()
@@ -484,7 +581,7 @@ async def probe(adapter, source, report_root, *, dimension_values="system"):
                     raise RuntimeError(f"saving drawing copy failed: {saved!r}")
         async with open_drawing(adapter, copy) as model:
             report["snapshots"]["reopened"] = snapshot(
-                model, dimension_values=dimension_values
+                model, app=adapter.swApp, dimension_values=dimension_values
             )
             compare(before, report["snapshots"]["reopened"], "saved and reopened")
             report["reopened_layout"] = layout(model)
@@ -506,6 +603,7 @@ async def probe(adapter, source, report_root, *, dimension_values="system"):
         f"{len(before['checked'])} annotations have unchanged supported attachment geometry; "
         f"{len(before['excluded'])} geometry exclusions; "
         f"{len(before['dimensions'])} dimension annotations have unchanged identity/configuration/value; "
+        f"{len(before['semantic_attachments'])} dimension-attached datums have unchanged semantic targets; "
         f"{len(before['dimensions_excluded'])} dimension exclusions (see report reasons)"
     )
     return {"probe": str(result_path)}
