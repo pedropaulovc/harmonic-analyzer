@@ -4861,6 +4861,7 @@ def repair_project_drawing_layout(
     """
     from _drawing_annotation_bounds import annotation_box
     from _drawing_native_gtol import arrange_native_gtol_columns
+    from _drawing_measurement_handoff import AnnotationMeasurementHandoff
     from _drawing_native_layout import NativeLayoutStatus, repair_native_layout
     from _drawing_view_packing import Rect
     from dataclasses import asdict
@@ -4874,20 +4875,33 @@ def repair_project_drawing_layout(
     title_block = Rect(
         _TITLE_BLOCK_LEFT_M, 0.0, float(properties[5]), _TITLE_BLOCK_TOP_M
     )
-    arrange_native_gtol_columns(adapter, views=views, measure_annotation=annotation_box)
-    report = repair_native_layout(
-        adapter,
-        views=views,
-        title_block=title_block,
-        measure_annotation=annotation_box,
-        alignments=alignments,
-        orderings=orderings,
-        notes=notes,
-        # Observed INote.GetExtent changes after exact anchor moves were up to
-        # 0.266 mm in the native pilots. This is extra planning room, not a
-        # native error bound or a relaxation of the final 2 mm clearance check.
-        planning_headroom_m=0.0005,
+    handoff = AnnotationMeasurementHandoff(
+        adapter, views=views, measure_annotation=annotation_box
     )
+    try:
+        arrange_native_gtol_columns(
+            adapter,
+            views=views,
+            measure_annotation=annotation_box,
+            record_measurement=handoff.record,
+        )
+        handoff.seal()
+        report = repair_native_layout(
+            adapter,
+            views=views,
+            title_block=title_block,
+            measure_annotation=annotation_box,
+            initial_measure_annotation=handoff.initial_measure,
+            # Observed INote.GetExtent changes after exact anchor moves were up
+            # to 0.266 mm. Extra planning room is not a native error bound or a
+            # relaxation of the final 2 mm clearance check.
+            planning_headroom_m=0.0005,
+            alignments=alignments,
+            orderings=orderings,
+            notes=notes,
+        )
+    finally:
+        handoff.close()
     _telemetry.info(
         "native sheet layout measured",
         layout_status=report.status.value,

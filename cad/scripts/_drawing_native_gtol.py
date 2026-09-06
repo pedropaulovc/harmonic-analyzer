@@ -131,6 +131,7 @@ class _Gtol:
     entity_types: tuple[int, ...]
     owner: Any
     owner_type: int
+    measurement: Any
 
 
 def _position(annotation: Any) -> tuple[float, float, float]:
@@ -204,6 +205,7 @@ def _read_gtols(adapter: Any, view: Any, measure: Callable) -> dict[str, _Gtol]:
             kinds,
             owner,
             owner_type,
+            bounds,
         )
     return result
 
@@ -386,6 +388,7 @@ def arrange_native_gtol_columns(
     *,
     views: Mapping[str, Any],
     measure_annotation: Callable | None = None,
+    record_measurement: Callable | None = None,
     gap_m: float = 0.002,
 ) -> dict[str, dict[str, Any]]:
     """Space exact native banks and translate their measured columns as a whole.
@@ -394,6 +397,9 @@ def arrange_native_gtol_columns(
     view packing. An empty view is a no-op; a singleton skips native multi-select
     commands. Failed commands, semantic drift, clamped targets, body deformation,
     and remaining native GTol overlap all fail loudly. Nothing is saved here.
+    An optional record_measurement(view, annotation, bounds) receives actual
+    final GTol output and post-command obstacle output for initial packing only;
+    it never replaces either fresh GTol witness or supplies derived bounds.
     """
     if not math.isfinite(gap_m) or gap_m < 0:
         raise ValueError("GTol clearance must be finite and nonnegative")
@@ -468,11 +474,14 @@ def arrange_native_gtol_columns(
                 "minimum clearance",
             )
         _assert_body_clearance(bank, gap_m)
-        obstacles = [
-            measure_annotation(adapter, _early_bound(raw, "IAnnotation")).body
-            for kind in (2, 4, 7)
-            for raw in view.GetAnnotationsByType(kind) or ()
-        ]
+        obstacles = []
+        for kind in (2, 4, 7):
+            for raw in view.GetAnnotationsByType(kind) or ():
+                annotation = _early_bound(raw, "IAnnotation")
+                measured = measure_annotation(adapter, annotation)
+                obstacles.append(measured.body)
+                if record_measurement is not None:
+                    record_measurement(view, annotation, measured)
         column = _union([row.body for row in bank.values()])
         delta = column_outboard_translation(column, outline, obstacles, gap_m=gap_m)
         with _telemetry.span(
@@ -502,6 +511,11 @@ def arrange_native_gtol_columns(
             raise RuntimeError(
                 "translated GTol column still collides with its view/annotation bodies"
             )
+        # Only the actual fresh FINAL witness can feed initial view packing.
+        # Derived intermediate bodies and the initial GTol read never enter it.
+        if record_measurement is not None:
+            for row in after.values():
+                record_measurement(view, row.annotation, row.measurement)
         report[label] = {
             "count": len(after),
             "commands": command_report,
