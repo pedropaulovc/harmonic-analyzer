@@ -221,19 +221,23 @@ def _length_overrides(rows):
 
 
 def _same_non_datum_primitives(before, after):
-    """Consume already measured native geometry; never add a second COM pass."""
+    """Compare captured fixed ink, including text placement, without native reads."""
     for name, original in before.items():
         if original.kind == 2:
             continue
         actual = after[name]
         for field in (
+            "body",
+            "envelope",
+            "text_boxes",
+            "text_runs",
             "native_strokes",
             "leader_segments",
             "native_leader_segments",
             "leader_decorations",
         ):
-            initial = tuple(getattr(original.measurement, field))
-            final = tuple(getattr(actual.measurement, field))
+            initial = getattr(original.measurement, field)
+            final = getattr(actual.measurement, field)
             if initial != final:
                 _telemetry.error(
                     "native non-datum primitive preservation failed",

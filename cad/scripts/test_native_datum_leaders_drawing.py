@@ -179,6 +179,9 @@ def policy_setup(monkeypatch, *, initial_shoulder=False, mode="ordinary"):
         state.snapshots.append((annotation, state.length))
         measured = base_measure(native_adapter, annotation)
         measured.envelope = measured.body
+        measured.text_boxes = (measured.body,)
+        for run in measured.text_runs:
+            run.position = measured.anchor
         measured.leader_segments = ()
         measured.native_leader_segments = ()
         measured.leader_decorations = ()
@@ -587,3 +590,80 @@ def test_invalid_independent_family_length_fails_before_any_style_or_preference_
         run()
     assert datum.specific.Shoulder is False
     assert state.writes == state.family_writes == []
+
+
+def test_global_write_rejects_ten_mm_fixed_dimension_text_and_body_shift(monkeypatch):
+    adapter, view, datum, dimension, state, measure, run = policy_setup(monkeypatch)
+    observed = []
+
+    def measured(native_adapter, annotation):
+        actual = measure(native_adapter, annotation)
+        if annotation is dimension:
+            delta = (0.01 if state.writes else 0.0, 0.0)
+            actual.body = actual.body.translated(delta)
+            actual.envelope = actual.body
+            actual.text_boxes = tuple(
+                box.translated(delta) for box in actual.text_boxes
+            )
+            for text in actual.text_runs:
+                text.position = (text.position[0] + delta[0], text.position[1])
+            observed.append(actual)
+        return actual
+
+    with pytest.raises(RuntimeError, match="non-datum native body"):
+        leaders.prepare_document_datum_leaders(
+            adapter,
+            views={"front": view},
+            measure=measured,
+            planning_gap_m=0.003,
+            declared_notes={},
+            gtol_placement=callouts.GtolPlacement.ARRANGED_NEXT,
+        )
+    assert len(observed) == 2
+    assert observed[0].native_strokes == observed[1].native_strokes
+    assert observed[1].body.xmin - observed[0].body.xmin == pytest.approx(0.01)
+
+
+@pytest.mark.parametrize("kind", [4, 5, 7])
+@pytest.mark.parametrize("field", ["body", "envelope", "text_boxes", "text_runs"])
+def test_fixed_ink_geometry_fields_reject_independent_drift_without_extra_reads(
+    monkeypatch, kind, field
+):
+    adapter, view, datum, dimension, state, measure, run = policy_setup(monkeypatch)
+    sf, gtol = add_family_annotations(view)
+    target = {4: dimension, 5: gtol, 7: sf}[kind]
+
+    def measured(native_adapter, annotation):
+        actual = measure(native_adapter, annotation)
+        if annotation is not target or not state.writes:
+            return actual
+        if field in {"body", "envelope"}:
+            setattr(actual, field, getattr(actual, field).translated((0.01, 0.0)))
+        if field == "text_boxes":
+            actual.text_boxes = tuple(
+                box.translated((0.01, 0.0)) for box in actual.text_boxes
+            )
+        if field == "text_runs":
+            actual.text_runs[0].position = (0.21, 0.2)
+        return actual
+
+    with pytest.raises(RuntimeError, match=f"non-datum native {field}"):
+        leaders.prepare_document_datum_leaders(
+            adapter,
+            views={"front": view},
+            measure=measured,
+            planning_gap_m=0.003,
+            declared_notes={},
+            gtol_placement=callouts.GtolPlacement.ARRANGED_NEXT,
+        )
+    assert sum(item is target for item, _ in state.snapshots) == 2
+
+
+def test_datum_frame_extension_still_permits_regenerated_specific_text(monkeypatch):
+    adapter, view, datum, dimension, state, measure, run = policy_setup(monkeypatch)
+    datum.specific.GetTextAtIndex = lambda _index: (
+        "generated-after" if state.writes else "generated-before"
+    )
+    run()
+    assert state.length > 0.00635 and len(state.writes) == 1
+    assert datum.specific.GetLabel() == "A"
