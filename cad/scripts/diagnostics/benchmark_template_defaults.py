@@ -40,6 +40,10 @@ from diagnostics._owned_native_session import (  # noqa: E402
 
 TARGETS = ("arbor_pedestal", "pen_marker")
 ORDER = ("baseline", "candidate", "candidate", "baseline")
+# Current set_units_mm explicitly sets linear units after selecting MMGS. Native
+# control probe_drawing_unit_defaults.py proves that setter switches the system
+# label to swUnitSystem_Custom=4. Preserve that exact terminal state in both arms.
+CURRENT_HELPER_UNIT_SYSTEM = 4
 
 
 @dataclass(frozen=True)
@@ -81,6 +85,18 @@ def replaced_setup(module, replacement):
 def compare_exact(before, after, phase):
     if before != after:
         raise RuntimeError(f"{phase}: saved/default/annotation witness changed")
+
+
+def validate_units(units, spec):
+    expected = {
+        "system": CURRENT_HELPER_UNIT_SYSTEM,
+        "linear": drawing._SW_LENGTH_MM,
+        "decimals": spec.decimals,
+    }
+    if units != expected:
+        raise RuntimeError(
+            f"inherited drawing units/precision differ: {units} != {expected}"
+        )
 
 
 def json_value(value):
@@ -213,12 +229,7 @@ def defaults_snapshot(adapter, spec):
             model.GetUserPreferenceIntegerValue(drawing._SW_PREF_UNITS_LINEAR_DP)
         ),
     }
-    if units != {
-        "system": drawing._SW_UNIT_SYSTEM_MMGS,
-        "linear": drawing._SW_LENGTH_MM,
-        "decimals": spec.decimals,
-    }:
-        raise RuntimeError(f"inherited drawing units/precision differ: {units}")
+    validate_units(units, spec)
     styles = {
         name: int(
             model.Extension.GetUserPreferenceInteger(

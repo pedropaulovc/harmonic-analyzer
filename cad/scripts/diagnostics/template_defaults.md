@@ -16,7 +16,7 @@ different default. Two- and three-decimal variants are tested offline.
 
 Preparation creates a drawing from the immutable project DRWDOT, calls the
 existing `new_project_drawing` once, and saves a new DRWDOT under a unique report
-directory. This captures the existing metric edge-break note, MMGS/mm precision,
+directory. This captures the existing metric edge-break note, custom-mm precision,
 all ten dimension text/leader style scopes and sheet scale. A new blank drawing
 instantiated from that DRWDOT must reproduce the measured defaults before the
 first recipe runs.
@@ -123,5 +123,24 @@ dirty unsaved Draw2 preserved; only the newly created blank drawing was closed.
 `probe_drawing_unit_defaults.py` is the bounded follow-up: two fresh owned blank
 drawings, tracing each of the existing three setter returns/readbacks and comparing
 the unchanged adapter helper's result. It performs no save, rebuild or export.
-Its native run needs its own source review and exclusive seat grant. Do not
-weaken the benchmark's unit assertion based only on the first observation.
+
+The reviewed follow-up ran at `6b73314c` on the same SolidWorks PID37136. Its
+`unit-defaults-61qf0gvd/units.json` records this exact sequence (all setters returned
+True):
+
+| Phase | Unit system | Linear unit | Decimals |
+| --- | ---: | ---: | ---: |
+| Fresh project-template drawing | IPS 3 | Inches 3 | 4 |
+| Set unit system 263 to MMGS 5 | MMGS 5 | Millimetres 0 | 4 |
+| Set linear units 47 to millimetres 0 | Custom 4 | Millimetres 0 | 4 |
+| Set linear decimals 49 to 2 | Custom 4 | Millimetres 0 | 2 |
+| Unchanged adapter helper on a second fresh drawing | Custom 4 | Millimetres 0 | 2 |
+
+Thus the individual linear-unit setter caused the observed system transition,
+including when length units were already millimetres. The benchmark now requires
+the exact terminal Custom4/mm0/requested-precision state and still compares the
+system value after template inheritance, reopen and across arms. It does not
+accept arbitrary equivalent presets or change the production helper. The live
+mechanism control used precision2; precision3 remains an offline-tested variant.
+Both owned blank drawings closed, the original template SHA stayed unchanged,
+and `ownership.json` again proves the visible part and dirty Draw2 were preserved.
