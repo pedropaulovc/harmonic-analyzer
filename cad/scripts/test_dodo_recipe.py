@@ -1153,15 +1153,19 @@ def test_recipe_digest_ignores_yaml_comments(tmp_path):
 # key (a submodule bump busts the key) -- while the SolidWorks-free check:* tasks,
 # which never touch COM, must stay off it.
 def _redirect_submodule(dodo, root: Path):
-    """Point dodo's submodule source + ALL THREE synthetic sidecars (full / assembly /
-    part-relevant) into a temp sandbox and reset the per-process memoization, so a test
-    controls the tree content and never writes into the real cad/out."""
+    """Isolate submodule source, digest sidecars, and CAD execution tokens.
+
+    Assembly cache keys also read their children's execution identities. Letting
+    those point at the live cad/out races concurrent build/cache-restore tasks and
+    makes a drawing-only edit appear to invalidate the assembly key.
+    """
     src = root / "src" / "solidworks_mcp"
     src.mkdir(parents=True, exist_ok=True)
     dodo.SUBMODULE_SRC = src
     dodo._SUBMODULE_DIGEST_FILE = root / ".submodule.digest"
     dodo._SUBMODULE_ASSEMBLY_DIGEST_FILE = root / ".submodule-assembly.digest"
     dodo._SUBMODULE_PART_DIGEST_FILE = root / ".submodule-part.digest"
+    dodo.CAD_OUT = root / "cad-out"
     _reset_submodule_memo(dodo)
     return src
 
@@ -1361,6 +1365,46 @@ def test_drawing_only_submodule_change_spares_parts_and_assemblies(tmp_path):
     assert p2 == p1, "a drawing.py edit must NOT bust the part key"
     assert a2 == a1, "a drawing.py edit must NOT bust the assembly key"
     assert d2 != d1, "a drawing.py edit MUST bust the whole-tree (drawing) digest"
+
+
+def test_submodule_key_comparison_ignores_concurrent_build_tokens(tmp_path):
+    """An unrelated builder cannot change the controlled submodule experiment."""
+    dodo = _load_dodo()
+    dodo.CAD_OUT = tmp_path / "concurrent-build"
+    asm = dodo.ASSEMBLY_ORDER[0]
+    child = dodo.references_of(asm)[0]
+    live_token = Path(dodo._part_execution_token(child))
+    live_token.parent.mkdir(parents=True)
+    live_token.write_text("a" * 64 + "\n")
+
+    src = _redirect_submodule(dodo, tmp_path / "sandbox")
+    controlled_token = Path(dodo._part_execution_token(child))
+    controlled_token.parent.mkdir(parents=True, exist_ok=True)
+    controlled_token.write_text("a" * 64 + "\n")
+    (src / "adapters.py").write_text("def mate(): return 1\n")
+    drawing = src / "adapters" / "solidworks" / "drawing.py"
+    drawing.parent.mkdir(parents=True)
+    drawing.write_text("def new_view(): return 1\n")
+
+    def inputs():
+        _reset_submodule_memo(dodo)
+        return dodo._cache.key_inputs(
+            dodo._assembly_file_deps(asm), dodo.ContentChecker._digest
+        )
+
+    before, before_inputs = inputs()
+    # Deterministic interleaving of check:recipe with a concurrent part restore.
+    # Neither write touches the assembly code or the controlled child identities.
+    live_token.write_text("b" * 64 + "\n")
+    drawing.write_text("def new_view(): return 2\n")
+    after, after_inputs = inputs()
+    after_by_path = dict(after_inputs)
+    moved = {
+        path: (digest, after_by_path.get(path))
+        for path, digest in before_inputs
+        if after_by_path.get(path) != digest
+    }
+    assert after == before, f"external build inputs escaped the sandbox: {moved}"
 
 
 def test_kinematics_verify_depends_on_pen_driver_and_truth_model():
