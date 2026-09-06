@@ -1,4 +1,4 @@
-"""Probe part-drawing attachments after moving/scaling views and reopening.
+"""Probe part-drawing attachments and dimension values through layout/reopen.
 
 Run ``uv run python cad/scripts/diagnostics/probe_drawing_attachments.py DRAWING``.
 The parent takes the pipeline's COM seat lock. Only a uniquely named drawing
@@ -8,6 +8,11 @@ the checked count. This compares geometry signatures, not persistent entity IDs.
 Only drawings referencing native parts are supported. Assembly drawings are
 rejected before copying or movement: their component ownership and transitive
 model dependencies need a separate snapshot contract.
+
+Dimension semantics are checked separately from attachment geometry, including
+imported dimensions with no supported attached entities. --dimension-values
+api-capture also records the current/older getter call shapes used to investigate
+native reference dimensions. Those observations are evidence, not fallback logic.
 """
 
 from __future__ import annotations
@@ -140,9 +145,110 @@ def referenced_model(view):
     raise RuntimeError("drawing view has no resolved source model")
 
 
+def dimension_api_observations(dimension, configuration):
+    """Reproduce the bounded system-value call shapes without changing a model.
+
+    On R2026x, an arbor-pedestal drawing reference RD1 returned None for the
+    three GetSystemValue3 calls below, while GetSystemValue2 returned 0.012 m.
+    Imported HeadHt was the positive control (0.003 m via GetSystemValue3).
+    Untested: other releases, typed BSTR-array configuration names,
+    swAllConfiguration, and the native IGet interface.
+    """
+    calls = {
+        "GetSystemValue3(1,empty)": lambda: dimension.GetSystemValue3(1, ""),
+        "GetSystemValue3(3,view_configuration)": lambda: dimension.GetSystemValue3(
+            3, configuration
+        ),
+        "GetSystemValue3(1,None)": lambda: dimension.GetSystemValue3(1, None),
+        "GetSystemValue2(empty)": lambda: dimension.GetSystemValue2(""),
+    }
+    result = {}
+    for name, getter in calls.items():
+        try:
+            result[name] = {"status": "returned", "value": getter()}
+        except Exception as error:
+            result[name] = {"status": "error", "error": repr(error)}
+    return result
+
+
+def dimension_semantics(annotation, model, reference, *, observation="system"):
+    """Read actual dimension identity, view configuration and SI-system value."""
+    raw_display = annotation.GetSpecificAnnotation()
+    if raw_display is None:
+        return None, {"reason": "annotation has no concrete display dimension"}
+    display = _early_bound(raw_display, "IDisplayDimension")
+    display_type = int(display.Type2)
+    is_reference = bool(display.IsReferenceDim())
+    kind = "drawing_reference" if is_reference else "model_dimension"
+    configuration = reference["configuration"]
+    if not configuration:
+        raise RuntimeError("dimension view has no referenced configuration")
+    owner_path = Path(model.GetPathName()) if is_reference else Path(reference["path"])
+    owner_suffix = f"@{owner_path.stem}.{'Drawing' if is_reference else 'Part'}"
+    components, observations = [], []
+    # swDimensionType_e.swChamferDimension has two underlying model dimensions.
+    for index in range(2 if display_type == 10 else 1):
+        raw_dimension = display.GetDimension2(index)
+        if raw_dimension is None:
+            raise RuntimeError(f"display dimension has no dimension at index {index}")
+        dimension = _early_bound(raw_dimension, "IDimension")
+        name, full_name = str(dimension.Name or ""), str(dimension.FullName or "")
+        if not name or not full_name.casefold().endswith(owner_suffix.casefold()):
+            raise RuntimeError(
+                f"dimension identity does not match its {kind} owner: {full_name!r}"
+            )
+        # Only the verified current drawing owner is normalized across copies.
+        # Model owners, feature names and dimension names remain exact.
+        qualified_name = (
+            full_name[: -len(owner_suffix)] + "@<drawing>"
+            if is_reference
+            else full_name
+        )
+        if is_reference:
+            # Explicitly use the documented system-unit reference getter. The
+            # current GetSystemValue3 shapes return None on the observed seat;
+            # --dimension-values api-capture retains a reproducible comparison.
+            value = dimension.GetSystemValue2("")
+            value_api = "GetSystemValue2"
+        else:
+            values = tuple(dimension.GetSystemValue3(3, configuration) or ())
+            if len(values) != 1:
+                raise RuntimeError(
+                    f"{full_name}: expected one system value for {configuration!r}: {values}"
+                )
+            value = values[0]
+            value_api = "GetSystemValue3"
+        if value is None or not math.isfinite(float(value)):
+            raise RuntimeError(
+                f"{full_name}: dimension system value is unreadable: {value}"
+            )
+        components.append(
+            {
+                "name": name,
+                "qualified_name": qualified_name,
+                "parameter_type": int(dimension.GetType()),
+                "value_system": round(float(value), 12),
+                "value_api": value_api,
+            }
+        )
+        row = {"full_name": full_name}
+        if observation == "api-capture":
+            row["value_api_calls"] = dimension_api_observations(
+                dimension, configuration
+            )
+        observations.append(row)
+    return {
+        "kind": kind,
+        "display_type": display_type,
+        "view_configuration": configuration,
+        "components": components,
+    }, observations
+
+
 @_telemetry.traced("diagnostic.drawing_attachments.snapshot")
-def snapshot(model):
+def snapshot(model, *, dimension_values="system"):
     checked, excluded, models = {}, {}, {}
+    dimensions, dimensions_excluded, dimension_observations = {}, {}, {}
     for view_key, view in views(model).items():
         models[view_key] = referenced_model(view)
         for raw in view.GetAnnotations() or ():
@@ -161,6 +267,15 @@ def snapshot(model):
             # from lost geometry. IsDangling is the documented disambiguator.
             if annotation.IsDangling():
                 raise RuntimeError(f"{key}: annotation is dangling")
+            if annotation_kind == 4:
+                semantic, observed = dimension_semantics(
+                    annotation, model, models[view_key], observation=dimension_values
+                )
+                if semantic is None:
+                    dimensions_excluded[key] = observed
+                else:
+                    dimensions[key] = semantic
+                    dimension_observations[key] = observed
             entities = tuple(annotation.GetAttachedEntities3() or ())
             kinds = tuple(
                 int(kind) for kind in annotation.GetAttachedEntityTypes() or ()
@@ -189,12 +304,25 @@ def snapshot(model):
                 )
             except UnsupportedGeometry as error:
                 excluded[key] = {"reason": str(error), "kinds": kinds}
-    return {"checked": checked, "excluded": excluded, "models": models}
+    return {
+        "checked": checked,
+        "excluded": excluded,
+        "models": models,
+        "dimensions": dimensions,
+        "dimensions_excluded": dimensions_excluded,
+        "dimension_observations": dimension_observations,
+    }
 
 
 def compare(before, after, phase):
     differences = {}
-    for section in ("checked", "excluded", "models"):
+    for section in (
+        "checked",
+        "excluded",
+        "models",
+        "dimensions",
+        "dimensions_excluded",
+    ):
         differences[section] = sorted(
             key
             for key in before[section].keys() | after[section].keys()
@@ -283,7 +411,7 @@ async def open_drawing(adapter, path):
         check(f"close {path.name}", await adapter.close_model())
 
 
-async def probe(adapter, source, report_root):
+async def probe(adapter, source, report_root, *, dimension_values="system"):
     report_root.mkdir(parents=True, exist_ok=True)
     run_dir = Path(tempfile.mkdtemp(prefix="attachment-probe-", dir=report_root))
     copy = run_dir / f"{source.stem}-{run_dir.name}.SLDDRW"
@@ -292,7 +420,8 @@ async def probe(adapter, source, report_root):
         "source": str(source),
         "copy": str(copy),
         "status": "running",
-        "scope": "part drawings; model-geometry signatures, not persistent entity IDs",
+        "scope": "part drawings; separate model-geometry and dimension-semantic checks, not persistent entity IDs",
+        "dimension_values": dimension_values,
         "snapshots": {},
     }
 
@@ -304,26 +433,38 @@ async def probe(adapter, source, report_root):
     try:
         source_digests = {str(source): file_digest(source)}
         async with open_drawing(adapter, source) as model:
-            before = snapshot(model)
+            before = snapshot(model, dimension_values=dimension_values)
             report["snapshots"]["source"] = before
+            report["coverage"] = {
+                "geometry_annotations_checked": len(before["checked"]),
+                "geometry_annotations_excluded": len(before["excluded"]),
+                "dimension_annotations_checked": len(before["dimensions"]),
+                "dimension_annotations_excluded": len(before["dimensions_excluded"]),
+            }
             report["source_layout"] = layout(model)
             checkpoint()
-        if not before["checked"]:
-            raise RuntimeError("probe found no supported model-geometry attachments")
+        if not before["checked"] and not before["dimensions"]:
+            raise RuntimeError(
+                "probe found no supported model-geometry attachments or dimension semantics"
+            )
         for reference in before["models"].values():
             path = reference["path"]
             source_digests[path] = file_digest(path)
         report["source_digests"] = source_digests
         shutil.copy2(source, copy)
         async with open_drawing(adapter, copy) as model:
-            report["snapshots"]["copy"] = snapshot(model)
+            report["snapshots"]["copy"] = snapshot(
+                model, dimension_values=dimension_values
+            )
             compare(before, report["snapshots"]["copy"], "untouched drawing copy")
             check_layout(
                 report["source_layout"], layout(model), "untouched drawing copy"
             )
             checkpoint()
             report["layout"] = move_and_scale(model)
-            report["snapshots"]["moved_scaled"] = snapshot(model)
+            report["snapshots"]["moved_scaled"] = snapshot(
+                model, dimension_values=dimension_values
+            )
             compare(before, report["snapshots"]["moved_scaled"], "move and scale")
             checkpoint()
             with _telemetry.span("diagnostic.drawing_attachments.save"):
@@ -331,7 +472,9 @@ async def probe(adapter, source, report_root):
                 if not (saved[0] if isinstance(saved, tuple) else saved):
                     raise RuntimeError(f"saving drawing copy failed: {saved!r}")
         async with open_drawing(adapter, copy) as model:
-            report["snapshots"]["reopened"] = snapshot(model)
+            report["snapshots"]["reopened"] = snapshot(
+                model, dimension_values=dimension_values
+            )
             compare(before, report["snapshots"]["reopened"], "saved and reopened")
             report["reopened_layout"] = layout(model)
             check_layout(
@@ -350,7 +493,9 @@ async def probe(adapter, source, report_root):
         raise
     _telemetry.success(
         f"{len(before['checked'])} annotations have unchanged supported attachment geometry; "
-        f"{len(before['excluded'])} annotations excluded (see report reasons)"
+        f"{len(before['excluded'])} geometry exclusions; "
+        f"{len(before['dimensions'])} dimension annotations have unchanged identity/configuration/value; "
+        f"{len(before['dimensions_excluded'])} dimension exclusions (see report reasons)"
     )
     return {"probe": str(result_path)}
 
@@ -362,6 +507,12 @@ def main(argv=None):
     )
     parser.add_argument(
         "--report-root", type=Path, default=ROOT / "cad/out/reports/drawing-attachments"
+    )
+    parser.add_argument(
+        "--dimension-values",
+        choices=("system", "api-capture"),
+        default="system",
+        help="also record dimension getter call shapes with api-capture",
     )
     parser.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
@@ -379,6 +530,8 @@ def main(argv=None):
                 str(source),
                 "--report-root",
                 str(report_root),
+                "--dimension-values",
+                args.dimension_values,
                 "--worker",
             ],
             "drawing attachment stability probe",
@@ -390,7 +543,11 @@ def main(argv=None):
         raise RuntimeError(
             "attachment probe worker requires the pipeline COM seat lock"
         )
-    return run_build(lambda adapter: probe(adapter, source, report_root))
+    return run_build(
+        lambda adapter: probe(
+            adapter, source, report_root, dimension_values=args.dimension_values
+        )
+    )
 
 
 if __name__ == "__main__":
