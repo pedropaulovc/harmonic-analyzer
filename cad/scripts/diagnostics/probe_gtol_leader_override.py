@@ -39,6 +39,11 @@ symbol-side horizontal extension is measured, preserved, and reported separately
 from the configured anchor-to-elbow length. Other view and sheet-format symbols
 remain in the exact unchanged full-inventory gate; they are never implicitly
 included in the intended-change allowance.
+The first SF attempt at a58b9b44 (gtol-leader-override-uhrxmlnf) stopped before
+any length mutation because this probe incorrectly assumed a non-JIS symbol.
+The existing recipe explicitly pins GetSymbol()==1 (swSFJIS_Machining_Req).
+The revised control requires that exact type and leaves its style unchanged;
+ISFSymbol.GetSymbolAllAround is not applicable to it under the native reference.
 """
 
 from __future__ import annotations
@@ -282,6 +287,30 @@ class ExistingSessionCopy(shoulder.OwnedDrawingCopy):
         self.paths, self.titles = {self.expected}, {}
 
 
+def surface_finish_properties(symbol):
+    symbol_kind = int(symbol.GetSymbol())
+    if symbol_kind != 1:  # existing add_surface_finish's swSFJIS_Machining_Req
+        raise RuntimeError(
+            f"bounded SF control requires the existing recipe symbol type 1; got {symbol_kind}"
+        )
+    count = int(symbol.GetTextCount())
+    if count < 1 or count > 10000:
+        raise RuntimeError("native SF target must have supported nonempty text")
+    return {
+        "symbol": symbol_kind,
+        "orientation": int(symbol.Orientation),
+        "angle": float(symbol.GetAngle()),
+        "lay": int(symbol.GetDirectionOfLay()),
+        # GetSymbol documents this getter only for non-JIS symbol types0/2/9.
+        # Type1 has no additional surface-texture getter requirement either.
+        "all_around": None,
+        "all_around_status": "not_applicable_to_swSFJIS_Machining_Req",
+        "semantic_text_fields": tuple(
+            str(symbol.GetText(index)) for index in range(1, 11)
+        ),
+    }
+
+
 def capture_target(adapter, part, scope=LengthScope.ANNOTATION):
     app = adapter.swApp
     kind, interface = (
@@ -336,24 +365,7 @@ def capture_target(adapter, part, scope=LengthScope.ANNOTATION):
     record["kind"] = kind
     if kind == 7:
         symbol = _early_bound(annotation.GetSpecificAnnotation(), "ISFSymbol")
-        symbol_kind = int(symbol.GetSymbol())
-        if symbol_kind not in {0, 2, 9}:
-            raise RuntimeError(
-                "bounded SF control requires a supported non-JIS native symbol"
-            )
-        count = int(symbol.GetTextCount())
-        if count < 1 or count > 10000:
-            raise RuntimeError("native SF target must have supported nonempty text")
-        record["sf_properties"] = {
-            "symbol": symbol_kind,
-            "orientation": int(symbol.Orientation),
-            "angle": float(symbol.GetAngle()),
-            "lay": int(symbol.GetDirectionOfLay()),
-            "all_around": bool(symbol.GetSymbolAllAround()),
-            "semantic_text_fields": tuple(
-                str(symbol.GetText(index)) for index in range(1, 11)
-            ),
-        }
+        record["sf_properties"] = surface_finish_properties(symbol)
         # Existing native evidence has a 1.75mm symbol-side stub preceding the
         # anchor; document length runs from symbol GetPosition to the elbow.
         if abs(record["position"][1] - record["leader_points"][4]) > EPSILON:
