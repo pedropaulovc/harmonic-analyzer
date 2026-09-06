@@ -4537,7 +4537,6 @@ def check_drawing_layout(adapter: Any, *, stem: str = "") -> None:
         )
 
 
-@_telemetry.traced("drawing.finalize")
 def _drawing_artifact_span(kind: Literal["drawing", "pdf", "png"], path: str):
     """Observe each actual save/export call without splitting or repeating it."""
     names = {
@@ -4548,6 +4547,7 @@ def _drawing_artifact_span(kind: Literal["drawing", "pdf", "png"], path: str):
     return _telemetry.span(names[kind], output_path=path)
 
 
+@_telemetry.traced("drawing.finalize")
 async def finalize_drawing(
     adapter: Any,
     outputs: DrawingOutputs,
