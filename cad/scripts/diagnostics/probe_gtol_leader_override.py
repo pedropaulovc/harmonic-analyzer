@@ -25,6 +25,13 @@ That variant passed at 108fe65a (gtol-leader-override-fd4f_eux): exact before-ex
 and reopened 6.35 mm geometry, unchanged body/attachments and identical PNGs.
 --length-scope gtol_default independently tests the document's GTol-family
 defaults on a fresh source copy; it never writes an individual annotation length.
+It passed at 4a28d4e0 (gtol-leader-override-y228ca9f): GTol-family inheritance OFF,
+family length 6.35 mm, global datum length unchanged 73.30296548073768 mm; actual
+leader was 6.35 mm immediately and after rebuild/reopen while its getter stayed
+-1 (document-driven). Only the GTol leader changed. After/reopened PNGs are byte
+identical to the positive individual-override control; no production route is
+changed by this diagnostic. The native toggle setter returned True with an OFF
+getter, contrary to its reference page's resulting-state return description.
 """
 
 from __future__ import annotations
@@ -112,9 +119,9 @@ def apply_length_scope(annotation, extension, scope):
             before["toggle_enum"], before["option_enum"], False
         )
     )
-    # SetUserPreferenceToggle documents its Boolean as the resulting state;
-    # False is legitimate for the requested OFF value. Preserve that return and
-    # require the explicit getter, rather than treating False as failed success.
+    # The reference describes a resulting-state Boolean; the positive 2026
+    # control instead returned True with an OFF getter. Preserve both native
+    # observations and require the explicit getter to prove the requested state.
     toggle_actual = bool(
         extension.GetUserPreferenceToggle(before["toggle_enum"], before["option_enum"])
     )
