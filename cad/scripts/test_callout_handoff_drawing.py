@@ -100,12 +100,14 @@ def test_handoff_eliminates_only_three_obstacle_reads_and_preserves_final_checks
             measure_obstacle=obstacle.initial_measure
             if policy == "handoff"
             else measure,
+            obstacle_read_scope=obstacle.read_scope if policy == "handoff" else None,
             record_measurement=packing.record,
         )
         packing.seal()
         reads_before_packing = reads.copy()
-        for annotation in (*symbols, *frames):
-            packing.initial_measure(adapter, annotation)
+        with packing.read_scope():
+            for annotation in (*symbols, *frames):
+                packing.initial_measure(adapter, annotation)
         assert reads == reads_before_packing
         # The required final packing read is fresh for EVERY annotation.
         for annotation in (*symbols, *frames):
@@ -157,6 +159,7 @@ def test_native_command_moving_fixed_obstacle_cannot_serve_stale_body(monkeypatc
             views={"front": view},
             measure_annotation=measure,
             measure_obstacle=handoff.initial_measure,
+            obstacle_read_scope=handoff.read_scope,
         )
     assert reads[4] == 2  # no silent fresh baseline after the rejected handoff
     handoff.close()

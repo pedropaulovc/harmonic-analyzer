@@ -101,6 +101,7 @@ def test_project_layout_orders_spacing_and_rejects_unfit_sheet(monkeypatch, stat
         views=views,
         measure_annotation=annotation_box,
         measure_obstacle=obstacle.initial_measure,
+        obstacle_read_scope=obstacle.read_scope,
         record_measurement=handoff.record,
     )
     arguments = dict(repair.call_args.kwargs)
@@ -112,6 +113,7 @@ def test_project_layout_orders_spacing_and_rejects_unfit_sheet(monkeypatch, stat
         ),
         "measure_annotation": annotation_box,
         "initial_measure_annotation": handoff.initial_measure,
+        "initial_measure_scope": handoff.read_scope,
         "planning_headroom_m": 0.0005,
         "alignments": alignments,
         "orderings": orderings,

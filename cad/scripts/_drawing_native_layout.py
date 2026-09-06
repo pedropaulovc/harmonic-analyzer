@@ -64,6 +64,8 @@ metres, not a second acceptance policy; solver and position tolerances stay inta
 
 from __future__ import annotations
 
+from contextlib import nullcontext
+
 from collections import Counter
 from dataclasses import dataclass
 from enum import Enum
@@ -838,6 +840,7 @@ def repair_native_layout(
     title_block: Rect,
     measure_annotation: Callable[[Any, Any], Any],
     initial_measure_annotation: Callable[[Any, Any], Any] | None = None,
+    initial_measure_scope: Callable | None = None,
     parents: Mapping[str, str] | None = None,
     alignments: Sequence[AxisLink] = (),
     orderings: Sequence[AxisOrder] = (),
@@ -890,14 +893,19 @@ def repair_native_layout(
             raise ValueError("native layout ordering refers to an invalid axis/view")
     order = _parent_order(views, parents or {})
     with _telemetry.span("drawing.native_layout.measure"):
-        before = _snapshot(
-            adapter,
-            views,
-            notes,
-            measure_annotation
-            if initial_measure_annotation is None
-            else initial_measure_annotation,
-        )
+        # Finish the read-only context witness before planning can return even
+        # UNCHANGED/NO_FIT, and before any native view/note movement.
+        with (
+            nullcontext() if initial_measure_scope is None else initial_measure_scope()
+        ):
+            before = _snapshot(
+                adapter,
+                views,
+                notes,
+                measure_annotation
+                if initial_measure_annotation is None
+                else initial_measure_annotation,
+            )
     planning_drawable = _inset_drawable(before.drawable, planning_headroom_m)
     if planning_drawable is None:
         reason = "planning headroom leaves no positive drawable area"

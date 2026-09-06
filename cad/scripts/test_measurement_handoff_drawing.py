@@ -50,9 +50,10 @@ def test_actual_complete_measurement_consumed_once_without_reading_text_again(
     handoff.record(view, annotation, measured)
     fresh.assert_not_called()
     handoff.seal()
-    assert handoff.initial_measure(adapter, annotation) is measured
-    fresh.assert_not_called()
-    assert handoff.initial_measure(adapter, annotation) is fresh.return_value
+    with handoff.read_scope():
+        assert handoff.initial_measure(adapter, annotation) is measured
+        fresh.assert_not_called()
+        assert handoff.initial_measure(adapter, annotation) is fresh.return_value
     fresh.assert_called_once_with(adapter, annotation)
     assert handoff._reused == 1
 
@@ -60,9 +61,10 @@ def test_actual_complete_measurement_consumed_once_without_reading_text_again(
 def test_unmeasured_and_sheet_owned_annotations_still_use_fresh_callback(monkeypatch):
     handoff, adapter, view, annotation, measured, fresh = context(monkeypatch)
     handoff.seal()
-    handoff.initial_measure(adapter, annotation)
-    annotation.OwnerType = 1
-    handoff.initial_measure(adapter, annotation)
+    with handoff.read_scope():
+        handoff.initial_measure(adapter, annotation)
+        annotation.OwnerType = 1
+        handoff.initial_measure(adapter, annotation)
     assert fresh.call_count == 2
 
 
@@ -98,9 +100,7 @@ def test_view_context_drift_is_not_a_silent_fresh_baseline(monkeypatch, field, s
     if field == "name":
         view.GetName2.return_value = "Changed"
     with pytest.raises(RuntimeError, match="view context changed"):
-        handoff.seal() if stage == "seal" else handoff.initial_measure(
-            adapter, annotation
-        )
+        handoff.seal() if stage == "seal" else handoff.begin_read()
     fresh.assert_not_called()
 
 
@@ -128,7 +128,8 @@ def test_exact_identity_and_anchor_required_at_consumption(monkeypatch, field):
     if field == "position":
         annotation.GetPosition.return_value = (0.021, 0.03, 0.0)
     with pytest.raises(RuntimeError, match="changed"):
-        handoff.initial_measure(adapter, annotation)
+        with handoff.read_scope():
+            handoff.initial_measure(adapter, annotation)
     fresh.assert_not_called()
 
 
@@ -168,11 +169,12 @@ def test_same_annotation_name_in_distinct_views_never_aliases(monkeypatch):
     handoff.record(view, annotation, measured)
     handoff.record(other_view, other_annotation, other_measurement)
     handoff.seal()
-    assert handoff.initial_measure(adapter, other_annotation) is other_measurement
-    assert handoff.initial_measure(adapter, annotation) is measured
+    with handoff.read_scope():
+        assert handoff.initial_measure(adapter, other_annotation) is other_measurement
+        assert handoff.initial_measure(adapter, annotation) is measured
 
 
-def test_context_change_during_initial_inventory_cannot_serve_a_later_entry(
+def test_context_change_during_initial_inventory_rejects_completion_before_mutation(
     monkeypatch,
 ):
     handoff, adapter, view, annotation, measured, fresh = context(monkeypatch)
@@ -180,10 +182,16 @@ def test_context_change_during_initial_inventory_cannot_serve_a_later_entry(
     handoff.seal()
     unrecorded = Mock()
     unrecorded.OwnerType = 1
-    handoff.initial_measure(adapter, unrecorded)
-    view.Position = (0.15, 0.2)
+    mutate_after_inventory = Mock()
     with pytest.raises(RuntimeError, match="view context changed"):
-        handoff.initial_measure(adapter, annotation)
+        with handoff.read_scope():
+            handoff.initial_measure(adapter, unrecorded)
+            view.Position = (0.15, 0.2)
+            # Intentional bank-boundary contract: an intermediate read may
+            # return, but the transaction cannot finish or mutate the drawing.
+            assert handoff.initial_measure(adapter, annotation) is measured
+        mutate_after_inventory()
+    mutate_after_inventory.assert_not_called()
     fresh.assert_called_once_with(adapter, unrecorded)
 
 
@@ -217,7 +225,8 @@ def test_complete_gtol_handoff_saves_initial_reads_but_never_final_reads(monkeyp
     )
     assert len(outputs) == 6
     handoff.seal()
-    initial = [handoff.initial_measure(adapter, annotation) for annotation in rows]
+    with handoff.read_scope():
+        initial = [handoff.initial_measure(adapter, annotation) for annotation in rows]
     assert all(a is b for a, b in zip(initial, outputs[3:], strict=True))
     assert len(outputs) == 6
     final = [fresh(adapter, annotation) for annotation in rows]
