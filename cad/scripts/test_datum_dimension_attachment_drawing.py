@@ -165,3 +165,53 @@ def test_raw_capture_rejects_unbounded_native_count(monkeypatch, count):
     )
     with pytest.raises(RuntimeError, match="primitive count"):
         probe.raw_display_data(annotation)
+
+
+def test_insertion_target_is_relative_to_measured_dimension_body():
+    from _drawing_view_packing import Rect
+
+    position = (0.17, 0.12, 0.0)
+    body = Rect(0.16, 0.12, 0.18, 0.127)
+    datum = Rect(0.20, 0.20, 0.207, 0.207)
+    target = probe.dimension_target_xy(position, body, datum)
+    assert target == pytest.approx((0.1535, 0.110, 0.0))
+    shifted = probe.dimension_target_xy(
+        (0.22, 0.14, 0.0), body.translated((0.05, 0.02)), datum
+    )
+    assert shifted == pytest.approx((target[0] + 0.05, target[1] + 0.02, 0))
+
+
+@pytest.mark.parametrize("target", [None, (0.1535, 0.110, 0.0)])
+def test_position_is_the_only_paired_insertion_delta(monkeypatch, target):
+    adapter, bore = context(monkeypatch)
+    events = []
+    old = SimpleNamespace(Select2=lambda *_: True)
+    new = SimpleNamespace(
+        SetPosition2=lambda *xyz: events.append(("position", xyz)) or True,
+        GetPosition=lambda: target,
+    )
+    tag = SimpleNamespace(
+        SetLabel=lambda label: events.append(("label", label)) or True,
+        GetAnnotation=lambda: new,
+    )
+    adapter.currentModel.ClearSelection2 = lambda _: events.append(("clear",))
+    adapter.currentModel.EditRebuild3 = lambda: events.append(("rebuild",)) or True
+    adapter.currentModel.InsertDatumTag2 = lambda: events.append(("insert",)) or tag
+    selection = adapter.currentModel.SelectionManager
+    selection.GetSelectedObjectType3 = lambda *_: 36
+    selection.GetSelectedObject6 = lambda *_: SimpleNamespace(GetAnnotation=lambda: old)
+    adapter.currentModel.Extension.DeleteSelection2 = lambda _: True
+    bore["view"].GetAnnotationsByType = lambda _: ()
+    monkeypatch.setattr(probe, "select_bore", lambda *_: None)
+    observed = {}
+    assert (
+        probe.replace_on_dimension(
+            adapter, bore, old, target=target, observations=observed
+        )
+        is new
+    )
+    expected = [("clear",), ("insert",), ("label", "A")]
+    if target is not None:
+        expected.append(("position", target))
+        assert observed["requested"] == observed["actual"] == target
+    assert events == [*expected, ("clear",), ("rebuild",)]

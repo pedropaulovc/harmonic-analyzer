@@ -1,9 +1,11 @@
-"""Copy-only gear datum mechanisms: named dimension insertion and no shoulder.
+"""Copy-only paired gear datum insertion, with an optional no-shoulder control.
 
 Run with the saved cone-gear.SLDDRW. Each route starts from an independent byte
-copy. Only the dimension route replaces the copied A symbol; selection is by
-native dimension name, never feature coordinates. Native insertion is exported
-before a derived nonzero outboard movement, then saved/reopened. Capture both
+copy. Default routes replace A by native dimension-name selection: compare
+insert/label/clear/rebuild against insert/label/position/clear/rebuild, using a
+target derived from the measured dimension body. ``--mode shoulder_false``
+tests the existing edge datum separately. Export insertion before a derived
+nonzero outboard move and save/reopen. Capture both
 IDatumTag primitives and IAnnotation.GetDisplayData without assuming that their
 coordinate frames agree. Original part/drawing hashes are checked on all exits.
 """
@@ -27,6 +29,7 @@ sys.path.insert(0, str(ROOT / "cad/scripts"))
 
 from _common import _early_bound, check, run_build  # noqa: E402
 from _drawing_annotation_bounds import (  # noqa: E402
+    annotation_box,
     bounds_from_snapshot,
     _native_snapshot,
     _frame_lines,
@@ -304,7 +307,23 @@ def outboard_target(position, body, outline):
     ), candidate.direction.value
 
 
-def replace_on_dimension(adapter, bore, old_annotation):
+def dimension_target_xy(position, dimension_body, datum_body):
+    """Put the datum beside the measured dimension body, without feature picks."""
+    if len(position) != 3 or not all(math.isfinite(v) for v in position):
+        raise RuntimeError("dimension has no finite native sheet anchor")
+    dx = (
+        dimension_body.xmin
+        - position[0]
+        - (datum_body.xmax - datum_body.xmin) / 2
+        - 0.003
+    )
+    dy = dimension_body.ymin - position[1] - (datum_body.ymax - datum_body.ymin) - 0.003
+    return position[0] + dx, position[1] + dy, 0.0
+
+
+def replace_on_dimension(
+    adapter, bore, old_annotation, *, target=None, observations=None
+):
     model, app = adapter.currentModel, adapter.swApp
     model.ClearSelection2(True)
     if not old_annotation.Select2(False, 0):
@@ -329,11 +348,24 @@ def replace_on_dimension(adapter, bore, old_annotation):
     tag = _early_bound(raw_tag, "IDatumTag")
     if not tag.SetLabel("A"):
         raise RuntimeError("new copied dimension-attached datum label rejected")
+    annotation = _early_bound(tag.GetAnnotation(), "IAnnotation")
+    if target is not None:
+        returned = bool(annotation.SetPosition2(*target))
+        if observations is not None:
+            observations.update(
+                requested=target,
+                returned=returned,
+                actual=tuple(annotation.GetPosition() or ()),
+            )
+        if not returned:
+            raise RuntimeError("datum insertion-finalization position rejected")
     model.ClearSelection2(True)
-    return _early_bound(tag.GetAnnotation(), "IAnnotation")
+    if not model.EditRebuild3():
+        raise RuntimeError("datum insertion-finalization rebuild failed")
+    return annotation
 
 
-async def probe(adapter, source, directory):
+async def probe(adapter, source, directory, mode="paired_dimensions"):
     from solidworks_mcp.adapters.solidworks.drawing import save_drawing
 
     part = (source.parent.parent / "sldprt/cone-gear.SLDPRT").resolve(strict=True)
@@ -359,7 +391,12 @@ async def probe(adapter, source, directory):
         return {"drawing": str(drawing), "pdf": str(pdf), "png": str(png)}
 
     try:
-        for mode in ("dimension", "shoulder_false"):
+        modes = (
+            ("dimension", "dimension_placed")
+            if mode == "paired_dimensions"
+            else ("shoulder_false",)
+        )
+        for mode in modes:
             trial = {"mode": mode}
             report["trials"].append(trial)
             try:
@@ -396,8 +433,32 @@ async def probe(adapter, source, directory):
                     attachments.snapshot(adapter.currentModel), original_key
                 )
                 trial["before_export"] = export(f"{mode}-before")
-                if mode == "dimension":
-                    annotation = replace_on_dimension(adapter, bore, annotation)
+                if mode in {"dimension", "dimension_placed"}:
+                    target = None
+                    if mode == "dimension_placed":
+                        dimension_bounds = annotation_box(adapter, bore["annotation"])
+                        dimension_position = tuple(
+                            float(v) for v in bore["annotation"].GetPosition() or ()
+                        )
+                        target = dimension_target_xy(
+                            dimension_position,
+                            dimension_bounds.body,
+                            Rect(**before["measurement"]["body"]),
+                        )
+                        trial["dimension_anchor"] = dimension_position
+                        trial["dimension_body"] = asdict(dimension_bounds.body)
+                    trial["insertion_finalization"] = {
+                        "sequence": "insert_label_position_clear_rebuild"
+                        if target is not None
+                        else "insert_label_clear_rebuild"
+                    }
+                    annotation = replace_on_dimension(
+                        adapter,
+                        bore,
+                        annotation,
+                        target=target,
+                        observations=trial["insertion_finalization"],
+                    )
                 else:
                     _early_bound(
                         annotation.GetSpecificAnnotation(), "IDatumTag"
@@ -415,7 +476,7 @@ async def probe(adapter, source, directory):
                 if native["binding_error"]:
                     raise RuntimeError(native["binding_error"])
                 if (
-                    mode == "dimension"
+                    mode in {"dimension", "dimension_placed"}
                     and native["binding"] != "exact_display_dimension"
                 ):
                     raise RuntimeError(
@@ -493,6 +554,11 @@ async def probe(adapter, source, directory):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("drawing", type=Path)
+    parser.add_argument(
+        "--mode",
+        choices=("paired_dimensions", "shoulder_false"),
+        default="paired_dimensions",
+    )
     parser.add_argument("--worker", action="store_true")
     args = parser.parse_args()
     source = args.drawing.resolve(strict=True)
@@ -503,7 +569,14 @@ def main():
         import dodo
 
         dodo._run(
-            [sys.executable, str(Path(__file__).resolve()), str(source), "--worker"],
+            [
+                sys.executable,
+                str(Path(__file__).resolve()),
+                str(source),
+                "--mode",
+                args.mode,
+                "--worker",
+            ],
             "native datum dimension attachment",
             com=True,
             log_stem="datum-dimension-attachment",
@@ -514,7 +587,7 @@ def main():
     reports = ROOT / "cad/out/reports"
     reports.mkdir(parents=True, exist_ok=True)
     directory = Path(tempfile.mkdtemp(prefix="datum-dimension-", dir=reports))
-    return run_build(lambda adapter: probe(adapter, source, directory))
+    return run_build(lambda adapter: probe(adapter, source, directory, args.mode))
 
 
 if __name__ == "__main__":
