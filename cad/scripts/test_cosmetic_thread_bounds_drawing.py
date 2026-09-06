@@ -40,6 +40,7 @@ def annotation(data):
         GetDisplayData=lambda: data,
         GetPosition=lambda: None,
         GetLeaderCount=lambda: 0,
+        GetMultiJogLeaderCount=lambda: 0,
     )
 
 

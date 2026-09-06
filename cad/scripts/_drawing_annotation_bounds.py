@@ -557,6 +557,14 @@ def _native_arcs(data: Any, count: int, stroke_width: float = 0.0):
 
 
 def _native_leaders(annotation: Any):
+    # IAnnotation exposes multi-jog leaders through a separate object inventory;
+    # swBENT alone does not certify that GetLeaderPointsAtIndex is complete.
+    # This bounded reader has no multi-jog renderer. Reject rather than drop it.
+    multi_jog_count = annotation.GetMultiJogLeaderCount()
+    if not math.isfinite(multi_jog_count) or multi_jog_count != 0:
+        raise ValueError(
+            f"unsupported native multi-jog leader count: {multi_jog_count}"
+        )
     count = annotation.GetLeaderCount()
     if not math.isfinite(count) or count < 0 or int(count) != count:
         raise ValueError(
