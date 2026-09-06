@@ -2,6 +2,7 @@
 
 import asyncio
 from contextlib import contextmanager
+from copy import deepcopy
 from dataclasses import dataclass
 import json
 from pathlib import Path
@@ -367,7 +368,7 @@ def test_actual_two_recipes_redirect_before_evaluating_output_aliases(tmp_path):
         source.write_bytes(b"fixture native file; never opened")
         trial = tmp_path / target
         trial.mkdir()
-        module, spec = probe.load_recipe(commit, target, trial, tmp_path)
+        module, spec = probe.load_recipe(commit, target, trial, source)
         assert module.SOURCE == source
         assert module.SLDDRW == module.OUTPUTS.slddrw
         assert module.PDF == module.OUTPUTS.pdf
@@ -534,10 +535,10 @@ def orchestration(monkeypatch, tmp_path):
     original.write_bytes(b"owned fixture template")
     calls, cleanup_calls, preparations = [], [], []
     failure = {}
-    roots = []
+    roots, registered_sources, loaded_sources = [], [], []
     ownership = SimpleNamespace(
         register_directory=lambda path: roots.append(path),
-        register_source=lambda path: None,
+        register_source=lambda path: registered_sources.append(Path(path)),
     )
 
     async def cleanup():
@@ -546,12 +547,15 @@ def orchestration(monkeypatch, tmp_path):
             raise RuntimeError("cleanup evidence")
         if failure.get("between_trials") and len(calls) == 1:
             source.write_bytes(b"source replaced after first trial")
+        if failure.get("copy_between_trials") and len(calls) == 1:
+            loaded_sources[0].write_bytes(b"copy changed; must not reset")
 
     adapter = SimpleNamespace(ownership=ownership, close_owned_documents=cleanup)
 
-    def load(commit, target, directory, source_root):
+    def load(commit, target, directory, owned_source):
         (directory / "recipe-source.py").write_text("# fixed recipe", encoding="utf-8")
-        return SimpleNamespace(SOURCE=source), probe.TemplateSpec((2, 1), 2)
+        loaded_sources.append(owned_source)
+        return SimpleNamespace(SOURCE=owned_source), probe.TemplateSpec((2, 1), 2)
 
     async def prepare(adapter, spec, directory, row):
         preparations.append(spec)
@@ -608,6 +612,8 @@ def orchestration(monkeypatch, tmp_path):
         preparations=preparations,
         failure=failure,
         source=source,
+        loaded_sources=loaded_sources,
+        registered_sources=registered_sources,
     )
 
 
@@ -622,6 +628,122 @@ def test_abba_prepares_once_and_checkpoints_all_four_trials(orchestration):
     assert report["immutable_input_changes"] == {}
     assert report["derived_template_changes"] == {}
     assert len({row["source_sha256"] for row in report["trials"]}) == 1
+    assert len(set(orchestration.loaded_sources)) == 1
+    owned = orchestration.loaded_sources[0]
+    assert owned != orchestration.source
+    assert owned.name != orchestration.source.name
+    assert owned not in orchestration.registered_sources
+    assert orchestration.source in orchestration.registered_sources
+    assert owned.read_bytes() == orchestration.source.read_bytes()
+    assert report["owned_sources"]["arbor_pedestal"]["ownership"] == "owned_copy"
+
+
+def test_owned_copy_disk_change_stops_without_reset_or_later_trial(orchestration):
+    orchestration.failure["copy_between_trials"] = True
+    with pytest.raises(RuntimeError, match="immutable benchmark inputs changed"):
+        orchestration.run()
+    assert orchestration.calls == ["baseline"]
+    copied = orchestration.loaded_sources[0]
+    assert copied.read_bytes() == b"copy changed; must not reset"
+    assert orchestration.source.read_bytes() == b"owned fixture source"
+    assert str(copied) in orchestration.report()["immutable_input_changes"]
+    assert orchestration.report()["trials"][0]["status"] == "failed"
+
+
+@pytest.mark.parametrize(
+    "changed", ["path", "configuration", "native_identity", "unresolved"]
+)
+def test_every_model_view_requires_exact_copy_and_configuration(
+    monkeypatch, tmp_path, changed
+):
+    source = tmp_path / "unique-owned.SLDPRT"
+    source.write_bytes(b"copy")
+    native, foreign = object(), object()
+    view = SimpleNamespace(ReferencedDocument=native)
+    reference = {"path": str(source), "configuration": "Default"}
+    adapter = SimpleNamespace(
+        currentModel=object(),
+        swApp=SimpleNamespace(
+            GetOpenDocumentByName=lambda path: native,
+            IsSame=lambda first, second: int(first is second),
+        ),
+    )
+    monkeypatch.setattr(
+        probe.attachments, "views", lambda model: {"front": view, "top": view}
+    )
+    monkeypatch.setattr(probe.attachments, "referenced_model", lambda view: reference)
+    probe.exact_source_views(adapter, source, "Default")
+    if changed == "path":
+        reference["path"] = str(tmp_path / "original.SLDPRT")
+    if changed == "configuration":
+        reference["configuration"] = "Other"
+    if changed == "native_identity":
+        view.ReferencedDocument = foreign
+    if changed == "unresolved":
+        view.ReferencedDocument = None
+    with pytest.raises(RuntimeError, match="exact copied source/config"):
+        probe.exact_source_views(adapter, source, "Default")
+
+
+def test_native_source_observation_records_dirty_but_rejects_replacement(
+    monkeypatch, tmp_path
+):
+    path = tmp_path / "copy.SLDPRT"
+    configuration = SimpleNamespace(Name="Default")
+    model = SimpleNamespace(
+        GetPathName=lambda: str(path),
+        GetType=lambda: 1,
+        GetSaveFlag=lambda: True,
+        Visible=True,
+        ConfigurationManager=SimpleNamespace(ActiveConfiguration=configuration),
+    )
+    app = SimpleNamespace(
+        GetOpenDocumentByName=lambda name: model,
+        IsSame=lambda first, second: int(first is second),
+    )
+    monkeypatch.setattr(probe, "_early_bound", lambda value, interface: value)
+    observation, handle = probe.source_observation(
+        SimpleNamespace(swApp=app), path, model
+    )
+    assert handle is model
+    assert observation["dirty"] == "dirty"
+    assert observation["identity"] == "same_native_document"
+    with pytest.raises(RuntimeError, match="native identity changed"):
+        probe.source_observation(SimpleNamespace(swApp=app), path, object())
+
+
+@pytest.mark.parametrize("lost", ["callout_text", "basic", "precision"])
+def test_cold_source_reopen_never_waives_display_or_tolerance_loss(lost):
+    geometry = {
+        key: {}
+        for key in (
+            "checked",
+            "excluded",
+            "models",
+            "dimensions",
+            "dimensions_excluded",
+            "semantic_attachments",
+        )
+    }
+    geometry["dimensions"] = {
+        "view/BoreDia/4": {"value_system": 0.009525, "tolerance_type": 1}
+    }
+    before = {
+        "attachments": geometry,
+        "layout": {},
+        "defaults": {},
+        "view_modes": [],
+        "native_annotations": {"view/BoreDia/4": {"text": "THRU", "precision": 3}},
+    }
+    after = deepcopy(before)
+    if lost == "callout_text":
+        after["native_annotations"]["view/BoreDia/4"]["text"] = ""
+    if lost == "basic":
+        after["attachments"]["dimensions"]["view/BoreDia/4"]["tolerance_type"] = 0
+    if lost == "precision":
+        after["native_annotations"]["view/BoreDia/4"]["precision"] = 2
+    with pytest.raises(RuntimeError, match="reopen"):
+        probe.compare_reopened(before, after)
 
 
 def test_between_trial_replacement_does_not_become_the_next_baseline(orchestration):
@@ -681,8 +803,9 @@ def test_final_hash_read_error_is_evidence_not_a_lost_checkpoint(monkeypatch, tm
     assert "not readable" in changed[str(source)]["error"]
 
 
+@pytest.mark.parametrize("save_mutation", [False, True])
 def test_trial_claims_creation_then_scopes_exact_save_and_restores_hooks(
-    monkeypatch, tmp_path
+    monkeypatch, tmp_path, save_mutation
 ):
     events = []
     outputs = probe.common.DrawingOutputs(
@@ -708,24 +831,26 @@ def test_trial_claims_creation_then_scopes_exact_save_and_restores_hooks(
         assert events[-1] == "save_enter"
         assert actual_outputs == outputs
         events.append("native_save")
+        if save_mutation:
+            source.write_bytes(b"unexpected reference save")
         return ["native", "pdf", "png"]
 
-    async def close_model(*, save):
-        assert save is False
-        events.append("close")
-        return SimpleNamespace(success=True)
+    async def close_owned_documents():
+        events.append("close_all_owned")
 
     async def open_model(path):
         assert Path(path) == outputs.slddrw
         events.append("reopen")
         return SimpleNamespace(success=True)
 
-    module = SimpleNamespace(OUTPUTS=outputs, finalize_drawing=finalize)
+    source = tmp_path / "owned-source.SLDPRT"
+    source.write_bytes(b"copy bytes")
+    module = SimpleNamespace(OUTPUTS=outputs, finalize_drawing=finalize, SOURCE=source)
     model = SimpleNamespace(GetPathName=lambda: str(outputs.slddrw))
     adapter = SimpleNamespace(
         ownership=SimpleNamespace(creating_document=creating, saving_as=saving),
         currentModel=model,
-        close_model=close_model,
+        close_owned_documents=close_owned_documents,
         open_model=open_model,
     )
 
@@ -744,30 +869,64 @@ def test_trial_claims_creation_then_scopes_exact_save_and_restores_hooks(
     monkeypatch.setattr(probe, "_early_bound", lambda raw, kind: raw)
     monkeypatch.setattr(probe, "check", lambda label, result: None)
     monkeypatch.setattr(probe, "finished_snapshot", lambda *args: {"fresh": "witness"})
+    monkeypatch.setattr(probe, "exact_source_views", lambda *args: None)
+    observed_handles = []
+
+    def source_state(adapter, path, previous):
+        observed_handles.append(previous)
+        return {
+            "configuration": "Default",
+            "dirty": "clean" if previous is None else "dirty",
+        }, model
+
+    monkeypatch.setattr(probe, "source_observation", source_state)
     monkeypatch.setattr(
         probe, "compare_reopened", lambda before, after: events.append("compare")
     )
     monkeypatch.setattr(
         probe.recipes, "validate_artifacts", lambda artifacts, outputs: artifacts
     )
-    row = {}
-    asyncio.run(
-        probe.run_trial(
-            adapter, module, probe.TemplateSpec((2, 1), 2), "baseline", {}, row
+    row = {"source_sha256": probe.attachments.file_digest(source)}
+
+    def run():
+        return asyncio.run(
+            probe.run_trial(
+                adapter, module, probe.TemplateSpec((2, 1), 2), "baseline", {}, row
+            )
         )
-    )
+
+    if save_mutation:
+        with pytest.raises(RuntimeError, match="owned source after recipe"):
+            run()
+        assert "owned source after drawing save" in row["recipe_error"]
+        assert source.read_bytes() == b"unexpected reference save"
+        assert "reopen" not in events
+        assert module.finalize_drawing is finalize
+        return
+    run()
     assert events == [
         "create_enter",
         "create_exit",
         "save_enter",
         "native_save",
         "save_exit",
-        "close",
+        "close_all_owned",
         "reopen",
         "compare",
-        "close",
+        "close_all_owned",
     ]
     assert module.new_project_drawing is setup
     assert module.finalize_drawing is finalize
     assert len(row["setup_seconds"]) == 1
     assert row["validation_seconds"] >= 0
+    assert set(row["owned_source_native"]) == {
+        "recipe_source_open",
+        "before_drawing_save",
+        "after_drawing_save",
+        "after_recipe",
+        "cold_source_reopen",
+        "after_persisted_checks",
+    }
+    # New source after cold close must not be compared with a stale COM handle.
+    assert observed_handles == [None, model, model, model, None, model]
+    assert row["owned_source_native"]["before_drawing_save"]["dirty"] == "dirty"
