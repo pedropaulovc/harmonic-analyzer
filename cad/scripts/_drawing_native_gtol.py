@@ -24,6 +24,8 @@ command changing body shape or content can never establish a new accepted base.
 
 from __future__ import annotations
 
+from contextlib import nullcontext
+
 from dataclasses import asdict, dataclass, replace
 from enum import Enum
 from itertools import combinations
@@ -512,6 +514,7 @@ def arrange_native_gtol_columns(
     views: Mapping[str, Any],
     measure_annotation: Callable | None = None,
     measure_obstacle: Callable | None = None,
+    obstacle_read_scope: Callable | None = None,
     record_measurement: Callable | None = None,
     gap_m: float = 0.002,
 ) -> dict[str, dict[str, Any]]:
@@ -611,19 +614,25 @@ def arrange_native_gtol_columns(
         # final cells after ALL view/note moves; no duplicate final font scan.
         obstacles = []
         measurements = {name: row.measurement for name, row in before.items()}
-        for kind in (2, 4, 7):
-            for raw in view.GetAnnotationsByType(kind) or ():
-                annotation = _early_bound(raw, "IAnnotation")
-                measured = measure_obstacle(adapter, annotation)
-                name = str(annotation.GetName())
-                if not name or name in measurements:
-                    raise RuntimeError(
-                        "native obstacle needs unique annotation identity"
-                    )
-                measurements[name] = measured
-                obstacles.append(measured.body)
-                if record_measurement is not None:
-                    record_measurement(view, annotation, measured)
+        # This scope contains reads/recording only. Completion is mandatory
+        # before the following native column movement; no mutated view is an
+        # acceptable new cache baseline.
+        with (
+            nullcontext() if obstacle_read_scope is None else obstacle_read_scope(view)
+        ):
+            for kind in (2, 4, 7):
+                for raw in view.GetAnnotationsByType(kind) or ():
+                    annotation = _early_bound(raw, "IAnnotation")
+                    measured = measure_obstacle(adapter, annotation)
+                    name = str(annotation.GetName())
+                    if not name or name in measurements:
+                        raise RuntimeError(
+                            "native obstacle needs unique annotation identity"
+                        )
+                    measurements[name] = measured
+                    obstacles.append(measured.body)
+                    if record_measurement is not None:
+                        record_measurement(view, annotation, measured)
         column = _union([row.body for row in bank.values()])
         with _telemetry.span(
             "drawing.gtol.translate_column",

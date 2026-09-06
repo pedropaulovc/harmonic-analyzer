@@ -91,6 +91,7 @@ def repair_project_drawing_layout(
             views=views,
             measure_annotation=annotation_box,
             measure_obstacle=obstacle_handoff.initial_measure,
+            obstacle_read_scope=obstacle_handoff.read_scope,
             record_measurement=handoff.record,
         )
         handoff.seal()
@@ -100,6 +101,7 @@ def repair_project_drawing_layout(
             title_block=title_block,
             measure_annotation=annotation_box,
             initial_measure_annotation=handoff.initial_measure,
+            initial_measure_scope=handoff.read_scope,
             # Observed INote.GetExtent changes after exact anchor moves were up
             # to 0.266 mm. Extra planning room is not a native error bound or a
             # relaxation of the final 2 mm clearance check.
