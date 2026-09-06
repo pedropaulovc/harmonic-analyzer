@@ -10,10 +10,12 @@ SF leader style intentionally changes before placement. Its semantic/attachment
 witness must survive that change; its freshly measured post-style body supplies
 the placement seed. Candidate trials read only positions. Fresh final native
 bodies must match the predicted translations and clear all other measured bodies.
-Datums have two witnessed native frame sides: crossing the attachment shifts the
-frame and its upright text above/below the anchor by the measured frame height.
-Their placement envelope is the union of those two translations; reflecting the
-whole text box is wrong when a datum carries below-frame callout text.
+Datum anchors may lie on horizontal OR vertical frame-side midpoints: the
+copy-only ``probe_datum_frame_anchors.py`` proves arbor B's left-side anchor.
+The two-state planning envelope uses the same/opposite frame side, translating
+the upright whole body by the measured width or height. Only a fresh final
+frame AND body match accepts a side change; cross-axis side changes are unproven
+and rejected. Reflecting text is wrong when a datum carries below-frame text.
 Planning clearance (3 mm) is separate from final clearance (2 mm), not a claimed
 measurement error bound. Leader routing/crossings and sheet fit are NOT certified
 here; decorated-view packing follows this operation.
@@ -199,6 +201,13 @@ def _datum_frame(measured: Any, position: tuple[float, float, float]) -> Rect:
         max(p[0] for p in points),
         max(p[1] for p in points),
     )
+    cx, cy = (frame.xmin + frame.xmax) / 2, (frame.ymin + frame.ymax) / 2
+    midpoints = (
+        (frame.xmin, cy),
+        (frame.xmax, cy),
+        (cx, frame.ymin),
+        (cx, frame.ymax),
+    )
     if any(
         abs(line.start[0] - line.end[0]) > _EPSILON_M
         and abs(line.start[1] - line.end[1]) > _EPSILON_M
@@ -206,12 +215,11 @@ def _datum_frame(measured: Any, position: tuple[float, float, float]) -> Rect:
     ) or (
         frame.xmax - frame.xmin <= _EPSILON_M
         or frame.ymax - frame.ymin <= _EPSILON_M
-        or abs(position[0] - (frame.xmin + frame.xmax) / 2) > _EPSILON_M
-        or min(abs(position[1] - frame.ymin), abs(position[1] - frame.ymax))
-        > _EPSILON_M
+        or not any(math.dist(position[:2], point) <= _EPSILON_M for point in midpoints)
     ):
         raise RuntimeError(
-            "datum frame must be upright with its native anchor on a horizontal side"
+            "datum frame must be upright with its native anchor on a horizontal side "
+            "midpoint or vertical side midpoint"
         )
     return frame
 
@@ -621,7 +629,10 @@ def _same_obstacles(app: Any, before: Mapping, after: Mapping) -> None:
 def _datum_side_delta(symbol: _Symbol) -> tuple[float, float]:
     if symbol.frame is None:
         raise RuntimeError("datum side change requires its measured native frame")
-    return 0.0, 2 * symbol.position[1] - symbol.frame.ymin - symbol.frame.ymax
+    return (
+        2 * symbol.position[0] - symbol.frame.xmin - symbol.frame.xmax,
+        2 * symbol.position[1] - symbol.frame.ymin - symbol.frame.ymax,
+    )
 
 
 def _placement_body(symbol: _Symbol) -> Rect:
@@ -629,9 +640,9 @@ def _placement_body(symbol: _Symbol) -> Rect:
         return symbol.body
     alternate = symbol.body.translated(_datum_side_delta(symbol))
     return Rect(
-        symbol.body.xmin,
+        min(symbol.body.xmin, alternate.xmin),
         min(symbol.body.ymin, alternate.ymin),
-        symbol.body.xmax,
+        max(symbol.body.xmax, alternate.xmax),
         max(symbol.body.ymax, alternate.ymax),
     )
 
