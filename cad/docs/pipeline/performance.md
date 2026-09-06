@@ -378,6 +378,16 @@ The control captured 60 annotation records but measured only 52 bodies, with
 eight explicit exclusions. It proves B's native placement, not whole-sheet fit
 or a completed production rocker recipe.
 
+The production gear subsequently passed the copied attachment control at
+`fc54887b`: all three views moved by (+8, -6) mm, changed from scale 1 to 0.75,
+and retained those changes after save/reopen. Datum A's exact native target and
+source-parameter roundtrip remained `BoreCutDia@BoreProfile@cone-gear.Part`,
+configuration `T120`, value 0.009525 m and tolerance type 0 (not BASIC). The report
+counts two geometry attachments, one dimension and one separate semantic datum
+attachment; five geometry exclusions remain explicit. Original drawing/part
+hashes were unchanged. Report: `attachment-probe-idkyr70q/attachments.json` under
+the datum-attachment-witness worktree's drawing-attachment reports.
+
 The [copied obstacle-handoff A/B](drawing-layout-handoff-profile.md) removed
 13 repeated full annotation measurements (93 to 80), but layout wall time changed
 only from 54.476 to 53.613 seconds in one profiled pair. Both copies passed final
