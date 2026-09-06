@@ -443,6 +443,24 @@ def test_sheet_owned_declared_note_has_valid_drawing_membership(monkeypatch):
     assert note.GetName() not in setup[4]
 
 
+def test_raw_dispatch_declared_note_is_bound_before_typed_access(monkeypatch):
+    import _drawing_native_callouts as module
+
+    setup = native_setup(monkeypatch)
+    note = unattached_note(setup)
+    raw = SimpleNamespace(GetName=note.GetName(), typed_note=note)
+    bindings = []
+
+    def bind(value, interface):
+        bindings.append((value, interface))
+        return note if value is raw else value
+
+    monkeypatch.setattr(module, "_early_bound", bind)
+    run_native(setup, deferred_notes=(raw,))
+    assert (raw, "IAnnotation") in bindings
+    assert note.GetName() not in setup[4]
+
+
 def test_undeclared_note_remains_a_measured_obstacle(monkeypatch):
     setup = native_setup(monkeypatch)
     note = unattached_note(setup)
