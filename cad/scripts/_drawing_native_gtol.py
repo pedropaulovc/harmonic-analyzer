@@ -511,6 +511,7 @@ def arrange_native_gtol_columns(
     *,
     views: Mapping[str, Any],
     measure_annotation: Callable | None = None,
+    measure_obstacle: Callable | None = None,
     record_measurement: Callable | None = None,
     gap_m: float = 0.002,
 ) -> dict[str, dict[str, Any]]:
@@ -526,6 +527,9 @@ def arrange_native_gtol_columns(
     The project wrapper MUST run validate_gtol_leader_clearance on its fresh
     packing-final measurements before acceptance, including unchanged packing;
     trial cells deliberately exclude deferred notes and are not a final proof.
+    A separate measure_obstacle callback may consume actual callout-final bounds
+    after validating unchanged native context/identity/position. It is NEVER
+    used for either GTol semantic/XML witness or final packing measurement.
     """
     if not math.isfinite(gap_m) or gap_m < 0:
         raise ValueError("GTol clearance must be finite and nonnegative")
@@ -535,6 +539,8 @@ def arrange_native_gtol_columns(
         from _drawing_annotation_bounds import annotation_box
 
         measure_annotation = annotation_box
+    if measure_obstacle is None:
+        measure_obstacle = measure_annotation
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
     registered = tuple(raw for sheet in drawing.GetViews() or () for raw in sheet[1:])
     names = set()
@@ -608,7 +614,7 @@ def arrange_native_gtol_columns(
         for kind in (2, 4, 7):
             for raw in view.GetAnnotationsByType(kind) or ():
                 annotation = _early_bound(raw, "IAnnotation")
-                measured = measure_annotation(adapter, annotation)
+                measured = measure_obstacle(adapter, annotation)
                 name = str(annotation.GetName())
                 if not name or name in measurements:
                     raise RuntimeError(

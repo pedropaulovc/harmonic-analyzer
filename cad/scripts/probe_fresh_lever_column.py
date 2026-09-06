@@ -30,7 +30,7 @@ from typing import Any
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import DrawingOutputs, _TITLE_BLOCK_LEFT_M, _TITLE_BLOCK_TOP_M
 from _drawing_annotation_bounds import annotation_box
-from _drawing_measurement_handoff import AnnotationMeasurementHandoff
+from _drawing_measurement_handoff import AnnotationMeasurementHandoff, HandoffPurpose
 from _drawing_native_gtol import arrange_native_gtol_columns
 from _drawing_native_layout import repair_native_layout, NativeLayoutStatus
 from _drawing_view_packing import Rect
@@ -51,7 +51,10 @@ def diagnostic_layout(adapter: Any, *, views, alignments=(), orderings=(), notes
     if len(properties) != 8:
         raise RuntimeError("coherent lever control requires complete sheet properties")
     handoff = AnnotationMeasurementHandoff(
-        adapter, views=views, measure_annotation=annotation_box
+        adapter,
+        views=views,
+        measure_annotation=annotation_box,
+        purpose=HandoffPurpose.INITIAL_PACKING,
     )
     try:
         gtols = arrange_native_gtol_columns(
