@@ -30,10 +30,15 @@ from pathlib import Path
 import shutil
 import sys
 import tempfile
+import time
 from typing import Any
 
 from _common import CAD_ROOT, _early_bound, check, run_build
-from _drawing_annotation_bounds import Segment, annotation_box
+from _drawing_annotation_bounds import (
+    Segment,
+    annotation_box,
+    annotation_leader_geometry,
+)
 from _drawing_common import render_pdf_png
 from _drawing_view_packing import Rect
 import _telemetry
@@ -123,6 +128,27 @@ def crossing_records(leader_banks, measurements, decorations):
                         }
                     )
     return result
+
+
+def prove_narrow_reader(bank, measurements):
+    """Read-only live parity against the freshly completed full measurements."""
+    started = time.perf_counter()
+    geometry = {
+        name: annotation_leader_geometry(row.annotation) for name, row in bank.items()
+    }
+    elapsed = time.perf_counter() - started
+    for name, actual in geometry.items():
+        expected = measurements[name]
+        if (
+            actual.segments != expected.leader_segments
+            or actual.decorations != expected.leader_decorations
+        ):
+            raise RuntimeError(f"{name}: narrow/full native leader geometry differs")
+    return {
+        "count": len(bank),
+        "elapsed_s": elapsed,
+        "native_geometry": "exactly_equal_to_full_snapshot",
+    }
 
 
 class VerticalDirection(Enum):
@@ -457,6 +483,7 @@ async def probe(adapter: Any, source: Path, requested_view: str | None):
             name: measured_before[name].leader_decorations for name in before
         }
         report["phases"]["before"] = {
+            "narrow_reader": prove_narrow_reader(before, measured_before),
             "bank": _records(before),
             "leaders": {
                 name: [asdict(segment) for segment in rows]
@@ -506,6 +533,7 @@ async def probe(adapter: Any, source: Path, requested_view: str | None):
             name: measured_after[name].leader_decorations for name in after
         }
         report["phases"]["after"] = {
+            "narrow_reader": prove_narrow_reader(after, measured_after),
             "bank": _records(after),
             "leaders": {
                 name: [asdict(segment) for segment in rows]
@@ -582,6 +610,7 @@ async def probe(adapter: Any, source: Path, requested_view: str | None):
                 for obstacle in (final_outline, *final_obstacles)
             )
             report["phases"]["vertical_final"] = {
+                "narrow_reader": prove_narrow_reader(final_bank, final_measured),
                 "bank": _records(final_bank),
                 "crossings": final_crossings,
                 "leader_decorations": {
@@ -632,6 +661,9 @@ async def probe(adapter: Any, source: Path, requested_view: str | None):
         _same_saved_frames(_records(saved_bank), _records(reopened_bank))
         report["reopened_bank"] = _records(reopened_bank)
         reopened_measured = _measure_view(adapter, matches[0])
+        report["reopened_narrow_reader"] = prove_narrow_reader(
+            reopened_bank, reopened_measured
+        )
         reopened_crossings = crossing_records(
             {name: _leaders(row.annotation) for name, row in reopened_bank.items()},
             reopened_measured,
