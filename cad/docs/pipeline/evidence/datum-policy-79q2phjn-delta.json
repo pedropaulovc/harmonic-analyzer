@@ -1,0 +1,1353 @@
+{
+  "receipt": "C:\\src\\ha-perf-datum-functional\\cad\\out\\reports\\datum-policy-79q2phjn\\pilot.json",
+  "receipt_sha256": "a924f8259c3f3fc5049a19b2b6715cbaffeb863f003f075e61438fd0ae483feb",
+  "trial": 0,
+  "changed_leaf_count": 190,
+  "summary": {
+    "count": 190,
+    "kinds": {
+      "numeric": 190
+    },
+    "max_absolute_numeric_delta": 0.0072252098470926285,
+    "maximum_paths": [
+      "/annotations/Sheet1~1DetailItem245/generic/texts/0/position/0",
+      "/annotations/Sheet1~1DetailItem245/measurement/text_runs/0/position/0",
+      "/annotations/Sheet1~1DetailItem245/native/text_runs/0/position/0"
+    ]
+  },
+  "generic_or_anchor_changed_leaf_count": 46,
+  "semantics_equal": true,
+  "layout_equal": true,
+  "differences": [
+    {
+      "path": "/annotations/Drawing View1~1DetailItem343/measurement/anchor/0",
+      "kind": "numeric",
+      "before": 0.1232700379408373,
+      "after": 0.12327003794083728,
+      "delta": -1.3877787807814457e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem343/native/anchor/0",
+      "kind": "numeric",
+      "before": 0.1232700379408373,
+      "after": 0.12327003794083728,
+      "delta": -1.3877787807814457e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem343/position/0",
+      "kind": "numeric",
+      "before": 0.1232700379408373,
+      "after": 0.12327003794083728,
+      "delta": -1.3877787807814457e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem346/measurement/anchor/0",
+      "kind": "numeric",
+      "before": 0.1232700379408373,
+      "after": 0.12327003794083728,
+      "delta": -1.3877787807814457e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem346/native/anchor/0",
+      "kind": "numeric",
+      "before": 0.1232700379408373,
+      "after": 0.12327003794083728,
+      "delta": -1.3877787807814457e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem346/position/0",
+      "kind": "numeric",
+      "before": 0.1232700379408373,
+      "after": 0.12327003794083728,
+      "delta": -1.3877787807814457e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/generic/lines/0/4",
+      "kind": "numeric",
+      "before": 0.12394376819090108,
+      "after": 0.1239437681909011,
+      "delta": 1.3877787807814457e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/generic/lines/0/7",
+      "kind": "numeric",
+      "before": 0.11670736526727846,
+      "after": 0.11670736526727851,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/generic/lines/0/8",
+      "kind": "numeric",
+      "before": 0.17163799823614767,
+      "after": 0.17163799823614762,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/generic/lines/1/4",
+      "kind": "numeric",
+      "before": 0.11670736526727846,
+      "after": 0.11670736526727851,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/generic/lines/1/5",
+      "kind": "numeric",
+      "before": 0.17163799823614767,
+      "after": 0.17163799823614762,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/generic/lines/1/7",
+      "kind": "numeric",
+      "before": 0.04340439978654077,
+      "after": 0.04340439978654083,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/generic/lines/1/8",
+      "kind": "numeric",
+      "before": 0.17163799823614767,
+      "after": 0.17163799823614762,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/generic/lines/2/4",
+      "kind": "numeric",
+      "before": 0.04340439978654077,
+      "after": 0.04340439978654083,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/generic/lines/2/5",
+      "kind": "numeric",
+      "before": 0.16813799823614767,
+      "after": 0.1681379982361476,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/generic/lines/2/7",
+      "kind": "numeric",
+      "before": 0.036404399786540774,
+      "after": 0.03640439978654083,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/generic/lines/2/8",
+      "kind": "numeric",
+      "before": 0.16813799823614767,
+      "after": 0.1681379982361476,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/generic/lines/3/4",
+      "kind": "numeric",
+      "before": 0.036404399786540774,
+      "after": 0.03640439978654083,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/generic/lines/3/5",
+      "kind": "numeric",
+      "before": 0.16813799823614767,
+      "after": 0.1681379982361476,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/generic/lines/3/7",
+      "kind": "numeric",
+      "before": 0.036404399786540774,
+      "after": 0.03640439978654083,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/generic/lines/3/8",
+      "kind": "numeric",
+      "before": 0.17513799823614767,
+      "after": 0.17513799823614762,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/generic/lines/4/4",
+      "kind": "numeric",
+      "before": 0.036404399786540774,
+      "after": 0.03640439978654083,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/generic/lines/4/5",
+      "kind": "numeric",
+      "before": 0.17513799823614767,
+      "after": 0.17513799823614762,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/generic/lines/4/7",
+      "kind": "numeric",
+      "before": 0.04340439978654077,
+      "after": 0.04340439978654083,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/generic/lines/4/8",
+      "kind": "numeric",
+      "before": 0.17513799823614767,
+      "after": 0.17513799823614762,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/generic/lines/5/4",
+      "kind": "numeric",
+      "before": 0.04340439978654077,
+      "after": 0.04340439978654083,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/generic/lines/5/5",
+      "kind": "numeric",
+      "before": 0.17513799823614767,
+      "after": 0.17513799823614762,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/generic/lines/5/7",
+      "kind": "numeric",
+      "before": 0.04340439978654077,
+      "after": 0.04340439978654083,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/generic/lines/5/8",
+      "kind": "numeric",
+      "before": 0.16813799823614767,
+      "after": 0.1681379982361476,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/generic/texts/0/position/0",
+      "kind": "numeric",
+      "before": 0.038178705389076376,
+      "after": 0.03817870538907643,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/generic/texts/0/position/1",
+      "kind": "numeric",
+      "before": 0.16885987306599504,
+      "after": 0.16885987306599498,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/anchor/0",
+      "kind": "numeric",
+      "before": 0.11670736526727846,
+      "after": 0.11670736526727851,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/anchor/1",
+      "kind": "numeric",
+      "before": 0.17163799823614767,
+      "after": 0.17163799823614762,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/body/xmax",
+      "kind": "numeric",
+      "before": 0.04340439978654077,
+      "after": 0.04340439978654083,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/body/xmin",
+      "kind": "numeric",
+      "before": 0.036404399786540774,
+      "after": 0.03640439978654083,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/body/ymax",
+      "kind": "numeric",
+      "before": 0.17513799823614767,
+      "after": 0.17513799823614762,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/body/ymin",
+      "kind": "numeric",
+      "before": 0.16813799823614767,
+      "after": 0.1681379982361476,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/envelope/xmax",
+      "kind": "numeric",
+      "before": 0.1249100164330464,
+      "after": 0.12491001643304643,
+      "delta": 2.7755575615628914e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/envelope/xmin",
+      "kind": "numeric",
+      "before": 0.036404399786540774,
+      "after": 0.03640439978654083,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/envelope/ymin",
+      "kind": "numeric",
+      "before": 0.16813799823614767,
+      "after": 0.1681379982361476,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/leader_decorations/0/xmax",
+      "kind": "numeric",
+      "before": 0.1249100164330464,
+      "after": 0.12491001643304643,
+      "delta": 2.7755575615628914e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/leader_decorations/0/xmin",
+      "kind": "numeric",
+      "before": 0.12217084947461354,
+      "after": 0.12217084947461357,
+      "delta": 2.7755575615628914e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/leader_segments/0/end/0",
+      "kind": "numeric",
+      "before": 0.11670736526727846,
+      "after": 0.11670736526727851,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/leader_segments/0/end/1",
+      "kind": "numeric",
+      "before": 0.17163799823614767,
+      "after": 0.17163799823614762,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/leader_segments/0/start/0",
+      "kind": "numeric",
+      "before": 0.12394376819090108,
+      "after": 0.1239437681909011,
+      "delta": 1.3877787807814457e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/leader_segments/1/end/0",
+      "kind": "numeric",
+      "before": 0.04340439978654077,
+      "after": 0.04340439978654083,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/leader_segments/1/end/1",
+      "kind": "numeric",
+      "before": 0.17163799823614767,
+      "after": 0.17163799823614762,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/leader_segments/1/start/0",
+      "kind": "numeric",
+      "before": 0.11670736526727846,
+      "after": 0.11670736526727851,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/leader_segments/1/start/1",
+      "kind": "numeric",
+      "before": 0.17163799823614767,
+      "after": 0.17163799823614762,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/native_strokes/0/end/0",
+      "kind": "numeric",
+      "before": 0.11670736526727846,
+      "after": 0.11670736526727851,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/native_strokes/0/end/1",
+      "kind": "numeric",
+      "before": 0.17163799823614767,
+      "after": 0.17163799823614762,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/native_strokes/0/start/0",
+      "kind": "numeric",
+      "before": 0.12394376819090108,
+      "after": 0.1239437681909011,
+      "delta": 1.3877787807814457e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/native_strokes/1/end/0",
+      "kind": "numeric",
+      "before": 0.04340439978654077,
+      "after": 0.04340439978654083,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/native_strokes/1/end/1",
+      "kind": "numeric",
+      "before": 0.17163799823614767,
+      "after": 0.17163799823614762,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/native_strokes/1/start/0",
+      "kind": "numeric",
+      "before": 0.11670736526727846,
+      "after": 0.11670736526727851,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/native_strokes/1/start/1",
+      "kind": "numeric",
+      "before": 0.17163799823614767,
+      "after": 0.17163799823614762,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/native_strokes/2/end/0",
+      "kind": "numeric",
+      "before": 0.036404399786540774,
+      "after": 0.03640439978654083,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/native_strokes/2/end/1",
+      "kind": "numeric",
+      "before": 0.16813799823614767,
+      "after": 0.1681379982361476,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/native_strokes/2/start/0",
+      "kind": "numeric",
+      "before": 0.04340439978654077,
+      "after": 0.04340439978654083,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/native_strokes/2/start/1",
+      "kind": "numeric",
+      "before": 0.16813799823614767,
+      "after": 0.1681379982361476,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/native_strokes/3/end/0",
+      "kind": "numeric",
+      "before": 0.036404399786540774,
+      "after": 0.03640439978654083,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/native_strokes/3/end/1",
+      "kind": "numeric",
+      "before": 0.17513799823614767,
+      "after": 0.17513799823614762,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/native_strokes/3/start/0",
+      "kind": "numeric",
+      "before": 0.036404399786540774,
+      "after": 0.03640439978654083,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/native_strokes/3/start/1",
+      "kind": "numeric",
+      "before": 0.16813799823614767,
+      "after": 0.1681379982361476,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/native_strokes/4/end/0",
+      "kind": "numeric",
+      "before": 0.04340439978654077,
+      "after": 0.04340439978654083,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/native_strokes/4/end/1",
+      "kind": "numeric",
+      "before": 0.17513799823614767,
+      "after": 0.17513799823614762,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/native_strokes/4/start/0",
+      "kind": "numeric",
+      "before": 0.036404399786540774,
+      "after": 0.03640439978654083,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/native_strokes/4/start/1",
+      "kind": "numeric",
+      "before": 0.17513799823614767,
+      "after": 0.17513799823614762,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/native_strokes/5/end/0",
+      "kind": "numeric",
+      "before": 0.04340439978654077,
+      "after": 0.04340439978654083,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/native_strokes/5/end/1",
+      "kind": "numeric",
+      "before": 0.16813799823614767,
+      "after": 0.1681379982361476,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/native_strokes/5/start/0",
+      "kind": "numeric",
+      "before": 0.04340439978654077,
+      "after": 0.04340439978654083,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/native_strokes/5/start/1",
+      "kind": "numeric",
+      "before": 0.17513799823614767,
+      "after": 0.17513799823614762,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/text_boxes/0/xmax",
+      "kind": "numeric",
+      "before": 0.04164063872240971,
+      "after": 0.041640638722409765,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/text_boxes/0/xmin",
+      "kind": "numeric",
+      "before": 0.03816870538907637,
+      "after": 0.03816870538907643,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/text_boxes/0/ymax",
+      "kind": "numeric",
+      "before": 0.1744297397326617,
+      "after": 0.17442973973266165,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/text_boxes/0/ymin",
+      "kind": "numeric",
+      "before": 0.16884987306599503,
+      "after": 0.16884987306599497,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/text_runs/0/position/0",
+      "kind": "numeric",
+      "before": 0.038178705389076376,
+      "after": 0.03817870538907643,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/measurement/text_runs/0/position/1",
+      "kind": "numeric",
+      "before": 0.16885987306599504,
+      "after": 0.16885987306599498,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/native/anchor/0",
+      "kind": "numeric",
+      "before": 0.11670736526727846,
+      "after": 0.11670736526727851,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/native/anchor/1",
+      "kind": "numeric",
+      "before": 0.17163799823614767,
+      "after": 0.17163799823614762,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/native/leader_boxes/0/xmax",
+      "kind": "numeric",
+      "before": 0.1249100164330464,
+      "after": 0.12491001643304643,
+      "delta": 2.7755575615628914e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/native/leader_boxes/0/xmin",
+      "kind": "numeric",
+      "before": 0.12217084947461354,
+      "after": 0.12217084947461357,
+      "delta": 2.7755575615628914e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/native/lines/0/end/0",
+      "kind": "numeric",
+      "before": 0.11670736526727846,
+      "after": 0.11670736526727851,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/native/lines/0/end/1",
+      "kind": "numeric",
+      "before": 0.17163799823614767,
+      "after": 0.17163799823614762,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/native/lines/0/start/0",
+      "kind": "numeric",
+      "before": 0.12394376819090108,
+      "after": 0.1239437681909011,
+      "delta": 1.3877787807814457e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/native/lines/1/end/0",
+      "kind": "numeric",
+      "before": 0.04340439978654077,
+      "after": 0.04340439978654083,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/native/lines/1/end/1",
+      "kind": "numeric",
+      "before": 0.17163799823614767,
+      "after": 0.17163799823614762,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/native/lines/1/start/0",
+      "kind": "numeric",
+      "before": 0.11670736526727846,
+      "after": 0.11670736526727851,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/native/lines/1/start/1",
+      "kind": "numeric",
+      "before": 0.17163799823614767,
+      "after": 0.17163799823614762,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/native/lines/2/end/0",
+      "kind": "numeric",
+      "before": 0.036404399786540774,
+      "after": 0.03640439978654083,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/native/lines/2/end/1",
+      "kind": "numeric",
+      "before": 0.16813799823614767,
+      "after": 0.1681379982361476,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/native/lines/2/start/0",
+      "kind": "numeric",
+      "before": 0.04340439978654077,
+      "after": 0.04340439978654083,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/native/lines/2/start/1",
+      "kind": "numeric",
+      "before": 0.16813799823614767,
+      "after": 0.1681379982361476,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/native/lines/3/end/0",
+      "kind": "numeric",
+      "before": 0.036404399786540774,
+      "after": 0.03640439978654083,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/native/lines/3/end/1",
+      "kind": "numeric",
+      "before": 0.17513799823614767,
+      "after": 0.17513799823614762,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/native/lines/3/start/0",
+      "kind": "numeric",
+      "before": 0.036404399786540774,
+      "after": 0.03640439978654083,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/native/lines/3/start/1",
+      "kind": "numeric",
+      "before": 0.16813799823614767,
+      "after": 0.1681379982361476,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/native/lines/4/end/0",
+      "kind": "numeric",
+      "before": 0.04340439978654077,
+      "after": 0.04340439978654083,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/native/lines/4/end/1",
+      "kind": "numeric",
+      "before": 0.17513799823614767,
+      "after": 0.17513799823614762,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/native/lines/4/start/0",
+      "kind": "numeric",
+      "before": 0.036404399786540774,
+      "after": 0.03640439978654083,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/native/lines/4/start/1",
+      "kind": "numeric",
+      "before": 0.17513799823614767,
+      "after": 0.17513799823614762,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/native/lines/5/end/0",
+      "kind": "numeric",
+      "before": 0.04340439978654077,
+      "after": 0.04340439978654083,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/native/lines/5/end/1",
+      "kind": "numeric",
+      "before": 0.16813799823614767,
+      "after": 0.1681379982361476,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/native/lines/5/start/0",
+      "kind": "numeric",
+      "before": 0.04340439978654077,
+      "after": 0.04340439978654083,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/native/lines/5/start/1",
+      "kind": "numeric",
+      "before": 0.17513799823614767,
+      "after": 0.17513799823614762,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/native/text_runs/0/position/0",
+      "kind": "numeric",
+      "before": 0.038178705389076376,
+      "after": 0.03817870538907643,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/native/text_runs/0/position/1",
+      "kind": "numeric",
+      "before": 0.16885987306599504,
+      "after": 0.16885987306599498,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/position/0",
+      "kind": "numeric",
+      "before": 0.11670736526727846,
+      "after": 0.11670736526727851,
+      "delta": 5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem349/position/1",
+      "kind": "numeric",
+      "before": 0.17163799823614767,
+      "after": 0.17163799823614762,
+      "delta": -5.551115123125783e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem350/generic/lines/1/7",
+      "kind": "numeric",
+      "before": 0.12394376819090108,
+      "after": 0.1239437681909011,
+      "delta": 1.3877787807814457e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem350/measurement/envelope/xmin",
+      "kind": "numeric",
+      "before": 0.1203070416408289,
+      "after": 0.12030704164082891,
+      "delta": 1.3877787807814457e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem350/measurement/leader_decorations/0/xmax",
+      "kind": "numeric",
+      "before": 0.12758049474097327,
+      "after": 0.1275804947409733,
+      "delta": 2.7755575615628914e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem350/measurement/leader_decorations/0/xmin",
+      "kind": "numeric",
+      "before": 0.1203070416408289,
+      "after": 0.12030704164082891,
+      "delta": 1.3877787807814457e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem350/measurement/leader_segments/1/end/0",
+      "kind": "numeric",
+      "before": 0.12394376819090108,
+      "after": 0.1239437681909011,
+      "delta": 1.3877787807814457e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem350/measurement/native_leader_segments/1/end/0",
+      "kind": "numeric",
+      "before": 0.12394376819090108,
+      "after": 0.1239437681909011,
+      "delta": 1.3877787807814457e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem350/measurement/native_strokes/1/end/0",
+      "kind": "numeric",
+      "before": 0.12394376819090108,
+      "after": 0.1239437681909011,
+      "delta": 1.3877787807814457e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem350/native/leader_boxes/0/xmax",
+      "kind": "numeric",
+      "before": 0.12758049474097327,
+      "after": 0.1275804947409733,
+      "delta": 2.7755575615628914e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem350/native/leader_boxes/0/xmin",
+      "kind": "numeric",
+      "before": 0.1203070416408289,
+      "after": 0.12030704164082891,
+      "delta": 1.3877787807814457e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem350/native/leaders/1/end/0",
+      "kind": "numeric",
+      "before": 0.12394376819090108,
+      "after": 0.1239437681909011,
+      "delta": 1.3877787807814457e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem350/native/lines/1/end/0",
+      "kind": "numeric",
+      "before": 0.12394376819090108,
+      "after": 0.1239437681909011,
+      "delta": 1.3877787807814457e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/generic/lines/0/4",
+      "kind": "numeric",
+      "before": 0.19824696752879506,
+      "after": 0.19824696752879503,
+      "delta": -2.7755575615628914e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/generic/lines/0/8",
+      "kind": "numeric",
+      "before": 0.18937656194075062,
+      "after": 0.18937656194075042,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/generic/lines/1/5",
+      "kind": "numeric",
+      "before": 0.18937656194075062,
+      "after": 0.18937656194075042,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/generic/lines/1/8",
+      "kind": "numeric",
+      "before": 0.18937656194075062,
+      "after": 0.18937656194075042,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/generic/lines/2/5",
+      "kind": "numeric",
+      "before": 0.1858765619407506,
+      "after": 0.18587656194075042,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/generic/lines/2/8",
+      "kind": "numeric",
+      "before": 0.1858765619407506,
+      "after": 0.18587656194075042,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/generic/lines/3/5",
+      "kind": "numeric",
+      "before": 0.1858765619407506,
+      "after": 0.18587656194075042,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/generic/lines/3/8",
+      "kind": "numeric",
+      "before": 0.19287656194075062,
+      "after": 0.19287656194075042,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/generic/lines/4/5",
+      "kind": "numeric",
+      "before": 0.19287656194075062,
+      "after": 0.19287656194075042,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/generic/lines/4/8",
+      "kind": "numeric",
+      "before": 0.19287656194075062,
+      "after": 0.19287656194075042,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/generic/lines/5/5",
+      "kind": "numeric",
+      "before": 0.19287656194075062,
+      "after": 0.19287656194075042,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/generic/lines/5/8",
+      "kind": "numeric",
+      "before": 0.1858765619407506,
+      "after": 0.18587656194075042,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/generic/texts/0/position/1",
+      "kind": "numeric",
+      "before": 0.18659843677059798,
+      "after": 0.1865984367705978,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/measurement/anchor/1",
+      "kind": "numeric",
+      "before": 0.18937656194075062,
+      "after": 0.18937656194075042,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/measurement/body/ymax",
+      "kind": "numeric",
+      "before": 0.19287656194075062,
+      "after": 0.19287656194075042,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/measurement/body/ymin",
+      "kind": "numeric",
+      "before": 0.1858765619407506,
+      "after": 0.18587656194075042,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/measurement/envelope/ymax",
+      "kind": "numeric",
+      "before": 0.19287656194075062,
+      "after": 0.19287656194075042,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/measurement/envelope/ymin",
+      "kind": "numeric",
+      "before": 0.1858765619407506,
+      "after": 0.18587656194075042,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/measurement/leader_decorations/0/xmax",
+      "kind": "numeric",
+      "before": 0.2006562526934194,
+      "after": 0.20065625269341938,
+      "delta": -2.7755575615628914e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/measurement/leader_decorations/0/ymax",
+      "kind": "numeric",
+      "before": 0.1889377954968879,
+      "after": 0.18893779549688794,
+      "delta": 2.7755575615628914e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/measurement/leader_decorations/0/ymin",
+      "kind": "numeric",
+      "before": 0.18618432673731725,
+      "after": 0.18618432673731722,
+      "delta": -2.7755575615628914e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/measurement/leader_segments/0/end/1",
+      "kind": "numeric",
+      "before": 0.18937656194075062,
+      "after": 0.18937656194075042,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/measurement/leader_segments/0/start/0",
+      "kind": "numeric",
+      "before": 0.19824696752879506,
+      "after": 0.19824696752879503,
+      "delta": -2.7755575615628914e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/measurement/leader_segments/1/end/1",
+      "kind": "numeric",
+      "before": 0.18937656194075062,
+      "after": 0.18937656194075042,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/measurement/leader_segments/1/start/1",
+      "kind": "numeric",
+      "before": 0.18937656194075062,
+      "after": 0.18937656194075042,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/measurement/native_strokes/0/end/1",
+      "kind": "numeric",
+      "before": 0.18937656194075062,
+      "after": 0.18937656194075042,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/measurement/native_strokes/0/start/0",
+      "kind": "numeric",
+      "before": 0.19824696752879506,
+      "after": 0.19824696752879503,
+      "delta": -2.7755575615628914e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/measurement/native_strokes/1/end/1",
+      "kind": "numeric",
+      "before": 0.18937656194075062,
+      "after": 0.18937656194075042,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/measurement/native_strokes/1/start/1",
+      "kind": "numeric",
+      "before": 0.18937656194075062,
+      "after": 0.18937656194075042,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/measurement/native_strokes/2/end/1",
+      "kind": "numeric",
+      "before": 0.1858765619407506,
+      "after": 0.18587656194075042,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/measurement/native_strokes/2/start/1",
+      "kind": "numeric",
+      "before": 0.1858765619407506,
+      "after": 0.18587656194075042,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/measurement/native_strokes/3/end/1",
+      "kind": "numeric",
+      "before": 0.19287656194075062,
+      "after": 0.19287656194075042,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/measurement/native_strokes/3/start/1",
+      "kind": "numeric",
+      "before": 0.1858765619407506,
+      "after": 0.18587656194075042,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/measurement/native_strokes/4/end/1",
+      "kind": "numeric",
+      "before": 0.19287656194075062,
+      "after": 0.19287656194075042,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/measurement/native_strokes/4/start/1",
+      "kind": "numeric",
+      "before": 0.19287656194075062,
+      "after": 0.19287656194075042,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/measurement/native_strokes/5/end/1",
+      "kind": "numeric",
+      "before": 0.1858765619407506,
+      "after": 0.18587656194075042,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/measurement/native_strokes/5/start/1",
+      "kind": "numeric",
+      "before": 0.19287656194075062,
+      "after": 0.19287656194075042,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/measurement/text_boxes/0/ymax",
+      "kind": "numeric",
+      "before": 0.19216830343726465,
+      "after": 0.19216830343726446,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/measurement/text_boxes/0/ymin",
+      "kind": "numeric",
+      "before": 0.18658843677059797,
+      "after": 0.18658843677059778,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/measurement/text_runs/0/position/1",
+      "kind": "numeric",
+      "before": 0.18659843677059798,
+      "after": 0.1865984367705978,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/native/anchor/1",
+      "kind": "numeric",
+      "before": 0.18937656194075062,
+      "after": 0.18937656194075042,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/native/leader_boxes/0/xmax",
+      "kind": "numeric",
+      "before": 0.2006562526934194,
+      "after": 0.20065625269341938,
+      "delta": -2.7755575615628914e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/native/leader_boxes/0/ymax",
+      "kind": "numeric",
+      "before": 0.1889377954968879,
+      "after": 0.18893779549688794,
+      "delta": 2.7755575615628914e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/native/leader_boxes/0/ymin",
+      "kind": "numeric",
+      "before": 0.18618432673731725,
+      "after": 0.18618432673731722,
+      "delta": -2.7755575615628914e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/native/lines/0/end/1",
+      "kind": "numeric",
+      "before": 0.18937656194075062,
+      "after": 0.18937656194075042,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/native/lines/0/start/0",
+      "kind": "numeric",
+      "before": 0.19824696752879506,
+      "after": 0.19824696752879503,
+      "delta": -2.7755575615628914e-17
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/native/lines/1/end/1",
+      "kind": "numeric",
+      "before": 0.18937656194075062,
+      "after": 0.18937656194075042,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/native/lines/1/start/1",
+      "kind": "numeric",
+      "before": 0.18937656194075062,
+      "after": 0.18937656194075042,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/native/lines/2/end/1",
+      "kind": "numeric",
+      "before": 0.1858765619407506,
+      "after": 0.18587656194075042,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/native/lines/2/start/1",
+      "kind": "numeric",
+      "before": 0.1858765619407506,
+      "after": 0.18587656194075042,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/native/lines/3/end/1",
+      "kind": "numeric",
+      "before": 0.19287656194075062,
+      "after": 0.19287656194075042,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/native/lines/3/start/1",
+      "kind": "numeric",
+      "before": 0.1858765619407506,
+      "after": 0.18587656194075042,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/native/lines/4/end/1",
+      "kind": "numeric",
+      "before": 0.19287656194075062,
+      "after": 0.19287656194075042,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/native/lines/4/start/1",
+      "kind": "numeric",
+      "before": 0.19287656194075062,
+      "after": 0.19287656194075042,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/native/lines/5/end/1",
+      "kind": "numeric",
+      "before": 0.1858765619407506,
+      "after": 0.18587656194075042,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/native/lines/5/start/1",
+      "kind": "numeric",
+      "before": 0.19287656194075062,
+      "after": 0.19287656194075042,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/native/text_runs/0/position/1",
+      "kind": "numeric",
+      "before": 0.18659843677059798,
+      "after": 0.1865984367705978,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View1~1DetailItem352/position/1",
+      "kind": "numeric",
+      "before": 0.18937656194075062,
+      "after": 0.18937656194075042,
+      "delta": -1.942890293094024e-16
+    },
+    {
+      "path": "/annotations/Drawing View2~1DetailItem351/generic/lines/0/5",
+      "kind": "numeric",
+      "before": 0.11630910226300195,
+      "after": 0.11630910226300196,
+      "delta": 1.3877787807814457e-17
+    },
+    {
+      "path": "/annotations/Drawing View2~1DetailItem351/measurement/envelope/ymin",
+      "kind": "numeric",
+      "before": 0.11630910226300195,
+      "after": 0.11630910226300196,
+      "delta": 1.3877787807814457e-17
+    },
+    {
+      "path": "/annotations/Drawing View2~1DetailItem351/measurement/leader_decorations/0/ymax",
+      "kind": "numeric",
+      "before": 0.11875910226300194,
+      "after": 0.11875910226300196,
+      "delta": 1.3877787807814457e-17
+    },
+    {
+      "path": "/annotations/Drawing View2~1DetailItem351/measurement/leader_decorations/0/ymin",
+      "kind": "numeric",
+      "before": 0.11630910226300195,
+      "after": 0.11630910226300196,
+      "delta": 1.3877787807814457e-17
+    },
+    {
+      "path": "/annotations/Drawing View2~1DetailItem351/measurement/leader_segments/0/start/1",
+      "kind": "numeric",
+      "before": 0.11630910226300195,
+      "after": 0.11630910226300196,
+      "delta": 1.3877787807814457e-17
+    },
+    {
+      "path": "/annotations/Drawing View2~1DetailItem351/measurement/native_strokes/0/start/1",
+      "kind": "numeric",
+      "before": 0.11630910226300195,
+      "after": 0.11630910226300196,
+      "delta": 1.3877787807814457e-17
+    },
+    {
+      "path": "/annotations/Drawing View2~1DetailItem351/native/leader_boxes/0/ymax",
+      "kind": "numeric",
+      "before": 0.11875910226300194,
+      "after": 0.11875910226300196,
+      "delta": 1.3877787807814457e-17
+    },
+    {
+      "path": "/annotations/Drawing View2~1DetailItem351/native/leader_boxes/0/ymin",
+      "kind": "numeric",
+      "before": 0.11630910226300195,
+      "after": 0.11630910226300196,
+      "delta": 1.3877787807814457e-17
+    },
+    {
+      "path": "/annotations/Drawing View2~1DetailItem351/native/lines/0/start/1",
+      "kind": "numeric",
+      "before": 0.11630910226300195,
+      "after": 0.11630910226300196,
+      "delta": 1.3877787807814457e-17
+    },
+    {
+      "path": "/annotations/Sheet1~1DetailItem245/generic/texts/0/position/0",
+      "kind": "numeric",
+      "before": 0.35389179984999647,
+      "after": 0.3611170096970891,
+      "delta": 0.0072252098470926285
+    },
+    {
+      "path": "/annotations/Sheet1~1DetailItem245/measurement/text_runs/0/position/0",
+      "kind": "numeric",
+      "before": 0.35389179984999647,
+      "after": 0.3611170096970891,
+      "delta": 0.0072252098470926285
+    },
+    {
+      "path": "/annotations/Sheet1~1DetailItem245/native/text_runs/0/position/0",
+      "kind": "numeric",
+      "before": 0.35389179984999647,
+      "after": 0.3611170096970891,
+      "delta": 0.0072252098470926285
+    }
+  ]
+}
