@@ -24,6 +24,7 @@ from channel_lever_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
 from _common import CAD_ROOT, check, run_build
+from _basic_dimensions import require_basic_dimension
 from _drawing_project_layout import repair_project_drawing_layout
 from _drawing_common import (
     DrawingOutputs,
@@ -46,6 +47,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_entities import CircleEdge, LineEdge, ModelEntities
 from _gtol_spec import PlanarFace
 from channel_lever_spec import (
+    SOURCE_BASIC_DIMENSIONS,
     BAR_PIN_X,
     BAR_TALL,
     HUB_LENGTH,
@@ -232,7 +234,7 @@ async def build(adapter: Any) -> dict[str, str]:
     front_annotations = retain_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
     )
-    profile_dimensions = {"BarLength", "TipCentreX", "NoseRadius", "TipRadius"}
+    profile_dimensions = set().union(*SOURCE_BASIC_DIMENSIONS.values())
     for annotation in front_annotations:
         name = dimension_name(adapter, annotation)
         if name not in profile_dimensions:
@@ -240,7 +242,7 @@ async def build(adapter: Any) -> dict[str, str]:
         display = annotation.GetSpecificAnnotation()
         if display is None:
             raise RuntimeError(f"profile dimension {name!r} has no display annotation")
-        set_basic_dimension(adapter, display, label=f"profile {name}")
+        require_basic_dimension(display, label=f"profile {name}")
     retain_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
     retain_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
 
