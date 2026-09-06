@@ -285,7 +285,8 @@ def _declared_notes(
         for raw in _early_bound(view, "IView").GetAnnotations() or ()
     )
     result = {}
-    for note in notes:
+    for raw_note in notes:
+        note = _early_bound(raw_note, "IAnnotation")
         name = str(note.GetName())
         if (
             not name
