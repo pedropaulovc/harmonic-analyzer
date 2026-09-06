@@ -374,7 +374,7 @@ def test_diagnostic_raw_shortcut_preserves_inherited_baseline_when_production_re
     )
     monkeypatch.setattr(sw_install, "launch_via_platform_shortcut", production_launch)
     raw_launch = Mock()
-    monkeypatch.setattr(probe.os, "startfile", raw_launch)
+    monkeypatch.setattr(probe.os, "startfile", raw_launch, raising=False)
     monkeypatch.setattr(probe, "process_inventory", lambda: [])
     request = tmp_path / "request.json"
     receipt = tmp_path / "receipt.json"
