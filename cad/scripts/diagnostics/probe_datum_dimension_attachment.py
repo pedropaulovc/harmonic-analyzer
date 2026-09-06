@@ -354,11 +354,12 @@ def same_handles(app, before, after):
 
 def without_datum(snapshot, key):
     result = deepcopy(snapshot)
-    if sum(key in result[section] for section in ("checked", "excluded")) != 1:
+    sections = ("checked", "excluded", "semantic_attachments")
+    if sum(key in result[section] for section in sections) != 1:
         raise RuntimeError(
             "target datum missing or duplicated in manufacturing snapshot"
         )
-    for section in ("checked", "excluded"):
+    for section in sections:
         result[section].pop(key, None)
     return result
 
@@ -592,7 +593,8 @@ async def probe(adapter, source, directory, mode="paired_dimensions"):
                 trial["before"] = before
                 original_key = f"{bore['view_key']}/{before['name']}/2"
                 manufacturing = without_datum(
-                    attachments.snapshot(adapter.currentModel), original_key
+                    attachments.snapshot(adapter.currentModel, app=adapter.swApp),
+                    original_key,
                 )
                 trial["before_export"] = export(f"{mode}-before")
                 if mode in {
@@ -694,7 +696,10 @@ async def probe(adapter, source, directory, mode="paired_dimensions"):
                 key = f"{bore['view_key']}/{native['name']}/2"
                 attachments.compare(
                     manufacturing,
-                    without_datum(attachments.snapshot(adapter.currentModel), key),
+                    without_datum(
+                        attachments.snapshot(adapter.currentModel, app=adapter.swApp),
+                        key,
+                    ),
                     "native mechanism",
                 )
                 trial["placement"] = place_datum_control(
@@ -733,7 +738,10 @@ async def probe(adapter, source, directory, mode="paired_dimensions"):
                 key = f"{bore['view_key']}/{reopened['name']}/2"
                 attachments.compare(
                     manufacturing,
-                    without_datum(attachments.snapshot(adapter.currentModel), key),
+                    without_datum(
+                        attachments.snapshot(adapter.currentModel, app=adapter.swApp),
+                        key,
+                    ),
                     "saved mechanism",
                 )
                 trial["reopened_export"] = export(f"{mode}-reopened")

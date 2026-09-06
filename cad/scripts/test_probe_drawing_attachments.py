@@ -1,6 +1,7 @@
 """Offline controls for the drawing attachment stability diagnostic."""
 
 from copy import deepcopy
+from functools import partial
 import json
 from pathlib import Path
 from types import SimpleNamespace
@@ -9,6 +10,9 @@ from unittest.mock import Mock
 import pytest
 
 from diagnostics import probe_drawing_attachments as probe
+
+APP = SimpleNamespace(IsSame=lambda a, b: int(a is b))
+geometry_snapshot = partial(probe.snapshot, app=APP)
 
 
 def dimension(
@@ -141,7 +145,7 @@ def test_snapshot_separates_checked_geometry_and_exclusions(source_model):
         Annotation("free", entities=(), kinds=()),
         Annotation("note", kind=6),
     )
-    result = probe.snapshot(Model([View("Front", source_model, annotations)]))
+    result = geometry_snapshot(Model([View("Front", source_model, annotations)]))
     assert tuple(result["checked"]) == ("Sheet1/Front/dimension/4",)
     assert len(result["excluded"]) == 3
     assert (
@@ -168,19 +172,19 @@ def test_dangling_annotation_cannot_be_excluded_as_unsupported(source_model, kin
         entities=tuple(None for _ in kinds), kinds=kinds, state="dangling"
     )
     with pytest.raises(RuntimeError, match="annotation is dangling"):
-        probe.snapshot(Model([View("Front", source_model, (item,))]))
+        geometry_snapshot(Model([View("Front", source_model, (item,))]))
 
 
 def test_null_supported_entity_still_fails_in_mixed_unsupported_array(source_model):
     item = Annotation(entities=(None, None), kinds=(0, 3))
     with pytest.raises(RuntimeError, match="supported attachment is null"):
-        probe.snapshot(Model([View("Front", source_model, (item,))]))
+        geometry_snapshot(Model([View("Front", source_model, (item,))]))
 
 
 def test_attachment_array_length_mismatch_fails(source_model):
     item = Annotation(entities=(), kinds=(3,))
     with pytest.raises(RuntimeError, match="different lengths"):
-        probe.snapshot(Model([View("Front", source_model, (item,))]))
+        geometry_snapshot(Model([View("Front", source_model, (item,))]))
 
 
 @pytest.mark.parametrize("shape", ["spline_edge", "spline_face"])
@@ -194,7 +198,7 @@ def test_geometry_without_signature_is_excluded(source_model, monkeypatch, shape
             probe, "_face_geometry", lambda _: SimpleNamespace(identity=4010)
         )
     item = Annotation(entities=(entity,), kinds=(kind,))
-    result = probe.snapshot(Model([View("Front", source_model, (item,))]))
+    result = geometry_snapshot(Model([View("Front", source_model, (item,))]))
     assert result["checked"] == {}
     assert len(result["excluded"]) == 1
 
@@ -226,7 +230,15 @@ def test_face_signature_distinguishes_opposite_outward_normals(monkeypatch):
 
 
 @pytest.mark.parametrize(
-    "section", ["checked", "excluded", "models", "dimensions", "dimensions_excluded"]
+    "section",
+    [
+        "checked",
+        "excluded",
+        "models",
+        "dimensions",
+        "dimensions_excluded",
+        "semantic_attachments",
+    ],
 )
 def test_comparison_detects_changed_inventory_and_model_reference(section):
     before = {
@@ -235,6 +247,7 @@ def test_comparison_detects_changed_inventory_and_model_reference(section):
         "models": {"view": "part"},
         "dimensions": {},
         "dimensions_excluded": {},
+        "semantic_attachments": {},
     }
     after = deepcopy(before)
     after[section]["changed"] = "different"
@@ -252,7 +265,7 @@ def test_imported_dimensions_have_semantics_without_supported_geometry(
     annotation.display = display_dimension(actual, kind=6)
     view = View("Front", source_model, (annotation,))
     view.ReferencedConfiguration = "FineBore"
-    result = probe.snapshot(Model([view]))
+    result = geometry_snapshot(Model([view]))
     key = "Sheet1/Front/dimension/4"
     assert result["checked"] == {}
     assert key in result["excluded"]
@@ -309,10 +322,10 @@ def test_native_dimensions_keep_geometry_and_values_separate_across_drawing_copi
     )
     model = Model([View("Front", source_model, (annotation,))])
     model.GetPathName = lambda: "source.SLDDRW"
-    before = probe.snapshot(model)
+    before = geometry_snapshot(model)
     model.GetPathName = lambda: "copy.SLDDRW"
     actual.FullName = "RD1@Front@copy.Drawing"
-    after = probe.snapshot(model)
+    after = geometry_snapshot(model)
     probe.compare(before, after, "copy")
     key = "Sheet1/Front/dimension/4"
     assert len(after["checked"][key]) == len(edges)
@@ -325,7 +338,7 @@ def test_native_dimensions_keep_geometry_and_values_separate_across_drawing_copi
     assert actual.GetSystemValue2.call_args.args == ("",)
     actual.GetSystemValue2.return_value += 0.001
     with pytest.raises(RuntimeError, match="dimensions.*dimension/4"):
-        probe.compare(before, probe.snapshot(model), "value changed")
+        probe.compare(before, geometry_snapshot(model), "value changed")
 
 
 @pytest.mark.parametrize("mutation", ["name", "configuration", "value", "tolerance"])
@@ -334,7 +347,7 @@ def test_dimension_semantic_changes_fail_snapshot_comparison(source_model, mutat
     actual = annotation.display.GetDimension2(0)
     view = View("Front", source_model, (annotation,))
     model = Model([view])
-    before = probe.snapshot(model)
+    before = geometry_snapshot(model)
     if mutation == "name":
         actual.Name, actual.FullName = "Wrong", "Wrong@Sketch@part.Part"
     if mutation == "configuration":
@@ -344,7 +357,7 @@ def test_dimension_semantic_changes_fail_snapshot_comparison(source_model, mutat
     if mutation == "tolerance":
         actual.Tolerance.Type = 1
     with pytest.raises(RuntimeError, match="dimensions.*dimension/4"):
-        probe.compare(before, probe.snapshot(model), "changed semantics")
+        probe.compare(before, geometry_snapshot(model), "changed semantics")
 
 
 @pytest.mark.parametrize("reference", ["model", "drawing"])
@@ -363,11 +376,11 @@ def test_basic_tolerance_loss_is_detected_even_when_value_geometry_are_unchanged
     annotation.display = display_dimension(actual, reference=reference)
     model = Model([View("Front", source_model, (annotation,))])
     model.GetPathName = lambda: "source.SLDDRW"
-    before = probe.snapshot(model)
+    before = geometry_snapshot(model)
     key = "Sheet1/Front/dimension/4"
     assert before["dimensions"][key]["components"][0]["designation"] == "basic"
     actual.Tolerance.Type = 0
-    after = probe.snapshot(model)
+    after = geometry_snapshot(model)
     assert before["checked"] == after["checked"]
     assert (
         before["dimensions"][key]["components"][0]["value_system"]
@@ -381,7 +394,7 @@ def test_missing_native_tolerance_cannot_silently_be_marked_nonbasic(source_mode
     annotation = Annotation()
     annotation.display.GetDimension2(0).Tolerance = None
     with pytest.raises(RuntimeError, match="no native tolerance"):
-        probe.snapshot(Model([View("Front", source_model, (annotation,))]))
+        geometry_snapshot(Model([View("Front", source_model, (annotation,))]))
 
 
 @pytest.mark.parametrize("reference", ["model", "drawing"])
@@ -397,7 +410,7 @@ def test_dimension_owner_identity_is_not_globally_stripped(source_model, referen
     model = Model([View("Front", source_model, (annotation,))])
     model.GetPathName = lambda: "source.SLDDRW"
     with pytest.raises(RuntimeError, match="does not match.*owner"):
-        probe.snapshot(model)
+        geometry_snapshot(model)
 
 
 def test_chamfer_semantics_read_both_underlying_dimensions(source_model):
@@ -407,7 +420,7 @@ def test_chamfer_semantics_read_both_underlying_dimensions(source_model):
     angle.Tolerance.Type = 1
     annotation = Annotation()
     annotation.display = display_dimension(distance, angle, kind=10)
-    result = probe.snapshot(Model([View("Front", source_model, (annotation,))]))
+    result = geometry_snapshot(Model([View("Front", source_model, (annotation,))]))
     items = result["dimensions"]["Sheet1/Front/dimension/4"]["components"]
     assert [row["parameter_type"] for row in items] == [0, 1]
     assert [row["value_system"] for row in items] == [0.001, 0.785398163397]
@@ -433,13 +446,13 @@ def test_unreadable_model_dimensions_fail_loud(source_model, failure):
     if failure == "nonfinite":
         actual.GetSystemValue3.return_value = (float("nan"),)
     with pytest.raises(RuntimeError, match="dimension|system value"):
-        probe.snapshot(Model([View("Front", source_model, (annotation,))]))
+        geometry_snapshot(Model([View("Front", source_model, (annotation,))]))
 
 
 def test_pmi_only_dimension_semantics_are_explicitly_excluded(source_model):
     annotation = Annotation(entities=(), kinds=())
     annotation.display = None
-    result = probe.snapshot(Model([View("Front", source_model, (annotation,))]))
+    result = geometry_snapshot(Model([View("Front", source_model, (annotation,))]))
     key = "Sheet1/Front/dimension/4"
     assert not result["dimensions"]
     assert (
@@ -456,7 +469,7 @@ def test_api_capture_records_failed_current_shapes_without_using_them(source_mod
     annotation.display = display_dimension(actual, reference="drawing")
     model = Model([View("Front", source_model, (annotation,))])
     model.GetPathName = lambda: "source.SLDDRW"
-    result = probe.snapshot(model, dimension_values="api-capture")
+    result = geometry_snapshot(model, dimension_values="api-capture")
     key = "Sheet1/Front/dimension/4"
     assert result["dimensions"][key]["components"][0]["value_system"] == 0.012
     calls = result["dimension_observations"][key][0]["value_api_calls"]
@@ -475,9 +488,9 @@ def test_view_order_does_not_change_snapshot(source_model):
     model = Model(
         [View("Front", source_model, (Annotation(),)), View("Side", source_model)]
     )
-    before = probe.snapshot(model)
+    before = geometry_snapshot(model)
     model.drawing_views.reverse()
-    probe.compare(before, probe.snapshot(model), "reordered views")
+    probe.compare(before, geometry_snapshot(model), "reordered views")
 
 
 @pytest.mark.parametrize("mode", ["ignored_move", "ignored_scale", "rejected_move"])
@@ -506,6 +519,7 @@ class Adapter:
     def __init__(self, source_model, mode="normal"):
         self.source_model, self.mode = source_model, mode
         self.currentModel = None
+        self.swApp = APP
         self.saved = {}
         self.opened, self.closed = [], []
 
@@ -606,6 +620,7 @@ async def test_value_only_probe_reports_zero_geometry_coverage(tmp_path, source_
         "geometry_annotations_excluded": 1,
         "dimension_annotations_checked": 1,
         "dimension_annotations_excluded": 0,
+        "semantic_attachments_checked": 0,
     }
     assert len(adapter.opened) == 3
     assert (

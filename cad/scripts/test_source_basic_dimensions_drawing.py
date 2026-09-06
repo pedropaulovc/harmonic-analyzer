@@ -142,6 +142,7 @@ def test_duplicate_imported_target_is_rejected_even_if_baseline_has_it(monkeypat
 def test_canonicalization_only_normalizes_verified_part_owner(tmp_path):
     path = tmp_path / "copy.SLDPRT"
     source = {
+        "semantic_attachments": {},
         "models": {"view": {"path": str(path)}},
         "dimensions": {
             "dim": {
@@ -172,6 +173,7 @@ def test_authoring_allows_only_exact_target_tolerance_in_shared_semantics():
                 "models",
                 "dimensions",
                 "dimensions_excluded",
+                "semantic_attachments",
             )
         },
     }
