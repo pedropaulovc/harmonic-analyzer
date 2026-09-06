@@ -10,6 +10,7 @@ from cone_pivot_screw_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
 from _common import CAD_ROOT, _early_bound, run_build
+from _drawing_project_layout import repair_project_drawing_layout
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
@@ -18,7 +19,6 @@ from _drawing_common import (
     auto_arrange_view_dimensions,
     curate_view_dimensions,
     import_cosmetic_threads,
-    repair_project_drawing_layout,
     set_hidden_lines_removed,
 )
 from _drawing_registry import DRAWINGS_BY_NAME

@@ -23,6 +23,7 @@ from pen_v_block_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
 from _common import CAD_ROOT, check, run_build
+from _drawing_project_layout import repair_project_drawing_layout
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
@@ -36,7 +37,6 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    repair_project_drawing_layout,
     set_basic_dimension,
     set_dimension_callouts,
     set_hidden_lines_removed,

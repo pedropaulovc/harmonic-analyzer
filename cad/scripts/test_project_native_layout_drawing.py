@@ -6,7 +6,7 @@ from unittest.mock import Mock
 
 import pytest
 
-import _drawing_common as drawing
+import _drawing_project_layout as drawing
 import _drawing_native_gtol as gtol
 import _drawing_native_layout as native
 import _drawing_measurement_handoff as handoff_module
@@ -73,7 +73,6 @@ def test_project_layout_orders_spacing_and_rejects_unfit_sheet(monkeypatch, stat
         "alignments": alignments,
         "orderings": orderings,
         "notes": notes,
-        "planning_headroom_m": 0.0005,
     }
 
 
