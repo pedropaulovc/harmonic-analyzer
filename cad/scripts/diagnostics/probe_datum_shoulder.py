@@ -22,10 +22,11 @@ control was active. Neither is a verdict against the native leader mechanism.
 The default is the positive document-length route; no historical commits are
 required to run it. An independently saved pre-policy drawing must have B's
 non-forced Shoulder=False; pass --part when using an archived drawing copy.
-The diagnostic requires an empty native document session and refuses pre-existing
-documents; it never clears them. Cleanup closes only the exact owned copy with
-save=False. A later unrelated active/open document makes cleanup refuse, while
-source hashes and the final report are still checked/written.
+The diagnostic borrows visible pre-existing documents without changing their
+identity, path, title, kind, dirty flag or visibility. Hidden baseline documents
+are refused because native scoped CloseDoc may also close hidden documents.
+Cleanup closes only exact owned copies/references without saving; unexpected
+native inventory makes cleanup refuse, while source hashes and evidence remain.
 """
 
 from __future__ import annotations
@@ -47,8 +48,8 @@ sys.path.insert(0, str(ROOT / "cad/scripts"))
 from _common import _early_bound, check  # noqa: E402
 from diagnostics._owned_native_session import (  # noqa: E402
     require_owned_diagnostic_environment,
-    run_owned_diagnostic,
 )
+from diagnostics._owned_native_documents import run_copy_diagnostic  # noqa: E402
 from _drawing_view_packing import Rect  # noqa: E402
 from _drawing_annotation_bounds import (  # noqa: E402
     _native_snapshot,
@@ -256,11 +257,10 @@ class OwnedDrawingCopy:
         self._inventory()
 
 
-async def finalize_probe(owned, report, report_path):
+async def finalize_probe(cleanup, report, report_path):
     """Source hashes and evidence survive a refusal to close unrelated state."""
     try:
-        if owned is not None:
-            await owned.close()
+        await cleanup()
     except Exception as error:
         report["cleanup_error"] = repr(error)
         raise
@@ -562,11 +562,15 @@ def set_shoulder(tag, policy):
 async def probe(
     adapter, source, directory, mode=ControlMode.DOCUMENT_LENGTH, *, part=None
 ):
-    from solidworks_mcp.adapters.solidworks.drawing import save_drawing
+    from diagnostics._owned_native_documents import save_drawing
+
+    adapter.ownership.register_directory(directory)
+    adapter.ownership.register_source(source)
 
     part = (part or source.parent.parent / "sldprt/rocker-arm.SLDPRT").resolve(
         strict=True
     )
+    adapter.ownership.register_source(part)
     report = {
         "mode": ControlMode(mode).value,
         "source_hashes": {str(p): file_digest(p) for p in (source, part)},
@@ -575,18 +579,15 @@ async def probe(
     app = _early_bound(adapter.swApp, "ISldWorks")
     report_path = directory / "datum-shoulder.json"
     baseline, target = None, None
-    owned = None
 
     def export(stem):
         drawing = directory / f"{directory.name}-{stem}.SLDDRW"
         pdf, png = drawing.with_suffix(".pdf"), drawing.with_suffix(".png")
-        owned.authorize_save(drawing)
         save_drawing(adapter, str(drawing), pdf_path=str(pdf))
         render_pdf_png(pdf, png)
         return {"drawing": str(drawing), "pdf": str(pdf), "png": str(png)}
 
     try:
-        owned = OwnedDrawingCopy(adapter, directory, part)
         variants = {
             ControlMode.SHOULDER: ("straight", "bent"),
             ControlMode.BENT_LENGTH: ("native_bent", "extended_bent"),
@@ -602,7 +603,6 @@ async def probe(
             report["trials"].append(trial)
             try:
                 copy = directory / f"{directory.name}-{variant}-source.SLDDRW"
-                owned.expect_open(copy)
                 shutil.copy2(source, copy)
                 check(
                     "open unique rocker shoulder copy",
@@ -612,7 +612,6 @@ async def probe(
                     raise RuntimeError(
                         "active drawing is not the unique requested copy"
                     )
-                owned.claim()
                 records, handles = frames.capture(adapter, part)
                 key = find_target(records)
                 before = records[key]
@@ -717,13 +716,11 @@ async def probe(
                     ),
                     "shoulder position",
                 )
-                await owned.close()
-                owned.expect_open(Path(trial["after_export"]["drawing"]))
+                await adapter.close_owned_documents()
                 check(
                     "reopen saved rocker shoulder copy",
                     await adapter.open_model(trial["after_export"]["drawing"]),
                 )
-                owned.claim()
                 reopened, reopened_handles = frames.capture(adapter, part)
                 trial["reopened"] = reopened[key]
                 if mode in (ControlMode.BENT_LENGTH, ControlMode.DOCUMENT_LENGTH):
@@ -770,12 +767,12 @@ async def probe(
             except Exception as error:
                 trial["error"] = repr(error)
             finally:
-                await owned.close()
+                await adapter.close_owned_documents()
     except Exception as error:
         report["error"] = repr(error)
         raise
     finally:
-        await finalize_probe(owned, report, report_path)
+        await finalize_probe(adapter.close_owned_documents, report, report_path)
     if any("error" in trial for trial in report["trials"]):
         raise RuntimeError(f"native shoulder witness failed; evidence: {report_path}")
     return {"report": str(report_path)}
@@ -803,6 +800,7 @@ def main():
     if source.name.lower() != "rocker-arm.slddrw" and part is None:
         raise ValueError("this bounded control requires saved rocker-arm.SLDDRW")
     if not args.worker:
+        require_owned_diagnostic_environment()
         sys.path.insert(0, str(ROOT))
         import dodo
 
@@ -826,7 +824,7 @@ def main():
     reports = ROOT / "cad/out/reports"
     reports.mkdir(parents=True, exist_ok=True)
     directory = Path(tempfile.mkdtemp(prefix="datum-shoulder-", dir=reports))
-    return run_owned_diagnostic(
+    return run_copy_diagnostic(
         lambda adapter: probe(adapter, source, directory, args.mode, part=part)
     )
 

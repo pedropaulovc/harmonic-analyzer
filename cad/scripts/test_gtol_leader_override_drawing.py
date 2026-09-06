@@ -386,11 +386,7 @@ def test_live_worker_preserves_source_hashes_even_if_cleanup_refuses(tmp_path):
 
     report_path = tmp_path / "report.json"
     with pytest.raises(RuntimeError, match="pre-existing"):
-        asyncio.run(
-            probe.shoulder.finalize_probe(
-                SimpleNamespace(close=refuse), report, report_path
-            )
-        )
+        asyncio.run(probe.shoulder.finalize_probe(refuse, report, report_path))
     assert report["source_hashes"] == report["source_hashes_after"]
     assert Path(report_path).is_file()
 

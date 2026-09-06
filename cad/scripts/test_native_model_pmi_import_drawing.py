@@ -239,6 +239,8 @@ def test_worker_never_opens_original_and_exports_even_after_witness_failure(
     monkeypatch, tmp_path, outcome
 ):
     from solidworks_mcp.adapters.solidworks import drawing
+    from contextlib import nullcontext
+    from unittest.mock import AsyncMock
 
     source = tmp_path / "original.SLDPRT"
     source.write_bytes(b"unchanged native source")
@@ -246,6 +248,9 @@ def test_worker_never_opens_original_and_exports_even_after_witness_failure(
     directory.mkdir()
     adapter, model = Mock(), Mock()
     adapter.swApp.CloseAllDocuments.return_value = True
+    adapter.close_owned_documents = AsyncMock()
+    adapter.ownership.creating_document.side_effect = lambda *_: nullcontext()
+    adapter.ownership.saving_as.side_effect = lambda *_: nullcontext()
     opened = []
 
     async def open_model(path):
@@ -283,6 +288,8 @@ def test_worker_never_opens_original_and_exports_even_after_witness_failure(
     else:
         asyncio.run(probe.probe(adapter, source, directory))
     assert source not in opened
+    adapter.swApp.CloseAllDocuments.assert_not_called()
+    assert adapter.close_owned_documents.await_count == 2
     assert len(opened) == 2
     assert all(path.parent == directory for path in opened)
     assert source.read_bytes() == b"unchanged native source"

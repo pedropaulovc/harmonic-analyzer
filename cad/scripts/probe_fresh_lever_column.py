@@ -27,7 +27,9 @@ import sys
 import tempfile
 from typing import Any
 
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, _early_bound, check
+from diagnostics._owned_native_documents import DocumentKind, run_copy_diagnostic
+from diagnostics._owned_native_session import require_owned_diagnostic_environment
 from _drawing_common import DrawingOutputs, _TITLE_BLOCK_LEFT_M, _TITLE_BLOCK_TOP_M
 from _drawing_annotation_bounds import annotation_box
 from _drawing_measurement_handoff import AnnotationMeasurementHandoff, HandoffPurpose
@@ -116,6 +118,9 @@ async def probe(adapter, source: Path, original_drawing: Path):
     directory = Path(
         tempfile.mkdtemp(prefix="coherent-lever-column-", dir=CAD_ROOT / "out/reports")
     )
+    adapter.ownership.register_directory(directory)
+    for original in (source, original_drawing):
+        adapter.ownership.register_source(original)
     outputs = DrawingOutputs(
         slddrw=directory / f"{directory.name}.SLDDRW",
         pdf=directory / f"{directory.name}.pdf",
@@ -137,15 +142,17 @@ async def probe(adapter, source: Path, original_drawing: Path):
             await adapter.open_model(str(source)),
         )
         report["source_basic_before"] = source_basic(adapter, source)
-        await build_lever(
-            adapter, source=source, outputs=outputs, layout=diagnostic_layout
-        )
+        with adapter.ownership.creating_document(DocumentKind.DRAWING, outputs.slddrw):
+            await build_lever(
+                adapter, source=source, outputs=outputs, layout=diagnostic_layout
+            )
         if Path(adapter.currentModel.GetPathName()).resolve() != outputs.slddrw:
             raise RuntimeError("real recipe did not save the unique diagnostic drawing")
         report["fresh_drawing_dimensions"] = drawing_dimensions(adapter, source)
         check(
             "close coherent diagnostic baseline", await adapter.close_model(save=False)
         )
+        adapter.ownership.freeze_owned_input(outputs.slddrw)
         report["column_control"] = await probe_column(adapter, outputs.slddrw, None)
         check(
             "reopen current lever source for final BASIC witness",
@@ -196,6 +203,7 @@ def main():
             "coherent control requires current native part and original drawing"
         )
     if not args.worker:
+        require_owned_diagnostic_environment()
         sys.path.insert(0, str(CAD_ROOT.parent))
         import dodo
 
@@ -216,7 +224,7 @@ def main():
     if not os.environ.get("HARMONIC_COM_SEAT"):
         raise RuntimeError("--worker requires the machine-global COM seat")
     _telemetry.set_service("coherent-lever-column-probe")
-    return run_build(lambda adapter: probe(adapter, source, drawing))
+    return run_copy_diagnostic(lambda adapter: probe(adapter, source, drawing))
 
 
 if __name__ == "__main__":

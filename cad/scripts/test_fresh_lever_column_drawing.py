@@ -4,6 +4,8 @@ import inspect
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
+from unittest.mock import Mock
+from contextlib import nullcontext
 
 import pytest
 
@@ -47,7 +49,14 @@ async def test_fresh_baseline_uses_unique_outputs_and_preserves_source_witnesses
     source.write_bytes(b"current-native-part")
     original.write_bytes(b"unchanged-old-native-drawing")
     state = {"path": "", "basic_reads": 0}
-    adapter = SimpleNamespace()
+    adapter = SimpleNamespace(
+        ownership=SimpleNamespace(
+            register_directory=Mock(),
+            register_source=Mock(),
+            freeze_owned_input=Mock(),
+            creating_document=Mock(side_effect=lambda *_: nullcontext()),
+        )
+    )
 
     async def open_model(path):
         state["path"] = path
@@ -75,6 +84,7 @@ async def test_fresh_baseline_uses_unique_outputs_and_preserves_source_witnesses
     async def probe_column(actual_adapter, drawing, requested):
         assert actual_adapter is adapter and requested is None
         assert drawing == calls[0][2]
+        adapter.ownership.freeze_owned_input.assert_called_once_with(drawing)
         calls.append(("column", drawing))
         if change == "source_bytes":
             source.write_bytes(b"unexpected-source-mutation")

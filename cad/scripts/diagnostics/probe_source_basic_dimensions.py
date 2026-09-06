@@ -33,7 +33,9 @@ import time
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "cad/scripts"))
 
-from _common import _early_bound, check, run_build  # noqa: E402
+from _common import _early_bound, check  # noqa: E402
+from diagnostics._owned_native_documents import run_copy_diagnostic  # noqa: E402
+from diagnostics._owned_native_session import require_owned_diagnostic_environment  # noqa: E402
 from _drawing_marks import _named_dimension  # noqa: E402
 from diagnostics import probe_drawing_attachments as attachments  # noqa: E402
 from diagnostics.probe_native_model_pmi import file_digest, render_pdf_png  # noqa: E402
@@ -208,6 +210,7 @@ def assert_drawing(before, after, stage, expected_type=None):
 
 def save_part(adapter, path):
     exact_document(adapter.currentModel, path)
+    adapter.ownership.assert_current_owned()
     # Generated IModelDoc2.Save3 returns (success, errors, warnings).
     result = adapter.currentModel.Save3(
         1, 0, 0
@@ -227,7 +230,10 @@ def save_part(adapter, path):
 
 
 async def probe(adapter, source, directory):
-    from solidworks_mcp.adapters.solidworks.drawing import save_drawing
+    from diagnostics._owned_native_documents import save_drawing
+
+    adapter.ownership.register_directory(directory)
+    adapter.ownership.register_source(source)
 
     app = _early_bound(adapter.swApp, "ISldWorks")
     report = {
@@ -239,15 +245,11 @@ async def probe(adapter, source, directory):
     part_copy = directory / f"{directory.name}-part.SLDPRT"
     shutil.copy2(source, drawing_copy)
 
-    def close():
-        if not app.CloseAllDocuments(True):
-            raise RuntimeError(
-                "could not close native documents for isolated BASIC control"
-            )
-        adapter.currentModel = None
+    async def close():
+        await adapter.close_owned_documents()
 
     async def open_copy(path):
-        close()
+        await close()
         check("open unique BASIC control copy", await adapter.open_model(str(path)))
         exact_document(adapter.currentModel, path)
 
@@ -289,21 +291,23 @@ async def probe(adapter, source, directory):
             report["drawing_before"], report["drawing_before"], "drawing baseline"
         )
         export("before")
-        close()
+        await close()
         # Read the actual source saved file freshly and explicitly READ ONLY.
-        opened = app.OpenDoc6(
-            str(part), 1, 3, configuration, 0, 0
-        )  # PART; Silent|ReadOnly
-        if (
-            not isinstance(opened, tuple)
-            or len(opened) != 3
-            or opened[0] is None
-            or int(opened[1]) != 0
-        ):
-            raise RuntimeError(f"read-only source part OpenDoc6 failed: {opened!r}")
-        adapter.currentModel = _early_bound(opened[0], "IModelDoc2")
+        adapter.ownership.register_source(part)
+        with adapter.ownership.opening_native_document(part) as claim:
+            opened = app.OpenDoc6(
+                str(part), 1, 3, configuration, 0, 0
+            )  # PART; Silent|ReadOnly
+            if (
+                not isinstance(opened, tuple)
+                or len(opened) != 3
+                or opened[0] is None
+                or int(opened[1]) != 0
+            ):
+                raise RuntimeError(f"read-only source part OpenDoc6 failed: {opened!r}")
+            claim(_early_bound(opened[0], "IModelDoc2"))
         report["source_part_before"], _ = part_dimensions(adapter, part, configuration)
-        close()
+        await close()
         shutil.copy2(
             part, part_copy
         )  # matching internal document ID; never rebuild a replacement
@@ -342,7 +346,7 @@ async def probe(adapter, source, directory):
             "part save/reopen",
             BASIC,
         )
-        close()
+        await close()
         if not part_copy.is_file():
             raise RuntimeError("closed-document relink target does not exist")
         if not app.ReplaceReferencedDocument(
@@ -375,7 +379,7 @@ async def probe(adapter, source, directory):
         raise
     finally:
         try:
-            close()
+            await close()
         finally:
             report["source_hashes_after"] = {
                 name: file_digest(Path(name)) for name in report["source_hashes"]
@@ -398,6 +402,7 @@ def main():
     if source.suffix.upper() != ".SLDDRW":
         raise ValueError("requires a native part drawing")
     if not args.worker:
+        require_owned_diagnostic_environment()
         sys.path.insert(0, str(ROOT))
         import dodo
 
@@ -413,7 +418,7 @@ def main():
     reports = ROOT / "cad/out/reports"
     reports.mkdir(parents=True, exist_ok=True)
     directory = Path(tempfile.mkdtemp(prefix="source-basic-dimensions-", dir=reports))
-    return run_build(lambda adapter: probe(adapter, source, directory))
+    return run_copy_diagnostic(lambda adapter: probe(adapter, source, directory))
 
 
 if __name__ == "__main__":

@@ -1,4 +1,8 @@
-"""New copy diagnostics cannot enter the production document-clearing runner."""
+"""New copy diagnostics cannot enter the production document-clearing runner.
+
+The *_drawing.py name enrolls this test in check:recipe; its existing binding
+scan dependencies also include every top-level and diagnostics source inspected.
+"""
 
 import ast
 from pathlib import Path
@@ -20,6 +24,18 @@ MIGRATED = (
     "probe_drawing_right_gtol_column.py",
     "probe_drawing_thread_ink.py",
     "probe_native_gtol_selection.py",
+    "probe_fresh_lever_column.py",
+    "probe_drawing_thread_view.py",
+    "diagnostics/probe_datum_shoulder.py",
+    "diagnostics/probe_gtol_autoarrange.py",
+    "diagnostics/probe_gtol_commands.py",
+    "diagnostics/probe_gtol_rigid_body.py",
+    "diagnostics/probe_dimensions_after_gtol.py",
+    "diagnostics/probe_datum_frame_anchors.py",
+    "diagnostics/probe_datum_sheet_z.py",
+    "diagnostics/probe_datum_dimension_attachment.py",
+    "diagnostics/probe_source_basic_dimensions.py",
+    "diagnostics/probe_native_model_pmi.py",
 )
 
 
@@ -64,3 +80,15 @@ def test_copy_entrypoint_uses_owned_runner_and_guards_parent_preflight(filename)
     assert isinstance(first, ast.Expr)
     assert isinstance(first.value, ast.Call)
     assert first.value.func.id == "require_owned_diagnostic_environment"
+
+
+def test_required_recipe_gate_enrolls_entrypoint_test_and_every_audited_source():
+    import dodo
+
+    task = next(item for item in dodo.task_check() if item["name"] == "recipe")
+    command = task["actions"][0][1][0]
+    assert str(Path(__file__).resolve()) in command
+    assert str(Path(__file__).resolve()) in task["file_dep"]
+    assert {str((SCRIPTS / name).resolve()) for name in MIGRATED} <= set(
+        task["file_dep"]
+    )

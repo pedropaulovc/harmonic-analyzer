@@ -24,7 +24,9 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "cad/scripts"))
 
-from _common import _early_bound, check, run_build  # noqa: E402
+from _common import _early_bound, check  # noqa: E402
+from diagnostics._owned_native_documents import run_copy_diagnostic  # noqa: E402
+from diagnostics._owned_native_session import require_owned_diagnostic_environment  # noqa: E402
 from _drawing_annotation_bounds import annotation_box, _native_snapshot  # noqa: E402
 import _drawing_native_callouts as callouts  # noqa: E402
 from _drawing_view_packing import Rect  # noqa: E402
@@ -174,7 +176,11 @@ def baseline_matches(expected, actual):
 
 
 async def probe(adapter, sources, directory):
-    from solidworks_mcp.adapters.solidworks.drawing import save_drawing
+    from diagnostics._owned_native_documents import save_drawing
+
+    adapter.ownership.register_directory(directory)
+    for source in sources:
+        adapter.ownership.register_source(source)
 
     report = {
         "sources": [str(p) for p in sources],
@@ -183,12 +189,9 @@ async def probe(adapter, sources, directory):
         "errors": [],
     }
     report_path = directory / "datum-sheet-z.json"
-    app = _early_bound(adapter.swApp, "ISldWorks")
 
-    def close():
-        if not app.CloseAllDocuments(True):
-            raise RuntimeError("failed to close unique datum diagnostic documents")
-        adapter.currentModel = None
+    async def close():
+        await adapter.close_owned_documents()
 
     async def open_copy(source, stem):
         copy = directory / f"{directory.name}-{stem}.SLDDRW"
@@ -253,7 +256,7 @@ async def probe(adapter, sources, directory):
                         selected.direction.value,
                     )
                 )
-            close()
+            await close()
             for key, label, seed, xy, direction in plans:
                 for variant, target in z_variants(xy, seed["position"][2]):
                     stem = f"{source.stem}-{label}-{variant}"
@@ -284,13 +287,13 @@ async def probe(adapter, sources, directory):
                         trial["error"] = repr(error)
                         report["errors"].append(f"{stem}: {error}")
                     finally:
-                        close()
+                        await close()
     except Exception as error:
         report["operation_error"] = repr(error)
         raise
     finally:
         try:
-            close()
+            await close()
         finally:
             try:
                 guard_sources(report)
@@ -317,6 +320,7 @@ def main():
             "this control accepts saved cone-gear and rocker-arm drawings only"
         )
     if not args.worker:
+        require_owned_diagnostic_environment()
         sys.path.insert(0, str(ROOT))
         import dodo
 
@@ -337,7 +341,7 @@ def main():
     reports = ROOT / "cad/out/reports"
     reports.mkdir(parents=True, exist_ok=True)
     directory = Path(tempfile.mkdtemp(prefix="datum-sheet-z-", dir=reports))
-    return run_build(lambda adapter: probe(adapter, sources, directory))
+    return run_copy_diagnostic(lambda adapter: probe(adapter, sources, directory))
 
 
 if __name__ == "__main__":

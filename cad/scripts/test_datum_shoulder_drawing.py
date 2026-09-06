@@ -191,7 +191,7 @@ def test_failure_cleanup_still_checks_original_hashes_and_writes_report(
 
     path = tmp_path / "report.json"
     with pytest.raises(RuntimeError, match="changed an original"):
-        asyncio.run(probe.finalize_probe(SimpleNamespace(close=refuse), report, path))
+        asyncio.run(probe.finalize_probe(refuse, report, path))
     actual = json.loads(path.read_text())
     assert "unrelated active" in actual["cleanup_error"]
     assert actual["source_hashes_after"] != actual["source_hashes"]
@@ -298,7 +298,7 @@ def test_cleanup_refusal_preserves_source_hash_witness_in_report(tmp_path):
 
     path = tmp_path / "report.json"
     with pytest.raises(RuntimeError, match="unrelated active"):
-        asyncio.run(probe.finalize_probe(SimpleNamespace(close=refuse), report, path))
+        asyncio.run(probe.finalize_probe(refuse, report, path))
     actual = json.loads(path.read_text())
     assert actual["source_hashes_after"] == actual["source_hashes"]
 
@@ -344,7 +344,7 @@ def test_datum_main_uses_connect_only_runner():
     import inspect
 
     assert "run_build" not in inspect.getsource(probe)
-    assert "return run_owned_diagnostic(" in inspect.getsource(probe.main)
+    assert "return run_copy_diagnostic(" in inspect.getsource(probe.main)
 
 
 def test_parent_environment_guard_runs_before_seat_wrapper(monkeypatch, tmp_path):
