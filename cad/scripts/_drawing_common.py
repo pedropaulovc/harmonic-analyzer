@@ -4883,6 +4883,10 @@ def repair_project_drawing_layout(
         alignments=alignments,
         orderings=orderings,
         notes=notes,
+        # Observed INote.GetExtent changes after exact anchor moves were up to
+        # 0.266 mm in the native pilots. This is extra planning room, not a
+        # native error bound or a relaxation of the final 2 mm clearance check.
+        planning_headroom_m=0.0005,
     )
     _telemetry.info(
         "native sheet layout measured",
