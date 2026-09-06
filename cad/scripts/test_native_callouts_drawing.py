@@ -935,3 +935,91 @@ def test_datum_frame_requires_complete_closed_native_geometry():
         _datum_frame(SimpleNamespace(native_strokes=native[:3]), (0.1, 0.2, 0))
     with pytest.raises(RuntimeError, match="horizontal side"):
         _datum_frame(SimpleNamespace(native_strokes=native), (0.1, 0.205, 0))
+
+
+def test_arbor_b_native_left_midpoint_frame_is_supported():
+    from _drawing_native_callouts import (
+        _datum_frame,
+        _datum_side_delta,
+        _placement_body,
+    )
+
+    # Copy-only datum-frames-7vuiv_23: same exact edge/owner and frame before/after export.
+    frame = Rect(
+        0.05208515635556541,
+        0.03895238175661547,
+        0.05908515635556541,
+        0.04595238175661548,
+    )
+    position = (0.05208515635556541, 0.042452381756615476, -0.016000000004)
+    assert (
+        _datum_frame(SimpleNamespace(native_strokes=frame_strokes(frame)), position)
+        == frame
+    )
+    original = replace(symbol(), position=position, body=frame, frame=frame)
+    assert _datum_side_delta(original) == pytest.approx((-0.007, 0))
+    assert _placement_body(original).bounds == pytest.approx(
+        (frame.xmin - 0.007, frame.ymin, frame.xmax, frame.ymax)
+    )
+
+
+@pytest.mark.parametrize("side", ["left", "right"])
+def test_vertical_frame_side_change_translates_whole_quantity_body(side):
+    from _drawing_native_callouts import _datum_frame, _datum_side_delta
+
+    frame = Rect(0.1, 0.2, 0.107, 0.207)
+    position = (frame.xmin if side == "left" else frame.xmax, 0.2035, 0)
+    assert (
+        _datum_frame(SimpleNamespace(native_strokes=frame_strokes(frame)), position)
+        == frame
+    )
+    initial = replace(
+        symbol(), position=position, body=Rect(0.09, 0.19, 0.14, 0.207), frame=frame
+    )
+    delta = _datum_side_delta(initial)
+    expected_dx = -0.007 if side == "left" else 0.007
+    assert delta == pytest.approx((expected_dx, 0))
+    actual = replace(
+        initial, body=initial.body.translated(delta), frame=frame.translated(delta)
+    )
+    app = SimpleNamespace(IsSame=lambda a, b: int(a is b))
+    _final_symbol(app, initial, initial, actual)
+    with pytest.raises(RuntimeError, match="post-style translation"):
+        _final_symbol(
+            app,
+            initial,
+            initial,
+            replace(actual, body=actual.body.translated((0, 0.001))),
+        )
+    with pytest.raises(RuntimeError, match="post-style translation"):
+        _final_symbol(app, initial, initial, replace(actual, frame=frame))
+
+
+def test_off_midpoint_and_rotated_datum_frames_still_fail():
+    from _drawing_native_callouts import _datum_frame
+
+    frame = Rect(0.1, 0.2, 0.107, 0.207)
+    with pytest.raises(RuntimeError, match="midpoint"):
+        _datum_frame(
+            SimpleNamespace(native_strokes=frame_strokes(frame)), (0.1, 0.201, 0)
+        )
+    points = ((0.1, 0.2), (0.107, 0.207), (0.1, 0.214), (0.093, 0.207))
+    rotated = tuple(Segment(points[i], points[(i + 1) % 4], 0) for i in range(4))
+    with pytest.raises(RuntimeError):
+        _datum_frame(SimpleNamespace(native_strokes=rotated), (0.0965, 0.2035, 0))
+
+
+def test_cross_axis_frame_side_change_remains_unproven_and_rejected():
+    initial = symbol()
+    delta = (
+        -0.0035,
+        0.0035,
+    )  # bottom-attached frame becomes right-attached, not opposite.
+    actual = replace(
+        initial,
+        body=initial.body.translated(delta),
+        frame=initial.frame.translated(delta),
+    )
+    app = SimpleNamespace(IsSame=lambda a, b: int(a is b))
+    with pytest.raises(RuntimeError, match="post-style translation"):
+        _final_symbol(app, initial, initial, actual)
