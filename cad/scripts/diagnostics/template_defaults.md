@@ -34,11 +34,51 @@ ownership inventories, default witnesses and cleanup; `witness_seconds`,
 runtime fingerprint checks are outside those inner timers. Cleanup errors retain
 the original setup/witness failure; a mismatch stops before another trial.
 
-This is an offline-tested control awaiting native validation, **not** an
-end-to-end speedup result or a replacement for saved-drawing/visual acceptance.
+The native result below is **not** an end-to-end speedup result or a replacement
+for saved-drawing/visual acceptance.
 The full-recipe benchmark below and its strict cold-reopen gates are unchanged.
 Native shape references are bundled `IDrawingDoc/GetViews.md` (one array per
 sheet, sheet-view first) and `IModelDoc2/GetPathName.md` (empty for unsaved files).
+
+### Native setup-only result, 2026-09-06
+
+One invocation at frozen `ba2efb5d37b7a340d77c9cfa67d3ae48cf8033f1`, own unchanged
+venv/adapter `e77bfda4de1962625da8a9a859eb0bbaf1e6f10f`, exited 0 (session 54687).
+It attached existing PID 37136 with AUTOSTART=0 and remote cache off, using scale
+2:1 and two decimals. Receipt:
+`cad/out/reports/template-defaults/template-setup-abba-o46g8sv9/measurements.json`;
+the adjacent `ownership.json` records cleanup and the protected baseline.
+
+Preparation passed in **36.40925 s**, including native DRWDOT save, complete
+new-from-template defaults verification and cleanup. All four arms passed the
+unsaved/one-sheet/zero-model-view checks and exact semantic defaults comparison.
+Each snapshot retained 43 sheet notes and 10 individually proved zero-ink linked
+note extent observations; units read back exactly as Custom=4, mm=0, decimals=2.
+
+| Arm | Inner setup (s) | Defaults witness (s) | Cleanup (s) | Gross trial (s) |
+|---|---:|---:|---:|---:|
+| A — current | 5.78215 | 15.33368 | 1.52097 | 23.14565 |
+| B — prepared | 1.30077 | 16.00385 | 1.20389 | 18.79104 |
+| B — prepared | 1.33518 | 16.06669 | 1.30909 | 18.97658 |
+| A — current | 5.25838 | 14.65890 | 1.12715 | 21.49932 |
+
+Observed mean inner setup was 5.52026 s current versus 1.31798 s prepared,
+a 4.20228 s difference in this block. Preparation is a separate one-time cost;
+diagnostic witness/cleanup are not included in those helper times. The root's
+COM-free `check:recipe` (session 43782, 2,960 tests in 60.87 s) overlapped on the
+same host, with no competing COM or venv change. These are exploratory paired
+timings, not unloaded-host latency, a confidence interval or a fleet estimate.
+There was no rerun. Full-recipe build speedup and persistence remain unproved.
+
+Original template SHA remained
+`cbad80d25315dddc9bb5fefd690915c6f18fa7d181ac8c30d2f1408a980b55cc`;
+prepared template SHA remained
+`ee2416aeba39f29ace9406a16e7d8c001f73ca74b2c8ccd95023909f690b21ef`.
+Runtime/input guards passed. No part was opened, no trial drawing/PDF/PNG was
+saved, and all six owned preparation/trial documents closed without error.
+The exact initial clean visible channel-lever part and dirty unsaved visible
+`Draw2 - Sheet1` remained; ownership reports baseline preserved and no probe or
+cleanup error. The COM seat was explicitly released after this single run.
 
 ## Full-recipe control
 
