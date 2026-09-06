@@ -21,10 +21,13 @@ def intersects_cell(segment: Segment, cell: Rect) -> bool:
     points = (*segment.start, *segment.end)
     if not all(math.isfinite(value) for value in points):
         raise ValueError("native leader coordinates must be finite")
+    if not math.isfinite(segment.width_m) or segment.width_m < 0:
+        raise ValueError("native leader width must be finite/nonnegative")
+    radius = segment.width_m / 2
     lower, upper = 0.0, 1.0
     for start, finish, minimum, maximum in (
-        (segment.start[0], segment.end[0], cell.xmin, cell.xmax),
-        (segment.start[1], segment.end[1], cell.ymin, cell.ymax),
+        (segment.start[0], segment.end[0], cell.xmin - radius, cell.xmax + radius),
+        (segment.start[1], segment.end[1], cell.ymin - radius, cell.ymax + radius),
     ):
         delta = finish - start
         if delta == 0:
@@ -91,6 +94,11 @@ def crossing_records(leader_banks, measurements, decorations):
 def displayed_leader_coverage(native, displayed):
     """Conservative complete-segment containment map; no dropped display ink."""
     epsilon = 1e-8  # Same native duplicate-vertex precision as bounds extraction.
+    if any(
+        not math.isfinite(line.width_m) or line.width_m < 0
+        for line in (*native.segments, *displayed)
+    ):
+        raise ValueError("leader coverage requires finite/nonnegative stroke widths")
 
     def on_segment(point, segment):
         length = math.dist(segment.start, segment.end)
@@ -109,14 +117,18 @@ def displayed_leader_coverage(native, displayed):
         native_indices = [
             i
             for i, segment in enumerate(native.segments)
-            if on_segment(line.start, segment) and on_segment(line.end, segment)
+            if line.width_m <= segment.width_m
+            and on_segment(line.start, segment)
+            and on_segment(line.end, segment)
         ]
         decoration_indices = [
             i
             for i, box in enumerate(native.decorations)
             if all(
-                box.xmin - epsilon <= point[0] <= box.xmax + epsilon
-                and box.ymin - epsilon <= point[1] <= box.ymax + epsilon
+                box.xmin - epsilon <= point[0] - line.width_m / 2
+                and point[0] + line.width_m / 2 <= box.xmax + epsilon
+                and box.ymin - epsilon <= point[1] - line.width_m / 2
+                and point[1] + line.width_m / 2 <= box.ymax + epsilon
                 for point in (line.start, line.end)
             )
         ]
