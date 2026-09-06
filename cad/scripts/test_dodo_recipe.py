@@ -168,6 +168,21 @@ def test_execution_identity_tracker_migrates_missing_and_legacy_tokens(tmp_path)
     assert tracker(None, {}) is True
 
 
+def test_channel_pose_helper_is_only_a_channel_construction_input():
+    dodo = _load_dodo()
+    helper = str((dodo.SCRIPTS_DIR / "_channel_pose.py").resolve())
+    consumers = {
+        stem for stem in dodo.ASSEMBLY_ORDER if helper in dodo._recipe_files(stem)
+    }
+    assert consumers == {"channel"}
+    for script in dodo.part_scripts():
+        stem = script.stem.removeprefix("build_")
+        assert helper not in dodo._part_file_deps(script, stem)
+    assert "_channel_pose" not in (dodo.SCRIPTS_DIR / "_cwm.py").read_text(
+        encoding="utf-8"
+    ).split("from __future__", 1)[1]
+
+
 def test_assembly_depends_on_exact_child_execution_identities():
     """Issue #301: recipe-equal CAD files can carry different PIDs/rebuild stamps."""
     dodo = _load_dodo()
