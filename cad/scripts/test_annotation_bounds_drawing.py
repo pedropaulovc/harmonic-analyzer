@@ -3,6 +3,7 @@
 from dataclasses import replace
 import math
 import sys
+from types import SimpleNamespace
 
 import pytest
 from _drawing_view_packing import Rect
@@ -14,6 +15,7 @@ from _drawing_annotation_bounds import (
     bounds_from_snapshot,
     font_cell_extent,
     _gdi_cell,
+    _native_snapshot,
 )
 
 
@@ -49,6 +51,104 @@ def test_native_stroke_witness_preserves_internal_geometry_and_print_width():
     )
     translated = bounds_from_snapshot(snapshot(kind=15, text_runs=(), lines=shifted))
     assert translated.native_strokes == shifted
+
+
+def _all_around_snapshot(
+    monkeypatch, *, side, all_around=lambda: True, circle_offset=0.0, sweep="closed"
+):
+    """Sanitized channel-lever DetailItem350 native side-switch fixture."""
+    import _drawing_annotation_bounds as module
+
+    monkeypatch.setattr(module, "_early_bound", lambda value, interface: value)
+    original_x = 0.229100000042
+    anchor_x, elbow_x = original_x, 0.222750000042
+    if side == "right":
+        anchor_x, elbow_x = 0.06324632791085244, 0.10834424444129764
+    anchor_y, elbow_y = 0.159750000025, 0.156250000025
+    width = 0.03874791653044521
+    frame = rectangle(anchor_x, anchor_y - 0.007, anchor_x + width, anchor_y)
+    start_x = anchor_x if side == "left" else anchor_x + width
+    leader = ((start_x, elbow_y, 0), (elbow_x, elbow_y, 0), (original_x, anchor_y, 0))
+    circle = (
+        -1,
+        0,
+        0,
+        0,
+        elbow_x + circle_offset + 0.00175,
+        elbow_y,
+        0,
+        elbow_x + circle_offset + (0.00175 if sweep == "closed" else -0.00175),
+        elbow_y,
+        0,
+        elbow_x + circle_offset,
+        elbow_y,
+        0,
+        0,
+        0,
+        1,
+        1,
+    )
+    data = SimpleNamespace(
+        GetTextCount=lambda: 0,
+        GetLineCount=lambda: len(frame),
+        GetLineAtIndex3=lambda index: (
+            -1,
+            0,
+            0,
+            0,
+            *frame[index].start,
+            0,
+            *frame[index].end,
+            0,
+        ),
+        GetArcCount=lambda: 1,
+        GetArcAtIndex2=lambda index: circle,
+        GetPolyLineCount=lambda: 0,
+        GetTriangleCount=lambda: 0,
+        GetArrowHeadCount=lambda: 0,
+        GetPolygonCount=lambda: 0,
+    )
+    annotation = SimpleNamespace(
+        GetType=lambda: 5,
+        GetName=lambda: "DetailItem350",
+        GetDisplayData=lambda: data,
+        GetLeaderCount=lambda: 1,
+        GetLeaderPointsAtIndex=lambda index: tuple(
+            value for point in leader for value in point
+        ),
+        GetLeaderAllAround=all_around,
+        GetPosition=lambda: (anchor_x, anchor_y, 0),
+    )
+    return _native_snapshot(annotation)
+
+
+def test_native_all_around_circle_follows_elbow_without_deforming_frame(monkeypatch):
+    before = bounds_from_snapshot(_all_around_snapshot(monkeypatch, side="left"))
+    after = bounds_from_snapshot(_all_around_snapshot(monkeypatch, side="right"))
+    delta = (0.06324632791085244 - 0.229100000042, 0)
+    assert after.body.bounds == pytest.approx(before.body.translated(delta).bounds)
+    assert before.body.xmin == pytest.approx(0.229100000042)
+    assert before.envelope.xmin == pytest.approx(0.221000000042)
+    assert after.envelope.xmax >= 0.11009424444129765
+    assert len(_all_around_snapshot(monkeypatch, side="right").leader_boxes) == 1
+
+
+def test_arc_at_elbow_is_not_excluded_without_native_all_around_flag(monkeypatch):
+    native = _all_around_snapshot(monkeypatch, side="left", all_around=lambda: False)
+    assert len(native.primitive_boxes) == 1
+    assert native.leader_boxes == ()
+    assert bounds_from_snapshot(native).body.xmin == pytest.approx(0.221000000042)
+
+
+@pytest.mark.parametrize("circle_offset,sweep", [(0.002, "closed"), (0.0, "partial")])
+def test_only_complete_circle_at_native_elbow_is_leader_decoration(
+    monkeypatch, circle_offset, sweep
+):
+    native = _all_around_snapshot(
+        monkeypatch, side="left", circle_offset=circle_offset, sweep=sweep
+    )
+    assert len(native.primitive_boxes) == 1
+    assert native.leader_boxes == ()
 
 
 def text(value="LONG QUANTITY BELOW FRAME", position=(0.05, 0.04), angle=0):
