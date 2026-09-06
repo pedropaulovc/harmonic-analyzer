@@ -494,3 +494,83 @@ def test_cleanup_does_not_pass_unloaded_target_or_reference_back_to_com(native):
     native.app.IsSame = reject_unloaded
     asyncio.run(adapter.close_owned_documents())
     assert native.app.documents == [user]
+
+
+def test_freeze_requires_exact_completed_and_closed_owned_artifact(native):
+    adapter = facade(native)
+    with pytest.raises(RuntimeError, match="completed|closed"):
+        adapter.ownership.freeze_owned_input(native.copy)
+    asyncio.run(adapter.open_model(str(native.copy)))
+    with pytest.raises(RuntimeError, match="completed|closed"):
+        adapter.ownership.freeze_owned_input(native.copy)
+    asyncio.run(adapter.close_model())
+    adapter.ownership.freeze_owned_input(native.copy)
+    adapter.ownership.register_source(native.copy)  # Explicit nested read-only reuse.
+    with pytest.raises(RuntimeError, match="protected|source|frozen"):
+        asyncio.run(adapter.open_model(str(native.copy)))
+    evidence = adapter.ownership.evidence()
+    assert evidence["frozen_inputs"][str(native.copy)]["native_state"]["path"] == str(
+        native.copy
+    )
+    assert evidence["source_hashes"][str(native.copy)]["unchanged"]
+
+
+@pytest.mark.parametrize("replacement", ["bytes", "file", "native_handle"])
+def test_freeze_rejects_changed_file_or_replaced_native_handle(native, replacement):
+    adapter = facade(native)
+    asyncio.run(adapter.open_model(str(native.copy)))
+    asyncio.run(adapter.close_model())
+    if replacement == "bytes":
+        native.copy.write_bytes(b"replacement contents")
+    if replacement == "file":
+        substitute = native.directory / "substitute.SLDDRW"
+        substitute.write_bytes(native.copy.read_bytes())
+        substitute.replace(native.copy)
+    if replacement == "native_handle":
+        native.app.documents.append(Model(native.copy))
+    with pytest.raises(RuntimeError, match="changed|unexpected|replaced"):
+        adapter.ownership.freeze_owned_input(native.copy)
+
+
+def test_frozen_artifact_replacement_is_rejected_on_nested_source_reuse(native):
+    adapter = facade(native)
+    asyncio.run(adapter.open_model(str(native.copy)))
+    asyncio.run(adapter.close_model())
+    adapter.ownership.freeze_owned_input(native.copy)
+    native.copy.write_bytes(b"changed after freeze")
+    with pytest.raises(RuntimeError, match="changed|replaced"):
+        adapter.ownership.register_source(native.copy)
+
+
+def test_explicit_native_open_scope_preserves_readonly_call_shape_and_claims_source(
+    native,
+):
+    adapter = facade(native)
+    calls = []
+
+    def open_doc(*args):
+        calls.append(args)
+        model = Model(native.source, kind=1)
+        native.app.documents.append(model)
+        native.app.ActiveDoc = model
+        return model, 0, 0
+
+    with adapter.ownership.opening_native_document(native.source) as claim:
+        result = open_doc(str(native.source), 1, 3, "Exact configuration", 0, 0)
+        claim(result[0])
+    assert calls == [(str(native.source), 1, 3, "Exact configuration", 0, 0)]
+    with pytest.raises(RuntimeError, match="borrowed|source|owned"):
+        adapter.ownership.assert_current_owned()
+    asyncio.run(adapter.close_owned_documents())
+    assert native.app.closes == [result[0]]
+
+
+def test_failed_explicit_native_open_claims_only_requested_source_for_cleanup(native):
+    adapter = facade(native)
+    model = Model(native.source, kind=1)
+    with pytest.raises(RuntimeError, match="native result error"):
+        with adapter.ownership.opening_native_document(native.source):
+            native.app.documents.append(model)
+            raise RuntimeError("native result error")
+    asyncio.run(adapter.close_owned_documents())
+    assert native.app.closes == [model]
