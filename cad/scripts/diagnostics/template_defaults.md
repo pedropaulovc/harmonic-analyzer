@@ -144,3 +144,26 @@ accept arbitrary equivalent presets or change the production helper. The live
 mechanism control used precision2; precision3 remains an offline-tested variant.
 Both owned blank drawings closed, the original template SHA stayed unchanged,
 and `ownership.json` again proves the visible part and dirty Draw2 were preserved.
+
+## Modern SaveAs first observation
+
+At revision `59fc13fb`, preparation passed the corrected unit, ten style-scope and
+sheet-note checks, then stopped at the owned SaveAs path guard. Extension SaveAs3
+returned `(True, 0, 0)`, but the drawing stayed unnamed and the requested DRWDOT
+did not exist. The failed preparation cost 16.439 seconds; no trial ran and this
+is not successful template timing. Evidence is retained in
+`template-abba-qyq6fi4_/measurements.json`; original hashes and visible baseline
+documents were preserved with no cleanup error.
+
+`probe_drawing_template_save.py` compares the exact existing production
+`IModelDoc2.SaveAs3(path,0,0)` call shape against this advanced silent SaveAs3
+shape on fresh blank drawings, each targeting SLDDRW and DRWDOT. Production
+SLDDRW is attempted first; if that positive call shape does not persist here,
+the remaining cells are not attempted. The control records raw returns, exact
+document/path/file witnesses, scoped ownership and save/reopen (or new document
+from DRWDOT) sheet properties. It compares complete call shapes, including their
+different option values, and therefore cannot isolate a method-only cause.
+The legacy integer result is retained without inventing an undocumented meaning;
+file plus exact native persistence must independently prove a successful cell.
+No unsupported-template or incorrect-guard conclusion follows from the first
+modern result. This follow-up needs separate source review and a seat grant.
