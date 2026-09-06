@@ -91,6 +91,24 @@ task-edge and target snapshots were byte-identical (SHA-256
 `24a2050d818acb6ee345fe3251fb839950b899bea45b5122b939a57653e1d904`).
 These are local startup observations, not elapsed full-build measurements.
 
+### Source-consuming assembly dependencies
+
+The source-manifest parser follows actual component insertion arguments, local
+wrappers and supported literal manifests, rather than matching names in comments
+or error messages. The real graph has 119 edges instead of 125. It removes these
+six false dependencies (assembly ← unnecessary input): frame ← gooseneck and
+rocker arm; drive train ← harmonic base and channel; channel ← cylinder gear and
+frame. This removes six target inputs, six execution-token inputs and one unused
+cylinder-gear configuration input. Other assembly edges are unchanged.
+
+Unknown source expressions fail discovery. `check:graph` also checks each
+builder's helper closure and the canonical insertion helpers against the supported
+source-consumption contract; the bounded parser does not claim whole-program
+Python analysis. Mutation and imported-helper regressions reject newly hidden
+sources. First parsing took 0.465 seconds versus 0.369 for the former scan;
+content-cached repeats took 0.029 seconds. This change avoids false rebuilds, not
+cold-start parsing cost.
+
 ### Drawing dependency scope
 
 `_drawing_project_layout.py` is imported directly by the seven semantic pilots,
@@ -298,7 +316,8 @@ no feasible layout at 6:1 after an exhaustive 65-node search. Changing its views
 to 4:1 produced a complete native/PDF/PNG build without reducing text or clearance.
 The later pedestal rerun exposed a separate overly restrictive implementation
 guard: a datum anchor need not lie on a horizontal frame edge. Its exact native
-left-edge midpoint is a supported API position; the correction is under test.
+left-edge midpoint is a supported API position. A read-only copy control measured
+that relationship before the guard was corrected; a production rerun then passed.
 
 At `8cc55ebd`, pedestal and pen v-block integrated layout took 66.380 and 45.206
 seconds respectively. These are successful layout phases, not complete drawing
@@ -334,6 +353,14 @@ multi-jog leaders. Explicit native stroke widths are respected; current GTol
 zero-width data certify centerlines plus native decoration boxes, not arbitrary
 layer/print stroke widths or exact glyph ink.
 
+At `64fd074f`, the corrected pedestal completed native/PDF/PNG output in 97.678
+seconds, including 64.258 seconds in integrated layout. The sheet was visually
+inspected. Its final frame/body readback and leader-clearance checks passed; trace
+`0x727cbc29cb1fc199802869ea7133edaa`. This makes four production pilots complete
+under the bounded leader policy. The gear, lever and rocker datum cases remain
+unresolved; stationary dimension-attached datum placement has a positive copied
+gear control but is not yet integrated into those production recipes.
+
 The current bounds implementation is calibrated for SolidWorks 2026 (major
 revision 34) and the tested native font profile. It uses conservative GDI text
 cells, actual native frame/stroke geometry and native note extents, not nominal
@@ -347,6 +374,24 @@ Separate cache transfer, COM-seat waiting, process startup, construction and
 verification. Correlate child spans with their task and attempt; exclude mocked
 test telemetry from build statistics. Do not add inclusive parents to children or
 sum overlapping workers' waits as elapsed pipeline time.
+
+Pytest now isolates full local telemetry before importing application modules,
+disables dashboard export and removes inherited production trace/startup context.
+Records are retained under `cad/out/reports/pytest-telemetry/run-*`; production
+defaults are unchanged. A separate fixture bug found during the dependency tests
+patched only `dodo.CAD_OUT`, while its imported artifact-path function read
+`_buildgraph.CAD_OUT`. It overwrote 108 generated part files and eight assemblies
+with mock bytes; their execution tokens were not overwritten. The fixture now
+patches both owners and checks resolved target/token containment before writing.
+Exact-hash artifact recovery is recorded under
+`performance-audit-20260905/artifact-recovery/`: 112 files came from exact local
+copies and four from their recorded Azure cache publications. All 116 recovered
+native files match their original, unchanged execution tokens; the final audit
+found zero mismatches. Only native members were restored, not tokens or other
+outputs. Pytest also now rejects ordinary Python writes, replacements, deletions
+and aliases involving the checkout's native output directories before collection;
+12 real mutation controls preserve their sentinels. This fixture tripwire is not
+an OS/COM sandbox. This incident was not a SolidWorks geometry or attachment failure.
 
 Save and PDF export need separate spans: together they consumed 87 to 116 seconds
 of the top assembly drawing's 107 to 140 second task in the inspected histories.
