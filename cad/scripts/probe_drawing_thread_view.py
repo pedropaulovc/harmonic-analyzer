@@ -2,6 +2,8 @@
 
 Run through uv with DRAWING PART --feature NAME. The parent takes the COM seat.
 Use --mode definition for a read-only copied-source feature-definition capture.
+Use --mode metadata for view-owned annotation width/layer/position metadata only,
+without a rebuild, configuration change, suppression, or save.
 Use --mode corrected with explicit standard/type/size/minor-diameter inputs to
 modify only the copied cosmetic definition, run A/B/A, and verify saved/reopened
 definition values. This does not repair an undersized solid thread envelope.
@@ -130,6 +132,58 @@ def capture_polylines(view):
         "edge_slot_count": len(edge_slots),
         "null_edge_slots": [i for i, edge in enumerate(edge_slots) if edge is None],
     }
+
+
+def thread_visual_metadata(annotation):
+    """Observe native width/layer defaults without interpreting undefined flags.
+
+    GetVisualProperties is color/style/width/layerID/layerOverride. The last
+    field is undefined on no-layer annotations; preserve it, do not use it as
+    a default-width certificate. GetPosition does not document cosmetic-thread
+    support, so an empty native position is evidence, not a guessed anchor.
+    """
+    properties = tuple(annotation.GetVisualProperties() or ())
+    if len(properties) != 5:
+        raise RuntimeError("thread visual properties must contain five integers")
+    return {
+        "layer": str(annotation.Layer),
+        "width": int(annotation.Width),
+        "visual_properties": properties,
+        "position": _numbers(annotation.GetPosition()),
+    }
+
+
+def capture_thread_metadata(adapter, views):
+    """Read actual annotation context without mutating or saving any document."""
+    result = {}
+    for name, view in views.items():
+        rows = []
+        for raw in view.GetAnnotationsByType(1) or ():
+            annotation = _early_bound(raw, "IAnnotation")
+            specific = _early_bound(annotation.GetSpecificAnnotation(), "ICThread")
+            if (
+                int(annotation.OwnerType) != 0
+                or int(adapter.swApp.IsSame(annotation.Owner, view)) != 1
+                or int(adapter.swApp.IsSame(specific.GetAnnotation(), annotation)) != 1
+            ):
+                raise RuntimeError(
+                    "cosmetic-thread metadata native owner/identity differs"
+                )
+            rows.append(
+                {
+                    "name": str(annotation.GetName()),
+                    "visible": int(annotation.Visible),
+                    "dangling": bool(annotation.IsDangling()),
+                    **thread_visual_metadata(annotation),
+                    "native_display_counts": display_counts(
+                        _early_bound(annotation.GetDisplayData(), "IDisplayData")
+                    ),
+                }
+            )
+        result[name] = rows
+    if not any(result.values()):
+        raise RuntimeError("copied drawing contains no cosmetic-thread annotations")
+    return result
 
 
 def capture_view(adapter, view):
@@ -535,7 +589,7 @@ def main():
     parser.add_argument("--feature", required=True)
     parser.add_argument(
         "--mode",
-        choices=("suppression", "definition", "corrected"),
+        choices=("suppression", "definition", "corrected", "metadata"),
         default="suppression",
     )
     parser.add_argument("--standard", type=int)
@@ -644,6 +698,10 @@ def main():
                 raise RuntimeError(
                     "source-feature control requires one explicit part configuration"
                 )
+            if args.mode == "metadata":
+                report["annotation_metadata"] = capture_thread_metadata(adapter, views)
+                report["outcome"] = "native_thread_annotation_metadata_captured"
+                return {"report": str(folder / "coverage.json")}
             part_model = _activate_copy(adapter, part_copy)
             expected_configuration = next(iter(configurations))
             manager = _early_bound(

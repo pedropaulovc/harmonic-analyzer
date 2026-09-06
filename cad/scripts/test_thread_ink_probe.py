@@ -415,3 +415,71 @@ def test_view_position_drift_is_not_interpreted_as_thread_ink():
     assert view_probe.view_context_differences({"iso": row}, {"iso": moved}) == {
         "iso": {"position": {"before": row["position"], "after": moved["position"]}}
     }
+
+
+def test_thread_visual_metadata_preserves_empty_layer_and_missing_native_position():
+    annotation = SimpleNamespace(
+        Layer="",
+        Width=0,
+        GetVisualProperties=lambda: (-1, 1, 0, -1, 0),
+        GetPosition=lambda: None,
+    )
+    assert view_probe.thread_visual_metadata(annotation) == {
+        "layer": "",
+        "width": 0,
+        "visual_properties": (-1, 1, 0, -1, 0),
+        "position": (),
+    }
+
+
+def test_thread_visual_metadata_preserves_layer_override_without_defaulting():
+    annotation = SimpleNamespace(
+        Layer="Heavy thread",
+        Width=7,
+        GetVisualProperties=lambda: (-1, 1, 7, 12, 4),
+        GetPosition=lambda: (0.1, 0.2, 0.3),
+    )
+    actual = view_probe.thread_visual_metadata(annotation)
+    assert actual["layer"] == "Heavy thread"
+    assert actual["visual_properties"] == (-1, 1, 7, 12, 4)
+    assert actual["position"] == (0.1, 0.2, 0.3)
+
+
+def test_metadata_capture_preserves_all_four_view_contexts_and_rejects_foreign_owner(
+    monkeypatch,
+):
+    monkeypatch.setattr(view_probe, "display_counts", lambda _data: {"lines": 2})
+    adapter = SimpleNamespace(swApp=SimpleNamespace(IsSame=lambda a, b: int(a is b)))
+    views, annotations = {}, []
+    for name in ("front", "end", "iso", "right"):
+        view = SimpleNamespace()
+        annotation = SimpleNamespace(
+            Layer="",
+            Width=0,
+            OwnerType=0,
+            Owner=view,
+            Visible=1,
+            IsDangling=lambda: False,
+            GetName=lambda: "NativeThread",
+            GetVisualProperties=lambda: (-1, 1, 0, -1, 0),
+            GetPosition=lambda: None,
+            GetDisplayData=lambda: object(),
+        )
+        specific = SimpleNamespace(
+            GetAnnotation=lambda annotation=annotation: annotation
+        )
+        annotation.GetSpecificAnnotation = lambda specific=specific: specific
+        view.GetAnnotationsByType = lambda _kind, annotation=annotation: (annotation,)
+        views[name] = view
+        annotations.append(annotation)
+    result = view_probe.capture_thread_metadata(adapter, views)
+    assert set(result) == set(views)
+    assert all(len(rows) == 1 and rows[0]["position"] == () for rows in result.values())
+    annotations[-1].Owner = object()
+    with pytest.raises(RuntimeError, match="owner/identity"):
+        view_probe.capture_thread_metadata(adapter, views)
+
+
+def test_metadata_capture_rejects_empty_thread_inventory():
+    with pytest.raises(RuntimeError, match="no cosmetic-thread"):
+        view_probe.capture_thread_metadata(object(), {})
