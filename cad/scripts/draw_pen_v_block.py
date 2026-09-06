@@ -53,8 +53,7 @@ from pen_v_block_spec import (
     BORE_DIA,
     CHAMFER,
     SCREW_HOLE_XY,
-    GROOVE_DEPTH,
-    GROOVE_WIDTH,
+    GROOVE_WIDTH as GROOVE_WIDTH,
     GROOVE_Z0,
     SURFACE_FINISHES,
 )
