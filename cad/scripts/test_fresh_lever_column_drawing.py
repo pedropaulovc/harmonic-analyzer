@@ -1,4 +1,4 @@
-"""Isolated recipe inputs and coherent copied-control orchestration contracts."""
+"""Coherent copied-control contracts enrolled in the full drawing recipe gate."""
 
 import inspect
 from pathlib import Path
