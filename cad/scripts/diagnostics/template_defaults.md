@@ -218,3 +218,27 @@ defaults comparison. Empty unlinked notes and every nonempty/resolved note keep
 their existing exact extent/content comparison. The next controlled native run
 must prove or reject the new classification; the preceding observation did not
 capture native primitive inventories and is not itself no-ink evidence.
+# Exact interrupted-trial recovery
+
+The `bc63e4d7` arbor trial (`template-abba-bn33bcg_`) passed template preparation
+but the original part became dirty in memory during the unchanged recipe. The
+ownership guard stopped before drawing save and refused its generic cleanup.
+Both original disk hashes and the two pre-existing visible documents were
+preserved. This is not an accepted performance result or a harmless dirty flag.
+
+`recover_template_abba_scene.py` is the separately reviewed, one-off recovery for
+that receipt and PID 37136. It captures the five named source parameters, native
+tolerance/BASIC values, current configuration, cached properties and Draw16's
+raw dimension/attachment observations, with individual read failures explicit.
+It requires the exact four visible documents, native identities and source SHA
+before closing only diagnostic-created Draw16 and diagnostic-opened arbor without
+saving. It rechecks the disk SHA and original two-document baseline afterwards.
+It never changes the shared ownership policy. Run only after a fresh exclusive
+seat grant; it cannot be reused for another scene. Native recovery remains
+unverified until its retained receipt reports success.
+
+The unchanged recipe's imported-dimension `SetText` and `SetPrecision3`, and
+drawing-created dimension `SetArcEndCondition`/`SetToleranceType`, are concrete
+mutating call sites to investigate. Imported BASIC validation itself is read-only.
+The current before/after guard does not localize which operation dirtied the part;
+no causal verdict or automatic benchmark retry follows from this observation.
