@@ -8,6 +8,7 @@ import pytest
 from _drawing_view_packing import Rect
 from _drawing_native_callouts import (
     Direction,
+    GtolPlacement,
     arrange_native_callouts,
     placement_candidates,
     _same_symbol,
@@ -230,9 +231,10 @@ def native_setup(monkeypatch, kind=2, outline=(0.02, 0.04, 0.1, 0.08)):
         ),
     )
     annotation.Owner = view
+    sheet_view = SimpleNamespace(GetAnnotations=lambda: ())
     model = SimpleNamespace(
         GetType=lambda: 3,
-        GetViews=lambda: ((object(), view),),
+        GetViews=lambda: ((sheet_view, view),),
         ActivateView=lambda name: activations.append(name) or True,
         ClearSelection2=lambda _: None,
     )
@@ -261,10 +263,10 @@ def native_setup(monkeypatch, kind=2, outline=(0.02, 0.04, 0.1, 0.08)):
     return adapter, view, annotation, annotations, calls, activations, measure
 
 
-def run_native(setup):
+def run_native(setup, **kwargs):
     adapter, view, *_rest, measure = setup
     return arrange_native_callouts(
-        adapter, views={"front": view}, measure_annotation=measure
+        adapter, views={"front": view}, measure_annotation=measure, **kwargs
     )
 
 
@@ -369,6 +371,119 @@ def test_native_attachment_count_cannot_hide_truncated_return_arrays(monkeypatch
     with pytest.raises(RuntimeError, match="exact callout attachments"):
         run_native(setup)
     assert not setup[2].moves
+
+
+def extra_annotation(setup, kind):
+    annotation = NativeAnnotation(kind)
+    annotation.Owner = setup[1]
+    annotation.position = (0.2, 0.2, 0)
+    setup[3].append(annotation)
+    return annotation
+
+
+def test_gtols_remain_fully_measured_obstacles_by_default(monkeypatch):
+    setup = native_setup(monkeypatch)
+    annotation = extra_annotation(setup, 5)
+    run_native(setup)
+    assert len(setup[4][annotation.GetName()]) == 2
+
+
+def test_following_gtol_pass_defers_only_gtol_glyph_measurement(monkeypatch):
+    setup = native_setup(monkeypatch)
+    gtol = extra_annotation(setup, 5)
+    dimension = extra_annotation(setup, 4)
+    result = run_native(setup, gtol_placement=GtolPlacement.ARRANGED_NEXT)
+    assert gtol.GetName() not in setup[4]
+    assert len(setup[4][dimension.GetName()]) == 2
+    assert result["front"]["deferred_annotations"] == {gtol.GetName(): 5}
+
+
+def test_deferred_gtol_replacement_is_not_hidden_by_skipped_glyph_measurement(
+    monkeypatch,
+):
+    setup = native_setup(monkeypatch)
+    gtol = extra_annotation(setup, 5)
+    original_move = setup[2].SetPosition2
+
+    def replace_gtol(*point):
+        replacement = NativeAnnotation(5)
+        replacement.Owner = setup[1]
+        setup[3][setup[3].index(gtol)] = replacement
+        return original_move(*point)
+
+    setup[2].SetPosition2 = replace_gtol
+    with pytest.raises(RuntimeError, match="deferred native annotation identity"):
+        run_native(setup, gtol_placement=GtolPlacement.ARRANGED_NEXT)
+
+
+def unattached_note(setup):
+    note = extra_annotation(setup, 6)
+    note.entities = ()
+    note.GetAttachedEntityTypes = lambda: ()
+    return note
+
+
+def test_only_exact_declared_unattached_note_defers_glyph_measurement(monkeypatch):
+    setup = native_setup(monkeypatch)
+    note = unattached_note(setup)
+    result = run_native(setup, deferred_notes=(note,))
+    assert note.GetName() not in setup[4]
+    assert result["front"]["deferred_annotations"] == {note.GetName(): 6}
+
+
+def test_sheet_owned_declared_note_has_valid_drawing_membership(monkeypatch):
+    setup = native_setup(monkeypatch)
+    note = unattached_note(setup)
+    setup[3].remove(note)
+    sheet_view = setup[0].currentModel.GetViews()[0][0]
+    sheet_view.GetAnnotations = lambda: (note,)
+    note.Owner = sheet_view
+    result = run_native(setup, deferred_notes=(note,))
+    assert result["front"]["deferred_annotations"] == {}
+    assert note.GetName() not in setup[4]
+
+
+def test_undeclared_note_remains_a_measured_obstacle(monkeypatch):
+    setup = native_setup(monkeypatch)
+    note = unattached_note(setup)
+    run_native(setup)
+    assert len(setup[4][note.GetName()]) == 2
+
+
+@pytest.mark.parametrize("problem", ["absent", "wrong_kind", "attached", "hidden"])
+def test_invalid_declared_packing_note_rejected_before_motion(monkeypatch, problem):
+    setup = native_setup(monkeypatch)
+    note = unattached_note(setup)
+    if problem == "absent":
+        setup[3].remove(note)
+    if problem == "wrong_kind":
+        note.kind = 5
+    if problem == "attached":
+        note.entities = (object(),)
+    if problem == "hidden":
+        note.Visible = 3
+    with pytest.raises(ValueError):
+        run_native(setup, deferred_notes=(note,))
+    assert not setup[2].moves
+
+
+def test_non_deferred_unsupported_footprint_still_fails(monkeypatch):
+    setup = native_setup(monkeypatch)
+    unsupported = extra_annotation(setup, 99)
+    adapter, view, *_rest, measure = setup
+
+    def strict_measure(adapter, annotation):
+        if annotation is unsupported:
+            raise ValueError("unsupported kind99")
+        return measure(adapter, annotation)
+
+    with pytest.raises(ValueError, match="unsupported kind99"):
+        arrange_native_callouts(
+            adapter,
+            views={"front": view},
+            measure_annotation=strict_measure,
+            gtol_placement=GtolPlacement.ARRANGED_NEXT,
+        )
 
 
 def test_witnessed_native_datum_frame_flip_is_not_mistaken_for_deformation():
