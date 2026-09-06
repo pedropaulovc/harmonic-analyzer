@@ -2029,6 +2029,41 @@ def delete_unnamed_imports(adapter: Any, annotations: list[Any]) -> list[Any]:
     return survivors
 
 
+@_telemetry.traced("drawing.retain_dimensions", label_param="view_label")
+def retain_view_dimensions(
+    adapter: Any,
+    view: Any,
+    *,
+    keep: Iterable[str],
+    view_label: str,
+) -> list[Any]:
+    """Keep exactly the named model dimensions without assigning text positions.
+
+    Native layout callers arrange the returned dimensions after authoring their
+    callouts. Import-time coordinate writes would be both redundant and dependent
+    on an earlier view layout. Validate multiplicity, not just set membership:
+    two imported dimensions with the same short name are ambiguous.
+    """
+    expected = tuple(keep)
+    if any(not isinstance(name, str) or not name for name in expected):
+        raise ValueError("retained dimension names must be nonempty strings")
+    if len(set(expected)) != len(expected):
+        raise ValueError("retained dimension names must be unique")
+    annotations = delete_unnamed_imports(
+        adapter, insert_marked_dimensions(adapter, view)
+    )
+    names = {dimension_name(adapter, annotation) for annotation in annotations}
+    delete = tuple(sorted(name for name in names if name and name not in expected))
+    curated = curate_dimensions(adapter, annotations, delete=delete)
+    present = Counter(dimension_name(adapter, annotation) for annotation in curated)
+    if present != Counter(expected):
+        raise RuntimeError(
+            f"{view_label} view model dimension mismatch: "
+            f"expected={sorted(expected)}, actual={dict(present)}"
+        )
+    return curated
+
+
 @_telemetry.traced("drawing.curate_dimensions", label_param="view_label")
 def curate_view_dimensions(
     adapter: Any,
