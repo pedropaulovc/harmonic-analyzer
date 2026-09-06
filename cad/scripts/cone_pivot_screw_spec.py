@@ -34,12 +34,24 @@ THREAD_LENGTH_TOL = 0.10
 THREAD_RUNOUT_PITCHES = 1.0
 DISTAL_CHAMFER = 0.50
 MIN_FULL_FORM = 6.00
-# The manufacturing contract remains the nominal external thread.  The CAD body
-# uses the matching tap-drill envelope so the simplified male/female solids do
-# not overlap; the native cosmetic thread and drawing carry the #10-24 form.
+# The manufacturing contract remains the nominal external thread. The CAD body
+# retains the matching tap-drill envelope to avoid simplified male/female solid
+# overlap. A boss cosmetic thread draws its MINOR diameter: it cannot restore
+# the absent nominal-major solid outline. Changing that outline requires a
+# separate assembly-fit/interference decision, not an annotation correction.
 THREAD_MAJOR_DIA = THREAD_MAJOR_MM[THREAD]
 THREAD_TAP_DRILL_DIA = TAP_DRILL_MM[THREAD]
 THREAD_SOLID_DIA = THREAD_TAP_DRILL_DIA
+# Installed SOLIDWORKS R2026x Toolbox swbrowser.sldedb: AI_DATA_THRD row
+# full_size='#10-24', THD_MINOR='.1404' inches. AI_Type_CThread names its type
+# 'Machine Threads'. This is the vendor cosmetic depiction, not a new ASME
+# dimensional tolerance. Keep unsupported catalog changes loud.
+if THREAD != "#10-24":
+    raise ValueError("cone pivot cosmetic-thread vendor row only covers #10-24")
+THREAD_COSMETIC_MINOR_DIA = 0.1404 * 25.4
+THREAD_COSMETIC_TYPE = "Machine Threads"
+if not 0 < THREAD_COSMETIC_MINOR_DIA < THREAD_SOLID_DIA:
+    raise ValueError("cone pivot cosmetic minor diameter must fit its solid envelope")
 
 SURFACE_FINISHES = (
     SurfaceFinishControl(
