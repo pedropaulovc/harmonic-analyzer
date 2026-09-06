@@ -310,6 +310,7 @@ async def build(adapter: Any) -> dict[str, str]:
         top,
         entity=entities["broad_a"],
         entity_type="FACE",
+        selection_point_xy=broad_face,
         symbol_xy=(broad_face[0] - 0.018, broad_face[1] + 0.016),
         datum="A",
         label="broad machined face",
@@ -319,6 +320,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         entity=entities["fulcrum"],
+        selection_point_xy=fulcrum_left,
         symbol_xy=(fulcrum_left[0] - 0.018, fulcrum_left[1]),
         datum="B",
         # SolidWorks normalizes this legal bore-axis tag by 0.0020 mm when
@@ -335,6 +337,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         entity=entities["top_front"],
         symbol_xy=(top_face[0], top_face[1] + 0.022),
+        selection_point_xy=top_face,
         datum="C",
         label="top clocking face",
     )
