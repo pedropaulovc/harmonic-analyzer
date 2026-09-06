@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from _drawing_test_support import linked_note_properties
 
 import channel_lever_spec
 import draw_channel_lever as drawing
@@ -40,7 +41,7 @@ def test_sheet_runs_at_1_to_1_with_1_to_4_isometric() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "scale=(1, 4)" in source  # the isometric override
     assert channel_lever_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:4"
-    assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
+    assert "Isometric View Note" in linked_note_properties(source)
 
 
 def test_linked_notes_are_functional_and_not_title_block_duplicates() -> None:
@@ -57,7 +58,7 @@ def test_linked_notes_are_functional_and_not_title_block_duplicates() -> None:
     assert "GRAY-IRON" not in notes
     assert "GREEN ENAMEL" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+    assert "Manufacturing Notes" in linked_note_properties(source)
 
 
 def test_native_gdt_and_finish_present() -> None:

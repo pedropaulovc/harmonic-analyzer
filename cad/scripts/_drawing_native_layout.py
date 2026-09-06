@@ -102,6 +102,7 @@ class NativeLayoutReport:
     after_bounds: Mapping[str, Rect]
     fixed_bounds: Mapping[str, Rect]
     attachment_identity_exclusions: Mapping[str, str]
+    footprint_exclusions: Mapping[str, str]
 
 
 @dataclass(frozen=True)
@@ -329,6 +330,13 @@ def _snapshot(
                 text,
             )
             note = note_by_annotation.get(key)
+            if int(annotation.Visible) == 3:  # swAnnotationHidden, not Unknown=0.
+                if note is not None:
+                    raise ValueError(f"{note.key}: a declared layout note is hidden")
+                # The saved-sheet control in probe_gtol_commands.py found an
+                # individually hidden SF at the origin. Retain its native object,
+                # attachment/text/visibility signatures, but it occupies no ink.
+                continue
             if note is not None:
                 if int(adapter.swApp.IsSame(note.annotation, annotation)) != 1:
                     raise RuntimeError(
@@ -428,6 +436,11 @@ def _report(
             ): "native annotation exposes no attached entities; geometry identity not checked"
             for key, entities in before.attached_entities.items()
             if not entities and key[2] in {2, 4, 5, 7}
+        },
+        footprint_exclusions={
+            str(key): "individually hidden (swAnnotationHidden=3); identity and visibility retained"
+            for key, signature in before.signatures.items()
+            if signature[3] == 3
         },
     )
 

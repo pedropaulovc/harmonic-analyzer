@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 from pathlib import Path
+from _drawing_test_support import linked_note_properties
 
 import build_pen_marker as part
 import draw_pen_marker as drawing
@@ -98,7 +99,7 @@ def test_cone_geometry_matches_the_notes() -> None:
     assert "TIP" in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+    assert "Manufacturing Notes" in linked_note_properties(source)
     assert "def _manufacturing_notes" not in source
 
 
@@ -117,7 +118,7 @@ def test_view_scales_are_explicit_and_profile_is_rotated() -> None:
     assert source.count("scale=(2, 1)") == 2
     assert source.count("scale=(1, 1)") == 1
     assert pen_marker_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:1"
-    assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
+    assert "Isometric View Note" in linked_note_properties(source)
     assert "_rotate_view(adapter, front, -math.pi / 2.0" in source
 
 

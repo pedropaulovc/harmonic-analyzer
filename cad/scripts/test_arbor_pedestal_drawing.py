@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from _drawing_test_support import linked_note_properties
 
 import _surface_finish
 import arbor_pedestal_spec
@@ -142,7 +143,7 @@ def test_notes_specify_part_requirements_without_title_block_duplicates() -> Non
     assert "25-50 um" not in notes
     assert "TWO COATS" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)' in source
+    assert "Manufacturing Notes" in linked_note_properties(source)
     assert "add_native_hole_callout(" in source
     assert 'label="flange-hole location from datum D"' in source
 

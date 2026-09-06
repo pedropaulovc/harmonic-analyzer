@@ -165,6 +165,53 @@ def test_already_fitting_layout_has_no_native_writes(monkeypatch):
     assert result.before_outlines == result.after_outlines
 
 
+def test_hidden_sheet_symbol_has_no_footprint_but_remains_in_manifest(monkeypatch):
+    front = View("front", Rect(1, 2, 3, 4))
+    hidden = Annotation("hidden-sf", Rect(-1, -1, 1, 1), kind=7)
+    hidden.Visible = 3
+    adapter, options, _ = scene(monkeypatch, {"front": front}, [hidden])
+    result = native.repair_native_layout(adapter, **options)
+    assert result.status is native.NativeLayoutStatus.UNCHANGED
+    assert list(result.footprint_exclusions) == ["('sheet', 'hidden-sf', 7)"]
+    assert hidden.Visible == 3
+    assert hidden.moves == []
+
+
+@pytest.mark.parametrize("visibility", [0, 1, 2])
+def test_unknown_visible_and_half_hidden_symbols_are_not_silently_excluded(monkeypatch, visibility):
+    front = View("front", Rect(1, 2, 3, 4))
+    annotation = Annotation("sf", Rect(-1, -1, 1, 1), kind=7)
+    annotation.Visible = visibility
+    adapter, options, _ = scene(monkeypatch, {"front": front}, [annotation])
+    result = native.repair_native_layout(adapter, **options)
+    assert result.status is native.NativeLayoutStatus.NO_FIT
+    assert result.footprint_exclusions == {}
+
+
+def test_hidden_symbol_becoming_visible_during_move_fails_readback(monkeypatch):
+    front = View("front", Rect(-1, 2, 1, 4))
+    hidden = Annotation("hidden-sf", Rect(-1, -1, 1, 1), kind=7)
+    hidden.Visible = 3
+    adapter, options, _ = scene(monkeypatch, {"front": front}, [hidden])
+
+    def reveal():
+        hidden.Visible = 1
+        return True
+
+    adapter.currentModel.EditRebuild3 = reveal
+    with pytest.raises(RuntimeError, match="annotation inventory"):
+        native.repair_native_layout(adapter, **options)
+
+
+def test_declared_layout_note_must_not_be_hidden(monkeypatch):
+    front = View("front", Rect(1, 2, 3, 4))
+    note = Annotation("manufacturing", Rect(1, 5, 3, 6))
+    note.Visible = 3
+    adapter, options, _ = scene(monkeypatch, {"front": front}, [note])
+    with pytest.raises(ValueError, match="declared layout note is hidden"):
+        native.repair_native_layout(adapter, **options, notes=(native.LayoutNote("notes", note),))
+
+
 def test_parent_propagation_does_not_apply_child_translation_twice(monkeypatch):
     front, top = View("front", Rect(-1, 1, 1, 3)), View("top", Rect(-1, 4, 1, 6))
     front.children, top.base = [top], front

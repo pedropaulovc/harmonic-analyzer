@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 from pathlib import Path
+from _drawing_test_support import linked_note_properties
 
 import rocker_arm_notes
 import rocker_arm_spec
@@ -61,7 +62,7 @@ def test_sheet_runs_at_1_to_2() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "scale=(1, 2)" in source
     assert rocker_arm_notes.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:4"
-    assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
+    assert "Isometric View Note" in linked_note_properties(source)
 
 
 def test_linked_notes_are_functional_metric_and_not_title_block_duplicates() -> None:
@@ -80,7 +81,7 @@ def test_linked_notes_are_functional_metric_and_not_title_block_duplicates() -> 
     assert "LINEAR +/-" not in notes
     assert "BA" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+    assert "Manufacturing Notes" in linked_note_properties(source)
 
 
 def test_native_gdt_and_finish_present() -> None:
