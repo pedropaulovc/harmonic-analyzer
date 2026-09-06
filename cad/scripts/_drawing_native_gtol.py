@@ -357,12 +357,28 @@ def _assert_measured_prediction(
     for name, row in measured.items():
         expected = predicted[name]
         if math.dist(row.position, expected.position) > _POSITION_EPSILON_M:
-            raise RuntimeError(f"{name}: final native GTol position drifted")
+            raise RuntimeError(
+                f"{name}: final native GTol position drifted: predicted={expected.position}, measured={row.position}"
+            )
         if any(
             abs(a - b) > _BODY_EPSILON_M
             for a, b in zip(row.body.bounds, expected.body.bounds)
         ):
-            raise RuntimeError(f"{name}: measured GTol body did not translate rigidly")
+            delta = tuple(a - b for a, b in zip(row.body.bounds, expected.body.bounds))
+            _telemetry.info(
+                "native GTol body translation mismatch",
+                annotation=name,
+                predicted_body=expected.body.bounds,
+                measured_body=row.body.bounds,
+                body_delta_m=delta,
+                predicted_position=expected.position,
+                measured_position=row.position,
+            )
+            raise RuntimeError(
+                f"{name}: measured GTol body did not translate rigidly: "
+                f"predicted={expected.body.bounds}, measured={row.body.bounds}, "
+                f"delta_m={delta}, position={row.position}"
+            )
 
 
 def arrange_native_gtol_columns(
