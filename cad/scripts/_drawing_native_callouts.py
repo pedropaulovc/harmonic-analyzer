@@ -165,8 +165,10 @@ def _read_symbol(
         raise RuntimeError(f"{name}: callout must belong to the exact drawing view")
     entities = tuple(annotation.GetAttachedEntities3() or ())
     types = tuple(int(value) for value in annotation.GetAttachedEntityTypes() or ())
+    native_count = int(annotation.GetAttachedEntityCount3())
     if (
         not entities
+        or native_count != len(entities)
         or len(entities) != len(types)
         or any(e is None for e in entities)
         or 0 in types
