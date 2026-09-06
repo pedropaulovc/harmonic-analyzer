@@ -60,6 +60,14 @@ def test_leader_decoration_boxes_remain_available_for_text_collision_checks():
     assert measured.envelope.xmax >= decoration.xmax
 
 
+def test_raw_native_route_is_distinct_from_displayed_open_strokes():
+    route = (Segment((0.03, 0.02), (0.05, 0.025)),)
+    native = snapshot(leaders=route)
+    measured = bounds_from_snapshot(native)
+    assert measured.native_leader_segments == route
+    assert measured.native_leader_segments != measured.leader_segments
+
+
 def _all_around_snapshot(
     monkeypatch,
     *,
