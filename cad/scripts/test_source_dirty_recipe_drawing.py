@@ -190,7 +190,6 @@ def test_real_owned_copy_cleanup_preserves_baseline_and_never_saves(
     monkeypatch.setattr(probe.benchmark, "revision", lambda _: "pinned")
     monkeypatch.setattr(probe, "helper_fingerprints", lambda: {"helper": "same"})
     monkeypatch.setattr(probe, "adapter_fingerprints", lambda: {"package": "same"})
-    monkeypatch.setattr(probe, "_early_bound", lambda value, _: value)
 
     def snapshot(app, model, path):
         if mode == "snapshot_failure" and model.dirty:
@@ -286,9 +285,11 @@ async def build(adapter):
 def test_complete_observed_dimension_inventory_includes_unmarked_and_chamfer_values(
     tmp_path, monkeypatch, variant
 ):
-    monkeypatch.setattr(probe, "_early_bound", lambda value, _: value)
+    from diagnostics import _source_dimension_snapshot as source_snapshot
+
+    monkeypatch.setattr(source_snapshot, "_early_bound", lambda value, _: value)
     monkeypatch.setattr(
-        probe, "_read_member", lambda value, name: getattr(value, name)()
+        source_snapshot, "_read_member", lambda value, name: getattr(value, name)()
     )
     monkeypatch.setattr(probe, "DRAWING_DIMENSIONS", {"FootProfile": {"Width"}})
     path = tmp_path / "owned-part.SLDPRT"
@@ -339,7 +340,7 @@ def test_complete_observed_dimension_inventory_includes_unmarked_and_chamfer_val
             else None
         ),
     )
-    monkeypatch.setattr(probe, "_iter_features", lambda _: (feature,))
+    monkeypatch.setattr(source_snapshot, "_iter_features", lambda _: (feature,))
     model = SimpleNamespace(
         ConfigurationManager=SimpleNamespace(
             ActiveConfiguration=SimpleNamespace(Name="Default")

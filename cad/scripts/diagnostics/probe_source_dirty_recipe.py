@@ -42,19 +42,17 @@ from contextlib import contextmanager
 from functools import wraps
 import inspect
 import json
-import math
 from pathlib import Path
 import shutil
 import sys
 import tempfile
 import time
-from types import SimpleNamespace
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "cad/scripts"))
 
-from _common import _early_bound, _iter_features, _read_member, check  # noqa: E402
+from _common import check  # noqa: E402
 from arbor_pedestal_spec import DRAWING_DIMENSIONS  # noqa: E402
 from diagnostics import benchmark_drawing_recipes as benchmark  # noqa: E402
 from diagnostics.probe_datum_policy_recipes import (  # noqa: E402
@@ -62,7 +60,9 @@ from diagnostics.probe_datum_policy_recipes import (  # noqa: E402
     helper_fingerprints,
 )
 from diagnostics.probe_drawing_attachments import file_digest  # noqa: E402
-from diagnostics.probe_source_basic_dimensions import tolerance  # noqa: E402
+from diagnostics._source_dimension_snapshot import (  # noqa: E402
+    dimension_snapshot as _source_snapshot,
+)
 from diagnostics._owned_native_documents import DocumentKind, run_copy_diagnostic  # noqa: E402
 from diagnostics._owned_native_session import require_owned_diagnostic_environment  # noqa: E402
 import _telemetry  # noqa: E402
@@ -72,113 +72,8 @@ class DiagnosticStop(BaseException):
     """Expected diagnostic stop; must bypass _attempt's Exception handlers."""
 
 
-def finite(value):
-    value = float(value)
-    if not math.isfinite(value):
-        raise RuntimeError("source dimension contains a non-finite value")
-    return value
-
-
 def dimension_snapshot(app, model, path):
-    """Read every observed feature dimension; do not toggle visibility or rebuild."""
-    configuration = str(
-        _early_bound(
-            _early_bound(
-                model.ConfigurationManager, "IConfigurationManager"
-            ).ActiveConfiguration,
-            "IConfiguration",
-        ).Name
-    )
-    if not configuration:
-        raise RuntimeError("source snapshot has no active configuration")
-    rows, handles, features = {}, {}, []
-    for feature in _iter_features(SimpleNamespace(currentModel=model)):
-        feature = _early_bound(feature, "IFeature")
-        feature_name = str(_read_member(feature, "Name"))
-        features.append(feature_name)
-        if len(features) >= 5000:
-            raise RuntimeError("source feature enumeration reached its bound")
-        display = _read_member(feature, "GetFirstDisplayDimension")
-        seen = []
-        while display is not None:
-            display = _early_bound(display, "IDisplayDimension")
-            if len(seen) >= 1000 or any(
-                int(app.IsSame(display, item)) == 1 for item in seen
-            ):
-                raise RuntimeError(
-                    "source display-dimension enumeration repeats/exceeds bound"
-                )
-            seen.append(display)
-            kind = int(display.Type2)
-            # GetDimension2 index 1 is meaningful only for swChamferDimension.
-            for index in range(2 if kind == 10 else 1):
-                dimension = _early_bound(display.GetDimension2(index), "IDimension")
-                if dimension is None:
-                    raise RuntimeError(
-                        "source display dimension has no model dimension"
-                    )
-                name = str(dimension.FullName)
-                if not name.casefold().endswith(f"@{path.stem}.Part".casefold()):
-                    raise RuntimeError(
-                        f"source dimension has wrong exact part owner: {name}"
-                    )
-                values = tuple(dimension.GetSystemValue3(3, configuration) or ())
-                if len(values) != 1:
-                    raise RuntimeError(
-                        f"source dimension value count is not one: {name}"
-                    )
-                tol = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-                native = {
-                    "value_system": finite(values[0]),
-                    **tolerance(dimension),
-                    # Existing supported getter shape, no alternate-call fallback.
-                    "tolerance_min": finite(tol.GetMinValue()),
-                    "tolerance_max": finite(tol.GetMaxValue()),
-                }
-                if name in handles and int(app.IsSame(handles[name], dimension)) != 1:
-                    raise RuntimeError(
-                        f"source dimension name has ambiguous native identity: {name}"
-                    )
-                if name in rows and rows[name]["native"] != native:
-                    raise RuntimeError(
-                        f"source dimension changed during one snapshot: {name}"
-                    )
-                rows.setdefault(name, {"native": native, "displays": []})
-                handles[name] = dimension
-                rows[name]["displays"].append(
-                    {
-                        "feature": feature_name,
-                        "dimension_type": kind,
-                        "index": index,
-                        "marked_for_drawing": bool(display.MarkedForDrawing),
-                        "primary_precision": int(display.GetPrimaryPrecision2()),
-                        "tolerance_precision": int(display.GetPrimaryTolPrecision2()),
-                        "text": {
-                            str(part): str(display.GetText(part) or "")
-                            for part in range(1, 9)
-                        }
-                        if not display.IsHoleCallout()
-                        else {"exclusion": "GetText does not support hole callouts"},
-                    }
-                )
-            display = feature.GetNextDisplayDimension(display)
-    required = {
-        f"{name}@{feature}"
-        for feature, names in DRAWING_DIMENSIONS.items()
-        for name in names
-    }
-    observed = {name.rsplit("@", 1)[0] for name in rows}
-    if required - observed:
-        raise RuntimeError(
-            f"source dimension inventory misses manufacturing dimensions: {sorted(required - observed)}"
-        )
-    for row in rows.values():
-        row["displays"].sort(key=lambda item: json.dumps(item, sort_keys=True))
-    return {
-        "configuration": configuration,
-        "features": features,
-        "dimensions": rows,
-    }, handles
+    return _source_snapshot(app, model, path, required=DRAWING_DIMENSIONS)
 
 
 class DirtyMonitor:
