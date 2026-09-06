@@ -46,22 +46,28 @@ excludes seat waiting (zero for these attempts) and cache transfer.
 | prepared handles, original sequence | 320.197 | 3,888 | included in each pose operation |
 | retained drivers, individual deletion | 334.959 | 216 | 76.516 |
 | retained drivers, one batch deletion | 247.125 | 216 | 2.695 |
+| repeated batch-deletion build | 264.880 | 216 | 3.032 |
 
 The last deletion spent 1.143 seconds inside `DeleteSelection2(0)`; the remaining
-1.552 seconds covers manifest resolution, selection and readback. All four builds
+1.552 seconds covers manifest resolution, selection and readback. The repeated
+build spent 1.364 seconds inside the native deletion. All five builds
 passed their construction gates. Reference and prepared-handle DOF manifests are
 byte-identical. The individual-deletion experiment preserves all manifest keys,
 component identities and state, with a maximum numeric difference of
 1.055e-9 mm. The batch-deletion manifest likewise preserves identities and state,
-with a maximum numeric difference of 1.050e-9 mm. All four builds have the same rounded mass-properties/pose
+with a maximum numeric difference of 1.050e-9 mm. The two batch-deletion DOF
+manifests are byte-identical (SHA-256
+`e5c09e65398839546c7147cc1b14724bc5b83fa4bdf7f8f2748fe86642338854`).
+All five builds have the same rounded mass-properties/pose
 fingerprint; that fingerprint is not raw CAD-byte equality or a substitute for
 independent saved-model verification.
 
 The corresponding task trace IDs, in table order, are
 `0x7f0525b4ba7b594486d3f433c3fad1c3`,
 `0x2e09f191b7027c43f04c5d9d4d2ab893`,
-`0x1adeed12c9431a9fbbbb1dffc73ba773`, and
-`0xe96bc142669b5cd06495cf34a62b3d18` in
+`0x1adeed12c9431a9fbbbb1dffc73ba773`,
+`0xe96bc142669b5cd06495cf34a62b3d18`, and
+`0x25ee7f00d62a807b1e6442cb045c66cf` in
 `cad/out/reports/telemetry/traces.jsonl`. Logs and preserved native artifacts for
 the experiment are under `cad/out/reports/performance-audit-20260905/`.
 
@@ -119,6 +125,16 @@ dimensions by their returned `GetNameForSelection()` identifiers and completed o
 same visible dimensions; that is evidence about those call shapes, not evidence
 that native arrangement is unavailable.
 
+`diagnostics/probe_gtol_autoarrange.py` supplies a separate control for GTols:
+`AlignDimensions` returned success but moved none of eight selected frames, while
+the dimension-only control moved an intentionally displaced dimension back by
+28.284 mm. That negative result is limited to `AlignDimensions`.
+`diagnostics/probe_gtol_commands.py` then exercised native annotation commands:
+Space Tightly Down (317), followed by Align Left (307), each moved six of eight
+frames. Exact drawing-context attachments, frame content and saved/reopened
+positions were preserved. The resulting columns still need moving outboard of
+the geometry; native spacing alone is not a complete sheet-layout solution.
+
 Treat historical API limitations as hypotheses with a recorded reproduction,
 including a working control and the variants not tried. In particular, a failure
 to force an imported annotation to a prescribed position does not establish that
@@ -168,3 +184,21 @@ helpers, configuration, templates and source parts. Both variants use the curren
 helpers and built parts: it measures recipe changes, not two complete historical
 pipeline versions. Each trial checkpoints its result and writes distinct native,
 PDF and PNG artifacts for inspection.
+
+The paired recipe comparison at `cea71c16` produced these build-body times, before
+the measured-layout integration:
+
+| drawing | original recipe, seconds | semantic recipe, seconds |
+|---|---:|---:|
+| arbor pedestal | 16.838, 20.281 | 17.808, 23.166 |
+| cone gear | 27.530, 26.300 | 8.967, 9.331 |
+
+The gear's feature-owned lookup removed its expensive whole-model traversal.
+The pedestal did not become faster in this small sample; its semantic changes
+target attachment reliability. All eight trials passed and used identical
+source-part hashes. Report:
+`cad/out/reports/drawing-benchmarks/abba-u1vy0qah/measurements.json`.
+The historical screw recipe could not load against the current helper API
+because it supplies the removed `side_centerline_face_xy` field. That failed
+attempt is not a performance result. Comparing that version requires isolating
+its historical helper closure, not adding coordinate-picking compatibility back.
