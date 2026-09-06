@@ -29,7 +29,9 @@ import tempfile
 import time
 from xml.etree import ElementTree
 
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, _early_bound, check
+from diagnostics._owned_native_documents import run_copy_diagnostic
+from diagnostics._owned_native_session import require_owned_diagnostic_environment
 from _drawing_annotation_bounds import annotation_box
 from _drawing_common import _TITLE_BLOCK_LEFT_M, _TITLE_BLOCK_TOP_M
 from _drawing_leader_clearance import validate_gtol_leader_clearance
@@ -247,7 +249,7 @@ def _profiled_layout(adapter, views, notes, mode, evidence, directory):
 
 
 async def probe(adapter, source, modes=tuple(Mode)):
-    from solidworks_mcp.adapters.solidworks.drawing import save_drawing
+    from diagnostics._owned_native_documents import save_drawing
 
     if (
         not modes
@@ -259,6 +261,8 @@ async def probe(adapter, source, modes=tuple(Mode)):
     reports.mkdir(parents=True, exist_ok=True)
     directory = Path(tempfile.mkdtemp(prefix="callout-handoff-", dir=reports)).resolve()
     source = source.resolve(strict=True)
+    adapter.ownership.register_directory(directory)
+    adapter.ownership.register_source(source)
     hashes = {source: hashlib.sha256(source.read_bytes()).hexdigest()}
     owned, report = (
         set(),
@@ -392,6 +396,7 @@ def main():
     source = args.drawing.resolve(strict=True)
     modes = tuple(Mode(value) for value in args.mode) if args.mode else tuple(Mode)
     if not args.worker:
+        require_owned_diagnostic_environment()
         sys.path.insert(0, str(CAD_ROOT.parent))
         import dodo
 
@@ -411,7 +416,7 @@ def main():
     if not os.environ.get("HARMONIC_COM_SEAT"):
         raise RuntimeError("--worker requires the machine-global COM seat")
     _telemetry.set_service("drawing-obstacle-handoff-probe")
-    return run_build(lambda adapter: probe(adapter, source, modes))
+    return run_copy_diagnostic(lambda adapter: probe(adapter, source, modes))
 
 
 if __name__ == "__main__":

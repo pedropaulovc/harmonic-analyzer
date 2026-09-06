@@ -31,7 +31,9 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "cad/scripts"))
 
 import _telemetry  # noqa: E402
-from _common import _early_bound, run_build  # noqa: E402
+from _common import _early_bound  # noqa: E402
+from diagnostics._owned_native_documents import DocumentKind, run_copy_diagnostic  # noqa: E402
+from diagnostics._owned_native_session import require_owned_diagnostic_environment  # noqa: E402
 from _drawing_common import DrawingOutputs  # noqa: E402
 from _drawing_registry import DRAWINGS_BY_NAME  # noqa: E402
 from diagnostics.probe_drawing_attachments import file_digest  # noqa: E402
@@ -214,6 +216,11 @@ def validate_artifacts(artifacts, outputs):
 
 
 def close_documents(adapter):
+    """Legacy global-close contract, retained only for its historical regression.
+
+    The diagnostic entrypoint no longer calls this helper. Its old test remains
+    unchanged while the replacement scoped lifecycle has independent coverage.
+    """
     app = _early_bound(adapter.swApp, "ISldWorks")
     if not app.CloseAllDocuments(True) or app.GetFirstDocument() is not None:
         raise RuntimeError("SolidWorks documents did not close before benchmark trial")
@@ -223,6 +230,7 @@ def close_documents(adapter):
 async def benchmark(adapter, targets, baseline, candidate, output_root):
     output_root.mkdir(parents=True, exist_ok=True)
     run_dir = Path(tempfile.mkdtemp(prefix="abba-", dir=output_root))
+    adapter.ownership.register_directory(run_dir)
     helper_inputs = helper_fingerprints()
     report = {
         "baseline": baseline,
@@ -264,12 +272,14 @@ async def benchmark(adapter, targets, baseline, candidate, output_root):
                     )
                     directory = run_dir / f"{target}-{index}-{variant}"
                     directory.mkdir()
+                    adapter.ownership.register_directory(directory)
                     module = load_recipe(
                         baseline if variant == "baseline" else candidate,
                         target,
                         directory,
                     )
                     current_source = Path(module.SOURCE).resolve(strict=True)
+                    adapter.ownership.register_source(current_source)
                     if source is None:
                         source, source_hash = (
                             current_source,
@@ -286,7 +296,7 @@ async def benchmark(adapter, targets, baseline, candidate, output_root):
                         source_sha256=source_hash,
                         recipe_sha256=file_digest(directory / "recipe-source.py"),
                     )
-                    close_documents(adapter)
+                    await adapter.close_owned_documents()
                     started = time.perf_counter()
                     with _telemetry.span(
                         "drawing.recipe_benchmark",
@@ -294,7 +304,10 @@ async def benchmark(adapter, targets, baseline, candidate, output_root):
                         variant=variant,
                         index=index,
                     ):
-                        artifacts = await module.build(adapter)
+                        with adapter.ownership.creating_document(
+                            DocumentKind.DRAWING, module.OUTPUTS.slddrw
+                        ):
+                            artifacts = await module.build(adapter)
                     trial["seconds"] = round(time.perf_counter() - started, 6)
                     started = None
                     trial["artifacts"] = validate_artifacts(artifacts, module.OUTPUTS)
@@ -337,6 +350,7 @@ def main(argv=None):
     baseline, candidate = revision(args.baseline), revision(args.candidate)
     report_root = args.report_root.resolve()
     if not args.worker:
+        require_owned_diagnostic_environment()
         import dodo
 
         dodo._run(
@@ -361,7 +375,7 @@ def main(argv=None):
         raise RuntimeError(
             "drawing benchmark worker requires the pipeline COM seat lock"
         )
-    return run_build(
+    return run_copy_diagnostic(
         lambda adapter: benchmark(
             adapter, args.targets, baseline, candidate, report_root
         )

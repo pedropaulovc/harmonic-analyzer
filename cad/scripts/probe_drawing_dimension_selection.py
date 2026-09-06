@@ -17,7 +17,9 @@ import sys
 import tempfile
 from typing import Any
 
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, _early_bound, check
+from diagnostics._owned_native_documents import run_copy_diagnostic
+from diagnostics._owned_native_session import require_owned_diagnostic_environment
 import _telemetry
 
 
@@ -42,6 +44,7 @@ def main() -> int:
     if source.suffix.upper() != ".SLDDRW":
         raise ValueError("probe requires a native drawing")
     if not args.worker:
+        require_owned_diagnostic_environment()
         sys.path.insert(0, str(CAD_ROOT.parent))
         import dodo
         dodo._run(
@@ -56,6 +59,8 @@ def main() -> int:
         report_root = CAD_ROOT / "out/reports"
         report_root.mkdir(parents=True, exist_ok=True)
         folder = Path(tempfile.mkdtemp(prefix="dimension-selection-", dir=report_root))
+        adapter.ownership.register_directory(folder)
+        adapter.ownership.register_source(source)
         copy = folder / f"probe-{folder.name}-{source.name}"
         shutil.copy2(source, copy)
         check("open unique diagnostic drawing copy", await adapter.open_model(str(copy)))
@@ -119,14 +124,15 @@ def main() -> int:
                 if not _capture(results, mode + "_AlignDimensions", lambda: extension.AlignDimensions(0, 0.001)):
                     raise RuntimeError(f"{mode} bank rejected AutoArrange")
         finally:
-            model.ClearSelection2(True)
-            check("close diagnostic copy without saving", await adapter.close_model(save=False))
-            report = folder / "selection.json"
-            report.write_text(json.dumps({"source": str(source), "copy": str(copy), "results": results}, indent=2), encoding="utf-8")
+            try:
+                await adapter.close_owned_documents()
+            finally:
+                report = folder / "selection.json"
+                report.write_text(json.dumps({"source": str(source), "copy": str(copy), "results": results}, indent=2), encoding="utf-8")
         return {"report": str(report)}
 
     _telemetry.set_service("drawing-dimension-selection-probe")
-    return run_build(probe)
+    return run_copy_diagnostic(probe)
 
 
 if __name__ == "__main__":
