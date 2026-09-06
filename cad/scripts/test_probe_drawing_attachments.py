@@ -11,13 +11,16 @@ import pytest
 from diagnostics import probe_drawing_attachments as probe
 
 
-def dimension(name="Length", full_name="Length@Sketch@part.Part", value=0.03):
+def dimension(
+    name="Length", full_name="Length@Sketch@part.Part", value=0.03, tolerance_type=0
+):
     return SimpleNamespace(
         Name=name,
         FullName=full_name,
         GetType=lambda: 0,
         GetSystemValue3=Mock(return_value=(value,)),
         GetSystemValue2=Mock(return_value=value),
+        Tolerance=SimpleNamespace(Type=tolerance_type),
     )
 
 
@@ -264,6 +267,8 @@ def test_imported_dimensions_have_semantics_without_supported_geometry(
                 "parameter_type": 0,
                 "value_system": 0.009525,
                 "value_api": "GetSystemValue3",
+                "tolerance_type": 0,
+                "designation": "other",
             }
         ],
     }
@@ -323,7 +328,7 @@ def test_native_dimensions_keep_geometry_and_values_separate_across_drawing_copi
         probe.compare(before, probe.snapshot(model), "value changed")
 
 
-@pytest.mark.parametrize("mutation", ["name", "configuration", "value"])
+@pytest.mark.parametrize("mutation", ["name", "configuration", "value", "tolerance"])
 def test_dimension_semantic_changes_fail_snapshot_comparison(source_model, mutation):
     annotation = Annotation(entities=(), kinds=())
     actual = annotation.display.GetDimension2(0)
@@ -336,8 +341,47 @@ def test_dimension_semantic_changes_fail_snapshot_comparison(source_model, mutat
         view.ReferencedConfiguration = "WrongConfiguration"
     if mutation == "value":
         actual.GetSystemValue3.return_value = (0.09,)
+    if mutation == "tolerance":
+        actual.Tolerance.Type = 1
     with pytest.raises(RuntimeError, match="dimensions.*dimension/4"):
         probe.compare(before, probe.snapshot(model), "changed semantics")
+
+
+@pytest.mark.parametrize("reference", ["model", "drawing"])
+def test_basic_tolerance_loss_is_detected_even_when_value_geometry_are_unchanged(
+    source_model, reference
+):
+    annotation = Annotation()
+    full_name = (
+        "RD1@Front@source.Drawing"
+        if reference == "drawing"
+        else "Length@Sketch@part.Part"
+    )
+    actual = dimension(
+        "RD1" if reference == "drawing" else "Length", full_name, tolerance_type=1
+    )
+    annotation.display = display_dimension(actual, reference=reference)
+    model = Model([View("Front", source_model, (annotation,))])
+    model.GetPathName = lambda: "source.SLDDRW"
+    before = probe.snapshot(model)
+    key = "Sheet1/Front/dimension/4"
+    assert before["dimensions"][key]["components"][0]["designation"] == "basic"
+    actual.Tolerance.Type = 0
+    after = probe.snapshot(model)
+    assert before["checked"] == after["checked"]
+    assert (
+        before["dimensions"][key]["components"][0]["value_system"]
+        == after["dimensions"][key]["components"][0]["value_system"]
+    )
+    with pytest.raises(RuntimeError, match="dimensions.*dimension/4"):
+        probe.compare(before, after, "BASIC lost during save/reopen")
+
+
+def test_missing_native_tolerance_cannot_silently_be_marked_nonbasic(source_model):
+    annotation = Annotation()
+    annotation.display.GetDimension2(0).Tolerance = None
+    with pytest.raises(RuntimeError, match="no native tolerance"):
+        probe.snapshot(Model([View("Front", source_model, (annotation,))]))
 
 
 @pytest.mark.parametrize("reference", ["model", "drawing"])
@@ -360,12 +404,14 @@ def test_chamfer_semantics_read_both_underlying_dimensions(source_model):
     distance = dimension("ChamferLength", "ChamferLength@Chamfer@part.Part", 0.001)
     angle = dimension("ChamferAngle", "ChamferAngle@Chamfer@part.Part", 0.785398163397)
     angle.GetType = lambda: 1
+    angle.Tolerance.Type = 1
     annotation = Annotation()
     annotation.display = display_dimension(distance, angle, kind=10)
     result = probe.snapshot(Model([View("Front", source_model, (annotation,))]))
     items = result["dimensions"]["Sheet1/Front/dimension/4"]["components"]
     assert [row["parameter_type"] for row in items] == [0, 1]
     assert [row["value_system"] for row in items] == [0.001, 0.785398163397]
+    assert [row["tolerance_type"] for row in items] == [0, 1]
     assert [call.args for call in annotation.display.GetDimension2.call_args_list] == [
         (0,),
         (1,),
@@ -490,6 +536,10 @@ class Adapter:
             view.annotations[0].display.GetDimension2(
                 0
             ).GetSystemValue3.return_value = (0.09,)
+        if self.mode == "lost_basic":
+            view.annotations[0].display.GetDimension2(0).Tolerance.Type = (
+                0 if path in self.saved else 1
+            )
         model = Model([view])
         model.GetPathName = lambda: path
 
@@ -510,7 +560,14 @@ class Adapter:
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "mode", ["normal", "lost_layout", "wrong_model_config", "wrong_dimension_value"]
+    "mode",
+    [
+        "normal",
+        "lost_layout",
+        "wrong_model_config",
+        "wrong_dimension_value",
+        "lost_basic",
+    ],
 )
 async def test_source_copy_change_reopen_workflow(tmp_path, source_model, mode):
     drawing = tmp_path / "source.SLDDRW"
