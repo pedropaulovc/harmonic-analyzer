@@ -673,7 +673,7 @@ async def probe(
         raise
     finally:
         report["elapsed_s"] = time.perf_counter() - started
-        await shoulder.finalize_probe(owned, report, report_path)
+        await shoulder.finalize_probe(owned.close, report, report_path)
     return {"report": str(report_path)}
 
 

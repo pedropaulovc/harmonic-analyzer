@@ -122,7 +122,10 @@ def test_probe_worker_validates_inventory_before_reporting_passed(monkeypatch, t
     model, view = Mock(), Mock()
     view.ReferencedDocument.GetPathName.return_value = str(part)
     model.GetViews.return_value = [[object(), view]]
-    adapter = SimpleNamespace(currentModel=None, swApp=Mock())
+    adapter = SimpleNamespace(
+        currentModel=None, swApp=Mock(),
+        ownership=SimpleNamespace(register_directory=Mock(), register_source=Mock()),
+    )
     adapter.swApp.IsSame.return_value = 1
     entity = object()
 
@@ -166,7 +169,7 @@ def test_probe_worker_validates_inventory_before_reporting_passed(monkeypatch, t
     monkeypatch.setattr(probe._drawing_common, "_style_surface_finish", Mock())
     monkeypatch.setattr(probe, "save_drawing", lambda *_args, **_kwargs: {"drawing": "copy", "pdf": "copy.pdf"})
     monkeypatch.setattr(probe, "render_pdf_png", Mock())
-    monkeypatch.setattr(probe, "run_build", lambda operation: asyncio.run(operation(adapter)))
+    monkeypatch.setattr(probe, "run_copy_diagnostic", lambda operation: asyncio.run(operation(adapter)))
     monkeypatch.setattr(probe._telemetry, "set_service", Mock())
     monkeypatch.setattr(sys, "argv", [str(Path(probe.__file__)), str(source), "--worker"])
     monkeypatch.setenv("HARMONIC_COM_SEAT", "mocked-no-com")

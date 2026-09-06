@@ -24,7 +24,9 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "cad/scripts"))
 
-from _common import _early_bound, check, run_build  # noqa: E402
+from _common import _early_bound, check  # noqa: E402
+from diagnostics._owned_native_documents import run_copy_diagnostic  # noqa: E402
+from diagnostics._owned_native_session import require_owned_diagnostic_environment  # noqa: E402
 from _drawing_annotation_bounds import annotation_box, _native_snapshot  # noqa: E402
 import _drawing_native_gtol as layout  # noqa: E402
 import _telemetry  # noqa: E402
@@ -124,7 +126,10 @@ def capture_stages(adapter, report, capture=native_records):
 
 
 async def probe(adapter, source, directory):
-    from solidworks_mcp.adapters.solidworks.drawing import save_drawing
+    from diagnostics._owned_native_documents import save_drawing
+
+    adapter.ownership.register_directory(directory)
+    adapter.ownership.register_source(source)
 
     report = {
         "source": str(source),
@@ -134,7 +139,6 @@ async def probe(adapter, source, directory):
     report_path = directory / "rigid-body.json"
     copy = directory / f"{directory.name}-source.SLDDRW"
     shutil.copy2(source, copy)
-    app = _early_bound(adapter.swApp, "ISldWorks")
 
     def export(stage):
         target = directory / f"{directory.name}-{stage}.SLDDRW"
@@ -176,9 +180,7 @@ async def probe(adapter, source, directory):
         except Exception as error:
             report["layout_error"] = repr(error)
         output = export("observed")
-        if not app.CloseAllDocuments(True):
-            raise RuntimeError("failed to close diagnostic drawings before reopen")
-        adapter.currentModel = None
+        await adapter.close_owned_documents()
         check(
             "reopen observed GTol rigidity copy", await adapter.open_model(str(output))
         )
@@ -198,9 +200,7 @@ async def probe(adapter, source, directory):
         raise
     finally:
         try:
-            if not app.CloseAllDocuments(True):
-                raise RuntimeError("failed to close GTol diagnostic documents")
-            adapter.currentModel = None
+            await adapter.close_owned_documents()
         finally:
             report["source_hashes_after"] = {
                 name: file_digest(Path(name)) for name in report["source_hashes"]
@@ -227,6 +227,7 @@ def main():
     if source.suffix.upper() != ".SLDDRW":
         raise ValueError("requires a native drawing")
     if not args.worker:
+        require_owned_diagnostic_environment()
         sys.path.insert(0, str(ROOT))
         import dodo
 
@@ -242,7 +243,7 @@ def main():
     reports = ROOT / "cad/out/reports"
     reports.mkdir(parents=True, exist_ok=True)
     directory = Path(tempfile.mkdtemp(prefix="gtol-rigidity-", dir=reports))
-    return run_build(lambda adapter: probe(adapter, source, directory))
+    return run_copy_diagnostic(lambda adapter: probe(adapter, source, directory))
 
 
 if __name__ == "__main__":

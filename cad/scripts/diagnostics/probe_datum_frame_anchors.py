@@ -21,7 +21,9 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "cad/scripts"))
 
-from _common import _early_bound, check, run_build  # noqa: E402
+from _common import _early_bound, check  # noqa: E402
+from diagnostics._owned_native_documents import run_copy_diagnostic  # noqa: E402
+from diagnostics._owned_native_session import require_owned_diagnostic_environment  # noqa: E402
 from _drawing_annotation_bounds import (  # noqa: E402
     _native_snapshot,
     _frame_lines,
@@ -195,7 +197,10 @@ def compare(app, before, before_handles, after, after_handles):
 
 
 async def probe(adapter, source, directory):
-    from solidworks_mcp.adapters.solidworks.drawing import save_drawing
+    from diagnostics._owned_native_documents import save_drawing
+
+    adapter.ownership.register_directory(directory)
+    adapter.ownership.register_source(source)
 
     part = (source.parent.parent / "sldprt" / f"{source.stem}.SLDPRT").resolve(
         strict=True
@@ -228,9 +233,7 @@ async def probe(adapter, source, directory):
         raise
     finally:
         try:
-            if not app.CloseAllDocuments(True):
-                raise RuntimeError("failed to close copied datum frame documents")
-            adapter.currentModel = None
+            await adapter.close_owned_documents()
         finally:
             try:
                 guard_sources(report)
@@ -247,6 +250,7 @@ def main():
     args = parser.parse_args()
     source = args.drawing.resolve(strict=True)
     if not args.worker:
+        require_owned_diagnostic_environment()
         sys.path.insert(0, str(ROOT))
         import dodo
 
@@ -262,7 +266,7 @@ def main():
     reports = ROOT / "cad/out/reports"
     reports.mkdir(parents=True, exist_ok=True)
     directory = Path(tempfile.mkdtemp(prefix="datum-frames-", dir=reports))
-    return run_build(lambda adapter: probe(adapter, source, directory))
+    return run_copy_diagnostic(lambda adapter: probe(adapter, source, directory))
 
 
 if __name__ == "__main__":
