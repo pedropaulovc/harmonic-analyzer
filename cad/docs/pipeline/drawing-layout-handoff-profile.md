@@ -63,6 +63,28 @@ positive control; these mixed-thread profile times are not a promised saving.
 By contrast, GDI cell calculation was about 0.07 s in the first profile and native
 symbol definitions about 0.37 s. Caching those does not address the main cost.
 
+### Main-thread return-wrapping control
+
+At `5e398d5b`, the existing annotation performance probe gained an explicit
+invoking-thread timer around pywin32's returned-object wrapper. A copied arbor
+measurement-only run passed with 25 annotations and exactly equal measured bounds
+before/after instrumentation; it performed no layout controls or saves. Original
+drawing and part hashes were unchanged. Evidence:
+`C:/src/harmonic-analyzer/cad/out/reports/annotation-profile-x9mukkxz/profile.json`.
+
+The uninstrumented pass took 7.897 seconds and the instrumented pass 7.146 seconds.
+Those successive observations do not estimate profiler overhead or a speedup.
+The latter contained 84 timed return wrappers totaling 0.990 seconds: 25
+`GetDisplayData`, 22 `GetTextFormat`, 11 `GetEnvironment`, 25 `Extension` and one
+`GetSpecificAnnotation`. This timer includes type discovery and Python wrapping,
+not the native call that returned the object. Inventory construction happened
+before the timed pass; this is not a complete layout profile. Its wrapping and
+makepy dispatch categories can overlap and must not be added together.
+
+Real worker-thread controls verify that both manual timers exclude background
+calls while preserving returned objects and errors. These results narrow the
+performance lead without establishing a faster production implementation.
+
 ## Smallest next measurement reuse and transaction proposal
 
 No following design is implemented by this observation.
