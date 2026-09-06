@@ -116,9 +116,10 @@ class _AssemblySources:
     all-assembly fallback could create cycles. Builders are never executed.
 
     Source sinks must remain in the builder: place_component, its batch form, or
-    InsertComponentParameters. Moving a sink into an imported helper requires
-    extending this contract and the complete eight-builder insertion manifest
-    regression. This is not a general Python/dataflow interpreter.
+    InsertComponentParameters. check:graph enforces the imported-source boundary
+    and canonical helper passthrough contracts, in addition to the eight-builder
+    insertion manifests. That coverage guard runs in the full pipeline, not a
+    standalone assembly task. This is not a general Python/dataflow interpreter.
     """
 
     def __init__(self, source: str):
@@ -165,6 +166,10 @@ class _AssemblySources:
             if item.arg == keyword:
                 return item.value
         return _AssemblySources.fail(call)
+
+    @staticmethod
+    def arguments(call: ast.Call) -> tuple[ast.AST, ...]:
+        return (*call.args, *(item.value for item in call.keywords))
 
     def scope_nodes(self, node: ast.AST) -> list[ast.AST]:
         scope = self.scopes[node]
@@ -252,12 +257,15 @@ class _AssemblySources:
             available = getattr(item, "lineno", 0) < node.lineno or (
                 self.scopes[node] is not self.tree and self.scopes[item] is self.tree
             )
-            if isinstance(item, ast.Assign):
-                for target in item.targets:
+            if isinstance(item, (ast.Assign, ast.AnnAssign)):
+                targets = (
+                    item.targets if isinstance(item, ast.Assign) else [item.target]
+                )
+                for target in targets:
                     if (
                         isinstance(target, ast.Name)
                         and target.id == node.id
-                        and len(item.targets) != 1
+                        and len(targets) != 1
                     ):
                         self.fail(item)
                     if (
@@ -267,7 +275,7 @@ class _AssemblySources:
                     ):
                         self.fail(item)
             if (
-                isinstance(item, ast.Assign)
+                isinstance(item, (ast.Assign, ast.AnnAssign, ast.NamedExpr))
                 and isinstance(item.value, ast.Name)
                 and item.value.id == node.id
                 and available
@@ -276,10 +284,11 @@ class _AssemblySources:
             if (
                 isinstance(item, ast.Call)
                 and available
-                and node not in item.args
+                and node not in self.arguments(item)
                 and self.call_name(item) not in {"len", "enumerate"}
                 and any(
-                    isinstance(arg, ast.Name) and arg.id == node.id for arg in item.args
+                    isinstance(arg, ast.Name) and arg.id == node.id
+                    for arg in self.arguments(item)
                 )
             ):
                 self.fail(item)  # an opaque consumer could mutate the manifest
@@ -299,10 +308,15 @@ class _AssemblySources:
         """Batch rows may receive non-source metadata, never opaque part edits."""
         row = loop.target.id
         for item in ast.walk(loop):
-            if isinstance(item, ast.Assign):
+            if isinstance(
+                item, (ast.Assign, ast.AnnAssign, ast.AugAssign, ast.NamedExpr)
+            ):
                 if isinstance(item.value, ast.Name) and item.value.id == row:
                     self.fail(item)
-                for target in item.targets:
+                targets = (
+                    item.targets if isinstance(item, ast.Assign) else [item.target]
+                )
+                for target in targets:
                     if (
                         not isinstance(target, ast.Subscript)
                         or not isinstance(target.value, ast.Name)
@@ -316,7 +330,8 @@ class _AssemblySources:
                         self.fail(item)
             if isinstance(item, ast.Call):
                 if any(
-                    isinstance(arg, ast.Name) and arg.id == row for arg in item.args
+                    isinstance(arg, ast.Name) and arg.id == row
+                    for arg in self.arguments(item)
                 ):
                     self.fail(item)
                 if (
@@ -341,6 +356,31 @@ class _AssemblySources:
                     self.fail(initial)
                 found.extend(initial.values)
         for item in self.scope_nodes(node):
+            if (
+                isinstance(item, (ast.Assign, ast.AnnAssign, ast.NamedExpr))
+                and item.value is not None
+                and ast.dump(item.value) == ast.dump(owner)
+            ):
+                self.fail(item)
+            if (
+                isinstance(item, ast.Assign)
+                and len(item.targets) != 1
+                and any(
+                    isinstance(target, ast.Name)
+                    and isinstance(owner, ast.Name)
+                    and target.id == owner.id
+                    for target in item.targets
+                )
+            ):
+                self.fail(item)
+            if (
+                isinstance(item, ast.Call)
+                and self.call_name(item) not in {"len", "sorted", "enumerate"}
+                and any(
+                    ast.dump(arg) == ast.dump(owner) for arg in self.arguments(item)
+                )
+            ):
+                self.fail(item)
             if (
                 isinstance(item, ast.Call)
                 and isinstance(item.func, ast.Attribute)
@@ -860,7 +900,8 @@ def _config_references_in_text(
             return None
         if isinstance(node, ast.Import):
             aliases.update(
-                alias.asname for alias in node.names
+                alias.asname
+                for alias in node.names
                 if alias.name in config_modules and alias.asname
             )
     calls: dict[int, str | None] = {}
@@ -891,7 +932,9 @@ def _config_tokens_in_source(path: Path) -> frozenset[str]:
     when timestamps are unchanged; accessor/family resolution is not memoized by
     this function. Callers retain their existing per-invocation graph snapshot.
     """
-    references = _config_references_in_text(path.read_text(encoding="utf-8"), _CONFIG_MODULES)
+    references = _config_references_in_text(
+        path.read_text(encoding="utf-8"), _CONFIG_MODULES
+    )
     if references is None:
         raise _UnknownConfigUse
     tokens: set[str] = set()
