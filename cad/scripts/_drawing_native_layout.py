@@ -52,9 +52,11 @@ from collections import Counter
 from dataclasses import dataclass
 from enum import Enum
 import math
+import json
 from typing import Any, Callable, Mapping, Sequence
 
 from _common import _early_bound
+from solidworks_mcp.adapters.com_variant import double_array
 from _drawing_view_packing import (
     Axis,
     AxisAlignment,
@@ -438,7 +440,9 @@ def _report(
             if not entities and key[2] in {2, 4, 5, 7}
         },
         footprint_exclusions={
-            str(key): "individually hidden (swAnnotationHidden=3); identity and visibility retained"
+            str(
+                key
+            ): "individually hidden (swAnnotationHidden=3); identity and visibility retained"
             for key, signature in before.signatures.items()
             if signature[3] == 3
         },
@@ -556,11 +560,21 @@ def repair_native_layout(
         for key in views
     }
     note_targets = {}
+    _telemetry.info(
+        "native layout translation plan",
+        view_targets=json.dumps(targets),
+        view_positions_before=json.dumps(before.positions),
+    )
     with _telemetry.span("drawing.native_layout.apply"):
         for key in order:
-            # Property assignment follows documented native aligned-child propagation.
-            # Even a zero-delta child gets its absolute target after its parent moved.
-            views[key].Position = targets[key]
+            # Native Position expects doubles, not a Python tuple marshalled as
+            # an array of VARIANTs. The method also gives an explicit success
+            # result. Keep parent propagation, then apply each child's original
+            # absolute target exactly once.
+            if not views[key].SetViewPosition(double_array(targets[key]), True):
+                raise RuntimeError(
+                    f"{key}: native view rejected layout target {targets[key]}"
+                )
         for note in notes:
             group = (
                 f"view:{note.follows_view}"
@@ -582,7 +596,8 @@ def repair_native_layout(
     for key, target in targets.items():
         if math.dist(target, after.positions[key]) > position_tolerance_m:
             raise RuntimeError(
-                f"{key}: native view did not reach absolute layout target"
+                f"{key}: native view did not reach absolute layout target: "
+                f"requested={target}, observed={after.positions[key]}"
             )
     for key, target in note_targets.items():
         if math.dist(target, after.note_positions[key]) > position_tolerance_m:
