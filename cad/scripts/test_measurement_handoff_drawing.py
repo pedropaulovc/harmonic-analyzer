@@ -264,7 +264,12 @@ def test_gtol_failed_final_guard_never_hands_off_a_new_body_baseline(monkeypatch
 
 def test_obstacle_actual_measurement_is_handed_off_after_commands(monkeypatch):
     adapter, view, rows, measure = native_context(monkeypatch, count=2)
-    obstacle, output = Mock(), SimpleNamespace(body=Rect(0.1, 0.01, 0.15, 0.05))
+    obstacle, output = Mock(), SimpleNamespace(
+        kind=4,
+        body=Rect(0.1, 0.01, 0.15, 0.05),
+        text_boxes=(),
+        text_runs=(),
+    )
     view.GetAnnotationsByType.side_effect = lambda kind: (
         rows if kind == 5 else (obstacle,) if kind == 4 else ()
     )
