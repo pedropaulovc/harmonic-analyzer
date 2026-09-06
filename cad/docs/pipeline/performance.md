@@ -188,6 +188,13 @@ Live controls distinguish native API behavior from implementation mistakes:
   Y. Detailed failures are retained under `cad/out/reports/native-layout/`, with
   before, predicted and observed footprints and actual clearance deficits.
 
+The project reserves an additional 0.5 mm during packing, including a planning
+inset at the sheet borders. Final acceptance still uses the original borders and
+2 mm clearance. This allowance is a chosen planning margin, not a guaranteed
+bound on future native extent changes. At `958f2fb5`, pedestal and rocker both
+passed the resulting live readback checks. No failed-layout retry loop or relaxed
+acceptance tolerance was introduced.
+
 These layout checks have a cost. At `5d863bb9`, the pedestal's measured-layout
 phase took 30.474 seconds, versus 42.061 seconds before reducing repeated GTol
 witnesses. That is layout time, not an end-to-end drawing speedup. The successful
