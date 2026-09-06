@@ -21,6 +21,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import _cwm  # noqa: E402
+import _channel_pose  # noqa: E402
 
 
 class FakeFeature:
@@ -336,7 +337,7 @@ def _pose_at(z):
 def test_prepared_pose_resets_reuse_handles_and_transforms_in_order(pose_bank):
     """Repeated driver resets must not repeat component lookup or allocation."""
     targets = [("rocker-1", _pose_at(0.01)), ("rod-1", _pose_at(0.02))]
-    prepared = _cwm.prepare_component_poses(pose_bank.adapter, iter(targets))
+    prepared = _channel_pose.prepare_component_poses(pose_bank.adapter, iter(targets))
     assert pose_bank.writes == []  # preparation cannot change the solver's input
 
     for _ in range(6):  # three resets for each of two copied channels
@@ -353,7 +354,7 @@ def test_prepared_pose_resets_reuse_handles_and_transforms_in_order(pose_bank):
 
 def test_prepare_missing_component_fails_before_any_pose_write(pose_bank):
     with pytest.raises(RuntimeError, match="component not found.*missing-1"):
-        _cwm.prepare_component_poses(
+        _channel_pose.prepare_component_poses(
             pose_bank.adapter,
             [("rocker-1", _pose_at(0.01)), ("missing-1", _pose_at(0.02))],
         )
@@ -361,7 +362,7 @@ def test_prepare_missing_component_fails_before_any_pose_write(pose_bank):
 
 
 def test_prepared_poses_cannot_be_applied_after_switching_documents(pose_bank):
-    prepared = _cwm.prepare_component_poses(
+    prepared = _channel_pose.prepare_component_poses(
         pose_bank.adapter, [("rocker-1", _pose_at(0.01))]
     )
     pose_bank.adapter.currentModel = object()
@@ -371,7 +372,7 @@ def test_prepared_poses_cannot_be_applied_after_switching_documents(pose_bank):
 
 
 def test_prepared_pose_groups_reset_only_the_requested_components(pose_bank):
-    prepared = _cwm.prepare_component_poses(
+    prepared = _channel_pose.prepare_component_poses(
         pose_bank.adapter,
         [("rocker-1", _pose_at(0.01)), ("rod-1", _pose_at(0.02))],
     )
@@ -386,7 +387,7 @@ def test_prepared_pose_groups_reset_only_the_requested_components(pose_bank):
 
 
 def test_prepared_pose_groups_reject_an_incomplete_component_slice(pose_bank):
-    prepared = _cwm.prepare_component_poses(
+    prepared = _channel_pose.prepare_component_poses(
         pose_bank.adapter, [("rocker-1", _pose_at(0.01))]
     )
     with pytest.raises(ValueError, match="complete groups"):
@@ -417,7 +418,7 @@ def driver_bank(monkeypatch, count=54):
         return True
 
     model.Extension.DeleteSelection2.side_effect = delete
-    monkeypatch.setattr(_cwm, "_early_bound", lambda obj, _kind: obj)
+    monkeypatch.setattr(_channel_pose, "_early_bound", lambda obj, _kind: obj)
     return SimpleNamespace(
         adapter=SimpleNamespace(currentModel=model), model=model,
         names=names, features=features, selected=selected,
@@ -428,7 +429,7 @@ def test_delete_driver_bank_resolves_then_removes_only_54_created_mates_once(mon
     bank = driver_bank(monkeypatch)
     names = list(reversed(bank.names))
     handles = [bank.features[name] for name in names]
-    _cwm.delete_pose_driver_bank(bank.adapter, names, expected_count=54)
+    _channel_pose.delete_pose_driver_bank(bank.adapter, names, expected_count=54)
     assert set(bank.features) == {"ParentDistance", "ParentPlane"}
     assert [call.args for call in bank.model.FeatureByName.call_args_list[:54]] == [
         (name,) for name in names
@@ -446,7 +447,7 @@ def test_delete_driver_bank_resolves_then_removes_only_54_created_mates_once(mon
 def test_delete_driver_bank_rejects_invalid_target_manifest_without_com(monkeypatch, names, expected):
     bank = driver_bank(monkeypatch, 2)
     with pytest.raises(ValueError, match="driver"):
-        _cwm.delete_pose_driver_bank(bank.adapter, names, expected_count=expected)
+        _channel_pose.delete_pose_driver_bank(bank.adapter, names, expected_count=expected)
     bank.model.FeatureByName.assert_not_called()
     bank.model.Extension.DeleteSelection2.assert_not_called()
 
@@ -466,7 +467,7 @@ def test_delete_driver_bank_validates_every_target_before_selecting_any(monkeypa
     if failure == "structural_mate":
         feature.GetTypeName2.return_value = "MateConcentric"
     with pytest.raises(RuntimeError, match="driver"):
-        _cwm.delete_pose_driver_bank(bank.adapter, bank.names, expected_count=2)
+        _channel_pose.delete_pose_driver_bank(bank.adapter, bank.names, expected_count=2)
     bank.features[bank.names[0]].Select2.assert_not_called()
     bank.model.Extension.DeleteSelection2.assert_not_called()
 
@@ -485,7 +486,7 @@ def test_delete_driver_bank_propagates_failure_without_fallback(monkeypatch, fai
     if failure == "com":
         bank.model.Extension.DeleteSelection2.side_effect = RuntimeError("driver COM delete failure")
     with pytest.raises(RuntimeError, match="driver"):
-        _cwm.delete_pose_driver_bank(bank.adapter, bank.names, expected_count=2)
+        _channel_pose.delete_pose_driver_bank(bank.adapter, bank.names, expected_count=2)
     assert bank.selected == []
     assert bank.model.Extension.DeleteSelection2.call_count <= 1
     bank.model.EditDelete.assert_not_called()
@@ -493,6 +494,6 @@ def test_delete_driver_bank_propagates_failure_without_fallback(monkeypatch, fai
 
 def test_delete_empty_driver_bank_is_a_noop(monkeypatch):
     bank = driver_bank(monkeypatch, 0)
-    _cwm.delete_pose_driver_bank(bank.adapter, [], expected_count=0)
+    _channel_pose.delete_pose_driver_bank(bank.adapter, [], expected_count=0)
     bank.model.FeatureByName.assert_not_called()
     bank.model.Extension.DeleteSelection2.assert_not_called()

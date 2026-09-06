@@ -160,17 +160,16 @@ from _assembly import (
     world_point,
     write_dof_manifest,
 )
+from _channel_pose import delete_pose_driver_bank, prepare_component_poses
 from _cwm import (
     component_constrained_status,
     component_distance_mate_flip,
     component_mate_count,
     component_mate_dump,
     copy_with_mates,
-    delete_pose_driver_bank,
     ensure_component_distance_mate_flip,
     external_mate_rows,
     mates_with_owners,
-    prepare_component_poses,
     resolve_entity,
 )
 from _transforms import (
