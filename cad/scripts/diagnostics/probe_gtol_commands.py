@@ -127,6 +127,46 @@ def compare(before, after, handles, app, *, stage):
     return movements
 
 
+def selection_context(app, drawing, selection, bank):
+    """Observe selection-manager context separately from exact annotation owner."""
+    views = [
+        _early_bound(raw, "IView")
+        for sheet in drawing.GetViews() or ()
+        for raw in sheet[1:]
+    ]
+    expected = [view for view in views if str(view.GetName2()) == bank[0][0]]
+    if len(expected) != 1:
+        raise RuntimeError("native selection probe needs one exact named drawing view")
+    rows = []
+    for index, (_, annotation) in enumerate(bank, 1):
+        view = selection.GetSelectedObjectsDrawingView2(index, -1)
+        selected = _early_bound(selection.GetSelectedObject6(index, -1), "IGtol")
+        actual = _early_bound(selected.GetAnnotation(), "IAnnotation")
+        owner_type = int(actual.OwnerType)
+        rows.append(
+            {
+                "name": str(annotation.GetName()),
+                "selected_type": int(selection.GetSelectedObjectType3(index, -1)),
+                "selected_view": None
+                if view is None
+                else str(_early_bound(view, "IView").GetName2()),
+                "selected_view_same": None
+                if view is None
+                else int(app.IsSame(view, expected[0])),
+                "selected_annotation_same": int(app.IsSame(actual, annotation)),
+                "owner_type": owner_type,
+                "owner_view": str(_early_bound(actual.Owner, "IView").GetName2())
+                if owner_type == 0
+                else None,
+                "owner_view_same": int(app.IsSame(actual.Owner, expected[0]))
+                if owner_type == 0
+                else None,
+            }
+        )
+    _telemetry.info(f"native GTol selection context: {json.dumps(rows)}")
+    return rows
+
+
 def run_command(app, model, drawing, bank, command):
     """Select one complete view-owned GTol bank, then run one documented command."""
     if len(bank) < 2:
@@ -146,6 +186,7 @@ def run_command(app, model, drawing, bank, command):
     count = int(selection.GetSelectedObjectCount2(-1))
     if count != len(bank):
         raise RuntimeError(f"selected GTol bank count {count} != {len(bank)}")
+    context = selection_context(app, drawing, selection, bank)
     enabled = bool(app.IsCommandEnabled(command))
     start = time.perf_counter()
     with _telemetry.span("diagnostic.gtol_command", command=command, view=view):
@@ -155,13 +196,57 @@ def run_command(app, model, drawing, bank, command):
         "view": view,
         "command": command,
         "selected": count,
+        "selection_context": context,
         "enabled": enabled,
         "return": accepted,
         "seconds": time.perf_counter() - start,
     }
 
 
-async def probe(adapter, source, directory):
+def sheet_symbol_context(drawing, hashes, name="DetailItem324"):
+    """Read a specifically named sheet annotation without selecting or changing it."""
+    found = []
+    for sheet in drawing.GetViews() or ():
+        for raw in sheet:
+            view = _early_bound(raw, "IView")
+            document = view.ReferencedDocument
+            if document is not None:
+                path = str(Path(document.GetPathName()).resolve())
+                hashes.setdefault(path, file_digest(Path(path)))
+            for raw_annotation in view.GetAnnotations() or ():
+                annotation = _early_bound(raw_annotation, "IAnnotation")
+                if str(annotation.GetName()) != name:
+                    continue
+                owner_type = int(annotation.OwnerType)
+                owner = annotation.Owner
+                owner_name = None
+                if owner is not None and owner_type in (1, 2):
+                    owner_name = str(_early_bound(owner, "ISheet").GetName())
+                if owner is not None and owner_type == 0:
+                    owner_name = str(_early_bound(owner, "IView").GetName2())
+                found.append(
+                    {
+                        "name": name,
+                        "enumerated_view": str(view.GetName2()),
+                        "kind": int(annotation.GetType()),
+                        "visible": int(annotation.Visible),
+                        "owner_type": owner_type,
+                        "owner_name": owner_name,
+                        "layer": str(annotation.Layer),
+                        "attachment_count": int(annotation.GetAttachedEntityCount3()),
+                        "attachment_types": tuple(
+                            annotation.GetAttachedEntityTypes() or ()
+                        ),
+                        "ink": metrics(annotation),
+                    }
+                )
+    if not found:
+        raise RuntimeError(f"native annotation {name} not found")
+    _telemetry.info(f"sheet symbol context: {json.dumps(found)}")
+    return found
+
+
+async def probe(adapter, source, directory, probe_mode="commands"):
     from solidworks_mcp.adapters.solidworks.drawing import save_drawing
 
     app = _early_bound(adapter.swApp, "ISldWorks")
@@ -181,6 +266,11 @@ async def probe(adapter, source, directory):
             if Path(adapter.currentModel.GetPathName()).resolve() != copy:
                 raise RuntimeError("SolidWorks opened a different drawing")
             drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+            if probe_mode == "sheet-symbol-context":
+                report["sheet_symbol"] = sheet_symbol_context(
+                    drawing, report["source_hashes"]
+                )
+                break
             baseline, handles = snapshot(drawing, report["source_hashes"])
             compare(
                 baseline,
@@ -270,6 +360,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("drawing", type=Path)
     parser.add_argument("--worker", action="store_true")
+    parser.add_argument(
+        "--mode", choices=("commands", "sheet-symbol-context"), default="commands"
+    )
     args = parser.parse_args()
     source = args.drawing.resolve(strict=True)
     if source.suffix.upper() != ".SLDDRW":
@@ -279,7 +372,14 @@ def main():
         import dodo
 
         dodo._run(
-            [sys.executable, str(Path(__file__).resolve()), str(source), "--worker"],
+            [
+                sys.executable,
+                str(Path(__file__).resolve()),
+                str(source),
+                "--worker",
+                "--mode",
+                args.mode,
+            ],
             "GTol native spacing commands",
             com=True,
             log_stem="gtol-commands-probe",
@@ -290,7 +390,7 @@ def main():
     reports = ROOT / "cad/out/reports"
     reports.mkdir(parents=True, exist_ok=True)
     directory = Path(tempfile.mkdtemp(prefix="gtol-commands-", dir=reports))
-    return run_build(lambda adapter: probe(adapter, source, directory))
+    return run_build(lambda adapter: probe(adapter, source, directory, args.mode))
 
 
 if __name__ == "__main__":
