@@ -2205,6 +2205,8 @@ def task_check():
         SCRIPTS_DIR / "test_probe_drawing_attachments.py",
         SCRIPTS_DIR / "test_benchmark_drawing_recipes.py",
         SCRIPTS_DIR / "test_annotation_performance_probe.py",
+        SCRIPTS_DIR / "test_mixed_annotation_probe.py",
+        SCRIPTS_DIR / "test_thread_ink_probe.py",
         SCRIPTS_DIR / "test_surface_finish.py",
         SCRIPTS_DIR / "test_surface_finish_ownership_a.py",
         # One offline contract file per manufacturing drawing (test_*_drawing.py),
