@@ -411,7 +411,15 @@ def arrange_native_gtol_columns(
             continue
         outline = Rect(*view.GetOutline())
         bank, command_report = before, []
-        for command in _COMMANDS if len(bank) > 1 else ():
+        # The copy-only cardinality control proves Space Tightly Down requires
+        # three selected GTols; Align Left works with two. Two frames still get
+        # the measured minimum-clearance pass after native alignment.
+        commands = ()
+        if len(bank) >= 2:
+            commands = (_COMMANDS[1],)
+        if len(bank) >= 3:
+            commands = _COMMANDS
+        for command in commands:
             _native_command(adapter, drawing, view, bank, command)
             current = _position_translated_bank(bank)
             motion = {
