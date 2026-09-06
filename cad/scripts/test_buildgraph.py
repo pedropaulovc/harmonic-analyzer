@@ -12,9 +12,10 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import _telemetry  # noqa: E402
 import _buildgraph as bg  # noqa: E402
 from _buildgraph import (  # noqa: E402
     ASSEMBLY_ORDER,
@@ -36,6 +37,193 @@ from _common import part_properties  # noqa: E402
 
 def _helper_names(stem_script: str) -> set[str]:
     return {Path(p).stem for p in module_deps_of(SCRIPTS_DIR / stem_script)}
+
+
+# Audited against each builder's insertion calls, local tuple/batch manifests,
+# generated spring family and top-level SUBASSEMBLIES (not the old regex output).
+_INSERTED_SOURCES = {
+    "frame": "fillister_screw frame_side_screw gooseneck_set_screw harmonic_base "
+    "lag_screw nameplate rocker_arm_support top_frame tube_frame",
+    "drive_train": "alignment_pinion arbor_pedestal cone_gear cone_gear_shaft "
+    "cone_lock_knob cone_pivot_post cone_pivot_screw cone_swing_platform "
+    "cone_tip_adjuster cone_tip_block cone_tip_bushing cone_tip_pinch_screw "
+    "crank_arm crank_drive_gear crank_handle crank_pin crank_pin_eye crank_pin_ring "
+    "crank_pinion crankshaft cylinder_end_disc cylinder_gear cylinder_gear_shaft "
+    "dome_cap_screw fillister_screw foot_screw pinion_arbor pinion_bracket pinion_cam "
+    "pinion_cam_pin pinion_handle pinion_lever pinion_lift_rod pinion_pivot_block "
+    "pinion_pivot_shaft pinion_spring slotted_screw swing_stop_screw",
+    "channel": "amplitude_bar channel_lever channel_spring_installed connecting_rod "
+    "frame_side_screw fulcrum_keeper fulcrum_shaft pivot_bracket pivot_shaft "
+    "rocker_arm spring_hook",
+    "summing": "boss_hook counter_spring gooseneck knife_hanger_stud knife_mount summing_lever",
+    "magnifier": "clamp_screw column_clamp_back column_clamp_front lever_wire "
+    "magnifying_bracket magnifying_clamp magnifying_lever magnifying_vertical_rod "
+    "magnifying_wheel output_fixture thumb_screw wheel_axle wheel_axle_nut wheel_bar",
+    "pen": "hanger_screw pen_frame pen_hanger pen_marker pen_rod pen_set_screw pen_v_block pen_wire",
+    "paper_drive": "bracket_screw chain_inner_link chain_outer_link clamp_screw "
+    "column_clamp_back column_clamp_front fillister_screw guide_lock latch_hook "
+    "platen platen_clip platen_guide platen_paper platen_rack rack_pinion support_bar "
+    "transgear_bracket transgear_feed_pinion transgear_knob_shaft transgear_latch "
+    "transgear_pinion transgear_removable transgear_stub transgear_thumbnut",
+    "harmonic_analyzer": "measuring_stick measuring_stick_stop frame drive_train "
+    "channel summing magnifier pen paper_drive",
+}
+
+
+@pytest.mark.parametrize("assembly", ASSEMBLY_ORDER)
+def test_all_assembly_references_match_inserted_source_manifests(assembly):
+    assert set(references_of(assembly)) == set(_INSERTED_SOURCES[assembly].split())
+
+
+def _source_references(tmp_path, monkeypatch, source, parts=("rocker_arm",)):
+    script = tmp_path / "build_parent_assembly.py"
+    script.write_text(source, encoding="utf-8")
+    monkeypatch.setattr(bg, "script_for", lambda _stem: script)
+    monkeypatch.setattr(bg, "part_stems", lambda: list(parts))
+    monkeypatch.setattr(bg, "ASSEMBLY_ORDER", ("parent", "channel"))
+    return set(bg.references_of("parent"))
+
+
+def test_reference_parser_ignores_prose_comments_and_non_source_literals(
+    tmp_path, monkeypatch
+):
+    source = '''"""The "channel" assembly does not belong here."""
+# Previously "channel" was mentioned by a diagnostic.
+raise AssertionError("channel station_z0 does not carry the fixed-post recenter")
+log("channel")
+label = "rocker-arm"
+'''
+    assert _source_references(tmp_path, monkeypatch, source) == set()
+
+
+def test_exact_source_name_does_not_reference_shorter_stem(tmp_path, monkeypatch):
+    source = "await place_component(adapter, 'rocker-arm-support', pos, rot, rows)"
+    assert _source_references(
+        tmp_path, monkeypatch, source, ("rocker_arm", "rocker_arm_support")
+    ) == {"rocker_arm_support"}
+
+
+@pytest.mark.parametrize(
+    "expression", ["lookup_part()", "runtime_name", 'f"{runtime_name}"']
+)
+def test_unresolved_source_argument_fails_without_all_assembly_fallback(
+    tmp_path, monkeypatch, expression
+):
+    with pytest.raises(ValueError, match="[Uu]nresolved assembly source"):
+        _source_references(
+            tmp_path,
+            monkeypatch,
+            f"await place_component(adapter, {expression}, pos, rot, rows)",
+        )
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "from _assembly import place_component as put\nawait put(adapter, part='rocker-arm', position=p, rotation=r, rows=q)",
+        "part = 'rocker-arm'; await place_component(adapter, part, p, r, q)",
+        "for part in ('rocker-arm',):\n    await place_component(adapter, part, p, r, q)",
+        "riders = [('rocker-arm', p)]\nfor part, pos in riders:\n    await place_component(adapter, part, pos, r, q)",
+        "async def place(adapter, part):\n    await place_component(adapter, part, p, r, q)\nawait place(adapter, 'rocker-arm')",
+        "await adapter.insert_component(InsertComponentParameters(file_path='C:/cad/rocker-arm.SLDPRT'))",
+        "parts = [{'part': 'rocker-arm'}]\nawait place_components_batch(adapter, parts)",
+        "parts = []\nparts.append({'part': 'rocker-arm'})\nawait place_components_batch(adapter, parts)",
+    ],
+)
+def test_reference_source_call_shapes(tmp_path, monkeypatch, source):
+    assert _source_references(tmp_path, monkeypatch, source) == {"rocker_arm"}
+
+
+def test_ambiguous_dynamic_source_family_keeps_every_possible_producer(
+    tmp_path, monkeypatch
+):
+    source = "await place_component(adapter, f'rocker-arm{suffix}', p, r, q)"
+    assert _source_references(
+        tmp_path, monkeypatch, source, ("rocker_arm", "rocker_arm_support")
+    ) == {"rocker_arm", "rocker_arm_support"}
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "parts = []\nparts.extend(runtime_parts())\nawait place_components_batch(adapter, parts)",
+        "parts = []\nparts += runtime_parts()\nawait place_components_batch(adapter, parts)",
+        "parts = []\nalias = parts\nalias.append({'part': 'rocker-arm'})\nawait place_components_batch(adapter, parts)",
+        "parts = alias = []\nalias.append({'part': 'rocker-arm'})\nawait place_components_batch(adapter, parts)",
+        "parts = []\nparts[0] = {'part': 'rocker-arm'}\nawait place_components_batch(adapter, parts)",
+        "parts = [{'part': 'rocker-arm'}]\nfor spec in parts:\n    spec['part'] = runtime_part()\nawait place_components_batch(adapter, parts)",
+        "parts = []\nmutate(parts)\nawait place_components_batch(adapter, parts)",
+        "await place_components_batch(adapter, runtime_parts())",
+        "await place_components_batch(adapter, [{'part': 'rocker-arm', **runtime_fields()}])",
+        "await adapter.insert_component(runtime_parameters())",
+        "part = 'rocker-arm'\npart += runtime_suffix()\nawait place_component(adapter, part, p, r, q)",
+        "await place_component(adapter, 'rocker-arm-misspelled', p, r, q)",
+        "put = place_component\nawait put(adapter, 'rocker-arm', p, r, q)",
+    ],
+)
+def test_unsupported_source_manipulation_fails_loud(tmp_path, monkeypatch, source):
+    with pytest.raises(ValueError, match="[Uu]nresolved assembly source"):
+        _source_references(tmp_path, monkeypatch, source)
+
+
+def test_reference_syntax_cache_detects_source_edits_and_resolves_current_registry(
+    tmp_path, monkeypatch
+):
+    source = "await place_component(adapter, 'rocker-arm', p, r, q)"
+    assert _source_references(tmp_path, monkeypatch, source) == {"rocker_arm"}
+    with pytest.raises(ValueError, match="[Uu]nresolved assembly source"):
+        _source_references(tmp_path, monkeypatch, source, ("rocker_arm_support",))
+    changed = "await place_component(adapter, 'rocker-arm-support', p, r, q)"
+    assert _source_references(
+        tmp_path, monkeypatch, changed, ("rocker_arm_support",)
+    ) == {"rocker_arm_support"}
+
+
+def test_local_path_wrapper_must_prove_it_preserves_source_name(tmp_path, monkeypatch):
+    source = """def _part(name):
+    path = (OUT_SLDPRT / f"{name}.SLDPRT").resolve()
+    return str(path)
+await adapter.insert_component(InsertComponentParameters(file_path=_part("rocker-arm")))
+"""
+    assert _source_references(tmp_path, monkeypatch, source) == {"rocker_arm"}
+    changed = source.replace('f"{name}.SLDPRT"', '"rocker-arm-support.SLDPRT"')
+    with pytest.raises(ValueError, match="[Uu]nresolved assembly source"):
+        _source_references(
+            tmp_path, monkeypatch, changed, ("rocker_arm", "rocker_arm_support")
+        )
+
+
+def test_later_module_bindings_are_conservative_for_function_sources(
+    tmp_path, monkeypatch
+):
+    source = """PART = 'rocker-arm'
+async def build(adapter):
+    await place_component(adapter, PART, p, r, q)
+PART = 'rocker-arm-support'
+"""
+    assert _source_references(
+        tmp_path, monkeypatch, source, ("rocker_arm", "rocker_arm_support")
+    ) == {"rocker_arm", "rocker_arm_support"}
+
+
+def test_memo_lookup_keeps_initial_values_and_explicit_default(tmp_path, monkeypatch):
+    source = """memo = {'old': 'rocker-arm'}
+part = memo.get(key, 'rocker-arm-support')
+memo[key] = 'rocker-arm-support'
+await place_component(adapter, part, p, r, q)
+"""
+    assert _source_references(
+        tmp_path, monkeypatch, source, ("rocker_arm", "rocker_arm_support")
+    ) == {"rocker_arm", "rocker_arm_support"}
+
+
+def test_later_module_manifest_appends_are_not_silently_lost(tmp_path, monkeypatch):
+    source = """parts = []
+async def build(adapter):
+    await place_components_batch(adapter, parts)
+parts.append({'part': 'rocker-arm'})
+"""
+    assert _source_references(tmp_path, monkeypatch, source) == {"rocker_arm"}
 
 
 def test_references_is_inverse_of_dependents():
@@ -408,21 +596,7 @@ def test_cached_config_syntax_preserves_unknown_reference_rejection():
 
 
 def _run() -> int:
-    failures = 0
-    for name, fn in sorted(globals().items()):
-        if not name.startswith("test_") or not callable(fn):
-            continue
-        try:
-            fn()
-            _telemetry.success(name)
-        except AssertionError as exc:
-            failures += 1
-            _telemetry.error(f"{name}: {exc}")
-    if failures:
-        _telemetry.error(f"FAIL: {failures} failure(s)")
-    else:
-        _telemetry.success("PASS: 0 failure(s)")
-    return 1 if failures else 0
+    return int(pytest.main([__file__, "-q"]))
 
 
 if __name__ == "__main__":
