@@ -69,11 +69,17 @@ def _digest(path):
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
+def _file_identity(path):
+    state = path.stat()
+    return state.st_dev, state.st_ino
+
+
 class DiagnosticDocuments:
     def __init__(self, adapter):
         self.adapter = adapter
         self.app = _early_bound(adapter.swApp, "ISldWorks")
         self.directories, self.sources, self.records = set(), {}, []
+        self.closed_artifacts, self.frozen_inputs = {}, {}
         self.current = None
         self.creation = None
         self.events = []
@@ -132,6 +138,9 @@ class DiagnosticDocuments:
 
     def register_source(self, source):
         path = Path(source).resolve(strict=True)
+        if path in self.frozen_inputs:
+            self._assert_frozen(path)
+            return
         if any(path.is_relative_to(directory) for directory in self.directories):
             raise RuntimeError(
                 f"registered source overlaps diagnostic output directory: {path}"
@@ -148,6 +157,37 @@ class DiagnosticDocuments:
                 )
         if path not in self.sources:
             self.sources[path] = _digest(path)
+        self.checkpoint()
+
+    def _assert_frozen(self, path):
+        original = self.frozen_inputs[path]
+        if (
+            _digest(path) != original["sha256"]
+            or _file_identity(path) != original["file_identity"]
+        ):
+            raise RuntimeError(f"frozen diagnostic input was changed/replaced: {path}")
+
+    def freeze_owned_input(self, path):
+        """Make one verified, closed diagnostic artifact an immutable nested input."""
+        path = Path(path).resolve(strict=True)
+        self.inventory()
+        record = self.closed_artifacts.get(path)
+        if record is None or self.app.GetOpenDocumentByName(str(path)) is not None:
+            raise RuntimeError(
+                "frozen input requires an exact completed, closed owned artifact"
+            )
+        if (
+            _digest(path) != record["sha256"]
+            or _file_identity(path) != record["file_identity"]
+        ):
+            raise RuntimeError(
+                f"completed diagnostic artifact was changed/replaced: {path}"
+            )
+        self.frozen_inputs[path] = dict(record)
+        self.sources[path] = record["sha256"]
+        self.events.append(
+            {"operation": "freeze_owned_input", "path": str(path), **record}
+        )
         self.checkpoint()
 
     def _output(self, path):
@@ -245,8 +285,8 @@ class DiagnosticDocuments:
                     role = Ownership.REFERENCE
                 self.records.append(NativeDocument(reference, role, state, {path}))
 
-    def _claim_open(self, path):
-        model = _early_bound(self.adapter.currentModel, "IModelDoc2")
+    def _claim_open(self, path, model):
+        model = _early_bound(model, "IModelDoc2")
         if model is None:
             model = _early_bound(
                 self.app.GetOpenDocumentByName(str(path)), "IModelDoc2"
@@ -283,6 +323,45 @@ class DiagnosticDocuments:
         self.checkpoint()
         return model
 
+    @contextmanager
+    def opening_native_document(self, path):
+        """Guard an explicit native OpenDoc call without changing its arguments."""
+        path = Path(path).resolve(strict=True)
+        self.inventory()
+        if path.parent in self.directories:
+            self._output(path)
+        elif path not in self.sources:
+            raise RuntimeError(
+                "native source open requires read-only source registration"
+            )
+        claimed = False
+
+        def claim(model):
+            nonlocal claimed
+            result = self._claim_open(path, model)
+            claimed = True
+            return result
+
+        try:
+            yield claim
+        except Exception:
+            try:
+                model = self.app.GetOpenDocumentByName(str(path))
+                if not claimed and model is not None:
+                    claim(model)
+            except Exception as error:
+                self.events.append(
+                    {
+                        "operation": "failed_native_open_unclaimed",
+                        "path": str(path),
+                        "error": repr(error),
+                    }
+                )
+                self.checkpoint()
+            raise
+        if not claimed:
+            raise RuntimeError("explicit native open did not claim its exact result")
+
     async def open_model(self, path, *args, **kwargs):
         self.inventory()
         path = Path(path).resolve(strict=True)
@@ -296,7 +375,7 @@ class DiagnosticDocuments:
             result = await self.adapter.open_model(str(path), *args, **kwargs)
         except Exception as error:
             try:
-                self._claim_open(path)
+                self._claim_open(path, self.adapter.currentModel)
             except Exception as ownership_error:
                 self.events.append(
                     {
@@ -309,7 +388,7 @@ class DiagnosticDocuments:
             raise error
         if not result.is_success:
             try:
-                self._claim_open(path)
+                self._claim_open(path, self.adapter.currentModel)
             except Exception as ownership_error:
                 self.events.append(
                     {
@@ -320,7 +399,7 @@ class DiagnosticDocuments:
                 )
             self.checkpoint()
             return result
-        self._claim_open(path)
+        self._claim_open(path, self.adapter.currentModel)
         return result
 
     def assign_current(self, model):
@@ -461,6 +540,21 @@ class DiagnosticDocuments:
 
     async def _close_record(self, record):
         documents = self.inventory()
+        completed = None
+        if record.ownership is Ownership.COPY and record.state["path"]:
+            path = Path(record.state["path"]).resolve()
+            state = _state(record.handle)
+            # A failed SaveAs can change the native path without producing a
+            # file; cleanup remains permitted, but it establishes no input proof.
+            if path.is_file() and state["dirty"] is DocumentState.CLEAN:
+                completed = (
+                    path,
+                    {
+                        "native_state": state,
+                        "sha256": _digest(path),
+                        "file_identity": _file_identity(path),
+                    },
+                )
         collateral = tuple(
             self._record(doc)
             for doc in documents
@@ -481,6 +575,9 @@ class DiagnosticDocuments:
         self.records.remove(record)
         self.adapter.currentModel = self.current = None
         self.inventory(may_unload=collateral)
+        if completed is not None:
+            path, evidence = completed
+            self.closed_artifacts[path] = evidence
         self.events.append(
             {
                 "operation": "close",
@@ -559,6 +656,9 @@ class DiagnosticDocuments:
             "baseline_initial": baseline,
             "final_inventory": final_inventory,
             "baseline_preservation": preservation,
+            "frozen_inputs": {
+                str(path): row for path, row in self.frozen_inputs.items()
+            },
         }
 
     def checkpoint(self):
