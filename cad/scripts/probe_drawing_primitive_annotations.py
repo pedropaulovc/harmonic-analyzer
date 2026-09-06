@@ -31,6 +31,25 @@ def observe(operation):
         return {"error": repr(error)}
 
 
+def display_counts(data):
+    """All documented display-data primitive inventories, including unsupported kinds."""
+    return {
+        label: int(getattr(data, method)())
+        for label, method in (
+            ("text", "GetTextCount"),
+            ("lines", "GetLineCount"),
+            ("arcs", "GetArcCount"),
+            ("polylines", "GetPolyLineCount"),
+            ("triangles", "GetTriangleCount"),
+            ("arrowheads", "GetArrowHeadCount"),
+            ("polygons", "GetPolygonCount"),
+            ("ellipses", "GetEllipseCount"),
+            ("parabolas", "GetParabolaCount"),
+            ("points", "GetPointCount"),
+        )
+    }
+
+
 def capture(adapter: Any, view: Any, annotation: Any) -> dict[str, Any]:
     kind = int(annotation.GetType())
     data = _early_bound(annotation.GetDisplayData(), "IDisplayData")
@@ -38,15 +57,7 @@ def capture(adapter: Any, view: Any, annotation: Any) -> dict[str, Any]:
         annotation.GetSpecificAnnotation(),
         {1: "ICThread", 13: "ICenterMark", 15: "ICenterLine"}[kind],
     )
-    generic_counts = {
-        label: int(getattr(data, method)())
-        for label, method in (
-            ("text", "GetTextCount"),
-            ("lines", "GetLineCount"),
-            ("arcs", "GetArcCount"),
-            ("polylines", "GetPolyLineCount"),
-        )
-    }
+    generic_counts = display_counts(data)
     if kind == 1:
         data = _early_bound(specific.GetDisplayData(), "IDisplayData")
     attached = tuple(annotation.GetAttachedEntities3() or ())
@@ -66,6 +77,10 @@ def capture(adapter: Any, view: Any, annotation: Any) -> dict[str, Any]:
             specific.GetAnnotation(), annotation
         ),
         "generic_display_counts": generic_counts,
+        "specific_display_counts": display_counts(data),
+        "view_native_display_counts": display_counts(
+            _early_bound(view.GetDisplayData4(), "IDisplayData")
+        ),
         "attachment_count": annotation.GetAttachedEntityCount3(),
         "attachment_types": tuple(annotation.GetAttachedEntityTypes() or ()),
         "attachment_nulls": [item is None for item in attached],
@@ -109,6 +124,9 @@ def capture(adapter: Any, view: Any, annotation: Any) -> dict[str, Any]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("drawings", nargs="+", type=Path)
+    parser.add_argument(
+        "--mode", choices=("inventory", "thread_filter"), default="inventory"
+    )
     parser.add_argument("--worker", action="store_true")
     args = parser.parse_args()
     sources = [path.resolve(strict=True) for path in args.drawings]
@@ -121,6 +139,8 @@ def main() -> int:
                 sys.executable,
                 str(Path(__file__).resolve()),
                 *map(str, sources),
+                "--mode",
+                args.mode,
                 "--worker",
             ],
             "primitive annotation coverage probe",
@@ -157,6 +177,33 @@ def main() -> int:
                     if Path(adapter.currentModel.GetPathName()).resolve() != copy:
                         raise RuntimeError("SolidWorks opened the wrong copy")
                     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+                    if args.mode == "thread_filter":
+                        extension = _early_bound(
+                            adapter.currentModel.Extension, "IModelDocExtension"
+                        )
+                        # Installed swconst.tlb values; DP_Detailing documents
+                        # both filters as document-level preferences.
+                        preferences = {
+                            "swDisplayCosmeticThreads": 41,
+                            "swDisplayAnnotations": 31,
+                        }
+                        row["filter_original"] = {
+                            name: extension.GetUserPreferenceToggle(value, 0)
+                            for name, value in preferences.items()
+                        }
+                        for name, value in preferences.items():
+                            extension.SetUserPreferenceToggle(value, 0, True)
+                            if not extension.GetUserPreferenceToggle(value, 0):
+                                raise RuntimeError(
+                                    f"copy display filter {name} did not enable"
+                                )
+                        adapter.currentModel.GraphicsRedraw2()
+                        if not adapter.currentModel.EditRebuild3():
+                            raise RuntimeError("copy display filter rebuild failed")
+                        row["filter_enabled"] = {
+                            name: extension.GetUserPreferenceToggle(value, 0)
+                            for name, value in preferences.items()
+                        }
                     for sheet in drawing.GetViews() or ():
                         for raw_view in sheet[1:]:
                             view = _early_bound(raw_view, "IView")
