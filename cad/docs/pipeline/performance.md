@@ -202,3 +202,38 @@ The historical screw recipe could not load against the current helper API
 because it supplies the removed `side_centerline_face_xy` field. That failed
 attempt is not a performance result. Comparing that version requires isolating
 its historical helper closure, not adding coordinate-picking compatibility back.
+
+## Further aggressive changes, in priority order
+
+1. **Separate assembly helper dependencies by actual consumer.** The historical
+   assembly cache had 18 hits and 149 misses. Among 102 observed miss-key
+   transitions, `_assembly.py` changed in 39; only one was an identity-only
+   transition. Splitting construction, pose and verification helpers into modules
+   imported directly by their consumers can stop a narrow edit invalidating every
+   assembly. Keep dependency-closure tests; re-exporting all modules through the
+   old umbrella would preserve the same invalidation problem. These counts do not
+   predict the hit rate after a split.
+2. **Author manufacturing annotations once, import into chosen native views.**
+   The model-PMI positive control establishes fast, attached import, but not a
+   finished layout. Next test selected-view import without the all-views
+   duplication, then one representative drawing per geometry family. Preserve
+   annotation coverage and values through source-part rebuild, scale changes and
+   save/reopen before migrating that family's recipes. Current semantic pilots
+   are not evidence that every remaining coordinate-based recipe is migrated.
+3. **Restore coherent assembly-and-child cache bundles.** This could make a cache
+   hit carry the exact referenced child identities instead of requiring the
+   checkout to have them already. Validate the complete manifest before atomic
+   publication/restore, detect conflicting active inputs, and fall back to the
+   ordinary build on a mismatch. The observed identity-only misses were rare, so
+   measure additional benefit after reducing broad recipe invalidation. Do not
+   remove existing exact-identity tokens on a geometric-similarity assumption.
+4. **Experiment with isolated SolidWorks workers.** Independent OS sessions/VMs,
+   output roots and explicit process-bound connections can parallelize cold work.
+   The existing shared desktop singleton and machine-global seat lock are not
+   that isolation mechanism. Keep the lock for the present architecture; a worker
+   experiment must positively prove document ownership, instance routing, recovery
+   and cache coherence before concurrent production builds are enabled.
+
+No measured conflict rate below five percent is claimed for these proposals.
+Use bounded pilots with telemetry for retries, stale references and manual
+repairs, then the independent-trial criterion above before making that claim.

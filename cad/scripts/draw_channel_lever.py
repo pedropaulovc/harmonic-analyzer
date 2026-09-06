@@ -36,6 +36,7 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    repair_project_drawing_layout,
     set_basic_dimension,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
@@ -142,24 +143,38 @@ def _add_tip_arc_center_mark(adapter: Any, view: Any, tip_arc: Any) -> None:
         raise RuntimeError("failed to add channel-lever tip R3 center mark")
 
 
-FRONT_KEEP = ("BarLength", "TipCentreX", "NoseRadius", "TipRadius", "FulcrumDia",)
+FRONT_KEEP = (
+    "BarLength",
+    "TipCentreX",
+    "NoseRadius",
+    "TipRadius",
+    "FulcrumDia",
+)
 RIGHT_KEEP: tuple[str, ...] = ()
 TOP_KEEP: tuple[str, ...] = ()
 
 
 def _model_entities(model: Any) -> dict[str, Any]:
     half_z = LEVER_THICKNESS / 2.0
-    return ModelEntities(model).resolve({
-        "fulcrum": CircleEdge(PIVOT_HOLE_DIA / 2.0, (0, 0, -HUB_LENGTH / 2.0), (0, 0, 1)),
-        "bar_pin": CircleEdge(_BAR_PIN_DIA / 2.0, (BAR_PIN_X, 0, -half_z), (0, 0, 1)),
-        "spring": CircleEdge(_SPRING_HOLE_DIA / 2.0, (LEVER_SPRING_X, 0, -half_z), (0, 0, 1)),
-        "tip": CircleEdge(TIP_RADIUS, (TIP_ARC_CX, 0, -half_z), (0, 0, 1)),
-        "top_front": LineEdge((80, BAR_TALL / 2.0, -half_z), (1, 0, 0)),
-        "top_back": LineEdge((80, BAR_TALL / 2.0, half_z), (1, 0, 0)),
-        "bottom_front": LineEdge((80, -BAR_TALL / 2.0, -half_z), (1, 0, 0)),
-        "broad_a": PlanarFace((0, 0, 1), half_z),
-        "broad_opposite": PlanarFace((0, 0, -1), half_z),
-    })
+    return ModelEntities(model).resolve(
+        {
+            "fulcrum": CircleEdge(
+                PIVOT_HOLE_DIA / 2.0, (0, 0, -HUB_LENGTH / 2.0), (0, 0, 1)
+            ),
+            "bar_pin": CircleEdge(
+                _BAR_PIN_DIA / 2.0, (BAR_PIN_X, 0, -half_z), (0, 0, 1)
+            ),
+            "spring": CircleEdge(
+                _SPRING_HOLE_DIA / 2.0, (LEVER_SPRING_X, 0, -half_z), (0, 0, 1)
+            ),
+            "tip": CircleEdge(TIP_RADIUS, (TIP_ARC_CX, 0, -half_z), (0, 0, 1)),
+            "top_front": LineEdge((80, BAR_TALL / 2.0, -half_z), (1, 0, 0)),
+            "top_back": LineEdge((80, BAR_TALL / 2.0, half_z), (1, 0, 0)),
+            "bottom_front": LineEdge((80, -BAR_TALL / 2.0, -half_z), (1, 0, 0)),
+            "broad_a": PlanarFace((0, 0, 1), half_z),
+            "broad_opposite": PlanarFace((0, 0, -1), half_z),
+        }
+    )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -257,7 +272,9 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # Section thickness (3.0) in the top view at mid-length (clear of the hub);
     # bar height (9.5) on the front profile at the same station.
-    _mid_x = (BAR_PIN_X + LEVER_SPRING_X) / 2.0 - 60.0  # ~92: between the hub and the tab
+    _mid_x = (
+        BAR_PIN_X + LEVER_SPRING_X
+    ) / 2.0 - 60.0  # ~92: between the hub and the tab
     add_entity_dimension(
         adapter,
         top,
@@ -373,10 +390,31 @@ async def build(adapter: Any) -> dict[str, str]:
         label="spring-eye hole position",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)
-    add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.175)
+    manufacturing = add_property_linked_note(
+        adapter, "Manufacturing Notes", 0.020, 0.075
+    )
+    caption = add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.175)
 
     auto_arrange_view_dimensions(adapter, (front, right, top, iso))
+    from _drawing_native_layout import AxisLink, LayoutNote
+    from _drawing_view_packing import Axis, AxisOrder
+
+    repair_project_drawing_layout(
+        adapter,
+        views={"front": front, "right": right, "top": top, "iso": iso},
+        alignments=(
+            AxisLink(Axis.X, "front", "top"),
+            AxisLink(Axis.Y, "front", "right"),
+        ),
+        orderings=(
+            AxisOrder(Axis.Y, "front", "top"),
+            AxisOrder(Axis.X, "front", "right"),
+        ),
+        notes=(
+            LayoutNote("manufacturing", manufacturing.GetAnnotation()),
+            LayoutNote("iso-caption", caption.GetAnnotation(), "iso"),
+        ),
+    )
     return await finalize_drawing(
         adapter,
         OUTPUTS,

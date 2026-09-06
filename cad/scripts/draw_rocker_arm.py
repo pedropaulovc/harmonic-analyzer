@@ -41,6 +41,7 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    repair_project_drawing_layout,
     set_basic_dimension,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
@@ -172,15 +173,23 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
 
-    entities = ModelEntities(front.ReferencedDocument).resolve({
-        "pivot": CircleEdge(PIVOT_HOLE_DIA / 2.0, (0, _PIVOT_MID_Y, -HUB_LENGTH / 2.0), (0, 0, 1)),
-        "rod": CircleEdge(_ROD_HOLE_DIA / 2.0, (ROD_HOLE_X, ROD_HOLE_Y, -ARM_THICKNESS / 2.0), (0, 0, 1)),
-        "broad": PlanarFace((0, 0, 1), ARM_THICKNESS / 2.0),
-        "tip": LineEdge(
-            (_TIP_FACE_MID_X, _TIP_FACE_MID_Y, -ARM_THICKNESS / 2.0),
-            (TOP_END_X / R_TOP, -math.cos(TOP_ARC_LEN / 2.0 / R_TOP), 0),
-        ),
-    })
+    entities = ModelEntities(front.ReferencedDocument).resolve(
+        {
+            "pivot": CircleEdge(
+                PIVOT_HOLE_DIA / 2.0, (0, _PIVOT_MID_Y, -HUB_LENGTH / 2.0), (0, 0, 1)
+            ),
+            "rod": CircleEdge(
+                _ROD_HOLE_DIA / 2.0,
+                (ROD_HOLE_X, ROD_HOLE_Y, -ARM_THICKNESS / 2.0),
+                (0, 0, 1),
+            ),
+            "broad": PlanarFace((0, 0, 1), ARM_THICKNESS / 2.0),
+            "tip": LineEdge(
+                (_TIP_FACE_MID_X, _TIP_FACE_MID_Y, -ARM_THICKNESS / 2.0),
+                (TOP_END_X / R_TOP, -math.cos(TOP_ARC_LEN / 2.0 / R_TOP), 0),
+            ),
+        }
+    )
 
     # Rod-pin hole native callout (the #47 wizard hole near the +X tip).
     add_native_hole_callout(
@@ -263,10 +272,26 @@ async def build(adapter: Any) -> dict[str, str]:
         label="rod-pin hole position",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.082)
-    add_property_linked_note(adapter, "Isometric View Note", 0.315, 0.150)
+    manufacturing = add_property_linked_note(
+        adapter, "Manufacturing Notes", 0.020, 0.082
+    )
+    caption = add_property_linked_note(adapter, "Isometric View Note", 0.315, 0.150)
 
     auto_arrange_view_dimensions(adapter, (front, right, iso))
+    from _drawing_native_layout import LayoutNote
+    from _drawing_view_packing import Axis, AxisOrder
+
+    # The right profile is enlarged independently (1:1 versus 1:2 front).
+    # Preserve its side of the elevation without inventing projected alignment.
+    repair_project_drawing_layout(
+        adapter,
+        views={"front": front, "right": right, "iso": iso},
+        orderings=(AxisOrder(Axis.X, "front", "right"),),
+        notes=(
+            LayoutNote("manufacturing", manufacturing.GetAnnotation()),
+            LayoutNote("iso-caption", caption.GetAnnotation(), "iso"),
+        ),
+    )
     return await finalize_drawing(
         adapter,
         OUTPUTS,

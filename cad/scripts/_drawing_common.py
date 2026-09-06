@@ -15,7 +15,11 @@ from collections import Counter
 from dataclasses import dataclass, replace
 from itertools import combinations
 from pathlib import Path
-from typing import Any, Iterable, Literal, Sequence
+from typing import TYPE_CHECKING, Any, Iterable, Literal, Mapping, Sequence
+
+if TYPE_CHECKING:
+    from _drawing_native_layout import AxisLink, LayoutNote, NativeLayoutReport
+    from _drawing_view_packing import AxisOrder
 
 
 import _config
@@ -68,13 +72,11 @@ _INSERT_HOLE_WIZARD_LOCATION_DIMS = 0x20000
 
 # swAnnotationType_e for the native GD&T symbols the recipes place at explicit
 # sheet coordinates (datum tags, feature-control frames, surface-finish symbols).
-# None of these interfaces expose a real bounding box (IDisplayData returns only
-# leader-polluted primitives in a non-sheet coordinate space), so each is boxed
-# as a nominal square around its GetPosition anchor. That nominal box is reliable
-# enough to catch a symbol placed clear OFF the sheet (overflow) but too coarse
-# to assert an OVERLAP without false positives -- a datum tag placed beside its
-# own feature-control frame, standard GD&T practice, would self-collide -- so the
-# symbols get ``NONE`` collision scope (overflow-checked, overlap-exempt).
+# The older explicit layout diagnostic below uses nominal symbol boxes and
+# exempts them from overlap checks. That is a limitation of that diagnostic,
+# not of the native API: _drawing_annotation_bounds measures native primitives,
+# separates leaders, and incorporates calibrated text cells for the new layout
+# path. Do not use these legacy nominal boxes to certify collision clearance.
 # (Codex #269 thread 5 overflow; overlap declined with this rationale.)
 _ANNOT_DATUM = 2
 _ANNOT_GTOL = 5
@@ -4839,6 +4841,57 @@ def _drawing_artifact_span(kind: Literal["drawing", "pdf", "png"], path: str):
         "png": "drawing.export_png",
     }
     return _telemetry.span(names[kind], output_path=path)
+
+
+@_telemetry.traced("drawing.project_native_layout")
+def repair_project_drawing_layout(
+    adapter: Any,
+    *,
+    views: Mapping[str, Any],
+    alignments: Sequence[AxisLink] = (),
+    orderings: Sequence[AxisOrder] = (),
+    notes: Sequence[LayoutNote] = (),
+) -> NativeLayoutReport:
+    """Space native callouts and pack the complete measured single-sheet drawing.
+
+    This is an explicit recipe choice while the fleet migrates to semantic
+    attachments. It preserves view scale, annotation content and text format.
+    Initial recipe coordinates seed native placement; they never identify model
+    geometry or substitute for measured final fit. An unfit sheet is not exported.
+    """
+    from _drawing_annotation_bounds import annotation_box
+    from _drawing_native_gtol import arrange_native_gtol_columns
+    from _drawing_native_layout import NativeLayoutStatus, repair_native_layout
+    from _drawing_view_packing import Rect
+    from dataclasses import asdict
+    import json
+
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    sheet = _early_bound(drawing.GetCurrentSheet(), "ISheet")
+    properties = tuple(sheet.GetProperties2() or ())
+    if len(properties) != 8:
+        raise RuntimeError("native project layout requires complete sheet properties")
+    title_block = Rect(
+        _TITLE_BLOCK_LEFT_M, 0.0, float(properties[5]), _TITLE_BLOCK_TOP_M
+    )
+    arrange_native_gtol_columns(adapter, views=views, measure_annotation=annotation_box)
+    report = repair_native_layout(
+        adapter,
+        views=views,
+        title_block=title_block,
+        measure_annotation=annotation_box,
+        alignments=alignments,
+        orderings=orderings,
+        notes=notes,
+    )
+    _telemetry.info(
+        "native sheet layout measured",
+        layout_status=report.status.value,
+        layout_report=json.dumps(asdict(report), default=lambda value: value.value),
+    )
+    if report.status in (NativeLayoutStatus.NO_FIT, NativeLayoutStatus.SEARCH_LIMIT):
+        raise RuntimeError(f"native drawing layout {report.status.value}: {report.reason}")
+    return report
 
 
 @_telemetry.traced("drawing.finalize")
