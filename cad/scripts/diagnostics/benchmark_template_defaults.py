@@ -145,18 +145,18 @@ def immutable_changes(expected):
     return changed
 
 
-def require_save_result(returned, path):
-    if (
-        not isinstance(returned, tuple)
-        or len(returned) != 3
-        or returned[0] is not True
-        or type(returned[1]) is not int
-        or returned[1] != 0
-        or type(returned[2]) is not int
-    ):
-        raise RuntimeError(f"template extension SaveAs3 failed: {returned!r}")
+def save_prepared_template(model, path, row):
+    """Use the persisted positive shape in probe_drawing_template_save.py."""
+    if path.exists():
+        raise ValueError("prepared template output is not fresh")
+    model.ClearSelection2(True)
+    row["save_method"] = "IModelDoc2.SaveAs3(path,0,0)"
+    row["save_return"] = model.SaveAs3(str(path), 0, 0)
+    # Native integer is recorded, not interpreted as an undocumented status.
+    if type(row["save_return"]) is not int:
+        raise RuntimeError("ModelDoc2.SaveAs3 returned an unexpected native type")
     if not path.is_file() or path.stat().st_size == 0:
-        raise RuntimeError("template extension SaveAs3 produced no complete file")
+        raise RuntimeError("prepared template save produced no complete file")
 
 
 def semantic_attachment(row, geometry, view_key):
@@ -432,21 +432,7 @@ async def prepare_template(adapter, spec, directory, row):
                 )
             row["before"] = defaults_snapshot(adapter, spec)
             with adapter.ownership.saving_as(path):
-                draw.ClearSelection2(True)
-                # Documented bool + out-error/out-warning contract. The obsolete
-                # IModelDoc2.SaveAs3 int return has no documented meaning locally.
-                extension = _early_bound(draw.Extension, "IModelDocExtension")
-                options = extension.GetAdvancedSaveAsOptions(
-                    0
-                )  # normal references only
-                if options is None:
-                    raise RuntimeError(
-                        "native advanced template save options are unavailable"
-                    )
-                row["save_return"] = extension.SaveAs3(
-                    str(path), 0, 1, None, options, 0, 0
-                )
-            require_save_result(row["save_return"], path)
+                save_prepared_template(draw, path, row)
             check("close prepared template", await adapter.close_model(save=False))
             with adapter.ownership.creating_document(
                 DocumentKind.DRAWING, directory / "verification.SLDDRW"
