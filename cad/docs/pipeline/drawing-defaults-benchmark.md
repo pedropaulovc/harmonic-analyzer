@@ -115,8 +115,25 @@ at `282bb9e7` saved and reopened both SLDDRW and DRWDOT with the existing
 `IModelDoc2.SaveAs3(path, 0, 0)` call. The tested advanced/silent call produced
 neither format despite its success tuple; other option combinations remain
 untested. Preparation now uses the proven existing call and retains fresh-file,
-exact-path and full inherited-default checks. No template speedup has yet been
-measured. See `diagnostics/template_defaults.md` for provenance.
+exact-path and full inherited-default checks. See
+`diagnostics/template_defaults.md` for provenance.
+
+At `bc63e4d7`, preparation and native inheritance passed in 34.062 seconds,
+including save, additional comparison witnesses and cleanup. Ten empty linked
+notes had different cached extents but independently exposed zero native text,
+geometry and leaders; their link expressions, anchors and font definitions
+matched exactly. All other captured defaults matched. Raw extents remain in the
+report rather than being treated as displayed content.
+
+The first unchanged arbor baseline then stopped before save/export: its source
+part changed from clean to dirty in memory during drawing construction. The
+source file hash stayed unchanged. The source-preservation guard refused both
+the save and ordinary cleanup; scoped diagnostic recovery and a first-transition
+repro are required before another trial. This is not a template-candidate
+failure: no candidate ran. The failed baseline reached that guard in 97.693
+seconds, with 4.627 seconds in setup. Neither is a completed drawing timing or
+evidence of a template speedup. Evidence is in the isolated template worktree's
+`template-abba-bn33bcg_/measurements.json` and `ownership.json`.
 
 ## Trial isolation
 
