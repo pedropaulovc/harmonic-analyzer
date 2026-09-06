@@ -148,6 +148,34 @@ def binding(app, entities, kinds, display):
     raise RuntimeError(f"unverified datum attachment kind: {kinds}")
 
 
+def raw_display_data(annotation):
+    """Capture the coordinate-frame question before applying calibrated bounds."""
+    data = _early_bound(annotation.GetDisplayData(), "IDisplayData")
+
+    def count(method):
+        result = int(getattr(data, method)())
+        if not 0 <= result <= 10000:
+            raise RuntimeError(f"unbounded datum primitive count: {method}={result}")
+        return result
+
+    return {
+        "lines": [tuple(data.GetLineAtIndex3(i)) for i in range(count("GetLineCount"))],
+        "arcs": [tuple(data.GetArcAtIndex2(i)) for i in range(count("GetArcCount"))],
+        "texts": [
+            {
+                "value": str(data.GetTextAtIndex(i)),
+                "position": tuple(data.GetTextPositionAtIndex(i) or ()),
+                "plane": tuple(data.GetTextPlaneAtIndex(i) or ()),
+                "height": float(data.GetTextHeightAtIndex(i)),
+                "font": str(data.GetTextFontAtIndex(i)),
+                "angle": float(data.GetTextAngleAtIndex(i)),
+                "reference": int(data.GetTextRefPositionAtIndex(i)),
+            }
+            for i in range(count("GetTextCount"))
+        ],
+    }
+
+
 def datum_state(adapter, bore, annotation):
     app, view = adapter.swApp, bore["view"]
     tag = _early_bound(annotation.GetSpecificAnnotation(), "IDatumTag")
@@ -174,13 +202,14 @@ def datum_state(adapter, bore, annotation):
         # Preserve native display evidence, export it, then fail the route.
         # This is an observation, never an accepted attachment fallback.
         tag_binding, binding_error = "unverified", str(error)
-    snapshot = _native_snapshot(annotation, adapter.currentModel.Extension)
+    raw_display = raw_display_data(annotation)
     measurement_error = None
     try:
+        snapshot = _native_snapshot(annotation, adapter.currentModel.Extension)
         measured = bounds_from_snapshot(snapshot)  # datum A has no symbol-font tokens
+        frame = _frame_lines(snapshot.lines)
     except ValueError as error:
-        measured, measurement_error = None, str(error)
-    frame = _frame_lines(snapshot.lines)
+        snapshot, measured, frame, measurement_error = None, None, (), str(error)
     point = tuple(float(v) for v in annotation.GetPosition() or ())
     if len(point) != 3 or not all(math.isfinite(v) for v in point):
         raise RuntimeError("datum has no finite native position")
@@ -206,7 +235,7 @@ def datum_state(adapter, bore, annotation):
             sorted(round(math.dist(line.start, line.end), 10) for line in frame)
         ),
         "frame_witness": "rectangle" if len(frame) == 4 else "unverified",
-        "format": tuple(snapshot.format_signature),
+        "format": tuple(snapshot.format_signature) if snapshot is not None else (),
         "position": point,
         "specific_data": {
             "lines": [
@@ -217,7 +246,8 @@ def datum_state(adapter, bore, annotation):
                 for i in range(int(tag.GetTextCount()))
             ],
         },
-        "display_data": asdict(snapshot),
+        "raw_display_data": raw_display,
+        "display_data": asdict(snapshot) if snapshot is not None else None,
         "measurement": asdict(measured) if measured is not None else None,
         "measurement_error": measurement_error,
     }
@@ -227,7 +257,13 @@ def datum_state(adapter, bore, annotation):
 
 
 def same_semantics(before, after):
-    ignored = {"position", "specific_data", "display_data", "measurement"}
+    ignored = {
+        "position",
+        "specific_data",
+        "display_data",
+        "raw_display_data",
+        "measurement",
+    }
     if before.keys() != after.keys():
         raise RuntimeError("native datum witness fields changed")
     for field in before.keys() - ignored:

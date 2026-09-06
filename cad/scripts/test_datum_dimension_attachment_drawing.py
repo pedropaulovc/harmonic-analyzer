@@ -136,3 +136,32 @@ def test_same_type_entity_replacement_is_rejected():
     probe.same_handles(app, before, before)
     with pytest.raises(RuntimeError, match="identity changed"):
         probe.same_handles(app, before, (annotation, tag, owner, object()))
+
+
+def test_raw_capture_retains_nonempty_text_plane_before_calibration(monkeypatch):
+    monkeypatch.setattr(probe, "_early_bound", lambda obj, _: obj)
+    data = SimpleNamespace(
+        GetLineCount=lambda: 0,
+        GetArcCount=lambda: 0,
+        GetTextCount=lambda: 1,
+        GetTextAtIndex=lambda _: "A",
+        GetTextPositionAtIndex=lambda _: (0.003, 0.004, 0),
+        GetTextPlaneAtIndex=lambda _: (1.0, 0.0, 0.0, 0.0, 1.0, 0.0),
+        GetTextHeightAtIndex=lambda _: 0.0035,
+        GetTextFontAtIndex=lambda _: "Arial",
+        GetTextAngleAtIndex=lambda _: 0.0,
+        GetTextRefPositionAtIndex=lambda _: 1,
+    )
+    record = probe.raw_display_data(SimpleNamespace(GetDisplayData=lambda: data))
+    assert record["texts"][0]["plane"] == (1.0, 0.0, 0.0, 0.0, 1.0, 0.0)
+    assert record["texts"][0]["position"] == (0.003, 0.004, 0)
+
+
+@pytest.mark.parametrize("count", [-1, 10001])
+def test_raw_capture_rejects_unbounded_native_count(monkeypatch, count):
+    monkeypatch.setattr(probe, "_early_bound", lambda obj, _: obj)
+    annotation = SimpleNamespace(
+        GetDisplayData=lambda: SimpleNamespace(GetLineCount=lambda: count)
+    )
+    with pytest.raises(RuntimeError, match="primitive count"):
+        probe.raw_display_data(annotation)
