@@ -59,6 +59,7 @@ def test_project_layout_orders_spacing_and_rejects_unfit_sheet(monkeypatch, stat
         "alignments": alignments,
         "orderings": orderings,
         "notes": notes,
+        "planning_headroom_m": 0.0005,
     }
 
 
