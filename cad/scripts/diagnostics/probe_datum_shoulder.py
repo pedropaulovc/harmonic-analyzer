@@ -44,7 +44,8 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "cad/scripts"))
 
-from _common import _early_bound, check, run_build  # noqa: E402
+from _common import _early_bound, check  # noqa: E402
+from diagnostics._owned_native_session import run_owned_diagnostic  # noqa: E402
 from _drawing_view_packing import Rect  # noqa: E402
 from _drawing_annotation_bounds import (  # noqa: E402
     _native_snapshot,
@@ -808,7 +809,7 @@ def main():
     reports = ROOT / "cad/out/reports"
     reports.mkdir(parents=True, exist_ok=True)
     directory = Path(tempfile.mkdtemp(prefix="datum-shoulder-", dir=reports))
-    return run_build(
+    return run_owned_diagnostic(
         lambda adapter: probe(adapter, source, directory, args.mode, part=part)
     )
 
