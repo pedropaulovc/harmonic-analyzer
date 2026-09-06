@@ -1,7 +1,35 @@
 # Drawing defaults: experiment scope
 
-These are experiments, not established speedups. The source drawing template,
-source CAD, and manufacturing requirements remain unchanged during controls.
+These are experiments, not established end-to-end speedups. The source drawing
+template, original source CAD, and manufacturing requirements remain unchanged
+during controls; owned source copies can become recipe outputs as documented below.
+
+## Current result: blank-sheet setup
+
+The native setup-only ABBA at frozen `ba2efb5d` passed all four arms with the
+existing defaults witnesses and protected-document cleanup. Current setup took
+5.782 and 5.258 seconds; prepared-template setup took 1.301 and 1.335 seconds.
+The means are 5.520 versus 1.318 seconds: an observed 4.202-second reduction
+(76.1%) in **blank-sheet setup**, not the complete drawing build. One-time
+template preparation, including save/inheritance checks and cleanup, took
+36.409 seconds. The prepared template must be reused for matching specifications
+to amortize that work; preparing it for every drawing would lose time.
+
+The comparison preserves units, precision, leader styles, scale and sheet notes;
+it skips repeat setters, note normalization and the two startup rebuilds. It does
+not enable draft-quality views or disable automatic updates. Default witnesses
+and cleanup were timed separately, and no trial drawing or source part was saved.
+Both original open documents, including the dirty unsaved drawing, were preserved.
+
+This is one exploratory ABBA block. COM-free tests ran on the same host during
+measurement, so it is not an unloaded-host latency estimate, confidence interval
+or evidence of a less-than-five-percent conflict rate. Receipt:
+`C:/src/ha-perf-sheet-template/cad/out/reports/template-defaults/template-setup-abba-o46g8sv9/measurements.json`.
+The full-recipe comparison remains unaccepted; the saved linked-title displacement
+and dimensional-line/frame collision are tracked in
+[`datum-policy-retained-output-audit.md`](datum-policy-retained-output-audit.md).
+
+## Opportunity and experiment design
 
 The ten-checkout telemetry audit in
 `cad/out/reports/performance-audit-20260905/summary.json` contains 593
@@ -95,8 +123,11 @@ The preceding SF attempt stopped before mutation because its diagnostic assumed
 a non-JIS symbol. The recipe actually pins native type 1. The corrected control
 preserves that exact existing type and omits only a getter documented as
 inapplicable to it; no production symbol-style change is part of this experiment.
-Both independent-family mechanisms are now proven on this copied rocker, but
-their combined production policy and the fresh lever drawing remain untested.
+Both independent-family mechanisms are proven on this copied rocker. A later
+fresh rocker recipe retained both family lengths, but failed cold-reopen layout
+equivalence and has a confirmed dimensional-line/frame collision. The combined
+recipe is therefore not accepted, and the fresh lever drawing remains untested;
+see the retained-output audit linked above.
 
 ## Prepared-template progress
 
@@ -145,8 +176,9 @@ the operation group, not an inner setter-versus-rebuild boundary or the effects
 of later recipe operations. The report is
 `C:/src/ha-perf-datum-functional/cad/out/reports/source-dirty-9cbdz77u/source-dirty.json`.
 Subsequent drawing controls must use owned part copies; the generic protection
-for borrowed originals remains unchanged. No completed template timing comparison
-is available yet.
+for borrowed originals remains unchanged. No completed full-recipe template
+timing comparison is available yet; the independent blank-sheet result above
+does not replace it.
 
 At `ab264db8`, preparation passed again in 36.329 seconds. The first baseline
 then completed save/export but failed the copied-part disk witness: during
