@@ -36,7 +36,9 @@ import shutil
 import sys
 import tempfile
 
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, _early_bound, check
+from diagnostics._owned_native_documents import run_copy_diagnostic
+from diagnostics._owned_native_session import require_owned_diagnostic_environment
 from _drawing_common import render_pdf_png
 from probe_drawing_primitive_annotations import display_counts
 from probe_drawing_thread_ink import ink_difference, vector_witness
@@ -629,6 +631,7 @@ def main():
     if source.suffix.upper() != ".SLDDRW" or source_part.suffix.upper() != ".SLDPRT":
         raise ValueError("thread-view probe requires a native drawing and native part")
     if not args.worker:
+        require_owned_diagnostic_environment()
         sys.path.insert(0, str(CAD_ROOT.parent))
         import dodo
 
@@ -665,6 +668,9 @@ def main():
         root = CAD_ROOT / "out/reports"
         root.mkdir(parents=True, exist_ok=True)
         folder = Path(tempfile.mkdtemp(prefix="thread-view-", dir=root)).resolve()
+        adapter.ownership.register_directory(folder)
+        for original in (source, source_part):
+            adapter.ownership.register_source(original)
         copy, part_copy = (
             folder / f"{folder.name}-{path.name}" for path in (source, source_part)
         )
@@ -838,11 +844,13 @@ def main():
                             "control requires visible seed-feature annotation inventory without patterns"
                         )
                 pdf = folder / f"{phase}.pdf"
+                adapter.ownership.assert_current_owned()
                 row["save"] = save_phase(model, copy, pdf)
                 render_pdf_png(pdf, folder / f"{phase}.png")
                 row["pdf_vectors"] = vector_witness(pdf)
             if args.mode == "corrected":
                 part_model = _activate_copy(adapter, part_copy)
+                adapter.ownership.assert_current_owned()
                 report["correction"]["save"] = save_native_copy(part_model, part_copy)
                 await close_copies(
                     adapter, ((drawing_model, copy), (part_model, part_copy))
@@ -937,7 +945,7 @@ def main():
         return {"report": str(folder / "coverage.json")}
 
     _telemetry.set_service("drawing-thread-view-probe")
-    return run_build(probe)
+    return run_copy_diagnostic(probe)
 
 
 if __name__ == "__main__":

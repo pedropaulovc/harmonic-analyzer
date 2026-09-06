@@ -37,7 +37,9 @@ from types import SimpleNamespace
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "cad/scripts"))
 
-from _common import _early_bound, check, run_build  # noqa: E402
+from _common import _early_bound, check  # noqa: E402
+from diagnostics._owned_native_documents import run_copy_diagnostic  # noqa: E402
+from diagnostics._owned_native_session import require_owned_diagnostic_environment  # noqa: E402
 from _drawing_annotation_bounds import (  # noqa: E402
     annotation_box,
     bounds_from_snapshot,
@@ -527,7 +529,10 @@ def require_explicit_attachment(observations):
 
 
 async def probe(adapter, source, directory, mode="paired_dimensions"):
-    from solidworks_mcp.adapters.solidworks.drawing import save_drawing
+    from diagnostics._owned_native_documents import save_drawing
+
+    adapter.ownership.register_directory(directory)
+    adapter.ownership.register_source(source)
 
     part = (source.parent.parent / "sldprt/cone-gear.SLDPRT").resolve(strict=True)
     report = {
@@ -537,10 +542,8 @@ async def probe(adapter, source, directory, mode="paired_dimensions"):
     report_path = directory / "datum-dimension-attachment.json"
     app = _early_bound(adapter.swApp, "ISldWorks")
 
-    def close():
-        if not app.CloseAllDocuments(True):
-            raise RuntimeError("failed to close copied datum mechanism drawings")
-        adapter.currentModel = None
+    async def close():
+        await adapter.close_owned_documents()
 
     def export(stem):
         drawing = directory / f"{directory.name}-{stem}.SLDDRW"
@@ -724,7 +727,7 @@ async def probe(adapter, source, directory, mode="paired_dimensions"):
                 trial["saved"] = saved
                 same_semantics(after, saved)
                 same_handles(app, after_handles, saved_handles)
-                close()
+                await close()
                 check(
                     "reopen saved datum mechanism",
                     await adapter.open_model(trial["after_export"]["drawing"]),
@@ -748,10 +751,10 @@ async def probe(adapter, source, directory, mode="paired_dimensions"):
             except Exception as error:
                 trial["error"] = repr(error)
             finally:
-                close()
+                await close()
     finally:
         try:
-            close()
+            await close()
         finally:
             try:
                 guard_sources(report)
@@ -787,6 +790,7 @@ def main():
     if source.name.lower() != "cone-gear.slddrw":
         raise ValueError("this bounded mechanism control requires cone-gear.SLDDRW")
     if not args.worker:
+        require_owned_diagnostic_environment()
         sys.path.insert(0, str(ROOT))
         import dodo
 
@@ -809,7 +813,9 @@ def main():
     reports = ROOT / "cad/out/reports"
     reports.mkdir(parents=True, exist_ok=True)
     directory = Path(tempfile.mkdtemp(prefix="datum-dimension-", dir=reports))
-    return run_build(lambda adapter: probe(adapter, source, directory, args.mode))
+    return run_copy_diagnostic(
+        lambda adapter: probe(adapter, source, directory, args.mode)
+    )
 
 
 if __name__ == "__main__":

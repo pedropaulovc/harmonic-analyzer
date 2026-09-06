@@ -28,9 +28,10 @@ def test_modern_tolerance_readback_matches_legacy_positive_control():
 def test_in_place_save_requires_document_and_native_success(tmp_path, result):
     path = tmp_path / "unique.SLDPRT"
     adapter = SimpleNamespace(
+        ownership=SimpleNamespace(assert_current_owned=Mock()),
         currentModel=SimpleNamespace(
             GetPathName=lambda: str(path), Save3=Mock(return_value=result)
-        )
+        ),
     )
     with pytest.raises(RuntimeError, match="Save3 failed"):
         probe.save_part(adapter, path)
@@ -52,9 +53,10 @@ def test_wrong_active_part_never_saves(tmp_path):
 def test_in_place_save_records_nonfatal_native_warnings(tmp_path):
     path = tmp_path / "unique.SLDPRT"
     adapter = SimpleNamespace(
+        ownership=SimpleNamespace(assert_current_owned=Mock()),
         currentModel=SimpleNamespace(
             GetPathName=lambda: str(path), Save3=lambda *args: (True, 0, 2)
-        )
+        ),
     )
     assert probe.save_part(adapter, path) == {
         "success": True,

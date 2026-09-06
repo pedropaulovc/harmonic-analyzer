@@ -34,7 +34,9 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "cad/scripts"))
 
 import _telemetry  # noqa: E402
-from _common import _early_bound, check, run_build  # noqa: E402
+from _common import _early_bound, check  # noqa: E402
+from diagnostics._owned_native_documents import run_copy_diagnostic  # noqa: E402
+from diagnostics._owned_native_session import require_owned_diagnostic_environment  # noqa: E402
 from _gtol_spec import gtol_frame_signature  # noqa: E402
 from _part_pmi import _face_geometry, _face_matches, _resolve_faces  # noqa: E402
 from transgear_stub_spec import GEOMETRIC_CONTROLS, PART_DATUMS  # noqa: E402
@@ -270,14 +272,16 @@ def import_native_pmi(drawing: Any) -> list[dict]:
     return imports
 
 
-def _close(app: Any, adapter: Any) -> None:
-    if not app.CloseAllDocuments(True):
-        raise RuntimeError("failed to close the isolated diagnostic documents")
-    adapter.currentModel = None
+async def _close(app: Any, adapter: Any) -> None:
+    await adapter.close_owned_documents()
 
 
 async def probe(adapter: Any, source: Path, directory: Path) -> dict[str, str]:
-    from solidworks_mcp.adapters.solidworks.drawing import new_drawing, save_drawing
+    from solidworks_mcp.adapters.solidworks.drawing import new_drawing
+    from diagnostics._owned_native_documents import DocumentKind, save_drawing
+
+    adapter.ownership.register_directory(directory)
+    adapter.ownership.register_source(source)
 
     report: dict[str, Any] = {
         "source": str(source),
@@ -303,7 +307,10 @@ async def probe(adapter: Any, source: Path, directory: Path) -> dict[str, str]:
             raise RuntimeError(
                 "source positive control is not the expected authored part"
             )
-        new_drawing(adapter)
+        with adapter.ownership.creating_document(
+            DocumentKind.DRAWING, directory / f"{directory.name}-initial.SLDDRW"
+        ):
+            new_drawing(adapter)
         drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
         view_start = time.perf_counter()
         with _telemetry.span("diagnostic.native_pmi_views"):
@@ -330,7 +337,7 @@ async def probe(adapter: Any, source: Path, directory: Path) -> dict[str, str]:
             }
             snapshot["export_seconds"] = time.perf_counter() - export_start
             if stage == "initial":
-                _close(app, adapter)
+                await _close(app, adapter)
                 check(
                     "reopen native PMI drawing", await adapter.open_model(str(native))
                 )
@@ -343,7 +350,7 @@ async def probe(adapter: Any, source: Path, directory: Path) -> dict[str, str]:
         raise
     finally:
         try:
-            _close(app, adapter)
+            await _close(app, adapter)
         finally:
             report["seconds"] = time.perf_counter() - start
             report["sha256_before"] = digest
@@ -377,6 +384,7 @@ def main() -> int:
     if source.suffix.upper() != ".SLDPRT":
         raise ValueError("the probe requires the built transgear-stub native part")
     if not args.worker:
+        require_owned_diagnostic_environment()
         sys.path.insert(0, str(ROOT))
         import dodo
 
@@ -393,7 +401,7 @@ def main() -> int:
     reports.mkdir(parents=True, exist_ok=True)
     directory = Path(tempfile.mkdtemp(prefix="native-model-pmi-", dir=reports))
     _telemetry.set_service("native-model-pmi-probe")
-    return run_build(lambda adapter: probe(adapter, source, directory))
+    return run_copy_diagnostic(lambda adapter: probe(adapter, source, directory))
 
 
 if __name__ == "__main__":

@@ -24,7 +24,9 @@ import time
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "cad/scripts"))
 
-from _common import _early_bound, check, run_build  # noqa: E402
+from _common import _early_bound, check  # noqa: E402
+from diagnostics._owned_native_documents import run_copy_diagnostic  # noqa: E402
+from diagnostics._owned_native_session import require_owned_diagnostic_environment  # noqa: E402
 from _drawing_common import auto_arrange_view_dimensions  # noqa: E402
 from _drawing_annotation_bounds import annotation_box  # noqa: E402
 from diagnostics import probe_drawing_attachments as attachments  # noqa: E402
@@ -119,7 +121,10 @@ def compare(adapter, before, after, handles, stage):
 
 
 async def probe(adapter, source, directory):
-    from solidworks_mcp.adapters.solidworks.drawing import save_drawing
+    from diagnostics._owned_native_documents import save_drawing
+
+    adapter.ownership.register_directory(directory)
+    adapter.ownership.register_source(source)
 
     report = {
         "source": str(source),
@@ -128,7 +133,6 @@ async def probe(adapter, source, directory):
     report_path = directory / "dimensions-after-gtol.json"
     copy = directory / f"{directory.name}-source.SLDDRW"
     shutil.copy2(source, copy)
-    app = _early_bound(adapter.swApp, "ISldWorks")
 
     def export(stage):
         target = directory / f"{directory.name}-{stage}.SLDDRW"
@@ -175,9 +179,7 @@ async def probe(adapter, source, directory):
             adapter, report["before"], report["after"], handles, "after native arrange"
         )
         output = export("after")
-        if not app.CloseAllDocuments(True):
-            raise RuntimeError("failed to close isolated drawing before reopen")
-        adapter.currentModel = None
+        await adapter.close_owned_documents()
         check(
             "reopen post-GTol dimension control", await adapter.open_model(str(output))
         )
@@ -194,9 +196,7 @@ async def probe(adapter, source, directory):
         raise
     finally:
         try:
-            if not app.CloseAllDocuments(True):
-                raise RuntimeError("failed to close native ordering control")
-            adapter.currentModel = None
+            await adapter.close_owned_documents()
         finally:
             report["source_hashes_after"] = {
                 name: file_digest(Path(name)) for name in report["source_hashes"]
@@ -221,6 +221,7 @@ def main():
     if source.suffix.upper() != ".SLDDRW":
         raise ValueError("requires a native drawing")
     if not args.worker:
+        require_owned_diagnostic_environment()
         sys.path.insert(0, str(ROOT))
         import dodo
 
@@ -236,7 +237,7 @@ def main():
     reports = ROOT / "cad/out/reports"
     reports.mkdir(parents=True, exist_ok=True)
     directory = Path(tempfile.mkdtemp(prefix="dimensions-after-gtol-", dir=reports))
-    return run_build(lambda adapter: probe(adapter, source, directory))
+    return run_copy_diagnostic(lambda adapter: probe(adapter, source, directory))
 
 
 if __name__ == "__main__":

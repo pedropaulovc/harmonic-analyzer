@@ -24,7 +24,9 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "cad/scripts"))
 
 import _telemetry  # noqa: E402
-from _common import _early_bound, check, run_build  # noqa: E402
+from _common import _early_bound, check  # noqa: E402
+from diagnostics._owned_native_documents import run_copy_diagnostic  # noqa: E402
+from diagnostics._owned_native_session import require_owned_diagnostic_environment  # noqa: E402
 from _gtol_spec import gtol_frame_signature  # noqa: E402
 from diagnostics.probe_gtol_autoarrange import metrics  # noqa: E402
 from diagnostics.probe_native_model_pmi import file_digest, render_pdf_png  # noqa: E402
@@ -247,7 +249,10 @@ def sheet_symbol_context(drawing, hashes, name="DetailItem324"):
 
 
 async def probe(adapter, source, directory, probe_mode="commands"):
-    from solidworks_mcp.adapters.solidworks.drawing import save_drawing
+    from diagnostics._owned_native_documents import save_drawing
+
+    adapter.ownership.register_directory(directory)
+    adapter.ownership.register_source(source)
 
     app = _early_bound(adapter.swApp, "ISldWorks")
     report = {
@@ -300,9 +305,7 @@ async def probe(adapter, source, directory, probe_mode="commands"):
                 )
                 output = directory / f"{directory.name}-{mode}-{command}.SLDDRW"
                 save_drawing(adapter, str(output))
-                if not app.CloseAllDocuments(True):
-                    raise RuntimeError("failed to close command control drawings")
-                adapter.currentModel = None
+                await adapter.close_owned_documents()
                 check(
                     "reopen command control drawing",
                     await adapter.open_model(str(output)),
@@ -325,17 +328,13 @@ async def probe(adapter, source, directory, probe_mode="commands"):
                 render_pdf_png(pdf, png)
                 step["png"] = str(png)
                 baseline = reopened
-            if not app.CloseAllDocuments(True):
-                raise RuntimeError("failed to close command control drawings")
-            adapter.currentModel = None
+            await adapter.close_owned_documents()
     except Exception as error:
         report["operation_error"] = repr(error)
         raise
     finally:
         try:
-            if not app.CloseAllDocuments(True):
-                raise RuntimeError("failed to close command control drawings")
-            adapter.currentModel = None
+            await adapter.close_owned_documents()
         finally:
             report["source_hashes_after"] = {
                 name: file_digest(Path(name)) for name in report["source_hashes"]
@@ -368,6 +367,7 @@ def main():
     if source.suffix.upper() != ".SLDDRW":
         raise ValueError("requires a native drawing")
     if not args.worker:
+        require_owned_diagnostic_environment()
         sys.path.insert(0, str(ROOT))
         import dodo
 
@@ -390,7 +390,9 @@ def main():
     reports = ROOT / "cad/out/reports"
     reports.mkdir(parents=True, exist_ok=True)
     directory = Path(tempfile.mkdtemp(prefix="gtol-commands-", dir=reports))
-    return run_build(lambda adapter: probe(adapter, source, directory, args.mode))
+    return run_copy_diagnostic(
+        lambda adapter: probe(adapter, source, directory, args.mode)
+    )
 
 
 if __name__ == "__main__":
