@@ -85,15 +85,51 @@ Real worker-thread controls verify that both manual timers exclude background
 calls while preserving returned objects and errors. These results narrow the
 performance lead without establishing a faster production implementation.
 
-## Smallest next measurement reuse and transaction proposal
+### Read-bank boundaries: matched ABBA control
 
-No following design is implemented by this observation.
+The read-bank optimization was subsequently tested on the same original drawing
+and part hashes, using the same `--mode handoff` diagnostic in two frozen checkouts.
+The old checkout was `506b6f9e`; the candidate was `42efdc6b` (production change
+`e6128bc9`). Each trial still made 80 full measurements and reused 13 obstacle
+measurements. Only repeated global drawing/sheet/view context checks moved to
+explicit start/end boundaries around read-only inventories. Exact per-entry
+annotation/owner identity and XYZ checks remain; a failed boundary prevents any
+following placement command or acceptance. Final native measurements are fresh.
+
+| ABBA trial | Layout | Callouts | GTols | Packing |
+|---|---:|---:|---:|---:|
+| Old 1 | 55.389 s | 17.365 s | 19.673 s | 18.327 s |
+| Bank 1 | 54.133 s | 17.300 s | 18.214 s | 18.595 s |
+| Bank 2 | 59.863 s | 18.573 s | 19.590 s | 21.671 s |
+| Old 2 | 61.286 s | 21.949 s | 20.866 s | 18.441 s |
+
+Both neighboring comparisons favored the candidate by 1.256 and 1.424 seconds;
+the mean difference was 1.339 seconds, about 2.3 percent. The within-policy spread
+is much larger than that difference. This small block supports retaining the
+limited optimization, not claiming a statistically established speedup or a fix
+for the larger layout regression.
+
+All four passed the native and saved/reopened geometry, dimension/BASIC and
+stored semantic witnesses, final packing and leader checks. Original source
+hashes remained unchanged. Final native view positions matched, and all four
+PDFs rasterized to identical 5100-by-3301 pixels at 300 dpi; the sheet was visually
+inspected. Evidence directories, in trial order:
+
+- `C:/src/ha-perf-handoff-entry-context/cad/out/reports/callout-handoff-0xxygjol`
+- `C:/src/ha-perf-handoff-bank-context/cad/out/reports/callout-handoff-1kk1jy0j`
+- `C:/src/ha-perf-handoff-bank-context/cad/out/reports/callout-handoff-vp_jla92`
+- `C:/src/ha-perf-handoff-entry-context/cad/out/reports/callout-handoff-ghshlid4`
+
+## Further measurement reuse and transaction proposal
+
+Only item 1 below is implemented and measured by the read-bank control above.
+The larger original-baseline transaction in items 2–5 remains a proposal.
 
 1. Move repeated global handoff context reads to explicit start/end boundaries
    around each single-STA consumer bank. Retain exact per-entry annotation/owner
    identity and position, and reject a changed view or active drawing at the end.
    The full final witness still rejects content or geometry changes. Benchmark the
-   native A/B before keeping this smaller optimization.
+   native A/B before keeping this smaller optimization; the result is above.
 2. Build one typed initial annotation inventory with exact owner/attachment,
    native parameters/value/BASIC, datum/SF fields, GTol XML, text/font and measured
    geometry. Carry this ORIGINAL baseline through all layout stages; a later stage
