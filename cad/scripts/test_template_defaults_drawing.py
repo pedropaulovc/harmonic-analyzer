@@ -10,6 +10,7 @@ from types import SimpleNamespace
 import pytest
 
 from diagnostics import benchmark_template_defaults as probe
+from diagnostics import probe_drawing_template_save as save_control
 
 
 def test_variants_preserve_exact_sheet_ratio_and_precision():
@@ -147,15 +148,44 @@ def test_partial_template_file_does_not_prove_success(tmp_path, returned):
     target = tmp_path / "partial.DRWDOT"
     target.write_bytes(b"partial output")
     with pytest.raises(RuntimeError, match="SaveAs3 failed"):
-        probe.require_save_result(returned, target)
+        save_control.require_save_result(returned, target)
 
 
 def test_save_requires_documented_success_and_complete_file(tmp_path):
     target = tmp_path / "owned.DRWDOT"
     with pytest.raises(RuntimeError, match="complete file"):
-        probe.require_save_result((True, 0, 0), target)
+        save_control.require_save_result((True, 0, 0), target)
     target.write_bytes(b"complete file")
-    probe.require_save_result((True, 0, 4), target)  # Warnings stay in the report.
+    save_control.require_save_result(
+        (True, 0, 4), target
+    )  # Warnings stay in the report.
+
+
+def test_preparation_uses_the_persisted_legacy_shape_once(tmp_path):
+    path, calls, row = tmp_path / "owned.DRWDOT", [], {}
+
+    def save(name, version, options):
+        calls.append((name, version, options))
+        Path(name).write_bytes(b"owned saved template")
+        return 0
+
+    model = SimpleNamespace(
+        ClearSelection2=lambda all: calls.append(("clear", all)), SaveAs3=save
+    )
+    probe.save_prepared_template(model, path, row)
+    assert calls == [("clear", True), (str(path), 0, 0)]
+    assert row["save_return"] == 0
+    assert row["save_method"] == "IModelDoc2.SaveAs3(path,0,0)"
+
+
+def test_preparation_never_accepts_legacy_integer_without_fresh_file(tmp_path):
+    model = SimpleNamespace(ClearSelection2=lambda all: None, SaveAs3=lambda *args: 0)
+    path = tmp_path / "missing.DRWDOT"
+    with pytest.raises(RuntimeError, match="no complete file"):
+        probe.save_prepared_template(model, path, {})
+    path.write_bytes(b"pre-existing")
+    with pytest.raises(ValueError, match="not fresh"):
+        probe.save_prepared_template(model, path, {})
 
 
 def test_immutable_hash_is_pinned_before_replacement(tmp_path):

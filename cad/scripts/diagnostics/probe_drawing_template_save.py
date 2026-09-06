@@ -37,6 +37,20 @@ CELLS = (
 )
 
 
+def require_save_result(returned, path):
+    if (
+        not isinstance(returned, tuple)
+        or len(returned) != 3
+        or returned[0] is not True
+        or type(returned[1]) is not int
+        or returned[1] != 0
+        or type(returned[2]) is not int
+    ):
+        raise RuntimeError(f"template extension SaveAs3 failed: {returned!r}")
+    if not path.is_file() or path.stat().st_size == 0:
+        raise RuntimeError("template extension SaveAs3 produced no complete file")
+
+
 def invoke_save(model, target, method, row):
     if method == "model_save_as3":
         row["arguments"] = [str(target), 0, 0]
@@ -136,13 +150,8 @@ async def capture(adapter, report_root):
                         checkpoint()
                 if row["file"].get("bytes", 0) <= 0:
                     raise RuntimeError("save call produced no complete native file")
-                if method == "extension_save_as3" and tuple(row["returned"])[:2] != (
-                    True,
-                    0,
-                ):
-                    raise RuntimeError(
-                        "modern SaveAs3 did not return success plus zero errors"
-                    )
+                if method == "extension_save_as3":
+                    require_save_result(row["returned"], target)
                 check(
                     "close saved control drawing", await adapter.close_model(save=False)
                 )
