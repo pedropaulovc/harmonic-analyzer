@@ -90,6 +90,7 @@ class OwnedDrawingCopy:
         self.source_part = source_part.resolve()
         self.handle = self.reference = self.expected = None
         self.paths = set()
+        self.titles = {}
         if (
             self.app.GetDocuments()
             or self.app.ActiveDoc is not None
@@ -162,6 +163,7 @@ class OwnedDrawingCopy:
             )
         self.expected = self._path(path)
         self.paths = {self.expected}
+        self.titles.clear()
 
     def _validate_active(self):
         current = _early_bound(self.adapter.currentModel, "IModelDoc2")
@@ -177,11 +179,6 @@ class OwnedDrawingCopy:
             raise RuntimeError(
                 "active native drawing path is not owned by this control"
             )
-        title = str(current.GetTitle()).casefold()
-        if title not in {path.name.casefold(), path.stem.casefold()}:
-            raise RuntimeError(
-                "owned drawing native title does not match its exact path"
-            )
         named = self.app.GetOpenDocumentByName(str(path))
         if named is None or int(self.app.IsSame(named, current)) != 1:
             raise RuntimeError(
@@ -189,6 +186,12 @@ class OwnedDrawingCopy:
             )
         if self.handle is not None and int(self.app.IsSame(current, self.handle)) != 1:
             raise RuntimeError("owned native drawing identity was replaced")
+        # GetTitle is a native window title, not a filename parser: drawings may
+        # include " - Sheet1". Witness it only after full-path/native identity.
+        title = str(current.GetTitle())
+        if not title or self.titles.get(path, title) != title:
+            raise RuntimeError("owned drawing native title changed unexpectedly")
+        self.titles[path] = title
         self._inventory(current)
         return current
 
@@ -232,6 +235,7 @@ class OwnedDrawingCopy:
             raise RuntimeError("owned datum drawing remained open after scoped close")
         self.handle = self.expected = None
         self.paths.clear()
+        self.titles.clear()
         self._inventory()
 
 
