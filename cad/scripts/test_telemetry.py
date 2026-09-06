@@ -32,6 +32,11 @@ from opentelemetry.sdk.trace import TracerProvider as SdkTracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
+# Enter pytest before importing application telemetry, so root conftest owns
+# the capture directory and export policy even for this direct script entry.
+if __name__ == "__main__":
+    sys.exit(pytest.main([__file__, "-q"]))
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import _telemetry  # noqa: E402
@@ -868,7 +873,3 @@ def test_jsonl_stream_falls_back_when_the_atomic_path_is_unavailable(
     assert json.loads((tmp_path / "logs.jsonl").read_text(encoding="utf-8")) == {
         "fallback": True
     }
-
-
-if __name__ == "__main__":
-    sys.exit(pytest.main([__file__, "-q"]))

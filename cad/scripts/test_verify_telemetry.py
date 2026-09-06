@@ -36,6 +36,11 @@ import types
 from pathlib import Path
 from typing import Any
 
+if __name__ == "__main__" and "--demo" not in sys.argv:
+    import pytest
+
+    sys.exit(pytest.main([__file__, "-v"]))
+
 # Export nowhere (no Aspire probe / OTLP retries) BEFORE the spine configures.
 os.environ.setdefault("OTEL_EXPORTER_OTLP_ENDPOINT", "")
 
@@ -554,9 +559,4 @@ def _demo() -> None:
 
 
 if __name__ == "__main__":
-    if "--demo" in sys.argv:
-        _demo()
-    else:
-        import pytest
-
-        sys.exit(pytest.main([__file__, "-v"]))
+    _demo()

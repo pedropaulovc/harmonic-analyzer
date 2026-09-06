@@ -26,6 +26,19 @@ def _load_dodo():
     return mod
 
 
+def test_every_pytest_gate_tracks_bootstrap_and_telemetry_gate_executes_isolation_control():
+    dodo = _load_dodo()
+    bootstrap = str((REPO_ROOT / "conftest.py").resolve())
+    isolation = str((REPO_ROOT / "cad" / "scripts" / "test_pytest_telemetry.py").resolve())
+    tasks = {task["name"]: task for task in dodo.task_check()}
+    for task in tasks.values():
+        command = task["actions"][0][1][0]
+        is_pytest = command[1:3] == ["-m", "pytest"]
+        assert (bootstrap in task["file_dep"]) == is_pytest, task["name"]
+    assert isolation in tasks["telemetry"]["file_dep"]
+    assert isolation in tasks["telemetry"]["actions"][0][1][0]
+
+
 class _FakeTask:
     def __init__(self):
         self.value_savers = []
