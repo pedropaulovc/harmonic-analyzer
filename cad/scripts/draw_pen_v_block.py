@@ -31,7 +31,7 @@ from _drawing_common import (
     add_property_linked_note,
     add_surface_finish,
     auto_arrange_view_dimensions,
-    curate_view_dimensions,
+    retain_view_dimensions,
     dimension_name,
     finalize_drawing,
     new_project_drawing,
@@ -53,7 +53,6 @@ from pen_v_block_spec import (
     BORE_X,
     BORE_DIA,
     CHAMFER,
-    SCREW_HOLE_XY,
     GROOVE_WIDTH as GROOVE_WIDTH,
     GROOVE_Z0,
     SURFACE_FINISHES,
@@ -98,42 +97,11 @@ def _front_y(model_y_mm: float) -> float:
     return FRONT_CENTER[1] + (model_y_mm - BLOCK_HEIGHT / 2.0) * SHEET_SCALE[0] / 1000.0
 
 
-# Per-view survivors of the marked-dimension import: parametric name -> sheet
-# position.  The linear chain stacks below the front view, smallest span nearest
-# the geometry; the slit band dims sit left of the view; the screw-hole group
-# sits right, between the front and right views.
-FRONT_KEEP = {
-    "Length": (_sheet_x(BLOCK_LENGTH / 2.0), 0.058),
-    "Chamfer2dx": (
-        _sheet_x(BLOCK_LENGTH - CHAMFER / 2.0),
-        _front_y(BLOCK_HEIGHT) + 0.012,
-    ),
-    # The set-screw hole now sits ON the rod-bore axis (x 10), so its station
-    # dim would overprint the top view's Bore0X (10.00) above the front view;
-    # it goes in the free band under the front view instead (the old slit row).
-    "ScrewHoleCx": (_sheet_x(SCREW_HOLE_XY[0] / 2.0), 0.070),
-    # +0.012 keeps this vertical dimension's line (drawn at the text's x, from the
-    # block bottom up to the hole centre) out of datum C's box in the crowded
-    # corridor between the front and right views; its text still clears the front
-    # view's right edge (x=0.194) by ~3 mm.
-    "ScrewHoleCz": (_sheet_x(BLOCK_LENGTH) + 0.012, _front_y(SCREW_HOLE_XY[1])),
-    "ScrewHoleDiaDim": (_sheet_x(BLOCK_LENGTH) + 0.024, _front_y(16.0)),
-}
-TOP_KEEP = {
-    "Bore0X": (_sheet_x(BORE_X[0] / 2.0), TOP_CENTER[1] - 0.042),
-    "Bore1X": (_sheet_x(BORE_X[1] / 2.0), TOP_CENTER[1] - 0.052),
-    "Bore0Dia": (_sheet_x(BORE_X[0]) + 0.030, TOP_CENTER[1] + 0.042),
-    # Bottom groove band (a Top-plane sketch, so its Z dims project into the
-    # top view): the width and its offset from the front depth face, stacked
-    # LEFT of the view (the right side carries the bore position FCF).
-    "GrooveWidth": (_sheet_x(0.0) - 0.018, TOP_CENTER[1]),
-    "GrooveZ0": (_sheet_x(0.0) - 0.032, TOP_CENTER[1] - 0.024),
-}
-RIGHT_KEEP = {
-    "Depth": (RIGHT_CENTER[0], 0.068),
-    # The groove rise, seen in the end section left of the right view.
-    "GrooveDepth": (RIGHT_CENTER[0] - 0.046, 0.088),
-}
+# Per-view model-dimension identities. SolidWorks arranges their text after
+# geometric controls and callouts are present; there are no import-time XYs.
+FRONT_KEEP = ("Length", "Chamfer2dx", "ScrewHoleCx", "ScrewHoleCz", "ScrewHoleDiaDim",)
+TOP_KEEP = ("Bore0X", "Bore1X", "Bore0Dia", "GrooveWidth", "GrooveZ0",)
+RIGHT_KEEP = ("Depth", "GrooveDepth",)
 
 # Right-view half extents at 4:1: the 16 (Z) x 18 (Y) stock section.
 RIGHT_HALF_Z = BLOCK_DEPTH / 2.0 * SHEET_SCALE[0] / 1000.0
@@ -198,15 +166,15 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, top):
         set_hidden_lines_visible(adapter, view)
 
-    front_annotations = curate_view_dimensions(
+    front_annotations = retain_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
     )
-    top_annotations = curate_view_dimensions(
+    top_annotations = retain_view_dimensions(
         adapter, top, keep=TOP_KEEP, view_label="top"
     )
     # Right view: the 16 x 18 stock section.  Depth is the model extrusion dim;
     # the 18 height is added as an explicit overall across the view's extremes.
-    right_annotations = curate_view_dimensions(
+    right_annotations = retain_view_dimensions(
         adapter, right, keep=RIGHT_KEEP, view_label="right"
     )
     set_dimension_callouts(
@@ -217,7 +185,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # The two bore stations from datum B are the nominal locations the A-B-C
     # position FCF controls, so they must be BASIC -- leaving them under the
     # general/title-block tolerance would double-tolerance the bore positions.
-    # curate_view_dimensions yields IAnnotation; set_basic_dimension wants the
+    # retain_view_dimensions yields IAnnotation; set_basic_dimension wants the
     # IDisplayDimension, so resolve it via GetSpecificAnnotation.
     top_by_name = {dimension_name(adapter, a): a for a in top_annotations}
     for station in ("Bore0X", "Bore1X"):

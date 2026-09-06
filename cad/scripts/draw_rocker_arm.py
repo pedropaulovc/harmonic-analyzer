@@ -37,7 +37,7 @@ from _drawing_common import (
     add_property_linked_note,
     add_surface_finish,
     auto_arrange_view_dimensions,
-    curate_view_dimensions,
+    retain_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -109,12 +109,10 @@ def _sheet_xy(mx: float, my: float) -> tuple[float, float]:
 # The large concentric radii are carried in the manufacturing note: imported
 # radius dimensions retain off-sheet centre witnesses even in shortened-radius
 # mode.  Keeping them as notes avoids clipped geometry without losing values.
-FRONT_KEEP = {
-    "PivotDia": (0.180, 0.120),
-}
+FRONT_KEEP = ("PivotDia",)
 NOTE_ONLY_DIMENSIONS = {"TopRadius", "BottomRadius"}
-RIGHT_KEEP: dict[str, tuple[float, float]] = {}
-TOP_KEEP: dict[str, tuple[float, float]] = {}
+RIGHT_KEEP: tuple[str, ...] = ()
+TOP_KEEP: tuple[str, ...] = ()
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -169,7 +167,7 @@ async def build(adapter: Any) -> dict[str, str]:
         set_hidden_lines_removed(adapter, view)
     set_hidden_lines_visible(adapter, front)
 
-    curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
+    retain_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")

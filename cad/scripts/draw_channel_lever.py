@@ -32,7 +32,7 @@ from _drawing_common import (
     add_native_hole_callout,
     add_property_linked_note,
     auto_arrange_view_dimensions,
-    curate_view_dimensions,
+    retain_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -142,15 +142,9 @@ def _add_tip_arc_center_mark(adapter: Any, view: Any, tip_arc: Any) -> None:
         raise RuntimeError("failed to add channel-lever tip R3 center mark")
 
 
-FRONT_KEEP = {
-    "BarLength": (FRONT_CENTER[0] - 0.010, 0.138),
-    "TipCentreX": (FRONT_CENTER[0] + 0.070, 0.125),
-    "NoseRadius": (0.070, 0.172),
-    "TipRadius": (0.240, 0.172),
-    "FulcrumDia": (0.075, 0.180),
-}
-RIGHT_KEEP: dict[str, tuple[float, float]] = {}
-TOP_KEEP: dict[str, tuple[float, float]] = {}
+FRONT_KEEP = ("BarLength", "TipCentreX", "NoseRadius", "TipRadius", "FulcrumDia",)
+RIGHT_KEEP: tuple[str, ...] = ()
+TOP_KEEP: tuple[str, ...] = ()
 
 
 def _model_entities(model: Any) -> dict[str, Any]:
@@ -220,7 +214,7 @@ async def build(adapter: Any) -> dict[str, str]:
         set_hidden_lines_removed(adapter, view)
     set_hidden_lines_visible(adapter, front)
 
-    front_annotations = curate_view_dimensions(
+    front_annotations = retain_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
     )
     profile_dimensions = {"BarLength", "TipCentreX", "NoseRadius", "TipRadius"}
@@ -232,8 +226,8 @@ async def build(adapter: Any) -> dict[str, str]:
         if display is None:
             raise RuntimeError(f"profile dimension {name!r} has no display annotation")
         set_basic_dimension(adapter, display, label=f"profile {name}")
-    curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
-    curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
+    retain_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
+    retain_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")

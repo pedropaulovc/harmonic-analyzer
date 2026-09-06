@@ -18,7 +18,7 @@ from _drawing_common import (
     add_property_linked_note,
     add_surface_finish,
     auto_arrange_view_dimensions,
-    curate_view_dimensions,
+    retain_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -84,15 +84,8 @@ def _front_y(model_y: float) -> float:
 
 # Front elevation carries the foot width + flange height, the arbor-bore station
 # and diameter, and the dome diameter; the plan carries the 16 foot depth.
-FRONT_KEEP = {
-    "Width": (FRONT_CENTER[0], _front_y(0.0) + 0.032),
-    "FootHt": (FRONT_CENTER[0] - 0.030, _front_y(FOOT_HEIGHT / 2.0)),
-    "BoreDia": (FRONT_CENTER[0] + 0.068, _front_y(BORE_HEIGHT) - 0.004),
-    "DomeDia": (FRONT_CENTER[0] + 0.066, _front_y(BORE_HEIGHT + 9.0)),
-}
-TOP_KEEP = {
-    "Depth": (TOP_CENTER[0] + 0.040, TOP_CENTER[1]),
-}
+FRONT_KEEP = ("Width", "FootHt", "BoreDia", "DomeDia",)
+TOP_KEEP = ("Depth",)
 DIMENSION_CALLOUTS = {
     "BoreDia": "THRU",
 }
@@ -205,10 +198,10 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, top):
         set_hidden_lines_visible(adapter, view)
 
-    front_annotations = curate_view_dimensions(
+    front_annotations = retain_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
     )
-    top_annotations = curate_view_dimensions(
+    top_annotations = retain_view_dimensions(
         adapter, top, keep=TOP_KEEP, view_label="top"
     )
     set_dimension_callouts(

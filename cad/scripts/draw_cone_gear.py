@@ -23,7 +23,7 @@ from _drawing_common import (
     add_property_linked_note,
     add_surface_finish,
     auto_arrange_view_dimensions,
-    curate_view_dimensions,
+    retain_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -64,9 +64,7 @@ BORE_R = BORE_DIA * VIEW_SCALE[0] / 2000.0
 HALF_OD = OUTSIDE_DIA * VIEW_SCALE[0] / 2000.0
 FRONT_FACE_X = RIGHT_CENTER[0] - FACE_WIDTH * VIEW_SCALE[0] / 2000.0
 
-FRONT_KEEP = {
-    "BoreCutDia": (FRONT_CENTER[0] - 0.055, FRONT_CENTER[1] - 0.030),
-}
+FRONT_KEEP = ("BoreCutDia",)
 # The generated gear has hundreds of tooth faces. Follow explicit ownership
 # from its named bore cut to the front rim and its neighbouring blank face.
 # This bounds entity discovery independently of tooth count.
@@ -125,7 +123,7 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
 
-    front_annotations = curate_view_dimensions(
+    front_annotations = retain_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
     )
     # 3 decimals so the displayed bore matches the family rows' 9.525 (a

@@ -27,7 +27,7 @@ from _drawing_common import (
     add_surface_finish,
     add_view_centerline,
     auto_arrange_view_dimensions,
-    curate_view_dimensions,
+    retain_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -75,9 +75,7 @@ ENTITY_ROLES = {
 _HALF_LEN = BARREL_TOP_Y * SHEET_SCALE[0] / 2000.0
 APEX = (FRONT_CENTER[0] - _HALF_LEN, FRONT_CENTER[1])
 
-FRONT_KEEP = {
-    "ConeH": (APEX[0] + 0.005, FRONT_CENTER[1] - 0.030),
-}
+FRONT_KEEP = ("ConeH",)
 
 
 def _rotate_view(adapter: Any, view: Any, angle: float, *, label: str) -> None:
@@ -176,7 +174,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     entities = ModelEntities(front.ReferencedDocument).resolve(ENTITY_ROLES)
-    curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
+    retain_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
     add_view_centerline(adapter, front, entity=entities["barrel"], label="pen-marker")
 
     add_entity_dimension(
