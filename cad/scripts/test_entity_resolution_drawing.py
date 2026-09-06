@@ -5,7 +5,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from _drawing_entities import CircleEdge, LineEdge, ModelEntities
+from _drawing_entities import CircleEdge, LineEdge, ModelEntities, ModelVertex
 
 
 def circle(center, radius, axis=(0.0, 0.0, 1.0)):
@@ -19,7 +19,8 @@ def circle(center, radius, axis=(0.0, 0.0, 1.0)):
 
 def line(start, end):
     curve = SimpleNamespace(IsCircle=lambda: False, IsLine=lambda: True)
-    vertex = lambda point: SimpleNamespace(GetPoint=lambda: tuple(v / 1000 for v in point))
+    def vertex(point):
+        return SimpleNamespace(GetPoint=lambda: tuple(v / 1000 for v in point))
     return SimpleNamespace(
         GetCurve=lambda: curve,
         GetStartVertex=lambda: vertex(start),
@@ -75,6 +76,20 @@ def test_axis_direction_is_unoriented_but_wrong_axis_is_rejected(monkeypatch):
     wanted = circle((0, 0, 0), 4, (0, 0, -1))
     entities, _ = resolver(monkeypatch, [circle((0, 0, 0), 4, (0, 1, 0)), wanted])
     assert entities.resolve({"bore": CircleEdge(4, (0, 0, 0), (0, 0, 1))})["bore"] is wanted
+
+
+@pytest.mark.parametrize("points,count", [([(0, 0, 0), (0, 110, 0)], 1), ([(0, 1, 0)], 0), ([(0, 0, 0), (0, 0, 0)], 2)])
+def test_apex_vertex_must_match_exactly_one_model_vertex(monkeypatch, points, count):
+    monkeypatch.setattr("_drawing_entities._early_bound", lambda obj, _interface: obj)
+    vertices = [SimpleNamespace(GetPoint=lambda point=point: tuple(v / 1000 for v in point)) for point in points]
+    body = SimpleNamespace(GetVertices=Mock(return_value=vertices))
+    entities = ModelEntities(SimpleNamespace(GetBodies2=lambda *_args: (body,)))
+    if count != 1:
+        with pytest.raises(RuntimeError, match=f"apex.*matched {count} vertices"):
+            entities.resolve({"apex": ModelVertex((0, 0, 0))})
+        return
+    assert entities.resolve({"apex": ModelVertex((0, 0, 0))})["apex"] is vertices[0]
+    body.GetVertices.assert_called_once_with()
 
 
 def dimension_context(monkeypatch):

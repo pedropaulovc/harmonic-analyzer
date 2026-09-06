@@ -5,7 +5,7 @@ Resolve all roles together after the source configuration has been selected and
 before editing its geometry. The resolver owns one model-topology snapshot; do
 not retain it across a model rebuild, configuration switch, or document close.
 
-The returned edges/faces are passed to IView.SelectEntity. They need no visible
+The returned edges/faces/vertices are passed to IView.SelectEntity. They need no visible
 entity sweep and remain independent of the view's position, scale and camera.
 Layout and leader coordinates belong in the drawing recipe, separately.
 """
@@ -76,6 +76,20 @@ class LineEdge:
 
 
 @dataclass(frozen=True)
+class ModelVertex:
+    """A unique topological vertex at the specified model position."""
+
+    point_mm: Point
+    tolerance_mm: float = 0.01
+
+    def __post_init__(self) -> None:
+        if self.tolerance_mm <= 0 or not all(
+            math.isfinite(value) for value in (*self.point_mm, self.tolerance_mm)
+        ):
+            raise ValueError("vertex selector must have finite geometry and positive tolerance")
+
+
+@dataclass(frozen=True)
 class _Circle:
     entity: Any
     center_mm: Point
@@ -113,20 +127,33 @@ class ModelEntities:
         self.model = model
 
     @_telemetry.traced("drawing.resolve_model_entities")
-    def resolve(self, roles: Mapping[str, CircleEdge | LineEdge | FaceSpec]) -> dict[str, Any]:
+    def resolve(self, roles: Mapping[str, CircleEdge | LineEdge | ModelVertex | FaceSpec]) -> dict[str, Any]:
         edge_roles = {key: spec for key, spec in roles.items() if isinstance(spec, (CircleEdge, LineEdge))}
-        face_roles = {key: spec for key, spec in roles.items() if key not in edge_roles}
+        vertex_roles = {key: spec for key, spec in roles.items() if isinstance(spec, ModelVertex)}
+        face_roles = {key: spec for key, spec in roles.items() if key not in edge_roles and key not in vertex_roles}
         resolved = _resolve_faces(self.model, face_roles) if face_roles else {}
-        if not edge_roles:
+        if not edge_roles and not vertex_roles:
             return resolved
 
         circles_needed = any(isinstance(spec, CircleEdge) for spec in edge_roles.values())
         lines_needed = any(isinstance(spec, LineEdge) for spec in edge_roles.values())
         matches: dict[str, list[Any]] = {key: [] for key in edge_roles}
+        vertex_matches: dict[str, list[Any]] = {key: [] for key in vertex_roles}
         part = _early_bound(self.model, "IPartDoc")
         edge_count = 0
+        vertex_count = 0
         for raw_body in part.GetBodies2(0, False) or ():
             body = _early_bound(raw_body, "IBody2")
+            if vertex_roles:
+                for raw_vertex in body.GetVertices() or ():
+                    vertex_count += 1
+                    vertex = _early_bound(raw_vertex, "IVertex")
+                    point = tuple(v * 1000 for v in vertex.GetPoint())
+                    for key, spec in vertex_roles.items():
+                        if math.dist(point, spec.point_mm) <= spec.tolerance_mm:
+                            vertex_matches[key].append(vertex)
+            if not edge_roles:
+                continue
             for raw_edge in body.GetEdges() or ():
                 edge_count += 1
                 edge = _early_bound(raw_edge, "IEdge")
@@ -153,11 +180,19 @@ class ModelEntities:
         span = _telemetry.trace.get_current_span()
         span.set_attribute("roles", len(roles))
         span.set_attribute("model_edges", edge_count)
+        span.set_attribute("model_vertices", vertex_count)
         for key, candidates in matches.items():
             if len(candidates) != 1:
                 raise RuntimeError(
                     f"{key}: {edge_roles[key]!r} matched {len(candidates)} edges; "
                     "the model role must identify exactly one edge"
+                )
+            resolved[key] = candidates[0]
+        for key, candidates in vertex_matches.items():
+            if len(candidates) != 1:
+                raise RuntimeError(
+                    f"{key}: {vertex_roles[key]!r} matched {len(candidates)} vertices; "
+                    "the model role must identify exactly one vertex"
                 )
             resolved[key] = candidates[0]
         return resolved
