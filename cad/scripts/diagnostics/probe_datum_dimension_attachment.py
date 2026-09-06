@@ -4,7 +4,9 @@ Run with the saved cone-gear.SLDDRW. Each route starts from an independent byte
 copy. Default routes replace A by native dimension-name selection: compare
 insert/label/clear/rebuild against insert/label/position/clear/rebuild, using a
 target derived from the measured dimension body. ``--mode shoulder_false``
-tests the existing edge datum separately. Export insertion before a derived
+tests the existing edge datum separately. ``--mode paired_selectors`` instead
+compares named DIMENSION selection with exact IAnnotation.Select2(False, 0),
+leaving insertion/label/clear/rebuild identical. Export insertion before a derived
 nonzero outboard move and save/reopen. Capture both
 IDatumTag primitives and IAnnotation.GetDisplayData without assuming that their
 coordinate frames agree. Original part/drawing hashes are checked on all exits.
@@ -15,6 +17,7 @@ from __future__ import annotations
 import argparse
 from copy import deepcopy
 from dataclasses import asdict
+from enum import StrEnum
 import json
 import math
 import os
@@ -46,24 +49,48 @@ import _telemetry  # noqa: E402
 EPSILON = 1e-8
 
 
-def select_bore(adapter, bore):
+class BoreSelector(StrEnum):
+    NAMED_DIMENSION = "named_dimension"
+    ANNOTATION_SELECT2 = "annotation_select2"
+
+
+def select_bore(adapter, bore, selector=BoreSelector.NAMED_DIMENSION):
     model, app = adapter.currentModel, adapter.swApp
     drawing = _early_bound(model, "IDrawingDoc")
     if not drawing.ActivateView(str(bore["view"].GetName2())):
         raise RuntimeError("cannot activate bore dimension view")
     model.ClearSelection2(True)
-    name = str(bore["display"].GetNameForSelection() or "")
-    if not name or not model.Extension.SelectByID2(
-        name, "DIMENSION", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
-    ):
-        raise RuntimeError("native named bore dimension selection rejected")
+    selector = BoreSelector(selector)
+    if selector is BoreSelector.ANNOTATION_SELECT2:
+        # Historical recipe call shape; obsolete does not mean unsupported.
+        # This route differs from the named control only at this selection call.
+        accepted = bool(bore["annotation"].Select2(False, 0))
+    else:
+        name = str(bore["display"].GetNameForSelection() or "")
+        accepted = bool(name) and bool(
+            model.Extension.SelectByID2(
+                name, "DIMENSION", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
+            )
+        )
+    if not accepted:
+        raise RuntimeError(
+            f"native bore dimension selection rejected: {selector.value}"
+        )
     selection = _early_bound(model.SelectionManager, "ISelectionMgr")
+    count = int(selection.GetSelectedObjectCount2(-1))
+    kind = int(selection.GetSelectedObjectType3(1, -1))
     if (
-        int(selection.GetSelectedObjectCount2(-1)) != 1
-        or int(selection.GetSelectedObjectType3(1, -1)) != 14
+        count != 1
+        or kind != 14
         or int(app.IsSame(selection.GetSelectedObject6(1, -1), bore["display"])) != 1
     ):
-        raise RuntimeError("named selection is not the exact bore display dimension")
+        raise RuntimeError("native selection is not the exact bore display dimension")
+    # GetSelectedObject6 returns IDisplayDimension for type 14, not IAnnotation
+    # or IDimension. Revalidate the source dimension after native selection.
+    selected = _early_bound(selection.GetSelectedObject6(1, -1), "IDisplayDimension")
+    dimension = _early_bound(selected.GetDimension2(0), "IDimension")
+    if int(app.IsSame(dimension, bore["dimension"])) != 1:
+        raise RuntimeError("selected bore display has a different source dimension")
     annotation = _early_bound(bore["display"].GetAnnotation(), "IAnnotation")
     if (
         int(app.IsSame(annotation, bore["annotation"])) != 1
@@ -71,6 +98,16 @@ def select_bore(adapter, bore):
         or int(app.IsSame(annotation.Owner, bore["view"])) != 1
     ):
         raise RuntimeError("selected bore dimension has the wrong native owner")
+    return {
+        "selector": selector.value,
+        "count": count,
+        "type": kind,
+        "selected_interface": "IDisplayDimension",
+        "display_identity": "exact",
+        "source_dimension_identity": "exact",
+        "annotation_owner_identity": "exact",
+        "selection_point": tuple(selection.GetSelectionPoint2(1, -1) or ()),
+    }
 
 
 def bore_target(adapter):
@@ -322,7 +359,13 @@ def dimension_target_xy(position, dimension_body, datum_body):
 
 
 def replace_on_dimension(
-    adapter, bore, old_annotation, *, target=None, observations=None
+    adapter,
+    bore,
+    old_annotation,
+    *,
+    target=None,
+    observations=None,
+    selector=BoreSelector.NAMED_DIMENSION,
 ):
     model, app = adapter.currentModel, adapter.swApp
     model.ClearSelection2(True)
@@ -341,7 +384,9 @@ def replace_on_dimension(
         raise RuntimeError("exact copied datum A deletion failed")
     if tuple(bore["view"].GetAnnotationsByType(2) or ()):
         raise RuntimeError("unexpected datum remains after exact copied A deletion")
-    select_bore(adapter, bore)
+    selection_observation = select_bore(adapter, bore, selector)
+    if observations is not None:
+        observations["selection"] = selection_observation
     raw_tag = model.InsertDatumTag2()
     if raw_tag is None:
         raise RuntimeError("InsertDatumTag2 rejected selected bore display dimension")
@@ -391,11 +436,11 @@ async def probe(adapter, source, directory, mode="paired_dimensions"):
         return {"drawing": str(drawing), "pdf": str(pdf), "png": str(png)}
 
     try:
-        modes = (
-            ("dimension", "dimension_placed")
-            if mode == "paired_dimensions"
-            else ("shoulder_false",)
-        )
+        modes = {
+            "paired_dimensions": ("dimension", "dimension_placed"),
+            "paired_selectors": ("dimension", "dimension_select2"),
+            "shoulder_false": ("shoulder_false",),
+        }[mode]
         for mode in modes:
             trial = {"mode": mode}
             report["trials"].append(trial)
@@ -433,7 +478,7 @@ async def probe(adapter, source, directory, mode="paired_dimensions"):
                     attachments.snapshot(adapter.currentModel), original_key
                 )
                 trial["before_export"] = export(f"{mode}-before")
-                if mode in {"dimension", "dimension_placed"}:
+                if mode in {"dimension", "dimension_placed", "dimension_select2"}:
                     target = None
                     if mode == "dimension_placed":
                         dimension_bounds = annotation_box(adapter, bore["annotation"])
@@ -458,6 +503,9 @@ async def probe(adapter, source, directory, mode="paired_dimensions"):
                         annotation,
                         target=target,
                         observations=trial["insertion_finalization"],
+                        selector=BoreSelector.ANNOTATION_SELECT2
+                        if mode == "dimension_select2"
+                        else BoreSelector.NAMED_DIMENSION,
                     )
                 else:
                     _early_bound(
@@ -476,7 +524,7 @@ async def probe(adapter, source, directory, mode="paired_dimensions"):
                 if native["binding_error"]:
                     raise RuntimeError(native["binding_error"])
                 if (
-                    mode in {"dimension", "dimension_placed"}
+                    mode in {"dimension", "dimension_placed", "dimension_select2"}
                     and native["binding"] != "exact_display_dimension"
                 ):
                     raise RuntimeError(
@@ -556,7 +604,7 @@ def main():
     parser.add_argument("drawing", type=Path)
     parser.add_argument(
         "--mode",
-        choices=("paired_dimensions", "shoulder_false"),
+        choices=("paired_dimensions", "paired_selectors", "shoulder_false"),
         default="paired_dimensions",
     )
     parser.add_argument("--worker", action="store_true")
