@@ -4,6 +4,7 @@ import ast
 import asyncio
 from copy import deepcopy
 import json
+import math
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -216,6 +217,21 @@ def test_digest_identifies_source_changes(tmp_path):
 def test_native_frame_signatures_are_json_serializable():
     signatures = [probe._expected_signature(row) for row in probe.ROWS]
     assert len(json.loads(json.dumps(signatures))) == 3
+
+
+@pytest.mark.parametrize("width_points", [792, 1224])
+def test_native_pdf_render_accepts_different_sheet_sizes(tmp_path, width_points):
+    from PIL import Image
+    from pypdf import PdfWriter
+
+    pdf, png = tmp_path / "native.pdf", tmp_path / "native.png"
+    writer = PdfWriter()
+    writer.add_blank_page(width=width_points, height=612)
+    with pdf.open("wb") as stream:
+        writer.write(stream)
+    probe.render_pdf_png(pdf, png)
+    with Image.open(png) as picture:
+        assert picture.size == (math.ceil(width_points * (300 / 72)), 2550)
 
 
 @pytest.mark.parametrize("outcome", ["passed", "failed"])
