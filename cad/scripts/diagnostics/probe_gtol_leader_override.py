@@ -20,7 +20,6 @@ from __future__ import annotations
 import argparse
 from dataclasses import asdict
 import math
-import os
 from pathlib import Path
 import shutil
 import sys
@@ -32,7 +31,10 @@ sys.path.insert(0, str(ROOT / "cad/scripts"))
 
 from _common import _early_bound, check  # noqa: E402
 from _drawing_annotation_bounds import annotation_box  # noqa: E402
-from diagnostics._owned_native_session import run_owned_diagnostic  # noqa: E402
+from diagnostics._owned_native_session import (  # noqa: E402
+    require_owned_diagnostic_environment,
+    run_owned_diagnostic,
+)
 from diagnostics import probe_datum_shoulder as shoulder  # noqa: E402
 from diagnostics import probe_drawing_attachments as attachments  # noqa: E402
 from diagnostics.probe_native_model_pmi import file_digest, render_pdf_png  # noqa: E402
@@ -74,7 +76,7 @@ class ExistingSessionCopy(shoulder.OwnedDrawingCopy):
         for _document, state in self.baseline:
             if not state["visible"]:
                 raise RuntimeError(
-                    "hidden pre-existing document prevents safe scoped CloseDoc"
+                    f"hidden pre-existing document prevents safe scoped CloseDoc: {state}"
                 )
             if state["path"] and Path(state["path"]).name.casefold() in protected_names:
                 raise RuntimeError(
@@ -385,8 +387,7 @@ def main():
         or part.name.casefold() != "rocker-arm.sldprt"
     ):
         raise ValueError("this control is bounded to the coherent rocker drawing/part")
-    if os.environ.get("HARMONIC_SW_AUTOSTART") != "0":
-        raise RuntimeError("control requires HARMONIC_SW_AUTOSTART=0")
+    require_owned_diagnostic_environment()
     if not args.worker:
         sys.path.insert(0, str(ROOT))
         import dodo

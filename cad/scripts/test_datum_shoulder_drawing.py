@@ -237,6 +237,7 @@ def test_standalone_default_runs_positive_document_route_with_explicit_part(
         SimpleNamespace(_run=lambda *args, **kwargs: calls.append((args, kwargs))),
     )
     monkeypatch.setattr(sys, "argv", ["probe", str(drawing), "--part", str(part)])
+    monkeypatch.setenv("HARMONIC_SW_AUTOSTART", "0")
     assert probe.main() == 0
     (arguments, title), keywords = calls[0]
     assert arguments[-2:] == ["--part", str(part.resolve())]
@@ -317,9 +318,6 @@ def test_native_runner_never_clears_existing_documents(monkeypatch, stage):
     original = documents[0]
     calls = []
 
-    async def connect():
-        calls.append("connect")
-
     async def disconnect():
         calls.append("disconnect")
 
@@ -329,7 +327,8 @@ def test_native_runner_never_clears_existing_documents(monkeypatch, stage):
         if stage == "failure":
             raise ValueError("probe failed")
 
-    adapter = SimpleNamespace(connect=connect, disconnect=disconnect)
+    adapter = SimpleNamespace(disconnect=disconnect)
+    monkeypatch.setattr(session, "attach_running", lambda _: calls.append("attach"))
     monkeypatch.setattr(session._watchdog, "start", lambda: calls.append("start"))
     monkeypatch.setattr(session._watchdog, "stop", lambda: calls.append("stop"))
     if stage == "failure":
@@ -337,7 +336,7 @@ def test_native_runner_never_clears_existing_documents(monkeypatch, stage):
             asyncio.run(session.connected_probe(adapter, callback))
     else:
         asyncio.run(session.connected_probe(adapter, callback))
-    assert calls == ["start", "connect", "probe", "disconnect", "stop"]
+    assert calls == ["start", "attach", "probe", "disconnect", "stop"]
     assert documents == [original]
 
 
@@ -346,6 +345,25 @@ def test_datum_main_uses_connect_only_runner():
 
     assert "run_build" not in inspect.getsource(probe)
     assert "return run_owned_diagnostic(" in inspect.getsource(probe.main)
+
+
+def test_parent_environment_guard_runs_before_seat_wrapper(monkeypatch, tmp_path):
+    import sys
+    from diagnostics import probe_gtol_leader_override
+
+    drawing, part = tmp_path / "rocker-arm.SLDDRW", tmp_path / "rocker-arm.SLDPRT"
+    drawing.write_bytes(b"drawing")
+    part.write_bytes(b"part")
+    calls = []
+    monkeypatch.setitem(
+        sys.modules, "dodo", SimpleNamespace(_run=lambda *a, **k: calls.append((a, k)))
+    )
+    monkeypatch.setattr(sys, "argv", ["probe", str(drawing), "--part", str(part)])
+    monkeypatch.delenv("HARMONIC_SW_AUTOSTART", raising=False)
+    for module in (probe, probe_gtol_leader_override):
+        with pytest.raises(RuntimeError, match="AUTOSTART=0"):
+            module.main()
+    assert calls == []
 
 
 def test_connect_only_entrypoint_preserves_docs_before_owned_guards(monkeypatch):
@@ -361,10 +379,15 @@ def test_connect_only_entrypoint_preserves_docs_before_owned_guards(monkeypatch)
         pass
 
     adapter = SimpleNamespace(
-        swApp=SimpleNamespace(CloseAllDocuments=lambda _: documents.clear()),
+        swApp=SimpleNamespace(
+            CloseAllDocuments=lambda _: documents.clear(),
+            GetProcessID=lambda: 37136,
+            RevisionNumber=lambda: "34.3.0",
+        ),
         connect=nothing,
         disconnect=nothing,
         _attempt=lambda callback, **_: callback(),
+        _initialize_com_apartment=lambda: None,
     )
 
     async def owned_guards(_adapter):
@@ -373,6 +396,9 @@ def test_connect_only_entrypoint_preserves_docs_before_owned_guards(monkeypatch)
         return {}
 
     monkeypatch.setattr(pywin32_adapter, "PyWin32Adapter", lambda _: adapter)
+    monkeypatch.setattr(
+        session.win32com.client, "GetActiveObject", lambda _: adapter.swApp
+    )
     monkeypatch.setattr(_common, "_pin_default_part_template", lambda _: None)
     monkeypatch.setattr(session._watchdog, "start", lambda: None)
     monkeypatch.setattr(session._watchdog, "stop", lambda: None)
@@ -381,6 +407,58 @@ def test_connect_only_entrypoint_preserves_docs_before_owned_guards(monkeypatch)
     monkeypatch.setenv("HARMONIC_SW_AUTOSTART", "0")
     assert session.run_owned_diagnostic(owned_guards) == 0
     assert documents == [original] and observed == [(original,)]
+
+
+def test_attach_only_no_running_instance_never_launches_or_writes_preferences(
+    monkeypatch,
+):
+    import asyncio
+    from diagnostics import _owned_native_session as session
+
+    calls = []
+
+    def absent(_progid):
+        calls.append("GetActiveObject")
+        raise RuntimeError("no running instance")
+
+    async def disconnect():
+        calls.append("disconnect")
+
+    async def callback(_adapter):
+        pytest.fail("probe must not run without an existing server")
+
+    adapter = SimpleNamespace(
+        _initialize_com_apartment=lambda: calls.append("STA"), disconnect=disconnect
+    )
+    monkeypatch.setattr(session.win32com.client, "GetActiveObject", absent)
+    monkeypatch.setattr(session._watchdog, "start", lambda: None)
+    monkeypatch.setattr(session._watchdog, "stop", lambda: None)
+    with pytest.raises(RuntimeError, match="no running instance"):
+        asyncio.run(session.connected_probe(adapter, callback))
+    assert calls == ["STA", "GetActiveObject", "disconnect"]
+
+
+def test_attach_only_reads_pid_revision_without_application_setters(monkeypatch):
+    from diagnostics import _owned_native_session as session
+
+    class ReadOnlyApp:
+        __slots__ = ()
+
+        def GetProcessID(self):
+            return 37136
+
+        def RevisionNumber(self):
+            return "34.3.0"
+
+    app = ReadOnlyApp()
+    adapter = SimpleNamespace(_initialize_com_apartment=lambda: None)
+    monkeypatch.setattr(session.win32com.client, "GetActiveObject", lambda _: app)
+    monkeypatch.setenv("HARMONIC_DIAGNOSTIC_SW_PID", "37136")
+    session.attach_running(adapter)
+    assert adapter.swApp is app
+    monkeypatch.setenv("HARMONIC_DIAGNOSTIC_SW_PID", "1")
+    with pytest.raises(RuntimeError, match="differs from expected"):
+        session.attach_running(adapter)
 
 
 def row():
