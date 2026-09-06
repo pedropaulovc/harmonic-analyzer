@@ -8,8 +8,8 @@ yields a build script's prerequisites (the DAG edges doit consumes as
 ``file_dep``), the latter yields a part's downstream assemblies (what the legacy
 ``--rebuild`` deleted).
 
-Lifted verbatim from the original ``build_all.py`` (constants + ``part_scripts`` /
-``artefact_for`` / ``script_for`` / ``dependents_of``).
+Assembly artefact edges come from source-consuming call arguments and manifests,
+not occurrences of part names in prose. Unknown source expressions fail loudly.
 """
 
 from __future__ import annotations
@@ -108,24 +108,427 @@ def script_for(stem: str) -> Path:
     return SCRIPTS_DIR / f"build_{stem}.py"
 
 
-def _references(asm_stem: str, candidate_stem: str) -> bool:
-    """True when ``candidate_stem``'s dashed name appears as a ``"..."`` literal
-    in ``asm_stem``'s build script.
+class _AssemblySources:
+    """Bounded enumeration of source arguments, not log/error/documentation text.
 
-    The single primitive both ``references_of`` and ``dependents_of`` share, so
-    they are exact inverses. Scan for ``"<dashed>`` at a stem boundary -- the
-    next char must be ``"`` (exact name) or ``-`` (a longer stem). A shared
-    *stem* prefix still over-matches (e.g. ``"cone-gear`` also hits
-    ``"cone-gear-shaft"``); an extra edge there costs at worst one extra refresh,
-    never a stale artefact. But an *alphanumeric* continuation is a DIFFERENT
-    word, not a longer stem, so it must NOT match: e.g. the config key
-    ``"channels"`` must not read as a reference to the ``channel`` assembly --
-    that spurious edge, harmless before the COM spine, closes a build cycle once
-    ``channel`` also task_dep's back onto its spine predecessor.
+    Local assignments, literal loop manifests, wrapper parameters and batch part
+    fields are supported. Unresolved source expressions fail task discovery; an
+    all-assembly fallback could create cycles. Builders are never executed.
+
+    Source sinks must remain in the builder: place_component, its batch form, or
+    InsertComponentParameters. Moving a sink into an imported helper requires
+    extending this contract and the complete eight-builder insertion manifest
+    regression. This is not a general Python/dataflow interpreter.
     """
-    dashed = candidate_stem.replace("_", "-")
-    src = script_for(asm_stem).read_text(encoding="utf-8")
-    return re.search(rf'"{re.escape(dashed)}(?![0-9A-Za-z])', src) is not None
+
+    def __init__(self, source: str):
+        self.tree = ast.parse(source)
+        self.scopes: dict[ast.AST, ast.AST] = {}
+        self.parents: dict[ast.AST, ast.AST] = {}
+        self.nodes: dict[ast.AST, list[ast.AST]] = {}
+        self.aliases: dict[str, str] = {}
+        self._index(self.tree, self.tree)
+        for node in ast.walk(self.tree):
+            if isinstance(node, ast.ImportFrom):
+                self.aliases.update({a.asname or a.name: a.name for a in node.names})
+
+    def _index(self, node: ast.AST, scope: ast.AST) -> None:
+        self.scopes[node] = scope
+        self.nodes.setdefault(scope, []).append(node)
+        child_scope = (
+            node if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) else scope
+        )
+        for child in ast.iter_child_nodes(node):
+            self.parents[child] = node
+            self._index(child, child_scope)
+
+    def call_name(self, node: ast.Call) -> str:
+        name = (
+            node.func.id
+            if isinstance(node.func, ast.Name)
+            else getattr(node.func, "attr", "")
+        )
+        return self.aliases.get(name, name)
+
+    @staticmethod
+    def fail(node: ast.AST):
+        raise ValueError(
+            f"Unresolved assembly source at line {getattr(node, 'lineno', '?')}: "
+            f"{ast.unparse(node)}; extend the source-expression contract explicitly"
+        )
+
+    @staticmethod
+    def argument(call: ast.Call, index: int, keyword: str) -> ast.AST:
+        if len(call.args) > index:
+            return call.args[index]
+        for item in call.keywords:
+            if item.arg == keyword:
+                return item.value
+        return _AssemblySources.fail(call)
+
+    def scope_nodes(self, node: ast.AST) -> list[ast.AST]:
+        scope = self.scopes[node]
+        if scope is self.tree:
+            return self.nodes[scope]
+        return [*self.nodes[scope], *self.nodes[self.tree]]
+
+    def bindings(self, node: ast.Name, trail: frozenset[ast.AST]) -> list[ast.AST]:
+        found = []
+        scope = self.scopes[node]
+        for item in self.scope_nodes(node):
+            late_global = scope is not self.tree and self.scopes[item] is self.tree
+            if not late_global and (
+                getattr(item, "lineno", 0),
+                getattr(item, "col_offset", 0),
+            ) >= (node.lineno, node.col_offset):
+                continue
+            if (
+                isinstance(item, ast.AugAssign)
+                and isinstance(item.target, ast.Name)
+                and item.target.id == node.id
+            ):
+                self.fail(item)
+            targets = (
+                item.targets
+                if isinstance(item, ast.Assign)
+                else ([item.target] if isinstance(item, ast.AnnAssign) else [])
+            )
+            for target in targets:
+                if (
+                    isinstance(target, ast.Name)
+                    and target.id == node.id
+                    and item.value is not None
+                ):
+                    found.append(item.value)
+            if (
+                isinstance(item, ast.NamedExpr)
+                and isinstance(item.target, ast.Name)
+                and item.target.id == node.id
+            ):
+                found.append(item.value)
+            if not isinstance(item, (ast.For, ast.AsyncFor)):
+                continue
+            if isinstance(item.target, ast.Name) and item.target.id == node.id:
+                found.extend(self.items(item.iter, trail))
+            if isinstance(item.target, (ast.Tuple, ast.List)):
+                for index, target in enumerate(item.target.elts):
+                    if not isinstance(target, ast.Name) or target.id != node.id:
+                        continue
+                    for row in self.items(item.iter, trail):
+                        if not isinstance(row, (ast.Tuple, ast.List)) or index >= len(
+                            row.elts
+                        ):
+                            self.fail(row)
+                        found.append(row.elts[index])
+        if isinstance(scope, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            args = [*scope.args.posonlyargs, *scope.args.args]
+            for index, arg in enumerate(args):
+                if arg.arg != node.id:
+                    continue
+                for call in ast.walk(self.tree):
+                    if (
+                        isinstance(call, ast.Call)
+                        and self.call_name(call) == scope.name
+                    ):
+                        found.append(self.argument(call, index, node.id))
+        if not found:
+            self.fail(node)
+        return found
+
+    def items(self, node: ast.AST, trail: frozenset[ast.AST]) -> list[ast.AST]:
+        if node in trail:
+            self.fail(node)
+        trail = trail | {node}
+        if isinstance(node, (ast.Tuple, ast.List, ast.Set)):
+            return list(node.elts)
+        if not isinstance(node, ast.Name):
+            return self.fail(node)
+        values = [
+            item
+            for binding in self.bindings(node, trail)
+            for item in self.items(binding, trail)
+        ]
+        for item in self.scope_nodes(node):
+            available = getattr(item, "lineno", 0) < node.lineno or (
+                self.scopes[node] is not self.tree and self.scopes[item] is self.tree
+            )
+            if isinstance(item, ast.Assign):
+                for target in item.targets:
+                    if (
+                        isinstance(target, ast.Name)
+                        and target.id == node.id
+                        and len(item.targets) != 1
+                    ):
+                        self.fail(item)
+                    if (
+                        isinstance(target, ast.Subscript)
+                        and isinstance(target.value, ast.Name)
+                        and target.value.id == node.id
+                    ):
+                        self.fail(item)
+            if (
+                isinstance(item, ast.Assign)
+                and isinstance(item.value, ast.Name)
+                and item.value.id == node.id
+                and available
+            ):
+                self.fail(item)  # mutable collection aliasing is not enumerated
+            if (
+                isinstance(item, ast.Call)
+                and available
+                and node not in item.args
+                and self.call_name(item) not in {"len", "enumerate"}
+                and any(
+                    isinstance(arg, ast.Name) and arg.id == node.id for arg in item.args
+                )
+            ):
+                self.fail(item)  # an opaque consumer could mutate the manifest
+            if (
+                isinstance(item, ast.Call)
+                and isinstance(item.func, ast.Attribute)
+                and isinstance(item.func.value, ast.Name)
+                and item.func.value.id == node.id
+                and available
+            ):
+                if item.func.attr != "append":
+                    self.fail(item)
+                values.append(self.argument(item, 0, "object"))
+        return values
+
+    def validate_row_uses(self, loop: ast.For) -> None:
+        """Batch rows may receive non-source metadata, never opaque part edits."""
+        row = loop.target.id
+        for item in ast.walk(loop):
+            if isinstance(item, ast.Assign):
+                if isinstance(item.value, ast.Name) and item.value.id == row:
+                    self.fail(item)
+                for target in item.targets:
+                    if (
+                        not isinstance(target, ast.Subscript)
+                        or not isinstance(target.value, ast.Name)
+                        or target.value.id != row
+                    ):
+                        continue
+                    if (
+                        not isinstance(target.slice, ast.Constant)
+                        or target.slice.value == "part"
+                    ):
+                        self.fail(item)
+            if isinstance(item, ast.Call):
+                if any(
+                    isinstance(arg, ast.Name) and arg.id == row for arg in item.args
+                ):
+                    self.fail(item)
+                if (
+                    isinstance(item.func, ast.Attribute)
+                    and isinstance(item.func.value, ast.Name)
+                    and item.func.value.id == row
+                    and item.func.attr not in {"get", "items"}
+                ):
+                    self.fail(item)
+
+    def field_writes(
+        self, node: ast.AST, owner: ast.AST, key: ast.AST | None
+    ) -> list[ast.AST]:
+        found = []
+        if key is None:
+            if not isinstance(owner, ast.Name):
+                self.fail(node)
+            for initial in self.bindings(owner, frozenset()):
+                if not isinstance(initial, ast.Dict) or any(
+                    value is None for value in initial.keys
+                ):
+                    self.fail(initial)
+                found.extend(initial.values)
+        for item in self.scope_nodes(node):
+            if (
+                isinstance(item, ast.Call)
+                and isinstance(item.func, ast.Attribute)
+                and ast.dump(item.func.value) == ast.dump(owner)
+                and item.func.attr not in {"get", "items"}
+            ):
+                self.fail(item)
+            if (
+                isinstance(item, (ast.AnnAssign, ast.AugAssign))
+                and isinstance(item.target, ast.Subscript)
+                and ast.dump(item.target.value) == ast.dump(owner)
+            ):
+                self.fail(item)
+            if not isinstance(item, ast.Assign):
+                continue
+            for target in item.targets:
+                if not isinstance(target, ast.Subscript) or ast.dump(
+                    target.value
+                ) != ast.dump(owner):
+                    continue
+                if key is not None and ast.dump(target.slice) != ast.dump(key):
+                    continue
+                if key is not None and item.lineno >= node.lineno:
+                    continue
+                found.append(item.value)
+        if not found:
+            self.fail(node)
+        return found
+
+    def strings(
+        self, node: ast.AST, trail: frozenset[ast.AST] = frozenset()
+    ) -> set[str]:
+        if node in trail:
+            # A loop's dictionary memo can feed itself. Only an anchored name
+            # elsewhere in that cycle permits collection to succeed.
+            return set()
+        trail = trail | {node}
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            return {node.value}
+        if isinstance(node, ast.Name):
+            return {
+                s
+                for binding in self.bindings(node, trail)
+                for s in self.strings(binding, trail)
+            }
+        if isinstance(node, ast.IfExp):
+            return self.strings(node.body, trail) | self.strings(node.orelse, trail)
+        if isinstance(node, ast.JoinedStr):
+            prefix = node.values[0] if node.values else None
+            if (
+                not isinstance(prefix, ast.Constant)
+                or not isinstance(prefix.value, str)
+                or not prefix.value
+            ):
+                return self.fail(node)
+            return {prefix.value + ("*" if len(node.values) > 1 else "")}
+        if isinstance(node, ast.Call) and self.call_name(node) in {
+            "_part",
+            "_subassembly",
+        }:
+            self.validate_path_wrapper(node)
+            return self.strings(self.argument(node, 0, "name"), trail)
+        if isinstance(node, ast.Call) and self.call_name(node) == "part_path":
+            return self.strings(self.argument(node, 0, "name"), trail)
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "get"
+        ):
+            values = self.field_writes(node, node.func.value, None)
+            defaults = [
+                *node.args[1:],
+                *(item.value for item in node.keywords if item.arg == "default"),
+            ]
+            values.extend(
+                value
+                for value in defaults
+                if not isinstance(value, ast.Constant) or value.value is not None
+            )
+            return {s for value in values for s in self.strings(value, trail)}
+        if isinstance(node, ast.Subscript):
+            values = self.field_writes(node, node.value, node.slice)
+            return {s for value in values for s in self.strings(value, trail)}
+        return self.fail(node)
+
+    def validate_path_wrapper(self, call: ast.Call) -> None:
+        """Prove the two local path wrappers preserve the supplied stem.
+
+        The existence guard may change without changing source identity; changing
+        the path expression/return/parameter requires explicit enumeration work.
+        """
+        name = self.call_name(call)
+        functions = [
+            node
+            for node in self.tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == name
+        ]
+        if len(functions) != 1:
+            self.fail(call)
+        function = functions[0]
+        if len(function.args.args) != 1 or function.args.args[0].arg != "name":
+            self.fail(function)
+        extension = "SLDPRT" if name == "_part" else "SLDASM"
+        expected = ast.parse(
+            f'path = (OUT_{extension} / f"{{name}}.{extension}").resolve()'
+        ).body[0]
+        assignments = [
+            node
+            for node in ast.walk(function)
+            if isinstance(node, (ast.Assign, ast.AnnAssign, ast.AugAssign))
+        ]
+        returns = [node for node in ast.walk(function) if isinstance(node, ast.Return)]
+        if len(assignments) != 1 or ast.dump(assignments[0]) != ast.dump(expected):
+            self.fail(function)
+        if len(returns) != 1 or ast.dump(returns[0]) != ast.dump(
+            ast.parse("return str(path)").body[0]
+        ):
+            self.fail(function)
+
+    def collect(self) -> frozenset[str]:
+        expressions = []
+        source_calls = {
+            "place_component",
+            "place_components_batch",
+            "InsertComponentParameters",
+        }
+        for node in ast.walk(self.tree):
+            name = node.id if isinstance(node, ast.Name) else getattr(node, "attr", "")
+            if self.aliases.get(name, name) not in source_calls or not isinstance(
+                getattr(node, "ctx", None), ast.Load
+            ):
+                continue
+            parent = self.parents.get(node)
+            if not isinstance(parent, ast.Call) or parent.func is not node:
+                self.fail(node)  # do not lose indirect callable aliases
+        for call in ast.walk(self.tree):
+            if not isinstance(call, ast.Call):
+                continue
+            name = self.call_name(call)
+            if name == "place_component":
+                expressions.append(self.argument(call, 1, "part"))
+            if name == "InsertComponentParameters":
+                expressions.append(self.argument(call, 0, "file_path"))
+            if name == "insert_component":
+                parameters = self.argument(call, 0, "parameters")
+                if (
+                    not isinstance(parameters, ast.Call)
+                    or self.call_name(parameters) != "InsertComponentParameters"
+                ):
+                    self.fail(call)
+            if name != "place_components_batch":
+                continue
+            manifest = self.argument(call, 1, "specs")
+            if isinstance(manifest, ast.Name):
+                for item in self.scope_nodes(manifest):
+                    if (
+                        isinstance(item, ast.For)
+                        and isinstance(item.iter, ast.Name)
+                        and item.iter.id == manifest.id
+                        and isinstance(item.target, ast.Name)
+                    ):
+                        self.validate_row_uses(item)
+            for item in self.items(manifest, frozenset()):
+                if not isinstance(item, ast.Dict) or any(
+                    key is None for key in item.keys
+                ):
+                    self.fail(item)
+                fields = [
+                    value
+                    for key, value in zip(item.keys, item.values)
+                    if isinstance(key, ast.Constant) and key.value == "part"
+                ]
+                if len(fields) != 1:
+                    self.fail(item)
+                expressions.extend(fields)
+        names = set()
+        for expression in expressions:
+            resolved = self.strings(expression)
+            if not resolved:
+                self.fail(expression)
+            names.update(resolved)
+        return frozenset(names)
+
+
+@functools.lru_cache(maxsize=128)
+def _assembly_source_names(source: str) -> frozenset[str]:
+    """Reuse syntax by content, never file time or a previously resolved DAG."""
+    return _AssemblySources(source).collect()
 
 
 def references_of(asm_stem: str) -> list[str]:
@@ -139,7 +542,32 @@ def references_of(asm_stem: str) -> list[str]:
     and the refresh/full decision fall out of the graph.
     """
     candidates = part_stems() + [a for a in ASSEMBLY_ORDER if a != asm_stem]
-    return [stem for stem in candidates if _references(asm_stem, stem)]
+    by_name = {stem.replace("_", "-"): stem for stem in candidates}
+    found = set()
+    source = script_for(asm_stem).read_text(encoding="utf-8")
+    for name in _assembly_source_names(source):
+        name = name.replace("\\", "/").rsplit("/", 1)[-1]
+        name = re.sub(r"\.(?:SLDPRT|SLDASM)$", "", name, flags=re.IGNORECASE)
+        if name in by_name:
+            found.add(by_name[name])
+            continue
+        if name.endswith("*"):
+            prefix = name[:-1]
+            matches = {
+                stem for dashed, stem in by_name.items() if dashed.startswith(prefix)
+            }
+            # In-script variants inherit the longest existing producer family,
+            # not the shorter 'channel' assembly prefix.
+            parents = [dashed for dashed in by_name if prefix.startswith(dashed + "-")]
+            if parents:
+                matches.add(by_name[max(parents, key=len)])
+            if matches:
+                found.update(matches)
+                continue
+        raise ValueError(
+            f"Unresolved assembly source {name!r} in {script_for(asm_stem)}"
+        )
+    return [stem for stem in candidates if stem in found]
 
 
 @functools.lru_cache(maxsize=1)
@@ -653,7 +1081,7 @@ def dependents_of(stem: str) -> list[str]:
     transitive edge -- it propagates through ``<sub>.SLDASM -> harmonic-analyzer
     .SLDASM`` -- so ``references_of`` is the DIRECT inverse only.
     """
-    deps = [asm for asm in ASSEMBLY_ORDER if asm != stem and _references(asm, stem)]
+    deps = [asm for asm in ASSEMBLY_ORDER if asm != stem and stem in references_of(asm)]
     if deps and "harmonic_analyzer" not in deps:
         deps.append("harmonic_analyzer")
     return deps
