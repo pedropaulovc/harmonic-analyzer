@@ -10,6 +10,16 @@ input hashes must remain exact. Existing user documents are never cleared.
 Title position differences are reported, not accepted as a representation
 tolerance. Printed PDF glyph boxes and PNG pixels are independent observations.
 Requires explicit seat grant, expected existing PID and AUTOSTART=0 before dodo.
+
+Control fd172469 stopped before export on 2026-09-06 (trace
+0x4eefc3116de37902a5a5a6c285d64ff1, retained-export-znkfgv80): archived JSON
+arrays were compared directly with live tuple geometry/kind arrays. All six
+serialized attachment gate sections match exactly; only three non-gating raw
+dimension-observation names acquired the unique drawing-copy basename. All 60
+annotation rows match the preceding cold-reopened receipt, with all nine input
+hashes, drawing-copy hash and the two baseline documents preserved. This fixes
+only that archived/live representation boundary, not the native comparator or
+the earlier substantive title-origin failure. No PDF was produced by that run.
 """
 
 from __future__ import annotations
@@ -91,6 +101,63 @@ def require_hashes(expected, phase):
             f"{phase}: protected retained native/output/source hash changed"
         )
     return actual
+
+
+def serialized(value):
+    """Match retained JSON arrays without rounding or changing any leaf value."""
+
+    def require_string_keys(item):
+        if isinstance(item, dict):
+            if any(not isinstance(key, str) for key in item):
+                raise TypeError(
+                    "native snapshot keys must be strings before JSON comparison"
+                )
+            for child in item.values():
+                require_string_keys(child)
+        if isinstance(item, (list, tuple)):
+            for child in item:
+                require_string_keys(child)
+
+    require_string_keys(value)
+    return json.loads(json.dumps(value, allow_nan=False))
+
+
+def compare_archived_drawing(archived, current):
+    canonical = serialized(current)
+    # The native/live comparison function remains unchanged. At this one
+    # persisted-report boundary, both operands must have JSON representation.
+    pilot.attachments.compare(
+        archived["semantics"], canonical["semantics"], "retained cold reopen"
+    )
+    for section in (
+        "checked",
+        "excluded",
+        "models",
+        "dimensions",
+        "dimensions_excluded",
+        "semantic_attachments",
+    ):
+        if changed_leaves(
+            archived["semantics"][section], canonical["semantics"][section]
+        ):
+            raise RuntimeError(
+                f"retained cold reopen: exact serialized {section} witness changed"
+            )
+    pilot.attachments.check_layout(
+        archived["layout"], canonical["layout"], "retained cold reopen"
+    )
+    if archived["annotations"].keys() != canonical["annotations"].keys():
+        raise RuntimeError("retained cold reopen: annotation inventory changed")
+    for name, row in archived["annotations"].items():
+        actual = canonical["annotations"][name]
+        if changed_leaves(row["semantic"], actual["semantic"]):
+            raise RuntimeError(f"{name}: retained annotation semantics changed")
+        if row.get("measurement_exclusion") != actual.get("measurement_exclusion"):
+            raise RuntimeError(f"{name}: retained bounds support changed")
+    # Origin/primitive/layout deltas remain reported in full, not normalized
+    # away or accepted as roundoff. Before/after EXPORT still uses strict live
+    # native comparators and exact handle identity, without this conversion.
+    return audit_pair(archived, canonical)
 
 
 def capture_drawing(adapter, part, configuration):
@@ -281,17 +348,7 @@ async def probe(adapter, receipt, output_root):
             report["source_before"],
             "retained source cold reopen",
         )
-        pilot.attachments.compare(
-            trial["built"]["semantics"],
-            report["before_export"]["semantics"],
-            "retained cold reopen",
-        )
-        pilot.attachments.check_layout(
-            trial["built"]["layout"],
-            report["before_export"]["layout"],
-            "retained cold reopen",
-        )
-        report["built_to_reopened"] = audit_pair(
+        report["built_to_reopened"] = compare_archived_drawing(
             trial["built"], report["before_export"]
         )
         require_hashes(expected, "before PDF export")
@@ -305,15 +362,16 @@ async def probe(adapter, receipt, output_root):
             source_model, "rocker_arm", part
         )
         report["export_delta"] = audit_pair(
-            report["before_export"], report["after_export"]
+            serialized(report["before_export"]), serialized(report["after_export"])
         )
         report["title_delta"] = changed_leaves(
-            report["title_before"], report["title_after"]
+            serialized(report["title_before"]), serialized(report["title_after"])
         )
         render_pdf_png(pdf, png)
         report["reopened_pdf_title"] = pdf_title(pdf)
         report["pdf_title_delta"] = changed_leaves(
-            report["original_pdf_title"], report["reopened_pdf_title"]
+            serialized(report["original_pdf_title"]),
+            serialized(report["reopened_pdf_title"]),
         )
         report["png_delta"] = compare_png(paths["png"], png)
         checkpoint()
