@@ -34,6 +34,7 @@ def repair_project_drawing_layout(
     geometry or substitute for measured final fit. An unfit sheet is not exported.
     """
     from _drawing_annotation_bounds import annotation_box
+    from _drawing_leader_clearance import validate_gtol_leader_clearance
     from _drawing_native_callouts import GtolPlacement, arrange_native_callouts
     from _drawing_native_gtol import arrange_native_gtol_columns
     from _drawing_measurement_handoff import AnnotationMeasurementHandoff
@@ -81,6 +82,7 @@ def repair_project_drawing_layout(
             alignments=alignments,
             orderings=orderings,
             notes=notes,
+            final_annotation_validation=validate_gtol_leader_clearance,
         )
     finally:
         handoff.close()

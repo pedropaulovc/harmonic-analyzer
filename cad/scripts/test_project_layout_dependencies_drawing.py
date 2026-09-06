@@ -19,6 +19,7 @@ PILOTS = {
 }
 NATIVE_LAYOUT_HELPERS = {
     "_drawing_annotation_bounds.py",
+    "_drawing_leader_clearance.py",
     "_drawing_measurement_handoff.py",
     "_drawing_native_callouts.py",
     "_drawing_native_gtol.py",

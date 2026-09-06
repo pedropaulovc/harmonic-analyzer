@@ -22,6 +22,7 @@ class Report:
 @pytest.mark.parametrize("status", list(native.NativeLayoutStatus))
 def test_project_layout_orders_spacing_and_rejects_unfit_sheet(monkeypatch, status):
     from _drawing_annotation_bounds import annotation_box
+    from _drawing_leader_clearance import validate_gtol_leader_clearance
 
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
     sheet = SimpleNamespace(GetProperties2=lambda: (8, 12, 1, 1, 0, 0.4318, 0.2794, 0))
@@ -88,6 +89,7 @@ def test_project_layout_orders_spacing_and_rejects_unfit_sheet(monkeypatch, stat
         "alignments": alignments,
         "orderings": orderings,
         "notes": notes,
+        "final_annotation_validation": validate_gtol_leader_clearance,
     }
 
 
