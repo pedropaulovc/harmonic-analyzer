@@ -82,7 +82,12 @@ def policy_setup(monkeypatch, *, initial_shoulder=False, mode="ordinary"):
         leaders,
         "_installed_swconst",
         lambda: SimpleNamespace(
-            swDetailingAnnotationBentLeaderLength=113, swDetailingNoOptionSpecified=0
+            swDetailingAnnotationBentLeaderLength=113,
+            swDetailingNoOptionSpecified=0,
+            swDetailingGtolUseDocBentLeaderLength=377,
+            swDetailingGtolBentLeaderLength=114,
+            swDetailingSFSymbolUseDocBentLeaderLength=379,
+            swDetailingSFSymbolBentLeaderLength=115,
         ),
     )
     datum.specific.Shoulder = initial_shoulder
@@ -95,7 +100,15 @@ def policy_setup(monkeypatch, *, initial_shoulder=False, mode="ordinary"):
         1.0,
     )
     state = SimpleNamespace(
-        length=0.00635, writes=[], rebuilds=0, snapshots=[], events=[], mode=mode
+        length=0.00635,
+        writes=[],
+        rebuilds=0,
+        snapshots=[],
+        events=[],
+        mode=mode,
+        inheritance={377: True, 379: True},
+        family_lengths={114: 0.012, 115: 0.015},
+        family_writes=[],
     )
     dimension = NativeAnnotation(4)
     dimension.Owner = view
@@ -103,6 +116,13 @@ def policy_setup(monkeypatch, *, initial_shoulder=False, mode="ordinary"):
     annotations.append(dimension)
 
     def set_length(preference, option, value):
+        if preference != 113:
+            state.family_writes.append((preference, option, value))
+            if mode == "family_reject":
+                return False
+            if mode != "family_ignore":
+                state.family_lengths[preference] = value
+            return True
         state.writes.append((preference, option, value))
         state.events.append("write")
         if mode == "reject":
@@ -124,11 +144,33 @@ def policy_setup(monkeypatch, *, initial_shoulder=False, mode="ordinary"):
 
     def rebuild():
         state.rebuilds += 1
+        if mode == "family_drift_after_rebuild":
+            state.family_lengths[114] += 0.001
         return mode != "rebuild_rejected"
 
+    def get_length(preference, option):
+        if preference == 113:
+            return state.length
+        toggle = {114: 377, 115: 379}[preference]
+        return (
+            state.length
+            if state.inheritance[toggle]
+            else state.family_lengths[preference]
+        )
+
+    def set_toggle(preference, option, value):
+        state.family_writes.append((preference, option, value))
+        if mode != "family_toggle_ignore":
+            state.inheritance[preference] = value
+        return True  # observed native result even when the actual value is False
+
     adapter.currentModel.Extension = SimpleNamespace(
-        GetUserPreferenceDouble=lambda *_: state.length,
+        GetUserPreferenceDouble=get_length,
         SetUserPreferenceDouble=set_length,
+        GetUserPreferenceToggle=lambda preference, option: state.inheritance[
+            preference
+        ],
+        SetUserPreferenceToggle=set_toggle,
     )
     adapter.currentModel.EditRebuild3 = rebuild
 
@@ -137,6 +179,9 @@ def policy_setup(monkeypatch, *, initial_shoulder=False, mode="ordinary"):
         state.snapshots.append((annotation, state.length))
         measured = base_measure(native_adapter, annotation)
         measured.envelope = measured.body
+        measured.leader_segments = ()
+        measured.native_leader_segments = ()
+        measured.leader_decorations = ()
         if annotation is not datum:
             return measured
         if not datum.specific.Shoulder:
@@ -242,6 +287,7 @@ def test_same_side_overlapping_datums_fail_before_global_write(monkeypatch):
         view,
         leaders._context(view),
         {"A": original, "B": replace(original, name="B")},
+        {},
         {},
         {},
     )
@@ -382,3 +428,162 @@ def test_gtol_xml_witness_uses_documented_one_based_indices(monkeypatch):
         "gtol": ('<gtol value="0.2"></gtol>',) * 2
     }
     assert indices == [1, 2]
+
+
+@pytest.mark.parametrize(
+    "gtol_inherited,sf_inherited",
+    [(True, True), (True, False), (False, True), (False, False)],
+)
+def test_family_defaults_preserve_each_initial_effective_length_with_one_rebuild(
+    monkeypatch, gtol_inherited, sf_inherited
+):
+    *_, state, measure, run = policy_setup(monkeypatch)
+    state.length = 0.011  # deliberately not the6.35mm diagnostic control value
+    state.inheritance = {377: gtol_inherited, 379: sf_inherited}
+    expected = {
+        114: 0.011 if gtol_inherited else 0.012,
+        115: 0.011 if sf_inherited else 0.015,
+    }
+    run()
+    assert state.inheritance == {377: False, 379: False}
+    assert state.family_lengths == expected
+    assert len(state.family_writes) == 2 * (int(gtol_inherited) + int(sf_inherited))
+    assert state.rebuilds == 1
+
+
+@pytest.mark.parametrize(
+    "mode",
+    [
+        "family_toggle_ignore",
+        "family_reject",
+        "family_ignore",
+        "family_drift_after_rebuild",
+    ],
+)
+def test_family_default_true_cannot_hide_ignored_or_drifting_native_definition(
+    monkeypatch, mode
+):
+    *_, run = policy_setup(monkeypatch, mode=mode)
+    with pytest.raises(RuntimeError, match="family"):
+        run()
+
+
+def test_zero_required_extension_leaves_all_family_definitions_and_rebuild_untouched(
+    monkeypatch,
+):
+    *_, state, measure, run = policy_setup(monkeypatch)
+    monkeypatch.setattr(leaders, "shared_increase", lambda *_: 0.0)
+    run()
+    assert state.family_writes == [] and state.writes == [] and state.rebuilds == 0
+    assert state.inheritance == {377: True, 379: True}
+
+
+def add_family_annotations(view):
+    class FamilyAnnotation(NativeAnnotation):
+        @property
+        def BentLeaderLength(self):
+            return self.native_override
+
+        @BentLeaderLength.setter
+        def BentLeaderLength(self, value):
+            raise AssertionError(
+                "production policy must never write individual overrides"
+            )
+
+    sf, gtol = FamilyAnnotation(7), FamilyAnnotation(5)
+    sf.native_override, gtol.native_override = -1.0, 0.019
+    frame = SimpleNamespace(GetSymbolXml=lambda: '<gtol value="0.2"/>')
+    gtol.specific.GetFrameCount = lambda: 1
+    gtol.specific.GetFrame = lambda index: frame
+    for item in (sf, gtol):
+        item.Owner = view
+        item.position = (0.3, 0.3, 0)
+    inventory = (*view.GetAnnotations(), sf, gtol)
+    view.GetAnnotations = lambda: inventory
+    view.GetAnnotationsByType = lambda kind: tuple(
+        a for a in inventory if a.kind == kind
+    )
+    return sf, gtol
+
+
+def test_individual_overrides_and_document_driven_minus_one_are_read_only(monkeypatch):
+    adapter, view, datum, dimension, state, measure, run = policy_setup(monkeypatch)
+    sf, gtol = add_family_annotations(view)
+    run()
+    assert (sf.BentLeaderLength, gtol.BentLeaderLength) == (-1.0, 0.019)
+    assert state.rebuilds == 1
+    # The stronger primitive/override comparisons consume the original two
+    # measurement banks; no additional native stroke/text measurement pass.
+    assert sum(item is sf for item, _ in state.snapshots) == 2
+    assert sum(item is gtol for item, _ in state.snapshots) == 2
+
+
+@pytest.mark.parametrize("target", ["sf", "gtol"])
+def test_changed_annotation_override_fails_even_if_primitive_geometry_is_unchanged(
+    monkeypatch, target
+):
+    adapter, view, datum, dimension, state, measure, run = policy_setup(monkeypatch)
+    sf, gtol = add_family_annotations(view)
+    original_rebuild = adapter.currentModel.EditRebuild3
+
+    def rebuild():
+        returned = original_rebuild()
+        (sf if target == "sf" else gtol).native_override = 0.023
+        return returned
+
+    adapter.currentModel.EditRebuild3 = rebuild
+    with pytest.raises(RuntimeError, match="annotation length override changed"):
+        run()
+
+
+@pytest.mark.parametrize("kind", [4, 5, 7])
+@pytest.mark.parametrize(
+    "field",
+    [
+        "native_strokes",
+        "leader_segments",
+        "native_leader_segments",
+        "leader_decorations",
+    ],
+)
+def test_final_non_datum_primitive_drift_rejected_with_identical_body_and_content(
+    monkeypatch, kind, field
+):
+    adapter, view, datum, dimension, state, measure, run = policy_setup(monkeypatch)
+    sf, gtol = add_family_annotations(view)
+    target = {4: dimension, 5: gtol, 7: sf}[kind]
+
+    def measured(native_adapter, annotation):
+        actual = measure(native_adapter, annotation)
+        if annotation is target:
+            delta = 0.001 if state.writes else 0.0
+            primitive = (
+                Rect(0.02, 0.04, 0.021 + delta, 0.041)
+                if field == "leader_decorations"
+                else Segment((0.02, 0.04), (0.021 + delta, 0.041), 0.00018)
+            )
+            setattr(actual, field, (primitive,))
+        return actual
+
+    with pytest.raises(RuntimeError, match=f"non-datum native {field}"):
+        leaders.prepare_document_datum_leaders(
+            adapter,
+            views={"front": view},
+            measure=measured,
+            planning_gap_m=0.003,
+            declared_notes={},
+            gtol_placement=callouts.GtolPlacement.ARRANGED_NEXT,
+        )
+
+
+@pytest.mark.parametrize("value", [0, -1, float("nan"), float("inf")])
+def test_invalid_independent_family_length_fails_before_any_style_or_preference_write(
+    monkeypatch, value
+):
+    adapter, view, datum, dimension, state, measure, run = policy_setup(monkeypatch)
+    state.inheritance[377] = False
+    state.family_lengths[114] = value
+    with pytest.raises(RuntimeError, match="family length is not positive/finite"):
+        run()
+    assert datum.specific.Shoulder is False
+    assert state.writes == state.family_writes == []
