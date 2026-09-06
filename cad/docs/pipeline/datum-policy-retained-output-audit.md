@@ -59,13 +59,39 @@ y=0.17966130952459589 ends at x=0.20924696752879507, also inside that cell.
 These are actual native line/frame coordinates, not conservative font bounds.
 The `133.07` BASIC dimension remains below the part.
 
-Current `_drawing_leader_clearance.validate_gtol_leader_clearance` constructs
+At the tested `0bb29b0c`, `_drawing_leader_clearance.validate_gtol_leader_clearance` constructs
 leader banks only for kind-5 GTols, then checks those leaders against other text
 cells. The reverse dimension-leader-to-GTol-frame/symbol collision is not checked.
 GTol placement uses dimension **bodies**, which intentionally exclude extension
 lines. Therefore existing body and one-direction leader checks can pass this
 real collision. A future repair needs symmetric dimension-stroke/frame checking
 and a native-placement candidate; skipping the first symbol cell is not a fix.
+
+### Correction under test
+
+The revised planner includes already-measured open strokes and decorations from
+the existing datum/dimension/surface-finish obstacle inventory, in addition to
+their bodies. Moving GTol candidates also check whole neighbouring GTol bodies,
+not just font cells, so blank symbol/frame areas are not holes in the witness.
+The fresh final checker tests all captured displayed strokes and native leader
+routes against every other GTol body; it exempts only the exact annotation's own
+join. This covers dimensions, other GTols, centermarks and centerlines without
+new COM calls or full annotation reads. The original implementation accepts the
+captured RD3/frame fixture; the revised one rejects it. Native re-layout and
+visual validation of the revised policy remain pending.
+
+Planning uses conservative axis-aligned stroke envelopes to retain the bounded
+existing candidate search. A diagonal envelope can block a genuinely clear
+position, producing longer leaders or a false no-fit. It is not an exact
+segment-aware placement solver, and its fleet rejection rate is not established.
+Zero-width native strokes get only an adjacent-representable-float enclosure;
+no physical line width is invented. The production 2 mm clearance supplies the
+gap. At a zero requested gap, the candidate's numerical tolerance can permit
+touching that the closed-segment final check rejects; zero-gap placement is not
+validated by this correction. The final checker still fails closed. Centerline
+and cosmetic-thread geometry is checked in the complete final inventory but
+has not been added to the narrower candidate inventory, avoiding new COM scans;
+a collision involving it can therefore fail instead of being automatically moved.
 
 ## Safety and remaining proof
 
