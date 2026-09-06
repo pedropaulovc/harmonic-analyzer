@@ -43,6 +43,16 @@ def repair_project_drawing_layout(
     from dataclasses import asdict
     import json
 
+    def validate_final_annotations(measurements_by_view):
+        clearance = validate_gtol_leader_clearance(measurements_by_view)
+        for view, result in clearance.items():
+            _telemetry.info(
+                "final native GTol clearance witnessed",
+                view=view,
+                clearance_report=json.dumps(result),
+                measurement_source="fresh_final_packing",
+            )
+
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
     sheet = _early_bound(drawing.GetCurrentSheet(), "ISheet")
     properties = tuple(sheet.GetProperties2() or ())
@@ -82,7 +92,7 @@ def repair_project_drawing_layout(
             alignments=alignments,
             orderings=orderings,
             notes=notes,
-            final_annotation_validation=validate_gtol_leader_clearance,
+            final_annotation_validation=validate_final_annotations,
         )
     finally:
         handoff.close()
