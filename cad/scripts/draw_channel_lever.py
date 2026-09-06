@@ -17,8 +17,9 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 import sys
-from typing import Any
+from typing import Any, Callable
 
 from channel_lever_spec import GEOMETRIC_TOLERANCES_MM
 
@@ -179,11 +180,18 @@ def _model_entities(model: Any) -> dict[str, Any]:
     )
 
 
-async def build(adapter: Any) -> dict[str, str]:
-    if not SOURCE.is_file():
-        raise FileNotFoundError(f"source part is missing: {SOURCE}")
+async def build(
+    adapter: Any,
+    *,
+    source: Path = SOURCE,
+    outputs: DrawingOutputs = OUTPUTS,
+    layout: Callable = repair_project_drawing_layout,
+) -> dict[str, str]:
+    """Build the real recipe; explicit inputs also permit isolated diagnostics."""
+    if not source.is_file():
+        raise FileNotFoundError(f"source part is missing: {source}")
 
-    check("open channel-lever source", await adapter.open_model(str(SOURCE)))
+    check("open channel-lever source", await adapter.open_model(str(source)))
     read_required_properties(
         adapter.currentModel,
         (
@@ -220,13 +228,13 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
 
-    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
-    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(1, 1))
+    front = place_view(adapter, str(source), "*Front", *FRONT_CENTER, scale=(1, 1))
+    right = place_view(adapter, str(source), "*Right", *RIGHT_CENTER, scale=(1, 1))
     # Top view (2026-09-02): the integral O12 x 7.06 fulcrum hub hides the whole
     # 3 x 9.5 plate section in the end view, so the plate thickness and the
     # broad-face datum are read here, along the length clear of the hub.
-    top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 1))
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 4))
+    top = place_view(adapter, str(source), "*Top", *TOP_CENTER, scale=(1, 1))
+    iso = place_view(adapter, str(source), "*Isometric", *ISO_CENTER, scale=(1, 4))
     for view in (right, top, iso):
         set_hidden_lines_removed(adapter, view)
     set_hidden_lines_visible(adapter, front)
@@ -401,7 +409,7 @@ async def build(adapter: Any) -> dict[str, str]:
     from _drawing_native_layout import AxisLink, LayoutNote
     from _drawing_view_packing import Axis, AxisOrder
 
-    repair_project_drawing_layout(
+    layout(
         adapter,
         views={"front": front, "right": right, "top": top, "iso": iso},
         alignments=(
@@ -419,7 +427,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     return await finalize_drawing(
         adapter,
-        OUTPUTS,
+        outputs,
         pdf_title="Channel Lever Manufacturing Drawing",
         scale=SHEET_SCALE,
     )
