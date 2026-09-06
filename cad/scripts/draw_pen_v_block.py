@@ -5,8 +5,8 @@ views, dimension layout, hole callouts, and manufacturing notes; every shared
 sheet/template, import, curation, and export behavior lives in
 ``_drawing_common``.
 
-The sheet runs at 4:1 (the block is 32 mm end to end); the isometric carries an
-explicit 2:1 override so it stays clear of the title block.
+The orthographic views run at 3:1 to leave room for the measured annotation
+footprints. The isometric carries an explicit 2:1 override.
 
 Run with SolidWorks open::
 
@@ -76,26 +76,15 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (4.0, 1.0)
+SHEET_SCALE = (3.0, 1.0)
 
-# Sheet layout (meters).  The front view's model bbox is 32 x 18 mm; at 4:1 the
-# view is 128 x 72 mm.  Third angle: the top view (block seen from above,
-# carrying the two pen bores) sits ABOVE the front view; the right view (16 x 18
-# stock section) sits to its right.
+# Initial view locations (meters), not attachment identities or final layout.
+# The measured layout keeps top above front and right beside front. At 4:1,
+# their decorated footprints cannot clear both the title block and top border.
 FRONT_CENTER = (0.130, 0.115)
 TOP_CENTER = (0.130, 0.215)
 RIGHT_CENTER = (0.265, 0.115)
 ISO_CENTER = (0.360, 0.225)
-
-
-def _sheet_x(model_x_mm: float) -> float:
-    """Sheet X of a model-X point in the front/top views (4:1, bbox-centred)."""
-    return FRONT_CENTER[0] + (model_x_mm - BLOCK_LENGTH / 2.0) * SHEET_SCALE[0] / 1000.0
-
-
-def _front_y(model_y_mm: float) -> float:
-    """Sheet Y of a model-Y point in the front view (4:1, bbox-centred)."""
-    return FRONT_CENTER[1] + (model_y_mm - BLOCK_HEIGHT / 2.0) * SHEET_SCALE[0] / 1000.0
 
 
 # Per-view model-dimension identities. SolidWorks arranges their text after
@@ -119,9 +108,8 @@ RIGHT_KEEP = (
     "GrooveDepth",
 )
 
-# Right-view half extents at 4:1: the 16 (Z) x 18 (Y) stock section.
+# Initial dimension-text seed; native arrangement chooses its final location.
 RIGHT_HALF_Z = BLOCK_DEPTH / 2.0 * SHEET_SCALE[0] / 1000.0
-RIGHT_HALF_Y = BLOCK_HEIGHT / 2.0 * SHEET_SCALE[0] / 1000.0
 DIMENSION_CALLOUTS = {
     "Bore0Dia": "2X THRU",
     "ScrewHoleDiaDim": "THRU",
@@ -169,11 +157,10 @@ async def build(adapter: Any) -> dict[str, str]:
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
-    # Explicit per-view scale: a view placed without one can silently
-    # auto-scale, which shifts every coordinate-based pick on it.
-    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(4, 1))
-    top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(4, 1))
-    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(4, 1))
+    # Pin the requested print scales; attachment lookup uses model entities.
+    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(3, 1))
+    top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(3, 1))
+    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(3, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2, 1))
     for view in (right, iso):
         set_hidden_lines_removed(adapter, view)
@@ -210,9 +197,8 @@ async def build(adapter: Any) -> dict[str, str]:
         if display is None:
             raise RuntimeError(f"{station} station has no display dimension to box")
         set_basic_dimension(adapter, display, label=f"{station} basic bore station")
-    # Block height (18): dimension the right view's flat top/bottom silhouette
-    # edges.  At 4:1 the 16 x 18 section spans +/-0.032 (Z) x +/-0.036 (Y)
-    # around the view center. The bottom edge is interrupted by the marker
+    # Block height: dimension the right view's flat top/bottom silhouette
+    # edges. The bottom edge is interrupted by the marker
     # groove (GROOVE_Z0..GROOVE_Z0 + GROOVE_WIDTH across the depth), so pick
     # it on the remaining land beside the groove, not at mid-depth.
     entities = ModelEntities(front.ReferencedDocument).resolve(
@@ -310,17 +296,8 @@ async def build(adapter: Any) -> dict[str, str]:
         label="pen bore finish (bore 1)",
     )
 
-    # x=0.020: the anchor is the text's left edge, so the ink starts here. The
-    # sheet's 0.0127 zone margin and the re-centred border rule (~0.0126) now
-    # agree, so 0.020 clears the rule and the audit enforces the same bound.
-    # y=0.046, not 0.070: this block is SIX lines (26.6 mm tall, anchored at its
-    # top line) and the front view's bottom edge is only at y=0.079, so anchoring
-    # it at 0.070 overlapped the whole 32.00/26.00 locator chain -- both dimension
-    # lines span the view's full width and printed through the note text like
-    # strikethrough. Dimensions are CollisionScope.NONE, so no gate sees this.
-    # 0.046 drops the block clear below the 32.00 text (bottom y 0.055) while
-    # keeping its own bottom at 0.0194 -- ~6.8 mm above the drawn bottom rule
-    # (~0.0126, now on the declared 12.7 mm margin).
+    # Native note extents participate in the measured layout. These are seeds;
+    # the manufacturing note moves independently and the caption follows iso.
     manufacturing = add_property_linked_note(
         adapter, "Manufacturing Notes", 0.020, 0.046
     )

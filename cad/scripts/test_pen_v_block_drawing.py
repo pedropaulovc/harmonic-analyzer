@@ -47,10 +47,10 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert {"ScrewHoleCx", "ScrewHoleCz", "ScrewHoleDiaDim"} <= set(drawing.FRONT_KEEP)
 
 
-def test_sheet_runs_at_4_to_1_with_2_to_1_isometric() -> None:
-    assert drawing.SHEET_SCALE == (4.0, 1.0)
+def test_sheet_runs_at_3_to_1_with_2_to_1_isometric() -> None:
+    assert drawing.SHEET_SCALE == (3.0, 1.0)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("scale=(4, 1)") == 3
+    assert source.count("scale=(3, 1)") == 3
     assert source.count("scale=(2, 1)") == 1  # the isometric override
     assert pen_v_block_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 2:1"
     assert "Isometric View Note" in linked_note_properties(source)
