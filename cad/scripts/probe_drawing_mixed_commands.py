@@ -91,9 +91,85 @@ def unchanged(adapter, before, before_native, after, after_native):
             raise RuntimeError("mixed command changed exact attachment identity")
 
 
+def leader_position_trials(adapter, view, before, native):
+    """Probe axis-aligned moves derived from the actual view and native body."""
+    outline = tuple(view.GetOutline())
+    rows = []
+    for key, (annotation, _entities) in native.items():
+        kind = before[key]["kind"]
+        if kind not in {2, 7}:
+            continue
+        row = {"key": key, "kind": kind, "outline": outline, "moves": []}
+        rows.append(row)
+        original = tuple(annotation.GetPosition())
+        if kind == 7:
+            row["leader_status"] = annotation.SetLeader3(
+                2, 0, True, False, False, False
+            )
+            row["leader_style"] = annotation.GetLeaderStyle()
+            if row["leader_status"] != 0 or row["leader_style"] != 2:
+                raise RuntimeError("native SF bent-leader setting rejected")
+        body = annotation_box(adapter, annotation).body
+        offsets = (
+            body.xmin - original[0],
+            body.ymin - original[1],
+            body.xmax - original[0],
+            body.ymax - original[1],
+        )
+        gap = 0.003
+        targets = (
+            ("above", (original[0], outline[3] + gap - offsets[1], original[2])),
+            ("below", (original[0], outline[1] - gap - offsets[3], original[2])),
+            ("left", (outline[0] - gap - offsets[2], original[1], original[2])),
+            ("right", (outline[2] + gap - offsets[0], original[1], original[2])),
+        )
+        accepted = []
+        for direction, target in targets:
+            result = annotation.SetPosition2(*target)
+            actual = tuple(annotation.GetPosition())
+            measured = annotation_box(adapter, annotation)
+            row["moves"].append(
+                {
+                    "direction": direction,
+                    "target": target,
+                    "return": result,
+                    "actual": actual,
+                    "target_error_m": math.dist(actual, target),
+                    "sheet_target_error_m": math.dist(actual[:2], target[:2]),
+                    "bounds": asdict(measured),
+                    "leaders": [
+                        tuple(annotation.GetLeaderPointsAtIndex(i) or ())
+                        for i in range(int(annotation.GetLeaderCount()))
+                    ],
+                }
+            )
+            if result and math.dist(actual[:2], target[:2]) < 1e-8:
+                accepted.append((direction, target))
+            if (
+                not annotation.SetPosition2(*original)
+                or math.dist(tuple(annotation.GetPosition())[:2], original[:2]) > 1e-8
+            ):
+                raise RuntimeError(
+                    "native datum/SF original position could not be restored"
+                )
+        if accepted:
+            row["retained_direction"], target = accepted[0]
+            if (
+                not annotation.SetPosition2(*target)
+                or math.dist(tuple(annotation.GetPosition())[:2], target[:2]) > 1e-8
+            ):
+                raise RuntimeError("native datum/SF accepted target did not repeat")
+        after, after_native = snapshot(adapter, view)
+        unchanged(adapter, before, native, after, after_native)
+    return rows
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("drawing", type=Path)
+    parser.add_argument(
+        "--mode", choices=("commands", "leader_position"), default="commands"
+    )
     parser.add_argument("--worker", action="store_true")
     args = parser.parse_args()
     source = args.drawing.resolve(strict=True)
@@ -102,7 +178,14 @@ def main() -> int:
         import dodo
 
         dodo._run(
-            [sys.executable, str(Path(__file__).resolve()), str(source), "--worker"],
+            [
+                sys.executable,
+                str(Path(__file__).resolve()),
+                str(source),
+                "--mode",
+                args.mode,
+                "--worker",
+            ],
             "mixed native annotation commands",
             log_stem="mixed-annotation-commands",
             com=True,
@@ -157,7 +240,13 @@ def main() -> int:
             report["view"] = view.GetName2()
             report["before"] = before
             original, original_native = before, native
-            for command in (317, 307):
+            if args.mode == "leader_position":
+                if not drawing.ActivateView(view.GetName2()):
+                    raise RuntimeError("native datum/SF view activation rejected")
+                report["leader_position_trials"] = leader_position_trials(
+                    adapter, view, before, native
+                )
+            for command in (317, 307) if args.mode == "commands" else ():
                 if not drawing.ActivateView(view.GetName2()):
                     raise RuntimeError("mixed native view activation rejected")
                 adapter.currentModel.ClearSelection2(True)
