@@ -112,3 +112,45 @@ text positions before and after one production PDF export, render to a unique
 PNG, and compare with the retained original PDF/PNG offline. This separates
 printed output from cached observations without rebuilding the recipe. It needs
 source review and a new explicit COM-seat grant.
+
+## No-setter export result — printed motion confirmed
+
+The follow-up control at `f07bf85556531c5857e1275264ee028b5ab50440` completed
+successfully: session 36917, trace `0x223ed7481f353050e82d4c29be052356`,
+76.516872 s. The single production PDF-only export took 2.201 s and PNG rendering
+0.271 s. No native drawing/source save, rebuild, relink, layout/default or
+annotation setter was used. Receipt:
+`C:/src/ha-perf-datum-functional/cad/out/reports/retained-export-ca311q5b/retained-export.json`,
+SHA-256 `4d990d172460fd2ef85507daea2996cbb8f8931ed9a84eebb4f7e2bcd31c7d02`.
+
+**The earlier title difference changes the printed layout.** PDFium measured all
+ten title characters about 20.480957 points (7.225226508 mm) farther right in the
+newly reopened export. Text and Y coordinates are unchanged. The native
+7.225209847 mm text-origin change agrees with that printed displacement to the
+precision of the PDF glyph boxes. The title's left/right glyph ink bounds move
+from [1004.138671875, 1105.9906005859375] points to
+[1024.61962890625, 1126.4715576171875] points.
+
+The PNG comparison finds 11,232 changed pixels, all inside the title region
+[4183, 2749, 4694, 2813] on the 5100-by-3300 image. Everything outside that region
+is pixel-identical. The reopened title remains readable. The existing RD3/GTol
+collision is unchanged, so this is still **not** whole-sheet visual acceptance.
+Generated PDF SHA-256:
+`856498e96ca1bb3a95b4199787ded1a693b3b8de0e3aeda91290cd30cb8c2133`;
+PNG: `37c1d7f647a7608cf015d93b43fa9d747d354c817662398daf905f34ec56137d`.
+
+Before versus after this one export, the full fresh native snapshot has zero
+changed leaves, and the title's ordinary getters are exact. The cold reopen had
+already established the changed text origin. `INote.GetTextJustification` is 2
+(center); vertical justification is 0 (top), and `PropertyLinkedText` is
+`$PRPSHEET:"SW-Title(Title)"`. Extent, anchor and text remain as previously recorded.
+This result rejects the hypothesis that only a harmless observation changed;
+it does **not** yet establish which cheaper native update boundary can stabilize
+linked-note layout before the original recipe export.
+
+All nine protected file hashes and the drawing-copy hash remain exact. The three
+source parameters now also match the retained source snapshot on cold reopen and
+retain exact native identities/values/tolerance types through export. All fresh
+attachment, dimension, annotation-handle and view-layout gates pass. Cleanup
+preserved the clean visible lever part and dirty visible unsaved Draw2, with no
+cleanup error. No second native invocation followed this completed control.
