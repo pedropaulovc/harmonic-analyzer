@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 import shutil
 import sys
@@ -48,6 +49,8 @@ def main() -> int:
             "drawing dimension selection probe", log_stem="drawing-dimension-selection-probe", com=True,
         )
         return 0
+    if not os.environ.get("HARMONIC_COM_SEAT"):
+        raise RuntimeError("--worker requires the machine-global COM seat; invoke the probe without --worker")
 
     async def probe(adapter: Any) -> dict[str, str]:
         report_root = CAD_ROOT / "out/reports"
