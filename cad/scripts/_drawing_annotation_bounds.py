@@ -526,6 +526,7 @@ def _native_snapshot(annotation: Any, extension: Any = None) -> NativeSnapshot:
                 raise ValueError("native print line weight must be positive")
         lines.append(Segment(raw[4:6], raw[7:9], width))
     boxes = []
+    arc_leader_candidates = []
     for index in range(int(data.GetArcCount())):
         raw = tuple(data.GetArcAtIndex2(index))
         if len(raw) != 17 or abs(raw[13]) > 1e-8 or abs(raw[14]) > 1e-8:
@@ -533,6 +534,10 @@ def _native_snapshot(annotation: Any, extension: Any = None) -> NativeSnapshot:
         radius = math.dist(raw[4:6], raw[10:12])
         boxes.append(
             Rect(raw[10] - radius, raw[11] - radius, raw[10] + radius, raw[11] + radius)
+        )
+        # Only a complete native circle can be an all-around leader adornment.
+        arc_leader_candidates.append(
+            (raw[10:12], math.dist(raw[4:7], raw[7:10]) <= _GEOMETRY_EPSILON_M)
         )
     for index in range(int(data.GetPolyLineCount())):
         raw = tuple(data.GetPolylineAtIndex2(index))
@@ -542,13 +547,31 @@ def _native_snapshot(annotation: Any, extension: Any = None) -> NativeSnapshot:
         points = tuple((raw[7 + i * 3], raw[8 + i * 3]) for i in range(count))
         lines.extend(Segment(a, b) for a, b in zip(points, points[1:]))
     leaders = []
+    elbows = []
     for index in range(int(annotation.GetLeaderCount())):
         raw = tuple(annotation.GetLeaderPointsAtIndex(index) or ())
         if len(raw) not in {6, 9}:
             raise ValueError("native leader must expose two or three XYZ points")
         points = tuple((raw[i], raw[i + 1]) for i in range(0, len(raw), 3))
         leaders.extend(Segment(a, b) for a, b in zip(points, points[1:]))
+        if len(points) == 3:
+            elbows.append(points[1])
     leader_boxes = []
+    if kind == 5 and boxes and elbows and annotation.GetLeaderAllAround():
+        body_boxes = []
+        for box, (center, complete_circle) in zip(
+            boxes, arc_leader_candidates, strict=True
+        ):
+            if complete_circle and any(
+                math.dist(center, elbow) <= _GEOMETRY_EPSILON_M for elbow in elbows
+            ):
+                # Live channel-lever witness: the all-around circle moves with
+                # the native elbow when the leader switches side. Its bounds
+                # belong to the decorated envelope, never the rigid GTol body.
+                leader_boxes.append(box)
+                continue
+            body_boxes.append(box)
+        boxes = body_boxes
     for index in range(int(data.GetTriangleCount())):
         raw = tuple(data.GetTriangleAtIndex(index))
         if len(raw) != 11:
