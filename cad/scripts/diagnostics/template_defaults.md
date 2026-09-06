@@ -187,3 +187,34 @@ All owned documents closed, the original template hash stayed unchanged, and
 the visible baseline part plus dirty Draw2 were preserved with no cleanup error.
 Using the proven legacy call changes only one-time preparation; both timed recipe
 arms retain the production save/export implementation unchanged.
+
+## Empty linked-note extent observation
+
+At `396792e5`, the styled DRWDOT saved successfully, then preparation stopped
+before any recipe at the full new-from-template comparison. Exactly ten notes
+with empty resolved text and retained property-link expressions changed native
+extents; some widths collapsed from tens of millimetres to zero. All units,
+dimension style scopes, sheet properties/mode and nonempty measured notes matched.
+This falsifies the blanket assumption that every empty linked-note extent is
+stable across template instantiation. It is not a rounding/tolerance finding.
+The failed 31.425-second preparation and full before/after data are in
+`template-abba-vnh3intp/measurements.json`; original hashes and baseline documents
+remained preserved.
+
+The benchmark now has an explicit narrow classification, evaluated from fresh
+native data rather than inferred from empty `INote.GetText`: an empty linked note
+must expose zero counts in all ten IDisplayData primitive inventories, zero
+ordinary and multi-jog leaders, one non-rich native font definition and a finite
+native XYZ anchor. Otherwise the diagnostic refuses the classification. Native
+line/frame/text/leader content cannot disappear behind this extent exclusion.
+No note names, expected count of ten, geometric coordinates or tolerances select
+the classification.
+
+For notes satisfying that proof, raw extents and native names remain under
+`blank_linked_extent_observations`; the semantic multiset retains exact link
+expression, visibility, multiplicity, native counts, leaders, anchor, font and
+document-format inheritance. Only that raw observation field is excluded from
+defaults comparison. Empty unlinked notes and every nonempty/resolved note keep
+their existing exact extent/content comparison. The next controlled native run
+must prove or reject the new classification; the preceding observation did not
+capture native primitive inventories and is not itself no-ink evidence.
