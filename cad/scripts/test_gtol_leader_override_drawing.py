@@ -131,6 +131,21 @@ def test_setup_refuses_hidden_docs_and_source_filename_collision(
     assert state.closes == []
 
 
+def test_exact_owned_path_cannot_close_a_colliding_native_title(monkeypatch, tmp_path):
+    adapter, state, directory, part, document, activate, _, unsaved, source = setup(
+        monkeypatch, tmp_path
+    )
+    owned = probe.ExistingSessionCopy(adapter, directory, part, source)
+    path = directory / "trial.SLDDRW"
+    owned.expect_open(path)
+    copy = document(path)
+    copy.GetTitle = lambda: unsaved.GetTitle()
+    activate(copy)
+    with pytest.raises(RuntimeError, match="uniquely"):
+        owned.claim()
+    assert state.closes == []
+
+
 def observed(length):
     return {
         "key": "Drawing View1/GTol1",

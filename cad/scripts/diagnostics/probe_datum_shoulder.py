@@ -45,7 +45,10 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "cad/scripts"))
 
 from _common import _early_bound, check  # noqa: E402
-from diagnostics._owned_native_session import run_owned_diagnostic  # noqa: E402
+from diagnostics._owned_native_session import (  # noqa: E402
+    require_owned_diagnostic_environment,
+    run_owned_diagnostic,
+)
 from _drawing_view_packing import Rect  # noqa: E402
 from _drawing_annotation_bounds import (  # noqa: E402
     _native_snapshot,
@@ -194,6 +197,19 @@ class OwnedDrawingCopy:
             raise RuntimeError("owned drawing native title changed unexpectedly")
         self.titles[path] = title
         self._inventory(current)
+        title_matches = [
+            document
+            for document in self.app.GetDocuments() or ()
+            if str(_early_bound(document, "IModelDoc2").GetTitle()).casefold()
+            == title.casefold()
+        ]
+        if (
+            len(title_matches) != 1
+            or int(self.app.IsSame(title_matches[0], current)) != 1
+        ):
+            raise RuntimeError(
+                "owned native title does not uniquely identify the scoped close target"
+            )
         return current
 
     def claim(self):
@@ -781,6 +797,7 @@ def main():
     )
     parser.add_argument("--worker", action="store_true")
     args = parser.parse_args()
+    require_owned_diagnostic_environment()
     source = args.drawing.resolve(strict=True)
     part = args.part.resolve(strict=True) if args.part is not None else None
     if source.name.lower() != "rocker-arm.slddrw" and part is None:
