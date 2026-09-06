@@ -1,7 +1,9 @@
 """No-setter retained exports must preserve source files and user documents."""
 
 import ast
+import copy
 import json
+import math
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -128,6 +130,97 @@ def test_no_layout_setter_or_rebuild_or_native_save_in_control_source():
     ]
 
 
+def archived_pair():
+    current = {
+        "semantics": {
+            "checked": {"datum": (("face", 4001, (0.1, 0.2, 0.3)),)},
+            "excluded": {"dimension": {"kinds": (0,), "reason": "no geometry"}},
+            "models": {
+                "view": {"path": "exact-source.SLDPRT", "configuration": "Default"}
+            },
+            "dimensions": {"Width": {"value_system": 0.02, "tolerance_type": 1}},
+            "dimensions_excluded": {},
+            "semantic_attachments": {},
+            "dimension_observations": {"Width": [{"full_name": "Width@old.Drawing"}]},
+        },
+        "annotations": {
+            "A": {
+                "semantic": {"kind": 2, "texts": ({"value": "A"},), "visible": 1},
+                "position": (0.1, 0.2, 0.0),
+            }
+        },
+        "layout": {},
+    }
+    return json.loads(json.dumps(current)), current
+
+
+def test_archived_roundtrip_boundary_fails_first_under_old_native_shape_comparison():
+    archived, current = archived_pair()
+    with pytest.raises(RuntimeError, match="attachment snapshot changed"):
+        probe.pilot.attachments.compare(
+            archived["semantics"], current["semantics"], "old boundary"
+        )
+    assert probe.compare_archived_drawing(archived, current)["changed_leaf_count"] == 0
+
+
+def test_serialization_rejects_key_collision_and_nonfinite_instead_of_coercion():
+    with pytest.raises(TypeError, match="keys must be strings"):
+        probe.serialized({"1": "old", 1: "would hide another key"})
+    with pytest.raises(ValueError):
+        probe.serialized({"coordinate": math.nan})
+
+
+@pytest.mark.parametrize(
+    "variant",
+    [
+        "geometry",
+        "value",
+        "source",
+        "configuration",
+        "text",
+        "enum",
+        "multiplicity",
+        "inventory",
+        "numeric_type",
+    ],
+)
+def test_archive_serialization_does_not_hide_any_actual_witness_change(variant):
+    archived, current = archived_pair()
+    if variant == "geometry":
+        current["semantics"]["checked"]["datum"] = (
+            ("face", 4001, (0.1, 0.2, 0.30000000000000004)),
+        )
+    if variant == "value":
+        current["semantics"]["dimensions"]["Width"]["value_system"] = 0.03
+    if variant in ("source", "configuration"):
+        field = "path" if variant == "source" else "configuration"
+        current["semantics"]["models"]["view"][field] = "different"
+    if variant == "text":
+        current["annotations"]["A"]["semantic"]["texts"][0]["value"] = "B"
+    if variant == "enum":
+        current["semantics"]["dimensions"]["Width"]["tolerance_type"] = 2
+    if variant == "multiplicity":
+        current["semantics"]["checked"]["datum"] *= 2
+    if variant == "inventory":
+        current["annotations"]["extra"] = copy.deepcopy(current["annotations"]["A"])
+    if variant == "numeric_type":
+        current["annotations"]["A"]["semantic"]["visible"] = True
+    with pytest.raises(RuntimeError):
+        probe.compare_archived_drawing(archived, current)
+
+
+def test_archived_raw_drawing_name_observation_is_retained_not_reclassified():
+    archived, current = archived_pair()
+    current["semantics"]["dimension_observations"]["Width"][0]["full_name"] = (
+        "Width@unique-copy.Drawing"
+    )
+    current["annotations"]["A"]["position"] = (0.107225, 0.2, 0.0)
+    delta = probe.compare_archived_drawing(archived, current)
+    assert delta["changed_leaf_count"] == 2
+    assert {row["kind"] for row in delta["differences"]} == {"value", "numeric"}
+    assert delta["summary"]["max_absolute_numeric_delta"] > 0.007
+
+
 def test_png_delta_counts_pixels_not_channels_and_no_threshold(tmp_path):
     from PIL import Image
 
@@ -169,7 +262,21 @@ async def test_owned_copy_and_protected_references_preserve_baseline_on_all_exit
     for path in artifacts.values():
         path.write_bytes(b"retained")
     source = {"configuration": "Default", "dimensions": {}}
-    witness = {"semantics": {}, "annotations": {}, "layout": {}}
+    witness = {
+        "semantics": {
+            key: {}
+            for key in (
+                "checked",
+                "excluded",
+                "models",
+                "dimensions",
+                "dimensions_excluded",
+                "semantic_attachments",
+            )
+        },
+        "annotations": {},
+        "layout": {},
+    }
     trial = {
         "target": "rocker_arm",
         "copy_source": str(part),
