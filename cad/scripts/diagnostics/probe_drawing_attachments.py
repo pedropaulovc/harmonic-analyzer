@@ -1,10 +1,13 @@
-"""Probe drawing attachment geometry after moving/scaling views and reopening.
+"""Probe part-drawing attachments after moving/scaling views and reopening.
 
 Run ``uv run python cad/scripts/diagnostics/probe_drawing_attachments.py DRAWING``.
 The parent takes the pipeline's COM seat lock. Only a uniquely named drawing
 copy under cad/out/reports/drawing-attachments is modified. The JSON report
 records every phase and excludes unsupported annotation/geometry kinds from
 the checked count. This compares geometry signatures, not persistent entity IDs.
+Only drawings referencing native parts are supported. Assembly drawings are
+rejected before copying or movement: their component ownership and transitive
+model dependencies need a separate snapshot contract.
 """
 
 from __future__ import annotations
@@ -110,7 +113,7 @@ def views(model):
 
 
 def referenced_model(view):
-    """Resolve the source document through a section view's base when needed."""
+    """Resolve a part reference through a section view's base when needed."""
     configuration = str(view.ReferencedConfiguration)
     visited = set()
     while view is not None:
@@ -124,6 +127,10 @@ def referenced_model(view):
             path = str(model.GetPathName())
             if not path:
                 raise RuntimeError(f"{name}: referenced model has no saved path")
+            if Path(path).suffix.upper() != ".SLDPRT":
+                raise ValueError(
+                    f"attachment probe supports part drawings only; {name} references {path}"
+                )
             return {
                 "path": str(Path(path).resolve(strict=True)),
                 "configuration": configuration,
@@ -285,6 +292,7 @@ async def probe(adapter, source, report_root):
         "source": str(source),
         "copy": str(copy),
         "status": "running",
+        "scope": "part drawings; model-geometry signatures, not persistent entity IDs",
         "snapshots": {},
     }
 
@@ -349,7 +357,9 @@ async def probe(adapter, source, report_root):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("drawing", type=Path)
+    parser.add_argument(
+        "drawing", type=Path, help="native drawing referencing only .SLDPRT models"
+    )
     parser.add_argument(
         "--report-root", type=Path, default=ROOT / "cad/out/reports/drawing-attachments"
     )
