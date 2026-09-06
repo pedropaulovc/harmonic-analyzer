@@ -28,7 +28,7 @@ sys.path.insert(0, str(ROOT / "cad/scripts"))
 
 from _common import _early_bound, check  # noqa: E402
 import _drawing_common as common  # noqa: E402
-from _drawing_annotation_bounds import annotation_box  # noqa: E402
+from _drawing_annotation_bounds import annotation_box, _native_counts  # noqa: E402
 from _drawing_registry import DRAWINGS_BY_NAME  # noqa: E402
 import _telemetry  # noqa: E402
 from solidworks_mcp.adapters.solidworks import drawing  # noqa: E402
@@ -182,10 +182,85 @@ def semantic_attachment(row, geometry, view_key):
 
 def cross_arm_signature(snapshot):
     return {
-        "defaults": snapshot["defaults"],
+        "defaults": defaults_semantics(snapshot["defaults"]),
         "view_modes": snapshot["view_modes"],
         "semantic_annotations": snapshot["semantic_annotations"],
     }
+
+
+def defaults_semantics(snapshot):
+    """Raw empty-link extents stay observable; their native proof stays semantic."""
+    return {
+        key: value
+        for key, value in snapshot.items()
+        if key != "blank_linked_extent_observations"
+    }
+
+
+def blank_linked_note_witness(annotation, note):
+    """Refuse the extent exclusion unless native displayed primitives are empty."""
+    if int(annotation.GetType()) != 6 or note.GetText() or not note.PropertyLinkedText:
+        raise RuntimeError("blank linked-note witness requires an empty linked INote")
+    data = _early_bound(annotation.GetDisplayData(), "IDisplayData")
+    if data is None:
+        raise RuntimeError("blank linked note has no native display inventory")
+    counts = _native_counts(
+        data,
+        (
+            "Text",
+            "Line",
+            "Arc",
+            "PolyLine",
+            "Triangle",
+            "ArrowHead",
+            "Polygon",
+            "Ellipse",
+            "Parabola",
+            "Point",
+        ),
+    )
+    if any(counts.values()):
+        raise RuntimeError(
+            f"blank linked note exposes native displayed primitives: {counts}"
+        )
+    leaders = {
+        "ordinary": annotation.GetLeaderCount(),
+        "multi_jog": annotation.GetMultiJogLeaderCount(),
+    }
+    if any(type(value) is not int or value != 0 for value in leaders.values()):
+        raise RuntimeError(f"blank linked note exposes native leaders: {leaders}")
+    if note.HasMultipleFonts or annotation.GetTextFormatCount() != 1:
+        raise RuntimeError("blank linked note has unsupported rich/compound formatting")
+    fmt = _early_bound(annotation.GetTextFormat(0), "ITextFormat")
+    if fmt is None:
+        raise RuntimeError("blank linked note has no native font definition")
+    anchor = tuple(annotation.GetPosition() or ())
+    if len(anchor) != 3 or not all(math.isfinite(value) for value in anchor):
+        raise RuntimeError("blank linked note has no finite native XYZ anchor")
+    definition = {
+        "font": str(fmt.TypeFaceName),
+        "height_m": float(fmt.CharHeight),
+        "height_points": int(fmt.CharHeightInPts),
+        "height_in_points": bool(fmt.IsHeightSpecifiedInPts()),
+        "width_factor": float(fmt.WidthFactor),
+        "bold": bool(fmt.Bold),
+        "italic": bool(fmt.Italic),
+        "use_document_format": bool(annotation.GetUseDocTextFormat(0)),
+    }
+    if not definition["font"] or any(
+        not math.isfinite(definition[key]) or definition[key] <= 0
+        for key in ("height_m", "width_factor")
+    ):
+        raise RuntimeError("blank linked note has invalid native font dimensions")
+    return json_value(
+        {
+            "classification": "blank_linked_note_zero_native_primitives",
+            "native_counts": counts,
+            "leaders": leaders,
+            "anchor": anchor,
+            "font_definition": definition,
+        }
+    )
 
 
 def inherited_drawing(adapter, template, spec):
@@ -240,7 +315,7 @@ def defaults_snapshot(adapter, spec):
     }
     if any(value != common._BROKEN_LEADER_HORIZONTAL_TEXT for value in styles.values()):
         raise RuntimeError(f"inherited dimension style differs: {styles}")
-    notes = []
+    notes, blank_extents = [], []
     sheet_view = _early_bound(ddoc.GetFirstView(), "IView")
     for raw in sheet_view.GetAnnotations() or ():
         annotation = _early_bound(raw, "IAnnotation")
@@ -255,6 +330,17 @@ def defaults_snapshot(adapter, spec):
         }
         if len(note_row["extent"]) != 6:
             raise RuntimeError("sheet note returned incomplete native extents")
+        if not note_row["text"] and note_row["linked_text"]:
+            note_row["blank_linked_witness"] = blank_linked_note_witness(
+                annotation, note
+            )
+            blank_extents.append(
+                {
+                    "name": str(annotation.GetName()),
+                    "linked_text": note_row["linked_text"],
+                    "extent": note_row.pop("extent"),
+                }
+            )
         if note_row["text"] and note_row["visible"] == 1:
             bounds = asdict(annotation_box(adapter, annotation))
             bounds.pop("name")
@@ -277,6 +363,7 @@ def defaults_snapshot(adapter, spec):
         "dimension_styles": styles,
         "sheet_properties": json_value(tuple(sheet.GetProperties2() or ())),
         "sheet_notes": semantic_multiset(notes),
+        "blank_linked_extent_observations": blank_extents,
         "sheet_mode": "edit_sheet",
     }
 
@@ -413,7 +500,10 @@ def compare_reopened(before, after):
         before["layout"], after["layout"], "template benchmark reopen"
     )
     for section in ("defaults", "native_annotations", "view_modes"):
-        compare_exact(before[section], after[section], "reopen " + section)
+        first, second = before[section], after[section]
+        if section == "defaults":
+            first, second = defaults_semantics(first), defaults_semantics(second)
+        compare_exact(first, second, "reopen " + section)
 
 
 async def prepare_template(adapter, spec, directory, row):
@@ -440,7 +530,9 @@ async def prepare_template(adapter, spec, directory, row):
                 inherited_drawing(adapter, path, spec)
             row["reopened"] = defaults_snapshot(adapter, spec)
             compare_exact(
-                row["before"], row["reopened"], "derived template new-document readback"
+                defaults_semantics(row["before"]),
+                defaults_semantics(row["reopened"]),
+                "derived template new-document readback",
             )
             check(
                 "close template verification drawing",
