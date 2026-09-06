@@ -1,11 +1,157 @@
 """COM-free controls for native layout collection, absolute movement and readback."""
 
 from types import SimpleNamespace
+import json
 
 import pytest
 
 import _drawing_native_layout as native
 from _drawing_view_packing import Axis, AxisOrder, Rect
+
+
+@pytest.fixture(autouse=True)
+def isolated_failure_reports(monkeypatch, tmp_path):
+    monkeypatch.setattr(native, "_FAILURE_REPORT_ROOT", tmp_path, raising=False)
+
+
+@pytest.mark.parametrize("overflow_m", [0.5, 2e-12])
+def test_failed_fit_persists_exact_measured_overflow(monkeypatch, overflow_m):
+    front = View("front", Rect(-1, 2, 1, 4))
+    annotation = Annotation("frame", Rect(-1, 2, 0, 3), owner=front, kind=5)
+    front.annotations = [annotation]
+    adapter, options, _ = scene(monkeypatch, {"front": front})
+
+    def rebuild():
+        annotation.rectangle = Rect(-overflow_m, 2, 1, 3)
+        return True
+
+    adapter.currentModel.EditRebuild3 = rebuild
+    with pytest.raises(RuntimeError, match="remeasured native layout") as caught:
+        native.repair_native_layout(adapter, **options)
+    evidence = caught.value.evidence
+    assert json.loads(caught.value.report_path.read_text()) == evidence
+    assert evidence["footprints"]["before"]["view:front"] == [-1, 2, 1, 4]
+    assert evidence["footprints"]["predicted"]["view:front"] == [0, 2, 2, 4]
+    assert evidence["footprints"]["observed"]["view:front"][0] == -overflow_m
+    assert evidence["raw_residuals"]["overflow"] == [
+        {"item": "view:front", "side": "left", "excess_m": overflow_m}
+    ]
+    assert evidence["positions"]["views"]["front"]["error_m"] == 0
+    assert evidence["outlines"]["observed"]["front"] == [0, 2, 2, 4]
+    assert (
+        evidence["annotation_bounds"]["observed"]["('view:front', 'frame', 5)"][0]
+        == -overflow_m
+    )
+    # A feasible correction is not proof the sheet fits without that correction.
+    assert evidence["validation"]["status"] == "packed"
+    assert evidence["validation"]["explored_nodes"] == 1
+    assert evidence["validation"]["translations"]["view:front"][0] == overflow_m
+
+
+def test_readback_evidence_names_overlap_and_order_gap(monkeypatch):
+    front = View("front", Rect(-1, 2, 1, 4))
+    right = View("right", Rect(3, 2, 5, 4))
+    annotation = Annotation("frame", Rect(-1, 2, 0, 3), owner=front, kind=5)
+    front.annotations = [annotation]
+    adapter, options, _ = scene(monkeypatch, {"front": front, "right": right})
+
+    def rebuild():
+        annotation.rectangle = Rect(0, 2, right.rectangle.xmin + 0.25, 3)
+        return True
+
+    adapter.currentModel.EditRebuild3 = rebuild
+    with pytest.raises(RuntimeError, match="remeasured native layout") as caught:
+        native.repair_native_layout(
+            adapter, **options, orderings=(AxisOrder(Axis.X, "front", "right"),)
+        )
+    residuals = caught.value.evidence["raw_residuals"]
+    pair = residuals["pairs"][0]
+    assert (pair["first"], pair["second"], pair["kind"]) == (
+        "view:front",
+        "view:right",
+        "overlap",
+    )
+    assert pair["overlap_m"] == [0.25, 2.0]
+    assert pair["clearance_deficit_m"] == pytest.approx(0.35)
+    assert residuals["orderings"][0]["gap_m"] == -0.25
+    assert residuals["orderings"][0]["deficit_m"] == pytest.approx(0.35)
+
+
+def test_clamped_position_persists_requested_observed_and_error(monkeypatch):
+    front = View("front", Rect(-1, 2, 1, 4))
+    front.movement = "clamp"
+    adapter, options, _ = scene(monkeypatch, {"front": front})
+    with pytest.raises(RuntimeError, match="did not reach absolute") as caught:
+        native.repair_native_layout(adapter, **options)
+    assert caught.value.evidence["positions"]["views"]["front"] == {
+        "before": [0, 3],
+        "requested": [1, 3],
+        "observed": [0, 3],
+        "observed_minus_requested_m": [-1, 0],
+        "error_m": 1,
+    }
+
+
+def test_search_limited_readback_reports_clearance_deficit_without_overlap(monkeypatch):
+    front = View("front", Rect(-1, 2, 1, 4))
+    fixed = Annotation("fixed", Rect(4, 2, 5, 4))
+    frame = Annotation("frame", Rect(-1, 2, 0, 3), owner=front, kind=5)
+    front.annotations = [frame]
+    adapter, options, _ = scene(monkeypatch, {"front": front}, [fixed])
+
+    def rebuild():
+        frame.rectangle = Rect(0, 2, 3.95, 3)
+        return True
+
+    adapter.currentModel.EditRebuild3 = rebuild
+    with pytest.raises(native.NativeLayoutReadbackError) as caught:
+        native.repair_native_layout(adapter, **options)
+    evidence = caught.value.evidence
+    assert evidence["validation"]["status"] == "search_limit"
+    pair = evidence["raw_residuals"]["pairs"][0]
+    assert pair["second"] == "('sheet', 'fixed', 6)"
+    assert pair["kind"] == "clearance"
+    assert pair["clearance_deficit_m"] == pytest.approx(0.05)
+    assert pair["overlap_m"] == [0, 2]
+    assert evidence["gap_m"] == 0.1
+    assert evidence["position_tolerance_m"] == 1e-8
+
+
+def test_raw_residuals_retain_axis_alignment_below_position_tolerance(monkeypatch):
+    front, top = View("front", Rect(-1, 2, 1, 4)), View("top", Rect(-1, 5, 1, 7))
+    adapter, options, _ = scene(monkeypatch, {"front": front, "top": top})
+
+    def rebuild():
+        top.shift(1e-9, 0)
+        return True
+
+    adapter.currentModel.EditRebuild3 = rebuild
+    with pytest.raises(native.NativeLayoutReadbackError) as caught:
+        native.repair_native_layout(
+            adapter, **options, alignments=(native.AxisLink(Axis.X, "front", "top"),)
+        )
+    evidence = caught.value.evidence
+    assert evidence["raw_residuals"]["alignments"][0]["first_minus_second_m"] == (
+        front.Position[0] - top.Position[0]
+    )
+    assert 0 < evidence["positions"]["views"]["top"]["error_m"] < 1e-8
+
+
+def test_failure_artifacts_are_unique_and_failed_persistence_keeps_original_error(
+    tmp_path, monkeypatch
+):
+    first = native.NativeLayoutReadbackError("original layout failure", {"test": 1})
+    second = native.NativeLayoutReadbackError("original layout failure", {"test": 2})
+    assert first.report_path != second.report_path
+    assert json.loads(first.report_path.read_text()) == {"test": 1}
+    assert json.loads(second.report_path.read_text()) == {"test": 2}
+    # A file cannot serve as a report directory. Preserve the CAD failure and
+    # in-memory evidence instead of replacing them with the filesystem exception.
+    monkeypatch.setattr(native, "_FAILURE_REPORT_ROOT", first.report_path)
+    failure = native.NativeLayoutReadbackError("original layout failure", {"test": 3})
+    assert "original layout failure; evidence persistence failed" in str(failure)
+    assert failure.evidence == {"test": 3}
+    assert failure.report_path is None
 
 
 class Annotation:

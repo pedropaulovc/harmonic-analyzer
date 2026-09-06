@@ -44,6 +44,9 @@ Immutable model-geometry identity across save/reopen remains the attachment
 probe's independent gate. Conservative font cells are not tight rendered ink.
 Null attachment handles fail; a native control exposing zero attachments is
 reported as a geometry-identity exclusion rather than a successful entity check.
+Completed readbacks that fail position or fit validation persist their measured
+evidence under cad/out/reports/native-layout. Raw residuals are unrounded sheet
+metres, not a second acceptance policy; solver and position tolerances stay intact.
 """
 
 from __future__ import annotations
@@ -51,11 +54,14 @@ from __future__ import annotations
 from collections import Counter
 from dataclasses import dataclass
 from enum import Enum
+from itertools import combinations
 import math
 import json
+from pathlib import Path
+import tempfile
 from typing import Any, Callable, Mapping, Sequence
 
-from _common import _early_bound
+from _common import CAD_ROOT, _early_bound
 from solidworks_mcp.adapters.com_variant import double_array
 from _drawing_view_packing import (
     Axis,
@@ -68,6 +74,36 @@ from _drawing_view_packing import (
     pack_view_groups,
 )
 import _telemetry
+
+
+_FAILURE_REPORT_ROOT = CAD_ROOT / "out" / "reports" / "native-layout"
+
+
+class NativeLayoutReadbackError(RuntimeError):
+    """Rejected measured layout, with JSON evidence even if persistence fails."""
+
+    def __init__(self, reason: str, evidence: dict[str, Any]):
+        self.evidence = evidence
+        self.report_path: Path | None = None
+        try:
+            _FAILURE_REPORT_ROOT.mkdir(parents=True, exist_ok=True)
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                suffix=".json",
+                prefix="readback-",
+                dir=_FAILURE_REPORT_ROOT,
+                delete=False,
+            ) as report:
+                json.dump(evidence, report, indent=2, allow_nan=False)
+                self.report_path = Path(report.name)
+        except OSError as error:
+            # Failure to write diagnostic evidence must not hide the CAD failure.
+            reason += f"; evidence persistence failed: {error}"
+            _telemetry.error(reason, readback_evidence=json.dumps(evidence))
+        if self.report_path is not None:
+            reason += f"; readback evidence: {self.report_path}"
+        super().__init__(reason)
 
 
 @dataclass(frozen=True)
@@ -119,6 +155,7 @@ class _Snapshot:
     annotations: Mapping[tuple[str, str, int], Any]
     attached_entities: Mapping[tuple[str, str, int], tuple[Any, ...]]
     note_positions: Mapping[str, tuple[float, ...]]
+    annotation_bounds: Mapping[tuple[str, str, int], Rect]
     drawable: Rect
     sheet_properties: tuple[float, ...]
 
@@ -282,6 +319,7 @@ def _snapshot(
             raise ValueError("native layout note is declared more than once")
         note_by_annotation[key] = note
     seen, signatures, entities, obstacles, note_positions = {}, {}, {}, {}, {}
+    annotation_bounds = {}
     for native_view in inventory:
         for raw in native_view.GetAnnotations() or ():
             annotation = _early_bound(raw, "IAnnotation")
@@ -298,6 +336,7 @@ def _snapshot(
             measured = measure_annotation(adapter, annotation)
             if (measured.name, measured.kind) != key[1:]:
                 raise RuntimeError(f"annotation measurement identity mismatch: {key}")
+            annotation_bounds[key] = measured.envelope
             count = int(annotation.GetAttachedEntityCount3())
             types = tuple(
                 int(value) for value in annotation.GetAttachedEntityTypes() or ()
@@ -379,6 +418,7 @@ def _snapshot(
         seen,
         entities,
         note_positions,
+        annotation_bounds,
         drawable,
         properties,
     )
@@ -465,6 +505,191 @@ def _fixed_content_issue(
     if result.status is PackingStatus.PACKED and result.explored_nodes == 0:
         return None
     return "fixed sheet content does not fit; explicitly declare movable notes or change the sheet plan"
+
+
+def _group_bounds(snapshot: _Snapshot) -> dict[str, Rect]:
+    return {
+        group.name: next(iter(group.rectangles.values())) for group in snapshot.groups
+    }
+
+
+def _raw_residuals(snapshot, title_block, gap_m, alignments, orderings):
+    """Expose exact signed gaps; do not round or apply an acceptance tolerance."""
+    groups = _group_bounds(snapshot)
+    content = {**groups, **{str(k): v for k, v in snapshot.obstacles.items()}}
+    overflow = []
+    for name, rectangle in content.items():
+        excesses = {
+            "left": snapshot.drawable.xmin - rectangle.xmin,
+            "bottom": snapshot.drawable.ymin - rectangle.ymin,
+            "right": rectangle.xmax - snapshot.drawable.xmax,
+            "top": rectangle.ymax - snapshot.drawable.ymax,
+        }
+        overflow.extend(
+            {"item": name, "side": side, "excess_m": value}
+            for side, value in excesses.items()
+            if value > 0
+        )
+    pairs = []
+    for (first, a), (second, b) in combinations(
+        {**content, "title-block": title_block}.items(), 2
+    ):
+        gaps = {
+            "first_left_of_second": b.xmin - a.xmax,
+            "second_left_of_first": a.xmin - b.xmax,
+            "first_below_second": b.ymin - a.ymax,
+            "second_below_first": a.ymin - b.ymax,
+        }
+        deficit = gap_m - max(gaps.values())
+        if deficit <= 0:
+            continue
+        overlap = [
+            max(0.0, min(a.xmax, b.xmax) - max(a.xmin, b.xmin)),
+            max(0.0, min(a.ymax, b.ymax) - max(a.ymin, b.ymin)),
+        ]
+        pairs.append(
+            {
+                "first": first,
+                "second": second,
+                "kind": "overlap" if min(overlap) > 0 else "clearance",
+                "directional_gaps_m": gaps,
+                "overlap_m": overlap,
+                "clearance_deficit_m": deficit,
+            }
+        )
+    aligned = [
+        {
+            "axis": link.axis.name,
+            "first": link.first_view,
+            "second": link.second_view,
+            "first_minus_second_m": snapshot.positions[link.first_view][link.axis.value]
+            - snapshot.positions[link.second_view][link.axis.value],
+        }
+        for link in alignments
+    ]
+    ordered = []
+    for order in orderings:
+        a, b = groups[f"view:{order.before_group}"], groups[f"view:{order.after_group}"]
+        observed_gap = b.bounds[order.axis.value] - a.bounds[order.axis.value + 2]
+        ordered.append(
+            {
+                "axis": order.axis.name,
+                "before": order.before_group,
+                "after": order.after_group,
+                "gap_m": observed_gap,
+                "deficit_m": max(0.0, gap_m - observed_gap),
+            }
+        )
+    return {
+        "overflow": overflow,
+        "pairs": pairs,
+        "alignments": aligned,
+        "orderings": ordered,
+    }
+
+
+def _readback_evidence(
+    reason,
+    before,
+    after,
+    plan,
+    validation,
+    title_block,
+    targets,
+    note_targets,
+    gap_m,
+    position_tolerance_m,
+    alignments,
+    orderings,
+):
+    def bounds(items):
+        return {str(key): list(value.bounds) for key, value in items.items()}
+
+    def packing(result):
+        if result is None:
+            return None
+        return {
+            "status": result.status.value,
+            "reason": result.reason,
+            "explored_nodes": result.explored_nodes,
+            "translations": {
+                key: list(value) for key, value in result.translations.items()
+            },
+        }
+
+    def positions(original, requested, observed):
+        return {
+            key: {
+                "before": list(original[key]),
+                "requested": list(target),
+                "observed": list(observed[key]),
+                "observed_minus_requested_m": [
+                    a - b for a, b in zip(observed[key], target)
+                ],
+                "error_m": math.dist(observed[key], target),
+            }
+            for key, target in requested.items()
+        }
+
+    predicted = {
+        key: rectangle.translated(plan.translations[key])
+        for key, rectangle in _group_bounds(before).items()
+    }
+    observed = _group_bounds(after)
+    return {
+        "schema_version": 1,
+        "reason": reason,
+        "units": "sheet metres",
+        "residual_policy": "raw unrounded measurements; not an acceptance tolerance",
+        "gap_m": gap_m,
+        "position_tolerance_m": position_tolerance_m,
+        "validation_node_budget": 1,
+        "plan": packing(plan),
+        "validation": packing(validation),
+        "references": {key: list(value) for key, value in before.references.items()},
+        "drawable": {
+            "before": list(before.drawable.bounds),
+            "observed": list(after.drawable.bounds),
+        },
+        "positions": {
+            "views": positions(before.positions, targets, after.positions),
+            "notes": positions(
+                before.note_positions, note_targets, after.note_positions
+            ),
+        },
+        "footprints": {
+            "before": bounds(_group_bounds(before)),
+            "predicted": bounds(predicted),
+            "observed": bounds(observed),
+            "observed_minus_predicted_m": {
+                key: [a - b for a, b in zip(rectangle.bounds, predicted[key].bounds)]
+                for key, rectangle in observed.items()
+                if key in predicted
+            },
+        },
+        "outlines": {
+            "before": bounds(before.outlines),
+            "predicted": bounds(
+                {
+                    key: value.translated(plan.translations[f"view:{key}"])
+                    for key, value in before.outlines.items()
+                }
+            ),
+            "observed": bounds(after.outlines),
+        },
+        "annotation_bounds": {
+            "before": bounds(before.annotation_bounds),
+            "observed": bounds(after.annotation_bounds),
+        },
+        "fixed_bounds": {
+            "title-block": list(title_block.bounds),
+            "before": bounds(before.obstacles),
+            "observed": bounds(after.obstacles),
+        },
+        "raw_residuals": _raw_residuals(
+            after, title_block, gap_m, alignments, orderings
+        ),
+    }
 
 
 @_telemetry.traced("drawing.native_layout")
@@ -593,15 +818,35 @@ def repair_native_layout(
             raise RuntimeError("native layout rebuild failed")
     with _telemetry.span("drawing.native_layout.readback"):
         after = _snapshot(adapter, views, notes, measure_annotation)
+
+    def readback_failure(reason, validation=None):
+        return NativeLayoutReadbackError(
+            reason,
+            _readback_evidence(
+                reason,
+                before,
+                after,
+                result,
+                validation,
+                title_block,
+                targets,
+                note_targets,
+                gap_m,
+                position_tolerance_m,
+                alignments,
+                orderings,
+            ),
+        )
+
     for key, target in targets.items():
         if math.dist(target, after.positions[key]) > position_tolerance_m:
-            raise RuntimeError(
+            raise readback_failure(
                 f"{key}: native view did not reach absolute layout target: "
                 f"requested={target}, observed={after.positions[key]}"
             )
     for key, target in note_targets.items():
         if math.dist(target, after.note_positions[key]) > position_tolerance_m:
-            raise RuntimeError(
+            raise readback_failure(
                 f"{key}: native note did not reach absolute layout target"
             )
     if (
@@ -639,8 +884,11 @@ def repair_native_layout(
         orderings=orders,
     )
     if validation.status is not PackingStatus.PACKED or validation.explored_nodes != 0:
-        raise RuntimeError(
-            f"remeasured native layout does not fit: {validation.reason}"
+        raise readback_failure(
+            "remeasured native layout does not fit without further movement: "
+            f"{validation.status.value}, explored_nodes={validation.explored_nodes}; "
+            f"{validation.reason}",
+            validation,
         )
     return _report(
         NativeLayoutStatus.APPLIED,
