@@ -199,6 +199,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         entity=entities["barrel"],
         symbol_xy=(FRONT_CENTER[0] + 0.035, FRONT_CENTER[1] - 0.026),
+        selection_point_xy=(FRONT_CENTER[0] + 0.035, FRONT_CENTER[1] - BARREL_DIA * SHEET_SCALE[0] / 2000),
         datum="A",
         label="pen-marker barrel axis",
         entity_type="FACE",

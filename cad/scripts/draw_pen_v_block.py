@@ -266,6 +266,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         entity=entities["bottom_front"],
+        selection_point_xy=(_sheet_x(30.0), _front_y(0.0)),
         symbol_xy=(_sheet_x(30.0), _front_y(0.0) - 0.008),
         datum="A",
         label="block bottom face",
@@ -275,6 +276,7 @@ async def build(adapter: Any) -> dict[str, str]:
         top,
         entity=entities["left_end"],
         entity_type="FACE",
+        selection_point_xy=(_sheet_x(0.0), TOP_CENTER[1]),
         symbol_xy=(_sheet_x(0.0) - 0.018, TOP_CENTER[1]),
         datum="B",
         label="block left end",
@@ -284,6 +286,7 @@ async def build(adapter: Any) -> dict[str, str]:
         right,
         entity=entities["broad"],
         entity_type="FACE",
+        selection_point_xy=(RIGHT_CENTER[0] - RIGHT_HALF_Z, RIGHT_CENTER[1]),
         # -0.010, not -0.016: symbol_xy is the box's RIGHT edge here (the leader
         # arrives from the right), so the 7.1 mm box grows LEFT -- at -0.016 it
         # spanned x 0.2097..0.2168 and the ScrewHoleCz dimension line, vertical at
