@@ -304,6 +304,78 @@ async def test_source_copy_change_reopen_workflow(tmp_path, source_model, mode):
     assert adapter.currentModel is None
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("reference_kind", ["direct", "section_base"])
+async def test_probe_rejects_assembly_references_before_copy_or_movement(
+    tmp_path, monkeypatch, reference_kind
+):
+    assembly = tmp_path / "assembly.SLDASM"
+    assembly.write_bytes(b"source assembly")
+    drawing = tmp_path / "source.SLDDRW"
+    drawing.write_bytes(b"source drawing")
+    adapter = Adapter(assembly)
+    original_open = adapter.open_model
+
+    async def open_model(path):
+        result = await original_open(path)
+        if reference_kind == "section_base":
+            base = adapter.currentModel.drawing_views[0]
+            adapter.currentModel.drawing_views = [
+                SimpleNamespace(
+                    GetUniqueName=lambda: "SectionA",
+                    GetName2=lambda: "SectionA",
+                    ReferencedConfiguration="Default",
+                    ReferencedDocument=None,
+                    GetBaseView=lambda: base,
+                    GetAnnotations=base.GetAnnotations,
+                    Position=base.Position,
+                    ScaleDecimal=base.ScaleDecimal,
+                )
+            ]
+        return result
+
+    adapter.open_model = open_model
+    copy = Mock(side_effect=AssertionError("assembly drawing must not be copied"))
+    move = Mock(side_effect=AssertionError("assembly drawing must not be moved"))
+    monkeypatch.setattr(probe.shutil, "copy2", copy)
+    monkeypatch.setattr(probe, "move_and_scale", move)
+    reports = tmp_path / "reports"
+    with pytest.raises(ValueError, match="part drawings only.*assembly.SLDASM"):
+        await probe.probe(adapter, drawing, reports)
+    copy.assert_not_called()
+    move.assert_not_called()
+    assert adapter.closed == adapter.opened == [str(drawing)]
+    (report_path,) = reports.glob("*/attachments.json")
+    report = json.loads(report_path.read_text())
+    assert report["status"] == "failed"
+    assert not Path(report["copy"]).exists()
+    assert drawing.read_bytes() == b"source drawing"
+    assert assembly.read_bytes() == b"source assembly"
+
+
+def test_section_base_part_reference_remains_supported(source_model):
+    base = View("Front", source_model)
+    section = SimpleNamespace(
+        GetUniqueName=lambda: "SectionA",
+        ReferencedConfiguration="SectionConfiguration",
+        ReferencedDocument=None,
+        GetBaseView=lambda: base,
+    )
+    assert probe.referenced_model(section) == {
+        "path": str(source_model),
+        "configuration": "SectionConfiguration",
+    }
+
+
+def test_cli_help_explains_part_only_scope(capsys):
+    with pytest.raises(SystemExit) as result:
+        probe.main(["--help"])
+    assert result.value.code == 0
+    help_text = capsys.readouterr().out
+    assert "Only drawings referencing native parts" in help_text
+    assert ".SLDPRT models" in help_text
+
+
 def test_worker_requires_pipeline_seat_lock(tmp_path, monkeypatch):
     drawing = tmp_path / "source.SLDDRW"
     drawing.write_bytes(b"drawing")
