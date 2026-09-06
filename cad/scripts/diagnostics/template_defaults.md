@@ -107,3 +107,21 @@ pywin32 wrapper specifies the exact seven-argument SaveAs3 call and three-value
 return. Offline tests prove that shape's acceptance/rejection logic, not native
 DRWDOT persistence or cross-arm equivalence. Those remain the first live control's
 explicit acceptance gates; no production path is changed before that evidence.
+
+## First native preparation observation
+
+At benchmark revision `63b71c14`, the first arbor-pedestal invocation stopped
+before DRWDOT save and before any recipe trial: the current setup's native unit
+readback was `{system: 4, linear: 0, decimals: 2}`, not the benchmark's asserted
+MMGS system 5. The bundled enum defines 4 as Custom and 5 as MMGS; this observation
+alone does not identify which operation changed the system. The 5.396-second
+failed preparation is not a successful preparation timing or an ABBA result.
+
+The retained `template-abba-7aedax4n/measurements.json` and `ownership.json` prove
+both source hashes unchanged and the initial visible channel-lever part plus
+dirty unsaved Draw2 preserved; only the newly created blank drawing was closed.
+`probe_drawing_unit_defaults.py` is the bounded follow-up: two fresh owned blank
+drawings, tracing each of the existing three setter returns/readbacks and comparing
+the unchanged adapter helper's result. It performs no save, rebuild or export.
+Its native run needs its own source review and exclusive seat grant. Do not
+weaken the benchmark's unit assertion based only on the first observation.
