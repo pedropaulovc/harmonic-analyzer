@@ -20,10 +20,13 @@ from _drawing_common import (
     set_hidden_lines_removed,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_entities import CircleEdge, ModelEntities
+from _gtol_spec import PlanarFace
 from _fastener_drawing import FastenerSheet, build_fastener_sheet
 from _surface_finish import surface_finish_by_key
 from cone_pivot_screw_spec import (
     HEAD_DIA,
+    SLOT_W,
     SHOULDER_DIA,
     SHOULDER_LEN,
     SURFACE_FINISHES,
@@ -59,47 +62,12 @@ SIDE_DIMENSION_CALLOUTS = {
     "ThreadLg": THREAD_DESIGNATION,
 }
 DIMENSION_CALLOUTS: dict[str, str] = {}
-
-
-def _circular_edge(
-    adapter: Any,
-    view: Any,
-    *,
-    center_y_mm: float,
-    radius_mm: float,
-    label: str,
-) -> Any:
-    """Return the unique visible circular edge matching model-space geometry."""
-    view = _early_bound(view, "IView")
-    components = adapter._attempt(lambda: view.GetVisibleComponents()) or (None,)
-    matches: list[Any] = []
-    seen: list[tuple[float, float]] = []
-    edge_count = 0
-    for component in components:
-        edges = (
-            adapter._attempt(lambda c=component: view.GetVisibleEntities2(c, 1)) or ()
-        )
-        edge_count += len(edges)
-        for edge in edges:
-            edge = _early_bound(edge, "IEdge")
-            curve = _early_bound(edge.GetCurve(), "ICurve")
-            if not curve.IsCircle():
-                continue
-            params = curve.CircleParams or ()
-            if len(params) != 7:
-                continue
-            center_y = float(params[1]) * 1000.0
-            radius = float(params[6]) * 1000.0
-            seen.append((center_y, radius))
-            if abs(center_y - center_y_mm) <= 0.02 and abs(radius - radius_mm) <= 0.02:
-                matches.append(edge)
-    if len(matches) != 1:
-        raise RuntimeError(
-            f"{label}: expected one visible circular edge at y={center_y_mm:g} "
-            f"r={radius_mm:g} mm, found {len(matches)}; "
-            f"components={len(components)} edges={edge_count} circles={seen}"
-        )
-    return matches[0]
+ENTITY_ROLES = {
+    "thread_end": CircleEdge(THREAD_SOLID_DIA / 2.0, (0, -UNDERHEAD_LEN, 0), (0, 1, 0)),
+    "head_bearing": CircleEdge(HEAD_DIA / 2.0, (0, 0, 0), (0, 1, 0)),
+    "shoulder_end": CircleEdge(SHOULDER_DIA / 2.0, (0, -SHOULDER_LEN, 0), (0, 1, 0)),
+    "slot_wall": PlanarFace((0, 0, 1), -SLOT_W / 2.0),
+}
 
 
 def _decorate(adapter: Any, side: Any, end: Any, _iso: Any) -> None:
@@ -121,30 +89,25 @@ def _decorate(adapter: Any, side: Any, end: Any, _iso: Any) -> None:
         "automatic callout note(s)"
     )
 
-    thread_end = _circular_edge(
-        adapter,
-        side,
-        center_y_mm=-UNDERHEAD_LEN,
-        radius_mm=THREAD_SOLID_DIA / 2.0,
-        label="thread datum edge",
-    )
+    source_model = _early_bound(side, "IView").ReferencedDocument
+    roles = ModelEntities(source_model).resolve(ENTITY_ROLES)
     add_datum_feature(
         adapter,
         side,
-        edge_entity=thread_end,
+        entity=roles["thread_end"],
         symbol_xy=(0.115, 0.130),
         datum="A",
         label="thread pitch-diameter datum feature",
         callout_below=f"{THREAD} THREAD",
     )
-    for edge_xy, frame_xy, below_text, label in (
-        ((0.070, 0.16980), (0.108, 0.182), "SHOULDER OD", "shoulder total runout"),
-        ((0.070, 0.17850), (0.108, 0.204), "HEAD OD", "head total runout"),
+    for role, frame_xy, below_text, label in (
+        ("shoulder_end", (0.108, 0.182), "SHOULDER OD", "shoulder total runout"),
+        ("head_bearing", (0.108, 0.204), "HEAD OD", "head total runout"),
     ):
         add_feature_control_frame(
             adapter,
             end,
-            edge_xy=edge_xy,
+            entity=roles[role],
             frame_xy=frame_xy,
             characteristic="total_runout",
             tolerance=GEOMETRIC_TOLERANCES_MM[label],
@@ -155,13 +118,7 @@ def _decorate(adapter: Any, side: Any, end: Any, _iso: Any) -> None:
     add_feature_control_frame(
         adapter,
         side,
-        edge_entity=_circular_edge(
-            adapter,
-            side,
-            center_y_mm=0.0,
-            radius_mm=HEAD_DIA / 2.0,
-            label="head bearing edge",
-        ),
+        entity=roles["head_bearing"],
         frame_xy=(0.240, 0.212),
         characteristic="perpendicularity",
         tolerance=GEOMETRIC_TOLERANCES_MM["head bearing face perpendicularity"],
@@ -172,13 +129,7 @@ def _decorate(adapter: Any, side: Any, end: Any, _iso: Any) -> None:
     add_feature_control_frame(
         adapter,
         side,
-        edge_entity=_circular_edge(
-            adapter,
-            side,
-            center_y_mm=-SHOULDER_LEN,
-            radius_mm=SHOULDER_DIA / 2.0,
-            label="shoulder end edge",
-        ),
+        entity=roles["shoulder_end"],
         frame_xy=(0.125, 0.170),
         characteristic="perpendicularity",
         tolerance=GEOMETRIC_TOLERANCES_MM["shoulder end perpendicularity"],
@@ -189,7 +140,8 @@ def _decorate(adapter: Any, side: Any, end: Any, _iso: Any) -> None:
     add_feature_control_frame(
         adapter,
         right,
-        edge_xy=(0.2898, 0.219),
+        entity=roles["slot_wall"],
+        entity_type="FACE",
         frame_xy=(0.325, 0.245),
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["slot median-plane position"],
@@ -200,7 +152,7 @@ def _decorate(adapter: Any, side: Any, end: Any, _iso: Any) -> None:
     add_surface_finish(
         adapter,
         end,
-        edge_xy=(0.08400, 0.13600),
+        entity=roles["shoulder_end"],
         symbol_xy=(0.125, 0.136),
         control=surface_finish_by_key(SURFACE_FINISHES, "ground_shoulder"),
         label="ground shoulder finish",

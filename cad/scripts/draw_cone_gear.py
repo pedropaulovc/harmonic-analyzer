@@ -31,7 +31,8 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _gear_drawing_entities import visible_circle_edge
+from _drawing_entities import CircleEdge, ModelEntities
+from _gtol_spec import PlanarFace
 from _surface_finish import surface_finish_by_key
 from cone_gear_spec import BORE_DIA, FACE_WIDTH, OUTSIDE_DIA, SURFACE_FINISHES
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -122,13 +123,17 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_precision(adapter, front_annotations, {"BoreCutDia": 3})
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to gear bore")
-    bore_edge = visible_circle_edge(adapter, front, BORE_DIA)
+    entities = ModelEntities(front.ReferencedDocument).resolve({
+        "bore": CircleEdge(BORE_DIA / 2.0, (0, 0, 0), (0, 0, 1)),
+        "front_face": PlanarFace((0, 0, -1), 0.0),
+    })
+    bore_edge = entities["bore"]
 
     bore_top = (FRONT_CENTER[0], FRONT_CENTER[1] + BORE_R)
     add_datum_feature(
         adapter,
         front,
-        edge_xy=bore_top,
+        entity=bore_edge,
         symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.028),
         datum="A",
         label="cone gear bore axis",
@@ -138,7 +143,8 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         right,
-        edge_xy=(FRONT_FACE_X, RIGHT_CENTER[1] + HALF_OD * 0.55),
+        entity=entities["front_face"],
+        entity_type="FACE",
         frame_xy=(FRONT_FACE_X - 0.034, RIGHT_CENTER[1] + HALF_OD + 0.010),
         characteristic="perpendicularity",
         tolerance=GEOMETRIC_TOLERANCES_MM["gear face squareness to bore"],
