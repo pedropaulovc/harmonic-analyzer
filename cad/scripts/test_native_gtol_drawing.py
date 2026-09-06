@@ -311,8 +311,6 @@ def test_native_command_semantic_drift_is_not_hidden_by_layout(monkeypatch, fail
     adapter.swApp.RunCommand.side_effect = corrupt
     with pytest.raises(RuntimeError):
         arrange(adapter, view, measure)
-    for item in rows:
-        item.SetPosition2.assert_not_called()
 
 
 @pytest.mark.parametrize("failure", ["reject", "clamp", "body", "attachment"])
@@ -418,3 +416,68 @@ def test_production_helper_never_recreates_annotations_or_selects_geometry():
         "GetOutline",
         "GetSelectedObjectsDrawingView2",
     } <= methods
+
+
+def test_full_native_witness_is_read_only_before_and_after_final_bank(monkeypatch):
+    adapter, view, rows, measure = native_context(monkeypatch)
+    measured = Mock(side_effect=measure)
+    result = arrange(adapter, view, measured)["front"]
+    assert measured.call_count == 2 * len(rows)
+    for annotation in rows:
+        assert (
+            annotation.GetSpecificAnnotation.return_value.GetFrameCount.call_count == 2
+        )
+        assert annotation.GetAttachedEntities3.call_count == 2
+    assert all(
+        call["body_union_source"] == "derived_translation"
+        for call in result["commands"]
+    )
+    assert result["body_before_source"] == "derived_translation"
+    assert result["body_after_source"] == "native_measurement"
+
+
+def test_intermediate_shape_change_cannot_become_the_new_accepted_body(monkeypatch):
+    adapter, view, rows, measure = native_context(monkeypatch)
+    native_command = adapter.swApp.RunCommand.side_effect
+
+    def change_shape(command, title):
+        native_command(command, title)
+        if command == 317:
+            rows[0].size = (0.15, 0.1)
+        return True
+
+    adapter.swApp.RunCommand.side_effect = change_shape
+    with pytest.raises(RuntimeError, match="body did not translate rigidly"):
+        arrange(adapter, view, measure)
+
+
+@pytest.mark.parametrize("field", ["quantity", "frame", "entity"])
+def test_intermediate_content_drift_is_rejected_by_the_final_full_witness(
+    monkeypatch, field
+):
+    adapter, view, rows, measure = native_context(monkeypatch)
+    measured = Mock(side_effect=measure)
+    native_command = adapter.swApp.RunCommand.side_effect
+
+    def corrupt(command, title):
+        native_command(command, title)
+        if command == 317:
+            gtol = rows[0].GetSpecificAnnotation.return_value
+            if field == "quantity":
+                gtol.GetTextAtIndex.side_effect = lambda index: ("0.05", "WRONG SIDE")[
+                    index
+                ]
+            if field == "frame":
+                gtol.GetFrame.return_value.GetSymbolXml.return_value = (
+                    '<frame tolerance="0.50"/>'
+                )
+            if field == "entity":
+                rows[0].GetAttachedEntities3.return_value = (object(),)
+        return True
+
+    adapter.swApp.RunCommand.side_effect = corrupt
+    with pytest.raises(RuntimeError, match="final native witness"):
+        arrange(adapter, view, measured)
+    assert measured.call_count == 2 * len(rows)
+    assert adapter.swApp.RunCommand.call_count == 2
+    assert any(annotation.SetPosition2.call_count for annotation in rows)
