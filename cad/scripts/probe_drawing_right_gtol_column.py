@@ -3,8 +3,9 @@
 Run through uv with DRAWING (optionally --view NAME). The largest unique native
 GTol bank is used unless explicitly named. Translate its complete measured body
 bank to the first clear RIGHT outboard position, keeping native Y/order/leaders.
-Compare actual native leader segments against conservative native text cells;
-these are potential text-cell crossings, not exact glyph-ink intersections.
+Compare actual native leader segments AND conservative native decoration boxes
+against text cells; these are potential ink-cell overlaps, not exact glyph-ink
+intersections. Decorations include all-around circles and native arrow symbols.
 If RIGHT still crosses text, try at most two absolute vertical candidates (UP,
 then DOWN), derived from the crossed cells and native elbow stations. Reuse text
 cells only for candidate screening; remeasure all native bodies/text at the final
@@ -86,7 +87,9 @@ def right_translation(
     raise RuntimeError("bounded right-column candidate did not clear obstacles")
 
 
-def crossing_records(leader_banks, measurements):
+def crossing_records(leader_banks, measurements, decorations):
+    if leader_banks.keys() != decorations.keys():
+        raise ValueError("every native leader bank needs explicit decoration inventory")
     result = []
     for name, segments in leader_banks.items():
         for target, bounds in measurements.items():
@@ -98,7 +101,15 @@ def crossing_records(leader_banks, measurements):
                     for i, segment in enumerate(segments)
                     if intersects_cell(segment, cell)
                 ]
-                if hits:
+                adornments = [
+                    i
+                    for i, box in enumerate(decorations[name])
+                    if box.xmin <= cell.xmax
+                    and cell.xmin <= box.xmax
+                    and box.ymin <= cell.ymax
+                    and cell.ymin <= box.ymax
+                ]
+                if hits or adornments:
                     result.append(
                         {
                             "leader_annotation": name,
@@ -107,6 +118,7 @@ def crossing_records(leader_banks, measurements):
                             "text_cell_index": index,
                             "text_cell": cell.bounds,
                             "segments": hits,
+                            "decorations": adornments,
                             "target_text": [run.value for run in bounds.text_runs],
                         }
                     )
@@ -131,7 +143,7 @@ class _TextCells:
     text_runs: tuple[Any, ...]
 
 
-def vertical_candidates(crossings, leaders, *, clearance_m=0.001):
+def vertical_candidates(crossings, leaders, decorations, *, clearance_m=0.001):
     """Two finite native-column hypotheses, never a computed leader route."""
     if not math.isfinite(clearance_m) or clearance_m < 0:
         raise ValueError("vertical candidate clearance must be finite/nonnegative")
@@ -139,15 +151,25 @@ def vertical_candidates(crossings, leaders, *, clearance_m=0.001):
         return ()
     up, down = [], []
     for crossing in crossings:
-        chain = leaders[crossing["leader_annotation"]]
-        if len(chain) != 2 or math.dist(chain[0].end, chain[1].start) > 1e-8:
-            raise ValueError(
-                "vertical control requires one native three-point bent leader"
-            )
-        elbow_y = chain[0].end[1]
+        name = crossing["leader_annotation"]
         cell = Rect(*crossing["text_cell"])
-        up.append(max(0.0, cell.ymax + clearance_m - elbow_y))
-        down.append(min(0.0, cell.ymin - clearance_m - elbow_y))
+        if crossing["segments"]:
+            chain = leaders[name]
+            if len(chain) != 2 or math.dist(chain[0].end, chain[1].start) > 1e-8:
+                raise ValueError(
+                    "vertical control requires one native three-point bent leader"
+                )
+            elbow_y = chain[0].end[1]
+            up.append(max(0.0, cell.ymax + clearance_m - elbow_y))
+            down.append(min(0.0, cell.ymin - clearance_m - elbow_y))
+        for index in crossing["decorations"]:
+            primitive = decorations[name][index]
+            up.append(max(0.0, cell.ymax + clearance_m - primitive.ymin))
+            down.append(min(0.0, cell.ymin - clearance_m - primitive.ymax))
+    if not up:
+        raise ValueError(
+            "crossing inventory has no actual obstructing native primitives"
+        )
     return (
         VerticalCandidate(VerticalDirection.UP, max(up)),
         VerticalCandidate(VerticalDirection.DOWN, min(down)),
@@ -176,12 +198,14 @@ def _candidate_trials(
     right_seed,
     measured,
     leaders,
+    decorations,
     crossings,
     outline,
     obstacles,
     *,
     move_bank,
     read_leaders,
+    read_decorations,
     attempts,
     gap_m=0.003,
 ):
@@ -189,7 +213,7 @@ def _candidate_trials(
     if attempts:
         raise ValueError("candidate attempt log must start empty")
     last = right_seed
-    for candidate in vertical_candidates(crossings, leaders):
+    for candidate in vertical_candidates(crossings, leaders, decorations):
         delta = (0.0, candidate.dy_m)
         attempt = {
             "direction": candidate.direction.value,
@@ -204,8 +228,11 @@ def _candidate_trials(
             f"diagnostic right column {candidate.direction.value}",
         )
         actual_leaders = read_leaders(last)
+        actual_decorations = read_decorations(last)
         actual_crossings = crossing_records(
-            actual_leaders, _candidate_text_cells(measured, right_seed, last)
+            actual_leaders,
+            _candidate_text_cells(measured, right_seed, last),
+            actual_decorations,
         )
         body_clear = all(
             _clear(row.body, obstacle, gap_m)
@@ -221,6 +248,10 @@ def _candidate_trials(
                 "native_leaders": {
                     name: [asdict(segment) for segment in rows]
                     for name, rows in actual_leaders.items()
+                },
+                "native_leader_decorations": {
+                    name: [box.bounds for box in boxes]
+                    for name, boxes in actual_decorations.items()
                 },
                 "predicted_positions": {
                     name: row.position for name, row in last.items()
@@ -422,13 +453,22 @@ async def probe(adapter: Any, source: Path, requested_view: str | None):
         leaders_before = {
             name: _leaders(row.annotation) for name, row in before.items()
         }
+        decorations_before = {
+            name: measured_before[name].leader_decorations for name in before
+        }
         report["phases"]["before"] = {
             "bank": _records(before),
             "leaders": {
                 name: [asdict(segment) for segment in rows]
                 for name, rows in leaders_before.items()
             },
-            "crossings": crossing_records(leaders_before, measured_before),
+            "leader_decorations": {
+                name: [box.bounds for box in boxes]
+                for name, boxes in decorations_before.items()
+            },
+            "crossings": crossing_records(
+                leaders_before, measured_before, decorations_before
+            ),
             "semantics": semantics_before,
         }
         outline = Rect(*view.GetOutline())
@@ -462,13 +502,22 @@ async def probe(adapter: Any, source: Path, requested_view: str | None):
         compare(semantics_before, semantics_after, "alternative right column")
         measured_after = _measure_view(adapter, view)
         leaders_after = {name: _leaders(row.annotation) for name, row in after.items()}
+        decorations_after = {
+            name: measured_after[name].leader_decorations for name in after
+        }
         report["phases"]["after"] = {
             "bank": _records(after),
             "leaders": {
                 name: [asdict(segment) for segment in rows]
                 for name, rows in leaders_after.items()
             },
-            "crossings": crossing_records(leaders_after, measured_after),
+            "leader_decorations": {
+                name: [box.bounds for box in boxes]
+                for name, boxes in decorations_after.items()
+            },
+            "crossings": crossing_records(
+                leaders_after, measured_after, decorations_after
+            ),
             "semantics": semantics_after,
         }
         saved = export("right")
@@ -480,12 +529,17 @@ async def probe(adapter: Any, source: Path, requested_view: str | None):
                 after,
                 measured_after,
                 leaders_after,
+                decorations_after,
                 right_crossings,
                 outline,
                 obstacles,
                 move_bank=gtol._move_bank,
                 read_leaders=lambda bank: {
                     name: _leaders(row.annotation) for name, row in bank.items()
+                },
+                read_decorations=lambda bank: {
+                    name: annotation_box(adapter, row.annotation).leader_decorations
+                    for name, row in bank.items()
                 },
                 attempts=report["vertical_attempts"],
             )
@@ -510,7 +564,12 @@ async def probe(adapter: Any, source: Path, requested_view: str | None):
             final_leaders = {
                 name: _leaders(row.annotation) for name, row in final_bank.items()
             }
-            final_crossings = crossing_records(final_leaders, final_measured)
+            final_decorations = {
+                name: final_measured[name].leader_decorations for name in final_bank
+            }
+            final_crossings = crossing_records(
+                final_leaders, final_measured, final_decorations
+            )
             final_obstacles = tuple(
                 bounds.body
                 for name, bounds in final_measured.items()
@@ -525,6 +584,10 @@ async def probe(adapter: Any, source: Path, requested_view: str | None):
             report["phases"]["vertical_final"] = {
                 "bank": _records(final_bank),
                 "crossings": final_crossings,
+                "leader_decorations": {
+                    name: [box.bounds for box in boxes]
+                    for name, boxes in final_decorations.items()
+                },
                 "semantics": final_semantics,
                 "body_clearance": "clear" if body_clear else "blocked",
                 "selected_direction": direction.value
@@ -568,6 +631,24 @@ async def probe(adapter: Any, source: Path, requested_view: str | None):
         reopened_bank = gtol._read_gtols(adapter, matches[0], annotation_box)
         _same_saved_frames(_records(saved_bank), _records(reopened_bank))
         report["reopened_bank"] = _records(reopened_bank)
+        reopened_measured = _measure_view(adapter, matches[0])
+        reopened_crossings = crossing_records(
+            {name: _leaders(row.annotation) for name, row in reopened_bank.items()},
+            reopened_measured,
+            {
+                name: reopened_measured[name].leader_decorations
+                for name in reopened_bank
+            },
+        )
+        report["reopened_crossings"] = reopened_crossings
+        if (
+            report["vertical_outcome"]
+            in {"fresh_native_witness_clear", "right_column_already_clear"}
+            and reopened_crossings
+        ):
+            raise RuntimeError(
+                "saved/reopened native leader geometry crosses a text cell"
+            )
         report["outcome"] = "captured_alternative_not_production_layout"
     except Exception as error:
         report["error"] = repr(error)
