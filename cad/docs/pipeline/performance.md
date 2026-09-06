@@ -62,6 +62,12 @@ All five builds have the same rounded mass-properties/pose
 fingerprint; that fingerprint is not raw CAD-byte equality or a substitute for
 independent saved-model verification.
 
+Prepared pose handles and driver-bank release now live in `_channel_pose.py`,
+imported directly by the channel builder. The moved implementations are unchanged.
+The recipe-closure regression finds exactly one assembly consumer and no part
+consumers. Shared `_cwm.py` still supplies the drive train and, transitively,
+paper drive; there is no re-export that would pull channel-only edits into them.
+
 The corresponding task trace IDs, in table order, are
 `0x7f0525b4ba7b594486d3f433c3fad1c3`,
 `0x2e09f191b7027c43f04c5d9d4d2ab893`,
@@ -231,9 +237,17 @@ its insertion position after a clamped trial. Removing intermediate restores
 allowed all four absolute candidates to run; neither drawing cleared the measured
 view/annotation bodies. Eight copied datum controls also produced identical XY
 and PNG output with returned Z versus sheet Z=0. Neither a restore nor Z=0 is a
-solution to the observed clamping. Dimension-selected insertion remains under
-test: the shapes tried so far inserted a visible but unattached tag. An existing
-edge-attached gear datum refused `Shoulder=False` and reported `ForcedShoulder`.
+solution to the observed clamping. Both tested dimension-selection routes inserted
+a visible but unattached tag. Explicit `IAnnotation.SetAttachedEntities` with the
+exact bore display dimension succeeded, however. The stationary control at
+`5cdf2cc6` used no position writes: exact attachment, native label, generic rendered
+text and save/reopen passed, with byte-identical native/reopened PNGs. Its report
+is `datum-dimension-0t6r0820/datum-dimension-attachment.json` under the channel
+worktree's reports. Datum-specific text/primitives remained stale until reopening;
+the generic `IAnnotation.GetDisplayData` and `GetLabel` were current throughout.
+This establishes attachment/native placement, not complete production sheet fit.
+An existing edge-attached gear datum refused `Shoulder=False` and reported
+`ForcedShoulder`; that negative result does not establish other shoulder states.
 
 Save/reopen controls exposed a separate specification bug: drawing-only BASIC
 edits on four imported lever dimensions disappeared when the source refreshed.
@@ -246,7 +260,10 @@ drawings check it read-only. Drawing-created reference dimensions remain local.
 The shared copy probe now checks tolerance type as well as value, including after
 save/reopen. All three source builders completed at `8cc55ebd`. Pedestal and pen
 v-block drawings also completed and their renders show the required BASIC boxes;
-lever passed its read-only BASIC checks but stopped at datum placement. The
+lever passed its read-only BASIC checks but stopped at datum placement. Four saved
+pilots subsequently passed copy/move/scale/save/reopen with 36 supported geometry
+annotations and 32 dimensions, including values and tolerance types; original
+hashes were unchanged. Those controls precede the latest leader policy. The
 final-head copy/move/scale/save/reopen fleet check remains outstanding.
 
 Readback of the screw's old saved
@@ -276,14 +293,46 @@ The screw drawing subsequently exposed a datum-with-below-text case: its native
 frame switches sides by translating the upright frame/text body by the measured
 frame height, not by reflecting the entire body rectangle. The correction uses
 the actual closed native frame and checks both frame and complete body against
-the same translation. The fresh native rerun remains required.
+the same translation. That check passed natively; whole-sheet packing then found
+no feasible layout at 6:1 after an exhaustive 65-node search. Changing its views
+to 4:1 produced a complete native/PDF/PNG build without reducing text or clearance.
+The later pedestal rerun exposed a separate overly restrictive implementation
+guard: a datum anchor need not lie on a horizontal frame edge. Its exact native
+left-edge midpoint is a supported API position; the correction is under test.
 
 At `8cc55ebd`, pedestal and pen v-block integrated layout took 66.380 and 45.206
 seconds respectively. These are successful layout phases, not complete drawing
-times or evidence of a speedup. The new callout stage adds measurements and the
-remaining internal leader/text crossing work is not complete. The bounded native
-GTol reader now shares geometry parsers with full bounds and rejects unsupported
-multi-jog leaders; copied native parity/timing checks are pending.
+times or evidence of a speedup. The new callout stage adds measurements.
+
+The GTol placement policy now tries at most six measured column candidates and
+reads actual native leader routes after each move. A copied coherent lever control
+reduced crossings from two to zero with a 5.402991 mm upward adjustment, including
+the all-around circle; exact attachments, frame/text and save/reopen passed.
+Native leader chains and displayed open strokes are distinct representations:
+all eight displayed strokes were covered geometrically, including a reversed
+segment. The narrow bank reads took 0.328–0.356 seconds before reopening. The
+control deliberately omitted the independently failing datum/finish stage and
+therefore does not establish a successful production lever drawing.
+
+Final leader/text validation reuses the fresh complete packing readback, after
+all view and note movement. It adds no COM/font scan. At `d79ef253`:
+
+| pilot | task seconds | layout seconds | result |
+|---|---:|---:|---|
+| cone pivot screw | 68.655 | 40.316 | native/PDF/PNG complete |
+| pen marker | 35.984 | 19.181 | native/PDF/PNG complete |
+| pen v-block | 81.230 | 48.667 | native/PDF/PNG complete |
+| arbor pedestal | 33.831 | 4.046 | rejected horizontal-only datum-anchor guard |
+
+The three successful sheets were visually inspected. Their final pure clearance
+callbacks took 0.11–0.32 ms. These are individual integrated observations, not an
+end-to-end speedup estimate. Trace IDs, in table order, are
+`0x4fe8fcc1d4a91adb117bb6900817787a`, `0xc046351fc3dfa1a176843ccce71e106f`,
+`0xb71838804901ce89d55d57e9e4931ebf`, and
+`0xb36ec01f44a0da99670d9859def4ed66`. The bounded reader rejects unsupported
+multi-jog leaders. Explicit native stroke widths are respected; current GTol
+zero-width data certify centerlines plus native decoration boxes, not arbitrary
+layer/print stroke widths or exact glyph ink.
 
 The current bounds implementation is calibrated for SolidWorks 2026 (major
 revision 34) and the tested native font profile. It uses conservative GDI text
