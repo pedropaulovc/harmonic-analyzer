@@ -9,8 +9,11 @@ Only drawings referencing native parts are supported. Assembly drawings are
 rejected before copying or movement: their component ownership and transitive
 model dependencies need a separate snapshot contract.
 
-Dimension semantics are checked separately from attachment geometry, including
-imported dimensions with no supported attached entities. --dimension-values
+Dimension semantics include the source dimension's native tolerance type/BASIC
+designation, separately from attachment geometry, including imported dimensions
+with no supported attached entities. Multi-value hole-callout variable overrides
+are not represented by IDimensionTolerance.Type and are outside this witness.
+--dimension-values
 api-capture also records the current/older getter call shapes used to investigate
 native reference dimensions. Those observations are evidence, not fallback logic.
 """
@@ -172,7 +175,7 @@ def dimension_api_observations(dimension, configuration):
 
 
 def dimension_semantics(annotation, model, reference, *, observation="system"):
-    """Read actual dimension identity, view configuration and SI-system value."""
+    """Read identity, configuration, SI value and source tolerance designation."""
     raw_display = annotation.GetSpecificAnnotation()
     if raw_display is None:
         return None, {"reason": "annotation has no concrete display dimension"}
@@ -222,6 +225,10 @@ def dimension_semantics(annotation, model, reference, *, observation="system"):
             raise RuntimeError(
                 f"{full_name}: dimension system value is unreadable: {value}"
             )
+        native_tolerance = dimension.Tolerance
+        if native_tolerance is None:
+            raise RuntimeError(f"{full_name}: dimension has no native tolerance")
+        tolerance_type = int(_early_bound(native_tolerance, "IDimensionTolerance").Type)
         components.append(
             {
                 "name": name,
@@ -229,6 +236,10 @@ def dimension_semantics(annotation, model, reference, *, observation="system"):
                 "parameter_type": int(dimension.GetType()),
                 "value_system": round(float(value), 12),
                 "value_api": value_api,
+                "tolerance_type": tolerance_type,
+                "designation": "basic"
+                if tolerance_type == 1
+                else "other",  # swTolBASIC
             }
         )
         row = {"full_name": full_name}

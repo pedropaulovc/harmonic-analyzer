@@ -9,6 +9,12 @@ before/after/reopened exports and all observations survive a failed witness.
 
 The four named LeverOutline dimensions are this experiment's explicit scope.
 No production drawing/part, coordinate, annotation layout, or value is changed.
+
+R2026x positive control, 2026-09-06: the saved lever and its freshly read source
+had type 0 for all four targets. Copied-part type 1 persisted through both part
+and relinked drawing save/reopen; PDF/PNG restored all four boxes. All eleven
+dimension values and supported geometry signatures stayed unchanged; original
+part/drawing SHA-256 hashes matched. Untested: other releases and configurations.
 """
 
 from __future__ import annotations
@@ -150,13 +156,25 @@ def assert_part(before, after, stage, expected_type=None):
 
 
 def assert_drawing(before, after, stage, expected_type=None):
-    attachments.compare(before["semantics"], after["semantics"], stage)
-    prior_rows, rows = before["dimensions"], after["dimensions"]
-    if prior_rows.keys() != rows.keys():
-        raise RuntimeError(f"{stage}: display dimension inventory changed")
     expected = {
         f"{name}@{feature}" for feature, names in TARGETS.items() for name in names
     }
+    expected_semantics = deepcopy(before["semantics"])
+    if expected_type is not None:
+        # These exact source designations are the ONLY expected semantic change.
+        for semantic in expected_semantics.get("dimensions", {}).values():
+            if semantic["kind"] != "model_dimension":
+                continue
+            for component in semantic["components"]:
+                if component["qualified_name"].rsplit("@", 1)[0] in expected:
+                    component["tolerance_type"] = expected_type
+                    component["designation"] = (
+                        "basic" if expected_type == BASIC else "other"
+                    )
+    attachments.compare(expected_semantics, after["semantics"], stage)
+    prior_rows, rows = before["dimensions"], after["dimensions"]
+    if prior_rows.keys() != rows.keys():
+        raise RuntimeError(f"{stage}: display dimension inventory changed")
     found = []
     for key, prior in prior_rows.items():
         current = rows[key]
