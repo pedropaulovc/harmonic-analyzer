@@ -282,12 +282,98 @@ def test_control_has_one_property_setter_and_no_layout_setters_or_build_runner()
     for forbidden in (
         ".SetLeader3(",
         ".SetPosition2(",
-        ".SetUserPreferenceDouble(",
         "run_build(",
         ".CloseAllDocuments(",
     ):
         assert forbidden not in source
     assert "return run_owned_diagnostic(" in source
+
+
+def family_extension(monkeypatch):
+    monkeypatch.setattr(
+        probe.shoulder,
+        "_installed_swconst",
+        lambda: SimpleNamespace(
+            swDetailingNoOptionSpecified=0,
+            swDetailingGtolUseDocBentLeaderLength=1001,
+            swDetailingGtolBentLeaderLength=2001,
+        ),
+    )
+    state = {"toggle": True, "length": 0.01}
+    calls = []
+
+    def toggle(pref, option, value):
+        assert (pref, option) == (1001, 0)
+        calls.append(("toggle", pref, option, value))
+        state["toggle"] = value
+        return value  # documented resulting-state form: false is requested OFF
+
+    def length(pref, option, value):
+        assert (pref, option) == (2001, 0)
+        calls.append(("length", pref, option, value))
+        state["length"] = value
+        return True
+
+    extension = SimpleNamespace(
+        GetUserPreferenceDouble=lambda pref, option: state["length"],
+        GetUserPreferenceToggle=lambda pref, option: state["toggle"],
+        SetUserPreferenceToggle=toggle,
+        SetUserPreferenceDouble=length,
+    )
+    return extension, state, calls
+
+
+def test_family_defaults_never_write_annotation_and_use_exact_type_options(monkeypatch):
+    extension, state, calls = family_extension(monkeypatch)
+    result = probe.apply_length_scope(
+        object(), extension, probe.LengthScope.GTOL_DEFAULT
+    )
+    assert calls == [("toggle", 1001, 0, False), ("length", 2001, 0, 0.00635)]
+    assert state == {"toggle": False, "length": 0.00635}
+    assert result["toggle_returned"] is False and result["toggle_actual"] is False
+    assert result["length_returned"] is True
+
+
+@pytest.mark.parametrize(
+    "failure", ["toggle_ignored", "double_rejected", "double_wrong"]
+)
+def test_family_defaults_reject_native_getter_or_setter_failure(monkeypatch, failure):
+    extension, state, calls = family_extension(monkeypatch)
+    if failure == "toggle_ignored":
+        extension.SetUserPreferenceToggle = lambda *args: False
+    if failure == "double_rejected":
+        extension.SetUserPreferenceDouble = lambda *args: False
+    if failure == "double_wrong":
+        extension.SetUserPreferenceDouble = lambda *args: True
+    with pytest.raises(RuntimeError):
+        probe.apply_length_scope(object(), extension, probe.LengthScope.GTOL_DEFAULT)
+
+
+def test_document_driven_minus_one_is_scope_specific_not_geometry_waiver():
+    after = {**observed(probe.OVERRIDE_LENGTH_M), "length_readback_m": -1.0}
+    probe.verify_override(
+        observed(probe.DOCUMENT_LENGTH_M),
+        after,
+        probe.DOCUMENT_LENGTH_M,
+        scope=probe.LengthScope.GTOL_DEFAULT,
+    )
+    with pytest.raises(RuntimeError, match="scope"):
+        probe.verify_override(
+            observed(probe.DOCUMENT_LENGTH_M), after, probe.DOCUMENT_LENGTH_M
+        )
+    with pytest.raises(RuntimeError, match="horizontal"):
+        probe.verify_override(
+            observed(probe.DOCUMENT_LENGTH_M),
+            {**after, "horizontal_length_m": 0.073},
+            probe.DOCUMENT_LENGTH_M,
+            scope=probe.LengthScope.GTOL_DEFAULT,
+        )
+
+
+def test_individual_override_never_changes_document_defaults():
+    annotation = SimpleNamespace(BentLeaderLength=-1)
+    probe.apply_length_scope(annotation, object(), probe.LengthScope.ANNOTATION)
+    assert annotation.BentLeaderLength == 0.00635
 
 
 def test_live_worker_preserves_source_hashes_even_if_cleanup_refuses(tmp_path):
