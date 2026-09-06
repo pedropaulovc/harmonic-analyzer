@@ -15,6 +15,7 @@ from _drawing_common import (
     add_datum_feature,
     add_feature_control_frame,
     add_surface_finish,
+    auto_arrange_view_dimensions,
     curate_view_dimensions,
     import_cosmetic_threads,
     set_hidden_lines_removed,
@@ -151,6 +152,7 @@ def _decorate(adapter: Any, side: Any, end: Any, _iso: Any) -> None:
         control=surface_finish_by_key(SURFACE_FINISHES, "ground_shoulder"),
         label="ground shoulder finish",
     )
+    auto_arrange_view_dimensions(adapter, (side, end, right))
 
 
 RECIPE = FastenerSheet(

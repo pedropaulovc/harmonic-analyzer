@@ -26,6 +26,7 @@ from _drawing_common import (
     add_property_linked_note,
     add_surface_finish,
     add_view_centerline,
+    auto_arrange_view_dimensions,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -227,6 +228,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.100)
     add_property_linked_note(adapter, "Isometric View Note", 0.305, 0.135)
 
+    auto_arrange_view_dimensions(adapter, (front, end, iso))
     return await finalize_drawing(
         adapter,
         OUTPUTS,

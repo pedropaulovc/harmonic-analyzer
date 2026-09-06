@@ -31,6 +31,7 @@ from _drawing_common import (
     add_feature_control_frame,
     add_native_hole_callout,
     add_property_linked_note,
+    auto_arrange_view_dimensions,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -381,6 +382,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)
     add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.175)
 
+    auto_arrange_view_dimensions(adapter, (front, right, top, iso))
     return await finalize_drawing(
         adapter,
         OUTPUTS,
