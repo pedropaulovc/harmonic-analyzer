@@ -22,6 +22,10 @@ control was active. Neither is a verdict against the native leader mechanism.
 The default is the positive document-length route; no historical commits are
 required to run it. An independently saved pre-policy drawing must have B's
 non-forced Shoulder=False; pass --part when using an archived drawing copy.
+The diagnostic requires an empty native document session and refuses pre-existing
+documents; it never clears them. Cleanup closes only the exact owned copy with
+save=False. A later unrelated active/open document makes cleanup refuse, while
+source hashes and the final report are still checked/written.
 """
 
 from __future__ import annotations
@@ -69,6 +73,182 @@ class ControlMode(StrEnum):
     SHOULDER = "shoulder"
     BENT_LENGTH = "bent_length"
     DOCUMENT_LENGTH = "document_length"
+
+
+class OwnedDrawingCopy:
+    """One owned native drawing; references are witnessed, never close targets.
+
+    ISldWorks.CloseDoc may unload non-active hidden references. Consequently this
+    copy-only diagnostic requires an initially empty document inventory and
+    refuses any later unrelated document before even calling the scoped close.
+    """
+
+    def __init__(self, adapter, directory, source_part):
+        self.adapter = adapter
+        self.app = _early_bound(adapter.swApp, "ISldWorks")
+        self.directory = directory.resolve()
+        self.source_part = source_part.resolve()
+        self.handle = self.reference = self.expected = None
+        self.paths = set()
+        if (
+            self.app.GetDocuments()
+            or self.app.ActiveDoc is not None
+            or adapter.currentModel is not None
+        ):
+            raise RuntimeError(
+                "datum control requires an empty native document session; no existing documents were closed"
+            )
+
+    def _path(self, path):
+        path = path.resolve()
+        if path.parent != self.directory or path.suffix.lower() != ".slddrw":
+            raise RuntimeError(
+                "owned drawing path must be one exact copy inside the diagnostic directory"
+            )
+        return path
+
+    def _inventory(self, owned=None):
+        found = []
+        names = set()
+        for raw in self.app.GetDocuments() or ():
+            document = _early_bound(raw, "IModelDoc2")
+            native_path = str(document.GetPathName())
+            if not native_path:
+                raise RuntimeError(
+                    "unrelated unsaved document prevents isolated cleanup"
+                )
+            path = Path(native_path).resolve()
+            if path in names:
+                raise RuntimeError(
+                    "duplicate native document paths prevent isolated cleanup"
+                )
+            names.add(path)
+            if owned is not None and int(self.app.IsSame(document, owned)) == 1:
+                found.append(document)
+                continue
+            if (
+                path == self.source_part
+                and self.reference is not None
+                and int(self.app.IsSame(document, self.reference)) == 1
+            ):
+                continue  # never a close target, including when still loaded after close
+            if (
+                path == self.source_part
+                and owned is not None
+                and self.reference is None
+                and int(document.GetType()) == 1
+            ):
+                self.reference = (
+                    document  # first loaded implicitly by the owned drawing
+                )
+                continue
+            raise RuntimeError("unrelated native document prevents isolated cleanup")
+        if owned is not None and len(found) != 1:
+            raise RuntimeError(
+                "owned drawing is not the unique native inventory member"
+            )
+        if self.source_part not in names:
+            self.reference = None  # SW may unload an implicitly opened reference
+
+    def expect_open(self, path):
+        if self.handle is not None:
+            raise RuntimeError(
+                "previous owned drawing must close before another is opened"
+            )
+        self._inventory()
+        if self.app.ActiveDoc is not None or self.adapter.currentModel is not None:
+            raise RuntimeError(
+                "unrelated active document prevents opening a diagnostic copy"
+            )
+        self.expected = self._path(path)
+        self.paths = {self.expected}
+
+    def _validate_active(self):
+        current = _early_bound(self.adapter.currentModel, "IModelDoc2")
+        active = _early_bound(self.app.ActiveDoc, "IModelDoc2")
+        if (
+            current is None
+            or active is None
+            or int(self.app.IsSame(current, active)) != 1
+        ):
+            raise RuntimeError("active document is not the exact owned drawing")
+        path = Path(str(current.GetPathName())).resolve()
+        if path not in self.paths or int(current.GetType()) != 3:
+            raise RuntimeError(
+                "active native drawing path is not owned by this control"
+            )
+        title = str(current.GetTitle()).casefold()
+        if title not in {path.name.casefold(), path.stem.casefold()}:
+            raise RuntimeError(
+                "owned drawing native title does not match its exact path"
+            )
+        named = self.app.GetOpenDocumentByName(str(path))
+        if named is None or int(self.app.IsSame(named, current)) != 1:
+            raise RuntimeError(
+                "owned path does not resolve to the exact active native drawing"
+            )
+        if self.handle is not None and int(self.app.IsSame(current, self.handle)) != 1:
+            raise RuntimeError("owned native drawing identity was replaced")
+        self._inventory(current)
+        return current
+
+    def claim(self):
+        if self.expected is None:
+            raise RuntimeError("no diagnostic copy opening was authorized")
+        self.handle = self._validate_active()
+
+    def authorize_save(self, path):
+        if self.handle is None:
+            raise RuntimeError("only an already owned native drawing may be exported")
+        self._validate_active()
+        self.paths.add(self._path(path))
+
+    async def close(self):
+        if self.handle is None:
+            # A failed open may have reached SW before the adapter returned.
+            # Claim only the exact authorized path with the same full guards.
+            if self.expected is None:
+                return
+            if self.adapter.currentModel is None:
+                if (
+                    self.app.ActiveDoc is not None
+                    or self.app.GetOpenDocumentByName(str(self.expected)) is not None
+                ):
+                    raise RuntimeError(
+                        "failed open left an unclaimed active document; refusing cleanup"
+                    )
+                return
+            self.claim()
+        self._validate_active()
+        closed_paths = tuple(self.paths)
+        check(
+            "close exact owned datum copy without saving",
+            await self.adapter.close_model(save=False),
+        )
+        if any(
+            self.app.GetOpenDocumentByName(str(path)) is not None
+            for path in closed_paths
+        ):
+            raise RuntimeError("owned datum drawing remained open after scoped close")
+        self.handle = self.expected = None
+        self.paths.clear()
+        self._inventory()
+
+
+async def finalize_probe(owned, report, report_path):
+    """Source hashes and evidence survive a refusal to close unrelated state."""
+    try:
+        if owned is not None:
+            await owned.close()
+    except Exception as error:
+        report["cleanup_error"] = repr(error)
+        raise
+    finally:
+        try:
+            guard_sources(report)
+        finally:
+            report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+            _telemetry.info(f"native datum shoulder observations: {report_path}")
 
 
 def document_length(extension):
@@ -374,20 +554,18 @@ async def probe(
     app = _early_bound(adapter.swApp, "ISldWorks")
     report_path = directory / "datum-shoulder.json"
     baseline, target = None, None
-
-    def close():
-        if not app.CloseAllDocuments(True):
-            raise RuntimeError("failed to close copied shoulder documents")
-        adapter.currentModel = None
+    owned = None
 
     def export(stem):
         drawing = directory / f"{directory.name}-{stem}.SLDDRW"
         pdf, png = drawing.with_suffix(".pdf"), drawing.with_suffix(".png")
+        owned.authorize_save(drawing)
         save_drawing(adapter, str(drawing), pdf_path=str(pdf))
         render_pdf_png(pdf, png)
         return {"drawing": str(drawing), "pdf": str(pdf), "png": str(png)}
 
     try:
+        owned = OwnedDrawingCopy(adapter, directory, part)
         variants = {
             ControlMode.SHOULDER: ("straight", "bent"),
             ControlMode.BENT_LENGTH: ("native_bent", "extended_bent"),
@@ -403,6 +581,7 @@ async def probe(
             report["trials"].append(trial)
             try:
                 copy = directory / f"{directory.name}-{variant}-source.SLDDRW"
+                owned.expect_open(copy)
                 shutil.copy2(source, copy)
                 check(
                     "open unique rocker shoulder copy",
@@ -412,6 +591,7 @@ async def probe(
                     raise RuntimeError(
                         "active drawing is not the unique requested copy"
                     )
+                owned.claim()
                 records, handles = frames.capture(adapter, part)
                 key = find_target(records)
                 before = records[key]
@@ -516,11 +696,13 @@ async def probe(
                     ),
                     "shoulder position",
                 )
-                close()
+                await owned.close()
+                owned.expect_open(Path(trial["after_export"]["drawing"]))
                 check(
                     "reopen saved rocker shoulder copy",
                     await adapter.open_model(trial["after_export"]["drawing"]),
                 )
+                owned.claim()
                 reopened, reopened_handles = frames.capture(adapter, part)
                 trial["reopened"] = reopened[key]
                 if mode in (ControlMode.BENT_LENGTH, ControlMode.DOCUMENT_LENGTH):
@@ -567,16 +749,12 @@ async def probe(
             except Exception as error:
                 trial["error"] = repr(error)
             finally:
-                close()
+                await owned.close()
+    except Exception as error:
+        report["error"] = repr(error)
+        raise
     finally:
-        try:
-            close()
-        finally:
-            try:
-                guard_sources(report)
-            finally:
-                report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
-                _telemetry.info(f"native datum shoulder observations: {report_path}")
+        await finalize_probe(owned, report, report_path)
     if any("error" in trial for trial in report["trials"]):
         raise RuntimeError(f"native shoulder witness failed; evidence: {report_path}")
     return {"report": str(report_path)}
