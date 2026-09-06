@@ -495,22 +495,24 @@ def _line_weight_preferences() -> tuple[int, ...]:
     )
 
 
-def _thread_line_width(extension: Any) -> float:
-    """Native document cosmetic-thread print width, including custom weights."""
+def _thread_line_width(annotation: Any, extension: Any) -> float:
+    """Resolve the annotation's actual standard print weight, not its default.
+
+    The copied-thread metadata control (probe_drawing_thread_view --mode
+    metadata) observed Layer="", Width=swLW_THIN and empty native positions in
+    all four corrected views; their PDF paths use the matching 0.18mm width.
+    IAnnotation.Width is a swLineWeights_e value. Document line-font settings
+    are defaults and cannot certify a layer override or annotation custom width.
+    Those unproven contexts fail explicitly; no guessed document fallback.
+    """
     if extension is None:
         raise ValueError("cosmetic-thread bounds require native document line weight")
-    constants = _installed_swconst()
-    weight = int(
-        extension.GetUserPreferenceInteger(
-            constants.swLineFontCosmeticThreadThickness, 0
-        )
-    )
-    if weight == 10:  # swLW_CUSTOM; DP_LineFont documents this preference pair.
-        preference = constants.swLineFontCosmeticThreadThicknessCustom
-    elif weight in range(8):
-        preference = _line_weight_preferences()[weight]
-    else:
+    if annotation.Layer != "":
+        raise ValueError("cosmetic-thread layer width is not calibrated")
+    weight = annotation.Width
+    if not math.isfinite(weight) or int(weight) != weight or weight not in range(8):
         raise ValueError(f"unsupported cosmetic-thread print weight {weight}")
+    preference = _line_weight_preferences()[int(weight)]
     width = float(extension.GetUserPreferenceDouble(preference, 0))
     if not math.isfinite(width) or width <= 0:
         raise ValueError("native cosmetic-thread print width must be positive")
@@ -694,7 +696,7 @@ def _native_snapshot(annotation: Any, extension: Any = None) -> NativeSnapshot:
     # A valid copied screw thread exposed lines, a circle and projected polylines
     # through this very IAnnotation API. The old zero-diameter feature exposed
     # nothing. Never infer thread ink from its smaller simplified solid face.
-    thread_width = _thread_line_width(extension) if kind == 1 else 0.0
+    thread_width = _thread_line_width(annotation, extension) if kind == 1 else 0.0
     runs = []
     for index in range(counts["Text"]):
         if tuple(data.GetTextPlaneAtIndex(index) or ()):

@@ -33,6 +33,8 @@ def native_data(*, lines=(), arcs=(), polylines=()):
 
 def annotation(data):
     return SimpleNamespace(
+        Layer="",
+        Width=0,
         GetType=lambda: 1,
         GetName=lambda: "Cosmetic Thread1",
         GetDisplayData=lambda: data,
@@ -108,7 +110,9 @@ def annotation(data):
 def test_thread_lines_circle_and_projected_polyline_have_print_width(
     monkeypatch, data, expected
 ):
-    monkeypatch.setattr(bounds, "_thread_line_width", lambda extension: 0.00018)
+    monkeypatch.setattr(
+        bounds, "_thread_line_width", lambda annotation, extension: 0.00018
+    )
     snapshot = bounds._native_snapshot(annotation(data), object())
     result = bounds.bounds_from_snapshot(snapshot)
     assert result.body.bounds == pytest.approx(expected)
@@ -120,7 +124,9 @@ def test_thread_lines_circle_and_projected_polyline_have_print_width(
 
 
 def test_empty_thread_data_does_not_prove_zero_ink(monkeypatch):
-    monkeypatch.setattr(bounds, "_thread_line_width", lambda extension: 0.00018)
+    monkeypatch.setattr(
+        bounds, "_thread_line_width", lambda annotation, extension: 0.00018
+    )
     with pytest.raises(ValueError):
         bounds._native_snapshot(annotation(native_data()), object())
 
@@ -130,7 +136,9 @@ def test_empty_thread_data_does_not_prove_zero_ink(monkeypatch):
 def test_thread_line_rejects_nonfinite_xyz_before_projection(
     monkeypatch, value, coordinate
 ):
-    monkeypatch.setattr(bounds, "_thread_line_width", lambda extension: 0.00018)
+    monkeypatch.setattr(
+        bounds, "_thread_line_width", lambda annotation, extension: 0.00018
+    )
     line = [0, 32, 1, 0, 0.1, 0.2, 0, 0.3, 0.4, 0]
     line[coordinate] = value
     with pytest.raises(ValueError, match="XYZ geometry must be finite"):
@@ -139,7 +147,9 @@ def test_thread_line_rejects_nonfinite_xyz_before_projection(
 
 @pytest.mark.parametrize("normal", [(float("nan"), 0, 1), (0, 0, 0)])
 def test_thread_arc_requires_finite_nonzero_sheet_normal(monkeypatch, normal):
-    monkeypatch.setattr(bounds, "_thread_line_width", lambda extension: 0.00018)
+    monkeypatch.setattr(
+        bounds, "_thread_line_width", lambda annotation, extension: 0.00018
+    )
     arc = (0, 32, -1, -1, 0.08, 0.15, 0, 0.08, 0.15, 0, 0.07, 0.15, 0, *normal, 1)
     with pytest.raises(ValueError, match="normal geometry|drawing sheet plane"):
         bounds._native_snapshot(annotation(native_data(arcs=(arc,))), object())
@@ -162,7 +172,9 @@ def test_thread_arc_requires_finite_nonzero_sheet_normal(monkeypatch, normal):
     ],
 )
 def test_native_primitive_counts_cannot_silently_drop_records(monkeypatch, value, kind):
-    monkeypatch.setattr(bounds, "_thread_line_width", lambda extension: 0.00018)
+    monkeypatch.setattr(
+        bounds, "_thread_line_width", lambda annotation, extension: 0.00018
+    )
     data = native_data(lines=((0, 32, 1, 0, 0.1, 0.2, 0, 0.3, 0.4, 0),))
     setattr(data, f"Get{kind}Count", lambda: value)
     with pytest.raises(ValueError, match="invalid.*count"):
@@ -171,7 +183,9 @@ def test_native_primitive_counts_cannot_silently_drop_records(monkeypatch, value
 
 @pytest.mark.parametrize("count", [2.5, -1, float("nan")])
 def test_polyline_embedded_count_cannot_truncate(monkeypatch, count):
-    monkeypatch.setattr(bounds, "_thread_line_width", lambda extension: 0.00018)
+    monkeypatch.setattr(
+        bounds, "_thread_line_width", lambda annotation, extension: 0.00018
+    )
     polyline = (0, 0, 0, 32, -1, -1, count, 0.1, 0.2, 0, 0.3, 0.4, 0)
     with pytest.raises(ValueError, match="integral point count"):
         bounds._native_snapshot(
@@ -179,50 +193,75 @@ def test_polyline_embedded_count_cannot_truncate(monkeypatch, count):
         )
 
 
-@pytest.mark.parametrize("weight,preference", [(0, 100), (3, 103), (10, 901)])
-def test_native_thread_weight_uses_actual_standard_or_custom_preference(
-    monkeypatch, weight, preference
+@pytest.mark.parametrize("weight", range(8))
+def test_native_thread_weight_uses_actual_annotation_not_document_default(
+    monkeypatch, weight
 ):
-    monkeypatch.setattr(
-        bounds,
-        "_installed_swconst",
-        lambda: SimpleNamespace(
-            swLineFontCosmeticThreadThickness=900,
-            swLineFontCosmeticThreadThicknessCustom=901,
-        ),
-    )
     monkeypatch.setattr(
         bounds, "_line_weight_preferences", lambda: tuple(range(100, 108))
     )
     calls = []
+
+    def forbidden_default(*_args):
+        pytest.fail("document cosmetic defaults do not establish annotation width")
+
     extension = SimpleNamespace(
-        GetUserPreferenceInteger=lambda key, option: weight,
+        GetUserPreferenceInteger=forbidden_default,
         GetUserPreferenceDouble=lambda key, option: (
             calls.append((key, option)) or 0.00018
         ),
     )
-    assert bounds._thread_line_width(extension) == 0.00018
-    assert calls == [(preference, 0)]
+    actual = SimpleNamespace(Layer="", Width=weight)
+    assert bounds._thread_line_width(actual, extension) == 0.00018
+    assert calls == [(100 + weight, 0)]
 
 
 @pytest.mark.parametrize(
-    "weight,width", [(9, 0.00018), (-1, 0.00018), (0, 0), (0, float("nan"))]
+    "weight,width",
+    [
+        (9, 0.00018),
+        (-1, 0.00018),
+        (8, 0.00018),
+        (10, 0.00018),
+        (1.5, 0.00018),
+        (0, 0),
+        (0, float("nan")),
+        (0, float("inf")),
+    ],
 )
 def test_unknown_thread_weight_or_invalid_width_fails(monkeypatch, weight, width):
-    monkeypatch.setattr(
-        bounds,
-        "_installed_swconst",
-        lambda: SimpleNamespace(
-            swLineFontCosmeticThreadThickness=900,
-            swLineFontCosmeticThreadThicknessCustom=901,
-        ),
-    )
     monkeypatch.setattr(
         bounds, "_line_weight_preferences", lambda: tuple(range(100, 108))
     )
     extension = SimpleNamespace(
-        GetUserPreferenceInteger=lambda key, option: weight,
         GetUserPreferenceDouble=lambda key, option: width,
     )
     with pytest.raises(ValueError):
-        bounds._thread_line_width(extension)
+        bounds._thread_line_width(SimpleNamespace(Layer="", Width=weight), extension)
+
+
+@pytest.mark.parametrize("weight", [0, 7, 9, 10])
+def test_layered_thread_does_not_silently_inherit_document_width(weight):
+    actual = SimpleNamespace(Layer="Heavy threads", Width=weight)
+    with pytest.raises(ValueError, match="layer"):
+        bounds._thread_line_width(actual, object())
+
+
+def test_snapshot_uses_annotation_width_instead_of_raw_line_or_document_default(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        bounds, "_line_weight_preferences", lambda: tuple(range(100, 108))
+    )
+    actual = annotation(native_data(lines=((0, 32, 1, 0, 0.1, 0.2, 0, 0.1, 0.3, 0),)))
+    actual.Width = 3
+    calls = []
+    extension = SimpleNamespace(
+        GetUserPreferenceDouble=lambda key, option: (
+            calls.append((key, option)) or 0.0006
+        ),
+    )
+    result = bounds.bounds_from_snapshot(bounds._native_snapshot(actual, extension))
+    assert result.body.bounds == pytest.approx((0.0997, 0.1997, 0.1003, 0.3003))
+    assert calls == [(103, 0)]
+    assert result.native_strokes[0].width_m == 0.0006
