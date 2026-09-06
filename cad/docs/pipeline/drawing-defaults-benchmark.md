@@ -80,6 +80,40 @@ contrary to the bundled method page's resulting-state return description. The
 control records both and checks the getter; it does not infer the setting from
 the setter's Boolean alone.
 
+The independent surface-finish control at `55f14f9d` also passed. Only the
+view-owned Ra 1.6 leader changed: its anchor-to-elbow length became 6.35 mm,
+while its measured 1.75 mm symbol-side extension remained unchanged. Symbol
+body, model endpoint, attachments, dimension values/tolerances, and the other
+59 annotation records were preserved through save/reopen. The global datum
+and GTol-family settings, including the sheet-format symbols, were unchanged.
+Settings/readback took 0.102 seconds and one checked rebuild 0.162 seconds;
+the complete diagnostic took 96.394 seconds. Report:
+`gtol-leader-override-f4ty_f46/gtol-leader-override.json`. Root visual inspection
+found the shortened leader readable; the after/reopened PNGs are identical.
+
+The preceding SF attempt stopped before mutation because its diagnostic assumed
+a non-JIS symbol. The recipe actually pins native type 1. The corrected control
+preserves that exact existing type and omits only a getter documented as
+inapplicable to it; no production symbol-style change is part of this experiment.
+Both independent-family mechanisms are now proven on this copied rocker, but
+their combined production policy and the fresh lever drawing remain untested.
+
+## Prepared-template progress
+
+The first preparation stopped before saving because its MMGS-preset assertion
+did not match the existing helper's actual Custom/mm state. A two-blank-drawing
+control traced the exact cause: selecting MMGS returns preset 5, then explicitly
+setting linear units to millimetres changes the preset to Custom 4. The unchanged
+helper produces the same final values. The benchmark now preserves those exact
+values, with the complete repro in `diagnostics/probe_drawing_unit_defaults.py`.
+
+The next preparation passed its default-setting witness but produced no DRWDOT
+despite `IModelDocExtension.SaveAs3` returning `(True, 0, 0)`. The owned-output
+guard rejected it before any recipe trial. This is a failed save call shape,
+not proof that template saving is unavailable. A positive-control comparison
+against the existing native drawing-save path is pending; no template speedup
+has yet been measured. See `diagnostics/template_defaults.md` for provenance.
+
 ## Trial isolation
 
 All native trials require the machine-global seat, an explicitly identified
