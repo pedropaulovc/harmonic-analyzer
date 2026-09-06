@@ -32,6 +32,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "FulcrumProfile": {"FulcrumDia"},
 }
 
+# True-profile coordinates/radii live on the saved part. Imported drawings
+# verify these BASIC designations rather than changing an unsaved source model.
+SOURCE_BASIC_DIMENSIONS: dict[str, set[str]] = {
+    "LeverOutline": {"BarLength", "TipCentreX", "NoseRadius", "TipRadius"},
+}
+
 # Integral fulcrum hub (2026-09-02 photo re-derive, ch17 p.40 page002_img03):
 # the levers stack hub-to-hub on the fulcrum shaft at the station pitch; the
 # 19 `lever-bushing` spacers are retired. OD = the old bushing's O12.

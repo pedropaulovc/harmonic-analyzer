@@ -10,6 +10,7 @@ from arbor_pedestal_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
+from _basic_dimensions import require_basic_dimension
 from _drawing_project_layout import repair_project_drawing_layout
 from _drawing_common import (
     DrawingOutputs,
@@ -236,8 +237,8 @@ async def build(adapter: Any) -> dict[str, str]:
         annotation = front_by_name[name]
         display = adapter._attempt(lambda a=annotation: a.GetSpecificAnnotation())
         if display is None:
-            raise RuntimeError(f"{name} has no display dimension to box")
-        set_basic_dimension(adapter, display, label=f"flank {name} coordinate")
+            raise RuntimeError(f"{name} has no display dimension to verify")
+        require_basic_dimension(display, label=f"flank {name} coordinate")
     top_by_name = {
         dimension_name(adapter, annotation): annotation
         for annotation in top_annotations
@@ -245,13 +246,13 @@ async def build(adapter: Any) -> dict[str, str]:
     depth_annotation = top_by_name["Depth"]
     depth_display = adapter._attempt(lambda: depth_annotation.GetSpecificAnnotation())
     if depth_display is None:
-        raise RuntimeError("Depth has no display dimension to box")
-    set_basic_dimension(adapter, depth_display, label="far-face depth coordinate")
+        raise RuntimeError("Depth has no display dimension to verify")
+    require_basic_dimension(depth_display, label="far-face depth coordinate")
     dome_annotation = front_by_name["DomeDia"]
     dome_display = adapter._attempt(lambda: dome_annotation.GetSpecificAnnotation())
     if dome_display is None:
-        raise RuntimeError("DomeDia has no display dimension to box")
-    set_basic_dimension(adapter, dome_display, label="crown true-profile diameter")
+        raise RuntimeError("DomeDia has no display dimension to verify")
+    require_basic_dimension(dome_display, label="crown true-profile diameter")
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the plan view")
 

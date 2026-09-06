@@ -23,6 +23,7 @@ from pen_v_block_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
 from _common import CAD_ROOT, check, run_build
+from _basic_dimensions import require_basic_dimension
 from _drawing_project_layout import repair_project_drawing_layout
 from _drawing_common import (
     DrawingOutputs,
@@ -37,7 +38,6 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    set_basic_dimension,
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
@@ -48,6 +48,7 @@ from _drawing_entities import CircleEdge, LineEdge, ModelEntities
 from _gtol_spec import PlanarFace
 from _surface_finish import surface_finish_by_key
 from pen_v_block_spec import (
+    SOURCE_BASIC_DIMENSIONS,
     BLOCK_DEPTH,
     BLOCK_HEIGHT,
     BLOCK_LENGTH,
@@ -188,15 +189,15 @@ async def build(adapter: Any) -> dict[str, str]:
     # The two bore stations from datum B are the nominal locations the A-B-C
     # position FCF controls, so they must be BASIC -- leaving them under the
     # general/title-block tolerance would double-tolerance the bore positions.
-    # retain_view_dimensions yields IAnnotation; set_basic_dimension wants the
-    # IDisplayDimension, so resolve it via GetSpecificAnnotation.
+    # Verify the saved source contract, without modifying an imported dimension.
+    # retain_view_dimensions yields IAnnotation, so resolve its IDisplayDimension.
     top_by_name = {dimension_name(adapter, a): a for a in top_annotations}
-    for station in ("Bore0X", "Bore1X"):
+    for station in sorted(SOURCE_BASIC_DIMENSIONS["BoreProfile"]):
         annotation = top_by_name[station]
         display = adapter._attempt(lambda a=annotation: a.GetSpecificAnnotation())
         if display is None:
-            raise RuntimeError(f"{station} station has no display dimension to box")
-        set_basic_dimension(adapter, display, label=f"{station} basic bore station")
+            raise RuntimeError(f"{station} station has no display dimension to verify")
+        require_basic_dimension(display, label=f"{station} basic bore station")
     # Block height: dimension the right view's flat top/bottom silhouette
     # edges. The bottom edge is interrupted by the marker
     # groove (GROOVE_Z0..GROOVE_Z0 + GROOVE_WIDTH across the depth), so pick
