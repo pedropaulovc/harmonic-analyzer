@@ -1,5 +1,7 @@
 """Semantic drawing attachments must survive layout changes and fail on ambiguity."""
 
+import ast
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -7,6 +9,19 @@ import pytest
 
 from _drawing_entities import CircleEdge, EdgeAdjacentFace, FaceBoundary, FeatureFace, LineEdge, ModelEntities, ModelVertex
 from _gtol_spec import CylinderFace, PlanarFace
+
+
+@pytest.mark.parametrize("name", ["cone_pivot_screw", "cone_gear", "arbor_pedestal", "channel_lever", "rocker_arm", "pen_v_block", "pen_marker"])
+def test_migrated_native_annotations_leave_placement_to_solidworks(name):
+    tree = ast.parse(Path(__file__).with_name(f"draw_{name}.py").read_text(encoding="utf-8"))
+    calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
+             and isinstance(node.func, ast.Name)
+             and node.func.id in {"add_datum_feature", "add_feature_control_frame", "add_surface_finish"}]
+    assert calls
+    for call in calls:
+        keywords = {keyword.arg for keyword in call.keywords}
+        assert "entity" in keywords
+        assert not keywords.intersection({"edge_xy", "symbol_xy", "frame_xy", "leader_attach_xy", "selection_point_xy", "position_tolerance_m"})
 
 
 def circle(center, radius, axis=(0.0, 0.0, 1.0)):

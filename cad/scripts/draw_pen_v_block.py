@@ -255,19 +255,10 @@ async def build(adapter: Any) -> dict[str, str]:
     # Native datum/GD&T/surface annotations.  A = the bottom face the block
     # seats on; B = the left end the slit and both bore stations run from;
     # C = the broad front face.
-    # Hangs below the bottom edge (a perpendicular standoff -- an X offset would
-    # run along the edge and leave the attachment triangle no room). x=30 mm is
-    # the one pocket in the band below the view: the 26.00 dimension line stops
-    # at x=0.170 and the 32.00 sits down at y=0.058, so x 0.175..0.194 is clear
-    # between the edge and the 32.00 line. The 7.1 mm box lands at y 0.0639..0.071
-    # on an 8 mm leader, clearing the 32.00 line by 5.9 mm and the 32.00's right
-    # extension line (x=0.194) by 4.5 mm.
     add_datum_feature(
         adapter,
         front,
         entity=entities["bottom_front"],
-        selection_point_xy=(_sheet_x(30.0), _front_y(0.0)),
-        symbol_xy=(_sheet_x(30.0), _front_y(0.0) - 0.008),
         datum="A",
         label="block bottom face",
     )
@@ -276,8 +267,6 @@ async def build(adapter: Any) -> dict[str, str]:
         top,
         entity=entities["left_end"],
         entity_type="FACE",
-        selection_point_xy=(_sheet_x(0.0), TOP_CENTER[1]),
-        symbol_xy=(_sheet_x(0.0) - 0.018, TOP_CENTER[1]),
         datum="B",
         label="block left end",
     )
@@ -286,13 +275,6 @@ async def build(adapter: Any) -> dict[str, str]:
         right,
         entity=entities["broad"],
         entity_type="FACE",
-        selection_point_xy=(RIGHT_CENTER[0] - RIGHT_HALF_Z, RIGHT_CENTER[1]),
-        # -0.010, not -0.016: symbol_xy is the box's RIGHT edge here (the leader
-        # arrives from the right), so the 7.1 mm box grows LEFT -- at -0.016 it
-        # spanned x 0.2097..0.2168 and the ScrewHoleCz dimension line, vertical at
-        # x=0.214, ran straight through it and struck out the "C". Pairs with the
-        # ScrewHoleCz move to x=0.206: box left edge 0.2157 now clears it by 9.7 mm.
-        symbol_xy=(RIGHT_CENTER[0] - RIGHT_HALF_Z - 0.010, RIGHT_CENTER[1] - 0.020),
         datum="C",
         label="block broad face",
     )
@@ -300,7 +282,6 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         entity=entities["bore0"],
-        frame_xy=(0.198, 0.196),
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["pen bore position"],
         datums=("A", "B", "C"),
@@ -313,7 +294,6 @@ async def build(adapter: Any) -> dict[str, str]:
         right,
         entity=entities["top"],
         entity_type="FACE",
-        frame_xy=(0.300, 0.165),
         characteristic="parallelism",
         tolerance=GEOMETRIC_TOLERANCES_MM["block top-face parallelism"],
         datums=("A",),
@@ -322,39 +302,17 @@ async def build(adapter: Any) -> dict[str, str]:
     # Ra 1.6 on BOTH pen bores (the 2X functional pair) -- add_surface_finish
     # attaches to one edge, so each bore carries its own symbol; a single symbol
     # would leave the other Ø8 bore without the finish requirement.
-    #
-    # Both symbols stack in the empty space RIGHT of the top view. The ▽ tip sits
-    # AT the anchor and the body draws up-right from there (~46 x 19 mm), so the
-    # old shared y=0.240 dropped both glyphs onto the view, whose top edge is
-    # y=0.248; there is no room to lift them (the border cuts in) and the band
-    # under the view is full of bore stations and chamfer/screw callouts.
-    #
-    # The LEFT column cannot take bore 0 either, though it looks empty: the body
-    # would have to clear the left frame bound at ~0.0127 (ink >= 0.020, so
-    # ax >= 0.026) AND stop before the view at 0.0658 (ax <= 0.0248) -- an empty
-    # window. Dropping it lower-left instead puts its bore up-RIGHT of the anchor,
-    # the one direction that makes the leader strike through its own text.
-    #
-    # So bore 0 is picked at its TOP rather than a side: from the right, a leader
-    # to its top edge passes ~5 mm ABOVE bore 1 (y=0.2365 vs bore 1's 0.231),
-    # whereas a leader to either of its side edges would run straight through
-    # bore 1. y=0.244 keeps this leader off bore 1's Ra body below (top 0.239).
     add_surface_finish(
         adapter,
         top,
         entity=entities["bore0"],
-        symbol_xy=(0.205, 0.244),
         control=surface_finish_by_key(SURFACE_FINISHES, "pen_bore_0"),
         label="pen bore finish (bore 0)",
     )
-    # Bore 1's RIGHT silhouette point (x 30) now coincides with the top chamfer's
-    # start line in the top view (BLOCK_LENGTH - CHAMFER = 30), so the pick
-    # grabbed that edge instead of the circle; pick the LEFT point (x 22).
     add_surface_finish(
         adapter,
         top,
         entity=entities["bore1"],
-        symbol_xy=(0.205, 0.220),
         control=surface_finish_by_key(SURFACE_FINISHES, "pen_bore_1"),
         label="pen bore finish (bore 1)",
     )

@@ -139,19 +139,15 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         entity=bore_edge,
-        selection_point_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + BORE_R),
-        symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.028),
         datum="A",
         label="cone gear bore axis",
         shoulder=True,
-        position_tolerance_m=0.0001,
     )
     add_feature_control_frame(
         adapter,
         right,
         entity=entities["front_face"],
         entity_type="FACE",
-        frame_xy=(FRONT_FACE_X - 0.034, RIGHT_CENTER[1] + HALF_OD + 0.010),
         characteristic="perpendicularity",
         tolerance=GEOMETRIC_TOLERANCES_MM["gear face squareness to bore"],
         datums=("A",),
@@ -160,7 +156,6 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         front,
-        symbol_xy=(FRONT_CENTER[0] + 0.015, FRONT_CENTER[1] - 0.052),
         control=surface_finish_by_key(SURFACE_FINISHES, "cone_gear_bore"),
         label="cone gear bore finish",
         entity=bore_edge,

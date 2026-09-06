@@ -95,21 +95,18 @@ def _decorate(adapter: Any, side: Any, end: Any, _iso: Any) -> None:
         adapter,
         side,
         entity=roles["thread_end"],
-        symbol_xy=(0.115, 0.130),
         datum="A",
         label="thread pitch-diameter datum feature",
         callout_below=f"{THREAD} THREAD",
     )
-    for role, leader_xy, frame_xy, below_text, label in (
-        ("shoulder_end", (0.070, 0.16980), (0.108, 0.182), "SHOULDER OD", "shoulder total runout"),
-        ("head_bearing", (0.070, 0.17850), (0.108, 0.204), "HEAD OD", "head total runout"),
+    for role, below_text, label in (
+        ("shoulder_end", "SHOULDER OD", "shoulder total runout"),
+        ("head_bearing", "HEAD OD", "head total runout"),
     ):
         add_feature_control_frame(
             adapter,
             end,
             entity=roles[role],
-            leader_attach_xy=leader_xy,
-            frame_xy=frame_xy,
             characteristic="total_runout",
             tolerance=GEOMETRIC_TOLERANCES_MM[label],
             datums=("A",),
@@ -120,7 +117,6 @@ def _decorate(adapter: Any, side: Any, end: Any, _iso: Any) -> None:
         adapter,
         side,
         entity=roles["head_bearing"],
-        frame_xy=(0.240, 0.212),
         characteristic="perpendicularity",
         tolerance=GEOMETRIC_TOLERANCES_MM["head bearing face perpendicularity"],
         datums=("A",),
@@ -131,7 +127,6 @@ def _decorate(adapter: Any, side: Any, end: Any, _iso: Any) -> None:
         adapter,
         side,
         entity=roles["shoulder_end"],
-        frame_xy=(0.125, 0.170),
         characteristic="perpendicularity",
         tolerance=GEOMETRIC_TOLERANCES_MM["shoulder end perpendicularity"],
         datums=("A",),
@@ -143,7 +138,6 @@ def _decorate(adapter: Any, side: Any, end: Any, _iso: Any) -> None:
         right,
         entity=roles["slot_wall"],
         entity_type="FACE",
-        frame_xy=(0.325, 0.245),
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["slot median-plane position"],
         datums=("A",),
@@ -154,8 +148,6 @@ def _decorate(adapter: Any, side: Any, end: Any, _iso: Any) -> None:
         adapter,
         end,
         entity=roles["shoulder_end"],
-        symbol_xy=(0.125, 0.136),
-        leader_attach_xy=(0.08400, 0.13600),
         control=surface_finish_by_key(SURFACE_FINISHES, "ground_shoulder"),
         label="ground shoulder finish",
     )
