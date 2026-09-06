@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from _drawing_view_packing import Rect
+from _drawing_annotation_bounds import Segment
 from _drawing_native_callouts import (
     Direction,
     GtolPlacement,
@@ -151,6 +152,8 @@ class NativeAnnotation:
         self.moves = []
         self.text_ids = []
         self.parameter = "Ra 1.6"
+        self.dimension_value = 0.012
+        self.dimension_calls = []
         self.mode = "ordinary"
         self.specific = SimpleNamespace(
             GetAnnotation=lambda: self,
@@ -164,6 +167,23 @@ class NativeAnnotation:
             Orientation=1,
             GetText=self.get_text,
         )
+        if kind == 4:
+            self.dimension = SimpleNamespace(
+                Name="RD1",
+                FullName="RD1@Drawing View1@Test.Drawing",
+                GetType=lambda: 1,
+                GetSystemValue2=lambda configuration: (
+                    self.dimension_calls.append((2, configuration))
+                    or self.dimension_value
+                ),
+                GetSystemValue3=lambda option, configuration: (
+                    self.dimension_calls.append((3, option, configuration))
+                    or (self.dimension_value,)
+                ),
+            )
+            self.specific.Type2 = 2
+            self.specific.IsReferenceDim = lambda: True
+            self.specific.GetDimension2 = lambda index: self.dimension
 
     def get_text(self, index):
         self.text_ids.append(index)
@@ -223,6 +243,7 @@ def native_setup(monkeypatch, kind=2, outline=(0.02, 0.04, 0.1, 0.08)):
     calls = {annotation.GetName(): []}
     activations = []
     view = SimpleNamespace(
+        ReferencedConfiguration="Default",
         GetName2=lambda: "Front",
         GetOutline=lambda: outline,
         GetAnnotations=lambda: tuple(annotations),
@@ -257,7 +278,13 @@ def native_setup(monkeypatch, kind=2, outline=(0.02, 0.04, 0.1, 0.08)):
                 target[0] - 0.002, target[1], target[0] + 0.002, target[1] + 0.007
             )
         return SimpleNamespace(
-            anchor=(x, y), body=body, text_runs=(), format_signature=("font", 0.0035)
+            anchor=(x, y),
+            body=body,
+            text_runs=(),
+            format_signature=("font", 0.0035),
+            native_strokes=(Segment((x, y), (x, y + 0.007), 0.00018),)
+            if item.kind == 15
+            else (),
         )
 
     return adapter, view, annotation, annotations, calls, activations, measure
@@ -502,6 +529,194 @@ def test_non_deferred_unsupported_footprint_still_fails(monkeypatch):
             measure_annotation=strict_measure,
             gtol_placement=GtolPlacement.ARRANGED_NEXT,
         )
+
+
+@pytest.mark.parametrize("change", ["reattach", "value"])
+def test_unrelated_dimension_semantic_change_is_not_a_new_layout_baseline(
+    monkeypatch, change
+):
+    setup = native_setup(monkeypatch)
+    dimension = extra_annotation(setup, 4)
+    dimension.dimension_value = 0.127
+    original_move = setup[2].SetPosition2
+
+    def mutate_other_dimension(*point):
+        if change == "reattach":
+            dimension.entities = (object(),)
+        if change == "value":
+            dimension.dimension_value = 0.125
+        return original_move(*point)
+
+    setup[2].SetPosition2 = mutate_other_dimension
+    with pytest.raises(RuntimeError, match="obstacle attachment|dimension"):
+        run_native(setup)
+
+
+def test_reference_dimension_with_no_geometry_still_has_native_value_witness(
+    monkeypatch,
+):
+    setup = native_setup(monkeypatch)
+    dimension = extra_annotation(setup, 4)
+    dimension.entities = ()
+    dimension.GetAttachedEntityTypes = lambda: ()
+    run_native(setup)
+    assert dimension.dimension_calls == [(2, ""), (2, "")]
+
+
+def test_model_dimension_uses_the_exact_view_configuration(monkeypatch):
+    setup = native_setup(monkeypatch)
+    dimension = extra_annotation(setup, 4)
+    dimension.specific.IsReferenceDim = lambda: False
+    setup[1].ReferencedConfiguration = "Machining"
+    run_native(setup)
+    assert dimension.dimension_calls == [(3, 3, "Machining"), (3, 3, "Machining")]
+
+
+def test_both_chamfer_parameters_are_checked_even_when_print_text_does_not_change(
+    monkeypatch,
+):
+    setup = native_setup(monkeypatch)
+    dimension = extra_annotation(setup, 4)
+    second = SimpleNamespace(
+        Name="RD2",
+        FullName="RD2@Drawing View1@Test.Drawing",
+        GetType=lambda: 2,
+        GetSystemValue2=lambda _: dimension.dimension_value,
+    )
+    indices = []
+    dimension.specific.Type2 = 10
+    dimension.specific.GetDimension2 = lambda index: (
+        indices.append(index) or (dimension.dimension if index == 0 else second)
+    )
+    dimension.dimension.GetSystemValue2 = lambda _: 0.002
+    original_move = setup[2].SetPosition2
+
+    def change_angle(*point):
+        dimension.dimension_value = 0.785
+        return original_move(*point)
+
+    setup[2].SetPosition2 = change_angle
+    with pytest.raises(RuntimeError, match="dimension.*system value changed"):
+        run_native(setup)
+    assert indices == [0, 1, 0, 1]
+
+
+def test_obstacle_native_count_rejects_truncated_attachment_arrays(monkeypatch):
+    setup = native_setup(monkeypatch)
+    obstacle = extra_annotation(setup, 4)
+    obstacle.GetAttachedEntityCount3 = lambda: 2
+    with pytest.raises(RuntimeError, match="obstacle attachment inventory"):
+        run_native(setup)
+    assert not setup[2].moves
+
+
+def test_generic_null_obstacle_attachment_is_not_allowed(monkeypatch):
+    setup = native_setup(monkeypatch)
+    obstacle = extra_annotation(setup, 4)
+    obstacle.entities = (None,)
+    obstacle.GetAttachedEntityTypes = lambda: (0,)
+    with pytest.raises(RuntimeError, match="unsupported null"):
+        run_native(setup)
+
+
+def test_supported_null_centerline_keeps_explicit_geometry_exclusion(monkeypatch):
+    setup = native_setup(monkeypatch)
+    obstacle = extra_annotation(setup, 15)
+    obstacle.entities = (None,)
+    obstacle.GetAttachedEntityTypes = lambda: (0,)
+    result = run_native(setup)
+    assert (
+        "exact specific identity"
+        in result["front"]["obstacle_attachment_exclusions"][obstacle.GetName()]
+    )
+
+
+def test_null_centerline_internal_stroke_change_fails_even_with_unchanged_body(
+    monkeypatch,
+):
+    setup = native_setup(monkeypatch)
+    obstacle = extra_annotation(setup, 15)
+    obstacle.entities = (None,)
+    obstacle.GetAttachedEntityTypes = lambda: (0,)
+    adapter, view, *_rest, measure = setup
+
+    def changed_stroke(adapter, annotation):
+        measured = measure(adapter, annotation)
+        if annotation is obstacle and setup[2].moves:
+            measured.native_strokes = (Segment((0.2, 0.2), (0.2, 0.206), 0.00018),)
+        return measured
+
+    with pytest.raises(RuntimeError, match="centerline/stroke witness changed"):
+        arrange_native_callouts(
+            adapter, views={"front": view}, measure_annotation=changed_stroke
+        )
+
+
+def test_telemetry_retains_native_attempt_and_final_body_readbacks(monkeypatch):
+    import _drawing_native_callouts as module
+
+    setup = native_setup(monkeypatch)
+    rows = []
+    monkeypatch.setattr(
+        module._telemetry,
+        "info",
+        lambda message, **fields: rows.append((message, fields)),
+    )
+    result = run_native(setup)
+    import json
+
+    recorded = next(
+        fields
+        for message, fields in rows
+        if message == "native callout layout witnessed"
+    )
+    decoded = json.loads(recorded["callout_report"])
+    assert decoded["attempts"][setup[2].GetName()][0]["actual"] == list(
+        result["front"]["attempts"][setup[2].GetName()][0]["actual"]
+    )
+    assert decoded["bodies_after"][setup[2].GetName()] == list(
+        result["front"]["bodies_after"][setup[2].GetName()]
+    )
+
+
+@pytest.mark.parametrize("restore_result", [False, True])
+def test_failed_seed_restore_reports_native_return_and_actual_without_relaxation(
+    monkeypatch, restore_result
+):
+    import _drawing_native_callouts as module
+
+    setup = native_setup(monkeypatch, outline=(0.045, 0, 0.055, 0.08))
+    annotation = setup[2]
+    seed = annotation.position
+    rows = []
+    monkeypatch.setattr(
+        module._telemetry,
+        "info",
+        lambda message, **fields: rows.append((message, fields)),
+    )
+
+    def unstable_restore(x, y, z):
+        annotation.moves.append((x, y, z))
+        annotation.position = (seed[0], y, z)
+        if (x, y, z) == seed:
+            annotation.position = (seed[0] + 0.0002, y, z)
+            return restore_result
+        return True
+
+    annotation.SetPosition2 = unstable_restore
+    with pytest.raises(
+        RuntimeError,
+        match="seed could not be restored: seed=.*candidate_target=.*candidate_actual=.*restoration=",
+    ):
+        run_native(setup)
+    record = next(
+        fields
+        for message, fields in rows
+        if message == "native callout candidate readback rejected"
+    )
+    assert record["restoration_return"] is restore_result
+    assert record["restoration_actual"] == (seed[0] + 0.0002, seed[1], seed[2])
+    assert len(annotation.moves) == 2  # no silent continuation or tolerance relaxation
 
 
 def test_witnessed_native_datum_frame_flip_is_not_mistaken_for_deformation():
