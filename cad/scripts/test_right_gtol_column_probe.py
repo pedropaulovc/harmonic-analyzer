@@ -15,7 +15,38 @@ from probe_drawing_right_gtol_column import (
     vertical_candidates,
     VerticalDirection,
     _candidate_trials,
+    prove_narrow_reader,
 )
+
+
+@pytest.mark.parametrize("change", ["none", "segment", "decoration"])
+def test_narrow_native_reader_requires_exact_full_snapshot_parity(monkeypatch, change):
+    import probe_drawing_right_gtol_column as module
+
+    segments = (Segment((0.1, 0.2), (0.3, 0.2)),)
+    decorations = (Rect(0.1, 0.1, 0.11, 0.11),)
+    actual = SimpleNamespace(
+        segments=segments
+        if change != "segment"
+        else (Segment((0.1, 0.2), (0.31, 0.2)),),
+        decorations=decorations
+        if change != "decoration"
+        else (Rect(0.1, 0.1, 0.12, 0.12),),
+    )
+    monkeypatch.setattr(module, "annotation_leader_geometry", lambda _: actual)
+    bank = {"frame": SimpleNamespace(annotation=object())}
+    measured = {
+        "frame": SimpleNamespace(
+            leader_segments=segments, leader_decorations=decorations
+        )
+    }
+    if change != "none":
+        with pytest.raises(RuntimeError, match="narrow/full"):
+            prove_narrow_reader(bank, measured)
+        return
+    report = prove_narrow_reader(bank, measured)
+    assert report["count"] == 1
+    assert report["elapsed_s"] >= 0
 
 
 @pytest.mark.parametrize(
