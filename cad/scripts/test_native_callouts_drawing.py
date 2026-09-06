@@ -91,6 +91,7 @@ def symbol():
         ("A", True),
         ("A",),
         ("font", 0.0035),
+        Rect(0.0965, 0.2, 0.1035, 0.207),
     )
 
 
@@ -286,10 +287,22 @@ def native_setup(monkeypatch, kind=2, outline=(0.02, 0.04, 0.1, 0.08)):
             format_signature=("font", 0.0035),
             native_strokes=(Segment((x, y), (x, y + 0.007), 0.00018),)
             if item.kind == 15
+            else frame_strokes(body)
+            if item.kind == 2
             else (),
         )
 
     return adapter, view, annotation, annotations, calls, activations, measure
+
+
+def frame_strokes(frame):
+    corners = (
+        (frame.xmin, frame.ymin),
+        (frame.xmax, frame.ymin),
+        (frame.xmax, frame.ymax),
+        (frame.xmin, frame.ymax),
+    )
+    return tuple(Segment(a, b) for a, b in zip(corners, (*corners[1:], corners[0])))
 
 
 def run_native(setup, **kwargs):
@@ -825,10 +838,14 @@ def test_witnessed_native_datum_frame_flip_is_not_mistaken_for_deformation(monke
             0.18899999999799998,
         ),
     )
+    original = replace(original, frame=original.body)
     position = (0.05547827660427293, 0.15641199999799996, 0)
     delta = position[0] - original.position[0], position[1] - original.position[1]
     predicted = replace(
-        original, position=position, body=original.body.translated(delta)
+        original,
+        position=position,
+        body=original.body.translated(delta),
+        frame=original.frame.translated(delta),
     )
     actual = replace(
         predicted,
@@ -839,6 +856,7 @@ def test_witnessed_native_datum_frame_flip_is_not_mistaken_for_deformation(monke
             0.15641199999799996,
         ),
     )
+    actual = replace(actual, frame=actual.body)
     app = SimpleNamespace(IsSame=lambda a, b: int(a is b))
     _final_symbol(app, original, predicted, actual)
     records = []
@@ -869,3 +887,51 @@ def test_witnessed_native_datum_frame_flip_is_not_mistaken_for_deformation(monke
     assert evidence["actual_position"] == actual.position
     assert evidence["actual_body"][-1] == actual.body.ymax + 0.001
     assert len(evidence["allowed_bodies"]) == 2
+
+
+def test_native_thread_datum_below_text_translates_with_frame_side_change():
+    # Root trace0x100912bb5caf48420bfc276a3500d090, SW34.3.0. The complete
+    # upright text body shifts by the frame height; it is NOT reflected.
+    initial = replace(
+        symbol(),
+        position=(0.17860899992200002, 0.1272, 0.0),
+        body=Rect(0.175098999922, 0.12075874983431774, 0.209099799922, 0.1342),
+        frame=Rect(0.175108999922, 0.1272, 0.182108999922, 0.1342),
+    )
+    delta = (0, 0.10161200000000002 - initial.position[1])
+    predicted = replace(
+        initial,
+        position=(initial.position[0], 0.10161200000000002, 0),
+        body=initial.body.translated(delta),
+        frame=initial.frame.translated(delta),
+    )
+    actual = replace(
+        predicted,
+        body=Rect(
+            0.175098999922, 0.08817074983431775, 0.209099799922, 0.10161200000000002
+        ),
+        frame=predicted.frame.translated((0, -0.007)),
+    )
+    app = SimpleNamespace(IsSame=lambda a, b: int(a is b))
+    _final_symbol(app, initial, predicted, actual)
+    with pytest.raises(RuntimeError, match="post-style translation"):
+        _final_symbol(app, initial, predicted, replace(actual, frame=predicted.frame))
+    with pytest.raises(RuntimeError, match="post-style translation"):
+        _final_symbol(
+            app,
+            initial,
+            predicted,
+            replace(actual, body=actual.body.translated((0, -0.001))),
+        )
+
+
+def test_datum_frame_requires_complete_closed_native_geometry():
+    from _drawing_native_callouts import _datum_frame
+
+    frame = Rect(0.09, 0.2, 0.11, 0.21)
+    native = frame_strokes(frame)
+    assert _datum_frame(SimpleNamespace(native_strokes=native), (0.1, 0.2, 0)) == frame
+    with pytest.raises(RuntimeError, match="rectangular frame"):
+        _datum_frame(SimpleNamespace(native_strokes=native[:3]), (0.1, 0.2, 0))
+    with pytest.raises(RuntimeError, match="horizontal side"):
+        _datum_frame(SimpleNamespace(native_strokes=native), (0.1, 0.205, 0))
