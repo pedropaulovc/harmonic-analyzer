@@ -10,6 +10,7 @@ from __future__ import annotations
 import sys
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -370,6 +371,40 @@ def test_part_properties_use_release_revision():
     import _config
 
     assert part_properties("platen-guide")["Revision"] == _config.release_revision()
+
+
+def test_config_syntax_is_reused_by_content_not_source_path():
+    bg._config_references_in_text.cache_clear()
+    first = "import _config as cfg\nx = cfg.machine('gear_train')\n"
+    changed = "import _config as cfg\nx = cfg.machine('output')\n"
+    with patch.object(bg.ast, "parse", wraps=bg.ast.parse) as parse:
+        assert _tokens(first) == frozenset({"machine/gear_train.yaml"})
+        assert _tokens(first) == frozenset({"machine/gear_train.yaml"})
+        assert _tokens(changed) == frozenset({"machine/output.yaml"})
+    assert parse.call_count == 2, "identical shared helper syntax must be analyzed once"
+
+
+def test_cached_config_syntax_still_resolves_current_family_membership():
+    source = "import _config\nx = _config.machine('gear_train')\n"
+    with patch.object(
+        bg, "_family_tokens", side_effect=[frozenset({"before"}), frozenset({"after"})]
+    ) as resolve:
+        assert _tokens(source) == frozenset({"before"})
+        assert _tokens(source) == frozenset({"after"})
+    assert resolve.call_count == 2, "filesystem/config resolution is not a syntax fact"
+
+
+def test_cached_config_syntax_preserves_unknown_reference_rejection():
+    source = "import _config as cfg\nx = cfg.machine\n"
+    bg._config_references_in_text.cache_clear()
+    with patch.object(bg.ast, "parse", wraps=bg.ast.parse) as parse:
+        for _ in range(2):
+            try:
+                _tokens(source)
+            except bg._UnknownConfigUse:
+                continue
+            raise AssertionError("unclassified config reference must remain conservative")
+    assert parse.call_count == 1
 
 
 def _run() -> int:
