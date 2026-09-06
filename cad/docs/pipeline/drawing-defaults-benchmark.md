@@ -148,6 +148,55 @@ Subsequent drawing controls must use owned part copies; the generic protection
 for borrowed originals remains unchanged. No completed template timing comparison
 is available yet.
 
+At `ab264db8`, preparation passed again in 36.329 seconds. The first baseline
+then completed save/export but failed the copied-part disk witness: during
+finalization, that part changed from dirty to clean in memory and its file hash
+changed. The original part, original template and prepared template were
+unchanged. Scoped cleanup restored the exact original two-document baseline.
+The 104.641-second recipe interval (5.569 seconds in setup) is a failed benchmark
+trial, not an accepted comparison; no candidate or cold-reopen validation ran.
+The retained native drawing, PDF, PNG and changed source copy are under
+`C:/src/ha-perf-sheet-template/cad/out/reports/template-defaults/template-abba-ykoh1l_z/`.
+Root inspected the baseline PNG; that eye pass does not replace the unperformed
+cold-reopen checks.
+
+Immutable original inputs remain required. Assuming that an owned source copy
+also stayed byte-identical through the unchanged recipe was an additional
+benchmark assumption, now disproven. The next diagnostic design gives each arm
+an exact fresh starting copy and retains the resulting part as that arm's output.
+It must compare source dimension identities, values, tolerances and BASIC state,
+record presentation changes, and reopen both source and drawing cold. No changed
+copy is reset or overwritten to hide the side effect. Pre-authoring presentation
+in the part is a separate production change, not an equivalent baseline.
+
+## Quality and update settings: separate controls
+
+The existing HLR and HLV helpers call
+`IView.SetDisplayMode4(False, mode, False, False, True)`: both geometry and
+cosmetic threads are explicitly precision quality. A draft template default
+would be overwritten. Sheet size/scale, view quality, and application defaults
+must therefore be evaluated as separate factors.
+
+The first proposed quality control changes only `Faceted` to true at the existing
+view-local calls, leaving cosmetic threads at precision quality and retaining
+all explicit rebuilds. It must check `GetFacettedHlrDisplay`, `GetCThreadQuality`,
+display mode and parent-setting inheritance. For a final-precision experiment,
+restore precision before measured layout and final validation, refresh the
+display geometry, and include that conversion in total time. Permanent draft
+output would need its own rendering and persistence acceptance.
+
+This view-local control cannot speed up initial view creation: those views
+already exist when the helpers run. The creation-time hidden/wireframe quality
+setting, `swEdgeQualityWireframeHiddenViews`, is application-global, not a sheet
+property; any later experiment must capture and restore it explicitly.
+
+`IView.DisableAutoUpdate` is another per-view setting. Like the drawing-wide
+`AutomaticViewUpdate` property, its name does not establish an annotation
+batching benefit. First prove deferred work with a controlled source change on
+an owned source/drawing pair, then measure the cost of re-enabling and updating.
+`UpdateViewDisplayGeometry` updates accessible display data; do not assume it
+replaces the model rebuild. These quality/update controls have not run natively.
+
 ## Trial isolation
 
 All native trials require the machine-global seat, an explicitly identified
