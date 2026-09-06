@@ -270,3 +270,88 @@ def test_position_is_the_only_paired_insertion_delta(monkeypatch, target, select
         expected.append(("position", target))
         assert observed["requested"] == observed["actual"] == target
     assert events == [*expected, ("clear",), ("rebuild",)]
+
+
+def attachment_context(monkeypatch, *, returned=True, kind=1):
+    adapter, bore = context(monkeypatch)
+    adapter.currentModel.EditRebuild3 = Mock(return_value=True)
+    target, tag = object(), object()
+    annotation = SimpleNamespace(SetAttachedEntities=Mock(return_value=returned))
+    state = {"attachment_types": (kind,), "position": (0.1, 0.2, 0), "label": "A"}
+    handles = (annotation, tag, bore["view"], target)
+    states = Mock(side_effect=[(dict(state), handles) for _ in range(3)])
+    monkeypatch.setattr(probe, "datum_state", states)
+    for key in ("full_name", "value_m", "configuration", "source", "view_key"):
+        bore[key] = key
+    monkeypatch.setattr(probe, "bore_target", lambda _: bore)
+    payload = SimpleNamespace(varianttype=8201, value=[target])
+    array = Mock(return_value=payload)
+    monkeypatch.setattr(probe, "dispatch_array", array)
+    return adapter, bore, annotation, target, kind, payload, states, array
+
+
+@pytest.mark.parametrize("kind", [1, 14])
+def test_explicit_attachment_uses_typed_array_and_two_fresh_identity_witnesses(
+    monkeypatch, kind
+):
+    adapter, bore, annotation, target, _, payload, states, array = attachment_context(
+        monkeypatch, kind=kind
+    )
+    observations = {}
+    assert probe.explicit_attach(adapter, bore, annotation, target, kind, observations)
+    array.assert_called_once_with([target])
+    annotation.SetAttachedEntities.assert_called_once_with(payload)
+    assert states.call_count == 3  # before, immediate, rebuilt
+    adapter.currentModel.EditRebuild3.assert_called_once_with()
+    assert (
+        observations["immediate_identity"]
+        == observations["rebuilt_identity"]
+        == "exact"
+    )
+    probe.require_explicit_attachment(observations)
+
+
+def test_explicit_false_return_is_captured_but_never_accepted(monkeypatch):
+    adapter, bore, annotation, target, kind, _, states, _ = attachment_context(
+        monkeypatch, returned=False
+    )
+    observations = {}
+    assert not probe.explicit_attach(
+        adapter, bore, annotation, target, kind, observations
+    )
+    assert states.call_count == 3
+    with pytest.raises(RuntimeError, match="returned false"):
+        probe.require_explicit_attachment(observations)
+
+
+@pytest.mark.parametrize("stage", [1, 2])
+def test_explicit_true_return_does_not_hide_identity_replacement(monkeypatch, stage):
+    adapter, bore, annotation, target, kind, _, states, _ = attachment_context(
+        monkeypatch
+    )
+    tag = object()
+    handles = (annotation, tag, bore["view"], target)
+    values = [({"attachment_types": (kind,)}, handles) for _ in range(3)]
+    values[stage] = (values[stage][0], (*handles[:3], object()))
+    states.side_effect = values
+    observations = {}
+    assert probe.explicit_attach(adapter, bore, annotation, target, kind, observations)
+    with pytest.raises(RuntimeError, match="exact-entity witness failed"):
+        probe.require_explicit_attachment(observations)
+
+
+def test_untyped_attachment_array_fails_before_mutation(monkeypatch):
+    adapter, bore, annotation, target, kind, payload, _, _ = attachment_context(
+        monkeypatch
+    )
+    payload.varianttype = 8204
+    with pytest.raises(RuntimeError, match="typed VT_DISPATCH"):
+        probe.explicit_attach(adapter, bore, annotation, target, kind, {})
+    annotation.SetAttachedEntities.assert_not_called()
+
+
+def test_explicit_attachment_cannot_change_the_source_parameter(monkeypatch):
+    adapter, bore, annotation, target, kind, _, _, _ = attachment_context(monkeypatch)
+    monkeypatch.setattr(probe, "bore_target", lambda _: {**bore, "value_m": 99})
+    with pytest.raises(RuntimeError, match="changed the bore source dimension"):
+        probe.explicit_attach(adapter, bore, annotation, target, kind, {})
