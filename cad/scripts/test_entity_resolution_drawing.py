@@ -16,11 +16,14 @@ def test_migrated_native_annotations_leave_placement_to_solidworks(name):
     tree = ast.parse(Path(__file__).with_name(f"draw_{name}.py").read_text(encoding="utf-8"))
     calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
              and isinstance(node.func, ast.Name)
-             and node.func.id in {"add_datum_feature", "add_feature_control_frame", "add_surface_finish"}]
+             and node.func.id in {"add_datum_feature", "add_dimension_datum", "add_feature_control_frame", "add_surface_finish"}]
     assert calls
     for call in calls:
         keywords = {keyword.arg for keyword in call.keywords}
-        assert "entity" in keywords
+        if call.func.id == "add_dimension_datum":
+            assert {"dimension_annotation", "source_feature", "source_dimension"} <= keywords
+        else:
+            assert "entity" in keywords
         assert not keywords.intersection({"edge_xy", "symbol_xy", "frame_xy", "leader_attach_xy", "selection_point_xy", "position_tolerance_m"})
     arrange = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
                and isinstance(node.func, ast.Name) and node.func.id == "auto_arrange_view_dimensions"]

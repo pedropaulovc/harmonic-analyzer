@@ -1125,7 +1125,7 @@ def _stub_layout(monkeypatch, leader_crossings):
     monkeypatch.setattr(
         drawing_common,
         "collect_layout_elements",
-        lambda _adapter: ([], [], WHOLE_SHEET),
+        lambda _adapter, **_kwargs: ([], [], WHOLE_SHEET),
     )
     monkeypatch.setattr(
         drawing_common,
@@ -1206,7 +1206,7 @@ def test_the_ratchet_never_excuses_a_leader_across_a_VIEW():
     import _drawing_common as dc
 
     real_collect, real_audit = dc.collect_layout_elements, dc.audit_layout
-    dc.collect_layout_elements = lambda _a: ([], [], WHOLE_SHEET)
+    dc.collect_layout_elements = lambda _a, **_kwargs: ([], [], WHOLE_SHEET)
     dc.audit_layout = lambda *_a, **_k: ([], [], mixed)
     try:
         with pytest.raises(RuntimeError):

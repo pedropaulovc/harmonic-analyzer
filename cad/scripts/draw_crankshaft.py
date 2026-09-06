@@ -345,12 +345,11 @@ async def build(adapter: Any) -> dict[str, str]:
         for annotation in front_annotations
     ):
         raise RuntimeError("crankshaft end view is missing ShaftDiaDim annotation")
-    # Establish datum A from the cylindrical OD itself.  A datum tag associated
-    # with the diameter display dimension renders correctly but reports its
-    # primitive geometry in the dimension's model coordinate frame, which makes
-    # the sheet-space layout audit read a false off-sheet leader.  The visible
-    # circular rim is the same cylindrical datum feature and reports truthful
-    # sheet-space tag geometry.
+    # Retain the existing cylindrical-OD edge route here. The gear copy control
+    # probe_datum_dimension_attachment.py disproves the old dimension-local-frame
+    # premise: IDatumTag-specific display data can be stale before reopen while
+    # generic IAnnotation display data is current. A crankshaft dimension route
+    # has not yet received that exact-attachment/native-layout validation.
     right_end_edges = _visible_shaft_end_edges(adapter, right)
     crank_end_edge = right_end_edges[0][1]
     far_end_edge = right_end_edges[-1][1]
