@@ -83,6 +83,7 @@ class AnnotationBounds:
     text_runs: tuple[TextRun, ...]
     leader_segments: tuple[Segment, ...]
     format_signature: tuple[Any, ...]
+    native_strokes: tuple[Segment, ...]
 
 
 def _rectangle(points: list[Point]) -> Rect:
@@ -416,6 +417,7 @@ def bounds_from_snapshot(
         snapshot.text_runs,
         leaders,
         snapshot.format_signature,
+        snapshot.lines,
     )
 
 
