@@ -4,6 +4,8 @@ Run native dimension/GTol arrangement before this helper. ``measure_annotation``
 is the native ``annotation_box(adapter, annotation)`` callback: it must expose
 envelope, name, kind, text_runs and format_signature. Unsupported annotations
 must raise; this module never substitutes nominal symbol sizes or drops them.
+The unsupported-entity centerline witness additionally requires native_strokes
+(each stroke's measured start, end and width_m), without another COM pass.
 
 Pass every drawing view explicitly. Projection alignment/order and free-note
 associations are recipe metadata, never inferred from nearby XY coordinates.
@@ -42,8 +44,10 @@ signatures, fixed obstacles, and measured fit are rechecked. Failure raises and
 leaves the unsaved drawing for the caller to discard; no save or rollback occurs.
 Immutable model-geometry identity across save/reopen remains the attachment
 probe's independent gate. Conservative font cells are not tight rendered ink.
-Null attachment handles fail; a native control exposing zero attachments is
-reported as a geometry-identity exclusion rather than a successful entity check.
+Null attachment handles fail except the measured, non-dangling view-owned
+centerline with one unsupported swSelNOTHING slot. Its native owner, annotation,
+specific interface and full stroke translation are checked; underlying entity
+identity is explicitly excluded. Zero attachments are also an identity exclusion.
 Completed readbacks that fail position or fit validation persist their measured
 evidence under cad/out/reports/native-layout. Raw residuals are unrounded sheet
 metres, not a second acceptance policy; solver and position tolerances stay intact.
@@ -144,6 +148,12 @@ class NativeLayoutReport:
 
 
 @dataclass(frozen=True)
+class _CenterlineWitness:
+    specific: Any
+    strokes: tuple[tuple[tuple[float, ...], tuple[float, ...], float], ...]
+
+
+@dataclass(frozen=True)
 class _Snapshot:
     positions: Mapping[str, tuple[float, ...]]
     scales: Mapping[str, tuple[float, ...]]
@@ -156,6 +166,7 @@ class _Snapshot:
     attached_entities: Mapping[tuple[str, str, int], tuple[Any, ...]]
     note_positions: Mapping[str, tuple[float, ...]]
     annotation_bounds: Mapping[tuple[str, str, int], Rect]
+    centerlines: Mapping[tuple[str, str, int], _CenterlineWitness]
     drawable: Rect
     sheet_properties: tuple[float, ...]
 
@@ -250,6 +261,44 @@ def _annotation_key(
     return owner, name, kind
 
 
+def _unsupported_centerline(adapter, annotation, key, measured, types, attached):
+    # GetAttachedEntities3 documents NULL/swSelNOTHING for either dangling OR
+    # unsupported entities. The probe_drawing_primitive_annotations.py control
+    # observes this one-slot, non-dangling drawing centerline, never a generic
+    # allowance for other kinds/owners or partially missing geometry handles.
+    if (
+        key[2] != 15
+        or int(annotation.OwnerType) != 0
+        or types != (0,)
+        or len(attached) != 1
+        or attached[0] is not None
+    ):
+        raise RuntimeError(
+            f"annotation attachment identity has a null native handle: {key}"
+        )
+    if annotation.IsDangling():
+        raise RuntimeError(f"native centerline is dangling: {key}")
+    raw = annotation.GetSpecificAnnotation()
+    if raw is None:
+        raise RuntimeError(f"native centerline specific interface is missing: {key}")
+    specific = _early_bound(raw, "ICenterLine")
+    if int(adapter.swApp.IsSame(specific.GetAnnotation(), annotation)) != 1:
+        raise RuntimeError(
+            f"native centerline specific annotation identity differs: {key}"
+        )
+    strokes = []
+    for stroke in measured.native_strokes:
+        start = _values(stroke.start, 2, f"{key} centerline stroke start")
+        end = _values(stroke.end, 2, f"{key} centerline stroke end")
+        width = float(stroke.width_m)
+        if start == end or not math.isfinite(width) or width <= 0:
+            raise RuntimeError(f"native centerline stroke geometry is invalid: {key}")
+        strokes.append((start, end, width))
+    if not strokes:
+        raise RuntimeError(f"native centerline has no measured stroke witness: {key}")
+    return _CenterlineWitness(specific, tuple(strokes))
+
+
 def _snapshot(
     adapter: Any,
     views: Mapping[str, Any],
@@ -320,6 +369,7 @@ def _snapshot(
         note_by_annotation[key] = note
     seen, signatures, entities, obstacles, note_positions = {}, {}, {}, {}, {}
     annotation_bounds = {}
+    centerlines = {}
     for native_view in inventory:
         for raw in native_view.GetAnnotations() or ():
             annotation = _early_bound(raw, "IAnnotation")
@@ -347,8 +397,8 @@ def _snapshot(
                     f"annotation attachment inventory is incomplete: {key}"
                 )
             if any(entity is None for entity in attached):
-                raise RuntimeError(
-                    f"annotation attachment identity has a null native handle: {key}"
+                centerlines[key] = _unsupported_centerline(
+                    adapter, annotation, key, measured, types, attached
                 )
             entities[key] = attached
             text = tuple(
@@ -419,6 +469,7 @@ def _snapshot(
         entities,
         note_positions,
         annotation_bounds,
+        centerlines,
         drawable,
         properties,
     )
@@ -473,11 +524,21 @@ def _report(
             **{str(key): value for key, value in before.obstacles.items()},
         },
         attachment_identity_exclusions={
-            str(
-                key
-            ): "native annotation exposes no attached entities; geometry identity not checked"
-            for key, entities in before.attached_entities.items()
-            if not entities and key[2] in {2, 4, 5, 7}
+            **{
+                str(
+                    key
+                ): "native annotation exposes no attached entities; geometry identity not checked"
+                for key, entities in before.attached_entities.items()
+                if not entities and key[2] in {2, 4, 5, 7}
+            },
+            **{
+                str(
+                    key
+                ): "non-dangling native centerline has unsupported swSelNOTHING entity; "
+                "annotation/owner/specific identity and native stroke translation checked, "
+                "underlying model-entity identity not checked"
+                for key in before.centerlines
+            },
         },
         footprint_exclusions={
             str(
@@ -861,12 +922,41 @@ def repair_native_layout(
         raise RuntimeError(
             "native layout changed annotation inventory, attachments, text, or format"
         )
+    if before.centerlines.keys() != after.centerlines.keys():
+        raise RuntimeError(
+            "native layout changed unsupported centerline entity inventory"
+        )
+    for key, witness in before.centerlines.items():
+        observed = after.centerlines[key]
+        if int(adapter.swApp.IsSame(witness.specific, observed.specific)) != 1:
+            raise RuntimeError(
+                f"native layout replaced centerline specific identity: {key}"
+            )
+        if len(witness.strokes) != len(observed.strokes):
+            raise RuntimeError(f"native layout changed centerline stroke count: {key}")
+        view = key[0].removeprefix("view:")
+        delta = tuple(
+            a - b for a, b in zip(after.positions[view], before.positions[view])
+        )
+        for original, actual in zip(witness.strokes, observed.strokes, strict=True):
+            expected = [
+                tuple(a + b for a, b in zip(point, delta)) for point in original[:2]
+            ]
+            if original[2] != actual[2] or any(
+                math.dist(target, point) > position_tolerance_m
+                for target, point in zip(expected, actual[:2])
+            ):
+                raise RuntimeError(
+                    f"native layout changed centerline stroke translation/width: {key}"
+                )
     for key, annotation in before.annotations.items():
         if int(adapter.swApp.IsSame(annotation, after.annotations[key])) != 1:
             raise RuntimeError(f"native layout replaced annotation identity: {key}")
         for original, observed in zip(
             before.attached_entities[key], after.attached_entities[key], strict=True
         ):
+            if key in before.centerlines and original is None and observed is None:
+                continue  # Explicit unsupported-entity witness above, not entity identity.
             if int(adapter.swApp.IsSame(original, observed)) != 1:
                 raise RuntimeError(
                     f"native layout changed exact attachment identity: {key}"

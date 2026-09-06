@@ -265,6 +265,7 @@ def measure(_adapter, annotation):
         kind=annotation.kind,
         envelope=annotation.rectangle,
         format_signature=(annotation.font, 0.0035),
+        native_strokes=getattr(annotation, "strokes", ()),
         text_runs=(
             SimpleNamespace(
                 value=annotation.text,
@@ -672,6 +673,112 @@ def test_null_attachment_handle_is_not_accepted_as_unchanged_geometry(monkeypatc
     adapter, options, _events = scene(monkeypatch, {"front": front})
     with pytest.raises(RuntimeError, match="null native handle"):
         native.repair_native_layout(adapter, **options)
+
+
+class CenterlineAnnotation(Annotation):
+    def __init__(self, owner):
+        super().__init__(
+            "centerline", Rect(-1, 2.9, 1, 3.1), owner=owner, kind=15, attachments=(0,)
+        )
+        self.entities = (None,)
+        self.dangling = False
+        self.specific = SimpleNamespace(GetAnnotation=lambda: self)
+        self.strokes = (SimpleNamespace(start=(-1, 3), end=(1, 3), width_m=0.00018),)
+
+    def GetSpecificAnnotation(self):
+        return self.specific
+
+    def IsDangling(self):
+        return self.dangling
+
+    def shift(self, dx, dy):
+        super().shift(dx, dy)
+        self.strokes = tuple(
+            SimpleNamespace(
+                start=(stroke.start[0] + dx, stroke.start[1] + dy),
+                end=(stroke.end[0] + dx, stroke.end[1] + dy),
+                width_m=stroke.width_m,
+            )
+            for stroke in self.strokes
+        )
+
+
+def test_non_dangling_native_centerline_reports_entity_exclusion_and_checks_strokes(
+    monkeypatch,
+):
+    front = View("front", Rect(-1, 2, 1, 4))
+    centerline = CenterlineAnnotation(front)
+    front.annotations = [centerline]
+    adapter, options, _ = scene(monkeypatch, {"front": front})
+    result = native.repair_native_layout(adapter, **options)
+    assert result.status is native.NativeLayoutStatus.APPLIED
+    assert result.attachment_identity_exclusions == {
+        "('view:front', 'centerline', 15)": "non-dangling native centerline has unsupported swSelNOTHING entity; "
+        "annotation/owner/specific identity and native stroke translation checked, "
+        "underlying model-entity identity not checked"
+    }
+    assert centerline.strokes[0].start == (0, 3)
+    assert centerline.strokes[0].end == (2, 3)
+
+
+@pytest.mark.parametrize(
+    "change",
+    ["dangling", "types", "specific", "roundtrip", "missing_strokes", "end", "width"],
+)
+def test_centerline_exception_rejects_changed_or_unproven_native_witness(
+    monkeypatch, change
+):
+    front = View("front", Rect(-1, 2, 1, 4))
+    centerline = CenterlineAnnotation(front)
+    front.annotations = [centerline]
+    adapter, options, _ = scene(monkeypatch, {"front": front})
+    rebuilt = []
+
+    def rebuild():
+        rebuilt.append(True)
+        if change == "dangling":
+            centerline.dangling = True
+        if change == "types":
+            centerline.attachments = (1,)
+        if change == "specific":
+            centerline.specific = SimpleNamespace(GetAnnotation=lambda: centerline)
+        if change == "roundtrip":
+            centerline.specific.GetAnnotation = lambda: object()
+        if change == "missing_strokes":
+            centerline.strokes = ()
+        if change == "end":
+            centerline.strokes[0].end = (1.5, 3)
+        if change == "width":
+            centerline.strokes[0].width_m = 0.0003
+        return True
+
+    adapter.currentModel.EditRebuild3 = rebuild
+    with pytest.raises(RuntimeError, match="centerline|null native handle"):
+        native.repair_native_layout(adapter, **options)
+    assert rebuilt == [True]
+
+
+@pytest.mark.parametrize("change", ["kind", "owner", "count", "type", "dangling"])
+def test_centerline_null_exception_does_not_extend_to_unobserved_attachment_shapes(
+    monkeypatch, change
+):
+    front = View("front", Rect(-1, 2, 1, 4))
+    centerline = CenterlineAnnotation(front)
+    if change == "kind":
+        centerline.kind = 13
+    if change == "owner":
+        centerline.OwnerType = 1
+    if change == "count":
+        centerline.attachments, centerline.entities = (0, 0), (None, None)
+    if change == "type":
+        centerline.attachments = (1,)
+    if change == "dangling":
+        centerline.dangling = True
+    front.annotations = [centerline]
+    adapter, options, _ = scene(monkeypatch, {"front": front})
+    with pytest.raises(RuntimeError, match="null native handle|centerline is dangling"):
+        native.repair_native_layout(adapter, **options)
+    assert front.moves == []
 
 
 def test_zero_attachment_model_dimension_has_explicit_identity_exclusion(monkeypatch):
