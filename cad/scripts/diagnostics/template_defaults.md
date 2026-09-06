@@ -1,5 +1,47 @@
 # Prepared drawing-template control
 
+## Independent setup-only control
+
+`benchmark_template_setup.py` isolates the sheet-default question from full-recipe
+source writes and drawing persistence. It prepares one derived DRWDOT with the
+existing helper, then creates four fresh **blank** owned drawings in ABBA order:
+current setup, prepared setup, prepared setup, current setup. No part/source is
+opened; there is no model view, new dimension, layout repair, drawing save or
+PDF/PNG export. Only one-time preparation saves its owned DRWDOT.
+
+Each trial must remain an unsaved drawing with exactly one sheet and no model
+views. The complete existing defaults snapshot must equal preparation, hence
+all four arms must agree: units/precision, dimension style scopes, sheet
+properties and sheet-note content/format. The already proven zero-native-ink
+linked-note class is the only extent exclusion, with its raw observation retained.
+All owned trial drawings close without saving; pre-existing native documents,
+the original project template and the prepared template remain protected.
+
+After freezing/review and a separate exclusive seat grant, from the isolated
+worktree with `HARMONIC_SW_AUTOSTART=0`, remote cache off and the expected existing
+PID in `HARMONIC_DIAGNOSTIC_SW_PID`:
+
+```powershell
+uv run python cad/scripts/diagnostics/benchmark_template_setup.py --scale 2 1 --decimals 2
+```
+
+The parent still uses the existing `dodo._run(..., com=True)` attach-only route.
+One `template-setup-abba-*` report directory contains preparation and each arm's
+full defaults, blank-sheet witness, input hashes, status and errors. Preparation
+time includes its save/inheritance checks/cleanup. Trial `setup_seconds` excludes
+ownership inventories, default witnesses and cleanup; `witness_seconds`,
+`cleanup_seconds` and inclusive `trial_elapsed_seconds` are separate. Input and
+runtime fingerprint checks are outside those inner timers. Cleanup errors retain
+the original setup/witness failure; a mismatch stops before another trial.
+
+This is an offline-tested control awaiting native validation, **not** an
+end-to-end speedup result or a replacement for saved-drawing/visual acceptance.
+The full-recipe benchmark below and its strict cold-reopen gates are unchanged.
+Native shape references are bundled `IDrawingDoc/GetViews.md` (one array per
+sheet, sheet-view first) and `IModelDoc2/GetPathName.md` (empty for unsaved files).
+
+## Full-recipe control
+
 `benchmark_template_defaults.py` compares the same pinned recipe in ABBA order:
 current setup, inherited-template setup, inherited-template setup, current setup.
 It is a diagnostic, not a production template change. No native result or speedup
