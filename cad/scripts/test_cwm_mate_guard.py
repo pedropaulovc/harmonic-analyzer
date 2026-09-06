@@ -14,6 +14,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 
@@ -390,3 +391,108 @@ def test_prepared_pose_groups_reject_an_incomplete_component_slice(pose_bank):
     )
     with pytest.raises(ValueError, match="complete groups"):
         prepared.groups(4)
+
+
+def driver_bank(monkeypatch, count=54):
+    """Track deletion targets without emulating SolidWorks' mate solver."""
+    names = [f"Distance{2000 + index}" for index in range(count)]
+    selected = []
+    model = Mock()
+    features = {}
+    for name in [*names, "ParentDistance", "ParentPlane"]:
+        feature = Mock()
+        feature.Name = name
+        feature.GetTypeName2.return_value = (
+            "RefPlane" if name == "ParentPlane" else "MateDistanceDim"
+        )
+        feature.Select2.side_effect = lambda append, mark, name=name: selected.append(name) or True
+        features[name] = feature
+    model.FeatureByName.side_effect = features.get
+    model.ClearSelection2.side_effect = lambda *_args: selected.clear()
+    model.SelectionManager.GetSelectedObjectCount2.side_effect = lambda _mark: len(selected)
+
+    def delete(_options):
+        for name in selected:
+            features.pop(name)
+        return True
+
+    model.Extension.DeleteSelection2.side_effect = delete
+    monkeypatch.setattr(_cwm, "_early_bound", lambda obj, _kind: obj)
+    return SimpleNamespace(
+        adapter=SimpleNamespace(currentModel=model), model=model,
+        names=names, features=features, selected=selected,
+    )
+
+
+def test_delete_driver_bank_resolves_then_removes_only_54_created_mates_once(monkeypatch):
+    bank = driver_bank(monkeypatch)
+    names = list(reversed(bank.names))
+    handles = [bank.features[name] for name in names]
+    _cwm.delete_pose_driver_bank(bank.adapter, names, expected_count=54)
+    assert set(bank.features) == {"ParentDistance", "ParentPlane"}
+    assert [call.args for call in bank.model.FeatureByName.call_args_list[:54]] == [
+        (name,) for name in names
+    ]
+    for feature in handles:
+        feature.Select2.assert_called_once_with(True, 0)
+    bank.model.Extension.DeleteSelection2.assert_called_once_with(0)
+    assert bank.selected == []
+    bank.model.EditDelete.assert_not_called()
+    bank.model.EditRebuild3.assert_not_called()
+    bank.model.ForceRebuild3.assert_not_called()
+
+
+@pytest.mark.parametrize("names,expected", [(["Distance2000"], 2), (["Distance2000"] * 2, 2), ([""], 1)])
+def test_delete_driver_bank_rejects_invalid_target_manifest_without_com(monkeypatch, names, expected):
+    bank = driver_bank(monkeypatch, 2)
+    with pytest.raises(ValueError, match="driver"):
+        _cwm.delete_pose_driver_bank(bank.adapter, names, expected_count=expected)
+    bank.model.FeatureByName.assert_not_called()
+    bank.model.Extension.DeleteSelection2.assert_not_called()
+
+
+@pytest.mark.parametrize("failure", ["missing", "wrong_name", "plane", "mate_folder", "structural_mate"])
+def test_delete_driver_bank_validates_every_target_before_selecting_any(monkeypatch, failure):
+    bank = driver_bank(monkeypatch, 2)
+    feature = bank.features[bank.names[1]]
+    if failure == "missing":
+        del bank.features[bank.names[1]]
+    if failure == "wrong_name":
+        feature.Name = "ParentDistance"
+    if failure == "plane":
+        feature.GetTypeName2.return_value = "RefPlane"
+    if failure == "mate_folder":
+        feature.GetTypeName2.return_value = "MateGroup"
+    if failure == "structural_mate":
+        feature.GetTypeName2.return_value = "MateConcentric"
+    with pytest.raises(RuntimeError, match="driver"):
+        _cwm.delete_pose_driver_bank(bank.adapter, bank.names, expected_count=2)
+    bank.features[bank.names[0]].Select2.assert_not_called()
+    bank.model.Extension.DeleteSelection2.assert_not_called()
+
+
+@pytest.mark.parametrize("failure", ["selection", "count", "delete", "survives", "com"])
+def test_delete_driver_bank_propagates_failure_without_fallback(monkeypatch, failure):
+    bank = driver_bank(monkeypatch, 2)
+    if failure == "selection":
+        bank.features[bank.names[1]].Select2.side_effect = None
+        bank.features[bank.names[1]].Select2.return_value = False
+    if failure == "count":
+        bank.model.SelectionManager.GetSelectedObjectCount2.side_effect = lambda _mark: 1
+    if failure in {"delete", "survives"}:
+        bank.model.Extension.DeleteSelection2.side_effect = None
+        bank.model.Extension.DeleteSelection2.return_value = failure == "survives"
+    if failure == "com":
+        bank.model.Extension.DeleteSelection2.side_effect = RuntimeError("driver COM delete failure")
+    with pytest.raises(RuntimeError, match="driver"):
+        _cwm.delete_pose_driver_bank(bank.adapter, bank.names, expected_count=2)
+    assert bank.selected == []
+    assert bank.model.Extension.DeleteSelection2.call_count <= 1
+    bank.model.EditDelete.assert_not_called()
+
+
+def test_delete_empty_driver_bank_is_a_noop(monkeypatch):
+    bank = driver_bank(monkeypatch, 0)
+    _cwm.delete_pose_driver_bank(bank.adapter, [], expected_count=0)
+    bank.model.FeatureByName.assert_not_called()
+    bank.model.Extension.DeleteSelection2.assert_not_called()
