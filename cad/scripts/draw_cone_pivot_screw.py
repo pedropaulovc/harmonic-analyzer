@@ -46,7 +46,10 @@ SOURCE = CAD_ROOT / "out" / "sldprt" / f"{PART_STEM}.SLDPRT"
 OUTPUTS = DrawingOutputs(**SPEC.outputs)
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
-SHEET_SCALE = (6.0, 1.0)
+# The measured 6:1 decorated views exhausted rigid packing without fitting the
+# ASME B border/title block. Keep native text sizes and annotation coverage;
+# reduce geometric magnification and require the same fresh packing checks.
+SHEET_SCALE = (4.0, 1.0)
 END_KEEP = {
     "HeadDiaDim": (0.028, 0.176),
     "ShoulderDiaDim": (0.028, 0.124),

@@ -71,6 +71,13 @@ CASES = (
 )
 
 
+def test_cone_pivot_screw_reduced_magnification_keeps_single_native_sheet_scale():
+    import draw_cone_pivot_screw as drawing
+
+    assert drawing.SHEET_SCALE == (4.0, 1.0)
+    assert drawing.RECIPE.scale is drawing.SHEET_SCALE
+
+
 @pytest.mark.parametrize("case", CASES, ids=lambda case: case.part_name)
 def test_registry_paths_and_marked_dimensions(case: Case) -> None:
     drawing = importlib.import_module(case.module_name)
