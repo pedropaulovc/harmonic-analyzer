@@ -157,6 +157,7 @@ def test_manufacturing_comparison_removes_only_the_target_datum():
     snapshot = {
         "checked": {"Front/A/2": ["edge"], "Front/dim/4": ["dimension"]},
         "excluded": {},
+        "semantic_attachments": {},
         "dimensions": {"Front/dim/4": {"value": 0.009525}},
     }
     result = probe.without_datum(snapshot, "Front/A/2")
@@ -167,9 +168,24 @@ def test_manufacturing_comparison_removes_only_the_target_datum():
 
 def test_manufacturing_snapshot_must_contain_the_target_once():
     with pytest.raises(RuntimeError, match="missing or duplicated"):
-        probe.without_datum({"checked": {}, "excluded": {}}, "Front/A/2")
+        probe.without_datum(
+            {"checked": {}, "excluded": {}, "semantic_attachments": {}}, "Front/A/2"
+        )
     with pytest.raises(RuntimeError, match="missing or duplicated"):
-        probe.without_datum({"checked": {"A": 1}, "excluded": {"A": 2}}, "A")
+        probe.without_datum(
+            {"checked": {"A": 1}, "excluded": {"A": 2}, "semantic_attachments": {}}, "A"
+        )
+
+
+def test_manufacturing_comparison_removes_only_target_semantic_datum():
+    before = {
+        "checked": {},
+        "excluded": {},
+        "semantic_attachments": {"A": {"target": "Bore"}, "B": {"target": "Other"}},
+    }
+    after = probe.without_datum(before, "A")
+    assert after["semantic_attachments"] == {"B": {"target": "Other"}}
+    assert "A" in before["semantic_attachments"]
 
 
 def test_native_frame_size_change_is_rejected():

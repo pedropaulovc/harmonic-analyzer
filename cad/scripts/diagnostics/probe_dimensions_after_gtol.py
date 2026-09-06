@@ -81,7 +81,7 @@ def leader_text_intersections(measured):
 def capture(adapter, hashes):
     model = adapter.currentModel
     drawing = _early_bound(model, "IDrawingDoc")
-    semantics = attachments.snapshot(model)
+    semantics = attachments.snapshot(model, app=adapter.swApp)
     for reference in semantics["models"].values():
         source = reference["path"]
         hashes.setdefault(source, file_digest(Path(source)))

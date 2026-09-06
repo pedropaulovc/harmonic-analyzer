@@ -94,6 +94,7 @@ def test_real_dimension_semantic_drift_is_not_treated_as_layout_movement(monkeyp
         "excluded": {},
         "models": {},
         "dimensions_excluded": {},
+        "semantic_attachments": {},
         "dimensions": {"dim": {"value_system": 0.127}},
     }
     after_semantics = {**semantics, "dimensions": {"dim": {"value_system": 0.128}}}

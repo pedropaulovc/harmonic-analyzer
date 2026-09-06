@@ -351,7 +351,7 @@ async def probe(adapter: Any, source: Path, requested_view: str | None):
                 "right-column control requires existing native bent GTol leaders"
             )
         native_before = _native_entities(adapter, view)
-        semantics_before = snapshot(adapter.currentModel)
+        semantics_before = snapshot(adapter.currentModel, app=adapter.swApp)
         measured_before = _measure_view(adapter, view)
         leaders_before = {
             name: _leaders(row.annotation) for name, row in before.items()
@@ -402,7 +402,7 @@ async def probe(adapter: Any, source: Path, requested_view: str | None):
         gtol._unchanged(adapter.swApp, before, after, "alternative right column")
         gtol._assert_measured_prediction(predicted, after)
         _same_native(adapter.swApp, native_before, _native_entities(adapter, view))
-        semantics_after = snapshot(adapter.currentModel)
+        semantics_after = snapshot(adapter.currentModel, app=adapter.swApp)
         compare(semantics_before, semantics_after, "alternative right column")
         measured_after = _measure_view(adapter, view)
         leaders_after = {name: _leaders(row.annotation) for name, row in after.items()}
@@ -461,7 +461,7 @@ async def probe(adapter: Any, source: Path, requested_view: str | None):
             )
             gtol._assert_measured_prediction(trial, final_bank)
             _same_native(adapter.swApp, native_before, _native_entities(adapter, view))
-            final_semantics = snapshot(adapter.currentModel)
+            final_semantics = snapshot(adapter.currentModel, app=adapter.swApp)
             compare(
                 semantics_before, final_semantics, "right-column vertical final witness"
             )
@@ -520,7 +520,7 @@ async def probe(adapter: Any, source: Path, requested_view: str | None):
         check("reopen right-column saved copy", await adapter.open_model(str(saved)))
         if Path(adapter.currentModel.GetPathName()).resolve() != saved:
             raise RuntimeError("reopened right-column document path differs")
-        reopened = snapshot(adapter.currentModel)
+        reopened = snapshot(adapter.currentModel, app=adapter.swApp)
         compare(semantics_before, reopened, "saved/reopened alternative right column")
         report["reopened_semantics"] = reopened
         drawing = _early_bound(adapter.currentModel, "IDrawingDoc")

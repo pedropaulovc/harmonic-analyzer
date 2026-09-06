@@ -209,7 +209,7 @@ async def probe(adapter, source, directory):
         check("open unique datum frame copy", await adapter.open_model(str(copy)))
         if Path(adapter.currentModel.GetPathName()).resolve() != copy:
             raise RuntimeError("active drawing is not the unique requested copy")
-        manufacturing = attachments.snapshot(adapter.currentModel)
+        manufacturing = attachments.snapshot(adapter.currentModel, app=adapter.swApp)
         report["before"], handles = capture(adapter, part)
         drawing = directory / f"{directory.name}-export.SLDDRW"
         pdf, png = drawing.with_suffix(".pdf"), drawing.with_suffix(".png")
@@ -220,7 +220,7 @@ async def probe(adapter, source, directory):
         compare(app, report["before"], handles, report["after"], after_handles)
         attachments.compare(
             manufacturing,
-            attachments.snapshot(adapter.currentModel),
+            attachments.snapshot(adapter.currentModel, app=adapter.swApp),
             "datum frame copy export",
         )
     except Exception as error:
