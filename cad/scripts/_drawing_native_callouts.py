@@ -22,6 +22,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from enum import Enum
+import json
 import math
 from typing import Any, Callable, Mapping, Sequence
 
@@ -44,6 +45,11 @@ class Direction(Enum):
 class GtolPlacement(Enum):
     FIXED = "fixed"
     ARRANGED_NEXT = "arranged_next"
+
+
+class DimensionSource(Enum):
+    DRAWING_REFERENCE = "drawing_reference"
+    MODEL = "model"
 
 
 @dataclass(frozen=True)
@@ -119,6 +125,21 @@ class _Obstacle:
     owner_type: int
     body: Rect
     content: tuple[Any, ...]
+    entities: tuple[Any, ...]
+    entity_types: tuple[int, ...]
+    null_specific: Any | None
+    native_strokes: tuple[Any, ...]
+    dimension: _Dimension | None
+
+
+@dataclass(frozen=True)
+class _Dimension:
+    display: Any
+    dimensions: tuple[Any, ...]
+    source: DimensionSource
+    display_type: int
+    configuration: str
+    parameters: tuple[tuple[str, str, int, float], ...]
 
 
 @dataclass(frozen=True)
@@ -247,8 +268,108 @@ def _visible_annotations(view: Any) -> dict[str, Any]:
     return result
 
 
+def _dimension_witness(adapter: Any, view: Any, annotation: Any) -> _Dimension:
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    if (
+        display is None
+        or int(adapter.swApp.IsSame(display.GetAnnotation(), annotation)) != 1
+    ):
+        raise RuntimeError(
+            "obstacle dimension display does not round-trip to its annotation"
+        )
+    display_type = int(display.Type2)
+    source = (
+        DimensionSource.DRAWING_REFERENCE
+        if display.IsReferenceDim()
+        else DimensionSource.MODEL
+    )
+    configuration = str(view.ReferencedConfiguration)
+    if not configuration:
+        raise RuntimeError("obstacle dimension view has no referenced configuration")
+    dimensions, parameters = [], []
+    for index in range(2 if display_type == 10 else 1):  # both chamfer parameters
+        raw = display.GetDimension2(index)
+        if raw is None:
+            raise RuntimeError(f"obstacle display dimension has no parameter {index}")
+        dimension = _early_bound(raw, "IDimension")
+        name, full_name = str(dimension.Name), str(dimension.FullName)
+        if not name or not full_name:
+            raise RuntimeError("obstacle dimension has no complete native identity")
+        if source is DimensionSource.DRAWING_REFERENCE:
+            # The committed probe_drawing_attachments --dimension-values api-capture
+            # positively controls this getter for native drawing reference dimensions;
+            # GetSystemValue3 returned None on that call shape. No fallback is tried.
+            value = dimension.GetSystemValue2("")
+        else:
+            values = tuple(dimension.GetSystemValue3(3, configuration) or ())
+            if len(values) != 1:
+                raise RuntimeError(
+                    "obstacle model dimension did not return one configured value"
+                )
+            value = values[0]
+        if value is None or not math.isfinite(float(value)):
+            raise RuntimeError("obstacle dimension system value is not finite/readable")
+        dimensions.append(dimension)
+        parameters.append((name, full_name, int(dimension.GetType()), float(value)))
+    return _Dimension(
+        display,
+        tuple(dimensions),
+        source,
+        display_type,
+        configuration,
+        tuple(parameters),
+    )
+
+
+def _null_centerline_witness(
+    adapter: Any,
+    view: Any,
+    annotation: Any,
+    measured: Any,
+    entities: tuple,
+    types: tuple,
+):
+    # Same bounded native positive control as _drawing_native_layout: kind15 has
+    # one unsupported swSelNOTHING slot. This is a stroke/owner witness, not an
+    # invented entity identity or permission for generic dangling annotations.
+    if (
+        int(annotation.GetType()) != 15
+        or int(annotation.OwnerType) != 0
+        or entities != (None,)
+        or types != (0,)
+        or int(adapter.swApp.IsSame(annotation.Owner, view)) != 1
+    ):
+        raise RuntimeError("obstacle attachment has an unsupported null native handle")
+    specific = _early_bound(annotation.GetSpecificAnnotation(), "ICenterLine")
+    if (
+        specific is None
+        or int(adapter.swApp.IsSame(specific.GetAnnotation(), annotation)) != 1
+    ):
+        raise RuntimeError("obstacle centerline specific identity is unavailable")
+    strokes = []
+    for stroke in measured.native_strokes:
+        start, end, width = (
+            tuple(stroke.start),
+            tuple(stroke.end),
+            float(stroke.width_m),
+        )
+        if (
+            len(start) != 2
+            or len(end) != 2
+            or start == end
+            or not all(math.isfinite(v) for v in (*start, *end, width))
+            or width <= 0
+        ):
+            raise RuntimeError("obstacle centerline has invalid native stroke geometry")
+        strokes.append((start, end, width))
+    if not strokes:
+        raise RuntimeError("obstacle centerline has no measured native stroke witness")
+    return specific, tuple(strokes)
+
+
 def _read_obstacles(
     adapter: Any,
+    view: Any,
     annotations: Mapping[str, Any],
     measure: Callable,
     deferred: Mapping[str, _Deferred],
@@ -258,6 +379,28 @@ def _read_obstacles(
         if int(annotation.GetType()) in _INTERFACES or name in deferred:
             continue
         measured = measure(adapter, annotation)  # unsupported kinds fail explicitly
+        entities = tuple(annotation.GetAttachedEntities3() or ())
+        types = tuple(int(value) for value in annotation.GetAttachedEntityTypes() or ())
+        if (
+            len(entities) != len(types)
+            or int(annotation.GetAttachedEntityCount3()) != len(entities)
+            or annotation.IsDangling()
+        ):
+            raise RuntimeError(
+                f"{name}: obstacle attachment inventory is incomplete or dangling"
+            )
+        specific, strokes = None, ()
+        if any(entity is None for entity in entities):
+            specific, strokes = _null_centerline_witness(
+                adapter, view, annotation, measured, entities, types
+            )
+        elif 0 in types:
+            raise RuntimeError(f"{name}: obstacle attachment type is unsupported")
+        dimension = (
+            _dimension_witness(adapter, view, annotation)
+            if int(annotation.GetType()) == 4
+            else None
+        )
         result[name] = _Obstacle(
             annotation,
             int(annotation.GetType()),
@@ -265,6 +408,11 @@ def _read_obstacles(
             int(annotation.OwnerType),
             measured.body,
             (tuple(measured.format_signature), _ink_content(measured)),
+            entities,
+            types,
+            specific,
+            strokes,
+            dimension,
         )
     return result
 
@@ -367,6 +515,60 @@ def _same_obstacles(app: Any, before: Mapping, after: Mapping) -> None:
             or int(app.IsSame(original.owner, actual.owner)) != 1
         ):
             raise RuntimeError(f"{name}: native obstacle identity changed")
+        if original.entity_types != actual.entity_types or len(
+            original.entities
+        ) != len(actual.entities):
+            raise RuntimeError(f"{name}: obstacle attachment inventory changed")
+        for first, second in zip(original.entities, actual.entities):
+            if (
+                original.null_specific is not None
+                and actual.null_specific is not None
+                and first is None
+                and second is None
+            ):
+                continue  # exact native centerline/stroke witness checked below
+            if int(app.IsSame(first, second)) != 1:
+                raise RuntimeError(
+                    f"{name}: exact obstacle attachment identity changed"
+                )
+        if original.null_specific is not None or actual.null_specific is not None:
+            if (
+                original.null_specific is None
+                or actual.null_specific is None
+                or int(app.IsSame(original.null_specific, actual.null_specific)) != 1
+                or original.native_strokes != actual.native_strokes
+            ):
+                raise RuntimeError(
+                    f"{name}: obstacle native centerline/stroke witness changed"
+                )
+        old_dim, new_dim = original.dimension, actual.dimension
+        if old_dim is None and new_dim is None:
+            continue
+        if old_dim is None or new_dim is None:
+            raise RuntimeError(f"{name}: obstacle dimension witness inventory changed")
+        if (
+            old_dim.source,
+            old_dim.display_type,
+            old_dim.configuration,
+            old_dim.parameters,
+        ) != (
+            new_dim.source,
+            new_dim.display_type,
+            new_dim.configuration,
+            new_dim.parameters,
+        ):
+            raise RuntimeError(
+                f"{name}: obstacle dimension identity/type/configuration/system value changed"
+            )
+        if (
+            int(app.IsSame(old_dim.display, new_dim.display)) != 1
+            or len(old_dim.dimensions) != len(new_dim.dimensions)
+            or any(
+                int(app.IsSame(a, b)) != 1
+                for a, b in zip(old_dim.dimensions, new_dim.dimensions)
+            )
+        ):
+            raise RuntimeError(f"{name}: obstacle native dimension identity changed")
 
 
 def _reflected_datum_body(symbol: _Symbol) -> Rect:
@@ -416,13 +618,29 @@ def _place(symbol: _Symbol, outline: Rect, obstacles: Sequence[Rect], gap_m: flo
         ):
             return predicted, attempts
         # A clamped candidate is not a new base. Restore before trying another axis.
+        restored = bool(symbol.annotation.SetPosition2(*symbol.position))
+        restoration_actual = _position(symbol.annotation)
+        restoration = {
+            "target": symbol.position,
+            "return": restored,
+            "actual": restoration_actual,
+        }
+        attempts[-1]["restoration"] = restoration
+        _telemetry.info(
+            "native callout candidate readback rejected",
+            annotation=symbol.name,
+            seed_position=symbol.position,
+            candidate_target=target,
+            candidate_actual=actual,
+            restoration_return=restored,
+            restoration_actual=restoration_actual,
+        )
         if (
-            not symbol.annotation.SetPosition2(*symbol.position)
-            or math.dist(_position(symbol.annotation)[:2], symbol.position[:2])
-            > _EPSILON_M
+            not restored
+            or math.dist(restoration_actual[:2], symbol.position[:2]) > _EPSILON_M
         ):
             raise RuntimeError(
-                f"{symbol.name}: native callout seed could not be restored"
+                f"{symbol.name}: native callout seed could not be restored: seed={symbol.position}, candidate_target={target}, candidate_actual={actual}, restoration={restoration}"
             )
     raise RuntimeError(
         f"{symbol.name}: no permitted native direction clears measured bodies: {attempts}"
@@ -526,7 +744,7 @@ def arrange_native_callouts(
                 app, annotations, gtol_placement, declared_notes
             )
             obstacles = _read_obstacles(
-                adapter, annotations, measure_annotation, deferred
+                adapter, view, annotations, measure_annotation, deferred
             )
             outline = Rect(*view.GetOutline())
         bank, attempts = dict(before), {}
@@ -578,7 +796,7 @@ def arrange_native_callouts(
             )
             _same_deferred(app, deferred, final_deferred)
             final_obstacles = _read_obstacles(
-                adapter, final_annotations, measure_annotation, final_deferred
+                adapter, view, final_annotations, measure_annotation, final_deferred
             )
             _same_obstacles(app, obstacles, final_obstacles)
             final_outline = Rect(*view.GetOutline())
@@ -603,7 +821,17 @@ def arrange_native_callouts(
             "bodies_after": {name: row.body.bounds for name, row in after.items()},
             "positions_after": {name: row.position for name, row in after.items()},
             "deferred_annotations": {name: row.kind for name, row in deferred.items()},
+            "obstacle_attachment_exclusions": {
+                name: "non-dangling native centerline: exact specific identity and unchanged native strokes"
+                for name, row in final_obstacles.items()
+                if row.null_specific is not None
+            },
         }
+        _telemetry.info(
+            "native callout layout witnessed",
+            view=label,
+            callout_report=json.dumps(report[label]),
+        )
     _same_deferred(
         app, declared_notes, _declared_notes(adapter, drawing, views, deferred_notes)
     )
