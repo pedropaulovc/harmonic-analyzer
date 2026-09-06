@@ -6,6 +6,8 @@ timed annotation readers. This diagnostic baseline is not a production fallback.
 Free native notes are explicitly movable diagnostic groups; recipe-specific
 projection links are outside this A/B layout contract. Original files are hashed
 and never saved. Only uniquely named outputs under this report directory change.
+Use --mode handoff in two frozen checkouts to compare implementations of the
+same policy; each run still saves/reopens and checks its complete native output.
 """
 
 from __future__ import annotations
@@ -244,17 +246,30 @@ def _profiled_layout(adapter, views, notes, mode, evidence, directory):
         }
 
 
-async def probe(adapter, source):
+async def probe(adapter, source, modes=tuple(Mode)):
     from solidworks_mcp.adapters.solidworks.drawing import save_drawing
 
+    if (
+        not modes
+        or len(set(modes)) != len(modes)
+        or any(not isinstance(mode, Mode) for mode in modes)
+    ):
+        raise ValueError("probe requires distinct explicit measurement policies")
     reports = CAD_ROOT / "out/reports"
     reports.mkdir(parents=True, exist_ok=True)
     directory = Path(tempfile.mkdtemp(prefix="callout-handoff-", dir=reports)).resolve()
     source = source.resolve(strict=True)
     hashes = {source: hashlib.sha256(source.read_bytes()).hexdigest()}
-    owned, report = set(), {"source": str(source), "modes": {}}
+    owned, report = (
+        set(),
+        {
+            "source": str(source),
+            "selected_policies": [mode.value for mode in modes],
+            "modes": {},
+        },
+    )
     try:
-        for mode in Mode:
+        for mode in modes:
             copy = directory / f"{directory.name}-{mode.value}.SLDDRW"
             observed = copy.with_stem(copy.stem + "-observed")
             for path in (copy, observed):
@@ -319,19 +334,20 @@ async def probe(adapter, source):
                 )
             row["reopened"], row["stage"] = reopened, "passed"
             check("close reopened obstacle copy", await adapter.close_model(save=False))
-        fresh, cached = report["modes"]["fresh"], report["modes"]["handoff"]
-        compare(fresh["after"], cached["after"], "fresh versus handoff")
-        if fresh["layout_after"] != cached["layout_after"]:
-            raise RuntimeError("A/B native layout positions differ")
-        saved = fresh["full_measurement_total"] - cached["full_measurement_total"]
-        if saved != cached["reused_obstacle_count"] or saved <= 0:
-            raise RuntimeError(
-                "handoff did not remove exactly its recorded obstacle reads"
+        if len(modes) == 2:
+            fresh, cached = report["modes"]["fresh"], report["modes"]["handoff"]
+            compare(fresh["after"], cached["after"], "fresh versus handoff")
+            if fresh["layout_after"] != cached["layout_after"]:
+                raise RuntimeError("A/B native layout positions differ")
+            saved = fresh["full_measurement_total"] - cached["full_measurement_total"]
+            if saved != cached["reused_obstacle_count"] or saved <= 0:
+                raise RuntimeError(
+                    "handoff did not remove exactly its recorded obstacle reads"
+                )
+            report["measurement_reads_saved"] = saved
+            report["layout_seconds_saved"] = (
+                fresh["layout_seconds"] - cached["layout_seconds"]
             )
-        report["measurement_reads_saved"] = saved
-        report["layout_seconds_saved"] = (
-            fresh["layout_seconds"] - cached["layout_seconds"]
-        )
         report["stage"] = "passed"
     except Exception as error:
         report["stage"] = "failed"
@@ -369,14 +385,24 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("drawing", type=Path)
     parser.add_argument("--worker", action="store_true")
+    parser.add_argument(
+        "--mode", choices=[mode.value for mode in Mode], action="append"
+    )
     args = parser.parse_args()
     source = args.drawing.resolve(strict=True)
+    modes = tuple(Mode(value) for value in args.mode) if args.mode else tuple(Mode)
     if not args.worker:
         sys.path.insert(0, str(CAD_ROOT.parent))
         import dodo
 
         dodo._run(
-            [sys.executable, str(Path(__file__).resolve()), str(source), "--worker"],
+            [
+                sys.executable,
+                str(Path(__file__).resolve()),
+                str(source),
+                "--worker",
+                *[argument for mode in modes for argument in ("--mode", mode.value)],
+            ],
             "callout obstacle handoff control",
             log_stem="callout-obstacle-handoff",
             com=True,
@@ -385,7 +411,7 @@ def main():
     if not os.environ.get("HARMONIC_COM_SEAT"):
         raise RuntimeError("--worker requires the machine-global COM seat")
     _telemetry.set_service("drawing-obstacle-handoff-probe")
-    return run_build(lambda adapter: probe(adapter, source))
+    return run_build(lambda adapter: probe(adapter, source, modes))
 
 
 if __name__ == "__main__":

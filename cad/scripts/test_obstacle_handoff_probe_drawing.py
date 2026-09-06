@@ -50,6 +50,7 @@ def test_worker_requires_explicit_seat_before_run_build(monkeypatch, tmp_path):
     "change",
     [
         "none",
+        "handoff_only",
         "wrong_copy",
         "source_mutation",
         "witness_failure",
@@ -142,7 +143,8 @@ async def test_ab_copies_preserve_originals_and_retain_failed_checkpoints(
     monkeypatch.setattr(control, "compare", compare)
     monkeypatch.setattr(control, "layout", lambda *_: {"view": (0.1, 0.2)})
     monkeypatch.setattr(native_drawing, "save_drawing", save_drawing)
-    if change != "none":
+    success = change in ("none", "handoff_only")
+    if not success:
         patterns = {
             "wrong_copy": "wrong obstacle copy",
             "source_mutation": "original source bytes",
@@ -153,14 +155,17 @@ async def test_ab_copies_preserve_originals_and_retain_failed_checkpoints(
         }
         with pytest.raises(RuntimeError, match=patterns[change]):
             await control.probe(adapter, source)
-    if change == "none":
-        await control.probe(adapter, source)
-        assert len(paths) == 4 and len(set(paths)) == 4
-        assert len(comparisons) == 5
+    if success:
+        modes = (
+            (control.Mode.HANDOFF,) if change == "handoff_only" else tuple(control.Mode)
+        )
+        await control.probe(adapter, source, modes)
+        assert len(paths) == 2 * len(modes) and len(set(paths)) == len(paths)
+        assert len(comparisons) == (2 if change == "handoff_only" else 5)
     reports = list((root / "out/reports").glob("callout-handoff-*/handoff.json"))
     assert len(reports) == 1
     report = json.loads(reports[0].read_text(encoding="utf-8"))
-    assert report["stage"] == ("passed" if change == "none" else "failed")
+    assert report["stage"] == ("passed" if success else "failed")
     assert report["source_sha256"][str(source)] == source_hash
     assert report["source_unchanged"][str(source)] is True
     assert source.read_bytes() == b"original drawing"
@@ -170,3 +175,17 @@ async def test_ab_copies_preserve_originals_and_retain_failed_checkpoints(
         assert report["measurement_reads_saved"] == 2
         assert report["layout_seconds_saved"] == 1
         assert all(report["source_unchanged"].values())
+    if change == "handoff_only":
+        assert report["selected_policies"] == ["handoff"]
+        assert set(report["modes"]) == {"handoff"}
+        assert report["modes"]["handoff"]["stage"] == "passed"
+        assert "measurement_reads_saved" not in report
+        assert "layout_seconds_saved" not in report
+        assert all(report["source_unchanged"].values())
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("modes", [(), ("handoff",), (control.Mode.HANDOFF,) * 2])
+async def test_invalid_policy_selection_fails_before_copy_or_com(modes):
+    with pytest.raises(ValueError, match="distinct explicit"):
+        await control.probe(None, None, modes)
