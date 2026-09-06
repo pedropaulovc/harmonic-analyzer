@@ -242,6 +242,8 @@ Read-only capture returned all five named source dimensions, four source BASIC
 designations, cached properties/current Default configuration, and 25 drawing
 annotations including nine dimensions. No captured annotation was dangling;
 unsupported sketch-entity attachments remain explicitly excluded, not proved.
+These five parameters are a bounded forensic snapshot, not proof of complete
+in-memory/disk equivalence or of which recipe operation dirtied the source.
 Do not run the recovery again: its required four-document scene no longer exists.
 
 The unchanged recipe's imported-dimension `SetText` and `SetPrecision3`, and
