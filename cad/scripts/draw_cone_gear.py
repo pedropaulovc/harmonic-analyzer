@@ -31,8 +31,8 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _drawing_entities import CircleEdge, ModelEntities
-from _gtol_spec import PlanarFace
+from _drawing_entities import CircleEdge, EdgeAdjacentFace, FaceBoundary, FeatureFace, ModelEntities
+from _gtol_spec import CylinderFace, PlanarFace
 from _surface_finish import surface_finish_by_key
 from cone_gear_spec import BORE_DIA, FACE_WIDTH, OUTSIDE_DIA, SURFACE_FINISHES
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -65,6 +65,15 @@ FRONT_FACE_X = RIGHT_CENTER[0] - FACE_WIDTH * VIEW_SCALE[0] / 2000.0
 
 FRONT_KEEP = {
     "BoreCutDia": (FRONT_CENTER[0] - 0.055, FRONT_CENTER[1] - 0.030),
+}
+# The generated gear has hundreds of tooth faces. Follow explicit ownership
+# from its named bore cut to the front rim and its neighbouring blank face.
+# This bounds entity discovery independently of tooth count.
+BORE_FACE = FeatureFace("BoreCut", CylinderFace(BORE_DIA))
+BORE_RIM = FaceBoundary(BORE_FACE, CircleEdge(BORE_DIA / 2.0, (0, 0, 0), (0, 0, 1)))
+ENTITY_ROLES = {
+    "bore": BORE_RIM,
+    "front_face": EdgeAdjacentFace(BORE_RIM, PlanarFace((0, 0, -1), 0.0)),
 }
 
 
@@ -123,16 +132,14 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_precision(adapter, front_annotations, {"BoreCutDia": 3})
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to gear bore")
-    entities = ModelEntities(front.ReferencedDocument).resolve({
-        "bore": CircleEdge(BORE_DIA / 2.0, (0, 0, 0), (0, 0, 1)),
-        "front_face": PlanarFace((0, 0, -1), 0.0),
-    })
+    entities = ModelEntities(front.ReferencedDocument).resolve(ENTITY_ROLES)
     bore_edge = entities["bore"]
 
     add_datum_feature(
         adapter,
         front,
         entity=bore_edge,
+        selection_point_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + BORE_R),
         symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.028),
         datum="A",
         label="cone gear bore axis",

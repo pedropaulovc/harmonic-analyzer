@@ -14,12 +14,12 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any, Iterable, Mapping
 
 import _telemetry
 from _common import _early_bound
 from _gtol_spec import FaceSpec
-from _part_pmi import _resolve_faces
+from _part_pmi import _face_geometry, _face_matches
 
 
 Point = tuple[float, float, float]
@@ -90,6 +90,34 @@ class ModelVertex:
 
 
 @dataclass(frozen=True)
+class FeatureFace:
+    """Exact face geometry owned by one explicitly named source-model feature."""
+
+    feature_name: str
+    face: FaceSpec
+
+    def __post_init__(self) -> None:
+        if not self.feature_name.strip():
+            raise ValueError("feature face requires a nonempty model feature name")
+
+
+@dataclass(frozen=True)
+class FaceBoundary:
+    """Exact edge geometry on a resolved feature face, not the entire body."""
+
+    face: FeatureFace
+    edge: CircleEdge | LineEdge
+
+
+@dataclass(frozen=True)
+class EdgeAdjacentFace:
+    """Exact face geometry immediately adjacent to a resolved boundary edge."""
+
+    edge: FaceBoundary
+    face: FaceSpec
+
+
+@dataclass(frozen=True)
 class _Circle:
     entity: Any
     center_mm: Point
@@ -120,6 +148,101 @@ class _Line:
         return math.dist(nearest, spec.point_mm) <= spec.tolerance_mm
 
 
+def _edge_geometry(raw_edge: Any, *, circles: bool, lines: bool) -> _Circle | _Line | None:
+    edge = _early_bound(raw_edge, "IEdge")
+    curve = _early_bound(edge.GetCurve(), "ICurve")
+    if circles and curve.IsCircle():
+        params = tuple(curve.CircleParams)
+        return _Circle(edge, tuple(v * 1000 for v in params[:3]), tuple(params[3:6]), params[6] * 1000)
+    if lines and curve.IsLine():
+        start, end = edge.GetStartVertex(), edge.GetEndVertex()
+        if start is None or end is None:
+            return None
+        start = _early_bound(start, "IVertex").GetPoint()
+        end = _early_bound(end, "IVertex").GetPoint()
+        return _Line(edge, tuple(v * 1000 for v in start), tuple(v * 1000 for v in end))
+    return None
+
+
+def _resolve_face_requests(faces: Iterable[Any], requests: Mapping[str, FaceSpec], *, scope: str) -> dict[str, Any]:
+    matches: dict[str, list[Any]] = {key: [] for key in requests}
+    with _telemetry.span("drawing.collect_faces", scope=scope, roles=len(requests)) as span:
+        count = 0
+        for face in faces:
+            count += 1
+            geometry = _face_geometry(face)
+            if geometry is None:
+                continue
+            for key, spec in requests.items():
+                if _face_matches(geometry, spec):
+                    matches[key].append(geometry.face)
+        span.set_attribute("faces", count)
+    resolved = {}
+    for key, candidates in matches.items():
+        if len(candidates) != 1:
+            raise RuntimeError(f"{key}: {scope} {requests[key]!r} matched {len(candidates)} faces; expected exactly one")
+        resolved[key] = candidates[0]
+    return resolved
+
+
+def _model_faces(model: Any) -> Iterable[Any]:
+    part = _early_bound(model, "IPartDoc")
+    for raw_body in part.GetBodies2(0, False) or ():
+        face = _early_bound(raw_body, "IBody2").GetFirstFace()
+        while face is not None:
+            yield face
+            face = _early_bound(face, "IFace2").GetNextFace()
+
+
+ScopedEntity = FeatureFace | FaceBoundary | EdgeAdjacentFace
+
+
+class _ScopedEntities:
+    """Resolve a small ownership chain; never fall back to a body traversal."""
+
+    def __init__(self, model: Any):
+        self.model = model
+        self.resolved: dict[ScopedEntity, Any] = {}
+        self.feature_faces: dict[str, tuple[Any, ...]] = {}
+
+    def resolve(self, spec: ScopedEntity) -> Any:
+        if spec not in self.resolved:
+            self.resolved[spec] = self._resolve(spec)
+        return self.resolved[spec]
+
+    def _resolve(self, spec: ScopedEntity) -> Any:
+        if isinstance(spec, FeatureFace):
+            if spec.feature_name not in self.feature_faces:
+                with _telemetry.span("drawing.feature_faces", feature=spec.feature_name) as span:
+                    part = _early_bound(self.model, "IPartDoc")
+                    feature = part.FeatureByName(spec.feature_name)
+                    if feature is None:
+                        raise RuntimeError(f"model feature {spec.feature_name!r} is missing")
+                    self.feature_faces[spec.feature_name] = tuple(_early_bound(feature, "IFeature").GetFaces() or ())
+                    span.set_attribute("faces", len(self.feature_faces[spec.feature_name]))
+            return _resolve_face_requests(
+                self.feature_faces[spec.feature_name], {"face": spec.face}, scope=f"feature {spec.feature_name}",
+            )["face"]
+        if isinstance(spec, EdgeAdjacentFace):
+            edge = _early_bound(self.resolve(spec.edge), "IEdge")
+            return _resolve_face_requests(
+                (face for face in edge.GetTwoAdjacentFaces2() or () if face is not None),
+                {"face": spec.face}, scope=f"adjacent to {spec.edge!r}",
+            )["face"]
+        face = _early_bound(self.resolve(spec.face), "IFace2")
+        matches = []
+        with _telemetry.span("drawing.collect_edges", scope=f"boundary of {spec.face!r}", roles=1) as span:
+            edges = tuple(face.GetEdges() or ())
+            span.set_attribute("edges", len(edges))
+            for edge in edges:
+                geometry = _edge_geometry(edge, circles=isinstance(spec.edge, CircleEdge), lines=isinstance(spec.edge, LineEdge))
+                if geometry is not None and geometry.matches(spec.edge):
+                    matches.append(geometry.entity)
+        if len(matches) != 1:
+            raise RuntimeError(f"{spec!r} matched {len(matches)} edges; expected exactly one face boundary")
+        return matches[0]
+
+
 class ModelEntities:
     """A bounded, read-only entity index for one source model/configuration."""
 
@@ -127,11 +250,15 @@ class ModelEntities:
         self.model = model
 
     @_telemetry.traced("drawing.resolve_model_entities")
-    def resolve(self, roles: Mapping[str, CircleEdge | LineEdge | ModelVertex | FaceSpec]) -> dict[str, Any]:
+    def resolve(self, roles: Mapping[str, CircleEdge | LineEdge | ModelVertex | FaceSpec | ScopedEntity]) -> dict[str, Any]:
+        scoped = _ScopedEntities(self.model)
+        scoped_roles = {key: spec for key, spec in roles.items() if isinstance(spec, (FeatureFace, FaceBoundary, EdgeAdjacentFace))}
+        resolved = {key: scoped.resolve(spec) for key, spec in scoped_roles.items()}
         edge_roles = {key: spec for key, spec in roles.items() if isinstance(spec, (CircleEdge, LineEdge))}
         vertex_roles = {key: spec for key, spec in roles.items() if isinstance(spec, ModelVertex)}
-        face_roles = {key: spec for key, spec in roles.items() if key not in edge_roles and key not in vertex_roles}
-        resolved = _resolve_faces(self.model, face_roles) if face_roles else {}
+        face_roles = {key: spec for key, spec in roles.items() if key not in edge_roles and key not in vertex_roles and key not in scoped_roles}
+        if face_roles:
+            resolved.update(_resolve_face_requests(_model_faces(self.model), face_roles, scope="model"))
         if not edge_roles and not vertex_roles:
             return resolved
 
@@ -154,28 +281,19 @@ class ModelEntities:
                             vertex_matches[key].append(vertex)
             if not edge_roles:
                 continue
-            for raw_edge in body.GetEdges() or ():
-                edge_count += 1
-                edge = _early_bound(raw_edge, "IEdge")
-                curve = _early_bound(edge.GetCurve(), "ICurve")
-                geometry = None
-                if circles_needed and curve.IsCircle():
-                    params = tuple(curve.CircleParams)
-                    geometry = _Circle(edge, tuple(v * 1000 for v in params[:3]), tuple(params[3:6]), params[6] * 1000)
-                if geometry is None and lines_needed and curve.IsLine():
-                    start, end = edge.GetStartVertex(), edge.GetEndVertex()
-                    if start is None or end is None:
+            with _telemetry.span("drawing.collect_edges", scope="model body", roles=len(edge_roles)) as edge_span:
+                raw_edges = tuple(body.GetEdges() or ())
+                edge_count += len(raw_edges)
+                edge_span.set_attribute("edges", len(raw_edges))
+                for raw_edge in raw_edges:
+                    geometry = _edge_geometry(raw_edge, circles=circles_needed, lines=lines_needed)
+                    if geometry is None:
                         continue
-                    start = _early_bound(start, "IVertex").GetPoint()
-                    end = _early_bound(end, "IVertex").GetPoint()
-                    geometry = _Line(edge, tuple(v * 1000 for v in start), tuple(v * 1000 for v in end))
-                if geometry is None:
-                    continue
-                for key, spec in edge_roles.items():
-                    if isinstance(spec, CircleEdge) and isinstance(geometry, _Circle) and geometry.matches(spec):
-                        matches[key].append(edge)
-                    if isinstance(spec, LineEdge) and isinstance(geometry, _Line) and geometry.matches(spec):
-                        matches[key].append(edge)
+                    for key, spec in edge_roles.items():
+                        if isinstance(spec, CircleEdge) and isinstance(geometry, _Circle) and geometry.matches(spec):
+                            matches[key].append(geometry.entity)
+                        if isinstance(spec, LineEdge) and isinstance(geometry, _Line) and geometry.matches(spec):
+                            matches[key].append(geometry.entity)
 
         span = _telemetry.trace.get_current_span()
         span.set_attribute("roles", len(roles))

@@ -5,7 +5,8 @@ from unittest.mock import Mock
 
 import pytest
 
-from _drawing_entities import CircleEdge, LineEdge, ModelEntities, ModelVertex
+from _drawing_entities import CircleEdge, EdgeAdjacentFace, FaceBoundary, FeatureFace, LineEdge, ModelEntities, ModelVertex
+from _gtol_spec import CylinderFace, PlanarFace
 
 
 def circle(center, radius, axis=(0.0, 0.0, 1.0)):
@@ -90,6 +91,68 @@ def test_apex_vertex_must_match_exactly_one_model_vertex(monkeypatch, points, co
         return
     assert entities.resolve({"apex": ModelVertex((0, 0, 0))})["apex"] is vertices[0]
     body.GetVertices.assert_called_once_with()
+
+
+def feature_context(monkeypatch, face_specs):
+    monkeypatch.setattr("_drawing_entities._early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr("_drawing_entities._face_geometry", lambda face: SimpleNamespace(face=face, spec=face.spec))
+    monkeypatch.setattr("_drawing_entities._face_matches", lambda geometry, spec: geometry.spec == spec)
+    faces = [SimpleNamespace(spec=spec) for spec in face_specs]
+    feature = SimpleNamespace(GetFaces=Mock(return_value=faces))
+    model = SimpleNamespace(FeatureByName=Mock(return_value=feature))
+    return model, faces, feature
+
+
+def test_named_feature_bounds_lookup_and_shared_face_is_read_once(monkeypatch):
+    cylinder, plane = CylinderFace(9.525), PlanarFace((0, 0, -1), 0)
+    model, faces, feature = feature_context(monkeypatch, [cylinder])
+    rim = circle((0, 0, 0), 9.525 / 2)
+    front_face = SimpleNamespace(spec=plane)
+    rim.GetTwoAdjacentFaces2 = Mock(return_value=[faces[0], front_face])
+    faces[0].GetEdges = Mock(return_value=[rim, circle((0, 0, 6.5), 9.525 / 2)])
+    owned = FeatureFace("BoreCut", cylinder)
+    boundary = FaceBoundary(owned, CircleEdge(9.525 / 2, (0, 0, 0), (0, 0, 1)))
+    resolved = ModelEntities(model).resolve({"bore": boundary, "front": EdgeAdjacentFace(boundary, plane), "bore_face": owned})
+    assert resolved == {"bore": rim, "front": front_face, "bore_face": faces[0]}
+    # A gear's body-wide topology is deliberately absent from the mock. The
+    # bore cut owns one cylinder and the requested face bounds only two rims.
+    model.FeatureByName.assert_called_once_with("BoreCut")
+    feature.GetFaces.assert_called_once_with()
+    faces[0].GetEdges.assert_called_once_with()
+    rim.GetTwoAdjacentFaces2.assert_called_once_with()
+
+
+@pytest.mark.parametrize("face_specs", [[], [CylinderFace(12)], [CylinderFace(9.525), CylinderFace(9.525)]])
+def test_feature_face_rejects_missing_wrong_and_ambiguous_ownership(monkeypatch, face_specs):
+    model, _, _ = feature_context(monkeypatch, face_specs)
+    with pytest.raises(RuntimeError, match="BoreCut.*matched (0|2) faces"):
+        ModelEntities(model).resolve({"bore": FeatureFace("BoreCut", CylinderFace(9.525))})
+
+
+def test_missing_named_feature_does_not_fall_back_to_global_geometry(monkeypatch):
+    model, _, _ = feature_context(monkeypatch, [])
+    model.FeatureByName.return_value = None
+    with pytest.raises(RuntimeError, match="BoreCut.*missing"):
+        ModelEntities(model).resolve({"bore": FeatureFace("BoreCut", CylinderFace(9.525))})
+
+
+@pytest.mark.parametrize("edge_count", [0, 2])
+def test_face_boundary_rejects_missing_or_ambiguous_rims(monkeypatch, edge_count):
+    model, faces, _ = feature_context(monkeypatch, [CylinderFace(8)])
+    faces[0].GetEdges = Mock(return_value=[circle((0, 0, 0), 4) for _ in range(edge_count)])
+    spec = FaceBoundary(FeatureFace("BoreCut", CylinderFace(8)), CircleEdge(4, (0, 0, 0), (0, 0, 1)))
+    with pytest.raises(RuntimeError, match=f"matched {edge_count} edges"):
+        ModelEntities(model).resolve({"bore": spec})
+
+
+def test_adjacent_face_does_not_accept_wrong_side_plane(monkeypatch):
+    model, faces, _ = feature_context(monkeypatch, [CylinderFace(8)])
+    rim = circle((0, 0, 0), 4)
+    rim.GetTwoAdjacentFaces2 = lambda: [faces[0], SimpleNamespace(spec=PlanarFace((0, 0, 1), 0))]
+    faces[0].GetEdges = lambda: [rim]
+    boundary = FaceBoundary(FeatureFace("BoreCut", CylinderFace(8)), CircleEdge(4, (0, 0, 0), (0, 0, 1)))
+    with pytest.raises(RuntimeError, match="matched 0 faces"):
+        ModelEntities(model).resolve({"front": EdgeAdjacentFace(boundary, PlanarFace((0, 0, -1), 0))})
 
 
 def dimension_context(monkeypatch):
