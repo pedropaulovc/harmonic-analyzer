@@ -812,7 +812,7 @@ def test_next_absolute_candidate_does_not_require_restorable_intermediate_seed(
     )  # fresh final native body still checked
 
 
-def test_witnessed_native_datum_frame_flip_is_not_mistaken_for_deformation():
+def test_witnessed_native_datum_frame_flip_is_not_mistaken_for_deformation(monkeypatch):
     # Actual marker copy control: crossing the attachment changes the frame side.
     before = symbol()
     original = replace(
@@ -841,6 +841,11 @@ def test_witnessed_native_datum_frame_flip_is_not_mistaken_for_deformation():
     )
     app = SimpleNamespace(IsSame=lambda a, b: int(a is b))
     _final_symbol(app, original, predicted, actual)
+    records = []
+    monkeypatch.setattr(
+        "_drawing_native_callouts._telemetry.info",
+        lambda message, **attributes: records.append((message, attributes)),
+    )
     with pytest.raises(RuntimeError, match="post-style translation"):
         _final_symbol(
             app,
@@ -856,3 +861,11 @@ def test_witnessed_native_datum_frame_flip_is_not_mistaken_for_deformation():
                 ),
             ),
         )
+    message, evidence = records[0]
+    assert message == "native callout body translation mismatch"
+    assert evidence["annotation_kind"] == 2
+    assert evidence["initial_body"] == original.body.bounds
+    assert evidence["predicted_position"] == predicted.position
+    assert evidence["actual_position"] == actual.position
+    assert evidence["actual_body"][-1] == actual.body.ymax + 0.001
+    assert len(evidence["allowed_bodies"]) == 2

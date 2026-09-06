@@ -661,6 +661,17 @@ def _final_symbol(
         math.dist(predicted.position[:2], actual.position[:2]) > _EPSILON_M
         or not body_matches
     ):
+        _telemetry.info(
+            "native callout body translation mismatch",
+            annotation=initial.name,
+            annotation_kind=actual.kind,
+            initial_position=initial.position,
+            predicted_position=predicted.position,
+            actual_position=actual.position,
+            initial_body=initial.body.bounds,
+            allowed_bodies=tuple(body.bounds for body in allowed_bodies),
+            actual_body=actual.body.bounds,
+        )
         raise RuntimeError(
             f"{initial.name}: final native body did not match its post-style translation"
         )
