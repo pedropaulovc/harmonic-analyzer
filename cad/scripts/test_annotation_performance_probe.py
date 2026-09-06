@@ -1,6 +1,8 @@
 """Profiler instrumentation must preserve calls, errors and restoration."""
 
 import cProfile
+from concurrent.futures import ThreadPoolExecutor
+from types import SimpleNamespace
 
 import pytest
 
@@ -9,6 +11,7 @@ from probe_drawing_annotation_performance import (
     _dispatch_rows,
     _profile_report,
 )
+import probe_drawing_annotation_performance as control
 
 
 class FakeDispatch:
@@ -67,3 +70,87 @@ def test_cprofile_report_keeps_function_locations_and_counts():
     assert row["line"] > 0
     assert row["file"].endswith("test_annotation_performance_probe.py")
     assert "measured_control" in report["summary"]
+
+
+@pytest.mark.parametrize("outcome", ["returned", "raised"])
+def test_return_wrapper_timer_preserves_call_and_restores_function(outcome):
+    expected = object()
+    calls = []
+
+    def wrap(*args, **kwargs):
+        calls.append((args, kwargs))
+        if outcome == "raised":
+            raise ValueError("original wrapping failure")
+        return expected
+
+    client = SimpleNamespace(__WrapDispatch=wrap)
+    ticks, rows = iter((2.0, 2.25)), _dispatch_rows()
+    with control.return_wrapping_timings(client, rows, clock=lambda: next(ticks)):
+        if outcome == "raised":
+            with pytest.raises(ValueError, match="original wrapping failure"):
+                client.__WrapDispatch(expected, "GetDisplayData", None, clsctx=4)
+        if outcome == "returned":
+            assert (
+                client.__WrapDispatch(expected, "GetDisplayData", None, clsctx=4)
+                is expected
+            )
+    assert client.__WrapDispatch is wrap
+    assert calls == [((expected, "GetDisplayData", None), {"clsctx": 4})]
+    assert rows["GetDisplayData"] == {
+        "calls": 1,
+        "errors": int(outcome == "raised"),
+        "seconds": 0.25,
+        "max_seconds": 0.25,
+    }
+
+
+def test_return_wrapper_timer_excludes_actual_worker_thread_calls():
+    calls, expected = [], object()
+
+    def wrap(*args, **kwargs):
+        calls.append((args, kwargs))
+        return expected
+
+    client = SimpleNamespace(__WrapDispatch=wrap)
+    rows, ticks = _dispatch_rows(), iter((1.0, 1.125))
+    with control.return_wrapping_timings(client, rows, clock=lambda: next(ticks)):
+        with ThreadPoolExecutor(max_workers=1) as worker:
+            assert (
+                worker.submit(client.__WrapDispatch, expected, "worker").result()
+                is expected
+            )
+        assert client.__WrapDispatch(expected, userName="main") is expected
+    assert len(calls) == 2
+    assert set(rows) == {"main"}
+    assert rows["main"]["seconds"] == 0.125
+    assert client.__WrapDispatch is wrap
+
+
+def test_dispatch_timer_excludes_actual_worker_thread_calls():
+    rows, ticks = _dispatch_rows(), iter((1.0, 1.125))
+    with dispatch_timings(FakeDispatch, rows, clock=lambda: next(ticks)):
+        with ThreadPoolExecutor(max_workers=1) as worker:
+            assert worker.submit(
+                FakeDispatch()._ApplyTypes_, 1, 2, (1, 0), (), "worker", None, 42
+            ).result() == (42,)
+        assert FakeDispatch()._ApplyTypes_(1, 2, (1, 0), (), "main", None, 13) == (13,)
+    assert set(rows) == {"FakeDispatch.main"}
+
+
+def test_measurement_scope_never_runs_layout_controls(monkeypatch):
+    monkeypatch.setattr(
+        control,
+        "_small_controls",
+        lambda *_: pytest.fail("read-only scope moved a view"),
+    )
+    assert control.scope_controls(None, [], control.ProbeScope.MEASUREMENTS) == {
+        "status": "not_requested"
+    }
+
+
+def test_layout_control_scope_runs_explicit_controls(monkeypatch):
+    expected = {"control": "observed"}
+    monkeypatch.setattr(control, "_small_controls", lambda *_: expected)
+    assert (
+        control.scope_controls(None, [], control.ProbeScope.LAYOUT_CONTROLS) is expected
+    )
