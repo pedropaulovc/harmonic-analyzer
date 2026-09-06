@@ -6,10 +6,15 @@ after the initial packing snapshot. Final packing must use the independent
 fresh measurement callback, even when the initial plan requires no movement.
 Position/context checks do not prove unchanged text or shape: the fresh final
 packing inventory and measurements remain the semantic and final-fit witness.
+Consumers must bracket read-only inventory collection with read_scope. Drawing,
+sheet and recorded view context are checked at both boundaries, not for every
+entry. A read may return after mid-bank context drift, but completion fails before
+the consumer may run a native command, move a view or accept an unchanged plan.
 """
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import Enum
 import math
@@ -23,6 +28,7 @@ class _Phase(Enum):
     RECORDING = "recording"
     SEALED = "sealed"
     CONSUMING = "consuming"
+    FAILED = "failed"
     CLOSED = "closed"
 
 
@@ -57,11 +63,12 @@ def _view_context(view):
 
 
 class AnnotationMeasurementHandoff:
-    """Record actual output, seal unchanged context, consume once, then close.
+    """Record actual output, seal, consume each entry once in read banks, close.
 
     Names index candidates only; native IsSame checks prove annotation, owner,
     drawing and sheet identity. Native view position/scale/model/configuration
-    and annotation position must remain exactly equal to the recorded values.
+    must match at both read-bank boundaries. Every reused entry independently
+    retains exact native annotation/owner identity and recorded XYZ checks.
     An absent entry is a normal fresh measurement, but a changed recorded
     context is a failed transaction, never a silent new baseline.
     """
@@ -91,6 +98,8 @@ class AnnotationMeasurementHandoff:
         self._contexts = {}
         self._entries = {}
         self._phase = _Phase.RECORDING
+        self._reading_names = ()
+        self._context_names = ()
         self._recorded = self._reused = self._fresh = 0
 
     def _same(self, first, second):
@@ -103,12 +112,12 @@ class AnnotationMeasurementHandoff:
             raise RuntimeError("measurement handoff native view identity changed")
         return name
 
-    def _assert_context(self, view_name=None):
+    def _assert_context(self, names=None):
         if not self._same(self._model, self._adapter.currentModel):
             raise RuntimeError("measurement handoff active drawing identity changed")
         if not self._same(self._sheet, self._drawing.GetCurrentSheet()):
             raise RuntimeError("measurement handoff active sheet identity changed")
-        names = self._contexts if view_name is None else (view_name,)
+        names = self._contexts if names is None else names
         for name in names:
             context = self._contexts[name]
             if context != _view_context(self._views[name]):
@@ -145,25 +154,50 @@ class AnnotationMeasurementHandoff:
         self._assert_context()
         self._phase = _Phase.SEALED
 
+    def begin_read(self, view=None):
+        """Start a read-only bank; completion must precede any native mutation."""
+        if self._phase is not _Phase.SEALED:
+            raise RuntimeError("measurement handoff cannot begin a read bank")
+        names = tuple(self._views) if view is None else (self._view(view),)
+        contexts = tuple(name for name in names if name in self._contexts)
+        self._assert_context(contexts)
+        self._reading_names, self._context_names = names, contexts
+        self._phase = _Phase.CONSUMING
+
+    def end_read(self):
+        """Reject mid-inventory drift before a subsequent command can run."""
+        if self._phase is not _Phase.CONSUMING:
+            raise RuntimeError("measurement handoff has no active read bank")
+        self._phase = _Phase.FAILED
+        self._assert_context(self._context_names)
+        self._reading_names = self._context_names = ()
+        self._phase = _Phase.SEALED
+
+    @contextmanager
+    def read_scope(self, view=None):
+        self.begin_read(view)
+        try:
+            yield
+        finally:
+            self.end_read()
+
     def initial_measure(self, adapter, annotation):
-        if self._phase not in {_Phase.SEALED, _Phase.CONSUMING}:
-            raise RuntimeError("measurement handoff is not ready for its consumer")
+        if self._phase is not _Phase.CONSUMING:
+            raise RuntimeError("measurement handoff is not ready: no active read bank")
         if adapter is not self._adapter:
             raise RuntimeError("measurement handoff adapter changed")
-        if self._phase is _Phase.SEALED:
-            self._assert_context()
-            self._phase = _Phase.CONSUMING
         if int(annotation.OwnerType) != 0:
             self._fresh += 1
             return self._measure(adapter, annotation)
         owner = annotation.Owner
         name = self._view(_early_bound(owner, "IView"))
+        if name not in self._reading_names:
+            raise RuntimeError("measurement handoff owner is outside its read bank")
         key = (name, str(annotation.GetName()), int(annotation.GetType()))
         entry = self._entries.get(key)
         if entry is None:
             self._fresh += 1
             return self._measure(adapter, annotation)
-        self._assert_context(name)
         if not self._same(entry.annotation, annotation) or not self._same(
             entry.owner, owner
         ):
@@ -181,6 +215,8 @@ class AnnotationMeasurementHandoff:
         return entry.measured
 
     def close(self):
+        if self._phase is _Phase.CONSUMING:
+            raise RuntimeError("measurement handoff requires read bank completion")
         self._entries.clear()
         self._phase = _Phase.CLOSED
         _telemetry.info(

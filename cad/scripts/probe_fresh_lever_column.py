@@ -72,6 +72,7 @@ def diagnostic_layout(adapter: Any, *, views, alignments=(), orderings=(), notes
             ),
             measure_annotation=annotation_box,
             initial_measure_annotation=handoff.initial_measure,
+            initial_measure_scope=handoff.read_scope,
             planning_headroom_m=0.0005,
             alignments=alignments,
             orderings=orderings,

@@ -162,6 +162,9 @@ def _run_layout(adapter, views, notes, mode, evidence):
                 measure_obstacle=obstacle.initial_measure
                 if obstacle is not None
                 else measure,
+                obstacle_read_scope=obstacle.read_scope
+                if obstacle is not None
+                else None,
                 record_measurement=packing.record,
             )
             packing.seal()
@@ -185,6 +188,7 @@ def _run_layout(adapter, views, notes, mode, evidence):
                 ),
                 measure_annotation=measure,
                 initial_measure_annotation=packing.initial_measure,
+                initial_measure_scope=packing.read_scope,
                 planning_headroom_m=0.0005,
                 final_annotation_validation=final,
             )
