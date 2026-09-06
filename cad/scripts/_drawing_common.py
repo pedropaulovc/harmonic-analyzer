@@ -15,7 +15,7 @@ from collections import Counter
 from dataclasses import dataclass, replace
 from itertools import combinations
 from pathlib import Path
-from typing import Any, Iterable, Literal, Sequence
+from typing import Any, Callable, Iterable, Literal, Sequence
 
 
 import _config
@@ -53,6 +53,8 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     set_units_mm,
     view_name,
 )
+
+GdtEnvelopeMeasurement = Callable[[Any, Any, int], Sequence[float]]
 
 
 # swAnnotationType_e.swNote -- the view-owned annotation TYPE that becomes a
@@ -4199,12 +4201,7 @@ def _table_element(adapter: Any, table: Any, name: str) -> LayoutElement | None:
 
 
 def _datum_is_dimension_attached(adapter: Any, annotation: Any) -> bool:
-    """Whether a datum tag is attached to a display dimension.
-
-    SolidWorks reports ``IDatumTag`` primitive coordinates for this attachment
-    type in the dimension's local frame.  They must not be mixed with the
-    sheet-space annotation position used by the layout audit.
-    """
+    """Whether a datum tag's native attachment is a display dimension."""
     attachment_types = (
         adapter._attempt(
             lambda: adapter._get_attr_or_call(annotation, "GetAttachedEntityTypes")
@@ -4215,7 +4212,11 @@ def _datum_is_dimension_attached(adapter: Any, annotation: Any) -> bool:
 
 
 def _measured_gdt_box(
-    adapter: Any, annotation: Any, kind: int
+    adapter: Any,
+    annotation: Any,
+    kind: int,
+    *,
+    measure_gdt: GdtEnvelopeMeasurement | None = None,
 ) -> tuple[float, float, float, float] | None:
     """Box a GD&T symbol from the geometry SolidWorks actually renders.
 
@@ -4226,19 +4227,34 @@ def _measured_gdt_box(
     centerPt[3], rotationDir]``. Their union is the symbol's ink, leader
     included, which is exactly the question an OVERFLOW check asks.
 
-    They are NOT on ``IAnnotation``: go through ``GetSpecificAnnotation()``
-    first, or every call raises. (``GetExtent`` is not the route -- the type
-    library declares it on ``IBomTable`` and ``INote`` only, verified against a
-    working ``INote.GetExtent()`` in the same probe run.)
+    The default legacy route below uses these specific-annotation methods.
+    An explicit ``measure_gdt`` callback instead measures the actual generic
+    ``IAnnotation.GetDisplayData`` envelope including rendered text. That route
+    is mandatory for dimension-attached datums because their specific data can
+    remain stale before reopen (see the committed stationary attachment probe).
     """
-    if kind == _ANNOT_DATUM:
-        if _datum_is_dimension_attached(adapter, annotation):
-            # A datum attached to a display dimension reports IDatumTag primitive
-            # coordinates in that dimension's local frame, unlike the sheet-space
-            # primitives of an edge-attached tag. Its IAnnotation.GetPosition is
-            # still the documented sheet-space symbol origin, so the nominal datum
-            # box below is the truthful overflow check for this attachment type.
-            return None
+    if measure_gdt is not None:
+        measured = tuple(
+            float(value) for value in measure_gdt(adapter, annotation, kind)
+        )
+        if (
+            len(measured) != 4
+            or not all(math.isfinite(value) for value in measured)
+            or measured[0] >= measured[2]
+            or measured[1] >= measured[3]
+        ):
+            raise RuntimeError("GD&T measurement callback returned invalid native bounds")
+        return measured
+    if kind == _ANNOT_DATUM and _datum_is_dimension_attached(adapter, annotation):
+        # probe_datum_dimension_attachment.py --mode stationary_attachment proves
+        # specific display data can be stale until reopen, not dimension-local.
+        # The actual generic frame is remote from GetPosition. A nominal box at
+        # that anchor would silently miss the printed datum. Keep the calibrated
+        # measurement dependency opt-in, outside the unmigrated drawing closure.
+        raise RuntimeError(
+            "dimension-attached datum audit requires an explicit generic GD&T "
+            "measurement callback; nominal anchor bounds are not native evidence"
+        )
 
     spec = adapter._attempt(
         lambda: adapter._get_attr_or_call(annotation, "GetSpecificAnnotation")
@@ -4274,7 +4290,12 @@ def _measured_gdt_box(
 
 
 def _gdt_element(
-    adapter: Any, annotation: Any, name: str, kind: int
+    adapter: Any,
+    annotation: Any,
+    name: str,
+    kind: int,
+    *,
+    measure_gdt: GdtEnvelopeMeasurement | None = None,
 ) -> LayoutElement | None:
     """Box a native GD&T symbol from its rendered geometry where possible.
 
@@ -4304,7 +4325,7 @@ def _gdt_element(
     if not position:
         return None
     x, y = float(position[0]), float(position[1])
-    if kind == _ANNOT_SFSYM:
+    if kind == _ANNOT_SFSYM and measure_gdt is None:
         return LayoutElement(
             name,
             "gdt",
@@ -4314,7 +4335,7 @@ def _gdt_element(
             y + _SF_BOX_UP_M,
             scope=CollisionScope.NONE,
         )
-    measured = _measured_gdt_box(adapter, annotation, kind)
+    measured = _measured_gdt_box(adapter, annotation, kind, measure_gdt=measure_gdt)
     if measured is not None:
         x0, y0, x1, y1 = measured
         return LayoutElement(name, "gdt", x0, y0, x1, y1, scope=CollisionScope.NONE)
@@ -4347,7 +4368,9 @@ def _dim_element(adapter: Any, annotation: Any, name: str) -> LayoutElement | No
     )
 
 
-def _iter_view_annotations(adapter: Any, view: Any):
+def _iter_view_annotations(
+    adapter: Any, view: Any, *, measure_gdt: GdtEnvelopeMeasurement | None = None
+):
     """Yield ``(LayoutElement, annotation)`` for each note / GD&T symbol / dimension.
 
     ``IView.GetAnnotations`` returns dimensions, center marks, cosmetic-thread
@@ -4378,7 +4401,9 @@ def _iter_view_annotations(adapter: Any, view: Any):
         if kind == _ANNOT_NOTE:
             element = _note_element(adapter, annotation, name)
         elif kind in _GDT_TYPES:
-            element = _gdt_element(adapter, annotation, name, kind)
+            element = _gdt_element(
+                adapter, annotation, name, kind, measure_gdt=measure_gdt
+            )
         elif kind == _ANNOT_DIM:
             element = _dim_element(adapter, annotation, name)
         else:
@@ -4624,6 +4649,8 @@ def _leader_segments_of(
 
 def collect_layout_elements(
     adapter: Any,
+    *,
+    measure_gdt: GdtEnvelopeMeasurement | None = None,
 ) -> tuple[list[LayoutElement], list[LeaderSegment], DrawableRegion]:
     """Gather every drawing element, its leader geometry, and the drawable region.
 
@@ -4635,10 +4662,11 @@ def collect_layout_elements(
     * each NOTE a real view owns (the general-notes block and schedule cells); a
       SMALL note centered inside its own view is a hole tag / balloon sitting on
       the geometry and is scoped ``NON_VIEW`` (does not collide with its view);
-    * every native GD&T symbol (datum tag / feature-control frame /
-      surface-finish) and DISPLAY DIMENSION / hole callout, boxed nominally and
-      scoped ``NONE`` (no real bbox API, and they sit on the geometry they
-      annotate) -- overflow- and title-block-keep-out-checked only;
+    * every native GD&T symbol and DISPLAY DIMENSION / hole callout, scoped
+      ``NONE`` because they intentionally join their owning geometry. The legacy
+      box sources are described by their element helpers; an explicit GD&T
+      measurement callback provides current generic native envelopes and is
+      mandatory for dimension-attached datums;
     * every TABLE (hole tables land on the SHEET view, so it is scanned too);
     * two reserved KEEP-OUT boxes -- the checked-in title block and its
       projection symbol -- so no content may land on either.
@@ -4683,7 +4711,9 @@ def collect_layout_elements(
                     scope=_view_scope(adapter, view),
                 )
             )
-        for element, annotation in _iter_view_annotations(adapter, view):
+        for element, annotation in _iter_view_annotations(
+            adapter, view, measure_gdt=measure_gdt
+        ):
             # Record the owning view: a NON_VIEW annotation is exempt from
             # colliding with THIS view only, not other drawing views (Codex #269
             # thread 3).
@@ -4757,7 +4787,9 @@ def collect_layout_elements(
     if sheet_view is not None:
         for table in _iter_tables(adapter, sheet_view):
             tables[table.label] = table
-        for element, annotation in _iter_view_annotations(adapter, sheet_view):
+        for element, annotation in _iter_view_annotations(
+            adapter, sheet_view, measure_gdt=measure_gdt
+        ):
             if element.kind != "note":
                 continue
             owner_type = int(
@@ -4799,10 +4831,19 @@ def collect_layout_elements(
     return elements, leaders, region
 
 
-def check_drawing_layout(adapter: Any, *, stem: str = "") -> None:
+def check_drawing_layout(
+    adapter: Any,
+    *,
+    stem: str = "",
+    measure_gdt: GdtEnvelopeMeasurement | None = None,
+) -> None:
     """Diagnose a colliding, border-crossing, or leader-crossed layout.
 
     This is an explicit diagnostic, not part of the drawing build hot path.
+    ``measure_gdt(adapter, annotation, kind)`` may supply a freshly measured
+    generic native envelope; dimension-attached datums REQUIRE it. The pilot
+    ``_drawing_native_datums.measured_gdt_envelope`` supplies that callback without
+    making the unmigrated fleet import the native-layout measurement helpers.
 
     ``stem`` names the sheet in failures. Every sheet is held to ZERO on every
     defect class -- there is no grandfathered case. There WAS one: pen-assembly
@@ -4812,7 +4853,9 @@ def check_drawing_layout(adapter: Any, *, stem: str = "") -> None:
     :func:`_spread_balloons`). The ratchet was deleted with the defect.
     """
     with _telemetry.span("drawing.layout_audit"):
-        elements, leaders, region = collect_layout_elements(adapter)
+        elements, leaders, region = collect_layout_elements(
+            adapter, measure_gdt=measure_gdt
+        )
         overlaps, overflows, crossings = audit_layout(elements, region, leaders=leaders)
         if not overlaps and not overflows and not crossings:
             _telemetry.success(

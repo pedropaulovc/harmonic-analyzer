@@ -17,9 +17,9 @@ from cone_gear_spec import GEOMETRIC_TOLERANCES_MM
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_project_layout import repair_project_drawing_layout
+from _drawing_native_datums import add_dimension_datum
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
     add_feature_control_frame,
     add_property_linked_note,
     add_surface_finish,
@@ -141,13 +141,15 @@ async def build(adapter: Any) -> dict[str, str]:
     entities = ModelEntities(front.ReferencedDocument).resolve(ENTITY_ROLES)
     bore_edge = entities["bore"]
 
-    add_datum_feature(
+    (bore_annotation,) = front_annotations
+    add_dimension_datum(
         adapter,
         front,
-        entity=bore_edge,
+        dimension_annotation=bore_annotation,
+        source_feature="BoreProfile",
+        source_dimension="BoreCutDia",
         datum="A",
         label="cone gear bore axis",
-        shoulder=True,
     )
     add_feature_control_frame(
         adapter,
