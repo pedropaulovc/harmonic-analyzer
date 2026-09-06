@@ -8,6 +8,9 @@ from pathlib import Path
 import build_pen_marker as part
 import draw_pen_marker as drawing
 import pen_marker_spec
+import pytest
+from types import SimpleNamespace
+from unittest.mock import Mock
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -44,14 +47,45 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
 
 def test_native_dimensions_cover_diameter_and_overall_length() -> None:
     # The revolve's sketch chain only carries radius / partial-length dims, so
-    # the barrel diameter and overall length are drawing-native picked dims:
-    # the Ø silhouette width plus the apex-vertex-to-end-face overall.
+    # the barrel diameter and overall length are drawing-native dimensions:
+    # the actual end circle plus apex-vertex-to-end-circle overall.
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("_add_picked_dimension(") >= 3  # def + 2 call sites
-    assert '("VERTEX", APEX)' in source
-    assert "<MOD-DIAM>" in source
-    assert source.count("_display_as_diameter(") == 2  # def + the barrel dim
-    assert "_add_axis_centerline(adapter, front" in source
+    assert 'entities=(entities["apex"], entities["end"])' in source
+    assert 'orientation="horizontal"' in source
+    assert 'edge=entities["end"]' in source
+    assert "AddDiameterDimension2" in source
+    assert 'add_view_centerline(adapter, front, entity=entities["barrel"]' in source
+    assert "SelectByID2" not in source
+    assert drawing.ENTITY_ROLES["apex"].point_mm == (0, 0, 0)
+    assert drawing.ENTITY_ROLES["end"].center_mm == (0, pen_marker_spec.BARREL_TOP_Y, 0)
+    assert drawing.ENTITY_ROLES["end"].radius_mm == pen_marker_spec.BARREL_DIA / 2
+
+
+@pytest.mark.parametrize("failure", [None, "view", "edge", "dimension"])
+def test_native_diameter_selects_model_rim_and_rejects_failed_creation(monkeypatch, failure):
+    edge, dimension = object(), object()
+    draw = SimpleNamespace(
+        ActivateView=Mock(return_value=failure != "view"),
+        ClearSelection2=Mock(),
+        AddDiameterDimension2=Mock(return_value=None if failure == "dimension" else dimension),
+        EditRebuild3=Mock(),
+    )
+    view = SimpleNamespace(SelectEntity=Mock(return_value=failure != "edge"))
+    adapter = SimpleNamespace(currentModel=draw)
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, kind: value)
+    monkeypatch.setattr(drawing, "view_name", lambda adapter, view: "end")
+    if failure:
+        with pytest.raises(RuntimeError):
+            drawing._add_barrel_diameter(adapter, view, edge=edge, text_xy=(0.3, 0.1), label="diameter")
+        draw.EditRebuild3.assert_not_called()
+        if failure != "dimension":
+            draw.AddDiameterDimension2.assert_not_called()
+        return
+    assert drawing._add_barrel_diameter(adapter, view, edge=edge, text_xy=(0.3, 0.1), label="diameter") is dimension
+    draw.ActivateView.assert_called_once_with("end")
+    view.SelectEntity.assert_called_once_with(edge, False)
+    draw.AddDiameterDimension2.assert_called_once_with(0.3, 0.1, 0.0)
+    draw.EditRebuild3.assert_called_once_with()
 
 
 def test_cone_geometry_matches_the_notes() -> None:
@@ -80,7 +114,7 @@ def test_native_gdt_controls_tip_runout_and_barrel_finish() -> None:
 def test_view_scales_are_explicit_and_profile_is_rotated() -> None:
     assert drawing.SHEET_SCALE == (2.0, 1.0)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("scale=(2, 1)") == 1
+    assert source.count("scale=(2, 1)") == 2
     assert source.count("scale=(1, 1)") == 1
     assert pen_marker_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:1"
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in source

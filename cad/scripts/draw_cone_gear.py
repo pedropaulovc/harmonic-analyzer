@@ -129,7 +129,6 @@ async def build(adapter: Any) -> dict[str, str]:
     })
     bore_edge = entities["bore"]
 
-    bore_top = (FRONT_CENTER[0], FRONT_CENTER[1] + BORE_R)
     add_datum_feature(
         adapter,
         front,
