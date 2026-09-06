@@ -10,6 +10,8 @@ An optional initial_measure_annotation callback may supply transaction-local
 measurements for the first snapshot only. It owns freshness validation and must
 raise if its witness changed. Final measurement always calls measure_annotation
 afresh, including a no-movement plan; this module has no persistent bounds cache.
+Final annotation validation consumes that same fresh snapshot after position,
+identity and fit checks. It must not perform another native measurement pass.
 
 Pass every drawing view explicitly. Projection alignment/order and free-note
 associations are recipe metadata, never inferred from nearby XY coordinates.
@@ -180,6 +182,7 @@ class _Snapshot:
     centerlines: Mapping[tuple[str, str, int], _CenterlineWitness]
     drawable: Rect
     sheet_properties: tuple[float, ...]
+    measurements: Mapping[str, Mapping[str, Any]]
 
 
 def _values(raw: Any, count: int, label: str) -> tuple[float, ...]:
@@ -380,6 +383,7 @@ def _snapshot(
         note_by_annotation[key] = note
     seen, signatures, entities, obstacles, note_positions = {}, {}, {}, {}, {}
     annotation_bounds = {}
+    measurements = {key: {} for key in views}
     centerlines = {}
     for native_view in inventory:
         for raw in native_view.GetAnnotations() or ():
@@ -439,6 +443,22 @@ def _snapshot(
                 # individually hidden SF at the origin. Retain its native object,
                 # attachment/text/visibility signatures, but it occupies no ink.
                 continue
+            # Retain the exact already-read object, including native leader
+            # geometry/text cells, for a pure final validator. A sheet-owned
+            # caption following a view belongs to that view's collision bank.
+            measured_view = (
+                note.follows_view
+                if note is not None and note.follows_view is not None
+                else key[0].removeprefix("view:")
+                if key[0].startswith("view:")
+                else None
+            )
+            if measured_view is not None:
+                if key[1] in measurements[measured_view]:
+                    raise RuntimeError(
+                        "final view measurements require unique annotation names"
+                    )
+                measurements[measured_view][key[1]] = measured
             if note is not None:
                 if int(adapter.swApp.IsSame(note.annotation, annotation)) != 1:
                     raise RuntimeError(
@@ -483,6 +503,7 @@ def _snapshot(
         centerlines,
         drawable,
         properties,
+        measurements,
     )
 
 
@@ -825,6 +846,8 @@ def repair_native_layout(
     planning_headroom_m: float = 0.0,
     max_search_nodes: int = 10_000,
     position_tolerance_m: float = 1e-8,
+    final_annotation_validation: Callable[[Mapping[str, Mapping[str, Any]]], None]
+    | None = None,
 ) -> NativeLayoutReport:
     """Repair one fully declared sheet, or return an explicit no-write packing result."""
     if int(adapter.currentModel.GetType()) != 3:
@@ -1061,6 +1084,9 @@ def repair_native_layout(
             f"{validation.reason}",
             validation,
         )
+    if final_annotation_validation is not None:
+        with _telemetry.span("drawing.native_layout.validate_final_annotations"):
+            final_annotation_validation(after.measurements)
     return _report(
         NativeLayoutStatus.APPLIED
         if movement_required

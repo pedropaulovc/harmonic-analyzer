@@ -480,6 +480,87 @@ def test_already_fitting_layout_has_no_native_writes(monkeypatch):
 
 
 @pytest.mark.parametrize("xmin", [-1, 1])
+def test_final_validator_reuses_exact_fresh_measurement_without_another_scan(
+    monkeypatch, xmin
+):
+    front = View("front", Rect(xmin, 2, xmin + 2, 4))
+    annotation = Annotation("frame", Rect(xmin, 2, xmin + 1, 3), owner=front, kind=5)
+    front.annotations = [annotation]
+    adapter, options, _ = scene(monkeypatch, {"front": front})
+    reads, validations = [], []
+
+    def tracked(adapter, item):
+        result = measure(adapter, item)
+        reads.append(result)
+        return result
+
+    def validate(banks):
+        assert len(reads) == 2
+        assert banks["front"]["frame"] is reads[-1]
+        assert banks["front"]["frame"] is not reads[0]
+        assert banks["front"]["frame"].envelope == annotation.rectangle
+        validations.append(banks)
+
+    options["measure_annotation"] = tracked
+    result = native.repair_native_layout(
+        adapter, **options, final_annotation_validation=validate
+    )
+    assert len(validations) == 1
+    assert len(reads) == 2
+    assert result.status is (
+        native.NativeLayoutStatus.APPLIED
+        if xmin < 0
+        else native.NativeLayoutStatus.UNCHANGED
+    )
+
+
+def test_final_validator_includes_following_caption_and_excludes_hidden_ink(
+    monkeypatch,
+):
+    front = View("front", Rect(1, 2, 3, 4))
+    caption = Annotation("caption", Rect(1, 4.1, 3, 4.5))
+    hidden = Annotation("hidden", Rect(1, 2, 2, 3), owner=front, kind=5)
+    hidden.Visible = 3
+    front.annotations = [hidden]
+    adapter, options, _ = scene(monkeypatch, {"front": front}, [caption])
+    banks = []
+    native.repair_native_layout(
+        adapter,
+        **options,
+        notes=(native.LayoutNote("caption", caption, follows_view="front"),),
+        final_annotation_validation=banks.append,
+    )
+    assert set(banks[0]["front"]) == {"caption"}
+
+
+@pytest.mark.parametrize("xmin", [-1, 1])
+def test_final_validation_rejection_prevents_acceptance_even_without_movement(
+    monkeypatch, xmin
+):
+    front = View("front", Rect(xmin, 2, xmin + 2, 4))
+    adapter, options, _ = scene(monkeypatch, {"front": front})
+
+    def reject(_banks):
+        raise RuntimeError("native leader crosses final text")
+
+    with pytest.raises(RuntimeError, match="crosses final text"):
+        native.repair_native_layout(
+            adapter, **options, final_annotation_validation=reject
+        )
+
+
+def test_no_fit_does_not_supply_initial_measurements_to_final_validator(monkeypatch):
+    front = View("front", Rect(1, 2, 30, 40))
+    adapter, options, _ = scene(monkeypatch, {"front": front})
+    calls = []
+    result = native.repair_native_layout(
+        adapter, **options, final_annotation_validation=calls.append
+    )
+    assert result.status is native.NativeLayoutStatus.NO_FIT
+    assert calls == []
+
+
+@pytest.mark.parametrize("xmin", [-1, 1])
 def test_initial_measurement_handoff_is_used_once_then_always_fresh(monkeypatch, xmin):
     front = View("front", Rect(xmin, 2, xmin + 2, 4))
     annotation = Annotation("frame", Rect(xmin, 2, xmin + 1, 3), owner=front, kind=5)
