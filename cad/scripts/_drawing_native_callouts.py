@@ -26,6 +26,12 @@ generic frame can be remote from GetPosition and its IDatumTag-specific text can
 remain stale until reopen. The generic rendered text plus GetLabel are the semantic
 witness; specific text is diagnostic only. Stationary means no position writes,
 not an exemption from actual view, dimension-text or other body clearance.
+
+The BENT_DOCUMENT opt-in recognizes actual horizontal elbow-to-frame geometry,
+then changes the document leader length once through a fully witnessed prepass.
+Those datum frames are stationary during this phase; no SetPosition2 is tried.
+The document preference can also change other leaders, so its prepass never
+hands off pre-change obstacles to the later fresh callout and packing phases.
 """
 
 from __future__ import annotations
@@ -65,6 +71,23 @@ class DimensionSource(Enum):
 class SymbolPlacement(Enum):
     MOVABLE = "movable"
     STATIONARY_DIMENSION = "stationary_dimension"
+    STATIONARY_BENT = "stationary_bent"
+
+
+class DatumLeaderPolicy(Enum):
+    EXISTING = "existing"
+    BENT_DOCUMENT = "bent_document"
+
+
+class ShoulderConstraint(Enum):
+    FREE = "free"
+    FORCED = "forced"
+
+
+@dataclass(frozen=True)
+class BentShoulder:
+    direction: Direction
+    length_m: float
 
 
 @dataclass(frozen=True)
@@ -135,6 +158,8 @@ class _Symbol:
     placement: SymbolPlacement = SymbolPlacement.MOVABLE
     attached_dimension: _Dimension | None = None
     specific_text: tuple[str, ...] = ()
+    bent_shoulder: BentShoulder | None = None
+    shoulder_constraint: ShoulderConstraint | None = None
 
 
 @dataclass(frozen=True)
@@ -267,8 +292,46 @@ def _attached_dimension(adapter: Any, view: Any, entity: Any) -> _Dimension:
     return _dimension_witness(adapter, view, annotation)
 
 
+def _bent_shoulder(
+    measured: Any, position: tuple[float, float, float], frame: Rect
+) -> BentShoulder:
+    """Recognize the measured left/right horizontal shoulder, not any remote anchor."""
+    x, y = position[:2]
+    mid_y = (frame.ymin + frame.ymax) / 2
+    if abs(y - mid_y) > _EPSILON_M:
+        raise RuntimeError(
+            "bent datum requires a horizontal native elbow/frame association"
+        )
+    if x < frame.xmin - _EPSILON_M:
+        joint, direction = (frame.xmin, mid_y), Direction.RIGHT
+    elif x > frame.xmax + _EPSILON_M:
+        joint, direction = (frame.xmax, mid_y), Direction.LEFT
+    else:
+        raise RuntimeError("bent datum elbow must be outside its measured frame")
+    matches = tuple(
+        stroke
+        for stroke in measured.native_strokes
+        if (
+            math.dist(stroke.start, (x, y)) <= _EPSILON_M
+            and math.dist(stroke.end, joint) <= _EPSILON_M
+        )
+        or (
+            math.dist(stroke.end, (x, y)) <= _EPSILON_M
+            and math.dist(stroke.start, joint) <= _EPSILON_M
+        )
+    )
+    if len(matches) != 1:
+        raise RuntimeError("bent datum needs one exact native elbow-to-frame segment")
+    return BentShoulder(direction, abs(joint[0] - x))
+
+
 def _read_symbol(
-    adapter: Any, view: Any, annotation: Any, measure: Callable
+    adapter: Any,
+    view: Any,
+    annotation: Any,
+    measure: Callable,
+    *,
+    datum_leader_policy: DatumLeaderPolicy = DatumLeaderPolicy.EXISTING,
 ) -> _Symbol:
     app = adapter.swApp
     kind, name = int(annotation.GetType()), str(annotation.GetName())
@@ -315,16 +378,39 @@ def _read_symbol(
             )
     placement = SymbolPlacement.MOVABLE
     attached_dimension = None
+    shoulder_constraint = None
     if kind == 2 and 14 in types:
         if types != (14,):
             raise RuntimeError("stationary datum needs exactly one display dimension")
         placement = SymbolPlacement.STATIONARY_DIMENSION
         attached_dimension = _attached_dimension(adapter, view, entities[0])
+    if (
+        kind == 2
+        and datum_leader_policy is DatumLeaderPolicy.BENT_DOCUMENT
+        and types != (14,)
+    ):
+        if types not in ((1,), (2,)) or properties[2] != 1:
+            raise RuntimeError(
+                "document datum leaders require one exact edge/face and a square frame"
+            )
+        if properties[1]:
+            placement = SymbolPlacement.STATIONARY_BENT
+        shoulder_constraint = (
+            ShoulderConstraint.FORCED
+            if specific.ForcedShoulder
+            else ShoulderConstraint.FREE
+        )
     position = _position(annotation)
     if math.dist(position[:2], measured.anchor) > _EPSILON_M:
         raise RuntimeError(
             f"{name}: callout body/position have different sheet anchors"
         )
+    frame = _datum_frame(measured, position, placement) if kind == 2 else None
+    shoulder = (
+        _bent_shoulder(measured, position, frame)
+        if placement is SymbolPlacement.STATIONARY_BENT
+        else None
+    )
     return _Symbol(
         name,
         kind,
@@ -339,10 +425,12 @@ def _read_symbol(
         ink if kind == 2 else (specific_text, ink),
         tuple(measured.format_signature),
         measured,
-        _datum_frame(measured, position, placement) if kind == 2 else None,
+        frame,
         placement,
         attached_dimension,
         specific_text,
+        shoulder,
+        shoulder_constraint,
     )
 
 
@@ -355,6 +443,7 @@ def _same_symbol(app: Any, before: _Symbol, after: _Symbol) -> None:
         "format",
         "entity_types",
         "placement",
+        "shoulder_constraint",
     ):
         if getattr(before, field) != getattr(after, field):
             raise RuntimeError(f"{before.name}: native callout {field} changed")
@@ -368,6 +457,15 @@ def _same_symbol(app: Any, before: _Symbol, after: _Symbol) -> None:
     _same_dimension(
         app, before.name, before.attached_dimension, after.attached_dimension
     )
+    if before.bent_shoulder != after.bent_shoulder:
+        a, b = before.bent_shoulder, after.bent_shoulder
+        if (
+            a is None
+            or b is None
+            or a.direction is not b.direction
+            or abs(a.length_m - b.length_m) > _EPSILON_M
+        ):
+            raise RuntimeError(f"{before.name}: native bent shoulder geometry changed")
 
 
 def _visible_annotations(view: Any) -> dict[str, Any]:
@@ -740,7 +838,7 @@ def _stationary_owner_obstacles(
 
 
 def _placement_body(symbol: _Symbol) -> Rect:
-    if symbol.kind != 2 or symbol.placement is SymbolPlacement.STATIONARY_DIMENSION:
+    if symbol.kind != 2 or symbol.placement is not SymbolPlacement.MOVABLE:
         return symbol.body
     alternate = symbol.body.translated(_datum_side_delta(symbol))
     return Rect(
@@ -760,7 +858,7 @@ def _place(
     stationary_gap_m: float | None = None,
 ):
     attempts = []
-    if symbol.placement is SymbolPlacement.STATIONARY_DIMENSION:
+    if symbol.placement is not SymbolPlacement.MOVABLE:
         clearance = gap_m if stationary_gap_m is None else stationary_gap_m
         if not all(
             _clear(symbol.body, item, clearance) for item in (outline, *obstacles)
@@ -841,7 +939,7 @@ def _final_symbol(
     if (
         math.dist(predicted.position[:2], actual.position[:2]) > _EPSILON_M
         or (
-            actual.placement is SymbolPlacement.STATIONARY_DIMENSION
+            actual.placement is not SymbolPlacement.MOVABLE
             and abs(predicted.position[2] - actual.position[2]) > _EPSILON_M
         )
         or not body_matches
@@ -880,6 +978,7 @@ def arrange_native_callouts(
     gap_m: float = 0.002,
     gtol_placement: GtolPlacement = GtolPlacement.FIXED,
     deferred_notes: Sequence[Any] = (),
+    datum_leader_policy: DatumLeaderPolicy = DatumLeaderPolicy.EXISTING,
 ) -> dict[str, dict[str, Any]]:
     """Clear native datum/SF bodies before GTol columns and decorated-view packing.
 
@@ -905,6 +1004,8 @@ def arrange_native_callouts(
     model, app = adapter.currentModel, adapter.swApp
     if not isinstance(gtol_placement, GtolPlacement):
         raise ValueError("GTol placement must use the explicit placement policy enum")
+    if not isinstance(datum_leader_policy, DatumLeaderPolicy):
+        raise ValueError("datum leaders require the explicit placement policy enum")
     if int(model.GetType()) != 3:
         raise ValueError("native callout layout requires the active drawing")
     if measure_annotation is None:
@@ -927,6 +1028,17 @@ def arrange_native_callouts(
             )
         names.add(name)
     declared_notes = _declared_notes(adapter, drawing, views, deferred_notes)
+    if datum_leader_policy is DatumLeaderPolicy.BENT_DOCUMENT:
+        from _drawing_native_datum_leaders import prepare_document_datum_leaders
+
+        prepare_document_datum_leaders(
+            adapter,
+            views=views,
+            measure=measure_annotation,
+            planning_gap_m=planning_gap_m,
+            declared_notes=declared_notes,
+            gtol_placement=gtol_placement,
+        )
     report = {}
     for label, view in views.items():
         if not any(view.GetAnnotationsByType(kind) for kind in _INTERFACES):
@@ -938,7 +1050,13 @@ def arrange_native_callouts(
         with _telemetry.span("drawing.callouts.initial_witness", view=label):
             annotations = _visible_annotations(view)
             before = {
-                name: _read_symbol(adapter, view, annotation, measure_annotation)
+                name: _read_symbol(
+                    adapter,
+                    view,
+                    annotation,
+                    measure_annotation,
+                    datum_leader_policy=datum_leader_policy,
+                )
                 for name, annotation in annotations.items()
                 if int(annotation.GetType()) in _INTERFACES
             }
@@ -951,7 +1069,15 @@ def arrange_native_callouts(
             _stationary_owner_obstacles(app, before, obstacles)
             outline = Rect(*view.GetOutline())
         bank, attempts = dict(before), {}
-        for name in sorted(bank, key=lambda key: (bank[key].kind, key)):
+        for name in sorted(
+            bank,
+            key=lambda key: (
+                -bank[key].kind
+                if datum_leader_policy is DatumLeaderPolicy.BENT_DOCUMENT
+                else bank[key].kind,
+                key,
+            ),
+        ):
             seed = bank[name]
             if seed.kind == 7:
                 with _telemetry.span(
@@ -968,7 +1094,11 @@ def arrange_native_callouts(
                             f"{name}: native bent surface-finish leader rejected"
                         )
                     styled = _read_symbol(
-                        adapter, view, seed.annotation, measure_annotation
+                        adapter,
+                        view,
+                        seed.annotation,
+                        measure_annotation,
+                        datum_leader_policy=datum_leader_policy,
                     )
                     _same_symbol(app, seed, styled)
                     seed = styled  # measured AFTER intentional representation change
@@ -994,7 +1124,13 @@ def arrange_native_callouts(
                     "native callout operation changed visible annotation inventory"
                 )
             after = {
-                name: _read_symbol(adapter, view, annotation, measure_annotation)
+                name: _read_symbol(
+                    adapter,
+                    view,
+                    annotation,
+                    measure_annotation,
+                    datum_leader_policy=datum_leader_policy,
+                )
                 for name, annotation in final_annotations.items()
                 if int(annotation.GetType()) in _INTERFACES
             }
