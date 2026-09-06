@@ -12,11 +12,17 @@ Coordinates are sheet metres. Footprints must include quantity/below-frame text
 and exclude open leaders. Outboard means outside the actual IView.GetOutline;
 same-view datum, dimension and surface-finish bodies are also kept clear. This
 local operation does not certify leader crossings or final sheet fit.
+
+Full native XML/text/attachment/body witnesses are read before and after each
+view's complete bank operation. Intermediate bodies are explicitly derived from
+observed position translations, not remeasured ink. Final native measurement
+must match that prediction and every initial semantic/identity witness; a native
+command changing body shape or content can never establish a new accepted base.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from itertools import combinations
 import math
 from typing import Any, Callable, Mapping, Sequence
@@ -309,12 +315,19 @@ def _assert_body_clearance(bank: Mapping[str, _Gtol], gap_m: float) -> None:
             )
 
 
+def _position_translated_bank(bank: Mapping[str, _Gtol]) -> dict[str, _Gtol]:
+    """Observe actual native positions; keep bodies as unverified predictions."""
+    result = {}
+    for name, row in bank.items():
+        position = _position(row.annotation)
+        delta = (position[0] - row.position[0], position[1] - row.position[1])
+        result[name] = replace(row, position=position, body=row.body.translated(delta))
+    return result
+
+
 def _move_bank(
-    adapter: Any,
-    view: Any,
     bank: Mapping[str, _Gtol],
     deltas: Mapping[str, tuple[float, float]],
-    measure: Callable,
     stage: str,
 ) -> dict[str, _Gtol]:
     targets = {
@@ -330,20 +343,26 @@ def _move_bank(
             *targets[name]
         ):
             raise RuntimeError(f"{stage}: {name}: native GTol translation rejected")
-    after = _read_gtols(adapter, view, measure)
-    _unchanged(adapter.swApp, bank, after, stage)
+    after = _position_translated_bank(bank)
     for name, row in after.items():
         if math.dist(row.position, targets[name]) > _POSITION_EPSILON_M:
             raise RuntimeError(f"{stage}: {name}: native GTol translation was clamped")
-        expected = bank[name].body.translated(deltas[name])
+    return after
+
+
+def _assert_measured_prediction(
+    predicted: Mapping[str, _Gtol], measured: Mapping[str, _Gtol]
+) -> None:
+    """Final native ink must match translated INITIAL bodies, not a new base."""
+    for name, row in measured.items():
+        expected = predicted[name]
+        if math.dist(row.position, expected.position) > _POSITION_EPSILON_M:
+            raise RuntimeError(f"{name}: final native GTol position drifted")
         if any(
             abs(a - b) > _BODY_EPSILON_M
-            for a, b in zip(row.body.bounds, expected.bounds)
+            for a, b in zip(row.body.bounds, expected.body.bounds)
         ):
-            raise RuntimeError(
-                f"{stage}: {name}: measured GTol body did not translate rigidly"
-            )
-    return after
+            raise RuntimeError(f"{name}: measured GTol body did not translate rigidly")
 
 
 def arrange_native_gtol_columns(
@@ -385,7 +404,8 @@ def arrange_native_gtol_columns(
         names.add(name)
     report = {}
     for label, view in views.items():
-        before = _read_gtols(adapter, view, measure_annotation)
+        with _telemetry.span("drawing.gtol.initial_witness", view=label):
+            before = _read_gtols(adapter, view, measure_annotation)
         if not before:
             report[label] = {"count": 0, "commands": [], "translation_m": (0.0, 0.0)}
             continue
@@ -393,15 +413,17 @@ def arrange_native_gtol_columns(
         bank, command_report = before, []
         for command in _COMMANDS if len(bank) > 1 else ():
             _native_command(adapter, drawing, view, bank, command)
-            current = _read_gtols(adapter, view, measure_annotation)
-            motion = _unchanged(
-                adapter.swApp, bank, current, f"native command {command}"
-            )
+            current = _position_translated_bank(bank)
+            motion = {
+                name: math.dist(row.position, current[name].position)
+                for name, row in bank.items()
+            }
             command_report.append(
                 {
                     "command": command,
                     "movement_m": motion,
                     "body_union": _union([row.body for row in current.values()]).bounds,
+                    "body_union_source": "derived_translation",
                 }
             )
             bank = current
@@ -414,13 +436,11 @@ def arrange_native_gtol_columns(
             view=label,
             count=len(bank),
             moved_count=sum(delta != (0.0, 0.0) for delta in clearance_deltas.values()),
+            bounds_source="derived_translation",
         ):
             bank = _move_bank(
-                adapter,
-                view,
                 bank,
                 clearance_deltas,
-                measure_annotation,
                 "minimum clearance",
             )
         _assert_body_clearance(bank, gap_m)
@@ -437,16 +457,19 @@ def arrange_native_gtol_columns(
             count=len(bank),
             dx=delta[0],
             dy=delta[1],
+            bounds_source="derived_translation",
         ):
-            after = _move_bank(
-                adapter,
-                view,
+            predicted = _move_bank(
                 bank,
                 {name: delta for name in bank},
-                measure_annotation,
                 "outboard column",
             )
-        _unchanged(adapter.swApp, before, after, "outboard column")
+        with _telemetry.span(
+            "drawing.gtol.final_witness", view=label, count=len(before)
+        ):
+            after = _read_gtols(adapter, view, measure_annotation)
+            _unchanged(adapter.swApp, before, after, "final native witness")
+            _assert_measured_prediction(predicted, after)
         _assert_body_clearance(after, gap_m)
         final_column = _union([row.body for row in after.values()])
         if not _separated(final_column, outline, gap_m) or any(
@@ -461,7 +484,9 @@ def arrange_native_gtol_columns(
             "clearance_translations_m": clearance_deltas,
             "translation_m": delta,
             "body_before": column.bounds,
+            "body_before_source": "derived_translation",
             "body_after": final_column.bounds,
+            "body_after_source": "native_measurement",
             "positions_after": {name: row.position for name, row in after.items()},
             "obstacle_count": len(obstacles),
         }
