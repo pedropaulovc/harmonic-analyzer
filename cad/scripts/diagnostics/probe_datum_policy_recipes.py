@@ -148,8 +148,19 @@ def require_copy_hash(trial, phase):
         )
 
 
-def drawing_witness(adapter):
+def drawing_witness(adapter, *, source, configuration):
     semantics = attachments.snapshot(adapter.currentModel, app=adapter.swApp)
+    if not semantics["models"]:
+        raise RuntimeError("functional pilot has no captured drawing view models")
+    for view, model in semantics["models"].items():
+        if (
+            Path(model["path"]).resolve() != source
+            or model["configuration"] != configuration
+        ):
+            raise RuntimeError(
+                f"{view}: drawing does not reference the expected owned source/configuration: "
+                f"{model} != {source} / {configuration}"
+            )
     if (
         not semantics["checked"]
         or not semantics["dimensions"]
@@ -267,7 +278,11 @@ async def pilot(adapter, candidate, source_root, guard_root, output_root):
             with _telemetry.span(
                 "diagnostic.datum_policy.drawing_witness", target=target, phase="built"
             ):
-                trial["built"] = drawing_witness(adapter)
+                trial["built"] = drawing_witness(
+                    adapter,
+                    source=copy_source,
+                    configuration=trial["source_before"]["configuration"],
+                )
             trial["source_after"], after_handles = source_dimensions(
                 source_model, target, copy_source
             )
@@ -291,7 +306,11 @@ async def pilot(adapter, candidate, source_root, guard_root, output_root):
                 target=target,
                 phase="reopened",
             ):
-                trial["reopened"] = drawing_witness(adapter)
+                trial["reopened"] = drawing_witness(
+                    adapter,
+                    source=copy_source,
+                    configuration=trial["source_before"]["configuration"],
+                )
             compare_drawing(adapter.swApp, trial["built"], trial["reopened"])
             reopened_source = adapter.swApp.GetOpenDocumentByName(str(copy_source))
             trial["source_reopened"], _ = source_dimensions(
