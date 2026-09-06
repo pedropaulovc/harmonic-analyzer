@@ -282,10 +282,9 @@ async def build(adapter: Any) -> dict[str, str]:
     set_basic_dimension(adapter, bar_height, label="bar height from datum C")
 
     # Hole identities come from the model roles. These projected positions only
-    # keep the two native hole callouts and their FCFs in separate text lanes.
+    # keep the two native hole callouts in separate text lanes.
     bar_pin_edge = _sheet_xy(BAR_PIN_X, _BAR_PIN_DIA / 2.0)
     spring_edge = _sheet_xy(LEVER_SPRING_X - _SPRING_HOLE_DIA / 2.0, 0.0)
-    spring_fcf_edge = _sheet_xy(LEVER_SPRING_X + _SPRING_HOLE_DIA / 2.0, 0.0)
     add_native_hole_callout(
         adapter,
         front,
@@ -304,40 +303,27 @@ async def build(adapter: Any) -> dict[str, str]:
     # Complete datum reference frame: A is a broad machined face (primary), B
     # is the functional fulcrum-bore axis (secondary), and C is the top narrow
     # face (tertiary clocking).  The two BASIC hole locations reference A|B|C.
-    broad_face = _top_xy(_mid_x - 25.0, LEVER_THICKNESS / 2.0)  # the broad face's edge line, top view
     add_datum_feature(
         adapter,
         top,
         entity=entities["broad_a"],
         entity_type="FACE",
-        selection_point_xy=broad_face,
-        symbol_xy=(broad_face[0] - 0.018, broad_face[1] + 0.016),
         datum="A",
         label="broad machined face",
     )
-    fulcrum_left = _sheet_xy(-PIVOT_HOLE_DIA / 2.0, 0.0)
     add_datum_feature(
         adapter,
         front,
         entity=entities["fulcrum"],
-        selection_point_xy=fulcrum_left,
-        symbol_xy=(fulcrum_left[0] - 0.018, fulcrum_left[1]),
         datum="B",
-        # SolidWorks normalizes this legal bore-axis tag by 0.0020 mm when
-        # committed.  This allowance checks annotation readback only; it does
-        # not alter the part's manufacturing tolerances.
         label="fulcrum bore axis",
-        position_tolerance_m=0.0001,
     )
     # The integral hub hides this face in the end view. Identify its visible
     # long edge in the front view so the clocking datum has a readable witness.
-    top_face = _sheet_xy(45.0, BAR_TALL / 2.0)
     add_datum_feature(
         adapter,
         front,
         entity=entities["top_front"],
-        symbol_xy=(top_face[0], top_face[1] + 0.022),
-        selection_point_xy=top_face,
         datum="C",
         label="top clocking face",
     )
@@ -345,7 +331,6 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         entity=entities["top_front"],
-        frame_xy=(0.105, 0.210),
         characteristic="profile_surface",
         tolerance=GEOMETRIC_TOLERANCES_MM["outer perimeter profile"],
         datums=("A", "B", "C"),
@@ -356,7 +341,6 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         entity=entities["fulcrum"],
-        frame_xy=(0.065, 0.200),
         characteristic="perpendicularity",
         tolerance=GEOMETRIC_TOLERANCES_MM["fulcrum bore perpendicularity"],
         datums=("A",),
@@ -368,7 +352,6 @@ async def build(adapter: Any) -> dict[str, str]:
         right,
         entity=entities["broad_opposite"],
         entity_type="FACE",
-        frame_xy=(0.225, 0.205),
         characteristic="parallelism",
         tolerance=GEOMETRIC_TOLERANCES_MM["opposite broad face parallelism"],
         datums=("A",),
@@ -378,10 +361,6 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         entity=entities["bar_pin"],
-        # Keep this frame below the hole-callout elbow (y ~= 0.182) and in a
-        # separate horizontal lane from the spring-eye frame.  Routing it from
-        # the old above-left position crossed the bar-pin callout leader.
-        frame_xy=(bar_pin_edge[0] - 0.045, 0.174),
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["bar-pin hole position"],
         datums=("A", "B", "C"),
@@ -391,11 +370,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         front,
-        # The hole callout owns the 9-o'clock rim and routes up-left.  Attach
-        # the position frame at 3 o'clock and keep its whole leader to the
-        # right of the callout path.
         entity=entities["spring"],
-        frame_xy=(spring_fcf_edge[0] + 0.020, 0.174),
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["spring-eye hole position"],
         datums=("A", "B", "C"),

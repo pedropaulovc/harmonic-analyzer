@@ -198,31 +198,24 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         entity=entities["barrel"],
-        symbol_xy=(FRONT_CENTER[0] + 0.035, FRONT_CENTER[1] - 0.026),
-        selection_point_xy=(FRONT_CENTER[0] + 0.035, FRONT_CENTER[1] - BARREL_DIA * SHEET_SCALE[0] / 2000),
         datum="A",
         label="pen-marker barrel axis",
         entity_type="FACE",
     )
-    # Above the overall dimension: the current 110 mm body leaves too little
-    # margin left of the apex for the former 60 mm recipe's frame placement.
     add_feature_control_frame(
         adapter,
         front,
         entity=entities["tip"],
-        frame_xy=(0.025, FRONT_CENTER[1] + 0.065),
         characteristic="circular_runout",
         tolerance=GEOMETRIC_TOLERANCES_MM["marker tip runout"],
         datums=("A",),
         label="marker tip runout",
         entity_type="FACE",
     )
-    # Keep the finish symbol in the band between barrel and overall dimension.
     add_surface_finish(
         adapter,
         front,
         entity=entities["barrel"],
-        symbol_xy=(FRONT_CENTER[0] - 0.016, 0.196),
         control=surface_finish_by_key(SURFACE_FINISHES, "barrel"),
         label="barrel bearing finish",
         entity_type="FACE",

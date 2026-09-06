@@ -24,7 +24,7 @@ from typing import Any
 
 from _drawing_entities import CircleEdge, LineEdge, ModelEntities
 from _gtol_spec import PlanarFace
-from rocker_arm_spec import ARM_DEPTH, GEOMETRIC_TOLERANCES_MM
+from rocker_arm_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
 from _common import CAD_ROOT, check, run_build
@@ -216,82 +216,40 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_basic_dimension(adapter, rod_location_y, label="rod-pin Y location")
 
-    # Datum A identifies the pivot bore's cylindrical surface.  Keep its leader
-    # oblique to both centre-mark axes so the triangle unmistakably terminates
-    # on the circumference rather than appearing to identify the bore centre.
-    pivot_datum_angle = math.radians(135.0)
-    pivot_radius = PIVOT_HOLE_DIA / 2.0
-    pivot_datum_rim = _sheet_xy(
-        pivot_radius * math.cos(pivot_datum_angle),
-        _PIVOT_MID_Y + pivot_radius * math.sin(pivot_datum_angle),
-    )
-    pivot_datum_standoff = 0.020
+    # Datum A identifies the pivot bore's cylindrical surface; let the native
+    # annotation choose its station on that known model rim.
     add_datum_feature(
         adapter,
         front,
         entity=entities["pivot"],
-        symbol_xy=(
-            pivot_datum_rim[0] + pivot_datum_standoff * math.cos(pivot_datum_angle),
-            pivot_datum_rim[1] + pivot_datum_standoff * math.sin(pivot_datum_angle),
-        ),
-        selection_point_xy=pivot_datum_rim,
         datum="A",
         label="pivot bore cylindrical datum feature",
         shoulder=True,
-        # SolidWorks snaps this circular bore attachment to its nearest legal
-        # anchor.  The live readback is 0.0109 mm from the requested point;
-        # allow that native normalization while retaining the shared strict
-        # persistence check for freely positioned annotations.
-        position_tolerance_m=0.0001,
-    )
-    # Ra on the bore rim at 7:30 -- oblique to both centre-mark axes like the
-    # datum above: since the integral hub (2026-09-02) the 6 o'clock point on
-    # the bore lies on the centre mark's vertical extension and the coordinate
-    # pick resolved to the hub's O10 rim instead of the O6.5 bore edge. Then a
-    # position FCF tying the rod-pin hole to the complete A-B-C frame.
-    pivot_finish_angle = math.radians(225.0)
-    pivot_bottom = _sheet_xy(
-        pivot_radius * math.cos(pivot_finish_angle),
-        _PIVOT_MID_Y + pivot_radius * math.sin(pivot_finish_angle),
     )
     # Reuse the resolved bore, including its hub-end station; the concentric
     # hub rim can never satisfy this role's centre/radius constraints.
-    pivot_bore_edge = entities["pivot"]
     add_surface_finish(
         adapter,
         front,
-        edge_entity=pivot_bore_edge,
-        symbol_xy=(pivot_bottom[0] - 0.012, pivot_bottom[1] - 0.020),
+        entity=entities["pivot"],
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bore"),
         label="pivot bore finish",
     )
     # Datum B (broad face, on the end view) orients the hole axes; datum C
     # (the +X tip face) clocks rotation about the pivot axis, so the X/Y BASIC
     # coordinates above have an inspectable direction.
-    # Datum B on the strap's broad face in the end view, picked ABOVE the hub
-    # band (the O10 hub hides the flank over y 3..13 since 2026-09-02); the
-    # end view is centred on the strap's mid-depth (_PIVOT_MID_Y).
-    broad_face = (
-        RIGHT_CENTER[0] - ARM_THICKNESS / 2000.0,
-        RIGHT_CENTER[1] + (ARM_DEPTH - 1.0 - _PIVOT_MID_Y) / 1000.0  # right view is 1:1,
-    )
     add_datum_feature(
         adapter,
         right,
         entity=entities["broad"],
         entity_type="FACE",
-        selection_point_xy=broad_face,
-        symbol_xy=(broad_face[0] - 0.016, broad_face[1] - 0.014),
         datum="B",
         label="broad face",
     )
-    tip_face = _sheet_xy(_TIP_FACE_MID_X, _TIP_FACE_MID_Y)
     add_datum_feature(
         adapter,
         front,
         entity=entities["tip"],
-        selection_point_xy=tip_face,
-        symbol_xy=(tip_face[0] + 0.012, tip_face[1] + 0.012),
         datum="C",
         label="rod-side tip face",
     )
@@ -299,7 +257,6 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         entity=entities["rod"],
-        frame_xy=(0.300, 0.195),
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["rod-pin hole position"],
         datums=("A", "B", "C"),
