@@ -157,7 +157,7 @@ def test_bore_dome_and_mounting_hole_have_inspectable_gdt() -> None:
     assert 'quantity="CROWN + 2 FLANKS + FOOT TOP + RIGHT SIDE"' in source
     assert 'quantity="DATUM D FACE"' in source
     assert 'datums=("A", "B", "D")' in source
-    assert "leader_attach_xy=" in source
+    assert "leader_attach_xy=" not in source
     assert 'characteristic="flatness"' in source
     assert 'characteristic="perpendicularity"' in source
     assert source.count("_add_circle_basic(") == 4  # helper plus three calls
@@ -189,8 +189,7 @@ def test_view_scales_are_explicit() -> None:
     assert drawing.FRONT_CENTER == (0.100, 0.150)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("scale=(2, 1)") == 3  # elevation + plan + pictorial
-    assert "frame_xy=(0.185, 0.080)" in source
-    assert "frame_xy=(0.020, 0.105)" in source
+    assert "frame_xy=" not in source
 
 
 def test_part_stamps_make_critical_properties() -> None:

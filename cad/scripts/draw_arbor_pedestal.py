@@ -247,7 +247,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # Datum A = the foot seat face (the base-seat datum the bore/dome heights
     # measure from). The arbor bore is toleranced parallel to it and carries the
     # clamp-fit finish.
-    _bore_r = BORE_DIA / 2.0 * _S
     entities = _model_entities(front.ReferencedDocument)
     foot_entity, side_entity, flank_entity, bore_entity, dome_entity = (
         entities[key] for key in ("foot", "side", "flank", "bore", "dome")
@@ -273,7 +272,6 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         front,
-        symbol_xy=(FRONT_CENTER[0] + 0.050, _front_y(0.0) + 0.010),
         datum="A",
         label="foot seat face",
         entity=foot_entity,
@@ -281,9 +279,6 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         front,
-        # Keep the tag on the inboard side of the datum edge.  Its short
-        # rightward leader stays clear of the datum-B perpendicularity frame.
-        symbol_xy=(0.086, _front_y(2.5)),
         datum="B",
         label="left foot side",
         entity=side_entity,
@@ -291,7 +286,6 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         front,
-        frame_xy=(0.185, 0.080),
         characteristic="flatness",
         tolerance=GEOMETRIC_TOLERANCES_MM["datum-A seat flatness"],
         label="datum-A seat flatness",
@@ -300,7 +294,6 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         front,
-        frame_xy=(0.020, 0.105),
         characteristic="perpendicularity",
         tolerance=GEOMETRIC_TOLERANCES_MM["datum-B side perpendicularity"],
         datums=("A",),
@@ -313,7 +306,6 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         front,
-        frame_xy=(0.020, _front_y(BORE_HEIGHT) + 0.006),
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["arbor bore true position"],
         datums=("A", "B"),
@@ -324,7 +316,6 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         front,
-        frame_xy=(0.245, _front_y(BORE_HEIGHT) + 0.014),
         characteristic="profile_surface",
         tolerance=GEOMETRIC_TOLERANCES_MM["controlled exterior surface profile"],
         datums=("A", "B"),
@@ -335,11 +326,9 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         front,
-        symbol_xy=(0.155, 0.225),
         control=surface_finish_by_key(SURFACE_FINISHES, "arbor_bore"),
         label="arbor bore finish",
         entity=bore_entity,
-        leader_attach_xy=(FRONT_CENTER[0] + _bore_r, _front_y(BORE_HEIGHT)),
     )
     screw_entity = entities["screw"]
     datum_d_entity = entities["datum_d"]
@@ -362,7 +351,6 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         top,
-        symbol_xy=(0.145, 0.260),
         datum="D",
         label="exposed flange edge",
         entity=datum_d_entity,
@@ -370,7 +358,6 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         top,
-        frame_xy=(0.020, 0.235),
         characteristic="perpendicularity",
         tolerance=GEOMETRIC_TOLERANCES_MM["datum-D face perpendicularity"],
         datums=("A", "B"),
@@ -389,7 +376,6 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         top,
-        frame_xy=(0.300, 0.250),
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["flange-hole true position"],
         datums=("A", "B", "D"),
@@ -400,7 +386,6 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         top,
-        frame_xy=(0.245, 0.242),
         characteristic="profile_surface",
         tolerance=GEOMETRIC_TOLERANCES_MM["strap near-face profile"],
         datums=("A", "B", "D"),
@@ -411,7 +396,6 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         top,
-        frame_xy=(0.300, 0.220),
         characteristic="profile_surface",
         tolerance=GEOMETRIC_TOLERANCES_MM["coplanar far-face profile"],
         datums=("A", "B", "D"),
