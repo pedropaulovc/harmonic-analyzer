@@ -38,6 +38,33 @@ and Document Properties > Annotations > Geometric Tolerances / Surface Finishes.
 The latter expose separate type-level leader-length settings, which avoid
 assuming that one shared annotation length is appropriate for every symbol.
 
+## Native leader update control
+
+`diagnostics/probe_gtol_leader_override.py` changes one existing tolerance
+annotation on a uniquely copied rocker drawing. The shared datum leader setting
+stays at 73.30296548 mm; the requested individual tolerance leader is 6.35 mm.
+
+The immediate-read variant at `9eef747b` accepted the setter, but its first
+`GetLeaderPointsAtIndex` still returned the old geometry. Later display-data
+measurement and the saved/reopened drawing already showed the correct short
+leader. Its strict pre-export assertion failed; this is an update-order result,
+not evidence that the setter is unavailable.
+
+At `108fe65a`, one checked `EditRebuild3` before measurement made the exact 6.35 mm
+leader visible both before export and after reopening. The annotation body,
+frame join, model endpoint, view contexts and source hashes were unchanged.
+All 60 annotation semantic records, eight supported geometry attachments and
+four dimensions/tolerance types passed; no dimension was excluded. The control
+preserved the two existing visible documents, including an unsaved drawing, and
+closed only its own copy.
+
+The report is
+`C:/src/ha-perf-channel/cad/out/reports/gtol-leader-override-fd4f_eux/gtol-leader-override.json`.
+This establishes one annotation override and its update boundary, not a
+type-level default, a completed lever drawing, or an end-to-end speedup.
+
+## Trial isolation
+
 All native trials require the machine-global seat, an explicitly identified
 running SolidWorks session, owned outputs, and diagnostic-only attachment.
 They must not use the production build wrapper's document clearing or automatic
