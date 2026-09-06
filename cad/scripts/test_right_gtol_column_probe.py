@@ -16,6 +16,7 @@ from probe_drawing_right_gtol_column import (
     VerticalDirection,
     _candidate_trials,
     prove_narrow_reader,
+    displayed_leader_coverage,
 )
 
 
@@ -37,7 +38,9 @@ def test_narrow_native_reader_requires_exact_full_snapshot_parity(monkeypatch, c
     bank = {"frame": SimpleNamespace(annotation=object())}
     measured = {
         "frame": SimpleNamespace(
-            leader_segments=segments, leader_decorations=decorations
+            leader_segments=segments,
+            native_leader_segments=segments,
+            leader_decorations=decorations,
         )
     }
     if change != "none":
@@ -47,6 +50,43 @@ def test_narrow_native_reader_requires_exact_full_snapshot_parity(monkeypatch, c
     report = prove_narrow_reader(bank, measured)
     assert report["count"] == 1
     assert report["elapsed_s"] >= 0
+
+
+def test_display_strokes_may_reverse_or_be_shortened_but_must_be_fully_covered():
+    native = SimpleNamespace(
+        segments=(Segment((0, 0), (1, 0)),), decorations=(Rect(0.9, -0.1, 1.1, 0.1),)
+    )
+    displayed = (
+        Segment((1, 0), (0, 0)),
+        Segment((0.2, 0), (0.7, 0)),
+        Segment((1, -0.05), (1, 0.05)),
+        Segment((0.4, 0.2), (0.5, 0.2)),
+    )
+    result = displayed_leader_coverage(native, displayed)
+    assert result["coverage"][0]["native_container_indices"] == [0]
+    assert result["coverage"][1]["native_container_indices"] == [0]
+    assert result["coverage"][2]["decoration_container_indices"] == [0]
+    assert result["uncovered_display_indices"] == [3]
+
+
+def test_raw_parity_does_not_hide_uncovered_displayed_leader(monkeypatch):
+    import probe_drawing_right_gtol_column as module
+
+    raw = (Segment((0.1, 0.2), (0.3, 0.2)),)
+    monkeypatch.setattr(
+        module,
+        "annotation_leader_geometry",
+        lambda _: SimpleNamespace(segments=raw, decorations=()),
+    )
+    measured = SimpleNamespace(
+        native_leader_segments=raw,
+        leader_decorations=(),
+        leader_segments=(Segment((0.1, 0.21), (0.3, 0.21)),),
+    )
+    with pytest.raises(RuntimeError, match="does not cover every displayed"):
+        prove_narrow_reader(
+            {"frame": SimpleNamespace(annotation=object())}, {"frame": measured}
+        )
 
 
 @pytest.mark.parametrize(

@@ -85,6 +85,9 @@ class AnnotationBounds:
     format_signature: tuple[Any, ...]
     native_strokes: tuple[Segment, ...]
     leader_decorations: tuple[Rect, ...] = ()
+    # Preserve the IAnnotation route separately from open IDisplayData strokes.
+    # Consumers must not confuse API endpoint chains with displayed ink.
+    native_leader_segments: tuple[Segment, ...] = ()
 
 
 def _rectangle(points: list[Point]) -> Rect:
@@ -424,6 +427,7 @@ def bounds_from_snapshot(
         snapshot.format_signature,
         snapshot.lines,
         snapshot.leader_boxes,
+        snapshot.leaders,
     )
 
 
