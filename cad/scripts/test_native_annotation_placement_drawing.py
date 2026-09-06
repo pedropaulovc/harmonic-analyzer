@@ -200,3 +200,76 @@ def test_native_placement_preserves_label_or_manufacturing_value_assertions(
         )
     with pytest.raises(RuntimeError, match="bore"):
         insert(kind, adapter, view, entity)
+
+
+def arrange_context(monkeypatch, counts):
+    model = Mock()
+    model.Extension.AlignDimensions.return_value = True
+    model.SelectionManager.GetSelectedObjectCount2.return_value = sum(counts)
+    views = []
+    dimensions = []
+    for count in counts:
+        annotations = [Mock() for _index in range(count)]
+        dimensions.extend(annotations)
+        view = Mock()
+        view.GetAnnotationsByType.return_value = annotations
+        views.append(view)
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _kind: obj)
+    monkeypatch.setattr(drawing, "null_callout", lambda: None)
+    return SimpleNamespace(currentModel=model), views, dimensions
+
+
+def test_auto_arrange_queries_only_dimensions_and_arranges_once_for_all_views(
+    monkeypatch,
+):
+    adapter, views, dimensions = arrange_context(monkeypatch, [2, 1, 0])
+    assert drawing.auto_arrange_view_dimensions(adapter, views) == 3
+    for view in views:
+        view.GetAnnotationsByType.assert_called_once_with(4)
+        view.GetAnnotations.assert_not_called()
+    for annotation in dimensions:
+        annotation.Select3.assert_called_once_with(True, None)
+        annotation.SetPosition2.assert_not_called()
+    adapter.currentModel.Extension.AlignDimensions.assert_called_once_with(0, 0.001)
+    assert adapter.currentModel.ClearSelection2.call_count == 2
+    adapter.currentModel.EditRebuild3.assert_not_called()
+
+
+def test_auto_arrange_skips_empty_dimension_bank(monkeypatch):
+    adapter, views, _dimensions = arrange_context(monkeypatch, [0, 0])
+    assert drawing.auto_arrange_view_dimensions(adapter, views) == 0
+    adapter.currentModel.Extension.AlignDimensions.assert_not_called()
+
+
+@pytest.mark.parametrize("failure", ["selection", "count", "arrange", "com"])
+def test_auto_arrange_fails_loud_and_clears_selections_without_fallback(
+    monkeypatch, failure
+):
+    adapter, views, dimensions = arrange_context(monkeypatch, [2])
+    model = adapter.currentModel
+    if failure == "selection":
+        dimensions[1].Select3.return_value = False
+    if failure == "count":
+        model.SelectionManager.GetSelectedObjectCount2.return_value = 1
+    if failure == "arrange":
+        model.Extension.AlignDimensions.return_value = False
+    if failure == "com":
+        model.Extension.AlignDimensions.side_effect = RuntimeError(
+            "native arrange COM failure"
+        )
+    with pytest.raises(RuntimeError, match="dimension|arrange"):
+        drawing.auto_arrange_view_dimensions(adapter, views)
+    assert model.ClearSelection2.call_count == 2
+    model.Extension.SelectByID2.assert_not_called()
+    for dimension in dimensions:
+        dimension.SetPosition2.assert_not_called()
+
+
+@pytest.mark.parametrize("spacing", [0, -1, float("nan"), float("inf")])
+def test_auto_arrange_rejects_invalid_spacing_without_touching_drawing(
+    monkeypatch, spacing
+):
+    adapter, views, _dimensions = arrange_context(monkeypatch, [1])
+    with pytest.raises(ValueError, match="spacing"):
+        drawing.auto_arrange_view_dimensions(adapter, views, spacing_m=spacing)
+    adapter.currentModel.ClearSelection2.assert_not_called()
