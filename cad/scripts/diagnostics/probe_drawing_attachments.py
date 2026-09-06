@@ -38,7 +38,9 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "cad/scripts"))
 
-from _common import _early_bound, check, run_build  # noqa: E402
+from _common import _early_bound, check  # noqa: E402
+from diagnostics._owned_native_documents import run_copy_diagnostic  # noqa: E402
+from diagnostics._owned_native_session import require_owned_diagnostic_environment  # noqa: E402
 from _part_pmi import _face_geometry  # noqa: E402
 import _telemetry  # noqa: E402
 from solidworks_mcp.adapters.com_variant import double_array  # noqa: E402
@@ -515,6 +517,8 @@ async def open_drawing(adapter, path):
 async def probe(adapter, source, report_root, *, dimension_values="system"):
     report_root.mkdir(parents=True, exist_ok=True)
     run_dir = Path(tempfile.mkdtemp(prefix="attachment-probe-", dir=report_root))
+    adapter.ownership.register_directory(run_dir)
+    adapter.ownership.register_source(source)
     copy = run_dir / f"{source.stem}-{run_dir.name}.SLDDRW"
     result_path = run_dir / "attachments.json"
     report = {
@@ -576,6 +580,7 @@ async def probe(adapter, source, report_root, *, dimension_values="system"):
             compare(before, report["snapshots"]["moved_scaled"], "move and scale")
             checkpoint()
             with _telemetry.span("diagnostic.drawing_attachments.save"):
+                adapter.ownership.assert_current_owned()
                 saved = model.Save3(1, 0, 0)  # swSaveAsOptions_Silent
                 if not (saved[0] if isinstance(saved, tuple) else saved):
                     raise RuntimeError(f"saving drawing copy failed: {saved!r}")
@@ -630,6 +635,7 @@ def main(argv=None):
         raise ValueError("probe input must be a native drawing")
     report_root = args.report_root.resolve()
     if not args.worker:
+        require_owned_diagnostic_environment()
         import dodo
 
         dodo._run(
@@ -652,7 +658,7 @@ def main(argv=None):
         raise RuntimeError(
             "attachment probe worker requires the pipeline COM seat lock"
         )
-    return run_build(
+    return run_copy_diagnostic(
         lambda adapter: probe(
             adapter, source, report_root, dimension_values=args.dimension_values
         )

@@ -522,6 +522,11 @@ class Adapter:
         self.swApp = APP
         self.saved = {}
         self.opened, self.closed = [], []
+        self.ownership = SimpleNamespace(
+            register_directory=Mock(),
+            register_source=Mock(),
+            assert_current_owned=Mock(),
+        )
 
     async def open_model(self, path):
         self.opened.append(path)
@@ -753,6 +758,7 @@ def test_parent_uses_pipeline_lock_for_the_worker(
 ):
     drawing = tmp_path / "source.SLDDRW"
     drawing.write_bytes(b"source")
+    monkeypatch.setenv("HARMONIC_SW_AUTOSTART", "0")
     launch = Mock()
     monkeypatch.setitem(probe.sys.modules, "dodo", SimpleNamespace(_run=launch))
     assert probe.main([str(drawing), "--dimension-values", dimension_values]) == 0
@@ -761,3 +767,14 @@ def test_parent_uses_pipeline_lock_for_the_worker(
     assert str(drawing) in command
     assert command[command.index("--dimension-values") + 1] == dimension_values
     assert launch.call_args.kwargs["com"] is True
+
+
+def test_parent_refuses_autostart_before_pipeline_preflight(tmp_path, monkeypatch):
+    drawing = tmp_path / "source.SLDDRW"
+    drawing.write_bytes(b"source")
+    launch = Mock()
+    monkeypatch.setitem(probe.sys.modules, "dodo", SimpleNamespace(_run=launch))
+    monkeypatch.delenv("HARMONIC_SW_AUTOSTART", raising=False)
+    with pytest.raises(RuntimeError, match="HARMONIC_SW_AUTOSTART=0"):
+        probe.main([str(drawing)])
+    launch.assert_not_called()

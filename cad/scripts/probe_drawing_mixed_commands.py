@@ -14,10 +14,12 @@ import sys
 import tempfile
 from typing import Any
 
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, _early_bound, check
+from diagnostics._owned_native_documents import run_copy_diagnostic
+from diagnostics._owned_native_session import require_owned_diagnostic_environment
 from _drawing_annotation_bounds import annotation_box
 from _drawing_common import render_pdf_png
-from solidworks_mcp.adapters.solidworks.drawing import save_drawing
+from diagnostics._owned_native_documents import save_drawing
 import _telemetry
 
 
@@ -174,6 +176,7 @@ def main() -> int:
     args = parser.parse_args()
     source = args.drawing.resolve(strict=True)
     if not args.worker:
+        require_owned_diagnostic_environment()
         sys.path.insert(0, str(CAD_ROOT.parent))
         import dodo
 
@@ -198,6 +201,8 @@ def main() -> int:
         root = CAD_ROOT / "out/reports"
         root.mkdir(parents=True, exist_ok=True)
         folder = Path(tempfile.mkdtemp(prefix="mixed-commands-", dir=root))
+        adapter.ownership.register_directory(folder)
+        adapter.ownership.register_source(source)
         copy = folder / f"{folder.name}-{source.name}"
         saved = folder / f"observed-{copy.name}"
         shutil.copy2(source, copy)
@@ -324,7 +329,7 @@ def main() -> int:
         return {"report": str(folder / "mixed.json")}
 
     _telemetry.set_service("drawing-mixed-native-command-probe")
-    return run_build(probe)
+    return run_copy_diagnostic(probe)
 
 
 if __name__ == "__main__":

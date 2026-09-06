@@ -18,7 +18,9 @@ import sys
 import tempfile
 from typing import Any
 
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, _early_bound, check
+from diagnostics._owned_native_documents import run_copy_diagnostic
+from diagnostics._owned_native_session import require_owned_diagnostic_environment
 from _drawing_annotation_bounds import annotation_box
 from solidworks_mcp.adapters.com_variant import double_array
 import _telemetry
@@ -131,6 +133,7 @@ def main() -> int:
     args = parser.parse_args()
     sources = [path.resolve(strict=True) for path in args.drawings]
     if not args.worker:
+        require_owned_diagnostic_environment()
         sys.path.insert(0, str(CAD_ROOT.parent))
         import dodo
 
@@ -155,6 +158,9 @@ def main() -> int:
         root = CAD_ROOT / "out/reports"
         root.mkdir(parents=True, exist_ok=True)
         folder = Path(tempfile.mkdtemp(prefix="primitive-annotations-", dir=root))
+        adapter.ownership.register_directory(folder)
+        for source in sources:
+            adapter.ownership.register_source(source)
         report: dict[str, Any] = {"drawings": []}
         hashes = {
             path: hashlib.sha256(path.read_bytes()).hexdigest() for path in sources
@@ -272,7 +278,7 @@ def main() -> int:
         return {"report": str(folder / "primitives.json")}
 
     _telemetry.set_service("drawing-primitive-annotation-probe")
-    return run_build(probe)
+    return run_copy_diagnostic(probe)
 
 
 if __name__ == "__main__":

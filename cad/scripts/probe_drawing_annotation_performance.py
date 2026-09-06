@@ -32,7 +32,9 @@ import time
 from typing import Any
 from unittest.mock import patch
 
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, _early_bound, check
+from diagnostics._owned_native_documents import run_copy_diagnostic
+from diagnostics._owned_native_session import require_owned_diagnostic_environment
 from _drawing_annotation_bounds import annotation_box
 from solidworks_mcp.adapters.com_variant import double_array
 import _telemetry
@@ -297,6 +299,7 @@ def main() -> int:
     scope = ProbeScope(args.scope)
     source = args.drawing.resolve(strict=True)
     if not args.worker:
+        require_owned_diagnostic_environment()
         sys.path.insert(0, str(CAD_ROOT.parent))
         import dodo
 
@@ -323,6 +326,8 @@ def main() -> int:
         root = CAD_ROOT / "out/reports"
         root.mkdir(parents=True, exist_ok=True)
         folder = Path(tempfile.mkdtemp(prefix="annotation-profile-", dir=root))
+        adapter.ownership.register_directory(folder)
+        adapter.ownership.register_source(source)
         copy = folder / f"{folder.name}-{source.name}"
         shutil.copy2(source, copy)
         hashes = {source: hashlib.sha256(source.read_bytes()).hexdigest()}
@@ -434,15 +439,7 @@ def main() -> int:
             raise
         finally:
             try:
-                current = adapter.currentModel
-                if (
-                    current is not None
-                    and Path(current.GetPathName()).resolve() == copy
-                ):
-                    check(
-                        "close profile copy without saving",
-                        await adapter.close_model(save=False),
-                    )
+                await adapter.close_owned_documents()
                 report["source_unchanged"] = {
                     str(path): hashlib.sha256(path.read_bytes()).hexdigest() == digest
                     for path, digest in hashes.items()
@@ -457,7 +454,7 @@ def main() -> int:
         return {"report": str(folder / "profile.json")}
 
     _telemetry.set_service("drawing-annotation-performance-probe")
-    return run_build(probe)
+    return run_copy_diagnostic(probe)
 
 
 if __name__ == "__main__":
