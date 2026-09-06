@@ -54,7 +54,13 @@ def test_native_stroke_witness_preserves_internal_geometry_and_print_width():
 
 
 def _all_around_snapshot(
-    monkeypatch, *, side, all_around=lambda: True, circle_offset=0.0, sweep="closed"
+    monkeypatch,
+    *,
+    side,
+    all_around=lambda: True,
+    circle_offset=0.0,
+    sweep="closed",
+    unsupported_counts=(0, 0, 0),
 ):
     """Sanitized channel-lever DetailItem350 native side-switch fixture."""
     import _drawing_annotation_bounds as module
@@ -107,6 +113,9 @@ def _all_around_snapshot(
         GetTriangleCount=lambda: 0,
         GetArrowHeadCount=lambda: 0,
         GetPolygonCount=lambda: 0,
+        GetEllipseCount=lambda: unsupported_counts[0],
+        GetParabolaCount=lambda: unsupported_counts[1],
+        GetPointCount=lambda: unsupported_counts[2],
     )
     annotation = SimpleNamespace(
         GetType=lambda: 5,
@@ -120,6 +129,14 @@ def _all_around_snapshot(
         GetPosition=lambda: (anchor_x, anchor_y, 0),
     )
     return _native_snapshot(annotation)
+
+
+@pytest.mark.parametrize("counts", [(1, 0, 0), (0, 2, 0), (0, 0, 1), (-1, 0, 0)])
+def test_unsupported_native_primitive_inventory_cannot_be_silently_omitted(
+    monkeypatch, counts
+):
+    with pytest.raises(ValueError, match="native primitive inventory"):
+        _all_around_snapshot(monkeypatch, side="left", unsupported_counts=counts)
 
 
 def test_native_all_around_circle_follows_elbow_without_deforming_frame(monkeypatch):
