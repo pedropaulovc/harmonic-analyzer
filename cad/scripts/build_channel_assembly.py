@@ -149,7 +149,6 @@ from _assembly import (
     component_named_ref,
     component_transform,
     concentric_mate,
-    delete_assembly_feature,
     distance_driver,
     named_ref,
     place_component,
@@ -167,6 +166,7 @@ from _cwm import (
     component_mate_count,
     component_mate_dump,
     copy_with_mates,
+    delete_pose_driver_bank,
     ensure_component_distance_mate_flip,
     external_mate_rows,
     mates_with_owners,
@@ -1717,8 +1717,9 @@ async def build(adapter) -> dict[str, str]:
     with _telemetry.span(
         "cwm.release_pose_drivers", channels=len(copied), drivers=len(retained_drives)
     ):
-        for name in reversed(retained_drives):
-            delete_assembly_feature(adapter, name)
+        delete_pose_driver_bank(
+            adapter, reversed(retained_drives), expected_count=3 * len(copied)
+        )
 
     # End-state validation of the replicated channels: ONE closing solve, then
     # prove each copy from the model (the CopyWithMates2 return value LIES):
