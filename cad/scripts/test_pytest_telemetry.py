@@ -156,3 +156,51 @@ def test_real_telemetry_self_runner_enters_pytest_before_application_import(tmp_
     assert [row["body"] for row in _records(capture / "logs.jsonl")] == [
         "did the thing"
     ]
+
+
+def test_pytest_rejects_live_native_output_mutations(tmp_path):
+    """Run all write controls in one disposable miniature pytest checkout."""
+    operations = [
+        "target.write_bytes(b'fixture')",
+        "target.with_name('new.SLDPRT').write_text('fixture')",
+        "open(target, 'wb')",
+        "io.open(target, 'r+b')",
+        "os.open(target, os.O_WRONLY | os.O_TRUNC)",
+        "shutil.copyfile(scratch, target)",
+        "scratch.replace(target)",
+        "target.rename(scratch)",
+        "target.unlink()",
+        "os.truncate(target, 0)",
+        "shutil.rmtree(target.parent)",
+        "os.link(target, scratch.with_name('alias'))",
+    ]
+    scripts = _mini_repo(tmp_path)
+    shutil.copy2(REPO_ROOT / "conftest.py", tmp_path)
+    target = tmp_path / "cad" / "out" / "sldprt" / "native.SLDPRT"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(b"native sentinel")
+    test = scripts / "test_native_guard.py"
+    test.write_text(
+        "import io, os, shutil\nfrom pathlib import Path\nimport pytest\n"
+        f"@pytest.mark.parametrize('operation', {operations!r})\n"
+        "def test_fixture_cannot_mutate_live_cad(tmp_path, operation):\n"
+        f"    target = Path({str(target)!r})\n"
+        "    scratch = tmp_path / 'scratch.SLDPRT'\n"
+        "    scratch.write_bytes(b'scratch')\n"
+        "    assert target.read_bytes() == b'native sentinel'\n"
+        "    shutil.copyfile(target, tmp_path / 'read-only-copy.SLDPRT')\n"
+        "    with pytest.raises(PermissionError, match='pytest native output guard'):\n"
+        "        eval(operation)\n"
+        "    assert target.read_bytes() == b'native sentinel'\n",
+        encoding="utf-8",
+    )
+    run = subprocess.run(
+        [sys.executable, "-m", "pytest", "-q", str(test)],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert run.returncode == 0, run.stdout + run.stderr
+    assert f"{len(operations)} passed" in run.stdout
+    assert target.read_bytes() == b"native sentinel"
