@@ -159,3 +159,56 @@ def test_canonicalization_only_normalizes_verified_part_owner(tmp_path):
     source["models"]["view"]["path"] = str(tmp_path / "wrong.SLDPRT")
     with pytest.raises(RuntimeError, match="unexpectedly references"):
         probe.canonical_semantics(source, path)
+
+
+def test_authoring_allows_only_exact_target_tolerance_in_shared_semantics():
+    before = {
+        "dimensions": dimension_rows(),
+        "semantics": {
+            key: {}
+            for key in (
+                "checked",
+                "excluded",
+                "models",
+                "dimensions",
+                "dimensions_excluded",
+            )
+        },
+    }
+    before["semantics"]["dimensions"] = {
+        name: {
+            "kind": "model_dimension",
+            "components": [
+                {
+                    "qualified_name": f"{name}@LeverOutline@<source-part>",
+                    "tolerance_type": 0,
+                    "designation": "other",
+                    "value_system": 0.127,
+                }
+            ],
+        }
+        for name in probe.TARGETS["LeverOutline"]
+    }
+    before["semantics"]["dimensions"]["unrelated"] = {
+        "kind": "model_dimension",
+        "components": [
+            {
+                "qualified_name": "FulcrumDia@FulcrumProfile@<source-part>",
+                "tolerance_type": 0,
+                "designation": "other",
+                "value_system": 0.0065,
+            }
+        ],
+    }
+    after = deepcopy(before)
+    for name in probe.TARGETS["LeverOutline"]:
+        after["dimensions"][name]["tolerance_type"] = 1
+        after["semantics"]["dimensions"][name]["components"][0].update(
+            tolerance_type=1, designation="basic"
+        )
+    probe.assert_drawing(before, after, "part BASIC authoring", 1)
+    after["semantics"]["dimensions"]["unrelated"]["components"][0].update(
+        tolerance_type=1, designation="basic"
+    )
+    with pytest.raises(RuntimeError, match="attachment snapshot changed.*unrelated"):
+        probe.assert_drawing(before, after, "unexpected source edit", 1)
