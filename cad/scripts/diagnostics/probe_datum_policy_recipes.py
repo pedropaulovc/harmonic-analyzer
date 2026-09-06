@@ -6,11 +6,16 @@ and final gates run unchanged; the reviewed benchmark loader redirects SOURCE
 and OUTPUTS before defaults/aliases are evaluated. This is a functional pilot,
 not an ABBA speed benchmark or a full doit merge gate.
 
-The exact existing source files are immutable inputs, avoiding an alternate-path
-same-basename lever while the user's visible lever part and Draw2 remain open.
-Shared diagnostic ownership closes only known documents, never baseline ones.
+Original source files are disk-read only, never opened. Each recipe uses a
+unique-basename exact bytecopy in its registered diagnostic directory. Native
+imported callout formatting can mutate the copied source display in memory (the
+arbor source-dirty-9cbdz77u control proved this); existing COPY ownership permits
+discarding that copy but does not relax protected original/baseline documents.
+Copy disk hashes must remain exact: no source save is authorized. Shared
+ownership preserves the user's visible lever and unsaved Draw2 throughout.
 Every successful recipe gets a fresh saved/reopened geometry, dimension/BASIC,
 annotation-content/layout and source-parameter witness. Stop at the first failure.
+The named parameter witnesses do not prove full in-memory source immutability.
 """
 
 from __future__ import annotations
@@ -18,6 +23,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import shutil
 import sys
 import tempfile
 import time
@@ -132,6 +138,16 @@ def require_same_source(
             raise RuntimeError(f"{stage}: exact source dimension identity changed")
 
 
+def require_copy_hash(trial, phase):
+    """Record the owned part's disk identity; formatting may dirty memory only."""
+    actual = attachments.file_digest(Path(trial["copy_source"]))
+    trial.setdefault("copy_hashes", {})[phase] = actual
+    if actual != EXPECTED_PART_HASHES[trial["target"]]:
+        raise RuntimeError(
+            f"{phase}: owned source copy changed on disk; no source save is authorized"
+        )
+
+
 def drawing_witness(adapter):
     semantics = attachments.snapshot(adapter.currentModel, app=adapter.swApp)
     if (
@@ -187,6 +203,7 @@ async def pilot(adapter, candidate, source_root, guard_root, output_root):
         "order": ORDER,
         "trials": [],
         "scope": "one functional build per recipe; no speedup/full-pipeline claim",
+        "source_witness_scope": "exact original/copy disk hashes and named recipe dimension identities/values/tolerances/BASIC; not full in-memory source immutability",
     }
     report_path = directory / "pilot.json"
 
@@ -207,17 +224,29 @@ async def pilot(adapter, candidate, source_root, guard_root, output_root):
             trial_dir = directory / target
             trial_dir.mkdir()
             adapter.ownership.register_directory(trial_dir)
+            copy_source = (
+                trial_dir / f"{sources[target].stem}-source-{directory.name}.SLDPRT"
+            )
+            shutil.copy2(sources[target], copy_source)
+            trial.update(
+                original_source=str(sources[target]), copy_source=str(copy_source)
+            )
+            # Do not register/freeze this as a protected source: it is an owned
+            # COPY, and imported drawing formatting can legitimately dirty it.
+            require_copy_hash(trial, "copied")
+            checkpoint()
             module = benchmark.load_recipe(
-                candidate, target, trial_dir, source=sources[target]
+                candidate, target, trial_dir, source=copy_source
             )
             await adapter.close_owned_documents()
             check(
-                "open exact source witness",
-                await adapter.open_model(str(sources[target])),
+                "open exact owned source copy",
+                await adapter.open_model(str(copy_source)),
             )
+            adapter.ownership.assert_current_owned()
             source_model = adapter.currentModel
             trial["source_before"], source_handles = source_dimensions(
-                source_model, target, sources[target]
+                source_model, target, copy_source
             )
             trial["recipe_sha256"] = attachments.file_digest(
                 trial_dir / "recipe-source.py"
@@ -233,13 +262,14 @@ async def pilot(adapter, candidate, source_root, guard_root, output_root):
                 trial["recipe_seconds"] = time.perf_counter() - started
                 checkpoint()
             trial["artifacts"] = benchmark.validate_artifacts(artifacts, module.OUTPUTS)
+            require_copy_hash(trial, "after_recipe")
             adapter.ownership.assert_current_owned()
             with _telemetry.span(
                 "diagnostic.datum_policy.drawing_witness", target=target, phase="built"
             ):
                 trial["built"] = drawing_witness(adapter)
             trial["source_after"], after_handles = source_dimensions(
-                source_model, target, sources[target]
+                source_model, target, copy_source
             )
             require_same_source(
                 trial["source_before"],
@@ -250,6 +280,7 @@ async def pilot(adapter, candidate, source_root, guard_root, output_root):
                 handles_after=after_handles,
             )
             await adapter.close_owned_documents()
+            require_copy_hash(trial, "after_close")
             check(
                 "reopen owned production drawing",
                 await adapter.open_model(str(module.OUTPUTS.slddrw)),
@@ -262,9 +293,9 @@ async def pilot(adapter, candidate, source_root, guard_root, output_root):
             ):
                 trial["reopened"] = drawing_witness(adapter)
             compare_drawing(adapter.swApp, trial["built"], trial["reopened"])
-            reopened_source = adapter.swApp.GetOpenDocumentByName(str(sources[target]))
+            reopened_source = adapter.swApp.GetOpenDocumentByName(str(copy_source))
             trial["source_reopened"], _ = source_dimensions(
-                reopened_source, target, sources[target]
+                reopened_source, target, copy_source
             )
             require_same_source(
                 trial["source_before"], trial["source_reopened"], "saved reopen"
@@ -280,6 +311,7 @@ async def pilot(adapter, candidate, source_root, guard_root, output_root):
                 )
             require_sources(sources, guards)
             await adapter.close_owned_documents()
+            require_copy_hash(trial, "after_reopened_close")
             trial["status"] = "passed"
             checkpoint()
         report["status"] = "passed"
@@ -289,6 +321,15 @@ async def pilot(adapter, candidate, source_root, guard_root, output_root):
             report["trials"][-1].update(status="failed", error=repr(error))
         raise
     finally:
+        for trial in report["trials"]:
+            if "copy_source" not in trial:
+                continue
+            try:
+                trial["copy_final"] = attachments.file_digest(
+                    Path(trial["copy_source"])
+                )
+            except OSError as error:
+                trial["copy_final"] = {"error": repr(error)}
         report["sources_after"] = {}
         for path in (*sources.values(), *guards.values()):
             try:
