@@ -19,6 +19,13 @@ and rejected. Reflecting text is wrong when a datum carries below-frame text.
 Planning clearance (3 mm) is separate from final clearance (2 mm), not a claimed
 measurement error bound. Leader routing/crossings and sheet fit are NOT certified
 here; decorated-view packing follows this operation.
+
+An explicitly attached display-dimension datum has a separate STATIONARY policy.
+``probe_datum_dimension_attachment.py --mode stationary_attachment`` proves its
+generic frame can be remote from GetPosition and its IDatumTag-specific text can
+remain stale until reopen. The generic rendered text plus GetLabel are the semantic
+witness; specific text is diagnostic only. Stationary means no position writes,
+not an exemption from actual view, dimension-text or other body clearance.
 """
 
 from __future__ import annotations
@@ -53,6 +60,11 @@ class GtolPlacement(Enum):
 class DimensionSource(Enum):
     DRAWING_REFERENCE = "drawing_reference"
     MODEL = "model"
+
+
+class SymbolPlacement(Enum):
+    MOVABLE = "movable"
+    STATIONARY_DIMENSION = "stationary_dimension"
 
 
 @dataclass(frozen=True)
@@ -119,6 +131,9 @@ class _Symbol:
     text: tuple[Any, ...]
     format: tuple[Any, ...]
     frame: Rect | None = None
+    placement: SymbolPlacement = SymbolPlacement.MOVABLE
+    attached_dimension: _Dimension | None = None
+    specific_text: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -188,7 +203,11 @@ def _properties(kind: int, specific: Any) -> tuple[Any, ...]:
     return symbol, int(specific.GetDirectionOfLay()), all_around, orientation, texts
 
 
-def _datum_frame(measured: Any, position: tuple[float, float, float]) -> Rect:
+def _datum_frame(
+    measured: Any,
+    position: tuple[float, float, float],
+    placement: SymbolPlacement = SymbolPlacement.MOVABLE,
+) -> Rect:
     from _drawing_annotation_bounds import _frame_lines
 
     lines = _frame_lines(tuple(measured.native_strokes))
@@ -215,13 +234,35 @@ def _datum_frame(measured: Any, position: tuple[float, float, float]) -> Rect:
     ) or (
         frame.xmax - frame.xmin <= _EPSILON_M
         or frame.ymax - frame.ymin <= _EPSILON_M
-        or not any(math.dist(position[:2], point) <= _EPSILON_M for point in midpoints)
+        or (
+            placement is SymbolPlacement.MOVABLE
+            and not any(
+                math.dist(position[:2], point) <= _EPSILON_M for point in midpoints
+            )
+        )
     ):
         raise RuntimeError(
             "datum frame must be upright with its native anchor on a horizontal side "
             "midpoint or vertical side midpoint"
         )
     return frame
+
+
+def _attached_dimension(adapter: Any, view: Any, entity: Any) -> _Dimension:
+    display = _early_bound(entity, "IDisplayDimension")
+    raw = display.GetAnnotation() if display is not None else None
+    annotation = _early_bound(raw, "IAnnotation") if raw is not None else None
+    if (
+        annotation is None
+        or int(annotation.GetType()) != 4
+        or int(annotation.Visible) != 1
+        or annotation.IsDangling()
+        or int(annotation.OwnerType) != 0
+        or int(adapter.swApp.IsSame(annotation.Owner, view)) != 1
+        or int(adapter.swApp.IsSame(annotation.GetSpecificAnnotation(), display)) != 1
+    ):
+        raise RuntimeError("attached dimension must belong to the exact native view")
+    return _dimension_witness(adapter, view, annotation)
 
 
 def _read_symbol(
@@ -253,11 +294,30 @@ def _read_symbol(
             f"{name}: specific symbol does not round-trip to its annotation"
         )
     count = int(specific.GetTextCount())
-    if count < 1:
+    if not 0 <= count <= 10000 or (kind == 7 and count < 1):
         raise RuntimeError(f"{name}: callout has no displayed text")
     properties = _properties(kind, specific)
-    text = tuple(str(specific.GetTextAtIndex(index)) for index in range(count))
+    specific_text = tuple(str(specific.GetTextAtIndex(index)) for index in range(count))
     measured = measure(adapter, annotation)
+    ink = _ink_content(measured)
+    if kind == 2:
+        rendered = tuple(run[0] for run in ink)
+        if (
+            not properties[0]
+            or not rendered
+            or any(not value.strip() for value in rendered)
+            or properties[0] not in rendered
+        ):
+            raise RuntimeError(
+                f"{name}: rendered datum text lacks its exact nonempty label"
+            )
+    placement = SymbolPlacement.MOVABLE
+    attached_dimension = None
+    if kind == 2 and 14 in types:
+        if types != (14,):
+            raise RuntimeError("stationary datum needs exactly one display dimension")
+        placement = SymbolPlacement.STATIONARY_DIMENSION
+        attached_dimension = _attached_dimension(adapter, view, entities[0])
     position = _position(annotation)
     if math.dist(position[:2], measured.anchor) > _EPSILON_M:
         raise RuntimeError(
@@ -274,14 +334,25 @@ def _read_symbol(
         position,
         measured.body,
         properties,
-        (text, _ink_content(measured)),
+        ink if kind == 2 else (specific_text, ink),
         tuple(measured.format_signature),
-        _datum_frame(measured, position) if kind == 2 else None,
+        _datum_frame(measured, position, placement) if kind == 2 else None,
+        placement,
+        attached_dimension,
+        specific_text,
     )
 
 
 def _same_symbol(app: Any, before: _Symbol, after: _Symbol) -> None:
-    for field in ("name", "kind", "properties", "text", "format", "entity_types"):
+    for field in (
+        "name",
+        "kind",
+        "properties",
+        "text",
+        "format",
+        "entity_types",
+        "placement",
+    ):
         if getattr(before, field) != getattr(after, field):
             raise RuntimeError(f"{before.name}: native callout {field} changed")
     if len(before.entities) != len(after.entities) or any(
@@ -291,6 +362,9 @@ def _same_symbol(app: Any, before: _Symbol, after: _Symbol) -> None:
     for field in ("annotation", "specific", "owner"):
         if int(app.IsSame(getattr(before, field), getattr(after, field))) != 1:
             raise RuntimeError(f"{before.name}: native {field} identity changed")
+    _same_dimension(
+        app, before.name, before.attached_dimension, after.attached_dimension
+    )
 
 
 def _visible_annotations(view: Any) -> dict[str, Any]:
@@ -597,33 +671,39 @@ def _same_obstacles(app: Any, before: Mapping, after: Mapping) -> None:
                     f"{name}: obstacle native centerline/stroke witness changed"
                 )
         old_dim, new_dim = original.dimension, actual.dimension
-        if old_dim is None and new_dim is None:
-            continue
-        if old_dim is None or new_dim is None:
-            raise RuntimeError(f"{name}: obstacle dimension witness inventory changed")
-        if (
-            old_dim.source,
-            old_dim.display_type,
-            old_dim.configuration,
-            old_dim.parameters,
-        ) != (
-            new_dim.source,
-            new_dim.display_type,
-            new_dim.configuration,
-            new_dim.parameters,
-        ):
-            raise RuntimeError(
-                f"{name}: obstacle dimension identity/type/configuration/system value changed"
-            )
-        if (
-            int(app.IsSame(old_dim.display, new_dim.display)) != 1
-            or len(old_dim.dimensions) != len(new_dim.dimensions)
-            or any(
-                int(app.IsSame(a, b)) != 1
-                for a, b in zip(old_dim.dimensions, new_dim.dimensions)
-            )
-        ):
-            raise RuntimeError(f"{name}: obstacle native dimension identity changed")
+        _same_dimension(app, name, old_dim, new_dim)
+
+
+def _same_dimension(
+    app: Any, name: str, old_dim: _Dimension | None, new_dim: _Dimension | None
+):
+    if old_dim is None and new_dim is None:
+        return
+    if old_dim is None or new_dim is None:
+        raise RuntimeError(f"{name}: obstacle dimension witness inventory changed")
+    if (
+        old_dim.source,
+        old_dim.display_type,
+        old_dim.configuration,
+        old_dim.parameters,
+    ) != (
+        new_dim.source,
+        new_dim.display_type,
+        new_dim.configuration,
+        new_dim.parameters,
+    ):
+        raise RuntimeError(
+            f"{name}: obstacle dimension identity/type/configuration/system value changed"
+        )
+    if (
+        int(app.IsSame(old_dim.display, new_dim.display)) != 1
+        or len(old_dim.dimensions) != len(new_dim.dimensions)
+        or any(
+            int(app.IsSame(a, b)) != 1
+            for a, b in zip(old_dim.dimensions, new_dim.dimensions)
+        )
+    ):
+        raise RuntimeError(f"{name}: obstacle native dimension identity changed")
 
 
 def _datum_side_delta(symbol: _Symbol) -> tuple[float, float]:
@@ -635,8 +715,28 @@ def _datum_side_delta(symbol: _Symbol) -> tuple[float, float]:
     )
 
 
+def _stationary_owner_obstacles(
+    app: Any, symbols: Mapping[str, _Symbol], obstacles: Mapping[str, _Obstacle]
+):
+    """A datum's intentional leader join never exempts its dimension's text."""
+    for symbol in symbols.values():
+        dimension = symbol.attached_dimension
+        if dimension is None:
+            continue
+        matches = tuple(
+            obstacle
+            for obstacle in obstacles.values()
+            if obstacle.dimension is not None
+            and int(app.IsSame(dimension.display, obstacle.dimension.display)) == 1
+        )
+        if len(matches) != 1:
+            raise RuntimeError(
+                f"{symbol.name}: owning dimension needs exactly one measured obstacle"
+            )
+
+
 def _placement_body(symbol: _Symbol) -> Rect:
-    if symbol.kind != 2:
+    if symbol.kind != 2 or symbol.placement is SymbolPlacement.STATIONARY_DIMENSION:
         return symbol.body
     alternate = symbol.body.translated(_datum_side_delta(symbol))
     return Rect(
@@ -647,8 +747,24 @@ def _placement_body(symbol: _Symbol) -> Rect:
     )
 
 
-def _place(symbol: _Symbol, outline: Rect, obstacles: Sequence[Rect], gap_m: float):
+def _place(
+    symbol: _Symbol,
+    outline: Rect,
+    obstacles: Sequence[Rect],
+    gap_m: float,
+    *,
+    stationary_gap_m: float | None = None,
+):
     attempts = []
+    if symbol.placement is SymbolPlacement.STATIONARY_DIMENSION:
+        clearance = gap_m if stationary_gap_m is None else stationary_gap_m
+        if not all(
+            _clear(symbol.body, item, clearance) for item in (outline, *obstacles)
+        ):
+            raise RuntimeError(
+                f"{symbol.name}: stationary datum body clearance is insufficient"
+            )
+        return symbol, attempts
     placement_body = _placement_body(symbol)
     for candidate in placement_candidates(
         placement_body, outline, obstacles, gap_m=gap_m
@@ -696,7 +812,7 @@ def _final_symbol(
 ) -> None:
     _same_symbol(app, initial, actual)
     allowed = ((predicted.body, predicted.frame),)
-    if actual.kind == 2:
+    if actual.kind == 2 and actual.placement is SymbolPlacement.MOVABLE:
         side_delta = _datum_side_delta(predicted)
         allowed += (
             (
@@ -720,6 +836,10 @@ def _final_symbol(
     )
     if (
         math.dist(predicted.position[:2], actual.position[:2]) > _EPSILON_M
+        or (
+            actual.placement is SymbolPlacement.STATIONARY_DIMENSION
+            and abs(predicted.position[2] - actual.position[2]) > _EPSILON_M
+        )
         or not body_matches
     ):
         _telemetry.info(
@@ -821,6 +941,7 @@ def arrange_native_callouts(
             obstacles = _read_obstacles(
                 adapter, view, annotations, measure_annotation, deferred
             )
+            _stationary_owner_obstacles(app, before, obstacles)
             outline = Rect(*view.GetOutline())
         bank, attempts = dict(before), {}
         for name in sorted(bank, key=lambda key: (bank[key].kind, key)):
@@ -851,7 +972,11 @@ def arrange_native_callouts(
                 "drawing.callouts.native_position", view=label, annotation=name
             ):
                 bank[name], attempts[name] = _place(
-                    seed, outline, other_bodies, planning_gap_m
+                    seed,
+                    outline,
+                    other_bodies,
+                    planning_gap_m,
+                    stationary_gap_m=gap_m,
                 )
         with _telemetry.span(
             "drawing.callouts.final_witness", view=label, count=len(before)
@@ -874,6 +999,7 @@ def arrange_native_callouts(
                 adapter, view, final_annotations, measure_annotation, final_deferred
             )
             _same_obstacles(app, obstacles, final_obstacles)
+            _stationary_owner_obstacles(app, after, final_obstacles)
             final_outline = Rect(*view.GetOutline())
             if before.keys() != after.keys():
                 raise RuntimeError("native callout operation changed symbol inventory")
@@ -895,6 +1021,14 @@ def arrange_native_callouts(
             "attempts": attempts,
             "bodies_after": {name: row.body.bounds for name, row in after.items()},
             "positions_after": {name: row.position for name, row in after.items()},
+            "placement_classes": {
+                name: row.placement.value for name, row in after.items()
+            },
+            "specific_text_diagnostics": {
+                name: {"before": before[name].specific_text, "after": row.specific_text}
+                for name, row in after.items()
+                if row.kind == 2
+            },
             "deferred_annotations": {name: row.kind for name, row in deferred.items()},
             "obstacle_attachment_exclusions": {
                 name: "non-dangling native centerline: exact specific identity and unchanged native strokes"
