@@ -556,6 +556,59 @@ def add_datum_feature(
     return tag
 
 
+@_telemetry.traced("drawing.native_gtol_selection", label_param="label")
+def _project_native_gtol_selection(
+    adapter: Any, view: Any, entity: Any, *, entity_type: str, label: str
+) -> None:
+    """Give native GTol insertion a sheet-space point on its selected entity.
+
+    Live copy probes show InsertGtol consumes the model-space selection point
+    as sheet coordinates even when the selected entity owns the correct view.
+    Project the kernel's point through the actual view transform; do not move
+    the resulting annotation or select geometry by coordinates. Edge selection
+    can have no selection point, so its native curve endpoint supplies one.
+    This is GTol-specific: datum and finish insertion already map their points.
+    """
+    selection = _early_bound(adapter.currentModel.SelectionManager, "ISelectionMgr")
+    if int(selection.GetSelectedObjectCount2(-1)) != 1:
+        raise RuntimeError(f"{label}: native GTol requires exactly one selected entity")
+    owner = selection.GetSelectedObjectsDrawingView2(1, -1)
+    if owner is None or view_name(adapter, _early_bound(owner, "IView")) != view_name(adapter, view):
+        raise RuntimeError(f"{label}: native GTol entity has the wrong drawing view")
+    if entity_type == "EDGE":
+        edge = _early_bound(entity, "IEdge")
+        if edge.GetCurve() is None:
+            raise RuntimeError(f"{label}: native GTol edge has no curve")
+        parameters = edge.GetCurveParams3()
+        if parameters is None:
+            raise RuntimeError(f"{label}: native GTol edge has no curve parameters")
+        point = tuple(_early_bound(parameters, "ICurveParamData").StartPoint or ())
+    elif entity_type == "FACE":
+        point = tuple(selection.GetSelectionPoint2(1, -1) or ())
+    else:
+        raise ValueError(f"{label}: native GTol point requires a model EDGE or FACE")
+    if len(point) != 3 or not all(math.isfinite(value) for value in point):
+        raise RuntimeError(f"{label}: native GTol model point is unreadable: {point}")
+    xy = model_point_in_view(adapter, view, point, label=label)
+    projected = (*xy, 0.0)
+    if not all(math.isfinite(value) for value in projected):
+        raise RuntimeError(f"{label}: native GTol view projection is not finite: {projected}")
+    if not selection.SetSelectionPoint2(1, -1, *projected):
+        raise RuntimeError(f"{label}: native GTol projected selection point was rejected")
+    actual = tuple(selection.GetSelectionPoint2(1, -1) or ())
+    if len(actual) != 3 or not all(math.isfinite(value) for value in actual) or math.dist(actual, projected) > 1e-12:
+        raise RuntimeError(f"{label}: native GTol projected selection point did not persist: {actual}")
+    if int(selection.GetSelectedObjectCount2(-1)) != 1:
+        raise RuntimeError(f"{label}: native GTol projection changed selection count")
+    after = selection.GetSelectedObject6(1, -1)
+    application = _early_bound(adapter.swApp, "ISldWorks")
+    if after is None or int(application.IsSame(entity, after)) != 1:
+        raise RuntimeError(f"{label}: native GTol projection changed entity identity")
+    span = _telemetry.trace.get_current_span()
+    span.set_attribute("model_point_m", point)
+    span.set_attribute("sheet_point_m", projected)
+
+
 @_telemetry.traced("drawing.feature_control_frame", label_param="label")
 def add_feature_control_frame(
     adapter: Any,
@@ -597,6 +650,8 @@ def add_feature_control_frame(
         entity_type=entity_type,
         label=label,
     )
+    if frame_xy is None:
+        _project_native_gtol_selection(adapter, view, edge, entity_type=entity_type, label=label)
     gtol = draw.InsertGtol()
     if gtol is None:
         raise RuntimeError(f"failed to insert feature-control frame ({label})")
