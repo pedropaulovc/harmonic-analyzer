@@ -305,3 +305,113 @@ def test_thread_ink_conclusion_requires_repeatable_control(
         )
         == outcome
     )
+
+
+def correction_fixture(monkeypatch):
+    monkeypatch.setattr(view_probe, "_early_bound", lambda value, _kind: value)
+    calls = []
+    data = SimpleNamespace(
+        Diameter=0,
+        DiameterType=3,
+        BlindDepth=0.008,
+        ApplyThread=0,
+        Standard=-2,
+        StandardType="",
+        Size="",
+        AccessSelections=lambda *_args: calls.append("access") or True,
+        ReleaseSelectionAccess=lambda: calls.append("release"),
+    )
+    model = SimpleNamespace(EditRebuild3=lambda: calls.append("rebuild") or True)
+    feature = SimpleNamespace(
+        GetDefinition=lambda: data,
+        ModifyDefinition=lambda *_args: calls.append("modify") or True,
+        GetErrorCode2=lambda: (0, False),
+    )
+    args = SimpleNamespace(
+        standard=0,
+        standard_type="Machine Threads",
+        thread_size="#10-24",
+        minor_diameter_mm=3.56616,
+    )
+    return model, feature, data, args, calls
+
+
+def test_explicit_vendor_thread_correction_is_read_back_after_native_modify(
+    monkeypatch,
+):
+    model, feature, _data, args, calls = correction_fixture(monkeypatch)
+    requested = view_probe.correction_request(
+        args, view_probe.feature_definition(feature)
+    )
+    record = {}
+    view_probe.correct_definition(model, feature, requested, record)
+    assert calls == ["access", "modify", "rebuild"]
+    assert record["readback"]["diameter_m"] == pytest.approx(0.00356616)
+    assert record["readback"]["standard"] == 0
+    assert record["readback"]["standard_type"] == "Machine Threads"
+    assert record["readback"]["size"] == "#10-24"
+
+
+@pytest.mark.parametrize(
+    "failure", ["access", "modify", "rebuild", "feature_error", "readback"]
+)
+def test_unverified_native_thread_correction_fails(monkeypatch, failure):
+    model, feature, data, args, _calls = correction_fixture(monkeypatch)
+    requested = view_probe.correction_request(
+        args, view_probe.feature_definition(feature)
+    )
+    if failure == "access":
+        data.AccessSelections = lambda *_args: False
+    if failure == "modify":
+        feature.ModifyDefinition = lambda *_args: False
+    if failure == "rebuild":
+        model.EditRebuild3 = lambda: False
+    if failure == "feature_error":
+        feature.GetErrorCode2 = lambda: (5, False)
+    if failure == "readback":
+        model.EditRebuild3 = lambda: setattr(data, "Diameter", 0.0) or True
+    with pytest.raises(RuntimeError):
+        view_probe.correct_definition(model, feature, requested, {})
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("standard", None),
+        ("standard_type", ""),
+        ("thread_size", ""),
+        ("minor_diameter_mm", 0),
+        ("minor_diameter_mm", float("nan")),
+    ],
+)
+def test_correction_requires_explicit_nonzero_thread_inputs(monkeypatch, field, value):
+    _model, feature, _data, args, _calls = correction_fixture(monkeypatch)
+    setattr(args, field, value)
+    with pytest.raises(ValueError):
+        view_probe.correction_request(args, view_probe.feature_definition(feature))
+
+
+def test_correction_never_treats_internal_major_diameter_as_external_minor(monkeypatch):
+    _model, feature, data, args, _calls = correction_fixture(monkeypatch)
+    data.DiameterType = 2
+    with pytest.raises(ValueError, match="MinorDiameter"):
+        view_probe.correction_request(args, view_probe.feature_definition(feature))
+
+
+def test_view_position_drift_is_not_interpreted_as_thread_ink():
+    row = {
+        "position": [0.37, 0.17],
+        "outline": [0.32, 0.09, 0.41, 0.24],
+        "scale": [6, 1],
+        "angle": 0,
+        "reference": "copy.SLDPRT",
+        "configuration": "Default",
+        "display_mode": 2,
+        "faceted": False,
+        "thread_high_quality": True,
+    }
+    assert view_probe.view_context_differences({"iso": row}, {"iso": row}) == {}
+    moved = {**row, "position": [0.31427049648711945, -0.1657118594847775]}
+    assert view_probe.view_context_differences({"iso": row}, {"iso": moved}) == {
+        "iso": {"position": {"before": row["position"], "after": moved["position"]}}
+    }

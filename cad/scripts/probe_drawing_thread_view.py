@@ -2,6 +2,9 @@
 
 Run through uv with DRAWING PART --feature NAME. The parent takes the COM seat.
 Use --mode definition for a read-only copied-source feature-definition capture.
+Use --mode corrected with explicit standard/type/size/minor-diameter inputs to
+modify only the copied cosmetic definition, run A/B/A, and verify saved/reopened
+definition values. This does not repair an undersized solid thread envelope.
 Only a uniquely copied drawing and its uniquely copied part are modified. The
 closed drawing is relinked before opening; every view must resolve the copied
 part and one configuration. The source feature must be CosmeticThread and initially
@@ -347,6 +350,87 @@ def feature_definition(feature):
     }
 
 
+def correction_request(args, original):
+    if (
+        args.standard is None
+        or not args.standard_type
+        or not args.thread_size
+        or args.minor_diameter_mm is None
+        or not math.isfinite(args.minor_diameter_mm)
+        or args.minor_diameter_mm <= 0
+    ):
+        raise ValueError(
+            "corrected mode requires explicit standard/type/size and positive minor diameter"
+        )
+    if original["diameter_type"] != 3:
+        raise ValueError(
+            "minor-diameter control requires the native Boss/MinorDiameter type"
+        )
+    return {
+        **original,
+        "standard": args.standard,
+        "standard_type": args.standard_type,
+        "size": args.thread_size,
+        "diameter_m": args.minor_diameter_mm / 1000.0,
+    }
+
+
+def assert_definition(actual, requested):
+    for key, expected in requested.items():
+        observed = actual[key]
+        if key in ("diameter_m", "blind_depth_m"):
+            if math.isfinite(observed) and abs(observed - expected) <= 1e-12:
+                continue
+            raise RuntimeError(
+                f"native thread definition differs at {key}: {observed} != {expected}"
+            )
+        if observed != expected:
+            raise RuntimeError(
+                f"native thread definition differs at {key}: {observed!r} != {expected!r}"
+            )
+
+
+def correct_definition(model, feature, requested, record):
+    """Modify the copied native feature, recording actual returns before gating."""
+    data = _early_bound(feature.GetDefinition(), "ICosmeticThreadFeatureData")
+    if not data.AccessSelections(model, None):
+        raise RuntimeError("native thread definition selection access rejected")
+    access_state = "held"
+    try:
+        data.Standard = requested["standard"]
+        data.StandardType = requested["standard_type"]
+        data.Size = requested["size"]
+        data.Diameter = requested["diameter_m"]
+        data.ApplyThread = requested["apply_thread"]
+        data.BlindDepth = requested["blind_depth_m"]
+        # ModifyDefinition consumes the access/rollback transaction, including
+        # its documented failure state; discard the copy on any failed gate.
+        access_state = "submitted"
+        record["modify_result"] = bool(feature.ModifyDefinition(data, model, None))
+    finally:
+        if access_state == "held":
+            data.ReleaseSelectionAccess()
+    if not record["modify_result"]:
+        raise RuntimeError("native thread ModifyDefinition rejected correction")
+    record["rebuild_result"] = bool(model.EditRebuild3())
+    record["feature_error"] = tuple(feature.GetErrorCode2())
+    record["readback"] = feature_definition(feature)
+    if not record["rebuild_result"] or record["feature_error"][0] != 0:
+        raise RuntimeError("corrected cosmetic thread has a native rebuild error")
+    assert_definition(record["readback"], requested)
+
+
+def save_native_copy(model, path):
+    if Path(model.GetPathName()).resolve() != path:
+        raise RuntimeError("refusing to save a model outside the verified copy path")
+    saved, errors, warnings = model.Save3(1, 0, 0)
+    if not saved or errors:
+        raise RuntimeError(
+            f"copied native document Save3 failed: {(saved, errors, warnings)}"
+        )
+    return {"save_warnings": warnings}
+
+
 async def close_copies(adapter, documents):
     """Close only verified copy handles, regardless of which copy was active."""
     for model, path in documents:
@@ -418,14 +502,46 @@ def ink_outcome(phases, repeat_ink, suppression_ink):
     return "inconclusive_no_source_feature_ink_change"
 
 
+def view_context_differences(first, second):
+    """Report native context drift separately from thread-owned display ink."""
+    if set(first) != set(second):
+        raise RuntimeError("thread control changed the native view inventory")
+    fields = (
+        "position",
+        "outline",
+        "scale",
+        "angle",
+        "reference",
+        "configuration",
+        "display_mode",
+        "faceted",
+        "thread_high_quality",
+    )
+    return {
+        name: {
+            field: {"before": row[field], "after": second[name][field]}
+            for field in fields
+            if row[field] != second[name][field]
+        }
+        for name, row in first.items()
+        if any(row[field] != second[name][field] for field in fields)
+    }
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("drawing", type=Path)
     parser.add_argument("part", type=Path)
     parser.add_argument("--feature", required=True)
     parser.add_argument(
-        "--mode", choices=("suppression", "definition"), default="suppression"
+        "--mode",
+        choices=("suppression", "definition", "corrected"),
+        default="suppression",
     )
+    parser.add_argument("--standard", type=int)
+    parser.add_argument("--standard-type")
+    parser.add_argument("--thread-size")
+    parser.add_argument("--minor-diameter-mm", type=float)
     parser.add_argument("--worker", action="store_true")
     args = parser.parse_args()
     source, source_part = (
@@ -438,18 +554,27 @@ def main():
         sys.path.insert(0, str(CAD_ROOT.parent))
         import dodo
 
+        command = [
+            sys.executable,
+            str(Path(__file__).resolve()),
+            str(source),
+            str(source_part),
+            "--feature",
+            args.feature,
+            "--mode",
+            args.mode,
+            "--worker",
+        ]
+        for flag, value in (
+            ("--standard", args.standard),
+            ("--standard-type", args.standard_type),
+            ("--thread-size", args.thread_size),
+            ("--minor-diameter-mm", args.minor_diameter_mm),
+        ):
+            if value is not None:
+                command.extend((flag, str(value)))
         dodo._run(
-            [
-                sys.executable,
-                str(Path(__file__).resolve()),
-                str(source),
-                str(source_part),
-                "--feature",
-                args.feature,
-                "--mode",
-                args.mode,
-                "--worker",
-            ],
+            command,
             "thread native-view source-feature control",
             log_stem="thread-view-coverage",
             com=True,
@@ -569,6 +694,20 @@ def main():
             if args.mode == "definition":
                 report["outcome"] = "source_feature_definition_captured"
                 return {"report": str(folder / "coverage.json")}
+            if args.mode == "corrected":
+                requested = correction_request(
+                    args, report["source_feature_definition"]
+                )
+                report["correction"] = {"requested": requested}
+                correct_definition(part_model, feature, requested, report["correction"])
+                corrected_metrics, baseline_bodies = body_metric_guard(part_model)
+                report["correction"]["body_metric_checks"] = compare_body_metrics(
+                    baseline_metrics, corrected_metrics
+                )
+                baseline_metrics = corrected_metrics
+                report["body_identity_scope"] = (
+                    "healthy rebuild and suppression after cosmetic definition edit; no identity claim across reopen"
+                )
             for phase, state in (
                 ("present", 1),
                 ("suppressed", 0),
@@ -620,6 +759,36 @@ def main():
                 row["save"] = save_phase(model, copy, pdf)
                 render_pdf_png(pdf, folder / f"{phase}.png")
                 row["pdf_vectors"] = vector_witness(pdf)
+            if args.mode == "corrected":
+                part_model = _activate_copy(adapter, part_copy)
+                report["correction"]["save"] = save_native_copy(part_model, part_copy)
+                await close_copies(
+                    adapter, ((drawing_model, copy), (part_model, part_copy))
+                )
+                drawing_model = part_model = None
+                check(
+                    "reopen corrected part copy",
+                    await adapter.open_model(str(part_copy)),
+                )
+                part_model = _early_bound(adapter.currentModel, "IModelDoc2")
+                if Path(part_model.GetPathName()).resolve() != part_copy:
+                    raise RuntimeError(
+                        "reopened corrected part is not the intended copy"
+                    )
+                reopened_feature = _early_bound(
+                    _early_bound(part_model, "IPartDoc").FeatureByName(args.feature),
+                    "IFeature",
+                )
+                report["correction"]["reopened_definition"] = feature_definition(
+                    reopened_feature
+                )
+                assert_definition(
+                    report["correction"]["reopened_definition"], requested
+                )
+                reopened_metrics, _reopened_bodies = body_metric_guard(part_model)
+                report["correction"]["reopened_body_metric_checks"] = (
+                    compare_body_metrics(baseline_metrics, reopened_metrics)
+                )
             phases = report["phases"]
             report["repeat_ink"] = ink_difference(
                 folder / "present.png", folder / "present_again.png"
@@ -643,6 +812,17 @@ def main():
                 }
                 for key in views
             }
+            report["view_context_differences"] = {
+                phase: view_context_differences(
+                    phases["present"]["views"], phases[phase]["views"]
+                )
+                for phase in ("suppressed", "present_again")
+            }
+            if any(report["view_context_differences"].values()):
+                report["outcome"] = "inconclusive_view_context_change"
+                raise RuntimeError(
+                    "source-feature view context changed; A/B cannot isolate thread ink"
+                )
             report["outcome"] = ink_outcome(
                 phases, report["repeat_ink"], report["suppression_ink"]
             )
