@@ -35,6 +35,9 @@ annotations, including explicitly associated captions. These conservative boxes
 can reject a layout which a finer shape solver might fit. NO_FIT and SEARCH_LIMIT
 make no changes and never shrink fonts, change view scale, or remove content.
 This first version does not repair collisions internal to one decorated view.
+Optional planning_headroom_m adds clearance and insets the planning rectangle
+only. The final readback uses the original drawable and gap_m. The caller chooses
+this conservative allowance; it is not a claimed bound on native extent error.
 
 Absolute targets come from the ORIGINAL snapshot. Native parent movement can
 propagate to children; parents are applied first, children then receive their
@@ -145,6 +148,10 @@ class NativeLayoutReport:
     fixed_bounds: Mapping[str, Rect]
     attachment_identity_exclusions: Mapping[str, str]
     footprint_exclusions: Mapping[str, str]
+    planning_headroom_m: float
+    planning_gap_m: float
+    validation_gap_m: float
+    planning_drawable: Rect | None
 
 
 @dataclass(frozen=True)
@@ -502,6 +509,8 @@ def _report(
     after: _Snapshot | None,
     title_block: Rect,
     reason: str,
+    gap_m: float,
+    planning_headroom_m: float,
 ) -> NativeLayoutReport:
     return NativeLayoutReport(
         status=status,
@@ -547,6 +556,24 @@ def _report(
             for key, signature in before.signatures.items()
             if signature[3] == 3
         },
+        planning_headroom_m=planning_headroom_m,
+        planning_gap_m=gap_m + planning_headroom_m,
+        validation_gap_m=gap_m,
+        planning_drawable=_inset_drawable(before.drawable, planning_headroom_m),
+    )
+
+
+def _inset_drawable(drawable: Rect, headroom_m: float) -> Rect | None:
+    if (
+        min(drawable.xmax - drawable.xmin, drawable.ymax - drawable.ymin)
+        <= 2 * headroom_m
+    ):
+        return None
+    return Rect(
+        drawable.xmin + headroom_m,
+        drawable.ymin + headroom_m,
+        drawable.xmax - headroom_m,
+        drawable.ymax - headroom_m,
     )
 
 
@@ -662,6 +689,7 @@ def _readback_evidence(
     position_tolerance_m,
     alignments,
     orderings,
+    planning_headroom_m,
 ):
     def bounds(items):
         return {str(key): list(value.bounds) for key, value in items.items()}
@@ -697,12 +725,18 @@ def _readback_evidence(
         for key, rectangle in _group_bounds(before).items()
     }
     observed = _group_bounds(after)
+    planning_drawable = _inset_drawable(before.drawable, planning_headroom_m)
+    assert planning_drawable is not None  # Readback follows a successful plan.
     return {
         "schema_version": 1,
         "reason": reason,
         "units": "sheet metres",
         "residual_policy": "raw unrounded measurements; not an acceptance tolerance",
         "gap_m": gap_m,
+        "validation_gap_m": gap_m,
+        "planning_gap_m": gap_m + planning_headroom_m,
+        "planning_headroom_m": planning_headroom_m,
+        "planning_drawable": list(planning_drawable.bounds),
         "position_tolerance_m": position_tolerance_m,
         "validation_node_budget": 1,
         "plan": packing(plan),
@@ -765,6 +799,7 @@ def repair_native_layout(
     orderings: Sequence[AxisOrder] = (),
     notes: Sequence[LayoutNote] = (),
     gap_m: float = 0.002,
+    planning_headroom_m: float = 0.0,
     max_search_nodes: int = 10_000,
     position_tolerance_m: float = 1e-8,
 ) -> NativeLayoutReport:
@@ -773,6 +808,10 @@ def repair_native_layout(
         raise ValueError("native layout requires an active drawing")
     if not math.isfinite(position_tolerance_m) or position_tolerance_m <= 0:
         raise ValueError("native layout position tolerance must be positive and finite")
+    if not math.isfinite(planning_headroom_m) or planning_headroom_m < 0:
+        raise ValueError(
+            "native layout planning headroom must be nonnegative and finite"
+        )
     views = {key: _early_bound(view, "IView") for key, view in views.items()}
     notes = tuple(
         LayoutNote(
@@ -806,18 +845,39 @@ def repair_native_layout(
     order = _parent_order(views, parents or {})
     with _telemetry.span("drawing.native_layout.measure"):
         before = _snapshot(adapter, views, notes, measure_annotation)
+    planning_drawable = _inset_drawable(before.drawable, planning_headroom_m)
+    if planning_drawable is None:
+        reason = "planning headroom leaves no positive drawable area"
+        failure = PackingResult(PackingStatus.DOES_NOT_FIT, {}, 0, reason)
+        return _report(
+            NativeLayoutStatus.NO_FIT,
+            failure,
+            before,
+            None,
+            title_block,
+            reason,
+            gap_m,
+            planning_headroom_m,
+        )
     fixed_issue = _fixed_content_issue(before, title_block, gap_m)
     if fixed_issue is not None:
         failure = PackingResult(PackingStatus.DOES_NOT_FIT, {}, 0, fixed_issue)
         return _report(
-            NativeLayoutStatus.NO_FIT, failure, before, None, title_block, fixed_issue
+            NativeLayoutStatus.NO_FIT,
+            failure,
+            before,
+            None,
+            title_block,
+            fixed_issue,
+            gap_m,
+            planning_headroom_m,
         )
     links, orders = _relations(before, alignments, orderings)
     result = pack_view_groups(
         before.groups,
-        before.drawable,
+        planning_drawable,
         (title_block, *before.obstacles.values()),
-        gap_m=gap_m,
+        gap_m=gap_m + planning_headroom_m,
         max_search_nodes=max_search_nodes,
         alignments=links,
         orderings=orders,
@@ -828,7 +888,16 @@ def repair_native_layout(
             if result.status is PackingStatus.DOES_NOT_FIT
             else NativeLayoutStatus.SEARCH_LIMIT
         )
-        return _report(status, result, before, None, title_block, result.reason)
+        return _report(
+            status,
+            result,
+            before,
+            None,
+            title_block,
+            result.reason,
+            gap_m,
+            planning_headroom_m,
+        )
     if not any(any(delta) for delta in result.translations.values()):
         return _report(
             NativeLayoutStatus.UNCHANGED,
@@ -837,6 +906,8 @@ def repair_native_layout(
             before,
             title_block,
             "measured sheet already fits",
+            gap_m,
+            planning_headroom_m,
         )
     targets = {
         key: tuple(
@@ -850,6 +921,10 @@ def repair_native_layout(
         "native layout translation plan",
         view_targets=json.dumps(targets),
         view_positions_before=json.dumps(before.positions),
+        planning_headroom_m=planning_headroom_m,
+        planning_gap_m=gap_m + planning_headroom_m,
+        validation_gap_m=gap_m,
+        planning_drawable=json.dumps(planning_drawable.bounds),
     )
     with _telemetry.span("drawing.native_layout.apply"):
         for key in order:
@@ -896,6 +971,7 @@ def repair_native_layout(
                 position_tolerance_m,
                 alignments,
                 orderings,
+                planning_headroom_m,
             ),
         )
 
@@ -987,4 +1063,6 @@ def repair_native_layout(
         after,
         title_block,
         "native positions and measured layout verified",
+        gap_m,
+        planning_headroom_m,
     )
