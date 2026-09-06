@@ -617,31 +617,16 @@ def _place(symbol: _Symbol, outline: Rect, obstacles: Sequence[Rect], gap_m: flo
             for item in (outline, *obstacles)
         ):
             return predicted, attempts
-        # A clamped candidate is not a new base. Restore before trying another axis.
-        restored = bool(symbol.annotation.SetPosition2(*symbol.position))
-        restoration_actual = _position(symbol.annotation)
-        restoration = {
-            "target": symbol.position,
-            "return": restored,
-            "actual": restoration_actual,
-        }
-        attempts[-1]["restoration"] = restoration
+        # Every next target is absolute, from the ORIGINAL measured seed. A
+        # clamped trial is never adopted as a body/position base and need not
+        # return to an insertion point that the native symbol cannot maintain.
         _telemetry.info(
             "native callout candidate readback rejected",
             annotation=symbol.name,
             seed_position=symbol.position,
             candidate_target=target,
             candidate_actual=actual,
-            restoration_return=restored,
-            restoration_actual=restoration_actual,
         )
-        if (
-            not restored
-            or math.dist(restoration_actual[:2], symbol.position[:2]) > _EPSILON_M
-        ):
-            raise RuntimeError(
-                f"{symbol.name}: native callout seed could not be restored: seed={symbol.position}, candidate_target={target}, candidate_actual={actual}, restoration={restoration}"
-            )
     raise RuntimeError(
         f"{symbol.name}: no permitted native direction clears measured bodies: {attempts}"
     )

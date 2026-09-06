@@ -679,9 +679,8 @@ def test_telemetry_retains_native_attempt_and_final_body_readbacks(monkeypatch):
     )
 
 
-@pytest.mark.parametrize("restore_result", [False, True])
-def test_failed_seed_restore_reports_native_return_and_actual_without_relaxation(
-    monkeypatch, restore_result
+def test_all_rejected_absolute_candidates_fail_with_original_seed_telemetry(
+    monkeypatch,
 ):
     import _drawing_native_callouts as module
 
@@ -695,28 +694,63 @@ def test_failed_seed_restore_reports_native_return_and_actual_without_relaxation
         lambda message, **fields: rows.append((message, fields)),
     )
 
-    def unstable_restore(x, y, z):
+    def always_clamped(x, y, z):
         annotation.moves.append((x, y, z))
-        annotation.position = (seed[0], y, z)
-        if (x, y, z) == seed:
-            annotation.position = (seed[0] + 0.0002, y, z)
-            return restore_result
+        annotation.position = (seed[0] + 0.0002, seed[1], seed[2])
         return True
 
-    annotation.SetPosition2 = unstable_restore
+    annotation.SetPosition2 = always_clamped
     with pytest.raises(
         RuntimeError,
-        match="seed could not be restored: seed=.*candidate_target=.*candidate_actual=.*restoration=",
+        match="no permitted native direction clears measured bodies",
     ):
         run_native(setup)
-    record = next(
+    records = [
         fields
         for message, fields in rows
         if message == "native callout candidate readback rejected"
+    ]
+    assert len(records) == 4
+    assert all(row["seed_position"] == seed for row in records)
+    assert all(
+        row["candidate_actual"] == (seed[0] + 0.0002, seed[1], seed[2])
+        for row in records
     )
-    assert record["restoration_return"] is restore_result
-    assert record["restoration_actual"] == (seed[0] + 0.0002, seed[1], seed[2])
-    assert len(annotation.moves) == 2  # no silent continuation or tolerance relaxation
+    assert len(annotation.moves) == 4  # one absolute trial per bounded direction
+
+
+def test_next_absolute_candidate_does_not_require_restorable_intermediate_seed(
+    monkeypatch,
+):
+    setup = native_setup(monkeypatch, outline=(0.045, 0, 0.055, 0.08))
+    annotation = setup[2]
+    seed = annotation.position
+    restorations = []
+
+    def native_absolute_position(x, y, z):
+        annotation.moves.append((x, y, z))
+        if (x, y, z) == seed:
+            restorations.append((x, y, z))
+            annotation.position = (x + 0.0002, y, z)
+            return False  # Original insertion seed is not a stable native target.
+        if x != seed[0]:
+            annotation.position = (seed[0] + 0.0001, y, z)
+            return True  # Native horizontal direction clamps off the original seed.
+        annotation.position = (x, y, -0.0045385)
+        return True  # The subsequent original-seed absolute vertical target works.
+
+    annotation.SetPosition2 = native_absolute_position
+    result = run_native(setup)["front"]
+    assert restorations == []
+    directions = [
+        item["direction"] for item in result["attempts"][annotation.GetName()]
+    ]
+    assert set(directions[:2]) == {"left", "right"}
+    assert directions[-1] == "up"
+    assert annotation.moves[-1][0] == seed[0]  # not accumulated from the clamped x
+    assert (
+        len(setup[4][annotation.GetName()]) == 2
+    )  # fresh final native body still checked
 
 
 def test_witnessed_native_datum_frame_flip_is_not_mistaken_for_deformation():
