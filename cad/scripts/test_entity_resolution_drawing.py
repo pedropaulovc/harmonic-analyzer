@@ -75,3 +75,57 @@ def test_axis_direction_is_unoriented_but_wrong_axis_is_rejected(monkeypatch):
     wanted = circle((0, 0, 0), 4, (0, 0, -1))
     entities, _ = resolver(monkeypatch, [circle((0, 0, 0), 4, (0, 1, 0)), wanted])
     assert entities.resolve({"bore": CircleEdge(4, (0, 0, 0), (0, 0, 1))})["bore"] is wanted
+
+
+def dimension_context(monkeypatch):
+    import _drawing_common as drawing
+
+    model = Mock()
+    view = SimpleNamespace(SelectEntity=Mock(return_value=True))
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(drawing, "view_name", lambda *_args: "Machining view")
+    return drawing, SimpleNamespace(currentModel=model), view
+
+
+@pytest.mark.parametrize("orientation,method", [
+    ("smart", "AddDimension2"),
+    ("horizontal", "AddHorizontalDimension2"),
+    ("vertical", "AddVerticalDimension2"),
+])
+def test_entity_dimension_uses_selected_view_order_and_explicit_measurement_direction(monkeypatch, orientation, method):
+    drawing, adapter, view = dimension_context(monkeypatch)
+    first, second = object(), object()
+    result = drawing.add_entity_dimension(
+        adapter, view, entities=(first, second), text_xy=(0.12, 0.18),
+        label="hole station", orientation=orientation,
+    )
+    model = adapter.currentModel
+    model.ActivateView.assert_called_once_with("Machining view")
+    assert [call.args for call in view.SelectEntity.call_args_list] == [(first, False), (second, True)]
+    creator = getattr(model, method)
+    creator.assert_called_once_with(0.12, 0.18, 0.0)
+    assert result is creator.return_value
+    model.EditRebuild3.assert_called_once_with()
+    model.Extension.SelectByID2.assert_not_called()
+
+
+@pytest.mark.parametrize("failure", ["view", "first_entity", "second_entity", "dimension"])
+def test_entity_dimension_rejects_lost_view_selection_and_creation(monkeypatch, failure):
+    drawing, adapter, view = dimension_context(monkeypatch)
+    model = adapter.currentModel
+    if failure == "view":
+        model.ActivateView.return_value = False
+    if failure == "first_entity":
+        view.SelectEntity.side_effect = [False]
+    if failure == "second_entity":
+        view.SelectEntity.side_effect = [True, False]
+    if failure == "dimension":
+        model.AddDimension2.return_value = None
+    with pytest.raises(RuntimeError, match="hole station"):
+        drawing.add_entity_dimension(
+            adapter, view, entities=(object(), object()), text_xy=(0.12, 0.18),
+            label="hole station",
+        )
+    if failure != "dimension":
+        model.AddDimension2.assert_not_called()
+    model.EditRebuild3.assert_not_called()
