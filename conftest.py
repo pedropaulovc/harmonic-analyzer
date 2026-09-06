@@ -19,7 +19,10 @@ _CAPTURE_DIR = Path(tempfile.mkdtemp(prefix="run-", dir=_CAPTURE_ROOT))
 os.environ["HARMONIC_TELEMETRY_DIR"] = str(_CAPTURE_DIR)
 for _signal in ("", "_TRACES", "_LOGS", "_METRICS"):
     os.environ[f"OTEL_EXPORTER_OTLP{_signal}_ENDPOINT"] = ""
-for _context in ("TRACEPARENT", "TRACESTATE"):
+# The spawn timestamp belongs to the same production parent as its trace context.
+# Keeping it after detaching that context emits an unrelated proc.startup root
+# inside whichever test first opens a pipeline/build session.
+for _context in ("TRACEPARENT", "TRACESTATE", "HARMONIC_SPAWN_NS"):
     os.environ.pop(_context, None)
 
 

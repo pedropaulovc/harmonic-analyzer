@@ -6,6 +6,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import time
 
 import pytest
 
@@ -48,6 +49,8 @@ def test_child():
     assert all(type(p).__name__ == "SimpleSpanProcessor" for p in t._span_processors)
     assert not os.environ.get("TRACEPARENT")
     assert not os.environ.get("TRACESTATE")
+    assert not os.environ.get("HARMONIC_SPAWN_NS")
+    t.record_process_startup()
     for signal in ("", "_TRACES", "_LOGS", "_METRICS"):
         assert os.environ["OTEL_EXPORTER_OTLP" + signal + "_ENDPOINT"] == ""
     with t.span("mock.test"):
@@ -63,6 +66,7 @@ def test_child():
     env["HARMONIC_TELEMETRY_DIR"] = str(tmp_path / "production-override")
     env["TRACEPARENT"] = "00-0123456789abcdef0123456789abcdef-0123456789abcdef-01"
     env["TRACESTATE"] = "production=parent"
+    env["HARMONIC_SPAWN_NS"] = str(time.time_ns())
     # An explicit production endpoint must be disabled, not just the default
     # dashboard probe. A real export here rejects the child assertions.
     for signal in ("", "_TRACES", "_LOGS", "_METRICS"):
