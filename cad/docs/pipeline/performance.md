@@ -356,10 +356,37 @@ layer/print stroke widths or exact glyph ink.
 At `64fd074f`, the corrected pedestal completed native/PDF/PNG output in 97.678
 seconds, including 64.258 seconds in integrated layout. The sheet was visually
 inspected. Its final frame/body readback and leader-clearance checks passed; trace
-`0x727cbc29cb1fc199802869ea7133edaa`. This makes four production pilots complete
-under the bounded leader policy. The gear, lever and rocker datum cases remain
-unresolved; stationary dimension-attached datum placement has a positive copied
-gear control but is not yet integrated into those production recipes.
+`0x727cbc29cb1fc199802869ea7133edaa`.
+
+At `d9351009`, the gear also completed native/PDF/PNG output in 38.697 seconds,
+including 18.817 seconds in integrated layout. Datum A is attached explicitly to
+the imported `BoreCutDia@BoreProfile` display dimension, which identifies the bore
+axis. Its native frame stays where SolidWorks puts it: no datum position writes.
+The exact dimension/source identity, native label, actual frame/body clearance
+and final sheet fit are checked. The sheet was visually inspected; trace
+`0xc779ee25b1980e33ce281ec30dec9cd4`. Five production pilots now complete under
+the bounded leader policy. Lever and rocker remain unresolved; their face datums
+must not be reattached to unrelated dimensions merely to obtain easier placement.
+
+A copied rocker control at `3efbf8a2` establishes another native placement route:
+changing the document's annotation bent-leader length from 6.35 to 13.36625 mm
+moved datum B's frame 7.01625 mm outboard, with its elbow and exact face attachment
+unchanged. The measured body/view-outline gap became 3 mm and persisted after
+save/reopen; native and reopened PNGs matched. The preference also moved A/C
+frames and changed one GTol's leader, so it cannot be treated as a local B edit.
+The control captured 60 annotation records but measured only 52 bodies, with
+eight explicit exclusions. It proves B's native placement, not whole-sheet fit
+or a completed production rocker recipe.
+
+The [copied obstacle-handoff A/B](drawing-layout-handoff-profile.md) removed
+13 repeated full annotation measurements (93 to 80), but layout wall time changed
+only from 54.476 to 53.613 seconds in one profiled pair. Both copies passed final
+clearance and saved semantic checks, and their PDF rasterizations were identical.
+This 0.864-second observation does not resolve the drawing-layout regression.
+The installed Python profiler also captured background threads; the committed
+COM-free repro prevents its cumulative caller rows being mistaken for clean
+SolidWorks-thread attribution. Further measurement reuse and an in-process reader
+remain experiments, not measured production improvements.
 
 The current bounds implementation is calibrated for SolidWorks 2026 (major
 revision 34) and the tested native font profile. It uses conservative GDI text
