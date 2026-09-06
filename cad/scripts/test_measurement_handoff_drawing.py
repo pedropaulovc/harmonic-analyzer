@@ -289,6 +289,8 @@ def test_obstacle_actual_measurement_is_handed_off_after_commands(monkeypatch):
             body=Rect(0.1, 0.01, 0.15, 0.05),
             text_boxes=(),
             text_runs=(),
+            leader_segments=(),
+            leader_decorations=(),
         ),
     )
     view.GetAnnotationsByType.side_effect = lambda kind: (

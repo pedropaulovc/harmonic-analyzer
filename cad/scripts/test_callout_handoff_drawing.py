@@ -38,6 +38,10 @@ def scene(monkeypatch):
         measured.name, measured.kind = annotation.GetName(), int(annotation.GetType())
         measured.envelope = measured.body
         measured.text_boxes = ()
+        # This scene has no external stroke/decorations; keep the fixture's
+        # native-bounds schema complete for the strengthened obstacle consumer.
+        measured.leader_segments = ()
+        measured.leader_decorations = ()
         outputs.append((annotation, measured))
         return measured
 
