@@ -445,7 +445,7 @@ def sf_observed(length):
         "position": anchor,
         "key": "Sheet1/Drawing View1/DetailItem350",
         "inventory_key": "Drawing View1/DetailItem350",
-        "sf_properties": {"symbol": 9, "orientation": 1, "texts": ("Ra 1.6",)},
+        "sf_properties": {"symbol": 1, "orientation": 1, "texts": ("Ra 1.6",)},
         "length_readback_m": -1.0,
         "horizontal_length_m": length + 0.00175,
         "effective_length_m": length,
@@ -518,3 +518,31 @@ def test_sf_target_rejects_sheet_or_template_ownership(
     )
     with pytest.raises(RuntimeError, match="owner roundtrip"):
         probe.capture_target(adapter, part, probe.LengthScope.SF_DEFAULT)
+
+
+def test_sf_recipe_type_one_preserves_semantics_without_inapplicable_getter():
+    symbol = SimpleNamespace(
+        GetSymbol=lambda: 1,
+        GetTextCount=lambda: 1,
+        Orientation=1,
+        GetAngle=lambda: 0.0,
+        GetDirectionOfLay=lambda: 0,
+        GetText=lambda field: "Ra 1.6" if field == 8 else "",
+    )
+    actual = probe.surface_finish_properties(symbol)
+    assert actual == {
+        "symbol": 1,
+        "orientation": 1,
+        "angle": 0.0,
+        "lay": 0,
+        "all_around": None,
+        "all_around_status": "not_applicable_to_swSFJIS_Machining_Req",
+        "semantic_text_fields": ("", "", "", "", "", "", "", "Ra 1.6", "", ""),
+    }
+
+
+@pytest.mark.parametrize("native_kind", [0, 2, 9, -1])
+def test_sf_control_refuses_other_styles_with_actual_native_type(native_kind):
+    symbol = SimpleNamespace(GetSymbol=lambda: native_kind)
+    with pytest.raises(RuntimeError, match=f"got {native_kind}"):
+        probe.surface_finish_properties(symbol)
