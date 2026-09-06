@@ -2,6 +2,7 @@
 
 from dataclasses import replace
 import math
+import sys
 
 import pytest
 from _drawing_view_packing import Rect
@@ -260,6 +261,7 @@ def test_lone_centerline_has_native_print_thickness_not_invented_layout_width():
     )
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows GDI positive control")
 def test_actual_missing_gdi_font_is_not_silently_substituted():
     with pytest.raises(ValueError, match="substituted"):
         _gdi_cell("Missing CAD Font 7192", "Ra 1.6")
@@ -285,6 +287,7 @@ def test_uncalibrated_font_or_height_mapping_is_rejected(signature):
         font_cell_extent(text(), signature)
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows GDI calibration witness")
 def test_real_gdi_metric_matches_saved_basic_dimension_cell():
     # Matching PDF transform and native frame were independently captured by
     # probe_drawing_annotation_bounds, not derived from this function.
@@ -293,5 +296,6 @@ def test_real_gdi_metric_matches_saved_basic_dimension_cell():
     assert cell.ymax - cell.ymin == pytest.approx(0.00555625, abs=0.00006)
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows GDI positive control")
 def test_actual_font_side_bearing_covers_negative_j_overhang():
     assert _gdi_cell("Century Gothic", "j").xmin < 0
