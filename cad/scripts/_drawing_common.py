@@ -394,6 +394,46 @@ def _validate_surface_finish_control_face(
     )
 
 
+def _validate_native_annotation(
+    adapter: Any, annotation: Any, entity: Any, *, label: str
+) -> None:
+    """Validate native placement without demanding a prescribed layout.
+
+    Geometry identity and readable coordinates are hard requirements. Sheet
+    overflow is diagnosed here; the existing explicit layout audit and render
+    inspection assess the symbol's full extent and neighbouring annotations.
+    """
+    annotation = _early_bound(annotation, "IAnnotation")
+    position = tuple(annotation.GetPosition() or ())
+    if len(position) != 3 or not all(math.isfinite(value) for value in position):
+        raise RuntimeError(f"{label}: native annotation position is unreadable: {position}")
+    attached = tuple(annotation.GetAttachedEntities3() or ())
+    if len(attached) != 1 or attached[0] is None:
+        raise RuntimeError(f"{label}: native annotation has missing or dangling attachment")
+    application = _early_bound(adapter.swApp, "ISldWorks")
+    # ISldWorks.IsSame: 1=same, 0=different, -1=unknown (official example).
+    if int(application.IsSame(entity, attached[0])) != 1:
+        raise RuntimeError(f"{label}: native annotation attached to a different entity")
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    sheet = drawing.GetCurrentSheet()
+    if sheet is None:
+        raise RuntimeError(f"{label}: native annotation has no drawing sheet")
+    properties = tuple(_early_bound(sheet, "ISheet").GetProperties2() or ())
+    if len(properties) < 7:
+        raise RuntimeError(f"{label}: native annotation sheet size is unreadable")
+    width, height = float(properties[5]), float(properties[6])
+    if not all(math.isfinite(value) and value > 0 for value in (width, height)):
+        raise RuntimeError(f"{label}: native annotation sheet size is invalid")
+    span = _telemetry.trace.get_current_span()
+    span.set_attribute("placement", "native")
+    span.set_attribute("native_position_m", position)
+    if not (0 <= position[0] <= width and 0 <= position[1] <= height):
+        _telemetry.warn(
+            f"{label}: native annotation anchor is outside the sheet: "
+            f"position={position}, sheet={(width, height)}; inspect drawing layout"
+        )
+
+
 @_telemetry.traced("drawing.datum_feature", label_param="label")
 def add_datum_feature(
     adapter: Any,
@@ -401,7 +441,7 @@ def add_datum_feature(
     *,
     edge_xy: tuple[float, float] | None = None,
     edge_entity: Any | None = None,
-    symbol_xy: tuple[float, float],
+    symbol_xy: tuple[float, float] | None = None,
     datum: str,
     label: str,
     entity_type: str = "EDGE",
@@ -415,10 +455,17 @@ def add_datum_feature(
 
     ``entity_type`` widens the pick for entities that are not model edges —
     a revolve's flank lines are ``"SILHOUETTE"`` edges.
+
+    Omit ``symbol_xy`` with an explicit model ``entity`` to keep SolidWorks'
+    native insertion position. Explicit positions remain available for recipes
+    that need a particular layout; only that path asserts the exact position.
     """
+    if symbol_xy is None and (entity is None or annotation is not None):
+        raise ValueError(f"{label}: native placement requires an explicit model entity")
     draw = adapter.currentModel
+    selected_entity = None
     if annotation is None:
-        _select_annotation_entity(
+        selected_entity = _select_annotation_entity(
             adapter,
             view,
             edge_xy=edge_xy,
@@ -479,30 +526,33 @@ def add_datum_feature(
     tag_annotation = _sw_type_info.early_bound_or_flag(
         tag.GetAnnotation(), "IAnnotation", "GetPosition", "SetPosition2"
     )
-    if not tag_annotation.SetPosition2(symbol_xy[0], symbol_xy[1], 0.0):
-        raise RuntimeError(f"failed to position datum {datum} ({label})")
-    actual_position = tag_annotation.GetPosition()
-    position_error = (
-        math.inf
-        if not actual_position
-        else math.hypot(
-            float(actual_position[0]) - symbol_xy[0],
-            float(actual_position[1]) - symbol_xy[1],
+    if symbol_xy is not None:
+        if not tag_annotation.SetPosition2(symbol_xy[0], symbol_xy[1], 0.0):
+            raise RuntimeError(f"failed to position datum {datum} ({label})")
+        actual_position = tag_annotation.GetPosition()
+        position_error = (
+            math.inf
+            if not actual_position
+            else math.hypot(
+                float(actual_position[0]) - symbol_xy[0],
+                float(actual_position[1]) - symbol_xy[1],
+            )
         )
-    )
-    if position_error > position_tolerance_m:
-        raise RuntimeError(
-            f"datum {datum} position did not persist ({label}): "
-            f"{tuple(actual_position[:2]) if actual_position else None}; "
-            f"requested={symbol_xy}, error={position_error:.6g} m, "
-            f"limit={position_tolerance_m:.6g} m"
-        )
+        if position_error > position_tolerance_m:
+            raise RuntimeError(
+                f"datum {datum} position did not persist ({label}): "
+                f"{tuple(actual_position[:2]) if actual_position else None}; "
+                f"requested={symbol_xy}, error={position_error:.6g} m, "
+                f"limit={position_tolerance_m:.6g} m"
+            )
     if str(tag.GetLabel()) != datum:
         raise RuntimeError(f"datum feature label did not persist ({label})")
     if callout_below and not tag.SetText(4, callout_below):
         raise RuntimeError(f"failed to set datum callout text ({label})")
     draw.ClearSelection2(True)
     draw.EditRebuild3()
+    if symbol_xy is None:
+        _validate_native_annotation(adapter, tag_annotation, selected_entity, label=label)
     return tag
 
 
@@ -513,7 +563,7 @@ def add_feature_control_frame(
     *,
     edge_xy: tuple[float, float] | None = None,
     edge_entity: Any | None = None,
-    frame_xy: tuple[float, float],
+    frame_xy: tuple[float, float] | None = None,
     characteristic: str,
     tolerance: str,
     datums: Sequence[str] = (),
@@ -529,7 +579,14 @@ def add_feature_control_frame(
 
     ``entity_type`` widens the pick for entities that are not model edges —
     a revolve's flank lines are ``"SILHOUETTE"`` edges.
+
+    Omit ``frame_xy`` with an explicit model ``entity`` to retain the native
+    InsertGtol placement near the selected geometry.
     """
+    if frame_xy is None and entity is None:
+        raise ValueError(f"{label}: native placement requires an explicit model entity")
+    if frame_xy is None and leader_attach_xy is not None:
+        raise ValueError(f"{label}: native placement cannot fix a leader endpoint")
     draw = adapter.currentModel
     edge = _select_annotation_entity(
         adapter,
@@ -651,7 +708,7 @@ def add_feature_control_frame(
             f"failed to set a bent leader on the feature-control frame ({label}): "
             f"SetLeader3 status {leader_status}"
         )
-    if not annotation.SetPosition2(frame_xy[0], frame_xy[1], 0.0):
+    if frame_xy is not None and not annotation.SetPosition2(frame_xy[0], frame_xy[1], 0.0):
         raise RuntimeError(f"failed to position feature-control frame ({label})")
     if leader_attach_xy is not None and not annotation.SetLeaderAttachmentPointAtIndex(
         0, leader_attach_xy[0], leader_attach_xy[1], 0.0
@@ -685,6 +742,8 @@ def add_feature_control_frame(
                 f"actual={actual_attach}, requested={leader_attach_xy}, "
                 f"error={attach_error:.6g} m"
             )
+    if frame_xy is None:
+        _validate_native_annotation(adapter, annotation, edge, label=label)
     draw.ClearSelection2(True)
     return gtol
 
@@ -806,7 +865,7 @@ def add_surface_finish(
     *,
     edge_xy: tuple[float, float] | None = None,
     edge_entity: Any | None = None,
-    symbol_xy: tuple[float, float],
+    symbol_xy: tuple[float, float] | None = None,
     roughness_ra: str | None = None,
     control: SurfaceFinishControl | None = None,
     label: str,
@@ -821,7 +880,15 @@ def add_surface_finish(
     edges — a revolve's flank lines are ``"SILHOUETTE"`` edges.  Pass a model
     ``edge_entity`` obtained from ``IView.GetVisibleEntities2`` when a small or
     overlapping projection makes coordinate selection ambiguous.
+
+    Omit ``symbol_xy`` with an explicit model ``entity`` for a native attached
+    no-leader symbol. InsertSurfaceFinishSymbol3 documents that location inputs
+    are ignored in swNO_LEADER mode; no generic auto-place leader API is used.
     """
+    if symbol_xy is None and entity is None:
+        raise ValueError(f"{label}: native placement requires an explicit model entity")
+    if symbol_xy is None and leader_attach_xy is not None:
+        raise ValueError(f"{label}: native placement cannot fix a leader endpoint")
     if control is not None:
         if roughness_ra is not None or production_method:
             raise ValueError(
@@ -862,11 +929,12 @@ def add_surface_finish(
             f"SURFACE_AUDIT {label}: entity_type={entity_type}, faces={diagnostic!r}"
         )
     draw = adapter.currentModel
+    insertion_xy = (0.0, 0.0) if symbol_xy is None else symbol_xy
     symbol = draw.Extension.InsertSurfaceFinishSymbol3(
         1,  # installed R2026x swSFSymType_e.swSFMachining_Req
-        _LEADER_BENT,  # swLeaderStyle_e.swBENT -- see _LEADER_BENT
-        symbol_xy[0],
-        symbol_xy[1],
+        0 if symbol_xy is None else _LEADER_BENT,  # swNO_LEADER / swBENT
+        insertion_xy[0],
+        insertion_xy[1],
         0.0,
         0,  # swSFLaySym_e.swSFNone
         10,  # swArrowStyle_e.swNO_ARROWHEAD
@@ -902,29 +970,32 @@ def add_surface_finish(
         "SetLeader3",
         "SetLeaderAttachmentPointAtIndex",
     )
-    leader_status = int(
-        annotation.SetLeader3(
-            _LEADER_BENT,
-            _LEADER_SIDE_SMART,
-            True,  # smart arrowhead
-            False,  # perpendicular (GTol-only)
-            False,  # all-around
-            False,  # dashed
+    if symbol_xy is not None:
+        leader_status = int(
+            annotation.SetLeader3(
+                _LEADER_BENT,
+                _LEADER_SIDE_SMART,
+                True,  # smart arrowhead
+                False,  # perpendicular (GTol-only)
+                False,  # all-around
+                False,  # dashed
+            )
         )
-    )
-    if leader_status != 0:
-        raise RuntimeError(
-            f"failed to set a bent leader on the Ra {roughness_ra} symbol "
-            f"({label}): SetLeader3 status {leader_status}"
-        )
-    if not annotation.SetPosition2(symbol_xy[0], symbol_xy[1], 0.0):
-        raise RuntimeError(f"failed to position surface-finish symbol ({label})")
+        if leader_status != 0:
+            raise RuntimeError(
+                f"failed to set a bent leader on the Ra {roughness_ra} symbol "
+                f"({label}): SetLeader3 status {leader_status}"
+            )
+        if not annotation.SetPosition2(symbol_xy[0], symbol_xy[1], 0.0):
+            raise RuntimeError(f"failed to position surface-finish symbol ({label})")
     if leader_attach_xy is not None and not annotation.SetLeaderAttachmentPointAtIndex(
         0, leader_attach_xy[0], leader_attach_xy[1], 0.0
     ):
         raise RuntimeError(f"failed to position surface-finish leader ({label})")
     draw.ClearSelection2(True)
     draw.EditRebuild3()
+    if symbol_xy is None:
+        _validate_native_annotation(adapter, annotation, selected_entity, label=label)
     return symbol
 
 
