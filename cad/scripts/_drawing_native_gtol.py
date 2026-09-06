@@ -4,14 +4,16 @@ The runnable control is ``diagnostics/probe_gtol_commands.py``: commands 317
 and 307 move real view-owned GTol banks and preserve saved entity/text identity.
 Their success does NOT certify collision clearance. This helper keeps their
 top-down order, moves only later members downward by the measured missing gap,
-then translates the complete bank horizontally. It never creates annotations,
-picks geometry, changes text, or searches alternative vertical layouts. The
-caller subsequently packs decorated views onto the sheet and verifies the save.
+then tests at most six whole-bank outboard/vertical positions against actual
+native leaders and measured text. It never creates annotations, picks geometry,
+changes text, or edits leader segments. The caller subsequently packs decorated
+views onto the sheet and verifies the save.
 
 Coordinates are sheet metres. Footprints must include quantity/below-frame text
 and exclude open leaders. Outboard means outside the actual IView.GetOutline;
 same-view datum, dimension and surface-finish bodies are also kept clear. This
-local operation does not certify leader crossings or final sheet fit.
+local operation requires text-cell clearance and complete displayed-stroke
+coverage, but does not certify final sheet fit or exact glyph-ink distances.
 
 Full native XML/text/attachment/body witnesses are read before and after each
 view's complete bank operation. Intermediate bodies are explicitly derived from
@@ -22,14 +24,23 @@ command changing body shape or content can never establish a new accepted base.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, replace
+from enum import Enum
 from itertools import combinations
+import json
 import math
 from typing import Any, Callable, Mapping, Sequence
 from xml.etree import ElementTree
 
 from _common import _early_bound
 from _drawing_view_packing import Rect
+from _drawing_annotation_bounds import LeaderGeometry, annotation_leader_geometry
+from _drawing_leader_clearance import (
+    crossing_records,
+    displayed_leader_coverage,
+    vertical_candidates,
+    _candidate_text_cells,
+)
 import _telemetry
 
 
@@ -58,13 +69,23 @@ def _separated(first: Rect, second: Rect, gap_m: float = 0.0) -> bool:
     )
 
 
-def column_outboard_translation(
+class ColumnSide(Enum):
+    LEFT = "left"
+    RIGHT = "right"
+
+
+class _Clearance(Enum):
+    CLEAR = "clear"
+    BLOCKED = "blocked"
+
+
+def column_outboard_candidates(
     column: Rect,
     outline: Rect,
     obstacles: Sequence[Rect] = (),
     *,
     gap_m: float = 0.002,
-) -> tuple[float, float]:
+) -> tuple[tuple[ColumnSide, float], ...]:
     """Return the least absolute horizontal shift among all feasible positions.
 
     A fixed-height rectangle's horizontal collision constraints are open
@@ -89,7 +110,20 @@ def column_outboard_translation(
             feasible.append(dx)
     if not feasible:
         raise RuntimeError("no finite horizontal outboard translation was found")
-    return min(feasible, key=lambda value: (abs(value), value)), 0.0
+    sides = []
+    for side, values in (
+        (ColumnSide.LEFT, [dx for dx in feasible if dx <= left + _BODY_EPSILON_M]),
+        (ColumnSide.RIGHT, [dx for dx in feasible if dx >= right - _BODY_EPSILON_M]),
+    ):
+        if values:
+            sides.append((side, min(values, key=lambda value: (abs(value), value))))
+    return tuple(sorted(sides, key=lambda row: (abs(row[1]), row[1])))
+
+
+def column_outboard_translation(column, outline, obstacles=(), *, gap_m=0.002):
+    return column_outboard_candidates(column, outline, obstacles, gap_m=gap_m)[0][
+        1
+    ], 0.0
 
 
 def column_clearance_translations(
@@ -341,15 +375,102 @@ def _move_bank(
         for name, row in bank.items()
     }
     for name, row in bank.items():
-        if deltas[name] != (0.0, 0.0) and not row.annotation.SetPosition2(
-            *targets[name]
-        ):
+        unchanged = (
+            deltas[name] == (0.0, 0.0)
+            and math.dist(_position(row.annotation), targets[name])
+            <= _POSITION_EPSILON_M
+        )
+        if not unchanged and not row.annotation.SetPosition2(*targets[name]):
             raise RuntimeError(f"{stage}: {name}: native GTol translation rejected")
     after = _position_translated_bank(bank)
     for name, row in after.items():
         if math.dist(row.position, targets[name]) > _POSITION_EPSILON_M:
             raise RuntimeError(f"{stage}: {name}: native GTol translation was clamped")
     return after
+
+
+def _place_clear_column(
+    seed, initial, measurements, outline, obstacles, *, gap_m, read_geometry
+):
+    """At most six native bank translations; never mutate a leader segment."""
+    column = _union([row.body for row in seed.values()])
+    sides = column_outboard_candidates(column, outline, obstacles, gap_m=gap_m)
+    attempts, horizontal = [], []
+
+    def screen(delta, stage):
+        attempt = {"stage": stage, "delta_m": delta, "status": "started"}
+        attempts.append(attempt)
+        predicted = _move_bank(seed, {name: delta for name in seed}, stage)
+        geometry = {
+            name: read_geometry(row.annotation) for name, row in predicted.items()
+        }
+        crossings = crossing_records(
+            {name: row.segments for name, row in geometry.items()},
+            _candidate_text_cells(measurements, initial, predicted),
+            {name: row.decorations for name, row in geometry.items()},
+        )
+        body_clear = all(
+            _separated(row.body, obstacle, gap_m)
+            for row in predicted.values()
+            for obstacle in (outline, *obstacles)
+        )
+        attempt.update(
+            status="screened",
+            crossings=crossings,
+            body_clearance="clear" if body_clear else "blocked",
+            positions={name: row.position for name, row in predicted.items()},
+            geometry={name: asdict(row) for name, row in geometry.items()},
+        )
+        return (
+            predicted,
+            geometry,
+            crossings,
+            _Clearance.CLEAR if body_clear else _Clearance.BLOCKED,
+        )
+
+    # Test both horizontal sides first, then each side's two measured vertical
+    # hypotheses. Reverse order tries the most recently observed native side
+    # first; the successful lever control is RIGHT then UP. Targets ALWAYS use
+    # the same immutable seed, even when an earlier native route was rejected.
+    for side, dx in sides:
+        predicted, geometry, crossings, body_clear = screen((dx, 0.0), side.value)
+        if body_clear is _Clearance.CLEAR and not crossings:
+            return predicted, geometry, attempts
+        horizontal.append((side, dx, geometry, crossings))
+    for side, dx, geometry, crossings in reversed(horizontal):
+        candidates = vertical_candidates(
+            crossings,
+            {name: row.segments for name, row in geometry.items()},
+            {name: row.decorations for name, row in geometry.items()},
+        )
+        for candidate in candidates:
+            predicted, actual, hits, body_clear = screen(
+                (dx, candidate.dy_m), f"{side.value}-{candidate.direction.value}"
+            )
+            if body_clear is _Clearance.CLEAR and not hits:
+                return predicted, actual, attempts
+    raise RuntimeError(
+        f"no clear native GTol column within six-candidate bound: {json.dumps(attempts)}"
+    )
+
+
+def _final_leader_witness(last_geometry, bank):
+    coverage = {}
+    for name, row in bank.items():
+        full = row.measurement
+        actual = LeaderGeometry(
+            tuple(full.native_leader_segments), tuple(full.leader_decorations)
+        )
+        if actual != last_geometry[name]:
+            raise RuntimeError(
+                f"{name}: final full native leader geometry differs from candidate"
+            )
+        coverage[name] = displayed_leader_coverage(actual, full.leader_segments)
+    if any(row["uncovered_display_indices"] for row in coverage.values()):
+        raise RuntimeError(
+            f"final native leader does not cover every displayed stroke: {json.dumps(coverage)}"
+        )
+    return coverage
 
 
 def _assert_measured_prediction(
@@ -400,6 +521,9 @@ def arrange_native_gtol_columns(
     An optional record_measurement(view, annotation, bounds) receives actual
     final GTol output and post-command obstacle output for initial packing only;
     it never replaces either fresh GTol witness or supplies derived bounds.
+    The project wrapper MUST run validate_gtol_leader_clearance on its fresh
+    packing-final measurements before acceptance, including unchanged packing;
+    trial cells deliberately exclude deferred notes and are not a final proof.
     """
     if not math.isfinite(gap_m) or gap_m < 0:
         raise ValueError("GTol clearance must be finite and nonnegative")
@@ -474,35 +598,53 @@ def arrange_native_gtol_columns(
                 "minimum clearance",
             )
         _assert_body_clearance(bank, gap_m)
+        # One post-command obstacle read supplies trial cells and the initial
+        # packing handoff. The packing-final callback checks newly measured
+        # final cells after ALL view/note moves; no duplicate final font scan.
         obstacles = []
+        measurements = {name: row.measurement for name, row in before.items()}
         for kind in (2, 4, 7):
             for raw in view.GetAnnotationsByType(kind) or ():
                 annotation = _early_bound(raw, "IAnnotation")
                 measured = measure_annotation(adapter, annotation)
+                name = str(annotation.GetName())
+                if not name or name in measurements:
+                    raise RuntimeError(
+                        "native obstacle needs unique annotation identity"
+                    )
+                measurements[name] = measured
                 obstacles.append(measured.body)
                 if record_measurement is not None:
                     record_measurement(view, annotation, measured)
         column = _union([row.body for row in bank.values()])
-        delta = column_outboard_translation(column, outline, obstacles, gap_m=gap_m)
         with _telemetry.span(
             "drawing.gtol.translate_column",
             view=label,
             count=len(bank),
-            dx=delta[0],
-            dy=delta[1],
             bounds_source="derived_translation",
         ):
-            predicted = _move_bank(
+            predicted, geometry, attempts = _place_clear_column(
                 bank,
-                {name: delta for name in bank},
-                "outboard column",
+                before,
+                measurements,
+                outline,
+                obstacles,
+                gap_m=gap_m,
+                read_geometry=annotation_leader_geometry,
             )
+        delta = attempts[-1]["delta_m"]
+        _telemetry.info(
+            "native GTol column candidates screened",
+            view=label,
+            candidates=json.dumps(attempts),
+        )
         with _telemetry.span(
             "drawing.gtol.final_witness", view=label, count=len(before)
         ):
             after = _read_gtols(adapter, view, measure_annotation)
             _unchanged(adapter.swApp, before, after, "final native witness")
             _assert_measured_prediction(predicted, after)
+            coverage = _final_leader_witness(geometry, after)
         _assert_body_clearance(after, gap_m)
         final_column = _union([row.body for row in after.values()])
         if not _separated(final_column, outline, gap_m) or any(
@@ -527,5 +669,13 @@ def arrange_native_gtol_columns(
             "body_after_source": "native_measurement",
             "positions_after": {name: row.position for name, row in after.items()},
             "obstacle_count": len(obstacles),
+            "native_candidates": attempts,
+            "final_displayed_leader_coverage": coverage,
         }
+        _telemetry.info(
+            "native GTol leader clearance witnessed",
+            view=label,
+            candidate_count=len(attempts),
+            layout_report=json.dumps(report[label]),
+        )
     return report
