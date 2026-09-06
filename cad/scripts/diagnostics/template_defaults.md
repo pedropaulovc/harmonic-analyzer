@@ -233,9 +233,16 @@ raw dimension/attachment observations, with individual read failures explicit.
 It requires the exact four visible documents, native identities and source SHA
 before closing only diagnostic-created Draw16 and diagnostic-opened arbor without
 saving. It rechecks the disk SHA and original two-document baseline afterwards.
-It never changes the shared ownership policy. Run only after a fresh exclusive
-seat grant; it cannot be reused for another scene. Native recovery remains
-unverified until its retained receipt reports success.
+It never changes the shared ownership policy. It cannot be reused for another
+scene. The reviewed native run at `aaf2d01b` exited zero: receipt
+`scene-recovery-jzbwv6ny/recovery.json` records both no-save closes, the exact
+original two-document baseline, and all three arbor SHA witnesses equal to
+`dbb991437aea105ca5352b8b76468874077aeed0a74906413a1cc56fb7ca769e`.
+Read-only capture returned all five named source dimensions, four source BASIC
+designations, cached properties/current Default configuration, and 25 drawing
+annotations including nine dimensions. No captured annotation was dangling;
+unsupported sketch-entity attachments remain explicitly excluded, not proved.
+Do not run the recovery again: its required four-document scene no longer exists.
 
 The unchanged recipe's imported-dimension `SetText` and `SetPrecision3`, and
 drawing-created dimension `SetArcEndCondition`/`SetToleranceType`, are concrete
