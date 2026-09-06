@@ -110,9 +110,13 @@ values, with the complete repro in `diagnostics/probe_drawing_unit_defaults.py`.
 The next preparation passed its default-setting witness but produced no DRWDOT
 despite `IModelDocExtension.SaveAs3` returning `(True, 0, 0)`. The owned-output
 guard rejected it before any recipe trial. This is a failed save call shape,
-not proof that template saving is unavailable. A positive-control comparison
-against the existing native drawing-save path is pending; no template speedup
-has yet been measured. See `diagnostics/template_defaults.md` for provenance.
+not proof that template saving is unavailable. The subsequent four-cell control
+at `282bb9e7` saved and reopened both SLDDRW and DRWDOT with the existing
+`IModelDoc2.SaveAs3(path, 0, 0)` call. The tested advanced/silent call produced
+neither format despite its success tuple; other option combinations remain
+untested. Preparation now uses the proven existing call and retains fresh-file,
+exact-path and full inherited-default checks. No template speedup has yet been
+measured. See `diagnostics/template_defaults.md` for provenance.
 
 ## Trial isolation
 
