@@ -68,7 +68,7 @@ async def test_ab_copies_preserve_originals_and_retain_failed_checkpoints(
     source_hash = control.hashlib.sha256(source.read_bytes()).hexdigest()
     paths, comparisons = [], []
     state = {"phase": "open"}
-    adapter = SimpleNamespace(currentModel=None)
+    adapter = SimpleNamespace(currentModel=None, swApp=object())
 
     async def open_model(path):
         resolved = Path(path).resolve()
@@ -137,7 +137,7 @@ async def test_ab_copies_preserve_originals_and_retain_failed_checkpoints(
     monkeypatch.setattr(
         control,
         "snapshot",
-        lambda *_: {"geometry": "native", "basic": 1, "value": 0.012},
+        lambda _model, *, app: {"geometry": "native", "basic": 1, "value": 0.012},
     )
     monkeypatch.setattr(control, "compare", compare)
     monkeypatch.setattr(control, "layout", lambda *_: {"view": (0.1, 0.2)})

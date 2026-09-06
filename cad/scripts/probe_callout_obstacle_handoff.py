@@ -276,11 +276,14 @@ async def probe(adapter, source):
                 hashes.setdefault(
                     reference, hashlib.sha256(reference.read_bytes()).hexdigest()
                 )
-            before, fields = snapshot(adapter.currentModel), _semantic_fields(views)
+            before, fields = (
+                snapshot(adapter.currentModel, app=adapter.swApp),
+                _semantic_fields(views),
+            )
             row["before"] = before
             row["stage"] = "layout"
             _profiled_layout(adapter, views, notes, mode, row, directory)
-            after = snapshot(adapter.currentModel)
+            after = snapshot(adapter.currentModel, app=adapter.swApp)
             compare(before, after, f"{mode.value} native layout")
             if fields != _semantic_fields(views):
                 raise RuntimeError(
@@ -304,7 +307,7 @@ async def probe(adapter, source):
                 raise RuntimeError(
                     "native application reopened the wrong obstacle copy"
                 )
-            reopened = snapshot(adapter.currentModel)
+            reopened = snapshot(adapter.currentModel, app=adapter.swApp)
             compare(before, reopened, f"{mode.value} save/reopen")
             if fields != _semantic_fields(_context(adapter)[1]):
                 raise RuntimeError(
