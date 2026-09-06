@@ -104,11 +104,19 @@ def test_cleanup_closes_drawing_then_part_even_when_part_is_active(
     drawing = SimpleNamespace(GetPathName=lambda: str(drawing_path))
     part = SimpleNamespace(GetPathName=lambda: str(part_path))
     closed = []
-    adapter = SimpleNamespace(currentModel=part)
+    opened = [drawing, part]
+    adapter = SimpleNamespace(
+        currentModel=part,
+        swApp=SimpleNamespace(
+            GetDocuments=lambda: tuple(opened),
+            IsSame=lambda a, b: int(a is b),
+        ),
+    )
 
     async def close(save):
         assert save is False
         closed.append(adapter.currentModel)
+        opened.remove(adapter.currentModel)
         adapter.currentModel = None
 
     adapter.close_model = close
@@ -117,6 +125,40 @@ def test_cleanup_closes_drawing_then_part_even_when_part_is_active(
         view_probe.close_copies(adapter, ((drawing, drawing_path), (part, part_path)))
     )
     assert closed == [drawing, part]
+
+
+def test_cleanup_does_not_reuse_part_wrapper_after_drawing_unloads_reference(tmp_path):
+    drawing_path, part_path = tmp_path / "copy.SLDDRW", tmp_path / "copy.SLDPRT"
+    opened, closed = [], []
+    drawing = SimpleNamespace(GetPathName=lambda: str(drawing_path))
+
+    def part_path_name():
+        if not opened:
+            raise RuntimeError("disconnected referenced part")
+        return str(part_path)
+
+    part = SimpleNamespace(GetPathName=part_path_name)
+    opened.extend((drawing, part))
+    adapter = SimpleNamespace(
+        currentModel=drawing,
+        swApp=SimpleNamespace(
+            GetDocuments=lambda: tuple(opened),
+            IsSame=lambda a, b: int(a is b),
+        ),
+    )
+
+    async def close(save):
+        assert save is False
+        closed.append(adapter.currentModel)
+        opened.clear()
+        adapter.currentModel = None
+        return SimpleNamespace(is_success=True, error=None, data=None)
+
+    adapter.close_model = close
+    asyncio.run(
+        view_probe.close_copies(adapter, ((drawing, drawing_path), (part, part_path)))
+    )
+    assert closed == [drawing]
 
 
 def test_cleanup_rejects_foreign_document_before_close(monkeypatch, tmp_path):

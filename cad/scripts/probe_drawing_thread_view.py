@@ -486,7 +486,13 @@ def save_native_copy(model, path):
 
 
 async def close_copies(adapter, documents):
-    """Close only verified copy handles, regardless of which copy was active."""
+    """Close verified copies without reusing an unloaded reference's wrapper.
+
+    Closing a drawing can unload its unwindowed referenced part. Validate both
+    paths before closing either; native document inventory, not a disconnected
+    part wrapper, then determines which copy still needs closing.
+    """
+    verified = []
     for model, path in documents:
         if model is None:
             continue
@@ -494,8 +500,26 @@ async def close_copies(adapter, documents):
             raise RuntimeError(
                 "refusing to close a model outside the verified copy paths"
             )
-        adapter.currentModel = model
+        verified.append((model, path))
+    for original, path in verified:
+        matches = [
+            model
+            for raw in adapter.swApp.GetDocuments() or ()
+            if Path((model := _early_bound(raw, "IModelDoc2")).GetPathName()).resolve()
+            == path
+        ]
+        if not matches:
+            continue
+        if len(matches) != 1 or int(adapter.swApp.IsSame(matches[0], original)) != 1:
+            raise RuntimeError("copied document identity changed before cleanup")
+        adapter.currentModel = matches[0]
         check("close thread source-feature copy", await adapter.close_model(save=False))
+    remaining = {
+        Path(_early_bound(raw, "IModelDoc2").GetPathName()).resolve()
+        for raw in adapter.swApp.GetDocuments() or ()
+    }
+    if any(path in remaining for _model, path in verified):
+        raise RuntimeError("native copy document remained open after cleanup")
 
 
 def save_phase(model, drawing_path, pdf_path):
@@ -896,6 +920,9 @@ def main():
                 await close_copies(
                     adapter, ((drawing_model, copy), (part_model, part_copy))
                 )
+            except Exception as error:
+                report["cleanup_error"] = repr(error)
+                raise
             finally:
                 report["source_unchanged"] = {
                     str(path): hashlib.sha256(path.read_bytes()).hexdigest() == digest
