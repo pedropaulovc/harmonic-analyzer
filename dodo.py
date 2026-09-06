@@ -2386,11 +2386,13 @@ def task_check():
                 str((SCRIPTS_DIR / "cut_release.py").resolve()),
                 str((SCRIPTS_DIR / "export_models.py").resolve()),
                 str((SCRIPTS_DIR / "test_telemetry.py").resolve()),
+                str((SCRIPTS_DIR / "test_pytest_telemetry.py").resolve()),
                 str((SCRIPTS_DIR / "test_cut_release_telemetry.py").resolve()),
             ],
             "cmd": [
                 *pytest_cmd,
                 str(SCRIPTS_DIR / "test_telemetry.py"),
+                str(SCRIPTS_DIR / "test_pytest_telemetry.py"),
                 str(SCRIPTS_DIR / "test_cut_release_telemetry.py"),
             ],
         },
@@ -2496,9 +2498,14 @@ def task_check():
     )
     for name, spec in specs.items():
         stamp = str(REPORTS / f"check-{name}.ok")
+        file_dep = list(spec["file_dep"])
+        if spec["cmd"][:3] == [sys.executable, "-m", "pytest"]:
+            # Pytest loads this before importing tests. An isolation policy
+            # change must invalidate every pytest gate, not just telemetry's.
+            file_dep.append(str((REPO_ROOT / "conftest.py").resolve()))
         yield {
             "name": name,
-            "file_dep": spec["file_dep"],
+            "file_dep": file_dep,
             "targets": [stamp],
             "actions": [(_run_stamped, [spec["cmd"], f"check {name}", stamp])],
             "clean": True,

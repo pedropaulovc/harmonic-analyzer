@@ -14,6 +14,9 @@ from pathlib import Path
 
 import pytest
 
+if __name__ == "__main__":
+    sys.exit(pytest.main([__file__, "-q"]))
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import _artifact_cache as cache  # noqa: E402
@@ -243,7 +246,3 @@ def test_probe_presence_and_disabled(tmp_path, fake, monkeypatch):
     assert cache.probe("q" * 64) is False
     monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "off")
     assert cache.probe(key) is None                          # disabled -> unknown
-
-
-if __name__ == "__main__":
-    sys.exit(pytest.main([__file__, "-q"]))

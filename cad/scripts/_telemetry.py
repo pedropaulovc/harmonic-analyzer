@@ -20,8 +20,10 @@ What you get, **preconfigured on import** (zero env, no collector):
   silent hole in the trace — and :func:`run_pipeline_span` opens a root span that
   spans an entire process invocation, so every child has a parent.
 * **Structured capture (best-effort).** Full span/log JSON is also written under
-  ``cad/out/reports/telemetry/`` for post-hoc querying; failures there never
-  break a build (same discipline as the cache ``.jsonl`` log).
+  ``cad/out/reports/telemetry/`` (override: ``HARMONIC_TELEMETRY_DIR``) for
+  post-hoc querying; failures there never break a build. Pytest's explicit root
+  bootstrap retains separate ``cad/out/reports/pytest-telemetry/run-*`` files
+  and disables OTLP before test collection, including inherited child capture.
 
 Drop-in for the old helpers: ``progress()`` == the old ``log()``, ``success()``
 == the ``  OK  `` lines, ``warn()`` / ``error()`` == the ``!!`` / ``FAIL`` lines.
@@ -304,13 +306,21 @@ def _compact_span(span: ReadableSpan) -> str:
 
 
 def _telemetry_dir() -> Path | None:
-    """``cad/out/reports/telemetry`` if it can be created, else ``None``.
+    """Configured capture directory if creatable, otherwise ``None``.
 
+    ``HARMONIC_TELEMETRY_DIR`` overrides ``cad/out/reports/telemetry``. The
+    explicit environment setting is inherited by child processes; pytest's
+    bootstrap uses it to retain mock telemetry separately from build evidence.
     Best-effort, exactly like the cache ``.jsonl`` log: telemetry capture must
     never be the reason a build fails.
     """
     try:
-        out = Path(__file__).resolve().parents[1] / "out" / "reports" / "telemetry"
+        configured = os.environ.get("HARMONIC_TELEMETRY_DIR")
+        out = (
+            Path(configured).resolve()
+            if configured
+            else Path(__file__).resolve().parents[1] / "out" / "reports" / "telemetry"
+        )
         out.mkdir(parents=True, exist_ok=True)
         return out
     except Exception:  # noqa: BLE001 - capture is best-effort, never fatal
@@ -585,8 +595,8 @@ def configure(*, console: bool = True, force: bool = False) -> None:
     """Wire up the trace + log providers. Idempotent; safe to call from import.
 
     ``console`` toggles the human-readable stderr stream (and the compact span
-    tracer). File capture under ``cad/out/reports/telemetry`` is always attempted
-    (best-effort).
+    tracer). File capture under ``HARMONIC_TELEMETRY_DIR`` (default
+    ``cad/out/reports/telemetry``) is always attempted, best-effort.
     """
     global _configured
     if _configured and not force:
