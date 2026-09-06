@@ -154,6 +154,165 @@ def test_failure_artifacts_are_unique_and_failed_persistence_keeps_original_erro
     assert failure.report_path is None
 
 
+@pytest.mark.parametrize("headroom_m", [0.0, 0.0005])
+def test_planning_headroom_absorbs_observed_note_extent_drift_without_relaxing_fit(
+    monkeypatch, headroom_m
+):
+    front = View("front", Rect(5, 5, 7, 7))
+    note = Annotation("manufacturing", Rect(1, -0.1, 3, 1))
+    adapter, options, _ = scene(monkeypatch, {"front": front}, [note])
+    options.update(
+        gap_m=0.002,
+        planning_headroom_m=headroom_m,
+        notes=(native.LayoutNote("manufacturing", note),),
+    )
+    calls = []
+    original_pack = native.pack_view_groups
+
+    def pack(*args, **kwargs):
+        calls.append((args[1], kwargs["gap_m"]))
+        return original_pack(*args, **kwargs)
+
+    def rebuild():
+        # Rocker readback-isqo6i2l: native anchor reaches its target, but the
+        # measured note extent shifts down by this amount after the rebuild.
+        note.rectangle = note.rectangle.translated((0, -0.00014335831381729822))
+        return True
+
+    monkeypatch.setattr(native, "pack_view_groups", pack)
+    adapter.currentModel.EditRebuild3 = rebuild
+    if headroom_m == 0:
+        with pytest.raises(native.NativeLayoutReadbackError):
+            native.repair_native_layout(adapter, **options)
+        return
+    report = native.repair_native_layout(adapter, **options)
+    assert report.status is native.NativeLayoutStatus.APPLIED
+    assert calls == [
+        (Rect(0.0005, 0.0005, 9.9995, 9.9995), 0.0025),
+        (Rect(0, 0, 10, 10), 0.002),
+    ]
+    assert report.planning_headroom_m == 0.0005
+    assert report.planning_gap_m == 0.0025
+    assert report.validation_gap_m == 0.002
+    assert report.planning_drawable == Rect(0.0005, 0.0005, 9.9995, 9.9995)
+    assert report.drawable == Rect(0, 0, 10, 10)
+    assert note.rectangle.ymin == pytest.approx(0.0005 - 0.00014335831381729822)
+    assert len(front.moves) == len(note.moves) == 1
+
+
+def test_planning_allowance_does_not_accept_drift_that_still_overflows(monkeypatch):
+    front = View("front", Rect(-1, 2, 1, 4))
+    frame = Annotation("frame", Rect(-1, 2, 0, 3), owner=front, kind=5)
+    front.annotations = [frame]
+    adapter, options, _ = scene(monkeypatch, {"front": front})
+
+    def rebuild():
+        frame.rectangle = Rect(-0.001, 2, 1, 3)
+        return True
+
+    adapter.currentModel.EditRebuild3 = rebuild
+    with pytest.raises(native.NativeLayoutReadbackError) as caught:
+        native.repair_native_layout(adapter, **options, planning_headroom_m=0.0005)
+    assert caught.value.evidence["planning_headroom_m"] == 0.0005
+    assert caught.value.evidence["planning_gap_m"] == 0.1005
+    assert caught.value.evidence["validation_gap_m"] == 0.1
+    assert caught.value.evidence["raw_residuals"]["overflow"][0]["excess_m"] == 0.001
+
+
+@pytest.mark.parametrize("headroom", [-0.001, float("nan"), float("inf")])
+def test_invalid_planning_headroom_fails_before_native_movement(monkeypatch, headroom):
+    front = View("front", Rect(-1, 2, 1, 4))
+    adapter, options, _ = scene(monkeypatch, {"front": front})
+    with pytest.raises(ValueError, match="planning headroom"):
+        native.repair_native_layout(adapter, **options, planning_headroom_m=headroom)
+    assert front.moves == []
+
+
+@pytest.mark.parametrize("headroom_m", [0.0, 0.0005])
+def test_arbor_measured_footprint_replay_retains_two_mm_final_clearance(
+    monkeypatch, headroom_m
+):
+    # readback-zuvizh35: replay measured decorated footprints, anchors and native
+    # extent changes. This checks the observed error pattern, not an assumption
+    # that SolidWorks will produce the same error at every future position.
+    footprints = {
+        "front": Rect(
+            0.059114843638434555,
+            0.08386714832239814,
+            0.2329768666726667,
+            0.2300659917941963,
+        ),
+        "top": Rect(
+            0.04711484363843457,
+            0.21030124885875273,
+            0.22129435639677897,
+            0.2780000000040001,
+        ),
+        "iso": Rect(
+            0.30112772874546706,
+            0.08748706156634467,
+            0.368872271254533,
+            0.21251293843365535,
+        ),
+    }
+    anchors = {"front": (0.1, 0.15), "top": (0.1, 0.245), "iso": (0.335, 0.15)}
+    views = {key: View(key, value) for key, value in footprints.items()}
+    for key, view in views.items():
+        view._position = anchors[key]
+    note = Annotation(
+        "manufacturing",
+        Rect(
+            0.019678754098360646,
+            0.025237606557377057,
+            0.19721226229508193,
+            0.07529404683840751,
+        ),
+    )
+    adapter, options, _ = scene(monkeypatch, views, [note])
+    sheet = adapter.currentModel.GetCurrentSheet()
+    sheet.GetProperties2 = lambda: (0, 0, 1, 1, 0, 0.4318, 0.2794, 0)
+    sheet.GetZoneMargin = lambda _index: 0.0127
+    options.update(
+        gap_m=0.002,
+        planning_headroom_m=headroom_m,
+        title_block=Rect(0.264, 0, 0.4318, 0.064),
+        notes=(native.LayoutNote("manufacturing", note),),
+        alignments=(native.AxisLink(Axis.X, "front", "top"),),
+        orderings=(AxisOrder(Axis.Y, "front", "top"),),
+    )
+
+    def rebuild():
+        delta = (
+            -9.990510100837957e-6,
+            6.765943245515271e-5,
+            -9.990510100810202e-6,
+            -0.00026605016941841364,
+        )
+        note.rectangle = Rect(*(a + b for a, b in zip(note.rectangle.bounds, delta)))
+        return True
+
+    adapter.currentModel.EditRebuild3 = rebuild
+    if headroom_m == 0:
+        with pytest.raises(native.NativeLayoutReadbackError):
+            native.repair_native_layout(adapter, **options)
+        return
+    report = native.repair_native_layout(adapter, **options)
+    assert report.status is native.NativeLayoutStatus.APPLIED
+    assert report.validation_gap_m == 0.002
+    assert all(len(view.moves) == 1 for view in views.values())
+    assert len(note.moves) == 1
+
+
+def test_headroom_that_consumes_sheet_reports_no_fit_without_writes(monkeypatch):
+    front = View("front", Rect(-1, 2, 1, 4))
+    adapter, options, _ = scene(monkeypatch, {"front": front})
+    report = native.repair_native_layout(adapter, **options, planning_headroom_m=5)
+    assert report.status is native.NativeLayoutStatus.NO_FIT
+    assert report.planning_drawable is None
+    assert "no positive drawable area" in report.reason
+    assert front.moves == []
+
+
 class Annotation:
     def __init__(self, name, rectangle, *, owner=None, kind=6, attachments=()):
         self.name, self.rectangle, self.Owner, self.kind = name, rectangle, owner, kind
