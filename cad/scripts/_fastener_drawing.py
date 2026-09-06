@@ -8,6 +8,7 @@ from typing import Any, Callable, Literal, Mapping
 
 import _telemetry
 from _common import check
+from _drawing_entities import FeatureFace, ModelEntities
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
@@ -39,7 +40,7 @@ class FastenerSheet:
     side_dimension_callouts: Mapping[str, str] | None = None
     note_xy: tuple[float, float] = (0.020, 0.115)
     end_note_xy: tuple[float, float] = (0.050, 0.220)
-    side_centerline_face_xy: tuple[float, float] | None = None
+    side_centerline_face: FeatureFace | None = None
     end_center_mark: Literal["required", "not_applicable"] = "not_applicable"
     decorate: Callable[[Any, Any, Any, Any], None] | None = None
 
@@ -123,11 +124,14 @@ async def build_fastener_sheet(
     # adds no manufacturing information; the thread callout owns that feature.
     set_hidden_lines_removed(adapter, end)
 
-    if recipe.side_centerline_face_xy is not None:
+    if recipe.side_centerline_face is not None:
+        axis_face = ModelEntities(side.ReferencedDocument).resolve(
+            {"side_axis": recipe.side_centerline_face}
+        )["side_axis"]
         add_view_centerline(
             adapter,
             side,
-            face_xy=recipe.side_centerline_face_xy,
+            entity=axis_face,
             label=f"{property_view} side-view axis centerline",
         )
     if recipe.end_center_mark == "required" and not auto_center_marks(

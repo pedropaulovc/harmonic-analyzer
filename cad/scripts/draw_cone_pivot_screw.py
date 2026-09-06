@@ -21,8 +21,8 @@ from _drawing_common import (
     set_hidden_lines_removed,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _drawing_entities import CircleEdge, ModelEntities
-from _gtol_spec import PlanarFace
+from _drawing_entities import CircleEdge, FeatureFace, ModelEntities
+from _gtol_spec import CylinderFace, PlanarFace
 from _fastener_drawing import FastenerSheet, build_fastener_sheet
 from _surface_finish import surface_finish_by_key
 from cone_pivot_screw_spec import (
@@ -172,7 +172,7 @@ RECIPE = FastenerSheet(
     side_dimension_callouts=SIDE_DIMENSION_CALLOUTS,
     note_xy=(0.020, 0.105),
     end_note_xy=(0.020, 0.245),
-    side_centerline_face_xy=(0.190, 0.145),
+    side_centerline_face=FeatureFace("Shoulder", CylinderFace(SHOULDER_DIA)),
     decorate=_decorate,
 )
 

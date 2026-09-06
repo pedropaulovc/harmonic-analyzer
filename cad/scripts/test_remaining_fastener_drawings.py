@@ -270,7 +270,12 @@ def test_cone_pivot_tail_view_exposes_the_ground_shoulder() -> None:
     assert drawing.SIDE_DIMENSION_CALLOUTS["ThreadLg"] == spec.THREAD_DESIGNATION
     assert '"1/4-20' not in drawing_source
     assert drawing.RECIPE.decorate is drawing._decorate
-    assert drawing.RECIPE.side_centerline_face_xy == (0.190, 0.145)
+    from _drawing_entities import FeatureFace
+    from _gtol_spec import CylinderFace
+
+    assert drawing.RECIPE.side_centerline_face == FeatureFace(
+        "Shoulder", CylinderFace(spec.SHOULDER_DIA)
+    )
     assert drawing_source.count("add_datum_feature(") == 1
     assert drawing_source.count("add_feature_control_frame(") == 4
     assert drawing_source.count("add_surface_finish(") == 1
@@ -357,6 +362,12 @@ def test_cone_pivot_producer_rejects_missing_persisted_drawing_property() -> Non
 def test_cone_tip_pinch_sheet_defines_a_flat_end_without_duplicate_head_diameter() -> None:
     drawing = importlib.import_module("draw_cone_tip_pinch_screw")
     spec = importlib.import_module("cone_tip_pinch_screw_spec")
+    from _drawing_entities import FeatureFace
+    from _gtol_spec import CylinderFace
+
+    assert drawing.RECIPE.side_centerline_face == FeatureFace(
+        "Shank", CylinderFace(spec.SHANK_DIA)
+    )
     assert drawing.END_KEEP == {}
     assert drawing.RECIPE.side_center == (0.190, 0.190)
     assert spec.DRAWING_DIMENSIONS == {}
