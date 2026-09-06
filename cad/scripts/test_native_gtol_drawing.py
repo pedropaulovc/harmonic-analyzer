@@ -11,6 +11,7 @@ import pytest
 
 import _drawing_native_gtol as layout
 from _drawing_view_packing import Rect
+from _drawing_annotation_bounds import Segment
 
 
 @pytest.mark.parametrize(
@@ -445,6 +446,32 @@ def test_measured_surface_finish_body_changes_outboard_choice(monkeypatch):
     assert result["translation_m"] == pytest.approx((0.402, 0))
     assert result["obstacle_count"] == 1
     obstacle.SetPosition2.assert_not_called()
+
+
+def test_dimension_extension_changes_outboard_choice_without_another_read(monkeypatch):
+    adapter, view, rows, measure = native_context(monkeypatch, count=1)
+    dimension = Mock()
+    dimension.GetName.return_value = "dimension"
+    dimension.position = [0.02, 0.95, 0]
+    dimension.size = (0.02, 0.01)  # Its text body alone clears the initial lane.
+    view.GetAnnotationsByType.side_effect = lambda kind: {5: rows, 4: [dimension]}.get(
+        kind, ()
+    )
+
+    def measure_with_extension(adapter, annotation):
+        bounds = measure(adapter, annotation)
+        if annotation is dimension:
+            bounds.kind = 4
+            bounds.leader_segments = (Segment((0.15, 0.7), (0.15, 0.85)),)
+        return bounds
+
+    reads = Mock(side_effect=measure_with_extension)
+    result = arrange(adapter, view, reads)["front"]
+    body = Rect(*result["body_after"])
+    assert body.xmax <= 0.148 + 1e-8 or body.xmin >= 0.152 - 1e-8
+    assert result["obstacle_count"] == 2  # Body plus actual extension stroke.
+    assert reads.call_count == 3  # Initial/final GTol, one existing obstacle read.
+    dimension.SetPosition2.assert_not_called()
 
 
 def test_production_helper_never_recreates_annotations_or_selects_geometry():

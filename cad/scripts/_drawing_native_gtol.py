@@ -12,7 +12,9 @@ views onto the sheet and verifies the save.
 Coordinates are sheet metres. Footprints must include quantity/below-frame text
 and exclude open leaders. Outboard means outside the actual IView.GetOutline;
 same-view datum, dimension and surface-finish bodies are also kept clear. This
-local operation requires text-cell clearance and complete displayed-stroke
+includes their measured open strokes and leader decorations, so a dimension
+extension cannot pass through an otherwise clear GTol symbol/frame. This local
+operation requires text-cell clearance and complete displayed-stroke
 coverage, but does not certify final sheet fit or exact glyph-ink distances.
 
 Full native XML/text/attachment/body witnesses are read before and after each
@@ -40,6 +42,7 @@ from _drawing_annotation_bounds import LeaderGeometry, annotation_leader_geometr
 from _drawing_leader_clearance import (
     crossing_records,
     displayed_leader_coverage,
+    stationary_ink_obstacles,
     vertical_candidates,
     _candidate_text_cells,
 )
@@ -630,7 +633,7 @@ def arrange_native_gtol_columns(
                             "native obstacle needs unique annotation identity"
                         )
                     measurements[name] = measured
-                    obstacles.append(measured.body)
+                    obstacles.extend(stationary_ink_obstacles(measured))
                     if record_measurement is not None:
                         record_measurement(view, annotation, measured)
         column = _union([row.body for row in bank.values()])

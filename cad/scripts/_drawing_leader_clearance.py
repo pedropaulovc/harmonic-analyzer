@@ -50,6 +50,34 @@ def _clear(first: Rect, second: Rect, gap: float) -> bool:
     )
 
 
+def stationary_ink_obstacles(bounds):
+    """Keep moved frames clear of an existing annotation's body AND open ink.
+
+    These rectangles conservatively bound already-measured displayed strokes;
+    they are planning obstacles, not a new native measurement or inferred route.
+    In particular, dimension extension lines are not part of a text-only body.
+    """
+    obstacles = [bounds.body, *bounds.leader_decorations]
+    for stroke in bounds.leader_segments:
+        if not all(math.isfinite(value) for value in (*stroke.start, *stroke.end)):
+            raise ValueError("stationary annotation stroke must be finite")
+        if not math.isfinite(stroke.width_m) or stroke.width_m < 0:
+            raise ValueError("stationary annotation width must be finite/nonnegative")
+        radius = stroke.width_m / 2
+        # Rect requires positive area. Enclose even a zero-width horizontal or
+        # vertical native stroke by the adjacent representable floats; this
+        # does not invent a physical print width. The planner adds its gap.
+        obstacles.append(
+            Rect(
+                math.nextafter(min(stroke.start[0], stroke.end[0]) - radius, -math.inf),
+                math.nextafter(min(stroke.start[1], stroke.end[1]) - radius, -math.inf),
+                math.nextafter(max(stroke.start[0], stroke.end[0]) + radius, math.inf),
+                math.nextafter(max(stroke.start[1], stroke.end[1]) + radius, math.inf),
+            )
+        )
+    return tuple(obstacles)
+
+
 def crossing_records(leader_banks, measurements, decorations):
     if leader_banks.keys() != decorations.keys():
         raise ValueError("every native leader bank needs explicit decoration inventory")
@@ -206,20 +234,16 @@ def vertical_candidates(crossings, leaders, decorations, *, clearance_m=0.001):
 
 
 def _candidate_text_cells(measured, right_seed, predicted):
-    """Only bank text cells translate; every other measured cell stays fixed."""
+    """Moving GTol bodies include symbol/frame ink; other text cells stay fixed."""
     result = {}
     for name, bounds in measured.items():
-        delta = (0.0, 0.0)
-        if name in right_seed:
-            delta = tuple(
-                predicted[name].position[i] - right_seed[name].position[i]
-                for i in (0, 1)
-            )
         result[name] = _TextCells(
             bounds.kind,
-            tuple(cell.translated(delta) for cell in bounds.text_boxes),
+            (predicted[name].body,)
+            if name in right_seed
+            else tuple(bounds.text_boxes),
             tuple(bounds.text_runs),
-            bounds.body.translated(delta) if bounds.kind == 6 else None,
+            bounds.body if bounds.kind == 6 else None,
         )
     return result
 
@@ -231,6 +255,9 @@ def validate_gtol_leader_clearance(measurements_by_view):
     view AFTER attachment/content/packing checks. This pure callback performs no
     COM or font work, and never substitutes cached trial cells for final bounds.
     Declared view-owned notes are included here even though trials defer them.
+    Clearance is bidirectional: another annotation's displayed extension/leader
+    strokes and decorations must also avoid every GTol body, including symbols
+    and frame borders outside the font cells.
     """
     report = {}
     for view, measurements in measurements_by_view.items():
@@ -258,11 +285,29 @@ def validate_gtol_leader_clearance(measurements_by_view):
             raise RuntimeError(
                 f"{view}: final measured GTol leader/text-cell crossings: {json.dumps({'crossings': crossings, 'native_geometry': {name: asdict(row) for name, row in geometry.items()}})}"
             )
+        reverse_crossings = crossing_records(
+            {
+                name: (*row.native_strokes, *row.native_leader_segments)
+                for name, row in measurements.items()
+            },
+            {
+                name: _TextCells(row.kind, (row.body,), row.text_runs)
+                for name, row in measurements.items()
+                if row.kind == 5
+            },
+            {name: row.leader_decorations for name, row in measurements.items()},
+        )
+        if reverse_crossings:
+            raise RuntimeError(
+                f"{view}: final annotation stroke/GTol-body crossings: "
+                f"{json.dumps(reverse_crossings)}"
+            )
         report[view] = {
             "gtol_count": len(geometry),
             "displayed_stroke_count": sum(
                 len(row["display_segments"]) for row in coverage.values()
             ),
             "crossings": crossings,
+            "reverse_crossings": reverse_crossings,
         }
     return report
