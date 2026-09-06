@@ -42,7 +42,8 @@ class FastenerSheet:
     end_note_xy: tuple[float, float] = (0.050, 0.220)
     side_centerline_face: FeatureFace | None = None
     end_center_mark: Literal["required", "not_applicable"] = "not_applicable"
-    decorate: Callable[[Any, Any, Any, Any], None] | None = None
+    decorate: Callable[[Any, Any, Any, Any], Mapping[str, Any]] | None = None
+    layout: Callable[[Any, Mapping[str, Any], Mapping[str, Any]], None] | None = None
 
 
 @_telemetry.traced("drawing.fastener_sheet")
@@ -156,11 +157,25 @@ async def build_fastener_sheet(
             dict(recipe.side_dimension_callouts or {}),
         )
 
+    views = {"side": side, "end": end, "iso": iso}
     if recipe.decorate is not None:
-        recipe.decorate(adapter, side, end, iso)
+        additional_views = recipe.decorate(adapter, side, end, iso)
+        if set(additional_views).intersection(views):
+            raise ValueError(
+                "fastener decorator must not replace existing view identities"
+            )
+        views.update(additional_views)
 
-    add_property_linked_note(adapter, "Manufacturing Notes", *recipe.note_xy)
-    add_property_linked_note(adapter, "End View Note", *recipe.end_note_xy)
+    notes = {
+        "manufacturing": add_property_linked_note(
+            adapter, "Manufacturing Notes", *recipe.note_xy
+        ),
+        "end-caption": add_property_linked_note(
+            adapter, "End View Note", *recipe.end_note_xy
+        ),
+    }
+    if recipe.layout is not None:
+        recipe.layout(adapter, views, notes)
 
     return await finalize_drawing(
         adapter,

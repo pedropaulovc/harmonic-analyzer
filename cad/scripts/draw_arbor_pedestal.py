@@ -22,6 +22,7 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    repair_project_drawing_layout,
     set_arc_endpoints_to_center,
     set_basic_dimension,
     set_dimension_callouts,
@@ -30,6 +31,8 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_entities import CircleEdge, LineEdge, ModelEntities
+from _drawing_native_layout import AxisLink, LayoutNote
+from _drawing_view_packing import Axis, AxisOrder
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from arbor_pedestal_spec import (
@@ -84,7 +87,12 @@ def _front_y(model_y: float) -> float:
 
 # Front elevation carries the foot width + flange height, the arbor-bore station
 # and diameter, and the dome diameter; the plan carries the 16 foot depth.
-FRONT_KEEP = ("Width", "FootHt", "BoreDia", "DomeDia",)
+FRONT_KEEP = (
+    "Width",
+    "FootHt",
+    "BoreDia",
+    "DomeDia",
+)
 TOP_KEEP = ("Depth",)
 DIMENSION_CALLOUTS = {
     "BoreDia": "THRU",
@@ -99,17 +107,26 @@ def _model_entities(model: Any) -> dict[str, Any]:
     near_z = FOOT_DEPTH / 2.0 - STRAP_T
     flank_rise = BORE_HEIGHT - FOOT_HEIGHT
     flank_run = (FOOT_WIDTH / 2.0 - TOP_RADIUS) * flank_rise / BORE_HEIGHT
-    return ModelEntities(model).resolve({
-        "foot": LineEdge((0, 0, -FOOT_DEPTH / 2.0), (1, 0, 0)),
-        "side": LineEdge((-FOOT_WIDTH / 2.0, FOOT_HEIGHT / 2.0, -FOOT_DEPTH / 2.0), (0, 1, 0)),
-        "flank": LineEdge((TOP_RADIUS + flank_run / 2.0, BORE_HEIGHT - flank_rise / 2.0, near_z), (-flank_run, flank_rise, 0)),
-        "bore": CircleEdge(BORE_DIA / 2.0, (0, BORE_HEIGHT, near_z), (0, 0, 1)),
-        "dome": CircleEdge(TOP_RADIUS, (0, BORE_HEIGHT, near_z), (0, 0, 1)),
-        "screw": CircleEdge(SCREW_CLEARANCE_DIA / 2.0, (0, FOOT_HEIGHT, -5.0), (0, 1, 0)),
-        "datum_d": LineEdge((0, FOOT_HEIGHT, -FOOT_DEPTH / 2.0), (1, 0, 0)),
-        "strap_near": LineEdge((0, FOOT_HEIGHT, near_z), (1, 0, 0)),
-        "far_face": LineEdge((0, 0, FOOT_DEPTH / 2.0), (1, 0, 0)),
-    })
+    return ModelEntities(model).resolve(
+        {
+            "foot": LineEdge((0, 0, -FOOT_DEPTH / 2.0), (1, 0, 0)),
+            "side": LineEdge(
+                (-FOOT_WIDTH / 2.0, FOOT_HEIGHT / 2.0, -FOOT_DEPTH / 2.0), (0, 1, 0)
+            ),
+            "flank": LineEdge(
+                (TOP_RADIUS + flank_run / 2.0, BORE_HEIGHT - flank_rise / 2.0, near_z),
+                (-flank_run, flank_rise, 0),
+            ),
+            "bore": CircleEdge(BORE_DIA / 2.0, (0, BORE_HEIGHT, near_z), (0, 0, 1)),
+            "dome": CircleEdge(TOP_RADIUS, (0, BORE_HEIGHT, near_z), (0, 0, 1)),
+            "screw": CircleEdge(
+                SCREW_CLEARANCE_DIA / 2.0, (0, FOOT_HEIGHT, -5.0), (0, 1, 0)
+            ),
+            "datum_d": LineEdge((0, FOOT_HEIGHT, -FOOT_DEPTH / 2.0), (1, 0, 0)),
+            "strap_near": LineEdge((0, FOOT_HEIGHT, near_z), (1, 0, 0)),
+            "far_face": LineEdge((0, 0, FOOT_DEPTH / 2.0), (1, 0, 0)),
+        }
+    )
 
 
 @_telemetry.traced("drawing.circle_basic", label_param="label")
@@ -398,9 +415,18 @@ async def build(adapter: Any) -> dict[str, str]:
         entity=far_face_entity,
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)
+    manufacturing = add_property_linked_note(
+        adapter, "Manufacturing Notes", 0.020, 0.075
+    )
 
     auto_arrange_view_dimensions(adapter, (front, top, iso))
+    repair_project_drawing_layout(
+        adapter,
+        views={"front": front, "top": top, "iso": iso},
+        alignments=(AxisLink(Axis.X, "front", "top"),),
+        orderings=(AxisOrder(Axis.Y, "front", "top"),),
+        notes=(LayoutNote("manufacturing", manufacturing.GetAnnotation()),),
+    )
     return await finalize_drawing(
         adapter,
         OUTPUTS,
