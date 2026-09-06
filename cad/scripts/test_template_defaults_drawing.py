@@ -381,15 +381,20 @@ def test_actual_two_recipes_redirect_before_evaluating_output_aliases(tmp_path):
 
 
 def test_cross_arm_checks_sheet_notes_and_empty_view_quality():
+    source, digest = Path("C:/same/marker.SLDPRT"), "a" * 64
     snapshot = {
         "defaults": {"sheet_notes": ["0.25 MM"]},
-        "view_modes": ["precise"],
+        "view_modes": [json.dumps("precise")],
         "semantic_annotations": [],
     }
     changed = {**snapshot, "defaults": {"sheet_notes": ["0.010 IN"]}}
-    assert probe.cross_arm_signature(snapshot) != probe.cross_arm_signature(changed)
-    changed = {**snapshot, "view_modes": ["draft"]}
-    assert probe.cross_arm_signature(snapshot) != probe.cross_arm_signature(changed)
+    assert probe.cross_arm_signature(
+        snapshot, source, digest
+    ) != probe.cross_arm_signature(changed, source, digest)
+    changed = {**snapshot, "view_modes": [json.dumps("draft")]}
+    assert probe.cross_arm_signature(
+        snapshot, source, digest
+    ) != probe.cross_arm_signature(changed, source, digest)
 
 
 def test_semantic_datum_strips_only_verified_native_annotation_labels():
@@ -450,7 +455,10 @@ def test_finished_semantics_exclude_raw_drawing_filename_observations(monkeypatc
         }
         geometry = {
             "models": {
-                view_key: {"path": "C:/same/marker.SLDPRT", "configuration": "Default"}
+                view_key: {
+                    "path": str(Path("C:/same/marker.SLDPRT")),
+                    "configuration": "Default",
+                }
             },
             "checked": {},
             "excluded": {key: {"reason": "no model-geometry attachments", "kinds": []}},
@@ -498,7 +506,10 @@ def test_finished_semantics_exclude_raw_drawing_filename_observations(monkeypatc
     second = snapshot_for("DetailItem99", "candidate-owned")
     assert first["native_annotations"] != second["native_annotations"]
     assert first["attachments"] != second["attachments"]
-    assert probe.cross_arm_signature(first) == probe.cross_arm_signature(second)
+    source = Path("C:/same/marker.SLDPRT")
+    assert probe.cross_arm_signature(
+        first, source, "a" * 64
+    ) == probe.cross_arm_signature(second, source, "a" * 64)
     assert "baseline-owned" not in json.dumps(first["semantic_annotations"])
 
 
@@ -549,6 +560,8 @@ def orchestration(monkeypatch, tmp_path):
             source.write_bytes(b"source replaced after first trial")
         if failure.get("copy_between_trials") and len(calls) == 1:
             loaded_sources[0].write_bytes(b"copy changed; must not reset")
+        if failure.get("previous_output") and len(calls) == 2:
+            loaded_sources[0].write_bytes(b"previous saved output changed")
 
     adapter = SimpleNamespace(ownership=ownership, close_owned_documents=cleanup)
 
@@ -576,15 +589,25 @@ def orchestration(monkeypatch, tmp_path):
         checkpoint = json.loads((roots[0] / "measurements.json").read_text())
         assert checkpoint["trials"][-1]["status"] == "running"
         row.update(setup_seconds=[0.5], recipe_seconds=10, validation_seconds=2)
+        assert module.SOURCE.read_bytes() == b"owned fixture source"
         if failure.get("trial"):
             raise RuntimeError("recipe evidence")
+        if failure.get("presentation_output"):
+            module.SOURCE.write_bytes(b"retained saved presentation")
+        row["source_output_sha256"] = probe.attachments.file_digest(module.SOURCE)
+        row["source_snapshots"] = {
+            "initial": {"value": 1},
+            "cold_reopened": {"value": 1},
+        }
         row["reopened"] = {
             "defaults": {"notes": ["0.25 MM"]},
-            "view_modes": ["precise"],
-            "semantic_annotations": ["unchanged"],
+            "view_modes": [json.dumps("precise")],
+            "semantic_annotations": [json.dumps("unchanged")],
         }
         if failure.get("semantic") and variant == "candidate":
-            row["reopened"]["semantic_annotations"] = ["dimension missing"]
+            row["reopened"]["semantic_annotations"] = [json.dumps("dimension missing")]
+        if failure.get("source_semantic") and variant == "candidate":
+            row["source_snapshots"]["cold_reopened"] = {"value": 2}
 
     monkeypatch.setattr(probe.common, "PROJECT_DRWDOT", original)
     monkeypatch.setattr(probe, "runtime_fingerprints", lambda: {"input": "unchanged"})
@@ -628,26 +651,59 @@ def test_abba_prepares_once_and_checkpoints_all_four_trials(orchestration):
     assert report["immutable_input_changes"] == {}
     assert report["derived_template_changes"] == {}
     assert len({row["source_sha256"] for row in report["trials"]}) == 1
-    assert len(set(orchestration.loaded_sources)) == 1
-    owned = orchestration.loaded_sources[0]
-    assert owned != orchestration.source
-    assert owned.name != orchestration.source.name
-    assert owned not in orchestration.registered_sources
+    assert len(set(orchestration.loaded_sources)) == 4
+    assert len({path.name for path in orchestration.loaded_sources}) == 1
+    for owned in orchestration.loaded_sources:
+        assert owned != orchestration.source
+        assert owned.name != orchestration.source.name
+        assert owned not in orchestration.registered_sources
+        assert owned.read_bytes() == orchestration.source.read_bytes()
     assert orchestration.source in orchestration.registered_sources
-    assert owned.read_bytes() == orchestration.source.read_bytes()
-    assert report["owned_sources"]["arbor_pedestal"]["ownership"] == "owned_copy"
+    assert all(
+        row["ownership"] == "owned_copy" for row in report["owned_sources"].values()
+    )
 
 
-def test_owned_copy_disk_change_stops_without_reset_or_later_trial(orchestration):
+def test_each_arm_starts_from_original_not_previous_saved_output(orchestration):
+    orchestration.failure["presentation_output"] = True
+    orchestration.run()
+    assert len(orchestration.calls) == 4
+    assert all(
+        path.read_bytes() == b"retained saved presentation"
+        for path in orchestration.loaded_sources
+    )
+    assert orchestration.source.read_bytes() == b"owned fixture source"
+    for row in orchestration.report()["trials"]:
+        assert row["source_output_sha256"] != row["source_sha256"]
+        assert row["retained_source_sha256"] == row["source_output_sha256"]
+
+
+def test_saved_output_change_during_cleanup_stops_without_reset(orchestration):
     orchestration.failure["copy_between_trials"] = True
-    with pytest.raises(RuntimeError, match="immutable benchmark inputs changed"):
+    with pytest.raises(RuntimeError, match="retained source outputs changed"):
         orchestration.run()
     assert orchestration.calls == ["baseline"]
     copied = orchestration.loaded_sources[0]
     assert copied.read_bytes() == b"copy changed; must not reset"
     assert orchestration.source.read_bytes() == b"owned fixture source"
-    assert str(copied) in orchestration.report()["immutable_input_changes"]
+    assert orchestration.report()["immutable_input_changes"] == {}
     assert orchestration.report()["trials"][0]["status"] == "failed"
+    assert (
+        "saved source output changed during cleanup"
+        in orchestration.report()["trials"][0]["retained_source_error"]
+    )
+
+
+def test_later_arm_cannot_silently_change_previous_retained_part(orchestration):
+    orchestration.failure["previous_output"] = True
+    with pytest.raises(RuntimeError, match="retained source outputs changed"):
+        orchestration.run()
+    report = orchestration.report()
+    assert orchestration.calls == ["baseline", "candidate"]
+    assert report["status"] == "failed"
+    assert list(report["retained_source_changes"]) == [
+        str(orchestration.loaded_sources[0])
+    ]
 
 
 @pytest.mark.parametrize(
@@ -790,6 +846,13 @@ def test_cross_arm_mismatch_stops_after_first_candidate(orchestration):
     assert orchestration.report()["trials"][1]["status"] == "failed"
 
 
+def test_source_presentation_output_is_compared_across_arms(orchestration):
+    orchestration.failure["source_semantic"] = True
+    with pytest.raises(RuntimeError, match="cross-arm"):
+        orchestration.run()
+    assert orchestration.calls == ["baseline", "candidate"]
+
+
 def test_final_hash_read_error_is_evidence_not_a_lost_checkpoint(monkeypatch, tmp_path):
     source = tmp_path / "owned.SLDPRT"
     source.write_bytes(b"fixture")
@@ -803,9 +866,186 @@ def test_final_hash_read_error_is_evidence_not_a_lost_checkpoint(monkeypatch, tm
     assert "not readable" in changed[str(source)]["error"]
 
 
-@pytest.mark.parametrize("save_mutation", [False, True])
+def source_witness(source, text=""):
+    return {
+        "configuration": "Default",
+        "features": ["BoreProfile"],
+        "dimensions": {
+            f"BoreDia@BoreProfile@{source.stem}.Part": {
+                "native": {
+                    "value_system": 0.009525,
+                    "tolerance_type": 1,
+                    "designation": "basic",
+                    "tolerance_min": 0.0,
+                    "tolerance_max": 0.0,
+                },
+                "displays": [
+                    {
+                        "feature": "BoreProfile",
+                        "dimension_type": 6,
+                        "index": 0,
+                        "marked_for_drawing": True,
+                        "primary_precision": 2,
+                        "tolerance_precision": 2,
+                        "text": {"4": text, "8": text},
+                    }
+                ],
+            }
+        },
+    }
+
+
+def test_source_witness_records_only_permitted_presentation_changes(tmp_path):
+    from diagnostics._source_dimension_snapshot import compare_source
+
+    source = tmp_path / "owned.SLDPRT"
+    before, after = source_witness(source), source_witness(source, "THRU")
+    dimension = next(iter(after["dimensions"].values()))
+    dimension["displays"][0]["primary_precision"] = 3
+    handle = object()
+    handles = {name: handle for name in before["dimensions"]}
+    changes = compare_source(
+        before,
+        after,
+        app=SimpleNamespace(IsSame=lambda a, b: int(a is b)),
+        handles_before=handles,
+        handles_after=handles,
+    )
+    assert list(changes) == list(before["dimensions"])
+    name = next(iter(changes))
+    assert changes[name]["before"][0]["text"]["4"] == ""
+    assert changes[name]["after"][0]["text"]["4"] == "THRU"
+    assert changes[name]["after"][0]["primary_precision"] == 3
+
+
+@pytest.mark.parametrize(
+    "changed",
+    [
+        "value_system",
+        "tolerance_type",
+        "designation",
+        "tolerance_min",
+        "tolerance_max",
+        "native_identity",
+        "configuration",
+        "feature",
+        "dimension_name",
+        "display_missing",
+        "dimension_type",
+        "marked_for_drawing",
+    ],
+)
+def test_source_witness_rejects_numeric_basic_identity_and_inventory_drift(
+    tmp_path, changed
+):
+    from diagnostics._source_dimension_snapshot import compare_source
+
+    before = source_witness(tmp_path / "owned.SLDPRT")
+    after = deepcopy(before)
+    name = next(iter(before["dimensions"]))
+    row = after["dimensions"][name]
+    first, second = object(), object()
+    handles = {name: first}
+    if changed in row["native"]:
+        row["native"][changed] = "not_basic" if changed == "designation" else 7
+    if changed == "configuration":
+        after["configuration"] = "Wrong"
+    if changed == "feature":
+        after["features"].append("AddedFeature")
+    if changed == "dimension_name":
+        after["dimensions"]["Other@BoreProfile@owned.Part"] = after["dimensions"].pop(
+            name
+        )
+    if changed == "display_missing":
+        row["displays"] = []
+    if changed == "dimension_type":
+        row["displays"][0]["dimension_type"] = 2
+    if changed == "marked_for_drawing":
+        row["displays"][0]["marked_for_drawing"] = False
+    with pytest.raises(RuntimeError, match="source"):
+        compare_source(
+            before,
+            after,
+            app=SimpleNamespace(IsSame=lambda a, b: int(a is b)),
+            handles_before=handles,
+            handles_after={name: second} if changed == "native_identity" else handles,
+        )
+
+
+def test_cross_arm_normalizes_only_verified_source_owners(tmp_path):
+    first = tmp_path / "arm0" / "same-owned.SLDPRT"
+    second = tmp_path / "arm1" / first.name
+
+    def snapshot(source):
+        reference = {"path": str(source), "configuration": "Default"}
+        dimension = {
+            "kind": "model_dimension",
+            "components": [
+                {
+                    "name": "BoreDia",
+                    "qualified_name": f"BoreDia@BoreProfile@{source.stem}.Part",
+                    "value_system": 0.009525,
+                    "tolerance_type": 1,
+                    "designation": "basic",
+                }
+            ],
+        }
+        return {
+            "defaults": {"sheet_notes": ["same printed filename"]},
+            "view_modes": probe.semantic_multiset([{"source": reference}]),
+            "semantic_annotations": probe.semantic_multiset(
+                [
+                    {
+                        "view": {"source": reference},
+                        "dimensions": dimension,
+                        "checked": [
+                            {
+                                "kind": "circle",
+                                "center": [0.0, 0.0, 0.0],
+                                "radius": 0.0047625,
+                            }
+                        ],
+                    }
+                ]
+            ),
+        }
+
+    a, b = snapshot(first), snapshot(second)
+    assert a != b
+    assert probe.cross_arm_signature(a, first, "a" * 64) == probe.cross_arm_signature(
+        b, second, "a" * 64
+    )
+    assert probe.cross_arm_signature(a, first, "a" * 64) != probe.cross_arm_signature(
+        a, first, "b" * 64
+    )
+    for wrong in ("view_path", "dimension_owner", "configuration_empty"):
+        changed = deepcopy(b)
+        row = json.loads(changed["semantic_annotations"][0])
+        if wrong == "view_path":
+            row["view"]["source"]["path"] = str(first)
+        if wrong == "dimension_owner":
+            row["dimensions"]["components"][0]["qualified_name"] = (
+                "BoreDia@BoreProfile@original.Part"
+            )
+        if wrong == "configuration_empty":
+            row["view"]["source"]["configuration"] = ""
+        changed["semantic_annotations"] = probe.semantic_multiset([row])
+        with pytest.raises(RuntimeError, match="unproved copied-source owner"):
+            probe.cross_arm_signature(changed, second, "a" * 64)
+    changed = deepcopy(b)
+    row = json.loads(changed["semantic_annotations"][0])
+    row["checked"][0]["radius"] += 0.001
+    changed["semantic_annotations"] = probe.semantic_multiset([row])
+    assert probe.cross_arm_signature(a, first, "a" * 64) != probe.cross_arm_signature(
+        changed, second, "a" * 64
+    )
+
+
+@pytest.mark.parametrize(
+    "output_change", ["unchanged", "presentation", "value", "cold_text_loss"]
+)
 def test_trial_claims_creation_then_scopes_exact_save_and_restores_hooks(
-    monkeypatch, tmp_path, save_mutation
+    monkeypatch, tmp_path, output_change
 ):
     events = []
     outputs = probe.common.DrawingOutputs(
@@ -831,8 +1071,8 @@ def test_trial_claims_creation_then_scopes_exact_save_and_restores_hooks(
         assert events[-1] == "save_enter"
         assert actual_outputs == outputs
         events.append("native_save")
-        if save_mutation:
-            source.write_bytes(b"unexpected reference save")
+        if output_change != "unchanged":
+            source.write_bytes(b"saved reference presentation")
         return ["native", "pdf", "png"]
 
     async def close_owned_documents():
@@ -852,6 +1092,7 @@ def test_trial_claims_creation_then_scopes_exact_save_and_restores_hooks(
         currentModel=model,
         close_owned_documents=close_owned_documents,
         open_model=open_model,
+        swApp=SimpleNamespace(IsSame=lambda first, second: int(first is second)),
     )
 
     def setup(current, **kwargs):
@@ -876,9 +1117,26 @@ def test_trial_claims_creation_then_scopes_exact_save_and_restores_hooks(
         observed_handles.append(previous)
         return {
             "configuration": "Default",
-            "dirty": "clean" if previous is None else "dirty",
+            "dirty": "dirty" if events and "native_save" not in events else "clean",
         }, model
 
+    dimension_handle, reopened_handle = object(), object()
+    snapshots_taken = []
+
+    def snapshot(app, native, path, *, required):
+        assert native is model and path == source
+        assert required == probe.SOURCE_DIMENSIONS["arbor_pedestal"]
+        text = "THRU" if events and output_change != "unchanged" else ""
+        if "reopen" in events and output_change == "cold_text_loss":
+            text = ""
+        result = source_witness(source, text)
+        if events and output_change == "value":
+            next(iter(result["dimensions"].values()))["native"]["value_system"] += 0.001
+        snapshots_taken.append(deepcopy(result))
+        handle = reopened_handle if "reopen" in events else dimension_handle
+        return result, {name: handle for name in result["dimensions"]}
+
+    monkeypatch.setattr(probe, "dimension_snapshot", snapshot)
     monkeypatch.setattr(probe, "source_observation", source_state)
     monkeypatch.setattr(
         probe, "compare_reopened", lambda before, after: events.append("compare")
@@ -886,7 +1144,10 @@ def test_trial_claims_creation_then_scopes_exact_save_and_restores_hooks(
     monkeypatch.setattr(
         probe.recipes, "validate_artifacts", lambda artifacts, outputs: artifacts
     )
-    row = {"source_sha256": probe.attachments.file_digest(source)}
+    row = {
+        "target": "arbor_pedestal",
+        "source_sha256": probe.attachments.file_digest(source),
+    }
 
     def run():
         return asyncio.run(
@@ -895,13 +1156,21 @@ def test_trial_claims_creation_then_scopes_exact_save_and_restores_hooks(
             )
         )
 
-    if save_mutation:
-        with pytest.raises(RuntimeError, match="owned source after recipe"):
+    if output_change == "value":
+        with pytest.raises(RuntimeError, match="source value/tolerance/BASIC changed"):
             run()
-        assert "owned source after drawing save" in row["recipe_error"]
-        assert source.read_bytes() == b"unexpected reference save"
+        assert "value/tolerance/BASIC" in row["recipe_error"]
+        assert source.read_bytes() == b"copy bytes"
+        assert "native_save" not in events
         assert "reopen" not in events
         assert module.finalize_drawing is finalize
+        return
+    if output_change == "cold_text_loss":
+        with pytest.raises(RuntimeError, match="cold source presentation/semantics"):
+            run()
+        assert source.read_bytes() == b"saved reference presentation"
+        assert "reopen" in events
+        assert "compare" not in events
         return
     run()
     assert events == [
@@ -921,6 +1190,7 @@ def test_trial_claims_creation_then_scopes_exact_save_and_restores_hooks(
     assert row["validation_seconds"] >= 0
     assert set(row["owned_source_native"]) == {
         "recipe_source_open",
+        "after_initial_snapshot",
         "before_drawing_save",
         "after_drawing_save",
         "after_recipe",
@@ -928,5 +1198,17 @@ def test_trial_claims_creation_then_scopes_exact_save_and_restores_hooks(
         "after_persisted_checks",
     }
     # New source after cold close must not be compared with a stale COM handle.
-    assert observed_handles == [None, model, model, model, None, model]
+    assert observed_handles == [None, model, model, model, model, None, model]
     assert row["owned_source_native"]["before_drawing_save"]["dirty"] == "dirty"
+    assert len(snapshots_taken) == 4
+    assert row["recipe_elapsed_seconds"] == pytest.approx(
+        row["recipe_seconds"] + row["recipe_excluded_source_snapshot_seconds"]
+    )
+    assert row["recipe_excluded_source_snapshot_seconds"] == pytest.approx(
+        row["source_snapshot_seconds"]["initial"]
+        + row["source_snapshot_seconds"]["before_drawing_save"]
+    )
+    if output_change == "presentation":
+        assert row["source_output_sha256"] != row["source_sha256"]
+        assert row["source_presentation_changes"]["cold_reopened"]
+        assert source.read_bytes() == b"saved reference presentation"

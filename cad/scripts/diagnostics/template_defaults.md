@@ -51,13 +51,14 @@ are unique; recipe output declarations and aliases are rewritten before recipe
 evaluation. This is a bounded adapter for the two trusted direct recipes, not a
 sandbox for arbitrary Python recipes.
 
-Each ABBA block now uses one uniquely named byte-copy of its original part in a
-registered diagnostic source directory. The reviewed shared loader redirects
-`SOURCE` before aliases and function defaults bind. All four trials use that same
-copy path and exact initial disk bytes. The original and project template retain
-protected SOURCE ownership; the copy is ordinary COPY ownership, never registered
-as SOURCE. Its disk hash is nevertheless immutable: an implicit reference save,
-trial write or between-trial change fails, with no automatic reset or retry.
+Each arm now starts from a fresh exact byte-copy of the original part in its own
+registered source directory. All four copies share one block-unique basename,
+but have different absolute paths. The reviewed shared loader redirects `SOURCE`
+before aliases and function defaults bind. The original and project template
+retain protected SOURCE ownership; each copy is ordinary COPY ownership, never
+registered as SOURCE. A recipe's saved part is retained as that arm's output,
+never overwritten or reset for another arm. Its output hash is pinned after the
+recipe and must stay unchanged through read-only validation and cleanup.
 
 The owned-copy first-dirty control at `99eadbe7` localized the initial dirty flag
 to the `set_dimension_callouts` operation group: observed source BoreDia display
@@ -67,15 +68,25 @@ from rebuild, characterize later writes, or establish full source equivalence.
 Accordingly, benchmark source path/kind/configuration/native identity and dirty
 state are recorded at recipe-open, before/after save and after persisted checks.
 Every model view must reference the exact copied source and configuration.
+The small `_source_dimension_snapshot.py` reader is extracted from that proven
+control. Initial, pre-save, post-recipe and cold-reopened observations retain all
+observed feature/display dimensions, not just the five required arbor dimensions.
+Configuration, feature/name inventory, native values, tolerance type/limits and
+BASIC designation stay exact. Native dimension handles must remain identical
+within the same open part; closed wrappers are never compared. Display inventory,
+type and marking remain exact; text and precision deltas are retained explicitly.
+The initial snapshot itself must not dirty the fresh source. This is an observed
+dimension/attachment witness, not a claim of full BREP/source equivalence.
 
 Persisted validation closes **both** drawing and owned source without saving,
-checks the copy's disk SHA, discards the old COM handle, and reopens the drawing
+checks the saved copy's disk SHA, discards the old COM handles, and reopens the drawing
 with a fresh native source instance. It then repeats the unchanged values,
 tolerances, text, attachments, defaults and layout comparisons. A lost THRU callout,
 BASIC designation or precision after cold reopen fails; keeping a dirty source
 open is not a persistence witness. Both owned documents close after every trial.
-The native run of this immutable-copy variant is recorded below; do not repeat
-the blocked shape or change its retained copy to satisfy the hash check.
+The previous immutable-copy failure is recorded below; do not repeat that blocked
+shape or change its retained copy to satisfy the hash check. The fresh-per-arm
+replacement is offline-tested only until a separately reviewed native run.
 
 ## Evidence and timing boundaries
 
@@ -89,14 +100,20 @@ configuration, adapter, template resources and every diagnostic Python module.
 
 Timing fields are intentionally separate:
 
-- `owned_sources[target].seconds`: one-time byte copying and initial hash checks.
+- `owned_sources[trial-directory].seconds`: per-arm byte copying and initial hash checks.
 - `template_preparations[].seconds`: one-time setup, DRWDOT save, inherited-default
   verification and its scoped cleanup. Do not exclude this cost when estimating
   first-use performance.
 - `trials[].setup_seconds`: the inner setup helper only. Ownership inventory
   guards sit outside this timer.
-- `trials[].recipe_seconds`: complete recipe body, including its ownership guards,
-  source-state/hash guards, current final validation, native save and PDF/PNG export.
+- `trials[].recipe_elapsed_seconds`: complete recipe wall time, including inserted
+  initial and pre-save source snapshots. `recipe_seconds` subtracts only those
+  explicitly measured snapshots (`recipe_excluded_source_snapshot_seconds`);
+  ownership, path/configuration/hash guards, recipe validation and native/PDF/PNG
+  finalization remain included. The recipe telemetry span retains inclusive time.
+- `trials[].source_snapshot_seconds`: raw per-phase source-witness durations.
+  The post-recipe source snapshot is outside recipe wall time; cold-reopened
+  source capture is part of the separate validation timer.
 - `trials[].validation_seconds`: additional diagnostic cold-source saved/reopened comparison,
   outside the recipe timer. Per-trial final cleanup is also outside that timer.
 
@@ -105,7 +122,11 @@ attachment geometry, dimension values/tolerances, layout and measured content.
 Cross-arm comparisons use a multiplicity-preserving semantic inventory rather
 than regenerated DetailItem labels. Datum-to-dimension label removal requires an
 independent exact target-dimension witness. Raw observations remain in the
-report. Sheet note text/link text/extents/format and every view's display-quality
+report. Only an exact witnessed arm source path and model-dimension owner suffix
+map to `original-sha256:<pinned-input-hash>` across arms. A different owner fails;
+other names/text/geometry are not stripped. Initial and cold-reopened source
+snapshots are also compared across arms, including their presentation output.
+Sheet note text/link text/extents/format and every view's display-quality
 readbacks are included, even for views with no annotations. Unsupported geometry
 exclusions stay explicit; the diagnostic does not claim to prove excluded
 attachments. Native extents are not assumed to translate rigidly or be harmless
@@ -115,7 +136,7 @@ One ABBA block supports only its observed paired timing differences. It does not
 establish a fleet speedup, a conflict probability below 5%, or visual equivalence
 of every export. The retained PDFs/PNGs still need a human eye pass.
 
-## Owned-copy native result and the next design decision
+## Historical immutable-copy native result
 
 The reviewed arbor-only run at `ab264db8` (parent session 84016, existing PID
 37136, AUTOSTART=0, remote cache off) stopped on its first baseline. Retained
@@ -149,7 +170,9 @@ output; never reset it. Compare observed source native dimension identities,
 values/tolerances/BASIC before/after in the same open document, preserve explicit
 presentation deltas, and require cold source-plus-drawing semantic readback.
 Across arms, map only the independently verified source path/owner to its pinned
-original digest. This proposal is not implemented or native-validated.
+original digest. That fresh-per-arm replacement is now implemented as described
+above; it has not yet passed a native block. The failed immutable-copy run and
+its outputs remain unchanged.
 
 Pre-authoring THRU/precision once on a copied part is a different starting recipe
 condition. It also needs a positive control showing that repeated setters do not
