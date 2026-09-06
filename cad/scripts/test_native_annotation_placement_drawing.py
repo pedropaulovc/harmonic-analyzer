@@ -58,6 +58,9 @@ def native_context(monkeypatch):
         lambda obj, *_args: obj,
     )
     monkeypatch.setattr(drawing, "view_name", lambda *_args: "Front")
+    # Selection projection has its own geometry/context tests below; these
+    # insertion tests isolate annotation value and attachment validation.
+    monkeypatch.setattr(drawing, "_project_native_gtol_selection", Mock())
     return adapter, view, entity, annotation
 
 
@@ -105,6 +108,12 @@ def test_native_placement_keeps_created_position_and_validates_attachment(
     adapter.swApp.IsSame.assert_called_once_with(entity, entity)
     adapter.currentModel.Extension.SelectByID2.assert_not_called()
     adapter.currentModel.SelectionManager.SetSelectionPoint2.assert_not_called()
+    if kind == "frame":
+        drawing._project_native_gtol_selection.assert_called_once_with(
+            adapter, view, entity, entity_type="EDGE", label="bore"
+        )
+    else:
+        drawing._project_native_gtol_selection.assert_not_called()
 
 
 def test_native_surface_finish_uses_documented_location_ignored_no_leader_mode(
@@ -176,6 +185,7 @@ def test_explicit_placement_remains_available_for_unmigrated_recipes(
     adapter, view, entity, annotation = native_context(monkeypatch)
     insert(kind, adapter, view, entity, **{keyword: (0.12, 0.18)})
     annotation.SetPosition2.assert_called_once_with(0.12, 0.18, 0.0)
+    drawing._project_native_gtol_selection.assert_not_called()
     if kind == "surface":
         assert (
             adapter.currentModel.Extension.InsertSurfaceFinishSymbol3.call_args.args[1]
