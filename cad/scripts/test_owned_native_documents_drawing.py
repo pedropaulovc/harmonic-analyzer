@@ -574,3 +574,23 @@ def test_failed_explicit_native_open_claims_only_requested_source_for_cleanup(na
             raise RuntimeError("native result error")
     asyncio.run(adapter.close_owned_documents())
     assert native.app.closes == [model]
+
+
+def test_finalization_rejects_same_bytes_replacement_after_frozen_nested_reuse(native):
+    async def callback(adapter):
+        adapter.ownership.register_directory(native.directory)
+        await adapter.open_model(str(native.copy))
+        await adapter.close_model()
+        adapter.ownership.freeze_owned_input(native.copy)
+        adapter.ownership.register_source(native.copy)
+        substitute = native.directory / "same-bytes.SLDDRW"
+        substitute.write_bytes(native.copy.read_bytes())
+        substitute.replace(native.copy)
+
+    with pytest.raises(RuntimeError, match="source files changed"):
+        asyncio.run(owned.owned_callback(native.adapter, callback))
+    report = json.loads((native.directory / "ownership.json").read_text())
+    frozen = report["source_hashes"][str(native.copy)]
+    assert frozen["before"] == frozen["after"]
+    assert not frozen["file_identity_unchanged"]
+    assert not frozen["unchanged"]

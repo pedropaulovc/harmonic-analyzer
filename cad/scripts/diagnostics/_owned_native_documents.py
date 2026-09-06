@@ -617,6 +617,15 @@ class DiagnosticDocuments:
                     "after": after,
                     "unchanged": before == after,
                 }
+                if path in self.frozen_inputs:
+                    identity = _file_identity(path)
+                    expected = self.frozen_inputs[path]["file_identity"]
+                    hashes[str(path)].update(
+                        file_identity_before=expected,
+                        file_identity_after=identity,
+                        file_identity_unchanged=identity == expected,
+                        unchanged=before == after and identity == expected,
+                    )
             except OSError as error:
                 hashes[str(path)] = {
                     "before": before,
