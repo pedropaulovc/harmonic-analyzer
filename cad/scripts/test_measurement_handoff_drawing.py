@@ -35,7 +35,10 @@ def context(monkeypatch):
     )
     fresh = Mock(return_value=object())
     handoff = handoff_module.AnnotationMeasurementHandoff(
-        adapter, views={"front": view}, measure_annotation=fresh
+        adapter,
+        views={"front": view},
+        measure_annotation=fresh,
+        purpose=handoff_module.HandoffPurpose.INITIAL_PACKING,
     )
     return handoff, adapter, view, annotation, measured, fresh
 
@@ -156,7 +159,10 @@ def test_same_annotation_name_in_distinct_views_never_aliases(monkeypatch):
     other_annotation.GetType.return_value = 5
     other_annotation.GetPosition.return_value = annotation.GetPosition()
     handoff = handoff_module.AnnotationMeasurementHandoff(
-        adapter, views={"front": view, "right": other_view}, measure_annotation=fresh
+        adapter,
+        views={"front": view, "right": other_view},
+        measure_annotation=fresh,
+        purpose=handoff_module.HandoffPurpose.INITIAL_PACKING,
     )
     other_measurement = SimpleNamespace(**vars(measured))
     handoff.record(view, annotation, measured)
@@ -198,7 +204,10 @@ def test_complete_gtol_handoff_saves_initial_reads_but_never_final_reads(monkeyp
         return measured
 
     handoff = handoff_module.AnnotationMeasurementHandoff(
-        adapter, views={"front": view}, measure_annotation=fresh
+        adapter,
+        views={"front": view},
+        measure_annotation=fresh,
+        purpose=handoff_module.HandoffPurpose.INITIAL_PACKING,
     )
     gtol.arrange_native_gtol_columns(
         adapter,
@@ -264,11 +273,14 @@ def test_gtol_failed_final_guard_never_hands_off_a_new_body_baseline(monkeypatch
 
 def test_obstacle_actual_measurement_is_handed_off_after_commands(monkeypatch):
     adapter, view, rows, measure = native_context(monkeypatch, count=2)
-    obstacle, output = Mock(), SimpleNamespace(
-        kind=4,
-        body=Rect(0.1, 0.01, 0.15, 0.05),
-        text_boxes=(),
-        text_runs=(),
+    obstacle, output = (
+        Mock(),
+        SimpleNamespace(
+            kind=4,
+            body=Rect(0.1, 0.01, 0.15, 0.05),
+            text_boxes=(),
+            text_runs=(),
+        ),
     )
     view.GetAnnotationsByType.side_effect = lambda kind: (
         rows if kind == 5 else (obstacle,) if kind == 4 else ()

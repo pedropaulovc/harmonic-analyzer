@@ -1,6 +1,6 @@
-"""One-transaction handoff of actual measurements into initial sheet packing.
+"""One-consumer handoff of actual fixed-obstacle or initial packing measurements.
 
-Only view-owned annotations freshly measured by the GTol phase are recorded.
+Only view-owned annotations freshly measured by the preceding phase are recorded.
 The handoff never measures on record, never serves a GTol witness, and expires
 after the initial packing snapshot. Final packing must use the independent
 fresh measurement callback, even when the initial plan requires no movement.
@@ -24,6 +24,11 @@ class _Phase(Enum):
     SEALED = "sealed"
     CONSUMING = "consuming"
     CLOSED = "closed"
+
+
+class HandoffPurpose(Enum):
+    GTOL_OBSTACLES = "gtol_obstacles_only"
+    INITIAL_PACKING = "initial_packing_only"
 
 
 @dataclass(frozen=True)
@@ -62,8 +67,16 @@ class AnnotationMeasurementHandoff:
     """
 
     def __init__(
-        self, adapter: Any, *, views: Mapping[str, Any], measure_annotation: Callable
+        self,
+        adapter: Any,
+        *,
+        views: Mapping[str, Any],
+        measure_annotation: Callable,
+        purpose: HandoffPurpose,
     ):
+        if not isinstance(purpose, HandoffPurpose):
+            raise ValueError("measurement handoff requires an explicit purpose enum")
+        self._purpose = purpose
         self._adapter = adapter
         self._model = adapter.currentModel
         self._drawing = _early_bound(self._model, "IDrawingDoc")
@@ -109,7 +122,12 @@ class AnnotationMeasurementHandoff:
         if int(annotation.OwnerType) != 0 or not self._same(owner, view):
             raise RuntimeError("measurement handoff requires exact drawing-view owner")
         key = (name, str(annotation.GetName()), int(annotation.GetType()))
-        if key[2] not in {2, 4, 5, 7} or key[1:] != (measured.name, measured.kind):
+        permitted = (
+            {2, 4, 7}
+            if self._purpose is HandoffPurpose.GTOL_OBSTACLES
+            else {2, 4, 5, 7}
+        )
+        if key[2] not in permitted or key[1:] != (measured.name, measured.kind):
             raise RuntimeError("measurement handoff annotation measurement mismatch")
         position = _values(annotation.GetPosition(), 3, "annotation position")
         if position[:2] != tuple(measured.anchor):
@@ -129,7 +147,7 @@ class AnnotationMeasurementHandoff:
 
     def initial_measure(self, adapter, annotation):
         if self._phase not in {_Phase.SEALED, _Phase.CONSUMING}:
-            raise RuntimeError("measurement handoff is not ready for initial packing")
+            raise RuntimeError("measurement handoff is not ready for its consumer")
         if adapter is not self._adapter:
             raise RuntimeError("measurement handoff adapter changed")
         if self._phase is _Phase.SEALED:
@@ -170,6 +188,6 @@ class AnnotationMeasurementHandoff:
             recorded_count=self._recorded,
             reused_count=self._reused,
             fresh_initial_count=self._fresh,
-            scope="initial_packing_only",
+            scope=self._purpose.value,
             final_witness="fresh_native_measurement",
         )

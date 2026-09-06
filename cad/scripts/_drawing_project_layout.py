@@ -37,7 +37,10 @@ def repair_project_drawing_layout(
     from _drawing_leader_clearance import validate_gtol_leader_clearance
     from _drawing_native_callouts import GtolPlacement, arrange_native_callouts
     from _drawing_native_gtol import arrange_native_gtol_columns
-    from _drawing_measurement_handoff import AnnotationMeasurementHandoff
+    from _drawing_measurement_handoff import (
+        AnnotationMeasurementHandoff,
+        HandoffPurpose,
+    )
     from _drawing_native_layout import NativeLayoutStatus, repair_native_layout
     from _drawing_view_packing import Rect
     from dataclasses import asdict
@@ -62,20 +65,32 @@ def repair_project_drawing_layout(
         _TITLE_BLOCK_LEFT_M, 0.0, float(properties[5]), _TITLE_BLOCK_TOP_M
     )
     handoff = AnnotationMeasurementHandoff(
-        adapter, views=views, measure_annotation=annotation_box
+        adapter,
+        views=views,
+        measure_annotation=annotation_box,
+        purpose=HandoffPurpose.INITIAL_PACKING,
+    )
+    obstacle_handoff = AnnotationMeasurementHandoff(
+        adapter,
+        views=views,
+        measure_annotation=annotation_box,
+        purpose=HandoffPurpose.GTOL_OBSTACLES,
     )
     try:
         arrange_native_callouts(
             adapter,
             views=views,
             measure_annotation=annotation_box,
+            record_measurement=obstacle_handoff.record,
             gtol_placement=GtolPlacement.ARRANGED_NEXT,
             deferred_notes=tuple(note.annotation for note in notes),
         )
+        obstacle_handoff.seal()
         arrange_native_gtol_columns(
             adapter,
             views=views,
             measure_annotation=annotation_box,
+            measure_obstacle=obstacle_handoff.initial_measure,
             record_measurement=handoff.record,
         )
         handoff.seal()
@@ -95,6 +110,7 @@ def repair_project_drawing_layout(
             final_annotation_validation=validate_final_annotations,
         )
     finally:
+        obstacle_handoff.close()
         handoff.close()
     _telemetry.info(
         "native sheet layout measured",

@@ -130,6 +130,7 @@ class _Symbol:
     properties: tuple[Any, ...]
     text: tuple[Any, ...]
     format: tuple[Any, ...]
+    measurement: Any
     frame: Rect | None = None
     placement: SymbolPlacement = SymbolPlacement.MOVABLE
     attached_dimension: _Dimension | None = None
@@ -149,6 +150,7 @@ class _Obstacle:
     null_specific: Any | None
     native_strokes: tuple[Any, ...]
     dimension: _Dimension | None
+    measurement: Any
 
 
 @dataclass(frozen=True)
@@ -336,6 +338,7 @@ def _read_symbol(
         properties,
         ink if kind == 2 else (specific_text, ink),
         tuple(measured.format_signature),
+        measured,
         _datum_frame(measured, position, placement) if kind == 2 else None,
         placement,
         attached_dimension,
@@ -528,6 +531,7 @@ def _read_obstacles(
             specific,
             strokes,
             dimension,
+            measured,
         )
     return result
 
@@ -871,6 +875,7 @@ def arrange_native_callouts(
     *,
     views: Mapping[str, Any],
     measure_annotation: Callable | None = None,
+    record_measurement: Callable | None = None,
     planning_gap_m: float = 0.003,
     gap_m: float = 0.002,
     gtol_placement: GtolPlacement = GtolPlacement.FIXED,
@@ -887,6 +892,8 @@ def arrange_native_callouts(
     subsequent whole-sheet packing, whose final measurement includes every note.
     Deferred annotations retain inventory/identity/type/visibility witnesses but
     do not contribute temporary obstacle glyph measurements.
+    The optional recorder receives only actual final kind2/4/7 measurements,
+    after ALL per-view checks pass, for the following fixed-obstacle stage.
     """
     if (
         not all(math.isfinite(v) and v >= 0 for v in (planning_gap_m, gap_m))
@@ -1014,6 +1021,12 @@ def arrange_native_callouts(
                     raise RuntimeError(
                         f"{name}: final native callout body clearance is insufficient"
                     )
+        if record_measurement is not None:
+            for row in after.values():
+                record_measurement(view, row.annotation, row.measurement)
+            for row in final_obstacles.values():
+                if row.kind == 4:
+                    record_measurement(view, row.annotation, row.measurement)
         report[label] = {
             "count": len(after),
             "planning_gap_m": planning_gap_m,
