@@ -47,6 +47,7 @@ from _common import (
 )
 
 import _telemetry
+from _basic_dimensions import author_basic_dimensions
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -55,6 +56,7 @@ from _drawing_marks import (
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from pen_v_block_spec import (
+    SOURCE_BASIC_DIMENSIONS,
     BLOCK_DEPTH,
     BLOCK_HEIGHT,
     BLOCK_LENGTH,
@@ -269,6 +271,7 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    author_basic_dimensions(adapter, SOURCE_BASIC_DIMENSIONS)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
 
     # Bright brass in every photo (ch24 p.60/61, v4_t00603..t00645): no colour

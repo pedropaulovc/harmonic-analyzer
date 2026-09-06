@@ -60,9 +60,11 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
 )
+from _basic_dimensions import author_basic_dimensions
 from _fit_limits import deviations
 from _part_pmi import author_part_pmi
 from arbor_pedestal_spec import (
+    SOURCE_BASIC_DIMENSIONS,
     BORE_DIA,
     BORE_DIA_BAND,
     BORE_HEIGHT,
@@ -309,6 +311,7 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    author_basic_dimensions(adapter, SOURCE_BASIC_DIMENSIONS)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,

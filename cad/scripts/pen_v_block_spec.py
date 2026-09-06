@@ -80,6 +80,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ScrewHoleProfile": {"ScrewHoleCx", "ScrewHoleCz", "ScrewHoleDiaDim"},
 }
 
+# Position-controlled bore stations: save BASIC on these source dimensions so
+# imported drawing boxes survive closing/reopening both native documents.
+SOURCE_BASIC_DIMENSIONS: dict[str, set[str]] = {
+    "BoreProfile": {"Bore0X", "Bore1X"},
+}
+
 # True free-text instructions only.  Geometry, datum structure, form/orientation,
 # and roughness live in native dimensions / datum tags / FCFs / surface symbols.
 # The part build stamps these strings into the SLDPRT; the drawing displays only

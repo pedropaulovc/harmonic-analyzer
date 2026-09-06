@@ -60,6 +60,7 @@ from _common import (
     volume_check,
 )
 from _holes import NUMBER_DRILL_MM, HoleSpec, wizard_holes
+from _basic_dimensions import author_basic_dimensions
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -67,6 +68,7 @@ from _drawing_marks import (
 )
 from _saved_part_guard import require_saved_drawing_properties
 from channel_lever_spec import (
+    SOURCE_BASIC_DIMENSIONS,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     ISOMETRIC_VIEW_NOTE,
@@ -359,6 +361,7 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    author_basic_dimensions(adapter, SOURCE_BASIC_DIMENSIONS)
     apply_drawing_properties(
         adapter,
         PART_NAME,
