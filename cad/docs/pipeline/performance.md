@@ -85,6 +85,16 @@ task-edge and target snapshots were byte-identical (SHA-256
 `24a2050d818acb6ee345fe3251fb839950b899bea45b5122b939a57653e1d904`).
 These are local startup observations, not elapsed full-build measurements.
 
+### Drawing dependency scope
+
+`_drawing_project_layout.py` is imported directly by the seven semantic pilots,
+not through `_drawing_common.py`. An exact closure comparison over all 92 drawing
+recipes found that the other 85 drop only the five native layout, GTol, bounds,
+packing and measurement-handoff helpers. The seven pilots retain every previous
+dependency and add the new wrapper. No runtime behavior changed. Regression tests
+pin both directions, so an edit to experimental layout code no longer invalidates
+the unmigrated fleet through an unused shared-helper import.
+
 ## Drawing attachments
 
 Model geometry owns attachment identity. Let SolidWorks choose annotation layout
@@ -202,6 +212,14 @@ lever, pen v-block and marker build bodies took 40.498, 36.595 and 16.274 second
 in the same five-pilot run; pedestal and rocker failed their final fit checks and
 did not publish new drawing outputs. The gear's earlier recipe-only speedup must
 not be presented as including this added measurement work.
+
+The first live transaction-local handoff at `465835d0` reused 21 measured
+annotations for initial packing, freshly measured five others, and retained a
+fresh complete final readback. Initial packing measurement took 4.487 seconds;
+the final readback took 7.260 seconds. The build body took 44.695 seconds, versus
+50.376 seconds in the preceding successful non-handoff pilot. These are successive
+observations under changing seat load, not a controlled net-speedup estimate.
+The handoff cannot survive the transaction or supply the final measurement.
 
 The current bounds implementation is calibrated for SolidWorks 2026 (major
 revision 34) and the tested native font profile. It uses conservative GDI text
