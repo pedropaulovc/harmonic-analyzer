@@ -113,6 +113,8 @@ def capture(annotation: Any) -> dict[str, Any]:
         result["note_extent"] = tuple(
             _early_bound(annotation.GetSpecificAnnotation(), "INote").GetExtent()
         )
+    if result["kind"] == 5:
+        result["leader_all_around"] = annotation.GetLeaderAllAround()
     return result
 
 
