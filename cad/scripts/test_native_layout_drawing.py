@@ -103,6 +103,13 @@ class View:
         if self.movement == "accept":
             self.shift(value[0] - self.Position[0], value[1] - self.Position[1])
 
+    def SetViewPosition(self, value, move_children):
+        assert move_children is True
+        if self.movement == "reject":
+            return False
+        self.Position = value
+        return True
+
 
 def measure(_adapter, annotation):
     if annotation.kind == 17:
@@ -127,6 +134,7 @@ def measure(_adapter, annotation):
 
 def scene(monkeypatch, views, sheet_annotations=()):
     monkeypatch.setattr(native, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(native, "double_array", tuple)
     sheet_view = View("sheet", Rect(0, 0, 10, 10))
     sheet_view.annotations = list(sheet_annotations)
     events = []
@@ -178,7 +186,9 @@ def test_hidden_sheet_symbol_has_no_footprint_but_remains_in_manifest(monkeypatc
 
 
 @pytest.mark.parametrize("visibility", [0, 1, 2])
-def test_unknown_visible_and_half_hidden_symbols_are_not_silently_excluded(monkeypatch, visibility):
+def test_unknown_visible_and_half_hidden_symbols_are_not_silently_excluded(
+    monkeypatch, visibility
+):
     front = View("front", Rect(1, 2, 3, 4))
     annotation = Annotation("sf", Rect(-1, -1, 1, 1), kind=7)
     annotation.Visible = visibility
@@ -209,7 +219,9 @@ def test_declared_layout_note_must_not_be_hidden(monkeypatch):
     note.Visible = 3
     adapter, options, _ = scene(monkeypatch, {"front": front}, [note])
     with pytest.raises(ValueError, match="declared layout note is hidden"):
-        native.repair_native_layout(adapter, **options, notes=(native.LayoutNote("notes", note),))
+        native.repair_native_layout(
+            adapter, **options, notes=(native.LayoutNote("notes", note),)
+        )
 
 
 def test_parent_propagation_does_not_apply_child_translation_twice(monkeypatch):
@@ -410,11 +422,15 @@ def test_post_rebuild_changes_are_rejected(monkeypatch, change):
         native.repair_native_layout(adapter, **options)
 
 
-def test_true_but_clamped_view_position_is_rejected(monkeypatch):
+@pytest.mark.parametrize("movement", ["reject", "clamp"])
+def test_rejected_or_clamped_view_position_fails(monkeypatch, movement):
     front = View("front", Rect(-1, 2, 1, 4))
-    front.movement = "clamp"
+    front.movement = movement
     adapter, options, _events = scene(monkeypatch, {"front": front})
-    with pytest.raises(RuntimeError, match="did not reach absolute layout target"):
+    with pytest.raises(
+        RuntimeError,
+        match="rejected layout target|did not reach absolute layout target",
+    ):
         native.repair_native_layout(adapter, **options)
 
 
