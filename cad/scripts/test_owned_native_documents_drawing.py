@@ -109,6 +109,18 @@ def test_unrelated_dirty_unsaved_document_survives_open_and_last_trial_cleanup(n
     assert native.app.documents == [user]
     assert native.app.closes == [copy]
     assert user.dirty and user.Visible and user.path == ""
+    adapter.ownership.checkpoint()
+    evidence = json.loads((native.directory / "ownership.json").read_text())
+    expected = {
+        "path": "",
+        "title": "User drawing",
+        "kind": 3,
+        "dirty": "dirty",
+        "visible": "visible",
+    }
+    assert evidence["baseline_initial"] == [expected]
+    assert evidence["final_inventory"] == [expected]
+    assert evidence["baseline_preservation"] == {"status": "preserved"}
 
 
 def test_initial_hidden_document_is_rejected_without_native_mutation(native):
@@ -256,6 +268,84 @@ def test_save_as_cannot_authorize_borrowed_source_or_external_destination(native
             pytest.fail("external output must not enter a write scope")
 
 
+def test_wrong_active_document_rejects_save_even_with_unchanged_current_pointer(native):
+    user = Model(None, title="Unrelated active", dirty=True)
+    native.app.documents.append(user)
+    adapter = facade(native)
+    asyncio.run(adapter.open_model(str(native.copy)))
+    native.app.ActiveDoc = user
+    with pytest.raises(RuntimeError, match="active"):
+        with adapter.ownership.saving_as(native.directory / "observed.SLDDRW"):
+            pytest.fail("SaveAs must not run against the user's active document")
+    assert user.dirty and not native.app.closes
+
+
+@pytest.mark.parametrize("first", ["source", "directory"])
+def test_source_and_output_registration_cannot_overlap_in_either_order(native, first):
+    adapter = owned.DiagnosticAdapter(native.adapter)
+    with pytest.raises(RuntimeError, match="source|overlap"):
+        if first == "source":
+            adapter.ownership.register_source(native.copy)
+            adapter.ownership.register_directory(native.directory)
+        if first == "directory":
+            adapter.ownership.register_directory(native.directory)
+            adapter.ownership.register_source(native.copy)
+
+
+def test_new_visible_implicit_reference_is_cleaned_up_without_touching_baseline(native):
+    user = Model(None, title="Unrelated baseline", dirty=True)
+    native.app.documents.append(user)
+    adapter = facade(native)
+    asyncio.run(adapter.open_model(str(native.copy)))
+    target = adapter.currentModel
+    reference = Model(native.source, kind=1, visible=True)
+    native.app.documents.append(reference)
+    target.references.append(reference)
+    adapter.ownership._add_references(target)
+    asyncio.run(adapter.close_owned_documents())
+    assert native.app.documents == [user]
+    assert native.app.closes == [target, reference]
+
+
+def test_delegate_part_creation_requires_scope_before_native_operation(native):
+    calls = []
+
+    async def create_part(*args, **kwargs):
+        calls.append((args, kwargs))
+        model = Model(None, kind=1)
+        native.app.documents.append(model)
+        native.app.ActiveDoc = native.adapter.currentModel = model
+        return SimpleNamespace(is_success=True, data=None)
+
+    native.adapter.create_part = create_part
+    adapter = facade(native)
+    with pytest.raises(RuntimeError, match="creation scope"):
+        asyncio.run(adapter.create_part("new part", units="mm"))
+    assert not calls
+
+
+def test_delegate_part_creation_claims_raw_current_assignment_in_explicit_scope(native):
+    calls = []
+
+    async def create_part(*args, **kwargs):
+        calls.append((args, kwargs))
+        model = Model(None, kind=1)
+        native.app.documents.append(model)
+        native.app.ActiveDoc = native.adapter.currentModel = model
+        return SimpleNamespace(is_success=True, data=None)
+
+    native.adapter.create_part = create_part
+    adapter = facade(native)
+    with adapter.ownership.creating_document(
+        owned.DocumentKind.PART, native.directory / "part.SLDPRT"
+    ):
+        asyncio.run(adapter.create_part("new part", units="mm"))
+    model = adapter.currentModel
+    asyncio.run(adapter.close_owned_documents())
+    assert calls == [(("new part",), {"units": "mm"})]
+    assert native.app.closes == [model]
+
+
 def test_creation_scope_claims_one_exact_new_native_document(native):
     adapter = facade(native)
     with adapter.ownership.creating_document(owned.DocumentKind.DRAWING, native.copy):
@@ -328,6 +418,9 @@ def test_successful_save_scope_requires_native_path_readback(native):
 
 
 def test_failure_preserves_source_hash_and_cleanup_evidence(native):
+    user = Model(None, title="Preserved user's dirty drawing", dirty=True)
+    native.app.documents.append(user)
+
     async def callback(adapter):
         adapter.ownership.register_directory(native.directory)
         adapter.ownership.register_source(native.source)
@@ -344,7 +437,27 @@ def test_failure_preserves_source_hash_and_cleanup_evidence(native):
     evidence = json.loads((native.directory / "ownership.json").read_text())
     assert evidence["source_hashes"][str(native.source)]["unchanged"] is False
     assert evidence["cleanup_error"]
+    assert "Unexpected hidden" in evidence["cleanup_error"]
+    assert evidence["baseline_initial"][0]["title"] == user.title
+    assert evidence["baseline_preservation"] == {"status": "preserved"}
+    assert {row["title"] for row in evidence["final_inventory"]} == {
+        user.title,
+        native.copy.name,
+        "Unexpected hidden",
+    }
     assert not native.app.closes
+
+
+def test_changed_baseline_is_reported_without_rewriting_initial_evidence(native):
+    user = Model(None, title="Immutable initial title")
+    native.app.documents.append(user)
+    adapter = facade(native)
+    user.dirty = True
+    adapter.ownership.checkpoint()
+    evidence = json.loads((native.directory / "ownership.json").read_text())
+    assert evidence["baseline_initial"][0]["dirty"] == "clean"
+    assert evidence["final_inventory"][0]["dirty"] == "dirty"
+    assert evidence["baseline_preservation"] == {"status": "changed"}
 
 
 def test_callback_finalizer_closes_last_trial_document(native):
