@@ -367,3 +367,26 @@ def test_prepared_poses_cannot_be_applied_after_switching_documents(pose_bank):
     with pytest.raises(RuntimeError, match="document changed"):
         prepared.apply()
     assert pose_bank.writes == []
+
+
+def test_prepared_pose_groups_reset_only_the_requested_components(pose_bank):
+    prepared = _cwm.prepare_component_poses(
+        pose_bank.adapter,
+        [("rocker-1", _pose_at(0.01)), ("rod-1", _pose_at(0.02))],
+    )
+    rocker, rod = prepared.groups(1)
+    rocker.apply()
+    rocker.apply()
+    assert [name for name, _ in pose_bank.writes] == ["rocker-1", "rocker-1"]
+    rod.apply()
+    assert [name for name, _ in pose_bank.writes] == ["rocker-1", "rocker-1", "rod-1"]
+    assert pose_bank.lookups == ["rocker-1", "rod-1"]
+    assert len(pose_bank.transforms) == 2
+
+
+def test_prepared_pose_groups_reject_an_incomplete_component_slice(pose_bank):
+    prepared = _cwm.prepare_component_poses(
+        pose_bank.adapter, [("rocker-1", _pose_at(0.01))]
+    )
+    with pytest.raises(ValueError, match="complete groups"):
+        prepared.groups(4)
