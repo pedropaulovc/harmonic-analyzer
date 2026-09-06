@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 import sys
-from typing import Any
+from typing import Any, Mapping
 
 from cone_pivot_screw_spec import GEOMETRIC_TOLERANCES_MM
 
@@ -18,6 +18,7 @@ from _drawing_common import (
     auto_arrange_view_dimensions,
     curate_view_dimensions,
     import_cosmetic_threads,
+    repair_project_drawing_layout,
     set_hidden_lines_removed,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -71,7 +72,7 @@ ENTITY_ROLES = {
 }
 
 
-def _decorate(adapter: Any, side: Any, end: Any, _iso: Any) -> None:
+def _decorate(adapter: Any, side: Any, end: Any, _iso: Any) -> dict[str, Any]:
     """Add the native GD&T and finish controls required by the shoulder joint."""
     right = place_view(adapter, str(SOURCE), "*Right", 0.285, 0.170, scale=SHEET_SCALE)
     set_hidden_lines_removed(adapter, right)
@@ -153,6 +154,23 @@ def _decorate(adapter: Any, side: Any, end: Any, _iso: Any) -> None:
         label="ground shoulder finish",
     )
     auto_arrange_view_dimensions(adapter, (side, end, right))
+    return {"right": right}
+
+
+def _layout(adapter: Any, views: Mapping[str, Any], notes: Mapping[str, Any]) -> None:
+    from _drawing_native_layout import AxisLink, LayoutNote
+    from _drawing_view_packing import Axis, AxisOrder
+
+    repair_project_drawing_layout(
+        adapter,
+        views=views,
+        alignments=(AxisLink(Axis.Y, "side", "right"),),
+        orderings=(AxisOrder(Axis.X, "side", "right"),),
+        notes=(
+            LayoutNote("manufacturing", notes["manufacturing"].GetAnnotation()),
+            LayoutNote("end-caption", notes["end-caption"].GetAnnotation(), "end"),
+        ),
+    )
 
 
 RECIPE = FastenerSheet(
@@ -174,6 +192,7 @@ RECIPE = FastenerSheet(
     end_note_xy=(0.020, 0.245),
     side_centerline_face=FeatureFace("Shoulder", CylinderFace(SHOULDER_DIA)),
     decorate=_decorate,
+    layout=_layout,
 )
 
 

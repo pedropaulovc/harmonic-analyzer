@@ -27,12 +27,19 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    repair_project_drawing_layout,
     set_dimension_precision,
     set_hidden_lines_removed,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _drawing_entities import CircleEdge, EdgeAdjacentFace, FaceBoundary, FeatureFace, ModelEntities
+from _drawing_entities import (
+    CircleEdge,
+    EdgeAdjacentFace,
+    FaceBoundary,
+    FeatureFace,
+    ModelEntities,
+)
 from _gtol_spec import CylinderFace, PlanarFace
 from _surface_finish import surface_finish_by_key
 from cone_gear_spec import BORE_DIA, FACE_WIDTH, OUTSIDE_DIA, SURFACE_FINISHES
@@ -160,9 +167,24 @@ async def build(adapter: Any) -> dict[str, str]:
         entity=bore_edge,
     )
 
-    add_property_linked_note(adapter, "Gear Data", 0.018, 0.262)
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.018, 0.095)
+    gear_data = add_property_linked_note(adapter, "Gear Data", 0.018, 0.262)
+    manufacturing = add_property_linked_note(
+        adapter, "Manufacturing Notes", 0.018, 0.095
+    )
     auto_arrange_view_dimensions(adapter, (front, right, iso))
+    from _drawing_native_layout import AxisLink, LayoutNote
+    from _drawing_view_packing import Axis, AxisOrder
+
+    repair_project_drawing_layout(
+        adapter,
+        views={"front": front, "right": right, "iso": iso},
+        alignments=(AxisLink(Axis.Y, "front", "right"),),
+        orderings=(AxisOrder(Axis.X, "front", "right"),),
+        notes=(
+            LayoutNote("gear-data", gear_data.GetAnnotation()),
+            LayoutNote("manufacturing", manufacturing.GetAnnotation()),
+        ),
+    )
     return await finalize_drawing(
         adapter,
         OUTPUTS,

@@ -31,6 +31,7 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    repair_project_drawing_layout,
     set_hidden_lines_removed,
     stamp_drawing_summary,
 )
@@ -223,10 +224,26 @@ async def build(adapter: Any) -> dict[str, str]:
     # x=0.020: the anchor is the text's left edge, so the ink starts here. The
     # sheet's 0.0127 zone margin and the re-centred border rule (~0.0126) now
     # agree, so 0.020 clears the rule and the audit enforces the same bound.
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.100)
-    add_property_linked_note(adapter, "Isometric View Note", 0.305, 0.135)
+    manufacturing = add_property_linked_note(
+        adapter, "Manufacturing Notes", 0.020, 0.100
+    )
+    caption = add_property_linked_note(adapter, "Isometric View Note", 0.305, 0.135)
 
     auto_arrange_view_dimensions(adapter, (front, end, iso))
+    from _drawing_native_layout import LayoutNote
+    from _drawing_view_packing import Axis, AxisOrder
+
+    # This end view accompanies a rotated elevation; do not infer a native
+    # parent/child relation from their initial page positions.
+    repair_project_drawing_layout(
+        adapter,
+        views={"front": front, "end": end, "iso": iso},
+        orderings=(AxisOrder(Axis.X, "front", "end"),),
+        notes=(
+            LayoutNote("manufacturing", manufacturing.GetAnnotation()),
+            LayoutNote("iso-caption", caption.GetAnnotation(), "iso"),
+        ),
+    )
     return await finalize_drawing(
         adapter,
         OUTPUTS,

@@ -36,6 +36,7 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    repair_project_drawing_layout,
     set_basic_dimension,
     set_dimension_callouts,
     set_hidden_lines_removed,
@@ -99,9 +100,24 @@ def _front_y(model_y_mm: float) -> float:
 
 # Per-view model-dimension identities. SolidWorks arranges their text after
 # geometric controls and callouts are present; there are no import-time XYs.
-FRONT_KEEP = ("Length", "Chamfer2dx", "ScrewHoleCx", "ScrewHoleCz", "ScrewHoleDiaDim",)
-TOP_KEEP = ("Bore0X", "Bore1X", "Bore0Dia", "GrooveWidth", "GrooveZ0",)
-RIGHT_KEEP = ("Depth", "GrooveDepth",)
+FRONT_KEEP = (
+    "Length",
+    "Chamfer2dx",
+    "ScrewHoleCx",
+    "ScrewHoleCz",
+    "ScrewHoleDiaDim",
+)
+TOP_KEEP = (
+    "Bore0X",
+    "Bore1X",
+    "Bore0Dia",
+    "GrooveWidth",
+    "GrooveZ0",
+)
+RIGHT_KEEP = (
+    "Depth",
+    "GrooveDepth",
+)
 
 # Right-view half extents at 4:1: the 16 (Z) x 18 (Y) stock section.
 RIGHT_HALF_Z = BLOCK_DEPTH / 2.0 * SHEET_SCALE[0] / 1000.0
@@ -199,16 +215,24 @@ async def build(adapter: Any) -> dict[str, str]:
     # around the view center. The bottom edge is interrupted by the marker
     # groove (GROOVE_Z0..GROOVE_Z0 + GROOVE_WIDTH across the depth), so pick
     # it on the remaining land beside the groove, not at mid-depth.
-    entities = ModelEntities(front.ReferencedDocument).resolve({
-        "bottom_front": LineEdge((BLOCK_LENGTH / 2.0, 0, 0), (1, 0, 0)),
-        "bottom_land": LineEdge((BLOCK_LENGTH, 0, GROOVE_Z0 / 2.0), (0, 0, 1)),
-        "top_end": LineEdge((BLOCK_LENGTH - CHAMFER, BLOCK_HEIGHT, GROOVE_Z0 / 2.0), (0, 0, 1)),
-        "left_end": PlanarFace((-1, 0, 0), 0),
-        "broad": PlanarFace((0, 0, -1), 0),
-        "top": PlanarFace((0, 1, 0), BLOCK_HEIGHT),
-        "bore0": CircleEdge(BORE_DIA / 2.0, (BORE_X[0], BLOCK_HEIGHT, BLOCK_DEPTH / 2.0), (0, 1, 0)),
-        "bore1": CircleEdge(BORE_DIA / 2.0, (BORE_X[1], BLOCK_HEIGHT, BLOCK_DEPTH / 2.0), (0, 1, 0)),
-    })
+    entities = ModelEntities(front.ReferencedDocument).resolve(
+        {
+            "bottom_front": LineEdge((BLOCK_LENGTH / 2.0, 0, 0), (1, 0, 0)),
+            "bottom_land": LineEdge((BLOCK_LENGTH, 0, GROOVE_Z0 / 2.0), (0, 0, 1)),
+            "top_end": LineEdge(
+                (BLOCK_LENGTH - CHAMFER, BLOCK_HEIGHT, GROOVE_Z0 / 2.0), (0, 0, 1)
+            ),
+            "left_end": PlanarFace((-1, 0, 0), 0),
+            "broad": PlanarFace((0, 0, -1), 0),
+            "top": PlanarFace((0, 1, 0), BLOCK_HEIGHT),
+            "bore0": CircleEdge(
+                BORE_DIA / 2.0, (BORE_X[0], BLOCK_HEIGHT, BLOCK_DEPTH / 2.0), (0, 1, 0)
+            ),
+            "bore1": CircleEdge(
+                BORE_DIA / 2.0, (BORE_X[1], BLOCK_HEIGHT, BLOCK_DEPTH / 2.0), (0, 1, 0)
+            ),
+        }
+    )
     add_entity_dimension(
         adapter,
         right,
@@ -297,10 +321,31 @@ async def build(adapter: Any) -> dict[str, str]:
     # 0.046 drops the block clear below the 32.00 text (bottom y 0.055) while
     # keeping its own bottom at 0.0194 -- ~6.8 mm above the drawn bottom rule
     # (~0.0126, now on the declared 12.7 mm margin).
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.046)
-    add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.180)
+    manufacturing = add_property_linked_note(
+        adapter, "Manufacturing Notes", 0.020, 0.046
+    )
+    caption = add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.180)
 
     auto_arrange_view_dimensions(adapter, (front, top, right, iso))
+    from _drawing_native_layout import AxisLink, LayoutNote
+    from _drawing_view_packing import Axis, AxisOrder
+
+    repair_project_drawing_layout(
+        adapter,
+        views={"front": front, "top": top, "right": right, "iso": iso},
+        alignments=(
+            AxisLink(Axis.X, "front", "top"),
+            AxisLink(Axis.Y, "front", "right"),
+        ),
+        orderings=(
+            AxisOrder(Axis.Y, "front", "top"),
+            AxisOrder(Axis.X, "front", "right"),
+        ),
+        notes=(
+            LayoutNote("manufacturing", manufacturing.GetAnnotation()),
+            LayoutNote("iso-caption", caption.GetAnnotation(), "iso"),
+        ),
+    )
     return await finalize_drawing(
         adapter,
         OUTPUTS,
