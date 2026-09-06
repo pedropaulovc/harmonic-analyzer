@@ -41,11 +41,9 @@ from _drawing_annotation_bounds import (
 from _drawing_common import render_pdf_png
 from _drawing_view_packing import Rect
 from _drawing_leader_clearance import (
-    intersects_cell,
     _clear,
     crossing_records,
     displayed_leader_coverage,
-    VerticalDirection,
     vertical_candidates,
     _candidate_text_cells,
 )

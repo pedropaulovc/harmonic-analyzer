@@ -89,8 +89,8 @@ for _stream in (sys.stdout, sys.stderr):
     if _reconfigure is not None:
         _reconfigure(encoding="utf-8", errors="replace")
 
-import yaml as _yaml
-from doit.dependency import CHECKERS, Dependency, JsonDB, MD5Checker
+import yaml as _yaml  # noqa: E402 - configure Windows output before dependency imports
+from doit.dependency import CHECKERS, Dependency, JsonDB, MD5Checker  # noqa: E402
 from filelock import FileLock, Timeout  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "cad" / "scripts"))
