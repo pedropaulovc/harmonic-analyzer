@@ -1,7 +1,10 @@
 """ABBA control: current drawing setup versus an inherited project DRWDOT.
 
 Only arbor_pedestal and pen_marker direct recipes are supported initially.
-The original template and source parts are immutable. A derived template is
+The original template and source parts are immutable and never opened for a
+recipe. One uniquely named owned part byte-copy is reused across each ABBA
+block; display edits may occur only in that copy's memory, never its disk bytes.
+A derived template is
 prepared once per exact sheet-scale/decimal variant; that cost is reported
 separately. Both arms retain all recipe layout/manufacturing/export code.
 No view quality, automatic-update, font-size or leader policy is changed.
@@ -17,10 +20,10 @@ from dataclasses import asdict, dataclass
 import json
 import math
 from pathlib import Path
+import shutil
 import sys
 import tempfile
 import time
-import types
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
@@ -368,26 +371,13 @@ def defaults_snapshot(adapter, spec):
     }
 
 
-def load_recipe(commit, target, directory, source_root):
+def load_recipe(commit, target, directory, source):
     if target not in TARGETS:
         raise ValueError(f"unsupported first-control target: {target}")
     code = recipes.recipe_source(commit, target)
-    source_path = directory / "recipe-source.py"
-    tree = recipes.redirected_tree(code, str(source_path))
-    source = (source_root / f"{DRAWINGS_BY_NAME[target].artifact_stem}.SLDPRT").resolve(
-        strict=True
+    tree = recipes.redirected_tree(
+        code, str(directory / "recipe-source.py"), source=source
     )
-    sources = [
-        node
-        for node in tree.body
-        if isinstance(node, ast.Assign)
-        and len(node.targets) == 1
-        and isinstance(node.targets[0], ast.Name)
-        and node.targets[0].id == "SOURCE"
-    ]
-    if len(sources) != 1:
-        raise ValueError("recipe requires one module-global SOURCE declaration")
-    sources[0].value = ast.Name("_benchmark_source", ast.Load())
     setup_calls = [
         node
         for node in ast.walk(tree)
@@ -406,34 +396,81 @@ def load_recipe(commit, target, directory, source_root):
             "recipe setup scale must use the explicit SHEET_SCALE constant"
         )
     decimals = ast.literal_eval(keywords["decimals"]) if "decimals" in keywords else 2
-    basename = f"{source.stem}-{directory.parent.name}-{directory.name}"
-    outputs = common.DrawingOutputs(
-        directory / f"{basename}.SLDDRW",
-        directory / f"{basename}.pdf",
-        directory / f"{basename}.png",
-    )
-    module = types.ModuleType("template_benchmark_" + basename.replace("-", "_"))
-    module.__file__ = str(source_path)
-    module._benchmark_source = source
-    module._benchmark_paths = {
-        "OUTPUTS": outputs,
-        "SLDDRW": outputs.slddrw,
-        "PDF": outputs.pdf,
-        "PNG": outputs.png,
-    }
-    source_path.write_text(code, encoding="utf-8")
-    sys.modules[module.__name__] = module
-    exec(
-        compile(ast.fix_missing_locations(tree), str(source_path), "exec"),
-        module.__dict__,
-    )
-    if (
-        module.SOURCE != source
-        or module.OUTPUTS != outputs
-        or module.new_project_drawing is not common.new_project_drawing
-    ):
-        raise ValueError("recipe rebound isolated source/output/setup contracts")
+    module = recipes.load_recipe(commit, target, directory, source=source)
+    if module.new_project_drawing is not common.new_project_drawing:
+        raise ValueError("recipe rebound isolated setup contract")
     return module, TemplateSpec(module.SHEET_SCALE, decimals)
+
+
+def copy_source(adapter, original, directory, expected_hash):
+    """One exact copy per ABBA block; never reset or register it as SOURCE."""
+    started = time.perf_counter()
+    directory.mkdir()
+    adapter.ownership.register_directory(directory)
+    path = directory / f"{original.stem}-{directory.parent.name}-owned.SLDPRT"
+    if path.exists():
+        raise RuntimeError("owned benchmark source must be a fresh unique file")
+    compare_exact(
+        expected_hash, attachments.file_digest(original), "original before copy"
+    )
+    shutil.copy2(original, path)
+    compare_exact(expected_hash, attachments.file_digest(path), "owned byte copy")
+    compare_exact(
+        expected_hash, attachments.file_digest(original), "original after copy"
+    )
+    return {
+        "original": str(original),
+        "path": str(path),
+        "sha256": expected_hash,
+        "ownership": "owned_copy",
+        "seconds": time.perf_counter() - started,
+    }
+
+
+def source_observation(adapter, path, previous=None):
+    """Read exact owned native source state; never infer source equivalence."""
+    raw = adapter.swApp.GetOpenDocumentByName(str(path))
+    if raw is None:
+        raise RuntimeError("owned benchmark source is not open at required phase")
+    model = _early_bound(raw, "IModelDoc2")
+    if str(model.GetPathName()) != str(path) or int(model.GetType()) != 1:
+        raise RuntimeError("benchmark source path/kind changed")
+    if previous is not None and int(adapter.swApp.IsSame(model, previous)) != 1:
+        raise RuntimeError("benchmark source native identity changed")
+    manager = _early_bound(model.ConfigurationManager, "IConfigurationManager")
+    configuration = str(
+        _early_bound(manager.ActiveConfiguration, "IConfiguration").Name
+    )
+    if not configuration:
+        raise RuntimeError("owned source has no active configuration")
+    return {
+        "path": str(path),
+        "kind": 1,
+        "configuration": configuration,
+        "dirty": "dirty" if model.GetSaveFlag() else "clean",
+        "visible": "visible" if model.Visible else "hidden",
+        "identity": "captured" if previous is None else "same_native_document",
+    }, model
+
+
+def exact_source_views(adapter, source, configuration):
+    found = attachments.views(adapter.currentModel)
+    if not found:
+        raise RuntimeError("benchmark drawing has no source views")
+    native_source = adapter.swApp.GetOpenDocumentByName(str(source))
+    if native_source is None:
+        raise RuntimeError("benchmark copied source is no longer open")
+    for key, view in found.items():
+        reference = attachments.referenced_model(view)
+        raw = view.ReferencedDocument
+        if (
+            reference != {"path": str(source), "configuration": configuration}
+            or raw is None
+            or int(adapter.swApp.IsSame(raw, native_source)) != 1
+        ):
+            raise RuntimeError(
+                f"{key}: model view does not reference exact copied source/config"
+            )
 
 
 def finished_snapshot(adapter, spec):
@@ -550,8 +587,34 @@ async def prepare_template(adapter, spec, directory, row):
 async def run_trial(adapter, module, spec, variant, template, row):
     from diagnostics._owned_native_documents import DocumentKind
 
+    native_source = None
+    source_configuration = None
+
+    def observe_source(phase):
+        nonlocal native_source, source_configuration
+        observation, native_source = source_observation(
+            adapter, module.SOURCE, native_source
+        )
+        row.setdefault("owned_source_native", {})[phase] = observation
+        if (
+            source_configuration is not None
+            and observation["configuration"] != source_configuration
+        ):
+            raise RuntimeError("owned source configuration changed during trial")
+        source_configuration = observation["configuration"]
+
+    def check_copy_disk(phase):
+        actual = attachments.file_digest(module.SOURCE)
+        row.setdefault("owned_source_disk", {})[phase] = actual
+        compare_exact(row["source_sha256"], actual, phase)
+
     def setup(current_adapter, **kwargs):
         check_setup_arguments(spec, kwargs)
+        observe_source("recipe_source_open")
+        if row["owned_source_native"]["recipe_source_open"]["dirty"] != "clean":
+            raise RuntimeError(
+                "fresh trial source is already dirty before drawing setup"
+            )
         with adapter.ownership.creating_document(
             DocumentKind.DRAWING, module.OUTPUTS.slddrw
         ):
@@ -576,8 +639,18 @@ async def run_trial(adapter, module, spec, variant, template, row):
     async def finalize(current_adapter, outputs, **kwargs):
         if outputs != module.OUTPUTS:
             raise RuntimeError("recipe bypassed its isolated output contract")
-        with adapter.ownership.saving_as(outputs.slddrw):
-            return await original_finalize(current_adapter, outputs, **kwargs)
+        observe_source("before_drawing_save")
+        exact_source_views(adapter, module.SOURCE, source_configuration)
+        check_copy_disk("owned source before drawing save")
+        try:
+            with adapter.ownership.saving_as(outputs.slddrw):
+                return await original_finalize(current_adapter, outputs, **kwargs)
+        except Exception as error:
+            row["finalize_error"] = repr(error)
+            raise
+        finally:
+            observe_source("after_drawing_save")
+            check_copy_disk("owned source after drawing save")
 
     module.finalize_drawing = finalize
     started = time.perf_counter()
@@ -587,9 +660,15 @@ async def run_trial(adapter, module, spec, variant, template, row):
             _telemetry.span("diagnostic.template.recipe", variant=variant),
         ):
             artifacts = await module.build(adapter)
+    except Exception as error:
+        row["recipe_error"] = repr(error)
+        raise
     finally:
         row["recipe_seconds"] = time.perf_counter() - started
         module.finalize_drawing = original_finalize
+        if native_source is not None:
+            observe_source("after_recipe")
+            check_copy_disk("owned source after recipe")
     if len(row.get("setup_seconds", ())) != 1:
         raise RuntimeError("recipe did not invoke setup exactly once")
     row["artifacts"] = recipes.validate_artifacts(artifacts, module.OUTPUTS)
@@ -602,17 +681,26 @@ async def run_trial(adapter, module, spec, variant, template, row):
                     "recipe did not leave its exact saved drawing active"
                 )
             row["saved"] = finished_snapshot(adapter, spec)
-            check("close benchmark drawing", await adapter.close_model(save=False))
+            exact_source_views(adapter, module.SOURCE, source_configuration)
+            await adapter.close_owned_documents()
+            # Native wrappers from the closed source are now invalid. Reopening
+            # only the drawing would leave unsaved source display edits live and
+            # would not prove disk-source persistence.
+            native_source = None
+            check_copy_disk("owned source after cold close")
             check(
                 "reopen benchmark drawing",
                 await adapter.open_model(str(module.OUTPUTS.slddrw)),
             )
+            observe_source("cold_source_reopen")
             row["reopened"] = finished_snapshot(adapter, spec)
+            exact_source_views(adapter, module.SOURCE, source_configuration)
             compare_reopened(row["saved"], row["reopened"])
-            check(
-                "close reopened benchmark drawing",
-                await adapter.close_model(save=False),
-            )
+            observe_source("after_persisted_checks")
+            check_copy_disk("owned source after persisted checks")
+            await adapter.close_owned_documents()
+            native_source = None
+            check_copy_disk("owned source after final close")
     finally:
         row["validation_seconds"] = time.perf_counter() - started
 
@@ -638,12 +726,13 @@ async def benchmark(adapter, targets, commit, source_root, report_root):
         "revision": commit,
         "helper_revision": recipes.revision("HEAD"),
         "helper_inputs": inputs,
-        "immutable_sources": immutable,
+        "immutable_disk_inputs": immutable,
         "order": ORDER,
         "template_preparations": [],
+        "owned_sources": {},
         "trials": [],
         "scope": "same current direct part recipes; inherited defaults only; observed ABBA timings, not fleet speedup/risk",
-        "timing_scope": "setup inner helper; recipe body includes ownership guards; extra persisted checks and one-time template preparation reported separately",
+        "timing_scope": "setup inner helper; recipe body includes ownership/source guards; extra cold-source persisted checks, one-time source copying and template preparation reported separately",
     }
     report_path = run_dir / "measurements.json"
 
@@ -654,13 +743,26 @@ async def benchmark(adapter, targets, commit, source_root, report_root):
     checkpoint()
     try:
         for target in targets:
+            owned = copy_source(
+                adapter,
+                sources[target],
+                run_dir / f"{target}-source",
+                immutable[str(sources[target])],
+            )
+            report["owned_sources"][target] = owned
+            # Disk immutability is a separate benchmark witness, not SOURCE native
+            # ownership. Only this owned copy may accrue display edits in memory.
+            immutable[owned["path"]] = owned["sha256"]
+            checkpoint()
             baseline_semantic = None
             for index, variant in enumerate(ORDER):
                 directory = run_dir / f"{target}-{index}-{variant}"
                 directory.mkdir()
                 adapter.ownership.register_directory(directory)
-                module, spec = load_recipe(commit, target, directory, source_root)
-                if module.SOURCE != sources[target] or immutable_changes(immutable):
+                module, spec = load_recipe(
+                    commit, target, directory, Path(owned["path"])
+                )
+                if module.SOURCE != Path(owned["path"]) or immutable_changes(immutable):
                     raise RuntimeError("pinned source/template changed between trials")
                 source_hash = immutable[str(module.SOURCE)]
                 if spec not in templates:
@@ -730,7 +832,16 @@ async def benchmark(adapter, targets, commit, source_root, report_root):
                         row.update(status="failed", cleanup_error=repr(cleanup_error))
                         raise
                     finally:
+                        row["immutable_changes_after_cleanup"] = immutable_changes(
+                            immutable
+                        )
+                        if row["immutable_changes_after_cleanup"]:
+                            row["status"] = "failed"
                         checkpoint()
+                        if row["immutable_changes_after_cleanup"]:
+                            raise RuntimeError(
+                                "immutable benchmark inputs changed between trials after cleanup"
+                            )
         report["status"] = "passed"
     except Exception as error:
         report.update(status="failed", error=str(error))

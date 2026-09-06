@@ -51,6 +51,31 @@ are unique; recipe output declarations and aliases are rewritten before recipe
 evaluation. This is a bounded adapter for the two trusted direct recipes, not a
 sandbox for arbitrary Python recipes.
 
+Each ABBA block now uses one uniquely named byte-copy of its original part in a
+registered diagnostic source directory. The reviewed shared loader redirects
+`SOURCE` before aliases and function defaults bind. All four trials use that same
+copy path and exact initial disk bytes. The original and project template retain
+protected SOURCE ownership; the copy is ordinary COPY ownership, never registered
+as SOURCE. Its disk hash is nevertheless immutable: an implicit reference save,
+trial write or between-trial change fails, with no automatic reset or retry.
+
+The owned-copy first-dirty control at `99eadbe7` localized the initial dirty flag
+to the `set_dimension_callouts` operation group: observed source BoreDia display
+text slots 4/8 changed from empty to THRU, while all 20 observed dimension native
+IDs/values/tolerances stayed unchanged. This does not distinguish its inner setter
+from rebuild, characterize later writes, or establish full source equivalence.
+Accordingly, benchmark source path/kind/configuration/native identity and dirty
+state are recorded at recipe-open, before/after save and after persisted checks.
+Every model view must reference the exact copied source and configuration.
+
+Persisted validation closes **both** drawing and owned source without saving,
+checks the copy's disk SHA, discards the old COM handle, and reopens the drawing
+with a fresh native source instance. It then repeats the unchanged values,
+tolerances, text, attachments, defaults and layout comparisons. A lost THRU callout,
+BASIC designation or precision after cold reopen fails; keeping a dirty source
+open is not a persistence witness. Both owned documents close after every trial.
+This new variant is offline-tested only until an explicitly granted native run.
+
 ## Evidence and timing boundaries
 
 `measurements.json` is checkpointed before each preparation/trial and after each
@@ -63,14 +88,15 @@ configuration, adapter, template resources and every diagnostic Python module.
 
 Timing fields are intentionally separate:
 
+- `owned_sources[target].seconds`: one-time byte copying and initial hash checks.
 - `template_preparations[].seconds`: one-time setup, DRWDOT save, inherited-default
   verification and its scoped cleanup. Do not exclude this cost when estimating
   first-use performance.
 - `trials[].setup_seconds`: the inner setup helper only. Ownership inventory
   guards sit outside this timer.
 - `trials[].recipe_seconds`: complete recipe body, including its ownership guards,
-  current final validation, native save and PDF/PNG export.
-- `trials[].validation_seconds`: additional diagnostic saved/reopened comparison,
+  source-state/hash guards, current final validation, native save and PDF/PNG export.
+- `trials[].validation_seconds`: additional diagnostic cold-source saved/reopened comparison,
   outside the recipe timer. Per-trial final cleanup is also outside that timer.
 
 Saved/reopened comparisons preserve each drawing's native annotation inventory,
