@@ -42,6 +42,48 @@ def test_recipe_outputs_are_redirected_before_defaults_and_aliases(
     assert module.__file__ == str(tmp_path / "recipe-source.py")
 
 
+def test_explicit_source_redirects_before_function_defaults_and_aliases(
+    tmp_path, monkeypatch
+):
+    source = tmp_path / "guarded.SLDPRT"
+    source.write_bytes(b"immutable source")
+    code = (
+        recipe(Path("wrong/source.SLDPRT"))
+        + "\nSOURCE_ALIAS = SOURCE\ndef input_default(source=SOURCE):\n    return source\n"
+    )
+    monkeypatch.setattr(bench, "recipe_source", lambda *_: code)
+    module = bench.load_recipe("pinned", "cone_pivot_screw", tmp_path, source=source)
+    assert (
+        module.SOURCE
+        == module.SOURCE_ALIAS
+        == module.input_default()
+        == source.resolve()
+    )
+
+
+@pytest.mark.parametrize(
+    "declaration",
+    [
+        "SOURCE = OTHER = value",
+        "SOURCE, OTHER = values",
+        "SOURCE: Path",
+        "SOURCE, (SOURCE,) = values",
+    ],
+)
+def test_unsupported_source_redirect_declarations_fail_before_execution(declaration):
+    with pytest.raises(ValueError, match="declaration"):
+        bench.redirected_tree(
+            "OUTPUTS = value\n" + declaration, "recipe.py", source=Path("source.SLDPRT")
+        )
+
+
+def test_explicit_source_requires_one_declaration(tmp_path):
+    with pytest.raises(ValueError, match="exactly one.*SOURCE"):
+        bench.redirected_tree(
+            "OUTPUTS = value", "recipe.py", source=tmp_path / "source.SLDPRT"
+        )
+
+
 @pytest.mark.parametrize(
     "extra",
     [
