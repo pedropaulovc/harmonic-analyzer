@@ -283,7 +283,16 @@ def native_setup(monkeypatch, kind=2, outline=(0.02, 0.04, 0.1, 0.08)):
         return SimpleNamespace(
             anchor=(x, y),
             body=body,
-            text_runs=(),
+            text_runs=(
+                SimpleNamespace(
+                    value="A" if item.kind == 2 else item.parameter,
+                    font="Arial",
+                    height_m=0.0035,
+                    angle_rad=0.0,
+                    reference=1,
+                    inverted=False,
+                ),
+            ),
             format_signature=("font", 0.0035),
             native_strokes=(Segment((x, y), (x, y + 0.007), 0.00018),)
             if item.kind == 15
@@ -293,6 +302,182 @@ def native_setup(monkeypatch, kind=2, outline=(0.02, 0.04, 0.1, 0.08)):
         )
 
     return adapter, view, annotation, annotations, calls, activations, measure
+
+
+def stationary_setup(monkeypatch):
+    """The witnessed gear datum has a native anchor remote from its frame."""
+    setup = native_setup(monkeypatch)
+    adapter, view, datum, annotations, calls, activations, measure = setup
+    datum.position = (0.15, 0.12, -0.00315)
+    dimension = NativeAnnotation(4)
+    dimension.Owner = view
+    dimension.position = (0.14, 0.12, 0)
+    annotations.append(dimension)
+    datum.entities = (dimension.specific,)
+    datum.GetAttachedEntityTypes = lambda: (14,)
+
+    def stationary_measure(adapter, annotation):
+        result = measure(adapter, annotation)
+        if annotation is datum:
+            result.body = Rect(0.177, 0.144, 0.184, 0.151)
+            result.native_strokes = frame_strokes(result.body)
+        return result
+
+    return (*setup[:-1], stationary_measure), dimension
+
+
+def test_dimension_datum_is_stationary_with_measured_off_anchor_frame(monkeypatch):
+    setup, _dimension = stationary_setup(monkeypatch)
+    result = run_native(setup)["front"]
+    assert not setup[2].moves
+    assert len(setup[4][setup[2].GetName()]) == 2
+    assert result["placement_classes"][setup[2].GetName()] == "stationary_dimension"
+    assert result["bodies_after"][setup[2].GetName()] == (0.177, 0.144, 0.184, 0.151)
+
+
+def test_stationary_owner_dimension_text_is_still_an_obstacle(monkeypatch):
+    setup, dimension = stationary_setup(monkeypatch)
+    dimension.position = (0.18, 0.145, 0)
+    with pytest.raises(RuntimeError, match="stationary.*clearance"):
+        run_native(setup)
+    assert not setup[2].moves
+
+
+def test_stationary_datum_cannot_overlap_the_actual_view(monkeypatch):
+    setup, _dimension = stationary_setup(monkeypatch)
+    setup[1].GetOutline = lambda: (0.16, 0.14, 0.19, 0.16)
+    with pytest.raises(RuntimeError, match="stationary.*clearance"):
+        run_native(setup)
+    assert not setup[2].moves
+
+
+def test_stationary_attachment_dimension_must_belong_to_exact_view(monkeypatch):
+    setup, dimension = stationary_setup(monkeypatch)
+    dimension.Owner = object()
+    with pytest.raises(RuntimeError, match="dimension.*exact.*view"):
+        run_native(setup)
+    assert not setup[2].moves
+
+
+def test_stationary_owner_dimension_cannot_disappear_from_measured_obstacles(
+    monkeypatch,
+):
+    setup, dimension = stationary_setup(monkeypatch)
+    setup[3].remove(dimension)
+    with pytest.raises(RuntimeError, match="owning dimension.*measured obstacle"):
+        run_native(setup)
+    assert not setup[2].moves
+
+
+def test_stationary_owner_dimension_value_is_freshly_guarded(monkeypatch):
+    setup, dimension = stationary_setup(monkeypatch)
+    original_measure = setup[-1]
+
+    def change_parameter(adapter, annotation):
+        result = original_measure(adapter, annotation)
+        if annotation is setup[2] and len(setup[4][annotation.GetName()]) > 1:
+            dimension.dimension_value += 0.001
+        return result
+
+    with pytest.raises(RuntimeError, match="system value changed"):
+        run_native((*setup[:-1], change_parameter))
+    assert not setup[2].moves
+
+
+def test_stationary_rendered_quantity_change_is_not_hidden_by_same_label(monkeypatch):
+    setup, _dimension = stationary_setup(monkeypatch)
+    original_measure = setup[-1]
+
+    def change_quantity(adapter, annotation):
+        result = original_measure(adapter, annotation)
+        if annotation is setup[2]:
+            result.text_runs += (
+                SimpleNamespace(
+                    **{
+                        **vars(result.text_runs[0]),
+                        "value": "2X"
+                        if len(setup[4][annotation.GetName()]) == 1
+                        else "3X",
+                    }
+                ),
+            )
+        return result
+
+    with pytest.raises(RuntimeError, match="text changed"):
+        run_native((*setup[:-1], change_quantity))
+
+
+def test_stale_specific_text_becoming_current_is_retained_only_in_diagnostics(
+    monkeypatch,
+):
+    setup, _dimension = stationary_setup(monkeypatch)
+    datum = setup[2]
+    datum.specific.GetTextAtIndex = lambda _index: (
+        "B" if not setup[4][datum.GetName()] else "A"
+    )
+    result = run_native(setup)["front"]
+    assert result["specific_text_diagnostics"][datum.GetName()] == {
+        "before": ("B",),
+        "after": ("A",),
+    }
+
+
+def test_stale_specific_datum_text_is_diagnostic_not_manufacturing_truth(monkeypatch):
+    setup, _dimension = stationary_setup(monkeypatch)
+    setup[2].specific.GetTextAtIndex = lambda _index: "B"
+    result = run_native(setup)["front"]
+    assert result["specific_text_diagnostics"][setup[2].GetName()] == {
+        "before": ("B",),
+        "after": ("B",),
+    }
+
+
+@pytest.mark.parametrize("text", ["B", "", " "])
+def test_generic_datum_text_must_contain_its_exact_nonempty_label(monkeypatch, text):
+    setup = native_setup(monkeypatch)
+    original_measure = setup[-1]
+
+    def wrong_text(adapter, annotation):
+        result = original_measure(adapter, annotation)
+        result.text_runs[0].value = text
+        return result
+
+    with pytest.raises(RuntimeError, match="rendered datum.*label"):
+        run_native((*setup[:-1], wrong_text))
+    assert not setup[2].moves
+
+
+def test_generic_datum_label_mutation_fails_even_if_specific_text_stays_old(
+    monkeypatch,
+):
+    setup, _dimension = stationary_setup(monkeypatch)
+    original_measure = setup[-1]
+
+    def mutate_final(adapter, annotation):
+        result = original_measure(adapter, annotation)
+        if annotation is setup[2] and len(setup[4][annotation.GetName()]) > 1:
+            annotation.specific.GetLabel = lambda: "B"
+            result.text_runs[0].value = "B"
+        return result
+
+    with pytest.raises(RuntimeError, match="properties changed|rendered datum.*label"):
+        run_native((*setup[:-1], mutate_final))
+
+
+def test_stationary_final_fresh_frame_drift_is_not_accepted(monkeypatch):
+    setup, _dimension = stationary_setup(monkeypatch)
+    original_measure = setup[-1]
+
+    def move_body(adapter, annotation):
+        result = original_measure(adapter, annotation)
+        if annotation is setup[2] and len(setup[4][annotation.GetName()]) > 1:
+            result.body = result.body.translated((0.002, 0))
+            result.native_strokes = frame_strokes(result.body)
+        return result
+
+    with pytest.raises(RuntimeError, match="post-style translation"):
+        run_native((*setup[:-1], move_body))
+    assert not setup[2].moves
 
 
 def frame_strokes(frame):
