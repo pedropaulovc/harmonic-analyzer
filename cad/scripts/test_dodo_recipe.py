@@ -1480,6 +1480,7 @@ def test_recipe_gate_tracks_sources_imported_by_its_tests():
         "test_part_owned_geometric_tolerances.py",
         "test_probe_surface_finish_pmi_telemetry.py",
         "test_probe_drawing_attachments.py",
+        "test_benchmark_drawing_recipes.py",
         "test_surface_finish.py",
         "test_surface_finish_ownership_a.py",
         "test_pose_manifest.py",
