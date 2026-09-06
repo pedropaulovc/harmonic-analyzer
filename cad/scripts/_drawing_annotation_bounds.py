@@ -489,6 +489,15 @@ def _native_snapshot(annotation: Any, extension: Any = None) -> NativeSnapshot:
     if kind not in _KINDS:
         raise ValueError(f"unsupported annotation kind {kind}: {annotation.GetName()}")
     data = _early_bound(annotation.GetDisplayData(), "IDisplayData")
+    # Documented inventories exist for these primitives, but this reader has
+    # no bounded representation for them yet. Never certify an incomplete box.
+    unsupported = {
+        "ellipses": int(data.GetEllipseCount()),
+        "parabolas": int(data.GetParabolaCount()),
+        "points": int(data.GetPointCount()),
+    }
+    if any(count != 0 for count in unsupported.values()):
+        raise ValueError(f"unsupported native primitive inventory: {unsupported}")
     runs = []
     for index in range(int(data.GetTextCount())):
         if tuple(data.GetTextPlaneAtIndex(index) or ()):
