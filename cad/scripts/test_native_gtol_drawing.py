@@ -166,7 +166,7 @@ def arrange(adapter, view, measure):
 
 
 def test_native_commands_clearance_and_outboard_shift_keep_exact_entities(monkeypatch):
-    adapter, view, rows, measure = native_context(monkeypatch)
+    adapter, view, rows, measure = native_context(monkeypatch, count=3)
     result = arrange(adapter, view, measure)["front"]
     assert [call.args[0] for call in adapter.swApp.RunCommand.call_args_list] == [
         317,
@@ -181,6 +181,14 @@ def test_native_commands_clearance_and_outboard_shift_keep_exact_entities(monkey
     assert rows[0].SetPosition2.call_count == 1
     assert rows[1].SetPosition2.call_count == 2
     assert result["body_after"][0] == pytest.approx(0.802)
+
+
+@pytest.mark.parametrize("count,commands", [(0, []), (1, []), (2, [307]), (3, [317, 307])])
+def test_native_spacing_uses_the_observed_minimum_bank_cardinality(monkeypatch, count, commands):
+    adapter, view, rows, measure = native_context(monkeypatch, count=count)
+    adapter.swApp.IsCommandEnabled.side_effect = lambda command: command != 317 or count >= 3
+    arrange(adapter, view, measure)
+    assert [call.args[0] for call in adapter.swApp.RunCommand.call_args_list] == commands
 
 
 @pytest.mark.parametrize("count", [0, 1])
@@ -252,10 +260,7 @@ def test_real_gtol_selection_with_null_manager_view_uses_exact_annotation_owner(
     adapter.currentModel.SelectionManager.GetSelectedObjectsDrawingView2.return_value = None
     report = arrange(adapter, view, measure)["front"]
     assert report["count"] == 2
-    assert [call.args[0] for call in adapter.swApp.RunCommand.call_args_list] == [
-        317,
-        307,
-    ]
+    assert [call.args[0] for call in adapter.swApp.RunCommand.call_args_list] == [307]
 
 
 def test_source_owned_gtol_cannot_use_null_selection_view_as_a_view_identity_witness(
@@ -437,7 +442,7 @@ def test_full_native_witness_is_read_only_before_and_after_final_bank(monkeypatc
 
 
 def test_intermediate_shape_change_cannot_become_the_new_accepted_body(monkeypatch):
-    adapter, view, rows, measure = native_context(monkeypatch)
+    adapter, view, rows, measure = native_context(monkeypatch, count=3)
     native_command = adapter.swApp.RunCommand.side_effect
 
     def change_shape(command, title):
@@ -455,7 +460,7 @@ def test_intermediate_shape_change_cannot_become_the_new_accepted_body(monkeypat
 def test_intermediate_content_drift_is_rejected_by_the_final_full_witness(
     monkeypatch, field
 ):
-    adapter, view, rows, measure = native_context(monkeypatch)
+    adapter, view, rows, measure = native_context(monkeypatch, count=3)
     measured = Mock(side_effect=measure)
     native_command = adapter.swApp.RunCommand.side_effect
 
