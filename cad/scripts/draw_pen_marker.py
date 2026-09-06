@@ -18,6 +18,7 @@ from pen_marker_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
+from _drawing_project_layout import repair_project_drawing_layout
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
@@ -31,7 +32,6 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    repair_project_drawing_layout,
     set_hidden_lines_removed,
     stamp_drawing_summary,
 )
