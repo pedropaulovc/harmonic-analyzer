@@ -24,7 +24,7 @@ sys.path.insert(0, str(ROOT / "cad/scripts"))
 
 from _common import _early_bound  # noqa: E402
 from _drawing_template_defaults import compare_defaults, snapshot_defaults  # noqa: E402
-from solidworks_mcp.adapters.com_variant import double_array  # noqa: E402
+import _drawing_template_viewport as viewports  # noqa: E402
 from diagnostics import _owned_native_documents as owned  # noqa: E402
 from diagnostics import _populated_template_symbols as symbols  # noqa: E402
 from diagnostics import probe_prepared_template_cache as base  # noqa: E402
@@ -87,41 +87,7 @@ def runtime_inputs(adapter, spec):
     }
 
 
-def viewport(model):
-    # INote.GetExtent explicitly is invalid for invisible documents.
-    if not bool(model.Visible):
-        raise RuntimeError("viewport experiment requires a visible drawing")
-    view = _early_bound(model.ActiveView, "IModelView")
-    scale = view.Scale2
-    transform = tuple(view.Transform.ArrayData)
-    translation = tuple(_early_bound(view.Translation3, "IMathVector").ArrayData)
-    orientation = tuple(_early_bound(view.Orientation3, "IMathTransform").ArrayData)
-    pixels = tuple(view.GetVisibleBox())
-    if (
-        type(scale) not in (int, float)
-        or not math.isfinite(scale)
-        or scale <= 0
-        or len(transform) != 16
-        or len(translation) != 3
-        or len(orientation) != 16
-        or any(
-            type(x) not in (int, float) or not math.isfinite(x)
-            for x in (*transform, *translation, *orientation)
-        )
-        or len(pixels) != 4
-        or any(type(x) is not int for x in pixels)
-        or pixels[0] >= pixels[2]
-        or pixels[1] >= pixels[3]
-    ):
-        raise RuntimeError("invalid native viewport scale/transform/pixel box")
-    return {
-        "scale2": scale,
-        "transform": list(transform),
-        "translation3": list(translation),
-        "orientation3": list(orientation),
-        "visible_box_pixels": list(pixels),
-        "document_visibility": "visible",
-    }
+viewport = viewports.capture
 
 
 def identity_bank(adapter):
@@ -382,18 +348,9 @@ async def probe(
                 raise RuntimeError("native Scale2 changed the original orientation")
             if translation is Translation.ORIGINAL:
                 row["translation_target"] = initial["translation3"]
-                math_utility = _early_bound(
-                    adapter.swApp.GetMathUtility(), "IMathUtility"
+                viewports.assign_translation(
+                    adapter.swApp, view, initial["translation3"]
                 )
-                vector = math_utility.CreateVector(
-                    double_array(initial["translation3"])
-                )
-                if vector is None:
-                    raise RuntimeError("native CreateVector returned null")
-                vector = _early_bound(vector, "IMathVector")
-                if list(vector.ArrayData) != initial["translation3"]:
-                    raise RuntimeError("fresh native translation vector differs")
-                view.Translation3 = vector
             model.GraphicsRedraw2()  # Identical documented redraw in every arm.
             row["viewport"] = viewport(model)
             if row["viewport"]["orientation3"] != initial["orientation3"]:

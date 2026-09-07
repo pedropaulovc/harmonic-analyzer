@@ -128,3 +128,39 @@ and [MathVector.ArrayData](https://help.solidworks.com/2026/English/api/sldworks
 The official “Get Angle of Hole Not Normal to a Face” example creates a vector
 from three doubles. This is a call-shape reference, not proof that restoring
 viewport translation will make this native template's A/A defaults exact.
+
+## Controlled-translation positive result and two-document test
+
+The independently executed `--translation original` control at root `fabbea31`
+passed, receipt `prepared-viewport-0htc7jjy/measurements.json`, SHA-256
+`f853ba23b5cc867d92f2955fc5f8639e4aca8ed164736b067404f07b7169824d`.
+The original/first/restored viewports and the complete A/A defaults (including
+raw blank-linked extent observations) are exactly equal. Every export, semantic,
+glyph/pixel and supported-path/object-inventory gate passed. All three full-page
+raster hashes equal the zoom-only run's `58270d9f…c922f`. Inputs remained exact;
+ownership returned empty→empty with no cleanup error. A/B extents still changed
+on the half-size pixel grid. This proves the same-document native call shape,
+not preparation equivalence between two newly created documents.
+
+The shared capture/vector/restore operations now live in the drawing-only
+`_drawing_template_viewport.py`, with no diagnostic imports. Restore refuses a
+different orientation or visible pixel box, and requires exact full viewport
+readback. It never writes orientation or resizes the document window.
+
+The next independently gated cache experiment is:
+
+```powershell
+uv run python cad/scripts/diagnostics/probe_prepared_template_cache.py `
+  --expected-pid $env:HARMONIC_DIAGNOSTIC_SW_PID `
+  --scale 1 1 --decimals 2 --printed-format compare --viewport captured
+```
+
+Use the same explicit environment/seat conditions as above. This probe uses only
+its run-local cache. Normal setup captures its viewport. Both preparation CREATE
+scopes and subsequent prepared MISS/HIT trials restore it after creation, before
+their strict snapshots. All existing normal/MISS/HIT raw defaults, printed output,
+source/hash/cache and ownership gates remain in force. The default `--viewport
+normal` makes no viewport-restoration calls. The captured-mode mock demonstrates
+new-document pan changing extents, and still rejects independent `1e-12` raw
+extent drift, orientation changes and wrong translation readback. Its native
+two-document outcome is not claimed by the same-document positive control.

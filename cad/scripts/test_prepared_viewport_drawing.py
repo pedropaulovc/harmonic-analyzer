@@ -191,6 +191,7 @@ def scene(native, monkeypatch, tmp_path):  # noqa: F811
         }
 
     monkeypatch.setattr(probe, "_early_bound", lambda value, _: value)
+    monkeypatch.setattr(probe.viewports, "_early_bound", lambda value, _: value)
     monkeypatch.setattr(probe.base, "_early_bound", lambda value, _: value)
     monkeypatch.setattr(probe.base.common, "new_drawing", create)
     monkeypatch.setattr(probe, "snapshot_defaults", snapshot)
@@ -543,6 +544,42 @@ def test_controlled_translation_cli_forwards_same_policy_to_owned_worker(
     )
     assert probe.main([*args, "--worker"]) == 0
     assert observed == [probe.Translation.ORIGINAL]
+
+
+@pytest.mark.parametrize(
+    "fault", ["active", "pixel_box", "orientation", "translation_readback"]
+)
+def test_shared_restore_preserves_failed_native_context_observations(scene, fault):
+    model = scene.Drawing()
+    scene.native.app.ActiveDoc = model
+    target = probe.viewports.capture(model)
+    observation = {}
+    if fault == "active":
+        scene.native.app.ActiveDoc = scene.baseline
+    if fault == "pixel_box":
+        model.ActiveView.GetVisibleBox = lambda: (0, 0, 1201, 800)
+    if fault == "orientation":
+        scene.faults["orientation"] = True
+        model.ActiveView._scale = 2
+    if fault == "translation_readback":
+        scene.faults["translation_readback"] = True
+    with pytest.raises(RuntimeError):
+        probe.viewports.restore(scene.native.app, model, target, observation)
+    assert observation["status"] == "failed" and observation["target"] == target
+    assert "error" in observation
+    if fault in ("active", "pixel_box", "orientation"):
+        assert scene.calls == []
+    if fault == "translation_readback":
+        assert observation["after"]["translation3"] != target["translation3"]
+
+
+def test_shared_viewport_module_has_no_diagnostic_dependency():
+    from _buildgraph import module_deps_of
+
+    assert not any(
+        "diagnostics" in Path(path).parts
+        for path in module_deps_of(Path(probe.viewports.__file__))
+    )
 
 
 def test_complete_supported_object_inventory_and_flat_paths_are_exact(
