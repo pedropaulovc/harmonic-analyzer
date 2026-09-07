@@ -68,6 +68,126 @@ def _empty_link(annotation, note):
     return {"native_counts": counts, "leaders": leaders, "anchor": anchor, "font": font}
 
 
+def _surface_finish_snapshot(adapter, annotation):
+    """Preserve a native template SF; do not apply the pilot callout style policy."""
+    specific = _early_bound(annotation.GetSpecificAnnotation(), "ISFSymbol")
+    if specific is None:
+        raise RuntimeError("template surface finish has no native ISFSymbol")
+    returned = specific.GetAnnotation()
+    if returned is None or int(adapter.swApp.IsSame(returned, annotation)) != 1:
+        raise RuntimeError("template surface finish annotation identity differs")
+    symbol = specific.GetSymbol()
+    if type(symbol) is not int or symbol not in {0, 1, 2, 7, 8, 9}:
+        raise RuntimeError(f"unsupported template surface finish symbol: {symbol}")
+
+    # GetText identifiers are swSurfaceFinishSymbolText_e slots, NOT zero-based
+    # displayed-text indices. The documented count call must precede GetText.
+    count = specific.GetTextCount()
+    if type(count) is not int or count < 0:
+        raise RuntimeError("template surface finish has invalid text count")
+    text_fields = {
+        name: specific.GetText(index)
+        for index, name in enumerate(
+            (
+                "material_removal_allowance",
+                "production_method",
+                "sampling_length",
+                "other_roughness_value",
+                "maximum_roughness",
+                "minimum_roughness",
+                "roughness_spacing",
+                "roughness_value_1",
+                "roughness_value_2",
+                "roughness_value_3",
+            ),
+            start=1,
+        )
+    }
+    if any(
+        value is not None and not isinstance(value, str)
+        for value in text_fields.values()
+    ):
+        raise RuntimeError("template surface finish has invalid native text")
+    position = list(annotation.GetPosition() or ())
+    if len(position) != 3 or not all(math.isfinite(n) for n in position):
+        raise RuntimeError("template surface finish has no finite XYZ anchor")
+    if annotation.GetTextFormatCount() != 1:
+        raise RuntimeError("unsupported template surface finish font count")
+    fmt = _early_bound(annotation.GetTextFormat(0), "ITextFormat")
+    if fmt is None:
+        raise RuntimeError("template surface finish has no native font definition")
+    font = {
+        "font": fmt.TypeFaceName,
+        "height_m": fmt.CharHeight,
+        "height_points": fmt.CharHeightInPts,
+        "height_in_points": fmt.IsHeightSpecifiedInPts(),
+        "width_factor": fmt.WidthFactor,
+        "bold": fmt.Bold,
+        "italic": fmt.Italic,
+        "backwards": fmt.BackWards,
+        "character_spacing_factor": fmt.CharSpacingFactor,
+        "escapement_rad": fmt.Escapement,
+        "line_length_m": fmt.LineLength,
+        "line_spacing": fmt.LineSpacing,
+        "oblique_angle": fmt.ObliqueAngle,
+        "strikeout": fmt.Strikeout,
+        "underline": fmt.Underline,
+        "upside_down": fmt.UpsideDown,
+        "vertical": fmt.Vertical,
+        "use_document_format": annotation.GetUseDocTextFormat(0),
+    }
+    if (
+        not isinstance(font["font"], str)
+        or not font["font"]
+        or any(
+            not math.isfinite(font[key]) or font[key] <= 0
+            for key in ("height_m", "width_factor")
+        )
+    ):
+        raise RuntimeError("template surface finish has invalid native font")
+    row = {
+        "kind": 7,
+        "visible": annotation.Visible,
+        "symbol": symbol,
+        "orientation": specific.Orientation,
+        "angle": specific.GetAngle(),
+        "direction_of_lay": specific.GetDirectionOfLay(),
+        "profile_direction": specific.ProfileDirection,
+        "profile_angle": specific.ProfileAngle,
+        "gost_notation": specific.GOSTNotation,
+        "gost_default_symbol": specific.GOSTDefaultSymbol,
+        "attached": specific.IsAttached(),
+        "extra_leader": specific.HasExtraLeader(),
+        "text_count": count,
+        "text_fields": text_fields,
+        "position": position,
+        "format": font,
+    }
+    for name, supported in (
+        ("visible", range(4)),  # swAnnotationVisibilityState_e
+        ("orientation", range(1, 6)),  # swSurfaceFinishSymbolOrientation_e
+        ("direction_of_lay", range(8)),  # swSFLaySym_e
+        ("profile_direction", range(5)),  # swSFProfileDirection_e
+    ):
+        if type(row[name]) is not int or row[name] not in supported:
+            raise RuntimeError(
+                f"unsupported template surface finish {name}: {row[name]}"
+            )
+    if symbol in {0, 2, 9}:
+        row["all_around"] = specific.GetSymbolAllAround()
+    if symbol in {7, 8}:
+        texture = specific.GetSymbolSurfaceTexture()
+        if type(texture) is not int or texture not in {3, 4, 5, 6}:
+            raise RuntimeError(
+                f"unsupported template surface finish texture: {texture}"
+            )
+        row["surface_texture"] = texture
+    measured = asdict(annotation_box(adapter, annotation))
+    measured.pop("name")  # Native generated IDs are not a cross-document identity.
+    row["measured"] = measured
+    return _plain(row)
+
+
 def snapshot_defaults(adapter, spec):
     """Capture the existing blank-sheet setup contract, without native setters."""
     import _drawing_common as common
@@ -106,10 +226,13 @@ def snapshot_defaults(adapter, spec):
     if any(value != common._BROKEN_LEADER_HORIZONTAL_TEXT for value in styles.values()):
         raise RuntimeError(f"prepared dimension styles differ: {styles}")
     sheet_view = _early_bound(ddoc.GetFirstView(), "IView")
-    notes, empty_extents, other_kinds = [], [], []
+    notes, finishes, empty_extents, other_kinds = [], [], [], []
     for raw in sheet_view.GetAnnotations() or ():
         annotation = _early_bound(raw, "IAnnotation")
         kind = int(annotation.GetType())
+        if kind == 7:
+            finishes.append(_surface_finish_snapshot(adapter, annotation))
+            continue
         if kind != 6:
             other_kinds.append(kind)
             continue
@@ -141,9 +264,7 @@ def snapshot_defaults(adapter, spec):
             row["measured"] = measured
         notes.append(_plain(row))
     if other_kinds:
-        raise RuntimeError(
-            f"unsupported non-note blank-sheet annotations: {other_kinds}"
-        )
+        raise RuntimeError(f"unsupported blank-sheet annotation kinds: {other_kinds}")
     normalized = [" ".join(row["text"].upper().split()) for row in notes]
     if (
         normalized.count(common._METRIC_EDGE_BREAK_NOTE) != 1
@@ -162,6 +283,9 @@ def snapshot_defaults(adapter, spec):
             else "hidden",
             "sheet_notes": sorted(
                 notes, key=lambda row: json.dumps(row, sort_keys=True)
+            ),
+            "sheet_surface_finishes": sorted(
+                finishes, key=lambda row: json.dumps(row, sort_keys=True)
             ),
             "blank_linked_extent_observations": empty_extents,
             "sheet_mode": "edit_sheet",
