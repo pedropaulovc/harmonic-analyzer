@@ -26,10 +26,14 @@ def consumer(request, bank, monkeypatch):
     bank.dimension.GetType = lambda: 0
     monkeypatch.setattr(coverage, "_early_bound", lambda value, _: value)
     if request.param == "model_parameter":
-        read = lambda: coverage._parameter(bank.dimension, "Default")
+        def read():
+            return coverage._parameter(bank.dimension, "Default")
+
         keys = ("tolerance_min", "tolerance_max")
     else:
-        read = lambda: bank.observer.capture("test")["tolerance"]
+        def read():
+            return bank.observer.capture("test")["tolerance"]
+
         keys = ("minimum", "maximum")
     return NS(native=native, read=read, keys=keys, bank=bank)
 
