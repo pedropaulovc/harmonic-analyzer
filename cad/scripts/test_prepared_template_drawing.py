@@ -29,6 +29,10 @@ def cache(monkeypatch, tmp_path):
         calls.append(directory)
         (directory / "prepared.DRWDOT").write_bytes(b"native derived template")
         receipt.update(before={"units": 4}, after={"units": 4})
+        receipt.update(
+            viewport_before={"scale2": 1.0},
+            viewport_restore={"status": "passed", "after": {"scale2": 1.0}},
+        )
 
     monkeypatch.setattr(prepared, "preparation_inputs", identity)
     monkeypatch.setattr(prepared, "_prepare_native", native)
@@ -70,7 +74,8 @@ def test_scale_and_precision_are_cache_inputs(cache, spec):
 
 
 @pytest.mark.parametrize(
-    "damage", ["bytes", "missing", "manifest", "receipt", "receipt_inputs"]
+    "damage",
+    ["bytes", "missing", "manifest", "receipt", "receipt_inputs", "viewport_receipt"],
 )
 def test_corruption_is_loud_never_reprepared_or_fallback(cache, damage):
     entry = access(cache)
@@ -82,10 +87,13 @@ def test_corruption_is_loud_never_reprepared_or_fallback(cache, damage):
         (entry.directory / "manifest.json").write_text("{}")
     if damage == "receipt":
         (entry.directory / "receipt.json").write_text("{}")
-    if damage == "receipt_inputs":
+    if damage in {"receipt_inputs", "viewport_receipt"}:
         path = entry.directory / "receipt.json"
         receipt = json.loads(path.read_text())
-        receipt["inputs"] = {"wrong": "inputs"}
+        if damage == "receipt_inputs":
+            receipt["inputs"] = {"wrong": "inputs"}
+        if damage == "viewport_receipt":
+            receipt["viewport_restore"]["after"]["scale2"] += 1e-12
         path.write_text(json.dumps(receipt))
         manifest_path = entry.directory / "manifest.json"
         manifest = json.loads(manifest_path.read_text())
@@ -234,6 +242,7 @@ def native(monkeypatch, tmp_path):
 
     def create(adapter, **kwargs):
         model = Model(f"Draw{len(created)}")
+        model.viewport = {"scale2": 0.98, "translation3": [float(len(created)), 0.2, 0.3]}
         documents.append(model)
         created.append(model)
         adapter.currentModel = app.ActiveDoc = model
@@ -261,6 +270,25 @@ def native(monkeypatch, tmp_path):
     monkeypatch.setattr(common, "new_drawing", create)
     monkeypatch.setattr(prepared, "check", lambda label, result: result)
     monkeypatch.setattr(prepared, "snapshot_defaults", lambda a, s: {"units": 4})
+    viewport_calls = []
+
+    def capture_viewport(model):
+        viewport_calls.append(("capture", model))
+        return deepcopy(model.viewport)
+
+    def restore_viewport(app, model, target, observation):
+        assert model is app.ActiveDoc and model is adapter.currentModel
+        assert model is not source
+        viewport_calls.append(("restore", model))
+        observation.update(target=deepcopy(target), before=deepcopy(model.viewport))
+        model.viewport = deepcopy(target)
+        observation.update(after=deepcopy(model.viewport), status="passed")
+
+    monkeypatch.setattr(
+        prepared,
+        "template_viewport",
+        SimpleNamespace(capture=capture_viewport, restore=restore_viewport),
+    )
     directory = tmp_path / "stage"
     directory.mkdir()
     return SimpleNamespace(
@@ -272,6 +300,7 @@ def native(monkeypatch, tmp_path):
         scopes=scopes,
         context=context,
         directory=directory,
+        viewport_calls=viewport_calls,
     )
 
 
@@ -305,6 +334,51 @@ def test_native_preparation_preserves_source_and_uses_exact_owned_scopes(native)
         ("save", str(native.directory / "prepared.DRWDOT"), 0, 0),
     ]
     assert receipt["baseline_preserved"] == "exact_native_handles_and_state"
+
+
+def test_preparation_restores_captured_viewport_before_exact_raw_snapshot(
+    native, monkeypatch
+):
+    monkeypatch.setattr(
+        prepared,
+        "snapshot_defaults",
+        lambda adapter, spec: {"raw_extent": deepcopy(adapter.currentModel.viewport)},
+    )
+    receipt = run_native(native)
+    assert receipt["before"] == receipt["after"]
+    assert receipt["viewport_restore"]["before"] != receipt["viewport_before"]
+    assert receipt["viewport_restore"]["after"] == receipt["viewport_before"]
+    assert native.viewport_calls == [
+        ("capture", native.created[0]),
+        ("restore", native.created[1]),
+    ]
+
+
+def test_failed_viewport_restore_retains_evidence_and_closes_only_owned(
+    native, monkeypatch
+):
+    def fail(app, model, target, observation):
+        observation.update(status="failed", error="exact viewport readback differs")
+        raise RuntimeError(observation["error"])
+
+    monkeypatch.setattr(prepared.template_viewport, "restore", fail)
+    receipt = {}
+    with pytest.raises(ExceptionGroup):
+        run_native(native, receipt)
+    assert receipt["viewport_restore"]["status"] == "failed"
+    assert "after" not in receipt
+    assert native.closed == native.created and len(native.closed) == 2
+    assert native.documents == [native.source]
+
+
+def test_viewport_alignment_does_not_waive_raw_annotation_changes(native, monkeypatch):
+    readings = iter(({"extent": [0.1]}, {"extent": [0.1 + 1e-12]}))
+    monkeypatch.setattr(prepared, "snapshot_defaults", lambda *args: next(readings))
+    receipt = {}
+    with pytest.raises(ExceptionGroup):
+        run_native(native, receipt)
+    assert receipt["viewport_restore"]["status"] == "passed"
+    assert native.closed == native.created and len(native.closed) == 2
 
 
 def test_hidden_source_is_rejected_before_creating_or_closing(native):
@@ -368,6 +442,7 @@ def test_actual_fingerprint_contains_preparation_and_adapter_closure(monkeypatch
         "cad/scripts/_drawing_common.py",
         "cad/scripts/_drawing_prepared_template.py",
         "cad/scripts/_drawing_template_defaults.py",
+        "cad/scripts/_drawing_template_viewport.py",
         "cad/scripts/_drawing_native_display_data.py",
         "cad/scripts/_drawing_annotation_bounds.py",
         "cad/scripts/_drawing_view_packing.py",
