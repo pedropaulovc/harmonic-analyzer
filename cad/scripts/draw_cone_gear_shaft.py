@@ -233,12 +233,15 @@ async def build(
             ),
             "journal_cylindricity": PmiDrawingPlacement(
                 view=end,
-                position=(0.150, 0.142),
+                # Request the band below diameter text and above the notes.
+                # Native leader clearance still needs a fresh printed witness.
+                position=(0.100, 0.085),
                 edge_entity=pivot_edge,
             ),
             "tip_runout": PmiDrawingPlacement(
                 view=side,
-                position=(0.070, 0.245),
+                # Request a rightward origin; keep the native FACE finish put.
+                position=(0.110, 0.245),
                 attachment_xy=tip_top,
                 attachment_type="SILHOUETTE",
             ),
