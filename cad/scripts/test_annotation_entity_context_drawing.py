@@ -47,7 +47,10 @@ def scene(monkeypatch):
         GetSelectedObjectsDrawingView2=lambda *_: view,
         GetSelectedObjectType3=lambda *_: 1,
     )
-    draw_extension = Mock(side_effect=AssertionError("never use drawing extension"))
+    draw_extension = Mock()
+    draw_extension.GetCorrespondingEntity2.side_effect = AssertionError(
+        "never use drawing extension"
+    )
     adapter = SimpleNamespace(
         swApp=SimpleNamespace(IsSame=lambda a, b: int(a is b)),
         currentModel=SimpleNamespace(
@@ -91,6 +94,11 @@ def test_unsupported_entity_type_rejects_before_reads_or_observer_mutation(scene
     scene.adapter.swApp.IsSame.assert_not_called()
 
 
+def test_drawing_extension_mapping_guard_rejects_method_calls(scene):
+    with pytest.raises(AssertionError, match="never use drawing extension"):
+        scene.draw_extension.GetCorrespondingEntity2(scene.selected)
+
+
 def test_source_view_context_is_distinguished_from_attachment_change(scene):
     selected = capture(scene, "selected", selected=scene.selected)
     immediate = capture(
@@ -107,6 +115,7 @@ def test_source_view_context_is_distinguished_from_attachment_change(scene):
         assert row["reads"]["source_reverse_attached"]["value"] == 1
         assert row["reads"]["view_owner"]["value"] == 1
     scene.draw_extension.assert_not_called()
+    scene.draw_extension.GetCorrespondingEntity2.assert_not_called()
     assert {
         id(call.args[0])
         for call in scene.extension.GetCorrespondingEntity2.call_args_list

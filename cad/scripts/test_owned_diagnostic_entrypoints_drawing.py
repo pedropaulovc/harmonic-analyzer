@@ -36,6 +36,7 @@ MIGRATED = (
     "diagnostics/probe_datum_dimension_attachment.py",
     "diagnostics/probe_source_basic_dimensions.py",
     "diagnostics/probe_native_model_pmi.py",
+    "diagnostics/probe_populated_template.py",
 )
 
 
@@ -68,6 +69,24 @@ def test_copy_entrypoint_uses_owned_runner_and_guards_parent_preflight(filename)
         for node in tree.body
         if isinstance(node, ast.FunctionDef) and node.name == "main"
     )
+    unconditional_guards = [
+        node for node in main.body
+        if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call)
+        and isinstance(node.value.func, ast.Name)
+        and node.value.func.id == "require_owned_diagnostic_environment"
+    ]
+    if unconditional_guards:
+        # This form protects both routes; it must precede either native dispatch.
+        dispatches = [
+            node for node in ast.walk(main) if isinstance(node, ast.Call)
+            and (
+                isinstance(node.func, ast.Name) and node.func.id == "run_copy_diagnostic"
+                or isinstance(node.func, ast.Attribute) and node.func.attr == "_run"
+            )
+        ]
+        assert len(dispatches) == 2
+        assert all(unconditional_guards[0].lineno < node.lineno for node in dispatches)
+        return
     parent = next(
         node
         for node in ast.walk(main)
@@ -92,3 +111,24 @@ def test_required_recipe_gate_enrolls_entrypoint_test_and_every_audited_source()
     assert {str((SCRIPTS / name).resolve()) for name in MIGRATED} <= set(
         task["file_dep"]
     )
+
+
+@pytest.mark.parametrize("position", ["before", "between", "after"])
+def test_unconditional_guard_must_precede_both_native_dispatches(monkeypatch, tmp_path, position):
+    import sys
+
+    guard = "    require_owned_diagnostic_environment()\n"
+    worker = "    if args.worker:\n        return run_copy_diagnostic(callback)\n"
+    parent = "    dodo._run(command)\n"
+    body = {
+        "before": guard + worker + parent,
+        "between": worker + guard + parent,
+        "after": worker + parent + guard,
+    }[position]
+    (tmp_path / "fixture.py").write_text("def main(args):\n" + body, encoding="utf-8")
+    monkeypatch.setattr(sys.modules[__name__], "SCRIPTS", tmp_path)
+    if position == "before":
+        test_copy_entrypoint_uses_owned_runner_and_guards_parent_preflight("fixture.py")
+        return
+    with pytest.raises(AssertionError):
+        test_copy_entrypoint_uses_owned_runner_and_guards_parent_preflight("fixture.py")

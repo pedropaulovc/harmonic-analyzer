@@ -185,7 +185,7 @@ def test_snapshot_uses_drawing_not_source_part_persistent_reference_context(
 
 
 def test_diagnostic_never_positions_or_recreates_annotations():
-    tree = ast.parse(Path(probe.__file__).read_text())
+    tree = ast.parse(Path(probe.__file__).read_text(encoding="utf-8"))
     calls = {
         node.func.attr
         for node in ast.walk(tree)
