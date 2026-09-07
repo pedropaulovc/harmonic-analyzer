@@ -11,6 +11,7 @@ from enum import Enum
 import math
 import json
 from typing import Any
+from types import SimpleNamespace
 
 from _drawing_annotation_bounds import Segment, LeaderGeometry
 from _drawing_view_packing import Rect
@@ -117,6 +118,55 @@ def crossing_records(leader_banks, measurements, decorations):
                         }
                     )
     return result
+
+
+def dimension_crossings(measurements):
+    """All same-view dimension ink against the original manufacturing-body bank.
+
+    This is the retained dimension-arrangement diagnostic's unchanged gate.
+    Center marks are geometry adornments, not text/frame obstacles; no datum,
+    other dimension, GTol, note or surface-finish body is exempted. In particular,
+    type-14 intentional joins are not assumed. Inputs are already measured.
+    """
+    result = {}
+    for key, rows in measurements.items():
+        dimensions = {name: row for name, row in rows.items() if row.kind == 4}
+        targets = {
+            name: SimpleNamespace(
+                kind=row.kind,
+                text_boxes=(row.body,),
+                text_runs=row.text_runs,
+                body=row.body,
+            )
+            for name, row in rows.items()
+            if row.kind in (2, 4, 5, 6, 7)
+        }
+        result[key] = crossing_records(
+            {
+                name: (*row.native_strokes, *row.native_leader_segments)
+                for name, row in dimensions.items()
+            },
+            targets,
+            {name: row.leader_decorations for name, row in dimensions.items()},
+        )
+    return result
+
+
+def validate_dimension_leader_clearance(measurements_by_view):
+    """Reject actual dimension strokes/decorations through any foreign body."""
+    crossings = dimension_crossings(measurements_by_view)
+    if any(crossings.values()):
+        raise RuntimeError(
+            "final native dimension stroke/other-body crossings: "
+            + json.dumps(crossings)
+        )
+    return {
+        view: {
+            "dimension_count": sum(row.kind == 4 for row in rows.values()),
+            "crossings": crossings[view],
+        }
+        for view, rows in measurements_by_view.items()
+    }
 
 
 def displayed_leader_coverage(native, displayed):
@@ -239,9 +289,7 @@ def _candidate_text_cells(measured, right_seed, predicted):
     for name, bounds in measured.items():
         result[name] = _TextCells(
             bounds.kind,
-            (predicted[name].body,)
-            if name in right_seed
-            else tuple(bounds.text_boxes),
+            (predicted[name].body,) if name in right_seed else tuple(bounds.text_boxes),
             tuple(bounds.text_runs),
             bounds.body if bounds.kind == 6 else None,
         )

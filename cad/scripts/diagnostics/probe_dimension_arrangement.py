@@ -21,7 +21,6 @@ import shutil
 import sys
 import tempfile
 import time
-from types import SimpleNamespace
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
@@ -30,7 +29,10 @@ sys.path.insert(0, str(ROOT / "cad/scripts"))
 from _common import _early_bound, check  # noqa: E402
 from _drawing_annotation_bounds import annotation_box  # noqa: E402
 from _drawing_common import render_pdf_png  # noqa: E402
-from _drawing_leader_clearance import crossing_records, validate_gtol_leader_clearance  # noqa: E402
+from _drawing_leader_clearance import (  # noqa: E402
+    dimension_crossings,
+    validate_gtol_leader_clearance,
+)
 from diagnostics import probe_datum_policy_recipes as pilot  # noqa: E402
 from diagnostics import probe_retained_drawing_export as retained  # noqa: E402
 from diagnostics._owned_native_documents import run_copy_diagnostic  # noqa: E402
@@ -190,34 +192,6 @@ def measure_views(adapter, views):
             # are not a fallback and no nominal bodies are substituted.
             rows[name] = annotation_box(adapter, annotation)
         result[key] = rows
-    return result
-
-
-def dimension_crossings(measurements):
-    result = {}
-    for key, rows in measurements.items():
-        dimensions = {name: row for name, row in rows.items() if row.kind == 4}
-        # Center marks are geometry adornments, not text/frame obstacles. Their
-        # identity and complete strokes are still captured. Do not exempt any
-        # other dimension or datum. Type-14 intentional joins are NOT assumed.
-        targets = {
-            name: SimpleNamespace(
-                kind=row.kind,
-                text_boxes=(row.body,),
-                text_runs=row.text_runs,
-                body=row.body,
-            )
-            for name, row in rows.items()
-            if row.kind in (2, 4, 5, 6, 7)
-        }
-        result[key] = crossing_records(
-            {
-                name: (*row.native_strokes, *row.native_leader_segments)
-                for name, row in dimensions.items()
-            },
-            targets,
-            {name: row.leader_decorations for name, row in dimensions.items()},
-        )
     return result
 
 
