@@ -1,7 +1,8 @@
 # Tooth-selector observation control
 
-Diagnostic-only, opt-in observation of the existing gear selector. Native execution
-of this instrumentation is pending. It changes no recipe, selection predicate,
+Diagnostic-only, opt-in observation of the existing gear selector. Two native
+observations are recorded below; full recipe acceptance remains pending.
+It changes no recipe, selection predicate,
 radius tolerance, tie rule, entity identity gate, source pin, or BSURF index rule.
 
 ## Retained reason for the control
@@ -93,3 +94,49 @@ uv run --no-sync python cad/scripts/diagnostics/probe_datum_policy_recipes.py --
 No new lifecycle, retry, selector fallback or accepted snapshot from exploratory
 reads is introduced. Inspect `trials[0].tooth_selector_observations` alongside the
 original selector span and unchanged failure evidence.
+
+## Native observations on 2026-09-07
+
+Both runs used root/helper revision `d93b88503769b9be23b8a10f12d95307ae53adab`,
+adapter `25bc99b1ae39d8c0e004867e9b5c0f2068f2abc2`, prepared factory, the same
+protected gear hash above, and existing SolidWorks PID 42080 / revision 34.3.0.
+They ran serially with source/config/adapter files unchanged during execution.
+
+| pilot directory under `cad/out/reports/` | BSURF control | native enumeration | selector including observations | pilot elapsed |
+|---|---|---:|---:|---:|
+| `datum-policy-w4090gdy` | off | 293.020 s | 296.700 s | 387.879 s |
+| `datum-policy-5fe0i713` | boundary-domain | 9.812 s | 13.803 s | 115.879 s |
+
+Each enumerated nine silhouettes, matched one and returned binding index 8.
+All actual endpoint arrays were finite native doubles, without swallowed getter
+errors. Entry and exit each proved one owning-view match and exact current,
+active and referenced-source identity. Right stayed at `(0.300, 0.175)` m,
+scale 1.0, with the same model-to-view transform across the selector.
+The selected endpoints' Y coordinates were approximately `0.0325753615032` m,
+matching the requested radius; the observer did not transform them.
+
+During the long first scan, a read-only `uv tool run py-spy dump --pid 33356`
+showed the Python main thread waiting in generated `GetVisibleEntities2`, called
+from the original `visible_view_entities`. The watchdog thread remained alive.
+A Win32-only inventory found the enabled drawing window and no matching modal.
+The native call eventually returned without interruption. Its variable cost is
+unexplained; these two instrumented runs are not an ABBA speed comparison and
+do not establish whether the additional getters affect native cache state.
+
+Neither run accepted the recipe: both stopped at strict BSURF
+`GetControlPoints(1,6)` readback before tooth FCF insertion. The second retained
+the [eleven index-boundary results](tooth-tip-bsurface-witness.md#native-index-boundary-result).
+Both original/copy gear hashes remained exact, all four protected hashes and
+factory/helper/adapter guards matched, runtime guard errors were empty, and
+initial/final native inventories were empty with no cleanup error.
+
+Receipt SHA-256 values:
+
+- `w4090gdy/pilot.json`: `d79005d14c32f36bd9342f96ba9e6e7dc219f58c32faf41308439ea12a7b5f87`.
+- `w4090gdy/ownership.json`: `ca6a86a5584c09a08be098c345911a869850180d1cd9b0cb364efb5c06bd84fd`.
+- `5fe0i713/pilot.json`: `3a8a480a45d9e12435b727554c2e5b0fe0b89a37072c1a8ce7a5700b9881e3fb`.
+- `5fe0i713/ownership.json`: `0e252783399310a488c970704b4703052ddec316df4e72d9d1762d926cd1c2c9`.
+
+These successful selections do not explain the earlier zero-match run or its
+post-failure displaced view. No selector radius/tie rule or production layout
+was changed, and no failed identity check was bypassed.

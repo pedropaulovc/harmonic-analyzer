@@ -144,7 +144,7 @@ try {
 
 This uses the existing locked attach-only worker and owned source/drawing
 lifecycle. It does not authorize another recipe attempt or a save of the copied
-source. Boundary-control native results remain pending.
+source. The completed boundary-control result is recorded below.
 
 Offline boundary tests first reported 21 failures and 2 unchanged-default
 passes (`run-x35zngby`). They now cover strict enum routing, missing evidence,
@@ -154,6 +154,46 @@ and refusal to substitute exploratory coefficients for the full grid. The
 25-case boundary suite, including original getter-exception preservation,
 passed in 0.64 s (`run-ruu9ckp1`). Ruff F/RUF043/RUF059 and diff checks passed.
 These fixtures establish instrumentation behavior, not native domain results.
+
+## Native index-boundary result
+
+At root/helper `d93b88503769b9be23b8a10f12d95307ae53adab`, the owned prepared
+`crank_drive_gear` pilot `datum-policy-5fe0i713` reached all eleven planned
+boundary reads. The preceding observer-only `datum-policy-w4090gdy` run had
+reached the same strict sixth-point failure. Both selected one of nine tooth
+silhouettes with exact view/source ownership. Complete receipt hashes, timings
+and cleanup evidence are in the [selector observation results](tooth-selector-observation.md#native-observations-on-2026-09-07).
+
+The reported grid remained 5 rows, 25 columns, dimension 4, with U/V orders 5/3
+and knot counts 30/8. Actual positional calls returned:
+
+| first argument | second argument | raw result |
+|---:|---:|---|
+| 2 | 3 | four doubles; documented example control |
+| 1 | 5 | four doubles |
+| 1 | 6 | `None` |
+| 5 | 1 | four doubles |
+| 6 | 1 | four doubles |
+| 25 | 1 | four doubles |
+| 26 | 1 | `None` |
+| 1 | 25 | `None` |
+| 1 | 26 | `None` |
+| 0 | 1 | `None` |
+| 1 | 0 | `None` |
+
+The generated early-bound ABI still forwards `Row, Column` in that order; no
+Python argument reversal explains this result. These observations contradict
+the documented respective row/column upper bounds on this native surface.
+They support testing a first-argument 1..25 / second-argument 1..5 grid, but do
+not prove every pair, including `(25,5)`, succeeds or establishes a stable
+same-session/cold identity witness. No production acceptance rule or existing
+matrix assertion has been changed to accommodate the observation.
+
+After the exploratory reads, the unchanged strict reader again rejected
+`GetControlPoints(1,6)`. No partial grid was accepted and the tooth FCF did not
+reach insertion. A complete correction requires a full-grid native control,
+reconciliation of the documented/tested index contract with the observed ABI,
+then repeated/attached/cold identity and printed manufacturing acceptance.
 
 ## Supported request, not an exactness assumption
 
@@ -227,7 +267,7 @@ and native call counts are unchanged. The ten-file adjacent suite passed
 `git diff --check` passed. The journaling follow-up subsequently produced the
 second failed native receipt described above.
 
-Both native attempts failed as recorded above; complete native acceptance
+The native attempts failed as recorded above; complete native acceptance
 remains pending. Use the existing pilot after source review
 and confirmed exclusive seat ownership/current PID; the prepared factory keeps
 the preceding failure's setup arm. Stop at the first failure; no second variant
