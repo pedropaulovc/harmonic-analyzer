@@ -59,7 +59,8 @@ dependencies = [
 # Backs the SolidWorks-free `check:*` gates (math/config/graph/nameplate/recipe).
 # Synced by default with `uv sync`.
 dev = [
-    "pytest>=8.0",
+    # RaisesExc/RaisesGroup support the viewport tests' exact exception groups.
+    "pytest>=8.4",
     "pytest-asyncio>=0.21.0",
     "ruff>=0.15.20",
     # Pull the submodule's `ui` extra (fastapi + prefab-ui) transitively through

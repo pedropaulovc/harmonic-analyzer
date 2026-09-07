@@ -786,8 +786,7 @@ def test_shared_restore_rejected_scale_stops_before_translation_and_redraw(
     assert observation["after_scale"]["scale2"] == readback
     assert observation["after_scale"]["scale2"] != target["scale2"]
     assert observation["after_scale"]["orientation3"] == target["orientation3"]
-    # A final readback already rejected these setters, but only after these
-    # unneeded translation/vector/redraw operations had occurred.
+    # Rejected scale readback stops before translation, vector creation or redraw.
     assert scene.calls == [("scale", 2.0)]
     assert scene.vectors == []
     assert view._translation == before["translation3"]

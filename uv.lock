@@ -1289,7 +1289,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "pytest", specifier = ">=8.0" },
+    { name = "pytest", specifier = ">=8.4" },
     { name = "pytest-asyncio", specifier = ">=0.21.0" },
     { name = "ruff", specifier = ">=0.15.20" },
     { name = "solidworks-mcp-python", extras = ["ui"], editable = "SolidworksMCP-python" },
