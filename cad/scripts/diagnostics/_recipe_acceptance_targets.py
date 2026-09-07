@@ -6,11 +6,13 @@ No recipe, geometry, output path or production layout policy lives here.
 """
 
 from dataclasses import dataclass, field
+from importlib import import_module
 
 import channel_lever_spec
 import fulcrum_shaft_spec
 import pivot_shaft_spec
 import rocker_arm_notes
+from diagnostics._recipe_view_roles import VIEW_ROLES, ViewRole
 
 
 @dataclass(frozen=True)
@@ -20,6 +22,7 @@ class RecipeTarget:
     dimensions: dict[str, set[str]]
     basic: dict[str, set[str]] = field(default_factory=dict)
     entity_labels: dict[str, str] = field(default_factory=dict)
+    view_roles: dict[str, ViewRole] = field(default_factory=dict)
 
 
 def _shaft_labels(stem, spec):
@@ -60,3 +63,28 @@ TARGETS = {
         entity_labels=_shaft_labels("pivot", pivot_shaft_spec),
     ),
 }
+
+
+# Exact native bytes read from root outputs and compared with execution tokens
+# on 2026-09-06; no claim that disk equality proves builder provenance.
+_VIEW_SOURCE_HASHES = {
+    "alignment_pinion": "858dc759943c2f739b3081fd02f313c26ead01eb837e08f9c79d59caac388920",
+    "cone_gear_shaft": "8df108cb4053bd47bcc1acc8b83fede6e3a52a9d3c4f6341c1ab3702d512b0ab",
+    "crank_drive_gear": "2cd81cf44def13c0bbd298617d16769206e4931eac41a04642ac6217e4880cb5",
+    "crank_pinion": "08ea59d153d8801792a8b611981702d0b584b9e8a04a33e4b9cb322a3d9df6fc",
+    "crankshaft": "3c0224617322e3a10cca4a5c52e2b0a3b4c82e7be7969c0b21faf4db58b4cd94",
+    "cylinder_gear": "46fcb66a87fd35f8862e4a01e2225688b91ab7182608bce26159f59c5b14f120",
+    "rack_pinion": "96f57e663d04d745e8ad67d36a5f9ea4ddbaece4c82b2dc312bca69d4d8005b8",
+    "spring_hook": "29c04a0919e0f720915527bd62cdb90eed909de6d14e74b9068c106baa42ace5",
+    "transgear_feed_pinion": "f9b033d0026ef26996a52f73fad3b3147c6f5e5b15333a306004dcaf435a0d77",
+    "transgear_pinion": "4c079ba522ccf79fa90e75afa23303ba4c2f6541232e608525368e4cbb56d335",
+}
+for _target, _hash in _VIEW_SOURCE_HASHES.items():
+    _spec_name = "spring_hook_notes" if _target == "spring_hook" else f"{_target}_spec"
+    _spec = import_module(_spec_name)
+    TARGETS[_target] = RecipeTarget(
+        _hash,
+        _spec_name,
+        _spec.DRAWING_DIMENSIONS,
+        view_roles=VIEW_ROLES[_target],
+    )
