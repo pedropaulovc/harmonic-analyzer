@@ -107,7 +107,7 @@ def scene(native, monkeypatch, tmp_path):  # noqa: F811
     )
     reports = tmp_path / "reports"
 
-    def run():
+    def run(**options):
         return asyncio.run(
             owned.owned_callback(
                 native.adapter,
@@ -116,6 +116,7 @@ def scene(native, monkeypatch, tmp_path):  # noqa: F811
                     probe.prepared.TemplateSpec((2, 1), 2),
                     reports,
                     123,
+                    **options,
                 ),
             )
         )
@@ -186,6 +187,102 @@ def test_first_raw_failure_stops_before_cache_preparation_and_retains_cleanup(sc
     assert len(scene.created) == 1 and not scene.saves
     assert scene.native.app.documents == scene.baseline
     assert "raw native defaults rejected" in report["trials"][0]["error"]
+
+
+def test_printed_policy_exports_all_three_and_compares_to_normal(scene, monkeypatch):
+    exports, comparisons = [], []
+
+    def capture(adapter, directory):
+        adapter.ownership.assert_current_owned()
+        exports.append(directory.name)
+        return {"variant": directory.name}
+
+    def compare(before, after):
+        comparisons.append((before["variant"], after["variant"]))
+        return {"changed_pixel_count": 0}
+
+    monkeypatch.setattr(probe, "printed_witness", capture)
+    monkeypatch.setattr(probe, "compare_printed", compare)
+    scene.run(printed_format=probe.PrintedFormat.COMPARE)
+    report, _ = scene.report()
+    assert exports == ["normal", "prepared_miss", "prepared_hit"]
+    assert comparisons == [("normal", "prepared_miss"), ("normal", "prepared_hit")]
+    assert len(scene.created) == 5 and len(scene.saves) == 1
+    assert report["printed_format"] == "compare"
+    assert all("post_print_witness_seconds" in row for row in report["trials"])
+    assert scene.native.app.documents == scene.baseline
+
+
+def test_printed_difference_stops_before_hit_without_reset(scene, monkeypatch):
+    monkeypatch.setattr(probe, "printed_witness", lambda *args: {"captured": "yes"})
+
+    def reject(*args):
+        raise RuntimeError("visible border changed")
+
+    monkeypatch.setattr(probe, "compare_printed", reject)
+    with pytest.raises(ExceptionGroup):
+        scene.run(printed_format=probe.PrintedFormat.COMPARE)
+    report, _ = scene.report()
+    assert len(report["accessors"]) == 1
+    assert "visible border changed" in report["trials"][-1]["error"]
+    assert scene.native.app.documents == scene.baseline
+
+
+def test_post_export_default_mutation_remains_a_failure(scene, monkeypatch):
+    def mutate(*args):
+        scene.faults["snapshot"] = True
+        return {"captured": "yes"}
+
+    monkeypatch.setattr(probe, "printed_witness", mutate)
+    with pytest.raises(ExceptionGroup):
+        scene.run(printed_format=probe.PrintedFormat.COMPARE)
+    report, _ = scene.report()
+    assert report["accessors"] == []
+    assert "raw native defaults rejected" in report["trials"][0]["error"]
+    assert scene.native.app.documents == scene.baseline
+
+
+@pytest.mark.parametrize("change", ["none", "pixel", "glyph", "page", "file"])
+def test_printed_comparison_rejects_real_output_changes(tmp_path, change):
+    from PIL import Image
+
+    snapshots = []
+    for name in ("before", "after"):
+        pdf, png = tmp_path / f"{name}.pdf", tmp_path / f"{name}.png"
+        pdf.write_bytes(b"pdf bytes differ from appearance contract: " + name.encode())
+        pixels = Image.new("RGB", (12, 12), "white")
+        if name == "after" and change == "pixel":
+            pixels.putpixel((4, 6), (0, 0, 0))
+        pixels.save(png)
+        snapshots.append(
+            {
+                "pdf": str(pdf),
+                "png": str(png),
+                "sha256": {
+                    "pdf": probe.prepared._sha(pdf),
+                    "png": probe.prepared._sha(png),
+                },
+                "page_size_pt": [12, 12],
+                "glyphs": [{"text": "A", "box_pt": [1.0, 2.0, 3.0, 4.0]}],
+            }
+        )
+    if change == "glyph":
+        snapshots[1]["glyphs"][0]["box_pt"][0] += 1e-12
+    if change == "page":
+        snapshots[1]["page_size_pt"][0] = 13
+    if change == "file":
+        Path(snapshots[0]["pdf"]).write_bytes(b"unexpected mutation")
+    if change == "none":
+        assert probe.compare_printed(*snapshots)["changed_pixel_count"] == 0
+        return
+    with pytest.raises(RuntimeError):
+        probe.compare_printed(*snapshots)
+
+
+def test_printed_policy_rejects_untyped_selector_before_work(scene):
+    with pytest.raises(ValueError, match="policy enum"):
+        scene.run(printed_format="compare")
+    assert not scene.created
 
 
 def test_normal_to_prepared_difference_stops_before_hit_without_weakening(scene):
