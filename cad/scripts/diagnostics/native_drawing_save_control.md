@@ -71,13 +71,36 @@ contexts. `native_call_seconds` covers extension binding and the modern native
 call, excluding subsequent file/path reads. Neither is end-to-end build time.
 
 This module is a composition seam, not another native launcher. The pilot's CLI
-selection is integrated separately with its source-boundary observer. Native
+accepts `--drawing-save legacy|extension_silent` only with
+`--target alignment_pinion --source-observation alignment_save`. Both parent and
+worker validate that scope before any document/file operation. Omission retains
+the original unpatched path; an explicit legacy arm also leaves its exact save
+function untouched. The save context encloses the source observer so both arms
+retain every boundary bank. Native
 acceptance needs a reviewed, frozen, single-target `alignment_pinion` legacy /
 modern pair through that attach-only runner, using fresh matched source copies,
 the same immutable input bytes and source value/tolerance/presentation banks.
 All drawing and source persistence gates remain mandatory. No such pair has
 been run for this control yet, and no source-immutability or performance result
 is claimed.
+
+Run each arm separately on the same frozen checkout and matched source bytes:
+
+```powershell
+$env:HARMONIC_SW_AUTOSTART = '0'
+$env:HARMONIC_REMOTE_CACHE_MODE = 'off'
+$env:HARMONIC_DIAGNOSTIC_SW_PID = '<verified existing PID>'
+uv run --no-sync python cad/scripts/diagnostics/probe_datum_policy_recipes.py `
+  --source-root C:/src/harmonic-analyzer/cad/out/sldprt `
+  --guard-root C:/src/harmonic-analyzer/cad/out/sldprt `
+  --target alignment_pinion --factory normal `
+  --source-observation alignment_save --drawing-save legacy
+```
+
+After inspecting the legacy receipt and cleanup, repeat with
+`--drawing-save extension_silent`. Legacy source-copy drift is an expected failed
+control, not permission to alter the source acceptance condition. The modern
+arm must still pass that condition and every built/cold drawing witness.
 
 ## Offline verification
 

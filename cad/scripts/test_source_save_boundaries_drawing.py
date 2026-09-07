@@ -386,10 +386,12 @@ def test_explicit_cli_forwards_variant_without_changing_factory_or_guards(
     assert parent.call_args.kwargs["com"] is True
 
 
+@pytest.mark.parametrize("save_variant", [None, "legacy", "extension_silent"])
 @pytest.mark.asyncio
 async def test_pilot_wraps_real_recipe_and_retains_banks_before_hash_failure(
-    tmp_path, monkeypatch
+    tmp_path, monkeypatch, save_variant
 ):
+    from diagnostics import _native_drawing_save_control as native_save
     from test_datum_policy_recipes_drawing import Adapter, fixture_sources
     from test_benchmark_drawing_recipes import recipe
 
@@ -411,6 +413,17 @@ async def test_pilot_wraps_real_recipe_and_retains_banks_before_hash_failure(
         lambda *_: ({"configuration": "Default", "dimensions": {}}, {"one": handle}),
     )
     events = []
+
+    @contextmanager
+    def save_control(actual_adapter, variant, *, records):
+        assert actual_adapter is adapter
+        assert variant is native_save.DrawingSave(save_variant)
+        assert records == []
+        events.append("save_enter")
+        yield
+        events.append("save_exit")
+
+    monkeypatch.setattr(native_save, "native_drawing_save_control", save_control)
 
     class Observer:
         def __init__(
@@ -443,6 +456,9 @@ async def test_pilot_wraps_real_recipe_and_retains_banks_before_hash_failure(
             tmp_path / "reports",
             targets=("alignment_pinion",),
             source_observation=control.SourceObservation.ALIGNMENT_SAVE,
+            drawing_save=(
+                native_save.DrawingSave(save_variant) if save_variant else None
+            ),
         )
     import json
 
@@ -454,4 +470,78 @@ async def test_pilot_wraps_real_recipe_and_retains_banks_before_hash_failure(
     assert result["runtime_final_guard_errors"] == [
         "RuntimeError('final owned source copy changed on disk')"
     ]
-    assert events == ["enter", "exit", "checked"]
+    expected = ["enter", "exit", "checked"]
+    if save_variant is not None:
+        expected = ["save_enter", "enter", "exit", "save_exit", "checked"]
+        assert result["trials"][0]["drawing_save"] == save_variant
+        assert result["trials"][0]["native_save_calls"] == []
+    assert events == expected
+
+
+@pytest.mark.parametrize("variant", ["legacy", "extension_silent"])
+def test_save_cli_requires_source_banks_before_environment(
+    monkeypatch, tmp_path, variant
+):
+    environment = Mock(side_effect=AssertionError("must not attach"))
+    monkeypatch.setattr(pilot, "require_owned_diagnostic_environment", environment)
+    with pytest.raises(ValueError, match="alignment_save observations"):
+        pilot.main([
+            "--source-root", str(tmp_path), "--guard-root", str(tmp_path),
+            "--target", "alignment_pinion", "--drawing-save", variant,
+        ])
+    environment.assert_not_called()
+
+
+@pytest.mark.parametrize("route", ["parent", "worker"])
+@pytest.mark.parametrize("variant", ["legacy", "extension_silent"])
+def test_save_cli_forwards_explicit_enum(monkeypatch, tmp_path, route, variant):
+    import asyncio
+    import sys
+    from diagnostics._native_drawing_save_control import DrawingSave
+
+    monkeypatch.setattr(pilot, "require_owned_diagnostic_environment", lambda: None)
+    monkeypatch.setattr(pilot.benchmark, "revision", lambda _: "frozen")
+    parent, seen = Mock(), []
+    monkeypatch.setitem(sys.modules, "dodo", NS(_run=parent))
+
+    async def run(*args, **kwargs):
+        seen.append(kwargs)
+        return 0
+
+    monkeypatch.setattr(pilot, "pilot", run)
+    monkeypatch.setattr(
+        pilot, "run_copy_diagnostic", lambda callback: asyncio.run(callback(object()))
+    )
+    argv = [
+        "--source-root", str(tmp_path), "--guard-root", str(tmp_path),
+        "--target", "alignment_pinion", "--source-observation", "alignment_save",
+        "--drawing-save", variant,
+    ]
+    if route == "worker":
+        argv.append("--worker")
+    assert pilot.main(argv) == 0
+    if route == "worker":
+        assert seen == [{
+            "targets": ("alignment_pinion",),
+            "source_observation": control.SourceObservation.ALIGNMENT_SAVE,
+            "drawing_save": DrawingSave(variant),
+        }]
+        return
+    command = parent.call_args.args[0]
+    assert command[command.index("--drawing-save") + 1] == variant
+    assert command[command.index("--source-observation") + 1] == "alignment_save"
+    assert parent.call_args.kwargs["com"] is True
+
+
+def test_direct_save_selection_rejects_string_and_wrong_targets():
+    from diagnostics._native_drawing_save_control import DrawingSave
+
+    for variant, order in (
+        ("extension_silent", ("alignment_pinion",)),
+        (DrawingSave.EXTENSION_SILENT, ("channel_lever",)),
+        (DrawingSave.LEGACY, ("alignment_pinion", "rocker_arm")),
+    ):
+        with pytest.raises(ValueError, match="drawing-save control"):
+            pilot.require_drawing_save(
+                variant, control.SourceObservation.ALIGNMENT_SAVE, order
+            )
