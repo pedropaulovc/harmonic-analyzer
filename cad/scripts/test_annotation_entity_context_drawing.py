@@ -209,6 +209,7 @@ def test_real_validator_failure_survives_observation_and_all_hooks_restore(
                 bank.view,
                 source,
                 entity_type="EDGE",
+                entity_context=acceptance.drawing.AnnotationEntityContext.VIEW,
                 label="label datum:A",
             )
     assert originals == tuple(

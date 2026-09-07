@@ -2,6 +2,7 @@
 
 import ast
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
@@ -17,9 +18,18 @@ from test_shaft_pmi_entities_drawing import cylinder
 def projected_native_datum(monkeypatch):
     adapter, view, _entity, annotation = native_context(monkeypatch)
     entity = cylinder()
+    view_entity = cylinder()
     view.GetName2 = lambda: "Front"
-    adapter.currentModel.SelectionManager.GetSelectedObject6.return_value = entity
-    annotation.GetAttachedEntities3.return_value = (entity,)
+    view.ReferencedDocument = SimpleNamespace(
+        GetType=lambda: 1,
+        Extension=SimpleNamespace(
+            GetCorrespondingEntity2=Mock(
+                side_effect=lambda actual: entity if actual is view_entity else actual
+            )
+        ),
+    )
+    adapter.currentModel.SelectionManager.GetSelectedObject6.return_value = view_entity
+    annotation.GetAttachedEntities3.return_value = (view_entity,)
     annotation.GetAttachedEntityTypes.return_value = (2,)
     annotation.Owner, annotation.OwnerType = view, 0
     annotation.Visible = 1
@@ -27,7 +37,11 @@ def projected_native_datum(monkeypatch):
     datum = PartDatum("A", CylinderFace(6.35))
     annotation.GetName.return_value = datum.annotation_name
     placement = drawing.PmiDrawingPlacement(
-        view=view, position=None, entity=entity, attachment_type="FACE"
+        view=view,
+        position=None,
+        entity=entity,
+        attachment_type="FACE",
+        entity_context=drawing.AnnotationEntityContext.MODEL,
     )
 
     def run():
@@ -55,6 +69,13 @@ def test_typed_native_datum_never_sets_position_and_keeps_exact_entity_bank(
     view.SelectEntity.assert_called_once()
     guard.assert_called_once()
     assert guard.call_args.kwargs["entity_type"] == "FACE"
+    assert (
+        guard.call_args.kwargs["entity_context"]
+        == drawing.AnnotationEntityContext.MODEL
+    )
+    view.ReferencedDocument.Extension.GetCorrespondingEntity2.assert_called_once_with(
+        adapter.currentModel.SelectionManager.GetSelectedObject6.return_value
+    )
     annotation.IsDangling.assert_called_once_with()
 
 
@@ -151,6 +172,9 @@ def test_only_shaft_datum_seed_is_native_other_three_pmi_seeds_remain(recipe):
     for key, call in zip(placements.keys, placements.values, strict=True):
         keywords = {kw.arg: kw.value for kw in call.keywords}
         assert "entity" in keywords
+        assert (
+            ast.unparse(keywords["entity_context"]) == "AnnotationEntityContext.MODEL"
+        )
         if key.value == "datum:A":
             assert isinstance(keywords["position"], ast.Constant)
             assert keywords["position"].value is None
