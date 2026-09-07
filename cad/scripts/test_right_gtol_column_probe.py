@@ -295,7 +295,7 @@ def test_decoration_only_crossing_uses_its_native_bounds_without_inventing_elbow
 
 
 def test_decoration_offsets_are_translation_independent():
-    leaders, measured, _ = lever_crossing_fixture()
+    _, measured, _ = lever_crossing_fixture()
     decorations = native_all_around_fixture()
     delta = (0.2, -0.06)
     shifted_decorations = {

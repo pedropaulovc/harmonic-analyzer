@@ -305,7 +305,7 @@ def datum_dimension_attachment(
         raise RuntimeError(
             "datum attachment currently requires a source model dimension"
         )
-    source = _early_bound(view.ReferencedDocument, "IModelDoc2")
+    source = referenced_document(view)
     if source is None or Path(source.GetPathName()).resolve(strict=True) != Path(
         reference["path"]
     ):

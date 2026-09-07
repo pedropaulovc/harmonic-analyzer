@@ -166,8 +166,8 @@ def main() -> int:
             path: hashlib.sha256(path.read_bytes()).hexdigest() for path in sources
         }
         try:
-            for source in sources:
-                copy = folder / f"{folder.name}-{source.name}"
+            for source_index, source in enumerate(sources):
+                copy = folder / f"{folder.name}-{source_index:02d}-{source.name}"
                 shutil.copy2(source, copy)
                 row: dict[str, Any] = {
                     "source": str(source),

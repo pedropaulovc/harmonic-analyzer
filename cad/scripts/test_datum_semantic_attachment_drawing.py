@@ -15,8 +15,8 @@ from test_probe_drawing_attachments import (
 )
 
 
-@pytest.fixture
-def context(monkeypatch, tmp_path):
+@pytest.fixture(params=("direct", "section_base"))
+def context(monkeypatch, tmp_path, request):
     monkeypatch.setattr(probe, "_early_bound", lambda value, _kind: value)
     source = tmp_path / "part.SLDPRT"
     source.write_bytes(b"native part")
@@ -37,6 +37,12 @@ def context(monkeypatch, tmp_path):
     view.__class__ = type(
         "NativeView", (View,), {"ReferencedDocument": property(lambda _: source_model)}
     )
+    if request.param == "section_base":
+        base = view.__class__("Base", source)
+        view.__class__ = type(
+            "SectionView", (View,), {"ReferencedDocument": property(lambda _: "")}
+        )
+        view.GetBaseView = lambda: base
     for annotation in (target, datum):
         annotation.OwnerType, annotation.Owner, annotation.Visible = 0, view, 1
         annotation.GetAttachedEntityCount3 = lambda annotation=annotation: len(
@@ -60,6 +66,9 @@ def context(monkeypatch, tmp_path):
 
 def test_type14_is_checked_as_semantics_not_fake_model_geometry(context):
     c = context
+    # Positive control: the existing resolver already returns the exact source
+    # handle for both direct and documented empty-reference section views.
+    assert probe.referenced_document(c.view) is c.source_model
     actual = probe.snapshot(c.model, app=c.app)
     key = "Sheet1/Front/DatumA/2"
     assert key not in actual["checked"] and key not in actual["excluded"]
@@ -73,6 +82,17 @@ def test_type14_is_checked_as_semantics_not_fake_model_geometry(context):
     assert component["qualified_name"] == "BoreCutDia@BoreCut@part.Part"
     assert component["value_system"] == 0.009525
     assert component["tolerance_type"] == 1
+    c.source_model.Parameter.assert_called_once_with("BoreCutDia@BoreCut")
+
+
+def test_resolved_source_does_not_accept_equal_valued_different_parameter(context):
+    c = context
+    c.source_model.Parameter.return_value = dimension(
+        "BoreCutDia", "BoreCutDia@BoreCut@part.Part", 0.009525, 1
+    )
+    assert probe.referenced_document(c.view) is c.source_model
+    with pytest.raises(RuntimeError, match="not the exact source feature parameter"):
+        probe.snapshot(c.model, app=c.app)
     c.source_model.Parameter.assert_called_once_with("BoreCutDia@BoreCut")
 
 
