@@ -7,6 +7,11 @@ is a narrow representation budget, not a manufacturing/layout tolerance. Raw
 values and all differences are retained; unknown fields remain exact. Arc arrays
 and text planes mix quantities and are deliberately not mapped.
 
+The crankshaft cold-reopen repro also contains Z residues serialized as zero.
+Only complete XYZ vectors with unchanged X/Y and one exactly zero Z can use a
+vector-scaled 16-ULP AND 1e-14 m budget. These transitions are reported separately;
+this does not discard Z or relax nonzero-to-nonzero or near-zero X/Y comparisons.
+
 This compares annotation observations, not persistent attachment identity. The
 caller's existing source, attachment-signature and layout gates remain required.
 Same-geometry reattachment needs a separate persistent-reference witness.
@@ -58,6 +63,41 @@ def _coordinate_path(path):
     return False
 
 
+def _zero_z_vector(snapshot, path):
+    """Get a complete documented XYZ vector, never infer a coordinate's units."""
+    start, size = 0, 3
+    match path[1:]:
+        case ("position", 2) | ("generic", "texts", int(), "position", 2):
+            pass
+        case ("generic", "lines", int(), 6 | 9):
+            start, size = path[-1] - 2, 10
+        case _:
+            return None
+    value = snapshot
+    for token in path[:-1]:
+        value = value[token]
+    if type(value) not in (list, tuple) or len(value) != size:
+        return None
+    vector = value[start : start + 3]
+    if any(type(component) is not float for component in vector):
+        return None
+    return vector
+
+
+def _zero_z_budget(before, after, path):
+    old = _zero_z_vector(before, path)
+    new = _zero_z_vector(after, path)
+    if old is None or new is None or old[:2] != new[:2]:
+        return None
+    if old[2] != 0.0 and new[2] != 0.0:
+        return None
+    scale = max(abs(component) for vector in (old, new) for component in vector)
+    budget = min(MAX_COORDINATE_DELTA_M, MAX_COORDINATE_ULPS * math.ulp(scale))
+    if max(abs(old[2]), abs(new[2])) > budget:
+        return None
+    return {"coordinate_budget_m": budget, "vector_scale_m": scale}
+
+
 def compare_reopened_annotations(before, after):
     """Return exact rejected deltas and bounded coordinate deltas separately.
 
@@ -65,7 +105,7 @@ def compare_reopened_annotations(before, after):
     changes (including bool/int and int/float) never receive a coordinate budget.
     Nonfinite observations fail even when both snapshots contain the same value.
     """
-    rejected, roundoff = [], []
+    rejected, roundoff, zero_z = [], [], []
 
     def emit(path, kind, old, new):
         row = {"path": _pointer(path), "kind": kind, "before": old, "after": new}
@@ -84,6 +124,11 @@ def compare_reopened_annotations(before, after):
             row["coordinate_budget_m"] = budget
             if abs(new - old) <= budget:
                 roundoff.append(row)
+                return
+            zero_budget = _zero_z_budget(before, after, path)
+            if zero_budget is not None:
+                row.update(zero_budget)
+                zero_z.append(row)
                 return
         rejected.append(row)
 
@@ -144,5 +189,6 @@ def compare_reopened_annotations(before, after):
         "status": "failed" if rejected else "passed",
         "rejected": rejected,
         "coordinate_roundoff": roundoff,
+        "zero_z_serialization": zero_z,
         "scope": "annotation observations only; attachment/source gates remain separate",
     }

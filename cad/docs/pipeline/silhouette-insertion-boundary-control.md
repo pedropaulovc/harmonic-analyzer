@@ -136,3 +136,49 @@ ID. Its native insertion, saved/reopened face identity and printed placement
 still need separate proof. The original silhouette PID/raw-equality tests stay
 unchanged. The integrated four-file diagnostic test run passed 174 tests in
 13.84 s (`pytest-telemetry/run-rdhph0pf`).
+
+## Native FACE-placement results, 2026-09-07
+
+Frozen root `be38f5b5`, adapter `25bc99b1`, PID 31860 ran the existing owned
+prepared pilot for spring hook and crankshaft. Receipt
+`cad/out/reports/datum-policy-43xc6f6u/pilot.json`, SHA-256
+`bc0aa118e95deaba84fa6de2289dad31df0804e43a25de79030822e1c1567d65`,
+records 501.860751 seconds including both recipes, witnesses and failure capture.
+Neither source pin changed. Original/source-copy hashes stayed exact, final
+runtime guard errors were empty, and cleanup completed.
+
+Spring hook passed the complete recipe, built/cold source and explicit FACE
+attachment gates. Recipe time was 37.7598435 seconds. Its annotation comparison
+had no rejected differences or coordinate exceptions. The fresh PNG was visually
+inspected: Ra 1.6 sits directly on the lower shank, with no bent leader and a
+readable 5:1 sheet. This proves this native sample, not a fleet failure rate.
+
+Crankshaft's recipe passed in 25.7561287 seconds; its built four-role entity
+bank and exact cold drawing semantics/view-layout comparison also passed. The
+fresh PNG was inspected: the bearing-journal finish label is readable and placed
+on the journal boundary. The pilot still **failed** before the cold source and
+fresh FACE-role comparison. Fifteen Z-coordinate leaves on datum B (kind 2,
+DetailItem351) and the end-face perpendicularity FCF (kind 5, DetailItem352)
+changed from magnitudes at most `2.465190328815662e-32` metres to zero. Forty-two
+other differences passed the pre-existing leaf-ULP rule. No rejected X/Y, text,
+style or view-layout changes occurred. This is not completed cold acceptance.
+
+The selected raw containers and the original fifteen rejected leaves are retained
+in [the zero-Z evidence fixture](evidence/crankshaft-43xc6f6u-zero-z.json).
+The cold-only comparator now reports `zero_z_serialization` separately: only a
+complete documented XYZ vector with exactly unchanged X/Y and one exactly zero
+Z may receive `min(1e-14 m, 16 ULP of the vector's largest absolute component)`.
+Both Z magnitudes must fit. Original numbers and deltas are retained; there is
+no rounding, blanket Z discard, or relaxed near-zero X/Y/nonzero-to-nonzero rule.
+The FCF's actual nonzero body Z (`0.004762500000000003` m) remains significant.
+
+This is an explicitly added representation policy based on the retained repro,
+not an API guarantee that drawing Z is always zero. Bundled `IAnnotation.GetPosition`
+documents sheet-relative XYZ; `IDisplayData.GetLineAtIndex3` documents ten slots
+with start/end XYZ, and `GetTextPositionAtIndex` documents a three-component
+display-data offset. Unknown fields, arcs, text planes, style, source parameters
+and attachment identity remain outside this rule. The deliberate stricter
+near-zero-X test and the previous 190-leaf audit's 187/3 classification remain
+unchanged. Same-session export comparison is still exact. The focused five-file
+suite passed 289 tests in 3.72 seconds (`run-5qi571og`); a fresh native crank
+replay remains required to exercise the previously unreached gates.
