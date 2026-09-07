@@ -16,7 +16,7 @@ artifact: input schema 2, manifest and native receipt all describe the 1:1 base.
 
 `ProjectDrawingFactory` remains bound to the recipe's actual scale and precision.
 `prepared_drawing_factory(adapter, entry, spec=requested)` verifies that the
-entry matches the requested precision. Before any setter, the instance path
+entry matches the requested precision. Before the instance-scale setter, the path
 validates the entry's current inputs/receipt/bytes, creates the blank and proves
 its inherited 1:1 ASME-B sheet, single empty sheet and exact active/current drawing.
 It then calls `ISheet.SetScale(numerator, denominator, True, False)` exactly once,
