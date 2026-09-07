@@ -1,7 +1,7 @@
 # Fresh linked-title update control
 
-Status: offline-tested diagnostic, not yet run in SolidWorks. It does not change
-production finalization or establish a redraw fix.
+Status: native baseline reproduced the printed shift; the one pre-save redraw
+did not prevent it. This diagnostic does not change production finalization.
 
 The retained rocker control proved a real printed change: cold reopening moved
 all ten `rocker-arm` title glyphs right by about 7.22523 mm, while the note anchor,
@@ -93,13 +93,84 @@ directory is never reported as runtime provenance. Stop on the first failed gate
 
 The earlier PID 37136 is no longer a valid assumed target: the user closed
 SolidWorks during a separate root pilot while this control was being prepared.
-This diagnostic has made no native calls. Use only a new explicitly confirmed
-existing PID; it must not launch/recover SolidWorks itself.
+The reviewed invocation below used newly confirmed PID 31860 with an empty
+document inventory. Future invocations still require a new explicit grant and
+confirmed existing PID; this diagnostic must not launch/recover SolidWorks itself.
 
 Offline verification: 42 focused tests and 160 adjacent tests passed; Ruff is
 clean. Tests cover candidate gating, exact one-redraw ordering, wrapper restoration,
 source-copy save rejection, wrong view references, title link/style/identity
 mutations, and survival of the clean part plus dirty unsaved baseline drawing
 after normal execution and baseline/candidate failures. The test is automatically
-enrolled by the existing `test_*_drawing.py` recipe-gate discovery. Native outcome
-remains untested pending source review and a new seat grant.
+enrolled by the existing `test_*_drawing.py` recipe-gate discovery.
+
+## Native result: redraw does not prevent this reproduced shift
+
+One approved invocation at frozen `8d3b6c6d9a12dfc91684c31447e452a0751a7804`
+finished with exit 0 and diagnostic outcome `candidate_not_stable` on
+2026-09-06, 17:33:57–17:36:19 PDT. The candidate ran only because the fresh
+baseline satisfied the printed-displacement and changed-pixel gate. There was
+no retry or additional native operation after the invocation.
+
+- Trace: `0xdd6bf5200f4839777a72b1424c036716`; task 142.160844 s.
+- Report: `C:/src/ha-perf-title-update/cad/out/reports/fresh-title-_bp8u5uy/title-update.json`.
+- Report SHA-256: `01f9deb35b48ce90c12402e249ebe4842e119c2cb5f42d75912c873a1f5e556e`.
+- Baseline trial: 72.182456 s; candidate: 68.235653 s, including diagnostic
+  measurements and cold exports. This is not a performance comparison.
+- The candidate's single `GraphicsRedraw2()` took 0.003567 s.
+
+Both trials produced exactly the same printed result: cold reopening moved all
+ten title characters right by 20.48095703125 pt (7.22522650825 mm), with
+0.00006103515625 pt maximum rigid-translation residual. Each first/cold PNG pair
+differs in 11,232 pixels, all inside `[4183,2749,4694,2813]` on the 5100×3300
+image. The baseline and candidate **first PNGs are byte-identical**, as are their
+**cold PNGs**:
+
+| render | SHA-256, same for baseline and redraw candidate |
+|---|---|
+| first PDF rendered PNG | `e5373867e6a2bb0f31ba0a08bc3387a2005241fc121a49a90ecb8b1e60d5557c` |
+| cold-reopened PDF rendered PNG | `dfe17a7faaf8ff2c809aad9793ae2a018a66ce5ead32dff7299fa0f7de4d3f72` |
+
+The stage observations narrow the problem:
+
+| boundary | property source | resolved title | generic text X, metres |
+|---|---|---|---:|
+| blank setup | `Default` | empty | no text primitive |
+| immediately after Front view | `Default` | `rocker-arm` | 0.35389179984999647 |
+| explicit property link / UNIT_DISPLAY | `Drawing View1` | unchanged | unchanged |
+| candidate pre-save redraw | `Drawing View1` | unchanged | unchanged |
+| native save and first PDF export | `Drawing View1` | unchanged | unchanged |
+| cold reopen | `Drawing View1` | unchanged | 0.3611170096970891 |
+| subsequent PDF-only export | `Drawing View1` | unchanged | unchanged |
+
+Thus the title is already resolved, with the eventually displaced origin, before
+the finalizer changes `CustomPropertyView`. This rules out the need for full
+recipe annotation/layout work to reproduce; it does not identify which native
+update mechanism is missing. The title's anchor, native extent, horizontal
+justification 2, vertical justification 0, lock state and linked text remain
+unchanged after initial resolution. The only three cold-reopen snapshot changes
+are the same title X origin represented in generic data, measured text runs and
+native text runs. All other leaves across 47 annotation rows are identical;
+the subsequent no-setter PDF export produces zero live snapshot differences.
+
+Both original rocker paths and the template retain exact hashes. Both owned
+source copies retain original SHA-256
+`3bfb6da45b91e5a73b24c74baf81141899149e3c327aa943930baed3fba4d4a0`.
+The three named source parameters/tolerances/configuration and their same-session
+native identities pass. The one drawing view references the exact owned source
+and `Default` configuration. This minimal view has no authored drawing dimensions
+or checked model-geometry attachments; its two native kind-13 center-mark
+exclusions are retained explicitly. Do not describe this as full manufacturing
+sheet validation.
+
+Ownership started and ended with `[]`, reports `preserved`, and has no native or
+cleanup error. All owned documents were closed without a source save; the seat
+was explicitly released. The two distinct PNGs were visually inspected: title
+movement agrees with the glyph/pixel measurements, and the simple Front view
+and other printed content do not change.
+
+Conclusion is limited to this call shape: **one pre-native-save GraphicsRedraw2
+does not prevent linked-title recentering on cold reopen**. Late `EditRebuild3`,
+late `ForceRebuild3`, same-value native justification reapplication, and the modern
+model-view redraw method remain untested here. No production fallback or comparator
+relaxation follows from this result.
