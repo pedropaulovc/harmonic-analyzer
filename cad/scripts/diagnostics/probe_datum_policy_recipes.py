@@ -783,13 +783,16 @@ async def pilot(
                                 else nullcontext()
                             ),
                             (
-                                source_boundaries.observe()
-                                if source_boundaries is not None
+                                # Install common/recipe identity-checked entity
+                                # hooks before the selected source observer
+                                # wraps those recipe aliases for read-only banks.
+                                entity_acceptance.observe(adapter, entity_handles)
+                                if entity_acceptance is not None
                                 else nullcontext()
                             ),
                             (
-                                entity_acceptance.observe(adapter, entity_handles)
-                                if entity_acceptance is not None
+                                source_boundaries.observe()
+                                if source_boundaries is not None
                                 else nullcontext()
                             ),
                         ):
