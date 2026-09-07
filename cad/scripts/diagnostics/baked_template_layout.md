@@ -3,7 +3,7 @@
 This diagnostic authors a copied template. The seven-note candidate now supplies
 the branch's project template after blank native persistence and populated
 rocker/lever field validation; full-recipe and fleet gates still govern release.
-The earlier experiments below remain historical evidence. It
+The earlier experiments below remain historical evidence. The diagnostic
 authors a fresh owned DRWDOT from the unmodified project template using bare
 `new_drawing`; it does not normalize units, notes, styles, sheet scale or view
 quality. No model document is opened. The following are intentional template
