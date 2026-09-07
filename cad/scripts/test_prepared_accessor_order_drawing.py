@@ -74,9 +74,10 @@ def test_accessor_first_reproduces_actual_no_resize_failure_without_priming(
         assert len(report["frame_control"]["captures"]) == 2
         assert report["frame_control"]["restores"] == []
         assert (
-            receipt["viewport_restore"]["before"]["document_frame"]["FrameWidth"]
+            report["frame_control"]["captures"][-1]["document_frame"]["FrameWidth"]
             == 1607
         )
+        assert "document_frame" not in receipt["viewport_restore"]["before"]
     assert original == (probe.viewports.capture, probe.viewports.restore)
 
 
@@ -150,6 +151,66 @@ def test_capture_only_patches_only_getters_not_the_production_restore(frame_scen
         assert probe.viewports.capture is not original[0]
         assert probe.viewports.restore is original[1]
     assert original == (probe.viewports.capture, probe.viewports.restore)
+
+
+def test_capture_only_frame_metadata_cannot_add_a_production_acceptance_gate(
+    frame_scene, monkeypatch
+):
+    f = frame_scene
+    original_capture = probe.viewports.capture
+
+    def stable_visible_viewport(model):
+        # Document-frame dimensions include non-visible client/decorations;
+        # the production acceptance contract is the unchanged six-field view.
+        value = original_capture(model)
+        value["visible_box_pixels"] = [2216, 141, 3824, 995]
+        value["transform"][12] = model.ActiveView.Scale2
+        return value
+
+    monkeypatch.setattr(probe.viewports, "capture", stable_visible_viewport)
+    f.scene.run(**options(f))
+    report, _ = f.scene.report()
+    assert report["status"] == "passed" and f.writes == []
+    captures = report["frame_control"]["captures"]
+    assert captures[0]["document_frame"]["FrameWidth"] == 1608
+    assert captures[-1]["document_frame"]["FrameWidth"] == 1607
+    receipt = json.loads(
+        (Path(report["accessors"][0]["directory"]) / "receipt.json").read_text()
+    )
+    target = receipt["viewport_before"]
+    assert set(target) == {
+        "scale2",
+        "transform",
+        "translation3",
+        "orientation3",
+        "visible_box_pixels",
+        "document_visibility",
+    }
+    assert receipt["viewport_restore"]["after"] == target
+    assert all(
+        "document_frame" not in receipt["viewport_restore"][name]
+        for name in ("before", "target", "after_scale", "after")
+    )
+
+
+def test_capture_only_returns_original_value_and_retains_independent_evidence(
+    frame_scene, monkeypatch
+):
+    from types import SimpleNamespace
+
+    f = frame_scene
+    value = {"translation3": [1.0, 2.0, 0.0]}
+    monkeypatch.setattr(probe.viewports, "capture", lambda model: value)
+    evidence = {}
+    model = SimpleNamespace(ActiveView=SimpleNamespace(**f.measured))
+    with frames.intercept(
+        f.scene.native.adapter, frames.FramePolicy.CAPTURE_ONLY, evidence
+    ):
+        observed = probe.viewports.capture(model)
+        assert observed is value and "document_frame" not in value
+        observed["translation3"][0] = 99
+    assert evidence["captures"][0]["translation3"] == [1.0, 2.0, 0.0]
+    assert evidence["captures"][0]["document_frame"] == f.measured
 
 
 def test_accessor_first_cli_defaults_to_capture_only_before_entering_existing_runner(

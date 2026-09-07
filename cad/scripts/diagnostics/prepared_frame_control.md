@@ -212,8 +212,10 @@ hashes, exact-owned cleanup and empty initial/final inventory remain required.
 There is deliberately **no PDF/PNG preservation claim** in this narrow scope.
 
 The default frame policy for this scope is `capture_only`. It replaces only the
-capture getter, adding the five raw native Frame* fields to the production
-viewport snapshots. It does not wrap the restore function, perform a preliminary
+capture getter, retaining the five raw native Frame* fields in independent
+`frame_control.captures` observations, NOT the returned production viewport.
+The original six-field value is returned unchanged, so frame metadata cannot
+create a new final equality gate. It does not wrap the restore function, perform a preliminary
 restore snapshot, write a frame field, or move the pixel-box refusal. The explicit
 `unchanged` policy is a no-interception arm; `measured_restore` remains available
 as a separate later candidate, not the first reproduction. All arms require the
@@ -243,3 +245,17 @@ and `test_prepared_accessor_order_drawing.py`. The default capture-only mock
 reproduces the production one-pixel rejection after two creations/one save with
 zero extra viewport or frame writes; the original restore binding remains exact.
 These tests are not native evidence for capture-only failure or recovery.
+
+Independent review caught an observational defect in `60fc7913` before native
+execution: its capture-only wrapper returned `document_frame` to production,
+silently adding frame equality to the final full-dictionary comparator. The
+fail-first adversarial control kept all six production viewport fields equal
+while changing the native frame; the original wrapper incorrectly failed with
+`native full viewport readback differs`. Capture-only now returns the untouched
+production value and keeps a deep-copied enriched observation separately. The
+same test passes without frame setters. Explicit `measured_restore` still returns
+the enriched viewport and deliberately checks exact frame equality; its accepted
+scope is unchanged. No production comparator was modified.
+
+Fail-first receipt: `run-ocnc3ore`; corrected six-file gate: 240 tests passed in
+15.60 seconds, `run-v2vt33t4`. No native capture-only run preceded this correction.

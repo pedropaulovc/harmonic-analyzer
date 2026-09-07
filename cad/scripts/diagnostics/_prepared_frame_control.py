@@ -1,6 +1,7 @@
 """Explicit diagnostic-only document-frame interception; never a production policy."""
 
 from contextlib import ExitStack, contextmanager
+from copy import deepcopy
 from dataclasses import asdict
 from enum import StrEnum
 import json
@@ -124,8 +125,15 @@ def intercept(adapter, policy, evidence):
 
     def capture(model):
         value = original_capture(model)
-        value["document_frame"] = frame(_early_bound(model.ActiveView, "IModelView"))
-        evidence["captures"].append(value)
+        measured = frame(_early_bound(model.ActiveView, "IModelView"))
+        observation = deepcopy(value)
+        observation["document_frame"] = measured
+        evidence["captures"].append(observation)
+        if policy is FramePolicy.CAPTURE_ONLY:
+            # Observation is not another production equality field. Return the
+            # original six-field value unchanged, including its object identity.
+            return value
+        value["document_frame"] = measured
         return value
 
     def restore(native_app, model, target, observation):
