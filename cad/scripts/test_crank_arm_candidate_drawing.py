@@ -61,6 +61,10 @@ class Document:
     def GetCurrentSheet(self):
         return SimpleNamespace(GetProperties2=lambda: (0, 0, 2, 1))
 
+    def EditRebuild3(self):
+        assert self.alive
+        return True
+
     def Save3(self, options, errors, warnings):
         assert self.alive and self.save_action is not None
         return self.save_action(options, errors, warnings)
@@ -94,12 +98,21 @@ class Annotation:
         self.OwnerType = 0
         self.label = label
         self.handles = tuple(handles)
+        self.position = (0.123, 0.456, 0.0042)
 
     def GetName(self):
         return self.label
 
     def GetAnnotation(self):
         return self
+
+    def GetPosition(self):
+        return self.position
+
+    def SetPosition2(self, x, y, z):
+        assert z == self.position[2]
+        self.position = (x, y, z)
+        return True
 
     def GetAttachedEntities3(self):
         return self.handles
@@ -381,6 +394,7 @@ def candidate(tmp_path, monkeypatch):
     monkeypatch.setattr(probe, "provenance", lambda: {"source_sha256": digest})
     monkeypatch.setattr(probe, "revision", lambda root: "offline-current-recipe")
     monkeypatch.setattr(probe, "_early_bound", lambda obj, kind: obj)
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, kind: obj)
     monkeypatch.setattr(probe, "source_snapshot", snapshot)
     monkeypatch.setattr(probe, "require_source_unchanged", lambda before, after: None)
     monkeypatch.setattr(probe, "drawing_dimensions", lambda model: {})
