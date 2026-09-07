@@ -7,6 +7,7 @@ cad/docs/pipeline/tooth-tip-bsurface-witness.md for the native acceptance scope.
 """
 
 from enum import StrEnum
+from itertools import product
 import math
 import os
 
@@ -28,6 +29,13 @@ class Sense(StrEnum):
 class GridControl(StrEnum):
     OFF = "off"
     BOUNDARY_DOMAIN = "boundary-domain"
+    COLUMN_ROW_GRID = "column-row-grid"
+
+
+class GridObservation(StrEnum):
+    READING = "reading"
+    ALL_FINITE = "all_vectors_finite"
+    INVALID = "invalid_vectors"
 
 
 def grid_control_from_environment():
@@ -37,7 +45,8 @@ def grid_control_from_environment():
     try:
         return GridControl(raw)
     except ValueError as error:
-        raise ValueError(f"{field}: expected off or boundary-domain, got {raw!r}") from error
+        choices = ", ".join(mode.value for mode in GridControl)
+        raise ValueError(f"{field}: expected {choices}, got {raw!r}") from error
 
 
 # Diagnostic read-budget bounds, not asserted SolidWorks API limits.
@@ -136,6 +145,39 @@ def _boundary_control(data, metadata, evidence):
             continue
 
 
+@traced("diagnostic.silhouette.bsurface.column_row_grid")
+def _column_row_control(data, metadata, evidence):
+    """Observe every proposed pair, then leave ordinary acceptance unchanged."""
+    rows = metadata["ControlPointRowCount"]
+    columns = metadata["ControlPointColumnCount"]
+    dimension = metadata["ControlPointDimension"]
+    journal = evidence["grid_control"] = {
+        "mode": GridControl.COLUMN_ROW_GRID.value,
+        "scope": "raw_index_observation_not_acceptance",
+        "metadata": {"rows": rows, "columns": columns, "dimension": dimension},
+        "status": GridObservation.READING.value,
+        "reads": [],
+        "valid_vectors": 0,
+    }
+    # _bspline already validated counts, knots and the total read budget.
+    # These argument ranges are a hypothesis from 5fe0i713, not a changed
+    # interpretation of the reported metadata or an accepted matrix.
+    for first, second in product(range(1, columns + 1), range(1, rows + 1)):
+        record = {"first": first, "second": second}
+        journal["reads"].append(record)
+        try:
+            raw = _read(lambda: data.GetControlPoints(first, second), record, "returned")
+            _doubles(raw, dimension, label=f"control GetControlPoints({first},{second})")
+        except Exception as error:
+            record["vector_error"] = repr(error)
+            continue
+        journal["valid_vectors"] += 1
+    state = GridObservation.ALL_FINITE
+    if journal["valid_vectors"] != rows * columns:
+        state = GridObservation.INVALID
+    journal["status"] = state.value
+
+
 def _parameterization(data, *, evidence=None):
     result = {}
     raw_reads = None
@@ -226,6 +268,8 @@ def _bspline(data, *, evidence=None, control=GridControl.OFF):
         result[field] = knots
     if control is GridControl.BOUNDARY_DOMAIN:
         _boundary_control(data, result, evidence)
+    if control is GridControl.COLUMN_ROW_GRID:
+        _column_row_control(data, result, evidence)
     point_reads = []
     if evidence is not None:
         evidence["control_point_reads"] = point_reads
@@ -256,12 +300,12 @@ def snapshot(face, surface, *, evidence=None):
     The caller still checks drawing PID, owning view, native face identity and
     exact raw silhouette curve/endpoints; no geometric fallback is introduced.
     An optional journal retains partial metadata and raw scalar/array reads
-    without extra native calls. Only explicit boundary-domain mode adds the
+    without extra native calls. Only an explicit observation mode adds the
     bounded exploratory reads; their results never populate the accepted grid.
     """
     control = grid_control_from_environment()
-    if control is GridControl.BOUNDARY_DOMAIN and evidence is None:
-        raise ValueError("BSURF boundary-domain control requires a retained evidence sink")
+    if control is not GridControl.OFF and evidence is None:
+        raise ValueError(f"BSURF {control.value} control requires a retained evidence sink")
     result = {
         "identity": 4006,
         "read_request": {

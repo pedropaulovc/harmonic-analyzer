@@ -195,6 +195,32 @@ reach insertion. A complete correction requires a full-grid native control,
 reconciliation of the documented/tested index contract with the observed ABI,
 then repeated/attached/cold identity and printed manufacturing acceptance.
 
+## Full proposed-domain observation
+
+`HARMONIC_BSURF_GRID_CONTROL=column-row-grid` requests every pair in
+`1..ControlPointColumnCount` by `1..ControlPointRowCount` before the unchanged
+ordinary reader. It replaces the eleven boundary observations for that run;
+it does not run both observation modes or alter the native approximation request.
+For the observed grid this means 125 queries, including `(25,5)`. The existing
+4096-vector total budget is checked before any control-point request.
+
+Each record names the actual positional arguments `first` and `second` and
+retains the raw return or getter exception. Finite-vector validation checks the
+reported dimension without rounding coordinates or dividing rational weights.
+An interior rejection is retained and the remaining bounded observations still
+run. `all_vectors_finite` describes only these proposed-domain returns, never
+an accepted surface or native attachment; serialization errors remain visible
+in individual raw records. The ordinary reader then executes its original
+row/column calls and propagates its original failure. Exploratory values never
+populate `bspline.control_points`.
+
+The mode is explicit, rejected without an evidence sink before native access,
+and journaled in the existing pilot receipt. Use the same owned pilot command
+with only `HARMONIC_BSURF_GRID_CONTROL` changed to `column-row-grid`; leave source
+pins, view ownership, selection and manufacturing gates unchanged. Native
+execution of this full-grid control remains pending while the foundation full
+build owns the seat. Existing matrix assertions were not rewritten.
+
 ## Supported request, not an exactness assumption
 
 The bundled official **Get B-Spline Surface Parameterization Data (C#)** example
