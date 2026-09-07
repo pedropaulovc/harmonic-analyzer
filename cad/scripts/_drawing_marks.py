@@ -1,9 +1,8 @@
 """Part-side drawing support: dimension marks + manufacturing properties.
 
-Imported ONLY by parts that ship a manufacturing drawing (see
-``_drawing_registry``).  Deliberately a separate module from ``_common`` so
-adding a drawing to one part never shifts the recipe digest of the ~100 parts
-that carry no drawing.
+Production source-model operations for parts that ship a manufacturing drawing
+(see ``_drawing_registry``). Keep diagnostic-only setters in separate modules:
+whole-module recipes must not inherit edits to operations they never use.
 
 The drawing recipe (``draw_<part>.py``) later imports exactly the dimensions a
 part marks here (``swInsertDimensionsMarkedForDrawing``), so the SLDPRT stays
@@ -17,6 +16,7 @@ from typing import Any, Mapping
 
 import _config
 import _telemetry
+from _model_provenance import DRAWN_BY
 from _common import (
     apply_custom_properties,
     _dim_owner_feature,
@@ -231,23 +231,6 @@ def set_dimension_symmetric_angular_tolerance(
     )
 
 
-@_telemetry.traced("dim.prefix", label_param="dimension_name")
-def set_dimension_prefix(
-    adapter: Any, feature_name: str, dimension_name: str, prefix: str
-) -> None:
-    """Set and verify a model display dimension's native prefix text."""
-    display, _ = _named_dimension(adapter, feature_name, dimension_name)
-    display = _early_bound(display, "IDisplayDimension")
-    # IDisplayDimension.SetText is void; GetText supplies the success witness.
-    display.SetText(1, prefix)  # swDimensionTextParts_e.swDimensionTextPrefix
-    applied = display.GetText(1)
-    if applied != prefix:
-        raise RuntimeError(
-            f"{dimension_name}@{feature_name}: prefix did not persist as {prefix!r}; "
-            f"native readback is {applied!r}"
-        )
-
-
 @_telemetry.traced("dim.diametric", label_param="label")
 async def add_diametric_linear_dimension(
     adapter: Any,
@@ -415,12 +398,6 @@ def clear_dimensions_for_drawing(adapter: Any) -> None:
                     cleared += 1
                 display = current.GetNextDisplayDimension(display)
     _telemetry.success(f"cleared {cleared} model-dimension drawing marks")
-
-
-# Drafter shown in the title block DRAWN field. Checked/approval are left blank
-# on the sheet (a machinist signs them on the printed copy). See issue #249 for
-# the title-block property-provenance consolidation this path is part of.
-DRAWN_BY = "PPVC"
 
 
 def apply_drawing_properties(

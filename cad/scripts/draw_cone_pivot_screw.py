@@ -3,7 +3,7 @@ r"""Create the curated cone-platform pivot shoulder-screw drawing."""
 from __future__ import annotations
 
 import argparse
-from cone_pivot_screw_spec import SIDE_DIMENSION_CALLOUTS
+from cone_pivot_screw_callouts import SIDE_DIMENSION_CALLOUTS
 import sys
 from typing import Any, Mapping
 

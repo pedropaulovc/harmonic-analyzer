@@ -96,7 +96,7 @@ from _common import (
     check,
     run_build,
 )
-from _drawing_marks import DRAWN_BY
+from _model_provenance import DRAWN_BY
 from _assembly import (
     assembly_title_properties,
     assert_component_placed,

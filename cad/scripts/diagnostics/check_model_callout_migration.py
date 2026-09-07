@@ -23,6 +23,12 @@ removed_expression_imports = {
     "draw_magnifying_vertical_rod": {"ROD_DIA"},
     "draw_pinion_arbor": {"CAP_R"},
 }
+separate_callout_modules = {
+    "draw_cone_pivot_post": "cone_pivot_post_callouts",
+    "draw_crank_drive_gear": "crank_drive_gear_callouts",
+    "draw_cone_pivot_screw": "cone_pivot_screw_callouts",
+    "draw_fillister_screw": "fillister_screw_callouts",
+}
 
 
 class ApprovedCalloutChanges(ast.NodeTransformer):
@@ -32,11 +38,22 @@ class ApprovedCalloutChanges(ast.NodeTransformer):
         self.maps = {row["name"] for row in definitions[drawing]["maps"]}
         if drawing == "draw_connecting_rod":
             self.maps = {"DIMENSION_CALLOUTS"}
+        if drawing == "draw_fillister_screw":
+            # Existing whole-text callout, separately pinned by the fillister
+            # identity/content test; not a geometry or arbitrary import exemption.
+            self.maps.add("DIMENSION_TEXT")
 
     def visit_ImportFrom(self, node):
+        if node.level != 0:
+            return node
         removed = set()
         if node.module == self.spec:
             removed = self.maps | removed_expression_imports.get(self.drawing, set())
+        if (
+            self.drawing in separate_callout_modules
+            and node.module == separate_callout_modules[self.drawing]
+        ):
+            removed = self.maps
         if node.module == "_drawing_common":
             removed = {"set_dimension_callouts", "verify_dimension_callouts"}
         if node.module == "_model_dimension_callouts":
@@ -101,7 +118,7 @@ def check(baseline):
                 "status": "passed",
                 "files": rows,
                 "count": len(rows),
-                "scope": "all AST except explicitly enumerated callout maps, imports, source capture, author/verifier calls and cone-pivot metadata; exact removed callout content independently pinned by test_model_callout_fleet_drawing",
+                "scope": "all AST except explicitly enumerated callout maps, imports, source capture, author/verifier calls and cone-pivot metadata; exact removed callout content independently pinned by test_model_callout_fleet_drawing and test_fillister_screw_drawing",
             },
             indent=2,
         )

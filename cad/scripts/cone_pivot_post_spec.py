@@ -119,9 +119,3 @@ GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
     "journal-axis true position": "0.05",
     "crank-bore true position": "0.10",
 }
-
-
-# Model display callouts, imported read-only by the manufacturing drawing.
-DIMENSION_CALLOUTS = {
-    "CrankBoreDia": "THRU",
-}

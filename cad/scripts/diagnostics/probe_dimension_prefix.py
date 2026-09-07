@@ -23,6 +23,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "cad/scripts"))
 
 from _common import _early_bound, check  # noqa: E402
+import _dimension_prefix as prefix_control  # noqa: E402
 import _drawing_marks as marks  # noqa: E402
 import _telemetry  # noqa: E402
 from diagnostics import benchmark_drawing_recipes as benchmark  # noqa: E402
@@ -174,7 +175,7 @@ async def probe(adapter, source, expected_hash, candidate, report_root):
         current(adapter, model, copied)
         started = time.perf_counter()
         try:
-            report["helper_return"] = marks.set_dimension_prefix(
+            report["helper_return"] = prefix_control.set_dimension_prefix(
                 adapter, FEATURE, DIMENSION, PREFIX
             )
         except Exception as error:

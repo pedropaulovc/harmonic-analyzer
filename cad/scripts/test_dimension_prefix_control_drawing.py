@@ -21,6 +21,7 @@ def scene(native, monkeypatch):  # noqa: F811
     native.app.ActiveDoc = baseline
     monkeypatch.setattr(probe, "_early_bound", lambda value, _: value)
     monkeypatch.setattr(probe.marks, "_early_bound", lambda value, _: value)
+    monkeypatch.setattr(probe.prefix_control, "_early_bound", lambda value, _: value)
     monkeypatch.setattr(probe.benchmark, "revision", lambda _: "a" * 40)
     monkeypatch.setattr(probe, "helper_fingerprints", lambda: {"prefix": "frozen"})
     monkeypatch.setattr(probe, "adapter_fingerprints", lambda: {"adapter": "frozen"})
@@ -112,8 +113,8 @@ def scene(native, monkeypatch):  # noqa: F811
         ),
     )
     native.baseline = baseline
-    native.helper = Mock(wraps=probe.marks.set_dimension_prefix)
-    monkeypatch.setattr(probe.marks, "set_dimension_prefix", native.helper)
+    native.helper = Mock(wraps=probe.prefix_control.set_dimension_prefix)
+    monkeypatch.setattr(probe.prefix_control, "set_dimension_prefix", native.helper)
     return native
 
 

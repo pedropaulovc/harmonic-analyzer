@@ -20,6 +20,9 @@ from diagnostics._model_callout_migration_inventory import INVENTORY
 
 
 ACTIVE = sorted({row["drawing"] for row in INVENTORY["calls"] if row["rows"]})
+SEPARATE_CALLOUT_MODULES = {
+    "cone_pivot_post", "crank_drive_gear", "cone_pivot_screw", "fillister_screw"
+}
 
 
 def evaluated(node, module):
@@ -151,7 +154,8 @@ def test_every_direct_drawing_verifies_exact_rows_with_explicit_source_and_view(
 def test_moved_expressions_and_shared_map_identity_are_unchanged(definition):
     drawing = importlib.import_module(definition["drawing"])
     stem = definition["drawing"].removeprefix("draw_")
-    source = importlib.import_module(stem + "_spec")
+    suffix = "_callouts" if stem in SEPARATE_CALLOUT_MODULES else "_spec"
+    source = importlib.import_module(stem + suffix)
     builder = importlib.import_module("build_" + stem)
     tree = tree_for(source)
     assignments = {}

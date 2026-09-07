@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import math
 from _model_dimension_callouts import author_model_callouts
-from cone_pivot_screw_spec import SIDE_DIMENSION_CALLOUTS
+from cone_pivot_screw_callouts import SIDE_DIMENSION_CALLOUTS
 import sys
 
 import _telemetry

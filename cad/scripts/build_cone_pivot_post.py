@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import math
 from _model_dimension_callouts import author_model_callouts
-from cone_pivot_post_spec import DIMENSION_CALLOUTS
+from cone_pivot_post_callouts import DIMENSION_CALLOUTS
 import sys
 from typing import Any
 

@@ -68,7 +68,7 @@ from _common import (
     check,
     run_build,
 )
-from _drawing_marks import DRAWN_BY
+from _model_provenance import DRAWN_BY
 from _assembly import (
     angle_driver,
     assembly_title_properties,

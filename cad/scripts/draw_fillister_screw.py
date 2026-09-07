@@ -10,7 +10,7 @@ nominals come from the fastener catalog via ``fillister_screw_spec``.
 from __future__ import annotations
 
 import argparse
-from fillister_screw_spec import SIDE_DIMENSION_CALLOUTS, DIMENSION_TEXT
+from fillister_screw_callouts import SIDE_DIMENSION_CALLOUTS, DIMENSION_TEXT
 import sys
 from typing import Any
 

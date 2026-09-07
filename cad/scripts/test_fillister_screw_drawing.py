@@ -7,6 +7,7 @@ from pathlib import Path
 import build_fillister_screw as part
 import draw_fillister_screw as drawing
 import fillister_screw_spec as spec
+import fillister_screw_callouts as callouts
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fastener_catalog import fastener
 
@@ -46,9 +47,9 @@ def test_lengths_are_inserted_from_named_model_dimensions() -> None:
     drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
     part_source = Path(part.__file__).read_text(encoding="utf-8")
     assert part_source.count("set_dimension_symmetric_tolerance(") == 3
-    assert part.DIMENSION_TEXT is drawing.DIMENSION_TEXT is spec.DIMENSION_TEXT
-    assert spec.DIMENSION_TEXT == {"ShankDia": "#4-40 UNC-2A"}
-    assert spec.DIMENSION_TEXT["ShankDia"] == spec.THREAD_DESIGNATION
+    assert part.DIMENSION_TEXT is drawing.DIMENSION_TEXT is callouts.DIMENSION_TEXT
+    assert callouts.DIMENSION_TEXT == {"ShankDia": "#4-40 UNC-2A"}
+    assert callouts.DIMENSION_TEXT["ShankDia"] == spec.THREAD_DESIGNATION
     assert "set_dimension_text" not in drawing_source
     assert 'author_model_callouts(adapter, "ShankProfile", DIMENSION_TEXT, location="all")' in part_source
     assert part_source.index('mark_dimensions_for_drawing(') < part_source.index('location="all"') < part_source.index('return await save_part_and_images(')

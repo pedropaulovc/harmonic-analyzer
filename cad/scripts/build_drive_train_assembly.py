@@ -160,7 +160,7 @@ from _common import (
     log,
     run_build,
 )
-from _drawing_marks import DRAWN_BY
+from _model_provenance import DRAWN_BY
 from _transforms import ROT_Y_180, compose_rows, euler_from_rows
 from cone_pivot_post_installation import (
     CHANNEL_Z0,

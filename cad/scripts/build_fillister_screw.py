@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import math
 from _model_dimension_callouts import author_model_callouts
-from fillister_screw_spec import SIDE_DIMENSION_CALLOUTS, DIMENSION_TEXT
+from fillister_screw_callouts import SIDE_DIMENSION_CALLOUTS, DIMENSION_TEXT
 import sys
 
 from _fastener_catalog import fastener

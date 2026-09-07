@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 
 import _drawing_marks
+import _dimension_prefix
 from pinion_cam_pin_spec import PIN_DIA_BAND
 from pinion_cam_spec import BORE_BAND as CAM_BORE_BAND
 from pinion_handle_spec import ROD_HOLE_REAM_BAND, ROD_PRESS_BAND
@@ -125,13 +126,13 @@ def test_dimension_prefix_helper_has_an_operation_span(
             return self.prefix
 
     display = PrefixDisplay()
-    monkeypatch.setattr(_drawing_marks._telemetry, "span", capture_span)
+    monkeypatch.setattr(_dimension_prefix._telemetry, "span", capture_span)
     monkeypatch.setattr(
-        _drawing_marks, "_named_dimension", lambda *_args: (display, object())
+        _dimension_prefix, "_named_dimension", lambda *_args: (display, object())
     )
-    monkeypatch.setattr(_drawing_marks, "_early_bound", lambda value, _type: value)
+    monkeypatch.setattr(_dimension_prefix, "_early_bound", lambda value, _type: value)
 
-    _drawing_marks.set_dimension_prefix(object(), "GripAngleDim", "GripAngle", "REF ")
+    _dimension_prefix.set_dimension_prefix(object(), "GripAngleDim", "GripAngle", "REF ")
 
     assert display.prefix == "REF "
     assert spans == [("dim.prefix", {"label": "GripAngle"})]
@@ -154,11 +155,11 @@ def test_dimension_prefix_accepts_void_setter_with_exact_readback(
 
     display = SimpleNamespace(SetText=set_text, GetText=get_text)
     monkeypatch.setattr(
-        _drawing_marks, "_named_dimension", lambda *_args: (display, object())
+        _dimension_prefix, "_named_dimension", lambda *_args: (display, object())
     )
-    monkeypatch.setattr(_drawing_marks, "_early_bound", lambda value, _type: value)
+    monkeypatch.setattr(_dimension_prefix, "_early_bound", lambda value, _type: value)
 
-    _drawing_marks.set_dimension_prefix(object(), "GripAngleDim", "GripAngle", prefix)
+    _dimension_prefix.set_dimension_prefix(object(), "GripAngleDim", "GripAngle", prefix)
 
     assert calls == [("set", 1, prefix), ("get", 1)]
 
@@ -175,14 +176,14 @@ def test_dimension_prefix_rejects_mismatched_or_null_readback(
         GetText=lambda _part: observed,
     )
     monkeypatch.setattr(
-        _drawing_marks, "_named_dimension", lambda *_args: (display, object())
+        _dimension_prefix, "_named_dimension", lambda *_args: (display, object())
     )
-    monkeypatch.setattr(_drawing_marks, "_early_bound", lambda value, _type: value)
+    monkeypatch.setattr(_dimension_prefix, "_early_bound", lambda value, _type: value)
 
     with pytest.raises(
         RuntimeError, match="GripAngle@GripAngleDim: prefix did not persist"
     ):
-        _drawing_marks.set_dimension_prefix(
+        _dimension_prefix.set_dimension_prefix(
             object(), "GripAngleDim", "GripAngle", prefix
         )
 
@@ -222,13 +223,13 @@ def test_dimension_prefix_propagates_native_exception_through_operation_span(
 
     display = SimpleNamespace(SetText=set_text, GetText=get_text)
     monkeypatch.setattr(
-        _drawing_marks, "_named_dimension", lambda *_args: (display, object())
+        _dimension_prefix, "_named_dimension", lambda *_args: (display, object())
     )
-    monkeypatch.setattr(_drawing_marks, "_early_bound", lambda value, _type: value)
-    monkeypatch.setattr(_drawing_marks._telemetry, "span", capture_span)
+    monkeypatch.setattr(_dimension_prefix, "_early_bound", lambda value, _type: value)
+    monkeypatch.setattr(_dimension_prefix._telemetry, "span", capture_span)
 
     with pytest.raises(type(failure), match="COM call rejected") as caught:
-        _drawing_marks.set_dimension_prefix(
+        _dimension_prefix.set_dimension_prefix(
             object(), "GripAngleDim", "GripAngle", "REF "
         )
 

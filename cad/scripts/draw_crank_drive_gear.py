@@ -8,7 +8,7 @@ backlash, mating pinion).
 from __future__ import annotations
 
 import argparse
-from crank_drive_gear_spec import DIMENSION_CALLOUTS
+from crank_drive_gear_callouts import DIMENSION_CALLOUTS
 import sys
 from typing import Any
 

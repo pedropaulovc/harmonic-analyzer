@@ -3,7 +3,7 @@ r"""Create the curated machinist drawing for the v2 cone pivot post."""
 from __future__ import annotations
 
 import argparse
-from cone_pivot_post_spec import DIMENSION_CALLOUTS
+from cone_pivot_post_callouts import DIMENSION_CALLOUTS
 import sys
 from typing import Any
 

@@ -204,7 +204,7 @@ async def test_actual_screw_entry_forwards_owned_inputs_to_shared_fastener(
     ]
     assert (
         module.RECIPE.side_dimension_callouts
-        is import_module("cone_pivot_screw_spec").SIDE_DIMENSION_CALLOUTS
+        is import_module("cone_pivot_screw_callouts").SIDE_DIMENSION_CALLOUTS
     )
     assert module.RECIPE.side_callout_feature == "ThreadTail"
 

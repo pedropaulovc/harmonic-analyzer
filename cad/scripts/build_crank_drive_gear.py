@@ -43,7 +43,7 @@ from __future__ import annotations
 
 import math
 from _model_dimension_callouts import author_model_callouts
-from crank_drive_gear_spec import DIMENSION_CALLOUTS
+from crank_drive_gear_callouts import DIMENSION_CALLOUTS
 import sys
 
 import _config

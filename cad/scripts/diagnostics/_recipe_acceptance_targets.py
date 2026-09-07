@@ -20,6 +20,7 @@ import channel_lever_spec
 import cone_pivot_screw_spec
 import cone_tip_adjuster_spec
 import fillister_screw_spec
+from fillister_screw_callouts import SIDE_DIMENSION_CALLOUTS
 import fulcrum_shaft_spec
 import pivot_shaft_spec
 import rocker_arm_notes
@@ -110,7 +111,7 @@ TARGETS = {
                 "*Right",
                 2,
                 (),
-                (fillister_screw_spec.SIDE_DIMENSION_CALLOUTS["ShankLg"],),
+                (SIDE_DIMENSION_CALLOUTS["ShankLg"],),
             ),
         ),
     ),
