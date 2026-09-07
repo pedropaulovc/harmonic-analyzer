@@ -293,9 +293,55 @@ def test_snapshot_fresh_handles_after_cold_reopen_and_no_source_lower_getter(sce
     assert not hasattr(old_dimension, "GetLowerText")
 
 
+def test_boundary_snapshot_observes_lower_loss_without_requiring_completed_use(scene):
+    with scene.instance.observe():
+        before = scene.instance.boundary_snapshot()
+        apply(scene)
+        after = scene.instance.boundary_snapshot()
+        scene.state.lower = ""
+        lost = scene.instance.boundary_snapshot()
+    key = "Drawing View1/ArborBoreDia"  # Exact all_annotation_layout native key.
+    assert set(before) == set(after) == set(lost) == {key}
+    assert before[key]["lower_text"] == lost[key]["lower_text"] == ""
+    assert after[key]["lower_text"] == control.TEXT
+    assert before[key]["parameters"] == after[key]["parameters"] == lost[key]["parameters"]
+    assert scene.model.GetViews.call_count == 3
+    scene.display.SetLowerText.assert_called_once_with(control.TEXT)
+    scene.model.EditRebuild3.assert_called_once_with()
+
+
+@pytest.mark.parametrize("mode", ["part", "active", "parameter", "duplicate"])
+def test_boundary_snapshot_keeps_owned_drawing_and_exact_native_identity_guards(scene, mode):
+    if mode == "part":
+        scene.state.native_kind = 1
+    if mode == "active":
+        scene.adapter.swApp.ActiveDoc = object()
+    if mode == "parameter":
+        scene.display.GetDimension2 = lambda _: NS(**vars(scene.dimension))
+    if mode == "duplicate":
+        scene.view.GetAnnotations.return_value = (scene.annotation, scene.annotation)
+    with scene.instance.observe():
+        with pytest.raises(RuntimeError):
+            scene.instance.boundary_snapshot()
+    scene.display.SetLowerText.assert_not_called()
+    scene.model.EditRebuild3.assert_not_called()
+    if mode in ("part", "active"):
+        scene.display.GetLowerText.assert_not_called()
+
+
+def test_boundary_snapshot_rejects_closed_lifetime_without_native_reads(scene):
+    with scene.instance.observe():
+        apply(scene)
+    scene.display.GetLowerText.reset_mock()
+    with pytest.raises(RuntimeError, match="active context"):
+        scene.instance.boundary_snapshot()
+    scene.model.GetViews.assert_not_called()
+    scene.display.GetLowerText.assert_not_called()
+
+
 @pytest.mark.parametrize(
     "mode",
-    ["lost", "hidden_text", "one_line", "wrong_key", "duplicate", "stale_id", "part"],
+    ["lost", "hidden_text", "one_line", "wrong_key", "sheet_prefix", "duplicate", "stale_id", "part"],
 )
 def test_fresh_snapshot_retains_observed_failure_without_accepting_hidden_storage(
     scene, mode
@@ -311,6 +357,8 @@ def test_fresh_snapshot_retains_observed_failure_without_accepting_hidden_storag
         rows["Drawing View1/ArborBoreDia"]["generic"]["texts"].pop()
     if mode == "wrong_key":
         rows["Drawing View2/ArborBoreDia"] = rows.pop("Drawing View1/ArborBoreDia")
+    if mode == "sheet_prefix":
+        rows["Sheet1/Drawing View1/ArborBoreDia"] = rows.pop("Drawing View1/ArborBoreDia")
     if mode == "duplicate":
         scene.view.GetAnnotations.return_value = (scene.annotation, scene.annotation)
     if mode == "stale_id":
