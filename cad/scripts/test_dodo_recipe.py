@@ -416,6 +416,68 @@ def test_cached_drawing_miss_builds_once_then_stores(tmp_path, monkeypatch):
     assert stores[0][1] == [output]
 
 
+def test_actual_rocker_support_drawing_action_supplies_required_parser_stem(monkeypatch):
+    """Review's missing-argument claim must exercise the real command and parser."""
+    import ast
+    import sys
+    from unittest.mock import Mock
+
+    import pytest
+    import draw_rocker_arm_support as drawing
+
+    dodo = _load_dodo()
+    stem = "rocker_arm_support"
+    spec = dodo.DRAWINGS_BY_NAME[stem]
+    monkeypatch.setattr(dodo, "_drawing_file_deps", lambda _stem: [])
+    monkeypatch.setattr(dodo, "_cache_key", Mock(return_value="offline-command-proof"))
+    restore, store = Mock(return_value=False), Mock(return_value="stored")
+    monkeypatch.setattr(dodo._cache, "restore", restore)
+    monkeypatch.setattr(dodo._cache, "store", store)
+    monkeypatch.setattr(dodo, "_com_seat", lambda _label: contextlib.nullcontext())
+    ready, execute = Mock(), Mock()
+    monkeypatch.setattr(dodo, "_sw_ensure_once", ready)
+    monkeypatch.setattr(dodo, "_exec_com", execute)
+    native = Mock(side_effect=AssertionError("parser proof must not build a drawing"))
+    monkeypatch.setattr(drawing, "run_drawing_build", native)
+
+    task = next(task for task in dodo.task_drawing() if task["name"] == stem)
+    (action, arguments), = task["actions"]
+    assert action is dodo._cached_drawing_action
+    assert arguments == [stem]
+    action(*arguments)
+    execute.assert_called_once()
+    command, label = execute.call_args.args
+    assert label == f"drawing:{stem}"
+    assert execute.call_args.kwargs == {"log_stem": f"drawing-{stem}"}
+    assert restore.call_count == 2
+    ready.assert_called_once_with()
+    store.assert_called_once()
+
+    # Evaluate the actual command expression, not a hand-written argv template.
+    tree = ast.parse(inspect.getsource(action))
+    assignment, = (
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.Assign)
+        and any(isinstance(target, ast.Name) and target.id == "cmd" for target in node.targets)
+    )
+    expression = ast.Expression(assignment.value)
+    assert command == eval(
+        compile(expression, dodo.__file__, "eval"), {"sys": sys, "spec": spec}
+    )
+    assert Path(command[1]) == Path(drawing.__file__).resolve()
+    monkeypatch.setattr(sys, "argv", command[1:])
+    assert drawing._parse_args().part == drawing.PART_STEM == "rocker-arm-support"
+
+    # The positional argument remains required, and the underscored task name
+    # is not accepted in place of the dashed native part stem.
+    for argv in (command[1:2], [command[1], stem]):
+        monkeypatch.setattr(sys, "argv", argv)
+        with pytest.raises(SystemExit) as rejected:
+            drawing._parse_args()
+        assert rejected.value.code == 2
+    native.assert_not_called()
+
+
 def test_cache_status_covers_drawings():
     dodo = _load_dodo()
     rows = dict(dodo._cache_rows())
