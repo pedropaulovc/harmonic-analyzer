@@ -286,3 +286,30 @@ witnesses. Built acceptance rejected missing lower text; cold reopening was not
 reached. Failure evidence retained no capture errors. Originals and the copied
 source remained exact, the two baseline pivot documents were preserved, and
 cleanup/final guards were clean. No production text/save policy is promoted.
+
+## Remaining recipe boundaries: loss during finalization
+
+At `5e468895`, adapter `e77bfda4`, PID 31860, the same legacy command produced
+`datum-policy-q37e1dvb/pilot.json`, SHA-256
+`facb0ee216034501391cfac1502ef4a289900b8f650b6d619d8b63cb021c18cf`.
+Fresh lower-text reads remained exact after center marks, circle selection,
+datum, feature-control frame, surface finish and both property notes. The text
+was still present immediately before `finalize_drawing`, but empty immediately
+before native save. The clearing operation is therefore inside finalization,
+not any preceding annotation helper. This does not yet distinguish SetScale
+from the other finalization operations.
+
+The run reached 23 of the 25 selected banks. The after-native bank rejected the
+renamed drawing because this pilot still called the raw adapter saver: the
+outer drawing-creation scope did not reconcile SaveAs ownership until recipe
+exit. The previously repaired shared owned saver was not on this call path.
+The fix is to install that owned saver in the actual pilot before its optional
+save control, preserving the legacy control's no-op contract; six call-path
+tests reproduce the failure and check both native APIs and failure cleanup.
+
+Recipe/pilot times were 96.983/154.319 s, including diagnostic reads. Ordinary
+PDF, built and cold acceptance were not reached. Failure capture completed with
+no errors; source/copy hashes stayed exact. On exit, creation-scope
+reconciliation and owned cleanup succeeded, the two clean/visible baseline
+pivot documents remained open, and final runtime guards were empty.
+No production text policy is accepted from this failed pilot.

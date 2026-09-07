@@ -6,7 +6,7 @@ keyword into the unchanged view, dimension, annotation and finalizer logic.
 Every recipe declares `TEMPLATE_SPEC` from its actual scale and precision;
 shared fastener and assembly drawing helpers forward the same callable.
 
-`_drawing_common.new_project_drawing` remains the normal initializer used to
+`_drawing_sheet_setup.new_project_drawing` is the normal initializer used to
 prepare an entry. It never calls the runner. No global factory replacement,
 adapter mode, new doit task or concurrent COM operation is involved.
 The existing production `run_build` connect/CloseAllDocuments policy is unchanged;
@@ -81,3 +81,21 @@ Both cold comparison arrays were empty and the same five explicit roles passed.
 Source hashes were exact at every saved/closed/reopened checkpoint, baseline
 documents were preserved, cleanup succeeded and final guards were empty.
 These are two accepted empty-map recipes, not an A/B fleet timing result.
+
+## Lever prepared acceptance at `a25fe21c`
+
+The owned channel-lever recipe also passed built/cold and visual acceptance on
+adapter `e77bfda4`, PID 31860: `datum-policy-dqu2i_at/pilot.json`, SHA-256
+`7e450161e9575a2f3afc786d8a30c7b645ed5cb910c8a50eed4fd3d63dd55dc9`.
+Its isolated MISS/HIT took 37.687/0.046 s. Factory setup took 1.110 s,
+included in the 140.089 s recipe; total diagnostic time was 279.759 s.
+The two cold comparison arrays were empty. BASIC dimensions, raw source values
+and annotation witnesses passed, originals/copy hashes remained exact, and the
+baseline pivot documents were preserved with successful cleanup and no final
+guard errors. The PNG retained readable dimensions and native leader positions.
+
+This accepts one prepared lever recipe, not a fleet speedup: its 140 s recipe
+cost remains after the roughly one-second factory setup. These three retained
+runs precede the setup-module extraction in
+[prepared-template-key-isolation.md](prepared-template-key-isolation.md); that
+dependency-boundary change still needs its own native acceptance.
