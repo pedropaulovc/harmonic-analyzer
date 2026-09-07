@@ -169,7 +169,7 @@ async def build(
             "Isometric View Note",
         ),
     )
-    drawing_model, sheet = drawing_factory(
+    drawing_model, _sheet = drawing_factory(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE
     )
     stamp_drawing_summary(

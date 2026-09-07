@@ -135,7 +135,7 @@ def test_sheet_guards_remain_loud_before_viewport_or_rebuild(native, damage):
         trace.sheet.GetProperties2.return_value[5] = 0.5
     if damage == "short_readback":
         trace.sheet.GetProperties2.return_value = []
-    with pytest.raises(RuntimeError, match="sheet|ASME B"):
+    with pytest.raises(RuntimeError, match=r"sheet|ASME B"):
         setup.new_project_drawing(adapter, scale=(2, 1))
     trace.draw.ViewZoomtofit2.assert_not_called()
     trace.draw.ForceRebuild3.assert_not_called()

@@ -141,7 +141,7 @@ async def test_incomplete_post_setter_properties_fail_before_correction(native, 
     native.properties[2:4] = [1.0, 1.0]
     native.properties[7] = 1
     native.sheet.GetProperties2.side_effect = [list(native.properties), after]
-    with pytest.raises(RuntimeError, match="incomplete.*properties"):
+    with pytest.raises(RuntimeError, match=r"incomplete.*properties"):
         await finalize(native)
     native.sheet.SetScale.assert_called_once_with(2.0, 1.0, False, False)
     native.sheet.SetProperties2.assert_not_called()
@@ -155,7 +155,7 @@ async def test_equal_initial_pair_cannot_bypass_later_full_readback(native, chan
     after = list(before)
     after[2 if change == "scale" else 5] = 3.0
     native.sheet.GetProperties2.side_effect = [before, after]
-    with pytest.raises(RuntimeError, match="drawing sheet scale|ASME B size"):
+    with pytest.raises(RuntimeError, match=r"drawing sheet scale|ASME B size"):
         await finalize(native)
     native.sheet.SetScale.assert_not_called()
     native.save.assert_not_called()
@@ -170,7 +170,7 @@ async def test_incomplete_initial_properties_fail_before_set_or_export(
 ):
     native.sheet.GetProperties2.side_effect = None
     native.sheet.GetProperties2.return_value = properties
-    with pytest.raises(RuntimeError, match="incomplete.*properties"):
+    with pytest.raises(RuntimeError, match=r"incomplete.*properties"):
         await finalize(native)
     native.sheet.SetScale.assert_not_called()
     native.sheet.SetProperties2.assert_not_called()

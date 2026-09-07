@@ -129,7 +129,7 @@ async def build(
             "Manufacturing Notes",
         ),
     )
-    drawing_model, sheet = drawing_factory(adapter, property_view=PART_STEM)
+    drawing_model, _sheet = drawing_factory(adapter, property_view=PART_STEM)
     stamp_drawing_summary(
         adapter,
         drawing_model,

@@ -1040,9 +1040,14 @@ async def pilot(
                 )
                 from diagnostics._source_callout_authoring import expected_copy_hash
 
-                expected_hash = expected_copy_hash(
-                    trial, EXPECTED_PART_HASHES[trial["target"]]
-                )
+                try:
+                    expected_hash = expected_copy_hash(
+                        trial, EXPECTED_PART_HASHES[trial["target"]]
+                    )
+                except Exception as error:
+                    trial["copy_final_expected_error"] = repr(error)
+                    runtime_guard_errors.append(error)
+                    continue
                 if trial["copy_final"] != expected_hash:
                     runtime_guard_errors.append(
                         RuntimeError("final owned source copy changed on disk")
