@@ -63,3 +63,9 @@ GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
     "ear-hole position": "0.25",
     "mating-face parallelism": "0.10",
 }
+
+
+# Model display callouts, imported read-only by the manufacturing drawing.
+DIMENSION_CALLOUTS = {
+    "BoreDia": "THRU\nSLIP FIT ON <MOD-DIAM>25.4 COLUMN",
+}

@@ -29,6 +29,8 @@ Run (SolidWorks already open)::
 from __future__ import annotations
 
 import math
+from _model_dimension_callouts import author_model_callouts
+from pinion_lever_spec import DIMENSION_CALLOUTS
 import sys
 
 from _common import (
@@ -431,6 +433,21 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
+    author_model_callouts(
+        adapter, "BarrelProfile", {"HubBore": DIMENSION_CALLOUTS["HubBore"]}
+    )
+    author_model_callouts(adapter, "Barrel", {"BoreDepth": DIMENSION_CALLOUTS["BoreDepth"]})
+    author_model_callouts(adapter, "Wall", {"EndWall": DIMENSION_CALLOUTS["EndWall"]})
+    author_model_callouts(
+        adapter,
+        "RodProfile",
+        {
+            "RodTipY": DIMENSION_CALLOUTS["RodTipY"],
+            "RodTipDia": DIMENSION_CALLOUTS["RodTipDia"],
+            "GripHalfAngle": DIMENSION_CALLOUTS["GripHalfAngle"],
+        },
+    )
+    author_model_callouts(adapter, "CapProfile", {"CapR": DIMENSION_CALLOUTS["CapR"]})
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
     return artefacts

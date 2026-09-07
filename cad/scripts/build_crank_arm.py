@@ -28,6 +28,8 @@ Run (SolidWorks already open)::
 from __future__ import annotations
 
 import sys
+from _model_dimension_callouts import author_model_callouts
+from crank_arm_spec import DIMENSION_CALLOUTS
 
 from _common import (
     SketchDims,
@@ -353,6 +355,12 @@ async def build(adapter) -> dict[str, str]:
             "Manufacturing Notes": DRAWING_NOTES,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
+    )
+    author_model_callouts(
+        adapter, "ShaftBoreProfile", {"ShaftBoreDia": DIMENSION_CALLOUTS["ShaftBoreDia"]}
+    )
+    author_model_callouts(
+        adapter, "DimpleProfile", {"DimpleDia": DIMENSION_CALLOUTS["DimpleDia"]}
     )
     return await save_part_and_images(adapter, PART_NAME)
 

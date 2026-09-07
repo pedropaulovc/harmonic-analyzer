@@ -3,6 +3,7 @@ r"""Create the curated machinist drawing for the alignment-pinion arbor."""
 from __future__ import annotations
 
 import argparse
+from pinion_arbor_spec import CAP_CALLOUTS
 import sys
 from typing import Any
 
@@ -19,13 +20,13 @@ from _drawing_common import (
     project_part_pmi,
     read_required_properties,
     set_dimension_callouts,
+    verify_dimension_callouts,
     set_hidden_lines_removed,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from pinion_arbor_spec import (
-    CAP_R,
     CAP_SAG,
     GEOMETRIC_CONTROLS,
     PART_DATUMS,
@@ -94,7 +95,7 @@ RIGHT_KEEP = {
 # The shaft fit lives on the source-model dimension. The crown descriptor is
 # still a sheet layout annotation, not a tolerance override.
 DIMENSION_CALLOUTS: dict[str, str] = {}
-CAP_CALLOUTS = {"CapSagDim": f"SR{CAP_R:.2f} CROWN"}
+
 
 
 async def build(
@@ -125,6 +126,7 @@ async def build(
             "End View Note",
         ),
     )
+    callout_source_model = adapter.currentModel
     drawing_model, _sheet = drawing_factory(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE
     )
@@ -153,7 +155,14 @@ async def build(
         adapter, right, keep=RIGHT_KEEP, view_label="right"
     )
     set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
-    set_dimension_callouts(adapter, right_annotations, CAP_CALLOUTS)
+    verify_dimension_callouts(
+        adapter,
+        right_annotations,
+        CAP_CALLOUTS,
+        feature_name="BackCapProfile",
+        view=right,
+        source_model=callout_source_model,
+    )
     # SolidWorks classifies a solid circular end silhouette under the same
     # AutoInsertCenterMarks2 "hole" bit as a bored circle; disabling that bit
     # makes the API a guaranteed no-op even though the end view is circular.

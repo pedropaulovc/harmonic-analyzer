@@ -13,6 +13,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+from pinion_pivot_shaft_spec import DIMENSION_CALLOUTS
 import math
 import sys
 from typing import Any
@@ -31,7 +32,7 @@ from _drawing_common import (
     curate_view_dimensions,
     finalize_drawing,
     read_required_properties,
-    set_dimension_callouts,
+    verify_dimension_callouts,
     set_hidden_lines_removed,
     stamp_drawing_summary,
 )
@@ -82,10 +83,7 @@ FRONT_KEEP = {
 RIGHT_KEEP = {
     "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.025),
 }
-DIMENSION_CALLOUTS = {
-    "ShaftDia": "FINAL SIZE",
-    "Depth": "CYLINDRICAL BODY\nBETWEEN CROWN ROOT CIRCLES",
-}
+
 
 
 async def build(
@@ -118,6 +116,7 @@ async def build(
             "Iso View Note",
         ),
     )
+    callout_source_model = adapter.currentModel
     drawing_model, _sheet = drawing_factory(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE
     )
@@ -145,8 +144,21 @@ async def build(
     right_annotations = curate_view_dimensions(
         adapter, right, keep=RIGHT_KEEP, view_label="right"
     )
-    set_dimension_callouts(
-        adapter, [*front_annotations, *right_annotations], DIMENSION_CALLOUTS
+    verify_dimension_callouts(
+        adapter,
+        [*front_annotations, *right_annotations],
+        {"ShaftDia": DIMENSION_CALLOUTS["ShaftDia"]},
+        feature_name="ShaftProfile",
+        view=front,
+        source_model=callout_source_model,
+    )
+    verify_dimension_callouts(
+        adapter,
+        [*front_annotations, *right_annotations],
+        {"Depth": DIMENSION_CALLOUTS["Depth"]},
+        feature_name="Shaft",
+        view=right,
+        source_model=callout_source_model,
     )
     # SolidWorks classifies a solid circular end silhouette under the same
     # AutoInsertCenterMarks2 "hole" bit as a bored circle; disabling that bit

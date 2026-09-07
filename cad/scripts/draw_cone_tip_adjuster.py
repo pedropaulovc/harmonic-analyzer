@@ -3,6 +3,7 @@ r"""Create the curated machinist drawing for the cone tip adjuster set screw."""
 from __future__ import annotations
 
 import argparse
+from cone_tip_adjuster_spec import DIMENSION_CALLOUTS
 import sys
 from typing import Any
 
@@ -20,7 +21,7 @@ from _drawing_common import (
     finalize_drawing,
     import_cosmetic_threads,
     read_required_properties,
-    set_dimension_callouts,
+    verify_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     set_reference_dimensions,
@@ -83,10 +84,7 @@ CUP_KEEP = {
 # The two entries that remain are sheet annotation, not specification:
 #   BodyDiaDim - the thread designation, already derived from the spec's THREAD.
 #   CupDepth   - the machining instruction for the marked blind-hole depth.
-DIMENSION_CALLOUTS = {
-    "BodyDiaDim": f"{THREAD} UNC-2A",
-    "CupDepth": "DEEP",
-}
+
 
 
 def _circular_edge(view: Any, *, radius_mm: float, center_y_mm: float) -> Any:
@@ -142,6 +140,7 @@ async def build(
             "Manufacturing Notes",
         ),
     )
+    callout_source_model = adapter.currentModel
     drawing_model, _sheet = drawing_factory(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE
     )
@@ -182,19 +181,21 @@ async def build(
     cup_annotations = curate_view_dimensions(
         adapter, cup, keep=CUP_KEEP, view_label="cup end"
     )
-    set_dimension_callouts(
+    verify_dimension_callouts(
         adapter,
         [*front_annotations, *end_annotations, *cup_annotations],
-        {
-            name: text
-            for name, text in DIMENSION_CALLOUTS.items()
-            if name != "BodyDiaDim"
-        },
+        {name: text for name, text in DIMENSION_CALLOUTS.items() if name != "BodyDiaDim"},
+        feature_name="Cup",
+        view=front,
+        source_model=callout_source_model,
     )
-    set_dimension_callouts(
+    verify_dimension_callouts(
         adapter,
         front_annotations,
         {"BodyDiaDim": DIMENSION_CALLOUTS["BodyDiaDim"]},
+        feature_name="BodyProfile",
+        view=front,
+        source_model=callout_source_model,
         location="above",
     )
     set_reference_dimensions(adapter, front_annotations, ("BodyDiaDim",))

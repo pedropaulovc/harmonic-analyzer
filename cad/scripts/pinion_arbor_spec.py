@@ -52,3 +52,7 @@ DRAWING_NOTES = "\n".join(
     )
 )
 END_VIEW_NOTE = "END VIEW SCALE 2:1"
+
+
+# Model display callouts, imported read-only by the manufacturing drawing.
+CAP_CALLOUTS = {"CapSagDim": f"SR{CAP_R:.2f} CROWN"}

@@ -17,6 +17,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+from crank_handle_spec import DIMENSION_CALLOUTS
 import sys
 from typing import Any
 
@@ -36,7 +37,7 @@ from _drawing_common import (
     finalize_drawing,
     read_required_properties,
     set_basic_dimension,
-    set_dimension_callouts,
+    verify_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
@@ -101,9 +102,7 @@ RIGHT_KEEP = {
 # The HandleLength band moved onto the model dimension in build_crank_handle
 # (crank_handle_spec.HANDLE_LENGTH_BAND). The pivot-bore tolerance now also
 # renders from its model dimension; the callout retains only process intent.
-DIMENSION_CALLOUTS = {
-    "PivotBoreDia": "THRU - REAM",
-}
+
 
 
 async def build(
@@ -134,6 +133,7 @@ async def build(
             "Isometric View Note",
         ),
     )
+    callout_source_model = adapter.currentModel
     drawing_model, _sheet = drawing_factory(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE
     )
@@ -165,8 +165,13 @@ async def build(
     right_annotations = curate_view_dimensions(
         adapter, right, keep=RIGHT_KEEP, view_label="right"
     )
-    set_dimension_callouts(
-        adapter, [*front_annotations, *right_annotations], DIMENSION_CALLOUTS
+    verify_dimension_callouts(
+        adapter,
+        [*front_annotations, *right_annotations],
+        DIMENSION_CALLOUTS,
+        feature_name="PivotBoreProfile",
+        view=right,
+        source_model=callout_source_model,
     )
     front_by_name = {dimension_name(adapter, a): a for a in front_annotations}
     for station in ("CollarLength", "PeakStation"):

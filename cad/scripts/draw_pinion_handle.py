@@ -15,6 +15,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+from pinion_handle_spec import DIMENSION_CALLOUTS
 import sys
 from typing import Any
 
@@ -34,7 +35,7 @@ from _drawing_common import (
     finalize_drawing,
     model_point_in_view,
     read_required_properties,
-    set_dimension_callouts,
+    verify_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     set_basic_dimension,
@@ -113,14 +114,7 @@ TOP_KEEP = {
     "RodDia": (0.300, 0.092),
     "RodHoleDia": (0.300, 0.112),
 }
-DIMENSION_CALLOUTS = {
-    "TubeId": "FINAL REAM",
-    "GripLen": "CYL. LENGTH",
-    "TubeLen": "BORE DEPTH",
-    "RodSpan": "OAL",
-    "RodDia": "PRESS ROD",
-    "RodHoleDia": "BODY HOLE; REAM THRU",
-}
+
 
 
 async def build(
@@ -151,6 +145,7 @@ async def build(
             "Isometric View Note",
         ),
     )
+    callout_source_model = adapter.currentModel
     drawing_model, _sheet = drawing_factory(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE
     )
@@ -184,10 +179,53 @@ async def build(
     top_annotations = curate_view_dimensions(
         adapter, top, keep=TOP_KEEP, view_label="top"
     )
-    set_dimension_callouts(
+    verify_dimension_callouts(
         adapter,
         [*front_annotations, *right_annotations, *top_annotations],
-        DIMENSION_CALLOUTS,
+        {"TubeId": DIMENSION_CALLOUTS["TubeId"]},
+        feature_name="TubeProfile",
+        view=front,
+        source_model=callout_source_model,
+    )
+    verify_dimension_callouts(
+        adapter,
+        [*front_annotations, *right_annotations, *top_annotations],
+        {"GripLen": DIMENSION_CALLOUTS["GripLen"]},
+        feature_name="Grip",
+        view=right,
+        source_model=callout_source_model,
+    )
+    verify_dimension_callouts(
+        adapter,
+        [*front_annotations, *right_annotations, *top_annotations],
+        {"TubeLen": DIMENSION_CALLOUTS["TubeLen"]},
+        feature_name="Tube",
+        view=right,
+        source_model=callout_source_model,
+    )
+    verify_dimension_callouts(
+        adapter,
+        [*front_annotations, *right_annotations, *top_annotations],
+        {"RodSpan": DIMENSION_CALLOUTS["RodSpan"]},
+        feature_name="Rod",
+        view=front,
+        source_model=callout_source_model,
+    )
+    verify_dimension_callouts(
+        adapter,
+        [*front_annotations, *right_annotations, *top_annotations],
+        {"RodDia": DIMENSION_CALLOUTS["RodDia"]},
+        feature_name="RodProfile",
+        view=top,
+        source_model=callout_source_model,
+    )
+    verify_dimension_callouts(
+        adapter,
+        [*front_annotations, *right_annotations, *top_annotations],
+        {"RodHoleDia": DIMENSION_CALLOUTS["RodHoleDia"]},
+        feature_name="RodHoleProfile",
+        view=top,
+        source_model=callout_source_model,
     )
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")

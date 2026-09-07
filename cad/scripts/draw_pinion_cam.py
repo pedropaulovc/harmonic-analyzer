@@ -14,6 +14,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+from pinion_cam_spec import DIMENSION_CALLOUTS
 import sys
 from typing import Any
 
@@ -33,7 +34,7 @@ from _drawing_common import (
     finalize_drawing,
     read_required_properties,
     set_basic_dimension,
-    set_dimension_callouts,
+    verify_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
@@ -105,12 +106,7 @@ TOP_KEEP = {
     "BossDia": (0.180, 0.225),
     "BossCz": (0.155, 0.200),
 }
-DIMENSION_CALLOUTS = {
-    "BoreDia": "FINAL REAM; THRU",
-    "CollarCy": "BOTH END FACES",
-    "BossProjection": f"BEYOND DIA {CAM_OD:.2f} OD",
-    "BossCz": "A TO BOSS / TAP AXIS",
-}
+
 
 
 @_telemetry.traced("drawing.pinion_cam_front_end_scan")
@@ -169,6 +165,7 @@ async def build(
             "Isometric View Note",
         ),
     )
+    callout_source_model = adapter.currentModel
     drawing_model, _sheet = drawing_factory(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE
     )
@@ -197,8 +194,37 @@ async def build(
     top_annotations = curate_view_dimensions(
         adapter, top, keep=TOP_KEEP, view_label="top"
     )
-    set_dimension_callouts(
-        adapter, [*front_annotations, *top_annotations], DIMENSION_CALLOUTS
+    verify_dimension_callouts(
+        adapter,
+        [*front_annotations, *top_annotations],
+        {"BoreDia": DIMENSION_CALLOUTS["BoreDia"]},
+        feature_name="BoreProfile",
+        view=front,
+        source_model=callout_source_model,
+    )
+    verify_dimension_callouts(
+        adapter,
+        [*front_annotations, *top_annotations],
+        {"CollarCy": DIMENSION_CALLOUTS["CollarCy"]},
+        feature_name="CollarProfile",
+        view=front,
+        source_model=callout_source_model,
+    )
+    verify_dimension_callouts(
+        adapter,
+        [*front_annotations, *top_annotations],
+        {"BossProjection": DIMENSION_CALLOUTS["BossProjection"]},
+        feature_name="SetPinBossProjection",
+        view=front,
+        source_model=callout_source_model,
+    )
+    verify_dimension_callouts(
+        adapter,
+        [*front_annotations, *top_annotations],
+        {"BossCz": DIMENSION_CALLOUTS["BossCz"]},
+        feature_name="BossProfile",
+        view=top,
+        source_model=callout_source_model,
     )
     top_by_name = {dimension_name(adapter, a): a for a in top_annotations}
     boss_station = top_by_name["BossCz"]

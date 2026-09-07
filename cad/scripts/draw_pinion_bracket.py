@@ -16,6 +16,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+from pinion_bracket_spec import DIMENSION_CALLOUTS
 import sys
 from typing import Any
 
@@ -33,7 +34,7 @@ from _drawing_common import (
     curate_view_dimensions,
     finalize_drawing,
     read_required_properties,
-    set_dimension_callouts,
+    verify_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
@@ -114,18 +115,7 @@ RIGHT_KEEP = {
     # Locates the pin seat through the thickness (mid-plane) in the section view.
     "PinSeatCz": (0.245, 0.190),
 }
-DIMENSION_CALLOUTS = {
-    "PivotBoreDia": "PIVOT BORE; THRU - REAM",
-    "ArborBoreDia": "ARBOR BORE; THRU - REAM",
-    "PinSeatCy": "PIN-SEAT AXIS ABOVE PIVOT-BORE AXIS",
-    "Depth": "ONE STRAP THICKNESS",
-    "PinSeatDia": (
-        "H7; BLIND; FLAT BOTTOM\nENTRY ON THE STRAIGHT EDGE FACE\n"
-        "NEAREST THE PIVOT BORE"
-    ),
-    "PinSeatCz": "FROM DATUM C",
-    "PinSeatDepth": "FULL-DIAMETER DEPTH",
-}
+
 
 
 async def build(
@@ -156,6 +146,7 @@ async def build(
             "Isometric View Note",
         ),
     )
+    callout_source_model = adapter.currentModel
     drawing_model, _sheet = drawing_factory(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE
     )
@@ -188,10 +179,51 @@ async def build(
     right_annotations = curate_view_dimensions(
         adapter, right, keep=RIGHT_KEEP, view_label="right"
     )
-    set_dimension_callouts(
+    verify_dimension_callouts(
         adapter,
         [*front_annotations, *right_annotations],
-        DIMENSION_CALLOUTS,
+        {
+            "PivotBoreDia": DIMENSION_CALLOUTS["PivotBoreDia"],
+            "ArborBoreDia": DIMENSION_CALLOUTS["ArborBoreDia"],
+        },
+        feature_name="StrapProfile",
+        view=front,
+        source_model=callout_source_model,
+    )
+    verify_dimension_callouts(
+        adapter,
+        [*front_annotations, *right_annotations],
+        {"PinSeatCy": DIMENSION_CALLOUTS["PinSeatCy"]},
+        feature_name="PinSeatProfile",
+        view=front,
+        source_model=callout_source_model,
+    )
+    verify_dimension_callouts(
+        adapter,
+        [*front_annotations, *right_annotations],
+        {"Depth": DIMENSION_CALLOUTS["Depth"]},
+        feature_name="Strap",
+        view=right,
+        source_model=callout_source_model,
+    )
+    verify_dimension_callouts(
+        adapter,
+        [*front_annotations, *right_annotations],
+        {
+            "PinSeatDia": DIMENSION_CALLOUTS["PinSeatDia"],
+            "PinSeatCz": DIMENSION_CALLOUTS["PinSeatCz"],
+        },
+        feature_name="PinSeatProfile",
+        view=right,
+        source_model=callout_source_model,
+    )
+    verify_dimension_callouts(
+        adapter,
+        [*front_annotations, *right_annotations],
+        {"PinSeatDepth": DIMENSION_CALLOUTS["PinSeatDepth"]},
+        feature_name="PinSeat",
+        view=front,
+        source_model=callout_source_model,
     )
 
     for view, label in ((front, "front"), (right, "right")):

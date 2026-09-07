@@ -16,6 +16,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+from knife_mount_spec import DIMENSION_CALLOUTS
 import sys
 from typing import Any
 
@@ -34,7 +35,7 @@ from _drawing_common import (
     curate_view_dimensions,
     finalize_drawing,
     read_required_properties,
-    set_dimension_callouts,
+    verify_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
@@ -87,9 +88,7 @@ FRONT_KEEP = {
     "BoreDia": (FRONT_CENTER[0] - 0.048, _front_y(BORE_CY) + 0.026),
 }
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
-DIMENSION_CALLOUTS = {
-    "BoreDia": "THRU",
-}
+
 
 RIGHT_HALF_Z = SUPPORT_Z_THICK / 2.0 * SHEET_SCALE[0] / 1000.0
 RIGHT_HALF_Y = (BLK_TOP - BLK_BOT) / 2.0 * SHEET_SCALE[0] / 1000.0
@@ -123,6 +122,7 @@ async def build(
             "Isometric View Note",
         ),
     )
+    callout_source_model = adapter.currentModel
     drawing_model, _sheet = drawing_factory(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE
     )
@@ -153,7 +153,14 @@ async def build(
         adapter, front, keep=FRONT_KEEP, view_label="front"
     )
     curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
-    set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
+    verify_dimension_callouts(
+        adapter,
+        front_annotations,
+        DIMENSION_CALLOUTS,
+        feature_name="BoreProfile",
+        view=front,
+        source_model=callout_source_model,
+    )
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to knife bore")
 

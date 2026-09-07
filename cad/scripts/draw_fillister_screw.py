@@ -10,6 +10,7 @@ nominals come from the fastener catalog via ``fillister_screw_spec``.
 from __future__ import annotations
 
 import argparse
+from fillister_screw_spec import SIDE_DIMENSION_CALLOUTS
 import sys
 from typing import Any
 
@@ -23,6 +24,7 @@ from _drawing_common import (
     finalize_drawing,
     read_required_properties,
     set_dimension_callouts,
+    verify_dimension_callouts,
     set_dimension_text,
     set_hidden_lines_removed,
     stamp_drawing_summary,
@@ -59,7 +61,7 @@ END_KEEP = {
     "HeadDia": (END_CENTER[0], END_CENTER[1] + 0.050),
 }
 DIMENSION_CALLOUTS: dict[str, str] = {}
-SIDE_DIMENSION_CALLOUTS = {"ShankLg": "UNDERHEAD LENGTH"}
+
 SIDE_KEEP = {
     "HeadHt": (SIDE_CENTER[0], SIDE_CENTER[1] + 0.034),
     "ShankLg": (SIDE_CENTER[0] - 0.024, SIDE_CENTER[1] - 0.034),
@@ -95,6 +97,7 @@ async def build(
             "End View Note",
         ),
     )
+    callout_source_model = adapter.currentModel
     drawing_model, _sheet = drawing_factory(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE
     )
@@ -127,7 +130,14 @@ async def build(
     side_annotations = curate_view_dimensions(
         adapter, side, keep=SIDE_KEEP, view_label="side"
     )
-    set_dimension_callouts(adapter, side_annotations, SIDE_DIMENSION_CALLOUTS)
+    verify_dimension_callouts(
+        adapter,
+        side_annotations,
+        SIDE_DIMENSION_CALLOUTS,
+        feature_name="Shank",
+        view=side,
+        source_model=callout_source_model,
+    )
     set_dimension_text(
         adapter, side_annotations, {"ShankDia": "#4-40 UNC-2A"}
     )

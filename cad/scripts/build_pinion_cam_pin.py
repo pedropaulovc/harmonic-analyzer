@@ -25,6 +25,8 @@ Run (SolidWorks already open)::
 from __future__ import annotations
 
 import math
+from _model_dimension_callouts import author_model_callouts
+from pinion_cam_pin_spec import DIMENSION_CALLOUTS
 import sys
 
 from _common import (
@@ -229,6 +231,9 @@ async def build(adapter) -> dict[str, str]:
             "End View Note": END_VIEW_NOTE,
         },
     )
+    author_model_callouts(adapter, "PinProfile", {"PinDia": DIMENSION_CALLOUTS["PinDia"]})
+    author_model_callouts(adapter, "Pin", {"Depth": DIMENSION_CALLOUTS["Depth"]})
+    author_model_callouts(adapter, "CapProfile", {"CapR": DIMENSION_CALLOUTS["CapR"]})
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
     return artefacts

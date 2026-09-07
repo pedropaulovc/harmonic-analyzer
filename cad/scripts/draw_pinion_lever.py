@@ -13,6 +13,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+from pinion_lever_spec import DIMENSION_CALLOUTS
 import math
 import sys
 from typing import Any
@@ -34,7 +35,7 @@ from _drawing_common import (
     finalize_drawing,
     model_point_in_view,
     read_required_properties,
-    set_dimension_callouts,
+    verify_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
@@ -105,15 +106,7 @@ RIGHT_KEEP = {
     "EndWall": (0.235, 0.190),
 }
 TOP_KEEP = {"CapR": (0.290, 0.165)}
-DIMENSION_CALLOUTS = {
-    "HubBore": "FINAL REAM",
-    "BoreDepth": "FULL-DIA DEPTH FROM B; FLAT BOTTOM",
-    "EndWall": "END WALL TO CROWN ROOT PLANE",
-    "RodTipY": "FROM HUB AXIS",
-    "RodTipDia": "AT TIP",
-    "GripHalfAngle": "GRIP HALF-ANGLE TO AXIS",
-    "CapR": "SPHERICAL CROWN",
-}
+
 
 
 async def build(
@@ -144,6 +137,7 @@ async def build(
             "Isometric View Note",
         ),
     )
+    callout_source_model = adapter.currentModel
     drawing_model, _sheet = drawing_factory(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE
     )
@@ -176,10 +170,49 @@ async def build(
     top_annotations = curate_view_dimensions(
         adapter, top, keep=TOP_KEEP, view_label="top"
     )
-    set_dimension_callouts(
+    verify_dimension_callouts(
         adapter,
         [*front_annotations, *right_annotations, *top_annotations],
-        DIMENSION_CALLOUTS,
+        {"HubBore": DIMENSION_CALLOUTS["HubBore"]},
+        feature_name="BarrelProfile",
+        view=front,
+        source_model=callout_source_model,
+    )
+    verify_dimension_callouts(
+        adapter,
+        [*front_annotations, *right_annotations, *top_annotations],
+        {"BoreDepth": DIMENSION_CALLOUTS["BoreDepth"]},
+        feature_name="Barrel",
+        view=side,
+        source_model=callout_source_model,
+    )
+    verify_dimension_callouts(
+        adapter,
+        [*front_annotations, *right_annotations, *top_annotations],
+        {"EndWall": DIMENSION_CALLOUTS["EndWall"]},
+        feature_name="Wall",
+        view=side,
+        source_model=callout_source_model,
+    )
+    verify_dimension_callouts(
+        adapter,
+        [*front_annotations, *right_annotations, *top_annotations],
+        {
+            "RodTipY": DIMENSION_CALLOUTS["RodTipY"],
+            "RodTipDia": DIMENSION_CALLOUTS["RodTipDia"],
+            "GripHalfAngle": DIMENSION_CALLOUTS["GripHalfAngle"],
+        },
+        feature_name="RodProfile",
+        view=front,
+        source_model=callout_source_model,
+    )
+    verify_dimension_callouts(
+        adapter,
+        [*front_annotations, *right_annotations, *top_annotations],
+        {"CapR": DIMENSION_CALLOUTS["CapR"]},
+        feature_name="CapProfile",
+        view=top,
+        source_model=callout_source_model,
     )
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")

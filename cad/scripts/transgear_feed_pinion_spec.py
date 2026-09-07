@@ -65,3 +65,14 @@ DRAWING_NOTES = "\n".join(
 GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
     "pinion face squareness to bore": "0.05",
 }
+
+
+# Model display callouts, imported read-only by the manufacturing drawing.
+DIMENSION_CALLOUTS = {
+    # Reamed slip fit on the stud's turned Ø5 front seat (nominal-or-under, like
+    # the arbor journals): min 0.03 diametral clearance, inside the project's
+    # 0.025..0.075 shaft-in-bushing policy. Also settles which tolerance-block
+    # row governs the bore (neither .XX +/-0.51 nor DRILLED +0.10/0 -- the
+    # callout's own limits do).
+    "BoreDia": "THRU - REAM",
+}

@@ -57,3 +57,11 @@ GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
     "cam-pin seated-end flatness": "0.05",
     "pinion cam-pin crown profile": "0.05",
 }
+
+
+# Model display callouts, imported read-only by the manufacturing drawing.
+DIMENSION_CALLOUTS = {
+    "PinDia": "FINAL SIZE",
+    "Depth": "SEATED FLAT END TO CROWN ROOT",
+    "CapR": "OUTER CROWN",
+}

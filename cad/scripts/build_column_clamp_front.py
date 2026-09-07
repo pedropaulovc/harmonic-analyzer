@@ -15,6 +15,8 @@ Run (SolidWorks already open)::
 from __future__ import annotations
 
 import sys
+from _model_dimension_callouts import author_model_callouts
+from column_clamp_front_spec import DIMENSION_CALLOUTS
 
 from _clamp_arc import build_arc
 from _common import run_build, save_part_and_images
@@ -59,6 +61,7 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
+    author_model_callouts(adapter, "BoreProfile", DIMENSION_CALLOUTS)
     return await save_part_and_images(adapter, PART_NAME)
 
 

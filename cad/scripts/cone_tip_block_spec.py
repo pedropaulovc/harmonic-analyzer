@@ -72,3 +72,9 @@ GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
     "slot median-plane position": "0.10",
     "pinch common-axis true position": "0.05",
 }
+
+
+# Model display callouts, imported read-only by the manufacturing drawing.
+DIMENSION_CALLOUTS = {
+    "PassageDiaDim": "THRU - CLEARANCE PASSAGE",
+}
