@@ -204,3 +204,37 @@ from `CalloutText1/2`. The bundled chamfer example demonstrates that setter on a
 drawing-created dimension. Imported diameter, multiline text and cold persistence
 remain untested deltas; no source-authoring or drawing-owned-note refactor is
 required before trying that documented field.
+
+## Isolated drawing lower-text field control
+
+The pilot now accepts `--callout-storage lower_text`, only for alignment with
+source observation banks and an explicit legacy or modern save arm. Omission
+does not change the production helper. The selected control patches both loaded
+recipe/common callout aliases before the source observer enters; all aliases
+restore on success or failure. It changes `SetText(4, text)` to the documented
+void `SetLowerText(text)` on the same exact imported bore dimension, then performs
+the existing single rebuild. No source getter uses this drawing-only field.
+
+Both initial operation readback and fresh built/cold snapshots require exact
+GetLowerText, native source-dimension/annotation/view identities, unaltered
+parameter/attachment witnesses, and both requested lines in the existing native
+text runs. Cold snapshots use newly resolved source handles, never old handles
+from a closed document. Whole-drawing layout and source-copy hash gates remain
+unchanged. This permits native placement of text below the dimension line;
+it does not accept hidden string storage as visible manufacturing content.
+
+First test the existing save API, changing only the text field from the retained
+legacy arm. Use the same verified PID, attach-only environment and frozen-root
+conditions above:
+
+```powershell
+uv run --no-sync python cad/scripts/diagnostics/probe_datum_policy_recipes.py `
+  --source-root C:/src/harmonic-analyzer/cad/out/sldprt `
+  --guard-root C:/src/harmonic-analyzer/cad/out/sldprt `
+  --target alignment_pinion --factory normal `
+  --source-observation alignment_save --drawing-save legacy `
+  --callout-storage lower_text
+```
+
+The offline helper/pilot/save selection passed 180 tests. Native source cleanliness,
+multiline layout and cold persistence are not established by those tests.

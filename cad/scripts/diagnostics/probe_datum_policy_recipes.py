@@ -10,6 +10,8 @@ project drawing factory. Use separate invocations for a functional pair: a
 failed normal cold-title witness never authorizes continuing to prepared.
 The opt-in --drawing-save control requires alignment_pinion and its source
 boundary observations. It changes only the native save call, not hash acceptance.
+--callout-storage lower_text changes only that recipe's below-text field and
+requires an explicit save arm plus the same source and cold drawing witnesses.
 
 Run only under an explicitly granted COM seat, attaching to the expected existing
 SolidWorks process with automatic launch/recovery disabled. Production recipes
@@ -554,6 +556,24 @@ def require_drawing_save(variant, source_observation, order):
         )
 
 
+def require_callout_storage(variant, source_observation, drawing_save, order):
+    if variant is None:
+        return
+    from diagnostics._drawing_lower_text_control import CalloutStorage
+    from diagnostics._native_drawing_save_control import DrawingSave
+    from diagnostics._source_save_boundaries import SourceObservation
+
+    if (
+        not isinstance(variant, CalloutStorage)
+        or not isinstance(drawing_save, DrawingSave)
+        or source_observation is not SourceObservation.ALIGNMENT_SAVE
+        or tuple(order) != ("alignment_pinion",)
+    ):
+        raise ValueError(
+            "callout-storage control requires alignment_pinion, alignment_save observations and an explicit drawing-save arm"
+        )
+
+
 async def pilot(
     adapter,
     candidate,
@@ -566,6 +586,7 @@ async def pilot(
     linear_control=None,
     source_observation=None,
     drawing_save=None,
+    callout_storage=None,
 ):
     order = target_order(targets)
     from diagnostics._source_save_boundaries import (
@@ -574,6 +595,7 @@ async def pilot(
 
     require_source_targets(source_observation, order)
     require_drawing_save(drawing_save, source_observation, order)
+    require_callout_storage(callout_storage, source_observation, drawing_save, order)
     protected_targets = tuple(dict.fromkeys((*ORDER, *order)))
     if linear_control is not None:
         from diagnostics._linear_dimension_arrangement import require_targets
@@ -700,6 +722,13 @@ async def pilot(
                 trial_dir / "recipe-source.py"
             )
             build_kwargs = {"drawing_factory": drawing_factory}
+            callout_control = None
+            if callout_storage is not None:
+                from diagnostics._drawing_lower_text_control import LowerTextControl
+
+                callout_control = LowerTextControl(
+                    adapter, module, trial, source_handles
+                )
             save_control = nullcontext()
             if drawing_save is not None:
                 from diagnostics._native_drawing_save_control import (
@@ -745,6 +774,11 @@ async def pilot(
                         with (
                             save_control,
                             (
+                                callout_control.observe()
+                                if callout_control is not None
+                                else nullcontext()
+                            ),
+                            (
                                 source_boundaries.observe()
                                 if source_boundaries is not None
                                 else nullcontext()
@@ -758,6 +792,8 @@ async def pilot(
                             artifacts = await module.build(adapter, **build_kwargs)
                 if source_boundaries is not None:
                     source_boundaries.require_used()
+                if callout_control is not None:
+                    callout_control.require_used()
                 if setup_controller is not None:
                     setup_controller.require_used()
                 if setup_controller is None:
@@ -793,6 +829,13 @@ async def pilot(
                 handles_before=source_handles,
                 handles_after=after_handles,
             )
+            if callout_control is not None:
+                trial["callout_storage_built"] = callout_control.snapshot(
+                    adapter,
+                    after_handles,
+                    phase="built",
+                    annotations=trial["built"]["annotations"],
+                )
             if manifest.entity_labels:
                 trial["source_entities_after"], after_entities = (
                     entity_acceptance.source_snapshot(source_model)
@@ -825,6 +868,20 @@ async def pilot(
                     adapter,
                     source=copy_source,
                     configuration=trial["source_before"]["configuration"],
+                )
+            if callout_control is not None:
+                cold_source = adapter.swApp.GetOpenDocumentByName(str(copy_source))
+                cold_values, cold_handles = source_dimensions(
+                    cold_source, target, copy_source
+                )
+                require_same_source(
+                    trial["source_before"], cold_values, "lower-text cold source"
+                )
+                trial["callout_storage_reopened"] = callout_control.snapshot(
+                    adapter,
+                    cold_handles,
+                    phase="reopened",
+                    annotations=trial["reopened"]["annotations"],
                 )
             trial["reopen_annotation_comparison"] = compare_drawing_reopen(
                 trial["built"], trial["reopened"]
@@ -976,6 +1033,7 @@ async def pilot(
 
 
 def main(argv=None):
+    from diagnostics._drawing_lower_text_control import CalloutStorage
     from diagnostics._native_drawing_save_control import DrawingSave
     from diagnostics._source_save_boundaries import (
         SourceObservation,
@@ -1011,6 +1069,12 @@ def main(argv=None):
     )
     parser.add_argument("--worker", action="store_true")
     parser.add_argument(
+        "--callout-storage",
+        type=CalloutStorage,
+        choices=tuple(CalloutStorage),
+        help="diagnostic alignment drawing lower text; explicit save and source banks required",
+    )
+    parser.add_argument(
         "--drawing-save",
         type=DrawingSave,
         choices=tuple(DrawingSave),
@@ -1032,6 +1096,9 @@ def main(argv=None):
     order = target_order(args.target)
     require_source_targets(args.source_observation, order)
     require_drawing_save(args.drawing_save, args.source_observation, order)
+    require_callout_storage(
+        args.callout_storage, args.source_observation, args.drawing_save, order
+    )
     require_targets(args.linear_dimensions, order)
     require_owned_diagnostic_environment()  # before dodo._run in the parent
     if args.factory is not None:
@@ -1063,6 +1130,11 @@ def main(argv=None):
                 ),
                 *(argument for target in order for argument in ("--target", target)),
                 *(
+                    ["--callout-storage", args.callout_storage.value]
+                    if args.callout_storage is not None
+                    else []
+                ),
+                *(
                     ["--drawing-save", args.drawing_save.value]
                     if args.drawing_save is not None
                     else []
@@ -1092,6 +1164,11 @@ def main(argv=None):
             guard_root,
             args.report_root.resolve(),
             targets=order,
+            **(
+                {"callout_storage": args.callout_storage}
+                if args.callout_storage is not None
+                else {}
+            ),
             **(
                 {"drawing_save": args.drawing_save}
                 if args.drawing_save is not None
