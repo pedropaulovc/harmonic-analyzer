@@ -423,9 +423,499 @@ async def positive_control(adapter, directory):
     return {"report": str(report_path)}
 
 
+CALLOUT_ROLES = {
+    "arm-width overall": ("width_lo", "width_hi"),
+    "shaft-to-handle-pivot location": ("shaft", "pivot"),
+    "handle-pivot transverse location": ("side_c", "pivot"),
+    "dimple transverse location from datum C": ("side_c", "dimple"),
+    "cross-hole station from datum A": ("station_a", "pin"),
+    "cross-hole true position": ("pin",),
+    "crank-arm cross-hole": ("pin",),
+    "crank broad face": ("datum_a",),
+    "crank shaft axis": ("shaft",),
+    "crank width side": ("side_c",),
+    "handle pivot position": ("pivot",),
+    "handle pivot hole": ("pivot",),
+    "crank broad-face parallelism": ("opposite_a",),
+    "shaft bore finish": ("shaft",),
+}
+
+
+def drawing_dimensions(model):
+    """Raw drawing values and presentation, supplementing the shared SI snapshot."""
+    from diagnostics import probe_drawing_attachments as attachments
+    from diagnostics._source_dimension_snapshot import display_presentation, finite
+
+    rows = {}
+    for view_key, view in attachments.views(model).items():
+        for raw in view.GetAnnotations() or ():
+            annotation = _early_bound(raw, "IAnnotation")
+            if int(annotation.GetType()) != 4:
+                continue
+            display = _early_bound(
+                annotation.GetSpecificAnnotation(), "IDisplayDimension"
+            )
+            dimension = _early_bound(display.GetDimension2(0), "IDimension")
+            tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+            configuration = str(view.ReferencedConfiguration)
+            value = (
+                dimension.GetSystemValue2("")
+                if display.IsReferenceDim()
+                else tuple(dimension.GetSystemValue3(3, configuration))[0]
+            )
+            key = f"{view_key}/{annotation.GetName()}"
+            if key in rows:
+                raise RuntimeError(f"duplicate drawing dimension identity: {key}")
+            rows[key] = {
+                "name": str(dimension.FullName),
+                "value_system": finite(value),
+                "tolerance_type": int(tolerance.Type),
+                "tolerance_min": finite(tolerance.GetMinValue()),
+                "tolerance_max": finite(tolerance.GetMaxValue()),
+                "primary_precision": int(display.GetPrimaryPrecision2()),
+                "tolerance_precision": int(display.GetPrimaryTolPrecision2()),
+                "arc_conditions": tuple(
+                    int(dimension.GetArcEndCondition(index)) for index in (1, 2)
+                ),
+                "hole_callout": bool(display.IsHoleCallout()),
+                **display_presentation(display),
+            }
+    return rows
+
+
+def require_source_unchanged(before, after):
+    from diagnostics._source_dimension_snapshot import compare_source
+
+    changes = compare_source(
+        before["observed_dimensions"], after["observed_dimensions"]
+    )
+    if changes or before["required_dimensions"] != after["required_dimensions"]:
+        raise RuntimeError(
+            "crank-arm source presentation or required dimensions changed"
+        )
+    if after["dirty_before"] or after["dirty_after"]:
+        raise RuntimeError("crank-arm source became dirty")
+
+
+def require_manufacturing(row, recorded):
+    """Pin the five added SI measurements and their native BASIC/arc meanings."""
+    required = {
+        "arm-width overall": (0.016, 0, (0, 0)),
+        "shaft-to-handle-pivot location": (0.075, 1, (1, 1)),
+        "handle-pivot transverse location": (0.008, 1, (0, 1)),
+        "dimple transverse location from datum C": (0.008, 0, (0, 1)),
+        "cross-hole station from datum A": (0.004, 1, (0, 1)),
+    }
+    for label, (value, basic, arcs) in required.items():
+        key = "/".join(recorded[label])
+        dimension = row["dimensions"][key]
+        # Same 12-place SI readback boundary as the shared attachment snapshot;
+        # raw values are additionally retained and compared exactly across saves.
+        if (
+            round(dimension["value_system"], 12) != value
+            or (dimension["tolerance_type"] == 1) != (basic == 1)
+            or dimension["arc_conditions"] != arcs
+            or not dimension["show_dimension_value"]
+        ):
+            raise RuntimeError(
+                f"{label}: native measurement/BASIC/arc meaning changed: {dimension}"
+            )
+    for label in ("crank-arm cross-hole", "handle pivot hole"):
+        key = "/".join(recorded[label])
+        if not row["dimensions"][key]["hole_callout"]:
+            raise RuntimeError(f"{label}: not a native Hole Wizard callout")
+        if not row["annotations"][key]["semantic"]["texts"]:
+            raise RuntimeError(f"{label}: missing actual displayed hole text")
+    expected = {
+        f"{name}@{feature}"
+        for feature, names in DRAWING_DIMENSIONS.items()
+        for name in names
+    }
+    marked = {
+        value["name"].rsplit("@", 1)[0]
+        for value in row["dimensions"].values()
+        if value["name"].endswith(".Part")
+        and value["name"].rsplit("@", 1)[0] in expected
+    }
+    if marked != expected or row["sheet"][2:4] != (2.0, 1.0):
+        raise RuntimeError("marked dimension union or sheet scale changed")
+
+
+async def candidate_control(adapter, directory):
+    """Execute the committed recipe, then inspect fresh cold and relocated handles."""
+    from diagnostics import benchmark_drawing_recipes as benchmark
+    from diagnostics import probe_drawing_attachments as attachments
+    from diagnostics._owned_native_documents import DocumentKind, save_drawing
+    from diagnostics._recipe_template_factory import (
+        DrawingFactory,
+        RecipeTemplateFactory,
+    )
+    from diagnostics._reopen_annotation_comparison import compare_reopened_annotations
+    from diagnostics.probe_datum_shoulder import all_annotation_layout
+    from diagnostics.probe_retained_drawing_export import export_pdf_only
+    from _drawing_entities import ModelEntities
+    import _drawing_common as drawing
+
+    adapter.ownership.register_directory(directory)
+    adapter.ownership.register_source(SOURCE)
+    source = directory / f"{directory.name}-part.SLDPRT"
+    report = {
+        "status": "running",
+        "provenance": provenance(),
+        "observations": [],
+        "phases": {},
+    }
+    report_path = directory / "measurements.json"
+    controller = RecipeTemplateFactory(DrawingFactory.PREPARED)
+
+    def checkpoint():
+        persist_report(report_path, report)
+
+    recorded = {}
+    try:
+        shutil.copy2(SOURCE, source)
+        module = benchmark.load_recipe(
+            revision(ROOT), "crank_arm", directory, source=source
+        )
+        report["recipe_sha256"] = sha(directory / "recipe-source.py")
+        factory = await controller.configure(adapter, module, report, directory)
+        check("open candidate source copy", await adapter.open_model(str(source)))
+        source_model = module.require_source(adapter, adapter.currentModel)
+        report["source_before"] = source_snapshot(adapter, source)
+        requests = dict(module.ENTITY_ROLES)
+        requests.update(
+            {
+                f"face:{role}": selector.face
+                for role, selector in module.ENTITY_ROLES.items()
+            }
+        )
+
+        def resolve(model):
+            module.require_source(adapter, model)
+            bank = ModelEntities(model).resolve(requests)
+            geometry = {
+                name: attachments.geometry(entity, 2 if name.startswith("face:") else 1)
+                for name, entity in bank.items()
+            }
+            return bank, geometry
+
+        bank, report["entities_before"] = resolve(source_model)
+        checkpoint()
+        originals = {
+            name: getattr(module, name)
+            for name in (
+                "add_entity_dimension",
+                "add_datum_feature",
+                "add_feature_control_frame",
+                "add_native_hole_callout",
+                "add_surface_finish",
+            )
+        }
+        types = {
+            "add_entity_dimension": "IDisplayDimension",
+            "add_datum_feature": "IDatumTag",
+            "add_feature_control_frame": "IGtol",
+            "add_native_hole_callout": "IDisplayDimension",
+            "add_surface_finish": "ISFSymbol",
+        }
+
+        def insert(name, actual_adapter, view, **kwargs):
+            adapter.ownership.assert_current_owned()
+            module.require_source(adapter, source_model)
+            label = kwargs["label"]
+            roles = CALLOUT_ROLES[label]
+            expected = tuple(bank[role] for role in roles)
+            supplied = kwargs.get("entities") or (
+                kwargs.get("entity") or kwargs.get("edge"),
+            )
+            if (
+                actual_adapter is not adapter
+                or label in recorded
+                or len(supplied) != len(expected)
+            ):
+                raise RuntimeError(
+                    f"{label}: wrong adapter, duplicate or missing entity argument"
+                )
+            if (
+                int(adapter.swApp.IsSame(view.ReferencedDocument, source_model)) != 1
+                or str(view.ReferencedConfiguration) != "Default"
+                or any(
+                    int(adapter.swApp.IsSame(a, b)) != 1
+                    for a, b in zip(supplied, expected, strict=True)
+                )
+            ):
+                raise RuntimeError(f"{label}: wrong exact source/view/entity arguments")
+            row = {
+                "label": label,
+                "roles": roles,
+                "status": "inserting",
+                "selection_witnesses": [],
+            }
+            report["observations"].append(row)
+            checkpoint()
+            # Read the native selected object/view, not just SelectEntity's return.
+            # These pre-insertion witnesses do not replace the actual helper's
+            # own selection, insertion, attachment or final layout validators.
+            adapter.currentModel.ClearSelection2(True)
+            manager = _early_bound(
+                adapter.currentModel.SelectionManager, "ISelectionMgr"
+            )
+            for index, entity in enumerate(supplied):
+                adapter.ownership.assert_current_owned()
+                ok = bool(view.SelectEntity(entity, index > 0))
+                actual = manager.GetSelectedObject6(index + 1, -1)
+                mapped = drawing._drawing_entity_in_source(
+                    view, actual, entity_type="EDGE", label=label
+                )
+                witness = {
+                    "return": ok,
+                    "count": int(manager.GetSelectedObjectCount2(-1)),
+                    "source_identity": int(adapter.swApp.IsSame(mapped, entity)),
+                    "view_identity": int(
+                        adapter.swApp.IsSame(
+                            manager.GetSelectedObjectsDrawingView2(index + 1, -1), view
+                        )
+                    ),
+                }
+                row["selection_witnesses"].append(witness)
+                checkpoint()
+                if (
+                    not ok
+                    or witness["count"] != index + 1
+                    or witness["source_identity"] != 1
+                    or witness["view_identity"] != 1
+                ):
+                    raise RuntimeError(f"{label}: native selection witness failed")
+            result = _early_bound(
+                originals[name](actual_adapter, view, **kwargs), types[name]
+            )
+            annotation = _early_bound(result.GetAnnotation(), "IAnnotation")
+            row["attachment"] = require_attachment(
+                adapter, annotation, view, expected, label
+            )
+            recorded[label] = (str(view.GetName2()), str(annotation.GetName()))
+            row["status"] = "passed"
+            checkpoint()
+            return result
+
+        started = time.perf_counter()
+        with ExitStack() as stack:
+            stack.enter_context(
+                adapter.ownership.creating_document(
+                    DocumentKind.DRAWING, module.OUTPUTS.slddrw
+                )
+            )
+            stack.enter_context(patch("_drawing_common.save_drawing", save_drawing))
+            for name in originals:
+                stack.enter_context(
+                    patch.object(
+                        module,
+                        name,
+                        lambda a, v, _name=name, **kw: insert(_name, a, v, **kw),
+                    )
+                )
+            report["artifacts"] = await module.build(adapter, drawing_factory=factory)
+        report["instrumented_recipe_seconds"] = time.perf_counter() - started
+        controller.require_used()
+        if recorded.keys() != CALLOUT_ROLES.keys():
+            raise RuntimeError(
+                "candidate did not exercise all fourteen annotations / fifteen former pick sites"
+            )
+
+        def scene(phase, source_handle, expected_bank):
+            adapter.ownership.assert_current_owned()
+            module.require_source(adapter, source_handle)
+            current = _early_bound(adapter.currentModel, "IModelDoc2")
+            if (
+                int(current.GetType()) != 3
+                or Path(current.GetPathName()).resolve()
+                != module.OUTPUTS.slddrw.resolve()
+            ):
+                raise RuntimeError("candidate scene is not its exact owned drawing")
+            row = {}
+            report["phases"][phase] = row
+            row["attachments"] = attachments.snapshot(current, app=adapter.swApp)
+            row["annotations"], _ = all_annotation_layout(adapter)
+            row["dimensions"] = drawing_dimensions(current)
+            row["layout"] = attachments.layout(current)
+            row["sheet"] = tuple(
+                _early_bound(
+                    _early_bound(current, "IDrawingDoc").GetCurrentSheet(), "ISheet"
+                ).GetProperties2()
+            )
+            row["source"] = source_snapshot(
+                SimpleNamespace(currentModel=source_handle, swApp=adapter.swApp), source
+            )
+            inventory = {}
+            for view in attachments.views(current).values():
+                if (
+                    int(adapter.swApp.IsSame(view.ReferencedDocument, source_handle))
+                    != 1
+                    or str(view.ReferencedConfiguration) != "Default"
+                ):
+                    raise RuntimeError(
+                        "candidate scene has the wrong view source/configuration"
+                    )
+                for raw in view.GetAnnotations() or ():
+                    annotation = _early_bound(raw, "IAnnotation")
+                    key = (str(view.GetName2()), str(annotation.GetName()))
+                    if key in inventory:
+                        raise RuntimeError(
+                            "candidate annotation inventory is ambiguous"
+                        )
+                    inventory[key] = (annotation, view)
+            row["explicit_roles"] = {}
+            for label, key in recorded.items():
+                annotation, view = inventory[key]
+                row["explicit_roles"][label] = require_attachment(
+                    adapter,
+                    annotation,
+                    view,
+                    tuple(expected_bank[role] for role in CALLOUT_ROLES[label]),
+                    label,
+                )
+            checkpoint()
+            require_source_unchanged(report["source_before"], row["source"])
+            require_manufacturing(row, recorded)
+            if row["attachments"]["dimensions_excluded"]:
+                raise RuntimeError("candidate has unsupported dimension semantics")
+            return row
+
+        def compare(before, after, phase):
+            attachments.compare(before["attachments"], after["attachments"], phase)
+            if (
+                before["dimensions"] != after["dimensions"]
+                or before["sheet"] != after["sheet"]
+                or before["explicit_roles"] != after["explicit_roles"]
+            ):
+                raise RuntimeError(
+                    f"{phase}: raw dimensions, sheet or explicit roles changed"
+                )
+
+        built = scene("built", source_model, bank)
+        await adapter.close_owned_documents()
+        bank = source_model = None  # never reuse closed native handles
+        check("cold-open owned source", await adapter.open_model(str(source)))
+        source_model = module.require_source(adapter, adapter.currentModel)
+        bank, report["entities_reopened"] = resolve(source_model)
+        if report["entities_before"] != report["entities_reopened"]:
+            raise RuntimeError("cold source role geometry changed")
+        check(
+            "cold-open owned drawing",
+            await adapter.open_model(str(module.OUTPUTS.slddrw)),
+        )
+        reopened = scene("reopened", source_model, bank)
+        # Retain a fresh cold print even if the subsequent exact comparison fails.
+        export_pdf_only(adapter, directory / "cold.pdf")
+        drawing.render_pdf_png(directory / "cold.pdf", directory / "cold.png")
+        compare(built, reopened, "cold reopen")
+        attachments.check_layout(built["layout"], reopened["layout"], "cold reopen")
+        report["cold_annotations"] = compare_reopened_annotations(
+            built["annotations"], reopened["annotations"]
+        )
+        checkpoint()
+        if report["cold_annotations"]["status"] != "passed":
+            raise RuntimeError("cold reopen annotation contents/layout changed")
+        adapter.ownership.assert_current_owned()
+        report["movement"] = attachments.move_and_scale(adapter.currentModel)
+        moved = scene("moved_scaled", source_model, bank)
+        compare(reopened, moved, "view movement and scale")
+        adapter.ownership.assert_current_owned()
+        save_drawing(adapter, str(module.OUTPUTS.slddrw))
+        await adapter.close_owned_documents()
+        bank = source_model = None
+        check("reopen moved source", await adapter.open_model(str(source)))
+        source_model = module.require_source(adapter, adapter.currentModel)
+        bank, report["entities_moved_reopened"] = resolve(source_model)
+        if report["entities_before"] != report["entities_moved_reopened"]:
+            raise RuntimeError("moved-cold source role geometry changed")
+        check(
+            "reopen moved drawing", await adapter.open_model(str(module.OUTPUTS.slddrw))
+        )
+        moved_cold = scene("moved_reopened", source_model, bank)
+        compare(moved, moved_cold, "moved drawing cold reopen")
+        attachments.check_layout(
+            report["movement"]["requested"],
+            moved_cold["layout"],
+            "moved drawing cold reopen",
+        )
+        report["moved_cold_annotations"] = compare_reopened_annotations(
+            moved["annotations"], moved_cold["annotations"]
+        )
+        checkpoint()
+        if report["moved_cold_annotations"]["status"] != "passed":
+            raise RuntimeError("moved-cold annotation contents/layout changed")
+        export_pdf_only(adapter, directory / "moved-cold.pdf")
+        drawing.render_pdf_png(
+            directory / "moved-cold.pdf", directory / "moved-cold.png"
+        )
+        report["status"] = "passed"
+    except Exception as error:
+        report.update(status="failed", error=repr(error))
+        try:
+            adapter.ownership.assert_current_owned()
+            if int(adapter.currentModel.GetType()) == 3:
+                report["partial_annotations"], _ = all_annotation_layout(adapter)
+                report["partial_attachments"] = attachments.snapshot(
+                    adapter.currentModel, app=adapter.swApp
+                )
+                export_pdf_only(adapter, directory / "failure.pdf")
+                drawing.render_pdf_png(
+                    directory / "failure.pdf", directory / "failure.png"
+                )
+        except Exception as evidence_error:
+            report["partial_evidence_error"] = repr(evidence_error)
+        raise
+    finally:
+        primary = sys.exception()
+        errors = []
+        for label, action in (
+            ("template_guards", lambda: _require_template_guards(controller)),
+            ("source_original", lambda: _require_hash(SOURCE)),
+            ("source_copy", lambda: _require_hash(source)),
+            ("execution_token", lambda: _require_token()),
+        ):
+            try:
+                report[label] = action()
+            except Exception as error:
+                report[label] = {"error": repr(error)}
+                errors.append(error)
+        try:
+            checkpoint()
+        except Exception as error:
+            errors.append(error)
+        if errors:
+            raise ExceptionGroup(
+                "candidate operation/final evidence failures",
+                ([primary] if primary else []) + errors,
+            ) from None
+    return {"report": str(report_path)}
+
+
+def _require_template_guards(controller):
+    errors = controller.final_guards()
+    if errors:
+        raise ExceptionGroup("candidate template/helper guards", errors)
+    return "passed"
+
+
+def _require_hash(path):
+    value = sha(path)
+    if value != EXPECTED_SOURCE_SHA:
+        raise RuntimeError(f"source hash changed: {path}")
+    return value
+
+
+def _require_token():
+    value = TOKEN.read_text(encoding="utf-8").strip()
+    if value != EXPECTED_SOURCE_SHA:
+        raise RuntimeError("original execution token changed")
+    return value
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("mode", choices=("source", "drawing", "positive"))
+    parser.add_argument("mode", choices=("source", "drawing", "positive", "candidate"))
     parser.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
     require_owned_diagnostic_environment()
@@ -448,6 +938,7 @@ def main(argv=None):
         "source": capture_source,
         "drawing": capture_drawing,
         "positive": positive_control,
+        "candidate": candidate_control,
     }[args.mode]
     return run_copy_diagnostic(lambda adapter: callback(adapter, directory))
 
