@@ -1,9 +1,9 @@
 # Canonical prepared base, requested-scale instances
 
-This is an offline-tested architecture candidate based on `0d208ea0`. No native
-run, populated-sheet acceptance or end-to-end speedup is claimed for this change.
-The earlier per-scale preparation receipts remain evidence for their recorded
-code, not acceptance of canonical instances.
+All 15 registered scale pairs passed the owned native blank-sheet control at
+`7c86fdba` on 2026-09-07. Populated-sheet acceptance and a matched end-to-end
+fleet comparison remain outstanding. The earlier per-scale preparation receipts
+remain evidence for their recorded code; the canonical result is recorded below.
 
 ## Boundary
 
@@ -99,7 +99,64 @@ machine lock; the worker attaches only. Reports are under a fresh
 `cad/out/reports/canonical-template-scales-*` directory. An all-scale blank pass
 still needs printed visual review and the unchanged populated/full-fleet gates.
 
-## Cost hypothesis, not measured improvement
+## Native all-scale result, 2026-09-07
+
+The command above completed with exit 0 at root
+`7c86fdbaf4e6d3d274d6be39831c68d4e4e98e16`, adapter
+`25bc99b1ae39d8c0e004867e9b5c0f2068f2abc2`, on the attached PID 31860.
+No source edits or checkout changes occurred during the native process.
+The complete receipt is
+`cad/out/reports/canonical-template-scales-j2jsh_cv/measurements.json`, SHA-256
+`23deb35d5598bc2fe92df3aac65d7b81c352740b27564933fffcc7ce521031b6`.
+
+Every pair passed the exact raw/default, viewport, native save/reopen and
+printed comparison gates. All normal/canonical preview comparisons and cold
+preview comparisons had **zero changed pixels** at 5100 by 3300 pixels; all
+paired cold comparisons passed. All 30 saved native blanks retained their exact
+bytes through cold export and final cleanup. All 46 runtime/template/cache guards
+passed. The outer `ownership.json` records the one borrowed baseline document
+preserved, one final document, and no probe or cleanup error. The original
+DRWDOT stayed at SHA-256
+`2b1bbe3dfff265e8bb35ea79f0f9690f808049f5cef764cab8959c1eaee5e849`.
+
+| Requested scale | Normal factory seconds | Canonical factory seconds |
+|---|---:|---:|
+| 1:1 | 4.969167 | 1.601307 |
+| 1:2 | 5.652346 | 1.682220 |
+| 1:3 | 5.129620 | 1.635766 |
+| 1:4 | 4.953524 | 1.682155 |
+| 1:5 | 5.487613 | 1.590366 |
+| 1:6 | 5.249727 | 1.643630 |
+| 1:7 | 5.931822 | 1.984354 |
+| 1:8 | 5.173546 | 1.521264 |
+| 2:1 | 5.047432 | 1.763003 |
+| 3:1 | 5.114064 | 1.647237 |
+| 4:1 | 5.409907 | 1.532086 |
+| 5:1 | 4.597569 | 1.592026 |
+| 6:1 | 4.958193 | 1.678935 |
+| 7:1 | 5.140653 | 1.584946 |
+| 8:1 | 5.455546 | 1.674538 |
+
+Mean factory setup was 5.218049 seconds normal versus 1.654256 canonical.
+The single base MISS cost 49.208331 seconds; its HIT cost 0.046461 seconds,
+under key `501c5b276632ddd820eb4b72f42613ba93a8ea31eda6cfd64d2b4b95461f75ec`.
+For these 15 instances, canonical factory time plus that one preparation was
+74.022164 seconds, versus 78.270729 seconds of normal factory time. This avoids
+presenting the factory-only saving as though cold preparation were free.
+
+The complete diagnostic took 3095.704639 seconds, including repeated raw
+witnesses, PDF/PNG export, save/reopen and cleanup. That is acceptance-test time,
+not production setup time. The pairs ran once each, normal then canonical, in
+fixed order; they are not randomized repeated performance samples. No full-recipe
+speedup or below-five-percent failure-rate claim follows from this control.
+
+The cold canonical PNGs for 1:1, 1:7 and 8:1 were visually inspected: the frame,
+zones, title block and displayed scale were intact. Model-linked properties are
+blank because these drawings contain no source view. This does not establish
+populated titles, manufacturing annotation coverage or affected-part render
+acceptance. Those remain part of the full recipe/fleet validation.
+
+## Earlier cost hypothesis, not a measured fleet improvement
 
 Retained per-scale preparation was roughly 37–45 s, normal blank setup roughly
 5 s, inherited setup roughly 1.4 s. At those illustrative costs, 15 preparations
