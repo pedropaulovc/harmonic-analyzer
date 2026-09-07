@@ -546,8 +546,14 @@ async def pilot(
     targets=None,
     setup_controller=None,
     linear_control=None,
+    source_observation=None,
 ):
     order = target_order(targets)
+    from diagnostics._source_save_boundaries import (
+        require_targets as require_source_targets,
+    )
+
+    require_source_targets(source_observation, order)
     protected_targets = tuple(dict.fromkeys((*ORDER, *order)))
     if linear_control is not None:
         from diagnostics._linear_dimension_arrangement import require_targets
@@ -674,6 +680,20 @@ async def pilot(
                 trial_dir / "recipe-source.py"
             )
             build_kwargs = {"drawing_factory": drawing_factory}
+            source_boundaries = None
+            if source_observation is not None:
+                from diagnostics._source_save_boundaries import SourceSaveBoundaries
+
+                source_boundaries = SourceSaveBoundaries(
+                    adapter,
+                    module,
+                    trial,
+                    checkpoint,
+                    source_model,
+                    trial["source_before"],
+                    source_handles,
+                    lambda: source_dimensions(source_model, target, copy_source),
+                )
             if linear_control is not None:
                 build_kwargs.update(
                     linear_control.bind(
@@ -692,11 +712,20 @@ async def pilot(
                         DocumentKind.DRAWING, module.OUTPUTS.slddrw
                     ):
                         with (
-                            entity_acceptance.observe(adapter, entity_handles)
-                            if entity_acceptance is not None
-                            else nullcontext()
+                            (
+                                source_boundaries.observe()
+                                if source_boundaries is not None
+                                else nullcontext()
+                            ),
+                            (
+                                entity_acceptance.observe(adapter, entity_handles)
+                                if entity_acceptance is not None
+                                else nullcontext()
+                            ),
                         ):
                             artifacts = await module.build(adapter, **build_kwargs)
+                if source_boundaries is not None:
+                    source_boundaries.require_used()
                 if setup_controller is not None:
                     setup_controller.require_used()
                 if setup_controller is None:
@@ -915,6 +944,10 @@ async def pilot(
 
 
 def main(argv=None):
+    from diagnostics._source_save_boundaries import (
+        SourceObservation,
+        require_targets as require_source_targets,
+    )
     from diagnostics._linear_dimension_arrangement import (
         LinearArrangement,
         ParallelLinearControl,
@@ -945,6 +978,12 @@ def main(argv=None):
     )
     parser.add_argument("--worker", action="store_true")
     parser.add_argument(
+        "--source-observation",
+        type=SourceObservation,
+        choices=tuple(SourceObservation),
+        help="read-only alignment source banks around callout/precision/native-save/PDF",
+    )
+    parser.add_argument(
         "--linear-dimensions",
         type=LinearArrangement,
         choices=tuple(LinearArrangement),
@@ -952,6 +991,7 @@ def main(argv=None):
     )
     args = parser.parse_args(argv)
     order = target_order(args.target)
+    require_source_targets(args.source_observation, order)
     require_targets(args.linear_dimensions, order)
     require_owned_diagnostic_environment()  # before dodo._run in the parent
     if args.factory is not None:
@@ -983,6 +1023,11 @@ def main(argv=None):
                 ),
                 *(argument for target in order for argument in ("--target", target)),
                 *(
+                    ["--source-observation", args.source_observation.value]
+                    if args.source_observation is not None
+                    else []
+                ),
+                *(
                     ["--linear-dimensions", args.linear_dimensions.value]
                     if args.linear_dimensions is not None
                     else []
@@ -1002,6 +1047,11 @@ def main(argv=None):
             guard_root,
             args.report_root.resolve(),
             targets=order,
+            **(
+                {"source_observation": args.source_observation}
+                if args.source_observation is not None
+                else {}
+            ),
             **(
                 {"setup_controller": RecipeTemplateFactory(args.factory)}
                 if args.factory is not None
