@@ -55,9 +55,10 @@ horizontal/vertical note justification, position locks, sheet-format visibility,
 measured visible note content, and the template's surface-finish symbols. No
 floats are rounded: represented native coordinates also compare exactly. The
 first native normal baseline exposed an unsupported surface-finish inventory
-before reaching cache preparation (recorded below). The expanded witness has
-not yet run natively; any later numerical contract requires measured evidence,
-not blanket tolerance.
+before reaching cache preparation (recorded below). The expanded raw witness
+subsequently passed normal setup and rejected two within-snapshot extent
+differences during preparation. The current read-order correction awaits native
+validation; no numerical tolerance was introduced.
 
 An empty linked note's extent is observational only after every native text,
 stroke, other display primitive and ordinary/multi-jog leader count is zero.
@@ -240,4 +241,32 @@ unchanged. Prior derived-geometry assertions were replaced with stricter raw
 array/component drift checks, not removed. The notes path remains unchanged.
 This raw equality check does not prove printed sketch/logo geometry or rendering;
 blank PDF/vector/visual comparison and full-recipe acceptance remain required.
-The revised raw normal/miss/hit sequence has not yet run natively.
+The revised raw control's first native result follows.
+
+### Normal raw capture passes; early and later note extents disagree
+
+At root `6173108a2c05f30700d106f7315817d196077498`, normal setup passed in
+3.2238526 s plus 8.2781968 s for its complete witness. The miss ran 21.9323562 s
+and failed exact comparison only at the UNIT linked note's two raw extent-X
+values. Early X limits were `[0.4024436674473067, 0.4141235035128806]`; later
+limits were `[0.40077511943793903, 0.4154583419203746]` metres. Both snapshots'
+measured native body/envelope already matched those later limits exactly;
+text, links, formatting and raw SF content also matched.
+
+Evidence: `prepared-template-cache-1xvbtz_u/cache/`
+`pending-541278447690-37kvnlsy/receipt.json`, SHA-256
+`0e403837120483813c46290821bc93dcdf4f40b6b60f12ce39bd67502cb30732`.
+The outer measurement SHA is
+`d37c4a6ad376b7617a166666ce3cd87ce36e69574eb852705b0dd846af353f34`.
+The original template hash and empty baseline/final document inventories remained
+unchanged, with no cleanup error. Three owned documents closed; one fresh DRWDOT
+was retained in the failed unpublished directory. The hit was never reached.
+
+This is consistent with native content/extent settling during the original
+`GetExtent` → text/link → measurement sequence; the precise triggering getter
+has not been isolated. The validator now reads text/link and native measurement
+before the raw extent. No setter, retry, second normalization or exception
+exclusion is added. A fail-first order regression models the observed mismatch,
+asserts the raw and measured extent agree, and preserves exact rejection of a
+1e-12 extent change even when measured geometry stays identical. The reordered
+normal/miss/hit control still needs native validation.
