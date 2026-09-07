@@ -308,7 +308,9 @@ def test_complete_observed_dimension_inventory_includes_unmarked_and_chamfer_val
         return SimpleNamespace(
             FullName=f"{name}@{path.stem if variant != 'wrong_owner' else 'Other'}.Part",
             Tolerance=SimpleNamespace(
-                Type=1, GetMinValue=lambda: 0.0, GetMaxValue=lambda: 0.0
+                Type=1,
+                GetMinValue2=lambda: (1, 0.0),
+                GetMaxValue2=lambda: (1, 0.0),
             ),
             GetToleranceType=lambda: 1,
             GetSystemValue3=lambda *_: (

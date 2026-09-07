@@ -877,7 +877,9 @@ def source_witness(source, text=""):
                     "tolerance_type": 1,
                     "designation": "basic",
                     "tolerance_min": 0.0,
+                    "tolerance_min_status": 1,
                     "tolerance_max": 0.0,
+                    "tolerance_max_status": 1,
                 },
                 "displays": [
                     {
@@ -925,7 +927,9 @@ def test_source_witness_records_only_permitted_presentation_changes(tmp_path):
         "tolerance_type",
         "designation",
         "tolerance_min",
+        "tolerance_min_status",
         "tolerance_max",
+        "tolerance_max_status",
         "native_identity",
         "configuration",
         "feature",

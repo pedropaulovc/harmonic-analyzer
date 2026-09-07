@@ -438,3 +438,52 @@ drawing-created dimension `SetArcEndCondition`/`SetToleranceType`, are concrete
 mutating call sites to investigate. Imported BASIC validation itself is read-only.
 The current before/after guard does not localize which operation dirtied the part;
 no causal verdict or automatic benchmark retry follows from this observation.
+
+## Tolerance value applicability in source snapshots
+
+PR #680 review comment 3950733442 correctly identified the obsolete
+`IDimensionTolerance.GetMinValue/GetMaxValue` reads. The current getters return
+**an integer status plus an out double, not a Boolean**. The bundled complete
+`GetMinValue2.md`, `GetMaxValue2.md`, `swDimensionToleranceWarning_e.md`, and
+`Get_Dimension_Tolerance_Example_CSharp.md` establish:
+
+- `0 = swDimensionTolerance_ValidForType`;
+- `1 = swDimensionTolerance_NotValidForType`.
+
+The generated `sldworks_2026.py` methods use an optional out argument, integer
+return `(3, 0)` and out-double argument `((16389, 2),)`. The existing recovery
+calls both methods with no arguments. Its retained native receipt is
+`C:/src/ha-perf-sheet-template/cad/out/reports/template-defaults/scene-recovery-jzbwv6ny/recovery.json`,
+SHA-256 `47df257b61dceef616d2227df1df6da92521e52957bd1054bd1c7279f1328d34`:
+
+- source and imported BoreDia, bilateral type 2: minimum `[0, 0.000025]`,
+  maximum `[0, 0.000055]`;
+- four source BASIC dimensions, type 1: both return `[1, 0.0]`;
+- drawing-reference RD2 in Drawing View2, type 0/NONE: both return `[1, 0.0]`.
+
+These JSON arrays retain the generated binding's `(status, value)` tuples. The
+individual getter observations are `returned`, not merely an overall successful
+recovery. They prove this call shape for those observations, not applicability
+for every tolerance type. The one-off recovery must not be rerun against today's
+different scene; its source and historical receipt remain unchanged.
+
+The source snapshot now records the exact finite native double together with
+`tolerance_min_status` / `tolerance_max_status` (the enum's original integers in
+JSON). Status 1 remains an explicit not-applicable observation, **not a validated
+zero limit**. Exact before/after comparison includes both status and value, even
+when inapplicable. A caller requiring a usable bound must require status 0.
+Unknown status, Boolean/nonnumeric/coerced status, malformed tuple, non-double or
+nonfinite value fails; no obsolete-getter fallback, rounding or default is added.
+
+`test_source_tolerance_snapshot_drawing.py` is enrolled by the existing recipe
+test glob. Its 53 cases failed before the change on obsolete-getter use. The new
+tests plus first-dirty, template-default and recovery tests pass (175 tests,
+2.35 s). They cover BASIC/NONE, both validity transition directions, exact value
+drift, malformed returns, native exceptions and absence of legacy retries. This
+was followed by 208 passing tests in 2.24 s including the unchanged retention and
+rocker contracts (`run-f8j5f50e`); actual `task_check()` enumeration confirmed the
+new file in both the recipe command and dependencies. Ruff F/diff checks passed.
+This is an offline code result: a new native run is still required for the updated
+snapshot. Later-stack `_model_dimension_coverage` (fillister) and
+`_source_save_boundaries` still need explicit propagation of this contract;
+production `_drawing_marks` tolerance authoring is a separate part-input change.
