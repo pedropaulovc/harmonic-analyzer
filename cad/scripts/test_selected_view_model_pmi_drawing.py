@@ -191,7 +191,9 @@ def test_parent_environment_fails_before_native_wrapper(tmp_path, monkeypatch, f
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("mode", ["passed", "missing_pmi", "cold_title", "copy_saved"])
+@pytest.mark.parametrize(
+    "mode", ["passed", "missing_pmi", "cold_title", "copy_saved", "view_creation_failed"]
+)
 async def test_owned_control_exports_failures_but_never_saves_original_or_ignores_copy_drift(
     native,  # noqa: F811 - imported pytest fixture
     tmp_path,
@@ -283,6 +285,7 @@ async def test_owned_control_exports_failures_but_never_saves_original_or_ignore
 
     def importing(adapter, view, rows, checkpoint):
         assert view is selected
+        adapter.ownership.assert_current_owned()
         phase["imported"] = True
         rows.append({"count": len(items)})
         return list(items.values())
@@ -314,7 +317,13 @@ async def test_owned_control_exports_failures_but_never_saves_original_or_ignore
         assert part is not original and part.path != str(source)
         drawing = Model(None, title="Owned PMI", dirty=True)
         drawing.references = [part]
-        drawing.Create3rdAngleViews2 = lambda path: path == part.path
+
+        def create_views(path):
+            # Observed native transition, including a rejection after rename.
+            drawing.title = Path(path).stem + " - Sheet1"
+            return path == part.path and mode != "view_creation_failed"
+
+        drawing.Create3rdAngleViews2 = create_views
         native.app.documents.append(drawing)
         native.app.ActiveDoc = drawing
         adapter.currentModel = drawing
@@ -363,6 +372,11 @@ async def test_owned_control_exports_failures_but_never_saves_original_or_ignore
     assert report["status"] == ("passed" if mode == "passed" else "failed")
     assert report["inputs_before"] == report["inputs_after"]
     assert report["visual_review"] == "pending"
+    if mode == "view_creation_failed":
+        assert not report["artifacts"] and not report["imports"]
+        assert "third-angle views rejected" in report["operation_error"]
+        assert "cleanup_error" not in report
+        return
     assert "initial" in report["artifacts"]
     if mode != "copy_saved":
         assert "reopened" in report["artifacts"]

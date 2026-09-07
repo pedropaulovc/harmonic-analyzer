@@ -1,7 +1,7 @@
 # Selected-view native PMI control
 
-Implemented and offline-tested; **no native invocation or drawing acceptance
-yet**. The earlier all-view control imported real plain model datums/FCFs quickly,
+Implemented and offline-tested; **native import and drawing acceptance remain
+unproved by this control**. The earlier all-view control imported real plain model datums/FCFs quickly,
 with correct face attachments, but duplicated them across views and left
 overlapping native positions. This is one selection-scope delta, not a rollout or
 a claim that native import can already replace every drawing recipe.
@@ -72,3 +72,24 @@ API references read: `IDrawingDoc.InsertModelAnnotations3`,
 `GetSelectedObjectType3`, `GetSelectedObjectCount2`, `IView.GetName2`,
 `GetOrientationName`, `ReferencedConfiguration`, and `Create3rdAngleViews2`;
 the bundled Get Annotations Arrays and named drawing-view selection examples.
+
+## First native attempt: diagnostic creation-scope defect
+
+At root `e6484849`, adapter `e77bfda4`, PID 31860, the first native attempt
+stopped before either import. `Create3rdAngleViews2` renamed the unsaved drawing
+after its source, outside the probe's creation scope. The exact ownership guard
+rejected the unrecorded title and refused cleanup; this is not an import failure.
+The probe now includes native view creation in that scope. The scope still
+requires the same native document handle, kind and declared output path.
+Lifecycle tests reproduce the title change on success and on native rejection.
+
+Receipt: `cad/out/reports/selected-view-pmi-rf8wvvaq/observations.json`, SHA-256
+`ddd94abf10cd05bc5437598bcec9e97991f276d58e7ebfbb5c1edb956b831fe4`.
+Original part, configured template and copied part hashes were unchanged.
+The two diagnostic documents were subsequently closed without saving after
+checking the exact recorded empty baseline, full current inventory, three view
+references to that exact copied part, native identity and hashes. No global close
+or recovery restart was used. The recovery command and output are retained in
+`cad/out/logs/selected-view-pmi-rf8wvvaq-recovery.log`; final native inventory was
+empty and all three hashes remained unchanged. The old all-view control is
+unchanged; historical import evidence does not prove its current lifecycle.
