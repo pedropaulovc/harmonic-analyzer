@@ -1622,6 +1622,19 @@ def test_recipe_gate_tracks_sources_imported_by_its_tests():
     ), "the pen/summing metadata contract must execute under check:recipe"
 
 
+def test_recipe_gate_enrolls_every_drawing_batch_contract_once():
+    dodo = _load_dodo()
+    recipe = next(task for task in dodo.task_check() if task["name"] == "recipe")
+    command = [Path(argument).name for argument in recipe["actions"][0][1][0]]
+    deps = {Path(path).name for path in recipe["file_dep"]}
+    batches = {
+        path.name for path in dodo.SCRIPTS_DIR.glob("test_*_drawing_batch_contract.py")
+    }
+    assert "test_gear_drawing_batch_contract.py" in batches
+    assert batches <= deps
+    assert {name: command.count(name) for name in batches} == dict.fromkeys(batches, 1)
+
+
 def test_submodule_digest_is_checkout_eol_independent(tmp_path):
     """Issue #255 also covers the synthetic submodule sidecars: raw hashing here
     would move every COM key when core.autocrlf rematerialises vendored Python."""
