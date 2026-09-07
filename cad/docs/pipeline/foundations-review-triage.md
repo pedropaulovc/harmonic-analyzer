@@ -114,9 +114,12 @@ change improves performance or safety:
   that failure report. Geometric endpoint pairs use `strict=True`.
 - The view-scale test now states what it proves: model-only identity resolution.
   Its unused fake view position/scale did not exercise native layout behavior.
-- The unused `_clear` helper was removed. `_candidate_text_cells` stays: both
-  production GTol arrangement and the right-column diagnostic call it, and its
-  existing tests cover the returned cells.
+- Both `_clear` and `_candidate_text_cells` stay. `_clear` has three live calls
+  in `probe_drawing_right_gtol_column`; production GTol arrangement and the
+  right-column diagnostic call `_candidate_text_cells`. The initial cleanup
+  missed the multiline import and deleted `_clear`; full `check:recipe` caught
+  three collection errors (`run-9tdivtgg`). Restore its exact implementation and
+  keep the existing diagnostic/leader-policy tests in the verification scope.
 - Do not memoize content hashes using only path, length and mtime. The new
   prepared-template regression changes equal-length bytes, restores the original
   mtime, and verifies that the exact hash still changes. Such a memo would accept
