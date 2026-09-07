@@ -81,9 +81,8 @@ def test_actual_changed_input_requires_a_different_entry(cache, field):
     assert before.path.is_file()
 
 
-@pytest.mark.parametrize("spec", [{"scale": (2, 1)}, {"decimals": 3}])
-def test_scale_and_precision_are_cache_inputs(cache, spec):
-    assert access(cache).key != access(cache, **spec).key
+def test_precision_remains_a_cache_input(cache):
+    assert access(cache).key != access(cache, decimals=3).key
 
 
 @pytest.mark.parametrize(
@@ -258,7 +257,10 @@ def native(monkeypatch, tmp_path):
 
     def create(adapter, **kwargs):
         model = Model(f"Draw{len(created)}")
-        model.viewport = {"scale2": 0.98, "translation3": [float(len(created)), 0.2, 0.3]}
+        model.viewport = {
+            "scale2": 0.98,
+            "translation3": [float(len(created)), 0.2, 0.3],
+        }
         documents.append(model)
         created.append(model)
         adapter.currentModel = app.ActiveDoc = model
@@ -576,16 +578,21 @@ def test_each_preparation_helper_byte_change_changes_actual_key(
     assert real_sha(original) == before["source_sha256"][f"cad/scripts/{helper}"]
 
 
-def test_inherited_path_verifies_bytes_before_native_and_omits_setters(
+def test_inherited_path_verifies_bytes_before_native_and_only_sets_instance_scale(
     cache, monkeypatch
 ):
     entry = access(cache)
     calls = []
-    sheet = object()
+    sheet = SimpleNamespace(
+        SetScale=lambda *args: calls.append(("scale", args)) or True
+    )
     draw = SimpleNamespace(
         EditSheet=lambda: calls.append("edit_sheet"),
         GetCurrentSheet=lambda: sheet,
         ViewZoomtofit2=lambda: calls.append("fit"),
+        GetViews=lambda: ((object(),),),
+        GetType=lambda: 3,
+        GetPathName=lambda: "",
     )
 
     def create(adapter, **kwargs):
@@ -593,18 +600,30 @@ def test_inherited_path_verifies_bytes_before_native_and_omits_setters(
         return draw
 
     monkeypatch.setattr(sheet_setup, "new_drawing", create)
-    monkeypatch.setattr(sheet_setup, "assert_asme_b_sheet", lambda *a, **k: calls.append(k))
-    assert prepared.inherited_drawing(cache.adapter, entry) == (draw, sheet)
+    monkeypatch.setattr(prepared, "_early_bound", lambda obj, _: obj)
+    cache.adapter = SimpleNamespace(
+        currentModel=draw,
+        swApp=SimpleNamespace(ActiveDoc=draw, IsSame=lambda a, b: int(a is b)),
+    )
+    monkeypatch.setattr(
+        sheet_setup, "assert_asme_b_sheet", lambda *a, **k: calls.append(k)
+    )
+    assert prepared.inherited_drawing(cache.adapter, entry, spec=entry.spec) == (
+        draw,
+        sheet,
+    )
     assert calls[0]["template"] == str(entry.path)
     assert calls[1:] == [
         "edit_sheet",
-        {"phase": "prepared setup", "scale": (1.0, 1.0)},
+        {"phase": "inherited canonical base", "scale": (1.0, 1.0)},
+        ("scale", (1.0, 1.0, True, False)),
+        {"phase": "prepared requested scale", "scale": (1.0, 1.0)},
         "fit",
     ]
     entry.path.write_bytes(b"corrupted")
     calls.clear()
     with pytest.raises(RuntimeError, match="hash differs"):
-        prepared.inherited_drawing(cache.adapter, entry)
+        prepared.inherited_drawing(cache.adapter, entry, spec=entry.spec)
     assert calls == []
 
 
@@ -838,7 +857,9 @@ def test_settled_note_extent_drift_still_fails_exact_comparison(lazy_note_extent
         defaults.compare_defaults(before, lazy_note_extent.snapshot())
 
 
-def test_raw_extent_only_drift_is_not_waived_when_measured_body_matches(lazy_note_extent):
+def test_raw_extent_only_drift_is_not_waived_when_measured_body_matches(
+    lazy_note_extent,
+):
     before = lazy_note_extent.snapshot()
     after = deepcopy(before)
     note = next(row for row in after["sheet_notes"] if row["text"] == "UNIT: mm")

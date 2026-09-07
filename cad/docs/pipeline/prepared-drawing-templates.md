@@ -1,5 +1,9 @@
 # Prepared drawing templates: opt-in implementation
 
+Historical implementation and native receipts below describe the per-scale
+accessor. The [canonical-base candidate](canonical-prepared-template-base.md)
+supersedes its API/key shape; that candidate's native acceptance is separate.
+
 The existing `new_project_drawing` path and every production recipe remain
 unchanged. No rollout or full-sheet native acceptance is claimed by this patch.
 
