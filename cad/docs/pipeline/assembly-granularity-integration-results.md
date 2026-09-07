@@ -66,8 +66,9 @@ Reproducer in the code checkout:
 `84fcbf2e89b5b5efba4761ee082363295657af6c3b968aab049bb58d1e3c439e`.
 Run with `uv run python` while the native checkout still holds the pinned main
 sources. The post-fix `extraction-audit.json` receipt is
-`abaa8aaf79136d87ece53aaaa89dd96642bf9133b6ec87e9350c7619311a4875`;
-the earlier receipt is retained as `extraction-audit-076e936f.json`.
+`d2b86542dcfc75d2b216f350a806f98a56c2ecc866949b1670da0ac89342c9c2`;
+earlier receipts are retained as `extraction-audit-076e936f.json` and
+`extraction-audit-e7d2d5f3.json`.
 
 The attach-only, seat-locked inventory found PID 18748, revision 34.3.0, and
 only the two clean documents from our completed #685 run. Those exact documents
@@ -116,3 +117,30 @@ limited after an explicit request. Windows CLI attempts also returned
 reached, with advertised retry windows retained in the complete logs. No billing
 setting changed. The Codex bot again requested an account/GitHub connection.
 Missing watcher output or a resolved thread is not counted as a clean review.
+
+The Windows CLI later completed a full child review at `79804d94`, with zero
+findings across all 23 changed files. Its complete local cache is preserved as
+`cr-687-79804d94-full-cache`; actual diffs and source contents match
+`d25cceb7..79804d94`, allowing only terminal LF and Windows CRLF differences.
+The verification receipt `cr-687-cache-verification-crlf.json` has SHA-256
+`c145c7c6aecc8513195cb6886eddfe93b0b5ec30577e86224d080f1be0a77fcd`.
+
+The corresponding parent review at `d25cceb7` found that keyed dictionary writes
+below a consuming function were incorrectly excluded. Fail-first tests reproduced
+that dropped edge, an unknown-value escape, and a same-line earlier-write case;
+three ordering controls passed. Fix `34ef4e83` applies the existing late-global
+rule and statement-column ordering. All 95 parser tests then passed. The child
+was rebased onto this parent; no native source was changed during the baseline.
+
+The new full offline invocation passed 1155 recipe tests (83.87 s), 97 graph tests
+(14.17 s), and four isolation tests (8.95 s); the 13-test cache gate stayed current.
+Its log `offline-gates-keyed-source-fixed.log` has SHA-256
+`43578887bc32db5d48e3e470e45cc905807441597f77ab8231681d7ae4648890`.
+`keyed-source-fail-first.log` and `keyed-source-fixed.log` retain the regression
+receipts. The refreshed source audit still proves 125/119 edges, 137/139 modules,
+82 unchanged definitions, 13 import-only callers and unchanged 108 leaf keys.
+
+Both original CLI cache entries were moved into this run's evidence directory,
+after verified complete copies were retained, so subsequent review requests can
+cover full PR diffs. No authentication, billing or other experiment cache changed.
+Clean reviews of the corrected parent and rebased child remain pending.
