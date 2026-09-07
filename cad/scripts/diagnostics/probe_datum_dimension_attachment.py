@@ -613,6 +613,12 @@ async def probe(adapter, source, directory, mode="paired_dimensions"):
                 }:
                     target = None
                     if mode == "dimension_placed":
+                        if before["measurement"] is None:
+                            raise RuntimeError(
+                                "dimension_placed requires measured datum bounds "
+                                "before placement; raw observations and before export captured; "
+                                f"measurement_error={before['measurement_error']!r}"
+                            )
                         dimension_bounds = annotation_box(adapter, bore["annotation"])
                         dimension_position = tuple(
                             float(v) for v in bore["annotation"].GetPosition() or ()

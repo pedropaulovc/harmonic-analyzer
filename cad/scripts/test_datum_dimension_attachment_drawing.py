@@ -1,7 +1,9 @@
 """Named datum-to-dimension experiments preserve exact native selection gates."""
 
+import json
+from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
@@ -408,3 +410,192 @@ def test_stale_specific_text_remains_diagnostic_not_semantic():
     assert before["specific_data"]["texts"] == ("B",)
     with pytest.raises(RuntimeError, match="text changed"):
         probe.same_semantics(before, {**after, "text": ("A", "changed quantity")})
+
+
+@pytest.fixture
+def measured_datum_probe(monkeypatch, tmp_path):
+    from _drawing_annotation_bounds import NativeSnapshot, Segment
+    from diagnostics import _owned_native_documents as owned
+    from solidworks_mcp.adapters.base import AdapterResult, AdapterResultStatus
+
+    source = tmp_path / "slddrw/cone-gear.SLDDRW"
+    part = tmp_path / "sldprt/cone-gear.SLDPRT"
+    for path in (source, part):
+        path.parent.mkdir()
+        path.write_bytes(b"unchanged source fixture")
+    directory = tmp_path / "paired-control"
+    directory.mkdir()
+    monkeypatch.setattr(probe, "_early_bound", lambda value, _: value)
+    view, display = object(), object()
+    annotation = SimpleNamespace(
+        GetType=lambda: 2,
+        OwnerType=0,
+        Visible=1,
+        Owner=view,
+        IsDangling=lambda: False,
+        GetAttachedEntities3=lambda: (display,),
+        GetAttachedEntityTypes=lambda: (14,),
+        GetAttachedEntityCount3=lambda: 1,
+        GetPosition=lambda: (0.2, 0.2, 0.0),
+        GetName=lambda: "DatumA",
+    )
+    tag = SimpleNamespace(
+        GetAnnotation=lambda: annotation,
+        GetLabel=lambda: "A",
+        Shoulder=True,
+        ForcedShoulder=False,
+        GetDisplayStyle=lambda: 0,
+        GetTextCount=lambda: 0,
+        GetLineCount=lambda: 0,
+    )
+    annotation.GetSpecificAnnotation = lambda: tag
+    dimension_annotation = SimpleNamespace(GetPosition=lambda: (0.17, 0.12, 0.0))
+    bore = {
+        "source": str(part),
+        "full_name": "BoreCutDia@BoreProfile@cone-gear.Part",
+        "value_m": 0.009525,
+        "configuration": "Default",
+        "view_key": "Front",
+        "view": view,
+        "display": display,
+        "annotation": dimension_annotation,
+    }
+    adapter = SimpleNamespace(
+        ownership=SimpleNamespace(register_directory=Mock(), register_source=Mock()),
+        swApp=SimpleNamespace(IsSame=lambda left, right: int(left is right)),
+        close_owned_documents=AsyncMock(),
+        currentModel=None,
+    )
+
+    async def open_model(path):
+        adapter.currentModel = SimpleNamespace(
+            GetPathName=lambda: path, Extension=object()
+        )
+        return AdapterResult(AdapterResultStatus.SUCCESS)
+
+    adapter.open_model = AsyncMock(side_effect=open_model)
+    monkeypatch.setattr(probe, "bore_target", lambda _: bore)
+    monkeypatch.setattr(probe, "datum_a", lambda *_: annotation)
+    monkeypatch.setattr(
+        probe, "raw_display_data", lambda _: {"texts": [{"value": "A"}]}
+    )
+    corners = ((0.2, 0.2), (0.207, 0.2), (0.207, 0.207), (0.2, 0.207))
+    snapshot = NativeSnapshot(
+        "DatumA",
+        2,
+        (0.2, 0.2),
+        (),
+        tuple(Segment(corners[i], corners[(i + 1) % 4]) for i in range(4)),
+        (),
+        (),
+        None,
+        (),
+    )
+    monkeypatch.setattr(probe, "_native_snapshot", Mock(return_value=snapshot))
+    monkeypatch.setattr(
+        probe.attachments,
+        "snapshot",
+        lambda *_a, **_kw: {
+            "checked": {"Front/DatumA/2": "datum"},
+            "excluded": {},
+            "semantic_attachments": {},
+        },
+    )
+
+    def save_drawing(_adapter, drawing, *, pdf_path):
+        Path(drawing).write_bytes(b"offline drawing export fixture")
+        Path(pdf_path).write_bytes(b"offline PDF export fixture")
+
+    monkeypatch.setattr(owned, "save_drawing", Mock(side_effect=save_drawing))
+    monkeypatch.setattr(
+        probe,
+        "render_pdf_png",
+        lambda _, png: png.write_bytes(b"offline PNG export fixture"),
+    )
+    monkeypatch.setattr(probe, "replace_on_dimension", Mock(return_value=annotation))
+    monkeypatch.setattr(
+        probe, "dimension_target_xy", Mock(wraps=probe.dimension_target_xy)
+    )
+    monkeypatch.setattr(
+        probe,
+        "annotation_box",
+        Mock(return_value=SimpleNamespace(body=probe.Rect(0.16, 0.12, 0.18, 0.127))),
+    )
+    monkeypatch.setattr(probe, "place_datum_control", Mock())
+    return SimpleNamespace(**locals())
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("boundary", ["_native_snapshot", "bounds_from_snapshot"])
+async def test_dimension_placed_requires_before_bounds_and_retains_native_error(
+    measured_datum_probe, monkeypatch, boundary
+):
+    c = measured_datum_probe
+    native_error = ValueError(f"native datum {boundary} rejected calibration")
+    monkeypatch.setattr(probe, boundary, Mock(side_effect=native_error))
+    with pytest.raises(
+        RuntimeError, match="datum mechanism witness failed; complete evidence"
+    ):
+        await probe.probe(c.adapter, c.source, c.directory)
+
+    report = json.loads(
+        (c.directory / "datum-dimension-attachment.json").read_text(encoding="utf-8")
+    )
+    assert [trial["mode"] for trial in report["trials"]] == [
+        "dimension",
+        "dimension_placed",
+    ]
+    placed = report["trials"][1]
+    assert placed["before"]["measurement"] is None
+    assert placed["before"]["measurement_error"] == str(native_error)
+    assert placed["before"]["raw_display_data"] == {"texts": [{"value": "A"}]}
+    assert "dimension_placed requires measured datum bounds" in placed["error"]
+    assert str(native_error) in placed["error"]
+    assert "TypeError" not in placed["error"]
+    assert "insertion_finalization" not in placed
+    assert "placement" not in placed
+    assert all(Path(path).is_file() for path in placed["before_export"].values())
+    assert report["source_hashes_after"] == report["source_hashes"]
+    probe.annotation_box.assert_not_called()
+    probe.dimension_target_xy.assert_not_called()
+    probe.place_datum_control.assert_not_called()
+    # The unpositioned control remains independent and keeps its insertion.
+    probe.replace_on_dimension.assert_called_once()
+    assert probe.replace_on_dimension.call_args.kwargs["target"] is None
+    assert c.adapter.close_owned_documents.await_count == 3
+
+
+@pytest.mark.asyncio
+async def test_dimension_placed_with_measured_bounds_keeps_derived_insertion_target(
+    measured_datum_probe,
+):
+    c = measured_datum_probe
+    planned = RuntimeError("stop after verified insertion plan")
+    probe.replace_on_dimension.side_effect = planned
+    with pytest.raises(
+        RuntimeError, match="datum mechanism witness failed; complete evidence"
+    ):
+        await probe.probe(c.adapter, c.source, c.directory)
+
+    report = json.loads(
+        (c.directory / "datum-dimension-attachment.json").read_text(encoding="utf-8")
+    )
+    placed = report["trials"][1]
+    assert placed["before"]["measurement_error"] is None
+    assert placed["before"]["measurement"]["body"] == {
+        "xmin": 0.2,
+        "ymin": 0.2,
+        "xmax": 0.207,
+        "ymax": 0.207,
+    }
+    assert placed["error"] == repr(planned)
+    assert probe.replace_on_dimension.call_count == 2
+    assert probe.replace_on_dimension.call_args_list[0].kwargs["target"] is None
+    assert probe.replace_on_dimension.call_args_list[1].kwargs[
+        "target"
+    ] == pytest.approx((0.1535, 0.110, 0.0))
+    probe.annotation_box.assert_called_once_with(c.adapter, c.dimension_annotation)
+    probe.dimension_target_xy.assert_called_once()
+    probe.place_datum_control.assert_not_called()
+    assert report["source_hashes_after"] == report["source_hashes"]
+    assert c.adapter.close_owned_documents.await_count == 3
