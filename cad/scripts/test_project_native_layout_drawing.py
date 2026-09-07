@@ -82,6 +82,7 @@ def test_project_layout_orders_spacing_and_rejects_unfit_sheet(monkeypatch, stat
         gtol_placement=callouts.GtolPlacement.ARRANGED_NEXT,
         deferred_notes=(notes[0].annotation,),
         datum_leader_policy=callouts.DatumLeaderPolicy.EXISTING,
+        datum_initial_measurement=callouts.DatumInitialMeasurement.FRESH,
     )
     assert factory.call_args_list == [
         call(
