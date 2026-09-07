@@ -261,3 +261,11 @@ Final frozen replay and print inspection of the adjusted layout, a clean
 latest-code local review, and the full graph build gate remain pending. The full
 graph build has not run; the known baseline recipe failure prevents a green
 result. No merge readiness is claimed.
+
+The `8484555b` finish endpoint trial failed the unchanged attachment check:
+`count=0, entities=0, types=(), expected=1`. Owned diagnostic `5auke05p`
+retains the failing recipe, partial annotations/render and final ownership/hash
+evidence (trace `0xa441206f7015c9e47d42ab27e1e34aac`). The attempted call supplied
+sheet X/Y and the shared helper's z=0; this does not establish that every native
+leader-endpoint variant detaches. The next recipe uses the supported native
+finish placement with no separate leader, preserving the same MODEL entity.
