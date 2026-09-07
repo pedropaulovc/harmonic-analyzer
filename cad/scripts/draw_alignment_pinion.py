@@ -105,6 +105,7 @@ async def build(
             "Manufacturing Notes",
         ),
     )
+    source_model = adapter.currentModel
     drawing_model, _sheet = drawing_factory(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE
     )
@@ -129,7 +130,8 @@ async def build(
         adapter, front, keep=FRONT_KEEP, view_label="front"
     )
     verify_dimension_callouts(
-        adapter, front_annotations, DIMENSION_CALLOUTS, feature_name="ArborBoreProfile"
+        adapter, front_annotations, DIMENSION_CALLOUTS, feature_name="ArborBoreProfile",
+        view=front, source_model=source_model,
     )
     set_dimension_precision(adapter, front_annotations, DIMENSION_PRECISION)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
