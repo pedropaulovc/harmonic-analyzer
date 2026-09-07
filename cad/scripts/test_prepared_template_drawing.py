@@ -534,9 +534,9 @@ def blank_sheet(
 
 def test_default_snapshot_preserves_links_multiplicity_raw_font_and_anchor(blank_sheet):
     adapter, spec = blank_sheet.adapter, blank_sheet.spec
-    blank_note = blank_sheet.blank_note
+    linked_note = blank_sheet.blank_note
     before = defaults.snapshot_defaults(adapter, spec)
-    blank_note.note.GetExtent = lambda: (0.1, 0.2, 0, 0.1, 0.21, 0)
+    linked_note.note.GetExtent = lambda: (0.1, 0.2, 0, 0.1, 0.21, 0)
     after = defaults.snapshot_defaults(adapter, spec)
     defaults.compare_defaults(before, after)
     assert len(before["sheet_notes"]) == 3
@@ -544,7 +544,7 @@ def test_default_snapshot_preserves_links_multiplicity_raw_font_and_anchor(blank
         before["blank_linked_extent_observations"]
         != after["blank_linked_extent_observations"]
     )
-    blank_note.fmt.CharHeight += 1e-12
+    linked_note.fmt.CharHeight += 1e-12
     with pytest.raises(RuntimeError, match="raw defaults"):
         defaults.compare_defaults(after, defaults.snapshot_defaults(adapter, spec))
     blank_sheet.units[263] = 5
