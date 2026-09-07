@@ -28,6 +28,7 @@ sys.path.insert(0, str(ROOT / "cad/scripts"))
 from _common import _early_bound  # noqa: E402
 import _drawing_common as common  # noqa: E402
 import _drawing_prepared_template as prepared  # noqa: E402
+import _drawing_template_viewport as viewports  # noqa: E402
 from _drawing_template_defaults import compare_defaults, snapshot_defaults  # noqa: E402
 import _telemetry  # noqa: E402
 from diagnostics import _owned_native_documents as ownership  # noqa: E402
@@ -38,6 +39,11 @@ from diagnostics import probe_retained_drawing_export as printed  # noqa: E402
 class PrintedFormat(StrEnum):
     SKIP = "skip"
     COMPARE = "compare"
+
+
+class Viewport(StrEnum):
+    NORMAL = "normal"
+    CAPTURED = "captured"
 
 
 def require_environment(expected_pid):
@@ -59,6 +65,7 @@ def runtime_inputs(adapter, spec):
         Path(session.__file__).resolve(),
         ROOT / "dodo.py",
         Path(printed.__file__).resolve(),
+        Path(viewports.__file__).resolve(),
     ]
     return {
         "preparation": prepared.preparation_inputs(adapter, spec),
@@ -165,6 +172,8 @@ async def trial(
     *,
     printed_format=PrintedFormat.SKIP,
     printed_expected=None,
+    viewport=Viewport.NORMAL,
+    captured_viewport=None,
 ):
     errors = []
     row.update(status="running", phase="setup")
@@ -186,6 +195,22 @@ async def trial(
                     )
                 if entry is not None:
                     prepared.inherited_drawing(adapter, entry)
+        if viewport is Viewport.CAPTURED:
+            row["phase"] = "viewport"
+            adapter.ownership.assert_current_owned()
+            if captured_viewport is None:
+                if entry is not None:
+                    raise RuntimeError(
+                        "prepared trial needs the normal trial's captured viewport"
+                    )
+                row["viewport"] = viewports.capture(adapter.currentModel)
+            else:
+                control = row["viewport_control"] = {}
+                with timed(row, "viewport_restore_seconds"):
+                    viewports.restore(
+                        adapter.swApp, adapter.currentModel, captured_viewport, control
+                    )
+                row["viewport"] = control["after"]
         row["phase"] = "raw_defaults"
         checkpoint()
         with timed(row, "witness_seconds"):
@@ -206,6 +231,14 @@ async def trial(
                 row["after_print_defaults"] = snapshot_defaults(adapter, spec)
                 compare_defaults(row["defaults"], row["after_print_defaults"])
                 row["after_print_blank"] = blank_witness(adapter)
+                if viewport is Viewport.CAPTURED:
+                    row["after_print_viewport"] = viewports.capture(
+                        adapter.currentModel
+                    )
+                    if row["after_print_viewport"] != row["viewport"]:
+                        raise RuntimeError(
+                            "printed trial changed the exact captured viewport"
+                        )
     except Exception as error:
         row.update(error=repr(error), failed_phase=row["phase"])
         errors.append(error)
@@ -229,10 +262,18 @@ async def trial(
 
 
 async def probe(
-    adapter, spec, report_root, expected_pid, *, printed_format=PrintedFormat.SKIP
+    adapter,
+    spec,
+    report_root,
+    expected_pid,
+    *,
+    printed_format=PrintedFormat.SKIP,
+    viewport=Viewport.NORMAL,
 ):
     if not isinstance(printed_format, PrintedFormat):
         raise ValueError("printed format requires an explicit policy enum")
+    if not isinstance(viewport, Viewport):
+        raise ValueError("viewport requires an explicit policy enum")
     require_environment(expected_pid)
     if int(adapter.swApp.GetProcessID()) != expected_pid:
         raise RuntimeError(
@@ -261,6 +302,7 @@ async def probe(
         ).stdout.strip(),
         "scope": "blank_setup_cache_miss_hit_only",
         "printed_format": printed_format.value,
+        "viewport": viewport.value,
         "spec": asdict(spec),
         "source_template": {"path": str(original), "sha256": original_sha},
         "runtime_inputs": pinned,
@@ -326,6 +368,19 @@ async def probe(
         try:
             with context:
                 yield
+                if (
+                    viewport is Viewport.CAPTURED
+                    and kind is prepared.TemplateOperation.CREATE
+                ):
+                    adapter.ownership.assert_current_owned()
+                    control = row["viewport_control"] = {}
+                    with timed(row, "viewport_restore_seconds"):
+                        viewports.restore(
+                            adapter.swApp,
+                            adapter.currentModel,
+                            report["captured_viewport"],
+                            control,
+                        )
             row["status"] = "completed"
         except Exception as error:
             row.update(status="failed", error=repr(error))
@@ -340,11 +395,17 @@ async def probe(
         row = {"variant": variant}
         report["trials"].append(row)
         options = {}
+        if viewport is Viewport.CAPTURED:
+            options.update(
+                viewport=viewport, captured_viewport=report.get("captured_viewport")
+            )
         if printed_format is PrintedFormat.COMPARE:
-            options = {
-                "printed_format": printed_format,
-                "printed_expected": report["trials"][0].get("printed"),
-            }
+            options.update(
+                {
+                    "printed_format": printed_format,
+                    "printed_expected": report["trials"][0].get("printed"),
+                }
+            )
         await trial(
             adapter, spec, entry, trial_dir, row, expected, checkpoint, **options
         )
@@ -355,6 +416,8 @@ async def probe(
     try:
         guard("before_normal")
         normal = await run_trial("normal", None, None)
+        if viewport is Viewport.CAPTURED:
+            report["captured_viewport"] = report["trials"][0]["viewport"]
         for access_kind in ("miss", "hit"):
             report["phase"] = access_kind
             guard("before_" + access_kind)
@@ -453,6 +516,9 @@ def main(argv=None):
     parser.add_argument("--scale", type=float, nargs=2, default=(2.0, 1.0))
     parser.add_argument("--decimals", type=int, choices=(2, 3), default=2)
     parser.add_argument(
+        "--viewport", type=Viewport, choices=tuple(Viewport), default=Viewport.NORMAL
+    )
+    parser.add_argument(
         "--printed-format",
         type=PrintedFormat,
         choices=tuple(PrintedFormat),
@@ -475,6 +541,7 @@ def main(argv=None):
                 args.report_root.resolve(),
                 args.expected_pid,
                 printed_format=args.printed_format,
+                viewport=args.viewport,
             )
         )
     import dodo
@@ -491,6 +558,8 @@ def main(argv=None):
             str(spec.decimals),
             "--printed-format",
             args.printed_format.value,
+            "--viewport",
+            args.viewport.value,
             "--report-root",
             str(args.report_root.resolve()),
             "--worker",
