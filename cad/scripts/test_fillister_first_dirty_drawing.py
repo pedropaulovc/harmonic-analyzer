@@ -197,7 +197,30 @@ def test_real_whole_text_helper_is_only_an_observed_group_and_never_reaches_save
     }
 
 
-def test_fillister_is_not_silently_enrolled_in_full_owned_pilot():
+def test_fillister_owned_pilot_enrollment_is_explicit_and_dimension_only():
+    from diagnostics._model_dimension_coverage import (
+        ModelDimensionRole,
+        SemanticCoverage,
+    )
     from diagnostics._recipe_acceptance_targets import TARGETS
 
-    assert "fillister_screw" not in TARGETS
+    manifest = TARGETS["fillister_screw"]
+    assert manifest.source_sha256 == (
+        "e7b48995c9f2e87af473219edfca1500a14e77bd353a330c64883011ab4fb60d"
+    )
+    assert manifest.spec_module == "fillister_screw_spec"
+    assert manifest.dimensions == fillister_screw_spec.DRAWING_DIMENSIONS
+    assert manifest.coverage is SemanticCoverage.MODEL_DIMENSIONS_ONLY
+    assert manifest.basic == manifest.entity_labels == manifest.view_roles == {}
+    assert manifest.model_views == ("*Right", "*Back", "*Isometric")
+    assert manifest.model_dimensions == (
+        ModelDimensionRole("HeadProfile", "HeadDia", "*Back", 6, (10,)),
+        ModelDimensionRole(
+            "ShankProfile", "ShankDia", "*Right", 6, (10,),
+            (fillister_screw_spec.THREAD_DESIGNATION,),
+        ),
+        ModelDimensionRole("Head", "HeadHt", "*Right", 2, ()),
+        ModelDimensionRole(
+            "Shank", "ShankLg", "*Right", 2, (), ("UNDERHEAD LENGTH",),
+        ),
+    )
