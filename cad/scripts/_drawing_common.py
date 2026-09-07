@@ -2120,7 +2120,7 @@ def verify_dimension_callouts(
     feature_name: str,
     view: Any,
     source_model: Any,
-    location: Literal["above", "below", "prefix", "suffix"] = "below",
+    location: Literal["above", "below", "prefix", "suffix", "all"] = "below",
 ) -> None:
     """Verify imported text against the caller's intended view and source PART.
 
@@ -2129,7 +2129,7 @@ def verify_dimension_callouts(
     """
     from _drawing_marks import _named_dimension
 
-    text_part = {"above": 3, "below": 4, "prefix": 1, "suffix": 2}[location]
+    text_part = {"above": 3, "below": 4, "prefix": 1, "suffix": 2, "all": 0}[location]
     model = adapter.currentModel
     if model is None or _early_bound(model, "IModelDoc2").GetType() != 3:  # swDocDRAWING
         raise RuntimeError("imported dimension callout verification requires a DRAWING")
@@ -2180,22 +2180,23 @@ def verify_dimension_callouts(
         require_same(source_dimension, dimension, "source parameter")
         if display.IsHoleCallout() is not False:
             raise RuntimeError(f"dimension {name!r}: GetText does not support hole callouts")
-        if location in ("prefix", "suffix"):
-            from _model_dimension_callouts import _reference_presentation
+        if location in ("prefix", "suffix", "all"):
+            from _model_dimension_callouts import _dimension_presentation, _whole_text_presentation
 
             source_display = _early_bound(_source_display, "IDisplayDimension")
             if source_display.IsHoleCallout() is not False:
                 raise RuntimeError(f"dimension {name!r}: source GetText does not support hole callouts")
-            expected = _reference_presentation(source_display)
-            actual = _reference_presentation(display)
-            if (
-                expected[text_part - 1] != text
-                or expected[text_part + 3] != text
-                or actual != expected
-            ):
+            source_state = _dimension_presentation(source_display)
+            actual = _dimension_presentation(display)
+            expected = _whole_text_presentation(text)
+            if location != "all":
+                fields = list(source_state[0])
+                fields[text_part - 1] = fields[text_part + 3] = text
+                expected = tuple(fields), True
+            if source_state != expected or actual != expected:
                 raise RuntimeError(
-                    f"{name}@{feature_name}: imported reference presentation differs: "
-                    f"source={expected!r}, drawing={actual!r}, requested={text!r}"
+                    f"{name}@{feature_name}: imported presentation/numeric visibility differs: "
+                    f"source={source_state!r}, drawing={actual!r}, expected={expected!r}"
                 )
             continue
         actual = display.GetText(text_part)

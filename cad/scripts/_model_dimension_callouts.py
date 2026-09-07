@@ -12,19 +12,28 @@ from _drawing_marks import _named_dimension
 import _telemetry
 
 
-def _reference_presentation(display: Any) -> tuple[str, ...]:
-    """Read all native text/definition fields of a numeric reference dimension."""
+def _dimension_presentation(display: Any) -> tuple[tuple[str, ...], bool]:
+    """Read raw native text/definition fields and numeric visibility, uncoerced."""
     display = _early_bound(display, "IDisplayDimension")
-    if display.ShowDimensionValue is not True:
-        raise RuntimeError(
-            "reference dimension requires its native numeric value visible"
-        )
+    visible = display.ShowDimensionValue
+    if type(visible) is not bool:
+        raise RuntimeError(f"unsupported native numeric visibility: {visible!r}")
     fields = tuple(display.GetText(part) for part in range(1, 9))
     if any(type(text) is not str for text in fields):
-        raise RuntimeError(
-            f"reference dimension has unsupported native text: {fields!r}"
-        )
-    return fields
+        raise RuntimeError(f"dimension has unsupported native text: {fields!r}")
+    return fields, visible
+
+
+def _whole_text_presentation(text: str) -> tuple[tuple[str, ...], bool]:
+    """The complete documented SetText(All) result, including definition fields."""
+    return (text, "", "", "", text, "", "", ""), False
+
+
+def _require_presentation(actual, expected, label: str) -> None:
+    if actual[1] is not expected[1]:
+        raise RuntimeError(f"{label}: native numeric visibility differs")
+    if actual != expected:
+        raise RuntimeError(f"{label}: presentation differs: {actual!r} != {expected!r}")
 
 
 def _require_model_identity(
@@ -43,7 +52,7 @@ def _require_model_identity(
         )
         if type(status) is not int or status != 1:
             raise RuntimeError(
-                "model reference callout document/parameter identity differs or is unknown"
+                "model callout document/parameter identity differs or is unknown"
             )
 
 
@@ -53,17 +62,18 @@ def author_model_callouts(
     feature_name: str,
     callout_text: Mapping[str, str],
     *,
-    location: Literal["above", "below", "prefix", "suffix"] = "below",
+    location: Literal["above", "below", "prefix", "suffix", "all"] = "below",
 ) -> None:
     """Set one feature's exact named non-hole dimensions, without save/rebuild."""
-    text_part = {"above": 3, "below": 4, "prefix": 1, "suffix": 2}[location]
+    text_part = {"above": 3, "below": 4, "prefix": 1, "suffix": 2, "all": 0}[location]
     # Prefix/suffix retain a numeric value and every other compartment. Their
-    # definition companions are checked too; these are literal fields, not All.
-    reference_field = location in ("prefix", "suffix")
+    # definition companions are checked too. All explicitly replaces the entire
+    # text and hides the numeric value; it is not a prefix-only approximation.
+    full_presentation = location in ("prefix", "suffix", "all")
     model = adapter.currentModel
     if model is None or _early_bound(model, "IModelDoc2").GetType() != 1:  # swDocPART
         raise RuntimeError("model dimension callouts require a PART document")
-    if reference_field:
+    if full_presentation:
         _require_model_identity(adapter, model, model, model)
     resolved = []
     for name, text in callout_text.items():
@@ -78,24 +88,27 @@ def author_model_callouts(
                 f"{name}@{feature_name}: SetText does not support hole callouts"
             )
         expected = None
-        if reference_field:
+        if full_presentation:
             _require_model_identity(adapter, model, dimension, display.GetDimension2(0))
-            fields = list(_reference_presentation(display))
-            fields[text_part - 1] = fields[text_part + 3] = text
-            expected = tuple(fields)
+            before_fields, before_visible = _dimension_presentation(display)
+            expected = _whole_text_presentation(text)
+            if location != "all":
+                if before_visible is not True:
+                    raise RuntimeError(
+                        "reference dimension requires its native numeric value visible"
+                    )
+                fields = list(before_fields)
+                fields[text_part - 1] = fields[text_part + 3] = text
+                expected = tuple(fields), True
         resolved.append((name, display, dimension, text, expected))
     for name, display, dimension, text, expected in resolved:
-        if reference_field:
+        if full_presentation:
             _require_model_identity(adapter, model, dimension, display.GetDimension2(0))
         display.SetText(text_part, text)
-        if reference_field:
-            actual = _reference_presentation(display)
+        if full_presentation:
+            actual = _dimension_presentation(display)
             _require_model_identity(adapter, model, dimension, display.GetDimension2(0))
-            if actual != expected:
-                raise RuntimeError(
-                    f"{name}@{feature_name}: reference presentation differs: "
-                    f"{actual!r} != {expected!r}"
-                )
+            _require_presentation(actual, expected, f"{name}@{feature_name}")
             continue
         actual = display.GetText(text_part)
         if actual != text:
@@ -104,16 +117,14 @@ def author_model_callouts(
                 f"{actual!r} != {text!r}"
             )
     if resolved:
-        if reference_field:
+        if full_presentation:
             _require_model_identity(adapter, model, model, model)
         # SetText documents this display refresh. It does not rebuild or save.
         _early_bound(model, "IModelDoc2").GraphicsRedraw2()
-    if reference_field:
+    if full_presentation:
         for name, display, dimension, _text, expected in resolved:
-            actual = _reference_presentation(display)
+            actual = _dimension_presentation(display)
             _require_model_identity(adapter, model, dimension, display.GetDimension2(0))
-            if actual != expected:
-                raise RuntimeError(
-                    f"{name}@{feature_name}: reference presentation changed after redraw: "
-                    f"{actual!r} != {expected!r}"
-                )
+            _require_presentation(
+                actual, expected, f"{name}@{feature_name} after redraw"
+            )

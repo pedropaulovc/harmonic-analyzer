@@ -46,7 +46,15 @@ def test_lengths_are_inserted_from_named_model_dimensions() -> None:
     drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
     part_source = Path(part.__file__).read_text(encoding="utf-8")
     assert part_source.count("set_dimension_symmetric_tolerance(") == 3
-    assert '"ShankDia": "#4-40 UNC-2A"' in drawing_source
+    assert part.DIMENSION_TEXT is drawing.DIMENSION_TEXT is spec.DIMENSION_TEXT
+    assert spec.DIMENSION_TEXT == {"ShankDia": "#4-40 UNC-2A"}
+    assert spec.DIMENSION_TEXT["ShankDia"] == spec.THREAD_DESIGNATION
+    assert "set_dimension_text" not in drawing_source
+    assert 'author_model_callouts(adapter, "ShankProfile", DIMENSION_TEXT, location="all")' in part_source
+    assert part_source.index('mark_dimensions_for_drawing(') < part_source.index('location="all"') < part_source.index('return await save_part_and_images(')
+    assert 'adapter, side_annotations, DIMENSION_TEXT' in drawing_source
+    assert 'feature_name="ShankProfile", view=side' in drawing_source
+    assert 'source_model=callout_source_model, location="all"' in drawing_source
     assert "add_feature_control_frame(" not in drawing_source
 
 
