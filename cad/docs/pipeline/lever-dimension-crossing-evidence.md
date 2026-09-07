@@ -240,3 +240,48 @@ reopen checks and an eye pass over the changed PNG. Do not infer native movement
 from AutoArrange's return value or call the redesign faster before measuring
 the complete recipe. Five-view construction and measured fit may cost more;
 this candidate targets the concrete remaining readability defect.
+
+### First integrated native runs
+
+The five-view recipe was tested with the prepared factory, so these runs check
+that combination, not an isolated layout-speed comparison. Both used the exact
+registered lever source and guard, adapter `e77bfda4`, existing PID 31860,
+autostart disabled and remote cache off.
+
+At `44185bd7`, the run stopped during the document-wide datum leader policy:
+sheet-format surface-finish annotation `DetailItem325` failed its fixed-native-ink
+comparison. The original diagnostic retained its name but not the differing
+fields. Receipt `datum-policy-s8cl936z/pilot.json`, SHA-256
+`5f80856e29634fd6d6bdddaa1e83b752561e51c65772965642761157d4dc2f8c`.
+This is an unresolved preservation failure, not proof that printed ink moved.
+
+Commit `f0fb2a43` added failure-only native identity, visibility and complete
+before/after snapshot logging without changing the comparison. A fresh repeat
+passed that check and reached final packing/GTol validation, then failed the
+dimension gate on two remaining pairs:
+
+- Profile: `BarLength` stroke 6 crosses the `TipCentreX` BASIC 182.80 body.
+- Hole pattern: `RD1` stroke 6 crosses the `RD2` BASIC 177.80 body.
+
+Right, Top and isometric had no reported dimension/body crossing. Six of the
+old eight pairs are absent, including the two known diameter/radius and datum-C
+defects, but export was correctly stopped before a new PNG existed. Native
+stroke/box evidence does not substitute for inspecting the redesigned print.
+The full failed final snapshot and diagnostic-only rendered evidence should be
+retained before owned cleanup in the next control.
+
+Repeat receipt `datum-policy-jgxaythz/pilot.json`, SHA-256
+`93009bd209655fb61fd3e7a7127a1bd573b2e2322a2b95bd7a954386e1643684`.
+Its recipe took 99.123294 s before failure; pilot time was 132.711814 s. The
+earlier fixed-template mismatch did not recur, but no implementation fix was
+made and it remains unresolved. Neither run is accepted or a speedup.
+
+Both runs preserved original/guard hashes and exact source-copy bytes, passed
+final template/cache/helper/adapter guards, and returned to the initially empty
+document table without cleanup errors. The full offline recipe gate exposed one
+older assertion requiring arrangement after datums; this contradicted the
+approved earlier arrangement. After raising that conflict, `f0933f94` retained
+all semantic/forbidden-selector assertions and pinned the lever's one pass
+between dimension creation and datum/GTol creation. Seven COM-free gates passed
+at `f0fb2a43`, including 3,784 recipe tests in 72.35 s. This is not the full
+drawing-inclusive native merge gate.
