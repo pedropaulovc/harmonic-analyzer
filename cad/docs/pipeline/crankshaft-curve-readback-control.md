@@ -2,9 +2,11 @@
 
 This is a diagnostic, not a production geometry-witness change. The retained
 single-part invocation failed its coverage gate after capturing all eight edges;
-the separate paired-source extension is not yet executed.
+the separate paired-source invocation subsequently passed the native LINE,
+CIRCLE and PinHole intersection controls, as recorded below.
 The line/circle reader and the MODEL/VIEW identity and cold-reopen gates remain
-unchanged. No native acceptance or performance improvement is claimed.
+unchanged. That source-reader proof is not drawing/cold acceptance or a
+performance improvement claim.
 
 ## Reproduced boundary
 
@@ -43,8 +45,8 @@ The rocker source is independently pinned to
 Both originals are protected and checked before either part opens. Rocker runs
 first, capturing the first actual native LINE edge with the unchanged analytic
 reader. After its owned copy closes, crankshaft must supply both CIRCLE and
-exact `PinHole`-adjacent `INTERSECTION_TYPE` 3004 B-curve rows. This is the route
-intended to establish successful three-kind coverage, not a claim it has passed.
+exact `PinHole`-adjacent `INTERSECTION_TYPE` 3004 B-curve rows. The retained paired
+invocation below establishes that three-kind coverage for its pinned sources.
 There is no retry or second stage after a failure. A parent receipt links both
 child receipts (including a failed child), captures stage/total time, and rechecks
 both originals and every created copy at the end.
@@ -135,7 +137,8 @@ Paired extension offline verification: 227 focused/adjacent tests passed in
 3.00 s (`pytest-telemetry/run-3ch22c6w`); Ruff and `git diff --check` passed.
 Tests include either wrong original rejected before any copy opens, first-copy
 mutation during the second stage, failed-child receipt retention and unrelated
-document survival. No paired native invocation has run yet.
+document survival. This offline checkpoint preceded the paired native invocation
+recorded next; it was not itself native proof.
 
 ## Paired native positive control
 

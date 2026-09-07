@@ -1,8 +1,12 @@
 # Silhouette SF insertion boundary control
 
-This diagnostic preserves the failing production identity gate. It does not
+This historical diagnostic preserves the failing silhouette identity gate. It does not
 accept a silhouette because its geometry or persistent-reference bytes match.
 The two native boundary runs below retain the rejection unchanged.
+Both current production SF roles have since migrated to controlled FACE/native
+placement, so neither enrolls in this silhouette-only observer. Spring hook's
+complete native FACE acceptance and the narrower crankshaft results are recorded
+under [Native FACE-placement results](#native-face-placement-results-2026-09-07).
 
 ## Retained failures
 
@@ -33,9 +37,12 @@ therefore a boundary to measure, not an established cause.
 
 ## Added observations
 
-The existing owned full-recipe pilot installs the observer only for the existing
-VIEW-origin JOURNAL/SHANK surface-finish roles. Production functions and their
-acceptance logic remain unchanged.
+The observer supports only the historical VIEW-origin type46 JOURNAL/SHANK
+surface-finish roles. After migration to JOURNAL_FACE/SHANK_FACE, zero current
+`VIEW_ROLES` entries match. Explicit historical test manifests still exercise
+the instrumentation and rejection/ownership controls. This is retained negative
+repro support, not instrumentation claimed to run for current FACE recipes;
+their ordinary VIEW selection/attachment/built/cold guards remain active.
 
 1. `pre_insert_self`: reuse the exact reference bank already obtained by the
    successful selection gate; add native handle/reference self controls.
@@ -79,10 +86,12 @@ referenced objects (0 different, 1 same, -1 unknown in the official example).
 `GetFace`, `GetCurve` and endpoint getters provide the corresponding witnesses.
 No source-context silhouette persistence is assumed.
 
-Run the existing `probe_datum_policy_recipes.py --target spring_hook` (or
-`--target crankshaft`) only with the main agent's explicit native seat grant,
-frozen source/adapter, expected PID and existing disabled-autostart/cache flags.
-There is no new acceptance mode or alternate runner.
+The native silhouette boundary is reproducible from frozen `9ef1f724` in an
+isolated checkout with that revision's pinned source copies and adapter, using
+`probe_datum_policy_recipes.py --target spring_hook` (or `--target crankshaft`).
+Confirm exclusive seat ownership/current PID and use disabled-autostart/cache
+flags. The same commands at the current revision test FACE placement and do not
+activate this historical observer. No alternate acceptance mode was added.
 
 Offline tests:
 
@@ -128,13 +137,14 @@ the retained failure bank now has accepted semantics rather than the previous
 `checked_empty` rejection. That geometry observation does not prove persistent
 object identity and did not bypass the production rejection.
 
-The next candidate is explicit attachment to the already controlled cylindrical
+The subsequent candidate used explicit attachment to the already controlled cylindrical
 FACE with native symbol placement, not relaxed silhouette identity. This matches
 the surface-finish control's physical target while avoiding the need to assert
 that view-returned and annotation-returned silhouette objects share a persistent
-ID. Its native insertion, saved/reopened face identity and printed placement
-still need separate proof. The original silhouette PID/raw-equality tests stay
-unchanged. The integrated four-file diagnostic test run passed 174 tests in
+ID. The native FACE results below supply that separate proof for spring hook;
+crankshaft's recorded partial results retain their stated cold-gate failures.
+The original silhouette PID/raw-equality tests stay unchanged. The integrated
+four-file diagnostic test run passed 174 tests in
 13.84 s (`pytest-telemetry/run-rdhph0pf`).
 
 ## Native FACE-placement results, 2026-09-07

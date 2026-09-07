@@ -324,25 +324,78 @@ def test_reopened_parameter_checks_use_only_fresh_handles(context):
     assert after == before
 
 
-@pytest.mark.parametrize("change", ["value", "precision", "text", "missing_print"])
-def test_cold_and_printed_comparisons_are_exact(context, change):
+@pytest.mark.parametrize(
+    "change,reason",
+    [
+        ("value", "raw source bank changed"),
+        ("text", "imported raw parameter/presentation differs from source"),
+        ("missing_print", "no native printed witness"),
+    ],
+)
+def test_cold_capture_and_printed_boundaries_reject_before_bank_comparison(
+    context, change, reason
+):
     c = context
-    _, before = capture(c)
+    capture(c)
     c.reopen()
     item = c.current.annotations["ShankDia@ShankProfile"]
     if change == "value":
         c.current.parameters["ShankDia@ShankProfile"].GetSystemValue3.return_value = (
             0.002000000000000001,
         )
-    if change == "precision":
-        item.display.GetPrimaryPrecision2 = lambda: 3
     if change == "text":
         item.display.text["1"] = "wrong"
     if change == "missing_print":
         c.printed = lambda: {}
-    with pytest.raises(RuntimeError):
-        _, after = capture(c)
+    with pytest.raises(RuntimeError, match=reason):
+        capture(c)
+
+
+def test_cold_precision_change_reaches_exact_bank_comparison(context):
+    c = context
+    _, before = capture(c)
+    c.reopen()
+    c.current.annotations["ShankDia@ShankProfile"].display.GetPrimaryPrecision2 = (
+        lambda: 3
+    )
+    # Capture/print accept this native field; the separate cold comparison owns
+    # the failure. Keep both reads outside raises so it cannot pass prematurely.
+    _, after = capture(c)
+    with pytest.raises(
+        RuntimeError, match="cold reopen changed exact model-dimension coverage"
+    ):
         c.coverage.compare({"model_dimensions": before}, {"model_dimensions": after})
+
+
+@pytest.mark.parametrize(
+    "change",
+    ["value", "precision", "text", "missing_print", "owner", "tolerance_status"],
+)
+def test_comparison_itself_rejects_changed_complete_banks(context, change):
+    c = context
+    _, before = capture(c)
+    c.reopen()
+    _, after = capture(c)
+    c.coverage.compare({"model_dimensions": before}, {"model_dimensions": after})
+    changed = deepcopy(after)
+    row = changed["dimensions"]["ShankDia@ShankProfile"]
+    if change == "value":
+        row["native"]["value_system"] += 1e-16
+    if change == "precision":
+        row["presentation"]["primary_precision"] += 1
+    if change == "text":
+        row["presentation"]["text"]["1"] = "changed"
+    if change == "missing_print":
+        del row["native_text_values"]
+    if change == "owner":
+        row["view"] = "another view"
+    if change == "tolerance_status":
+        row["native"]["tolerance_max_status"] = 1
+    assert changed != after
+    with pytest.raises(
+        RuntimeError, match="cold reopen changed exact model-dimension coverage"
+    ):
+        c.coverage.compare({"model_dimensions": before}, {"model_dimensions": changed})
 
 
 def test_manifest_cannot_hide_required_geometry_roles(context):
@@ -419,7 +472,7 @@ def test_dimension_only_policy_cannot_hide_an_extra_annotation_role(context, kin
     extra = Annotation("Unexpected", kind=kind)
     extra.GetAttachedEntityCount3 = lambda: 1
     c.current.model.drawing_views[0].annotations.append(extra)
-    with pytest.raises(RuntimeError, match="unexpected.*role"):
+    with pytest.raises(RuntimeError, match=r"unexpected.*role"):
         capture(c)
 
 
@@ -551,7 +604,7 @@ async def test_actual_pilot_composes_declared_bank_and_fresh_cold_readers(
     else:
         with pytest.raises(
             RuntimeError,
-            match="imported source parameter|raw source bank|production gate",
+            match=r"imported source parameter|raw source bank|production gate",
         ):
             await pilot.pilot(
                 c.adapter,

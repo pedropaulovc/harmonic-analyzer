@@ -1,8 +1,10 @@
-"""Observe SF silhouette identity across existing insertion/rebuild boundaries.
+"""Retain the historical SF silhouette insertion/rebuild negative control.
 
 Two small proactive identity banks are necessary to observe pre-failure state.
 Full geometry and fresh role resolution run only after the production validator
 rejects. Nothing here can accept a rejected identity or replace its exception.
+Current spring/journal roles use FACE and deliberately do not enroll here; the
+frozen native repro and explicit historical test manifests retain this path.
 """
 
 from contextlib import contextmanager

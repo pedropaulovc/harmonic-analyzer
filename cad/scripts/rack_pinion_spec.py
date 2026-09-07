@@ -72,7 +72,8 @@ DIMENSION_CALLOUTS = {
     # Reamed slip fit on the stud's turned Ø5 front seat (nominal-or-under, like
     # the arbor journals): min 0.03 diametral clearance, inside the project's
     # 0.025..0.075 shaft-in-bushing policy. Also settles which tolerance-block
-    # row governs the bore (neither .XX +/-0.51 nor DRILLED +0.10/0 -- the
-    # callout's own limits do).
+    # row governs the bore: the source dimension's explicit BORE_DIA_BAND
+    # (+0.05/+0.03 mm), not .XX +/-0.51 or DRILLED +0.10/0. THRU - REAM names
+    # the operation; its text carries no tolerance limits.
     "BoreDia": "THRU - REAM",
 }

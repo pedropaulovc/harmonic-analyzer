@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import ast
 import re
 from pathlib import Path
+
+import pytest
 
 import build_crankshaft as part
 import crankshaft_spec
@@ -110,6 +113,24 @@ def test_linked_notes_define_remaining_operations() -> None:
     assert "def _manufacturing_notes" not in source
 
 
+def _annotation_call(source, helper, label):
+    matches = [
+        node
+        for node in ast.walk(ast.parse(source))
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == helper
+        and any(
+            keyword.arg == "label"
+            and isinstance(keyword.value, ast.Constant)
+            and keyword.value.value == label
+            for keyword in node.keywords
+        )
+    ]
+    assert len(matches) == 1
+    return matches[0], {keyword.arg: keyword.value for keyword in matches[0].keywords}
+
+
 def test_native_finish_and_notes_control_the_turned_shaft() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_datum_feature(") == 2
@@ -119,10 +140,18 @@ def test_native_finish_and_notes_control_the_turned_shaft() -> None:
     assert re.search(r"GetVisibleEntities2\(\s*c,\s*3\s*\)", source)
     assert "face=journal_face" in source
     assert re.search(r"GetVisibleEntities2\(\s*c,\s*4\s*\)", source)
-    assert "journal_face = _visible_cylindrical_face(adapter, right, JOURNAL_DIA)" in source
-    assert "entity=journal_face" in source
+    assert (
+        "journal_face = _visible_cylindrical_face(adapter, right, JOURNAL_DIA)"
+        in source
+    )
+    finish, finish_keywords = _annotation_call(
+        source, "add_surface_finish", "crankshaft bearing-journal finish"
+    )
+    assert [ast.unparse(arg) for arg in finish.args] == ["adapter", "right"]
+    assert ast.unparse(finish_keywords["entity"]) == "journal_face"
+    assert ast.literal_eval(finish_keywords["entity_type"]) == "FACE"
+    assert {"symbol_xy", "edge_xy", "edge_entity"}.isdisjoint(finish_keywords)
     assert "edge_entity=journal_silhouette" not in source
-    assert 'entity_type="FACE"' in source
     assert 'production_method="BEARING JOURNAL"' not in source
     assert crankshaft_spec.SURFACE_FINISHES[0].production_method == "BEARING JOURNAL"
     assert 'surface_finish_by_key(SURFACE_FINISHES, "bearing_journal")' in source
@@ -131,7 +160,13 @@ def test_native_finish_and_notes_control_the_turned_shaft() -> None:
         drawing.FRONT_CENTER[0] + drawing.JOURNAL_DIA * drawing.END_VIEW_SCALE / 2000.0,
         drawing.FRONT_CENTER[1],
     )
-    assert "edge_xy=DATUM_A_RIGHT" in source
+    datum, datum_keywords = _annotation_call(
+        source, "add_datum_feature", "bearing-journal datum axis"
+    )
+    assert [ast.unparse(arg) for arg in datum.args] == ["adapter", "front"]
+    assert ast.literal_eval(datum_keywords["datum"]) == "A"
+    assert ast.unparse(datum_keywords["edge_xy"]) == "DATUM_A_RIGHT"
+    assert {"entity", "edge_entity", "entity_type"}.isdisjoint(datum_keywords)
     assert "entity=shaft_datum_edge" not in source
     assert "shoulder=True" not in source
     assert "position_tolerance_m=0.0001" in source
@@ -167,3 +202,21 @@ def test_part_stamps_make_critical_properties() -> None:
     assert "1018" in str(config["material_specification"])
     assert config["finish"]
     assert int(config["quantity"]) == 1
+
+
+def test_journal_finish_contract_cannot_borrow_an_unrelated_face_literal(monkeypatch):
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    old = 'entity=journal_face,\n        entity_type="FACE",'
+    assert source.count(old) == 1
+    changed = source.replace(old, 'entity=journal_face,\n        entity_type="EDGE",')
+    changed += "\nUNRELATED = 'entity_type=\"FACE\"'\n"
+    original_read = Path.read_text
+
+    def read(path, *args, **kwargs):
+        if path == Path(drawing.__file__):
+            return changed
+        return original_read(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", read)
+    with pytest.raises(AssertionError):
+        test_native_finish_and_notes_control_the_turned_shaft()

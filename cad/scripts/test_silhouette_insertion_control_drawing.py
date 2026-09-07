@@ -8,7 +8,7 @@ import pytest
 
 from diagnostics import _silhouette_insertion_control as control
 from diagnostics import _recipe_view_entity_acceptance as observer
-from diagnostics._recipe_view_roles import ViewRole, ViewResolver
+from diagnostics._recipe_view_roles import VIEW_ROLES, ViewRole, ViewResolver
 from test_owned_native_documents_drawing import native as native
 from test_silhouette_identity_control_drawing import (
     owned_scene as owned_scene,
@@ -167,6 +167,7 @@ def test_failed_predicate_keeps_original_once_and_compares_stored_native_ids(
 def test_secondary_capture_failure_never_masks_original_or_leaks_wrappers(
     scene, monkeypatch, failure
 ):
+    fixture_binding = control._early_bound
     primary = RuntimeError("original native rejection")
     scene.validator.side_effect = primary
     original_same = control.persistent.require_same
@@ -178,18 +179,21 @@ def test_secondary_capture_failure_never_masks_original_or_leaks_wrappers(
         scene.bank.module._shank_silhouette.side_effect = RuntimeError(
             "resolver failed"
         )
-    if failure == "ownership":
-        monkeypatch.setattr(
-            scene.adapter.ownership,
-            "assert_current_owned",
-            Mock(side_effect=RuntimeError("ownership refused")),
-        )
     if failure == "malformed_attachment":
         scene.annotation.GetAttachedEntities3 = lambda: ()
     if failure == "malformed_reference":
         scene.drawing.Extension.GetPersistReference3 = lambda _: memoryview(b"")
-    with pytest.raises(RuntimeError) as raised:
-        run(scene)
+    # Only the injected refusal ends here; fixtures' native binding/style and
+    # ownership doubles must stay installed through the real cleanup checks.
+    with monkeypatch.context() as ownership_fault:
+        if failure == "ownership":
+            ownership_fault.setattr(
+                scene.adapter.ownership,
+                "assert_current_owned",
+                Mock(side_effect=RuntimeError("ownership refused")),
+            )
+        with pytest.raises(RuntimeError) as raised:
+            run(scene)
     assert raised.value is primary
     scene.validator.assert_called_once()
     assert control.persistent.require_same is original_same
@@ -197,10 +201,46 @@ def test_secondary_capture_failure_never_masks_original_or_leaks_wrappers(
     assert control.drawing._validate_explicit_annotation_attachment is scene.validator
     assert rows(scene)["production_predicate"]["original_error"] == repr(primary)
     json.dumps(rows(scene), allow_nan=False)
-    # Restore the deliberately injected ownership refusal before normal cleanup.
-    if failure == "ownership":
-        monkeypatch.undo()
+    assert control._early_bound is fixture_binding
+    assert control.drawing._style_surface_finish is scene.original_style
+    assert control.drawing._validate_explicit_annotation_attachment is scene.validator
     assert_owned_cleanup(scene)
+
+
+def test_current_face_migration_does_not_enroll_historical_silhouette_boundaries():
+    for roles in VIEW_ROLES.values():
+        boundary = control.InsertionBoundaries(NS(roles=roles), object())
+        assert all(not boundary.supports(label) for label in roles)
+    assert (
+        VIEW_ROLES["spring_hook"]["shank seating finish"].resolver
+        is ViewResolver.SHANK_FACE
+    )
+    assert (
+        VIEW_ROLES["crankshaft"]["crankshaft bearing-journal finish"].resolver
+        is ViewResolver.JOURNAL_FACE
+    )
+
+
+@pytest.mark.parametrize("resolver", [ViewResolver.SHANK, ViewResolver.JOURNAL])
+@pytest.mark.parametrize(
+    "kind,annotation_kind",
+    [
+        ("SILHOUETTE", 7),
+        ("FACE", 7),
+        ("SILHOUETTE", 5),
+    ],
+)
+def test_retained_boundary_control_only_accepts_its_historical_sf_manifest(
+    resolver,
+    kind,
+    annotation_kind,
+):
+    role = ViewRole("*Right", annotation_kind, kind, resolver)
+    boundary = control.InsertionBoundaries(NS(roles={"historical": role}), object())
+    assert boundary.supports("historical") is (
+        (kind, annotation_kind) == ("SILHOUETTE", 7)
+    )
+    assert boundary.supports("missing") is False
 
 
 def test_success_never_fresh_resolves_or_captures_full_geometry(scene):
