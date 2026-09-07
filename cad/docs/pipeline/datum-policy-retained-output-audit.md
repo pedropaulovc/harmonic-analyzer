@@ -292,6 +292,20 @@ candidate, retaining the 1:4 isometric, is the next bounded test under the user'
 explicit permission to change drawing layout; native readability and complete
 gates must still be proved.
 
+The 1:2 candidate at `42ccf5a6fc20284f00d841fb8a552117c779d452` also failed
+before save, after **68.5652548 s**, at the earlier GTol column stage. Receipt:
+`cad/out/reports/datum-policy-9v0ujds_/pilot.json`, SHA-256
+`7b5146812d689d104fadc644f64926026b19f1088895e7389a5e88bd8426d5ae`.
+All six attempted rigid column placements were screened for native leader/text
+crossings. In particular, the right and right-up candidates cross the `9.50`
+dimension text with different rows of the four-frame column. This establishes
+failure of the current six-candidate search, not absence of a valid native
+placement. The recipe preserves complete candidate positions, leader segments,
+decorations and crossed text cells in its error evidence for offline replay.
+The four original/guard hashes and owned lever copy remained exact; ownership
+again began/ended empty with no cleanup error. No native/PDF/PNG acceptance or
+speedup is claimed by the shorter failing interval.
+
 ## Next performance target from the completed rocker trace
 
 Trace `0xcd23024b719ec37b6a478e9d28e0d762` attributes 13.538 s and 12.032 s to
