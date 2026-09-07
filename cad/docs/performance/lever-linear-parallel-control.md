@@ -259,3 +259,26 @@ The offline fixture now uses those observed native tuples independently of the
 production mapping. It reproduced the rejection before the correction. Wrong,
 reversed and borrowed tuples remain explicit negative cases. A new native run
 must validate the corrected extraction and its unchanged final layout gates.
+
+### Integrated production spacing passes full recipe and cold reopen
+
+At frozen root `93294cb6` / adapter `e77bfda4` / PID 31860, the owned full
+lever recipe passed with `--factory normal`, without `--linear-dimensions`.
+Receipt `datum-policy-ojk8x6mf/pilot.json`, SHA-256
+`5bf8a1143fd9a643eead3e33cb0183773a6c87ae8100f7df1a1d03944b7bd6e2`,
+records recipe time `140.72933779994491` s and total diagnostic time
+`235.38867210003082` s. The production spacing span took `5.119921` s;
+both pairs retained exact native identities and achieved clearance
+`0.0009999999999999731` m. These times are not a matched fleet comparison.
+
+The unchanged complete recipe gates, saved drawing, source parameter witnesses
+and cold annotation comparison passed; rejected and coordinate-roundoff lists
+are empty. Original/source-copy hashes and runtime input guards remained exact.
+Owned cleanup returned the empty document baseline without recovery. Main's
+inspection of the exported PNG confirmed separated BASIC dimensions, legible
+manufacturing symbols and the revised title block without its earlier overlap.
+
+This validates the production spacing extraction, not the prepared factory:
+that runner's first-miss raw note-extent mismatch is a separate retained failure
+and still needs its own control and successful native run. It is not the full
+`doit -n 4` merge gate.
