@@ -334,3 +334,33 @@ Failure capture was complete with no errors, and owned cleanup restored the
 empty baseline without error. Main's eye review found all five symbols clear
 but the original DWG/REV title-block text overlapping. There is no full-sheet
 visual/cold acceptance or pivot native acceptance from this fulcrum result.
+
+### Both shafts pass with the populated title-block candidate
+
+Frozen root `d8ec09f5` / adapter `e77bfda4`, existing SW PID 31860, ran the
+complete fulcrum then pivot recipes with `--factory prepared` and the project
+template SHA-256 `2b1bbe3dfff265e8bb35ea79f0f9690f808049f5cef764cab8959c1eaee5e849`.
+Receipt `cad/out/reports/datum-policy-7wjzdu9q/pilot.json` has SHA-256
+`f0e7ab9419a1879f3e8852d7737c67997760f913d95e9395662c0635dd2c3a4a`.
+Both trials passed the full recipe, saved native/PDF/PNG artifacts, exact cold
+annotation comparison (no roundoff allowances), and all five explicit entity
+roles before and after reopening: datum A, bearing cylindricity, both end
+perpendicularities and bearing finish. Cold roles were resolved freshly, not
+compared through closed-document handles.
+
+Recipe timers were 23.099 s and 19.035 s; prepared instantiation inside those
+timers was 1.587 s and 1.295 s. The 262.787 s diagnostic total also includes
+separate preparation, source/attachment observations and cold verification.
+These are instrumented functional controls, not an unpaired speedup claim.
+
+Original and owned-copy source hashes stayed exact at every checkpoint, runtime
+guard errors were empty, and cleanup restored the empty baseline without error.
+Main inspected both complete PNGs: all five symbols are readable, and the title,
+drawing number, revision, finish and material no longer overlap. Pivot retains
+long but clear leaders. Fulcrum's previous 4.007 mm title movement is absent;
+the comparison itself was not weakened.
+
+This proves the two recipes with the revised template and prepared constructor.
+The subsequent explicit production factory/runner integration still requires
+its own native boundary check; remaining VIEW/silhouette callers and fleet
+acceptance are not covered by these two drawings.
