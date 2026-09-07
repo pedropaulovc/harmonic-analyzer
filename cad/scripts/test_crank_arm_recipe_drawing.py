@@ -267,8 +267,8 @@ def test_finish_move_preserves_native_z_and_revalidates_exact_attachment(scene, 
     scene.finish.GetAnnotation.assert_called_once_with()
     scene.finish_annotation.GetPosition.assert_called_once_with()
     scene.finish_annotation.SetPosition2.assert_called_once_with(
-        recipe._sheet_x(0.0),
-        recipe.FRONT_CENTER[1] + spec.SHAFT_BORE_DIA * recipe.SHEET_SCALE[0] / 2000,
+        recipe._sheet_x(spec.SHAFT_BORE_DIA * 3.0**0.5 / 4.0),
+        recipe.FRONT_CENTER[1] + spec.SHAFT_BORE_DIA * recipe.SHEET_SCALE[0] / 4000,
         z,
     )
     scene.drawing.EditRebuild3.assert_called_once_with()
@@ -309,7 +309,7 @@ def test_finish_rechecks_source_context_immediately_before_position_mutation(sce
         if fault == "active_document":
             scene.app.ActiveDoc = scene.source
     scene.hooks["finish.GetPosition"] = corrupt
-    with pytest.raises(RuntimeError, match="source|context"):
+    with pytest.raises(RuntimeError, match=r"source|context"):
         scene.run()
     scene.finish_annotation.GetPosition.assert_called_once_with()
     scene.finish_annotation.SetPosition2.assert_not_called()
@@ -339,7 +339,7 @@ def test_finish_rechecks_context_after_move_before_rebuilding(scene, fault):
         if fault == "active_document":
             scene.app.ActiveDoc = scene.source
     scene.hooks["finish.SetPosition2"] = corrupt
-    with pytest.raises(RuntimeError, match="source|context"):
+    with pytest.raises(RuntimeError, match=r"source|context"):
         scene.run()
     scene.finish_annotation.SetPosition2.assert_called_once()
     scene.drawing.EditRebuild3.assert_not_called()

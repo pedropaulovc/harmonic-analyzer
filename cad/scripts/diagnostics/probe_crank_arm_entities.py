@@ -627,7 +627,7 @@ def render_details(pdf, prefix):
 
     windows = {
         "shaft-finish": (0.012, 0.108, 0.094, 0.184),
-        "front-dimensions": (0.065, 0.074, 0.277, 0.164),
+        "front-dimensions": (0.065, 0.074, 0.277, 0.180),
         "stock-datums": (0.267, 0.090, 0.375, 0.165),
         "cross-hole": (0.033, 0.181, 0.196, 0.240),
         "title": (0.260, 0.012, 0.420, 0.073),
