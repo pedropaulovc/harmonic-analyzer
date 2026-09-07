@@ -1,10 +1,11 @@
-"""Fresh linked-title baseline, then ONE redraw candidate only after reproduction.
+"""Fresh linked-title baseline, then ONE chosen update only after reproduction.
 
 Create a project-template drawing with one Front view of an exact, uniquely
 named owned rocker-part bytecopy. Call the production finalizer unchanged.
 Diagnostic wrappers observe the late property and native/PDF save boundaries;
-only the candidate adds GraphicsRedraw2 immediately before native SaveAs3.
-No title setters, geometry picks, extra rebuilds, default changes, or full recipe.
+the explicit candidate adds either GraphicsRedraw2 OR one checked EditRebuild3
+immediately before native SaveAs3. No title setters, geometry picks, other added
+rebuilds, default changes, or full recipe.
 
 Each trial closes all and ONLY owned documents, cold-opens its saved drawing,
 and exports a second PDF without native save or redraw. A candidate is authorized
@@ -13,8 +14,8 @@ pixels in this fresh baseline. A non-reproduction is inconclusive, not success.
 Originals, template and owned source-copy bytes remain exact; full native title
 and annotation deltas are evidence, never normalized into an equality pass.
 
-API references: ISheet.CustomPropertyView, IModelDoc2.GraphicsRedraw2 and the
-official Redraw_Graphics_Example_VB; INote.GetText/PropertyLinkedText/GetExtent/
+API references: ISheet.CustomPropertyView, IModelDoc2.GraphicsRedraw2/EditRebuild3,
+official Redraw_Graphics_Example_VB/Rebuild_Example_VB; INote.GetText/PropertyLinkedText/GetExtent/
 GetTextJustification/GetTextVerticalJustification/LockPosition. GraphicsRedraw2
 is obsolete but documented and already used by this project. This tests its
 known no-argument form, not an inferred missing-rebuild cause.
@@ -59,6 +60,7 @@ FRONT_CENTER, SCALE = (0.180, 0.175), (1.0, 2.0)
 class Variant(StrEnum):
     BASELINE = "baseline"
     REDRAW = "pre_save_redraw"
+    EDIT_REBUILD = "pre_save_edit_rebuild"
 
 
 def require_title_style(before, after):
@@ -173,6 +175,7 @@ class TitleObserver:
             stage
             in {
                 "before_native_save",
+                "after_pre_save_edit_rebuild",
                 "after_native_save",
                 "before_pdf_export",
                 "after_pdf_export",
@@ -202,7 +205,7 @@ def finalizer_observations(adapter, observer, variant):
         common.apply_custom_properties,
         drawing.save_drawing,
     )
-    counts = {"properties": 0, "drawing": 0, "pdf": 0, "redraw": 0}
+    counts = {"properties": 0, "drawing": 0, "pdf": 0, "redraw": 0, "edit_rebuild": 0}
 
     def properties(current, values):
         if (
@@ -237,6 +240,16 @@ def finalizer_observations(adapter, observer, variant):
                     current.currentModel.GraphicsRedraw2()  # Official void/no-arg form.
                 counts["redraw"] += 1
                 observer.record("after_pre_save_redraw")
+            if kind == "drawing" and variant is Variant.EDIT_REBUILD:
+                counts["edit_rebuild"] += 1
+                with _telemetry.span("diagnostic.fresh_title.edit_rebuild") as span:
+                    returned = current.currentModel.EditRebuild3()
+                    span.set_attribute("native_return", repr(returned))
+                    if returned is not True:
+                        raise RuntimeError(
+                            f"pre-save EditRebuild3 did not return True: {returned!r}"
+                        )
+                observer.record("after_pre_save_edit_rebuild")
             with artifact_context(kind, target) if artifact_context else nullcontext():
                 yield
             observer.record(f"after_{phase}")
@@ -252,6 +265,7 @@ def finalizer_observations(adapter, observer, variant):
             "drawing": 1,
             "pdf": 1,
             "redraw": int(variant is Variant.REDRAW),
+            "edit_rebuild": int(variant is Variant.EDIT_REBUILD),
         }
         if counts != expected:
             raise RuntimeError(
@@ -312,13 +326,15 @@ def printed_displacement(before, after):
     }
 
 
-async def run_pair(trial):
+async def run_pair(trial, selected):
+    if not isinstance(selected, Variant) or selected is Variant.BASELINE:
+        raise ValueError("an explicit non-baseline title update candidate is required")
     baseline = await trial(Variant.BASELINE)
     if baseline["printed"]["classification"] != "reproduced":
         return "inconclusive_baseline_not_reproduced"
     if baseline["png_delta"]["changed_pixel_count"] <= 0:
         raise RuntimeError("PDF displacement lacks changed rendered pixels")
-    candidate = await trial(Variant.REDRAW)
+    candidate = await trial(selected)
     if (
         candidate["printed"]["classification"] == "unchanged"
         and candidate["png_delta"]["changed_pixel_count"] == 0
@@ -530,7 +546,7 @@ async def one_trial(adapter, variant, source, directory, report, checkpoint, exp
     return trial
 
 
-async def probe(adapter, source, guard, output_root):
+async def probe(adapter, source, guard, output_root, candidate):
     expected = require_inputs(source, guard)
     output_root.mkdir(parents=True, exist_ok=True)
     directory = Path(tempfile.mkdtemp(prefix="fresh-title-", dir=output_root))
@@ -540,6 +556,7 @@ async def probe(adapter, source, guard, output_root):
     report_path = directory / "title-update.json"
     report = {
         "status": "running",
+        "candidate": candidate.value,
         "inputs_before": expected,
         "trials": [],
         "revision": pilot.benchmark.revision("HEAD"),
@@ -573,7 +590,7 @@ async def probe(adapter, source, guard, output_root):
                 )
             return result
 
-        report["outcome"] = await run_pair(run)
+        report["outcome"] = await run_pair(run, candidate)
         report["status"] = "observed"
     except Exception as error:
         report.update(status="failed", error=repr(error))
@@ -589,6 +606,12 @@ def main(argv=None):
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--guard-source", type=Path, required=True)
     parser.add_argument("--report-root", type=Path, default=ROOT / "cad/out/reports")
+    parser.add_argument(
+        "--candidate",
+        type=Variant,
+        choices=(Variant.REDRAW, Variant.EDIT_REBUILD),
+        required=True,
+    )
     parser.add_argument("--worker", action="store_true")
     args = parser.parse_args(argv)
     require_owned_diagnostic_environment()
@@ -617,6 +640,8 @@ def main(argv=None):
                 str(guard),
                 "--report-root",
                 str(args.report_root.resolve()),
+                "--candidate",
+                args.candidate.value,
                 "--worker",
             ],
             "fresh linked-title update control",
@@ -625,7 +650,9 @@ def main(argv=None):
         )
         return 0
     return run_copy_diagnostic(
-        lambda adapter: probe(adapter, source, guard, args.report_root.resolve())
+        lambda adapter: probe(
+            adapter, source, guard, args.report_root.resolve(), args.candidate
+        )
     )
 
 
