@@ -47,6 +47,7 @@ import sys
 import tempfile
 import time
 from types import SimpleNamespace
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
@@ -58,6 +59,7 @@ from diagnostics import probe_datum_shoulder as shoulder  # noqa: E402
 from diagnostics import probe_drawing_attachments as attachments  # noqa: E402
 from diagnostics.probe_source_basic_dimensions import part_dimensions  # noqa: E402
 from diagnostics._owned_native_documents import DocumentKind, run_copy_diagnostic  # noqa: E402
+from diagnostics._owned_native_documents import save_drawing as owned_save_drawing  # noqa: E402
 from diagnostics._owned_native_session import require_owned_diagnostic_environment  # noqa: E402
 from diagnostics._reopen_annotation_comparison import compare_reopened_annotations  # noqa: E402
 from diagnostics._recipe_acceptance_targets import TARGETS  # noqa: E402
@@ -776,6 +778,10 @@ async def pilot(
                         DocumentKind.DRAWING, module.OUTPUTS.slddrw
                     ):
                         with (
+                            # Complete native rename ownership before source
+                            # after-banks; the creation scope exits too late.
+                            # LEGACY leaves this base intact, modern overrides it.
+                            patch("_drawing_common.save_drawing", owned_save_drawing),
                             save_control,
                             (
                                 callout_control.observe()
