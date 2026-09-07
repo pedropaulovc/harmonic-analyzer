@@ -5,12 +5,16 @@ feature. Cached display handles are checked against freshly resolved IDimensions
 at every boundary. This is not a complete source annotation/BREP inventory.
 Disk drift is recorded here, not authorized: the pilot's existing after_recipe
 and final immutable-copy gates still reject it after retaining both save banks.
+The selected drawing_reader arm additionally brackets eight remaining loaded
+alignment-recipe calls; it does not instrument internal calls or add mutations.
+The default observer retains its original four stages and nine capture banks.
 """
 
 from contextlib import contextmanager, nullcontext
 from enum import StrEnum
 from functools import wraps
 from pathlib import Path
+import inspect
 import math
 import sys
 import time
@@ -26,6 +30,19 @@ class SourceObservation(StrEnum):
 
 
 STAGES = ("callouts", "precision", "native_save", "pdf_export")
+# Loaded alignment recipe calls after precision; not operations inside common
+# helpers. The two note invocations have distinct occurrence labels. Only the
+# explicitly selected drawing_reader arm observes these additional boundaries.
+DRAWING_OPERATIONS = (
+    "auto_center_marks",
+    "visible_circle_edge",
+    "add_datum_feature",
+    "add_feature_control_frame",
+    "add_surface_finish",
+    "add_property_linked_note",
+    "add_property_linked_note",
+    "finalize_drawing",
+)
 DIMENSION = "ArborBoreDia@ArborBoreProfile"
 
 
@@ -48,6 +65,7 @@ class SourceSaveBoundaries:
         self.drawing_reader = drawing_reader
         self.checkpoint = checkpoint
         self.stages = []
+        self.drawing_operations = []
         self.display = None
         self.initial_tolerance = None
         self.initial_display_type = None
@@ -210,6 +228,12 @@ class SourceSaveBoundaries:
         ):
             raise RuntimeError("source boundary operation order/count changed")
         self.stages.append(label)
+        with self._operation_observation(label):
+            yield
+
+    @contextmanager
+    def _operation_observation(self, label):
+        """One read pair for either a required save stage or selected helper."""
         self.capture(f"before_{label}")
         try:
             yield
@@ -230,12 +254,61 @@ class SourceSaveBoundaries:
                 )
 
     @contextmanager
+    def _drawing_boundary(self, name):
+        index = len(self.drawing_operations)
+        if (
+            self.stages != list(STAGES[:2])
+            or index >= len(DRAWING_OPERATIONS)
+            or name != DRAWING_OPERATIONS[index]
+        ):
+            raise RuntimeError("source drawing operation order/count changed")
+        self.drawing_operations.append(name)
+        label = f"drawing.{name}#{self.drawing_operations.count(name)}"
+        with self._operation_observation(label):
+            yield
+
+    def _drawing_originals(self):
+        if self.drawing_reader is None:
+            return {}
+        originals = {}
+        for name in dict.fromkeys(DRAWING_OPERATIONS):
+            original = getattr(self.module, name, None)
+            if not callable(original) or inspect.iscoroutinefunction(original) != (
+                name == "finalize_drawing"
+            ):
+                raise RuntimeError(f"selected drawing helper shape changed: {name}")
+            originals[name] = original
+        self.report["drawing_operations"] = self.drawing_operations
+        return originals
+
+    def _wrap_drawing_operation(self, name, original):
+        if name == "finalize_drawing":
+            @wraps(original)
+            async def finalize(adapter, *args, **kwargs):
+                if adapter is not self.adapter:
+                    raise RuntimeError("source drawing operation changed adapter")
+                with self._drawing_boundary(name):
+                    return await original(adapter, *args, **kwargs)
+
+            return finalize
+
+        @wraps(original)
+        def call(adapter, *args, **kwargs):
+            if adapter is not self.adapter:
+                raise RuntimeError("source drawing operation changed adapter")
+            with self._drawing_boundary(name):
+                return original(adapter, *args, **kwargs)
+
+        return call
+
+    @contextmanager
     def observe(self):
         self.capture("initial")
         originals = {
             name: getattr(self.module, name)
             for name in ("set_dimension_callouts", "set_dimension_precision")
         }
+        drawing_originals = self._drawing_originals()
         original_save = drawing.save_drawing
 
         def wrapped(label, original):
@@ -280,10 +353,14 @@ class SourceSaveBoundaries:
                 if getattr(drawing, name) is not original:
                     raise RuntimeError("source boundary recipe helper alias changed")
                 setattr(self.module, name, wrapped(label, original))
+            for name, original in drawing_originals.items():
+                setattr(self.module, name, self._wrap_drawing_operation(name, original))
             drawing.save_drawing = save
             yield
         finally:
             for name, original in originals.items():
+                setattr(self.module, name, original)
+            for name, original in drawing_originals.items():
                 setattr(self.module, name, original)
             drawing.save_drawing = original_save
 
@@ -292,3 +369,7 @@ class SourceSaveBoundaries:
             raise RuntimeError(
                 "source boundary control did not observe all four operations"
             )
+        if self.drawing_reader is not None and self.drawing_operations != list(
+            DRAWING_OPERATIONS
+        ):
+            raise RuntimeError("source boundary did not observe all drawing operations")
