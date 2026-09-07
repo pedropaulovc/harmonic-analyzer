@@ -14,6 +14,7 @@ import math
 from _common import _early_bound
 import _drawing_silhouette_identity as persistent
 from diagnostics import _bsurface_attachment_witness as bsurface
+from diagnostics import _silhouette_bcurve_witness as bcurve
 
 
 def finite_array(raw, size, *, label):
@@ -80,6 +81,7 @@ def _curve_read(curve, method, evidence):
 
 def snapshot(app, view, entity, *, evidence=None):
     """Return raw supported geometry plus the native face handle for live checks."""
+    curve_control = bcurve.curve_control_from_environment()
     if entity is None:
         raise RuntimeError("silhouette attachment is null")
     silhouette = _early_bound(entity, "ISilhouetteEdge")
@@ -97,9 +99,18 @@ def snapshot(app, view, entity, *, evidence=None):
     if raw_curve is None:
         raise RuntimeError("silhouette curve is null")
     curve = _early_bound(raw_curve, "ICurve")
-    is_line = bool(_curve_read(curve, "IsLine", evidence))
-    is_circle = bool(_curve_read(curve, "IsCircle", evidence))
-    if is_line == is_circle:
+    raw_line = _curve_read(curve, "IsLine", evidence)
+    raw_circle = _curve_read(curve, "IsCircle", evidence)
+    is_line, is_circle = bool(raw_line), bool(raw_circle)
+    if (
+        curve_control is bcurve.CurveControl.BCURVE_3005
+        and raw_line is False and raw_circle is False
+    ):
+        params = bcurve.snapshot(
+            curve, evidence.setdefault("bcurve", {}) if evidence is not None else {}
+        )
+        curve_kind = curve_control.value
+    elif is_line == is_circle:
         primary = RuntimeError("unsupported or contradictory silhouette curve kind")
         if evidence is not None:
             try:
@@ -111,11 +122,13 @@ def snapshot(app, view, entity, *, evidence=None):
                 # failed independently and must remain the primary rejection.
                 pass
         raise primary
-    field, size = ("LineParams", 6) if is_line else ("CircleParams", 7)
-    params = finite_array(getattr(curve, field), size, label=field)
-    _nonzero(params[3:6], field)
-    if is_circle and params[6] <= 0:
-        raise RuntimeError(f"{field}: non-positive native radius {params[6]}")
+    else:
+        field, size = ("LineParams", 6) if is_line else ("CircleParams", 7)
+        params = finite_array(getattr(curve, field), size, label=field)
+        _nonzero(params[3:6], field)
+        if is_circle and params[6] <= 0:
+            raise RuntimeError(f"{field}: non-positive native radius {params[6]}")
+        curve_kind = "line" if is_line else "circle"
     points = []
     for field in ("GetStartPoint", "GetEndPoint"):
         point = getattr(silhouette, field)()
@@ -127,7 +140,7 @@ def snapshot(app, view, entity, *, evidence=None):
     if is_line and points[0] == points[1]:
         raise RuntimeError("silhouette line has coincident endpoints")
     return {
-        "curve_kind": "line" if is_line else "circle",
+        "curve_kind": curve_kind,
         "curve_parameters": params,
         "start": points[0],
         "end": points[1],
