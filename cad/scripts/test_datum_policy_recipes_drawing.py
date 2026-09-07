@@ -378,11 +378,7 @@ def test_source_dimensions_use_production_manifest_and_read_only_native_owner(
             ActiveConfiguration=SimpleNamespace(Name="Default")
         ),
     )
-    expected = (
-        probe.DRAWING_DIMENSIONS
-        if target == "channel_lever"
-        else probe.ROCKER_DIMENSIONS
-    )
+    expected = probe.TARGETS[target].dimensions
 
     def part_dimensions(adapter, actual_path, configuration, *, targets):
         assert adapter.currentModel is model
@@ -415,7 +411,7 @@ def test_source_missing_basic_designation_fails_instead_of_reauthoring(
     )
     rows = {
         f"{name}@{feature}": {"tolerance_type": 0}
-        for feature, names in probe.DRAWING_DIMENSIONS.items()
+        for feature, names in probe.TARGETS["channel_lever"].dimensions.items()
         for name in names
     }
     monkeypatch.setattr(probe, "part_dimensions", lambda *args, **kwargs: (rows, {}))
