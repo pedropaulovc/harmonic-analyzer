@@ -521,6 +521,8 @@ async def test_owned_control_exports_failures_but_never_saves_original_or_ignore
     assert report["status"] == expected_status
     assert report["inputs_before"] == report["inputs_after"]
     assert report["visual_review"] == "pending"
+    if arrangement is not None:
+        assert f"one native {probe.PMI_SPACING_COMMANDS[arrangement]} spacing command" in report["scope"]
     if arrangement is None or mode in {
         "missing_pmi",
         "view_creation_failed",
