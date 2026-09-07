@@ -220,6 +220,62 @@ await place_component(adapter, part, p, r, q)
     ) == {"rocker_arm", "rocker_arm_support"}
 
 
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        (
+            "SPECS = {}\nSPECS['main'] = 'rocker-arm'\n"
+            "async def build(adapter):\n"
+            "    await place_component(adapter, SPECS['main'], p, r, q)\n"
+            "SPECS['main'] = 'rocker-arm-support'\n",
+            {"rocker_arm", "rocker_arm_support"},
+        ),
+        (
+            "SPECS = {}\nSPECS['main'] = 'rocker-arm'\n"
+            "await place_component(adapter, SPECS['main'], p, r, q)\n"
+            "SPECS['main'] = 'rocker-arm-support'\n",
+            {"rocker_arm"},
+        ),
+        (
+            "async def build(adapter):\n"
+            "    specs = {}\n    specs['main'] = 'rocker-arm'\n"
+            "    await place_component(adapter, specs['main'], p, r, q)\n"
+            "    specs['main'] = 'rocker-arm-support'\n",
+            {"rocker_arm"},
+        ),
+        (
+            "specs = {}\nspecs['main'] = 'rocker-arm'\n"
+            "specs['main'] = 'rocker-arm-support'; "
+            "await place_component(adapter, specs['main'], p, r, q)\n",
+            {"rocker_arm", "rocker_arm_support"},
+        ),
+        (
+            "specs = {}\nspecs['main'] = 'rocker-arm'\n"
+            "await place_component(adapter, specs['main'], p, r, q); "
+            "specs['main'] = 'rocker-arm-support'\n",
+            {"rocker_arm"},
+        ),
+    ],
+)
+def test_keyed_source_writes_respect_scope_and_statement_order(
+    tmp_path, monkeypatch, source, expected
+):
+    assert _source_references(
+        tmp_path, monkeypatch, source, ("rocker_arm", "rocker_arm_support")
+    ) == expected
+
+
+def test_late_global_keyed_source_write_cannot_hide_unknown_value(tmp_path, monkeypatch):
+    source = (
+        "SPECS = {}\nSPECS['main'] = 'rocker-arm'\n"
+        "async def build(adapter):\n"
+        "    await place_component(adapter, SPECS['main'], p, r, q)\n"
+        "SPECS['main'] = runtime_part()\n"
+    )
+    with pytest.raises(ValueError, match=r"[Uu]nresolved assembly source"):
+        _source_references(tmp_path, monkeypatch, source)
+
+
 def test_later_module_manifest_appends_are_not_silently_lost(tmp_path, monkeypatch):
     source = """parts = []
 async def build(adapter):
