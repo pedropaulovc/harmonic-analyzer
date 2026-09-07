@@ -567,9 +567,17 @@ def digest_trial(monkeypatch):
         adapter.currentModel.Extension.NeedsRebuild2 = state.status_after_rebuild
         return state.rebuilt
 
-    async def properties():
+    original_model = adapter.currentModel
+
+    def properties(caller, *, expected_model: object, expected_configuration: str):
+        assert caller is adapter
+        assert expected_model is original_model
+        assert expected_configuration == configuration.Name
         calls.append(("mass", configuration.Name))
-        return SimpleNamespace(is_success=True, data=mass)
+        return mass
+
+    def forbidden_mass_read():
+        pytest.fail("geometry digest must not call the rebuilding adapter mass reader")
 
     def component_list(top_only):
         calls.append(("poses", configuration.Name, top_only))
@@ -577,10 +585,11 @@ def digest_trial(monkeypatch):
 
     adapter.list_configurations = configs
     adapter.set_active_configuration = activate
-    adapter.get_mass_properties = properties
+    adapter.get_mass_properties = forbidden_mass_read
     adapter.currentModel.ForceRebuild3 = rebuild
     adapter.currentModel.GetComponents = component_list
     monkeypatch.setattr(_assembly, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(_assembly, "read_resolved_mass_properties", properties)
     return SimpleNamespace(
         digest=lambda: asyncio.run(_assembly.assembly_geometry_digest(adapter, "test-assembly")),
         adapter=adapter, calls=calls, state=state, configuration=configuration,

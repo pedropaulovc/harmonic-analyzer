@@ -2,8 +2,8 @@
 
 Batch B follows accepted Batch A, `aff115c4` (native candidate `840b0a42`),
 on branch `perf/assembly-mass-read`. The adapter remains
-`e77bfda4de1962625da8a9a859eb0bbaf1e6f10f`. Stationary comparison passed;
-changed-part and production acceptance remain pending.
+`e77bfda4de1962625da8a9a859eb0bbaf1e6f10f`. Stationary and real changed-part
+comparisons passed; production assembly acceptance remains pending.
 Portfolio status belongs on the [project](https://github.com/users/pedropaulovc/projects/1).
 
 ## Hypothesis and scope
@@ -225,3 +225,61 @@ Full failed attempt and passed control evidence:
 Its 39 closed control hashes permit a guarded resume after checking native bytes,
 source/adapter identity, sidecars, original-file preservation and reference closure.
 The failed attempt remains part of reliability accounting.
+
+### Resumed fixture: real dependent-part comparison passed
+
+Frozen source `fd973ea2e6ebf8c35bbefa85b6648767de5bedd2`, same adapter/PID.
+Run: 2026-09-07 05:49:55.716734 UTC to 06:10:16.728693 UTC,
+1221.014597 s wall, exit 0. Resume validated the previous control's native hashes,
+source/adapter, original outputs, sidecars and complete closed reference closure
+in 0.238168 s; it never opened or rewrote that preserved control.
+
+```powershell
+uv run python cad/scripts/diagnostics/probe_assembly_part_change.py --control-report cad/out/reports/assembly-part-change-2swnolqp/measurements.json
+```
+
+Both independent copied parts passed the unchanged-value equation control,
+6.125→6.225 mm bore update, strict save and cold part reopen. Observed volume
+loss was 56.258100617 mm³ versus 56.258070444 mm³ analytical prediction.
+
+| Phase | Baseline seconds | Candidate seconds |
+| --- | ---: | ---: |
+| Real changed-part assembly refresh, including witnesses/gates/save/render | 416.280623 | 325.828321 |
+| Observed mass read within that refresh, including pose witness | 134.000704 | 3.527803 |
+| Independent cold verification, including rebuild and all gates | 285.765874 | 168.229211 |
+| Observed cold mass read, including pose witness | 136.652966 | 4.597882 |
+
+All 13 attempted phases passed. Both variants ran DOF, interference and health;
+both reopened clean before the independent checked solve. Their complete changed
+fingerprint was exactly `c18923927f548bdfd59c9f711b50d0a3f5f064c1c9a5f8718f1a3245f02cac8e`,
+different from the unchanged control. Raw A/B mass properties matched under the
+original strict comparison, and all component poses matched the control. No
+auto-repair, retry, crash or recovery occurred. All 254 original native files and
+hidden sidecars retained exact SHA-256 values and path membership.
+
+This is one changed-input trial per variant, not a repeated speed estimate.
+It complements the six stationary successes per variant rather than replacing
+their alternating-order evidence. The earlier failed attempt remains failed.
+
+Raw report: `cad/out/reports/assembly-part-change-ppyufwir/measurements.json`,
+SHA-256 `c2770de0f6b9fe23f3ff24a19f8f34e0e5f3a3295e1a00ce67801d6fc964a4c6`.
+Trace `0x23655ca6ff077f29d26863eadfb9c46b`: 79 spans, zero errors,
+1219.858695 s task time. Exclusive profile:
+`cad/out/reports/assembly-mass-read/part-change-profile.json`, SHA-256
+`447c060a4d9f6ee29dda986a24fc6de29315c3b48270dce680febb143dd50db3`.
+
+## Production integration
+
+`assembly_geometry_digest` now captures its expected native document and calls
+the statically imported assembly-only direct reader after the callers' checked
+solve. Explicit configuration/rest rebuilds, pose rows, rounding, fingerprint
+decisions and all validation/save gates remain unchanged. The adapter is not
+modified. The helper checks active/current document identity, exact configuration
+and clean rebuild state before and after reading the same legacy mass API; a
+missing, malformed or nonfinite result fails without a fallback.
+
+The helper is a real transitive construction/refresh input of all eight assemblies,
+not a verify-only module hidden from recipe discovery. Production acceptance,
+same-recipe child-identity propagation and the final zero-COM no-op follow this
+code-complete checkpoint. The primary agent still owns the full drawing-inclusive
+stack gate; every PR still requires its own clean Codex review.

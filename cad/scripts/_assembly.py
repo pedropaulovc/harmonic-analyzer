@@ -14,6 +14,7 @@ from typing import Any
 
 import _config
 import _telemetry
+from _assembly_mass_properties import read_resolved_mass_properties
 from _common import (
     DEFAULT_VIEWS,
     FULLY_CONSTRAINED,
@@ -2489,6 +2490,7 @@ async def assembly_geometry_digest(adapter: Any, asm_name: str) -> str:
     colours that matter are applied at assembly scope via ``apply_component_color``
     (the FULL path -> recipe change -> save), so this only bites a bare part recolour;
     force a rebuild (delete the .SLDASM target) if one must propagate up."""
+    expected_model = adapter.currentModel
     configs = check("list configurations", await adapter.list_configurations())
     rest = "Default" if "Default" in configs else (configs[0] if configs else None)
     # Only switch configs for a genuinely multi-config assembly. A config switch
@@ -2527,13 +2529,11 @@ async def assembly_geometry_digest(adapter: Any, asm_name: str) -> str:
         async with _telemetry.aspan(
             "geometry_digest.mass_properties", configuration=cfg
         ):
-            res = await adapter.get_mass_properties()
-        if not res.is_success:
-            raise RuntimeError(
-                f"{asm_name}: get_mass_properties failed for config {cfg!r}: "
-                f"{res.error}"
+            # Save/refresh already checked the final solve; switched configs are
+            # explicitly solved above. Do not repeat a whole-model rebuild here.
+            mp = read_resolved_mass_properties(
+                adapter, expected_model=expected_model, expected_configuration=cfg
             )
-        mp = res.data
         moi = mp.moments_of_inertia
         rows.append(
             (
