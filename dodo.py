@@ -2189,7 +2189,6 @@ def task_check():
         # Drawing infrastructure and cross-sheet contracts do not follow the
         # per-sheet test_*_drawing.py suffix, so enroll them explicitly.
         SCRIPTS_DIR / "test_drawing_marks.py",
-        SCRIPTS_DIR / "test_cone_drawing_batch_contract.py",
         SCRIPTS_DIR / "test_fastener_catalog.py",
         # Fleet-wide manufacturing ownership/validation contracts are standalone
         # tests rather than one-file-per-drawing tests, so the glob below cannot
@@ -2217,12 +2216,10 @@ def task_check():
         # the one-file-per-drawing discovery pattern above.
         SCRIPTS_DIR / "test_fastener_drawing_metadata.py",
         SCRIPTS_DIR / "test_remaining_fastener_drawings.py",
-        SCRIPTS_DIR / "test_pen_summing_drawing_batch_contract.py",
-        # Was omitted while its two siblings above were enrolled, so NO gate ran
-        # it: converting channel to a three-view diagram left it reading
-        # attributes the sheet no longer defines, and every check:* gate stayed
-        # green (codex #416). Enrolled so the cross-sheet contracts are covered.
-        SCRIPTS_DIR / "test_assembly_drawing_batch_contract.py",
+        # Discover every cross-sheet batch, not a manually maintained subset.
+        # Gear was omitted after assembly's earlier omission (#416), leaving a
+        # stale cone-gear selector contract invisible to a green recipe gate.
+        *sorted(SCRIPTS_DIR.glob("test_*_drawing_batch_contract.py")),
     ]
     # test_out_param_binding SCANS sources instead of importing them (it reads
     # every top-level build script and every diagnostics/*.py looking for
