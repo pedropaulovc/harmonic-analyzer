@@ -5,6 +5,11 @@ trial native saves or model-linked-title acceptance. Optional printed-format
 comparison exports PDF/PNG for each trial without saving the drawing. Only the production
 MISS saves one owned DRWDOT. Requires frozen source, AUTOSTART=0, remote cache off,
 an explicit existing SW PID and the parent machine-global COM seat.
+
+The explicit accessor_only scope instead executes one real preparation accessor:
+no preliminary normal drawing, factory trial, extra CREATE-exit viewport restore
+or printed comparison. Its default capture_only frame policy adds raw getters,
+not setters; it preserves the production no-resize failure for diagnosis.
 """
 
 from __future__ import annotations
@@ -47,6 +52,37 @@ class PrintedFormat(StrEnum):
 class Viewport(StrEnum):
     NORMAL = "normal"
     CAPTURED = "captured"
+
+
+class Scope(StrEnum):
+    CACHE_MISS_HIT = "cache_miss_hit"
+    ACCESSOR_ONLY = "accessor_only"
+
+
+def frame_selection(scope, policy, viewport, printed_format):
+    if not isinstance(scope, Scope):
+        raise ValueError("probe scope requires an explicit enum")
+    if policy is None:
+        policy = (
+            frames.FramePolicy.CAPTURE_ONLY
+            if scope is Scope.ACCESSOR_ONLY
+            else frames.FramePolicy.UNCHANGED
+        )
+    if not isinstance(policy, frames.FramePolicy):
+        raise ValueError("frame control requires an explicit policy enum")
+    if scope is Scope.ACCESSOR_ONLY:
+        if viewport is not Viewport.NORMAL or printed_format is not PrintedFormat.SKIP:
+            raise ValueError(
+                "accessor_only forbids preliminary viewport restoration and printed trials"
+            )
+        return policy
+    if policy is frames.FramePolicy.MEASURED_RESTORE and (
+        viewport is not Viewport.CAPTURED or printed_format is not PrintedFormat.COMPARE
+    ):
+        raise ValueError(
+            "measured_restore requires captured viewport and printed comparison"
+        )
+    return policy
 
 
 def require_environment(expected_pid):
@@ -273,7 +309,8 @@ async def probe(
     *,
     printed_format=PrintedFormat.SKIP,
     viewport=Viewport.NORMAL,
-    frame_policy=frames.FramePolicy.UNCHANGED,
+    frame_policy=None,
+    scope=Scope.CACHE_MISS_HIT,
     failure_receipt=None,
     failure_receipt_sha256=None,
 ):
@@ -281,16 +318,13 @@ async def probe(
         raise ValueError("printed format requires an explicit policy enum")
     if not isinstance(viewport, Viewport):
         raise ValueError("viewport requires an explicit policy enum")
-    if frame_policy is frames.FramePolicy.MEASURED_RESTORE and (
-        viewport is not Viewport.CAPTURED or printed_format is not PrintedFormat.COMPARE
-    ):
-        raise ValueError(
-            "measured_restore requires captured viewport and printed comparison"
-        )
+    frame_policy = frame_selection(scope, frame_policy, viewport, printed_format)
     original = sheet_setup.PROJECT_DRWDOT.resolve(strict=True)
     failure_pin = frames.failure_input(
         frame_policy, spec, original, failure_receipt, failure_receipt_sha256
     )
+    if scope is Scope.ACCESSOR_ONLY and failure_pin is None:
+        raise ValueError("accessor_only requires pinned production failure inputs")
     require_environment(expected_pid)
     if int(adapter.swApp.GetProcessID()) != expected_pid:
         raise RuntimeError(
@@ -301,6 +335,8 @@ async def probe(
         and str(adapter.swApp.RevisionNumber()) != failure_pin["solidworks_revision"]
     ):
         raise RuntimeError("frame control native revision differs from failure receipt")
+    if scope is Scope.ACCESSOR_ONLY and prepared._documents(adapter.swApp):
+        raise RuntimeError("accessor_only requires empty initial documents")
     report_root.mkdir(parents=True, exist_ok=True)
     directory = Path(
         tempfile.mkdtemp(prefix="prepared-template-cache-", dir=report_root)
@@ -314,7 +350,7 @@ async def probe(
     original_sha = prepared._sha(original)
     report = {
         "status": "running",
-        "phase": "normal_setup",
+        "phase": "preparation" if scope is Scope.ACCESSOR_ONLY else "normal_setup",
         "expected_pid": expected_pid,
         "revision": subprocess.run(
             ["git", "rev-parse", "HEAD"],
@@ -323,7 +359,10 @@ async def probe(
             text=True,
             cwd=ROOT,
         ).stdout.strip(),
-        "scope": "blank_setup_cache_miss_hit_only",
+        "scope": "production_preparation_accessor_only"
+        if scope is Scope.ACCESSOR_ONLY
+        else "blank_setup_cache_miss_hit_only",
+        "sequence": scope.value,
         "printed_format": printed_format.value,
         "viewport": viewport.value,
         "frame_policy": frame_policy.value,
@@ -338,7 +377,11 @@ async def probe(
         "operation_scopes": [],
         "guards": [],
         "timing_scope": "accessor timing includes its input/hash/receipt work and, on miss, native preparation/witness/cleanup; setup timer includes the inner factory and its native adapter assignment; outer ownership checks, full raw witnesses, cleanup and explicit guards are separately timed",
-        "claim_scope": "one observed blank setup/miss/hit sequence and raw-default agreement; not ABBA, full sheet-format sketch/logo preservation, end-to-end speedup, model-linked title acceptance or conflict probability",
+        "claim_scope": (
+            "one production accessor, two owned blank creations and one DRWDOT save; no preliminary normal drawing, CREATE-exit viewport setters, cache-hit/factory/printed trial or PDF/PNG claim; attach-only initialization and ownership readbacks differ from production connection"
+            if scope is Scope.ACCESSOR_ONLY
+            else "one observed blank setup/miss/hit sequence and raw-default agreement; not ABBA, full sheet-format sketch/logo preservation, end-to-end speedup, model-linked title acceptance or conflict probability"
+        ),
     }
     report_path = directory / "measurements.json"
     cached = {}
@@ -445,11 +488,15 @@ async def probe(
         controls.enter_context(
             frames.intercept(adapter, frame_policy, report["frame_control"])
         )
-        guard("before_normal")
-        normal = await run_trial("normal", None, None)
-        if viewport is Viewport.CAPTURED:
-            report["captured_viewport"] = report["trials"][0]["viewport"]
-        for access_kind in ("miss", "hit"):
+        normal = None
+        if scope is Scope.CACHE_MISS_HIT:
+            guard("before_normal")
+            normal = await run_trial("normal", None, None)
+            if viewport is Viewport.CAPTURED:
+                report["captured_viewport"] = report["trials"][0]["viewport"]
+        for access_kind in (
+            ("miss",) if scope is Scope.ACCESSOR_ONLY else ("miss", "hit")
+        ):
             report["phase"] = access_kind
             guard("before_" + access_kind)
             start_scopes = len(report["operation_scopes"])
@@ -503,9 +550,16 @@ async def probe(
                 native_receipt = json.loads(
                     (entry.directory / "receipt.json").read_text(encoding="utf-8")
                 )
-                with timed(row, "normal_comparison_seconds"):
-                    compare_defaults(normal, native_receipt["before"])
-                    compare_defaults(normal, native_receipt["after"])
+                comparison_timer = (
+                    "preparation_comparison_seconds"
+                    if scope is Scope.ACCESSOR_ONLY
+                    else "normal_comparison_seconds"
+                )
+                with timed(row, comparison_timer):
+                    if normal is not None:
+                        compare_defaults(normal, native_receipt["before"])
+                        compare_defaults(normal, native_receipt["after"])
+                    compare_defaults(native_receipt["before"], native_receipt["after"])
                 row["status"] = "passed"
             except Exception as error:
                 row.update(status="failed", error=repr(error))
@@ -513,7 +567,8 @@ async def probe(
             finally:
                 checkpoint()
             guard("after_" + access_kind)
-            await run_trial("prepared_" + access_kind, entry, normal)
+            if scope is Scope.CACHE_MISS_HIT:
+                await run_trial("prepared_" + access_kind, entry, normal)
     except Exception as error:
         report["error"] = repr(error)
         errors.append(error)
@@ -552,13 +607,16 @@ def main(argv=None):
     parser.add_argument("--scale", type=float, nargs=2, default=(2.0, 1.0))
     parser.add_argument("--decimals", type=int, choices=(2, 3), default=2)
     parser.add_argument(
+        "--scope", type=Scope, choices=tuple(Scope), default=Scope.CACHE_MISS_HIT
+    )
+    parser.add_argument(
         "--viewport", type=Viewport, choices=tuple(Viewport), default=Viewport.NORMAL
     )
     parser.add_argument(
         "--frame-policy",
         type=frames.FramePolicy,
         choices=tuple(frames.FramePolicy),
-        default=frames.FramePolicy.UNCHANGED,
+        default=None,
     )
     parser.add_argument("--failure-receipt", type=Path)
     parser.add_argument("--failure-receipt-sha256")
@@ -577,13 +635,18 @@ def main(argv=None):
     args = parser.parse_args(argv)
     require_environment(args.expected_pid)
     spec = prepared.TemplateSpec(tuple(args.scale), args.decimals)
-    frames.failure_input(
+    args.frame_policy = frame_selection(
+        args.scope, args.frame_policy, args.viewport, args.printed_format
+    )
+    failure_pin = frames.failure_input(
         args.frame_policy,
         spec,
         sheet_setup.PROJECT_DRWDOT,
         args.failure_receipt,
         args.failure_receipt_sha256,
     )
+    if args.scope is Scope.ACCESSOR_ONLY and failure_pin is None:
+        raise ValueError("accessor_only requires pinned production failure inputs")
     if args.worker:
         return ownership.run_copy_diagnostic(
             lambda adapter: probe(
@@ -594,6 +657,7 @@ def main(argv=None):
                 printed_format=args.printed_format,
                 viewport=args.viewport,
                 frame_policy=args.frame_policy,
+                scope=args.scope,
                 failure_receipt=args.failure_receipt,
                 failure_receipt_sha256=args.failure_receipt_sha256,
             )
@@ -622,6 +686,8 @@ def main(argv=None):
             args.printed_format.value,
             "--viewport",
             args.viewport.value,
+            "--scope",
+            args.scope.value,
             *frame_arguments,
             "--report-root",
             str(args.report_root.resolve()),
