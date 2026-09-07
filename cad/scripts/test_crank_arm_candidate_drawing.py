@@ -396,6 +396,7 @@ def candidate(tmp_path, monkeypatch):
     monkeypatch.setattr(owned, "save_drawing", save)
     monkeypatch.setattr(exports, "export_pdf_only", export)
     monkeypatch.setattr(drawing, "render_pdf_png", lambda *args: None)
+    monkeypatch.setattr(probe, "render_details", lambda *args: {})
     monkeypatch.setattr(
         drawing, "_drawing_entity_in_source", lambda view, entity, **kwargs: entity
     )

@@ -576,6 +576,43 @@ def save_moved_drawing(adapter, path):
     return result
 
 
+def render_details(pdf, prefix):
+    """Rasterize native vector-PDF detail windows, without altering any geometry."""
+    import pypdfium2 as pdfium
+
+    windows = {
+        "shaft-finish": (0.012, 0.108, 0.094, 0.184),
+        "front-dimensions": (0.065, 0.074, 0.277, 0.164),
+        "stock-datums": (0.267, 0.090, 0.375, 0.165),
+        "cross-hole": (0.033, 0.181, 0.196, 0.240),
+        "title": (0.260, 0.012, 0.420, 0.073),
+        "notes": (0.012, 0.024, 0.262, 0.063),
+    }
+    paths = {}
+    with pdfium.PdfDocument(str(pdf)) as document:
+        if len(document) != 1:
+            raise RuntimeError("crank-arm detail rendering requires one native sheet")
+        page = document[0]
+        width, height = page.get_size()
+        points_per_metre = 72 / 0.0254
+        for label, (left, bottom, right, top) in windows.items():
+            target = prefix.with_name(f"{prefix.name}-{label}.png")
+            if target.exists():
+                raise RuntimeError(f"detail target already exists: {target}")
+            crop = (
+                left * points_per_metre,
+                bottom * points_per_metre,
+                width - right * points_per_metre,
+                height - top * points_per_metre,
+            )
+            bitmap = page.render(scale=600 / 72, crop=crop)
+            bitmap.to_pil().save(target, dpi=(600, 600))
+            bitmap.close()
+            paths[label] = {"path": str(target), "sha256": sha(target)}
+        page.close()
+    return paths
+
+
 async def candidate_control(adapter, directory):
     """Execute the committed recipe, then inspect fresh cold and relocated handles."""
     from diagnostics import benchmark_drawing_recipes as benchmark
@@ -829,6 +866,9 @@ async def candidate_control(adapter, directory):
 
         built = scene("built", source_model, bank)
         shutil.copy2(module.OUTPUTS.slddrw, directory / "built.SLDDRW")
+        report["built_details"] = render_details(
+            module.OUTPUTS.pdf, directory / "built"
+        )
         await adapter.close_owned_documents()
         bank = source_model = None  # never reuse closed native handles
         check("cold-open owned source", await adapter.open_model(str(source)))
@@ -844,6 +884,9 @@ async def candidate_control(adapter, directory):
         # Retain a fresh cold print even if the subsequent exact comparison fails.
         export_pdf_only(adapter, directory / "cold.pdf")
         drawing.render_pdf_png(directory / "cold.pdf", directory / "cold.png")
+        report["cold_details"] = render_details(
+            directory / "cold.pdf", directory / "cold"
+        )
         compare(built, reopened, "cold reopen")
         attachments.check_layout(built["layout"], reopened["layout"], "cold reopen")
         report["cold_annotations"] = compare_reopened_annotations(
