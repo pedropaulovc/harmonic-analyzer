@@ -11,12 +11,38 @@ retains both viewport observations; a hit also requires the successful exact
 restoration witness. The helper's source enters the preparation input key.
 
 This follows the successful same-document controlled-pan experiment below,
-not a rounding allowance. The actual two-document production path still needs
-its native run. Fail-first fixtures reproduced the differing measurement frame
+not a rounding allowance. The actual two-document production path passed the
+native run recorded below. Fail-first fixtures reproduced the differing measurement frame
 and missing restoration; 143 preparation/control tests and 217 factory tests
 pass. Three diagnostic integration expectations now account for the one new
 production restoration; normal mode still adds no diagnostic override, and all
 raw-extent drift rejection assertions remain in place.
+
+### Production MISS/HIT at `d6ad5aad`
+
+The actual `drawing:fulcrum_shaft` task prepared and validated the template in
+28.735 s; its drawing build took 42.171 s. A separately invoked
+`drawing:pivot_shaft` used the same cache key in 0.002477 s and built in 13.391 s.
+Both tasks exited zero on the existing PID 31860 with adapter `e77bfda4` and
+remote cache/autostart disabled. The `-s` task selection used the existing part
+artifacts without rebuilding their producers; this is not a full pipeline gate.
+
+Receipt: `cad/out/prepared-drawing-templates/ad3b6bf9cd3fffd8f2d69c251e1dba186dc9b304f5a0584debc4f7ad7ed978d8/receipt.json`,
+SHA-256 `866a379644da0f9a92123fba25cb00765f47accb982b1969379a4e375cc90391`.
+Viewport restoration, all 43 note records, both surface-finish records, styles,
+sheet properties and units are exact. Only 18 leaves in the previously excluded
+empty linked-field extent observations differ. Preparation inputs stayed exact
+and owned preparation documents were cleaned up without error.
+
+Both generated full-sheet PNGs were visually inspected: dimensions, symbols
+and title-block text are readable. Original source hashes remain exactly
+`73eeb75dcb1f24ca70b5f5ad2212d7b829a94af3a518b7c3830ff6c58e47d740`
+(fulcrum) and
+`e5bcdb79849aac9ce6068188ccf0c6e2fd1222e82f1d8b4d75e0fd2723f01dc5`
+(pivot). The open pivot file required read-only shared access for SHA-256;
+size/mtime stayed stable during that read. This run did not cold-reopen the
+drawings or compare printed normal/MISS/HIT pairs. Those boundaries remain
+separate from production cache acceptance.
 
 ## Diagnostic provenance
 
@@ -180,7 +206,8 @@ its run-local cache. Normal setup captures its viewport. Both preparation CREATE
 scopes and subsequent prepared MISS/HIT trials restore it after creation, before
 their strict snapshots. All existing normal/MISS/HIT raw defaults, printed output,
 source/hash/cache and ownership gates remain in force. The default `--viewport
-normal` makes no viewport-restoration calls. The captured-mode mock demonstrates
+normal` adds no diagnostic viewport-restoration calls; the production preparer
+still restores its verification frame. The captured-mode mock demonstrates
 new-document pan changing extents, and still rejects independent `1e-12` raw
 extent drift, orientation changes and wrong translation readback. Its native
 two-document outcome is not claimed by the same-document positive control.
