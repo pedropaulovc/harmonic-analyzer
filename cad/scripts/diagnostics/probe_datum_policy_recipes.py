@@ -3,6 +3,9 @@
 Default order is rocker then lever. Repeat --target to select an explicit order,
 for example --target channel_lever for the independent lever-only control.
 Both registered original/guard source pairs remain hash-protected for any order.
+Optional --factory normal|prepared selects only the isolated recipe's initial
+project drawing factory. Use separate invocations for a functional pair: a
+failed normal cold-title witness never authorizes continuing to prepared.
 
 Run only under an explicitly granted COM seat, attaching to the expected existing
 SolidWorks process with automatic launch/recovery disabled. Production recipes
@@ -224,7 +227,14 @@ def compare_drawing_reopen(before, after):
 
 
 async def pilot(
-    adapter, candidate, source_root, guard_root, output_root, *, targets=None
+    adapter,
+    candidate,
+    source_root,
+    guard_root,
+    output_root,
+    *,
+    targets=None,
+    setup_controller=None,
 ):
     order = target_order(targets)
     output_root.mkdir(parents=True, exist_ok=True)
@@ -245,11 +255,16 @@ async def pilot(
         "candidate": candidate,
         "helper_revision": benchmark.revision("HEAD"),
         "order": order,
+        "factory": setup_controller.variant.value if setup_controller else "normal",
         "trials": [],
         "scope": "one functional build per recipe; no speedup/full-pipeline claim",
         "source_witness_scope": "exact original/copy disk hashes and named recipe dimension identities/values/tolerances/BASIC; not full in-memory source immutability",
     }
     report_path = directory / "pilot.json"
+    pilot_started = time.perf_counter()
+    report["elapsed_scope"] = (
+        "pilot source guards, preparation, recipe and cold witnesses; excludes parent lock/attach and outer owned-session cleanup"
+    )
 
     def checkpoint():
         report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
@@ -283,6 +298,8 @@ async def pilot(
                 candidate, target, trial_dir, source=copy_source
             )
             await adapter.close_owned_documents()
+            if setup_controller is not None:
+                await setup_controller.configure(adapter, module, trial, trial_dir)
             check(
                 "open exact owned source copy",
                 await adapter.open_model(str(copy_source)),
@@ -302,6 +319,8 @@ async def pilot(
                         DocumentKind.DRAWING, module.OUTPUTS.slddrw
                     ):
                         artifacts = await module.build(adapter)
+                if setup_controller is not None:
+                    setup_controller.require_used()
             finally:
                 trial["recipe_seconds"] = time.perf_counter() - started
                 checkpoint()
@@ -380,6 +399,7 @@ async def pilot(
             report["trials"][-1].update(status="failed", error=repr(error))
         raise
     finally:
+        primary_error = sys.exception()
         for trial in report["trials"]:
             if "copy_source" not in trial:
                 continue
@@ -395,16 +415,43 @@ async def pilot(
                 report["sources_after"][str(path)] = attachments.file_digest(path)
             except OSError as error:
                 report["sources_after"][str(path)] = {"error": repr(error)}
+        guard_errors = []
+        if setup_controller is not None:
+            guard_errors = setup_controller.final_guards()
+            report["factory_final_guards"] = setup_controller.guards
+            if guard_errors:
+                report.update(
+                    status="failed",
+                    factory_guard_errors=[repr(error) for error in guard_errors],
+                )
+        report["elapsed_seconds"] = time.perf_counter() - pilot_started
         checkpoint()
+        if guard_errors:
+            raise BaseExceptionGroup(
+                "functional recipe/factory final guards failed",
+                ([primary_error] if primary_error is not None else []) + guard_errors,
+            )
     return {"report": str(report_path)}
 
 
 def main(argv=None):
+    from diagnostics._recipe_template_factory import (
+        DrawingFactory,
+        RecipeTemplateFactory,
+        require_factory_environment,
+    )
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-root", type=Path, required=True)
     parser.add_argument("--guard-root", type=Path, required=True)
     parser.add_argument("--report-root", type=Path, default=ROOT / "cad/out/reports")
     parser.add_argument("--candidate", default="HEAD")
+    parser.add_argument(
+        "--factory",
+        type=DrawingFactory,
+        choices=tuple(DrawingFactory),
+        help="explicit full-recipe factory control; prepared materialization is timed separately",
+    )
     parser.add_argument(
         "--target",
         action="append",
@@ -415,6 +462,8 @@ def main(argv=None):
     args = parser.parse_args(argv)
     order = target_order(args.target)
     require_owned_diagnostic_environment()  # before dodo._run in the parent
+    if args.factory is not None:
+        require_factory_environment()
     candidate = benchmark.revision(args.candidate)
     source_root, guard_root = (
         args.source_root.resolve(strict=True),
@@ -435,6 +484,11 @@ def main(argv=None):
                 str(args.report_root.resolve()),
                 "--candidate",
                 candidate,
+                *(
+                    ["--factory", args.factory.value]
+                    if args.factory is not None
+                    else []
+                ),
                 *(argument for target in order for argument in ("--target", target)),
                 "--worker",
             ],
@@ -451,6 +505,11 @@ def main(argv=None):
             guard_root,
             args.report_root.resolve(),
             targets=order,
+            **(
+                {"setup_controller": RecipeTemplateFactory(args.factory)}
+                if args.factory is not None
+                else {}
+            ),
         )
     )
 
