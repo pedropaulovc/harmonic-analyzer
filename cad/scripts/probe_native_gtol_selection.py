@@ -129,7 +129,13 @@ def main() -> int:
             report["stage"] = "save"
             adapter.ownership.assert_current_owned()
             saved = model.Save3(1, 0, 0)  # swSaveAsOptions_Silent, only this drawing copy
-            if not (saved[0] if isinstance(saved, tuple) else saved):
+            report["save_result"] = saved
+            if (
+                not isinstance(saved, tuple) or len(saved) != 3
+                or saved[0] is not True
+                or type(saved[1]) is not int or saved[1] != 0
+                or type(saved[2]) is not int
+            ):
                 raise RuntimeError(f"diagnostic copy save failed: {saved}")
             check("close saved GTol diagnostic copy", await adapter.close_model(save=False))
             report["stage"] = "reopen"
