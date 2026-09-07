@@ -271,8 +271,12 @@ def test_coordinate_annotation_not_claimed_explicit_or_migrated(bank):
 def silhouette_bank(bank, monkeypatch):
     from test_silhouette_attachment_witness_drawing import fixture
 
-    _, _, entity, *_ = fixture()
+    app, _, entity, *_ = fixture()
     monkeypatch.setattr(observer.silhouette, "_early_bound", lambda obj, _: obj)
+    monkeypatch.setattr(observer.silhouette.persistent, "_early_bound", lambda obj, _: obj)
+    monkeypatch.setattr(observer.silhouette.persistent, "byte_variant", lambda value: value)
+    bank.adapter.currentModel.GetType = lambda: 3
+    bank.adapter.currentModel.Extension = app.drawing.Extension
     entity.GetView = lambda: bank.view
     bank.entity = bank.view.entity = entity
     bank.manager.GetSelectedObjectType3 = lambda *_: 46
@@ -403,6 +407,59 @@ def test_cold_silhouette_has_fresh_owner_face_and_geometry(bank, monkeypatch):
     bank.view.GetName2 = Mock(side_effect=AssertionError("closed VIEW read"))
     bank.entity.GetFace = Mock(side_effect=AssertionError("closed face read"))
     assert bank.witness.drawing_snapshot(bank.adapter, phase="reopened") == built
+
+
+def test_silhouette_built_bank_uses_persistent_identity_for_fresh_wrapper(bank, monkeypatch):
+    entity = silhouette_bank(bank, monkeypatch)
+    with bank.witness.observe(bank.adapter):
+        bank.module.add_surface_finish(bank.adapter, bank.view, label="finish",
+                                       entity=entity, entity_type="SILHOUETTE")
+    resolved = NS(**vars(entity))
+    bank.view.entity = resolved
+    assert bank.adapter.swApp.IsSame(entity, resolved) == 0
+    result = bank.witness.drawing_snapshot(bank.adapter, phase="built")
+    assert set(result["explicit"]) == {"finish"}
+    evidence = bank.witness.context_report["stages"][-1]
+    assert evidence["original_fresh_persistent_identity"]["native_result"] == 1
+    assert evidence["silhouette"]["persistent_identity"]["native_result"] == 1
+
+
+@pytest.mark.parametrize("result", [1, 0, -1])
+def test_cold_silhouette_identity_uses_only_reopened_drawing_and_fresh_handles(bank, monkeypatch, result):
+    from test_silhouette_attachment_witness_drawing import fixture
+
+    silhouette_bank(bank, monkeypatch)
+    with bank.witness.observe(bank.adapter):
+        bank.module.add_surface_finish(bank.adapter, bank.view, label="finish",
+                                       entity=bank.entity, entity_type="SILHOUETTE")
+    built = bank.witness.drawing_snapshot(bank.adapter, phase="built")
+    cold_app, _, resolved, *_ = fixture()
+    cold = NS(GetName2=lambda: "Drawing View1", GetOrientationName=lambda: "*Front", entity=resolved)
+    resolved.GetView = lambda: cold
+    attached = NS(**vars(resolved))
+    assert bank.adapter.swApp.IsSame(resolved, attached) == 0
+    annotation = NS(**vars(bank.annotations["finish"]))
+    annotation.Owner = cold
+    annotation.GetAttachedEntities3 = lambda: (attached,)
+    cold.GetAnnotations = lambda: (annotation,)
+    monkeypatch.setattr(observer.attachments, "views", lambda _: {"Sheet/View": cold})
+    old = bank.adapter.currentModel
+    cold_model = cold_app.drawing
+    cold_model.GetCurrentSheet = old.GetCurrentSheet
+    old.GetType = Mock(side_effect=AssertionError("closed drawing read"))
+    old.Extension.GetPersistReference3 = Mock(side_effect=AssertionError("closed drawing reference query"))
+    references = Mock(side_effect=lambda item: memoryview(bytes(item.persistent_ref)))
+    cold_model.Extension.GetPersistReference3 = references
+    cold_model.Extension.IsSamePersistentID = Mock(return_value=result)
+    bank.adapter.currentModel = cold_model
+    bank.view.GetName2 = Mock(side_effect=AssertionError("closed view read"))
+    bank.entity.GetFace = Mock(side_effect=AssertionError("closed silhouette read"))
+    if result != 1:
+        with pytest.raises(RuntimeError, match="IsSamePersistentID"):
+            bank.witness.drawing_snapshot(bank.adapter, phase="reopened")
+        return
+    assert bank.witness.drawing_snapshot(bank.adapter, phase="reopened") == built
+    assert [call.args for call in references.call_args_list] == [(resolved,), (attached,)]
 
 
 def test_view_observer_rejects_model_contract_before_insertion(bank):

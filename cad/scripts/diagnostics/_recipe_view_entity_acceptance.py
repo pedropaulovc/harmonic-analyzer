@@ -105,6 +105,7 @@ class ViewEntityAcceptance:
                 view,
                 expected,
                 attached,
+                drawing=adapter.currentModel,
                 label="VIEW attachment",
                 evidence=row.setdefault("silhouette", {}),
             )
@@ -190,6 +191,7 @@ class ViewEntityAcceptance:
                             view,
                             expected,
                             actual,
+                            drawing=adapter.currentModel,
                             label="VIEW selection",
                             evidence=row.setdefault("silhouette", {}),
                         )
@@ -345,12 +347,19 @@ class ViewEntityAcceptance:
                 if resolved is None:
                     raise RuntimeError(f"{label}: fresh VIEW role resolved null")
                 if phase == EntityWitnessPhase.BUILT:
-                    silhouette.same(
-                        adapter.swApp,
-                        expected,
-                        resolved,
-                        label=f"{label} original/fresh role",
-                    )
+                    if role.entity_kind == 46:
+                        silhouette.persistent.require_same(
+                            adapter.currentModel, expected, resolved,
+                            label=f"{label} original/fresh silhouette role",
+                            evidence=row.setdefault("original_fresh_persistent_identity", {}),
+                        )
+                    else:
+                        silhouette.same(
+                            adapter.swApp,
+                            expected,
+                            resolved,
+                            label=f"{label} original/fresh role",
+                        )
                 raw = self._attachment(
                     adapter, view, annotation, resolved, role.entity_kind, row
                 )
