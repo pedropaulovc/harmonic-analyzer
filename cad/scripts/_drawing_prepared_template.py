@@ -322,6 +322,10 @@ async def _prepare_native(adapter, spec, directory, receipt, operation_context):
             app, app.ActiveDoc, owned
         ):
             raise RuntimeError("refusing to restore an unexpected preparation viewport")
+        # Force the verified owned document's display update before measurement.
+        # Exact viewport/defaults checks below still decide whether it persisted.
+        with _telemetry.span("drawing.template.verification_redraw"):
+            owned.GraphicsRedraw2()
         receipt["viewport_restore"] = {}
         template_viewport.restore(
             app, owned, receipt["viewport_before"], receipt["viewport_restore"]

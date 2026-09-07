@@ -231,6 +231,9 @@ class Model:
     def ViewZoomtofit2(self):
         self.calls.append("fit")
 
+    def GraphicsRedraw2(self):
+        self.calls.append("redraw")
+
 
 @pytest.fixture
 def native(monkeypatch, tmp_path):
@@ -329,6 +332,73 @@ def run_native(native, receipt=None):
         )
     )
     return receipt
+
+
+def test_verification_redraw_follows_owned_fit_and_precedes_restore(
+    native, monkeypatch
+):
+    original_restore = prepared.template_viewport.restore
+    observed = []
+
+    def restore(app, model, target, observation):
+        observed.append(list(model.calls))
+        assert model.calls == ["edit_sheet", "fit", "redraw"]
+        return original_restore(app, model, target, observation)
+
+    monkeypatch.setattr(prepared.template_viewport, "restore", restore)
+    run_native(native)
+    assert observed == [["edit_sheet", "fit", "redraw"]]
+    assert native.created[0].calls.count("redraw") == 0
+    assert native.created[1].calls.count("redraw") == 1
+    assert native.source.calls == []
+
+
+def test_verification_redraw_exception_remains_fatal_and_closes_only_owned(
+    native, monkeypatch
+):
+    def reject(model):
+        assert model is native.created[1]
+        assert model.calls == ["edit_sheet", "fit"]
+        raise RuntimeError("verification redraw rejected")
+
+    monkeypatch.setattr(Model, "GraphicsRedraw2", reject)
+    receipt = {}
+    with pytest.raises(ExceptionGroup) as caught:
+        run_native(native, receipt)
+    assert "verification redraw rejected" in repr(caught.value)
+    assert "after" not in receipt and "viewport_restore" not in receipt
+    assert native.closed == native.created
+    assert native.documents == [native.source]
+    assert native.source.calls == []
+
+
+@pytest.mark.parametrize("fault", ["active", "current", "baseline_state"])
+def test_verification_redraw_waits_for_existing_ownership_guards(native, fault):
+    original_context = native.context
+
+    @contextmanager
+    def context(kind, path):
+        with original_context(kind, path):
+            yield
+        if kind is not prepared.TemplateOperation.CREATE or len(native.created) != 2:
+            return
+        if fault == "active":
+            native.adapter.swApp.ActiveDoc = native.source
+        if fault == "current":
+            native.adapter.currentModel = native.source
+        if fault == "baseline_state":
+            native.source.dirty = True
+
+    native.context = context
+    receipt = {}
+    with pytest.raises(ExceptionGroup):
+        run_native(native, receipt)
+    assert len(native.created) == 2
+    assert native.created[1].calls == ["edit_sheet", "fit"]
+    assert "viewport_restore" not in receipt and "after" not in receipt
+    assert native.closed == [native.created[0]]
+    assert native.documents == [native.source, native.created[1]]
+    assert native.source.calls == []
 
 
 def test_native_preparation_preserves_source_and_uses_exact_owned_scopes(native):
