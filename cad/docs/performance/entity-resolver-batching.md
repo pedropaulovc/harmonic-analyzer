@@ -7,13 +7,15 @@ This child experiment follows
 Batching saved 0.88 s (41.1%) in the hot resolver comparison and 1.47 s (9.1%)
 per production drawing in the matched ABBA pass. Complete crank manufacturing,
 identity, cold-reopen and print checks passed. Integration and merging remain
-with VM1; latest-code review is being completed separately.
+with VM1. Local CodeRabbit reviewed all six files with zero findings.
 
 ## Inputs and ownership
 
 - Accepted parent: #682, `19431a0088519bd8755b941a3da73a699c0ed7e1`.
 - Adapter: `25bc99b1ae39d8c0e004867e9b5c0f2068f2abc2`.
 - Branch: `perf/entity-resolver-batching`.
+- Child PR: [#685](https://github.com/pedropaulovc/harmonic-analyzer/pull/685),
+  open and ready for review, not for merge.
 - Isolated checkout: `C:/src/ha-entity-resolver-batching`, with its own
   `uv sync --frozen` environment and no borrowed build state or artifacts.
 - Observed main: `c6ab57db`. It includes assembly-health work after the accepted
@@ -189,6 +191,10 @@ Fail-first baseline: three expected batching failures and 13 passes in
 (`run-14ghe8fg`). Ruff passed after removing one unused diagnostic import.
 Graph: 83 passed (`run-hvruxzeb`); part isolation: four passed (`run-sikro6jk`).
 Full recipe gate: 6199 passed, one failed in 285.11 s (`run-h7xiejm5`).
+After all native work, the gate rerun retained the same sole failure and 6199
+passes in 259.15 s (`run-tqw_00va`); graph and isolation remained current.
+The final raw-string-only test change passed all 22 new tests in 0.61 s
+(`run-tzr_jn0s`) and the explicit Ruff `RUF043` check.
 The sole failure is the unchanged
 `test_fillister_is_not_silently_enrolled_in_full_owned_pilot` registration/test
 contradiction at the frozen baseline. Neither its assertion nor registry changed.
@@ -203,15 +209,20 @@ contains six files. GitHub GraphQL also returned `graphql_rate_limit`, causing
 the watch-pr comment formatter to pause after three retries. REST readback
 confirmed the review skip; missing formatter output was not treated as approval.
 The authorized Windows CodeRabbit CLI review uses both the parent branch and
-exact accepted baseline, with pinned helper sources as context. Its result is
-pending. The first local pass found only a documentation inconsistency between
+exact accepted baseline, with pinned helper sources as context. The first local
+pass found only a documentation inconsistency between
 the committed scaffold and the live results note supplied as review context;
 this complete committed report replaces that scaffold before re-review.
 No production-code finding was raised. No parent branch, merge or billing
 setting changed.
 
 The second local pass requested only an explicit raw-regex test literal; it is
-fixed without changing the pattern or assertion. A separate receipt audit
+fixed without changing the pattern or assertion. The third pass completed with
+zero findings on all six files at
+`4c13ed91036ec8478cd97e3a9c9d9a86ac9f70f1` (CLI exit 0). This subsequent
+documentation-only commit records the completed review and gate receipts;
+production, diagnostic and test code are unchanged from that reviewed commit.
+A separate receipt audit
 corrected two swapped A-sample table rows; aggregate calculations were unchanged.
 Native observations total 16 successful production builds (including five warm
 builds and the final restored output), 24 successful ABBA resolver samples and
@@ -219,6 +230,17 @@ two successful complete crank callbacks. A post-build archive command initially
 used the wrong PNG path; it was corrected before the next sample without rerunning
 or changing that successful native result. No native failure is hidden by that
 bookkeeping correction.
+
+The exact local review invocation was:
+
+```powershell
+cr review --agent --committed --base perf/crank-arm-semantic-entities --base-commit 19431a0088519bd8755b941a3da73a699c0ed7e1 --config cad/docs/performance/entity-resolver-batching.md cad/scripts/_part_pmi.py cad/scripts/_drawing_common.py cad/scripts/diagnostics/_owned_native_session.py
+```
+
+GitHub REST also returned HTTP 403 rate limiting during final readback; a later
+REST update succeeded and recorded this result in the PR description. The
+persistent watcher remains attached. Its parent-conflict notice is deferred to
+VM1 under the frozen-base handoff, not resolved by altering parent integration.
 
 The complete bounded ownership list is:
 
@@ -246,3 +268,5 @@ PDFs, PNGs, detail crops, ownership receipts and telemetry remain beside them.
 | `entity-resolver-production-B6-final/crank-arm.SLDDRW` | `05f962e1eb37a8dc3b38f1c6bea6bf26d97ede5120869bc9bacf2d24c2cc1df3` |
 | `entity-resolver-production-B6-final/crank-arm.pdf` | `887768ac92b056c9669a6f9c04ee9de82f0d2bb39474f699e8fce8a94e685ab9` |
 | `entity-resolver-local-review-4c99b9d6.log` (first local review) | `506372dcd1a5b0ef494119884616c1c48ec61c6e8bc9cb767816c4d8ab2fd5a2` |
+| `entity-resolver-local-review-ec2cdfb8.log` (second local review) | `74db7fac7cf93936bae4822d1cb819d64065d32c38a3a75a05701fa7b8d4e2f9` |
+| `entity-resolver-local-review-4c13ed91.log` (clean latest-code review) | `f66afd14aad8197a90645730f489bac45d5f1058d2a5df2d006134357207e4e3` |
