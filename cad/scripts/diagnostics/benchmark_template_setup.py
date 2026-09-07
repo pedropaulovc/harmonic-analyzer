@@ -69,7 +69,7 @@ async def setup_trial(adapter, spec, prepared, directory, row, checkpoint):
                 ),
             ):
                 if row["variant"] == "baseline":
-                    defaults.common.new_project_drawing(
+                    defaults.sheet_setup.new_project_drawing(
                         adapter, scale=spec.scale, decimals=spec.decimals
                     )
                 if row["variant"] == "candidate":
@@ -107,7 +107,7 @@ async def benchmark(adapter, spec, report_root):
     report_root.mkdir(parents=True, exist_ok=True)
     run_dir = Path(tempfile.mkdtemp(prefix="template-setup-abba-", dir=report_root))
     adapter.ownership.register_directory(run_dir)
-    original = defaults.common.PROJECT_DRWDOT.resolve(strict=True)
+    original = defaults.sheet_setup.PROJECT_DRWDOT.resolve(strict=True)
     adapter.ownership.register_source(original)
     immutable = defaults.immutable_hashes([original])
     inputs = defaults.runtime_fingerprints()

@@ -176,7 +176,7 @@ def test_populated_variant_guard_and_evidence_flow_precede_any_native_mutation(
     receipt = tmp_path / "population.json"
     receipt.write_bytes(b"pinned evidence")
     digest = hashlib.sha256(receipt.read_bytes()).hexdigest()
-    monkeypatch.setattr(probe.common, "PROJECT_DRWDOT", template)
+    monkeypatch.setattr(probe.sheet_setup, "PROJECT_DRWDOT", template)
     monkeypatch.setattr(probe.pilot, "helper_fingerprints", lambda: {})
     monkeypatch.setattr(probe.pilot, "adapter_fingerprints", lambda: {})
     monkeypatch.setattr(probe.pilot.benchmark, "revision", lambda _: "frozen")

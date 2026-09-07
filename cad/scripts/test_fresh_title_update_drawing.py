@@ -850,7 +850,7 @@ def test_owned_fresh_pair_preserves_originals_and_two_visible_baseline_docs(
         created.append(model)
         return model, object()
 
-    monkeypatch.setattr(probe.drawing, "new_project_drawing", blank)
+    monkeypatch.setattr(probe.sheet_setup, "new_project_drawing", blank)
 
     def front(adapter, path, *_args, **_kwargs):
         part = native.app.GetOpenDocumentByName(path)

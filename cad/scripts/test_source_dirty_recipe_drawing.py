@@ -1,5 +1,7 @@
 """First dirty transition stops the unchanged recipe, even through _attempt."""
 
+import _drawing_sheet_setup as sheet_setup
+
 import asyncio
 from pathlib import Path
 from types import SimpleNamespace
@@ -218,7 +220,7 @@ def test_real_owned_copy_cleanup_preserves_baseline_and_never_saves(
         if mode == "source_disk_change":
             native.source.write_bytes(b"corrupted original fixture")
 
-    monkeypatch.setattr(common, "new_project_drawing", blank)
+    monkeypatch.setattr(sheet_setup, "new_project_drawing", blank)
     monkeypatch.setattr(common, "set_dimension_callouts", callouts)
     monkeypatch.setattr(common, "read_required_properties", place)
     code = """from pathlib import Path

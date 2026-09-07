@@ -72,13 +72,13 @@ def preparation_inputs(adapter, spec):
     unrelated edits inside those modules can over-invalidate preparation. Paths are
     checkout-relative; interpreter and exact native revision are explicit inputs.
     """
-    import _drawing_common as common
+    import _drawing_sheet_setup as sheet_setup
     from _buildgraph import module_deps_of
     import solidworks_mcp
 
     root = Path(__file__).resolve().parents[2]
-    entry = Path(common.__file__).resolve()
-    # These are separate roots: CURRENT deliberately does not import PREPARED.
+    entry = Path(sheet_setup.__file__).resolve()
+    # Setup deliberately does not import the preparer or manufacturing helpers.
     # The second closure owns the raw validator and native measurement helpers.
     preparation_modules = (entry, Path(__file__).resolve())
     sources = set(preparation_modules)
@@ -92,7 +92,7 @@ def preparation_inputs(adapter, spec):
     sources.update((root / "SolidworksMCP-python/src").rglob("*.py"))
     sources.update((root / "cad/config").rglob("*.yaml"))
     sources.update((root / "uv.lock", root / "pyproject.toml"))
-    template = Path(common.PROJECT_DRWDOT).resolve(strict=True)
+    template = Path(sheet_setup.PROJECT_DRWDOT).resolve(strict=True)
     if template.stat().st_size == 0:
         raise RuntimeError("original project drawing template is empty")
     revision = str(adapter.swApp.RevisionNumber())
@@ -166,22 +166,22 @@ def _seat():
 
 def inherited_drawing(adapter, entry):
     """Verify then instantiate; no normalization, style setters or blank rebuilds."""
-    import _drawing_common as common
+    import _drawing_sheet_setup as sheet_setup
 
     _seat()
     path = _read_entry(entry, preparation_inputs(adapter, entry.spec))
-    draw = common.new_drawing(
+    draw = sheet_setup.new_drawing(
         adapter,
         template=str(path),
-        width=common.ASME_B_WIDTH_M,
-        height=common.ASME_B_HEIGHT_M,
+        width=sheet_setup.ASME_B_WIDTH_M,
+        height=sheet_setup.ASME_B_HEIGHT_M,
     )
     ddoc = _early_bound(draw, "IDrawingDoc")
     ddoc.EditSheet()
     sheet = _early_bound(ddoc.GetCurrentSheet(), "ISheet")
     if sheet is None:
         raise RuntimeError("prepared template returned no current sheet")
-    common.assert_asme_b_sheet(
+    sheet_setup.assert_asme_b_sheet(
         adapter, sheet, phase="prepared setup", scale=entry.spec.scale
     )
     draw.ViewZoomtofit2()
@@ -228,7 +228,7 @@ def _verify_baseline(app, baseline, extra=()):
 
 async def _prepare_native(adapter, spec, directory, receipt, operation_context):
     """Two owned blank documents; no borrowed source close/reopen or save."""
-    import _drawing_common as common
+    import _drawing_sheet_setup as sheet_setup
 
     app = adapter.swApp
     baseline = [(model, _state(model)) for model in _documents(app)]
@@ -267,7 +267,7 @@ async def _prepare_native(adapter, spec, directory, receipt, operation_context):
     path = directory / "prepared.DRWDOT"
     try:
         with operation_context(TemplateOperation.CREATE, path):
-            owned, _ = common.new_project_drawing(
+            owned, _ = sheet_setup.new_project_drawing(
                 adapter, scale=spec.scale, decimals=spec.decimals
             )
         _verify_baseline(app, baseline, [owned])
@@ -308,11 +308,11 @@ async def _prepare_native(adapter, spec, directory, receipt, operation_context):
         with operation_context(
             TemplateOperation.CREATE, directory / "verification.SLDDRW"
         ):
-            owned = common.new_drawing(
+            owned = sheet_setup.new_drawing(
                 adapter,
                 template=str(path),
-                width=common.ASME_B_WIDTH_M,
-                height=common.ASME_B_HEIGHT_M,
+                width=sheet_setup.ASME_B_WIDTH_M,
+                height=sheet_setup.ASME_B_HEIGHT_M,
             )
             ddoc = _early_bound(owned, "IDrawingDoc")
             ddoc.EditSheet()

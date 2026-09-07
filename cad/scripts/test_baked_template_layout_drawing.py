@@ -295,15 +295,15 @@ def test_pdf_fit_uses_bottom_left_coordinates_and_preserves_whitespace_evidence(
 def test_bare_creation_does_not_call_project_normalization(monkeypatch):
     expected = object()
     native_new = Mock(return_value=expected)
-    monkeypatch.setattr(probe.common, "new_drawing", native_new)
+    monkeypatch.setattr(probe.sheet_setup, "new_drawing", native_new)
     normalized = Mock(side_effect=AssertionError("no normalization"))
-    monkeypatch.setattr(probe.common, "new_project_drawing", normalized)
+    monkeypatch.setattr(probe.sheet_setup, "new_project_drawing", normalized)
     assert probe.bare_drawing("adapter", "source.DRWDOT") is expected
     native_new.assert_called_once_with(
         "adapter",
         template="source.DRWDOT",
-        width=probe.common.ASME_B_WIDTH_M,
-        height=probe.common.ASME_B_HEIGHT_M,
+        width=probe.sheet_setup.ASME_B_WIDTH_M,
+        height=probe.sheet_setup.ASME_B_HEIGHT_M,
     )
     normalized.assert_not_called()
 
@@ -332,7 +332,7 @@ def test_owned_blank_control_preserves_baseline_and_never_opens_a_model(
 
     original = tmp_path / "original.DRWDOT"
     original.write_bytes(b"exact original template")
-    monkeypatch.setattr(probe.common, "PROJECT_DRWDOT", original)
+    monkeypatch.setattr(probe.sheet_setup, "PROJECT_DRWDOT", original)
     monkeypatch.setattr(probe.pilot, "helper_fingerprints", lambda: {})
     monkeypatch.setattr(probe.pilot, "adapter_fingerprints", lambda: {})
     monkeypatch.setattr(probe.pilot.benchmark, "revision", lambda _: "frozen")
@@ -438,7 +438,7 @@ def test_primary_and_cleanup_errors_are_both_retained(monkeypatch, tmp_path):
 
     original = tmp_path / "original.DRWDOT"
     original.write_bytes(b"source")
-    monkeypatch.setattr(probe.common, "PROJECT_DRWDOT", original)
+    monkeypatch.setattr(probe.sheet_setup, "PROJECT_DRWDOT", original)
     monkeypatch.setattr(probe.pilot, "helper_fingerprints", lambda: {})
     monkeypatch.setattr(probe.pilot, "adapter_fingerprints", lambda: {})
     monkeypatch.setattr(probe.pilot.benchmark, "revision", lambda _: "frozen")

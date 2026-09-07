@@ -23,6 +23,8 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "cad/scripts"))
 
+import _drawing_sheet_setup as sheet_setup  # noqa: E402
+
 import _drawing_common as common  # noqa: E402
 from _drawing_prepared_template import TemplateSpec  # noqa: E402
 from _drawing_template_defaults import snapshot_defaults  # noqa: E402
@@ -46,7 +48,7 @@ def preferences(adapter):
     model = layout.cells.required(adapter.currentModel, "IModelDoc2")
     ddoc = layout.cells.required(model, "IDrawingDoc")
     sheet = layout.cells.required(ddoc.GetCurrentSheet(), "ISheet")
-    common.assert_asme_b_sheet(
+    sheet_setup.assert_asme_b_sheet(
         adapter, sheet, phase="populated template", scale=title.SCALE
     )
     return layout.plain(
@@ -58,10 +60,10 @@ def preferences(adapter):
             "dimension_styles": {
                 name: int(
                     model.Extension.GetUserPreferenceInteger(
-                        common._PREF_DIM_TEXT_AND_LEADER_STYLE, option
+                        sheet_setup._PREF_DIM_TEXT_AND_LEADER_STYLE, option
                     )
                 )
-                for name, option in common._DIM_DETAILING_SCOPES.items()
+                for name, option in sheet_setup._DIM_DETAILING_SCOPES.items()
             },
             "sheet_properties": list(sheet.GetProperties2()),
             "sheet_format_visibility": "visible"
@@ -131,7 +133,7 @@ class PopulatedControl:
             raise RuntimeError("normal setup may run only once")
         require_template(self.template, self.sha256)
         self.setup["calls"] += 1
-        original = common.new_drawing
+        original = sheet_setup.new_drawing
 
         def redirected(current, *args, **native):
             if (
@@ -139,9 +141,9 @@ class PopulatedControl:
                 or args
                 or native
                 != {
-                    "template": str(common.PROJECT_DRWDOT),
-                    "width": common.ASME_B_WIDTH_M,
-                    "height": common.ASME_B_HEIGHT_M,
+                    "template": str(sheet_setup.PROJECT_DRWDOT),
+                    "width": sheet_setup.ASME_B_WIDTH_M,
+                    "height": sheet_setup.ASME_B_HEIGHT_M,
                 }
                 or self.setup["template_calls"]
             ):
@@ -150,11 +152,11 @@ class PopulatedControl:
             return original(current, **dict(native, template=str(self.template)))
 
         start = time.perf_counter()
-        common.new_drawing = redirected
+        sheet_setup.new_drawing = redirected
         try:
-            result = common.new_project_drawing(adapter, **kwargs)
+            result = sheet_setup.new_project_drawing(adapter, **kwargs)
         finally:
-            common.new_drawing = original
+            sheet_setup.new_drawing = original
             self.setup["normal_setup_seconds"] = time.perf_counter() - start
             self.checkpoint()
         if self.setup["template_calls"] != 1:
@@ -300,8 +302,8 @@ async def probe(adapter, template, sha256, source_root, output_root, symbol_path
         {
             str(template): sha256,
             str(symbol_path): definition["sha256"],
-            str(common.PROJECT_DRWDOT): title.pilot.attachments.file_digest(
-                common.PROJECT_DRWDOT
+            str(sheet_setup.PROJECT_DRWDOT): title.pilot.attachments.file_digest(
+                sheet_setup.PROJECT_DRWDOT
             ),
         }
     )

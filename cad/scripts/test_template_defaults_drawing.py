@@ -150,7 +150,7 @@ def test_blank_linked_extents_are_raw_only_after_native_proof(monkeypatch, blank
         kind: int = 6
 
     edge_note = SimpleNamespace(
-        GetText=lambda: probe.common._METRIC_EDGE_BREAK_NOTE,
+        GetText=lambda: probe.sheet_setup._METRIC_EDGE_BREAK_NOTE,
         PropertyLinkedText="",
         GetExtent=lambda: (0.2, 0.3, 0, 0.25, 0.31, 0),
     )
@@ -169,7 +169,7 @@ def test_blank_linked_extents_are_raw_only_after_native_proof(monkeypatch, blank
         Extension=SimpleNamespace(GetUserPreferenceInteger=lambda pref, scope: 2),
     )
     monkeypatch.setattr(
-        probe.common, "assert_asme_b_sheet", lambda *args, **kwargs: None
+        probe.sheet_setup, "assert_asme_b_sheet", lambda *args, **kwargs: None
     )
     monkeypatch.setattr(probe, "annotation_box", lambda *args: Bounds("edge-break"))
     adapter = SimpleNamespace(currentModel=model)
@@ -227,7 +227,7 @@ def test_candidate_omits_all_setters_and_blank_rebuilds(monkeypatch, tmp_path):
         lambda *args, **kwargs: calls.append(("new", kwargs["template"])) or draw,
     )
     monkeypatch.setattr(
-        probe.common,
+        probe.sheet_setup,
         "assert_asme_b_sheet",
         lambda *args, **kwargs: calls.append(("assert", kwargs["scale"])),
     )
@@ -603,7 +603,7 @@ def orchestration(monkeypatch, tmp_path):
         if failure.get("source_semantic") and variant == "candidate":
             row["source_snapshots"]["cold_reopened"] = {"value": 2}
 
-    monkeypatch.setattr(probe.common, "PROJECT_DRWDOT", original)
+    monkeypatch.setattr(probe.sheet_setup, "PROJECT_DRWDOT", original)
     monkeypatch.setattr(probe, "runtime_fingerprints", lambda: {"input": "unchanged"})
     monkeypatch.setattr(probe.recipes, "revision", lambda revision: "frozen-head")
     monkeypatch.setattr(probe, "load_recipe", load)
@@ -1042,7 +1042,9 @@ def test_trial_claims_creation_then_scopes_exact_save_and_restores_hooks(
     monkeypatch, tmp_path, output_change
 ):
     events = []
-    outputs = probe.common.DrawingOutputs(
+    from _drawing_common import DrawingOutputs
+
+    outputs = DrawingOutputs(
         tmp_path / "owned.SLDDRW", tmp_path / "owned.pdf", tmp_path / "owned.png"
     )
 
@@ -1100,7 +1102,7 @@ def test_trial_claims_creation_then_scopes_exact_save_and_restores_hooks(
         return await module.finalize_drawing(current, outputs)
 
     module.new_project_drawing, module.build = setup, build
-    monkeypatch.setattr(probe.common, "new_project_drawing", setup)
+    monkeypatch.setattr(probe.sheet_setup, "new_project_drawing", setup)
     monkeypatch.setattr(probe, "_early_bound", lambda raw, kind: raw)
     monkeypatch.setattr(probe, "check", lambda label, result: None)
     monkeypatch.setattr(probe, "finished_snapshot", lambda *args: {"fresh": "witness"})

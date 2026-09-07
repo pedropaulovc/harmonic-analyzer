@@ -345,29 +345,29 @@ def test_normal_factory_redirects_one_argument_and_always_restores(
     sha = probe.title.pilot.attachments.file_digest(path)
     adapter = object()
     native = Mock(return_value="drawing")
-    monkeypatch.setattr(probe.common, "new_drawing", native)
+    monkeypatch.setattr(probe.sheet_setup, "new_drawing", native)
 
     def current(current_adapter, **_):
         if mode == "raised":
             raise RuntimeError("normal setup failure")
-        result = probe.common.new_drawing(
+        result = probe.sheet_setup.new_drawing(
             current_adapter,
             template="wrong"
             if mode == "different_template"
-            else str(probe.common.PROJECT_DRWDOT),
-            width=probe.common.ASME_B_WIDTH_M,
-            height=probe.common.ASME_B_HEIGHT_M,
+            else str(probe.sheet_setup.PROJECT_DRWDOT),
+            width=probe.sheet_setup.ASME_B_WIDTH_M,
+            height=probe.sheet_setup.ASME_B_HEIGHT_M,
         )
         if mode == "extra_call":
-            probe.common.new_drawing(
+            probe.sheet_setup.new_drawing(
                 current_adapter,
-                template=str(probe.common.PROJECT_DRWDOT),
-                width=probe.common.ASME_B_WIDTH_M,
-                height=probe.common.ASME_B_HEIGHT_M,
+                template=str(probe.sheet_setup.PROJECT_DRWDOT),
+                width=probe.sheet_setup.ASME_B_WIDTH_M,
+                height=probe.sheet_setup.ASME_B_HEIGHT_M,
             )
         return result
 
-    monkeypatch.setattr(probe.common, "new_project_drawing", current)
+    monkeypatch.setattr(probe.sheet_setup, "new_project_drawing", current)
     witness = Mock(return_value={"exact": "normal defaults"})
     monkeypatch.setattr(probe, "snapshot_defaults", witness)
     controller = probe.PopulatedControl(path, sha, Mock(), {})
@@ -376,8 +376,8 @@ def test_normal_factory_redirects_one_argument_and_always_restores(
         native.assert_called_once_with(
             adapter,
             template=str(path),
-            width=probe.common.ASME_B_WIDTH_M,
-            height=probe.common.ASME_B_HEIGHT_M,
+            width=probe.sheet_setup.ASME_B_WIDTH_M,
+            height=probe.sheet_setup.ASME_B_HEIGHT_M,
         )
         witness.assert_called_once()
         with pytest.raises(RuntimeError, match="only once"):
@@ -386,14 +386,14 @@ def test_normal_factory_redirects_one_argument_and_always_restores(
         with pytest.raises(RuntimeError):
             controller.factory(adapter)
         witness.assert_not_called()
-    assert probe.common.new_drawing is native
+    assert probe.sheet_setup.new_drawing is native
 
 
 def test_template_hash_mismatch_stops_before_any_factory_call(monkeypatch, tmp_path):
     path = tmp_path / "derived.DRWDOT"
     path.write_bytes(b"wrong bytes")
     native = Mock(side_effect=AssertionError("no native call"))
-    monkeypatch.setattr(probe.common, "new_drawing", native)
+    monkeypatch.setattr(probe.sheet_setup, "new_drawing", native)
     controller = probe.PopulatedControl(path, "0" * 64, Mock(), {})
     with pytest.raises(RuntimeError):
         controller.factory(object())
@@ -421,7 +421,7 @@ def test_thin_controller_reuses_two_trials_and_retains_failed_acceptance(
         path = sources / f"{target.replace('_', '-')}.SLDPRT"
         path.write_bytes(target.encode())
         expected[str(path)] = probe.title.pilot.attachments.file_digest(path)
-    monkeypatch.setattr(probe.common, "PROJECT_DRWDOT", original)
+    monkeypatch.setattr(probe.sheet_setup, "PROJECT_DRWDOT", original)
     monkeypatch.setattr(probe.title.pilot, "require_sources", lambda *_: dict(expected))
     monkeypatch.setattr(probe.title.pilot, "helper_fingerprints", lambda: {})
     monkeypatch.setattr(probe.title.pilot, "adapter_fingerprints", lambda: {})

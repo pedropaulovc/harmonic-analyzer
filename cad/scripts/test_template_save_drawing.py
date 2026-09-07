@@ -133,7 +133,7 @@ def test_capture_keeps_failed_cells_and_requires_the_first_positive(
         creating_document=creating,
         saving_as=saving,
     )
-    monkeypatch.setattr(probe.common, "PROJECT_DRWDOT", original)
+    monkeypatch.setattr(probe.sheet_setup, "PROJECT_DRWDOT", original)
     monkeypatch.setattr(probe, "revision", lambda revision: "frozen")
     monkeypatch.setattr(probe, "_early_bound", lambda raw, kind: raw)
     monkeypatch.setattr(probe, "sheet_witness", lambda model: {"sheet": "unchanged"})
