@@ -172,3 +172,35 @@ guards reported no drift. Recipe/pilot times were 31.738/91.643 s.
 The next run must correct the diagnostic scope ordering and keep the immediate
 post-observer active-document check. This partial result establishes native
 persistence for this call shape, not a completed source-safe drawing recipe.
+
+## Reconciled modern save: cold callout loss
+
+At `5db764ad` the corrected native scope completed the recipe and both save
+boundaries. Receipt `datum-policy-uiu2rsnq/pilot.json`, SHA-256
+`7583b8e718b945884648ceec42bb6bbd25dfa4ab20e3b0d314d624ea09fbdd7a`,
+retains all nine source banks. The modern save returned `(True, 0, 0)` and
+produced a 203,888-byte drawing in 1.125 s. Original copy hashes remained exact
+after the complete recipe, PDF export, closing and final cleanup. All source
+value/tolerance/identity banks passed; the built explicit bore-finish witness
+also passed. Recipe/pilot times were 36.769/156.874 s, including diagnostics.
+
+Cold reopening failed the unchanged annotation comparator: all 162 rejected
+observations belong to `ArborBoreDia`. The two callout lines `THRU - REAM` and
+`PRESS FIT` disappeared, and the dimension's text/leader layout changed with
+them. The initial and cold failure PNGs visibly confirm that content loss;
+the value and tolerance remain printed. Other annotations were unchanged.
+The source remained unsaved, so avoiding its disk write alone does not preserve
+the current shared callout fields. This is not an accepted production save fix.
+
+Failure PDF evidence completed with no errors. The two pre-existing pivot
+documents retained exact identities/states, owned cleanup succeeded, and final
+runtime guards reported no drift. The complete offline recipe gate at this
+revision passed 4,824 tests in 81.57 s; it does not override this native failure.
+
+The smallest next field-level control is `IDisplayDimension.SetLowerText`, with
+explicit `GetLowerText` readback. `IModelDocExtension.EditDimensionProperties`
+distinguishes `DimensionLowerText` (valid for drawing display dimensions only)
+from `CalloutText1/2`. The bundled chamfer example demonstrates that setter on a
+drawing-created dimension. Imported diameter, multiline text and cold persistence
+remain untested deltas; no source-authoring or drawing-owned-note refactor is
+required before trying that documented field.
