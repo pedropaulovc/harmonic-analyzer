@@ -30,6 +30,7 @@ from _common import CAD_ROOT, check
 from _drawing_build import ProjectDrawingFactory, TemplateSpec, run_drawing_build
 from _basic_dimensions import require_basic_dimension
 from _drawing_project_layout import DatumLeaderPolicy, repair_project_drawing_layout
+from _drawing_parallel_dimensions import align_channel_lever_basic_pairs
 from _drawing_leader_clearance import validate_dimension_leader_clearance
 from _drawing_common import (
     DrawingOutputs,
@@ -262,8 +263,13 @@ async def build(
         adapter, front, keep=FRONT_KEEP, view_label="profile"
     )
     profile_dimensions = set().union(*SOURCE_BASIC_DIMENSIONS.values())
+    profile_linear = {}
     for annotation in front_annotations:
         name = dimension_name(adapter, annotation)
+        if name in {"BarLength", "TipCentreX"}:
+            if name in profile_linear:
+                raise RuntimeError(f"duplicate profile linear dimension {name!r}")
+            profile_linear[name] = annotation
         if name not in profile_dimensions:
             continue
         display = annotation.GetSpecificAnnotation()
@@ -436,6 +442,19 @@ async def build(
     from _drawing_native_layout import AxisLink, LayoutNote
     from _drawing_view_packing import Axis, AxisOrder
 
+    # Exact retained/created handles, one native parallel pass per BASIC pair.
+    # The measured lever calibration is limited to these scale-0.5 view classes.
+    if profile_linear.keys() != {"BarLength", "TipCentreX"}:
+        raise RuntimeError("missing exact profile BASIC pair")
+    align_channel_lever_basic_pairs(
+        adapter,
+        front=front,
+        bar_length=profile_linear["BarLength"],
+        tip_centre_x=profile_linear["TipCentreX"],
+        holes=holes,
+        bar_pin_c2c=bar_pin_c2c.GetAnnotation(),
+        spring_c2c=spring_c2c.GetAnnotation(),
+    )
     layout(
         adapter,
         datum_leader_policy=DatumLeaderPolicy.BENT_DOCUMENT,

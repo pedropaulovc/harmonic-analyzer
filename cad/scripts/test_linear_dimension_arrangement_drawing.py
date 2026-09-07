@@ -209,6 +209,27 @@ def test_pair_offset_uses_full_body_to_line_reach_and_exact_source_values(scene)
     assert plans["holes"]["document_offset_m"] == pytest.approx(0.0222)
 
 
+def test_diagnostic_rejects_production_spacing_before_reads_or_mutation(monkeypatch):
+    from _drawing_parallel_dimensions import align_channel_lever_basic_pairs
+
+    capture = Mock(side_effect=AssertionError("must not capture"))
+    select = Mock(side_effect=AssertionError("must not select"))
+    monkeypatch.setattr(control, "capture", capture)
+    monkeypatch.setattr(control, "select_and_align", select)
+    module = NS(align_channel_lever_basic_pairs=align_channel_lever_basic_pairs)
+    trial = {"target": "channel_lever"}
+    source_reader, checkpoint = Mock(), Mock()
+    with pytest.raises(RuntimeError, match="cannot stack"):
+        control.ParallelLinearControl(control.LinearArrangement.PARALLEL).bind(
+            object(), module, trial, checkpoint, source_reader, object()
+        )
+    capture.assert_not_called()
+    select.assert_not_called()
+    source_reader.assert_not_called()
+    checkpoint.assert_not_called()
+    assert trial == {"target": "channel_lever"}
+
+
 def test_retained_native_basic_lines_derive_calibrated_per_view_pitch(scene):
     _, views, before = scene
     for key, measurement in RETAINED["before"].items():
