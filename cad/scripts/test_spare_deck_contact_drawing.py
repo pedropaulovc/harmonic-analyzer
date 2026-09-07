@@ -5,6 +5,7 @@ from types import SimpleNamespace as NS
 from unittest.mock import AsyncMock, Mock
 
 import pytest
+from solidworks_mcp.adapters.base import AdapterResult, AdapterResultStatus
 
 from diagnostics import probe_spare_deck_contact as probe
 from diagnostics import probe_assembly_health_targets as ownership
@@ -70,6 +71,114 @@ def test_resolved_dependencies_still_reject_foreign_inputs(monkeypatch, tmp_path
     )
     with pytest.raises(RuntimeError, match="leave this checkout"):
         ownership.OwnedAssembly(NS(swApp=app), source)
+
+
+@pytest.fixture
+def local_dependencies(monkeypatch, tmp_path):
+    monkeypatch.setattr(ownership, "ROOT", tmp_path)
+    monkeypatch.setattr(ownership, "_early_bound", lambda value, _: value)
+    source = tmp_path / "cad/out/sldasm/top.SLDASM"
+    local = tmp_path / "cad/out/sldprt/part.SLDPRT"
+    foreign = tmp_path / "producer/cad/out/sldprt/part.SLDPRT"
+    for path, content in (
+        (source, b"saved top"),
+        (local, b"current checkout child"),
+        (foreign, b"different producer child"),
+    ):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
+
+    def document(path, kind):
+        return NS(
+            GetPathName=lambda: str(path),
+            GetTitle=lambda: path.name,
+            GetType=lambda: kind,
+        )
+
+    top = document(source, 2)
+    child = document(local, 1)
+    app = NS(
+        GetDocuments=Mock(return_value=()),
+        ActiveDoc=None,
+        GetCurrentWorkingDirectory=Mock(return_value=str(tmp_path)),
+        GetDocumentDependencies2=Mock(return_value=("part", str(local))),
+        IsSame=lambda left, right: int(left is right),
+    )
+    adapter = NS(swApp=app, currentModel=None)
+
+    async def open_model(path):
+        assert path == str(source)
+        app.GetDocuments.return_value = (top, child)
+        app.ActiveDoc = top
+        adapter.currentModel = top
+        return AdapterResult(AdapterResultStatus.SUCCESS)
+
+    adapter.open_model = AsyncMock(side_effect=open_model)
+    return NS(**locals())
+
+
+@pytest.mark.asyncio
+async def test_owned_inputs_are_resolved_local_bytes_not_producer_authentication(
+    local_dependencies,
+):
+    c = local_dependencies
+    owner = ownership.OwnedAssembly(c.adapter, c.source)
+    await owner.open()
+    assert owner.inputs == {c.source, c.local}
+    assert owner.hashes[str(c.local)] == ownership.digest(c.local)
+    assert owner.hashes[str(c.local)] != ownership.digest(c.foreign)
+    assert owner.identity(c.child) == (str(c.local), 1)
+    assert all(row["unchanged"] for row in owner.input_evidence().values())
+    c.app.GetDocumentDependencies2.assert_called_once_with(
+        str(c.source), True, True, False
+    )
+
+
+def test_resolved_same_name_foreign_dependency_is_not_relocated_by_name(
+    local_dependencies,
+):
+    c = local_dependencies
+    c.app.GetDocumentDependencies2.return_value = ("part", str(c.foreign))
+    with pytest.raises(RuntimeError, match="leave this checkout"):
+        ownership.OwnedAssembly(c.adapter, c.source)
+    c.adapter.open_model.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_native_open_cannot_claim_a_foreign_same_name_document(
+    local_dependencies,
+):
+    c = local_dependencies
+    owner = ownership.OwnedAssembly(c.adapter, c.source)
+    foreign_child = c.document(c.foreign, 1)
+
+    async def open_foreign(path):
+        assert path == str(c.source)
+        c.app.GetDocuments.return_value = (c.top, foreign_child)
+        c.app.ActiveDoc = c.top
+        c.adapter.currentModel = c.top
+        return AdapterResult(AdapterResultStatus.SUCCESS)
+
+    c.adapter.open_model.side_effect = open_foreign
+    with pytest.raises(RuntimeError, match="unowned or ambiguous native document"):
+        await owner.open()
+    assert owner.handles == {}
+    assert owner.root is None
+    c.adapter.open_model.assert_awaited_once_with(str(c.source))
+
+
+@pytest.mark.asyncio
+async def test_same_path_native_handle_replacement_is_not_owned(local_dependencies):
+    c = local_dependencies
+    owner = ownership.OwnedAssembly(c.adapter, c.source)
+    await owner.open()
+    replacement = c.document(c.local, 1)
+    c.app.GetDocuments.return_value = (c.top, replacement)
+    with pytest.raises(RuntimeError, match="native document identity changed"):
+        owner.assert_active()
+    with pytest.raises(RuntimeError, match="unowned/replaced native document"):
+        owner.identity(replacement)
+    assert owner.handles[c.local] is c.child
 
 
 @pytest.fixture

@@ -25,8 +25,27 @@ The probe does not save, rebuild, change configurations, make selections, export
 or change application preferences. The dependency query can change SW's working
 directory according to the API documentation; the owner records and restores
 that directory before opening anything. It rechecks native instances and document state,
-closes its owned documents, and compares all saved dependency hashes. Its report
+closes its owned documents, and compares all native-resolved local input hashes. Its report
 retains primary, cleanup, input-hash and checkpoint failures together.
+
+### Dependency ownership is not producer-child authentication
+
+The input set comes from `GetDocumentDependencies2(..., True, True, False)`:
+SolidWorks resolves paths using its native search rules. Every returned path must
+exist in this checkout's native output directories. Every opened document must
+belong to that set with an unambiguous title, and its native handle must remain
+the one claimed after open. A foreign same-name document or a replaced local
+handle is rejected; the probe does not relocate files by matching basenames.
+
+The top assembly is checked against the explicit caller-supplied SHA-256.
+Child hashes, however, are observations taken before open and compared after
+cleanup, not expected identities supplied by a trusted producing build. A
+different child already present at the expected local path can therefore become
+the observed baseline. The receipt proves contact in the exact local model
+opened and preservation of those inputs; it does not independently authenticate
+the producer's child identities. Full build/cache-identity gates remain separate.
+Historical producer-child authentication would require an explicit trusted
+manifest and relocation-aware verification; this diagnostic does not claim one.
 
 ## API premises and verification boundary
 
@@ -59,6 +78,14 @@ with no open documents and no observed working-directory change. The owner
 now uses that native search result, still rejects any resolved foreign path,
 and preserves query and directory-restoration failures together. It never
 rewrites a dependency path by filename or edits the saved assemblies.
+
+The rejection and accepted-pass receipts remain under
+`C:/src/ha-perf-spare-deck-seating/cad/out/reports/`; they are historical native
+evidence, not a claim that later review-only commits ran a fresh native trial.
+Changing `Searchflag` to `False` would restore the demonstrated cold rejection,
+not add relocation-aware child authentication. The offline ownership controls
+also cover same-name foreign dependencies, a foreign same-name document returned
+by open, a replaced same-path native handle, and the local-hash authenticity limit.
 
 ## Accepted native contact
 

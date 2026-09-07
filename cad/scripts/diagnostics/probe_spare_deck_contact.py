@@ -1,7 +1,8 @@
 """Read native T18 underside/deck contact in this checkout's saved complete top.
 
 Requires an empty session, explicit existing SW PID, and the parent COM seat.
-No save, rebuild, configuration/selection change, export, or application setting.
+No save, rebuild, configuration/selection change, export, or persistent application
+setting change. Native dependency search restores its working-directory effect.
 """
 
 from __future__ import annotations
@@ -162,7 +163,7 @@ def component(owner, candidates, filename, parent, configuration=None):
     identity = owner.identity(model)
     if identity != (str(expected), wanted_kind):
         raise RuntimeError(
-            f"{filename}: referenced model differs from exact saved input"
+            f"{filename}: referenced model differs from exact resolved input"
         )
     row = {
         "name": text(item.Name2, "component name"),
