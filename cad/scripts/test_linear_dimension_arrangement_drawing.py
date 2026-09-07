@@ -16,6 +16,40 @@ from _drawing_native_callouts import _Dimension, DimensionSource
 from _drawing_project_layout import repair_project_drawing_layout
 from diagnostics import _linear_dimension_arrangement as control
 from diagnostics import probe_datum_policy_recipes as pilot
+from diagnostics._linear_pair_k5mypm3x import RETAINED
+
+
+def measured_basic(name, line_y, height=0.006):
+    xmin, xmax, bottom, top = 0.1, 0.12, line_y + 0.0011, line_y + 0.0011 + height
+
+    def line(start, end):
+        return {"start": start, "end": end, "width_m": 0.0}
+
+    return {
+        "name": name,
+        "kind": 4,
+        "format_signature": ("Century Gothic",),
+        "body": {"xmin": xmin, "xmax": xmax, "ymin": bottom, "ymax": top},
+        "native_strokes": [
+            line((xmin, bottom), (xmin, top)),
+            line((xmin, top), (xmax, top)),
+            line((xmax, top), (xmax, bottom)),
+            line((xmax, bottom), (xmin, bottom)),
+            line((0.05, 0.4), (0.05, line_y - 0.001)),
+            line((0.18, 0.4), (0.18, line_y - 0.001)),
+            line((0.05, line_y), (0.18, line_y)),
+        ],
+        "native_leader_segments": (),
+        "leader_decorations": tuple(
+            {
+                "xmin": x - 0.003,
+                "xmax": x + 0.003,
+                "ymin": line_y - 0.003,
+                "ymax": line_y + 0.003,
+            }
+            for x in (0.05, 0.18)
+        ),
+    }
 
 
 @pytest.fixture
@@ -23,10 +57,10 @@ def scene(monkeypatch):
     monkeypatch.setattr(control, "_early_bound", lambda item, _: item)
     monkeypatch.setattr(control, "null_callout", lambda: None)
     views = {label: NS(GetName2=lambda label=label: label) for label in control.PAIRS}
-    rows, handles, dimensions, tolerances = {}, {}, {}, {}
+    rows, handles, dimensions, tolerances, source_handles = {}, {}, {}, {}, {}
     source_handle = object()
     for label, pair in control.PAIRS.items():
-        for name, value in pair:
+        for index, (name, value) in enumerate(pair):
             key = f"{label}/{name}"
             annotation = NS(Owner=views[label])
             display = NS(
@@ -37,12 +71,16 @@ def scene(monkeypatch):
             dimensions[key] = _Dimension(
                 display,
                 (parameter,),
-                DimensionSource.DRAWING_REFERENCE,
-                11,
+                DimensionSource.MODEL
+                if label == "front"
+                else DimensionSource.DRAWING_REFERENCE,
+                11 if label == "front" else 2,
                 "Default",
                 ((name, key + "@Draw1.Drawing", 2, value),),
             )
             tolerances[key] = (1,)
+            if label == "front":
+                source_handles[name] = parameter
             handles[key] = (annotation, views[label], source_handle)
             rows[key] = {
                 "semantic": {
@@ -54,13 +92,9 @@ def scene(monkeypatch):
                 "position": (0.1, 0.2, 0),
                 "native": {"metadata": "same"},
                 "generic": {"texts": (name,)},
-                "measurement": {
-                    "name": name,
-                    "kind": 4,
-                    "format_signature": ("Century Gothic",),
-                    "body": {"xmin": 0.1, "xmax": 0.12, "ymin": 0.2, "ymax": 0.206},
-                    "native_strokes": ((0.1, 0.2, 0.12, 0.2),),
-                },
+                "measurement": measured_basic(
+                    name, 0.19 + (0.1 if label == "holes" else 0) - index * 0.006
+                ),
             }
     rows["front/Note"] = {
         "semantic": {"kind": 6},
@@ -78,7 +112,7 @@ def scene(monkeypatch):
             "configuration": "Default",
             "dimensions": {"BarLength": {"value": 0.169, "tolerance_type": 1}},
         },
-        {"BarLength": source_handle},
+        source_handles,
     )
     extension = NS(
         GetUserPreferenceDouble=Mock(side_effect=[0.005, 0.007]),
@@ -99,9 +133,16 @@ def changed(before):
         dimensions=dict(before.dimensions),
         tolerances=dict(before.tolerances),
     )
-    for key in before.dimensions:
-        after.rows[key]["position"] = (0.1, 0.21, 0)
-        after.rows[key]["measurement"]["native_strokes"] = ((0.1, 0.21, 0.12, 0.21),)
+    pairs, plans = control.planned_pairs(
+        before,
+        {label: NS(GetName2=lambda label=label: label) for label in control.PAIRS},
+    )
+    for label, keys in pairs.items():
+        first_line = plans[label]["geometry"][keys[0]]["line_y_m"] + 0.002
+        for index, key in enumerate(keys):
+            y = first_line - index * plans[label]["paper_pitch_m"]
+            after.rows[key]["position"] = (0.1, y + 0.002778, 0)
+            after.rows[key]["measurement"] = measured_basic(key.split("/")[1], y)
     return after
 
 
@@ -133,10 +174,11 @@ def wrapper(monkeypatch, scene, after=None):
         adapter, NS(build=build), trial, checkpoint, Mock(), object()
     )
     # Use the actual geometry-derived value, never a nominal assertion constant.
-    requested = control.planned_pairs(before, views)[1]
+    plans = control.planned_pairs(before, views)[1]
     adapter.currentModel.Extension.GetUserPreferenceDouble.side_effect = [
         0.005,
-        requested,
+        plans["front"]["document_offset_m"],
+        plans["holes"]["document_offset_m"],
     ]
     return NS(
         adapter=adapter,
@@ -153,15 +195,151 @@ def wrapper(monkeypatch, scene, after=None):
     )
 
 
-def test_pair_offset_uses_actual_body_height_and_exact_source_values(scene):
+def test_pair_offset_uses_full_body_to_line_reach_and_exact_source_values(scene):
     _, views, before = scene
-    before.rows["holes/RD2"]["measurement"]["body"]["ymax"] = 0.209
-    pairs, distance = control.planned_pairs(before, views)
+    before.rows["holes/RD2"]["measurement"]["body"]["ymax"] += 0.003
+    pairs, plans = control.planned_pairs(before, views)
     assert pairs == {
         "front": ("front/BarLength", "front/TipCentreX"),
         "holes": ("holes/RD1", "holes/RD2"),
     }
-    assert distance == pytest.approx(0.010)
+    assert plans["front"]["paper_pitch_m"] == pytest.approx(0.0081)
+    assert plans["holes"]["paper_pitch_m"] == pytest.approx(0.0111)
+    assert plans["front"]["document_offset_m"] == pytest.approx(0.0081)
+    assert plans["holes"]["document_offset_m"] == pytest.approx(0.0222)
+
+
+def test_retained_native_basic_lines_derive_calibrated_per_view_pitch(scene):
+    _, views, before = scene
+    for key, measurement in RETAINED["before"].items():
+        before.rows[key]["measurement"].update(deepcopy(measurement))
+    pairs, plans = control.planned_pairs(before, views)
+    assert plans["front"]["paper_pitch_m"] == pytest.approx(
+        0.00768111649025552, abs=1e-15
+    )
+    assert plans["holes"]["paper_pitch_m"] == pytest.approx(
+        0.00768111649025552, abs=1e-15
+    )
+    assert plans["front"]["document_offset_m"] == plans["front"]["paper_pitch_m"]
+    assert plans["holes"]["document_offset_m"] == plans["holes"]["paper_pitch_m"] * 2
+    after = replace(before, rows=deepcopy(before.rows))
+    for key, measurement in RETAINED["after"].items():
+        after.rows[key]["measurement"].update(deepcopy(measurement))
+    # Native movement alone did not provide line/body clearance at the old offset.
+    for label, keys in pairs.items():
+        with pytest.raises(RuntimeError, match="1mm paper line/body clearance"):
+            control.observed_pair_clearance(after, {label: keys})
+
+
+@pytest.mark.parametrize(
+    "mode",
+    ["scale", "missing_scale", "duplicate_scale", "source", "type", "parameters"],
+)
+def test_calibrated_gain_rejects_unmeasured_contracts(scene, mode):
+    _, views, before = scene
+    key = "front/BarLength"
+    if mode == "scale":
+        before.layout["front"]["scale"] = 0.25
+    if mode == "missing_scale":
+        del before.layout["front"]
+    if mode == "duplicate_scale":
+        before.layout["Sheet2/front"] = before.layout["front"]
+    if mode == "source":
+        before.dimensions[key] = replace(
+            before.dimensions[key], source=DimensionSource.DRAWING_REFERENCE
+        )
+    if mode == "type":
+        before.dimensions[key] = replace(before.dimensions[key], display_type=2)
+    if mode == "parameters":
+        before.dimensions[key] = replace(
+            before.dimensions[key], parameters=before.dimensions[key].parameters * 2
+        )
+    with pytest.raises(RuntimeError):
+        control.planned_pairs(before, views)
+
+
+def test_geometry_classification_is_independent_of_native_stroke_order_and_direction():
+    original = deepcopy(RETAINED["before"]["front/BarLength"])
+    shuffled = deepcopy(original)
+    shuffled["native_strokes"] = [
+        dict(row, start=row["end"], end=row["start"])
+        for row in reversed(shuffled["native_strokes"])
+    ]
+    assert control.basic_linear_geometry(shuffled) == control.basic_linear_geometry(
+        original
+    )
+
+
+@pytest.mark.parametrize(
+    "mode",
+    [
+        "extra",
+        "missing",
+        "diagonal",
+        "width",
+        "nan",
+        "open_frame",
+        "frame_outside",
+        "wrong_extension",
+        "native_jog",
+        "decoration",
+        "ambiguous",
+    ],
+)
+def test_unrecognized_basic_geometry_does_not_use_arbitrary_segment_indices(mode):
+    measured = measured_basic("BarLength", 0.19)
+    strokes = measured["native_strokes"]
+    if mode == "extra":
+        strokes.append(strokes[-1])
+    if mode == "missing":
+        strokes.pop()
+    if mode == "diagonal":
+        strokes[-1]["end"] = (0.18, 0.191)
+    if mode == "width":
+        strokes[0]["width_m"] = 0.0001
+    if mode == "nan":
+        strokes[0]["end"] = (float("nan"), 0.2)
+    if mode == "open_frame":
+        strokes[0]["end"] = (0.1, 0.21)
+    if mode == "frame_outside":
+        measured["body"]["xmin"] += 0.001
+    if mode == "wrong_extension":
+        strokes[-2]["start"] = (0.17, 0.4)
+        strokes[-2]["end"] = (0.17, 0.189)
+    if mode == "native_jog":
+        measured["native_leader_segments"] = [strokes[-1]]
+    if mode == "decoration":
+        measured["leader_decorations"][0]["xmin"] = float("nan")
+    if mode == "ambiguous":
+        strokes[1] = dict(strokes[-1])
+    with pytest.raises(RuntimeError):
+        control.basic_linear_geometry(measured)
+
+
+@pytest.mark.parametrize("mode", ["reverse_rank", "nonnested", "arrow_over_body"])
+def test_pair_geometry_requires_observed_rank_nested_stations_and_safe_decorations(
+    scene, mode
+):
+    _, views, before = scene
+    measured = before.rows["front/TipCentreX"]["measurement"]
+    if mode == "reverse_rank":
+        before.rows["front/TipCentreX"]["measurement"] = measured_basic(
+            "TipCentreX", 0.2
+        )
+    if mode == "nonnested":
+        # Entire second frame/body moves right of the first line's extension.
+        for x in ("xmin", "xmax"):
+            measured["body"][x] += 0.1
+        for stroke in measured["native_strokes"][:4]:
+            stroke["start"] = (stroke["start"][0] + 0.1, stroke["start"][1])
+            stroke["end"] = (stroke["end"][0] + 0.1, stroke["end"][1])
+        for stroke in measured["native_strokes"][4:]:
+            stroke["start"] = (stroke["start"][0] + 0.1, stroke["start"][1])
+            stroke["end"] = (stroke["end"][0] + 0.1, stroke["end"][1])
+    if mode == "arrow_over_body":
+        measured["leader_decorations"][0].update(xmin=0.11, xmax=0.13)
+    with pytest.raises(RuntimeError):
+        control.planned_pairs(before, views)
 
 
 def test_retained_native_nominal_roundoff_is_not_a_parameter_mutation(scene):
@@ -244,9 +422,8 @@ def test_named_pair_rejects_unsupported_or_wrong_feature_without_coordinate_sear
             before.dimensions[key], parameters=(("BarLength", key, 2, 0.170),)
         )
     if mode in {"nan_height", "zero_height"}:
-        before.rows[key]["measurement"]["body"]["ymax"] = (
-            float("nan") if mode == "nan_height" else 0.2
-        )
+        body = before.rows[key]["measurement"]["body"]
+        body["ymax"] = float("nan") if mode == "nan_height" else body["ymin"]
     with pytest.raises(RuntimeError):
         control.planned_pairs(before, views)
 
@@ -275,8 +452,8 @@ def test_named_native_void_calls_once_per_pair_then_original_gate_once(
     ]
     assert test.capture.call_count == 2
     extension = test.adapter.currentModel.Extension
-    assert extension.SetUserPreferenceDouble.call_count == 1
-    assert extension.GetUserPreferenceDouble.call_count == 2
+    assert extension.SetUserPreferenceDouble.call_count == 2
+    assert extension.GetUserPreferenceDouble.call_count == 3
     assert set(test.trial["linear_dimension_control"]["moved"]) == set(
         test.before.dimensions
     )
@@ -284,6 +461,57 @@ def test_named_native_void_calls_once_per_pair_then_original_gate_once(
     with pytest.raises(RuntimeError, match="exactly once"):
         test.invoke(test.adapter, views=test.views)
     assert test.select.call_count == 2
+
+
+def test_each_pair_uses_its_own_offset_immediately_before_single_native_call(
+    monkeypatch, scene
+):
+    test = wrapper(monkeypatch, scene)
+    events = []
+    extension = test.adapter.currentModel.Extension
+    extension.SetUserPreferenceDouble.side_effect = lambda p, o, v: (
+        events.append(("write", v)) or True
+    )
+    test.select.side_effect = lambda a, v, keys, b: (
+        events.append(("align", keys)) or {"seconds": 0.001}
+    )
+    test.invoke(test.adapter, views=test.views)
+    report = test.trial["linear_dimension_control"]
+    assert events == [
+        ("write", report["plans"]["front"]["document_offset_m"]),
+        ("align", ("front/BarLength", "front/TipCentreX")),
+        ("write", report["plans"]["holes"]["document_offset_m"]),
+        ("align", ("holes/RD1", "holes/RD2")),
+    ]
+    assert all(
+        row["line_body_clearance_m"] == pytest.approx(0.001)
+        for row in report["observed_pair_clearance"].values()
+    )
+    assert test.capture.call_count == 2  # existing full before/after, no per-pair scan
+
+
+def test_moved_pair_with_insufficient_actual_clearance_is_not_accepted(
+    monkeypatch, scene
+):
+    _, _, before = scene
+    after = changed(before)
+    # Translation proves movement, but unchanged 6mm rank still overlaps BASIC ink.
+    after.rows["holes/RD1"]["measurement"] = measured_basic("RD1", 0.3)
+    after.rows["holes/RD2"]["measurement"] = measured_basic("RD2", 0.294)
+    test = wrapper(monkeypatch, scene, after)
+    with pytest.raises(RuntimeError, match="1mm paper line/body clearance"):
+        test.invoke(test.adapter, views=test.views)
+    assert len(test.trial["linear_dimension_control"]["moved"]) == 4
+    test.original.assert_not_called()
+    assert test.capture.call_count == 2
+
+
+def test_retained_native_fixture_is_enrolled_by_recipe_gate():
+    import dodo
+
+    fixture = Path(__file__).parent / "diagnostics/_linear_pair_k5mypm3x.py"
+    task = next(item for item in dodo.task_check() if item["name"] == "recipe")
+    assert str(fixture.resolve()) in task["file_dep"]
 
 
 @pytest.mark.parametrize("mode", ["write_false", "readback", "invalid_initial"])
@@ -572,7 +800,7 @@ def test_capture_reads_native_inventory_once_and_rejects_owner_or_source_drift(
             bank.append(bank[0])
         view.GetAnnotationsByType = Mock(return_value=bank)
     if mode == "undeclared_model_parameter":
-        key = "front/BarLength"
+        key = "holes/RD1"
         annotations[id(before.handles[key][0])] = replace(
             before.dimensions[key], source=DimensionSource.MODEL
         )
