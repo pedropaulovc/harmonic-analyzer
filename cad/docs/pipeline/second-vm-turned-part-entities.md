@@ -76,7 +76,7 @@ VM1 will leave these nine paths to VM2 during this assignment. Read shared helpe
 as needed, but coordinate before editing the resolver, `_drawing_common.py`,
 factory/layout code, diagnostic runners/registries, `dodo.py`, adapter, builders,
 specs, configuration, templates, memory or any other recipe. Do not change
-#676 through #678, #680 through #682, #685, or the assembly extraction branches.
+PRs #676 through #678, #680 through #682, #685, or the assembly extraction branches.
 Keep the withdrawn mass-read optimization out of this work.
 
 ## Selection inventory and geometry traps
