@@ -862,7 +862,8 @@ def test_owned_fresh_pair_preserves_originals_and_two_visible_baseline_docs(
     monkeypatch.setattr(probe, "place_view", front)
 
     class Observer:
-        def __init__(self, adapter, trial, checkpoint):
+        def __init__(self, adapter, trial, checkpoint, *, expected_title=probe.TITLE):
+            assert expected_title == probe.TITLE
             self.annotation, self.key = adapter.currentModel.title_note, "Sheet1/Title"
             self.trial, self.checkpoint = trial, checkpoint
             trial["title_stages"] = []
@@ -944,7 +945,7 @@ def test_owned_fresh_pair_preserves_originals_and_two_visible_baseline_docs(
     monkeypatch.setattr(
         probe.retained,
         "pdf_title",
-        lambda path: glyphs(
+        lambda path, *, text=probe.TITLE: glyphs(
             20
             if path.name == "cold.pdf"
             and path.parent.name == "baseline"

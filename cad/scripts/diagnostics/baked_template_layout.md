@@ -158,3 +158,65 @@ region/layout policies and remain part of that acceptance, not bypasses.
 Only after those and review may the copied DRWDOT replace the project
 template. Its changed source bytes naturally invalidate prepared-template and
 drawing recipe keys; no per-recipe segment scan or layout setter is proposed.
+
+## Minimal populated control (offline-tested, not run yet)
+
+`probe_populated_template.py` consumes an explicit DRWDOT path and exact hash.
+It reuses the existing `probe_fresh_title_update.one_trial` lifecycle for one
+Front view each of an owned rocker and lever bytecopy. Existing update variants
+and their baseline reproduction gates remain unchanged. The populated control
+uses the no-treatment variant and independently requires exact cold native,
+linked-field PDF glyph and whole-page PNG equality; it does not claim a full
+manufacturing recipe.
+
+Normal `new_project_drawing` executes its existing note normalization, units,
+dimension styles, scale and rebuild operations. One scoped adapter-factory
+argument redirect selects the supplied DRWDOT and is restored on success or
+exception; only one matching `NewDocument` call is permitted. There are **no
+new title/layout setters**. This tests baked title formatting, not prepared
+default setup performance. Setup time and its separate default witness time
+are reported independently of the full diagnostic trial duration.
+
+The read-only observer verifies TITLE against the copied part's saved Summary
+Title, Number against its file-level Number property, and the preserved
+two-term Revision expression against drawing-level plus part-level Revision.
+Source configuration, native identity, selected source dimensions/tolerances,
+original/copy hashes and true drawing-plus-part cold reopening remain guarded
+by the existing trial. The first control targets the two exact recorded source
+manifests; configuration-specific property overrides are not being generalized.
+
+All linked fields and PART/DWG/REV/MATERIAL/FINISH labels are audited. Boxed
+values use their measured physical cells. Labels have explicit semantic
+associations with their value cells, so a MATERIAL label whose anchor is above
+its divider cannot be silently assigned to FINISH. Copyright is explicitly a
+footer strip between the measured outer sheet bottom and the DWG cell's lower
+rule, across the measured outer frame; it is not called a closed cell or used
+as a fallback for unknown notes. Its native and printed boxes must fit that
+strip without intersecting native template line segments. This does not claim
+a collision solver for arbitrary sketch curves or template SF glyphs; those
+remain raw/native and full-page print witnesses, and broader fleet acceptance
+remains subsequent work.
+
+Every native/PDF containment failure, unresolved visible formula, unsupported
+PDF text form, missing region and <1 mm pairwise field gap is retained as an
+acceptance failure. Material/finish crowding is not waived. These fit issues
+are collected across both targets to expose the full picture; ownership,
+source or native-safety failures still stop immediately. Strict cold raw
+font/link/layout/default and linked-field PDF-glyph changes also reject the
+result. Failed output is retained, never reset or substituted.
+
+After main-agent review and an explicit native seat grant:
+
+```powershell
+$env:HARMONIC_SW_AUTOSTART = '0'
+$env:HARMONIC_REMOTE_CACHE_MODE = 'off'
+$env:HARMONIC_DIAGNOSTIC_SW_PID = '31860'
+uv run --no-sync python cad/scripts/diagnostics/probe_populated_template.py `
+  --template C:/src/harmonic-analyzer/cad/out/reports/baked-template-rotski52/baked-template-rotski52.DRWDOT `
+  --template-sha256 1ad599b58fa54bef11a3dc1f5a70758c755bef271c05775f841221eaad0b976d `
+  --source-root C:/src/harmonic-analyzer/cad/out/sldprt
+```
+
+No native run of this populated control has occurred. Original project DRWDOT,
+the derived input, both original parts, imported adapter and helper files stay
+unchanged. The retained output report lives under `populated-template-*`.

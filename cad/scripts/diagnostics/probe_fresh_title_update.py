@@ -184,8 +184,9 @@ def find_title(adapter):
 class TitleObserver:
     """Cached exact title handle; no repeated full-document measurements."""
 
-    def __init__(self, adapter, trial, checkpoint):
+    def __init__(self, adapter, trial, checkpoint, *, expected_title=TITLE):
         self.adapter, self.trial, self.checkpoint = adapter, trial, checkpoint
+        self.expected_title = expected_title
         self.model = adapter.currentModel
         self.key, self.annotation = find_title(adapter)
         self.owner = self.annotation.Owner
@@ -261,7 +262,7 @@ class TitleObserver:
                 "cold_open",
                 "after_cold_pdf",
             }
-            and row["text"] != TITLE
+            and row["text"] != self.expected_title
         ):
             raise RuntimeError(
                 f"{stage}: title did not resolve to exact owned-part summary"
@@ -486,19 +487,23 @@ def finalizer_observations(adapter, observer, variant):
         )
 
 
-def printed_displacement(before, after):
+def printed_displacement(before, after, *, expected_title=TITLE):
     """Classify an experiment; never round/accept a native or PDF comparator."""
     if (
-        before["text"] != TITLE
-        or after["text"] != TITLE
+        before["text"] != expected_title
+        or after["text"] != expected_title
         or before["page_size_pt"] != after["page_size_pt"]
     ):
         raise RuntimeError("PDF title text/page changed")
     rows_before, rows_after = before["characters"], after["characters"]
-    if len(rows_before) != len(TITLE) or len(rows_after) != len(TITLE):
+    if len(rows_before) != len(expected_title) or len(rows_after) != len(
+        expected_title
+    ):
         raise RuntimeError("PDF title glyph multiplicity changed")
     deltas = []
-    for letter, left, right in zip(TITLE, rows_before, rows_after, strict=True):
+    for letter, left, right in zip(
+        expected_title, rows_before, rows_after, strict=True
+    ):
         if left["text"] != letter or right["text"] != letter:
             raise RuntimeError("PDF title character changed")
         a, b = (
@@ -583,13 +588,36 @@ def require_inputs(source, guard):
     return expected
 
 
-async def one_trial(adapter, variant, source, directory, report, checkpoint, expected):
+async def one_trial(
+    adapter,
+    variant,
+    source,
+    directory,
+    report,
+    checkpoint,
+    expected,
+    *,
+    source_target="rocker_arm",
+    source_title=TITLE,
+    factory=None,
+    observe_output=None,
+):
+    """Reuse exact lifecycle for a second explicit source/factory diagnostic.
+
+    Optional observation is read-only. Original update experiments retain their
+    default rocker manifest, production factory and baseline reproduction gate.
+    """
+    if source_target not in pilot.EXPECTED_PART_HASHES or not source_title:
+        raise ValueError("unsupported title trial source target/title")
+    source_sha = expected[str(source)]
     trial_dir = directory / variant.value
     trial_dir.mkdir()
     adapter.ownership.register_directory(trial_dir)
-    copy_source = trial_dir / f"rocker-source-{directory.name}-{variant.value}.SLDPRT"
+    copy_source = (
+        trial_dir / f"{source_target}-source-{directory.name}-{variant.value}.SLDPRT"
+    )
     shutil.copy2(source, copy_source)
-    copy_expected = {str(copy_source): EXPECTED_SOURCE_SHA256}
+    copy_expected = {str(copy_source): source_sha}
     retained.require_hashes(copy_expected, "exact fresh title part copy")
     stem = f"title-{directory.name}-{variant.value}"
     outputs = drawing.DrawingOutputs(
@@ -601,7 +629,7 @@ async def one_trial(adapter, variant, source, directory, report, checkpoint, exp
         "variant": variant.value,
         "status": "running",
         "source_copy": str(copy_source),
-        "copy_hashes": {"initial": EXPECTED_SOURCE_SHA256},
+        "copy_hashes": {"initial": source_sha},
     }
     report["trials"].append(trial)
     checkpoint()
@@ -612,15 +640,17 @@ async def one_trial(adapter, variant, source, directory, report, checkpoint, exp
         )
         source_model = adapter.currentModel
         trial["source_before"], source_handles = pilot.source_dimensions(
-            source_model, "rocker_arm", copy_source
+            source_model, source_target, copy_source
         )
-        if str(source_model.SummaryInfo(0)) != TITLE:
+        if str(source_model.SummaryInfo(0)) != source_title:
             raise RuntimeError(
                 "owned source does not contain the exact saved summary Title"
             )
         with adapter.ownership.creating_document(DocumentKind.DRAWING, outputs.slddrw):
-            drawing.new_project_drawing(adapter, scale=SCALE)
-            observer = TitleObserver(adapter, trial, checkpoint)
+            (factory or drawing.new_project_drawing)(adapter, scale=SCALE)
+            observer = TitleObserver(
+                adapter, trial, checkpoint, expected_title=source_title
+            )
             observer.record("after_blank_setup")
             view = place_view(
                 adapter, str(copy_source), "*Front", *FRONT_CENTER, scale=SCALE
@@ -660,7 +690,7 @@ async def one_trial(adapter, variant, source, directory, report, checkpoint, exp
                 "title annotation was replaced during fresh construction"
             )
         trial["source_after"], after_handles = pilot.source_dimensions(
-            source_model, "rocker_arm", copy_source
+            source_model, source_target, copy_source
         )
         pilot.require_same_source(
             trial["source_before"],
@@ -670,7 +700,9 @@ async def one_trial(adapter, variant, source, directory, report, checkpoint, exp
             handles_before=source_handles,
             handles_after=after_handles,
         )
-        trial["first_pdf_title"] = retained.pdf_title(outputs.pdf)
+        trial["first_pdf_title"] = retained.pdf_title(outputs.pdf, text=source_title)
+        if observe_output is not None:
+            observe_output(adapter, "built", trial, outputs.pdf)
         if variant is Variant.LEFT_TITLE_CELL:
             title_cell.require_pdf_fit(
                 trial["left_title_cell"]["cell_m"], trial["first_pdf_title"]
@@ -687,7 +719,9 @@ async def one_trial(adapter, variant, source, directory, report, checkpoint, exp
         # New handle after cold reopen: never redraw this already-resolved copy.
         cold_trial = {"title_stages": []}
         trial["cold_title"] = cold_trial
-        cold = TitleObserver(adapter, cold_trial, checkpoint)
+        cold = TitleObserver(
+            adapter, cold_trial, checkpoint, expected_title=source_title
+        )
         cold_open = cold.record("cold_open")
         require_title_style(trial["title_stages"][-1], cold_open)
         if variant in (Variant.RELINK, Variant.LEFT_TITLE_CELL):
@@ -710,7 +744,7 @@ async def one_trial(adapter, variant, source, directory, report, checkpoint, exp
         )
         reopened_source = adapter.swApp.GetOpenDocumentByName(str(copy_source))
         trial["source_reopened"], cold_source_handles = pilot.source_dimensions(
-            reopened_source, "rocker_arm", copy_source
+            reopened_source, source_target, copy_source
         )
         pilot.require_same_source(
             trial["source_before"],
@@ -735,7 +769,7 @@ async def one_trial(adapter, variant, source, directory, report, checkpoint, exp
             adapter, copy_source, trial["source_before"]["configuration"]
         )
         trial["source_after_cold_pdf"], after_cold_source_handles = (
-            pilot.source_dimensions(reopened_source, "rocker_arm", copy_source)
+            pilot.source_dimensions(reopened_source, source_target, copy_source)
         )
         pilot.require_same_source(
             trial["source_reopened"],
@@ -763,13 +797,17 @@ async def one_trial(adapter, variant, source, directory, report, checkpoint, exp
         require_cold_semantics(trial["reopened"], trial["after_cold_pdf"])
         drawing.render_pdf_png(cold_pdf, cold_png)
         trial["cold_artifacts"] = {"pdf": str(cold_pdf), "png": str(cold_png)}
-        trial["cold_pdf_title"] = retained.pdf_title(cold_pdf)
+        trial["cold_pdf_title"] = retained.pdf_title(cold_pdf, text=source_title)
+        if observe_output is not None:
+            observe_output(adapter, "cold", trial, cold_pdf)
         if variant is Variant.LEFT_TITLE_CELL:
             title_cell.require_pdf_fit(
                 trial["left_title_cell"]["cell_m"], trial["cold_pdf_title"]
             )
         trial["printed"] = printed_displacement(
-            trial["first_pdf_title"], trial["cold_pdf_title"]
+            trial["first_pdf_title"],
+            trial["cold_pdf_title"],
+            expected_title=source_title,
         )
         trial["png_delta"] = retained.compare_png(outputs.png, cold_png)
         retained.require_hashes(native_expected, "cold PDF did not save native drawing")
