@@ -75,6 +75,47 @@ def _bootstrap_pid():
     return int(value)
 
 
+def _bootstrap_builder_logs(request, task, build):
+    """Bind the existing launch/artifact logs to this exact producer checkout."""
+    path = ROOT / "cad/out/reports/telemetry/logs.jsonl"
+    prefixes = (">> part:crank_arm: ", "artefact part: ")
+    # dodo records ' '.join(cmd), not a shell-quoted command line. Compare the
+    # whole record built from its fixed two-element argv; do not split on spaces
+    # or accept substrings (both would misread Windows paths containing spaces).
+    expected = (
+        prefixes[0] + f"{ROOT / '.venv/Scripts/python.exe'} "
+        f"{ROOT / 'cad/scripts/build_crank_arm.py'}",
+        prefixes[1] + str(SOURCE),
+    )
+    records = {prefix: [] for prefix in prefixes}
+    with path.open(encoding="utf-8") as stream:
+        for line in stream:
+            row = json.loads(line)
+            if row.get("trace_id") != request.builder_trace:
+                continue
+            body = row.get("body")
+            for prefix in prefixes:
+                if isinstance(body, str) and body.startswith(prefix):
+                    records[prefix].append(row)
+    if any(len(rows) != 1 for rows in records.values()):
+        raise RuntimeError("bootstrap producer needs one launch and artifact log")
+    selected = [records[prefix][0] for prefix in prefixes]
+    intervals = (
+        (_bootstrap_time(task["start_time"]), _bootstrap_time(build["start_time"])),
+        (_bootstrap_time(build["end_time"]), _bootstrap_time(task["end_time"])),
+    )
+    for row, body, (start, end) in zip(selected, expected, intervals, strict=True):
+        if (
+            row["body"] != body
+            or row.get("span_id") != task["context"]["span_id"]
+            or row.get("attributes", {}).get("code.file.path")
+            != str(ROOT / "cad/scripts/_telemetry.py")
+            or not start <= _bootstrap_time(row["timestamp"]) <= end
+        ):
+            raise RuntimeError("bootstrap producer log has foreign paths or context")
+    return {"path": str(path), "records": selected}
+
+
 def bootstrap_inputs(request):
     """Validate recorded local build evidence, without accepting a replacement pin.
 
@@ -203,6 +244,7 @@ def bootstrap_inputs(request):
         "token_file_identity": [TOKEN.stat().st_dev, TOKEN.stat().st_ino],
         "builder_trace_file": str(traces),
         "builder_spans": selected,
+        "builder_logs": _bootstrap_builder_logs(request, task, build),
         "host": platform.node(),
         **{name: str(actual.resolve()) for name, (actual, _) in imports.items()},
     }
@@ -397,6 +439,21 @@ def _bootstrap_current(adapter, model, path, kind):
         raise RuntimeError("bootstrap has the wrong exact owned document context")
 
 
+async def _bootstrap_interruption_cleanup(adapter, report, error):
+    """Attempt only owned cleanup, retaining the original interruption object."""
+    adapter.ownership.failure = repr(error)
+    try:
+        await adapter.close_owned_documents()
+    except BaseException as cleanup:
+        report["interruption_cleanup_error"] = repr(cleanup)
+        error.add_note(f"bootstrap owned cleanup also failed: {cleanup!r}")
+    try:
+        adapter.ownership.checkpoint()
+    except BaseException as checkpoint:
+        report["interruption_checkpoint_error"] = repr(checkpoint)
+        error.add_note(f"bootstrap ownership checkpoint also failed: {checkpoint!r}")
+
+
 @_telemetry.traced("diagnostic.crank_arm.bootstrap")
 async def capture_bootstrap(adapter, directory, request):
     """Capture new local evidence only; never adopt pins or declare equivalence."""
@@ -433,6 +490,7 @@ async def capture_bootstrap(adapter, directory, request):
     }
     controller = None
     copy_created = False
+    interruption_handled = False
     try:
         report["provenance"] = bootstrap_inputs(request)
         adapter.ownership.register_source(SOURCE)
@@ -535,66 +593,83 @@ async def capture_bootstrap(adapter, directory, request):
         # The existing outer owner handles Exception, not process interruptions.
         # Close only our owned documents before propagating the original object.
         if not isinstance(error, Exception):
-            adapter.ownership.failure = repr(error)
-            try:
-                await adapter.close_owned_documents()
-            except BaseException as cleanup:
-                report["interruption_cleanup_error"] = repr(cleanup)
-                error.add_note(f"bootstrap owned cleanup also failed: {cleanup!r}")
-            try:
-                adapter.ownership.checkpoint()
-            except BaseException as checkpoint:
-                report["interruption_checkpoint_error"] = repr(checkpoint)
-                error.add_note(
-                    f"bootstrap ownership checkpoint also failed: {checkpoint!r}"
-                )
+            interruption_handled = True
+            await _bootstrap_interruption_cleanup(adapter, report, error)
         raise
     finally:
         primary, errors = sys.exception(), []
-        actions = {
-            "source_original": lambda: sha(SOURCE),
-            "execution_token": lambda: TOKEN.read_text(encoding="utf-8").strip(),
-        }
-        if copy_created or source.exists():
-            actions["source_copy"] = lambda: sha(source)
-        for name, action in actions.items():
-            try:
-                report[name] = action()
-                if report[name] != request.expected_source_sha:
-                    raise RuntimeError(f"bootstrap final {name} changed")
-            except Exception as error:
-                report[name] = {"value": report.get(name), "error": repr(error)}
-                errors.append(error)
         try:
-            final = bootstrap_inputs(request)
-            report["provenance_after"] = final
-            if "provenance" in report and final != report["provenance"]:
-                raise RuntimeError("bootstrap builder/input evidence changed")
-        except Exception as error:
-            errors.append(error)
-        if controller is not None:
+            actions = {
+                "source_original": lambda: sha(SOURCE),
+                "execution_token": lambda: TOKEN.read_text(encoding="utf-8").strip(),
+            }
+            if copy_created or source.exists():
+                actions["source_copy"] = lambda: sha(source)
+            for name, action in actions.items():
+                try:
+                    report[name] = action()
+                    if report[name] != request.expected_source_sha:
+                        raise RuntimeError(f"bootstrap final {name} changed")
+                except Exception as error:
+                    report[name] = {"value": report.get(name), "error": repr(error)}
+                    errors.append(error)
             try:
-                report["template_guards"] = _require_template_guards(controller)
+                final = bootstrap_inputs(request)
+                report["provenance_after"] = final
+                if "provenance" in report and final != report["provenance"]:
+                    raise RuntimeError("bootstrap builder/input evidence changed")
             except Exception as error:
                 errors.append(error)
-            report["template_guard_details"] = controller.guards
-        if errors:
-            report.update(
-                status="failed", final_errors=[repr(error) for error in errors]
+            if controller is not None:
+                try:
+                    report["template_guards"] = _require_template_guards(controller)
+                except Exception as error:
+                    errors.append(error)
+                report["template_guard_details"] = controller.guards
+            if errors:
+                report.update(
+                    status="failed", final_errors=[repr(error) for error in errors]
+                )
+            try:
+                report_path.write_text(
+                    json.dumps(report, indent=2, default=json_default), encoding="utf-8"
+                )
+            except Exception as error:
+                errors.append(error)
+            if errors:
+                raise BaseExceptionGroup(
+                    "bootstrap capture/final evidence failures",
+                    ([primary] if primary else []) + errors,
+                ) from None
+        except BaseException as final_error:
+            if isinstance(final_error, Exception):
+                raise
+            interruption = (
+                primary
+                if primary is not None and not isinstance(primary, Exception)
+                else final_error
             )
-        try:
-            # This finalizer already preserves primary + write failures, including
-            # BaseException interruptions; do not nest the legacy report wrapper.
-            report_path.write_text(
-                json.dumps(report, indent=2, default=json_default), encoding="utf-8"
-            )
-        except Exception as error:
-            errors.append(error)
-        if errors:
-            raise BaseExceptionGroup(
-                "bootstrap capture/final evidence failures",
-                ([primary] if primary else []) + errors,
-            ) from None
+            report["status"] = "failed"
+            report.setdefault("error", repr(interruption))
+            report["interruption"] = repr(interruption)
+            if final_error is not interruption:
+                report["interruption_final_error"] = repr(final_error)
+                interruption.add_note(
+                    f"bootstrap final evidence also failed: {final_error!r}"
+                )
+            if primary is not None and primary is not interruption:
+                interruption.add_note(f"bootstrap capture also failed: {primary!r}")
+            if not interruption_handled:
+                await _bootstrap_interruption_cleanup(adapter, report, interruption)
+            try:
+                report_path.write_text(
+                    json.dumps(report, indent=2, default=json_default), encoding="utf-8"
+                )
+            except BaseException as write_error:
+                interruption.add_note(
+                    f"bootstrap interrupted receipt write failed: {write_error!r}"
+                )
+            raise interruption
     return {"report": str(report_path)}
 
 

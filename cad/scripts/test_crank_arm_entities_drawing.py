@@ -664,6 +664,8 @@ def bootstrap_files(tmp_path, monkeypatch):
     import draw_crank_arm as recipe
     import solidworks_mcp.adapters.pywin32_adapter as adapter_module
 
+    tmp_path = tmp_path / "checkout with spaces"
+    tmp_path.mkdir()
     source = tmp_path / "cad/out/sldprt/crank-arm.SLDPRT"
     source.parent.mkdir(parents=True)
     source.write_bytes(b"genuine local build fixture")
@@ -699,10 +701,35 @@ def bootstrap_files(tmp_path, monkeypatch):
     ]
     traces = tmp_path / "cad/out/reports/telemetry/traces.jsonl"
     traces.parent.mkdir(parents=True)
+    logs = traces.with_name("logs.jsonl")
+    commands = [
+        {
+            "body": f">> part:crank_arm: {tmp_path / '.venv/Scripts/python.exe'} "
+            f"{tmp_path / 'cad/scripts/build_crank_arm.py'}",
+            "trace_id": trace,
+            "span_id": "parent",
+            "timestamp": "2026-09-07T00:00:00.500000Z",
+            "attributes": {
+                "code.file.path": str(tmp_path / "cad/scripts/_telemetry.py")
+            },
+        },
+        {
+            "body": f"artefact part: {source}",
+            "trace_id": trace,
+            "span_id": "parent",
+            "timestamp": "2026-09-07T00:00:08.500000Z",
+            "attributes": {
+                "code.file.path": str(tmp_path / "cad/scripts/_telemetry.py")
+            },
+        },
+    ]
 
     def write():
         traces.write_text(
             "\n".join(json.dumps(row) for row in rows) + "\n", encoding="utf-8"
+        )
+        logs.write_text(
+            "\n".join(json.dumps(row) for row in commands) + "\n", encoding="utf-8"
         )
 
     write()
@@ -748,6 +775,8 @@ def bootstrap_files(tmp_path, monkeypatch):
         rows=rows,
         write=write,
         traces=traces,
+        logs=logs,
+        commands=commands,
         request=request,
         git=git,
         git_calls=git_calls,
@@ -770,6 +799,90 @@ def test_bootstrap_inputs_require_actual_completed_local_builder_and_token(
     assert row["baseline_revision"] == "b" * 40
     assert row["adapter_commit"] == "c" * 40
     assert probe.EXPECTED_SOURCE_SHA != row["source_sha256"]
+
+
+def test_bootstrap_retains_exact_producer_records_with_windows_path_spaces(
+    bootstrap_files,
+):
+    state = bootstrap_files
+    row = probe.bootstrap_inputs(state.request)
+    assert row["builder_logs"] == {"path": str(state.logs), "records": state.commands}
+    assert "checkout with spaces" in state.commands[0]["body"]
+
+
+@pytest.mark.parametrize(
+    "fault",
+    [
+        "missing",
+        "duplicate",
+        "foreign_python",
+        "foreign_script",
+        "foreign_output",
+        "foreign_origin",
+        "wrong_span",
+        "wrong_trace",
+        "late_command",
+        "early_output",
+        "quoted_command",
+        "substring_command",
+    ],
+)
+def test_bootstrap_rejects_unbound_producer_logs(bootstrap_files, fault):
+    state = bootstrap_files
+    if fault == "missing":
+        state.commands.pop()
+    elif fault == "duplicate":
+        state.commands.append(dict(state.commands[0]))
+    elif fault == "foreign_python":
+        state.commands[0]["body"] = state.commands[0]["body"].replace(
+            str(probe.ROOT / ".venv/Scripts/python.exe"), "C:\\other\\python.exe"
+        )
+    elif fault == "foreign_script":
+        state.commands[0]["body"] = state.commands[0]["body"].replace(
+            str(probe.ROOT / "cad/scripts/build_crank_arm.py"),
+            "C:\\other\\build_crank_arm.py",
+        )
+    elif fault == "foreign_output":
+        state.commands[1]["body"] = "artefact part: C:\\other\\crank-arm.SLDPRT"
+    elif fault == "foreign_origin":
+        state.commands[0]["attributes"]["code.file.path"] = "C:\\other\\_telemetry.py"
+    elif fault == "wrong_span":
+        state.commands[0]["span_id"] = "other-task"
+    elif fault == "wrong_trace":
+        state.commands[0]["trace_id"] = "0x" + "2" * 32
+    elif fault == "late_command":
+        state.commands[0]["timestamp"] = "2026-09-07T00:00:02Z"
+    elif fault == "early_output":
+        state.commands[1]["timestamp"] = "2026-09-07T00:00:07Z"
+    elif fault == "quoted_command":
+        state.commands[0]["body"] = state.commands[0]["body"].replace(
+            str(probe.ROOT / ".venv/Scripts/python.exe"),
+            '"' + str(probe.ROOT / ".venv/Scripts/python.exe") + '"',
+        )
+    else:
+        state.commands[0]["body"] += " --foreign-option"
+    state.write()
+    with pytest.raises(RuntimeError, match="producer"):
+        probe.bootstrap_inputs(state.request)
+
+
+def test_bootstrap_ignores_other_traces_but_rejects_shared_trace_foreign_producer(
+    bootstrap_files,
+):
+    state = bootstrap_files
+    foreign = dict(
+        state.commands[0],
+        trace_id="0x" + "2" * 32,
+        body=">> part:crank_arm: C:\\other\\python.exe C:\\other\\build_crank_arm.py",
+    )
+    state.commands.append(foreign)
+    state.write()
+    row = probe.bootstrap_inputs(state.request)
+    assert row["builder_logs"]["records"] == state.commands[:2]
+    foreign["trace_id"] = state.request.builder_trace
+    state.write()
+    with pytest.raises(RuntimeError, match="producer"):
+        probe.bootstrap_inputs(state.request)
 
 
 @pytest.mark.parametrize(
@@ -1213,3 +1326,163 @@ async def test_bootstrap_interruption_retains_failure_and_closes_only_owned_docu
         == row["execution_token"]
         == state.digest
     )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("error_type", [asyncio.CancelledError, KeyboardInterrupt])
+@pytest.mark.parametrize("boundary", ["inputs", "hash", "write"])
+async def test_bootstrap_finalizer_interruption_cleans_actual_outer_callback(
+    bootstrap_callback, monkeypatch, error_type, boundary
+):
+    from diagnostics import _owned_native_documents as owned
+
+    state = bootstrap_callback
+    primary = error_type("interrupted final evidence")
+    checkpoint = Mock()
+    state.adapter.ownership.checkpoint = checkpoint
+    monkeypatch.setattr(owned, "DiagnosticAdapter", lambda adapter: adapter)
+    original_inputs = probe.bootstrap_inputs
+    input_calls = []
+
+    def inputs(request):
+        input_calls.append(request)
+        if boundary == "inputs" and len(input_calls) == 2:
+            raise primary
+        return original_inputs(request)
+
+    monkeypatch.setattr(probe, "bootstrap_inputs", inputs)
+    original_sha = probe.sha
+    fired = []
+
+    def sha(path):
+        if boundary == "hash" and state.insertions and not fired:
+            fired.append("hash")
+            raise primary
+        return original_sha(path)
+
+    monkeypatch.setattr(probe, "sha", sha)
+    original_write = Path.write_text
+
+    def write(path, data, *args, **kwargs):
+        if boundary == "write" and '"status": "captured"' in data and not fired:
+            fired.append("write")
+            raise primary
+        return original_write(path, data, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "write_text", write)
+    with pytest.raises(error_type) as raised:
+        await owned.owned_callback(
+            state.adapter,
+            lambda adapter: probe.capture_bootstrap(
+                adapter, state.directory, state.request
+            ),
+        )
+    assert raised.value is primary
+    assert len(state.insertions) == 14 and state.events.count("save") == 1
+    assert state.events.count("close") == 1 and not state.documents
+    checkpoint.assert_called_once_with()
+    row = json.loads(
+        (state.directory / "measurements.json").read_text(encoding="utf-8")
+    )
+    assert row["status"] == "failed" and "interrupted final evidence" in row["error"]
+    assert row["acceptance"] == "not_run" and row["equivalence"] == "unproven"
+
+
+@pytest.mark.asyncio
+async def test_bootstrap_preserves_first_interruption_and_secondary_cleanup_errors(
+    bootstrap_callback, monkeypatch
+):
+    state = bootstrap_callback
+    primary = KeyboardInterrupt("first interruption")
+    secondary = asyncio.CancelledError("final provenance interrupted")
+    calls = []
+
+    def inputs(request):
+        calls.append(request)
+        if len(calls) == 2:
+            raise secondary
+        return dict(state.inputs)
+
+    def capture(*args):
+        raise primary
+
+    original_close = state.adapter.close_owned_documents
+
+    async def close():
+        await original_close()
+        raise RuntimeError("cleanup read failed")
+
+    monkeypatch.setattr(probe, "bootstrap_inputs", inputs)
+    monkeypatch.setattr(probe, "_source_snapshot_with_handles", capture)
+    state.adapter.close_owned_documents = close
+    state.adapter.ownership.checkpoint = Mock(
+        side_effect=RuntimeError("checkpoint failed")
+    )
+    with pytest.raises(KeyboardInterrupt) as raised:
+        await probe.capture_bootstrap(state.adapter, state.directory, state.request)
+    assert raised.value is primary
+    assert state.events.count("close") == 1
+    row = json.loads(
+        (state.directory / "measurements.json").read_text(encoding="utf-8")
+    )
+    assert row["status"] == "failed" and "first interruption" in row["error"]
+    assert "cleanup read failed" in row["interruption_cleanup_error"]
+    assert "checkpoint failed" in row["interruption_checkpoint_error"]
+    assert "final provenance interrupted" in row["interruption_final_error"]
+
+
+@pytest.mark.asyncio
+async def test_bootstrap_final_interruption_keeps_prior_capture_failure(
+    bootstrap_callback, monkeypatch
+):
+    state = bootstrap_callback
+    state.fault = "save"
+    primary = KeyboardInterrupt("final read interrupted after save failure")
+    calls = []
+
+    def inputs(request):
+        calls.append(request)
+        if len(calls) == 2:
+            raise primary
+        return dict(state.inputs)
+
+    monkeypatch.setattr(probe, "bootstrap_inputs", inputs)
+    state.adapter.ownership.checkpoint = Mock()
+    with pytest.raises(KeyboardInterrupt) as raised:
+        await probe.capture_bootstrap(state.adapter, state.directory, state.request)
+    assert raised.value is primary and state.events.count("close") == 1
+    row = json.loads(
+        (state.directory / "measurements.json").read_text(encoding="utf-8")
+    )
+    assert "primary save failure" in row["error"]
+    assert "final read interrupted" in row["interruption"]
+    assert any("primary save failure" in note for note in primary.__notes__)
+
+
+@pytest.mark.asyncio
+async def test_bootstrap_interrupted_emergency_report_write_preserves_original(
+    bootstrap_callback, monkeypatch
+):
+    state = bootstrap_callback
+    primary = KeyboardInterrupt("final provenance interrupted")
+    calls = []
+    original_write = Path.write_text
+
+    def inputs(request):
+        calls.append(request)
+        if len(calls) == 2:
+            raise primary
+        return dict(state.inputs)
+
+    def write(path, data, *args, **kwargs):
+        if '"interruption"' in data:
+            raise OSError("receipt storage unavailable")
+        return original_write(path, data, *args, **kwargs)
+
+    monkeypatch.setattr(probe, "bootstrap_inputs", inputs)
+    monkeypatch.setattr(Path, "write_text", write)
+    state.adapter.ownership.checkpoint = Mock()
+    with pytest.raises(KeyboardInterrupt) as raised:
+        await probe.capture_bootstrap(state.adapter, state.directory, state.request)
+    assert raised.value is primary and state.events.count("close") == 1
+    assert any("receipt storage unavailable" in note for note in primary.__notes__)

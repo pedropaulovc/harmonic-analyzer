@@ -29,6 +29,12 @@ capture, it verifies:
   The task must report a cache miss. Source modification time falls within the
   build span; token modification follows it within the task span. A later local
   crank task rejects the request. Other appended telemetry is allowed.
+- The matching `logs.jsonl` has exactly one launch and one output-part record
+  in that task's trace and span. They identify this checkout's `.venv` Python,
+  `build_crank_arm.py`, output part and `_telemetry.py` origin. The launch occurs
+  before `part.build`, and the output record after it. Both complete records
+  are retained and compared again at final capture. A shared telemetry directory
+  does not make a foreign producer local.
 - An explicit positive `HARMONIC_DIAGNOSTIC_SW_PID` identifies the licensed process.
   The shared attach-only runner still requires autostart disabled and the parent
   seat lock. The callback independently checks the attached PID.
@@ -40,7 +46,7 @@ the existing `read_required_properties` path and documented
 document and native identity are checked around the source read. No property,
 dimension, source save or token setter is introduced.
 
-The build trace, token and native stamp are independent consistency checks within
+The build trace, producer logs, token and native stamp are consistency checks within
 the local build workflow. They are not signed attestations and do not prove that
 two independently rebuilt solids are geometrically equivalent. Copying a native
 file or restamping its token does not satisfy this procedure.
@@ -94,7 +100,11 @@ overwritten. Operation errors and independent final guard errors remain in the
 receipt and cause failure.
 For a cancellation or keyboard interruption, this callback attempts owned-document
 cleanup and the ownership checkpoint before rethrowing the original interruption.
-That handling is local to `bootstrap`; it does not change the shared runner.
+This includes interruptions during final hash/provenance reads and receipt writes.
+Cleanup runs once. The callback retains earlier capture errors and secondary
+cleanup failures, then attempts a failed receipt write. If that write also fails,
+the original interruption carries the write error as an exception note; the prior
+receipt must not be treated as complete. This handling is local to `bootstrap`.
 
 ## Evidence still needed before changing pins
 
@@ -132,3 +142,46 @@ they do not constitute native acceptance. Ruff and `git diff --check` passed.
 An AST comparison against the base preserved all 19 existing probe functions
 other than CLI dispatch and the source-reader extraction, all 23 existing test
 functions/classes, and all top-level constants. No deliberate assertion changed.
+
+## Review corrections after d76c9943
+
+The Windows Codex full-base review of `d76c9943` against `bca3e4e7` found two
+problems: trace location alone did not establish the producing checkout, and
+interruptions inside the finalizer skipped owned cleanup. Its complete receipt is
+retained at `C:/src/ha-bsurf-column-row-review/cad/out/reports/codex-crank-bootstrap-d76c9943/`.
+The independent actual-callback reproduction (`run-4pqmm4uf`) left two owned
+document doubles live and the receipt `running` when the final provenance read
+was interrupted. This was an offline bug witness, not a native run.
+
+The producer check uses existing logs; no shared runtime telemetry changed.
+`dodo._run_subprocess` emits `">> part:crank_arm: " + " ".join(cmd)` from its
+two-element Python/script argument list. `_common.run_build` emits
+`"artefact part: " + path` after the build returns. Retained native trace
+`0xd8cf5918a61444e622a0caa4fad294a7` in the primary checkout's September 2
+`logs.jsonl` records both shapes with the same task span. This establishes the
+record format, not acceptance of a new bootstrap source.
+
+The diagnostic compares each complete emitted string against the frozen producer
+paths. It does not parse the unquoted display string as a shell command, split
+paths on spaces, strip quotes or accept path substrings. Windows paths containing
+spaces are covered; added quotes/options and foreign/duplicate/missing records
+reject. Other traces can coexist in the file without supplying this task's proof.
+
+The first 20 new cases failed before the fixes (`run-edt5ruz4` in
+`C:/src/ha-crank-bootstrap-guards/cad/out/reports/pytest-telemetry/`). They cover
+producer identity and interruption in final provenance, hash and report operations.
+The interruption tests call the real `capture_bootstrap` and shared
+`owned_callback` with the existing native doubles. Historical modes, source pins
+and manufacturing assertions remain unchanged. Native bootstrap and all later
+equivalence/cold/print requirements remain pending.
+
+After the fixes, the same eight suites passed 260 tests in 11.37 seconds
+(`run-herr9u2a`). Ruff F/E9 and `git diff --check` passed. The read-only
+`cad/out/reports/bootstrap-guard-audit.py` replay accepted the complete retained
+September 2 task/build/log records; its full output is
+`cad/out/reports/bootstrap-guard-audit.log` in the guards worktree. That audit also
+confirmed all 27 unchanged probe definitions, 39 unchanged test definitions and
+all existing top-level constants remain exact. Only the two corrected bootstrap
+functions and the fixture's required producer-log bank are excluded from those
+definition counts. This is log-format and offline regression evidence, not a
+native bootstrap run.
