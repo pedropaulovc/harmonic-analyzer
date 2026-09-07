@@ -137,6 +137,9 @@ class EntityAcceptance:
                 entity_type=self.kinds[role][0],
                 label=f"{phase} {role}",
             )
+            drawing._validate_native_pmi_placement(
+                adapter, annotation, label=f"{phase} {role}"
+            )
             result[role] = {
                 "view": key[0],
                 "name": name,

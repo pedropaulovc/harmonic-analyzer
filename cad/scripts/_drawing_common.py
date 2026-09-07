@@ -211,10 +211,14 @@ class DrawingOutputs:
 
 @dataclass(frozen=True)
 class PmiDrawingPlacement:
-    """Drawing-view routing and layout contract for one model-owned PMI item."""
+    """Drawing-view routing and layout contract for one model-owned PMI item.
+
+    ``position=None`` retains native placement with an explicit model entity.
+    Numeric positions retain the existing exact layout/tolerance contract.
+    """
 
     view: Any
-    position: tuple[float, float]
+    position: tuple[float, float] | None
     attachment_xy: tuple[float, float] | None = None
     edge_entity: Any | None = None
     entity: Any | None = None
@@ -231,6 +235,10 @@ class PmiDrawingPlacement:
             raise ValueError(
                 "projected PMI placement needs exactly one attachment coordinate/entity"
             )
+        if self.position is None and self.entity is None:
+            raise ValueError("native PMI placement requires an explicit model entity")
+        if self.position is None and self.leader_attachment_xy is not None:
+            raise ValueError("native PMI placement cannot fix a leader endpoint")
         if self.position_tolerance_m <= 0.0:
             raise ValueError("projected PMI position tolerance must be positive")
 
@@ -432,6 +440,32 @@ def _validate_native_annotation(
             f"{label}: native annotation anchor is outside the sheet: "
             f"position={position}, sheet={(width, height)}; inspect drawing layout"
         )
+
+
+def _validate_native_pmi_placement(adapter: Any, annotation: Any, *, label: str) -> None:
+    """Require a visible-state, non-dangling, on-sheet anchor at the PMI bank.
+
+    Visible=1 is individual visibility, not proof of unhidden layers or printed
+    readability. Full body/layout and render checks remain separate acceptance.
+    Unlike insertion-time diagnostics, this bank may not defer anchor overflow.
+    """
+    annotation = _early_bound(annotation, "IAnnotation")
+    if int(annotation.Visible) != 1 or annotation.IsDangling():
+        raise RuntimeError(f"{label}: native PMI is hidden, unknown, or dangling")
+    position = tuple(annotation.GetPosition() or ())
+    if len(position) != 3 or not all(math.isfinite(value) for value in position):
+        raise RuntimeError(f"{label}: native PMI has an unreadable position")
+    sheet = _early_bound(adapter.currentModel, "IDrawingDoc").GetCurrentSheet()
+    if sheet is None:
+        raise RuntimeError(f"{label}: native PMI has no drawing sheet")
+    properties = tuple(_early_bound(sheet, "ISheet").GetProperties2() or ())
+    if len(properties) < 7:
+        raise RuntimeError(f"{label}: native PMI sheet size is unreadable")
+    width, height = float(properties[5]), float(properties[6])
+    if not all(math.isfinite(value) and value > 0 for value in (width, height)):
+        raise RuntimeError(f"{label}: native PMI sheet size is invalid")
+    if not (0 <= position[0] <= width and 0 <= position[1] <= height):
+        raise RuntimeError(f"{label}: native PMI anchor is outside the sheet: {position}")
 
 
 @_telemetry.traced("drawing.datum_feature", label_param="label")
@@ -949,20 +983,21 @@ def project_part_pmi(
                 f"{label}: projected gtol {control.key} changed semantics"
             )
         annotation = _name(gtol.GetAnnotation(), control.annotation_name, control.key)
-        after = tuple(annotation.GetPosition() or ())
-        drift = (
-            math.inf
-            if len(after) < 2
-            else math.hypot(
-                float(after[0]) - placement.position[0],
-                float(after[1]) - placement.position[1],
+        if placement.position is not None:
+            after = tuple(annotation.GetPosition() or ())
+            drift = (
+                math.inf
+                if len(after) < 2
+                else math.hypot(
+                    float(after[0]) - placement.position[0],
+                    float(after[1]) - placement.position[1],
+                )
             )
-        )
-        if drift > placement.position_tolerance_m:
-            raise RuntimeError(
-                f"{label}: {control.key} position drift {drift * 1000:.2f} mm "
-                f"exceeds {placement.position_tolerance_m * 1000:.2f} mm"
-            )
+            if drift > placement.position_tolerance_m:
+                raise RuntimeError(
+                    f"{label}: {control.key} position drift {drift * 1000:.2f} mm "
+                    f"exceeds {placement.position_tolerance_m * 1000:.2f} mm"
+                )
         owner = _early_bound(annotation.Owner, "IView")
         expected_view = _early_bound(placement.view, "IView")
         if str(owner.GetName2()) != str(expected_view.GetName2()):
@@ -980,6 +1015,8 @@ def project_part_pmi(
             adapter, projected[key], placement.view, entity,
             entity_type=placement.attachment_type, label=f"{label} {key}",
         )
+        if placement.position is None:
+            _validate_native_pmi_placement(adapter, projected[key], label=f"{label} {key}")
     _telemetry.event("drawing.pmi_projected", count=len(projected), exact_entity_witnesses=len(explicit))
     return projected
 

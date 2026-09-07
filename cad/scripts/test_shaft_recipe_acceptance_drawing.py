@@ -89,9 +89,16 @@ def entity_bank(monkeypatch):
             GetAttachedEntityTypes=lambda role=role: (witness.kinds[role][1],),
             OwnerType=0,
             Owner=view,
+            Visible=1,
+            IsDangling=lambda: False,
+            GetPosition=lambda: (0.1, 0.2, 0.0),
         )
     view.GetAnnotations = lambda: tuple(annotations.values())
-    model = object()
+    model = SimpleNamespace(
+        GetCurrentSheet=lambda: SimpleNamespace(
+            GetProperties2=lambda: (0, 0, 1, 1, 0, 0.4, 0.3, 0)
+        )
+    )
     adapter = SimpleNamespace(
         currentModel=model, swApp=SimpleNamespace(IsSame=lambda a, b: int(a is b))
     )
@@ -180,6 +187,21 @@ def test_missing_observer_row_is_not_hidden_by_unrelated_geometry(entity_bank):
     record_bank(bank)
     del bank.witness.recorded["bearing_finish"]
     with pytest.raises(RuntimeError, match="coverage"):
+        bank.witness.drawing_snapshot(bank.adapter, bank.source, phase="built")
+
+
+@pytest.mark.parametrize("fault", ["hidden", "dangling", "off_sheet"])
+def test_final_bank_checks_earlier_datum_after_finish_insertion(entity_bank, fault):
+    bank = entity_bank
+    record_bank(bank)
+    datum = bank.annotations["datum:A"]
+    if fault == "hidden":
+        datum.Visible = 3
+    if fault == "dangling":
+        datum.IsDangling = lambda: True
+    if fault == "off_sheet":
+        datum.GetPosition = lambda: (0.5, 0.2, 0.0)
+    with pytest.raises(RuntimeError, match="native PMI"):
         bank.witness.drawing_snapshot(bank.adapter, bank.source, phase="built")
 
 
