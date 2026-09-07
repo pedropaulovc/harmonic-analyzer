@@ -2,8 +2,8 @@
 
 Production selectors/validators run unchanged. The explicit origin manifest
 does not claim coordinate-picked annotations were migrated. Their normal
-snapshot remains authoritative; observed type46 calls receive separate raw geometry
-evidence here because the legacy generic snapshot excludes that kind.
+snapshot remains authoritative; observed type46 calls also receive exact
+selection/attachment persistent-identity and raw geometry evidence here.
 """
 
 from contextlib import contextmanager
