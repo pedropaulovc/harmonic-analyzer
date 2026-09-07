@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import argparse
 from contextlib import ExitStack
+from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
 import hashlib
 import json
 import os
 from pathlib import Path
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -40,6 +43,169 @@ BASELINE_DRAWING_REPORT = (
 BASELINE_DRAWING_REPORT_SHA = (
     "6e00b42ca53fe0d4557ee7ae98044f016683c6ad1a4cb5ea8568b36fa529815d"
 )
+
+
+@dataclass(frozen=True)
+class BootstrapRequest:
+    expected_source_sha: str
+    builder_revision: str
+    builder_trace: str
+    baseline_revision: str | None = None
+
+
+def _bootstrap_git(*arguments, directory=None):
+    return subprocess.check_output(
+        ["git", "-C", str(directory or ROOT), *arguments], text=True, encoding="utf-8"
+    ).strip()
+
+
+def _bootstrap_time(value):
+    parsed = datetime.fromisoformat(value)
+    if parsed.utcoffset() is None:
+        raise ValueError("builder timestamp must include its timezone")
+    return parsed.timestamp()
+
+
+def _bootstrap_pid():
+    value = os.environ.get("HARMONIC_DIAGNOSTIC_SW_PID", "")
+    if not re.fullmatch(r"[1-9][0-9]*", value):
+        raise RuntimeError(
+            "bootstrap requires an explicit positive licensed SolidWorks PID"
+        )
+    return int(value)
+
+
+def bootstrap_inputs(request):
+    """Validate recorded local build evidence, without accepting a replacement pin.
+
+    The native Generator stamp is independently checked after opening the copy.
+    These checks establish provenance, not old/new manufacturing equivalence.
+    """
+    import draw_crank_arm as recipe
+    import solidworks_mcp.adapters.pywin32_adapter as native
+
+    for value, expression in (
+        (request.expected_source_sha, r"[0-9a-f]{64}"),
+        (request.builder_revision, r"[0-9a-f]{40}"),
+        (request.builder_trace, r"0x[0-9a-f]{32}"),
+    ):
+        if not re.fullmatch(expression, value):
+            raise ValueError("bootstrap requires exact SHA/revision/trace identifiers")
+    if request.baseline_revision is not None and (
+        not re.fullmatch(r"[0-9a-f]{40}", request.baseline_revision)
+        or _bootstrap_git("rev-parse", request.baseline_revision + "^{commit}")
+        != request.baseline_revision
+    ):
+        raise ValueError("baseline recipe revision must be an exact existing commit")
+    if _bootstrap_git("rev-parse", "HEAD") != request.builder_revision:
+        raise RuntimeError("bootstrap must run on the exact local builder revision")
+    adapter_root = ROOT / "SolidworksMCP-python"
+    for directory in (None, adapter_root):
+        if _bootstrap_git("status", "--porcelain=v1", directory=directory):
+            raise RuntimeError("bootstrap requires clean frozen source and adapter")
+    adapter_revision = _bootstrap_git("rev-parse", "HEAD", directory=adapter_root)
+    if adapter_revision != _bootstrap_git("rev-parse", "HEAD:SolidworksMCP-python"):
+        raise RuntimeError("bootstrap adapter differs from the frozen gitlink")
+    if (
+        request.baseline_revision is not None
+        and _bootstrap_git(
+            "rev-parse", request.baseline_revision + ":SolidworksMCP-python"
+        )
+        != adapter_revision
+    ):
+        raise RuntimeError(
+            "baseline recipe and local runtime have different adapter pins"
+        )
+    imports = {
+        "recipe_import": (
+            Path(recipe.__file__),
+            ROOT / "cad/scripts/draw_crank_arm.py",
+        ),
+        "adapter_import": (
+            Path(native.__file__),
+            adapter_root / "src/solidworks_mcp/adapters/pywin32_adapter.py",
+        ),
+        "python": (Path(sys.executable), ROOT / ".venv/Scripts/python.exe"),
+    }
+    if any(
+        actual.resolve() != expected.resolve() for actual, expected in imports.values()
+    ):
+        raise RuntimeError(
+            "bootstrap must use this checkout's recipe, adapter and venv"
+        )
+    if (
+        sha(SOURCE) != request.expected_source_sha
+        or TOKEN.read_text(encoding="utf-8").strip() != request.expected_source_sha
+    ):
+        raise RuntimeError(
+            "bootstrap source/token differs from the explicit expected SHA"
+        )
+    traces = ROOT / "cad/out/reports/telemetry/traces.jsonl"
+    selected, tasks = [], []
+    with traces.open(encoding="utf-8") as stream:
+        for line in stream:
+            row = json.loads(line)
+            if row.get("name") == "task part:crank_arm":
+                tasks.append(row)
+            if row.get("context", {}).get(
+                "trace_id"
+            ) == request.builder_trace and row.get("name") in {
+                "part.build",
+                "task part:crank_arm",
+            }:
+                selected.append(row)
+    task_rows = [row for row in selected if row["name"] == "task part:crank_arm"]
+    build_rows = [row for row in selected if row["name"] == "part.build"]
+    if len(task_rows) != 1 or len(build_rows) != 1:
+        raise RuntimeError(
+            "bootstrap needs one completed local part task and child build"
+        )
+    task, build = task_rows[0], build_rows[0]
+    if (
+        any(row.get("status", {}).get("status_code") != "OK" for row in selected)
+        or task.get("attributes", {}).get("cache") != "miss"
+        or task.get("attributes", {}).get("label") != "part:crank_arm"
+        or build.get("attributes", {}).get("target") != "crank_arm"
+        or build.get("parent_id") != task["context"]["span_id"]
+        or task.get("parent_id") is not None
+    ):
+        raise RuntimeError("bootstrap trace is not a successful native crank build")
+    start, end = _bootstrap_time(task["start_time"]), _bootstrap_time(task["end_time"])
+    build_start, build_end = (
+        _bootstrap_time(build["start_time"]),
+        _bootstrap_time(build["end_time"]),
+    )
+    if not (
+        start
+        <= build_start
+        <= SOURCE.stat().st_mtime
+        <= build_end
+        <= TOKEN.stat().st_mtime
+        <= end
+    ) or any(_bootstrap_time(row["end_time"]) > end for row in tasks):
+        raise RuntimeError(
+            "source/token timestamps do not belong to the latest local build"
+        )
+    return {
+        "builder_revision": request.builder_revision,
+        "baseline_revision": request.baseline_revision,
+        "adapter_commit": adapter_revision,
+        "expected_pid": _bootstrap_pid(),
+        "expected_generator": "harmonic-analyzer @ "
+        + _bootstrap_git("rev-parse", "--short", request.builder_revision),
+        "source": str(SOURCE),
+        "source_sha256": request.expected_source_sha,
+        "execution_token": request.expected_source_sha,
+        "source_size": SOURCE.stat().st_size,
+        "source_mtime_ns": SOURCE.stat().st_mtime_ns,
+        "token_mtime_ns": TOKEN.stat().st_mtime_ns,
+        "source_file_identity": [SOURCE.stat().st_dev, SOURCE.stat().st_ino],
+        "token_file_identity": [TOKEN.stat().st_dev, TOKEN.stat().st_ino],
+        "builder_trace_file": str(traces),
+        "builder_spans": selected,
+        "host": platform.node(),
+        **{name: str(actual.resolve()) for name, (actual, _) in imports.items()},
+    }
 
 
 def sha(path):
@@ -98,6 +264,10 @@ def provenance():
 
 @_telemetry.traced("diagnostic.crank_arm.source_snapshot")
 def source_snapshot(adapter, path):
+    return _source_snapshot_with_handles(adapter, path)[0]
+
+
+def _source_snapshot_with_handles(adapter, path):
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     if (
         int(model.GetType()) != 1
@@ -109,7 +279,9 @@ def source_snapshot(adapter, path):
     ):
         raise RuntimeError("crank-arm snapshot has the wrong exact source owner")
     before = bool(model.GetSaveFlag())
-    raw, _ = dimension_snapshot(adapter.swApp, model, path, required=DRAWING_DIMENSIONS)
+    raw, handles = dimension_snapshot(
+        adapter.swApp, model, path, required=DRAWING_DIMENSIONS
+    )
     required, _ = part_dimensions(
         adapter, path, raw["configuration"], targets=DRAWING_DIMENSIONS
     )
@@ -118,7 +290,7 @@ def source_snapshot(adapter, path):
         "dirty_after": bool(model.GetSaveFlag()),
         "required_dimensions": required,
         "observed_dimensions": raw,
-    }
+    }, handles
 
 
 async def capture_source(adapter, directory):
@@ -208,6 +380,222 @@ async def capture_drawing(adapter, directory):
     finally:
         persist_report(directory / "measurements.json", report)
     return {"report": str(directory / "measurements.json")}
+
+
+def _bootstrap_current(adapter, model, path, kind):
+    adapter.ownership.assert_current_owned()
+    if (
+        int(model.GetType()) != kind
+        or Path(model.GetPathName()).resolve() != path.resolve()
+        or int(adapter.swApp.IsSame(adapter.currentModel, model)) != 1
+        or int(adapter.swApp.IsSame(adapter.swApp.ActiveDoc, model)) != 1
+        or int(
+            adapter.swApp.IsSame(adapter.swApp.GetOpenDocumentByName(str(path)), model)
+        )
+        != 1
+    ):
+        raise RuntimeError("bootstrap has the wrong exact owned document context")
+
+
+@_telemetry.traced("diagnostic.crank_arm.bootstrap")
+async def capture_bootstrap(adapter, directory, request):
+    """Capture new local evidence only; never adopt pins or declare equivalence."""
+    from diagnostics import benchmark_drawing_recipes as benchmark
+    from diagnostics import probe_drawing_attachments as attachments
+    from diagnostics._owned_native_documents import DocumentKind, save_drawing
+    from diagnostics._recipe_template_factory import (
+        DrawingFactory,
+        RecipeTemplateFactory,
+    )
+    from diagnostics._source_dimension_snapshot import compare_source
+    from diagnostics.probe_datum_shoulder import all_annotation_layout
+    from _drawing_common import read_required_properties
+    from _drawing_entities import ModelEntities
+    import draw_crank_arm as recipe
+
+    adapter.ownership.register_directory(directory)
+    report_path = directory / "measurements.json"
+    source = directory / f"{directory.name}-part.SLDPRT"
+    if report_path.exists() or source.exists():
+        raise RuntimeError("bootstrap requires fresh evidence/output paths")
+    report = {
+        "status": "running",
+        "purpose": "capture_only_bootstrap",
+        "acceptance": "not_run",
+        "equivalence": "unproven",
+        "baseline_revision": request.baseline_revision,
+        "schema_gaps": [
+            "Historical source snapshots lack native tolerance applicability statuses.",
+            "No historical receipt, cross-build identity, or old/new source comparison is performed.",
+            "Captured drawing data is not independent historical manufacturing proof.",
+            "Cold-reopen and rendered-print acceptance remain separate required work.",
+        ],
+    }
+    controller = None
+    copy_created = False
+    try:
+        report["provenance"] = bootstrap_inputs(request)
+        adapter.ownership.register_source(SOURCE)
+        adapter.ownership.register_source(TOKEN)
+        report["session"] = {
+            "pid": int(adapter.swApp.GetProcessID()),
+            "revision": str(adapter.swApp.RevisionNumber()),
+        }
+        if report["session"]["pid"] != report["provenance"]["expected_pid"]:
+            raise RuntimeError("bootstrap attached a different licensed SolidWorks PID")
+        persist_report(report_path, report)
+        shutil.copy2(SOURCE, source)
+        copy_created = True
+        if sha(source) != request.expected_source_sha:
+            raise RuntimeError("bootstrap copy does not match the expected source")
+        if request.baseline_revision is not None:
+            module = benchmark.load_recipe(
+                request.baseline_revision, "crank_arm", directory, source=source
+            )
+            report["baseline_recipe_sha256"] = sha(directory / "recipe-source.py")
+            controller = RecipeTemplateFactory(DrawingFactory.PREPARED)
+            factory = await controller.configure(adapter, module, report, directory)
+        check("open bootstrap owned source", await adapter.open_model(str(source)))
+        model = _early_bound(adapter.currentModel, "IModelDoc2")
+        _bootstrap_current(adapter, model, source, 1)
+        if model.GetSaveFlag() is not False:
+            raise RuntimeError(
+                "bootstrap source is dirty or has unreadable dirty state"
+            )
+        report["generator"] = read_required_properties(
+            model, ("Generator",), required=("Generator",)
+        )["Generator"]
+        _bootstrap_current(adapter, model, source, 1)
+        if report["generator"] != report["provenance"]["expected_generator"]:
+            raise RuntimeError(
+                "native Generator does not identify the exact clean local builder"
+            )
+        report["source_before"], handles = _source_snapshot_with_handles(
+            adapter, source
+        )
+        require_source_unchanged(report["source_before"], report["source_before"])
+        requests = dict(recipe.ENTITY_ROLES)
+        requests.update(
+            {f"face:{name}": value.face for name, value in recipe.ENTITY_ROLES.items()}
+        )
+        report["selectors"] = {name: repr(value) for name, value in requests.items()}
+        report["source_roles"] = {
+            name: attachments.geometry(entity, 2 if name.startswith("face:") else 1)
+            for name, entity in ModelEntities(model).resolve(requests).items()
+        }
+        _bootstrap_current(adapter, model, source, 1)
+        persist_report(report_path, report)
+        if request.baseline_revision is not None:
+            with adapter.ownership.creating_document(
+                DocumentKind.DRAWING, module.OUTPUTS.slddrw
+            ):
+                with patch("_drawing_common.save_drawing", save_drawing):
+                    report["artifacts"] = await module.build(
+                        adapter, drawing_factory=factory
+                    )
+            controller.require_used()
+            current = _early_bound(adapter.currentModel, "IModelDoc2")
+            _bootstrap_current(adapter, current, module.OUTPUTS.slddrw, 3)
+            views = attachments.views(current)
+            if len(views) != 4 or any(
+                int(adapter.swApp.IsSame(view.ReferencedDocument, model)) != 1
+                or str(view.ReferencedConfiguration) != "Default"
+                for view in views.values()
+            ):
+                raise RuntimeError(
+                    "bootstrap drawing has the wrong exact view/source context"
+                )
+            report["drawing"] = {
+                "attachments": attachments.snapshot(current, app=adapter.swApp)
+            }
+            report["drawing"]["annotations"], _ = all_annotation_layout(adapter)
+            report["drawing"]["dimensions"] = drawing_dimensions(current)
+            report["drawing"]["layout"] = attachments.layout(current)
+            report["drawing"]["sheet"] = tuple(
+                _early_bound(
+                    _early_bound(current, "IDrawingDoc").GetCurrentSheet(), "ISheet"
+                ).GetProperties2()
+            )
+            _bootstrap_current(adapter, current, module.OUTPUTS.slddrw, 3)
+        report["source_after"], after_handles = _source_snapshot_with_handles(
+            SimpleNamespace(currentModel=model, swApp=adapter.swApp), source
+        )
+        persist_report(report_path, report)
+        compare_source(
+            report["source_before"]["observed_dimensions"],
+            report["source_after"]["observed_dimensions"],
+            app=adapter.swApp,
+            handles_before=handles,
+            handles_after=after_handles,
+        )
+        require_source_unchanged(report["source_before"], report["source_after"])
+        report["status"] = "captured"
+    except BaseException as error:
+        report.update(status="failed", error=repr(error))
+        # The existing outer owner handles Exception, not process interruptions.
+        # Close only our owned documents before propagating the original object.
+        if not isinstance(error, Exception):
+            adapter.ownership.failure = repr(error)
+            try:
+                await adapter.close_owned_documents()
+            except BaseException as cleanup:
+                report["interruption_cleanup_error"] = repr(cleanup)
+                error.add_note(f"bootstrap owned cleanup also failed: {cleanup!r}")
+            try:
+                adapter.ownership.checkpoint()
+            except BaseException as checkpoint:
+                report["interruption_checkpoint_error"] = repr(checkpoint)
+                error.add_note(
+                    f"bootstrap ownership checkpoint also failed: {checkpoint!r}"
+                )
+        raise
+    finally:
+        primary, errors = sys.exception(), []
+        actions = {
+            "source_original": lambda: sha(SOURCE),
+            "execution_token": lambda: TOKEN.read_text(encoding="utf-8").strip(),
+        }
+        if copy_created or source.exists():
+            actions["source_copy"] = lambda: sha(source)
+        for name, action in actions.items():
+            try:
+                report[name] = action()
+                if report[name] != request.expected_source_sha:
+                    raise RuntimeError(f"bootstrap final {name} changed")
+            except Exception as error:
+                report[name] = {"value": report.get(name), "error": repr(error)}
+                errors.append(error)
+        try:
+            final = bootstrap_inputs(request)
+            report["provenance_after"] = final
+            if "provenance" in report and final != report["provenance"]:
+                raise RuntimeError("bootstrap builder/input evidence changed")
+        except Exception as error:
+            errors.append(error)
+        if controller is not None:
+            try:
+                report["template_guards"] = _require_template_guards(controller)
+            except Exception as error:
+                errors.append(error)
+            report["template_guard_details"] = controller.guards
+        if errors:
+            report.update(
+                status="failed", final_errors=[repr(error) for error in errors]
+            )
+        try:
+            # This finalizer already preserves primary + write failures, including
+            # BaseException interruptions; do not nest the legacy report wrapper.
+            report_path.write_text(
+                json.dumps(report, indent=2, default=json_default), encoding="utf-8"
+            )
+        except Exception as error:
+            errors.append(error)
+        if errors:
+            raise BaseExceptionGroup(
+                "bootstrap capture/final evidence failures",
+                ([primary] if primary else []) + errors,
+            ) from None
+    return {"report": str(report_path)}
 
 
 def positive_roles():
@@ -1044,15 +1432,62 @@ def _require_token():
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("mode", choices=("source", "drawing", "positive", "candidate"))
+    parser.add_argument(
+        "mode", choices=("source", "drawing", "positive", "candidate", "bootstrap")
+    )
+    parser.add_argument("--expected-source-sha")
+    parser.add_argument("--builder-revision")
+    parser.add_argument("--builder-trace")
+    parser.add_argument("--baseline-revision")
     parser.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
+    bootstrap_arguments = (
+        args.expected_source_sha,
+        args.builder_revision,
+        args.builder_trace,
+        args.baseline_revision,
+    )
+    request = None
+    if args.mode == "bootstrap":
+        if not all(bootstrap_arguments[:3]) or any(
+            not re.fullmatch(pattern, value)
+            for value, pattern in zip(
+                bootstrap_arguments[:3],
+                (r"[0-9a-f]{64}", r"[0-9a-f]{40}", r"0x[0-9a-f]{32}"),
+                strict=True,
+            )
+        ):
+            parser.error(
+                "bootstrap requires exact --expected-source-sha, --builder-revision and --builder-trace"
+            )
+        request = BootstrapRequest(*bootstrap_arguments)
+    elif any(value is not None for value in bootstrap_arguments):
+        parser.error(
+            "bootstrap provenance arguments are unsupported in acceptance/historical modes"
+        )
     require_owned_diagnostic_environment()
+    if request is not None:
+        _bootstrap_pid()
+        bootstrap_inputs(request)
     if not args.worker:
         import dodo
 
+        command = [sys.executable, str(Path(__file__).resolve()), args.mode]
+        if request is not None:
+            command.extend(
+                [
+                    "--expected-source-sha",
+                    request.expected_source_sha,
+                    "--builder-revision",
+                    request.builder_revision,
+                    "--builder-trace",
+                    request.builder_trace,
+                ]
+            )
+            if request.baseline_revision is not None:
+                command.extend(["--baseline-revision", request.baseline_revision])
         dodo._run(
-            [sys.executable, str(Path(__file__).resolve()), args.mode, "--worker"],
+            [*command, "--worker"],
             "crank-arm entity diagnostic",
             com=True,
             log_stem="crank-arm-entities-probe",
@@ -1063,6 +1498,10 @@ def main(argv=None):
     reports = ROOT / "cad/out/reports"
     reports.mkdir(parents=True, exist_ok=True)
     directory = Path(tempfile.mkdtemp(prefix="crank-arm-entities-", dir=reports))
+    if request is not None:
+        return run_copy_diagnostic(
+            lambda adapter: capture_bootstrap(adapter, directory, request)
+        )
     callback = {
         "source": capture_source,
         "drawing": capture_drawing,

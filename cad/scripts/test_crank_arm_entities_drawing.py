@@ -12,6 +12,9 @@ import pytest
 
 from diagnostics import probe_crank_arm_entities as probe
 
+# Reuse the existing actual-recipe composition fixture, not a second runner.
+from test_crank_arm_candidate_drawing import candidate as candidate
+
 
 class EvidenceKind(Enum):
     DIMENSION = "dimension"
@@ -596,3 +599,617 @@ def test_details_render_vector_pdf_windows_without_changing_source(
     assert pdf.read_bytes() == before
     with pytest.raises(RuntimeError, match="already exists"):
         probe.render_details(pdf, tmp_path / "cold")
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        ["bootstrap"],
+        ["bootstrap", "--expected-source-sha", "0" * 64],
+        ["source", "--expected-source-sha", "0" * 64],
+        [
+            "bootstrap",
+            "--expected-source-sha",
+            "wrong",
+            "--builder-revision",
+            "a" * 40,
+            "--builder-trace",
+            "0x" + "1" * 32,
+        ],
+    ],
+)
+def test_bootstrap_cli_rejects_incomplete_or_misapplied_request_before_runner(
+    monkeypatch, arguments
+):
+    runner = Mock(side_effect=AssertionError("must reject before native runner"))
+    monkeypatch.setattr(probe, "run_copy_diagnostic", runner)
+    monkeypatch.setattr(probe, "require_owned_diagnostic_environment", lambda: None)
+    with pytest.raises(SystemExit):
+        probe.main(arguments)
+    runner.assert_not_called()
+
+
+def test_bootstrap_cli_forwards_explicit_request_through_locked_parent(monkeypatch):
+    import dodo
+
+    request = [
+        "bootstrap",
+        "--expected-source-sha",
+        "0" * 64,
+        "--builder-revision",
+        "a" * 40,
+        "--builder-trace",
+        "0x" + "1" * 32,
+        "--baseline-revision",
+        "b" * 40,
+    ]
+    preflight = Mock(return_value={})
+    run = Mock()
+    monkeypatch.setattr(probe, "bootstrap_inputs", preflight)
+    monkeypatch.setattr(probe, "require_owned_diagnostic_environment", lambda: None)
+    monkeypatch.setattr(dodo, "_run", run)
+    monkeypatch.setenv("HARMONIC_DIAGNOSTIC_SW_PID", "123")
+    assert probe.main(request) == 0
+    assert preflight.call_count == 1
+    command = run.call_args.args[0]
+    assert command[2:] == [*request, "--worker"]
+    assert run.call_args.kwargs["com"] is True
+
+
+@pytest.fixture
+def bootstrap_files(tmp_path, monkeypatch):
+    import os
+    import sys
+    from datetime import datetime, timezone
+    import draw_crank_arm as recipe
+    import solidworks_mcp.adapters.pywin32_adapter as adapter_module
+
+    source = tmp_path / "cad/out/sldprt/crank-arm.SLDPRT"
+    source.parent.mkdir(parents=True)
+    source.write_bytes(b"genuine local build fixture")
+    token = source.with_name(".crank-arm.execution")
+    token.write_text(probe.sha(source), encoding="utf-8")
+    timestamp = datetime(2026, 9, 7, tzinfo=timezone.utc).timestamp()
+    os.utime(source, (timestamp + 5, timestamp + 5))
+    os.utime(token, (timestamp + 9, timestamp + 9))
+    trace = "0x" + "1" * 32
+
+    def row(name, start, end, span, parent, **attributes):
+        return {
+            "name": name,
+            "context": {"trace_id": trace, "span_id": span},
+            "parent_id": parent,
+            "status": {"status_code": "OK"},
+            "start_time": f"2026-09-07T00:00:{start:02d}Z",
+            "end_time": f"2026-09-07T00:00:{end:02d}Z",
+            "attributes": attributes,
+        }
+
+    rows = [
+        row("part.build", 1, 8, "child", "parent", target="crank_arm"),
+        row(
+            "task part:crank_arm",
+            0,
+            10,
+            "parent",
+            None,
+            label="part:crank_arm",
+            cache="miss",
+        ),
+    ]
+    traces = tmp_path / "cad/out/reports/telemetry/traces.jsonl"
+    traces.parent.mkdir(parents=True)
+
+    def write():
+        traces.write_text(
+            "\n".join(json.dumps(row) for row in rows) + "\n", encoding="utf-8"
+        )
+
+    write()
+    git_calls = []
+
+    def git(*args, directory=None):
+        git_calls.append((args, directory))
+        if args == ("status", "--porcelain=v1"):
+            return ""
+        if args == ("rev-parse", "HEAD"):
+            return "c" * 40 if directory else "a" * 40
+        if args == ("rev-parse", "HEAD:SolidworksMCP-python"):
+            return "c" * 40
+        if args == ("rev-parse", "--short", "a" * 40):
+            return "a" * 8
+        if args == ("rev-parse", "b" * 40 + "^{commit}"):
+            return "b" * 40
+        if args == ("rev-parse", "b" * 40 + ":SolidworksMCP-python"):
+            return "c" * 40
+        raise AssertionError(args)
+
+    monkeypatch.setattr(probe, "ROOT", tmp_path)
+    monkeypatch.setattr(probe, "SOURCE", source)
+    monkeypatch.setattr(probe, "TOKEN", token)
+    monkeypatch.setattr(probe, "_bootstrap_git", git)
+    monkeypatch.setenv("HARMONIC_DIAGNOSTIC_SW_PID", "123")
+    monkeypatch.setattr(sys, "executable", str(tmp_path / ".venv/Scripts/python.exe"))
+    monkeypatch.setattr(
+        recipe, "__file__", str(tmp_path / "cad/scripts/draw_crank_arm.py")
+    )
+    monkeypatch.setattr(
+        adapter_module,
+        "__file__",
+        str(
+            tmp_path
+            / "SolidworksMCP-python/src/solidworks_mcp/adapters/pywin32_adapter.py"
+        ),
+    )
+    request = probe.BootstrapRequest(probe.sha(source), "a" * 40, trace, "b" * 40)
+    return SimpleNamespace(
+        source=source,
+        token=token,
+        rows=rows,
+        write=write,
+        traces=traces,
+        request=request,
+        git=git,
+        git_calls=git_calls,
+    )
+
+
+def test_bootstrap_inputs_require_actual_completed_local_builder_and_token(
+    bootstrap_files,
+):
+    state = bootstrap_files
+    row = probe.bootstrap_inputs(state.request)
+    assert (
+        row["source_sha256"]
+        == row["execution_token"]
+        == state.request.expected_source_sha
+    )
+    assert row["builder_spans"] == state.rows
+    assert row["expected_generator"] == "harmonic-analyzer @ aaaaaaaa"
+    assert row["builder_revision"] == "a" * 40
+    assert row["baseline_revision"] == "b" * 40
+    assert row["adapter_commit"] == "c" * 40
+    assert probe.EXPECTED_SOURCE_SHA != row["source_sha256"]
+
+
+@pytest.mark.parametrize(
+    "fault",
+    [
+        "wrong_token",
+        "wrong_sha",
+        "failed",
+        "cache_hit",
+        "no_child",
+        "wrong_parent",
+        "wrong_target",
+        "source_mtime",
+        "token_mtime",
+        "duplicate",
+        "later_build",
+        "dirty",
+        "wrong_head",
+        "wrong_adapter",
+    ],
+)
+def test_bootstrap_inputs_fail_closed_on_unproven_build(
+    bootstrap_files, monkeypatch, fault
+):
+    import os
+
+    state = bootstrap_files
+    if fault == "wrong_token":
+        state.token.write_text("0" * 64, encoding="utf-8")
+    if fault == "wrong_sha":
+        state.source.write_bytes(b"replacement with no builder")
+    if fault == "failed":
+        state.rows[0]["status"]["status_code"] = "ERROR"
+    if fault == "cache_hit":
+        state.rows[1]["attributes"]["cache"] = "hit"
+    if fault == "no_child":
+        state.rows.pop(0)
+    if fault == "wrong_parent":
+        state.rows[0]["parent_id"] = "other"
+    if fault == "wrong_target":
+        state.rows[0]["attributes"]["target"] = "other"
+    if fault in {"source_mtime", "token_mtime"}:
+        os.utime(state.source if fault == "source_mtime" else state.token, (0, 0))
+    if fault == "duplicate":
+        state.rows.append(state.rows[1])
+    if fault == "later_build":
+        from copy import deepcopy
+
+        later = deepcopy(state.rows[1])
+        later["context"]["trace_id"] = "0x" + "2" * 32
+        later["start_time"], later["end_time"] = (
+            "2026-09-07T01:00:00Z",
+            "2026-09-07T01:01:00Z",
+        )
+        state.rows.append(later)
+    if fault in {"dirty", "wrong_head", "wrong_adapter"}:
+
+        def git(*args, directory=None):
+            if fault == "dirty" and args == ("status", "--porcelain=v1"):
+                return " M source.py"
+            if (
+                fault == "wrong_head"
+                and args == ("rev-parse", "HEAD")
+                and directory is None
+            ):
+                return "d" * 40
+            if (
+                fault == "wrong_adapter"
+                and args == ("rev-parse", "HEAD")
+                and directory is not None
+            ):
+                return "d" * 40
+            return state.git(*args, directory=directory)
+
+        monkeypatch.setattr(probe, "_bootstrap_git", git)
+    state.write()
+    with pytest.raises((RuntimeError, ValueError)):
+        probe.bootstrap_inputs(state.request)
+
+
+@pytest.fixture
+def bootstrap_callback(candidate, monkeypatch):
+    state = candidate
+    state.request = probe.BootstrapRequest(
+        state.digest, "a" * 40, "0x" + "1" * 32, "b" * 40
+    )
+    state.inputs = {
+        "source_sha256": state.digest,
+        "execution_token": state.digest,
+        "expected_generator": "harmonic-analyzer @ aaaaaaaa",
+        "expected_pid": 123,
+    }
+    monkeypatch.setattr(probe, "bootstrap_inputs", lambda request: dict(state.inputs))
+    state.adapter.swApp.GetProcessID = lambda: 123
+    state.adapter.swApp.RevisionNumber = lambda: "34.3.0"
+    original_open = state.adapter.open_model
+
+    async def open_model(path):
+        result = await original_open(path)
+        model = state.adapter.currentModel
+        model.GetSaveFlag = lambda: state.fault == "dirty-source" and model.kind == 1
+        model.GetCustomInfoValue = lambda configuration, name: (
+            "wrong"
+            if state.fault == "generator"
+            else state.inputs["expected_generator"]
+        )
+        return result
+
+    state.adapter.open_model = open_model
+    source_snapshot = probe.source_snapshot
+
+    def read(adapter, path):
+        row = source_snapshot(adapter, path)
+        row["observed_dimensions"] = {
+            "configuration": "Default",
+            "features": [],
+            "dimensions": {},
+        }
+        if state.fault == "raw-drift" and state.insertions:
+            row["required_dimensions"] = {"unexpected": 1}
+        return row, {}
+
+    monkeypatch.setattr(probe, "_source_snapshot_with_handles", read)
+
+    def require(before, after):
+        assert before == after, "source changed"
+
+    monkeypatch.setattr(probe, "require_source_unchanged", require)
+    return state
+
+
+@pytest.mark.asyncio
+async def test_bootstrap_full_callback_captures_explicit_recipe_without_acceptance(
+    bootstrap_callback,
+):
+    state = bootstrap_callback
+    result = await probe.capture_bootstrap(
+        state.adapter, state.directory, state.request
+    )
+    row = json.loads(Path(result["report"]).read_text(encoding="utf-8"))
+    assert row["status"] == "captured"
+    assert row["equivalence"] == "unproven"
+    assert row["acceptance"] == "not_run"
+    assert row["baseline_revision"] == state.request.baseline_revision
+    assert len(state.insertions) == 14
+    assert state.module.build is state.build_function
+    assert state.events.count("save") == 1
+    assert state.events.index("configure") < next(
+        index
+        for index, item in enumerate(state.events)
+        if isinstance(item, tuple) and item[0] == "open"
+    )
+    assert "save3" not in state.events and "close" not in state.events
+    assert (
+        row["source_original"]
+        == row["source_copy"]
+        == row["execution_token"]
+        == state.digest
+    )
+    assert row["source_before"] == row["source_after"]
+    probe.require_manufacturing.assert_not_called()
+
+
+@pytest.mark.parametrize("value", [None, "", "0", "-1", "1.2", "arbitrary"])
+def test_bootstrap_requires_explicit_licensed_pid_before_native_runner(
+    monkeypatch, value
+):
+    import dodo
+
+    if value is None:
+        monkeypatch.delenv("HARMONIC_DIAGNOSTIC_SW_PID", raising=False)
+    if value is not None:
+        monkeypatch.setenv("HARMONIC_DIAGNOSTIC_SW_PID", value)
+    monkeypatch.setattr(probe, "bootstrap_inputs", Mock(return_value={}))
+    monkeypatch.setattr(probe, "require_owned_diagnostic_environment", lambda: None)
+    runner = Mock(side_effect=AssertionError("native runner must not start"))
+    monkeypatch.setattr(probe, "run_copy_diagnostic", runner)
+    monkeypatch.setattr(dodo, "_run", runner)
+    with pytest.raises(RuntimeError, match="PID"):
+        probe.main(
+            [
+                "bootstrap",
+                "--expected-source-sha",
+                "0" * 64,
+                "--builder-revision",
+                "a" * 40,
+                "--builder-trace",
+                "0x" + "1" * 32,
+            ]
+        )
+    runner.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_bootstrap_missing_created_copy_fails_final_guard(
+    bootstrap_callback, monkeypatch
+):
+    state = bootstrap_callback
+    original = probe.require_source_unchanged
+    calls = []
+
+    def remove_copy(before, after):
+        calls.append(1)
+        original(before, after)
+        if len(calls) == 2:
+            (state.directory / "trial-part.SLDPRT").unlink()
+
+    monkeypatch.setattr(probe, "require_source_unchanged", remove_copy)
+    with pytest.raises(ExceptionGroup, match="final evidence"):
+        await probe.capture_bootstrap(state.adapter, state.directory, state.request)
+    row = json.loads(
+        (state.directory / "measurements.json").read_text(encoding="utf-8")
+    )
+    assert row["status"] == "failed" and "error" in row["source_copy"]
+    assert row["source_original"] == row["execution_token"] == state.digest
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("fault", ["source", "active", "pid"])
+async def test_bootstrap_rejects_wrong_native_context_before_measurement(
+    bootstrap_callback, monkeypatch, fault
+):
+    state = bootstrap_callback
+    original = state.adapter.open_model
+
+    async def wrong_context(path):
+        if fault == "source":
+            state.fault = "source"
+        result = await original(path)
+        if fault == "active":
+            state.adapter.swApp.ActiveDoc = object()
+        return result
+
+    state.adapter.open_model = wrong_context
+    if fault == "pid":
+        state.adapter.swApp.GetProcessID = lambda: 999
+    reads = Mock(side_effect=AssertionError("must not read geometry"))
+    monkeypatch.setattr(probe, "_source_snapshot_with_handles", reads)
+    with pytest.raises((RuntimeError, AssertionError)):
+        await probe.capture_bootstrap(state.adapter, state.directory, state.request)
+    reads.assert_not_called()
+    assert not state.insertions and not state.saved
+    row = json.loads(
+        (state.directory / "measurements.json").read_text(encoding="utf-8")
+    )
+    assert row["status"] == "failed" and row["acceptance"] == "not_run"
+
+
+def test_bootstrap_worker_dispatches_actual_callback(bootstrap_callback, monkeypatch):
+    state = bootstrap_callback
+    monkeypatch.setenv("HARMONIC_SW_AUTOSTART", "0")
+    monkeypatch.setenv("HARMONIC_COM_SEAT", "test-owned-lock")
+    monkeypatch.setenv("HARMONIC_DIAGNOSTIC_SW_PID", "123")
+    monkeypatch.setattr(
+        probe.tempfile, "mkdtemp", lambda **kwargs: str(state.directory)
+    )
+    monkeypatch.setattr(probe, "ROOT", state.directory.parent)
+    calls = []
+
+    def run(callback):
+        calls.append(callback)
+        result = asyncio.run(callback(state.adapter))
+        assert Path(result["report"]).parent == state.directory
+        return 0
+
+    monkeypatch.setattr(probe, "run_copy_diagnostic", run)
+    assert (
+        probe.main(
+            [
+                "bootstrap",
+                "--expected-source-sha",
+                state.digest,
+                "--builder-revision",
+                "a" * 40,
+                "--builder-trace",
+                "0x" + "1" * 32,
+                "--baseline-revision",
+                "b" * 40,
+                "--worker",
+            ]
+        )
+        == 0
+    )
+    assert len(calls) == 1 and len(state.insertions) == 14
+    row = json.loads(
+        (state.directory / "measurements.json").read_text(encoding="utf-8")
+    )
+    assert row["status"] == "captured" and row["acceptance"] == "not_run"
+    assert row["source_before"] == row["source_after"]
+    assert row["generator"] == state.inputs["expected_generator"]
+    assert "drawing" in row and "schema_gaps" in row
+    probe.require_manufacturing.assert_not_called()
+    assert probe.EXPECTED_SOURCE_SHA == state.digest  # fixture pin was not changed
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "fault, error",
+    [
+        ("generator", "Generator"),
+        ("dirty-source", "dirty"),
+        ("view", "context"),
+        ("save", "primary save failure"),
+        ("raw-drift", "source changed"),
+    ],
+)
+async def test_bootstrap_callback_preserves_failed_evidence_and_never_accepts(
+    bootstrap_callback, fault, error
+):
+    state = bootstrap_callback
+    state.fault = fault
+    with pytest.raises((RuntimeError, AssertionError), match=error):
+        await probe.capture_bootstrap(state.adapter, state.directory, state.request)
+    row = json.loads(
+        (state.directory / "measurements.json").read_text(encoding="utf-8")
+    )
+    assert row["status"] == "failed" and error in row["error"]
+    assert row["acceptance"] == "not_run" and row["equivalence"] == "unproven"
+    assert (
+        row["source_original"]
+        == row["source_copy"]
+        == row["execution_token"]
+        == state.digest
+    )
+    if fault in {"generator", "dirty-source"}:
+        assert state.insertions == [] and "factory" not in state.events
+
+
+@pytest.mark.asyncio
+async def test_bootstrap_source_only_never_configures_factory_or_builds(
+    bootstrap_callback,
+):
+    state = bootstrap_callback
+    request = probe.BootstrapRequest(state.digest, "a" * 40, "0x" + "1" * 32)
+    result = await probe.capture_bootstrap(state.adapter, state.directory, request)
+    row = json.loads(Path(result["report"]).read_text(encoding="utf-8"))
+    assert row["status"] == "captured" and "drawing" not in row
+    assert state.insertions == [] and "configure" not in state.events
+    assert not state.exports and not state.saved
+
+
+@pytest.mark.asyncio
+async def test_bootstrap_preserves_primary_with_independent_final_guard_failure(
+    bootstrap_callback, monkeypatch
+):
+    state = bootstrap_callback
+    state.fault = "save"
+    calls = []
+
+    def read(request):
+        calls.append(request)
+        if len(calls) > 1:
+            raise RuntimeError("builder evidence changed")
+        return state.inputs
+
+    monkeypatch.setattr(probe, "bootstrap_inputs", read)
+    with pytest.raises(ExceptionGroup) as raised:
+        await probe.capture_bootstrap(state.adapter, state.directory, state.request)
+    assert str(raised.value.exceptions[0]) == "primary save failure"
+    assert str(raised.value.exceptions[1]) == "builder evidence changed"
+    row = json.loads(
+        (state.directory / "measurements.json").read_text(encoding="utf-8")
+    )
+    assert row["status"] == "failed" and "primary save failure" in row["error"]
+    assert (
+        row["source_original"]
+        == row["source_copy"]
+        == row["execution_token"]
+        == state.digest
+    )
+
+
+@pytest.mark.asyncio
+async def test_bootstrap_compares_fresh_native_parameter_identity(
+    bootstrap_callback, monkeypatch
+):
+    state = bootstrap_callback
+    original = probe._source_snapshot_with_handles
+    handles = []
+
+    def read(adapter, path):
+        row, _ = original(adapter, path)
+        row["observed_dimensions"]["dimensions"] = {
+            "Width@ArmProfile": {"native": {"value": 0.016}, "displays": []}
+        }
+        handle = object()
+        handles.append(handle)
+        return row, {"Width@ArmProfile": handle}
+
+    monkeypatch.setattr(probe, "_source_snapshot_with_handles", read)
+    with pytest.raises(RuntimeError, match="source native dimension identity changed"):
+        await probe.capture_bootstrap(state.adapter, state.directory, state.request)
+    assert len(handles) == 2
+    row = json.loads(
+        (state.directory / "measurements.json").read_text(encoding="utf-8")
+    )
+    assert row["source_before"] == row["source_after"]
+    assert row["status"] == "failed" and row["acceptance"] == "not_run"
+
+
+@pytest.mark.parametrize("path_kind", ["measurements.json", "trial-part.SLDPRT"])
+@pytest.mark.asyncio
+async def test_bootstrap_never_overwrites_existing_evidence(
+    bootstrap_callback, path_kind
+):
+    state = bootstrap_callback
+    retained = state.directory / path_kind
+    retained.write_bytes(b"historical evidence")
+    with pytest.raises(RuntimeError, match="fresh evidence/output paths"):
+        await probe.capture_bootstrap(state.adapter, state.directory, state.request)
+    assert retained.read_bytes() == b"historical evidence"
+    assert not state.documents and not state.insertions
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("error_type", [asyncio.CancelledError, KeyboardInterrupt])
+async def test_bootstrap_interruption_retains_failure_and_closes_only_owned_documents(
+    bootstrap_callback, monkeypatch, error_type
+):
+    state = bootstrap_callback
+    primary = error_type("interrupted native capture")
+
+    def interrupt(*args):
+        raise primary
+
+    monkeypatch.setattr(probe, "_source_snapshot_with_handles", interrupt)
+    checkpoint = Mock()
+    state.adapter.ownership.checkpoint = checkpoint
+    with pytest.raises(error_type) as raised:
+        await probe.capture_bootstrap(state.adapter, state.directory, state.request)
+    assert raised.value is primary
+    assert state.events.count("close") == 1 and not state.documents
+    checkpoint.assert_called_once_with()
+    row = json.loads(
+        (state.directory / "measurements.json").read_text(encoding="utf-8")
+    )
+    assert row["status"] == "failed" and "interrupted native capture" in row["error"]
+    assert (
+        row["source_original"]
+        == row["source_copy"]
+        == row["execution_token"]
+        == state.digest
+    )
