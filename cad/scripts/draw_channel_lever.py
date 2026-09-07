@@ -6,8 +6,10 @@ sheet/template, import, curation, and export behavior lives in
 ``_drawing_common``.
 
 The lever is a long thin third-class lever (~186 mm nose-to-tip, 9.5 mm tall,
-3.0 mm thick).  The sheet runs at 1:2 with a small 1:4 isometric; the 3.0 x 9.5
-section is dimensioned on a right end view.
+3.0 mm thick). The sheet runs at 1:2 with a small 1:4 isometric. Separate
+front-orientation views carry the true profile and the hole pattern so their
+diameter and radius leaders do not compete for the same drawing space. The
+3.0 mm thickness is dimensioned in Top; the hub masks it in the end view.
 
 Run with SolidWorks open::
 
@@ -27,6 +29,7 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _basic_dimensions import require_basic_dimension
 from _drawing_project_layout import DatumLeaderPolicy, repair_project_drawing_layout
+from _drawing_leader_clearance import validate_dimension_leader_clearance
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
@@ -87,9 +90,10 @@ _BBOX_CX = (-_NOSE_R + TIP_END_X) / 2.0  # front-view X centre
 _SPRING_HOLE_DIA = 4.039  # #21 drill
 _BAR_PIN_DIA = 1.994  # #47 drill
 
-FRONT_CENTER = (0.150, 0.155)
-RIGHT_CENTER = (0.295, 0.155)
-TOP_CENTER = (0.150, 0.205)  # above the profile: plate thickness + datum A live here
+FRONT_CENTER = (0.150, 0.135)
+HOLES_CENTER = (0.150, 0.235)
+RIGHT_CENTER = (0.295, 0.135)
+TOP_CENTER = (0.150, 0.185)
 ISO_CENTER = (0.360, 0.210)
 
 
@@ -112,6 +116,12 @@ def _top_xy(mx: float, mz: float) -> tuple[float, float]:
         TOP_CENTER[0] + ratio * (mx - _BBOX_CX) / 1000.0,
         TOP_CENTER[1] + ratio * mz / 1000.0,
     )
+
+
+def _holes_xy(mx: float, my: float) -> tuple[float, float]:
+    """Project model millimetres to hole-view text seeds, never feature picks."""
+    x, y = _sheet_xy(mx, my)
+    return x + HOLES_CENTER[0] - FRONT_CENTER[0], y + HOLES_CENTER[1] - FRONT_CENTER[1]
 
 
 def _force_dimension_black(dimension: Any, *, label: str) -> None:
@@ -155,8 +165,8 @@ FRONT_KEEP = (
     "TipCentreX",
     "NoseRadius",
     "TipRadius",
-    "FulcrumDia",
 )
+HOLES_KEEP = ("FulcrumDia",)
 RIGHT_KEEP: tuple[str, ...] = ()
 TOP_KEEP: tuple[str, ...] = ()
 
@@ -233,18 +243,21 @@ async def build(
     )
 
     front = place_view(adapter, str(source), "*Front", *FRONT_CENTER, scale=SHEET_SCALE)
+    holes = place_view(adapter, str(source), "*Front", *HOLES_CENTER, scale=SHEET_SCALE)
     right = place_view(adapter, str(source), "*Right", *RIGHT_CENTER, scale=SHEET_SCALE)
     # Top view (2026-09-02): the integral O12 x 7.06 fulcrum hub hides the whole
-    # 3 x 9.5 plate section in the end view, so the plate thickness and the
-    # broad-face datum are read here, along the length clear of the hub.
+    # 3 x 9.5 plate section in the end view, so the plate thickness is read
+    # here, along the length clear of the hub. Datum C uses the same top-front
+    # model edge as before, now in this separate orthogonal view.
     top = place_view(adapter, str(source), "*Top", *TOP_CENTER, scale=SHEET_SCALE)
     iso = place_view(adapter, str(source), "*Isometric", *ISO_CENTER, scale=(1, 4))
     for view in (right, top, iso):
         set_hidden_lines_removed(adapter, view)
     set_hidden_lines_visible(adapter, front)
+    set_hidden_lines_visible(adapter, holes)
 
     front_annotations = retain_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="front"
+        adapter, front, keep=FRONT_KEEP, view_label="profile"
     )
     profile_dimensions = set().union(*SOURCE_BASIC_DIMENSIONS.values())
     for annotation in front_annotations:
@@ -255,11 +268,12 @@ async def build(
         if display is None:
             raise RuntimeError(f"profile dimension {name!r} has no display annotation")
         require_basic_dimension(display, label=f"profile {name}")
+    retain_view_dimensions(adapter, holes, keep=HOLES_KEEP, view_label="holes")
     retain_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
     retain_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
 
-    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center marks to front view")
+    if not auto_center_marks(adapter, holes, holes=True, size=0.0025):
+        raise RuntimeError("failed to add ASME center marks to hole-pattern view")
     entities = _model_entities(front.ReferencedDocument)
     _add_tip_arc_center_mark(adapter, front, entities["tip"])
 
@@ -267,18 +281,18 @@ async def build(
     # (bore edge to bore edge; SolidWorks dimensions circle edges centre-to-centre).
     bar_pin_c2c = add_entity_dimension(
         adapter,
-        front,
+        holes,
         entities=(entities["fulcrum"], entities["bar_pin"]),
-        text_xy=(FRONT_CENTER[0] - 0.020, 0.128),
+        text_xy=(HOLES_CENTER[0] - 0.020, HOLES_CENTER[1] - 0.027),
         label="fulcrum-to-bar-pin c2c",
     )
     set_basic_dimension(adapter, bar_pin_c2c, label="fulcrum-to-bar-pin c2c")
     _force_dimension_black(bar_pin_c2c, label="fulcrum-to-bar-pin c2c")
     spring_c2c = add_entity_dimension(
         adapter,
-        front,
+        holes,
         entities=(entities["fulcrum"], entities["spring"]),
-        text_xy=(FRONT_CENTER[0], 0.118),
+        text_xy=(HOLES_CENTER[0], HOLES_CENTER[1] - 0.037),
         label="fulcrum-to-spring c2c",
     )
     set_basic_dimension(adapter, spring_c2c, label="fulcrum-to-spring c2c")
@@ -307,23 +321,31 @@ async def build(
     )
     set_basic_dimension(adapter, bar_height, label="bar height from datum C")
 
-    # Hole identities come from the model roles. These projected positions only
-    # keep the two native hole callouts in separate text lanes.
-    bar_pin_edge = _sheet_xy(BAR_PIN_X, _BAR_PIN_DIA / 2.0)
-    spring_edge = _sheet_xy(LEVER_SPRING_X - _SPRING_HOLE_DIA / 2.0, 0.0)
+    # Hole identities come from the model roles. These projected text seeds
+    # precede the single native arrangement pass; they never select features.
+    bar_pin_edge = _holes_xy(BAR_PIN_X, _BAR_PIN_DIA / 2.0)
+    spring_edge = _holes_xy(LEVER_SPRING_X - _SPRING_HOLE_DIA / 2.0, 0.0)
     add_native_hole_callout(
         adapter,
-        front,
+        holes,
         edge=entities["bar_pin"],
-        callout_xy=(bar_pin_edge[0] - 0.010, 0.185),
+        callout_xy=(bar_pin_edge[0] - 0.010, HOLES_CENTER[1] + 0.030),
         label="bar-pin hole",
     )
     add_native_hole_callout(
         adapter,
-        front,
+        holes,
         edge=entities["spring"],
-        callout_xy=(spring_edge[0] + 0.005, 0.185),
+        callout_xy=(spring_edge[0] + 0.005, HOLES_CENTER[1] + 0.030),
         label="spring-eye hole",
+    )
+
+    # Let the native dimension bank settle BEFORE authoring symbol/GTol bodies.
+    # The retained single-view control's 1 mm spacing produced 6 mm anchor
+    # steps whose actual BASIC frames overlapped adjacent extension lines.
+    # This is one documented native spacing request, not a placement retry.
+    auto_arrange_view_dimensions(
+        adapter, (front, holes, right, top, iso), spacing_m=0.003
     )
 
     # Complete datum reference frame: A is a broad machined face (primary), B
@@ -331,7 +353,7 @@ async def build(
     # face (tertiary clocking).  The two BASIC hole locations reference A|B|C.
     add_datum_feature(
         adapter,
-        top,
+        right,
         entity=entities["broad_a"],
         entity_type="FACE",
         datum="A",
@@ -339,16 +361,16 @@ async def build(
     )
     add_datum_feature(
         adapter,
-        front,
+        holes,
         entity=entities["fulcrum"],
         datum="B",
         label="fulcrum bore axis",
     )
-    # The integral hub hides this face in the end view. Identify its visible
-    # long edge in the front view so the clocking datum has a readable witness.
+    # Keep the exact long-edge identity; separate the clocking datum from the
+    # profile's R3 leader instead of searching for another coordinate pick.
     add_datum_feature(
         adapter,
-        front,
+        top,
         entity=entities["top_front"],
         datum="C",
         label="top clocking face",
@@ -365,7 +387,7 @@ async def build(
     )
     add_feature_control_frame(
         adapter,
-        front,
+        holes,
         entity=entities["fulcrum"],
         characteristic="perpendicularity",
         tolerance=GEOMETRIC_TOLERANCES_MM["fulcrum bore perpendicularity"],
@@ -385,7 +407,7 @@ async def build(
     )
     add_feature_control_frame(
         adapter,
-        front,
+        holes,
         entity=entities["bar_pin"],
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["bar-pin hole position"],
@@ -395,7 +417,7 @@ async def build(
     )
     add_feature_control_frame(
         adapter,
-        front,
+        holes,
         entity=entities["spring"],
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["spring-eye hole position"],
@@ -409,14 +431,14 @@ async def build(
     )
     caption = add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.175)
 
-    auto_arrange_view_dimensions(adapter, (front, right, top, iso))
     from _drawing_native_layout import AxisLink, LayoutNote
     from _drawing_view_packing import Axis, AxisOrder
 
     layout(
         adapter,
         datum_leader_policy=DatumLeaderPolicy.BENT_DOCUMENT,
-        views={"front": front, "right": right, "top": top, "iso": iso},
+        additional_annotation_validation=validate_dimension_leader_clearance,
+        views={"front": front, "holes": holes, "right": right, "top": top, "iso": iso},
         alignments=(
             AxisLink(Axis.X, "front", "top"),
             AxisLink(Axis.Y, "front", "right"),
