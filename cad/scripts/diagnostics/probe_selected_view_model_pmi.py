@@ -41,6 +41,7 @@ from diagnostics._owned_native_documents import (  # noqa: E402
 )
 from diagnostics._source_dimension_snapshot import dimension_snapshot, compare_source  # noqa: E402
 from diagnostics._reopen_annotation_comparison import compare_reopened_annotations  # noqa: E402
+from diagnostics._source_pmi_comparison import SourcePmiBoundary, compare_source_pmi  # noqa: E402
 
 
 class PmiArrangement(StrEnum):
@@ -586,7 +587,9 @@ async def probe(
             json.dumps(report, indent=2, allow_nan=False), encoding="utf-8"
         )
 
-    def source_witness(model, phase, before=None, handles=None):
+    def source_witness(
+        model, phase, before=None, handles=None, *, boundary=SourcePmiBoundary.LIVE
+    ):
         if (
             model is None
             or int(model.GetType()) != 1
@@ -606,7 +609,9 @@ async def probe(
                     "source does not satisfy the authored PMI positive control"
                 )
         else:
-            if before["pmi"] != annotations:
+            comparison = compare_source_pmi(before["pmi"], annotations, boundary=boundary)
+            report[phase]["pmi_comparison"] = comparison
+            if comparison["status"] != "passed":
                 raise RuntimeError("source PMI changed during drawing import/export")
             changes = compare_source(
                 before["dimensions"],
@@ -764,7 +769,12 @@ async def probe(
         reopened_source = _early_bound(
             app.GetOpenDocumentByName(str(copy)), "IModelDoc2"
         )
-        source_witness(reopened_source, "source_reopened", source_before)
+        cold_source, cold_source_handles = source_witness(
+            reopened_source,
+            "source_reopened",
+            source_before,
+            boundary=SourcePmiBoundary.COLD,
+        )
         reopened, reopened_views, reopened_handles = snapshot(
             adapter, copy, configuration, reopened_source
         )
@@ -799,7 +809,12 @@ async def probe(
             reopened_handles,
             exported_handles,
         )
-        source_witness(reopened_source, "source_after_reopened_export", source_before)
+        source_witness(
+            reopened_source,
+            "source_after_reopened_export",
+            cold_source,
+            cold_source_handles,
+        )
         retained.require_hashes(
             {str(native): saved_sha, **copy_expected}, "PDF-only cold export"
         )

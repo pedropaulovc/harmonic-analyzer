@@ -1,0 +1,1598 @@
+{
+  "receipt": "cad/out/reports/selected-view-pmi-dw50mqvy/observations.json",
+  "receipt_sha256": "d1c551feb949197d0915d94aa4cbbe3df0c6f8812bf48816a229c6468ce1ef0f",
+  "before": {
+    "pmi": [
+      {
+        "name": "HARMONIC_PMI_datum_A",
+        "type": 2,
+        "key": "datum:A",
+        "signature": [
+          "datum",
+          "A"
+        ],
+        "is_dimxpert": false,
+        "visible": 1,
+        "dangling": false,
+        "position_m": [
+          5.832380380939283e-19,
+          0.004550000043999965,
+          0.0147625
+        ],
+        "owner_type": 3,
+        "owner_identity": 1,
+        "view": null,
+        "attachment_count": 1,
+        "attachment_types": [
+          2
+        ],
+        "null_entities": 0,
+        "face_identity": 1,
+        "face_spec_matches": true
+      },
+      {
+        "name": "HARMONIC_PMI_seat_cylindricity",
+        "type": 5,
+        "key": "seat_cylindricity",
+        "signature": [
+          "gtol",
+          {
+            "characteristic_symbol": "GTOL-CYL",
+            "tolerance": "0.01",
+            "datums": [],
+            "tolerance_zone": "linear"
+          }
+        ],
+        "is_dimxpert": false,
+        "visible": 1,
+        "dangling": false,
+        "position_m": [
+          3.061616940311174e-19,
+          0.016000000131,
+          0.002499999953
+        ],
+        "owner_type": 3,
+        "owner_identity": 1,
+        "view": null,
+        "attachment_count": 1,
+        "attachment_types": [
+          2
+        ],
+        "null_entities": 0,
+        "face_identity": 1,
+        "face_spec_matches": true
+      },
+      {
+        "name": "HARMONIC_PMI_seat_runout",
+        "type": 5,
+        "key": "seat_runout",
+        "signature": [
+          "gtol",
+          {
+            "characteristic_symbol": "GTOL-SRUN",
+            "tolerance": "0.03",
+            "datums": [
+              "A"
+            ],
+            "tolerance_zone": "linear"
+          }
+        ],
+        "is_dimxpert": false,
+        "visible": 1,
+        "dangling": false,
+        "position_m": [
+          3.061616940311174e-19,
+          0.016000000131,
+          0.002499999953
+        ],
+        "owner_type": 3,
+        "owner_identity": 1,
+        "view": null,
+        "attachment_count": 1,
+        "attachment_types": [
+          2
+        ],
+        "null_entities": 0,
+        "face_identity": 1,
+        "face_spec_matches": true
+      }
+    ],
+    "dimensions": {
+      "configuration": "Default",
+      "features": [
+        "Annotations",
+        "Cap",
+        "CapPlane",
+        "CapProfile",
+        "CapSlot",
+        "CapSlotProfile",
+        "Comments",
+        "Design Binder",
+        "Equations",
+        "Favorites",
+        "Front Plane",
+        "History",
+        "Lights and Cameras",
+        "Markups",
+        "Origin",
+        "Plain Carbon Steel",
+        "Right Plane",
+        "Selection Sets",
+        "Sensors",
+        "Solid Bodies",
+        "Stub",
+        "StubProfile",
+        "Surface Bodies",
+        "Top Plane"
+      ],
+      "dimensions": {
+        "BaseLength@StubProfile@selected-view-pmi-dw50mqvy-transgear-stub.Part": {
+          "native": {
+            "value_system": 0.009100000088,
+            "tolerance_type": 0,
+            "designation": "other",
+            "tolerance_min": 0,
+            "tolerance_max": 0
+          },
+          "displays": [
+            {
+              "feature": "Stub",
+              "dimension_type": 12,
+              "index": 0,
+              "marked_for_drawing": true,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            },
+            {
+              "feature": "StubProfile",
+              "dimension_type": 12,
+              "index": 0,
+              "marked_for_drawing": true,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            }
+          ]
+        },
+        "SeatLength@StubProfile@selected-view-pmi-dw50mqvy-transgear-stub.Part": {
+          "native": {
+            "value_system": 0.013800000085999999,
+            "tolerance_type": 0,
+            "designation": "other",
+            "tolerance_min": 0,
+            "tolerance_max": 0
+          },
+          "displays": [
+            {
+              "feature": "Stub",
+              "dimension_type": 12,
+              "index": 0,
+              "marked_for_drawing": true,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            },
+            {
+              "feature": "StubProfile",
+              "dimension_type": 12,
+              "index": 0,
+              "marked_for_drawing": true,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            }
+          ]
+        },
+        "CollarLength@StubProfile@selected-view-pmi-dw50mqvy-transgear-stub.Part": {
+          "native": {
+            "value_system": 0.0040000001280000004,
+            "tolerance_type": 0,
+            "designation": "other",
+            "tolerance_min": 0,
+            "tolerance_max": 0
+          },
+          "displays": [
+            {
+              "feature": "Stub",
+              "dimension_type": 12,
+              "index": 0,
+              "marked_for_drawing": true,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            },
+            {
+              "feature": "StubProfile",
+              "dimension_type": 12,
+              "index": 0,
+              "marked_for_drawing": true,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            }
+          ]
+        },
+        "BaseDia@StubProfile@selected-view-pmi-dw50mqvy-transgear-stub.Part": {
+          "native": {
+            "value_system": 0.009524999999999999,
+            "tolerance_type": 2,
+            "designation": "other",
+            "tolerance_min": -0.00005,
+            "tolerance_max": 0
+          },
+          "displays": [
+            {
+              "feature": "Stub",
+              "dimension_type": 6,
+              "index": 0,
+              "marked_for_drawing": true,
+              "primary_precision": -2,
+              "tolerance_precision": 2,
+              "text": {
+                "1": "<MOD-DIAM>",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "<MOD-DIAM>",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            },
+            {
+              "feature": "StubProfile",
+              "dimension_type": 6,
+              "index": 0,
+              "marked_for_drawing": true,
+              "primary_precision": -2,
+              "tolerance_precision": 2,
+              "text": {
+                "1": "<MOD-DIAM>",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "<MOD-DIAM>",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            }
+          ]
+        },
+        "SeatDia@StubProfile@selected-view-pmi-dw50mqvy-transgear-stub.Part": {
+          "native": {
+            "value_system": 0.004999999906,
+            "tolerance_type": 2,
+            "designation": "other",
+            "tolerance_min": -0.00002,
+            "tolerance_max": 0
+          },
+          "displays": [
+            {
+              "feature": "Stub",
+              "dimension_type": 6,
+              "index": 0,
+              "marked_for_drawing": true,
+              "primary_precision": -2,
+              "tolerance_precision": 2,
+              "text": {
+                "1": "<MOD-DIAM>",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "<MOD-DIAM>",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            },
+            {
+              "feature": "StubProfile",
+              "dimension_type": 6,
+              "index": 0,
+              "marked_for_drawing": true,
+              "primary_precision": -2,
+              "tolerance_precision": 2,
+              "text": {
+                "1": "<MOD-DIAM>",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "<MOD-DIAM>",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            }
+          ]
+        },
+        "CollarDia@StubProfile@selected-view-pmi-dw50mqvy-transgear-stub.Part": {
+          "native": {
+            "value_system": 0.013999999939999999,
+            "tolerance_type": 0,
+            "designation": "other",
+            "tolerance_min": 0,
+            "tolerance_max": 0
+          },
+          "displays": [
+            {
+              "feature": "Stub",
+              "dimension_type": 6,
+              "index": 0,
+              "marked_for_drawing": true,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "<MOD-DIAM>",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "<MOD-DIAM>",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            },
+            {
+              "feature": "StubProfile",
+              "dimension_type": 6,
+              "index": 0,
+              "marked_for_drawing": true,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "<MOD-DIAM>",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "<MOD-DIAM>",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            }
+          ]
+        },
+        "D1@Stub@selected-view-pmi-dw50mqvy-transgear-stub.Part": {
+          "native": {
+            "value_system": 6.283185307179586,
+            "tolerance_type": 0,
+            "designation": "other",
+            "tolerance_min": 0,
+            "tolerance_max": 0
+          },
+          "displays": [
+            {
+              "feature": "Stub",
+              "dimension_type": 3,
+              "index": 0,
+              "marked_for_drawing": false,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            }
+          ]
+        },
+        "D1@CapPlane@selected-view-pmi-dw50mqvy-transgear-stub.Part": {
+          "native": {
+            "value_system": 0.026900000301999998,
+            "tolerance_type": 0,
+            "designation": "other",
+            "tolerance_min": 0,
+            "tolerance_max": 0
+          },
+          "displays": [
+            {
+              "feature": "Cap",
+              "dimension_type": 2,
+              "index": 0,
+              "marked_for_drawing": false,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            },
+            {
+              "feature": "CapPlane",
+              "dimension_type": 2,
+              "index": 0,
+              "marked_for_drawing": false,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            },
+            {
+              "feature": "CapProfile",
+              "dimension_type": 2,
+              "index": 0,
+              "marked_for_drawing": false,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            }
+          ]
+        },
+        "CapDia@CapProfile@selected-view-pmi-dw50mqvy-transgear-stub.Part": {
+          "native": {
+            "value_system": 0.004999999906,
+            "tolerance_type": 0,
+            "designation": "other",
+            "tolerance_min": 0,
+            "tolerance_max": 0
+          },
+          "displays": [
+            {
+              "feature": "Cap",
+              "dimension_type": 6,
+              "index": 0,
+              "marked_for_drawing": false,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "<MOD-DIAM>",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "<MOD-DIAM>",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            },
+            {
+              "feature": "CapProfile",
+              "dimension_type": 6,
+              "index": 0,
+              "marked_for_drawing": false,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "<MOD-DIAM>",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "<MOD-DIAM>",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            }
+          ]
+        },
+        "D1@Cap@selected-view-pmi-dw50mqvy-transgear-stub.Part": {
+          "native": {
+            "value_system": 0.001500000048,
+            "tolerance_type": 0,
+            "designation": "other",
+            "tolerance_min": 0,
+            "tolerance_max": 0
+          },
+          "displays": [
+            {
+              "feature": "Cap",
+              "dimension_type": 2,
+              "index": 0,
+              "marked_for_drawing": false,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            }
+          ]
+        },
+        "SlotSpan@CapSlotProfile@selected-view-pmi-dw50mqvy-transgear-stub.Part": {
+          "native": {
+            "value_system": 0.004999999906,
+            "tolerance_type": 0,
+            "designation": "other",
+            "tolerance_min": 0,
+            "tolerance_max": 0
+          },
+          "displays": [
+            {
+              "feature": "CapSlot",
+              "dimension_type": 2,
+              "index": 0,
+              "marked_for_drawing": false,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            },
+            {
+              "feature": "CapSlotProfile",
+              "dimension_type": 2,
+              "index": 0,
+              "marked_for_drawing": false,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            }
+          ]
+        },
+        "SlotDepth@CapSlotProfile@selected-view-pmi-dw50mqvy-transgear-stub.Part": {
+          "native": {
+            "value_system": 0.00060000007,
+            "tolerance_type": 0,
+            "designation": "other",
+            "tolerance_min": 0,
+            "tolerance_max": 0
+          },
+          "displays": [
+            {
+              "feature": "CapSlot",
+              "dimension_type": 2,
+              "index": 0,
+              "marked_for_drawing": false,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            },
+            {
+              "feature": "CapSlotProfile",
+              "dimension_type": 2,
+              "index": 0,
+              "marked_for_drawing": false,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            }
+          ]
+        },
+        "SlotX0@CapSlotProfile@selected-view-pmi-dw50mqvy-transgear-stub.Part": {
+          "native": {
+            "value_system": 0.002499999953,
+            "tolerance_type": 0,
+            "designation": "other",
+            "tolerance_min": 0,
+            "tolerance_max": 0
+          },
+          "displays": [
+            {
+              "feature": "CapSlot",
+              "dimension_type": 11,
+              "index": 0,
+              "marked_for_drawing": false,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            },
+            {
+              "feature": "CapSlotProfile",
+              "dimension_type": 11,
+              "index": 0,
+              "marked_for_drawing": false,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            }
+          ]
+        },
+        "SlotY0@CapSlotProfile@selected-view-pmi-dw50mqvy-transgear-stub.Part": {
+          "native": {
+            "value_system": 0.02780000028,
+            "tolerance_type": 0,
+            "designation": "other",
+            "tolerance_min": 0,
+            "tolerance_max": 0
+          },
+          "displays": [
+            {
+              "feature": "CapSlot",
+              "dimension_type": 12,
+              "index": 0,
+              "marked_for_drawing": false,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            },
+            {
+              "feature": "CapSlotProfile",
+              "dimension_type": 12,
+              "index": 0,
+              "marked_for_drawing": false,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            }
+          ]
+        },
+        "D1@CapSlot@selected-view-pmi-dw50mqvy-transgear-stub.Part": {
+          "native": {
+            "value_system": 0.0008,
+            "tolerance_type": 0,
+            "designation": "other",
+            "tolerance_min": 0,
+            "tolerance_max": 0
+          },
+          "displays": [
+            {
+              "feature": "CapSlot",
+              "dimension_type": 2,
+              "index": 0,
+              "marked_for_drawing": false,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "after": {
+    "pmi": [
+      {
+        "name": "HARMONIC_PMI_datum_A",
+        "type": 2,
+        "key": "datum:A",
+        "signature": [
+          "datum",
+          "A"
+        ],
+        "is_dimxpert": false,
+        "visible": 1,
+        "dangling": false,
+        "position_m": [
+          5.8323803809392685e-19,
+          0.004550000043999965,
+          0.0147625
+        ],
+        "owner_type": 3,
+        "owner_identity": 1,
+        "view": null,
+        "attachment_count": 1,
+        "attachment_types": [
+          2
+        ],
+        "null_entities": 0,
+        "face_identity": 1,
+        "face_spec_matches": true
+      },
+      {
+        "name": "HARMONIC_PMI_seat_cylindricity",
+        "type": 5,
+        "key": "seat_cylindricity",
+        "signature": [
+          "gtol",
+          {
+            "characteristic_symbol": "GTOL-CYL",
+            "tolerance": "0.01",
+            "datums": [],
+            "tolerance_zone": "linear"
+          }
+        ],
+        "is_dimxpert": false,
+        "visible": 1,
+        "dangling": false,
+        "position_m": [
+          3.06161694031216e-19,
+          0.016000000131,
+          0.002499999953
+        ],
+        "owner_type": 3,
+        "owner_identity": 1,
+        "view": null,
+        "attachment_count": 1,
+        "attachment_types": [
+          2
+        ],
+        "null_entities": 0,
+        "face_identity": 1,
+        "face_spec_matches": true
+      },
+      {
+        "name": "HARMONIC_PMI_seat_runout",
+        "type": 5,
+        "key": "seat_runout",
+        "signature": [
+          "gtol",
+          {
+            "characteristic_symbol": "GTOL-SRUN",
+            "tolerance": "0.03",
+            "datums": [
+              "A"
+            ],
+            "tolerance_zone": "linear"
+          }
+        ],
+        "is_dimxpert": false,
+        "visible": 1,
+        "dangling": false,
+        "position_m": [
+          3.06161694031216e-19,
+          0.016000000131,
+          0.002499999953
+        ],
+        "owner_type": 3,
+        "owner_identity": 1,
+        "view": null,
+        "attachment_count": 1,
+        "attachment_types": [
+          2
+        ],
+        "null_entities": 0,
+        "face_identity": 1,
+        "face_spec_matches": true
+      }
+    ],
+    "dimensions": {
+      "configuration": "Default",
+      "features": [
+        "Annotations",
+        "Cap",
+        "CapPlane",
+        "CapProfile",
+        "CapSlot",
+        "CapSlotProfile",
+        "Comments",
+        "Design Binder",
+        "Equations",
+        "Favorites",
+        "Front Plane",
+        "History",
+        "Lights and Cameras",
+        "Markups",
+        "Origin",
+        "Plain Carbon Steel",
+        "Right Plane",
+        "Selection Sets",
+        "Sensors",
+        "Solid Bodies",
+        "Stub",
+        "StubProfile",
+        "Surface Bodies",
+        "Top Plane"
+      ],
+      "dimensions": {
+        "BaseLength@StubProfile@selected-view-pmi-dw50mqvy-transgear-stub.Part": {
+          "native": {
+            "value_system": 0.009100000088,
+            "tolerance_type": 0,
+            "designation": "other",
+            "tolerance_min": 0,
+            "tolerance_max": 0
+          },
+          "displays": [
+            {
+              "feature": "Stub",
+              "dimension_type": 12,
+              "index": 0,
+              "marked_for_drawing": true,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            },
+            {
+              "feature": "StubProfile",
+              "dimension_type": 12,
+              "index": 0,
+              "marked_for_drawing": true,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            }
+          ]
+        },
+        "SeatLength@StubProfile@selected-view-pmi-dw50mqvy-transgear-stub.Part": {
+          "native": {
+            "value_system": 0.013800000085999999,
+            "tolerance_type": 0,
+            "designation": "other",
+            "tolerance_min": 0,
+            "tolerance_max": 0
+          },
+          "displays": [
+            {
+              "feature": "Stub",
+              "dimension_type": 12,
+              "index": 0,
+              "marked_for_drawing": true,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            },
+            {
+              "feature": "StubProfile",
+              "dimension_type": 12,
+              "index": 0,
+              "marked_for_drawing": true,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            }
+          ]
+        },
+        "CollarLength@StubProfile@selected-view-pmi-dw50mqvy-transgear-stub.Part": {
+          "native": {
+            "value_system": 0.0040000001280000004,
+            "tolerance_type": 0,
+            "designation": "other",
+            "tolerance_min": 0,
+            "tolerance_max": 0
+          },
+          "displays": [
+            {
+              "feature": "Stub",
+              "dimension_type": 12,
+              "index": 0,
+              "marked_for_drawing": true,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            },
+            {
+              "feature": "StubProfile",
+              "dimension_type": 12,
+              "index": 0,
+              "marked_for_drawing": true,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            }
+          ]
+        },
+        "BaseDia@StubProfile@selected-view-pmi-dw50mqvy-transgear-stub.Part": {
+          "native": {
+            "value_system": 0.009524999999999999,
+            "tolerance_type": 2,
+            "designation": "other",
+            "tolerance_min": -0.00005,
+            "tolerance_max": 0
+          },
+          "displays": [
+            {
+              "feature": "Stub",
+              "dimension_type": 6,
+              "index": 0,
+              "marked_for_drawing": true,
+              "primary_precision": -2,
+              "tolerance_precision": 2,
+              "text": {
+                "1": "<MOD-DIAM>",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "<MOD-DIAM>",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            },
+            {
+              "feature": "StubProfile",
+              "dimension_type": 6,
+              "index": 0,
+              "marked_for_drawing": true,
+              "primary_precision": -2,
+              "tolerance_precision": 2,
+              "text": {
+                "1": "<MOD-DIAM>",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "<MOD-DIAM>",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            }
+          ]
+        },
+        "SeatDia@StubProfile@selected-view-pmi-dw50mqvy-transgear-stub.Part": {
+          "native": {
+            "value_system": 0.004999999906,
+            "tolerance_type": 2,
+            "designation": "other",
+            "tolerance_min": -0.00002,
+            "tolerance_max": 0
+          },
+          "displays": [
+            {
+              "feature": "Stub",
+              "dimension_type": 6,
+              "index": 0,
+              "marked_for_drawing": true,
+              "primary_precision": -2,
+              "tolerance_precision": 2,
+              "text": {
+                "1": "<MOD-DIAM>",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "<MOD-DIAM>",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            },
+            {
+              "feature": "StubProfile",
+              "dimension_type": 6,
+              "index": 0,
+              "marked_for_drawing": true,
+              "primary_precision": -2,
+              "tolerance_precision": 2,
+              "text": {
+                "1": "<MOD-DIAM>",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "<MOD-DIAM>",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            }
+          ]
+        },
+        "CollarDia@StubProfile@selected-view-pmi-dw50mqvy-transgear-stub.Part": {
+          "native": {
+            "value_system": 0.013999999939999999,
+            "tolerance_type": 0,
+            "designation": "other",
+            "tolerance_min": 0,
+            "tolerance_max": 0
+          },
+          "displays": [
+            {
+              "feature": "Stub",
+              "dimension_type": 6,
+              "index": 0,
+              "marked_for_drawing": true,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "<MOD-DIAM>",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "<MOD-DIAM>",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            },
+            {
+              "feature": "StubProfile",
+              "dimension_type": 6,
+              "index": 0,
+              "marked_for_drawing": true,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "<MOD-DIAM>",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "<MOD-DIAM>",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            }
+          ]
+        },
+        "D1@Stub@selected-view-pmi-dw50mqvy-transgear-stub.Part": {
+          "native": {
+            "value_system": 6.283185307179586,
+            "tolerance_type": 0,
+            "designation": "other",
+            "tolerance_min": 0,
+            "tolerance_max": 0
+          },
+          "displays": [
+            {
+              "feature": "Stub",
+              "dimension_type": 3,
+              "index": 0,
+              "marked_for_drawing": false,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            }
+          ]
+        },
+        "D1@CapPlane@selected-view-pmi-dw50mqvy-transgear-stub.Part": {
+          "native": {
+            "value_system": 0.026900000301999998,
+            "tolerance_type": 0,
+            "designation": "other",
+            "tolerance_min": 0,
+            "tolerance_max": 0
+          },
+          "displays": [
+            {
+              "feature": "Cap",
+              "dimension_type": 2,
+              "index": 0,
+              "marked_for_drawing": false,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            },
+            {
+              "feature": "CapPlane",
+              "dimension_type": 2,
+              "index": 0,
+              "marked_for_drawing": false,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            },
+            {
+              "feature": "CapProfile",
+              "dimension_type": 2,
+              "index": 0,
+              "marked_for_drawing": false,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            }
+          ]
+        },
+        "CapDia@CapProfile@selected-view-pmi-dw50mqvy-transgear-stub.Part": {
+          "native": {
+            "value_system": 0.004999999906,
+            "tolerance_type": 0,
+            "designation": "other",
+            "tolerance_min": 0,
+            "tolerance_max": 0
+          },
+          "displays": [
+            {
+              "feature": "Cap",
+              "dimension_type": 6,
+              "index": 0,
+              "marked_for_drawing": false,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "<MOD-DIAM>",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "<MOD-DIAM>",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            },
+            {
+              "feature": "CapProfile",
+              "dimension_type": 6,
+              "index": 0,
+              "marked_for_drawing": false,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "<MOD-DIAM>",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "<MOD-DIAM>",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            }
+          ]
+        },
+        "D1@Cap@selected-view-pmi-dw50mqvy-transgear-stub.Part": {
+          "native": {
+            "value_system": 0.001500000048,
+            "tolerance_type": 0,
+            "designation": "other",
+            "tolerance_min": 0,
+            "tolerance_max": 0
+          },
+          "displays": [
+            {
+              "feature": "Cap",
+              "dimension_type": 2,
+              "index": 0,
+              "marked_for_drawing": false,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            }
+          ]
+        },
+        "SlotSpan@CapSlotProfile@selected-view-pmi-dw50mqvy-transgear-stub.Part": {
+          "native": {
+            "value_system": 0.004999999906,
+            "tolerance_type": 0,
+            "designation": "other",
+            "tolerance_min": 0,
+            "tolerance_max": 0
+          },
+          "displays": [
+            {
+              "feature": "CapSlot",
+              "dimension_type": 2,
+              "index": 0,
+              "marked_for_drawing": false,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            },
+            {
+              "feature": "CapSlotProfile",
+              "dimension_type": 2,
+              "index": 0,
+              "marked_for_drawing": false,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            }
+          ]
+        },
+        "SlotDepth@CapSlotProfile@selected-view-pmi-dw50mqvy-transgear-stub.Part": {
+          "native": {
+            "value_system": 0.00060000007,
+            "tolerance_type": 0,
+            "designation": "other",
+            "tolerance_min": 0,
+            "tolerance_max": 0
+          },
+          "displays": [
+            {
+              "feature": "CapSlot",
+              "dimension_type": 2,
+              "index": 0,
+              "marked_for_drawing": false,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            },
+            {
+              "feature": "CapSlotProfile",
+              "dimension_type": 2,
+              "index": 0,
+              "marked_for_drawing": false,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            }
+          ]
+        },
+        "SlotX0@CapSlotProfile@selected-view-pmi-dw50mqvy-transgear-stub.Part": {
+          "native": {
+            "value_system": 0.002499999953,
+            "tolerance_type": 0,
+            "designation": "other",
+            "tolerance_min": 0,
+            "tolerance_max": 0
+          },
+          "displays": [
+            {
+              "feature": "CapSlot",
+              "dimension_type": 11,
+              "index": 0,
+              "marked_for_drawing": false,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            },
+            {
+              "feature": "CapSlotProfile",
+              "dimension_type": 11,
+              "index": 0,
+              "marked_for_drawing": false,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            }
+          ]
+        },
+        "SlotY0@CapSlotProfile@selected-view-pmi-dw50mqvy-transgear-stub.Part": {
+          "native": {
+            "value_system": 0.02780000028,
+            "tolerance_type": 0,
+            "designation": "other",
+            "tolerance_min": 0,
+            "tolerance_max": 0
+          },
+          "displays": [
+            {
+              "feature": "CapSlot",
+              "dimension_type": 12,
+              "index": 0,
+              "marked_for_drawing": false,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            },
+            {
+              "feature": "CapSlotProfile",
+              "dimension_type": 12,
+              "index": 0,
+              "marked_for_drawing": false,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            }
+          ]
+        },
+        "D1@CapSlot@selected-view-pmi-dw50mqvy-transgear-stub.Part": {
+          "native": {
+            "value_system": 0.0008,
+            "tolerance_type": 0,
+            "designation": "other",
+            "tolerance_min": 0,
+            "tolerance_max": 0
+          },
+          "displays": [
+            {
+              "feature": "CapSlot",
+              "dimension_type": 2,
+              "index": 0,
+              "marked_for_drawing": false,
+              "primary_precision": -2,
+              "tolerance_precision": -2,
+              "text": {
+                "1": "",
+                "2": "",
+                "3": "",
+                "4": "",
+                "5": "",
+                "6": "",
+                "7": "",
+                "8": ""
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

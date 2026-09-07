@@ -308,3 +308,28 @@ API references consulted from the bundled official documentation:
 `IEdge.GetTwoAdjacentFaces2`, `IAnnotation.GetAttachedEntities3`,
 `GetAttachedEntityTypes`, `GetAttachedEntityCount3`, `Owner`, `OwnerType`, and
 `ISldWorks.IsSame`; associated selection/attachment examples and owner/select enums.
+
+### Full fulcrum build: five explicit roles pass, cold title still fails
+
+Root `edde1174` / adapter `e77bfda` built and saved the fulcrum native drawing,
+PDF and PNG in 21.2943858000217 s (`recipe_seconds`, including diagnostic
+context observations). Receipt `cad/out/reports/datum-policy-ges4a7q0/pilot.json`
+has SHA-256
+`47db15fe4c750df94a331060a3ddd59ffc2355733df595bf2fe62b3296e6fb41`.
+The built explicit bank contains all four PMI roles and the surface finish,
+with exact MODEL-context reverse mapping to their original controlled entities;
+11 context observation stages were retained. This is not an uninstrumented
+speed comparison.
+
+Cold reopen rejected only the linked TITLE `Sheet1/DetailItem245`: its X text
+origin moved from 0.35389179984999647 to 0.35789913560224523 m, a
+4.007335752248764 mm displacement repeated in three measured paths. The final
+cold explicit-entity bank was therefore not reached. That substantive title
+movement remains a failed gate, independently of the source-PMI near-zero
+serialization correction in the [selected-view control](selected-view-model-pmi-control.md).
+
+Original and owned-copy hashes remained exact; runtime guard errors were empty.
+Failure capture was complete with no errors, and owned cleanup restored the
+empty baseline without error. Main's eye review found all five symbols clear
+but the original DWG/REV title-block text overlapping. There is no full-sheet
+visual/cold acceptance or pivot native acceptance from this fulcrum result.
