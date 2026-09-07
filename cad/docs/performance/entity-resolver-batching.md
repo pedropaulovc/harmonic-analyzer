@@ -93,8 +93,8 @@ Uninstrumented resolver seconds, in execution order:
 | Block | A | B | B | A |
 |---|---:|---:|---:|---:|
 | 1 | 2.186753 | 1.281873 | 1.520520 | 2.564985 |
-| 2 | 2.094509 | 1.256206 | 1.265919 | 2.077304 |
-| 3 | 2.091196 | 1.229585 | 1.209113 | 2.394274 |
+| 2 | 2.091196 | 1.256206 | 1.265919 | 2.077304 |
+| 3 | 2.094509 | 1.229585 | 1.209113 | 2.394274 |
 
 Median: 2.140631 s to 1.261062 s, saving 0.879569 s (41.1%).
 Means: 2.234837 s and 1.293869 s. Ranges: 2.077304 to 2.564985 s
@@ -209,6 +209,16 @@ the committed scaffold and the live results note supplied as review context;
 this complete committed report replaces that scaffold before re-review.
 No production-code finding was raised. No parent branch, merge or billing
 setting changed.
+
+The second local pass requested only an explicit raw-regex test literal; it is
+fixed without changing the pattern or assertion. A separate receipt audit
+corrected two swapped A-sample table rows; aggregate calculations were unchanged.
+Native observations total 16 successful production builds (including five warm
+builds and the final restored output), 24 successful ABBA resolver samples and
+two successful complete crank callbacks. A post-build archive command initially
+used the wrong PNG path; it was corrected before the next sample without rerunning
+or changing that successful native result. No native failure is hidden by that
+bookkeeping correction.
 
 The complete bounded ownership list is:
 

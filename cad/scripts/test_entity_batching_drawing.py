@@ -142,7 +142,7 @@ def test_batched_ownership_failures_never_return_partial_results_or_fallback(top
         owned_face.GetEdges.return_value = []
     if fault == "ambiguous_edge":
         owned_face.GetEdges.return_value.append(circle())
-    with pytest.raises(RuntimeError, match="Bore|matched [02] edges"):
+    with pytest.raises(RuntimeError, match=r"Bore|matched [02] edges"):
         entities.ModelEntities(topology.model).resolve({
             "good": entities.FeatureFace("Good", PlanarFace((0, 1, 0), 4)),
             "bad": entities.FaceBoundary(entities.FeatureFace("Bore", CylinderFace(8)),
