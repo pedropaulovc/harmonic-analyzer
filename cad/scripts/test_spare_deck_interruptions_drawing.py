@@ -253,3 +253,196 @@ async def test_failure_checkpoint_attempt_is_bounded_and_preserves_both_errors(
     assert len(calls) == 4
     c.owner.close.assert_awaited_once()
     c.owner.input_evidence.assert_called_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "entry,checkpoint_index,phase,total_calls",
+    [
+        ("measure", 3, "measure", 4),
+        ("probe", 4, "probe", 5),
+        ("probe", 3, "measure", 5),
+    ],
+)
+@pytest.mark.parametrize("publication", ["before_write", "after_write"])
+async def test_ordinary_final_write_failure_publishes_failure_on_one_retry(
+    context, monkeypatch, entry, checkpoint_index, phase, total_calls, publication
+):
+    c = context
+    primary = OSError("ordinary receipt write rejected")
+    original = probe.checkpoint
+    observations = []
+    reports = []
+
+    def checkpoint(path, report):
+        observations.append(deepcopy(report))
+        reports.append(report)
+        if len(observations) == checkpoint_index and publication == "before_write":
+            raise primary
+        original(path, report)
+        if len(observations) == checkpoint_index and publication == "after_write":
+            raise primary
+
+    monkeypatch.setattr(probe, "checkpoint", checkpoint)
+    with pytest.raises(ExceptionGroup) as caught:
+        if entry == "measure":
+            await probe.measure(c.adapter, c.report, c.path, c.sha)
+        if entry == "probe":
+            await probe.probe(c.adapter, c.directory, c.sha)
+    expected = (primary,)
+    if entry == "probe" and phase == "measure":
+        (nested,) = caught.value.exceptions
+        assert type(nested) is ExceptionGroup
+        assert nested.message == "spare seating diagnostic failed"
+        assert nested.exceptions == expected
+    if entry == "measure" or phase == "probe":
+        assert caught.value.exceptions == expected
+
+    receipt = json.loads(c.path.read_text(encoding="utf-8"))
+    assert receipt["status"] == "failed"
+    assert repr(primary) in receipt["errors"]
+    assert receipt["inputs"] == c.inputs
+    assert receipt["final_inventory"] == []
+    assert len(observations) == total_calls
+    written_group = next(g for g in receipt["final_checkpoints"] if g["phase"] == phase)
+    memory_group = next(
+        g for g in reports[-1]["final_checkpoints"] if g["phase"] == phase
+    )
+    assert [a["purpose"] for a in written_group["attempts"]] == [
+        "final",
+        "failure_retry",
+    ]
+    assert written_group["attempts"][0] == {
+        "purpose": "final",
+        "report_status": "passed",
+        "outcome": "failed",
+        "error": repr(primary),
+    }
+    assert written_group["attempts"][1]["report_status"] == "failed"
+    # A write cannot attest its own return in the bytes it is still publishing.
+    expected_retry_outcome = (
+        "returned" if entry == "probe" and phase == "measure" else "started"
+    )
+    assert written_group["attempts"][1]["outcome"] == expected_retry_outcome
+    assert memory_group["attempts"][1]["outcome"] == "returned"
+    c.owner.open.assert_awaited_once()
+    c.owner.close.assert_awaited_once()
+    c.owner.input_evidence.assert_called_once()
+    probe.contact.assert_called_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("secondary_kind", ["same_instance", "distinct_instance"])
+@pytest.mark.parametrize("entry", ["measure", "probe"])
+async def test_ordinary_retry_failure_is_bounded_and_preserves_error_identity(
+    context, monkeypatch, secondary_kind, entry
+):
+    c = context
+    primary = OSError("receipt unavailable")
+    secondary = (
+        primary if secondary_kind == "same_instance" else OSError("receipt unavailable")
+    )
+    original = probe.checkpoint
+    observations = []
+    reports = []
+
+    def checkpoint(path, report):
+        observations.append(deepcopy(report))
+        reports.append(report)
+        original(path, report)
+        if len(observations) == 3:
+            raise primary
+        if len(observations) == 4:
+            raise secondary
+
+    monkeypatch.setattr(probe, "checkpoint", checkpoint)
+    with pytest.raises(ExceptionGroup) as caught:
+        if entry == "measure":
+            await probe.measure(c.adapter, c.report, c.path, c.sha)
+        if entry == "probe":
+            await probe.probe(c.adapter, c.directory, c.sha)
+    failure = caught.value
+    if entry == "probe":
+        (failure,) = failure.exceptions
+        assert type(failure) is ExceptionGroup
+        assert failure.message == "spare seating diagnostic failed"
+    expected = (primary,) if secondary_kind == "same_instance" else (primary, secondary)
+    assert failure.exceptions == expected
+    memory_report = reports[-1]
+    assert memory_report["status"] == "failed"
+    attempts = memory_report["final_checkpoints"][0]["attempts"]
+    assert len(attempts) == 2
+    assert [a["outcome"] for a in attempts] == ["failed", "failed"]
+    assert [a["error"] for a in attempts] == [repr(primary), repr(secondary)]
+    if secondary_kind == "same_instance":
+        assert any("same exception instance" in note for note in primary.__notes__)
+        assert attempts[1]["exception_identity"] == "same_as_initial"
+    if secondary_kind == "distinct_instance":
+        assert "exception_identity" not in attempts[1]
+    receipt = json.loads(c.path.read_text(encoding="utf-8"))
+    assert receipt["status"] == "failed"
+    assert receipt["inputs"] == c.inputs
+    assert receipt["final_inventory"] == []
+    assert len(observations) == (4 if entry == "measure" else 5)
+    c.owner.open.assert_awaited_once()
+    c.owner.close.assert_awaited_once()
+    c.owner.input_evidence.assert_called_once()
+    probe.contact.assert_called_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("identity", ["same_instance", "distinct_instances"])
+async def test_persistent_checkpoint_failure_across_actual_probe_keeps_unique_errors(
+    context, monkeypatch, identity
+):
+    c = context
+    primary = OSError("persistent checkpoint failure")
+    faults = [primary] * 4
+    if identity == "distinct_instances":
+        faults = [OSError("persistent checkpoint failure") for _ in range(4)]
+    original = probe.checkpoint
+    calls = []
+
+    def checkpoint(path, report):
+        calls.append(report)
+        original(path, report)
+        if len(calls) >= 3:
+            raise faults[len(calls) - 3]
+
+    monkeypatch.setattr(probe, "checkpoint", checkpoint)
+    with pytest.raises(ExceptionGroup) as caught:
+        await probe.probe(c.adapter, c.directory, c.sha)
+    measure_failure = caught.value.exceptions[0]
+    assert type(measure_failure) is ExceptionGroup
+    assert measure_failure.message == "spare seating diagnostic failed"
+    if identity == "same_instance":
+        assert measure_failure.exceptions == (primary,)
+        assert caught.value.exceptions == (measure_failure,)
+        assert (
+            len(
+                [
+                    note
+                    for note in primary.__notes__
+                    if "same exception instance" in note
+                ]
+            )
+            == 3
+        )
+    if identity == "distinct_instances":
+        assert measure_failure.exceptions == tuple(faults[:2])
+        assert caught.value.exceptions == (measure_failure, *faults[2:])
+    assert len(calls) == 6
+    report = calls[-1]
+    assert report["status"] == "failed"
+    assert [g["phase"] for g in report["final_checkpoints"]] == ["measure", "probe"]
+    for group in report["final_checkpoints"]:
+        assert [a["outcome"] for a in group["attempts"]] == ["failed", "failed"]
+    receipt = json.loads(c.path.read_text(encoding="utf-8"))
+    assert receipt["status"] == "failed"
+    assert receipt["inputs"] == c.inputs
+    assert receipt["final_inventory"] == []
+    assert len(receipt["final_checkpoints"]) == 2
+    c.owner.open.assert_awaited_once()
+    c.owner.close.assert_awaited_once()
+    c.owner.input_evidence.assert_called_once()
+    probe.contact.assert_called_once()

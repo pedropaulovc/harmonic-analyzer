@@ -446,9 +446,13 @@ async def test_final_checkpoint_failure_preserves_native_error_and_cleanup(
     monkeypatch.setattr(
         probe, "contact", Mock(side_effect=primary if outcome == "failed" else None)
     )
-    monkeypatch.setattr(
-        probe, "checkpoint", Mock(side_effect=[None, None, write_error])
-    )
+
+    def unavailable_final_receipt(*_):
+        if checkpoint.call_count >= 3:
+            raise write_error
+
+    checkpoint = Mock(side_effect=unavailable_final_receipt)
+    monkeypatch.setattr(probe, "checkpoint", checkpoint)
     with pytest.raises(ExceptionGroup) as caught:
         await probe.measure(
             object(), {}, tmp_path / "contact.json", probe.digest(source)

@@ -398,22 +398,54 @@ def _raise_recorded_errors(label, errors):
         raise ExceptionGroup(label, errors)
 
 
-def _final_checkpoint(report_path, report, errors):
-    try:
-        checkpoint(report_path, report)
-    except BaseException as error:
-        errors.append(error)
-        report["status"] = "failed"
-        report.setdefault("errors", []).append(repr(error))
-        if isinstance(error, Exception):
-            return
-        # An interrupted write may already have published "passed". Make one
-        # bounded attempt to replace it with failure evidence; never repeat COM.
+def _record_checkpoint_error(report, errors, error, label):
+    # The outer probe can encounter the same persistent write error already
+    # retained inside measure's group. Preserve that object's first position.
+    pending = list(errors)
+    while pending:
+        prior = pending.pop()
+        if prior is error:
+            error.add_note(f"{label} raised the same exception instance again")
+            return "already_recorded"
+        if isinstance(prior, BaseExceptionGroup):
+            pending.extend(prior.exceptions)
+    errors.append(error)
+    report.setdefault("errors", []).append(repr(error))
+    return "new"
+
+
+def _final_checkpoint(report_path, report, errors, *, phase):
+    group = {"phase": phase, "attempts": []}
+    report.setdefault("final_checkpoints", []).append(group)
+    initial_error = None
+    # Any failed write may already have published "passed". Make one failure-
+    # only write attempt, including ordinary errors, without repeating COM.
+    for purpose in ("final", "failure_retry"):
+        attempt = {
+            "purpose": purpose,
+            "report_status": report["status"],
+            "outcome": "started",
+        }
+        group["attempts"].append(attempt)
         try:
             checkpoint(report_path, report)
-        except BaseException as secondary:
-            errors.append(secondary)
-            report["errors"].append(repr(secondary))
+        except BaseException as error:
+            attempt.update(outcome="failed", error=repr(error))
+            report["status"] = "failed"
+            identity = _record_checkpoint_error(
+                report, errors, error, f"{phase} {purpose} checkpoint"
+            )
+            if identity == "already_recorded":
+                attempt["exception_identity"] = (
+                    "same_as_initial" if error is initial_error else identity
+                )
+            if initial_error is None:
+                initial_error = error
+            continue
+        # The file records "started" for its own write. Only an enclosing write
+        # can persist this returned outcome; do not add a third evidence write.
+        attempt["outcome"] = "returned"
+        return
 
 
 async def measure(adapter, report, report_path, expected_sha):
@@ -460,7 +492,7 @@ async def measure(adapter, report, report_path, expected_sha):
             status="passed" if completed and not errors else "failed",
             errors=[repr(e) for e in errors],
         )
-        _final_checkpoint(report_path, report, errors)
+        _final_checkpoint(report_path, report, errors, phase="measure")
     _raise_recorded_errors("spare seating diagnostic failed", errors)
 
 
@@ -515,7 +547,7 @@ async def probe(adapter, directory, expected_sha):
         if not completed or errors:
             report["status"] = "failed"
         report.setdefault("errors", []).extend(repr(error) for error in errors)
-        _final_checkpoint(report_path, report, errors)
+        _final_checkpoint(report_path, report, errors, phase="probe")
     _raise_recorded_errors("spare seating inspection/report failed", errors)
     return {"report": str(report_path)}
 

@@ -65,7 +65,7 @@ Offline tests cover gap/penetration, disjoint trimmed faces, wrong configuration
 parent/face ownership, replaced instances, malformed native returns and error
 preservation. The three checkpoint-error tests failed before error aggregation
 was added. All 32 tests then passed. Inventory and dependency-query regressions
-bring the current focused suite to 40 passing tests.
+brought that focused suite to 40 passing tests at `dad339f0`.
 
 ## Cold dependency-query correction
 
@@ -104,3 +104,53 @@ were unchanged, and the observed final document inventory was empty.
 
 The review's possible coplanar-face ambiguity did not occur in this model.
 The selector still rejects ambiguity; no split-face fallback was added.
+
+## Review correction: final receipt failures
+
+Review of `5251dc854be3fa886ee569ddc969894ce769c2d0` identified that an ordinary
+final-checkpoint error could leave a previously published `passed` receipt.
+The cancellation path already attempted a failure-only write; ordinary errors
+now receive the same one-attempt bound. Neither path retries the measurement,
+native open, contact reads or cleanup. A successful failure-only write still
+raises the original failure; it does not convert the run to success.
+
+`final_checkpoints` records the `measure` and `probe` phases separately, each
+with its initial write and, only after failure, one `failure_retry`. Each attempt
+records the report status it tried to publish and its observed outcome. The
+bytes being written record their own attempt as `started`, not a prediction
+that the write returned. The in-memory record changes to `returned` or `failed`
+after the call; an enclosing checkpoint may persist that later observation.
+There is no third write merely to attest a previous write's return.
+
+A repeated identical exception object keeps its first position in the raised
+group and gains a note identifying the repeated write failure, including when
+the outer probe encounters an error already inside the measurement's group.
+Both attempts remain visible in the attempt records. Distinct exception objects
+are retained even when their types and messages are identical. Cancellation and
+keyboard interruption retain their original identity and control-flow behavior.
+
+If storage rejects both attempts, the on-disk receipt may be stale or incomplete.
+It must not be treated as a successful run independently of the runner's failure
+and retained error evidence. The in-memory attempt records retain both failures;
+this change does not claim it can publish to an unwritable destination.
+
+The review work used an isolated checkout at
+`C:/src/ha-spare-contact-review-5251`, pinned to adapter
+`2269009ed56712867826516f4406afc98a0c2814`. Twelve ordinary-write and persistent
+composition cases failed before the checkpoint fix; their JUnit evidence is
+`cad/out/reports/review-684-checkpoint-fail-first.xml` in that checkout. They cover
+before/after publication, successful failure-only writes, same/distinct repeated
+errors, and the actual `probe` → `measure` composition. Existing exact error-tuple
+and native-once assertions remain unchanged. One finite mock sequence became a
+persistent callable so a second write receives the intended `OSError`, not an
+unrelated iterator-exhaustion error.
+
+The complete offline run passed 125 tests:
+
+```powershell
+uv run --frozen --no-sync python -m pytest cad/scripts/test_spare_deck_contact_drawing.py cad/scripts/test_spare_deck_interruptions_drawing.py cad/scripts/test_owned_assembly_health_session.py -q --junitxml=cad/out/reports/review-684-complete.xml
+```
+
+This is offline diagnostic validation, not a fresh native build, visual gate or
+clean review of the updated commits. The historical native contact receipt above
+remains separately identified by its original commit and exact top hash.
