@@ -510,8 +510,13 @@ def align_channel_lever_basic_pairs(
         int(constants.swDetailingNoOptionSpecified),
     )
     extension = _early_bound(model.Extension, "IModelDocExtension")
-    old_offset = float(extension.GetUserPreferenceDouble(preference, option))
-    if not math.isfinite(old_offset) or old_offset <= 0:
+    # Validate the inherited document setting, not a rollback value. The
+    # per-pair writes intentionally leave the final calibrated offset in this
+    # drawing, as in the saved/cold control documented in
+    # cad/docs/performance/lever-linear-parallel-control.md. Restoring it would
+    # be a different, untested layout policy (including on failed commands).
+    initial_offset = float(extension.GetUserPreferenceDouble(preference, option))
+    if not math.isfinite(initial_offset) or initial_offset <= 0:
         raise RuntimeError("parallel document spacing is invalid")
     for label, rows in before.items():
         _same_context(adapter, model, sheet, contexts)

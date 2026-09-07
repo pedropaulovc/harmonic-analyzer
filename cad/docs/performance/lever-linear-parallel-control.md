@@ -282,3 +282,16 @@ This validates the production spacing extraction, not the prepared factory:
 that runner's first-miss raw note-extent mismatch is a separate retained failure
 and still needs its own control and successful native run. It is not the full
 `doit -n 4` merge gate.
+
+### Review clarification: persisted spacing is intentional
+
+The Windows factory review at `c0595378` proposed restoring the value called
+`old_offset`. That name was misleading: it validates the initial document
+setting, not a rollback snapshot. The explicit persistence contract above and
+the integrated `93294cb6` control use exactly two offset writes, leaving the
+hole-view request in the drawing. The variable is now named `initial_offset`;
+the calls, ownership checks and original error paths are unchanged. Existing
+tests still pin two writes, three reads and one command per pair. Restoring the
+preference, even after failure, would be a separate native experiment requiring
+fresh geometry, saved/cold and printed-layout checks; the API documentation does
+not establish that restoration leaves arranged geometry unchanged.
