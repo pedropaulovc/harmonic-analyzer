@@ -60,14 +60,36 @@ def persistent_controls(extension, entities, records):
         )
 
 
+def _dirty_flags(models, records, phase):
+    errors = []
+    for scope, model in models.items():
+        row = records.setdefault(scope, {})
+        try:
+            row[f"dirty_{phase}"] = model.GetSaveFlag()
+        except Exception as error:
+            row[f"dirty_{phase}_error"] = repr(error)
+            errors.append(error)
+    return errors
+
+
 def capture(adapter, view, expected, selected, evidence):
     """Best-effort failure evidence; never replace the original rejection."""
     records = evidence.setdefault("persistent_identity_control", {})
+    models = {}
     try:
         adapter.ownership.assert_current_owned()
         drawing = _early_bound(adapter.currentModel, "IModelDoc2")
         if drawing.GetType() != 3:
             raise RuntimeError("silhouette control requires the owned drawing")
+        models = {
+            "drawing": drawing,
+            "source": _early_bound(view.ReferencedDocument, "IModelDoc2"),
+        }
+        # Drawing-context queries may themselves affect the referenced source.
+        # Bracket BOTH documents before even the repeated selection/face reads.
+        before_errors = _dirty_flags(models, records, "before")
+        if before_errors:
+            raise before_errors[0]
         manager = _early_bound(drawing.SelectionManager, "ISelectionMgr")
         if manager.GetSelectedObjectCount2(-1) != 1 or manager.GetSelectedObjectType3(1, -1) != 46:
             raise RuntimeError("silhouette control requires one unchanged type46 selection")
@@ -80,13 +102,21 @@ def capture(adapter, view, expected, selected, evidence):
             "expected_face": _early_bound(expected, "ISilhouetteEdge").GetFace(),
             "selected_face": _early_bound(selected, "ISilhouetteEdge").GetFace(),
         }
-        for scope, model in (("drawing", drawing), ("source", view.ReferencedDocument)):
-            model = _early_bound(model, "IModelDoc2")
-            row = records[scope] = {"dirty_before": model.GetSaveFlag()}
+        for scope, model in models.items():
             persistent_controls(
-                _early_bound(model.Extension, "IModelDocExtension"), entities, row
+                _early_bound(model.Extension, "IModelDocExtension"), entities, records[scope]
             )
-            row["dirty_after"] = model.GetSaveFlag()
-        adapter.ownership.assert_current_owned()
     except Exception as error:
         records["capture_error"] = repr(error)
+    finally:
+        # Partial evidence still needs a final observation. Each failed flag
+        # remains separate from the original native capture/identity exception.
+        after_errors = _dirty_flags(models, records, "after")
+        if after_errors:
+            records.setdefault("capture_error", repr(after_errors[0]))
+        if models:
+            try:
+                adapter.ownership.assert_current_owned()
+            except Exception as error:
+                field = "final_ownership_error" if "capture_error" in records else "capture_error"
+                records[field] = repr(error)
