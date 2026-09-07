@@ -327,3 +327,28 @@ repair, not the text policy.
 
 The integrated offline `check:recipe` gate at `f46678cf` passed all 4,953 tests
 in 83.91 s (`cad/out/reports/pytest-telemetry/run-vmcnx2yd`).
+
+## Late lower text: stored but not printed
+
+At `9f2f5d9a`, the explicit `--callout-storage lower_text_before_save` arm
+queued the same request, then freshly verified its native identities and applied
+one SetLowerText/rebuild after finalization. All other arguments matched the
+legacy baseline. Receipt `datum-policy-rqv9qa0l/pilot.json`, SHA-256
+`7d9aa7f12dba466f92b15ab43595e643909516aee6b2f36e51ee3bff5dc3f5c3`,
+retains all 25 observation banks.
+
+Exact lower text survived native save, PDF export and finalization, with clean
+source flags and unchanged raw values, tolerances and hashes. However, built
+acceptance rejected `lower-text requested lines are not both displayed`.
+The generic native text runs contain the diameter and its limits, not the fit
+lines; visual inspection of the recipe PNG confirms their absence. Cold
+reopening was not reached. This imported-diameter/multiline form is therefore
+not a usable printed-callout solution under either tested timing; this is not
+a claim that SetLowerText never works for other dimension types or call forms.
+
+The queued operation took 0.586 s and the later write/readback 4.033 s.
+Recipe/pilot times were 122.238/205.572 s including diagnostics. Failure capture
+had no errors, source/copy hashes remained exact, and cleanup preserved the two
+original clean/visible pivot documents with empty final guards. No production
+text policy changed. The integrated offline suite passed 4,980 tests in 89.76 s
+(`cad/out/reports/pytest-telemetry/run-tsgd1o9a`).
