@@ -408,6 +408,7 @@ async def build(
         label="shaft bore finish",
     )
     # Move the no-leader symbol along its attached rim, not its leader endpoint.
+    # The 30-degree layout seed keeps the Ra text below the arm's top outline.
     # Native SetPosition2 may constrain this layout seed to the attached edge.
     annotation = _early_bound(finish.GetAnnotation(), "IAnnotation")
     position = tuple(annotation.GetPosition() or ())
@@ -415,8 +416,8 @@ async def build(
         raise RuntimeError("shaft bore finish: invalid native symbol position")
     shaft = entities(front, "shaft")[0]  # Recheck ownership before mutation.
     if not annotation.SetPosition2(
-        _sheet_x(0.0),
-        FRONT_CENTER[1] + SHAFT_BORE_DIA * SHEET_SCALE[0] / 2000.0,
+        _sheet_x(SHAFT_BORE_DIA * 3.0**0.5 / 4.0),
+        FRONT_CENTER[1] + SHAFT_BORE_DIA * SHEET_SCALE[0] / 4000.0,
         position[2],
     ):
         raise RuntimeError("shaft bore finish: native symbol move failed")
