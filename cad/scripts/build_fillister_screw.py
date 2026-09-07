@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import math
 from _model_dimension_callouts import author_model_callouts
-from fillister_screw_spec import SIDE_DIMENSION_CALLOUTS
+from fillister_screw_spec import SIDE_DIMENSION_CALLOUTS, DIMENSION_TEXT
 import sys
 
 from _fastener_catalog import fastener
@@ -158,6 +158,7 @@ async def build(adapter) -> dict[str, str]:
         },
     )
     author_model_callouts(adapter, "Shank", SIDE_DIMENSION_CALLOUTS)
+    author_model_callouts(adapter, "ShankProfile", DIMENSION_TEXT, location="all")
     return await save_part_and_images(adapter, PART_NAME)
 
 

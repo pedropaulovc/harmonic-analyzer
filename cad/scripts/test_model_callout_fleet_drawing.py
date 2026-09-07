@@ -1,4 +1,4 @@
-"""Retain 35-part / 72 original rows, plus two source-owned tip reference fields."""
+"""Retain 72 original rows, two tip fields and one fillister whole-text row."""
 
 import ast
 import asyncio
@@ -40,6 +40,8 @@ def expected_rows(drawing):
             ("BodyProfile", "BodyDiaDim", "(<MOD-DIAM>", "prefix"): 1,
             ("BodyProfile", "BodyDiaDim", ")", "suffix"): 1,
         })
+    if drawing == "draw_fillister_screw":
+        rows.update({("ShankProfile", "ShankDia", "#4-40 UNC-2A", "all"): 1})
     return rows
 
 
@@ -174,7 +176,7 @@ def test_moved_expressions_and_shared_map_identity_are_unchanged(definition):
 def test_exact_fleet_counts_and_only_approved_part_dependency_growth():
     assert len(ACTIVE) == 35
     assert sum(len(row["rows"]) for row in INVENTORY["calls"]) == 72
-    assert sum(sum(expected_rows(name).values()) for name in ACTIVE) == 74
+    assert sum(sum(expected_rows(name).values()) for name in ACTIVE) == 75
     expected = {name.replace("draw_", "build_", 1) for name in ACTIVE}
     helper = str(Path(author.__file__).resolve())
     actual = {path.stem for path in part_scripts() if helper in module_deps_of(path)}
