@@ -76,3 +76,54 @@ mistyped the parallel test filename and ran zero tests (`run-acf4dzfn`); the
 415-test result above is the corrected run. These checks do not establish native
 save/render behavior or performance. No acceptance predicates, native helper
 call order, ownership policy or manufacturing recipe operations changed.
+
+## Completed review of `f0eed58a`
+
+The next Windows `review findings` read returned **12 stored findings** for
+`f0eed58aee67fce77e3ccd8dd7ef59284b9c0fc2`. No new review was started. All
+198 stored diff blocks exactly match
+`31b145837d5262dbe130c4509992895795bd7675..f0eed58a` after trailing-newline
+normalization. `git.json` instead records main's branch tip `c6ab57db`; that
+metadata is not the effective diff base.
+
+Complete original receipt:
+
+```text
+C:/Users/pedro/AppData/Local/coderabbit/reviews/67bfeb62/20eb45af/reviews/1788799106057
+git.json SHA256: 27fe706b101637b81d12ec879831e62c65dcd1e245c642b0c68efd8735dee13e
+incrementalDiff.v2.json SHA256: db3797814073c0ac90c67de4edcbc32eb95dc280585c660b49480b01de88c448
+```
+
+All 16 files, including the completion marker, were copied without modification
+to `cad/out/reports/coderabbit-factory-f0eed58a-1788799106057`; every copied
+SHA-256 matched the original.
+
+| Finding prefix | Verified disposition |
+|---|---|
+| `26dfe83f`, `85e9a917`, `b4b56b2e`, `bb85fc26`, `c0ae3da1`, `d3b54612`, `d4b99857`, `dd49021f` | Rename unused sheet bindings in pinion pivot block, lever, bracket, handle, spring, platen guide, cam and pen V-block. Factory calls and arguments unchanged. |
+| `8a1cf77b`, `c81b7edb` | Raw regex strings in sheet-setup and finalizer-scale tests; same pattern values. |
+| `5d50aeea` | Missing import disproved again: fixture blob `8013dc1a` is tracked at the reviewed head; all 24 unsaved-owner tests pass unchanged. |
+| `f923456d` | Real finalization defect: failed authored-copy provenance could replace the primary exception and skip later copy/source/runtime guards and the checkpoint. Collect the expected-hash error, preserve the measured copy hash, and continue the existing failure path. |
+
+Four fail-first cases (`run-xqvt63n9`) exercise the real provenance validator:
+wrong original hash or missing baseline, each with a completed run or an earlier
+recipe failure. The fix retains the exact primary exception when one exists;
+otherwise the original guard exceptions reach the existing exception group.
+Both trial hashes, protected source hashes, helper/adapter checks and the final
+receipt survive. Provenance failure still fails the run; no fallback hash is
+invented. The catch is confined to expected-hash resolution, including malformed
+baseline data, not the recipe or acceptance comparisons.
+
+The focused suite also exposed 16 inherited fixture failures after the
+foundation's current tolerance getter change. The source-authoring double now
+exposes `(0, float_value)` current getters, retaining its scalar getters solely
+because this factory slice's save-boundary consumer still calls them. No
+production fallback was added. Consumer propagation remains the separate
+top-PR #675 migration, not this #681 fix; integer status `0` is valid and `1`
+is not applicable, never a Boolean success flag.
+
+Final focused/adjacent evidence: **226 passed in 5.82 s**, telemetry
+`run-50v_b2df`; Ruff `F,RUF043,RUF059` and diff-check pass. This includes all
+eight affected recipe tests, sheet setup/finalizer, owned pilot, source-authoring
+and unsaved-owner tests. No COM, rebase, source artifact, review reply or
+resolution action was performed. Native acceptance remains separate.

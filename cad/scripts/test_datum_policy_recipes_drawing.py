@@ -223,6 +223,94 @@ def test_invalid_target_order_is_rejected(targets):
         probe.target_order(targets)
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("phase", ["completed", "recipe_failed"])
+@pytest.mark.parametrize("provenance", ["wrong_original", "missing_baseline"])
+async def test_final_expected_copy_error_retains_primary_and_all_remaining_guards(
+    tmp_path, monkeypatch, phase, provenance
+):
+    from diagnostics import _source_callout_authoring as authoring
+
+    source_root, guard_root = fixture_sources(tmp_path, monkeypatch)
+    monkeypatch.setattr(probe.benchmark, "recipe_source", lambda *_: recipe(Path("unused")))
+    monkeypatch.setattr(probe.benchmark, "revision", lambda _: "frozen")
+    helpers = Mock(return_value={"helper": "frozen"})
+    adapter_files = Mock(return_value={"adapter": "frozen"})
+    monkeypatch.setattr(probe, "helper_fingerprints", helpers)
+    monkeypatch.setattr(probe, "adapter_fingerprints", adapter_files)
+    source_handle = object()
+    monkeypatch.setattr(
+        probe, "source_dimensions",
+        lambda *_: ({"configuration": "Default"}, {"D": source_handle}),
+    )
+    monkeypatch.setattr(probe, "drawing_witness", lambda *_a, **_kw: {"exact": "same"})
+    monkeypatch.setattr(
+        probe, "compare_drawing_reopen", lambda *_: {"status": "passed"}
+    )
+    monkeypatch.setattr(probe, "retain_failed_drawing", Mock())
+    primary = RuntimeError("second recipe failed before final copy guards")
+
+    class ControlledAdapter(Adapter):
+        async def draw(self, outputs, source):
+            if phase == "recipe_failed" and len(self.drawn) == 1:
+                self.drawn.append((outputs, source))
+                raise primary
+            return await super().draw(outputs, source)
+
+    adapter = ControlledAdapter("normal")
+    original = authoring.expected_copy_hash
+    expected_errors, final_targets = [], []
+
+    def expected_hash(trial, original_hash):
+        if "copy_final" in trial:
+            final_targets.append(trial["target"])
+            if trial["target"] == probe.ORDER[0]:
+                # Exercise the real validator only at finalization, after the
+                # unchanged recipe/source/close checks have already run.
+                trial["source_callout_authoring"] = {
+                    "status": "passed", "variant": "alignment_fit",
+                    "original_sha256": "wrong original",
+                }
+                if provenance == "wrong_original":
+                    trial["source_callout_authoring"]["baseline"] = {
+                        "path": trial["copy_source"], "sha256": original_hash,
+                    }
+        try:
+            return original(trial, original_hash)
+        except (RuntimeError, KeyError) as error:
+            expected_errors.append(error)
+            raise
+
+    monkeypatch.setattr(authoring, "expected_copy_hash", expected_hash)
+    reports = tmp_path / "reports"
+    if phase == "recipe_failed":
+        with pytest.raises(RuntimeError) as caught:
+            await probe.pilot(adapter, "frozen", source_root, guard_root, reports)
+        assert caught.value is primary
+        assert "additional final guard failures" in primary.__notes__[0]
+    else:
+        with pytest.raises(ExceptionGroup) as caught:
+            await probe.pilot(adapter, "frozen", source_root, guard_root, reports)
+        assert caught.value.exceptions == tuple(expected_errors)
+    assert len(expected_errors) == 1
+    assert final_targets == list(probe.ORDER)
+    (report_path,) = reports.glob("*/pilot.json")
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert report["status"] == "failed"
+    assert report["sources_after"] == report["sources_before"]
+    assert report["runtime_final_guard_errors"] == [repr(expected_errors[0])]
+    assert report["trials"][0]["copy_final_expected_error"] == repr(expected_errors[0])
+    assert all(
+        row["copy_final"] == probe.EXPECTED_PART_HASHES[row["target"]]
+        for row in report["trials"]
+    )
+    if phase == "recipe_failed":
+        assert report["error"] == report["trials"][-1]["error"] == repr(primary)
+    assert helpers.call_count == adapter_files.call_count == (
+        4 if phase == "completed" else 3
+    )
+
+
 @pytest.mark.parametrize(
     "targets", [None, ("channel_lever",), tuple(reversed(probe.ORDER))]
 )

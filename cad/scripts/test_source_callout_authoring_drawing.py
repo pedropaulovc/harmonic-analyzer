@@ -304,7 +304,13 @@ async def owned_pilot_case(
             GetSystemValue3=lambda *_: (model.raw,),
             GetToleranceType=lambda: 2,
             Tolerance=NS(
-                Type=2, GetMinValue=lambda: -0.00004, GetMaxValue=lambda: -0.00002
+                Type=2,
+                GetMinValue2=lambda: (0, -0.00004),
+                GetMaxValue2=lambda: (0, -0.00002),
+                # Factory save boundaries still use the scalar getters; the
+                # separate top-stack consumer migration removes those calls.
+                GetMinValue=lambda: -0.00004,
+                GetMaxValue=lambda: -0.00002,
             ),
         )
 
