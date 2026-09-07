@@ -282,3 +282,41 @@ of this correction is pending a separately granted run.
 ```powershell
 uv run python -m pytest cad/scripts/test_source_pmi_comparison_drawing.py cad/scripts/test_selected_view_model_pmi_drawing.py cad/scripts/test_reopen_annotation_comparison_drawing.py -q
 ```
+
+## Standalone Space Evenly Down alternative
+
+The symbol-measurement-corrected 317 trial retained an initial drawing, PDF and
+PNG, but did not pass. Receipt `selected-view-pmi-dw50mqvy/observations.json`,
+SHA-256 `d1c551feb949197d0915d94aa4cbbe3df0c6f8812bf48816a229c6468ce1ef0f`,
+records exact three-item selection, command enabled/returned True in 1.0760444 s,
+and FCF pair clearance **-0.0376042155 mm**. The inspected initial PNG also has
+the frames over the shaft's model lines. A separate source-PMI comparison error
+stopped cold acceptance. Neither the body intersection nor the source error is
+waived by this next variant.
+
+The same runner now accepts a mutually exclusive option:
+
+```powershell
+# Same frozen checkout, guarded source, verified PID and coordinated seat as above.
+uv run python cad/scripts/diagnostics/probe_selected_view_model_pmi.py C:/src/harmonic-analyzer/cad/out/sldprt/transgear-stub.SLDPRT --expected-pid <approved-PID> --orientation '*Right' --arrangement space-evenly-down
+```
+
+This chooses `swCommands_SpaceEvenlyDown` (313) **instead of** 317. It starts from
+fresh imports, selects the same two real GTols and datum A, tests enablement,
+and makes exactly one command call. It never runs 317 first, retries, sets a
+position, edits a source, or changes either import's arguments. Omitting
+`--arrangement` still performs no spacing command; `space-tightly-down` retains
+the original standalone 317 control.
+
+The bundled [swCommands_e reference](https://help.solidworks.com/2026/english/api/swcommands/SolidWorks.Interop.swcommands~SolidWorks.Interop.swcommands.swCommands_e.html)
+explicitly lists 313 for multiple selected annotations or dimensions. It does
+not guarantee clear text, a particular pitch, or separation from model ink.
+This is one testable native alternative, not a claim that it repairs the sheet.
+
+Acceptance is unchanged: exact selected types/identities/owners, complete
+manufacturing/source/attachment witnesses, unchanged unselected ink and views,
+actual GTol motion, positive pairwise body gaps, and all native save/export/cold
+and ownership/hash guards. Native True cannot pass a no-op, touching frames or
+changed semantics. Printed readability remains a separate required inspection;
+the receipt keeps `visual_review=pending`. The 313 option has offline coverage
+only until a separately authorized frozen native run.
