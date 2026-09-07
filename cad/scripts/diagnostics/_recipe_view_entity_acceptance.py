@@ -17,6 +17,7 @@ from diagnostics import _silhouette_attachment_witness as silhouette
 from diagnostics import _view_intersection_curve_witness as intersection
 from diagnostics._recipe_entity_acceptance import EntityWitnessPhase
 from diagnostics._recipe_view_roles import ViewResolver
+from diagnostics._view_curve_cold_identity import ColdIntersectionIdentities
 
 
 def geometry(app, view, entity, kind, *, evidence=None):
@@ -63,6 +64,7 @@ class ViewEntityAcceptance:
         self.initial_geometry = {}
         self.initial_faces = {}
         self.keys = {}
+        self.cold_intersections = ColdIntersectionIdentities()
         self.context_report = {"context": "view", "stages": []}
 
     @contextmanager
@@ -378,6 +380,12 @@ class ViewEntityAcceptance:
                     raise RuntimeError(
                         f"{label}: raw VIEW geometry changed since selection"
                     )
+                if role.entity_kind == 1 and raw[0] == "intersection_curve":
+                    self.cold_intersections.observe(
+                        adapter, label, key, resolved, raw,
+                        phase=phase.value,
+                        evidence=row.setdefault("cold_edge_identity", {}),
+                    )
                 result["explicit"][label] = {
                     "key": key,
                     "kind": role.entity_kind,
@@ -400,6 +408,10 @@ class ViewEntityAcceptance:
                     )
             result["coordinate_picked"][label] = row
         return result
+
+    def compare_cold(self, before, after):
+        """Keep raw banks; classify only native-proved cold curve-ID metadata."""
+        return self.cold_intersections.compare(before, after)
 
     def _key(self, adapter, label, created, created_view, inventory, phase):
         key = (
