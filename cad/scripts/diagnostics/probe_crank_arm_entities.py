@@ -139,16 +139,43 @@ async def capture_source(adapter, directory):
         report.update(status="failed", error=repr(error))
         raise
     finally:
-        report["source_sha256_after"] = sha(SOURCE)
-        report["execution_token_after"] = TOKEN.read_text(encoding="utf-8").strip()
-        persist_report(report_path, report)
-        _telemetry.info(f"crank-arm evidence: {report_path}")
-        if (
-            report["source_sha256_after"] != report["provenance"]["source_sha256"]
-            or report["execution_token_after"]
-            != report["provenance"]["execution_token"]
+        primary = sys.exception()
+        errors = []
+        for field, read, expected in (
+            (
+                "source_sha256_after",
+                lambda: sha(SOURCE),
+                report["provenance"]["source_sha256"],
+            ),
+            (
+                "execution_token_after",
+                lambda: TOKEN.read_text(encoding="utf-8").strip(),
+                report["provenance"]["execution_token"],
+            ),
         ):
-            raise RuntimeError("crank-arm source or original token changed")
+            try:
+                report[field] = read()
+                if report[field] != expected:
+                    raise RuntimeError(
+                        f"crank-arm source or original token changed: {field}"
+                    )
+            except Exception as error:
+                report[field] = {"error": repr(error)}
+                errors.append(error)
+        if errors:
+            report.update(
+                status="failed", final_errors=[repr(error) for error in errors]
+            )
+        try:
+            persist_report(report_path, report)
+        except Exception as error:
+            errors.append(error)
+        _telemetry.info(f"crank-arm evidence: {report_path}")
+        if errors:
+            raise ExceptionGroup(
+                "source snapshot/final evidence failures",
+                ([primary] if primary else []) + errors,
+            ) from None
     return {"report": str(report_path)}
 
 
@@ -417,15 +444,33 @@ async def positive_control(adapter, directory):
             report["partial_snapshot_error"] = repr(snapshot_error)
         raise
     finally:
-        report["template_guard_errors"] = [
-            repr(error) for error in controller.final_guards()
-        ]
-        report["source_copy_sha256_after"] = sha(source)
-        checkpoint()
-        if report["source_copy_sha256_after"] != EXPECTED_SOURCE_SHA:
-            raise RuntimeError("positive control changed its source copy on disk")
-        if report["template_guard_errors"]:
-            raise RuntimeError("positive control template/helper guards failed")
+        primary = sys.exception()
+        errors = []
+        for field, action in (
+            ("template_guards", lambda: _require_template_guards(controller)),
+            ("source_copy_sha256_after", lambda: _require_hash(source)),
+            ("source_original_sha256_after", lambda: _require_hash(SOURCE)),
+            ("execution_token_after", _require_token),
+        ):
+            try:
+                report[field] = action()
+            except Exception as error:
+                report[field] = {"error": repr(error)}
+                errors.append(error)
+        report["template_guard_details"] = controller.guards
+        if errors:
+            report.update(
+                status="failed", final_errors=[repr(error) for error in errors]
+            )
+        try:
+            checkpoint()
+        except Exception as error:
+            errors.append(error)
+        if errors:
+            raise ExceptionGroup(
+                "positive control/final evidence failures",
+                ([primary] if primary else []) + errors,
+            ) from None
     return {"report": str(report_path)}
 
 
