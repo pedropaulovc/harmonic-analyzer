@@ -204,17 +204,34 @@ def require_copy_hash(trial, phase):
         )
 
 
-def drawing_witness(adapter, *, source, configuration):
-    return _drawing_witness(adapter, source=source, configuration=configuration)[0]
+def drawing_witness(adapter, *, source, configuration, model_dimensions=None):
+    return _drawing_witness(
+        adapter,
+        source=source,
+        configuration=configuration,
+        model_dimensions=model_dimensions,
+    )[0]
 
 
-def _drawing_witness(adapter, *, source, configuration):
-    semantics = _drawing_semantics(adapter, source=source, configuration=configuration)
+def _drawing_witness(adapter, *, source, configuration, model_dimensions=None):
+    coverage = {}
+    if model_dimensions is None:
+        semantics = _drawing_semantics(
+            adapter, source=source, configuration=configuration
+        )
+    else:
+        semantics, bank = model_dimensions.capture(
+            adapter, source=source, configuration=configuration
+        )
+        coverage["model_dimensions"] = bank
     annotations, handles = shoulder.all_annotation_layout(adapter)
+    if model_dimensions is not None:
+        model_dimensions.require_printed(annotations, bank)
     return {
         "semantics": semantics,
         "annotations": annotations,
         "layout": attachments.layout(adapter.currentModel),
+        **coverage,
     }, handles
 
 
@@ -283,6 +300,9 @@ def _drawing_semantics(adapter, *, source, configuration):
 
 
 def compare_drawing(app, before, after):
+    from diagnostics._model_dimension_coverage import compare
+
+    compare(before, after)
     attachments.compare(
         before["semantics"], after["semantics"], "saved production reopen"
     )
@@ -300,6 +320,9 @@ def compare_drawing(app, before, after):
 
 def compare_drawing_reopen(before, after):
     """Keep all attachment/source semantics exact; report coordinate noise only."""
+    from diagnostics._model_dimension_coverage import compare
+
+    compare(before, after)
     attachments.compare(
         before["semantics"], after["semantics"], "saved production reopen"
     )
@@ -805,6 +828,16 @@ async def pilot(
             trial["source_before"], source_handles = source_dimensions(
                 source_model, target, copy_source
             )
+            from diagnostics._model_dimension_coverage import (
+                ModelDimensionCoverage,
+                SemanticCoverage,
+            )
+
+            witness_kwargs = {}
+            if manifest.coverage is SemanticCoverage.MODEL_DIMENSIONS_ONLY:
+                witness_kwargs["model_dimensions"] = ModelDimensionCoverage(
+                    adapter, manifest, source_model, copy_source, trial
+                )
             source_callout_control = None
             if source_callout_authoring is not None:
                 from diagnostics._source_callout_authoring import SourceCalloutControl
@@ -935,6 +968,7 @@ async def pilot(
                     adapter,
                     source=copy_source,
                     configuration=trial["source_before"]["configuration"],
+                    **witness_kwargs,
                 )
             trial["source_after"], after_handles = source_dimensions(
                 source_model, target, copy_source
@@ -986,6 +1020,7 @@ async def pilot(
                     adapter,
                     source=copy_source,
                     configuration=trial["source_before"]["configuration"],
+                    **witness_kwargs,
                 )
             if callout_control is not None:
                 cold_source = adapter.swApp.GetOpenDocumentByName(str(copy_source))
