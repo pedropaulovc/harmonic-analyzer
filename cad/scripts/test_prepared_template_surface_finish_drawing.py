@@ -1,11 +1,12 @@
 """Blank-template SF symbols are preserved, never normalized or omitted."""
 
+import _drawing_sheet_setup as sheet_setup
+
 from dataclasses import dataclass
 from types import SimpleNamespace
 
 import pytest
 
-import _drawing_common as common
 from _drawing_prepared_template import TemplateSpec
 import _drawing_template_defaults as defaults
 
@@ -157,7 +158,7 @@ def scene(monkeypatch):
     annotation.GetLeaderStyle = lambda: 2
     annotation.GetLeaderPointsAtIndex = lambda index: data.leaders[index]
     edge_note = SimpleNamespace(
-        GetText=lambda: common._METRIC_EDGE_BREAK_NOTE,
+        GetText=lambda: sheet_setup._METRIC_EDGE_BREAK_NOTE,
         PropertyLinkedText="",
         GetExtent=lambda: (0.2, 0.04, 0, 0.3, 0.045, 0),
         GetTextJustification=lambda: 1,

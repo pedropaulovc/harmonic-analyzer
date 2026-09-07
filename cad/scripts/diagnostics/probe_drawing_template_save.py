@@ -23,8 +23,9 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "cad/scripts"))
 
+import _drawing_sheet_setup as sheet_setup  # noqa: E402
+
 from _common import _early_bound, check  # noqa: E402
-import _drawing_common as common  # noqa: E402
 from solidworks_mcp.adapters.solidworks import drawing  # noqa: E402
 from diagnostics._owned_native_documents import DocumentKind, run_copy_diagnostic  # noqa: E402
 from diagnostics._owned_native_session import require_owned_diagnostic_environment  # noqa: E402
@@ -96,7 +97,7 @@ def sheet_witness(model):
 
 
 async def capture(adapter, report_root):
-    template = common.PROJECT_DRWDOT.resolve(strict=True)
+    template = sheet_setup.PROJECT_DRWDOT.resolve(strict=True)
     report_root.mkdir(parents=True, exist_ok=True)
     directory = Path(tempfile.mkdtemp(prefix="template-save-", dir=report_root))
     adapter.ownership.register_directory(directory)
@@ -118,8 +119,8 @@ async def capture(adapter, report_root):
             return drawing.new_drawing(
                 adapter,
                 template=str(source_template),
-                width=common.ASME_B_WIDTH_M,
-                height=common.ASME_B_HEIGHT_M,
+                width=sheet_setup.ASME_B_WIDTH_M,
+                height=sheet_setup.ASME_B_HEIGHT_M,
             )
 
     checkpoint()

@@ -42,6 +42,8 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "cad/scripts"))
 
+import _drawing_sheet_setup as sheet_setup  # noqa: E402
+
 import _common as common  # noqa: E402
 import _drawing_common as drawing  # noqa: E402
 import _telemetry  # noqa: E402
@@ -582,8 +584,8 @@ def require_cold_semantics(before, after):
 def require_inputs(source, guard):
     expected = {str(path): EXPECTED_SOURCE_SHA256 for path in (source, guard)}
     retained.require_hashes(expected, "fresh title original source")
-    expected[str(drawing.PROJECT_DRWDOT)] = pilot.attachments.file_digest(
-        drawing.PROJECT_DRWDOT
+    expected[str(sheet_setup.PROJECT_DRWDOT)] = pilot.attachments.file_digest(
+        sheet_setup.PROJECT_DRWDOT
     )
     return expected
 
@@ -647,7 +649,7 @@ async def one_trial(
                 "owned source does not contain the exact saved summary Title"
             )
         with adapter.ownership.creating_document(DocumentKind.DRAWING, outputs.slddrw):
-            (factory or drawing.new_project_drawing)(adapter, scale=SCALE)
+            (factory or sheet_setup.new_project_drawing)(adapter, scale=SCALE)
             observer = TitleObserver(
                 adapter, trial, checkpoint, expected_title=source_title
             )

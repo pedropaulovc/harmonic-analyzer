@@ -256,7 +256,7 @@ async def test_abba_reports_actual_scope_and_rejects_input_drift(
     if mode == "unused_factory":
         code = code.replace("    drawing_factory(adapter)\n", "")
     monkeypatch.setattr(bench, "recipe_source", lambda *_: code)
-    monkeypatch.setattr(_drawing_build.common, "new_project_drawing", Mock())
+    monkeypatch.setattr(_drawing_build.sheet_setup, "new_project_drawing", Mock())
     monkeypatch.setattr(bench, "revision", lambda _: "helper-head")
     monkeypatch.setattr(bench, "_early_bound", lambda obj, _: obj)
     reads = []

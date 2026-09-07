@@ -1,5 +1,7 @@
 """COM-free prepared-template identity, ownership and explicit opt-in contracts."""
 
+import _drawing_sheet_setup as sheet_setup
+
 import asyncio
 from contextlib import contextmanager
 from copy import deepcopy
@@ -11,7 +13,6 @@ from types import SimpleNamespace
 
 import pytest
 
-import _drawing_common as common
 import _drawing_prepared_template as prepared
 import _drawing_template_defaults as defaults
 from test_template_defaults_drawing import blank_note  # noqa: F401
@@ -165,7 +166,7 @@ def test_invalid_spec_rejected(scale, decimals):
 def test_current_setup_does_not_import_prepared_or_native_bounds():
     from _buildgraph import module_deps_of
 
-    closure = {Path(path).name for path in module_deps_of(Path(common.__file__))}
+    closure = {Path(path).name for path in module_deps_of(Path(sheet_setup.__file__))}
     assert "_drawing_prepared_template.py" not in closure
     assert "_drawing_template_defaults.py" not in closure
     assert "_drawing_annotation_bounds.py" not in closure
@@ -277,9 +278,9 @@ def native(monkeypatch, tmp_path):
         yield
 
     monkeypatch.setattr(
-        common, "new_project_drawing", lambda a, **k: (create(a, **k), object())
+        sheet_setup, "new_project_drawing", lambda a, **k: (create(a, **k), object())
     )
-    monkeypatch.setattr(common, "new_drawing", create)
+    monkeypatch.setattr(sheet_setup, "new_drawing", create)
     monkeypatch.setattr(prepared, "check", lambda label, result: result)
     monkeypatch.setattr(prepared, "snapshot_defaults", lambda a, s: {"units": 4})
     viewport_calls = []
@@ -416,13 +417,13 @@ def test_failed_defaults_closes_only_its_owned_drawing_and_restores_source(
 def test_setup_failure_after_newdocument_still_claims_exact_created_handle(
     native, monkeypatch
 ):
-    original = common.new_project_drawing
+    original = sheet_setup.new_project_drawing
 
     def fail(*args, **kwargs):
         original(*args, **kwargs)
         raise RuntimeError("style setter failed")
 
-    monkeypatch.setattr(common, "new_project_drawing", fail)
+    monkeypatch.setattr(sheet_setup, "new_project_drawing", fail)
     with pytest.raises(ExceptionGroup):
         run_native(native)
     assert len(native.closed) == 1
@@ -451,7 +452,7 @@ def test_actual_fingerprint_contains_preparation_and_adapter_closure(monkeypatch
     )
     sources = first["source_sha256"]
     for required in (
-        "cad/scripts/_drawing_common.py",
+        "cad/scripts/_drawing_sheet_setup.py",
         "cad/scripts/_drawing_prepared_template.py",
         "cad/scripts/_drawing_template_defaults.py",
         "cad/scripts/_drawing_template_viewport.py",
@@ -521,8 +522,8 @@ def test_inherited_path_verifies_bytes_before_native_and_omits_setters(
         calls.append(kwargs)
         return draw
 
-    monkeypatch.setattr(common, "new_drawing", create)
-    monkeypatch.setattr(common, "assert_asme_b_sheet", lambda *a, **k: calls.append(k))
+    monkeypatch.setattr(sheet_setup, "new_drawing", create)
+    monkeypatch.setattr(sheet_setup, "assert_asme_b_sheet", lambda *a, **k: calls.append(k))
     assert prepared.inherited_drawing(cache.adapter, entry) == (draw, sheet)
     assert calls[0]["template"] == str(entry.path)
     assert calls[1:] == [
@@ -578,7 +579,7 @@ def blank_sheet(
         kind: int = 6
 
     edge = SimpleNamespace(
-        GetText=lambda: common._METRIC_EDGE_BREAK_NOTE,
+        GetText=lambda: sheet_setup._METRIC_EDGE_BREAK_NOTE,
         PropertyLinkedText="",
         GetExtent=lambda: (0.2, 0.3, 0, 0.25, 0.31, 0),
         GetTextJustification=lambda: 2,
@@ -792,14 +793,14 @@ def test_native_save_requires_owned_document_still_active(native, monkeypatch):
 def test_duplicate_document_title_refuses_save_and_title_based_close(
     native, monkeypatch
 ):
-    original = common.new_project_drawing
+    original = sheet_setup.new_project_drawing
 
     def duplicate_title(*args, **kwargs):
         draw, sheet = original(*args, **kwargs)
         draw.title = native.source.title.swapcase()
         return draw, sheet
 
-    monkeypatch.setattr(common, "new_project_drawing", duplicate_title)
+    monkeypatch.setattr(sheet_setup, "new_project_drawing", duplicate_title)
     with pytest.raises(ExceptionGroup):
         run_native(native)
     assert not native.closed
@@ -837,14 +838,14 @@ def test_native_save_failures_never_pass_and_close_only_owned(
 def test_setup_failure_with_changed_active_user_document_never_closes_it(
     native, monkeypatch
 ):
-    original = common.new_project_drawing
+    original = sheet_setup.new_project_drawing
 
     def fail(*args, **kwargs):
         original(*args, **kwargs)
         native.adapter.swApp.ActiveDoc = native.source
         raise RuntimeError("user activated original during failed setup")
 
-    monkeypatch.setattr(common, "new_project_drawing", fail)
+    monkeypatch.setattr(sheet_setup, "new_project_drawing", fail)
     receipt = {}
     with pytest.raises(ExceptionGroup):
         run_native(native, receipt)

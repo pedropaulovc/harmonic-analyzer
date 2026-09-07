@@ -30,8 +30,9 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "cad/scripts"))
 
+import _drawing_sheet_setup as sheet_setup  # noqa: E402
+
 from _common import _early_bound, check  # noqa: E402
-import _drawing_common as common  # noqa: E402
 from _drawing_annotation_bounds import annotation_box, _native_counts  # noqa: E402
 from _drawing_registry import DRAWINGS_BY_NAME  # noqa: E402
 import _telemetry  # noqa: E402
@@ -319,15 +320,15 @@ def inherited_drawing(adapter, template, spec):
     draw = drawing.new_drawing(
         adapter,
         template=str(template),
-        width=common.ASME_B_WIDTH_M,
-        height=common.ASME_B_HEIGHT_M,
+        width=sheet_setup.ASME_B_WIDTH_M,
+        height=sheet_setup.ASME_B_HEIGHT_M,
     )
     ddoc = _early_bound(draw, "IDrawingDoc")
     ddoc.EditSheet()
     sheet = ddoc.GetCurrentSheet()
     if sheet is None:
         raise RuntimeError("derived template returned no current sheet")
-    common.assert_asme_b_sheet(
+    sheet_setup.assert_asme_b_sheet(
         adapter, sheet, phase="inherited setup", scale=spec.scale
     )
     draw.ViewZoomtofit2()
@@ -339,7 +340,7 @@ def defaults_snapshot(adapter, spec):
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     ddoc = _early_bound(model, "IDrawingDoc")
     sheet = _early_bound(ddoc.GetCurrentSheet(), "ISheet")
-    common.assert_asme_b_sheet(
+    sheet_setup.assert_asme_b_sheet(
         adapter, sheet, phase="defaults witness", scale=spec.scale
     )
     units = {
@@ -357,12 +358,12 @@ def defaults_snapshot(adapter, spec):
     styles = {
         name: int(
             model.Extension.GetUserPreferenceInteger(
-                common._PREF_DIM_TEXT_AND_LEADER_STYLE, option
+                sheet_setup._PREF_DIM_TEXT_AND_LEADER_STYLE, option
             )
         )
-        for name, option in common._DIM_DETAILING_SCOPES.items()
+        for name, option in sheet_setup._DIM_DETAILING_SCOPES.items()
     }
-    if any(value != common._BROKEN_LEADER_HORIZONTAL_TEXT for value in styles.values()):
+    if any(value != sheet_setup._BROKEN_LEADER_HORIZONTAL_TEXT for value in styles.values()):
         raise RuntimeError(f"inherited dimension style differs: {styles}")
     notes, blank_extents = [], []
     sheet_view = _early_bound(ddoc.GetFirstView(), "IView")
@@ -398,10 +399,10 @@ def defaults_snapshot(adapter, spec):
     edge_break = [
         row
         for row in notes
-        if " ".join(row["text"].upper().split()) == common._METRIC_EDGE_BREAK_NOTE
+        if " ".join(row["text"].upper().split()) == sheet_setup._METRIC_EDGE_BREAK_NOTE
     ]
     if len(edge_break) != 1 or any(
-        " ".join(row["text"].upper().split()) == common._OLD_EDGE_BREAK_NOTE
+        " ".join(row["text"].upper().split()) == sheet_setup._OLD_EDGE_BREAK_NOTE
         for row in notes
     ):
         raise RuntimeError("metric edge-break note did not persist exactly once")
@@ -603,7 +604,7 @@ async def prepare_template(adapter, spec, directory, row):
     try:
         with _telemetry.span("diagnostic.template.prepare"):
             with adapter.ownership.creating_document(DocumentKind.DRAWING, path):
-                draw, _ = common.new_project_drawing(
+                draw, _ = sheet_setup.new_project_drawing(
                     adapter, scale=spec.scale, decimals=spec.decimals
                 )
             row["before"] = defaults_snapshot(adapter, spec)
@@ -714,7 +715,7 @@ async def run_trial(adapter, module, spec, variant, template, row):
             try:
                 with _telemetry.span("diagnostic.template.setup", variant=variant):
                     result = (
-                        common.new_project_drawing(current_adapter, **kwargs)
+                        sheet_setup.new_project_drawing(current_adapter, **kwargs)
                         if variant == "baseline"
                         else inherited_drawing(
                             current_adapter, Path(template["path"]), spec
@@ -814,7 +815,7 @@ async def benchmark(adapter, targets, commit, source_root, report_root):
         ).resolve(strict=True)
         for target in targets
     }
-    immutable = immutable_hashes([common.PROJECT_DRWDOT, *sources.values()])
+    immutable = immutable_hashes([sheet_setup.PROJECT_DRWDOT, *sources.values()])
     for path in immutable:
         adapter.ownership.register_source(path)
     inputs = runtime_fingerprints()
