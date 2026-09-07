@@ -296,7 +296,7 @@ def test_recipe_revalidates_context_between_entity_insertions(scene, fault):
         if fault == "drawing_replaced":
             scene.app.ActiveDoc = object()
     scene.hooks["add_entity_dimension"] = corrupt
-    with pytest.raises(RuntimeError, match="source|context"):
+    with pytest.raises(RuntimeError, match=r"source|context"):
         scene.run()
     assert len(scene.calls["add_entity_dimension"]) == 1
     assert "add_datum_feature" not in scene.events
@@ -370,5 +370,5 @@ def test_actual_recipe_roles_fail_on_missing_or_ambiguous_topology(topology, fau
         face.GetEdges.return_value = []
     if fault == "ambiguous_edge":
         face.GetEdges.return_value *= 2
-    with pytest.raises(RuntimeError, match="ShaftBore|shaft"):
+    with pytest.raises(RuntimeError, match=r"ShaftBore|shaft"):
         native.ModelEntities(topology.model).resolve(recipe.ENTITY_ROLES)

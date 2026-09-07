@@ -7,12 +7,12 @@ Work in progress. This document records the bounded migration requested in
 
 - Root baseline: `bc593d784fba08fc6552224767a460338f51b664`.
 - Adapter: `25bc99b1ae39d8c0e004867e9b5c0f2068f2abc2`.
-- Independent seed clone: `C:/src/ha-crank-arm-vm-seed`.
-- Worktree: `C:/src/ha-crank-arm-semantic-entities`.
+- Independent seed clone and isolated worktree as specified in the handoff;
+  exact checkout paths are captured in the local native receipts.
 - Branch: `perf/crank-arm-semantic-entities`.
 - Initial `git fetch origin main` found no commits in `HEAD..origin/main`.
 - Own uv environment, CPython 3.14.5; no borrowed output, cache, DB or tokens.
-- Attach-only SolidWorks PID 18748, revision 34.3.0. Initial locked native
+- Attach-only SolidWorks revision 34.3.0. Initial locked native
   inventory was empty. Cache is disabled for native baseline production.
 
 The part, spec, configuration, adapter and shared drawing helpers remain outside
@@ -89,10 +89,11 @@ source, native drawing, PDF, PNG and telemetry are retained in
 
 Actual imports are from this worktree's `cad/scripts/draw_crank_arm.py` and
 `SolidworksMCP-python/src/solidworks_mcp/adapters/pywin32_adapter.py`, using
-`.venv/Scripts/python.exe`. All native jobs attach to PID 18748 on
-`vm-solidworks` (SolidWorks 34.3.0) under the machine-global lock and watchdog.
+`.venv/Scripts/python.exe`. All native jobs attach to the receipt-pinned
+SolidWorks process under the machine-global lock and watchdog. Host and PID
+are recorded in each local receipt rather than prescribed for another seat.
 `HARMONIC_SW_AUTOSTART=0`, `HARMONIC_REMOTE_CACHE_MODE=off`, and
-`HARMONIC_DIAGNOSTIC_SW_PID=18748` are set. No restart, source save, source
+`HARMONIC_DIAGNOSTIC_SW_PID=<receipt-pinned PID>` are set. No restart, source save, source
 repair, hidden inventory cleanup bypass or adapter edit is authorized.
 
 ### Retained receipts
@@ -218,7 +219,7 @@ coordination with the parent owner before the full build gate can be green.
 PR [#682](https://github.com/pedropaulovc/harmonic-analyzer/pull/682) targets the
 unchanged drawing parent. CodeRabbit skipped automatic review on the non-default
 base, and the explicit review was rate-limited (comment 5572490004). Use the
-installed Windows `C:/Users/pedro/AppData/Local/Programs/coderabbit/cr.exe` with
+installed Windows `cr.exe` with
 `review --agent --committed --base-commit <exact merge-base>`. No billing changes.
 
 Local review at `b974b038`, merge-base `bc593d784fba08fc6552224767a460338f51b664`,
@@ -235,8 +236,28 @@ finish entities. Real native run `wlp6wb24` executes both calls and passes their
 exact attachment/cold checks. No TypeError occurs. This is evidence against the
 finding, not a clean review verdict; a contextualized re-review is still required.
 
-Full frozen native replay, final production rerun, fresh readable detail crops,
-final print acceptance, clean latest-head review and the full graph build gate
-are still pending. The first full-sheet renders preserve manufacturing content
-but expose inherited crowded transverse-dimension placement; a green native
-layout gate alone is not print acceptance. No merge readiness is claimed.
+Frozen native run `pr4c3vvn` at `8484e910` passed the full candidate callback,
+including both cold opens, move/scale checks, all fourteen exact attachments,
+source/token preservation and final guards. Built and first-cold 600 dpi detail
+crops were byte-identical. Inspection found the shaft diameter leader crossing
+R8 text, overlapping finish/datum arrows, and two FCF borders touching nearby
+lines. The next revision adjusts annotation placement and finish leader routing
+only; it does not change the selected entities or manufacturing requirements.
+
+The corrected fleet capture passed a 445-test focused suite (`run-8zjmnqo7`,
+11.46 s). The repeated full recipe gate returned 6144 passes and only the
+baseline fillister failure (`run-2zdoiquy`, 267.58 s).
+
+Local review at `8484e910` found three minor issues (machine-specific paths in
+this document and regex literal style in two test files), plus a valid evidence
+preservation issue: a final source-hash/token read could mask an earlier error
+and prevent the receipt from being written. All are addressed. The source and
+positive-control finalizers now attempt every guard independently, persist the
+failure receipt, and retain the primary error alongside final evidence errors.
+Fifteen new regression tests cover unreadable/changed hashes and tokens,
+persistence failures, and positive-control final guards.
+
+Final frozen replay and print inspection of the adjusted layout, a clean
+latest-code local review, and the full graph build gate remain pending. The full
+graph build has not run; the known baseline recipe failure prevents a green
+result. No merge readiness is claimed.

@@ -84,7 +84,7 @@ ISO_CENTER = (0.360, 0.230)
 
 
 def _sheet_x(model_x_mm: float) -> float:
-    """Text layout only: sheet X for the front/top view's model station."""
+    """Annotation layout only: sheet X for the front/top view's model station."""
     bbox_center = (ARM_END_X - HALF_WIDTH) / 2.0
     return FRONT_CENTER[0] + (model_x_mm - bbox_center) * SHEET_SCALE[0] / 1000.0
 
@@ -138,7 +138,7 @@ ENTITY_ROLES = {
 FRONT_KEEP = {
     "ArmEndX": (0.190, 0.086),
     "DimpleX": (_sheet_x(DIMPLE_X / 2.0), 0.112),
-    "BossRadius": (0.052, 0.162),
+    "BossRadius": (0.030, 0.158),
     "ShaftBoreDia": (_sheet_x(0.0), 0.172),
     "DimpleDia": (_sheet_x(DIMPLE_X), 0.172),
 }
@@ -329,7 +329,7 @@ async def build(
         adapter,
         top,
         entity=entities(top, "pin")[0],
-        frame_xy=(0.100, 0.230),
+        frame_xy=(0.100, 0.237),
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["cross-hole true position"],
         datums=("A", "B"),
@@ -373,7 +373,7 @@ async def build(
         adapter,
         front,
         entity=entities(front, "pivot")[0],
-        frame_xy=(0.222, 0.158),
+        frame_xy=(0.222, 0.167),
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["handle pivot position"],
         datums=("A", "B", "C"),
@@ -403,6 +403,12 @@ async def build(
         entity=entities(front, "shaft")[0],
         entity_context=AnnotationEntityContext.MODEL,
         symbol_xy=(0.022, 0.125),
+        # Route the finish arrow to the bottom of the already-selected rim,
+        # clear of datum B's native lower-left arrow. This is not a feature pick.
+        leader_attach_xy=(
+            _sheet_x(0.0),
+            FRONT_CENTER[1] - SHAFT_BORE_DIA * SHEET_SCALE[0] / 2000.0,
+        ),
         control=surface_finish_by_key(SURFACE_FINISHES, "shaft_bore"),
         label="shaft bore finish",
     )
