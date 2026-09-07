@@ -123,6 +123,7 @@ from _transforms import (  # noqa: E402
     rows_from_euler,
 )
 from cone_pivot_post_installation import FRAME_FRONT_COLUMN_Z
+from harmonic_base_spec import STACK_HEIGHT as BASE_DECK_Y
 
 ASM_NAME = "paper-drive"
 
@@ -402,11 +403,12 @@ NET_RACK_TRAVEL_PER_CRANK_REV = (
 )  # 1.596 mm
 
 # Spare T18 removable: the swap chain wheel, stored flat on the base top
-# (y 50.8 + the 2.4 face), well west of the platen, axis +Z laid flat ->
-# Rx(-90). A spare for this subsystem, so it rides here as a flat sibling of
+# (local z=0 underside at the deck). Rx(-90) maps local +Z to machine +Y,
+# so the face thickness extends UP from the deck, not down to it.
+# A spare for this subsystem, so it rides here as a flat sibling of
 # the mounted T24; placing it loose at the TOP level would clash on leaf name
 # with the T12/T24 instances nested in drive-train / this sub.
-SPARE_GEAR_POS = (160.0, 53.2, -15.0)  # machine +X (west) of the platen
+SPARE_GEAR_POS = (160.0, BASE_DECK_Y, -15.0)  # machine +X (west) of the platen
 
 # --- fasteners ----------------------------------------------------------------
 # Platen-clip screws: through the clips' end holes into the platen's edge
