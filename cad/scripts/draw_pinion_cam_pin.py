@@ -13,6 +13,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+from pinion_cam_pin_spec import DIMENSION_CALLOUTS
 import math
 import sys
 from typing import Any
@@ -34,7 +35,7 @@ from _drawing_common import (
     finalize_drawing,
     model_point_in_view,
     read_required_properties,
-    set_dimension_callouts,
+    verify_dimension_callouts,
     set_dimension_precision,
     set_hidden_lines_removed,
     stamp_drawing_summary,
@@ -83,11 +84,7 @@ RIGHT_KEEP = {
     "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.040),
     "CapR": (RIGHT_CENTER[0] + 0.035, RIGHT_CENTER[1] + 0.040),
 }
-DIMENSION_CALLOUTS = {
-    "PinDia": "FINAL SIZE",
-    "Depth": "SEATED FLAT END TO CROWN ROOT",
-    "CapR": "OUTER CROWN",
-}
+
 
 
 async def build(
@@ -118,6 +115,7 @@ async def build(
             "End View Note",
         ),
     )
+    callout_source_model = adapter.currentModel
     drawing_model, _sheet = drawing_factory(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE
     )
@@ -145,8 +143,29 @@ async def build(
     right_annotations = curate_view_dimensions(
         adapter, right, keep=RIGHT_KEEP, view_label="right"
     )
-    set_dimension_callouts(
-        adapter, [*front_annotations, *right_annotations], DIMENSION_CALLOUTS
+    verify_dimension_callouts(
+        adapter,
+        [*front_annotations, *right_annotations],
+        {"PinDia": DIMENSION_CALLOUTS["PinDia"]},
+        feature_name="PinProfile",
+        view=front,
+        source_model=callout_source_model,
+    )
+    verify_dimension_callouts(
+        adapter,
+        [*front_annotations, *right_annotations],
+        {"Depth": DIMENSION_CALLOUTS["Depth"]},
+        feature_name="Pin",
+        view=right,
+        source_model=callout_source_model,
+    )
+    verify_dimension_callouts(
+        adapter,
+        [*front_annotations, *right_annotations],
+        {"CapR": DIMENSION_CALLOUTS["CapR"]},
+        feature_name="CapProfile",
+        view=right,
+        source_model=callout_source_model,
     )
     set_dimension_precision(adapter, front_annotations, {"PinDia": 3})
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):

@@ -20,6 +20,8 @@ Run (SolidWorks already open)::
 from __future__ import annotations
 
 import math
+from _model_dimension_callouts import author_model_callouts
+from pinion_pivot_shaft_spec import DIMENSION_CALLOUTS
 import sys
 
 from _common import (
@@ -270,6 +272,10 @@ async def build(adapter) -> dict[str, str]:
             "Iso View Note": ISO_VIEW_NOTE,
         },
     )
+    author_model_callouts(
+        adapter, "ShaftProfile", {"ShaftDia": DIMENSION_CALLOUTS["ShaftDia"]}
+    )
+    author_model_callouts(adapter, "Shaft", {"Depth": DIMENSION_CALLOUTS["Depth"]})
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
     return artefacts

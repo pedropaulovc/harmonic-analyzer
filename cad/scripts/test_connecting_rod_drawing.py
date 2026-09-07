@@ -87,7 +87,14 @@ def test_native_gdt_and_finish_present() -> None:
     assert source.count("add_feature_control_frame(") == 1
     assert 'datums=("A", "B")' in source
     assert 'characteristic="position"' in source
-    assert '"StrapBoreDia": "BORE"' in source
+    assert '"StrapBoreDia": "BORE"' in Path(connecting_rod_spec.__file__).read_text(
+        encoding="utf-8"
+    )
+    assert (
+        drawing.DIMENSION_CALLOUTS
+        is rod.DIMENSION_CALLOUTS
+        is connecting_rod_spec.DIMENSION_CALLOUTS
+    )
     assert "+0.10/0" not in source
     assert "add_surface_finish(" in source
     assert "add_native_hole_callout(" in source

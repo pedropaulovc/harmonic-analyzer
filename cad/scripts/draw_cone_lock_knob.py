@@ -3,6 +3,7 @@ r"""Create the curated machinist drawing for the cone platform lock knob."""
 from __future__ import annotations
 
 import argparse
+from cone_lock_knob_spec import DIMENSION_CALLOUTS
 import sys
 from typing import Any
 
@@ -20,7 +21,7 @@ from _drawing_common import (
     curate_view_dimensions,
     finalize_drawing,
     read_required_properties,
-    set_dimension_callouts,
+    verify_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
@@ -33,7 +34,6 @@ from cone_lock_knob_spec import (
     DOME_R as DOME_R,
     STUD_DIA,
     STUD_LEN,
-    STUD_THREAD,
     SURFACE_FINISHES,
     WASHER_DIA,
     WASHER_T,
@@ -129,9 +129,7 @@ TOP_KEEP = {
         TOP_CENTER[1] - 0.012,
     ),
 }
-DIMENSION_CALLOUTS = {
-    "StudDia": f"{STUD_THREAD} UNC-2A",
-}
+
 
 
 def _outline_center(adapter: Any, view: Any) -> tuple[float, float]:
@@ -180,6 +178,7 @@ async def build(
             "Manufacturing Notes",
         ),
     )
+    callout_source_model = adapter.currentModel
     drawing_model, _sheet = drawing_factory(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE
     )
@@ -222,7 +221,14 @@ async def build(
         adapter, top, keep=_shifted(TOP_KEEP, top_delta), view_label="top"
     )
     annotations = [*front_annotations, *top_annotations]
-    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    verify_dimension_callouts(
+        adapter,
+        annotations,
+        DIMENSION_CALLOUTS,
+        feature_name="StudProfile",
+        view=top,
+        source_model=callout_source_model,
+    )
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to top view")
 

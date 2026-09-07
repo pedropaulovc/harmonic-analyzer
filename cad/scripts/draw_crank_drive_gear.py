@@ -8,6 +8,7 @@ backlash, mating pinion).
 from __future__ import annotations
 
 import argparse
+from crank_drive_gear_spec import DIMENSION_CALLOUTS
 import sys
 from typing import Any
 
@@ -25,7 +26,7 @@ from _drawing_common import (
     curate_view_dimensions,
     finalize_drawing,
     read_required_properties,
-    set_dimension_callouts,
+    verify_dimension_callouts,
     set_dimension_precision,
     set_hidden_lines_removed,
     stamp_drawing_summary,
@@ -66,14 +67,7 @@ FRONT_FACE_X = RIGHT_CENTER[0] - FACE_WIDTH * VIEW_SCALE[0] / 2000.0
 FRONT_KEEP = {
     "BoreDia": (FRONT_CENTER[0] - 0.055, FRONT_CENTER[1] - 0.030),
 }
-DIMENSION_CALLOUTS = {
-    # Reamed slip fit on the crankshaft journal (nominal-or-under, like the
-    # arbor journals): min 0.03 diametral clearance, inside the project's
-    # 0.025..0.075 shaft-in-bushing policy. Also settles which tolerance-block
-    # row governs the bore (neither .XX +/-0.51 nor DRILLED +0.10/0 -- the
-    # model dimension's own limits do).
-    "BoreDia": "THRU - REAM",
-}
+
 DIMENSION_PRECISION = {"BoreDia": 3}
 
 
@@ -105,6 +99,7 @@ async def build(
             "Manufacturing Notes",
         ),
     )
+    callout_source_model = adapter.currentModel
     drawing_model, _sheet = drawing_factory(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE
     )
@@ -129,7 +124,14 @@ async def build(
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
     )
-    set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
+    verify_dimension_callouts(
+        adapter,
+        front_annotations,
+        DIMENSION_CALLOUTS,
+        feature_name="BoreProfile",
+        view=front,
+        source_model=callout_source_model,
+    )
     set_dimension_precision(adapter, front_annotations, DIMENSION_PRECISION)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to gear bore")

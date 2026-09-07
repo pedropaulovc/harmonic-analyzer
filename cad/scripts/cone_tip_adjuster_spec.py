@@ -66,3 +66,10 @@ GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
     "cup axis position": "0.05",
     "driver-slot median-plane position": "0.10",
 }
+
+
+# Model display callouts, imported read-only by the manufacturing drawing.
+DIMENSION_CALLOUTS = {
+    "BodyDiaDim": f"{THREAD} UNC-2A",
+    "CupDepth": "DEEP",
+}

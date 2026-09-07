@@ -23,6 +23,8 @@ Run (SolidWorks already open)::
 from __future__ import annotations
 
 import math
+from _model_dimension_callouts import author_model_callouts
+from fillister_screw_spec import SIDE_DIMENSION_CALLOUTS
 import sys
 
 from _fastener_catalog import fastener
@@ -155,6 +157,7 @@ async def build(adapter) -> dict[str, str]:
             "End View Note": END_VIEW_NOTE,
         },
     )
+    author_model_callouts(adapter, "Shank", SIDE_DIMENSION_CALLOUTS)
     return await save_part_and_images(adapter, PART_NAME)
 
 

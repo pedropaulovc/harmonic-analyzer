@@ -10,6 +10,7 @@ cam and alignment notch are carried by the manufacturing notes.
 from __future__ import annotations
 
 import argparse
+from cylinder_gear_spec import DIMENSION_CALLOUTS
 import math
 import sys
 from typing import Any
@@ -28,7 +29,7 @@ from _drawing_common import (
     curate_view_dimensions,
     finalize_drawing,
     read_required_properties,
-    set_dimension_callouts,
+    verify_dimension_callouts,
     set_dimension_precision,
     set_hidden_lines_removed,
     stamp_drawing_summary,
@@ -72,12 +73,7 @@ HALF_OD = OUTSIDE_DIA * VIEW_SCALE[0] / 2000.0
 FRONT_KEEP = {
     "BoreDia": (FRONT_CENTER[0] - 0.055, FRONT_CENTER[1] - 0.030),
 }
-DIMENSION_CALLOUTS = {
-    # The 9.525 +0.03/+0.05 reamed bore against the arbor's
-    # 9.525 +0.00/-0.02 journal guarantees 0.03..0.07 diametral clearance,
-    # inside the project's 0.025..0.075 shaft-in-bushing policy.
-    "BoreDia": "THRU - REAM",
-}
+
 DIMENSION_PRECISION = {"BoreDia": 3}
 
 
@@ -130,6 +126,7 @@ async def build(
             "Manufacturing Notes",
         ),
     )
+    callout_source_model = adapter.currentModel
     drawing_model, _sheet = drawing_factory(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE
     )
@@ -154,7 +151,14 @@ async def build(
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
     )
-    set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
+    verify_dimension_callouts(
+        adapter,
+        front_annotations,
+        DIMENSION_CALLOUTS,
+        feature_name="BoreProfile",
+        view=front,
+        source_model=callout_source_model,
+    )
     set_dimension_precision(adapter, front_annotations, DIMENSION_PRECISION)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to gear bore")

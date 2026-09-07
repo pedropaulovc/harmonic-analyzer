@@ -149,7 +149,8 @@ def test_direct_limits_and_native_gdt_control_the_cam_axes() -> None:
     assert "BossProjection" in drawing.FRONT_KEEP
     assert "+/-0.05" not in Path(drawing.__file__).read_text(encoding="utf-8")
     assert "BEYOND" in drawing.DIMENSION_CALLOUTS["BossProjection"]
-    assert "{CAM_OD:.2f} OD" in source
+    assert "{CAM_OD:.2f} OD" in Path(pinion_cam_spec.__file__).read_text(encoding="utf-8")
+    assert drawing.DIMENSION_CALLOUTS is cam.DIMENSION_CALLOUTS is pinion_cam_spec.DIMENSION_CALLOUTS
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:

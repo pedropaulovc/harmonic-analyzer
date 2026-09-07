@@ -67,3 +67,12 @@ GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
     "cam boss axis position": "0.03",
     "cam tap pitch axis position": "0.03",
 }
+
+
+# Model display callouts, imported read-only by the manufacturing drawing.
+DIMENSION_CALLOUTS = {
+    "BoreDia": "FINAL REAM; THRU",
+    "CollarCy": "BOTH END FACES",
+    "BossProjection": f"BEYOND DIA {CAM_OD:.2f} OD",
+    "BossCz": "A TO BOSS / TAP AXIS",
+}

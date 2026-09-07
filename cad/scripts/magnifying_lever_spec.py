@@ -42,3 +42,10 @@ DRAWING_NOTES = "\n".join(
 )
 END_VIEW_NOTE = "END VIEW SCALE 4:1"
 ISO_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
+
+
+# Model display callouts, imported read-only by the manufacturing drawing.
+DIMENSION_CALLOUTS = {
+    "DomeRadius": "FULL R, BOTH ENDS - Ø6 ROD",
+    "RightDomeCentre": "TO FAR DOME CENTRE",
+}

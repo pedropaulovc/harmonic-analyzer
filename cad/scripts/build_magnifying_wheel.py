@@ -22,6 +22,8 @@ Run (SolidWorks already open)::
 from __future__ import annotations
 
 import sys
+from _model_dimension_callouts import author_model_callouts
+from magnifying_wheel_spec import DIMENSION_CALLOUTS
 
 from _common import (
     PANEL_BLACK,
@@ -398,6 +400,12 @@ async def build(adapter) -> dict[str, str]:
             "Section View Note": SECTION_VIEW_NOTE,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
+    )
+    author_model_callouts(
+        adapter, "BoreProfile", {"BoreDiaDim": DIMENSION_CALLOUTS["BoreDiaDim"]}
+    )
+    author_model_callouts(
+        adapter, "SpokeProfile", {"SpokeWidthDim": DIMENSION_CALLOUTS["SpokeWidthDim"]}
     )
     return await save_part_and_images(adapter, PART_NAME)
 

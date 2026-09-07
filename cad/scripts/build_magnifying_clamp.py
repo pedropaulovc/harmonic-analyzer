@@ -22,6 +22,8 @@ Run (SolidWorks already open)::
 from __future__ import annotations
 
 import math
+from _model_dimension_callouts import author_model_callouts
+from magnifying_clamp_spec import DIMENSION_CALLOUTS
 import sys
 
 from _common import (
@@ -236,6 +238,14 @@ async def build(adapter) -> dict[str, str]:
             "Manufacturing Notes": DRAWING_NOTES,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
+    )
+    author_model_callouts(
+        adapter,
+        "LeverBoreProfile",
+        {"LeverBoreDiaDim": DIMENSION_CALLOUTS["LeverBoreDiaDim"]},
+    )
+    author_model_callouts(
+        adapter, "RodBoreProfile", {"RodBoreDiaDim": DIMENSION_CALLOUTS["RodBoreDiaDim"]}
     )
     return await save_part_and_images(adapter, PART_NAME)
 

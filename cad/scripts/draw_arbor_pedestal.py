@@ -3,6 +3,7 @@ r"""Create the curated machinist drawing for the cylinder-arbor pedestal."""
 from __future__ import annotations
 
 import argparse
+from arbor_pedestal_spec import DIMENSION_CALLOUTS
 import sys
 from typing import Any
 
@@ -26,7 +27,7 @@ from _drawing_common import (
     read_required_properties,
     set_arc_endpoints_to_center,
     set_basic_dimension,
-    set_dimension_callouts,
+    verify_dimension_callouts,
     set_dimension_precision,
     set_hidden_lines_visible,
     stamp_drawing_summary,
@@ -96,9 +97,7 @@ FRONT_KEEP = (
     "DomeDia",
 )
 TOP_KEEP = ("Depth",)
-DIMENSION_CALLOUTS = {
-    "BoreDia": "THRU",
-}
+
 # 3/8 in = 9.525 exactly; show 3 places so the view matches the note (else the
 # 2-decimal sheet default prints 9.53 against the DIA 9.525 the note cites).
 DIMENSION_PRECISION = {"BoreDia": 3}
@@ -193,6 +192,7 @@ async def build(
             "Manufacturing Notes",
         ),
     )
+    callout_source_model = adapter.currentModel
     drawing_model, _sheet = drawing_factory(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE
     )
@@ -225,8 +225,13 @@ async def build(
     top_annotations = retain_view_dimensions(
         adapter, top, keep=TOP_KEEP, view_label="top"
     )
-    set_dimension_callouts(
-        adapter, [*front_annotations, *top_annotations], DIMENSION_CALLOUTS
+    verify_dimension_callouts(
+        adapter,
+        [*front_annotations, *top_annotations],
+        DIMENSION_CALLOUTS,
+        feature_name="BoreProfile",
+        view=front,
+        source_model=callout_source_model,
     )
     set_dimension_precision(adapter, front_annotations, DIMENSION_PRECISION)
     front_by_name = {

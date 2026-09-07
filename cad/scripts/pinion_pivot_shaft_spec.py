@@ -54,3 +54,10 @@ GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
     "pinion pivot cylindrical body": "0.01",
     "pinion pivot crown profile": "0.05",
 }
+
+
+# Model display callouts, imported read-only by the manufacturing drawing.
+DIMENSION_CALLOUTS = {
+    "ShaftDia": "FINAL SIZE",
+    "Depth": "CYLINDRICAL BODY\nBETWEEN CROWN ROOT CIRCLES",
+}
