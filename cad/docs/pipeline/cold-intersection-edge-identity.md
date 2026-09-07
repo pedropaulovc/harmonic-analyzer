@@ -1,8 +1,63 @@
 # Cold intersection-edge identity candidate
 
 Diagnostic only. No production selector, curve reader, source part, template,
-layout predicate or geometry tolerance changes. Native acceptance of the new
-persistent-ID call shape remains pending.
+layout predicate or geometry tolerance changes. One full crankshaft pilot now
+passes with native cross-cold persistent-ID proof; this is not fleet or cold
+pixel-equivalence acceptance.
+
+## Native positive control
+
+At frozen root `5e7737560d1efba42ff03d75376565e3b4710962`, the prepared-factory
+crankshaft pilot exited 0 and reports `passed`:
+
+- `cad/out/reports/datum-policy-_ombplu9/pilot.json`, SHA-256
+  `f9dd490db1d4d3527670243379d2a0cec8d56ed308e79b3071549947f2f39319`.
+- Its `ownership.json`, SHA-256
+  `a5bb24df288e3652dd5c4b3d23890fb68d559bed9f4587a366b08e20652f3eeb`.
+
+For `cross-hole true position` at `Drawing View2/DetailItem353`, both built and
+cold observations resolved one attached EDGE. `GetPersistReference3` returned
+an 805-byte `memoryview` in each phase. Native self-comparisons and the cold
+`IsSamePersistentID` comparison returned integer **1** on the same saved
+drawing path. The only raw explicit-bank delta was
+`/explicit/cross-hole true position/geometry/1/trim/CurveTag`,
+**549654 → 551552**. The comparison retained that delta as native-identity-proven
+metadata and rejected nothing; the complete raw banks remain in the receipt.
+Every other explicit-bank field was exact, including the new journal FACE
+finish. Fresh resolver/owner/attachment checks remained active; no live-session
+CurveTag or physical-geometry check was relaxed.
+
+Built/cold source and semantic banks matched. The annotation comparison passed
+with zero rejected leaves, 42 separately reported coordinate-ULP observations
+and 15 sheet-Z serialization observations under the existing annotation-only
+policy. Four explicit VIEW roles were checked: crank-end datum face, end-face
+perpendicularity, cross-hole true position and bearing-journal finish. The
+bearing-journal datum axis remains explicitly `coordinate_pick_not_migrated`;
+this result does not confer explicit selected-entity identity on that role.
+
+The actual drawing recipe took **24.4898122 s**, including its **1.7895901 s**
+inner prepared-factory setup. Separately, the accessor miss/preparation took
+**42.9095518 s**, and the verified hit took **0.0423147 s**. Total pilot time
+was **183.0649552 s**, covering its guards, preparation, recipe and cold
+witnesses but excluding parent lock/attach and outer owned-session cleanup.
+It is one functional sample, not a paired speedup measurement.
+
+Original and copied crankshaft bytes stayed exactly
+`3c0224617322e3a10cca4a5c52e2b0a3b4c82e7be7969c0b21faf4db58b4cd94`
+after recipe, close and cold reopen/close. Protected rocker/lever sources also
+stayed exact. The original `2b1bbe3d...5e849` template, prepared bytes, manifest,
+preparation receipt and helper/adapter fingerprints passed final guards, with
+no runtime guard errors. Cleanup closed only owned documents and preserved the
+already-open visible, clean original fillister part; ownership reports
+`preserved` and null probe/cleanup errors.
+
+The native drawing, PDF and PNG were produced. Main's visual inspection of the
+**built**, not cold-exported, PNG found readable geometry, populated title block,
+thread/hole/fit callouts and journal FACE finish. The lower cross-hole cluster
+is crowded, with no missing manufacturing callout observed. There was no
+cold-export pixel comparison or overall layout redesign. Full-fleet/build gates
+and other targets remain separate; this does not retroactively pass the older
+failure below, which lacked native persistent-ID evidence.
 
 ## Retained failure
 
@@ -78,8 +133,8 @@ Full-pilot fixtures use the real cold comparator and retain its rejection report
 Offline focused/adjacent verification passed 451 tests in 17.57 s
 (`pytest-telemetry/run-nbc31vqt`); Ruff F and `git diff --check` passed.
 
-After review and an explicit seat grant, the existing full owned pilot is the
-native positive control, with no new launcher or callout authoring:
+The existing full owned pilot reproduces the native control from its frozen
+checkout on the serialized seat, with no new launcher or callout authoring:
 
 ```powershell
 $env:HARMONIC_SW_AUTOSTART = '0'
@@ -91,7 +146,8 @@ uv run --no-sync python cad/scripts/diagnostics/probe_datum_policy_recipes.py `
   --candidate HEAD --factory prepared --target crankshaft
 ```
 
-The PID must be the separately granted existing seat. Existing source hashes,
+Use the confirmed current PID, not an assumed persistent process. Source hashes,
 runtime fingerprints, ownership, save/reopen, source/annotation/attachment and
-layout gates remain mandatory. The new proof must return native 1 in that
-actual drawing context before the candidate can be accepted. No speedup claim.
+layout gates remain mandatory. Each replay must obtain native 1 in its actual
+drawing context; the recorded positive control is not permission to skip that
+proof. No speedup claim.
