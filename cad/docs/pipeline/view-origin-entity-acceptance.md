@@ -167,3 +167,21 @@ IsSamePersistentID comparisons and dirty-state observations. Missing references
 are reported, never treated as equality. No acceptance gate, selection or
 geometry is changed by this control. The offline suite at `418955f5` passed
 5,029 tests in 94.01 s (`run-goyd_l2f`).
+
+The persistent-reference replay at `c0595378` produced
+`datum-policy-mkm2cgba/pilot.json`, SHA-256
+`787d7ffffce747d57751f5f9a84c2d0edd36fefb922f29b1b077ce9c1e2a84c3`.
+The repeated selection compares equal (`1`); expected/selected silhouettes still
+compare different (`0`) and their faces compare equal (`1`). All five reference
+reads in each document context failed the diagnostic's nonempty unsigned-byte
+array validation. The receipt does not retain their raw return types, so this
+does **not** establish that native persistent references are unavailable. The
+next control must retain that raw shape and include a source-owned entity with
+a known working reference. The strict selection rejection remains unchanged.
+
+Drawing/source dirty flags were respectively `True -> True` and `False -> False`.
+The original and owned source hashes remained unchanged; cleanup preserved the
+baseline documents and final runtime guards were empty. Recipe/pilot times were
+30.816/151.280 s. Failure capture again retained the two secondary dimension-
+exclusion errors separately from the original identity failure. No built or
+cold acceptance was reached.
