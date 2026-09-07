@@ -40,7 +40,7 @@ def test_only_alignment_source_pin_migrates_to_the_actual_authored_output():
     # The new tip's pin was separately migrated after its real production rebuild.
     expected = UNCHANGED | {
         "alignment_pinion": AUTHORED_SOURCE,
-        "cone_tip_adjuster": "f3578ac2b2ab95e478bc7bd72c316ebab057c125d5244af6fa2c3e12f4d48468",
+        "cone_tip_adjuster": "18d0c1669c8de923420655d621f58d24afe404bc1d3a5a787930ebeeb2fefbf2",
         "cone_pivot_screw": "515019088b41d329b45f0487b9241123751ecac7d6c116481930ae9c45e89c36",
     }
     assert {key: row.source_sha256 for key, row in manifest.TARGETS.items()} == expected

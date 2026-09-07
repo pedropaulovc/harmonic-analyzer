@@ -19,7 +19,7 @@ from diagnostics import probe_source_basic_dimensions as parameters
 
 FASTENERS = {
     "cone_tip_adjuster": (
-        "f3578ac2b2ab95e478bc7bd72c316ebab057c125d5244af6fa2c3e12f4d48468",
+        "18d0c1669c8de923420655d621f58d24afe404bc1d3a5a787930ebeeb2fefbf2",
         {
             "BodyProfile": {"BodyDiaDim"},
             "Body": {"BodyLenDim"},
