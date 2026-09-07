@@ -404,6 +404,7 @@ def test_pdf_readback_records_actual_glyph_boxes_and_rejects_missing_title(tmp_p
     result = probe.pdf_title(pdf)
     assert result["text"] == "rocker-arm"
     assert len(result["characters"]) == 10
+    assert {row["generated"] for row in result["characters"]} == {0}
     assert 99 < result["ink_box_pt"][0] < 102
     with pytest.raises(RuntimeError, match="one exact"):
         probe.pdf_title(pdf, "nonexistent")

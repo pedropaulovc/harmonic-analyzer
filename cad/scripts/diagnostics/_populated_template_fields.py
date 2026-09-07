@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from itertools import combinations
+import math
 import re
 
 from diagnostics import _baked_template_layout as layout
@@ -84,6 +85,73 @@ def intersects_rule(box, endpoints):
     return True
 
 
+def native_run_breaks(note, pdf):
+    """Reconcile only generated zero-ink CRLF between exact native text runs.
+
+    Full native GetText and ordered display run text must agree independently.
+    No character replacement, space normalization or inferred word wrap occurs.
+    The raw PDF dictionary remains untouched, including separator boxes/flags.
+    """
+    runs = note.get("display", {}).get("texts", [])
+    values = [run["value"] for run in runs]
+    if (
+        len(runs) < 2
+        or note["display"]["counts"]["Text"] != len(runs)
+        or any(not value or "\r" in value or "\n" in value for value in values)
+        or "".join(values) != note["text"]
+        or "\r\n".join(values) != pdf["text"]
+    ):
+        raise RuntimeError("native/PDF text does not match exact native run breaks")
+    previous_y = math.inf
+    for run in runs:
+        position = run["position"]
+        if (
+            len(position) != 3
+            or not all(math.isfinite(value) for value in position)
+            or not position[1] < previous_y
+            or run["angle_rad"] != 0
+            or run["reference"] != 1
+            or run["inverted"] != 0
+            or run["plane"] is not None
+        ):
+            raise RuntimeError("unsupported native line geometry at PDF run break")
+        previous_y = position[1]
+    characters = pdf["characters"]
+    if (
+        any(len(row["text"]) != 1 for row in characters)
+        or "".join(row["text"] for row in characters) != pdf["text"]
+    ):
+        raise RuntimeError(
+            "PDF character inventory differs from complete extracted text"
+        )
+    separators, offset = [], 0
+    for index, value in enumerate(values[:-1]):
+        offset += len(value)
+        for row, expected in zip(characters[offset : offset + 2], "\r\n", strict=True):
+            box = row["box_pt"]
+            if (
+                row["text"] != expected
+                or type(row.get("generated")) is not int
+                or row["generated"] != 1
+                or len(box) != 4
+                or not all(math.isfinite(value) for value in box)
+                or box[0] != box[2]
+                or box[1] != box[3]
+            ):
+                raise RuntimeError(
+                    "native run separator is not generated zero-ink CRLF"
+                )
+        separators.append(
+            {"after_native_run": index, "character_indices": [offset, offset + 1]}
+        )
+        offset += 2
+    return {
+        "representation": "pdfium_generated_native_run_breaks",
+        "text": note["text"],
+        "separators": separators,
+    }
+
+
 def field_audit(notes, lines, *, pdf_reader, symbol_reader=None):
     """Unknown/missing regions and all collisions are failures, not exclusions."""
     fields, issues, regions = {}, [], {}
@@ -159,13 +227,13 @@ def field_audit(notes, lines, *, pdf_reader, symbol_reader=None):
                 else pdf_reader(row["text"])
             )
             entry["pdf"] = pdf
-            # Only separately observed repeated ASCII-space representation may
-            # differ; no symbol/line-wrap/text replacement is inferred.
+            # Existing repeated ASCII-space policy remains separate. A line
+            # separator needs actual PDFium flags plus exact native run proof.
             printed_text = pdf.get("decoded_native_text", pdf["text"])
             if " ".join(filter(None, printed_text.split(" "))) != " ".join(
                 filter(None, row["text"].split(" "))
             ):
-                raise RuntimeError("native/PDF field text differs")
+                entry["text_representation"] = native_run_breaks(row, pdf)
             entry["pdf_box_m"] = tuple(
                 value * 0.0254 / 72 for value in pdf["ink_box_pt"]
             )
@@ -213,3 +281,138 @@ def field_audit(notes, lines, *, pdf_reader, symbol_reader=None):
         "issues": issues,
         "status": "failed" if issues else "passed",
     }
+
+
+def audit_retained(receipt, expected_sha256, library_path):
+    """Replay every built/cold field from unchanged native rows and actual PDFs.
+
+    This is not a new native run or a replacement for the archived native,
+    source, ownership and whole-sheet comparisons. Their raw receipt is pinned.
+    """
+    import hashlib
+    import json
+    from pathlib import Path
+
+    from diagnostics import _populated_template_symbols as symbols
+    from diagnostics import probe_retained_drawing_export as retained
+
+    def digest(path):
+        return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+    if digest(receipt) != expected_sha256:
+        raise RuntimeError("retained populated receipt SHA256 differs")
+    report = json.loads(receipt.read_text(encoding="utf-8"))
+    expected = {str(receipt): expected_sha256, **report["inputs_before"]}
+    if report["inputs_before"] != report["inputs_after"]:
+        raise RuntimeError("archived original input hashes changed")
+    paths = set(expected)
+    for trial in report["trials"]:
+        if trial["copy_hashes"]["initial"] != trial["copy_hashes"]["final"]:
+            raise RuntimeError("archived owned source hash changed")
+        expected[trial["source_copy"]] = trial["copy_hashes"]["initial"]
+        paths.update(
+            [
+                trial["source_copy"],
+                *trial["artifacts"].values(),
+                *trial["cold_artifacts"].values(),
+            ]
+        )
+    initial_hashes = {path: digest(path) for path in sorted(paths)}
+    if any(initial_hashes[path] != sha for path, sha in expected.items()):
+        raise RuntimeError("retained input/source hash differs from native receipt")
+    library = symbols.symbol_library(library_path)
+    if (
+        str(library_path) not in expected
+        or library["sha256"] != expected[str(library_path)]
+    ):
+        raise RuntimeError("symbol library is not the exact archived input")
+    result = {
+        "scope": "COM-free complete populated field replay; not a native invocation",
+        "receipt_sha256": expected_sha256,
+        "original_status": report["status"],
+        "inputs_before": initial_hashes,
+        "helpers": {
+            str(Path(path).resolve()): digest(path)
+            for path in (
+                __file__,
+                symbols.__file__,
+                retained.__file__,
+                layout.__file__,
+                layout.cells.__file__,
+            )
+        },
+        "archived_acceptance_issues": {
+            trial["target"]: trial["acceptance_issues"] for trial in report["trials"]
+        },
+        "targets": {},
+    }
+    for trial in report["trials"]:
+        phases = {}
+        for phase, artifacts in (
+            ("built", trial["artifacts"]),
+            ("cold", trial["cold_artifacts"]),
+        ):
+            observation = trial["linked_fields"][phase]
+            lines = [
+                tuple(segment["sheet_points"])
+                for segment in observation["template_geometry"]["segments"]
+                if segment["kind"] == 0 and segment["role"] == "drawing"
+            ]
+            pdf = Path(artifacts["pdf"])
+            fit = field_audit(
+                observation["notes"],
+                lines,
+                pdf_reader=lambda text: retained.pdf_title(pdf, text),
+                symbol_reader=lambda note: symbols.pdf_field(pdf, note, library),
+            )
+            if fit["fields"].keys() != observation["fit"]["fields"].keys():
+                raise RuntimeError("retained field inventory changed during replay")
+            # Prove all pre-existing PDF text/ink observations are unchanged;
+            # only new generated-character metadata may be absent in the archive.
+            for name, row in fit["fields"].items():
+                if "pdf" not in row:
+                    continue
+                raw_pdf = retained.serialized(row["pdf"])
+                for character in raw_pdf["characters"]:
+                    character.pop("generated", None)
+                if raw_pdf != observation["fit"]["fields"][name].get("pdf"):
+                    raise RuntimeError(
+                        f"retained PDF raw field changed: {trial['target']}/{phase}/{name}"
+                    )
+            phases[phase] = {"pdf_sha256": digest(pdf), "fit": fit}
+        result["targets"][trial["target"]] = phases
+    result["inputs_after"] = {path: digest(path) for path in sorted(paths)}
+    if result["inputs_after"] != initial_hashes:
+        raise RuntimeError("retained files changed during field replay")
+    result["status"] = (
+        "passed"
+        if all(
+            phase["fit"]["status"] == "passed"
+            for phases in result["targets"].values()
+            for phase in phases.values()
+        )
+        else "failed"
+    )
+    return result
+
+
+if __name__ == "__main__":
+    import argparse
+    import json
+    from pathlib import Path
+
+    parser = argparse.ArgumentParser(
+        description="COM-free complete retained field audit"
+    )
+    parser.add_argument("--receipt", type=Path, required=True)
+    parser.add_argument("--sha256", required=True)
+    parser.add_argument("--symbol-library", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    args = parser.parse_args()
+    if args.output.exists():
+        raise RuntimeError("field replay output already exists")
+    result = audit_retained(args.receipt, args.sha256, args.symbol_library)
+    with args.output.open("x", encoding="utf-8") as output:
+        json.dump(result, output, indent=2, allow_nan=False)
+    print(json.dumps({"status": result["status"], "output": str(args.output)}))
+    raise SystemExit(0 if result["status"] == "passed" else 1)
