@@ -151,6 +151,20 @@ Count the following routes, then take the union of recipe names rather than
 summing the overlapping recipe column. Calls in loops count once as source
 sites, not once per native invocation.
 
+The [retained audit script](recount-coordinate-selections.py) executes that
+literal predicate and prints every counted file/line:
+
+```powershell
+uv run --no-sync python cad/docs/pipeline/recount-coordinate-selections.py --root .
+```
+
+Run it against the audited recipe revision. Its closing assertion pins this
+92/43 observation; a later migration should change the count. This is an audit
+reproducer, not a generic Python call-graph analyzer. In particular, its raw
+`SelectByID2` match is valid for this snapshot because the only direct recipe
+call is the unnamed geometry selection in `draw_crank_pin`; inspect the
+classification again if new direct calls or wrapper aliases appear.
+
 | Coordinate-selection route | Source sites | Recipes |
 |---|---:|---:|
 | `add_datum_feature` without an entity or annotation | 56 | 33 |
@@ -541,12 +555,17 @@ measurements.
    old umbrella would preserve the same invalidation problem. These counts do not
    predict the hit rate after a split.
 2. **Author manufacturing annotations once, import into chosen native views.**
-   The [selected-Right-view control](selected-view-model-pmi-control.md) subsequently
-   imported the exact datum and two FCFs without duplicates in receipt
-   `selected-view-pmi-vx_7_s57/observations.json`. The frames overlapped, and
-   save/export added a center mark, failing inventory before cold reopen.
-   Selected-view import is therefore already native-tested for this call shape,
-   but not an accepted recipe replacement. Before migrating a family's recipes,
+   The [selected-Right-view control](selected-view-model-pmi-control.md) imported
+   the exact datum and two FCFs without duplicates in
+   `selected-view-pmi-vx_7_s57/observations.json`, but overlapping frames and a
+   save-time center mark prevented acceptance. The later Space Evenly Down (313)
+   control (`cekzu9_u`) passed machine, manufacturing, source, attachment,
+   save/export and cold-reopen checks. Its separated FCFs still crossed shaft
+   ink, so visual inspection rejected the drawing. Auto Arrange (2976) was
+   disabled for the tested mixed selection (`31ypm276`); no arrangement command
+   or saved/cold result followed. These results establish working selected-view
+   import and scoped native behavior, not an accepted production replacement.
+   Before migrating a family's recipes,
    prove annotation coverage and values through source-part rebuild, scale changes
    and save/reopen. Current semantic pilots are not evidence that every remaining
    coordinate-based recipe is migrated.
