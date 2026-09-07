@@ -114,3 +114,21 @@ Required evidence remains both exact finish attachments through built/cold
 reopen, unchanged source/dimension/PMI banks, final manufacturing/layout checks
 and a readable freshly exported PNG. No acceptance predicate or source pin is
 changed. No native run was performed while preparing this candidate.
+
+## Review follow-up: preserve production identity guards
+
+Review of `78e7082b` found that its native call shape took an existing helper
+branch which checked selected/attached identity but skipped the positioned
+branch's original-argument, owning-view, attachment-type and native-count checks.
+The owned observer still checked these; ordinary production did not. A pure
+real-helper regression accepted a correctly attached FACE with the wrong view
+owner in native mode, while positioned mode rejected it. The first regression
+run retained 15 failures and 11 passing controls (`pytest-telemetry/run-nehpfd7d`).
+
+Native explicit FACE finishes now also use that same existing explicit validator,
+including source reverse mapping for MODEL-origin faces. The native position and
+selected-attachment validator still runs, and no placement setters are added.
+Native EDGE/SILHOUETTE paths and positioned paths are unchanged. Tests retain
+the wrong-owner repro, equal-geometry/wrong-identity cases, exact type/count
+refusals and source-mapping controls. This repairs a production guard regression;
+it does not establish native placement, cold persistence or printed acceptance.
