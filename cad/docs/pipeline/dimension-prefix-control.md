@@ -1,18 +1,49 @@
 # Owned source-prefix positive control
 
-Diagnostic candidate only; no native run or persisted/printed acceptance yet.
-The separate fix `271f80b27196dcc8580d912d614780f1e3a44c77` corrects
+The owned native control passed at `5e773756`; no save, cold-reopen or printed
+acceptance is claimed. The fix originated as
+`271f80b27196dcc8580d912d614780f1e3a44c77` and corrects
 `_drawing_marks.set_dimension_prefix`: `IDisplayDimension.SetText` is void,
 so success is its exact `GetText(1)` readback, not a Boolean return. Its old
 telemetry fixture invented `True`; the corrected fixture keeps the span
 assertion and supplies the actual void shape. No production caller exists.
 
-The correction is replayed as `96679c5f` on published `fc13a85b`. Despite no
+The correction was replayed as `96679c5f` on `fc13a85b`, then integrated as
+`f02d9f47`; the diagnostic was integrated as `5e773756`. Despite no
 callers, `_drawing_marks.py` content is an input to 86 of 108 current part
-helper closures (parent's read-only graph audit). Integrate this correction
-before the final affected-part/full-stack build; prior native recipe acceptance
-does not cover its changed digests. The diagnostic below is a separate commit,
-not an exemption from that build gate.
+helper closures (parent's read-only graph audit). Its integration therefore
+still requires the final affected-part/full-stack build; prior native recipe
+acceptance does not cover its changed digests. This small native control is not
+an exemption from that build gate.
+
+## Native result: immediate and redraw readbacks
+
+The frozen `5e7737560d1efba42ff03d75376565e3b4710962` run passed on the
+serialized native seat. Retained evidence under `cad/out/reports/`:
+
+- `dimension-prefix-jv_856cn/prefix.json`, SHA-256
+  `782de3c7589ed3d6b939c7984f9f46a34a02638b763df3cc21ffffae5eaee282`.
+- `dimension-prefix-jv_856cn/ownership.json`, SHA-256
+  `6d121b52ca4debb7b42c376a03d6118809bdb61e0343d072d1b0bd74f04197f5`.
+
+The real helper returned `None` in **1.3740676 s**. On
+`BodyDiaDim@BodyProfile`, only GetText fields 1 and 5 changed, from
+`<MOD-DIAM>` to `PREFIX CONTROL ` (including its trailing space). Fields 3 and
+7 retained `5/16-18 UNC-2A`; 2/4/6/8 stayed empty. `ShowDimensionValue` stayed
+`True`. The complete immediate and post-redraw banks were identical. All five
+observed source dimension names, values, tolerance types/BASIC designations and
+the `Default` configuration stayed exact; every same-session dimension identity
+readback was integer 1. The copy's dirty flags remained `False`, including
+before/after every getter bank; text changed without an observed dirty flag.
+
+Original and copied disk bytes retained the pinned `f3578ac2...48468` SHA below
+at copy, before close and after close. Cleanup closed only the owned copy and
+preserved the original visible, clean cone-tip part that was already open.
+The receipt has no errors; ownership reports no probe or cleanup error and
+`baseline_preservation.status = preserved`. Imported adapter/helper fingerprints
+were guarded. No source save, drawing import, cold reopen, PDF/PNG export or
+full geometry proof occurred: this proves the corrected void-call/readback
+contract in one native PART, not persistence or printed output.
 
 ## Exact control
 
@@ -53,10 +84,11 @@ introduced to obtain feature dimensions; missing/ambiguous named inventory
 fails. The method docs prohibit `GetText(0)` despite that older dimension-values
 example using it; this control reads only the documented 1..8 fields.
 
-## Native invocation after review and separate seat grant
+## Reproduction invocation
 
-Run in the frozen integrated checkout using its unchanged adapter/venv. The
-source SHA below is the reviewed existing cone-tip input, not an automatic pin.
+Run in the frozen integrated checkout using its unchanged adapter/venv and
+the serialized native seat. The source SHA below is the reviewed existing
+cone-tip input, not an automatic pin.
 Confirm the current PID separately; 31860 is not a perpetual readiness claim.
 
 ```powershell
