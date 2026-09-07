@@ -2,7 +2,8 @@
 
 Execution evidence for [the second-VM handoff](second-vm-assembly-handoff.md).
 The initial saved-channel check and complete assembly fleet passed soundness and
-kinematics; paired performance measurements are in progress. Portfolio status
+kinematics. Paired measurements support the implemented top-level health target
+enumeration; final candidate acceptance is pending. Portfolio status
 is tracked on the [project board](https://github.com/users/pedropaulovc/projects/1).
 
 ## Frozen starting environment
@@ -151,8 +152,65 @@ The baseline session retained 114 clone-owned documents after verification.
 After preserving outputs and inspecting every path, these were closed without
 saving (zero documents remained). No user document was present or discarded.
 
+### Paired native result
+
+```powershell
+$env:HARMONIC_SW_AUTOSTART = '0'
+$env:HARMONIC_REMOTE_CACHE_MODE = 'off'
+$env:HARMONIC_DIAGNOSTIC_SW_PID = '18748'
+uv run python cad/scripts/diagnostics/probe_assembly_health_targets.py
+```
+
+Two ABBA blocks per model completed with **24 passed / 0 failed trials**, no
+retries or recoveries, at 2026-09-07 02:34:54 UTC. The seat was held for 614.4
+seconds with zero waiting; that includes open, shared rebuild, untimed witness
+and state checks, and cleanup. Production sources remained at the baseline;
+the diagnostic records root `b503b7b9` plus its own exact source hash. Commit
+`cd4fbda7` published the already-running diagnostic without changing its bytes.
+
+All timings below measure the whole production health gate, excluding rebuild,
+open, target-identity witnesses and transform snapshots. A uses descendant
+enumeration; B uses top-level enumeration. Values are in execution order within
+each variant (the actual schedule was ABBA, ABBA).
+
+| assembly | A seconds (four trials) | B seconds (four trials) | enumerated A / B | health targets |
+|---|---|---|---:|---:|
+| channel | 9.586, 8.692, 8.987, 9.274 | 9.838, 8.683, 9.170, 9.318 | 128 / 128 | 129 |
+| summing | 0.590, 0.578, 0.583, 0.576 | 0.569, 0.565, 0.561, 0.543 | 8 / 8 | 9 |
+| harmonic-analyzer | 9.052, 9.267, 7.431, 4.580 | 0.669, 0.632, 0.906, 0.433 | 400 / 9 | 10 |
+
+The top assembly's median health-gate time fell from 8.242 to 0.651 seconds
+(92.1%). Channel's median was 9.130 / 9.244 seconds; summing's was 0.580 / 0.563.
+The leaf controls show no material benefit; this is a traversal optimization for
+nested assemblies, not an end-to-end build-speed claim. Within-run timing drift
+is visible in the full retained sample, including the fastest baseline trial.
+
+Every block preserved target-instance names and multiplicity, native document
+identities, null-child behavior and What's Wrong results. Configuration, rebuild
+state and all component transforms were unchanged after each trial. SHA-256
+readbacks after closing established unchanged native inputs: 12 channel files,
+7 summing files and all 114 top-assembly files (sets overlap).
+
+| paired native root | SHA-256 before and after |
+|---|---|
+| channel | `909e1a6630a0bbcaa0d9475d83e390f7210e99e807fd9a45d26b523779e97e26` |
+| summing | `8455fa3d09aa3c4cf4e03254acca1faf4b89123f07a1212459b3521fa65da320` |
+| harmonic-analyzer | `2a79eaf0ba16372b06dbc10173cd060b657d6ee4d2edff88e02c8b84a4890d4e` |
+
+Trace: `0x54647cf29a724f7dac99198f97c19a0b`. Exact per-trial span IDs, timings,
+all dependency hashes and witnesses are retained in
+`cad/out/reports/assembly-health-targets-zd_3kf2m/measurements.json`
+(SHA-256 `bfa6c9d0e7104704a32b5d474a769a21ba94d980200f6e1bf6b89d79ab5ea90c`).
+
+Production now changes only this `GetComponents` argument and explanatory
+comments. Regression cases exercise repeated child instances, null/self/nested
+exclusion, explicit models, shallow inspection, named child errors, and shared
+versus gate-owned rebuilds. Before the change, the focused test run produced
+six expected failures on `[False] != [True]`, one pass and eleven deselections
+(`cad/out/reports/pytest-telemetry/run-8rz3sib_/`). Existing assertions were not
+weakened. This small sample does not establish a population failure rate below 5%.
+
 ## Outstanding evidence
 
-A measured bounded improvement with paired trials and regression tests;
-input-identity checks; candidate assembly acceptance; final trace/hash manifests.
+Input-identity checks; candidate assembly acceptance; final trace/hash manifests.
 No failure-rate bound or full merge-gate result is claimed.
