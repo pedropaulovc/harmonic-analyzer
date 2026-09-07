@@ -165,10 +165,16 @@ def native_views(adapter, source, configuration, source_model):
     return handles, rows
 
 
-def front_view(handles, rows):
-    candidates = [name for name, row in rows.items() if row["orientation"] == "*Front"]
+def orientation_view(handles, rows, orientation):
+    if orientation not in ("*Front", "*Top", "*Right"):
+        raise ValueError(
+            f"unsupported native orthographic orientation: {orientation!r}"
+        )
+    candidates = [
+        name for name, row in rows.items() if row["orientation"] == orientation
+    ]
     if len(candidates) != 1:
-        raise RuntimeError(f"native *Front orientation is not unique: {rows}")
+        raise RuntimeError(f"native {orientation} orientation is not unique: {rows}")
     return handles[candidates[0]]
 
 
@@ -244,7 +250,15 @@ def unchanged_live(
         raise RuntimeError("native save/export changed actual annotation layout")
 
 
-async def probe(adapter, source, output_root, expected_pid, expected_source_sha):
+async def probe(
+    adapter,
+    source,
+    output_root,
+    expected_pid,
+    expected_source_sha,
+    *,
+    orientation="*Front",
+):
     require_environment(expected_pid)
     app = _early_bound(adapter.swApp, "ISldWorks")
     if int(app.GetProcessID()) != expected_pid:
@@ -281,7 +295,8 @@ async def probe(adapter, source, output_root, expected_pid, expected_source_sha)
     report = {
         "status": "running",
         "visual_review": "pending",
-        "scope": "two imports into one exactly selected native Front view; no layout/source edits or retry",
+        "scope": "two imports into one exactly selected native orthographic view; no layout/source edits or retry",
+        "requested_orientation": orientation,
         "source": str(source),
         "copy": str(copy),
         "inputs_before": expected,
@@ -366,7 +381,7 @@ async def probe(adapter, source, output_root, expected_pid, expected_source_sha)
             raise RuntimeError(
                 "fresh native views already contain PMI; import baseline is not empty"
             )
-        view = front_view(view_handles, before["views"])
+        view = orientation_view(view_handles, before["views"], orientation)
         selected_name = str(view.GetName2())
         report["selected_view"] = selected_name
         imported = selected_imports(adapter, view, report["imports"], checkpoint)
@@ -559,6 +574,12 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("source", type=Path)
     parser.add_argument("--expected-pid", type=int, required=True)
+    parser.add_argument(
+        "--orientation",
+        choices=("*Front", "*Top", "*Right"),
+        default="*Front",
+        help="one explicitly selected native view; each invocation uses a fresh source copy",
+    )
     parser.add_argument("--report-root", type=Path, default=ROOT / "cad/out/reports")
     parser.add_argument("--source-sha256", help=argparse.SUPPRESS)
     parser.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
@@ -573,7 +594,12 @@ def main(argv=None):
             raise RuntimeError("source identity changed between parent and worker")
         return run_copy_diagnostic(
             lambda adapter: probe(
-                adapter, source, args.report_root.resolve(), args.expected_pid, digest
+                adapter,
+                source,
+                args.report_root.resolve(),
+                args.expected_pid,
+                digest,
+                orientation=args.orientation,
             )
         )
     import dodo
@@ -585,6 +611,8 @@ def main(argv=None):
             str(source),
             "--expected-pid",
             str(args.expected_pid),
+            "--orientation",
+            args.orientation,
             "--report-root",
             str(args.report_root.resolve()),
             "--source-sha256",

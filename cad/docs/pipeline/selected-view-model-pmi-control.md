@@ -127,3 +127,17 @@ replacement. Datum import into another native orientation, source annotation
 view choices, and native arrangement are untested deltas, not unavailable APIs.
 The coordinate-removal work can independently use existing exact model entities
 while preserving the shared typed PMI content.
+
+## Explicit orthographic orientation control
+
+`--orientation '*Right'` now changes only the selected native orientation; the
+default remains `*Front`. Each invocation uses a fresh source bytecopy and makes
+the same two imports exactly once. `*Top` is also selectable. The requested
+orientation must resolve uniquely through `IView.GetOrientationName`; neither
+view order nor position substitutes for identity. All original coverage,
+source/native identity, layout, export and cleanup checks remain unchanged.
+
+This tests whether the missing Front datum is view-dependent, using the earlier
+all-view datum import as the positive control. There is no annotation repositioning
+or center-mark exemption, so existing frame overlap or export inventory changes
+can still reject the candidate even if datum import succeeds.
