@@ -134,8 +134,21 @@ It proves the original generic
 guards still reject those shapes and the blank plan selects only the two
 actual static labels, while retaining nonzero formula ink in its phase report.
 
-The corrected blank phase has not run natively yet. Blank success cannot prove
-the widths of unresolved TITLE/DWG/REV/material values.
+The corrected blank phase **passed** on frozen root `4b58d536` using adapter
+`e77bfda4`, existing SW PID 31860, session 20008. Receipt
+`baked-template-rotski52/template-layout.json` has SHA-256
+`16592ba587355eaf431656e44b7cc99c78b79bc26530d56aaa0541c22f042d49`.
+The 96.601 s diagnostic included all authoring, native snapshot, save, PDF/PNG
+and cleanup work; it is not a per-drawing setup latency measurement. Raw
+saved/re-instantiated snapshots and PDF glyphs agreed, with zero changed pixels
+and zero maximum channel delta in the 5100×3300 full-page images. The original
+template hash stayed exact, ownership was empty→empty/preserved, and both
+primary/cleanup error lists were empty.
+
+The new owned `baked-template-rotski52.DRWDOT` is retained beside that receipt,
+SHA-256 `1ad599b58fa54bef11a3dc1f5a70758c755bef271c05775f841221eaad0b976d`.
+It has not replaced the project template. This blank success cannot prove the
+widths of unresolved TITLE/DWG/REV/material values.
 Next gates are setter-free normal-setup populated rocker and lever controls,
 full recipes with cold native/PDF/PNG comparison, and long-title/field fleet
 fit. The open footer and material/finish defects must get explicit semantic
