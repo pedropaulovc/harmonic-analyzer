@@ -1,7 +1,8 @@
-"""One per-view native AutoArrange control on exact retained lever copies.
+"""One selected native dimension-arrangement control on retained lever copies.
 
 Requires an explicitly granted seat and existing expected PID. The only drawing
-layout operation is AlignDimensions(AutoArrange, .001) once on Drawing View1.
+layout operation is AlignDimensions once on Drawing View1: the original all-
+dimension AutoArrange, or explicit SpaceEvenly on the five radial/diameter items.
 Closed-document reference replacement targets an owned bytecopy and an identical
 native-ID part bytecopy. No native drawing/part save, rebuild, retry, or global
 preference write. PDF-only output is diagnostic even when clearance fails.
@@ -12,6 +13,7 @@ from __future__ import annotations
 import argparse
 from copy import deepcopy
 from dataclasses import asdict
+from enum import StrEnum
 import json
 import os
 from pathlib import Path
@@ -43,6 +45,39 @@ ARTIFACT_SHA = {
 }
 VIEW = "Sheet1/Drawing View1"
 KNOWN_PAIRS = {("FulcrumDia", "NoseRadius"), ("RD5", "DetailItem349")}
+RADIAL_TYPES = {
+    "NoseRadius": 5,
+    "TipRadius": 5,
+    "FulcrumDia": 6,
+    "RD4": 6,
+    "RD5": 6,
+}
+
+
+class Arrangement(StrEnum):
+    AUTO_ARRANGE = "auto_arrange"
+    RADIAL_SPACE_EVENLY = "radial_space_evenly"
+
+
+def selected_types(expected, arrangement):
+    """Select from the captured semantic bank, never from text or coordinates."""
+    if not isinstance(arrangement, Arrangement):
+        raise ValueError("native arrangement requires its explicit policy enum")
+    if not expected or any(
+        not name or type(kind) is not int or kind not in range(1, 17)
+        for name, kind in expected.items()
+    ):
+        raise ValueError("native arrangement needs known nonempty dimension types")
+    if arrangement is Arrangement.AUTO_ARRANGE:
+        if len(expected) < 2:
+            raise ValueError("AutoArrange requires at least two captured dimensions")
+        return dict(expected)
+    radial = {name: kind for name, kind in expected.items() if kind in (5, 6)}
+    if radial != RADIAL_TYPES:
+        raise ValueError(
+            f"radial spacing requires the five reviewed native dimension types: {radial}"
+        )
+    return radial
 
 
 def read_inputs(receipt):
@@ -194,16 +229,30 @@ def require_positive_baseline(crossings):
     }
     if not KNOWN_PAIRS <= pairs:
         raise RuntimeError(
-            "both exact retained dimension/frame crossings must reproduce before AutoArrange"
+            "both exact retained dimension/frame crossings must reproduce before arrangement"
         )
 
 
-def arrange_once(adapter, view, expected, handles):
+def require_clearance(crossings, arrangement):
+    """Selection scope never narrows the original all-view clearance gate."""
+    if any(crossings.values()):
+        raise RuntimeError(
+            f"native {arrangement.value} leaves dimension stroke/other-body crossings; see measured report"
+        )
+
+
+def arrange_once(
+    adapter, view, expected, handles, *, arrangement=Arrangement.AUTO_ARRANGE
+):
+    planned = selected_types(expected, arrangement)
+    if expected.keys() != handles.keys():
+        raise ValueError("captured dimension types and exact handle inventory differ")
     model = adapter.currentModel
     selection = _early_bound(model.SelectionManager, "ISelectionMgr")
     extension = _early_bound(model.Extension, "IModelDocExtension")
     drawing = _early_bound(model, "IDrawingDoc")
     bank = {}
+    seen = set()
     model.ClearSelection2(True)
     try:
         if not drawing.ActivateView(str(view.GetName2())):
@@ -213,7 +262,7 @@ def arrange_once(adapter, view, expected, handles):
             name = str(annotation.GetName())
             if (
                 name not in expected
-                or name in bank
+                or name in seen
                 or int(annotation.Visible) != 1
                 or int(annotation.OwnerType) != 0
                 or int(adapter.swApp.IsSame(annotation.Owner, view)) != 1
@@ -226,6 +275,12 @@ def arrange_once(adapter, view, expected, handles):
             display = _early_bound(
                 annotation.GetSpecificAnnotation(), "IDisplayDimension"
             )
+            native_type = display.Type2
+            if type(native_type) is not int or native_type != expected[name]:
+                raise RuntimeError(f"captured native dimension type changed: {name}")
+            seen.add(name)
+            if name not in planned:
+                continue
             selection_name = str(display.GetNameForSelection() or "")
             if not selection_name or not extension.SelectByID2(
                 selection_name, "DIMENSION", 0.0, 0.0, 0.0, True, 0, null_callout(), 0
@@ -242,17 +297,28 @@ def arrange_once(adapter, view, expected, handles):
                 != 1
             ):
                 raise RuntimeError("selected object is not the exact IDisplayDimension")
-        if bank.keys() != expected or len(bank) < 2:
+        if seen != expected.keys() or bank.keys() != planned.keys() or len(bank) < 2:
             raise RuntimeError(
                 "selected dimension inventory differs from measured bank"
             )
         started = time.perf_counter()
-        if not extension.AlignDimensions(0, 0.001):
-            raise RuntimeError("one native per-view AutoArrange rejected")
+        # Bundled IModelDocExtension.AlignDimensions + swAlignDimensionType_e:
+        # AutoArrange=0, SpaceEvenly=1. The native palette supports radial
+        # spacing; Stagger is a linear-dimension tool, not a diameter fallback.
+        code, alignment = (
+            (0, "AutoArrange")
+            if arrangement is Arrangement.AUTO_ARRANGE
+            else (1, "SpaceEvenly")
+        )
+        if not extension.AlignDimensions(code, 0.001):
+            raise RuntimeError(f"one native per-view {alignment} rejected")
         return {
             "selected": tuple(bank),
+            "dimension_types": planned,
+            "arrangement": arrangement.value,
             "seconds": time.perf_counter() - started,
-            "alignment": "AutoArrange",
+            "alignment": alignment,
+            "alignment_value": code,
             "spacing_m": 0.001,
         }
     finally:
@@ -275,7 +341,7 @@ def compare_arranged(adapter, before, after, before_handles, after_handles, sele
     )
     if set(changes) - selected:
         raise RuntimeError(
-            f"AutoArrange moved an unselected annotation: {sorted(set(changes) - selected)}"
+            f"native dimension arrangement moved an unselected annotation: {sorted(set(changes) - selected)}"
         )
     return changes
 
@@ -316,7 +382,9 @@ def compare_measured(before, after, movable=()):
                 raise RuntimeError(f"{view}/{name}: arranged text/format changed")
 
 
-async def probe(adapter, receipt, output_root):
+async def probe(adapter, receipt, output_root, *, arrangement=Arrangement.AUTO_ARRANGE):
+    if not isinstance(arrangement, Arrangement):
+        raise ValueError("native arrangement requires its explicit policy enum")
     trial, paths, previous, expected = read_inputs(receipt)
     output_root.mkdir(parents=True, exist_ok=True)
     directory = Path(tempfile.mkdtemp(prefix="dimension-arrange-", dir=output_root))
@@ -334,7 +402,8 @@ async def probe(adapter, receipt, output_root):
         "helper_fingerprints": pilot.helper_fingerprints(),
         "imported_adapter": pilot.adapter_fingerprints(),
         "view": VIEW,
-        "scope": "one per-view AutoArrange; no native save/rebuild or automatic next candidate",
+        "arrangement": arrangement.value,
+        "scope": "one selected native per-view arrangement; no native save/rebuild or automatic next candidate",
     }
     copy_expected = {}
     errors = []
@@ -401,16 +470,24 @@ async def probe(adapter, receipt, output_root):
         report["before_gtol_clearance"] = validate_gtol_leader_clearance(before)
         checkpoint()
         names = {name for name, row in before[VIEW].items() if row.kind == 4}
+        types = {
+            name: report["before"]["semantics"]["dimensions"][f"{VIEW}/{name}/4"][
+                "display_type"
+            ]
+            for name in names
+        }
         report["native_arrange"] = arrange_once(
             adapter,
             views[VIEW],
-            names,
+            types,
             {name: before_handles[f"Drawing View1/{name}"][0] for name in names},
+            arrangement=arrangement,
         )
         report["after"], after_handles = retained.capture_drawing(
             adapter, part, configuration
         )
-        selected = {f"Drawing View1/{name}" for name in names}
+        selected_names = report["native_arrange"]["selected"]
+        selected = {f"Drawing View1/{name}" for name in selected_names}
         report["moved_dimensions"] = compare_arranged(
             adapter,
             report["before"],
@@ -420,7 +497,7 @@ async def probe(adapter, receipt, output_root):
             selected,
         )
         after = measure_views(adapter, views)
-        compare_measured(before, after, {(VIEW, name) for name in names})
+        compare_measured(before, after, {(VIEW, name) for name in selected_names})
         report["after_measured"] = {
             key: {name: asdict(row) for name, row in rows.items()}
             for key, rows in after.items()
@@ -479,10 +556,7 @@ async def probe(adapter, receipt, output_root):
         report["after_gtol_clearance"] = validate_gtol_leader_clearance(
             exported_measurements
         )
-        if any(report["after_crossings"].values()):
-            raise RuntimeError(
-                "native AutoArrange leaves dimension stroke/other-body crossings; see measured report"
-            )
+        require_clearance(report["after_crossings"], arrangement)
         report["status"] = "clear_under_measured_gate"
     except Exception as error:
         report.update(status="failed", error=repr(error))
@@ -540,8 +614,15 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--receipt", type=Path, required=True)
     parser.add_argument("--report-root", type=Path, default=ROOT / "cad/out/reports")
+    parser.add_argument(
+        "--arrangement",
+        choices=tuple(item.value for item in Arrangement),
+        default=Arrangement.AUTO_ARRANGE.value,
+        help="one explicit native operation; never an automatic candidate sequence",
+    )
     parser.add_argument("--worker", action="store_true")
     args = parser.parse_args(argv)
+    arrangement = Arrangement(args.arrangement)
     require_owned_diagnostic_environment()
     if (
         os.environ.get("HARMONIC_REMOTE_CACHE_MODE") != "off"
@@ -561,6 +642,8 @@ def main(argv=None):
                 str(receipt),
                 "--report-root",
                 str(args.report_root.resolve()),
+                "--arrangement",
+                arrangement.value,
                 "--worker",
             ],
             "one per-view native dimension arrangement",
@@ -569,7 +652,9 @@ def main(argv=None):
         )
         return 0
     return run_copy_diagnostic(
-        lambda adapter: probe(adapter, receipt, args.report_root.resolve())
+        lambda adapter: probe(
+            adapter, receipt, args.report_root.resolve(), arrangement=arrangement
+        )
     )
 
 

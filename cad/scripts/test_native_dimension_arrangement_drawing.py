@@ -21,7 +21,7 @@ def selection_context(monkeypatch):
     selected = []
     view = SimpleNamespace(GetName2=lambda: "Drawing View1")
     dimensions = {
-        name: SimpleNamespace(GetNameForSelection=lambda name=name: name)
+        name: SimpleNamespace(Type2=2, GetNameForSelection=lambda name=name: name)
         for name in ("first", "second")
     }
     annotations = {
@@ -61,7 +61,9 @@ def selection_context(monkeypatch):
 
 def test_exact_bank_calls_autoarrange_once_without_position_or_rebuild(monkeypatch):
     adapter, view, annotations, _ = selection_context(monkeypatch)
-    report = probe.arrange_once(adapter, view, set(annotations), annotations)
+    report = probe.arrange_once(
+        adapter, view, dict.fromkeys(annotations, 2), annotations
+    )
     assert report["selected"] == ("first", "second")
     adapter.currentModel.Extension.AlignDimensions.assert_called_once_with(0, 0.001)
     assert adapter.currentModel.ClearSelection2.call_count == 2
@@ -102,7 +104,7 @@ def test_bad_native_bank_aborts_before_arrangement_and_clears_only_selection(
     if fault == "activate":
         adapter.currentModel.ActivateView.return_value = False
     with pytest.raises(RuntimeError):
-        probe.arrange_once(adapter, view, set(expected), expected)
+        probe.arrange_once(adapter, view, dict.fromkeys(expected, 2), expected)
     adapter.currentModel.Extension.AlignDimensions.assert_not_called()
     assert adapter.currentModel.ClearSelection2.call_count == 2
 
@@ -111,7 +113,7 @@ def test_native_false_does_not_retry(monkeypatch):
     adapter, view, annotations, _ = selection_context(monkeypatch)
     adapter.currentModel.Extension.AlignDimensions.return_value = False
     with pytest.raises(RuntimeError, match="AutoArrange rejected"):
-        probe.arrange_once(adapter, view, set(annotations), annotations)
+        probe.arrange_once(adapter, view, dict.fromkeys(annotations, 2), annotations)
     assert adapter.currentModel.Extension.AlignDimensions.call_count == 1
 
 
