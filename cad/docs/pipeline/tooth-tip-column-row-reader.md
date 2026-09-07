@@ -55,11 +55,20 @@ establish native coefficient stability.
 
 ## Native trial
 
-Use this checkout's own environment and adapter, a clean committed candidate,
-and a freshly confirmed existing SolidWorks PID. The parent pilot acquires the
+Run from the clean, committed candidate checkout with its own environment and
+adapter, and a freshly confirmed existing SolidWorks PID. The parent pilot acquires the
 machine seat lock and the worker owns unique copies; borrowed documents and
 original source pins stay protected. Freeze candidate/runtime files for the
 whole run. Do not save or regenerate the protected originals.
+
+The runtime checkout and protected artifact roots are separate inputs. The
+command below preserves this experiment's selected source and guard directory,
+`C:/src/harmonic-analyzer/cad/out/sldprt`; the separate candidate checkout does
+not supply those pinned originals. On another machine, explicitly select
+`--source-root` and `--guard-root` containing the pinned rocker, lever and target
+parts. The pilot resolves both roots and verifies their exact hashes before
+opening copies. Both flags may name the same validated directory; they are not
+derived from the runtime checkout or its output directory.
 
 ```powershell
 $env:HARMONIC_SW_AUTOSTART = '0'
