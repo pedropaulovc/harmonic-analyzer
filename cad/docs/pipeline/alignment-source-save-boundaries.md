@@ -352,3 +352,50 @@ had no errors, source/copy hashes remained exact, and cleanup preserved the two
 original clean/visible pivot documents with empty final guards. No production
 text policy changed. The integrated offline suite passed 4,980 tests in 89.76 s
 (`cad/out/reports/pytest-telemetry/run-tsgd1o9a`).
+
+## Source-authored callout: printed and cold-reopened positive control
+
+At `5ce3489b`, adapter `e77bfda4`, PID 31860, the explicit owned-source
+control passed with the normal drawing factory and legacy save:
+
+```powershell
+uv run --no-sync python cad/scripts/diagnostics/probe_datum_policy_recipes.py `
+  --source-root C:/src/harmonic-analyzer/cad/out/sldprt `
+  --guard-root C:/src/harmonic-analyzer/cad/out/sldprt `
+  --target alignment_pinion --factory normal `
+  --source-observation alignment_save --drawing-save legacy `
+  --source-callout-authoring alignment_fit
+```
+
+Receipt `datum-policy-k15laxv1/pilot.json`, SHA-256
+`c75c5eb53ccb2bc9480a4492d520801f3002885ce64dac19acbe97afd88a6b48`,
+records intentional authoring of `THRU - REAM\nPRESS FIT` on the copied
+part's `ArborBoreDia@ArborBoreProfile` display dimension, followed by Save3
+`(True, 0, 0)` and a cold part reopen. The complete observed parameter/text
+inventory matched the expected single-field change; this is not a whole-BREP
+immutability proof. The original part retained SHA-256
+`858dc759943c2f739b3081fd02f313c26ead01eb837e08f9c79d59caac388920`.
+Only the owned copy received the authored baseline
+`9c816b3e14b0aa829e59dcd82d73794314bc9d87a72668e9ada2be348c2ddc5c`.
+
+The drawing imported that source text without a drawing-side text setter or
+callout rebuild. All 25 source banks stayed clean and retained the authored
+copy hash. Both built and cold-reopened drawing snapshots passed: exact slots
+4/8, source parameter, raw value/tolerance and attachment type `[10]` matched,
+and both requested lines appeared once in the native printed text. The raw
+built/reopened callout rows matched exactly; the independent annotation
+comparison had zero rejections and zero coordinate-roundoff differences.
+Visual inspection of the exported PNG confirmed the two readable fit lines
+beneath the diameter and its limits.
+
+Source authoring took 23.285 s; recipe/pilot times were 113.290/219.844 s,
+including observation work. Protected originals stayed exact; the owned copy
+kept its authored baseline through recipe execution and both closes. Cleanup
+succeeded, baseline documents were preserved, and final runtime guards were
+empty. The integrated offline suite passed 5,026 tests in 89.62 s
+(`cad/out/reports/pytest-telemetry/run-fweu39mb`).
+
+This accepts the explicit source-authoring control for this callout. Production
+builder integration and the other callout-bearing parts still require their
+own verification; this single run establishes neither fleet speed nor a
+failure-rate bound.
