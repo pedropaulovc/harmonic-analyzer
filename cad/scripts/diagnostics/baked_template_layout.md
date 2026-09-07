@@ -159,7 +159,7 @@ Only after those and review may the copied DRWDOT replace the project
 template. Its changed source bytes naturally invalidate prepared-template and
 drawing recipe keys; no per-recipe segment scan or layout setter is proposed.
 
-## Minimal populated control (offline-tested, not run yet)
+## Minimal populated control
 
 `probe_populated_template.py` consumes an explicit DRWDOT path and exact hash.
 It reuses the existing `probe_fresh_title_update.one_trial` lifecycle for one
@@ -217,6 +217,36 @@ uv run --no-sync python cad/scripts/diagnostics/probe_populated_template.py `
   --source-root C:/src/harmonic-analyzer/cad/out/sldprt
 ```
 
-No native run of this populated control has occurred. Original project DRWDOT,
-the derived input, both original parts, imported adapter and helper files stay
-unchanged. The retained output report lives under `populated-template-*`.
+The first run at root `65f21f18`, adapter `e77bfda4`, PID 31860, session 91024
+finished with **failed fit acceptance**, not a persistence failure. Receipt
+`populated-template-3kmuxyu1/populated-template.json` has SHA-256
+`9c549d6e62a1078fec1772b5de808e338adcda97c8e5bd0e05dcd2d72d1d49c1`.
+Rocker and lever trial timers were 106.7342 s and 104.0771 s; both had zero
+cold native changes and zero changed full-page PNG pixels. Original parts,
+owned source bytes, original/derived templates and helper/adapter guards passed.
+These are diagnostic durations, not full recipe build or cleanup-inclusive
+timings. The two targets each retained 16 issues (eight repeated built/cold):
+
+- MATERIAL label extends 0.350423 mm above its physical cell; its native gap
+  from the material value is 0.667419 mm.
+- PART/TITLE native boxes overlap by 0.667419 mm. Printed glyphs have a
+  positive 0.270499 mm gap, still below the required 1 mm (not literal ink overlap).
+- FINISH/value gaps are 0.333710 mm native and 0.935761 mm printed.
+- The angular tolerance is native `<GGTOL-ANGULAR>\r\n±1°`. Its symbol is PDF
+  vector ink, so the literal text-only reader cannot validate it. This remains
+  an explicit unsupported representation, not missing or zero ink.
+- The defaults comparator incorrectly expected the blank property-source mode
+  to survive finalization. `_drawing_common.finalize_drawing` explicitly calls
+  `ISheet.SetProperties2(..., False)` then sets and validates `CustomPropertyView`.
+  `GetProperties2[7]` documents that exact mode, and the retained title stages
+  show `Default` changing to `Drawing View1` at the property-link boundary.
+
+The corrected phase contract requires **exactly** inherited mode 1 before
+population and explicit mode 0 after, with every other default unchanged.
+It also checks the sheet's selected view name against the single actual model
+view, exact referenced source identity and configuration. The raw arrays and
+named transition stay in the receipt and built/cold equality remains exact.
+Bundled references: `ISheet/GetProperties2.md`, `SetProperties2.md`,
+`CustomPropertyView.md`, `IView/GetName2.md`, `ReferencedDocument.md`,
+`ReferencedConfiguration.md`, and `Set_Drawing_Sheet_Properties_Example_CSharp.md`.
+No production setter changed and none of the real fit defects is waived.

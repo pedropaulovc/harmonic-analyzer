@@ -14,6 +14,65 @@ from test_baked_template_layout_drawing import note, scene
 from test_title_cell_drawing import box_lines
 
 
+def test_populated_defaults_require_the_exact_explicit_property_source_transition():
+    blank = {
+        "units": {"system": 4},
+        "sheet_properties": [2, 12, 1, 2, 0, 0.4318, 0.2794, 1],
+    }
+    final = deepcopy(blank)
+    final["sheet_properties"][7] = 0
+    transition = probe.require_linked_preferences(blank, final)
+    assert transition["field"] == "ISheet.GetProperties2.sameCustomProp"
+    assert transition["before"] == 1 and transition["after"] == 0
+    assert blank["sheet_properties"][7] == 1
+    for bad in (
+        blank,
+        dict(final, units={"system": 5}),
+        dict(final, sheet_properties=final["sheet_properties"][:7]),
+    ):
+        with pytest.raises(RuntimeError):
+            probe.require_linked_preferences(blank, bad)
+    with pytest.raises(RuntimeError):
+        probe.require_linked_preferences(final, final)
+
+
+@pytest.mark.parametrize(
+    "mode", ["pass", "wrong_view", "extra_view", "foreign_source", "configuration"]
+)
+def test_property_source_is_the_one_exact_owned_model_view(monkeypatch, tmp_path, mode):
+    source = object()
+    view = SimpleNamespace(
+        GetName2=lambda: "Front",
+        ReferencedDocument=object() if mode == "foreign_source" else source,
+        ReferencedConfiguration="Other" if mode == "configuration" else "Default",
+    )
+    sheet = SimpleNamespace(
+        CustomPropertyView="Other" if mode == "wrong_view" else "Front"
+    )
+    document = SimpleNamespace(GetCurrentSheet=lambda: sheet)
+    adapter = SimpleNamespace(
+        currentModel=document, swApp=SimpleNamespace(IsSame=lambda a, b: int(a is b))
+    )
+    monkeypatch.setattr(probe.layout.cells, "required", lambda value, _: value)
+    monkeypatch.setattr(
+        probe.common,
+        "iter_views",
+        lambda _: iter([view, view] if mode == "extra_view" else [view]),
+    )
+    if mode != "pass":
+        with pytest.raises(RuntimeError):
+            probe.property_source(adapter, source, tmp_path / "owned.SLDPRT", "Default")
+        return
+    assert probe.property_source(
+        adapter, source, tmp_path / "owned.SLDPRT", "Default"
+    ) == {
+        "view": "Front",
+        "source": str(tmp_path / "owned.SLDPRT"),
+        "configuration": "Default",
+        "identity": "exact_native_source",
+    }
+
+
 def populated():
     notes, lines = scene()
     for name, text in (("title", "rocker-arm"), ("dwg", "MHA-071"), ("rev", "v32")):
@@ -308,8 +367,16 @@ def test_read_only_observer_keeps_links_full_cold_style_and_independent_failures
         "template_lines",
         lambda _: (lines, {"same": "native lines"}),
     )
-    prefs = {"units": {"system": 4, "linear": 0, "decimals": 2}}
+    prefs = {
+        "units": {"system": 4, "linear": 0, "decimals": 2},
+        "sheet_properties": [2, 12, 1, 2, 0, 0.4318, 0.2794, 0],
+    }
     monkeypatch.setattr(probe, "preferences", lambda _: deepcopy(prefs))
+    monkeypatch.setattr(
+        probe,
+        "property_source",
+        lambda *_: {"view": "Front", "identity": "exact_native_source"},
+    )
     glyph = {"text": "REV", "characters": [{"text": "R", "box_pt": [1, 2, 3, 4]}]}
     monkeypatch.setattr(
         probe.fields,
@@ -321,7 +388,8 @@ def test_read_only_observer_keeps_links_full_cold_style_and_independent_failures
     )
     controller = probe.PopulatedControl(tmp_path / "derived.DRWDOT", "0" * 64, Mock())
     controller.setup["normalized_blank_defaults"] = deepcopy(prefs)
-    trial = {"source_copy": str(path)}
+    controller.setup["normalized_blank_defaults"]["sheet_properties"][7] = 1
+    trial = {"source_copy": str(path), "source_before": {"configuration": "Default"}}
     if mode == "wrong_owner":
         with pytest.raises(RuntimeError, match="wrong exact source"):
             controller.observe(adapter, "built", trial, tmp_path / "first.pdf")
