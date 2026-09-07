@@ -138,8 +138,10 @@ The corrected blank phase **passed** on frozen root `4b58d536` using adapter
 `e77bfda4`, existing SW PID 31860, session 20008. Receipt
 `baked-template-rotski52/template-layout.json` has SHA-256
 `16592ba587355eaf431656e44b7cc99c78b79bc26530d56aaa0541c22f042d49`.
-The 96.601 s diagnostic included all authoring, native snapshot, save, PDF/PNG
-and cleanup work; it is not a per-drawing setup latency measurement. Raw
+The 96.601 s probe timer included authoring, native snapshots, save, PDF/PNG
+and its inner owned-document cleanup. It excludes parent seat-lock wait,
+attach and the outer `run_copy_diagnostic` cleanup; it is not a per-drawing
+setup latency measurement. Raw
 saved/re-instantiated snapshots and PDF glyphs agreed, with zero changed pixels
 and zero maximum channel delta in the 5100×3300 full-page images. The original
 template hash stayed exact, ownership was empty→empty/preserved, and both
