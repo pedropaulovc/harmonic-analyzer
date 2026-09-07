@@ -403,7 +403,13 @@ class _AssemblySources:
                     continue
                 if key is not None and ast.dump(target.slice) != ast.dump(key):
                     continue
-                if key is not None and item.lineno >= node.lineno:
+                late_global = (
+                    self.scopes[node] is not self.tree
+                    and self.scopes[item] is self.tree
+                )
+                if key is not None and not late_global and (
+                    item.lineno, item.col_offset
+                ) >= (node.lineno, node.col_offset):
                     continue
                 found.append(item.value)
         if not found:
