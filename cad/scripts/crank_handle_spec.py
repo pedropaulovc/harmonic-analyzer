@@ -80,3 +80,9 @@ GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
     "full-length bore total runout": "0.10",
     "turned handle profile": "0.50",
 }
+
+
+# Model display callouts, imported read-only by the manufacturing drawing.
+DIMENSION_CALLOUTS = {
+    "PivotBoreDia": "THRU - REAM",
+}

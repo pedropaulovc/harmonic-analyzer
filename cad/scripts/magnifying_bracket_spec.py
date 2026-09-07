@@ -46,3 +46,12 @@ DRAWING_NOTES = "\n".join(
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
+
+
+# Model display callouts, imported read-only by the manufacturing drawing.
+DIMENSION_CALLOUTS = {
+    "ArmWidth": "ARM WIDTH",
+    "ArmDepth": "ARM LENGTH",
+    "FlangeWidth": "FLANGE WIDTH",
+    "FlangeDepth": "FLANGE DEPTH",
+}

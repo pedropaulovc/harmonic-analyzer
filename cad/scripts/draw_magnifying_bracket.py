@@ -18,6 +18,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+from magnifying_bracket_spec import DIMENSION_CALLOUTS
 import sys
 from typing import Any
 
@@ -30,7 +31,7 @@ from _drawing_common import (
     curate_view_dimensions,
     finalize_drawing,
     read_required_properties,
-    set_dimension_callouts,
+    verify_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
@@ -74,12 +75,7 @@ FRONT_KEEP: dict[str, tuple[float, float]] = {}
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
 # Blind-review round 1: the four plan values read unattached at a glance --
 # label each with the feature it controls.
-DIMENSION_CALLOUTS = {
-    "ArmWidth": "ARM WIDTH",
-    "ArmDepth": "ARM LENGTH",
-    "FlangeWidth": "FLANGE WIDTH",
-    "FlangeDepth": "FLANGE DEPTH",
-}
+
 
 
 async def build(
@@ -110,6 +106,7 @@ async def build(
             "Isometric View Note",
         ),
     )
+    callout_source_model = adapter.currentModel
     drawing_model, _sheet = drawing_factory(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE
     )
@@ -140,7 +137,28 @@ async def build(
     )
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
     curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
-    set_dimension_callouts(adapter, top_annotations, DIMENSION_CALLOUTS)
+    verify_dimension_callouts(
+        adapter,
+        top_annotations,
+        {
+            "ArmWidth": DIMENSION_CALLOUTS["ArmWidth"],
+            "ArmDepth": DIMENSION_CALLOUTS["ArmDepth"],
+        },
+        feature_name="ArmProfile",
+        view=top,
+        source_model=callout_source_model,
+    )
+    verify_dimension_callouts(
+        adapter,
+        top_annotations,
+        {
+            "FlangeWidth": DIMENSION_CALLOUTS["FlangeWidth"],
+            "FlangeDepth": DIMENSION_CALLOUTS["FlangeDepth"],
+        },
+        feature_name="FlangeProfile",
+        view=top,
+        source_model=callout_source_model,
+    )
 
     # ASME centre mark on the collar bore (a real circular edge in the end view).
     if not auto_center_marks(adapter, right, holes=True, size=0.0025):

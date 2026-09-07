@@ -17,6 +17,8 @@ Run (SolidWorks already open)::
 from __future__ import annotations
 
 import math
+from _model_dimension_callouts import author_model_callouts
+from cone_pivot_screw_spec import SIDE_DIMENSION_CALLOUTS
 import sys
 
 import _telemetry
@@ -330,6 +332,7 @@ async def build(adapter) -> dict[str, str]:
             "End View Note": END_VIEW_NOTE,
         },
     )
+    author_model_callouts(adapter, "ThreadTail", SIDE_DIMENSION_CALLOUTS)
     artefacts = await save_part_and_images(adapter, PART_NAME)
     await _assert_saved_drawing_properties(adapter, artefacts["part"])
     _assert_saved_cosmetic_thread(adapter, cosmetic_thread_name)

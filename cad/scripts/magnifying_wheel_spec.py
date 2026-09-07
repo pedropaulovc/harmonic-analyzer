@@ -65,3 +65,10 @@ ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
 GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
     "rim runout to the bore": "0.10",
 }
+
+
+# Model display callouts, imported read-only by the manufacturing drawing.
+DIMENSION_CALLOUTS = {
+    "BoreDiaDim": "THRU - REAM",
+    "SpokeWidthDim": "6X SPOKE",
+}

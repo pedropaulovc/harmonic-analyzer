@@ -23,6 +23,8 @@ Run only with SolidWorks already open::
 from __future__ import annotations
 
 import math
+from _model_dimension_callouts import author_model_callouts
+from cone_pivot_post_spec import DIMENSION_CALLOUTS
 import sys
 from typing import Any
 
@@ -448,6 +450,7 @@ async def build(adapter: Any) -> dict[str, str]:
             ("mount east", "AXIS"),
         ),
     )
+    author_model_callouts(adapter, "CrankBoreProfile", DIMENSION_CALLOUTS)
     return await save_part_and_images(adapter, PART_NAME)
 
 

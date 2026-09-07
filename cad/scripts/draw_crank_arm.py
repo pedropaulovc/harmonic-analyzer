@@ -16,6 +16,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+from crank_arm_spec import DIMENSION_CALLOUTS
 import math
 import sys
 from typing import Any
@@ -37,7 +38,7 @@ from _drawing_common import (
     finalize_drawing,
     find_edge_near,
     read_required_properties,
-    set_dimension_callouts,
+    verify_dimension_callouts,
     set_dimension_precision,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
@@ -120,10 +121,7 @@ FRONT_KEEP = {
 }
 RIGHT_KEEP = {"Depth": (0.300, 0.108)}
 TOP_KEEP = {}
-DIMENSION_CALLOUTS = {
-    "ShaftBoreDia": "THRU - REAM 3/8 IN",
-    "DimpleDia": "0.5 DEEP",
-}
+
 
 
 async def build(
@@ -154,6 +152,7 @@ async def build(
             "Isometric View Note",
         ),
     )
+    callout_source_model = adapter.currentModel
     drawing_model, sheet = drawing_factory(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE
     )
@@ -193,10 +192,21 @@ async def build(
     top_annotations = curate_view_dimensions(
         adapter, top, keep=TOP_KEEP, view_label="top"
     )
-    set_dimension_callouts(
+    verify_dimension_callouts(
         adapter,
         [*front_annotations, *top_annotations, *right_annotations],
-        DIMENSION_CALLOUTS,
+        {"ShaftBoreDia": DIMENSION_CALLOUTS["ShaftBoreDia"]},
+        feature_name="ShaftBoreProfile",
+        view=front,
+        source_model=callout_source_model,
+    )
+    verify_dimension_callouts(
+        adapter,
+        [*front_annotations, *top_annotations, *right_annotations],
+        {"DimpleDia": DIMENSION_CALLOUTS["DimpleDia"]},
+        feature_name="DimpleProfile",
+        view=front,
+        source_model=callout_source_model,
     )
     # The shaft bore is an exact 3/8 in (Ø9.525) reamed bore; its native
     # dimension callout cites that conversion, so preserve three decimals.

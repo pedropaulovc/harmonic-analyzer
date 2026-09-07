@@ -15,6 +15,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+from pinion_spring_spec import DIMENSION_CALLOUTS
 import sys
 from typing import Any
 
@@ -32,7 +33,7 @@ from _drawing_common import (
     curate_view_dimensions,
     finalize_drawing,
     read_required_properties,
-    set_dimension_callouts,
+    verify_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
@@ -98,11 +99,7 @@ FRONT_KEEP = {
     "KinkR": (0.070, 0.215),
 }
 TOP_KEEP: dict[str, tuple[float, float]] = {}
-DIMENSION_CALLOUTS: dict[str, str] = {
-    "FootLen": "TRUE LENGTH\nFREE END TO BEND TANGENCY",
-    "BendR": "INSIDE RADIUS",
-    "KinkR": "INSIDE RADIUS",
-}
+
 
 
 async def build(
@@ -133,6 +130,7 @@ async def build(
             "Isometric View Note",
         ),
     )
+    callout_source_model = adapter.currentModel
     drawing_model, _sheet = drawing_factory(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE
     )
@@ -161,7 +159,14 @@ async def build(
         curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
     else:
         curate_view_dimensions(adapter, top, keep={}, view_label="top")
-    set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
+    verify_dimension_callouts(
+        adapter,
+        front_annotations,
+        DIMENSION_CALLOUTS,
+        feature_name="SpringProfile",
+        view=front,
+        source_model=callout_source_model,
+    )
     terminal_mid = (
         (KINK_EXIT[0] + FLAT_TIP[0]) / 2.0,
         (KINK_EXIT[1] + FLAT_TIP[1]) / 2.0,

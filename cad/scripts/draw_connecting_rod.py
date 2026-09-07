@@ -16,6 +16,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+from connecting_rod_spec import DIMENSION_CALLOUTS
 import sys
 from typing import Any
 
@@ -36,7 +37,7 @@ from _drawing_common import (
     finalize_drawing,
     read_required_properties,
     set_basic_dimension,
-    set_dimension_callouts,
+    verify_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
@@ -129,6 +130,7 @@ async def build(
             "Isometric View Note",
         ),
     )
+    callout_source_model = adapter.currentModel
     drawing_model, _sheet = drawing_factory(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE
     )
@@ -161,7 +163,14 @@ async def build(
     )
     # The strap-bore tolerance imports with the named model dimension.  The
     # drawing owns only this descriptive text beneath the native value/band.
-    set_dimension_callouts(adapter, front_annotations, {"StrapBoreDia": "BORE"})
+    verify_dimension_callouts(
+        adapter,
+        front_annotations,
+        DIMENSION_CALLOUTS,
+        feature_name="StrapBoreProfile",
+        view=front,
+        source_model=callout_source_model,
+    )
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")

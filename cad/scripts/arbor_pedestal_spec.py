@@ -115,3 +115,9 @@ GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
     "strap near-face profile": "0.10",
     "coplanar far-face profile": "0.10",
 }
+
+
+# Model display callouts, imported read-only by the manufacturing drawing.
+DIMENSION_CALLOUTS = {
+    "BoreDia": "THRU",
+}

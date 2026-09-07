@@ -83,3 +83,15 @@ GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
     "grip tip face flatness": "0.05",
     "grip tip face perpendicularity": "0.10",
 }
+
+
+# Model display callouts, imported read-only by the manufacturing drawing.
+DIMENSION_CALLOUTS = {
+    "HubBore": "FINAL REAM",
+    "BoreDepth": "FULL-DIA DEPTH FROM B; FLAT BOTTOM",
+    "EndWall": "END WALL TO CROWN ROOT PLANE",
+    "RodTipY": "FROM HUB AXIS",
+    "RodTipDia": "AT TIP",
+    "GripHalfAngle": "GRIP HALF-ANGLE TO AXIS",
+    "CapR": "SPHERICAL CROWN",
+}

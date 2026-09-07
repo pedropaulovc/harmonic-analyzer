@@ -14,6 +14,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+from magnifying_clamp_spec import DIMENSION_CALLOUTS
 import sys
 from typing import Any
 
@@ -32,7 +33,7 @@ from _drawing_common import (
     curate_view_dimensions,
     finalize_drawing,
     read_required_properties,
-    set_dimension_callouts,
+    verify_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
@@ -104,10 +105,7 @@ TOP_KEEP = {
 }
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
 
-DIMENSION_CALLOUTS = {
-    "LeverBoreDiaDim": "THRU - SLIP FIT Ø6 ROD",
-    "RodBoreDiaDim": "THRU - SLIP FIT Ø5 ROD",
-}
+
 
 RIGHT_HALF_Z = BLOCK_DEPTH / 2.0 * SHEET_SCALE[0] / 1000.0
 RIGHT_HALF_Y = BLOCK_HEIGHT / 2.0 * SHEET_SCALE[0] / 1000.0
@@ -141,6 +139,7 @@ async def build(
             "Isometric View Note",
         ),
     )
+    callout_source_model = adapter.currentModel
     drawing_model, _sheet = drawing_factory(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE
     )
@@ -174,8 +173,21 @@ async def build(
         adapter, top, keep=TOP_KEEP, view_label="top"
     )
     curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
-    set_dimension_callouts(
-        adapter, [*front_annotations, *top_annotations], DIMENSION_CALLOUTS
+    verify_dimension_callouts(
+        adapter,
+        [*front_annotations, *top_annotations],
+        {"LeverBoreDiaDim": DIMENSION_CALLOUTS["LeverBoreDiaDim"]},
+        feature_name="LeverBoreProfile",
+        view=front,
+        source_model=callout_source_model,
+    )
+    verify_dimension_callouts(
+        adapter,
+        [*front_annotations, *top_annotations],
+        {"RodBoreDiaDim": DIMENSION_CALLOUTS["RodBoreDiaDim"]},
+        feature_name="RodBoreProfile",
+        view=top,
+        source_model=callout_source_model,
     )
     for view, label in ((front, "front"), (top, "top")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):

@@ -105,3 +105,18 @@ GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
     "lower end-arc profile": "0.05",
     "upper end-arc profile": "0.05",
 }
+
+
+# Model display callouts, imported read-only by the manufacturing drawing.
+DIMENSION_CALLOUTS = {
+    "PivotBoreDia": "PIVOT BORE; THRU - REAM",
+    "ArborBoreDia": "ARBOR BORE; THRU - REAM",
+    "PinSeatCy": "PIN-SEAT AXIS ABOVE PIVOT-BORE AXIS",
+    "Depth": "ONE STRAP THICKNESS",
+    "PinSeatDia": (
+        "H7; BLIND; FLAT BOTTOM\nENTRY ON THE STRAIGHT EDGE FACE\n"
+        "NEAREST THE PIVOT BORE"
+    ),
+    "PinSeatCz": "FROM DATUM C",
+    "PinSeatDepth": "FULL-DIAMETER DEPTH",
+}

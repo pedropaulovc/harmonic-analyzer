@@ -36,6 +36,8 @@ Run (SolidWorks already open)::
 from __future__ import annotations
 
 import sys
+from _model_dimension_callouts import author_model_callouts
+from connecting_rod_spec import DIMENSION_CALLOUTS
 
 from _common import (
     SketchDims,
@@ -418,6 +420,7 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
+    author_model_callouts(adapter, "StrapBoreProfile", DIMENSION_CALLOUTS)
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(
         adapter,
