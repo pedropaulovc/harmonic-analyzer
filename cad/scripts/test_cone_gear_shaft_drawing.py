@@ -161,7 +161,8 @@ def test_datum_symbol_requests_the_persisted_journal_boundary() -> None:
     # The imported datum tag's placement stays DERIVED from the journal's
     # small-end station (JOURNAL_END), never a frozen sheet number.
     assert "position=(big_end_x - JOURNAL_END / 1000.0, 0.252)" in source
-    assert "symbol_xy=(0.255, 0.242)" in source
+    # The finish's former fixed position is intentionally retired; the
+    # native-face recipe tests pin its exact control, face and no-leader call.
     assert cone_gear_shaft_spec.END_VIEW_NOTE == "END VIEW SCALE 4:1"
     assert 'add_property_linked_note(adapter, "End View Note"' in source
 
