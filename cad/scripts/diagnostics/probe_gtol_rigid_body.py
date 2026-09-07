@@ -31,6 +31,7 @@ from _drawing_annotation_bounds import annotation_box, _native_snapshot  # noqa:
 import _drawing_native_gtol as layout  # noqa: E402
 import _telemetry  # noqa: E402
 from diagnostics.probe_native_model_pmi import file_digest, render_pdf_png  # noqa: E402
+from diagnostics.probe_drawing_attachments import referenced_document  # noqa: E402
 
 
 def predicted_records(bank):
@@ -167,7 +168,7 @@ async def probe(adapter, source, directory):
                 if name in views:
                     raise RuntimeError(f"duplicate drawing view name: {name}")
                 views[name] = view
-                source_part = str(Path(view.ReferencedDocument.GetPathName()).resolve())
+                source_part = str(Path(referenced_document(view).GetPathName()).resolve())
                 report["source_hashes"].setdefault(
                     source_part, file_digest(Path(source_part))
                 )

@@ -30,6 +30,7 @@ from diagnostics._owned_native_session import require_owned_diagnostic_environme
 from _gtol_spec import gtol_frame_signature  # noqa: E402
 from diagnostics.probe_gtol_autoarrange import metrics  # noqa: E402
 from diagnostics.probe_native_model_pmi import file_digest, render_pdf_png  # noqa: E402
+from diagnostics.probe_drawing_attachments import referenced_document  # noqa: E402
 
 
 def resolve_reference(extension, reference):
@@ -62,7 +63,7 @@ def snapshot(drawing, hashes):
             annotations = tuple(view.GetAnnotationsByType(5) or ())
             if not annotations:
                 continue
-            model = _early_bound(view.ReferencedDocument, "IModelDoc2")
+            model = referenced_document(view)
             source = str(Path(model.GetPathName()).resolve())
             hashes.setdefault(source, file_digest(Path(source)))
             for raw in annotations:
@@ -107,6 +108,18 @@ def snapshot(drawing, hashes):
     return records, handles
 
 
+def _text_values(ink, *, label):
+    """Do not reinterpret an observed native error dictionary as text rows."""
+    gtol = ink.get("gtol") if isinstance(ink, dict) else None
+    rows = gtol.get("text") if isinstance(gtol, dict) else None
+    if not isinstance(rows, list) or any(
+        not isinstance(row, dict) or not isinstance(row.get("text"), str)
+        for row in rows
+    ):
+        raise RuntimeError(f"{label}: incomplete native ink.gtol.text capture: {ink!r}")
+    return [row["text"] for row in rows]
+
+
 def compare(before, after, handles, app, *, stage):
     if set(before) != set(after):
         raise RuntimeError(f"{stage}: native annotation coverage changed")
@@ -116,8 +129,8 @@ def compare(before, after, handles, app, *, stage):
         for field in ("source", "attachment_types", "frame_signature"):
             if current[field] != prior[field]:
                 raise RuntimeError(f"{stage}: {key}: {field} changed")
-        old_text = [row["text"] for row in prior["ink"]["gtol"]["text"]]
-        new_text = [row["text"] for row in current["ink"]["gtol"]["text"]]
+        old_text = _text_values(prior["ink"], label=f"{stage}: {key}: before")
+        new_text = _text_values(current["ink"], label=f"{stage}: {key}: after")
         if old_text != new_text or current["dangling"]:
             raise RuntimeError(f"{stage}: {key}: text changed or annotation dangling")
         expected_entity = resolve_reference(
@@ -209,10 +222,12 @@ def sheet_symbol_context(drawing, hashes, name="DetailItem324"):
     """Read a specifically named sheet annotation without selecting or changing it."""
     found = []
     for sheet in drawing.GetViews() or ():
-        for raw in sheet:
+        for index, raw in enumerate(sheet):
             view = _early_bound(raw, "IView")
-            document = view.ReferencedDocument
-            if document is not None:
+            # The first entry is the sheet itself; body views may reference a
+            # model through their section base rather than ReferencedDocument.
+            if index:
+                document = referenced_document(view)
                 path = str(Path(document.GetPathName()).resolve())
                 hashes.setdefault(path, file_digest(Path(path)))
             for raw_annotation in view.GetAnnotations() or ():
@@ -277,6 +292,8 @@ async def probe(adapter, source, directory, probe_mode="commands"):
                 )
                 break
             baseline, handles = snapshot(drawing, report["source_hashes"])
+            trial = {"mode": mode, "baseline": baseline, "steps": []}
+            report["trials"].append(trial)
             compare(
                 baseline,
                 baseline,
@@ -284,8 +301,6 @@ async def probe(adapter, source, directory, probe_mode="commands"):
                 app,
                 stage="persistent-reference positive control",
             )
-            trial = {"mode": mode, "baseline": baseline, "steps": []}
-            report["trials"].append(trial)
             for command in commands:
                 step = {"command": command, "calls": []}
                 trial["steps"].append(step)

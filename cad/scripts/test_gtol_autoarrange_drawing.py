@@ -10,6 +10,7 @@ import pytest
 
 from diagnostics import probe_gtol_autoarrange as probe
 from diagnostics import _owned_native_documents as owned
+from diagnostics import probe_drawing_attachments as attachments
 
 
 def context(monkeypatch):
@@ -131,6 +132,8 @@ async def test_actual_probe_rejects_failed_alignment_after_retaining_all_trials(
     extension.SelectByID2 = lambda *_: select(annotations[4])
     view = NS(
         GetName2=lambda: "native-view",
+        GetUniqueName=lambda: "native-view",
+        ReferencedConfiguration="Default",
         GetAnnotationsByType=lambda kind: (annotations[kind],) if kind in annotations else (),
         ReferencedDocument=NS(GetPathName=lambda: str(part)),
     )
@@ -154,6 +157,7 @@ async def test_actual_probe_rejects_failed_alignment_after_retaining_all_trials(
 
     adapter.open_model = open_model
     monkeypatch.setattr(probe, "_early_bound", lambda item, _: item)
+    monkeypatch.setattr(attachments, "_early_bound", lambda item, _: item)
     monkeypatch.setattr(probe, "metrics", lambda item: {"position": item.position})
     save, render = Mock(), Mock()
     monkeypatch.setattr(owned, "save_drawing", save)

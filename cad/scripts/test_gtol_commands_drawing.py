@@ -5,10 +5,15 @@ from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
 from unittest.mock import Mock
+from unittest.mock import AsyncMock
+from types import SimpleNamespace as NS
+import json
 
 import pytest
 
 from diagnostics import probe_gtol_commands as probe
+from diagnostics import probe_drawing_attachments as attachments
+from diagnostics import _owned_native_documents as owned
 
 
 def command_context(monkeypatch):
@@ -125,6 +130,33 @@ def test_actual_motion_not_command_boolean_defines_effect(monkeypatch):
     )
 
 
+@pytest.mark.parametrize("bank", ["before", "after"])
+@pytest.mark.parametrize("shape", ["native_error", "missing", "none", "string", "row", "text_type"])
+def test_text_capture_failure_names_stage_annotation_bank_and_raw_cause(monkeypatch, bank, shape):
+    app, handles, resolver = comparison_context(monkeypatch)
+    before, after = witness(), witness()
+    bad = {
+        "native_error": {"error": "RuntimeError('native text read rejected')"},
+        "none": None,
+        "string": "not a text row bank",
+        "row": ["not a row"],
+        "text_type": [{"text": 0.05}],
+    }
+    changed = before if bank == "before" else after
+    if shape == "missing":
+        changed["view/FCF"]["ink"]["gtol"].pop("text")
+    else:
+        changed["view/FCF"]["ink"]["gtol"]["text"] = bad[shape]
+    saved = deepcopy((before, after))
+    with pytest.raises(RuntimeError, match=f"command 317: view/FCF: {bank}.*gtol.text") as caught:
+        probe.compare(before, after, handles, app, stage="command 317")
+    if shape == "native_error":
+        assert "native text read rejected" in str(caught.value)
+    assert (before, after) == saved
+    resolver.assert_not_called()
+    app.IsSame.assert_not_called()
+
+
 @pytest.mark.parametrize(
     "failure",
     [
@@ -159,6 +191,7 @@ def test_snapshot_uses_drawing_not_source_part_persistent_reference_context(
     monkeypatch, tmp_path
 ):
     monkeypatch.setattr(probe, "_early_bound", lambda item, name: item)
+    monkeypatch.setattr(attachments, "_early_bound", lambda item, name: item)
     monkeypatch.setattr(probe, "file_digest", lambda path: "sha")
     monkeypatch.setattr(probe, "metrics", lambda item: {})
 
@@ -171,8 +204,11 @@ def test_snapshot_uses_drawing_not_source_part_persistent_reference_context(
     drawing.GetViews.return_value = [(Mock(), view)]
     drawing.Extension.GetPersistReference3.return_value = (1, 2, 255)
     view.GetName2.return_value = "view"
+    view.GetUniqueName.return_value = "view"
+    view.ReferencedConfiguration = "Default"
     view.GetAnnotationsByType.return_value = (annotation,)
     view.ReferencedDocument.GetPathName.return_value = str(tmp_path / "source.SLDPRT")
+    (tmp_path / "source.SLDPRT").write_bytes(b"protected model")
     annotation.GetName.return_value = "FCF"
     annotation.GetAttachedEntities3.return_value = (entity,)
     annotation.GetAttachedEntityTypes.return_value = (2,)
@@ -201,8 +237,10 @@ def test_diagnostic_never_positions_or_recreates_annotations():
     assert {"RunCommand", "IsCommandEnabled", "GetObjectByPersistReference3"} <= calls
 
 
-def test_sheet_symbol_probe_records_hidden_state_without_mutation(monkeypatch):
+@pytest.mark.parametrize("source_view", ["sheet_only", "direct", "section"])
+def test_sheet_symbol_probe_records_hidden_state_without_mutation(monkeypatch, tmp_path, source_view):
     monkeypatch.setattr(probe, "_early_bound", lambda item, name: item)
+    monkeypatch.setattr(attachments, "_early_bound", lambda item, name: item)
     monkeypatch.setattr(
         probe, "metrics", lambda item: {"position": (0, 0, 0), "text": []}
     )
@@ -217,9 +255,81 @@ def test_sheet_symbol_probe_records_hidden_state_without_mutation(monkeypatch):
     annotation.Owner.GetName.return_value = "Sheet1"
     annotation.GetAttachedEntityCount3.return_value = 0
     annotation.GetAttachedEntityTypes.return_value = ()
-    result = probe.sheet_symbol_context(drawing, {})
+    hashes = {}
+    part = tmp_path / "source.SLDPRT"
+    if source_view != "sheet_only":
+        from test_probe_base_reference_drawing import section_reference
+
+        part.write_bytes(b"protected model")
+        view, model = section_reference(part, "section")
+        view.GetAnnotations = lambda: ()
+        if source_view == "direct":
+            view.ReferencedDocument = model
+        drawing.GetViews.return_value = [(sheet_view, view)]
+    result = probe.sheet_symbol_context(drawing, hashes)
     assert result[0]["visible"] == 3
     assert result[0]["owner_type"] == 1
     assert result[0]["attachment_count"] == 0
     annotation.Select2.assert_not_called()
     annotation.SetPosition2.assert_not_called()
+    assert hashes == ({} if source_view == "sheet_only" else {str(part): probe.file_digest(part)})
+
+
+@pytest.mark.asyncio
+async def test_actual_native_text_error_is_retained_before_command_or_save(monkeypatch, tmp_path):
+    source, part = tmp_path / "source.SLDDRW", tmp_path / "part.SLDPRT"
+    source.write_bytes(b"original drawing")
+    part.write_bytes(b"original part")
+    annotation, gtol, drawing, view = Mock(), Mock(), Mock(), Mock()
+    annotation.GetName.return_value = "FCF"
+    annotation.GetPosition.return_value = (0.1, 0.1, 0)
+    annotation.GetType.return_value = 5
+    annotation.GetAttachedEntities3.return_value = (object(),)
+    annotation.GetAttachedEntityTypes.return_value = (2,)
+    annotation.IsDangling.return_value = False
+    annotation.GetDisplayData.return_value = None
+    annotation.GetSpecificAnnotation.return_value = gtol
+    gtol.GetHeight.return_value = 0.0035
+    gtol.GetTextPoint.return_value = (0.1, 0.1, 0)
+    gtol.GetTextFont.return_value = "Century Gothic"
+    gtol.GetTextCount.return_value = 1
+    gtol.GetTextAtIndex.side_effect = RuntimeError("native getter failed at index 0")
+    gtol.GetLineCount.return_value = 0
+    gtol.GetFrame.return_value.GetSymbolXml.return_value = "exact frame"
+    view.GetName2.return_value = view.GetUniqueName.return_value = "view"
+    view.ReferencedConfiguration = "Default"
+    view.ReferencedDocument.GetPathName.return_value = str(part)
+    view.GetAnnotationsByType.return_value = (annotation,)
+    drawing.GetViews.return_value = ((object(), view),)
+    drawing.Extension.GetPersistReference3.return_value = (1, 2, 3)
+    adapter = NS(currentModel=drawing, swApp=Mock(), ownership=NS(register_directory=Mock(), register_source=Mock()), close_owned_documents=AsyncMock())
+
+    async def open_model(path):
+        drawing.GetPathName.return_value = path
+        return NS(is_success=True, data=None)
+
+    @dataclass
+    class Signature:
+        text: str
+
+    adapter.open_model = AsyncMock(side_effect=open_model)
+    monkeypatch.setattr(probe, "gtol_frame_signature", lambda value: Signature(value))
+    for module in (probe, attachments):
+        monkeypatch.setattr(module, "_early_bound", lambda item, _: item)
+    from diagnostics import probe_gtol_autoarrange
+    monkeypatch.setattr(probe_gtol_autoarrange, "_early_bound", lambda item, _: item)
+    command, save = Mock(), Mock()
+    monkeypatch.setattr(probe, "run_command", command)
+    monkeypatch.setattr(owned, "save_drawing", save)
+    with pytest.raises(RuntimeError, match="positive control: view/FCF: before.*native getter failed at index 0") as caught:
+        await probe.probe(adapter, source, tmp_path)
+    command.assert_not_called()
+    save.assert_not_called()
+    adapter.close_owned_documents.assert_awaited_once_with()
+    report = json.loads((tmp_path / "commands.json").read_text(encoding="utf-8"))
+    assert report["operation_error"] == repr(caught.value)
+    assert report["trials"][0]["baseline"]["view/FCF"]["ink"]["gtol"]["text"] == {
+        "error": "RuntimeError('native getter failed at index 0')"
+    }
+    assert report["source_hashes"] == report["source_hashes_after"]
+    gtol.GetTextAtIndex.assert_called_once_with(0)

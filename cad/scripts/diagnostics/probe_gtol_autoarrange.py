@@ -25,6 +25,7 @@ from _common import _early_bound, check  # noqa: E402
 from diagnostics._owned_native_documents import run_copy_diagnostic  # noqa: E402
 from diagnostics._owned_native_session import require_owned_diagnostic_environment  # noqa: E402
 from diagnostics.probe_native_model_pmi import file_digest, render_pdf_png  # noqa: E402
+from diagnostics.probe_drawing_attachments import referenced_document  # noqa: E402
 
 
 def observe(operation):
@@ -170,7 +171,7 @@ async def probe(adapter, source, directory):
             for sheet in drawing.GetViews() or ():
                 for raw_view in sheet[1:]:
                     view = _early_bound(raw_view, "IView")
-                    document = _early_bound(view.ReferencedDocument, "IModelDoc2")
+                    document = referenced_document(view)
                     reference = str(Path(document.GetPathName()).resolve())
                     report["source_hashes"].setdefault(
                         reference, file_digest(Path(reference))
