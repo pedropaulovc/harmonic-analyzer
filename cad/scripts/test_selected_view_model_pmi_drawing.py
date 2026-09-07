@@ -8,6 +8,12 @@ import pytest
 from diagnostics import probe_selected_view_model_pmi as probe
 from test_owned_native_documents_drawing import Model, native  # noqa: F401
 
+ROTATIONS = {
+    "*Front": (1, 0, 0, 0, 1, 0, 0, 0, 1),
+    "*Top": (1, 0, 0, 0, 0, -1, 0, 1, 0),
+    "*Right": (0, 0, -1, 0, 1, 0, 1, 0, 0),
+}
+
 
 def native_fixture(monkeypatch):
     monkeypatch.setattr(probe, "_early_bound", lambda value, _: value)
@@ -162,32 +168,68 @@ def test_returned_array_matches_new_view_annotation_native_identities(returned):
 @pytest.mark.parametrize("names", [[], ["Front", "Duplicate"], ["Front"]])
 def test_front_resolved_from_unique_native_orientation_not_view_order(names):
     handles = {name: object() for name in names}
-    rows = {name: {"orientation": "*Front"} for name in names}
+    rows = {
+        name: {"orientation": "*Front", "rotation": ROTATIONS["*Front"]}
+        for name in names
+    }
     if len(names) == 1:
-        assert probe.orientation_view(handles, rows, "*Front") is handles["Front"]
+        assert (
+            probe.orientation_view(handles, rows, "*Front", ROTATIONS)
+            is handles["Front"]
+        )
     else:
         with pytest.raises(RuntimeError, match="not unique"):
-            probe.orientation_view(handles, rows, "*Front")
+            probe.orientation_view(handles, rows, "*Front", ROTATIONS)
 
 
 @pytest.mark.parametrize("orientation", ["*Front", "*Top", "*Right"])
 def test_explicit_orientation_selects_native_view_not_array_position(orientation):
     rows = {
-        "Arbitrary 31": {"orientation": "*Right"},
-        "Arbitrary 17": {"orientation": "*Front"},
-        "Arbitrary 2": {"orientation": "*Top"},
+        "Arbitrary 31": {"orientation": "", "rotation": ROTATIONS["*Right"]},
+        "Arbitrary 17": {"orientation": "*Front", "rotation": ROTATIONS["*Front"]},
+        "Arbitrary 2": {"orientation": "", "rotation": ROTATIONS["*Top"]},
     }
     handles = {name: object() for name in rows}
     expected = next(
-        name for name, row in rows.items() if row["orientation"] == orientation
+        name for name, row in rows.items() if row["rotation"] == ROTATIONS[orientation]
     )
-    assert probe.orientation_view(handles, rows, orientation) is handles[expected]
+    assert (
+        probe.orientation_view(handles, rows, orientation, ROTATIONS)
+        is handles[expected]
+    )
 
 
 def test_unknown_orientation_does_not_guess_an_available_view():
     with pytest.raises(ValueError, match="unsupported"):
         probe.orientation_view(
-            {"Front": object()}, {"Front": {"orientation": "*Front"}}, "Front"
+            {"Front": object()},
+            {"Front": {"orientation": "*Front"}},
+            "Front",
+            ROTATIONS,
+        )
+
+
+@pytest.mark.parametrize("invalid", [(1,) * 8, (float("nan"),) * 9, (0,) * 9])
+def test_malformed_native_rotation_is_rejected(invalid):
+    with pytest.raises(RuntimeError, match="rotation"):
+        probe.rotation_values(invalid)
+
+
+def test_projected_selection_requires_front_matrix_positive_control():
+    rows = {"Front": {"orientation": "*Front", "rotation": ROTATIONS["*Top"]}}
+    with pytest.raises(RuntimeError, match="standard Front"):
+        probe.orientation_view({"Front": object()}, rows, "*Right", ROTATIONS)
+
+
+def test_duplicate_projected_rotations_are_not_disambiguated_by_position():
+    rows = {
+        "Front": {"orientation": "*Front", "rotation": ROTATIONS["*Front"]},
+        "First": {"orientation": "", "rotation": ROTATIONS["*Right"]},
+        "Second": {"orientation": "", "rotation": ROTATIONS["*Right"]},
+    }
+    with pytest.raises(RuntimeError, match="not unique"):
+        probe.orientation_view(
+            {name: object() for name in rows}, rows, "*Right", ROTATIONS
         )
 
 
@@ -306,6 +348,7 @@ async def test_owned_control_exports_failures_but_never_saves_original_or_ignore
         view_rows = {
             name: {
                 "orientation": "*Front" if name == "Front" else "",
+                "rotation": ROTATIONS[f"*{name}"],
                 "source": str(copy),
                 "configuration": configuration,
             }
@@ -345,6 +388,9 @@ async def test_owned_control_exports_failures_but_never_saves_original_or_ignore
 
     async def opening(path):
         result = await initial_open(path)
+        native.adapter.currentModel.GetStandardViewRotation = lambda view_id: ROTATIONS[
+            {1: "*Front", 4: "*Right", 5: "*Top"}[view_id]
+        ]
         if Path(path).suffix.upper() == ".SLDDRW":
             part = Model(references[path], kind=1)
             native.app.documents.append(part)
@@ -458,6 +504,9 @@ def test_native_view_inventory_keeps_exact_source_and_configuration(
             if failure == "configuration"
             else "Default",
             GetOrientationName=lambda: "*Front",
+            ModelToViewTransform=SimpleNamespace(
+                ArrayData=(*ROTATIONS[f"*{name}"], 0, 0, 0, 1, 0, 0, 0)
+            ),
         )
         for name in names
     ]

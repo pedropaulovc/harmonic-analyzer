@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 from pathlib import Path
 import shutil
 import sys
@@ -158,6 +159,9 @@ def native_views(adapter, source, configuration, source_model):
         handles[name] = view
         rows[name] = {
             "orientation": str(view.GetOrientationName()),
+            "rotation": rotation_values(
+                _early_bound(view.ModelToViewTransform, "IMathTransform").ArrayData[:9]
+            ),
             "source": reference,
             "configuration": current_configuration,
             "source_identity": source_identity,
@@ -165,13 +169,47 @@ def native_views(adapter, source, configuration, source_model):
     return handles, rows
 
 
-def orientation_view(handles, rows, orientation):
+def rotation_values(raw):
+    values = tuple(float(value) for value in raw)
+    if len(values) != 9 or not all(math.isfinite(value) for value in values):
+        raise RuntimeError("native view rotation must contain nine finite values")
+    axes = (values[:3], values[3:6], values[6:9])
+    for i, first in enumerate(axes):
+        for j, second in enumerate(axes):
+            if not math.isclose(
+                sum(a * b for a, b in zip(first, second)), float(i == j), abs_tol=1e-9
+            ):
+                raise RuntimeError("native view rotation is not orthonormal")
+    return values
+
+
+def orientation_view(handles, rows, orientation, standard_rotations):
     if orientation not in ("*Front", "*Top", "*Right"):
         raise ValueError(
             f"unsupported native orthographic orientation: {orientation!r}"
         )
+    front = [name for name, row in rows.items() if row["orientation"] == "*Front"]
+    if len(front) != 1:
+        raise RuntimeError(f"native *Front orientation is not unique: {rows}")
+
+    def matches(actual, expected):
+        return all(
+            math.isclose(a, b, rel_tol=0, abs_tol=1e-9)
+            for a, b in zip(
+                rotation_values(actual), rotation_values(expected), strict=True
+            )
+        )
+
+    # Positive control for the matrix convention before selecting any projected
+    # view. GetOrientationName is documented empty for projected views.
+    if not matches(rows[front[0]]["rotation"], standard_rotations["*Front"]):
+        raise RuntimeError(
+            "named Front view does not match the source standard Front rotation"
+        )
     candidates = [
-        name for name, row in rows.items() if row["orientation"] == orientation
+        name
+        for name, row in rows.items()
+        if matches(row["rotation"], standard_rotations[orientation])
     ]
     if len(candidates) != 1:
         raise RuntimeError(f"native {orientation} orientation is not unique: {rows}")
@@ -364,6 +402,10 @@ async def probe(
         adapter.ownership.assert_current_owned()
         source_model = _early_bound(adapter.currentModel, "IModelDoc2")
         source_before, source_handles = source_witness(source_model, "source_before")
+        report["standard_rotations"] = {
+            name: rotation_values(source_model.GetStandardViewRotation(view_id))
+            for name, view_id in (("*Front", 1), ("*Right", 4), ("*Top", 5))
+        }  # swStandardViews_e; read-only source API.
         configuration = source_before["dimensions"]["configuration"]
         with adapter.ownership.creating_document(DocumentKind.DRAWING, native):
             native_drawing.new_drawing(adapter, template=str(template))
@@ -381,7 +423,9 @@ async def probe(
             raise RuntimeError(
                 "fresh native views already contain PMI; import baseline is not empty"
             )
-        view = orientation_view(view_handles, before["views"], orientation)
+        view = orientation_view(
+            view_handles, before["views"], orientation, report["standard_rotations"]
+        )
         selected_name = str(view.GetName2())
         report["selected_view"] = selected_name
         imported = selected_imports(adapter, view, report["imports"], checkpoint)
