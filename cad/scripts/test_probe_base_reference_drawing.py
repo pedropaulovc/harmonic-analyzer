@@ -3,6 +3,7 @@
 import asyncio
 import importlib
 import json
+from pathlib import Path
 from types import SimpleNamespace as NS
 from unittest.mock import AsyncMock, Mock
 
@@ -41,10 +42,20 @@ def section_reference(path, mode):
     ],
 )
 @pytest.mark.parametrize("mode", ["section", "missing", "cycle"])
+@pytest.mark.parametrize("temporary_path", ["direct", "parent_alias"])
 def test_actual_worker_resolves_base_source_or_names_failure_before_mutation(
-    monkeypatch, tmp_path, name, mode
+    monkeypatch, tmp_path, name, mode, temporary_path
 ):
     module = importlib.import_module(name)
+    original_mkdtemp = module.tempfile.mkdtemp
+
+    def temporary_directory(**kwargs):
+        path = Path(original_mkdtemp(**kwargs))
+        if temporary_path == "parent_alias":
+            return str(path / ".." / path.name)
+        return str(path)
+
+    monkeypatch.setattr(module.tempfile, "mkdtemp", temporary_directory)
     source, part = tmp_path / "cone-gear.SLDDRW", tmp_path / "cone-gear.SLDPRT"
     source.write_bytes(b"source drawing")
     part.write_bytes(b"source part")

@@ -1,10 +1,39 @@
 """The datum Z diagnostic changes one argument and never trusts a True alone."""
 
 from dataclasses import replace
+from unittest.mock import Mock
 import pytest
 
 from diagnostics import probe_datum_sheet_z as probe
 from test_native_callouts_drawing import native_setup
+
+
+@pytest.mark.parametrize("route", ["parent", "worker"])
+@pytest.mark.parametrize("duplicate", ["exact", "same_stem"])
+def test_duplicate_trial_names_stop_before_native_dispatch(
+    monkeypatch, tmp_path, route, duplicate
+):
+    first = tmp_path / "cone-gear.SLDDRW"
+    first.write_bytes(b"first")
+    second = first
+    if duplicate == "same_stem":
+        second = tmp_path / "other" / first.name
+        second.parent.mkdir()
+        second.write_bytes(b"second")
+    boundary = Mock(side_effect=AssertionError("must reject before native dispatch"))
+    monkeypatch.setattr(probe, "require_owned_diagnostic_environment", boundary)
+    monkeypatch.setattr(probe, "run_copy_diagnostic", boundary)
+    monkeypatch.setattr(probe, "ROOT", tmp_path)
+    monkeypatch.setenv("HARMONIC_COM_SEAT", "offline")
+    monkeypatch.setattr(
+        probe.sys, "argv",
+        ["probe", str(first), str(second)] + (["--worker"] if route == "worker" else []),
+    )
+    with pytest.raises(ValueError, match="each drawing stem.*only once"):
+        probe.main()
+    boundary.assert_not_called()
+    assert first.read_bytes() == b"first"
+    assert not (tmp_path / "cad/out").exists()
 
 
 def setup(monkeypatch):

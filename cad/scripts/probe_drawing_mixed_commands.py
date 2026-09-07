@@ -201,7 +201,7 @@ def main() -> int:
     async def probe(adapter: Any) -> dict[str, str]:
         root = CAD_ROOT / "out/reports"
         root.mkdir(parents=True, exist_ok=True)
-        folder = Path(tempfile.mkdtemp(prefix="mixed-commands-", dir=root))
+        folder = Path(tempfile.mkdtemp(prefix="mixed-commands-", dir=root)).resolve()
         adapter.ownership.register_directory(folder)
         adapter.ownership.register_source(source)
         copy = folder / f"{folder.name}-{source.name}"

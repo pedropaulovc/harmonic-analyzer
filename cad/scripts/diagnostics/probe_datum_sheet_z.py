@@ -320,6 +320,8 @@ def main():
         raise ValueError(
             "this control accepts saved cone-gear and rocker-arm drawings only"
         )
+    if len({path.stem for path in sources}) != len(sources):
+        raise ValueError("each drawing stem may be measured only once per invocation")
     if not args.worker:
         require_owned_diagnostic_environment()
         sys.path.insert(0, str(ROOT))

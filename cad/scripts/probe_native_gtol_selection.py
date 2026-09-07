@@ -91,7 +91,7 @@ def main() -> int:
     async def probe(adapter: Any) -> dict[str, str]:
         report_root = CAD_ROOT / "out/reports"
         report_root.mkdir(parents=True, exist_ok=True)
-        folder = Path(tempfile.mkdtemp(prefix="native-gtol-selection-", dir=report_root))
+        folder = Path(tempfile.mkdtemp(prefix="native-gtol-selection-", dir=report_root)).resolve()
         adapter.ownership.register_directory(folder)
         adapter.ownership.register_source(source)
         copy = folder / f"probe-{folder.name}-{source.name}"
