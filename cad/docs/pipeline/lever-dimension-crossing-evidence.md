@@ -189,3 +189,54 @@ This result is limited to one radial bank on the already-packed retained sheet.
 It does not establish that native dimension arrangement is generally inert.
 The next meaningful change is less crowded view ownership and an earlier
 dimension-layout phase, not repeated calls against this unchanged scene.
+
+## Five-view recipe candidate (native acceptance pending)
+
+The next isolated recipe candidate splits the ten front-view dimensions into
+two five-dimension banks at the existing 1:2 scale. It creates one additional
+standard `*Front` view with the already-used `CreateDrawViewFromModelView3`
+path; no crop sketch, detail-circle picker or coordinate-search loop is added.
+
+| view | retained manufacturing content |
+| --- | --- |
+| profile Front | BASIC R4.75, R3, 169, 182.8 and 9.5; outer-profile GTol |
+| hole-pattern Front | diameter 6.50, both native hole callouts, BASIC 127/177.8; datum B; bore perpendicularity and both hole-position GTols |
+| Top | thickness 3.0; datum C on the same exact top-front model edge |
+| Right | datum A on the same exact broad-face entity; opposite-face parallelism |
+| isometric | unchanged 1:4 view and property-linked caption |
+
+The source part, four source BASIC designations, all reference-dimension values,
+all three datum identities and all five GTol contents/attachments remain the
+contract. View ownership changes deliberately: diameter and profile-radius
+leaders no longer share one Front, and the Top thickness dimension no longer
+shares its view with datum A. The original manufacturing/property-linked notes
+remain. This does not yet prove native datum placement in the changed views,
+printed clarity, or five-view sheet fit.
+
+The recipe requests **one** native AutoArrange pass after all dimensions and
+hole callouts, before datums/GTols, with `spacing_m=0.003`. The documented
+`AlignDimensions` spacing parameter specifies metres between dimensions. The
+previous 1 mm request left 6 mm text-anchor steps with measured BASIC bodies
+intersecting adjacent extension lines. A larger native request is a hypothesis,
+not a promise of exact pitch or obstacle avoidance. No annotation position retry
+or leader-routing algorithm is introduced.
+
+The original all-view dimension-stroke/foreign-body checker is now shared with
+the retained diagnostic. The lever alone opts into it through an additional
+final validation callback. The mandatory GTol gate runs unconditionally first;
+both consume the **same fresh final packing measurements**, with no additional
+COM scan. Dimensions, datums, GTols, notes and surface-finish bodies retain the
+original crossing rules, including touching and native leader decorations.
+Center marks retain the original geometry-adornment exclusion; no new datum or
+dimension exception is added. Any crossing prevents production export.
+
+Run this candidate only through the existing owned
+`diagnostics/probe_datum_policy_recipes.py --target channel_lever --candidate <revision>`
+control after an explicit seat grant, with the exact current source and protected
+guard roots. The runtime must contain the matching shared-helper changes.
+Acceptance requires the full source/attachment/dimension/BASIC witnesses,
+successful native construction, the strict final crossing gate, saved/cold
+reopen checks and an eye pass over the changed PNG. Do not infer native movement
+from AutoArrange's return value or call the redesign faster before measuring
+the complete recipe. Five-view construction and measured fit may cost more;
+this candidate targets the concrete remaining readability defect.

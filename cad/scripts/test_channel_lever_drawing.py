@@ -23,7 +23,9 @@ def test_required_drawing_paths() -> None:
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert lever.DRAWING_DIMENSIONS is channel_lever_spec.DRAWING_DIMENSIONS
     marked = set().union(*channel_lever_spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) | set(drawing.TOP_KEEP)
+    kept = set().union(
+        drawing.FRONT_KEEP, drawing.HOLES_KEEP, drawing.RIGHT_KEEP, drawing.TOP_KEEP
+    )
     assert kept == marked
     assert "TipCentreX" in marked
 
@@ -55,34 +57,38 @@ def test_all_orthographic_views_and_final_sheet_share_declared_scale() -> None:
         for node in ast.walk(tree)
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
     ]
-    views = {
-        ast.literal_eval(call.args[2]): call
-        for call in calls
-        if call.func.id == "place_view"
-    }
-    assert set(views) == {"*Front", "*Right", "*Top", "*Isometric"}
+    views = [call for call in calls if call.func.id == "place_view"]
+    assert [ast.literal_eval(call.args[2]) for call in views] == [
+        "*Front",
+        "*Front",
+        "*Right",
+        "*Top",
+        "*Isometric",
+    ]
     sheet_calls = [
         call
         for call in calls
         if call.func.id in {"new_project_drawing", "finalize_drawing"}
     ]
     assert len(sheet_calls) == 2
-    for call in [views["*Front"], views["*Right"], views["*Top"], *sheet_calls]:
+    for call in [*views[:4], *sheet_calls]:
         scale = next(
             keyword.value for keyword in call.keywords if keyword.arg == "scale"
         )
         assert isinstance(scale, ast.Name) and scale.id == "SHEET_SCALE"
     iso_scale = next(
-        keyword.value
-        for keyword in views["*Isometric"].keywords
-        if keyword.arg == "scale"
+        keyword.value for keyword in views[-1].keywords if keyword.arg == "scale"
     )
     assert ast.literal_eval(iso_scale) == (1, 4)
 
 
 @pytest.mark.parametrize(
     "projection,center",
-    [(drawing._sheet_xy, drawing.FRONT_CENTER), (drawing._top_xy, drawing.TOP_CENTER)],
+    [
+        (drawing._sheet_xy, drawing.FRONT_CENTER),
+        (drawing._top_xy, drawing.TOP_CENTER),
+        (drawing._holes_xy, drawing.HOLES_CENTER),
+    ],
 )
 def test_half_scale_text_projection_uses_model_mm_and_view_center(projection, center):
     assert projection(drawing._BBOX_CX, 0.0) == pytest.approx(center)
@@ -93,7 +99,11 @@ def test_half_scale_text_projection_uses_model_mm_and_view_center(projection, ce
 
 @pytest.mark.parametrize(
     "projection,center",
-    [(drawing._sheet_xy, drawing.FRONT_CENTER), (drawing._top_xy, drawing.TOP_CENTER)],
+    [
+        (drawing._sheet_xy, drawing.FRONT_CENTER),
+        (drawing._top_xy, drawing.TOP_CENTER),
+        (drawing._holes_xy, drawing.HOLES_CENTER),
+    ],
 )
 def test_text_projection_derives_both_axes_from_declared_scale(
     monkeypatch, projection, center
