@@ -3,7 +3,7 @@
 Create a project-template drawing with one Front view of an exact, uniquely
 named owned rocker-part bytecopy. Call the production finalizer unchanged.
 Diagnostic wrappers observe the late property and native/PDF save boundaries;
-the explicit candidate adds a redraw, one checked EditRebuild3, or reapplication
+the explicit candidate adds a redraw, one checked ordinary/forced rebuild, or reapplication
 of the title's existing horizontal justification plus its documented redraw,
 immediately before native SaveAs3. No position writes, geometry picks, other
 added rebuilds, default changes, or full recipe.
@@ -15,7 +15,7 @@ pixels in this fresh baseline. A non-reproduction is inconclusive, not success.
 Originals, template and owned source-copy bytes remain exact; full native title
 and annotation deltas are evidence, never normalized into an equality pass.
 
-API references: ISheet.CustomPropertyView, IModelDoc2.GraphicsRedraw2/EditRebuild3,
+API references: ISheet.CustomPropertyView, IModelDoc2.GraphicsRedraw2/EditRebuild3/ForceRebuild3,
 official Redraw_Graphics_Example_VB/Rebuild_Example_VB; INote.GetText/PropertyLinkedText/GetExtent/
 GetTextJustification/GetTextVerticalJustification/LockPosition. GraphicsRedraw2
 is obsolete but documented and already used by this project. This tests its
@@ -62,6 +62,7 @@ class Variant(StrEnum):
     BASELINE = "baseline"
     REDRAW = "pre_save_redraw"
     EDIT_REBUILD = "pre_save_edit_rebuild"
+    FORCE_REBUILD = "pre_save_force_rebuild"
     REJUSTIFY = "pre_save_rejustify"
 
 
@@ -178,6 +179,7 @@ class TitleObserver:
             in {
                 "before_native_save",
                 "after_pre_save_edit_rebuild",
+                "after_pre_save_force_rebuild",
                 "after_pre_save_rejustify",
                 "after_pre_save_rejustify_redraw",
                 "after_native_save",
@@ -211,7 +213,7 @@ def finalizer_observations(adapter, observer, variant):
     )
     counts = {
         "properties": 0, "drawing": 0, "pdf": 0,
-        "redraw": 0, "edit_rebuild": 0, "justification": 0,
+        "redraw": 0, "edit_rebuild": 0, "force_rebuild": 0, "justification": 0,
     }
 
     def properties(current, values):
@@ -257,6 +259,16 @@ def finalizer_observations(adapter, observer, variant):
                             f"pre-save EditRebuild3 did not return True: {returned!r}"
                         )
                 observer.record("after_pre_save_edit_rebuild")
+            if kind == "drawing" and variant is Variant.FORCE_REBUILD:
+                counts["force_rebuild"] += 1
+                with _telemetry.span("diagnostic.fresh_title.force_rebuild") as span:
+                    returned = current.currentModel.ForceRebuild3(False)
+                    span.set_attribute("native_return", repr(returned))
+                    if returned is not True:
+                        raise RuntimeError(
+                            f"pre-save ForceRebuild3 did not return True: {returned!r}"
+                        )
+                observer.record("after_pre_save_force_rebuild")
             if kind == "drawing" and variant is Variant.REJUSTIFY:
                 note = _early_bound(observer.annotation.GetSpecificAnnotation(), "INote")
                 justification = int(note.GetTextJustification())
@@ -286,6 +298,7 @@ def finalizer_observations(adapter, observer, variant):
             "pdf": 1,
             "redraw": int(variant in (Variant.REDRAW, Variant.REJUSTIFY)),
             "edit_rebuild": int(variant is Variant.EDIT_REBUILD),
+            "force_rebuild": int(variant is Variant.FORCE_REBUILD),
             "justification": int(variant is Variant.REJUSTIFY),
         }
         if counts != expected:
@@ -630,7 +643,7 @@ def main(argv=None):
     parser.add_argument(
         "--candidate",
         type=Variant,
-        choices=(Variant.REDRAW, Variant.EDIT_REBUILD, Variant.REJUSTIFY),
+        choices=(Variant.REDRAW, Variant.EDIT_REBUILD, Variant.FORCE_REBUILD, Variant.REJUSTIFY),
         required=True,
     )
     parser.add_argument("--worker", action="store_true")
