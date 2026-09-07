@@ -5,7 +5,7 @@ import _drawing_sheet_setup as sheet_setup
 import asyncio
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
@@ -24,7 +24,7 @@ def monitor(tmp_path, monkeypatch):
     )
     snapshots = []
 
-    def snapshot(*_):
+    def snapshot(*_, **_kwargs):
         snapshots.append(model.dirty)
         return {"dimensions": {"Width": {"value": 0.024, "basic": 1}}}, {"Width": model}
 
@@ -71,7 +71,7 @@ def test_failed_transition_readback_still_cannot_be_swallowed_by_attempt(
     guard.baseline()
     later = Mock()
 
-    def broken_readback(*_):
+    def broken_readback(*_, **_kwargs):
         raise RuntimeError("readback failed")
 
     monkeypatch.setattr(probe, "dimension_snapshot", broken_readback)
@@ -95,7 +95,7 @@ def test_baseline_readback_that_dirties_copy_is_not_blame_on_recipe(
 ):
     guard, model, _ = monitor(tmp_path, monkeypatch)
 
-    def snapshot(*_):
+    def snapshot(*_, **_kwargs):
         model.dirty = True
         return {}, {}
 
@@ -176,11 +176,13 @@ def test_outer_environment_is_checked_before_parent_dodo(monkeypatch, tmp_path):
 @pytest.mark.parametrize(
     "mode", ["dirty", "clean", "snapshot_failure", "source_disk_change"]
 )
+@pytest.mark.parametrize("target", tuple(probe.Target))
 def test_real_owned_copy_cleanup_preserves_baseline_and_never_saves(
     native,  # noqa: F811 - imported pytest fixture
     tmp_path,
     monkeypatch,
     mode,
+    target,
 ):
     import json
     import _drawing_common as common
@@ -193,10 +195,25 @@ def test_real_owned_copy_cleanup_preserves_baseline_and_never_saves(
     monkeypatch.setattr(probe, "helper_fingerprints", lambda: {"helper": "same"})
     monkeypatch.setattr(probe, "adapter_fingerprints", lambda: {"package": "same"})
 
-    def snapshot(app, model, path):
+    def snapshot(app, model, path, *, target):
         if mode == "snapshot_failure" and model.dirty:
             raise RuntimeError("native dimension readback failed")
-        return {"dimensions": {"Width": {"native": "same"}}}, {"Width": model}
+        name = "BodyDiaDim" if target is probe.Target.CONE_TIP_ADJUSTER else "Width"
+        return {
+            "dimensions": {
+                name: {
+                    "native": "same",
+                    "displays": [
+                        {
+                            "text": {
+                                "1": "(<MOD-DIAM>" if model.dirty else "",
+                                "2": ")" if model.dirty else "",
+                            }
+                        }
+                    ],
+                }
+            }
+        }, {name: model}
 
     monkeypatch.setattr(probe, "dimension_snapshot", snapshot)
     touched = []
@@ -221,7 +238,12 @@ def test_real_owned_copy_cleanup_preserves_baseline_and_never_saves(
             native.source.write_bytes(b"corrupted original fixture")
 
     monkeypatch.setattr(sheet_setup, "new_project_drawing", blank)
-    monkeypatch.setattr(common, "set_dimension_callouts", callouts)
+    callout_name = (
+        "set_reference_dimensions"
+        if target is probe.Target.CONE_TIP_ADJUSTER
+        else "set_dimension_callouts"
+    )
+    monkeypatch.setattr(common, callout_name, callouts)
     monkeypatch.setattr(common, "read_required_properties", place)
     code = """from pathlib import Path
 from _drawing_build import TemplateSpec
@@ -236,14 +258,16 @@ async def build(adapter, *, drawing_factory):
     set_dimension_callouts(adapter, str(SOURCE))
     return await finalize_drawing(adapter, OUTPUTS)
 """
-    monkeypatch.setattr(probe.benchmark, "recipe_source", lambda *_: code)
+    code = code.replace("set_dimension_callouts", callout_name)
+    recipe_source = Mock(return_value=code)
+    monkeypatch.setattr(probe.benchmark, "recipe_source", recipe_source)
     reports = tmp_path / "reports"
 
     async def run():
         return await owned.owned_callback(
             native.adapter,
             lambda adapter: probe.probe(
-                adapter, native.source, original_hash, "pinned", reports
+                adapter, native.source, original_hash, "pinned", reports, target=target
             ),
         )
 
@@ -264,6 +288,13 @@ async def build(adapter, *, drawing_factory):
         asyncio.run(run())
     (receipt,) = reports.glob("*/source-dirty.json")
     report = json.loads(receipt.read_text())
+    recipe_source.assert_called_once_with("pinned", target.value)
+    assert report["target"] == target.value
+    assert report["source_spec"] == probe.TARGETS[target].spec.__name__
+    assert len(report["required_dimensions"]) == 5
+    assert Path(report["copy"]).name.startswith(
+        probe.TARGETS[target].copy_prefix + "-source-dirty-"
+    )
     assert native.app.documents == [baseline]
     assert (
         baseline.dirty and baseline.Visible and baseline.GetTitle() == "Draw2 - Sheet1"
@@ -281,7 +312,13 @@ async def build(adapter, *, drawing_factory):
         return
     assert report["original_after"] == original_hash
     if mode == "dirty":
-        assert report["stop"]["boundary"] == "recipe.set_dimension_callouts"
+        assert report["stop"]["boundary"] == f"recipe.{callout_name}"
+        name = "BodyDiaDim" if target is probe.Target.CONE_TIP_ADJUSTER else "Width"
+        assert report["stop"]["changed_since_initial_snapshot"] == [name]
+        assert report["stop"]["dimension_identity"] == {name: "same"}
+        assert report["stop"]["snapshot"]["dimensions"][name]["displays"][0][
+            "text"
+        ] == {"1": "(<MOD-DIAM>", "2": ")"}
 
 
 @pytest.mark.parametrize(
@@ -305,7 +342,11 @@ def test_complete_observed_dimension_inventory_includes_unmarked_and_chamfer_val
     monkeypatch.setattr(
         source_snapshot, "_read_member", lambda value, name: getattr(value, name)()
     )
-    monkeypatch.setattr(probe, "DRAWING_DIMENSIONS", {"FootProfile": {"Width"}})
+    monkeypatch.setattr(
+        probe.TARGETS[probe.Target.ARBOR_PEDESTAL].spec,
+        "DRAWING_DIMENSIONS",
+        {"FootProfile": {"Width"}},
+    )
     path = tmp_path / "owned-part.SLDPRT"
 
     def dimension(name):
@@ -398,3 +439,113 @@ def test_operation_error_that_dirties_part_records_error_and_aborts(
         guard.wrap("recipe.failed_callout", operation)()
     assert guard.report["stop"]["phase"] == "after_error"
     assert "native operation failed" in guard.report["stop"]["operation_error"]
+
+
+def test_explicit_tip_target_selects_exact_spec_before_native_reads(monkeypatch):
+    import cone_tip_adjuster_spec
+
+    captured = Mock(return_value=({"dimensions": {}}, {}))
+    monkeypatch.setattr(probe, "_source_snapshot", captured)
+    app, model, path = object(), object(), Path("owned.SLDPRT")
+    probe.dimension_snapshot(app, model, path, target=probe.Target.CONE_TIP_ADJUSTER)
+    captured.assert_called_once_with(
+        app, model, path, required=cone_tip_adjuster_spec.DRAWING_DIMENSIONS
+    )
+    assert sum(map(len, cone_tip_adjuster_spec.DRAWING_DIMENSIONS.values())) == 5
+
+
+def test_unknown_target_refuses_before_output_or_native(monkeypatch, tmp_path):
+    with pytest.raises(ValueError, match="target"):
+        asyncio.run(
+            probe.probe(
+                object(),
+                tmp_path / "source",
+                "a" * 64,
+                "pinned",
+                tmp_path / "reports",
+                target="unreviewed",
+            )
+        )
+    assert not (tmp_path / "reports").exists()
+
+
+@pytest.mark.parametrize("selection", [None, "arbor_pedestal", "cone_tip_adjuster"])
+def test_cli_target_and_exact_candidate_forward_to_locked_worker(
+    monkeypatch, tmp_path, selection
+):
+    import dodo
+
+    source = tmp_path / "source.SLDPRT"
+    source.write_bytes(b"source")
+    monkeypatch.setattr(probe, "require_owned_diagnostic_environment", lambda: None)
+    monkeypatch.setattr(probe.benchmark, "revision", lambda ref: "f" * 40)
+    run = Mock()
+    monkeypatch.setattr(dodo, "_run", run)
+    arguments = [
+        "--source",
+        str(source),
+        "--expected-sha256",
+        probe.file_digest(source),
+        "--candidate",
+        "reviewed",
+    ]
+    if selection:
+        arguments += ["--target", selection]
+    assert probe.main(arguments) == 0
+    command = run.call_args.args[0]
+    assert command[command.index("--target") + 1] == (selection or "arbor_pedestal")
+    assert command[command.index("--candidate") + 1] == "f" * 40
+    assert run.call_args.kwargs["com"] is True
+    assert command[-1] == "--worker"
+
+
+def test_tip_worker_forwards_the_same_registered_target(monkeypatch, tmp_path):
+    source = tmp_path / "source.SLDPRT"
+    source.write_bytes(b"source")
+    monkeypatch.setattr(probe, "require_owned_diagnostic_environment", lambda: None)
+    monkeypatch.setattr(probe.benchmark, "revision", lambda _: "f" * 40)
+    operation = AsyncMock(return_value={"report": "owned"})
+    monkeypatch.setattr(probe, "probe", operation)
+    adapter = object()
+    monkeypatch.setattr(
+        probe, "run_copy_diagnostic", lambda callback: asyncio.run(callback(adapter))
+    )
+    report_root = tmp_path / "reports"
+    probe.main(
+        [
+            "--worker",
+            "--target",
+            "cone_tip_adjuster",
+            "--source",
+            str(source),
+            "--expected-sha256",
+            probe.file_digest(source),
+            "--report-root",
+            str(report_root),
+        ]
+    )
+    operation.assert_awaited_once_with(
+        adapter,
+        source.resolve(),
+        probe.file_digest(source),
+        "f" * 40,
+        report_root.resolve(),
+        target=probe.Target.CONE_TIP_ADJUSTER,
+    )
+
+
+def test_unregistered_cli_target_stops_before_environment_and_runner(monkeypatch):
+    environment = Mock()
+    monkeypatch.setattr(probe, "require_owned_diagnostic_environment", environment)
+    with pytest.raises(SystemExit):
+        probe.main(
+            [
+                "--target",
+                "unreviewed",
+                "--source",
+                "missing.SLDPRT",
+                "--expected-sha256",
+                "a" * 64,
+            ]
+        )
+    environment.assert_not_called()
