@@ -544,9 +544,14 @@ async def pilot(
     *,
     targets=None,
     setup_controller=None,
+    linear_control=None,
 ):
     order = target_order(targets)
     protected_targets = tuple(dict.fromkeys((*ORDER, *order)))
+    if linear_control is not None:
+        from diagnostics._linear_dimension_arrangement import require_targets
+
+        require_targets(linear_control.variant, order)
     output_root.mkdir(parents=True, exist_ok=True)
     directory = Path(tempfile.mkdtemp(prefix="datum-policy-", dir=output_root))
     adapter.ownership.register_directory(directory)
@@ -648,6 +653,16 @@ async def pilot(
             trial["recipe_sha256"] = attachments.file_digest(
                 trial_dir / "recipe-source.py"
             )
+            build_kwargs = {}
+            if linear_control is not None:
+                build_kwargs = linear_control.bind(
+                    adapter,
+                    module,
+                    trial,
+                    checkpoint,
+                    lambda: source_dimensions(source_model, target, copy_source),
+                    source_model,
+                )
             started = time.perf_counter()
             try:
                 with _telemetry.span("diagnostic.datum_policy.recipe", target=target):
@@ -659,9 +674,11 @@ async def pilot(
                             if entity_acceptance is not None
                             else nullcontext()
                         ):
-                            artifacts = await module.build(adapter)
+                            artifacts = await module.build(adapter, **build_kwargs)
                 if setup_controller is not None:
                     setup_controller.require_used()
+                if linear_control is not None:
+                    linear_control.require_used()
             finally:
                 trial["recipe_seconds"] = time.perf_counter() - started
                 checkpoint()
@@ -868,6 +885,11 @@ async def pilot(
 
 
 def main(argv=None):
+    from diagnostics._linear_dimension_arrangement import (
+        LinearArrangement,
+        ParallelLinearControl,
+        require_targets,
+    )
     from diagnostics._recipe_template_factory import (
         DrawingFactory,
         RecipeTemplateFactory,
@@ -892,8 +914,15 @@ def main(argv=None):
         help="repeat to choose recipe order; default: rocker_arm then channel_lever",
     )
     parser.add_argument("--worker", action="store_true")
+    parser.add_argument(
+        "--linear-dimensions",
+        type=LinearArrangement,
+        choices=tuple(LinearArrangement),
+        help="diagnostic only: exact channel_lever linear pairs before original layout",
+    )
     args = parser.parse_args(argv)
     order = target_order(args.target)
+    require_targets(args.linear_dimensions, order)
     require_owned_diagnostic_environment()  # before dodo._run in the parent
     if args.factory is not None:
         require_factory_environment()
@@ -923,6 +952,11 @@ def main(argv=None):
                     else []
                 ),
                 *(argument for target in order for argument in ("--target", target)),
+                *(
+                    ["--linear-dimensions", args.linear_dimensions.value]
+                    if args.linear_dimensions is not None
+                    else []
+                ),
                 "--worker",
             ],
             "combined datum-policy functional pilot",
@@ -941,6 +975,11 @@ def main(argv=None):
             **(
                 {"setup_controller": RecipeTemplateFactory(args.factory)}
                 if args.factory is not None
+                else {}
+            ),
+            **(
+                {"linear_control": ParallelLinearControl(args.linear_dimensions)}
+                if args.linear_dimensions is not None
                 else {}
             ),
         )
