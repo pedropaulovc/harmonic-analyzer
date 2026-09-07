@@ -20,6 +20,72 @@ def test_bad_native_references_rejected(raw):
         control._byte_reference(raw)
 
 
+@pytest.mark.parametrize("buffer", [bytes(range(20)), bytearray(range(20))])
+def test_native_unsigned_byte_memoryview_references_are_decoded_without_unwrapping(buffer):
+    raw = memoryview(buffer)
+    assert raw.format == "B" and raw.ndim == 1 and raw.itemsize == 1 and raw.contiguous
+    assert control._byte_reference(raw) == tuple(range(20))
+
+
+def released_memoryview():
+    raw = memoryview(b"abc")
+    raw.release()
+    return raw
+
+
+@pytest.mark.parametrize("make", [
+    lambda: memoryview(b""),
+    lambda: memoryview(b"abcd").cast("B", shape=(2, 2)),
+    lambda: memoryview(b"a").cast("B", shape=()),
+    lambda: memoryview(control.array("I", [1, 2])),
+    lambda: memoryview(control.array("b", [1, 2])),
+    lambda: memoryview(b"ab").cast("c"),
+    lambda: memoryview(b"abcd")[::2],
+    released_memoryview,
+])
+def test_malformed_memoryview_reference_rejected(make):
+    with pytest.raises(RuntimeError, match="native persistent reference"):
+        control._byte_reference(make())
+
+
+def test_released_memoryview_retains_raw_type_and_observation_error():
+    records = {}
+    control.persistent_controls(NS(GetPersistReference3=lambda _: released_memoryview()),
+                                {"expected": object()}, records)
+    assert records["raw_returns"]["expected"]["type"] == "builtins.memoryview"
+    assert "observation_error" in records["raw_returns"]["expected"]
+    assert "native persistent reference" in records["expected"]["error"]
+    assert records["compare.expected.expected"] == {"status": "missing_reference"}
+
+
+def test_owned_hook_and_both_contexts_use_native_memoryview_references(owned_scene):
+    scene = owned_scene
+    feature = NS(Name="Hook", GetTypeName2=lambda: "Sweep")
+    scene.source.FeatureByName = Mock(return_value=feature)
+    for model in (scene.drawing, scene.source):
+        original = model.Extension.GetPersistReference3
+        model.Extension.GetPersistReference3 = (
+            lambda entity, read=original: memoryview(bytes(range(20)))
+            if entity is feature else memoryview(bytes(read(entity)))
+        )
+    resolver = scene.source.Extension.GetObjectByPersistReference3 = Mock(return_value=(feature, 0))
+    evidence = {}
+    control.capture(scene.adapter, scene.bank.view, scene.expected, scene.selected, evidence)
+    rows = evidence["persistent_identity_control"]
+    for scope in ("drawing", "source"):
+        assert rows[scope]["expected"] == {"value": (11, 22)}
+        assert rows[scope]["compare.expected.selected"] == {"value": 1}
+        assert rows[scope]["raw_returns"]["expected"] == {
+            "type": "builtins.memoryview", "value": [11, 22],
+            "element_types": ["builtins.int", "builtins.int"], "format": "B", "shape": [2],
+        }
+    assert rows["source_feature_control"]["status"] == "passed"
+    assert rows["source_feature_control"]["reference"] == tuple(range(20))
+    resolver.assert_called_once_with(tuple(range(20)))
+    assert scene.adapter.currentModel is scene.native.app.ActiveDoc is scene.drawing
+    assert_owned_cleanup(scene)
+
+
 def test_literal_byte_references_and_native_comparisons(monkeypatch):
     monkeypatch.setattr(control, "_variant", lambda value: value)
     calls = []
@@ -102,7 +168,7 @@ def test_fake_variant_attributes_are_not_treated_as_native_variant():
 
 
 @pytest.mark.parametrize("raw", [float("nan"), float("inf"), memoryview(b"abc"), {"nested": (True, 1.5, None)}])
-def test_invalid_reference_shapes_remain_complete_json_safe_observations(raw):
+def test_reference_shapes_remain_complete_json_safe_observations(raw):
     observed = control._raw_return(raw)
     assert observed["type"] == f"{type(raw).__module__}.{type(raw).__qualname__}"
     json.dumps(observed, allow_nan=False)
