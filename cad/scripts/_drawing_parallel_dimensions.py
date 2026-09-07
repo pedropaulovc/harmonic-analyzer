@@ -43,6 +43,14 @@ PAIRS = {
     "front": (("BarLength", TAB_START_X / 1000), ("TipCentreX", TIP_ARC_CX / 1000)),
     "holes": (("RD1", BAR_PIN_X / 1000), ("RD2", LEVER_SPRING_X / 1000)),
 }
+# Native xqvch22r before/after/build/cold: swSelectType_e 11=SKETCHPOINT,
+# 25=EXTSKETCHPOINT, 1=EDGE. Ordered per dimension, not per view/source class.
+ATTACHMENT_TYPES = {
+    "BarLength": (11, 11),
+    "TipCentreX": (25, 11),
+    "RD1": (1, 1),
+    "RD2": (1, 1),
+}
 NOMINAL_LINEAR_TOLERANCE_M = 1e-9  # Design recognition only; mutation checks exact.
 PAPER_CLEARANCE_M = 0.001
 GEOMETRY_EPS_M = 1e-10  # Axis/connectivity and final floating-point subtraction only.
@@ -342,10 +350,12 @@ def _capture(
         or len(entities) != count
         or len(kinds) != count
         or any(entity is None for entity in entities)
-        or kinds != ((11, 11) if label == "front" else (1, 1))
+        or kinds != ATTACHMENT_TYPES[name]
     ):
         raise RuntimeError(
-            f"parallel dimension has an incomplete/unrecognized attachment inventory: {name}"
+            f"parallel dimension has an incomplete/unrecognized attachment inventory: "
+            f"{name}; count={count}, entities={len(entities)}, "
+            f"types={kinds}, expected={ATTACHMENT_TYPES[name]}"
         )
     measured = annotation_box(adapter, annotation)
     if measured.name != name or measured.kind != 4:
