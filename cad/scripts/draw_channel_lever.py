@@ -26,7 +26,7 @@ from typing import Any, Callable
 from channel_lever_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
-from _common import CAD_ROOT, check
+from _common import CAD_ROOT, _early_bound, check
 from _drawing_build import ProjectDrawingFactory, TemplateSpec, run_drawing_build
 from _basic_dimensions import require_basic_dimension
 from _drawing_project_layout import DatumLeaderPolicy, repair_project_drawing_layout
@@ -446,6 +446,11 @@ async def build(
     # The measured lever calibration is limited to these scale-0.5 view classes.
     if profile_linear.keys() != {"BarLength", "TipCentreX"}:
         raise RuntimeError("missing exact profile BASIC pair")
+    # AddDimension2 returns a raw dispatch. Bind its method before calling it;
+    # late binding can evaluate GetAnnotation then invoke the returned object's
+    # nonexistent default member (native receipt datum-policy-gyx30dw5).
+    bar_pin_c2c = _early_bound(bar_pin_c2c, "IDisplayDimension")
+    spring_c2c = _early_bound(spring_c2c, "IDisplayDimension")
     align_channel_lever_basic_pairs(
         adapter,
         front=front,
