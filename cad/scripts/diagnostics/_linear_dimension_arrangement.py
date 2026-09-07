@@ -10,7 +10,7 @@ reference2 pairs at view scale 0.5. That is a bounded calibration, not an API ru
 The revised request still needs fresh geometry and unchanged downstream gates.
 """
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from enum import StrEnum
 import math
 import time
@@ -22,7 +22,17 @@ from _drawing_native_callouts import (
     _same_dimension,
     DimensionSource,
 )
-from channel_lever_spec import BAR_PIN_X, LEVER_SPRING_X, TAB_START_X, TIP_ARC_CX
+from _drawing_annotation_bounds import Segment
+from _drawing_view_packing import Rect
+from _drawing_parallel_dimensions import (
+    BasicLinearInk,
+    NOMINAL_LINEAR_TOLERANCE_M,
+    PAIRS,
+    basic_linear_geometry as read_basic_linear_geometry,
+    basic_pair_geometry,
+    observed_paper_clearance,
+    required_paper_pitch,
+)
 from diagnostics import probe_datum_shoulder as shoulder
 from diagnostics import probe_drawing_attachments as attachments
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
@@ -33,168 +43,35 @@ class LinearArrangement(StrEnum):
     PARALLEL = "parallel"
 
 
-PAIRS = {
-    "front": (("BarLength", TAB_START_X / 1000), ("TipCentreX", TIP_ARC_CX / 1000)),
-    "holes": (("RD1", BAR_PIN_X / 1000), ("RD2", LEVER_SPRING_X / 1000)),
-}
-# Nominal design matching only. The retained native model dimensions differ
-# from nominal by +0.074/-0.094 nm; use a bounded 1 nm absolute comparison.
-# _same_dimension and source before/after equality remain EXACT mutation gates.
-NOMINAL_LINEAR_TOLERANCE_M = 1e-9
-PAPER_CLEARANCE_M = 0.001
-_GEOMETRY_EPS_M = 1e-10  # Axis/connectivity classification only, never value drift.
-
-
-def _near(a, b):
-    return math.isclose(a, b, rel_tol=0, abs_tol=_GEOMETRY_EPS_M)
+def _ink(measurement):
+    """Decode this diagnostic's serialized native ink; no extra COM measurement."""
+    try:
+        return BasicLinearInk(
+            Rect(**measurement["body"]),
+            tuple(Segment(**row) for row in measurement["native_strokes"]),
+            tuple(
+                Segment(**row) for row in measurement.get("native_leader_segments", ())
+            ),
+            tuple(Rect(**row) for row in measurement.get("leader_decorations", ())),
+        )
+    except (TypeError, ValueError) as error:
+        raise RuntimeError(
+            "parallel BASIC measurement is not finite native geometry"
+        ) from error
 
 
 def basic_linear_geometry(measurement):
-    """Recognize the captured axis-aligned BASIC frame/line/extensions, not indices."""
-    body = measurement["body"]
-    values = tuple(float(body[key]) for key in ("xmin", "ymin", "xmax", "ymax"))
-    if (
-        not all(math.isfinite(value) for value in values)
-        or values[0] >= values[2]
-        or values[1] >= values[3]
-    ):
-        raise RuntimeError("parallel BASIC body must have finite positive area")
-    strokes = tuple(measurement["native_strokes"])
-    if len(strokes) != 7 or measurement.get("native_leader_segments", ()):
-        raise RuntimeError(
-            "parallel BASIC geometry requires frame, two extensions and one dimension line"
-        )
-    horizontal, vertical = [], []
-    for index, stroke in enumerate(strokes):
-        start, end = tuple(stroke["start"]), tuple(stroke["end"])
-        if (
-            len(start) != 2
-            or len(end) != 2
-            or not all(math.isfinite(float(value)) for value in (*start, *end))
-            or stroke["width_m"] != 0
-        ):
-            raise RuntimeError(
-                "parallel BASIC strokes require finite observed zero-width native segments"
-            )
-        dx, dy = end[0] - start[0], end[1] - start[1]
-        if _near(dy, 0) and not _near(dx, 0):
-            horizontal.append(index)
-            continue
-        if _near(dx, 0) and not _near(dy, 0):
-            vertical.append(index)
-            continue
-        raise RuntimeError("parallel BASIC geometry is not axis aligned")
-    if len(horizontal) != 3 or len(vertical) != 4:
-        raise RuntimeError(
-            "parallel BASIC geometry lacks the rectangular frame/extension inventory"
-        )
-    candidates = [
-        index
-        for index in horizontal
-        if strokes[index]["start"][1] < body["ymin"] - _GEOMETRY_EPS_M
-        and min(strokes[index]["start"][0], strokes[index]["end"][0]) < body["xmin"]
-        and max(strokes[index]["start"][0], strokes[index]["end"][0]) > body["xmax"]
-    ]
-    if len(candidates) != 1:
-        raise RuntimeError(
-            "parallel BASIC dimension line is not uniquely identified by geometry"
-        )
-    index = candidates[0]
-    line = strokes[index]
-    line_y = line["start"][1]
-    stations = sorted((line["start"][0], line["end"][0]))
-    extensions = []
-    for x in stations:
-        matches = [
-            item
-            for item in vertical
-            if _near(strokes[item]["start"][0], x)
-            and min(strokes[item]["start"][1], strokes[item]["end"][1]) <= line_y
-            and max(strokes[item]["start"][1], strokes[item]["end"][1]) > body["ymax"]
-        ]
-        if len(matches) != 1:
-            raise RuntimeError(
-                "parallel BASIC dimension line lacks exact two extension stations"
-            )
-        extensions.extend(matches)
-    frame = [
-        stroke
-        for item, stroke in enumerate(strokes)
-        if item not in (index, *extensions)
-    ]
-    nodes, edges = [], set()
-    for stroke in frame:
-        edge = []
-        for point in (stroke["start"], stroke["end"]):
-            matches = [
-                i
-                for i, old in enumerate(nodes)
-                if all(_near(a, b) for a, b in zip(point, old, strict=True))
-            ]
-            if not matches:
-                nodes.append(point)
-                matches = [len(nodes) - 1]
-            edge.append(matches[0])
-        edges.add(tuple(sorted(edge)))
-    if (
-        len(frame) != 4
-        or len(nodes) != 4
-        or len(edges) != 4
-        or any(sum(node in edge for edge in edges) != 2 for node in range(4))
-    ):
-        raise RuntimeError(
-            "parallel BASIC remaining strokes do not form one closed rectangular frame"
-        )
-    if any(
-        not (
-            body["xmin"] - _GEOMETRY_EPS_M <= x <= body["xmax"] + _GEOMETRY_EPS_M
-            and body["ymin"] - _GEOMETRY_EPS_M <= y <= body["ymax"] + _GEOMETRY_EPS_M
-        )
-        for x, y in nodes
-    ):
-        raise RuntimeError("parallel BASIC frame is not contained by measured body")
-    decorations = tuple(measurement.get("leader_decorations", ()))
-    for item in decorations:
-        vals = tuple(float(item[key]) for key in ("xmin", "ymin", "xmax", "ymax"))
-        if (
-            not all(math.isfinite(value) for value in vals)
-            or vals[0] >= vals[2]
-            or vals[1] >= vals[3]
-        ):
-            raise RuntimeError(
-                "parallel BASIC leader decoration is not a finite positive rectangle"
-            )
-    return {
-        "line_y_m": line_y,
-        "line_x_m": stations,
-        "body": body,
-        "upper_reach_m": body["ymax"] - line_y,
-        "body_height_m": body["ymax"] - body["ymin"],
-        "decorations": decorations,
-    }
+    return asdict(read_basic_linear_geometry(_ink(measurement)))
+
+
+def _pair_geometry(rows, keys):
+    return basic_pair_geometry(*(_ink(rows[key]["measurement"]) for key in keys))
 
 
 def pair_geometry(rows, keys):
-    geometry = {key: basic_linear_geometry(rows[key]["measurement"]) for key in keys}
-    first, second = (geometry[key] for key in keys)
-    if first["line_y_m"] <= second["line_y_m"]:
-        raise RuntimeError(
-            "parallel BASIC pair does not have the observed shorter-above-longer order"
-        )
-    for own, other in ((first, second), (second, first)):
-        body = other["body"]
-        if not (
-            own["line_x_m"][0] < body["xmin"] and own["line_x_m"][1] > body["xmax"]
-        ):
-            raise RuntimeError("parallel BASIC pair lacks the observed nested span")
-        if any(
-            not (item["xmax"] < body["xmin"] or item["xmin"] > body["xmax"])
-            for item in own["decorations"]
-        ):
-            raise RuntimeError(
-                "parallel BASIC leader decoration can intersect the other body"
-            )
-    return geometry
+    return dict(
+        zip(keys, (asdict(row) for row in _pair_geometry(rows, keys)), strict=True)
+    )
 
 
 def require_targets(variant, targets):
@@ -335,10 +212,11 @@ def planned_pairs(before, views):
             raise RuntimeError(
                 "parallel gain calibration only covers the exact model11/reference2 pairs at scale0.5"
             )
-        geometry = pair_geometry(before.rows, tuple(selected))
-        paper_pitch = (
-            max(row["upper_reach_m"] for row in geometry.values()) + PAPER_CLEARANCE_M
+        typed_geometry = _pair_geometry(before.rows, tuple(selected))
+        geometry = dict(
+            zip(selected, (asdict(row) for row in typed_geometry), strict=True)
         )
+        paper_pitch = required_paper_pitch(typed_geometry)
         plans[label] = {
             "geometry": geometry,
             "paper_pitch_m": paper_pitch,
@@ -354,19 +232,16 @@ def planned_pairs(before, views):
 def observed_pair_clearance(after, pairs):
     result = {}
     for label, keys in pairs.items():
-        geometry = pair_geometry(after.rows, keys)
-        first, second = (geometry[key] for key in keys)
-        pitch = first["line_y_m"] - second["line_y_m"]
-        clearance = pitch - max(row["upper_reach_m"] for row in geometry.values())
+        typed_geometry = _pair_geometry(after.rows, keys)
+        geometry = dict(zip(keys, (asdict(row) for row in typed_geometry), strict=True))
+        first, second = typed_geometry
+        pitch = first.line_y_m - second.line_y_m
+        clearance = observed_paper_clearance(typed_geometry)
         result[label] = {
             "paper_pitch_m": pitch,
             "line_body_clearance_m": clearance,
             "geometry": geometry,
         }
-        if clearance < PAPER_CLEARANCE_M - _GEOMETRY_EPS_M:
-            raise RuntimeError(
-                f"parallel native pair did not retain 1mm paper line/body clearance: {label}: {result[label]}"
-            )
     return result
 
 
@@ -481,6 +356,11 @@ class ParallelLinearControl:
 
     def bind(self, adapter, module, trial, checkpoint, source_reader, expected_source):
         require_targets(self.variant, (trial["target"],))
+        if "align_channel_lever_basic_pairs" in vars(module):
+            raise RuntimeError(
+                "parallel diagnostic cannot stack on a recipe with production BASIC spacing; "
+                "omit --linear-dimensions for production acceptance or replay with matching historical tooling"
+            )
         defaults = module.build.__kwdefaults__ or {}
         original = defaults.get("layout")
         if not callable(original) or self.calls:
