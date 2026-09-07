@@ -64,6 +64,31 @@ def checkpoint(path, report):
     path.write_text(json.dumps(report, indent=2), encoding="utf-8")
 
 
+def resolved_dependency_rows(app, source):
+    """Use native search rules, restoring any documented directory side effect."""
+    before = app.GetCurrentWorkingDirectory()
+    if type(before) is not str or not before:
+        raise RuntimeError("dependency query returned no working directory")
+    errors = []
+    rows = None
+    try:
+        rows = tuple(app.GetDocumentDependencies2(str(source), True, True, False) or ())
+    except Exception as error:
+        errors.append(error)
+    finally:
+        try:
+            if app.GetCurrentWorkingDirectory() != before:
+                if app.SetCurrentWorkingDirectory(before) is not True:
+                    raise RuntimeError("dependency query working directory restore rejected")
+                if app.GetCurrentWorkingDirectory() != before:
+                    raise RuntimeError("dependency query working directory restore differs")
+        except Exception as error:
+            errors.append(error)
+    if errors:
+        raise ExceptionGroup("native dependency query or directory restoration failed", errors)
+    return rows
+
+
 class OwnedAssembly:
     """An initially empty session, then one exact saved assembly dependency set."""
 
@@ -75,7 +100,7 @@ class OwnedAssembly:
         self.root = None
         if self.app.GetDocuments() or self.app.ActiveDoc is not None:
             raise RuntimeError("health probe requires an empty session; no documents closed")
-        rows = tuple(self.app.GetDocumentDependencies2(str(source), True, False, False) or ())
+        rows = resolved_dependency_rows(self.app, source)
         if len(rows) % 2:
             raise RuntimeError("saved dependency API returned an incomplete filename/path pair")
         self.inputs = {source, *(Path(path).resolve(strict=True) for path in rows[1::2])}

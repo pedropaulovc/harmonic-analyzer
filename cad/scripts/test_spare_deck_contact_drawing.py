@@ -7,11 +7,69 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 
 from diagnostics import probe_spare_deck_contact as probe
+from diagnostics import probe_assembly_health_targets as ownership
 
 
 def pose(rows=None, translation=(0.0, 0.0, 0.0)):
     rows = rows or ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0))
     return (*[v for row in rows for v in row], *translation, 1.0, 0.0, 0.0, 0.0)
+
+
+@pytest.mark.parametrize("directory", ["stable", "changed"])
+def test_dependency_query_uses_native_search_and_restores_directory(directory):
+    readings = ["original", "original"]
+    if directory == "changed":
+        readings = ["original", "query directory", "original"]
+    app = NS(
+        GetCurrentWorkingDirectory=Mock(side_effect=readings),
+        SetCurrentWorkingDirectory=Mock(return_value=True),
+        GetDocumentDependencies2=Mock(return_value=("part", "resolved-local-part")),
+    )
+    assert ownership.resolved_dependency_rows(app, "top") == (
+        "part",
+        "resolved-local-part",
+    )
+    app.GetDocumentDependencies2.assert_called_once_with("top", True, True, False)
+    assert app.SetCurrentWorkingDirectory.call_count == int(directory == "changed")
+
+
+@pytest.mark.parametrize("restore", ["ok", "rejected", "wrong_readback"])
+def test_dependency_failure_preserves_query_and_directory_errors(restore):
+    primary = RuntimeError("native dependency search rejected")
+    app = NS(
+        GetCurrentWorkingDirectory=Mock(
+            side_effect=[
+                "original",
+                "changed",
+                "wrong" if restore == "wrong_readback" else "original",
+            ]
+        ),
+        SetCurrentWorkingDirectory=Mock(return_value=restore != "rejected"),
+        GetDocumentDependencies2=Mock(side_effect=primary),
+    )
+    with pytest.raises(ExceptionGroup) as caught:
+        ownership.resolved_dependency_rows(app, "top")
+    assert caught.value.exceptions[0] is primary
+    assert len(caught.value.exceptions) == (1 if restore == "ok" else 2)
+    app.SetCurrentWorkingDirectory.assert_called_once_with("original")
+
+
+def test_resolved_dependencies_still_reject_foreign_inputs(monkeypatch, tmp_path):
+    monkeypatch.setattr(ownership, "ROOT", tmp_path)
+    monkeypatch.setattr(ownership, "_early_bound", lambda value, _: value)
+    source = tmp_path / "cad/out/sldasm/top.SLDASM"
+    source.parent.mkdir(parents=True)
+    source.write_bytes(b"saved top")
+    foreign = tmp_path / "foreign.SLDPRT"
+    foreign.write_bytes(b"foreign native input")
+    app = NS(
+        GetDocuments=Mock(return_value=()),
+        ActiveDoc=None,
+        GetCurrentWorkingDirectory=Mock(return_value=str(tmp_path)),
+        GetDocumentDependencies2=Mock(return_value=("foreign", str(foreign))),
+    )
+    with pytest.raises(RuntimeError, match="leave this checkout"):
+        ownership.OwnedAssembly(NS(swApp=app), source)
 
 
 @pytest.fixture

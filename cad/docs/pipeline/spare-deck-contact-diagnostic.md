@@ -22,7 +22,9 @@ interference-free. The full assembly gate and fresh side/oblique renders remain
 separate requirements.
 
 The probe does not save, rebuild, change configurations, make selections, export,
-or change application settings. It rechecks native instances and document state,
+or change application preferences. The dependency query can change SW's working
+directory according to the API documentation; the owner records and restores
+that directory before opening anything. It rechecks native instances and document state,
 closes its owned documents, and compares all saved dependency hashes. Its report
 retains primary, cleanup, input-hash and checkpoint failures together.
 
@@ -44,3 +46,15 @@ Offline tests cover gap/penetration, disjoint trimmed faces, wrong configuration
 parent/face ownership, replaced instances, malformed native returns and error
 preservation. The three checkpoint-error tests failed before error aggregation
 was added. All 32 tests then passed. **Native contact acceptance is still pending.**
+
+## Cold dependency-query correction
+
+The first native attempt on September 7 at `b474b553` stopped before opening
+the model: `spare-deck-contact-er843xec/contact.json` records the ownership
+rejection. `GetDocumentDependencies2(..., Searchflag=False, ...)` returned
+29 local paths and 84 paths from the producing checkout. The documented
+`Searchflag=True` positive control returned all 113 paths in this checkout,
+with no open documents and no observed working-directory change. The owner
+now uses that native search result, still rejects any resolved foreign path,
+and preserves query and directory-restoration failures together. It never
+rewrites a dependency path by filename or edits the saved assemblies.
