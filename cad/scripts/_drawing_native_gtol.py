@@ -42,8 +42,10 @@ from _drawing_annotation_bounds import LeaderGeometry, annotation_leader_geometr
 from _drawing_leader_clearance import (
     crossing_records,
     displayed_leader_coverage,
+    intersects_cell,
     stationary_ink_obstacles,
-    vertical_candidates,
+    VerticalCandidate,
+    VerticalDirection,
     _candidate_text_cells,
 )
 import _telemetry
@@ -158,73 +160,200 @@ def column_clearance_translations(
     return result
 
 
-def column_vertical_candidates(crossings, geometry, measurements, *, clearance_m=0.001):
-    """Two whole-bank frontiers derived from the observed horizontal routes.
+def _line_vertical_interval(line, cell, motion, clearance):
+    """Closed forbidden DY interval for fixed X and endpoint Y coefficients.
 
-    Initial hits alone miss a lower row entering the same cell after an UP
-    shift. Extend those two hypotheses across every bank row and every fixed
-    measured cell in its route's horizontal range. These are not a leader
-    solver: fixed model endpoints and native routing may still cause crossings,
-    so actual native geometry/body readback and every final witness remain
-    mandatory. No coordinate grid, iterative retries, or new measurement pass.
+    Clip the parameter t to the rectangle's X slab, as intersects_cell does.
+    Rigid Y motion is linear; a fixed/moving endpoint pair has bounds a/t+b,
+    whose extrema are at that clipped interval's ends. No diagonal AABB is
+    substituted for the line. Motion is relative to the target cell.
     """
-    initial = vertical_candidates(
-        crossings,
-        {name: row.segments for name, row in geometry.items()},
-        {name: row.decorations for name, row in geometry.items()},
-        clearance_m=clearance_m,
+    if not math.isfinite(clearance) or clearance < 0:
+        raise ValueError("vertical candidate clearance must be finite/nonnegative")
+    expanded = Rect(
+        cell.xmin - clearance,
+        cell.ymin - clearance,
+        cell.xmax + clearance,
+        cell.ymax + clearance,
     )
-    if not initial:
+    # Reuse the acceptance clipper's finite-coordinate/width validation.
+    stationary_hit = intersects_cell(line, expanded)
+    if motion not in ((0, 0), (1, 1), (-1, -1), (1, 0), (0, 1), (-1, 0), (0, -1)):
+        raise ValueError("unsupported relative vertical endpoint motion")
+    if motion == (0, 0):
+        return (-math.inf, math.inf) if stationary_hit else None
+    start, end = line.start, line.end
+    coefficients = motion
+    if motion[0] != motion[1] and motion[0] != 0:
+        start, end = end, start
+        coefficients = motion[::-1]
+    radius = line.width_m / 2
+    xmin, xmax = expanded.xmin - radius, expanded.xmax + radius
+    ymin, ymax = expanded.ymin - radius, expanded.ymax + radius
+    lower, upper = 0.0, 1.0
+    dx = end[0] - start[0]
+    if dx == 0:
+        if not xmin <= start[0] <= xmax:
+            return None
+    else:
+        enter, leave = sorted(((xmin - start[0]) / dx, (xmax - start[0]) / dx))
+        lower, upper = max(lower, enter), min(upper, leave)
+        if lower > upper:
+            return None
+    dy = end[1] - start[1]
+    if coefficients[0] == coefficients[1]:
+        values = (start[1] + lower * dy, start[1] + upper * dy)
+        interval = ymin - max(values), ymax - min(values)
+    elif lower == 0 and ymin <= start[1] <= ymax:
+        return -math.inf, math.inf  # fixed endpoint itself intersects the cell
+    elif upper == 0:
+        return None
+    else:
+        low_values = [(ymin - start[1]) / upper - dy]
+        high_values = [(ymax - start[1]) / upper - dy]
+        if lower > 0:
+            low_values.append((ymin - start[1]) / lower - dy)
+            high_values.append((ymax - start[1]) / lower - dy)
+        if lower == 0 and start[1] > ymax:
+            low_values.append(-math.inf)
+        if lower == 0 and start[1] < ymin:
+            high_values.append(math.inf)
+        interval = min(low_values), max(high_values)
+    return interval if coefficients[1] == 1 else (-interval[1], -interval[0])
+
+
+def _decoration_motion(box, chain):
+    """Associate a measured decoration with moving shoulder OR fixed endpoint."""
+
+    def contains(point):
+        return (
+            box.xmin - _BODY_EPSILON_M <= point[0] <= box.xmax + _BODY_EPSILON_M
+            and box.ymin - _BODY_EPSILON_M <= point[1] <= box.ymax + _BODY_EPSILON_M
+        )
+
+    moving = contains(chain[0].start) or contains(chain[0].end)
+    fixed = contains(chain[1].end)
+    if moving == fixed:
+        raise ValueError(
+            "whole-bank frontier decoration has ambiguous/unknown vertex association"
+        )
+    return 1 if moving else 0
+
+
+def _box_vertical_interval(box, cell, motion, clearance):
+    if box.xmax + clearance < cell.xmin or cell.xmax + clearance < box.xmin:
+        return None
+    low, high = cell.ymin - clearance - box.ymax, cell.ymax + clearance - box.ymin
+    if motion == 0:
+        return (-math.inf, math.inf) if low <= 0 <= high else None
+    if motion == 1:
+        return low, high
+    if motion == -1:
+        return -high, -low
+    raise ValueError("unsupported relative vertical rectangle motion")
+
+
+def _nearest_vertical_candidates(intervals):
+    """Walk a finite interval union once per direction, never a grid/retry loop."""
+    if any(
+        math.isnan(low) or math.isnan(high) or low > high for low, high in intervals
+    ):
+        raise ValueError("invalid forbidden vertical interval")
+    result = []
+    for direction, sign in ((VerticalDirection.UP, 1), (VerticalDirection.DOWN, -1)):
+        ordered = sorted(
+            (low, high) if sign == 1 else (-high, -low) for low, high in intervals
+        )
+        offset = 0.0
+        for low, high in ordered:
+            if low > offset:
+                break
+            if offset <= high:
+                # Outward 1 nm exceeds float cancellation at sheet coordinates;
+                # it is numerical headroom, not a new physical clearance policy.
+                offset = high + _POSITION_EPSILON_M
+        if math.isfinite(offset) and offset > 0:
+            result.append(VerticalCandidate(direction, sign * offset))
+    return tuple(result)
+
+
+def column_vertical_candidates(
+    crossings,
+    geometry,
+    measurements,
+    *,
+    clearance_m=0.001,
+    bodies=(),
+    obstacles=(),
+    gap_m=0.002,
+):
+    """Nearest UP/DOWN free interval under the observed three-point route model.
+
+    Every measured cell participates, not just current hits. The shoulder and
+    its decoration move with the bank; model endpoints/arrows stay fixed. Other
+    GTol bodies move with the bank too. Unsupported routes fail instead of
+    guessing. These two predictions ONLY order native attempts: actual route,
+    body, semantic and final sheet checks still decide acceptance.
+    """
+    if any(not math.isfinite(value) or value < 0 for value in (clearance_m, gap_m)):
+        raise ValueError("vertical candidate clearance must be finite/nonnegative")
+    if not crossings:
         return ()
-    fixed_cells = tuple(
-        cell
-        for name, row in measurements.items()
-        if name not in geometry
-        for cell in ((row.body,) if row.kind == 6 else row.text_boxes)
-    )
-    up, down = initial[0].dy_m, initial[1].dy_m
-    for row in geometry.values():
+    intervals = []
+    for name, row in geometry.items():
         chain = row.segments
-        if not chain:
+        if not chain and not row.decorations:
             continue
-        if len(chain) != 2 or math.dist(chain[0].end, chain[1].start) > 1e-8:
-            raise ValueError(
-                "whole-bank frontier requires native three-point bent leaders"
+        if (
+            len(chain) != 2
+            or math.dist(chain[0].end, chain[1].start) > _BODY_EPSILON_M
+            or abs(chain[0].end[1] - chain[0].start[1]) > _BODY_EPSILON_M
+            or any(
+                not all(
+                    math.isfinite(value)
+                    for value in (*line.start, *line.end, line.width_m)
+                )
+                or line.width_m < 0
+                for line in chain
             )
-        if any(
-            not all(
-                math.isfinite(value) for value in (*line.start, *line.end, line.width_m)
-            )
-            or line.width_m < 0
-            for line in chain
         ):
             raise ValueError(
-                "whole-bank frontier requires finite native geometry/width"
+                "whole-bank frontier requires finite native three-point bent leaders"
             )
-        radius = max(line.width_m for line in chain) / 2.0
-        xmin = (
-            min(point[0] for line in chain for point in (line.start, line.end)) - radius
+        decorations = tuple(
+            (box, _decoration_motion(box, chain)) for box in row.decorations
         )
-        xmax = (
-            max(point[0] for line in chain for point in (line.start, line.end)) + radius
-        )
-        shoulder = chain[0]
-        ymin = min(shoulder.start[1], shoulder.end[1]) - radius
-        ymax = max(shoulder.start[1], shoulder.end[1]) + radius
-        # The first rectangle is the moving shoulder's Y extent paired with
-        # the complete observed route's X range. Decorations supply additional
-        # candidate extents, never a claim that their model endpoints move.
-        extents = (
-            (xmin, xmax, ymin, ymax),
-            *((box.xmin, box.xmax, box.ymin, box.ymax) for box in row.decorations),
-        )
-        for cell in fixed_cells:
-            for left, right, bottom, top in extents:
-                if right < cell.xmin or left > cell.xmax:
-                    continue
-                up = max(up, cell.ymax + clearance_m - bottom)
-                down = min(down, cell.ymin - clearance_m - top)
-    return replace(initial[0], dy_m=up), replace(initial[1], dy_m=down)
+        for target, measured in measurements.items():
+            if target == name:
+                continue  # own native leader/frame join is intentional
+            target_motion = 1 if target in geometry else 0
+            for cell in (measured.body,) if measured.kind == 6 else measured.text_boxes:
+                intervals.extend(
+                    _line_vertical_interval(line, cell, motion, clearance_m)
+                    for line, motion in zip(
+                        chain,
+                        (
+                            (1 - target_motion, 1 - target_motion),
+                            (1 - target_motion, -target_motion),
+                        ),
+                    )
+                )
+                intervals.extend(
+                    _box_vertical_interval(
+                        box, cell, motion - target_motion, clearance_m
+                    )
+                    for box, motion in decorations
+                )
+    # Match the existing _separated tolerance; a sufficient horizontal body
+    # gap must not acquire a false vertical constraint merely at equality.
+    intervals.extend(
+        _box_vertical_interval(body, obstacle, 1, gap_m - _BODY_EPSILON_M)
+        for body in bodies
+        for obstacle in obstacles
+    )
+    return _nearest_vertical_candidates(
+        [interval for interval in intervals if interval is not None]
+    )
 
 
 @dataclass(frozen=True)
@@ -504,17 +633,24 @@ def _place_clear_column(
             _Clearance.CLEAR if body_clear else _Clearance.BLOCKED,
         )
 
-    # Test both horizontal sides first, then each side's two whole-bank vertical
-    # frontiers. Reverse order tries the most recently observed native side
+    # Test both horizontal sides first, then each side's nearest free UP/DOWN
+    # intervals. Reverse order tries the most recently observed native side
     # first; the successful lever control is RIGHT then UP. Targets ALWAYS use
     # the same immutable seed, even when an earlier native route was rejected.
     for side, dx in sides:
         predicted, geometry, crossings, body_clear = screen((dx, 0.0), side.value)
         if body_clear is _Clearance.CLEAR and not crossings:
             return predicted, geometry, attempts
-        horizontal.append((side, dx, geometry, crossings))
-    for side, dx, geometry, crossings in reversed(horizontal):
-        candidates = column_vertical_candidates(crossings, geometry, measurements)
+        horizontal.append((side, dx, predicted, geometry, crossings))
+    for side, dx, horizontal_bank, geometry, crossings in reversed(horizontal):
+        candidates = column_vertical_candidates(
+            crossings,
+            geometry,
+            _candidate_text_cells(measurements, initial, horizontal_bank),
+            bodies=tuple(row.body for row in horizontal_bank.values()),
+            obstacles=(outline, *obstacles),
+            gap_m=gap_m,
+        )
         for candidate in candidates:
             predicted, actual, hits, body_clear = screen(
                 (dx, candidate.dy_m), f"{side.value}-{candidate.direction.value}"
