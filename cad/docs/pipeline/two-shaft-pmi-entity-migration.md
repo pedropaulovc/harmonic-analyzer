@@ -232,6 +232,63 @@ multiple/null attachments, interruption and restoration of all three observers.
 uv run python -m pytest cad/scripts/test_annotation_entity_context_drawing.py cad/scripts/test_shaft_recipe_acceptance_drawing.py -q
 ```
 
+### Mapping control confirms a context mismatch, not datum replacement
+
+The observer ran at root `b63fc27e` / adapter `e77bfda` on the exact owned fulcrum
+copy. Receipt `cad/out/reports/datum-policy-frqt5lvn/pilot.json`, SHA-256
+`2692010d4d53ee3a9598fe71ae6bab952e7a3f8a0a2c3ad74d343a6171e73d08`:
+
+| Native equality/readback | Immediately after datum insertion | Final PMI bank |
+| --- | ---: | ---: |
+| Original source versus selected view entity | 0 | 0 |
+| Selected view entity versus actual attachment | 1 | 1 |
+| Source versus reverse-mapped selected entity | 1 | 1 |
+| Source versus reverse-mapped attached entity | 1 | 1 |
+| Source versus unconverted attachment | 0 | 0 |
+
+All four selected PMI entities reverse-mapped to their exact original model
+roles. Forward mapping returned null for the Front rim used by datum A and
+cylindricity, but returned the exact selected edge for both Right-view end rims.
+Thus a forward-map fallback would impose an unsupported extra requirement on
+this proven reverse-mapping call shape. The datum did not change attachment
+between its immediate and completed-bank witnesses.
+
+The unchanged old direct comparison still failed. Recipe time was
+17.721189600008074 s, including 3.553409700456541 s of instrumented read groups
+(3.5550348999677226 s observer wall time). An offline gate ran concurrently;
+this is not a speed comparison. All source/runtime hashes remained exact,
+failure evidence had no errors, and owned cleanup restored the empty baseline.
+The four PMI items were visible in the failed-scene PNG, but SF insertion,
+native save, full cold reopen and complete-sheet acceptance were not reached.
+
+Production now declares `AnnotationEntityContext.MODEL` on the two shafts' four
+PMI roles and their finish. The validator first requires exact annotation owner,
+attachment count/type and view identity, then maps the actual attached drawing
+edge/face through the referenced source **part** extension and requires
+`IsSame(expected_original_role, mapped) == 1`. Null mappings, read errors and
+unknown identity fail; geometry, names, forward mapping and direct-identity
+fallbacks cannot substitute. Existing cone PMI and other view-derived explicit
+SF callers keep the default `VIEW` contract and its direct native comparison.
+No source geometry, specification, display seed or tolerance changes.
+
+The owned observer requires the same original source-role identity. Its complete
+built and cold banks explicitly use model context against freshly resolved
+source handles; cold tests use distinct new source/view handles and forbid old
+view access. Fourteen new context tests failed first on the old API. Tests cover
+both mapping directions' context separation, null/wrong/unknown/throwing reverse
+mapping, wrong document/view, direct-view silhouette preservation and the real
+native datum/SF call paths. Type-46 **model** reverse mapping is not claimed;
+the two existing silhouette SF callers retain their direct-view contract.
+
+```powershell
+uv run python -m pytest cad/scripts/test_annotation_attachment_context_drawing.py cad/scripts/test_native_pmi_datum_drawing.py cad/scripts/test_shaft_recipe_acceptance_drawing.py -q
+```
+
+The owned command above with `--candidate b63fc27e` retains the old recipe's
+direct-view expectation for replay of the mismatch. A reviewed current-head
+invocation is required to test the corrected model-context recipe; no new native
+or full cold/printed acceptance is claimed by this implementation.
+
 Re-runnable offline proof:
 
 ```powershell

@@ -13,6 +13,7 @@ import os
 import sys
 from collections import Counter
 from dataclasses import dataclass, replace
+from enum import StrEnum
 from itertools import combinations
 from pathlib import Path
 from typing import Any, Callable, Iterable, Literal, Sequence
@@ -209,12 +210,21 @@ class DrawingOutputs:
     png: Path
 
 
+class AnnotationEntityContext(StrEnum):
+    """Native context of the caller's expected attachment handle."""
+
+    MODEL = "model"
+    VIEW = "view"
+
+
 @dataclass(frozen=True)
 class PmiDrawingPlacement:
     """Drawing-view routing and layout contract for one model-owned PMI item.
 
     ``position=None`` retains native placement with an explicit model entity.
     Numeric positions retain the existing exact layout/tolerance contract.
+    Model-resolved handles declare ``entity_context=MODEL``; view-resolved
+    handles retain ``VIEW``. This is independent of annotation placement.
     """
 
     view: Any
@@ -223,10 +233,12 @@ class PmiDrawingPlacement:
     edge_entity: Any | None = None
     entity: Any | None = None
     attachment_type: str = "EDGE"
+    entity_context: AnnotationEntityContext = AnnotationEntityContext.VIEW
     position_tolerance_m: float = 1.5e-5
     leader_attachment_xy: tuple[float, float] | None = None
 
     def __post_init__(self) -> None:
+        AnnotationEntityContext(self.entity_context)
         supplied = sum(
             value is not None
             for value in (self.attachment_xy, self.edge_entity, self.entity)
@@ -844,19 +856,22 @@ def _validate_explicit_annotation_attachment(
     entity: Any,
     *,
     entity_type: str,
+    entity_context: AnnotationEntityContext,
     label: str,
 ) -> None:
     """Witness one explicit model attachment and its actual drawing-view owner.
 
     GetAttachedEntities3 and GetAttachedEntityTypes are parallel arrays. Null
     entries are not an identity witness, even when Count3 reports one. Native
-    IsSame must return 1: identical names/geometry and unknown identity do not
-    prove that insertion retained the selected entity or owning view.
+    MODEL expectations require exact reverse-mapped source identity; VIEW
+    expectations compare the native handles directly. Names/geometry and unknown
+    identity never substitute for either contract or exact owning-view identity.
     """
     # swSelectType_e: swSelEDGES, swSelFACES, swSelSILHOUETTES.
     native_type = {"EDGE": 1, "FACE": 2, "SILHOUETTE": 46}.get(entity_type)
     if native_type is None:
         raise ValueError(f"{label}: unsupported explicit attachment type {entity_type!r}")
+    entity_context = AnnotationEntityContext(entity_context)
     annotation = _early_bound(annotation, "IAnnotation")
     attached = tuple(annotation.GetAttachedEntities3() or ())
     kinds = tuple(annotation.GetAttachedEntityTypes() or ())
@@ -867,14 +882,35 @@ def _validate_explicit_annotation_attachment(
             f"count={count}, entities={len(attached)}, types={kinds}, expected={native_type}"
         )
     application = _early_bound(adapter.swApp, "ISldWorks")
-    if int(application.IsSame(entity, attached[0])) != 1:
-        raise RuntimeError(f"{label}: explicit annotation attachment changed entity identity")
     # swAnnotationOwner_DrawingView=0. Owner may otherwise be a sheet/part.
     if int(annotation.OwnerType) != 0:
         raise RuntimeError(f"{label}: explicit annotation owner is not a drawing view")
     owner = annotation.Owner
     if owner is None or int(application.IsSame(owner, view)) != 1:
         raise RuntimeError(f"{label}: explicit annotation has a different owning view")
+    actual = attached[0]
+    if entity_context == AnnotationEntityContext.MODEL:
+        actual = _drawing_entity_in_source(view, actual, entity_type=entity_type, label=label)
+    if int(application.IsSame(entity, actual)) != 1:
+        raise RuntimeError(f"{label}: explicit annotation attachment changed entity identity ({entity_context.value})")
+
+
+def _drawing_entity_in_source(view: Any, entity: Any, *, entity_type: str, label: str) -> Any:
+    """Map a drawing entity through its source PART extension, without fallback.
+
+    IModelDocExtension.GetCorrespondingEntity2's bundled part/view example uses
+    the part extension. Native fulcrum control datum-policy-frqt5lvn confirms this
+    direction when IView.GetCorrespondingEntity returns null for the same rim.
+    """
+    if entity_type not in {"EDGE", "FACE"}:
+        raise ValueError(f"{label}: model attachment mapping requires EDGE or FACE")
+    source = _early_bound(view, "IView").ReferencedDocument
+    if source is None or int(source.GetType()) != 1:
+        raise RuntimeError(f"{label}: model attachment has no referenced source part")
+    mapped = _early_bound(source.Extension, "IModelDocExtension").GetCorrespondingEntity2(entity)
+    if mapped is None:
+        raise RuntimeError(f"{label}: drawing attachment has no corresponding source entity")
+    return mapped
 
 
 def _validate_pmi_controlled_face(placement: PmiDrawingPlacement, face: Any, *, label: str) -> None:
@@ -1016,7 +1052,8 @@ def project_part_pmi(
         entity = placement.entity if placement.entity is not None else placement.edge_entity
         _validate_explicit_annotation_attachment(
             adapter, projected[key], placement.view, entity,
-            entity_type=placement.attachment_type, label=f"{label} {key}",
+            entity_type=placement.attachment_type, entity_context=placement.entity_context,
+            label=f"{label} {key}",
         )
         if placement.position is None:
             _validate_native_pmi_placement(adapter, projected[key], label=f"{label} {key}")
@@ -1071,6 +1108,7 @@ def add_surface_finish(
     control: SurfaceFinishControl | None = None,
     label: str,
     entity_type: str = "EDGE",
+    entity_context: AnnotationEntityContext = AnnotationEntityContext.VIEW,
     entity: Any | None = None,
     leader_attach_xy: tuple[float, float] | None = None,
     production_method: str = "",
@@ -1085,6 +1123,8 @@ def add_surface_finish(
     Omit ``symbol_xy`` with an explicit model ``entity`` for a native attached
     no-leader symbol. InsertSurfaceFinishSymbol3 documents that location inputs
     are ignored in swNO_LEADER mode; no generic auto-place leader API is used.
+    Explicitly positioned model-role entities require ``entity_context=MODEL``;
+    entities returned by a view retain direct ``VIEW`` identity comparison.
     """
     if symbol_xy is None and entity is None:
         raise ValueError(f"{label}: native placement requires an explicit model entity")
@@ -1201,7 +1241,8 @@ def add_surface_finish(
     elif entity is not None or edge_entity is not None:
         expected = entity if entity is not None else edge_entity
         _validate_explicit_annotation_attachment(
-            adapter, annotation, view, expected, entity_type=entity_type, label=label,
+            adapter, annotation, view, expected, entity_type=entity_type,
+            entity_context=entity_context, label=label,
         )
     return symbol
 

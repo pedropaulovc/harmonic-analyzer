@@ -9,6 +9,7 @@ from typing import Any
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
+    AnnotationEntityContext,
     DrawingOutputs,
     PmiDrawingPlacement,
     add_property_linked_note,
@@ -182,22 +183,26 @@ async def build(adapter: Any) -> dict[str, str]:
                 view=front,
                 position=None,  # Keep native datum placement on the exact bearing rim.
                 entity=entities["datum:A"],
+                entity_context=AnnotationEntityContext.MODEL,
             ),
             "bearing_cylindricity": PmiDrawingPlacement(
                 view=right,
                 position=(RIGHT_CENTER[0] - 0.045, 0.236),
                 entity=entities["bearing_cylindricity"],
+                entity_context=AnnotationEntityContext.MODEL,
                 attachment_type="FACE",
             ),
             "plus_z_end_perpendicularity": PmiDrawingPlacement(
                 view=right,
                 position=(left_end[0] - 0.042, 0.180),
                 entity=entities["plus_z_end_perpendicularity"],
+                entity_context=AnnotationEntityContext.MODEL,
             ),
             "minus_z_end_perpendicularity": PmiDrawingPlacement(
                 view=right,
                 position=(right_end[0] + 0.014, 0.180),
                 entity=entities["minus_z_end_perpendicularity"],
+                entity_context=AnnotationEntityContext.MODEL,
             ),
         },
         datums=PART_DATUMS,
@@ -214,6 +219,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         right,
         entity=entities["bearing_finish"],
+        entity_context=AnnotationEntityContext.MODEL,
         symbol_xy=(RIGHT_CENTER[0] + 0.045, 0.222),
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bearing"),
         label="pivot bearing finish",

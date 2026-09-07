@@ -78,8 +78,22 @@ def entity_bank(monkeypatch):
     )
     monkeypatch.setattr(entities, "ModelEntities", resolver)
     view = SimpleNamespace(GetName2=lambda: "Front")
+    view_entities = {role: object() for role in roles}
+    reverse_entities = {
+        id(value): source_entities[role] for role, value in view_entities.items()
+    }
+    for role, value in view_entities.items():
+        geometry[id(value)] = geometry[id(source_entities[role])]
+    view.ReferencedDocument = SimpleNamespace(
+        GetType=lambda: 1,
+        Extension=SimpleNamespace(
+            GetCorrespondingEntity2=lambda entity: reverse_entities.get(
+                id(entity), entity
+            )
+        ),
+    )
     annotations = {}
-    for role, entity in ((role, source_entities[role]) for role in roles):
+    for role, entity in view_entities.items():
         kind = {"datum:A": 2, "bearing_cylindricity": 5, "bearing_finish": 7}[role]
         annotations[role] = SimpleNamespace(
             GetName=lambda role=role: role,
@@ -111,6 +125,7 @@ def entity_bank(monkeypatch):
         view=view,
         annotations=annotations,
         resolver=resolver,
+        view_entities=view_entities,
     )
 
 
@@ -123,6 +138,7 @@ def record_bank(bank):
                 bank.view,
                 bank.source[role],
                 entity_type=bank.witness.kinds[role][0],
+                entity_context=entities.drawing.AnnotationEntityContext.MODEL,
                 label=f"label {role}",
             )
 
@@ -190,6 +206,27 @@ def test_missing_observer_row_is_not_hidden_by_unrelated_geometry(entity_bank):
         bank.witness.drawing_snapshot(bank.adapter, bank.source, phase="built")
 
 
+def test_observer_cannot_accept_a_new_expected_role_despite_consistent_mapping(
+    entity_bank,
+):
+    bank = entity_bank
+    changed_source = object()
+    bank.view.ReferencedDocument.Extension.GetCorrespondingEntity2 = lambda _: (
+        changed_source
+    )
+    with pytest.raises(RuntimeError, match="not its source role"):
+        with bank.witness.observe(bank.adapter, bank.source):
+            entities.drawing._validate_explicit_annotation_attachment(
+                bank.adapter,
+                bank.annotations["datum:A"],
+                bank.view,
+                changed_source,
+                entity_type="EDGE",
+                entity_context=entities.drawing.AnnotationEntityContext.MODEL,
+                label="label datum:A",
+            )
+
+
 @pytest.mark.parametrize("fault", ["hidden", "dangling", "off_sheet"])
 def test_final_bank_checks_earlier_datum_after_finish_insertion(entity_bank, fault):
     bank = entity_bank
@@ -214,13 +251,25 @@ def test_cold_witness_resolves_new_native_entities_without_old_handle_calls(
     built = bank.witness.drawing_snapshot(bank.adapter, bank.source, phase="built")
     cold_view = SimpleNamespace(GetName2=lambda: "Front")
     cold_entities = {key: object() for key in bank.source}
+    cold_view_entities = {role: object() for role in bank.witness.roles}
     for key, value in cold_entities.items():
         bank.geometry[id(value)] = bank.geometry[id(bank.source[key])]
+    cold_reverse = {
+        id(value): cold_entities[role] for role, value in cold_view_entities.items()
+    }
+    for role, value in cold_view_entities.items():
+        bank.geometry[id(value)] = bank.geometry[id(cold_entities[role])]
+    cold_view.ReferencedDocument = SimpleNamespace(
+        GetType=lambda: 1,
+        Extension=SimpleNamespace(
+            GetCorrespondingEntity2=lambda entity: cold_reverse.get(id(entity), entity)
+        ),
+    )
     cold_annotations = {}
     for role, original in bank.annotations.items():
         row = SimpleNamespace(**vars(original))
         row.Owner = cold_view
-        row.GetAttachedEntities3 = lambda role=role: (cold_entities[role],)
+        row.GetAttachedEntities3 = lambda role=role: (cold_view_entities[role],)
         cold_annotations[role] = row
     if fault == "wrong_entity":
         cold_annotations["bearing_finish"].GetAttachedEntities3 = lambda: (object(),)
