@@ -74,3 +74,37 @@ other 34 recipes. Production rebuilds, saved/cold source values and tolerances,
 imported identity, layout and printed/visual checks remain mandatory. Diagnostics
 that observed the old setter require their explicit verifier ABI migration;
 historical tooling is not silently adapted.
+
+### First production builders
+
+The root's actual alignment-pinion part and drawing passed at `fdf1e84d`;
+the native source/save and visual evidence is recorded in
+[`alignment-source-save-boundaries.md`](../../docs/pipeline/alignment-source-save-boundaries.md).
+This is distinct from the earlier diagnostic authoring of an owned source copy.
+
+The actual cone-tip-adjuster builder passed at `2d5d4d4d`, including the original
+above-text BodyProfile callout and below-text Cup callout. Its saved execution
+token is `8e2ce51d8e7ca47f9ca5a8e5c743d1d6a0f0cd749e10195a54e2140117bf12f4`.
+The cup/slot part render was visually inspected. Its drawing stopped before the
+recipe, at the prepared-template visible-pixel-box check; no drawing callout
+verification was reached. A production retry at `5448afab` repeated the exact
+one-pixel-per-dimension mismatch, retained in
+`cad/out/prepared-drawing-templates/pending-09f01092e507-vao_atut/receipt.json`
+(SHA-256 `436ceb10b7fa52f0ef809576ba08bb18dd91ad6f980e1ded523ec11d4e54814d`).
+
+The actual cone-pivot-screw builder passed at `c61655db`, adapter `25bc99b1`,
+licensed PID 31860, remote cache off. Source SHA-256 and execution token both
+equal `515019088b41d329b45f0487b9241123751ecac7d6c116481930ae9c45e89c36`.
+Trace `0x03b6ad66aeedd08030f5543c0e2da971` records 95.660778 seconds for the
+part task, including 2.131209 seconds authoring the ThreadTail callout. Its
+slotted-head/shoulder/tail render was visually inspected. The subsequent drawing
+also stopped before its shared-fastener recipe at the same template check:
+`pending-09f01092e507-dn6v_vzy/receipt.json`, SHA-256
+`e5ae56a4ad0ea4071d2f7308e71c2c348e8ce60b658bdf67e7fd8f6ff765f28d`.
+The drawing task took 26.395381 seconds, trace
+`0x7e1768d6bbf3294c9cf279d69a1ca52e`.
+
+Both failing template receipts preserve the original visible rectangle
+`[2216, 141, 3824, 995]` and verification rectangle `[2216, 141, 3823, 994]`,
+with no cleanup error. These are successful source builders but failed drawing
+tasks, not native acceptance of the above-text or shared-fastener import paths.
