@@ -181,3 +181,45 @@ uv run --no-sync python -m pytest -q --tb=short cad/scripts/test_drawing_layout_
 All runs used the integration checkout's own venv. No COM, native artifact
 changes, source pin changes, memory edits or new native acceptance are part of
 this review follow-up.
+
+## Fixture and arbor findings at `b3c193bb`
+
+The reported CWM fixture leak does not occur under pytest. The module's autouse
+`_patch` fixture replaces the adapter module before all five real `pose_bank`
+consumers and restores it afterward. `test_cwm_fixture_lifecycle_drawing.py`
+preloads the real adapter in a fresh subprocess and checks its entire namespace
+and `sys.modules` identity through actual fixture setup and teardown. The check
+passes after an injected test-body failure too. A separate negative control
+injects a real-module mutation only in its disposable subprocess and confirms
+that the check catches it. The original fixtures and assertions are unchanged.
+The 40 CWM/lifecycle tests passed in 4.61 s (`run-o2r4k0p_`).
+
+The unit-defaults rerun claim is also false for the actual test. Its `Model`
+class and `values` dictionary are created inside each invocation; it creates
+one instance. The added control executes that original test twice, including
+all setter and readback assertions, and verifies different classes and
+dictionaries with identical initial and final values. All three unit-defaults
+tests passed in 0.53 s (`run-geo0opkr`).
+
+The arbor recipe did request an unused `dome` circle edge and unpack it into
+`dome_entity`. `ModelEntities.resolve` requires a unique match for every
+requested role, so that unused request could reject an otherwise usable source.
+This review did not reproduce such a rejection in SolidWorks.
+
+Remove only the unused selector and unpacked variable. The eight consumed
+roles retain their selectors. `DomeDia` still receives its BASIC check, and
+the exterior profile frame still attaches to the flank with the exact quantity
+`CROWN + 2 FLANKS + FOOT TOP + RIGHT SIDE`. Source geometry, view placement,
+dimensions, datums, finishes, and final validation code are unchanged.
+
+The new arbor regression executes the actual recipe's entity resolution,
+unpacking and PMI-call block with mocked native boundaries. It failed first
+because the resolver received the extra ninth role (`run-zqxcfh_8`), then passed
+with exactly eight resolved and consumed handles. Existing manufacturing
+assertions remain intact. The combined focused/adjacent suite passed 200 tests
+in 7.09 s (`run-lpy94u93`); Ruff F and diff-check were clean.
+Graph and part-isolation checks passed 93 tests in 20.17 s (`run-qf7fd07r`).
+
+Native arbor revalidation is still required. No COM calls, rendered-output
+inspection, cold-reopen acceptance, or speedup measurement were performed for
+this change. The offline results do not replace those checks.

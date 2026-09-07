@@ -119,7 +119,6 @@ def _model_entities(model: Any) -> dict[str, Any]:
                 (-flank_run, flank_rise, 0),
             ),
             "bore": CircleEdge(BORE_DIA / 2.0, (0, BORE_HEIGHT, near_z), (0, 0, 1)),
-            "dome": CircleEdge(TOP_RADIUS, (0, BORE_HEIGHT, near_z), (0, 0, 1)),
             "screw": CircleEdge(
                 SCREW_CLEARANCE_DIA / 2.0, (0, FOOT_HEIGHT, -5.0), (0, 1, 0)
             ),
@@ -260,8 +259,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # measure from). The arbor bore is toleranced parallel to it and carries the
     # clamp-fit finish.
     entities = _model_entities(front.ReferencedDocument)
-    foot_entity, side_entity, flank_entity, bore_entity, dome_entity = (
-        entities[key] for key in ("foot", "side", "flank", "bore", "dome")
+    foot_entity, side_entity, flank_entity, bore_entity = (
+        entities[key] for key in ("foot", "side", "flank", "bore")
     )
     _add_circle_basic(
         adapter,

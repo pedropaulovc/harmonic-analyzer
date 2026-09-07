@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import ast
 import re
 from pathlib import Path
+from types import SimpleNamespace
 from _drawing_test_support import linked_note_properties
 
 import _surface_finish
@@ -211,3 +213,70 @@ def test_part_stamps_make_critical_properties() -> None:
     # Two identical castings: the south pedestal plus the north one rotated
     # 180 about Y (build_drive_train_assembly places both).
     assert int(config["quantity"]) == 2
+
+
+def test_model_entity_bank_resolves_only_roles_consumed_by_actual_pmi_calls(monkeypatch):
+    resolved = {
+        name: object()
+        for name in (
+            "foot", "side", "flank", "bore", "screw", "datum_d", "strap_near", "far_face"
+        )
+    }
+    model = object()
+    banks, calls = [], []
+
+    class Index:
+        def __init__(self, source):
+            assert source is model
+
+        def resolve(self, roles):
+            assert tuple(roles) == tuple(resolved)
+            banks.append(roles)
+            return resolved
+
+    monkeypatch.setattr(drawing, "ModelEntities", Index)
+
+    def record(name):
+        def capture(*args, **kwargs):
+            calls.append((name, args, kwargs))
+
+        return capture
+
+    namespace = dict(vars(drawing))
+    namespace.update(
+        adapter=object(), front=SimpleNamespace(ReferencedDocument=model), top=object()
+    )
+    for name in (
+        "_add_circle_basic", "add_datum_feature", "add_feature_control_frame",
+        "add_surface_finish", "add_native_hole_callout",
+    ):
+        namespace[name] = record(name)
+
+    # Execute the real recipe's resolution/unpacking and every following PMI
+    # call, stopping before notes/layout. No hand-copied recipe or COM methods.
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    build = next(node for node in tree.body if isinstance(node, ast.AsyncFunctionDef)
+                 and node.name == "build")
+    assignments = {
+        node.targets[0].id: index
+        for index, node in enumerate(build.body)
+        if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name)
+    }
+    body = build.body[assignments["entities"]:assignments["manufacturing"]]
+    exec(compile(ast.Module(body=body, type_ignores=[]), drawing.__file__, "exec"), namespace)
+
+    assert len(banks) == 1
+    consumed = {
+        role for role, entity in resolved.items()
+        if any(value is entity for _, args, kwargs in calls
+               for value in (*args, *kwargs.values()))
+    }
+    assert consumed == set(resolved)
+    exterior, = [kwargs for name, _, kwargs in calls
+                 if name == "add_feature_control_frame"
+                 and kwargs["label"] == "controlled exterior surface profile"]
+    assert exterior["entity"] is resolved["flank"]
+    assert exterior["quantity"] == "CROWN + 2 FLANKS + FOOT TOP + RIGHT SIDE"
+    assert 'dome_annotation = front_by_name["DomeDia"]' in source
+    assert 'require_basic_dimension(dome_display, label="crown true-profile diameter")' in source
