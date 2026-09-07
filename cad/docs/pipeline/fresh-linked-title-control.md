@@ -3,7 +3,8 @@
 Status: native baseline reproduced the printed shift; the one pre-save redraw
 and one checked pre-save rebuild did not prevent it. This diagnostic does not
 change production finalization. Same-value horizontal justification followed by
-its documented redraw also leaves the shift. A forced-rebuild control is next.
+its documented redraw also leaves the shift. The forced-rebuild control likewise
+returned success without preventing it. No ineffective update was added to production.
 Both independent native controls are recorded below.
 
 The retained rocker control proved a real printed change: cold reopening moved
@@ -267,4 +268,21 @@ text-format update or forced rebuild refreshes the cached text origin.
 `IModelDoc2.ForceRebuild3(False)` before the native save, requires native `True`,
 and makes no redraw or note setter call. Existing baseline and output comparisons
 are unchanged. The ordinary/forced rebuild tests cover exact argument shapes and
-False/None rejection before saving. 66 focused tests pass; native result pending.
+False/None rejection before saving. 66 focused tests pass.
+
+At frozen root `cd0ab7c6`, session 9540 finished with exit 0 and
+`candidate_not_stable`. Report:
+`cad/out/reports/fresh-title-rrt7c__6/title-update.json`. The baseline and candidate
+trial totals were 60.691189 and 60.603678 seconds. Each still shifts the title
+7.22522650825 mm on cold reopen, changing 11,232 pixels. The candidate recorded
+one successful forced rebuild, no ordinary rebuild/redraw/note setter, and one
+native/PDF save. Originals, template and copied-source hashes are unchanged;
+ownership ends empty with preservation passed and no probe/cleanup error.
+
+The remaining strict-position acceptance question is separate from native API
+effectiveness. Both inspected title placements fit visibly within the title cell.
+The user permits layout changes, but that alone has not been treated as permission
+to relax the existing cold-position comparator. Any explicit allowance for linked
+title reflow must validate both title-cell placements and preserve the stronger
+manufacturing-annotation/source-identity checks; it must not become a general
+annotation-displacement tolerance. That choice has been raised with the user.
