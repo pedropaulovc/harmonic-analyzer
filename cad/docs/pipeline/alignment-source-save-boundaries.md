@@ -1,0 +1,129 @@
+# Alignment source-save boundary control
+
+This is diagnostic instrumentation, not an accepted save-policy change. Native
+execution requires a reviewed frozen revision and the shared seat grant.
+
+## Retained failure
+
+The ordinary alignment-pinion pilot at `add24145` produced native/PDF/PNG output,
+then rejected its owned source copy because the bytes changed. Recipe time was
+22.666290000022855 s, including existing diagnostic reads. The receipt is
+`cad/out/reports/datum-policy-s3q2gji6/pilot.json` in the primary checkout:
+
+- Receipt SHA-256: `e9190be3f09daf379d7e71bde6b73e08e1aa71f33fc6b35447a3362847cffe62`.
+- Original and initial copy: `858dc759943c2f739b3081fd02f313c26ead01eb837e08f9c79d59caac388920`.
+- Copy after the recipe: `4bd7337bcdb79e2020e802c784eb8e5e7c6d0bad39aa6d23472ff1d8ca2804f0`.
+- Trace: `0xcded02273219e9a9d40d5c2f5ff65034`.
+
+The copy's observed last-write time, `2026-09-07T06:43:48.8946648Z`, falls inside
+`drawing.save_native` (`06:43:48.542209Z`–`06:43:49.998375Z`), before the PDF span.
+This associates the disk write with the native-save phase; it does not identify
+which earlier operation first dirtied the source. The recipe applies the bore's
+`THRU - REAM\nPRESS FIT` callout and precision before finalization. Each helper
+already performs its own rebuild. The observer does not add a rebuild or setter.
+
+The failure capture retained the same named `ArborBoreDia@ArborBoreProfile`
+manufacturing value/tolerance witness (`0.008000000002`, tolerance type 2).
+The ordinary `source_after` acceptance bank was not reached. One parameter is
+not a full source-equivalence proof. The original part and other protected inputs
+kept their hashes. Ownership returned from an empty baseline to empty; cleanup
+was null. The final runtime guard also reported the changed copy, as required.
+
+For comparison, the earlier arbor first-dirty control
+`probe_source_dirty_recipe.py` (`source-dirty-9cbdz77u`, frozen `99eadbe7`) observed
+its first dirty transition around the unchanged callout helper, with only the
+bore's below-text changing among its 20 observed dimensions. It did not bisect
+that helper's SetText versus rebuild operations and did not save. That result is
+not evidence that alignment has the identical first-dirty operation.
+
+## Instrumented replay
+
+`--source-observation alignment_save` opts the existing owned full-recipe pilot
+into nine read banks: initial, then before/after callouts, precision, native save,
+and PDF export. Only `--target alignment_pinion` is accepted. Default behavior and
+all original source/copy/runtime/attachment/layout/cold/export guards remain.
+
+The helper calibrates one source `IDisplayDimension` through the exact named
+feature once. It requires a unique observed display and its exact existing
+`IDimension`; it never toggles visibility. At each boundary it records:
+
+- GetSaveFlag before and after the getters, plus exact copy-file hash;
+- freshly resolved named source configuration/value/tolerance/BASIC and native
+  parameter identity, using the existing pilot reader;
+- an additional unrounded, finite, single GetSystemValue3 scalar, with exact
+  same-session equality, and tolerance limits;
+- the cached display's current exact parameter identity, type, precision and raw
+  GetText parts 1–8. Hole-callout text is explicitly unsupported here.
+
+The repeated source reader resolves only the manifest's named feature dimension,
+not a complete source annotation or BREP inventory. Its existing rounded witness
+is retained alongside the new raw scalar. Every bank has its own read duration;
+these additional reads are not a speedup. Raw presentation changes are evidence,
+not silently classified as harmless. Getter-induced dirtiness, missing/ambiguous
+calibration, invalid native shapes, or identity/value/tolerance changes fail.
+
+The save wrapper composes the existing `artifact_context`; it performs no save
+itself. Both native-save and PDF observations survive before the unchanged
+after-recipe immutable-copy gate rejects disk drift. Primary operation errors
+remain primary if a subsequent read or evidence checkpoint also fails.
+
+Example command, only after a current PID and seat grant are supplied:
+
+```powershell
+$env:HARMONIC_SW_AUTOSTART = '0'
+$env:HARMONIC_REMOTE_CACHE_MODE = 'off'
+$env:HARMONIC_DIAGNOSTIC_SW_PID = '<reviewed-current-PID>'
+$env:PYTHONPATH = 'C:/src/ha-perf-source-save-boundaries/cad/scripts;C:/src/harmonic-analyzer/SolidworksMCP-python/src'
+uv run --no-project --python C:/src/harmonic-analyzer/.venv/Scripts/python.exe python cad/scripts/diagnostics/probe_datum_policy_recipes.py --candidate HEAD --factory normal --target alignment_pinion --source-observation alignment_save --source-root C:/src/harmonic-analyzer/cad/out/sldprt --guard-root C:/src/harmonic-analyzer/cad/out/sldprt
+```
+
+Run from the frozen isolated checkout. The existing parent runner takes the
+machine lock; the worker remains attach-only. It fingerprints actual imported
+adapter/helper sources and uses unique owned copies. No native result for this
+new opt-in is claimed by its offline tests.
+
+Offline verification: 133 tests passed in 2.64 s across source-boundary,
+full-recipe pilot, first-dirty control and factory suites; Ruff passed. Tests
+include raw sub-rounding value changes, malformed native arrays, replaced
+documents/parameters, getter dirtiness, original-error retention, CLI scope, and
+both save banks surviving before the unchanged immutable-copy rejection.
+
+## Save API contract and separate candidate
+
+The bundled current `IModelDocExtension.SaveAs3` explicitly accepts
+`swSaveAsOptions_e`. That enum defines `Silent=1` separately from
+`SaveReferenced=4`, the latter requesting all referenced assembly/drawing
+components. A bounded candidate can therefore omit bit 4:
+
+```python
+extension = _early_bound(drawing.Extension, "IModelDocExtension")
+advanced = extension.GetAdvancedSaveAsOptions(0)
+result = extension.SaveAs3(native_path, 0, 1, None, advanced, 0, 0)
+```
+
+This is a candidate call shape, not a guarantee that dirty referenced files stay
+unchanged. `GetAdvancedSaveAsOptions(0)` uses the separate
+`swSaveWithReferencesOptions_e`: zero means the normal reference list, **not**
+"no references." `SaveAllAsCopy=False` likewise is not a no-reference-save
+contract. The obsolete `IModelDoc2.SaveAs3(path, 0, 0)` page does not document its
+Options parameter enough to transfer the modern contract to that legacy call.
+
+The earlier four-cell `probe_drawing_template_save.py` control
+(`template-save-74ytw6wb`, frozen `282bb9e7`) proved the legacy three-argument call
+saved/reopened blank SLDDRW and DRWDOT files. The tested modern advanced/silent
+shape returned `(True, 0, 0)` but produced neither requested file nor native path.
+Those blank documents had no dirty references, so that failure does not answer
+the reference-write question. A new control must validate native result, actual
+file/path, exact source hashes and cold witnesses. No alternative save is added
+by this commit.
+
+Docs read: `IModelDocExtension.SaveAs3`, `GetAdvancedSaveAsOptions`,
+`IAdvancedSaveAsOptions.SaveAllAsCopy`, `IModelDoc2.SaveAs3`,
+`swSaveAsOptions_e`, `swSaveWithReferencesOptions_e`, and the bundled PDF-save
+example. Source getter docs and the dimension-enumeration example were read
+before implementing the banks.
+
+Composition seam for a separate save control: install its context **before**
+`SourceSaveBoundaries.observe()`. The observer captures the current
+`_drawing_common.save_drawing` and forwards its composed `artifact_context`
+without duplicating either save. The legacy context must remain an exact no-op.
