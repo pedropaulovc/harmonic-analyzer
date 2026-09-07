@@ -214,3 +214,31 @@ cleanup checks are unchanged; the known new-center-mark failure is not waived.
 This is a native mechanism control, not a performance comparison or approval
 to replace the production drawing path. Printed readability and native command
 effectiveness remain unproven until the coordinated frozen run.
+
+### First three-annotation command result
+
+At root `b63fc27e` / adapter `e77bfda4` / PID 31860, all three selections had
+the expected types and exact annotation/view identities. Command 317 was
+enabled and returned True in 1.0712462 s. The cylindricity anchor stayed fixed;
+the runout anchor moved from Y=89.960000 to 82.997604 mm, and datum A moved
+from Y=67.060000 to 72.475196 mm. The runout Z readback also became 2.5 mm;
+sheet-space ink, not anchor motion alone, must establish the rendered result.
+
+The diagnostic then rejected missing body measurements before export. Its
+shared raw reader had called `bounds_from_snapshot` without the symbol lookup
+already supplied by production `annotation_box`, so `<GTOL-CYL>` was explicitly
+unmeasured. It now uses the same `IEnvironment` native definition reader on
+the already-captured snapshot, with successful definitions cached only within
+that capture. Unknown definitions still produce an explicit measurement failure;
+there is no font-glyph guess or omitted-body acceptance. Two new regressions
+failed before this correction; 230 focused tests passed afterward.
+
+Receipt `selected-view-pmi-6eemzmc6/observations.json` has SHA-256
+`80f15e532be61a416216b4653035ca8fd83187627cf4136afe6ca5f54c68ad8f`.
+The 44.167799 s diagnostic ran alongside offline tests and is not a speed
+comparison. Source/template/runtime guards and empty-to-empty cleanup passed.
+No PDF, saved drawing or cold-reopen acceptance was produced by this attempt.
+
+At this code checkpoint the seven offline gates were current, including 4,143
+recipe tests (`pytest-telemetry/run-jatvb_dw`, 86.84 s); this remains distinct
+from full native pipeline acceptance.
