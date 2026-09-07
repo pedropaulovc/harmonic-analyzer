@@ -3,7 +3,6 @@ r"""Create the curated machinist drawing for the lever fulcrum shaft."""
 from __future__ import annotations
 
 import argparse
-import math
 import sys
 from typing import Any
 
@@ -24,6 +23,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_entities import CircleEdge, FaceBoundary, FeatureFace, ModelEntities
 from _surface_finish import surface_finish_by_key
 from fulcrum_shaft_spec import (
     GEOMETRIC_CONTROLS,
@@ -82,6 +82,25 @@ RIGHT_KEEP = {
 # The shaft fit lives on the source-model dimension.
 DIMENSION_CALLOUTS: dict[str, str] = {}
 
+# All roles are model millimetres on the builder's named Shaft feature. The
+# Front view sees the -Z rim; the Right view shows the two end rims edge-on.
+# Each boundary is scoped to its controlled face, not a body-wide circle pick.
+_CONTROL_FACES = {row.key: FeatureFace("Shaft", row.face) for row in GEOMETRIC_CONTROLS}
+_FRONT_RIM = CircleEdge(SHAFT_DIA / 2, (0, 0, -SHAFT_LENGTH / 2), (0, 0, 1))
+ENTITY_ROLES = {
+    "datum:A": FaceBoundary(FeatureFace("Shaft", PART_DATUMS[0].face), _FRONT_RIM),
+    "bearing_cylindricity": FaceBoundary(_CONTROL_FACES["bearing_cylindricity"], _FRONT_RIM),
+    "plus_z_end_perpendicularity": FaceBoundary(
+        _CONTROL_FACES["plus_z_end_perpendicularity"],
+        CircleEdge(SHAFT_DIA / 2, (0, 0, SHAFT_LENGTH / 2), (0, 0, 1)),
+    ),
+    "minus_z_end_perpendicularity": FaceBoundary(_CONTROL_FACES["minus_z_end_perpendicularity"], _FRONT_RIM),
+    "bearing_finish": FaceBoundary(
+        FeatureFace("Shaft", surface_finish_by_key(SURFACE_FINISHES, "bearing").face),
+        _FRONT_RIM,
+    ),
+}
+
 
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
@@ -131,6 +150,7 @@ async def build(adapter: Any) -> dict[str, str]:
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
+    entities = ModelEntities(front.ReferencedDocument).resolve(ENTITY_ROLES)
 
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
@@ -143,21 +163,8 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to shaft end view")
 
-    end_radius = SHAFT_DIA * END_VIEW_SCALE / 2000.0
-    end_circle = (
-        FRONT_CENTER[0] + end_radius,
-        FRONT_CENTER[1],
-    )
     left_end = (RIGHT_CENTER[0] - SHAFT_LENGTH / 2000.0, RIGHT_CENTER[1])
     right_end = (RIGHT_CENTER[0] + SHAFT_LENGTH / 2000.0, RIGHT_CENTER[1])
-    end_top = (
-        FRONT_CENTER[0],
-        FRONT_CENTER[1] + SHAFT_DIA * END_VIEW_SCALE / 2000.0,
-    )
-    end_upper = (
-        FRONT_CENTER[0] + end_radius * math.cos(math.radians(50.0)),
-        FRONT_CENTER[1] + end_radius * math.sin(math.radians(50.0)),
-    )
     # GD&T is model PMI (fulcrum_shaft_spec.PART_DATUMS/GEOMETRIC_CONTROLS,
     # authored by build_fulcrum_shaft) — project it and place it where the
     # hand-authored symbols used to sit (sheet-LEFT of the *Right view is the
@@ -171,30 +178,31 @@ async def build(adapter: Any) -> dict[str, str]:
             "datum:A": PmiDrawingPlacement(
                 view=front,
                 position=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.024),
-                attachment_xy=end_top,
+                entity=entities["datum:A"],
                 position_tolerance_m=0.0001,
             ),
             "bearing_cylindricity": PmiDrawingPlacement(
-                view=front, position=(0.065, 0.250), attachment_xy=end_upper
+                view=front, position=(0.065, 0.250), entity=entities["bearing_cylindricity"]
             ),
             "plus_z_end_perpendicularity": PmiDrawingPlacement(
                 view=right,
                 position=(left_end[0] - 0.042, 0.180),
-                attachment_xy=left_end,
+                entity=entities["plus_z_end_perpendicularity"],
             ),
             "minus_z_end_perpendicularity": PmiDrawingPlacement(
                 view=right,
                 position=(right_end[0] + 0.014, 0.180),
-                attachment_xy=right_end,
+                entity=entities["minus_z_end_perpendicularity"],
             ),
         },
         datums=PART_DATUMS,
         controls=GEOMETRIC_CONTROLS,
         label="fulcrum shaft PMI",
     )
-    # Up-RIGHT of the end circle, on the same side as the `end_circle` pick
-    # (the circle's RIGHTMOST point), so the leader comes in from the right and
-    # never crosses the circle.  Two constraints forced this side:
+    # Retain the historical display seed up-right of the controlled end rim;
+    # its exact entity now supplies attachment, not a sheet-coordinate pick.
+    # The prior leader came in from the right without crossing the circle.
+    # These historical observations explain the seed, not the new route's fit:
     #   * it used to sit at RIGHT_CENTER[0] and drag a 130 mm diagonal leader
     #     back to this circle; and
     #   * placing it up-LEFT instead only traded that for a leader that raked
@@ -210,7 +218,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         front,
-        edge_xy=end_circle,
+        entity=entities["bearing_finish"],
         symbol_xy=(0.075, 0.222),
         control=surface_finish_by_key(SURFACE_FINISHES, "bearing"),
         label="fulcrum bearing finish",

@@ -803,6 +803,61 @@ def add_feature_control_frame(
     return gtol
 
 
+def _validate_explicit_annotation_attachment(
+    adapter: Any,
+    annotation: Any,
+    view: Any,
+    entity: Any,
+    *,
+    entity_type: str,
+    label: str,
+) -> None:
+    """Witness one explicit model attachment and its actual drawing-view owner.
+
+    GetAttachedEntities3 and GetAttachedEntityTypes are parallel arrays. Null
+    entries are not an identity witness, even when Count3 reports one. Native
+    IsSame must return 1: identical names/geometry and unknown identity do not
+    prove that insertion retained the selected entity or owning view.
+    """
+    # swSelectType_e: swSelEDGES, swSelFACES, swSelSILHOUETTES.
+    native_type = {"EDGE": 1, "FACE": 2, "SILHOUETTE": 46}.get(entity_type)
+    if native_type is None:
+        raise ValueError(f"{label}: unsupported explicit attachment type {entity_type!r}")
+    annotation = _early_bound(annotation, "IAnnotation")
+    attached = tuple(annotation.GetAttachedEntities3() or ())
+    kinds = tuple(annotation.GetAttachedEntityTypes() or ())
+    count = int(annotation.GetAttachedEntityCount3())
+    if count != 1 or len(attached) != 1 or attached[0] is None or kinds != (native_type,):
+        raise RuntimeError(
+            f"{label}: explicit annotation attachment mismatch: "
+            f"count={count}, entities={len(attached)}, types={kinds}, expected={native_type}"
+        )
+    application = _early_bound(adapter.swApp, "ISldWorks")
+    if int(application.IsSame(entity, attached[0])) != 1:
+        raise RuntimeError(f"{label}: explicit annotation attachment changed entity identity")
+    # swAnnotationOwner_DrawingView=0. Owner may otherwise be a sheet/part.
+    if int(annotation.OwnerType) != 0:
+        raise RuntimeError(f"{label}: explicit annotation owner is not a drawing view")
+    owner = annotation.Owner
+    if owner is None or int(application.IsSame(owner, view)) != 1:
+        raise RuntimeError(f"{label}: explicit annotation has a different owning view")
+
+
+def _validate_pmi_controlled_face(placement: PmiDrawingPlacement, face: Any, *, label: str) -> None:
+    """Require a face or boundary edge to qualify the unchanged typed PMI row."""
+    from _part_pmi import _face_matches
+
+    entity = placement.entity if placement.entity is not None else placement.edge_entity
+    faces = _surface_finish_entity_faces(entity, entity_type=placement.attachment_type, label=label)
+    signatures = _surface_finish_face_signatures(faces)
+    matched = sum(_face_matches(item["geometry"], face) for item in signatures)
+    if matched != 1:
+        raise RuntimeError(
+            f"{label}: explicit {placement.attachment_type} touches {matched} "
+            f"controlled PMI faces; expected exactly one matching {face!r}"
+        )
+
+
 @_telemetry.traced("drawing.project_part_pmi", label_param="label")
 def project_part_pmi(
     adapter: Any,
@@ -832,6 +887,14 @@ def project_part_pmi(
             f"{label}: placement keys {sorted(placements)} != "
             f"spec annotations {sorted(expected_keys)}"
         )
+
+    explicit = {}
+    for row in (*datums, *controls):
+        placement = placements[row.key]
+        if placement.entity is None and placement.edge_entity is None:
+            continue
+        _validate_pmi_controlled_face(placement, row.face, label=f"{label} {row.key}")
+        explicit[row.key] = placement
 
     projected: dict[str, Any] = {}
 
@@ -909,7 +972,15 @@ def project_part_pmi(
             )
         projected[control.key] = annotation
 
-    _telemetry.event("drawing.pmi_projected", count=len(projected))
+    # Check the complete explicit bank after all insertion/rebuild operations,
+    # including datums whose old explicit-position path only checked labels/XY.
+    for key, placement in explicit.items():
+        entity = placement.entity if placement.entity is not None else placement.edge_entity
+        _validate_explicit_annotation_attachment(
+            adapter, projected[key], placement.view, entity,
+            entity_type=placement.attachment_type, label=f"{label} {key}",
+        )
+    _telemetry.event("drawing.pmi_projected", count=len(projected), exact_entity_witnesses=len(explicit))
     return projected
 
 
@@ -1087,6 +1158,11 @@ def add_surface_finish(
     draw.EditRebuild3()
     if symbol_xy is None:
         _validate_native_annotation(adapter, annotation, selected_entity, label=label)
+    elif entity is not None or edge_entity is not None:
+        expected = entity if entity is not None else edge_entity
+        _validate_explicit_annotation_attachment(
+            adapter, annotation, view, expected, entity_type=entity_type, label=label,
+        )
     return symbol
 
 
