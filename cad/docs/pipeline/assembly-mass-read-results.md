@@ -2,7 +2,8 @@
 
 Batch B follows accepted Batch A, `aff115c4` (native candidate `840b0a42`),
 on branch `perf/assembly-mass-read`. The adapter remains
-`e77bfda4de1962625da8a9a859eb0bbaf1e6f10f`. Experiment results are pending.
+`e77bfda4de1962625da8a9a859eb0bbaf1e6f10f`. Stationary comparison passed;
+changed-part and production acceptance remain pending.
 Portfolio status belongs on the [project](https://github.com/users/pedropaulovc/projects/1).
 
 ## Hypothesis and scope
@@ -94,3 +95,66 @@ The first probe launch at 2026-09-07 04:54:44.633813 UTC stopped during Python
 import (`ModuleNotFoundError: psutil`, 0.227641 s wall), before COM attachment or
 any native trial. Process-age collection now uses the existing pywin32 bindings
 (`GetProcessTimes`), verified against PID 18748; dependencies remain unchanged.
+
+## Stationary native positive control
+
+Frozen source: `2cbe2a50d777028fdf0d74463361802e99be33ad`; same adapter and
+licensed process. After one checked deep rebuild and deep-health gate, the
+unchanged complete production fingerprint ran three ABBA blocks on one reopened
+drive-train. A calls the original adapter, with its hidden rebuild observed; B
+reads the same legacy native mass object without that rebuild. Timings include
+all fingerprint work and candidate guards, but exclude open, shared rebuild,
+health and untimed state witnesses. All twelve trials passed without native
+failure, retry, recovery or mate repair.
+
+| Trial | Variant | Fingerprint s | Hidden rebuild s | SW session age s |
+| ---: | :---: | ---: | ---: | ---: |
+| 1 | A | 129.411317 | 113.723655 | 16080.185 |
+| 2 | B | 4.657590 | none | 16214.781 |
+| 3 | B | 4.968940 | none | 16224.530 |
+| 4 | A | 111.747442 | 104.270892 | 16234.927 |
+| 5 | A | 141.057070 | 132.999674 | 16351.796 |
+| 6 | B | 4.643030 | none | 16497.993 |
+| 7 | B | 4.658064 | none | 16507.598 |
+| 8 | A | 116.659124 | 109.172598 | 16517.366 |
+| 9 | A | 92.606578 | 85.015418 | 16639.300 |
+| 10 | B | 5.270386 | none | 16737.091 |
+| 11 | B | 4.620363 | none | 16747.583 |
+| 12 | A | 132.380124 | 116.602496 | 16757.239 |
+
+Median: **123.035221 s → 4.657827 s**, saving 118.377394 s (96.214% of this
+stationary fingerprint phase). This is not a whole-build speed claim: native mass
+calculation may reuse internally cached values on the stationary candidate.
+Fresh construction and changed-part acceptance must cover nonstationary reads.
+
+Every complete SHA-256 fingerprint was
+`15e144ee08e61593d08c828237175bbd6d1f2932398720dd7d29efdf62e586ed`, also matching
+the saved baseline sidecar. Raw mass/volume/area/COM/inertia and all component
+poses/configurations passed the recorded relative `1e-10`, absolute `1e-9`
+comparison; full rounded fingerprints must match exactly. Every trial retained
+clean `NeedsRebuild2` and the same native document identities. This native model
+has only `Default`; multi-configuration activation/resolve/rest behavior is
+covered by behavioral offline tests, not claimed as a native multi-config trial.
+
+Run: 2026-09-07 04:55:32.940688 UTC to 05:11:41.576194 UTC,
+968.638566 s wall. Trace `0x04a87e9afc4f07834f6739169f4e75c1`:
+70 spans, zero errors, 967.486092 s after seat acquisition. All 39 saved native
+inputs (root plus 38 parts) retained their exact SHA-256 after owned documents
+were closed without saving. Raw trials and state witnesses:
+`cad/out/reports/assembly-mass-read-v_ga9jbv/measurements.json`, SHA-256
+`9731f41b493e3fc81781612ba9f9846ea223b25b4a388d7fa66a92e4f9578ab5`.
+Exclusive profile: `cad/out/reports/assembly-mass-read/paired-profile.json`,
+SHA-256 `e8b679a713d59c0a327c1c7f5adb06c7db965a203f697b3a3c31a11a287d79b8`.
+
+```powershell
+$env:HARMONIC_SW_AUTOSTART='0'
+$env:HARMONIC_REMOTE_CACHE_MODE='off'
+$env:HARMONIC_DIAGNOSTIC_SW_PID='<inventoried licensed PID>'
+uv run python cad/scripts/diagnostics/probe_assembly_mass_read.py --blocks 3
+```
+
+The enrolled `test_verify_auto_repair.py` module now passes 67 tests, including
+legacy unit/tensor mapping, strict malformed/state rejection, golden fingerprint
+rows, pose-only changes and configuration-switch failure/rest handling
+(`run-spiaovl8`, 0.53 s). Ruff and whitespace checks pass. The production
+fingerprint still calls the original adapter at this checkpoint.

@@ -399,6 +399,60 @@ def test_resolved_mass_reader_preserves_legacy_units_and_tensor_mapping(resolved
     assert trial.calls.count(("create",)) == 2
 
 
+def test_resolved_mass_reader_accepts_tuple_vectors(resolved_mass_reader):
+    trial = resolved_mass_reader
+    expected = trial.read()
+    trial.mass.CenterOfMass = tuple(trial.mass.CenterOfMass)
+
+    def tuple_inertia(reference):
+        assert reference == 0
+        return tuple(trial.inertia)
+
+    trial.mass.GetMomentOfInertia = tuple_inertia
+    assert trial.read().model_dump() == expected.model_dump()
+
+
+@pytest.mark.parametrize(
+    "missing", [{"expected_model": None}, {"expected_configuration": ""}]
+)
+def test_resolved_mass_reader_requires_expected_model_and_configuration(
+    resolved_mass_reader, missing
+):
+    from _assembly_mass_properties import read_resolved_mass_properties
+
+    trial = resolved_mass_reader
+    expected = {
+        "expected_model": trial.expected,
+        "expected_configuration": "Default",
+        **missing,
+    }
+    with pytest.raises(RuntimeError, match="requires a model and configuration"):
+        read_resolved_mass_properties(trial.adapter, **expected)
+    assert ("create",) not in trial.calls
+
+
+@pytest.mark.parametrize("phase", ["before", "after"])
+@pytest.mark.parametrize("missing", ["extension", "rebuild status"])
+def test_resolved_mass_reader_requires_readable_solve_state(
+    resolved_mass_reader, phase, missing
+):
+    trial = resolved_mass_reader
+
+    def corrupt():
+        if missing == "extension":
+            trial.expected.Extension = None
+        if missing == "rebuild status":
+            trial.extension.NeedsRebuild2 = None
+
+    if phase == "before":
+        corrupt()
+    if phase == "after":
+        trial.after_read.append(corrupt)
+    with pytest.raises(RuntimeError):
+        trial.read()
+    assert trial.calls.count(("create",)) == (0 if phase == "before" else 1)
+
+
 @pytest.mark.parametrize("phase", ["before", "after"])
 @pytest.mark.parametrize("fault", ["current", "active", "indeterminate", "configuration", "dirty"])
 def test_resolved_mass_reader_rejects_changed_or_unresolved_state(
@@ -436,6 +490,9 @@ def test_resolved_mass_reader_rejects_changed_or_unresolved_state(
         ("inertia", [0.0] * 10), ("inertia", "123456789"),
         ("Mass", float("nan")), ("Volume", float("inf")), ("Volume", 1e308),
         ("SurfaceArea", float("-inf")),
+        ("Mass", "not numeric"),
+        ("CenterOfMass", [0.0, "not numeric", 0.0]),
+        ("inertia", [0.0, 0.0, 0.0, "not numeric", 0.0, 0.0, 0.0, 0.0, 0.0]),
         ("CenterOfMass", [0.0, float("nan"), 0.0]),
         ("inertia", [0.0, 0.0, 0.0, float("inf"), 0.0, 0.0, 0.0, 0.0, 0.0]),
     ],
