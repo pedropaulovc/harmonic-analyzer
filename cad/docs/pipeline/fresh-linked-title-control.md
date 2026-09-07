@@ -5,8 +5,8 @@ and one checked pre-save rebuild did not prevent it. This diagnostic does not
 change production finalization. Same-value horizontal justification followed by
 its documented redraw also leaves the shift. The forced-rebuild control likewise
 returned success without preventing it. No ineffective update was added to production.
-The four native candidate controls are recorded below. A fifth, same-expression
-property-link reapplication, is prepared but has not run natively.
+All five native candidate controls are recorded below. Same-expression
+property-link reapplication also leaves the printed shift unchanged.
 
 The retained rocker control proved a real printed change: cold reopening moved
 all ten `rocker-arm` title glyphs right by about 7.22523 mm, while the note anchor,
@@ -291,7 +291,7 @@ title reflow must validate both title-cell placements and preserve the stronger
 manufacturing-annotation/source-identity checks; it must not become a general
 annotation-displacement tolerance. That choice has been raised with the user.
 
-## Fifth candidate: reapply the exact property link (not yet run)
+## Fifth candidate: reapply the exact property link
 
 `--candidate pre_save_relink` reads the title note's native unresolved expression,
 requires the exact already-witnessed `$PRPSHEET:"SW-Title(Title)"`, and assigns
@@ -301,7 +301,8 @@ native save. It never substitutes the resolved `rocker-arm` literal, calls
 documentation states get/set semantics and imposes no redraw requirement.
 The bundle search found no setter-specific `PropertyLinkedText` example; the
 related `Change_Note_Text_Example_VB` demonstrates `SetText`, not this property.
-This candidate is therefore a documented API hypothesis awaiting native proof.
+That documentation motivated the hypothesis; the negative native control below
+tests this exact assignment rather than inferring effectiveness from the API.
 
 Before save, readback must preserve the exact unresolved link, resolved title,
 horizontal/vertical justification, lock, annotation anchor, property-view/source
@@ -323,7 +324,44 @@ change, then cover exact assignment/readback, anchor/link/font failures, no
 candidate on non-reproduction, and restoration of wrapped finalizer functions.
 
 Prepared in isolated `ha-perf-title-link-refresh` from root `1acb6dfe`, with its
-own locked uv environment and unchanged adapter `e77bfda4`. After source review
-and an explicit seat grant, use the existing invocation above with
-`--candidate pre_save_relink` from the frozen reviewed checkout. No native run,
-production update or successful title-refresh claim is implied by this patch.
+own locked uv environment and unchanged adapter `e77bfda4`. The implementation
+commit `1b0ab300` passed 215 scoped offline tests, not the full pipeline; the
+reviewed native invocation below used its integrated root revision.
+
+### Native result: exact link reapplication also leaves the shift
+
+At frozen root `0ee5978b885c46c494f5f5da4f264d78619ec1c5`, the approved
+baseline plus `pre_save_relink` pair on PID 31860 finished with exit 0 and
+`candidate_not_stable` (session 12571). Exit 0 means the diagnostic completed,
+not that title stability passed. The fresh baseline reproduced before the
+candidate ran; no retry or further title variant followed.
+
+- Report: `C:/src/harmonic-analyzer/cad/out/reports/fresh-title-hgj78f5g/title-update.json`.
+- Report SHA-256: `98762abb263b761d8c5426f0c8c08d0bf9a671391f413cae388b8504740fcdb4`.
+- Baseline trial: 65.112050 s; candidate: 63.760221 s. These include native
+  observations and cold exports and are not a performance comparison.
+- Candidate counts: one same-expression link assignment, zero extra redraw,
+  ordinary/forced rebuild or justification calls, and one native/PDF save.
+
+Both trials moved all ten PDF title glyphs right by 7.22522650825 mm on cold
+reopen. Each first/cold 5100×3300 PNG pair changed 11,232 pixels, confined to
+`[4183,2749,4694,2813]`. The exact link, resolved text, anchor, alignment, lock,
+all sixteen native font properties, height mode and format inheritance passed
+the candidate's pre/post-assignment and cold-readback guards. Each full cold
+snapshot changed only the same three title-X representations recorded above;
+the subsequent no-setter PDF export changed zero native snapshot leaves.
+
+Both protected original rocker paths retain SHA-256 `3bfb6da4…3fba4d4a0`,
+and the project template retains `cbad80d2…980b55cc`; the full before/after hashes
+are in the receipt. Both independently owned source copies retain the exact
+original part hash. Existing named source-value/tolerance, view-reference and
+annotation-semantic guards passed within this minimal drawing's stated scope.
+The companion `ownership.json` records `[]` initially and finally, `preserved`,
+and no probe or cleanup error. All owned documents closed and the native seat
+was released.
+
+Conclusion: **one pre-native-save assignment of the already-correct
+PropertyLinkedText expression does not prevent this reproduced cold title
+reflow**. This is not a verdict on untested linked-note update mechanisms, a
+full manufacturing-sheet acceptance, or a speedup claim. No production setter,
+fallback or comparator relaxation follows; further title variants are paused.
