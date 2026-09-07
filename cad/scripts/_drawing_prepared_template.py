@@ -21,6 +21,7 @@ import time
 
 from _common import _early_bound, check
 from _drawing_template_defaults import compare_defaults, snapshot_defaults
+import _drawing_template_viewport as template_viewport
 import _telemetry
 
 
@@ -143,6 +144,9 @@ def _read_entry(entry, inputs):
             or receipt["inputs"] != inputs
             or not receipt["before"]
             or not receipt["after"]
+            or not receipt["viewport_before"]
+            or receipt["viewport_restore"]["status"] != "passed"
+            or receipt["viewport_restore"]["after"] != receipt["viewport_before"]
         ):
             raise ValueError("native validation receipt is incomplete")
         compare_defaults(receipt["before"], receipt["after"])
@@ -267,6 +271,9 @@ async def _prepare_native(adapter, spec, directory, receipt, operation_context):
                 adapter, scale=spec.scale, decimals=spec.decimals
             )
         _verify_baseline(app, baseline, [owned])
+        # GetExtent is pixel-quantized even though it reports sheet coordinates.
+        # Preserve the exact measurement frame, not just ViewZoomtofit2's scale.
+        receipt["viewport_before"] = template_viewport.capture(owned)
         receipt["before"] = snapshot_defaults(adapter, spec)
         with operation_context(TemplateOperation.SAVE_AS, path):
             _verify_baseline(app, baseline, [owned])
@@ -283,7 +290,8 @@ async def _prepare_native(adapter, spec, directory, receipt, operation_context):
             receipt["save_result"] = result
             receipt["saved_path"] = str(owned.GetPathName())
             # This complete legacy call shape has a committed native positive
-            # control. Its integer Options is NOT the modern SaveAs flags enum.
+            # control. The bundled legacy Options parameter has no documented
+            # enum mapping; do not infer the modern SaveAs flags contract here.
             # Return integer is retained, not interpreted as an undocumented
             # status enum. Exact fresh path plus re-instantiated defaults gate it.
             if (
@@ -310,6 +318,14 @@ async def _prepare_native(adapter, spec, directory, receipt, operation_context):
             ddoc.EditSheet()
             owned.ViewZoomtofit2()
         _verify_baseline(app, baseline, [owned])
+        if not _same(app, adapter.currentModel, owned) or not _same(
+            app, app.ActiveDoc, owned
+        ):
+            raise RuntimeError("refusing to restore an unexpected preparation viewport")
+        receipt["viewport_restore"] = {}
+        template_viewport.restore(
+            app, owned, receipt["viewport_before"], receipt["viewport_restore"]
+        )
         receipt["after"] = snapshot_defaults(adapter, spec)
         compare_defaults(receipt["before"], receipt["after"])
     except Exception as exc:
