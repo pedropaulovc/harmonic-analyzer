@@ -191,7 +191,7 @@ The typed pure BASIC-frame/line/extension recognition, pair geometry, required
 pitch and observed clearance are shared with the diagnostic. Existing nominal
 1 nm recognition is not a mutation tolerance: before/after native parameter
 values remain exact. The 1/0.5 paper-pitch gains are explicitly limited to the
-observed lever MODEL/type11 and DRAWING_REFERENCE/type2 pairs at view scale0.5;
+observed lever MODEL/type11 and DRAWING_REFERENCE/type2 pairs at view scale 0.5;
 unrecognized scale, class, ordering or native stroke inventory fails. The final
 whole-sheet crossing/packing/manufacturing gate is unchanged.
 
