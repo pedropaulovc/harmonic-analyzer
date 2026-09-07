@@ -1,6 +1,7 @@
 """Final native packing snapshots gate internal leader/text clearance cheaply."""
 
 from types import SimpleNamespace
+import json
 
 import pytest
 
@@ -207,6 +208,46 @@ def test_other_gtol_centerline_or_thread_ink_cannot_cross_a_frame(kind):
                 }
             }
         )
+
+
+@pytest.mark.parametrize("kind", [13, 15])
+def test_reverse_failure_retains_source_kind_and_exact_hit_inventory(kind):
+    displayed = Segment((0.2, 0.21), (0.35, 0.21), 0.00018)
+    native = Segment((0.31, 0.18), (0.31, 0.22))
+    decoration = Rect(0.305, 0.205, 0.315, 0.215)
+    source = measured(
+        kind, display=(displayed,), native=(native,), decorations=(decoration,)
+    )
+    target = measured(5, body=Rect(0.3, 0.2, 0.4, 0.25))
+    with pytest.raises(RuntimeError, match="annotation stroke/GTol-body") as caught:
+        validate_gtol_leader_clearance({"end": {"reference": source, "frame": target}})
+    [row] = json.loads(str(caught.value).split("crossings: ", 1)[1])
+    assert row["source_kind"] == kind
+    assert row["segments"] == [0, 1]
+    assert row["source_segments"] == [
+        {
+            "combined_index": 0,
+            "inventory": "native_strokes",
+            "inventory_index": 0,
+            "start": list(displayed.start),
+            "end": list(displayed.end),
+            "width_m": displayed.width_m,
+        },
+        {
+            "combined_index": 1,
+            "inventory": "native_leader_segments",
+            "inventory_index": 0,
+            "start": list(native.start),
+            "end": list(native.end),
+            "width_m": native.width_m,
+        },
+    ]
+    assert row["source_decorations"] == [
+        {"index": 0, "bounds": list(decoration.bounds)}
+    ]
+    assert row["text_cell"] == list(target.body.bounds)
+    assert source.native_strokes == (displayed,)
+    assert source.native_leader_segments == (native,)
 
 
 def test_stationary_obstacles_include_displayed_width_and_decorations():

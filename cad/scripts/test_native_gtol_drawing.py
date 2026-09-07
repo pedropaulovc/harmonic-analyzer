@@ -11,7 +11,8 @@ import pytest
 
 import _drawing_native_gtol as layout
 from _drawing_view_packing import Rect
-from _drawing_annotation_bounds import Segment
+from _drawing_annotation_bounds import NativeSnapshot, Segment, bounds_from_snapshot
+from _drawing_leader_clearance import validate_gtol_leader_clearance
 
 
 @pytest.mark.parametrize(
@@ -472,6 +473,99 @@ def test_dimension_extension_changes_outboard_choice_without_another_read(monkey
     assert result["obstacle_count"] == 2  # Body plus actual extension stroke.
     assert reads.call_count == 3  # Initial/final GTol, one existing obstacle read.
     dimension.SetPosition2.assert_not_called()
+
+
+@pytest.mark.parametrize("kind", [13, 15])
+@pytest.mark.parametrize("visible", [0, 1])
+def test_center_reference_ink_changes_lane_without_position_handoff(
+    monkeypatch, kind, visible
+):
+    adapter, view, rows, measure = native_context(monkeypatch, count=1)
+    reference = Mock()
+    reference.GetName.return_value = "native-reference"
+    reference.GetType.return_value = kind
+    reference.Visible, reference.OwnerType, reference.Owner = visible, 0, view
+    reference.GetPosition.return_value = None  # Native centerline contract.
+    view.GetAnnotationsByType.side_effect = lambda requested: {
+        5: rows,
+        kind: [reference],
+    }.get(requested, ())
+    # Use the real bounds derivation. The body includes the entire printed
+    # centerline and its width, not a text cell or an annotation-position proxy.
+    reference_bounds = bounds_from_snapshot(
+        NativeSnapshot(
+            name="native-reference",
+            kind=kind,
+            anchor=(0.1, 0.75),
+            text_runs=(),
+            lines=(Segment((0.0, 0.75), (0.2, 0.75), 0.0002),),
+            leaders=(),
+            primitive_boxes=(),
+            note_extent=None,
+            format_signature=(),
+        )
+    )
+    measured_gtols = []
+
+    def fresh_measure(adapter, annotation):
+        if annotation is reference:
+            return reference_bounds
+        bounds = measure(adapter, annotation)
+        bounds.native_strokes = ()
+        measured_gtols.append(bounds)
+        return bounds
+
+    reads = Mock(side_effect=fresh_measure)
+    cached_read = Mock(side_effect=AssertionError("reference ink needs a fresh read"))
+    record = Mock()
+    result = layout.arrange_native_gtol_columns(
+        adapter,
+        views={"front": view},
+        measure_annotation=reads,
+        measure_obstacle=cached_read,
+        record_measurement=record,
+    )["front"]
+    placed = Rect(*result["body_after"])
+    assert placed.xmin >= reference_bounds.body.xmax + 0.002 - 1e-8
+    assert result["translation_m"] == pytest.approx((0.402, 0))
+    assert result["obstacle_count"] == 1
+    assert reads.call_count == 3  # Initial/final GTol plus one fresh reference.
+    assert [call.args[1] for call in reads.call_args_list].count(reference) == 1
+    cached_read.assert_not_called()
+    assert [call.args[1] for call in record.call_args_list] == rows
+    reference.GetPosition.assert_not_called()  # No XYZ-only cache registration.
+    reference.SetPosition2.assert_not_called()
+    reference.Select2.assert_not_called()
+    final = validate_gtol_leader_clearance(
+        {"front": {"GTol0": measured_gtols[-1], "native-reference": reference_bounds}}
+    )
+    assert final["front"]["reverse_crossings"] == []
+
+
+@pytest.mark.parametrize("kind", [13, 15])
+@pytest.mark.parametrize("owner_type,visible", [(2, 1), (0, 3)])
+def test_reference_inventory_excludes_only_template_and_hidden_ink(
+    monkeypatch, kind, owner_type, visible
+):
+    adapter, view, rows, measure = native_context(monkeypatch, count=1)
+    reference = Mock(OwnerType=owner_type, Visible=visible)
+    view.GetAnnotationsByType.side_effect = lambda requested: {
+        5: rows,
+        kind: [reference],
+    }.get(requested, ())
+    reads = Mock(side_effect=measure)
+    result = arrange(adapter, view, reads)["front"]
+    assert result["obstacle_count"] == 0
+    assert [call.args[1] for call in reads.call_args_list] == [rows[0], rows[0]]
+    reference.SetPosition2.assert_not_called()
+
+
+def test_no_gtol_bank_does_not_enumerate_or_measure_reference_ink(monkeypatch):
+    adapter, view, _, measure = native_context(monkeypatch, count=0)
+    reads = Mock(side_effect=measure)
+    assert arrange(adapter, view, reads)["front"]["count"] == 0
+    assert [call.args for call in view.GetAnnotationsByType.call_args_list] == [(5,)]
+    reads.assert_not_called()
 
 
 def test_production_helper_never_recreates_annotations_or_selects_geometry():
