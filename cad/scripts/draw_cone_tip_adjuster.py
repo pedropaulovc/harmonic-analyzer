@@ -3,7 +3,7 @@ r"""Create the curated machinist drawing for the cone tip adjuster set screw."""
 from __future__ import annotations
 
 import argparse
-from cone_tip_adjuster_spec import DIMENSION_CALLOUTS
+from cone_tip_adjuster_spec import DIMENSION_CALLOUTS, REFERENCE_PREFIXES, REFERENCE_SUFFIXES
 import sys
 from typing import Any
 
@@ -24,7 +24,6 @@ from _drawing_common import (
     verify_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
-    set_reference_dimensions,
     stamp_drawing_summary,
     visible_view_entities,
 )
@@ -81,7 +80,7 @@ CUP_KEEP = {
 # dimension in build_cone_tip_adjuster (cone_tip_adjuster_spec.GENERAL_TOL_MM /
 # CUP_DIA_BAND), where SolidWorks renders it natively.
 #
-# The two entries that remain are sheet annotation, not specification:
+# These source-authored display fields are imported read-only:
 #   BodyDiaDim - the thread designation, already derived from the spec's THREAD.
 #   CupDepth   - the machining instruction for the marked blind-hole depth.
 
@@ -198,7 +197,16 @@ async def build(
         source_model=callout_source_model,
         location="above",
     )
-    set_reference_dimensions(adapter, front_annotations, ("BodyDiaDim",))
+    verify_dimension_callouts(
+        adapter, front_annotations, REFERENCE_PREFIXES,
+        feature_name="BodyProfile", view=front,
+        source_model=callout_source_model, location="prefix",
+    )
+    verify_dimension_callouts(
+        adapter, front_annotations, REFERENCE_SUFFIXES,
+        feature_name="BodyProfile", view=front,
+        source_model=callout_source_model, location="suffix",
+    )
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the head end view")
     if not auto_center_marks(adapter, cup, holes=True, size=0.0025):

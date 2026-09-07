@@ -73,3 +73,8 @@ DIMENSION_CALLOUTS = {
     "BodyDiaDim": f"{THREAD} UNC-2A",
     "CupDepth": "DEEP",
 }
+
+# Exact native representation observed in source-dirty-h1h1oz50. Keep the
+# diameter numeric and preserve the catalog thread in the above compartment.
+REFERENCE_PREFIXES = {"BodyDiaDim": "(<MOD-DIAM>"}
+REFERENCE_SUFFIXES = {"BodyDiaDim": ")"}
