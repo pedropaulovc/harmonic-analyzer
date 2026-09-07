@@ -4,6 +4,16 @@ This branch isolates the accepted native top-level health traversal change from
 the drawing stack. Its **new-tree full native build and visual gate are pending**.
 The historical VM2 acceptance is supporting evidence, not a transferred gate.
 
+The paired probe deliberately accepts both strict Boolean production requests.
+Its retained ABBA at `b503b7b9` ran before the production change, so the recorded
+request was `False` even when the synthetic candidate sent `True` to native
+enumeration. Requested and effective flags remain separate in every timed row.
+These variant timings and functional-equivalence witnesses are not automatic
+proof that production adopted the candidate; the unwrapped production tests
+separately require `GetComponents(True)`. Requiring a `True` request inside the
+probe would invalidate that historical before-change control. Offline tests
+cover all four request/variant pairs, malformed requests and native failures.
+
 ## Exact scope
 
 Base: `9e746e1513479290565e6d920e74dadb3c7062a2` (main).

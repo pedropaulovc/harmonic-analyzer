@@ -104,3 +104,63 @@ def test_worker_requires_machine_seat_before_adapter_construction(monkeypatch):
     with pytest.raises(RuntimeError, match="coordinated COM seat"):
         session.run_owned_diagnostic(AsyncMock())
     constructor.assert_not_called()
+
+
+@pytest.mark.parametrize("requested", [False, True])
+@pytest.mark.parametrize("variant_name,effective", [
+    ("BASELINE", False), ("CANDIDATE", True),
+])
+def test_health_probe_preserves_pre_and_post_change_requests(requested, variant_name, effective):
+    from diagnostics import probe_assembly_health_targets as probe
+
+    rows = [object(), object()]
+    native = NS(GetComponents=Mock(return_value=rows))
+    calls = []
+    observer = probe.AssemblyEnumeration(native, probe.Variant[variant_name], calls)
+
+    assert observer.GetComponents(requested) is rows
+
+    native.GetComponents.assert_called_once_with(effective)
+    assert calls == [{
+        "requested_top_level_only": requested,
+        "effective_top_level_only": effective,
+        "status": "returned", "components": 2,
+    }]
+    probe.require_one_enumeration(calls)
+
+
+@pytest.mark.parametrize("requested", [None, 0, 1, 1.0, "True", "False"])
+def test_health_probe_rejects_non_boolean_before_native_enumeration(requested):
+    from diagnostics import probe_assembly_health_targets as probe
+
+    native = NS(GetComponents=Mock())
+    calls = []
+    observer = probe.AssemblyEnumeration(native, probe.Variant.CANDIDATE, calls)
+
+    with pytest.raises(RuntimeError, match="must request one boolean"):
+        observer.GetComponents(requested)
+
+    native.GetComponents.assert_not_called()
+    assert calls == []
+
+
+@pytest.mark.parametrize("variant_name", ["BASELINE", "CANDIDATE"])
+def test_health_probe_preserves_native_failure_and_refuses_completed_trial(variant_name):
+    from diagnostics import probe_assembly_health_targets as probe
+
+    original = RuntimeError("native enumeration rejected")
+    native = NS(GetComponents=Mock(side_effect=original))
+    calls = []
+    observer = probe.AssemblyEnumeration(native, probe.Variant[variant_name], calls)
+
+    with pytest.raises(RuntimeError) as caught:
+        observer.GetComponents(False)
+
+    assert caught.value is original
+    assert calls == [{
+        "requested_top_level_only": False,
+        "effective_top_level_only": variant_name == "CANDIDATE",
+        "status": "failed", "error": repr(original),
+    }]
+    with pytest.raises(RuntimeError, match="exactly one completed"):
+        probe.require_one_enumeration(calls)

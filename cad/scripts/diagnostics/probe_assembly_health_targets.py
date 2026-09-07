@@ -165,7 +165,13 @@ class OwnedAssembly:
 
 
 class AssemblyEnumeration:
-    """Force each variant's enumeration, regardless of the production call's flag."""
+    """Force a variant, retaining the production request as separate evidence.
+
+    Both Boolean requests are intentional: the retained pre-change ABBA ran
+    while production still requested False. These synthetic variants compare
+    timings and functional equivalence; they do not prove production adopted
+    the candidate. The unwrapped production regression tests pin that True call.
+    """
 
     def __init__(self, native, variant, counts):
         self.native, self.variant, self.counts = native, variant, counts
