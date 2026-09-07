@@ -1,8 +1,8 @@
 # Independent assembly validation on vm-solidworks
 
 Execution evidence for [the second-VM handoff](second-vm-assembly-handoff.md).
-The initial saved-channel soundness check passed; fleet acceptance and paired
-performance measurements are pending. Portfolio status
+The initial saved-channel check and complete assembly fleet passed soundness and
+kinematics; paired performance measurements are in progress. Portfolio status
 is tracked on the [project board](https://github.com/users/pedropaulovc/projects/1).
 
 ## Frozen starting environment
@@ -49,7 +49,7 @@ The run finished successfully at 2026-09-07 00:44:13 UTC. There were zero failed
 tasks and zero SolidWorks recoveries. Channel construction took 225.280 seconds
 (223.903 seconds in the build body); independent saved soundness took 25.250
 seconds. Both task spans recorded zero seat wait. Driver-bank deletion took
-2.654 seconds, including 1.172 seconds in the native call. These are observations
+2.646 seconds, including 1.174 seconds in the native call. These are observations
 on this VM, not comparisons against the first VM's wall times.
 
 All six saved-model gates passed: saved-rebuild-clean, dof-free-necessity,
@@ -91,11 +91,68 @@ uv run python -m doit -n 4 build_bare verify:soundness verify:kinematics
 ```
 
 This run uses root `20ec8ee0` (only the initial evidence document added since
-`bf7f92ad`) and the unchanged pinned adapter. Results are pending.
+`bf7f92ad`) and the unchanged pinned adapter. Documentation commit `b503b7b9`
+was made during the run; imported native sources did not change. The run ended
+at 2026-09-07 02:18:27 UTC with exit 0, zero failed tasks and zero recoveries.
+Every dependency was built locally after read-only cache misses. No experimental
+artifacts were uploaded; remote-cache hits were not demonstrated.
+
+All eight saved assemblies passed soundness, including saved-rebuild, health,
+DOF, mate and interference checks. Channel's already-current stamp was retained;
+the other seven ran in this invocation. Kinematics passed (102.23 seconds,
+trace `0xa57c10feff6fe51fc3b9650c3c448be2`).
+
+Times below are task spans **after seat acquisition**, not total scheduler wall
+time. Seat waiting is a separate recorded attribute and is not construction cost.
+Initial channel figures are included for completeness.
+
+| assembly | native task s | seat wait s | saved soundness s | construction trace |
+|---|---:|---:|---:|---|
+| channel | 225.280 | 0 | 25.250 | `0x0319584c22350b5ca4463493f3368261` |
+| frame | 123.650 | 22.99 | 35.470 | `0xf47827efc7397ed241ef6e9b89e4881e` |
+| drive-train | 474.850 | 118.02 | 59.050 | `0x00f7ffa7b02aa2f46a3bab940e66c9f5` |
+| paper-drive | 171.170 | 41.56 | 34.260 | `0xbcc20fc274566a24a11b7b7f67bc0450` |
+| pen | 24.960 | 186.65 | 9.690 | `0x768b6a3a32dcf3d614410183c968957b` |
+| magnifier | 37.840 | 192.05 | 11.750 | `0x4ed0a8cda3573c1e2c49c30e963b0c09` |
+| summing | 34.660 | 753.48 | 14.210 | `0xee11e77d55d985e34f291acd710c1a7b` |
+| harmonic-analyzer | 310.180 | 135.84 | 106.300 | `0x4917c16664abb49ce0384e428041e04a` |
+
+All eight fresh isometric assembly PNGs were inspected. No obvious displaced
+components were seen; dense edge shading limits fine gear/contact inspection.
+Complete native dependencies, renders, cache log and telemetry are preserved in
+`cad/out/reports/assembly-vm2/fleet-baseline/`.
+
+### No-change behavior
+
+With `HARMONIC_REMOTE_CACHE_MODE=off`, a subsequent
+`uv run python -m doit -n 4 build_bare` skipped all 108 parts and eight assemblies:
+10.4004653 seconds process wall time, exit 0, no COM work. This repeated a
+preceding no-change invocation whose terminal timing was not retained; it is
+not presented as a first-versus-second timing comparison.
+
+### Profile and paired probe
+
+Channel's initial spans put 104.57 seconds in pose driving, 27.25 seconds in
+CopyWithMates and 9.35 seconds in geometry digest collection. The top assembly's
+health target collection took 13.15 seconds during construction and 7.57 seconds
+during saved soundness, despite producing only ten targets. Summing produced
+nine targets in 1.48/0.26 seconds; channel produced 129 in 3.52/3.30 seconds.
+
+The bounded candidate is native top-level component enumeration inside
+`assert_model_healthy`, which already filters out all nested instance names.
+It does not deduplicate repeated child documents or change rebuild/error rules.
+The committed diagnostic `probe_assembly_health_targets.py` compares the exact
+production gate with each enumeration flag, in ABBA order on one opened and
+deep-rebuilt saved model. Witness and pose collection are outside timed trials.
+It records exact dependency hashes, native target identities, null children,
+What's Wrong results, configuration and transforms, and refuses foreign documents.
+
+The baseline session retained 114 clone-owned documents after verification.
+After preserving outputs and inspecting every path, these were closed without
+saving (zero documents remained). No user document was present or discarded.
 
 ## Outstanding evidence
 
-Complete assembly graph, soundness and kinematics; remaining fresh render
-inspection; a measured bounded improvement with paired trials;
-incremental no-change and input-identity checks; final trace and hash manifests.
+A measured bounded improvement with paired trials and regression tests;
+input-identity checks; candidate assembly acceptance; final trace/hash manifests.
 No failure-rate bound or full merge-gate result is claimed.
