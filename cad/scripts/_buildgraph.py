@@ -891,7 +891,8 @@ def _config_references_in_text(
     Shared helpers occur in many task closures. Repeating their AST walks made
     config analysis dominate task loading. Do not cache resolved config tokens
     here: family membership and accessor mappings are evaluated by the caller.
-    None denotes an unclassifiable bare-name import, never an empty read set.
+    None denotes an unclassifiable import or escaped module reference, never
+    an empty read set.
     """
     nodes = tuple(ast.walk(ast.parse(text)))
     aliases = set(config_modules)
@@ -913,8 +914,17 @@ def _config_references_in_text(
             and node.func.value.id in aliases
         ):
             calls[id(node.func)] = _literal_first_arg(node)
+    attribute_receivers = {
+        id(node.value) for node in nodes if isinstance(node, ast.Attribute)
+    }
     references = []
     for node in nodes:
+        if (
+            isinstance(node, ast.Name)
+            and node.id in aliases
+            and id(node) not in attribute_receivers
+        ):
+            return None  # passing/aliasing the module can hide arbitrary reads
         if (
             isinstance(node, ast.Attribute)
             and isinstance(node.value, ast.Name)

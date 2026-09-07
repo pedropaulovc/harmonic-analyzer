@@ -823,6 +823,31 @@ def test_config_files_resolve_known_forms():
     assert _tokens("WIDTH = 3.0\n") == frozenset()
 
 
+@pytest.mark.parametrize(
+    "source",
+    [
+        "import _config\nx = getattr(_config, name)\n",
+        "import _config\nx = helper(_config)\n",
+        "import _config as cfg\nx = helper(cfg)\n",
+        "import _config\ncfg = _config\nx = cfg.machine('output')\n",
+        "import _config\nx = [_config]\n",
+        "import _config\nx = _config.fit('g', 'k')\ny = helper(_config)\n",
+    ],
+)
+def test_bare_config_module_references_fail_closed(monkeypatch, tmp_path, source):
+    """An escaped module can read any config, including beside known accessors."""
+    script = tmp_path / "build_config_escape.py"
+    script.write_text(source, encoding="utf-8")
+    monkeypatch.setattr(bg, "module_deps_of", lambda _: ())
+    bg.config_files_of.cache_clear()
+    try:
+        assert bg.config_files_of(script) == frozenset({"**"})
+        with pytest.raises(bg._UnknownConfigUse):
+            bg._config_tokens_in_source(script)
+    finally:
+        bg.config_files_of.cache_clear()
+
+
 def test_config_accessor_coverage():
     """Every accessor defined in _config.py is classified here (fixed-file or
     family). A new accessor added without an entry reads as 'unknown' and falls
