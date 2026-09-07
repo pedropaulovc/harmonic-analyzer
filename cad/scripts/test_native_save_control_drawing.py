@@ -138,10 +138,79 @@ def test_only_drawing_uses_typed_modern_call_with_context_order(scene):
     assert row["native_file"]["bytes"] == len(b"native drawing")
     assert row["seconds"] >= 0
     assert ("bind", "IModelDocExtension") in scene.events
-    assert scene.events.index("scope.enter") < scene.events.index(
-        ("context.enter", "drawing")
+    assert (
+        scene.events.index(("context.enter", "drawing"))
+        < scene.events.index("scope.enter")
+        < scene.events.index(("modern", (0, 1, None, None, 0, 0)))
+        < scene.events.index("scope.exit")
+        < scene.events.index(("context.exit", "drawing"))
+        < scene.events.index(("context.enter", "pdf"))
     )
-    assert scene.events[-1] == "scope.exit"
+    assert scene.events.count("scope.enter") == scene.events.count("scope.exit") == 1
+
+
+def test_real_owned_inventory_reconciles_native_rename_before_pdf(scene, monkeypatch):
+    from diagnostics import _owned_native_documents as owned
+
+    monkeypatch.setattr(owned, "_early_bound", lambda value, _: value)
+    app = scene.adapter.swApp
+    app.documents = []
+    app.ActiveDoc = scene.adapter.currentModel = None
+    app.GetDocuments = lambda: tuple(app.documents)
+    app.IsSame = lambda first, second: int(first is second)
+    app.GetOpenDocumentByName = lambda path: next(
+        (model for model in app.documents if model.GetPathName() == path), None
+    )
+    model = scene.model
+    model.Visible = True
+    model.GetSaveFlag = lambda: not bool(model.path)
+    model.GetTitle = lambda: (
+        f"{Path(model.path).stem} - Sheet1" if model.path else "Unsaved drawing"
+    )
+    model.GetViews = lambda: ((object(),),)
+    adapter = owned.DiagnosticAdapter(scene.adapter)
+    adapter.ownership.register_directory(scene.native.parent)
+    boundaries = []
+
+    @contextmanager
+    def artifact(kind, path):
+        # Match the source observer's checkpoint at entry and exit. Its own
+        # observations must see a fully reconciled authorized rename.
+        adapter.ownership.checkpoint()
+        boundaries.append(("before", kind, adapter.ownership.current.state["path"]))
+        yield
+        adapter.ownership.assert_current_owned()
+        adapter.ownership.checkpoint()
+        boundaries.append(("after", kind, adapter.ownership.current.state["path"]))
+
+    with adapter.ownership.creating_document(owned.DocumentKind.DRAWING, scene.native):
+        app.documents.append(model)
+        app.ActiveDoc = model
+        adapter.currentModel = model
+        with control.native_drawing_save_control(
+            adapter, control.DrawingSave.EXTENSION_SILENT, records=scene.records
+        ):
+            result = common.save_drawing(
+                adapter,
+                str(scene.native),
+                pdf_path=str(scene.pdf),
+                png_path=str(scene.png),
+                artifact_context=artifact,
+            )
+
+    expected = str(scene.native)
+    assert boundaries == [
+        ("before", "drawing", ""),
+        ("after", "drawing", expected),
+        ("before", "pdf", expected),
+        ("after", "pdf", expected),
+        ("before", "png", expected),
+        ("after", "png", expected),
+    ]
+    assert result == {"drawing": expected, "pdf": str(scene.pdf), "png": str(scene.png)}
+    assert adapter.ownership.current.state["title"] == f"{scene.native.stem} - Sheet1"
+    assert scene.records[0]["status"] == "passed"
+    assert adapter.ownership.assert_current_owned().handle is model
 
 
 @pytest.mark.parametrize(

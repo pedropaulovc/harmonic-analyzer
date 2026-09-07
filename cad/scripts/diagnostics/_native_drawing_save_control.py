@@ -144,35 +144,37 @@ def _save(
         if model.GetType() != 3:
             raise RuntimeError("modern native save control requires an owned drawing")
         row["native_path_before"] = model.GetPathName()
-        with adapter.ownership.saving_as(rows[0][1]):
-            try:
-                # Deliberately mirrors the adapter's three-artifact loop: the
-                # caller's context still encloses stale-file removal and save.
-                for kind, path in rows:
-                    context = (
-                        artifact_context(kind, path)
-                        if artifact_context
-                        else nullcontext()
-                    )
-                    with context:
-                        # The observer can perform native reads/checkpoints on
-                        # entry. Recheck the active owned drawing after them,
-                        # before deleting a target or invoking active-doc SaveAs.
-                        adapter.ownership.assert_current_owned()
+        # Artifact observation brackets a complete authorized native rename.
+        # Reconcile its inventory before observers or later exports read it.
+        for kind, path in rows:
+            context = (
+                artifact_context(kind, path) if artifact_context else nullcontext()
+            )
+            with context:
+                # Entry can perform native reads/checkpoints. Check afterwards,
+                # before any stale deletion or active-document save/export.
+                adapter.ownership.assert_current_owned()
+                save_scope = (
+                    adapter.ownership.saving_as(path)
+                    if kind == "drawing"
+                    else nullcontext()
+                )
+                with save_scope:
+                    try:
                         os.makedirs(os.path.dirname(path), exist_ok=True)
                         if os.path.exists(path):
                             os.remove(path)
                         if kind == "drawing":
                             _modern_save(model, Path(path), row)
-                            adapter.ownership.assert_current_owned()
                         if kind != "drawing":
                             draw.SaveAs3(path, 0, 0)
                         if not os.path.isfile(path):
                             raise RuntimeError(f"SaveAs3 produced no file: {path}")
-                        out[kind] = path
-            except Exception as error:
-                failures.append(error)
-                raise
+                    except Exception as error:
+                        failures.append(error)
+                        raise
+                adapter.ownership.assert_current_owned()
+                out[kind] = path
         row["status"] = "passed"
         return out
     except Exception as error:
