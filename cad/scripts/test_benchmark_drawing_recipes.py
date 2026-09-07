@@ -9,6 +9,7 @@ from unittest.mock import Mock
 
 import pytest
 
+import _drawing_build
 from _drawing_common import DrawingOutputs
 from diagnostics import benchmark_drawing_recipes as bench
 
@@ -26,6 +27,7 @@ ALIAS = OUTPUTS
 def captured(outputs=OUTPUTS, pdf=PDF):
     return outputs, pdf
 async def build(adapter, *, drawing_factory):
+    drawing_factory(adapter)
     return await adapter.draw(OUTPUTS, SOURCE)
 """
 
@@ -242,13 +244,19 @@ class Adapter:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("mode", ["normal", "source_drift", "helper_drift"])
+@pytest.mark.parametrize(
+    "mode", ["normal", "source_drift", "helper_drift", "unused_factory"]
+)
 async def test_abba_reports_actual_scope_and_rejects_input_drift(
     tmp_path, monkeypatch, mode
 ):
     source = tmp_path / "part.SLDPRT"
     source.write_bytes(b"original part")
-    monkeypatch.setattr(bench, "recipe_source", lambda *_: recipe(source))
+    code = recipe(source)
+    if mode == "unused_factory":
+        code = code.replace("    drawing_factory(adapter)\n", "")
+    monkeypatch.setattr(bench, "recipe_source", lambda *_: code)
+    monkeypatch.setattr(_drawing_build.common, "new_project_drawing", Mock())
     monkeypatch.setattr(bench, "revision", lambda _: "helper-head")
     monkeypatch.setattr(bench, "_early_bound", lambda obj, _: obj)
     reads = []
@@ -277,7 +285,10 @@ async def test_abba_reports_actual_scope_and_rejects_input_drift(
         )
         result_path = Path(result["measurements"])
     else:
-        with pytest.raises(RuntimeError, match="changed"):
+        expected_error = (
+            "exactly one drawing factory" if mode == "unused_factory" else "changed"
+        )
+        with pytest.raises(RuntimeError, match=expected_error):
             await bench.benchmark(
                 adapter, ["cone_pivot_screw"], "base-sha", "candidate-sha", reports
             )
