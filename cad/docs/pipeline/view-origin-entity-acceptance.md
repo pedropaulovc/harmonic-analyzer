@@ -149,3 +149,21 @@ records native self-comparisons, reversed comparison and face identity controls
 on failure. It retains the same rejection rule and raw geometry requirements;
 an observation error cannot replace the original failure. All 32 silhouette
 tests pass, including the original equal-geometry/wrong-identity rejection.
+
+The self-control replay at `418955f5` produced
+`datum-policy-dc1qpiet/pilot.json`, SHA-256
+`7007fcf6480ea78b8471371f42268c8bfcb70ec2ae12573a7f955823d1a2d766`.
+Both silhouettes compare equal to themselves (`1`); both cross-comparison
+directions return `0`. Both faces compare equal to themselves and to each other
+(`1`). Raw silhouette snapshots remain exactly equal. This rules out a blanket
+failure of native self-identity under this tested form; it does not decide
+whether these separate silhouette objects describe the same selectable target.
+The pilot still failed at selection. Recipe/pilot times were 31.939/161.012 s;
+cleanup preserved baseline documents and final runtime guards were empty.
+
+The next failure-only control records a repeated selection read and literal
+persistent IDs in both drawing and source-document contexts, with native
+IsSamePersistentID comparisons and dirty-state observations. Missing references
+are reported, never treated as equality. No acceptance gate, selection or
+geometry is changed by this control. The offline suite at `418955f5` passed
+5,029 tests in 94.01 s (`run-goyd_l2f`).
