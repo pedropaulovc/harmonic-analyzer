@@ -550,7 +550,7 @@ class _AssemblySources:
                     self.fail(item)
                 fields = [
                     value
-                    for key, value in zip(item.keys, item.values)
+                    for key, value in zip(item.keys, item.values, strict=True)
                     if isinstance(key, ast.Constant) and key.value == "part"
                 ]
                 if len(fields) != 1:

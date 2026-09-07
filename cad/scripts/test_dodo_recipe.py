@@ -206,8 +206,11 @@ def test_source_graph_cache_keys_preserve_real_transitive_identity_edges(
     tmp_path, monkeypatch
 ):
     """Actual DAG, isolated recipe bytes/tokens: never read a live builder's files."""
+    import _buildgraph
+
     dodo = _load_dodo()
     monkeypatch.setattr(dodo, "CAD_OUT", tmp_path / "out")
+    monkeypatch.setattr(_buildgraph, "CAD_OUT", dodo.CAD_OUT)
     recipes = {}
     part_tokens = {}
     assembly_tokens = {}
@@ -222,6 +225,8 @@ def test_source_graph_cache_keys_preserve_real_transitive_identity_edges(
                 if kind == "part"
                 else dodo._assembly_execution_token(stem)
             )
+            assert target.resolve().is_relative_to(tmp_path.resolve()), target
+            assert token.resolve().is_relative_to(tmp_path.resolve()), token
             target.parent.mkdir(parents=True, exist_ok=True)
             token.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(b"CAD identity A")

@@ -111,7 +111,7 @@ def test_exact_source_name_does_not_reference_shorter_stem(tmp_path, monkeypatch
 def test_unresolved_source_argument_fails_without_all_assembly_fallback(
     tmp_path, monkeypatch, expression
 ):
-    with pytest.raises(ValueError, match="[Uu]nresolved assembly source"):
+    with pytest.raises(ValueError, match=r"[Uu]nresolved assembly source"):
         _source_references(
             tmp_path,
             monkeypatch,
@@ -165,7 +165,7 @@ def test_ambiguous_dynamic_source_family_keeps_every_possible_producer(
     ],
 )
 def test_unsupported_source_manipulation_fails_loud(tmp_path, monkeypatch, source):
-    with pytest.raises(ValueError, match="[Uu]nresolved assembly source"):
+    with pytest.raises(ValueError, match=r"[Uu]nresolved assembly source"):
         _source_references(tmp_path, monkeypatch, source)
 
 
@@ -174,7 +174,7 @@ def test_reference_syntax_cache_detects_source_edits_and_resolves_current_regist
 ):
     source = "await place_component(adapter, 'rocker-arm', p, r, q)"
     assert _source_references(tmp_path, monkeypatch, source) == {"rocker_arm"}
-    with pytest.raises(ValueError, match="[Uu]nresolved assembly source"):
+    with pytest.raises(ValueError, match=r"[Uu]nresolved assembly source"):
         _source_references(tmp_path, monkeypatch, source, ("rocker_arm_support",))
     changed = "await place_component(adapter, 'rocker-arm-support', p, r, q)"
     assert _source_references(
@@ -190,7 +190,7 @@ await adapter.insert_component(InsertComponentParameters(file_path=_part("rocker
 """
     assert _source_references(tmp_path, monkeypatch, source) == {"rocker_arm"}
     changed = source.replace('f"{name}.SLDPRT"', '"rocker-arm-support.SLDPRT"')
-    with pytest.raises(ValueError, match="[Uu]nresolved assembly source"):
+    with pytest.raises(ValueError, match=r"[Uu]nresolved assembly source"):
         _source_references(
             tmp_path, monkeypatch, changed, ("rocker_arm", "rocker_arm_support")
         )
@@ -245,7 +245,7 @@ parts.append({'part': 'rocker-arm'})
 def test_review_keyword_and_annotated_mutations_never_drop_sources(
     tmp_path, monkeypatch, source
 ):
-    with pytest.raises(ValueError, match="[Uu]nresolved assembly source"):
+    with pytest.raises(ValueError, match=r"[Uu]nresolved assembly source"):
         _source_references(
             tmp_path, monkeypatch, source, ("rocker_arm", "rocker_arm_support")
         )
