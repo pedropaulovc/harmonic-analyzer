@@ -84,7 +84,13 @@ def scene(monkeypatch):
             annotation.GetType = lambda: 4
             annotation.IsDangling = lambda: False
             annotation.entities = (object(), object())
-            annotation.types = (11, 11) if label == "front" else (1, 1)
+            # Native xqvch22r before/after/build/cold, independent of production.
+            annotation.types = {
+                "BarLength": (11, 11),
+                "TipCentreX": (25, 11),
+                "RD1": (1, 1),
+                "RD2": (1, 1),
+            }[name]
             annotation.GetAttachedEntities3 = lambda a=annotation: a.entities
             annotation.GetAttachedEntityTypes = lambda a=annotation: a.types
             annotation.GetAttachedEntityCount3 = lambda a=annotation: len(a.entities)
@@ -201,6 +207,25 @@ def test_exactly_four_initial_four_final_bounds_and_one_native_call_per_pair(sce
     for view in scene.views.values():
         view.GetAnnotations.assert_not_called()
         view.GetAnnotationsByType.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "name,types",
+    [
+        ("TipCentreX", (11, 11)),
+        ("TipCentreX", (11, 25)),
+        ("BarLength", (25, 11)),
+        ("RD1", (11, 11)),
+        ("RD2", (25, 11)),
+    ],
+)
+def test_each_named_dimension_requires_its_observed_ordered_attachment_types(
+    scene, name, types
+):
+    scene.annotations[name].types = types
+    with pytest.raises(RuntimeError, match="attachment inventory"):
+        scene.run()
+    assert not scene.commands and not scene.offsets
 
 
 @pytest.mark.parametrize(

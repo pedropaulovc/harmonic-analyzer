@@ -236,3 +236,26 @@ The fail-first fixture now rejects direct raw `GetAnnotation` access and checks
 both explicit bindings plus the original exact four-handle call. All 59 focused
 recipe/spacing tests pass, including the unchanged call-shape and manufacturing
 assertions. A fresh native invocation is required to validate this binding fix.
+
+### Second extraction run: distinct profile attachment types
+
+At `bed7f2b6` / the same adapter and PID, the binding fix reached the helper.
+Its initial capture rejected `TipCentreX` before either native command because
+the extraction incorrectly assumed both profile dimensions attach to two type11
+sketch points. The retained successful `xqvch22r` receipt instead reports
+`BarLength=(11,11)`, `TipCentreX=(25,11)`, and both reference dimensions
+`(1,1)` in all four before/after/build/cold snapshots. The official enum defines
+type25 as an external sketch point. The helper now requires each named ordered
+pair; it does not accept a union of types or weaken exact entity identity checks.
+
+The second failed receipt is `datum-policy-5g3di5o5/pilot.json`, SHA-256
+`33eddeb49975537240fa26f847a0c1dffe94fe5758deee70e623bcea7226d693`.
+Runtime guards and original/source-copy hashes
+remained exact; owned cleanup restored the empty baseline. Failure capture still
+hit the separate unsaved-owner defect. Neither command execution nor cold-layout
+success is established by this run.
+
+The offline fixture now uses those observed native tuples independently of the
+production mapping. It reproduced the rejection before the correction. Wrong,
+reversed and borrowed tuples remain explicit negative cases. A new native run
+must validate the corrected extraction and its unchanged final layout gates.
