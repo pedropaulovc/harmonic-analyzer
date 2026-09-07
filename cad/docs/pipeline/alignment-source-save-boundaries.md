@@ -399,3 +399,27 @@ This accepts the explicit source-authoring control for this callout. Production
 builder integration and the other callout-bearing parts still require their
 own verification; this single run establishes neither fleet speed nor a
 failure-rate bound.
+
+## Production verifier through the prepared factory
+
+At `9013ca26`, merged adapter `25bc99b1` and PID 31860, the same source-authoring
+control with `--factory prepared` passed through the real production
+`verify_dimension_callouts`, including its intended-view, intended-source and
+exact native source-parameter checks. The diagnostic contract is explicitly
+`source_verifier_v1`; no retired setter alias is synthesized.
+
+Receipt `datum-policy-4otwr7y8/pilot.json`, SHA-256
+`677281374e636df92345b1f75456c5d1c94691a6aeb03c8c2227e2d813a98fc2`,
+retains all 25 clean source banks, successful import/built/cold printed-callout
+snapshots, and zero rejected or coordinate-roundoff annotation differences.
+The authored copy baseline was
+`23e7e33d4f5c14472750e0c03a07830c04b708fa10c7e6ffba1289804e72aa22`
+and stayed exact through drawing work and both closes. Original hashes remained
+unchanged; cleanup preserved baseline documents and runtime guards were empty.
+The PNG was visually inspected: both fit lines remain readable below the bore
+diameter and limits.
+
+Recipe/pilot times were 142.882/343.359 s including diagnostic work. This was
+not an isolated speed comparison: the offline suite ran concurrently and passed
+5,069 tests in 93.21 s (`run-1s2dll9q`). The actual part builder and final full
+pipeline remain separate acceptance work; this pilot authored an owned copy.
