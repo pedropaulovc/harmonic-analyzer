@@ -55,6 +55,21 @@ def test_candidate_budget_uses_immutable_seed_and_actual_native_route(
         "_read_gtols",
         lambda *_: pytest.fail("candidate performed full frame/font/XML read"),
     )
+    derive = policy.column_vertical_candidates
+
+    def checked_prediction(hits, geometry, measured, *, bodies, obstacles, gap_m):
+        # Prediction must start from this side's CURRENT horizontal bank, not
+        # the pre-command annotation measurement or the other side's position.
+        body = bodies[0]
+        assert measured["frame"].text_boxes == (body,)
+        assert any(body == seed["frame"].body.translated(delta) for delta in moves[:2])
+        assert obstacles == (Rect(0.08, 0.148, 0.287, 0.172),)
+        assert gap_m == 0.002
+        return derive(
+            hits, geometry, measured, bodies=bodies, obstacles=obstacles, gap_m=gap_m
+        )
+
+    monkeypatch.setattr(policy, "column_vertical_candidates", checked_prediction)
     arguments = dict(gap_m=0.002, read_geometry=read)
     if clear_at == 7:
         with pytest.raises(RuntimeError, match="six-candidate bound"):
