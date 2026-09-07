@@ -4,6 +4,11 @@ Use this document as the next VM's task prompt. It defines one bounded migration
 it does not report completed native validation or merge readiness. The
 [project board](https://github.com/users/pedropaulovc/projects/1) owns scheduling.
 
+This is the next batch after the completed VM2 assembly handoff (#676 through
+#678). Leave those branches and their restored artifacts alone. The mass-read
+optimization was withdrawn after a paper-drive pose mismatch; do not reintroduce
+it. This task owns a different drawing and can run while VM1 validates its fleet.
+
 ## Task and checkout
 
 Replace sheet-coordinate feature picking in `cad/scripts/draw_crank_arm.py`
@@ -17,7 +22,7 @@ the bundled API contracts and examples before introducing native calls. Use uv
 and this worktree's own virtual environment.
 
 Repository: `https://github.com/pedropaulovc/harmonic-analyzer`.
-Frozen starting commit: `7c86fdbaf4e6d3d274d6be39831c68d4e4e98e16`, published on
+Frozen starting commit: `bc593d784fba08fc6552224767a460338f51b664`, published on
 `perf/cad-build-and-drawing-entities`. Its adapter gitlink is
 `25bc99b1ae39d8c0e004867e9b5c0f2068f2abc2`.
 
@@ -26,7 +31,7 @@ inspect it and coordinate a new name; do not overwrite it.
 
 ```powershell
 git clone --recurse-submodules --branch perf/cad-build-and-drawing-entities https://github.com/pedropaulovc/harmonic-analyzer.git C:/src/ha-crank-arm-vm-seed
-git -C C:/src/ha-crank-arm-vm-seed worktree add -b perf/crank-arm-semantic-entities C:/src/ha-crank-arm-semantic-entities 7c86fdbaf4e6d3d274d6be39831c68d4e4e98e16
+git -C C:/src/ha-crank-arm-vm-seed worktree add -b perf/crank-arm-semantic-entities C:/src/ha-crank-arm-semantic-entities bc593d784fba08fc6552224767a460338f51b664
 Set-Location C:/src/ha-crank-arm-semantic-entities
 git submodule update --init --recursive
 uv sync
@@ -92,7 +97,10 @@ Relevant building blocks already exist at the frozen revision:
   `edge_entity` annotation arguments, `AnnotationEntityContext.MODEL`, and
   `add_native_hole_callout(..., edge=...)`. Use the real argument shapes and
   source/view ownership contract; do not rely on default VIEW context for a
-  source-owned annotation entity.
+  source-owned surface-finish entity. Only surface-finish accepts the
+  `entity_context` keyword; datum/FCF accept `entity` without that keyword,
+  hole callouts accept `edge`, and entity dimensions use `entities=(first, second)`.
+  Do not copy one helper's call shape to another.
 - `draw_channel_lever.py`, `draw_arbor_pedestal.py`, `draw_fulcrum_shaft.py` and
   `draw_cone_pivot_screw.py` contain relevant resolved-entity examples. Their
   existence is not native proof for the crank arm's faces or interrupted edges.
@@ -105,6 +113,11 @@ geometry. For example, the frozen spec has `ARM_C2C = 75.0`; older drawing
 comments still discuss 66 mm. The builder names `Arm`, `ShaftBore`, `PivotBore`,
 `Dimple`, `AnchorTap` and `PinHole`. These are candidate ownership scopes, not
 proof that each final edge survives on the feature you first expect.
+
+The frozen base includes the native FACE surface-finish owning-view correction:
+letting SolidWorks choose a position does not bypass the original-entity,
+attachment-type/count or owning-view checks. Its offline regressions passed;
+the cone-shaft native replay is a separate VM1 task, not proof for crank arm.
 
 Preserve the exact marked-dimension union from `DRAWING_DIMENSIONS`, the five
 added dimensions and their centre-versus-tangent interpretation, and the
@@ -132,6 +145,7 @@ In this worktree, after recording the frozen revision and obtaining the local
 seat, build the source through doit with cache disabled:
 
 ```powershell
+$env:HARMONIC_SW_AUTOSTART = '0'
 $env:HARMONIC_REMOTE_CACHE_MODE = 'off'
 uv run python -m doit -a part:crank_arm
 ```
@@ -205,6 +219,16 @@ overwrite the only retained baseline while producing candidate outputs.
    recipe. Declare the crank-arm requirements locally from the unchanged spec
    and builder, and bind only this recipe's source/output paths to declared owned
    copies. Preserve its actual factory and read-only callout-verifier contracts.
+   Reuse `RecipeTemplateFactory.configure/require_used/final_guards` and
+   `_owned_native_documents.save_drawing` for the actual factory/save path;
+   test the composed recipe rather than only its wrappers.
+
+   In particular, `part_dimensions(..., targets=DRAWING_DIMENSIONS)` supplies
+   rounded system values, full names, tolerance types/BASIC and live handles.
+   It does not supply raw values, tolerance bounds, precision, all text fields
+   or numeric visibility. Collect those extra readbacks in the crank-arm-only
+   diagnostic when proving those requirements; do not claim the smaller bank
+   covers them or broaden a shared helper without coordination.
 
    Use the existing locked parent/worker and attach-only ownership flow. Recheck
    the authorized ActiveDoc/currentModel before native mutations. Verify exact
@@ -237,13 +261,22 @@ monitor running. Mark the PR ready when code-complete, before the remaining test
 runs, so review and testing can proceed together. Address actual CI/review
 failures; do not lower thresholds or rewrite deliberate tests silently.
 
-Run the recipe-specific tests and the relevant offline graph/isolation/layout
-checks. Before merge, satisfy the repository's full graph/build gate on the
+Run the recipe-specific tests, `test_surface_finish_ownership_a.py` and the
+relevant offline graph/isolation/layout checks. Before merge, satisfy the
+repository's full graph/build gate on the
 latest code with `uv run python -m doit -n 4`, explicitly rerun and validate
 `drawing:crank_arm`, complete the native cold/render checks above, and obtain
 one clean CodeRabbit OR Codex review of the latest code. Follow the current
 stack sharing rules; a local focused test run is not the full build gate.
 Do not squash or delete a parent branch while children still target it.
+
+If PR review quota is exhausted, use the local CodeRabbit CLI in Windows, not
+WSL. Run the installed CLI with `review --agent --committed --base-commit` and
+the exact PR merge-base. Preserve its complete output, reviewed head/base and
+verdict. A clean local CodeRabbit review satisfies the review gate; a quota or
+authentication rejection does not. Do not enable usage credits or change billing
+settings. The parent is split as #680 -> #681 -> #675 for review; your new PR
+still targets the unchanged `perf/cad-build-and-drawing-entities` head branch.
 
 Hand back the commits/PR, removed-site inventory, actual source/build provenance,
 commands, test results, trace/report hashes and paths, fresh rendered evidence,
