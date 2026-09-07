@@ -25,6 +25,17 @@ only its storage Y/Z change. A new envelope test fails at the first candidate
 native contact or full-model clearance evidence. The full build, saved contact
 readback, and fresh oblique visual inspection remain required.
 
+The revised tip envelope is X=140..180 and Z=-95..-55 mm. The deck's flat
+interior is X=-215.25..215.25 and Z=-126.35..126.35 mm, so the whole circular
+envelope lies inside the raised rim. This bound complements the nameplate
+clearance test; it does not replace the native interference gate.
+
+The full `uv run python -m doit -n 4` at
+`f82021edfff36155b765b50e99c4e2d3e1610bea` exited zero on September 7.
+It rebuilt paper-drive and the top assembly, regenerated their drawings, and
+passed soundness and kinematics. The recipe gate passed 1,186 tests. Native
+contact readback, fresh render inspection and latest-head review remain open.
+
 The original candidate analysis below is retained as provenance; its
 "only Y changes" proposal was rejected by the full-model test above.
 
@@ -95,7 +106,7 @@ confirmed the test file in both the recipe command and dependencies; closure
 inspection found no part consumers of the changed assembly builder. These are
 offline checks, not a full-pipeline result.
 
-## Native acceptance still required
+## Native acceptance boundary
 
 This code-only correction is separate from health-only PR #683. Its previous
 build/render evidence does not validate the corrected assembly. Before accepting
@@ -103,4 +114,5 @@ this geometry change, rebuild paper-drive and the containing top assembly, retai
 actual T18 configuration/transform and underside/deck contact readbacks, run the
 unchanged soundness/kinematics gates, and inspect fresh top-level side/oblique
 renders showing the seating and surrounding clearance. The full pipeline and
-review merge gates still apply. No corrected native build or render is claimed.
+review merge gates still apply. The revised build result is recorded above;
+contact and visual acceptance are not yet claimed.
