@@ -28,7 +28,7 @@ that directory before opening anything. It rechecks native instances and documen
 closes its owned documents, and compares all native-resolved local input hashes. Its report
 retains primary, cleanup, input-hash and checkpoint failures together.
 
-### Dependency ownership is not producer-child authentication
+## Dependency ownership is not producer-child authentication
 
 The input set comes from `GetDocumentDependencies2(..., True, True, False)`:
 SolidWorks resolves paths using its native search rules. Every returned path must
