@@ -27,9 +27,7 @@ def test_factory_resolves_feature_role_independently_of_layout(
     centerline = Mock()
     monkeypatch.setattr(factory, "ModelEntities", resolver)
     monkeypatch.setattr(factory, "add_view_centerline", centerline)
-    monkeypatch.setattr(
-        factory, "new_project_drawing", Mock(return_value=(object(), object()))
-    )
+    drawing_factory = Mock(return_value=(object(), object()))
     monkeypatch.setattr(factory, "place_view", Mock(return_value=side))
     monkeypatch.setattr(
         factory, "finalize_drawing", AsyncMock(return_value={"drawing": "done"})
@@ -54,6 +52,7 @@ def test_factory_resolves_feature_role_independently_of_layout(
     result = asyncio.run(
         factory.build_fastener_sheet(
             adapter,
+            drawing_factory=drawing_factory,
             source=source,
             property_view="pinch",
             outputs=object(),

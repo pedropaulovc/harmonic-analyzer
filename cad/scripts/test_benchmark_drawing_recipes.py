@@ -17,13 +17,15 @@ def recipe(source):
     return f"""
 from pathlib import Path
 from _drawing_common import DrawingOutputs
+from _drawing_build import TemplateSpec
 SOURCE = Path({str(source)!r})
+TEMPLATE_SPEC = TemplateSpec()
 OUTPUTS = DrawingOutputs(Path("production.SLDDRW"), Path("production.pdf"), Path("production.png"))
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 ALIAS = OUTPUTS
 def captured(outputs=OUTPUTS, pdf=PDF):
     return outputs, pdf
-async def build(adapter):
+async def build(adapter, *, drawing_factory):
     return await adapter.draw(OUTPUTS, SOURCE)
 """
 
@@ -40,6 +42,26 @@ def test_recipe_outputs_are_redirected_before_defaults_and_aliases(
     assert module.PDF == module.OUTPUTS.pdf
     assert module.SLDDRW.parent == tmp_path
     assert module.__file__ == str(tmp_path / "recipe-source.py")
+
+
+@pytest.mark.parametrize("shape", ("old", "optional", "missing_spec"))
+def test_pre_migration_or_implicit_factory_contract_is_rejected(
+    tmp_path, monkeypatch, shape
+):
+    code = recipe(tmp_path / "part.SLDPRT")
+    if shape == "old":
+        code = code.replace(
+            "async def build(adapter, *, drawing_factory):", "async def build(adapter):"
+        )
+    if shape == "optional":
+        code = code.replace("*, drawing_factory):", "*, drawing_factory=None):")
+    if shape == "missing_spec":
+        code = code.replace(
+            "TEMPLATE_SPEC = TemplateSpec()", "REMOVED_SPEC = TemplateSpec()"
+        )
+    monkeypatch.setattr(bench, "recipe_source", lambda *_: code)
+    with pytest.raises(ValueError, match="explicit drawing_factory/TEMPLATE_SPEC"):
+        bench.load_recipe("old-or-implicit", "cone_pivot_screw", tmp_path)
 
 
 def test_explicit_source_redirects_before_function_defaults_and_aliases(

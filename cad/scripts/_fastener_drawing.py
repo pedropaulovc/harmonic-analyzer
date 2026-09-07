@@ -8,6 +8,7 @@ from typing import Any, Callable, Literal, Mapping
 
 import _telemetry
 from _common import check
+from _drawing_build import ProjectDrawingFactory
 from _drawing_entities import FeatureFace, ModelEntities
 from _drawing_common import (
     DrawingOutputs,
@@ -15,7 +16,6 @@ from _drawing_common import (
     add_view_centerline,
     curate_view_dimensions,
     finalize_drawing,
-    new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
     set_hidden_lines_removed,
@@ -50,6 +50,7 @@ class FastenerSheet:
 async def build_fastener_sheet(
     adapter: Any,
     *,
+    drawing_factory: ProjectDrawingFactory,
     source: Path,
     property_view: str,
     outputs: DrawingOutputs,
@@ -82,7 +83,7 @@ async def build_fastener_sheet(
             "End View Note",
         ),
     )
-    drawing_model, _sheet = new_project_drawing(
+    drawing_model, _sheet = drawing_factory(
         adapter, property_view=property_view, scale=recipe.scale
     )
     stamp_drawing_summary(

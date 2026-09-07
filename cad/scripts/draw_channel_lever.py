@@ -26,7 +26,8 @@ from typing import Any, Callable
 from channel_lever_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, check
+from _drawing_build import ProjectDrawingFactory, TemplateSpec, run_drawing_build
 from _basic_dimensions import require_basic_dimension
 from _drawing_project_layout import DatumLeaderPolicy, repair_project_drawing_layout
 from _drawing_leader_clearance import validate_dimension_leader_clearance
@@ -40,7 +41,6 @@ from _drawing_common import (
     auto_arrange_view_dimensions,
     retain_view_dimensions,
     finalize_drawing,
-    new_project_drawing,
     read_required_properties,
     set_basic_dimension,
     set_hidden_lines_removed,
@@ -84,6 +84,7 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 2.0)  # 1:2; leave room for the measured annotation envelopes.
+TEMPLATE_SPEC = TemplateSpec(scale=SHEET_SCALE, decimals=2)
 
 _NOSE_R = BAR_TALL / 2.0  # 4.75
 _BBOX_CX = (-_NOSE_R + TIP_END_X) / 2.0  # front-view X centre
@@ -197,6 +198,7 @@ def _model_entities(model: Any) -> dict[str, Any]:
 async def build(
     adapter: Any,
     *,
+    drawing_factory: ProjectDrawingFactory,
     source: Path = SOURCE,
     outputs: DrawingOutputs = OUTPUTS,
     layout: Callable = repair_project_drawing_layout,
@@ -227,7 +229,7 @@ async def build(
             "Isometric View Note",
         ),
     )
-    drawing_model, _sheet = new_project_drawing(
+    drawing_model, _sheet = drawing_factory(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE
     )
     stamp_drawing_summary(
@@ -469,4 +471,4 @@ def _parse_args() -> argparse.Namespace:
 if __name__ == "__main__":
     _parse_args()
     _telemetry.set_service("drawing-export")
-    sys.exit(run_build(build))
+    sys.exit(run_drawing_build(build, spec=TEMPLATE_SPEC))

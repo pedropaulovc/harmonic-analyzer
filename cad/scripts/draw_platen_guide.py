@@ -18,7 +18,8 @@ from typing import Any
 from platen_guide_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, _early_bound, check
+from _drawing_build import ProjectDrawingFactory, TemplateSpec, run_drawing_build
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
@@ -28,7 +29,6 @@ from _drawing_common import (
     finalize_drawing,
     import_cosmetic_threads,
     insert_hole_table,
-    new_project_drawing,
     read_required_properties,
     set_hidden_lines_removed,
     stamp_drawing_summary,
@@ -56,6 +56,7 @@ OUTPUTS = DrawingOutputs(
 SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
+TEMPLATE_SPEC = TemplateSpec(scale=(1, 1), decimals=2)
 
 # The 1:1 front view is centred at sheet X=0.190 m. Derive its left edge from
 # the resized guide so hole-table and datum anchors follow the part geometry.
@@ -101,7 +102,9 @@ def _bottom_surface_edge(view: Any) -> Any:
     return edge
 
 
-async def build(adapter: Any) -> dict[str, str]:
+async def build(
+    adapter: Any, *, drawing_factory: ProjectDrawingFactory
+) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
@@ -126,7 +129,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Manufacturing Notes",
         ),
     )
-    drawing_model, sheet = new_project_drawing(adapter, property_view=PART_STEM)
+    drawing_model, sheet = drawing_factory(adapter, property_view=PART_STEM)
     stamp_drawing_summary(
         adapter,
         drawing_model,
@@ -335,4 +338,4 @@ def _parse_args() -> argparse.Namespace:
 if __name__ == "__main__":
     _parse_args()
     _telemetry.set_service("drawing-export")
-    sys.exit(run_build(build))
+    sys.exit(run_drawing_build(build, spec=TEMPLATE_SPEC))

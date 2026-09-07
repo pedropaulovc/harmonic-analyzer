@@ -7,10 +7,10 @@ from typing import Any
 
 import _telemetry
 from _common import check
+from _drawing_build import ProjectDrawingFactory
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
-    new_project_drawing,
     read_required_properties,
 )
 from solidworks_mcp.adapters.solidworks.drawing import place_view
@@ -20,6 +20,7 @@ from solidworks_mcp.adapters.solidworks.drawing import place_view
 async def build_simple_three_view_drawing(
     adapter: Any,
     *,
+    drawing_factory: ProjectDrawingFactory,
     source: Path,
     outputs: DrawingOutputs,
     sheet_scale: tuple[float, float],
@@ -54,7 +55,7 @@ async def build_simple_three_view_drawing(
             "Quantity",
         ),
     )
-    new_project_drawing(adapter, scale=sheet_scale)
+    drawing_factory(adapter, scale=sheet_scale)
 
     for view_name, center in (
         ("*Front", front_center),

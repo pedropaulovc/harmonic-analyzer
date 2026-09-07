@@ -68,7 +68,7 @@ def test_all_orthographic_views_and_final_sheet_share_declared_scale() -> None:
     sheet_calls = [
         call
         for call in calls
-        if call.func.id in {"new_project_drawing", "finalize_drawing"}
+        if call.func.id in {"drawing_factory", "finalize_drawing"}
     ]
     assert len(sheet_calls) == 2
     for call in [*views[:4], *sheet_calls]:

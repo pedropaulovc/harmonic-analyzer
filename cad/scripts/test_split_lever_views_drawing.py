@@ -40,9 +40,8 @@ def built(monkeypatch, tmp_path):
     adapter = SimpleNamespace(currentModel=model, open_model=open_model)
     monkeypatch.setattr(recipe, "check", lambda *args: None)
     monkeypatch.setattr(recipe, "read_required_properties", lambda *args, **kw: None)
-    monkeypatch.setattr(
-        recipe, "new_project_drawing", lambda *args, **kw: (model, None)
-    )
+    def drawing_factory(*args, **kw):
+        return model, None
     monkeypatch.setattr(recipe, "stamp_drawing_summary", lambda *args: None)
 
     def place(adapter, path, orientation, x, y, *, scale):
@@ -119,7 +118,11 @@ def built(monkeypatch, tmp_path):
         return {"status": "success"}
 
     monkeypatch.setattr(recipe, "finalize_drawing", finalize)
-    result = asyncio.run(recipe.build(adapter, source=source, layout=layout))
+    result = asyncio.run(
+        recipe.build(
+            adapter, drawing_factory=drawing_factory, source=source, layout=layout
+        )
+    )
     return SimpleNamespace(events=events, views=views, entities=entities, result=result)
 
 
