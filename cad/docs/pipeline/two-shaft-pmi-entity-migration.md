@@ -1,11 +1,13 @@
 # Two-shaft PMI entity migration
 
-This bounded candidate replaces eight PMI attachment picks and two surface-finish
-picks in `draw_fulcrum_shaft.py` and `draw_pivot_shaft.py`. The first native
-fulcrum control stopped at its old datum display seed (receipt below). The native
-datum-placement correction has **offline proof only**; complete native build,
-saved/reopened identity and render acceptance remain required.
-No speed improvement is claimed.
+This migration replaces eight PMI attachment picks and two surface-finish
+picks in `draw_fulcrum_shaft.py` and `draw_pivot_shaft.py`. Both recipes passed
+native build, cold entity/content checks and render inspection at `d8ec09f5`,
+as recorded below. The later [production MISS/HIT at `d6ad5aad`](prepared-template-viewport-control.md#production-misshit-at-d6ad5aad)
+passed both drawing tasks but did not repeat cold or printed-pair comparisons.
+The earlier failed controls remain below as provenance. These results do not
+cover the other explicit-entity callers or the full pipeline. No speed
+improvement is claimed.
 
 Both source builders name their single solid extrusion `Shaft`. Existing
 `ModelEntities`, `FeatureFace` and `FaceBoundary` resolve all roles in one request:
@@ -20,7 +22,7 @@ Both source builders name their single solid extrusion `Shaft`. Existing
 
 The rim stations/radii come from the existing model dimensions, never sheet
 coordinates. The Front/-Z routing follows the project's existing front-view
-convention; selection and placement on these two native files still need a pilot.
+convention; the two-shaft native results below cover this routing.
 Feature membership is `FeatureByName("Shaft").GetFaces()` plus exact-one geometric
 matching, not an exclusive-owner claim: the API permits shared feature faces and
 `IFace2.GetFeature()` returns only the oldest owner.
@@ -130,9 +132,9 @@ Pivot is a separately authorized invocation with `--target pivot_shaft`, not an
 automatic retry/continuation after a failed fulcrum. Outputs use unique registered
 directories; a successful recipe still requires its native/PDF/PNG, fresh cold
 witness and an eye pass. This is not the full doit merge gate or a speed trial.
-The other ten production callers and the typography diagnostic remain pending
-separate enrollment/acceptance; in particular type-46 silhouette geometry is not
-silently accepted by the current general attachment snapshot's exclusion list.
+These two shaft results do not establish acceptance of the other ten production
+callers or the typography diagnostic. In particular, a general attachment
+snapshot's type-46 exclusion is not silhouette identity evidence.
 
 Offline runner/role acceptance regression:
 
@@ -223,8 +225,9 @@ source-to-reverse is 1 for a context difference; a later selected-to-attached
 change is separate evidence of replacement. Neither outcome is assumed in code.
 
 The existing one-target command above reruns this control after review and a
-fresh exclusive seat grant. No native execution of the observer is claimed here.
-Its mocks deliberately distinguish equal-geometry native handles and retain the
+fresh exclusive seat grant. The observer's initial implementation had only mock
+verification; its subsequent native result is recorded in the next section.
+The mocks deliberately distinguish equal-geometry native handles and retain the
 real production rejection; they also cover null/unknown/read-error mappings,
 multiple/null attachments, interruption and restoration of all three observers.
 
@@ -286,9 +289,9 @@ uv run python -m pytest cad/scripts/test_annotation_attachment_context_drawing.p
 ```
 
 The owned command above with `--candidate b63fc27e` retains the old recipe's
-direct-view expectation for replay of the mismatch. A reviewed current-head
-invocation is required to test the corrected model-context recipe; no new native
-or full cold/printed acceptance is claimed by this implementation.
+direct-view expectation for replay of the mismatch. The corrected model-context
+recipe's subsequent native and cold results are recorded below; its implementation
+tests alone did not establish that acceptance.
 
 Re-runnable offline proof:
 
@@ -361,6 +364,9 @@ long but clear leaders. Fulcrum's previous 4.007 mm title movement is absent;
 the comparison itself was not weakened.
 
 This proves the two recipes with the revised template and prepared constructor.
-The subsequent explicit production factory/runner integration still requires
-its own native boundary check; remaining VIEW/silhouette callers and fleet
-acceptance are not covered by these two drawings.
+The subsequent explicit production factory/runner passed its
+[MISS/HIT boundary at `d6ad5aad`](prepared-template-viewport-control.md#production-misshit-at-d6ad5aad),
+with both PNGs inspected and source hashes unchanged. That production run did
+not cold-reopen the drawings or compare printed normal/MISS/HIT pairs; the cold
+role proof above belongs to `d8ec09f5`. Neither run covers the remaining
+VIEW/silhouette callers or fleet acceptance.
