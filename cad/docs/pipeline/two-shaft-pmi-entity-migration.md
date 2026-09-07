@@ -184,6 +184,54 @@ No tolerance assertion was relaxed. API references: `IAnnotation.Visible`,
 `swAnnotationVisibilityState_e`, `IAnnotation.IsDangling` and
 `IAnnotation.SetPosition2` (documented placement restrictions can clamp a datum).
 
+### Native-position attempt: unresolved source/view identity
+
+Root `3db3efe2` / adapter `e77bfda` reached the complete PMI bank and failed its
+datum-A entity identity check after **7.40359040000476 s**. Receipt:
+`cad/out/reports/datum-policy-yic4qtbp/pilot.json`, SHA-256
+`e7ad58f741194cef28bbfb31a4c78133a048217f4438bc2c10101639865bfe17`.
+The failure evidence is complete with no capture errors; original/source-copy
+hashes and final runtime guards remained exact. Failure-only PDF/PNG were made,
+not a saved native drawing or a cold/whole-sheet acceptance result.
+
+The retained datum circle geometry equals its intended source rim exactly in
+the existing serialized geometry witness: center `(0, 0, -0.091)` m, radius
+`0.003175` m. The three FCF signatures also match their intended source rims.
+This is **not** an identity proof. The immediate native datum check compares the
+handle returned by `SelectionMgr.GetSelectedObject6`; the final bank compares
+the original `ModelEntities` handle. The receipt did not retain the intermediate
+native identity matrix, so it cannot distinguish different source/view contexts
+from attachment replacement during subsequent insertions/rebuilds.
+
+The same owned pilot now records `entity_context_observations` for explicit-role
+recipes. It observes the existing selection, immediate native validation and
+final explicit-bank boundaries without changing any production validator or
+selection. The matrix retains `IsSame` results for original source, selected,
+corresponding-view and attached entities, plus their reverse-mapped part entities.
+It uses documented `IView.GetCorrespondingEntity(source)` and, as in the bundled
+*Get Corresponding Entities Between Parts and Views* example,
+**the source part's** `Extension.GetCorrespondingEntity2(view_entity)`.
+No document activation, selection, source write, or new retry is introduced.
+
+Null mappings, unknown (`-1`) identity and read errors are recorded distinctly.
+They cannot convert the original failure into acceptance. Every read group and
+stage is timed; these diagnostic reads are included in `recipe_seconds`, so the
+instrumented run is not an uninstrumented speed measurement. The pilot stores
+the matrix even when its original attachment check aborts. Expected same-session
+disambiguation: selected-to-attached stays 1 while source-to-selected is 0 and
+source-to-reverse is 1 for a context difference; a later selected-to-attached
+change is separate evidence of replacement. Neither outcome is assumed in code.
+
+The existing one-target command above reruns this control after review and a
+fresh exclusive seat grant. No native execution of the observer is claimed here.
+Its mocks deliberately distinguish equal-geometry native handles and retain the
+real production rejection; they also cover null/unknown/read-error mappings,
+multiple/null attachments, interruption and restoration of all three observers.
+
+```powershell
+uv run python -m pytest cad/scripts/test_annotation_entity_context_drawing.py cad/scripts/test_shaft_recipe_acceptance_drawing.py -q
+```
+
 Re-runnable offline proof:
 
 ```powershell
