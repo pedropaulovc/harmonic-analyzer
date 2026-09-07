@@ -4,7 +4,7 @@ ISilhouetteEdge.GetView/GetFace/GetCurve and ordered MathPoint endpoints are
 read directly. GetFace's reference frame is not documented: no source reverse
 mapping is inferred. Drawing persistent IDs prove silhouette identity; native
 IsSame continues to prove same-session view/face ownership;
-analytic parameters describe geometry but never substitute for identity.
+captured parameters describe geometry but never substitute for identity.
 Unsupported native shapes fail. No rounding or coordinate-frame transform is
 applied, so any cold serialization differences remain visible in raw receipts.
 """
@@ -13,6 +13,7 @@ import math
 
 from _common import _early_bound
 import _drawing_silhouette_identity as persistent
+from diagnostics import _bsurface_attachment_witness as bsurface
 
 
 def finite_array(raw, size, *, label):
@@ -39,7 +40,7 @@ def _nonzero(values, label):
 
 
 def surface_witness(face):
-    """Raw analytic surface, not IFace2.GetBox's approximate/rebuild-variant box."""
+    """Raw supported surface, never an approximate IFace2.GetBox identity proxy."""
     if face is None:
         raise RuntimeError("silhouette face is null")
     face = _early_bound(face, "IFace2")
@@ -47,7 +48,14 @@ def surface_witness(face):
     if surface is None:
         raise RuntimeError("silhouette face surface is null")
     surface = _early_bound(surface, "ISurface")
-    identity = int(surface.Identity())
+    raw_identity = surface.Identity()
+    identity = int(raw_identity)
+    if identity == 4006:
+        if type(raw_identity) is not int:
+            raise RuntimeError(
+                f"BSURF Identity: expected native integer, got {raw_identity!r}"
+            )
+        return bsurface.snapshot(face, surface)
     # swSurfaceTypes_e: explicit bounded initial repertoire. Cones and other
     # surfaces require their own native positive control, not guessed arrays.
     fields = {4001: ("PlaneParams", 6), 4002: ("CylinderParams", 7)}
@@ -61,7 +69,7 @@ def surface_witness(face):
     return {"identity": identity, "parameters": params}
 
 
-def snapshot(app, view, entity):
+def snapshot(app, view, entity, *, evidence=None):
     """Return raw supported geometry plus the native face handle for live checks."""
     if entity is None:
         raise RuntimeError("silhouette attachment is null")
@@ -69,6 +77,10 @@ def snapshot(app, view, entity):
     same(app, silhouette.GetView(), view, label="silhouette owning view")
     face = silhouette.GetFace()
     face_data = surface_witness(face)
+    if evidence is not None:
+        # Retain successful surface readback if a later curve/endpoint getter
+        # rejects. A partial record is evidence, never a successful snapshot.
+        evidence["face_surface"] = face_data
     raw_curve = silhouette.GetCurve()
     if raw_curve is None:
         raise RuntimeError("silhouette curve is null")
@@ -121,13 +133,20 @@ def _record_identity_controls(app, expected, actual, before_face, after_face, ev
 
 def require_same(app, view, expected, actual, *, drawing, label, evidence):
     """Record both raw snapshots before exact entity/face/geometry acceptance."""
-    before, before_face = snapshot(app, view, expected)
+    before, before_face = snapshot(
+        app, view, expected, evidence=evidence.setdefault("expected", {})
+    )
     evidence["expected"] = before
-    after, after_face = snapshot(app, view, actual)
+    after, after_face = snapshot(
+        app, view, actual, evidence=evidence.setdefault("actual", {})
+    )
     evidence["actual"] = after
     try:
         persistent.require_same(
-            drawing, expected, actual, label=f"{label} silhouette entity",
+            drawing,
+            expected,
+            actual,
+            label=f"{label} silhouette entity",
             evidence=evidence.setdefault("persistent_identity", {}),
         )
     except RuntimeError:
