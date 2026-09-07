@@ -552,7 +552,12 @@ def test_complete_explicit_scope_and_default_order():
     rows = [row for roles in VIEW_ROLES.values() for row in roles.values()]
     assert len(rows) == 21
     assert sum(row.annotation_kind == 7 for row in rows) == 11
-    assert sum(row.entity_kind == 46 for row in rows) == 4
+    assert {
+        label for roles in VIEW_ROLES.values() for label, row in roles.items()
+        if row.entity_kind == 46
+    } == {"gear tooth-tip circular runout", "pinion tooth-tip circular runout"}
+    assert VIEW_ROLES["spring_hook"]["shank seating finish"].entity_kind == 2
+    assert VIEW_ROLES["crankshaft"]["crankshaft bearing-journal finish"].entity_kind == 2
     assert pilot.target_order() == ("rocker_arm", "channel_lever")
 
 

@@ -335,7 +335,6 @@ async def build(
             raise RuntimeError(f"failed to add ASME center marks to {label} view")
 
     journal_face = _visible_cylindrical_face(adapter, right, JOURNAL_DIA)
-    journal_silhouette = _visible_journal_silhouette(adapter, right)
     add_view_centerline(
         adapter,
         right,
@@ -423,11 +422,10 @@ async def build(
     add_surface_finish(
         adapter,
         right,
-        symbol_xy=(0.205, 0.145),
         control=surface_finish_by_key(SURFACE_FINISHES, "bearing_journal"),
         label="crankshaft bearing-journal finish",
-        edge_entity=journal_silhouette,
-        entity_type="SILHOUETTE",
+        entity=journal_face,
+        entity_type="FACE",
     )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.045)
     # Identify the enlarged circular projection without relying on its position.
