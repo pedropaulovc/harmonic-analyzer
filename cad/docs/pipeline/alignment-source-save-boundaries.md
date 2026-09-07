@@ -127,3 +127,48 @@ Composition seam for a separate save control: install its context **before**
 `SourceSaveBoundaries.observe()`. The observer captures the current
 `_drawing_common.save_drawing` and forwards its composed `artifact_context`
 without duplicating either save. The legacy context must remain an exact no-op.
+
+## Native boundary replay at `3b426b62`
+
+The separate legacy and null-advanced extension runs used adapter `e77bfda4`,
+the same existing PID 31860, fresh copies of the pinned alignment part, normal
+factory, and disabled remote cache/autostart. The pre-existing pivot drawing and
+part were preserved, including native identities and clean/visible state; both
+runs cleaned up their owned documents without error. Originals stayed exact.
+
+Legacy receipt: `datum-policy-drg09evu/pilot.json`, SHA-256
+`3c965cb022f790d3b84108873a31908797ab7c2debac9572cad602cef75b7d0d`.
+All nine source banks completed. The source was clean before the callout helper
+and dirty afterward; observed text slots 4 and 8 changed to
+`THRU - REAM\nPRESS FIT`. Precision did not change the observed source display.
+The exact raw bore value `0.008000000002000001`, tolerances and native parameter
+identities stayed unchanged at every bank. This locates the first dirty helper,
+not SetText versus its existing rebuild within that helper.
+
+The copy SHA stayed original through `before_native_save`, then changed to
+`09c1de0d6b849fa848ebf1f5fe6a1d08664caa45f1f5bf09ff46ac6f4240acde`
+at `after_native_save`, where the dirty flag cleared. Both PDF banks retained
+that changed hash. The recipe's unchanged copy-hash gate rejected it. Recipe
+time including instrumentation was 33.808 s; total pilot time was 89.388 s.
+Failure evidence was complete with no capture errors. This is a failed source
+acceptance control, not a performance baseline for uninstrumented production.
+
+Modern receipt: `datum-policy-ytl97oo4/pilot.json`, SHA-256
+`0046e3ce7abca28a3570c2a4bc78a0ac78d5b9c394ab593e81b4d0576b3c4878`.
+The typed null-advanced call returned `(True, 0, 0)`, produced a 203,426-byte
+native drawing at the exact requested path, and took 1.105 s. The source
+remained dirty in memory and retained its original disk hash after that call;
+all seven reached source banks retained exact raw value/tolerance/identity.
+
+The trial nevertheless failed: the diagnostic's post-save inventory check ran
+inside the `saving_as` scope, before that scope reconciled the authorized
+unsaved-to-saved path/title transition. It therefore rejected the renamed
+drawing against its old recorded name. The native save itself passed its
+file/path/result checks. Scope exit reconciled ownership and cleanup succeeded.
+Failure-only PDF evidence was complete and preserved source bytes; ordinary
+recipe PDF, built acceptance and cold reopening were not reached. Runtime final
+guards reported no drift. Recipe/pilot times were 31.738/91.643 s.
+
+The next run must correct the diagnostic scope ordering and keep the immediate
+post-observer active-document check. This partial result establishes native
+persistence for this call shape, not a completed source-safe drawing recipe.
