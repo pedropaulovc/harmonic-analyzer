@@ -833,7 +833,7 @@ def test_part_change_owner_rejects_foreign_document_before_any_close(native_fixt
     assert trial.closed == []
     assert len(trial.documents) == 2
     with pytest.raises(trial.probe.OwnershipError):
-        trial.wrapped.currentModel
+        _ = trial.wrapped.currentModel
 
 
 def test_part_change_owner_latches_raw_cleanup_errors_through_attempt(native_fixture_owner):
@@ -859,7 +859,7 @@ def test_part_change_owner_rejects_failed_open_but_can_close_claimed_copy(native
     with pytest.raises(trial.probe.OwnershipError, match="fixture open failed"):
         asyncio.run(trial.wrapped.open_model(str(trial.path)))
     with pytest.raises(trial.probe.OwnershipError):
-        trial.wrapped.currentModel
+        _ = trial.wrapped.currentModel
     trial.owner.close()
     assert trial.closed == ["copy.SLDPRT"]
 
@@ -869,7 +869,7 @@ def test_part_change_owner_rejects_same_handle_path_change(native_fixture_owner,
     asyncio.run(trial.wrapped.open_model(str(trial.path)))
     trial.model.path = tmp_path / "foreign-after-save-as.SLDPRT"
     with pytest.raises(trial.probe.OwnershipError):
-        trial.wrapped.currentModel
+        _ = trial.wrapped.currentModel
     assert trial.closed == []
 
 
