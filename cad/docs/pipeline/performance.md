@@ -1,5 +1,11 @@
 # Build performance and drawing attachment contracts
 
+Documentation audit, 2026-09-07, at `e5b3da74`: measurements and failed controls
+below apply to their named revisions, not the current fleet or work queue.
+The [project](https://github.com/users/pedropaulovc/projects/1) owns priorities.
+Current prepared-factory behavior and remaining acceptance boundaries are in
+[prepared drawing builds](prepared-drawing-builds.md).
+
 The September 2026 telemetry audit identified two recurring costs: channel pose
 correction repeatedly resolves the same components and transforms, and drawing
 recipes repeatedly locate geometry through sheet coordinates or whole-view scans.
@@ -112,21 +118,70 @@ cold-start parsing cost.
 ### Drawing dependency scope
 
 `_drawing_project_layout.py` is imported directly by the seven semantic pilots,
-not through `_drawing_common.py`. An exact closure comparison over all 92 drawing
-recipes found that the other 85 drop only the five native layout, GTol, bounds,
-packing and measurement-handoff helpers. The seven pilots retain every previous
-dependency and add the new wrapper. No runtime behavior changed. Regression tests
-pin both directions, so an edit to experimental layout code no longer invalidates
-the unmigrated fleet through an unused shared-helper import.
+not through `_drawing_common.py`. At the layout-module extraction, a closure
+comparison over all 92 drawing recipes found that the other 85 dropped only the
+five native layout, GTol, bounds, packing and measurement-handoff helpers. The
+seven pilots retained every previous dependency and added the new wrapper.
+No runtime behavior changed in that extraction.
+The later prepared factory also depends on blank annotation measurement; the
+historical five-module reduction is not the current complete cache-input list.
+See [prepared drawing builds](prepared-drawing-builds.md) for that distinction.
 
 ## Drawing attachments
 
-Model geometry owns attachment identity. Let SolidWorks choose annotation layout
-where its native API supports it; fixed sheet coordinates are not a manufacturing
-requirement. A drawing must not identify a bore, datum, controlled surface or
+The migration contract is that model geometry owns attachment identity. Let
+SolidWorks choose annotation layout where its native API supports it; fixed
+sheet coordinates are not a manufacturing requirement. A drawing must not
+identify a bore, datum, controlled surface or
 dimension endpoint by selecting the first nearby edge. Converting an already
 identified entity's location into drawing coordinates is distinct from using
 coordinates to discover that entity.
+
+### Static coordinate-selection remainder
+
+At `e5b3da74`, the [registry](../../scripts/_drawing_registry.py) contains 92
+production drawings: 84 part drawings and eight assembly drawings. A source-callsite
+audit finds coordinate-based geometry selection in **43 recipes**, all part
+drawings. This is the existing migration remainder, not a claim that the other
+49 have passed native acceptance or that annotation placement must avoid XY.
+
+To reproduce the count, read the registry's `DrawingSpec.script_name` rows and
+inspect each named script's call expressions, including local helper bodies.
+Count the following routes, then take the union of recipe names rather than
+summing the overlapping recipe column. Calls in loops count once as source
+sites, not once per native invocation.
+
+| Coordinate-selection route | Source sites | Recipes |
+|---|---:|---:|
+| `add_datum_feature` without an entity or annotation | 56 | 33 |
+| `add_feature_control_frame` without an entity | 58 | 33 |
+| `add_surface_finish` without an entity | 23 | 22 |
+| `PmiDrawingPlacement.attachment_xy` without an entity | 18 | 6 |
+| `add_edge_dimension` | 27 | 13 |
+| `add_native_hole_callout` without `edge` | 11 | 9 |
+| `insert_hole_table` with coordinate datum/hole selection | 2 | 2 |
+| `find_edge_near` | 5 | 2 |
+| `add_view_centerline` without `entity` or `face` | 4 | 4 |
+| Direct unnamed geometry `SelectByID2` in `draw_crank_pin` | 1 | 1 |
+
+The routing is inspectable in [`_drawing_common.py`](../../scripts/_drawing_common.py):
+`_select_annotation_entity` sends `edge_xy` to `_select_view_entity`, whose
+coordinate branch uses unnamed `SelectByID2`. `project_part_pmi` forwards
+`attachment_xy` to that same branch. Its 18 counted placements are in
+`draw_cylinder_gear_shaft` (4), `draw_pinion_arbor` (3), `draw_transgear_stub` (3),
+`draw_wheel_axle` (4), `draw_pen_rod` (3) and `draw_cone_gear_shaft` (1).
+They select geometry by sheet XY; their separate `position` seeds do not enter
+the count. Explicit `entity`, `edge_entity` and annotation arguments are excluded.
+
+Also exclude source-model geometric role predicates, positions derived from
+already resolved entities, view/text/leader placement, and named dimension/view
+selection with ignored zero coordinates. The harmonic-base hole table supplies
+`datum_axes` and `hole_entities`, so its retained point arrays do not make it a
+coordinate pick. Shared fastener/assembly helpers add no coordinate-selection
+route of their own; recipe decorators remain included in the source inspection.
+This is a bounded static inventory, not whole-program execution or attachment proof.
+
+### Entity and native validation contract
 
 Entity resolution must specify the required geometric role, validate its model
 context, and reject missing or ambiguous results. Resolve all requested entities
@@ -364,9 +419,12 @@ the imported `BoreCutDia@BoreProfile` display dimension, which identifies the bo
 axis. Its native frame stays where SolidWorks puts it: no datum position writes.
 The exact dimension/source identity, native label, actual frame/body clearance
 and final sheet fit are checked. The sheet was visually inspected; trace
-`0xc779ee25b1980e33ce281ec30dec9cd4`. Five production pilots now complete under
-the bounded leader policy. Lever and rocker remain unresolved; their face datums
-must not be reattached to unrelated dimensions merely to obtain easier placement.
+`0xc779ee25b1980e33ce281ec30dec9cd4`. At that revision, five production pilots
+completed under the bounded leader policy; lever and rocker were unresolved.
+The later [prepared lever run at `a25fe21c`](prepared-drawing-builds.md#lever-prepared-acceptance-at-a25fe21c)
+passed built/cold and visual checks. The earlier failures remain historical
+evidence, not a current two-recipe blocker list. Face datums must not be
+reattached to unrelated dimensions merely to obtain easier placement.
 
 A copied rocker control at `3efbf8a2` establishes another native placement route:
 changing the document's annotation bent-leader length from 6.35 to 13.36625 mm
@@ -466,7 +524,13 @@ because it supplies the removed `side_centerline_face_xy` field. That failed
 attempt is not a performance result. Comparing that version requires isolating
 its historical helper closure, not adding coordinate-picking compatibility back.
 
-## Further aggressive changes, in priority order
+## Further experiments from the September audit
+
+These proposals explain the original performance investigation, not mandatory
+unfinished controls or a current priority order. The project owns sequencing;
+enabled production changes retain the full build, visual and persistence checks
+described above. Statistical timing and conflict-rate claims require their own
+measurements.
 
 1. **Separate assembly helper dependencies by actual consumer.** The historical
    assembly cache had 18 hits and 149 misses. Among 102 observed miss-key
@@ -477,12 +541,15 @@ its historical helper closure, not adding coordinate-picking compatibility back.
    old umbrella would preserve the same invalidation problem. These counts do not
    predict the hit rate after a split.
 2. **Author manufacturing annotations once, import into chosen native views.**
-   The model-PMI positive control establishes fast, attached import, but not a
-   finished layout. Next test selected-view import without the all-views
-   duplication, then one representative drawing per geometry family. Preserve
-   annotation coverage and values through source-part rebuild, scale changes and
-   save/reopen before migrating that family's recipes. Current semantic pilots
-   are not evidence that every remaining coordinate-based recipe is migrated.
+   The [selected-Right-view control](selected-view-model-pmi-control.md) subsequently
+   imported the exact datum and two FCFs without duplicates in receipt
+   `selected-view-pmi-vx_7_s57/observations.json`. The frames overlapped, and
+   save/export added a center mark, failing inventory before cold reopen.
+   Selected-view import is therefore already native-tested for this call shape,
+   but not an accepted recipe replacement. Before migrating a family's recipes,
+   prove annotation coverage and values through source-part rebuild, scale changes
+   and save/reopen. Current semantic pilots are not evidence that every remaining
+   coordinate-based recipe is migrated.
 3. **Restore coherent assembly-and-child cache bundles.** This could make a cache
    hit carry the exact referenced child identities instead of requiring the
    checkout to have them already. Validate the complete manifest before atomic

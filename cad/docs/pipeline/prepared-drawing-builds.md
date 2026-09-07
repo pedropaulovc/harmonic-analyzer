@@ -1,5 +1,9 @@
 # Prepared defaults in drawing builds
 
+Implementation scope checked on 2026-09-07 at `e5b3da74`. Measurements below
+belong to their named revisions; they are not a current fleet result or schedule.
+Work sequencing belongs to the [project](https://github.com/users/pedropaulovc/projects/1).
+
 The drawing-only runner prepares or validates a content-addressed DRWDOT before
 the recipe opens its source. It then passes a synchronous `drawing_factory`
 keyword into the unchanged view, dimension, annotation and finalizer logic.
@@ -15,10 +19,10 @@ Invoke drawings through `uv run python -m doit drawing:<registry-name>` so the
 existing machine seat is held. An uncoordinated direct script launch now fails
 before connect/cleanup, rather than reaching template preparation without a lock.
 
-The existing preparation key includes original template bytes, actual preparation
-and validation helper closures, adapter/config/lock inputs, exact scale/precision,
-Python runtime and native SOLIDWORKS revision. Hits verify the manifest, receipt
-and derived bytes; corruption fails rather than rebuilding or selecting another
+The preparation key includes original template bytes, actual preparation
+and validation helper closures, adapter/config/lock inputs, canonical 1:1 scale
+and precision, Python runtime and native SOLIDWORKS revision. Hits verify the
+manifest, receipt and derived bytes; corruption fails rather than rebuilding or selecting another
 factory. The inherited factory revalidates its entry before creating a drawing.
 An adapter/spec mismatch, duplicate creation or unconsumed factory fails.
 
@@ -27,23 +31,51 @@ doit freshness and remote cache keys change together. Source execution-token and
 original-template dependencies remain intact. The derived cache directory is
 not an independent recipe input. Parts and assembly builds do not import the
 drawing runner. Blank-default validation genuinely uses annotation measurement
-and rectangle helpers; edits to those now invalidate every drawing. Placement,
-GTol, callout and handoff helpers remain exclusive to the native-layout pilots.
+and rectangle helpers; edits to those invalidate every drawing. The seven
+native-layout pilots additionally import `_drawing_project_layout` directly;
+the factory does not enable that layout policy for the other recipes.
 
 There are 15 current scale specifications, all at two decimal places. Each
-unchanged specification reuses one validated entry, but a first cold fleet run
-pays up to 15 preparations. No first-fleet speedup is claimed. The earlier owned
-blank normal/miss/hit and prepared-rocker results motivate this integration;
-native acceptance of this exact production boundary and broader fleet fit still
-need to run before merge. Template authoring/promotion is a separate change.
+recipe retains its requested spec, while preparation stores one truthful 1:1
+base per precision. The current fleet therefore shares one base, rather than
+paying for the older design's 15 scale-specific preparations. Before any model
+views exist, the inherited factory validates the base, its empty sheet and exact
+active drawing, then calls `SetScale(numerator, denominator, True, False)` and
+checks the requested pair. These are the normal initializer's flags: scale
+annotation positions, not text height. The finalizer still assigns each populated
+sheet's property-linked model view and verifies the actual requested scale.
+See the [canonical base contract and native evidence](canonical-prepared-template-base.md).
+
+## Acceptance scope
+
+The earlier [production MISS/HIT at `d6ad5aad`](prepared-template-viewport-control.md#production-misshit-at-d6ad5aad)
+completed fulcrum and pivot drawing tasks. The canonical control at `7c86fdba`
+later passed all 15 same-requested-scale normal/prepared pairs, including raw
+defaults, viewport, saved/cold and printed comparisons on 30 blank drawings.
+Those results establish their recorded boundaries, not the final populated fleet.
+
+The remaining merge evidence is a successful full `uv run python -m doit -n 4`
+at the final integrated head, affected-render and complete-sheet inspection, and
+the saved/cold source, attachment and printed witnesses required by the enabled
+annotation changes. `build` includes all 92 drawings; `build_bare` does not.
+Production `finalize_drawing` saves native/PDF and renders PNG, but does not
+cold-reopen. A successful drawing task alone is not cold-persistence evidence.
+One top-of-stack build and visual pass can cover the stacked factory change.
+
+Normal setup remains an explicit diagnostic control. Untried arrangement,
+surface-readback or save variants are not additional merge requirements unless
+chosen to resolve a production correctness gap. A matched full-recipe/fleet
+normal-versus-canonical comparison must include cold preparation and instance
+scaling before claiming an end-to-end speedup. No such speedup is claimed here.
 
 ## Owned validation and the diagnostic contract
 
 An owned pilot materializes through its existing CREATE/SAVE_AS and guarded
 directory-relocation scopes before source opening. It then constructs the same
-`prepared_drawing_factory(adapter, entry)` used by production and passes it into
-the recipe inside the existing single-drawing creation scope. NORMAL uses the
-explicit normal factory and never silently falls back from a prepared failure.
+`prepared_drawing_factory(adapter, entry, spec=requested)` used by production
+and passes it into the recipe inside the existing single-drawing creation scope.
+NORMAL uses the explicit normal factory and never silently falls back from a
+prepared failure.
 
 Current recipe-loading diagnostics require the explicit, required
 `drawing_factory` keyword and `TEMPLATE_SPEC`. Pre-migration Git revisions must
@@ -52,6 +84,10 @@ automatic old/new signature adaptation. This deliberately changes invocation
 plumbing, not ownership, source-value, cold-reopen or print acceptance gates.
 
 ## Fulcrum empty-callout acceptance at `5eb96629`
+
+Historical per-scale results, retained in the 2026-09-07 audit: the following
+fulcrum, pivot and lever runs predate canonical preparation. Their hashes,
+timings and acceptance scope apply to the recorded implementations.
 
 The owned prepared full-recipe pilot passed on adapter `e77bfda4`, PID 31860,
 after `a96cb782` removed the rebuild for empty callout maps. Receipt
@@ -69,7 +105,7 @@ found readable dimensions, controls and title text with the expected geometry.
 
 Originals and the owned source retained exact hashes; the clean/visible baseline
 pivot part and drawing were preserved, owned cleanup succeeded and final guards
-were empty. This validates one empty-map recipe through the current prepared
+were empty. This validates one empty-map recipe through that revision's prepared
 factory, not the remaining 21 empty-map recipes or the complete drawing fleet.
 
 The matching pivot-shaft run at `bb56cd28` also passed built/cold checks and
@@ -98,4 +134,6 @@ This accepts one prepared lever recipe, not a fleet speedup: its 140 s recipe
 cost remains after the roughly one-second factory setup. These three retained
 runs precede the setup-module extraction in
 [prepared-template-key-isolation.md](prepared-template-key-isolation.md); that
-dependency-boundary change still needs its own native acceptance.
+later implementation must be assessed using its own evidence, including the
+canonical blank control linked above, rather than treating these older timings
+as measurements of the current populated fleet.
