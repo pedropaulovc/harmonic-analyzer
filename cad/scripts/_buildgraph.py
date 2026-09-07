@@ -361,19 +361,102 @@ class _AssemblySources:
                 ):
                     self.fail(item)
 
+    def direct_mapping_bindings(self, node: ast.AST, owner: ast.Name) -> list[ast.AST]:
+        """Read direct owner assignments without interpreting generated row shapes."""
+        found = []
+        for item in self.scope_nodes(node):
+            if self.availability_before(item, node) is _SourceAvailability.FUTURE:
+                continue
+            if (
+                isinstance(item, ast.AugAssign)
+                and isinstance(item.target, ast.Name)
+                and item.target.id == owner.id
+            ):
+                self.fail(item)
+            targets = (
+                item.targets if isinstance(item, ast.Assign)
+                else [item.target] if isinstance(item, (ast.AnnAssign, ast.NamedExpr))
+                else []
+            )
+            if any(isinstance(target, ast.Name) and target.id == owner.id for target in targets):
+                if item.value is not None:
+                    found.append(item.value)
+        return found
+
+    def prepared_row_selections(self, node: ast.AST, owner: ast.Name) -> set[ast.AST]:
+        """Recognize selection from the same unescaped collection prepared earlier."""
+        found = set()
+        for value in self.direct_mapping_bindings(node, owner):
+            if not isinstance(value, ast.Subscript) or not isinstance(value.value, ast.Name):
+                continue
+            collection = value.value
+            loops = [
+                item for item in self.scope_nodes(node)
+                if isinstance(item, ast.For)
+                and isinstance(item.target, ast.Name) and item.target.id == owner.id
+                and isinstance(item.iter, ast.Name) and item.iter.id == collection.id
+                and self.availability_before(item, value) is _SourceAvailability.AVAILABLE
+            ]
+            if not loops:
+                continue
+            for loop in loops:
+                if set(self.bindings(loop.iter, frozenset())) != set(self.bindings(collection, frozenset())):
+                    self.fail(value)  # collection was rebound after its rows were prepared
+            for use in self.scope_nodes(node):
+                if not isinstance(use, ast.Name) or use.id != collection.id or not isinstance(use.ctx, ast.Load):
+                    continue
+                parent = self.parents[use]
+                if isinstance(parent, ast.Subscript) and parent.value is use and isinstance(parent.ctx, ast.Load):
+                    assignment = self.parents[parent]
+                    if (
+                        isinstance(assignment, ast.Assign)
+                        and assignment.value is parent
+                        and len(assignment.targets) == 1
+                        and isinstance(assignment.targets[0], ast.Name)
+                        and assignment.targets[0].id == owner.id
+                    ):
+                        continue
+                if parent in loops and parent.iter is use:
+                    continue
+                self.fail(use)  # collection alias/mutation/opaque consumer is unsupported
+            found.add(value)
+        return found
+
     def field_writes(
         self, node: ast.AST, owner: ast.AST, key: ast.AST | None
     ) -> list[ast.AST]:
         found = []
-        if key is None:
-            if not isinstance(owner, ast.Name):
-                self.fail(node)
-            for initial in self.bindings(owner, frozenset()):
-                if not isinstance(initial, ast.Dict) or any(
-                    value is None for value in initial.keys
-                ):
-                    self.fail(initial)
+        if not isinstance(owner, ast.Name):
+            self.fail(node)
+        # Keep generated rows' explicit field-write contract: their non-source
+        # shape need not be interpreted. Direct map assignments still cannot hide
+        # an initial source, opaque rebinding or whole-container augmentation.
+        initial_values = (
+            self.bindings(owner, frozenset()) if key is None
+            else self.direct_mapping_bindings(node, owner)
+        )
+        prepared_rows = self.prepared_row_selections(node, owner) if key is not None else set()
+        for initial in initial_values:
+            if initial in prepared_rows:
+                continue
+            if not isinstance(initial, ast.Dict) or any(
+                value is None for value in initial.keys
+            ):
+                self.fail(initial)
+            if key is None:
                 found.extend(initial.values)
+                continue
+            for field, value in zip(initial.keys, initial.values, strict=True):
+                if ast.dump(field) == ast.dump(key):
+                    found.append(value)
+                    continue
+                if (
+                    isinstance(field, ast.Constant)
+                    and isinstance(key, ast.Constant)
+                    and field.value != key.value
+                ):
+                    continue
+                self.fail(initial)
         for item in self.scope_nodes(node):
             if (
                 isinstance(item, (ast.Assign, ast.AnnAssign, ast.NamedExpr))
