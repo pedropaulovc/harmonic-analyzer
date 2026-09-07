@@ -77,3 +77,30 @@ Production helper closures and build-cache inputs do not change: only diagnostic
 enrollment, tests and this provenance do. A read-only `module_deps_of` audit of
 all 213 `build_*.py`/`draw_*.py` files found no consumer of the changed diagnostic
 manifest; its only runtime importer is the diagnostic pilot.
+
+## Actual-source cold replay passed, 2026-09-07
+
+The command above passed at frozen root `63d6e2e5`, adapter `25bc99b1`, PID
+31860, with neither source authoring nor lower-text mutation enabled. Receipt
+`cad/out/reports/datum-policy-ojv0f8vq/pilot.json` has SHA-256
+`dbdfe5384efc7922082e9863d8ca99a68387ac188660e46591ba311bc248dfe5`.
+Recipe time was 47.118125 s; the complete measured pilot was 210.836612 s,
+including preparation, source observations and built/cold checks. These are
+instrumented functional timings, not a production benchmark.
+
+The copied source ended with the exact enrolled `9e09613d...c0632` identity;
+original protection and final runtime guards passed. Built/reopened explicit
+attachment banks compare exactly. The annotation comparison passed with no
+rejected differences and no coordinate-roundoff exceptions. Existing source,
+dimension/tolerance/BASIC, imported callout, and sheet witnesses also passed.
+
+The main agent visually inspected the fresh printed PNG: `THRU - REAM` and
+`PRESS FIT` are both readable beneath the bore size/tolerance, and the finish
+leader remains at the bore. The PNG SHA-256 is
+`ad636ce5eb72379b492407e287f32b6c22fe7e5fece66bf25754623bc113e860`,
+identical to the earlier successful production PNG. Owned native drawing SHA is
+`1999c20bb37ac3b86c557e5e37d0fdd29ec246855c77620f416aae1addb012f7`;
+PDF SHA is `143399a0758ee879631076aed97946e0bffd222270a6eaa7507096cf3dab67ff`.
+This closes the new-source alignment pilot, not the drawing fleet or full
+stack merge gates. The root manifest/recipe/GTol/clearance baseline tests also
+passed 148 tests in 2.11 s (`pytest-telemetry/run-7m9m4le9`).
