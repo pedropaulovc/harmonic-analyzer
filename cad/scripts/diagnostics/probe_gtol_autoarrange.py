@@ -276,6 +276,15 @@ async def probe(adapter, source, directory):
         raise RuntimeError(
             "attachment witness failed: " + "; ".join(report["failures"])
         )
+    rejected = [
+        trial["mode"]
+        for trial in report["trials"]
+        if trial["align"].get("return") is not True
+    ]
+    if rejected:
+        raise RuntimeError(
+            f"native AlignDimensions control failed for {rejected}; complete evidence: {path}"
+        )
     return {"report": str(path)}
 
 
