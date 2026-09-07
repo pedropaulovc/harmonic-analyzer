@@ -172,14 +172,20 @@ class ViewEntityAcceptance:
                 ):
                     raise RuntimeError("VIEW selection kind changed")
                 if role.entity_kind == 46:
-                    silhouette.require_same(
-                        adapter.swApp,
-                        view,
-                        expected,
-                        actual,
-                        label="VIEW selection",
-                        evidence=row.setdefault("silhouette", {}),
-                    )
+                    try:
+                        silhouette.require_same(
+                            adapter.swApp,
+                            view,
+                            expected,
+                            actual,
+                            label="VIEW selection",
+                            evidence=row.setdefault("silhouette", {}),
+                        )
+                    except RuntimeError:
+                        from diagnostics._silhouette_identity_control import capture
+
+                        capture(adapter, view, expected, actual, row)
+                        raise
                     row["argument_geometry"] = row["silhouette"]["expected"]
                     row["selected_geometry"] = row["silhouette"]["actual"]
                     self.initial_faces[label] = _early_bound(
