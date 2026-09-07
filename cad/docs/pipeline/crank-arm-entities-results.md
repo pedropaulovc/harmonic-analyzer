@@ -298,3 +298,15 @@ advanced to `c6ab57db`. The PR monitor reports DIRTY. The measured worktree
 remains frozen at the recorded baseline rather than mixing new helpers into
 these receipts. Integration/rebase and a new baseline against the updated
 parent are outstanding; no parent or assembly branch was modified here.
+
+Run `th956w0k` at `77df0951` passed the complete native callback, including
+post-move exact shaft-finish identity, both cold opens and source/template
+guards (trace `0xadb6d0ddaedd9b1379baa1c454219276`). Its top-rim finish placement
+puts the Ra text on the arm outline, so the next layout seed moves around the
+same rim to 30 degrees. The front detail window now includes the raised pivot
+FCF in full. The native layout gate has not been used to waive visual defects.
+
+The 404-test focused suite passed (`run-0c3wquyl`, 10.60 s). Local CodeRabbit
+review of `77df0951`, with both the actual parent branch and exact baseline
+specified plus pinned helper sources as context, found only two regex-literal
+nits in the added tests. Both are fixed without changing their assertions.
