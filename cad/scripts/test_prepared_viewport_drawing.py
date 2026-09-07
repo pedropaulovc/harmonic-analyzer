@@ -2,8 +2,10 @@
 
 import asyncio
 from copy import deepcopy
+import inspect
 import json
 from pathlib import Path
+import re
 from types import SimpleNamespace
 
 import pytest
@@ -11,6 +13,96 @@ import pytest
 from diagnostics import _owned_native_documents as owned
 from diagnostics import probe_prepared_viewport as probe
 from test_owned_native_documents_drawing import Model, native  # noqa: F401
+
+
+def _runtime_failure(message):
+    return pytest.RaisesExc(RuntimeError, match=f"^{re.escape(message)}$")
+
+
+def _viewport_failure(*messages):
+    return pytest.RaisesGroup(
+        *(_runtime_failure(message) for message in messages),
+        match="^prepared viewport control failed$",
+    )
+
+
+def _fault_failure(fault):
+    if fault == "source":
+        return pytest.RaisesGroup(
+            _viewport_failure(
+                "pinned input/runtime bytes changed",
+                "pinned input/runtime bytes changed",
+            ),
+            _runtime_failure("diagnostic source files changed; see ownership evidence"),
+            match="^diagnostic failure with preserved cleanup/source evidence$",
+        )
+    messages = {
+        "restore": ("prepared template raw defaults did not persist exactly",),
+        "text": ("exact captured fields differ",),
+        "identity": ("native blank annotation/view identity changed",),
+        "export": ("injected PDF failure",) * 3,
+        "open": ("injected create failure",),
+        "vector": ("exact PDF vector geometry/inventory differs",) * 2,
+        "active": ("native write requires the exact owned active document",),
+        "clamp": ("native viewport scale assignment did not persist",),
+        "pan_drift": (
+            "prepared template raw defaults did not persist exactly",
+            "exact captured fields differ",
+        ),
+        "translation_readback": ("native original Translation3 readback differs",),
+        "null_vector": ("native CreateVector returned null",),
+        "orientation": ("native Scale2 changed the original orientation",),
+    }
+    return _viewport_failure(*messages[fault])
+
+
+@pytest.mark.parametrize(
+    "test_name,arguments",
+    [
+        ("test_failure_retains_evidence_and_scoped_cleanup", {"fault": "restore"}),
+        ("test_strict_a_a_extent_failure_does_not_discard_independent_pdf_verdict", {}),
+        ("test_vector_failure_keeps_pdf_verdict_and_all_raw_arms", {}),
+        (
+            "test_supported_image_inventory_cannot_pass_without_exact_printed_appearance",
+            {},
+        ),
+        ("test_zoom_only_pan_failure_remains_failed_without_translation_writes", {}),
+        (
+            "test_controlled_translation_rejects_failed_native_readback_before_measurement",
+            {"fault": "null_vector"},
+        ),
+    ],
+)
+@pytest.mark.parametrize("replacement", ["assertion", "wrong_leaf", "wrong_owner"])
+def test_failure_assertions_reject_unrelated_errors_despite_valid_failed_receipt(
+    scene, monkeypatch, test_name, arguments, replacement
+):
+    run = scene.run
+
+    def replace_failure(**kwargs):
+        try:
+            run(**kwargs)
+        except ExceptionGroup as original:
+            if replacement == "assertion":
+                raise AssertionError("unrelated programming failure") from original
+            if replacement == "wrong_leaf":
+                raise ExceptionGroup(
+                    original.message, [RuntimeError("unrelated runtime failure")]
+                ) from original
+            raise ExceptionGroup(
+                "unrelated group owner", original.exceptions
+            ) from original
+        raise AssertionError("real fault did not execute")
+
+    scene.run = replace_failure
+    test = globals()[test_name]
+    keywords = {"scene": scene, **arguments}
+    if "monkeypatch" in inspect.signature(test).parameters:
+        keywords["monkeypatch"] = monkeypatch
+    with pytest.raises(
+        pytest.fail.Exception, match="Raised exception group did not match"
+    ):
+        test(**keywords)
 
 
 @pytest.mark.parametrize(
@@ -348,7 +440,7 @@ def test_one_blank_three_absolute_scales_no_save_preserves_dirty_baseline(scene)
 )
 def test_failure_retains_evidence_and_scoped_cleanup(scene, fault):
     scene.faults[fault] = True
-    with pytest.raises(Exception):
+    with _fault_failure(fault):
         scene.run()
     assert scene.report()["status"] == "failed"
     assert scene.native.app.documents == [scene.baseline]
@@ -358,7 +450,7 @@ def test_failure_retains_evidence_and_scoped_cleanup(scene, fault):
 
 def test_strict_a_a_extent_failure_does_not_discard_independent_pdf_verdict(scene):
     scene.faults["restore"] = True
-    with pytest.raises(Exception):
+    with _fault_failure("restore"):
         scene.run()
     comparisons = scene.report()["comparisons"]
     assert comparisons["a_a_strict_defaults"]["status"] == "failed"
@@ -367,7 +459,7 @@ def test_strict_a_a_extent_failure_does_not_discard_independent_pdf_verdict(scen
 
 def test_vector_failure_keeps_pdf_verdict_and_all_raw_arms(scene):
     scene.faults["vector"] = True
-    with pytest.raises(Exception):
+    with _fault_failure("vector"):
         scene.run()
     report = scene.report()
     assert len(report["arms"]) == 3
@@ -524,7 +616,7 @@ def test_supported_image_inventory_cannot_pass_without_exact_printed_appearance(
         raise RuntimeError("image appearance pixel comparison failed")
 
     monkeypatch.setattr(probe.base, "compare_printed", fail)
-    with pytest.raises(Exception):
+    with _viewport_failure(*("image appearance pixel comparison failed",) * 2):
         scene.run()
     report = scene.report()
     assert (
@@ -572,7 +664,7 @@ def test_original_translation_controls_scale_setter_pan_drift(scene):
 
 def test_zoom_only_pan_failure_remains_failed_without_translation_writes(scene):
     scene.faults["pan_drift"] = True
-    with pytest.raises(Exception):
+    with _fault_failure("pan_drift"):
         scene.run()
     report = scene.report()
     assert report["translation"] == "native"
@@ -589,7 +681,7 @@ def test_controlled_translation_rejects_failed_native_readback_before_measuremen
     scene, fault
 ):
     scene.faults[fault] = True
-    with pytest.raises(Exception):
+    with _fault_failure(fault):
         scene.run(translation=probe.Translation.ORIGINAL)
     report = scene.report()
     assert report["status"] == "failed"

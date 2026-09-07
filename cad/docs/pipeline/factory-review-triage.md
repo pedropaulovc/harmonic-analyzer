@@ -137,9 +137,13 @@ reports `complete`; this is a completed review with findings, not a clean review
 The adapter gitlink is `25bc99b1ae39d8c0e004867e9b5c0f2068f2abc2`.
 All 196 stored diff blocks match the explicit base-to-head range after
 trailing-newline normalization. That Git range has 198 blocks: the review
-omitted `_drawing_common.py` and this triage file, both supplied as `--config`
-context. The review therefore does not establish coverage of those two changed
-files; the next clean-review gate must cover them as well.
+receipt omits `_drawing_common.py` and this triage file, both supplied as
+`--config` context. Inspection of the installed CLI 0.7.6 shows that this filter
+applies when persisting the incremental diff, not when sending review files:
+an existing context file keeps its original diff in the outgoing review.
+The missing blocks are therefore a retained-diff provenance gap, not evidence
+that those files were excluded from review. Context notes outside the changed
+files will avoid that gap on the next run.
 
 The original receipt and its retained copy are:
 
@@ -189,10 +193,37 @@ uv run --no-sync python -m pytest -q --tb=short cad/scripts/test_prepared_viewpo
 
 Ruff `F,RUF043,RUF059` and `git diff --check` pass for the changed Python files.
 An additional `B017` check reported six existing broad exception assertions in
-`test_prepared_viewport_drawing.py`; those predate this review and remain
-unchanged. They are not counted as a passing lint check or a reviewed fix here.
+`test_prepared_viewport_drawing.py`; these remained unchanged at checkpoint
+`37ecbe43`. The follow-up below fixes them; that earlier result was not a
+passing B017 check.
 
 Full-stack native validation, exact integrated-head re-review, visual inspection
 and merging remain VM1 integration work. This pass neither modifies the VM2
 resolver files nor changes manufacturing content, source-authoring behavior,
 native helpers, adapter code, memory files or the fillister enrollment assertion.
+
+## Follow-up: viewport exception assertions
+
+The six inherited B017 sites were investigated in the same isolated checkout
+after `37ecbe43`. Each of their 14 distinct fault modes ran through the real
+probe and owned-document wrapper with the existing native test doubles. Their
+receipts remain under `cad/out/reports/viewport-exception-<fault>-*`.
+Every case raises a `prepared viewport control failed` ExceptionGroup with
+specific RuntimeError children. Source mutation additionally produces the
+outer ownership group and its independent source-file error.
+
+The tests now use `pytest.RaisesGroup` and `pytest.RaisesExc` to require the
+observed group owner, complete child set, nesting and exact actionable messages.
+All existing receipt, geometry, print, cleanup, source and translation predicates
+remain unchanged. There are no production changes in this follow-up.
+
+Eighteen regressions failed first in `run-7b0omk66`. Each invokes one of the six
+actual tests, first allowing the real failure to produce its retained receipt,
+then substituting an unrelated AssertionError, a wrong RuntimeError leaf, or a
+group with the wrong owner. All six old broad assertions accepted all three
+substitutions despite the wrong exception. The tightened assertions reject them.
+The complete viewport file then passed **76 tests in 6.60 s**, `run-ee0y2zar`.
+The eight-file focused/adjacent command above subsequently passed **439 tests
+in 14.23 s**, `run-0e2glhy_`. Ruff `F,B017,RUF043,RUF059` and diff-check now pass
+for all six Python files changed across the two commits. Native acceptance and
+the clean integrated-head review remain separate gates.
