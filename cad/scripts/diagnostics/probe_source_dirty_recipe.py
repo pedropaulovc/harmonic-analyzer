@@ -234,7 +234,8 @@ def instrument_recipe(module, monitor):
         (module, name, f"recipe.{name}")
         for name, value in vars(module).items()
         if inspect.isfunction(value)
-        and name not in {"build", "run_build", "_parse_args", "finalize_drawing"}
+        and name
+        not in {"build", "run_drawing_build", "_parse_args", "finalize_drawing"}
     ]
     targets.extend(
         (common, name, f"nested.{name}")
@@ -293,6 +294,9 @@ async def probe(adapter, source, expected_hash, candidate, report_root):
         module = benchmark.load_recipe(
             candidate, "arbor_pedestal", directory, source=copied
         )
+        from _drawing_build import normal_drawing_factory
+
+        drawing_factory = normal_drawing_factory(adapter, module.TEMPLATE_SPEC)
         report["recipe_sha256"] = file_digest(directory / "recipe-source.py")
         check("open owned arbor copy", await adapter.open_model(str(copied)))
         adapter.ownership.assert_current_owned()
@@ -305,7 +309,12 @@ async def probe(adapter, source, expected_hash, candidate, report_root):
                 with adapter.ownership.creating_document(
                     DocumentKind.DRAWING, module.OUTPUTS.slddrw
                 ):
-                    await module.build(adapter)
+                    await module.build(
+                        adapter,
+                        drawing_factory=monitor.wrap(
+                            "recipe.drawing_factory", drawing_factory
+                        ),
+                    )
             raise RuntimeError("recipe returned without diagnostic finalization stop")
         except DiagnosticStop:
             report["status"] = "stopped_at_boundary"

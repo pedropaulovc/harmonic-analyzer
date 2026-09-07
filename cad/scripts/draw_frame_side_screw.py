@@ -7,7 +7,8 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, run_build
+from _common import CAD_ROOT
+from _drawing_build import ProjectDrawingFactory, TemplateSpec, run_drawing_build
 from _drawing_common import DrawingOutputs
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fastener_drawing import FastenerSheet, build_fastener_sheet
@@ -23,6 +24,7 @@ SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 # #10-24 x 12.7 screw; 6:1 draws the ~15.7 mm length as ~94 mm and the head
 # OD (7) as ~42 mm.
 SHEET_SCALE = (6.0, 1.0)
+TEMPLATE_SPEC = TemplateSpec(scale=SHEET_SCALE, decimals=2)
 _S = SHEET_SCALE[0] / 1000.0  # sheet meters per model mm
 
 # Authored on the Top plane, axis +Y: head at y in [0, HEAD_H] (top), shank at
@@ -74,9 +76,11 @@ RECIPE = FastenerSheet(
 )
 
 
-async def build(adapter: Any) -> dict[str, str]:
+async def build(
+    adapter: Any, *, drawing_factory: ProjectDrawingFactory
+) -> dict[str, str]:
     return await build_fastener_sheet(
-        adapter, source=SOURCE, property_view=PART_STEM, outputs=OUTPUTS, recipe=RECIPE
+        adapter, drawing_factory=drawing_factory, source=SOURCE, property_view=PART_STEM, outputs=OUTPUTS, recipe=RECIPE
     )
 
 
@@ -89,4 +93,4 @@ def _parse_args() -> argparse.Namespace:
 if __name__ == "__main__":
     _parse_args()
     _telemetry.set_service("drawing-export")
-    sys.exit(run_build(build))
+    sys.exit(run_drawing_build(build, spec=TEMPLATE_SPEC))

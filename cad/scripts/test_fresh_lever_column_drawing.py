@@ -122,7 +122,7 @@ async def test_explicit_source_is_used_before_recipe_drives_native_application(
     missing = tmp_path / "unique-missing.SLDPRT"
     adapter = SimpleNamespace(open_model=AsyncMock())
     with pytest.raises(FileNotFoundError, match="unique-missing"):
-        await recipe.build(adapter, source=missing)
+        await recipe.build(adapter, drawing_factory=Mock(), source=missing)
     adapter.open_model.assert_not_awaited()
 
 
@@ -171,8 +171,10 @@ async def test_fresh_baseline_uses_unique_outputs_and_preserves_source_witnesses
     adapter.open_model, adapter.close_model = open_model, close_model
     calls = []
 
-    async def build(actual_adapter, *, source, outputs, layout):
+    async def build(actual_adapter, *, drawing_factory, source, outputs, layout):
         assert actual_adapter is adapter
+        assert drawing_factory.adapter is adapter
+        assert drawing_factory.spec == recipe.TEMPLATE_SPEC
         assert layout is control.diagnostic_layout
         assert outputs is not recipe.OUTPUTS
         assert outputs.slddrw.parent.parent == root / "out/reports"

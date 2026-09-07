@@ -7,7 +7,8 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, check
+from _drawing_build import ProjectDrawingFactory, TemplateSpec, run_drawing_build
 from _drawing_common import (
     DrawingOutputs,
     PmiDrawingPlacement,
@@ -18,7 +19,6 @@ from _drawing_common import (
     curate_view_dimensions,
     finalize_drawing,
     project_part_pmi,
-    new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
     set_hidden_lines_removed,
@@ -54,6 +54,7 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 1.0)
+TEMPLATE_SPEC = TemplateSpec(scale=SHEET_SCALE, decimals=2)
 TOP_VIEW_SCALE = 4.0
 FRONT_CENTER = (0.070, 0.150)
 RIGHT_CENTER = (0.140, 0.150)
@@ -84,7 +85,9 @@ DIMENSION_CALLOUTS: dict[str, str] = {}
 TOP_DIMENSION_CALLOUTS: dict[str, str] = {}
 
 
-async def build(adapter: Any) -> dict[str, str]:
+async def build(
+    adapter: Any, *, drawing_factory: ProjectDrawingFactory
+) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
@@ -110,7 +113,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Top View Note",
         ),
     )
-    drawing_model, _sheet = new_project_drawing(
+    drawing_model, _sheet = drawing_factory(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE
     )
     stamp_drawing_summary(
@@ -303,4 +306,4 @@ def _parse_args() -> argparse.Namespace:
 if __name__ == "__main__":
     _parse_args()
     _telemetry.set_service("drawing-export")
-    sys.exit(run_build(build))
+    sys.exit(run_drawing_build(build, spec=TEMPLATE_SPEC))

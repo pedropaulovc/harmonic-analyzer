@@ -9,7 +9,8 @@ from typing import Any, Mapping
 from cone_pivot_screw_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, run_build
+from _common import CAD_ROOT, _early_bound
+from _drawing_build import ProjectDrawingFactory, TemplateSpec, run_drawing_build
 from _drawing_project_layout import repair_project_drawing_layout
 from _drawing_common import (
     DrawingOutputs,
@@ -50,6 +51,7 @@ SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 # ASME B border/title block. Keep native text sizes and annotation coverage;
 # reduce geometric magnification and require the same fresh packing checks.
 SHEET_SCALE = (4.0, 1.0)
+TEMPLATE_SPEC = TemplateSpec(scale=SHEET_SCALE, decimals=2)
 END_KEEP = {
     "HeadDiaDim": (0.028, 0.176),
     "ShoulderDiaDim": (0.028, 0.124),
@@ -199,9 +201,11 @@ RECIPE = FastenerSheet(
 )
 
 
-async def build(adapter: Any) -> dict[str, str]:
+async def build(
+    adapter: Any, *, drawing_factory: ProjectDrawingFactory
+) -> dict[str, str]:
     return await build_fastener_sheet(
-        adapter, source=SOURCE, property_view=PART_STEM, outputs=OUTPUTS, recipe=RECIPE
+        adapter, drawing_factory=drawing_factory, source=SOURCE, property_view=PART_STEM, outputs=OUTPUTS, recipe=RECIPE
     )
 
 
@@ -214,4 +218,4 @@ def _parse_args() -> argparse.Namespace:
 if __name__ == "__main__":
     _parse_args()
     _telemetry.set_service("drawing-export")
-    sys.exit(run_build(build))
+    sys.exit(run_drawing_build(build, spec=TEMPLATE_SPEC))

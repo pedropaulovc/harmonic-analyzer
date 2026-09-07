@@ -144,11 +144,8 @@ def test_shared_builder_places_exactly_front_right_and_isometric(
         "read_required_properties",
         lambda model, names, *, required: calls.append(("props", names, required)),
     )
-    monkeypatch.setattr(
-        _assembly_drawing,
-        "new_project_drawing",
-        lambda _adapter, *, scale: calls.append(("new", scale)),
-    )
+    def drawing_factory(_adapter, *, scale):
+        calls.append(("new", scale))
     monkeypatch.setattr(
         _assembly_drawing,
         "place_view",
@@ -166,6 +163,7 @@ def test_shared_builder_places_exactly_front_right_and_isometric(
     result = asyncio.run(
         _assembly_drawing.build_simple_three_view_drawing(
             adapter,
+            drawing_factory=drawing_factory,
             source=source,
             outputs=outputs,
             sheet_scale=(1.0, 4.0),

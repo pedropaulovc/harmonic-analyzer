@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import argparse
 import ast
-from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import asdict, dataclass
 import json
@@ -82,16 +81,6 @@ def check_setup_arguments(spec, kwargs):
         raise ValueError(
             f"recipe changed its drawing-setup variant: {actual} != {spec}"
         )
-
-
-@contextmanager
-def replaced_setup(module, replacement):
-    original = module.new_project_drawing
-    module.new_project_drawing = replacement
-    try:
-        yield
-    finally:
-        module.new_project_drawing = original
 
 
 def compare_exact(before, after, phase):
@@ -440,10 +429,10 @@ def load_recipe(commit, target, directory, source):
         for node in ast.walk(tree)
         if isinstance(node, ast.Call)
         and isinstance(node.func, ast.Name)
-        and node.func.id == "new_project_drawing"
+        and node.func.id == "drawing_factory"
     ]
     if len(setup_calls) != 1 or len(setup_calls[0].args) != 1:
-        raise ValueError("recipe requires exactly one direct new_project_drawing call")
+        raise ValueError("recipe requires exactly one direct drawing_factory call")
     keywords = {keyword.arg: keyword.value for keyword in setup_calls[0].keywords}
     if set(keywords) - {"property_view", "scale", "decimals"}:
         raise ValueError("recipe has unsupported setup arguments")
@@ -454,8 +443,11 @@ def load_recipe(commit, target, directory, source):
         )
     decimals = ast.literal_eval(keywords["decimals"]) if "decimals" in keywords else 2
     module = recipes.load_recipe(commit, target, directory, source=source)
-    if module.new_project_drawing is not common.new_project_drawing:
-        raise ValueError("recipe rebound isolated setup contract")
+    if (module.TEMPLATE_SPEC.scale, module.TEMPLATE_SPEC.decimals) != (
+        tuple(module.SHEET_SCALE),
+        decimals,
+    ):
+        raise ValueError("recipe explicit template spec differs from setup call")
     return module, TemplateSpec(module.SHEET_SCALE, decimals)
 
 
@@ -756,11 +748,8 @@ async def run_trial(adapter, module, spec, variant, template, row):
     module.finalize_drawing = finalize
     started = time.perf_counter()
     try:
-        with (
-            replaced_setup(module, setup),
-            _telemetry.span("diagnostic.template.recipe", variant=variant),
-        ):
-            artifacts = await module.build(adapter)
+        with _telemetry.span("diagnostic.template.recipe", variant=variant):
+            artifacts = await module.build(adapter, drawing_factory=setup)
     except Exception as error:
         row["recipe_error"] = repr(error)
         raise

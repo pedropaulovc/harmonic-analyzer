@@ -14,13 +14,13 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, check
+from _drawing_build import ProjectDrawingFactory, TemplateSpec, run_drawing_build
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
     curate_view_dimensions,
     finalize_drawing,
-    new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
     set_dimension_text,
@@ -46,6 +46,7 @@ PNG = OUTPUTS.png
 # A #4-40 x 4 mm screw is tiny; 8:1 draws the head OD (5.5) as ~44 mm and the
 # whole length (~6.2) as ~50 mm -- big enough to pick edges and read text.
 SHEET_SCALE = (8.0, 1.0)
+TEMPLATE_SPEC = TemplateSpec(scale=SHEET_SCALE, decimals=2)
 # The screw is authored on the Front plane, axis along +Z: head at z in
 # [-HEAD_H, 0], shank at z in [0, SHANK_LEN].  The head-end circle projects in
 # the *Front view; the profile (axis horizontal) projects in the *Right view.
@@ -66,7 +67,9 @@ SIDE_KEEP = {
 }
 
 
-async def build(adapter: Any) -> dict[str, str]:
+async def build(
+    adapter: Any, *, drawing_factory: ProjectDrawingFactory
+) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
@@ -92,7 +95,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "End View Note",
         ),
     )
-    drawing_model, _sheet = new_project_drawing(
+    drawing_model, _sheet = drawing_factory(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE
     )
     stamp_drawing_summary(
@@ -151,4 +154,4 @@ def _parse_args() -> argparse.Namespace:
 if __name__ == "__main__":
     _parse_args()
     _telemetry.set_service("drawing-export")
-    sys.exit(run_build(build))
+    sys.exit(run_drawing_build(build, spec=TEMPLATE_SPEC))

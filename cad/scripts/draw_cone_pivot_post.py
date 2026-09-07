@@ -9,7 +9,8 @@ from typing import Any
 from cone_pivot_post_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, _early_bound, check
+from _drawing_build import ProjectDrawingFactory, TemplateSpec, run_drawing_build
 from _drawing_common import (
     DrawingOutputs,
     add_attached_note,
@@ -19,7 +20,6 @@ from _drawing_common import (
     curate_view_dimensions,
     finalize_drawing,
     model_point_in_view,
-    new_project_drawing,
     read_required_properties,
     set_basic_dimension,
     set_dimension_callouts,
@@ -67,6 +67,7 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 1.0)
+TEMPLATE_SPEC = TemplateSpec(scale=SHEET_SCALE, decimals=2)
 _S = SHEET_SCALE[0] / 1000.0
 
 # Third-angle: the front elevation carries the height and crank journal; the
@@ -256,7 +257,9 @@ def _add_journal_axis_table(adapter: Any) -> None:
     adapter.currentModel.EditRebuild3()
 
 
-async def build(adapter: Any) -> dict[str, str]:
+async def build(
+    adapter: Any, *, drawing_factory: ProjectDrawingFactory
+) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
@@ -280,7 +283,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Manufacturing Notes",
         ),
     )
-    drawing_model, _sheet = new_project_drawing(
+    drawing_model, _sheet = drawing_factory(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE
     )
     stamp_drawing_summary(
@@ -462,4 +465,4 @@ def _parse_args() -> argparse.Namespace:
 if __name__ == "__main__":
     _parse_args()
     _telemetry.set_service("drawing-export")
-    sys.exit(run_build(build))
+    sys.exit(run_drawing_build(build, spec=TEMPLATE_SPEC))
