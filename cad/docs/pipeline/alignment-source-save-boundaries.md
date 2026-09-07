@@ -313,3 +313,17 @@ no errors; source/copy hashes stayed exact. On exit, creation-scope
 reconciliation and owned cleanup succeeded, the two clean/visible baseline
 pivot documents remained open, and final runtime guards were empty.
 No production text policy is accepted from this failed pilot.
+
+The repaired pilot at `c74532b8` completed all 25 banks with the unchanged
+early lower-text/legacy arm: `datum-policy-4npjgg_h/pilot.json`, SHA-256
+`3e17643e5b5f06da0f789ff95f31aed2dcb22cca17746a14bac2344aab5a9b7c`.
+Native save and PDF export now completed through the owned wrapper. Every source
+bank remained clean with the exact original copy hash. Built acceptance still
+rejected the missing lower text; no cold run was reached. Recipe/pilot times
+were 113.365/196.459 s, including all observation work. Failure capture had no
+errors, source/copy hashes stayed exact, baseline documents were preserved,
+cleanup succeeded and final guards were empty. This validates the save-wiring
+repair, not the text policy.
+
+The integrated offline `check:recipe` gate at `f46678cf` passed all 4,953 tests
+in 83.91 s (`cad/out/reports/pytest-telemetry/run-vmcnx2yd`).
