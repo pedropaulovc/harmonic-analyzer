@@ -5,7 +5,8 @@ and one checked pre-save rebuild did not prevent it. This diagnostic does not
 change production finalization. Same-value horizontal justification followed by
 its documented redraw also leaves the shift. The forced-rebuild control likewise
 returned success without preventing it. No ineffective update was added to production.
-Both independent native controls are recorded below.
+The four native candidate controls are recorded below. A fifth, same-expression
+property-link reapplication, is prepared but has not run natively.
 
 The retained rocker control proved a real printed change: cold reopening moved
 all ten `rocker-arm` title glyphs right by about 7.22523 mm, while the note anchor,
@@ -41,6 +42,9 @@ unchanged, including its existing sheet checks and native/PDF/PNG output path.
    native save, with identical observations plus one post-operation title snapshot.
    The rebuild candidate does not also redraw or force-rebuild. A return other
    than native `True` stops before SLDDRW/PDF output.
+   The fifth candidate, `pre_save_relink`, performs exactly one property assignment
+   of the title's already-verified `INote.PropertyLinkedText` expression and no
+   redraw or rebuild; its additional preservation guards are described below.
 
 `unchanged`, subpixel or non-rigid baseline deltas are **inconclusive** and prevent
 candidate execution. The 0.001-point rigid-residual threshold only classifies the
@@ -286,3 +290,40 @@ to relax the existing cold-position comparator. Any explicit allowance for linke
 title reflow must validate both title-cell placements and preserve the stronger
 manufacturing-annotation/source-identity checks; it must not become a general
 annotation-displacement tolerance. That choice has been raised with the user.
+
+## Fifth candidate: reapply the exact property link (not yet run)
+
+`--candidate pre_save_relink` reads the title note's native unresolved expression,
+requires the exact already-witnessed `$PRPSHEET:"SW-Title(Title)"`, and assigns
+that same string once through `INote.PropertyLinkedText` immediately before
+native save. It never substitutes the resolved `rocker-arm` literal, calls
+`SetText`, changes justification/position, or adds redraw/rebuild. The property
+documentation states get/set semantics and imposes no redraw requirement.
+The bundle search found no setter-specific `PropertyLinkedText` example; the
+related `Change_Note_Text_Example_VB` demonstrates `SetText`, not this property.
+This candidate is therefore a documented API hypothesis awaiting native proof.
+
+Before save, readback must preserve the exact unresolved link, resolved title,
+horizontal/vertical justification, lock, annotation anchor, property-view/source
+context, native text content and all sixteen `ITextFormat` properties plus height
+mode and document-format inheritance. Those full font checks also run against
+the cold-reopened title. Glyph positions and note extent remain raw treatment
+observations; changing either does not itself pass the candidate. The existing
+exact first/cold PDF glyph and PNG comparisons determine printed stability,
+and all original ownership, source-value, disk-hash and annotation-semantic gates
+remain active. Getter/observation overhead is included in the relink span; it
+is not a setter-only timing or a proof that the assignment alone caused change.
+
+The fresh baseline must still reproduce the material rigid printed displacement
+with changed pixels before the candidate can start. Counters require one link
+assignment, zero extra redraw/rebuild/justification calls and one native/PDF save;
+attempted counts and partial evidence survive a failed setter/readback. Tests
+first failed on the missing variant and on an otherwise undetected native Bold
+change, then cover exact assignment/readback, anchor/link/font failures, no
+candidate on non-reproduction, and restoration of wrapped finalizer functions.
+
+Prepared in isolated `ha-perf-title-link-refresh` from root `1acb6dfe`, with its
+own locked uv environment and unchanged adapter `e77bfda4`. After source review
+and an explicit seat grant, use the existing invocation above with
+`--candidate pre_save_relink` from the frozen reviewed checkout. No native run,
+production update or successful title-refresh claim is implied by this patch.

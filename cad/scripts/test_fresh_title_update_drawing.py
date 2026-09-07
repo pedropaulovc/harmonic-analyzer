@@ -15,10 +15,13 @@ from test_owned_native_documents_drawing import Model, native  # noqa: F401
 
 
 @pytest.mark.parametrize("returned", [True, False, None])
-@pytest.mark.parametrize("variant,method,field,args", [
-    (probe.Variant.EDIT_REBUILD, "EditRebuild3", "edit_rebuild", ()),
-    (probe.Variant.FORCE_REBUILD, "ForceRebuild3", "force_rebuild", (False,)),
-])
+@pytest.mark.parametrize(
+    "variant,method,field,args",
+    [
+        (probe.Variant.EDIT_REBUILD, "EditRebuild3", "edit_rebuild", ()),
+        (probe.Variant.FORCE_REBUILD, "ForceRebuild3", "force_rebuild", (False,)),
+    ],
+)
 def test_rebuild_is_one_checked_pre_save_call_without_redraw(
     monkeypatch, returned, variant, method, field, args
 ):
@@ -30,7 +33,9 @@ def test_rebuild_is_one_checked_pre_save_call_without_redraw(
     setattr(model, method, native_rebuild)
     adapter = SimpleNamespace(
         currentModel=model,
-        ownership=SimpleNamespace(saving_as=lambda _: __import__("contextlib").nullcontext()),
+        ownership=SimpleNamespace(
+            saving_as=lambda _: __import__("contextlib").nullcontext()
+        ),
     )
     observer = SimpleNamespace(record=lambda stage: calls.append(stage))
     monkeypatch.setattr(probe.common, "apply_custom_properties", lambda *_: None)
@@ -80,7 +85,9 @@ def glyphs(dx=0.0, dy=0.0):
     }
 
 
-@pytest.mark.parametrize("mode", ["preserved", "wrong_alignment", "lost_link", "throws"])
+@pytest.mark.parametrize(
+    "mode", ["preserved", "wrong_alignment", "lost_link", "throws"]
+)
 def test_same_justification_uses_void_setter_then_redraw_before_save(monkeypatch, mode):
     calls = []
     note = SimpleNamespace(justification=2, link=probe.TITLE_LINK)
@@ -96,7 +103,9 @@ def test_same_justification_uses_void_setter_then_redraw_before_save(monkeypatch
 
     note.SetTextJustification = Mock(side_effect=set_justification)
     annotation = SimpleNamespace(GetSpecificAnnotation=lambda: note)
-    model = SimpleNamespace(GraphicsRedraw2=Mock(side_effect=lambda: calls.append("redraw")))
+    model = SimpleNamespace(
+        GraphicsRedraw2=Mock(side_effect=lambda: calls.append("redraw"))
+    )
     from contextlib import nullcontext
 
     adapter = SimpleNamespace(
@@ -107,10 +116,15 @@ def test_same_justification_uses_void_setter_then_redraw_before_save(monkeypatch
     def observe(stage):
         calls.append(stage)
         before = {
-            "key": "format/title", "linked_text": probe.TITLE_LINK,
-            "horizontal_justification": 2, "vertical_justification": 0, "locked": False,
+            "key": "format/title",
+            "linked_text": probe.TITLE_LINK,
+            "horizontal_justification": 2,
+            "vertical_justification": 0,
+            "locked": False,
         }
-        after = dict(before, horizontal_justification=note.justification, linked_text=note.link)
+        after = dict(
+            before, horizontal_justification=note.justification, linked_text=note.link
+        )
         probe.require_title_style(before, after)
 
     observer = SimpleNamespace(annotation=annotation, record=observe)
@@ -126,15 +140,23 @@ def test_same_justification_uses_void_setter_then_redraw_before_save(monkeypatch
     monkeypatch.setattr(probe.drawing, "save_drawing", save)
 
     def run():
-        with probe.finalizer_observations(adapter, observer, probe.Variant.REJUSTIFY) as counts:
+        with probe.finalizer_observations(
+            adapter, observer, probe.Variant.REJUSTIFY
+        ) as counts:
             probe.common.apply_custom_properties(adapter, {"UNIT_DISPLAY": "MM"})
             probe.drawing.save_drawing(adapter, "owned.SLDDRW", pdf_path="owned.pdf")
         return counts
 
     if mode == "preserved":
         assert run() == {
-            "properties": 1, "drawing": 1, "pdf": 1,
-            "redraw": 1, "edit_rebuild": 0, "force_rebuild": 0, "justification": 1,
+            "properties": 1,
+            "drawing": 1,
+            "pdf": 1,
+            "redraw": 1,
+            "edit_rebuild": 0,
+            "force_rebuild": 0,
+            "justification": 1,
+            "linked_text": 0,
         }
         assert calls.index("before_native_save") < calls.index(("justify", 2))
         assert calls.index(("justify", 2)) < calls.index("after_pre_save_rejustify")
@@ -194,7 +216,13 @@ def test_glyph_invalid_content_or_geometry_is_never_a_positive_control(field):
     "classification", ["unchanged", "subpixel_delta", "nonrigid_delta"]
 )
 @pytest.mark.parametrize(
-    "candidate", [probe.Variant.REDRAW, probe.Variant.EDIT_REBUILD, probe.Variant.REJUSTIFY]
+    "candidate",
+    [
+        probe.Variant.REDRAW,
+        probe.Variant.EDIT_REBUILD,
+        probe.Variant.REJUSTIFY,
+        probe.Variant.RELINK,
+    ],
 )
 def test_candidate_is_not_even_started_without_reproduction(classification, candidate):
     calls = []
@@ -223,7 +251,13 @@ def test_reproduced_pdf_without_changed_pixels_is_not_candidate_authority():
 
 
 @pytest.mark.parametrize(
-    "candidate", [probe.Variant.REDRAW, probe.Variant.EDIT_REBUILD, probe.Variant.REJUSTIFY]
+    "candidate",
+    [
+        probe.Variant.REDRAW,
+        probe.Variant.EDIT_REBUILD,
+        probe.Variant.REJUSTIFY,
+        probe.Variant.RELINK,
+    ],
 )
 def test_candidate_runs_once_after_baseline_and_keeps_failure(candidate):
     calls = []
@@ -266,7 +300,8 @@ def test_cli_rejects_missing_or_invalid_candidate_before_environment(
 
 
 @pytest.mark.parametrize(
-    "variant", [probe.Variant.BASELINE, probe.Variant.REDRAW, probe.Variant.EDIT_REBUILD]
+    "variant",
+    [probe.Variant.BASELINE, probe.Variant.REDRAW, probe.Variant.EDIT_REBUILD],
 )
 def test_finalizer_hooks_preserve_call_order_and_only_candidate_redraws(
     monkeypatch, variant
@@ -320,6 +355,7 @@ def test_finalizer_hooks_preserve_call_order_and_only_candidate_redraws(
         "edit_rebuild": int(variant is probe.Variant.EDIT_REBUILD),
         "force_rebuild": 0,
         "justification": 0,
+        "linked_text": 0,
     }
     assert (
         calls.index("after_property_link_before_unit")
@@ -379,6 +415,25 @@ def test_environment_rejected_before_parent_native_wrapper(monkeypatch, tmp_path
                 str(tmp_path / "missing"),
             ]
         )
+
+
+def test_cli_accepts_explicit_relink_then_checks_environment_before_native_work(
+    monkeypatch,
+):
+    environment = Mock(side_effect=RuntimeError("bounded environment witness"))
+    monkeypatch.setattr(probe, "require_owned_diagnostic_environment", environment)
+    with pytest.raises(RuntimeError, match="bounded environment witness"):
+        probe.main(
+            [
+                "--candidate",
+                "pre_save_relink",
+                "--source",
+                "part.SLDPRT",
+                "--guard-source",
+                "guard.SLDPRT",
+            ]
+        )
+    environment.assert_called_once_with()
 
 
 @pytest.mark.parametrize("outcome", ["stable", "printed_shift", "other_pixels"])
@@ -449,6 +504,183 @@ def title_native(monkeypatch):
         probe.pilot.shoulder, "raw_display_data", lambda _: copy.deepcopy(raw)
     )
     return adapter, view, annotation, note, raw
+
+
+@pytest.mark.parametrize(
+    "mode",
+    [
+        "preserved",
+        "lost_link",
+        "wrong_text",
+        "alignment",
+        "anchor",
+        "font",
+        "bold",
+        "format_inheritance",
+        "throws",
+    ],
+)
+def test_same_property_link_is_written_once_without_redraw_and_verified_before_save(
+    monkeypatch, mode
+):
+    from contextlib import nullcontext
+
+    adapter, _, annotation, note, raw = title_native(monkeypatch)
+    adapter.ownership = SimpleNamespace(saving_as=lambda _: nullcontext())
+    adapter.currentModel.GraphicsRedraw2 = Mock(
+        side_effect=AssertionError("no added redraw")
+    )
+    adapter.currentModel.EditRebuild3 = Mock(
+        side_effect=AssertionError("no added rebuild")
+    )
+    adapter.currentModel.ForceRebuild3 = Mock(
+        side_effect=AssertionError("no added force rebuild")
+    )
+    calls = []
+    fmt = SimpleNamespace(
+        TypeFaceName="Century Gothic",
+        CharHeight=0.00635,
+        CharHeightInPts=24,
+        BackWards=False,
+        Bold=False,
+        CharSpacingFactor=1.0,
+        Escapement=0.0,
+        Italic=False,
+        LineLength=0.0,
+        LineSpacing=0.001,
+        ObliqueAngle=0.0,
+        Strikeout=False,
+        Underline=False,
+        UpsideDown=False,
+        Vertical=False,
+        WidthFactor=1.0,
+        IsHeightSpecifiedInPts=lambda: False,
+    )
+    annotation.GetTextFormatCount = lambda: 1
+    annotation.GetTextFormat = lambda index: fmt
+    annotation.GetUseDocTextFormat = lambda index: True
+
+    class LinkedNote:
+        def __init__(self):
+            self.link = probe.TITLE_LINK
+
+        def __getattr__(self, name):
+            return getattr(note, name)
+
+        @property
+        def PropertyLinkedText(self):
+            return self.link
+
+        @PropertyLinkedText.setter
+        def PropertyLinkedText(self, value):
+            calls.append(("linked_text", value))
+            if mode == "throws":
+                raise RuntimeError("native property assignment failed")
+            self.link = "literal" if mode == "lost_link" else value
+            if mode == "wrong_text":
+                note.GetText = lambda: "wrong"
+            if mode == "alignment":
+                note.GetTextJustification = lambda: 1
+            if mode == "anchor":
+                annotation.GetPosition = lambda: (0.38, 0.047, 0)
+            if mode == "font":
+                raw["texts"][0]["font"] = "Arial"
+            if mode == "bold":
+                fmt.Bold = True
+            if mode == "format_inheritance":
+                annotation.GetUseDocTextFormat = lambda index: False
+            # Glyph placement is the tested output, not a permitted anchor write.
+            raw["texts"][0]["position"] = (0.368225, 0.040, 0)
+
+    linked_note = LinkedNote()
+    annotation.GetSpecificAnnotation = lambda: linked_note
+    observer = probe.TitleObserver(adapter, {}, Mock())
+    original_record = observer.record
+
+    def record(stage):
+        calls.append(stage)
+        return original_record(stage)
+
+    observer.record = record
+    original_properties = Mock()
+    monkeypatch.setattr(probe.common, "apply_custom_properties", original_properties)
+
+    def save(current, path, *, artifact_context, **kwargs):
+        for kind, target in (("drawing", path), ("pdf", kwargs["pdf_path"])):
+            with artifact_context(kind, target):
+                calls.append(kind)
+
+    monkeypatch.setattr(probe.drawing, "save_drawing", save)
+    variant = probe.Variant("pre_save_relink")
+
+    def run():
+        with probe.finalizer_observations(adapter, observer, variant) as counts:
+            probe.common.apply_custom_properties(adapter, {"UNIT_DISPLAY": "MM"})
+            probe.drawing.save_drawing(adapter, "owned.SLDDRW", pdf_path="owned.pdf")
+        return counts
+
+    if mode == "preserved":
+        assert run() == {
+            "properties": 1,
+            "drawing": 1,
+            "pdf": 1,
+            "redraw": 0,
+            "edit_rebuild": 0,
+            "force_rebuild": 0,
+            "justification": 0,
+            "linked_text": 1,
+        }
+        assert calls.index("before_native_save") < calls.index(
+            ("linked_text", probe.TITLE_LINK)
+        )
+        assert calls.index(("linked_text", probe.TITLE_LINK)) < calls.index(
+            "after_pre_save_relink"
+        )
+        assert (
+            calls.index("after_pre_save_relink")
+            < calls.index("drawing")
+            < calls.index("pdf")
+        )
+    else:
+        with pytest.raises(RuntimeError):
+            run()
+        assert "drawing" not in calls and "pdf" not in calls
+    assert calls.count(("linked_text", probe.TITLE_LINK)) == 1
+    adapter.currentModel.GraphicsRedraw2.assert_not_called()
+    adapter.currentModel.EditRebuild3.assert_not_called()
+    adapter.currentModel.ForceRebuild3.assert_not_called()
+    assert probe.common.apply_custom_properties is original_properties
+    assert probe.drawing.save_drawing is save
+
+
+@pytest.mark.parametrize(
+    "field",
+    ["CharHeight", "Bold", "Underline", "CharSpacingFactor", "GetUseDocTextFormat"],
+)
+def test_relinked_title_cold_readback_requires_exact_full_font(field):
+    before = {
+        "key": "Sheet1/Title",
+        "linked_text": probe.TITLE_LINK,
+        "horizontal_justification": 2,
+        "vertical_justification": 0,
+        "locked": False,
+        "text": probe.TITLE,
+        "position": (0.379, 0.047, 0),
+        "property_view": "Default",
+        "unit_display": "MM",
+        "relink_font_format": {field: 1},
+        "generic": {
+            "texts": [{"value": probe.TITLE, "position": (0.36, 0.04, 0)}],
+            "lines": [],
+            "arcs": [],
+        },
+    }
+    after = copy.deepcopy(before)
+    after["generic"]["texts"][0]["position"] = (0.368225, 0.04, 0)
+    probe.require_relinked_title(before, after)
+    after["relink_font_format"][field] = 2
+    with pytest.raises(RuntimeError, match="relink"):
+        probe.require_relinked_title(before, after)
 
 
 def test_title_resolved_and_generic_positions_are_separate_raw_observations(
