@@ -1,12 +1,15 @@
 """Offline controls for native GTol arrangement experiments and their witnesses."""
 
 import ast
+import json
 from pathlib import Path
-from unittest.mock import Mock
+from types import SimpleNamespace as NS
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
 from diagnostics import probe_gtol_autoarrange as probe
+from diagnostics import _owned_native_documents as owned
 
 
 def context(monkeypatch):
@@ -91,6 +94,90 @@ def test_native_exception_is_recorded_with_its_exact_error():
         raise RuntimeError("COM call rejected")
 
     assert probe.observe(reject) == {"error": "RuntimeError('COM call rejected')"}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("fault", ["none", "activate", "selection", "align", "false"])
+async def test_actual_probe_rejects_failed_alignment_after_retaining_all_trials(
+    monkeypatch, tmp_path, fault
+):
+    source, part = tmp_path / "original.SLDDRW", tmp_path / "source.SLDPRT"
+    source.write_bytes(b"drawing")
+    part.write_bytes(b"part")
+    selected = []
+    extension = NS(AlignDimensions=Mock(return_value=fault != "false"))
+    if fault == "align":
+        extension.AlignDimensions.side_effect = RuntimeError("native alignment failed")
+
+    def select(item):
+        if fault == "selection":
+            return False
+        selected.append(item)
+        return True
+
+    annotations = {}
+    for kind in (4, 5):
+        entity = object()
+        item = NS(position=(0.1, 0.1, 0.0))
+        item.GetName = lambda kind=kind: f"annotation-{kind}"
+        item.GetPosition = lambda item=item: item.position
+        item.SetPosition2 = lambda *position, item=item: setattr(item, "position", position) or True
+        item.GetAttachedEntities3 = lambda entity=entity: (entity,)
+        item.GetAttachedEntityTypes = lambda: (2,)
+        item.IsDangling = lambda: False
+        item.Select2 = lambda *_args, item=item: select(item)
+        item.GetSpecificAnnotation = lambda: NS(GetNameForSelection=lambda: "Width@source@view")
+        annotations[kind] = item
+    extension.SelectByID2 = lambda *_: select(annotations[4])
+    view = NS(
+        GetName2=lambda: "native-view",
+        GetAnnotationsByType=lambda kind: (annotations[kind],) if kind in annotations else (),
+        ReferencedDocument=NS(GetPathName=lambda: str(part)),
+    )
+    model = NS(
+        Extension=extension,
+        SelectionManager=NS(GetSelectedObjectCount2=lambda _: len(selected)),
+        ClearSelection2=lambda _: selected.clear(),
+        ActivateView=lambda _: fault != "activate",
+        GetViews=lambda: ((object(), view),),
+    )
+    adapter = NS(
+        currentModel=model,
+        swApp=NS(IsSame=lambda first, second: int(first is second)),
+        ownership=NS(register_directory=Mock(), register_source=Mock()),
+        close_owned_documents=AsyncMock(),
+    )
+
+    async def open_model(path):
+        model.GetPathName = lambda: path
+        return NS(is_success=True, data=None)
+
+    adapter.open_model = open_model
+    monkeypatch.setattr(probe, "_early_bound", lambda item, _: item)
+    monkeypatch.setattr(probe, "metrics", lambda item: {"position": item.position})
+    save, render = Mock(), Mock()
+    monkeypatch.setattr(owned, "save_drawing", save)
+    monkeypatch.setattr(probe, "render_pdf_png", render)
+    if fault == "none":
+        result = await probe.probe(adapter, source, tmp_path)
+        assert result == {"report": str(tmp_path / "autoarrange.json")}
+    if fault != "none":
+        with pytest.raises(RuntimeError, match="native AlignDimensions control failed"):
+            await probe.probe(adapter, source, tmp_path)
+    report = json.loads((tmp_path / "autoarrange.json").read_text(encoding="utf-8"))
+    assert len(report["trials"]) == 3
+    assert report["source_hashes"] == report["source_hashes_after"]
+    assert report["failures"] == []
+    for trial in report["trials"]:
+        assert len(trial["annotations"]) == 2
+        assert all(row["entity_identity"] == [1] for row in trial["annotations"])
+        if fault in {"activate", "selection", "align"}:
+            assert "error" in trial["align"]
+        if fault == "false":
+            assert trial["align"]["return"] is False
+    assert save.call_count == render.call_count == 3
+    assert adapter.close_owned_documents.await_count == 4
+    assert extension.AlignDimensions.call_count == (0 if fault in {"activate", "selection"} else 3)
 
 
 def valid_attachment():
