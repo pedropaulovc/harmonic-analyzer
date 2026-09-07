@@ -48,6 +48,11 @@ def bare_drawing(adapter, template):
 
 async def transform(adapter, directory, report, checkpoint, population=None):
     if (
+        report.get("layout_policy") == gaps.LayoutPolicy.MATERIAL_FINISH.value
+        and population is None
+    ):
+        raise ValueError("material-finish requires exact populated evidence")
+    if (
         report.get("layout_policy") == gaps.LayoutPolicy.MATERIAL_CENTER.value
         and population is not None
     ):
@@ -66,8 +71,6 @@ async def transform(adapter, directory, report, checkpoint, population=None):
     label_plan, phase_scope = layout.blank_label_plan, layout.blank_phase_scope
     apply, require_transition = layout.apply_layout, layout.require_transition
     if report.get("layout_policy") == gaps.LayoutPolicy.MATERIAL_FINISH.value:
-        if population is None:
-            raise ValueError("material-finish requires exact populated evidence")
         report["plan"], report["predicted_population"] = material_finish.measured_plan(
             report["before"]["notes"], lines, population["targets"]
         )

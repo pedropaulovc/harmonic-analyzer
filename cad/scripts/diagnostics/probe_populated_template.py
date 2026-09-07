@@ -218,6 +218,10 @@ class PopulatedControl:
             expected[fields.VALUE_LINKS["material"]] = str(
                 source.GetCustomInfoValue("", "Material")
             )
+        if self.population is Population.MATERIAL_FINISH:
+            expected[fields.VALUE_LINKS["finish"]] = str(
+                source.GetCustomInfoValue("", "Finish")
+            )
         row = {
             "notes": notes,
             "surface_finishes": finishes,

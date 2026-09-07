@@ -118,6 +118,17 @@ def _samples(notes, lines, targets, centered):
             raise RuntimeError("material-finish blank geometry/note inventory differs")
         for name, row in sample["notes"].items():
             current = notes[name]
+            expected_link, expected_text = current["link"], current["text"]
+            if (
+                expected_link
+                == expected_text
+                == layout.sheet_setup._OLD_EDGE_BREAK_NOTE
+            ):
+                # Normal new_project_drawing already performs this exact metric
+                # conversion. Blank authoring must still preserve the old note.
+                expected_link = expected_text = (
+                    layout.sheet_setup._METRIC_EDGE_BREAK_NOTE
+                )
             expected_position = (
                 centered[name]["position"]
                 if name == material_name
@@ -130,7 +141,6 @@ def _samples(notes, lines, targets, centered):
                 any(
                     row[key] != current[key]
                     for key in (
-                        "link",
                         "font",
                         "horizontal",
                         "lock",
@@ -139,9 +149,10 @@ def _samples(notes, lines, targets, centered):
                         "owner_type",
                     )
                 )
+                or row["link"] != expected_link
                 or row["position"] != list(expected_position)
                 or row["vertical"] != expected_vertical
-                or ("$PRP" not in row["link"] and row["text"] != current["text"])
+                or ("$PRP" not in row["link"] and row["text"] != expected_text)
             ):
                 raise RuntimeError(
                     f"material-finish {target}/{name}: blank style/content/anchor differs"
@@ -179,6 +190,43 @@ def _samples(notes, lines, targets, centered):
             ]:
                 raise RuntimeError("material-finish native box differs from raw extent")
             _box(field["pdf"]["ink_box_pt"], "raw PDF ink")
+        _require_derived_fields(sample)
+
+
+def _require_derived_fields(sample):
+    """Reuse the field auditor to derive regions and boxes from raw observations."""
+
+    def pdf_for_text(text):
+        matches = [
+            row["pdf"]
+            for row in sample["fields"].values()
+            if row["native_text"] == text
+        ]
+        if len(matches) != 1:
+            raise RuntimeError("material-finish raw PDF text is ambiguous")
+        return matches[0]
+
+    def pdf_for_note(note):
+        names = [name for name, row in sample["notes"].items() if row is note]
+        if len(names) != 1:
+            raise RuntimeError("material-finish raw note is ambiguous")
+        return sample["fields"][names[0]]["pdf"]
+
+    replay = fields.field_audit(
+        sample["notes"],
+        sample["lines"],
+        pdf_reader=pdf_for_text,
+        symbol_reader=pdf_for_note,
+    )
+    for name, original in sample["fields"].items():
+        if not original["native_text"]:
+            continue
+        derived = replay["fields"][name]
+        for key in ("region_m", *BOXES):
+            if list(original[key]) != list(derived[key]):
+                raise RuntimeError(
+                    f"material-finish {name}/{key} differs from raw observations"
+                )
 
 
 def measured_plan(notes, lines, targets):
