@@ -28,6 +28,15 @@ def test_migrated_native_annotations_leave_placement_to_solidworks(name):
     arrange = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
                and isinstance(node.func, ast.Name) and node.func.id == "auto_arrange_view_dimensions"]
     assert len(arrange) == 1
+    if name == "channel_lever":
+        # The split-view recipe settles dimensions before adding datum/GTol bodies.
+        dimensions = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
+                      and isinstance(node.func, ast.Name)
+                      and node.func.id in {"retain_view_dimensions", "add_entity_dimension", "add_native_hole_callout"}]
+        assert dimensions
+        assert max(call.lineno for call in dimensions) < arrange[0].lineno
+        assert arrange[0].lineno < min(call.lineno for call in calls)
+        return
     assert arrange[0].lineno > max(call.lineno for call in calls)
 
 
