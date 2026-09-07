@@ -155,6 +155,10 @@ def _save(
                         else nullcontext()
                     )
                     with context:
+                        # The observer can perform native reads/checkpoints on
+                        # entry. Recheck the active owned drawing after them,
+                        # before deleting a target or invoking active-doc SaveAs.
+                        adapter.ownership.assert_current_owned()
                         os.makedirs(os.path.dirname(path), exist_ok=True)
                         if os.path.exists(path):
                             os.remove(path)
