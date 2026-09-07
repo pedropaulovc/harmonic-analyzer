@@ -58,6 +58,7 @@ from diagnostics._owned_native_session import require_owned_diagnostic_environme
 from diagnostics._reopen_annotation_comparison import compare_reopened_annotations  # noqa: E402
 from diagnostics._recipe_acceptance_targets import TARGETS  # noqa: E402
 from diagnostics._recipe_entity_acceptance import EntityAcceptance  # noqa: E402
+from diagnostics._recipe_view_entity_acceptance import ViewEntityAcceptance  # noqa: E402
 import _telemetry  # noqa: E402
 
 ORDER = ("rocker_arm", "channel_lever")
@@ -617,14 +618,28 @@ async def pilot(
             )
             entity_acceptance = None
             manifest = TARGETS[target]
+            entity_handles = after_entities = reopened_entities = None
+            if manifest.view_roles:
+                entity_acceptance = ViewEntityAcceptance(module, manifest)
             if manifest.entity_labels:
                 entity_acceptance = EntityAcceptance(module, manifest)
+            if entity_acceptance is not None:
                 trial["acceptance_manifest"] = {
                     "source_sha256": EXPECTED_PART_HASHES[target],
                     "dimensions": {
                         key: sorted(names) for key, names in manifest.dimensions.items()
                     },
                     "explicit_labels": manifest.entity_labels,
+                    "view_roles": {
+                        label: {
+                            "orientation": role.orientation,
+                            "annotation_kind": role.annotation_kind,
+                            "entity_type": role.entity_type,
+                            "resolver": role.resolver.value,
+                        }
+                        for label, role in manifest.view_roles.items()
+                    },
+                    "entity_context": "view" if manifest.view_roles else "model",
                     "input_scope": "exact disk identity; builder content recorded, not inferred native build provenance",
                     "code": {
                         f"cad/scripts/{name}.py": attachments.file_digest(
@@ -651,7 +666,7 @@ async def pilot(
             trial["source_before"], source_handles = source_dimensions(
                 source_model, target, copy_source
             )
-            if entity_acceptance is not None:
+            if manifest.entity_labels:
                 trial["source_entities_before"], entity_handles = (
                     entity_acceptance.source_snapshot(source_model)
                 )
@@ -717,7 +732,7 @@ async def pilot(
                 handles_before=source_handles,
                 handles_after=after_handles,
             )
-            if entity_acceptance is not None:
+            if manifest.entity_labels:
                 trial["source_entities_after"], after_entities = (
                     entity_acceptance.source_snapshot(source_model)
                 )
@@ -729,6 +744,7 @@ async def pilot(
                     handles_before=entity_handles,
                     handles_after=after_entities,
                 )
+            if entity_acceptance is not None:
                 trial["explicit_entities_built"] = entity_acceptance.drawing_snapshot(
                     adapter, after_entities, phase="built"
                 )
@@ -764,7 +780,7 @@ async def pilot(
             require_same_source(
                 trial["source_before"], trial["source_reopened"], "saved reopen"
             )
-            if entity_acceptance is not None:
+            if manifest.entity_labels:
                 trial["source_entities_reopened"], reopened_entities = (
                     entity_acceptance.source_snapshot(reopened_source)
                 )
@@ -773,6 +789,7 @@ async def pilot(
                     trial["source_entities_reopened"],
                     "cold controlled faces/boundaries",
                 )
+            if entity_acceptance is not None:
                 trial["explicit_entities_reopened"] = (
                     entity_acceptance.drawing_snapshot(
                         adapter, reopened_entities, phase="reopened"
