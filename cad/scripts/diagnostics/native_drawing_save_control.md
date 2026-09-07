@@ -30,8 +30,10 @@ and [save options](https://help.solidworks.com/2026/english/api/swconst/SolidWor
 The official PDF example demonstrates the extension's older `SaveAs` API with
 Silent and export data, not this exact `SaveAs3` form. Earlier owned template
 controls used an actual `GetAdvancedSaveAsOptions(0)` object and did not establish
-positive persistence for the modern method. **Null AdvancedSaveAsOptions has not
-yet passed a native control here.** A rejection stops the trial; there is no
+positive persistence for the modern method. The later null-advanced form saved
+the requested native drawing, but its recipe failed; see the
+[native replay evidence](../../docs/pipeline/alignment-source-save-boundaries.md#native-boundary-replay-at-3b426b62).
+A rejection stops the trial; there is no
 fallback, added rebuild, ClearSelection, source save, or automatic retry.
 
 PDF and optional PNG still use exactly `draw.SaveAs3(path, 0, 0)`. Each artifact
@@ -80,9 +82,20 @@ retain every boundary bank. Native
 acceptance needs a reviewed, frozen, single-target `alignment_pinion` legacy /
 modern pair through that attach-only runner, using fresh matched source copies,
 the same immutable input bytes and source value/tolerance/presentation banks.
-All drawing and source persistence gates remain mandatory. No such pair has
-been run for this control yet, and no source-immutability or performance result
-is claimed.
+All drawing and source persistence gates remain mandatory. Separate legacy and
+modern arms ran at `3b426b62`, but neither completed drawing acceptance. The
+legacy arm (`datum-policy-drg09evu`) failed on source-copy hash drift. The modern
+arm (`datum-policy-ytl97oo4`) used both typed nulls, returned `(True, 0, 0)` and
+saved a 203,426-byte drawing at the exact requested path while preserving source
+bytes. Its post-save ownership check ran before `saving_as` reconciled the new
+path/title, so ordinary recipe PDF, built acceptance and cold reopening were
+not reached. The [boundary replay record](../../docs/pipeline/alignment-source-save-boundaries.md#native-boundary-replay-at-3b426b62)
+contains both receipt hashes and the cleanup evidence.
+
+The corrected modern run at `5db764ad` (`datum-policy-uiu2rsnq`) completed the
+recipe and PDF save with source-copy hashes unchanged, then
+[failed cold acceptance when the two fit-callout lines disappeared](../../docs/pipeline/alignment-source-save-boundaries.md#reconciled-modern-save-cold-callout-loss).
+These runs establish no accepted production save change or performance benefit.
 
 Run each arm separately on the same frozen checkout and matched source bytes:
 
