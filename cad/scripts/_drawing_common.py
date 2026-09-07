@@ -819,7 +819,8 @@ def _validate_explicit_annotation_attachment(
     GetAttachedEntities3 and GetAttachedEntityTypes are parallel arrays. Null
     entries are not an identity witness, even when Count3 reports one. Native
     MODEL expectations require exact reverse-mapped source identity; VIEW
-    expectations compare the native handles directly. Names/geometry and unknown
+    EDGE/FACE VIEW expectations compare native handles directly; SILHOUETTE VIEW
+    expectations use the drawing's native persistent-ID comparator. Names/geometry and unknown
     identity never substitute for either contract or exact owning-view identity.
     """
     # swSelectType_e: swSelEDGES, swSelFACES, swSelSILHOUETTES.
@@ -846,6 +847,11 @@ def _validate_explicit_annotation_attachment(
     actual = attached[0]
     if entity_context == AnnotationEntityContext.MODEL:
         actual = _drawing_entity_in_source(view, actual, entity_type=entity_type, label=label)
+    if native_type == 46:
+        from _drawing_silhouette_identity import require_same
+
+        require_same(adapter.currentModel, entity, actual, label=label)
+        return
     if int(application.IsSame(entity, actual)) != 1:
         raise RuntimeError(f"{label}: explicit annotation attachment changed entity identity ({entity_context.value})")
 
