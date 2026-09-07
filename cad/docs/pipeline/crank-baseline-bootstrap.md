@@ -8,7 +8,7 @@ A successful capture is evidence for a later migration decision, not that decisi
 The implementation starts at integration head
 `bca3e4e7231ea5c07b8c9bbc21b9ea131a806cf1`. The original `source`, `drawing`,
 `positive`, and `candidate` modes still reject replacement sources, including one
-whose execution token matches its new bytes. Their `cfde0355...b65b4d3` source
+whose execution token matches its new bytes. Their `cfde0355...a65b4d3` source
 pin, `19431a0088519bd8755b941a3da73a699c0ed7e1` baseline and pinned historical
 receipt are unchanged. No shared resolver, production recipe, or adapter changes
 are part of this capture mode.
