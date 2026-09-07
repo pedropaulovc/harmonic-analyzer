@@ -53,7 +53,7 @@ already-open visible, clean original fillister part; ownership reports
 
 The native drawing, PDF and PNG were produced. Main's visual inspection of the
 **built**, not cold-exported, PNG found readable geometry, populated title block,
-thread/hole/fit callouts and journal FACE finish. The lower cross-hole cluster
+hole/fit callouts and journal FACE finish. The lower cross-hole cluster
 is crowded, with no missing manufacturing callout observed. There was no
 cold-export pixel comparison or overall layout redesign. Full-fleet/build gates
 and other targets remain separate; this does not retroactively pass the older
