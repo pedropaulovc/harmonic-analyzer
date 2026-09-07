@@ -192,7 +192,56 @@ def dimension_api_observations(dimension, configuration):
     return result
 
 
-def dimension_semantics(annotation, model, reference, *, observation="system"):
+def _unsaved_reference_owner(app, model, view, annotation, display):
+    """Use the current native drawing/view, never an arbitrary FullName suffix.
+
+    GetPathName documents the empty string for an unsaved document. GetTitle
+    is a window title, not a path: the retained Draw90 control returned
+    'Draw90 - Sheet1'. Remove only the exact current native sheet suffix.
+    The caller's view comes from this drawing's GetViews inventory.
+    """
+    if app is None or view is None:
+        raise RuntimeError("unsaved reference dimension requires native owner evidence")
+    current = app.ActiveDoc
+    owner = annotation.Owner
+    roundtrip = display.GetAnnotation()
+    if (
+        int(model.GetType()) != 3
+        or current is None
+        or int(app.IsSame(current, model)) != 1
+        or int(annotation.OwnerType) != 0
+        or owner is None
+        or int(app.IsSame(owner, view)) != 1
+        or roundtrip is None
+        or int(app.IsSame(roundtrip, annotation)) != 1
+    ):
+        raise RuntimeError(
+            "unsaved reference dimension has wrong native drawing/view/display owner"
+        )
+    sheet = _early_bound(model, "IDrawingDoc").GetCurrentSheet()
+    if sheet is None:
+        raise RuntimeError("unsaved reference drawing has no current native sheet")
+    sheet_name = _early_bound(sheet, "ISheet").GetName()
+    title, view_name = model.GetTitle(), view.GetName2()
+    if any(
+        not isinstance(value, str) or not value
+        for value in (title, sheet_name, view_name)
+    ):
+        raise RuntimeError(
+            "unsaved reference drawing has empty native title/sheet/view"
+        )
+    owner_name = title.removesuffix(f" - {sheet_name}")
+    # GetTitle's documented Explorer-extension variation; no generic stem/split.
+    if owner_name.casefold().endswith(".slddrw"):
+        owner_name = owner_name[: -len(".slddrw")]
+    if not owner_name or any(character in owner_name for character in "@/\\"):
+        raise RuntimeError(f"unsupported unsaved drawing title {title!r}")
+    return {"title": title, "sheet": sheet_name, "owner": owner_name, "view": view_name}
+
+
+def dimension_semantics(
+    annotation, model, reference, *, observation="system", app=None, view=None
+):
     """Read identity, configuration, SI value and source tolerance designation."""
     raw_display = annotation.GetSpecificAnnotation()
     if raw_display is None:
@@ -204,8 +253,14 @@ def dimension_semantics(annotation, model, reference, *, observation="system"):
     configuration = reference["configuration"]
     if not configuration:
         raise RuntimeError("dimension view has no referenced configuration")
-    owner_path = Path(model.GetPathName()) if is_reference else Path(reference["path"])
-    owner_suffix = f"@{owner_path.stem}.{'Drawing' if is_reference else 'Part'}"
+    drawing_path = model.GetPathName() if is_reference else None
+    unsaved_owner = None
+    if is_reference and drawing_path == "":
+        unsaved_owner = _unsaved_reference_owner(app, model, view, annotation, display)
+        owner_suffix = f"@{unsaved_owner['owner']}.Drawing"
+    else:
+        owner_path = Path(drawing_path) if is_reference else Path(reference["path"])
+        owner_suffix = f"@{owner_path.stem}.{'Drawing' if is_reference else 'Part'}"
     components, observations = [], []
     # swDimensionType_e.swChamferDimension has two underlying model dimensions.
     for index in range(2 if display_type == 10 else 1):
@@ -217,6 +272,13 @@ def dimension_semantics(annotation, model, reference, *, observation="system"):
         if not name or not full_name.casefold().endswith(owner_suffix.casefold()):
             raise RuntimeError(
                 f"dimension identity does not match its {kind} owner: {full_name!r}"
+            )
+        if (
+            unsaved_owner is not None
+            and full_name != f"{name}@{unsaved_owner['view']}{owner_suffix}"
+        ):
+            raise RuntimeError(
+                f"unsaved reference dimension does not match its native view/title: {full_name!r}"
             )
         # Only the verified current drawing owner is normalized across copies.
         # Model owners, feature names and dimension names remain exact.
@@ -261,6 +323,8 @@ def dimension_semantics(annotation, model, reference, *, observation="system"):
             }
         )
         row = {"full_name": full_name}
+        if unsaved_owner is not None:
+            row["unsaved_owner"] = dict(unsaved_owner)
         if observation == "api-capture":
             row["value_api_calls"] = dimension_api_observations(
                 dimension, configuration
@@ -367,7 +431,12 @@ def snapshot(model, *, app, dimension_values="system"):
                 raise RuntimeError(f"{key}: annotation is dangling")
             if annotation_kind == 4:
                 semantic, observed = dimension_semantics(
-                    annotation, model, models[view_key], observation=dimension_values
+                    annotation,
+                    model,
+                    models[view_key],
+                    observation=dimension_values,
+                    app=app,
+                    view=view,
                 )
                 if semantic is None:
                     dimensions_excluded[key] = observed
