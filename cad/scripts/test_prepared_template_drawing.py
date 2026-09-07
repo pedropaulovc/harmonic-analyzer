@@ -368,11 +368,52 @@ def test_actual_fingerprint_contains_preparation_and_adapter_closure(monkeypatch
         "cad/scripts/_drawing_common.py",
         "cad/scripts/_drawing_prepared_template.py",
         "cad/scripts/_drawing_template_defaults.py",
+        "cad/scripts/_drawing_annotation_bounds.py",
+        "cad/scripts/_drawing_view_packing.py",
         "uv.lock",
         "SolidworksMCP-python/src/solidworks_mcp/adapters/solidworks/drawing.py",
     ):
         assert required in sources
     assert first["solidworks_revision"] == "34.3.0"
+
+
+@pytest.mark.parametrize(
+    "helper",
+    [
+        "_drawing_prepared_template.py",
+        "_drawing_template_defaults.py",
+        "_drawing_annotation_bounds.py",
+        "_drawing_view_packing.py",
+    ],
+)
+def test_each_preparation_helper_byte_change_changes_actual_key(
+    monkeypatch, tmp_path, helper
+):
+    """Actual closure/key code; mutate an owned byte-copy, never checkout inputs."""
+    original = Path(prepared.__file__).parent / helper
+    copied = tmp_path / helper
+    copied.write_bytes(original.read_bytes())
+    real_sha = prepared._sha
+    monkeypatch.setattr(
+        prepared,
+        "_sha",
+        lambda path: real_sha(
+            copied if Path(path).resolve() == original.resolve() else path
+        ),
+    )
+    adapter = SimpleNamespace(swApp=SimpleNamespace(RevisionNumber=lambda: "34.3.0"))
+    spec = prepared.TemplateSpec()
+    before = prepared.preparation_inputs(adapter, spec)
+    copied.write_bytes(copied.read_bytes() + b"\n# owned test input mutation\n")
+    after = prepared.preparation_inputs(adapter, spec)
+    changed = {
+        name
+        for name, digest in before["source_sha256"].items()
+        if digest != after["source_sha256"][name]
+    }
+    assert changed == {f"cad/scripts/{helper}"}
+    assert prepared._key(before) != prepared._key(after)
+    assert real_sha(original) == before["source_sha256"][f"cad/scripts/{helper}"]
 
 
 def test_inherited_path_verifies_bytes_before_native_and_omits_setters(

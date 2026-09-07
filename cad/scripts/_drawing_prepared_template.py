@@ -77,8 +77,11 @@ def preparation_inputs(adapter, spec):
 
     root = Path(__file__).resolve().parents[2]
     entry = Path(common.__file__).resolve()
-    sources = {entry, Path(__file__).resolve()}
-    for preparation_module in tuple(sources):
+    # These are separate roots: CURRENT deliberately does not import PREPARED.
+    # The second closure owns the raw validator and native measurement helpers.
+    preparation_modules = (entry, Path(__file__).resolve())
+    sources = set(preparation_modules)
+    for preparation_module in preparation_modules:
         sources.update(Path(path) for path in module_deps_of(preparation_module))
     adapter_root = root / "SolidworksMCP-python/src/solidworks_mcp"
     if Path(solidworks_mcp.__file__).resolve().parent != adapter_root.resolve():
