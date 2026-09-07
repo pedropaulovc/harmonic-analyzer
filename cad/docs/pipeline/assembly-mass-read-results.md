@@ -89,3 +89,8 @@ candidate substitutes the strict legacy native mass read. Three ABBA blocks
 retain six observations per variant, complete raw properties and component poses,
 session age, failures and input-preservation evidence. No production call site
 has changed at this stage.
+
+The first probe launch at 2026-09-07 04:54:44.633813 UTC stopped during Python
+import (`ModuleNotFoundError: psutil`, 0.227641 s wall), before COM attachment or
+any native trial. Process-age collection now uses the existing pywin32 bindings
+(`GetProcessTimes`), verified against PID 18748; dependencies remain unchanged.

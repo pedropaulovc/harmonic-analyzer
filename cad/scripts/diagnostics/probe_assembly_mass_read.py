@@ -26,7 +26,8 @@ import time
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "cad/scripts"))
 
-import psutil  # noqa: E402
+import win32api  # noqa: E402
+import win32process  # noqa: E402
 from solidworks_mcp.adapters.base import AdapterResult, AdapterResultStatus  # noqa: E402
 
 import _assembly  # noqa: E402
@@ -132,10 +133,15 @@ async def probe(adapter, directory, blocks):
     report_path = directory / "measurements.json"
     owner = OwnedAssembly(adapter, ROOT / "cad/out/sldasm/drive-train.SLDASM")
     pid = int(adapter.swApp.GetProcessID())
+    process = win32api.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+    try:
+        process_started = win32process.GetProcessTimes(process)["CreationTime"].timestamp()
+    finally:
+        process.Close()
     report = {
         "status": "running", "start_unix_ns": time.time_ns(), "host": platform.node(),
         "root": str(ROOT), "python": sys.executable, "solidworks_pid": pid,
-        "solidworks_start_unix_s": psutil.Process(pid).create_time(),
+        "solidworks_start_unix_s": process_started,
         "solidworks_revision": str(adapter.swApp.RevisionNumber()),
         "root_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
         "adapter_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT / "SolidworksMCP-python", text=True).strip(),
