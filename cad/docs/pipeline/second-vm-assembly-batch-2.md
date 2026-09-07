@@ -178,7 +178,8 @@ uv run python -m doit -n 4 build_bare
 These are assembly acceptance, not a waiver of the repository's full
 `uv run python -m doit -n 4` merge gate. The primary agent coordinates that gate
 and drawing inspection at the final stack head. Each PR still needs its own
-clean Codex review. Open each draft PR early, mark ready at code-complete before
+clean CodeRabbit or Codex review; either one is sufficient. Open each draft PR
+early, mark ready at code-complete before
 tests, and follow watch-pr for review/CI changes. Do not merge the stack or delete
 its parents as part of this handoff.
 
