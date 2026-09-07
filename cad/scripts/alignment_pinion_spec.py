@@ -33,6 +33,14 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ArborBoreProfile": {"ArborBoreDia"},
 }
 
+DIMENSION_CALLOUTS = {
+    # Light press under the MHA-102 arbor's Ø8.00 +0.00/-0.02 journal: bore
+    # 7.96..7.98 vs shaft 7.98..8.00 guarantees 0.00..0.04 interference. Also
+    # settles which tolerance-block row governs (neither .XX +/-0.51 nor
+    # DRILLED +0.10/0 -- the model dimension's own limits do).
+    "ArborBoreDia": "THRU - REAM\nPRESS FIT",
+}
+
 
 def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> str:
     """Render an aligned gear/sprocket data block for a property-linked note."""

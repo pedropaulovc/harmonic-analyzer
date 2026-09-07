@@ -21,7 +21,7 @@ from typing import Any, Callable, Iterable, Literal, Sequence
 
 import _config
 import _telemetry
-from _common import _early_bound
+from _common import _dim_owner_feature, _early_bound
 from _gtol_spec import GTOL_SYMBOLS as _GTOL_SYMBOLS
 from _gtol_spec import gtol_frame_xml as _gtol_frame_xml
 from _surface_finish import SurfaceFinishControl
@@ -2102,6 +2102,54 @@ def set_dimension_callouts(
     if remaining:
         raise RuntimeError(f"dimension callouts not applied: {sorted(remaining)}")
     adapter.currentModel.EditRebuild3()
+
+
+@_telemetry.traced("drawing.verify_model_callouts", label_param="feature_name")
+def verify_dimension_callouts(
+    adapter: Any,
+    annotations: Iterable[Any],
+    callout_text: dict[str, str],
+    *,
+    feature_name: str,
+    location: Literal["above", "below"] = "below",
+) -> None:
+    """Require exact imported model callouts; never set text, rebuild or save."""
+    text_part = {"above": 3, "below": 4}[location]  # swDimensionTextParts_e
+    model = adapter.currentModel
+    if model is None or _early_bound(model, "IModelDoc2").GetType() != 3:  # swDocDRAWING
+        raise RuntimeError("imported dimension callout verification requires a DRAWING")
+    matched: dict[str, list[Any]] = {name: [] for name in callout_text}
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        name = dimension_name(adapter, annotation)
+        if name in matched:
+            matched[name].append(annotation)
+    for name, text in callout_text.items():
+        if not isinstance(name, str) or not name or not isinstance(text, str):
+            raise ValueError("imported callouts require nonempty dimension names and literal text")
+        if len(matched[name]) != 1:
+            raise RuntimeError(
+                f"{name}@{feature_name}: expected exactly one imported dimension, "
+                f"found {len(matched[name])}"
+            )
+        raw_display = matched[name][0].GetSpecificAnnotation()
+        if raw_display is None:
+            raise RuntimeError(f"dimension {name!r} has no display annotation")
+        display = _early_bound(raw_display, "IDisplayDimension")
+        raw_dimension = display.GetDimension2(0)
+        if raw_dimension is None:
+            raise RuntimeError(f"dimension {name!r} has no source parameter")
+        dimension = _early_bound(raw_dimension, "IDimension")
+        if dimension.Name != name or _dim_owner_feature(dimension) != feature_name:
+            raise RuntimeError(f"dimension {name!r} does not belong to {feature_name!r}")
+        if display.IsHoleCallout() is not False:
+            raise RuntimeError(f"dimension {name!r}: GetText does not support hole callouts")
+        actual = display.GetText(text_part)
+        if actual != text:
+            raise RuntimeError(
+                f"{name}@{feature_name}: imported {location} callout differs: "
+                f"{actual!r} != {text!r}"
+            )
 
 
 def set_dimension_text(
