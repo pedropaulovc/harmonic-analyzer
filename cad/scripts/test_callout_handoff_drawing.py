@@ -167,3 +167,41 @@ def test_native_command_moving_fixed_obstacle_cannot_serve_stale_body(monkeypatc
         )
     assert reads[4] == 2  # no silent fresh baseline after the rejected handoff
     handoff.close()
+
+
+def test_view_without_callouts_is_measured_once_by_gtol_obstacle_consumer(monkeypatch):
+    adapter, view, frames, symbols, measure, reads, outputs = scene(monkeypatch)
+    dimension = symbols[1]
+    annotations = [dimension, *frames]
+    view.GetAnnotations.return_value = annotations
+    view.GetAnnotationsByType.side_effect = lambda kind: tuple(
+        item for item in annotations if int(item.GetType()) == kind
+    )
+    handoff = handoffs.AnnotationMeasurementHandoff(
+        adapter,
+        views={"front": view},
+        measure_annotation=measure,
+        purpose=handoffs.HandoffPurpose.GTOL_OBSTACLES,
+    )
+    try:
+        report = callouts.arrange_native_callouts(
+            adapter,
+            views={"front": view},
+            measure_annotation=measure,
+            gtol_placement=callouts.GtolPlacement.ARRANGED_NEXT,
+            record_measurement=handoff.record,
+        )
+        assert report == {"front": {"count": 0}}
+        assert reads == {}
+        handoff.seal()
+        gtols.arrange_native_gtol_columns(
+            adapter,
+            views={"front": view},
+            measure_annotation=measure,
+            measure_obstacle=handoff.initial_measure,
+            obstacle_read_scope=handoff.read_scope,
+        )
+        assert reads == {4: 1, 5: 6}
+        assert dimension.moves == []
+    finally:
+        handoff.close()

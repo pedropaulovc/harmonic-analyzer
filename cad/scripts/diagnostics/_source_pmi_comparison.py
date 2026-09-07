@@ -32,7 +32,9 @@ def compare_source_pmi(before, after, *, boundary):
         raise RuntimeError("source PMI unexpectedly matched a drawing-coordinate path")
     budgets = {}
     if boundary == SourcePmiBoundary.COLD:
-        for index, (old, new) in enumerate(zip(before, after)):
+        # The exact comparator already reports a length mismatch as rejected.
+        # Pair the overlap only; strict=True would discard that failure receipt.
+        for index, (old, new) in enumerate(zip(before, after, strict=False)):
             if type(old) is not dict or type(new) is not dict:
                 continue
             first, last = old.get("position_m"), new.get("position_m")

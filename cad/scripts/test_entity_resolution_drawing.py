@@ -67,16 +67,25 @@ def resolver(monkeypatch, edges):
     return ModelEntities(model), scan
 
 
-@pytest.mark.parametrize("position,scale", [((0.1, 0.2), 1), ((0.3, 0.07), 0.5), ((0.05, 0.08), 6)])
-def test_bore_identity_is_independent_of_view_translation_and_scale(monkeypatch, position, scale):
+def test_bore_resolves_exact_model_identity_without_a_drawing_view(monkeypatch):
     bore = circle((0, 0, 0), 4.7625)
     # Equal diameter elsewhere, back rim, and a coaxial gear outline are distractors.
     distractors = [circle((20, 0, 0), 4.7625), circle((0, 0, 6.5), 4.7625), circle((0, 0, 0), 31)]
     entities, _ = resolver(monkeypatch, [*distractors, bore])
     resolved = entities.resolve({"bore": CircleEdge(4.7625, (0, 0, 0), (0, 0, 1))})
-    view = SimpleNamespace(Position=position, ScaleDecimal=scale, SelectEntity=Mock(return_value=True))
-    assert view.SelectEntity(resolved["bore"], False)
-    assert view.SelectEntity.call_args.args[0] is bore
+    assert resolved["bore"] is bore
+
+
+@pytest.mark.parametrize("selector", [
+    CircleEdge(4, (0, 0, 0), (0, 0, 1)),
+    LineEdge((15, 5, 0), (1, 0, 0)),
+])
+def test_null_native_curve_fails_without_excluding_unknown_topology(monkeypatch, selector):
+    unknown = SimpleNamespace(GetCurve=Mock(return_value=None))
+    entities, _ = resolver(monkeypatch, [unknown])
+    with pytest.raises(RuntimeError, match="model edge GetCurve returned no curve"):
+        entities.resolve({"attachment": selector})
+    unknown.GetCurve.assert_called_once_with()
 
 
 def test_resolve_all_roles_with_one_model_topology_scan(monkeypatch):

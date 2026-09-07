@@ -151,6 +151,8 @@ class _Line:
 def _edge_geometry(raw_edge: Any, *, kinds: frozenset[type]) -> _Circle | _Line | None:
     edge = _early_bound(raw_edge, "IEdge")
     curve = _early_bound(edge.GetCurve(), "ICurve")
+    if curve is None:
+        raise RuntimeError("model edge GetCurve returned no curve")
     if CircleEdge in kinds and curve.IsCircle():
         params = tuple(curve.CircleParams)
         return _Circle(edge, tuple(v * 1000 for v in params[:3]), tuple(params[3:6]), params[6] * 1000)

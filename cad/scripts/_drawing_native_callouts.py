@@ -448,7 +448,7 @@ def _same_symbol(app: Any, before: _Symbol, after: _Symbol) -> None:
         if getattr(before, field) != getattr(after, field):
             raise RuntimeError(f"{before.name}: native callout {field} changed")
     if len(before.entities) != len(after.entities) or any(
-        int(app.IsSame(a, b)) != 1 for a, b in zip(before.entities, after.entities)
+        int(app.IsSame(a, b)) != 1 for a, b in zip(before.entities, after.entities, strict=True)
     ):
         raise RuntimeError(f"{before.name}: exact controlled entity identity changed")
     for field in ("annotation", "specific", "owner"):
@@ -750,7 +750,7 @@ def _same_obstacles(app: Any, before: Mapping, after: Mapping) -> None:
             original.entities
         ) != len(actual.entities):
             raise RuntimeError(f"{name}: obstacle attachment inventory changed")
-        for first, second in zip(original.entities, actual.entities):
+        for first, second in zip(original.entities, actual.entities, strict=True):
             if (
                 original.null_specific is not None
                 and actual.null_specific is not None
@@ -802,7 +802,7 @@ def _same_dimension(
         or len(old_dim.dimensions) != len(new_dim.dimensions)
         or any(
             int(app.IsSame(a, b)) != 1
-            for a, b in zip(old_dim.dimensions, new_dim.dimensions)
+            for a, b in zip(old_dim.dimensions, new_dim.dimensions, strict=True)
         )
     ):
         raise RuntimeError(f"{name}: obstacle native dimension identity changed")
@@ -923,15 +923,16 @@ def _final_symbol(
             ),
         )
     body_matches = any(
-        all(abs(a - b) <= _EPSILON_M for a, b in zip(body.bounds, actual.body.bounds))
+        all(abs(a - b) <= _EPSILON_M for a, b in zip(body.bounds, actual.body.bounds, strict=True))
         and (
-            frame is None
-            and actual.frame is None
-            or frame is not None
-            and actual.frame is not None
-            and all(
-                abs(a - b) <= _EPSILON_M
-                for a, b in zip(frame.bounds, actual.frame.bounds)
+            (frame is None and actual.frame is None)
+            or (
+                frame is not None
+                and actual.frame is not None
+                and all(
+                    abs(a - b) <= _EPSILON_M
+                    for a, b in zip(frame.bounds, actual.frame.bounds, strict=True)
+                )
             )
         )
         for body, frame in allowed
@@ -1042,6 +1043,9 @@ def arrange_native_callouts(
     report = {}
     for label, view in views.items():
         if not any(view.GetAnnotationsByType(kind) for kind in _INTERFACES):
+            # No callout mutation means no before/final obstacle reads to reuse.
+            # The next GTol stage measures dimensions once; entering this pass
+            # solely to populate its handoff would measure them twice instead.
             report[label] = {"count": 0}
             continue
         if not drawing.ActivateView(str(view.GetName2())):

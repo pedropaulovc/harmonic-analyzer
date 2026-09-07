@@ -42,15 +42,6 @@ def intersects_cell(segment: Segment, cell: Rect) -> bool:
     return True
 
 
-def _clear(first: Rect, second: Rect, gap: float) -> bool:
-    return (
-        first.xmax + gap <= second.xmin + 1e-9
-        or second.xmax + gap <= first.xmin + 1e-9
-        or first.ymax + gap <= second.ymin + 1e-9
-        or second.ymax + gap <= first.ymin + 1e-9
-    )
-
-
 def stationary_ink_obstacles(bounds):
     """Keep moved frames clear of an existing annotation's body AND open ink.
 
