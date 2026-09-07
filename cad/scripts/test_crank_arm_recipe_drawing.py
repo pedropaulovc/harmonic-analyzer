@@ -46,6 +46,26 @@ def scene(monkeypatch, tmp_path):
         if phase in state.hooks:
             state.hooks[phase]()
 
+    annotation = SimpleNamespace(
+        GetPosition=Mock(return_value=(0.12, 0.13, 0.0042)),
+        SetPosition2=Mock(return_value=True),
+    )
+    state.finish_annotation = annotation
+    state.finish = SimpleNamespace(GetAnnotation=Mock(return_value=annotation))
+    drawing.EditRebuild3 = Mock(return_value=True)
+
+    def native_event(name, method):
+        def invoke(*_args):
+            state.events.append(name)
+            hook(name)
+            return method.return_value
+        method.side_effect = invoke
+
+    native_event("finish.GetAnnotation", state.finish.GetAnnotation)
+    native_event("finish.GetPosition", annotation.GetPosition)
+    native_event("finish.SetPosition2", annotation.SetPosition2)
+    native_event("drawing.EditRebuild3", drawing.EditRebuild3)
+
     async def open_model(filename):
         assert filename == str(path)
         adapter.currentModel = source
@@ -112,6 +132,8 @@ def scene(monkeypatch, tmp_path):
                 return [SimpleNamespace(name=name) for name in kwargs["keep"]]
             if name == "auto_center_marks":
                 return True
+            if name == "add_surface_finish":
+                return state.finish
             return None
         return call
 
@@ -123,6 +145,7 @@ def scene(monkeypatch, tmp_path):
         "set_arc_endpoints_to_center", "set_basic_dimension",
         "add_feature_control_frame", "add_native_hole_callout",
         "add_datum_feature", "add_surface_finish", "add_property_linked_note",
+        "_validate_explicit_annotation_attachment",
     ):
         monkeypatch.setattr(recipe, name, record(name))
     for name in ("add_edge_dimension", "find_edge_near", "_select_view_entity"):
@@ -235,6 +258,109 @@ def test_recipe_annotations_use_owned_handles_and_model_finish_context(scene):
     assert [args[1] for args, _ in scene.calls["add_property_linked_note"]] == [
         "Manufacturing Notes", "Isometric View Note"
     ]
+
+
+@pytest.mark.parametrize("z", [0.0, 0.0042, -0.0021])
+def test_finish_move_preserves_native_z_and_revalidates_exact_attachment(scene, z):
+    scene.finish_annotation.GetPosition.return_value = (0.123, 0.456, z)
+    scene.run()
+    scene.finish.GetAnnotation.assert_called_once_with()
+    scene.finish_annotation.GetPosition.assert_called_once_with()
+    scene.finish_annotation.SetPosition2.assert_called_once_with(
+        recipe._sheet_x(0.0),
+        recipe.FRONT_CENTER[1] + spec.SHAFT_BORE_DIA * recipe.SHEET_SCALE[0] / 2000,
+        z,
+    )
+    scene.drawing.EditRebuild3.assert_called_once_with()
+    (args, kwargs), = scene.calls["_validate_explicit_annotation_attachment"]
+    assert len(args) == 4
+    assert all(actual is expected for actual, expected in zip(args, (
+        scene.adapter, scene.finish_annotation, scene.views["*Front"], scene.banks[0]["shaft"]
+    ), strict=True))
+    assert kwargs == {"entity_type": "EDGE", "entity_context": recipe.AnnotationEntityContext.MODEL,
+                      "label": "shaft bore finish"}
+    start = scene.events.index("add_surface_finish")
+    assert scene.events[start:start + 6] == [
+        "add_surface_finish", "finish.GetAnnotation", "finish.GetPosition",
+        "finish.SetPosition2", "drawing.EditRebuild3", "_validate_explicit_annotation_attachment",
+    ]
+
+
+@pytest.mark.parametrize("position", [None, (), (0.1, 0.2), (0.1, 0.2, 0.3, 0.4)])
+def test_invalid_finish_position_fails_before_mutation_and_finalize(scene, position):
+    scene.finish_annotation.GetPosition.return_value = position
+    with pytest.raises(RuntimeError, match="invalid native symbol position"):
+        scene.run()
+    scene.finish_annotation.SetPosition2.assert_not_called()
+    scene.drawing.EditRebuild3.assert_not_called()
+    assert "_validate_explicit_annotation_attachment" not in scene.events
+    assert "finalize" not in scene.events
+
+
+@pytest.mark.parametrize("fault", ["source", "configuration", "view", "active_document"])
+def test_finish_rechecks_source_context_immediately_before_position_mutation(scene, fault):
+    def corrupt():
+        if fault == "source":
+            scene.app.GetOpenDocumentByName.return_value = object()
+        if fault == "configuration":
+            scene.source.ConfigurationManager.ActiveConfiguration.Name = "Other"
+        if fault == "view":
+            scene.views["*Front"].ReferencedDocument = object()
+        if fault == "active_document":
+            scene.app.ActiveDoc = scene.source
+    scene.hooks["finish.GetPosition"] = corrupt
+    with pytest.raises(RuntimeError, match="source|context"):
+        scene.run()
+    scene.finish_annotation.GetPosition.assert_called_once_with()
+    scene.finish_annotation.SetPosition2.assert_not_called()
+    scene.drawing.EditRebuild3.assert_not_called()
+    assert "finalize" not in scene.events
+
+
+def test_failed_finish_move_does_not_rebuild_validate_or_finalize(scene):
+    scene.finish_annotation.SetPosition2.return_value = False
+    with pytest.raises(RuntimeError, match="native symbol move failed"):
+        scene.run()
+    scene.finish_annotation.SetPosition2.assert_called_once()
+    scene.drawing.EditRebuild3.assert_not_called()
+    assert "_validate_explicit_annotation_attachment" not in scene.events
+    assert "finalize" not in scene.events
+
+
+@pytest.mark.parametrize("fault", ["source", "configuration", "view", "active_document"])
+def test_finish_rechecks_context_after_move_before_rebuilding(scene, fault):
+    def corrupt():
+        if fault == "source":
+            scene.app.GetOpenDocumentByName.return_value = object()
+        if fault == "configuration":
+            scene.source.ConfigurationManager.ActiveConfiguration.Name = "Other"
+        if fault == "view":
+            scene.views["*Front"].ReferencedDocument = object()
+        if fault == "active_document":
+            scene.app.ActiveDoc = scene.source
+    scene.hooks["finish.SetPosition2"] = corrupt
+    with pytest.raises(RuntimeError, match="source|context"):
+        scene.run()
+    scene.finish_annotation.SetPosition2.assert_called_once()
+    scene.drawing.EditRebuild3.assert_not_called()
+    assert "_validate_explicit_annotation_attachment" not in scene.events
+    assert "finalize" not in scene.events
+
+
+def test_finish_attachment_validation_failure_stops_before_notes_or_finalize(scene):
+    failure = RuntimeError("shaft bore finish: changed exact attachment")
+
+    def reject():
+        raise failure
+
+    scene.hooks["_validate_explicit_annotation_attachment"] = reject
+    with pytest.raises(RuntimeError) as raised:
+        scene.run()
+    assert raised.value is failure
+    scene.finish_annotation.SetPosition2.assert_called_once()
+    scene.drawing.EditRebuild3.assert_called_once()
+    assert "add_property_linked_note" not in scene.events
+    assert "finalize" not in scene.events
 
 
 @pytest.mark.parametrize("fault", ["path", "kind", "configuration", "extra_configuration", "replaced", "inactive"])

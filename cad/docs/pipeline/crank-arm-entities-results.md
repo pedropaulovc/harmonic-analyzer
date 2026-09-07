@@ -269,3 +269,32 @@ evidence (trace `0xa441206f7015c9e47d42ab27e1e34aac`). The attempted call suppli
 sheet X/Y and the shared helper's z=0; this does not establish that every native
 leader-endpoint variant detaches. The next recipe uses the supported native
 finish placement with no separate leader, preserving the same MODEL entity.
+
+Run `hbg9jqkn` at `8f9c95e9` passed the complete native callback with that
+no-leader finish: exact original/copy/token SHA, all guards, both cold opens,
+raw manufacturing values and fourteen attachment roles. Receipt SHA-256 is
+`395920edcdb2e3f264353fd0f92185598a006729c7e672046475836b78e59c4d`;
+ownership receipt SHA is
+`a77d079aaa5e91706d0dea0a01944b3b8788148711e01e36cfe522e71cea9b0a`.
+Production took 26.006758 s, resolver 5.278469 s, trace
+`0x138ae888be0751581edaed77e35fd34e`. Instrumented recipe time was 38.359464 s,
+trace `0x03ea1bd35390335d6105a6ec0417610d`. The finish text still overlaps
+model ink, so this run is not print acceptance. The next placement trial moves
+the no-leader symbol along its attached rim with `IAnnotation.SetPosition2`,
+preserves its observed Z, rechecks ownership before mutation and validates exact
+MODEL attachment after rebuilding. It never sets a leader endpoint.
+
+Local review at `8484555b` claimed the worker returns a mapping as its exit
+status. The pinned `_owned_native_documents.py:937` delegates to
+`_owned_native_session.run_owned_diagnostic`, which logs the callback mapping
+and returns integer 0 on success (line 77), or 1 on failure (line 74).
+Both successful and rejected native subprocesses demonstrate those statuses.
+No type-coercing fallback was added. A later review repeated the helper-signature
+finding already refuted above; subsequent review context includes actual pinned
+helper sources, not just this explanation.
+
+During the frozen run, the parent was force-pushed to `ee91bb98` and main
+advanced to `c6ab57db`. The PR monitor reports DIRTY. The measured worktree
+remains frozen at the recorded baseline rather than mixing new helpers into
+these receipts. Integration/rebase and a new baseline against the updated
+parent are outstanding; no parent or assembly branch was modified here.
