@@ -495,7 +495,7 @@ def test_manufacturing_requires_native_hole_callouts_and_actual_text(
     if fault == "fake_callout":
         row["dimensions"][key]["hole_callout"] = False
     with pytest.raises(
-        RuntimeError, match="native Hole Wizard callout|actual displayed hole text"
+        RuntimeError, match=r"native Hole Wizard callout|actual displayed hole text"
     ):
         probe.require_manufacturing(row, manufacturing.recorded)
 
@@ -526,7 +526,7 @@ def test_manufacturing_requires_pinned_successful_native_source_receipt(
         manufacturing.receipt["status"] = "failed"
         manufacturing.write_receipt()
     with pytest.raises(
-        RuntimeError, match="baseline receipt changed|baseline has the wrong source"
+        RuntimeError, match=r"baseline receipt changed|baseline has the wrong source"
     ):
         probe.require_manufacturing(manufacturing.collect(), manufacturing.recorded)
 
