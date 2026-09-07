@@ -57,12 +57,41 @@ def bank(monkeypatch):
 def test_native_command_is_only317_exact_three_types_identity_and_cleanup(bank):
     adapter, view, annotations, selected = bank
     row = {}
-    probe.space_imported_pmi(adapter, view, annotations, row, lambda: None)
+    probe.space_imported_pmi(
+        adapter,
+        view,
+        annotations,
+        row,
+        lambda: None,
+        arrangement=probe.PmiArrangement.SPACE_TIGHTLY_DOWN,
+    )
     adapter.swApp.RunCommand.assert_called_once_with(317, "")
     adapter.swApp.IsCommandEnabled.assert_called_once_with(317)
     assert [item["type"] for item in row["selections"]] == [13, 13, 36]
     assert all(item["identity"] == 1 for item in row["selections"])
     assert row["command_seconds"] >= 0 and row["returned"]
+    assert selected == []
+    assert adapter.currentModel.ClearSelection2.call_count == 2
+    for annotation in annotations:
+        annotation.Select2.assert_called_once_with(True, 0)
+
+
+def test_even_spacing_replaces317_with_one313_call_on_the_same_exact_bank(bank):
+    adapter, view, annotations, selected = bank
+    row = {}
+    probe.space_imported_pmi(
+        adapter,
+        view,
+        annotations,
+        row,
+        lambda: None,
+        arrangement=probe.PmiArrangement.SPACE_EVENLY_DOWN,
+    )
+    adapter.swApp.IsCommandEnabled.assert_called_once_with(313)
+    adapter.swApp.RunCommand.assert_called_once_with(313, "")
+    assert row["command"] == 313
+    assert [item["type"] for item in row["selections"]] == [13, 13, 36]
+    assert all(item["identity"] == 1 for item in row["selections"])
     assert selected == []
     assert adapter.currentModel.ClearSelection2.call_count == 2
     for annotation in annotations:
@@ -88,7 +117,10 @@ def test_native_command_is_only317_exact_three_types_identity_and_cleanup(bank):
         "returned_false",
     ],
 )
-def test_native_selection_or_command_rejection_is_not_a_success(bank, mode):
+@pytest.mark.parametrize("arrangement", tuple(probe.PmiArrangement))
+def test_native_selection_or_command_rejection_is_not_a_success(
+    bank, mode, arrangement
+):
     adapter, view, annotations, selected = bank
     selection = adapter.currentModel.SelectionManager
     if mode == "empty":
@@ -121,12 +153,34 @@ def test_native_selection_or_command_rejection_is_not_a_success(bank, mode):
     if mode == "returned_false":
         adapter.swApp.RunCommand.return_value = False
     with pytest.raises(RuntimeError):
-        probe.space_imported_pmi(adapter, view, annotations, {}, lambda: None)
+        probe.space_imported_pmi(
+            adapter, view, annotations, {}, lambda: None, arrangement=arrangement
+        )
     assert not selected
     assert adapter.swApp.RunCommand.call_count == (1 if mode == "returned_false" else 0)
+    if mode == "returned_false":
+        adapter.swApp.RunCommand.assert_called_once_with(
+            probe.PMI_SPACING_COMMANDS[arrangement], ""
+        )
 
 
-def test_primary_native_error_and_cleanup_failure_are_both_retained(bank):
+@pytest.mark.parametrize(
+    "variant", ["space-evenly-down", "space-tightly-down", 313, [313, 317]]
+)
+def test_raw_or_stacked_spacing_requests_are_rejected_before_native_access(
+    bank, variant
+):
+    adapter, view, annotations, _ = bank
+    with pytest.raises(ValueError, match="Right"):
+        probe.space_imported_pmi(
+            adapter, view, annotations, {}, lambda: None, arrangement=variant
+        )
+    adapter.ownership.assert_current_owned.assert_not_called()
+    adapter.swApp.RunCommand.assert_not_called()
+
+
+@pytest.mark.parametrize("arrangement", tuple(probe.PmiArrangement))
+def test_primary_native_error_and_cleanup_failure_are_both_retained(bank, arrangement):
     adapter, view, annotations, _ = bank
     adapter.swApp.RunCommand.side_effect = RuntimeError("command failed")
     adapter.currentModel.ClearSelection2.side_effect = [
@@ -134,7 +188,9 @@ def test_primary_native_error_and_cleanup_failure_are_both_retained(bank):
         RuntimeError("cleanup failed"),
     ]
     with pytest.raises(ExceptionGroup) as caught:
-        probe.space_imported_pmi(adapter, view, annotations, {}, lambda: None)
+        probe.space_imported_pmi(
+            adapter, view, annotations, {}, lambda: None, arrangement=arrangement
+        )
     assert [str(item) for item in caught.value.exceptions] == [
         "command failed",
         "cleanup failed",
@@ -263,20 +319,21 @@ def test_true_native_return_cannot_pass_without_readable_actual_motion(scene, mo
         assert any("did not move" in message for message in report["failures"])
 
 
+@pytest.mark.parametrize("variant", ["space-tightly-down", "space-evenly-down"])
 def test_right_only_selector_is_forwarded_and_front_rejected_before_native(
-    tmp_path, monkeypatch
+    tmp_path, monkeypatch, variant
 ):
     source = tmp_path / "source.SLDPRT"
     source.write_bytes(b"owned fixture")
     environment, parent = Mock(), Mock()
     monkeypatch.setattr(probe, "require_environment", environment)
     monkeypatch.setitem(sys.modules, "dodo", NS(_run=parent))
-    args = [str(source), "--expected-pid", "123", "--arrangement", "space-tightly-down"]
+    args = [str(source), "--expected-pid", "123", "--arrangement", variant]
     with pytest.raises(ValueError, match="Right"):
         probe.main(args)
     environment.assert_not_called()
     assert probe.main([*args, "--orientation", "*Right"]) == 0
     command = parent.call_args.args[0]
-    assert command[command.index("--arrangement") + 1] == "space-tightly-down"
+    assert command[command.index("--arrangement") + 1] == variant
     assert command[command.index("--orientation") + 1] == "*Right"
     assert parent.call_args.kwargs["com"] is True

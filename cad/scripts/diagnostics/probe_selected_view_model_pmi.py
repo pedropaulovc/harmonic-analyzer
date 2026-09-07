@@ -2,8 +2,8 @@
 
 Composes the safe all-view control without modifying it. Uses a fresh unique
 transgear-stub bytecopy, three native orthographic views and exactly two imports.
-Default only changes AllViews to False. The explicit Right-only spacing option
-runs one native317 command on the three imported annotations, with no setter,
+Default only changes AllViews to False. Each explicit Right-only spacing option
+runs one native 317 OR 313 command on the three imported annotations, with no setter,
 manual position, additional command or retry.
 Missing coverage remains a failed observation even when diagnostic exports exist.
 """
@@ -46,17 +46,26 @@ from diagnostics._source_pmi_comparison import SourcePmiBoundary, compare_source
 
 class PmiArrangement(StrEnum):
     SPACE_TIGHTLY_DOWN = "space-tightly-down"
+    SPACE_EVENLY_DOWN = "space-evenly-down"
+
+
+PMI_SPACING_COMMANDS = {
+    PmiArrangement.SPACE_TIGHTLY_DOWN: 317,
+    PmiArrangement.SPACE_EVENLY_DOWN: 313,
+}
 
 
 def require_arrangement(orientation, arrangement):
     if arrangement is None:
         return
-    if orientation != "*Right" or arrangement is not PmiArrangement.SPACE_TIGHTLY_DOWN:
+    if orientation != "*Right" or not isinstance(arrangement, PmiArrangement):
         raise ValueError("PMI spacing control requires the explicit native Right view")
 
 
-def space_imported_pmi(adapter, view, imported, row, checkpoint):
-    """One native317 command on the exact real two-GTol/one-datum bank."""
+def space_imported_pmi(adapter, view, imported, row, checkpoint, *, arrangement):
+    """One selected spacing command, never stacked, on the same exact native bank."""
+    require_arrangement("*Right", arrangement)
+    command = PMI_SPACING_COMMANDS[arrangement]
     adapter.ownership.assert_current_owned()
     model, app = _early_bound(adapter.currentModel, "IModelDoc2"), adapter.swApp
     drawing = _early_bound(model, "IDrawingDoc")
@@ -74,7 +83,7 @@ def space_imported_pmi(adapter, view, imported, row, checkpoint):
         raise RuntimeError(
             "PMI spacing needs two distinct GTols and one distinct datum"
         )
-    row.update(command=317, selections=[], status="selecting")
+    row.update(command=command, selections=[], status="selecting")
     model.ClearSelection2(True)
     try:
         if not drawing.ActivateView(str(view.GetName2())):
@@ -132,21 +141,25 @@ def space_imported_pmi(adapter, view, imported, row, checkpoint):
                 raise RuntimeError(
                     "PMI spacing selection changed annotation/view identity"
                 )
-        row["enabled"] = bool(app.IsCommandEnabled(317))
+        row["enabled"] = bool(app.IsCommandEnabled(command))
         checkpoint()
         if not row["enabled"]:
-            raise RuntimeError("native PMI Space Tightly Down317 is disabled")
+            raise RuntimeError(f"native PMI {arrangement.value} {command} is disabled")
         adapter.ownership.assert_current_owned()
         started = time.perf_counter()
         try:
             with _telemetry.span(
-                "diagnostic.selected_view_pmi.space_tightly_down", count=3
+                f"diagnostic.selected_view_pmi.{arrangement.name.lower()}",
+                command=command,
+                count=3,
             ):
-                row["returned"] = bool(app.RunCommand(317, ""))
+                row["returned"] = bool(app.RunCommand(command, ""))
         finally:
             row["command_seconds"] = time.perf_counter() - started
         if not row["returned"]:
-            raise RuntimeError("native PMI Space Tightly Down317 rejected the bank")
+            raise RuntimeError(
+                f"native PMI {arrangement.value} {command} rejected the bank"
+            )
         row["status"] = "returned"
     finally:
         primary_error = sys.exception()
@@ -259,7 +272,7 @@ def compare_arranged_pmi(
         for key, row in movement.items()
         if before["annotations"][key]["semantic"]["kind"] == 5
     ):
-        failures.append("Space Tightly Down did not move either imported GTol anchor")
+        failures.append("Native PMI spacing did not move either imported GTol anchor")
     return {"movement": movement, "body_gaps": gaps, "failures": failures}
 
 
@@ -577,7 +590,7 @@ async def probe(
     errors = []
     if arrangement is not None:
         report["scope"] = (
-            "two exact Right-view PMI imports plus one native317 spacing command on their exact three annotations; no manual placement/source edits/retry"
+            f"two exact Right-view PMI imports plus one native{PMI_SPACING_COMMANDS[arrangement]} spacing command on their exact three annotations; no manual placement/source edits/retry"
         )
     copy_expected = {}
     started = time.perf_counter()
@@ -709,7 +722,14 @@ async def probe(
             if report["failures"]:
                 raise RuntimeError("PMI arrangement requires complete initial coverage")
             arrangement_report = report["arrangement"] = {"variant": arrangement.value}
-            space_imported_pmi(adapter, view, imported, arrangement_report, checkpoint)
+            space_imported_pmi(
+                adapter,
+                view,
+                imported,
+                arrangement_report,
+                checkpoint,
+                arrangement=arrangement,
+            )
             arranged, arranged_views, arranged_handles = snapshot(
                 adapter, copy, configuration, source_model
             )
