@@ -13,15 +13,17 @@ def early_bound(monkeypatch):
 
 def fixture():
     view = object()
-    surface = NS(Identity=lambda: 4002, CylinderParams=(0, 0, 0, 0, 0, 1, .003))
+    surface = NS(Identity=lambda: 4002, CylinderParams=(0, 0, 0, 0, 0, 1, 0.003))
     face = NS(GetSurface=lambda: surface)
-    curve = NS(IsLine=lambda: True, IsCircle=lambda: False, LineParams=(.003, 0, 0, 0, 0, 1))
+    curve = NS(
+        IsLine=lambda: True, IsCircle=lambda: False, LineParams=(0.003, 0, 0, 0, 0, 1)
+    )
     entity = NS(
         GetView=lambda: view,
         GetFace=lambda: face,
         GetCurve=lambda: curve,
-        GetStartPoint=lambda: NS(ArrayData=(.003, 0, 0)),
-        GetEndPoint=lambda: NS(ArrayData=(.003, 0, .1)),
+        GetStartPoint=lambda: NS(ArrayData=(0.003, 0, 0)),
+        GetEndPoint=lambda: NS(ArrayData=(0.003, 0, 0.1)),
     )
     app = NS(IsSame=lambda left, right: int(left is right))
     return app, view, entity, face, surface, curve
@@ -30,9 +32,11 @@ def fixture():
 def test_line_native_values_and_identity_are_retained():
     app, view, entity, face, surface, curve = fixture()
     evidence = {}
-    result = witness.require_same(app, view, entity, entity, label="finish", evidence=evidence)
-    assert result["start"] == (.003, 0, 0)
-    assert result["end"] == (.003, 0, .1)
+    result = witness.require_same(
+        app, view, entity, entity, label="finish", evidence=evidence
+    )
+    assert result["start"] == (0.003, 0, 0)
+    assert result["end"] == (0.003, 0, 0.1)
     assert result["face_surface"]["parameters"] == surface.CylinderParams
     assert result["curve_parameters"] == curve.LineParams
     assert evidence["expected"] == evidence["actual"] == result
@@ -45,7 +49,9 @@ def test_equal_geometry_wrong_or_unknown_identity_rejected(code):
     app.IsSame = lambda left, right: 1 if left is right else code
     evidence = {}
     with pytest.raises(RuntimeError, match="silhouette entity"):
-        witness.require_same(app, view, entity, substitute, label="finish", evidence=evidence)
+        witness.require_same(
+            app, view, entity, substitute, label="finish", evidence=evidence
+        )
     assert evidence["expected"] == evidence["actual"]
 
 
@@ -62,7 +68,9 @@ def test_wrong_view_rejected():
         witness.snapshot(app, object(), entity)
 
 
-@pytest.mark.parametrize("field", ["GetFace", "GetCurve", "GetStartPoint", "GetEndPoint"])
+@pytest.mark.parametrize(
+    "field", ["GetFace", "GetCurve", "GetStartPoint", "GetEndPoint"]
+)
 def test_null_native_objects_rejected(field):
     app, view, entity, *_ = fixture()
     setattr(entity, field, lambda: None)
@@ -70,7 +78,19 @@ def test_null_native_objects_rejected(field):
         witness.snapshot(app, view, entity)
 
 
-@pytest.mark.parametrize("raw", [None, (), (1, 2), (1, 2, 3, 4), (True, 0, 0), ("1", 0, 0), (float("nan"), 0, 0), (float("inf"), 0, 0)])
+@pytest.mark.parametrize(
+    "raw",
+    [
+        None,
+        (),
+        (1, 2),
+        (1, 2, 3, 4),
+        (True, 0, 0),
+        ("1", 0, 0),
+        (float("nan"), 0, 0),
+        (float("inf"), 0, 0),
+    ],
+)
 def test_bad_endpoint_array_rejected(raw):
     app, view, entity, *_ = fixture()
     entity.GetEndPoint = lambda: NS(ArrayData=raw)
@@ -104,17 +124,30 @@ def test_circle_and_plane_supported_without_inventing_arc_trim():
     surface.PlaneParams = (0, 0, 1, 0, 0, 0)
     curve.IsLine = lambda: False
     curve.IsCircle = lambda: True
-    curve.CircleParams = (0, 0, 0, 0, 0, 1, .003)
+    curve.CircleParams = (0, 0, 0, 0, 0, 1, 0.003)
     entity.GetEndPoint = entity.GetStartPoint
     result, _ = witness.snapshot(app, view, entity)
     assert result["curve_kind"] == "circle"
-    assert set(result) == {"curve_kind", "curve_parameters", "start", "end", "face_surface"}
+    assert set(result) == {
+        "curve_kind",
+        "curve_parameters",
+        "start",
+        "end",
+        "face_surface",
+    }
 
 
 def test_raw_arithmetic_change_is_enumerable_not_rounded_away():
     app, view, entity, *_ = fixture()
-    entity.GetEndPoint = Mock(side_effect=[NS(ArrayData=(.003, 0, .1)), NS(ArrayData=(.003, 0, .10000000000000002))])
+    entity.GetEndPoint = Mock(
+        side_effect=[
+            NS(ArrayData=(0.003, 0, 0.1)),
+            NS(ArrayData=(0.003, 0, 0.10000000000000002)),
+        ]
+    )
     evidence = {}
     with pytest.raises(RuntimeError, match="raw geometry changed"):
-        witness.require_same(app, view, entity, entity, label="finish", evidence=evidence)
+        witness.require_same(
+            app, view, entity, entity, label="finish", evidence=evidence
+        )
     assert evidence["expected"]["end"] != evidence["actual"]["end"]

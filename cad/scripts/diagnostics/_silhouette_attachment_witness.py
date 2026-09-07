@@ -16,7 +16,9 @@ from _common import _early_bound
 def finite_array(raw, size, *, label):
     if not isinstance(raw, (tuple, list)) or len(raw) != size:
         raise RuntimeError(f"{label}: expected {size} native doubles, got {raw!r}")
-    if any(type(value) not in (int, float) or not math.isfinite(value) for value in raw):
+    if any(
+        type(value) not in (int, float) or not math.isfinite(value) for value in raw
+    ):
         raise RuntimeError(f"{label}: non-finite/non-numeric native array {raw!r}")
     return tuple(raw)
 
@@ -82,7 +84,9 @@ def snapshot(app, view, entity):
         point = getattr(silhouette, field)()
         if point is None:
             raise RuntimeError(f"silhouette {field} returned null")
-        points.append(finite_array(_early_bound(point, "IMathPoint").ArrayData, 3, label=field))
+        points.append(
+            finite_array(_early_bound(point, "IMathPoint").ArrayData, 3, label=field)
+        )
     if is_line and points[0] == points[1]:
         raise RuntimeError("silhouette line has coincident endpoints")
     return {
