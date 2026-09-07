@@ -50,3 +50,42 @@ copy-save boundary, a real dependent-part change in isolated fixtures, a
 same-recipe child identity change, configuration switching and the subsequent
 zero-COM no-op. A production change will be retained only after measured benefit
 and native acceptance; a negative result will retain its reproducible diagnostic.
+
+## Fresh construction baseline
+
+Frozen source: `f681b566b8038a2e762a273c8718a61083cba8a5`.
+`doit -n 4 assembly:drive_train` ran cache-off from
+2026-09-07 04:37:01.286783 UTC to 04:49:20.218778 UTC: 738.930890 s wall,
+723.499224 s traced task time after zero seat wait. All required part tasks
+were up to date; drive-train was constructed from scratch. No retry, recovery or
+error span occurred. The licensed process remained 18748.
+
+The exact trace `0x6afcf97a583f16839fd9283e8175b51a` contains 207 spans.
+`report_assembly_profile.py` retains their original records and attributes each
+nanosecond once. Fingerprint collection took 128.552266 s, of which mass-property
+collection was 123.119657 s; DOF validation and final rebuild remain separate.
+This does not yet split the adapter's hidden rebuild from native mass calculation.
+
+Run the reporter to reproduce the complete category table:
+
+```powershell
+uv run python cad/scripts/diagnostics/report_assembly_profile.py cad/out/reports/telemetry/traces.jsonl 0x6afcf97a583f16839fd9283e8175b51a cad/out/reports/assembly-mass-read/fresh-baseline-profile.json
+```
+
+Report SHA-256:
+`b677b281b69ae7b8b23bd3c99ceeda1a51f88aeff03053ba7bd9f5b3539bd4ff`.
+Closed native outputs, sidecars, renders, telemetry and database are preserved in
+`cad/out/reports/assembly-mass-read/fresh-baseline-f681b566/`.
+`fresh-baseline-manifest.json` beside that directory records all 116 native hashes
+and execution tokens. Every hash matches its token. All 108 parts and the other
+seven assemblies are byte-identical to accepted Batch A; only drive-train changed.
+Owned documents were closed without saving and the inventory verified empty.
+Manifest SHA-256: `7764a4ccb29a40e074e665ed410ed2231a2ec45d2df3580dfe67f58a98c180d0`.
+
+The initial candidate is diagnostic-only: `probe_assembly_mass_read.py` invokes
+the unchanged complete production fingerprint through an adapter observer.
+Baseline forwards to the pinned adapter and records its hidden deep rebuild;
+candidate substitutes the strict legacy native mass read. Three ABBA blocks
+retain six observations per variant, complete raw properties and component poses,
+session age, failures and input-preservation evidence. No production call site
+has changed at this stage.

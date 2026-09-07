@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import inspect
 import json
+import asyncio
+import hashlib
 from types import SimpleNamespace
 
 import pytest
@@ -302,3 +304,299 @@ def test_refresh_dof_gate_rejects_stray_free_component(tmp_path, monkeypatch) ->
     )
     with pytest.raises(RuntimeError, match="structural-bracket-1"):
         assert_manifest_dof_state(adapter, "channel")
+
+
+@pytest.fixture
+def resolved_mass_reader(monkeypatch):
+    import _assembly_mass_properties as reader
+
+    calls = []
+    after_read = []
+    inertia = [0.11, 0.12, 0.13, 0.21, 0.22, 0.23, 0.31, 0.32, 0.33]
+
+    def read_inertia(reference):
+        calls.append(("inertia", reference))
+        for operation in after_read:
+            operation()
+        return inertia
+
+    mass = SimpleNamespace(
+        Volume=0.0025,
+        SurfaceArea=0.75,
+        Mass=19.5,
+        CenterOfMass=[0.012, -0.034, 0.056],
+        GetMomentOfInertia=read_inertia,
+    )
+
+    def create():
+        calls.append(("create",))
+        return mass
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("resolved mass read must not rebuild, activate, save, or fall back")
+
+    extension = SimpleNamespace(NeedsRebuild2=0, CreateMassProperty=create)
+    configuration = SimpleNamespace(Name="Default")
+    manager = SimpleNamespace(ActiveConfiguration=configuration)
+
+    def wrapper():
+        return SimpleNamespace(
+            native_id=17,
+            Extension=extension,
+            ConfigurationManager=manager,
+            GetType=lambda: 2,
+            ForceRebuild3=forbidden,
+            Save3=forbidden,
+        )
+
+    expected, current, active = wrapper(), wrapper(), wrapper()
+
+    def same(left, right):
+        calls.append(("same",))
+        return int(left.native_id == right.native_id)
+
+    adapter = SimpleNamespace(
+        currentModel=current,
+        swApp=SimpleNamespace(ActiveDoc=active, IsSame=same),
+        get_mass_properties=forbidden,
+        set_active_configuration=forbidden,
+    )
+    monkeypatch.setattr(reader, "_early_bound", lambda value, _interface: value)
+
+    def read():
+        return reader.read_resolved_mass_properties(
+            adapter,
+            expected_model=expected,
+            expected_configuration="Default",
+        )
+
+    return SimpleNamespace(
+        read=read, adapter=adapter, expected=expected, mass=mass,
+        extension=extension, configuration=configuration, inertia=inertia,
+        calls=calls, after_read=after_read,
+    )
+
+
+def test_resolved_mass_reader_preserves_legacy_units_and_tensor_mapping(resolved_mass_reader):
+    from solidworks_mcp.adapters.base import MassProperties
+
+    trial = resolved_mass_reader
+    result = trial.read()
+    assert isinstance(result, MassProperties)
+    assert result.volume == 2_500_000.0
+    assert result.surface_area == 750_000.0
+    assert result.mass == 19.5
+    assert result.center_of_mass == pytest.approx([12.0, -34.0, 56.0])
+    assert result.moments_of_inertia == {
+        "Ixx": 0.11, "Iyy": 0.22, "Izz": 0.33,
+        "Ixy": 0.12, "Ixz": 0.13, "Iyz": 0.23,
+    }
+    assert trial.calls.count(("create",)) == 1
+    assert trial.calls.count(("inertia", 0)) == 1
+    assert trial.calls.count(("same",)) >= 4
+    # A second call must acquire a fresh native mass-property object.
+    trial.read()
+    assert trial.calls.count(("create",)) == 2
+
+
+@pytest.mark.parametrize("phase", ["before", "after"])
+@pytest.mark.parametrize("fault", ["current", "active", "indeterminate", "configuration", "dirty"])
+def test_resolved_mass_reader_rejects_changed_or_unresolved_state(
+    resolved_mass_reader, phase, fault
+):
+    trial = resolved_mass_reader
+
+    def corrupt():
+        if fault == "current":
+            trial.adapter.currentModel.native_id = 99
+        if fault == "active":
+            trial.adapter.swApp.ActiveDoc.native_id = 99
+        if fault == "indeterminate":
+            trial.adapter.swApp.IsSame = lambda *_args: -1
+        if fault == "configuration":
+            trial.configuration.Name = "Other"
+        if fault == "dirty":
+            trial.extension.NeedsRebuild2 = 1
+
+    if phase == "before":
+        corrupt()
+    if phase == "after":
+        trial.after_read.append(corrupt)
+    with pytest.raises(RuntimeError):
+        trial.read()
+    assert trial.calls.count(("create",)) == (0 if phase == "before" else 1)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("CenterOfMass", None), ("CenterOfMass", [1.0, 2.0]),
+        ("CenterOfMass", [1.0, 2.0, 3.0, 4.0]), ("CenterOfMass", "123"),
+        ("inertia", None), ("inertia", [0.0] * 8),
+        ("inertia", [0.0] * 10), ("inertia", "123456789"),
+        ("Mass", float("nan")), ("Volume", float("inf")), ("Volume", 1e308),
+        ("SurfaceArea", float("-inf")),
+        ("CenterOfMass", [0.0, float("nan"), 0.0]),
+        ("inertia", [0.0, 0.0, 0.0, float("inf"), 0.0, 0.0, 0.0, 0.0, 0.0]),
+    ],
+)
+def test_resolved_mass_reader_rejects_malformed_or_nonfinite_properties(
+    resolved_mass_reader, field, value
+):
+    trial = resolved_mass_reader
+    if field == "inertia":
+        trial.mass.GetMomentOfInertia = lambda _reference: value
+    if field != "inertia":
+        setattr(trial.mass, field, value)
+    with pytest.raises(RuntimeError):
+        trial.read()
+
+
+def test_resolved_mass_reader_rejects_null_mass_object(resolved_mass_reader):
+    trial = resolved_mass_reader
+    trial.extension.CreateMassProperty = lambda: None
+    with pytest.raises(RuntimeError):
+        trial.read()
+
+
+@pytest.mark.parametrize("missing", ["current", "active"])
+def test_resolved_mass_reader_rejects_missing_documents(resolved_mass_reader, missing):
+    trial = resolved_mass_reader
+    if missing == "current":
+        trial.adapter.currentModel = None
+    if missing == "active":
+        trial.adapter.swApp.ActiveDoc = None
+    with pytest.raises(RuntimeError):
+        trial.read()
+    assert ("create",) not in trial.calls
+
+
+@pytest.fixture
+def digest_trial(monkeypatch):
+    import _assembly
+    from solidworks_mcp.adapters.base import MassProperties
+
+    calls = []
+    configuration = SimpleNamespace(Name="Default")
+    transform = [1.00000012, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0,
+                 0.012341, -0.056781, 0.090121, 1.0, 0.0, 0.0, 0.0]
+    components = [
+        SimpleNamespace(Name2=name, Transform2=SimpleNamespace(ArrayData=list(transform)))
+        for name in ("z-part-1", "a-part-1")
+    ]
+    mass = MassProperties(
+        mass=1.23456789, volume=1234.56789, surface_area=2345.67891,
+        center_of_mass=[1.234567, -2.345678, 3.456789],
+        moments_of_inertia={
+            "Ixx": 0.111119, "Iyy": 0.222229, "Izz": 0.333339,
+            "Ixy": 0.444449, "Ixz": 0.555559, "Iyz": 0.666669,
+        },
+    )
+    state = SimpleNamespace(configs=["Default"], rebuilt=True, status_after_rebuild=0)
+    adapter = _Adapter()
+    adapter.currentModel.ConfigurationManager = SimpleNamespace(ActiveConfiguration=configuration)
+
+    async def configs():
+        return SimpleNamespace(is_success=True, data=state.configs)
+
+    async def activate(name):
+        calls.append(("activate", name))
+        configuration.Name = name
+        adapter.currentModel.Extension.NeedsRebuild2 = 1
+        return SimpleNamespace(is_success=True, data=None)
+
+    def rebuild(top_only):
+        calls.append(("rebuild", configuration.Name, top_only))
+        adapter.currentModel.Extension.NeedsRebuild2 = state.status_after_rebuild
+        return state.rebuilt
+
+    async def properties():
+        calls.append(("mass", configuration.Name))
+        return SimpleNamespace(is_success=True, data=mass)
+
+    def component_list(top_only):
+        calls.append(("poses", configuration.Name, top_only))
+        return components
+
+    adapter.list_configurations = configs
+    adapter.set_active_configuration = activate
+    adapter.get_mass_properties = properties
+    adapter.currentModel.ForceRebuild3 = rebuild
+    adapter.currentModel.GetComponents = component_list
+    monkeypatch.setattr(_assembly, "_early_bound", lambda value, _interface: value)
+    return SimpleNamespace(
+        digest=lambda: asyncio.run(_assembly.assembly_geometry_digest(adapter, "test-assembly")),
+        adapter=adapter, calls=calls, state=state, configuration=configuration,
+        components=components, mass=mass,
+    )
+
+
+def test_geometry_digest_has_unchanged_golden_rows_and_single_config_no_solve(digest_trial):
+    trial = digest_trial
+    expected_rows = [
+        ("Default", 1.234568, 1234.568, 2345.679, (1.2346, -2.3457, 3.4568),
+         (0.1111, 0.2222, 0.3333, 0.4444, 0.5556, 0.6667)),
+        ("Default", "a-part-1", (1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0),
+         (0.0123, -0.0568, 0.0901)),
+        ("Default", "z-part-1", (1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0),
+         (0.0123, -0.0568, 0.0901)),
+    ]
+    assert trial.digest() == hashlib.sha256(repr(expected_rows).encode("utf-8")).hexdigest()
+    assert trial.calls == [("mass", "Default"), ("poses", "Default", True)]
+
+
+def test_geometry_digest_ignores_order_noise_and_tail_but_detects_pose_only_change(digest_trial):
+    trial = digest_trial
+    before = trial.digest()
+    trial.components.reverse()
+    pose = trial.components[0].Transform2.ArrayData
+    pose[0] += 1e-9
+    pose[9] += 1e-9
+    pose[12:] = [7.0, 8.0, 9.0, 10.0]
+    assert trial.digest() == before
+    pose[9] += 0.001
+    assert trial.digest() != before
+
+
+@pytest.mark.parametrize(
+    "configs", [["Default", "Travel"], ["Park", "Travel"], ["Travel", "Default"]]
+)
+def test_geometry_digest_explicitly_solves_switches_and_returns_to_rest(digest_trial, configs):
+    trial = digest_trial
+    trial.state.configs = configs
+    trial.configuration.Name = configs[0]
+    trial.digest()
+    expected = [
+        ("mass", configs[0]), ("poses", configs[0], True),
+        ("activate", configs[1]), ("rebuild", configs[1], False),
+        ("mass", configs[1]), ("poses", configs[1], True),
+    ]
+    rest = "Default" if "Default" in configs else configs[0]
+    if configs[1] != rest:
+        expected.extend([("activate", rest), ("rebuild", rest, False)])
+    assert trial.calls == expected
+    assert trial.configuration.Name == rest
+
+
+@pytest.mark.parametrize(("rebuilt", "status"), [(False, 0), (None, 0), (True, 1)])
+def test_geometry_digest_rejects_unsolved_switch_before_mass_read(digest_trial, rebuilt, status):
+    trial = digest_trial
+    trial.state.configs = ["Default", "Travel"]
+    trial.state.rebuilt = rebuilt
+    trial.state.status_after_rebuild = status
+    with pytest.raises(RuntimeError):
+        trial.digest()
+    assert ("mass", "Travel") not in trial.calls
+
+
+def test_geometry_digest_rejects_failed_configuration_activation(digest_trial):
+    trial = digest_trial
+    trial.state.configs = ["Default", "Travel"]
+
+    async def fail_activation(_name):
+        return SimpleNamespace(is_success=False, error="activation rejected")
+
+    trial.adapter.set_active_configuration = fail_activation
+    with pytest.raises(RuntimeError, match="activation rejected"):
+        trial.digest()
+    assert trial.calls == [("mass", "Default"), ("poses", "Default", True)]
