@@ -51,11 +51,14 @@ async def transform(adapter, directory, report, checkpoint, population=None):
         and population is not None
     ):
         raise ValueError("material-center cannot combine historical populated-gap changes")
+    snapshot = layout.blank_snapshot
+    if report.get("layout_policy") == gaps.LayoutPolicy.MATERIAL_CENTER.value:
+        snapshot = material.blank_snapshot
     derived = directory / f"{directory.name}.DRWDOT"
     report["derived_template"] = str(derived)
     with adapter.ownership.creating_document(DocumentKind.DRAWING, derived):
         bare_drawing(adapter, sheet_setup.PROJECT_DRWDOT)
-    report["before"], handles, lines = layout.blank_snapshot(adapter)
+    report["before"], handles, lines = snapshot(adapter)
     label_plan, phase_scope = layout.blank_label_plan, layout.blank_phase_scope
     apply, require_transition = layout.apply_layout, layout.require_transition
     if report.get("layout_policy") == gaps.LayoutPolicy.MATERIAL_CENTER.value:
@@ -77,7 +80,7 @@ async def transform(adapter, directory, report, checkpoint, population=None):
     checkpoint()
     adapter.ownership.assert_current_owned()
     apply(adapter, handles, report["plan"], report["operations"], checkpoint)
-    report["after"], after_handles, _ = layout.blank_snapshot(adapter)
+    report["after"], after_handles, _ = snapshot(adapter)
     checkpoint()
     layout.require_same_handles(adapter.swApp, handles, after_handles)
     require_transition(report["before"], report["after"], report["plan"])
@@ -91,7 +94,7 @@ async def transform(adapter, directory, report, checkpoint, population=None):
     report["pdf_fit"] = layout.pdf_field_fit(
         Path(report["printed_authored"]["pdf"]), report["after"]["notes"], plan
     )
-    report["after_pdf"], pdf_handles, _ = layout.blank_snapshot(adapter)
+    report["after_pdf"], pdf_handles, _ = snapshot(adapter)
     checkpoint()
     layout.require_same_handles(adapter.swApp, handles, pdf_handles)
     layout.require_equal(
@@ -100,7 +103,7 @@ async def transform(adapter, directory, report, checkpoint, population=None):
     report["save"] = {}
     with adapter.ownership.saving_as(derived):
         defaults.save_prepared_template(adapter.currentModel, derived, report["save"])
-    report["saved"], saved_handles, _ = layout.blank_snapshot(adapter)
+    report["saved"], saved_handles, _ = snapshot(adapter)
     checkpoint()
     layout.require_same_handles(adapter.swApp, handles, saved_handles)
     layout.require_equal(report["after"], report["saved"], "fresh DRWDOT save")
@@ -115,7 +118,7 @@ async def transform(adapter, directory, report, checkpoint, population=None):
         DocumentKind.DRAWING, directory / "unsaved-readback.SLDDRW"
     ):
         bare_drawing(adapter, derived)
-    report["reinstantiated"], readback_handles, readback_lines = layout.blank_snapshot(
+    report["reinstantiated"], readback_handles, readback_lines = snapshot(
         adapter
     )
     checkpoint()
@@ -138,7 +141,7 @@ async def transform(adapter, directory, report, checkpoint, population=None):
         report["reinstantiated"]["notes"],
         cold_plan,
     )
-    report["reinstantiated_after_pdf"], final_handles, _ = layout.blank_snapshot(
+    report["reinstantiated_after_pdf"], final_handles, _ = snapshot(
         adapter
     )
     checkpoint()

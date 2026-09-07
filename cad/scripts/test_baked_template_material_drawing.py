@@ -158,7 +158,7 @@ def test_material_native_calls_stop_on_rejected_readback(monkeypatch, mode):
 
     before, lines = scene()
     plan = material.material_plan(before["notes"], lines)
-    owner, model = object(), SimpleNamespace(GraphicsRedraw2=Mock())
+    owner, model = object(), SimpleNamespace(Visible=True, GraphicsRedraw2=Mock())
     native_note = SimpleNamespace(
         LockPosition=False,
         PropertyLinkedText=material.MATERIAL_LINK,
@@ -204,7 +204,7 @@ def test_material_native_calls_stop_on_rejected_readback(monkeypatch, mode):
 def test_blank_phase_is_persistence_only_and_population_fit_stays_strict():
     from diagnostics import _baked_template_material as material
 
-    before, after, plan, lines = transformed()
+    _before, after, plan, lines = transformed()
     labels = material.static_label_plan(after["notes"], lines, plan)
     assert set(labels) == {"label"}
     scope = material.phase_scope(after["notes"])
@@ -245,7 +245,10 @@ def test_actual_material_transform_never_invokes_historical_planners(
 
     before, lines = scene()
     report = {"layout_policy": "material-center"}
+    model = SimpleNamespace(Visible=True)
     adapter = SimpleNamespace(
+        currentModel=model,
+        swApp=SimpleNamespace(ActiveDoc=model, IsSame=lambda a, b: int(a is b)),
         ownership=SimpleNamespace(
             creating_document=lambda *_: nullcontext(), assert_current_owned=Mock()
         )
@@ -273,3 +276,81 @@ def test_actual_material_transform_never_invokes_historical_planners(
             probe.transform(adapter, tmp_path, report, Mock(), {"old": "receipt"})
         )
     assert apply.call_count == 1
+
+
+@pytest.mark.parametrize("visible", [False, None, 1])
+def test_material_route_rejects_invisible_document_before_first_extent(
+    tmp_path, monkeypatch, visible
+):
+    from diagnostics import probe_baked_template_layout as probe
+    from diagnostics import _baked_template_material as material
+
+    model = SimpleNamespace(Visible=visible)
+    adapter = SimpleNamespace(
+        currentModel=model,
+        swApp=SimpleNamespace(ActiveDoc=model, IsSame=lambda a, b: int(a is b)),
+        ownership=SimpleNamespace(
+            creating_document=lambda *_: nullcontext(), assert_current_owned=Mock()
+        ),
+    )
+    monkeypatch.setattr(probe, "bare_drawing", Mock())
+    snapshot = Mock(side_effect=AssertionError("GetExtent must not run invisibly"))
+    apply = Mock(side_effect=AssertionError("no setter may run invisibly"))
+    monkeypatch.setattr(layout, "blank_snapshot", snapshot)
+    monkeypatch.setattr(material, "apply_layout", apply)
+    with pytest.raises(RuntimeError, match="visible"):
+        asyncio.run(
+            probe.transform(adapter, tmp_path, {"layout_policy": "material-center"}, Mock())
+        )
+    snapshot.assert_not_called()
+    apply.assert_not_called()
+    assert model.Visible is visible  # Reject; never force visibility.
+
+
+@pytest.mark.parametrize("hide_at", ["entry", "vertical", "position"])
+def test_material_mutation_rechecks_visibility_and_stops_further_writes(
+    monkeypatch, hide_at
+):
+    from diagnostics import _baked_template_material as material
+
+    before, lines = scene()
+    plan = material.material_plan(before["notes"], lines)
+    owner = object()
+    model = SimpleNamespace(Visible=hide_at != "entry", GraphicsRedraw2=Mock())
+    vertical = [0]
+
+    def set_vertical(value):
+        vertical[0] = value
+        if hide_at == "vertical":
+            model.Visible = False
+
+    def set_position(*xyz):
+        if hide_at == "position":
+            model.Visible = False
+        return True
+
+    note = SimpleNamespace(
+        LockPosition=False,
+        PropertyLinkedText=material.MATERIAL_LINK,
+        GetTextJustification=lambda: 1,
+        GetTextVerticalJustification=lambda: vertical[0],
+        SetTextVerticalJustification=Mock(side_effect=set_vertical),
+    )
+    annotation = SimpleNamespace(
+        Owner=owner,
+        GetSpecificAnnotation=lambda: note,
+        SetPosition2=Mock(side_effect=set_position),
+        GetPosition=lambda: plan["value"]["position"],
+    )
+    adapter = SimpleNamespace(
+        currentModel=model,
+        ownership=SimpleNamespace(assert_current_owned=Mock()),
+        swApp=SimpleNamespace(ActiveDoc=model, IsSame=lambda a, b: int(a is b)),
+    )
+    monkeypatch.setattr(layout.cells, "required", lambda value, _: value)
+    with pytest.raises(RuntimeError, match="visible"):
+        material.apply_layout(adapter, {"value": (annotation, owner)}, plan, [], Mock())
+    assert model.Visible is False
+    assert note.SetTextVerticalJustification.call_count == (0 if hide_at == "entry" else 1)
+    assert annotation.SetPosition2.call_count == (1 if hide_at == "position" else 0)
+    model.GraphicsRedraw2.assert_not_called()

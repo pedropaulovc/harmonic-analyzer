@@ -14,6 +14,25 @@ MATERIAL_LINK = '$PRPSHEET:"Material"'
 MIDDLE = 1  # swTextAlignmentVertical_e.swTextAlignmentMiddle
 
 
+def require_visible_owned_drawing(adapter, expected_model=None):
+    """GetExtent is invalid for invisible documents; never force visibility."""
+    adapter.ownership.assert_current_owned()
+    model = adapter.currentModel
+    if int(adapter.swApp.IsSame(adapter.swApp.ActiveDoc, model)) != 1 or (
+        expected_model is not None
+        and int(adapter.swApp.IsSame(expected_model, model)) != 1
+    ):
+        raise RuntimeError("material centering lost its exact active owned drawing")
+    if model.Visible is not True:
+        raise RuntimeError("material centering requires a visible owned drawing")
+    return model
+
+
+def blank_snapshot(adapter):
+    require_visible_owned_drawing(adapter)
+    return layout.blank_snapshot(adapter)
+
+
 def material_plan(notes, lines):
     """Keep the inherited X/Z and font; derive Y only from native cell rules."""
     name = layout.unique_note(notes, link=MATERIAL_LINK)
@@ -74,10 +93,7 @@ def apply_layout(adapter, handles, plan, receipt, checkpoint):
     name, target = next(iter(plan.items()))
     if target["role"] != "material" or target["vertical"] != MIDDLE:
         raise RuntimeError("material centering received an unsupported target")
-    adapter.ownership.assert_current_owned()
-    model = adapter.currentModel
-    if int(adapter.swApp.IsSame(adapter.swApp.ActiveDoc, model)) != 1:
-        raise RuntimeError("material centering lost its exact active owned drawing")
+    model = require_visible_owned_drawing(adapter)
     annotation, owner = handles[name]
     actual_owner = annotation.Owner
     if (owner is None) != (actual_owner is None) or (
@@ -97,12 +113,14 @@ def apply_layout(adapter, handles, plan, receipt, checkpoint):
     operation = {"name": name, "role": "material", "target": target, "calls": []}
     receipt.append(operation)
     checkpoint()
+    require_visible_owned_drawing(adapter, model)
     operation["calls"].append("SetTextVerticalJustification")
     note.SetTextVerticalJustification(MIDDLE)
     operation["vertical_after"] = int(note.GetTextVerticalJustification())
     checkpoint()
     if operation["vertical_after"] != MIDDLE:
         raise RuntimeError("material middle-justification setter was rejected")
+    require_visible_owned_drawing(adapter, model)
     operation["calls"].append("SetPosition2")
     returned = annotation.SetPosition2(*target["position"])
     operation["position_return"] = repr(returned)
@@ -110,6 +128,7 @@ def apply_layout(adapter, handles, plan, receipt, checkpoint):
     checkpoint()
     if returned is not True or operation["position_after"] != target["position"]:
         raise RuntimeError("material position setter was rejected or clamped")
+    require_visible_owned_drawing(adapter, model)
     model.GraphicsRedraw2()
 
 
