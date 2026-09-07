@@ -35,13 +35,64 @@ def scene(native, monkeypatch, tmp_path):  # noqa: F811
     native.app.RevisionNumber = lambda: "34.3.0"
     native.app.UserControl = True
     created, saves, faults = [], [], {}
+    viewport_calls = []
     expected = {
         "units": {"system": 4, "linear": 0, "decimals": 2},
         "sheet_notes": [{"link": '$PRPSHEET:"Material"', "alignment": 1}],
         "blank_linked_extent_observations": [0.125],
     }
 
+    class View:
+        def __init__(self):
+            self._scale = 1.0
+            self.translation = [0.01 * (len(created) + 1), 0.002, 0.0]
+
+        @property
+        def Scale2(self):
+            return self._scale
+
+        @Scale2.setter
+        def Scale2(self, value):
+            viewport_calls.append(("scale", value))
+            self._scale = value
+            self.translation[0] += 0.01
+
+        @property
+        def Translation3(self):
+            return SimpleNamespace(ArrayData=tuple(self.translation))
+
+        @Translation3.setter
+        def Translation3(self, value):
+            viewport_calls.append(("translation", tuple(value.ArrayData)))
+            self.translation = list(value.ArrayData)
+            if faults.get("translation_readback"):
+                self.translation[0] += 1e-12
+
+        @property
+        def Orientation3(self):
+            matrix = [1.0] * 16
+            if faults.get("orientation") and len(created) >= 2:
+                matrix[0] += 1e-12
+            return SimpleNamespace(ArrayData=matrix)
+
+        @property
+        def Transform(self):
+            matrix = [1.0] * 16
+            matrix[9:12] = self.translation
+            matrix[12] = self._scale
+            return SimpleNamespace(ArrayData=matrix)
+
+        def GetVisibleBox(self):
+            return (0, 0, 800, 600)
+
     class Drawing(Model):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.ActiveView = View()
+
+        def GraphicsRedraw2(self):
+            viewport_calls.append(("redraw", self.ActiveView.Scale2))
+
         def SaveAs3(self, path, version, options):
             assert (version, options) == (0, 0)
             Path(path).write_bytes(b"prepared native template")
@@ -79,6 +130,12 @@ def scene(native, monkeypatch, tmp_path):  # noqa: F811
         if faults.get("snapshot"):
             raise RuntimeError("raw native defaults rejected")
         value = deepcopy(expected)
+        if faults.get("different_viewport_extents"):
+            value["sheet_notes"][0]["extent"] = [
+                adapter.currentModel.ActiveView.translation[0]
+            ]
+        if faults.get("independent_extent_drift") and len(created) >= 3:
+            value["sheet_notes"][0]["extent"] = [1e-12]
         if faults.get("prepared_mismatch") and len(created) >= 2:
             value["units"]["decimals"] = 3
         if faults.get("original_mutation"):
@@ -86,6 +143,11 @@ def scene(native, monkeypatch, tmp_path):  # noqa: F811
         return value
 
     native.app.ActivateDoc3 = activate
+    native.app.GetMathUtility = lambda: SimpleNamespace(
+        CreateVector=lambda values: SimpleNamespace(
+            ArrayData=tuple(values.value if hasattr(values, "value") else values)
+        )
+    )
     monkeypatch.setattr(probe.common, "PROJECT_DRWDOT", original)
     monkeypatch.setattr(probe.common, "new_drawing", create)
     monkeypatch.setattr(
@@ -135,6 +197,7 @@ def scene(native, monkeypatch, tmp_path):  # noqa: F811
         saves=saves,
         faults=faults,
         original=original,
+        viewport_calls=viewport_calls,
     )
 
 
@@ -155,6 +218,7 @@ def test_real_cache_miss_hit_preserves_baseline_and_exact_one_save(scene):
     assert scene.native.adapter.opens == []
     assert scene.original.read_bytes() == b"immutable source template"
     assert all(row["status"] == "passed" for row in report["guards"])
+    assert scene.viewport_calls == []
     miss, hit = report["accessors"]
     assert miss["artifacts"] == hit["artifacts"]
     assert "relocation_seconds" in miss and "relocation_seconds" not in hit
@@ -294,6 +358,73 @@ def test_normal_to_prepared_difference_stops_before_hit_without_weakening(scene)
     assert report["accessors"][0]["status"] == "failed"
     assert len(scene.created) == 3
     assert scene.native.app.documents == scene.baseline
+
+
+def test_distinct_new_document_pan_is_rejected_by_unchanged_normal_control(scene):
+    scene.faults["different_viewport_extents"] = True
+    with pytest.raises(ExceptionGroup):
+        scene.run()
+    report, _ = scene.report()
+    assert report["status"] == "failed"
+    assert report["accessors"][0]["status"] == "failed"
+    assert scene.viewport_calls == []
+
+
+def test_captured_viewport_applies_to_both_prepare_creates_and_miss_hit_trials(
+    scene, monkeypatch
+):
+    monkeypatch.setattr(probe.viewports, "_early_bound", lambda value, _: value)
+    scene.faults["different_viewport_extents"] = True
+    exports = []
+    monkeypatch.setattr(
+        probe,
+        "printed_witness",
+        lambda adapter, directory: (
+            exports.append(directory.name) or {"pdf": "captured"}
+        ),
+    )
+    monkeypatch.setattr(
+        probe, "compare_printed", lambda *args: {"changed_pixel_count": 0}
+    )
+    scene.run(
+        viewport=probe.Viewport.CAPTURED, printed_format=probe.PrintedFormat.COMPARE
+    )
+    report, _ = scene.report()
+    assert report["status"] == "passed"
+    assert exports == ["normal", "prepared_miss", "prepared_hit"]
+    assert [call[0] for call in scene.viewport_calls] == [
+        "scale",
+        "translation",
+        "redraw",
+    ] * 4
+    controls = [
+        row["viewport_control"]
+        for row in report["operation_scopes"]
+        if row["operation"] == "create"
+    ]
+    controls += [row["viewport_control"] for row in report["trials"][1:]]
+    assert len(controls) == 4
+    assert all(row["after"] == report["captured_viewport"] for row in controls)
+    assert len(scene.created) == 5 and len(scene.saves) == 1
+    assert scene.native.app.documents == scene.baseline
+
+
+@pytest.mark.parametrize(
+    "fault", ["orientation", "translation_readback", "independent_extent_drift"]
+)
+def test_captured_viewport_does_not_waive_wrong_orientation_pan_or_raw_extent(
+    scene, monkeypatch, fault
+):
+    monkeypatch.setattr(probe.viewports, "_early_bound", lambda value, _: value)
+    scene.faults[fault] = True
+    with pytest.raises(ExceptionGroup):
+        scene.run(viewport=probe.Viewport.CAPTURED)
+    report, _ = scene.report()
+    assert report["status"] == "failed"
+    assert [row["kind"] for row in report["accessors"]] == ["miss"]
+    assert scene.native.app.documents == scene.baseline
+    if fault == "orientation":
+        assert scene.viewport_calls == []
 
 
 def test_changed_source_is_recorded_and_never_reset(scene):
