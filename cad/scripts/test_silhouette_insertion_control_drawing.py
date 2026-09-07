@@ -239,6 +239,70 @@ def test_old_wrapper_geometry_precedes_fresh_resolver_side_effect(scene):
     assert_owned_cleanup(scene)
 
 
+@pytest.mark.parametrize(
+    "switch", ["active", "current", "both", "owned_source", "source", "view"]
+)
+def test_getter_context_switch_refuses_fresh_resolver_before_any_activation(
+    scene, monkeypatch, switch
+):
+    original = scene.expected.GetFace
+
+    def switch_context():
+        if scene.phase == "after":
+            if switch in {"active", "both"}:
+                scene.native.app.ActiveDoc = scene.user
+            if switch in {"current", "both"}:
+                scene.native.adapter.currentModel = scene.user
+            if switch == "owned_source":
+                scene.native.app.ActiveDoc = scene.source
+                scene.adapter.currentModel = scene.source
+            if switch == "source":
+                scene.bank.view.ReferencedDocument = scene.user
+            if switch == "view":
+                monkeypatch.setattr(
+                    observer.attachments, "views", lambda _: {"different": object()}
+                )
+        return original()
+
+    scene.expected.GetFace = switch_context
+    with pytest.raises(RuntimeError, match="native IsSamePersistentID returned 0"):
+        run(scene)
+    scene.bank.module._shank_silhouette.assert_not_called()
+    result = rows(scene)
+    assert result["production_predicate"]["native_result"] == 0
+    assert "error" in result["rejected_post_rebuild"]["fresh_resolver"]
+    assert "fresh_identity" not in result["rejected_post_rebuild"]
+    # Restore only test-injected state before checking the real owned cleanup.
+    scene.bank.view.ReferencedDocument = scene.source
+    scene.native.app.ActiveDoc = scene.drawing
+    scene.adapter.currentModel = scene.drawing
+    assert_owned_cleanup(scene)
+
+
+@pytest.mark.parametrize("switch", ["active", "source"])
+def test_resolver_context_change_is_rejected_before_fresh_entity_queries(scene, switch):
+    def resolve(*_):
+        if switch == "active":
+            scene.native.app.ActiveDoc = scene.user
+        if switch == "source":
+            scene.bank.view.ReferencedDocument = scene.user
+        return scene.fresh
+
+    scene.bank.module._shank_silhouette.side_effect = resolve
+    with pytest.raises(RuntimeError, match="native IsSamePersistentID returned 0"):
+        run(scene)
+    scene.bank.module._shank_silhouette.assert_called_once()
+    result = rows(scene)["rejected_post_rebuild"]
+    assert "error" in result["fresh_resolver"]
+    assert "fresh_identity" not in result
+    assert not any(
+        call[1] == "reference" and call[2] is scene.fresh for call in scene.native_calls
+    )
+    scene.native.app.ActiveDoc = scene.drawing
+    scene.bank.view.ReferencedDocument = scene.source
+    assert_owned_cleanup(scene)
+
+
 def test_existing_style_error_propagates_unchanged_and_restores_both_wrappers(scene):
     primary = RuntimeError("original styling failure")
     scene.original_style.side_effect = primary

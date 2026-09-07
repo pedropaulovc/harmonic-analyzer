@@ -43,7 +43,7 @@ class InsertionBoundaries:
         models = {}
         try:
             adapter = self.adapter
-            adapter.ownership.assert_current_owned()
+            drawing_record = adapter.ownership.assert_current_owned()
             model = _early_bound(adapter.currentModel, "IModelDoc2")
             kind = model.GetType()
             if type(kind) is not int or kind != 3:
@@ -63,7 +63,53 @@ class InsertionBoundaries:
             errors = _dirty_flags(models, row, "before")
             if errors:
                 raise errors[0]
-            read(row, _early_bound(model.Extension, "IModelDocExtension"))
+
+            def require_context():
+                if adapter.ownership.assert_current_owned() is not drawing_record:
+                    raise RuntimeError("fresh resolver changed owned drawing record")
+                if (
+                    adapter.ownership._record(source) is not source_record
+                    or source_record.ownership is not Ownership.COPY
+                ):
+                    raise RuntimeError("fresh resolver changed owned source record")
+                # Reuse the observer's existing native drawing-view inventory.
+                from diagnostics.probe_drawing_attachments import views
+
+                native_views = views(model)
+                results = [
+                    adapter.swApp.IsSame(view, current)
+                    for current in native_views.values()
+                ]
+                if (
+                    any(
+                        type(value) is not int or value not in (0, 1)
+                        for value in results
+                    )
+                    or results.count(1) != 1
+                ):
+                    raise RuntimeError(
+                        "fresh resolver original view is not uniquely in captured drawing"
+                    )
+                for scope, first, second in (
+                    ("source", source, view.ReferencedDocument),
+                    ("current drawing", model, adapter.currentModel),
+                    ("active drawing", model, adapter.swApp.ActiveDoc),
+                ):
+                    if first is None or second is None:
+                        raise RuntimeError(f"fresh resolver has null {scope}")
+                    result = adapter.swApp.IsSame(first, second)
+                    if type(result) is not int or result != 1:
+                        raise RuntimeError(f"fresh resolver changed exact {scope}")
+                # No intervening observation between this final ownership check
+                # and the resolver (SHANK can call ActivateView).
+                if adapter.ownership.assert_current_owned() is not drawing_record:
+                    raise RuntimeError("fresh resolver changed current ownership")
+
+            read(
+                row,
+                _early_bound(model.Extension, "IModelDocExtension"),
+                require_context,
+            )
         except Exception as error:
             row["capture_error"] = repr(error)
         finally:
@@ -133,7 +179,7 @@ class InsertionBoundaries:
             for name in ("expected", "actual")
         }
 
-        def read(row, extension):
+        def read(row, extension, _require_context):
             expected, selected, _ = self.observer.selected[label]
             row["stored_selection_references"] = self.initial[label]
             for name, entity in (("expected", expected), ("selected", selected)):
@@ -165,7 +211,7 @@ class InsertionBoundaries:
         return entities[0]
 
     def before_rebuild(self, label, annotation):
-        def read(row, extension):
+        def read(row, extension, _require_context):
             expected, selected, _ = self.observer.selected[label]
             attached = self.attachment(annotation, row)
             self.identities(
@@ -178,7 +224,7 @@ class InsertionBoundaries:
         self.sample(label, "post_style_pre_rebuild", read)
 
     def rejected(self, label, annotation, predicate_entities):
-        def read(row, extension):
+        def read(row, extension, require_context):
             expected, selected, view = self.observer.selected[label]
             attached = self.attachment(annotation, row)
             entities = {
@@ -226,7 +272,9 @@ class InsertionBoundaries:
             }
             fresh_started = time.perf_counter()
             try:
+                require_context()
                 fresh = role.resolve(self.observer.module, self.adapter, view)
+                require_context()
                 fresh_row = row["fresh_identity"] = {}
                 self.identities(
                     extension, {"fresh": fresh}, fresh_row, stored=references
