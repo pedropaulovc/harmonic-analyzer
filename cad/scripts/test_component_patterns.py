@@ -7,10 +7,13 @@ from pathlib import Path
 import pytest
 
 import _assembly
+import _assembly_patterns
 from _assembly import (
+    assert_pose_ledger,
+)
+from _assembly_patterns import (
     PatternDirection,
     assert_pattern_targets,
-    assert_pose_ledger,
     circular_component_pattern,
     ensure_global_pattern_axis,
     grid_component_pattern,
@@ -98,9 +101,9 @@ def test_linear_pattern_rejects_nonpositive_spacing_before_com() -> None:
 
 def test_linear_pattern_preserves_reverse_direction(monkeypatch: pytest.MonkeyPatch) -> None:
     adapter = _PatternAdapter()
-    monkeypatch.setattr(_assembly, "ensure_global_pattern_axis", lambda *_: "PatternAxisX")
-    monkeypatch.setattr(_assembly, "_select_pattern_inputs", lambda *_: None)
-    monkeypatch.setattr(_assembly, "_early_bound", lambda obj, *_: obj)
+    monkeypatch.setattr(_assembly_patterns, "ensure_global_pattern_axis", lambda *_: "PatternAxisX")
+    monkeypatch.setattr(_assembly_patterns, "_select_pattern_inputs", lambda *_: None)
+    monkeypatch.setattr(_assembly_patterns, "_early_bound", lambda obj, *_: obj)
     names = asyncio.run(
         linear_component_pattern(
             adapter,
@@ -163,6 +166,7 @@ def test_pattern_targets_join_final_pose_ledger(
 
     _assembly._POSE_LEDGER.clear()
     monkeypatch.setattr(_assembly, "component_transform", transform)
+    monkeypatch.setattr(_assembly_patterns, "component_transform", transform)
     assert_pattern_targets(None, ["pattern-1"], [position.copy()], rows, "pattern")
 
     position[0] += 1.0
@@ -171,7 +175,7 @@ def test_pattern_targets_join_final_pose_ledger(
 
 
 def test_pattern_helpers_do_not_reference_removed_flag_helpers() -> None:
-    tree = ast.parse(Path(_assembly.__file__).read_text(encoding="utf-8"))
+    tree = ast.parse(Path(_assembly_patterns.__file__).read_text(encoding="utf-8"))
     loaded_names = {
         node.id
         for node in ast.walk(tree)

@@ -156,12 +156,17 @@ def test_no_assembly_imports_drawing_submodule():
 
 
 def test_no_part_imports_main_assembly_helper():
-    """No part pulls in the main-repo ``_assembly`` helper (the assembly-level mate/
-    gate glue). If one did, editing ``_assembly.py`` would rebuild parts -- and the
-    module_deps_of closure would carry it, contradicting the part/assembly split."""
+    """No part reaches core or specialized assembly helpers transitively.
+
+    Name the extracted providers even if they later stop importing core: their
+    assembly-only policy must not depend on an incidental import back-edge.
+    """
+    assembly_helpers = {
+        "_assembly", "_motion", "_assembly_patterns", "_assembly_couplings"
+    }
     offenders = {
         script.name: sorted(Path(p).stem for p in module_deps_of(script)
-                            if Path(p).stem in {"_assembly", "_motion"})
+                            if Path(p).stem in assembly_helpers)
         for script in part_scripts()
     }
     offenders = {k: v for k, v in offenders.items() if v}

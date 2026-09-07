@@ -101,14 +101,16 @@ from _assembly import (
     assembly_title_properties,
     assert_component_placed,
     assert_components_fully_defined,
-    assert_pattern_targets,
     check_no_interference,
-    grid_component_pattern,
     lock_mate,
     named_ref,
-    PatternDirection,
     place_component,
     save_assembly_and_images,
+)
+from _assembly_patterns import (
+    assert_pattern_targets,
+    grid_component_pattern,
+    PatternDirection,
 )
 from _transforms import ROT_X_NEG90, ROT_X_POS90, ROT_Y_POS90, rot_z_rows, rows_from_euler
 from build_harmonic_base import (

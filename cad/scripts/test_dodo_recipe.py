@@ -13,6 +13,8 @@ import re
 import time
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -194,6 +196,126 @@ def test_channel_pose_helper_is_only_a_channel_construction_input():
     assert "_channel_pose" not in (dodo.SCRIPTS_DIR / "_cwm.py").read_text(
         encoding="utf-8"
     ).split("from __future__", 1)[1]
+
+
+@pytest.fixture
+def isolated_assembly_helper_keys(tmp_path, monkeypatch):
+    """Real discovered dependency sets and key functions, copied input bytes only.
+
+    Discovery reads source but never native outputs. All artifacts, execution
+    tokens, and synthetic adapter dependencies live under this fixture before
+    task generation; changing a helper cannot race a concurrent CAD build.
+    """
+    import _buildgraph
+
+    dodo = _load_dodo()
+    fixture_root = tmp_path / "repo"
+    fixture_root.mkdir()
+    monkeypatch.setattr(dodo, "CAD_OUT", fixture_root / "cad" / "out")
+    monkeypatch.setattr(_buildgraph, "CAD_OUT", dodo.CAD_OUT)
+    for tier in ("part", "assembly"):
+        sidecar = fixture_root / f".adapter-{tier}.digest"
+        sidecar.write_text(f"fixed {tier} adapter input\n", encoding="utf-8")
+        monkeypatch.setattr(
+            dodo, f"_submodule_{tier}_dep", lambda path=str(sidecar): path
+        )
+
+    assembly_recipes = {
+        stem: dodo._recipe_files(stem) for stem in dodo.ASSEMBLY_ORDER
+    }
+    part_tasks = {task["name"]: task for task in dodo.task_part()}
+    assembly_tasks = {task["name"]: task for task in dodo.task_assembly()}
+    sources = {
+        path for recipe in assembly_recipes.values() for path in recipe
+    } | {path for task in part_tasks.values() for path in task["file_dep"]}
+    mapped = {}
+    for path in sources:
+        original = Path(path).resolve()
+        if original.is_relative_to(fixture_root):
+            mapped[path] = str(original)
+            continue
+        copied = fixture_root / original.relative_to(REPO_ROOT)
+        assert copied.resolve().is_relative_to(fixture_root.resolve())
+        copied.parent.mkdir(parents=True, exist_ok=True)
+        if original.exists():
+            copied.write_bytes(original.read_bytes())
+        mapped[path] = str(copied)
+
+    for task in [*part_tasks.values(), *assembly_tasks.values()]:
+        for target in task["targets"]:
+            path = Path(target)
+            assert path.resolve().is_relative_to(fixture_root.resolve()), path
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b"a" * 64 + b"\n")
+
+    recipes = {
+        stem: [mapped[path] for path in paths]
+        for stem, paths in assembly_recipes.items()
+    }
+    part_deps = {
+        stem: [mapped[path] for path in task["file_dep"]]
+        for stem, task in part_tasks.items()
+    }
+    monkeypatch.setattr(dodo, "_recipe_files", lambda stem: recipes[stem])
+    monkeypatch.setattr(dodo, "_part_file_deps", lambda _script, stem: part_deps[stem])
+    monkeypatch.setattr(dodo, "REPO_ROOT", fixture_root)
+    monkeypatch.setattr(dodo._cache, "REPO_ROOT", fixture_root)
+    dodo._ARTEFACT_INDEX = None
+    dodo._ARTEFACT_DIGEST_MEMO.clear()
+    for stem, task in assembly_tasks.items():
+        assert dodo._assembly_file_deps(stem) == [
+            mapped.get(path, path) for path in task["file_dep"]
+        ]
+
+    def snapshot():
+        dodo._ARTEFACT_DIGEST_MEMO.clear()
+        return {
+            "recipes": {
+                stem: dodo._digest_files(paths) for stem, paths in recipes.items()
+            },
+            "assemblies": {
+                task["name"]: dodo._cache_key(task["file_dep"])
+                for task in dodo.task_assembly()
+            },
+            "part_recipes": {
+                stem: dodo._digest_files(paths) for stem, paths in part_deps.items()
+            },
+            "parts": {
+                stem: dodo._cache_key(paths) for stem, paths in part_deps.items()
+            },
+        }
+
+    return dodo, fixture_root, snapshot
+
+
+@pytest.mark.parametrize(
+    ("helper", "consumers"),
+    [
+        ("_assembly_patterns", {"drive_train", "frame", "magnifier", "paper_drive"}),
+        ("_assembly_couplings", {"drive_train", "paper_drive"}),
+        ("_assembly", None),
+    ],
+)
+def test_assembly_helper_edits_change_only_real_recipe_and_cache_consumers(
+    isolated_assembly_helper_keys, helper, consumers
+):
+    dodo, root, snapshot = isolated_assembly_helper_keys
+    expected = set(dodo.ASSEMBLY_ORDER) if consumers is None else consumers
+    before = snapshot()
+    copied_helper = root / "cad" / "scripts" / f"{helper}.py"
+    assert copied_helper.is_file(), f"missing real helper input: {helper}"
+    copied_helper.write_bytes(copied_helper.read_bytes() + b"\n# isolated key mutation\n")
+    after = snapshot()
+
+    def changed(group):
+        return {stem for stem in before[group] if before[group][stem] != after[group][stem]}
+
+    assert changed("recipes") == expected
+    # Parent keys legitimately include child recipe digests before their exact
+    # execution tokens change. This is not a direct top-level FULL rebuild.
+    assert changed("assemblies") == expected | {"harmonic_analyzer"}
+    assert changed("part_recipes") == set()
+    assert changed("parts") == set()
 
 
 def test_assembly_depends_on_exact_child_execution_identities():
