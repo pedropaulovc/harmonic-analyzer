@@ -13,7 +13,7 @@ Creation and SaveAs are explicit scopes, never inferred from arbitrary assignmen
 
 from __future__ import annotations
 
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass, field
 from enum import Enum, IntEnum
 import hashlib
@@ -938,9 +938,50 @@ def run_copy_diagnostic(callback):
     return run_owned_diagnostic(lambda adapter: owned_callback(adapter, callback))
 
 
-def save_drawing(adapter, path, *args, **kwargs):
-    """Preserve native drawing/PDF export call shapes within one SaveAs scope."""
+def save_drawing(adapter, path, *args, artifact_context=None, **kwargs):
+    """Observe complete native renames; export PDF/PNG outside the rename scope."""
     from solidworks_mcp.adapters.solidworks.drawing import save_drawing as native_save
 
-    with adapter.ownership.saving_as(path):
-        return native_save(adapter, path, *args, **kwargs)
+    if not path:
+        raise ValueError("owned drawing save requires a native target")
+    record = adapter.ownership.assert_current_owned()
+
+    def require_current():
+        if adapter.ownership.assert_current_owned() is not record:
+            raise RuntimeError("owned document changed during drawing save observation")
+
+    @contextmanager
+    def observe_artifact(kind, target):
+        observation = (
+            artifact_context(kind, target) if artifact_context else nullcontext()
+        )
+        primary = None
+        try:
+            with observation:
+                try:
+                    # The adapter captured its draw handle before entering this
+                    # callback. Recheck after observer entry, before file writes.
+                    require_current()
+                    scope = (
+                        adapter.ownership.saving_as(target)
+                        if kind == "drawing"
+                        else nullcontext()
+                    )
+                    with scope:
+                        yield
+                    # saving_as reconciles native path/title before after-bank
+                    # callbacks and the next PDF/PNG inventory see the document.
+                    require_current()
+                except Exception as error:
+                    primary = error
+                    raise
+        except Exception as error:
+            if primary is not None and error is not primary:
+                raise ExceptionGroup(
+                    "drawing save and artifact observation failures", [primary, error]
+                ) from None
+            raise
+
+    return native_save(
+        adapter, path, *args, artifact_context=observe_artifact, **kwargs
+    )
