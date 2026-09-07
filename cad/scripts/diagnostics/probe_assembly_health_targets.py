@@ -88,6 +88,11 @@ def resolved_dependency_rows(app, source):
             errors.append(error)
     if errors:
         raise ExceptionGroup("native dependency query or directory restoration failed", errors)
+    if not rows:
+        raise RuntimeError(
+            "native dependency query resolved no dependencies; this diagnostic "
+            "requires a built assembly with external children"
+        )
     return rows
 
 

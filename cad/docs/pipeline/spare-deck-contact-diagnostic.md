@@ -36,6 +36,9 @@ exist in this checkout's native output directories. Every opened document must
 belong to that set with an unambiguous title, and its native handle must remain
 the one claimed after open. A foreign same-name document or a replaced local
 handle is rejected; the probe does not relocate files by matching basenames.
+An empty dependency result is rejected before open, after restoring the query's
+directory effect. This diagnostic targets built assemblies with external children;
+it is not a general validator for dependency-free assemblies.
 
 The top assembly is checked against the explicit caller-supplied SHA-256.
 Child hashes, however, are observations taken before open and compared after

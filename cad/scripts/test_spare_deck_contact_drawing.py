@@ -136,6 +136,22 @@ async def test_owned_inputs_are_resolved_local_bytes_not_producer_authentication
     )
 
 
+@pytest.mark.parametrize("native_rows", [None, ()])
+def test_empty_dependency_result_rejects_before_open_and_restores_directory(
+    local_dependencies, native_rows,
+):
+    c = local_dependencies
+    c.app.GetDocumentDependencies2.return_value = native_rows
+    c.app.GetCurrentWorkingDirectory.side_effect = (
+        str(c.tmp_path), str(c.source.parent), str(c.tmp_path)
+    )
+    c.app.SetCurrentWorkingDirectory = Mock(return_value=True)
+    with pytest.raises(RuntimeError, match="resolved no dependencies"):
+        ownership.OwnedAssembly(c.adapter, c.source)
+    c.app.SetCurrentWorkingDirectory.assert_called_once_with(str(c.tmp_path))
+    c.adapter.open_model.assert_not_awaited()
+
+
 def test_resolved_same_name_foreign_dependency_is_not_relocated_by_name(
     local_dependencies,
 ):
