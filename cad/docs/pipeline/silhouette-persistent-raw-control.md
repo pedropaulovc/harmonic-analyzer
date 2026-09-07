@@ -68,3 +68,33 @@ This fixes the demonstrated container rejection, not silhouette acceptance.
 Native persistent comparisons and the complete feature round trip are still
 pending. The receipt's dirty flags were drawing True→True and source False→False;
 original/copy hashes remained exact and final guards were empty.
+
+## Native drawing-context identity positive control
+
+At root `7f382136`, adapter `25bc99b1` and licensed PID 31860, receipt
+`datum-policy-rm_6b7hu/pilot.json`, SHA-256
+`01add2f94a53a3ae4db7a47877723ddb9a23e53616eae67142e5df94c7e71d91`,
+records successful native comparison of the decoded references. Every drawing-
+context comparison returned 1: both silhouette self-comparisons, requested versus
+selected, selected versus repeated selection, and the two underlying faces.
+The direct requested/selected `ISldWorks.IsSame` result remained 0.
+
+The source Hook feature also passed: native self identity 1, persistent self
+identity 1, and `GetObjectByPersistReference3` returned status 0 with native
+identity 1. The source-context silhouette comparison did **not** pass: the
+requested reference was absent and the selected reference even compared unequal
+to itself (0). The positive silhouette result is drawing-scoped only; raw byte
+equality is not used as an acceptance predicate.
+
+Dirty flags stayed drawing True→True and source False→False. Original/owned-copy
+hashes stayed exact, cleanup preserved baseline documents and final runtime
+guards were empty. Recipe/pilot times were 27.197/127.077 s. The whole pilot
+remains failed under the unchanged direct-handle gate; built/cold acceptance
+was not reached, and both generic failure snapshots retained their separate
+dimension-exclusion errors.
+
+This disproves the experimental assumption that direct handle inequality alone
+establishes a different drawing silhouette. A production correction must retain
+exact owning-view and underlying-face identity and raw geometry checks, use
+native drawing-context persistent comparison, and reject different/unknown IDs.
+Its full recipe/save/cold acceptance is still required.
