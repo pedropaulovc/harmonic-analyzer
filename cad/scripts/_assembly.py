@@ -2601,8 +2601,12 @@ def assert_model_healthy(
         with _telemetry.span("health.collect_targets") as csp:
             targets = [(label or "top", model_doc)]
             if deep:
+                # The gate checks top-level instance documents below. Ask the
+                # native API for those directly; enumerating descendants only
+                # to discard slash-qualified names adds hundreds of COM reads.
+                # Paired native repro: diagnostics/probe_assembly_health_targets.py.
                 comps = (
-                    adapter._attempt(lambda: asm_doc.GetComponents(False), default=None)
+                    adapter._attempt(lambda: asm_doc.GetComponents(True), default=None)
                     or []
                 )
                 for comp in comps:

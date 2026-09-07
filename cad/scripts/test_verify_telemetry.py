@@ -473,6 +473,120 @@ def test_soundness_rebuild_spans_name_only_real_rebuilds(monkeypatch, tmp_path):
     assert collect[0].attributes["targets"] == COMPONENT_COUNTS["frame"] + 1
 
 
+def _health_target_case(monkeypatch, child_errors=()):
+    """Small, non-sleeping seam; keep the production health collector and spans."""
+    root = types.SimpleNamespace()
+    child = object()
+    calls = types.SimpleNamespace(enumerations=[], children=[], targets=[], rebuilds=[])
+
+    def component(name, document):
+        def get_model():
+            calls.children.append(name)
+            return document
+
+        return types.SimpleNamespace(Name2=name, GetModelDoc2=get_model)
+
+    components = [
+        component("shared-2", child),
+        component("unloaded-1", None),
+        component("shared-1", child),
+        component("self-1", root),
+        # Deliberately supply a slash-qualified row even to the top-only call:
+        # preserve the collector's existing name filter independently of the API.
+        component("sub-1/nested-1", object()),
+    ]
+
+    def get_components(top_level_only):
+        calls.enumerations.append(top_level_only)
+        return components
+
+    def rebuild(top_only):
+        calls.rebuilds.append(top_only)
+        return True
+
+    def whats_wrong(_adapter, document):
+        calls.targets.append(document)
+        return list(child_errors) if document is child else []
+
+    root.GetComponents = get_components
+    root.ForceRebuild3 = rebuild
+    adapter = MockAdapter()
+    adapter._current = root
+    monkeypatch.setattr(_assembly, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(_assembly, "whats_wrong", whats_wrong)
+    return adapter, root, child, calls
+
+
+@pytest.mark.parametrize("model_source", ["active", "explicit"])
+def test_health_top_level_collection_preserves_instance_targets(monkeypatch, model_source):
+    adapter, root, child, calls = _health_target_case(monkeypatch)
+    kwargs = {}
+    if model_source == "explicit":
+        adapter._current = object()  # self-exclusion belongs to model, not ActiveDoc.
+        kwargs["model"] = root
+    capture = _attach_capture()
+
+    _assembly.assert_model_healthy(adapter, label="assembly", rebuilt=True, **kwargs)
+
+    assert calls.enumerations == [True]
+    assert calls.children == ["shared-2", "unloaded-1", "shared-1", "self-1"]
+    assert calls.targets == [root, child, child]  # same document, two instance checks
+    assert calls.rebuilds == []
+    spans = capture.get_finished_spans()
+    assert _by_name(spans, "health.collect_targets")[0].attributes["targets"] == 3
+    assert _by_name(spans, "health.whats_wrong")[0].attributes["targets"] == 3
+    assert _by_name(spans, "health.rebuild") == []
+
+
+def test_health_shallow_does_not_enumerate_children(monkeypatch):
+    adapter, root, _, calls = _health_target_case(monkeypatch)
+
+    _assembly.assert_model_healthy(adapter, label="assembly", deep=False, rebuilt=True)
+
+    assert calls.enumerations == []
+    assert calls.children == []
+    assert calls.targets == [root]
+    assert calls.rebuilds == []
+
+
+def test_health_child_error_keeps_each_instance_name(monkeypatch):
+    adapter, root, child, calls = _health_target_case(
+        monkeypatch, child_errors=[("BrokenMate", 48, False)]
+    )
+    capture = _attach_capture()
+
+    with pytest.raises(RuntimeError, match="model unhealthy") as failure:
+        _assembly.assert_model_healthy(adapter, label="assembly", rebuilt=True)
+
+    assert calls.enumerations == [True]
+    assert calls.targets == [root, child, child]
+    assert "shared-1:BrokenMate" in str(failure.value)
+    assert "shared-2:BrokenMate" in str(failure.value)
+    gate = _by_name(capture.get_finished_spans(), "gate.health")[0]
+    assert gate.status.status_code.name == "ERROR"
+    assert gate.attributes["errors"] == 2
+
+
+@pytest.mark.parametrize("rebuild_source", ["shared_clean", "shared_failed", "gate_owned"])
+def test_health_preserves_shared_rebuild_result(monkeypatch, rebuild_source):
+    adapter, _, _, calls = _health_target_case(monkeypatch)
+    kwargs = {}
+    if rebuild_source != "gate_owned":
+        kwargs["rebuilt"] = rebuild_source == "shared_clean"
+    capture = _attach_capture()
+
+    if rebuild_source == "shared_failed":
+        with pytest.raises(RuntimeError, match="ForceRebuild3 returned False"):
+            _assembly.assert_model_healthy(adapter, label="assembly", **kwargs)
+    if rebuild_source != "shared_failed":
+        _assembly.assert_model_healthy(adapter, label="assembly", **kwargs)
+
+    expected_rebuilds = [False] if rebuild_source == "gate_owned" else []
+    assert calls.rebuilds == expected_rebuilds
+    assert calls.enumerations == [True]
+    assert len(_by_name(capture.get_finished_spans(), "health.rebuild")) == len(expected_rebuilds)
+
+
 # NOTE: test_slow_gates_have_child_spans_no_unspanned_gap was removed. It asserted
 # each slow gate's child spans cover >=85% of the gate's wall-clock -- a wall-clock
 # ratio that is inherently jitter-sensitive (a one-off scheduler/GC pause in the
