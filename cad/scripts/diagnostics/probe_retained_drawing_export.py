@@ -251,6 +251,7 @@ def export_pdf_only(adapter, pdf):
 def pdf_title(path, text="rocker-arm"):
     """Native PDF glyph ink boxes; local PDFium only, no SolidWorks or edits."""
     import pypdfium2 as pdfium
+    import pypdfium2.raw as raw
 
     document = pdfium.PdfDocument(str(path))
     try:
@@ -264,9 +265,17 @@ def pdf_title(path, text="rocker-arm"):
             raise RuntimeError("PDF must contain one exact readable rocker-arm title")
         index, count = match
         characters = [
-            {"text": textpage.get_text_range(i, 1), "box_pt": textpage.get_charbox(i)}
+            {
+                "text": textpage.get_text_range(i, 1),
+                "box_pt": textpage.get_charbox(i),
+                # PDFium documents generated spaces/newlines separately from
+                # PDF text content. Retain this observation; never strip here.
+                "generated": int(raw.FPDFText_IsGenerated(textpage, i)),
+            }
             for i in range(index, index + count)
         ]
+        if any(row["generated"] not in (0, 1) for row in characters):
+            raise RuntimeError("PDF generated-character read failed")
         boxes = [row["box_pt"] for row in characters]
         return {
             "page_size_pt": page.get_size(),
