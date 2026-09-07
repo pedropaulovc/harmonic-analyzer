@@ -2,7 +2,9 @@
 
 Default order is rocker then lever. Repeat --target to select an explicit order,
 for example --target channel_lever for the independent lever-only control.
-Both registered original/guard source pairs remain hash-protected for any order.
+Both original rocker/lever pairs and each explicitly selected target remain
+hash-protected. --source-root and --guard-root may name the same directory:
+ownership and the initial/final SHA witness protect that one original directly.
 Optional --factory normal|prepared selects only the isolated recipe's initial
 project drawing factory. Use separate invocations for a functional pair: a
 failed normal cold-title witness never authorizes continuing to prepared.
@@ -31,6 +33,7 @@ failure; no native drawing/source save or additional successful-trial reads.
 from __future__ import annotations
 
 import argparse
+from contextlib import nullcontext
 from enum import StrEnum
 import json
 import math
@@ -46,8 +49,6 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "cad/scripts"))
 
 from _common import _early_bound, check  # noqa: E402
-from channel_lever_spec import DRAWING_DIMENSIONS, SOURCE_BASIC_DIMENSIONS  # noqa: E402
-from rocker_arm_notes import DRAWING_DIMENSIONS as ROCKER_DIMENSIONS  # noqa: E402
 from diagnostics import benchmark_drawing_recipes as benchmark  # noqa: E402
 from diagnostics import probe_datum_shoulder as shoulder  # noqa: E402
 from diagnostics import probe_drawing_attachments as attachments  # noqa: E402
@@ -55,13 +56,12 @@ from diagnostics.probe_source_basic_dimensions import part_dimensions  # noqa: E
 from diagnostics._owned_native_documents import DocumentKind, run_copy_diagnostic  # noqa: E402
 from diagnostics._owned_native_session import require_owned_diagnostic_environment  # noqa: E402
 from diagnostics._reopen_annotation_comparison import compare_reopened_annotations  # noqa: E402
+from diagnostics._recipe_acceptance_targets import TARGETS  # noqa: E402
+from diagnostics._recipe_entity_acceptance import EntityAcceptance  # noqa: E402
 import _telemetry  # noqa: E402
 
 ORDER = ("rocker_arm", "channel_lever")
-EXPECTED_PART_HASHES = {
-    "rocker_arm": "3bfb6da45b91e5a73b24c74baf81141899149e3c327aa943930baed3fba4d4a0",
-    "channel_lever": "6a994561f19487029c938cd7cca5047acbdfbf686020514be538ef5a632e0841",
-}
+EXPECTED_PART_HASHES = {target: row.source_sha256 for target, row in TARGETS.items()}
 
 
 def target_order(targets=None):
@@ -107,8 +107,10 @@ def helper_fingerprints():
 
 
 def require_sources(sources, guards):
+    if sources.keys() != guards.keys():
+        raise ValueError("source and guard manifests must have the same targets")
     hashes = {}
-    for target in ORDER:
+    for target in sources:
         for path in (sources[target], guards[target]):
             actual = attachments.file_digest(path)
             hashes[str(path)] = actual
@@ -138,17 +140,17 @@ def source_dimensions(model, target, path):
     )
     if not configuration:
         raise RuntimeError("source parameter witness has no active configuration")
-    targets = DRAWING_DIMENSIONS if target == "channel_lever" else ROCKER_DIMENSIONS
+    manifest = TARGETS[target]
+    targets = manifest.dimensions
     rows, handles = part_dimensions(
         SimpleNamespace(currentModel=model), path, configuration, targets=targets
     )
-    if target == "channel_lever":
-        for feature, names in SOURCE_BASIC_DIMENSIONS.items():
-            for name in names:
-                if rows[f"{name}@{feature}"]["tolerance_type"] != 1:
-                    raise RuntimeError(
-                        f"{name}@{feature}: saved source BASIC designation missing"
-                    )
+    for feature, names in manifest.basic.items():
+        for name in names:
+            if rows[f"{name}@{feature}"]["tolerance_type"] != 1:
+                raise RuntimeError(
+                    f"{name}@{feature}: saved source BASIC designation missing"
+                )
     return {"configuration": configuration, "dimensions": rows}, handles
 
 
@@ -544,6 +546,7 @@ async def pilot(
     setup_controller=None,
 ):
     order = target_order(targets)
+    protected_targets = tuple(dict.fromkeys((*ORDER, *order)))
     output_root.mkdir(parents=True, exist_ok=True)
     directory = Path(tempfile.mkdtemp(prefix="datum-policy-", dir=output_root))
     adapter.ownership.register_directory(directory)
@@ -551,17 +554,18 @@ async def pilot(
         target: (source_root / f"{target.replace('_', '-')}.SLDPRT").resolve(
             strict=True
         )
-        for target in ORDER
+        for target in protected_targets
     }
     guards = {
         target: (guard_root / sources[target].name).resolve(strict=True)
-        for target in ORDER
+        for target in protected_targets
     }
     report = {
         "status": "running",
         "candidate": candidate,
         "helper_revision": benchmark.revision("HEAD"),
         "order": order,
+        "protected_targets": protected_targets,
         "factory": setup_controller.variant.value if setup_controller else "normal",
         "trials": [],
         "scope": "one functional build per recipe; no speedup/full-pipeline claim",
@@ -581,7 +585,7 @@ async def pilot(
     _telemetry.info("combined datum-policy pilot report", path=str(report_path))
     try:
         report["sources_before"] = require_sources(sources, guards)
-        for path in (*sources.values(), *guards.values()):
+        for path in dict.fromkeys((*sources.values(), *guards.values())):
             adapter.ownership.register_source(path)
         report["helpers"] = helper_fingerprints()
         report["imported_adapter"] = adapter_fingerprints()
@@ -606,6 +610,24 @@ async def pilot(
             module = benchmark.load_recipe(
                 candidate, target, trial_dir, source=copy_source
             )
+            entity_acceptance = None
+            manifest = TARGETS[target]
+            if manifest.entity_labels:
+                entity_acceptance = EntityAcceptance(module, manifest)
+                trial["acceptance_manifest"] = {
+                    "source_sha256": EXPECTED_PART_HASHES[target],
+                    "dimensions": {
+                        key: sorted(names) for key, names in manifest.dimensions.items()
+                    },
+                    "explicit_labels": manifest.entity_labels,
+                    "input_scope": "exact disk identity; builder content recorded, not inferred native build provenance",
+                    "code": {
+                        f"cad/scripts/{name}.py": attachments.file_digest(
+                            ROOT / f"cad/scripts/{name}.py"
+                        )
+                        for name in (f"build_{target}", manifest.spec_module)
+                    },
+                }
             failure_output = module.OUTPUTS.slddrw
             await adapter.close_owned_documents()
             if setup_controller is not None:
@@ -619,6 +641,10 @@ async def pilot(
             trial["source_before"], source_handles = source_dimensions(
                 source_model, target, copy_source
             )
+            if entity_acceptance is not None:
+                trial["source_entities_before"], entity_handles = (
+                    entity_acceptance.source_snapshot(source_model)
+                )
             trial["recipe_sha256"] = attachments.file_digest(
                 trial_dir / "recipe-source.py"
             )
@@ -628,7 +654,12 @@ async def pilot(
                     with adapter.ownership.creating_document(
                         DocumentKind.DRAWING, module.OUTPUTS.slddrw
                     ):
-                        artifacts = await module.build(adapter)
+                        with (
+                            entity_acceptance.observe(adapter, entity_handles)
+                            if entity_acceptance is not None
+                            else nullcontext()
+                        ):
+                            artifacts = await module.build(adapter)
                 if setup_controller is not None:
                     setup_controller.require_used()
             finally:
@@ -656,6 +687,21 @@ async def pilot(
                 handles_before=source_handles,
                 handles_after=after_handles,
             )
+            if entity_acceptance is not None:
+                trial["source_entities_after"], after_entities = (
+                    entity_acceptance.source_snapshot(source_model)
+                )
+                require_same_source(
+                    trial["source_entities_before"],
+                    trial["source_entities_after"],
+                    "recipe controlled faces/boundaries",
+                    app=adapter.swApp,
+                    handles_before=entity_handles,
+                    handles_after=after_entities,
+                )
+                trial["explicit_entities_built"] = entity_acceptance.drawing_snapshot(
+                    adapter, after_entities, phase="built"
+                )
             await adapter.close_owned_documents()
             require_copy_hash(trial, "after_close")
             check(
@@ -688,6 +734,27 @@ async def pilot(
             require_same_source(
                 trial["source_before"], trial["source_reopened"], "saved reopen"
             )
+            if entity_acceptance is not None:
+                trial["source_entities_reopened"], reopened_entities = (
+                    entity_acceptance.source_snapshot(reopened_source)
+                )
+                require_same_source(
+                    trial["source_entities_before"],
+                    trial["source_entities_reopened"],
+                    "cold controlled faces/boundaries",
+                )
+                trial["explicit_entities_reopened"] = (
+                    entity_acceptance.drawing_snapshot(
+                        adapter, reopened_entities, phase="reopened"
+                    )
+                )
+                if (
+                    trial["explicit_entities_built"]
+                    != trial["explicit_entities_reopened"]
+                ):
+                    raise RuntimeError(
+                        "cold reopen changed explicit annotation role/geometry/view"
+                    )
             benchmark.check_fingerprints(
                 report["helpers"],
                 helper_fingerprints(),
@@ -718,6 +785,7 @@ async def pilot(
         raise
     finally:
         primary_error = sys.exception()
+        runtime_guard_errors = []
         for trial in report["trials"]:
             if "copy_source" not in trial:
                 continue
@@ -725,14 +793,51 @@ async def pilot(
                 trial["copy_final"] = attachments.file_digest(
                     Path(trial["copy_source"])
                 )
+                if trial["copy_final"] != EXPECTED_PART_HASHES[trial["target"]]:
+                    runtime_guard_errors.append(
+                        RuntimeError("final owned source copy changed on disk")
+                    )
             except OSError as error:
                 trial["copy_final"] = {"error": repr(error)}
+                runtime_guard_errors.append(error)
         report["sources_after"] = {}
         for path in (*sources.values(), *guards.values()):
             try:
                 report["sources_after"][str(path)] = attachments.file_digest(path)
             except OSError as error:
                 report["sources_after"][str(path)] = {"error": repr(error)}
+        for label, action in (
+            ("original source hashes", lambda: require_sources(sources, guards)),
+            (
+                "frozen helper files",
+                lambda: benchmark.check_fingerprints(
+                    report["helpers"],
+                    helper_fingerprints(),
+                    "frozen helpers/config/template",
+                ),
+            ),
+            (
+                "actual adapter",
+                lambda: benchmark.check_fingerprints(
+                    report["imported_adapter"],
+                    adapter_fingerprints(),
+                    "actual imported adapter",
+                ),
+            ),
+        ):
+            if label == "frozen helper files" and "helpers" not in report:
+                continue
+            if label == "actual adapter" and "imported_adapter" not in report:
+                continue
+            try:
+                action()
+            except Exception as error:
+                runtime_guard_errors.append(error)
+        report["runtime_final_guard_errors"] = [
+            repr(error) for error in runtime_guard_errors
+        ]
+        if runtime_guard_errors:
+            report["status"] = "failed"
         guard_errors = []
         if setup_controller is not None:
             guard_errors = setup_controller.final_guards()
@@ -747,7 +852,17 @@ async def pilot(
         if guard_errors:
             raise BaseExceptionGroup(
                 "functional recipe/factory final guards failed",
-                ([primary_error] if primary_error is not None else []) + guard_errors,
+                ([primary_error] if primary_error is not None else [])
+                + guard_errors
+                + runtime_guard_errors,
+            )
+        if runtime_guard_errors and primary_error is None:
+            raise BaseExceptionGroup(
+                "functional recipe final guards failed", runtime_guard_errors
+            )
+        if runtime_guard_errors and primary_error is not None:
+            primary_error.add_note(
+                f"additional final guard failures: {report['runtime_final_guard_errors']}"
             )
     return {"report": str(report_path)}
 

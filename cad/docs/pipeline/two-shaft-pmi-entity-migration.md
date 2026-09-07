@@ -82,6 +82,60 @@ aliases and helper references for the transitive-consumer review. No native
 success, silhouette identity behavior, or visual acceptance is inferred from this
 source inventory.
 
+## First two owned native checkpoints
+
+The existing `diagnostics/probe_datum_policy_recipes.py` now has explicit
+`fulcrum_shaft` and `pivot_shaft` manifests. Its default remains rocker then
+lever. Each shaft uses its unchanged production dimension manifest (diameter and
+length), recipe, builder and specification; no part rebuilding is authorized by
+this diagnostic. The pinned 2026-09-06 native input hashes are:
+
+| Part | SHA-256 |
+|---|---|
+| `fulcrum-shaft.SLDPRT` | `73eeb75dcb1f24ca70b5f5ad2212d7b829a94af3a518b7c3830ff6c58e47d740` |
+| `pivot-shaft.SLDPRT` | `e5bcdb79849aac9ce6068188ccf0c6e2fd1222e82f1d8b4d75e0fd2723f01dc5` |
+
+Their execution-token contents matched those hashes. This establishes exact
+input identity, not proof that current builder bytes originally produced them.
+The receipt separately fingerprints the builder/specification, archived recipe,
+all runtime helpers/config/templates and the actual imported adapter package.
+Final file guards also run after failure and retain any additional error without
+masking the primary failure.
+
+The diagnostic observes the unchanged production attachment validator, requiring
+all four PMI rows plus the finish. After the complete recipe it rechecks exact
+annotation/view/entity identities and the controlled source face/boundary shapes.
+Cold reopen uses newly resolved source entities, not old closed-document handles;
+the expected annotation coverage, geometry and view membership must persist.
+The existing full drawing content/layout/cold-title gates remain unchanged.
+Named dimensions and controlled roles do not prove full in-memory source
+immutability. Source-copy disk saves still fail; originals are never opened.
+
+After review, a fresh explicit seat/PID grant and a frozen runtime, run **one**
+target per invocation from the integrated checkout. Set
+`HARMONIC_SW_AUTOSTART=0`, `HARMONIC_REMOTE_CACHE_MODE=off` and
+`HARMONIC_DIAGNOSTIC_SW_PID` to the independently verified existing process.
+The same source and guard directory is intentional: initial/final exact hashes
+and shared ownership protect one original; no redundant guard file is required.
+
+```powershell
+uv run --no-sync python cad/scripts/diagnostics/probe_datum_policy_recipes.py --target fulcrum_shaft --candidate HEAD --source-root C:/src/harmonic-analyzer/cad/out/sldprt --guard-root C:/src/harmonic-analyzer/cad/out/sldprt
+```
+
+Pivot is a separately authorized invocation with `--target pivot_shaft`, not an
+automatic retry/continuation after a failed fulcrum. Outputs use unique registered
+directories; a successful recipe still requires its native/PDF/PNG, fresh cold
+witness and an eye pass. This is not the full doit merge gate or a speed trial.
+The other ten production callers and the typography diagnostic remain pending
+separate enrollment/acceptance; in particular type-46 silhouette geometry is not
+silently accepted by the current general attachment snapshot's exclusion list.
+
+Offline runner/role acceptance regression:
+
+```powershell
+uv run python -m pytest cad/scripts/test_shaft_recipe_acceptance_drawing.py cad/scripts/test_datum_policy_recipes_drawing.py cad/scripts/test_recipe_template_factory_drawing.py -q
+```
+
 Re-runnable offline proof:
 
 ```powershell
