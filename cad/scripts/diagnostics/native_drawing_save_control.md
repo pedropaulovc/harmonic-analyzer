@@ -14,7 +14,7 @@ explicit context; no adapter source, COM object or global preference is patched.
 The selected drawing call is early-bound `IModelDocExtension.SaveAs3`:
 
 ```python
-extension.SaveAs3(path, 0, 1, None, None, 0, 0)
+extension.SaveAs3(str(path), 0, 1, null_dispatch(), null_dispatch(), 0, 0)
 ```
 
 The arguments mean current native version, Silent only, null ExportData, null
