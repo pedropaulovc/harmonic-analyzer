@@ -16,6 +16,7 @@ from dataclasses import dataclass, replace
 from enum import StrEnum
 from itertools import combinations
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Callable, Iterable, Literal, Sequence
 
 
@@ -2111,13 +2112,36 @@ def verify_dimension_callouts(
     callout_text: dict[str, str],
     *,
     feature_name: str,
+    view: Any,
+    source_model: Any,
     location: Literal["above", "below"] = "below",
 ) -> None:
-    """Require exact imported model callouts; never set text, rebuild or save."""
+    """Verify imported text against the caller's intended view and source PART.
+
+    Neither the expected source nor the source parameter is inferred from the
+    annotation being checked. Never set text, rebuild, activate or save.
+    """
+    from _drawing_marks import _named_dimension
+
     text_part = {"above": 3, "below": 4}[location]  # swDimensionTextParts_e
     model = adapter.currentModel
     if model is None or _early_bound(model, "IModelDoc2").GetType() != 3:  # swDocDRAWING
         raise RuntimeError("imported dimension callout verification requires a DRAWING")
+    if source_model is None or _early_bound(source_model, "IModelDoc2").GetType() != 1:
+        raise RuntimeError("imported callout verification requires the intended source PART")
+    if view is None:
+        raise RuntimeError("imported callout verification requires the intended view")
+    view = _early_bound(view, "IView")
+    application = _early_bound(adapter.swApp, "ISldWorks")
+
+    def require_same(expected: Any, actual: Any, label: str) -> None:
+        if expected is None or actual is None or application.IsSame(expected, actual) != 1:
+            raise RuntimeError(f"imported callout {label} identity differs or is unknown")
+
+    require_same(source_model, view.ReferencedDocument, "view source")
+    # The existing named-part resolver only consumes currentModel. Give it the
+    # explicit source handle without changing the drawing adapter or ActiveDoc.
+    source_reader = SimpleNamespace(currentModel=source_model)
     matched: dict[str, list[Any]] = {name: [] for name in callout_text}
     for raw in annotations:
         annotation = _early_bound(raw, "IAnnotation")
@@ -2132,7 +2156,11 @@ def verify_dimension_callouts(
                 f"{name}@{feature_name}: expected exactly one imported dimension, "
                 f"found {len(matched[name])}"
             )
-        raw_display = matched[name][0].GetSpecificAnnotation()
+        annotation = matched[name][0]
+        if annotation.GetType() != 4 or annotation.OwnerType != 0:
+            raise RuntimeError(f"dimension {name!r} is not a drawing-view dimension")
+        require_same(view, annotation.Owner, "annotation view")
+        raw_display = annotation.GetSpecificAnnotation()
         if raw_display is None:
             raise RuntimeError(f"dimension {name!r} has no display annotation")
         display = _early_bound(raw_display, "IDisplayDimension")
@@ -2142,6 +2170,8 @@ def verify_dimension_callouts(
         dimension = _early_bound(raw_dimension, "IDimension")
         if dimension.Name != name or _dim_owner_feature(dimension) != feature_name:
             raise RuntimeError(f"dimension {name!r} does not belong to {feature_name!r}")
+        _source_display, source_dimension = _named_dimension(source_reader, feature_name, name)
+        require_same(source_dimension, dimension, "source parameter")
         if display.IsHoleCallout() is not False:
             raise RuntimeError(f"dimension {name!r}: GetText does not support hole callouts")
         actual = display.GetText(text_part)
