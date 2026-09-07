@@ -6,12 +6,13 @@ previous fourteen; every previous pin and the default rocker/lever order remain
 unchanged. There is no source authoring, automatic pinning, alternative accepted
 hash, new runner, or production recipe/layout change.
 
-Native cold acceptance of these two enrolled inputs is pending. Following the
-initial enrollment, the tip was rebuilt through the real production task and
-its pin explicitly migrated to `f3578ac2...8468` below. The historical builder
-identity and the mismatching pre-rebuild output are both rejected; neither is
-an alternative accepted input. The first owned tip replay then failed its
-source-copy preservation gate; the screw target was not reached (receipt below).
+Both targets passed full owned/cold replay at `f6370560` (final section below).
+The intervening failures and pin migrations remain historical evidence: the
+first tip replay on `f3578ac2...8468` failed source-copy preservation and never
+started the screw. Source-owned reference authoring then produced the explicitly
+pinned tip `18d0c166...efbf2`; the screw still uses `51501908...9c36`. Older tip
+hashes are not alternative accepted inputs. The shared successful-two-target
+receipt is nevertheless a failed batch because its third target was rejected.
 
 ## Source provenance and the pre-rebuild tip mismatch
 
@@ -104,27 +105,28 @@ coverage is not an additional persistent-identity proof. Expected callout
 storage verification and unchanged emitted text do not alone establish visual
 readability; the fresh PDF/PNG must also be inspected.
 
-## Serial native replay after review
+## Serial native replay
 
-Only the parent with the granted native seat should run this, from the reviewed
-and frozen root checkout. Confirm the actual live PID first. The parent command
-takes the existing machine-global lock; do not invoke `--worker` directly.
+Run from the reviewed, frozen checkout with the serialized native seat and a
+confirmed live PID. The parent command takes the existing machine-global lock;
+do not invoke `--worker` directly. Native testing is already authorized.
 
 ```powershell
 $env:HARMONIC_SW_AUTOSTART = '0'
 $env:HARMONIC_REMOTE_CACHE_MODE = 'off'
 $env:HARMONIC_DIAGNOSTIC_SW_PID = '31860'
 uv run --no-sync python cad/scripts/diagnostics/probe_datum_policy_recipes.py `
-  --candidate HEAD `
+  --candidate f6370560303f9025f6cd48ab9230edc0fd0410dd `
   --source-root C:/src/harmonic-analyzer/cad/out/sldprt `
   --guard-root C:/src/harmonic-analyzer/cad/out/sldprt `
   --target cone_pivot_screw --factory prepared
 ```
 
-After integrating this separately reviewed pin migration, use the same command
-with `--target cone_tip_adjuster` in a separate serial invocation. Only the
-rebuilt `f3578ac2...8468` tip is accepted; both `55cc3360...5194` and the original
-`8e2ce51d...12f4` are explicitly tested as rejections.
+Use the same command with `--target cone_tip_adjuster` for a separate serial
+invocation. This revision requires the source-authored `18d0c166...efbf2` tip,
+not the earlier `f3578ac2...8468` input used by the failed historical replay.
+Its builder and explicit pin provenance are in
+[cone-tip source reference](../../docs/pipeline/cone-tip-source-reference.md).
 
 ## Offline verification
 
@@ -177,3 +179,48 @@ or checker exemption follows from this failure. The receipt locates the byte
 change within the recipe, not at a particular operation; attributing it to
 `set_reference_dimensions` or any individual setter still requires a separate
 first-dirty boundary observation.
+
+## Full cold replay of both fasteners, 2026-09-07
+
+At frozen `f6370560303f9025f6cd48ab9230edc0fd0410dd`, both fastener rows passed
+with the prepared factory (requested 4:1, two decimals). Retained receipt:
+`cad/out/reports/datum-policy-e0vlt1wm/pilot.json`, SHA-256
+`66a97d1528ee5eefc6ac85ee24f2e9115946b32f843c55100eefb29519ed27b5`.
+
+| Target | Exact original/copy SHA-256 throughout | Required dimensions | Recipe / setup seconds | Separate cache miss / hit seconds |
+| --- | --- | ---: | --- | --- |
+| `cone_tip_adjuster` | `18d0c1669c8de923420655d621f58d24afe404bc1d3a5a787930ebeeb2fefbf2` | 5 | 24.9530979 / 1.6674348 | 46.5258049 / 0.0519504 |
+| `cone_pivot_screw` | `515019088b41d329b45f0487b9241123751ecac7d6c116481930ae9c45e89c36` | 7 | 87.6248523 / 2.2341826 | 53.8233989 / 0.0429789 |
+
+Setup is inside the recipe timer; the accessor timings are separate. Each target
+used its own empty diagnostic cache, so the screw's miss is not a production
+cross-recipe cache-hit measurement. Total batch time **651.7559998 s** includes
+source guards, preparation, recipes and cold witnesses, excluding parent
+lock/attach and outer ownership cleanup. Offline tests ran concurrently on the
+host: no unloaded-host latency, speedup or full-pipeline claim follows.
+
+Both targets retained their exact copied bytes after the recipe, after closing
+all owned documents, after fresh drawing/source reopen and after final close.
+The required source dimension banks, including values/tolerances/BASIC and
+configuration `Default`, matched before/after/cold. The existing same-session
+source identity checks passed. Built/cold drawing semantics, measured annotations
+and view layouts matched exactly; both annotation comparators had **zero rejected,
+zero coordinate-roundoff and zero zero-Z differences**. This remains the existing
+generic attachment/required-dimension scope, not new explicit VIEW-role or
+cross-cold persistent-identity enrollment.
+
+Native drawing, PDF and PNG artifacts are retained under each target directory.
+The main runner visually inspected both **built** PNGs, including the tip's
+reference/thread text and the screw's manufacturing callouts. The pilot did not
+export a second cold PDF/PNG or compare cold pixels.
+
+Do not label the whole batch passed: its third row, `cone_gear_shaft`, failed
+with `pivot journal finish: explicit annotation attachment mismatch: count=0,
+entities=0, types=(), expected=2`. That does not revoke the two completed passing
+rows or establish acceptance of the shaft. Ownership receipt
+`cad/out/reports/datum-policy-e0vlt1wm/ownership.json`, SHA-256
+`f5c57baa5383ec38faa10368a6dcdb3057c43bb55ea3f77b38e72990866ad7d5`,
+preserves the shaft probe error and reports no cleanup error. Initial/final
+inventory is the same clean, visible original cone-tip part; baseline preservation
+passed. All five protected originals and template/cache/helper/adapter inputs
+matched their starting hashes, with `runtime_final_guard_errors=[]`.
