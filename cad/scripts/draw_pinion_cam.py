@@ -8,7 +8,7 @@ collar length live on the Top plane (top view carries the boss and length).
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_pinion_cam.py pinion-cam
+    uv run python -m doit drawing:pinion_cam
 """
 
 from __future__ import annotations

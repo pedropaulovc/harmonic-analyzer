@@ -11,7 +11,7 @@ the FRONT view is the long side elevation and the RIGHT view is the circular end
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_magnifying_lever.py magnifying-lever
+    uv run python -m doit drawing:magnifying_lever
 """
 
 from __future__ import annotations

@@ -9,7 +9,7 @@ front profile view; the top view shows the 4.0-wide foot and the screw hole.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_pinion_spring.py pinion-spring
+    uv run python -m doit drawing:pinion_spring
 """
 
 from __future__ import annotations

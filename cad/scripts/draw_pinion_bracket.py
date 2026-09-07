@@ -10,7 +10,7 @@ explicit 1:1 override so it stays clear of the title block.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_pinion_bracket.py pinion-bracket
+    uv run python -m doit drawing:pinion_bracket
 """
 
 from __future__ import annotations

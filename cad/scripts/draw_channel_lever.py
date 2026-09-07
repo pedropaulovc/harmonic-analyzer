@@ -13,7 +13,7 @@ diameter and radius leaders do not compete for the same drawing space. The
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_channel_lever.py channel-lever
+    uv run python -m doit drawing:channel_lever
 """
 
 from __future__ import annotations

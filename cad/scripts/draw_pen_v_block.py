@@ -10,7 +10,7 @@ footprints. The isometric carries an explicit 2:1 override.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_pen_v_block.py pen-v-block
+    uv run python -m doit drawing:pen_v_block
 """
 
 from __future__ import annotations
