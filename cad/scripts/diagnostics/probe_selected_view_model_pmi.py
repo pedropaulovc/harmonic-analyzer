@@ -2,13 +2,17 @@
 
 Composes the safe all-view control without modifying it. Uses a fresh unique
 transgear-stub bytecopy, three native orthographic views and exactly two imports.
-Only AllViews changes to False; no annotation/layout/source setter or retry.
+Default only changes AllViews to False. The explicit Right-only spacing option
+runs one native317 command on the three imported annotations, with no setter,
+manual position, additional command or retry.
 Missing coverage remains a failed observation even when diagnostic exports exist.
 """
 
 from __future__ import annotations
 
 import argparse
+from enum import StrEnum
+from itertools import combinations
 import json
 import math
 from pathlib import Path
@@ -37,6 +41,225 @@ from diagnostics._owned_native_documents import (  # noqa: E402
 )
 from diagnostics._source_dimension_snapshot import dimension_snapshot, compare_source  # noqa: E402
 from diagnostics._reopen_annotation_comparison import compare_reopened_annotations  # noqa: E402
+
+
+class PmiArrangement(StrEnum):
+    SPACE_TIGHTLY_DOWN = "space-tightly-down"
+
+
+def require_arrangement(orientation, arrangement):
+    if arrangement is None:
+        return
+    if orientation != "*Right" or arrangement is not PmiArrangement.SPACE_TIGHTLY_DOWN:
+        raise ValueError("PMI spacing control requires the explicit native Right view")
+
+
+def space_imported_pmi(adapter, view, imported, row, checkpoint):
+    """One native317 command on the exact real two-GTol/one-datum bank."""
+    adapter.ownership.assert_current_owned()
+    model, app = _early_bound(adapter.currentModel, "IModelDoc2"), adapter.swApp
+    drawing = _early_bound(model, "IDrawingDoc")
+    selection = _early_bound(model.SelectionManager, "ISelectionMgr")
+    annotations = tuple(_early_bound(item, "IAnnotation") for item in imported)
+    if len(annotations) != 3 or any(item is None for item in annotations):
+        raise RuntimeError(
+            "PMI spacing needs exactly three nonnull imported annotations"
+        )
+    kinds = tuple(int(item.GetType()) for item in annotations)
+    if sorted(kinds) != [2, 5, 5] or any(
+        int(app.IsSame(first, second)) == 1
+        for first, second in combinations(annotations, 2)
+    ):
+        raise RuntimeError(
+            "PMI spacing needs two distinct GTols and one distinct datum"
+        )
+    row.update(command=317, selections=[], status="selecting")
+    model.ClearSelection2(True)
+    try:
+        if not drawing.ActivateView(str(view.GetName2())):
+            raise RuntimeError("PMI spacing could not activate its exact Right view")
+        for annotation, kind in zip(annotations, kinds, strict=True):
+            if (
+                int(annotation.OwnerType) != 0
+                or int(app.IsSame(annotation.Owner, view)) != 1
+            ):
+                raise RuntimeError(
+                    "PMI spacing imported annotation has a different owner"
+                )
+            # Same native-proven call shape as the existing GTol command control.
+            # Select2 is obsolete in favor of Select3, but not a coordinate pick.
+            if not annotation.Select2(True, 0):
+                raise RuntimeError("PMI spacing annotation selection rejected")
+        if int(selection.GetSelectedObjectCount2(-1)) != 3:
+            raise RuntimeError("PMI spacing selected bank is not exactly three")
+        for index, (annotation, kind) in enumerate(
+            zip(annotations, kinds, strict=True), 1
+        ):
+            expected_type, interface = (36, "IDatumTag") if kind == 2 else (13, "IGtol")
+            selected_type = int(selection.GetSelectedObjectType3(index, -1))
+            if selected_type != expected_type:
+                raise RuntimeError(
+                    "PMI spacing selected native annotation type differs"
+                )
+            specific = _early_bound(selection.GetSelectedObject6(index, -1), interface)
+            selected = (
+                _early_bound(specific.GetAnnotation(), "IAnnotation")
+                if specific is not None
+                else None
+            )
+            selected_view = selection.GetSelectedObjectsDrawingView2(index, -1)
+            identity = (
+                int(app.IsSame(selected, annotation)) if selected is not None else None
+            )
+            row["selections"].append(
+                {
+                    "name": str(annotation.GetName()),
+                    "type": selected_type,
+                    "identity": identity,
+                    "selected_view_null": selected_view is None,
+                }
+            )
+            if (
+                identity != 1
+                or (
+                    selected_view is not None
+                    and int(app.IsSame(selected_view, view)) != 1
+                )
+                or int(selected.OwnerType) != 0
+                or int(app.IsSame(selected.Owner, view)) != 1
+            ):
+                raise RuntimeError(
+                    "PMI spacing selection changed annotation/view identity"
+                )
+        row["enabled"] = bool(app.IsCommandEnabled(317))
+        checkpoint()
+        if not row["enabled"]:
+            raise RuntimeError("native PMI Space Tightly Down317 is disabled")
+        adapter.ownership.assert_current_owned()
+        started = time.perf_counter()
+        try:
+            with _telemetry.span(
+                "diagnostic.selected_view_pmi.space_tightly_down", count=3
+            ):
+                row["returned"] = bool(app.RunCommand(317, ""))
+        finally:
+            row["command_seconds"] = time.perf_counter() - started
+        if not row["returned"]:
+            raise RuntimeError("native PMI Space Tightly Down317 rejected the bank")
+        row["status"] = "returned"
+    finally:
+        primary_error = sys.exception()
+        try:
+            adapter.ownership.assert_current_owned()
+            model.ClearSelection2(True)
+        except Exception as error:
+            row["selection_cleanup_error"] = repr(error)
+            raise BaseExceptionGroup(
+                "PMI spacing/selection cleanup failed",
+                ([primary_error] if primary_error is not None else []) + [error],
+            )
+        finally:
+            checkpoint()
+
+
+def compare_arranged_pmi(
+    adapter,
+    before,
+    after,
+    before_views,
+    after_views,
+    before_handles,
+    after_handles,
+    selected_name,
+):
+    """Exact semantic/identity checks; allow only the imported bank's native ink to move."""
+    if before["views"] != after["views"] or before_views.keys() != after_views.keys():
+        raise RuntimeError(
+            "PMI spacing changed native view/source/configuration inventory"
+        )
+    if any(
+        int(adapter.swApp.IsSame(view, after_views[name])) != 1
+        for name, view in before_views.items()
+    ):
+        raise RuntimeError("PMI spacing replaced a native view")
+    pilot.attachments.check_layout(before["layout"], after["layout"], "PMI spacing")
+    if {key: value for key, value in before["pmi"].items() if key != "annotations"} != {
+        key: value for key, value in after["pmi"].items() if key != "annotations"
+    }:
+        raise RuntimeError("PMI spacing changed native sheet/view geometry")
+    initial_pmi = {row["name"]: row for row in before["pmi"]["annotations"]}
+    actual_pmi = {row["name"]: row for row in after["pmi"]["annotations"]}
+    if (
+        len(before["pmi"]["annotations"]) != 3
+        or len(after["pmi"]["annotations"]) != 3
+        or len(initial_pmi) != 3
+        or initial_pmi.keys() != actual_pmi.keys()
+    ):
+        raise RuntimeError("PMI spacing changed the imported semantic inventory")
+    for name, initial in initial_pmi.items():
+        actual = actual_pmi[name]
+        if {key: value for key, value in initial.items() if key != "position_m"} != {
+            key: value for key, value in actual.items() if key != "position_m"
+        }:
+            raise RuntimeError(
+                f"PMI spacing changed manufacturing/attachment semantics: {name}"
+            )
+    pilot.shoulder.compare_all_annotation_layout(
+        adapter.swApp,
+        before["annotations"],
+        after["annotations"],
+        before_handles,
+        after_handles,
+    )
+    permitted = {f"{selected_name}/{name}" for name in initial_pmi}
+    if not permitted <= before["annotations"].keys():
+        raise RuntimeError("PMI spacing has no exact raw bank in the selected view")
+    movement, bodies = {}, {}
+    for key, initial in before["annotations"].items():
+        actual = after["annotations"][key]
+        if key not in permitted:
+            if initial != actual:
+                raise RuntimeError(
+                    f"PMI spacing changed unselected annotation ink: {key}"
+                )
+            continue
+        old, new = initial.get("measurement"), actual.get("measurement")
+        if old is None or new is None:
+            raise RuntimeError(f"PMI spacing lacks native body measurement: {key}")
+        if any(
+            old[field] != new[field] for field in ("name", "kind", "format_signature")
+        ):
+            raise RuntimeError(f"PMI spacing changed native annotation format: {key}")
+        movement[key] = {
+            "anchor_before": initial["position"],
+            "anchor_after": actual["position"],
+            "body_before": old["body"],
+            "body_after": new["body"],
+            "native_before": initial["native"],
+            "native_after": actual["native"],
+        }
+        bodies[key] = new["body"]
+    gaps, failures = [], coverage_failures(after["pmi"], selected_name, "after spacing")
+    for first, second in combinations(bodies, 2):
+        a, b = bodies[first], bodies[second]
+        gap = max(
+            b["xmin"] - a["xmax"],
+            a["xmin"] - b["xmax"],
+            b["ymin"] - a["ymax"],
+            a["ymin"] - b["ymax"],
+        )
+        gaps.append({"first": first, "second": second, "axis_gap_m": gap})
+        if gap <= 0:
+            failures.append(
+                f"native PMI bodies still overlap/touch: {first} / {second}"
+            )
+    if not any(
+        row["anchor_before"] != row["anchor_after"]
+        for key, row in movement.items()
+        if before["annotations"][key]["semantic"]["kind"] == 5
+    ):
+        failures.append("Space Tightly Down did not move either imported GTol anchor")
+    return {"movement": movement, "body_gaps": gaps, "failures": failures}
 
 
 def select_exact_view(adapter, view, observation):
@@ -296,7 +519,9 @@ async def probe(
     expected_source_sha,
     *,
     orientation="*Front",
+    arrangement=None,
 ):
+    require_arrangement(orientation, arrangement)
     require_environment(expected_pid)
     app = _early_bound(adapter.swApp, "ISldWorks")
     if int(app.GetProcessID()) != expected_pid:
@@ -335,6 +560,7 @@ async def probe(
         "visual_review": "pending",
         "scope": "two imports into one exactly selected native orthographic view; no layout/source edits or retry",
         "requested_orientation": orientation,
+        "requested_arrangement": arrangement.value if arrangement is not None else None,
         "source": str(source),
         "copy": str(copy),
         "inputs_before": expected,
@@ -348,6 +574,10 @@ async def probe(
         "artifacts": {},
     }
     errors = []
+    if arrangement is not None:
+        report["scope"] = (
+            "two exact Right-view PMI imports plus one native317 spacing command on their exact three annotations; no manual placement/source edits/retry"
+        )
     copy_expected = {}
     started = time.perf_counter()
 
@@ -470,6 +700,37 @@ async def probe(
             source_model, "source_after_import", source_before, source_handles
         )
         checkpoint()
+        if arrangement is not None:
+            if report["failures"]:
+                raise RuntimeError("PMI arrangement requires complete initial coverage")
+            arrangement_report = report["arrangement"] = {"variant": arrangement.value}
+            space_imported_pmi(adapter, view, imported, arrangement_report, checkpoint)
+            arranged, arranged_views, arranged_handles = snapshot(
+                adapter, copy, configuration, source_model
+            )
+            report["arranged"] = arranged
+            arrangement_report.update(
+                compare_arranged_pmi(
+                    adapter,
+                    initial,
+                    arranged,
+                    initial_views,
+                    arranged_views,
+                    initial_handles,
+                    arranged_handles,
+                    selected_name,
+                )
+            )
+            report["failures"].extend(arrangement_report["failures"])
+            source_witness(
+                source_model, "source_after_arrangement", source_before, source_handles
+            )
+            initial, initial_views, initial_handles = (
+                arranged,
+                arranged_views,
+                arranged_handles,
+            )
+            checkpoint()
         # Diagnostic output is retained even when coverage is incomplete; the
         # final machine status stays failed. No source-part save is authorized.
         pdf, png = directory / "initial.pdf", directory / "initial.png"
@@ -625,9 +886,13 @@ def main(argv=None):
         help="one explicitly selected native view; each invocation uses a fresh source copy",
     )
     parser.add_argument("--report-root", type=Path, default=ROOT / "cad/out/reports")
+    parser.add_argument(
+        "--arrangement", type=PmiArrangement, choices=tuple(PmiArrangement)
+    )
     parser.add_argument("--source-sha256", help=argparse.SUPPRESS)
     parser.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
+    require_arrangement(args.orientation, args.arrangement)
     require_environment(args.expected_pid)  # Before dodo._run in the parent.
     source = args.source.resolve(strict=True)
     if source.suffix.upper() != ".SLDPRT" or not source.is_file():
@@ -644,6 +909,11 @@ def main(argv=None):
                 args.expected_pid,
                 digest,
                 orientation=args.orientation,
+                **(
+                    {"arrangement": args.arrangement}
+                    if args.arrangement is not None
+                    else {}
+                ),
             )
         )
     import dodo
@@ -657,6 +927,11 @@ def main(argv=None):
             str(args.expected_pid),
             "--orientation",
             args.orientation,
+            *(
+                ["--arrangement", args.arrangement.value]
+                if args.arrangement is not None
+                else []
+            ),
             "--report-root",
             str(args.report_root.resolve()),
             "--source-sha256",
