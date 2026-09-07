@@ -6,12 +6,15 @@ from unittest.mock import Mock
 import pytest
 
 import _drawing_common as drawing
+import _drawing_silhouette_identity as persistent
 from test_native_annotation_placement_drawing import native_context
 
 
 @pytest.fixture
 def bank(monkeypatch):
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _: value)
+    monkeypatch.setattr(persistent, "_early_bound", lambda value, _: value)
+    monkeypatch.setattr(persistent, "byte_variant", lambda value: value)
     model_entity, view_entity = object(), object()
     reverse = Mock(return_value=model_entity)
     source = SimpleNamespace(
@@ -29,7 +32,11 @@ def bank(monkeypatch):
         Owner=view,
         OwnerType=0,
     )
-    adapter = SimpleNamespace(swApp=SimpleNamespace(IsSame=lambda a, b: int(a is b)))
+    current = SimpleNamespace(GetType=lambda: 3, Extension=SimpleNamespace(
+        GetPersistReference3=lambda entity: (1,) if entity is view_entity else (2,),
+        IsSamePersistentID=lambda first, second: int(first == second),
+    ))
+    adapter = SimpleNamespace(swApp=SimpleNamespace(IsSame=lambda a, b: int(a is b)), currentModel=current)
     return SimpleNamespace(**locals())
 
 

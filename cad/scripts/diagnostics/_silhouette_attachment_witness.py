@@ -2,7 +2,8 @@
 
 ISilhouetteEdge.GetView/GetFace/GetCurve and ordered MathPoint endpoints are
 read directly. GetFace's reference frame is not documented: no source reverse
-mapping is inferred. Native IsSame proves same-session entity/face ownership;
+mapping is inferred. Drawing persistent IDs prove silhouette identity; native
+IsSame continues to prove same-session view/face ownership;
 analytic parameters describe geometry but never substitute for identity.
 Unsupported native shapes fail. No rounding or coordinate-frame transform is
 applied, so any cold serialization differences remain visible in raw receipts.
@@ -11,6 +12,7 @@ applied, so any cold serialization differences remain visible in raw receipts.
 import math
 
 from _common import _early_bound
+import _drawing_silhouette_identity as persistent
 
 
 def finite_array(raw, size, *, label):
@@ -117,14 +119,17 @@ def _record_identity_controls(app, expected, actual, before_face, after_face, ev
             controls[name] = {"error": repr(error)}
 
 
-def require_same(app, view, expected, actual, *, label, evidence):
+def require_same(app, view, expected, actual, *, drawing, label, evidence):
     """Record both raw snapshots before exact entity/face/geometry acceptance."""
     before, before_face = snapshot(app, view, expected)
     evidence["expected"] = before
     after, after_face = snapshot(app, view, actual)
     evidence["actual"] = after
     try:
-        same(app, expected, actual, label=f"{label} silhouette entity")
+        persistent.require_same(
+            drawing, expected, actual, label=f"{label} silhouette entity",
+            evidence=evidence.setdefault("persistent_identity", {}),
+        )
     except RuntimeError:
         _record_identity_controls(
             app, expected, actual, before_face, after_face, evidence
