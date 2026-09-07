@@ -12,10 +12,12 @@ class ViewResolver(StrEnum):
     OUTER_END = "outer_end"
     PLANAR_FACE = "planar_face"
     JOURNAL = "journal"
+    JOURNAL_FACE = "journal_face"
     CRANK_END = "crank_end"
     FAR_END = "far_end"
     CROSS_HOLE = "cross_hole"
     SHANK = "shank"
+    SHANK_FACE = "shank_face"
 
 
 @dataclass(frozen=True)
@@ -49,6 +51,8 @@ class ViewRole:
                 return module._largest_visible_planar_face(adapter, view)
             case ViewResolver.JOURNAL:
                 return module._visible_journal_silhouette(adapter, view)
+            case ViewResolver.JOURNAL_FACE:
+                return module._visible_cylindrical_face(adapter, view, module.JOURNAL_DIA)
             case ViewResolver.CRANK_END | ViewResolver.FAR_END:
                 candidates = module._visible_shaft_end_edges(adapter, view)
                 if len(candidates) < 2 or candidates[0][0] == candidates[-1][0]:
@@ -61,6 +65,9 @@ class ViewRole:
                 # This existing resolver activates its view (no geometry write).
                 # Observation reports it explicitly; it is not getter-only.
                 return module._shank_silhouette(adapter, view)
+            case ViewResolver.SHANK_FACE:
+                # Uses the same view-activating shank resolver, then GetFace.
+                return module._shank_face(adapter, view)
         raise RuntimeError(f"unsupported VIEW resolver {self.resolver!r}")
 
 
@@ -112,10 +119,10 @@ VIEW_ROLES = {
             "*Right", 5, "EDGE", ViewResolver.CROSS_HOLE
         ),
         "crankshaft bearing-journal finish": ViewRole(
-            "*Right", 7, "SILHOUETTE", ViewResolver.JOURNAL
+            "*Right", 7, "FACE", ViewResolver.JOURNAL_FACE
         ),
     },
     "spring_hook": {
-        "shank seating finish": ViewRole("*Front", 7, "SILHOUETTE", ViewResolver.SHANK),
+        "shank seating finish": ViewRole("*Front", 7, "FACE", ViewResolver.SHANK_FACE),
     },
 }

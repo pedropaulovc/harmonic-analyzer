@@ -132,6 +132,15 @@ def _shank_silhouette(adapter: Any, view: Any) -> Any:
     return silhouette
 
 
+def _shank_face(adapter: Any, view: Any) -> Any:
+    """Use the exact face of the existing shank silhouette, without a new pick."""
+    silhouette = _early_bound(_shank_silhouette(adapter, view), "ISilhouetteEdge")
+    face = silhouette.GetFace()
+    if face is None:
+        raise RuntimeError("spring-hook shank silhouette has no face")
+    return _early_bound(face, "IFace2")
+
+
 FRONT_KEEP = {
     "Rise": (0.075, FRONT_CENTER[1]),
     "ArmRun": (0.130, 0.205),
@@ -194,16 +203,15 @@ async def build(
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
     curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
 
-    # Attach Ra to the longest front-view cylindrical outline: the straight
-    # seating shank.  Swept wire exposes this as a drawing-native silhouette,
-    # not a model edge, so select the returned entity rather than guessing a pick.
-    shank_edge = _shank_silhouette(adapter, front)
+    # The part-owned finish controls the whole seating cylinder. Use its exact
+    # face and native no-leader placement; no silhouette object equality is
+    # inferred between view enumeration and the symbol's attachment wrapper.
+    shank_face = _shank_face(adapter, front)
     add_surface_finish(
         adapter,
         front,
-        edge_entity=shank_edge,
-        entity_type="SILHOUETTE",
-        symbol_xy=(0.140, 0.120),
+        entity=shank_face,
+        entity_type="FACE",
         control=surface_finish_by_key(SURFACE_FINISHES, "shank_seating"),
         label="shank seating finish",
     )

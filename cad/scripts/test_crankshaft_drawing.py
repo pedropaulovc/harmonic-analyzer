@@ -119,9 +119,10 @@ def test_native_finish_and_notes_control_the_turned_shaft() -> None:
     assert re.search(r"GetVisibleEntities2\(\s*c,\s*3\s*\)", source)
     assert "face=journal_face" in source
     assert re.search(r"GetVisibleEntities2\(\s*c,\s*4\s*\)", source)
-    assert "journal_silhouette = _visible_journal_silhouette(adapter, right)" in source
-    assert "edge_entity=journal_silhouette" in source
-    assert 'entity_type="SILHOUETTE"' in source
+    assert "journal_face = _visible_cylindrical_face(adapter, right, JOURNAL_DIA)" in source
+    assert "entity=journal_face" in source
+    assert "edge_entity=journal_silhouette" not in source
+    assert 'entity_type="FACE"' in source
     assert 'production_method="BEARING JOURNAL"' not in source
     assert crankshaft_spec.SURFACE_FINISHES[0].production_method == "BEARING JOURNAL"
     assert 'surface_finish_by_key(SURFACE_FINISHES, "bearing_journal")' in source
@@ -135,7 +136,7 @@ def test_native_finish_and_notes_control_the_turned_shaft() -> None:
     assert "shoulder=True" not in source
     assert "position_tolerance_m=0.0001" in source
     assert "annotation=shaft_dia_annotation" not in source
-    assert "symbol_xy=(0.205, 0.145)" in source
+    assert "symbol_xy=(0.205, 0.145)" not in source
     assert "frame_xy=(0.100, 0.055)" in source
     assert 'characteristic="position"' in source
     assert 'characteristic="perpendicularity"' in source
