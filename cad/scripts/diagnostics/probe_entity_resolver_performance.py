@@ -6,7 +6,6 @@ import argparse
 from collections import defaultdict
 from contextlib import ExitStack
 import hashlib
-import json
 import os
 from pathlib import Path
 import platform
