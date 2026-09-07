@@ -22,7 +22,7 @@ def model_fixture(tmp_path, monkeypatch):
     monkeypatch.setattr(
         factory.pilot, "adapter_fingerprints", lambda: {"adapter": "same"}
     )
-    module = SimpleNamespace(new_project_drawing=normal, SHEET_SCALE=(1.0, 2.0))
+    module = SimpleNamespace(TEMPLATE_SPEC=factory.prepared.TemplateSpec((1, 2), 2))
     events = []
 
     @contextmanager
@@ -51,15 +51,17 @@ async def test_normal_factory_records_only_original_setup(tmp_path, monkeypatch)
     )
     controller = factory.RecipeTemplateFactory(factory.DrawingFactory.NORMAL)
     trial = {}
-    await controller.configure(adapter, module, trial, tmp_path)
+    selected = await controller.configure(adapter, module, trial, tmp_path)
     assert events == []
-    assert module.new_project_drawing is not normal
+    assert not hasattr(module, "new_project_drawing")
     assert factory.common.new_project_drawing is normal
-    assert module.new_project_drawing(adapter, property_view="Front", scale=(1, 2)) == (
+    assert selected(adapter, property_view="Front", scale=(1, 2)) == (
         "draw",
         "sheet",
     )
-    normal.assert_called_once_with(adapter, property_view="Front", scale=(1, 2))
+    normal.assert_called_once_with(
+        adapter, property_view="Front", scale=(1, 2), decimals=2
+    )
     controller.require_used()
     assert trial["template_factory"]["setup_calls"] == 1
     assert trial["template_factory"]["setup_seconds"] >= 0
@@ -110,11 +112,11 @@ async def test_prepared_materialization_precedes_recipe_and_uses_exact_scopes(
     monkeypatch.setattr(factory.prepared, "inherited_drawing", inherited)
     controller = factory.RecipeTemplateFactory(factory.DrawingFactory.PREPARED)
     trial = {}
-    await controller.configure(adapter, module, trial, tmp_path)
+    selected = await controller.configure(adapter, module, trial, tmp_path)
     assert [kind for kind, _ in events] == ["create", "save_as", "create"]
     assert len(calls) == 2
     adapter.ownership.relocate_prepared_template_directory.assert_called_once()
-    assert module.new_project_drawing(adapter, property_view="Front", scale=(1, 2)) == (
+    assert selected(adapter, property_view="Front", scale=(1, 2)) == (
         "inherited",
         "sheet",
     )
@@ -144,9 +146,9 @@ async def test_setup_signature_drift_fails_without_native_factory(
 ):
     adapter, module, normal, _ = model_fixture(tmp_path, monkeypatch)
     controller = factory.RecipeTemplateFactory(factory.DrawingFactory.NORMAL)
-    await controller.configure(adapter, module, {}, tmp_path)
+    selected = await controller.configure(adapter, module, {}, tmp_path)
     with pytest.raises(ValueError, match="setup"):
-        module.new_project_drawing(adapter, **kwargs)
+        selected(adapter, **kwargs)
     normal.assert_not_called()
 
 
@@ -154,14 +156,14 @@ async def test_setup_signature_drift_fails_without_native_factory(
 async def test_wrong_adapter_missing_or_repeated_setup_rejected(tmp_path, monkeypatch):
     adapter, module, normal, _ = model_fixture(tmp_path, monkeypatch)
     controller = factory.RecipeTemplateFactory(factory.DrawingFactory.NORMAL)
-    await controller.configure(adapter, module, {}, tmp_path)
+    selected = await controller.configure(adapter, module, {}, tmp_path)
     with pytest.raises(RuntimeError, match="exactly one"):
         controller.require_used()
     with pytest.raises(RuntimeError, match="adapter"):
-        module.new_project_drawing(object(), scale=(1, 2))
-    module.new_project_drawing(adapter, scale=(1, 2))
+        selected(object(), scale=(1, 2))
+    selected(adapter, scale=(1, 2))
     with pytest.raises(RuntimeError, match="once"):
-        module.new_project_drawing(adapter, scale=(1, 2))
+        selected(adapter, scale=(1, 2))
     assert normal.call_count == 1
 
 
@@ -172,10 +174,10 @@ async def test_primary_setup_error_and_final_input_drift_are_both_visible(
     adapter, module, normal, _ = model_fixture(tmp_path, monkeypatch)
     controller = factory.RecipeTemplateFactory(factory.DrawingFactory.NORMAL)
     trial = {}
-    await controller.configure(adapter, module, trial, tmp_path)
+    selected = await controller.configure(adapter, module, trial, tmp_path)
     normal.side_effect = RuntimeError("native setup rejected")
     with pytest.raises(RuntimeError, match="native setup rejected"):
-        module.new_project_drawing(adapter, scale=(1, 2))
+        selected(adapter, scale=(1, 2))
     assert trial["template_factory"]["setup_seconds"] >= 0
     monkeypatch.setattr(
         factory.pilot, "adapter_fingerprints", lambda: {"adapter": "changed"}
@@ -326,6 +328,7 @@ async def test_full_pilot_keeps_source_and_cold_checks_for_each_selected_factory
             assert not adapter.drawn
             events.append("configure_before_open")
             row["template_factory"] = {"variant": variant.value, "setup_seconds": 0.01}
+            return Mock(name="explicit_factory")
 
         def require_used(self):
             events.append("recipe_complete")

@@ -14,6 +14,7 @@ import time
 
 import _drawing_common as common
 import _drawing_prepared_template as prepared
+from _drawing_build import normal_drawing_factory, prepared_drawing_factory
 import _telemetry
 from diagnostics import probe_datum_policy_recipes as pilot
 from diagnostics.probe_prepared_template_cache import (
@@ -49,9 +50,9 @@ class RecipeTemplateFactory:
         self.guards = {}
 
     async def configure(self, adapter, module, trial, directory):
-        if module.new_project_drawing is not common.new_project_drawing:
-            raise RuntimeError("isolated recipe must use the current project factory")
-        spec = prepared.TemplateSpec(tuple(module.SHEET_SCALE), 2)
+        spec = module.TEMPLATE_SPEC
+        if not isinstance(spec, prepared.TemplateSpec):
+            raise RuntimeError("isolated recipe requires an explicit TemplateSpec")
         if self.initial is None:
             self.initial = {
                 "helpers": pilot.helper_fingerprints(),
@@ -72,7 +73,12 @@ class RecipeTemplateFactory:
         entry = None
         if self.variant is DrawingFactory.PREPARED:
             entry = await self._prepare(adapter, spec, Path(directory) / "cache", row)
-        original_factory = module.new_project_drawing
+        factory = (
+            normal_drawing_factory(adapter, spec)
+            if entry is None
+            else prepared_drawing_factory(adapter, entry)
+        )
+        self.factory = factory
 
         def drawing_factory(actual_adapter, **kwargs):
             if actual_adapter is not adapter:
@@ -94,15 +100,11 @@ class RecipeTemplateFactory:
                 with _telemetry.span(
                     "diagnostic.recipe_template.setup", variant=self.variant.value
                 ):
-                    if entry is None:
-                        return original_factory(actual_adapter, **kwargs)
-                    # Current new_project_drawing deliberately ignores property_view;
-                    # the unchanged finalizer links the actual model view later.
-                    return prepared.inherited_drawing(actual_adapter, entry)
+                    return factory(actual_adapter, **kwargs)
             finally:
                 row["setup_seconds"] = time.perf_counter() - started
 
-        module.new_project_drawing = drawing_factory
+        return drawing_factory
 
     async def _prepare(self, adapter, spec, cache_root, row):
         pending = set()
@@ -182,6 +184,7 @@ class RecipeTemplateFactory:
     def require_used(self):
         if self.row is None or self.row["setup_calls"] != 1:
             raise RuntimeError("full recipe must execute exactly one selected factory")
+        self.factory.require_used()
 
     def final_guards(self):
         """Read-only final guards also run after native recipe/title failure."""

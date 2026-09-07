@@ -11,6 +11,9 @@ This runner supports trusted repository recipes using the OUTPUTS contract.
 It redirects outputs before evaluating defaults and aliases, rejects direct
 save/write calls, and checks produced artifacts. It is not a Python sandbox.
 Assembly drawings require a dependency snapshot and are not supported here.
+Recipes must use the current explicit drawing_factory keyword and TEMPLATE_SPEC
+contract. Pre-migration revisions require their matching historical tooling;
+this runner does not silently adapt or fall back to the old recipe ABI.
 """
 
 from __future__ import annotations
@@ -18,6 +21,7 @@ from __future__ import annotations
 import argparse
 import ast
 import json
+import inspect
 import os
 from pathlib import Path
 import subprocess
@@ -35,6 +39,7 @@ from _common import _early_bound  # noqa: E402
 from diagnostics._owned_native_documents import DocumentKind, run_copy_diagnostic  # noqa: E402
 from diagnostics._owned_native_session import require_owned_diagnostic_environment  # noqa: E402
 from _drawing_common import DrawingOutputs  # noqa: E402
+from _drawing_build import TemplateSpec, normal_drawing_factory  # noqa: E402
 from _drawing_registry import DRAWINGS_BY_NAME  # noqa: E402
 from diagnostics.probe_drawing_attachments import file_digest  # noqa: E402
 
@@ -187,6 +192,18 @@ def load_recipe(commit, target, directory, *, source=None):
         module._benchmark_paths["SOURCE"] = source
     sys.modules[module.__name__] = module
     exec(compile(tree, str(source_path), "exec"), module.__dict__)
+    factory_parameter = inspect.signature(module.build).parameters.get(
+        "drawing_factory"
+    )
+    if (
+        factory_parameter is None
+        or factory_parameter.kind is not inspect.Parameter.KEYWORD_ONLY
+        or factory_parameter.default is not inspect.Parameter.empty
+        or not isinstance(getattr(module, "TEMPLATE_SPEC", None), TemplateSpec)
+    ):
+        raise ValueError(
+            "recipe requires the current explicit drawing_factory/TEMPLATE_SPEC contract; use matching historical tooling for old revisions"
+        )
     if module.OUTPUTS != outputs:
         raise RuntimeError("recipe rebound OUTPUTS after its redirected declaration")
     if source is not None and module.SOURCE != source:
@@ -312,6 +329,7 @@ async def benchmark(adapter, targets, baseline, candidate, output_root):
                         recipe_sha256=file_digest(directory / "recipe-source.py"),
                     )
                     await adapter.close_owned_documents()
+                    factory = normal_drawing_factory(adapter, module.TEMPLATE_SPEC)
                     started = time.perf_counter()
                     with _telemetry.span(
                         "drawing.recipe_benchmark",
@@ -322,7 +340,9 @@ async def benchmark(adapter, targets, baseline, candidate, output_root):
                         with adapter.ownership.creating_document(
                             DocumentKind.DRAWING, module.OUTPUTS.slddrw
                         ):
-                            artifacts = await module.build(adapter)
+                            artifacts = await module.build(
+                                adapter, drawing_factory=factory
+                            )
                     trial["seconds"] = round(time.perf_counter() - started, 6)
                     started = None
                     trial["artifacts"] = validate_artifacts(artifacts, module.OUTPUTS)

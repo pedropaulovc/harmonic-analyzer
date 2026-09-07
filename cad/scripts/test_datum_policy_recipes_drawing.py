@@ -351,13 +351,22 @@ def test_parent_requires_no_autostart_before_any_native_parent_wrapper(
         probe.main(["--source-root", str(tmp_path), "--guard-root", str(tmp_path)])
 
 
-def test_real_candidate_recipes_have_pre_execution_source_and_output_contract(tmp_path):
+def test_real_candidate_recipes_have_pre_execution_source_and_output_contract(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(
+        probe.benchmark,
+        "recipe_source",
+        lambda _, target: (probe.ROOT / f"cad/scripts/draw_{target}.py").read_text(),
+    )
     for target in probe.ORDER:
         source = tmp_path / f"{target}.SLDPRT"
         source.write_bytes(b"input only; never COM")
         trial = tmp_path / target
         trial.mkdir()
-        module = probe.benchmark.load_recipe("2802e92a", target, trial, source=source)
+        module = probe.benchmark.load_recipe(
+            "working-tree", target, trial, source=source
+        )
         assert module.SOURCE == source
         assert module.OUTPUTS.slddrw.parent == trial
         if target == "channel_lever":

@@ -17,7 +17,8 @@ from typing import Any
 from cylinder_gear_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, _early_bound, check
+from _drawing_build import ProjectDrawingFactory, TemplateSpec, run_drawing_build
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
@@ -26,7 +27,6 @@ from _drawing_common import (
     add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
-    new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
     set_dimension_precision,
@@ -59,6 +59,7 @@ PNG = OUTPUTS.png
 # gear-data and manufacturing-notes blocks. The gear axis is Z, so *Front shows
 # the toothed face and *Right the disc thickness (face 3 + cam) edge-on.
 SHEET_SCALE = (1.0, 1.0)
+TEMPLATE_SPEC = TemplateSpec(scale=SHEET_SCALE, decimals=2)
 VIEW_SCALE = (1, 1)
 FRONT_CENTER = (0.225, 0.175)
 RIGHT_CENTER = (0.300, 0.175)
@@ -101,7 +102,9 @@ def _largest_visible_planar_face(adapter: Any, view: Any) -> Any:
     return max(candidates, key=lambda item: item[0])[1]
 
 
-async def build(adapter: Any) -> dict[str, str]:
+async def build(
+    adapter: Any, *, drawing_factory: ProjectDrawingFactory
+) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
@@ -127,7 +130,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Manufacturing Notes",
         ),
     )
-    drawing_model, _sheet = new_project_drawing(
+    drawing_model, _sheet = drawing_factory(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE
     )
     stamp_drawing_summary(
@@ -231,4 +234,4 @@ def _parse_args() -> argparse.Namespace:
 if __name__ == "__main__":
     _parse_args()
     _telemetry.set_service("drawing-export")
-    sys.exit(run_build(build))
+    sys.exit(run_drawing_build(build, spec=TEMPLATE_SPEC))

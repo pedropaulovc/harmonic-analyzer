@@ -38,7 +38,8 @@ from _drawing_native_layout import repair_native_layout, NativeLayoutStatus
 from _drawing_view_packing import Rect
 from _drawing_marks import _named_dimension
 from channel_lever_spec import SOURCE_BASIC_DIMENSIONS
-from draw_channel_lever import build as build_lever
+from draw_channel_lever import TEMPLATE_SPEC, build as build_lever
+from _drawing_build import normal_drawing_factory
 from probe_drawing_right_gtol_column import probe as probe_column
 from diagnostics.probe_source_basic_dimensions import drawing_dimensions
 import _telemetry
@@ -144,7 +145,11 @@ async def probe(adapter, source: Path, original_drawing: Path):
         report["source_basic_before"] = source_basic(adapter, source)
         with adapter.ownership.creating_document(DocumentKind.DRAWING, outputs.slddrw):
             await build_lever(
-                adapter, source=source, outputs=outputs, layout=diagnostic_layout
+                adapter,
+                drawing_factory=normal_drawing_factory(adapter, TEMPLATE_SPEC),
+                source=source,
+                outputs=outputs,
+                layout=diagnostic_layout,
             )
         if Path(adapter.currentModel.GetPathName()).resolve() != outputs.slddrw:
             raise RuntimeError("real recipe did not save the unique diagnostic drawing")

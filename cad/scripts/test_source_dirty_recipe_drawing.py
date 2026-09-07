@@ -199,7 +199,7 @@ def test_real_owned_copy_cleanup_preserves_baseline_and_never_saves(
     monkeypatch.setattr(probe, "dimension_snapshot", snapshot)
     touched = []
 
-    def blank(adapter):
+    def blank(adapter, **kwargs):
         drawing = Model(None, title="Owned new drawing", dirty=True)
         native.app.documents.append(drawing)
         native.app.ActiveDoc = drawing
@@ -222,12 +222,14 @@ def test_real_owned_copy_cleanup_preserves_baseline_and_never_saves(
     monkeypatch.setattr(common, "set_dimension_callouts", callouts)
     monkeypatch.setattr(common, "read_required_properties", place)
     code = """from pathlib import Path
-from _drawing_common import new_project_drawing, read_required_properties, set_dimension_callouts, finalize_drawing
+from _drawing_build import TemplateSpec
+from _drawing_common import read_required_properties, set_dimension_callouts, finalize_drawing
+TEMPLATE_SPEC = TemplateSpec()
 SOURCE = Path("incorrect original; redirected before execution")
 OUTPUTS = None
-async def build(adapter):
+async def build(adapter, *, drawing_factory):
     await adapter.open_model(str(SOURCE))
-    new_project_drawing(adapter)
+    drawing_factory(adapter)
     read_required_properties(adapter, str(SOURCE))
     set_dimension_callouts(adapter, str(SOURCE))
     return await finalize_drawing(adapter, OUTPUTS)

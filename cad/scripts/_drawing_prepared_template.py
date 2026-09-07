@@ -1,9 +1,9 @@
-"""Opt-in, content-addressed project DRWDOT materialization.
+"""Content-addressed project DRWDOT materialization for drawing builds.
 
 Call ``await prepare_project_drawing_template`` under the existing COM seat before
 entering a recipe's drawing-creation scope. Construction only consumes a validated
 entry; a missing/corrupt entry never falls back to another template or setup path.
-No production recipe opts in until full-sheet native acceptance is complete.
+The drawing-only runner materializes before the recipe opens its source.
 """
 
 from contextlib import nullcontext
