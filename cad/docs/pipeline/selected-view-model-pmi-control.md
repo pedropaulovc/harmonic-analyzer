@@ -1,7 +1,7 @@
 # Selected-view native PMI control
 
-Implemented and offline-tested; **native import and drawing acceptance remain
-unproved by this control**. The earlier all-view control imported real plain model datums/FCFs quickly,
+Implemented and native-tested; **selected-view GTol import works for this source,
+but complete drawing acceptance fails**. The earlier all-view control imported real plain model datums/FCFs quickly,
 with correct face attachments, but duplicated them across views and left
 overlapping native positions. This is one selection-scope delta, not a rollout or
 a claim that native import can already replace every drawing recipe.
@@ -93,3 +93,37 @@ or recovery restart was used. The recovery command and output are retained in
 `cad/out/logs/selected-view-pmi-rf8wvvaq-recovery.log`; final native inventory was
 empty and all three hashes remained unchanged. The old all-view control is
 unchanged; historical import evidence does not prove its current lifecycle.
+
+## Scope-corrected native result
+
+At root `a0d156b9`, adapter `e77bfda4`, PID 31860, exact selection succeeded
+before each import: count 1, type 12, and native view identity 1.
+
+| Import | Returned | Native call time |
+| --- | ---: | ---: |
+| GTols into Front | 2 | 0.026473200 s |
+| Datum into Front | 0 | 0.004490300 s |
+
+The two returned GTols bijectively matched the new view annotation inventory.
+Both had the intended source-face identity, typed frame content, correct native
+view owner and no dangling attachment. They were not duplicated into other
+views. Datum A was missing, so coverage already failed. The retained initial
+PNG was inspected: the two frames overlap each other on the part. Fast insertion
+is not readable manufacturing output.
+
+The initial native save/PDF export also introduced a type-13 center mark,
+`Drawing View2/DetailItem1`, absent from the before-save inventory. The unchanged
+full-annotation inventory gate stopped there. Cold reopen was not reached, and
+the added center mark has not been exempted from preservation checks.
+
+Receipt: `cad/out/reports/selected-view-pmi-4jskgzkm/observations.json`, SHA-256
+`55db6b3f8cf4f6b8ed144cf300cc154027e312d5da9158ee2345b6c623d55b0a`.
+Total diagnostic time was 29.554629 s, not a production recipe timing. Original,
+copied-part, configured-template, helper and actual-adapter guards passed.
+Cleanup closed only the owned drawing/copy and restored the empty baseline.
+
+This rejects this exact Front-only, unchanged-position candidate as a complete
+replacement. Datum import into another native orientation, source annotation
+view choices, and native arrangement are untested deltas, not unavailable APIs.
+The coordinate-removal work can independently use existing exact model entities
+while preserving the shared typed PMI content.
