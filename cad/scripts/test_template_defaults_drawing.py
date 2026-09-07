@@ -249,26 +249,13 @@ def test_missing_candidate_template_never_falls_back_to_seat_default(tmp_path):
         )
 
 
-def test_setup_injection_is_module_local_and_preserves_arguments():
-    def original(*args, **kwargs):
-        return "draw", "sheet"
+def test_setup_is_passed_explicitly_without_recipe_global_replacement():
+    import inspect
 
-    def replacement(*args, **kwargs):
-        return "candidate", "sheet"
-
-    module = SimpleNamespace(new_project_drawing=original)
-    with probe.replaced_setup(module, replacement):
-        assert module.new_project_drawing is replacement
-    assert module.new_project_drawing is original
-
-
-def test_setup_injection_restores_on_error():
-    original = object()
-    module = SimpleNamespace(new_project_drawing=original)
-    with pytest.raises(RuntimeError):
-        with probe.replaced_setup(module, object()):
-            raise RuntimeError("recipe failed")
-    assert module.new_project_drawing is original
+    source = inspect.getsource(probe.run_trial)
+    assert "module.build(adapter, drawing_factory=setup)" in source
+    assert "module.new_project_drawing =" not in source
+    assert not hasattr(probe, "replaced_setup")
 
 
 def test_setup_contract_rejects_unexpected_runtime_variant():
@@ -360,7 +347,14 @@ def test_immutable_hash_is_pinned_before_replacement(tmp_path):
     )
 
 
-def test_actual_two_recipes_redirect_before_evaluating_output_aliases(tmp_path):
+def test_actual_two_recipes_redirect_before_evaluating_output_aliases(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(
+        probe.recipes,
+        "recipe_source",
+        lambda _, target: (probe.ROOT / f"cad/scripts/draw_{target}.py").read_text(),
+    )
     specs = []
     commit = probe.recipes.revision("HEAD")
     for target in probe.TARGETS:
@@ -1105,8 +1099,8 @@ def test_trial_claims_creation_then_scopes_exact_save_and_restores_hooks(
         assert kwargs == {"scale": (2, 1)}
         return model, object()
 
-    async def build(current):
-        module.new_project_drawing(current, scale=(2, 1))
+    async def build(current, *, drawing_factory):
+        drawing_factory(current, scale=(2, 1))
         return await module.finalize_drawing(current, outputs)
 
     module.new_project_drawing, module.build = setup, build

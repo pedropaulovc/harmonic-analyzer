@@ -841,8 +841,8 @@ async def test_pilot_explicit_layout_binding_retains_source_and_cold_gates(
     monkeypatch.setattr(pilot, "helper_fingerprints", lambda: {"helper": "same"})
     monkeypatch.setattr(pilot, "adapter_fingerprints", lambda: {"adapter": "same"})
     source = recipe(Path("unused.SLDPRT")).replace(
-        "async def build(adapter):",
-        "async def build(adapter, *, layout):\n    layout(adapter)",
+        "async def build(adapter, *, drawing_factory):",
+        "async def build(adapter, *, drawing_factory, layout):\n    layout(adapter)",
     )
     monkeypatch.setattr(pilot.benchmark, "recipe_source", lambda *_: source)
     source_handle = object()

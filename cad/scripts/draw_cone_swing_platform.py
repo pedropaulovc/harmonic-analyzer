@@ -22,14 +22,14 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, _early_bound, check
+from _drawing_build import ProjectDrawingFactory, TemplateSpec, run_drawing_build
 from _drawing_common import (
     DrawingOutputs,
     add_native_hole_callout,
     add_property_linked_note,
     curate_view_dimensions,
     finalize_drawing,
-    new_project_drawing,
     read_required_properties,
     set_hidden_lines_removed,
     stamp_drawing_summary,
@@ -60,6 +60,7 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 3.0)   # 1:2 plan keeps the 266 mm envelope in-zone
+TEMPLATE_SPEC = TemplateSpec(scale=SHEET_SCALE, decimals=2)
 
 # Sheet layout (meters).  The 1:2 plan is the main definition view; the
 # isometric and an end view occupy the open right-hand field.
@@ -191,7 +192,9 @@ def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any]:
     return pivot_edges[0], mount_edges[0]
 
 
-async def build(adapter: Any) -> dict[str, str]:
+async def build(
+    adapter: Any, *, drawing_factory: ProjectDrawingFactory
+) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
@@ -221,7 +224,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "End View Note",
         ),
     )
-    drawing_model, _sheet = new_project_drawing(
+    drawing_model, _sheet = drawing_factory(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE
     )
     stamp_drawing_summary(
@@ -300,4 +303,4 @@ def _parse_args() -> argparse.Namespace:
 if __name__ == "__main__":
     _parse_args()
     _telemetry.set_service("drawing-export")
-    sys.exit(run_build(build))
+    sys.exit(run_drawing_build(build, spec=TEMPLATE_SPEC))

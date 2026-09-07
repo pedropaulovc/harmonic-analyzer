@@ -635,8 +635,13 @@ async def pilot(
                 }
             failure_output = module.OUTPUTS.slddrw
             await adapter.close_owned_documents()
+            from _drawing_build import normal_drawing_factory
+
+            drawing_factory = normal_drawing_factory(adapter, module.TEMPLATE_SPEC)
             if setup_controller is not None:
-                await setup_controller.configure(adapter, module, trial, trial_dir)
+                drawing_factory = await setup_controller.configure(
+                    adapter, module, trial, trial_dir
+                )
             check(
                 "open exact owned source copy",
                 await adapter.open_model(str(copy_source)),
@@ -653,15 +658,17 @@ async def pilot(
             trial["recipe_sha256"] = attachments.file_digest(
                 trial_dir / "recipe-source.py"
             )
-            build_kwargs = {}
+            build_kwargs = {"drawing_factory": drawing_factory}
             if linear_control is not None:
-                build_kwargs = linear_control.bind(
-                    adapter,
-                    module,
-                    trial,
-                    checkpoint,
-                    lambda: source_dimensions(source_model, target, copy_source),
-                    source_model,
+                build_kwargs.update(
+                    linear_control.bind(
+                        adapter,
+                        module,
+                        trial,
+                        checkpoint,
+                        lambda: source_dimensions(source_model, target, copy_source),
+                        source_model,
+                    )
                 )
             started = time.perf_counter()
             try:
@@ -682,7 +689,9 @@ async def pilot(
             finally:
                 trial["recipe_seconds"] = time.perf_counter() - started
                 if entity_acceptance is not None:
-                    trial["entity_context_observations"] = entity_acceptance.context_report
+                    trial["entity_context_observations"] = (
+                        entity_acceptance.context_report
+                    )
                 checkpoint()
             trial["artifacts"] = benchmark.validate_artifacts(artifacts, module.OUTPUTS)
             require_copy_hash(trial, "after_recipe")
