@@ -66,9 +66,9 @@ Reproducer in the code checkout:
 `84fcbf2e89b5b5efba4761ee082363295657af6c3b968aab049bb58d1e3c439e`.
 Run with `uv run python` while the native checkout still holds the pinned main
 sources. The post-fix `extraction-audit.json` receipt is
-`d2b86542dcfc75d2b216f350a806f98a56c2ecc866949b1670da0ac89342c9c2`;
+`ec09e2d29351d47cc2e3121a2d29b89be7739fdf5578f369e73f2a73b61c2e2c`;
 earlier receipts are retained as `extraction-audit-076e936f.json` and
-`extraction-audit-e7d2d5f3.json`.
+`extraction-audit-e7d2d5f3.json` and `extraction-audit-d887117a.json`.
 
 The attach-only, seat-locked inventory found PID 18748, revision 34.3.0, and
 only the two clean documents from our completed #685 run. Those exact documents
@@ -144,3 +144,27 @@ Both original CLI cache entries were moved into this run's evidence directory,
 after verified complete copies were retained, so subsequent review requests can
 cover full PR diffs. No authentication, billing or other experiment cache changed.
 Clean reviews of the corrected parent and rebased child remain pending.
+
+The next parent review reproduced same-line batch appends being dropped. A
+bounded runtime audit then reproduced loop-carried scalar, keyed and list sources,
+plus different key expressions that can address the same dictionary field.
+Fail-first runs recorded six and nine failures, respectively, with sixteen
+passing controls. Fix `56601349` shares lexical/global/prior-iteration ordering
+and rejects potentially aliasing key expressions unless literal keys are provably
+distinct. This is conservative source discovery, not general Python execution.
+The native baseline and all assembly helper bodies remain unchanged.
+
+All 126 parent graph tests passed (14.28 s). After child rebase, the full offline
+run passed 1155 recipe tests (87.58 s), 128 graph tests (14.31 s) and four isolation
+tests (9.31 s), with the cache gate current. Log
+`offline-gates-loop-order-fixed.log` has SHA-256
+`1cb0c235e8e7bada1488c5a2bf426b0ddf64725c863cd52d95a56a4e437425ed`.
+The actual-parser/source-contract audit retained the same graph, 82 definition
+ASTs, 13 import-only callers and 108 leaf-key invariants.
+
+Complete parent review caches and their actual diff/source verification receipts
+are retained for `d25cceb7` and `34ef4e83`. A second full child review at `aa89a0f4`
+found nothing; its 23-file content-verification receipt has SHA-256
+`ea223d04ae8eb5a53d155e49dc1ae7afb430034d384ed7a45a11d354070430ed`.
+Reviews against the latest parent `56601349` remain pending after another CLI
+rate limit. No old review is relabeled as coverage of the new code.
