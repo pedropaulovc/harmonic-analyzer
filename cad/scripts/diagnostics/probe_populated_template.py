@@ -10,6 +10,7 @@ acceptance fail, including existing footer/material/finish defects.
 from __future__ import annotations
 
 import argparse
+from copy import deepcopy
 import json
 import os
 from pathlib import Path
@@ -68,6 +69,50 @@ def preferences(adapter):
             "sheet_mode": "edit_sheet" if ddoc.GetEditSheet() else "edit_template",
         }
     )
+
+
+def require_linked_preferences(blank, current):
+    """finalize_drawing explicitly changes only the sheet property-source mode."""
+    expected = {key: deepcopy(blank[key]) for key in current}
+    properties = expected.get("sheet_properties", [])
+    if len(properties) != 8 or properties[7] != 1:
+        raise RuntimeError(
+            "blank template must use the documented inherited property-source mode"
+        )
+    properties[7] = 0
+    if current != expected:
+        raise RuntimeError(
+            "populated defaults differ from the exact explicit-source phase contract"
+        )
+    return {
+        "field": "ISheet.GetProperties2.sameCustomProp",
+        "before": 1,
+        "after": 0,
+        "operation": "finalize_drawing: SetProperties2(..., False)",
+    }
+
+
+def property_source(adapter, source, source_path, configuration):
+    """Witness the actual explicit source; no name-only ownership acceptance."""
+    drawing = layout.cells.required(adapter.currentModel, "IDrawingDoc")
+    sheet = layout.cells.required(drawing.GetCurrentSheet(), "ISheet")
+    views = tuple(common.iter_views(adapter))
+    if len(views) != 1:
+        raise RuntimeError("minimal populated control requires one exact model view")
+    view = layout.cells.required(views[0], "IView")
+    name = str(view.GetName2())
+    if not name or str(sheet.CustomPropertyView) != name:
+        raise RuntimeError("sheet properties do not reference the exact model view")
+    if int(adapter.swApp.IsSame(view.ReferencedDocument, source)) != 1:
+        raise RuntimeError("sheet property view references a foreign native source")
+    if str(view.ReferencedConfiguration) != configuration:
+        raise RuntimeError("sheet property view references a different configuration")
+    return {
+        "view": name,
+        "source": str(source_path),
+        "configuration": configuration,
+        "identity": "exact_native_source",
+    }
 
 
 class PopulatedControl:
@@ -148,6 +193,9 @@ class PopulatedControl:
             "template_geometry": geometry,
             "preferences": preferences(adapter),
             "expected_link_values": expected,
+            "property_source": property_source(
+                adapter, source, source_path, trial["source_before"]["configuration"]
+            ),
         }
         trial.setdefault("linked_fields", {})[phase] = row
         self.checkpoint()
@@ -181,12 +229,16 @@ class PopulatedControl:
                     {"field": link, "kind": "baked_format", "error": str(error)}
                 )
         initial = self.setup["normalized_blank_defaults"]
-        if row["preferences"] != {key: initial[key] for key in row["preferences"]}:
+        try:
+            row["preference_transition"] = require_linked_preferences(
+                initial, row["preferences"]
+            )
+        except RuntimeError as error:
             issues.append(
                 {
                     "field": "defaults",
                     "kind": "normal_setup_changed",
-                    "error": "units/style/scale/sheet properties changed",
+                    "error": str(error),
                 }
             )
         if phase == "cold":
@@ -199,6 +251,7 @@ class PopulatedControl:
                     "template_geometry",
                     "preferences",
                     "expected_link_values",
+                    "property_source",
                 )
             }
             new = {key: row[key] for key in old}
