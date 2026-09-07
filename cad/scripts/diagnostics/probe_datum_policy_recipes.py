@@ -68,6 +68,7 @@ from diagnostics._reopen_annotation_comparison import compare_reopened_annotatio
 from diagnostics._recipe_acceptance_targets import TARGETS  # noqa: E402
 from diagnostics._recipe_entity_acceptance import EntityAcceptance  # noqa: E402
 from diagnostics._recipe_view_entity_acceptance import ViewEntityAcceptance  # noqa: E402
+from diagnostics import _slotted_screw_layout_witness as slotted_layout  # noqa: E402
 from diagnostics._bsurface_attachment_witness import grid_control_from_environment  # noqa: E402
 from diagnostics._tooth_selector_observation import (  # noqa: E402
     observation_from_environment, observe_selector,
@@ -90,6 +91,15 @@ def target_order(targets=None):
         raise ValueError("select a nonempty order from the registered pilot recipes")
     if len(set(order)) != len(order):
         raise ValueError("each selected recipe may run only once per invocation")
+    return order
+
+
+def _layout_order(mode, targets):
+    if mode is slotted_layout.LayoutObservation.CAPTURE_ONLY:
+        slotted_layout.require_selection(mode, targets or ORDER, TARGETS)
+        return tuple(targets)
+    order = target_order(targets)
+    slotted_layout.require_selection(mode, order, TARGETS)
     return order
 
 
@@ -238,6 +248,38 @@ def _drawing_witness(adapter, *, source, configuration, model_dimensions=None):
         "layout": attachments.layout(adapter.currentModel),
         **coverage,
     }, handles
+
+
+def _slotted_drawing_witness(
+    adapter, *, phase, trial, outputs, checkpoint, source, configuration,
+    model_dimensions,
+):
+    """Opt-in observations outside recipe timing; default captures are unchanged."""
+    bank, handles = _drawing_witness(
+        adapter, source=source, configuration=configuration,
+        model_dimensions=model_dimensions,
+    )
+    record = trial.setdefault("slotted_layout", {})
+    row = slotted_layout.capture(
+        adapter, phase=phase, bank=bank, handles=handles, source=source,
+        outputs=outputs, record=record, checkpoint=checkpoint,
+    )
+    if phase is slotted_layout.CapturePhase.REOPENED:
+        after, after_handles = _drawing_witness(
+            adapter, source=source, configuration=configuration,
+            model_dimensions=model_dimensions,
+        )
+        row["post_export_drawing"] = after
+        checkpoint()
+        compare_drawing(adapter.swApp, bank, after)
+        if bank != after:
+            raise RuntimeError("slotted PDF export changed the exact complete drawing bank")
+        shoulder.compare_all_annotation_layout(
+            adapter.swApp, bank["annotations"], after["annotations"],
+            handles, after_handles,
+        )
+        row["post_export_identity"] = "exact"
+    return bank
 
 
 class DrawingSemanticCoverageError(RuntimeError):
@@ -681,10 +723,21 @@ async def pilot(
     drawing_save=None,
     callout_storage=None,
     source_callout_authoring=None,
+    layout_observation=None,
 ):
     grid_control = grid_control_from_environment()
     tooth_observation = observation_from_environment()
-    order = target_order(targets)
+    order = _layout_order(layout_observation, targets)
+    if layout_observation is slotted_layout.LayoutObservation.CAPTURE_ONLY:
+        if any(value is not None for value in (
+            linear_control, source_observation, drawing_save, callout_storage,
+            source_callout_authoring,
+        )) or setup_controller is None:
+            raise ValueError("slotted capture-only requires only its prepared factory")
+        return await slotted_layout.capture_only(
+            adapter, candidate, source_root, guard_root, output_root,
+            setup_controller=setup_controller,
+        )
     require_tooth_targets(tooth_observation, order)
     from diagnostics._source_save_boundaries import (
         require_targets as require_source_targets,
@@ -730,6 +783,7 @@ async def pilot(
         "order": order,
         "protected_targets": protected_targets,
         "factory": setup_controller.variant.value if setup_controller else "normal",
+        **({"layout_observation": layout_observation.value} if layout_observation is not None else {}),
         "bsurf_grid_control": grid_control.value,
         "tooth_selector_observation": tooth_observation.value,
         "trials": [],
@@ -977,11 +1031,20 @@ async def pilot(
             with _telemetry.span(
                 "diagnostic.datum_policy.drawing_witness", target=target, phase="built"
             ):
-                trial["built"] = drawing_witness(
+                reader = drawing_witness
+                observation_kwargs = {}
+                if layout_observation is not None:
+                    reader = _slotted_drawing_witness
+                    observation_kwargs = {
+                        "phase": slotted_layout.CapturePhase.BUILT,
+                        "trial": trial, "outputs": module.OUTPUTS, "checkpoint": checkpoint,
+                    }
+                trial["built"] = reader(
                     adapter,
                     source=copy_source,
                     configuration=trial["source_before"]["configuration"],
                     **witness_kwargs,
+                    **observation_kwargs,
                 )
             trial["source_after"], after_handles = source_dimensions(
                 source_model, target, copy_source
@@ -1029,11 +1092,14 @@ async def pilot(
                 target=target,
                 phase="reopened",
             ):
-                trial["reopened"] = drawing_witness(
+                if layout_observation is not None:
+                    observation_kwargs["phase"] = slotted_layout.CapturePhase.REOPENED
+                trial["reopened"] = reader(
                     adapter,
                     source=copy_source,
                     configuration=trial["source_before"]["configuration"],
                     **witness_kwargs,
+                    **observation_kwargs,
                 )
             if callout_control is not None:
                 cold_source = adapter.swApp.GetOpenDocumentByName(str(copy_source))
@@ -1101,6 +1167,8 @@ async def pilot(
                     raise RuntimeError(
                         "cold reopen changed explicit annotation role/geometry/view"
                     )
+            if layout_observation is not None:
+                slotted_layout.compare_cold(layout_observation, trial["slotted_layout"])
             benchmark.check_fingerprints(
                 report["helpers"],
                 helper_fingerprints(),
@@ -1257,6 +1325,11 @@ def main(argv=None):
     parser.add_argument("--report-root", type=Path, default=ROOT / "cad/out/reports")
     parser.add_argument("--candidate", default="HEAD")
     parser.add_argument(
+        "--layout-observation", type=slotted_layout.LayoutObservation,
+        choices=tuple(slotted_layout.LayoutObservation),
+        help="slotted-only border/full-page print witness; requires explicit native source enrollment",
+    )
+    parser.add_argument(
         "--factory",
         type=DrawingFactory,
         choices=tuple(DrawingFactory),
@@ -1265,7 +1338,7 @@ def main(argv=None):
     parser.add_argument(
         "--target",
         action="append",
-        choices=tuple(EXPECTED_PART_HASHES),
+        choices=tuple(dict.fromkeys((*EXPECTED_PART_HASHES, "slotted_screw"))),
         help="repeat to choose recipe order; default: rocker_arm then channel_lever",
     )
     parser.add_argument("--worker", action="store_true")
@@ -1299,7 +1372,13 @@ def main(argv=None):
         help="diagnostic only: exact channel_lever linear pairs before original layout",
     )
     args = parser.parse_args(argv)
-    order = target_order(args.target)
+    order = _layout_order(args.layout_observation, args.target)
+    if args.layout_observation is slotted_layout.LayoutObservation.CAPTURE_ONLY:
+        if args.factory is not DrawingFactory.PREPARED or any(value is not None for value in (
+            args.linear_dimensions, args.source_observation, args.drawing_save,
+            args.callout_storage, args.source_callout_authoring,
+        )):
+            raise ValueError("slotted capture-only requires only its prepared factory")
     require_tooth_targets(tooth_observation, order)
     require_source_targets(args.source_observation, order)
     require_drawing_save(args.drawing_save, args.source_observation, order)
@@ -1315,6 +1394,8 @@ def main(argv=None):
     if args.factory is not None:
         require_factory_environment()
     candidate = benchmark.revision(args.candidate)
+    if args.layout_observation is slotted_layout.LayoutObservation.CAPTURE_ONLY and candidate != slotted_layout.PRODUCER_REVISION:
+        raise ValueError("slotted capture-only requires the exact producer revision")
     selected_callout_contract(
         candidate,
         args.source_observation,
@@ -1340,6 +1421,8 @@ def main(argv=None):
                 str(args.report_root.resolve()),
                 "--candidate",
                 candidate,
+                *(["--layout-observation", args.layout_observation.value]
+                  if args.layout_observation is not None else []),
                 *(
                     ["--factory", args.factory.value]
                     if args.factory is not None
@@ -1385,6 +1468,8 @@ def main(argv=None):
             guard_root,
             args.report_root.resolve(),
             targets=order,
+            **({"layout_observation": args.layout_observation}
+               if args.layout_observation is not None else {}),
             **(
                 {"source_callout_authoring": args.source_callout_authoring}
                 if args.source_callout_authoring is not None else {}
