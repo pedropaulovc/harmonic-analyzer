@@ -62,6 +62,58 @@ def test_same_entity_but_substituted_equal_surface_face_rejected():
         witness.require_same(app, view, entity, entity, label="finish", evidence={})
 
 
+def test_rejected_identity_records_self_and_face_positive_controls():
+    app, view, entity, *_ = fixture()
+    substitute = NS(**vars(entity))
+    evidence = {}
+    with pytest.raises(RuntimeError, match="silhouette entity.*returned 0"):
+        witness.require_same(
+            app, view, entity, substitute, label="finish", evidence=evidence
+        )
+    assert evidence["identity_controls"] == {
+        "expected_self": {"result": 1},
+        "actual_self": {"result": 1},
+        "reverse_pair": {"result": 0},
+        "expected_face_self": {"result": 1},
+        "actual_face_self": {"result": 1},
+        "face_pair": {"result": 1},
+    }
+
+
+def test_self_identity_rejection_is_evidence_not_acceptance():
+    app, view, entity, *_ = fixture()
+    app.IsSame = lambda left, right: 1 if left is view and right is view else 0
+    evidence = {}
+    with pytest.raises(RuntimeError, match="silhouette entity.*returned 0"):
+        witness.require_same(
+            app, view, entity, entity, label="finish", evidence=evidence
+        )
+    assert all(row == {"result": 0} for row in evidence["identity_controls"].values())
+
+
+def test_control_capture_error_never_replaces_original_identity_failure():
+    app, view, entity, face, *_ = fixture()
+    substitute = NS(**vars(entity))
+
+    def is_same(left, right):
+        if left is entity and right is substitute:
+            return 0
+        if left is view and right is view:
+            return 1
+        if left is face and right is face:
+            return 1
+        raise RuntimeError("native control read failed")
+
+    app.IsSame = is_same
+    evidence = {}
+    with pytest.raises(RuntimeError, match="silhouette entity.*returned 0"):
+        witness.require_same(
+            app, view, entity, substitute, label="finish", evidence=evidence
+        )
+    assert "native control read failed" in evidence["identity_controls"]["expected_self"]["error"]
+    assert evidence["identity_controls"]["face_pair"] == {"result": 1}
+
+
 def test_wrong_view_rejected():
     app, _, entity, *_ = fixture()
     with pytest.raises(RuntimeError, match="owning view"):

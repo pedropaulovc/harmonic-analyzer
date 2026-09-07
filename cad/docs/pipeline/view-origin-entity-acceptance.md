@@ -116,3 +116,36 @@ identity banks, null fresh resolution, original-face substitution under the
 same silhouette handle, source-save/title failures, actual manager substitution
 despite a correct legacy helper return, and wrapper restoration. The unchanged
 MODEL helper has no diff in this slice. Ruff and `git diff --check` pass.
+
+## First crankshaft and spring-hook native controls
+
+Both controls used `56223c49`, merged adapter `25bc99b1`, licensed PID 31860
+and the prepared factory, with source/guard roots both pointing to root
+`cad/out/sldprt`. Neither reached successful built or cold acceptance.
+
+Crankshaft receipt `datum-policy-qzwh2cwm/pilot.json`, SHA-256
+`5988c9ce981ee4352ce4651e56b94ea5b6e8651400bbf40be730acf6f0965700`,
+failed inside the diagnostic selector observer for `cross-hole true position`:
+the explicit rim is neither a line nor a circle, the only edge shapes then
+supported by the legacy geometry witness. This is an unsupported observation,
+not evidence that production selection or FCF insertion is invalid. Recipe/pilot
+times were 27.804/188.729 s; failure capture completed without errors. The
+following spring-hook target was not started in this invocation.
+
+A separate spring-hook run produced `datum-policy-3smjq0sj/pilot.json`, SHA-256
+`0cd38d921d6e26dc5f980c85dd90e32fc40821207e70e479041322a48f4e82e6`.
+Selection count/type were exactly `1/46`. Requested and selected silhouette
+snapshots matched in every raw curve, endpoint and cylindrical-face parameter,
+but `IsSame(requested, selected)` returned `0`. The existing identity gate
+rejected it before SF insertion. This does not establish whether selection
+changed the geometric target or the native silhouette representation.
+Recipe/pilot times were 27.640/141.514 s. Failure capture was partial: both generic
+semantic snapshots rejected dimension exclusions. Those secondary errors did
+not replace the recorded selection failure.
+
+Both runs retained original hashes, preserved baseline documents, completed
+owned cleanup and ended with empty runtime guards. The next silhouette replay
+records native self-comparisons, reversed comparison and face identity controls
+on failure. It retains the same rejection rule and raw geometry requirements;
+an observation error cannot replace the original failure. All 32 silhouette
+tests pass, including the original equal-geometry/wrong-identity rejection.
