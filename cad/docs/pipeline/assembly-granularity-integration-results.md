@@ -8,7 +8,10 @@ VM1 owns integration and merging. Portfolio status belongs on the
 
 ## Inputs and extraction
 
-- Main: `c6ab57dbdf73a733b32fb580bada81dab7fd758c`, re-fetched before baseline.
+- Initial main: `c6ab57dbdf73a733b32fb580bada81dab7fd758c`.
+- Integrated main: `55056d4990d38ebb461f343d3002fc90731b9e73` (#684), fetched
+  while the initial native baseline was running. Both PRs were rebased in the
+  code-only checkout; the active native checkout remained frozen on initial main.
 - Adapter: `2269009ed56712867826516f4406afc98a0c2814`, unchanged from main.
 - Parser branch: `perf/assembly-source-dependencies-isolated`, PR #686.
 - Child branch: `perf/assembly-granularity-isolated`.
@@ -168,3 +171,31 @@ found nothing; its 23-file content-verification receipt has SHA-256
 `ea223d04ae8eb5a53d155e49dc1ae7afb430034d384ed7a45a11d354070430ed`.
 Reviews against the latest parent `56601349` remain pending after another CLI
 rate limit. No old review is relabeled as coverage of the new code.
+
+## Owner provenance fix and main advancement
+
+The next parent review found whole-dictionary augmented assignments missing from
+keyed reads. Runtime-backed regressions also covered owner initialization and
+rebinding. Fix `5d9dcfdf` rejects unknown owners and mutations while preserving the
+existing channel's prepared-row protocol. The first broad fix failed two existing
+channel tests; their assertions were retained. Collection and selected-row escape
+regressions then pinned the narrower provenance rule. All 144 parent graph tests
+passed (12.99 s), followed by 1155 recipe tests (83.89 s), 146 child graph tests
+(14.12 s), four isolation tests (8.89 s), and the current cache gate.
+
+`offline-gates-owner-provenance-fixed.log` has SHA-256
+`5d6d61fdcf68be546f87fa508058661f73f8f7f5f4e7a3c5e0f183e7d7684a9a`.
+The full Windows CodeRabbit review at `5d9dcfdf` found nothing across all three
+parent files. Its complete cache is retained as `cr-686-5d9dcfdf-full-cache`;
+actual stored diffs and source match the exact initial-main base and reviewed
+head. Receipt `cr-686-5d9dcfdf-cache-verification.json` has SHA-256
+`dcc77d43a532a93246ba81e7ffd4df32ad87d0e481fbeb8ac81613d4c518e97c`.
+
+Main subsequently merged #684. The rebased parser head is `cf8b3f80`; the child
+retains main's corrected spare-sprocket position and `harmonic_base_spec` import.
+Its paper-drive builder diff against integrated main contains imports only.
+The initial-main reports above remain historical receipts, not evidence against
+the newer main. After the frozen initial run ends, its closed artifacts will be
+preserved before an updated-main baseline is built in the same native checkout.
+Fresh same-main reports, full native validation, zero-COM repeat, visual checks,
+and reviews of the rebased stack remain pending.
