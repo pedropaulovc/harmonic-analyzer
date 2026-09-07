@@ -199,3 +199,30 @@ the newer main. After the frozen initial run ends, its closed artifacts will be
 preserved before an updated-main baseline is built in the same native checkout.
 Fresh same-main reports, full native validation, zero-COM repeat, visual checks,
 and reviews of the rebased stack remain pending.
+
+The integrated-main source audit passed at child `19a370ca`: 125/119 edges,
+108 parts, 137/139-module closures, 82 equal definitions and 13 import-only callers.
+Reproducer `audit_source_55056d49.py` has SHA-256
+`6c3e6f91790fbc14d0dd9a767233c8e812662612730082464e3bd3e9a718d551`;
+`source-audit-55056d49-19a370ca/source-audit.json` has SHA-256
+`bec7290c3dcbd8bec01424ac10971f8c72564fdd8f628d0d81e3c03725f9b025`.
+This audit materializes Git source only and does not inspect native/cache state.
+
+The rebased parent `cf8b3f80` received a clean full CodeRabbit review. Its complete
+cache and exact three-file diff/source verification are retained;
+`cr-686-cf8b3f80-cache-verification.json` has SHA-256
+`70544c165017a8c7de3a096b3a0e16cdb6c12bb851d851fbe7da3992c599a58f`.
+The child review at `19a370ca` claimed the mutation fixture reused discovery-time
+assembly dependencies. Inspection showed each snapshot already called the real
+task generator afresh. Explicit guards now check every regenerated task against
+`_assembly_file_deps` and require every path beneath the fixture. All three helper
+mutation cases passed (56.44 s), retaining the exact key-change assertions.
+`helper-snapshot-path-provenance.log` has SHA-256
+`a190aa80b6ff70d6631ee0e29c19f8dfc0bdc3d7c5c933610913139d99fbe4ab`.
+The reported review and its full 23-file content verification remain preserved,
+not relabeled as clean. Another full child review is required.
+
+The first integrated-main offline invocation passed 1266 recipe tests (91.37 s)
+and four isolation tests (9.77 s); graph and cache gates were current from their
+successful prior runs. Log `offline-gates-main550.log` has SHA-256
+`7104f56504b921ce64208888a4d1c472f7d87d87aedf953303ad1c868a8edee1`.

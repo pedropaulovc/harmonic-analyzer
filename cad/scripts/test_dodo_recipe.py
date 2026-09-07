@@ -241,13 +241,24 @@ def isolated_assembly_helper_keys(tmp_path, monkeypatch):
 
     def snapshot():
         dodo._ARTEFACT_DIGEST_MEMO.clear()
+        # Generate again after redirecting recipe paths; the discovery-time
+        # assembly_tasks above are used only to initialize isolated targets.
+        current_assembly_tasks = {
+            task["name"]: task for task in dodo.task_assembly()
+        }
+        for stem, task in current_assembly_tasks.items():
+            assert task["file_dep"] == dodo._assembly_file_deps(stem)
+            assert all(
+                Path(path).resolve().is_relative_to(fixture_root.resolve())
+                for path in task["file_dep"]
+            ), stem
         return {
             "recipes": {
                 stem: dodo._digest_files(paths) for stem, paths in recipes.items()
             },
             "assemblies": {
-                task["name"]: dodo._cache_key(task["file_dep"])
-                for task in dodo.task_assembly()
+                stem: dodo._cache_key(task["file_dep"])
+                for stem, task in current_assembly_tasks.items()
             },
             "part_recipes": {
                 stem: dodo._digest_files(paths) for stem, paths in part_deps.items()
