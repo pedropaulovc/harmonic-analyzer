@@ -383,9 +383,42 @@ def document_state(owner):
     return state
 
 
+def _raise_recorded_errors(label, errors):
+    # Interruptions remain control flow, never members of an ExceptionGroup.
+    # Retain secondary failures without replacing the first interruption.
+    for error in errors:
+        if isinstance(error, Exception):
+            continue
+        for secondary in errors:
+            if secondary is not error:
+                error.add_note(f"{label}; additional failure: {secondary!r}")
+        raise error
+    if errors:
+        raise ExceptionGroup(label, errors)
+
+
+def _final_checkpoint(report_path, report, errors):
+    try:
+        checkpoint(report_path, report)
+    except BaseException as error:
+        errors.append(error)
+        report["status"] = "failed"
+        report.setdefault("errors", []).append(repr(error))
+        if isinstance(error, Exception):
+            return
+        # An interrupted write may already have published "passed". Make one
+        # bounded attempt to replace it with failure evidence; never repeat COM.
+        try:
+            checkpoint(report_path, report)
+        except BaseException as secondary:
+            errors.append(secondary)
+            report["errors"].append(repr(secondary))
+
+
 async def measure(adapter, report, report_path, expected_sha):
     owner = None
     errors = []
+    completed = False
     try:
         source = (ROOT / "cad/out/sldasm/harmonic-analyzer.SLDASM").resolve(strict=True)
         if digest(source) != expected_sha:
@@ -404,14 +437,15 @@ async def measure(adapter, report, report_path, expected_sha):
         report["after"] = document_state(owner)
         if report["after"] != report["before"]:
             raise RuntimeError("native inspection changed document state")
-    except Exception as error:
+        completed = True
+    except BaseException as error:
         errors.append(error)
     finally:
         if owner is not None:
             try:
                 await owner.close()
                 report["final_inventory"] = sorted(map(str, owner.inventory()))
-            except Exception as error:
+            except BaseException as error:
                 errors.append(error)
             try:
                 report["inputs"] = owner.input_evidence()
@@ -419,18 +453,14 @@ async def measure(adapter, report, report_path, expected_sha):
                     row["status"] != "unchanged" for row in report["inputs"].values()
                 ):
                     raise RuntimeError("saved input hashes changed or unreadable")
-            except Exception as error:
+            except BaseException as error:
                 errors.append(error)
         report.update(
-            status="failed" if errors else "passed", errors=[repr(e) for e in errors]
+            status="passed" if completed and not errors else "failed",
+            errors=[repr(e) for e in errors],
         )
-        try:
-            checkpoint(report_path, report)
-        except Exception as error:
-            errors.append(error)
-            report.update(status="failed", errors=[repr(e) for e in errors])
-    if errors:
-        raise ExceptionGroup("spare seating diagnostic failed", errors)
+        _final_checkpoint(report_path, report, errors)
+    _raise_recorded_errors("spare seating diagnostic failed", errors)
 
 
 async def probe(adapter, directory, expected_sha):
@@ -464,20 +494,28 @@ async def probe(adapter, directory, expected_sha):
         "contact_limit_m": CONTACT_M,
         "direction_limit": DIRECTION,
     }
-    started = time.perf_counter()
+    started = None
     errors = []
+    completed = False
     try:
+        started = time.perf_counter()
         await measure(adapter, report, report_path, expected_sha)
-    except Exception as error:
+        completed = True
+    except BaseException as error:
         errors.append(error)
     finally:
-        report["inspection_and_owned_cleanup_seconds"] = time.perf_counter() - started
         try:
-            checkpoint(report_path, report)
-        except Exception as error:
+            if started is not None:
+                report["inspection_and_owned_cleanup_seconds"] = (
+                    time.perf_counter() - started
+                )
+        except BaseException as error:
             errors.append(error)
-    if errors:
-        raise ExceptionGroup("spare seating inspection/report failed", errors)
+        if not completed or errors:
+            report["status"] = "failed"
+        report.setdefault("errors", []).extend(repr(error) for error in errors)
+        _final_checkpoint(report_path, report, errors)
+    _raise_recorded_errors("spare seating inspection/report failed", errors)
     return {"report": str(report_path)}
 
 

@@ -96,13 +96,14 @@ This is not caused by the health traversal change:
   Y=53.2/55.6, while `harmonic_base_spec.STACK_HEIGHT` puts the deck at Y=50.8.
   The T18 footprint at X=160, Z=-15 lies inside the rim, not on its raised edge.
 
-## Narrow correction and offline repro
+## Rejected historical Y-only proposal and offline repro
 
-Only the spare's Y placement changes: use the shared `STACK_HEIGHT` directly,
+This section records the rejected Y-only candidate, not the revised Y/Z placement
+above. It changed only the spare's Y placement to the shared `STACK_HEIGHT`,
 leaving X/Z, rotation, T18 configuration, fixed state and subsystem ownership
-unchanged. Its thickness then extends upward from the deck to Y=53.2. No part,
-mounted sprocket, driven mate, manufacturing value or shared health helper changes.
-The added pure-spec import makes deck-height changes an assembly input; it does
+unchanged. Its thickness then extended upward from the deck to Y=53.2. No part,
+mounted sprocket, driven mate, manufacturing value or shared health helper changed.
+The added pure-spec import made deck-height changes an assembly input; it did
 not insert the base into this subassembly or change any part recipe.
 
 `test_paper_drive_assembly_drawing.py` is already enrolled by the `check:recipe`
