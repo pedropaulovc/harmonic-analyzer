@@ -247,14 +247,17 @@ def test_moving_gtol_body_is_not_mistaken_for_a_stationary_text_obstacle():
     assert policy.column_vertical_candidates(hits, geometry, cells) == baseline
 
 
-def test_previously_unhit_fixed_cell_also_contributes_to_frontier():
+def test_previously_unhit_upper_cell_must_not_force_bank_above_a_clear_gap():
     geometry, cells = half_scale_lever_fixture()
     hits = crossings(geometry, cells)
     cells["higher-dimension"] = SimpleNamespace(
         kind=4, text_boxes=(Rect(0.21, 0.18, 0.218, 0.185),)
     )
     up, _ = policy.column_vertical_candidates(hits, geometry, cells)
-    assert up.dy_m == pytest.approx(0.185 + 0.001 - 0.12687500001249996)
+    # The old maximum-frontier contract was deliberately superseded by the
+    # measured ten-cell failure: both upper and lower obstacles bound a gap.
+    assert up.dy_m == pytest.approx(0.02152486647419627)
+    assert crossings(predict_routes(geometry, up.dy_m), cells) == []
 
 
 def test_noninitial_row_width_and_decoration_are_not_dropped():
@@ -270,8 +273,10 @@ def test_noninitial_row_width_and_decoration_are_not_dropped():
     geometry["DetailItem357"] = LeaderGeometry(
         row.segments, (*row.decorations, Rect(0.21, 0.120, 0.218, 0.122))
     )
-    up, _ = policy.column_vertical_candidates(hits, geometry, cells)
-    assert up.dy_m == pytest.approx(0.14739986648669623 + 0.001 - 0.120)
+    # An unassociated synthetic box is not evidence that a decoration follows
+    # the shoulder. The new prediction must reject this unsupported shape.
+    with pytest.raises(ValueError, match="decoration"):
+        policy.column_vertical_candidates(hits, geometry, cells)
 
 
 @pytest.mark.parametrize("fault", ["shape", "disconnected", "nan", "negative_width"])
