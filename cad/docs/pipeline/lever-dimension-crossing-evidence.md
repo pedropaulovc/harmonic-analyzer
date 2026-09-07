@@ -68,8 +68,8 @@ layout nor that a repeated call will solve it. No production gate is weakened.
 The offline-tested candidate is now
 `diagnostics/probe_dimension_arrangement.py --receipt <pilot.json>`. It requires
 `HARMONIC_SW_AUTOSTART=0`, `HARMONIC_REMOTE_CACHE_MODE=off`, an explicit existing
-`HARMONIC_DIAGNOSTIC_SW_PID`, and a separately granted native seat. It has not
-been run. Exact owned copies are linked while the drawing is closed; only that
+`HARMONIC_DIAGNOSTIC_SW_PID`, and the coordinated native seat. Its first native
+result follows below. Exact owned copies are linked while the drawing is closed; only that
 owned drawing's reference bytes may change. Original artifacts and the copied
 part are never saved. Helpers, imported adapter, every original input and both
 copies have final hash witnesses even after operation or cleanup failure.
@@ -83,3 +83,36 @@ intersection is a gate failure, not necessarily glyph-ink intersection. The two
 specific closed-frame crossings above have the stronger native-stroke proof.
 Post-operation PDF output, if present, is diagnostic even when a gate fails;
 there is no native-save, accepted-sheet claim or automatic second candidate.
+
+## Native result: accepted call, no dimension movement
+
+At frozen root `7ae01b6d`, adapter `e77bfda4`, PID 31860, the control reproduced
+both known crossings and passed the archived drawing/source checks before the
+single native call. `AlignDimensions(0, 0.001)` returned true in **0.0011768 s**
+with ten exact front-view display dimensions selected. No dimension moved:
+the recorded `moved_dimensions` is empty and fresh before/after measurements
+are identical. This particular post-layout, per-view call is a no-op; it does
+not establish a general limitation of AutoArrange or its other call contexts.
+
+Receipt: `cad/out/reports/dimension-arrange-bb7lbqpw/dimension-arrange.json`,
+SHA-256 `2af31fda94f0bccd9aa89384131e911376e8ae3de0a2722874595d4290d0fffc`.
+The final conservative body check still reports seven front-view and one top-view
+crossings, including both independently proven text/frame intersections. The
+other reported body intersections are not all classified as glyph-ink defects.
+The diagnostic therefore exited nonzero; no production arrangement change was
+adopted. `SpaceEvenly`, `Stagger`, another call phase and a less crowded view
+layout remain untested alternatives, not established fixes.
+
+PDF-only `after.pdf` and its production preview `after.png` were retained next
+to the receipt. Original-resolution visual inspection confirms that the R4.75
+and datum C crossings remain. Export did not change native annotations or
+measured geometry. All nine protected inputs, copied-source bytes, post-relink
+drawing-copy bytes, helper/config fingerprints and imported adapter fingerprints
+passed final guards. Initial/final native inventories were empty, with no cleanup
+error. Only the isolated closed drawing copy's reference bytes were changed;
+there was no native drawing/part save or rebuild.
+
+After integration, the seven selected COM-free gates passed at `e5a970bc`:
+`check:recipe` ran **3,655 tests in 53.86 s**; six other gates were current.
+Telemetry: `cad/out/reports/pytest-telemetry/run-5ufhufmj`. This is not the full
+native pipeline merge gate, and the lever remains visually unaccepted.
