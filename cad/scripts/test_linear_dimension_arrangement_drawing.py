@@ -4,7 +4,8 @@ import asyncio
 from copy import deepcopy
 from dataclasses import replace
 from types import SimpleNamespace as NS
-from unittest.mock import Mock
+from unittest.mock import Mock, create_autospec
+import inspect
 import sys
 from pathlib import Path
 import json
@@ -12,6 +13,7 @@ import json
 import pytest
 
 from _drawing_native_callouts import _Dimension, DimensionSource
+from _drawing_project_layout import repair_project_drawing_layout
 from diagnostics import _linear_dimension_arrangement as control
 from diagnostics import probe_datum_policy_recipes as pilot
 
@@ -117,10 +119,13 @@ def wrapper(monkeypatch, scene, after=None):
         "_installed_swconst",
         lambda: NS(swDetailingDimToDimOffset=1, swDetailingNoOptionSpecified=0),
     )
-    original = Mock(return_value="strict original layout result")
+    original = create_autospec(
+        inspect.unwrap(repair_project_drawing_layout),
+        return_value="strict original layout result",
+    )
 
     async def build(adapter, *, layout=original):
-        return layout(adapter, views)
+        return layout(adapter, views=views)
 
     trial, checkpoint = {"target": "channel_lever"}, Mock()
     instance = control.ParallelLinearControl(control.LinearArrangement.PARALLEL)
@@ -252,15 +257,15 @@ def test_named_native_void_calls_once_per_pair_then_original_gate_once(
     test = wrapper(monkeypatch, scene)
     result = test.invoke(
         test.adapter,
-        test.views,
-        "notes",
+        views=test.views,
+        notes="notes",
         additional_annotation_validation="mandatory checker",
     )
     assert result == "strict original layout result"
     test.original.assert_called_once_with(
         test.adapter,
-        test.views,
-        "notes",
+        views=test.views,
+        notes="notes",
         additional_annotation_validation="mandatory checker",
     )
     assert test.select.call_count == 2
@@ -277,7 +282,7 @@ def test_named_native_void_calls_once_per_pair_then_original_gate_once(
     )
     test.instance.require_used()
     with pytest.raises(RuntimeError, match="exactly once"):
-        test.invoke(test.adapter, test.views)
+        test.invoke(test.adapter, views=test.views)
     assert test.select.call_count == 2
 
 
@@ -294,7 +299,7 @@ def test_document_preference_rejection_stops_before_native_arrangement(
     if mode == "invalid_initial":
         extension.GetUserPreferenceDouble.side_effect = [float("nan")]
     with pytest.raises(RuntimeError):
-        test.invoke(test.adapter, test.views)
+        test.invoke(test.adapter, views=test.views)
     test.select.assert_not_called()
     test.original.assert_not_called()
 
@@ -358,7 +363,7 @@ def test_full_same_session_witness_blocks_semantic_changes_and_noop(
             after.rows[key]["native"]["metadata"] = "changed only"
     test = wrapper(monkeypatch, scene, after)
     with pytest.raises(RuntimeError):
-        test.invoke(test.adapter, test.views)
+        test.invoke(test.adapter, views=test.views)
     test.original.assert_not_called()
     assert "error" in test.trial["linear_dimension_control"]
 
@@ -375,7 +380,7 @@ def test_existing_crossing_failure_and_checkpoint_failure_preserve_original(
 
     test.original.side_effect = original
     with pytest.raises(RuntimeError) as caught:
-        test.invoke(test.adapter, test.views)
+        test.invoke(test.adapter, views=test.views)
     assert caught.value is primary
     assert (
         "receipt write failed"
@@ -388,7 +393,7 @@ def test_empty_unused_or_wrong_adapter_callback_is_not_accepted(monkeypatch, sce
     with pytest.raises(RuntimeError, match="not invoked"):
         test.instance.require_used()
     with pytest.raises(RuntimeError, match="owned adapter"):
-        test.invoke(object(), test.views)
+        test.invoke(object(), views=test.views)
     test.capture.assert_not_called()
     test.original.assert_not_called()
 

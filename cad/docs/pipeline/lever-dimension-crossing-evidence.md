@@ -342,3 +342,27 @@ owned cleanup passed. The native sheet scale was 1:1 before finalization,
 unchanged by export. Recipe time was 86.066959 s; the 171.240112 s pilot also
 includes preparation and failure evidence, but excludes outer cleanup and seat
 attachment. This is a functional capture result, not an A/B performance claim.
+
+### Named parallel spacing reached the native operation
+
+At root `3db3efe2` / adapter `e77bfda4` / PID 31860, the nominal-precision
+correction let both exact named pairs reach `AlignParallelDimensions`. The
+profile call took 10.5405 ms and the hole-pattern call took 10.3532 ms. The
+drawing-local spacing preference retained the measured request of 6.5798667 mm.
+Native TipCentreX moved down 0.5798667 mm and RD2 moved up 2.7100667 mm; all
+source values/handles, annotation semantics/attachments, unselected ink and view
+layout passed the exact before/after checks. These are operation timings, not
+the much longer diagnostic capture or a complete recipe speedup.
+
+The trial then failed before the unchanged layout gates: the diagnostic wrapper
+forwarded `views` positionally to a keyword-only function. Its permissive mock
+had hidden that integration bug. The fixture now uses the actual unwrapped
+production function signature, reproducing two failures before the callback
+correction; afterward all 111 linear-control/owned-pilot tests passed. Notes,
+views and the mandatory validation callback are forwarded as keywords. This
+does not establish final crossing clearance or cold drawing acceptance.
+
+Receipt `datum-policy-k5mypm3x/pilot.json` has SHA-256
+`c678cdf0b4f3b9f8b56524e0a540731ad78b533f859e8a5296919a409a0b98c0`.
+Failure capture remains explicitly partial because the unsaved drawing-reference
+owner is rejected; no native drawing or source save was substituted.
