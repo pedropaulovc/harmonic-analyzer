@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import math
 from _model_dimension_callouts import author_model_callouts
-from cone_tip_adjuster_spec import DIMENSION_CALLOUTS
+from cone_tip_adjuster_spec import DIMENSION_CALLOUTS, REFERENCE_PREFIXES, REFERENCE_SUFFIXES
 import sys
 
 import _telemetry
@@ -289,6 +289,8 @@ async def build(adapter) -> dict[str, str]:
         {"BodyDiaDim": DIMENSION_CALLOUTS["BodyDiaDim"]},
         location="above",
     )
+    author_model_callouts(adapter, "BodyProfile", REFERENCE_PREFIXES, location="prefix")
+    author_model_callouts(adapter, "BodyProfile", REFERENCE_SUFFIXES, location="suffix")
     return await save_part_and_images(adapter, PART_NAME)
 
 

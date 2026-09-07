@@ -1,4 +1,4 @@
-"""Exact 35-part / 72-row migration from the retained pre-migration contract."""
+"""Retain 35-part / 72 original rows, plus two source-owned tip reference fields."""
 
 import ast
 import asyncio
@@ -27,12 +27,20 @@ def evaluated(node, module):
 
 
 def expected_rows(drawing):
-    return Counter(
+    rows = Counter(
         (item["owners"][0], item["dimension"], item["text"], row["location"])
         for row in INVENTORY["calls"]
         if row["drawing"] == drawing
         for item in row["rows"]
     )
+    if drawing == "draw_cone_tip_adjuster":
+        # Separately approved reference-formatting migration, not a change to
+        # the historical 72-row above/below callout inventory.
+        rows.update({
+            ("BodyProfile", "BodyDiaDim", "(<MOD-DIAM>", "prefix"): 1,
+            ("BodyProfile", "BodyDiaDim", ")", "suffix"): 1,
+        })
+    return rows
 
 
 def calls(tree, name):
@@ -165,7 +173,8 @@ def test_moved_expressions_and_shared_map_identity_are_unchanged(definition):
 
 def test_exact_fleet_counts_and_only_approved_part_dependency_growth():
     assert len(ACTIVE) == 35
-    assert sum(sum(expected_rows(name).values()) for name in ACTIVE) == 72
+    assert sum(len(row["rows"]) for row in INVENTORY["calls"]) == 72
+    assert sum(sum(expected_rows(name).values()) for name in ACTIVE) == 74
     expected = {name.replace("draw_", "build_", 1) for name in ACTIVE}
     helper = str(Path(author.__file__).resolve())
     actual = {path.stem for path in part_scripts() if helper in module_deps_of(path)}
