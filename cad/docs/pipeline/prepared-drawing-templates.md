@@ -321,3 +321,22 @@ command or future template variant. PDFs are retained for zoomed visual
 inspection. Export/render/readback times are separate from setup timings. The
 original template and published cache artifacts remain hash-guarded. Native
 printed results and full-recipe validation are still pending for this option.
+
+The printed control at root `6435f217` then **passed**. Receipt:
+`prepared-template-cache-nnlc4te9/measurements.json`, SHA-256
+`abaae0f7d9d3a6d812301a8f60876414eab5e0e6d6ed391b6fc3d908e57b9384`.
+Normal, prepared-miss and prepared-hit exports all contain the same 441 PDF
+characters at identical glyph boxes on a 1224-by-792-point page. Their
+5100-by-3300 PNGs have zero changed pixels and the same SHA-256:
+`639fc11fd7c15c13643ad334b03ffaa609981c9b5b1785945a3f757248b5f580`.
+Visual inspection of the prepared-hit image confirms the complete blank border,
+zone markings, title cells, tolerance symbols and projection/license artwork.
+
+Normal factory took 2.980349 s; prepared-hit factory plus cache lookup took
+1.314356 + 0.049877 = **1.364234 s**. One-time miss cost was 22.170859 s.
+Export/render/comparison took 0.700/0.979/0.990 s; full post-export native
+witnesses took 8.320/10.001/9.354 s separately. These are sequential observations,
+not an end-to-end speedup estimate. All post-export defaults, original-template
+bytes and cache guards passed; native inventory began/ended empty with no
+cleanup error. Complete model-linked recipes and their cold-reopen acceptance
+remain pending, and no production recipe uses this helper yet.
