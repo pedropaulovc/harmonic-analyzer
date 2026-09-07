@@ -50,6 +50,14 @@ one skip and the two old literal-location failures above. After their approved
 updates, focused checks passed; the actual enrolled gate is rerun on the frozen
 candidate before handoff.
 
+Frozen candidate `232250a2` then passed the actual combined command above:
+`check:recipe` 5186 tests in 91.80 s (`run-kg86af8x`), `check:graph` 83 tests in
+10.34 s (`run-zp0gc9lg`), `check:config` exit 0, and `check:partiso` four tests in
+7.65 s (`run-a56cajtb`). The parent process exited 0. Receipts are retained under
+`C:/src/ha-perf-model-callout-fleet/cad/out/reports/pytest-telemetry/`; the actual
+recipe command enrolled both renamed callout test files. These are offline gates,
+not native fleet acceptance or performance measurements.
+
 ## Cache impact and native acceptance still required
 
 The author helper has exactly 35 part consumers. This fleet-only change affects
