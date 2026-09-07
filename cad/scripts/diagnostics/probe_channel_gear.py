@@ -35,8 +35,10 @@ from _common import (
 )
 from _assembly import (
     coincident_mate,
-    gear_mate,
     named_ref,
+)
+from _assembly_couplings import (
+    gear_mate,
 )
 from build_motion_study import (
     OUT_SLDASM, _by_z_rank, _comp_xform, _components, _entity_ref, _find_one,

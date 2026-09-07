@@ -93,26 +93,30 @@ from _assembly import (
     angle_driver,
     assembly_title_properties,
     assert_component_placed,
-    assert_pattern_targets,
     assert_free_dof_necessity,
     check_no_interference,
     component_names,
     component_origin,
     component_transform,
     distance_driver,
-    gear_mate,
-    linear_component_pattern,
-    grid_component_pattern,
     lock_mate,
     named_ref,
-    PatternDirection,
     place_component,
-    rack_pinion_mate,
     reledger_to_solved,
     remap_front_to_machine_front,
     reset_dof_manifest,
     save_assembly_and_images,
     write_dof_manifest,
+)
+from _assembly_couplings import (
+    gear_mate,
+    rack_pinion_mate,
+)
+from _assembly_patterns import (
+    assert_pattern_targets,
+    linear_component_pattern,
+    grid_component_pattern,
+    PatternDirection,
 )
 from _transforms import (  # noqa: E402
     IDENTITY,

@@ -51,3 +51,44 @@ keys. A child recipe change can legitimately change its parent's task key before
 any native rebuild. A token-only change follows the separate exact-identity path.
 Moving functions predicts reduced invalidation coverage, not faster native COM
 execution. The first build after extraction pays a one-time recipe migration.
+
+## Extraction and consumer matrix
+
+The source and AST comparison against `a6b5c900` found identical definitions for
+all eight pattern functions, their enum, four coupling functions and 69 functions
+remaining in core. Thirteen production/diagnostic callers changed imports only.
+Pattern tests passed (12 tests, 0.37 s, `pytest-telemetry/run-dkb67fei`).
+
+| transitive consumer | pattern group before / after | coupling group before / after |
+|---|---|---|
+| frame | core / patterns | core / absent |
+| drive-train | core / patterns | core / couplings |
+| channel | core / absent | core / absent |
+| summing | core / absent | core / absent |
+| magnifier | core / patterns | core / absent |
+| pen | core / absent | core / absent |
+| paper-drive | core / patterns | core / couplings |
+| harmonic-analyzer | core / absent | core / absent |
+| refresh entrypoint | core / absent | core / absent |
+| verify entrypoint | core / patterns | core / couplings |
+| postbuild entrypoint | core / absent | core / absent |
+| all 108 leaf parts | absent / absent | absent / absent |
+
+These are static transitive imports, including local imports used for builder
+constants. Verification reaches builders transitively; its actual task dependencies
+are recorded separately. No verification-only provider was introduced.
+
+The after report is `cad/out/reports/assembly-cache-granularity/after.json`,
+SHA-256 `8a5e0d7b5f2d460d836c4b81e09b919f5190e0311a6ef1a2f4d5adfef7e47a64`.
+It adds generated-task consistency assertions, verify task dependencies and
+source SHA-256 values to the baseline schema. All eight direct recipes/task keys
+change once during migration; all 108 leaf keys remain identical.
+
+Five focused tests passed in 50.39 s (`pytest-telemetry/run-74l29t4z`): exact
+transitive consumer sets and isolated mutations of both extracted providers plus
+core. They use copied actual inputs with production recipe and cache-key code.
+Pattern edits now full-rebuild four assemblies; coupling edits full-rebuild two.
+Both also change the top assembly's task key through child recipes while leaving
+its direct recipe alone. Core edits still change all eight. All leaf recipes and
+keys remain unchanged in every case. Existing exact-child identity and canonical
+placement discovery tests remain intact.

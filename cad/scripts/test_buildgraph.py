@@ -993,6 +993,27 @@ def test_assemblies_depend_on_assembly_helpers():
         assert {"_assembly", "_common"} <= helpers, f"{stem}: {helpers}"
 
 
+@pytest.mark.parametrize(
+    ("helper", "consumers"),
+    [
+        ("_assembly_patterns", {"drive_train", "frame", "magnifier", "paper_drive"}),
+        ("_assembly_couplings", {"drive_train", "paper_drive"}),
+    ],
+)
+def test_specialized_assembly_helpers_have_exact_transitive_consumers(helper, consumers):
+    actual = {
+        stem
+        for stem in ASSEMBLY_ORDER
+        if helper in _helper_names(script_for(stem).name)
+    }
+    assert actual == consumers
+    assert helper not in _helper_names("_assembly.py"), (
+        "core must not re-export specialized helpers and reconnect all recipes"
+    )
+    for stem in part_stems():
+        assert helper not in _helper_names(f"build_{stem}.py"), stem
+
+
 def test_module_deps_are_transitive():
     """The closure follows imports through helper chains: a chain-link part pulls
     _chain_link -> _chain -> _common, and _config arrives via _common's lazy

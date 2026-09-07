@@ -29,8 +29,10 @@ from _common import (
 )
 from _assembly import (
     coincident_mate,
-    gear_mate,
     named_ref,
+)
+from _assembly_couplings import (
+    gear_mate,
     rack_pinion_mate,
 )
 from build_motion_study import (
