@@ -320,3 +320,25 @@ Offline gates ran concurrently, so these are not comparative performance data.
 All seven offline gates passed at this code checkpoint, including 3,890 recipe
 tests in 74.42 s (`pytest-telemetry/run-svaajh5a`). This is not the full native
 pipeline or final drawing acceptance.
+
+### Independent raw capture verified
+
+At frozen root `fe78272f`, adapter `e77bfda4`, PID 31860, the unchanged lever
+recipe again failed on the same two BASIC-box crossings. The corrected capture
+retained the complete raw annotation rows before and after PDF export. Exact
+native handles, raw rows, source dimensions, drawing/source state, sheet
+properties and file hashes were unchanged. The semantic checker still rejected
+the unsaved `RD1@Drawing View1@Draw57.Drawing` owner in both phases; the report
+therefore explicitly remains `partial`, not complete attachment acceptance.
+
+Receipt `datum-policy-uxnsbzpi/pilot.json` has SHA-256
+`55f1c0abc48a1b4c876f54132b1a1b92f5587515d234006bfcebe51f968656dc`.
+The retained `channel_lever/failure-evidence.json` has SHA-256
+`30d74449027b9425e55e937d745fd2ff7d4b711c80e536d9cc9c0906899f1828`.
+Its PNG hash is identical to the preceding failed print
+(`334034f8ee058a5e83c01768f1249924de296dc86e4ecdbc476aebfdb492ba76`).
+Original and copied sources, template/cache/runtime guards and empty-to-empty
+owned cleanup passed. The native sheet scale was 1:1 before finalization,
+unchanged by export. Recipe time was 86.066959 s; the 171.240112 s pilot also
+includes preparation and failure evidence, but excludes outer cleanup and seat
+attachment. This is a functional capture result, not an A/B performance claim.
