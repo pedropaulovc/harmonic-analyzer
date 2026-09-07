@@ -116,6 +116,29 @@ def finite(value):
     return value
 
 
+def display_presentation(display):
+    """Exact GetText(1..8) plus the numeric visibility changed by SetText(0)."""
+    show = display.ShowDimensionValue
+    if type(show) is not bool:
+        raise RuntimeError(
+            f"source ShowDimensionValue returned a non-boolean value: {show!r}"
+        )
+    hole = display.IsHoleCallout()
+    if type(hole) is not bool:
+        raise RuntimeError(
+            f"source IsHoleCallout returned a non-boolean value: {hole!r}"
+        )
+    if hole:
+        return {
+            "show_dimension_value": show,
+            "text": {"exclusion": "GetText does not support hole callouts"},
+        }
+    text = {str(part): display.GetText(part) for part in range(1, 9)}
+    if any(type(value) is not str for value in text.values()):
+        raise RuntimeError(f"source GetText returned a non-string value: {text!r}")
+    return {"show_dimension_value": show, "text": text}
+
+
 def dimension_snapshot(app, model, path, *, required):
     """Read every observed feature dimension; do not toggle visibility or rebuild."""
     configuration = str(
@@ -188,12 +211,7 @@ def dimension_snapshot(app, model, path, *, required):
                         "marked_for_drawing": bool(display.MarkedForDrawing),
                         "primary_precision": int(display.GetPrimaryPrecision2()),
                         "tolerance_precision": int(display.GetPrimaryTolPrecision2()),
-                        "text": {
-                            str(part): str(display.GetText(part) or "")
-                            for part in range(1, 9)
-                        }
-                        if not display.IsHoleCallout()
-                        else {"exclusion": "GetText does not support hole callouts"},
+                        **display_presentation(display),
                     }
                 )
             display = feature.GetNextDisplayDimension(display)

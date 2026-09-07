@@ -198,14 +198,24 @@ def test_real_owned_copy_cleanup_preserves_baseline_and_never_saves(
     def snapshot(app, model, path, *, target):
         if mode == "snapshot_failure" and model.dirty:
             raise RuntimeError("native dimension readback failed")
-        name = "BodyDiaDim" if target is probe.Target.CONE_TIP_ADJUSTER else "Width"
+        name = {
+            probe.Target.ARBOR_PEDESTAL: "Width",
+            probe.Target.CONE_TIP_ADJUSTER: "BodyDiaDim",
+            probe.Target.FILLISTER_SCREW: "ShankDia",
+        }[target]
         return {
             "dimensions": {
                 name: {
                     "native": "same",
                     "displays": [
                         {
+                            "show_dimension_value": not (
+                                model.dirty and target is probe.Target.FILLISTER_SCREW
+                            ),
                             "text": {
+                                "1": "#4-40 UNC-2A" if model.dirty else "",
+                                "2": "",
+                            } if target is probe.Target.FILLISTER_SCREW else {
                                 "1": "(<MOD-DIAM>" if model.dirty else "",
                                 "2": ")" if model.dirty else "",
                             }
@@ -238,11 +248,11 @@ def test_real_owned_copy_cleanup_preserves_baseline_and_never_saves(
             native.source.write_bytes(b"corrupted original fixture")
 
     monkeypatch.setattr(sheet_setup, "new_project_drawing", blank)
-    callout_name = (
-        "set_reference_dimensions"
-        if target is probe.Target.CONE_TIP_ADJUSTER
-        else "set_dimension_callouts"
-    )
+    callout_name = {
+        probe.Target.ARBOR_PEDESTAL: "set_dimension_callouts",
+        probe.Target.CONE_TIP_ADJUSTER: "set_reference_dimensions",
+        probe.Target.FILLISTER_SCREW: "set_dimension_text",
+    }[target]
     monkeypatch.setattr(common, callout_name, callouts)
     monkeypatch.setattr(common, "read_required_properties", place)
     code = """from pathlib import Path
@@ -291,7 +301,10 @@ async def build(adapter, *, drawing_factory):
     recipe_source.assert_called_once_with("pinned", target.value)
     assert report["target"] == target.value
     assert report["source_spec"] == probe.TARGETS[target].spec.__name__
-    assert len(report["required_dimensions"]) == 5
+    if target is probe.Target.FILLISTER_SCREW:
+        assert len(report["required_dimensions"]) == 4
+    else:
+        assert len(report["required_dimensions"]) == 5
     assert Path(report["copy"]).name.startswith(
         probe.TARGETS[target].copy_prefix + "-source-dirty-"
     )
@@ -313,12 +326,19 @@ async def build(adapter, *, drawing_factory):
     assert report["original_after"] == original_hash
     if mode == "dirty":
         assert report["stop"]["boundary"] == f"recipe.{callout_name}"
-        name = "BodyDiaDim" if target is probe.Target.CONE_TIP_ADJUSTER else "Width"
+        name = {
+            probe.Target.ARBOR_PEDESTAL: "Width",
+            probe.Target.CONE_TIP_ADJUSTER: "BodyDiaDim",
+            probe.Target.FILLISTER_SCREW: "ShankDia",
+        }[target]
         assert report["stop"]["changed_since_initial_snapshot"] == [name]
         assert report["stop"]["dimension_identity"] == {name: "same"}
-        assert report["stop"]["snapshot"]["dimensions"][name]["displays"][0][
-            "text"
-        ] == {"1": "(<MOD-DIAM>", "2": ")"}
+        display = report["stop"]["snapshot"]["dimensions"][name]["displays"][0]
+        if target is probe.Target.FILLISTER_SCREW:
+            assert display["text"] == {"1": "#4-40 UNC-2A", "2": ""}
+            assert display["show_dimension_value"] is False
+        else:
+            assert display["text"] == {"1": "(<MOD-DIAM>", "2": ")"}
 
 
 @pytest.mark.parametrize(
@@ -378,6 +398,7 @@ def test_complete_observed_dimension_inventory_includes_unmarked_and_chamfer_val
             GetPrimaryPrecision2=lambda: 3,
             GetPrimaryTolPrecision2=lambda: 2,
             IsHoleCallout=lambda: variant == "hole_callout",
+            ShowDimensionValue=True,
             GetText=text,
         )
 
@@ -421,6 +442,7 @@ def test_complete_observed_dimension_inventory_includes_unmarked_and_chamfer_val
     row = actual["dimensions"][unmarked.FullName]
     assert row["native"]["tolerance_type"] == 1
     assert row["displays"][0]["marked_for_drawing"] is False
+    assert row["displays"][0]["show_dimension_value"] is True
     if variant == "hole_callout":
         text.assert_not_called()
 
@@ -469,7 +491,9 @@ def test_unknown_target_refuses_before_output_or_native(monkeypatch, tmp_path):
     assert not (tmp_path / "reports").exists()
 
 
-@pytest.mark.parametrize("selection", [None, "arbor_pedestal", "cone_tip_adjuster"])
+@pytest.mark.parametrize(
+    "selection", [None, "arbor_pedestal", "cone_tip_adjuster", "fillister_screw"]
+)
 def test_cli_target_and_exact_candidate_forward_to_locked_worker(
     monkeypatch, tmp_path, selection
 ):
