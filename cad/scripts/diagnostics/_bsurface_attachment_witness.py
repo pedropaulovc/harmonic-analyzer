@@ -8,6 +8,7 @@ cad/docs/pipeline/tooth-tip-bsurface-witness.md for the native acceptance scope.
 
 from enum import StrEnum
 import math
+import os
 
 from _common import _early_bound
 from _telemetry import traced
@@ -22,6 +23,21 @@ class Periodicity(StrEnum):
 class Sense(StrEnum):
     SAME = "same"
     OPPOSITE = "opposite"
+
+
+class GridControl(StrEnum):
+    OFF = "off"
+    BOUNDARY_DOMAIN = "boundary-domain"
+
+
+def grid_control_from_environment():
+    """Explicit diagnostic mode, checked by parent and worker before COM."""
+    field = "HARMONIC_BSURF_GRID_CONTROL"
+    raw = os.environ.get(field, GridControl.OFF.value)
+    try:
+        return GridControl(raw)
+    except ValueError as error:
+        raise ValueError(f"{field}: expected off or boundary-domain, got {raw!r}") from error
 
 
 # Diagnostic read-budget bounds, not asserted SolidWorks API limits.
@@ -80,6 +96,46 @@ def _read(operation, records, field):
     return raw
 
 
+def boundary_indices(*, rows, columns):
+    """At most eleven raw requests, not an alternative accepted grid."""
+    for field, value in (("rows", rows), ("columns", columns)):
+        _integer(value, label=field, minimum=1, maximum=MAX_CONTROL_POINTS)
+    # The official example's (2,3) leads. Vary one argument through each
+    # measured count/count+1, then make two explicit out-of-doc zero requests.
+    # Deduplicate small/square grids; never reinterpret row/column metadata.
+    return tuple(dict.fromkeys((
+        (2, 3), (1, rows), (1, rows + 1), (rows, 1), (rows + 1, 1),
+        (columns, 1), (columns + 1, 1), (1, columns), (1, columns + 1),
+        (0, 1), (1, 0),
+    )))
+
+
+@traced("diagnostic.silhouette.bsurface.boundary_domain")
+def _boundary_control(data, metadata, evidence):
+    """Retain all bounded observations, including rejects; accept nothing."""
+    row = evidence["grid_control"] = {
+        "mode": GridControl.BOUNDARY_DOMAIN.value,
+        "scope": "raw_index_observation_not_acceptance",
+        "metadata": {
+            "rows": metadata["ControlPointRowCount"],
+            "columns": metadata["ControlPointColumnCount"],
+            "dimension": metadata["ControlPointDimension"],
+        },
+        "reads": [],
+    }
+    for index_row, column in boundary_indices(
+        rows=row["metadata"]["rows"], columns=row["metadata"]["columns"],
+    ):
+        record = {"row": index_row, "column": column}
+        row["reads"].append(record)
+        try:
+            _read(lambda: data.GetControlPoints(index_row, column), record, "returned")
+        except Exception:
+            # _read already retained this exact getter error. It does not
+            # replace the ordinary full-grid validation that follows.
+            continue
+
+
 def _parameterization(data, *, evidence=None):
     result = {}
     raw_reads = None
@@ -120,7 +176,7 @@ def _parameterization(data, *, evidence=None):
     return result
 
 
-def _bspline(data, *, evidence=None):
+def _bspline(data, *, evidence=None, control=GridControl.OFF):
     result = {}
     raw_reads = None
     if evidence is not None:
@@ -168,6 +224,8 @@ def _bspline(data, *, evidence=None):
                 f"BSURF {field}: empty/decreasing native knot vector {knots!r}"
             )
         result[field] = knots
+    if control is GridControl.BOUNDARY_DOMAIN:
+        _boundary_control(data, result, evidence)
     point_reads = []
     if evidence is not None:
         evidence["control_point_reads"] = point_reads
@@ -197,9 +255,13 @@ def snapshot(face, surface, *, evidence=None):
     Face UV bounds are a parameter rectangle, NOT its trimming loops or BREP.
     The caller still checks drawing PID, owning view, native face identity and
     exact raw silhouette curve/endpoints; no geometric fallback is introduced.
-    An optional journal retains partial metadata and raw scalar/array reads.
-    It is non-authoritative and adds no native calls.
+    An optional journal retains partial metadata and raw scalar/array reads
+    without extra native calls. Only explicit boundary-domain mode adds the
+    bounded exploratory reads; their results never populate the accepted grid.
     """
+    control = grid_control_from_environment()
+    if control is GridControl.BOUNDARY_DOMAIN and evidence is None:
+        raise ValueError("BSURF boundary-domain control requires a retained evidence sink")
     result = {
         "identity": 4006,
         "read_request": {
@@ -245,5 +307,7 @@ def snapshot(face, surface, *, evidence=None):
     result["bspline_sense"] = (Sense.SAME if same_sense else Sense.OPPOSITE).value
     if evidence is not None:
         evidence.update(result)
-    result["bspline"] = _bspline(_early_bound(data, "IBSurfParamData"), evidence=evidence)
+    result["bspline"] = _bspline(
+        _early_bound(data, "IBSurfParamData"), evidence=evidence, control=control,
+    )
     return result

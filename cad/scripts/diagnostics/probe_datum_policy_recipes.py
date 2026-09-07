@@ -68,6 +68,7 @@ from diagnostics._reopen_annotation_comparison import compare_reopened_annotatio
 from diagnostics._recipe_acceptance_targets import TARGETS  # noqa: E402
 from diagnostics._recipe_entity_acceptance import EntityAcceptance  # noqa: E402
 from diagnostics._recipe_view_entity_acceptance import ViewEntityAcceptance  # noqa: E402
+from diagnostics._bsurface_attachment_witness import grid_control_from_environment  # noqa: E402
 import _telemetry  # noqa: E402
 
 ORDER = ("rocker_arm", "channel_lever")
@@ -677,6 +678,7 @@ async def pilot(
     callout_storage=None,
     source_callout_authoring=None,
 ):
+    grid_control = grid_control_from_environment()
     order = target_order(targets)
     from diagnostics._source_save_boundaries import (
         require_targets as require_source_targets,
@@ -722,6 +724,7 @@ async def pilot(
         "order": order,
         "protected_targets": protected_targets,
         "factory": setup_controller.variant.value if setup_controller else "normal",
+        "bsurf_grid_control": grid_control.value,
         "trials": [],
         "scope": "one functional build per recipe; no speedup/full-pipeline claim",
         "source_witness_scope": "exact original/copy disk hashes and named recipe dimension identities/values/tolerances/BASIC; not full in-memory source immutability",
@@ -1216,6 +1219,7 @@ async def pilot(
 
 
 def main(argv=None):
+    grid_control_from_environment()  # invalid opt-in refuses before parent/worker COM routing
     from diagnostics._source_callout_authoring import (
         SourceCalloutAuthoring, require_selection,
     )

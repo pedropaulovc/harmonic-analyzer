@@ -82,6 +82,79 @@ Neither a zero-based nor a transposed request is justified by this receipt.
 The next native control can compare the documented example index and boundary
 indices against the now-retained counts. Its result remains untested.
 
+## Retained metadata and opt-in boundary-domain control
+
+The second prepared trial, at `37b13401` in
+`cad/out/reports/datum-policy-vxy0llpy/pilot.json`, failed at the same `(1,6)`
+request. SHA256:
+`deaa6c9be61e313c3220b092dee695cbcb0b517c0a69d3209fb1192909eff8e1`.
+Its journal now records **25 columns, 5 rows, dimension 4, U/V orders 5/3,
+and U/V knot counts 30/8**. The first five `(1,column)` requests returned
+four-double tuples; `(1,6)` returned `None`. These are observed property values
+and calls, not a conclusion about the API's actual index domain or a reason to
+transpose its arguments. Recipe time was 64.34269279998261 s and total pilot
+time 137.11865799990483 s, including the failed witness. The copied gear hash
+stayed exact; all four protected hashes were unchanged, initial/final native
+inventories were empty, and cleanup had no error.
+
+`HARMONIC_BSURF_GRID_CONTROL=boundary-domain` explicitly enables a separate
+raw observation group before the unchanged full grid. Missing variable or `off`
+adds no calls; any other value is rejected in parent/worker routing before COM
+and at the direct surface entry. An opt-in surface read requires an evidence
+sink. The pilot records its mode as `bsurf_grid_control`; the surface journal
+stores `grid_control` with the requested indices, literal returns and exceptions.
+
+The bounded plan starts with the official example's `(2,3)`, then varies one
+argument using each measured count and count+1. For this observed grid it is:
+
+```text
+(2,3), (1,5), (1,6), (5,1), (6,1),
+(25,1), (26,1), (1,25), (1,26), (0,1), (1,0)
+```
+
+The last two are explicit **out-of-documented-domain negative probes**, never
+normal requests. Smaller/square grids deduplicate this fixed plan; there are
+at most 11 queries, not an expanded grid search. The generated ABI still gets
+Row then Column. The request remains `GetBSurfParams3(False, False, VP0, 0.01)`.
+No conversion, tolerance, zero-based acceptance or transpose is introduced.
+Getter errors stay in the observation group and do not skip later planned
+observations. Then the original full-grid reader runs from `(1,1)`, with the
+same strict shape/finite checks and first-failure behavior. Exploratory values
+never populate its geometry bank or replace its rejection. The separate
+`diagnostic.silhouette.bsurface.boundary_domain` span exposes added read time;
+this instrumented run is not a performance comparison.
+
+For one owned control, set the environment only for the existing pilot command
+below (same source/guard paths and confirmed exclusive seat/PID):
+
+```powershell
+$env:HARMONIC_SW_AUTOSTART = '0'
+$env:HARMONIC_REMOTE_CACHE_MODE = 'off'
+$env:HARMONIC_DIAGNOSTIC_SW_PID = '<confirmed existing PID>'
+$env:HARMONIC_BSURF_GRID_CONTROL = 'boundary-domain'
+try {
+    uv run --no-sync python cad/scripts/diagnostics/probe_datum_policy_recipes.py `
+      --candidate HEAD --factory prepared --target crank_drive_gear `
+      --source-root C:/src/harmonic-analyzer/cad/out/sldprt `
+      --guard-root C:/src/harmonic-analyzer/cad/out/sldprt
+} finally {
+    Remove-Item Env:HARMONIC_BSURF_GRID_CONTROL
+}
+```
+
+This uses the existing locked attach-only worker and owned source/drawing
+lifecycle. It does not authorize another recipe attempt or a save of the copied
+source. Boundary-control native results remain pending.
+
+Offline boundary tests first reported 21 failures and 2 unchanged-default
+passes (`run-x35zngby`). They now cover strict enum routing, missing evidence,
+bounded deduplication, the observed native metadata shape, literal null/errors,
+and refusal to substitute exploratory coefficients for the full grid. The
+12-file adjacent run passed 484 tests in 18.84 s (`run-nqyfz0zi`); the final
+25-case boundary suite, including original getter-exception preservation,
+passed in 0.64 s (`run-ruu9ckp1`). Ruff F/RUF043/RUF059 and diff checks passed.
+These fixtures establish instrumentation behavior, not native domain results.
+
 ## Supported request, not an exactness assumption
 
 The bundled official **Get B-Spline Surface Parameterization Data (C#)** example
@@ -151,10 +224,10 @@ counts. Added controls preserve partial parameter arrays and the original
 validation error if journal encoding fails, and prove that successful geometry
 and native call counts are unchanged. The ten-file adjacent suite passed
 389 tests in 20.02 s (`run-pb9a7cir`); Ruff F/RUF043/RUF059 and
-`git diff --check` passed. Native execution of this journaling follow-up remains
-pending.
+`git diff --check` passed. The journaling follow-up subsequently produced the
+second failed native receipt described above.
 
-The first native attempt failed as recorded above; complete native acceptance
+Both native attempts failed as recorded above; complete native acceptance
 remains pending. Use the existing pilot after source review
 and confirmed exclusive seat ownership/current PID; the prepared factory keeps
 the preceding failure's setup arm. Stop at the first failure; no second variant
