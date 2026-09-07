@@ -8,6 +8,8 @@ ownership and the initial/final SHA witness protect that one original directly.
 Optional --factory normal|prepared selects only the isolated recipe's initial
 project drawing factory. Use separate invocations for a functional pair: a
 failed normal cold-title witness never authorizes continuing to prepared.
+The opt-in --drawing-save control requires alignment_pinion and its source
+boundary observations. It changes only the native save call, not hash acceptance.
 
 Run only under an explicitly granted COM seat, attaching to the expected existing
 SolidWorks process with automatic launch/recovery disabled. Production recipes
@@ -536,6 +538,22 @@ def retain_failed_drawing(adapter, trial, output, checkpoint):
     persist()
 
 
+def require_drawing_save(variant, source_observation, order):
+    from diagnostics._native_drawing_save_control import DrawingSave
+    from diagnostics._source_save_boundaries import SourceObservation
+
+    if variant is None:
+        return
+    if (
+        not isinstance(variant, DrawingSave)
+        or source_observation is not SourceObservation.ALIGNMENT_SAVE
+        or tuple(order) != ("alignment_pinion",)
+    ):
+        raise ValueError(
+            "drawing-save control requires only alignment_pinion with alignment_save observations"
+        )
+
+
 async def pilot(
     adapter,
     candidate,
@@ -547,6 +565,7 @@ async def pilot(
     setup_controller=None,
     linear_control=None,
     source_observation=None,
+    drawing_save=None,
 ):
     order = target_order(targets)
     from diagnostics._source_save_boundaries import (
@@ -554,6 +573,7 @@ async def pilot(
     )
 
     require_source_targets(source_observation, order)
+    require_drawing_save(drawing_save, source_observation, order)
     protected_targets = tuple(dict.fromkeys((*ORDER, *order)))
     if linear_control is not None:
         from diagnostics._linear_dimension_arrangement import require_targets
@@ -680,6 +700,17 @@ async def pilot(
                 trial_dir / "recipe-source.py"
             )
             build_kwargs = {"drawing_factory": drawing_factory}
+            save_control = nullcontext()
+            if drawing_save is not None:
+                from diagnostics._native_drawing_save_control import (
+                    native_drawing_save_control,
+                )
+
+                trial["drawing_save"] = drawing_save.value
+                trial["native_save_calls"] = []
+                save_control = native_drawing_save_control(
+                    adapter, drawing_save, records=trial["native_save_calls"]
+                )
             source_boundaries = None
             if source_observation is not None:
                 from diagnostics._source_save_boundaries import SourceSaveBoundaries
@@ -712,6 +743,7 @@ async def pilot(
                         DocumentKind.DRAWING, module.OUTPUTS.slddrw
                     ):
                         with (
+                            save_control,
                             (
                                 source_boundaries.observe()
                                 if source_boundaries is not None
@@ -944,6 +976,7 @@ async def pilot(
 
 
 def main(argv=None):
+    from diagnostics._native_drawing_save_control import DrawingSave
     from diagnostics._source_save_boundaries import (
         SourceObservation,
         require_targets as require_source_targets,
@@ -978,6 +1011,12 @@ def main(argv=None):
     )
     parser.add_argument("--worker", action="store_true")
     parser.add_argument(
+        "--drawing-save",
+        type=DrawingSave,
+        choices=tuple(DrawingSave),
+        help="diagnostic native save only; requires alignment source observations",
+    )
+    parser.add_argument(
         "--source-observation",
         type=SourceObservation,
         choices=tuple(SourceObservation),
@@ -992,6 +1031,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
     order = target_order(args.target)
     require_source_targets(args.source_observation, order)
+    require_drawing_save(args.drawing_save, args.source_observation, order)
     require_targets(args.linear_dimensions, order)
     require_owned_diagnostic_environment()  # before dodo._run in the parent
     if args.factory is not None:
@@ -1023,6 +1063,11 @@ def main(argv=None):
                 ),
                 *(argument for target in order for argument in ("--target", target)),
                 *(
+                    ["--drawing-save", args.drawing_save.value]
+                    if args.drawing_save is not None
+                    else []
+                ),
+                *(
                     ["--source-observation", args.source_observation.value]
                     if args.source_observation is not None
                     else []
@@ -1047,6 +1092,11 @@ def main(argv=None):
             guard_root,
             args.report_root.resolve(),
             targets=order,
+            **(
+                {"drawing_save": args.drawing_save}
+                if args.drawing_save is not None
+                else {}
+            ),
             **(
                 {"source_observation": args.source_observation}
                 if args.source_observation is not None
