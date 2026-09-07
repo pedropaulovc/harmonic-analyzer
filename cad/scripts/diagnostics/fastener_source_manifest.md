@@ -10,7 +10,8 @@ Native cold acceptance of these two enrolled inputs is pending. Following the
 initial enrollment, the tip was rebuilt through the real production task and
 its pin explicitly migrated to `f3578ac2...8468` below. The historical builder
 identity and the mismatching pre-rebuild output are both rejected; neither is
-an alternative accepted input.
+an alternative accepted input. The first owned tip replay then failed its
+source-copy preservation gate; the screw target was not reached (receipt below).
 
 ## Source provenance and the pre-rebuild tip mismatch
 
@@ -144,3 +145,35 @@ historical input. After changing only that registry identity, the four-file
 pin/spec/fleet suite passed 151 tests in 4.44 seconds (`run-8ui396og`); Ruff and
 diff checks passed. The full sixteen-entry equality still pins every other
 identity exactly.
+
+## First owned tip replay: source-copy preservation failed
+
+At frozen root `fb958fda`, the prepared full-recipe pilot selected tip then screw.
+Receipt `cad/out/reports/datum-policy-sd8umcdz/pilot.json` has SHA-256
+`100067e57314e7eeee8d9d848190d246868bebf2035cc1613f76e91d2078fce0`.
+The complete failed pilot took 183.5877625 seconds; the tip recipe returned after
+24.0260824 seconds. These include diagnostic work and are not a speed comparison.
+
+The tip's owned source copy began with the enrolled
+`f3578ac2b2ab95e478bc7bd72c316ebab057c125d5244af6fa2c3e12f4d48468`
+identity. Immediately after the recipe, its SHA was
+`9864a588cb934322d1a0fa58cff56aba1f8b40845663cdd2cd686f13551fe5e1`;
+the final observation retained that same changed identity. The original error
+was `after_recipe: owned source copy changed on disk; no source save is
+authorized`. The independent final runtime guard also rejected the changed copy.
+
+All four protected original files, including the freshly rebuilt tip, kept their
+exact starting hashes. Failure capture completed with `errors=[]` and retained
+native observations plus PDF/PNG evidence. Its before/after-export preservation
+checks concern the already-failed scene; they do not establish unchanged source
+semantics across the recipe. The normal post-recipe source witness and built/cold
+drawing acceptance were not reached. There is only one trial in the receipt:
+the second selected screw target never started.
+
+This preserves the distinction between historical successful production tasks
+and the stricter owned-copy/cold pilot: a returned recipe or successful native
+save does not pass the latter gate. No source-pin update, source-write permission,
+or checker exemption follows from this failure. The receipt locates the byte
+change within the recipe, not at a particular operation; attributing it to
+`set_reference_dimensions` or any individual setter still requires a separate
+first-dirty boundary observation.
