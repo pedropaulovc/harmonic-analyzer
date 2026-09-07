@@ -16,6 +16,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+from pinion_pivot_block_spec import DIMENSION_CALLOUTS
 import sys
 from typing import Any
 
@@ -35,7 +36,7 @@ from _drawing_common import (
     curate_view_dimensions,
     finalize_drawing,
     read_required_properties,
-    set_dimension_callouts,
+    verify_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     set_basic_dimension,
@@ -119,10 +120,7 @@ FRONT_KEEP = {
 }
 RIGHT_KEEP = {"Depth": (0.280, 0.168)}
 TOP_KEEP = {}
-DIMENSION_CALLOUTS = {
-    "PivotBoreDia": "THRU - REAM 1/4 IN",
-    "LiftBoreDia": "THRU - REAM 1/4 IN",
-}
+
 
 
 async def build(
@@ -153,6 +151,7 @@ async def build(
             "Isometric View Note",
         ),
     )
+    callout_source_model = adapter.currentModel
     drawing_model, sheet = drawing_factory(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE
     )
@@ -191,10 +190,13 @@ async def build(
     top_annotations = curate_view_dimensions(
         adapter, top, keep=TOP_KEEP, view_label="top"
     )
-    set_dimension_callouts(
+    verify_dimension_callouts(
         adapter,
         [*front_annotations, *top_annotations, *right_annotations],
         DIMENSION_CALLOUTS,
+        feature_name="BlockProfile",
+        view=front,
+        source_model=callout_source_model,
     )
 
     for view, label in ((front, "front"), (top, "top")):

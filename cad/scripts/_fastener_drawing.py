@@ -18,6 +18,7 @@ from _drawing_common import (
     finalize_drawing,
     read_required_properties,
     set_dimension_callouts,
+    verify_dimension_callouts,
     set_hidden_lines_removed,
     stamp_drawing_summary,
 )
@@ -38,6 +39,7 @@ class FastenerSheet:
     dimension_callouts: Mapping[str, str]
     side_keep: Mapping[str, tuple[float, float]] | None = None
     side_dimension_callouts: Mapping[str, str] | None = None
+    side_callout_feature: str | None = None
     note_xy: tuple[float, float] = (0.020, 0.115)
     end_note_xy: tuple[float, float] = (0.050, 0.220)
     side_centerline_face: FeatureFace | None = None
@@ -57,6 +59,8 @@ async def build_fastener_sheet(
     recipe: FastenerSheet,
 ) -> dict[str, str]:
     """Build one profile + head-end + isometric fastener sheet."""
+    if recipe.side_dimension_callouts and not recipe.side_callout_feature:
+        raise ValueError("nonempty fastener side callouts require an exact source feature")
     if not source.is_file():
         raise FileNotFoundError(f"source part is missing: {source}")
 
@@ -83,6 +87,7 @@ async def build_fastener_sheet(
             "End View Note",
         ),
     )
+    callout_source_model = adapter.currentModel
     drawing_model, _sheet = drawing_factory(
         adapter, property_view=property_view, scale=recipe.scale
     )
@@ -152,11 +157,17 @@ async def build_fastener_sheet(
         side_annotations = curate_view_dimensions(
             adapter, side, keep=dict(recipe.side_keep), view_label="side"
         )
-        set_dimension_callouts(
-            adapter,
-            side_annotations,
-            dict(recipe.side_dimension_callouts or {}),
-        )
+        if recipe.side_dimension_callouts:
+            verify_dimension_callouts(
+                adapter,
+                side_annotations,
+                dict(recipe.side_dimension_callouts),
+                feature_name=recipe.side_callout_feature,
+                view=side,
+                source_model=callout_source_model,
+            )
+        if not recipe.side_dimension_callouts:
+            set_dimension_callouts(adapter, side_annotations, {})
 
     views = {"side": side, "end": end, "iso": iso}
     if recipe.decorate is not None:

@@ -59,3 +59,10 @@ ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
 GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
     "block top-face parallelism": "0.10",
 }
+
+
+# Model display callouts, imported read-only by the manufacturing drawing.
+DIMENSION_CALLOUTS = {
+    "LeverBoreDiaDim": "THRU - SLIP FIT Ø6 ROD",
+    "RodBoreDiaDim": "THRU - SLIP FIT Ø5 ROD",
+}

@@ -31,6 +31,8 @@ Run (SolidWorks already open)::
 from __future__ import annotations
 
 import math
+from _model_dimension_callouts import author_model_callouts
+from pinion_bracket_spec import DIMENSION_CALLOUTS
 import sys
 
 from _common import (
@@ -530,6 +532,27 @@ async def build(adapter) -> dict[str, str]:
             (arbor_axis, "AXIS"),
             (pin_seat_axis, "AXIS"),
         ),
+    )
+    author_model_callouts(
+        adapter,
+        "StrapProfile",
+        {
+            "PivotBoreDia": DIMENSION_CALLOUTS["PivotBoreDia"],
+            "ArborBoreDia": DIMENSION_CALLOUTS["ArborBoreDia"],
+        },
+    )
+    author_model_callouts(
+        adapter,
+        "PinSeatProfile",
+        {
+            "PinSeatCy": DIMENSION_CALLOUTS["PinSeatCy"],
+            "PinSeatDia": DIMENSION_CALLOUTS["PinSeatDia"],
+            "PinSeatCz": DIMENSION_CALLOUTS["PinSeatCz"],
+        },
+    )
+    author_model_callouts(adapter, "Strap", {"Depth": DIMENSION_CALLOUTS["Depth"]})
+    author_model_callouts(
+        adapter, "PinSeat", {"PinSeatDepth": DIMENSION_CALLOUTS["PinSeatDepth"]}
     )
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)

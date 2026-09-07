@@ -404,10 +404,13 @@ def test_verifier_resolves_exact_source_tree_without_switching_drawing(
     assert native.model.mock_calls == [call.GetType()]
 
 
-def test_callout_author_is_an_alignment_only_part_input():
+def test_callout_author_has_exact_approved_part_inputs():
+    from test_model_callout_fleet_drawing import ACTIVE
+
     helper = Path(author.__file__).resolve()
     consumers = {
         path.stem for path in part_scripts() if str(helper) in module_deps_of(path)
     }
-    assert consumers == {"build_alignment_pinion"}
+    assert consumers == {name.replace("draw_", "build_", 1) for name in ACTIVE}
+    assert len(consumers) == 35
     assert str(Path(common.__file__).resolve()) not in module_deps_of(helper)

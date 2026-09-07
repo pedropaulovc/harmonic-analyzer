@@ -110,3 +110,10 @@ GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
     "lift-bore parallelism": "0.10",
     "hold-down hole position": "0.25",
 }
+
+
+# Model display callouts, imported read-only by the manufacturing drawing.
+DIMENSION_CALLOUTS = {
+    "PivotBoreDia": "THRU - REAM 1/4 IN",
+    "LiftBoreDia": "THRU - REAM 1/4 IN",
+}

@@ -3,6 +3,7 @@ r"""Create the curated machinist drawing for the v2 cone pivot post."""
 from __future__ import annotations
 
 import argparse
+from cone_pivot_post_spec import DIMENSION_CALLOUTS
 import sys
 from typing import Any
 
@@ -22,7 +23,7 @@ from _drawing_common import (
     model_point_in_view,
     read_required_properties,
     set_basic_dimension,
-    set_dimension_callouts,
+    verify_dimension_callouts,
     set_dimension_precision,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
@@ -98,9 +99,7 @@ TOP_KEEP = {
     "MainBodyDia": (TOP_CENTER[0] - 0.040, TOP_CENTER[1]),
     "HeadDia": (TOP_CENTER[0] + 0.045, TOP_CENTER[1]),
 }
-DIMENSION_CALLOUTS = {
-    "CrankBoreDia": "THRU",
-}
+
 DIMENSION_PRECISION = {
     "MainBodyDia": 3,
     "HeadDia": 4,
@@ -283,6 +282,7 @@ async def build(
             "Manufacturing Notes",
         ),
     )
+    callout_source_model = adapter.currentModel
     drawing_model, _sheet = drawing_factory(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE
     )
@@ -312,7 +312,14 @@ async def build(
         adapter, top, keep=TOP_KEEP, view_label="top"
     )
     annotations = [*front_annotations, *top_annotations]
-    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    verify_dimension_callouts(
+        adapter,
+        annotations,
+        DIMENSION_CALLOUTS,
+        feature_name="CrankBoreProfile",
+        view=front,
+        source_model=callout_source_model,
+    )
     set_dimension_precision(adapter, annotations, DIMENSION_PRECISION)
     front_by_name = {
         dimension_name(adapter, annotation): annotation

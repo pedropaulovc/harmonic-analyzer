@@ -110,3 +110,10 @@ GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
     "handle pivot position": "0.20",
     "crank broad-face parallelism": "0.10",
 }
+
+
+# Model display callouts, imported read-only by the manufacturing drawing.
+DIMENSION_CALLOUTS = {
+    "ShaftBoreDia": "THRU - REAM 3/8 IN",
+    "DimpleDia": "0.5 DEEP",
+}

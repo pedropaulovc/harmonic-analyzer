@@ -17,6 +17,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+from magnifying_vertical_rod_spec import DIMENSION_CALLOUTS
 import sys
 from typing import Any
 
@@ -29,12 +30,12 @@ from _drawing_common import (
     curate_view_dimensions,
     finalize_drawing,
     read_required_properties,
-    set_dimension_callouts,
+    verify_dimension_callouts,
     set_hidden_lines_removed,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from magnifying_vertical_rod_spec import ROD_DIA, ROD_LENGTH
+from magnifying_vertical_rod_spec import ROD_LENGTH
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -71,10 +72,7 @@ FRONT_KEEP = {
     "DomeRadius": (RIGHT_CENTER[0] - 0.075, FRONT_CENTER[1] + 0.028),
 }
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
-DIMENSION_CALLOUTS = {
-    "DomeRadius": f"FULL R, BOTH ENDS - Ø{ROD_DIA:g} ROD",
-    "RightDomeCentre": "TO FAR DOME CENTRE",
-}
+
 
 
 async def build(
@@ -107,6 +105,7 @@ async def build(
             "Iso View Note",
         ),
     )
+    callout_source_model = adapter.currentModel
     drawing_model, _sheet = drawing_factory(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE
     )
@@ -132,7 +131,14 @@ async def build(
         adapter, front, keep=FRONT_KEEP, view_label="front"
     )
     curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
-    set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
+    verify_dimension_callouts(
+        adapter,
+        front_annotations,
+        DIMENSION_CALLOUTS,
+        feature_name="RodProfile",
+        view=front,
+        source_model=callout_source_model,
+    )
     # The end silhouette is circular; SolidWorks files it under the same
     # "hole" bit as a bored circle, so a disabled bit makes the API a no-op.
     if not auto_center_marks(adapter, right, holes=True, size=0.0025):

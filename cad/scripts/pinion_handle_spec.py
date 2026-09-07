@@ -82,3 +82,14 @@ GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
     "handle flat-end perpendicularity": "0.05",
     "handle transverse-axis position": "0.05",
 }
+
+
+# Model display callouts, imported read-only by the manufacturing drawing.
+DIMENSION_CALLOUTS = {
+    "TubeId": "FINAL REAM",
+    "GripLen": "CYL. LENGTH",
+    "TubeLen": "BORE DEPTH",
+    "RodSpan": "OAL",
+    "RodDia": "PRESS ROD",
+    "RodHoleDia": "BODY HOLE; REAM THRU",
+}

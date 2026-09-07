@@ -117,3 +117,9 @@ GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
     "shoulder total runout": "0.05",
     "head total runout": "0.05",
 }
+
+
+# Model display callouts, imported read-only by the manufacturing drawing.
+SIDE_DIMENSION_CALLOUTS = {
+    "ThreadLg": THREAD_DESIGNATION,
+}

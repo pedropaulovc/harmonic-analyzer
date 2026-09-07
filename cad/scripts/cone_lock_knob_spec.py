@@ -66,3 +66,9 @@ GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
     "washer flange runout": "0.10",
     "clamp seat perpendicularity": "0.05",
 }
+
+
+# Model display callouts, imported read-only by the manufacturing drawing.
+DIMENSION_CALLOUTS = {
+    "StudDia": f"{STUD_THREAD} UNC-2A",
+}

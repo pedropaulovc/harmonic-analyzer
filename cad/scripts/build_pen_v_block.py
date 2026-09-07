@@ -23,6 +23,8 @@ Run (SolidWorks already open)::
 from __future__ import annotations
 
 import math
+from _model_dimension_callouts import author_model_callouts
+from pen_v_block_spec import DIMENSION_CALLOUTS
 import sys
 
 from _common import (
@@ -285,6 +287,17 @@ async def build(adapter) -> dict[str, str]:
             "Manufacturing Notes": DRAWING_NOTES,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
+    )
+    author_model_callouts(
+        adapter, "BoreProfile", {"Bore0Dia": DIMENSION_CALLOUTS["Bore0Dia"]}
+    )
+    author_model_callouts(
+        adapter,
+        "ScrewHoleProfile",
+        {"ScrewHoleDiaDim": DIMENSION_CALLOUTS["ScrewHoleDiaDim"]},
+    )
+    author_model_callouts(
+        adapter, "OutlineProfile", {"Chamfer2dx": DIMENSION_CALLOUTS["Chamfer2dx"]}
     )
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(

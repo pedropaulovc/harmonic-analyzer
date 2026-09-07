@@ -3,6 +3,7 @@ r"""Create the curated machinist drawing for the cone-tip spacer bushing."""
 from __future__ import annotations
 
 import argparse
+from cone_tip_bushing_spec import DIMENSION_CALLOUTS
 import sys
 from typing import Any
 
@@ -21,7 +22,7 @@ from _drawing_common import (
     curate_view_dimensions,
     finalize_drawing,
     read_required_properties,
-    set_dimension_callouts,
+    verify_dimension_callouts,
     set_dimension_precision,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
@@ -71,9 +72,7 @@ END_KEEP = {
 SIDE_KEEP = {
     "Depth": (SIDE_CENTER[0] + 0.036, SIDE_CENTER[1]),
 }
-DIMENSION_CALLOUTS = {
-    "BoreDiaDim": "1/32 IN THRU",
-}
+
 # The bore is an exact inch conversion (1/32 in = 0.794); the sheet default of
 # 2 decimals (0.79) would contradict the note, so this one dim displays 3.
 DIMENSION_PRECISION = {"BoreDiaDim": 3}
@@ -105,6 +104,7 @@ async def build(
             "Manufacturing Notes",
         ),
     )
+    callout_source_model = adapter.currentModel
     drawing_model, _sheet = drawing_factory(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE
     )
@@ -134,7 +134,14 @@ async def build(
         adapter, side, keep=SIDE_KEEP, view_label="side"
     )
     annotations = [*end_annotations, *side_annotations]
-    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    verify_dimension_callouts(
+        adapter,
+        annotations,
+        DIMENSION_CALLOUTS,
+        feature_name="BoreProfile",
+        view=end,
+        source_model=callout_source_model,
+    )
     set_dimension_precision(adapter, annotations, DIMENSION_PRECISION)
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to end view")

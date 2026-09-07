@@ -43,6 +43,8 @@ Run (SolidWorks already open)::
 from __future__ import annotations
 
 import math
+from _model_dimension_callouts import author_model_callouts
+from knife_mount_spec import DIMENSION_CALLOUTS
 import sys
 
 from _common import (
@@ -315,6 +317,7 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
+    author_model_callouts(adapter, "BoreProfile", DIMENSION_CALLOUTS)
     return await save_part_and_images(adapter, PART_NAME)
 
 

@@ -108,3 +108,11 @@ GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
     "pen bore position": "0.20",
     "block top-face parallelism": "0.10",
 }
+
+
+# Model display callouts, imported read-only by the manufacturing drawing.
+DIMENSION_CALLOUTS = {
+    "Bore0Dia": "2X THRU",
+    "ScrewHoleDiaDim": "THRU",
+    "Chamfer2dx": "X 45 DEG, 2 PLACES",
+}

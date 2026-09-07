@@ -16,6 +16,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+from pen_v_block_spec import DIMENSION_CALLOUTS
 import sys
 from typing import Any
 
@@ -38,7 +39,7 @@ from _drawing_common import (
     dimension_name,
     finalize_drawing,
     read_required_properties,
-    set_dimension_callouts,
+    verify_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
@@ -112,11 +113,7 @@ RIGHT_KEEP = (
 
 # Initial dimension-text seed; native arrangement chooses its final location.
 RIGHT_HALF_Z = BLOCK_DEPTH / 2.0 * SHEET_SCALE[0] / 1000.0
-DIMENSION_CALLOUTS = {
-    "Bore0Dia": "2X THRU",
-    "ScrewHoleDiaDim": "THRU",
-    "Chamfer2dx": "X 45 DEG, 2 PLACES",
-}
+
 
 
 async def build(
@@ -147,6 +144,7 @@ async def build(
             "Isometric View Note",
         ),
     )
+    callout_source_model = adapter.currentModel
     drawing_model, sheet = drawing_factory(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE
     )
@@ -184,10 +182,29 @@ async def build(
     right_annotations = retain_view_dimensions(
         adapter, right, keep=RIGHT_KEEP, view_label="right"
     )
-    set_dimension_callouts(
+    verify_dimension_callouts(
         adapter,
         [*front_annotations, *top_annotations, *right_annotations],
-        DIMENSION_CALLOUTS,
+        {"Bore0Dia": DIMENSION_CALLOUTS["Bore0Dia"]},
+        feature_name="BoreProfile",
+        view=top,
+        source_model=callout_source_model,
+    )
+    verify_dimension_callouts(
+        adapter,
+        [*front_annotations, *top_annotations, *right_annotations],
+        {"ScrewHoleDiaDim": DIMENSION_CALLOUTS["ScrewHoleDiaDim"]},
+        feature_name="ScrewHoleProfile",
+        view=front,
+        source_model=callout_source_model,
+    )
+    verify_dimension_callouts(
+        adapter,
+        [*front_annotations, *top_annotations, *right_annotations],
+        {"Chamfer2dx": DIMENSION_CALLOUTS["Chamfer2dx"]},
+        feature_name="OutlineProfile",
+        view=front,
+        source_model=callout_source_model,
     )
     # The two bore stations from datum B are the nominal locations the A-B-C
     # position FCF controls, so they must be BASIC -- leaving them under the

@@ -53,3 +53,7 @@ SURFACE_FINISHES = (
 GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
     "rocker pin hole position": "0.20",
 }
+
+
+# Model display callouts, imported read-only by the manufacturing drawing.
+DIMENSION_CALLOUTS = {"StrapBoreDia": "BORE"}

@@ -3,6 +3,7 @@ r"""Create the curated cone-platform pivot shoulder-screw drawing."""
 from __future__ import annotations
 
 import argparse
+from cone_pivot_screw_spec import SIDE_DIMENSION_CALLOUTS
 import sys
 from typing import Any, Mapping
 
@@ -34,7 +35,6 @@ from cone_pivot_screw_spec import (
     SHOULDER_LEN,
     SURFACE_FINISHES,
     THREAD,
-    THREAD_DESIGNATION,
     THREAD_SOLID_DIA,
     UNDERHEAD_LEN,
 )
@@ -65,9 +65,7 @@ SLOT_KEEP = {
     "SlotWDim": (0.285, 0.242),
     "SlotDepth": (0.325, 0.215),
 }
-SIDE_DIMENSION_CALLOUTS = {
-    "ThreadLg": THREAD_DESIGNATION,
-}
+
 DIMENSION_CALLOUTS: dict[str, str] = {}
 ENTITY_ROLES = {
     "thread_end": CircleEdge(THREAD_SOLID_DIA / 2.0, (0, -UNDERHEAD_LEN, 0), (0, 1, 0)),
@@ -193,6 +191,7 @@ RECIPE = FastenerSheet(
     dimension_callouts=DIMENSION_CALLOUTS,
     side_keep=SIDE_KEEP,
     side_dimension_callouts=SIDE_DIMENSION_CALLOUTS,
+    side_callout_feature="ThreadTail",
     note_xy=(0.020, 0.105),
     end_note_xy=(0.020, 0.245),
     side_centerline_face=FeatureFace("Shoulder", CylinderFace(SHOULDER_DIA)),

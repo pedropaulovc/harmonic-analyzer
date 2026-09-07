@@ -63,3 +63,7 @@ DRAWING_NOTES = "\n".join(
     )
 )
 END_VIEW_NOTE = "DRIVER-FACE VIEW"
+
+
+# Model display callouts, imported read-only by the manufacturing drawing.
+SIDE_DIMENSION_CALLOUTS = {"ShankLg": "UNDERHEAD LENGTH"}

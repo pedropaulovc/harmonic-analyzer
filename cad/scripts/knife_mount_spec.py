@@ -69,3 +69,9 @@ ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
 GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
     "knife-bore position": "0.20",
 }
+
+
+# Model display callouts, imported read-only by the manufacturing drawing.
+DIMENSION_CALLOUTS = {
+    "BoreDia": "THRU",
+}
