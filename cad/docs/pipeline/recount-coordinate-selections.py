@@ -85,7 +85,12 @@ def main():
         print(name, "sites", counts[name], "recipes", len(recipes[name]))
         print("  ", ", ".join(locations[name]))
     print("Union names:", ", ".join(sorted(union)))
-    assert len(rows) == 92 and len(union) == 43, "audited registry/count changed"
+    if len(rows) != 92 or len(union) != 43:
+        raise SystemExit(
+            "audited coordinate-selection counts changed: "
+            "expected registry=92 and coordinate_recipes=43; "
+            f"observed registry={len(rows)} and coordinate_recipes={len(union)}"
+        )
 
 
 if __name__ == "__main__":

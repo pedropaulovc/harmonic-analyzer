@@ -136,9 +136,15 @@ Offline focused/adjacent verification passed 451 tests in 17.57 s
 The existing full owned pilot reproduces the native control from its frozen
 checkout on the serialized seat, with no new launcher or callout authoring:
 
+PID 31860 belongs to the recorded runs above. Before replay, confirm exclusive
+machine-seat ownership and readiness of the current licensed SolidWorks session,
+then replace the PID placeholder below. If no licensed session is ready, use the
+project's licensed launch/recovery workflow before attaching; do not COM-start
+an unlicensed instance. Autostart stays disabled.
+
 ```powershell
 $env:HARMONIC_SW_AUTOSTART = '0'
-$env:HARMONIC_DIAGNOSTIC_SW_PID = '31860'
+$env:HARMONIC_DIAGNOSTIC_SW_PID = '<confirmed-current-PID>'
 $env:HARMONIC_REMOTE_CACHE_MODE = 'off'
 uv run --no-sync python cad/scripts/diagnostics/probe_datum_policy_recipes.py `
   --source-root C:/src/harmonic-analyzer/cad/out/sldprt `
@@ -146,8 +152,8 @@ uv run --no-sync python cad/scripts/diagnostics/probe_datum_policy_recipes.py `
   --candidate HEAD --factory prepared --target crankshaft
 ```
 
-Use the confirmed current PID, not an assumed persistent process. Source hashes,
-runtime fingerprints, ownership, save/reopen, source/annotation/attachment and
-layout gates remain mandatory. Each replay must obtain native 1 in its actual
+Source hashes, runtime fingerprints, ownership, save/reopen,
+source/annotation/attachment and layout gates remain mandatory. Each replay
+must obtain native 1 in its actual
 drawing context; the recorded positive control is not permission to skip that
 proof. No speedup claim.

@@ -87,14 +87,18 @@ example using it; this control reads only the documented 1..8 fields.
 ## Reproduction invocation
 
 Run in the frozen integrated checkout using its unchanged adapter/venv and
-the serialized native seat. The source SHA below is the reviewed existing
-cone-tip input, not an automatic pin.
-Confirm the current PID separately; 31860 is not a perpetual readiness claim.
+the serialized native seat. The source SHA below identifies the recorded
+cone-tip input, not an automatic pin. PID 31860 was the historical session.
+Before replay, confirm exclusive machine-seat ownership and readiness of the
+current licensed SolidWorks session, then replace the PID placeholder below.
+If no licensed session is ready, use the project's licensed launch/recovery
+workflow before attaching; do not COM-start an unlicensed instance. Autostart
+stays disabled, and the source hash/owned-copy guards remain mandatory.
 
 ```powershell
 $env:HARMONIC_SW_AUTOSTART='0'
 $env:HARMONIC_REMOTE_CACHE_MODE='off'
-$env:HARMONIC_DIAGNOSTIC_SW_PID='31860'
+$env:HARMONIC_DIAGNOSTIC_SW_PID='<confirmed-current-PID>'
 uv run --no-sync python cad/scripts/diagnostics/probe_dimension_prefix.py `
   --candidate HEAD `
   --source C:/src/harmonic-analyzer/cad/out/sldprt/cone-tip-adjuster.SLDPRT `
