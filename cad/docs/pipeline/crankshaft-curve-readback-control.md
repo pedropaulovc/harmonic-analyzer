@@ -98,7 +98,7 @@ documents modeler tolerance as relevant to representation accuracy. We neither
 change that tolerance nor equate returned spline data with exact BREP identity.
 This control does not sample a curve into an approximate acceptance witness.
 
-Untested: the paired rocker LINE control, repeated/cold parameter stability,
+Untested at that stage: the paired rocker LINE control, repeated/cold parameter stability,
 original/selected/attached drawing-context equivalence,
 and a full crankshaft recipe through save/reopen/printed acceptance. Those
 remain separate gates before extending a production diagnostic comparator.
@@ -136,3 +136,25 @@ Paired extension offline verification: 227 focused/adjacent tests passed in
 Tests include either wrong original rejected before any copy opens, first-copy
 mutation during the second stage, failed-child receipt retention and unrelated
 document survival. No paired native invocation has run yet.
+
+## Paired native positive control
+
+The explicit paired invocation passed at root `925dace0`, adapter `25bc99b1`
+and licensed PID 31860 with remote caching disabled. Receipt
+`paired-curves-vzrh7ohz/paired-curves.json`, SHA-256
+`84f3f85e4abf8d64f576a3621ac85e9beebece4ca68ef5c619fa0e45e3bb9eee`,
+records 47.075 s total. Rocker-arm edge 1 supplied the LINE control (19.277 s);
+crankshaft supplied six CIRCLE edges and both exact PinHole INTERSECTION 3004
+edges, indices 0 and 7 (27.412 s). Every attempted raw edge row was captured.
+
+The respective child receipt hashes are
+`00246115a565c8a70aff3164159f5aca5c488286a7976b900e586d77be10f279`
+and `a41bad07a9170d5443dee60319eccf7e0f6bf1be70deb9c790ea163df7b1cfed`.
+Both source dirty flags stayed false. Original and owned-copy hashes retained
+their exact pinned values, including the first copy after the second stage;
+aggregate errors and final guard errors were empty. Owned cleanup succeeded.
+
+This proves the paired source-reader call shapes, not drawing attachment or
+cold serialization equality. The historical crankshaft-only missing-LINE
+receipt remains a failed negative control. Integrated paired/fleet/preflight
+tests passed 210 tests in 5.31 s (`run-w1vvvgj0`).
