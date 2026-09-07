@@ -20,9 +20,16 @@ from diagnostics._native_drawing_save_control import DrawingSave
 @pytest.mark.parametrize("route", ["parent", "worker"])
 @pytest.mark.parametrize("save", tuple(DrawingSave))
 @pytest.mark.parametrize("storage", tuple(lower.CalloutStorage))
-def test_explicit_field_and_save_factors_are_forwarded(monkeypatch, tmp_path, route, save, storage):
+def test_explicit_field_and_save_factors_are_forwarded(
+    monkeypatch, tmp_path, route, save, storage
+):
     monkeypatch.setattr(pilot, "require_owned_diagnostic_environment", lambda: None)
     monkeypatch.setattr(pilot.benchmark, "revision", lambda _: "frozen")
+    monkeypatch.setattr(
+        pilot.benchmark,
+        "recipe_source",
+        lambda *_: "from _drawing_common import set_dimension_callouts",
+    )
     parent, seen = Mock(), []
     monkeypatch.setitem(sys.modules, "dodo", NS(_run=parent))
 
@@ -97,7 +104,12 @@ async def test_pilot_field_observer_order_and_fresh_cold_handles(
         pilot.TARGETS, "alignment_pinion", NS(view_roles={}, entity_labels=())
     )
     monkeypatch.setattr(
-        pilot.benchmark, "recipe_source", lambda *_: recipe(Path("unused.SLDPRT"))
+        pilot.benchmark,
+        "recipe_source",
+        lambda *_: (
+            recipe(Path("unused.SLDPRT"))
+            + "\nfrom _drawing_common import set_dimension_callouts\n"
+        ),
     )
     monkeypatch.setattr(pilot.benchmark, "revision", lambda _: "frozen")
     monkeypatch.setattr(pilot, "helper_fingerprints", lambda: {"helper": "frozen"})
@@ -114,7 +126,8 @@ async def test_pilot_field_observer_order_and_fresh_cold_handles(
     monkeypatch.setattr(pilot, "source_dimensions", dimensions)
 
     class Boundaries:
-        def __init__(self, *args, drawing_reader):
+        def __init__(self, *args, drawing_reader, callout_contract):
+            assert callout_contract is source.CalloutContract.DRAWING_SETTER_V1
             assert drawing_reader.__self__.__class__ is Field
             assert drawing_reader.__func__ is Field.boundary_snapshot
             self.drawing_reader = drawing_reader
