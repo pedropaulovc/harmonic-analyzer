@@ -345,6 +345,7 @@ async def benchmark(adapter, targets, baseline, candidate, output_root):
                             )
                     trial["seconds"] = round(time.perf_counter() - started, 6)
                     started = None
+                    factory.require_used()
                     trial["artifacts"] = validate_artifacts(artifacts, module.OUTPUTS)
                     check_fingerprints(
                         helper_inputs,

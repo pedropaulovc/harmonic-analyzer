@@ -684,6 +684,8 @@ async def pilot(
                             artifacts = await module.build(adapter, **build_kwargs)
                 if setup_controller is not None:
                     setup_controller.require_used()
+                if setup_controller is None:
+                    drawing_factory.require_used()
                 if linear_control is not None:
                     linear_control.require_used()
             finally:

@@ -8,6 +8,7 @@ from unittest.mock import Mock
 
 import pytest
 
+import _drawing_build
 from diagnostics import probe_datum_policy_recipes as probe
 from diagnostics import _owned_native_documents as owned
 from test_benchmark_drawing_recipes import recipe
@@ -15,6 +16,8 @@ from test_owned_native_documents_drawing import Model, native  # noqa: F401
 
 
 def fixture_sources(tmp_path, monkeypatch):
+    # Keep the real single-use factory; only its native blank-creation leaf is fake.
+    monkeypatch.setattr(_drawing_build.common, "new_project_drawing", Mock())
     source_root, guard_root = tmp_path / "sources", tmp_path / "guards"
     source_root.mkdir()
     guard_root.mkdir()
@@ -73,6 +76,7 @@ class Adapter:
         "reopen_drift",
         "reopen_rejected",
         "adapter_drift",
+        "unused_factory",
     ],
 )
 @pytest.mark.parametrize(
@@ -83,11 +87,10 @@ async def test_one_fresh_recipe_each_in_order_and_stop_first_failure(
 ):
     expected_order = probe.ORDER if targets is None else targets
     source_root, guard_root = fixture_sources(tmp_path, monkeypatch)
-    monkeypatch.setattr(
-        probe.benchmark,
-        "recipe_source",
-        lambda *_: recipe(Path("unread/alternate.SLDPRT")),
-    )
+    code = recipe(Path("unread/alternate.SLDPRT"))
+    if mode == "unused_factory":
+        code = code.replace("    drawing_factory(adapter)\n", "")
+    monkeypatch.setattr(probe.benchmark, "recipe_source", lambda *_: code)
     monkeypatch.setattr(probe.benchmark, "revision", lambda _: "frozen-candidate")
     monkeypatch.setattr(probe, "helper_fingerprints", lambda: {"helper": "frozen"})
     fingerprint_calls = []
@@ -174,6 +177,9 @@ async def test_one_fresh_recipe_each_in_order_and_stop_first_failure(
         for target in probe.ORDER
     )
     assert report["status"] == ("passed" if mode == "normal" else "failed")
+    if mode == "unused_factory":
+        assert "exactly one drawing factory" in report["trials"][0]["error"]
+        assert not snapshots
     assert len(report["sources_after"]) == 4
     assert all(
         outputs.slddrw.is_relative_to(output_root) for outputs, _ in adapter.drawn
