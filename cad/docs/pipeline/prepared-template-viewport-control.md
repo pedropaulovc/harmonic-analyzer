@@ -1,7 +1,27 @@
 # Retained prepared-template viewport control
 
-This is a diagnostic, not a prepared-cache acceptance change. It neither changes
-the production comparator nor publishes the failed template.
+## Production measurement-frame correction
+
+The production preparer now captures the first owned blank's native viewport
+before reading defaults. It restores that exact scale and translation on the
+verification drawing, requires unchanged orientation and complete viewport
+readback, then performs the original exact raw-default comparison. It sets no
+note position, font, sheet property or annotation geometry. The cache receipt
+retains both viewport observations; a hit also requires the successful exact
+restoration witness. The helper's source enters the preparation input key.
+
+This follows the successful same-document controlled-pan experiment below,
+not a rounding allowance. The actual two-document production path still needs
+its native run. Fail-first fixtures reproduced the differing measurement frame
+and missing restoration; 143 preparation/control tests and 217 factory tests
+pass. Three diagnostic integration expectations now account for the one new
+production restoration; normal mode still adds no diagnostic override, and all
+raw-extent drift rejection assertions remain in place.
+
+## Diagnostic provenance
+
+The controls below neither change the production comparator nor publish the
+failed template. Their run-local artifacts are not production cache entries.
 
 The production first-miss receipt at `f7a9fa55` is
 `cad/out/prepared-drawing-templates/pending-82fdda7f6c7b-2d8h09eb/receipt.json`,

@@ -218,7 +218,15 @@ def test_real_cache_miss_hit_preserves_baseline_and_exact_one_save(scene):
     assert scene.native.adapter.opens == []
     assert scene.original.read_bytes() == b"immutable source template"
     assert all(row["status"] == "passed" for row in report["guards"])
-    assert scene.viewport_calls == []
+    assert scene.viewport_calls == [
+        ("scale", 1.0),
+        ("translation", (0.02, 0.002, 0.0)),
+        ("redraw", 1.0),
+    ]  # The production preparer restores its verification document once.
+    assert all(
+        "viewport_control" not in row
+        for row in (*report["operation_scopes"], *report["trials"])
+    )
     miss, hit = report["accessors"]
     assert miss["artifacts"] == hit["artifacts"]
     assert "relocation_seconds" in miss and "relocation_seconds" not in hit
@@ -367,7 +375,20 @@ def test_distinct_new_document_pan_is_rejected_by_unchanged_normal_control(scene
     report, _ = scene.report()
     assert report["status"] == "failed"
     assert report["accessors"][0]["status"] == "failed"
-    assert scene.viewport_calls == []
+    assert scene.viewport_calls == [
+        ("scale", 1.0),
+        ("translation", (0.02, 0.002, 0.0)),
+        ("redraw", 1.0),
+    ]
+    assert all(
+        "viewport_control" not in row
+        for row in (*report["operation_scopes"], *report["trials"])
+    )
+    receipt = json.loads(
+        (Path(report["accessors"][0]["directory"]) / "receipt.json").read_text()
+    )
+    assert receipt["viewport_before"] == receipt["viewport_restore"]["after"]
+    assert receipt["before"] == receipt["after"]
 
 
 def test_captured_viewport_applies_to_both_prepare_creates_and_miss_hit_trials(
@@ -396,7 +417,7 @@ def test_captured_viewport_applies_to_both_prepare_creates_and_miss_hit_trials(
         "scale",
         "translation",
         "redraw",
-    ] * 4
+    ] * 5  # Four diagnostic creations plus the production verification restore.
     controls = [
         row["viewport_control"]
         for row in report["operation_scopes"]
