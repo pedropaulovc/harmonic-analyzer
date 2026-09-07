@@ -138,7 +138,14 @@ def _save(
     failures, out = [], {}
     started = time.perf_counter()
     try:
-        adapter.ownership.assert_current_owned()
+        record = adapter.ownership.assert_current_owned()
+
+        def require_current():
+            if adapter.ownership.assert_current_owned() is not record:
+                raise RuntimeError(
+                    "owned document changed during drawing save observation"
+                )
+
         draw = _draw(adapter)
         model = _early_bound(draw, "IModelDoc2")
         if model.GetType() != 3:
@@ -153,7 +160,8 @@ def _save(
             with context:
                 # Entry can perform native reads/checkpoints. Check afterwards,
                 # before any stale deletion or active-document save/export.
-                adapter.ownership.assert_current_owned()
+                # Another owned document is not the cached draw/model above.
+                require_current()
                 save_scope = (
                     adapter.ownership.saving_as(path)
                     if kind == "drawing"
@@ -173,7 +181,7 @@ def _save(
                     except Exception as error:
                         failures.append(error)
                         raise
-                adapter.ownership.assert_current_owned()
+                require_current()
                 out[kind] = path
         row["status"] = "passed"
         return out

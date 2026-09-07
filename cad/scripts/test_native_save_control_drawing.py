@@ -1,5 +1,6 @@
 """Diagnostic SaveAs3 routing; these doubles establish no native persistence."""
 
+import asyncio
 from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
@@ -8,6 +9,7 @@ import pytest
 
 import _drawing_common as common
 from diagnostics import _native_drawing_save_control as control
+from test_owned_native_documents_drawing import Model, facade, native as native
 
 
 @pytest.fixture
@@ -450,6 +452,83 @@ def test_artifact_context_active_doc_change_refuses_before_delete_or_save(
         if isinstance(row, tuple) and row[0] in {"modern", "legacy"}
     ]
     assert len(actual_saves) == changed_index
+
+
+@pytest.mark.parametrize("changed_at", ["drawing", "pdf", "png"])
+def test_other_owned_document_cannot_replace_cached_drawing(
+    native, monkeypatch, changed_at
+):
+    monkeypatch.setattr(control, "_early_bound", lambda value, _: value)
+    user = Model(None, title="User drawing", dirty=True)
+    native.app.documents.append(user)
+    native.app.ActiveDoc = user
+    adapter = facade(native)
+    asyncio.run(adapter.open_model(str(native.copy)))
+    drawing = adapter.currentModel
+    original_record = adapter.ownership.assert_current_owned()
+    other = native.directory / "other.SLDDRW"
+    other.write_bytes(b"other owned copy")
+    paths = {
+        "drawing": native.directory / "output.SLDDRW",
+        "pdf": native.directory / "output.pdf",
+        "png": native.directory / "output.png",
+    }
+    for path in paths.values():
+        path.write_bytes(b"retained stale artifact")
+    calls, records = [], []
+
+    def modern(path, *args):
+        calls.append(("drawing", args))
+        Path(path).write_bytes(b"native drawing")
+        drawing.path, drawing.title = path, Path(path).name
+        return True, 0, 2
+
+    def legacy(path, *args):
+        calls.append((Path(path).suffix[1:], args))
+        Path(path).write_bytes(b"legacy export")
+        return 0
+
+    drawing.Extension = SimpleNamespace(SaveAs3=modern)
+    drawing.SaveAs3 = legacy
+
+    @contextmanager
+    def artifact(kind, path):
+        if kind == changed_at:
+            asyncio.run(adapter.open_model(str(other)))
+            # It is genuinely owned and active, but not the saver's cached draw.
+            record = adapter.ownership.assert_current_owned()
+            assert record is not original_record
+            assert record.handle is adapter.currentModel is native.app.ActiveDoc
+        yield
+
+    original_save = common.save_drawing
+    with pytest.raises(RuntimeError, match="owned document changed"):
+        with control.native_drawing_save_control(
+            adapter, control.DrawingSave.EXTENSION_SILENT, records=records
+        ):
+            common.save_drawing(
+                adapter,
+                str(paths["drawing"]),
+                pdf_path=str(paths["pdf"]),
+                png_path=str(paths["png"]),
+                artifact_context=artifact,
+            )
+    assert common.save_drawing is original_save
+    changed_index = tuple(paths).index(changed_at)
+    assert [kind for kind, _ in calls] == list(paths)[:changed_index]
+    for kind in tuple(paths)[changed_index:]:
+        assert paths[kind].read_bytes() == b"retained stale artifact"
+    assert records[0]["status"] == "failed"
+    assert "owned document changed" in records[0]["failures"][0]
+    assert other.read_bytes() == b"other owned copy"
+    assert native.copy.read_bytes() == b"copy"
+    assert native.source.read_bytes() == b"original"
+    other_handle = adapter.currentModel
+    assert other_handle is not drawing
+    asyncio.run(adapter.close_owned_documents())
+    assert native.app.documents == [user]
+    assert {id(model) for model in native.app.closes} == {id(drawing), id(other_handle)}
+    assert user.path == "" and user.dirty and user.Visible
 
 
 def test_unknown_variant_does_not_replace_alias(scene):
