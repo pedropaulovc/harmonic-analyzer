@@ -46,6 +46,12 @@ You own `cad/scripts/draw_crank_arm.py`,
 named `test_*_drawing.py`, and a crank-arm evidence document under
 `cad/docs/pipeline/`.
 
+You may also add `cad/scripts/diagnostics/probe_crank_arm_entities.py` and its
+crank-arm-specific tests to complete native validation independently. Keep it
+limited to this recipe and compose the existing owned-session/document,
+source/annotation snapshot and cold-reopen helpers. Do not create a general
+runner framework or change shared diagnostic registries/runners to enroll it.
+
 Read shared code, but coordinate before changing `_drawing_common.py`, entity
 resolvers, layout/checking helpers, the prepared-template or factory code,
 diagnostic registries/runners, `dodo.py`, source-authoring helpers, the adapter,
@@ -185,8 +191,30 @@ overwrite the only retained baseline while producing candidate outputs.
    and retain its full report, including exclusions. `crank_arm` is not enrolled
    in the fixed-source `probe_datum_policy_recipes.py` target manifest at this
    base. Do not invent a `--target crank_arm` invocation or copy another VM's
-   pins into that manifest. Coordinate any needed enrollment or shared harness
-   change; reuse existing ownership/snapshot helpers rather than a new framework.
+   pins into that manifest. Use the permitted crank-arm-only diagnostic when
+   the existing attachment probe cannot provide the complete proof below. It
+   must run without waiting for shared target enrollment.
+
+   Inspect the exact signatures, schemas, ownership boundaries and tests of
+   `_owned_native_session.py`, `_owned_native_documents.py`,
+   `probe_source_basic_dimensions.part_dimensions`,
+   `probe_drawing_attachments.snapshot` / `compare`,
+   `probe_datum_shoulder.all_annotation_layout` and
+   `_reopen_annotation_comparison.compare_reopened_annotations` before composing
+   them. These helpers exist at the frozen base; none alone certifies the whole
+   recipe. Declare the crank-arm requirements locally from the unchanged spec
+   and builder, and bind only this recipe's source/output paths to declared owned
+   copies. Preserve its actual factory and read-only callout-verifier contracts.
+
+   Use the existing locked parent/worker and attach-only ownership flow. Recheck
+   the authorized ActiveDoc/currentModel before native mutations. Verify exact
+   source/view ownership and selected/attached identities when resolving,
+   selecting and inserting the drawing annotations. Preserve borrowed documents and inspect hidden
+   inventory effects before cleanup. Retain original errors, partial snapshots
+   and final source/hash/ownership evidence on failure. Test the full composed
+   callback, including wrong-document/source rejection, ambiguous entities,
+   failed save/export, fresh cold handles and cleanup, rather than testing only
+   thin wrappers. Shared helper changes still require coordination.
 
    A successful attachment probe alone is not full cold/print acceptance. Close
    only owned drawing/source copies, reopen the source and drawing with fresh
