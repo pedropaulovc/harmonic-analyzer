@@ -77,7 +77,7 @@ class RecipeTemplateFactory:
         factory = (
             normal_drawing_factory(adapter, spec)
             if entry is None
-            else prepared_drawing_factory(adapter, entry)
+            else prepared_drawing_factory(adapter, entry, spec=spec)
         )
         self.factory = factory
 
@@ -148,7 +148,6 @@ class RecipeTemplateFactory:
             try:
                 entry = await prepared.prepare_project_drawing_template(
                     adapter,
-                    scale=spec.scale,
                     decimals=spec.decimals,
                     cache_root=cache_root,
                     operation_context=operation_context,

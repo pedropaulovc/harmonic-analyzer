@@ -110,7 +110,7 @@ def scene(native, monkeypatch, tmp_path):  # noqa: F811
             pass
 
         def GetCurrentSheet(self):
-            return object()
+            return SimpleNamespace(SetScale=lambda *args: True)
 
     def create(adapter, **kwargs):
         model = Drawing(None, title=f"Owned blank {len(created)}")
@@ -170,12 +170,13 @@ def scene(native, monkeypatch, tmp_path):  # noqa: F811
     reports = tmp_path / "reports"
 
     def run(**options):
+        spec = options.pop("spec", probe.prepared.TemplateSpec((2, 1), 2))
         return asyncio.run(
             owned.owned_callback(
                 native.adapter,
                 lambda adapter: probe.probe(
                     adapter,
-                    probe.prepared.TemplateSpec((2, 1), 2),
+                    spec,
                     reports,
                     123,
                     **options,
@@ -364,8 +365,14 @@ def test_normal_to_prepared_difference_stops_before_hit_without_weakening(scene)
         scene.run()
     report, _ = scene.report()
     assert [row["kind"] for row in report["accessors"]] == ["miss"]
-    assert report["accessors"][0]["status"] == "failed"
-    assert len(scene.created) == 3
+    assert report["accessors"][0]["status"] == "passed"
+    assert (
+        report["accessors"][0]["normal_receipt_comparison"]
+        == "different_scale_compare_requested_factory_trial"
+    )
+    assert report["trials"][-1]["status"] == "failed"
+    assert report["trials"][-1]["failed_phase"] == "raw_defaults"
+    assert len(scene.created) == 4
     assert scene.native.app.documents == scene.baseline
 
 
@@ -375,7 +382,9 @@ def test_distinct_new_document_pan_is_rejected_by_unchanged_normal_control(scene
         scene.run()
     report, _ = scene.report()
     assert report["status"] == "failed"
-    assert report["accessors"][0]["status"] == "failed"
+    assert report["accessors"][0]["status"] == "passed"
+    assert report["trials"][-1]["status"] == "failed"
+    assert report["trials"][-1]["failed_phase"] == "raw_defaults"
     assert scene.viewport_calls == [
         ("redraw", 1.0),
         ("scale", 1.0),

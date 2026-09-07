@@ -1,5 +1,9 @@
 # Prepared-template setup key isolation
 
+The extraction and native results below precede the
+[canonical-base candidate](canonical-prepared-template-base.md). Its requested
+instance scale/base identity split is a separate architecture and acceptance step.
+
 This is a module-boundary change based on `bb56cd28`, not new native acceptance
 or a measured fleet speedup. Prepared cold/reopen/render and the final full-build
 gate remain required after integration.

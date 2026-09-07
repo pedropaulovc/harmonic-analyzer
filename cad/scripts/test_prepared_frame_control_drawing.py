@@ -15,6 +15,10 @@ from test_prepared_template_cache_probe_drawing import scene  # noqa: F401
 
 @pytest.fixture
 def frame_scene(scene, monkeypatch, tmp_path):  # noqa: F811
+    # Current accessor artifact is canonical 1:1. Historical noncanonical
+    # receipts remain provenance, not a same-spec replay of this architecture.
+    run = scene.run
+    scene.run = lambda **options: run(spec=probe.prepared.TemplateSpec(), **options)
     scene.native.app.documents.clear()
     scene.native.app.ActiveDoc = scene.native.adapter.currentModel = None
     scene.baseline.clear()
@@ -90,7 +94,7 @@ def frame_scene(scene, monkeypatch, tmp_path):  # noqa: F811
                 "status": "failed",
                 "viewport_before": before,
                 "inputs": {
-                    "spec": {"scale": [2, 1], "decimals": 2},
+                    "spec": {"scale": [1, 1], "decimals": 2},
                     "solidworks_revision": "34.3.0",
                     "template_sha256": probe.prepared._sha(scene.original),
                 },
@@ -300,7 +304,7 @@ def test_parent_forwards_explicit_frame_receipt_under_existing_seat(
             "--expected-pid",
             "123",
             "--scale",
-            "2",
+            "1",
             "1",
             "--decimals",
             "2",
