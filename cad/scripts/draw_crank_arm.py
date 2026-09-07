@@ -285,6 +285,7 @@ async def build(
         text_xy=(_sheet_x(ARM_C2C / 2.0), 0.102),
         label="shaft-to-handle-pivot location",
     )
+    set_arc_endpoints_to_center(adapter, pivot_location, label="handle-pivot location")
     set_basic_dimension(adapter, pivot_location, label="handle-pivot location")
     handle_transverse = add_entity_dimension(
         adapter,
