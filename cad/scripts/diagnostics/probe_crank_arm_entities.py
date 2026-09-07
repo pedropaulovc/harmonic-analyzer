@@ -558,6 +558,24 @@ def require_manufacturing(row, recorded):
         raise RuntimeError("marked dimension union or sheet scale changed")
 
 
+def save_moved_drawing(adapter, path):
+    """Save an already-open owned copy in place, as the shared attachment probe does."""
+    adapter.ownership.assert_current_owned()
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    if (
+        int(model.GetType()) != 3
+        or Path(model.GetPathName()).resolve() != path.resolve()
+    ):
+        raise RuntimeError("moved save requires the exact owned drawing")
+    with _telemetry.span("diagnostic.crank_arm.save_moved"):
+        result = model.Save3(1, 0, 0)
+    if not (result[0] if isinstance(result, tuple) else result):
+        raise RuntimeError(f"moved drawing Save3 failed: {result!r}")
+    if isinstance(result, tuple) and result[1] != 0:
+        raise RuntimeError(f"moved drawing Save3 returned errors: {result!r}")
+    return result
+
+
 async def candidate_control(adapter, directory):
     """Execute the committed recipe, then inspect fresh cold and relocated handles."""
     from diagnostics import benchmark_drawing_recipes as benchmark
@@ -810,6 +828,7 @@ async def candidate_control(adapter, directory):
                 )
 
         built = scene("built", source_model, bank)
+        shutil.copy2(module.OUTPUTS.slddrw, directory / "built.SLDDRW")
         await adapter.close_owned_documents()
         bank = source_model = None  # never reuse closed native handles
         check("cold-open owned source", await adapter.open_model(str(source)))
@@ -838,7 +857,7 @@ async def candidate_control(adapter, directory):
         moved = scene("moved_scaled", source_model, bank)
         compare(reopened, moved, "view movement and scale")
         adapter.ownership.assert_current_owned()
-        save_drawing(adapter, str(module.OUTPUTS.slddrw))
+        report["moved_save"] = save_moved_drawing(adapter, module.OUTPUTS.slddrw)
         await adapter.close_owned_documents()
         bank = source_model = None
         check("reopen moved source", await adapter.open_model(str(source)))
@@ -897,6 +916,11 @@ async def candidate_control(adapter, directory):
             except Exception as error:
                 report[label] = {"error": repr(error)}
                 errors.append(error)
+        report["template_guard_details"] = controller.guards
+        if errors:
+            report.update(
+                status="failed", final_errors=[repr(error) for error in errors]
+            )
         try:
             checkpoint()
         except Exception as error:
