@@ -84,7 +84,7 @@ independent of BSURF exploratory indexing:
 ```powershell
 $env:HARMONIC_SW_AUTOSTART = '0'
 $env:HARMONIC_REMOTE_CACHE_MODE = 'off'
-$env:DIAGNOSTIC_SW_PID = '<confirmed current PID>'
+$env:HARMONIC_DIAGNOSTIC_SW_PID = '<confirmed current PID>'
 $env:HARMONIC_TOOTH_SELECTOR_OBSERVATION = 'endpoints'
 $env:HARMONIC_BSURF_GRID_CONTROL = 'off'
 uv run --no-sync python cad/scripts/diagnostics/probe_datum_policy_recipes.py --source-root C:/src/harmonic-analyzer/cad/out/sldprt --guard-root C:/src/harmonic-analyzer/cad/out/sldprt --factory prepared --target crank_drive_gear --candidate <reviewed-integrated-SHA>
