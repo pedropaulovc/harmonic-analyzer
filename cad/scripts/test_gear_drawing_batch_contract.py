@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 from pathlib import Path
 
 import _config
@@ -22,6 +23,8 @@ import draw_transgear_pinion
 import rack_pinion_spec
 import transgear_feed_pinion_spec
 import transgear_pinion_spec
+from _drawing_entities import CircleEdge, EdgeAdjacentFace, FaceBoundary, FeatureFace
+from _gtol_spec import CylinderFace, PlanarFace
 
 
 SHEETS = (
@@ -94,6 +97,11 @@ def test_notes_do_not_repeat_title_block_quantity() -> None:
 
 def test_bore_annotations_use_explicit_nonconflicting_selectors() -> None:
     for module in DRAWING_MODULES:
+        if module is draw_cone_gear:
+            # The semantic pilot's source-owned bore and dimension-attached
+            # datum have their complete contract below. Requiring its retired
+            # visible-edge sweep would undo the requested attachment migration.
+            continue
         source = Path(module.__file__).read_text(encoding="utf-8")
         assert "bore_edge = visible_circle_edge(" in source, module.__name__
         if module in CRANK_PAIR_MODULES:
@@ -113,6 +121,59 @@ def test_bore_annotations_use_explicit_nonconflicting_selectors() -> None:
         )
         assert expected_tolerance in source, module.__name__
         assert "shoulder=True" in source, module.__name__
+
+
+def test_cone_bore_uses_model_owned_rim_and_exact_size_datum() -> None:
+    module = draw_cone_gear
+    rim = FaceBoundary(
+        FeatureFace("BoreCut", CylinderFace(cone_gear_spec.BORE_DIA)),
+        CircleEdge(cone_gear_spec.BORE_DIA / 2.0, (0, 0, 0), (0, 0, 1)),
+    )
+    assert module.ENTITY_ROLES == {
+        "bore": rim,
+        "front_face": EdgeAdjacentFace(rim, PlanarFace((0, 0, -1), 0.0)),
+    }
+    tree = ast.parse(Path(module.__file__).read_text(encoding="utf-8"))
+    build = next(node for node in tree.body if isinstance(node, ast.AsyncFunctionDef))
+    assignments = {
+        ast.unparse(target): ast.unparse(node.value)
+        for node in ast.walk(build)
+        if isinstance(node, ast.Assign)
+        for target in node.targets
+    }
+    assert assignments["entities"] == (
+        "ModelEntities(front.ReferencedDocument).resolve(ENTITY_ROLES)"
+    )
+    assert assignments["bore_edge"] == "entities['bore']"
+    assert assignments["(bore_annotation,)"] == "front_annotations"
+    calls = [node for node in ast.walk(build) if isinstance(node, ast.Call)]
+    assert not any(
+        isinstance(node.func, ast.Name)
+        and node.func.id in {"visible_circle_edge", "find_edge_near", "add_datum_feature"}
+        for node in calls
+    )
+
+    def keywords(name):
+        matches = [
+            node for node in calls
+            if isinstance(node.func, ast.Name) and node.func.id == name
+        ]
+        assert len(matches) == 1, name
+        assert [ast.unparse(arg) for arg in matches[0].args] == ["adapter", "front"]
+        return {item.arg: ast.unparse(item.value) for item in matches[0].keywords}
+
+    assert keywords("add_dimension_datum") == {
+        "dimension_annotation": "bore_annotation",
+        "source_feature": "'BoreProfile'",
+        "source_dimension": "'BoreCutDia'",
+        "datum": "'A'",
+        "label": "'cone gear bore axis'",
+    }
+    assert keywords("add_surface_finish") == {
+        "control": "surface_finish_by_key(SURFACE_FINISHES, 'cone_gear_bore')",
+        "label": "'cone gear bore finish'",
+        "entity": "bore_edge",
+    }
 
 
 def test_crank_pair_runout_uses_tooth_tip_silhouette_topology() -> None:
