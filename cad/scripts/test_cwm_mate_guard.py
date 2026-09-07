@@ -321,12 +321,29 @@ def pose_bank(monkeypatch):
         transforms.append(transform)
         return transform
 
+    # _patch creates this test-local module and monkeypatch restores sys.modules
+    # afterward. This assignment never modifies the real adapter module.
     module = sys.modules["solidworks_mcp.adapters.solidworks.assembly"]
     module._create_math_transform = create_transform
     adapter = SimpleNamespace(currentModel=SimpleNamespace(GetComponentByName=lookup))
     return SimpleNamespace(
         adapter=adapter, lookups=lookups, transforms=transforms, writes=writes,
     )
+
+
+def test_pose_fixture_module_is_scoped_and_restored(monkeypatch):
+    name = "solidworks_mcp.adapters.solidworks.assembly"
+    original = sys.modules[name]
+    original_members = dict(vars(original))
+    with monkeypatch.context() as scoped:
+        _patch.__wrapped__(scoped)
+        local = sys.modules[name]
+        assert local is not original
+        pose_bank.__wrapped__(scoped)
+        assert callable(local._create_math_transform)
+        assert vars(original) == original_members
+    assert sys.modules[name] is original
+    assert vars(original) == original_members
 
 
 def _pose_at(z):
