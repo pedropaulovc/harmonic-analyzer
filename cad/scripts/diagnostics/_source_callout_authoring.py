@@ -80,6 +80,14 @@ class SourceCalloutControl:
     def __init__(self, adapter, module, trial, checkpoint):
         if trial["target"] != "alignment_pinion":
             raise ValueError("source authoring requires only alignment_pinion")
+        if getattr(
+            module, "verify_dimension_callouts", None
+        ) is not common.verify_dimension_callouts or hasattr(
+            module, "set_dimension_callouts"
+        ):
+            raise ValueError(
+                "source-authoring control requires the actual verify_dimension_callouts recipe; historical setter interception is retired"
+            )
         self.adapter, self.module, self.trial, self.checkpoint = (
             adapter,
             module,
@@ -227,6 +235,7 @@ class SourceCalloutControl:
                     "authored source cold read changed dirty state or bytes"
                 )
             self.handles = fresh_handles
+            self.source_model = reopened
             self.report["baseline"] = {"path": str(self.path), "sha256": saved_hash}
             self.report["status"] = "passed"
             self.phase = _Phase.AUTHORED
@@ -337,23 +346,34 @@ class SourceCalloutControl:
                 "source callout drawing context requires authored cold baseline"
             )
         self.phase = _Phase.DRAWING
-        original = self.module.set_dimension_callouts
+        original = self.module.verify_dimension_callouts
         try:
-            if original is not common.set_dimension_callouts:
+            if original is not common.verify_dimension_callouts:
                 raise RuntimeError("source callout recipe/common aliases changed")
 
-            def verify(adapter, annotations, callout_text, *, location="below"):
+            def verify(
+                adapter,
+                annotations,
+                callout_text,
+                *,
+                feature_name,
+                view,
+                source_model,
+                location="below",
+            ):
                 if (
                     adapter is not self.adapter
                     or self.calls
                     or callout_text != CALLOUT
                     or location != "below"
+                    or feature_name != "ArborBoreProfile"
                 ):
                     raise RuntimeError(
                         "source callout requires one exact read-only drawing request"
                     )
                 self.calls += 1
                 model = self._owned(3)
+                self._same(self.source_model, source_model, "explicit source model")
                 selected = tuple(annotations)
                 if len(selected) != 1:
                     raise RuntimeError(
@@ -361,7 +381,7 @@ class SourceCalloutControl:
                     )
                 annotation = _early_bound(selected[0], "IAnnotation")
                 key, row = self._read_drawing(
-                    annotation, _early_bound(annotation.Owner, "IView"), self.handles
+                    annotation, _early_bound(view, "IView"), self.handles
                 )
                 self.report["imported_request"] = {key: row}
                 self._same(model, self._owned(3), "import request drawing")
@@ -369,12 +389,24 @@ class SourceCalloutControl:
                     raise RuntimeError(
                         "fresh import did not retain authored fit callout"
                     )
+                # Execute the actual production verifier unchanged. The control
+                # does not synthesize a setter alias or replace production proof.
+                result = original(
+                    adapter,
+                    selected,
+                    callout_text,
+                    feature_name=feature_name,
+                    view=view,
+                    source_model=source_model,
+                    location=location,
+                )
+                self._same(model, self._owned(3), "production verifier drawing")
                 self.report["import_verification"] = "passed"
-                # No SetText, SetLowerText, rebuild, or alternative field.
+                return result
 
             with (
-                patch.object(self.module, "set_dimension_callouts", verify),
-                patch.object(common, "set_dimension_callouts", verify),
+                patch.object(self.module, "verify_dimension_callouts", verify),
+                patch.object(common, "verify_dimension_callouts", verify),
             ):
                 yield
         finally:

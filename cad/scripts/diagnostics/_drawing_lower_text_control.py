@@ -33,6 +33,7 @@ from _drawing_native_callouts import (
     _dimension_witness,
     _same_dimension,
 )
+from diagnostics._callout_recipe_contract import HISTORICAL_REPLAY
 
 
 class CalloutStorage(StrEnum):
@@ -279,12 +280,19 @@ class LowerTextControl:
             raise RuntimeError("lower-text context can be entered only once")
         self.lifetime = _Lifetime.ACTIVE
         try:
-            original = self.module.set_dimension_callouts
+            original = getattr(self.module, "set_dimension_callouts", None)
+            if original is None or hasattr(self.module, "verify_dimension_callouts"):
+                raise ValueError(
+                    "unsupported recipe contract for lower-text experiment. "
+                    + HISTORICAL_REPLAY
+                )
             if common.set_dimension_callouts is not original:
                 raise RuntimeError("lower-text recipe/common helper alias changed")
             replacement = self._call
             save_scope = (
-                patch.object(common, "save_drawing", self._save_wrapper(common.save_drawing))
+                patch.object(
+                    common, "save_drawing", self._save_wrapper(common.save_drawing)
+                )
                 if self.storage is CalloutStorage.LOWER_TEXT_BEFORE_SAVE
                 else nullcontext()
             )

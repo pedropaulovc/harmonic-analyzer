@@ -19,8 +19,24 @@ from diagnostics import _native_drawing_save_control as saves
 from diagnostics import _owned_native_documents as owned
 from diagnostics import probe_datum_policy_recipes as pilot
 from test_datum_policy_recipes_drawing import fixture_sources
-from test_lower_text_before_save_pilot_drawing import _recipe
+from test_lower_text_before_save_pilot_drawing import _recipe as historical_recipe
 from test_owned_native_documents_drawing import Model, native as native
+
+
+def verifier_recipe():
+    """Explicit new-contract fixture: actual verifier, no retired setter alias."""
+    return (
+        historical_recipe()
+        .replace("set_dimension_callouts", "verify_dimension_callouts")
+        .replace(
+            "    drawing_factory(adapter)",
+            "    source_model = adapter.currentModel\n    drawing_factory(adapter)",
+        )
+        .replace(
+            "location='below'",
+            "feature_name='ArborBoreProfile', view=adapter.currentModel.front_view, source_model=source_model, location='below'",
+        )
+    )
 
 
 @pytest.mark.parametrize("route", ["parent", "worker"])
@@ -29,6 +45,7 @@ def test_source_authoring_cli_forwards_explicit_factor_with_no_lower_control(
 ):
     monkeypatch.setattr(pilot, "require_owned_diagnostic_environment", lambda: None)
     monkeypatch.setattr(pilot.benchmark, "revision", lambda _: "frozen")
+    monkeypatch.setattr(pilot.benchmark, "recipe_source", lambda *_: verifier_recipe())
     parent, observed = Mock(), []
     monkeypatch.setitem(sys.modules, "dodo", NS(_run=parent))
 
@@ -127,6 +144,66 @@ def test_h1_can_only_follow_complete_authoring_provenance(tmp_path, mode):
     )
 
 
+def test_retired_source_authoring_invocation_rejects_before_native_or_disk(monkeypatch):
+    read = Mock(side_effect=AssertionError("unsupported ABI must not read native/disk"))
+    monkeypatch.setattr(control.attachments, "file_digest", read)
+    with pytest.raises(ValueError, match="historical setter interception is retired"):
+        control.SourceCalloutControl(
+            object(),
+            NS(set_dimension_callouts=common.set_dimension_callouts),
+            {"target": "alignment_pinion"},
+            read,
+        )
+    read.assert_not_called()
+
+
+def test_production_verifier_error_propagates_without_false_success_and_restores_aliases(
+    monkeypatch,
+):
+    primary = RuntimeError("native production verifier rejected source")
+    original = Mock(side_effect=primary)
+    monkeypatch.setattr(common, "verify_dimension_callouts", original)
+    monkeypatch.setattr(control, "_early_bound", lambda value, _: value)
+    adapter, view, source_model, annotation, model = (object() for _ in range(5))
+    module = NS(verify_dimension_callouts=original)
+    instance = object.__new__(control.SourceCalloutControl)
+    instance.phase, instance.calls = control._Phase.AUTHORED, 0
+    instance.adapter, instance.module = adapter, module
+    instance.source_model, instance.handles, instance.report = source_model, {}, {}
+    instance._owned = Mock(return_value=model)
+    instance._same = Mock()
+    instance._read_drawing = Mock(
+        return_value=("front/bore", {"text": {"4": control.TEXT, "8": control.TEXT}})
+    )
+    with pytest.raises(RuntimeError) as caught:
+        with instance.observe():
+            module.verify_dimension_callouts(
+                adapter,
+                (annotation,),
+                control.CALLOUT,
+                feature_name="ArborBoreProfile",
+                view=view,
+                source_model=source_model,
+            )
+    assert caught.value is primary
+    original.assert_called_once_with(
+        adapter,
+        (annotation,),
+        control.CALLOUT,
+        feature_name="ArborBoreProfile",
+        view=view,
+        source_model=source_model,
+        location="below",
+    )
+    assert (
+        module.verify_dimension_callouts is common.verify_dimension_callouts is original
+    )
+    assert "imported_request" in instance.report
+    assert "import_verification" not in instance.report
+    with pytest.raises(RuntimeError, match="exactly once"):
+        instance.require_used()
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("save_variant", tuple(saves.DrawingSave))
 @pytest.mark.parametrize(
@@ -144,17 +221,39 @@ def test_h1_can_only_follow_complete_authoring_provenance(tmp_path, mode):
 async def test_actual_owned_pilot_authors_only_copy_then_preserves_h1_and_print(
     native, tmp_path, monkeypatch, save_variant, outcome
 ):
+    await owned_pilot_case(
+        native, tmp_path, monkeypatch, save_variant, outcome, origin="diagnostic"
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("save_variant", tuple(saves.DrawingSave))
+@pytest.mark.parametrize("outcome", ["passed", "drawing_cold_loss"])
+async def test_production_verifier_recipe_uses_real_nine_bank_observer_without_authoring(
+    native, tmp_path, monkeypatch, save_variant, outcome
+):
+    await owned_pilot_case(
+        native, tmp_path, monkeypatch, save_variant, outcome, origin="production"
+    )
+
+
+async def owned_pilot_case(
+    native, tmp_path, monkeypatch, save_variant, outcome, *, origin
+):
+    production = origin == "production"
     monkeypatch.setattr(pilot, "ORDER", ("alignment_pinion",))
     sources, guards = fixture_sources(tmp_path, monkeypatch)
     monkeypatch.setitem(
         pilot.TARGETS, "alignment_pinion", NS(view_roles={}, entity_labels=())
     )
-    monkeypatch.setattr(pilot.benchmark, "recipe_source", lambda *_: _recipe())
+    monkeypatch.setattr(pilot.benchmark, "recipe_source", lambda *_: verifier_recipe())
     monkeypatch.setattr(pilot.benchmark, "revision", lambda _: "frozen")
     monkeypatch.setattr(pilot, "helper_fingerprints", lambda: {"helper": "same"})
     monkeypatch.setattr(pilot, "adapter_fingerprints", lambda: {"adapter": "same"})
     monkeypatch.setattr(pilot, "retain_failed_drawing", Mock())
-    for module in (_common, control, source_snapshot, boundaries, saves):
+    native.adapter._attempt = lambda action: action()
+    native.adapter._get_attr_or_call = lambda item, name: getattr(item, name)
+    for module in (_common, common, control, source_snapshot, boundaries, saves):
         monkeypatch.setattr(module, "_early_bound", lambda value, _: value)
     monkeypatch.setattr("_drawing_marks._early_bound", lambda value, _: value)
     monkeypatch.setattr("_drawing_native_callouts._early_bound", lambda value, _: value)
@@ -171,7 +270,7 @@ async def test_actual_owned_pilot_authors_only_copy_then_preserves_h1_and_print(
     monkeypatch.setattr(pilot.benchmark, "load_recipe", load)
 
     def part_model(model):
-        text = part_saved.get(model.path, "")
+        text = part_saved.get(model.path, control.TEXT if production else "")
         model.text = "" if outcome == "part_cold_loss" else text
         model.raw = raw
         model.ConfigurationManager = NS(ActiveConfiguration=NS(Name="Default"))
@@ -270,6 +369,7 @@ async def test_actual_owned_pilot_authors_only_copy_then_preserves_h1_and_print(
             IsReferenceDim=lambda: False,
             IsHoleCallout=lambda: False,
             GetDimension2=lambda _: part.parameter,
+            GetDimension=lambda: part.parameter,
             GetAnnotation=lambda: annotation,
             GetText=lambda index: model.text if index in (4, 8) else "",
             SetText=Mock(side_effect=AssertionError("no drawing SetText")),
@@ -280,6 +380,7 @@ async def test_actual_owned_pilot_authors_only_copy_then_preserves_h1_and_print(
         sheet_view = NS(GetAnnotations=lambda: ())
         model.GetViews = lambda: ((sheet_view, view),)
         model.annotations, model.references = (annotation,), [part]
+        model.front_view = view
         drawings.append(model)
         return model
 
@@ -333,6 +434,7 @@ async def test_actual_owned_pilot_authors_only_copy_then_preserves_h1_and_print(
     monkeypatch.setattr(_drawing_build.sheet_setup, "new_project_drawing", create)
     original_callouts = Mock(side_effect=AssertionError("no production drawing setter"))
     monkeypatch.setattr(common, "set_dimension_callouts", original_callouts)
+    original_verifier = common.verify_dimension_callouts
     monkeypatch.setattr(common, "set_dimension_precision", Mock())
     originals = {}
     for name in dict.fromkeys(boundaries.DRAWING_OPERATIONS[:-1]):
@@ -382,7 +484,13 @@ async def test_actual_owned_pilot_authors_only_copy_then_preserves_h1_and_print(
             targets=("alignment_pinion",),
             drawing_save=save_variant,
             source_observation=boundaries.SourceObservation.ALIGNMENT_SAVE,
-            source_callout_authoring=control.SourceCalloutAuthoring.ALIGNMENT_FIT,
+            **(
+                {}
+                if production
+                else {
+                    "source_callout_authoring": control.SourceCalloutAuthoring.ALIGNMENT_FIT
+                }
+            ),
         )
 
     if outcome == "passed":
@@ -393,12 +501,9 @@ async def test_actual_owned_pilot_authors_only_copy_then_preserves_h1_and_print(
     (receipt,) = (tmp_path / "reports").glob("*/pilot.json")
     report = json.loads(receipt.read_text())
     trial = report["trials"][0]
-    authored = trial["source_callout_authoring"]
     assert report["sources_before"] == report["sources_after"]
-    assert authored["original_sha256"] == pilot.EXPECTED_PART_HASHES["alignment_pinion"]
     assert report["status"] == ("passed" if outcome == "passed" else "failed")
     assert native.app.documents == [baseline] and baseline.dirty
-    parts[0].display.SetText.assert_called_once_with(4, control.TEXT)
     assert all(part.display.GetLowerText.call_count == 0 for part in parts)
     assert all(
         model.display.SetText.call_count == model.display.SetLowerText.call_count == 0
@@ -406,13 +511,48 @@ async def test_actual_owned_pilot_authors_only_copy_then_preserves_h1_and_print(
     )
     assert common.save_drawing is original_save
     assert (
-        common.set_dimension_callouts
-        is modules[0].set_dimension_callouts
-        is original_callouts
+        common.verify_dimension_callouts
+        is modules[0].verify_dimension_callouts
+        is original_verifier
     )
+    assert not hasattr(modules[0], "set_dimension_callouts")
+    assert common.set_dimension_callouts is original_callouts
+    original_callouts.assert_not_called()
     assert all(
         getattr(modules[0], name) is original for name, original in originals.items()
     )
+    if production:
+        assert "source_callout_authoring" not in trial
+        assert all(
+            part.display.SetText.call_count == part.Save3.call_count == 0
+            for part in parts
+        )
+        assert events == []
+        assert (
+            trial["copy_hashes"]["copied"]
+            == trial["copy_final"]
+            == pilot.EXPECTED_PART_HASHES["alignment_pinion"]
+        )
+        assert trial["source_boundaries"]["callout_contract"] == "source_verifier_v1"
+        rows = trial["source_boundaries"]["banks"]
+        assert len(rows) == 9
+        assert all(row["disk_sha256"] == trial["copy_final"] for row in rows)
+        assert all(row["raw_system_values"] == [raw] for row in rows)
+        assert all(
+            row["dirty_before_read"] is row["dirty_after_read"] is False for row in rows
+        )
+        assert all(
+            row["display"]["text"]["4"] == row["display"]["text"]["8"] == control.TEXT
+            for row in rows
+        )
+        assert report["runtime_final_guard_errors"] == []
+        assert parts[-1].parameter is not parts[0].parameter
+        if outcome == "passed":
+            assert trial["built"] == trial["reopened"]
+        return
+    authored = trial["source_callout_authoring"]
+    assert authored["original_sha256"] == pilot.EXPECTED_PART_HASHES["alignment_pinion"]
+    parts[0].display.SetText.assert_called_once_with(4, control.TEXT)
     if outcome in (
         "setter_failure",
         "unrelated_change",
@@ -426,6 +566,8 @@ async def test_actual_owned_pilot_authors_only_copy_then_preserves_h1_and_print(
             assert events == ["part_setter"]
         return
     assert authored["status"] == "passed"
+    assert trial["callout_contract"] == "source_verifier_v1"
+    assert trial["source_boundaries"]["callout_contract"] == "source_verifier_v1"
     assert (
         authored["baseline"]["sha256"]
         == trial["copy_final"]

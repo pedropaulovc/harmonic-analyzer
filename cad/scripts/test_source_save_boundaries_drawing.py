@@ -114,6 +114,7 @@ def bank(tmp_path, monkeypatch):
         deepcopy(native),
         handles.copy(),
         reader,
+        callout_contract=control.CalloutContract.DRAWING_SETTER_V1,
     )
     return NS(**locals())
 
@@ -385,6 +386,11 @@ def test_explicit_cli_forwards_variant_without_changing_factory_or_guards(
 
     monkeypatch.setattr(pilot, "require_owned_diagnostic_environment", lambda: None)
     monkeypatch.setattr(pilot.benchmark, "revision", lambda _: "frozen")
+    monkeypatch.setattr(
+        pilot.benchmark,
+        "recipe_source",
+        lambda *_: "from _drawing_common import set_dimension_callouts",
+    )
     parent, seen = Mock(), []
     monkeypatch.setitem(sys.modules, "dodo", NS(_run=parent))
 
@@ -437,7 +443,12 @@ async def test_pilot_wraps_real_recipe_and_retains_banks_before_hash_failure(
         pilot.TARGETS, "alignment_pinion", NS(view_roles={}, entity_labels=())
     )
     monkeypatch.setattr(
-        pilot.benchmark, "recipe_source", lambda *_: recipe(Path("unused.SLDPRT"))
+        pilot.benchmark,
+        "recipe_source",
+        lambda *_: (
+            recipe(Path("unused.SLDPRT"))
+            + "\nfrom _drawing_common import set_dimension_callouts\n"
+        ),
     )
     monkeypatch.setattr(pilot.benchmark, "revision", lambda _: "frozen")
     monkeypatch.setattr(pilot, "helper_fingerprints", lambda: {"helper": "frozen"})
@@ -463,8 +474,19 @@ async def test_pilot_wraps_real_recipe_and_retains_banks_before_hash_failure(
 
     class Observer:
         def __init__(
-            self, adapter, module, trial, checkpoint, source, before, handles, reader
+            self,
+            adapter,
+            module,
+            trial,
+            checkpoint,
+            source,
+            before,
+            handles,
+            reader,
+            *,
+            callout_contract,
         ):
+            assert callout_contract is control.CalloutContract.DRAWING_SETTER_V1
             assert source == adapter.currentModel == trial["copy_source"]
             assert handles == {"one": handle}
             assert reader()[0] == before
@@ -537,6 +559,11 @@ def test_save_cli_forwards_explicit_enum(monkeypatch, tmp_path, route, variant):
 
     monkeypatch.setattr(pilot, "require_owned_diagnostic_environment", lambda: None)
     monkeypatch.setattr(pilot.benchmark, "revision", lambda _: "frozen")
+    monkeypatch.setattr(
+        pilot.benchmark,
+        "recipe_source",
+        lambda *_: "from _drawing_common import set_dimension_callouts",
+    )
     parent, seen = Mock(), []
     monkeypatch.setitem(sys.modules, "dodo", NS(_run=parent))
 
