@@ -180,9 +180,8 @@ async def build(adapter: Any) -> dict[str, str]:
         placements={
             "datum:A": PmiDrawingPlacement(
                 view=front,
-                position=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.024),
+                position=None,  # Keep native datum placement on the exact bearing rim.
                 entity=entities["datum:A"],
-                position_tolerance_m=0.00002,
             ),
             "bearing_cylindricity": PmiDrawingPlacement(
                 view=right,
