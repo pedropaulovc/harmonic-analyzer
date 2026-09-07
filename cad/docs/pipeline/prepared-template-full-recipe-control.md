@@ -1,18 +1,21 @@
 # Prepared template: full-recipe functional control
 
-The prepared rocker arm passed the native full-recipe control below. Production
-rollout, the remaining recipes and complete printed acceptance are still pending.
-Blank normal/MISS/HIT raw and printed controls do not prove a model-linked sheet
-survives native save, cold reopen and rendering. This extends the existing owned
-rocker/lever pilot to test that remaining path, without changing any recipe or
-production helper.
+The prepared rocker arm passed the native full-recipe and cold-annotation control
+below; its original revision-cell overflow prevented full visual acceptance.
+Later [two-shaft controls](two-shaft-pmi-entity-migration.md#both-shafts-pass-with-the-populated-title-block-candidate)
+passed cold role/content checks and render inspection with the revised template.
+The [production MISS/HIT at `d6ad5aad`](prepared-template-viewport-control.md#production-misshit-at-d6ad5aad)
+then passed both shaft drawing tasks. That production run did not repeat cold or
+printed normal/MISS/HIT comparisons. These bounded results do not establish fleet
+or full-pipeline acceptance.
 
-Use `probe_datum_policy_recipes.py --factory normal|prepared`. Both variants bind
-only the isolated loaded recipe's `new_project_drawing`; normal calls the current
-factory unchanged. Prepared invokes `_drawing_prepared_template` before any owned
-source opens, validates a fresh MISS and a read-only HIT, then uses the validated
-entry for the recipe's single setup. The declared recipe scale and two-decimal
-setup must match; unsupported factory arguments fail, with no fallback.
+Use `probe_datum_policy_recipes.py --factory normal|prepared`. The current runner
+passes an explicit `drawing_factory` to the isolated recipe; it does not replace
+recipe globals. Normal calls the normal factory unchanged. Prepared invokes
+`_drawing_prepared_template` before any owned source opens, validates a fresh
+MISS and a read-only HIT, then uses the validated entry for the recipe's single
+setup. The declared recipe scale and two-decimal setup must match; unsupported
+factory arguments fail, with no fallback.
 
 Each invocation stops at its first failure. A normal linked-title cold-reopen
 rejection remains a failure and does not automatically launch prepared. Run the
@@ -49,8 +52,8 @@ in-memory source immutability.
 Original template, derived cache artifacts, actual imported adapter and helper
 fingerprints receive final guards even after a recipe failure; any additional
 guard failures are reported together with the original error. Native cleanup
-remains the shared exact-owned-document lifecycle. No full pipeline gate, visual
-acceptance, production rollout, or conflict probability is established offline.
+remains the shared exact-owned-document lifecycle. Offline tests do not establish
+native acceptance; the retained results below have their own measured scope.
 
 ## Native rocker result
 
