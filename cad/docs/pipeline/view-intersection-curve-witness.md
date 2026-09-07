@@ -80,3 +80,22 @@ and copy hashes, complete annotation inventory/content/attachment checks, native
 save, cold role and drawing checks, PDF/PNG output and visual inspection. A
 coefficient or curve-tag difference will remain explicit in the raw stage rows
 and fail rather than being classified harmless without evidence.
+
+## First native VIEW result
+
+At `b1a12523`, adapter `25bc99b1` and PID 31860, the prepared-factory crankshaft
+pilot reached and inserted the cross-hole true-position FCF successfully.
+Receipt `datum-policy-e9ii3a93/pilot.json`, SHA-256
+`dbaddaeea87584ed969ab67262ac7afa81d212f27afbf74c027248f8ed7ae918`,
+retains identical raw 3004 rows for the requested edge, actual selection and
+inserted attachment, with exactly one attachment of type 1. Native identity and
+owning-view checks passed at those stages. This includes all coefficients,
+knots, trim/domain fields and curve tag (434454 in this session).
+
+The overall pilot remains **failed**: the later bearing-journal surface finish
+hit the separate type-46 silhouette `IsSame` rejection. Built/final and cold
+banks were therefore not reached. Recipe/pilot times were 38.280/160.230 s.
+Failure evidence completed with no secondary errors, original/copy source
+hashes stayed exact, owned cleanup succeeded and final runtime guards were
+empty. This establishes immediate VIEW selection/attachment readback, not full
+crankshaft or cold-serialization acceptance.
