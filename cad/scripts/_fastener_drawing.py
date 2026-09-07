@@ -8,6 +8,7 @@ from typing import Any, Callable, Literal, Mapping
 
 import _telemetry
 from _common import check
+from _drawing_entities import FeatureFace, ModelEntities
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
@@ -39,9 +40,10 @@ class FastenerSheet:
     side_dimension_callouts: Mapping[str, str] | None = None
     note_xy: tuple[float, float] = (0.020, 0.115)
     end_note_xy: tuple[float, float] = (0.050, 0.220)
-    side_centerline_face_xy: tuple[float, float] | None = None
+    side_centerline_face: FeatureFace | None = None
     end_center_mark: Literal["required", "not_applicable"] = "not_applicable"
-    decorate: Callable[[Any, Any, Any, Any], None] | None = None
+    decorate: Callable[[Any, Any, Any, Any], Mapping[str, Any]] | None = None
+    layout: Callable[[Any, Mapping[str, Any], Mapping[str, Any]], None] | None = None
 
 
 @_telemetry.traced("drawing.fastener_sheet")
@@ -123,11 +125,14 @@ async def build_fastener_sheet(
     # adds no manufacturing information; the thread callout owns that feature.
     set_hidden_lines_removed(adapter, end)
 
-    if recipe.side_centerline_face_xy is not None:
+    if recipe.side_centerline_face is not None:
+        axis_face = ModelEntities(side.ReferencedDocument).resolve(
+            {"side_axis": recipe.side_centerline_face}
+        )["side_axis"]
         add_view_centerline(
             adapter,
             side,
-            face_xy=recipe.side_centerline_face_xy,
+            entity=axis_face,
             label=f"{property_view} side-view axis centerline",
         )
     if recipe.end_center_mark == "required" and not auto_center_marks(
@@ -152,11 +157,25 @@ async def build_fastener_sheet(
             dict(recipe.side_dimension_callouts or {}),
         )
 
+    views = {"side": side, "end": end, "iso": iso}
     if recipe.decorate is not None:
-        recipe.decorate(adapter, side, end, iso)
+        additional_views = recipe.decorate(adapter, side, end, iso)
+        if set(additional_views).intersection(views):
+            raise ValueError(
+                "fastener decorator must not replace existing view identities"
+            )
+        views.update(additional_views)
 
-    add_property_linked_note(adapter, "Manufacturing Notes", *recipe.note_xy)
-    add_property_linked_note(adapter, "End View Note", *recipe.end_note_xy)
+    notes = {
+        "manufacturing": add_property_linked_note(
+            adapter, "Manufacturing Notes", *recipe.note_xy
+        ),
+        "end-caption": add_property_linked_note(
+            adapter, "End View Note", *recipe.end_note_xy
+        ),
+    }
+    if recipe.layout is not None:
+        recipe.layout(adapter, views, notes)
 
     return await finalize_drawing(
         adapter,

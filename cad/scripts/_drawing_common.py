@@ -15,7 +15,7 @@ from collections import Counter
 from dataclasses import dataclass, replace
 from itertools import combinations
 from pathlib import Path
-from typing import Any, Iterable, Literal, Sequence
+from typing import Any, Callable, Iterable, Literal, Sequence
 
 
 import _config
@@ -54,6 +54,8 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     view_name,
 )
 
+GdtEnvelopeMeasurement = Callable[[Any, Any, int], Sequence[float]]
+
 
 # swAnnotationType_e.swNote -- the view-owned annotation TYPE that becomes a
 # free-standing layout element (the general-notes block, schedule cells). Tables
@@ -68,13 +70,11 @@ _INSERT_HOLE_WIZARD_LOCATION_DIMS = 0x20000
 
 # swAnnotationType_e for the native GD&T symbols the recipes place at explicit
 # sheet coordinates (datum tags, feature-control frames, surface-finish symbols).
-# None of these interfaces expose a real bounding box (IDisplayData returns only
-# leader-polluted primitives in a non-sheet coordinate space), so each is boxed
-# as a nominal square around its GetPosition anchor. That nominal box is reliable
-# enough to catch a symbol placed clear OFF the sheet (overflow) but too coarse
-# to assert an OVERLAP without false positives -- a datum tag placed beside its
-# own feature-control frame, standard GD&T practice, would self-collide -- so the
-# symbols get ``NONE`` collision scope (overflow-checked, overlap-exempt).
+# The older explicit layout diagnostic below uses nominal symbol boxes and
+# exempts them from overlap checks. That is a limitation of that diagnostic,
+# not of the native API: _drawing_annotation_bounds measures native primitives,
+# separates leaders, and incorporates calibrated text cells for the new layout
+# path. Do not use these legacy nominal boxes to certify collision clearance.
 # (Codex #269 thread 5 overflow; overlap declined with this rationale.)
 _ANNOT_DATUM = 2
 _ANNOT_GTOL = 5
@@ -394,6 +394,46 @@ def _validate_surface_finish_control_face(
     )
 
 
+def _validate_native_annotation(
+    adapter: Any, annotation: Any, entity: Any, *, label: str
+) -> None:
+    """Validate native placement without demanding a prescribed layout.
+
+    Geometry identity and readable coordinates are hard requirements. Sheet
+    overflow is diagnosed here; the existing explicit layout audit and render
+    inspection assess the symbol's full extent and neighbouring annotations.
+    """
+    annotation = _early_bound(annotation, "IAnnotation")
+    position = tuple(annotation.GetPosition() or ())
+    if len(position) != 3 or not all(math.isfinite(value) for value in position):
+        raise RuntimeError(f"{label}: native annotation position is unreadable: {position}")
+    attached = tuple(annotation.GetAttachedEntities3() or ())
+    if len(attached) != 1 or attached[0] is None:
+        raise RuntimeError(f"{label}: native annotation has missing or dangling attachment")
+    application = _early_bound(adapter.swApp, "ISldWorks")
+    # ISldWorks.IsSame: 1=same, 0=different, -1=unknown (official example).
+    if int(application.IsSame(entity, attached[0])) != 1:
+        raise RuntimeError(f"{label}: native annotation attached to a different entity")
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    sheet = drawing.GetCurrentSheet()
+    if sheet is None:
+        raise RuntimeError(f"{label}: native annotation has no drawing sheet")
+    properties = tuple(_early_bound(sheet, "ISheet").GetProperties2() or ())
+    if len(properties) < 7:
+        raise RuntimeError(f"{label}: native annotation sheet size is unreadable")
+    width, height = float(properties[5]), float(properties[6])
+    if not all(math.isfinite(value) and value > 0 for value in (width, height)):
+        raise RuntimeError(f"{label}: native annotation sheet size is invalid")
+    span = _telemetry.trace.get_current_span()
+    span.set_attribute("placement", "native")
+    span.set_attribute("native_position_m", position)
+    if not (0 <= position[0] <= width and 0 <= position[1] <= height):
+        _telemetry.warn(
+            f"{label}: native annotation anchor is outside the sheet: "
+            f"position={position}, sheet={(width, height)}; inspect drawing layout"
+        )
+
+
 @_telemetry.traced("drawing.datum_feature", label_param="label")
 def add_datum_feature(
     adapter: Any,
@@ -401,7 +441,7 @@ def add_datum_feature(
     *,
     edge_xy: tuple[float, float] | None = None,
     edge_entity: Any | None = None,
-    symbol_xy: tuple[float, float],
+    symbol_xy: tuple[float, float] | None = None,
     datum: str,
     label: str,
     entity_type: str = "EDGE",
@@ -415,10 +455,17 @@ def add_datum_feature(
 
     ``entity_type`` widens the pick for entities that are not model edges —
     a revolve's flank lines are ``"SILHOUETTE"`` edges.
+
+    Omit ``symbol_xy`` with an explicit model ``entity`` to keep SolidWorks'
+    native insertion position. Explicit positions remain available for recipes
+    that need a particular layout; only that path asserts the exact position.
     """
+    if symbol_xy is None and (entity is None or annotation is not None):
+        raise ValueError(f"{label}: native placement requires an explicit model entity")
     draw = adapter.currentModel
+    selected_entity = None
     if annotation is None:
-        _select_annotation_entity(
+        selected_entity = _select_annotation_entity(
             adapter,
             view,
             edge_xy=edge_xy,
@@ -479,31 +526,87 @@ def add_datum_feature(
     tag_annotation = _sw_type_info.early_bound_or_flag(
         tag.GetAnnotation(), "IAnnotation", "GetPosition", "SetPosition2"
     )
-    if not tag_annotation.SetPosition2(symbol_xy[0], symbol_xy[1], 0.0):
-        raise RuntimeError(f"failed to position datum {datum} ({label})")
-    actual_position = tag_annotation.GetPosition()
-    position_error = (
-        math.inf
-        if not actual_position
-        else math.hypot(
-            float(actual_position[0]) - symbol_xy[0],
-            float(actual_position[1]) - symbol_xy[1],
+    if symbol_xy is not None:
+        if not tag_annotation.SetPosition2(symbol_xy[0], symbol_xy[1], 0.0):
+            raise RuntimeError(f"failed to position datum {datum} ({label})")
+        actual_position = tag_annotation.GetPosition()
+        position_error = (
+            math.inf
+            if not actual_position
+            else math.hypot(
+                float(actual_position[0]) - symbol_xy[0],
+                float(actual_position[1]) - symbol_xy[1],
+            )
         )
-    )
-    if position_error > position_tolerance_m:
-        raise RuntimeError(
-            f"datum {datum} position did not persist ({label}): "
-            f"{tuple(actual_position[:2]) if actual_position else None}; "
-            f"requested={symbol_xy}, error={position_error:.6g} m, "
-            f"limit={position_tolerance_m:.6g} m"
-        )
+        if position_error > position_tolerance_m:
+            raise RuntimeError(
+                f"datum {datum} position did not persist ({label}): "
+                f"{tuple(actual_position[:2]) if actual_position else None}; "
+                f"requested={symbol_xy}, error={position_error:.6g} m, "
+                f"limit={position_tolerance_m:.6g} m"
+            )
     if str(tag.GetLabel()) != datum:
         raise RuntimeError(f"datum feature label did not persist ({label})")
     if callout_below and not tag.SetText(4, callout_below):
         raise RuntimeError(f"failed to set datum callout text ({label})")
     draw.ClearSelection2(True)
     draw.EditRebuild3()
+    if symbol_xy is None:
+        _validate_native_annotation(adapter, tag_annotation, selected_entity, label=label)
     return tag
+
+
+@_telemetry.traced("drawing.native_gtol_selection", label_param="label")
+def _project_native_gtol_selection(
+    adapter: Any, view: Any, entity: Any, *, entity_type: str, label: str
+) -> None:
+    """Give native GTol insertion a sheet-space point on its selected entity.
+
+    Live copy probes show InsertGtol consumes the model-space selection point
+    as sheet coordinates even when the selected entity owns the correct view.
+    Project the kernel's point through the actual view transform; do not move
+    the resulting annotation or select geometry by coordinates. Edge selection
+    can have no selection point, so its native curve endpoint supplies one.
+    This is GTol-specific: datum and finish insertion already map their points.
+    """
+    selection = _early_bound(adapter.currentModel.SelectionManager, "ISelectionMgr")
+    if int(selection.GetSelectedObjectCount2(-1)) != 1:
+        raise RuntimeError(f"{label}: native GTol requires exactly one selected entity")
+    owner = selection.GetSelectedObjectsDrawingView2(1, -1)
+    if owner is None or view_name(adapter, _early_bound(owner, "IView")) != view_name(adapter, view):
+        raise RuntimeError(f"{label}: native GTol entity has the wrong drawing view")
+    if entity_type == "EDGE":
+        edge = _early_bound(entity, "IEdge")
+        if edge.GetCurve() is None:
+            raise RuntimeError(f"{label}: native GTol edge has no curve")
+        parameters = edge.GetCurveParams3()
+        if parameters is None:
+            raise RuntimeError(f"{label}: native GTol edge has no curve parameters")
+        point = tuple(_early_bound(parameters, "ICurveParamData").StartPoint or ())
+    elif entity_type == "FACE":
+        point = tuple(selection.GetSelectionPoint2(1, -1) or ())
+    else:
+        raise ValueError(f"{label}: native GTol point requires a model EDGE or FACE")
+    if len(point) != 3 or not all(math.isfinite(value) for value in point):
+        raise RuntimeError(f"{label}: native GTol model point is unreadable: {point}")
+    xy = model_point_in_view(adapter, view, point, label=label)
+    projected = (*xy, 0.0)
+    if not all(math.isfinite(value) for value in projected):
+        raise RuntimeError(f"{label}: native GTol view projection is not finite: {projected}")
+    if not selection.SetSelectionPoint2(1, -1, *projected):
+        raise RuntimeError(f"{label}: native GTol projected selection point was rejected")
+    actual = tuple(selection.GetSelectionPoint2(1, -1) or ())
+    if len(actual) != 3 or not all(math.isfinite(value) for value in actual) or math.dist(actual, projected) > 1e-12:
+        raise RuntimeError(f"{label}: native GTol projected selection point did not persist: {actual}")
+    if int(selection.GetSelectedObjectCount2(-1)) != 1:
+        raise RuntimeError(f"{label}: native GTol projection changed selection count")
+    after = selection.GetSelectedObject6(1, -1)
+    application = _early_bound(adapter.swApp, "ISldWorks")
+    if after is None or int(application.IsSame(entity, after)) != 1:
+        raise RuntimeError(f"{label}: native GTol projection changed entity identity")
+    span = _telemetry.trace.get_current_span()
+    span.set_attribute("model_point_m", point)
+    span.set_attribute("sheet_point_m", projected)
 
 
 @_telemetry.traced("drawing.feature_control_frame", label_param="label")
@@ -513,7 +616,7 @@ def add_feature_control_frame(
     *,
     edge_xy: tuple[float, float] | None = None,
     edge_entity: Any | None = None,
-    frame_xy: tuple[float, float],
+    frame_xy: tuple[float, float] | None = None,
     characteristic: str,
     tolerance: str,
     datums: Sequence[str] = (),
@@ -529,7 +632,14 @@ def add_feature_control_frame(
 
     ``entity_type`` widens the pick for entities that are not model edges —
     a revolve's flank lines are ``"SILHOUETTE"`` edges.
+
+    Omit ``frame_xy`` with an explicit model ``entity`` to retain the native
+    InsertGtol placement near the selected geometry.
     """
+    if frame_xy is None and entity is None:
+        raise ValueError(f"{label}: native placement requires an explicit model entity")
+    if frame_xy is None and leader_attach_xy is not None:
+        raise ValueError(f"{label}: native placement cannot fix a leader endpoint")
     draw = adapter.currentModel
     edge = _select_annotation_entity(
         adapter,
@@ -540,6 +650,8 @@ def add_feature_control_frame(
         entity_type=entity_type,
         label=label,
     )
+    if frame_xy is None:
+        _project_native_gtol_selection(adapter, view, edge, entity_type=entity_type, label=label)
     gtol = draw.InsertGtol()
     if gtol is None:
         raise RuntimeError(f"failed to insert feature-control frame ({label})")
@@ -651,7 +763,7 @@ def add_feature_control_frame(
             f"failed to set a bent leader on the feature-control frame ({label}): "
             f"SetLeader3 status {leader_status}"
         )
-    if not annotation.SetPosition2(frame_xy[0], frame_xy[1], 0.0):
+    if frame_xy is not None and not annotation.SetPosition2(frame_xy[0], frame_xy[1], 0.0):
         raise RuntimeError(f"failed to position feature-control frame ({label})")
     if leader_attach_xy is not None and not annotation.SetLeaderAttachmentPointAtIndex(
         0, leader_attach_xy[0], leader_attach_xy[1], 0.0
@@ -685,6 +797,8 @@ def add_feature_control_frame(
                 f"actual={actual_attach}, requested={leader_attach_xy}, "
                 f"error={attach_error:.6g} m"
             )
+    if frame_xy is None:
+        _validate_native_annotation(adapter, annotation, edge, label=label)
     draw.ClearSelection2(True)
     return gtol
 
@@ -799,6 +913,41 @@ def project_part_pmi(
     return projected
 
 
+def _style_surface_finish(adapter: Any, symbol: Any, annotation: Any, *, label: str) -> None:
+    """Use the drawing's dimension typography and native upright orientation.
+
+    The template's SF default is 6.35 mm while dimensions/notes are 3.5 mm.
+    Both native and old bent-leader insertions inherit that oversized default.
+    Copy the actual document dimension format rather than hardcoding a font or
+    size. The copy-only probe_drawing_annotation_layout diagnostic proves this
+    style remains attached, horizontal and correctly sized after save/reopen.
+    """
+    extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
+    # swDetailingDimensionTextFormat=1, swDetailingNoOptionSpecified=0,
+    # read from the installed R2026x swconst.tlb by the committed diagnostic.
+    raw = extension.GetUserPreferenceTextFormat(1, 0)
+    if raw is None:
+        raise RuntimeError(f"{label}: drawing has no dimension text standard")
+    desired = _early_bound(raw, "ITextFormat")
+
+    def signature(value: Any) -> tuple[float, str, float, bool]:
+        return (float(value.CharHeight), str(value.TypeFaceName), float(value.WidthFactor), bool(value.Italic))
+
+    expected = signature(desired)
+    if not math.isfinite(expected[0]) or expected[0] <= 0 or not expected[1]:
+        raise RuntimeError(f"{label}: drawing dimension text standard is invalid: {expected}")
+    if not annotation.SetTextFormat(0, False, desired):
+        raise RuntimeError(f"{label}: surface finish rejected dimension text standard")
+    symbol = _early_bound(symbol, "ISFSymbol")
+    symbol.Orientation = 1  # swSFOrientation_Upright: horizontal, not entity-perpendicular
+    applied = annotation.GetTextFormat(0)
+    if applied is None or signature(_early_bound(applied, "ITextFormat")) != expected:
+        raise RuntimeError(f"{label}: surface finish text standard did not persist")
+    angle = float(symbol.GetAngle())
+    if int(symbol.Orientation) != 1 or not math.isfinite(angle) or abs(math.remainder(angle, 2 * math.pi)) > 1e-9:
+        raise RuntimeError(f"{label}: surface finish native upright orientation did not persist")
+
+
 @_telemetry.traced("drawing.surface_finish", label_param="label")
 def add_surface_finish(
     adapter: Any,
@@ -806,7 +955,7 @@ def add_surface_finish(
     *,
     edge_xy: tuple[float, float] | None = None,
     edge_entity: Any | None = None,
-    symbol_xy: tuple[float, float],
+    symbol_xy: tuple[float, float] | None = None,
     roughness_ra: str | None = None,
     control: SurfaceFinishControl | None = None,
     label: str,
@@ -821,7 +970,15 @@ def add_surface_finish(
     edges — a revolve's flank lines are ``"SILHOUETTE"`` edges.  Pass a model
     ``edge_entity`` obtained from ``IView.GetVisibleEntities2`` when a small or
     overlapping projection makes coordinate selection ambiguous.
+
+    Omit ``symbol_xy`` with an explicit model ``entity`` for a native attached
+    no-leader symbol. InsertSurfaceFinishSymbol3 documents that location inputs
+    are ignored in swNO_LEADER mode; no generic auto-place leader API is used.
     """
+    if symbol_xy is None and entity is None:
+        raise ValueError(f"{label}: native placement requires an explicit model entity")
+    if symbol_xy is None and leader_attach_xy is not None:
+        raise ValueError(f"{label}: native placement cannot fix a leader endpoint")
     if control is not None:
         if roughness_ra is not None or production_method:
             raise ValueError(
@@ -862,11 +1019,12 @@ def add_surface_finish(
             f"SURFACE_AUDIT {label}: entity_type={entity_type}, faces={diagnostic!r}"
         )
     draw = adapter.currentModel
+    insertion_xy = (0.0, 0.0) if symbol_xy is None else symbol_xy
     symbol = draw.Extension.InsertSurfaceFinishSymbol3(
         1,  # installed R2026x swSFSymType_e.swSFMachining_Req
-        _LEADER_BENT,  # swLeaderStyle_e.swBENT -- see _LEADER_BENT
-        symbol_xy[0],
-        symbol_xy[1],
+        0 if symbol_xy is None else _LEADER_BENT,  # swNO_LEADER / swBENT
+        insertion_xy[0],
+        insertion_xy[1],
         0.0,
         0,  # swSFLaySym_e.swSFNone
         10,  # swArrowStyle_e.swNO_ARROWHEAD
@@ -902,29 +1060,33 @@ def add_surface_finish(
         "SetLeader3",
         "SetLeaderAttachmentPointAtIndex",
     )
-    leader_status = int(
-        annotation.SetLeader3(
-            _LEADER_BENT,
-            _LEADER_SIDE_SMART,
-            True,  # smart arrowhead
-            False,  # perpendicular (GTol-only)
-            False,  # all-around
-            False,  # dashed
+    if symbol_xy is not None:
+        leader_status = int(
+            annotation.SetLeader3(
+                _LEADER_BENT,
+                _LEADER_SIDE_SMART,
+                True,  # smart arrowhead
+                False,  # perpendicular (GTol-only)
+                False,  # all-around
+                False,  # dashed
+            )
         )
-    )
-    if leader_status != 0:
-        raise RuntimeError(
-            f"failed to set a bent leader on the Ra {roughness_ra} symbol "
-            f"({label}): SetLeader3 status {leader_status}"
-        )
-    if not annotation.SetPosition2(symbol_xy[0], symbol_xy[1], 0.0):
-        raise RuntimeError(f"failed to position surface-finish symbol ({label})")
+        if leader_status != 0:
+            raise RuntimeError(
+                f"failed to set a bent leader on the Ra {roughness_ra} symbol "
+                f"({label}): SetLeader3 status {leader_status}"
+            )
+        if not annotation.SetPosition2(symbol_xy[0], symbol_xy[1], 0.0):
+            raise RuntimeError(f"failed to position surface-finish symbol ({label})")
     if leader_attach_xy is not None and not annotation.SetLeaderAttachmentPointAtIndex(
         0, leader_attach_xy[0], leader_attach_xy[1], 0.0
     ):
         raise RuntimeError(f"failed to position surface-finish leader ({label})")
+    _style_surface_finish(adapter, symbol, annotation, label=label)
     draw.ClearSelection2(True)
     draw.EditRebuild3()
+    if symbol_xy is None:
+        _validate_native_annotation(adapter, annotation, selected_entity, label=label)
     return symbol
 
 
@@ -1867,6 +2029,66 @@ def delete_unnamed_imports(adapter: Any, annotations: list[Any]) -> list[Any]:
     return survivors
 
 
+@_telemetry.traced("drawing.retain_dimensions", label_param="view_label")
+def retain_view_dimensions(
+    adapter: Any,
+    view: Any,
+    *,
+    keep: Iterable[str],
+    view_label: str,
+) -> list[Any]:
+    """Keep exactly the named model dimensions without assigning text positions.
+
+    Native layout callers arrange the returned dimensions after authoring their
+    callouts. Import-time coordinate writes would be both redundant and dependent
+    on an earlier view layout. Validate multiplicity, not just set membership:
+    two imported dimensions with the same short name are ambiguous.
+
+    Read the actual view back after curation: the adapter's returned survivor
+    list is not evidence that deletion succeeded. Individual visibility is
+    required too; IAnnotation.Visible does not certify layer visibility or the
+    final rendered ink, which remain drawing-layout validation concerns.
+    """
+    expected = tuple(keep)
+    if any(not isinstance(name, str) or not name for name in expected):
+        raise ValueError("retained dimension names must be nonempty strings")
+    if len(set(expected)) != len(expected):
+        raise ValueError("retained dimension names must be unique")
+    annotations = delete_unnamed_imports(
+        adapter, insert_marked_dimensions(adapter, view)
+    )
+    names = {dimension_name(adapter, annotation) for annotation in annotations}
+    delete = tuple(sorted(name for name in names if name and name not in expected))
+    curated = curate_dimensions(adapter, annotations, delete=delete)
+    present = Counter(dimension_name(adapter, annotation) for annotation in curated)
+    if present != Counter(expected):
+        raise RuntimeError(
+            f"{view_label} view model dimension mismatch: "
+            f"expected={sorted(expected)}, actual={dict(present)}"
+        )
+    view = _early_bound(view, "IView")
+    observed = []
+    for raw in view.GetAnnotationsByType(_ANNOT_DIM) or ():
+        if raw is None:
+            raise RuntimeError(f"{view_label} view model dimension mismatch: missing annotation")
+        observed.append(_early_bound(raw, "IAnnotation"))
+    present = Counter(dimension_name(adapter, annotation) for annotation in observed)
+    if present != Counter(expected):
+        raise RuntimeError(
+            f"{view_label} view model dimension mismatch after curation: "
+            f"expected={sorted(expected)}, actual={dict(present)}"
+        )
+    for annotation in observed:
+        # swAnnotationVisibilityState_e.swAnnotationVisible=1. Hidden and
+        # half-hidden annotations must not silently satisfy a print contract.
+        if int(annotation.Visible) != 1:
+            raise RuntimeError(
+                f"{view_label} retained dimension {dimension_name(adapter, annotation)!r} "
+                "is not individually visible"
+            )
+    return observed
+
+
 @_telemetry.traced("drawing.curate_dimensions", label_param="view_label")
 def curate_view_dimensions(
     adapter: Any,
@@ -2196,6 +2418,119 @@ def offset_dimension_text(
     if remaining:
         raise RuntimeError(f"dimension text not offset: {sorted(remaining)}")
     adapter.currentModel.EditRebuild3()
+
+
+@_telemetry.traced("drawing.auto_arrange_dimensions")
+def auto_arrange_view_dimensions(
+    adapter: Any, views: Iterable[Any], *, spacing_m: float = 0.001
+) -> int:
+    """Let SolidWorks arrange the existing dimensions in the supplied views.
+
+    Call once after the annotation phase. GetAnnotationsByType limits the scan
+    to view-owned display dimensions; datum tags, FCFs and surface finishes
+    are never selected for the dimension-only AlignDimensions API. There is
+    one native arrange call for the whole bank and no manual-position retry.
+    Dimension names come from the actual display annotations, never recipes.
+    """
+    if not math.isfinite(spacing_m) or spacing_m <= 0:
+        raise ValueError("dimension auto-arrange spacing must be finite and positive")
+    views = tuple(views)
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    selection = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    extension = _early_bound(draw.Extension, "IModelDocExtension")
+    count = 0
+    draw.ClearSelection2(True)
+    try:
+        for raw_view in views:
+            view = _early_bound(raw_view, "IView")
+            annotations = tuple(view.GetAnnotationsByType(_ANNOT_DIM) or ())
+            if not annotations:
+                continue
+            name = view_name(adapter, view)
+            if not drawing.ActivateView(name):
+                raise RuntimeError(f"failed to activate dimension view {name!r} for auto-arrange")
+            for raw_annotation in annotations:
+                if raw_annotation is None:
+                    raise RuntimeError("auto-arrange received a missing dimension annotation")
+                annotation = _early_bound(raw_annotation, "IAnnotation")
+                display = annotation.GetSpecificAnnotation()
+                if display is None:
+                    raise RuntimeError(f"auto-arrange dimension in {name!r} has no display dimension")
+                display = _early_bound(display, "IDisplayDimension")
+                selection_name = str(display.GetNameForSelection() or "")
+                if not selection_name:
+                    raise RuntimeError(f"auto-arrange dimension in {name!r} has no selection name")
+                # Live positive control: imported drawing dimensions reject
+                # Select3(None/SelectData.View) on this seat, while their own
+                # GetNameForSelection names select the complete bank. This is
+                # name identity; the coordinate fields are ignored. See the
+                # copy-only probe_drawing_dimension_selection.py diagnostic.
+                if not extension.SelectByID2(
+                    selection_name, "DIMENSION", 0.0, 0.0, 0.0, True, 0, null_callout(), 0
+                ):
+                    raise RuntimeError(
+                        f"failed to select dimension {count + 1} for auto-arrange: "
+                        f"view={name!r}, annotation={annotation.GetName()!r}, "
+                        f"type={annotation.GetType()}, visibility={annotation.Visible}"
+                    )
+                count += 1
+        if count == 0:
+            return 0
+        selected_count = int(selection.GetSelectedObjectCount2(-1))
+        if selected_count != count:
+            raise RuntimeError(
+                f"dimension auto-arrange selection count mismatch: {selected_count} != {count}"
+            )
+        if not extension.AlignDimensions(0, spacing_m):  # swAlignDimensionType_AutoArrange
+            raise RuntimeError(f"SolidWorks rejected native auto-arrange for {count} dimensions")
+        return count
+    finally:
+        draw.ClearSelection2(True)
+        span = _telemetry.trace.get_current_span()
+        span.set_attribute("views", len(views))
+        span.set_attribute("dimensions", count)
+
+
+@_telemetry.traced("drawing.entity_dimension", label_param="label")
+def add_entity_dimension(
+    adapter: Any,
+    view: Any,
+    *,
+    entities: tuple[Any, Any],
+    text_xy: tuple[float, float],
+    label: str,
+    orientation: str = "smart",
+) -> Any:
+    """Dimension two resolved model entities; coordinates only place the text.
+
+    IView.SelectEntity maps each source-model entity into this drawing view.
+    Use horizontal/vertical for directed distances and smart for unambiguous
+    circle-centre distances. Angular endpoint choices need their own contract.
+    """
+    if len(entities) != 2:
+        raise ValueError(f"{label} requires exactly two model entities")
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    if not ddoc.ActivateView(view_name(adapter, view)):
+        raise RuntimeError(f"failed to activate drawing view for {label}")
+    if orientation not in {"smart", "horizontal", "vertical"}:
+        raise ValueError(f"unknown dimension orientation: {orientation!r}")
+    draw.ClearSelection2(True)
+    for index, entity in enumerate(entities):
+        if entity is None or not view.SelectEntity(entity, index > 0):
+            raise RuntimeError(f"failed to select {label} model entity {index}")
+    creators = {
+        "smart": draw.AddDimension2,
+        "horizontal": draw.AddHorizontalDimension2,
+        "vertical": draw.AddVerticalDimension2,
+    }
+    dimension = creators[orientation](*text_xy, 0.0)
+    draw.ClearSelection2(True)
+    if dimension is None:
+        raise RuntimeError(f"failed to add the {label} {orientation} dimension")
+    draw.EditRebuild3()
+    return dimension
 
 
 def add_edge_dimension(
@@ -3866,12 +4201,7 @@ def _table_element(adapter: Any, table: Any, name: str) -> LayoutElement | None:
 
 
 def _datum_is_dimension_attached(adapter: Any, annotation: Any) -> bool:
-    """Whether a datum tag is attached to a display dimension.
-
-    SolidWorks reports ``IDatumTag`` primitive coordinates for this attachment
-    type in the dimension's local frame.  They must not be mixed with the
-    sheet-space annotation position used by the layout audit.
-    """
+    """Whether a datum tag's native attachment is a display dimension."""
     attachment_types = (
         adapter._attempt(
             lambda: adapter._get_attr_or_call(annotation, "GetAttachedEntityTypes")
@@ -3882,7 +4212,11 @@ def _datum_is_dimension_attached(adapter: Any, annotation: Any) -> bool:
 
 
 def _measured_gdt_box(
-    adapter: Any, annotation: Any, kind: int
+    adapter: Any,
+    annotation: Any,
+    kind: int,
+    *,
+    measure_gdt: GdtEnvelopeMeasurement | None = None,
 ) -> tuple[float, float, float, float] | None:
     """Box a GD&T symbol from the geometry SolidWorks actually renders.
 
@@ -3893,19 +4227,34 @@ def _measured_gdt_box(
     centerPt[3], rotationDir]``. Their union is the symbol's ink, leader
     included, which is exactly the question an OVERFLOW check asks.
 
-    They are NOT on ``IAnnotation``: go through ``GetSpecificAnnotation()``
-    first, or every call raises. (``GetExtent`` is not the route -- the type
-    library declares it on ``IBomTable`` and ``INote`` only, verified against a
-    working ``INote.GetExtent()`` in the same probe run.)
+    The default legacy route below uses these specific-annotation methods.
+    An explicit ``measure_gdt`` callback instead measures the actual generic
+    ``IAnnotation.GetDisplayData`` envelope including rendered text. That route
+    is mandatory for dimension-attached datums because their specific data can
+    remain stale before reopen (see the committed stationary attachment probe).
     """
-    if kind == _ANNOT_DATUM:
-        if _datum_is_dimension_attached(adapter, annotation):
-            # A datum attached to a display dimension reports IDatumTag primitive
-            # coordinates in that dimension's local frame, unlike the sheet-space
-            # primitives of an edge-attached tag. Its IAnnotation.GetPosition is
-            # still the documented sheet-space symbol origin, so the nominal datum
-            # box below is the truthful overflow check for this attachment type.
-            return None
+    if measure_gdt is not None:
+        measured = tuple(
+            float(value) for value in measure_gdt(adapter, annotation, kind)
+        )
+        if (
+            len(measured) != 4
+            or not all(math.isfinite(value) for value in measured)
+            or measured[0] >= measured[2]
+            or measured[1] >= measured[3]
+        ):
+            raise RuntimeError("GD&T measurement callback returned invalid native bounds")
+        return measured
+    if kind == _ANNOT_DATUM and _datum_is_dimension_attached(adapter, annotation):
+        # probe_datum_dimension_attachment.py --mode stationary_attachment proves
+        # specific display data can be stale until reopen, not dimension-local.
+        # The actual generic frame is remote from GetPosition. A nominal box at
+        # that anchor would silently miss the printed datum. Keep the calibrated
+        # measurement dependency opt-in, outside the unmigrated drawing closure.
+        raise RuntimeError(
+            "dimension-attached datum audit requires an explicit generic GD&T "
+            "measurement callback; nominal anchor bounds are not native evidence"
+        )
 
     spec = adapter._attempt(
         lambda: adapter._get_attr_or_call(annotation, "GetSpecificAnnotation")
@@ -3941,7 +4290,12 @@ def _measured_gdt_box(
 
 
 def _gdt_element(
-    adapter: Any, annotation: Any, name: str, kind: int
+    adapter: Any,
+    annotation: Any,
+    name: str,
+    kind: int,
+    *,
+    measure_gdt: GdtEnvelopeMeasurement | None = None,
 ) -> LayoutElement | None:
     """Box a native GD&T symbol from its rendered geometry where possible.
 
@@ -3971,7 +4325,7 @@ def _gdt_element(
     if not position:
         return None
     x, y = float(position[0]), float(position[1])
-    if kind == _ANNOT_SFSYM:
+    if kind == _ANNOT_SFSYM and measure_gdt is None:
         return LayoutElement(
             name,
             "gdt",
@@ -3981,7 +4335,7 @@ def _gdt_element(
             y + _SF_BOX_UP_M,
             scope=CollisionScope.NONE,
         )
-    measured = _measured_gdt_box(adapter, annotation, kind)
+    measured = _measured_gdt_box(adapter, annotation, kind, measure_gdt=measure_gdt)
     if measured is not None:
         x0, y0, x1, y1 = measured
         return LayoutElement(name, "gdt", x0, y0, x1, y1, scope=CollisionScope.NONE)
@@ -4014,7 +4368,9 @@ def _dim_element(adapter: Any, annotation: Any, name: str) -> LayoutElement | No
     )
 
 
-def _iter_view_annotations(adapter: Any, view: Any):
+def _iter_view_annotations(
+    adapter: Any, view: Any, *, measure_gdt: GdtEnvelopeMeasurement | None = None
+):
     """Yield ``(LayoutElement, annotation)`` for each note / GD&T symbol / dimension.
 
     ``IView.GetAnnotations`` returns dimensions, center marks, cosmetic-thread
@@ -4045,7 +4401,9 @@ def _iter_view_annotations(adapter: Any, view: Any):
         if kind == _ANNOT_NOTE:
             element = _note_element(adapter, annotation, name)
         elif kind in _GDT_TYPES:
-            element = _gdt_element(adapter, annotation, name, kind)
+            element = _gdt_element(
+                adapter, annotation, name, kind, measure_gdt=measure_gdt
+            )
         elif kind == _ANNOT_DIM:
             element = _dim_element(adapter, annotation, name)
         else:
@@ -4291,6 +4649,8 @@ def _leader_segments_of(
 
 def collect_layout_elements(
     adapter: Any,
+    *,
+    measure_gdt: GdtEnvelopeMeasurement | None = None,
 ) -> tuple[list[LayoutElement], list[LeaderSegment], DrawableRegion]:
     """Gather every drawing element, its leader geometry, and the drawable region.
 
@@ -4302,10 +4662,11 @@ def collect_layout_elements(
     * each NOTE a real view owns (the general-notes block and schedule cells); a
       SMALL note centered inside its own view is a hole tag / balloon sitting on
       the geometry and is scoped ``NON_VIEW`` (does not collide with its view);
-    * every native GD&T symbol (datum tag / feature-control frame /
-      surface-finish) and DISPLAY DIMENSION / hole callout, boxed nominally and
-      scoped ``NONE`` (no real bbox API, and they sit on the geometry they
-      annotate) -- overflow- and title-block-keep-out-checked only;
+    * every native GD&T symbol and DISPLAY DIMENSION / hole callout, scoped
+      ``NONE`` because they intentionally join their owning geometry. The legacy
+      box sources are described by their element helpers; an explicit GD&T
+      measurement callback provides current generic native envelopes and is
+      mandatory for dimension-attached datums;
     * every TABLE (hole tables land on the SHEET view, so it is scanned too);
     * two reserved KEEP-OUT boxes -- the checked-in title block and its
       projection symbol -- so no content may land on either.
@@ -4350,7 +4711,9 @@ def collect_layout_elements(
                     scope=_view_scope(adapter, view),
                 )
             )
-        for element, annotation in _iter_view_annotations(adapter, view):
+        for element, annotation in _iter_view_annotations(
+            adapter, view, measure_gdt=measure_gdt
+        ):
             # Record the owning view: a NON_VIEW annotation is exempt from
             # colliding with THIS view only, not other drawing views (Codex #269
             # thread 3).
@@ -4424,7 +4787,9 @@ def collect_layout_elements(
     if sheet_view is not None:
         for table in _iter_tables(adapter, sheet_view):
             tables[table.label] = table
-        for element, annotation in _iter_view_annotations(adapter, sheet_view):
+        for element, annotation in _iter_view_annotations(
+            adapter, sheet_view, measure_gdt=measure_gdt
+        ):
             if element.kind != "note":
                 continue
             owner_type = int(
@@ -4466,10 +4831,19 @@ def collect_layout_elements(
     return elements, leaders, region
 
 
-def check_drawing_layout(adapter: Any, *, stem: str = "") -> None:
+def check_drawing_layout(
+    adapter: Any,
+    *,
+    stem: str = "",
+    measure_gdt: GdtEnvelopeMeasurement | None = None,
+) -> None:
     """Diagnose a colliding, border-crossing, or leader-crossed layout.
 
     This is an explicit diagnostic, not part of the drawing build hot path.
+    ``measure_gdt(adapter, annotation, kind)`` may supply a freshly measured
+    generic native envelope; dimension-attached datums REQUIRE it. The pilot
+    ``_drawing_native_datums.measured_gdt_envelope`` supplies that callback without
+    making the unmigrated fleet import the native-layout measurement helpers.
 
     ``stem`` names the sheet in failures. Every sheet is held to ZERO on every
     defect class -- there is no grandfathered case. There WAS one: pen-assembly
@@ -4479,7 +4853,9 @@ def check_drawing_layout(adapter: Any, *, stem: str = "") -> None:
     :func:`_spread_balloons`). The ratchet was deleted with the defect.
     """
     with _telemetry.span("drawing.layout_audit"):
-        elements, leaders, region = collect_layout_elements(adapter)
+        elements, leaders, region = collect_layout_elements(
+            adapter, measure_gdt=measure_gdt
+        )
         overlaps, overflows, crossings = audit_layout(elements, region, leaders=leaders)
         if not overlaps and not overflows and not crossings:
             _telemetry.success(
@@ -4494,6 +4870,18 @@ def check_drawing_layout(adapter: Any, *, stem: str = "") -> None:
             f"crossing(s), {len(crossings)} leader crossing(s)):\n"
             + format_findings(overlaps, overflows, crossings)
         )
+
+
+def _drawing_artifact_span(kind: Literal["drawing", "pdf", "png"], path: str):
+    """Observe each actual save/export call without splitting or repeating it."""
+    names = {
+        "drawing": "drawing.save_native",
+        "pdf": "drawing.export_pdf",
+        "png": "drawing.export_png",
+    }
+    return _telemetry.span(names[kind], output_path=path)
+
+
 
 
 @_telemetry.traced("drawing.finalize")
@@ -4644,7 +5032,8 @@ async def finalize_drawing(
     # path; the template and precomputed recipe placements own the layout.
     with _telemetry.span("drawing.save_and_export_pdf"):
         artifacts = save_drawing(
-            adapter, str(outputs.slddrw), pdf_path=str(outputs.pdf)
+            adapter, str(outputs.slddrw), pdf_path=str(outputs.pdf),
+            artifact_context=_drawing_artifact_span,
         )
     if set(artifacts) != {"drawing", "pdf"}:
         raise RuntimeError(f"drawing save/export incomplete: {artifacts!r}")

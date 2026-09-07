@@ -22,20 +22,23 @@ import math
 import sys
 from typing import Any
 
-from _gear_drawing_entities import visible_circle_edge
-from rocker_arm_spec import ARM_DEPTH, GEOMETRIC_TOLERANCES_MM
+from _drawing_entities import CircleEdge, LineEdge, ModelEntities
+from _gtol_spec import PlanarFace
+from rocker_arm_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
 from _common import CAD_ROOT, check, run_build
+from _drawing_project_layout import DatumLeaderPolicy, repair_project_drawing_layout
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
-    add_edge_dimension,
+    add_entity_dimension,
     add_feature_control_frame,
     add_native_hole_callout,
     add_property_linked_note,
     add_surface_finish,
-    curate_view_dimensions,
+    auto_arrange_view_dimensions,
+    retain_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -48,6 +51,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from rocker_arm_spec import (
     ARM_THICKNESS,
+    HUB_LENGTH,
     PIVOT_HOLE_DIA,
     R_TOP,
     ROD_HOLE_X,
@@ -106,12 +110,10 @@ def _sheet_xy(mx: float, my: float) -> tuple[float, float]:
 # The large concentric radii are carried in the manufacturing note: imported
 # radius dimensions retain off-sheet centre witnesses even in shortened-radius
 # mode.  Keeping them as notes avoids clipped geometry without losing values.
-FRONT_KEEP = {
-    "PivotDia": (0.180, 0.120),
-}
+FRONT_KEEP = ("PivotDia",)
 NOTE_ONLY_DIMENSIONS = {"TopRadius", "BottomRadius"}
-RIGHT_KEEP: dict[str, tuple[float, float]] = {}
-TOP_KEEP: dict[str, tuple[float, float]] = {}
+RIGHT_KEEP: tuple[str, ...] = ()
+TOP_KEEP: tuple[str, ...] = ()
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -155,7 +157,7 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
 
-    # Explicit per-view scale (an auto-scaled view shifts every coordinate pick).
+    # Explicit view scales establish the sheet layout, not attachment identity.
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 2))
     # 1:1 right end view: the 2.50 x ~29 strap section -- shows the section the
     # profile notes describe, gives the through direction, and carries datum B
@@ -166,17 +168,34 @@ async def build(adapter: Any) -> dict[str, str]:
         set_hidden_lines_removed(adapter, view)
     set_hidden_lines_visible(adapter, front)
 
-    curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
+    retain_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
 
+    entities = ModelEntities(front.ReferencedDocument).resolve(
+        {
+            "pivot": CircleEdge(
+                PIVOT_HOLE_DIA / 2.0, (0, _PIVOT_MID_Y, -HUB_LENGTH / 2.0), (0, 0, 1)
+            ),
+            "rod": CircleEdge(
+                _ROD_HOLE_DIA / 2.0,
+                (ROD_HOLE_X, ROD_HOLE_Y, -ARM_THICKNESS / 2.0),
+                (0, 0, 1),
+            ),
+            "broad": PlanarFace((0, 0, 1), ARM_THICKNESS / 2.0),
+            "tip": LineEdge(
+                (_TIP_FACE_MID_X, _TIP_FACE_MID_Y, -ARM_THICKNESS / 2.0),
+                (TOP_END_X / R_TOP, -math.cos(TOP_ARC_LEN / 2.0 / R_TOP), 0),
+            ),
+        }
+    )
+
     # Rod-pin hole native callout (the #47 wizard hole near the +X tip).
-    rod_rim = _sheet_xy(ROD_HOLE_X, ROD_HOLE_Y - _ROD_HOLE_DIA / 2.0)
     add_native_hole_callout(
         adapter,
         front,
-        edge_xy=rod_rim,
+        edge=entities["rod"],
         callout_xy=(0.300, 0.128),
         label="rod-pin hole",
     )
@@ -186,109 +205,66 @@ async def build(adapter: Any) -> dict[str, str]:
     # above its mid-height), so a single slant centre distance would leave the
     # angular component uninspectable; two component dimensions fully define
     # the true position the FCF below controls.
-    pivot_rim = _sheet_xy(0.0, _PIVOT_MID_Y - PIVOT_HOLE_DIA / 2.0)
-    rod_location_x = add_edge_dimension(
+    rod_location_x = add_entity_dimension(
         adapter,
         front,
-        p0=pivot_rim,
-        p1=rod_rim,
+        entities=(entities["pivot"], entities["rod"]),
         text_xy=(0.180, 0.138),
         label="rod-pin X location",
         orientation="horizontal",
     )
     set_basic_dimension(adapter, rod_location_x, label="rod-pin X location")
-    rod_location_y = add_edge_dimension(
+    rod_location_y = add_entity_dimension(
         adapter,
         front,
-        p0=pivot_rim,
-        p1=rod_rim,
+        entities=(entities["pivot"], entities["rod"]),
         text_xy=(0.267, 0.162),
         label="rod-pin Y location",
         orientation="vertical",
     )
     set_basic_dimension(adapter, rod_location_y, label="rod-pin Y location")
 
-    # Datum A identifies the pivot bore's cylindrical surface.  Keep its leader
-    # oblique to both centre-mark axes so the triangle unmistakably terminates
-    # on the circumference rather than appearing to identify the bore centre.
-    pivot_datum_angle = math.radians(135.0)
-    pivot_radius = PIVOT_HOLE_DIA / 2.0
-    pivot_datum_rim = _sheet_xy(
-        pivot_radius * math.cos(pivot_datum_angle),
-        _PIVOT_MID_Y + pivot_radius * math.sin(pivot_datum_angle),
-    )
-    pivot_datum_standoff = 0.020
+    # Datum A identifies the pivot bore's cylindrical surface; let the native
+    # annotation choose its station on that known model rim.
     add_datum_feature(
         adapter,
         front,
-        edge_xy=pivot_datum_rim,
-        symbol_xy=(
-            pivot_datum_rim[0] + pivot_datum_standoff * math.cos(pivot_datum_angle),
-            pivot_datum_rim[1] + pivot_datum_standoff * math.sin(pivot_datum_angle),
-        ),
+        entity=entities["pivot"],
         datum="A",
         label="pivot bore cylindrical datum feature",
         shoulder=True,
-        # SolidWorks snaps this circular bore attachment to its nearest legal
-        # anchor.  The live readback is 0.0109 mm from the requested point;
-        # allow that native normalization while retaining the shared strict
-        # persistence check for freely positioned annotations.
-        position_tolerance_m=0.0001,
     )
-    # Ra on the bore rim at 7:30 -- oblique to both centre-mark axes like the
-    # datum above: since the integral hub (2026-09-02) the 6 o'clock point on
-    # the bore lies on the centre mark's vertical extension and the coordinate
-    # pick resolved to the hub's O10 rim instead of the O6.5 bore edge. Then a
-    # position FCF tying the rod-pin hole to the complete A-B-C frame.
-    pivot_finish_angle = math.radians(225.0)
-    pivot_bottom = _sheet_xy(
-        pivot_radius * math.cos(pivot_finish_angle),
-        _PIVOT_MID_Y + pivot_radius * math.sin(pivot_finish_angle),
-    )
-    # Pick the bore circle by DIAMETER (the visible-entity walk the cone-gear
-    # drawing uses): a coordinate pick on the concentric O6.5 / O10 rims
-    # resolves to the hub's outer circle within SolidWorks' tolerance.
-    pivot_bore_edge = visible_circle_edge(adapter, front, PIVOT_HOLE_DIA)
+    # Reuse the resolved bore, including its hub-end station; the concentric
+    # hub rim can never satisfy this role's centre/radius constraints.
     add_surface_finish(
         adapter,
         front,
-        edge_entity=pivot_bore_edge,
-        symbol_xy=(pivot_bottom[0] - 0.012, pivot_bottom[1] - 0.020),
+        entity=entities["pivot"],
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bore"),
         label="pivot bore finish",
     )
     # Datum B (broad face, on the end view) orients the hole axes; datum C
     # (the +X tip face) clocks rotation about the pivot axis, so the X/Y BASIC
     # coordinates above have an inspectable direction.
-    # Datum B on the strap's broad face in the end view, picked ABOVE the hub
-    # band (the O10 hub hides the flank over y 3..13 since 2026-09-02); the
-    # end view is centred on the strap's mid-depth (_PIVOT_MID_Y).
-    broad_face = (
-        RIGHT_CENTER[0] - ARM_THICKNESS / 2000.0,
-        RIGHT_CENTER[1] + (ARM_DEPTH - 1.0 - _PIVOT_MID_Y) / 1000.0  # right view is 1:1,
-    )
     add_datum_feature(
         adapter,
         right,
-        edge_xy=broad_face,
-        symbol_xy=(broad_face[0] - 0.016, broad_face[1] - 0.014),
+        entity=entities["broad"],
+        entity_type="FACE",
         datum="B",
         label="broad face",
     )
-    tip_face = _sheet_xy(_TIP_FACE_MID_X, _TIP_FACE_MID_Y)
     add_datum_feature(
         adapter,
         front,
-        edge_xy=tip_face,
-        symbol_xy=(tip_face[0] + 0.012, tip_face[1] + 0.012),
+        entity=entities["tip"],
         datum="C",
         label="rod-side tip face",
     )
     add_feature_control_frame(
         adapter,
         front,
-        edge_xy=rod_rim,
-        frame_xy=(0.300, 0.195),
+        entity=entities["rod"],
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["rod-pin hole position"],
         datums=("A", "B", "C"),
@@ -296,9 +272,27 @@ async def build(adapter: Any) -> dict[str, str]:
         label="rod-pin hole position",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.082)
-    add_property_linked_note(adapter, "Isometric View Note", 0.315, 0.150)
+    manufacturing = add_property_linked_note(
+        adapter, "Manufacturing Notes", 0.020, 0.082
+    )
+    caption = add_property_linked_note(adapter, "Isometric View Note", 0.315, 0.150)
 
+    auto_arrange_view_dimensions(adapter, (front, right, iso))
+    from _drawing_native_layout import LayoutNote
+    from _drawing_view_packing import Axis, AxisOrder
+
+    # The right profile is enlarged independently (1:1 versus 1:2 front).
+    # Preserve its side of the elevation without inventing projected alignment.
+    repair_project_drawing_layout(
+        adapter,
+        datum_leader_policy=DatumLeaderPolicy.BENT_DOCUMENT,
+        views={"front": front, "right": right, "iso": iso},
+        orderings=(AxisOrder(Axis.X, "front", "right"),),
+        notes=(
+            LayoutNote("manufacturing", manufacturing.GetAnnotation()),
+            LayoutNote("iso-caption", caption.GetAnnotation(), "iso"),
+        ),
+    )
     return await finalize_drawing(
         adapter,
         OUTPUTS,

@@ -1,0 +1,1178 @@
+"""COM-free controls for native layout collection, absolute movement and readback."""
+
+from types import SimpleNamespace
+import json
+
+import pytest
+
+import _drawing_native_layout as native
+from _drawing_view_packing import Axis, AxisOrder, Rect
+
+
+@pytest.fixture(autouse=True)
+def isolated_failure_reports(monkeypatch, tmp_path):
+    monkeypatch.setattr(native, "_FAILURE_REPORT_ROOT", tmp_path, raising=False)
+
+
+@pytest.mark.parametrize("overflow_m", [0.5, 2e-12])
+def test_failed_fit_persists_exact_measured_overflow(monkeypatch, overflow_m):
+    front = View("front", Rect(-1, 2, 1, 4))
+    annotation = Annotation("frame", Rect(-1, 2, 0, 3), owner=front, kind=5)
+    front.annotations = [annotation]
+    adapter, options, _ = scene(monkeypatch, {"front": front})
+
+    def rebuild():
+        annotation.rectangle = Rect(-overflow_m, 2, 1, 3)
+        return True
+
+    adapter.currentModel.EditRebuild3 = rebuild
+    with pytest.raises(RuntimeError, match="remeasured native layout") as caught:
+        native.repair_native_layout(adapter, **options)
+    evidence = caught.value.evidence
+    assert json.loads(caught.value.report_path.read_text()) == evidence
+    assert evidence["footprints"]["before"]["view:front"] == [-1, 2, 1, 4]
+    assert evidence["footprints"]["predicted"]["view:front"] == [0, 2, 2, 4]
+    assert evidence["footprints"]["observed"]["view:front"][0] == -overflow_m
+    assert evidence["raw_residuals"]["overflow"] == [
+        {"item": "view:front", "side": "left", "excess_m": overflow_m}
+    ]
+    assert evidence["positions"]["views"]["front"]["error_m"] == 0
+    assert evidence["outlines"]["observed"]["front"] == [0, 2, 2, 4]
+    assert (
+        evidence["annotation_bounds"]["observed"]["('view:front', 'frame', 5)"][0]
+        == -overflow_m
+    )
+    # A feasible correction is not proof the sheet fits without that correction.
+    assert evidence["validation"]["status"] == "packed"
+    assert evidence["validation"]["explored_nodes"] == 1
+    assert evidence["validation"]["translations"]["view:front"][0] == overflow_m
+
+
+def test_readback_evidence_names_overlap_and_order_gap(monkeypatch):
+    front = View("front", Rect(-1, 2, 1, 4))
+    right = View("right", Rect(3, 2, 5, 4))
+    annotation = Annotation("frame", Rect(-1, 2, 0, 3), owner=front, kind=5)
+    front.annotations = [annotation]
+    adapter, options, _ = scene(monkeypatch, {"front": front, "right": right})
+
+    def rebuild():
+        annotation.rectangle = Rect(0, 2, right.rectangle.xmin + 0.25, 3)
+        return True
+
+    adapter.currentModel.EditRebuild3 = rebuild
+    with pytest.raises(RuntimeError, match="remeasured native layout") as caught:
+        native.repair_native_layout(
+            adapter, **options, orderings=(AxisOrder(Axis.X, "front", "right"),)
+        )
+    residuals = caught.value.evidence["raw_residuals"]
+    pair = residuals["pairs"][0]
+    assert (pair["first"], pair["second"], pair["kind"]) == (
+        "view:front",
+        "view:right",
+        "overlap",
+    )
+    assert pair["overlap_m"] == [0.25, 2.0]
+    assert pair["clearance_deficit_m"] == pytest.approx(0.35)
+    assert residuals["orderings"][0]["gap_m"] == -0.25
+    assert residuals["orderings"][0]["deficit_m"] == pytest.approx(0.35)
+
+
+def test_clamped_position_persists_requested_observed_and_error(monkeypatch):
+    front = View("front", Rect(-1, 2, 1, 4))
+    front.movement = "clamp"
+    adapter, options, _ = scene(monkeypatch, {"front": front})
+    with pytest.raises(RuntimeError, match="did not reach absolute") as caught:
+        native.repair_native_layout(adapter, **options)
+    assert caught.value.evidence["positions"]["views"]["front"] == {
+        "before": [0, 3],
+        "requested": [1, 3],
+        "observed": [0, 3],
+        "observed_minus_requested_m": [-1, 0],
+        "error_m": 1,
+    }
+
+
+def test_search_limited_readback_reports_clearance_deficit_without_overlap(monkeypatch):
+    front = View("front", Rect(-1, 2, 1, 4))
+    fixed = Annotation("fixed", Rect(4, 2, 5, 4))
+    frame = Annotation("frame", Rect(-1, 2, 0, 3), owner=front, kind=5)
+    front.annotations = [frame]
+    adapter, options, _ = scene(monkeypatch, {"front": front}, [fixed])
+
+    def rebuild():
+        frame.rectangle = Rect(0, 2, 3.95, 3)
+        return True
+
+    adapter.currentModel.EditRebuild3 = rebuild
+    with pytest.raises(native.NativeLayoutReadbackError) as caught:
+        native.repair_native_layout(adapter, **options)
+    evidence = caught.value.evidence
+    assert evidence["validation"]["status"] == "search_limit"
+    pair = evidence["raw_residuals"]["pairs"][0]
+    assert pair["second"] == "('sheet', 'fixed', 6)"
+    assert pair["kind"] == "clearance"
+    assert pair["clearance_deficit_m"] == pytest.approx(0.05)
+    assert pair["overlap_m"] == [0, 2]
+    assert evidence["gap_m"] == 0.1
+    assert evidence["position_tolerance_m"] == 1e-8
+
+
+def test_raw_residuals_retain_axis_alignment_below_position_tolerance(monkeypatch):
+    front, top = View("front", Rect(-1, 2, 1, 4)), View("top", Rect(-1, 5, 1, 7))
+    adapter, options, _ = scene(monkeypatch, {"front": front, "top": top})
+
+    def rebuild():
+        top.shift(1e-9, 0)
+        return True
+
+    adapter.currentModel.EditRebuild3 = rebuild
+    with pytest.raises(native.NativeLayoutReadbackError) as caught:
+        native.repair_native_layout(
+            adapter, **options, alignments=(native.AxisLink(Axis.X, "front", "top"),)
+        )
+    evidence = caught.value.evidence
+    assert evidence["raw_residuals"]["alignments"][0]["first_minus_second_m"] == (
+        front.Position[0] - top.Position[0]
+    )
+    assert 0 < evidence["positions"]["views"]["top"]["error_m"] < 1e-8
+
+
+def test_failure_artifacts_are_unique_and_failed_persistence_keeps_original_error(
+    tmp_path, monkeypatch
+):
+    first = native.NativeLayoutReadbackError("original layout failure", {"test": 1})
+    second = native.NativeLayoutReadbackError("original layout failure", {"test": 2})
+    assert first.report_path != second.report_path
+    assert json.loads(first.report_path.read_text()) == {"test": 1}
+    assert json.loads(second.report_path.read_text()) == {"test": 2}
+    # A file cannot serve as a report directory. Preserve the CAD failure and
+    # in-memory evidence instead of replacing them with the filesystem exception.
+    monkeypatch.setattr(native, "_FAILURE_REPORT_ROOT", first.report_path)
+    failure = native.NativeLayoutReadbackError("original layout failure", {"test": 3})
+    assert "original layout failure; evidence persistence failed" in str(failure)
+    assert failure.evidence == {"test": 3}
+    assert failure.report_path is None
+
+
+@pytest.mark.parametrize("headroom_m", [0.0, 0.0005])
+def test_planning_headroom_absorbs_observed_note_extent_drift_without_relaxing_fit(
+    monkeypatch, headroom_m
+):
+    front = View("front", Rect(5, 5, 7, 7))
+    note = Annotation("manufacturing", Rect(1, -0.1, 3, 1))
+    adapter, options, _ = scene(monkeypatch, {"front": front}, [note])
+    options.update(
+        gap_m=0.002,
+        planning_headroom_m=headroom_m,
+        notes=(native.LayoutNote("manufacturing", note),),
+    )
+    calls = []
+    original_pack = native.pack_view_groups
+
+    def pack(*args, **kwargs):
+        calls.append((args[1], kwargs["gap_m"]))
+        return original_pack(*args, **kwargs)
+
+    def rebuild():
+        # Rocker readback-isqo6i2l: native anchor reaches its target, but the
+        # measured note extent shifts down by this amount after the rebuild.
+        note.rectangle = note.rectangle.translated((0, -0.00014335831381729822))
+        return True
+
+    monkeypatch.setattr(native, "pack_view_groups", pack)
+    adapter.currentModel.EditRebuild3 = rebuild
+    if headroom_m == 0:
+        with pytest.raises(native.NativeLayoutReadbackError):
+            native.repair_native_layout(adapter, **options)
+        return
+    report = native.repair_native_layout(adapter, **options)
+    assert report.status is native.NativeLayoutStatus.APPLIED
+    assert calls == [
+        (Rect(0.0005, 0.0005, 9.9995, 9.9995), 0.0025),
+        (Rect(0, 0, 10, 10), 0.002),
+    ]
+    assert report.planning_headroom_m == 0.0005
+    assert report.planning_gap_m == 0.0025
+    assert report.validation_gap_m == 0.002
+    assert report.planning_drawable == Rect(0.0005, 0.0005, 9.9995, 9.9995)
+    assert report.drawable == Rect(0, 0, 10, 10)
+    assert note.rectangle.ymin == pytest.approx(0.0005 - 0.00014335831381729822)
+    assert len(front.moves) == len(note.moves) == 1
+
+
+def test_planning_allowance_does_not_accept_drift_that_still_overflows(monkeypatch):
+    front = View("front", Rect(-1, 2, 1, 4))
+    frame = Annotation("frame", Rect(-1, 2, 0, 3), owner=front, kind=5)
+    front.annotations = [frame]
+    adapter, options, _ = scene(monkeypatch, {"front": front})
+
+    def rebuild():
+        frame.rectangle = Rect(-0.001, 2, 1, 3)
+        return True
+
+    adapter.currentModel.EditRebuild3 = rebuild
+    with pytest.raises(native.NativeLayoutReadbackError) as caught:
+        native.repair_native_layout(adapter, **options, planning_headroom_m=0.0005)
+    assert caught.value.evidence["planning_headroom_m"] == 0.0005
+    assert caught.value.evidence["planning_gap_m"] == 0.1005
+    assert caught.value.evidence["validation_gap_m"] == 0.1
+    assert caught.value.evidence["raw_residuals"]["overflow"][0]["excess_m"] == 0.001
+
+
+@pytest.mark.parametrize("headroom", [-0.001, float("nan"), float("inf")])
+def test_invalid_planning_headroom_fails_before_native_movement(monkeypatch, headroom):
+    front = View("front", Rect(-1, 2, 1, 4))
+    adapter, options, _ = scene(monkeypatch, {"front": front})
+    with pytest.raises(ValueError, match="planning headroom"):
+        native.repair_native_layout(adapter, **options, planning_headroom_m=headroom)
+    assert front.moves == []
+
+
+@pytest.mark.parametrize("headroom_m", [0.0, 0.0005])
+def test_arbor_measured_footprint_replay_retains_two_mm_final_clearance(
+    monkeypatch, headroom_m
+):
+    # readback-zuvizh35: replay measured decorated footprints, anchors and native
+    # extent changes. This checks the observed error pattern, not an assumption
+    # that SolidWorks will produce the same error at every future position.
+    footprints = {
+        "front": Rect(
+            0.059114843638434555,
+            0.08386714832239814,
+            0.2329768666726667,
+            0.2300659917941963,
+        ),
+        "top": Rect(
+            0.04711484363843457,
+            0.21030124885875273,
+            0.22129435639677897,
+            0.2780000000040001,
+        ),
+        "iso": Rect(
+            0.30112772874546706,
+            0.08748706156634467,
+            0.368872271254533,
+            0.21251293843365535,
+        ),
+    }
+    anchors = {"front": (0.1, 0.15), "top": (0.1, 0.245), "iso": (0.335, 0.15)}
+    views = {key: View(key, value) for key, value in footprints.items()}
+    for key, view in views.items():
+        view._position = anchors[key]
+    note = Annotation(
+        "manufacturing",
+        Rect(
+            0.019678754098360646,
+            0.025237606557377057,
+            0.19721226229508193,
+            0.07529404683840751,
+        ),
+    )
+    adapter, options, _ = scene(monkeypatch, views, [note])
+    sheet = adapter.currentModel.GetCurrentSheet()
+    sheet.GetProperties2 = lambda: (0, 0, 1, 1, 0, 0.4318, 0.2794, 0)
+    sheet.GetZoneMargin = lambda _index: 0.0127
+    options.update(
+        gap_m=0.002,
+        planning_headroom_m=headroom_m,
+        title_block=Rect(0.264, 0, 0.4318, 0.064),
+        notes=(native.LayoutNote("manufacturing", note),),
+        alignments=(native.AxisLink(Axis.X, "front", "top"),),
+        orderings=(AxisOrder(Axis.Y, "front", "top"),),
+    )
+
+    def rebuild():
+        delta = (
+            -9.990510100837957e-6,
+            6.765943245515271e-5,
+            -9.990510100810202e-6,
+            -0.00026605016941841364,
+        )
+        note.rectangle = Rect(*(a + b for a, b in zip(note.rectangle.bounds, delta)))
+        return True
+
+    adapter.currentModel.EditRebuild3 = rebuild
+    if headroom_m == 0:
+        with pytest.raises(native.NativeLayoutReadbackError):
+            native.repair_native_layout(adapter, **options)
+        return
+    report = native.repair_native_layout(adapter, **options)
+    assert report.status is native.NativeLayoutStatus.APPLIED
+    assert report.validation_gap_m == 0.002
+    assert all(len(view.moves) == 1 for view in views.values())
+    assert len(note.moves) == 1
+
+
+def test_headroom_that_consumes_sheet_reports_no_fit_without_writes(monkeypatch):
+    front = View("front", Rect(-1, 2, 1, 4))
+    adapter, options, _ = scene(monkeypatch, {"front": front})
+    report = native.repair_native_layout(adapter, **options, planning_headroom_m=5)
+    assert report.status is native.NativeLayoutStatus.NO_FIT
+    assert report.planning_drawable is None
+    assert "no positive drawable area" in report.reason
+    assert front.moves == []
+
+
+class Annotation:
+    def __init__(self, name, rectangle, *, owner=None, kind=6, attachments=()):
+        self.name, self.rectangle, self.Owner, self.kind = name, rectangle, owner, kind
+        self.OwnerType = 1 if owner is None else 0
+        self.Visible = 1
+        self.position = (rectangle.xmin, rectangle.ymax, 0.0)
+        self.attachments = attachments
+        self.entities = tuple(object() for _kind in attachments)
+        self.text, self.font = "manufacturing value", "Native font"
+        self.moves = []
+        self.movement = "accept"
+
+    def GetName(self):
+        return self.name
+
+    def GetType(self):
+        return self.kind
+
+    def GetAttachedEntityCount3(self):
+        return len(self.attachments)
+
+    def GetAttachedEntityTypes(self):
+        return self.attachments
+
+    def GetAttachedEntities3(self):
+        return self.entities
+
+    def GetPosition(self):
+        return self.position
+
+    def shift(self, dx, dy):
+        self.rectangle = self.rectangle.translated((dx, dy))
+        self.position = (self.position[0] + dx, self.position[1] + dy, self.position[2])
+
+    def SetPosition2(self, x, y, z):
+        self.moves.append((x, y, z))
+        if self.movement == "reject":
+            return False
+        if self.movement == "accept":
+            self.shift(x - self.position[0], y - self.position[1])
+        return True
+
+
+class View:
+    def __init__(self, name, rectangle):
+        self.name, self.rectangle = name, rectangle
+        self._position = (
+            (rectangle.xmin + rectangle.xmax) / 2,
+            (rectangle.ymin + rectangle.ymax) / 2,
+        )
+        self.ScaleRatio = (1.0, 1.0)
+        self.ReferencedConfiguration = "Default"
+        self.reference = "C:/model.SLDPRT"
+        self.annotations, self.children, self.moves = [], [], []
+        self.base = self.next = None
+        self.events = []
+        self.movement = "accept"
+
+    def GetName2(self):
+        return self.name
+
+    def GetOutline(self):
+        return self.rectangle.bounds
+
+    def GetReferencedModelName(self):
+        return self.reference
+
+    def GetBaseView(self):
+        return self.base
+
+    def GetNextView(self):
+        return self.next
+
+    def GetAnnotations(self):
+        return self.annotations
+
+    @property
+    def Position(self):
+        return self._position
+
+    def shift(self, dx, dy):
+        self._position = (self._position[0] + dx, self._position[1] + dy)
+        self.rectangle = self.rectangle.translated((dx, dy))
+        for annotation in self.annotations:
+            annotation.shift(dx, dy)
+        for child in self.children:
+            child.shift(dx, dy)
+
+    @Position.setter
+    def Position(self, value):
+        self.moves.append(value)
+        self.events.append(self.name)
+        if self.movement == "accept":
+            self.shift(value[0] - self.Position[0], value[1] - self.Position[1])
+
+    def SetViewPosition(self, value, move_children):
+        assert move_children is True
+        if self.movement == "reject":
+            return False
+        self.Position = value
+        return True
+
+
+def measure(_adapter, annotation):
+    if annotation.kind == 17:
+        raise ValueError("unsupported native annotation kind 17")
+    return SimpleNamespace(
+        name=annotation.name,
+        kind=annotation.kind,
+        envelope=annotation.rectangle,
+        format_signature=(annotation.font, 0.0035),
+        native_strokes=getattr(annotation, "strokes", ()),
+        text_runs=(
+            SimpleNamespace(
+                value=annotation.text,
+                height_m=0.0035,
+                font=annotation.font,
+                angle_rad=0.0,
+                reference=1,
+                inverted=0,
+            ),
+        ),
+    )
+
+
+def scene(monkeypatch, views, sheet_annotations=()):
+    monkeypatch.setattr(native, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(native, "double_array", tuple)
+    sheet_view = View("sheet", Rect(0, 0, 10, 10))
+    sheet_view.annotations = list(sheet_annotations)
+    events = []
+    ordered = [sheet_view, *views.values()]
+    for index, view in enumerate(ordered):
+        view.events = events
+        view.next = ordered[index + 1] if index + 1 < len(ordered) else None
+    sheet = SimpleNamespace(
+        GetProperties2=lambda: (0.0, 0.0, 1.0, 1.0, 0.0, 10.0, 10.0, 0.0),
+        GetZoneMargin=lambda _index: 0.0,
+    )
+    model = SimpleNamespace(
+        GetType=lambda: 3,
+        GetCurrentSheet=lambda: sheet,
+        GetFirstView=lambda: sheet_view,
+        EditRebuild3=lambda: True,
+    )
+    adapter = SimpleNamespace(
+        currentModel=model, swApp=SimpleNamespace(IsSame=lambda a, b: int(a is b))
+    )
+    options = dict(
+        views=views,
+        title_block=Rect(8, 0, 10, 1),
+        measure_annotation=measure,
+        gap_m=0.1,
+    )
+    return adapter, options, events
+
+
+def test_already_fitting_layout_has_no_native_writes(monkeypatch):
+    front = View("front", Rect(1, 2, 3, 4))
+    adapter, options, _events = scene(monkeypatch, {"front": front})
+    result = native.repair_native_layout(adapter, **options)
+    assert result.status is native.NativeLayoutStatus.UNCHANGED
+    assert front.moves == []
+    assert result.before_outlines == result.after_outlines
+
+
+@pytest.mark.parametrize("xmin", [-1, 1])
+def test_final_validator_reuses_exact_fresh_measurement_without_another_scan(
+    monkeypatch, xmin
+):
+    front = View("front", Rect(xmin, 2, xmin + 2, 4))
+    annotation = Annotation("frame", Rect(xmin, 2, xmin + 1, 3), owner=front, kind=5)
+    front.annotations = [annotation]
+    adapter, options, _ = scene(monkeypatch, {"front": front})
+    reads, validations = [], []
+
+    def tracked(adapter, item):
+        result = measure(adapter, item)
+        reads.append(result)
+        return result
+
+    def validate(banks):
+        assert len(reads) == 2
+        assert banks["front"]["frame"] is reads[-1]
+        assert banks["front"]["frame"] is not reads[0]
+        assert banks["front"]["frame"].envelope == annotation.rectangle
+        validations.append(banks)
+
+    options["measure_annotation"] = tracked
+    result = native.repair_native_layout(
+        adapter, **options, final_annotation_validation=validate
+    )
+    assert len(validations) == 1
+    assert len(reads) == 2
+    assert result.status is (
+        native.NativeLayoutStatus.APPLIED
+        if xmin < 0
+        else native.NativeLayoutStatus.UNCHANGED
+    )
+
+
+def test_final_validator_includes_following_caption_and_excludes_hidden_ink(
+    monkeypatch,
+):
+    front = View("front", Rect(1, 2, 3, 4))
+    caption = Annotation("caption", Rect(1, 4.1, 3, 4.5))
+    hidden = Annotation("hidden", Rect(1, 2, 2, 3), owner=front, kind=5)
+    hidden.Visible = 3
+    front.annotations = [hidden]
+    adapter, options, _ = scene(monkeypatch, {"front": front}, [caption])
+    banks = []
+    native.repair_native_layout(
+        adapter,
+        **options,
+        notes=(native.LayoutNote("caption", caption, follows_view="front"),),
+        final_annotation_validation=banks.append,
+    )
+    assert set(banks[0]["front"]) == {"caption"}
+
+
+@pytest.mark.parametrize("xmin", [-1, 1])
+def test_final_validation_rejection_prevents_acceptance_even_without_movement(
+    monkeypatch, xmin
+):
+    front = View("front", Rect(xmin, 2, xmin + 2, 4))
+    adapter, options, _ = scene(monkeypatch, {"front": front})
+
+    def reject(_banks):
+        raise RuntimeError("native leader crosses final text")
+
+    with pytest.raises(RuntimeError, match="crosses final text"):
+        native.repair_native_layout(
+            adapter, **options, final_annotation_validation=reject
+        )
+
+
+def test_no_fit_does_not_supply_initial_measurements_to_final_validator(monkeypatch):
+    front = View("front", Rect(1, 2, 30, 40))
+    adapter, options, _ = scene(monkeypatch, {"front": front})
+    calls = []
+    result = native.repair_native_layout(
+        adapter, **options, final_annotation_validation=calls.append
+    )
+    assert result.status is native.NativeLayoutStatus.NO_FIT
+    assert calls == []
+
+
+@pytest.mark.parametrize("xmin", [-1, 1])
+def test_initial_measurement_handoff_is_used_once_then_always_fresh(monkeypatch, xmin):
+    front = View("front", Rect(xmin, 2, xmin + 2, 4))
+    annotation = Annotation("frame", Rect(xmin, 2, xmin + 1, 3), owner=front, kind=5)
+    front.annotations = [annotation]
+    adapter, options, _ = scene(monkeypatch, {"front": front})
+    calls, rebuilds = [], []
+
+    def initial(adapter, value):
+        calls.append(("initial", value))
+        return measure(adapter, value)
+
+    def fresh(adapter, value):
+        calls.append(("fresh", value))
+        return measure(adapter, value)
+
+    def rebuild():
+        rebuilds.append(True)
+        return True
+
+    adapter.currentModel.EditRebuild3 = rebuild
+    options["measure_annotation"] = fresh
+    result = native.repair_native_layout(
+        adapter, **options, initial_measure_annotation=initial
+    )
+    assert calls == [("initial", annotation), ("fresh", annotation)]
+    expected = (
+        native.NativeLayoutStatus.APPLIED
+        if xmin < 0
+        else native.NativeLayoutStatus.UNCHANGED
+    )
+    assert result.status is expected
+    assert len(rebuilds) == len(front.moves) == (1 if xmin < 0 else 0)
+
+
+@pytest.mark.parametrize("change", ["text", "bounds", "identity"])
+def test_unchanged_plan_does_not_accept_stale_initial_handoff(monkeypatch, change):
+    front = View("front", Rect(1, 2, 3, 4))
+    annotation = Annotation("frame", Rect(1, 2, 2, 3), owner=front, kind=5)
+    front.annotations = [annotation]
+    adapter, options, _ = scene(monkeypatch, {"front": front})
+
+    def initial(adapter, value):
+        cached = measure(adapter, value)
+        if change == "text":
+            annotation.text = "changed text after initial capture"
+        if change == "bounds":
+            annotation.rectangle = Rect(-1, 2, 2, 3)
+        if change == "identity":
+            front.annotations = [
+                Annotation("frame", Rect(1, 2, 2, 3), owner=front, kind=5)
+            ]
+        return cached
+
+    with pytest.raises(
+        RuntimeError, match="changed annotation|replaced annotation|remeasured native"
+    ):
+        native.repair_native_layout(
+            adapter, **options, initial_measure_annotation=initial
+        )
+    assert front.moves == []
+
+
+def test_initial_handoff_rejection_is_not_hidden_by_a_fresh_fallback(monkeypatch):
+    front = View("front", Rect(1, 2, 3, 4))
+    front.annotations = [Annotation("frame", Rect(1, 2, 2, 3), owner=front, kind=5)]
+    adapter, options, _ = scene(monkeypatch, {"front": front})
+
+    def initial(_adapter, _annotation):
+        raise RuntimeError("transaction-local witness changed")
+
+    with pytest.raises(RuntimeError, match="transaction-local witness changed"):
+        native.repair_native_layout(
+            adapter, **options, initial_measure_annotation=initial
+        )
+    assert front.moves == []
+
+
+def test_hidden_sheet_symbol_has_no_footprint_but_remains_in_manifest(monkeypatch):
+    front = View("front", Rect(1, 2, 3, 4))
+    hidden = Annotation("hidden-sf", Rect(-1, -1, 1, 1), kind=7)
+    hidden.Visible = 3
+    adapter, options, _ = scene(monkeypatch, {"front": front}, [hidden])
+    result = native.repair_native_layout(adapter, **options)
+    assert result.status is native.NativeLayoutStatus.UNCHANGED
+    assert list(result.footprint_exclusions) == ["('sheet', 'hidden-sf', 7)"]
+    assert hidden.Visible == 3
+    assert hidden.moves == []
+
+
+@pytest.mark.parametrize("visibility", [0, 1, 2])
+def test_unknown_visible_and_half_hidden_symbols_are_not_silently_excluded(
+    monkeypatch, visibility
+):
+    front = View("front", Rect(1, 2, 3, 4))
+    annotation = Annotation("sf", Rect(-1, -1, 1, 1), kind=7)
+    annotation.Visible = visibility
+    adapter, options, _ = scene(monkeypatch, {"front": front}, [annotation])
+    result = native.repair_native_layout(adapter, **options)
+    assert result.status is native.NativeLayoutStatus.NO_FIT
+    assert result.footprint_exclusions == {}
+
+
+def test_hidden_symbol_becoming_visible_during_move_fails_readback(monkeypatch):
+    front = View("front", Rect(-1, 2, 1, 4))
+    hidden = Annotation("hidden-sf", Rect(-1, -1, 1, 1), kind=7)
+    hidden.Visible = 3
+    adapter, options, _ = scene(monkeypatch, {"front": front}, [hidden])
+
+    def reveal():
+        hidden.Visible = 1
+        return True
+
+    adapter.currentModel.EditRebuild3 = reveal
+    with pytest.raises(RuntimeError, match="annotation inventory"):
+        native.repair_native_layout(adapter, **options)
+
+
+def test_declared_layout_note_must_not_be_hidden(monkeypatch):
+    front = View("front", Rect(1, 2, 3, 4))
+    note = Annotation("manufacturing", Rect(1, 5, 3, 6))
+    note.Visible = 3
+    adapter, options, _ = scene(monkeypatch, {"front": front}, [note])
+    with pytest.raises(ValueError, match="declared layout note is hidden"):
+        native.repair_native_layout(
+            adapter, **options, notes=(native.LayoutNote("notes", note),)
+        )
+
+
+def test_parent_propagation_does_not_apply_child_translation_twice(monkeypatch):
+    front, top = View("front", Rect(-1, 1, 1, 3)), View("top", Rect(-1, 4, 1, 6))
+    front.children, top.base = [top], front
+    originals = {"front": front.Position, "top": top.Position}
+    adapter, options, events = scene(monkeypatch, {"top": top, "front": front})
+    result = native.repair_native_layout(
+        adapter,
+        **options,
+        parents={"top": "front"},
+        alignments=(native.AxisLink(Axis.X, "front", "top"),),
+        orderings=(AxisOrder(Axis.Y, "front", "top"),),
+    )
+    assert result.status is native.NativeLayoutStatus.APPLIED
+    assert events == ["front", "top"]
+    for name, view in options["views"].items():
+        assert len(view.moves) == 1
+        assert view.Position == pytest.approx(
+            tuple(
+                a + b
+                for a, b in zip(originals[name], result.translations[f"view:{name}"])
+            )
+        )
+    assert front.Position[0] == pytest.approx(top.Position[0])
+
+
+def test_explicit_free_note_below_border_moves_without_changing_view_scale(monkeypatch):
+    front = View("front", Rect(5, 5, 7, 7))
+    note = Annotation("general", Rect(1, -2, 3, -1))
+    adapter, options, _events = scene(monkeypatch, {"front": front}, [note])
+    result = native.repair_native_layout(
+        adapter, **options, notes=(native.LayoutNote("general", note),)
+    )
+    assert result.status is native.NativeLayoutStatus.APPLIED
+    assert note.rectangle.ymin >= 0
+    assert len(note.moves) == 1
+    assert front.ScaleRatio == (1.0, 1.0)
+
+
+def test_view_owned_free_note_is_not_double_counted_or_double_translated(monkeypatch):
+    front = View("front", Rect(-1, 5, 1, 7))
+    note = Annotation("general", Rect(1, -2, 3, -1), owner=front)
+    front.annotations = [note]
+    original = note.GetPosition()
+    adapter, options, _events = scene(monkeypatch, {"front": front})
+    result = native.repair_native_layout(
+        adapter, **options, notes=(native.LayoutNote("general", note),)
+    )
+    assert result.status is native.NativeLayoutStatus.APPLIED
+    assert result.before_bounds["view:front"] == Rect(-1, 5, 1, 7)
+    assert result.before_bounds["note:general"] == Rect(1, -2, 3, -1)
+    assert note.GetPosition()[:2] == pytest.approx(
+        tuple(a + b for a, b in zip(original, result.translations["note:general"]))
+    )
+    assert len(note.moves) == 1
+
+
+def test_sheet_owned_caption_uses_explicit_view_association(monkeypatch):
+    front, iso = View("front", Rect(1, 4, 3, 6)), View("iso", Rect(10, 4, 11, 5))
+    caption = Annotation("caption", Rect(7, 3, 8, 3.5))
+    original = caption.GetPosition()
+    adapter, options, _events = scene(
+        monkeypatch, {"front": front, "iso": iso}, [caption]
+    )
+    result = native.repair_native_layout(
+        adapter,
+        **options,
+        notes=(native.LayoutNote("caption", caption, follows_view="iso"),),
+    )
+    assert result.status is native.NativeLayoutStatus.APPLIED
+    assert caption.GetPosition()[:2] == pytest.approx(
+        tuple(a + b for a, b in zip(original, result.translations["view:iso"]))
+    )
+    assert "note:caption" not in result.translations
+
+
+@pytest.mark.parametrize("kind", [6, 14])
+def test_unlisted_sheet_notes_and_measured_tables_are_fixed_obstacles(
+    monkeypatch, kind
+):
+    front = View("front", Rect(1, 1, 3, 3))
+    fixed = Annotation("fixed", Rect(1, 1, 3, 3), kind=kind)
+    original = fixed.rectangle
+    adapter, options, _events = scene(monkeypatch, {"front": front}, [fixed])
+    result = native.repair_native_layout(adapter, **options)
+    assert result.status is native.NativeLayoutStatus.APPLIED
+    assert fixed.rectangle == original
+    assert fixed.moves == []
+
+
+@pytest.mark.parametrize(
+    "rectangles",
+    [
+        [Rect(1, -2, 3, -1)],
+        [Rect(8, 0, 9, 0.5)],
+        [Rect(1, 1, 3, 3), Rect(2, 2, 4, 4)],
+    ],
+)
+def test_invalid_fixed_content_cannot_be_reported_as_a_fitting_sheet(
+    monkeypatch, rectangles
+):
+    front = View("front", Rect(5, 5, 7, 7))
+    notes = [
+        Annotation(str(index), rectangle) for index, rectangle in enumerate(rectangles)
+    ]
+    adapter, options, _events = scene(monkeypatch, {"front": front}, notes)
+    result = native.repair_native_layout(adapter, **options)
+    assert result.status is native.NativeLayoutStatus.NO_FIT
+    assert "fixed" in result.reason
+    assert front.moves == []
+
+
+def test_native_zone_margin_not_a_copied_nominal_margin(monkeypatch):
+    front = View("front", Rect(0.2, 2, 1.2, 3))
+    adapter, options, _events = scene(monkeypatch, {"front": front})
+    adapter.currentModel.GetCurrentSheet().GetZoneMargin = lambda index: (0, 0, 0, 1)[
+        index
+    ]
+    result = native.repair_native_layout(adapter, **options)
+    assert result.status is native.NativeLayoutStatus.APPLIED
+    assert front.rectangle.xmin >= 1
+
+
+def test_annotation_envelope_overflow_cannot_hide_behind_small_view_outline(
+    monkeypatch,
+):
+    front = View("front", Rect(1, 2, 3, 4))
+    front.annotations = [
+        Annotation("huge-callout", Rect(-20, 2, 20, 3), owner=front, kind=5)
+    ]
+    adapter, options, _events = scene(monkeypatch, {"front": front})
+    result = native.repair_native_layout(adapter, **options)
+    assert result.status is native.NativeLayoutStatus.NO_FIT
+    assert front.moves == []
+    assert result.after_outlines == {}
+
+
+def test_search_limit_returns_without_native_writes(monkeypatch):
+    front, top = View("front", Rect(1, 2, 3, 4)), View("top", Rect(1, 2, 3, 4))
+    adapter, options, _events = scene(monkeypatch, {"front": front, "top": top})
+    result = native.repair_native_layout(adapter, **options, max_search_nodes=1)
+    assert result.status is native.NativeLayoutStatus.SEARCH_LIMIT
+    assert front.moves == top.moves == []
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        "text",
+        "font",
+        "visibility",
+        "attachments",
+        "missing",
+        "scale",
+        "reference",
+        "configuration",
+        "envelope",
+        "fixed",
+    ],
+)
+def test_post_rebuild_changes_are_rejected(monkeypatch, change):
+    front = View("front", Rect(-1, 2, 1, 4))
+    annotation = Annotation(
+        "size", Rect(-1, 2, 1, 3), owner=front, kind=4, attachments=(1, 1)
+    )
+    front.annotations = [annotation]
+    fixed = Annotation("fixed", Rect(5, 5, 6, 6))
+    adapter, options, _events = scene(monkeypatch, {"front": front}, [fixed])
+
+    def rebuild():
+        if change == "text":
+            annotation.text = "wrong value"
+        if change == "font":
+            annotation.font = "changed font"
+        if change == "visibility":
+            annotation.Visible = 3
+        if change == "attachments":
+            annotation.attachments = (2, 2)
+        if change == "missing":
+            front.annotations.clear()
+        if change == "scale":
+            front.ScaleRatio = (2.0, 1.0)
+        if change == "reference":
+            front.reference = "C:/other.SLDPRT"
+        if change == "configuration":
+            front.ReferencedConfiguration = "Other"
+        if change == "envelope":
+            annotation.rectangle = Rect(-5, -5, 20, 20)
+        if change == "fixed":
+            fixed.shift(0.5, 0)
+        return True
+
+    adapter.currentModel.EditRebuild3 = rebuild
+    with pytest.raises(
+        RuntimeError, match="changed|moved fixed|remeasured native layout"
+    ):
+        native.repair_native_layout(adapter, **options)
+
+
+@pytest.mark.parametrize("movement", ["reject", "clamp"])
+def test_rejected_or_clamped_view_position_fails(monkeypatch, movement):
+    front = View("front", Rect(-1, 2, 1, 4))
+    front.movement = movement
+    adapter, options, _events = scene(monkeypatch, {"front": front})
+    with pytest.raises(
+        RuntimeError,
+        match="rejected layout target|did not reach absolute layout target",
+    ):
+        native.repair_native_layout(adapter, **options)
+
+
+@pytest.mark.parametrize("movement", ["reject", "clamp"])
+def test_rejected_or_clamped_free_note_movement_fails(monkeypatch, movement):
+    front = View("front", Rect(5, 5, 7, 7))
+    note = Annotation("general", Rect(1, -2, 3, -1))
+    note.movement = movement
+    adapter, options, _events = scene(monkeypatch, {"front": front}, [note])
+    with pytest.raises(
+        RuntimeError, match="movement was rejected|did not reach absolute layout target"
+    ):
+        native.repair_native_layout(
+            adapter, **options, notes=(native.LayoutNote("general", note),)
+        )
+
+
+def test_unknown_annotation_kind_is_not_silently_discarded(monkeypatch):
+    front = View("front", Rect(1, 2, 3, 4))
+    front.annotations = [
+        Annotation("unsupported", Rect(1, 2, 3, 3), owner=front, kind=17)
+    ]
+    adapter, options, _events = scene(monkeypatch, {"front": front})
+    with pytest.raises(ValueError, match="unsupported native annotation"):
+        native.repair_native_layout(adapter, **options)
+    assert front.moves == []
+
+
+def test_unplanned_native_view_is_not_ignored(monkeypatch):
+    front, iso = View("front", Rect(1, 2, 3, 4)), View("iso", Rect(5, 5, 7, 7))
+    adapter, options, _events = scene(monkeypatch, {"front": front, "iso": iso})
+    options["views"] = {"front": front}
+    with pytest.raises(RuntimeError, match="view inventory differs from plan"):
+        native.repair_native_layout(adapter, **options)
+
+
+def test_same_named_view_from_another_document_is_rejected(monkeypatch):
+    front = View("front", Rect(1, 2, 3, 4))
+    foreign = View("front", Rect(-1, 2, 1, 4))
+    adapter, options, _events = scene(monkeypatch, {"front": front})
+    options["views"] = {"front": foreign}
+    with pytest.raises(RuntimeError, match="not the active sheet's native view"):
+        native.repair_native_layout(adapter, **options)
+    assert front.moves == foreign.moves == []
+
+
+def test_same_named_annotation_owner_from_another_document_is_rejected(monkeypatch):
+    front = View("front", Rect(1, 2, 3, 4))
+    foreign = View("front", Rect(1, 2, 3, 4))
+    front.annotations = [Annotation("frame", Rect(1, 2, 2, 3), owner=foreign, kind=5)]
+    adapter, options, _events = scene(monkeypatch, {"front": front})
+    with pytest.raises(RuntimeError, match="not the planned native view object"):
+        native.repair_native_layout(adapter, **options)
+
+
+@pytest.mark.parametrize("identity", ["annotation", "attachment"])
+def test_rebuild_cannot_replace_native_identity_under_identical_labels(
+    monkeypatch, identity
+):
+    front = View("front", Rect(-1, 2, 1, 4))
+    annotation = Annotation(
+        "frame", Rect(-1, 2, 0, 3), owner=front, kind=5, attachments=(1,)
+    )
+    front.annotations = [annotation]
+    adapter, options, _events = scene(monkeypatch, {"front": front})
+
+    def rebuild():
+        if identity == "annotation":
+            replacement = Annotation(
+                "frame", annotation.rectangle, owner=front, kind=5, attachments=(1,)
+            )
+            replacement.entities = annotation.entities
+            front.annotations = [replacement]
+        if identity == "attachment":
+            annotation.entities = (object(),)
+        return True
+
+    adapter.currentModel.EditRebuild3 = rebuild
+    with pytest.raises(
+        RuntimeError,
+        match="replaced annotation identity|changed exact attachment identity",
+    ):
+        native.repair_native_layout(adapter, **options)
+
+
+def test_null_attachment_handle_is_not_accepted_as_unchanged_geometry(monkeypatch):
+    front = View("front", Rect(1, 2, 3, 4))
+    annotation = Annotation(
+        "frame", Rect(1, 2, 2, 3), owner=front, kind=5, attachments=(1,)
+    )
+    annotation.entities = (None,)
+    front.annotations = [annotation]
+    adapter, options, _events = scene(monkeypatch, {"front": front})
+    with pytest.raises(RuntimeError, match="null native handle"):
+        native.repair_native_layout(adapter, **options)
+
+
+class CenterlineAnnotation(Annotation):
+    def __init__(self, owner):
+        super().__init__(
+            "centerline", Rect(-1, 2.9, 1, 3.1), owner=owner, kind=15, attachments=(0,)
+        )
+        self.entities = (None,)
+        self.dangling = False
+        self.specific = SimpleNamespace(GetAnnotation=lambda: self)
+        self.strokes = (SimpleNamespace(start=(-1, 3), end=(1, 3), width_m=0.00018),)
+
+    def GetSpecificAnnotation(self):
+        return self.specific
+
+    def IsDangling(self):
+        return self.dangling
+
+    def shift(self, dx, dy):
+        super().shift(dx, dy)
+        self.strokes = tuple(
+            SimpleNamespace(
+                start=(stroke.start[0] + dx, stroke.start[1] + dy),
+                end=(stroke.end[0] + dx, stroke.end[1] + dy),
+                width_m=stroke.width_m,
+            )
+            for stroke in self.strokes
+        )
+
+
+def test_non_dangling_native_centerline_reports_entity_exclusion_and_checks_strokes(
+    monkeypatch,
+):
+    front = View("front", Rect(-1, 2, 1, 4))
+    centerline = CenterlineAnnotation(front)
+    front.annotations = [centerline]
+    adapter, options, _ = scene(monkeypatch, {"front": front})
+    result = native.repair_native_layout(adapter, **options)
+    assert result.status is native.NativeLayoutStatus.APPLIED
+    assert result.attachment_identity_exclusions == {
+        "('view:front', 'centerline', 15)": "non-dangling native centerline has unsupported swSelNOTHING entity; "
+        "annotation/owner/specific identity and native stroke translation checked, "
+        "underlying model-entity identity not checked"
+    }
+    assert centerline.strokes[0].start == (0, 3)
+    assert centerline.strokes[0].end == (2, 3)
+
+
+@pytest.mark.parametrize(
+    "change",
+    ["dangling", "types", "specific", "roundtrip", "missing_strokes", "end", "width"],
+)
+def test_centerline_exception_rejects_changed_or_unproven_native_witness(
+    monkeypatch, change
+):
+    front = View("front", Rect(-1, 2, 1, 4))
+    centerline = CenterlineAnnotation(front)
+    front.annotations = [centerline]
+    adapter, options, _ = scene(monkeypatch, {"front": front})
+    rebuilt = []
+
+    def rebuild():
+        rebuilt.append(True)
+        if change == "dangling":
+            centerline.dangling = True
+        if change == "types":
+            centerline.attachments = (1,)
+        if change == "specific":
+            centerline.specific = SimpleNamespace(GetAnnotation=lambda: centerline)
+        if change == "roundtrip":
+            centerline.specific.GetAnnotation = lambda: object()
+        if change == "missing_strokes":
+            centerline.strokes = ()
+        if change == "end":
+            centerline.strokes[0].end = (1.5, 3)
+        if change == "width":
+            centerline.strokes[0].width_m = 0.0003
+        return True
+
+    adapter.currentModel.EditRebuild3 = rebuild
+    with pytest.raises(RuntimeError, match="centerline|null native handle"):
+        native.repair_native_layout(adapter, **options)
+    assert rebuilt == [True]
+
+
+@pytest.mark.parametrize("change", ["kind", "owner", "count", "type", "dangling"])
+def test_centerline_null_exception_does_not_extend_to_unobserved_attachment_shapes(
+    monkeypatch, change
+):
+    front = View("front", Rect(-1, 2, 1, 4))
+    centerline = CenterlineAnnotation(front)
+    if change == "kind":
+        centerline.kind = 13
+    if change == "owner":
+        centerline.OwnerType = 1
+    if change == "count":
+        centerline.attachments, centerline.entities = (0, 0), (None, None)
+    if change == "type":
+        centerline.attachments = (1,)
+    if change == "dangling":
+        centerline.dangling = True
+    front.annotations = [centerline]
+    adapter, options, _ = scene(monkeypatch, {"front": front})
+    with pytest.raises(RuntimeError, match="null native handle|centerline is dangling"):
+        native.repair_native_layout(adapter, **options)
+    assert front.moves == []
+
+
+def test_zero_attachment_model_dimension_has_explicit_identity_exclusion(monkeypatch):
+    front = View("front", Rect(1, 2, 3, 4))
+    front.annotations = [
+        Annotation("imported-dimension", Rect(1, 2, 2, 3), owner=front, kind=4)
+    ]
+    adapter, options, _events = scene(monkeypatch, {"front": front})
+    result = native.repair_native_layout(adapter, **options)
+    assert len(result.attachment_identity_exclusions) == 1
+    assert "geometry identity not checked" in next(
+        iter(result.attachment_identity_exclusions.values())
+    )
+
+
+def test_rejected_rebuild_aborts_without_claiming_layout_success(monkeypatch):
+    front = View("front", Rect(-1, 2, 1, 4))
+    adapter, options, _events = scene(monkeypatch, {"front": front})
+    adapter.currentModel.EditRebuild3 = lambda: False
+    with pytest.raises(RuntimeError, match="rebuild failed"):
+        native.repair_native_layout(adapter, **options)
+
+
+def test_different_annotations_with_same_name_and_context_are_ambiguous(monkeypatch):
+    front = View("front", Rect(1, 2, 3, 4))
+    front.annotations = [
+        Annotation("same", Rect(1, 2, 2, 3), owner=front) for _ in range(2)
+    ]
+    adapter, options, _events = scene(monkeypatch, {"front": front})
+    with pytest.raises(RuntimeError, match="annotation identity is ambiguous"):
+        native.repair_native_layout(adapter, **options)
+
+
+def test_repeated_enumeration_of_same_native_annotation_is_deduplicated(monkeypatch):
+    front = View("front", Rect(1, 2, 3, 4))
+    annotation = Annotation("same", Rect(1, 2, 2, 3), owner=front)
+    front.annotations = [annotation, annotation]
+    adapter, options, _events = scene(monkeypatch, {"front": front})
+    assert (
+        native.repair_native_layout(adapter, **options).status
+        is native.NativeLayoutStatus.UNCHANGED
+    )
+
+
+def test_native_parent_must_be_declared_and_logical_cycles_fail(monkeypatch):
+    front, top = View("front", Rect(1, 2, 3, 4)), View("top", Rect(1, 5, 3, 7))
+    adapter, options, _events = scene(monkeypatch, {"front": front, "top": top})
+    top.base = front
+    with pytest.raises(ValueError, match="declare its native base"):
+        native.repair_native_layout(adapter, **options)
+    with pytest.raises(ValueError, match="cycle"):
+        native.repair_native_layout(
+            adapter, **options, parents={"top": "front", "front": "top"}
+        )
+
+
+def test_template_annotations_are_explicitly_covered_by_supplied_keepout(monkeypatch):
+    front = View("front", Rect(8, 0, 9, 0.5))
+    template = Annotation("title", Rect(8, 0, 10, 1), kind=17)
+    template.OwnerType = 2
+    adapter, options, _events = scene(monkeypatch, {"front": front}, [template])
+    result = native.repair_native_layout(adapter, **options)
+    assert result.status is native.NativeLayoutStatus.APPLIED
+    assert template.moves == []
+
+
+def test_native_layout_sources_and_contract_are_enrolled_in_recipe_gate():
+    from pathlib import Path
+    from test_dodo_recipe import _load_dodo
+
+    recipe = next(
+        task for task in _load_dodo().task_check() if task["name"] == "recipe"
+    )
+    assert Path(__file__).name in {
+        Path(item).name for item in recipe["actions"][0][1][0]
+    }
+    assert {"_drawing_native_layout.py", "_drawing_view_packing.py"} <= {
+        Path(item).name for item in recipe["file_dep"]
+    }

@@ -13,12 +13,15 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import _cwm  # noqa: E402
+import _channel_pose  # noqa: E402
 
 
 class FakeFeature:
@@ -286,3 +289,211 @@ def test_distance_mate_lookup_is_traced() -> None:
         '@_telemetry.traced("copy_with_mates.distance_mate_lookup", '
         'label_param="name")\ndef _component_distance_mate(' in source
     )
+
+
+@pytest.fixture
+def pose_bank(monkeypatch):
+    """Record the COM boundary of repeated resets without simulating a solver."""
+    lookups = []
+    transforms = []
+    writes = []
+
+    class PoseComponent:
+        def __init__(self, name):
+            self.name = name
+
+        @property
+        def Transform2(self):
+            raise AssertionError("pose reset must only write the target transform")
+
+        @Transform2.setter
+        def Transform2(self, transform):
+            writes.append((self.name, transform))
+
+    components = {name: PoseComponent(name) for name in ("rocker-1", "rod-1")}
+
+    def lookup(name):
+        lookups.append(name)
+        return components.get(name)
+
+    def create_transform(adapter, values):
+        transform = SimpleNamespace(values=tuple(values))
+        transforms.append(transform)
+        return transform
+
+    module = sys.modules["solidworks_mcp.adapters.solidworks.assembly"]
+    module._create_math_transform = create_transform
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(GetComponentByName=lookup))
+    return SimpleNamespace(
+        adapter=adapter, lookups=lookups, transforms=transforms, writes=writes,
+    )
+
+
+def _pose_at(z):
+    return [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0,
+            0.0, 0.0, z, 1.0, 0.0, 0.0, 0.0]
+
+
+def test_prepared_pose_resets_reuse_handles_and_transforms_in_order(pose_bank):
+    """Repeated driver resets must not repeat component lookup or allocation."""
+    targets = [("rocker-1", _pose_at(0.01)), ("rod-1", _pose_at(0.02))]
+    prepared = _channel_pose.prepare_component_poses(pose_bank.adapter, iter(targets))
+    assert pose_bank.writes == []  # preparation cannot change the solver's input
+
+    for _ in range(6):  # three resets for each of two copied channels
+        prepared.apply()
+
+    assert pose_bank.lookups == ["rocker-1", "rod-1"]
+    assert len(pose_bank.transforms) == 2
+    expected = list(zip([name for name, _ in targets], pose_bank.transforms))
+    assert pose_bank.writes == expected * 6
+    assert [transform.values for transform in pose_bank.transforms] == [
+        tuple(values) for _, values in targets
+    ]
+
+
+def test_prepare_missing_component_fails_before_any_pose_write(pose_bank):
+    with pytest.raises(RuntimeError, match="component not found.*missing-1"):
+        _channel_pose.prepare_component_poses(
+            pose_bank.adapter,
+            [("rocker-1", _pose_at(0.01)), ("missing-1", _pose_at(0.02))],
+        )
+    assert pose_bank.writes == []
+
+
+def test_prepared_poses_cannot_be_applied_after_switching_documents(pose_bank):
+    prepared = _channel_pose.prepare_component_poses(
+        pose_bank.adapter, [("rocker-1", _pose_at(0.01))]
+    )
+    pose_bank.adapter.currentModel = object()
+    with pytest.raises(RuntimeError, match="document changed"):
+        prepared.apply()
+    assert pose_bank.writes == []
+
+
+def test_prepared_pose_groups_reset_only_the_requested_components(pose_bank):
+    prepared = _channel_pose.prepare_component_poses(
+        pose_bank.adapter,
+        [("rocker-1", _pose_at(0.01)), ("rod-1", _pose_at(0.02))],
+    )
+    rocker, rod = prepared.groups(1)
+    rocker.apply()
+    rocker.apply()
+    assert [name for name, _ in pose_bank.writes] == ["rocker-1", "rocker-1"]
+    rod.apply()
+    assert [name for name, _ in pose_bank.writes] == ["rocker-1", "rocker-1", "rod-1"]
+    assert pose_bank.lookups == ["rocker-1", "rod-1"]
+    assert len(pose_bank.transforms) == 2
+
+
+def test_prepared_pose_groups_reject_an_incomplete_component_slice(pose_bank):
+    prepared = _channel_pose.prepare_component_poses(
+        pose_bank.adapter, [("rocker-1", _pose_at(0.01))]
+    )
+    with pytest.raises(ValueError, match="complete groups"):
+        prepared.groups(4)
+
+
+def driver_bank(monkeypatch, count=54):
+    """Track deletion targets without emulating SolidWorks' mate solver."""
+    names = [f"Distance{2000 + index}" for index in range(count)]
+    selected = []
+    model = Mock()
+    features = {}
+    for name in [*names, "ParentDistance", "ParentPlane"]:
+        feature = Mock()
+        feature.Name = name
+        feature.GetTypeName2.return_value = (
+            "RefPlane" if name == "ParentPlane" else "MateDistanceDim"
+        )
+        feature.Select2.side_effect = lambda append, mark, name=name: selected.append(name) or True
+        features[name] = feature
+    model.FeatureByName.side_effect = features.get
+    model.ClearSelection2.side_effect = lambda *_args: selected.clear()
+    model.SelectionManager.GetSelectedObjectCount2.side_effect = lambda _mark: len(selected)
+
+    def delete(_options):
+        for name in selected:
+            features.pop(name)
+        return True
+
+    model.Extension.DeleteSelection2.side_effect = delete
+    monkeypatch.setattr(_channel_pose, "_early_bound", lambda obj, _kind: obj)
+    return SimpleNamespace(
+        adapter=SimpleNamespace(currentModel=model), model=model,
+        names=names, features=features, selected=selected,
+    )
+
+
+def test_delete_driver_bank_resolves_then_removes_only_54_created_mates_once(monkeypatch):
+    bank = driver_bank(monkeypatch)
+    names = list(reversed(bank.names))
+    handles = [bank.features[name] for name in names]
+    _channel_pose.delete_pose_driver_bank(bank.adapter, names, expected_count=54)
+    assert set(bank.features) == {"ParentDistance", "ParentPlane"}
+    assert [call.args for call in bank.model.FeatureByName.call_args_list[:54]] == [
+        (name,) for name in names
+    ]
+    for feature in handles:
+        feature.Select2.assert_called_once_with(True, 0)
+    bank.model.Extension.DeleteSelection2.assert_called_once_with(0)
+    assert bank.selected == []
+    bank.model.EditDelete.assert_not_called()
+    bank.model.EditRebuild3.assert_not_called()
+    bank.model.ForceRebuild3.assert_not_called()
+
+
+@pytest.mark.parametrize("names,expected", [(["Distance2000"], 2), (["Distance2000"] * 2, 2), ([""], 1)])
+def test_delete_driver_bank_rejects_invalid_target_manifest_without_com(monkeypatch, names, expected):
+    bank = driver_bank(monkeypatch, 2)
+    with pytest.raises(ValueError, match="driver"):
+        _channel_pose.delete_pose_driver_bank(bank.adapter, names, expected_count=expected)
+    bank.model.FeatureByName.assert_not_called()
+    bank.model.Extension.DeleteSelection2.assert_not_called()
+
+
+@pytest.mark.parametrize("failure", ["missing", "wrong_name", "plane", "mate_folder", "structural_mate"])
+def test_delete_driver_bank_validates_every_target_before_selecting_any(monkeypatch, failure):
+    bank = driver_bank(monkeypatch, 2)
+    feature = bank.features[bank.names[1]]
+    if failure == "missing":
+        del bank.features[bank.names[1]]
+    if failure == "wrong_name":
+        feature.Name = "ParentDistance"
+    if failure == "plane":
+        feature.GetTypeName2.return_value = "RefPlane"
+    if failure == "mate_folder":
+        feature.GetTypeName2.return_value = "MateGroup"
+    if failure == "structural_mate":
+        feature.GetTypeName2.return_value = "MateConcentric"
+    with pytest.raises(RuntimeError, match="driver"):
+        _channel_pose.delete_pose_driver_bank(bank.adapter, bank.names, expected_count=2)
+    bank.features[bank.names[0]].Select2.assert_not_called()
+    bank.model.Extension.DeleteSelection2.assert_not_called()
+
+
+@pytest.mark.parametrize("failure", ["selection", "count", "delete", "survives", "com"])
+def test_delete_driver_bank_propagates_failure_without_fallback(monkeypatch, failure):
+    bank = driver_bank(monkeypatch, 2)
+    if failure == "selection":
+        bank.features[bank.names[1]].Select2.side_effect = None
+        bank.features[bank.names[1]].Select2.return_value = False
+    if failure == "count":
+        bank.model.SelectionManager.GetSelectedObjectCount2.side_effect = lambda _mark: 1
+    if failure in {"delete", "survives"}:
+        bank.model.Extension.DeleteSelection2.side_effect = None
+        bank.model.Extension.DeleteSelection2.return_value = failure == "survives"
+    if failure == "com":
+        bank.model.Extension.DeleteSelection2.side_effect = RuntimeError("driver COM delete failure")
+    with pytest.raises(RuntimeError, match="driver"):
+        _channel_pose.delete_pose_driver_bank(bank.adapter, bank.names, expected_count=2)
+    assert bank.selected == []
+    assert bank.model.Extension.DeleteSelection2.call_count <= 1
+    bank.model.EditDelete.assert_not_called()
+
+
+def test_delete_empty_driver_bank_is_a_noop(monkeypatch):
+    bank = driver_bank(monkeypatch, 0)
+    _channel_pose.delete_pose_driver_bank(bank.adapter, [], expected_count=0)
+    bank.model.FeatureByName.assert_not_called()
+    bank.model.Extension.DeleteSelection2.assert_not_called()

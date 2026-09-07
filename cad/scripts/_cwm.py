@@ -42,9 +42,9 @@ pinned rules this module encodes:
   stored state: author transient drive mates pinning each free DOF at the
   design pose (exactly like an authored chain), then delete them.
 
-This module is deliberately OUTSIDE ``_assembly.py``: it rides only the
-recipe of the build scripts that import it (today ``build_channel_assembly``),
-so a change here re-keys those assemblies alone, not the whole fleet.
+This shared copy/mate module is outside ``_assembly.py``. Channel-only prepared
+poses and driver-bank release live in ``_channel_pose`` and are not re-exported
+here: changing those operations must not invalidate the drive-train recipe.
 """
 
 from __future__ import annotations

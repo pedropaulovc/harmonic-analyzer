@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from _drawing_test_support import linked_note_properties
 
 import build_cone_gear as part
 import cone_gear_spec as spec
@@ -48,8 +49,8 @@ def test_gear_data_block_specifies_the_tooth_system() -> None:
     for teeth, bore_mm in spec.FAMILY_BORES_MM.items():
         assert bore_mm == part.bore_dia_in(teeth) * spec.MM_PER_IN
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Gear Data"' in source
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+    assert "Gear Data" in linked_note_properties(source)
+    assert "Manufacturing Notes" in linked_note_properties(source)
 
 
 def test_manufacturing_notes_cover_teeth_and_family() -> None:
@@ -70,7 +71,10 @@ def test_manufacturing_notes_cover_teeth_and_family() -> None:
 
 def test_native_gdt_controls_bore_datum_and_finish() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 1
+    assert source.count("add_dimension_datum(") == 1
+    assert "add_datum_feature(" not in source
+    assert 'source_feature="BoreProfile"' in source
+    assert 'source_dimension="BoreCutDia"' in source
     assert source.count("add_feature_control_frame(") == 1
     assert source.count("add_surface_finish(") == 1
     assert spec.SURFACE_FINISHES[0].native_attachment == "model"

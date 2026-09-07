@@ -26,6 +26,19 @@ def _load_dodo():
     return mod
 
 
+def test_every_pytest_gate_tracks_bootstrap_and_telemetry_gate_executes_isolation_control():
+    dodo = _load_dodo()
+    bootstrap = str((REPO_ROOT / "conftest.py").resolve())
+    isolation = str((REPO_ROOT / "cad" / "scripts" / "test_pytest_telemetry.py").resolve())
+    tasks = {task["name"]: task for task in dodo.task_check()}
+    for task in tasks.values():
+        command = task["actions"][0][1][0]
+        is_pytest = command[1:3] == ["-m", "pytest"]
+        assert (bootstrap in task["file_dep"]) == is_pytest, task["name"]
+    assert isolation in tasks["telemetry"]["file_dep"]
+    assert isolation in tasks["telemetry"]["actions"][0][1][0]
+
+
 class _FakeTask:
     def __init__(self):
         self.value_savers = []
@@ -168,6 +181,21 @@ def test_execution_identity_tracker_migrates_missing_and_legacy_tokens(tmp_path)
     assert tracker(None, {}) is True
 
 
+def test_channel_pose_helper_is_only_a_channel_construction_input():
+    dodo = _load_dodo()
+    helper = str((dodo.SCRIPTS_DIR / "_channel_pose.py").resolve())
+    consumers = {
+        stem for stem in dodo.ASSEMBLY_ORDER if helper in dodo._recipe_files(stem)
+    }
+    assert consumers == {"channel"}
+    for script in dodo.part_scripts():
+        stem = script.stem.removeprefix("build_")
+        assert helper not in dodo._part_file_deps(script, stem)
+    assert "_channel_pose" not in (dodo.SCRIPTS_DIR / "_cwm.py").read_text(
+        encoding="utf-8"
+    ).split("from __future__", 1)[1]
+
+
 def test_assembly_depends_on_exact_child_execution_identities():
     """Issue #301: recipe-equal CAD files can carry different PIDs/rebuild stamps."""
     dodo = _load_dodo()
@@ -180,6 +208,100 @@ def test_assembly_depends_on_exact_child_execution_identities():
                 else dodo._part_execution_token(ref)
             )
             assert token in deps, f"assembly:{stem} lacks exact identity for {ref}"
+
+
+def test_assembly_file_deps_drop_only_non_inserted_source_targets():
+    dodo = _load_dodo()
+    removed = {
+        "frame": ("gooseneck", "rocker_arm"),
+        "drive_train": ("harmonic_base", "channel"),
+        "channel": ("cylinder_gear", "frame"),
+    }
+    for assembly, sources in removed.items():
+        dependencies = set(dodo._assembly_file_deps(assembly))
+        for source in sources:
+            if source in dodo.ASSEMBLY_ORDER:
+                target = dodo._sldasm(source)
+                token = dodo._assembly_execution_token(source)
+            else:
+                target = dodo._sldprt(source)
+                token = dodo._part_execution_token(source)
+            assert target not in dependencies, (assembly, source)
+            assert token not in dependencies, (assembly, source)
+
+
+def test_source_graph_cache_keys_preserve_real_transitive_identity_edges(
+    tmp_path, monkeypatch
+):
+    """Actual DAG, isolated recipe bytes/tokens: never read a live builder's files."""
+    import _buildgraph
+
+    dodo = _load_dodo()
+    monkeypatch.setattr(dodo, "CAD_OUT", tmp_path / "out")
+    monkeypatch.setattr(_buildgraph, "CAD_OUT", tmp_path / "out")
+    recipes = {}
+    part_tokens = {}
+    assembly_tokens = {}
+    for kind, stems in (("part", dodo.part_stems()), ("assembly", dodo.ASSEMBLY_ORDER)):
+        for stem in stems:
+            recipe = tmp_path / f"{kind}-{stem}.input"
+            recipe.write_text(f"source recipe for {kind}:{stem}\n")
+            recipes[kind, stem] = str(recipe)
+            target = Path(dodo._sldprt(stem) if kind == "part" else dodo._sldasm(stem))
+            token = Path(
+                dodo._part_execution_token(stem)
+                if kind == "part"
+                else dodo._assembly_execution_token(stem)
+            )
+            # Validate BEFORE even creating directories: artefact_for is imported
+            # from _buildgraph and does not read dodo.CAD_OUT.
+            assert target.resolve().is_relative_to(tmp_path.resolve()), target
+            assert token.resolve().is_relative_to(tmp_path.resolve()), token
+            target.parent.mkdir(parents=True, exist_ok=True)
+            token.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(b"CAD identity A")
+            token.write_text("a" * 64 + "\n")
+            (part_tokens if kind == "part" else assembly_tokens)[stem] = token
+    monkeypatch.setattr(dodo, "_recipe_files", lambda stem: [recipes["assembly", stem]])
+    monkeypatch.setattr(
+        dodo, "_part_file_deps", lambda _script, stem: [recipes["part", stem]]
+    )
+
+    def keys():
+        dodo._ARTEFACT_DIGEST_MEMO.clear()
+        return {
+            stem: dodo._cache_key(dodo._assembly_file_deps(stem))
+            for stem in dodo.ASSEMBLY_ORDER
+        }
+
+    def changed(before, after):
+        return {stem for stem in before if before[stem] != after[stem]}
+
+    baseline = keys()
+    cases = {
+        "rocker_arm": {"channel"},
+        "gooseneck": {"summing"},
+        "harmonic_base": {"frame"},
+        "cylinder_gear": {"drive_train"},
+        "frame_side_screw": {"frame", "channel"},
+    }
+    for source, expected in cases.items():
+        part_tokens[source].write_text("b" * 64 + "\n")
+        assert changed(baseline, keys()) == expected, source
+        part_tokens[source].write_text("a" * 64 + "\n")
+
+    # A real channel-child identity refresh restamps channel, then invalidates
+    # top-level CAD. It must never traverse the removed channel->drive edge.
+    part_tokens["rocker_arm"].write_text("b" * 64 + "\n")
+    channel_dirty = keys()
+    assembly_tokens["channel"].write_text("c" * 64 + "\n")
+    assert changed(channel_dirty, keys()) == {"harmonic_analyzer"}
+    assembly_tokens["channel"].write_text("a" * 64 + "\n")
+    part_tokens["rocker_arm"].write_text("a" * 64 + "\n")
+
+    # Recipe changes propagate recursively even before execution tokens change.
+    Path(recipes["part", "rocker_arm"]).write_text("changed rocker geometry recipe\n")
+    assert changed(baseline, keys()) == {"channel", "harmonic_analyzer"}
 
 
 def test_verify_gates_depend_on_exact_assembly_identities():
@@ -1153,15 +1275,19 @@ def test_recipe_digest_ignores_yaml_comments(tmp_path):
 # key (a submodule bump busts the key) -- while the SolidWorks-free check:* tasks,
 # which never touch COM, must stay off it.
 def _redirect_submodule(dodo, root: Path):
-    """Point dodo's submodule source + ALL THREE synthetic sidecars (full / assembly /
-    part-relevant) into a temp sandbox and reset the per-process memoization, so a test
-    controls the tree content and never writes into the real cad/out."""
+    """Isolate submodule source, digest sidecars, and CAD execution tokens.
+
+    Assembly cache keys also read their children's execution identities. Letting
+    those point at the live cad/out races concurrent build/cache-restore tasks and
+    makes a drawing-only edit appear to invalidate the assembly key.
+    """
     src = root / "src" / "solidworks_mcp"
     src.mkdir(parents=True, exist_ok=True)
     dodo.SUBMODULE_SRC = src
     dodo._SUBMODULE_DIGEST_FILE = root / ".submodule.digest"
     dodo._SUBMODULE_ASSEMBLY_DIGEST_FILE = root / ".submodule-assembly.digest"
     dodo._SUBMODULE_PART_DIGEST_FILE = root / ".submodule-part.digest"
+    dodo.CAD_OUT = root / "cad-out"
     _reset_submodule_memo(dodo)
     return src
 
@@ -1363,6 +1489,46 @@ def test_drawing_only_submodule_change_spares_parts_and_assemblies(tmp_path):
     assert d2 != d1, "a drawing.py edit MUST bust the whole-tree (drawing) digest"
 
 
+def test_submodule_key_comparison_ignores_concurrent_build_tokens(tmp_path):
+    """An unrelated builder cannot change the controlled submodule experiment."""
+    dodo = _load_dodo()
+    dodo.CAD_OUT = tmp_path / "concurrent-build"
+    asm = dodo.ASSEMBLY_ORDER[0]
+    child = dodo.references_of(asm)[0]
+    live_token = Path(dodo._part_execution_token(child))
+    live_token.parent.mkdir(parents=True)
+    live_token.write_text("a" * 64 + "\n")
+
+    src = _redirect_submodule(dodo, tmp_path / "sandbox")
+    controlled_token = Path(dodo._part_execution_token(child))
+    controlled_token.parent.mkdir(parents=True, exist_ok=True)
+    controlled_token.write_text("a" * 64 + "\n")
+    (src / "adapters.py").write_text("def mate(): return 1\n")
+    drawing = src / "adapters" / "solidworks" / "drawing.py"
+    drawing.parent.mkdir(parents=True)
+    drawing.write_text("def new_view(): return 1\n")
+
+    def inputs():
+        _reset_submodule_memo(dodo)
+        return dodo._cache.key_inputs(
+            dodo._assembly_file_deps(asm), dodo.ContentChecker._digest
+        )
+
+    before, before_inputs = inputs()
+    # Deterministic interleaving of check:recipe with a concurrent part restore.
+    # Neither write touches the assembly code or the controlled child identities.
+    live_token.write_text("b" * 64 + "\n")
+    drawing.write_text("def new_view(): return 2\n")
+    after, after_inputs = inputs()
+    after_by_path = dict(after_inputs)
+    moved = {
+        path: (digest, after_by_path.get(path))
+        for path, digest in before_inputs
+        if after_by_path.get(path) != digest
+    }
+    assert after == before, f"external build inputs escaped the sandbox: {moved}"
+
+
 def test_kinematics_verify_depends_on_pen_driver_and_truth_model():
     """Post-#221 (park-driver machinery removed): build_pen_assembly no longer
     imports pen_driver/truth_model, so those modules ride no assembly's .SLDASM
@@ -1435,6 +1601,8 @@ def test_recipe_gate_tracks_sources_imported_by_its_tests():
         "test_gtol_spec.py",
         "test_part_owned_geometric_tolerances.py",
         "test_probe_surface_finish_pmi_telemetry.py",
+        "test_probe_drawing_attachments.py",
+        "test_benchmark_drawing_recipes.py",
         "test_surface_finish.py",
         "test_surface_finish_ownership_a.py",
         "test_pose_manifest.py",

@@ -30,11 +30,19 @@ from __future__ import annotations
 
 import asyncio
 import os
+import subprocess
 import sys
 import time
 import types
 from pathlib import Path
 from typing import Any
+
+import pytest
+
+if __name__ == "__main__" and "--demo" not in sys.argv:
+    import pytest
+
+    sys.exit(pytest.main([__file__, "-v"]))
 
 # Export nowhere (no Aspire probe / OTLP retries) BEFORE the spine configures.
 os.environ.setdefault("OTEL_EXPORTER_OTLP_ENDPOINT", "")
@@ -42,54 +50,13 @@ os.environ.setdefault("OTEL_EXPORTER_OTLP_ENDPOINT", "")
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 
-# --------------------------------------------------------------------------- #
-# Stub the one solidworks_mcp symbol verify.py imports at module load. The COM  #
-# behaviour itself comes from the mock adapter below; _gear_mate_links is       #
-# monkeypatched per-test, so this only needs to satisfy the import.             #
-# --------------------------------------------------------------------------- #
-def _install_solidworks_stub() -> None:
-    for name in (
-        "solidworks_mcp",
-        "solidworks_mcp.adapters",
-        "solidworks_mcp.adapters.solidworks",
-        "solidworks_mcp.adapters.solidworks.assembly",
-    ):
-        if name not in sys.modules:
-            sys.modules[name] = types.ModuleType(name)
-    asm = sys.modules["solidworks_mcp.adapters.solidworks.assembly"]
-    if not hasattr(asm, "_gear_mate_links"):
-        asm._gear_mate_links = lambda adapter: []  # type: ignore[attr-defined]
-    # _common._flag does `from solidworks_mcp.adapters import sw_type_info` then
-    # sw_type_info.flag_methods(...). Provide a no-op so method-flagging is a
-    # silent no-op on the mock (real seat flags COM dispatch; the mock needs none).
-    sti_name = "solidworks_mcp.adapters.sw_type_info"
-    if sti_name not in sys.modules:
-        sti = types.ModuleType(sti_name)
-        sti.flag_methods = lambda obj, iface: None  # type: ignore[attr-defined]
-        sys.modules[sti_name] = sti
-        sys.modules["solidworks_mcp.adapters"].sw_type_info = sti  # type: ignore[attr-defined]
-    # Some helpers import parameter classes from solidworks_mcp.adapters.base at
-    # runtime; a permissive kwargs holder is enough to satisfy those imports.
-    base_name = "solidworks_mcp.adapters.base"
-    if base_name not in sys.modules:
-        base = types.ModuleType(base_name)
-
-        class _Params:  # accepts any kwargs
-            def __init__(self, **kw: Any) -> None:
-                self.__dict__.update(kw)
-
-        base.SuppressMateParameters = _Params  # type: ignore[attr-defined]
-        base.MateEntityRef = _Params  # type: ignore[attr-defined]
-        base.RenameFeatureParameters = _Params  # type: ignore[attr-defined]
-        sys.modules[base_name] = base
-        sys.modules["solidworks_mcp.adapters"].base = base  # type: ignore[attr-defined]
-
-
-_install_solidworks_stub()
-
+# Import the real module definitions without opening SolidWorks. Package-wide
+# sys.modules stubs at collection time broke other tests' later adapter imports.
+# Mock only the COM behavior in _patch_com_seam, restored by each monkeypatch.
 import _assembly  # noqa: E402
 import _telemetry  # noqa: E402
 import verify  # noqa: E402
+from solidworks_mcp.adapters import sw_type_info  # noqa: E402
 
 # --------------------------------------------------------------------------- #
 # Timing model -- base seconds per COM call, lifted from verify-soundness.log   #
@@ -318,6 +285,9 @@ def _patch_com_seam(monkeypatch, gear_owner: str = "drive-train") -> None:
 
     monkeypatch.setattr(_assembly, "whats_wrong", clean_whats_wrong)
     monkeypatch.setattr(verify, "_gear_mate_links", _fake_gear_links(gear_owner))
+    # The mock has no COM methods to flag; keep generated-wrapper loading out of
+    # the timing model without replacing the real sw_type_info module.
+    monkeypatch.setattr(sw_type_info, "flag_methods", lambda obj, *interfaces: 0)
 
 
 # --------------------------------------------------------------------------- #
@@ -380,6 +350,78 @@ def _dur(span) -> float:
 # --------------------------------------------------------------------------- #
 # Tests                                                                        #
 # --------------------------------------------------------------------------- #
+@pytest.mark.parametrize("import_order", ["telemetry-first", "adapter-first"])
+def test_collection_preserves_real_adapter_imports(import_order):
+    """Collection must neither replace the adapter package nor patch its symbols."""
+    program = """
+import importlib
+import sys
+from pathlib import Path
+
+sys.path.insert(0, sys.argv[1])
+before = {}
+if sys.argv[2] == "adapter-first":
+    from solidworks_mcp.adapters import base, sw_recovery, sw_type_info
+    from solidworks_mcp.adapters.solidworks import assembly
+    before = {
+        "base": base,
+        "sw_recovery": sw_recovery,
+        "flag_methods": sw_type_info.flag_methods,
+        "gear_links": assembly._gear_mate_links,
+    }
+
+import test_verify_telemetry
+
+from solidworks_mcp.adapters import base, sw_recovery, sw_type_info
+from solidworks_mcp.adapters.solidworks import assembly
+for name in ("solidworks_mcp", "solidworks_mcp.adapters",
+             "solidworks_mcp.adapters.base", "solidworks_mcp.adapters.sw_recovery",
+             "solidworks_mcp.adapters.sw_type_info",
+             "solidworks_mcp.adapters.solidworks.assembly"):
+    module = importlib.import_module(name)
+    assert module.__spec__ is not None, name
+    assert Path(module.__file__).is_file(), name
+assert base.InsertComponentParameters(file_path="example.SLDPRT").file_path == "example.SLDPRT"
+assert callable(sw_recovery.wait_until_connected)
+if before:
+    assert base is before["base"]
+    assert sw_recovery is before["sw_recovery"]
+    assert sw_type_info.flag_methods is before["flag_methods"]
+    assert assembly._gear_mate_links is before["gear_links"]
+"""
+    run = subprocess.run(
+        [sys.executable, "-c", program, str(Path(__file__).parent), import_order],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert run.returncode == 0, run.stdout + run.stderr
+
+
+@pytest.mark.parametrize("completion", ["success", "exception"])
+def test_com_seam_restores_real_functions(completion):
+    originals = (
+        _assembly.whats_wrong,
+        verify._gear_mate_links,
+        sw_type_info.flag_methods,
+    )
+    try:
+        with pytest.MonkeyPatch.context() as scoped:
+            _patch_com_seam(scoped)
+            assert _assembly.whats_wrong is not originals[0]
+            assert verify._gear_mate_links is not originals[1]
+            assert sw_type_info.flag_methods is not originals[2]
+            assert sw_type_info.flag_methods(object(), "IModelDoc2") == 0
+            if completion == "exception":
+                raise RuntimeError("mock gate failed")
+    except RuntimeError as exc:
+        assert completion == "exception"
+        assert str(exc) == "mock gate failed"
+    assert _assembly.whats_wrong is originals[0]
+    assert verify._gear_mate_links is originals[1]
+    assert sw_type_info.flag_methods is originals[2]
+
+
 def test_no_per_component_dof_check_spans(monkeypatch, tmp_path):
     """The dof gate no longer emits one span per component (the de-noise)."""
     spans, report = _run_soundness(["frame", "drive-train"], monkeypatch, tmp_path)
@@ -554,9 +596,4 @@ def _demo() -> None:
 
 
 if __name__ == "__main__":
-    if "--demo" in sys.argv:
-        _demo()
-    else:
-        import pytest
-
-        sys.exit(pytest.main([__file__, "-v"]))
+    _demo()

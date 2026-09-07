@@ -16,13 +16,15 @@ from cone_gear_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
 from _common import CAD_ROOT, check, run_build
+from _drawing_project_layout import repair_project_drawing_layout
+from _drawing_native_datums import add_dimension_datum
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
     add_feature_control_frame,
     add_property_linked_note,
     add_surface_finish,
-    curate_view_dimensions,
+    auto_arrange_view_dimensions,
+    retain_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -31,7 +33,14 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _gear_drawing_entities import visible_circle_edge
+from _drawing_entities import (
+    CircleEdge,
+    EdgeAdjacentFace,
+    FaceBoundary,
+    FeatureFace,
+    ModelEntities,
+)
+from _gtol_spec import CylinderFace, PlanarFace
 from _surface_finish import surface_finish_by_key
 from cone_gear_spec import BORE_DIA, FACE_WIDTH, OUTSIDE_DIA, SURFACE_FINISHES
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -62,8 +71,15 @@ BORE_R = BORE_DIA * VIEW_SCALE[0] / 2000.0
 HALF_OD = OUTSIDE_DIA * VIEW_SCALE[0] / 2000.0
 FRONT_FACE_X = RIGHT_CENTER[0] - FACE_WIDTH * VIEW_SCALE[0] / 2000.0
 
-FRONT_KEEP = {
-    "BoreCutDia": (FRONT_CENTER[0] - 0.055, FRONT_CENTER[1] - 0.030),
+FRONT_KEEP = ("BoreCutDia",)
+# The generated gear has hundreds of tooth faces. Follow explicit ownership
+# from its named bore cut to the front rim and its neighbouring blank face.
+# This bounds entity discovery independently of tooth count.
+BORE_FACE = FeatureFace("BoreCut", CylinderFace(BORE_DIA))
+BORE_RIM = FaceBoundary(BORE_FACE, CircleEdge(BORE_DIA / 2.0, (0, 0, 0), (0, 0, 1)))
+ENTITY_ROLES = {
+    "bore": BORE_RIM,
+    "front_face": EdgeAdjacentFace(BORE_RIM, PlanarFace((0, 0, -1), 0.0)),
 }
 
 
@@ -114,7 +130,7 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
 
-    front_annotations = curate_view_dimensions(
+    front_annotations = retain_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
     )
     # 3 decimals so the displayed bore matches the family rows' 9.525 (a
@@ -122,24 +138,24 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_precision(adapter, front_annotations, {"BoreCutDia": 3})
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to gear bore")
-    bore_edge = visible_circle_edge(adapter, front, BORE_DIA)
+    entities = ModelEntities(front.ReferencedDocument).resolve(ENTITY_ROLES)
+    bore_edge = entities["bore"]
 
-    bore_top = (FRONT_CENTER[0], FRONT_CENTER[1] + BORE_R)
-    add_datum_feature(
+    (bore_annotation,) = front_annotations
+    add_dimension_datum(
         adapter,
         front,
-        edge_xy=bore_top,
-        symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.028),
+        dimension_annotation=bore_annotation,
+        source_feature="BoreProfile",
+        source_dimension="BoreCutDia",
         datum="A",
         label="cone gear bore axis",
-        shoulder=True,
-        position_tolerance_m=0.0001,
     )
     add_feature_control_frame(
         adapter,
         right,
-        edge_xy=(FRONT_FACE_X, RIGHT_CENTER[1] + HALF_OD * 0.55),
-        frame_xy=(FRONT_FACE_X - 0.034, RIGHT_CENTER[1] + HALF_OD + 0.010),
+        entity=entities["front_face"],
+        entity_type="FACE",
         characteristic="perpendicularity",
         tolerance=GEOMETRIC_TOLERANCES_MM["gear face squareness to bore"],
         datums=("A",),
@@ -148,14 +164,29 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         front,
-        symbol_xy=(FRONT_CENTER[0] + 0.015, FRONT_CENTER[1] - 0.052),
         control=surface_finish_by_key(SURFACE_FINISHES, "cone_gear_bore"),
         label="cone gear bore finish",
         entity=bore_edge,
     )
 
-    add_property_linked_note(adapter, "Gear Data", 0.018, 0.262)
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.018, 0.095)
+    gear_data = add_property_linked_note(adapter, "Gear Data", 0.018, 0.262)
+    manufacturing = add_property_linked_note(
+        adapter, "Manufacturing Notes", 0.018, 0.095
+    )
+    auto_arrange_view_dimensions(adapter, (front, right, iso))
+    from _drawing_native_layout import AxisLink, LayoutNote
+    from _drawing_view_packing import Axis, AxisOrder
+
+    repair_project_drawing_layout(
+        adapter,
+        views={"front": front, "right": right, "iso": iso},
+        alignments=(AxisLink(Axis.Y, "front", "right"),),
+        orderings=(AxisOrder(Axis.X, "front", "right"),),
+        notes=(
+            LayoutNote("gear-data", gear_data.GetAnnotation()),
+            LayoutNote("manufacturing", manufacturing.GetAnnotation()),
+        ),
+    )
     return await finalize_drawing(
         adapter,
         OUTPUTS,

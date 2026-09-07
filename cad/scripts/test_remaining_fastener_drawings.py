@@ -71,6 +71,13 @@ CASES = (
 )
 
 
+def test_cone_pivot_screw_reduced_magnification_keeps_single_native_sheet_scale():
+    import draw_cone_pivot_screw as drawing
+
+    assert drawing.SHEET_SCALE == (4.0, 1.0)
+    assert drawing.RECIPE.scale is drawing.SHEET_SCALE
+
+
 @pytest.mark.parametrize("case", CASES, ids=lambda case: case.part_name)
 def test_registry_paths_and_marked_dimensions(case: Case) -> None:
     drawing = importlib.import_module(case.module_name)
@@ -270,12 +277,23 @@ def test_cone_pivot_tail_view_exposes_the_ground_shoulder() -> None:
     assert drawing.SIDE_DIMENSION_CALLOUTS["ThreadLg"] == spec.THREAD_DESIGNATION
     assert '"1/4-20' not in drawing_source
     assert drawing.RECIPE.decorate is drawing._decorate
-    assert drawing.RECIPE.side_centerline_face_xy == (0.190, 0.145)
+    from _drawing_entities import FeatureFace
+    from _gtol_spec import CylinderFace
+
+    assert drawing.RECIPE.side_centerline_face == FeatureFace(
+        "Shoulder", CylinderFace(spec.SHOULDER_DIA)
+    )
     assert drawing_source.count("add_datum_feature(") == 1
     assert drawing_source.count("add_feature_control_frame(") == 4
     assert drawing_source.count("add_surface_finish(") == 1
-    assert 'label="head bearing edge"' in drawing_source
-    assert "edge_entity=_circular_edge(" in drawing_source
+    from _drawing_entities import CircleEdge
+
+    assert drawing.ENTITY_ROLES["head_bearing"] == CircleEdge(
+        spec.HEAD_DIA / 2.0, (0, 0, 0), (0, 1, 0)
+    )
+    assert drawing.ENTITY_ROLES["shoulder_end"] == CircleEdge(
+        spec.SHOULDER_DIA / 2.0, (0, -spec.SHOULDER_LEN, 0), (0, 1, 0)
+    )
     assert "import_cosmetic_threads(adapter, side)" in drawing_source
     assert 'place_view(adapter, str(SOURCE), "*Right"' in drawing_source
     assert 'quantity="SLOT MEDIAN PLANE"' in drawing_source
@@ -348,9 +366,134 @@ def test_cone_pivot_producer_rejects_missing_persisted_drawing_property() -> Non
         asyncio.run(build._assert_saved_drawing_properties(adapter, "exact.SLDPRT"))
 
 
+def _cosmetic_feature(**changes):
+    data = SimpleNamespace(
+        Standard=0, StandardType="Machine Threads", Size="#10-24",
+        Diameter=0.00356616, DiameterType=3, ApplyThread=0, BlindDepth=0.008,
+    )
+    for name, value in changes.items():
+        setattr(data, name, value)
+    return SimpleNamespace(
+        Name="NativeThreadName42", GetTypeName2=lambda: "CosmeticThread",
+        GetDefinition=lambda: data, GetErrorCode2=lambda: (0, False),
+    )
+
+
+def test_cone_pivot_cosmetic_creation_uses_supported_vendor_minor_definition(
+    monkeypatch,
+) -> None:
+    build = importlib.import_module("build_cone_pivot_screw")
+    calls = []
+    feature = _cosmetic_feature()
+    manager = SimpleNamespace(
+        InsertCosmeticThread3=lambda **kwargs: calls.append(kwargs) or feature
+    )
+    adapter = object()
+
+    async def rebuild(actual):
+        assert actual is adapter
+        calls.append("rebuilt")
+
+    monkeypatch.setattr(build, "force_rebuild", rebuild)
+    assert asyncio.run(build._create_cosmetic_thread(adapter, manager)) == feature.Name
+    assert calls == [
+        dict(Standard=0, StandardType="Machine Threads", Size="#10-24",
+             Diameter=pytest.approx(0.00356616), EndType=0, Depth=0.008,
+             Note="#10-24 UNC-2A"),
+        "rebuilt",
+    ]
+
+
+@pytest.mark.parametrize("name,value", [
+    ("Standard", -2), ("StandardType", ""), ("Size", ""),
+    ("Diameter", 0.0), ("Diameter", float("nan")),
+    ("Diameter", float("inf")), ("Diameter", 0.004826),
+    ("DiameterType", 2), ("ApplyThread", 2), ("BlindDepth", 0.007),
+])
+def test_cone_pivot_cosmetic_readback_rejects_wrong_definition(name, value) -> None:
+    build = importlib.import_module("build_cone_pivot_screw")
+    with pytest.raises(RuntimeError, match=name):
+        build._assert_cosmetic_thread(_cosmetic_feature(**{name: value}))
+
+
+@pytest.mark.parametrize("code,warning", [(1, False), (1, True)])
+def test_cone_pivot_cosmetic_rejects_native_feature_errors(code, warning) -> None:
+    build = importlib.import_module("build_cone_pivot_screw")
+    feature = _cosmetic_feature()
+    feature.GetErrorCode2 = lambda: (code, warning)
+    with pytest.raises(RuntimeError, match="feature status"):
+        build._assert_cosmetic_thread(feature)
+
+
+def test_cone_pivot_cosmetic_rejects_null_definition_and_feature() -> None:
+    build = importlib.import_module("build_cone_pivot_screw")
+    with pytest.raises(RuntimeError, match="missing"):
+        build._assert_cosmetic_thread(None)
+    feature = _cosmetic_feature()
+    feature.GetDefinition = lambda: None
+    with pytest.raises(RuntimeError, match="definition"):
+        build._assert_cosmetic_thread(feature)
+
+
+def test_cone_pivot_cosmetic_saved_gate_resolves_observed_native_name() -> None:
+    build = importlib.import_module("build_cone_pivot_screw")
+    feature = _cosmetic_feature()
+    names = []
+    part = SimpleNamespace(FeatureByName=lambda name: names.append(name) or feature)
+    build._assert_saved_cosmetic_thread(SimpleNamespace(currentModel=part), feature.Name)
+    assert names == [feature.Name]
+    part.FeatureByName = lambda name: None
+    with pytest.raises(RuntimeError, match="missing"):
+        build._assert_saved_cosmetic_thread(SimpleNamespace(currentModel=part), feature.Name)
+
+
+def test_cone_pivot_cosmetic_rejected_creation_does_not_rebuild(monkeypatch) -> None:
+    build = importlib.import_module("build_cone_pivot_screw")
+    manager = SimpleNamespace(InsertCosmeticThread3=lambda **kwargs: None)
+
+    async def forbidden_rebuild(_adapter):
+        pytest.fail("rejected creation must stop before rebuild")
+
+    monkeypatch.setattr(build, "force_rebuild", forbidden_rebuild)
+    with pytest.raises(RuntimeError, match="rejected"):
+        asyncio.run(build._create_cosmetic_thread(object(), manager))
+
+
+def test_cone_pivot_cosmetic_accepts_serialized_float_but_not_larger_drift() -> None:
+    build = importlib.import_module("build_cone_pivot_screw")
+    feature = _cosmetic_feature(Diameter=0.0035661599999999996)
+    assert build._assert_cosmetic_thread(feature) == feature.Name
+    with pytest.raises(RuntimeError, match="Diameter"):
+        build._assert_cosmetic_thread(_cosmetic_feature(Diameter=0.00356616 + 2e-12))
+
+
+def test_cone_pivot_cosmetic_saved_gate_rejects_definition_drift() -> None:
+    build = importlib.import_module("build_cone_pivot_screw")
+    part = SimpleNamespace(FeatureByName=lambda name: _cosmetic_feature(Size=""))
+    with pytest.raises(RuntimeError, match="Size"):
+        build._assert_saved_cosmetic_thread(SimpleNamespace(currentModel=part), "NativeName")
+
+
+def test_cone_pivot_cosmetic_vendor_depiction_preserves_simplified_body() -> None:
+    spec = importlib.import_module("cone_pivot_screw_spec")
+    build = importlib.import_module("build_cone_pivot_screw")
+    assert spec.THREAD_COSMETIC_MINOR_DIA == pytest.approx(3.56616)
+    assert spec.THREAD_COSMETIC_TYPE == "Machine Threads"
+    assert spec.THREAD_SOLID_DIA == pytest.approx(3.797)
+    assert spec.THREAD_MAJOR_DIA == pytest.approx(4.826)
+    source = Path(build.__file__).read_text(encoding="utf-8")
+    assert "_assert_saved_cosmetic_thread(adapter, cosmetic_thread_name)" in source
+
+
 def test_cone_tip_pinch_sheet_defines_a_flat_end_without_duplicate_head_diameter() -> None:
     drawing = importlib.import_module("draw_cone_tip_pinch_screw")
     spec = importlib.import_module("cone_tip_pinch_screw_spec")
+    from _drawing_entities import FeatureFace
+    from _gtol_spec import CylinderFace
+
+    assert drawing.RECIPE.side_centerline_face == FeatureFace(
+        "Shank", CylinderFace(spec.SHANK_DIA)
+    )
     assert drawing.END_KEEP == {}
     assert drawing.RECIPE.side_center == (0.190, 0.190)
     assert spec.DRAWING_DIMENSIONS == {}

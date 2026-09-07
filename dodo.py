@@ -89,8 +89,8 @@ for _stream in (sys.stdout, sys.stderr):
     if _reconfigure is not None:
         _reconfigure(encoding="utf-8", errors="replace")
 
-import yaml as _yaml
-from doit.dependency import CHECKERS, Dependency, JsonDB, MD5Checker
+import yaml as _yaml  # noqa: E402 - configure Windows output before dependency imports
+from doit.dependency import CHECKERS, Dependency, JsonDB, MD5Checker  # noqa: E402
 from filelock import FileLock, Timeout  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "cad" / "scripts"))
@@ -2202,6 +2202,12 @@ def task_check():
         SCRIPTS_DIR / "test_gtol_spec.py",
         SCRIPTS_DIR / "test_part_owned_geometric_tolerances.py",
         SCRIPTS_DIR / "test_probe_surface_finish_pmi_telemetry.py",
+        SCRIPTS_DIR / "test_probe_drawing_attachments.py",
+        SCRIPTS_DIR / "test_benchmark_drawing_recipes.py",
+        SCRIPTS_DIR / "test_annotation_performance_probe.py",
+        SCRIPTS_DIR / "test_mixed_annotation_probe.py",
+        SCRIPTS_DIR / "test_thread_ink_probe.py",
+        SCRIPTS_DIR / "test_right_gtol_column_probe.py",
         SCRIPTS_DIR / "test_surface_finish.py",
         SCRIPTS_DIR / "test_surface_finish_ownership_a.py",
         # One offline contract file per manufacturing drawing (test_*_drawing.py),
@@ -2380,11 +2386,13 @@ def task_check():
                 str((SCRIPTS_DIR / "cut_release.py").resolve()),
                 str((SCRIPTS_DIR / "export_models.py").resolve()),
                 str((SCRIPTS_DIR / "test_telemetry.py").resolve()),
+                str((SCRIPTS_DIR / "test_pytest_telemetry.py").resolve()),
                 str((SCRIPTS_DIR / "test_cut_release_telemetry.py").resolve()),
             ],
             "cmd": [
                 *pytest_cmd,
                 str(SCRIPTS_DIR / "test_telemetry.py"),
+                str(SCRIPTS_DIR / "test_pytest_telemetry.py"),
                 str(SCRIPTS_DIR / "test_cut_release_telemetry.py"),
             ],
         },
@@ -2490,9 +2498,14 @@ def task_check():
     )
     for name, spec in specs.items():
         stamp = str(REPORTS / f"check-{name}.ok")
+        file_dep = list(spec["file_dep"])
+        if spec["cmd"][:3] == [sys.executable, "-m", "pytest"]:
+            # Pytest loads this before importing tests. An isolation policy
+            # change must invalidate every pytest gate, not just telemetry's.
+            file_dep.append(str((REPO_ROOT / "conftest.py").resolve()))
         yield {
             "name": name,
-            "file_dep": spec["file_dep"],
+            "file_dep": file_dep,
             "targets": [stamp],
             "actions": [(_run_stamped, [spec["cmd"], f"check {name}", stamp])],
             "clean": True,

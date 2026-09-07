@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import ast
 from pathlib import Path
+from _drawing_test_support import linked_note_properties
+import pytest
 
 import channel_lever_spec
 import draw_channel_lever as drawing
@@ -35,12 +38,70 @@ def test_draw_view_math_matches_the_spec() -> None:
     assert channel_lever_spec.PIVOT_HOLE_DIA == lever.PIVOT_HOLE_DIA
 
 
-def test_sheet_runs_at_1_to_1_with_1_to_4_isometric() -> None:
-    assert drawing.SHEET_SCALE == (1.0, 1.0)
+def test_sheet_runs_at_1_to_2_with_1_to_4_isometric() -> None:
+    # New declared layout requirement: half-scale orthographic views leave room
+    # for the measured datum/GTol envelopes; the model dimensions do not change.
+    assert drawing.SHEET_SCALE == (1.0, 2.0)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "scale=(1, 4)" in source  # the isometric override
     assert channel_lever_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:4"
-    assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
+    assert "Isometric View Note" in linked_note_properties(source)
+
+
+def test_all_orthographic_views_and_final_sheet_share_declared_scale() -> None:
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    calls = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+    ]
+    views = {
+        ast.literal_eval(call.args[2]): call
+        for call in calls
+        if call.func.id == "place_view"
+    }
+    assert set(views) == {"*Front", "*Right", "*Top", "*Isometric"}
+    sheet_calls = [
+        call
+        for call in calls
+        if call.func.id in {"new_project_drawing", "finalize_drawing"}
+    ]
+    assert len(sheet_calls) == 2
+    for call in [views["*Front"], views["*Right"], views["*Top"], *sheet_calls]:
+        scale = next(
+            keyword.value for keyword in call.keywords if keyword.arg == "scale"
+        )
+        assert isinstance(scale, ast.Name) and scale.id == "SHEET_SCALE"
+    iso_scale = next(
+        keyword.value
+        for keyword in views["*Isometric"].keywords
+        if keyword.arg == "scale"
+    )
+    assert ast.literal_eval(iso_scale) == (1, 4)
+
+
+@pytest.mark.parametrize(
+    "projection,center",
+    [(drawing._sheet_xy, drawing.FRONT_CENTER), (drawing._top_xy, drawing.TOP_CENTER)],
+)
+def test_half_scale_text_projection_uses_model_mm_and_view_center(projection, center):
+    assert projection(drawing._BBOX_CX, 0.0) == pytest.approx(center)
+    assert projection(drawing._BBOX_CX + 20.0, -8.0) == pytest.approx(
+        (center[0] + 0.010, center[1] - 0.004)
+    )
+
+
+@pytest.mark.parametrize(
+    "projection,center",
+    [(drawing._sheet_xy, drawing.FRONT_CENTER), (drawing._top_xy, drawing.TOP_CENTER)],
+)
+def test_text_projection_derives_both_axes_from_declared_scale(
+    monkeypatch, projection, center
+):
+    monkeypatch.setattr(drawing, "SHEET_SCALE", (2.0, 5.0))
+    assert projection(drawing._BBOX_CX + 20.0, -8.0) == pytest.approx(
+        (center[0] + 0.008, center[1] - 0.0032)
+    )
 
 
 def test_linked_notes_are_functional_and_not_title_block_duplicates() -> None:
@@ -57,24 +118,24 @@ def test_linked_notes_are_functional_and_not_title_block_duplicates() -> None:
     assert "GRAY-IRON" not in notes
     assert "GREEN ENAMEL" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+    assert "Manufacturing Notes" in linked_note_properties(source)
 
 
 def test_native_gdt_and_finish_present() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'bar_height = add_edge_dimension(' in source
-    assert 'set_basic_dimension(adapter, bar_height, label="bar height from datum C")' in source
-    assert source.count("add_datum_feature(") == 3
+    assert "bar_height = add_entity_dimension(" in source
     assert (
-        'label="fulcrum bore axis",\n        position_tolerance_m=0.0001'
+        'set_basic_dimension(adapter, bar_height, label="bar height from datum C")'
         in source
     )
-    assert source.count("position_tolerance_m=0.0001") == 1
+    assert source.count("add_datum_feature(") == 3
+    assert 'label="fulcrum bore axis"' in source
+    assert "position_tolerance_m=" not in source
     assert source.count("_force_dimension_black(") == 3
     assert source.count("annotation.Color = 0") == 1
     assert "annotation.LayerOverride" in source
     assert "InsertCenterMark3(2, False, False)" in source
-    assert "tip_edge = _sheet_xy(TIP_END_X, 0.0)" in source
+    assert "view.SelectEntity(tip_arc, False)" in source
     assert source.count("add_feature_control_frame(") == 5
     assert source.count('characteristic="position"') == 2
     assert source.count('datums=("A", "B", "C")') == 3
@@ -83,12 +144,11 @@ def test_native_gdt_and_finish_present() -> None:
     assert 'characteristic="parallelism"' in source
     assert source.count('datums=("A",)') == 2
     assert "all_around=True" in source
-    assert 'edge_xy=bar_pin_edge' in source
+    assert 'entity=entities["bar_pin"]' in source
     assert 'label="bar-pin hole position"' in source
-    assert 'edge_xy=spring_fcf_edge' in source
+    assert 'entity=entities["spring"]' in source
     assert 'label="spring-eye hole position"' in source
-    assert "bar_pin_edge[0] - 0.045, 0.174" in source
-    assert "spring_fcf_edge[0] + 0.020, 0.174" in source
+    assert "frame_xy=" not in source
     assert "add_surface_finish(" not in source
     assert source.count("add_native_hole_callout(") == 2
 

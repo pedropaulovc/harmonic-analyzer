@@ -2,10 +2,9 @@ r"""Create the curated machinist drawing for the pen marker.
 
 A turned revolve (barrel + conical tip) whose model axis runs +Y, so the
 profile view is ROTATED 90 deg on the sheet to the lathe convention (axis
-horizontal, tip left).  The barrel diameter and overall length live on the
-silhouette as drawing-native picked dimensions (the revolve's sketch chain
-only carries radius / partial-length dims); the tip-cone height is the one
-marked model dimension.
+horizontal, tip left). Model entities anchor the native overall length and
+end-view diameter (the revolve's sketch chain only carries radius / partial-
+length dims); the tip-cone height is the one marked model dimension.
 """
 
 from __future__ import annotations
@@ -19,24 +18,28 @@ from pen_marker_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
+from _drawing_project_layout import repair_project_drawing_layout
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
+    add_entity_dimension,
     add_feature_control_frame,
     add_property_linked_note,
     add_surface_finish,
-    curate_view_dimensions,
+    add_view_centerline,
+    auto_arrange_view_dimensions,
+    retain_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
     set_hidden_lines_removed,
     stamp_drawing_summary,
 )
+from _drawing_entities import CircleEdge, ModelEntities, ModelVertex
 from _drawing_registry import DRAWINGS_BY_NAME
+from _gtol_spec import ConeFace, CylinderFace
 from _surface_finish import surface_finish_by_key
 from pen_marker_spec import BARREL_DIA, BARREL_TOP_Y, CONE_H, SURFACE_FINISHES
-from solidworks_mcp.adapters import sw_type_info as _sw_type_info
-from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     place_view,
     set_view_position,
@@ -60,24 +63,20 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (2.0, 1.0)
 FRONT_CENTER = (0.150, 0.180)
 ISO_CENTER = (0.330, 0.190)
+END_CENTER = (0.330, 0.100)
+ENTITY_ROLES = {
+    "apex": ModelVertex((0.0, 0.0, 0.0)),
+    "end": CircleEdge(BARREL_DIA / 2, (0.0, BARREL_TOP_Y, 0.0), (0, 1, 0)),
+    "barrel": CylinderFace(BARREL_DIA),
+    "tip": ConeFace(math.degrees(math.atan((BARREL_DIA / 2) / CONE_H))),
+}
 
-# Sheet-space geometry of the rotated profile (model +Y -> sheet -X: tip on
+# Sheet-space layout of the rotated profile (model +Y -> sheet +X: tip on
 # the LEFT, barrel top face on the RIGHT), all in meters at the 2:1 view scale.
 _HALF_LEN = BARREL_TOP_Y * SHEET_SCALE[0] / 2000.0
-_HALF_DIA = BARREL_DIA * SHEET_SCALE[0] / 2000.0
 APEX = (FRONT_CENTER[0] - _HALF_LEN, FRONT_CENTER[1])
-CONE_BASE_X = APEX[0] + CONE_H * SHEET_SCALE[0] / 1000.0
-END_FACE = (FRONT_CENTER[0] + _HALF_LEN, FRONT_CENTER[1])
-BARREL_TOP_EDGE = (FRONT_CENTER[0] + 0.035, FRONT_CENTER[1] + _HALF_DIA)
-BARREL_BOTTOM_EDGE = (FRONT_CENTER[0] + 0.035, FRONT_CENTER[1] - _HALF_DIA)
-CONE_FLANK = (
-    (APEX[0] + CONE_BASE_X) / 2.0,
-    FRONT_CENTER[1] + _HALF_DIA / 2.0,
-)
 
-FRONT_KEEP = {
-    "ConeH": (APEX[0] + 0.005, FRONT_CENTER[1] - 0.030),
-}
+FRONT_KEEP = ("ConeH",)
 
 
 def _rotate_view(adapter: Any, view: Any, angle: float, *, label: str) -> None:
@@ -91,19 +90,15 @@ def _rotate_view(adapter: Any, view: Any, angle: float, *, label: str) -> None:
     adapter.currentModel.EditRebuild3()
 
 
-def _add_picked_dimension(
+def _add_barrel_diameter(
     adapter: Any,
     view: Any,
     *,
-    picks: tuple[tuple[str, tuple[float, float]], ...],
+    edge: Any,
     text_xy: tuple[float, float],
     label: str,
 ) -> Any:
-    """Dimension across explicit typed picks (EDGE/VERTEX) at sheet points.
-
-    ``_drawing_common.add_edge_dimension`` only picks edges; the revolve's tip
-    apex is a VERTEX, so the overall length needs a mixed-type pick.
-    """
+    """Create a true diameter dimension on the model rim in its end view."""
     draw = adapter.currentModel
     ddoc = _early_bound(
         draw, "IDrawingDoc"
@@ -112,60 +107,14 @@ def _add_picked_dimension(
     if not ddoc.ActivateView(name):
         raise RuntimeError(f"failed to activate drawing view {name!r}")
     draw.ClearSelection2(True)
-    for index, (entity_type, (x, y)) in enumerate(picks):
-        selected = draw.Extension.SelectByID2(
-            "", entity_type, x, y, 0.0, index > 0, 0, null_callout(), 0
-        )
-        if not selected:
-            raise RuntimeError(
-                f"failed to select {label} {entity_type.lower()} {index} at "
-                f"sheet ({x:g}, {y:g})"
-            )
-    dimension = draw.AddDimension2(text_xy[0], text_xy[1], 0.0)
+    if edge is None or not view.SelectEntity(edge, False):
+        raise RuntimeError(f"failed to select model rim for {label}")
+    dimension = draw.AddDiameterDimension2(text_xy[0], text_xy[1], 0.0)
     draw.ClearSelection2(True)
-    draw.EditRebuild3()
     if dimension is None:
         raise RuntimeError(f"failed to add the {label} dimension")
-    return dimension
-
-
-def _display_as_diameter(adapter: Any, dimension: Any, *, label: str) -> None:
-    """Prefix a silhouette-width dimension with the ASME diameter symbol."""
-    display = _sw_type_info.early_bound_or_flag(
-        dimension, "IDisplayDimension", "SetText", "GetText"
-    )
-    adapter._attempt(lambda: display.SetText(1, "<MOD-DIAM>"))  # swDimensionTextPrefix
-    applied = str(adapter._attempt(lambda: display.GetText(1)) or "")
-    if "<MOD-DIAM>" not in applied:
-        raise RuntimeError(f"{label} dimension did not take the diameter prefix")
-    adapter.currentModel.EditRebuild3()
-
-
-def _add_axis_centerline(adapter: Any, view: Any, *, label: str) -> Any:
-    """Insert the turned-part axis centerline between the barrel silhouettes."""
-    draw = adapter.currentModel
-    ddoc = _early_bound(
-        draw, "IDrawingDoc"
-    )  # IDrawingDoc view for drawing-only methods (same dispatch)
-    name = view_name(adapter, view)
-    if not ddoc.ActivateView(name):
-        raise RuntimeError(f"failed to activate drawing view {name!r}")
-    draw.ClearSelection2(True)
-    for index, (x, y) in enumerate((BARREL_TOP_EDGE, BARREL_BOTTOM_EDGE)):
-        selected = draw.Extension.SelectByID2(
-            "", "SILHOUETTE", x, y, 0.0, index > 0, 0, null_callout(), 0
-        )
-        if not selected:
-            raise RuntimeError(
-                f"failed to select {label} silhouette edge {index} at "
-                f"sheet ({x:g}, {y:g})"
-            )
-    centerline = ddoc.InsertCenterLine2()
-    draw.ClearSelection2(True)
     draw.EditRebuild3()
-    if centerline is None:
-        raise RuntimeError(f"failed to insert the {label} axis centerline")
-    return centerline
+    return dimension
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -211,12 +160,13 @@ async def build(adapter: Any) -> dict[str, str]:
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
-    for view in (front, iso):
+    end = place_view(adapter, str(SOURCE), "*Top", *END_CENTER, scale=(2, 1))
+    for view in (front, iso, end):
         set_hidden_lines_removed(adapter, view)
     # Lathe convention: axis horizontal. Model +Y (the pen axis) points up in
     # *Front; -90 deg turns it to +X so the tip apex lands on the LEFT. The
     # rotation does not pivot about the geometry center, so re-pin the center
-    # afterwards -- every sheet coordinate below assumes it.
+    # afterwards for layout; entity identity does not depend on that position.
     _rotate_view(adapter, front, -math.pi / 2.0, label="pen-marker profile")
     if not set_view_position(adapter, front, *FRONT_CENTER):
         raise RuntimeError("failed to re-center the rotated pen-marker profile")
@@ -224,92 +174,76 @@ async def build(adapter: Any) -> dict[str, str]:
         f"pen-marker profile outline after rotate: {view_outline(adapter, front)}"
     )
 
-    curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
-    _add_axis_centerline(adapter, front, label="pen-marker")
+    entities = ModelEntities(front.ReferencedDocument).resolve(ENTITY_ROLES)
+    retain_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
+    add_view_centerline(adapter, front, entity=entities["barrel"], label="pen-marker")
 
-    _add_picked_dimension(
+    add_entity_dimension(
         adapter,
         front,
-        picks=(("VERTEX", APEX), ("EDGE", END_FACE)),
+        entities=(entities["apex"], entities["end"]),
         text_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.042),
         label="overall length",
+        orientation="horizontal",
     )
-    barrel_dia = _add_picked_dimension(
+    _add_barrel_diameter(
         adapter,
-        front,
-        picks=(
-            ("SILHOUETTE", BARREL_TOP_EDGE),
-            ("SILHOUETTE", BARREL_BOTTOM_EDGE),
-        ),
-        text_xy=(END_FACE[0] + 0.030, FRONT_CENTER[1]),
+        end,
+        edge=entities["end"],
+        text_xy=(END_CENTER[0] + 0.030, END_CENTER[1]),
         label="barrel diameter",
     )
-    _display_as_diameter(adapter, barrel_dia, label="barrel diameter")
 
     add_datum_feature(
         adapter,
         front,
-        edge_xy=BARREL_BOTTOM_EDGE,
-        symbol_xy=(BARREL_BOTTOM_EDGE[0], FRONT_CENTER[1] - 0.026),
+        entity=entities["barrel"],
         datum="A",
         label="pen-marker barrel axis",
-        entity_type="SILHOUETTE",
+        entity_type="FACE",
     )
-    # frame_xy is the frame's TOP-LEFT corner and the box grows RIGHT from it:
-    # measured, the anchor (APEX[0]-0.014 = 0.076) rendered the box at
-    # x 0.0759..0.1012, y 0.2062..0.2121 -- 25.3 mm wide. The overall-length
-    # dimension below picks the apex VERTEX, so its left extension line rises at
-    # exactly APEX[0] = 0.090, which fell 14 mm INSIDE that box and struck out
-    # the "0.10" tolerance cell. (The 60.00 is a GRAY reference dimension, so a
-    # crop thresholded at 128 cannot see the line at all -- only the render or a
-    # 200-threshold crop shows it.)
-    #
-    # -0.032 puts the box at 0.058..0.0833: its right edge clears APEX[0] by
-    # 6.7 mm, and it lands in empty sheet (the only ink measured in
-    # x 0.030..0.076, y 0.204..0.214 was the box's own left border). It may NOT
-    # go right instead: the Ra body's ink starts at x=0.1119, so a box left-
-    # anchored past the extension line would end at 0.1173 and run 5.4 mm into
-    # it -- the "x<=0.111" bound noted below is real and tight. The leader now
-    # crosses the gray extension line on its way to the cone flank, which is
-    # ordinary ASME routing; a struck-out tolerance value is not.
     add_feature_control_frame(
         adapter,
         front,
-        edge_xy=CONE_FLANK,
-        frame_xy=(APEX[0] - 0.032, FRONT_CENTER[1] + 0.032),
+        entity=entities["tip"],
         characteristic="circular_runout",
         tolerance=GEOMETRIC_TOLERANCES_MM["marker tip runout"],
         datums=("A",),
         label="marker tip runout",
-        entity_type="SILHOUETTE",
+        entity_type="FACE",
     )
-    # In the band ABOVE the barrel, between the barrel top (0.188) and the 60.00
-    # dimension line (~0.221) -- NOT above that dimension, where an early pass
-    # ran the leader through the 60.00 text and struck it out.
-    #
-    # The leader leaves the anchor at the symbol's ▽ tip and the ▽ opens UPWARD,
-    # so a leader that has to CLIMB to its target is drawn through the glyph (or
-    # along its flank) unless it escapes sideways faster than the ▽'s ~1.8 flank
-    # slope. Anchoring to the TOP silhouette instead makes the leader run DOWN
-    # and away from the body entirely, so it stays short and unambiguous. The
-    # body draws up and RIGHT of the anchor (~x+0.039, y+0.019), which fixes the
-    # 0.196 ceiling here and keeps it clear of the tip-runout frame at x<=0.111.
     add_surface_finish(
         adapter,
         front,
-        edge_xy=(FRONT_CENTER[0] - 0.024, FRONT_CENTER[1] + _HALF_DIA),
-        symbol_xy=(FRONT_CENTER[0] - 0.016, 0.196),
+        entity=entities["barrel"],
         control=surface_finish_by_key(SURFACE_FINISHES, "barrel"),
         label="barrel bearing finish",
-        entity_type="SILHOUETTE",
+        entity_type="FACE",
     )
 
     # x=0.020: the anchor is the text's left edge, so the ink starts here. The
     # sheet's 0.0127 zone margin and the re-centred border rule (~0.0126) now
     # agree, so 0.020 clears the rule and the audit enforces the same bound.
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.100)
-    add_property_linked_note(adapter, "Isometric View Note", 0.305, 0.135)
+    manufacturing = add_property_linked_note(
+        adapter, "Manufacturing Notes", 0.020, 0.100
+    )
+    caption = add_property_linked_note(adapter, "Isometric View Note", 0.305, 0.135)
 
+    auto_arrange_view_dimensions(adapter, (front, end, iso))
+    from _drawing_native_layout import LayoutNote
+    from _drawing_view_packing import Axis, AxisOrder
+
+    # This end view accompanies a rotated elevation; do not infer a native
+    # parent/child relation from their initial page positions.
+    repair_project_drawing_layout(
+        adapter,
+        views={"front": front, "end": end, "iso": iso},
+        orderings=(AxisOrder(Axis.X, "front", "end"),),
+        notes=(
+            LayoutNote("manufacturing", manufacturing.GetAnnotation()),
+            LayoutNote("iso-caption", caption.GetAnnotation(), "iso"),
+        ),
+    )
     return await finalize_drawing(
         adapter,
         OUTPUTS,

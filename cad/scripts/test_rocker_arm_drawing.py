@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 from pathlib import Path
+from _drawing_test_support import linked_note_properties
 
 import rocker_arm_notes
 import rocker_arm_spec
@@ -61,7 +62,7 @@ def test_sheet_runs_at_1_to_2() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "scale=(1, 2)" in source
     assert rocker_arm_notes.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:4"
-    assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
+    assert "Isometric View Note" in linked_note_properties(source)
 
 
 def test_linked_notes_are_functional_metric_and_not_title_block_duplicates() -> None:
@@ -80,7 +81,7 @@ def test_linked_notes_are_functional_metric_and_not_title_block_duplicates() -> 
     assert "LINEAR +/-" not in notes
     assert "BA" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+    assert "Manufacturing Notes" in linked_note_properties(source)
 
 
 def test_native_gdt_and_finish_present() -> None:
@@ -88,8 +89,8 @@ def test_native_gdt_and_finish_present() -> None:
     # A = pivot bore axis, B = broad face (right end view), C = rod-side tip
     # face; the rod-pin position frame references all three.
     assert source.count("add_datum_feature(") == 3
-    assert source.count("position_tolerance_m=0.0001") == 1
-    assert "pivot_datum_angle = math.radians(135.0)" in source
+    assert "position_tolerance_m=" not in source
+    assert 'entity=entities["pivot"]' in source
     assert 'label="pivot bore cylindrical datum feature"' in source
     assert source.count("shoulder=True") == 1
     assert source.count("add_feature_control_frame(") == 1
@@ -97,7 +98,8 @@ def test_native_gdt_and_finish_present() -> None:
     assert 'characteristic="position"' in source
     assert "add_surface_finish(" in source
     assert "add_native_hole_callout(" in source
-    assert source.count("edge_xy=rod_rim") == 2
+    assert 'edge=entities["rod"]' in source
+    assert 'entity=entities["rod"]' in source
 
 
 def test_large_radius_values_are_note_only() -> None:

@@ -76,6 +76,14 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "DomeProfile": {"DomeDia"},
 }
 
+# Coordinates defining the profile-controlled exterior, authored in the part.
+# Bore-axis coordinates are drawing-created reference dimensions, not this set.
+SOURCE_BASIC_DIMENSIONS: dict[str, set[str]] = {
+    "FootProfile": {"Width", "Depth"},
+    "Foot": {"FootHt"},
+    "DomeProfile": {"DomeDia"},
+}
+
 DRAWING_NOTES = "\n".join(
     (
         "MACHINE FROM CONTINUOUS-CAST STOCK; REMOVE AS-CAST SKIN.",

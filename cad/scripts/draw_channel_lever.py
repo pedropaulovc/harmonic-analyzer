@@ -6,7 +6,7 @@ sheet/template, import, curation, and export behavior lives in
 ``_drawing_common``.
 
 The lever is a long thin third-class lever (~186 mm nose-to-tip, 9.5 mm tall,
-3.0 mm thick).  The sheet runs at 1:1 with a small 1:4 isometric; the 3.0 x 9.5
+3.0 mm thick).  The sheet runs at 1:2 with a small 1:4 isometric; the 3.0 x 9.5
 section is dimensioned on a right end view.
 
 Run with SolidWorks open::
@@ -17,21 +17,25 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 import sys
-from typing import Any
+from typing import Any, Callable
 
 from channel_lever_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
 from _common import CAD_ROOT, check, run_build
+from _basic_dimensions import require_basic_dimension
+from _drawing_project_layout import DatumLeaderPolicy, repair_project_drawing_layout
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
-    add_edge_dimension,
+    add_entity_dimension,
     add_feature_control_frame,
     add_native_hole_callout,
     add_property_linked_note,
-    curate_view_dimensions,
+    auto_arrange_view_dimensions,
+    retain_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -41,16 +45,21 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_entities import CircleEdge, LineEdge, ModelEntities
+from _gtol_spec import PlanarFace
 from channel_lever_spec import (
+    SOURCE_BASIC_DIMENSIONS,
     BAR_PIN_X,
     BAR_TALL,
+    HUB_LENGTH,
     LEVER_SPRING_X,
     LEVER_THICKNESS,
     PIVOT_HOLE_DIA,
     TIP_END_X,
+    TIP_ARC_CX,
+    TIP_RADIUS,
 )
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
-from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     dimension_name,
@@ -71,7 +80,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (1.0, 1.0)  # 1:1
+SHEET_SCALE = (1.0, 2.0)  # 1:2; leave room for the measured annotation envelopes.
 
 _NOSE_R = BAR_TALL / 2.0  # 4.75
 _BBOX_CX = (-_NOSE_R + TIP_END_X) / 2.0  # front-view X centre
@@ -85,19 +94,23 @@ ISO_CENTER = (0.360, 0.210)
 
 
 def _sheet_xy(mx: float, my: float) -> tuple[float, float]:
-    """Sheet (x, y) of a model point in the bbox-centred front view (1:1)."""
+    """Project model millimetres to front-view text seeds at the declared scale."""
+    ratio = SHEET_SCALE[0] / SHEET_SCALE[1]
     return (
-        FRONT_CENTER[0] + (mx - _BBOX_CX) / 1000.0,
-        FRONT_CENTER[1] + my / 1000.0,
+        FRONT_CENTER[0] + ratio * (mx - _BBOX_CX) / 1000.0,
+        FRONT_CENTER[1] + ratio * my / 1000.0,
     )
 
 
 def _top_xy(mx: float, mz: float) -> tuple[float, float]:
-    """Sheet (x, y) of a model (x, z) point in the top view (1:1, x aligned
-    with the front view, centred on the plate's mid-thickness)."""
+    """Project model (x, z) millimetres to top-view text seeds at sheet scale.
+
+    X aligns with the front view; Z is centred on the plate's mid-thickness.
+    """
+    ratio = SHEET_SCALE[0] / SHEET_SCALE[1]
     return (
-        TOP_CENTER[0] + (mx - _BBOX_CX) / 1000.0,
-        TOP_CENTER[1] + mz / 1000.0,
+        TOP_CENTER[0] + ratio * (mx - _BBOX_CX) / 1000.0,
+        TOP_CENTER[1] + ratio * mz / 1000.0,
     )
 
 
@@ -119,7 +132,7 @@ def _force_dimension_black(dimension: Any, *, label: str) -> None:
         raise RuntimeError(f"{label} did not retain its color override")
 
 
-def _add_tip_arc_center_mark(adapter: Any, view: Any) -> None:
+def _add_tip_arc_center_mark(adapter: Any, view: Any, tip_arc: Any) -> None:
     """Center-mark the outer R3 arc so its boxed centre coordinate is explicit."""
     draw = adapter.currentModel
     drawing_doc = _sw_type_info.early_bound_or_flag(
@@ -128,10 +141,7 @@ def _add_tip_arc_center_mark(adapter: Any, view: Any) -> None:
     if not drawing_doc.ActivateView(view_name(adapter, view)):
         raise RuntimeError("failed to activate channel-lever front view")
     draw.ClearSelection2(True)
-    tip_edge = _sheet_xy(TIP_END_X, 0.0)
-    selected = draw.Extension.SelectByID2(
-        "", "EDGE", tip_edge[0], tip_edge[1], 0.0, False, 0, null_callout(), 0
-    )
+    selected = view.SelectEntity(tip_arc, False)
     if not selected:
         raise RuntimeError("failed to select channel-lever tip R3 arc")
     center_mark = drawing_doc.InsertCenterMark3(2, False, False)
@@ -140,22 +150,52 @@ def _add_tip_arc_center_mark(adapter: Any, view: Any) -> None:
         raise RuntimeError("failed to add channel-lever tip R3 center mark")
 
 
-FRONT_KEEP = {
-    "BarLength": (FRONT_CENTER[0] - 0.010, 0.138),
-    "TipCentreX": (FRONT_CENTER[0] + 0.070, 0.125),
-    "NoseRadius": (0.070, 0.172),
-    "TipRadius": (0.240, 0.172),
-    "FulcrumDia": (0.075, 0.180),
-}
-RIGHT_KEEP: dict[str, tuple[float, float]] = {}
-TOP_KEEP: dict[str, tuple[float, float]] = {}
+FRONT_KEEP = (
+    "BarLength",
+    "TipCentreX",
+    "NoseRadius",
+    "TipRadius",
+    "FulcrumDia",
+)
+RIGHT_KEEP: tuple[str, ...] = ()
+TOP_KEEP: tuple[str, ...] = ()
 
 
-async def build(adapter: Any) -> dict[str, str]:
-    if not SOURCE.is_file():
-        raise FileNotFoundError(f"source part is missing: {SOURCE}")
+def _model_entities(model: Any) -> dict[str, Any]:
+    half_z = LEVER_THICKNESS / 2.0
+    return ModelEntities(model).resolve(
+        {
+            "fulcrum": CircleEdge(
+                PIVOT_HOLE_DIA / 2.0, (0, 0, -HUB_LENGTH / 2.0), (0, 0, 1)
+            ),
+            "bar_pin": CircleEdge(
+                _BAR_PIN_DIA / 2.0, (BAR_PIN_X, 0, -half_z), (0, 0, 1)
+            ),
+            "spring": CircleEdge(
+                _SPRING_HOLE_DIA / 2.0, (LEVER_SPRING_X, 0, -half_z), (0, 0, 1)
+            ),
+            "tip": CircleEdge(TIP_RADIUS, (TIP_ARC_CX, 0, -half_z), (0, 0, 1)),
+            "top_front": LineEdge((80, BAR_TALL / 2.0, -half_z), (1, 0, 0)),
+            "top_back": LineEdge((80, BAR_TALL / 2.0, half_z), (1, 0, 0)),
+            "bottom_front": LineEdge((80, -BAR_TALL / 2.0, -half_z), (1, 0, 0)),
+            "broad_a": PlanarFace((0, 0, 1), half_z),
+            "broad_opposite": PlanarFace((0, 0, -1), half_z),
+        }
+    )
 
-    check("open channel-lever source", await adapter.open_model(str(SOURCE)))
+
+async def build(
+    adapter: Any,
+    *,
+    source: Path = SOURCE,
+    outputs: DrawingOutputs = OUTPUTS,
+    layout: Callable = repair_project_drawing_layout,
+) -> dict[str, str]:
+    """Build the real recipe; explicit inputs also permit isolated diagnostics."""
+    if not source.is_file():
+        raise FileNotFoundError(f"source part is missing: {source}")
+
+    check("open channel-lever source", await adapter.open_model(str(source)))
     read_required_properties(
         adapter.currentModel,
         (
@@ -192,21 +232,21 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
 
-    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
-    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(1, 1))
+    front = place_view(adapter, str(source), "*Front", *FRONT_CENTER, scale=SHEET_SCALE)
+    right = place_view(adapter, str(source), "*Right", *RIGHT_CENTER, scale=SHEET_SCALE)
     # Top view (2026-09-02): the integral O12 x 7.06 fulcrum hub hides the whole
     # 3 x 9.5 plate section in the end view, so the plate thickness and the
     # broad-face datum are read here, along the length clear of the hub.
-    top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 1))
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 4))
+    top = place_view(adapter, str(source), "*Top", *TOP_CENTER, scale=SHEET_SCALE)
+    iso = place_view(adapter, str(source), "*Isometric", *ISO_CENTER, scale=(1, 4))
     for view in (right, top, iso):
         set_hidden_lines_removed(adapter, view)
     set_hidden_lines_visible(adapter, front)
 
-    front_annotations = curate_view_dimensions(
+    front_annotations = retain_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
     )
-    profile_dimensions = {"BarLength", "TipCentreX", "NoseRadius", "TipRadius"}
+    profile_dimensions = set().union(*SOURCE_BASIC_DIMENSIONS.values())
     for annotation in front_annotations:
         name = dimension_name(adapter, annotation)
         if name not in profile_dimensions:
@@ -214,34 +254,30 @@ async def build(adapter: Any) -> dict[str, str]:
         display = annotation.GetSpecificAnnotation()
         if display is None:
             raise RuntimeError(f"profile dimension {name!r} has no display annotation")
-        set_basic_dimension(adapter, display, label=f"profile {name}")
-    curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
-    curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
+        require_basic_dimension(display, label=f"profile {name}")
+    retain_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
+    retain_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
-    _add_tip_arc_center_mark(adapter, front)
+    entities = _model_entities(front.ReferencedDocument)
+    _add_tip_arc_center_mark(adapter, front, entities["tip"])
 
     # Fulcrum -> bar-pin (127) and fulcrum -> spring-eye (177.8) centre distances
     # (bore edge to bore edge; SolidWorks dimensions circle edges centre-to-centre).
-    fulcrum_rim = _sheet_xy(-PIVOT_HOLE_DIA / 2.0, 0.0)
-    bar_pin_rim = _sheet_xy(BAR_PIN_X - _BAR_PIN_DIA / 2.0, 0.0)
-    spring_rim = _sheet_xy(LEVER_SPRING_X - _SPRING_HOLE_DIA / 2.0, 0.0)
-    bar_pin_c2c = add_edge_dimension(
+    bar_pin_c2c = add_entity_dimension(
         adapter,
         front,
-        p0=fulcrum_rim,
-        p1=bar_pin_rim,
+        entities=(entities["fulcrum"], entities["bar_pin"]),
         text_xy=(FRONT_CENTER[0] - 0.020, 0.128),
         label="fulcrum-to-bar-pin c2c",
     )
     set_basic_dimension(adapter, bar_pin_c2c, label="fulcrum-to-bar-pin c2c")
     _force_dimension_black(bar_pin_c2c, label="fulcrum-to-bar-pin c2c")
-    spring_c2c = add_edge_dimension(
+    spring_c2c = add_entity_dimension(
         adapter,
         front,
-        p0=fulcrum_rim,
-        p1=spring_rim,
+        entities=(entities["fulcrum"], entities["spring"]),
         text_xy=(FRONT_CENTER[0], 0.118),
         label="fulcrum-to-spring c2c",
     )
@@ -250,48 +286,42 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # Section thickness (3.0) in the top view at mid-length (clear of the hub);
     # bar height (9.5) on the front profile at the same station.
-    _mid_x = (BAR_PIN_X + LEVER_SPRING_X) / 2.0 - 60.0  # ~92: between the hub and the tab
-    add_edge_dimension(
+    _mid_x = (
+        BAR_PIN_X + LEVER_SPRING_X
+    ) / 2.0 - 60.0  # ~92: between the hub and the tab
+    add_entity_dimension(
         adapter,
         top,
-        p0=_top_xy(_mid_x, -LEVER_THICKNESS / 2.0),
-        p1=_top_xy(_mid_x, LEVER_THICKNESS / 2.0),
+        entities=(entities["top_front"], entities["top_back"]),
         text_xy=(_top_xy(_mid_x, 0.0)[0], TOP_CENTER[1] + 0.020),
         label="lever thickness",
         orientation="vertical",
     )
-    bar_height = add_edge_dimension(
+    bar_height = add_entity_dimension(
         adapter,
         front,
-        p0=_sheet_xy(_mid_x, -BAR_TALL / 2.0),
-        p1=_sheet_xy(_mid_x, BAR_TALL / 2.0),
+        entities=(entities["bottom_front"], entities["top_front"]),
         text_xy=(_sheet_xy(_mid_x, 0.0)[0] + 0.022, FRONT_CENTER[1]),
         label="bar height",
         orientation="vertical",
     )
     set_basic_dimension(adapter, bar_height, label="bar height from datum C")
 
-    # Hole callouts (bar-pin #47, spring-eye #21).  Pick a point ON each hole's
-    # rim, not its centre: SolidWorks edge selection only catches the circular
-    # edge within tolerance of the rim.  The bar-pin sits in the tall 9.5 mm bar,
-    # so its 12-o'clock rim is clear.  The spring eye rides a narrow 6.0 mm tab
-    # (rim ~1 mm from the tab's top edge), so a 12-o'clock pick grabs the tab
-    # edge and AddHoleCallout2 fails -- pick it at 9 o'clock (toward the lever
-    # body, on the Y=0 centreline), ~3 mm from the tab edges and clear of the tip.
+    # Hole identities come from the model roles. These projected positions only
+    # keep the two native hole callouts in separate text lanes.
     bar_pin_edge = _sheet_xy(BAR_PIN_X, _BAR_PIN_DIA / 2.0)
     spring_edge = _sheet_xy(LEVER_SPRING_X - _SPRING_HOLE_DIA / 2.0, 0.0)
-    spring_fcf_edge = _sheet_xy(LEVER_SPRING_X + _SPRING_HOLE_DIA / 2.0, 0.0)
     add_native_hole_callout(
         adapter,
         front,
-        edge_xy=bar_pin_edge,
+        edge=entities["bar_pin"],
         callout_xy=(bar_pin_edge[0] - 0.010, 0.185),
         label="bar-pin hole",
     )
     add_native_hole_callout(
         adapter,
         front,
-        edge_xy=spring_edge,
+        edge=entities["spring"],
         callout_xy=(spring_edge[0] + 0.005, 0.185),
         label="spring-eye hole",
     )
@@ -299,73 +329,55 @@ async def build(adapter: Any) -> dict[str, str]:
     # Complete datum reference frame: A is a broad machined face (primary), B
     # is the functional fulcrum-bore axis (secondary), and C is the top narrow
     # face (tertiary clocking).  The two BASIC hole locations reference A|B|C.
-    broad_face = _top_xy(_mid_x - 25.0, LEVER_THICKNESS / 2.0)  # the broad face's edge line, top view
     add_datum_feature(
         adapter,
         top,
-        edge_xy=broad_face,
-        symbol_xy=(broad_face[0] - 0.018, broad_face[1] + 0.016),
+        entity=entities["broad_a"],
+        entity_type="FACE",
         datum="A",
         label="broad machined face",
     )
-    fulcrum_left = _sheet_xy(-PIVOT_HOLE_DIA / 2.0, 0.0)
     add_datum_feature(
         adapter,
         front,
-        edge_xy=fulcrum_left,
-        symbol_xy=(fulcrum_left[0] - 0.018, fulcrum_left[1]),
+        entity=entities["fulcrum"],
         datum="B",
-        # SolidWorks normalizes this legal bore-axis tag by 0.0020 mm when
-        # committed.  This allowance checks annotation readback only; it does
-        # not alter the part's manufacturing tolerances.
         label="fulcrum bore axis",
-        position_tolerance_m=0.0001,
     )
-    top_face = (
-        RIGHT_CENTER[0],
-        RIGHT_CENTER[1] + BAR_TALL / 2000.0,
-    )
+    # The integral hub hides this face in the end view. Identify its visible
+    # long edge in the front view so the clocking datum has a readable witness.
     add_datum_feature(
         adapter,
-        right,
-        edge_xy=top_face,
-        symbol_xy=(top_face[0] + 0.018, top_face[1] + 0.010),
+        front,
+        entity=entities["top_front"],
         datum="C",
         label="top clocking face",
     )
-    outer_profile = _sheet_xy(80.0, BAR_TALL / 2.0)
     add_feature_control_frame(
         adapter,
         front,
-        edge_xy=outer_profile,
-        frame_xy=(0.105, 0.210),
+        entity=entities["top_front"],
         characteristic="profile_surface",
         tolerance=GEOMETRIC_TOLERANCES_MM["outer perimeter profile"],
         datums=("A", "B", "C"),
         all_around=True,
         label="outer perimeter profile",
     )
-    fulcrum_bottom = _sheet_xy(0.0, -PIVOT_HOLE_DIA / 2.0)
     add_feature_control_frame(
         adapter,
         front,
-        edge_xy=fulcrum_bottom,
-        frame_xy=(0.065, 0.200),
+        entity=entities["fulcrum"],
         characteristic="perpendicularity",
         tolerance=GEOMETRIC_TOLERANCES_MM["fulcrum bore perpendicularity"],
         datums=("A",),
         diameter=True,
         label="fulcrum bore perpendicularity",
     )
-    opposite_broad_face = (
-        RIGHT_CENTER[0] + LEVER_THICKNESS / 2000.0,
-        RIGHT_CENTER[1],
-    )
     add_feature_control_frame(
         adapter,
         right,
-        edge_xy=opposite_broad_face,
-        frame_xy=(0.225, 0.205),
+        entity=entities["broad_opposite"],
+        entity_type="FACE",
         characteristic="parallelism",
         tolerance=GEOMETRIC_TOLERANCES_MM["opposite broad face parallelism"],
         datums=("A",),
@@ -374,11 +386,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         front,
-        edge_xy=bar_pin_edge,
-        # Keep this frame below the hole-callout elbow (y ~= 0.182) and in a
-        # separate horizontal lane from the spring-eye frame.  Routing it from
-        # the old above-left position crossed the bar-pin callout leader.
-        frame_xy=(bar_pin_edge[0] - 0.045, 0.174),
+        entity=entities["bar_pin"],
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["bar-pin hole position"],
         datums=("A", "B", "C"),
@@ -388,11 +396,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         front,
-        # The hole callout owns the 9-o'clock rim and routes up-left.  Attach
-        # the position frame at 3 o'clock and keep its whole leader to the
-        # right of the callout path.
-        edge_xy=spring_fcf_edge,
-        frame_xy=(spring_fcf_edge[0] + 0.020, 0.174),
+        entity=entities["spring"],
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["spring-eye hole position"],
         datums=("A", "B", "C"),
@@ -400,12 +404,35 @@ async def build(adapter: Any) -> dict[str, str]:
         label="spring-eye hole position",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)
-    add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.175)
+    manufacturing = add_property_linked_note(
+        adapter, "Manufacturing Notes", 0.020, 0.075
+    )
+    caption = add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.175)
 
+    auto_arrange_view_dimensions(adapter, (front, right, top, iso))
+    from _drawing_native_layout import AxisLink, LayoutNote
+    from _drawing_view_packing import Axis, AxisOrder
+
+    layout(
+        adapter,
+        datum_leader_policy=DatumLeaderPolicy.BENT_DOCUMENT,
+        views={"front": front, "right": right, "top": top, "iso": iso},
+        alignments=(
+            AxisLink(Axis.X, "front", "top"),
+            AxisLink(Axis.Y, "front", "right"),
+        ),
+        orderings=(
+            AxisOrder(Axis.Y, "front", "top"),
+            AxisOrder(Axis.X, "front", "right"),
+        ),
+        notes=(
+            LayoutNote("manufacturing", manufacturing.GetAnnotation()),
+            LayoutNote("iso-caption", caption.GetAnnotation(), "iso"),
+        ),
+    )
     return await finalize_drawing(
         adapter,
-        OUTPUTS,
+        outputs,
         pdf_title="Channel Lever Manufacturing Drawing",
         scale=SHEET_SCALE,
     )

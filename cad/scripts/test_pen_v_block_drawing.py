@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from _drawing_test_support import linked_note_properties
 
 import build_pen_v_block as part
 import draw_pen_v_block as drawing
@@ -37,20 +38,22 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
         pen_v_block_spec.BLOCK_HEIGHT,
         pen_v_block_spec.BLOCK_DEPTH,
     )
-    assert (drawing.BORE_X, drawing.GROOVE_WIDTH, drawing.SCREW_HOLE_XY) == (
+    assert (drawing.BORE_X, drawing.GROOVE_WIDTH) == (
         pen_v_block_spec.BORE_X,
         pen_v_block_spec.GROOVE_WIDTH,
-        pen_v_block_spec.SCREW_HOLE_XY,
     )
+    # Screw location is imported from the marked native dimensions. The recipe
+    # no longer computes sheet coordinates from a second screw-location alias.
+    assert {"ScrewHoleCx", "ScrewHoleCz", "ScrewHoleDiaDim"} <= set(drawing.FRONT_KEEP)
 
 
-def test_sheet_runs_at_4_to_1_with_2_to_1_isometric() -> None:
-    assert drawing.SHEET_SCALE == (4.0, 1.0)
+def test_sheet_runs_at_3_to_1_with_2_to_1_isometric() -> None:
+    assert drawing.SHEET_SCALE == (3.0, 1.0)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("scale=(4, 1)") == 3
+    assert source.count("scale=(3, 1)") == 3
     assert source.count("scale=(2, 1)") == 1  # the isometric override
     assert pen_v_block_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 2:1"
-    assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
+    assert "Isometric View Note" in linked_note_properties(source)
 
 
 def test_linked_notes_cover_the_marker_groove_and_functional_tolerances() -> None:
@@ -67,7 +70,7 @@ def test_linked_notes_cover_the_marker_groove_and_functional_tolerances() -> Non
     assert "HOLE CENTRES" not in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+    assert "Manufacturing Notes" in linked_note_properties(source)
     assert "_NOTES_" not in source
 
 
