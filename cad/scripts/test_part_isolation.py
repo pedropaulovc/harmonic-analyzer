@@ -162,7 +162,8 @@ def test_no_part_imports_main_assembly_helper():
     assembly-only policy must not depend on an incidental import back-edge.
     """
     assembly_helpers = {
-        "_assembly", "_motion", "_assembly_patterns", "_assembly_couplings"
+        "_assembly", "_motion", "_assembly_patterns", "_assembly_couplings",
+        "_assembly_mass_properties",
     }
     offenders = {
         script.name: sorted(Path(p).stem for p in module_deps_of(script)

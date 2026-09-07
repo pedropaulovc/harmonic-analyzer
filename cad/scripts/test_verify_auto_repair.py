@@ -657,3 +657,91 @@ def test_geometry_digest_rejects_failed_configuration_activation(digest_trial):
     with pytest.raises(RuntimeError, match="activation rejected"):
         trial.digest()
     assert trial.calls == [("mass", "Default"), ("poses", "Default", True)]
+
+
+@pytest.fixture
+def assembly_profile_records():
+    def span(name, identity, parent, start, end, **attributes):
+        return {
+            "name": name, "context": {"trace_id": "trace-exact", "span_id": identity},
+            "parent_id": parent,
+            "start_time": f"2026-09-07T00:00:00.{start:09d}Z",
+            "end_time": f"2026-09-07T00:00:00.{end:09d}Z",
+            "attributes": attributes, "status": {"status_code": "OK"},
+        }
+
+    return [
+        span("geometry_digest.mass_properties", "mass", "geometry", 3, 6),
+        span("assembly.geometry_digest", "geometry", "root", 2, 7),
+        span("mate one", "mate", "root", 7, 9, kind="lock"),
+        span("task assembly:drive_train", "root", None, 0, 10, seat_wait_s=1000),
+    ]
+
+
+def test_assembly_profile_exact_trace_exclusive_nanoseconds_and_retained_errors(
+    tmp_path, assembly_profile_records
+):
+    from diagnostics.report_assembly_profile import report
+
+    records = assembly_profile_records
+    records[0]["status"]["status_code"] = "ERROR"
+    selected = [json.dumps(row).encode() + b"\n" for row in records]
+    other = {
+        "context": {"trace_id": "different-trace"}, "message": "trace-exact",
+    }
+    path = tmp_path / "trace.jsonl"
+    path.write_bytes(selected[0] + json.dumps(other).encode() + b"\n" + b"".join(selected[1:]))
+    result = report(path, "trace-exact")
+    assert result["span_count"] == 4
+    assert result["error_span_count"] == 1
+    assert result["selected_records_sha256"] == hashlib.sha256(b"".join(selected)).hexdigest()
+    assert result["task"]["duration_ns"] == result["exclusive_total_ns"] == 10
+    assert result["task"]["seat_wait_s"] == 1000
+    assert {row["category"]: row["exclusive_ns"] for row in result["categories"]} == {
+        "task": 3, "assembly.geometry_digest": 5, "scalar mates": 2,
+    }
+    assert {row["record"]["context"]["span_id"]: row["exclusive_ns"] for row in result["spans"]} == {
+        "root": 3, "geometry": 2, "mass": 3, "mate": 2,
+    }
+    assert sorted(row["source_line"] for row in result["spans"]) == [1, 3, 4, 5]
+
+
+@pytest.mark.parametrize(
+    "fault", ["duplicate", "missing_parent", "multiple_roots", "negative", "outside", "overlap", "cycle", "absent"]
+)
+def test_assembly_profile_rejects_incomplete_or_double_counted_traces(
+    tmp_path, assembly_profile_records, fault
+):
+    from diagnostics.report_assembly_profile import report
+
+    records = assembly_profile_records
+    mass, geometry, mate, root = records
+    if fault == "duplicate":
+        records.append(root)
+    if fault == "missing_parent":
+        geometry["parent_id"] = "not-recorded"
+    if fault == "multiple_roots":
+        geometry["parent_id"] = None
+    if fault == "negative":
+        mass["end_time"] = geometry["start_time"]
+    if fault == "outside":
+        mass["start_time"] = root["start_time"]
+    if fault == "overlap":
+        mate["start_time"] = mass["end_time"]
+    if fault == "cycle":
+        geometry["parent_id"] = "mass"
+        mass.update(start_time=geometry["start_time"], end_time=geometry["end_time"])
+    if fault == "absent":
+        records = []
+    path = tmp_path / "trace.jsonl"
+    path.write_text("".join(json.dumps(row) + "\n" for row in records), encoding="utf-8")
+    with pytest.raises(ValueError):
+        report(path, "trace-exact")
+
+
+def test_assembly_profile_timestamp_offsets_and_interval_union_are_exact():
+    from diagnostics.report_assembly_profile import timestamp_ns, union_ns
+
+    assert timestamp_ns("2026-09-07T00:00:00.123456789Z") == timestamp_ns("2026-09-06T17:00:00.123456789-07:00")
+    assert timestamp_ns("2026-09-07T00:00:00.000000001Z") - timestamp_ns("2026-09-07T00:00:00Z") == 1
+    assert union_ns([(5, 9), (1, 7), (10, 12), (3, 3)]) == 10
