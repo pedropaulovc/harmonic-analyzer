@@ -41,8 +41,9 @@ async def test_explicit_source_is_used_before_recipe_drives_native_application(
 @pytest.mark.asyncio
 @pytest.mark.parametrize("change", ["none", "basic", "source_bytes", "wrong_output"])
 @pytest.mark.parametrize("report_root", ["present", "absent"])
+@pytest.mark.parametrize("temporary_path", ["direct", "parent_alias"])
 async def test_fresh_baseline_uses_unique_outputs_and_preserves_source_witnesses(
-    monkeypatch, tmp_path, change, report_root
+    monkeypatch, tmp_path, change, report_root, temporary_path
 ):
     root = tmp_path / "cad"
     if report_root == "present":
@@ -51,6 +52,15 @@ async def test_fresh_baseline_uses_unique_outputs_and_preserves_source_witnesses
     source.write_bytes(b"current-native-part")
     original.write_bytes(b"unchanged-old-native-drawing")
     state = {"path": "", "basic_reads": 0}
+    original_mkdtemp = control.tempfile.mkdtemp
+
+    def temporary_directory(**kwargs):
+        path = Path(original_mkdtemp(**kwargs))
+        if temporary_path == "parent_alias":
+            return str(path / ".." / path.name)
+        return str(path)
+
+    monkeypatch.setattr(control.tempfile, "mkdtemp", temporary_directory)
     adapter = SimpleNamespace(
         ownership=SimpleNamespace(
             register_directory=Mock(),

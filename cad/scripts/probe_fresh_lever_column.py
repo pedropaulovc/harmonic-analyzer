@@ -119,7 +119,7 @@ async def probe(adapter, source: Path, original_drawing: Path):
     reports.mkdir(parents=True, exist_ok=True)
     directory = Path(
         tempfile.mkdtemp(prefix="coherent-lever-column-", dir=reports)
-    )
+    ).resolve()
     adapter.ownership.register_directory(directory)
     for original in (source, original_drawing):
         adapter.ownership.register_source(original)
