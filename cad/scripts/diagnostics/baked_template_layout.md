@@ -1,6 +1,9 @@
 # Copied project-template title layout
 
-This is a blank-only diagnostic, not a production template replacement. It
+This diagnostic authors a copied template. The seven-note candidate now supplies
+the branch's project template after blank native persistence and populated
+rocker/lever field validation; full-recipe and fleet gates still govern release.
+The earlier experiments below remain historical evidence. It
 authors a fresh owned DRWDOT from the unmodified project template using bare
 `new_drawing`; it does not normalize units, notes, styles, sheet scale or view
 quality. No model document is opened. The following are intentional template
@@ -366,6 +369,32 @@ the retained error list is empty.
 
 Its fresh derived DRWDOT has SHA-256
 `2b1bbe3dfff265e8bb35ea79f0f9690f808049f5cef764cab8959c1eaee5e849`.
-It remains a diagnostic output, not the project template. This receipt proves
-blank inheritance and print persistence only; resolved-field fit, full recipes
-and fleet acceptance are separate controls.
+At that stage it remained a diagnostic output, not the project template. This
+receipt proves blank inheritance and print persistence only; resolved-field fit,
+full recipes and fleet acceptance are separate controls.
+
+## Branch template candidate after populated-field validation
+
+The project `cad/templates/harmonic-analyzer.DRWDOT` now contains the exact
+native-generated seven-note candidate above (SHA-256 `2b1bbe3dfff265e8bb35ea79f0f9690f808049f5cef764cab8959c1eaee5e849`).
+The prior tracked file, SHA-256 `cbad80d25315dddc9bb5fefd690915c6f18fa7d181ac8c30d2f1408a980b55cc`,
+remains recoverable in Git. This is a branch implementation candidate, not a
+released template or a waiver of full-recipe/fleet acceptance.
+
+Native population receipt `populated-template-jkka6_ki/populated-template.json`
+(SHA-256 `5c6f6f0fc3a47032e11b1f7162a1e811fde5ba2ce5db40efee20462beef84306`)
+preserves zero cold native changes, identical PDF glyph witnesses and zero
+changed PNG pixels for both sources. The only recorded failures were the two
+lever FINISH text comparisons: PDFium generated CRLF between two native text
+runs, with no missing or changed printed character. The narrowly corrected
+reader replays every field against the unchanged native observations and actual
+PDFs: **88 checks pass**, with exact original raw PDF text/ink and input hashes.
+See [the parser replay](../../docs/pipeline/populated-template-field-replay.md).
+Root replay is retained alongside the native receipt as `field-replay-root.json`
+(SHA-256 `8e4b8e574fa9bb53c13ede900445ad279b000810eca9c435ca9aa410ba8bfcdd`).
+
+Main inspected both populated PNGs: TITLE, drawing number/revision, MATERIAL and
+the lever's two-line FINISH are readable and separated. Those are minimal
+one-view template controls, not complete manufacturing drawings. The template's
+changed bytes invalidate dependent drawing/prepared-template keys normally;
+part and assembly recipes are unchanged by this binary replacement.
