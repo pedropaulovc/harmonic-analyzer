@@ -1,7 +1,10 @@
 # Crank-arm entity selection validation
 
-Work in progress. This document records the bounded migration requested in
-`second-vm-crank-arm-entities.md`; it is not native acceptance or merge readiness.
+The 15-site migration is implemented and validated at `09c050de` against the
+frozen inputs below. Production print inspection, migrated-entity cold/move
+checks and local CodeRabbit review passed. This is **not merge readiness**:
+the parent was rewritten during validation, and the pinned baseline has one
+failing offline recipe test. See [accepted result and limits](#accepted-result-and-limits).
 
 ## Frozen inputs and scope
 
@@ -310,3 +313,82 @@ The 404-test focused suite passed (`run-0c3wquyl`, 10.60 s). Local CodeRabbit
 review of `77df0951`, with both the actual parent branch and exact baseline
 specified plus pinned helper sources as context, found only two regex-literal
 nits in the added tests. Both are fixed without changing their assertions.
+
+## Accepted result and limits
+
+Code: `09c050de61c15e87f2f1138051ea4fc902431851`. Subsequent edits to this document
+record results only; no source, adapter, configuration, template or test changed
+during the accepted native run. All eight changed files are within the handoff's
+crank-arm ownership. Assembly PRs #676–678 were not modified.
+
+Production `doit -a -s drawing:crank_arm` passed the existing final gates.
+Trace `0xeaf8d8918fa32a24817d9aa569d05e3e` spans
+16:47:06.061754Z–16:47:32.627762Z on 2026-09-07: 26.566008 s total,
+5.192939 s resolving the bank. Baseline: 14.911039 s. No speedup is demonstrated.
+
+Owned run `crank-arm-entities-5oq6gsep/` passed its complete callback:
+14 explicit attachment roles, 13 raw drawing dimensions, marked-dimension union,
+manufacturing values/tolerances/text/BASIC/arc conditions, first cold reopen,
+view movement/scaling, `Save3`, second fresh-handle reopen, all-annotation
+comparisons and final factory/ownership/source guards. The original source,
+owned source copy and original execution token all retain SHA
+`6b086d5dbcb6e904fb794822728b705f69cd3903a0e8b2c5cf7abb8d9621f102`.
+Diagnostic trace `0x8b3252a95a7d812774f08b5c35a9621c` spans
+16:48:36.396675Z–16:52:23.211077Z. Its instrumented recipe took 42.497610 s;
+do not compare that instrumented time with production.
+
+Visual inspection covered the production and first-cold full sheets and all six
+600 dpi detail windows. All six built/cold crop hashes match; the first-cold
+full PNG is byte-identical to production. The front crop shows the entire finish
+text and pivot FCF; the overlapping shaft crop shows the shaft rim and datum B.
+Text, model outlines, finish and datum routing, FCF borders, hole callouts and
+title fields are readable at the intended 2:1 orthographic / 1:1 iso layout.
+
+The moved/scaled scratch sheet was also inspected. It deliberately scales every
+view by 0.75 while retaining annotation content, so it has layout crowding and
+an unchanged 1:1 iso note. It proves association/semantic persistence, **not**
+print acceptance at that altered layout. Open the production drawing or the
+diagnostic's `built.SLDDRW` for the accepted layout, not its moved scratch output.
+
+Validation limits are retained, not suppressed: the shared attachment snapshot
+reports 21 geometry exclusions (cosmetic-thread/center-mark/note annotation
+types, imported sketch-object attachments and the depth dimension's empty
+geometry attachment). There are zero dimension-semantic exclusions. The separate
+raw dimension/source and all-annotation banks check their recorded semantics and
+cold persistence; no exact model-geometry identity is claimed for those excluded
+objects. All 14 migrated entity-backed calls have independent exact source/view
+identity witnesses. Hole-callout text is read from actual annotation display
+text, not unsupported `IDisplayDimension.GetText`. The moved-cold comparison
+reports 180 coordinate-roundoff entries within the unchanged boundary-specific
+rules and no zero-Z serialization entries; no tolerance or exclusion was added.
+
+Paths below are relative to `cad/out/reports/`:
+
+| Evidence | SHA-256 |
+|---|---|
+| `crank-arm-entities-5oq6gsep/measurements.json` | `33b219d9632fd7c8df86bd06c608cd59198946ecdb51395b7a5d92c55a5a9d4b` |
+| `crank-arm-entities-5oq6gsep/ownership.json` | `58ec37804f7e5bdcc19435df45f1db3168a8380b535f098333a54fe2c7101344` |
+| `crank-arm-entities-5oq6gsep/cold.png` | `1c741775a9258d40ee9867202098b302ce0ac7a59d0d22df5357cf53de560d12` |
+| `crank-arm-entities-production-09c050de/crank-arm.SLDDRW` | `95d38fd4b828cd202e0b3b3f4fcdb391118783bf10d088be2e5080f3fd25f860` |
+| `crank-arm-entities-production-09c050de/crank-arm.pdf` | `2a46a9c2cd42de5c8a8bca119333f48f00c5bd170d2102e0cef6916613b0b39b` |
+| `crank-arm-entities-production-09c050de/telemetry/traces.jsonl` | `7ea76d648580812dce8a4a181341449a28905e33c318a685824a56a3396dabfe` |
+| `crank-arm-local-review-09c050de.log` | `e2f52e9e7b318e2ca8e453b445ef06ccd0b18a902ce14ac0a559475832ca9777` |
+
+Latest focused suite: 131 passed (`run-0zyxbq_0`, 4.21 s), Ruff clean. The broader
+entity/layout suite passed 404 tests before the last layout-seed-only change.
+Latest `doit -n 4 check:graph check:partiso check:recipe`: graph and isolation
+up-to-date from their green runs; recipe **6176 passed, one failed**
+(`run-r9lyu6db`, 265.20 s). The only failure is the unchanged baseline fillister
+registration contradiction reproduced above. The full COM graph was not run.
+
+Local CodeRabbit completed with **zero findings** on the latest code, using:
+
+```powershell
+cr review --agent --committed --base perf/cad-build-and-drawing-entities --base-commit bc593d784fba08fc6552224767a460338f51b664 --config cad/docs/pipeline/crank-arm-entities-results.md cad/scripts/_drawing_common.py cad/scripts/diagnostics/_owned_native_session.py
+```
+
+Remaining integration work: coordinate the baseline fillister test/registration
+contradiction, rebase this bounded patch onto a newly frozen parent revision,
+regenerate baseline evidence there, and satisfy the latest-code full graph gate
+before merge. The datum-A/station-side decision above remains unassumed; this
+migration preserves the original physical attachments. PR #682 remains open.
