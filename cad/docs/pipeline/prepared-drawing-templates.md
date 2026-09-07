@@ -57,8 +57,9 @@ floats are rounded: represented native coordinates also compare exactly. The
 first native normal baseline exposed an unsupported surface-finish inventory
 before reaching cache preparation (recorded below). The expanded raw witness
 subsequently passed normal setup and rejected two within-snapshot extent
-differences during preparation. The current read-order correction awaits native
-validation; no numerical tolerance was introduced.
+differences during preparation. The read-order correction subsequently passed
+the complete native normal/miss/hit control below; no numerical tolerance was
+introduced.
 
 An empty linked note's extent is observational only after every native text,
 stroke, other display primitive and ordinary/multi-jog leader count is zero.
@@ -134,10 +135,10 @@ for i in range(6):
 print(json.dumps({'native_calls':'none; RevisionNumber is injected','files':len(identity['source_sha256']),'seconds':rows},indent=2))"
 ```
 
-Still required before opt-in use: a dedicated owned native miss/hit control,
-source/active-document preservation on the real call shapes, raw-default
-readback, measured complete hit overhead, then matched full recipe/save/cold
-reopen and visual acceptance. No production recipe is switched by this patch.
+The owned native miss/hit control, exact raw-default readback, source/session
+preservation and complete hit overhead have now been observed below. Still
+required before rollout: printed sheet-format preservation, then matched full
+recipe/save/cold-reopen and visual acceptance. No production recipe is switched.
 
 ## First native cache control
 
@@ -269,4 +270,38 @@ before the raw extent. No setter, retry, second normalization or exception
 exclusion is added. A fail-first order regression models the observed mismatch,
 asserts the raw and measured extent agree, and preserves exact rejection of a
 1e-12 extent change even when measured geometry stays identical. The reordered
-normal/miss/hit control still needs native validation.
+normal/miss/hit control's result follows.
+
+### Complete native cache control passes
+
+At root `1acb6dfe`, PID 31860 / native revision 34.3.0, the normal setup, cache
+miss, prepared instantiation, cache hit and second instantiation all passed.
+Every raw-default comparison remained exact. Receipt:
+`prepared-template-cache-azvn2o4l/measurements.json`, SHA-256
+`8c33ff38fc2ce526da250e4b6acf12cf05c446403a0665476158f958eede966c`.
+
+| Observed operation | Seconds |
+| --- | ---: |
+| Normal factory | 3.062896 |
+| One-time miss, including preparation and native validation | 23.082265 |
+| Prepared factory after miss | 1.375135 |
+| Cache-hit lookup and receipt/hash validation | 0.054509 |
+| Prepared factory after hit | 1.286016 |
+
+The hit lookup plus factory totals **1.340526 s**, versus 3.062896 s for the
+normal factory in this sequence. Complete raw witnesses cost a further
+8.504/8.600/8.673 s in the three trials, timed separately. This is one sequential
+functional control, not ABBA or an end-to-end recipe benchmark. The reordered
+UNIT-note read is supported by this result; which getter triggers native extent
+settling remains unisolated.
+
+Exactly five owned drawings closed, and only one owned DRWDOT was saved. The
+original template stayed byte-exact, all nine input/cache guards passed, and
+initial/final document inventories were empty with no cleanup error. Published
+DRWDOT SHA-256 is
+`b840e9284276bed46116a5345c6d1a54f23543297400044ab023d13cbe4a8b52`;
+its native receipt SHA-256 is
+`7388ec44b732ab6c654d50c357cf5a75f2dc2406762f5d9e9075d391e0002ec7`.
+Neither artifact changed on the hit. This run exported no PDF/PNG and opened no
+model, so printed sketch/logo preservation and complete recipe acceptance are
+still unproved. The helper stays opt-in.

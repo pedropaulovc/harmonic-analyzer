@@ -332,6 +332,36 @@ The seven selected COM-free gates at `2e41d069` completed successfully:
 `check:recipe` ran **3,212 tests in 51.31 s**; six other gates were current.
 Pytest telemetry: `cad/out/reports/pytest-telemetry/run-23qt941k`.
 
+## Nearest-gap lever trial — GTol placement passes; drawing still rejected
+
+At root `27f0c11e8143cbdab31faa4a9c45fb3bac02c21c`, the 1:2 lever recipe
+completed in **91.5784824 s**, with native SLDDRW/PDF/PNG artifacts. The nearest
+vertical-gap candidate passed native GTol clearance and final sheet packing;
+the four-frame bank is on the left of the Front view. Receipt:
+`cad/out/reports/datum-policy-i2i_oplt/pilot.json`, SHA-256
+`bd281f36661a6d52001c6104806df241e31df834e3529c65eb59eeedd399e119`.
+This is a completed recipe interval, not a speed comparison with earlier failed
+runs that did less work.
+
+Cold reopen rejected exactly three title-X observations, each moving from
+`0.35389179984999647` to `0.3564776151157712` m (**2.585815266 mm**).
+There were no accepted coordinate-roundoff differences in this trial. The strict
+combined diagnostic therefore failed, and the later standalone cold-source
+parameter check was not reached. Post-recipe source parameters/native identities
+passed; all four original/guard source hashes and the owned copy's
+`6a994561f19487029c938cd7cca5047acbdfbf686020514be538ef5a632e0841`
+remained exact. Ownership began and ended empty, without a cleanup error.
+
+**Visual acceptance also fails independently of the title gate.** Inspection of
+the original-resolution PNG finds the diameter 6.50 leader crossing BASIC R4.75,
+and the diameter 4.04 THRU ALL leader crossing datum C. Segment clipping against
+the retained native text cells confirms real intersections, not diagonal
+bounding-box false positives. Existing final gates check GTol leader/text and
+stroke/GTol-body conflicts, not every dimension leader against dimension/datum
+text. Rigid view packing does not repair collisions inside a view. The next
+correction needs that missing coverage and native dimension placement; a passing
+GTol/packing result alone is not a whole-sheet collision guarantee.
+
 ## Next performance target from the completed rocker trace
 
 Trace `0xcd23024b719ec37b6a478e9d28e0d762` attributes 13.538 s and 12.032 s to
