@@ -284,7 +284,17 @@ def _template_unchanged(app, before, after):
         raise RuntimeError("document length changed template annotation inventory")
     for name, original in before.items():
         actual = after[name]
-        if int(app.IsSame(original[0], actual[0])) != 1 or original[1:] != actual[1:]:
+        identity = int(app.IsSame(original[0], actual[0]))
+        if identity != 1 or original[1:] != actual[1:]:
+            _telemetry.error(
+                "native fixed template ink preservation failed",
+                annotation=repr(name),
+                native_identity=identity,
+                before_visible=original[1],
+                after_visible=actual[1],
+                before_snapshot=repr(original[2]),
+                after_snapshot=repr(actual[2]),
+            )
             raise RuntimeError(f"{name}: document length changed fixed template ink")
 
 
