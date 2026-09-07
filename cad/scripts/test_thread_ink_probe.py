@@ -7,6 +7,88 @@ from probe_drawing_thread_ink import ink_difference
 import probe_drawing_thread_view as view_probe
 from types import SimpleNamespace
 import asyncio
+from contextlib import nullcontext
+import sys
+from unittest.mock import AsyncMock, Mock
+
+import probe_drawing_thread_ink as ink_probe
+from diagnostics import _owned_native_documents as owned
+from diagnostics import _owned_native_session as session
+
+
+@pytest.mark.parametrize(
+    "seat,autostart,expected_pid,outcome",
+    [
+        (None, "0", "37136", "seat"),
+        ("test", None, "37136", "autostart"),
+        ("test", "1", "37136", "autostart"),
+        ("test", "0", "37137", "pid"),
+        ("test", "0", "37136", "callback"),
+        ("test", "0", None, "callback"),
+    ],
+)
+def test_thread_ink_worker_reaches_real_shared_session_guards(
+    monkeypatch, tmp_path, seat, autostart, expected_pid, outcome
+):
+    from solidworks_mcp.adapters import pywin32_adapter
+
+    source = tmp_path / "original.SLDDRW"
+    source.write_bytes(b"protected native drawing")
+    monkeypatch.setattr(sys, "argv", ["thread-ink", str(source), "--worker"])
+    for name, value in (
+        ("HARMONIC_COM_SEAT", seat),
+        ("HARMONIC_SW_AUTOSTART", autostart),
+        ("HARMONIC_DIAGNOSTIC_SW_PID", expected_pid),
+    ):
+        if value is None:
+            monkeypatch.delenv(name, raising=False)
+        else:
+            monkeypatch.setenv(name, value)
+    app = SimpleNamespace(
+        GetProcessID=Mock(return_value=37136),
+        RevisionNumber=Mock(return_value="34.3.0"),
+    )
+    adapter = SimpleNamespace(
+        _initialize_com_apartment=Mock(), disconnect=AsyncMock()
+    )
+    factory = Mock(return_value=adapter)
+    active = Mock(return_value=app)
+    callback = AsyncMock(return_value={"test": "owned callback reached"})
+    telemetry = SimpleNamespace(
+        build_session=lambda *_: nullcontext(),
+        aspan=lambda *_: nullcontext(),
+        info=Mock(), error=Mock(), shutdown=Mock(),
+    )
+    monkeypatch.setattr(pywin32_adapter, "PyWin32Adapter", factory)
+    monkeypatch.setattr(session.win32com.client, "GetActiveObject", active)
+    monkeypatch.setattr(session, "_early_bound", lambda item, _: item)
+    monkeypatch.setattr(session, "_watchdog", SimpleNamespace(start=Mock(), stop=Mock()))
+    monkeypatch.setattr(session, "_telemetry", telemetry)
+    monkeypatch.setattr(ink_probe, "_telemetry", SimpleNamespace(set_service=Mock()))
+    monkeypatch.setattr(owned, "owned_callback", callback)
+
+    # Neither runner is mocked: main -> run_copy_diagnostic -> run_owned_diagnostic.
+    if outcome in {"seat", "autostart"}:
+        message = "machine-global COM seat" if outcome == "seat" else "AUTOSTART=0"
+        with pytest.raises(RuntimeError, match=message):
+            ink_probe.main()
+        factory.assert_not_called()
+        active.assert_not_called()
+        callback.assert_not_awaited()
+        adapter.disconnect.assert_not_awaited()
+    else:
+        assert ink_probe.main() == (1 if outcome == "pid" else 0)
+        factory.assert_called_once_with({})
+        active.assert_called_once_with("SldWorks.Application")
+        adapter.disconnect.assert_awaited_once_with()
+        if outcome == "pid":
+            callback.assert_not_awaited()
+            assert "differs from expected 37137" in telemetry.error.call_args.args[0]
+        else:
+            callback.assert_awaited_once()
+            assert callback.call_args.args[0] is adapter
+    assert source.read_bytes() == b"protected native drawing"
+    assert list(tmp_path.iterdir()) == [source]
 
 
 def test_identical_exports_have_no_ink_difference(tmp_path):

@@ -216,8 +216,19 @@ def test_unchanged_native_attachment_passes():
     assert probe.attachment_failures([valid_attachment()]) == []
 
 
-def test_diagnostic_does_not_recreate_gtols_or_select_geometry_by_coordinates():
-    tree = ast.parse(Path(probe.__file__).read_text())
+def test_diagnostic_does_not_recreate_gtols_or_select_geometry_by_coordinates(monkeypatch):
+    original_read = Path.read_text
+    reads = []
+
+    def strict_read(path, *args, **kwargs):
+        if path == Path(probe.__file__):
+            assert kwargs.get("encoding") == "utf-8"
+            reads.append(path)
+        return original_read(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", strict_read)
+    tree = ast.parse(Path(probe.__file__).read_text(encoding="utf-8"))
+    assert reads == [Path(probe.__file__)]
     attributes = {
         node.func.attr
         for node in ast.walk(tree)

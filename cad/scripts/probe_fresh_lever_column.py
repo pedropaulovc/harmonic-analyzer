@@ -25,15 +25,16 @@ import os
 from pathlib import Path
 import sys
 import tempfile
-from typing import Any
+from typing import Any, Callable, Mapping
 
 from _common import CAD_ROOT, _early_bound, check
 from diagnostics._owned_native_documents import DocumentKind, run_copy_diagnostic
 from diagnostics._owned_native_session import require_owned_diagnostic_environment
 from _drawing_common import DrawingOutputs, _TITLE_BLOCK_LEFT_M, _TITLE_BLOCK_TOP_M
-from _drawing_annotation_bounds import annotation_box
+from _drawing_annotation_bounds import AnnotationBounds, annotation_box
 from _drawing_measurement_handoff import AnnotationMeasurementHandoff, HandoffPurpose
 from _drawing_native_gtol import arrange_native_gtol_columns
+from _drawing_native_callouts import DatumLeaderPolicy
 from _drawing_native_layout import repair_native_layout, NativeLayoutStatus
 from _drawing_view_packing import Rect
 from _drawing_marks import _named_dimension
@@ -44,8 +45,31 @@ from diagnostics.probe_source_basic_dimensions import drawing_dimensions
 import _telemetry
 
 
-def diagnostic_layout(adapter: Any, *, views, alignments=(), orderings=(), notes=()):
-    """Explicit GTol+packing control, with no datum/SF placement stage."""
+def diagnostic_layout(
+    adapter: Any,
+    *,
+    views,
+    alignments=(),
+    orderings=(),
+    notes=(),
+    datum_leader_policy: DatumLeaderPolicy = DatumLeaderPolicy.EXISTING,
+    additional_annotation_validation: Callable[
+        [Mapping[str, Mapping[str, AnnotationBounds]]], Mapping[str, Any]
+    ] | None = None,
+):
+    """GTol+packing only: record the excluded datum policy, retain final gates.
+
+    The recipe's datum policy is not applied in this explicitly partial control.
+    Its additional validation still consumes the existing final packing snapshot,
+    after the mandatory GTol check, without another annotation scan.
+    """
+    from _drawing_leader_clearance import validate_gtol_leader_clearance
+
+    def validate_final_annotations(measurements_by_view):
+        validate_gtol_leader_clearance(measurements_by_view)
+        if additional_annotation_validation is not None:
+            additional_annotation_validation(measurements_by_view)
+
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
     properties = tuple(
         _early_bound(drawing.GetCurrentSheet(), "ISheet").GetProperties2() or ()
@@ -79,12 +103,14 @@ def diagnostic_layout(adapter: Any, *, views, alignments=(), orderings=(), notes
             alignments=alignments,
             orderings=orderings,
             notes=notes,
+            final_annotation_validation=validate_final_annotations,
         )
     finally:
         handoff.close()
     _telemetry.info(
         "diagnostic-only GTol+packing baseline",
         excluded_stage="datum_and_surface_finish_clearance",
+        excluded_datum_leader_policy=datum_leader_policy.value,
         gtols=json.dumps(gtols),
         packing=json.dumps(asdict(report), default=lambda value: value.value),
     )

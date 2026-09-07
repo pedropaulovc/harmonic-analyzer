@@ -1,6 +1,8 @@
 """Coherent copied-control contracts enrolled in the full drawing recipe gate."""
 
+import ast
 import inspect
+from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -12,6 +14,7 @@ import pytest
 import draw_channel_lever as recipe
 import probe_fresh_lever_column as control
 from _buildgraph import module_deps_of
+from _drawing_native_callouts import DatumLeaderPolicy
 
 
 def test_production_defaults_and_dependency_closure_exclude_diagnostics():
@@ -25,6 +28,91 @@ def test_production_defaults_and_dependency_closure_exclude_diagnostics():
         str(Path(recipe.__file__).with_name("_drawing_project_layout.py"))
         in dependencies
     )
+
+
+@pytest.mark.parametrize("failure", ["none", "no_additional", "gtol", "additional"])
+def test_diagnostic_layout_accepts_actual_recipe_call_and_preserves_final_checks(
+    monkeypatch, failure
+):
+    tree = ast.parse(inspect.getsource(recipe.build))
+    layout_call, = (
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+        and node.func.id == "layout"
+    )
+    kwargs = {
+        "views": {name: object() for name in ("front", "holes", "right", "top", "iso")},
+        "alignments": (object(),), "orderings": (object(),), "notes": (object(),),
+        "datum_leader_policy": DatumLeaderPolicy.BENT_DOCUMENT,
+    }
+    snapshot = {"front": {"native annotation": object()}}
+    events = []
+    primary = RuntimeError("exact final validation failure")
+
+    def validate_gtols(actual):
+        assert actual is snapshot
+        events.append("gtol")
+        if failure == "gtol":
+            raise primary
+        return {}
+
+    def additional(actual):
+        assert actual is snapshot
+        events.append("additional")
+        if failure == "additional":
+            raise primary
+        return {}
+
+    kwargs["additional_annotation_validation"] = (
+        None if failure == "no_additional" else additional
+    )
+    assert {keyword.arg for keyword in layout_call.keywords} == set(kwargs)
+
+    @dataclass
+    class Report:
+        status: control.NativeLayoutStatus = control.NativeLayoutStatus.UNCHANGED
+
+    report = Report()
+    sheet = SimpleNamespace(GetProperties2=lambda: (0, 0, 1, 2, 0, 0.43, 0.28, 0))
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(GetCurrentSheet=lambda: sheet))
+    handoff = Mock()
+
+    def pack(actual_adapter, **arguments):
+        assert actual_adapter is adapter
+        for name in ("views", "alignments", "orderings", "notes"):
+            assert arguments[name] is kwargs[name]
+        assert arguments["initial_measure_annotation"] is handoff.initial_measure
+        assert arguments["initial_measure_scope"] is handoff.read_scope
+        handoff.seal.assert_called_once_with()
+        arguments["final_annotation_validation"](snapshot)
+        return report
+
+    import _drawing_leader_clearance
+
+    monkeypatch.setattr(_drawing_leader_clearance, "validate_gtol_leader_clearance", validate_gtols)
+    monkeypatch.setattr(control, "_early_bound", lambda item, _: item)
+    monkeypatch.setattr(control, "AnnotationMeasurementHandoff", Mock(return_value=handoff))
+    arrange = Mock(return_value={})
+    monkeypatch.setattr(control, "arrange_native_gtol_columns", arrange)
+    monkeypatch.setattr(control, "repair_native_layout", pack)
+    telemetry = SimpleNamespace(info=Mock())
+    monkeypatch.setattr(control, "_telemetry", telemetry)
+    if failure in {"none", "no_additional"}:
+        assert control.diagnostic_layout(adapter, **kwargs) is report
+        assert telemetry.info.call_args.kwargs["excluded_stage"] == "datum_and_surface_finish_clearance"
+        assert telemetry.info.call_args.kwargs["excluded_datum_leader_policy"] == DatumLeaderPolicy.BENT_DOCUMENT.value
+    else:
+        with pytest.raises(RuntimeError) as caught:
+            control.diagnostic_layout(adapter, **kwargs)
+        assert caught.value is primary
+    assert events == (
+        ["gtol"] if failure in {"gtol", "no_additional"} else ["gtol", "additional"]
+    )
+    arrange.assert_called_once_with(
+        adapter, views=kwargs["views"], measure_annotation=control.annotation_box,
+        record_measurement=handoff.record,
+    )
+    handoff.close.assert_called_once_with()
 
 
 @pytest.mark.asyncio
