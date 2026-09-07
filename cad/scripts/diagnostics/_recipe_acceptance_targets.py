@@ -4,6 +4,8 @@ Initial hashes pin exact native inputs observed on 2026-09-06. Matching executio
 tokens were read for the two shafts; this does not prove builder provenance.
 Alignment's explicit 2026-09-07 production-builder migration is recorded in
 diagnostics/alignment_source_manifest.md; other input identities are unchanged.
+Two fastener production-builder inputs are explicitly enrolled in
+diagnostics/fastener_source_manifest.md; no prior target pin is changed.
 No recipe, geometry, output path or production layout policy lives here.
 """
 
@@ -11,6 +13,8 @@ from dataclasses import dataclass, field
 from importlib import import_module
 
 import channel_lever_spec
+import cone_pivot_screw_spec
+import cone_tip_adjuster_spec
 import fulcrum_shaft_spec
 import pivot_shaft_spec
 import rocker_arm_notes
@@ -63,6 +67,16 @@ TARGETS = {
         "pivot_shaft_spec",
         pivot_shaft_spec.DRAWING_DIMENSIONS,
         entity_labels=_shaft_labels("pivot", pivot_shaft_spec),
+    ),
+    "cone_tip_adjuster": RecipeTarget(
+        "8e2ce51d8e7ca47f9ca5a8e5c743d1d6a0f0cd749e10195a54e2140117bf12f4",
+        "cone_tip_adjuster_spec",
+        cone_tip_adjuster_spec.DRAWING_DIMENSIONS,
+    ),
+    "cone_pivot_screw": RecipeTarget(
+        "515019088b41d329b45f0487b9241123751ecac7d6c116481930ae9c45e89c36",
+        "cone_pivot_screw_spec",
+        cone_pivot_screw_spec.DRAWING_DIMENSIONS,
     ),
 }
 
