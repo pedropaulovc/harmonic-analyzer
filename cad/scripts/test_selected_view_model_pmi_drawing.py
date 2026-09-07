@@ -274,7 +274,7 @@ def test_parent_environment_fails_before_native_wrapper(tmp_path, monkeypatch, f
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("arrangement", [None, probe.PmiArrangement.SPACE_TIGHTLY_DOWN])
+@pytest.mark.parametrize("arrangement", [None, *tuple(probe.PmiArrangement)])
 @pytest.mark.parametrize(
     "mode",
     [
@@ -536,7 +536,8 @@ async def test_owned_control_exports_failures_but_never_saves_original_or_ignore
             report["source_before"]["dimensions"]
             == report["source_after_arrangement"]["dimensions"]
         )
-        assert report["requested_arrangement"] == "space-tightly-down"
+        assert report["requested_arrangement"] == arrangement.value
+        assert spacing.call_args.kwargs == {"arrangement": arrangement}
     if mode in {"cold_source_roundoff", "reopened_export_source_roundoff"}:
         cold = report["source_reopened"]["pmi_comparison"]
         live = report["source_after_reopened_export"]["pmi_comparison"]
