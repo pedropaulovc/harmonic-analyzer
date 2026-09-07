@@ -50,3 +50,24 @@ Current recipe-loading diagnostics require the explicit, required
 run with their matching historical tooling in a separate checkout; there is no
 automatic old/new signature adaptation. This deliberately changes invocation
 plumbing, not ownership, source-value, cold-reopen or print acceptance gates.
+
+## Fulcrum empty-callout acceptance at `5eb96629`
+
+The owned prepared full-recipe pilot passed on adapter `e77bfda4`, PID 31860,
+after `a96cb782` removed the rebuild for empty callout maps. Receipt
+`cad/out/reports/datum-policy-zkq8ce0i/pilot.json` has SHA-256
+`40a7b468df9c484da558dec3058bc4358a5167138aa9c8ab5b7829c14c12f9aa`.
+
+The fresh isolated entry's MISS took 35.544 s and its checked HIT 0.043 s.
+Drawing creation from that entry took 1.068 s, included in the 17.992 s recipe;
+total diagnostic time was 129.523 s. These are different scopes, not an A/B
+measurement of the removed rebuild. Cold annotation comparison had zero
+rejections and zero coordinate-roundoff exclusions. All five explicit roles
+(datum, cylindricity, two end perpendicularities and bearing finish) retained
+their exact source/drawing witnesses through cold reopening. The PNG eye pass
+found readable dimensions, controls and title text with the expected geometry.
+
+Originals and the owned source retained exact hashes; the clean/visible baseline
+pivot part and drawing were preserved, owned cleanup succeeded and final guards
+were empty. This validates one empty-map recipe through the current prepared
+factory, not the remaining 21 empty-map recipes or the complete drawing fleet.
