@@ -14,7 +14,7 @@ isometric.  The sheet runs at 1:2.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_summing_lever.py summing-lever
+    uv run python -m doit drawing:summing_lever
 """
 
 from __future__ import annotations

@@ -11,7 +11,7 @@ hole are dimensioned in the notes.  The sheet runs at 1:4.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_amplitude_bar.py amplitude-bar
+    uv run python -m doit drawing:amplitude_bar
 """
 
 from __future__ import annotations

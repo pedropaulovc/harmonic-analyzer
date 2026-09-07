@@ -7,7 +7,7 @@ in ``_drawing_common``.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_counter_spring.py counter-spring
+    uv run python -m doit drawing:counter_spring
 """
 
 from __future__ import annotations

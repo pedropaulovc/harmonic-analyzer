@@ -6,7 +6,7 @@ in the notes.  Shared behavior lives in ``_drawing_common``.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_spring_hook.py spring-hook
+    uv run python -m doit drawing:spring_hook
 """
 
 from __future__ import annotations

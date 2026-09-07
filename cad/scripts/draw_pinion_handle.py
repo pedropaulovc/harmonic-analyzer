@@ -9,7 +9,7 @@ diameter); the Z lengths import into the right view.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_pinion_handle.py pinion-handle
+    uv run python -m doit drawing:pinion_handle
 """
 
 from __future__ import annotations

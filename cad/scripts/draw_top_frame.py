@@ -14,7 +14,7 @@ the notes.  The sheet runs 1:2; the front elevation drops to 1:4.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_top_frame.py top-frame
+    uv run python -m doit drawing:top_frame
 """
 
 from __future__ import annotations

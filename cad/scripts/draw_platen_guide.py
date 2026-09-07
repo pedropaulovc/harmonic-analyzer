@@ -6,7 +6,7 @@ leader, reopen, and artifact behavior lives in ``_drawing_common``.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_platen_guide.py platen-guide
+    uv run python -m doit drawing:platen_guide
 """
 
 from __future__ import annotations

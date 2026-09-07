@@ -7,7 +7,7 @@ hub longitudinal view controls the blind bore, end wall, and spherical crown.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_pinion_lever.py pinion-lever
+    uv run python -m doit drawing:pinion_lever
 """
 
 from __future__ import annotations

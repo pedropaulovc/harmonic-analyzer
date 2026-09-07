@@ -8,7 +8,7 @@ the free and installed body lengths).  Shared behavior lives in
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_channel_spring_installed.py channel-spring-installed
+    uv run python -m doit drawing:channel_spring_installed
 """
 
 from __future__ import annotations
