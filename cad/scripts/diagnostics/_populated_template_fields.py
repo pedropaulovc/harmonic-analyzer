@@ -84,7 +84,7 @@ def intersects_rule(box, endpoints):
     return True
 
 
-def field_audit(notes, lines, *, pdf_reader):
+def field_audit(notes, lines, *, pdf_reader, symbol_reader=None):
     """Unknown/missing regions and all collisions are failures, not exclusions."""
     fields, issues, regions = {}, [], {}
 
@@ -153,11 +153,16 @@ def field_audit(notes, lines, *, pdf_reader):
         except Exception as error:
             issue(name, "native_fit", error)
         try:
-            pdf = pdf_reader(row["text"])
+            pdf = (
+                symbol_reader(row)
+                if symbol_reader is not None and "<" in row["text"]
+                else pdf_reader(row["text"])
+            )
             entry["pdf"] = pdf
             # Only separately observed repeated ASCII-space representation may
             # differ; no symbol/line-wrap/text replacement is inferred.
-            if " ".join(filter(None, pdf["text"].split(" "))) != " ".join(
+            printed_text = pdf.get("decoded_native_text", pdf["text"])
+            if " ".join(filter(None, printed_text.split(" "))) != " ".join(
                 filter(None, row["text"].split(" "))
             ):
                 raise RuntimeError("native/PDF field text differs")
