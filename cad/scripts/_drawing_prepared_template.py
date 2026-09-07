@@ -56,6 +56,13 @@ class PreparedTemplate:
         return self.directory / "prepared.DRWDOT"
 
 
+def canonical_spec(requested):
+    """The stored blank is 1:1; only precision varies between prepared bases."""
+    if not isinstance(requested, TemplateSpec):
+        raise TypeError("canonical preparation requires an explicit TemplateSpec")
+    return TemplateSpec(decimals=requested.decimals)
+
+
 def _sha(path):
     with Path(path).open("rb") as stream:
         return hashlib.file_digest(stream, "sha256").hexdigest()
@@ -72,6 +79,8 @@ def preparation_inputs(adapter, spec):
     unrelated edits inside those modules can over-invalidate preparation. Paths are
     checkout-relative; interpreter and exact native revision are explicit inputs.
     """
+    if spec != canonical_spec(spec):
+        raise ValueError("prepared input identity requires the canonical 1:1 spec")
     import _drawing_sheet_setup as sheet_setup
     from _buildgraph import module_deps_of
     import solidworks_mcp
@@ -99,7 +108,7 @@ def preparation_inputs(adapter, spec):
     if not revision:
         raise RuntimeError("native SolidWorks revision is missing")
     return {
-        "schema": 1,
+        "schema": 2,
         "template_sha256": _sha(template),
         "spec": json.loads(_json(asdict(spec))),
         "solidworks_revision": revision,
@@ -164,11 +173,18 @@ def _seat():
         )
 
 
-def inherited_drawing(adapter, entry):
-    """Verify then instantiate; no normalization, style setters or blank rebuilds."""
+def inherited_drawing(adapter, entry, *, spec):
+    """Instantiate the validated 1:1 base, then scale its empty owned instance.
+
+    No normalization, style setters or blank rebuilds. The requested scale is
+    applied with the normal initializer's annotation flags and read back before
+    the factory returns; model views and property-link selection come later.
+    """
     import _drawing_sheet_setup as sheet_setup
 
     _seat()
+    if entry.spec != canonical_spec(spec):
+        raise ValueError("prepared entry differs from requested canonical precision")
     path = _read_entry(entry, preparation_inputs(adapter, entry.spec))
     draw = sheet_setup.new_drawing(
         adapter,
@@ -182,8 +198,34 @@ def inherited_drawing(adapter, entry):
     if sheet is None:
         raise RuntimeError("prepared template returned no current sheet")
     sheet_setup.assert_asme_b_sheet(
-        adapter, sheet, phase="prepared setup", scale=entry.spec.scale
+        adapter, sheet, phase="inherited canonical base", scale=entry.spec.scale
     )
+    # GetViews is an array per sheet; its first member is the sheet itself.
+    views = ddoc.GetViews()
+    if (
+        int(draw.GetType()) != 3
+        or str(draw.GetPathName())
+        or not isinstance(views, (tuple, list))
+        or len(views) != 1
+        or not isinstance(views[0], (tuple, list))
+        or len(views[0]) != 1
+        or views[0][0] is None
+    ):
+        raise RuntimeError(
+            "canonical scale requires one unsaved sheet without model views"
+        )
+    if not _same(adapter.swApp, adapter.currentModel, draw) or not _same(
+        adapter.swApp, adapter.swApp.ActiveDoc, draw
+    ):
+        raise RuntimeError("canonical scale requires the exact owned active drawing")
+    with _telemetry.span("drawing.template.instance_scale", scale=spec.scale):
+        if sheet.SetScale(*spec.scale, True, False) is not True:
+            raise RuntimeError(
+                "failed to apply requested canonical-instance sheet scale"
+            )
+        sheet_setup.assert_asme_b_sheet(
+            adapter, sheet, phase="prepared requested scale", scale=spec.scale
+        )
     draw.ViewZoomtofit2()
     return draw, sheet
 
@@ -377,7 +419,7 @@ async def _prepare_native(adapter, spec, directory, receipt, operation_context):
 
 
 async def prepare_project_drawing_template(
-    adapter, *, scale=(1.0, 1.0), decimals=2, cache_root=None, operation_context=None
+    adapter, *, decimals=2, cache_root=None, operation_context=None
 ):
     """Prepare once, or verify an existing entry, under the caller's COM lock.
 
@@ -388,7 +430,7 @@ async def prepare_project_drawing_template(
     Failed staging directories/receipts are retained; no silent repair or retry.
     """
     _seat()
-    spec = TemplateSpec(scale, decimals)
+    spec = TemplateSpec(decimals=decimals)
     inputs = preparation_inputs(adapter, spec)
     key = _key(inputs)
     root = (

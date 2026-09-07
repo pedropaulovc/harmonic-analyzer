@@ -1,7 +1,7 @@
 """Owned blank-drawing control for the opt-in production template cache.
 
-One normal setup, one prepared MISS and one HIT; no part/model opens, model views,
-trial native saves or model-linked-title acceptance. Optional printed-format
+CLI: one normal setup, one prepared MISS and one HIT; no part/model opens, model
+views, trial native saves or model-linked-title acceptance. Optional printed-format
 comparison exports PDF/PNG for each trial without saving the drawing. Only the production
 MISS saves one owned DRWDOT. Requires frozen source, AUTOSTART=0, remote cache off,
 an explicit existing SW PID and the parent machine-global COM seat.
@@ -9,7 +9,11 @@ an explicit existing SW PID and the parent machine-global COM seat.
 The explicit accessor_only scope instead executes one real preparation accessor:
 no preliminary normal drawing, factory trial, extra CREATE-exit viewport restore
 or printed comparison. Its default capture_only frame policy adds raw getters,
-not setters; it preserves the production no-resize failure for diagnosis.
+not setters; it preserves the production no-resize failure for diagnosis. A pinned
+noncanonical historical preparation spec is refused, not relabeled a 1:1 replay.
+
+The composed all-scale control explicitly selects trial RoundTrip.SAVE_REOPEN,
+adding one owned native drawing save and cold/printed checks to each factory trial.
 """
 
 from __future__ import annotations
@@ -35,6 +39,7 @@ import _drawing_sheet_setup as sheet_setup  # noqa: E402
 from _common import _early_bound  # noqa: E402
 import _drawing_common as common  # noqa: E402
 import _drawing_prepared_template as prepared  # noqa: E402
+from _drawing_build import normal_drawing_factory, prepared_drawing_factory  # noqa: E402
 import _drawing_template_viewport as viewports  # noqa: E402
 from _drawing_template_defaults import compare_defaults, snapshot_defaults  # noqa: E402
 import _telemetry  # noqa: E402
@@ -52,6 +57,11 @@ class PrintedFormat(StrEnum):
 class Viewport(StrEnum):
     NORMAL = "normal"
     CAPTURED = "captured"
+
+
+class RoundTrip(StrEnum):
+    FRESH_ONLY = "fresh_only"
+    SAVE_REOPEN = "save_reopen"
 
 
 class Scope(StrEnum):
@@ -108,7 +118,10 @@ def runtime_inputs(adapter, spec):
         Path(frames.__file__).resolve(),
     ]
     return {
-        "preparation": prepared.preparation_inputs(adapter, spec),
+        "requested_spec": asdict(spec),
+        "preparation": prepared.preparation_inputs(
+            adapter, prepared.canonical_spec(spec)
+        ),
         "diagnostic_sources": {
             path.relative_to(ROOT).as_posix(): prepared._sha(path) for path in files
         },
@@ -135,20 +148,36 @@ def cache_artifacts(entry):
     }
 
 
-def blank_witness(adapter):
+def blank_witness(adapter, *, saved_path=None):
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     drawing = _early_bound(model, "IDrawingDoc")
     sheets = tuple(drawing.GetViews() or ())
     if (
         int(model.GetType()) != 3
-        or str(model.GetPathName())
+        or (
+            str(model.GetPathName()) != ""
+            if saved_path is None
+            else Path(str(model.GetPathName())).resolve() != Path(saved_path).resolve()
+        )
         or len(sheets) != 1
         or len(tuple(sheets[0] or ())) != 1
     ):
         raise RuntimeError(
-            "trial must be an unsaved one-sheet drawing without model views"
+            "trial must be the exact unsaved/saved one-sheet drawing without model views"
         )
-    return {"kind": 3, "path": "", "sheet_count": 1, "model_view_count": 0}
+    return {
+        "kind": 3,
+        "path": str(model.GetPathName()),
+        "sheet_count": 1,
+        "model_view_count": 0,
+    }
+
+
+def require_canonical_failure_pin(spec, failure_pin):
+    if failure_pin is not None and spec != prepared.canonical_spec(spec):
+        raise ValueError(
+            "historical noncanonical preparation failure is not an exact replay of the canonical 1:1 accessor"
+        )
 
 
 def printed_witness(adapter, directory):
@@ -214,12 +243,26 @@ async def trial(
     printed_expected=None,
     viewport=Viewport.NORMAL,
     captured_viewport=None,
+    round_trip=RoundTrip.FRESH_ONLY,
 ):
+    if not isinstance(round_trip, RoundTrip):
+        raise ValueError("blank round trip requires an explicit enum")
+    if round_trip is RoundTrip.SAVE_REOPEN and (
+        printed_format is not PrintedFormat.COMPARE or viewport is not Viewport.CAPTURED
+    ):
+        raise ValueError(
+            "saved blank comparison requires captured viewport and printed output"
+        )
     errors = []
     row.update(status="running", phase="setup")
     start = time.perf_counter()
     checkpoint()
     try:
+        factory = (
+            normal_drawing_factory(adapter, spec)
+            if entry is None
+            else prepared_drawing_factory(adapter, entry, spec=spec)
+        )
         with adapter.ownership.creating_document(
             ownership.DocumentKind.DRAWING, directory / "unsaved.SLDDRW"
         ):
@@ -229,12 +272,8 @@ async def trial(
                     "diagnostic.prepared_template.setup", variant=row["variant"]
                 ),
             ):
-                if entry is None:
-                    sheet_setup.new_project_drawing(
-                        adapter, scale=spec.scale, decimals=spec.decimals
-                    )
-                if entry is not None:
-                    prepared.inherited_drawing(adapter, entry)
+                factory(adapter, scale=spec.scale, decimals=spec.decimals)
+                factory.require_used()
         if viewport is Viewport.CAPTURED:
             row["phase"] = "viewport"
             adapter.ownership.assert_current_owned()
@@ -279,6 +318,12 @@ async def trial(
                         raise RuntimeError(
                             "printed trial changed the exact captured viewport"
                         )
+        if round_trip is RoundTrip.SAVE_REOPEN:
+            from diagnostics._blank_template_roundtrip import capture
+
+            row["phase"] = "save_reopen"
+            checkpoint()
+            await capture(adapter, spec, directory, row, checkpoint)
     except Exception as error:
         row.update(error=repr(error), failed_phase=row["phase"])
         errors.append(error)
@@ -291,6 +336,15 @@ async def trial(
         except Exception as error:
             row["cleanup_error"] = repr(error)
             errors.append(error)
+        cold = row.get("cold", {})
+        if "sha256_before" in cold:
+            try:
+                cold["sha256_after_cleanup"] = prepared._sha(cold["saved_path"])
+                if cold["sha256_after_cleanup"] != cold["sha256_before"]:
+                    raise RuntimeError("saved blank bytes changed during owned cleanup")
+            except Exception as error:
+                row["cleanup_hash_error"] = repr(error)
+                errors.append(error)
         row.update(
             status="failed" if errors else "passed",
             phase="finished",
@@ -323,6 +377,7 @@ async def probe(
     failure_pin = frames.failure_input(
         frame_policy, spec, original, failure_receipt, failure_receipt_sha256
     )
+    require_canonical_failure_pin(spec, failure_pin)
     if scope is Scope.ACCESSOR_ONLY and failure_pin is None:
         raise ValueError("accessor_only requires pinned production failure inputs")
     require_environment(expected_pid)
@@ -507,7 +562,6 @@ async def probe(
                 with timed(row, "seconds"):
                     entry = await prepared.prepare_project_drawing_template(
                         adapter,
-                        scale=spec.scale,
                         decimals=spec.decimals,
                         cache_root=cache_root,
                         operation_context=operation_context,
@@ -556,9 +610,18 @@ async def probe(
                     else "normal_comparison_seconds"
                 )
                 with timed(row, comparison_timer):
-                    if normal is not None:
+                    # The saved artifact is truthfully 1:1. Requested-scale
+                    # normal/prepared raw comparisons run in each factory trial.
+                    if normal is not None and spec == entry.spec:
                         compare_defaults(normal, native_receipt["before"])
                         compare_defaults(normal, native_receipt["after"])
+                    row["normal_receipt_comparison"] = (
+                        "same_spec"
+                        if normal is not None and spec == entry.spec
+                        else "different_scale_compare_requested_factory_trial"
+                        if normal is not None
+                        else "accessor_only"
+                    )
                     compare_defaults(native_receipt["before"], native_receipt["after"])
                 row["status"] = "passed"
             except Exception as error:
@@ -645,6 +708,7 @@ def main(argv=None):
         args.failure_receipt,
         args.failure_receipt_sha256,
     )
+    require_canonical_failure_pin(spec, failure_pin)
     if args.scope is Scope.ACCESSOR_ONLY and failure_pin is None:
         raise ValueError("accessor_only requires pinned production failure inputs")
     if args.worker:

@@ -23,7 +23,12 @@ def keys():
     adapter = SimpleNamespace(swApp=SimpleNamespace(RevisionNumber=lambda: "34.3.0"))
     specs = registered_specs()
     assert len(specs) == 15
-    return [prepared._key(prepared.preparation_inputs(adapter, spec)) for spec in specs]
+    return [
+        prepared._key(
+            prepared.preparation_inputs(adapter, prepared.canonical_spec(spec))
+        )
+        for spec in specs
+    ]
 
 
 def changed_source(monkeypatch, relative_path):
@@ -55,15 +60,16 @@ def test_setup_bytes_change_every_registered_template_key(monkeypatch):
     assert all(first != second for first, second in zip(before, keys(), strict=True))
 
 
-@pytest.mark.parametrize(
-    "spec", [prepared.TemplateSpec(scale=(2, 1)), prepared.TemplateSpec(decimals=3)]
-)
-def test_actual_scale_and_precision_inputs_remain_distinct(spec):
+def test_only_precision_varies_the_prepared_base_identity():
     adapter = SimpleNamespace(swApp=SimpleNamespace(RevisionNumber=lambda: "34.3.0"))
     baseline = prepared._key(
         prepared.preparation_inputs(adapter, prepared.TemplateSpec())
     )
+    assert len(set(keys())) == 1
+    spec = prepared.TemplateSpec(decimals=3)
     assert prepared._key(prepared.preparation_inputs(adapter, spec)) != baseline
+    with pytest.raises(ValueError, match="canonical"):
+        prepared.preparation_inputs(adapter, prepared.TemplateSpec((2, 1)))
 
 
 @pytest.mark.parametrize(

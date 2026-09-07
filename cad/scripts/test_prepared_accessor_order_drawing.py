@@ -231,7 +231,7 @@ def test_accessor_first_cli_defaults_to_capture_only_before_entering_existing_ru
             "--expected-pid",
             "123",
             "--scale",
-            "2",
+            "1",
             "1",
             "--failure-receipt",
             str(f.receipt),

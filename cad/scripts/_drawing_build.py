@@ -4,7 +4,7 @@ The doit action already owns the machine COM seat. Materialization completes
 before the recipe opens its source. The normal initializer stays in
 ``_drawing_sheet_setup``: preparation calls it, never this runner (no recursion).
 Owned diagnostics may materialize with their CREATE/SAVE_AS scopes first, then
-pass ``prepared_drawing_factory(adapter, entry)`` into the same recipe contract.
+pass ``prepared_drawing_factory(adapter, entry, spec=requested)`` into the same recipe contract.
 No process-global factory replacement or adapter mode is involved.
 """
 
@@ -63,22 +63,28 @@ class ProjectDrawingFactory:
 
 def normal_drawing_factory(adapter, spec: TemplateSpec) -> ProjectDrawingFactory:
     """Explicit normal-setup control for owned diagnostics, never a fallback."""
-    return ProjectDrawingFactory(adapter, spec, sheet_setup.new_project_drawing, "normal")
+    return ProjectDrawingFactory(
+        adapter, spec, sheet_setup.new_project_drawing, "normal"
+    )
 
 
 def prepared_drawing_factory(
-    adapter, entry: prepared.PreparedTemplate
+    adapter, entry: prepared.PreparedTemplate, *, spec: TemplateSpec
 ) -> ProjectDrawingFactory:
     """Consume the same validated entry in production and owned native pilots."""
     if not isinstance(entry, prepared.PreparedTemplate):
         raise TypeError("drawing factory requires an explicit PreparedTemplate")
+    if entry.spec != prepared.canonical_spec(spec):
+        raise RuntimeError(
+            "prepared entry spec differs from requested canonical base precision"
+        )
 
     def create(actual_adapter, **kwargs):
         # The normal initializer deliberately ignores property_view. The unchanged
         # finalizer selects the actual property-linked model view after creation.
-        return prepared.inherited_drawing(actual_adapter, entry)
+        return prepared.inherited_drawing(actual_adapter, entry, spec=spec)
 
-    return ProjectDrawingFactory(adapter, entry.spec, create, "prepared")
+    return ProjectDrawingFactory(adapter, spec, create, "prepared")
 
 
 async def prepare_drawing_factory(adapter, spec: TemplateSpec) -> ProjectDrawingFactory:
@@ -86,11 +92,9 @@ async def prepare_drawing_factory(adapter, spec: TemplateSpec) -> ProjectDrawing
     if not isinstance(spec, TemplateSpec):
         raise TypeError("drawing preparation requires an explicit TemplateSpec")
     entry = await prepared.prepare_project_drawing_template(
-        adapter, scale=spec.scale, decimals=spec.decimals
+        adapter, decimals=spec.decimals
     )
-    if entry.spec != spec:
-        raise RuntimeError("prepared entry spec differs from requested drawing spec")
-    return prepared_drawing_factory(adapter, entry)
+    return prepared_drawing_factory(adapter, entry, spec=spec)
 
 
 def run_drawing_build(build, *, spec: TemplateSpec) -> int:
