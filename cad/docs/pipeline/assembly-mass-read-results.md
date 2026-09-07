@@ -193,3 +193,35 @@ configuration and dependencies stay frozen throughout each native attempt.
 Native results are pending. Before launch, the enrolled focused module passes
 83 tests (including scoped-close, failed-open, latched-cleanup and same-handle
 path-change contracts); Ruff and CLI import/help checks pass.
+
+### First fixture attempt: nominal-readback rejection
+
+Frozen source `fbc7c199f57266ca9a587fa666e3cb30d6a66c3f`, same adapter/PID.
+Run: 2026-09-07 05:27:56.477713 UTC to 05:37:53.696416 UTC,
+597.221804 s wall, exit 1. The following phases completed before the rejection:
+
+| Phase | Seconds | Outcome |
+| --- | ---: | --- |
+| Closed control copy/relink | 2.834640 | 39 native files; reference closure passed |
+| Control resolve/fingerprint/gates/save | 321.876899 | Original full fingerprint; DOF, interference and health passed |
+| Independent control cold verification | 265.147314 | Reopened clean; fingerprint and full gates passed |
+| Independent baseline copy/relink | 2.715905 | Passed |
+| Baseline initial nominal check | 1.630531 | Rejected `58.000000078 mm` versus nominal `58 mm` |
+
+This was a diagnostic precision failure, not a solver failure or a candidate
+mass-read failure: no bore update or changed-part A/B refresh had occurred.
+The nominal-readback check incorrectly reused the stricter stationary raw-value
+comparison. The observed difference is 0.000000078 mm (0.078 nanometres).
+A separate 0.000001 mm absolute nominal check is being introduced, with no
+relative tolerance and no change to production tolerances, raw paired comparisons,
+fingerprint rounding or validation gates.
+
+Cleanup closed only the copied documents. All 254 original native files and
+hidden sidecars retained their exact SHA-256 and path membership. No retry,
+recovery or repair occurred. Trace: `0x175cca2a53f3b7b2a45728e8359c24fb`.
+Full failed attempt and passed control evidence:
+`cad/out/reports/assembly-part-change-2swnolqp/measurements.json`, SHA-256
+`ab0ed718879d2907cf43bc1ec317484280a2808d7a9ae0dbb938e28abc739953`.
+Its 39 closed control hashes permit a guarded resume after checking native bytes,
+source/adapter identity, sidecars, original-file preservation and reference closure.
+The failed attempt remains part of reliability accounting.

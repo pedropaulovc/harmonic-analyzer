@@ -5,12 +5,15 @@ cache off and autostart off. Never opens original native outputs. Copies retain
 native identities; closed-document reference replacement confines each fixture.
 Only the candidate adapter mass read changes; production refresh remains intact.
 Fixtures and every attempted phase are retained beside measurements.json.
+--control-report validates a prior closed control and copies it into new A/B
+fixtures; it does not reopen that control or relabel the prior trial as passed.
 """
 
 from __future__ import annotations
 
 import argparse
 from contextlib import contextmanager, ExitStack
+import hashlib
 import json
 import math
 import os
@@ -63,6 +66,14 @@ def dependencies(app, path, *, traverse):
 
 def native_hashes(paths):
     return {str(path): digest(path) for path in sorted(paths)}
+
+
+def require_nominal_mm(actual, expected, label):
+    """Compare a positive nominal dimension, not two raw geometry witnesses."""
+    if not math.isfinite(actual) or not math.isfinite(expected) or actual <= 0 or expected <= 0:
+        raise RuntimeError(f"{label} requires finite positive dimensions: {actual!r}, {expected!r}")
+    if not math.isclose(actual, expected, rel_tol=0.0, abs_tol=1e-6):
+        raise RuntimeError(f"{label} differs from nominal: {actual!r} != {expected!r} mm (1e-6 mm absolute tolerance)")
 
 
 def original_outputs():
@@ -485,7 +496,7 @@ async def set_bore(owner, diameter):
         if old.partition("=")[0].strip() != '"PivotBoreDia"' and new != old:
             raise RuntimeError(f"equation update changed an unrelated row: {old!r} -> {new!r}")
     checked_rebuild(owner.adapter)
-    require_equivalent(dimension_mm(owner, "PivotBoreDia@PivotBoreProfile"), diameter, "bore_mm")
+    require_nominal_mm(dimension_mm(owner, "PivotBoreDia@PivotBoreProfile"), diameter, "bore_mm")
     return {"adapter_result": data, "equations_before": before, "equations_after": after}
 
 
@@ -496,9 +507,9 @@ async def change_part(owner, root, report, report_path, label):
         configurations = check("part configurations", await owner.adapter.list_configurations())
         if configurations != ["Default"]:
             raise RuntimeError(f"single-configuration part control required: {configurations}")
-        require_equivalent(dimension_mm(owner, "HandleLength@HandleProfile"), HANDLE_LENGTH_MM, "handle_length_mm")
+        require_nominal_mm(dimension_mm(owner, "HandleLength@HandleProfile"), HANDLE_LENGTH_MM, "handle_length_mm")
         before = await part_witness(owner)
-        require_equivalent(before["bore_mm"], OLD_BORE_MM, "initial_bore_mm")
+        require_nominal_mm(before["bore_mm"], OLD_BORE_MM, "initial_bore_mm")
         row["equation_result"] = await set_bore(owner, OLD_BORE_MM)
         same = await part_witness(owner)
         row.update(before=before, after=same)
@@ -546,7 +557,104 @@ async def cold_verify(owner, root, variant, report, report_path, label, expected
         return row
 
 
-async def probe(adapter, directory):
+def validate_control_report(owner, control_report, current_report):
+    """Validate a closed, passed control without opening or modifying it.
+
+    The enclosing old trial may have failed later. Only its three explicitly
+    passed control phases are reused; the old trial status remains provenance.
+    """
+    owner.require_healthy()
+    owner.require_empty()
+    path = Path(control_report).resolve(strict=True)
+    reports = (ROOT / "cad/out/reports").resolve()
+    if not path.is_relative_to(reports) or path.name != "measurements.json":
+        raise RuntimeError("resume report must be a measurements.json under this clone's reports directory")
+    raw = path.read_bytes()
+    prior = json.loads(raw)
+    provenance = {
+        "report_path": str(path), "report_sha256": hashlib.sha256(raw).hexdigest(),
+        "parent_trial_status": prior["status"], "parent_trial_error": prior.get("error"),
+        "parent_trial_source_sha256": prior["source_sha256"],
+        "parent_root_commit": prior["root_commit"], "status": "validating",
+    }
+    current_report["resumed_control"] = provenance
+    if Path(prior["root"]).resolve() != ROOT or Path(prior["directory"]).resolve() != path.parent:
+        raise RuntimeError("resume report belongs to another clone/directory")
+    if "cleanup_error" in prior or prior.get("original_path_set_unchanged") is not True:
+        raise RuntimeError("prior trial did not prove clean cleanup and original path preservation")
+    originals = prior["original_hashes_before"]
+    evidence = prior["original_evidence"]
+    if not originals or originals != current_report["original_hashes_before"] or evidence.keys() != originals.keys():
+        raise RuntimeError("original native/sidecar SHA values or membership changed since the control")
+    if any(row.get("unchanged") is not True or row.get("before") != originals[name]
+           or row.get("after") != originals[name] for name, row in evidence.items()):
+        raise RuntimeError("prior trial did not prove every original native/sidecar unchanged")
+    if prior["adapter_commit"] != current_report["adapter_commit"]:
+        raise RuntimeError("adapter revision changed since the control")
+    # The old report pins the adapter by commit, not a separate source digest.
+    # Prove the current tree is that exact revision, including untracked inputs.
+    adapter_status = subprocess.check_output(
+        ["git", "status", "--porcelain", "--untracked-files=all"],
+        cwd=ROOT / "SolidworksMCP-python", text=True,
+    )
+    if adapter_status.strip():
+        raise RuntimeError("adapter worktree differs from the control's pinned revision")
+    for relative in ("cad/scripts/_assembly.py", "cad/scripts/_assembly_mass_properties.py"):
+        key = str(Path(relative))
+        if prior["source_sha256"][key] != current_report["source_sha256"][key]:
+            raise RuntimeError(f"control source SHA changed: {relative}")
+    if prior["source_fingerprint"] != current_report["source_fingerprint"] or prior["dof_manifest"] != current_report["dof_manifest"]:
+        raise RuntimeError("source fingerprint or DOF manifest changed since the control")
+    names = ("control.copy", "control.resolve_gate_save", "control.cold_verify")
+    selected = {}
+    for name in names:
+        rows = [row for row in prior["phases"] if row["name"] == name]
+        if len(rows) != 1 or rows[0]["status"] != "passed":
+            raise RuntimeError(f"resume requires one passed {name} phase")
+        selected[name] = rows[0]
+    copied, solved, cold = (selected[name] for name in names)
+    if copied["native_count"] != 39 or copied.get("closed_closure_verified") is not True:
+        raise RuntimeError("prior copied control lacks its 39-input closed-closure proof")
+    required_gates = {"assert_manifest_dof_state", "check_no_interference", "assert_model_healthy"}
+    for row in (solved, cold):
+        if row["fingerprint"] != current_report["source_fingerprint"] or set(row["gate_calls"]) != required_gates:
+            raise RuntimeError("prior control fingerprint/gate proof is incomplete")
+        if not row["mass_reads"] or any(read["status"] != "passed" or read["variant"] != Variant.BASELINE for read in row["mass_reads"]):
+            raise RuntimeError("prior control lacks successful legacy mass observations")
+    if cold.get("saved_rebuild_clean_before_resolve") is not True or solved["save_result"] != [True, 0, 0]:
+        raise RuntimeError("prior control lacks strict save and cold-clean proof")
+    control = (path.parent / f"control/sldasm/{ASM}.SLDASM").resolve(strict=True)
+    folders = (control.parent, control.parent.parent / "sldprt")
+    hashes = cold["closed_native_sha256"]
+    paths = {Path(value).resolve(strict=True) for value in hashes}
+    if len(hashes) != 39 or len(paths) != 39 or control not in paths or any(value.parent not in folders for value in paths):
+        raise RuntimeError("recorded control native paths leave the exact control directories")
+    if not control.is_relative_to(reports):
+        raise RuntimeError("resolved control leaves this clone's reports directory")
+    on_disk = {value.resolve() for folder in folders for value in folder.iterdir()
+               if value.is_file() and value.suffix.lower() in NATIVE_SUFFIXES and not value.name.startswith("~$")}
+    if paths != on_disk or native_hashes(paths) != hashes:
+        raise RuntimeError("closed control native hashes or membership changed")
+    if {Path(row["target"]).resolve() for row in copied["copies"]} != paths:
+        raise RuntimeError("closed control hashes do not belong to the passed copy phase")
+    if (control.parent / f".{ASM}.massprops.sha").read_text(encoding="utf-8").strip() != current_report["source_fingerprint"]:
+        raise RuntimeError("closed control fingerprint sidecar changed")
+    if json.loads((control.parent / f".{ASM}.dof.json").read_text(encoding="utf-8")) != current_report["dof_manifest"]:
+        raise RuntimeError("closed control DOF sidecar changed")
+    owner.require_empty()
+    edges = {value: dependencies(owner.app, value, traverse=False) for value in paths}
+    if any(not children <= paths for children in edges.values()):
+        raise RuntimeError("closed control has an external direct reference")
+    if dependencies(owner.app, control, traverse=True) | {control} != paths:
+        raise RuntimeError("closed control root does not reach all 39 recorded native inputs")
+    owner.require_empty()
+    provenance.update(status="validated", passed_control_phases=[selected[name] for name in names],
+                      adapter_revision=current_report["adapter_commit"], adapter_worktree_clean=True,
+                      closed_reference_edges={str(parent): sorted(str(child) for child in children) for parent, children in edges.items()})
+    return control, paths, edges, cold
+
+
+async def probe(adapter, directory, control_report=None):
     import solidworks_mcp.adapters.pywin32_adapter as imported_adapter
 
     if Path(sys.prefix).resolve() != ROOT / ".venv":
@@ -565,6 +673,7 @@ async def probe(adapter, directory):
             Path(__file__), ROOT / "cad/scripts/_assembly.py", ROOT / "cad/scripts/_assembly_mass_properties.py",
         )},
         "comparison": "one relinked legacy control, independent baseline/candidate part-change refreshes and cold gates",
+        "nominal_dimension_tolerance_mm": 1e-6,
         "timing_scope": "phase wall times include diagnostic witnesses; mass_read elapsed includes its pose witness",
         "original_hashes_before": {},
     }
@@ -588,27 +697,31 @@ async def probe(adapter, directory):
         if len(manifest["specs"]) != 4:
             raise RuntimeError("expected the drive-train's four saved DOF specifications")
         report.update(source_fingerprint=baseline_digest, dof_manifest=manifest, source_native_count=len(inputs))
-        with phase(report, report_path, "control.copy") as row:
-            control = copy_fixture(owner, inputs, source_edges, source, directory / "control", row)
-        with phase(report, report_path, "control.resolve_gate_save") as row:
-            reads, calls = [], []
-            row.update(mass_reads=reads, gate_calls=calls)
-            control_adapter = FixtureAdapter(owner, Variant.BASELINE, reads)
-            with fixture_environment(owner, control, calls):
-                await control_adapter.open_model(str(control))
-                checked_rebuild(control_adapter)
-                row["fingerprint"] = await _assembly.assembly_geometry_digest(control_adapter, ASM)
-                if not reads:
-                    raise RuntimeError("fingerprint bypassed the mass observer; use the recorded pre-integration revision")
-                if row["fingerprint"] != baseline_digest:
-                    raise RuntimeError("relinked unchanged control differs from original saved fingerprint")
-                gates(control_adapter)
-                row["save_result"] = strict_save(owner)
-                await _assembly.reconcile_saved_rebuild_state(control_adapter, ASM, control)
-                owner.close()
-        control_cold = await cold_verify(owner, control, Variant.BASELINE, report, report_path, "control", baseline_digest)
-        control_cold["closed_native_sha256"] = native_hashes(owner.paths)
-        control_paths, control_edges = set(owner.paths), dict(owner.edges)
+        if control_report is not None:
+            with phase(report, report_path, "control.resume_validation"):
+                control, control_paths, control_edges, control_cold = validate_control_report(owner, control_report, report)
+        else:
+            with phase(report, report_path, "control.copy") as row:
+                control = copy_fixture(owner, inputs, source_edges, source, directory / "control", row)
+            with phase(report, report_path, "control.resolve_gate_save") as row:
+                reads, calls = [], []
+                row.update(mass_reads=reads, gate_calls=calls)
+                control_adapter = FixtureAdapter(owner, Variant.BASELINE, reads)
+                with fixture_environment(owner, control, calls):
+                    await control_adapter.open_model(str(control))
+                    checked_rebuild(control_adapter)
+                    row["fingerprint"] = await _assembly.assembly_geometry_digest(control_adapter, ASM)
+                    if not reads:
+                        raise RuntimeError("fingerprint bypassed the mass observer; use the recorded pre-integration revision")
+                    if row["fingerprint"] != baseline_digest:
+                        raise RuntimeError("relinked unchanged control differs from original saved fingerprint")
+                    gates(control_adapter)
+                    row["save_result"] = strict_save(owner)
+                    await _assembly.reconcile_saved_rebuild_state(control_adapter, ASM, control)
+                    owner.close()
+            control_cold = await cold_verify(owner, control, Variant.BASELINE, report, report_path, "control", baseline_digest)
+            control_cold["closed_native_sha256"] = native_hashes(owner.paths)
+            control_paths, control_edges = set(owner.paths), dict(owner.edges)
         trials = []
         for variant in (Variant.BASELINE, Variant.CANDIDATE):
             label = "baseline" if variant is Variant.BASELINE else "candidate"
@@ -687,6 +800,7 @@ async def probe(adapter, directory):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--worker", action="store_true")
+    parser.add_argument("--control-report", type=Path, help="Reuse only the validated, closed passed control from this report")
     args = parser.parse_args()
     require_owned_diagnostic_environment()
     if os.environ.get("HARMONIC_REMOTE_CACHE_MODE") != "off" or not os.environ.get("HARMONIC_DIAGNOSTIC_SW_PID"):
@@ -698,12 +812,15 @@ def main():
         label = "assembly part-change comparison"
         with dodo._com_seat(label) as waited:
             with _telemetry.span(f"task {label}", label=label, seat_wait_s=waited):
-                dodo._exec([sys.executable, str(Path(__file__).resolve()), "--worker"], label)
+                command = [sys.executable, str(Path(__file__).resolve()), "--worker"]
+                if args.control_report is not None:
+                    command.extend(["--control-report", str(args.control_report.resolve(strict=True))])
+                dodo._exec(command, label)
         return 0
     reports = ROOT / "cad/out/reports"
     reports.mkdir(parents=True, exist_ok=True)
     directory = Path(tempfile.mkdtemp(prefix="assembly-part-change-", dir=reports))
-    return run_owned_diagnostic(lambda adapter: probe(adapter, directory))
+    return run_owned_diagnostic(lambda adapter: probe(adapter, directory, args.control_report))
 
 
 if __name__ == "__main__":

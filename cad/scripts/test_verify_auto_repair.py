@@ -871,3 +871,138 @@ def test_part_change_owner_rejects_unregistered_open_without_delegation(native_f
     with pytest.raises(trial.probe.OwnershipError):
         asyncio.run(trial.wrapped.open_model(str(foreign)))
     assert trial.state.open_calls == []
+
+
+def test_part_change_nominal_readback_accepts_observed_subnanometre_roundoff():
+    from diagnostics.probe_assembly_part_change import require_nominal_mm
+
+    require_nominal_mm(58.000000078, 58.0, "observed handle length")
+    require_nominal_mm(6.125000078, 6.125, "nominal bore readback")
+
+
+@pytest.mark.parametrize("actual", [58.000002, 57.999998, float("nan"), float("inf"), 0.0, -58.0])
+def test_part_change_nominal_readback_remains_finite_positive_and_narrow(actual):
+    from diagnostics.probe_assembly_part_change import require_nominal_mm
+
+    with pytest.raises(RuntimeError):
+        require_nominal_mm(actual, 58.0, "nominal readback")
+
+
+@pytest.fixture
+def saved_part_change_control(tmp_path, monkeypatch):
+    from pathlib import Path
+    from diagnostics import probe_assembly_part_change as probe
+
+    root = tmp_path / "repo"
+    prior_dir = root / "cad/out/reports/prior"
+    control = prior_dir / "control/sldasm/drive-train.SLDASM"
+    paths = {control, *(prior_dir / f"control/sldprt/part-{index}.SLDPRT" for index in range(38))}
+    for path in paths:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(path.name.encode())
+    fingerprint = "f" * 64
+    dof = {"specs": [{"name": str(index)} for index in range(4)]}
+    mass_sidecar = control.parent / ".drive-train.massprops.sha"
+    mass_sidecar.write_text(fingerprint, encoding="utf-8")
+    (control.parent / ".drive-train.dof.json").write_text(json.dumps(dof), encoding="utf-8")
+    originals = {str(root / "cad/out/sldasm/drive-train.SLDASM"): "original-hash"}
+    source_hashes = {
+        str(Path("cad/scripts/_assembly.py")): "core-hash",
+        str(Path("cad/scripts/_assembly_mass_properties.py")): "reader-hash",
+    }
+    current = {
+        "original_hashes_before": dict(originals), "adapter_commit": "adapter-commit",
+        "source_sha256": dict(source_hashes), "source_fingerprint": fingerprint, "dof_manifest": dof,
+    }
+    gate_names = ["assert_manifest_dof_state", "check_no_interference", "assert_model_healthy"]
+    solved = {
+        "name": "control.resolve_gate_save", "status": "passed", "fingerprint": fingerprint,
+        "gate_calls": gate_names, "save_result": [True, 0, 0],
+        "mass_reads": [{"status": "passed", "variant": probe.Variant.BASELINE}],
+    }
+    cold = {
+        **solved, "name": "control.cold_verify", "saved_rebuild_clean_before_resolve": True,
+        "closed_native_sha256": probe.native_hashes(paths),
+    }
+    prior = {
+        "root": str(root), "directory": str(prior_dir), "status": "failed",
+        "error": "later nominal assertion failed", "root_commit": "prior-commit",
+        "source_sha256": dict(source_hashes), "adapter_commit": "adapter-commit",
+        "source_fingerprint": fingerprint, "dof_manifest": dof,
+        "original_hashes_before": originals, "original_path_set_unchanged": True,
+        "original_evidence": {name: {"unchanged": True, "before": value, "after": value} for name, value in originals.items()},
+        "phases": [
+            {"name": "control.copy", "status": "passed", "native_count": 39, "closed_closure_verified": True,
+             "copies": [{"target": str(path)} for path in sorted(paths)]},
+            solved, cold,
+        ],
+    }
+    edges = {path: paths - {control} if path == control else set() for path in paths}
+    native_calls = []
+
+    def dependencies(path, traverse, search, readonly):
+        native_calls.append((path, traverse, search, readonly))
+        return tuple(item for child in sorted(edges[Path(path)]) for item in (child.name, str(child)))
+
+    owner = SimpleNamespace(
+        require_healthy=lambda: None, require_empty=lambda: None,
+        app=SimpleNamespace(GetDocumentDependencies2=dependencies),
+    )
+    monkeypatch.setattr(probe, "ROOT", root)
+    monkeypatch.setattr(probe.subprocess, "check_output", lambda *_args, **_kwargs: "")
+    path = prior_dir / "measurements.json"
+
+    def validate():
+        path.write_text(json.dumps(prior), encoding="utf-8")
+        return probe.validate_control_report(owner, path, current)
+
+    return SimpleNamespace(
+        validate=validate, probe=probe, root=root, control=control, paths=paths,
+        prior=prior, current=current, report_path=path, mass_sidecar=mass_sidecar,
+        edges=edges, native_calls=native_calls,
+    )
+
+
+def test_part_change_resume_reuses_only_passed_closed_control(saved_part_change_control):
+    trial = saved_part_change_control
+    root, paths, edges, cold = trial.validate()
+    assert root == trial.control and paths == trial.paths and edges == trial.edges
+    assert cold["status"] == "passed"
+    provenance = trial.current["resumed_control"]
+    assert provenance["parent_trial_status"] == "failed"
+    assert provenance["parent_trial_error"] == "later nominal assertion failed"
+    assert provenance["status"] == "validated"
+    assert provenance["report_sha256"] == trial.probe.digest(trial.report_path)
+    assert len(provenance["passed_control_phases"]) == 3
+    assert len(trial.native_calls) == 40  # Closed reference reads only; no open/close/write API.
+
+
+@pytest.mark.parametrize(
+    "fault", ["native_bytes", "sidecar", "source", "adapter", "original", "cleanup", "cold_failed", "cold_dirty", "no_mass", "external_reference"]
+)
+def test_part_change_resume_rejects_changed_or_incomplete_proof(saved_part_change_control, fault):
+    trial = saved_part_change_control
+    if fault == "native_bytes":
+        trial.control.write_bytes(b"changed native bytes")
+    if fault == "sidecar":
+        trial.mass_sidecar.write_text("changed", encoding="utf-8")
+    if fault == "source":
+        trial.current["source_sha256"][next(iter(trial.current["source_sha256"]))] = "changed"
+    if fault == "adapter":
+        trial.current["adapter_commit"] = "changed"
+    if fault == "original":
+        trial.current["original_hashes_before"][next(iter(trial.current["original_hashes_before"]))] = "changed"
+    if fault == "cleanup":
+        trial.prior["cleanup_error"] = "close failed"
+    if fault == "cold_failed":
+        trial.prior["phases"][2]["status"] = "failed"
+    if fault == "cold_dirty":
+        trial.prior["phases"][2]["saved_rebuild_clean_before_resolve"] = False
+    if fault == "no_mass":
+        trial.prior["phases"][2]["mass_reads"] = []
+    if fault == "external_reference":
+        external = trial.root / "outside-control.SLDPRT"
+        external.write_bytes(b"external")
+        trial.edges[trial.control].add(external)
+    with pytest.raises(RuntimeError):
+        trial.validate()
