@@ -6,6 +6,8 @@ fresh drawings with SLDDRW and DRWDOT targets. This compares complete call shape
 (including their different Options), not method identity alone. No source part,
 global preference or existing document is changed. No PDF/PNG, view or rebuild.
 Native run requires reviewed source, exclusive seat and AUTOSTART=0.
+Rejected cells retain failure_phase: save calls, ownership scope checks, native
+readbacks and reopen failures are separate observations, not equivalent causes.
 """
 
 from __future__ import annotations
@@ -138,23 +140,37 @@ async def capture(adapter, report_root):
             report["cells"].append(row)
             checkpoint()
             started = time.perf_counter()
+            phase = "save_scope_enter"
+            native_error = None
             try:
                 with adapter.ownership.saving_as(target):
+                    phase = "clear_selection"
                     model.ClearSelection2(True)
                     try:
+                        phase = "native_save"
                         invoke_save(model, target, method, row)
+                    except Exception as error:
+                        native_error = error
+                        row["native_error"] = repr(error)
+                        raise
                     finally:
+                        phase = "post_save_witness"
                         row["native_seconds"] = time.perf_counter() - started
                         row["after"] = document_witness(model)
                         row["file"] = file_witness(target)
+                        phase = "post_save_checkpoint"
                         checkpoint()
+                        phase = "save_scope_exit"
+                phase = "persistence_witness"
                 if row["file"].get("bytes", 0) <= 0:
                     raise RuntimeError("save call produced no complete native file")
                 if method == "extension_save_as3":
                     require_save_result(row["returned"], target)
+                phase = "owned_close"
                 check(
                     "close saved control drawing", await adapter.close_model(save=False)
                 )
+                phase = "reopen"
                 if extension == ".DRWDOT":
                     model = create(directory / f"verification-{index}.SLDDRW", target)
                 else:
@@ -163,13 +179,17 @@ async def capture(adapter, report_root):
                         await adapter.open_model(str(target)),
                     )
                     model = adapter.currentModel
+                phase = "reopened_witness"
                 row["reopened"] = document_witness(_early_bound(model, "IModelDoc2"))
                 row["sheet_reopened"] = sheet_witness(model)
                 if row["sheet_reopened"] != row["sheet_before"]:
                     raise RuntimeError("saved drawing/template sheet readback changed")
                 row["status"] = "persisted"
             except Exception as error:
-                row.update(status="rejected", error=repr(error))
+                row.update(
+                    status="rejected", error=repr(error),
+                    failure_phase="native_save" if error is native_error else phase,
+                )
             finally:
                 checkpoint()
                 try:

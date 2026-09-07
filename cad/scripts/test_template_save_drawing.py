@@ -60,8 +60,20 @@ def test_production_positive_format_precedes_all_other_cells():
 
 
 @pytest.mark.parametrize("production", ["persists", "no_output"])
+@pytest.mark.parametrize(
+    "fault",
+    [
+        "none",
+        "native_save",
+        "scope_enter",
+        "reopen",
+        "reopened_witness",
+        "post_save_witness",
+        "native_and_witness",
+    ],
+)
 def test_capture_keeps_failed_cells_and_requires_the_first_positive(
-    monkeypatch, tmp_path, production
+    monkeypatch, tmp_path, production, fault
 ):
     original = tmp_path / "original.DRWDOT"
     original.write_bytes(b"fixture template")
@@ -70,6 +82,7 @@ def test_capture_keeps_failed_cells_and_requires_the_first_positive(
 
     class Model:
         path = ""
+        title_reads = 0
         Extension = SimpleNamespace(
             GetAdvancedSaveAsOptions=lambda flag: object(),
             SaveAs3=lambda *args: (True, 0, 0),
@@ -79,6 +92,12 @@ def test_capture_keeps_failed_cells_and_requires_the_first_positive(
             return self.path
 
         def GetTitle(self):
+            self.title_reads += 1
+            if self.title_reads == 2 and fault in {
+                "post_save_witness",
+                "native_and_witness",
+            }:
+                raise RuntimeError("post-save title getter failed")
             return Path(self.path).name if self.path else "owned blank"
 
         def GetType(self):
@@ -91,6 +110,8 @@ def test_capture_keeps_failed_cells_and_requires_the_first_positive(
             pass
 
         def SaveAs3(self, path, version, options):
+            if fault in {"native_save", "native_and_witness"}:
+                raise RuntimeError("native save call failed")
             if production == "persists":
                 Path(path).write_bytes(b"owned native fixture")
                 self.path = path
@@ -102,6 +123,8 @@ def test_capture_keeps_failed_cells_and_requires_the_first_positive(
 
     @contextmanager
     def saving(output):
+        if fault == "scope_enter":
+            raise RuntimeError("ownership save scope refused")
         yield
         if adapter.currentModel.GetPathName() != str(output):
             raise RuntimeError("native SaveAs did not reach the requested output path")
@@ -121,6 +144,8 @@ def test_capture_keeps_failed_cells_and_requires_the_first_positive(
         adapter.currentModel = None
 
     async def open_model(path):
+        if fault == "reopen":
+            raise RuntimeError("saved drawing reopen failed")
         adapter.currentModel = Model()
         adapter.currentModel.path = path
         return object()
@@ -136,10 +161,18 @@ def test_capture_keeps_failed_cells_and_requires_the_first_positive(
     monkeypatch.setattr(probe.common, "PROJECT_DRWDOT", original)
     monkeypatch.setattr(probe, "revision", lambda revision: "frozen")
     monkeypatch.setattr(probe, "_early_bound", lambda raw, kind: raw)
-    monkeypatch.setattr(probe, "sheet_witness", lambda model: {"sheet": "unchanged"})
+    sheet_reads = []
+
+    def sheet_witness(model):
+        sheet_reads.append(model)
+        if fault == "reopened_witness" and len(sheet_reads) == 2:
+            raise RuntimeError("reopened sheet getter failed")
+        return {"sheet": "unchanged"}
+
+    monkeypatch.setattr(probe, "sheet_witness", sheet_witness)
     monkeypatch.setattr(probe, "check", lambda *args: None)
     monkeypatch.setattr(probe.drawing, "new_drawing", new_drawing)
-    if production == "no_output":
+    if production == "no_output" or fault != "none":
         with pytest.raises(RuntimeError, match="positive control failed"):
             asyncio.run(probe.capture(adapter, tmp_path / "reports"))
     else:
@@ -147,9 +180,28 @@ def test_capture_keeps_failed_cells_and_requires_the_first_positive(
     report = json.loads((directories[0] / "save.json").read_text())
     assert adapter.currentModel is None
     assert original.read_bytes() == b"fixture template"
-    if production == "no_output":
+    if production == "no_output" or fault != "none":
         assert len(report["cells"]) == 1
         assert report["status"] == "failed"
+        expected_phase = {
+            "native_save": "native_save",
+            "scope_enter": "save_scope_enter",
+            "reopen": "reopen",
+            "reopened_witness": "reopened_witness",
+            "post_save_witness": "post_save_witness",
+            "native_and_witness": "post_save_witness",
+        }.get(fault, "save_scope_exit")
+        if production == "no_output" and fault not in {
+            "native_save",
+            "scope_enter",
+            "post_save_witness",
+            "native_and_witness",
+        }:
+            expected_phase = "save_scope_exit"
+        assert report["cells"][0]["failure_phase"] == expected_phase
+        if fault == "native_and_witness":
+            assert "native save call failed" in report["cells"][0]["native_error"]
+            assert "post-save title getter failed" in report["cells"][0]["error"]
         return
     assert report["status"] == "captured"
     assert [row["status"] for row in report["cells"]] == [
@@ -163,3 +215,4 @@ def test_capture_keeps_failed_cells_and_requires_the_first_positive(
         assert row["after"]["path"] == ""
         assert row["file"] == {"status": "absent"}
         assert "requested output path" in row["error"]
+        assert row["failure_phase"] == "save_scope_exit"
