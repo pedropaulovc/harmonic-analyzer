@@ -31,7 +31,9 @@ failure; no native drawing/source save or additional successful-trial reads.
 from __future__ import annotations
 
 import argparse
+from enum import StrEnum
 import json
+import math
 from pathlib import Path
 import shutil
 import sys
@@ -178,6 +180,16 @@ def drawing_witness(adapter, *, source, configuration):
 
 
 def _drawing_witness(adapter, *, source, configuration):
+    semantics = _drawing_semantics(adapter, source=source, configuration=configuration)
+    annotations, handles = shoulder.all_annotation_layout(adapter)
+    return {
+        "semantics": semantics,
+        "annotations": annotations,
+        "layout": attachments.layout(adapter.currentModel),
+    }, handles
+
+
+def _drawing_semantics(adapter, *, source, configuration):
     semantics = attachments.snapshot(adapter.currentModel, app=adapter.swApp)
     if not semantics["models"]:
         raise RuntimeError("functional pilot has no captured drawing view models")
@@ -198,12 +210,7 @@ def _drawing_witness(adapter, *, source, configuration):
         raise RuntimeError(
             "functional pilot needs nonempty geometry/dimensions without dimension exclusions"
         )
-    annotations, handles = shoulder.all_annotation_layout(adapter)
-    return {
-        "semantics": semantics,
-        "annotations": annotations,
-        "layout": attachments.layout(adapter.currentModel),
-    }, handles
+    return semantics
 
 
 def compare_drawing(app, before, after):
@@ -256,6 +263,24 @@ def _failure_document(adapter, output):
     }
 
 
+class FailureEvidenceCompleteness(StrEnum):
+    COMPLETE = "complete"
+    PARTIAL = "partial"
+
+
+def _failure_sheet(adapter):
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    sheet = _early_bound(drawing.GetCurrentSheet(), "ISheet")
+    properties = tuple(float(value) for value in sheet.GetProperties2())
+    if len(properties) != 8 or not all(math.isfinite(value) for value in properties):
+        raise RuntimeError("failure sheet properties are not eight finite values")
+    return {
+        "name": str(sheet.GetName()),
+        "properties": properties,
+        "scale": properties[2:4],
+    }
+
+
 def retain_failed_drawing(adapter, trial, output, checkpoint):
     """Failure-only observations; the caller must re-raise its original error.
 
@@ -270,6 +295,7 @@ def retain_failed_drawing(adapter, trial, output, checkpoint):
     evidence = {
         "primary_error": trial["error"],
         "scope": "failed native scene, measured annotation ink and geometry/dimension witnesses; PDF-only export; no cold/native-save acceptance",
+        "completeness": FailureEvidenceCompleteness.PARTIAL,
         "errors": [],
     }
     trial["failure_evidence"] = evidence
@@ -290,14 +316,17 @@ def retain_failed_drawing(adapter, trial, output, checkpoint):
             try:
                 action()
             except Exception as error:
+                evidence["completeness"] = FailureEvidenceCompleteness.PARTIAL
                 evidence["errors"].append({"phase": phase, "error": repr(error)})
 
-    def observe(phase, action):
+    def observe(phase, action, *, destination=None, key=None):
+        destination = evidence if destination is None else destination
+        key = phase if key is None else key
         try:
             with _telemetry.span(
                 "diagnostic.datum_policy.failure_evidence", phase=phase
             ):
-                evidence[phase] = action()
+                destination[key] = action()
         except Exception as error:
             evidence["errors"].append({"phase": phase, "error": repr(error)})
 
@@ -332,35 +361,53 @@ def retain_failed_drawing(adapter, trial, output, checkpoint):
 
     def scene(phase):
         _failure_document(adapter, output)
-        source = Path(trial["copy_source"]).resolve(strict=True)
-        source_model = _early_bound(
-            adapter.swApp.GetOpenDocumentByName(str(source)), "IModelDoc2"
-        )
-        source_values, source_handles = source_dimensions(
-            source_model, trial["target"], source
-        )
-        drawing, annotation_handles = _drawing_witness(
-            adapter,
-            source=source,
-            configuration=trial["source_before"]["configuration"],
-        )
-        handles[phase] = (
-            adapter.currentModel,
-            source_model,
-            source_handles,
-            annotation_handles,
-        )
-        return {
-            "drawing": drawing,
-            "source": source_values,
-            "source_document": {
+        row = {"drawing": {}}
+        native = {"drawing": adapter.currentModel}
+        handles[phase] = native
+        source = Path(trial["copy_source"]).resolve()
+
+        def raw_annotations():
+            records, annotation_handles = shoulder.all_annotation_layout(adapter)
+            native["annotations"] = annotation_handles
+            return records
+
+        def source_parameters():
+            source_model = _early_bound(
+                adapter.swApp.GetOpenDocumentByName(str(source)), "IModelDoc2"
+            )
+            values, source_handles = source_dimensions(
+                source_model, trial["target"], source
+            )
+            native.update(source=source_model, source_dimensions=source_handles)
+            row["source_document"] = {
                 "path": str(source_model.GetPathName()),
                 "title": str(source_model.GetTitle()),
                 "kind": int(source_model.GetType()),
                 "dirty": bool(source_model.GetSaveFlag()),
                 "visible": bool(source_model.Visible),
-            },
-        }
+            }
+            return values
+
+        # Each independently captured field survives another field's rejection.
+        # In particular a saved-owner semantic check can reject an UNSAVED
+        # RD1@...@Draw52.Drawing without discarding all already measurable ink.
+        # Raw annotations are scanned once per phase, never via _drawing_witness.
+        for name, reader in (
+            ("annotations", raw_annotations),
+            ("layout", lambda: attachments.layout(adapter.currentModel)),
+            ("sheet", lambda: _failure_sheet(adapter)),
+            (
+                "semantics",
+                lambda: _drawing_semantics(
+                    adapter,
+                    source=source,
+                    configuration=trial["source_before"]["configuration"],
+                ),
+            ),
+        ):
+            observe(f"{phase}.{name}", reader, destination=row["drawing"], key=name)
+        observe(f"{phase}.source", source_parameters, destination=row, key="source")
+        return row
 
     observe("hashes_before", hashes)
     observe("before", lambda: scene("before"))
@@ -388,54 +435,91 @@ def retain_failed_drawing(adapter, trial, output, checkpoint):
     observe("after", lambda: scene("after"))
     persist()
 
-    def unchanged():
-        for field in ("document", "hashes"):
-            if evidence[f"{field}_before"] != evidence[f"{field}_after"]:
-                raise RuntimeError(f"failure PDF export changed {field}")
+    def equal_field(first, last, label):
+        if first != last:
+            raise RuntimeError(f"failure PDF export changed {label}")
+        return "unchanged"
+
+    def source_unchanged():
         before, after = evidence["before"], evidence["after"]
-        if before["source_document"] != after["source_document"]:
-            raise RuntimeError("failure PDF export changed the source document state")
+        equal_field(
+            before["source_document"], after["source_document"], "source document state"
+        )
         first, last = handles["before"], handles["after"]
-        if any(
-            int(adapter.swApp.IsSame(a, b)) != 1 for a, b in zip(first[:2], last[:2])
-        ):
-            raise RuntimeError("failure export replaced drawing/source native identity")
+        if int(adapter.swApp.IsSame(first["source"], last["source"])) != 1:
+            raise RuntimeError("failure export replaced source native identity")
         require_same_source(
             before["source"],
             after["source"],
             "failure PDF export",
             app=adapter.swApp,
-            handles_before=first[2],
-            handles_after=last[2],
+            handles_before=first["source_dimensions"],
+            handles_after=last["source_dimensions"],
         )
-        compare_drawing(adapter.swApp, before["drawing"], after["drawing"])
+        return "unchanged"
+
+    def raw_unchanged():
+        before, after = evidence["before"]["drawing"], evidence["after"]["drawing"]
+        first, last = handles["before"], handles["after"]
+        if int(adapter.swApp.IsSame(first["drawing"], last["drawing"])) != 1:
+            raise RuntimeError("failure export replaced drawing native identity")
         shoulder.compare_all_annotation_layout(
             adapter.swApp,
-            before["drawing"]["annotations"],
-            after["drawing"]["annotations"],
-            first[3],
-            last[3],
+            before["annotations"],
+            after["annotations"],
+            first["annotations"],
+            last["annotations"],
         )
-        if before["drawing"]["annotations"] != after["drawing"]["annotations"]:
-            raise RuntimeError(
-                "failure PDF export changed raw native annotation measurements"
-            )
-        return (
-            "exact captured state and identity unchanged; original trial still failed"
+        return equal_field(
+            before["annotations"],
+            after["annotations"],
+            "raw native annotation measurements",
         )
 
-    if all(
-        name in evidence
-        for name in (
-            "document_after",
-            "hashes_before",
-            "hashes_after",
-            "before",
-            "after",
-        )
+    for field, label in (("document", "document"), ("hashes", "hash")):
+        if all(f"{field}_{phase}" in evidence for phase in ("before", "after")):
+            observe(
+                f"{label}_preservation",
+                lambda field=field: equal_field(
+                    evidence[f"{field}_before"], evidence[f"{field}_after"], field
+                ),
+            )
+    before, after = evidence.get("before", {}), evidence.get("after", {})
+    if "source" in before and "source" in after:
+        observe("source_preservation", source_unchanged)
+    for field, label, compare in (
+        ("annotations", "raw", raw_unchanged),
+        (
+            "semantics",
+            "semantic",
+            lambda: attachments.compare(
+                before["drawing"]["semantics"],
+                after["drawing"]["semantics"],
+                "failure PDF export",
+            ),
+        ),
+        (
+            "layout",
+            "layout",
+            lambda: attachments.check_layout(
+                before["drawing"]["layout"],
+                after["drawing"]["layout"],
+                "failure PDF export",
+            ),
+        ),
+        (
+            "sheet",
+            "sheet",
+            lambda: equal_field(
+                before["drawing"]["sheet"],
+                after["drawing"]["sheet"],
+                "sheet properties",
+            ),
+        ),
     ):
-        observe("export_preservation", unchanged)
-    if "before" in evidence:
+        if all(field in row.get("drawing", {}) for row in (before, after)):
+            observe(f"{label}_preservation", compare)
+    if "source" in before:
         observe(
             "recipe_source_preservation",
             lambda: require_same_source(
@@ -444,6 +528,8 @@ def retain_failed_drawing(adapter, trial, output, checkpoint):
                 "failed recipe before evidence export",
             ),
         )
+    if not evidence["errors"]:
+        evidence["completeness"] = FailureEvidenceCompleteness.COMPLETE
     persist()
 
 
