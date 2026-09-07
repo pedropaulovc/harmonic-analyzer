@@ -104,9 +104,9 @@ def test_native_and_pdf_fit_are_strict_without_geometry_or_pixel_tolerance():
             {
                 "box_pt": (
                     0.333 * factor,
-                    792 - 0.047 * factor,
+                    0.04 * factor,
                     0.4 * factor,
-                    792 - 0.04 * factor,
+                    0.047 * factor,
                 )
             }
         ],
@@ -114,14 +114,32 @@ def test_native_and_pdf_fit_are_strict_without_geometry_or_pixel_tolerance():
     cell.require_pdf_fit(bounds, pdf)
     pdf["characters"][0]["box_pt"] = (
         (0.33 - 1e-8) * factor,
-        792 - 0.047 * factor,
+        0.04 * factor,
         0.4 * factor,
-        792 - 0.04 * factor,
+        0.047 * factor,
     )
     with pytest.raises(RuntimeError, match="fit"):
         cell.require_pdf_fit(bounds, pdf)
     pdf["characters"] = []
     with pytest.raises(RuntimeError, match="no title glyphs"):
+        cell.require_pdf_fit(bounds, pdf)
+
+
+def test_pdfium_lower_left_glyph_box_is_not_flipped_to_top_of_sheet():
+    from diagnostics import _linked_title_cell as cell
+
+    # Native fresh-title-3p8e2gl2: get_charbox returns left,bottom,right,top.
+    bounds = (0.33831249077644365, 0.03590604266734481, 0.4191, 0.051898935246752154)
+    box = (
+        967.4768676757812,
+        117.53108215332031,
+        972.75390625,
+        128.59107971191406,
+    )
+    pdf = {"page_size_pt": (1224, 792), "characters": [{"box_pt": box}]}
+    cell.require_pdf_fit(bounds, pdf)
+    pdf["characters"][0]["box_pt"] = (box[0], 792 - box[3], box[2], 792 - box[1])
+    with pytest.raises(RuntimeError, match="fit"):
         cell.require_pdf_fit(bounds, pdf)
 
 
