@@ -410,3 +410,28 @@ for Codex review. CodeRabbit's one test-style request was fixed in `0ce76c19`
 (101 focused tests and explicit B018 passed). No PR was merged or parent deleted.
 This small series proves neither a less-than-5% conflict rate nor remote-cache
 hit-rate improvement; cache transfers remained disabled.
+
+### Final diagnostics-only verification
+
+Withdrawal head: `37cd348864816fb7a5ca2ece31799ebef5cfd5b3`. The clean-tree
+dependency report `cad/out/reports/assembly-mass-read/final-withdrawn-dependencies.json`
+has SHA-256 `b88e8abbdf16e679e924d923995f485859efc6df1337355562de6593de9b89af`:
+all eight construction recipes and all 108 leaf-part keys match accepted Batch A;
+the direct reader has zero production assembly consumers.
+
+At that head the restored `doit -n 4 build_bare` ran
+2026-09-07 07:17:21.438977–07:17:31.980828 UTC, exit 0, **10.544467 s**,
+all 116 producers skipped and zero COM work. The complete requested COM-free
+gate command passed afterward, including **3055 recipe tests in 107.97 s**
+(`pytest-telemetry/run-dycexpmf`) and part isolation; unchanged gates retained their
+valid stamps. The focused diagnostic module independently passed 106 tests
+(`run-be11gm3n`, 5.81 s). Ruff and whitespace checks passed.
+
+Recovery was performed only after owned-document cleanup and byte-checked backup.
+The local preservation/recovery scripts remain beside the evidence:
+`capture-acceptance.ps1` SHA-256
+`f46debc67121c354136a217bf1f64c180b507cdbd50adfc221b3435e079b71f8`;
+`restore-accepted-baseline.ps1` SHA-256
+`b4e404f3578b988b0cb596b8a93208a6932b48a968dbb26d4c40a803563232e0`.
+No experimental artifact was published to the remote cache. The PR's final diff
+contains diagnostics, tests and this evidence, not a retained production change.
