@@ -277,7 +277,7 @@ def test_real_failure_hook_retains_controls_and_original_strict_identity_rejecti
         scene.bank.manager.GetSelectedObject6.side_effect = [scene.selected, RuntimeError("native repeated selection failed")]
     else:
         scene.state.failure = failure
-    with pytest.raises(RuntimeError, match="VIEW selection silhouette entity.*returned 0") as caught:
+    with pytest.raises(RuntimeError, match=r"VIEW selection silhouette entity.*returned 0") as caught:
         with scene.bank.witness.observe(scene.adapter):
             scene.bank.module.add_surface_finish(
                 scene.adapter, scene.bank.view, label="finish",

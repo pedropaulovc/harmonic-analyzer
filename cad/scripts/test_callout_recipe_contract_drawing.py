@@ -28,7 +28,7 @@ def test_each_explicit_version_has_one_native_helper(value):
 
 
 def test_current_tracked_alignment_uses_verifier_not_setter():
-    code = Path(__file__).with_name("draw_alignment_pinion.py").read_text()
+    code = Path(__file__).with_name("draw_alignment_pinion.py").read_text(encoding="utf-8")
     assert contract.recipe_contract(code) is contract.CalloutContract.SOURCE_VERIFIER_V1
 
 
@@ -82,7 +82,7 @@ async def test_wrong_recipe_experiment_fails_before_attach_or_owned_outputs(
     monkeypatch.setitem(sys.modules, "dodo", NS(_run=native))
     adapter = NS(ownership=native)
     output = tmp_path / "must-not-create"
-    with pytest.raises(ValueError, match="historical|frozen"):
+    with pytest.raises(ValueError, match=r"historical|frozen"):
         if route == "direct":
             await pilot.pilot(
                 adapter,

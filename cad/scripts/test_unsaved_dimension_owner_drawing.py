@@ -142,7 +142,7 @@ def test_saved_drawing_still_uses_path_not_title_or_new_owner_branch(context):
     c.app.ActiveDoc = None
     before = probe.snapshot(c.model, app=c.app)
     c.param.FullName = "RD1@Drawing View1@Draw90.Drawing"
-    with pytest.raises(RuntimeError, match="does not match.*owner"):
+    with pytest.raises(RuntimeError, match=r"does not match.*owner"):
         probe.snapshot(c.model, app=c.app)
     assert before["dimensions"]
     c.model.GetTitle.assert_not_called()
@@ -161,7 +161,7 @@ def test_source_dimension_in_unsaved_drawing_keeps_exact_part_owner(context):
         result["dimensions"][key]["components"][0]["qualified_name"] == c.param.FullName
     )
     c.param.FullName = "Length@Sketch@Draw90.Drawing"
-    with pytest.raises(RuntimeError, match="does not match.*owner"):
+    with pytest.raises(RuntimeError, match=r"does not match.*owner"):
         probe.snapshot(c.model, app=c.app)
     c.model.GetTitle.assert_not_called()
 

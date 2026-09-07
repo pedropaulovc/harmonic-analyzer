@@ -850,6 +850,26 @@ def test_capture_reads_native_inventory_once_and_rejects_owner_or_source_drift(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("signature_count", [0, 2])
+async def test_layout_fixture_rejects_missing_or_duplicate_build_signature(
+    tmp_path, monkeypatch, signature_count
+):
+    import test_benchmark_drawing_recipes as recipes
+
+    signature = "async def build(adapter, *, drawing_factory):"
+    monkeypatch.setattr(recipes, "recipe", lambda _: signature * signature_count)
+    invoked = Mock(side_effect=AssertionError("pilot must not run with a drifted fixture"))
+    monkeypatch.setattr(pilot, "pilot", invoked)
+    with pytest.raises(
+        AssertionError, match="fixture build signature must occur exactly once"
+    ):
+        await test_pilot_explicit_layout_binding_retains_source_and_cold_gates(
+            tmp_path, monkeypatch, "passed"
+        )
+    invoked.assert_not_called()
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("mode", ["passed", "cold_title", "copy_saved", "unused"])
 async def test_pilot_explicit_layout_binding_retains_source_and_cold_gates(
     tmp_path, monkeypatch, mode
@@ -861,8 +881,11 @@ async def test_pilot_explicit_layout_binding_retains_source_and_cold_gates(
     monkeypatch.setattr(pilot.benchmark, "revision", lambda _: "frozen")
     monkeypatch.setattr(pilot, "helper_fingerprints", lambda: {"helper": "same"})
     monkeypatch.setattr(pilot, "adapter_fingerprints", lambda: {"adapter": "same"})
-    source = recipe(Path("unused.SLDPRT")).replace(
-        "async def build(adapter, *, drawing_factory):",
+    signature = "async def build(adapter, *, drawing_factory):"
+    source = recipe(Path("unused.SLDPRT"))
+    assert source.count(signature) == 1, "fixture build signature must occur exactly once"
+    source = source.replace(
+        signature,
         "async def build(adapter, *, drawing_factory, layout):\n    layout(adapter)",
     )
     monkeypatch.setattr(pilot.benchmark, "recipe_source", lambda *_: source)

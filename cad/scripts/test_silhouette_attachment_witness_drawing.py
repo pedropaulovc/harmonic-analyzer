@@ -30,7 +30,7 @@ def fixture():
 
 
 def test_line_native_values_and_identity_are_retained():
-    app, view, entity, face, surface, curve = fixture()
+    app, view, entity, _face, surface, curve = fixture()
     evidence = {}
     result = witness.require_same(
         app, view, entity, entity, label="finish", evidence=evidence
@@ -66,7 +66,7 @@ def test_rejected_identity_records_self_and_face_positive_controls():
     app, view, entity, *_ = fixture()
     substitute = NS(**vars(entity))
     evidence = {}
-    with pytest.raises(RuntimeError, match="silhouette entity.*returned 0"):
+    with pytest.raises(RuntimeError, match=r"silhouette entity.*returned 0"):
         witness.require_same(
             app, view, entity, substitute, label="finish", evidence=evidence
         )
@@ -84,7 +84,7 @@ def test_self_identity_rejection_is_evidence_not_acceptance():
     app, view, entity, *_ = fixture()
     app.IsSame = lambda left, right: 1 if left is view and right is view else 0
     evidence = {}
-    with pytest.raises(RuntimeError, match="silhouette entity.*returned 0"):
+    with pytest.raises(RuntimeError, match=r"silhouette entity.*returned 0"):
         witness.require_same(
             app, view, entity, entity, label="finish", evidence=evidence
         )
@@ -106,7 +106,7 @@ def test_control_capture_error_never_replaces_original_identity_failure():
 
     app.IsSame = is_same
     evidence = {}
-    with pytest.raises(RuntimeError, match="silhouette entity.*returned 0"):
+    with pytest.raises(RuntimeError, match=r"silhouette entity.*returned 0"):
         witness.require_same(
             app, view, entity, substitute, label="finish", evidence=evidence
         )
@@ -166,7 +166,7 @@ def test_unsupported_surface_or_curve_is_not_silently_excluded():
         witness.snapshot(app, view, entity)
     surface.Identity = lambda: 4002
     curve.IsLine = lambda: False
-    with pytest.raises(RuntimeError, match="unsupported.*curve"):
+    with pytest.raises(RuntimeError, match=r"unsupported.*curve"):
         witness.snapshot(app, view, entity)
 
 
