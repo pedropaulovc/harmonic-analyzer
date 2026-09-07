@@ -419,9 +419,27 @@ async def probe(adapter, receipt, output_root):
         report.update(status="failed", error=repr(error))
         raise
     finally:
-        report["inputs_after"] = final_hashes(expected)
-        report["copy_after"] = final_hashes((str(copy),))[str(copy)]
-        checkpoint()
+        primary = sys.exception()
+        errors = []
+        for field, paths in (("inputs_after", expected), ("copy_after", (str(copy),))):
+            try:
+                hashes = final_hashes(paths)
+                report[field] = hashes[str(copy)] if field == "copy_after" else hashes
+            except Exception as error:
+                report[field] = {"error": repr(error)}
+                errors.append(error)
+        try:
+            checkpoint()
+        except Exception as error:
+            report["checkpoint_error"] = repr(error)
+            errors.append(error)
+        if primary is not None:
+            for error in errors:
+                primary.add_note(f"Retained export finalization ({report_path}): {error!r}")
+        elif errors:
+            for error in errors[:-1]:
+                errors[-1].add_note(f"Earlier retained export finalization error: {error!r}")
+            raise errors[-1]
     return {"report": str(report_path)}
 
 

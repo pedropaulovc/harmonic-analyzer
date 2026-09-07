@@ -260,17 +260,34 @@ class OwnedDrawingCopy:
 
 async def finalize_probe(cleanup, report, report_path):
     """Source hashes and evidence survive a refusal to close unrelated state."""
+    primary = sys.exception()
+    errors = []
     try:
-        await cleanup()
+        if cleanup is not None:
+            await cleanup()
     except Exception as error:
         report["cleanup_error"] = repr(error)
-        raise
-    finally:
-        try:
-            guard_sources(report)
-        finally:
-            report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
-            _telemetry.info(f"native datum shoulder observations: {report_path}")
+        errors.append(error)
+    try:
+        guard_sources(report)
+    except Exception as error:
+        report["source_guard_error"] = repr(error)
+        errors.append(error)
+    try:
+        report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+        _telemetry.info(f"native datum shoulder observations: {report_path}")
+    except Exception as error:
+        report["report_error"] = repr(error)
+        errors.append(error)
+    if primary is not None:
+        for error in errors:
+            primary.add_note(f"Diagnostic finalization ({report_path}): {error!r}")
+        return
+    if errors:
+        # Preserve the existing no-primary precedence: report, source, cleanup.
+        for error in errors[:-1]:
+            errors[-1].add_note(f"Earlier diagnostic finalization error: {error!r}")
+        raise errors[-1]
 
 
 def document_length(extension):
