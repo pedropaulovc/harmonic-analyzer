@@ -34,9 +34,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output", type=Path)
     args = parser.parse_args()
+    assembly_tasks = {task["name"]: task for task in dodo.task_assembly()}
+    part_tasks = {task["name"]: task for task in dodo.task_part()}
     assemblies = {}
     for stem in dodo.ASSEMBLY_ORDER:
-        item = record(script_for(stem), dodo._assembly_file_deps(stem))
+        dependencies = assembly_tasks[stem]["file_dep"]
+        assert dependencies == dodo._assembly_file_deps(stem)
+        item = record(script_for(stem), dependencies)
         recipe = dodo._recipe_files(stem)
         item["recipe"] = dodo._digest_files(recipe)
         item["recipe_files"] = [dodo._rel_tag(path) for path in recipe]
@@ -44,7 +48,9 @@ def main():
     parts = {}
     for script in part_scripts():
         stem = script.stem.removeprefix("build_")
-        parts[stem] = record(script, dodo._part_file_deps(script, stem))
+        dependencies = part_tasks[stem]["file_dep"]
+        assert dependencies == dodo._part_file_deps(script, stem)
+        parts[stem] = record(script, dependencies)
     report = {
         "head": subprocess.check_output(
             ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
@@ -58,6 +64,25 @@ def main():
             name: [dodo._rel_tag(path) for path in module_deps_of(ROOT / "cad/scripts" / name)]
             for name in ("refresh_assembly.py", "verify.py", "_assembly_postbuild.py")
         },
+        "verify_tasks": {
+            f"{group}:{task['name']}": [dodo._rel_tag(path) for path in task["file_dep"]]
+            for group, tasks in (
+                ("verify_soundness", dodo.task_verify_soundness()),
+                ("verify", dodo.task_verify()),
+            )
+            for task in tasks
+        },
+    }
+    sources = {
+        path
+        for item in (*assemblies.values(), *parts.values())
+        for path in item["inputs"]
+        if not path.startswith("cad/out/")
+    }
+    report["source_sha256"] = {
+        path: hashlib.sha256((ROOT / path).read_bytes()).hexdigest()
+        if (ROOT / path).is_file() else "<missing>"
+        for path in sorted(sources)
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")

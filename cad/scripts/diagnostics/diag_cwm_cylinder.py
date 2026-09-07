@@ -55,8 +55,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # cad/scripts
 from _assembly import (  # noqa: E402
     component_names,
     component_transform,
-    gear_mate,
     named_ref,
+)
+from _assembly_couplings import (  # noqa: E402
+    gear_mate,
 )
 from _assembly_postbuild import discard_open_documents  # noqa: E402
 from _common import OUT_SLDASM, _flag_only, check, log, run_build  # noqa: E402

@@ -32,8 +32,10 @@ from _common import (
 )
 from _assembly import (
     coincident_mate,
-    gear_mate,
     named_ref,
+)
+from _assembly_couplings import (
+    gear_mate,
 )
 from build_motion_study import (
     ANGLE, ASM, DURATION_S, FLEXIBLE, _comp_xform, _entity_ref, _find_one,

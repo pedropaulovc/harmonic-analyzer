@@ -29,7 +29,7 @@ from _common import (
     check,
     log,
 )
-from _assembly import (
+from _assembly_couplings import (
     gear_mate,
     rack_pinion_mate,
 )
