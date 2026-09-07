@@ -139,27 +139,38 @@ def test_project_layout_rejects_missing_sheet_contract_before_mutation(monkeypat
 
 
 @pytest.mark.parametrize("stage", ["callouts", "spacing", "packing"])
-def test_project_layout_expires_handoff_after_native_failure(monkeypatch, stage):
+@pytest.mark.parametrize("cleanup", ["none", "obstacle", "packing", "both"])
+def test_project_layout_expires_handoff_after_native_failure(
+    monkeypatch, stage, cleanup
+):
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _: value)
     sheet = SimpleNamespace(GetProperties2=lambda: (8, 12, 1, 1, 0, 0.4318, 0.2794, 0))
     adapter = SimpleNamespace(
         currentModel=SimpleNamespace(GetCurrentSheet=lambda: sheet)
     )
     handoff, obstacle = Mock(), Mock()
+    if cleanup in {"obstacle", "both"}:
+        obstacle.close.side_effect = RuntimeError("obstacle close refused")
+    if cleanup in {"packing", "both"}:
+        handoff.close.side_effect = RuntimeError("packing close refused")
     monkeypatch.setattr(
         handoff_module,
         "AnnotationMeasurementHandoff",
         Mock(side_effect=(handoff, obstacle)),
     )
     position, arrange, repair = Mock(), Mock(), Mock()
+    primary = RuntimeError("native failure")
     {"callouts": position, "spacing": arrange, "packing": repair}[
         stage
-    ].side_effect = RuntimeError("native failure")
+    ].side_effect = primary
     monkeypatch.setattr(callouts, "arrange_native_callouts", position)
     monkeypatch.setattr(gtol, "arrange_native_gtol_columns", arrange)
     monkeypatch.setattr(native, "repair_native_layout", repair)
-    with pytest.raises(RuntimeError, match="native failure"):
+    with pytest.raises(RuntimeError, match="native failure") as caught:
         drawing.repair_project_drawing_layout(adapter, views={"front": object()})
+    assert caught.value is primary
+    if cleanup != "none":
+        assert primary.__notes__
     handoff.close.assert_called_once_with()
     obstacle.close.assert_called_once_with()
     if stage != "packing":
@@ -167,6 +178,41 @@ def test_project_layout_expires_handoff_after_native_failure(monkeypatch, stage)
         repair.assert_not_called()
     if stage == "callouts":
         arrange.assert_not_called()
+
+
+def test_project_layout_attempts_both_closes_without_a_primary_failure(monkeypatch):
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _: value)
+    sheet = SimpleNamespace(GetProperties2=lambda: (8, 12, 1, 1, 0, 0.4318, 0.2794, 0))
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(GetCurrentSheet=lambda: sheet)
+    )
+    packing_error, obstacle_error = (
+        RuntimeError("packing close refused"),
+        RuntimeError("obstacle close refused"),
+    )
+    handoff, obstacle = Mock(), Mock()
+    handoff.close.side_effect, obstacle.close.side_effect = (
+        packing_error,
+        obstacle_error,
+    )
+    monkeypatch.setattr(
+        handoff_module,
+        "AnnotationMeasurementHandoff",
+        Mock(side_effect=(handoff, obstacle)),
+    )
+    monkeypatch.setattr(callouts, "arrange_native_callouts", Mock())
+    monkeypatch.setattr(gtol, "arrange_native_gtol_columns", Mock())
+    monkeypatch.setattr(
+        native,
+        "repair_native_layout",
+        Mock(return_value=Report(native.NativeLayoutStatus.UNCHANGED, "fit")),
+    )
+    with pytest.raises(RuntimeError) as caught:
+        drawing.repair_project_drawing_layout(adapter, views={"front": object()})
+    assert caught.value is obstacle_error
+    obstacle.close.assert_called_once_with()
+    handoff.close.assert_called_once_with()
+    assert any("packing close refused" in note for note in caught.value.__notes__)
 
 
 @pytest.mark.parametrize(
@@ -272,6 +318,7 @@ def test_additional_final_gate_cannot_replace_gtol_or_repeat_measurements(
         "validate_gtol_leader_clearance",
         lambda rows: validate("gtol", rows),
     )
+
     def additional(rows):
         return validate("additional", rows)
 
