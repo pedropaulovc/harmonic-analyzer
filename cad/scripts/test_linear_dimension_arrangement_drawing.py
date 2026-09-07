@@ -159,6 +159,50 @@ def test_pair_offset_uses_actual_body_height_and_exact_source_values(scene):
     assert distance == pytest.approx(0.010)
 
 
+def test_retained_native_nominal_roundoff_is_not_a_parameter_mutation(scene):
+    # datum-policy-wepq18dc stopped on the first pair before any native setter.
+    _, views, before = scene
+    values = {
+        "front/BarLength": 0.16900000007399998,
+        "front/TipCentreX": 0.182799999906,
+        "holes/RD1": 0.127,
+        "holes/RD2": 0.1778,
+    }
+    for key, value in values.items():
+        row = before.dimensions[key]
+        before.dimensions[key] = replace(
+            row, parameters=((*row.parameters[0][:3], value),)
+        )
+    pairs, _ = control.planned_pairs(before, views)
+    assert set(values) == {key for pair in pairs.values() for key in pair}
+
+
+@pytest.mark.parametrize("delta", [-2e-9, 2e-9])
+def test_nominal_design_check_still_rejects_outside_one_nanometre(scene, delta):
+    _, views, before = scene
+    key = "front/BarLength"
+    row = before.dimensions[key]
+    before.dimensions[key] = replace(
+        row, parameters=((*row.parameters[0][:3], 0.169 + delta),)
+    )
+    with pytest.raises(RuntimeError, match="value contract"):
+        control.planned_pairs(before, views)
+
+
+def test_even_one_ulp_same_session_value_change_remains_a_mutation(scene):
+    import math
+
+    adapter, _, before = scene
+    after = changed(before)
+    key = "front/BarLength"
+    row = before.dimensions[key]
+    after.dimensions[key] = replace(
+        row, parameters=((*row.parameters[0][:3], math.nextafter(0.169, math.inf)),)
+    )
+    with pytest.raises(RuntimeError, match="system value changed"):
+        control.compare_control(adapter, before, after, set(before.dimensions))
+
+
 @pytest.mark.parametrize(
     "mode",
     [

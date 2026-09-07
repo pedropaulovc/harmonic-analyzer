@@ -75,3 +75,30 @@ The `linear_dimension_control` receipt and `diagnostic.linear_dimensions.control
 span include diagnostic measurements, so they are not production layout timing.
 Native effectiveness and final readability remain unproven until this control
 runs; offline tests establish only its selection, scope and acceptance contract.
+
+## First native attempt: nominal comparison rejected before mutation
+
+At root `e9b3fde6` / adapter `e77bfda4`, receipt
+`cad/out/reports/datum-policy-wepq18dc/pilot.json`
+(SHA-256 `e2edccbb7923b050da32dd002630a1ca1c28566ab187e40f5218d774461669a2`)
+captured all four candidates, then rejected `BarLength` before any spacing setter
+or alignment call. The source identity, native type, BASIC type, visibility and
+owner checks were correct. Captured SI values were:
+
+| Named dimension | Native value (m) | Nominal (m) | Difference (nm) |
+| --- | ---: | ---: | ---: |
+| BarLength | 0.16900000007399998 | 0.169 | +0.074 |
+| TipCentreX | 0.182799999906 | 0.1828 | -0.094 |
+| Hole-view RD1 | 0.127 | 0.127 | 0 |
+| Hole-view RD2 | 0.1778 | 0.1778 | 0 |
+
+The original 1e-12 m nominal comparison was narrower than the observed native
+model representation. The diagnostic now uses **1e-9 m absolute, zero relative
+tolerance only when matching these four native values to their nominal design
+values**. This is a bounded 1 nm recognition allowance, not a manufacturing
+tolerance, a universal SolidWorks precision claim, or permission to mutate a
+parameter. Exact native parameter handles and exact before/after raw values,
+configuration, BASIC/other tolerance type and source witnesses remain mandatory.
+The retained-value regression failed before this correction; a one-ULP parameter
+change during the command still fails, while a 2 nm nominal mismatch also fails.
+No native spacing effect was measured by this stopped attempt.
