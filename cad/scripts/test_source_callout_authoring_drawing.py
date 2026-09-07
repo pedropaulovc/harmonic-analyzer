@@ -331,6 +331,7 @@ async def owned_pilot_case(
             MarkedForDrawing=True,
             GetPrimaryPrecision2=lambda: 2,
             GetPrimaryTolPrecision2=lambda: 5,
+            ShowDimensionValue=True,
             GetText=lambda index: model.text if index in (4, 8) else "",
             SetText=Mock(side_effect=set_text),
             GetLowerText=Mock(side_effect=AssertionError("no part LowerText")),

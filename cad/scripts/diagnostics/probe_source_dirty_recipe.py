@@ -19,9 +19,11 @@ particular inner COM setter caused the transition. No save/export is allowed.
 IFeature.GetFirst/GetNextDisplayDimension enumerate feature/subfeature dimensions
 in unspecified order. No display-toggle prerequisite is written by this probe;
 coverage is reported as the observed inventory and must include the selected
-target's required manufacturing dimensions. Both registered targets require five.
+target's required manufacturing dimensions (five for arbor/tip, four for fillister).
 Missing support fails rather than claiming completeness. Arbor remains the default;
-cone_tip_adjuster is an explicit independent control, with no automatic next trial.
+cone_tip_adjuster and fillister_screw are explicit independent controls, with no
+automatic next trial. Raw ShowDimensionValue is captured with GetText(1..8);
+whole-text setter presence alone does not establish a source transition.
 
 R2026x observation, 2026-09-06, frozen 99eadbe7, trace
 0x8d83b3f3456fe76a203b3f0b2b6c84e4: baseline getters, new drawing, three view
@@ -60,6 +62,7 @@ sys.path.insert(0, str(ROOT / "cad/scripts"))
 from _common import check  # noqa: E402
 import arbor_pedestal_spec  # noqa: E402
 import cone_tip_adjuster_spec  # noqa: E402
+import fillister_screw_spec  # noqa: E402
 from diagnostics import benchmark_drawing_recipes as benchmark  # noqa: E402
 from diagnostics.probe_datum_policy_recipes import (  # noqa: E402
     adapter_fingerprints,
@@ -81,6 +84,7 @@ class DiagnosticStop(BaseException):
 class Target(StrEnum):
     ARBOR_PEDESTAL = "arbor_pedestal"
     CONE_TIP_ADJUSTER = "cone_tip_adjuster"
+    FILLISTER_SCREW = "fillister_screw"
 
 
 @dataclass(frozen=True)
@@ -92,6 +96,7 @@ class RecipeTarget:
 TARGETS = {
     Target.ARBOR_PEDESTAL: RecipeTarget(arbor_pedestal_spec, "arbor"),
     Target.CONE_TIP_ADJUSTER: RecipeTarget(cone_tip_adjuster_spec, "cone-tip-adjuster"),
+    Target.FILLISTER_SCREW: RecipeTarget(fillister_screw_spec, "fillister-screw"),
 }
 
 
@@ -320,7 +325,7 @@ async def probe(
             for feature, names in selected.spec.DRAWING_DIMENSIONS.items()
             for name in names
         ),
-        "scope": "one selected recipe; observed source dimensions/text; first dirty boundary or before finalization; no save/export",
+        "scope": "one selected recipe; observed source dimensions/text/numeric visibility; first dirty boundary or before finalization; no save/export",
         "helper_revision": benchmark.revision("HEAD"),
     }
     report_path = directory / "source-dirty.json"
