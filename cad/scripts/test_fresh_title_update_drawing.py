@@ -15,21 +15,22 @@ from test_owned_native_documents_drawing import Model, native  # noqa: F401
 
 
 @pytest.mark.parametrize("returned", [True, False, None])
-def test_edit_rebuild_is_one_checked_pre_save_call_without_redraw(
-    monkeypatch, returned
+@pytest.mark.parametrize("variant,method,field,args", [
+    (probe.Variant.EDIT_REBUILD, "EditRebuild3", "edit_rebuild", ()),
+    (probe.Variant.FORCE_REBUILD, "ForceRebuild3", "force_rebuild", (False,)),
+])
+def test_rebuild_is_one_checked_pre_save_call_without_redraw(
+    monkeypatch, returned, variant, method, field, args
 ):
     calls = []
+    native_rebuild = Mock(side_effect=lambda *actual: calls.append(field) or returned)
     model = SimpleNamespace(
-        EditRebuild3=Mock(side_effect=lambda: calls.append("edit_rebuild") or returned),
-        GraphicsRedraw2=Mock(
-            side_effect=AssertionError("redraw is a different variant")
-        ),
+        GraphicsRedraw2=Mock(side_effect=AssertionError("different variant")),
     )
+    setattr(model, method, native_rebuild)
     adapter = SimpleNamespace(
         currentModel=model,
-        ownership=SimpleNamespace(
-            saving_as=lambda _: __import__("contextlib").nullcontext()
-        ),
+        ownership=SimpleNamespace(saving_as=lambda _: __import__("contextlib").nullcontext()),
     )
     observer = SimpleNamespace(record=lambda stage: calls.append(stage))
     monkeypatch.setattr(probe.common, "apply_custom_properties", lambda *_: None)
@@ -42,27 +43,25 @@ def test_edit_rebuild_is_one_checked_pre_save_call_without_redraw(
     monkeypatch.setattr(probe.drawing, "save_drawing", save)
 
     def run():
-        with probe.finalizer_observations(
-            adapter, observer, probe.Variant.EDIT_REBUILD
-        ) as counts:
+        with probe.finalizer_observations(adapter, observer, variant) as counts:
             probe.common.apply_custom_properties(adapter, {"UNIT_DISPLAY": "MM"})
             probe.drawing.save_drawing(adapter, "owned.SLDDRW", pdf_path="owned.pdf")
         return counts
 
     if returned is True:
-        assert run()["edit_rebuild"] == 1
+        assert run()[field] == 1
         assert (
             calls.index("before_native_save")
-            < calls.index("edit_rebuild")
-            < calls.index("after_pre_save_edit_rebuild")
+            < calls.index(field)
+            < calls.index(f"after_pre_save_{field}")
             < calls.index("drawing")
             < calls.index("pdf")
         )
     else:
-        with pytest.raises(RuntimeError, match="EditRebuild3"):
+        with pytest.raises(RuntimeError, match=method):
             run()
         assert "drawing" not in calls and "pdf" not in calls
-    model.EditRebuild3.assert_called_once_with()
+    native_rebuild.assert_called_once_with(*args)
     model.GraphicsRedraw2.assert_not_called()
 
 
@@ -135,7 +134,7 @@ def test_same_justification_uses_void_setter_then_redraw_before_save(monkeypatch
     if mode == "preserved":
         assert run() == {
             "properties": 1, "drawing": 1, "pdf": 1,
-            "redraw": 1, "edit_rebuild": 0, "justification": 1,
+            "redraw": 1, "edit_rebuild": 0, "force_rebuild": 0, "justification": 1,
         }
         assert calls.index("before_native_save") < calls.index(("justify", 2))
         assert calls.index(("justify", 2)) < calls.index("after_pre_save_rejustify")
@@ -319,6 +318,7 @@ def test_finalizer_hooks_preserve_call_order_and_only_candidate_redraws(
         "pdf": 1,
         "redraw": int(variant is probe.Variant.REDRAW),
         "edit_rebuild": int(variant is probe.Variant.EDIT_REBUILD),
+        "force_rebuild": 0,
         "justification": 0,
     }
     assert (

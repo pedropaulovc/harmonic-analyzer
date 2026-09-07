@@ -2,8 +2,8 @@
 
 Status: native baseline reproduced the printed shift; the one pre-save redraw
 and one checked pre-save rebuild did not prevent it. This diagnostic does not
-change production finalization. The next candidate reapplies the title's existing
-horizontal justification and performs its documented redraw; native result pending.
+change production finalization. Same-value horizontal justification followed by
+its documented redraw also leaves the shift. A forced-rebuild control is next.
 Both independent native controls are recorded below.
 
 The retained rocker control proved a real printed change: cold reopening moved
@@ -243,4 +243,28 @@ anchor, vertical alignment, lock and text remain governed by the original exact
 checks. No positions or property expressions are assigned. The same positive
 baseline gate, cold exports, full raw deltas and ownership protection remain.
 Offline: 63 focused tests pass, including void return, changed alignment/link,
-setter failure and restoration of diagnostic wrappers. Native execution pending.
+setter failure and restoration of diagnostic wrappers.
+
+The native control at root `5bef3987` finished with exit 0 and
+`candidate_not_stable`; session 4767 released the seat. Report:
+`cad/out/reports/fresh-title-9vn4gojb/title-update.json`, SHA-256
+`17653a6eed210105ce9e1a27a8bb856b1bea47c24fea49c1c31e9f2e6aab0e30`.
+Both baseline and candidate retain the same 7.22522650825 mm printed shift and
+11,232 changed pixels. Trial totals were 63.859078 and 63.149497 seconds, including
+the full diagnostic observations; these are not speed comparisons. Candidate
+counts are one justification setter, one redraw, zero rebuilds, one native save
+and one PDF save. The rejustify span includes observation/checkpoint work and
+must not be described as setter-only time.
+
+The raw pre-setter, post-setter and post-redraw observations confirm exact
+anchor/extent, horizontal/vertical alignment, lock and unresolved-link equality.
+Originals, template and both copied parts retain their exact hashes. Ownership
+starts/ends empty and reports preserved, with no probe or cleanup error. This
+same-value setter result does not establish whether a different-value setter,
+text-format update or forced rebuild refreshes the cached text origin.
+
+`--candidate pre_save_force_rebuild` adds one documented
+`IModelDoc2.ForceRebuild3(False)` before the native save, requires native `True`,
+and makes no redraw or note setter call. Existing baseline and output comparisons
+are unchanged. The ordinary/forced rebuild tests cover exact argument shapes and
+False/None rejection before saving. 66 focused tests pass; native result pending.
