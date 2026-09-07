@@ -409,7 +409,7 @@ def datum_dimension_attachment(
 
 
 @_telemetry.traced("diagnostic.drawing_attachments.snapshot")
-def snapshot(model, *, app, dimension_values="system"):
+def snapshot(model, *, app, dimension_values="system", view_observer=None):
     checked, excluded, models = {}, {}, {}
     dimensions, dimensions_excluded, dimension_observations = {}, {}, {}
     semantic_attachments = {}
@@ -418,6 +418,8 @@ def snapshot(model, *, app, dimension_values="system"):
         inventory = tuple(
             _early_bound(raw, "IAnnotation") for raw in view.GetAnnotations() or ()
         )
+        if view_observer is not None:
+            view_observer(view_key, view, inventory)
         for annotation in inventory:
             annotation_kind = int(annotation.GetType())
             key = f"{view_key}/{annotation.GetName()}/{annotation_kind}"

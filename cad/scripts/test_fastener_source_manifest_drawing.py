@@ -272,6 +272,14 @@ async def test_selected_fastener_runs_existing_copy_and_cold_gates(
 ):
     from test_benchmark_drawing_recipes import recipe
     from test_datum_policy_recipes_drawing import Adapter, fixture_sources
+    from diagnostics import _model_dimension_coverage as coverage
+
+    # This test replaces every source/drawing witness with scalar sentinels.
+    # Real declared coverage + pilot composition is exercised independently.
+    selected_coverage = Mock()
+    monkeypatch.setattr(
+        coverage, "ModelDimensionCoverage", Mock(return_value=selected_coverage)
+    )
 
     sources, _ = fixture_sources(tmp_path, monkeypatch)
     source = sources / f"{target.replace('_', '-')}.SLDPRT"
@@ -293,7 +301,12 @@ async def test_selected_fastener_runs_existing_copy_and_cold_gates(
     )
     seen = []
 
-    def witness(adapter, *, source, configuration):
+    def witness(adapter, *, source, configuration, **kwargs):
+        assert kwargs == (
+            {"model_dimensions": selected_coverage}
+            if target == "fillister_screw"
+            else {}
+        )
         assert source.name.startswith(target.replace("_", "-") + "-source-")
         assert source.is_relative_to(tmp_path / "reports")
         assert configuration == "Default"

@@ -644,6 +644,11 @@ async def test_owned_dirty_part_copies_preserve_real_baseline_lifecycle(
     mode,
     targets,
 ):
+    from diagnostics import _model_dimension_coverage as coverage
+
+    # The lifecycle fixture intentionally replaces native source/ink readers.
+    # Keep its ownership assertions; the declared coverage has a real pilot test.
+    monkeypatch.setattr(coverage, "ModelDimensionCoverage", Mock())
     source_root, guard_root = fixture_sources(tmp_path, monkeypatch)
     expected_order = probe.ORDER if targets is None else targets
     for target in targets or ():
@@ -680,7 +685,7 @@ async def test_owned_dirty_part_copies_preserve_real_baseline_lifecycle(
     monkeypatch.setattr(
         probe,
         "drawing_witness",
-        lambda adapter, *, source, configuration: {
+        lambda adapter, *, source, configuration, **_coverage: {
             "reference": adapter.currentModel.references[0].path
         },
     )
