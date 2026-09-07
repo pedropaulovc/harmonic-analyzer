@@ -108,6 +108,11 @@ def script_for(stem: str) -> Path:
     return SCRIPTS_DIR / f"build_{stem}.py"
 
 
+class _SourceAvailability(Enum):
+    AVAILABLE = "available"
+    FUTURE = "future"
+
+
 class _AssemblySources:
     """Bounded enumeration of source arguments, not log/error/documentation text.
 
@@ -177,15 +182,31 @@ class _AssemblySources:
             return self.nodes[scope]
         return [*self.nodes[scope], *self.nodes[self.tree]]
 
+    def availability_before(self, item: ast.AST, node: ast.AST) -> _SourceAvailability:
+        """Include lexical, deferred-global and possible prior-iteration writes."""
+        if self.scopes[node] is not self.tree and self.scopes[item] is self.tree:
+            return _SourceAvailability.AVAILABLE
+        if (
+            getattr(item, "lineno", 0), getattr(item, "col_offset", 0)
+        ) < (node.lineno, node.col_offset):
+            return _SourceAvailability.AVAILABLE
+        ancestors = set()
+        cursor = item
+        while cursor in self.parents:
+            cursor = self.parents[cursor]
+            ancestors.add(cursor)
+        cursor = node
+        while cursor in self.parents:
+            cursor = self.parents[cursor]
+            if isinstance(cursor, (ast.For, ast.AsyncFor, ast.While)) and cursor in ancestors:
+                return _SourceAvailability.AVAILABLE
+        return _SourceAvailability.FUTURE
+
     def bindings(self, node: ast.Name, trail: frozenset[ast.AST]) -> list[ast.AST]:
         found = []
         scope = self.scopes[node]
         for item in self.scope_nodes(node):
-            late_global = scope is not self.tree and self.scopes[item] is self.tree
-            if not late_global and (
-                getattr(item, "lineno", 0),
-                getattr(item, "col_offset", 0),
-            ) >= (node.lineno, node.col_offset):
+            if self.availability_before(item, node) is _SourceAvailability.FUTURE:
                 continue
             if (
                 isinstance(item, ast.AugAssign)
@@ -254,9 +275,7 @@ class _AssemblySources:
             for item in self.items(binding, trail)
         ]
         for item in self.scope_nodes(node):
-            available = getattr(item, "lineno", 0) < node.lineno or (
-                self.scopes[node] is not self.tree and self.scopes[item] is self.tree
-            )
+            available = self.availability_before(item, node) is _SourceAvailability.AVAILABLE
             if isinstance(item, (ast.Assign, ast.AnnAssign)):
                 targets = (
                     item.targets if isinstance(item, ast.Assign) else [item.target]
@@ -401,16 +420,16 @@ class _AssemblySources:
                     target.value
                 ) != ast.dump(owner):
                     continue
+                if key is not None and self.availability_before(item, node) is _SourceAvailability.FUTURE:
+                    continue
                 if key is not None and ast.dump(target.slice) != ast.dump(key):
-                    continue
-                late_global = (
-                    self.scopes[node] is not self.tree
-                    and self.scopes[item] is self.tree
-                )
-                if key is not None and not late_global and (
-                    item.lineno, item.col_offset
-                ) >= (node.lineno, node.col_offset):
-                    continue
+                    if (
+                        isinstance(target.slice, ast.Constant)
+                        and isinstance(key, ast.Constant)
+                        and target.slice.value != key.value
+                    ):
+                        continue
+                    self.fail(item)  # different key syntax can still alias the read
                 found.append(item.value)
         if not found:
             self.fail(node)
