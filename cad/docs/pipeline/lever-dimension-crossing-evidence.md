@@ -285,3 +285,38 @@ all semantic/forbidden-selector assertions and pinned the lever's one pass
 between dimension creation and datum/GTol creation. Seven COM-free gates passed
 at `f0fb2a43`, including 3,784 recipe tests in 72.35 s. This is not the full
 drawing-inclusive native merge gate.
+## Five-view failure print retained
+
+At root `89412bcc`, adapter `e77bfda4`, PID 31860, the next prepared lever run
+again passed the unchanged template-ink check and stopped on the same two final
+crossings. Failure-only capture retained a PDF and PNG before owned cleanup.
+Both were inspected: the shorter horizontal dimension line touches/crosses the
+lower, longer BASIC dimension's box for 169/182.80 and 127/177.80. These are not
+the earlier hole/radius leader conflicts. No crossing was exempted.
+
+The full semantic capture failed before and after export because the saved-owner
+dimension checker rejected the unsaved native identity
+`RD1@Drawing View1@Draw52.Drawing`. Consequently complete native ink/attachment
+preservation was **not** proved by this run. The PDF/PNG still exist; the original
+crossing exception remains the primary failed outcome. Independent raw-annotation
+capture is the next diagnostic correction, not a semantic-check waiver.
+
+The drawing stayed unsaved, dirty and visible across the PDF-only export. No
+native drawing file was created; original/copy hashes were unchanged. Original
+template, prepared cache, runtime helper/adapter guards passed. Owned cleanup
+returned the empty initial document inventory without error. The failed image's
+SCALE 1:1 text precedes `finalize_drawing`, which re-pins and checks sheet scale;
+it is not evidence that a finalized lever drawing would retain that scale.
+
+Receipts under `cad/out/reports/datum-policy-duc4i6q5/`:
+
+- `pilot.json`: `31b0c77d80d68d164148672cc78bd7072931379fdc00963eef278a865fcc9e4e`.
+- `channel_lever/failure-evidence.json`: `2dabcbd286f80cfc7ddf05f83e8a28df4f2c795e758e213359e80cf0118200c7`.
+- `channel_lever/failure.pdf`: `82dca5698477aa76b2419f6e4fc53fdd5de5491eddac0ef25d4e69485e39d039`.
+- `channel_lever/failure.png`: `334034f8ee058a5e83c01768f1249924de296dc86e4ecdbc476aebfdb492ba76`.
+
+The recipe ran 99.840350 s; the pilot including failure capture ran 143.337249 s.
+Offline gates ran concurrently, so these are not comparative performance data.
+All seven offline gates passed at this code checkpoint, including 3,890 recipe
+tests in 74.42 s (`pytest-telemetry/run-svaajh5a`). This is not the full native
+pipeline or final drawing acceptance.
