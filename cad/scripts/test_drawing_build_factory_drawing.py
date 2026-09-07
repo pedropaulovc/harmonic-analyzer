@@ -8,6 +8,29 @@ import pytest
 from _drawing_registry import DRAWINGS
 
 
+@pytest.mark.parametrize(
+    "check",
+    [
+        "test_every_recipe_declares_and_consumes_its_exact_explicit_spec",
+        "test_recipe_usage_does_not_bypass_required_machine_seat",
+    ],
+)
+def test_recipe_contract_checks_decode_source_as_utf8(monkeypatch, check):
+    drawing = next(item for item in DRAWINGS if item.name == "crank_arm")
+    read_text = Path.read_text
+    observed = []
+
+    def read(path, *args, **kwargs):
+        if path == drawing.script:
+            assert kwargs.get("encoding") == "utf-8"
+            observed.append(path)
+        return read_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", read)
+    globals()[check](drawing)
+    assert observed == [drawing.script]
+
+
 @pytest.mark.parametrize("drawing", DRAWINGS, ids=lambda item: item.name)
 def test_every_recipe_declares_and_consumes_its_exact_explicit_spec(drawing):
     import ast
@@ -23,7 +46,7 @@ def test_every_recipe_declares_and_consumes_its_exact_explicit_spec(drawing):
     assert isinstance(module.TEMPLATE_SPEC, TemplateSpec)
     assert module.TEMPLATE_SPEC.scale == getattr(module, "SHEET_SCALE", (1, 1))
     assert module.TEMPLATE_SPEC.decimals == 2
-    tree = ast.parse(drawing.script.read_text())
+    tree = ast.parse(drawing.script.read_text(encoding="utf-8"))
     calls = [
         node
         for node in ast.walk(tree)
@@ -78,7 +101,9 @@ def test_recipe_usage_does_not_bypass_required_machine_seat(drawing):
     import ast
     import re
 
-    docstring = ast.get_docstring(ast.parse(drawing.script.read_text())) or ""
+    docstring = (
+        ast.get_docstring(ast.parse(drawing.script.read_text(encoding="utf-8"))) or ""
+    )
     assert not re.search(r"uv run python[^\n]*draw_\w+\.py", docstring)
 
 

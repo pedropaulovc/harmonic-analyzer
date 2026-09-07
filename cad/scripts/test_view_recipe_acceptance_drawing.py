@@ -2,6 +2,7 @@
 
 import ast
 from contextlib import contextmanager
+import inspect
 import json
 from pathlib import Path
 from types import SimpleNamespace as NS
@@ -557,16 +558,22 @@ async def test_view_enrollment_reuses_full_owned_pilot_without_model_reverse_map
             self.context_report = {"context": "view"}
 
         @contextmanager
-        def observe(self, adapter, source_entities):
+        def observe(self, adapter, source_entities=None):
             assert source_entities is None
             phases.append("observe")
             yield
 
-        def drawing_snapshot(self, adapter, source_entities, *, phase):
+        def drawing_snapshot(self, adapter, source_entities=None, *, phase):
             assert source_entities is None
             phases.append(phase)
             return {"view": "same", "geometry": "same"}
 
+    for method in ("observe", "drawing_snapshot"):
+        keywords = {"phase": "built"} if method == "drawing_snapshot" else {}
+        # VIEW observers permit omission of the unused MODEL bank. The double
+        # must accept the same call shapes as the real protocol.
+        inspect.signature(getattr(Witness, method)).bind(None, None, **keywords)
+        inspect.signature(getattr(Witness, method)).bind(None, None, None, **keywords)
     monkeypatch.setattr(pilot, "ViewEntityAcceptance", Witness)
     monkeypatch.setattr(
         pilot,
@@ -580,7 +587,9 @@ async def test_view_enrollment_reuses_full_owned_pilot_without_model_reverse_map
             adapter, "candidate", source_root, source_root, root, targets=(target,)
         )
     else:
-        with pytest.raises(RuntimeError, match=r"source copy changed|annotation layout"):
+        with pytest.raises(
+            RuntimeError, match=r"source copy changed|annotation layout"
+        ):
             await pilot.pilot(
                 adapter, "candidate", source_root, source_root, root, targets=(target,)
             )

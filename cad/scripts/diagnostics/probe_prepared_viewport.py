@@ -57,13 +57,33 @@ def read_inputs(receipt_path, receipt_sha, template_path, template_sha):
         if base.prepared._sha(paths[label]) != sha:
             raise RuntimeError(f"pinned {label} SHA-256 differs")
     receipt = json.loads(paths["receipt"].read_text(encoding="utf-8"))
+    for field in ("saved_path", "status", "inputs.spec.scale", "inputs.spec.decimals"):
+        value = receipt
+        keys = field.split(".")
+        for index, key in enumerate(keys):
+            if not isinstance(value, dict) or key not in value:
+                missing = ".".join(keys[: index + 1])
+                raise RuntimeError(
+                    f"retained receipt {paths['receipt']} lacks required {missing} field"
+                )
+            value = value[key]
+    for field in ("saved_path", "status"):
+        if not isinstance(receipt[field], str) or not receipt[field].strip():
+            raise RuntimeError(
+                f"retained receipt {paths['receipt']} requires nonempty {field} text"
+            )
     if (
         paths["template"].suffix.lower() != ".drwdot"
         or Path(receipt["saved_path"]).resolve() != paths["template"]
     ):
         raise RuntimeError("retained receipt does not name this exact DRWDOT")
     spec = receipt["inputs"]["spec"]
-    base.prepared.TemplateSpec(tuple(spec["scale"]), spec["decimals"])
+    try:
+        base.prepared.TemplateSpec(tuple(spec["scale"]), spec["decimals"])
+    except (TypeError, ValueError) as error:
+        raise RuntimeError(
+            f"retained receipt {paths['receipt']} has invalid inputs.spec: {error}"
+        ) from error
     return {
         "receipt": {"path": str(paths["receipt"]), "sha256": receipt_sha},
         "template": {"path": str(paths["template"]), "sha256": template_sha},

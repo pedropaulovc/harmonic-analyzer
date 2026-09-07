@@ -127,3 +127,72 @@ Final focused/adjacent evidence: **226 passed in 5.82 s**, telemetry
 eight affected recipe tests, sheet setup/finalizer, owned pilot, source-authoring
 and unsaved-owner tests. No COM, rebase, source artifact, review reply or
 resolution action was performed. Native acceptance remains separate.
+
+## Completed review of `6506ca2d`
+
+The Windows CLI run completed with seven findings for exact head
+`6506ca2d8553477d4b2cf37e3c0746101dafba92`. Its requested base and `git.json`
+both name `0083e08be5b7a34bc6e74363d48422279b38a202`. The completion marker
+reports `complete`; this is a completed review with findings, not a clean review.
+The adapter gitlink is `25bc99b1ae39d8c0e004867e9b5c0f2068f2abc2`.
+All 196 stored diff blocks match the explicit base-to-head range after
+trailing-newline normalization. That Git range has 198 blocks: the review
+omitted `_drawing_common.py` and this triage file, both supplied as `--config`
+context. The review therefore does not establish coverage of those two changed
+files; the next clean-review gate must cover them as well.
+
+The original receipt and its retained copy are:
+
+```text
+C:/Users/pedro/AppData/Local/coderabbit/reviews/67bfeb62/582e3d84/reviews/1788801702928
+C:/src/ha-factory-review-contracts/cad/out/reports/coderabbit-681-6506ca2d/native-receipt
+git.json SHA256: 84cee3c628806297f8014b95a35903ddb75d85ca4a5da5fc56d165dcc0ac7fa5
+incrementalDiff.v2.json SHA256: 7bb401c9a8e00d3c51a0c9e406dc741c172e62f4df36649f66b89e236f6582f9
+```
+
+Triage and fixes ran offline in the separate `ha-factory-review-6506` worktree
+at that exact head, with its own venv and pinned adapter. The reviewed parent
+checkout remained untouched by this work.
+
+| Finding prefix | Verified disposition |
+|---|---|
+| `abeb8ac9`, `ce0f4b14` | Rename unused `sheet` bindings in crank arm and crank handle. Ruff reproduced both RUF059 findings. Factory calls, arguments and layout are unchanged. |
+| `0d51a8d5` | Give both VIEW observer test-double methods the real protocol's optional source-bank argument. Assert both positional call shapes; keep all original source, identity, title and cleanup assertions. |
+| `478ed6ef` | Validate required retained-receipt fields before indexing. Errors identify the pinned receipt path and missing field or malformed spec; no substitute values or alternate input are accepted. Original hash, exact-template and TemplateSpec checks remain. |
+| `e14c17b9` | Decode both recipe-contract source reads explicitly as UTF-8. Tests invoke the actual two contract checks and require the encoding at the read boundary. |
+| `2f624e3d` | False count claim. The four explicit type46 entries sum to four, as the finding itself acknowledges. The separately coordinate-picked cone silhouette is the fifth call. Table and manifest remain unchanged. |
+| `e3b50393` | Do not add drawing-side callout authoring. The actual part builder authors `DIMENSION_CALLOUTS` before saving; the drawing verifies the imported source text read-only. The proposal contradicts the deliberately tested source-authoring contract. |
+
+The last two dispositions have existing re-runnable tests beside their code:
+`test_complete_explicit_scope_and_default_order` proves the 21/11/4 manifest
+totals, and `test_all_existing_explicit_recipe_calls_are_enrolled` checks all
+ten recipe inventories. `test_alignment_authors_after_marking_and_verifies_in_drawing`
+pins source authoring before save and the absence of a drawing setter;
+`test_drawing_verifies_exact_import_read_only` and the owned source-authoring
+pilot tests exercise import verification and rejection without repair. These
+tests passed unchanged. No native evidence is newly claimed by this triage.
+
+Fourteen fail-first cases were retained in `run-4q6n0vuq`: six missing receipt
+fields raised bare KeyError, six VIEW protocol cases rejected the valid omitted
+bank argument, and two actual recipe-contract readers omitted UTF-8. After the
+fix, the same cases pass. Thirteen additional malformed receipt cases exercise
+invalid root/nested objects, path/status text and TemplateSpec inputs.
+
+Final focused/adjacent run: **421 passed in 14.88 s**, telemetry
+`run-xgdntwou`, covering the prepared viewport, VIEW acceptance, factory
+contracts, model/source callout authoring and all three affected recipe tests:
+
+```powershell
+$env:PYTHONPATH="$PWD/cad/scripts;$PWD/cad/comparisons/tools"
+uv run --no-sync python -m pytest -q --tb=short cad/scripts/test_prepared_viewport_drawing.py cad/scripts/test_view_recipe_acceptance_drawing.py cad/scripts/test_drawing_build_factory_drawing.py cad/scripts/test_model_dimension_callouts.py cad/scripts/test_source_callout_authoring_drawing.py cad/scripts/test_crank_arm_drawing.py cad/scripts/test_crank_handle_drawing.py cad/scripts/test_alignment_pinion_drawing.py
+```
+
+Ruff `F,RUF043,RUF059` and `git diff --check` pass for the changed Python files.
+An additional `B017` check reported six existing broad exception assertions in
+`test_prepared_viewport_drawing.py`; those predate this review and remain
+unchanged. They are not counted as a passing lint check or a reviewed fix here.
+
+Full-stack native validation, exact integrated-head re-review, visual inspection
+and merging remain VM1 integration work. This pass neither modifies the VM2
+resolver files nor changes manufacturing content, source-authoring behavior,
+native helpers, adapter code, memory files or the fillister enrollment assertion.

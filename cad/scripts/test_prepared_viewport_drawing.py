@@ -13,6 +13,94 @@ from diagnostics import probe_prepared_viewport as probe
 from test_owned_native_documents_drawing import Model, native  # noqa: F401
 
 
+@pytest.mark.parametrize(
+    "field",
+    [
+        "saved_path",
+        "status",
+        "inputs",
+        "inputs.spec",
+        "inputs.spec.scale",
+        "inputs.spec.decimals",
+    ],
+)
+def test_incomplete_retained_receipt_names_missing_field_before_native_work(
+    tmp_path, field
+):
+    template = tmp_path / "prepared.DRWDOT"
+    template.write_bytes(b"retained failed preparation")
+    data = {
+        "saved_path": str(template),
+        "status": "failed",
+        "inputs": {"spec": {"scale": [1, 1], "decimals": 2}},
+    }
+    parent = data
+    *ancestors, leaf = field.split(".")
+    for key in ancestors:
+        parent = parent[key]
+    del parent[leaf]
+    receipt = tmp_path / "receipt.json"
+    receipt.write_text(json.dumps(data), encoding="utf-8")
+    before = receipt.read_bytes(), template.read_bytes()
+    with pytest.raises(RuntimeError) as caught:
+        probe.read_inputs(
+            receipt,
+            probe.base.prepared._sha(receipt),
+            template,
+            probe.base.prepared._sha(template),
+        )
+    assert str(receipt.resolve()) in str(caught.value)
+    assert field in str(caught.value)
+    assert (receipt.read_bytes(), template.read_bytes()) == before
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("receipt", []),
+        ("saved_path", None),
+        ("saved_path", " "),
+        ("status", False),
+        ("status", ""),
+        ("inputs", []),
+        ("inputs.spec", None),
+        ("inputs.spec.scale", None),
+        ("inputs.spec.scale", [1]),
+        ("inputs.spec.scale", [True, 1]),
+        ("inputs.spec.scale", ["1", 1]),
+        ("inputs.spec.decimals", True),
+        ("inputs.spec.decimals", 4),
+    ],
+)
+def test_malformed_retained_receipt_has_actionable_input_error(tmp_path, field, value):
+    template = tmp_path / "prepared.DRWDOT"
+    template.write_bytes(b"retained failed preparation")
+    data = {
+        "saved_path": str(template),
+        "status": "failed",
+        "inputs": {"spec": {"scale": [1, 1], "decimals": 2}},
+    }
+    if field == "receipt":
+        data = value
+    if field != "receipt":
+        parent = data
+        *ancestors, leaf = field.split(".")
+        for key in ancestors:
+            parent = parent[key]
+        parent[leaf] = value
+    receipt = tmp_path / "receipt.json"
+    receipt.write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(RuntimeError) as caught:
+        probe.read_inputs(
+            receipt,
+            probe.base.prepared._sha(receipt),
+            template,
+            probe.base.prepared._sha(template),
+        )
+    assert str(receipt.resolve()) in str(caught.value)
+    assert "retained receipt" in str(caught.value)
+
+
 @pytest.fixture
 def scene(native, monkeypatch, tmp_path):  # noqa: F811
     for name, value in {
