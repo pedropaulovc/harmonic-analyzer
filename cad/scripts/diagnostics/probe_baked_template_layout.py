@@ -1,4 +1,4 @@
-"""Author four approved note layouts into a fresh owned DRWDOT, then instantiate.
+"""Author an explicit reviewed note-layout variant into an owned DRWDOT.
 
 Blank-only native control: no source models, production recipe edits, normalized
 defaults, or original-template replacement. The second drawing inherits the
@@ -24,6 +24,7 @@ sys.path.insert(0, str(ROOT / "cad/scripts"))
 import _drawing_common as common  # noqa: E402
 import _telemetry  # noqa: E402
 from diagnostics import _baked_template_layout as layout  # noqa: E402
+from diagnostics import _baked_template_gaps as gaps  # noqa: E402
 from diagnostics import benchmark_template_defaults as defaults  # noqa: E402
 from diagnostics import probe_prepared_template_cache as printed  # noqa: E402
 from diagnostics import probe_datum_policy_recipes as pilot  # noqa: E402
@@ -42,13 +43,19 @@ def bare_drawing(adapter, template):
     )
 
 
-async def transform(adapter, directory, report, checkpoint):
+async def transform(adapter, directory, report, checkpoint, population=None):
     derived = directory / f"{directory.name}.DRWDOT"
     report["derived_template"] = str(derived)
     with adapter.ownership.creating_document(DocumentKind.DRAWING, derived):
         bare_drawing(adapter, common.PROJECT_DRWDOT)
     report["before"], handles, lines = layout.blank_snapshot(adapter)
     report["plan"] = layout.layout_plan(report["before"]["notes"], lines)
+    label_plan, phase_scope = layout.blank_label_plan, layout.blank_phase_scope
+    if population is not None:
+        report["plan"], report["predicted_population"] = gaps.measured_plan(
+            report["before"]["notes"], lines, report["plan"], population["targets"]
+        )
+        label_plan, phase_scope = gaps.static_label_plan, gaps.phase_scope
     report["operations"] = []
     checkpoint()
     adapter.ownership.assert_current_owned()
@@ -59,8 +66,8 @@ async def transform(adapter, directory, report, checkpoint):
     checkpoint()
     layout.require_same_handles(adapter.swApp, handles, after_handles)
     layout.require_transition(report["before"], report["after"], report["plan"])
-    report["phase_scope"] = layout.blank_phase_scope(report["after"]["notes"])
-    plan = layout.blank_label_plan(report["after"]["notes"], lines, report["plan"])
+    report["phase_scope"] = phase_scope(report["after"]["notes"])
+    plan = label_plan(report["after"]["notes"], lines, report["plan"])
     report["field_fit"] = layout.require_field_fit(report["after"]["notes"], plan)
     first = directory / "authored"
     first.mkdir()
@@ -100,10 +107,8 @@ async def transform(adapter, directory, report, checkpoint):
     layout.require_equal(
         report["saved"], report["reinstantiated"], "bare saved-template inheritance"
     )
-    report["inherited_phase_scope"] = layout.blank_phase_scope(
-        report["reinstantiated"]["notes"]
-    )
-    cold_plan = layout.blank_label_plan(
+    report["inherited_phase_scope"] = phase_scope(report["reinstantiated"]["notes"])
+    cold_plan = label_plan(
         report["reinstantiated"]["notes"], readback_lines, report["plan"]
     )
     report["inherited_field_fit"] = layout.require_field_fit(
@@ -138,18 +143,46 @@ async def transform(adapter, directory, report, checkpoint):
     report["outcome"] = "blank_template_layout_persisted"
 
 
-async def probe(adapter, output_root):
+async def probe(
+    adapter,
+    output_root,
+    *,
+    policy=gaps.LayoutPolicy.FOUR_NOTES,
+    population_path=None,
+    population_sha256=None,
+):
     expected = {
         str(common.PROJECT_DRWDOT): pilot.attachments.file_digest(common.PROJECT_DRWDOT)
     }
+    population = None
+    if policy is gaps.LayoutPolicy.POPULATED_GAPS:
+        if population_path is None or population_sha256 is None:
+            raise ValueError("populated-gaps requires an exact receipt path and SHA256")
+        population = gaps.read_population(
+            population_path, population_sha256, expected[str(common.PROJECT_DRWDOT)]
+        )
+        expected[str(population_path)] = population_sha256
+    elif (
+        policy is not gaps.LayoutPolicy.FOUR_NOTES
+        or population_path is not None
+        or population_sha256 is not None
+    ):
+        raise ValueError(
+            "population evidence is valid only for the explicit populated-gaps variant"
+        )
     output_root.mkdir(parents=True, exist_ok=True)
     directory = Path(tempfile.mkdtemp(prefix="baked-template-", dir=output_root))
     adapter.ownership.register_directory(directory)
-    adapter.ownership.register_source(common.PROJECT_DRWDOT)
+    for source in expected:
+        adapter.ownership.register_source(Path(source))
     path = directory / "template-layout.json"
     report = {
         "status": "running",
-        "scope": "blank-only four-note DRWDOT layout; resolved source-linked fit/full recipes pending",
+        "scope": f"blank-only {policy} DRWDOT layout; fresh resolved fit/full recipes pending",
+        "layout_policy": policy.value,
+        "population_evidence": None
+        if population is None
+        else {key: value for key, value in population.items() if key != "targets"},
         "inputs_before": expected,
         "revision": pilot.benchmark.revision("HEAD"),
         "helpers": pilot.helper_fingerprints(),
@@ -164,7 +197,7 @@ async def probe(adapter, output_root):
     _telemetry.info("baked blank-template report", path=str(path))
     start, errors = time.perf_counter(), []
     try:
-        await transform(adapter, directory, report, checkpoint)
+        await transform(adapter, directory, report, checkpoint, population)
     except Exception as error:
         errors.append(error)
     finally:
@@ -205,6 +238,14 @@ async def probe(adapter, output_root):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--report-root", type=Path, default=ROOT / "cad/out/reports")
+    parser.add_argument(
+        "--layout",
+        type=gaps.LayoutPolicy,
+        choices=list(gaps.LayoutPolicy),
+        default=gaps.LayoutPolicy.FOUR_NOTES,
+    )
+    parser.add_argument("--populated-receipt", type=Path)
+    parser.add_argument("--populated-sha256")
     parser.add_argument("--worker", action="store_true")
     args = parser.parse_args(argv)
     require_owned_diagnostic_environment()
@@ -217,18 +258,36 @@ def main(argv=None):
         )
     if args.worker:
         return run_copy_diagnostic(
-            lambda adapter: probe(adapter, args.report_root.resolve())
+            lambda adapter: probe(
+                adapter,
+                args.report_root.resolve(),
+                policy=args.layout,
+                population_path=args.populated_receipt.resolve(strict=True)
+                if args.populated_receipt
+                else None,
+                population_sha256=args.populated_sha256,
+            )
         )
     import dodo
 
+    command = [
+        sys.executable,
+        str(Path(__file__).resolve()),
+        "--report-root",
+        str(args.report_root.resolve()),
+        "--worker",
+        "--layout",
+        args.layout.value,
+    ]
+    if args.populated_receipt is not None:
+        command += [
+            "--populated-receipt",
+            str(args.populated_receipt.resolve(strict=True)),
+        ]
+    if args.populated_sha256 is not None:
+        command += ["--populated-sha256", args.populated_sha256]
     dodo._run(
-        [
-            sys.executable,
-            str(Path(__file__).resolve()),
-            "--report-root",
-            str(args.report_root.resolve()),
-            "--worker",
-        ],
+        command,
         "baked project template layout",
         com=True,
         log_stem="baked-template-layout",

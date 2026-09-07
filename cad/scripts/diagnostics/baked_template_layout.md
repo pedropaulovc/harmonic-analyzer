@@ -292,3 +292,64 @@ Reader contracts are from installed pypdfium2 and the primary
 `FPDFPageObj_GetMatrix/GetBounds/GetStrokeWidth/GetStrokeColor`, and
 `FPDFPath_GetDrawMode`. This does not make the failed populated layout pass;
 MATERIAL, FINISH and PART/TITLE still require measured template corrections.
+
+## Next explicit blank variant: populated-gap layout (not run natively)
+
+The original `--layout four-notes` control and its four-note allowlist tests
+remain unchanged. `--layout populated-gaps` additionally consumes the exact
+failed two-target receipt above. It verifies its SHA, original template hash,
+complete rocker/lever inventory, unchanged protected/source-copy bytes and
+exact cold raw/image witnesses before creating a drawing. The recipe still
+authors a bare, model-free copy of the original DRWDOT. No measurement or
+layout setter is added to production finalization.
+
+This variant changes seven notes total: the original TITLE/DWG/REV value and
+REV label set, plus MATERIAL label/value and FINISH value. It retains every
+font size other than the already approved 3.5 mm DWG/REV values. PART and FINISH
+labels remain unchanged. The additional moves come from matching semantic
+links, exact font/anchor/style witnesses and actual measured rules/content:
+
+- TITLE moves down 2.167419 mm from the prior left-title target, giving 1.5 mm
+  predicted native clearance below PART. Its font stays 5.291667 mm.
+- FINISH moves down 1.166290 mm below its existing label. The lever's two-line
+  value uses 72.415 mm of a 75.586 mm cell, so a side-by-side treatment would
+  fail. The predicted bottom margin is 0.852681 mm; cell containment remains
+  strict and the label gap is 1.5 mm.
+- MATERIAL uses the cell width: left-align its static label at a half-label-
+  height inset, center label and value extents vertically, and place the value
+  1.5 mm to the label's right. The shallow cell is 6.498703 mm high; a vertical
+  stack with the required 1 mm gap would leave only 0.159350 mm total vertical
+  margin. The lever's 49.055311 mm value fits the horizontal plan without
+  shrinking its 2.38125 mm font or the label's 1.524 mm font.
+
+These numbers are output observations, not hardcoded placement offsets. The
+plan recomputes them from the pinned receipt and current native blank cell
+geometry. Its 0.5 mm planning headroom never relaxes the final 1 mm native/PDF
+clearance requirement. Both sources' predicted extents must fit their cells
+before any setter. A changed template, label/link/style, native anchor, cell
+rule or nonfitting source footprint rejects the plan.
+
+Blank acceptance now includes the five actual static labels REV, DWG, PART,
+MATERIAL and FINISH in their semantic cells, plus exact approved-transition,
+native save/re-instantiation, PDF glyph and full-page PNG persistence. Visible
+unresolved formulas are still retained, not treated as resolved field widths
+or zero ink. The report explicitly requires fresh populated confirmation;
+the copyright footer and all linked-field collisions remain in that phase's
+acceptance. Predicted fit is not native or printed proof.
+
+After source review and an explicit native seat grant, the bounded next
+blank-only invocation is:
+
+```powershell
+$env:HARMONIC_SW_AUTOSTART = '0'
+$env:HARMONIC_REMOTE_CACHE_MODE = 'off'
+$env:HARMONIC_DIAGNOSTIC_SW_PID = '31860'
+uv run --no-sync python cad/scripts/diagnostics/probe_baked_template_layout.py `
+  --layout populated-gaps `
+  --populated-receipt C:/src/harmonic-analyzer/cad/out/reports/populated-template-3kmuxyu1/populated-template.json `
+  --populated-sha256 9c549d6e62a1078fec1772b5de808e338adcda97c8e5bd0e05dcd2d72d1d49c1
+```
+
+The new DRWDOT remains an owned diagnostic output. Only a subsequent explicit
+populated rocker/lever control can validate inherited values/native/PDF fit
+and cold stability; full recipes and fleet fit still follow before rollout.
