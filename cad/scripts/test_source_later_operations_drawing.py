@@ -1,6 +1,9 @@
 """Additional selected-control banks keep native calls and default banks intact."""
 
 import inspect
+import ast
+from contextlib import nullcontext
+from copy import deepcopy
 from types import SimpleNamespace as NS
 from unittest.mock import Mock
 
@@ -243,4 +246,106 @@ def test_sync_error_keeps_primary_and_restores_exact_selected_alias(remaining):
         bank.saved[-1]["source_boundaries"]["banks"][-1]["boundary"]
         == "after_drawing.auto_center_marks#1"
     )
+    assert control.drawing.save_drawing is bank.save
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("selection", ["valid", "wrong_entity"])
+async def test_real_entity_and_source_observers_compose_in_actual_pilot_scope(
+    remaining, monkeypatch, selection
+):
+    from diagnostics import probe_datum_policy_recipes as pilot
+    from diagnostics._recipe_view_entity_acceptance import ViewEntityAcceptance
+    from test_view_recipe_acceptance_drawing import bank as view_bank
+
+    r, bank = remaining, remaining.bank
+    view = view_bank.__wrapped__(monkeypatch)
+    bank.adapter.currentModel = view.adapter.currentModel
+    for name, original in view.originals.items():
+        setattr(bank.module, name, original)
+    entity = ViewEntityAcceptance(bank.module, view.manifest)
+    if selection == "wrong_entity":
+        view.manager.GetSelectedObject6 = lambda *_: object()
+
+    async def build(adapter):
+        bank.module.set_dimension_callouts(adapter, [], {})
+        bank.module.set_dimension_precision(adapter, [], {})
+        for name in r.names[:2]:
+            getattr(bank.module, name)(adapter, r.arg, native_option=r.keyword)
+        bank.module.add_datum_feature(adapter, view.view, label="coordinate datum")
+        bank.module.add_feature_control_frame(
+            adapter, view.view, label="coordinate FCF"
+        )
+        bank.module.add_surface_finish(
+            adapter, view.view, label="finish", entity=view.entity
+        )
+        for _ in range(2):
+            bank.module.add_property_linked_note(
+                adapter, r.arg, native_option=r.keyword
+            )
+        return await bank.module.finalize_drawing(
+            adapter, r.arg, native_option=r.keyword
+        )
+
+    bank.module.build = build
+    # Execute the actual pilot's context-manager block, not a hand-copied order.
+    # The two observer implementations and selection/attachment checks are real;
+    # existing fixtures replace only native operations and source observations.
+    scopes = [
+        node
+        for node in ast.walk(ast.parse(inspect.getsource(pilot.pilot)))
+        if isinstance(node, ast.With)
+        and {"source_boundaries", "entity_acceptance"}
+        <= {
+            name.id
+            for item in node.items
+            for name in ast.walk(item.context_expr)
+            if isinstance(name, ast.Name)
+        }
+    ]
+    assert len(scopes) == 1
+    harness = ast.parse("async def run():\n    pass\n")
+    harness.body[0].body = [
+        deepcopy(scopes[0]),
+        ast.Return(value=ast.Name(id="artifacts", ctx=ast.Load())),
+    ]
+    namespace = dict(
+        save_control=nullcontext(),
+        callout_control=None,
+        source_boundaries=bank.observer,
+        entity_acceptance=entity,
+        adapter=bank.adapter,
+        entity_handles=None,
+        module=bank.module,
+        build_kwargs={},
+        nullcontext=nullcontext,
+    )
+    exec(
+        compile(ast.fix_missing_locations(harness), "<pilot observer scope>", "exec"),
+        namespace,
+    )
+    if selection == "valid":
+        result = await namespace["run"]()
+        assert result is r.returns["finalize_drawing"]
+        bank.observer.require_used()
+        entity.require_coverage()
+        assert set(entity.coordinate) == {"coordinate datum", "coordinate FCF"}
+        assert set(entity.selected) == set(entity.recorded) == {"finish"}
+        assert [row["stage"] for row in entity.context_report["stages"]] == [
+            "selected",
+            "inserted",
+        ]
+        assert len(bank.trial["source_boundaries"]["banks"]) == 25
+    if selection == "wrong_entity":
+        with pytest.raises(RuntimeError, match="VIEW argument/actual selection"):
+            await namespace["run"]()
+        assert (
+            bank.saved[-1]["source_boundaries"]["banks"][-1]["boundary"]
+            == "after_drawing.add_surface_finish#1"
+        )
+        assert entity.recorded == {}
+    for name, original in view.originals.items():
+        assert getattr(bank.module, name) is original
+        assert getattr(control.drawing, name) is original
+    assert control.drawing._select_annotation_entity is view.selected
     assert control.drawing.save_drawing is bank.save
