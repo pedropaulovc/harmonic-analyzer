@@ -2,7 +2,8 @@
 
 This is a diagnostic-only candidate. Production still refuses a different
 visible pixel box without any frame setters; its existing deliberate test is
-unchanged. No native result or production fix is claimed by the offline tests.
+unchanged. The first native cache run below passed without exercising any frame
+setter; neither the offline tests nor that run prove frame restoration.
 
 ## Trigger and measured boundary
 
@@ -83,7 +84,7 @@ seat's one-pixel difference. `GetVisibleBox` excludes the FeatureManager-obscure
 area, while the frame properties describe the document window in client-area
 pixels. Exact visible-box readback is therefore still necessary.
 
-## Proposed single native invocation — not yet run
+## Reviewed native invocation
 
 Only after main-agent source review, explicit seat grant and current inventory
 verification, with the existing licensed process and unchanged adapter:
@@ -110,3 +111,62 @@ Offline verification: 227 tests passed in 12.75 seconds, retained pytest receipt
 `test_prepared_template_drawing.py`, and `test_owned_native_documents_drawing.py`.
 The original zero-setter rejection assertion is unchanged. Mock success is not
 native frame-restoration evidence.
+
+## Native result: cache/defaults pass, frame mechanism not exercised
+
+The main agent ran the command above at root
+`5448afab0bdc3e3bf4d678390f17a390b2f63109`, adapter `25bc99b1`, SW PID 31860.
+Receipt: `cad/out/reports/prepared-template-cache/prepared-template-cache-m3dp9h5e/measurements.json`,
+SHA-256 `31bab228b1061719564f2c91f3227f12d6462b3fc6482997513e32cefe6e92ec`.
+The overall control passed, but its explicit outcome is
+**`no_frame_drift_observed`**: all five restore observations have empty setter
+lists, with zero observed visible-box drift and zero frame writes.
+
+Every captured document frame was left/top 0/0, width 1845, height 957,
+state 1 (maximized). Every visible pixel box was `[2216, 141, 3824, 995]`.
+The previously implemented scale/native-translation restoration still ran;
+this is not a zero-viewport-setter experiment. It did not reproduce the
+production failure or establish that the five new frame setters work natively.
+
+| Observed phase | Seconds |
+| --- | ---: |
+| Normal setup | 4.916975 |
+| MISS accessor, including native preparation/validation/cleanup | 45.388894 |
+| Prepared MISS factory | 1.499988 |
+| HIT accessor | 0.044222 |
+| Prepared HIT factory | 1.428377 |
+
+These are one exploratory sequence's separately timed phases, not an unloaded
+ABBA performance estimate or end-to-end recipe speedup. Raw witness times were
+15.698843 / 16.946440 / 16.430596 seconds; separate explicit viewport restorations
+for the prepared trials took 1.181938 / 1.316753 seconds. Those diagnostic costs
+are not included in the factory-only timings above.
+
+The offline reread independently passed the existing `compare_defaults` and
+`compare_printed` functions for normal/MISS/HIT, preparation before/after and
+post-export checks. Both prepared 5100×3300 PNGs had zero changed pixels and
+zero maximum channel delta; PDF page dimensions and exact text glyphs matched.
+The 43 notes and two SF annotations passed the enforced defaults comparison.
+Full raw snapshot dictionaries were **not** identical: only the existing
+`blank_linked_extent_observations` field (10 already-proven zero-ink linked-note
+rows) differed, including normal before/after PDF export. No new exclusion or
+tolerance was introduced by this control.
+
+The original template retained SHA-256 `2b1bbe3d…e5e849` in every phase guard.
+The run-local derived DRWDOT was `e1bdfb1845f1bb399243c4c734e5fde65642dcfebedc7f47cf8839d875dec550`;
+its native receipt was `c4201d2be31cddc998bad52a6f8da00d854cda81bffd88f939ab21e2f8a422cf`.
+MISS/HIT artifact inventories and hashes matched. Ownership receipt
+`6512f0ea639d7f4fac14df1e84f4060e28cb0ff20751d26b248eaf637b16d5b0`
+records empty→empty, five exact owned closes, preserved baseline and no errors.
+Production's no-resize policy remains unchanged.
+
+A deterministic perturbation could separately capture one owned blank, change
+only its native document frame, and require exact A/A viewport/defaults/printed
+recovery. Because this seat's captured state is maximized, merely subtracting
+one pixel from a width property might be ignored or change the window state;
+that cannot be assumed to reproduce the observed production failure. A normal-
+state size trial and a maximized-state round trip would be distinct contracts.
+No such perturbation is implemented or authorized here. The production retry
+has instead reproduced the actual failure, so comparing its creation/activation
+order with this diagnostic's preliminary normal drawing is the next narrower
+investigation before inventing a perturbation.
