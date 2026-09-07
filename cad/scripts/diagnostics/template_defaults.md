@@ -404,7 +404,8 @@ defaults comparison. Empty unlinked notes and every nonempty/resolved note keep
 their existing exact extent/content comparison. The next controlled native run
 must prove or reject the new classification; the preceding observation did not
 capture native primitive inventories and is not itself no-ink evidence.
-# Exact interrupted-trial recovery
+
+## Exact interrupted-trial recovery
 
 The `bc63e4d7` arbor trial (`template-abba-bn33bcg_`) passed template preparation
 but the original part became dirty in memory during the unchanged recipe. The
