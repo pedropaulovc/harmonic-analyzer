@@ -69,6 +69,10 @@ from diagnostics._recipe_acceptance_targets import TARGETS  # noqa: E402
 from diagnostics._recipe_entity_acceptance import EntityAcceptance  # noqa: E402
 from diagnostics._recipe_view_entity_acceptance import ViewEntityAcceptance  # noqa: E402
 from diagnostics._bsurface_attachment_witness import grid_control_from_environment  # noqa: E402
+from diagnostics._tooth_selector_observation import (  # noqa: E402
+    observation_from_environment, observe_selector,
+    require_targets as require_tooth_targets,
+)
 import _telemetry  # noqa: E402
 
 ORDER = ("rocker_arm", "channel_lever")
@@ -679,7 +683,9 @@ async def pilot(
     source_callout_authoring=None,
 ):
     grid_control = grid_control_from_environment()
+    tooth_observation = observation_from_environment()
     order = target_order(targets)
+    require_tooth_targets(tooth_observation, order)
     from diagnostics._source_save_boundaries import (
         require_targets as require_source_targets,
     )
@@ -725,6 +731,7 @@ async def pilot(
         "protected_targets": protected_targets,
         "factory": setup_controller.variant.value if setup_controller else "normal",
         "bsurf_grid_control": grid_control.value,
+        "tooth_selector_observation": tooth_observation.value,
         "trials": [],
         "scope": "one functional build per recipe; no speedup/full-pipeline claim",
         "source_witness_scope": "exact original/copy disk hashes and named recipe dimension identities/values/tolerances/BASIC; not full in-memory source immutability",
@@ -941,6 +948,9 @@ async def pilot(
                                 source_boundaries.observe()
                                 if source_boundaries is not None
                                 else nullcontext()
+                            ),
+                            observe_selector(
+                                adapter, module, source_model, trial, tooth_observation
                             ),
                         ):
                             artifacts = await module.build(adapter, **build_kwargs)
@@ -1220,6 +1230,7 @@ async def pilot(
 
 def main(argv=None):
     grid_control_from_environment()  # invalid opt-in refuses before parent/worker COM routing
+    tooth_observation = observation_from_environment()
     from diagnostics._source_callout_authoring import (
         SourceCalloutAuthoring, require_selection,
     )
@@ -1289,6 +1300,7 @@ def main(argv=None):
     )
     args = parser.parse_args(argv)
     order = target_order(args.target)
+    require_tooth_targets(tooth_observation, order)
     require_source_targets(args.source_observation, order)
     require_drawing_save(args.drawing_save, args.source_observation, order)
     require_callout_storage(
