@@ -681,6 +681,8 @@ async def pilot(
                     linear_control.require_used()
             finally:
                 trial["recipe_seconds"] = time.perf_counter() - started
+                if entity_acceptance is not None:
+                    trial["entity_context_observations"] = entity_acceptance.context_report
                 checkpoint()
             trial["artifacts"] = benchmark.validate_artifacts(artifacts, module.OUTPUTS)
             require_copy_hash(trial, "after_recipe")
