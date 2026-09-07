@@ -48,6 +48,21 @@ SOURCE_READBACK_SHA256 = (
 )
 
 
+def require_capture_factors():
+    from diagnostics._bsurface_attachment_witness import (
+        GridControl,
+        grid_control_from_environment,
+    )
+    from diagnostics._tooth_selector_observation import (
+        observation_from_environment,
+        require_targets,
+    )
+
+    if grid_control_from_environment() is not GridControl.OFF:
+        raise ValueError("slotted capture-only requires the default grid control")
+    require_targets(observation_from_environment(), ("slotted_screw",))
+
+
 def require_selection(mode, targets, manifests):
     if mode is None:
         return
@@ -551,6 +566,7 @@ async def capture_only(
     from diagnostics._owned_native_documents import DocumentKind, save_drawing
     from diagnostics._recipe_template_factory import DrawingFactory
 
+    require_capture_factors()
     if (
         candidate != PRODUCER_REVISION
         or setup_controller.variant is not DrawingFactory.PREPARED
@@ -629,6 +645,10 @@ async def capture_only(
             "initial copied source",
         )
         report["source_dirty_before"] = source_model.GetSaveFlag()
+        if report["source_dirty_before"] is not False:
+            raise RuntimeError(
+                "slotted capture requires an initially clean source dirty flag (native False)"
+            )
         report["source_before"], source_handles = source_reads.dimension_snapshot(
             adapter.swApp,
             source_model,
@@ -721,6 +741,13 @@ async def capture_only(
         if source_model is not None:
             try:
                 report["source_dirty_final"] = source_model.GetSaveFlag()
+                if (
+                    report.get("source_dirty_before") is not False
+                    or report["source_dirty_final"] is not False
+                ):
+                    raise RuntimeError(
+                        "slotted capture source dirty flag changed or is not native False"
+                    )
             except BaseException as error:
                 errors.append(error)
         try:

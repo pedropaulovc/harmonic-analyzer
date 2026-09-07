@@ -729,6 +729,7 @@ async def pilot(
     tooth_observation = observation_from_environment()
     order = _layout_order(layout_observation, targets)
     if layout_observation is slotted_layout.LayoutObservation.CAPTURE_ONLY:
+        slotted_layout.require_capture_factors()
         if any(value is not None for value in (
             linear_control, source_observation, drawing_save, callout_storage,
             source_callout_authoring,
@@ -1374,6 +1375,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
     order = _layout_order(args.layout_observation, args.target)
     if args.layout_observation is slotted_layout.LayoutObservation.CAPTURE_ONLY:
+        slotted_layout.require_capture_factors()
         if args.factory is not DrawingFactory.PREPARED or any(value is not None for value in (
             args.linear_dimensions, args.source_observation, args.drawing_save,
             args.callout_storage, args.source_callout_authoring,

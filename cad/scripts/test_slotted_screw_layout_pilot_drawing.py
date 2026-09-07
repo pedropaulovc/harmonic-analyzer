@@ -534,6 +534,12 @@ def test_incomplete_or_mixed_enrollment_contract_fails_before_environment(
         "none",
         "wrong_hash",
         "wrong_producer",
+        "initial_dirty",
+        "initial_unreadable",
+        "initial_zero",
+        "initial_getter_error",
+        "recipe_dirty",
+        "build_dirty",
         "build",
         "raw_capture",
         "source_drift",
@@ -576,6 +582,14 @@ async def test_actual_capture_callback_preserves_source_scope_and_nonacceptance(
     events, scopes = [], []
     adapter = Adapter("normal")
     source = NS(GetType=lambda: 1, GetSaveFlag=lambda: False)
+    if failure == "initial_dirty":
+        source.GetSaveFlag = lambda: True
+    if failure == "initial_unreadable":
+        source.GetSaveFlag = lambda: None
+    if failure == "initial_zero":
+        source.GetSaveFlag = lambda: 0
+    if failure == "initial_getter_error":
+        source.GetSaveFlag = Mock(side_effect=primary)
     model = NS(GetType=lambda: 3, GetSaveFlag=lambda: True, Visible=True)
     owned = {"native": None, "source": None}
     source.GetPathName = lambda: str(owned["source"])
@@ -618,7 +632,9 @@ async def test_actual_capture_callback_preserves_source_scope_and_nonacceptance(
     async def draw(outputs, actual_source):
         events.append("recipe")
         assert actual_source == owned["source"]
-        if failure == "build":
+        if failure in ("recipe_dirty", "build_dirty"):
+            source.GetSaveFlag = lambda: True
+        if failure in ("build", "build_dirty"):
             raise primary
         owned["native"] = outputs.slddrw
         adapter.currentModel = adapter.swApp.ActiveDoc = model
@@ -702,7 +718,13 @@ async def test_actual_capture_callback_preserves_source_scope_and_nonacceptance(
     else:
         with pytest.raises(RuntimeError) as caught:
             await operation()
-        if failure in ("build", "raw_capture", "cleanup"):
+        if failure in (
+            "build",
+            "build_dirty",
+            "raw_capture",
+            "cleanup",
+            "initial_getter_error",
+        ):
             assert caught.value is primary
     if failure == "wrong_hash":
         assert not events and not reports.exists()
@@ -722,6 +744,84 @@ async def test_actual_capture_callback_preserves_source_scope_and_nonacceptance(
     if failure == "raw_capture":
         assert report["capture_final"]["source_dirty"] is True
         assert report["final_guard_errors"] and primary.__notes__
+    if failure.startswith("initial_"):
+        assert not reads and "recipe" not in events and not scopes
+    if failure in ("recipe_dirty", "build_dirty"):
+        assert report["source_dirty_before"] is False
+        assert report["source_dirty_final"] is True
+        assert any("source dirty" in error for error in report["final_guard_errors"])
+        assert report["sources_after"][report["copy_source"]] == digest
+    if failure == "build_dirty":
+        assert any("source dirty" in note for note in primary.__notes__)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("route", ["parent", "worker", "pilot", "callback"])
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("HARMONIC_BSURF_GRID_CONTROL", "boundary-domain"),
+        ("HARMONIC_BSURF_GRID_CONTROL", "column-row-grid"),
+        ("HARMONIC_TOOTH_SELECTOR_OBSERVATION", "endpoints"),
+    ],
+)
+async def test_capture_rejects_every_nondefault_environment_factor_before_native(
+    monkeypatch,
+    tmp_path,
+    route,
+    field,
+    value,
+):
+    from diagnostics import probe_datum_policy_recipes as pilot
+    from diagnostics import _recipe_template_factory as factories
+
+    monkeypatch.setenv(field, value)
+    environment = Mock(
+        side_effect=AssertionError("must reject before native environment")
+    )
+    monkeypatch.setattr(pilot, "require_owned_diagnostic_environment", environment)
+    setup = NS(variant=factories.DrawingFactory.PREPARED)
+    with pytest.raises(ValueError, match="grid|tooth"):
+        if route == "callback":
+            await witness.capture_only(
+                object(),
+                witness.PRODUCER_REVISION,
+                tmp_path,
+                tmp_path,
+                tmp_path / "reports",
+                setup_controller=setup,
+            )
+        elif route == "pilot":
+            await pilot.pilot(
+                object(),
+                witness.PRODUCER_REVISION,
+                tmp_path,
+                tmp_path,
+                tmp_path / "reports",
+                targets=("slotted_screw",),
+                layout_observation=witness.LayoutObservation.CAPTURE_ONLY,
+                setup_controller=setup,
+            )
+        else:
+            pilot.main(
+                [
+                    "--source-root",
+                    str(tmp_path),
+                    "--guard-root",
+                    str(tmp_path),
+                    "--target",
+                    "slotted_screw",
+                    "--layout-observation",
+                    "capture_only",
+                    "--factory",
+                    "prepared",
+                    "--candidate",
+                    witness.PRODUCER_REVISION,
+                    *(["--worker"] if route == "worker" else []),
+                ]
+            )
+    environment.assert_not_called()
+    assert not (tmp_path / "reports").exists()
 
 
 @pytest.mark.parametrize(

@@ -63,6 +63,12 @@ presentation, native handles, copied bytes and all protected originals must
 remain exact. Partial observations survive errors, and cleanup/runtime/hash
 errors cannot replace the primary error.
 
+The copied part must report native Boolean `False` for its dirty flag on open
+and immediately before cleanup, including after a recipe failure. An unchanged
+file hash does not excuse an in-memory dirty source. The default BSURF grid and
+tooth-observation modes are required through the parent CLI, worker CLI, direct
+pilot call and direct capture callback.
+
 The receipt says `acceptance: not_accepted`, even when `status: capture_only`.
 It does not run cold acceptance, bless its own observed tuples, migrate pins or
 prove the candidate's printed layout. A separately reviewed enrollment must add
@@ -107,3 +113,9 @@ the actual existing pilot callback, both CLI routes, source-pin/context failures
 cleanup/primary-error preservation, interrupted reads, native-role identity
 controls and a real PDFium full-page raster fixture. Those are COM-free tests,
 not evidence that the new native capture has run.
+
+Pre-native review exposed the missing initial/final source-dirty guard and the
+direct-callback factor bypass. The added regressions failed in 15 cases against
+`ce8d7236` (`run-bnwwg4ck`); three existing rejection controls already passed.
+After correction, 256 focused/adjacent tests passed (`run-tm_5ds8b`), retaining
+the original error object when a failing recipe also dirties its copied source.
