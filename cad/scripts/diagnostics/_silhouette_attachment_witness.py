@@ -69,6 +69,15 @@ def surface_witness(face, *, evidence=None):
     return {"identity": identity, "parameters": params}
 
 
+def _curve_read(curve, method, evidence):
+    """Journal the actual zero-argument getter without retrying or coercing it."""
+    record = None
+    if evidence is not None:
+        record = {"method": method, "arguments": ()}
+        evidence.setdefault("curve_reads", []).append(record)
+    return bsurface._read(lambda: getattr(curve, method)(), record, "returned")
+
+
 def snapshot(app, view, entity, *, evidence=None):
     """Return raw supported geometry plus the native face handle for live checks."""
     if entity is None:
@@ -88,9 +97,20 @@ def snapshot(app, view, entity, *, evidence=None):
     if raw_curve is None:
         raise RuntimeError("silhouette curve is null")
     curve = _early_bound(raw_curve, "ICurve")
-    is_line, is_circle = bool(curve.IsLine()), bool(curve.IsCircle())
+    is_line = bool(_curve_read(curve, "IsLine", evidence))
+    is_circle = bool(_curve_read(curve, "IsCircle", evidence))
     if is_line == is_circle:
-        raise RuntimeError("unsupported or contradictory silhouette curve kind")
+        primary = RuntimeError("unsupported or contradictory silhouette curve kind")
+        if evidence is not None:
+            try:
+                # ICurve.Identity reports swCurveTypes_e. The literal result is
+                # failure-only evidence, never a new supported geometry reader.
+                _curve_read(curve, "Identity", evidence)
+            except Exception:
+                # The journal retains this getter error; classification already
+                # failed independently and must remain the primary rejection.
+                pass
+        raise primary
     field, size = ("LineParams", 6) if is_line else ("CircleParams", 7)
     params = finite_array(getattr(curve, field), size, label=field)
     _nonzero(params[3:6], field)

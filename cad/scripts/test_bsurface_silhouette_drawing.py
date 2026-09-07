@@ -289,7 +289,7 @@ def test_successful_bsurface_read_is_retained_when_later_curve_kind_rejects(bsur
             evidence=evidence,
         )
     assert set(evidence) == {"expected"}
-    assert set(evidence["expected"]) == {"face_surface"}
+    assert set(evidence["expected"]) == {"face_surface", "curve_reads"}
     assert evidence["expected"]["face_surface"]["identity"] == 4006
     assert len(evidence["expected"]["face_surface"]["bspline"]["control_points"]) == 2
     c.surface.GetBSurfParams3.assert_called_once()
