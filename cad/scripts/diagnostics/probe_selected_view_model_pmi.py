@@ -90,7 +90,7 @@ def space_imported_pmi(adapter, view, imported, row, checkpoint, *, arrangement)
     try:
         if not drawing.ActivateView(str(view.GetName2())):
             raise RuntimeError("PMI spacing could not activate its exact Right view")
-        for annotation, kind in zip(annotations, kinds, strict=True):
+        for annotation, _kind in zip(annotations, kinds, strict=True):
             if (
                 int(annotation.OwnerType) != 0
                 or int(app.IsSame(annotation.Owner, view)) != 1
@@ -416,7 +416,7 @@ def rotation_values(raw):
     for i, first in enumerate(axes):
         for j, second in enumerate(axes):
             if not math.isclose(
-                sum(a * b for a, b in zip(first, second)), float(i == j), abs_tol=1e-9
+                sum(a * b for a, b in zip(first, second, strict=True)), float(i == j), abs_tol=1e-9
             ):
                 raise RuntimeError("native view rotation is not orthonormal")
     return values

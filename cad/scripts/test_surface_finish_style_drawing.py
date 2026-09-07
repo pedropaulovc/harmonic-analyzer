@@ -61,7 +61,7 @@ def test_surface_style_rejects_missing_or_unapplied_native_style(monkeypatch, fa
         drawing._style_surface_finish(adapter, symbol, annotation, label="bore")
 
 
-@pytest.mark.parametrize("failure", [None, "font", "orientation", "position", "text", "glyph_height", "glyph_angle"])
+@pytest.mark.parametrize("failure", [None, "font", "height", "orientation", "position", "text", "glyph_height", "glyph_angle"])
 def test_saved_surface_witness_requires_real_rendered_font_and_content(failure):
     from probe_drawing_annotation_layout import _validate_reopened_surface
 
@@ -70,6 +70,8 @@ def test_saved_surface_witness_requires_real_rendered_font_and_content(failure):
               "text": [{"value": "Ra 1.6", "height_m": 0.0035, "angle": 0}]}
     after = deepcopy(before)
     if failure == "font":
+        after["format"]["font"] = "Arial"
+    if failure == "height":
         after["format"]["height_m"] = 0.00635
     if failure == "orientation":
         after["orientation"] = 3

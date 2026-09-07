@@ -332,7 +332,7 @@ def test_preparation_uses_the_persisted_legacy_shape_once(tmp_path):
         return 0
 
     model = SimpleNamespace(
-        ClearSelection2=lambda all: calls.append(("clear", all)), SaveAs3=save
+        ClearSelection2=lambda clear_all: calls.append(("clear", clear_all)), SaveAs3=save
     )
     probe.save_prepared_template(model, path, row)
     assert calls == [("clear", True), (str(path), 0, 0)]
@@ -341,7 +341,7 @@ def test_preparation_uses_the_persisted_legacy_shape_once(tmp_path):
 
 
 def test_preparation_never_accepts_legacy_integer_without_fresh_file(tmp_path):
-    model = SimpleNamespace(ClearSelection2=lambda all: None, SaveAs3=lambda *args: 0)
+    model = SimpleNamespace(ClearSelection2=lambda clear_all: None, SaveAs3=lambda *args: 0)
     path = tmp_path / "missing.DRWDOT"
     with pytest.raises(RuntimeError, match="no complete file"):
         probe.save_prepared_template(model, path, {})

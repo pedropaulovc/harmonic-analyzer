@@ -22,10 +22,11 @@ def test_one_snapshot_and_native_definition_per_distinct_symbol(
         GetSymLines=Mock(return_value=(0.0, 0.0, 0.0, 1.6, 1.0, 0.0)),
     )
     view = NS(GetName2=lambda: "Right")
-    annotations = []
+    annotations, frames = [], []
     for name in ("cylindricity", "runout"):
         frame = NS(GetSymbolXml=lambda: "unchanged frame")
-        specific = NS(GetFrameCount=lambda: 1, GetFrame=lambda _: frame)
+        frames.append(frame)
+        specific = NS(GetFrameCount=lambda: 1, GetFrame=lambda _, frame=frame: frame)
         annotations.append(
             NS(
                 GetName=lambda name=name: name,
@@ -41,6 +42,8 @@ def test_one_snapshot_and_native_definition_per_distinct_symbol(
                 GetPosition=lambda: (0.1, 0.2, 0),
             )
         )
+    for annotation, expected_frame in zip(annotations, frames, strict=True):
+        assert annotation.GetSpecificAnnotation().GetFrame(0) is expected_frame
     view.GetAnnotations = lambda: annotations
     app = NS(GetEnvironment=Mock(return_value=environment))
     adapter = NS(
