@@ -312,6 +312,35 @@ async def positive_control(adapter, directory):
             row = {"label": label, "roles": selected, "status": "inserting"}
             report["observations"].append(row)
             checkpoint()
+            adapter.currentModel.ClearSelection2(True)
+            row["selection_witnesses"] = []
+            manager = _early_bound(
+                adapter.currentModel.SelectionManager, "ISelectionMgr"
+            )
+            for index, entity in enumerate(entities):
+                adapter.ownership.assert_current_owned()
+                selected_ok = bool(view.SelectEntity(entity, index > 0))
+                count = int(manager.GetSelectedObjectCount2(-1))
+                selected_entity = manager.GetSelectedObject6(index + 1, -1)
+                owner = manager.GetSelectedObjectsDrawingView2(index + 1, -1)
+                mapped = drawing._drawing_entity_in_source(
+                    view, selected_entity, entity_type="EDGE", label=label
+                )
+                witness = {
+                    "return": selected_ok,
+                    "count": count,
+                    "source_identity": int(adapter.swApp.IsSame(mapped, entity)),
+                    "view_identity": int(adapter.swApp.IsSame(owner, view)),
+                }
+                row["selection_witnesses"].append(witness)
+                checkpoint()
+                if (
+                    not selected_ok
+                    or count != index + 1
+                    or witness["source_identity"] != 1
+                    or witness["view_identity"] != 1
+                ):
+                    raise RuntimeError(f"{label}: native selection witness failed")
             if name == "add_edge_dimension":
                 for key in ("p0", "p1"):
                     kwargs.pop(key)
@@ -320,10 +349,17 @@ async def positive_control(adapter, directory):
                 )
             else:
                 kwargs.pop("edge_xy")
+                if name == "add_datum_feature":
+                    kwargs.pop("symbol_xy")
+                    kwargs.pop("position_tolerance_m")
                 kwargs["edge" if name == "add_native_hole_callout" else "entity"] = (
                     entities[0]
                 )
                 result = originals[name](adapter, view, **kwargs)
+            result = _early_bound(
+                result,
+                "IDatumTag" if name == "add_datum_feature" else "IDisplayDimension",
+            )
             row["attachment"] = require_attachment(
                 adapter, result.GetAnnotation(), view, entities, label
             )
@@ -364,6 +400,15 @@ async def positive_control(adapter, directory):
         report["status"] = "passed"
     except Exception as error:
         report.update(status="failed", error=repr(error))
+        try:
+            adapter.ownership.assert_current_owned()
+            if int(adapter.currentModel.GetType()) == 3:
+                report["partial_annotations"], _ = all_annotation_layout(adapter)
+                report["partial_attachments"] = attachments.snapshot(
+                    adapter.currentModel, app=adapter.swApp
+                )
+        except Exception as snapshot_error:
+            report["partial_snapshot_error"] = repr(snapshot_error)
         raise
     finally:
         report["template_guard_errors"] = [
