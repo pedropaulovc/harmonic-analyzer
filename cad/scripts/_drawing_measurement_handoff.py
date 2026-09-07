@@ -1,4 +1,4 @@
-"""One-consumer handoff of actual fixed-obstacle or initial packing measurements.
+"""One-consumer handoff of actual annotation bounds between layout phases.
 
 Only view-owned annotations freshly measured by the preceding phase are recorded.
 The handoff never measures on record, never serves a GTol witness, and expires
@@ -10,6 +10,12 @@ Consumers must bracket read-only inventory collection with read_scope. Drawing,
 sheet and recorded view context are checked at both boundaries, not for every
 entry. A read may return after mid-bank context drift, but completion fails before
 the consumer may run a native command, move a view or accept an unchanged plan.
+
+The opt-in POST_DATUM_CALLOUTS purpose additionally pins the complete visible
+inventory and exact referenced-model identities, and permits one read scope for
+ALL views before any callout mutation. Only kind2/4/7 bounds are reused; initial
+native semantic/attachment/value reads, restyled SF bounds and final checks stay
+fresh. Native anchorless cosmetic threads/centerlines/centermarks are not cached.
 """
 
 from __future__ import annotations
@@ -30,11 +36,13 @@ class _Phase(Enum):
     CONSUMING = "consuming"
     FAILED = "failed"
     CLOSED = "closed"
+    EXHAUSTED = "exhausted"
 
 
 class HandoffPurpose(Enum):
     GTOL_OBSTACLES = "gtol_obstacles_only"
     INITIAL_PACKING = "initial_packing_only"
+    POST_DATUM_CALLOUTS = "post_datum_callout_initial_only"
 
 
 @dataclass(frozen=True)
@@ -43,6 +51,24 @@ class _Entry:
     owner: Any
     position: tuple[float, ...]
     measured: Any
+
+
+@dataclass(frozen=True)
+class _InventoryEntry:
+    annotation: Any
+    owner: Any
+    owner_type: int
+    kind: int
+    position: tuple[float, ...]
+
+
+def _inventory_position(annotation, kind):
+    values = annotation.GetPosition()
+    # These native kinds can have no annotation anchor. They are NEVER reused;
+    # the consumer measures their actual strokes afresh, as does its final pass.
+    if not values and kind in {1, 13, 15}:
+        return ()
+    return _values(values, 3, "inventory position")
 
 
 def _values(raw, size, label):
@@ -80,10 +106,16 @@ class AnnotationMeasurementHandoff:
         views: Mapping[str, Any],
         measure_annotation: Callable,
         purpose: HandoffPurpose,
+        inventory_of: Callable | None = None,
     ):
         if not isinstance(purpose, HandoffPurpose):
             raise ValueError("measurement handoff requires an explicit purpose enum")
         self._purpose = purpose
+        if (purpose is HandoffPurpose.POST_DATUM_CALLOUTS) != callable(inventory_of):
+            raise ValueError(
+                "post-datum handoff requires its exact visible inventory reader"
+            )
+        self._inventory_of = inventory_of
         self._adapter = adapter
         self._model = adapter.currentModel
         self._drawing = _early_bound(self._model, "IDrawingDoc")
@@ -97,6 +129,10 @@ class AnnotationMeasurementHandoff:
             self._views[name] = view
         self._contexts = {}
         self._entries = {}
+        self._inventories = {}
+        self._sources = {}
+        self._outlines = {}
+        self._consumed = set()
         self._phase = _Phase.RECORDING
         self._reading_names = ()
         self._context_names = ()
@@ -117,11 +153,90 @@ class AnnotationMeasurementHandoff:
             raise RuntimeError("measurement handoff active drawing identity changed")
         if not self._same(self._sheet, self._drawing.GetCurrentSheet()):
             raise RuntimeError("measurement handoff active sheet identity changed")
+        if self._purpose is HandoffPurpose.POST_DATUM_CALLOUTS and not self._same(
+            self._model, self._adapter.swApp.ActiveDoc
+        ):
+            raise RuntimeError("measurement handoff native active document changed")
         names = self._contexts if names is None else names
         for name in names:
             context = self._contexts[name]
             if context != _view_context(self._views[name]):
                 raise RuntimeError(f"measurement handoff view context changed: {name}")
+            if name in self._sources and (
+                not self._same(
+                    self._sources[name], self._views[name].ReferencedDocument
+                )
+                or self._outlines[name]
+                != _values(self._views[name].GetOutline(), 4, "view outline")
+            ):
+                raise RuntimeError(
+                    f"measurement handoff source/outline context changed: {name}"
+                )
+
+    def record_bank(self, view, rows, *, source):
+        """Record one already validated post-datum bank, not new semantic facts.
+
+        Only kind2/4/7 footprints are reused. Every other visible annotation
+        still participates in the exact inventory guard and is freshly measured
+        if consumed. The whole drawing's initial inventory is consumed before
+        any subsequent native geometry/style operation; this bank cannot reopen.
+        """
+        if (
+            self._purpose is not HandoffPurpose.POST_DATUM_CALLOUTS
+            or self._phase is not _Phase.RECORDING
+        ):
+            raise RuntimeError("measurement handoff is not recording post-datum banks")
+        name = self._view(view)
+        if name in self._inventories or source is None:
+            raise RuntimeError(
+                "measurement handoff duplicate or unresolved post-datum bank"
+            )
+        inventory = {}
+        for key, row in rows.items():
+            annotation = row.annotation
+            kind = row.kind
+            if (
+                key != str(annotation.GetName())
+                or kind != int(annotation.GetType())
+                or int(annotation.Visible) != 1
+                or not self._same(row.owner, annotation.Owner)
+            ):
+                raise RuntimeError("measurement handoff post-datum inventory changed")
+            inventory[key] = _InventoryEntry(
+                annotation,
+                row.owner,
+                int(annotation.OwnerType),
+                kind,
+                _inventory_position(annotation, kind),
+            )
+            if kind in {2, 4, 7} and inventory[key].owner_type == 0:
+                self.record(view, annotation, row.measurement)
+        self._inventories[name] = inventory
+        self._contexts[name] = _view_context(view)
+        self._sources[name] = source
+        self._outlines[name] = _values(view.GetOutline(), 4, "view outline")
+
+    def _assert_inventory(self):
+        for name, expected in self._inventories.items():
+            actual = self._inventory_of(self._views[name])
+            if expected.keys() != actual.keys():
+                raise RuntimeError(
+                    f"measurement handoff visible inventory changed: {name}"
+                )
+            for key, old in expected.items():
+                annotation = actual[key]
+                if (
+                    not self._same(old.annotation, annotation)
+                    or not self._same(old.owner, annotation.Owner)
+                    or old.owner_type != int(annotation.OwnerType)
+                    or old.kind != int(annotation.GetType())
+                    or key != str(annotation.GetName())
+                    or int(annotation.Visible) != 1
+                    or old.position != _inventory_position(annotation, old.kind)
+                ):
+                    raise RuntimeError(
+                        f"measurement handoff inventory identity/position changed: {name}/{key}"
+                    )
 
     def record(self, view, annotation, measured):
         if self._phase is not _Phase.RECORDING:
@@ -133,7 +248,8 @@ class AnnotationMeasurementHandoff:
         key = (name, str(annotation.GetName()), int(annotation.GetType()))
         permitted = (
             {2, 4, 7}
-            if self._purpose is HandoffPurpose.GTOL_OBSTACLES
+            if self._purpose
+            in {HandoffPurpose.GTOL_OBSTACLES, HandoffPurpose.POST_DATUM_CALLOUTS}
             else {2, 4, 5, 7}
         )
         if key[2] not in permitted or key[1:] != (measured.name, measured.kind):
@@ -151,6 +267,12 @@ class AnnotationMeasurementHandoff:
     def seal(self):
         if self._phase is not _Phase.RECORDING:
             raise RuntimeError("measurement handoff cannot be sealed twice")
+        if self._purpose is HandoffPurpose.POST_DATUM_CALLOUTS:
+            if self._inventories.keys() != self._views.keys():
+                raise RuntimeError(
+                    "measurement handoff requires every post-datum view bank"
+                )
+            self._assert_inventory()
         self._assert_context()
         self._phase = _Phase.SEALED
 
@@ -158,6 +280,12 @@ class AnnotationMeasurementHandoff:
         """Start a read-only bank; completion must precede any native mutation."""
         if self._phase is not _Phase.SEALED:
             raise RuntimeError("measurement handoff cannot begin a read bank")
+        if self._purpose is HandoffPurpose.POST_DATUM_CALLOUTS:
+            if view is not None:
+                raise RuntimeError(
+                    "post-datum handoff must consume all views before mutation"
+                )
+            self._assert_inventory()
         names = tuple(self._views) if view is None else (self._view(view),)
         contexts = tuple(name for name in names if name in self._contexts)
         self._assert_context(contexts)
@@ -169,9 +297,15 @@ class AnnotationMeasurementHandoff:
         if self._phase is not _Phase.CONSUMING:
             raise RuntimeError("measurement handoff has no active read bank")
         self._phase = _Phase.FAILED
+        if self._purpose is HandoffPurpose.POST_DATUM_CALLOUTS:
+            self._assert_inventory()
         self._assert_context(self._context_names)
         self._reading_names = self._context_names = ()
-        self._phase = _Phase.SEALED
+        self._phase = (
+            _Phase.EXHAUSTED
+            if self._purpose is HandoffPurpose.POST_DATUM_CALLOUTS
+            else _Phase.SEALED
+        )
 
     @contextmanager
     def read_scope(self, view=None):
@@ -194,6 +328,10 @@ class AnnotationMeasurementHandoff:
         if name not in self._reading_names:
             raise RuntimeError("measurement handoff owner is outside its read bank")
         key = (name, str(annotation.GetName()), int(annotation.GetType()))
+        if self._purpose is HandoffPurpose.POST_DATUM_CALLOUTS:
+            if key in self._consumed:
+                raise RuntimeError(f"measurement handoff entry consumed twice: {key}")
+            self._consumed.add(key)
         entry = self._entries.get(key)
         if entry is None:
             self._fresh += 1
@@ -217,7 +355,10 @@ class AnnotationMeasurementHandoff:
     def close(self):
         if self._phase is _Phase.CONSUMING:
             raise RuntimeError("measurement handoff requires read bank completion")
+        outcome = self._phase.value
         self._entries.clear()
+        self._inventories.clear()
+        self._consumed.clear()
         self._phase = _Phase.CLOSED
         _telemetry.info(
             "native annotation measurement handoff",
@@ -225,5 +366,6 @@ class AnnotationMeasurementHandoff:
             reused_count=self._reused,
             fresh_initial_count=self._fresh,
             scope=self._purpose.value,
+            lifecycle_outcome=outcome,
             final_witness="fresh_native_measurement",
         )

@@ -587,5 +587,6 @@ def prepare_document_datum_leaders(
             }
         ),
     )
-    # Nothing is handed off here: the ordinary callout loop now takes fresh
-    # post-policy measurements, then records only its actual FINAL obstacles.
+    # Only these completely validated POST-policy banks are eligible for the
+    # optional initial bounds handoff. All semantic and final reads stay fresh.
+    return after
