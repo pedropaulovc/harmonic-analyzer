@@ -75,14 +75,12 @@ async def test_prepared_materialization_precedes_recipe_and_uses_exact_scopes(
     adapter, module, normal, events = model_fixture(tmp_path, monkeypatch)
     entry_dir = tmp_path / "cache" / "key"
     entry = factory.prepared.PreparedTemplate(
-        entry_dir, "key", factory.prepared.TemplateSpec((1, 2), 2)
+        entry_dir, "key", factory.prepared.TemplateSpec()
     )
     calls = []
 
-    async def materialize(
-        actual_adapter, *, scale, decimals, cache_root, operation_context
-    ):
-        assert actual_adapter is adapter and scale == (1, 2) and decimals == 2
+    async def materialize(actual_adapter, *, decimals, cache_root, operation_context):
+        assert actual_adapter is adapter and decimals == 2
         assert normal.call_count == 0  # No actual recipe factory yet.
         calls.append(1)
         if len(calls) == 1:
@@ -120,7 +118,7 @@ async def test_prepared_materialization_precedes_recipe_and_uses_exact_scopes(
         "inherited",
         "sheet",
     )
-    inherited.assert_called_once_with(adapter, entry)
+    inherited.assert_called_once_with(adapter, entry, spec=module.TEMPLATE_SPEC)
     normal.assert_not_called()
     controller.require_used()
     assert [row["kind"] for row in trial["template_factory"]["accessors"]] == [

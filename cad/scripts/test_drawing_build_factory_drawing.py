@@ -146,16 +146,19 @@ def test_runner_prepares_before_recipe_and_preserves_result(monkeypatch):
     monkeypatch.setenv("HARMONIC_COM_SEAT", "test-only-no-COM")
     adapter = object()
     spec = runner.TemplateSpec((2, 1), 2)
-    entry = runner.prepared.PreparedTemplate(Path("cache"), "key", spec)
+    entry = runner.prepared.PreparedTemplate(
+        Path("cache"), "key", runner.prepared.canonical_spec(spec)
+    )
     events = []
 
-    async def prepare(actual, *, scale, decimals):
-        assert actual is adapter and (scale, decimals) == (spec.scale, 2)
+    async def prepare(actual, *, decimals):
+        assert actual is adapter and decimals == 2
         events.append("prepare")
         return entry
 
-    def inherited(actual, actual_entry):
+    def inherited(actual, actual_entry, *, spec):
         assert actual is adapter and actual_entry is entry
+        assert spec.scale == (2, 1) and actual_entry.spec.scale == (1, 1)
         events.append("inherited")
         return "draw", "sheet"
 
@@ -197,7 +200,11 @@ def test_same_factory_adapter_spec_single_use_and_success_witness(monkeypatch, k
         runner.normal_drawing_factory(adapter, spec)
         if kind == "normal"
         else runner.prepared_drawing_factory(
-            adapter, runner.prepared.PreparedTemplate(Path("cache"), "key", spec)
+            adapter,
+            runner.prepared.PreparedTemplate(
+                Path("cache"), "key", runner.prepared.canonical_spec(spec)
+            ),
+            spec=spec,
         )
     )
     with pytest.raises(RuntimeError, match="exactly one"):
