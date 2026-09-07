@@ -31,6 +31,7 @@ def native_snapshot(monkeypatch, tmp_path):
         GetPrimaryPrecision2=lambda: 3,
         GetPrimaryTolPrecision2=lambda: 3,
         IsHoleCallout=lambda: False,
+        ShowDimensionValue=True,
         GetText=lambda _part: "",
     )
     feature = SimpleNamespace(

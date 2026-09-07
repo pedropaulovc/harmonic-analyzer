@@ -57,8 +57,7 @@ def _parameter(dimension, configuration):
         "parameter_type": int(dimension.GetType()),
         "value_system": source_reads.finite(values[0]),
         **source_reads.tolerance(dimension),
-        "tolerance_min": source_reads.finite(tolerance.GetMinValue()),
-        "tolerance_max": source_reads.finite(tolerance.GetMaxValue()),
+        **source_reads.tolerance_limits(tolerance),
     }
 
 
