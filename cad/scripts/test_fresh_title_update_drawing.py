@@ -222,6 +222,7 @@ def test_glyph_invalid_content_or_geometry_is_never_a_positive_control(field):
         probe.Variant.EDIT_REBUILD,
         probe.Variant.REJUSTIFY,
         probe.Variant.RELINK,
+        probe.Variant.LEFT_TITLE_CELL,
     ],
 )
 def test_candidate_is_not_even_started_without_reproduction(classification, candidate):
@@ -257,6 +258,7 @@ def test_reproduced_pdf_without_changed_pixels_is_not_candidate_authority():
         probe.Variant.EDIT_REBUILD,
         probe.Variant.REJUSTIFY,
         probe.Variant.RELINK,
+        probe.Variant.LEFT_TITLE_CELL,
     ],
 )
 def test_candidate_runs_once_after_baseline_and_keeps_failure(candidate):

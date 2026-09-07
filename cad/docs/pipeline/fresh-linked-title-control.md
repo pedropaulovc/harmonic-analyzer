@@ -7,6 +7,8 @@ its documented redraw also leaves the shift. The forced-rebuild control likewise
 returned success without preventing it. No ineffective update was added to production.
 All five native candidate controls are recorded below. Same-expression
 property-link reapplication also leaves the printed shift unchanged.
+A separate measured-cell left-justified layout candidate is prepared below;
+it has not run natively and does not change production finalization.
 
 The retained rocker control proved a real printed change: cold reopening moved
 all ten `rocker-arm` title glyphs right by about 7.22523 mm, while the note anchor,
@@ -365,3 +367,76 @@ PropertyLinkedText expression does not prevent this reproduced cold title
 reflow**. This is not a verdict on untested linked-note update mechanisms, a
 full manufacturing-sheet acceptance, or a speedup claim. No production setter,
 fallback or comparator relaxation follows; further title variants are paused.
+
+## Next layout control: left-justified title in its measured cell
+
+`--candidate pre_save_left_title_cell` is a diagnostic layout change, not another
+same-value refresh setter. The existing tests deliberately reject changed
+justification, including the same-value REJUSTIFY control. That contract conflict
+was raised before editing: those tests and the global cold comparator stay
+unchanged. Only this new mode allows one checked center (`2`) to left (`1`)
+transition before saving, then seals the new alignment and anchor. Links, resolved
+title, vertical justification, lock, all sixteen font properties, height mode,
+format inheritance, source values/tolerances and document ownership remain exact.
+
+The diagnostic-only [`_linked_title_cell.py`](../../scripts/diagnostics/_linked_title_cell.py)
+reads `ISheet.GetTemplateSketch`, inventories its segments and transforms native
+line endpoints into sheet coordinates with the inverse `ModelToSketchTransform`.
+It finds the nearest horizontal/vertical rules crossing the exact linked TITLE
+note's anchor, then requires all four sides to close. Split collinear rules may
+join within an explicit 1 nm topology bound; raw coordinates remain unrounded.
+This bound is not used for title placement, fit or cold comparisons. Missing,
+ambiguous, nonplanar or open boundaries fail without choosing a larger rectangle.
+Curves, sketch text and construction entities are inventoried as non-boundaries,
+not declared absent or preserved in shape by this line-only reader.
+
+The requested sheet anchor is `(cell_left + native_font_height / 2, original_y, 0)`.
+The half-font-height inset is an explicit layout choice, not a compensation for
+the measured 7.225 mm shift; no old title-cell coordinates are supplied. The mode
+requires an unlocked centered note and makes exactly these calls:
+
+1. `INote.SetTextJustification(1)` (documented void).
+2. `IAnnotation.SetPosition2(x, y, 0)`, requiring native `True` and exact position
+   readback; a clamped position fails.
+3. `IModelDoc2.GraphicsRedraw2()`, as required by the justification documentation.
+
+No link, text, font, lock, source property, vertical alignment or template file is
+written. Native note extent must fit the measured cell after placement and cold
+reopen; every first/cold PDF title glyph box must also fit, with no acceptance
+tolerance. The cold cell is measured again. Candidate success additionally
+requires zero changed native annotation leaves, exact first/cold PDF glyph boxes
+and zero changed PNG pixels. Original positive-baseline reproduction, native
+identity and source-hash gates remain mandatory. Measured rules and attempted
+calls are retained if discovery or placement fails.
+
+Official bundle pages read: `ISheet.GetTemplateSketch`; `ISketch.GetSketchSegments`
+and `ModelToSketchTransform`; `ISketchSegment.GetType`, `GetID` and
+`ConstructionGeometry`; `ISketchLine.GetStartPoint2/GetEndPoint2`;
+`ISketchPoint.X/Y/Z`; `IMathTransform.Inverse/ArrayData`;
+`ISldWorks.GetMathUtility`; `IMathUtility.CreatePoint`;
+`IMathPoint.MultiplyTransform/ArrayData`; `INote.SetTextJustification`,
+`GetTextJustification`, `LockPosition`; `IAnnotation.SetPosition2`; and
+`IModelDoc2.GraphicsRedraw2`, plus `swTextJustification_e` and `swSketchSegments_e`.
+The official template-segment and sketch-to-model transform examples support
+those read patterns. The segment example edits the template; this diagnostic
+instead uses the documented direct `GetTemplateSketch` accessor and never selects
+or enters template-edit mode. That combined native call shape still needs its
+first live proof. The title may expose a different anchor or reference convention;
+the exact readbacks must establish that, not a pre-emptive fallback.
+
+After main-agent review, integration and an explicit exclusive seat grant, from
+the frozen integrated root with its unchanged locked uv environment:
+
+```powershell
+$env:HARMONIC_SW_AUTOSTART = '0'
+$env:HARMONIC_REMOTE_CACHE_MODE = 'off'
+$env:HARMONIC_DIAGNOSTIC_SW_PID = '<granted-existing-PID>'
+uv run --no-sync python cad/scripts/diagnostics/probe_fresh_title_update.py --candidate pre_save_left_title_cell --source C:/src/ha-perf-channel/cad/out/sldprt/rocker-arm.SLDPRT --guard-source C:/src/harmonic-analyzer/cad/out/sldprt/rocker-arm.SLDPRT
+```
+
+This prepares one baseline/candidate pair, not a production fix or full-recipe
+acceptance. New tests first failed on the missing cell helper/variant; they cover
+cell translation, segmented/open borders, native coordinate conversion, null and
+malformed data, strict fit, checked setters, exact font/link/clamp rejection,
+baseline gating and the stronger native-cold success condition. Native result,
+visual title-cell clearance and whole manufacturing-sheet acceptance are pending.
