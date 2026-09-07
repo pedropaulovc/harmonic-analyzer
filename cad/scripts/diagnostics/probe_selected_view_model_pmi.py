@@ -592,7 +592,7 @@ async def probe(
     errors = []
     if arrangement is not None:
         report["scope"] = (
-            f"two exact Right-view PMI imports plus one native{PMI_SPACING_COMMANDS[arrangement]} spacing command on their exact three annotations; no manual placement/source edits/retry"
+            f"two exact Right-view PMI imports plus one native {PMI_SPACING_COMMANDS[arrangement]} spacing command on their exact three annotations; no manual placement/source edits/retry"
         )
     copy_expected = {}
     started = time.perf_counter()

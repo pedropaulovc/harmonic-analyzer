@@ -127,3 +127,57 @@ change improves performance or safety:
 
 The eight-file focused/adjacent suite passes 292 tests in 3.69 seconds
 (`run-boyf6tsi`). These are offline regressions, not new native drawing acceptance.
+
+## Completed Windows review at `31b14583`
+
+The next stored review was read once with `coderabbit.exe review findings` in
+`C:/src/ha-foundations-integration`. No new review was requested and no comments
+were posted or resolved. The ten original finding JSONs, complete marker, Git
+metadata, diff and internal state were copied unchanged from:
+
+```text
+C:/Users/pedro/AppData/Local/coderabbit/reviews/053baf0b/0aac4846/reviews/1788799403501
+```
+
+The full retained copy is
+`C:/src/ha-foundations-integration/cad/out/reports/coderabbit-680-31b1458/native-receipt`.
+Its `git.json` pins head `31b145837d5262dbe130c4509992895795bd7675`, main base
+`c6ab57dbdf73a733b32fb580bada81dab7fd758c`, and branch
+`perf/cad-drawing-foundations`. The complete marker says `complete`.
+SHA-256: `git.json`
+`db04b9aa08723ba258ea78e598e5f15d548e1f4e605f9e52871197fd4adbdadb`;
+`incrementalDiff.v2.json`
+`c167271848f8729a3cf9ff7488a40d378685892837a1ed81e008c31aa9a7c05f`.
+
+| Finding prefix | Disposition |
+|---|---|
+| `00091cd1` | Fixed: resolve the native-GTol temporary directory before deriving the owned output paths. |
+| `03025687` | Fixed: a bare `_config` or imported alias passed to `getattr`, a helper, assignment or container now requires the whole config. Mixed known and escaped reads also fail closed. The AST remains content-cached; the added check is linear, not a nested walk per name. |
+| `2b4213e3` | Fixed in the live `pdf_title` reader: its error names the requested text. The cited populated-template fixture is an exact historical receipt, so its old message and SHA remain unchanged. No replacement native fixture was generated. |
+| `4f27649c` | Fixed: reject repeated drawing stems before parent or worker dispatch. Distinct source directories with the same stem also collide under this probe's output naming and are rejected. |
+| `68d9ddf5` | Fixed: resolve the fresh-lever directory before constructing outputs. The same actual-worker regression also reproduced and fixed unresolved paths in `probe_drawing_annotation_layout` and `probe_drawing_mixed_commands`. |
+| `6eca01b9` | False positive: the exact gitlink and checked-out adapter are both `e77bfda4de1962625da8a9a859eb0bbaf1e6f10f`. Its `adapters/solidworks/drawing.py:1125` accepts keyword-only `artifact_context`; line 1160 invokes it with each artifact kind and absolute path. Existing adapter tests execute the callback on success, missing output, exceptions and failed deletion. |
+| `b56a879b` | False positive, repeated from the first review: real `_common._early_bound(None, ...)` returns `None`. Existing tests exercise both direct null features and a saved `FeatureByName` returning null; both reach the named missing-thread error. No fake wrapper failure was introduced to manufacture a regression. |
+| `dcb3ade0` | Deferred: memory-record mutation is not authorized. `memory/usage.jsonl` was not edited. This is not a claim that its cited records are correct. |
+| `e78cc00d` | Fixed: retained scope text separates `native` from the command number. |
+| `f6ea563f` | Fixed: the overall AutoArrange control now fails after retaining all three trials when activation, selection or alignment throws, or alignment returns `False`. The existing helper-level false-result observation/no-fallback assertion is unchanged. Source and attachment gates still run, and trial exports and scoped cleanup remain intact. |
+
+### Offline evidence
+
+Six config regressions failed first (`run-6983mcku`); graph and part-isolation
+tests then passed 93 tests in 17.33 s (`run-dsim21wl`). The path, duplicate-input
+and requested-title cases produced 22 failures before their fixes
+(`run-kcmxw9ru`). Four full-probe alignment cases incorrectly returned success
+before the final result guard (`run-8mmfn3qb`). The combined nine-file diagnostic
+suite then passed 310 tests in 7.76 s (`run-m65qe6at`).
+
+The adapter artifact-context tests, drawing artifact-span tests and real
+early-binding tests passed 109 tests in 0.67 s (`run-0nmws7je`):
+
+```powershell
+uv run --no-sync python -m pytest -q --tb=short cad/scripts/test_drawing_layout_check.py cad/scripts/test_flag_only.py SolidworksMCP-python/tests/solidworks_mcp/adapters/solidworks/test_drawing_save.py
+```
+
+All runs used the integration checkout's own venv. No COM, native artifact
+changes, source pin changes, memory edits or new native acceptance are part of
+this review follow-up.

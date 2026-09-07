@@ -262,7 +262,7 @@ def pdf_title(path, text="rocker-arm"):
         search = textpage.search(text, match_case=True, match_whole_word=True)
         match = search.get_next()
         if match is None or search.get_next() is not None:
-            raise RuntimeError("PDF must contain one exact readable rocker-arm title")
+            raise RuntimeError(f"PDF must contain one exact readable {text!r} title")
         index, count = match
         characters = [
             {
