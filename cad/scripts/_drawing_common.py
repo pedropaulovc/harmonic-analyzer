@@ -2301,6 +2301,8 @@ def set_dimension_callouts(
         "below": _DIMENSION_TEXT_CALLOUT_BELOW,
     }[location]
     remaining = dict(callout_text)
+    if not remaining:
+        return
     for annotation in annotations:
         annotation = _sw_type_info.early_bound_or_flag(
             annotation, "IAnnotation", "GetSpecificAnnotation"
