@@ -73,6 +73,24 @@ def capture(scene, stage, **kwargs):
     return scene.observer.report["stages"][-1]
 
 
+@pytest.mark.parametrize("entity_type", ["VERTEX", "edge", "", None])
+def test_unsupported_entity_type_rejects_before_reads_or_observer_mutation(scene, entity_type):
+    scene.adapter.swApp.IsSame = Mock()
+    before = json.dumps(scene.observer.report)
+    with pytest.raises(ValueError, match="unsupported entity context type"):
+        scene.observer.capture(
+            scene.adapter, scene.view, scene.source,
+            label="label", entity_type=entity_type, stage="selected",
+            selected=scene.selected,
+        )
+    assert json.dumps(scene.observer.report) == before
+    assert scene.observer.selected == {}
+    assert scene.observer.views == {}
+    scene.view.GetCorrespondingEntity.assert_not_called()
+    scene.extension.GetCorrespondingEntity2.assert_not_called()
+    scene.adapter.swApp.IsSame.assert_not_called()
+
+
 def test_source_view_context_is_distinguished_from_attachment_change(scene):
     selected = capture(scene, "selected", selected=scene.selected)
     immediate = capture(

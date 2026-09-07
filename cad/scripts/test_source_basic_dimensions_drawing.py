@@ -216,3 +216,66 @@ def test_authoring_allows_only_exact_target_tolerance_in_shared_semantics():
     )
     with pytest.raises(RuntimeError, match="attachment snapshot changed.*unrelated"):
         probe.assert_drawing(before, after, "unexpected source edit", 1)
+
+
+def attached_basic_case():
+    semantics = {key: {} for key in (
+        "checked", "excluded", "models", "dimensions", "dimensions_excluded",
+        "semantic_attachments",
+    )}
+    def dimension(name):
+        return {"kind": "model_dimension", "components": [{
+            "qualified_name": f"{name}@LeverOutline@<source-part>",
+            "tolerance_type": 0, "designation": "other", "value_system": 0.127,
+        }]}
+    for name in probe.TARGETS["LeverOutline"]:
+        semantics["dimensions"][name] = dimension(name)
+    semantics["semantic_attachments"] = {
+        "Front/DatumA/2": {
+            "source": {"path": "<source-part>", "configuration": "Default"},
+            "label": "A", "dimension": dimension("BarLength"),
+        },
+        "Front/DatumB/2": {
+            "source": {"path": "<source-part>", "configuration": "Default"},
+            "label": "B", "dimension": dimension("Unrelated"),
+        },
+    }
+    before = {"semantics": semantics, "dimensions": dimension_rows()}
+    after = deepcopy(before)
+    for name in probe.TARGETS["LeverOutline"]:
+        after["dimensions"][name]["tolerance_type"] = 1
+        after["semantics"]["dimensions"][name]["components"][0].update(
+            tolerance_type=1, designation="basic"
+        )
+    after["semantics"]["semantic_attachments"]["Front/DatumA/2"]["dimension"]["components"][0].update(
+        tolerance_type=1, designation="basic"
+    )
+    return before, after
+
+
+def test_expected_basic_change_includes_exact_dimension_attached_to_datum():
+    before, after = attached_basic_case()
+    original = deepcopy(before)
+    probe.assert_drawing(before, after, "source BASIC", 1)
+    assert before == original
+
+
+@pytest.mark.parametrize("mutation", ["value", "identity", "source", "label", "unrelated", "missing"])
+def test_attached_basic_change_never_waives_other_semantic_fields(mutation):
+    before, after = attached_basic_case()
+    bank = after["semantics"]["semantic_attachments"]
+    datum = bank["Front/DatumA/2"]
+    if mutation == "value":
+        datum["dimension"]["components"][0]["value_system"] = 0.128
+    if mutation == "identity":
+        datum["dimension"]["components"][0]["qualified_name"] = "BarLength@WrongFeature@<source-part>"
+    if mutation == "source":
+        datum["source"]["configuration"] = "Wrong"
+    if mutation == "label":
+        datum["label"] = "C"
+    if mutation == "unrelated":
+        bank["Front/DatumB/2"]["dimension"]["components"][0].update(tolerance_type=1, designation="basic")
+    if mutation == "missing":
+        del bank["Front/DatumA/2"]
+    with pytest.raises(RuntimeError, match="attachment snapshot changed.*semantic_attachments"):
+        probe.assert_drawing(before, after, "source BASIC", 1)

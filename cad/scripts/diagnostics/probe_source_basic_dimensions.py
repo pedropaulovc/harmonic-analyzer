@@ -170,7 +170,12 @@ def assert_drawing(before, after, stage, expected_type=None):
     expected_semantics = deepcopy(before["semantics"])
     if expected_type is not None:
         # These exact source designations are the ONLY expected semantic change.
-        for semantic in expected_semantics.get("dimensions", {}).values():
+        semantic_dimensions = list(expected_semantics.get("dimensions", {}).values())
+        semantic_dimensions.extend(
+            attachment["dimension"]
+            for attachment in expected_semantics.get("semantic_attachments", {}).values()
+        )
+        for semantic in semantic_dimensions:
             if semantic["kind"] != "model_dimension":
                 continue
             for component in semantic["components"]:

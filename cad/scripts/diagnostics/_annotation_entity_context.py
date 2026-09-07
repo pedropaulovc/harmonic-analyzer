@@ -45,6 +45,10 @@ class EntityContextObservations:
         selected=None,
         annotation=None,
     ):
+        native_kinds = {"EDGE": 1, "FACE": 2, "SILHOUETTE": 46}
+        if entity_type not in native_kinds:
+            raise ValueError(f"unsupported entity context type: {entity_type!r}")
+        native_kind = native_kinds[entity_type]
         stage = EntityContextStage(stage)
         role = self.labels[label]
         if stage == EntityContextStage.SELECTED:
@@ -203,7 +207,6 @@ class EntityContextObservations:
                     )
                     same("selected_current_selection", selected, current)
                     same("view_selection_owner", view, owner)
-        native_kind = {"EDGE": 1, "FACE": 2, "SILHOUETTE": 46}[entity_type]
         for name, entity in (
             ("source", source),
             ("selected", selected),
