@@ -115,8 +115,9 @@ credit:
 1. **Build green** — the full `uv run python -m doit -n 4` pipeline (every
    part, assembly and gate) passes on the PR's head. **One** successful build
    is the bar.
-2. **Codex happy** — the Codex auto-review of the latest push found nothing
-   (👍 reaction, or its findings were addressed and re-reviewed clean).
+2. **One clean review** — either CodeRabbit or Codex reviewed the latest code
+   and found nothing, or its findings were addressed and re-reviewed clean.
+   One reviewer is sufficient; approval from both is not required.
 3. **Visual inspection of renders** — an eye pass over the rendered PNGs of
    every part/assembly the PR touched (regenerate them if stale or hard to
    read; move the camera off the standard axes when needed). The CAD gates
@@ -127,8 +128,8 @@ credit:
 covers every PR in that stack, and so does the visual inspection of the renders
 it produces — the top commit contains all of them, so building or eyeballing
 each branch separately re-proves the same artefacts on one COM seat. Gate 2 is
-NOT shared: Codex reviews each PR's own diff, so every PR in the stack still
-needs its own clean review. Order the stack so the riskiest change sits on top —
+NOT shared: each PR's own diff needs a clean CodeRabbit or Codex review.
+Order the stack so the riskiest change sits on top —
 if it fails, drop it off and gate the remainder, rather than having it block
 everything beneath it. Merge bottom-up and do NOT pass `--delete-branch`:
 deleting a parent branch auto-closes the children still targeting it.

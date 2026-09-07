@@ -7,8 +7,8 @@ its documented redraw also leaves the shift. The forced-rebuild control likewise
 returned success without preventing it. No ineffective update was added to production.
 All five native candidate controls are recorded below. Same-expression
 property-link reapplication also leaves the printed shift unchanged.
-A separate measured-cell left-justified layout candidate is prepared below;
-it has not run natively and does not change production finalization.
+A separate measured-cell left-justified layout candidate passed the corrected
+native pair below. It does not yet change production finalization or the template.
 
 The retained rocker control proved a real printed change: cold reopening moved
 all ten `rocker-arm` title glyphs right by about 7.22523 mm, while the note anchor,
@@ -460,3 +460,32 @@ counterpart. Strict containment is unchanged. The native run's original and
 template hashes were unchanged and owned cleanup ended empty/preserved. This run
 did not reach candidate cold reopen and is not evidence for or against cold
 layout stability; a fresh pair is required after the correction.
+
+### Corrected native pair: stable left-title layout
+
+At frozen root `920d4fc6` with adapter `e77bfda4`, existing SolidWorks PID 31860,
+the corrected command completed with exit 0 and outcome
+`candidate_printed_stable`. Receipt:
+`cad/out/reports/fresh-title-8nzblgc3/title-update.json`, SHA-256
+`e7aa1b8324439f10c98f762c2637c57abc3e6274d491364a9cab6d319de06840`.
+
+The centered baseline reproduced the 7.225226508 mm PDF shift and 11,232 changed
+PNG pixels. The left-aligned candidate preserved every cold native annotation
+leaf (zero changed), every PDF title glyph box and every PNG pixel. Both initial
+and reopened extents/glyphs fit the measured cell exactly. The retained dynamic
+property link, font and new anchor were unchanged; no cold setter or native
+re-save was used. Original source, guard and template hashes matched, and owned
+cleanup ended with the initially empty document table, no errors.
+
+Measured cell `(left,bottom,right,top)` in metres:
+`(0.33831249077644365, 0.03590604266734481, 0.4191, 0.051898935246752154)`.
+Checked anchor: `(0.340958324109777, 0.046985965791987744, 0)`.
+Trial times were 64.657 s baseline and 103.302 s candidate, including diagnostic
+witnesses; these are not a speedup. The candidate's extra geometry measurements
+must not become a per-drawing production cost without justification.
+
+Visual inspection of the cold PNG confirms the title is readable within its
+cell. It also shows a separate drawing-number/revision crowding defect that this
+TITLE-only treatment does not fix. Full manufacturing-recipe acceptance and
+production template integration remain pending; this minimal one-view control
+does not satisfy either gate.
