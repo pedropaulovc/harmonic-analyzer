@@ -3,6 +3,9 @@
 Install observe() BEFORE SourceSaveBoundaries.observe(): both recipe and common
 callout aliases must refer to this delta when that observer checks identity.
 The only mutation is SetLowerText followed by the existing one EditRebuild3.
+LOWER_TEXT_BEFORE_SAVE queues the same exact request without either mutation;
+it applies once inside the native artifact boundary after sheet finalization.
+The before-save source bank is intentionally observed before the queued write.
 The source observer retains raw GetText/value/tolerance banks unchanged; it must
 not query the drawing-only lower-text field on source-part displays.
 
@@ -17,7 +20,7 @@ https://help.solidworks.com/2026/english/api/sldworksapi/SolidWorks.Interop.sldw
 https://help.solidworks.com/2026/english/api/sldworksapi/Get_Chamfer_Display_Dimension_Example_CSharp.htm
 """
 
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from enum import StrEnum
 from pathlib import Path
 import time
@@ -34,6 +37,7 @@ from _drawing_native_callouts import (
 
 class CalloutStorage(StrEnum):
     LOWER_TEXT = "lower_text"
+    LOWER_TEXT_BEFORE_SAVE = "lower_text_before_save"
 
 
 class _Lifetime(StrEnum):
@@ -48,17 +52,23 @@ CALLOUT = {"ArborBoreDia": TEXT}
 
 
 class LowerTextControl:
-    def __init__(self, adapter, module, trial, source_handles):
+    def __init__(
+        self, adapter, module, trial, source_handles, *, storage=CalloutStorage.LOWER_TEXT
+    ):
         if trial["target"] != "alignment_pinion":
             raise ValueError("lower-text control requires only alignment_pinion")
         self._require_manifest(source_handles)
+        if not isinstance(storage, CalloutStorage):
+            raise ValueError("lower-text control requires an explicit storage enum")
+        self.storage = storage
         self.adapter, self.module = adapter, module
         self.handles = dict(source_handles)
         self.path = Path(trial["copy_source"]).resolve()
         self.configuration = trial["source_before"]["configuration"]
         self.lifetime, self.calls = _Lifetime.READY, 0
+        self.writes, self.pending = 0, None
         self.report = trial["lower_text_control"] = {
-            "variant": CalloutStorage.LOWER_TEXT.value,
+            "variant": storage.value,
             "scope": "one imported alignment diameter; no source lower-text reads",
             "operation": {},
             "snapshots": {},
@@ -183,25 +193,85 @@ class LowerTextControl:
                 raise RuntimeError("lower-text requires one exact passed annotation")
             before = self._read(selected[0], self.handles)
             record.update(annotation=before[0], before=before[1])
-            self._same(model, self._drawing(adapter), "pre-set drawing")
-            display = before[2][2].display
-            display.SetLowerText(TEXT)  # void; never interpret None as failure.
-            record["setter_readback"] = display.GetLowerText()
-            if record["setter_readback"] != TEXT:
-                raise RuntimeError("SetLowerText exact native readback failed")
-            model.EditRebuild3()  # Same one rebuild as set_dimension_callouts.
-            self._same(model, self._drawing(adapter), "post-rebuild drawing")
-            after = self._read(selected[0], self.handles)
-            record["after"] = after[1]
-            self._unchanged(before, after)
-            if after[1]["lower_text"] != TEXT:
-                raise RuntimeError("rebuild lost the exact native lower text")
-            record["status"] = "passed"
+            if self.storage is CalloutStorage.LOWER_TEXT_BEFORE_SAVE:
+                self.pending = model, before
+                record["status"] = "queued"
+                return
+            self._apply(model, before)
         except BaseException as error:
             record.update(status="failed", error=repr(error))
             raise
         finally:
             record["seconds"] = time.perf_counter() - started
+
+    def _apply(self, model, before):
+        if self.writes:
+            raise RuntimeError("lower-text native write must run exactly once")
+        self.writes += 1  # A failed setter is not permission to retry.
+        record = self.report["operation"]
+        self._same(model, self._drawing(self.adapter), "pre-set drawing")
+        display = before[2][2].display
+        display.SetLowerText(TEXT)  # void; never interpret None as failure.
+        record["setter_readback"] = display.GetLowerText()
+        if record["setter_readback"] != TEXT:
+            raise RuntimeError("SetLowerText exact native readback failed")
+        model.EditRebuild3()  # Same one rebuild as set_dimension_callouts.
+        self._same(model, self._drawing(self.adapter), "post-rebuild drawing")
+        after = self._read(before[2][0], self.handles)
+        record["after"] = after[1]
+        self._unchanged(before, after)
+        if after[1]["lower_text"] != TEXT:
+            raise RuntimeError("rebuild lost the exact native lower text")
+        record["status"] = "passed"
+
+    def _apply_queued(self):
+        record = self.report["operation"]
+        started = time.perf_counter()
+        try:
+            if (
+                self.lifetime is not _Lifetime.ACTIVE
+                or self.pending is None
+                or self.writes
+                or record.get("status") != "queued"
+            ):
+                raise RuntimeError("queued lower-text native write must run exactly once")
+            model, queued = self.pending
+            self._same(model, self._drawing(self.adapter), "queued drawing")
+            fresh = self._fresh_match(self.adapter, self.handles)
+            record["before_save"] = fresh[1]
+            self._unchanged(queued, fresh)
+            self._apply(model, fresh)  # Fresh native display, not the queued handle.
+        except BaseException as error:
+            record.update(status="failed", error=repr(error))
+            raise
+        finally:
+            record["before_save_seconds"] = time.perf_counter() - started
+
+    def _save_wrapper(self, original):
+        def save(adapter, slddrw_path, *, artifact_context=None, **kwargs):
+            if (
+                self.lifetime is not _Lifetime.ACTIVE
+                or adapter is not self.adapter
+                or Path(slddrw_path).resolve() != self.module.OUTPUTS.slddrw.resolve()
+            ):
+                raise RuntimeError("queued lower-text save scope changed")
+
+            @contextmanager
+            def artifact(kind, path):
+                with (
+                    artifact_context(kind, path) if artifact_context else nullcontext()
+                ):
+                    if kind == "drawing":
+                        if Path(path).resolve() != self.module.OUTPUTS.slddrw.resolve():
+                            raise RuntimeError("queued lower-text native target changed")
+                        self._apply_queued()
+                    yield
+
+            return original(
+                adapter, slddrw_path, artifact_context=artifact, **kwargs
+            )
+
+        return save
 
     @contextmanager
     def observe(self):
@@ -213,19 +283,28 @@ class LowerTextControl:
             if common.set_dimension_callouts is not original:
                 raise RuntimeError("lower-text recipe/common helper alias changed")
             replacement = self._call
+            save_scope = (
+                patch.object(common, "save_drawing", self._save_wrapper(common.save_drawing))
+                if self.storage is CalloutStorage.LOWER_TEXT_BEFORE_SAVE
+                else nullcontext()
+            )
             with (
                 patch.object(self.module, "set_dimension_callouts", replacement),
                 patch.object(common, "set_dimension_callouts", replacement),
+                save_scope,
             ):
                 yield
         finally:
             self.lifetime = _Lifetime.CLOSED
 
     def require_used(self):
-        if self.calls != 1 or self.report["operation"].get("status") != "passed":
+        if (
+            self.calls != 1 or self.writes != 1
+            or self.report["operation"].get("status") != "passed"
+        ):
             raise RuntimeError("lower-text requires one completed callout operation")
 
-    def _fresh_rows(self, adapter, source_handles):
+    def _fresh_match(self, adapter, source_handles):
         self._require_manifest(source_handles)
         model = self._drawing(adapter)
         matches = []
@@ -248,7 +327,10 @@ class LowerTextControl:
         if len(matches) != 1:
             raise RuntimeError("lower-text fresh inventory needs one exact dimension")
         self._same(model, self._drawing(adapter), "snapshot drawing")
-        key, row, _ = matches[0]
+        return matches[0]
+
+    def _fresh_rows(self, adapter, source_handles):
+        key, row, _ = self._fresh_match(adapter, source_handles)
         return {key: row}
 
     def boundary_snapshot(self):
