@@ -40,3 +40,25 @@ def test_rejected_setter_return_is_not_discarded_by_the_probe():
     assert len(rows) == 3
     assert all(row["returned"] is False for row in rows)
     assert all(row["readback"]["system"] == 17 for row in rows)
+
+
+def test_repeated_setter_contract_invocations_have_independent_model_state(monkeypatch):
+    original = probe.trace_setters
+    models = []
+    initial_values = []
+
+    def observe(model, decimals, rows, checkpoint):
+        models.append(model)
+        initial_values.append(dict(model.values))
+        return original(model, decimals, rows, checkpoint)
+
+    monkeypatch.setattr(probe, "trace_setters", observe)
+    # Execute the actual test twice, including every setter/readback assertion.
+    test_exact_adapter_setter_order_and_each_native_readback_is_retained()
+    test_exact_adapter_setter_order_and_each_native_readback_is_retained()
+
+    first, second = models
+    assert type(first) is not type(second)
+    assert first.values is not second.values
+    assert initial_values == [{263: 3, 47: 3, 49: 3}] * 2
+    assert first.values == second.values == {263: 5, 47: 0, 49: 2}
