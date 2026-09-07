@@ -311,6 +311,42 @@ def test_getter_dirty_transition_is_recorded_and_rejected(bank):
     assert bank.saved[-1]["source_boundaries"]["banks"][-1]["dirty_after_read"] is True
 
 
+def test_optional_drawing_bank_skips_source_only_initial_and_records_text_loss(bank):
+    drawing_reader = Mock(side_effect=[{"lower_text": "fit"}, {"lower_text": ""}])
+    bank.observer.drawing_reader = drawing_reader
+    bank.observer.capture("initial")
+    drawing_reader.assert_not_called()
+    bank.observer.capture("before_precision")
+    bank.observer.capture("after_precision")
+    rows = bank.saved[-1]["source_boundaries"]["banks"]
+    assert "drawing" not in rows[0]
+    assert rows[1]["drawing"] == {"lower_text": "fit"}
+    assert rows[2]["drawing"] == {"lower_text": ""}
+    assert drawing_reader.call_count == 2
+
+
+def test_drawing_reader_dirtiness_is_inside_source_getter_guard(bank):
+    def read():
+        bank.state.dirty = True
+        return {"lower_text": ""}
+
+    bank.observer.drawing_reader = read
+    with pytest.raises(RuntimeError, match="getters changed"):
+        bank.observer.capture("before_precision")
+    row = bank.saved[-1]["source_boundaries"]["banks"][-1]
+    assert row["drawing"] == {"lower_text": ""}
+    assert row["dirty_after_read"] is True
+
+
+def test_drawing_reader_failure_is_checkpointed_without_losing_source_bank(bank):
+    bank.observer.drawing_reader = Mock(side_effect=RuntimeError("drawing read failed"))
+    with pytest.raises(RuntimeError, match="drawing read failed"):
+        bank.observer.capture("before_precision")
+    row = bank.saved[-1]["source_boundaries"]["banks"][-1]
+    assert row["source"] == bank.native
+    assert "drawing read failed" in row["error"]
+
+
 def test_missing_or_out_of_order_operation_fails(bank):
     with pytest.raises(RuntimeError, match="all four"):
         bank.observer.require_used()

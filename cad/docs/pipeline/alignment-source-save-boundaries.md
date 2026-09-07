@@ -238,3 +238,34 @@ uv run --no-sync python cad/scripts/diagnostics/probe_datum_policy_recipes.py `
 
 The offline helper/pilot/save selection passed 180 tests. Native source cleanliness,
 multiline layout and cold persistence are not established by those tests.
+
+## Lower-text legacy replay: lost before built acceptance
+
+At `a39b52d8` with adapter `e77bfda4`, PID 31860 and the command above,
+`datum-policy-3hcoww72/pilot.json` failed built acceptance, before cold reopening.
+Receipt SHA-256:
+`ddd562d723419f7ec142f52ee4d08deda81fb02706cc3f8522992b90080b1da6`.
+The setter and its existing rebuild both retained exact
+`THRU - REAM\nPRESS FIT`, raw bore value `0.008000000002000001`, source
+parameter identity and attachment type `[10]`. The operation took 1.611 s.
+
+All nine source banks stayed clean with the original copy hash, including after
+legacy native save and PDF export. Source text/value/tolerance witnesses were
+unchanged. However, the fresh built display returned empty GetLowerText and its
+native text runs contained neither requested line. The recipe PNG confirms the
+missing text. Recipe/pilot times were 34.053/115.002 s including diagnostics.
+No cold comparison was reached; this is not a cold-persistence result.
+
+Failure evidence completed without capture errors; originals and the owned copy
+kept their exact hashes. The pre-existing clean/visible pivot drawing and part
+were preserved; owned cleanup succeeded and final runtime guards were empty.
+The first control proves source cleanliness for this call sequence, not usable
+printed callouts. It does not locate the later text-clearing operation.
+
+The next replay adds optional fresh drawing-field banks alongside the eight
+non-initial source banks. Those reads keep exact source/attachment witnesses,
+do not add a setter/rebuild, and remain inside the source getter-dirtiness guard.
+They record text loss without accepting it; the built/cold gates still reject
+missing storage or printed lines. The initial source-only bank never calls the
+drawing reader. The next run separates the precision helper, intervening recipe
+work, native save and PDF export as candidate loss boundaries.
