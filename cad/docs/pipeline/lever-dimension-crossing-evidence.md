@@ -162,3 +162,30 @@ if its two intended leaders improve. The PDF remains diagnostic-only; there is
 no native save or production recipe change. Offline selection/safety tests do
 not prove native movement, saved persistence or a performance benefit. Native
 execution of the radial variant is pending.
+
+### Native radial result: accepted call, unchanged geometry
+
+The frozen `e8cae04d` radial control selected exactly the five intended native
+dimensions and returned true from `AlignDimensions(1, 0.001)` in **0.0025896 s**.
+`moved_dimensions` is empty. All complete symbol-aware measurements before,
+after and after PDF export are exactly equal, and all eight recorded crossings
+remain (seven front-view, one top-view). The overall control therefore failed;
+this is not a successful layout or a performance improvement.
+
+Receipt: `cad/out/reports/dimension-arrange-ua1q54y6/dimension-arrange.json`,
+SHA-256 `437eec9bee4390ba7ce0e6165166e8aed6b791789d439fc32d85b0d6600631bd`.
+Its retained `after.pdf` and `after.png` show the unchanged diameter 6.50 leader
+through BASIC R4.75 and diameter 4.04 leader through datum C. Independent visual
+inspection confirms both defects. The other conservative body intersections
+remain reported, not silently treated as exact glyph-ink defects.
+
+Original input, post-relink owned-copy, helper/config and imported-adapter hash
+banks all match their final observations. Source semantic/native identity checks
+and post-export witnesses passed. Ownership began/ended empty and cleanup error
+is null. The native control held the seat for 94.65 s, mostly capture/validation;
+the 2.6 ms selected API call itself does not measure a full-recipe improvement.
+
+This result is limited to one radial bank on the already-packed retained sheet.
+It does not establish that native dimension arrangement is generally inert.
+The next meaningful change is less crowded view ownership and an earlier
+dimension-layout phase, not repeated calls against this unchanged scene.
