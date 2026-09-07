@@ -32,8 +32,8 @@ import _telemetry  # noqa: E402
 
 SOURCE = ROOT / "cad/out/sldprt/crank-arm.SLDPRT"
 TOKEN = SOURCE.with_name(".crank-arm.execution")
-EXPECTED_SOURCE_SHA = "6b086d5dbcb6e904fb794822728b705f69cd3903a0e8b2c5cf7abb8d9621f102"
-BASELINE = "bc593d784fba08fc6552224767a460338f51b664"
+EXPECTED_SOURCE_SHA = "cfde03558f6ca85ef096080d322f32621f62063d5994108fba54a5028a65b4d3"
+BASELINE = "19431a0088519bd8755b941a3da73a699c0ed7e1"
 BASELINE_DRAWING_REPORT = (
     ROOT / "cad/out/reports/crank-arm-entities-6x1gg817/measurements.json"
 )
