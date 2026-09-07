@@ -163,3 +163,30 @@ font/text and native geometry in EACH intermediate stage, then require the singl
 final original-baseline witness to reject. Separate native copied controls must
 confirm final rendering and saved semantics while phase timings/read counts prove
 the actual benefit. This is a larger contract change than the delivered handoff.
+
+### Full-recipe rocker: next bounded reduction
+
+The completed rocker construction at `890e3045` took 58.563 s; project layout
+took 45.545 s (trace `0xcd23024b719ec37b6a478e9d28e0d762`). Its datum
+initial/final witnesses consumed 25.570 s, while the datum write/rebuild took
+0.115 s. In particular, 44 template annotations were scanned twice. This recipe
+produced visually inspected exports but failed the separate strict cold-title
+position comparison; see `datum-policy-retained-output-audit.md`.
+
+The immediate candidate reuses validated post-datum annotation footprints for
+callout-initial reads, through the existing single-consumer handoff. Fresh
+semantic/attachment/value reads, exact owner/position/context checks, the datum
+document-final witness and the callout-final witness remain. SF geometry must
+still be freshly measured after its leader representation changes. The entire
+callout-initial envelope is 3.026 s in this trace: the saving must be smaller
+after retaining those reads and adding handoff checks. Native timing is pending.
+
+The larger transaction above could consolidate intermediate witness envelopes
+totaling 19.114 s in this rocker trace, **before replacement-reader overhead**.
+That is not a predicted speedup. Current packing readback is not a replacement
+for those witnesses: it excludes template annotations and lacks complete GTol
+XML, SF/datum properties and dimension-value checks. A transaction must carry
+the original exact manufacturing contract into an expanded fresh final reader,
+including unchanged-layout paths. Rejection rates and end-to-end savings need
+representative native trials; neither a sub-5-percent failure rate nor fleet
+acceptance follows from this profile.

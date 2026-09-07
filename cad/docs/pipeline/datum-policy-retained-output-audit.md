@@ -306,6 +306,32 @@ The four original/guard hashes and owned lever copy remained exact; ownership
 again began/ended empty with no cleanup error. No native/PDF/PNG acceptance or
 speedup is claimed by the shorter failing interval.
 
+The whole-bank frontier candidate at
+`2e41d0698bfe822b744fdfa702b233727f6384d8` also stopped at the six-candidate
+GTol check, after **68.9124080 s**. Receipt:
+`cad/out/reports/datum-policy-p6dj_zsa/pilot.json`, SHA-256
+`0f9a2502b7cd5a96a463aa9d412b521255358db55e96904afa2933aa9708602b`.
+All 17 reported line/text intersections reproduce with segment clipping; this
+is not a diagonal bounding-box false positive. The right-up candidate moves
+62.943477629 mm, clearing lower text but crossing the upper RD4 diameter and
+`1.99 THRU ALL` cells. Taking a maximum over every obstacle overshoots a gap.
+
+The captured native route follows the predicted moving-shoulder/fixed-attachment
+model for all four right-up leader chains. Offline replay against the ten cells
+retained in the failure finds a clear upper boundary at 21.524866474 mm. Those
+ten cells are not the whole sheet or its complete body inventory: this is a
+candidate-generation observation, not native acceptance. The next correction
+uses forbidden vertical intervals to choose a nearby gap, retaining the same
+six native attempts and independent actual-geometry checks.
+
+No native drawing or export was saved. All four original/guard hashes and the
+owned lever-copy hash remained exact. Initial/final ownership inventories were
+empty, baseline preservation passed, and cleanup reported no error.
+
+The seven selected COM-free gates at `2e41d069` completed successfully:
+`check:recipe` ran **3,212 tests in 51.31 s**; six other gates were current.
+Pytest telemetry: `cad/out/reports/pytest-telemetry/run-23qt941k`.
+
 ## Next performance target from the completed rocker trace
 
 Trace `0xcd23024b719ec37b6a478e9d28e0d762` attributes 13.538 s and 12.032 s to
