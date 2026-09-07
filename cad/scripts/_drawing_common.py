@@ -905,10 +905,13 @@ def project_part_pmi(
 
     ``author_part_pmi`` authors and verifies the same rows on the ``.SLDPRT``.
     The drawing display is generated from those rows rather than retyping any
-    datum or tolerance.  Native drawing annotations are intentional: live SW
-    2026 constrains imported datum positions and interprets imported FCF leader
-    endpoints in model space, yielding off-sheet leaders even when setter
-    readback reports the requested coordinates (reproduced 2026-07-29).
+    datum or tolerance. Recreation preserves this helper's per-view layout
+    contract; historical post-import editing failures are not a general import
+    restriction. The selected-Right-view control imported the exact datum and
+    both FCFs, but their overlap and a save-time inventory change still failed
+    complete-sheet acceptance. See cad/docs/pipeline/selected-view-model-pmi-control.md
+    and receipt selected-view-pmi-vx_7_s57/observations.json. That evidence proves
+    this import call shape's coverage, not an accepted native-layout replacement.
     """
     from _gtol_spec import gtol_frame_signature, validate_part_pmi
 
