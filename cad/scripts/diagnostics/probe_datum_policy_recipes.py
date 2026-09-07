@@ -729,7 +729,7 @@ async def pilot(
                 from diagnostics._drawing_lower_text_control import LowerTextControl
 
                 callout_control = LowerTextControl(
-                    adapter, module, trial, source_handles
+                    adapter, module, trial, source_handles, storage=callout_storage
                 )
             save_control = nullcontext()
             if drawing_save is not None:

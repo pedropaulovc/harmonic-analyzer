@@ -19,7 +19,8 @@ from diagnostics._native_drawing_save_control import DrawingSave
 
 @pytest.mark.parametrize("route", ["parent", "worker"])
 @pytest.mark.parametrize("save", tuple(DrawingSave))
-def test_explicit_field_and_save_factors_are_forwarded(monkeypatch, tmp_path, route, save):
+@pytest.mark.parametrize("storage", tuple(lower.CalloutStorage))
+def test_explicit_field_and_save_factors_are_forwarded(monkeypatch, tmp_path, route, save, storage):
     monkeypatch.setattr(pilot, "require_owned_diagnostic_environment", lambda: None)
     monkeypatch.setattr(pilot.benchmark, "revision", lambda _: "frozen")
     parent, seen = Mock(), []
@@ -36,7 +37,7 @@ def test_explicit_field_and_save_factors_are_forwarded(monkeypatch, tmp_path, ro
     argv = [
         "--source-root", str(tmp_path), "--guard-root", str(tmp_path),
         "--target", "alignment_pinion", "--source-observation", "alignment_save",
-        "--drawing-save", save.value, "--callout-storage", "lower_text",
+        "--drawing-save", save.value, "--callout-storage", storage.value,
     ]
     if route == "worker":
         argv.append("--worker")
@@ -46,11 +47,11 @@ def test_explicit_field_and_save_factors_are_forwarded(monkeypatch, tmp_path, ro
             "targets": ("alignment_pinion",),
             "source_observation": source.SourceObservation.ALIGNMENT_SAVE,
             "drawing_save": save,
-            "callout_storage": lower.CalloutStorage.LOWER_TEXT,
+            "callout_storage": storage,
         }]
         return
     command = parent.call_args.args[0]
-    assert command[command.index("--callout-storage") + 1] == "lower_text"
+    assert command[command.index("--callout-storage") + 1] == storage.value
     assert command[command.index("--drawing-save") + 1] == save.value
     assert parent.call_args.kwargs["com"] is True
 
@@ -129,9 +130,10 @@ async def test_pilot_field_observer_order_and_fresh_cold_handles(
             events.append("source_checked")
 
     class Field:
-        def __init__(self, actual_adapter, module, trial, handles):
+        def __init__(self, actual_adapter, module, trial, handles, *, storage):
             assert actual_adapter is adapter
             assert handles == {"bore": warm}
+            assert storage is lower.CalloutStorage.LOWER_TEXT
 
         @contextmanager
         def observe(self):
