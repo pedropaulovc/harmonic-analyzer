@@ -386,6 +386,7 @@ def test_source_observer_identity_check_accepts_nested_aliases(scene, monkeypatc
     # are mocked, not the identity check or nested alias lifecycle.
     observer = object.__new__(SourceSaveBoundaries)
     observer.adapter, observer.module = scene.adapter, scene.module
+    observer.drawing_reader = None
     observer.capture = Mock()
     observer.stages, observer.report = [], {}
     with scene.instance.observe(), observer.observe():
