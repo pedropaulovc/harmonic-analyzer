@@ -37,10 +37,10 @@ UNCHANGED = {
 
 def test_only_alignment_source_pin_migrates_to_the_actual_authored_output():
     # Explicit 14 -> 16 enrollment; all fourteen original pins stay exact.
-    # New targets are additions, not alternate accepted hashes for old inputs.
+    # The new tip's pin was separately migrated after its real production rebuild.
     expected = UNCHANGED | {
         "alignment_pinion": AUTHORED_SOURCE,
-        "cone_tip_adjuster": "8e2ce51d8e7ca47f9ca5a8e5c743d1d6a0f0cd749e10195a54e2140117bf12f4",
+        "cone_tip_adjuster": "f3578ac2b2ab95e478bc7bd72c316ebab057c125d5244af6fa2c3e12f4d48468",
         "cone_pivot_screw": "515019088b41d329b45f0487b9241123751ecac7d6c116481930ae9c45e89c36",
     }
     assert {key: row.source_sha256 for key, row in manifest.TARGETS.items()} == expected
