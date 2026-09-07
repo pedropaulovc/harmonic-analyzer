@@ -7,6 +7,7 @@ from unittest.mock import Mock, call
 
 import pytest
 
+import _common
 import _drawing_common as common
 import _drawing_marks as marks
 import _model_dimension_callouts as author
@@ -60,7 +61,28 @@ def native(monkeypatch):
     feature = Mock(spec=["GetFirstDisplayDimension", "GetNextDisplayDimension"])
     feature.GetFirstDisplayDimension.return_value = display
     feature.GetNextDisplayDimension.return_value = None
-    lookup = Mock(return_value=feature)
+    source_display = Mock(spec=["GetDimension2"])
+    source_display.GetDimension2.return_value = dimension
+    source_feature = Mock(
+        spec=[
+            "Name",
+            "GetFirstDisplayDimension",
+            "GetNextDisplayDimension",
+            "GetNextFeature",
+        ]
+    )
+    source_feature.Name = "ArborBoreProfile"
+    source_feature.GetFirstDisplayDimension.return_value = source_display
+    source_feature.GetNextDisplayDimension.return_value = None
+    source_feature.GetNextFeature.return_value = None
+    source_model = Mock(spec=["GetType", "FirstFeature"])
+    source_model.GetType.return_value = 1
+    source_model.FirstFeature.return_value = source_feature
+    lookup = Mock(
+        side_effect=lambda reader, name: (
+            source_feature if reader.currentModel is source_model else feature
+        )
+    )
     monkeypatch.setattr(marks, "_feature_by_name", lookup)
     for module in (author, marks, common):
         monkeypatch.setattr(module, "_early_bound", lambda obj, kind: obj)
@@ -69,8 +91,12 @@ def native(monkeypatch):
     )
     model = Mock(spec=["GetType", "GraphicsRedraw2"])
     model.GetType.return_value = 1
-    annotation = Mock(spec=["GetSpecificAnnotation"])
+    view = SimpleNamespace(ReferencedDocument=source_model)
+    annotation = Mock(spec=["GetSpecificAnnotation", "GetType", "OwnerType", "Owner"])
     annotation.GetSpecificAnnotation.return_value = display
+    annotation.GetType.return_value = 4
+    annotation.OwnerType = 0
+    annotation.Owner = view
 
     def read_member(obj, name):
         member = getattr(obj, name)
@@ -78,6 +104,9 @@ def native(monkeypatch):
 
     adapter = SimpleNamespace(
         currentModel=model,
+        swApp=SimpleNamespace(
+            IsSame=Mock(side_effect=lambda left, right: int(left is right))
+        ),
         _get_attr_or_call=read_member,
         _attempt=lambda operation, default=None: operation(),
     )
@@ -90,6 +119,9 @@ def native(monkeypatch):
         lookup=lookup,
         fields=fields,
         annotation=annotation,
+        view=view,
+        source_model=source_model,
+        source_display=source_display,
     )
 
 
@@ -105,6 +137,8 @@ def verify_call(native, **kwargs):
         (native.annotation,),
         spec.DIMENSION_CALLOUTS,
         feature_name="ArborBoreProfile",
+        view=native.view,
+        source_model=native.source_model,
         **kwargs,
     )
 
@@ -194,6 +228,8 @@ def test_exact_empty_field_is_supported_without_coercing_null(native, location, 
         [native.annotation],
         {"ArborBoreDia": ""},
         feature_name="ArborBoreProfile",
+        view=native.view,
+        source_model=native.source_model,
         location=location,
     )
     native.display.GetText.side_effect = None
@@ -204,6 +240,8 @@ def test_exact_empty_field_is_supported_without_coercing_null(native, location, 
             [native.annotation],
             {"ArborBoreDia": ""},
             feature_name="ArborBoreProfile",
+            view=native.view,
+            source_model=native.source_model,
             location=location,
         )
 
@@ -258,6 +296,8 @@ def test_drawing_rejects_incorrect_import_without_repair(native, damage):
             annotations,
             spec.DIMENSION_CALLOUTS,
             feature_name="ArborBoreProfile",
+            view=native.view,
+            source_model=native.source_model,
         )
     native.display.SetText.assert_not_called()
     native.model.GraphicsRedraw2.assert_not_called()
@@ -279,6 +319,89 @@ def test_drawing_missing_source_parameter_is_not_accepted(native):
     with pytest.raises(RuntimeError, match="no source parameter"):
         verify_call(native)
     native.display.SetText.assert_not_called()
+
+
+def test_same_named_dimension_from_other_part_is_not_accepted(native):
+    native.model.GetType.return_value = 3
+    native.fields[4] = spec.DIMENSION_CALLOUTS["ArborBoreDia"]
+    native.display.GetDimension2.return_value = SimpleNamespace(
+        **{
+            **vars(native.dimension),
+            "FullName": "ArborBoreDia@ArborBoreProfile@wrong-part.Part",
+        }
+    )
+    with pytest.raises(RuntimeError, match="source parameter"):
+        verify_call(native)
+    native.display.SetText.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "damage",
+    [
+        "wrong_view",
+        "null_owner",
+        "sheet_owner",
+        "part_owner",
+        "wrong_type",
+        "wrong_source",
+        "null_reference",
+        "null_view",
+        "null_source",
+        "drawing_source",
+        "unknown_identity",
+    ],
+)
+def test_verifier_requires_explicit_native_view_and_source_identity(native, damage):
+    native.model.GetType.return_value = 3
+    native.fields[4] = spec.DIMENSION_CALLOUTS["ArborBoreDia"]
+    if damage == "wrong_view":
+        native.annotation.Owner = SimpleNamespace(
+            ReferencedDocument=native.source_model
+        )
+    if damage == "null_owner":
+        native.annotation.Owner = None
+    if damage == "sheet_owner":
+        native.annotation.OwnerType = 1
+    if damage == "part_owner":
+        native.annotation.OwnerType = 3
+    if damage == "wrong_type":
+        native.annotation.GetType.return_value = 6
+    if damage == "wrong_source":
+        native.view.ReferencedDocument = Mock()
+    if damage == "null_reference":
+        native.view.ReferencedDocument = None
+    if damage == "null_view":
+        native.view = None
+    if damage == "null_source":
+        native.source_model = None
+    if damage == "drawing_source":
+        native.source_model.GetType.return_value = 3
+    if damage == "unknown_identity":
+        native.adapter.swApp.IsSame.side_effect = None
+        native.adapter.swApp.IsSame.return_value = -1
+    with pytest.raises(RuntimeError, match="identity|drawing-view|intended"):
+        verify_call(native)
+    native.display.SetText.assert_not_called()
+    native.display.GetText.assert_not_called()
+
+
+def test_verifier_resolves_exact_source_tree_without_switching_drawing(
+    native, monkeypatch
+):
+    native.model.GetType.return_value = 3
+    native.fields[4] = spec.DIMENSION_CALLOUTS["ArborBoreDia"]
+    monkeypatch.setattr(marks, "_feature_by_name", _common._feature_by_name)
+    monkeypatch.setattr(_common, "_early_bound", lambda obj, kind: obj)
+    verify_call(native)
+    native.source_model.FirstFeature.assert_called_once_with()
+    assert native.adapter.currentModel is native.model
+    assert native.adapter.swApp.IsSame.call_args_list == [
+        call(native.source_model, native.source_model),
+        call(native.view, native.view),
+        call(native.dimension, native.dimension),
+    ]
+    native.source_display.GetDimension2.assert_called_once_with(0)
+    assert native.model.mock_calls == [call.GetType()]
 
 
 def test_callout_author_is_an_alignment_only_part_input():
