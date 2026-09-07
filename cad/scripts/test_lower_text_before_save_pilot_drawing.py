@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 from types import SimpleNamespace as NS
+
 from unittest.mock import Mock
 
 import pytest
@@ -13,6 +14,7 @@ from diagnostics import _drawing_lower_text_control as lower
 from diagnostics import _native_drawing_save_control as native_save
 from diagnostics import _owned_native_documents as owned
 from diagnostics import _source_save_boundaries as boundaries
+from diagnostics._model_dimension_coverage import SemanticCoverage
 from diagnostics import probe_datum_policy_recipes as pilot
 from test_benchmark_drawing_recipes import recipe
 from test_datum_policy_recipes_drawing import fixture_sources
@@ -44,7 +46,11 @@ async def test_real_pilot_queued_field_with_25_banks_owned_rename_and_cold_gates
 ):
     monkeypatch.setattr(pilot, "ORDER", ("alignment_pinion",))
     sources, guards = fixture_sources(tmp_path, monkeypatch)
-    monkeypatch.setitem(pilot.TARGETS, "alignment_pinion", NS(view_roles={}, entity_labels=()))
+    monkeypatch.setitem(
+        pilot.TARGETS,
+        "alignment_pinion",
+        NS(view_roles={}, entity_labels=(), coverage=SemanticCoverage.GEOMETRY),
+    )
     monkeypatch.setattr(pilot.benchmark, "recipe_source", lambda *_: _recipe())
     monkeypatch.setattr(pilot.benchmark, "revision", lambda _: "frozen")
     monkeypatch.setattr(pilot, "helper_fingerprints", lambda: {"helper": "frozen"})
@@ -66,7 +72,11 @@ async def test_real_pilot_queued_field_with_25_banks_owned_rename_and_cold_gates
     monkeypatch.setattr(pilot.benchmark, "load_recipe", load)
 
     def prepare_part(part):
-        tol = NS(Type=2, GetMinValue=lambda: -0.00004, GetMaxValue=lambda: -0.00002)
+        tol = NS(
+            Type=2,
+            GetMinValue2=lambda: (0, -0.00004),
+            GetMaxValue2=lambda: (0, -0.00002),
+        )
         part.parameter = NS(
             Name=lower.DIMENSION, FullName=f"{lower.DIMENSION}@{Path(part.path).stem}.Part",
             GetType=lambda: 0, GetSystemValue3=lambda *args: (raw_value,),
