@@ -244,8 +244,18 @@ async def build(adapter):
         )
 
     if mode in {"snapshot_failure", "source_disk_change"}:
-        with pytest.raises(Exception):
+        expected_error = RuntimeError if mode == "snapshot_failure" else ExceptionGroup
+        with pytest.raises(expected_error) as caught:
             asyncio.run(run())
+        if mode == "snapshot_failure":
+            assert str(caught.value) == (
+                "source transition capture failed: RuntimeError('native dimension readback failed')"
+            )
+        if mode == "source_disk_change":
+            assert [str(error) for error in caught.value.exceptions] == [
+                "no-save original/copy disk identity guard failed",
+                "diagnostic source files changed; see ownership evidence",
+            ]
     else:
         asyncio.run(run())
     (receipt,) = reports.glob("*/source-dirty.json")
