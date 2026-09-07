@@ -2,8 +2,9 @@
 
 import inspect
 import ast
-from contextlib import nullcontext
+from contextlib import contextmanager, nullcontext
 from copy import deepcopy
+from pathlib import Path
 from types import SimpleNamespace as NS
 from unittest.mock import Mock
 
@@ -255,12 +256,65 @@ async def test_real_entity_and_source_observers_compose_in_actual_pilot_scope(
     remaining, monkeypatch, selection
 ):
     from diagnostics import probe_datum_policy_recipes as pilot
+    from diagnostics import _owned_native_documents as owned
     from diagnostics._recipe_view_entity_acceptance import ViewEntityAcceptance
+    from solidworks_mcp.adapters.solidworks import drawing as native_drawing
     from test_view_recipe_acceptance_drawing import bank as view_bank
 
     r, bank = remaining, remaining.bank
     view = view_bank.__wrapped__(monkeypatch)
-    bank.adapter.currentModel = view.adapter.currentModel
+    model, app = view.adapter.currentModel, bank.adapter.swApp
+    documents = []
+    for document, path, kind in (
+        (bank.source, str(bank.path), 1),
+        (model, "", 3),
+    ):
+        document.path = path
+        document.GetPathName = lambda document=document: document.path
+        document.GetTitle = lambda document=document: (
+            Path(document.path).name if document.path else "Owned unsaved drawing"
+        )
+        document.GetType = lambda kind=kind: kind
+        document.Visible = True
+    model.GetSaveFlag = lambda: not bool(model.path)
+    model.GetViews = lambda: ((object(),),)
+    app.GetDocuments = lambda: tuple(documents)
+    app.GetOpenDocumentByName = lambda path: next(
+        (document for document in documents if document.path == str(path)), None
+    )
+    app.ActiveDoc = bank.adapter.currentModel = None
+
+    async def open_source(path):
+        assert Path(path) == bank.path
+        documents.append(bank.source)
+        app.ActiveDoc = bank.adapter.currentModel = bank.source
+        return NS(is_success=True, data={})
+
+    bank.adapter.open_model = open_source
+    monkeypatch.setattr(owned, "_early_bound", lambda value, _: value)
+    ledger = bank.adapter.ownership = owned.DiagnosticDocuments(bank.adapter)
+    ledger.register_directory(bank.path.parent)
+    await ledger.open_model(str(bank.path))
+    with ledger.creating_document(owned.DocumentKind.DRAWING, bank.outputs.slddrw):
+        documents.append(model)
+        app.ActiveDoc = model
+        ledger.assign_current(model)
+    original_record = ledger.assert_current_owned()
+    save_scopes = Mock(wraps=ledger.saving_as)
+    monkeypatch.setattr(ledger, "saving_as", save_scopes)
+
+    def native_save(adapter, path, *, pdf_path, artifact_context):
+        @contextmanager
+        def artifact(kind, target):
+            with artifact_context(kind, target):
+                yield
+                if kind == "drawing":
+                    model.path = target
+            assert ledger.assert_current_owned() is original_record
+
+        return bank.save(adapter, path, pdf_path=pdf_path, artifact_context=artifact)
+
+    monkeypatch.setattr(native_drawing, "save_drawing", native_save)
     for name, original in view.originals.items():
         setattr(bank.module, name, original)
     entity = ViewEntityAcceptance(bank.module, view.manifest)
@@ -319,6 +373,8 @@ async def test_real_entity_and_source_observers_compose_in_actual_pilot_scope(
         module=bank.module,
         build_kwargs={},
         nullcontext=nullcontext,
+        patch=pilot.patch,
+        owned_save_drawing=pilot.owned_save_drawing,
     )
     exec(
         compile(ast.fix_missing_locations(harness), "<pilot observer scope>", "exec"),
@@ -336,6 +392,9 @@ async def test_real_entity_and_source_observers_compose_in_actual_pilot_scope(
             "inserted",
         ]
         assert len(bank.trial["source_boundaries"]["banks"]) == 25
+        save_scopes.assert_called_once_with(str(bank.outputs.slddrw))
+        assert ledger.assert_current_owned() is original_record
+        assert original_record.state["path"] == str(bank.outputs.slddrw)
     if selection == "wrong_entity":
         with pytest.raises(RuntimeError, match="VIEW argument/actual selection"):
             await namespace["run"]()
@@ -344,6 +403,7 @@ async def test_real_entity_and_source_observers_compose_in_actual_pilot_scope(
             == "after_drawing.add_surface_finish#1"
         )
         assert entity.recorded == {}
+        save_scopes.assert_not_called()
     for name, original in view.originals.items():
         assert getattr(bank.module, name) is original
         assert getattr(control.drawing, name) is original
