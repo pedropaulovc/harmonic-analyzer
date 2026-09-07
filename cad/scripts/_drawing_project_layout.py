@@ -6,6 +6,7 @@ must not make every manufacturing print depend on the native-layout pilot.
 
 from __future__ import annotations
 
+import sys
 from typing import TYPE_CHECKING, Any, Callable, Mapping, Sequence
 
 from _common import _early_bound
@@ -133,8 +134,21 @@ def repair_project_drawing_layout(
             final_annotation_validation=validate_final_annotations,
         )
     finally:
-        obstacle_handoff.close()
-        handoff.close()
+        primary = sys.exception()
+        cleanup_errors = []
+        for name, bank in (("obstacle", obstacle_handoff), ("packing", handoff)):
+            try:
+                bank.close()
+            except Exception as error:
+                error.add_note(f"Closing {name} annotation measurement handoff")
+                cleanup_errors.append(error)
+        if primary is not None:
+            for error in cleanup_errors:
+                primary.add_note(f"Annotation measurement handoff cleanup: {error!r}")
+        elif cleanup_errors:
+            for error in cleanup_errors[1:]:
+                cleanup_errors[0].add_note(f"Additional handoff cleanup error: {error!r}")
+            raise cleanup_errors[0]
     _telemetry.info(
         "native sheet layout measured",
         layout_status=report.status.value,
