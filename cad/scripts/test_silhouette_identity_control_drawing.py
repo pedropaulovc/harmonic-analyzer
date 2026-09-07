@@ -173,6 +173,90 @@ def test_accepted_native_identity_never_calls_failure_only_control(owned_scene, 
     assert_owned_cleanup(scene)
 
 
+def test_source_dirty_before_precedes_drawing_context_persistent_queries(owned_scene):
+    scene = owned_scene
+    original = scene.drawing.Extension.GetPersistReference3
+
+    def query(entity):
+        scene.source.dirty = True
+        return original(entity)
+
+    scene.drawing.Extension.GetPersistReference3 = query
+    evidence = {}
+    control.capture(scene.adapter, scene.bank.view, scene.expected, scene.selected, evidence)
+    row = evidence["persistent_identity_control"]["source"]
+    assert row["dirty_before"] is False and row["dirty_after"] is True
+    assert_owned_cleanup(scene)
+
+
+@pytest.mark.parametrize("operation", ["repeated_selection", "get_face"])
+def test_partial_capture_keeps_both_dirty_brackets_before_first_entity_query(owned_scene, operation):
+    scene = owned_scene
+
+    def query(*args):
+        scene.source.dirty = scene.drawing.dirty = True
+        raise RuntimeError(f"{operation} failed after dirtying documents")
+
+    if operation == "repeated_selection":
+        scene.bank.manager.GetSelectedObject6.side_effect = query
+    else:
+        scene.expected.GetFace = query
+    evidence = {}
+    control.capture(scene.adapter, scene.bank.view, scene.expected, scene.selected, evidence)
+    rows = evidence["persistent_identity_control"]
+    assert operation in rows["capture_error"]
+    assert rows["drawing"] == rows["source"] == {"dirty_before": False, "dirty_after": True}
+    assert scene.calls == []
+    assert_owned_cleanup(scene)
+
+
+def test_partial_capture_retains_final_dirty_read_error_without_masking_primary(owned_scene):
+    scene = owned_scene
+    original = scene.source.GetSaveFlag
+    state = NS(read="unarmed")
+
+    def query(*args):
+        state.read = "armed"
+        raise RuntimeError("primary native query failure")
+
+    def dirty():
+        if state.read == "armed":
+            state.read = "observed"
+            raise RuntimeError("final dirty read failure")
+        return original()
+
+    scene.bank.manager.GetSelectedObject6.side_effect = query
+    scene.source.GetSaveFlag = dirty
+    evidence = {}
+    control.capture(scene.adapter, scene.bank.view, scene.expected, scene.selected, evidence)
+    rows = evidence["persistent_identity_control"]
+    assert rows["capture_error"] == "RuntimeError('primary native query failure')"
+    assert rows["drawing"] == {"dirty_before": False, "dirty_after": False}
+    assert rows["source"] == {"dirty_before": False, "dirty_after_error": "RuntimeError('final dirty read failure')"}
+    assert scene.calls == []
+    scene.source.GetSaveFlag = original
+    assert_owned_cleanup(scene)
+
+
+def test_partial_capture_keeps_final_owned_active_guard_without_masking_primary(owned_scene):
+    scene = owned_scene
+
+    def query(*args):
+        scene.native.app.ActiveDoc = scene.user
+        raise RuntimeError("primary native selection failed")
+
+    scene.bank.manager.GetSelectedObject6.side_effect = query
+    evidence = {}
+    control.capture(scene.adapter, scene.bank.view, scene.expected, scene.selected, evidence)
+    rows = evidence["persistent_identity_control"]
+    assert rows["capture_error"] == "RuntimeError('primary native selection failed')"
+    assert "final_ownership_error" in rows
+    assert rows["drawing"] == rows["source"] == {"dirty_before": False, "dirty_after": False}
+    assert scene.calls == []
+    scene.native.app.ActiveDoc = scene.drawing
+    assert_owned_cleanup(scene)
+
+
 @pytest.mark.parametrize("failure", [None, ("source", "reference"), ("drawing", "compare"), "selection"])
 def test_real_failure_hook_retains_controls_and_original_strict_identity_rejection(
     owned_scene, monkeypatch, failure
@@ -205,7 +289,11 @@ def test_real_failure_hook_retains_controls_and_original_strict_identity_rejecti
     assert row["silhouette"]["expected"] == row["silhouette"]["actual"]
     records = row["persistent_identity_control"]
     if failure == "selection":
-        assert records == {"capture_error": "RuntimeError('native repeated selection failed')"}
+        assert records == {
+            "capture_error": "RuntimeError('native repeated selection failed')",
+            "drawing": {"dirty_before": False, "dirty_after": False},
+            "source": {"dirty_before": False, "dirty_after": False},
+        }
         assert scene.calls == []
     else:
         assert records["source"]["dirty_before"] is records["source"]["dirty_after"] is False
