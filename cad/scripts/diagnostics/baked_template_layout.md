@@ -293,7 +293,7 @@ Reader contracts are from installed pypdfium2 and the primary
 `FPDFPath_GetDrawMode`. This does not make the failed populated layout pass;
 MATERIAL, FINISH and PART/TITLE still require measured template corrections.
 
-## Next explicit blank variant: populated-gap layout (not run natively)
+## Explicit blank variant: populated-gap layout
 
 The original `--layout four-notes` control and its four-note allowlist tests
 remain unchanged. `--layout populated-gaps` additionally consumes the exact
@@ -353,3 +353,19 @@ uv run --no-sync python cad/scripts/diagnostics/probe_baked_template_layout.py `
 The new DRWDOT remains an owned diagnostic output. Only a subsequent explicit
 populated rocker/lever control can validate inherited values/native/PDF fit
 and cold stability; full recipes and fleet fit still follow before rollout.
+
+This seven-note blank variant **passed** at frozen root `5e486cfe`, adapter
+`e77bfda4`, existing SW PID 31860. Receipt
+`baked-template-d54wy3lp/template-layout.json` has SHA-256
+`806cfe2fe54ea76db62aee24962cc0d9f419e3e97723ed9f378c3daf2cf74741`.
+The 136.383 s diagnostic timer excludes parent seat-lock wait, attach and the
+outer ownership cleanup. Exact authored/saved/re-instantiated native state and
+PDF glyphs agreed; the 5100×3300 PNG comparison had zero changed pixels.
+The original template and pinned populated-input receipt hashes stayed exact;
+the retained error list is empty.
+
+Its fresh derived DRWDOT has SHA-256
+`2b1bbe3dfff265e8bb35ea79f0f9690f808049f5cef764cab8959c1eaee5e849`.
+It remains a diagnostic output, not the project template. This receipt proves
+blank inheritance and print persistence only; resolved-field fit, full recipes
+and fleet acceptance are separate controls.
