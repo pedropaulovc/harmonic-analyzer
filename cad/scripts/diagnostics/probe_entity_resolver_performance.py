@@ -9,6 +9,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import platform
 import subprocess
 import sys
 import tempfile
@@ -117,6 +118,7 @@ def resolve_sample(module, model, roles, instrumentation, measurement):
 
 
 async def capture(adapter, directory, mode, instrumentation):
+    import dodo
     import _drawing_entities as candidate
     import draw_crank_arm as recipe
 
@@ -127,7 +129,15 @@ async def capture(adapter, directory, mode, instrumentation):
         report["session"] = {
             "pid": int(adapter.swApp.GetProcessID()),
             "revision": str(adapter.swApp.RevisionNumber()),
+            "private_gb": dodo._sw_commit_gb(),
             "inventory": adapter.ownership.evidence(),
+        }
+        report["inputs"] = {
+            "head": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
+            "adapter": subprocess.check_output(["git", "-C", "SolidworksMCP-python", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
+            "python": sys.executable, "host": platform.node(),
+            "recipe_sha256": sha(Path(recipe.__file__)),
+            "selectors": {key: repr(value) for key, value in recipe.ENTITY_ROLES.items()},
         }
         if mode == "inventory":
             report["status"] = "passed"
@@ -147,6 +157,30 @@ async def capture(adapter, directory, mode, instrumentation):
         if Path(model.GetPathName()).resolve() != SOURCE.resolve():
             raise RuntimeError("resolver experiment has the wrong source")
         dirty = bool(model.GetSaveFlag())
+
+        def stationary_input():
+            recipe.require_source(adapter, model)
+            if int(adapter.swApp.IsSame(adapter.currentModel, model)) != 1:
+                raise RuntimeError("resolver current source changed")
+            if bool(model.GetSaveFlag()) != dirty:
+                raise RuntimeError("read-only resolver changed the dirty flag")
+            if mode != "abba":
+                return {}
+            from diagnostics.probe_drawing_attachments import views
+
+            drawing = adapter.swApp.GetOpenDocumentByName(str(recipe.OUTPUTS.slddrw))
+            if drawing is None:
+                raise RuntimeError("ABBA requires the warmed local production drawing open")
+            identities = {}
+            for name, view in views(_early_bound(drawing, "IModelDoc2")).items():
+                identities[name] = int(adapter.swApp.IsSame(view.ReferencedDocument, model))
+                if identities[name] != 1 or str(view.ReferencedConfiguration) != "Default":
+                    raise RuntimeError(f"{name}: production view source/configuration changed")
+            if len(identities) != 4:
+                raise RuntimeError("ABBA requires all four production views")
+            return identities
+
+        report["stationary_input"] = stationary_input()
         report["warmup"] = {}
         reference = resolve_sample(baseline, model, recipe.ENTITY_ROLES, "none", report["warmup"])
         order = "A" if mode == "profile" else "ABBA" * 3
@@ -155,18 +189,19 @@ async def capture(adapter, directory, mode, instrumentation):
             report["samples"].append(row)
             persist_report(path, report)
             try:
+                row["views_before"] = stationary_input()
                 bank = resolve_sample(
                     baseline if variant == "A" else candidate,
                     model, recipe.ENTITY_ROLES, instrumentation, row,
                 )
-                row["identity"] = {
-                    key: int(adapter.swApp.IsSame(reference[key], entity))
-                    for key, entity in bank.items()
-                }
-                if set(bank) != set(reference) or set(row["identity"].values()) != {1}:
+                row["identity"] = {}
+                if set(bank) != set(reference):
+                    raise RuntimeError("variant changed the role key set")
+                for key, entity in bank.items():
+                    row["identity"][key] = int(adapter.swApp.IsSame(reference[key], entity))
+                if set(row["identity"].values()) != {1}:
                     raise RuntimeError("variant changed a native role identity")
-                if bool(model.GetSaveFlag()) != dirty:
-                    raise RuntimeError("read-only resolver changed the dirty flag")
+                row["views_after"] = stationary_input()
                 row["status"] = "passed"
             except Exception as error:
                 row.update(status="failed", error=repr(error))
@@ -178,8 +213,28 @@ async def capture(adapter, directory, mode, instrumentation):
         report.update(status="failed", error=repr(error))
         raise
     finally:
-        report["final_inventory"] = adapter.ownership.evidence()
-        persist_report(path, report)
+        primary = sys.exception()
+        errors = []
+        for name, read in (
+            ("final_inventory", adapter.ownership.evidence),
+            ("private_gb_after", dodo._sw_commit_gb),
+        ):
+            try:
+                report[name] = read()
+            except Exception as error:
+                report[name] = {"error": repr(error)}
+                errors.append(error)
+        if errors:
+            report.update(status="failed", final_errors=[repr(error) for error in errors])
+        try:
+            persist_report(path, report)
+        except Exception as error:
+            errors.append(error)
+        if errors:
+            raise ExceptionGroup(
+                "resolver experiment and final evidence failures",
+                ([primary] if primary else []) + errors,
+            ) from None
     return {"report": str(path)}
 
 
