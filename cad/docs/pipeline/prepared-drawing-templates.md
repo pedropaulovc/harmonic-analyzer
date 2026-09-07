@@ -317,7 +317,10 @@ export and must remain exact. Any difference stops before the next trial.
 
 This checks printed appearance including sheet-format lines and logos at the
 production preview resolution, not equality of every underlying PDF vector
-command or future template variant. PDFs are retained for zoomed visual
+command or future template variant. The production renderer crops a possible
+extra bottom raster row to the standard preview size; this pixel contract is
+therefore preview identity, not inspection of that omitted page-edge row.
+PDFs are retained for zoomed visual
 inspection. Export/render/readback times are separate from setup timings. The
 original template and published cache artifacts remain hash-guarded. Native
 printed results and full-recipe validation are still pending for this option.
