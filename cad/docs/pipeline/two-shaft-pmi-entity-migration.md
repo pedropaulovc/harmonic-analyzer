@@ -1,8 +1,10 @@
 # Two-shaft PMI entity migration
 
 This bounded candidate replaces eight PMI attachment picks and two surface-finish
-picks in `draw_fulcrum_shaft.py` and `draw_pivot_shaft.py`. It has **offline proof
-only**; native build, saved/reopened identity and render acceptance remain required.
+picks in `draw_fulcrum_shaft.py` and `draw_pivot_shaft.py`. The first native
+fulcrum control stopped at its old datum display seed (receipt below). The native
+datum-placement correction has **offline proof only**; complete native build,
+saved/reopened identity and render acceptance remain required.
 No speed improvement is claimed.
 
 Both source builders name their single solid extrusion `Shaft`. Existing
@@ -24,7 +26,9 @@ matching, not an exclusive-owner claim: the API permits shared feature faces and
 `IFace2.GetFeature()` returns only the oldest owner.
 
 The typed datum/control/finish rows, part builders, view scales, dimension
-curation, display positions and placement tolerances are unchanged. No coordinate,
+curation and other display seeds are unchanged. The two datum rows now request
+native placement with `position=None`; numeric placement tolerances are not
+widened. No coordinate,
 nearest-entity, or visible-entity fallback was added. Layout is not accepted merely
 because an attachment is correct.
 
@@ -135,6 +139,50 @@ Offline runner/role acceptance regression:
 ```powershell
 uv run python -m pytest cad/scripts/test_shaft_recipe_acceptance_drawing.py cad/scripts/test_datum_policy_recipes_drawing.py cad/scripts/test_recipe_template_factory_drawing.py -q
 ```
+
+### First fulcrum native control and datum-only correction
+
+At root `37a58501` / adapter `e77bfda`, the normal-factory owned fulcrum control
+stopped after **5.946373899991158 s** of recipe execution. The old requested datum
+anchor was `(55, 229)` mm; native readback was
+`(55.00000000000015, 194.30287392280807)` mm. The 34.697126 mm difference exceeded
+the unchanged 0.1 mm explicit-position limit. This is a failed placement contract,
+not evidence that the datum API or exact entity selection cannot work.
+
+Receipt: `cad/out/reports/datum-policy-gt3wao0c/pilot.json`, SHA-256
+`2186170794a511c29b43c35914b5d32f7671ba60304925ab13d46f7bc42e8de0`.
+Its three protected originals and owned fulcrum copy retained their exact hashes;
+final runtime guards were clean. The failure-only PDF/PNG retained the incomplete
+sheet without a native drawing/source save. Eye inspection of
+`fulcrum_shaft/failure.png` shows A clearly below the circular end. The other
+controls/finish were not inserted, so this is not complete-sheet acceptance.
+The earlier seed remains reproducible with the owned pilot command above and
+`--candidate 37a58501`; a new native invocation still requires review/seat grant.
+
+`PmiDrawingPlacement.position=None` now explicitly requires a model `entity` and
+forbids a fixed leader endpoint. The two shaft datums use the existing
+`add_datum_feature(symbol_xy=None)` path, with **no `SetPosition2` call**. The
+complete native-PMI bank requires individual visibility state 1, non-dangling
+attachment and a finite on-sheet anchor, in addition to exact entity/view and
+typed-content checks. The owned pilot repeats these checks over all five guarded
+annotations after the finish is inserted and after cold reopen. Visibility state
+alone does not prove an unhidden layer, and anchor fit does not prove body/text
+clearance; full layout/cold/printed checks remain required.
+
+The existing direct native-insertion test intentionally allows an off-sheet
+anchor to emit a diagnostic before later layout. That helper/test contract stays
+unchanged; the stricter assertion belongs to completed native-PMI/acceptance
+banks. Other explicit positions retain their exact position assertions.
+
+```powershell
+uv run python -m pytest cad/scripts/test_native_pmi_datum_drawing.py cad/scripts/test_shaft_recipe_acceptance_drawing.py cad/scripts/test_shaft_pmi_entities_drawing.py cad/scripts/test_native_annotation_placement_drawing.py -q
+```
+
+The new native-PMI tests failed first: 11 failures / 3 passes exposed missing
+visibility/dangling/overflow checks and the still-explicit recipe datum seeds.
+No tolerance assertion was relaxed. API references: `IAnnotation.Visible`,
+`swAnnotationVisibilityState_e`, `IAnnotation.IsDangling` and
+`IAnnotation.SetPosition2` (documented placement restrictions can clamp a datum).
 
 Re-runnable offline proof:
 
