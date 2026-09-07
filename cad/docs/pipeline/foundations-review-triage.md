@@ -95,3 +95,32 @@ passed (`run-7jhbi94_`). Afterwards the seven-file focused/adjacent suite passed
 352 tests in 2.09 s (`run-sh7ltruo`); Ruff F and `git diff --check` passed.
 All checks used the isolated worktree's own venv and adapter `e77bfda4`. No COM,
 native artifact writes, new native acceptance or remote changes were performed.
+
+## GitHub review: entity and measurement checks
+
+Review `5133229263` added findings not present in the 17-item local report.
+The following decisions have executable checks, rather than assuming a suggested
+change improves performance or safety:
+
+- `3950733385`: a null `IEdge.GetCurve` now raises a named error. It is not
+  silently removed from the topology search. Both circle and line roles reproduce
+  the earlier `AttributeError` (`run-n57x9tyh`, two failures before the guard).
+- `3950733397`: retain the no-callout early exit. The actual callout/GTol handoff
+  regression measures a dimension-only obstacle zero times in the callout stage
+  and once in the GTol stage. Entering the before/final callout witness solely to
+  fill the handoff would measure it twice, not remove a repeated measurement.
+- `3950733451`: source-PMI pairing explicitly uses `strict=False`: the exact
+  comparator already records a length mismatch, and a strict zip must not replace
+  that failure report. Geometric endpoint pairs use `strict=True`.
+- The view-scale test now states what it proves: model-only identity resolution.
+  Its unused fake view position/scale did not exercise native layout behavior.
+- The unused `_clear` helper was removed. `_candidate_text_cells` stays: both
+  production GTol arrangement and the right-column diagnostic call it, and its
+  existing tests cover the returned cells.
+- Do not memoize content hashes using only path, length and mtime. The new
+  prepared-template regression changes equal-length bytes, restores the original
+  mtime, and verifies that the exact hash still changes. Such a memo would accept
+  altered template bytes under their old identity.
+
+The eight-file focused/adjacent suite passes 292 tests in 3.69 seconds
+(`run-boyf6tsi`). These are offline regressions, not new native drawing acceptance.

@@ -43,7 +43,7 @@ def clip_witness(line, cell):
     if near > far:
         raise AssertionError("entry/exit witness disagrees with production clipper")
     points = [
-        tuple(a + t * (b - a) for a, b in zip(line.start, line.end))
+        tuple(a + t * (b - a) for a, b in zip(line.start, line.end, strict=True))
         for t in (near, far)
     ]
     return {

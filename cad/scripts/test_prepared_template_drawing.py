@@ -5,6 +5,7 @@ from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import dataclass
 import json
+import os
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -14,6 +15,17 @@ import _drawing_common as common
 import _drawing_prepared_template as prepared
 import _drawing_template_defaults as defaults
 from test_template_defaults_drawing import blank_note  # noqa: F401
+
+
+def test_exact_hash_detects_same_size_edit_with_restored_mtime(tmp_path):
+    path = tmp_path / "prepared.DRWDOT"
+    path.write_bytes(b"original")
+    before_stat, before_hash = path.stat(), prepared._sha(path)
+    path.write_bytes(b"modified")
+    os.utime(path, ns=(before_stat.st_atime_ns, before_stat.st_mtime_ns))
+    assert path.stat().st_size == before_stat.st_size
+    assert path.stat().st_mtime_ns == before_stat.st_mtime_ns
+    assert prepared._sha(path) != before_hash
 
 
 @pytest.fixture
