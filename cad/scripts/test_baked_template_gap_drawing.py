@@ -26,16 +26,16 @@ def inputs():
             "cell": layout.cells.enclosing_cell(row["lines"], notes[title]["position"]),
         }
     }
-    return notes, row["lines"], base, deepcopy(RETAINED["targets"])
+    return notes, deepcopy(row["lines"]), base, deepcopy(RETAINED["targets"])
 
 
 def test_retained_both_source_footprints_get_measured_spacing_without_font_changes():
     from diagnostics import _baked_template_gaps as gaps
 
     notes, lines, base, targets = inputs()
-    saved = deepcopy((notes, base, targets))
+    saved = deepcopy((notes, lines, base, targets))
     plan, witness = gaps.measured_plan(notes, lines, base, targets)
-    assert (notes, base, targets) == saved
+    assert (notes, lines, base, targets) == saved
     assert {row["role"] for row in plan.values()} == {
         "title",
         "material_label",
@@ -56,6 +56,33 @@ def test_retained_both_source_footprints_get_measured_spacing_without_font_chang
         - witness["targets"]["channel_lever"]["before"]["finish"][0]
         > 0.072
     )
+
+
+def test_gap_inputs_do_not_alias_retained_native_lines():
+    first, second = inputs(), inputs()
+    retained = RETAINED["targets"]["rocker_arm"]["lines"]
+    assert first[1] == second[1] == retained
+    assert first[1] is not retained
+    assert second[1] is not first[1]
+    assert first[1][0] is not retained[0]
+    saved = deepcopy(retained)
+    first[1][0][0][0] += 0.001
+    assert retained == saved == second[1]
+
+
+def test_spacing_witness_rejects_an_in_place_line_mutation(monkeypatch):
+    from diagnostics import _baked_template_gaps as gaps
+
+    original = gaps.measured_plan
+
+    def corrupt(notes, lines, base, targets):
+        result = original(notes, lines, base, targets)
+        lines[0][0][0] += 0.001
+        return result
+
+    monkeypatch.setattr(gaps, "measured_plan", corrupt)
+    with pytest.raises(AssertionError):
+        test_retained_both_source_footprints_get_measured_spacing_without_font_changes()
 
 
 @pytest.mark.parametrize(
