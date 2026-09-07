@@ -25,6 +25,7 @@ from unittest.mock import patch
 from _common import CAD_ROOT, _early_bound, check
 from diagnostics._owned_native_documents import run_copy_diagnostic
 from diagnostics._owned_native_session import require_owned_diagnostic_environment
+from diagnostics.probe_drawing_attachments import referenced_model
 from _drawing_common import add_surface_finish, render_pdf_png
 import _drawing_common
 from _drawing_entities import CircleEdge, LineEdge, _edge_geometry
@@ -138,7 +139,7 @@ def main() -> int:
             extension = _early_bound(model.Extension, "IModelDocExtension")
             views = [_early_bound(view, "IView") for sheet in drawing.GetViews() or () for view in sheet[1:]]
             for view in views:
-                part = Path(view.ReferencedDocument.GetPathName()).resolve(strict=True)
+                part = Path(referenced_model(view)["path"])
                 hashes[part] = hashlib.sha256(part.read_bytes()).hexdigest()
             formats = _document_formats(extension)
             report["document_formats"] = {name: _format(value) for name, value in formats.items()}
