@@ -159,6 +159,149 @@ class DiagnosticDocuments:
             self.sources[path] = _digest(path)
         self.checkpoint()
 
+    def relocate_prepared_template_directory(self, previous, entry):
+        """Witness production's closed pending-cache directory rename.
+
+        This is not a general ownership alias/move API. The production entry,
+        hashed native receipt and the exact closed DRWDOT filesystem identity
+        must prove a sibling pending→content-key rename inside this run.
+        No live native wrapper or registered source/frozen input may move.
+        """
+        from _drawing_prepared_template import (
+            PreparedTemplate,
+            _read_entry,
+            preparation_inputs,
+        )
+
+        old = Path(previous).resolve()
+        event = {
+            "operation": "relocate_prepared_template",
+            "previous": str(old),
+            "status": "validating",
+        }
+        self.events.append(event)
+        try:
+            if not isinstance(entry, PreparedTemplate):
+                raise RuntimeError(
+                    "relocation requires the actual prepared-template entry type"
+                )
+            target = entry.directory.resolve(strict=True)
+            event["destination"] = str(target)
+            if (
+                old not in self.directories
+                or old.exists()
+                or not target.is_dir()
+                or old.parent != target.parent
+                or target.name != entry.key
+                or not old.name.startswith(f"pending-{entry.key[:12]}-")
+                or target in self.directories
+            ):
+                raise RuntimeError(
+                    "relocation is not the exact registered pending-cache rename"
+                )
+            if not any(
+                target.is_relative_to(root) and root not in (old, target)
+                for root in self.directories
+            ):
+                raise RuntimeError(
+                    "relocation target has no registered owning run directory"
+                )
+            if any(
+                path.is_relative_to(old) or path.is_relative_to(target)
+                for path in (*self.sources, *self.frozen_inputs)
+            ):
+                raise RuntimeError(
+                    "relocation contains a protected source/frozen input"
+                )
+            self.inventory()
+            current = self.adapter.currentModel
+            if (self.current is None and current is not None) or (
+                self.current is not None
+                and (
+                    self.current not in self.records
+                    or not self._same(current, self.current.handle)
+                )
+            ):
+                raise RuntimeError("relocation current-document ownership changed")
+            for record in self.records:
+                paths = set(record.paths)
+                if record.state["path"]:
+                    paths.add(Path(record.state["path"]).resolve())
+                if any(
+                    path.is_relative_to(old) or path.is_relative_to(target)
+                    for path in paths
+                ):
+                    raise RuntimeError(
+                        "relocation contains a live owned/baseline document"
+                    )
+            source = old / "prepared.DRWDOT"
+            artifact = self.closed_artifacts.get(source)
+            if artifact is None:
+                raise RuntimeError(
+                    "relocation has no closed native DRWDOT identity witness"
+                )
+            moved = target / "prepared.DRWDOT"
+            if (
+                _digest(moved) != artifact["sha256"]
+                or _file_identity(moved) != artifact["file_identity"]
+            ):
+                raise RuntimeError(
+                    "relocation changed the closed native DRWDOT bytes/identity"
+                )
+            _read_entry(entry, preparation_inputs(self.adapter, entry.spec))
+            expected = {
+                "prepared.DRWDOT",
+                "manifest.json",
+                "receipt.json",
+                "ownership.json",
+            }
+            if {path.name for path in target.iterdir()} != expected:
+                raise RuntimeError(
+                    "relocation contains unexpected prepared-cache members"
+                )
+            # No native call or await occurs between these registry assignments.
+            # Only after all guards pass may checkpoints target the new directory.
+            self.directories = (self.directories - {old}) | {target}
+            self.closed_artifacts = {
+                path: row
+                for path, row in self.closed_artifacts.items()
+                if path != source
+            }
+            self.closed_artifacts[moved] = artifact
+            event.update(
+                status="relocated",
+                native_sha256=artifact["sha256"],
+                native_file_identity=artifact["file_identity"],
+            )
+            self.checkpoint()
+        except Exception as error:
+            event.update(status="failed", error=repr(error))
+            # Old may already be absent, so don't call the all-directories
+            # checkpoint and mask this validation error with FileNotFoundError.
+            # Existing owned run directories retain the complete failure record.
+            evidence = self.evidence()
+            persistence_errors = []
+            for directory in sorted(self.directories):
+                if directory.is_dir():
+                    try:
+                        (directory / "ownership.json").write_text(
+                            json.dumps(
+                                evidence, indent=2, default=lambda value: value.value
+                            ),
+                            encoding="utf-8",
+                        )
+                    except OSError as persistence_error:
+                        persistence_errors.append(persistence_error)
+            if persistence_errors:
+                event["persistence_errors"] = [
+                    repr(item) for item in persistence_errors
+                ]
+                raise ExceptionGroup(
+                    "relocation validation/evidence failed",
+                    [error, *persistence_errors],
+                ) from error
+            raise
+
     def _assert_frozen(self, path):
         original = self.frozen_inputs[path]
         if (
@@ -672,11 +815,37 @@ class DiagnosticDocuments:
 
     def checkpoint(self):
         evidence = self.evidence()
-        for directory in self.directories:
-            (directory / "ownership.json").write_text(
-                json.dumps(evidence, indent=2, default=lambda value: value.value),
-                encoding="utf-8",
+        errors, written = [], []
+        for directory in sorted(self.directories):
+            try:
+                (directory / "ownership.json").write_text(
+                    json.dumps(evidence, indent=2, default=lambda value: value.value),
+                    encoding="utf-8",
+                )
+                written.append(directory)
+            except OSError as error:
+                errors.append(error)
+        if errors:
+            self.events.append(
+                {
+                    "operation": "checkpoint_failed",
+                    "errors": [repr(error) for error in errors],
+                }
             )
+            # Every requested checkpoint was attempted. Retain its failure in
+            # the destinations that worked, then propagate it; never waive a
+            # missing registered directory or replace the native probe error.
+            for directory in written:
+                try:
+                    (directory / "ownership.json").write_text(
+                        json.dumps(
+                            evidence, indent=2, default=lambda value: value.value
+                        ),
+                        encoding="utf-8",
+                    )
+                except OSError as error:
+                    errors.append(error)
+            raise ExceptionGroup("ownership checkpoints failed", errors)
 
 
 class DiagnosticAdapter:
@@ -745,7 +914,10 @@ async def owned_callback(adapter, callback):
         guarded.ownership.cleanup_error = repr(error)
         errors.append(error)
     finally:
-        guarded.ownership.checkpoint()
+        try:
+            guarded.ownership.checkpoint()
+        except Exception as error:
+            errors.append(error)
     if any(
         not row["unchanged"]
         for row in guarded.ownership.evidence()["source_hashes"].values()
