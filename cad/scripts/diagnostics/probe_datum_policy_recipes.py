@@ -218,6 +218,48 @@ def _drawing_witness(adapter, *, source, configuration):
     }, handles
 
 
+class DrawingSemanticCoverageError(RuntimeError):
+    """Keep a rejected, fully read snapshot separate from accepted semantics."""
+
+    def __init__(self, snapshot):
+        from collections import Counter
+
+        self.snapshot = snapshot
+        self.validation = {
+            "failed_conditions": [
+                name
+                for name, failed in (
+                    ("checked_empty", not snapshot["checked"]),
+                    ("dimensions_empty", not snapshot["dimensions"]),
+                    (
+                        "dimensions_excluded_nonempty",
+                        bool(snapshot["dimensions_excluded"]),
+                    ),
+                )
+                if failed
+            ],
+            "counts": {
+                name: len(snapshot[name])
+                for name in (
+                    "models",
+                    "checked",
+                    "excluded",
+                    "dimensions",
+                    "dimensions_excluded",
+                    "semantic_attachments",
+                )
+            },
+            "exclusion_reasons": {
+                name: dict(Counter(row["reason"] for row in snapshot[name].values()))
+                for name in ("excluded", "dimensions_excluded")
+            },
+        }
+        super().__init__(
+            "functional pilot semantic coverage rejected: "
+            + json.dumps(self.validation, sort_keys=True)
+        )
+
+
 def _drawing_semantics(adapter, *, source, configuration):
     semantics = attachments.snapshot(adapter.currentModel, app=adapter.swApp)
     if not semantics["models"]:
@@ -236,9 +278,7 @@ def _drawing_semantics(adapter, *, source, configuration):
         or not semantics["dimensions"]
         or semantics["dimensions_excluded"]
     ):
-        raise RuntimeError(
-            "functional pilot needs nonempty geometry/dimensions without dimension exclusions"
-        )
+        raise DrawingSemanticCoverageError(semantics)
     return semantics
 
 
@@ -357,7 +397,10 @@ def retain_failed_drawing(adapter, trial, output, checkpoint):
             ):
                 destination[key] = action()
         except Exception as error:
-            evidence["errors"].append({"phase": phase, "error": repr(error)})
+            rejected = {"phase": phase, "error": repr(error)}
+            if isinstance(error, DrawingSemanticCoverageError):
+                rejected.update(snapshot=error.snapshot, validation=error.validation)
+            evidence["errors"].append(rejected)
 
     # Refuse existing evidence before any write; never overwrite an earlier
     # observation, and do not inspect/export a borrowed or replaced document.
@@ -1019,6 +1062,11 @@ async def pilot(
         report.update(status="failed", error=repr(error))
         if report["trials"]:
             report["trials"][-1].update(status="failed", error=repr(error))
+            if isinstance(error, DrawingSemanticCoverageError):
+                report["trials"][-1]["semantic_failure"] = {
+                    "snapshot": error.snapshot,
+                    "validation": error.validation,
+                }
         if failure_output is not None:
             try:
                 checkpoint()
