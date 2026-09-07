@@ -34,6 +34,12 @@ SOURCE = ROOT / "cad/out/sldprt/crank-arm.SLDPRT"
 TOKEN = SOURCE.with_name(".crank-arm.execution")
 EXPECTED_SOURCE_SHA = "6b086d5dbcb6e904fb794822728b705f69cd3903a0e8b2c5cf7abb8d9621f102"
 BASELINE = "bc593d784fba08fc6552224767a460338f51b664"
+BASELINE_DRAWING_REPORT = (
+    ROOT / "cad/out/reports/crank-arm-entities-6x1gg817/measurements.json"
+)
+BASELINE_DRAWING_REPORT_SHA = (
+    "e24efe0444d38f0cfcdafb3eb9413623807d28f36d700256ca0ef0fae71b2c06"
+)
 
 
 def sha(path):
@@ -447,7 +453,7 @@ def drawing_dimensions(model):
     from diagnostics._source_dimension_snapshot import display_presentation, finite
 
     rows = {}
-    for view_key, view in attachments.views(model).items():
+    for view in attachments.views(model).values():
         for raw in view.GetAnnotations() or ():
             annotation = _early_bound(raw, "IAnnotation")
             if int(annotation.GetType()) != 4:
@@ -463,7 +469,7 @@ def drawing_dimensions(model):
                 if display.IsReferenceDim()
                 else tuple(dimension.GetSystemValue3(3, configuration))[0]
             )
-            key = f"{view_key}/{annotation.GetName()}"
+            key = f"{view.GetName2()}/{annotation.GetName()}"
             if key in rows:
                 raise RuntimeError(f"duplicate drawing dimension identity: {key}")
             rows[key] = {
@@ -499,6 +505,14 @@ def require_source_unchanged(before, after):
 
 def require_manufacturing(row, recorded):
     """Pin the five added SI measurements and their native BASIC/arc meanings."""
+    if sha(BASELINE_DRAWING_REPORT) != BASELINE_DRAWING_REPORT_SHA:
+        raise RuntimeError("crank-arm native baseline receipt changed")
+    baseline = json.loads(BASELINE_DRAWING_REPORT.read_text(encoding="utf-8"))
+    if (
+        baseline["status"] != "captured"
+        or baseline["provenance"]["source_sha256"] != EXPECTED_SOURCE_SHA
+    ):
+        raise RuntimeError("crank-arm native baseline has the wrong source")
     required = {
         "arm-width overall": (0.016, 0, (0, 0)),
         "shaft-to-handle-pivot location": (0.075, 1, (1, 1)),
@@ -506,19 +520,22 @@ def require_manufacturing(row, recorded):
         "dimple transverse location from datum C": (0.008, 0, (0, 1)),
         "cross-hole station from datum A": (0.004, 1, (0, 1)),
     }
-    for label, (value, basic, arcs) in required.items():
+    for label, (nominal, basic, arcs) in required.items():
         key = "/".join(recorded[label])
         dimension = row["dimensions"][key]
+        native_baseline = baseline["attachments"]["dimensions"][f"Sheet1/{key}/4"][
+            "components"
+        ][0]
         # Same 12-place SI readback boundary as the shared attachment snapshot;
         # raw values are additionally retained and compared exactly across saves.
         if (
-            round(dimension["value_system"], 12) != value
+            round(dimension["value_system"], 12) != native_baseline["value_system"]
             or (dimension["tolerance_type"] == 1) != (basic == 1)
             or dimension["arc_conditions"] != arcs
             or not dimension["show_dimension_value"]
         ):
             raise RuntimeError(
-                f"{label}: native measurement/BASIC/arc meaning changed: {dimension}"
+                f"{label} (nominal {nominal} m): native measurement/BASIC/arc meaning changed: {dimension}"
             )
     for label in ("crank-arm cross-hole", "handle pivot hole"):
         key = "/".join(recorded[label])
