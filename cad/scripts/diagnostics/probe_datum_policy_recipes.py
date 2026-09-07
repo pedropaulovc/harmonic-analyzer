@@ -24,8 +24,11 @@ unique-basename exact bytecopy in its registered diagnostic directory. Native
 imported callout formatting can mutate the copied source display in memory (the
 arbor source-dirty-9cbdz77u control proved this); existing COPY ownership permits
 discarding that copy but does not relax protected original/baseline documents.
-Copy disk hashes must remain exact: no source save is authorized. Shared
-ownership preserves the user's visible lever and unsaved Draw2 throughout.
+Copy disk hashes must remain exact: no source save is authorized by default.
+Only --source-callout-authoring alignment_fit deliberately authors the copied
+PART, saves/reopens it and pins H1 before drawing work; original H0 protection
+never changes. Its drawing callout request verifies import without a setter.
+Shared ownership preserves the user's visible lever and unsaved Draw2 throughout.
 Every successful recipe gets a fresh saved/reopened geometry, dimension/BASIC,
 annotation-content/layout and source-parameter witness. Stop at the first failure.
 The named parameter witnesses do not prove full in-memory source immutability.
@@ -178,7 +181,9 @@ def require_copy_hash(trial, phase):
     """Record the owned part's disk identity; formatting may dirty memory only."""
     actual = attachments.file_digest(Path(trial["copy_source"]))
     trial.setdefault("copy_hashes", {})[phase] = actual
-    if actual != EXPECTED_PART_HASHES[trial["target"]]:
+    from diagnostics._source_callout_authoring import expected_copy_hash
+
+    if actual != expected_copy_hash(trial, EXPECTED_PART_HASHES[trial["target"]]):
         raise RuntimeError(
             f"{phase}: owned source copy changed on disk; no source save is authorized"
         )
@@ -589,6 +594,7 @@ async def pilot(
     source_observation=None,
     drawing_save=None,
     callout_storage=None,
+    source_callout_authoring=None,
 ):
     order = target_order(targets)
     from diagnostics._source_save_boundaries import (
@@ -598,6 +604,11 @@ async def pilot(
     require_source_targets(source_observation, order)
     require_drawing_save(drawing_save, source_observation, order)
     require_callout_storage(callout_storage, source_observation, drawing_save, order)
+    from diagnostics._source_callout_authoring import require_selection
+
+    require_selection(
+        source_callout_authoring, callout_storage, source_observation, drawing_save, order
+    )
     protected_targets = tuple(dict.fromkeys((*ORDER, *order)))
     if linear_control is not None:
         from diagnostics._linear_dimension_arrangement import require_targets
@@ -716,6 +727,20 @@ async def pilot(
             trial["source_before"], source_handles = source_dimensions(
                 source_model, target, copy_source
             )
+            source_callout_control = None
+            if source_callout_authoring is not None:
+                from diagnostics._source_callout_authoring import SourceCalloutControl
+
+                source_callout_control = SourceCalloutControl(
+                    adapter, module, trial, checkpoint
+                )
+                source_model, trial["source_before"], source_handles = (
+                    await source_callout_control.author(
+                        source_model, trial["source_before"], source_handles,
+                        lambda model: source_dimensions(model, target, copy_source),
+                    )
+                )
+                require_copy_hash(trial, "authored_cold_baseline")
             if manifest.entity_labels:
                 trial["source_entities_before"], entity_handles = (
                     entity_acceptance.source_snapshot(source_model)
@@ -724,7 +749,7 @@ async def pilot(
                 trial_dir / "recipe-source.py"
             )
             build_kwargs = {"drawing_factory": drawing_factory}
-            callout_control = None
+            callout_control = source_callout_control
             if callout_storage is not None:
                 from diagnostics._drawing_lower_text_control import LowerTextControl
 
@@ -976,7 +1001,12 @@ async def pilot(
                 trial["copy_final"] = attachments.file_digest(
                     Path(trial["copy_source"])
                 )
-                if trial["copy_final"] != EXPECTED_PART_HASHES[trial["target"]]:
+                from diagnostics._source_callout_authoring import expected_copy_hash
+
+                expected_hash = expected_copy_hash(
+                    trial, EXPECTED_PART_HASHES[trial["target"]]
+                )
+                if trial["copy_final"] != expected_hash:
                     runtime_guard_errors.append(
                         RuntimeError("final owned source copy changed on disk")
                     )
@@ -1051,6 +1081,9 @@ async def pilot(
 
 
 def main(argv=None):
+    from diagnostics._source_callout_authoring import (
+        SourceCalloutAuthoring, require_selection,
+    )
     from diagnostics._drawing_lower_text_control import CalloutStorage
     from diagnostics._native_drawing_save_control import DrawingSave
     from diagnostics._source_save_boundaries import (
@@ -1087,6 +1120,11 @@ def main(argv=None):
     )
     parser.add_argument("--worker", action="store_true")
     parser.add_argument(
+        "--source-callout-authoring", type=SourceCalloutAuthoring,
+        choices=tuple(SourceCalloutAuthoring),
+        help="explicit owned alignment PART fit-text authoring; no drawing callout setter",
+    )
+    parser.add_argument(
         "--callout-storage",
         type=CalloutStorage,
         choices=tuple(CalloutStorage),
@@ -1116,6 +1154,10 @@ def main(argv=None):
     require_drawing_save(args.drawing_save, args.source_observation, order)
     require_callout_storage(
         args.callout_storage, args.source_observation, args.drawing_save, order
+    )
+    require_selection(
+        args.source_callout_authoring, args.callout_storage,
+        args.source_observation, args.drawing_save, order,
     )
     require_targets(args.linear_dimensions, order)
     require_owned_diagnostic_environment()  # before dodo._run in the parent
@@ -1147,6 +1189,10 @@ def main(argv=None):
                     else []
                 ),
                 *(argument for target in order for argument in ("--target", target)),
+                *(
+                    ["--source-callout-authoring", args.source_callout_authoring.value]
+                    if args.source_callout_authoring is not None else []
+                ),
                 *(
                     ["--callout-storage", args.callout_storage.value]
                     if args.callout_storage is not None
@@ -1182,6 +1228,10 @@ def main(argv=None):
             guard_root,
             args.report_root.resolve(),
             targets=order,
+            **(
+                {"source_callout_authoring": args.source_callout_authoring}
+                if args.source_callout_authoring is not None else {}
+            ),
             **(
                 {"callout_storage": args.callout_storage}
                 if args.callout_storage is not None
