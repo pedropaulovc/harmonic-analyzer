@@ -729,8 +729,10 @@ def arrange_native_gtol_columns(
     commands. Failed commands, semantic drift, clamped targets, body deformation,
     and remaining native GTol overlap all fail loudly. Nothing is saved here.
     An optional record_measurement(view, annotation, bounds) receives actual
-    final GTol output and post-command obstacle output for initial packing only;
-    it never replaces either fresh GTol witness or supplies derived bounds.
+    final GTol output and post-command datum/dimension/SF obstacle output for
+    initial packing only; it never replaces either fresh GTol witness or supplies
+    derived bounds. Center marks/lines are measured fresh and never registered
+    in the XYZ-position handoff: their native annotation position may be null.
     The project wrapper MUST run validate_gtol_leader_clearance on its fresh
     packing-final measurements before acceptance, including unchanged packing;
     trial cells deliberately exclude deferred notes and are not a final proof.
@@ -824,10 +826,20 @@ def arrange_native_gtol_columns(
         with (
             nullcontext() if obstacle_read_scope is None else obstacle_read_scope(view)
         ):
-            for kind in (2, 4, 7):
+            for kind in (2, 4, 7, 13, 15):
+                reference_ink = kind in (13, 15)  # swCenterMarkSym / swCenterLine
                 for raw in view.GetAnnotationsByType(kind) or ():
                     annotation = _early_bound(raw, "IAnnotation")
-                    measured = measure_obstacle(adapter, annotation)
+                    if reference_ink and (
+                        int(annotation.OwnerType) == 2 or int(annotation.Visible) == 3
+                    ):
+                        continue  # Same template/hidden exclusion as final packing.
+                    # Their measured body encloses all native center-reference
+                    # strokes (including width), not just a text/anchor proxy.
+                    # Keep these fixed and out of the position-only handoff;
+                    # final packing independently reads them again as before.
+                    reader = measure_annotation if reference_ink else measure_obstacle
+                    measured = reader(adapter, annotation)
                     name = str(annotation.GetName())
                     if not name or name in measurements:
                         raise RuntimeError(
@@ -835,7 +847,7 @@ def arrange_native_gtol_columns(
                         )
                     measurements[name] = measured
                     obstacles.extend(stationary_ink_obstacles(measured))
-                    if record_measurement is not None:
+                    if record_measurement is not None and not reference_ink:
                         record_measurement(view, annotation, measured)
         column = _union([row.body for row in bank.values()])
         with _telemetry.span(
