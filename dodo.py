@@ -2238,6 +2238,10 @@ def task_check():
             *(str(path.resolve()) for path in recipe_tests),
             *(dep for path in recipe_tests for dep in module_deps_of(path)),
             *scanned_by_binding_gate,
+            # The recount test executes this by pathname, outside the import closure.
+            str(
+                (REPO_ROOT / "cad/docs/pipeline/recount-coordinate-selections.py").resolve()
+            ),
             str(
                 (REPO_ROOT / "cad" / "comparisons" / "tools" / "composite.py").resolve()
             ),

@@ -65,3 +65,14 @@ def test_matching_inventory_stdout_is_identical_with_optimization(tmp_path):
     assert "Registry: 92 {'part': 92}" in normal.stdout
     assert "Coordinate union: 43\n" in normal.stdout
     assert "add_edge_dimension sites 43 recipes 43\n" in normal.stdout
+
+
+def test_recipe_gate_enrolls_recount_test_and_path_executed_script_once():
+    import dodo
+
+    recipe = next(task for task in dodo.task_check() if task["name"] == "recipe")
+    command_paths = [Path(item).resolve() for item in recipe["actions"][0][1][0]]
+    dependencies = [Path(item).resolve() for item in recipe["file_dep"]]
+    assert command_paths.count(Path(__file__).resolve()) == 1
+    assert dependencies.count(Path(__file__).resolve()) == 1
+    assert dependencies.count(RECOUNT.resolve()) == 1
