@@ -158,6 +158,75 @@ def column_clearance_translations(
     return result
 
 
+def column_vertical_candidates(crossings, geometry, measurements, *, clearance_m=0.001):
+    """Two whole-bank frontiers derived from the observed horizontal routes.
+
+    Initial hits alone miss a lower row entering the same cell after an UP
+    shift. Extend those two hypotheses across every bank row and every fixed
+    measured cell in its route's horizontal range. These are not a leader
+    solver: fixed model endpoints and native routing may still cause crossings,
+    so actual native geometry/body readback and every final witness remain
+    mandatory. No coordinate grid, iterative retries, or new measurement pass.
+    """
+    initial = vertical_candidates(
+        crossings,
+        {name: row.segments for name, row in geometry.items()},
+        {name: row.decorations for name, row in geometry.items()},
+        clearance_m=clearance_m,
+    )
+    if not initial:
+        return ()
+    fixed_cells = tuple(
+        cell
+        for name, row in measurements.items()
+        if name not in geometry
+        for cell in ((row.body,) if row.kind == 6 else row.text_boxes)
+    )
+    up, down = initial[0].dy_m, initial[1].dy_m
+    for row in geometry.values():
+        chain = row.segments
+        if not chain:
+            continue
+        if len(chain) != 2 or math.dist(chain[0].end, chain[1].start) > 1e-8:
+            raise ValueError(
+                "whole-bank frontier requires native three-point bent leaders"
+            )
+        if any(
+            not all(
+                math.isfinite(value) for value in (*line.start, *line.end, line.width_m)
+            )
+            or line.width_m < 0
+            for line in chain
+        ):
+            raise ValueError(
+                "whole-bank frontier requires finite native geometry/width"
+            )
+        radius = max(line.width_m for line in chain) / 2.0
+        xmin = (
+            min(point[0] for line in chain for point in (line.start, line.end)) - radius
+        )
+        xmax = (
+            max(point[0] for line in chain for point in (line.start, line.end)) + radius
+        )
+        shoulder = chain[0]
+        ymin = min(shoulder.start[1], shoulder.end[1]) - radius
+        ymax = max(shoulder.start[1], shoulder.end[1]) + radius
+        # The first rectangle is the moving shoulder's Y extent paired with
+        # the complete observed route's X range. Decorations supply additional
+        # candidate extents, never a claim that their model endpoints move.
+        extents = (
+            (xmin, xmax, ymin, ymax),
+            *((box.xmin, box.xmax, box.ymin, box.ymax) for box in row.decorations),
+        )
+        for cell in fixed_cells:
+            for left, right, bottom, top in extents:
+                if right < cell.xmin or left > cell.xmax:
+                    continue
+                up = max(up, cell.ymax + clearance_m - bottom)
+                down = min(down, cell.ymin - clearance_m - top)
+    return replace(initial[0], dy_m=up), replace(initial[1], dy_m=down)
+
+
 @dataclass(frozen=True)
 class _Gtol:
     annotation: Any
@@ -435,8 +504,8 @@ def _place_clear_column(
             _Clearance.CLEAR if body_clear else _Clearance.BLOCKED,
         )
 
-    # Test both horizontal sides first, then each side's two measured vertical
-    # hypotheses. Reverse order tries the most recently observed native side
+    # Test both horizontal sides first, then each side's two whole-bank vertical
+    # frontiers. Reverse order tries the most recently observed native side
     # first; the successful lever control is RIGHT then UP. Targets ALWAYS use
     # the same immutable seed, even when an earlier native route was rejected.
     for side, dx in sides:
@@ -445,11 +514,7 @@ def _place_clear_column(
             return predicted, geometry, attempts
         horizontal.append((side, dx, geometry, crossings))
     for side, dx, geometry, crossings in reversed(horizontal):
-        candidates = vertical_candidates(
-            crossings,
-            {name: row.segments for name, row in geometry.items()},
-            {name: row.decorations for name, row in geometry.items()},
-        )
+        candidates = column_vertical_candidates(crossings, geometry, measurements)
         for candidate in candidates:
             predicted, actual, hits, body_clear = screen(
                 (dx, candidate.dy_m), f"{side.value}-{candidate.direction.value}"
