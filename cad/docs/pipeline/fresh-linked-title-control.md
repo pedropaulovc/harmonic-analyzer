@@ -1,9 +1,10 @@
 # Fresh linked-title update control
 
 Status: native baseline reproduced the printed shift; the one pre-save redraw
-did not prevent it. This diagnostic does not change production finalization.
-One checked pre-save `EditRebuild3` also returned `True` without preventing the
-same printed shift. Both independent native controls are recorded below.
+and one checked pre-save rebuild did not prevent it. This diagnostic does not
+change production finalization. The next candidate reapplies the title's existing
+horizontal justification and performs its documented redraw; native result pending.
+Both independent native controls are recorded below.
 
 The retained rocker control proved a real printed change: cold reopening moved
 all ten `rocker-arm` title glyphs right by about 7.22523 mm, while the note anchor,
@@ -230,3 +231,16 @@ This is a negative result for **one pre-native-save checked EditRebuild3 in this
 fresh minimal drawing**, not a general rebuild or linked-title API verdict.
 Same-value justification reapplication, force rebuild and model-view redraw
 remain untested here. No production or comparator change is made by this evidence.
+
+## Next control: preserve alignment and refresh native note text
+
+`--candidate pre_save_rejustify` uses the exact observed title handle, reads its
+current horizontal justification, and reapplies that value through the void
+`INote.SetTextJustification` setter. Its official documentation requires the
+following `GraphicsRedraw2`; this candidate includes exactly one. Both operations
+have separate snapshots inside the existing pre-native-save boundary. Link,
+anchor, vertical alignment, lock and text remain governed by the original exact
+checks. No positions or property expressions are assigned. The same positive
+baseline gate, cold exports, full raw deltas and ownership protection remain.
+Offline: 63 focused tests pass, including void return, changed alignment/link,
+setter failure and restoration of diagnostic wrappers. Native execution pending.

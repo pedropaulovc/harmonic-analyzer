@@ -81,6 +81,80 @@ def glyphs(dx=0.0, dy=0.0):
     }
 
 
+@pytest.mark.parametrize("mode", ["preserved", "wrong_alignment", "lost_link", "throws"])
+def test_same_justification_uses_void_setter_then_redraw_before_save(monkeypatch, mode):
+    calls = []
+    note = SimpleNamespace(justification=2, link=probe.TITLE_LINK)
+    note.GetTextJustification = Mock(side_effect=lambda: note.justification)
+
+    def set_justification(value):
+        calls.append(("justify", value))
+        if mode == "throws":
+            raise RuntimeError("native setter failed")
+        note.justification = 1 if mode == "wrong_alignment" else value
+        note.link = "literal" if mode == "lost_link" else note.link
+        # Native void: None must not be treated as an API failure.
+
+    note.SetTextJustification = Mock(side_effect=set_justification)
+    annotation = SimpleNamespace(GetSpecificAnnotation=lambda: note)
+    model = SimpleNamespace(GraphicsRedraw2=Mock(side_effect=lambda: calls.append("redraw")))
+    from contextlib import nullcontext
+
+    adapter = SimpleNamespace(
+        currentModel=model,
+        ownership=SimpleNamespace(saving_as=lambda _: nullcontext()),
+    )
+
+    def observe(stage):
+        calls.append(stage)
+        before = {
+            "key": "format/title", "linked_text": probe.TITLE_LINK,
+            "horizontal_justification": 2, "vertical_justification": 0, "locked": False,
+        }
+        after = dict(before, horizontal_justification=note.justification, linked_text=note.link)
+        probe.require_title_style(before, after)
+
+    observer = SimpleNamespace(annotation=annotation, record=observe)
+    monkeypatch.setattr(probe, "_early_bound", lambda raw, _: raw)
+    original_properties = Mock()
+    monkeypatch.setattr(probe.common, "apply_custom_properties", original_properties)
+
+    def save(current, path, *, artifact_context, **kwargs):
+        for kind, target in (("drawing", path), ("pdf", kwargs["pdf_path"])):
+            with artifact_context(kind, target):
+                calls.append(kind)
+
+    monkeypatch.setattr(probe.drawing, "save_drawing", save)
+
+    def run():
+        with probe.finalizer_observations(adapter, observer, probe.Variant.REJUSTIFY) as counts:
+            probe.common.apply_custom_properties(adapter, {"UNIT_DISPLAY": "MM"})
+            probe.drawing.save_drawing(adapter, "owned.SLDDRW", pdf_path="owned.pdf")
+        return counts
+
+    if mode == "preserved":
+        assert run() == {
+            "properties": 1, "drawing": 1, "pdf": 1,
+            "redraw": 1, "edit_rebuild": 0, "justification": 1,
+        }
+        assert calls.index("before_native_save") < calls.index(("justify", 2))
+        assert calls.index(("justify", 2)) < calls.index("after_pre_save_rejustify")
+        assert calls.index("after_pre_save_rejustify") < calls.index("redraw")
+        assert calls.index("redraw") < calls.index("after_pre_save_rejustify_redraw")
+        assert calls.index("after_pre_save_rejustify_redraw") < calls.index("drawing")
+        assert calls.index("drawing") < calls.index("pdf")
+        model.GraphicsRedraw2.assert_called_once_with()
+    else:
+        with pytest.raises(RuntimeError):
+            run()
+        assert "drawing" not in calls and "pdf" not in calls
+        model.GraphicsRedraw2.assert_not_called()
+    note.GetTextJustification.assert_called_once_with()
+    note.SetTextJustification.assert_called_once_with(2)
+    assert probe.common.apply_custom_properties is original_properties
+    assert probe.drawing.save_drawing is save
+
+
 def test_glyph_classification_requires_material_rigid_printed_movement():
     assert (
         probe.printed_displacement(glyphs(), glyphs())["classification"] == "unchanged"
@@ -121,7 +195,7 @@ def test_glyph_invalid_content_or_geometry_is_never_a_positive_control(field):
     "classification", ["unchanged", "subpixel_delta", "nonrigid_delta"]
 )
 @pytest.mark.parametrize(
-    "candidate", [probe.Variant.REDRAW, probe.Variant.EDIT_REBUILD]
+    "candidate", [probe.Variant.REDRAW, probe.Variant.EDIT_REBUILD, probe.Variant.REJUSTIFY]
 )
 def test_candidate_is_not_even_started_without_reproduction(classification, candidate):
     calls = []
@@ -150,7 +224,7 @@ def test_reproduced_pdf_without_changed_pixels_is_not_candidate_authority():
 
 
 @pytest.mark.parametrize(
-    "candidate", [probe.Variant.REDRAW, probe.Variant.EDIT_REBUILD]
+    "candidate", [probe.Variant.REDRAW, probe.Variant.EDIT_REBUILD, probe.Variant.REJUSTIFY]
 )
 def test_candidate_runs_once_after_baseline_and_keeps_failure(candidate):
     calls = []
@@ -192,7 +266,9 @@ def test_cli_rejects_missing_or_invalid_candidate_before_environment(
     environment.assert_not_called()
 
 
-@pytest.mark.parametrize("variant", list(probe.Variant))
+@pytest.mark.parametrize(
+    "variant", [probe.Variant.BASELINE, probe.Variant.REDRAW, probe.Variant.EDIT_REBUILD]
+)
 def test_finalizer_hooks_preserve_call_order_and_only_candidate_redraws(
     monkeypatch, variant
 ):
@@ -243,6 +319,7 @@ def test_finalizer_hooks_preserve_call_order_and_only_candidate_redraws(
         "pdf": 1,
         "redraw": int(variant is probe.Variant.REDRAW),
         "edit_rebuild": int(variant is probe.Variant.EDIT_REBUILD),
+        "justification": 0,
     }
     assert (
         calls.index("after_property_link_before_unit")

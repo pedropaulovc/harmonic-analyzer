@@ -3,9 +3,10 @@
 Create a project-template drawing with one Front view of an exact, uniquely
 named owned rocker-part bytecopy. Call the production finalizer unchanged.
 Diagnostic wrappers observe the late property and native/PDF save boundaries;
-the explicit candidate adds either GraphicsRedraw2 OR one checked EditRebuild3
-immediately before native SaveAs3. No title setters, geometry picks, other added
-rebuilds, default changes, or full recipe.
+the explicit candidate adds a redraw, one checked EditRebuild3, or reapplication
+of the title's existing horizontal justification plus its documented redraw,
+immediately before native SaveAs3. No position writes, geometry picks, other
+added rebuilds, default changes, or full recipe.
 
 Each trial closes all and ONLY owned documents, cold-opens its saved drawing,
 and exports a second PDF without native save or redraw. A candidate is authorized
@@ -61,6 +62,7 @@ class Variant(StrEnum):
     BASELINE = "baseline"
     REDRAW = "pre_save_redraw"
     EDIT_REBUILD = "pre_save_edit_rebuild"
+    REJUSTIFY = "pre_save_rejustify"
 
 
 def require_title_style(before, after):
@@ -176,6 +178,8 @@ class TitleObserver:
             in {
                 "before_native_save",
                 "after_pre_save_edit_rebuild",
+                "after_pre_save_rejustify",
+                "after_pre_save_rejustify_redraw",
                 "after_native_save",
                 "before_pdf_export",
                 "after_pdf_export",
@@ -205,7 +209,10 @@ def finalizer_observations(adapter, observer, variant):
         common.apply_custom_properties,
         drawing.save_drawing,
     )
-    counts = {"properties": 0, "drawing": 0, "pdf": 0, "redraw": 0, "edit_rebuild": 0}
+    counts = {
+        "properties": 0, "drawing": 0, "pdf": 0,
+        "redraw": 0, "edit_rebuild": 0, "justification": 0,
+    }
 
     def properties(current, values):
         if (
@@ -250,6 +257,19 @@ def finalizer_observations(adapter, observer, variant):
                             f"pre-save EditRebuild3 did not return True: {returned!r}"
                         )
                 observer.record("after_pre_save_edit_rebuild")
+            if kind == "drawing" and variant is Variant.REJUSTIFY:
+                note = _early_bound(observer.annotation.GetSpecificAnnotation(), "INote")
+                justification = int(note.GetTextJustification())
+                with _telemetry.span("diagnostic.fresh_title.rejustify"):
+                    # INote.SetTextJustification is void. Preserve the existing
+                    # native alignment and verify it through the exact observer.
+                    counts["justification"] += 1
+                    note.SetTextJustification(justification)
+                    observer.record("after_pre_save_rejustify")
+                    # The setter's official documentation requires a redraw.
+                    counts["redraw"] += 1
+                    current.currentModel.GraphicsRedraw2()
+                    observer.record("after_pre_save_rejustify_redraw")
             with artifact_context(kind, target) if artifact_context else nullcontext():
                 yield
             observer.record(f"after_{phase}")
@@ -264,8 +284,9 @@ def finalizer_observations(adapter, observer, variant):
             "properties": 1,
             "drawing": 1,
             "pdf": 1,
-            "redraw": int(variant is Variant.REDRAW),
+            "redraw": int(variant in (Variant.REDRAW, Variant.REJUSTIFY)),
             "edit_rebuild": int(variant is Variant.EDIT_REBUILD),
+            "justification": int(variant is Variant.REJUSTIFY),
         }
         if counts != expected:
             raise RuntimeError(
@@ -609,7 +630,7 @@ def main(argv=None):
     parser.add_argument(
         "--candidate",
         type=Variant,
-        choices=(Variant.REDRAW, Variant.EDIT_REBUILD),
+        choices=(Variant.REDRAW, Variant.EDIT_REBUILD, Variant.REJUSTIFY),
         required=True,
     )
     parser.add_argument("--worker", action="store_true")
