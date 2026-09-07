@@ -259,3 +259,50 @@ scope is unchanged. No production comparator was modified.
 
 Fail-first receipt: `run-ocnc3ore`; corrected six-file gate: 240 tests passed in
 15.60 seconds, `run-v2vt33t4`. No native capture-only run preceded this correction.
+
+## Native accessor-only baselines: both pass
+
+At root `cd1766e1332829d2cee8154021eb80d863f035c1`, adapter `25bc99b1`, SW
+PID 31860, the main agent ran both narrow accessor-only policies without a
+preliminary normal drawing or CREATE-exit viewport restoration:
+
+| Policy | Report directory | Measurements SHA-256 | MISS accessor seconds |
+| --- | --- | --- | ---: |
+| capture_only | prepared-template-cache-6an_7wno | 295b75bf91e644e08a76109abe34716b8f7186d8578258cb684d895795d51a21 | 42.853273 |
+| unchanged | prepared-template-cache-m_6jb0ve | 4e96a56839bb965c72ca8b4e84e9d37de020658d7c1ee307b3907f0730cf3c80 | 45.558999 |
+
+Both report paths are under `cad/out/reports/prepared-template-cache/`, with
+`measurements.json` in the named directory. Both passed exactly one accessor,
+two owned blank creations and one DRWDOT save. Both have empty trial lists:
+there was no cache HIT, extra factory or PDF/PNG comparison. The unchanged arm
+has an empty `frame_control` dictionary and no frame interception/getters. The
+capture-only arm contains four getter observations, no restore interception and
+zero frame writes. All four observed pixel boxes are `[2216,141,3824,995]`, with
+FrameLeft/Top 0/0, FrameWidth/Height 1845/957, FrameState 1. The unchanged arm's
+original native before/restore-before/final pixel boxes match that rectangle too.
+
+Both final native viewport dictionaries contain exactly the original six fields
+and equal their initial targets. An offline reread re-passed `compare_defaults`;
+only the already-excluded zero-ink `blank_linked_extent_observations` differs.
+All immutable input guards pass. Ownership is empty→empty with two exact owned
+closes and no errors; ownership receipt hashes are
+`d2972b0747d282aa8cf909394307e9bb33502c8469e8aba8404f1092637a82d8`
+(capture-only) and
+`17e75e97719507ea85c4e59cdaa67ad1e5245f186a6e6357c9acaa53a023c4cb`
+(unchanged).
+
+These runs show that the preliminary normal drawing, extra CREATE-exit restores
+and added Frame getters are **not necessary** for the observed positive outcome
+in the attach-only owned path. They do not explain the three repeated failures
+under actual production initialization, prove stable production preparation, or
+prove any resizing/synchronization fix. Production connection and the diagnostic
+ownership wrapper's extra inventory/reference/readback calls remain differences.
+
+The smallest proposed actual-production observation was to append Frame getters
+and a second viewport snapshot only **after** the original no-resize branch had
+already rejected, retaining that failure regardless of subsequent reads. This
+would avoid a new launcher and capture whether the rejected state remains, but
+would not recover the already-closed original document's frame. It was not
+implemented here. The main agent separately authorized a one-redraw production
+candidate after verification ZoomToFit; its cause and native outcome remain
+unproved, and it is developed in another worktree, not mixed into these receipts.
