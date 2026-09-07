@@ -174,3 +174,43 @@ have the same native position and overlap. Native save/PDF export again added
 gate before cold reopen. There is no complete-sheet acceptance or production
 performance claim. Native insertion of all three items into one selected view
 is now positively established for this source; their layout remains unfinished.
+
+## One native spacing command on the complete Right bank
+
+The successful Right coverage control at `26baadce` imported two exact GTols
+and datum A in 37.4577 ms. It did not produce publishable layout: the two GTols
+share the same source-model position and the same imported sheet anchor. The
+first native save again added the independently gated type-13 center mark.
+That inventory failure remains, and cold persistence was not proved.
+
+The next diagnostic-only delta adds
+`--orientation '*Right' --arrangement space-tightly-down` to this same owned
+runner. The two import call shapes, including `UsePlacementInSketch=True`, stay
+unchanged. After proving complete coverage and exact returned identities, it
+selects those **three existing annotations** and runs `SpaceTightlyDown` (317)
+exactly once. No Align Left, position setter, new annotation, spacing search,
+retry, or production layout hook is added. The datum is a real selected member;
+no synthetic annotation is inserted to meet the command's selection cardinality.
+
+The bundled `swCommands_e` documents 317 for multi-selected annotations or
+dimensions. `ISldWorks.IsCommandEnabled` and `RunCommand` provide separate
+enablement/acceptance observations. Existing native GTol controls proved the
+Select2(True,0) call shape and observed 317 disabled for two GTols; this control
+tests one real mixed bank of two imported GTols and one imported datum.
+`ISelectionMgr` must report types 13/13/36, and each returned IGtol/IDatumTag
+must round-trip to the exact annotation with the exact Right-view owner.
+`UsePlacementInSketch` is documented specifically for dimensions; no claim is
+made that changing it would arrange these GTols.
+
+The report retains native before/after anchors, frame/text/stroke measurements,
+and pairwise body gaps. Native True alone is not success: at least one GTol
+anchor must actually move and the three measured bodies must not overlap or
+touch. Failed visual movement/clearance remains a failed result while diagnostic
+export is retained. Exact manufacturing signatures, all annotation/owner/attached
+native objects, source PMI/dimensions, view/sheet state and unselected ink remain
+gated. The original save/export, copied-source hash, cold-reopen and scoped
+cleanup checks are unchanged; the known new-center-mark failure is not waived.
+
+This is a native mechanism control, not a performance comparison or approval
+to replace the production drawing path. Printed readability and native command
+effectiveness remain unproven until the coordinated frozen run.

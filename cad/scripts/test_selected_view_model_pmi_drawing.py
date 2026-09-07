@@ -273,6 +273,7 @@ def test_parent_environment_fails_before_native_wrapper(tmp_path, monkeypatch, f
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("arrangement", [None, probe.PmiArrangement.SPACE_TIGHTLY_DOWN])
 @pytest.mark.parametrize(
     "mode",
     ["passed", "missing_pmi", "cold_title", "copy_saved", "view_creation_failed"],
@@ -282,6 +283,7 @@ async def test_owned_control_exports_failures_but_never_saves_original_or_ignore
     tmp_path,
     monkeypatch,
     mode,  # noqa: F811
+    arrangement,
 ):
     from copy import deepcopy
     from pathlib import Path
@@ -322,13 +324,17 @@ async def test_owned_control_exports_failures_but_never_saves_original_or_ignore
         lambda app, model, path, required: (deepcopy(dimensions), {"D": model}),
     )
     records = deepcopy(source_records)
+    view_label = "Front" if arrangement is None else "Right"
     for row in records:
-        row.update(view="Front", owner_type=0)
+        row.update(view=view_label, owner_type=0)
     if mode == "missing_pmi":
         records.pop()
     items = {row["name"]: object() for row in records}
-    selected = SimpleNamespace(GetName2=lambda: "Front")
-    view_handles = {"Front": selected, "Top": object(), "Right": object()}
+    selected = SimpleNamespace(GetName2=lambda: view_label)
+    view_handles = {
+        name: selected if name == view_label else object()
+        for name in ("Front", "Top", "Right")
+    }
     phase = {"imported": False}
 
     def captured(adapter, copy, configuration, source_model):
@@ -375,6 +381,16 @@ async def test_owned_control_exports_failures_but_never_saves_original_or_ignore
         return list(items.values())
 
     monkeypatch.setattr(probe, "selected_imports", importing)
+    spacing = Mock()
+    spacing_comparison = Mock(
+        return_value={
+            "movement": "measured by focused tests",
+            "body_gaps": [],
+            "failures": [],
+        }
+    )
+    monkeypatch.setattr(probe, "space_imported_pmi", spacing)
+    monkeypatch.setattr(probe, "compare_arranged_pmi", spacing_comparison)
     monkeypatch.setattr(
         probe,
         "compare_reopened_annotations",
@@ -440,7 +456,13 @@ async def test_owned_control_exports_failures_but_never_saves_original_or_ignore
 
     def callback(adapter):
         return probe.probe(
-            adapter, source, tmp_path / "reports", 123, probe.pmi.file_digest(source)
+            adapter,
+            source,
+            tmp_path / "reports",
+            123,
+            probe.pmi.file_digest(source),
+            orientation="*" + view_label,
+            arrangement=arrangement,
         )
 
     if mode == "passed":
@@ -459,10 +481,26 @@ async def test_owned_control_exports_failures_but_never_saves_original_or_ignore
     assert report["status"] == ("passed" if mode == "passed" else "failed")
     assert report["inputs_before"] == report["inputs_after"]
     assert report["visual_review"] == "pending"
+    if arrangement is None or mode in {"missing_pmi", "view_creation_failed"}:
+        spacing.assert_not_called()
+        spacing_comparison.assert_not_called()
+    else:
+        spacing.assert_called_once()
+        spacing_comparison.assert_called_once()
+        assert "source_after_arrangement" in report
+        assert (
+            report["source_before"]["dimensions"]
+            == report["source_after_arrangement"]["dimensions"]
+        )
+        assert report["requested_arrangement"] == "space-tightly-down"
     if mode == "view_creation_failed":
         assert not report["artifacts"] and not report["imports"]
         assert "third-angle views rejected" in report["operation_error"]
         assert "cleanup_error" not in report
+        return
+    if arrangement is not None and mode == "missing_pmi":
+        assert not report["artifacts"]
+        assert "requires complete initial coverage" in report["operation_error"]
         return
     assert "initial" in report["artifacts"]
     if mode != "copy_saved":
