@@ -226,6 +226,8 @@ def test_recipe_annotations_use_owned_handles_and_model_finish_context(scene):
         ("*Front", bank["pivot"], "handle pivot hole"),
     ]
     (args, kw), = scene.calls["add_surface_finish"]
+    assert "symbol_xy" not in kw
+    assert "leader_attach_xy" not in kw
     assert args == (scene.adapter, scene.views["*Front"])
     assert kw["entity"] is bank["shaft"]
     assert kw["entity_context"] is recipe.AnnotationEntityContext.MODEL
