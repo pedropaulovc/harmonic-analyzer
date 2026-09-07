@@ -182,3 +182,22 @@ near-zero-X test and the previous 190-leaf audit's 187/3 classification remain
 unchanged. Same-session export comparison is still exact. The focused five-file
 suite passed 289 tests in 3.72 seconds (`run-5qi571og`); a fresh native crank
 replay remains required to exercise the previously unreached gates.
+
+The fresh replay at frozen `fb958fda` is retained as
+`datum-policy-7vmq0092/pilot.json`, SHA-256
+`197fc32a67467c084d8e05fa6fe7e53c3a3ceb8012f1b1aacffe4945ab7e5b89`.
+Recipe 24.5471284 s, complete failed pilot 258.9274196 s. Annotation comparison
+now passed with zero rejected leaves, 42 existing ULP differences and 15 zero-Z
+transitions. The cold source bank passed. All four fresh role/attachment reads
+completed, including the journal FACE, but exact built/cold bank comparison
+still failed: the only difference was the cross-hole intersection edge's
+`geometry/1/trim/CurveTag`, `537446` to `539344`. Every other recorded field
+matched. Source-copy/original hashes remained exact, final runtime guards were
+empty, and failure capture completed without errors. The fresh PNG was inspected
+again with the same readable native journal finish placement.
+
+The raw curve reader and strict same-session/cold CurveTag assertions remain
+unchanged at this point. `ICurveParamData.CurveTag` documents a curve ID, without
+a cross-reopen lifetime promise. Whether it is appropriate in a cold geometric
+equality bank needs a separately reviewed distinction and native identity proof;
+the changed tag is not automatically ignored. This replay remains a failure.
