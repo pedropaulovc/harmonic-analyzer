@@ -179,7 +179,12 @@ semantic/attachment/value reads, exact owner/position/context checks, the datum
 document-final witness and the callout-final witness remain. SF geometry must
 still be freshly measured after its leader representation changes. The entire
 callout-initial envelope is 3.026 s in this trace: the saving must be smaller
-after retaining those reads and adding handoff checks. Native timing is pending.
+after retaining those reads and adding handoff checks. The subsequent
+[frozen rocker pair](post-datum-handoff-negative-control.md) rejected rollout:
+eight reused footprints reduced child initial reads, but the complete handoff
+cost 5.469 s versus 3.325 s for the fresh initial-witness spans. Both retained
+identical captured drawing content and the same cold-title failure. The smaller
+whole-recipe difference was not a demonstrated benefit of this slower phase.
 
 The larger transaction above could consolidate intermediate witness envelopes
 totaling 19.114 s in this rocker trace, **before replacement-reader overhead**.
