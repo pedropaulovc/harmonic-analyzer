@@ -191,7 +191,13 @@ async def probe(adapter, source, directory):
                                 }
                             )
             if mode == "displaced-dimensions-control":
-                item = next(row["annotation"] for row in rows if row["kind"] == 4)
+                item = next(
+                    (row["annotation"] for row in rows if row["kind"] == 4), None
+                )
+                if item is None:
+                    raise RuntimeError(
+                        "displaced-dimensions control requires one native dimension"
+                    )
                 prior = tuple(item.GetPosition())
                 if not item.SetPosition2(prior[0] + 0.02, prior[1] + 0.02, prior[2]):
                     raise RuntimeError(

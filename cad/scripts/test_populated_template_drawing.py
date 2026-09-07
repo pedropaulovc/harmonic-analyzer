@@ -519,7 +519,7 @@ def test_second_source_title_comparison_keeps_exact_glyph_gate():
 
 @pytest.mark.parametrize(
     "mode",
-    ["pass", "number", "revision", "font", "pdf_drift", "preferences", "wrong_owner"],
+    ["pass", "number", "revision", "font", "pdf_drift", "preferences", "missing_preference", "wrong_owner"],
 )
 def test_read_only_observer_keeps_links_full_cold_style_and_independent_failures(
     monkeypatch, tmp_path, mode
@@ -591,6 +591,8 @@ def test_read_only_observer_keeps_links_full_cold_style_and_independent_failures
         glyph["characters"][0]["box_pt"][0] += 1e-9
     if mode == "preferences":
         prefs["units"]["system"] = 5
+    if mode == "missing_preference":
+        prefs["new_native_preference"] = 7
     controller.observe(adapter, "cold", trial, tmp_path / "cold.pdf")
     issues = trial["linked_fields"]["cold"]["fit"]["issues"]
     if mode == "pass":
@@ -601,3 +603,5 @@ def test_read_only_observer_keeps_links_full_cold_style_and_independent_failures
         assert any(row["kind"] == "raw_snapshot" for row in issues)
     if mode == "pdf_drift":
         assert any(row["kind"] == "pdf_field_glyphs" for row in issues)
+    if mode == "missing_preference":
+        assert any(row["kind"] == "normal_setup_changed" and "new_native_preference" in row["error"] for row in issues)
