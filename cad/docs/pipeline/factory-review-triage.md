@@ -5,11 +5,13 @@ merge or native-fleet acceptance. No new review or COM invocation was needed.
 
 ## Receipt and scope
 
-The CLI's `review findings` returned 13 findings. Its stored `git.json` pins
-head `c05953787a6e38fee440422da775b9e366c06068`, branch
-`review/cr-cad-factories`, and **base `main` at
-`9e746e1513479290565e6d920e74dadb3c7062a2`**, not the factories' stacked
-foundation ancestor `d8ec09f5`. The complete receipt remains at:
+The CLI's `review findings` returned 13 findings for head
+`c05953787a6e38fee440422da775b9e366c06068`. The effective explicit review base is
+the stacked foundation `d8ec09f5`: all 197 stored diff blocks match that Git range
+exactly after trailing-newline normalization. The range from main contains 368
+files, including 171 not in this review. `git.json` records the base branch's main
+tip `9e746e1513479290565e6d920e74dadb3c7062a2`, not the effective `--base-commit`;
+it must not be used alone to infer review scope. The complete receipt remains at:
 
 ```text
 C:/Users/pedro/AppData/Local/coderabbit/reviews/a07668f8/afb7845d/reviews/1788792958714
