@@ -26,6 +26,7 @@ import tempfile
 from typing import Any
 
 from _common import CAD_ROOT, _early_bound, check
+from diagnostics.probe_drawing_attachments import referenced_document
 from diagnostics._owned_native_documents import run_copy_diagnostic
 from diagnostics._owned_native_session import require_owned_diagnostic_environment
 from _drawing_common import add_feature_control_frame
@@ -106,11 +107,12 @@ def main() -> int:
                 raise RuntimeError("SolidWorks opened a different drawing than the unique copy")
             views = _views(model)
             face_view, edge_view = views[args.face_view], views[args.edge_view]
-            source_part = Path(face_view.ReferencedDocument.GetPathName()).resolve(strict=True)
+            source_model = referenced_document(face_view)
+            source_part = Path(source_model.GetPathName()).resolve(strict=True)
             if source_part.stem != "cone-gear":
                 raise RuntimeError(f"diagnostic requires the cone-gear source model, got {source_part}")
             source_hashes[source_part] = _sha256(source_part)
-            entities = ModelEntities(face_view.ReferencedDocument).resolve(ENTITY_ROLES)
+            entities = ModelEntities(source_model).resolve(ENTITY_ROLES)
             before = {}
             report["stage"] = "insert"
             for role, entity_type, view in (
@@ -135,7 +137,7 @@ def main() -> int:
             if Path(adapter.currentModel.GetPathName()).resolve() != copy:
                 raise RuntimeError("SolidWorks reopened a different drawing")
             views = _views(adapter.currentModel)
-            entities = ModelEntities(views[args.face_view].ReferencedDocument).resolve(ENTITY_ROLES)
+            entities = ModelEntities(referenced_document(views[args.face_view])).resolve(ENTITY_ROLES)
             annotations = [_early_bound(annotation, "IAnnotation") for view in views.values()
                            for annotation in view.GetAnnotationsByType(5) or ()]
             after = {}

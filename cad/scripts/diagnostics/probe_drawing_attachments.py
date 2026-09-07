@@ -127,6 +127,19 @@ def views(model):
 
 def referenced_model(view):
     """Resolve a part reference through a section view's base when needed."""
+    return _source_reference(view)[1]
+
+
+def referenced_document(view):
+    """Return the same validated native source handle, including section bases.
+
+    IView.ReferencedDocument is empty for section views; GetBaseView supplies
+    the parent. Keep the existing cycle, saved-path and part-only guards.
+    """
+    return _source_reference(view)[0]
+
+
+def _source_reference(view):
     configuration = str(view.ReferencedConfiguration)
     visited = set()
     while view is not None:
@@ -144,7 +157,7 @@ def referenced_model(view):
                 raise ValueError(
                     f"attachment probe supports part drawings only; {name} references {path}"
                 )
-            return {
+            return model, {
                 "path": str(Path(path).resolve(strict=True)),
                 "configuration": configuration,
             }

@@ -17,6 +17,7 @@ from typing import Any
 from _common import CAD_ROOT, _early_bound, check
 from diagnostics._owned_native_documents import run_copy_diagnostic
 from diagnostics._owned_native_session import require_owned_diagnostic_environment
+from diagnostics.probe_drawing_attachments import referenced_model
 from _drawing_annotation_bounds import annotation_box
 from _drawing_common import render_pdf_png
 from diagnostics._owned_native_documents import save_drawing
@@ -227,9 +228,7 @@ def main() -> int:
                 for view in sheet[1:]
             ]
             for view in views:
-                reference = Path(view.ReferencedDocument.GetPathName()).resolve(
-                    strict=True
-                )
+                reference = Path(referenced_model(view)["path"])
                 hashes[reference] = hashlib.sha256(reference.read_bytes()).hexdigest()
             view = next(
                 (

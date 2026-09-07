@@ -115,11 +115,14 @@ def test_probe_worker_validates_inventory_before_reporting_passed(monkeypatch, t
     from pathlib import Path
 
     import probe_drawing_annotation_layout as probe
+    from diagnostics import probe_drawing_attachments as attachments
 
     source, part = tmp_path / "source.SLDDRW", tmp_path / "source.SLDPRT"
     source.write_bytes(b"original drawing")
     part.write_bytes(b"original part")
     model, view = Mock(), Mock()
+    view.ReferencedConfiguration = "Default"
+    view.GetUniqueName.return_value = "Front"
     view.ReferencedDocument.GetPathName.return_value = str(part)
     model.GetViews.return_value = [[object(), view]]
     adapter = SimpleNamespace(
@@ -161,6 +164,7 @@ def test_probe_worker_validates_inventory_before_reporting_passed(monkeypatch, t
     adapter.open_model, adapter.close_model = open_model, close_model
     monkeypatch.setattr(probe, "CAD_ROOT", tmp_path)
     monkeypatch.setattr(probe, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(attachments, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(probe, "_surface", surface)
     monkeypatch.setattr(probe, "_document_formats", lambda _extension: {})
     monkeypatch.setattr(probe, "_attachment_geometry", lambda _annotation: [{"radius": 0.01}])
