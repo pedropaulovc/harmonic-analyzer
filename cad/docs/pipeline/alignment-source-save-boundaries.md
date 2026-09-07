@@ -269,3 +269,20 @@ They record text loss without accepting it; the built/cold gates still reject
 missing storage or printed lines. The initial source-only bank never calls the
 drawing reader. The next run separates the precision helper, intervening recipe
 work, native save and PDF export as candidate loss boundaries.
+
+At `f26ec691`, the modern-save arm with these fresh drawing banks produced
+`datum-policy-7t6zttug/pilot.json`, SHA-256
+`c071a53c66aae1436c191ff82d3ec4df4f8a2ca36bc8969d61b7042ed87f92c4`.
+The lower text survived fresh inventory after callouts, before precision and
+after precision. It was already empty at `before_native_save`, and remained
+empty through both export banks and built acceptance. Thus this loss precedes
+either save call; a save-API change cannot repair it. Subsequent annotation
+operations and sheet finalization remain unseparated by these nine banks.
+
+The modern call itself returned `(True, 0, 0)`, wrote 202,884 bytes and took
+1.179 s. Recipe/pilot times including the expanded reads were 56.745/141.028 s.
+All source banks stayed clean with exact hashes and raw parameter/tolerance
+witnesses. Built acceptance rejected missing lower text; cold reopening was not
+reached. Failure evidence retained no capture errors. Originals and the copied
+source remained exact, the two baseline pivot documents were preserved, and
+cleanup/final guards were clean. No production text/save policy is promoted.
