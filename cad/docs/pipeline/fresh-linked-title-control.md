@@ -440,3 +440,23 @@ cell translation, segmented/open borders, native coordinate conversion, null and
 malformed data, strict fit, checked setters, exact font/link/clamp rejection,
 baseline gating and the stronger native-cold success condition. Native result,
 visual title-cell clearance and whole manufacturing-sheet acceptance are pending.
+
+### First left-cell run: PDF coordinate conversion defect
+
+At `0ee2e741`, `fresh-title-3p8e2gl2/title-update.json` (SHA-256
+`9446118a869a095fa2aa7d86952e70f55428d953b20591e7129a2d7ef9a11a6e`)
+reproduced the baseline's 7.225226508 mm printed shift. The candidate measured the
+native cell and passed checked placement, exact style and native extent fit, then
+stopped at its first PDF-fit check. The diagnostic wrongly treated PDFium
+`PdfTextPage.get_charbox` as top-left coordinates; the installed implementation
+and docstring return `(left, bottom, right, top)`. The raw first glyph is
+`(967.4768676757812, 117.53108215332031, 972.75390625, 128.59107971191406)` points.
+The extra Y inversion put that glyph near the top of the sheet in the check.
+
+Corrected the diagnostic conversion and its equally mistaken unit fixture,
+after raising the contradiction to the user. A regression now uses the retained
+raw glyph box, accepts its measured cell, and rejects its vertically flipped
+counterpart. Strict containment is unchanged. The native run's original and
+template hashes were unchanged and owned cleanup ended empty/preserved. This run
+did not reach candidate cold reopen and is not evidence for or against cold
+layout stability; a fresh pair is required after the correction.

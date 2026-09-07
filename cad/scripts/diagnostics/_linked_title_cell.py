@@ -188,7 +188,7 @@ def require_native_fit(cell, observation):
 
 
 def require_pdf_fit(cell, pdf):
-    """PDF coordinates are points from upper left; SW sheet metres from lower left."""
+    """PDFium get_charbox and SW sheet coordinates both originate at lower left."""
     width_pt, height_pt = finite(pdf["page_size_pt"], 2, "PDF page")
     if width_pt <= 0 or height_pt <= 0:
         raise RuntimeError("title cell: invalid PDF page")
@@ -204,9 +204,9 @@ def require_pdf_fit(cell, pdf):
             cell,
             (
                 x0 * factor,
-                (height_pt - y1) * factor,
+                y0 * factor,
                 x1 * factor,
-                (height_pt - y0) * factor,
+                y1 * factor,
             ),
             "PDF title glyph",
         )
