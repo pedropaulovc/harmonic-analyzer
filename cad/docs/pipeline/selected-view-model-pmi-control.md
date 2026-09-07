@@ -364,3 +364,21 @@ movement, pairwise body clearance, semantic/source/attachment, unselected-ink,
 save/cold/export, hash and ownership checks remain unchanged. Model-ink conflicts
 still require the visual inspection above. This variant adds no measurements or
 acceptance exemptions and is native-untested until a coordinated frozen run.
+
+### 2976 result: disabled for the exact mixed imported selection
+
+Frozen root `035b5b0d` / adapter `e77bfda4` / existing PID 31860 ran the
+standalone Auto Arrange variant. Receipt
+`selected-view-pmi-31ypm276/observations.json` has SHA-256
+`53a84978bca78554afa60b4a75f56b9912a63f0445339d61354c35b7c5e58dbd`.
+The exact imported selection contained GTol/GTol/datum native selection types
+13/13/36, each with `IsSame == 1` and the expected annotation owner. Native
+`IsCommandEnabled(2976)` returned False; the control stopped before RunCommand,
+so it proves no arrangement, saved-layout or cold-layout result.
+
+The failed receipt is retained as a failed observation. Source/input/helper and
+adapter guards stayed exact; cleanup restored the empty baseline without error.
+This is a rejection of this mixed bank after ActivateView and Select2, not a
+general API limitation. A different selected subset, Select3 with explicit
+drawing-view selection data, and other native document contexts remain untested
+by this receipt. No production behavior or acceptance gate changed in response.
