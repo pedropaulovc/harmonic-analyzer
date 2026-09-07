@@ -214,7 +214,8 @@ $env:HARMONIC_DIAGNOSTIC_SW_PID = '31860'
 uv run --no-sync python cad/scripts/diagnostics/probe_populated_template.py `
   --template C:/src/harmonic-analyzer/cad/out/reports/baked-template-rotski52/baked-template-rotski52.DRWDOT `
   --template-sha256 1ad599b58fa54bef11a3dc1f5a70758c755bef271c05775f841221eaad0b976d `
-  --source-root C:/src/harmonic-analyzer/cad/out/sldprt
+  --source-root C:/src/harmonic-analyzer/cad/out/sldprt `
+  --symbol-library 'C:/ProgramData/SOLIDWORKS/SOLIDWORKS 2026/lang/english/gtol.sym'
 ```
 
 The first run at root `65f21f18`, adapter `e77bfda4`, PID 31860, session 91024
@@ -250,3 +251,44 @@ Bundled references: `ISheet/GetProperties2.md`, `SetProperties2.md`,
 `CustomPropertyView.md`, `IView/GetName2.md`, `ReferencedDocument.md`,
 `ReferencedConfiguration.md`, and `Set_Drawing_Sheet_Properties_Example_CSharp.md`.
 No production setter changed and none of the real fit defects is waived.
+
+### Angular symbol decoding (COM-free positive replay)
+
+The literal-reader failure is now handled by an explicit, single-token vector
+witness, not Unicode substitution. The bundled **Gtol Frame XML Schema** guide
+defines `<Library-Symbol>` notation and directs readers to the installed
+`gtol.sym`. Its `GGTOL/ANGULAR` entry defines only `(0,0)→(1.6,1)` and
+`(0,0)→(1.6,0)` lines. The explicit library file is hashed as a guarded input;
+the observed installed SHA is
+`e179ba2744a1f1725db179bbdea3a5d0fe97196eaed59d56e990068cfbbb8e40`.
+
+Both retained PDFs contain exactly that two-line topology, represented by four
+move/line commands, plus the separate literal `±1°` glyphs. The raw content
+stream serializes endpoints `887.20001 154.70001`, `897.40002 161.10001`,
+`887.20001 154.70001`, `897.40002 154.70001`. Their 0.1 pt grid plus
+0.00005 pt decimal/float32 allowance explains the measured 0.039978 pt
+aspect residual from ideal 1.6; this is a bounded **symbol-shape** contract,
+not a general claim about SOLIDWORKS export precision. Unknown token, curve,
+transform, missing/extra line, wrong topology, unsupported grid or stroke
+style remains an error. Whole-frame path bounds are resolved into their
+actual segments, so the sheet border is not mistaken for local symbol ink.
+
+The actual PDF ink box includes the stroked path and literal glyph union;
+the 1 mm clearance/cell-fit checks use those raw values. Cold path endpoints,
+stroke/color and glyphs still compare exactly. This COM-free replay passed
+for rocker and lever, built versus cold, without changing any native file:
+
+```powershell
+# Run in cad/scripts using the worktree's uv project/venv.
+uv run --no-sync --project ../.. python -m diagnostics._populated_template_symbols `
+  --receipt C:/src/harmonic-analyzer/cad/out/reports/populated-template-3kmuxyu1/populated-template.json `
+  --sha256 9c549d6e62a1078fec1772b5de808e338adcda97c8e5bd0e05dcd2d72d1d49c1 `
+  --symbol-library 'C:/ProgramData/SOLIDWORKS/SOLIDWORKS 2026/lang/english/gtol.sym'
+```
+
+Reader contracts are from installed pypdfium2 and the primary
+[PDFium public path/object API](https://github.com/chromium/pdfium/blob/main/public/fpdf_edit.h):
+`FPDFPath_CountSegments/GetPathSegment`, `FPDFPathSegment_GetPoint/GetType/GetClose`,
+`FPDFPageObj_GetMatrix/GetBounds/GetStrokeWidth/GetStrokeColor`, and
+`FPDFPath_GetDrawMode`. This does not make the failed populated layout pass;
+MATERIAL, FINISH and PART/TITLE still require measured template corrections.

@@ -28,6 +28,7 @@ from _drawing_prepared_template import TemplateSpec  # noqa: E402
 from _drawing_template_defaults import snapshot_defaults  # noqa: E402
 from diagnostics import _baked_template_layout as layout  # noqa: E402
 from diagnostics import _populated_template_fields as fields  # noqa: E402
+from diagnostics import _populated_template_symbols as symbols  # noqa: E402
 from diagnostics import probe_fresh_title_update as title  # noqa: E402
 from diagnostics._owned_native_documents import run_copy_diagnostic  # noqa: E402
 from diagnostics._owned_native_session import require_owned_diagnostic_environment  # noqa: E402
@@ -116,8 +117,9 @@ def property_source(adapter, source, source_path, configuration):
 
 
 class PopulatedControl:
-    def __init__(self, template, sha256, checkpoint):
+    def __init__(self, template, sha256, checkpoint, symbol_definition):
         self.template, self.sha256, self.checkpoint = template, sha256, checkpoint
+        self.symbol_definition = symbol_definition
         self.setup = {
             "calls": 0,
             "template_calls": 0,
@@ -200,7 +202,12 @@ class PopulatedControl:
         trial.setdefault("linked_fields", {})[phase] = row
         self.checkpoint()
         row["fit"] = fields.field_audit(
-            notes, lines, pdf_reader=lambda text: title.retained.pdf_title(pdf, text)
+            notes,
+            lines,
+            pdf_reader=lambda text: title.retained.pdf_title(pdf, text),
+            symbol_reader=lambda note: symbols.pdf_field(
+                pdf, note, self.symbol_definition
+            ),
         )
         issues = row["fit"]["issues"]
         for link, value in expected.items():
@@ -279,8 +286,9 @@ class PopulatedControl:
         self.checkpoint()
 
 
-async def probe(adapter, template, sha256, source_root, output_root):
+async def probe(adapter, template, sha256, source_root, output_root, symbol_path):
     require_template(template, sha256)
+    definition = symbols.symbol_library(symbol_path)
     sources = {
         target: (source_root / f"{target.replace('_', '-')}.SLDPRT").resolve(
             strict=True
@@ -291,6 +299,7 @@ async def probe(adapter, template, sha256, source_root, output_root):
     expected.update(
         {
             str(template): sha256,
+            str(symbol_path): definition["sha256"],
             str(common.PROJECT_DRWDOT): title.pilot.attachments.file_digest(
                 common.PROJECT_DRWDOT
             ),
@@ -308,6 +317,7 @@ async def probe(adapter, template, sha256, source_root, output_root):
         "revision": title.pilot.benchmark.revision("HEAD"),
         "helpers": title.pilot.helper_fingerprints(),
         "adapter": title.pilot.adapter_fingerprints(),
+        "symbol_library": definition,
         "trials": [],
         "setups": {},
         "errors": [],
@@ -326,7 +336,7 @@ async def probe(adapter, template, sha256, source_root, output_root):
             trial_dir = directory / f"{directory.name}-{target}"
             trial_dir.mkdir()
             adapter.ownership.register_directory(trial_dir)
-            control = PopulatedControl(template, sha256, checkpoint)
+            control = PopulatedControl(template, sha256, checkpoint, definition)
             report["setups"][target] = control.setup
             trial = await title.one_trial(
                 adapter,
@@ -400,6 +410,7 @@ def main(argv=None):
     parser.add_argument("--template", type=Path, required=True)
     parser.add_argument("--template-sha256", required=True)
     parser.add_argument("--source-root", type=Path, required=True)
+    parser.add_argument("--symbol-library", type=Path, required=True)
     parser.add_argument("--report-root", type=Path, default=ROOT / "cad/out/reports")
     parser.add_argument("--worker", action="store_true")
     args = parser.parse_args(argv)
@@ -422,6 +433,7 @@ def main(argv=None):
                 args.template_sha256,
                 source_root,
                 args.report_root.resolve(),
+                args.symbol_library.resolve(strict=True),
             )
         )
     import dodo
@@ -438,6 +450,8 @@ def main(argv=None):
             str(source_root),
             "--report-root",
             str(args.report_root.resolve()),
+            "--symbol-library",
+            str(args.symbol_library.resolve(strict=True)),
             "--worker",
         ],
         "populated baked template control",

@@ -10,8 +10,184 @@ import pytest
 
 from diagnostics import _populated_template_fields as fields
 from diagnostics import probe_populated_template as probe
+from diagnostics import _populated_template_symbols as symbols
+from diagnostics._populated_template_native_fixture import RETAINED
 from test_baked_template_layout_drawing import note, scene
 from test_title_cell_drawing import box_lines
+
+
+def angular_path():
+    # Raw PDFium reads of the recorded first/cold PDFs; no manufactured Unicode.
+    points = [
+        [887.2000122070312, 154.70001220703125],
+        [897.4000244140625, 161.10000610351562],
+        [887.2000122070312, 154.70001220703125],
+        [897.4000244140625, 154.70001220703125],
+    ]
+    return {
+        "segments": [
+            {"kind": kind, "point_pt": point, "closure": "open"}
+            for kind, point in zip([2, 0, 2, 0], points, strict=True)
+        ],
+        "matrix": [1, 0, 0, 1, 0, 0],
+        "fill": 0,
+        "stroke": 1,
+        "rgba": [0, 0, 0, 255],
+        "width_pt": 0.5102400183677673,
+        "ink_box_pt": [
+            886.4966430664062,
+            153.99661254882812,
+            898.1033935546875,
+            161.80340576171875,
+        ],
+    }
+
+
+def test_retained_angular_path_matches_symbol_grid_without_rounding_raw_data(tmp_path):
+    path = tmp_path / "gtol.sym"
+    path.write_text(
+        "#GGTOL,GOST\n*ANGULAR,Angularity\nA,LINE .0,.0,1.6,1.\nA,LINE .0,.0,1.6,.0\n"
+    )
+    library = symbols.symbol_library(path)
+    actual = angular_path()
+    expected = deepcopy(actual)
+    result = symbols.require_angular_path(actual, library)
+    assert result["shape_residual_pt"] == 0.03997802734375
+    assert result["grid_residual_pt"] == pytest.approx(0.00002441406240905053)
+    assert result["path"] == actual == expected
+    path.write_text(path.read_text().replace("1.6,1.", "1.8,1."))
+    with pytest.raises(RuntimeError, match="definition"):
+        symbols.symbol_library(path)
+
+
+@pytest.mark.parametrize(
+    "mode",
+    [
+        "missing",
+        "curve",
+        "closed",
+        "extra",
+        "transparent",
+        "fill",
+        "nan",
+        "wrong_angle",
+        "off_grid",
+    ],
+)
+def test_angular_shape_does_not_accept_unknown_or_changed_vector_ink(mode):
+    path = angular_path()
+    if mode == "missing":
+        path["segments"].pop()
+    if mode == "extra":
+        path["segments"].append(deepcopy(path["segments"][-1]))
+    if mode == "curve":
+        path["segments"][1]["kind"] = 1
+    if mode == "closed":
+        path["segments"][-1]["closure"] = "closed"
+    if mode == "transparent":
+        path["rgba"][-1] = 0
+    if mode == "fill":
+        path["fill"] = 1
+    if mode == "nan":
+        path["segments"][0]["point_pt"][0] = float("nan")
+    if mode == "wrong_angle":
+        path["segments"][1]["point_pt"][1] += 1
+    if mode == "off_grid":
+        path["segments"][1]["point_pt"][1] += 0.012
+    with pytest.raises(RuntimeError):
+        symbols.require_angular_path(path, {"grid_lines": [[0, 0, 1.6, 1]]})
+
+
+def test_whole_sheet_frame_bbox_is_not_misidentified_as_symbol_ink():
+    path = angular_path()
+    path["segments"] = [
+        {"kind": kind, "point_pt": point, "closure": "open"}
+        for kind, point in [
+            (2, [0, 0]),
+            (0, [1224, 0]),
+            (0, [1224, 792]),
+            (0, [0, 792]),
+            (0, [0, 0]),
+        ]
+    ]
+    assert not symbols.intersects_path(path, [880, 145, 901, 163])
+    assert symbols.intersects_path(angular_path(), [880, 145, 901, 163])
+
+
+@pytest.mark.parametrize(
+    "mode",
+    [
+        "pass",
+        "token",
+        "font_rotation",
+        "run_count",
+        "missing_path",
+        "extra_path",
+        "cold_drift",
+    ],
+)
+def test_retained_symbol_note_preserves_literal_and_full_pdf_vector_witness(
+    monkeypatch, mode
+):
+    import pypdfium2
+
+    note = deepcopy(RETAINED["angular_note"])
+    if mode == "token":
+        note["text"] = note["text"].replace("ANGULAR", "UNKNOWN")
+    if mode == "font_rotation":
+        note["display"]["texts"][0]["angle_rad"] = 0.1
+    if mode == "run_count":
+        note["display"]["texts"].append(deepcopy(note["display"]["texts"][0]))
+    literal = {
+        "text": "±1°",
+        "characters": [{"text": "±1°", "box_pt": [888, 147, 897, 152]}],
+        "ink_box_pt": [888, 147, 897, 152],
+        "page_size_pt": [1224, 792],
+    }
+    monkeypatch.setattr(symbols.retained, "pdf_title", lambda *_: deepcopy(literal))
+    obj = SimpleNamespace(type=2, get_bounds=lambda: (886, 153, 899, 162))
+    native = angular_path()
+    monkeypatch.setattr(symbols, "path_snapshot", lambda _: deepcopy(native))
+    objects = (
+        [] if mode == "missing_path" else [obj, obj] if mode == "extra_path" else [obj]
+    )
+    page = SimpleNamespace(get_objects=lambda **_: iter(objects))
+
+    class Document:
+        def __len__(self):
+            return 1
+
+        def __getitem__(self, _):
+            return page
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(pypdfium2, "PdfDocument", lambda _: Document())
+    library = {"grid_lines": [[0, 0, 1.6, 1]]}
+    if mode not in ("pass", "cold_drift"):
+        with pytest.raises(RuntimeError):
+            symbols.pdf_field("owned.pdf", note, library)
+        return
+    result = symbols.pdf_field("owned.pdf", note, library)
+    assert result["text"] == "±1°"
+    assert result["decoded_native_text"] == note["text"]
+    assert result["symbol"]["path"] == native
+    assert result["ink_box_pt"][0] == native["ink_box_pt"][0]
+    if mode == "cold_drift":
+        native["ink_box_pt"][0] += 1e-9
+        assert symbols.pdf_field("cold.pdf", note, library) != result
+
+
+def test_retained_fixture_is_an_actual_recipe_gate_input():
+    import dodo
+    from diagnostics import _populated_template_native_fixture
+    from pathlib import Path
+
+    recipe = next(row for row in dodo.task_check() if row["name"] == "recipe")
+    assert Path(_populated_template_native_fixture.__file__).resolve() in {
+        Path(path).resolve() for path in recipe["file_dep"]
+    }
 
 
 def test_populated_defaults_require_the_exact_explicit_property_source_transition():
@@ -194,7 +370,7 @@ def test_normal_factory_redirects_one_argument_and_always_restores(
     monkeypatch.setattr(probe.common, "new_project_drawing", current)
     witness = Mock(return_value={"exact": "normal defaults"})
     monkeypatch.setattr(probe, "snapshot_defaults", witness)
-    controller = probe.PopulatedControl(path, sha, Mock())
+    controller = probe.PopulatedControl(path, sha, Mock(), {})
     if mode == "positive":
         assert controller.factory(adapter, scale=probe.title.SCALE) == "drawing"
         native.assert_called_once_with(
@@ -218,7 +394,7 @@ def test_template_hash_mismatch_stops_before_any_factory_call(monkeypatch, tmp_p
     path.write_bytes(b"wrong bytes")
     native = Mock(side_effect=AssertionError("no native call"))
     monkeypatch.setattr(probe.common, "new_drawing", native)
-    controller = probe.PopulatedControl(path, "0" * 64, Mock())
+    controller = probe.PopulatedControl(path, "0" * 64, Mock(), {})
     with pytest.raises(RuntimeError):
         controller.factory(object())
     native.assert_not_called()
@@ -232,6 +408,10 @@ def test_thin_controller_reuses_two_trials_and_retains_failed_acceptance(
 ):
     template = tmp_path / "derived.DRWDOT"
     template.write_bytes(b"derived")
+    symbol_path = tmp_path / "gtol.sym"
+    symbol_path.write_text(
+        "#GGTOL,GOST\n*ANGULAR,Angularity\nA,LINE .0,.0,1.6,1.\nA,LINE .0,.0,1.6,.0\n"
+    )
     original = tmp_path / "original.DRWDOT"
     original.write_bytes(b"original")
     sources = tmp_path / "parts"
@@ -288,11 +468,17 @@ def test_thin_controller_reuses_two_trials_and_retains_failed_acceptance(
     )
     sha = probe.title.pilot.attachments.file_digest(template)
     if mode == "pass":
-        asyncio.run(probe.probe(adapter, template, sha, sources, tmp_path / "reports"))
+        asyncio.run(
+            probe.probe(
+                adapter, template, sha, sources, tmp_path / "reports", symbol_path
+            )
+        )
     else:
         with pytest.raises(ExceptionGroup):
             asyncio.run(
-                probe.probe(adapter, template, sha, sources, tmp_path / "reports")
+                probe.probe(
+                    adapter, template, sha, sources, tmp_path / "reports", symbol_path
+                )
             )
     assert len(calls) == (1 if mode == "native_failure" else 2)
     (path,) = (tmp_path / "reports").glob("*/populated-template.json")
@@ -386,7 +572,9 @@ def test_read_only_observer_keeps_links_full_cold_style_and_independent_failures
             "fields": {"label": {"pdf": deepcopy(glyph)}},
         },
     )
-    controller = probe.PopulatedControl(tmp_path / "derived.DRWDOT", "0" * 64, Mock())
+    controller = probe.PopulatedControl(
+        tmp_path / "derived.DRWDOT", "0" * 64, Mock(), {}
+    )
     controller.setup["normalized_blank_defaults"] = deepcopy(prefs)
     controller.setup["normalized_blank_defaults"]["sheet_properties"][7] = 1
     trial = {"source_copy": str(path), "source_before": {"configuration": "Default"}}
