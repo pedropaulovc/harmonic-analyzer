@@ -14,14 +14,20 @@ from _common import _early_bound
 import _drawing_common as drawing
 from diagnostics import probe_drawing_attachments as attachments
 from diagnostics import _silhouette_attachment_witness as silhouette
+from diagnostics import _view_intersection_curve_witness as intersection
 from diagnostics._recipe_entity_acceptance import EntityWitnessPhase
 from diagnostics._recipe_view_roles import ViewResolver
 
 
-def geometry(app, view, entity, kind):
+def geometry(app, view, entity, kind, *, evidence=None):
     if kind == 46:
         return silhouette.snapshot(app, view, entity)[0]
-    result = attachments.geometry(entity, kind)
+    try:
+        result = attachments.geometry(entity, kind)
+    except attachments.UnsupportedGeometry:
+        if kind != 1:
+            raise
+        return intersection.snapshot(entity, evidence if evidence is not None else {})
     if result[0] == "line" and kind == 1:
         if len(result[1]) != 2:
             raise RuntimeError("VIEW edge line needs exactly two endpoints")
@@ -103,7 +109,13 @@ class ViewEntityAcceptance:
                 evidence=row.setdefault("silhouette", {}),
             )
         else:
-            row["geometry"] = geometry(adapter.swApp, view, attached, kind)
+            row["geometry"] = geometry(
+                adapter.swApp,
+                view,
+                attached,
+                kind,
+                evidence=row.setdefault("curve_read", {}),
+            )
             if expected is not None:
                 silhouette.same(
                     adapter.swApp,
@@ -195,10 +207,18 @@ class ViewEntityAcceptance:
                         raise RuntimeError("selected silhouette face became null")
                 else:
                     row["argument_geometry"] = geometry(
-                        adapter.swApp, view, expected, role.entity_kind
+                        adapter.swApp,
+                        view,
+                        expected,
+                        role.entity_kind,
+                        evidence=row.setdefault("argument_curve_read", {}),
                     )
                     row["selected_geometry"] = geometry(
-                        adapter.swApp, view, actual, role.entity_kind
+                        adapter.swApp,
+                        view,
+                        actual,
+                        role.entity_kind,
+                        evidence=row.setdefault("selected_curve_read", {}),
                     )
                     silhouette.same(
                         adapter.swApp,

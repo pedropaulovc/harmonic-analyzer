@@ -1,0 +1,82 @@
+# VIEW intersection-curve witness
+
+This is diagnostic-only support for the existing crankshaft cross-hole role.
+It does not change its production selector, PMI specification, source part or
+the generic attachment reader. Drawing-context and cold native acceptance are
+still required; source API readback alone does not establish either.
+
+## Evidence and boundary
+
+The [source curve control](crankshaft-curve-readback-control.md) retained two
+`PinHole`-adjacent edges with `Identity=3004`, `IsBcurve=True`, closed/periodic
+3D order-4 representations, 60 controls and 61 knots. The complete getter and
+trim rows are preserved in
+`cad/scripts/fixtures/crankshaft-intersection-curves-zj92q9yo.json`.
+They come from the **failed** single-part receipt
+`cad/out/reports/crankshaft-curves-zj92q9yo/curves.json`, SHA-256
+`77c14f47269c00088fd88cd46c3f0d211a43260abd705fd53f2f18969ba0b647`.
+That failure remains mandatory because the crankshaft has no LINE control;
+the separately guarded paired-source mode supplies that positive control.
+
+The fixture's two JSON objects were copied with `JsonElement.GetRawText`, not
+reserialized as floating-point values. Offline comparison against both original
+objects passed after CRLF-to-LF normalization only: every numeric spelling,
+boolean, parameter, array entry and metadata field is retained. The fixture is
+source-context data, not a fabricated drawing-context receipt.
+
+## Diagnostic change
+
+`_recipe_view_entity_acceptance.geometry` first uses its unchanged analytic
+reader. Only an unsupported EDGE enters `_view_intersection_curve_witness`;
+the new reader requires exact integer kind 3004 before requesting spline data.
+Other unsupported kinds and malformed analytic reads still fail.
+
+The new reader reuses `_raw_edge_curve.read_edge`, preserving all native status
+and data: curve kind/predicates, complete `GetEndParams`, `CurveType`, `CurveTag`,
+sense, edge parameter range, endpoints, getter arguments, spline metadata and
+both complete retval/out arrays. Arrays have bounded shapes and finite numbers.
+There is no sampling, rounding, rational-coordinate normalization, modeler
+tolerance change, BREP write, or fallback identity acceptance.
+
+Argument, selected and attached reads retain raw evidence in the existing stage
+report, including partial getter failures. Initial geometry is detached from
+mutable returned arrays. Exact original/selected/attached `IsSame`, annotation
+view ownership, type, visibility, non-dangling and on-sheet checks remain.
+Fresh cold role resolution uses reopened handles; the existing pilot still
+compares the whole built/reopened entity banks with `!=`. Even a one-ULP
+coefficient/domain change or a changed curve tag is a failed exact witness,
+not a tolerated serialization difference. No MODEL comparator changes.
+
+Bundled `GetBCurveParams5`, `GetEndParams`, `Identity`, spline getter/periodicity
+pages, `GetCurveParams3` and the B-curve C# example were read. The method documents
+that modeler tolerance affects representation accuracy: these coefficients are
+an additional raw witness alongside native identity, not a claim of exact BREP
+serialization. The call does not request cubic/non-rational conversion or alter
+the curve's observed closure/periodicity.
+
+## Reproduction and remaining native gate
+
+The focused fixture and observer regression suite is COM-free:
+
+```powershell
+uv run --no-sync python -m pytest -q `
+  cad/scripts/test_view_intersection_curve_witness_drawing.py `
+  cad/scripts/test_view_recipe_acceptance_drawing.py `
+  cad/scripts/test_crankshaft_curve_readback_drawing.py
+```
+
+Tests retain both full native rows, reject failed/nonfinite/short arrays and
+unproven kinds, reject equal-geometry substituted handles and wrong views, use
+fresh cold handles, and reject one-ULP controls/knots/trim/domain changes.
+Existing line/circle positive controls bypass the new reader entirely.
+
+Offline verification: 365 focused/adjacent tests passed in 7.33 s
+(`pytest-telemetry/run-mpmrqwgn`); Ruff and `git diff --check` passed. These are
+test-double/retained-data results, not a new native drawing invocation.
+
+After review, the main runner can use the existing owned full-recipe pilot with
+`--target crankshaft`; no new runner is introduced. It must still pass source
+and copy hashes, complete annotation inventory/content/attachment checks, native
+save, cold role and drawing checks, PDF/PNG output and visual inspection. A
+coefficient or curve-tag difference will remain explicit in the raw stage rows
+and fail rather than being classified harmless without evidence.
