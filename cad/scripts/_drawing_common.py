@@ -1199,7 +1199,12 @@ def add_surface_finish(
     draw.EditRebuild3()
     if symbol_xy is None:
         _validate_native_annotation(adapter, annotation, selected_entity, label=label)
-    elif entity is not None or edge_entity is not None:
+    # Native FACE placement must not bypass the positioned path's original
+    # entity, attachment type/count and owning-view checks. Position choice is
+    # independent of identity; MODEL faces retain exact source reverse mapping.
+    if (symbol_xy is not None or entity_type == "FACE") and (
+        entity is not None or edge_entity is not None
+    ):
         expected = entity if entity is not None else edge_entity
         _validate_explicit_annotation_attachment(
             adapter, annotation, view, expected, entity_type=entity_type,
