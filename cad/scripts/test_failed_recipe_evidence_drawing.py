@@ -16,6 +16,8 @@ from test_datum_policy_recipes_drawing import Adapter, fixture_sources
 from test_benchmark_drawing_recipes import recipe
 
 PDF_ONLY_EXPORT = printed.export_pdf_only
+DRAWING_SEMANTICS = probe._drawing_semantics
+RAW_COMPARE = probe.shoulder.compare_all_annotation_layout
 
 
 @pytest.fixture
@@ -32,6 +34,10 @@ def scene(native, monkeypatch):  # noqa: F811
     part = adapter.currentModel
     with adapter.ownership.creating_document(owned.DocumentKind.DRAWING, native.copy):
         model = Model(None, title="Failed diagnostic drawing", dirty=True)
+        model.GetCurrentSheet = lambda: SimpleNamespace(
+            GetName=lambda: "Sheet1",
+            GetProperties2=lambda: (3.0, 12.0, 1.0, 1.0, 0.0, 0.4318, 0.2794, 0.0),
+        )
         model.references = [part]
         native.app.documents.append(model)
         native.app.ActiveDoc = model
@@ -40,10 +46,28 @@ def scene(native, monkeypatch):  # noqa: F811
     drawing = {
         "semantics": {"checked": {"face": "geometry"}},
         "layout": {"view": "same"},
-        "annotations": {"front/dimension": {"measurement": {"body": [1, 2, 3, 4]}}},
+        "annotations": {
+            "front/dimension": {
+                "semantic": {"kind": 4},
+                "generic": {"lines": [[1, 2], [3, 4]]},
+                "position": (1, 2, 0),
+                "measurement": {"body": [1, 2, 3, 4]},
+            }
+        },
     }
-    witness = Mock(return_value=(drawing, {"dimension": (annotation, dimension)}))
-    monkeypatch.setattr(probe, "_drawing_witness", witness, raising=False)
+    witness = Mock(
+        return_value=(
+            drawing["annotations"],
+            {"front/dimension": (annotation, dimension)},
+        )
+    )
+    monkeypatch.setattr(probe.shoulder, "all_annotation_layout", witness)
+    monkeypatch.setattr(
+        probe, "_drawing_semantics", Mock(return_value=drawing["semantics"])
+    )
+    monkeypatch.setattr(probe.attachments, "layout", lambda _: drawing["layout"])
+    monkeypatch.setattr(probe.attachments, "check_layout", lambda *args: None)
+    monkeypatch.setattr(probe.attachments, "compare", lambda *args: None)
     source = {"configuration": "Default", "dimensions": {"Width": 0.1}}
     source_witness = Mock(return_value=(source, {"Width": dimension}))
     monkeypatch.setattr(probe, "source_dimensions", source_witness)
@@ -127,6 +151,41 @@ def test_real_pdf_only_helper_receives_empty_native_target(scene, monkeypatch):
     assert not scene.native.app.closes
 
 
+def test_unsaved_semantic_rejection_retains_raw_measurements_and_independent_checks(
+    scene, monkeypatch
+):
+    annotations = scene.witness.return_value[0]
+    raw = Mock(return_value=(annotations, scene.witness.return_value[1]))
+    monkeypatch.setattr(probe, "_drawing_semantics", DRAWING_SEMANTICS)
+    monkeypatch.setattr(probe.shoulder, "all_annotation_layout", raw)
+    semantic_error = RuntimeError(
+        "drawing_reference owner rejected RD1@Drawing View1@Draw52.Drawing"
+    )
+    semantics = Mock(side_effect=semantic_error)
+    monkeypatch.setattr(probe.attachments, "snapshot", semantics)
+    monkeypatch.setattr(probe.attachments, "layout", lambda _: {"view": "unchanged"})
+    monkeypatch.setattr(probe.attachments, "check_layout", lambda *args: None)
+    result = retain(scene)
+    assert result["before"]["drawing"]["annotations"] == annotations
+    assert result["after"]["drawing"]["annotations"] == annotations
+    assert result["before"]["source"] == result["after"]["source"]
+    assert result["completeness"] == "partial"
+    assert result["raw_preservation"] == "unchanged"
+    assert result["source_preservation"] == "unchanged"
+    assert result["document_preservation"] == result["hash_preservation"] == "unchanged"
+    assert "semantic_preservation" not in result
+    assert {item["phase"] for item in result["errors"]} == {
+        "before.semantics",
+        "after.semantics",
+    }
+    assert all(repr(semantic_error) == item["error"] for item in result["errors"])
+    assert (
+        scene.trial["status"] == "failed"
+        and result["primary_error"] == scene.trial["error"]
+    )
+    assert raw.call_count == semantics.call_count == 2
+
+
 @pytest.mark.parametrize(
     "wrong", ["active", "current", "kind", "other_owned", "hidden"]
 )
@@ -168,7 +227,10 @@ def test_evidence_phase_failure_is_retained_without_masking_primary(scene, failu
     if failure == "png":
         scene.render.side_effect = RuntimeError("render rejected")
     result = retain(scene)
-    assert any(item["phase"] == failure for item in result["errors"])
+    expected_phase = (
+        f"{failure}.annotations" if failure in {"before", "after"} else failure
+    )
+    assert any(item["phase"] == expected_phase for item in result["errors"])
     assert result["primary_error"] == scene.trial["error"]
     assert scene.trial["status"] == "failed"
     assert "document_after" in result and "hashes_after" in result
@@ -197,10 +259,7 @@ def test_export_mutation_is_reported_not_accepted(scene, mutation):
             )
         if mutation == "ink":
             original, handles = scene.witness.return_value
-            scene.witness.return_value = (
-                {**original, "annotations": {"moved": "ink"}},
-                handles,
-            )
+            scene.witness.return_value = ({**original, "moved": "ink"}, handles)
         if mutation == "active":
             scene.native.app.ActiveDoc = scene.user
 
@@ -240,6 +299,77 @@ def test_source_dispatch_is_bound_before_native_document_state_reads(
     assert all(
         call.args[0] is scene.part for call in scene.source_witness.call_args_list
     )
+
+
+def test_raw_handle_replacement_is_rejected_even_with_identical_exported_rows(
+    scene, monkeypatch
+):
+    monkeypatch.setattr(probe.shoulder, "compare_all_annotation_layout", RAW_COMPARE)
+    records, handles = scene.witness.return_value
+
+    def replacing_export(_, path):
+        path.write_bytes(b"PDF")
+        scene.witness.return_value = (
+            records,
+            {"front/dimension": (object(), handles["front/dimension"][1])},
+        )
+
+    scene.export.side_effect = replacing_export
+    result = retain(scene)
+    assert (
+        result["before"]["drawing"]["annotations"]
+        == result["after"]["drawing"]["annotations"]
+    )
+    errors = [item for item in result["errors"] if item["phase"] == "raw_preservation"]
+    assert len(errors) == 1 and "identity" in errors[0]["error"]
+    assert result["completeness"] == "partial"
+    assert result["source_preservation"] == "unchanged"
+
+
+@pytest.mark.parametrize("field", ["annotations", "source", "sheet", "layout"])
+def test_semantic_rejection_does_not_disable_other_independent_export_guards(
+    scene, monkeypatch, field
+):
+    monkeypatch.setattr(
+        probe, "_drawing_semantics", Mock(side_effect=RuntimeError("unsaved owner"))
+    )
+
+    def changed_export(_, path):
+        path.write_bytes(b"PDF")
+        if field == "annotations":
+            raw, handles = scene.witness.return_value
+            scene.witness.return_value = (
+                {**raw, "unexpected": {"ink": "changed"}},
+                handles,
+            )
+        if field == "source":
+            values, handles = scene.source_witness.return_value
+            scene.source_witness.return_value = (
+                {**values, "dimensions": {"Width": 0.2}},
+                handles,
+            )
+        if field == "sheet":
+            scene.model.GetCurrentSheet = lambda: SimpleNamespace(
+                GetName=lambda: "Sheet1",
+                GetProperties2=lambda: (3.0, 12.0, 1.0, 2.0, 0.0, 0.4318, 0.2794, 0.0),
+            )
+        if field == "layout":
+            monkeypatch.setattr(
+                probe.attachments, "layout", lambda _: {"view": "moved"}
+            )
+
+    def check_layout(first, last, *_):
+        assert first == last
+
+    monkeypatch.setattr(probe.attachments, "check_layout", check_layout)
+    scene.export.side_effect = changed_export
+    result = retain(scene)
+    label = "raw" if field == "annotations" else field
+    assert any(item["phase"] == f"{label}_preservation" for item in result["errors"])
+    assert result["completeness"] == "partial"
+    assert "semantic_preservation" not in result
+    assert result["document_preservation"] == result["hash_preservation"] == "unchanged"
+    assert scene.witness.call_count == scene.source_witness.call_count == 2
 
 
 @pytest.mark.parametrize("checkpoint_failure", ["pilot", "evidence"])
