@@ -211,3 +211,56 @@ repair was exercised by the actual `CATSTART` launch: initiated 2026-09-06
 31860 with no open documents and no blocking modal. This is a successful cold
 launch observation without the earlier CEF error, not proof about the unsaved
 Draw2 contents or a fleet launch-failure rate.
+
+## Corrected full rocker recipe — native placement passed, title gate failed
+
+The next functional run at `890e3045a6d91f175aa39efec9b60a69bbada817`
+completed the corrected rocker recipe in **58.5628034 s**, producing its native
+SLDDRW, PDF and PNG. This is one functional observation, not a paired speedup
+measurement. Receipt: `cad/out/reports/datum-policy-q5r9j0wd/pilot.json`, SHA-256
+`c08535c80ecf1b3c303ef1bb362704254a82af19e4fb0d38a40f771f7c8b69f3`;
+document-ownership evidence is adjacent in `ownership.json`.
+
+The corrected planner and final native collision checks passed. Visual inspection
+of the generated PNG confirms the RD3 BASIC `8.46` extension line no longer
+intersects the tolerance frame: the frame now sits to its right. This establishes
+the repair for this complete recipe, not a fleet-wide collision guarantee.
+
+The drawing witness captured 60 annotations, eight supported geometry attachments,
+four dimension values/tolerance types and seven explicitly excluded geometry
+records. Cold reopen preserved the checked attachment/dimension semantics and
+view layout. The cold-only numerical comparator accepted 187 coordinate-roundoff
+leaves and rejected exactly three leaves, all representations of the linked title
+text's X origin: generic text position, measurement text-run position and native
+text-run position. Each moves from `0.35389179984999647` to
+`0.3611170096970891` m, the already reproduced **7.225209847 mm** title shift.
+No manufacturing annotation position was relaxed to accept that movement.
+
+Consequently the combined diagnostic still **failed** its strict cold-reopen
+contract and stopped before running the lever. The source's post-recipe named
+parameters and native identities passed, but its later cold-reopened standalone
+parameter stage was not reached. The four original/root-guard files remained
+byte-exact; the owned rocker source copy also retained SHA-256
+`3bfb6da45b91e5a73b24c74baf81141899149e3c327aa943930baed3fba4d4a0`
+through recipe, close and final cleanup. Ownership began and ended with no open
+documents, with no cleanup error and no save of a source part.
+
+Four isolated fresh-drawing controls did not remove the title movement: redraw,
+`EditRebuild3`, same-value justification followed by redraw, and
+`ForceRebuild3(False)`. Their receipts and limits are recorded in
+[fresh-linked-title-control.md](fresh-linked-title-control.md). None was added to
+the production finalizer. Requiring identical initial/reopened linked-title
+positions is stronger than the user's permission for native layout changes; the
+question of accepting checked title-cell reflow is open. The existing strict gate
+has not been weakened while that choice is unresolved.
+
+Offline verification at `890e3045`: the seven selected COM-free doit gates exited
+successfully; `check:recipe` ran **3,077 tests in 44.82 s**, and six other gates
+were already current. At `56d239b1`, the prepared-template, fresh-title and layout
+dependency suites ran **211 tests in 3.25 s**. These are not substitutes for the
+full native pipeline merge gate.
+
+After the isolated prepared-template helpers were integrated, the same seven-gate
+command at `56d239b1` again exited successfully: `check:recipe` ran **3,128 tests
+in 47.58 s**, with the other six gates current. Pytest telemetry is retained at
+`cad/out/reports/pytest-telemetry/run-k5sydj7v`.
