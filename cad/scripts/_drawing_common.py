@@ -4860,21 +4860,29 @@ async def finalize_drawing(
         sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
         if sheet is None:
             raise RuntimeError(f"drawing sheet {sheet_name!r} has no ISheet")
-        # Inserting a model view lets SolidWorks auto-drift the SHEET scale off
-        # the 1:1 the template pinned (each view still carries its own explicit
-        # scale), so re-pin it once here before asserting the contract.
-        if not sheet.SetScale(float(scale[0]), float(scale[1]), False, False):
-            raise RuntimeError(
-                f"failed to set final drawing sheet {sheet_name!r} scale"
-            )
-        assert_asme_b_sheet(
-            adapter, sheet, phase=f"before save {sheet_name}", scale=scale
-        )
         properties = list(adapter._get_attr_or_call(sheet, "GetProperties2") or [])
         if len(properties) < 8:
             raise RuntimeError(
                 f"sheet {sheet_name!r} has incomplete properties: {properties!r}"
             )
+        # Model-view insertion can change the sheet ratio. SetScale is needed
+        # only when the native numerator/denominator differ, not for an exact
+        # no-op; even equivalent ratios must retain the requested pair.
+        if properties[2:4] != [float(scale[0]), float(scale[1])]:
+            if not sheet.SetScale(float(scale[0]), float(scale[1]), False, False):
+                raise RuntimeError(
+                    f"failed to set final drawing sheet {sheet_name!r} scale"
+                )
+            # The property-source correction below must not restore the old
+            # scale from the pre-setter array.
+            properties = list(adapter._get_attr_or_call(sheet, "GetProperties2") or [])
+            if len(properties) < 8:
+                raise RuntimeError(
+                    f"sheet {sheet_name!r} has incomplete properties: {properties!r}"
+                )
+        assert_asme_b_sheet(
+            adapter, sheet, phase=f"before save {sheet_name}", scale=scale
+        )
         if bool(properties[7]):
             # PasteSheet preserves the source sheet's "same as sheet specified
             # in Document Properties" flag. In that mode SolidWorks silently
