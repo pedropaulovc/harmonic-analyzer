@@ -62,11 +62,18 @@ def _reference(extension, entity, records, name):
         observation.update(_raw_return(raw))
     except Exception as error:
         observation["observation_error"] = repr(error)
-    # Keep the original validator, including rejection of wrapped/nested arrays.
+    # Only supported byte containers are decoded; wrapped/nested arrays fail.
     return _byte_reference(raw)
 
 
 def _byte_reference(raw):
+    if isinstance(raw, memoryview):
+        try:
+            if raw.ndim != 1 or raw.format != "B" or raw.itemsize != 1 or not raw.contiguous or raw.nbytes == 0:
+                raise RuntimeError("native persistent reference is not a nonempty contiguous unsigned-byte view")
+            return tuple(raw)
+        except ValueError as error:
+            raise RuntimeError("native persistent reference memoryview is released") from error
     if not isinstance(raw, (tuple, list, bytes)) or not raw:
         raise RuntimeError("native persistent reference is empty or has the wrong type")
     if any(type(value) is not int or not 0 <= value <= 255 for value in raw):
