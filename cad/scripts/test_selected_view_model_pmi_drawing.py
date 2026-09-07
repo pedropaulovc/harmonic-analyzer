@@ -164,10 +164,50 @@ def test_front_resolved_from_unique_native_orientation_not_view_order(names):
     handles = {name: object() for name in names}
     rows = {name: {"orientation": "*Front"} for name in names}
     if len(names) == 1:
-        assert probe.front_view(handles, rows) is handles["Front"]
+        assert probe.orientation_view(handles, rows, "*Front") is handles["Front"]
     else:
         with pytest.raises(RuntimeError, match="not unique"):
-            probe.front_view(handles, rows)
+            probe.orientation_view(handles, rows, "*Front")
+
+
+@pytest.mark.parametrize("orientation", ["*Front", "*Top", "*Right"])
+def test_explicit_orientation_selects_native_view_not_array_position(orientation):
+    rows = {
+        "Arbitrary 31": {"orientation": "*Right"},
+        "Arbitrary 17": {"orientation": "*Front"},
+        "Arbitrary 2": {"orientation": "*Top"},
+    }
+    handles = {name: object() for name in rows}
+    expected = next(
+        name for name, row in rows.items() if row["orientation"] == orientation
+    )
+    assert probe.orientation_view(handles, rows, orientation) is handles[expected]
+
+
+def test_unknown_orientation_does_not_guess_an_available_view():
+    with pytest.raises(ValueError, match="unsupported"):
+        probe.orientation_view(
+            {"Front": object()}, {"Front": {"orientation": "*Front"}}, "Front"
+        )
+
+
+def test_parent_forwards_explicit_orientation_to_native_worker(tmp_path, monkeypatch):
+    import sys
+
+    source = tmp_path / "transgear-stub.SLDPRT"
+    source.write_bytes(b"pinned source")
+    monkeypatch.setenv("HARMONIC_DIAGNOSTIC_SW_PID", "123")
+    monkeypatch.setenv("HARMONIC_SW_AUTOSTART", "0")
+    monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "off")
+    native_parent = Mock()
+    monkeypatch.setitem(sys.modules, "dodo", SimpleNamespace(_run=native_parent))
+    assert (
+        probe.main([str(source), "--expected-pid", "123", "--orientation", "*Right"])
+        == 0
+    )
+    command = native_parent.call_args.args[0]
+    assert command[command.index("--orientation") + 1] == "*Right"
+    assert native_parent.call_args.kwargs["com"] is True
 
 
 @pytest.mark.parametrize("failure", ["pid_missing", "autostart", "remote"])
@@ -192,7 +232,8 @@ def test_parent_environment_fails_before_native_wrapper(tmp_path, monkeypatch, f
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "mode", ["passed", "missing_pmi", "cold_title", "copy_saved", "view_creation_failed"]
+    "mode",
+    ["passed", "missing_pmi", "cold_title", "copy_saved", "view_creation_failed"],
 )
 async def test_owned_control_exports_failures_but_never_saves_original_or_ignores_copy_drift(
     native,  # noqa: F811 - imported pytest fixture
