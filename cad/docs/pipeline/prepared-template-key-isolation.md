@@ -104,3 +104,28 @@ checkpoints. Owned cleanup succeeded and restored only the original clean,
 visible pivot part/drawing; final runtime guards were empty. These two different
 scale specifications validate the extracted native preparation boundary. They
 do not replace the final all-drawing build or establish an A/B fleet speedup.
+
+## Exact no-op scale guard at `86256eaf`
+
+The finalizer now reads the native scale before setting it. An exact matching
+numerator/denominator skips SetScale; a differing pair still uses the original
+False/False annotation flags and fresh post-setter properties. Full ASME-B
+validation and explicit property-source correction remain mandatory. The normal
+blank initializer is unchanged. Nineteen new regression cases and all existing
+assertions pass; full `check:recipe` passed 4,999 tests in 86.04 s
+(`pytest-telemetry/run-h_6op571`).
+
+The same owned prepared pivot/rocker run passed native, cold and visual checks:
+`datum-policy-4chsu8_0/pilot.json`, SHA-256
+`e335582e80eac9858ae4fec247344ea30a8925ed916b5429fafe52e180482239`.
+Recipe times were 21.054/87.754 s and the combined diagnostic took 331.683 s;
+these single-run timings do not establish a speedup. Both PNGs are byte-identical
+to the preceding `8xtdrxmd` run (pivot `3f9218f9de922a1947de54f27a7995ff6745831a1203d685018f0d84f95bd54f`,
+rocker `3ff2482846b27b64e772d0b8d936de6de464941aa4f789ca7a4da61c62e2a179`).
+Cold comparison again rejected nothing: pivot was exact; rocker retained the
+same 187 coordinate-only differences, at most 1.943e-16 m. Original/copy hashes,
+baseline documents, cleanup and final guards all passed.
+
+The actual 1:1 and 1:2 preparation keys stayed identical to the prior native run,
+despite this `_drawing_common.py` edit. Thus the extracted cache boundary also
+survives a real finalizer change, not just the substituted-digest unit test.
