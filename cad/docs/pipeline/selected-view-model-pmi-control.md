@@ -320,3 +320,47 @@ and ownership/hash guards. Native True cannot pass a no-op, touching frames or
 changed semantics. Printed readability remains a separate required inspection;
 the receipt keeps `visual_review=pending`. The 313 option has offline coverage
 only until a separately authorized frozen native run.
+
+### 313 native result: machine checks passed, visual acceptance failed
+
+At `db33e21f` / adapter `e77bfda4` / PID31860, command 313 was enabled and
+returned True in 1.069610 s on the exact imported types13/13/36 bank. All machine,
+manufacturing, source, attachment, save/export and cold-reopen checks passed;
+the FCF pair's measured gap was **2.7344607728 mm**. The diagnostic took
+83.2161434 s, not a production recipe timing or speed comparison.
+
+Receipt `selected-view-pmi-cekzu9_u/observations.json`, SHA-256
+`717f72bf504c857eaae2b59c5204632a5e6fe5a8033d7837efffeec6455476bf`,
+retains `status=passed` for those machine checks and `visual_review=pending`.
+Its raw receipt remains unchanged. Independent inspection of `initial.png`
+rejects the layout: the two FCFs no longer overlap each other, but shaft edges
+still cross their frames/text. **This is not a publishable or accepted production
+drawing.** Pairwise body separation is not model-ink separation; the separate
+visual gate remains necessary.
+
+## Standalone Auto Arrange alternative on actual imported PMI
+
+The next option is `--orientation '*Right' --arrangement auto-arrange`.
+It uses `swCommands_AutoArrangeDimension` (2976) **instead of either 313 or 317**
+on a fresh two-GTol/one-datum imported bank. There is exactly one native command,
+with no earlier spacing command, coordinate setter, retry or fallback. The
+default no-command path and both standalone spacing controls remain available.
+
+The bundled `swCommands_e` explicitly lists 2976 as valid for multiple selected
+annotations **or** dimensions. The older `probe_gtol_commands.py` enumerates
+view-owned kind 5 GTol-only banks, so its result does not establish behavior for
+this exact real mixed imported bank. The retained root selected-view receipts
+contain commands 317 and 313 but no 2976 attempt before this option.
+
+The documented [IsCommandEnabled](https://help.solidworks.com/2026/english/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.ISldWorks~IsCommandEnabled.html)
+receives the command ID and reports current enablement; it does not promise
+that every annotation combination enables the command. The existing control
+checks it once **after** exact view activation and selected types/identities.
+False records that this context is disabled and stops before any command; it
+does not trigger a fallback or prove that the API is unavailable generally.
+[RunCommand](https://help.solidworks.com/2026/english/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.ISldWorks~RunCommand.html)
+receives `(2976, "")`; True reports execution, not useful layout. All actual
+movement, pairwise body clearance, semantic/source/attachment, unselected-ink,
+save/cold/export, hash and ownership checks remain unchanged. Model-ink conflicts
+still require the visual inspection above. This variant adds no measurements or
+acceptance exemptions and is native-untested until a coordinated frozen run.
