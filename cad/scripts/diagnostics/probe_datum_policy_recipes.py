@@ -10,6 +10,13 @@ and final gates run unchanged; the reviewed benchmark loader redirects SOURCE
 and OUTPUTS before defaults/aliases are evaluated. This is a functional pilot,
 not an ABBA speed benchmark or a full doit merge gate.
 
+--datum-initial-measurement selects FRESH (default) or REUSE_POST_POLICY through
+one trial-local project-layout binding installed before recipe execution. It
+changes no production recipe/default. Layout time is nested in recipe time;
+never add them. Timings remain performance observations if a later cold witness
+fails, not successful-drawing or speedup claims. The existing handoff span
+includes registration, inventory boundaries and initial semantic reads.
+
 Original source files are disk-read only, never opened. Each recipe uses a
 unique-basename exact bytecopy in its registered diagnostic directory. Native
 imported callout formatting can mutate the copied source display in memory (the
@@ -38,6 +45,8 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "cad/scripts"))
 
 from _common import _early_bound, check  # noqa: E402
+from _drawing_native_callouts import DatumInitialMeasurement  # noqa: E402
+from _drawing_project_layout import repair_project_drawing_layout  # noqa: E402
 from channel_lever_spec import DRAWING_DIMENSIONS, SOURCE_BASIC_DIMENSIONS  # noqa: E402
 from rocker_arm_notes import DRAWING_DIMENSIONS as ROCKER_DIMENSIONS  # noqa: E402
 from diagnostics import benchmark_drawing_recipes as benchmark  # noqa: E402
@@ -223,10 +232,68 @@ def compare_drawing_reopen(before, after):
     return compare_reopened_annotations(before["annotations"], after["annotations"])
 
 
+def measured_layout(variant, trial):
+    """Forward exactly one production call, adding only the selected option."""
+    if not isinstance(variant, DatumInitialMeasurement):
+        raise ValueError("datum measurement variant must use the explicit enum")
+
+    def layout(*args, **kwargs):
+        trial["layout_invocations"] = trial.get("layout_invocations", 0) + 1
+        if trial["layout_invocations"] != 1:
+            raise RuntimeError("selected diagnostic layout must run exactly once")
+        if "datum_initial_measurement" in kwargs:
+            raise ValueError("recipe already supplies a datum measurement option")
+        row = {"variant": variant.value, "status": "running"}
+        trial.setdefault("layout_calls", []).append(row)
+        with _telemetry.span(
+            "diagnostic.datum_policy.layout",
+            target=trial["target"],
+            datum_initial_measurement=variant.value,
+        ) as span:
+            context = span.get_span_context()
+            row.update(
+                trace_id=f"0x{context.trace_id:032x}",
+                span_id=f"0x{context.span_id:016x}",
+            )
+            started = time.perf_counter()
+            try:
+                result = repair_project_drawing_layout(
+                    *args, **kwargs, datum_initial_measurement=variant
+                )
+                row["status"] = "passed"
+                return result
+            except Exception as error:
+                row.update(status="failed", error=repr(error))
+                raise
+            finally:
+                row["seconds"] = time.perf_counter() - started
+
+    return layout
+
+
+def require_layout_invocation(trial):
+    rows = trial.get("layout_calls", ())
+    if (
+        trial.get("layout_invocations") != 1
+        or len(rows) != 1
+        or rows[0]["status"] != "passed"
+    ):
+        raise RuntimeError("selected diagnostic layout must complete exactly once")
+
+
 async def pilot(
-    adapter, candidate, source_root, guard_root, output_root, *, targets=None
+    adapter,
+    candidate,
+    source_root,
+    guard_root,
+    output_root,
+    *,
+    targets=None,
+    datum_initial_measurement=DatumInitialMeasurement.FRESH,
 ):
     order = target_order(targets)
+    if not isinstance(datum_initial_measurement, DatumInitialMeasurement):
+        raise ValueError("datum measurement variant must use the explicit enum")
     output_root.mkdir(parents=True, exist_ok=True)
     directory = Path(tempfile.mkdtemp(prefix="datum-policy-", dir=output_root))
     adapter.ownership.register_directory(directory)
@@ -245,6 +312,9 @@ async def pilot(
         "candidate": candidate,
         "helper_revision": benchmark.revision("HEAD"),
         "order": order,
+        "datum_initial_measurement": datum_initial_measurement.value,
+        "timing_relationship": "layout seconds are nested within recipe_seconds; do not add; performance-only observations even if later cold validation fails",
+        "handoff_span": "drawing.callouts.post_datum_handoff",
         "trials": [],
         "scope": "one functional build per recipe; no speedup/full-pipeline claim",
         "source_witness_scope": "exact original/copy disk hashes and named recipe dimension identities/values/tolerances/BASIC; not full in-memory source immutability",
@@ -280,8 +350,13 @@ async def pilot(
             require_copy_hash(trial, "copied")
             checkpoint()
             module = benchmark.load_recipe(
-                candidate, target, trial_dir, source=copy_source
+                candidate,
+                target,
+                trial_dir,
+                source=copy_source,
+                layout=measured_layout(datum_initial_measurement, trial),
             )
+            trial["execution"] = module.execution_receipt
             await adapter.close_owned_documents()
             check(
                 "open exact owned source copy",
@@ -302,6 +377,7 @@ async def pilot(
                         DocumentKind.DRAWING, module.OUTPUTS.slddrw
                     ):
                         artifacts = await module.build(adapter)
+                require_layout_invocation(trial)
             finally:
                 trial["recipe_seconds"] = time.perf_counter() - started
                 checkpoint()
@@ -406,6 +482,12 @@ def main(argv=None):
     parser.add_argument("--report-root", type=Path, default=ROOT / "cad/out/reports")
     parser.add_argument("--candidate", default="HEAD")
     parser.add_argument(
+        "--datum-initial-measurement",
+        choices=tuple(item.value for item in DatumInitialMeasurement),
+        default=DatumInitialMeasurement.FRESH.value,
+        help="explicit initial-bounds variant; no production recipe/default changes",
+    )
+    parser.add_argument(
         "--target",
         action="append",
         choices=tuple(EXPECTED_PART_HASHES),
@@ -414,6 +496,7 @@ def main(argv=None):
     parser.add_argument("--worker", action="store_true")
     args = parser.parse_args(argv)
     order = target_order(args.target)
+    variant = DatumInitialMeasurement(args.datum_initial_measurement)
     require_owned_diagnostic_environment()  # before dodo._run in the parent
     candidate = benchmark.revision(args.candidate)
     source_root, guard_root = (
@@ -435,6 +518,8 @@ def main(argv=None):
                 str(args.report_root.resolve()),
                 "--candidate",
                 candidate,
+                "--datum-initial-measurement",
+                variant.value,
                 *(argument for target in order for argument in ("--target", target)),
                 "--worker",
             ],
@@ -451,6 +536,7 @@ def main(argv=None):
             guard_root,
             args.report_root.resolve(),
             targets=order,
+            datum_initial_measurement=variant,
         )
     )
 
