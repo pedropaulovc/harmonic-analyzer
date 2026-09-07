@@ -237,8 +237,27 @@ async def test_production_verifier_recipe_uses_real_nine_bank_observer_without_a
     )
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("error_type", [AssertionError, ValueError])
+async def test_owned_negative_case_does_not_accept_unrelated_setter_exceptions(
+    native, tmp_path, monkeypatch, error_type
+):
+    unexpected = error_type("unrelated test or programming failure")
+    with pytest.raises(error_type) as caught:
+        await owned_pilot_case(
+            native,
+            tmp_path,
+            monkeypatch,
+            saves.DrawingSave.LEGACY,
+            "setter_failure",
+            origin="diagnostic",
+            setter_error=unexpected,
+        )
+    assert caught.value is unexpected
+
+
 async def owned_pilot_case(
-    native, tmp_path, monkeypatch, save_variant, outcome, *, origin
+    native, tmp_path, monkeypatch, save_variant, outcome, *, origin, setter_error=None
 ):
     production = origin == "production"
     monkeypatch.setattr(pilot, "ORDER", ("alignment_pinion",))
@@ -258,7 +277,11 @@ async def owned_pilot_case(
     monkeypatch.setattr("_drawing_marks._early_bound", lambda value, _: value)
     monkeypatch.setattr("_drawing_native_callouts._early_bound", lambda value, _: value)
     part_saved, drawing_saved, events, parts, drawings, modules = {}, {}, [], [], [], []
-    primary = RuntimeError("source native setter failed")
+    primary = (
+        setter_error
+        if setter_error is not None
+        else RuntimeError("source native setter failed")
+    )
     raw = 0.008000000001785
     original_load = pilot.benchmark.load_recipe
 
@@ -496,8 +519,10 @@ async def owned_pilot_case(
     if outcome == "passed":
         await owned.owned_callback(native.adapter, callback)
     else:
-        with pytest.raises(Exception):
+        with pytest.raises(RuntimeError) as caught:
             await owned.owned_callback(native.adapter, callback)
+        if outcome == "setter_failure":
+            assert caught.value is primary
     (receipt,) = (tmp_path / "reports").glob("*/pilot.json")
     report = json.loads(receipt.read_text())
     trial = report["trials"][0]

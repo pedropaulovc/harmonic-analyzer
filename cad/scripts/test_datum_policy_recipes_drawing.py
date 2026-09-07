@@ -363,7 +363,9 @@ def test_real_candidate_recipes_have_pre_execution_source_and_output_contract(
     monkeypatch.setattr(
         probe.benchmark,
         "recipe_source",
-        lambda _, target: (probe.ROOT / f"cad/scripts/draw_{target}.py").read_text(),
+        lambda _, target: (probe.ROOT / f"cad/scripts/draw_{target}.py").read_text(
+            encoding="utf-8"
+        ),
     )
     for target in probe.ORDER:
         source = tmp_path / f"{target}.SLDPRT"
@@ -467,7 +469,7 @@ def test_drawing_witness_requires_every_view_to_reference_expected_owned_source(
         assert actual["semantics"] is semantics
         all_annotations.assert_called_once_with(adapter)
     else:
-        with pytest.raises(RuntimeError, match="owned source|view models"):
+        with pytest.raises(RuntimeError, match=r"owned source|view models"):
             probe.drawing_witness(adapter, source=source, configuration="Default")
         all_annotations.assert_not_called()
     snapshot.assert_called_once_with(adapter.currentModel, app=adapter.swApp)
@@ -571,7 +573,7 @@ async def test_owned_dirty_part_copies_preserve_real_baseline_lifecycle(
         await owned.owned_callback(native.adapter, callback)
     else:
         with pytest.raises(
-            RuntimeError, match="production final gate|source copy changed"
+            RuntimeError, match=r"production final gate|source copy changed"
         ):
             await owned.owned_callback(native.adapter, callback)
     assert len(built) == (2 if mode == "normal" else 1)
