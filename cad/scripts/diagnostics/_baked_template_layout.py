@@ -321,6 +321,56 @@ def validation_plan(notes, lines, changes):
     return result
 
 
+def blank_label_plan(notes, lines, changes):
+    """Only two static labels have source-independent authoring-fit acceptance.
+
+    This does not classify formula tokens as empty or relax the populated fit
+    functions. The blank has no source model, so native printed formula widths
+    cannot establish the eventual widths of resolved manufacturing values.
+    """
+    revisions = [
+        name for name, row in changes.items() if row["role"] == "revision_label"
+    ]
+    if len(revisions) != 1:
+        raise RuntimeError("blank authoring requires one planned static REV label")
+    revision = unique_note(notes, text="REV")
+    if revision != revisions[0] or notes[revision]["link"] != "REV":
+        raise RuntimeError("blank REV fit target differs from the exact static label")
+    number = unique_note(notes, text="DWG.  NO.")
+    if notes[number]["link"] != "DWG.  NO.":
+        raise RuntimeError("blank DWG label is not exact static content")
+    return {
+        revision: deepcopy(changes[revision]),
+        number: {
+            "role": "number_label",
+            "cell": cells.enclosing_cell(lines, notes[number]["position"]),
+        },
+    }
+
+
+def blank_phase_scope(notes):
+    """Retain all native formula ink; defer fit explicitly, never waive it."""
+    return {
+        "phase": "blank_four_note_persistence",
+        "geometric_acceptance": "static_REV_and_DWG_labels_only",
+        "unresolved_linked_field_fit": "deferred_until_owned_source_population",
+        "copyright_open_footer": "not_accepted_or_fixed",
+        "material_finish_crowding": "not_accepted_or_fixed",
+        "linked_fields": {
+            name: {
+                "link": row["link"],
+                "native_text": row["text"],
+                "extent_scope": row["extent_scope"],
+                "native_extent": row["extent"],
+                "native_display_counts": row["display"]["counts"],
+                "fit_status": "deferred",
+            }
+            for name, row in notes.items()
+            if "$PRP" in row["link"]
+        },
+    }
+
+
 def require_field_fit(notes, plan):
     """Resolved native field extents: each own cell plus 1 mm neighboring clearance."""
     boxes = {}

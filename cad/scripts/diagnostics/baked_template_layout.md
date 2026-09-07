@@ -21,16 +21,24 @@ properties remain exact. The transition allowlist permits only these planned
 anchors/justifications/heights and their resulting glyph origins/extents.
 Neither source dimensions nor part geometry enter this authoring operation.
 
-Resolved visible linked fields and neighboring PART/MATERIAL/FINISH/DWG/REV
-labels must fit their own measured cells. Native extents and PDF glyph boxes
-must retain at least **1 mm** pairwise clearance, an explicit diagnostic layout
-criterion, not a numeric tolerance. Other labels are preserved by raw snapshot
-and full-page print comparison. Unresolved links are excluded from geometry
-checks only when their complete native display/leader inventory proves zero
-ink; their links/anchors/full font definitions remain exact. Their raw empty
-extents remain in the report, but are not treated as stable content, following
-the separately reproduced zero-ink template-save behavior. Resolved fields
-still require strict extent equality.
+The **blank** authoring-fit gate covers the changed static REV label and the
+unchanged neighboring DWG label in their actual measured cells. Their native
+extents and PDF glyph boxes must retain at least **1 mm** pairwise clearance,
+an explicit diagnostic layout criterion, not a numeric tolerance. The generic
+populated `validation_plan` and `require_field_fit` guards remain strict and
+unchanged; the blank phase now has a separate, explicit static-label plan.
+
+All model-linked values, the copyright footer, and material/finish crowding
+remain **unaccepted**, not silently passed. The blank has no source model and
+actually displays nonempty `$PRPSHEET:{...}` formula tokens. Their full native
+ink, extents, text, links and font definitions remain exact persistence
+witnesses; their widths do not establish the eventual widths of resolved
+values. The receipt lists every linked field with raw text/counts/extents and
+`fit_status: deferred`. Missing static labels or unexpected dynamic content in
+those label roles still fail. All other notes are preserved by raw snapshot
+and full-page print comparison. Only independently proven zero-ink notes have
+observational empty extents, following the separately reproduced template-save
+behavior. Nonempty formula extents are never put in that exclusion.
 
 The copied template is saved through the already-positive native
 `IModelDoc2.SaveAs3(path,0,0)` shape, with raw integer return retained, fresh
@@ -98,10 +106,40 @@ native observations, outputs and combined primary/cleanup errors are retained
 under a fresh `baked-template-*` report directory. Failure never publishes over
 the original template, retries, resets or relaxes a comparison.
 
-No native run of this four-note diagnostic has yet been performed. Blank
-success cannot prove the widths of unresolved TITLE/DWG/REV/material values.
+The first native run at `36476676` stopped before PDF/save after the four
+intended mutations passed their exact transition check. Receipt
+`baked-template-pw1wlxw9/template-layout.json`, SHA-256
+`557b00d6b0f0dce1d0663c11f7ad1cdbe9a702b9fc15cf6de13fb6148e0b494d`,
+proves why the original blank-fit premise was too strong:
+
+- Copyright note `DetailItem320` occupies an open footer strip. Its candidate
+  left divider stops at Y=13.396414 mm above the Y=12.7 mm bottom border,
+  leaving a 0.696414 mm opening; there is no closed rectangular cell.
+- TITLE/Number/Revision visibly print unresolved formula tokens. Their native
+  extents overflow intended cells by 2.858 mm downward, 9.438 mm right and
+  26.804 mm right respectively. These are real captured blank ink, not empty
+  notes or a claim about populated manufacturing values.
+- The unchanged MATERIAL label straddles a divider. Existing Material/label
+  and Finish/label native gaps are only 0.704 mm and 0.352 mm. Neither is fixed
+  or accepted by narrowing the blank phase to its two static audited labels.
+
+The original template SHA remained
+`cbad80d25315dddc9bb5fefd690915c6f18fa7d181ac8c30d2f1408a980b55cc`;
+baseline/final native inventories were empty with no cleanup error. No DRWDOT
+or printed artifact was saved by that failed run. The retained native-token
+fixture is a Python diagnostic source, so the existing `diagnostics/*.py`
+source-scan enrollment invalidates the recipe gate on its edits. A regression
+asserts its presence in the actual gate inputs; no `dodo.py` edit was needed.
+It proves the original generic
+guards still reject those shapes and the blank plan selects only the two
+actual static labels, while retaining nonzero formula ink in its phase report.
+
+The corrected blank phase has not run natively yet. Blank success cannot prove
+the widths of unresolved TITLE/DWG/REV/material values.
 Next gates are setter-free normal-setup populated rocker and lever controls,
 full recipes with cold native/PDF/PNG comparison, and long-title/field fleet
-fit. Only after those and review may the copied DRWDOT replace the project
+fit. The open footer and material/finish defects must get explicit semantic
+region/layout policies and remain part of that acceptance, not bypasses.
+Only after those and review may the copied DRWDOT replace the project
 template. Its changed source bytes naturally invalidate prepared-template and
 drawing recipe keys; no per-recipe segment scan or layout setter is proposed.

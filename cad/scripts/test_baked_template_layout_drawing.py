@@ -388,7 +388,7 @@ def test_owned_blank_control_preserves_baseline_and_never_opens_a_model(
     monkeypatch.setattr(layout, "blank_snapshot", snapshot)
     monkeypatch.setattr(layout, "layout_plan", lambda *_: plan)
     monkeypatch.setattr(layout, "apply_layout", apply)
-    monkeypatch.setattr(layout, "validation_plan", lambda *_: plan)
+    monkeypatch.setattr(layout, "blank_label_plan", lambda *_: plan)
     monkeypatch.setattr(layout, "require_field_fit", lambda *_: {})
     monkeypatch.setattr(layout, "pdf_field_fit", lambda *_: {})
     monkeypatch.setattr(probe.defaults, "save_prepared_template", save)
@@ -425,6 +425,11 @@ def test_owned_blank_control_preserves_baseline_and_never_opens_a_model(
         assert templates[1].read_bytes() == b"new derived template"
         evidence = json.loads((path.parent / "ownership.json").read_text())
         assert str(templates[1]) in evidence["frozen_inputs"]
+        assert (
+            report["phase_scope"]["unresolved_linked_field_fit"]
+            == "deferred_until_owned_source_population"
+        )
+        assert report["phase_scope"]["copyright_open_footer"] == "not_accepted_or_fixed"
 
 
 def test_primary_and_cleanup_errors_are_both_retained(monkeypatch, tmp_path):
@@ -505,3 +510,65 @@ def test_blank_control_refuses_a_model_reference(monkeypatch):
     model = SimpleNamespace(GetViews=lambda: [[view]])
     with pytest.raises(RuntimeError, match="source model reference"):
         layout.blank_snapshot(SimpleNamespace(currentModel=model))
+
+
+def native_tokens():
+    from diagnostics._baked_template_native_tokens_fixture import DATA
+
+    return deepcopy(DATA)
+
+
+def test_retained_native_fixture_is_a_recipe_gate_dependency():
+    from pathlib import Path
+    import dodo
+
+    path = Path(__file__).resolve()
+    expected = path.parent / "diagnostics/_baked_template_native_tokens_fixture.py"
+    task = next(task for task in dodo.task_check() if task["name"] == "recipe")
+    assert str(expected) in task["file_dep"]
+
+
+def test_retained_blank_formula_ink_is_preserved_but_not_mistaken_for_resolved_fit():
+    retained = native_tokens()
+    notes, lines, changes = retained["notes"], retained["lines"], retained["changes"]
+    with pytest.raises(RuntimeError, match="nearest rules do not form a closed cell"):
+        layout.validation_plan(notes, lines, changes)
+    with pytest.raises(RuntimeError, match="does not fit"):
+        layout.require_field_fit(notes, changes)
+    # The separate blank contract checks actual static labels; neither the
+    # populated closed-cell guard nor its fit assertion has been weakened.
+    plan = layout.blank_label_plan(notes, lines, changes)
+    assert set(plan) == {"DetailItem263", "DetailItem264"}
+    layout.require_field_fit(notes, plan)
+    scope = layout.blank_phase_scope(notes)
+    title = scope["linked_fields"]["DetailItem245"]
+    assert title["native_text"] == "$PRPSHEET:{SW-Title(Title)}"
+    assert title["native_display_counts"]["Text"] > 0
+    assert title["extent_scope"] == "measured" and title["fit_status"] == "deferred"
+    assert (
+        scope["copyright_open_footer"]
+        == scope["material_finish_crowding"]
+        == "not_accepted_or_fixed"
+    )
+    # Formula glyphs remain load-bearing raw evidence, not an empty-note waiver.
+    before = {"notes": notes}
+    after = deepcopy(before)
+    after["notes"]["DetailItem245"]["extent"][0] += 1e-12
+    with pytest.raises(RuntimeError):
+        layout.require_equal(before, after, "raw blank cold")
+
+
+@pytest.mark.parametrize("mode", ["missing", "duplicate", "dynamic", "changed_name"])
+def test_blank_static_label_plan_never_ignores_missing_or_dynamic_labels(mode):
+    retained = native_tokens()
+    notes, lines, changes = retained["notes"], retained["lines"], retained["changes"]
+    if mode == "missing":
+        del notes["DetailItem264"]
+    if mode == "duplicate":
+        notes["other"] = deepcopy(notes["DetailItem264"])
+    if mode == "dynamic":
+        notes["DetailItem263"]["link"] = '$PRP:"REV"'
+    if mode == "changed_name":
+        changes["other"] = changes.pop("DetailItem263")
+    with pytest.raises(RuntimeError):
+        layout.blank_label_plan(notes, lines, changes)

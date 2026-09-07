@@ -59,7 +59,8 @@ async def transform(adapter, directory, report, checkpoint):
     checkpoint()
     layout.require_same_handles(adapter.swApp, handles, after_handles)
     layout.require_transition(report["before"], report["after"], report["plan"])
-    plan = layout.validation_plan(report["after"]["notes"], lines, report["plan"])
+    report["phase_scope"] = layout.blank_phase_scope(report["after"]["notes"])
+    plan = layout.blank_label_plan(report["after"]["notes"], lines, report["plan"])
     report["field_fit"] = layout.require_field_fit(report["after"]["notes"], plan)
     first = directory / "authored"
     first.mkdir()
@@ -99,7 +100,10 @@ async def transform(adapter, directory, report, checkpoint):
     layout.require_equal(
         report["saved"], report["reinstantiated"], "bare saved-template inheritance"
     )
-    cold_plan = layout.validation_plan(
+    report["inherited_phase_scope"] = layout.blank_phase_scope(
+        report["reinstantiated"]["notes"]
+    )
+    cold_plan = layout.blank_label_plan(
         report["reinstantiated"]["notes"], readback_lines, report["plan"]
     )
     report["inherited_field_fit"] = layout.require_field_fit(
