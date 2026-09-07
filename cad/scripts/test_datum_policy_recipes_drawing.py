@@ -10,8 +10,27 @@ import pytest
 
 from diagnostics import probe_datum_policy_recipes as probe
 from diagnostics import _owned_native_documents as owned
-from test_benchmark_drawing_recipes import recipe
+from test_benchmark_drawing_recipes import recipe as output_recipe
 from test_owned_native_documents_drawing import Model, native  # noqa: F401
+
+
+def recipe(source):
+    """The pilot now requires its exact project-layout import/call contract."""
+    return (
+        "from _drawing_project_layout import repair_project_drawing_layout\n"
+        + output_recipe(source).replace(
+            "    return await adapter.draw(OUTPUTS, SOURCE)",
+            "    repair_project_drawing_layout(adapter, views={})\n"
+            "    return await adapter.draw(OUTPUTS, SOURCE)",
+        )
+    )
+
+
+@pytest.fixture(autouse=True)
+def layout_stub(monkeypatch):
+    callback = Mock()
+    monkeypatch.setattr(probe, "repair_project_drawing_layout", callback)
+    return callback
 
 
 def fixture_sources(tmp_path, monkeypatch):
@@ -78,8 +97,9 @@ class Adapter:
 @pytest.mark.parametrize(
     "targets", [None, ("channel_lever",), tuple(reversed(probe.ORDER))]
 )
+@pytest.mark.parametrize("variant", list(probe.DatumInitialMeasurement))
 async def test_one_fresh_recipe_each_in_order_and_stop_first_failure(
-    tmp_path, monkeypatch, mode, targets
+    tmp_path, monkeypatch, mode, targets, variant
 ):
     expected_order = probe.ORDER if targets is None else targets
     source_root, guard_root = fixture_sources(tmp_path, monkeypatch)
@@ -139,7 +159,13 @@ async def test_one_fresh_recipe_each_in_order_and_stop_first_failure(
     output_root = tmp_path / "reports"
     if mode == "normal":
         result = await probe.pilot(
-            adapter, "candidate", source_root, guard_root, output_root, targets=targets
+            adapter,
+            "candidate",
+            source_root,
+            guard_root,
+            output_root,
+            targets=targets,
+            datum_initial_measurement=variant,
         )
         report_path = Path(result["report"])
     else:
@@ -151,11 +177,20 @@ async def test_one_fresh_recipe_each_in_order_and_stop_first_failure(
                 guard_root,
                 output_root,
                 targets=targets,
+                datum_initial_measurement=variant,
             )
         (report_path,) = output_root.glob("*/pilot.json")
     report = json.loads(report_path.read_text())
     assert len(adapter.drawn) == (len(expected_order) if mode == "normal" else 1)
     assert report["order"] == list(expected_order)
+    assert report["datum_initial_measurement"] == variant.value
+    assert "do not add" in report["timing_relationship"]
+    for trial in report["trials"]:
+        assert trial["layout_invocations"] == 1
+        assert trial["layout_calls"][0]["status"] == "passed"
+        assert trial["layout_calls"][0]["variant"] == variant.value
+        assert trial["layout_calls"][0]["seconds"] <= trial["recipe_seconds"]
+        assert trial["execution"]["layout_binding"] == "repair_project_drawing_layout"
     assert [trial["target"] for trial in report["trials"]] == list(
         expected_order[: len(adapter.drawn)]
     )
@@ -232,7 +267,8 @@ def test_repeatable_target_cli_keeps_exact_order(monkeypatch, tmp_path, targets,
     monkeypatch.setitem(sys.modules, "dodo", SimpleNamespace(_run=parent))
     received = []
 
-    async def pilot(*args, targets=None):
+    async def pilot(*args, targets=None, datum_initial_measurement=None):
+        assert datum_initial_measurement is probe.DatumInitialMeasurement.FRESH
         received.append(probe.target_order(targets))
         return 0
 
@@ -464,11 +500,13 @@ def test_drawing_witness_requires_every_view_to_reference_expected_owned_source(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("mode", ["normal", "build_failure", "copy_saved"])
+@pytest.mark.parametrize("variant", list(probe.DatumInitialMeasurement))
 async def test_owned_dirty_part_copies_preserve_real_baseline_lifecycle(
     native,  # noqa: F811 - imported pytest fixture
     tmp_path,
     monkeypatch,
     mode,
+    variant,
 ):
     source_root, guard_root = fixture_sources(tmp_path, monkeypatch)
     original_lever = Model(source_root / "channel-lever.SLDPRT", kind=1)
@@ -553,7 +591,12 @@ async def test_owned_dirty_part_copies_preserve_real_baseline_lifecycle(
 
         native.adapter.draw = draw
         return await probe.pilot(
-            adapter, "frozen", source_root, guard_root, tmp_path / "reports"
+            adapter,
+            "frozen",
+            source_root,
+            guard_root,
+            tmp_path / "reports",
+            datum_initial_measurement=variant,
         )
 
     if mode == "normal":
