@@ -3,8 +3,9 @@
 Create a project-template drawing with one Front view of an exact, uniquely
 named owned rocker-part bytecopy. Call the production finalizer unchanged.
 Diagnostic wrappers observe the late property and native/PDF save boundaries;
-the explicit candidate adds a redraw, one checked ordinary/forced rebuild, or reapplication
-of the title's existing horizontal justification plus its documented redraw,
+the explicit candidate adds a redraw, one checked ordinary/forced rebuild,
+reapplication of the title's existing horizontal justification plus its documented redraw,
+or one reapplication of its exact existing property-link expression without redraw,
 immediately before native SaveAs3. No position writes, geometry picks, other
 added rebuilds, default changes, or full recipe.
 
@@ -64,6 +65,7 @@ class Variant(StrEnum):
     EDIT_REBUILD = "pre_save_edit_rebuild"
     FORCE_REBUILD = "pre_save_force_rebuild"
     REJUSTIFY = "pre_save_rejustify"
+    RELINK = "pre_save_relink"
 
 
 def require_title_style(before, after):
@@ -79,6 +81,63 @@ def require_title_style(before, after):
         {field: after[field] for field in fields},
     ):
         raise RuntimeError("title link/justification/lock style changed")
+
+
+def title_font_format(annotation):
+    """Exact standard-title font definition; no setters or text measurement."""
+    if annotation.GetTextFormatCount() != 1:
+        raise RuntimeError("title relink requires one native font-format scope")
+    fmt = _early_bound(annotation.GetTextFormat(0), "ITextFormat")
+    if fmt is None:
+        raise RuntimeError("title relink has no native font definition")
+    row = {
+        name: getattr(fmt, name)
+        for name in (
+            "TypeFaceName",
+            "CharHeight",
+            "CharHeightInPts",
+            "BackWards",
+            "Bold",
+            "CharSpacingFactor",
+            "Escapement",
+            "Italic",
+            "LineLength",
+            "LineSpacing",
+            "ObliqueAngle",
+            "Strikeout",
+            "Underline",
+            "UpsideDown",
+            "Vertical",
+            "WidthFactor",
+        )
+    }
+    row["IsHeightSpecifiedInPts"] = fmt.IsHeightSpecifiedInPts()
+    row["GetUseDocTextFormat"] = annotation.GetUseDocTextFormat(0)
+    return json.loads(json.dumps(row, allow_nan=False))
+
+
+def require_relinked_title(before, after):
+    """Only native glyph placement/extent is an experimental treatment output."""
+    require_title_style(before, after)
+    fields = ("text", "position", "property_view", "unit_display", "relink_font_format")
+    if changed_leaves(
+        {field: before[field] for field in fields},
+        {field: after[field] for field in fields},
+    ):
+        raise RuntimeError("title relink changed text/anchor/source context")
+
+    def content(row):
+        generic = dict(row["generic"])
+        generic["texts"] = [
+            {field: value for field, value in text.items() if field != "position"}
+            for text in generic["texts"]
+        ]
+        return generic
+
+    if changed_leaves(content(before), content(after)):
+        raise RuntimeError(
+            "title relink changed native text content/format or primitives"
+        )
 
 
 def _finite(values, length, label):
@@ -182,6 +241,7 @@ class TitleObserver:
                 "after_pre_save_force_rebuild",
                 "after_pre_save_rejustify",
                 "after_pre_save_rejustify_redraw",
+                "after_pre_save_relink",
                 "after_native_save",
                 "before_pdf_export",
                 "after_pdf_export",
@@ -212,8 +272,14 @@ def finalizer_observations(adapter, observer, variant):
         drawing.save_drawing,
     )
     counts = {
-        "properties": 0, "drawing": 0, "pdf": 0,
-        "redraw": 0, "edit_rebuild": 0, "force_rebuild": 0, "justification": 0,
+        "properties": 0,
+        "drawing": 0,
+        "pdf": 0,
+        "redraw": 0,
+        "edit_rebuild": 0,
+        "force_rebuild": 0,
+        "justification": 0,
+        "linked_text": 0,
     }
 
     def properties(current, values):
@@ -243,7 +309,7 @@ def finalizer_observations(adapter, observer, variant):
                 raise RuntimeError("PDF must follow the one native drawing save")
             counts[kind] += 1
             phase = "native_save" if kind == "drawing" else "pdf_export"
-            observer.record(f"before_{phase}")
+            before = observer.record(f"before_{phase}")
             if kind == "drawing" and variant is Variant.REDRAW:
                 with _telemetry.span("diagnostic.fresh_title.redraw"):
                     current.currentModel.GraphicsRedraw2()  # Official void/no-arg form.
@@ -270,7 +336,9 @@ def finalizer_observations(adapter, observer, variant):
                         )
                 observer.record("after_pre_save_force_rebuild")
             if kind == "drawing" and variant is Variant.REJUSTIFY:
-                note = _early_bound(observer.annotation.GetSpecificAnnotation(), "INote")
+                note = _early_bound(
+                    observer.annotation.GetSpecificAnnotation(), "INote"
+                )
                 justification = int(note.GetTextJustification())
                 with _telemetry.span("diagnostic.fresh_title.rejustify"):
                     # INote.SetTextJustification is void. Preserve the existing
@@ -282,6 +350,26 @@ def finalizer_observations(adapter, observer, variant):
                     counts["redraw"] += 1
                     current.currentModel.GraphicsRedraw2()
                     observer.record("after_pre_save_rejustify_redraw")
+            if kind == "drawing" and variant is Variant.RELINK:
+                note = _early_bound(
+                    observer.annotation.GetSpecificAnnotation(), "INote"
+                )
+                linked_text = note.PropertyLinkedText
+                if linked_text != TITLE_LINK or linked_text != before["linked_text"]:
+                    raise RuntimeError(
+                        "title relink lost the exact existing property expression"
+                    )
+                with _telemetry.span("diagnostic.fresh_title.relink"):
+                    before["relink_font_format"] = title_font_format(
+                        observer.annotation
+                    )
+                    # PropertyLinkedText is a property PUT, not SetText's boolean
+                    # method. Its documentation imposes no extra redraw/rebuild.
+                    counts["linked_text"] += 1
+                    note.PropertyLinkedText = linked_text
+                    after = observer.record("after_pre_save_relink")
+                    after["relink_font_format"] = title_font_format(observer.annotation)
+                    require_relinked_title(before, after)
             with artifact_context(kind, target) if artifact_context else nullcontext():
                 yield
             observer.record(f"after_{phase}")
@@ -300,6 +388,7 @@ def finalizer_observations(adapter, observer, variant):
             "edit_rebuild": int(variant is Variant.EDIT_REBUILD),
             "force_rebuild": int(variant is Variant.FORCE_REBUILD),
             "justification": int(variant is Variant.REJUSTIFY),
+            "linked_text": int(variant is Variant.RELINK),
         }
         if counts != expected:
             raise RuntimeError(
@@ -455,6 +544,9 @@ async def one_trial(adapter, variant, source, directory, report, checkpoint, exp
             observer.record("after_front_view")
             observer.record("before_finalizer_properties")
             with finalizer_observations(adapter, observer, variant) as counts:
+                trial["call_counts"] = (
+                    counts  # Retain attempted calls if a native guard fails.
+                )
                 artifacts = await drawing.finalize_drawing(
                     adapter,
                     outputs,
@@ -505,6 +597,14 @@ async def one_trial(adapter, variant, source, directory, report, checkpoint, exp
         cold = TitleObserver(adapter, cold_trial, checkpoint)
         cold_open = cold.record("cold_open")
         require_title_style(trial["title_stages"][-1], cold_open)
+        if variant is Variant.RELINK:
+            cold_open["relink_font_format"] = title_font_format(cold.annotation)
+            treatment = next(
+                row
+                for row in trial["title_stages"]
+                if row["stage"] == "after_pre_save_relink"
+            )
+            require_relinked_title(treatment, cold_open)
         trial["reopened"], cold_handles = retained.capture_drawing(
             adapter, copy_source, trial["source_before"]["configuration"]
         )
@@ -643,7 +743,13 @@ def main(argv=None):
     parser.add_argument(
         "--candidate",
         type=Variant,
-        choices=(Variant.REDRAW, Variant.EDIT_REBUILD, Variant.FORCE_REBUILD, Variant.REJUSTIFY),
+        choices=(
+            Variant.REDRAW,
+            Variant.EDIT_REBUILD,
+            Variant.FORCE_REBUILD,
+            Variant.REJUSTIFY,
+            Variant.RELINK,
+        ),
         required=True,
     )
     parser.add_argument("--worker", action="store_true")
