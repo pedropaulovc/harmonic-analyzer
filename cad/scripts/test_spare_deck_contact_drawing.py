@@ -234,6 +234,7 @@ async def test_primary_cleanup_and_hash_failures_all_remain_in_receipt(
         hashes={str(source): probe.digest(source)},
         open=AsyncMock(),
         close=AsyncMock(side_effect=cleanup),
+        inventory=Mock(return_value={}),
         input_evidence=lambda: {str(source): {"status": "unreadable"}},
     )
     monkeypatch.setattr(probe, "OwnedAssembly", lambda *_: owner)
@@ -270,6 +271,7 @@ async def test_final_checkpoint_failure_preserves_native_error_and_cleanup(
         hashes={str(source): probe.digest(source)},
         open=AsyncMock(),
         close=AsyncMock(),
+        inventory=Mock(return_value={}),
         input_evidence=lambda: {str(source): {"status": "unchanged"}},
     )
     monkeypatch.setattr(probe, "OwnedAssembly", lambda *_: owner)
@@ -287,6 +289,49 @@ async def test_final_checkpoint_failure_preserves_native_error_and_cleanup(
     assert caught.value.exceptions == (
         (primary, write_error) if outcome == "failed" else (write_error,)
     )
+    owner.close.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("inventory_result", ["empty", "read_error"])
+async def test_final_inventory_receipt_requires_actual_native_read(
+    monkeypatch, tmp_path, inventory_result
+):
+    monkeypatch.setattr(probe, "ROOT", tmp_path)
+    source = tmp_path / "cad/out/sldasm/harmonic-analyzer.SLDASM"
+    source.parent.mkdir(parents=True)
+    source.write_bytes(b"native source fixture")
+    read_error = RuntimeError("final inventory unavailable")
+    owner = NS(
+        hashes={str(source): probe.digest(source)},
+        open=AsyncMock(),
+        close=AsyncMock(),
+        inventory=Mock(
+            side_effect=[{}, read_error if inventory_result == "read_error" else {}]
+        ),
+        input_evidence=lambda: {str(source): {"status": "unchanged"}},
+    )
+    monkeypatch.setattr(probe, "OwnedAssembly", lambda *_: owner)
+    monkeypatch.setattr(probe, "document_state", lambda _: {"model": "clean"})
+    monkeypatch.setattr(probe, "contact", Mock())
+    monkeypatch.setattr(probe, "checkpoint", Mock())
+    report = {}
+    if inventory_result == "read_error":
+        with pytest.raises(ExceptionGroup) as caught:
+            await probe.measure(
+                object(), report, tmp_path / "contact.json", probe.digest(source)
+            )
+        assert caught.value.exceptions == (read_error,)
+        assert "final_inventory" not in report
+        assert report["status"] == "failed"
+    if inventory_result == "empty":
+        await probe.measure(
+            object(), report, tmp_path / "contact.json", probe.digest(source)
+        )
+        assert report["final_inventory"] == []
+        assert report["status"] == "passed"
+    assert report["baseline_inventory"] == []
+    assert owner.inventory.call_count == 2
     owner.close.assert_awaited_once()
 
 

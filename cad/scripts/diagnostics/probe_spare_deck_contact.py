@@ -392,7 +392,9 @@ async def measure(adapter, report, report_path, expected_sha):
             raise RuntimeError("saved top SHA differs from explicit expected input")
         owner = OwnedAssembly(adapter, source)
         report.update(
-            source=str(source), input_hashes=owner.hashes, baseline_inventory=[]
+            source=str(source),
+            input_hashes=owner.hashes,
+            baseline_inventory=sorted(map(str, owner.inventory())),
         )
         checkpoint(report_path, report)
         await owner.open()
@@ -408,7 +410,7 @@ async def measure(adapter, report, report_path, expected_sha):
         if owner is not None:
             try:
                 await owner.close()
-                report["final_inventory"] = []
+                report["final_inventory"] = sorted(map(str, owner.inventory()))
             except Exception as error:
                 errors.append(error)
             try:
