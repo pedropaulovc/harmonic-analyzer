@@ -423,3 +423,29 @@ Recipe/pilot times were 142.882/343.359 s including diagnostic work. This was
 not an isolated speed comparison: the offline suite ran concurrently and passed
 5,069 tests in 93.21 s (`run-1s2dll9q`). The actual part builder and final full
 pipeline remain separate acceptance work; this pilot authored an owned copy.
+
+## Actual part builder and production drawing
+
+At `fdf1e84d`, adapter `25bc99b1` and PID 31860, the uncached production command
+`uv run --no-sync python -m doit part:alignment_pinion drawing:alignment_pinion`
+passed. This ran the real part builder, its ordinary save and the real drawing
+recipe, not the source-authoring diagnostic. The part SHA-256 and recorded
+execution token both equal
+`9e09613dcdfeadcd76cfa4e28f2c9b6035ea1736bdb1bbcca1a7ecc3239c0632`.
+The saved drawing SHA-256 is
+`456c46b901ec86b919ca5e0cf7dca72b247d4d4f2af9ac87bc8d415986623355`.
+
+Telemetry traces `0x03198c7eb54a5ef6a8061d04a5213a1c` (part) and
+`0x05e139a123febf51647d5102365986d9` (drawing) record task times of
+54.972 and 64.975 s. Source callout authoring took 1.699 s; the read-only
+drawing verifier took 1.109 s. The drawing includes 36.980 s preparing the
+reusable template; its subsequent factory creation took 1.538 s. These are
+single-run measurements, not fleet performance or failure-rate estimates.
+
+Both production PNGs were visually inspected: the drum geometry and through
+bore are present, and both fit lines print beneath the diameter limits. Drawing
+PNG SHA-256 is
+`ad636ce5eb72379b492407e287f32b6c22fe7e5fece66bf25754623bc113e860`.
+The integrated author/fleet/diagnostic-contract tests passed 211 tests in
+6.22 s (`run-74qxzq37`). A cold acceptance replay of this newly built source
+and the remaining fleet/full pipeline are still separate gates.
