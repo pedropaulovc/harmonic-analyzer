@@ -79,11 +79,6 @@ class DatumLeaderPolicy(Enum):
     BENT_DOCUMENT = "bent_document"
 
 
-class DatumInitialMeasurement(Enum):
-    FRESH = "fresh"
-    REUSE_POST_POLICY = "reuse_post_policy"
-
-
 class ShoulderConstraint(Enum):
     FREE = "free"
     FORCED = "forced"
@@ -973,79 +968,6 @@ def _final_symbol(
         )
 
 
-def _initial_callout_witness(
-    adapter, view, measure, datum_leader_policy, gtol_placement, declared_notes
-):
-    annotations = _visible_annotations(view)
-    before = {
-        name: _read_symbol(
-            adapter,
-            view,
-            annotation,
-            measure,
-            datum_leader_policy=datum_leader_policy,
-        )
-        for name, annotation in annotations.items()
-        if int(annotation.GetType()) in _INTERFACES
-    }
-    deferred = _deferred_annotations(
-        adapter.swApp, annotations, gtol_placement, declared_notes
-    )
-    obstacles = _read_obstacles(adapter, view, annotations, measure, deferred)
-    _stationary_owner_obstacles(adapter.swApp, before, obstacles)
-    return annotations, before, deferred, obstacles, Rect(*view.GetOutline())
-
-
-@_telemetry.traced("drawing.callouts.post_datum_handoff")
-def _post_datum_initial_witnesses(
-    adapter,
-    views,
-    post_policy,
-    measure,
-    datum_leader_policy,
-    gtol_placement,
-    declared_notes,
-):
-    from _drawing_measurement_handoff import (
-        AnnotationMeasurementHandoff,
-        HandoffPurpose,
-    )
-
-    handoff = AnnotationMeasurementHandoff(
-        adapter,
-        views=views,
-        measure_annotation=measure,
-        purpose=HandoffPurpose.POST_DATUM_CALLOUTS,
-        inventory_of=_visible_annotations,
-    )
-    result = {}
-    try:
-        for label, bank in post_policy.items():
-            handoff.record_bank(
-                views[label], bank.symbols | bank.obstacles, source=bank.context[0]
-            )
-        handoff.seal()
-        # No ActivateView, ClearSelection, leader setter or position mutation in
-        # this bank. Native owner/context is explicit in every semantic reader.
-        # Completion (including all empty views) precedes the placement loop.
-        with handoff.read_scope():
-            for label, view in views.items():
-                if not post_policy[label].symbols:
-                    continue
-                with _telemetry.span("drawing.callouts.initial_witness", view=label):
-                    result[label] = _initial_callout_witness(
-                        adapter,
-                        view,
-                        handoff.initial_measure,
-                        datum_leader_policy,
-                        gtol_placement,
-                        declared_notes,
-                    )
-    finally:
-        handoff.close()
-    return result
-
-
 def arrange_native_callouts(
     adapter: Any,
     *,
@@ -1057,7 +979,6 @@ def arrange_native_callouts(
     gtol_placement: GtolPlacement = GtolPlacement.FIXED,
     deferred_notes: Sequence[Any] = (),
     datum_leader_policy: DatumLeaderPolicy = DatumLeaderPolicy.EXISTING,
-    datum_initial_measurement: DatumInitialMeasurement = DatumInitialMeasurement.FRESH,
 ) -> dict[str, dict[str, Any]]:
     """Clear native datum/SF bodies before GTol columns and decorated-view packing.
 
@@ -1072,10 +993,6 @@ def arrange_native_callouts(
     do not contribute temporary obstacle glyph measurements.
     The optional recorder receives only actual final kind2/4/7 measurements,
     after ALL per-view checks pass, for the following fixed-obstacle stage.
-    REUSE_POST_POLICY is an opt-in bounds-only handoff from the completed datum
-    document witness. Every initial semantic/attachment/value read still runs;
-    all view inventories finish before any callout mutation. Restyled SFs and
-    every final witness are measured independently, never through that handoff.
     """
     if (
         not all(math.isfinite(v) and v >= 0 for v in (planning_gap_m, gap_m))
@@ -1089,13 +1006,6 @@ def arrange_native_callouts(
         raise ValueError("GTol placement must use the explicit placement policy enum")
     if not isinstance(datum_leader_policy, DatumLeaderPolicy):
         raise ValueError("datum leaders require the explicit placement policy enum")
-    if not isinstance(datum_initial_measurement, DatumInitialMeasurement):
-        raise ValueError("datum initial measurement requires an explicit policy enum")
-    if (
-        datum_initial_measurement is DatumInitialMeasurement.REUSE_POST_POLICY
-        and datum_leader_policy is not DatumLeaderPolicy.BENT_DOCUMENT
-    ):
-        raise ValueError("post-datum reuse requires the completed bent-document policy")
     if int(model.GetType()) != 3:
         raise ValueError("native callout layout requires the active drawing")
     if measure_annotation is None:
@@ -1118,11 +1028,10 @@ def arrange_native_callouts(
             )
         names.add(name)
     declared_notes = _declared_notes(adapter, drawing, views, deferred_notes)
-    initial_witnesses = {}
     if datum_leader_policy is DatumLeaderPolicy.BENT_DOCUMENT:
         from _drawing_native_datum_leaders import prepare_document_datum_leaders
 
-        post_policy = prepare_document_datum_leaders(
+        prepare_document_datum_leaders(
             adapter,
             views=views,
             measure=measure_annotation,
@@ -1130,49 +1039,35 @@ def arrange_native_callouts(
             declared_notes=declared_notes,
             gtol_placement=gtol_placement,
         )
-        if datum_initial_measurement is DatumInitialMeasurement.REUSE_POST_POLICY:
-            initial_witnesses = _post_datum_initial_witnesses(
-                adapter,
-                views,
-                post_policy,
-                measure_annotation,
-                datum_leader_policy,
-                gtol_placement,
-                declared_notes,
-            )
-        del post_policy
     report = {}
     for label, view in views.items():
-        if (
-            datum_initial_measurement is DatumInitialMeasurement.REUSE_POST_POLICY
-            and label not in initial_witnesses
-        ):
-            # The completed visible inventory, not a raw kind query that also
-            # returns hidden SFs, decides which read-only banks had callouts.
-            report[label] = {"count": 0}
-            continue
-        if (
-            datum_initial_measurement is DatumInitialMeasurement.FRESH
-            and not any(view.GetAnnotationsByType(kind) for kind in _INTERFACES)
-        ):
+        if not any(view.GetAnnotationsByType(kind) for kind in _INTERFACES):
             report[label] = {"count": 0}
             continue
         if not drawing.ActivateView(str(view.GetName2())):
             raise RuntimeError("native callout owning view activation failed")
         model.ClearSelection2(True)
-        if datum_initial_measurement is DatumInitialMeasurement.REUSE_POST_POLICY:
-            initial = initial_witnesses.pop(label)
-        else:
-            with _telemetry.span("drawing.callouts.initial_witness", view=label):
-                initial = _initial_callout_witness(
+        with _telemetry.span("drawing.callouts.initial_witness", view=label):
+            annotations = _visible_annotations(view)
+            before = {
+                name: _read_symbol(
                     adapter,
                     view,
+                    annotation,
                     measure_annotation,
-                    datum_leader_policy,
-                    gtol_placement,
-                    declared_notes,
+                    datum_leader_policy=datum_leader_policy,
                 )
-        annotations, before, deferred, obstacles, outline = initial
+                for name, annotation in annotations.items()
+                if int(annotation.GetType()) in _INTERFACES
+            }
+            deferred = _deferred_annotations(
+                app, annotations, gtol_placement, declared_notes
+            )
+            obstacles = _read_obstacles(
+                adapter, view, annotations, measure_annotation, deferred
+            )
+            _stationary_owner_obstacles(app, before, obstacles)
+            outline = Rect(*view.GetOutline())
         bank, attempts = dict(before), {}
         for name in sorted(
             bank,
