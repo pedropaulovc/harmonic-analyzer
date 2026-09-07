@@ -49,6 +49,7 @@ class Population(StrEnum):
     HISTORICAL = "historical-rocker-lever"
     MATERIAL_BASELINE = "material-baseline"
     MATERIAL_CENTER = "material-center"
+    MATERIAL_FINISH = "material-finish"
 
 
 def require_template(path, sha256):
@@ -245,7 +246,7 @@ class PopulatedControl:
                 material_sources.require_material_value(
                     notes[name], expected[link],
                     expected_vertical=1
-                    if self.population is Population.MATERIAL_CENTER else 0,
+                    if self.population in (Population.MATERIAL_CENTER, Population.MATERIAL_FINISH) else 0,
                 )
             except RuntimeError as error:
                 issues.append({

@@ -18,6 +18,7 @@ class LayoutPolicy(StrEnum):
     FOUR_NOTES = "four-notes"
     POPULATED_GAPS = "populated-gaps"
     MATERIAL_CENTER = "material-center"
+    MATERIAL_FINISH = "material-finish"
 
 
 PLANNING_HEADROOM_M = 0.0005
@@ -31,7 +32,7 @@ ROLES = {
 }
 
 
-def read_population(path, sha256, template_sha256):
+def read_population_report(path, sha256, template_sha256):
     raw = path.read_bytes()
     if hashlib.sha256(raw).hexdigest() != sha256:
         raise RuntimeError("populated layout evidence SHA256 differs")
@@ -47,6 +48,11 @@ def read_population(path, sha256, template_sha256):
         raise RuntimeError(
             "populated evidence does not describe this exact source template"
         )
+    return report
+
+
+def read_population(path, sha256, template_sha256):
+    report = read_population_report(path, sha256, template_sha256)
     if report["status"] != "failed" or len(report["trials"]) != 2:
         raise RuntimeError("expected complete two-target failed-fit evidence")
     targets = {}

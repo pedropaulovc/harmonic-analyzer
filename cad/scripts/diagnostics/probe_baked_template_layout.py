@@ -27,6 +27,7 @@ import _telemetry  # noqa: E402
 from diagnostics import _baked_template_layout as layout  # noqa: E402
 from diagnostics import _baked_template_gaps as gaps  # noqa: E402
 from diagnostics import _baked_template_material as material  # noqa: E402
+from diagnostics import _baked_template_material_finish as material_finish  # noqa: E402
 from diagnostics import benchmark_template_defaults as defaults  # noqa: E402
 from diagnostics import probe_prepared_template_cache as printed  # noqa: E402
 from diagnostics import probe_datum_policy_recipes as pilot  # noqa: E402
@@ -52,7 +53,10 @@ async def transform(adapter, directory, report, checkpoint, population=None):
     ):
         raise ValueError("material-center cannot combine historical populated-gap changes")
     snapshot = layout.blank_snapshot
-    if report.get("layout_policy") == gaps.LayoutPolicy.MATERIAL_CENTER.value:
+    if report.get("layout_policy") in (
+        gaps.LayoutPolicy.MATERIAL_CENTER.value,
+        gaps.LayoutPolicy.MATERIAL_FINISH.value,
+    ):
         snapshot = material.blank_snapshot
     derived = directory / f"{directory.name}.DRWDOT"
     report["derived_template"] = str(derived)
@@ -61,7 +65,19 @@ async def transform(adapter, directory, report, checkpoint, population=None):
     report["before"], handles, lines = snapshot(adapter)
     label_plan, phase_scope = layout.blank_label_plan, layout.blank_phase_scope
     apply, require_transition = layout.apply_layout, layout.require_transition
-    if report.get("layout_policy") == gaps.LayoutPolicy.MATERIAL_CENTER.value:
+    if report.get("layout_policy") == gaps.LayoutPolicy.MATERIAL_FINISH.value:
+        if population is None:
+            raise ValueError("material-finish requires exact populated evidence")
+        report["plan"], report["predicted_population"] = material_finish.measured_plan(
+            report["before"]["notes"], lines, population["targets"]
+        )
+        label_plan, phase_scope = material_finish.static_label_plan, material_finish.phase_scope
+        apply = material_finish.apply_layout
+
+        def require_transition(before, after, plan):
+            material_finish.require_transition(before, after, plan, lines, population["targets"])
+
+    elif report.get("layout_policy") == gaps.LayoutPolicy.MATERIAL_CENTER.value:
         report["plan"] = material.material_plan(report["before"]["notes"], lines)
         label_plan, phase_scope = material.static_label_plan, material.phase_scope
         apply = material.apply_layout
@@ -71,7 +87,7 @@ async def transform(adapter, directory, report, checkpoint, population=None):
 
     else:
         report["plan"] = layout.layout_plan(report["before"]["notes"], lines)
-    if population is not None:
+    if population is not None and report.get("layout_policy") != gaps.LayoutPolicy.MATERIAL_FINISH.value:
         report["plan"], report["predicted_population"] = gaps.measured_plan(
             report["before"]["notes"], lines, report["plan"], population["targets"]
         )
@@ -173,10 +189,11 @@ async def probe(
         str(sheet_setup.PROJECT_DRWDOT): pilot.attachments.file_digest(sheet_setup.PROJECT_DRWDOT)
     }
     population = None
-    if policy is gaps.LayoutPolicy.POPULATED_GAPS:
+    if policy in (gaps.LayoutPolicy.POPULATED_GAPS, gaps.LayoutPolicy.MATERIAL_FINISH):
         if population_path is None or population_sha256 is None:
-            raise ValueError("populated-gaps requires an exact receipt path and SHA256")
-        population = gaps.read_population(
+            raise ValueError(f"{policy.value} requires an exact receipt path and SHA256")
+        read_population = material_finish.read_population if policy is gaps.LayoutPolicy.MATERIAL_FINISH else gaps.read_population
+        population = read_population(
             population_path, population_sha256, expected[str(sheet_setup.PROJECT_DRWDOT)]
         )
         expected[str(population_path)] = population_sha256
