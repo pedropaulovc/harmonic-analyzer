@@ -71,3 +71,13 @@ Originals and the owned source retained exact hashes; the clean/visible baseline
 pivot part and drawing were preserved, owned cleanup succeeded and final guards
 were empty. This validates one empty-map recipe through the current prepared
 factory, not the remaining 21 empty-map recipes or the complete drawing fleet.
+
+The matching pivot-shaft run at `bb56cd28` also passed built/cold checks and
+visual inspection: `datum-policy-yc6v83ov/pilot.json`, SHA-256
+`71245249198d0ad3a2185a52c446146068954a3310e9d4674154c7d463870d62`.
+Its fresh isolated MISS/HIT took 35.640/0.045 s; factory setup took 1.135 s,
+included in the 17.924 s recipe. Total diagnostic time was 123.988 s.
+Both cold comparison arrays were empty and the same five explicit roles passed.
+Source hashes were exact at every saved/closed/reopened checkpoint, baseline
+documents were preserved, cleanup succeeded and final guards were empty.
+These are two accepted empty-map recipes, not an A/B fleet timing result.
