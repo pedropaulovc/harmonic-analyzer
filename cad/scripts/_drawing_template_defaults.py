@@ -122,6 +122,9 @@ def snapshot_defaults(adapter, spec):
             "linked_text": str(note.PropertyLinkedText or ""),
             "extent": extent,
             "visible": int(annotation.Visible),
+            "horizontal_justification": int(note.GetTextJustification()),
+            "vertical_justification": int(note.GetTextVerticalJustification()),
+            "position_lock": "locked" if note.LockPosition else "unlocked",
         }
         if not row["text"] and row["linked_text"]:
             row["zero_ink"] = _empty_link(annotation, note)
@@ -154,6 +157,9 @@ def snapshot_defaults(adapter, spec):
             "units": units,
             "dimension_styles": styles,
             "sheet_properties": list(sheet.GetProperties2() or ()),
+            "sheet_format_visibility": "visible"
+            if sheet.SheetFormatVisible
+            else "hidden",
             "sheet_notes": sorted(
                 notes, key=lambda row: json.dumps(row, sort_keys=True)
             ),

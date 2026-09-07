@@ -208,6 +208,9 @@ def _same(app, first, second):
 
 def _verify_baseline(app, baseline, extra=()):
     current = _documents(app)
+    titles = [str(model.GetTitle()).casefold() for model in current]
+    if any(not title for title in titles) or len(set(titles)) != len(titles):
+        raise RuntimeError("template preparation needs unique nonempty document titles")
     if len(current) != len(baseline) + len(extra):
         raise RuntimeError("template preparation changed the document inventory")
     for model, state in baseline:
@@ -239,6 +242,7 @@ async def _prepare_native(adapter, spec, directory, receipt, operation_context):
         _same(app, previous, model) for model, _ in baseline
     ):
         raise RuntimeError("adapter currentModel is not an open baseline document")
+    _verify_baseline(app, baseline)
     receipt["baseline"] = [state for _, state in baseline]
     owned = None
     errors = []
@@ -265,6 +269,13 @@ async def _prepare_native(adapter, spec, directory, receipt, operation_context):
         _verify_baseline(app, baseline, [owned])
         receipt["before"] = snapshot_defaults(adapter, spec)
         with operation_context(TemplateOperation.SAVE_AS, path):
+            _verify_baseline(app, baseline, [owned])
+            if not _same(app, adapter.currentModel, owned) or not _same(
+                app, app.ActiveDoc, owned
+            ):
+                raise RuntimeError(
+                    "refusing to save an unexpected preparation document"
+                )
             if path.exists():
                 raise RuntimeError("prepared template target must be fresh")
             owned.ClearSelection2(True)

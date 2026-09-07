@@ -478,7 +478,8 @@ def test_blank_link_exclusion_checks_both_native_leader_inventories(blank_note, 
         defaults._empty_link(blank_note.annotation, blank_note.note)
 
 
-def test_default_snapshot_preserves_links_multiplicity_raw_font_and_anchor(
+@pytest.fixture
+def blank_sheet(
     monkeypatch,
     blank_note,  # noqa: F811
 ):
@@ -491,13 +492,22 @@ def test_default_snapshot_preserves_links_multiplicity_raw_font_and_anchor(
         GetText=lambda: common._METRIC_EDGE_BREAK_NOTE,
         PropertyLinkedText="",
         GetExtent=lambda: (0.2, 0.3, 0, 0.25, 0.31, 0),
+        GetTextJustification=lambda: 2,
+        GetTextVerticalJustification=lambda: 0,
+        LockPosition=False,
     )
+    blank_note.note.GetTextJustification = lambda: 2
+    blank_note.note.GetTextVerticalJustification = lambda: 0
+    blank_note.note.LockPosition = False
     edge_annotation = SimpleNamespace(
         GetType=lambda: 6, GetSpecificAnnotation=lambda: edge, Visible=1
     )
     notes = [edge_annotation, blank_note.annotation, blank_note.annotation]
     view = SimpleNamespace(GetAnnotations=lambda: notes)
-    sheet = SimpleNamespace(GetProperties2=lambda: (2, 12, 2, 1, 0, 0.4318, 0.2794, 1))
+    sheet = SimpleNamespace(
+        GetProperties2=lambda: (2, 12, 2, 1, 0, 0.4318, 0.2794, 1),
+        SheetFormatVisible=True,
+    )
     units = {263: 4, 47: 0, 49: 2}
     model = SimpleNamespace(
         GetCurrentSheet=lambda: sheet,
@@ -512,6 +522,19 @@ def test_default_snapshot_preserves_links_multiplicity_raw_font_and_anchor(
         currentModel=model, _get_attr_or_call=lambda obj, name: getattr(obj, name)()
     )
     spec = prepared.TemplateSpec((2, 1), 2)
+    return SimpleNamespace(
+        adapter=adapter,
+        spec=spec,
+        blank_note=blank_note,
+        edge=edge,
+        units=units,
+        sheet=sheet,
+    )
+
+
+def test_default_snapshot_preserves_links_multiplicity_raw_font_and_anchor(blank_sheet):
+    adapter, spec = blank_sheet.adapter, blank_sheet.spec
+    blank_note = blank_sheet.blank_note
     before = defaults.snapshot_defaults(adapter, spec)
     blank_note.note.GetExtent = lambda: (0.1, 0.2, 0, 0.1, 0.21, 0)
     after = defaults.snapshot_defaults(adapter, spec)
@@ -524,9 +547,71 @@ def test_default_snapshot_preserves_links_multiplicity_raw_font_and_anchor(
     blank_note.fmt.CharHeight += 1e-12
     with pytest.raises(RuntimeError, match="raw defaults"):
         defaults.compare_defaults(after, defaults.snapshot_defaults(adapter, spec))
-    units[263] = 5
+    blank_sheet.units[263] = 5
     with pytest.raises(RuntimeError, match="units differ"):
         defaults.snapshot_defaults(adapter, spec)
+
+
+@pytest.mark.parametrize("target", ["blank_link", "visible_note"])
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("GetTextJustification", lambda: 1),
+        ("GetTextVerticalJustification", lambda: 2),
+        ("LockPosition", True),
+    ],
+)
+def test_raw_defaults_reject_note_alignment_and_lock_changes(
+    blank_sheet, target, field, value
+):
+    adapter, spec = blank_sheet.adapter, blank_sheet.spec
+    note = blank_sheet.blank_note.note if target == "blank_link" else blank_sheet.edge
+    before = defaults.snapshot_defaults(adapter, spec)
+    setattr(note, field, value)
+    after = defaults.snapshot_defaults(adapter, spec)
+    with pytest.raises(RuntimeError, match="raw defaults"):
+        defaults.compare_defaults(before, after)
+
+
+def test_raw_defaults_reject_hidden_sheet_format(blank_sheet):
+    adapter, spec = blank_sheet.adapter, blank_sheet.spec
+    before = defaults.snapshot_defaults(adapter, spec)
+    blank_sheet.sheet.SheetFormatVisible = False
+    after = defaults.snapshot_defaults(adapter, spec)
+    with pytest.raises(RuntimeError, match="raw defaults"):
+        defaults.compare_defaults(before, after)
+
+
+def test_native_save_requires_owned_document_still_active(native, monkeypatch):
+    def switch_active(*args):
+        native.adapter.swApp.ActiveDoc = native.source
+        return {"units": 4}
+
+    monkeypatch.setattr(prepared, "snapshot_defaults", switch_active)
+    with pytest.raises(ExceptionGroup):
+        run_native(native)
+    assert not native.closed
+    assert all(not doc.calls for doc in native.created)
+    assert not (native.directory / "prepared.DRWDOT").exists()
+
+
+def test_duplicate_document_title_refuses_save_and_title_based_close(
+    native, monkeypatch
+):
+    original = common.new_project_drawing
+
+    def duplicate_title(*args, **kwargs):
+        draw, sheet = original(*args, **kwargs)
+        draw.title = native.source.title.swapcase()
+        return draw, sheet
+
+    monkeypatch.setattr(common, "new_project_drawing", duplicate_title)
+    with pytest.raises(ExceptionGroup):
+        run_native(native)
+    assert not native.closed
+    assert native.source in native.documents
+    assert all(not doc.calls for doc in native.created)
+    assert not (native.directory / "prepared.DRWDOT").exists()
 
 
 @pytest.mark.parametrize(
