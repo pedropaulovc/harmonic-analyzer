@@ -5,9 +5,10 @@ named owned rocker-part bytecopy. Call the production finalizer unchanged.
 Diagnostic wrappers observe the late property and native/PDF save boundaries;
 the explicit candidate adds a redraw, one checked ordinary/forced rebuild,
 reapplication of the title's existing horizontal justification plus its documented redraw,
-or one reapplication of its exact existing property-link expression without redraw,
-immediately before native SaveAs3. No position writes, geometry picks, other
-added rebuilds, default changes, or full recipe.
+or one reapplication of its exact existing property-link expression without redraw.
+The separate LEFT_TITLE_CELL layout candidate sets left justification and one
+sheet-format-cell-derived anchor, then the documented redraw before native SaveAs3.
+No compensating reflow offset, geometry picks, production defaults or full recipe.
 
 Each trial closes all and ONLY owned documents, cold-opens its saved drawing,
 and exports a second PDF without native save or redraw. A candidate is authorized
@@ -47,6 +48,7 @@ import _telemetry  # noqa: E402
 from _common import _early_bound, check  # noqa: E402
 from diagnostics import probe_retained_drawing_export as retained  # noqa: E402
 from diagnostics import probe_datum_policy_recipes as pilot  # noqa: E402
+from diagnostics import _linked_title_cell as title_cell  # noqa: E402
 from diagnostics.audit_drawing_snapshot_delta import audit_pair, changed_leaves  # noqa: E402
 from diagnostics._owned_native_documents import DocumentKind, run_copy_diagnostic  # noqa: E402
 from diagnostics._owned_native_session import require_owned_diagnostic_environment  # noqa: E402
@@ -66,6 +68,7 @@ class Variant(StrEnum):
     FORCE_REBUILD = "pre_save_force_rebuild"
     REJUSTIFY = "pre_save_rejustify"
     RELINK = "pre_save_relink"
+    LEFT_TITLE_CELL = "pre_save_left_title_cell"
 
 
 def require_title_style(before, after):
@@ -140,6 +143,14 @@ def require_relinked_title(before, after):
         )
 
 
+def require_left_title_transition(before, after, target):
+    """Only the explicit center→left and measured-anchor transition is permitted."""
+    if before["horizontal_justification"] != 2 or before["locked"]:
+        raise RuntimeError("left title requires the original unlocked centered note")
+    expected = dict(before, horizontal_justification=1, position=target)
+    require_relinked_title(expected, after)
+
+
 def _finite(values, length, label):
     values = tuple(float(value) for value in values or ())
     if len(values) != length or not all(math.isfinite(value) for value in values):
@@ -181,8 +192,9 @@ class TitleObserver:
         self.trial["title_key"] = self.key
         self.trial["title_stages"] = []
         self.initial = None
+        self.layout_style = None
 
-    def record(self, stage):
+    def record(self, stage, *, left_cell_transition=None):
         # During native SaveAs the shared saving_as scope has not yet updated
         # its recorded path/title. Verify handles here; that scope subsequently
         # performs its full path/inventory/source verification unchanged.
@@ -242,6 +254,7 @@ class TitleObserver:
                 "after_pre_save_rejustify",
                 "after_pre_save_rejustify_redraw",
                 "after_pre_save_relink",
+                "after_pre_save_left_title_cell",
                 "after_native_save",
                 "before_pdf_export",
                 "after_pdf_export",
@@ -254,9 +267,22 @@ class TitleObserver:
                 f"{stage}: title did not resolve to exact owned-part summary"
             )
         self.trial["title_stages"].append(row)
+        if left_cell_transition is not None:
+            if (
+                stage != "after_pre_save_left_title_cell"
+                or self.layout_style is not None
+                or self.initial is None
+            ):
+                raise RuntimeError("unexpected/repeated left title style transition")
+            before, target = left_cell_transition
+            require_title_style(self.initial, before)
+            row["relink_font_format"] = title_font_format(annotation)
+            self.checkpoint()
+            require_left_title_transition(before, row, target)
+            self.layout_style = row
         self.checkpoint()
         if self.initial is not None:
-            require_title_style(self.initial, row)
+            require_title_style(self.layout_style or self.initial, row)
         if self.initial is None:
             self.initial = row
         return row
@@ -281,6 +307,8 @@ def finalizer_observations(adapter, observer, variant):
         "justification": 0,
         "linked_text": 0,
     }
+    if variant is Variant.LEFT_TITLE_CELL:
+        counts["position"] = 0
 
     def properties(current, values):
         if (
@@ -370,6 +398,57 @@ def finalizer_observations(adapter, observer, variant):
                     after = observer.record("after_pre_save_relink")
                     after["relink_font_format"] = title_font_format(observer.annotation)
                     require_relinked_title(before, after)
+            if kind == "drawing" and variant is Variant.LEFT_TITLE_CELL:
+                with _telemetry.span("diagnostic.fresh_title.left_title_cell"):
+                    before["relink_font_format"] = title_font_format(
+                        observer.annotation
+                    )
+                    if before["locked"] or before["horizontal_justification"] != 2:
+                        raise RuntimeError(
+                            "left title requires the original unlocked centered note"
+                        )
+                    lines, geometry = title_cell.template_lines(current)
+                    observer.trial["left_title_cell"] = {
+                        "topology_m": title_cell.TOPOLOGY_M,
+                        "template_before": geometry,
+                        "inset_rule": "half_native_font_height",
+                    }
+                    observer.checkpoint()  # Keep measured rules even if cell discovery fails.
+                    cell = title_cell.enclosing_cell(lines, before["position"])
+                    target_position = title_cell.left_anchor(
+                        cell,
+                        before["position"],
+                        before["relink_font_format"]["CharHeight"],
+                    )
+                    observer.trial["left_title_cell"].update(
+                        cell_m=cell,
+                        requested_position_m=target_position,
+                    )
+                    observer.record("before_left_title_cell")
+                    note = _early_bound(
+                        observer.annotation.GetSpecificAnnotation(), "INote"
+                    )
+                    counts["justification"] += 1
+                    note.SetTextJustification(
+                        1
+                    )  # swTextJustificationLeft; documented void.
+                    counts["position"] += 1
+                    returned = observer.annotation.SetPosition2(*target_position)
+                    observer.trial["left_title_cell"]["position_return"] = repr(
+                        returned
+                    )
+                    observer.checkpoint()
+                    if returned is not True:
+                        raise RuntimeError(
+                            f"left title SetPosition2 rejected: {returned!r}"
+                        )
+                    counts["redraw"] += 1
+                    current.currentModel.GraphicsRedraw2()  # Required by SetTextJustification.
+                    after = observer.record(
+                        "after_pre_save_left_title_cell",
+                        left_cell_transition=(before, target_position),
+                    )
+                    title_cell.require_native_fit(cell, after)
             with artifact_context(kind, target) if artifact_context else nullcontext():
                 yield
             observer.record(f"after_{phase}")
@@ -384,12 +463,18 @@ def finalizer_observations(adapter, observer, variant):
             "properties": 1,
             "drawing": 1,
             "pdf": 1,
-            "redraw": int(variant in (Variant.REDRAW, Variant.REJUSTIFY)),
+            "redraw": int(
+                variant in (Variant.REDRAW, Variant.REJUSTIFY, Variant.LEFT_TITLE_CELL)
+            ),
             "edit_rebuild": int(variant is Variant.EDIT_REBUILD),
             "force_rebuild": int(variant is Variant.FORCE_REBUILD),
-            "justification": int(variant is Variant.REJUSTIFY),
+            "justification": int(
+                variant in (Variant.REJUSTIFY, Variant.LEFT_TITLE_CELL)
+            ),
             "linked_text": int(variant is Variant.RELINK),
         }
+        if variant is Variant.LEFT_TITLE_CELL:
+            expected["position"] = 1
         if counts != expected:
             raise RuntimeError(
                 f"finalizer call inventory differs: {counts} != {expected}"
@@ -461,6 +546,10 @@ async def run_pair(trial, selected):
     if (
         candidate["printed"]["classification"] == "unchanged"
         and candidate["png_delta"]["changed_pixel_count"] == 0
+        and (
+            selected is not Variant.LEFT_TITLE_CELL
+            or candidate["left_cell_native_stability"] == "unchanged"
+        )
     ):
         return "candidate_printed_stable"
     return "candidate_not_stable"
@@ -582,6 +671,10 @@ async def one_trial(adapter, variant, source, directory, report, checkpoint, exp
             handles_after=after_handles,
         )
         trial["first_pdf_title"] = retained.pdf_title(outputs.pdf)
+        if variant is Variant.LEFT_TITLE_CELL:
+            title_cell.require_pdf_fit(
+                trial["left_title_cell"]["cell_m"], trial["first_pdf_title"]
+            )
         native_expected = {
             str(outputs.slddrw): pilot.attachments.file_digest(outputs.slddrw)
         }
@@ -597,14 +690,21 @@ async def one_trial(adapter, variant, source, directory, report, checkpoint, exp
         cold = TitleObserver(adapter, cold_trial, checkpoint)
         cold_open = cold.record("cold_open")
         require_title_style(trial["title_stages"][-1], cold_open)
-        if variant is Variant.RELINK:
+        if variant in (Variant.RELINK, Variant.LEFT_TITLE_CELL):
             cold_open["relink_font_format"] = title_font_format(cold.annotation)
             treatment = next(
                 row
                 for row in trial["title_stages"]
-                if row["stage"] == "after_pre_save_relink"
+                if row["stage"] == f"after_{variant.value}"
             )
             require_relinked_title(treatment, cold_open)
+        if variant is Variant.LEFT_TITLE_CELL:
+            lines, geometry = title_cell.template_lines(adapter)
+            cell = title_cell.enclosing_cell(lines, cold_open["position"])
+            trial["left_title_cell"]["template_cold"] = geometry
+            if changed_leaves(trial["left_title_cell"]["cell_m"], cell):
+                raise RuntimeError("left title cell geometry changed on cold reopen")
+            title_cell.require_native_fit(cell, cold_open)
         trial["reopened"], cold_handles = retained.capture_drawing(
             adapter, copy_source, trial["source_before"]["configuration"]
         )
@@ -620,6 +720,13 @@ async def one_trial(adapter, variant, source, directory, report, checkpoint, exp
         trial["cold_delta"] = audit_pair(
             retained.serialized(trial["built"]), retained.serialized(trial["reopened"])
         )
+        if variant is Variant.LEFT_TITLE_CELL:
+            # Stronger candidate gate, not a relaxation of the shared comparator.
+            trial["left_cell_native_stability"] = (
+                "unchanged"
+                if trial["cold_delta"]["changed_leaf_count"] == 0
+                else "changed"
+            )
         require_cold_semantics(trial["built"], trial["reopened"])
         cold_pdf, cold_png = trial_dir / "cold.pdf", trial_dir / "cold.png"
         retained.export_pdf_only(adapter, cold_pdf)
@@ -657,6 +764,10 @@ async def one_trial(adapter, variant, source, directory, report, checkpoint, exp
         drawing.render_pdf_png(cold_pdf, cold_png)
         trial["cold_artifacts"] = {"pdf": str(cold_pdf), "png": str(cold_png)}
         trial["cold_pdf_title"] = retained.pdf_title(cold_pdf)
+        if variant is Variant.LEFT_TITLE_CELL:
+            title_cell.require_pdf_fit(
+                trial["left_title_cell"]["cell_m"], trial["cold_pdf_title"]
+            )
         trial["printed"] = printed_displacement(
             trial["first_pdf_title"], trial["cold_pdf_title"]
         )
@@ -749,6 +860,7 @@ def main(argv=None):
             Variant.FORCE_REBUILD,
             Variant.REJUSTIFY,
             Variant.RELINK,
+            Variant.LEFT_TITLE_CELL,
         ),
         required=True,
     )
