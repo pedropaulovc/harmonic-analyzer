@@ -13,6 +13,10 @@ from _common import _early_bound
 import _drawing_common as drawing
 from _drawing_entities import FaceBoundary, FeatureFace, ModelEntities
 from diagnostics import probe_drawing_attachments as attachments
+from diagnostics._annotation_entity_context import (
+    EntityContextObservations,
+    EntityContextStage,
+)
 
 
 class EntityWitnessPhase(StrEnum):
@@ -43,6 +47,7 @@ class EntityAcceptance:
         self.recorded = {}
         self.keys = {}
         self.validator = drawing._validate_explicit_annotation_attachment
+        self.context_report = None
 
     def source_snapshot(self, model):
         entities = ModelEntities(model).resolve(self.requests)
@@ -57,7 +62,63 @@ class EntityAcceptance:
 
     @contextmanager
     def observe(self, adapter, source_entities):
+        context = EntityContextObservations(self.labels, source_entities)
+        self.context_report = context.report
+        select_entity = drawing._select_annotation_entity
+        validate_native = drawing._validate_native_annotation
+
+        def selected(actual_adapter, view, **kwargs):
+            entity = select_entity(actual_adapter, view, **kwargs)
+            label = kwargs["label"]
+            if label in self.labels:
+                argument = kwargs.get("entity")
+                if argument is None:
+                    argument = kwargs.get("edge_entity")
+                context.capture(
+                    actual_adapter,
+                    view,
+                    argument,
+                    label=label,
+                    entity_type=kwargs["entity_type"],
+                    stage=EntityContextStage.SELECTED,
+                    selected=entity,
+                )
+            return entity
+
+        def native(actual_adapter, annotation, entity, *, label):
+            if label in self.labels:
+                role = self.labels[label]
+                if role in context.views:
+                    context.capture(
+                        actual_adapter,
+                        context.views[role],
+                        entity,
+                        label=label,
+                        entity_type=self.kinds[role][0],
+                        stage=EntityContextStage.IMMEDIATE,
+                        annotation=annotation,
+                    )
+                else:
+                    context.report["stages"].append(
+                        {
+                            "stage": EntityContextStage.IMMEDIATE.value,
+                            "role": role,
+                            "error": "no preceding observed selection; original validator still runs",
+                        }
+                    )
+            return validate_native(actual_adapter, annotation, entity, label=label)
+
         def validate(actual_adapter, annotation, view, entity, *, entity_type, label):
+            if label in self.labels:
+                context.capture(
+                    actual_adapter,
+                    view,
+                    entity,
+                    label=label,
+                    entity_type=entity_type,
+                    stage=EntityContextStage.FINAL,
+                    annotation=annotation,
+                )
             self.validator(
                 actual_adapter,
                 annotation,
@@ -84,10 +145,14 @@ class EntityAcceptance:
                 "explicit annotation validator changed before observation"
             )
         drawing._validate_explicit_annotation_attachment = validate
+        drawing._select_annotation_entity = selected
+        drawing._validate_native_annotation = native
         try:
             yield
         finally:
             drawing._validate_explicit_annotation_attachment = self.validator
+            drawing._select_annotation_entity = select_entity
+            drawing._validate_native_annotation = validate_native
 
     def require_coverage(self):
         if self.recorded.keys() != self.roles.keys():

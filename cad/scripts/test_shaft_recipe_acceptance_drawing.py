@@ -313,6 +313,7 @@ async def test_real_pilot_enrollment_keeps_owned_copy_and_cold_gates(
     class Witness:
         def __init__(self, module, manifest):
             assert manifest is targets.TARGETS[target]
+            self.context_report = {"stages": ["diagnostic-only matrix"]}
 
         def source_snapshot(self, model):
             phases.append("source")
