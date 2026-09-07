@@ -1,7 +1,9 @@
 """Explicit owned-pilot inputs and existing production readback contracts.
 
-Hashes pin the exact native inputs observed on 2026-09-06. Matching execution
+Initial hashes pin exact native inputs observed on 2026-09-06. Matching execution
 tokens were read for the two shafts; this does not prove builder provenance.
+Alignment's explicit 2026-09-07 production-builder migration is recorded in
+diagnostics/alignment_source_manifest.md; other input identities are unchanged.
 No recipe, geometry, output path or production layout policy lives here.
 """
 
@@ -68,7 +70,8 @@ TARGETS = {
 # Exact native bytes read from root outputs and compared with execution tokens
 # on 2026-09-06; no claim that disk equality proves builder provenance.
 _VIEW_SOURCE_HASHES = {
-    "alignment_pinion": "858dc759943c2f739b3081fd02f313c26ead01eb837e08f9c79d59caac388920",
+    # Actual authored production output; historical 858dc... receipts stay intact.
+    "alignment_pinion": "9e09613dcdfeadcd76cfa4e28f2c9b6035ea1736bdb1bbcca1a7ecc3239c0632",
     "cone_gear_shaft": "8df108cb4053bd47bcc1acc8b83fede6e3a52a9d3c4f6341c1ab3702d512b0ab",
     "crank_drive_gear": "2cd81cf44def13c0bbd298617d16769206e4931eac41a04642ac6217e4880cb5",
     "crank_pinion": "08ea59d153d8801792a8b611981702d0b584b9e8a04a33e4b9cb322a3d9df6fc",
