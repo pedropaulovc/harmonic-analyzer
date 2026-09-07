@@ -5,6 +5,12 @@ It does not change its production selector, PMI specification, source part or
 the generic attachment reader. Drawing-context and cold native acceptance are
 still required; source API readback alone does not establish either.
 
+The original exact cold-bank contract below is historical. The
+[native persistent-edge cold candidate](cold-intersection-edge-identity.md)
+retains those raw banks and the live comparator, but introduces a separate
+caller classification for an integer CurveTag change after native same-edge
+proof. Its native cold acceptance is not yet established.
+
 ## Evidence and boundary
 
 The [source curve control](crankshaft-curve-readback-control.md) retained two

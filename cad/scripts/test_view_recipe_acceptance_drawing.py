@@ -579,7 +579,9 @@ def test_fresh_crank_end_roles_require_two_distinct_end_stations(values):
         "cylinder_gear", "rack_pinion", "transgear_feed_pinion", "transgear_pinion",
     ],
 )
-@pytest.mark.parametrize("mode", ["normal", "title_failure", "source_saved"])
+@pytest.mark.parametrize(
+    "mode", ["normal", "title_failure", "source_saved", "cold_geometry_failure"]
+)
 async def test_view_enrollment_reuses_full_owned_pilot_without_model_reverse_mapping(
     tmp_path, monkeypatch, target, mode
 ):
@@ -624,6 +626,10 @@ async def test_view_enrollment_reuses_full_owned_pilot_without_model_reverse_map
     class Witness:
         def __init__(self, module, manifest):
             self.context_report = {"context": "view"}
+            self.cold_intersections = observer.ColdIntersectionIdentities()
+
+        # Exercise the actual cold policy; no manufactured successful verdict.
+        compare_cold = observer.ViewEntityAcceptance.compare_cold
 
         @contextmanager
         def observe(self, adapter, source_entities=None):
@@ -634,7 +640,14 @@ async def test_view_enrollment_reuses_full_owned_pilot_without_model_reverse_map
         def drawing_snapshot(self, adapter, source_entities=None, *, phase):
             assert source_entities is None
             phases.append(phase)
-            return {"view": "same", "geometry": "same"}
+            return {
+                "view": "same",
+                "geometry": (
+                    "changed"
+                    if phase == "reopened" and mode == "cold_geometry_failure"
+                    else "same"
+                ),
+            }
 
     for method in ("observe", "drawing_snapshot"):
         keywords = {"phase": "built"} if method == "drawing_snapshot" else {}
@@ -656,7 +669,8 @@ async def test_view_enrollment_reuses_full_owned_pilot_without_model_reverse_map
         )
     else:
         with pytest.raises(
-            RuntimeError, match=r"source copy changed|annotation layout"
+            RuntimeError,
+            match=r"source copy changed|annotation layout|explicit annotation",
         ):
             await pilot.pilot(
                 adapter, "candidate", source_root, source_root, root, targets=(target,)
@@ -673,6 +687,11 @@ async def test_view_enrollment_reuses_full_owned_pilot_without_model_reverse_map
     if mode == "normal":
         assert phases == ["observe", "built", "reopened"]
         assert trial["explicit_entities_built"] == trial["explicit_entities_reopened"]
+        assert trial["explicit_entity_comparison"]["status"] == "passed"
+    if mode == "cold_geometry_failure":
+        assert phases == ["observe", "built", "reopened"]
+        assert trial["explicit_entity_comparison"]["status"] == "failed"
+        assert trial["explicit_entity_comparison"]["rejected"][0]["path"] == "/geometry"
     if mode == "title_failure":
         assert phases == ["observe", "built"]
         assert trial["reopen_annotation_comparison"]["rejected"] == ["title moved"]

@@ -12,6 +12,7 @@ import pytest
 from diagnostics import _raw_edge_curve as raw
 from diagnostics import _recipe_view_entity_acceptance as observer
 from diagnostics import _view_intersection_curve_witness as witness
+from diagnostics import _view_curve_cold_identity as cold
 from diagnostics._recipe_view_roles import ViewRole, ViewResolver
 from test_view_recipe_acceptance_drawing import bank as bank
 
@@ -144,6 +145,16 @@ def curve_bank(bank, monkeypatch):
         "*Right", 5, "EDGE", ViewResolver.CROSS_HOLE
     )
     bank.module._visible_cross_hole_edge = lambda adapter, view: view.entity
+    # Native-shaped saved-document PID seam. Raw CurveTag/live-bank assertions
+    # below remain unchanged; fresh handles denote this same pinned edge.
+    monkeypatch.setattr(cold, "_early_bound", lambda value, _: value)
+    monkeypatch.setattr(cold.persistent, "byte_variant", lambda value: value)
+    bank.adapter.currentModel.GetType = lambda: 3
+    bank.adapter.currentModel.GetPathName = lambda: "C:/owned/crankshaft.SLDDRW"
+    bank.adapter.currentModel.Extension = NS(
+        GetPersistReference3=lambda _: memoryview(b"cross-hole-edge"),
+        IsSamePersistentID=lambda *_: 1,
+    )
     return edge
 
 
@@ -283,8 +294,12 @@ def test_cold_role_uses_fresh_native_handles_and_preserves_exact_numeric_compari
     if fault == "trim_tag":
         fresh_edge.GetCurveParams3.return_value.CurveTag += 1
     reopened = bank.witness.drawing_snapshot(bank.adapter, phase="reopened")
-    # The unchanged pilot compares these complete banks with != after reopen.
+    # Raw banks remain unequal: the new cold caller policy is separate below.
     assert (reopened == built) is (fault is None)
+    # Separate caller policy: raw inequality is still true for trim_tag, but
+    # native same-edge PID proof can classify that one cold metadata change.
+    comparison = bank.witness.compare_cold(built, reopened)
+    assert (comparison["status"] == "passed") is (fault in (None, "trim_tag"))
 
 
 def test_analytic_geometry_and_non_edge_failure_do_not_enter_new_curve_path(
