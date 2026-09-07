@@ -84,3 +84,36 @@ not remove source/hash/content or whole-sheet gates.
 Offline verification: 413 focused/adjacent tests passed in 23.39 s, including
 part isolation (`pytest-telemetry/run-2cbj52wm`). No COM invocation was performed
 in the implementation worktree.
+
+## Full-recipe controls: selection passes, post-rebuild attachment fails
+
+The integrated predicate passed 223 focused tests in the root (`run-wa5cptvr`,
+12.04 seconds). Native controls with adapter `25bc99b1` and licensed PID 31860
+then advanced beyond the old selection failure, but neither passed the recipe:
+
+| Target / frozen root | Receipt SHA-256 | Recipe / full pilot seconds |
+|---|---|---:|
+| crankshaft / `39615df9` | `c93a0a2b071b715bec5fb996b80d53e951129568fe63caeca8b897af829ea30c` | 41.638551 / 182.414780 |
+| spring-hook / `335e6ad8` | `4d4a4fe9b7b37423ec22b810ec3cc596afcbcc53d2618899cffe4bfaa94f4284` | 27.823261 / 125.830814 |
+
+Receipts are respectively `cad/out/reports/datum-policy-wzed5ja8/pilot.json`
+and `cad/out/reports/datum-policy-_pfvu2ct/pilot.json`. Both selected-stage
+silhouette comparisons returned native PID `1`, with the raw geometry checks
+passing. Crankshaft's three EDGE roles also passed selection and insertion,
+including the cross-hole intersection curve. Both recipes subsequently failed
+the production SF attachment predicate with native PID `0`, after the existing
+`ClearSelection2` / `EditRebuild3` sequence. The validator's failed comparison
+did not retain its raw references, so these receipts cannot distinguish a changed
+attachment from an earlier silhouette wrapper invalidated by insertion/rebuild.
+No identity predicate was bypassed and no built/cold acceptance was reached.
+
+Both original/owned-copy source hash and source-parameter preservation checks
+passed, with no final runtime guard errors. Crankshaft failure capture completed
+without secondary errors. Spring's improved rejected-snapshot evidence proves
+its separate generic coverage failure is **`checked_empty`**, not dimension
+exclusion: all three dimensions were captured, with zero excluded dimensions.
+The generic geometry reader supports only EDGE/FACE/VERTEX, whereas this drawing
+has an SF silhouette (46), dimension sketch points (11), a sketch segment (10)
+and a center mark (annotation 13). Both rejected snapshots retain those exact
+reasons. This observation does not waive either the generic coverage gate or the
+dedicated VIEW entity bank; that composition still needs a supported contract.
