@@ -36,6 +36,10 @@ PAIRS = {
     "front": (("BarLength", TAB_START_X / 1000), ("TipCentreX", TIP_ARC_CX / 1000)),
     "holes": (("RD1", BAR_PIN_X / 1000), ("RD2", LEVER_SPRING_X / 1000)),
 }
+# Nominal design matching only. The retained native model dimensions differ
+# from nominal by +0.074/-0.094 nm; use a bounded 1 nm absolute comparison.
+# _same_dimension and source before/after equality remain EXACT mutation gates.
+NOMINAL_LINEAR_TOLERANCE_M = 1e-9
 
 
 def require_targets(variant, targets):
@@ -147,7 +151,10 @@ def planned_pairs(before, views):
                 or before.tolerances[key] != (1,)
                 or len(dimension.parameters) != 1
                 or not math.isclose(
-                    dimension.parameters[0][3], value, rel_tol=0, abs_tol=1e-12
+                    dimension.parameters[0][3],
+                    value,
+                    rel_tol=0,
+                    abs_tol=NOMINAL_LINEAR_TOLERANCE_M,
                 )
             ):
                 raise RuntimeError(
@@ -286,6 +293,7 @@ class ParallelLinearControl:
             )
         report = {
             "variant": self.variant.value,
+            "nominal_linear_tolerance_m": NOMINAL_LINEAR_TOLERANCE_M,
             "pairs": {},
             "scope": "one document offset write plus two native parallel calls; no speedup claim",
         }
