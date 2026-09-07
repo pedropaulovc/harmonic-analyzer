@@ -10,6 +10,8 @@ import math
 import sys
 
 from _common import _early_bound
+from _drawing_silhouette_identity import byte_reference as _byte_reference
+from _drawing_silhouette_identity import byte_variant as _variant
 from diagnostics._owned_native_documents import Ownership
 
 
@@ -64,28 +66,6 @@ def _reference(extension, entity, records, name):
         observation["observation_error"] = repr(error)
     # Only supported byte containers are decoded; wrapped/nested arrays fail.
     return _byte_reference(raw)
-
-
-def _byte_reference(raw):
-    if isinstance(raw, memoryview):
-        try:
-            if raw.ndim != 1 or raw.format != "B" or raw.itemsize != 1 or not raw.contiguous or raw.nbytes == 0:
-                raise RuntimeError("native persistent reference is not a nonempty contiguous unsigned-byte view")
-            return tuple(raw)
-        except ValueError as error:
-            raise RuntimeError("native persistent reference memoryview is released") from error
-    if not isinstance(raw, (tuple, list, bytes)) or not raw:
-        raise RuntimeError("native persistent reference is empty or has the wrong type")
-    if any(type(value) is not int or not 0 <= value <= 255 for value in raw):
-        raise RuntimeError("native persistent reference is not an unsigned-byte array")
-    return tuple(raw)
-
-
-def _variant(reference):
-    import pythoncom
-    from win32com.client import VARIANT
-
-    return VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_UI1, reference)
 
 
 def _capture(records, name, operation):

@@ -279,6 +279,8 @@ def owned_scene(native, monkeypatch):
     """Real ownership/observer contexts; only the native COM objects are doubled."""
     monkeypatch.setattr(control, "_early_bound", lambda obj, _: obj)
     monkeypatch.setattr(silhouette, "_early_bound", lambda obj, _: obj)
+    monkeypatch.setattr(silhouette.persistent, "_early_bound", lambda obj, _: obj)
+    monkeypatch.setattr(silhouette.persistent, "byte_variant", lambda value: value)
     monkeypatch.setattr(control, "_variant", lambda value: value)
     bank = view_bank.__wrapped__(monkeypatch)
     user = Model(None, title="Unrelated dirty drawing", dirty=True)
@@ -373,7 +375,7 @@ def test_full_owned_capture_retains_both_document_ids_comparisons_and_observed_d
 
 def test_accepted_native_identity_never_calls_failure_only_control(owned_scene, monkeypatch):
     scene = owned_scene
-    capture = Mock(side_effect=AssertionError("successful selection must not query persistent IDs"))
+    capture = Mock(side_effect=AssertionError("successful selection must not run failure-only controls"))
     monkeypatch.setattr(control, "capture", capture)
     scene.bank.manager.GetSelectedObject6.return_value = scene.expected
     with scene.bank.witness.observe(scene.adapter):
@@ -382,7 +384,9 @@ def test_accepted_native_identity_never_calls_failure_only_control(owned_scene, 
             entity=scene.expected, entity_type="SILHOUETTE",
         )
     capture.assert_not_called()
-    assert scene.calls == []
+    assert len(scene.calls) == 6  # Two mandatory drawing PID gates, no source query.
+    assert all(call[0] == "drawing" for call in scene.calls)
+    assert scene.source.GetSaveFlag() is scene.drawing.GetSaveFlag() is False
     assert set(scene.bank.witness.recorded) == {"finish"}
     assert all("persistent_identity_control" not in row for row in scene.bank.witness.context_report["stages"])
     assert_owned_cleanup(scene)
@@ -488,6 +492,19 @@ def test_real_failure_hook_retains_controls_and_original_strict_identity_rejecti
             raise
 
     monkeypatch.setattr(silhouette, "require_same", rejecting)
+    # The native control disproved direct IsSame0 as a silhouette rejection.
+    # Keep the original failure-retention test with an actual PID0 rejection.
+    original_compare = scene.drawing.Extension.IsSamePersistentID
+    compared = []
+
+    def reject_first(first, second):
+        compared.append((first, second))
+        if len(compared) == 1:
+            scene.calls.append(("drawing", "compare", first, second))
+            return 0
+        return original_compare(first, second)
+
+    scene.drawing.Extension.IsSamePersistentID = reject_first
     if failure == "selection":
         scene.bank.manager.GetSelectedObject6.side_effect = [scene.selected, RuntimeError("native repeated selection failed")]
     else:
@@ -509,7 +526,8 @@ def test_real_failure_hook_retains_controls_and_original_strict_identity_rejecti
             "drawing": {"dirty_before": False, "dirty_after": False},
             "source": {"dirty_before": False, "dirty_after": False},
         }
-        assert scene.calls == []
+        assert len(scene.calls) == 3  # Mandatory predicate preceded failure capture.
+        assert all(call[0] == "drawing" for call in scene.calls)
     else:
         assert records["source"]["dirty_before"] is records["source"]["dirty_after"] is False
         if failure is None:
