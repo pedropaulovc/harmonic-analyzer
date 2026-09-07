@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import math
+import ast
 from pathlib import Path
 
 import crank_arm_spec
@@ -10,6 +10,19 @@ import draw_crank_arm as drawing
 import build_crank_arm as arm
 from _drawing_registry import DRAWINGS_BY_NAME
 from _holes import NUMBER_DRILL_MM
+
+
+def _has_dimension_call(helper: str, dimension: str) -> bool:
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    return any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == helper
+        and len(node.args) > 1
+        and isinstance(node.args[1], ast.Name)
+        and node.args[1].id == dimension
+        for node in ast.walk(tree)
+    )
 
 
 def test_required_drawing_paths() -> None:
@@ -93,52 +106,34 @@ def test_native_gdt_replaces_form_orientation_notes() -> None:
     assert "add_surface_finish(" in source
 
 
-def test_shaft_axis_datum_pick_is_radial_with_its_symbol() -> None:
-    centre = (drawing._sheet_x(0.0), drawing.FRONT_CENTER[1])
-    rim_vector = (
-        drawing.DATUM_B_RIM[0] - centre[0],
-        drawing.DATUM_B_RIM[1] - centre[1],
-    )
-    leader_vector = (
-        drawing.DATUM_B_SYMBOL[0] - drawing.DATUM_B_RIM[0],
-        drawing.DATUM_B_SYMBOL[1] - drawing.DATUM_B_RIM[1],
-    )
-    assert math.isclose(
-        math.hypot(*rim_vector), drawing.DATUM_B_RADIUS, abs_tol=1e-12
-    )
-    assert math.isclose(
-        rim_vector[0] * leader_vector[1] - rim_vector[1] * leader_vector[0],
-        0.0,
-        abs_tol=1e-12,
-    )
-    assert rim_vector[0] * leader_vector[0] + rim_vector[1] * leader_vector[1] > 0
+def test_shaft_axis_datum_uses_the_owned_bore_rim() -> None:
+    # Native-role attachment replaces the approved sheet-radius/routing contract.
+    shaft = drawing.ENTITY_ROLES["shaft"]
+    assert shaft.face.feature_name == "ShaftBore"
+    assert shaft.edge.radius_mm == crank_arm_spec.SHAFT_BORE_DIA / 2
+    assert shaft.edge.center_mm == (0, 0, crank_arm_spec.ARM_THICKNESS)
+    assert shaft.edge.axis == (0, 0, 1)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "edge_xy=DATUM_B_RIM" in source
-    assert "symbol_xy=DATUM_B_SYMBOL" in source
     assert "shoulder=True" in source
-    assert "position_tolerance_m=0.0001" in source
 
 
 def test_handle_pivot_has_basic_transverse_location_from_datum_c() -> None:
     assert crank_arm_spec.HALF_WIDTH == 8.0
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "handle_transverse = add_edge_dimension(" in source
+    assert "handle_transverse = add_entity_dimension(" in source
     assert 'orientation="vertical"' in source
-    assert "set_arc_endpoints_to_center(\n        adapter, handle_transverse" in source
-    assert "set_basic_dimension(\n        adapter, handle_transverse" in source
+    assert _has_dimension_call("set_arc_endpoints_to_center", "handle_transverse")
+    assert _has_dimension_call("set_basic_dimension", "handle_transverse")
 
 
 def test_cross_hole_has_basic_datum_a_station_and_position_control() -> None:
     assert crank_arm_spec.ARM_THICKNESS / 2.0 == 4.0
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "pin_station = add_edge_dimension(" in source
+    assert "pin_station = add_entity_dimension(" in source
     assert 'label="cross-hole station from datum A"' in source
-    assert "find_edge_near(" in source
-    assert 'label="cross-hole datum-A broad face"' in source
-    assert 'axis="y"' in source
     assert 'orientation="vertical"' in source
-    assert "set_arc_endpoints_to_center(\n        adapter, pin_station" in source
-    assert "set_basic_dimension(\n        adapter, pin_station" in source
+    assert _has_dimension_call("set_arc_endpoints_to_center", "pin_station")
+    assert _has_dimension_call("set_basic_dimension", "pin_station")
     assert 'label="cross-hole true position"' in source
     assert 'datums=("A", "B")' in source
     assert "CROSS-HOLE AXIS INTERSECTS DATUM AXIS B." in crank_arm_spec.DRAWING_NOTES
@@ -150,9 +145,10 @@ def test_dimple_has_both_nominal_location_coordinates() -> None:
     assert crank_arm_spec.HALF_WIDTH == 8.0
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert '"DimpleX":' in source
-    assert "dimple_transverse = add_edge_dimension(" in source
+    assert "dimple_transverse = add_entity_dimension(" in source
     assert 'label="dimple transverse location from datum C"' in source
-    assert "set_arc_endpoints_to_center(\n        adapter,\n        dimple_transverse" in source
+    assert _has_dimension_call("set_arc_endpoints_to_center", "dimple_transverse")
+    assert not _has_dimension_call("set_basic_dimension", "dimple_transverse")
 
 
 def test_gtol_annotations_are_migrated_to_current_xml_format() -> None:
