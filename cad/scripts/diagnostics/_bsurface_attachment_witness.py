@@ -30,6 +30,7 @@ class GridControl(StrEnum):
     OFF = "off"
     BOUNDARY_DOMAIN = "boundary-domain"
     COLUMN_ROW_GRID = "column-row-grid"
+    COLUMN_ROW_READER = "column-row-reader"
 
 
 class GridObservation(StrEnum):
@@ -270,17 +271,28 @@ def _bspline(data, *, evidence=None, control=GridControl.OFF):
         _boundary_control(data, result, evidence)
     if control is GridControl.COLUMN_ROW_GRID:
         _column_row_control(data, result, evidence)
+    if control is GridControl.COLUMN_ROW_READER:
+        # _3d4_qxm observed all 125 distinct native vectors in this domain.
+        # This explicit experiment does not change the disputed default ABI.
+        result["control_point_order"] = "column-row"
     point_reads = []
     if evidence is not None:
         evidence["control_point_reads"] = point_reads
 
     def control_point(row, column):
+        arguments = (row, column)
+        if control is GridControl.COLUMN_ROW_READER:
+            arguments = (column, row)
         record = None
         if evidence is not None:
             record = {"row": row, "column": column}
+            if control is GridControl.COLUMN_ROW_READER:
+                record["arguments"] = arguments
             point_reads.append(record)
-        raw = _read(lambda: data.GetControlPoints(row, column), record, "returned")
-        return _doubles(raw, dimension, label=f"GetControlPoints({row},{column})")
+        raw = _read(lambda: data.GetControlPoints(*arguments), record, "returned")
+        return _doubles(
+            raw, dimension, label=f"GetControlPoints({arguments[0]},{arguments[1]})",
+        )
 
     # Read every 1-based native point. Rational weights remain raw components.
     # Publish a completed grid only after every point passes, but retain each
@@ -299,9 +311,11 @@ def snapshot(face, surface, *, evidence=None):
     Face UV bounds are a parameter rectangle, NOT its trimming loops or BREP.
     The caller still checks drawing PID, owning view, native face identity and
     exact raw silhouette curve/endpoints; no geometric fallback is introduced.
-    An optional journal retains partial metadata and raw scalar/array reads
-    without extra native calls. Only an explicit observation mode adds the
-    bounded exploratory reads; their results never populate the accepted grid.
+    An optional journal retains partial metadata and raw scalar/array reads.
+    Boundary/domain observation modes add bounded exploratory reads whose
+    results never populate the comparison grid. The explicit column-row-reader
+    experiment instead changes the getter arguments, marks its resulting bank,
+    and retains logical indices and actual arguments without duplicate reads.
     """
     control = grid_control_from_environment()
     if control is not GridControl.OFF and evidence is None:
