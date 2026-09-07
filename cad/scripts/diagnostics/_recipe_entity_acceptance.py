@@ -108,7 +108,16 @@ class EntityAcceptance:
                     )
             return validate_native(actual_adapter, annotation, entity, label=label)
 
-        def validate(actual_adapter, annotation, view, entity, *, entity_type, label):
+        def validate(
+            actual_adapter,
+            annotation,
+            view,
+            entity,
+            *,
+            entity_type,
+            entity_context,
+            label,
+        ):
             if label in self.labels:
                 context.capture(
                     actual_adapter,
@@ -119,12 +128,16 @@ class EntityAcceptance:
                     stage=EntityContextStage.FINAL,
                     annotation=annotation,
                 )
+                context.report["stages"][-1]["expected_context"] = (
+                    drawing.AnnotationEntityContext(entity_context).value
+                )
             self.validator(
                 actual_adapter,
                 annotation,
                 view,
                 entity,
                 entity_type=entity_type,
+                entity_context=entity_context,
                 label=label,
             )
             if actual_adapter is not adapter or label not in self.labels:
@@ -134,7 +147,18 @@ class EntityAcceptance:
                 raise RuntimeError(f"duplicate explicit annotation witness {role!r}")
             if entity_type != self.kinds[role][0]:
                 raise RuntimeError(f"{role}: explicit attachment type changed")
-            if int(adapter.swApp.IsSame(entity, source_entities[role])) != 1:
+            source_entity = entity
+            if (
+                drawing.AnnotationEntityContext(entity_context)
+                == drawing.AnnotationEntityContext.VIEW
+            ):
+                source_entity = drawing._drawing_entity_in_source(
+                    view,
+                    entity,
+                    entity_type=entity_type,
+                    label=label,
+                )
+            if int(adapter.swApp.IsSame(source_entity, source_entities[role])) != 1:
                 raise RuntimeError(
                     f"{role}: explicit attachment is not its source role"
                 )
@@ -200,6 +224,7 @@ class EntityAcceptance:
                 view,
                 source_entities[role],
                 entity_type=self.kinds[role][0],
+                entity_context=drawing.AnnotationEntityContext.MODEL,
                 label=f"{phase} {role}",
             )
             drawing._validate_native_pmi_placement(

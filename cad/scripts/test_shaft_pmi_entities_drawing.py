@@ -329,6 +329,8 @@ def test_two_shaft_attachment_calls_use_entities_and_keep_display_seeds(recipe):
     for call in calls:
         keywords = {kw.arg for kw in call.keywords}
         assert "entity" in keywords
+        context = next(kw.value for kw in call.keywords if kw.arg == "entity_context")
+        assert ast.unparse(context) == "AnnotationEntityContext.MODEL"
         assert not keywords & {"attachment_xy", "edge_xy", "edge_entity"}
         assert (
             "position" if call.func.id == "PmiDrawingPlacement" else "symbol_xy"
