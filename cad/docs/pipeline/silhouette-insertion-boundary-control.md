@@ -63,6 +63,15 @@ and recipe time include this instrumentation; this is not a speed comparison.
 Secondary errors are retained without replacing the original rejection. PID0
 remains fatal even when every additional control passes.
 
+The fresh resolver has its own immediate context barrier, not just sample-entry
+and exit checks: the exact captured drawing must still be current and active,
+the original view must occur exactly once in that drawing's native view bank,
+and its referenced part must still be the same owned source. Check again after
+resolution before reading the returned entity. This addresses the reproduced
+case where an earlier `GetFace` changes the active/current document: resolution
+must not run, even if the replacement is another owned document. The refusal is
+secondary evidence; the original PID rejection remains authoritative.
+
 Official bundled contracts used: `GetPersistReference3` is document-scoped and
 its internal bytes may change across rebuilds; `IsSamePersistentID` compares the
 referenced objects (0 different, 1 same, -1 unknown in the official example).
