@@ -1,9 +1,12 @@
 # Cone-gear-shaft native FACE finish placement
 
-The candidate changes only the placement request for the two existing journal
-surface finishes. Native acceptance on this shaft is pending. The part geometry,
-source pin, selected faces, part-owned Ra 1.6 controls, dimensions and PMI remain
-unchanged. The coordinate-selected `tip_runout` PMI is outside this change.
+The two native FACE finishes passed the owned identity/cold control at
+`bd7e3384`, but its printed sheet has two FCF-leader/text crossings. The next
+candidate changes only those two existing FCF origins; its native routing is
+unvalidated. The successful finish placements, selected faces, source pin,
+part-owned controls, five diameter placements and manufacturing values stay
+unchanged. The historical finish-placement failure and positive control below
+remain evidence of their respective call shapes.
 
 ## Retained failure
 
@@ -81,7 +84,7 @@ Primary API pages read in the bundled reference:
 [SetLeaderAttachmentPointAtIndex](https://help.solidworks.com/2026/english/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.IAnnotation~SetLeaderAttachmentPointAtIndex.html),
 [GetAttachedEntities3](https://help.solidworks.com/2026/english/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.IAnnotation~GetAttachedEntities3.html).
 
-## Tests and next native acceptance
+## Original finish-candidate tests and native invocation
 
 Two new actual-call tests failed first against the old recipe because it passed
 both coordinate arguments (`pytest-telemetry/run-sm4lyetr`). The existing datum
@@ -110,10 +113,11 @@ uv run --no-sync python cad/scripts/diagnostics/probe_datum_policy_recipes.py `
   --candidate HEAD --factory prepared --target cone_gear_shaft
 ```
 
-Required evidence remains both exact finish attachments through built/cold
-reopen, unchanged source/dimension/PMI banks, final manufacturing/layout checks
-and a readable freshly exported PNG. No acceptance predicate or source pin is
-changed. No native run was performed while preparing this candidate.
+Use the same invocation for the two-FCF candidate. Required evidence remains
+both exact finish attachments through built/cold reopen, unchanged source/
+dimension/PMI banks, and a readable freshly exported PNG with measured native
+leader/text clearance. No acceptance predicate or source pin changes. The
+original offline preparation did not itself establish native acceptance.
 
 ## Review follow-up: preserve production identity guards
 
@@ -132,3 +136,103 @@ Native EDGE/SILHOUETTE paths and positioned paths are unchanged. Tests retain
 the wrong-owner repro, equal-geometry/wrong-identity cases, exact type/count
 refusals and source-mapping controls. This repairs a production guard regression;
 it does not establish native placement, cold persistence or printed acceptance.
+
+## Shaft native identity/cold PASS; visual FAIL
+
+The prepared-factory pilot at
+`bd7e33843eb65d1d22afa4fa8e413b1b78cd59cd` completed with `status=passed`:
+`cad/out/reports/datum-policy-y25nr2w2/pilot.json`, SHA-256
+`5f6e6a4fc524c95147d3231fee20c0f92392b17c1bf3b6c515defe41d2857c92`.
+Both native FACE finishes, datum A and journal cylindricity passed the explicit
+entity banks. Tip runout remained a separately reported coordinate-picked role;
+the explicit identity result must not be extended to that selection.
+
+Built/cold annotation comparison had zero rejected leaves, zero coordinate
+roundoff allowances and zero zero-Z allowances. Source values/tolerances and
+semantic attachments passed their existing comparisons. Original and owned-copy
+SHA stayed `8df108cb4053bd47bcc1acc8b83fede6e3a52a9d3c4f6341c1ab3702d512b0ab`
+through copying, recipe, close, cold reopen/close and final guards. The template
+and other protected inputs stayed exact, with no runtime guard errors.
+Ownership preserved the single visible clean `cylinder-gear.SLDPRT` baseline;
+probe/cleanup errors were null. Ownership receipt SHA-256:
+`ae29fab2c07e2e0c689476883528c69a8a3b0068572a2e0facb860406b6cb159`.
+
+Recipe time was 23.1330910 s, separate prepared-template miss 37.1590173 s,
+lookup hit 0.0479042 s, and whole pilot 171.6899835 s. This is one sample, not
+a performance comparison. The built artifacts under the receipt's
+`cone_gear_shaft/` directory use stem
+`cone-gear-shaft-datum-policy-y25nr2w2-cone_gear_shaft`:
+
+- PDF SHA-256: `c618e8764d535d30a2d962301a5d21ece8917965c1359054b02fd5b17c4f9323`.
+- PNG SHA-256: `afa74c3a14ca69043a2bf08c94188508b028680ca5b369e19dfb8333ec736dce`.
+
+Inspection of that PNG found two real text crossings. Raw annotation segments
+and measured text boxes identify their owners; PDFium's lower-left glyph boxes
+independently corroborate the printed locations. The following coordinates are
+sheet millimetres, displayed to six decimals; the receipt retains raw metres.
+
+| Leader / obstacle | Native segment, elbow to attachment | Crossed native text box |
+| --- | --- | --- |
+| `Drawing View1/HARMONIC_PMI_tip_runout` / `DetailItem358` Ra 1.6 | `(63.650000,241.500000)` to `(66.731808,215.396875)` | `(57.900407,219.592875)` to `(71.697340,225.172741)` |
+| `Drawing View2/HARMONIC_PMI_journal_cylindricity` / `Sec2Dia` 6.350 | `(143.650000,138.500000)` to `(43.649646,83.331143)` | `(95.862898,115.517778)` to `(108.812365,121.097644)` |
+
+The first segment crosses PDF glyph 722 (`1` in Ra 1.6). The second crosses
+glyphs 785/786 (`5`/`0` in 6.350) and 791/793/794 (the upper `0.00` zeros).
+These are glyph-box checks backed by the inspected PNG, not a general exact
+glyph-outline intersection algorithm. The retained-coordinate regression in
+`test_cone_gear_shaft_drawing.py` reproduces both old leader/text-box crossings
+without COM or access to the original artifact files.
+
+The five diameter strokes have ten pairwise intersections, all at the common
+centre `(55,105)`, and no crossings through another diameter's measured text
+box. The cylindricity leader adds the off-centre intersections: Sec2's shelf at
+`(101.913090,115.474305)`, Sec3's radial line at `(80.750289,103.799071)` and
+Sec4's radial line at `(70.963496,98.399829)`. The radial fan is visually busy,
+but these observations do not justify treating every common-centre diameter
+intersection as an erroneous leader crossing.
+
+The pilot's layout comparison checks persistence of view positions/scales and
+annotation geometry, not all-pairs ink clearance. Here it correctly proved that
+the bad layout persisted exactly. **Native identity/cold PASS is not visual
+acceptance**, and no cold PDF/PNG pixel comparison was performed.
+
+## Two-FCF presentation candidate — native validation pending
+
+Only two existing `PmiDrawingPlacement.position` arguments change:
+
+| Model-owned control | Old origin (mm) | Candidate origin (mm) |
+| --- | --- | --- |
+| `journal_cylindricity` | `(150,142)` | `(100,85)` |
+| `tip_runout` | `(70,245)` | `(110,245)` |
+
+The tip frame requests the free upper band further right of the native finish.
+The cylindricity frame requests the band below the diameter labels and above
+manufacturing notes. Translating its measured 7 mm-high frame to the candidate
+origin gives a nominal 6.464 mm gap to the lowest diameter body and 5.709 mm to
+the notes. Those translated-body gaps are placement rationale, **not a prediction
+of the new native leader route or proof of clearance**.
+
+The exact existing view/entity references, coordinate-picked tip attachment,
+datum A position, two no-leader FACE finish calls, `END_KEEP`, dimension
+precision, tolerances, controls and notes are preserved. No arrangement call,
+extra save/rebuild, helper change or manufacturing edit is added. The bundled
+`IAnnotation.SetPosition2` contract supports GTol origins but allows native
+placement restrictions; it cannot certify these proposed routes offline.
+
+The actual-call regression failed first in precisely the two FCF cases against
+`bd7e3384`; the eight other placement fields were identical. The datum case and
+all prior shaft tests passed (`pytest-telemetry/run-4ea9skkg`: 2 failed,
+13 passed). Existing native FACE tests still require the exact original controls
+and entities with no coordinate arguments. The candidate needs a new serialized
+native pilot, fresh leader/attachment readback, unchanged manufacturing and cold
+banks, and native/PDF/PNG clearance inspection before visual acceptance. No
+candidate native run has occurred.
+
+Candidate offline verification passed 228 focused/adjacent tests in 17.73 s
+(`pytest-telemetry/run-m9zafl_8`): shaft/batch contracts, native FACE recipe and
+helper controls, finish ownership, GTol projection, VIEW acceptance and source
+manifest tests. A complete recipe AST comparison against `bd7e3384`, restoring
+only the two old position literals in memory, was identical. Ruff F and
+`git diff --check` passed. Tests used the existing isolated rehearsal venv with
+unchanged adapter `25bc99b1ae39d8c0e004867e9b5c0f2068f2abc2`; no root environment
+or native documents were touched. This is not a full-pipeline or native gate.
