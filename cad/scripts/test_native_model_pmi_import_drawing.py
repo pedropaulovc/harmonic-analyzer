@@ -11,6 +11,8 @@ from unittest.mock import Mock
 import pytest
 
 from diagnostics import probe_native_model_pmi as probe
+from diagnostics import _owned_native_documents as owned
+from test_owned_native_documents_drawing import Model, native as native
 
 
 def valid_records():
@@ -236,35 +238,48 @@ def test_native_pdf_render_accepts_different_sheet_sizes(tmp_path, width_points)
 
 @pytest.mark.parametrize("outcome", ["passed", "failed"])
 def test_worker_never_opens_original_and_exports_even_after_witness_failure(
-    monkeypatch, tmp_path, outcome
+    monkeypatch, tmp_path, native, outcome
 ):
     from solidworks_mcp.adapters.solidworks import drawing
-    from contextlib import nullcontext
     from unittest.mock import AsyncMock
 
     source = tmp_path / "original.SLDPRT"
     source.write_bytes(b"unchanged native source")
     directory = tmp_path / "unique"
     directory.mkdir()
-    adapter, model = Mock(), Mock()
-    adapter.swApp.CloseAllDocuments.return_value = True
-    adapter.close_owned_documents = AsyncMock()
-    adapter.ownership.creating_document.side_effect = lambda *_: nullcontext()
-    adapter.ownership.saving_as.side_effect = lambda *_: nullcontext()
+    native.app.CloseAllDocuments = Mock()
+    adapter = owned.DiagnosticAdapter(native.adapter)
+    cleanup = AsyncMock(wraps=adapter.ownership.close_owned_documents)
+    monkeypatch.setattr(adapter.ownership, "close_owned_documents", cleanup)
+    scopes = Mock(wraps=adapter.ownership.saving_as)
+    monkeypatch.setattr(adapter.ownership, "saving_as", scopes)
     opened = []
+    original_open = native.adapter.open_model
 
     async def open_model(path):
         opened.append(Path(path))
-        adapter.currentModel = model
-        model.GetPathName.return_value = path
-        return object()
+        return await original_open(path)
 
     def create_drawing(adapter):
+        model = Model(None, title="Native PMI drawing")
+        model.Create3rdAngleViews2 = Mock(return_value=True)
+        native.app.documents.append(model)
+        native.app.ActiveDoc = model
         adapter.currentModel = model
 
-    def save_drawing(adapter, path, *, pdf_path):
-        Path(path).write_bytes(b"new drawing")
-        Path(pdf_path).write_bytes(b"new pdf")
+    def save_drawing(adapter, path, *, pdf_path, artifact_context):
+        record = adapter.ownership.assert_current_owned()
+        for kind, target in (("drawing", path), ("pdf", pdf_path)):
+            with artifact_context(kind, target):
+                assert adapter.ownership.assert_current_owned() is record
+                Path(target).write_bytes(
+                    b"new drawing" if kind == "drawing" else b"new pdf"
+                )
+                if kind == "drawing":
+                    record.handle.path, record.handle.title = target, Path(target).name
+            # SaveAs changes the same handle; scope exit must reconcile its path.
+            assert adapter.ownership.assert_current_owned() is record
+            assert record.state["path"] == path
 
     records = valid_records()
     if outcome == "failed":
@@ -289,7 +304,7 @@ def test_worker_never_opens_original_and_exports_even_after_witness_failure(
         asyncio.run(probe.probe(adapter, source, directory))
     assert source not in opened
     adapter.swApp.CloseAllDocuments.assert_not_called()
-    assert adapter.close_owned_documents.await_count == 2
+    assert cleanup.await_count == 2
     assert len(opened) == 2
     assert all(path.parent == directory for path in opened)
     assert source.read_bytes() == b"unchanged native source"
@@ -303,3 +318,7 @@ def test_worker_never_opens_original_and_exports_even_after_witness_failure(
     )
     for stage in ("initial", "reopened"):
         assert all(Path(path).is_file() for path in report[stage]["exports"].values())
+    assert [call.args for call in scopes.call_args_list] == [
+        (report[stage]["exports"]["drawing"],) for stage in ("initial", "reopened")
+    ]
+    assert native.app.documents == []
