@@ -2,8 +2,8 @@
 
 Status: native baseline reproduced the printed shift; the one pre-save redraw
 did not prevent it. This diagnostic does not change production finalization.
-The next independently selected candidate, one checked pre-save `EditRebuild3`,
-is prepared offline but has not run natively.
+One checked pre-save `EditRebuild3` also returned `True` without preventing the
+same printed shift. Both independent native controls are recorded below.
 
 The retained rocker control proved a real printed change: cold reopening moved
 all ten `rocker-arm` title glyphs right by about 7.22523 mm, while the note anchor,
@@ -186,3 +186,47 @@ does not prevent linked-title recentering on cold reopen**. Late `EditRebuild3`,
 late `ForceRebuild3`, same-value native justification reapplication, and the modern
 model-view redraw method remain untested here. No production fallback or comparator
 relaxation follows from this result.
+
+## Native result: checked EditRebuild3 also leaves the shift
+
+One separately approved invocation at frozen
+`09dcae4cd220f945f930fa40c15ccb097c205473`, with explicit candidate
+`pre_save_edit_rebuild`, finished with exit 0 and `candidate_not_stable` on
+2026-09-06, 17:48:44–17:50:56 PDT. The fresh baseline reproduced first; there was
+no automatic retry. The existing PID was 31860, with an empty initial inventory.
+
+- Trace: `0x5a76b8cba34db633e04e04d28fe860d8`; task 131.745262 s.
+- Report: `C:/src/ha-perf-title-update/cad/out/reports/fresh-title-8zhi6y5h/title-update.json`.
+- Report SHA-256: `2fc6f75d39f802c8bd4f38a53e9a163cca2b3e36e6863986b8c40a431c9b6954`.
+- Baseline trial: 65.162347 s; candidate: 64.947117 s, including diagnostic
+  measurements and cold exports, not a performance comparison.
+- The candidate made exactly one `EditRebuild3()`, returned native `True`, and
+  took 0.044046 s. It made no redraw call.
+
+Both trials again shifted all ten title glyphs right by 7.22522650825 mm on cold
+reopen, with 11,232 changed PNG pixels in the same title-only bounding rectangle.
+The first and cold PNGs have respectively the same `e5373867…` and `dfe17a7f…`
+hashes recorded above: baseline, redraw and rebuild all produced identical
+printed states. The rebuild candidate's two distinct PNGs were visually inspected.
+
+The post-rebuild title origin remains `0.35389179984999647` m, unchanged through
+native save and first PDF export. Cold reopen changes it to
+`0.3611170096970891` m. Each trial's complete cold-leaf audit again reports only
+the three title-X representations listed above, maximum delta
+`0.0072252098470926285` m; the subsequent PDF-only export changes zero leaves.
+Anchor, extent, justification, lock/link/text and all other annotation leaves
+remain unchanged. The documented successful rebuild return therefore does not
+prove title-display data was refreshed.
+
+Both original parts, the template and both owned source-copy disk hashes remain
+exact. Named source dimensions, tolerances/configuration, view references and
+annotation semantic/layout witnesses pass with the same limited minimal-view
+scope described above. Ownership reports `[]` to `[]`, `preserved`, and no probe
+or cleanup error. All owned documents were closed, and the COM seat was explicitly
+released. Source remained frozen throughout the invocation; 55 focused offline
+tests and Ruff had passed before it.
+
+This is a negative result for **one pre-native-save checked EditRebuild3 in this
+fresh minimal drawing**, not a general rebuild or linked-title API verdict.
+Same-value justification reapplication, force rebuild and model-view redraw
+remain untested here. No production or comparator change is made by this evidence.
