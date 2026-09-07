@@ -221,3 +221,205 @@ def test_worker_dispatches_complete_source_capture_through_owned_runner(native, 
     report_path = Path(result["report"])
     assert report_path.is_relative_to(probe.ROOT / "cad/out/reports")
     assert json.loads(report_path.read_text(encoding="utf-8"))["status"] == "captured"
+
+
+# Independent native receipt values, including the measured float above nominal.
+MANUFACTURING_DIMENSIONS = (
+    ("arm-width overall", "Right", 0.016, 0, (0, 0)),
+    ("shaft-to-handle-pivot location", "Front", 0.0750000001144, 1, (1, 1)),
+    ("handle-pivot transverse location", "Front", 0.008, 1, (0, 1)),
+    ("dimple transverse location from datum C", "Front", 0.008, 0, (0, 1)),
+    ("cross-hole station from datum A", "Top", 0.004, 1, (0, 1)),
+)
+
+
+@pytest.fixture
+def manufacturing(monkeypatch, tmp_path):
+    """A complete 13-dimension native-shaped drawing; no cad/out receipts needed."""
+    from diagnostics import probe_drawing_attachments as attachments
+
+    monkeypatch.setattr(probe, "_early_bound", lambda obj, _kind: obj)
+    monkeypatch.setattr(attachments, "_early_bound", lambda obj, _kind: obj)
+    views, recorded, handles, annotations = {}, {}, {}, {}
+
+    def add(label, view_name, value, basic=0, arcs=(0, 0), *, full_name=None, hole=False):
+        index = len(handles)
+        annotation_name = f"Dimension{index}"
+        key = f"{view_name}/{annotation_name}"
+        tolerance = SimpleNamespace(Type=basic, GetMinValue=lambda: 0.0, GetMaxValue=lambda: 0.0)
+        dimension = SimpleNamespace(
+            FullName=full_name or f"D{index}@Drawing",
+            Tolerance=tolerance,
+            GetSystemValue2=Mock(return_value=value),
+            GetSystemValue3=Mock(return_value=(value,)),
+            GetArcEndCondition=Mock(side_effect=lambda endpoint: arcs[endpoint - 1]),
+        )
+        display = SimpleNamespace(
+            GetDimension2=Mock(return_value=dimension),
+            IsReferenceDim=Mock(return_value=full_name is None),
+            IsHoleCallout=Mock(return_value=hole),
+            ShowDimensionValue=True,
+            GetPrimaryPrecision2=lambda: 3,
+            GetPrimaryTolPrecision2=lambda: 2,
+            GetText=Mock(return_value=""),
+        )
+        if hole:
+            display.GetText.side_effect = AssertionError("GetText does not support hole callouts")
+        annotation = SimpleNamespace(
+            GetType=lambda: 4, GetName=lambda: annotation_name,
+            GetSpecificAnnotation=lambda: display,
+        )
+        if view_name not in views:
+            views[view_name] = SimpleNamespace(
+                GetName2=lambda: view_name, GetUniqueName=lambda: f"Unique-{view_name}",
+                GetAnnotations=Mock(return_value=[]), ReferencedConfiguration="Default",
+            )
+        views[view_name].GetAnnotations.return_value.append(annotation)
+        recorded[label] = (view_name, annotation_name)
+        handles[label] = SimpleNamespace(dimension=dimension, display=display, annotation=annotation)
+        annotations[key] = {"semantic": {"texts": [{"text": "THRU"}] if hole else []}}
+
+    for label, view, value, basic, arcs in MANUFACTURING_DIMENSIONS:
+        add(label, view, value, basic, arcs)
+    add("crank-arm cross-hole", "Top", 0.004623, hole=True)
+    add("handle pivot hole", "Front", 0.005953125, hole=True)
+    for feature, names in probe.DRAWING_DIMENSIONS.items():
+        for name in sorted(names):
+            add(name, "Right" if name == "Depth" else "Front", 0.008,
+                full_name=f"{name}@{feature}@crank-arm.Part")
+    # Non-dimension annotations must not be interpreted as IDisplayDimension.
+    views["Front"].GetAnnotations.return_value.append(SimpleNamespace(GetType=lambda: 1))
+    sheet = SimpleNamespace(GetName2=lambda: "Sheet1")
+    model = SimpleNamespace(GetViews=lambda: ((sheet, *views.values()),))
+    receipt = {
+        "status": "captured", "provenance": {"source_sha256": probe.EXPECTED_SOURCE_SHA},
+        "attachments": {"dimensions": {
+            f"Sheet1/{'/'.join(recorded[label])}/4": {"components": [{"value_system": value}]}
+            for label, value in (
+                ("arm-width overall", 0.016),
+                ("shaft-to-handle-pivot location", 0.075000000114),
+                ("handle-pivot transverse location", 0.008),
+                ("dimple transverse location from datum C", 0.008),
+                ("cross-hole station from datum A", 0.004),
+            )
+        }},
+    }
+    receipt_path = tmp_path / "native-baseline-receipt.json"
+
+    def write_receipt():
+        receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+        monkeypatch.setattr(probe, "BASELINE_DRAWING_REPORT_SHA", probe.sha(receipt_path))
+
+    monkeypatch.setattr(probe, "BASELINE_DRAWING_REPORT", receipt_path)
+    write_receipt()
+
+    def collect():
+        return {"dimensions": probe.drawing_dimensions(model), "annotations": annotations,
+                "sheet": (0.4318, 0.2794, 2.0, 1.0)}
+
+    return SimpleNamespace(
+        model=model, views=views, recorded=recorded, handles=handles,
+        collect=collect, receipt=receipt, receipt_path=receipt_path, write_receipt=write_receipt,
+    )
+
+
+def test_actual_dimension_collector_and_manufacturing_validator_share_native_keys(manufacturing):
+    row = manufacturing.collect()
+    assert len(row["dimensions"]) == 13
+    assert row["dimensions"].keys() == row["annotations"].keys()
+    assert all(not key.startswith("Sheet1/") and "Unique-" not in key for key in row["dimensions"])
+    probe.require_manufacturing(row, manufacturing.recorded)
+    key = "/".join(manufacturing.recorded["shaft-to-handle-pivot location"])
+    assert row["dimensions"][key]["value_system"] == 0.0750000001144
+    for handle in manufacturing.handles.values():
+        handle.display.GetDimension2.assert_called_once_with(0)
+        if handle.display.IsReferenceDim.return_value:
+            handle.dimension.GetSystemValue2.assert_called_once_with("")
+            handle.dimension.GetSystemValue3.assert_not_called()
+            continue
+        handle.dimension.GetSystemValue3.assert_called_once_with(3, "Default")
+        handle.dimension.GetSystemValue2.assert_not_called()
+
+
+@pytest.mark.parametrize("fault", ["basic", "tangent", "value", "nominal_instead_of_native", "hidden_value"])
+def test_manufacturing_rejects_changed_native_dimension_meaning(manufacturing, fault):
+    label = "shaft-to-handle-pivot location"
+    handle = manufacturing.handles[label]
+    if fault == "basic":
+        handle.dimension.Tolerance.Type = 0
+    if fault == "tangent":
+        handle.dimension.GetArcEndCondition.side_effect = lambda _index: 0
+    if fault == "value":
+        # Two picometres exceeds the unchanged round(..., 12) receipt boundary.
+        handle.dimension.GetSystemValue2.return_value += 0.000000000002
+    if fault == "nominal_instead_of_native":
+        handle.dimension.GetSystemValue2.return_value = 0.075
+    if fault == "hidden_value":
+        handle.display.ShowDimensionValue = False
+    with pytest.raises(RuntimeError, match="native measurement/BASIC/arc meaning changed"):
+        probe.require_manufacturing(manufacturing.collect(), manufacturing.recorded)
+
+
+@pytest.mark.parametrize("label", [item[0] for item in MANUFACTURING_DIMENSIONS])
+def test_every_added_dimension_keeps_the_exact_twelve_place_native_boundary(manufacturing, label):
+    manufacturing.handles[label].dimension.GetSystemValue2.return_value += 0.000000000002
+    with pytest.raises(RuntimeError, match="native measurement/BASIC/arc meaning changed"):
+        probe.require_manufacturing(manufacturing.collect(), manufacturing.recorded)
+
+
+@pytest.mark.parametrize("label", ["arm-width overall", "dimple transverse location from datum C"])
+def test_manufacturing_rejects_adding_basic_to_ordinary_dimensions(manufacturing, label):
+    manufacturing.handles[label].dimension.Tolerance.Type = 1
+    with pytest.raises(RuntimeError, match="native measurement/BASIC/arc meaning changed"):
+        probe.require_manufacturing(manufacturing.collect(), manufacturing.recorded)
+
+
+@pytest.mark.parametrize("label", ["crank-arm cross-hole", "handle pivot hole"])
+@pytest.mark.parametrize("fault", ["missing_text", "fake_callout"])
+def test_manufacturing_requires_native_hole_callouts_and_actual_text(manufacturing, label, fault):
+    row = manufacturing.collect()
+    key = "/".join(manufacturing.recorded[label])
+    if fault == "missing_text":
+        row["annotations"][key]["semantic"]["texts"] = []
+    if fault == "fake_callout":
+        row["dimensions"][key]["hole_callout"] = False
+    with pytest.raises(RuntimeError, match="native Hole Wizard callout|actual displayed hole text"):
+        probe.require_manufacturing(row, manufacturing.recorded)
+
+
+@pytest.mark.parametrize("fault", ["missing_marked", "sheet_scale"])
+def test_manufacturing_requires_complete_marked_union_and_sheet_scale(manufacturing, fault):
+    row = manufacturing.collect()
+    if fault == "missing_marked":
+        del row["dimensions"]["/".join(manufacturing.recorded["Depth"])]
+    if fault == "sheet_scale":
+        row["sheet"] = (0.4318, 0.2794, 1.0, 1.0)
+    with pytest.raises(RuntimeError, match="marked dimension union or sheet scale"):
+        probe.require_manufacturing(row, manufacturing.recorded)
+
+
+@pytest.mark.parametrize("fault", ["receipt_sha", "wrong_source", "failed_receipt"])
+def test_manufacturing_requires_pinned_successful_native_source_receipt(manufacturing, fault):
+    if fault == "receipt_sha":
+        manufacturing.receipt_path.write_text("{}", encoding="utf-8")
+    if fault == "wrong_source":
+        manufacturing.receipt["provenance"]["source_sha256"] = "different source"
+        manufacturing.write_receipt()
+    if fault == "failed_receipt":
+        manufacturing.receipt["status"] = "failed"
+        manufacturing.write_receipt()
+    with pytest.raises(RuntimeError, match="baseline receipt changed|baseline has the wrong source"):
+        probe.require_manufacturing(manufacturing.collect(), manufacturing.recorded)
+
+
+def test_dimension_collector_rejects_duplicate_annotation_identity(manufacturing):
+    view = manufacturing.views["Front"]
+    view.GetAnnotations.return_value.append(view.GetAnnotations.return_value[0])
+    with pytest.raises(RuntimeError, match="duplicate drawing dimension identity: Front/"):
+        manufacturing.collect()
+
+
+def test_dimension_collector_rejects_nonfinite_readback(manufacturing):
+    manufacturing.handles["arm-width overall"].dimension.GetSystemValue2.return_value = float("nan")
+    with pytest.raises(RuntimeError, match="non-finite"):
+        manufacturing.collect()
