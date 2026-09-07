@@ -65,11 +65,23 @@ class Adapter:
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "mode", ["normal", "build_failure", "source_drift", "reopen_drift", "adapter_drift"]
+    "mode",
+    [
+        "normal",
+        "build_failure",
+        "source_drift",
+        "reopen_drift",
+        "reopen_rejected",
+        "adapter_drift",
+    ],
+)
+@pytest.mark.parametrize(
+    "targets", [None, ("channel_lever",), tuple(reversed(probe.ORDER))]
 )
 async def test_one_fresh_recipe_each_in_order_and_stop_first_failure(
-    tmp_path, monkeypatch, mode
+    tmp_path, monkeypatch, mode, targets
 ):
+    expected_order = probe.ORDER if targets is None else targets
     source_root, guard_root = fixture_sources(tmp_path, monkeypatch)
     monkeypatch.setattr(
         probe.benchmark,
@@ -114,6 +126,12 @@ async def test_one_fresh_recipe_each_in_order_and_stop_first_failure(
     def compare(before, after):
         if before != after:
             raise RuntimeError("saved annotation changed")
+        if mode == "reopen_rejected":
+            return {
+                "status": "failed",
+                "rejected": ["title moved"],
+                "coordinate_roundoff": [],
+            }
         return {"status": "passed", "rejected": [], "coordinate_roundoff": []}
 
     monkeypatch.setattr(probe, "compare_drawing_reopen", compare)
@@ -121,20 +139,29 @@ async def test_one_fresh_recipe_each_in_order_and_stop_first_failure(
     output_root = tmp_path / "reports"
     if mode == "normal":
         result = await probe.pilot(
-            adapter, "candidate", source_root, guard_root, output_root
+            adapter, "candidate", source_root, guard_root, output_root, targets=targets
         )
         report_path = Path(result["report"])
     else:
         with pytest.raises(RuntimeError):
             await probe.pilot(
-                adapter, "candidate", source_root, guard_root, output_root
+                adapter,
+                "candidate",
+                source_root,
+                guard_root,
+                output_root,
+                targets=targets,
             )
         (report_path,) = output_root.glob("*/pilot.json")
     report = json.loads(report_path.read_text())
-    assert len(adapter.drawn) == (2 if mode == "normal" else 1)
+    assert len(adapter.drawn) == (len(expected_order) if mode == "normal" else 1)
+    assert report["order"] == list(expected_order)
+    assert [trial["target"] for trial in report["trials"]] == list(
+        expected_order[: len(adapter.drawn)]
+    )
     # Source files are now unique owned copies. Reusing the original source
     # would mutate an already-visible user's model dimension callout text.
-    for target, (outputs, source) in zip(probe.ORDER, adapter.drawn):
+    for target, (outputs, source) in zip(expected_order, adapter.drawn):
         assert source.parent == outputs.slddrw.parent
         assert source.name.startswith(target.replace("_", "-") + "-source-")
         assert source.name != target.replace("_", "-") + ".SLDPRT"
@@ -159,23 +186,114 @@ async def test_one_fresh_recipe_each_in_order_and_stop_first_failure(
     assert not registered_sources.intersection(source for _, source in adapter.drawn)
     assert len(registered_sources) == 4
     if mode == "normal":
+        assert len(snapshots) == 2 * len(expected_order)
+        assert all(
+            trial["reopen_annotation_comparison"]["status"] == "passed"
+            for trial in report["trials"]
+        )
+        assert all(
+            set(trial["copy_hashes"])
+            == {"copied", "after_recipe", "after_close", "after_reopened_close"}
+            for trial in report["trials"]
+        )
         assert all(
             trial["copy_final"] == probe.EXPECTED_PART_HASHES[trial["target"]]
             for trial in report["trials"]
         )
 
 
+@pytest.mark.parametrize(
+    "targets",
+    [
+        (),
+        ("unknown",),
+        ("arbor_pedestal",),
+        ("channel_lever", "channel_lever"),
+        "channel_lever",
+    ],
+)
+def test_invalid_target_order_is_rejected(targets):
+    with pytest.raises(ValueError):
+        probe.target_order(targets)
+
+
+@pytest.mark.parametrize(
+    "targets", [None, ("channel_lever",), tuple(reversed(probe.ORDER))]
+)
+@pytest.mark.parametrize("route", ["parent", "worker"])
+def test_repeatable_target_cli_keeps_exact_order(monkeypatch, tmp_path, targets, route):
+    import asyncio
+    import sys
+
+    expected = probe.ORDER if targets is None else targets
+    monkeypatch.setattr(probe, "require_owned_diagnostic_environment", lambda: None)
+    monkeypatch.setattr(probe.benchmark, "revision", lambda _: "frozen")
+    parent = Mock()
+    monkeypatch.setitem(sys.modules, "dodo", SimpleNamespace(_run=parent))
+    received = []
+
+    async def pilot(*args, targets=None):
+        received.append(probe.target_order(targets))
+        return 0
+
+    monkeypatch.setattr(probe, "pilot", pilot)
+    monkeypatch.setattr(
+        probe, "run_copy_diagnostic", lambda callback: asyncio.run(callback(object()))
+    )
+    arguments = ["--source-root", str(tmp_path), "--guard-root", str(tmp_path)]
+    for target in targets or ():
+        arguments.extend(("--target", target))
+    if route == "worker":
+        arguments.append("--worker")
+    assert probe.main(arguments) == 0
+    if route == "worker":
+        assert received == [expected]
+        parent.assert_not_called()
+        return
+    (call,) = parent.call_args_list
+    command = call.args[0]
+    assert (
+        tuple(
+            command[index + 1]
+            for index, argument in enumerate(command)
+            if argument == "--target"
+        )
+        == expected
+    )
+    assert call.kwargs["com"] is True
+
+
+@pytest.mark.parametrize("targets", [("unknown",), ("channel_lever", "channel_lever")])
+def test_bad_cli_targets_fail_before_native_environment(monkeypatch, tmp_path, targets):
+    environment = Mock(side_effect=AssertionError("selection must fail first"))
+    monkeypatch.setattr(probe, "require_owned_diagnostic_environment", environment)
+    arguments = ["--source-root", str(tmp_path), "--guard-root", str(tmp_path)]
+    for target in targets:
+        arguments.extend(("--target", target))
+    with pytest.raises((ValueError, SystemExit)):
+        probe.main(arguments)
+    environment.assert_not_called()
+
+
 @pytest.mark.asyncio
+@pytest.mark.parametrize("targets", [None, ("channel_lever",)])
+@pytest.mark.parametrize("corrupted_root", ["source", "guard"])
 async def test_wrong_exact_source_fails_before_open_or_recipe_execution(
-    tmp_path, monkeypatch
+    tmp_path, monkeypatch, targets, corrupted_root
 ):
     source_root, guard_root = fixture_sources(tmp_path, monkeypatch)
-    (source_root / "rocker-arm.SLDPRT").write_bytes(b"different identity")
+    directory = source_root if corrupted_root == "source" else guard_root
+    (directory / "rocker-arm.SLDPRT").write_bytes(b"different identity")
     monkeypatch.setattr(probe.benchmark, "revision", lambda _: "candidate")
     adapter = Adapter("normal")
     with pytest.raises(RuntimeError, match="immutable source hash mismatch"):
         await probe.pilot(
-            adapter, "candidate", source_root, guard_root, tmp_path / "reports"
+            adapter,
+            "candidate",
+            source_root,
+            guard_root,
+            tmp_path / "reports",
+            targets=targets,
         )
     assert adapter.drawn == adapter.opened == []
     (report_path,) = (tmp_path / "reports").glob("*/pilot.json")
