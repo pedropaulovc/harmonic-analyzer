@@ -2181,7 +2181,11 @@ def verify_dimension_callouts(
         if display.IsHoleCallout() is not False:
             raise RuntimeError(f"dimension {name!r}: GetText does not support hole callouts")
         if location in ("prefix", "suffix", "all"):
-            from _model_dimension_callouts import _dimension_presentation, _whole_text_presentation
+            from _model_dimension_callouts import (
+                NumericVisibility,
+                _dimension_presentation,
+                _whole_text_presentation,
+            )
 
             source_display = _early_bound(_source_display, "IDisplayDimension")
             if source_display.IsHoleCallout() is not False:
@@ -2192,7 +2196,7 @@ def verify_dimension_callouts(
             if location != "all":
                 fields = list(source_state[0])
                 fields[text_part - 1] = fields[text_part + 3] = text
-                expected = tuple(fields), True
+                expected = tuple(fields), NumericVisibility.VISIBLE
             if source_state != expected or actual != expected:
                 raise RuntimeError(
                     f"{name}@{feature_name}: imported presentation/numeric visibility differs: "

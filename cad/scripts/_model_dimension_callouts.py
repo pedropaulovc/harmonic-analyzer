@@ -5,6 +5,7 @@ GetText readback, not a truthy return, witnesses the exact literal field. Saving
 and cold-reopen/print acceptance belong to the caller's build and drawing gates.
 """
 
+from enum import StrEnum
 from typing import Any, Literal, Mapping
 
 from _common import _early_bound
@@ -12,8 +13,13 @@ from _drawing_marks import _named_dimension
 import _telemetry
 
 
-def _dimension_presentation(display: Any) -> tuple[tuple[str, ...], bool]:
-    """Read raw native text/definition fields and numeric visibility, uncoerced."""
+class NumericVisibility(StrEnum):
+    VISIBLE = "visible"
+    HIDDEN = "hidden"
+
+
+def _dimension_presentation(display: Any) -> tuple[tuple[str, ...], NumericVisibility]:
+    """Validate the native Boolean locally; transmit explicit visibility state."""
     display = _early_bound(display, "IDisplayDimension")
     visible = display.ShowDimensionValue
     if type(visible) is not bool:
@@ -21,12 +27,13 @@ def _dimension_presentation(display: Any) -> tuple[tuple[str, ...], bool]:
     fields = tuple(display.GetText(part) for part in range(1, 9))
     if any(type(text) is not str for text in fields):
         raise RuntimeError(f"dimension has unsupported native text: {fields!r}")
-    return fields, visible
+    visibility = NumericVisibility.VISIBLE if visible else NumericVisibility.HIDDEN
+    return fields, visibility
 
 
-def _whole_text_presentation(text: str) -> tuple[tuple[str, ...], bool]:
+def _whole_text_presentation(text: str) -> tuple[tuple[str, ...], NumericVisibility]:
     """The complete documented SetText(All) result, including definition fields."""
-    return (text, "", "", "", text, "", "", ""), False
+    return (text, "", "", "", text, "", "", ""), NumericVisibility.HIDDEN
 
 
 def _require_presentation(actual, expected, label: str) -> None:
@@ -93,13 +100,13 @@ def author_model_callouts(
             before_fields, before_visible = _dimension_presentation(display)
             expected = _whole_text_presentation(text)
             if location != "all":
-                if before_visible is not True:
+                if before_visible is not NumericVisibility.VISIBLE:
                     raise RuntimeError(
                         "reference dimension requires its native numeric value visible"
                     )
                 fields = list(before_fields)
                 fields[text_part - 1] = fields[text_part + 3] = text
-                expected = tuple(fields), True
+                expected = tuple(fields), NumericVisibility.VISIBLE
         resolved.append((name, display, dimension, text, expected))
     for name, display, dimension, text, expected in resolved:
         if full_presentation:

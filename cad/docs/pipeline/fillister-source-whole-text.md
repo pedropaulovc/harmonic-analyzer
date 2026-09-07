@@ -68,6 +68,14 @@ method documentation and examples were read. The observed source flag staying
 True is retained as evidence, not used to weaken the documented candidate's
 numeric-hidden requirement.
 
+An additive review correction validates raw ShowDimensionValue as an exact
+Boolean inside the native reader, then transmits `NumericVisibility.VISIBLE`
+or `.HIDDEN` between helpers. The complete-state assertions are unchanged;
+this satisfies the project's enum-state rule without accepting truthy values
+or adding a property write. The original implementation commit is retained.
+The correction passed 472 focused/adjacent tests in 31.82 s
+(`pytest-telemetry/run-0a8xhabf`); its two new enum-boundary cases failed first.
+
 The approved deliberate test changes replace the fillister drawing-literal
 assertion with shared source authoring/read-only verification and add exactly
 one full-text row. All 72 historical callout rows plus both tip reference rows
