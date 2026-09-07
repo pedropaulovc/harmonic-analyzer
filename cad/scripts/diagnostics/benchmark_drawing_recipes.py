@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -157,7 +158,60 @@ def recipe_source(commit, target):
     ).stdout
 
 
-def load_recipe(commit, target, directory, *, source=None):
+def bind_recipe_layout(tree):
+    """Replace one exact project-layout import before aliases/defaults evaluate.
+
+    This is an explicit callback injection for trusted diagnostic recipes, not
+    a shared-module monkeypatch. Unrecognized/rebound imports fail before exec.
+    """
+    name = "repair_project_drawing_layout"
+    imports = [
+        (node, alias)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom)
+        for alias in node.names
+        if (alias.asname or alias.name) == name or alias.name == name
+    ]
+    if len(imports) != 1:
+        raise ValueError("layout injection requires exactly one project-layout import")
+    node, alias = imports[0]
+    if (
+        node not in tree.body
+        or node.module != "_drawing_project_layout"
+        or node.level != 0
+        or alias.name != name
+        or alias.asname is not None
+    ):
+        raise ValueError("unsupported diagnostic layout import shape")
+    if any(
+        isinstance(item, ast.Name)
+        and item.id == name
+        and isinstance(item.ctx, ast.Store)
+        or isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+        and item.name == name
+        for item in ast.walk(tree)
+    ):
+        raise ValueError("recipe rebinds its diagnostic layout import")
+    remaining = [item for item in node.names if item is not alias]
+    replacement = []
+    if remaining:
+        replacement.append(
+            ast.copy_location(ast.ImportFrom(node.module, remaining, node.level), node)
+        )
+    replacement.append(
+        ast.copy_location(
+            ast.Assign(
+                [ast.Name(name, ast.Store())], ast.Name("_benchmark_layout", ast.Load())
+            ),
+            node,
+        )
+    )
+    index = tree.body.index(node)
+    tree.body[index : index + 1] = replacement
+    return ast.fix_missing_locations(tree)
+
+
+def load_recipe(commit, target, directory, *, source=None, layout=None):
     code = recipe_source(commit, target)
     source_path = directory / "recipe-source.py"
     if source is not None:
@@ -165,6 +219,10 @@ def load_recipe(commit, target, directory, *, source=None):
         if source.suffix.upper() != ".SLDPRT":
             raise ValueError("explicit recipe source must be a native part")
     tree = redirected_tree(code, str(source_path), source=source)
+    if layout is not None:
+        if not callable(layout):
+            raise ValueError("diagnostic layout binding must be callable")
+        tree = bind_recipe_layout(tree)
     source_path.write_text(code, encoding="utf-8")
     stem = DRAWINGS_BY_NAME[target].artifact_stem
     basename = f"{stem}-{directory.parent.name}-{directory.name}"
@@ -185,8 +243,26 @@ def load_recipe(commit, target, directory, *, source=None):
     }
     if source is not None:
         module._benchmark_paths["SOURCE"] = source
+    if layout is not None:
+        module._benchmark_layout = layout
     sys.modules[module.__name__] = module
     exec(compile(tree, str(source_path), "exec"), module.__dict__)
+    if layout is not None and module.repair_project_drawing_layout is not layout:
+        raise RuntimeError("recipe replaced its injected diagnostic layout binding")
+    module.execution_receipt = {
+        "recipe_revision": commit,
+        "original_sha256": file_digest(source_path),
+        "compiled_ast_sha256": hashlib.sha256(
+            ast.dump(tree, include_attributes=True).encode("utf-8")
+        ).hexdigest(),
+        "layout_binding": "repair_project_drawing_layout"
+        if layout is not None
+        else None,
+        "source": str(source) if source is not None else None,
+        "outputs": {
+            key: str(getattr(outputs, key)) for key in ("slddrw", "pdf", "png")
+        },
+    }
     if module.OUTPUTS != outputs:
         raise RuntimeError("recipe rebound OUTPUTS after its redirected declaration")
     if source is not None and module.SOURCE != source:
