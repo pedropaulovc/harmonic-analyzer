@@ -352,9 +352,12 @@ async def probe(adapter, source, output_root, expected_pid, expected_source_sha)
         configuration = source_before["dimensions"]["configuration"]
         with adapter.ownership.creating_document(DocumentKind.DRAWING, native):
             native_drawing.new_drawing(adapter, template=str(template))
-        drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
-        if not drawing.Create3rdAngleViews2(str(copy)):
-            raise RuntimeError("native third-angle views rejected the owned copy")
+            drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+            # Native third-angle creation renames an unsaved drawing after its
+            # source. Keep that observed transition inside the creation scope;
+            # the scope still requires the same native handle and declared path.
+            if not drawing.Create3rdAngleViews2(str(copy)):
+                raise RuntimeError("native third-angle views rejected the owned copy")
         before, view_handles, before_handles = snapshot(
             adapter, copy, configuration, source_model
         )
