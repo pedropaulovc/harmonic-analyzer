@@ -90,8 +90,10 @@ Dirty flags stayed drawing True→True and source False→False. Original/owned-
 hashes stayed exact, cleanup preserved baseline documents and final runtime
 guards were empty. Recipe/pilot times were 27.197/127.077 s. The whole pilot
 remains failed under the unchanged direct-handle gate; built/cold acceptance
-was not reached, and both generic failure snapshots retained their separate
-dimension-exclusion errors.
+was not reached, and both generic failure observations retained the same
+ambiguous semantic-coverage error. They did not retain the rejected snapshots,
+so the actual failed predicate is unproved; see the
+[observability correction](drawing-semantic-failure-evidence.md).
 
 This disproves the experimental assumption that direct handle inequality alone
 establishes a different drawing silhouette. A production correction must retain

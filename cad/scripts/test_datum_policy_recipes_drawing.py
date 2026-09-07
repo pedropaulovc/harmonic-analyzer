@@ -563,6 +563,77 @@ def test_drawing_witness_requires_every_view_to_reference_expected_owned_source(
     snapshot.assert_called_once_with(adapter.currentModel, app=adapter.swApp)
 
 
+@pytest.mark.parametrize(
+    "empty,dimension_exclusions,failures",
+    [
+        (("checked",), {}, ["checked_empty"]),
+        (("dimensions",), {}, ["dimensions_empty"]),
+        (
+            (),
+            {"front/RD3/4": {"reason": "annotation has no concrete display dimension"}},
+            ["dimensions_excluded_nonempty"],
+        ),
+        (
+            ("checked", "dimensions"),
+            {"front/RD3/4": {"reason": "annotation has no concrete display dimension"}},
+            ["checked_empty", "dimensions_empty", "dimensions_excluded_nonempty"],
+        ),
+    ],
+)
+def test_semantic_gate_reports_exact_failed_conditions_and_retains_snapshot(
+    tmp_path, monkeypatch, empty, dimension_exclusions, failures
+):
+    source = tmp_path / "owned.SLDPRT"
+    semantics = {
+        "models": {"front": {"path": str(source), "configuration": "Default"}},
+        "checked": {"front/edge/1": ({"radius": 0.001},)},
+        "excluded": {
+            "front/sf/8": {"reason": "attachment kind not checked", "kinds": (46,)},
+            "front/note/6": {"reason": "no model-geometry attachments", "kinds": ()},
+        },
+        "dimensions": {"front/RD1/4": {"value_system": 0.024}},
+        "dimensions_excluded": dimension_exclusions,
+        "dimension_observations": {
+            "front/RD1/4": [{"full_name": "RD1@View1@Draw90.Drawing"}]
+        },
+        "semantic_attachments": {},
+    }
+    for section in empty:
+        semantics[section] = {}
+    snapshot = Mock(return_value=semantics)
+    monkeypatch.setattr(probe.attachments, "snapshot", snapshot)
+    adapter = SimpleNamespace(currentModel=object(), swApp=object())
+    with pytest.raises(probe.DrawingSemanticCoverageError) as raised:
+        probe._drawing_semantics(adapter, source=source, configuration="Default")
+    error = raised.value
+    assert error.snapshot is semantics
+    assert error.validation["failed_conditions"] == failures
+    assert error.validation["counts"] == {
+        section: len(semantics[section])
+        for section in (
+            "models",
+            "checked",
+            "excluded",
+            "dimensions",
+            "dimensions_excluded",
+            "semantic_attachments",
+        )
+    }
+    assert error.validation["exclusion_reasons"] == {
+        "excluded": {
+            "attachment kind not checked": 1,
+            "no model-geometry attachments": 1,
+        },
+        "dimensions_excluded": {"annotation has no concrete display dimension": 1}
+        if dimension_exclusions
+        else {},
+    }
+    assert ("checked_empty" in str(error)) == ("checked" in empty)
+    assert "attachment kind not checked" in str(error)
+    assert '"dimensions_excluded":' in str(error)
+    snapshot.assert_called_once_with(adapter.currentModel, app=adapter.swApp)
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("mode", ["normal", "build_failure", "copy_saved"])
 async def test_owned_dirty_part_copies_preserve_real_baseline_lifecycle(
