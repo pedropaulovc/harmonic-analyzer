@@ -9,8 +9,10 @@ this diagnostic and freezing its sources. No production helper is modified.
     uv run python cad/scripts/diagnostics/probe_assembly_health_targets.py
 
 Requires an EMPTY document inventory. Opens only checkout-local saved assemblies
-and their exact saved dependencies; never saves, launches, recovers or changes
-preferences. A native failure is retained and ends the experiment without retry.
+and their native-resolved checkout-local dependencies. Paths, observed input
+hashes and native handles are checked; producer-child authenticity is not proved.
+Never saves, launches, recovers or changes preferences. A native failure is
+retained and ends the experiment without retry.
 Baseline/candidate alternate ABBA on each single opened and deep-rebuilt model.
 These are health-gate timings, excluding open, rebuild and witness collection.
 Separate untimed gate invocations compare exact target instances, null children,
@@ -64,8 +66,43 @@ def checkpoint(path, report):
     path.write_text(json.dumps(report, indent=2), encoding="utf-8")
 
 
+def resolved_dependency_rows(app, source):
+    """Use native search rules, restoring any documented directory side effect."""
+    before = app.GetCurrentWorkingDirectory()
+    if type(before) is not str or not before:
+        raise RuntimeError("dependency query returned no working directory")
+    errors = []
+    rows = None
+    try:
+        rows = tuple(app.GetDocumentDependencies2(str(source), True, True, False) or ())
+    except Exception as error:
+        errors.append(error)
+    finally:
+        try:
+            if app.GetCurrentWorkingDirectory() != before:
+                if app.SetCurrentWorkingDirectory(before) is not True:
+                    raise RuntimeError("dependency query working directory restore rejected")
+                if app.GetCurrentWorkingDirectory() != before:
+                    raise RuntimeError("dependency query working directory restore differs")
+        except Exception as error:
+            errors.append(error)
+    if errors:
+        raise ExceptionGroup("native dependency query or directory restoration failed", errors)
+    if not rows:
+        raise RuntimeError(
+            "native dependency query resolved no dependencies; this diagnostic "
+            "requires a built assembly with external children"
+        )
+    return rows
+
+
 class OwnedAssembly:
-    """An initially empty session, then one exact saved assembly dependency set."""
+    """Own native-resolved local inputs in an initially empty session.
+
+    Search rules support cached assemblies whose saved paths name a producing
+    checkout. No path is rewritten by basename. The observed local hashes prove
+    preservation during this run, not equality with a trusted producer manifest.
+    """
 
     def __init__(self, adapter, source):
         self.adapter = adapter
@@ -75,13 +112,13 @@ class OwnedAssembly:
         self.root = None
         if self.app.GetDocuments() or self.app.ActiveDoc is not None:
             raise RuntimeError("health probe requires an empty session; no documents closed")
-        rows = tuple(self.app.GetDocumentDependencies2(str(source), True, False, False) or ())
+        rows = resolved_dependency_rows(self.app, source)
         if len(rows) % 2:
-            raise RuntimeError("saved dependency API returned an incomplete filename/path pair")
+            raise RuntimeError("resolved dependency API returned an incomplete filename/path pair")
         self.inputs = {source, *(Path(path).resolve(strict=True) for path in rows[1::2])}
         permitted = (ROOT / "cad/out/sldasm", ROOT / "cad/out/sldprt")
         if any(path.parent not in permitted for path in self.inputs):
-            raise RuntimeError(f"saved dependencies leave this checkout's native directories: {self.inputs}")
+            raise RuntimeError(f"resolved dependencies leave this checkout's native directories: {self.inputs}")
         self.hashes = {str(path): digest(path) for path in sorted(self.inputs)}
 
     def inventory(self, *, phase="stable"):
