@@ -9,7 +9,7 @@ across the section, the spoke section + count are noted.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_magnifying_wheel.py magnifying-wheel
+    uv run python -m doit drawing:magnifying_wheel
 """
 
 from __future__ import annotations

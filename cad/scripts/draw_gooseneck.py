@@ -13,7 +13,7 @@ drops to 1:4.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_gooseneck.py gooseneck
+    uv run python -m doit drawing:gooseneck
 """
 
 from __future__ import annotations

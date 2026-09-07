@@ -13,7 +13,7 @@ ear holes) sits to its right.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_column_clamp_front.py column-clamp-front
+    uv run python -m doit drawing:column_clamp_front
 """
 
 from __future__ import annotations

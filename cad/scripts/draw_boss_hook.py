@@ -11,7 +11,7 @@ top view shows the round wire section, and the isometric drops to 2:1.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_boss_hook.py boss-hook
+    uv run python -m doit drawing:boss_hook
 """
 
 from __future__ import annotations
