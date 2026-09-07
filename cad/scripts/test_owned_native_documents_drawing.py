@@ -1,6 +1,7 @@
 """Copy diagnostics preserve the existing native session, including failures."""
 
 import asyncio
+from contextlib import contextmanager
 import json
 from pathlib import Path
 from types import SimpleNamespace
@@ -594,3 +595,236 @@ def test_finalization_rejects_same_bytes_replacement_after_frozen_nested_reuse(n
     assert frozen["before"] == frozen["after"]
     assert not frozen["file_identity_unchanged"]
     assert not frozen["unchanged"]
+
+
+def test_legacy_save_reconciles_rename_before_after_artifact_observation(native):
+    user = Model(None, title="Preserved dirty drawing", dirty=True)
+    native.app.documents.append(user)
+    adapter = facade(native)
+    asyncio.run(adapter.open_model(str(native.copy)))
+    model = adapter.currentModel
+    target = native.directory / "renamed.SLDDRW"
+    pdf, png = target.with_suffix(".pdf"), target.with_suffix(".png")
+    calls, observations = [], []
+    for path in (target, pdf, png):
+        path.write_bytes(b"stale")
+
+    def save(path, version, options):
+        path = Path(path)
+        assert not path.exists()
+        calls.append((str(path), version, options))
+        path.write_bytes(b"fresh " + path.suffix.encode())
+        if path == target:
+            model.path, model.title = str(path), path.name
+        return 17  # Legacy code is not interpreted; existing file gate is retained.
+
+    @contextmanager
+    def observe(kind, path):
+        adapter.ownership.assert_current_owned()
+        observations.append(("before", kind, adapter.ownership.current.state["path"]))
+        yield
+        adapter.ownership.assert_current_owned()
+        observations.append(("after", kind, adapter.ownership.current.state["path"]))
+
+    model.SaveAs3 = save
+    result = owned.save_drawing(
+        adapter,
+        str(target),
+        pdf_path=str(pdf),
+        png_path=str(png),
+        artifact_context=observe,
+    )
+    assert calls == [(str(path), 0, 0) for path in (target, pdf, png)]
+    assert result == {"drawing": str(target), "pdf": str(pdf), "png": str(png)}
+    assert observations == [
+        ("before", "drawing", str(native.copy)),
+        ("after", "drawing", str(target)),
+        ("before", "pdf", str(target)),
+        ("after", "pdf", str(target)),
+        ("before", "png", str(target)),
+        ("after", "png", str(target)),
+    ]
+    asyncio.run(adapter.close_owned_documents())
+    assert native.app.documents == [user]
+    assert native.app.closes == [model]
+    assert native.source.read_bytes() == b"original"
+
+
+@pytest.mark.parametrize("phase", ["drawing", "pdf", "png"])
+def test_legacy_save_checks_active_owner_after_observer_before_writes(native, phase):
+    user = Model(None, title="User document", dirty=True)
+    native.app.documents.append(user)
+    adapter = facade(native)
+    asyncio.run(adapter.open_model(str(native.copy)))
+    model = adapter.currentModel
+    paths = [
+        native.directory / "output.SLDDRW",
+        native.directory / "output.pdf",
+        native.directory / "output.png",
+    ]
+    calls = []
+    for path in paths:
+        path.write_bytes(b"stale")
+
+    def save(path, version, options):
+        calls.append((str(path), version, options))
+        Path(path).write_bytes(b"new")
+        if Path(path) == paths[0]:
+            model.path, model.title = str(path), Path(path).name
+        return 0
+
+    @contextmanager
+    def observe(kind, path):
+        if kind == phase:
+            native.app.ActiveDoc = user
+        yield
+
+    model.SaveAs3 = save
+    with pytest.raises(RuntimeError, match="active"):
+        owned.save_drawing(
+            adapter,
+            str(paths[0]),
+            pdf_path=str(paths[1]),
+            png_path=str(paths[2]),
+            artifact_context=observe,
+        )
+    index = ["drawing", "pdf", "png"].index(phase)
+    assert calls == [(str(path), 0, 0) for path in paths[:index]]
+    assert all(path.read_bytes() == b"stale" for path in paths[index:])
+    assert native.app.ActiveDoc is user
+    assert not native.app.closes and user.dirty
+
+
+def test_legacy_save_rejects_observer_switch_to_different_owned_document(native):
+    adapter = facade(native)
+    asyncio.run(adapter.open_model(str(native.copy)))
+    original = adapter.currentModel
+    target = native.directory / "output.SLDDRW"
+    target.write_bytes(b"stale")
+    other = native.directory / "other.SLDDRW"
+    other.write_bytes(b"other owned")
+    calls = []
+    original.SaveAs3 = lambda *args: calls.append(args)
+
+    @contextmanager
+    def observe(kind, path):
+        asyncio.run(adapter.open_model(str(other)))
+        adapter.ownership.assert_current_owned()  # Owned is not the same document.
+        yield
+
+    with pytest.raises(RuntimeError, match="owned document changed"):
+        owned.save_drawing(adapter, str(target), artifact_context=observe)
+    assert not calls
+    assert target.read_bytes() == b"stale"
+
+
+def test_legacy_save_failure_observer_sees_reconciled_renamed_document(native):
+    adapter = facade(native)
+    asyncio.run(adapter.open_model(str(native.copy)))
+    model = adapter.currentModel
+    target = native.directory / "partial.SLDDRW"
+    failure = RuntimeError("native failed after rename")
+    observations = []
+
+    def save(path, *_args):
+        model.path, model.title = str(path), Path(path).name
+        Path(path).write_bytes(b"retained partial file")
+        raise failure
+
+    @contextmanager
+    def observe(kind, path):
+        try:
+            yield
+        finally:
+            adapter.ownership.assert_current_owned()
+            observations.append((kind, adapter.ownership.current.state["path"]))
+
+    model.SaveAs3 = save
+    with pytest.raises(RuntimeError, match="native failed after rename") as caught:
+        owned.save_drawing(adapter, str(target), artifact_context=observe)
+    assert caught.value is failure
+    assert observations == [("drawing", str(target))]
+    assert target.read_bytes() == b"retained partial file"
+    asyncio.run(adapter.close_owned_documents())
+    assert native.app.closes == [model]
+
+
+def test_legacy_save_keeps_native_and_after_observer_failures(native):
+    adapter = facade(native)
+    asyncio.run(adapter.open_model(str(native.copy)))
+    model = adapter.currentModel
+    target = native.directory / "partial.SLDDRW"
+    native_failure = RuntimeError("native save failed")
+    observer_failure = RuntimeError("after bank failed")
+
+    def save(path, *_args):
+        model.path, model.title = str(path), Path(path).name
+        Path(path).write_bytes(b"partial")
+        raise native_failure
+
+    @contextmanager
+    def observe(kind, path):
+        try:
+            yield
+        finally:
+            adapter.ownership.assert_current_owned()
+            raise observer_failure
+
+    model.SaveAs3 = save
+    with pytest.raises(ExceptionGroup) as caught:
+        owned.save_drawing(adapter, str(target), artifact_context=observe)
+    assert caught.value.exceptions == (native_failure, observer_failure)
+    assert target.read_bytes() == b"partial"
+    assert adapter.ownership.current.state["path"] == str(target)
+    asyncio.run(adapter.close_owned_documents())
+    assert native.app.closes == [model]
+
+
+@pytest.mark.parametrize("target", [None, ""])
+def test_legacy_save_requires_native_target_before_any_export(native, target):
+    adapter = facade(native)
+    asyncio.run(adapter.open_model(str(native.copy)))
+    calls = []
+    adapter.currentModel.SaveAs3 = lambda *args: calls.append(args)
+    pdf = native.directory / "existing.pdf"
+    pdf.write_bytes(b"preserve")
+    with pytest.raises(ValueError, match="native target"):
+        owned.save_drawing(adapter, target, pdf_path=str(pdf))
+    assert not calls
+    assert pdf.read_bytes() == b"preserve"
+
+
+@pytest.mark.parametrize("missing", ["drawing", "pdf", "png"])
+def test_legacy_save_preserves_missing_file_gate_without_observer(native, missing):
+    adapter = facade(native)
+    asyncio.run(adapter.open_model(str(native.copy)))
+    model = adapter.currentModel
+    paths = [
+        native.directory / "output.SLDDRW",
+        native.directory / "output.pdf",
+        native.directory / "output.png",
+    ]
+    index = ["drawing", "pdf", "png"].index(missing)
+    calls = []
+    for path in paths:
+        path.write_bytes(b"stale")
+
+    def save(path, version, options):
+        path = Path(path)
+        calls.append((str(path), version, options))
+        assert not path.exists()
+        if path == paths[0]:
+            model.path, model.title = str(path), path.name
+        if path != paths[index]:
+            path.write_bytes(b"new")
+        return 0
+
+    model.SaveAs3 = save
+    with pytest.raises(RuntimeError, match="SaveAs3 produced no file"):
+        owned.save_drawing(
+            adapter, str(paths[0]), pdf_path=str(paths[1]), png_path=str(paths[2])
+        )
+    assert calls == [(str(path), 0, 0) for path in paths[: index + 1]]
+    assert not paths[index].exists()
+    assert all(path.read_bytes() == b"stale" for path in paths[index + 1 :])
+    adapter.ownership.assert_current_owned()
