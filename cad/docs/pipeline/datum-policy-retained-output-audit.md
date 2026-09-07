@@ -264,3 +264,44 @@ After the isolated prepared-template helpers were integrated, the same seven-gat
 command at `56d239b1` again exited successfully: `check:recipe` ran **3,128 tests
 in 47.58 s**, with the other six gates current. Pytest telemetry is retained at
 `cad/out/reports/pytest-telemetry/run-k5sydj7v`.
+
+## Independent lever trial — existing 1:1 layout does not fit
+
+The explicit `--target channel_lever` selector preserves all pilot gates and both
+original/guard source pairs; it only avoids running the rocker first. At root
+`49474cfd9bcf1448ea0148b7062196e39faa9004`, the lever recipe stopped after
+**75.7540335 s** with `native drawing layout no_fit: no rigid translation
+satisfies supplied rectangles, obstacles and clearance`. Receipt:
+`cad/out/reports/datum-policy-_9eg2fy9/pilot.json`, SHA-256
+`e4f66e6f89d54200ccfca2be449ac02ea10ffadca622b54ec6155f30b80f26af`.
+Trace: `0x250c433e8d400b4f4652a3744ae3bdad`.
+
+The measured shared datum length increased from 6.35 to **190.722280561 mm**.
+GTol and surface-finish family lengths retained their original 6.35 mm effective
+values, and the datum/callout/GTol checks passed before final rigid-group packing
+reported no fit. The oversized opposed datum leaders are a layout constraint,
+not a lost CAD feature selection. No native drawing, PDF or PNG was exported;
+no save/cold-reopen or post-recipe source-parameter success is claimed.
+
+All four protected original/guard hashes remained exact. The owned lever copy
+also retained SHA-256
+`6a994561f19487029c938cd7cca5047acbdfbf686020514be538ef5a632e0841`.
+Ownership began/ended empty, with baseline preservation passed and no cleanup
+error. No retry was hidden inside the invocation. A 1:2 orthographic-layout
+candidate, retaining the 1:4 isometric, is the next bounded test under the user's
+explicit permission to change drawing layout; native readability and complete
+gates must still be proved.
+
+## Next performance target from the completed rocker trace
+
+Trace `0xcd23024b719ec37b6a478e9d28e0d762` attributes 13.538 s and 12.032 s to
+the datum prepass's initial/final native witnesses: **25.570 s of the 58.563 s
+recipe**. These are sibling spans, not overlapping totals. Overall project layout
+took 45.545 s; initial drawing setup took 3.253 s and finalization 1.906 s.
+Thus prepared blank defaults alone cannot remove the main remaining cost.
+
+The datum length is computed from current view geometry and obstacle bodies,
+not a fixed per-template default. Preparing GTol/SF family policies and applying
+the geometry-dependent datum setting earlier could reduce the two whole-sheet
+reads, but needs its own native control. Neither that reordering nor omission of
+the existing non-datum/content checks has been implemented by this evidence.
