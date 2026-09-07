@@ -40,12 +40,27 @@ FASTENERS = {
             "DriverSlot": {"SlotDepth"},
         },
     ),
+    "fillister_screw": (
+        "e7b48995c9f2e87af473219edfca1500a14e77bd353a330c64883011ab4fb60d",
+        {
+            "HeadProfile": {"HeadDia"},
+            "ShankProfile": {"ShankDia"},
+            "Head": {"HeadHt"},
+            "Shank": {"ShankLg"},
+        },
+    ),
+}
+FASTENER_SCALES = {
+    "cone_tip_adjuster": (4.0, 1.0),
+    "cone_pivot_screw": (4.0, 1.0),
+    "fillister_screw": (8.0, 1.0),
 }
 OBSERVED_UNAPPROVED_TIP = (
     "55cc336009f1a837e5c9fb5afbea4cc06d6658c17dcb0aaef86294762f555194"
 )
-HISTORICAL_TIP = (
-    "8e2ce51d8e7ca47f9ca5a8e5c743d1d6a0f0cd749e10195a54e2140117bf12f4"
+HISTORICAL_TIP = "8e2ce51d8e7ca47f9ca5a8e5c743d1d6a0f0cd749e10195a54e2140117bf12f4"
+PRE_WHOLE_TEXT_FILLISTER = (
+    "5ca2e24ed0a67672d77645c8ddbc5ada3806ecec763794a3652338044692be2a"
 )
 
 
@@ -60,13 +75,14 @@ def test_fasteners_are_explicit_pinned_targets_with_exact_spec_manifests(target)
     assert manifest.spec_module == f"{target}_spec"
     assert manifest.dimensions is spec.DRAWING_DIMENSIONS
     assert manifest.dimensions == dimensions
-    assert manifest.basic == {}  # Neither builder declares source BASIC fields.
+    assert manifest.basic == {}  # These builders declare no source BASIC fields.
     assert manifest.entity_labels == manifest.view_roles == {}
 
 
 @pytest.mark.parametrize("target", FASTENERS)
 @pytest.mark.parametrize(
-    "digest", [None, "0" * 64, OBSERVED_UNAPPROVED_TIP, HISTORICAL_TIP]
+    "digest",
+    [None, "0" * 64, OBSERVED_UNAPPROVED_TIP, HISTORICAL_TIP, PRE_WHOLE_TEXT_FILLISTER],
 )
 def test_fastener_input_never_accepts_a_different_source_or_repins(
     monkeypatch, tmp_path, target, digest
@@ -156,7 +172,7 @@ def test_actual_fastener_recipes_redirect_sources_aliases_and_prepared_spec(
         == module.PNG.parent
         == tmp_path / "trial"
     )
-    assert module.TEMPLATE_SPEC.scale == (4.0, 1.0)
+    assert module.TEMPLATE_SPEC.scale == FASTENER_SCALES[target]
     assert module.TEMPLATE_SPEC.decimals == 2
 
 
@@ -248,7 +264,9 @@ def test_fastener_cli_uses_prepared_factory_without_source_authoring_controls(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("target", FASTENERS)
-@pytest.mark.parametrize("mode", ["normal", "source_drift", "reopen_drift"])
+@pytest.mark.parametrize(
+    "mode", ["normal", "build_failure", "source_drift", "reopen_drift"]
+)
 async def test_selected_fastener_runs_existing_copy_and_cold_gates(
     monkeypatch, tmp_path, target, mode
 ):
@@ -300,7 +318,10 @@ async def test_selected_fastener_runs_existing_copy_and_cold_gates(
     if mode == "normal":
         await pilot.pilot(adapter, "frozen", sources, sources, root, targets=(target,))
     else:
-        with pytest.raises(RuntimeError, match="source copy changed|cold drawing text"):
+        with pytest.raises(
+            RuntimeError,
+            match="real recipe gate failed|source copy changed|cold drawing text",
+        ):
             await pilot.pilot(
                 adapter, "frozen", sources, sources, root, targets=(target,)
             )
@@ -315,6 +336,7 @@ async def test_selected_fastener_runs_existing_copy_and_cold_gates(
     forbidden.assert_not_called()
     trial = report["trials"][0]
     if mode == "normal":
+        assert adapter.currentModel is None
         assert report["status"] == "passed"
         assert len(seen) == 2
         assert trial["copy_final"] == pilot.EXPECTED_PART_HASHES[target]
@@ -328,6 +350,11 @@ async def test_selected_fastener_runs_existing_copy_and_cold_gates(
         assert report["status"] == "failed"
         assert report["runtime_final_guard_errors"]
         assert not seen
+    if mode == "build_failure":
+        assert report["status"] == "failed"
+        assert "real recipe gate failed" in report["error"]
+        assert not seen
+        assert trial["copy_final"] == pilot.EXPECTED_PART_HASHES[target]
     if mode == "reopen_drift":
         assert report["status"] == "failed"
         assert len(seen) == 2

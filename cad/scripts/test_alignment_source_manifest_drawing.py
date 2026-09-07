@@ -36,15 +36,17 @@ UNCHANGED = {
 
 
 def test_only_alignment_source_pin_migrates_to_the_actual_authored_output():
-    # Explicit 14 -> 16 enrollment; all fourteen original pins stay exact.
+    # Explicit 16 -> 17 enrollment preserves every existing pin and role.
     # The new tip's pin was separately migrated after its real production rebuild.
     expected = UNCHANGED | {
         "alignment_pinion": AUTHORED_SOURCE,
         "cone_tip_adjuster": "18d0c1669c8de923420655d621f58d24afe404bc1d3a5a787930ebeeb2fefbf2",
         "cone_pivot_screw": "515019088b41d329b45f0487b9241123751ecac7d6c116481930ae9c45e89c36",
+        "fillister_screw": "e7b48995c9f2e87af473219edfca1500a14e77bd353a330c64883011ab4fb60d",
     }
     assert {key: row.source_sha256 for key, row in manifest.TARGETS.items()} == expected
     assert pilot.EXPECTED_PART_HASHES == expected
+    assert len(expected) == 17
 
 
 @pytest.mark.parametrize("digest", [OLD_SOURCE, "0" * 64, AUTHORED_SOURCE])

@@ -6,6 +6,9 @@ Alignment's explicit 2026-09-07 production-builder migration is recorded in
 diagnostics/alignment_source_manifest.md; other input identities are unchanged.
 Two fastener production-builder inputs are explicitly enrolled in
 diagnostics/fastener_source_manifest.md; no prior target pin is changed.
+The seventeenth target is the actual whole-text-authored fillister output from
+the 7f070434 production part build. Full drawing/cold/printed acceptance is
+separate; this enrollment only pins those observed bytes and four dimensions.
 No recipe, geometry, output path or production layout policy lives here.
 """
 
@@ -15,6 +18,7 @@ from importlib import import_module
 import channel_lever_spec
 import cone_pivot_screw_spec
 import cone_tip_adjuster_spec
+import fillister_screw_spec
 import fulcrum_shaft_spec
 import pivot_shaft_spec
 import rocker_arm_notes
@@ -77,6 +81,11 @@ TARGETS = {
         "515019088b41d329b45f0487b9241123751ecac7d6c116481930ae9c45e89c36",
         "cone_pivot_screw_spec",
         cone_pivot_screw_spec.DRAWING_DIMENSIONS,
+    ),
+    "fillister_screw": RecipeTarget(
+        "e7b48995c9f2e87af473219edfca1500a14e77bd353a330c64883011ab4fb60d",
+        "fillister_screw_spec",
+        fillister_screw_spec.DRAWING_DIMENSIONS,
     ),
 }
 
