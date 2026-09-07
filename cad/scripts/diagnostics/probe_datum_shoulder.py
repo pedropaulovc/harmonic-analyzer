@@ -53,6 +53,7 @@ from diagnostics._owned_native_documents import run_copy_diagnostic  # noqa: E40
 from _drawing_view_packing import Rect  # noqa: E402
 from _drawing_annotation_bounds import (  # noqa: E402
     _native_snapshot,
+    _native_symbol_extent,
     _installed_swconst,
     bounds_from_snapshot,
 )
@@ -301,6 +302,16 @@ def set_document_length(extension, requested):
 def all_annotation_layout(adapter):
     """Record global property effects, including sheet/template-owned annotations."""
     records, handles = {}, {}
+    definitions = {}
+
+    def symbol_extent(token):
+        # Reuse the production native definition reader on the existing snapshot.
+        # Cache only within this capture; each later snapshot rereads its symbols.
+        if token not in definitions:
+            environment = _early_bound(adapter.swApp.GetEnvironment(), "IEnvironment")
+            definitions[token] = _native_symbol_extent(environment, token)
+        return definitions[token]
+
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
     for sheet in drawing.GetViews() or ():
         for raw_view in sheet:
@@ -365,7 +376,9 @@ def all_annotation_layout(adapter):
                         annotation, adapter.currentModel.Extension
                     )
                     row["native"] = asdict(native)
-                    row["measurement"] = asdict(bounds_from_snapshot(native))
+                    row["measurement"] = asdict(
+                        bounds_from_snapshot(native, symbol_extent=symbol_extent)
+                    )
                 except ValueError as error:
                     row["measurement_exclusion"] = str(error)
                 records[name] = row
