@@ -52,18 +52,31 @@ Preparation creates two blank drawings: current setup saved once as DRWDOT,
 then a fresh instance of that DRWDOT. It compares raw units, all ten dimension
 style scopes, sheet properties, linked-note expressions/multiplicity, fonts,
 horizontal/vertical note justification, position locks, sheet-format visibility,
-and measured visible note content. No floats are rounded: represented native
-coordinates also compare exactly. This stricter comparison has **not yet been
-run natively** and may reject a representational change; any later numerical
-contract requires measured evidence, not blanket tolerance.
+measured visible note content, and the template's surface-finish symbols. No
+floats are rounded: represented native coordinates also compare exactly. The
+first native normal baseline exposed an unsupported surface-finish inventory
+before reaching cache preparation (recorded below). The expanded witness has
+not yet run natively; any later numerical contract requires measured evidence,
+not blanket tolerance.
 
 An empty linked note's extent is observational only after every native text,
 stroke, other display primitive and ordinary/multi-jog leader count is zero.
 Its link, visibility, anchor and font remain exact. The committed blank-template
 control proved that such no-ink extents can collapse on instantiation. All raw
-extent observations remain in the receipt. Unsupported non-note annotations
-on a blank sheet fail; they are not silently omitted. This is a template-default
-witness, not a manufacturing-sheet geometry proof.
+extent observations remain in the receipt. Native surface-finish annotations
+(kind 7) retain symbol family, its documented all-around/texture subtype, all ten
+named text slots after `GetTextCount`, orientation/angle, lay/profile, GOST and
+attachment/extra-leader properties, visibility, native XYZ, all sixteen raw
+`ITextFormat` properties, `IsHeightSpecifiedInPts` and document-format inheritance.
+This includes underline/strikeout, spacing, escapement/slant and text direction,
+not only typeface and height. The complete existing `annotation_box` measurement
+retains text runs, bodies/envelopes, strokes, leaders and decorations; only its
+generated annotation name is excluded from cross-document comparison. The native
+`ISFSymbol.GetAnnotation` round-trip must match the enumerated annotation before
+capture. Rows form an exact multiset, preserving duplicate symbols. Other
+non-note kinds and unsupported symbol enums still fail, rather than disappearing
+from the witness. This is a template-default witness, not a manufacturing-sheet
+geometry proof.
 It does not inventory the sheet-format sketch or logos; full rendered/vector
 inspection remains required before rollout and is not implied by this receipt.
 
@@ -117,7 +130,7 @@ source/active-document preservation on the real call shapes, raw-default
 readback, measured complete hit overhead, then matched full recipe/save/cold
 reopen and visual acceptance. No production recipe is switched by this patch.
 
-## First native cache control (prepared, not yet run)
+## First native cache control
 
 `diagnostics/probe_prepared_template_cache.py` uses the production accessor and
 factory with the existing attach-only owned-document runner. It makes exactly
@@ -172,3 +185,27 @@ model-linked title behavior are not covered by those note/default snapshots;
 blank export/visual comparison and full-recipe cold-reopen acceptance remain
 separate requirements before rollout. First failure stops this sequence; no
 automatic weakening, reset or retry occurs.
+
+### First normal-baseline result
+
+At frozen root `c7405ed5b068b4d253f3d89ef0af1721ed00a48d`, the normal blank
+drawing setup took 2.8968366 s and its witness ran 7.2077718 s before rejecting
+`unsupported non-note blank-sheet annotations: [7, 7]`. This falsified the
+validator's notes-only blank-sheet assumption; it did not test or fail the
+cache accessor, template save, miss or hit. The receipt has zero accessor rows.
+
+Evidence: root `cad/out/reports/prepared-template-cache/`
+`prepared-template-cache-i7taja40/measurements.json`, SHA-256
+`5a85d094de19a1210470501aa8fec5f2edbcbb7f8d863c3f0ce5414ec85485ab`.
+The accompanying `ownership.json` records empty initial/final native inventories,
+baseline preservation and no cleanup error. Native PID was 31860, revision
+34.3.0. Original `harmonic-analyzer.DRWDOT` remained SHA-256
+`cbad80d25315dddc9bb5fefd690915c6f18fa7d181ac8c30d2f1408a980b55cc`.
+
+`test_prepared_template_surface_finish_drawing.py` first reproduced that same
+two-kind-7 rejection, then exercises the added exact SF witness, documented
+family-specific getters, duplicate inventory and rejection of changed text,
+font, inheritance, placement, native internal geometry and unknown kinds.
+This extends the validator; it does not normalize or remove either symbol.
+The expanded normal/miss/hit sequence still needs native acceptance, followed
+by blank export/visual and full-recipe cold-reopen checks before rollout.
