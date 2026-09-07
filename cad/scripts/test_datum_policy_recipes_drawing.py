@@ -548,13 +548,25 @@ def test_semantic_gate_reports_exact_failed_conditions_and_retains_snapshot(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("mode", ["normal", "build_failure", "copy_saved"])
+@pytest.mark.parametrize("targets", [None, ("fillister_screw",)])
 async def test_owned_dirty_part_copies_preserve_real_baseline_lifecycle(
     native,  # noqa: F811 - imported pytest fixture
     tmp_path,
     monkeypatch,
     mode,
+    targets,
 ):
     source_root, guard_root = fixture_sources(tmp_path, monkeypatch)
+    expected_order = probe.ORDER if targets is None else targets
+    for target in targets or ():
+        source_name = target.replace("_", "-") + ".SLDPRT"
+        for directory in (source_root, guard_root):
+            (directory / source_name).write_bytes(target.encode())
+        monkeypatch.setitem(
+            probe.EXPECTED_PART_HASHES,
+            target,
+            probe.attachments.file_digest(source_root / source_name),
+        )
     original_lever = Model(source_root / "channel-lever.SLDPRT", kind=1)
     drawing2 = Model(None, title="Draw2 - Sheet1", dirty=True)
     native.app.documents.extend((original_lever, drawing2))
@@ -637,7 +649,12 @@ async def test_owned_dirty_part_copies_preserve_real_baseline_lifecycle(
 
         native.adapter.draw = draw
         return await probe.pilot(
-            adapter, "frozen", source_root, guard_root, tmp_path / "reports"
+            adapter,
+            "frozen",
+            source_root,
+            guard_root,
+            tmp_path / "reports",
+            targets=targets,
         )
 
     if mode == "normal":
@@ -647,7 +664,7 @@ async def test_owned_dirty_part_copies_preserve_real_baseline_lifecycle(
             RuntimeError, match=r"production final gate|source copy changed"
         ):
             await owned.owned_callback(native.adapter, callback)
-    assert len(built) == (2 if mode == "normal" else 1)
+    assert len(built) == (len(expected_order) if mode == "normal" else 1)
     assert native.app.documents == [original_lever, drawing2]
     assert not original_lever.dirty and original_lever.Visible
     assert drawing2.dirty and drawing2.Visible and drawing2.GetPathName() == ""
@@ -658,10 +675,14 @@ async def test_owned_dirty_part_copies_preserve_real_baseline_lifecycle(
     assert all(item not in (original_lever, drawing2) for item in native.app.closes)
     (receipt,) = (tmp_path / "reports").glob("*/pilot.json")
     report = json.loads(receipt.read_text())
+    assert report["order"] == list(expected_order)
+    assert [trial["target"] for trial in report["trials"]] == list(
+        expected_order[:len(built)]
+    )
     assert report["sources_before"] == report["sources_after"]
     assert report["status"] == ("passed" if mode == "normal" else "failed")
     if mode == "copy_saved":
         assert (
             report["trials"][0]["copy_final"]
-            != probe.EXPECTED_PART_HASHES["rocker_arm"]
+            != probe.EXPECTED_PART_HASHES[expected_order[0]]
         )
