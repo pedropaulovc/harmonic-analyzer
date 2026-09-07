@@ -17,6 +17,7 @@ from diagnostics import _baked_template_layout as layout
 class LayoutPolicy(StrEnum):
     FOUR_NOTES = "four-notes"
     POPULATED_GAPS = "populated-gaps"
+    MATERIAL_CENTER = "material-center"
 
 
 PLANNING_HEADROOM_M = 0.0005

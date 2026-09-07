@@ -26,6 +26,7 @@ import _drawing_sheet_setup as sheet_setup  # noqa: E402
 import _telemetry  # noqa: E402
 from diagnostics import _baked_template_layout as layout  # noqa: E402
 from diagnostics import _baked_template_gaps as gaps  # noqa: E402
+from diagnostics import _baked_template_material as material  # noqa: E402
 from diagnostics import benchmark_template_defaults as defaults  # noqa: E402
 from diagnostics import probe_prepared_template_cache as printed  # noqa: E402
 from diagnostics import probe_datum_policy_recipes as pilot  # noqa: E402
@@ -45,13 +46,28 @@ def bare_drawing(adapter, template):
 
 
 async def transform(adapter, directory, report, checkpoint, population=None):
+    if (
+        report.get("layout_policy") == gaps.LayoutPolicy.MATERIAL_CENTER.value
+        and population is not None
+    ):
+        raise ValueError("material-center cannot combine historical populated-gap changes")
     derived = directory / f"{directory.name}.DRWDOT"
     report["derived_template"] = str(derived)
     with adapter.ownership.creating_document(DocumentKind.DRAWING, derived):
         bare_drawing(adapter, sheet_setup.PROJECT_DRWDOT)
     report["before"], handles, lines = layout.blank_snapshot(adapter)
-    report["plan"] = layout.layout_plan(report["before"]["notes"], lines)
     label_plan, phase_scope = layout.blank_label_plan, layout.blank_phase_scope
+    apply, require_transition = layout.apply_layout, layout.require_transition
+    if report.get("layout_policy") == gaps.LayoutPolicy.MATERIAL_CENTER.value:
+        report["plan"] = material.material_plan(report["before"]["notes"], lines)
+        label_plan, phase_scope = material.static_label_plan, material.phase_scope
+        apply = material.apply_layout
+
+        def require_transition(before, after, plan):
+            material.require_transition(before, after, plan, lines)
+
+    else:
+        report["plan"] = layout.layout_plan(report["before"]["notes"], lines)
     if population is not None:
         report["plan"], report["predicted_population"] = gaps.measured_plan(
             report["before"]["notes"], lines, report["plan"], population["targets"]
@@ -60,13 +76,11 @@ async def transform(adapter, directory, report, checkpoint, population=None):
     report["operations"] = []
     checkpoint()
     adapter.ownership.assert_current_owned()
-    layout.apply_layout(
-        adapter, handles, report["plan"], report["operations"], checkpoint
-    )
+    apply(adapter, handles, report["plan"], report["operations"], checkpoint)
     report["after"], after_handles, _ = layout.blank_snapshot(adapter)
     checkpoint()
     layout.require_same_handles(adapter.swApp, handles, after_handles)
-    layout.require_transition(report["before"], report["after"], report["plan"])
+    require_transition(report["before"], report["after"], report["plan"])
     report["phase_scope"] = phase_scope(report["after"]["notes"])
     plan = label_plan(report["after"]["notes"], lines, report["plan"])
     report["field_fit"] = layout.require_field_fit(report["after"]["notes"], plan)
@@ -164,7 +178,7 @@ async def probe(
         )
         expected[str(population_path)] = population_sha256
     elif (
-        policy is not gaps.LayoutPolicy.FOUR_NOTES
+        policy not in (gaps.LayoutPolicy.FOUR_NOTES, gaps.LayoutPolicy.MATERIAL_CENTER)
         or population_path is not None
         or population_sha256 is not None
     ):

@@ -603,14 +603,30 @@ async def one_trial(
     source_title=TITLE,
     factory=None,
     observe_output=None,
+    source_manifest=None,
+    view_scale=SCALE,
 ):
     """Reuse exact lifecycle for a second explicit source/factory diagnostic.
 
     Optional observation is read-only. Original update experiments retain their
     default rocker manifest, production factory and baseline reproduction gate.
+    The material population arm explicitly supplies its locally pinned manifest
+    and a 1:10 tube view; sheet defaults and all ownership/source gates remain.
     """
-    if source_target not in pilot.EXPECTED_PART_HASHES or not source_title:
+    if (
+        source_manifest is None and source_target not in pilot.EXPECTED_PART_HASHES
+    ) or not source_title:
         raise ValueError("unsupported title trial source target/title")
+    if (
+        source_manifest is not None
+        and expected.get(str(source)) != source_manifest.source_sha256
+    ):
+        raise RuntimeError("explicit source manifest hash does not match protected input")
+    witness_options = {} if source_manifest is None else {"manifest": source_manifest}
+
+    def source_witness(model):
+        return pilot.source_dimensions(model, source_target, copy_source, **witness_options)
+
     source_sha = expected[str(source)]
     trial_dir = directory / variant.value
     trial_dir.mkdir()
@@ -632,7 +648,20 @@ async def one_trial(
         "status": "running",
         "source_copy": str(copy_source),
         "copy_hashes": {"initial": source_sha},
+        "view_scale": list(view_scale),
     }
+    if source_manifest is not None:
+        trial["explicit_source_manifest"] = {
+            "sha256": source_manifest.source_sha256,
+            "dimensions": {
+                feature: sorted(names)
+                for feature, names in source_manifest.dimensions.items()
+            },
+            "basic": {
+                feature: sorted(names)
+                for feature, names in source_manifest.basic.items()
+            },
+        }
     report["trials"].append(trial)
     checkpoint()
     started = time.perf_counter()
@@ -641,9 +670,7 @@ async def one_trial(
             "open unique fresh title source", await adapter.open_model(str(copy_source))
         )
         source_model = adapter.currentModel
-        trial["source_before"], source_handles = pilot.source_dimensions(
-            source_model, source_target, copy_source
-        )
+        trial["source_before"], source_handles = source_witness(source_model)
         if str(source_model.SummaryInfo(0)) != source_title:
             raise RuntimeError(
                 "owned source does not contain the exact saved summary Title"
@@ -655,7 +682,7 @@ async def one_trial(
             )
             observer.record("after_blank_setup")
             view = place_view(
-                adapter, str(copy_source), "*Front", *FRONT_CENTER, scale=SCALE
+                adapter, str(copy_source), "*Front", *FRONT_CENTER, scale=view_scale
             )
             if (
                 view is None
@@ -691,9 +718,7 @@ async def one_trial(
             raise RuntimeError(
                 "title annotation was replaced during fresh construction"
             )
-        trial["source_after"], after_handles = pilot.source_dimensions(
-            source_model, source_target, copy_source
-        )
+        trial["source_after"], after_handles = source_witness(source_model)
         pilot.require_same_source(
             trial["source_before"],
             trial["source_after"],
@@ -745,9 +770,7 @@ async def one_trial(
             adapter, copy_source, trial["source_before"]["configuration"]
         )
         reopened_source = adapter.swApp.GetOpenDocumentByName(str(copy_source))
-        trial["source_reopened"], cold_source_handles = pilot.source_dimensions(
-            reopened_source, source_target, copy_source
-        )
+        trial["source_reopened"], cold_source_handles = source_witness(reopened_source)
         pilot.require_same_source(
             trial["source_before"],
             trial["source_reopened"],
@@ -771,7 +794,7 @@ async def one_trial(
             adapter, copy_source, trial["source_before"]["configuration"]
         )
         trial["source_after_cold_pdf"], after_cold_source_handles = (
-            pilot.source_dimensions(reopened_source, source_target, copy_source)
+            source_witness(reopened_source)
         )
         pilot.require_same_source(
             trial["source_reopened"],

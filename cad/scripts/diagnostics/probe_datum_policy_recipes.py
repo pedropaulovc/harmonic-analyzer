@@ -152,7 +152,7 @@ def require_sources(sources, guards):
 
 
 @_telemetry.traced("diagnostic.datum_policy.source_dimensions")
-def source_dimensions(model, target, path):
+def source_dimensions(model, target, path, *, manifest=None):
     model = _early_bound(model, "IModelDoc2")
     if (
         model is None
@@ -170,7 +170,10 @@ def source_dimensions(model, target, path):
     )
     if not configuration:
         raise RuntimeError("source parameter witness has no active configuration")
-    manifest = TARGETS[target]
+    # Only callers that explicitly supply a diagnostic manifest bypass the
+    # historical registry; no target is enrolled or global pin mutated here.
+    if manifest is None:
+        manifest = TARGETS[target]
     targets = manifest.dimensions
     rows, handles = part_dimensions(
         SimpleNamespace(currentModel=model), path, configuration, targets=targets

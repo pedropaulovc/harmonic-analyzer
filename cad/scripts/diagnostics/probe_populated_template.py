@@ -5,12 +5,18 @@ guards. Normal project setup runs unchanged except for its NewDocument template
 argument. No new title/layout setter; this is not prepared-default setup or a
 full manufacturing recipe. Every linked-field fit problem is retained and makes
 acceptance fail, including existing footer/material/finish defects.
+
+The explicit material-baseline/material-center modes use three separately
+recorded local foundation sources, not the historical pilot pins. Only the
+tube's minimal model view uses 1:10; the normal 1:2 sheet setup is unchanged.
+Both modes require the entire resolved Material value and strict field fit.
 """
 
 from __future__ import annotations
 
 import argparse
 from copy import deepcopy
+from enum import StrEnum
 import json
 import os
 from pathlib import Path
@@ -31,11 +37,18 @@ from _drawing_template_defaults import snapshot_defaults  # noqa: E402
 from diagnostics import _baked_template_layout as layout  # noqa: E402
 from diagnostics import _populated_template_fields as fields  # noqa: E402
 from diagnostics import _populated_template_symbols as symbols  # noqa: E402
+from diagnostics import _material_template_sources as material_sources  # noqa: E402
 from diagnostics import probe_fresh_title_update as title  # noqa: E402
 from diagnostics._owned_native_documents import run_copy_diagnostic  # noqa: E402
 from diagnostics._owned_native_session import require_owned_diagnostic_environment  # noqa: E402
 
 TARGETS = {"rocker_arm": "rocker-arm", "channel_lever": "channel-lever"}
+
+
+class Population(StrEnum):
+    HISTORICAL = "historical-rocker-lever"
+    MATERIAL_BASELINE = "material-baseline"
+    MATERIAL_CENTER = "material-center"
 
 
 def require_template(path, sha256):
@@ -124,9 +137,13 @@ def property_source(adapter, source, source_path, configuration):
 
 
 class PopulatedControl:
-    def __init__(self, template, sha256, checkpoint, symbol_definition):
+    def __init__(
+        self, template, sha256, checkpoint, symbol_definition,
+        *, population=Population.HISTORICAL,
+    ):
         self.template, self.sha256, self.checkpoint = template, sha256, checkpoint
         self.symbol_definition = symbol_definition
+        self.population = population
         self.setup = {
             "calls": 0,
             "template_calls": 0,
@@ -196,6 +213,10 @@ class PopulatedControl:
             )
             + str(source.GetCustomInfoValue("", "Revision")),
         }
+        if self.population is not Population.HISTORICAL:
+            expected[fields.VALUE_LINKS["material"]] = str(
+                source.GetCustomInfoValue("", "Material")
+            )
         row = {
             "notes": notes,
             "surface_finishes": finishes,
@@ -217,6 +238,20 @@ class PopulatedControl:
             ),
         )
         issues = row["fit"]["issues"]
+        if self.population is not Population.HISTORICAL:
+            try:
+                link = fields.VALUE_LINKS["material"]
+                name = layout.unique_note(notes, link=link)
+                material_sources.require_material_value(
+                    notes[name], expected[link],
+                    expected_vertical=1
+                    if self.population is Population.MATERIAL_CENTER else 0,
+                )
+            except RuntimeError as error:
+                issues.append({
+                    "field": "material", "kind": "explicit_material_contract",
+                    "error": str(error),
+                })
         for link, value in expected.items():
             try:
                 name = layout.unique_note(notes, link=link)
@@ -293,16 +328,28 @@ class PopulatedControl:
         self.checkpoint()
 
 
-async def probe(adapter, template, sha256, source_root, output_root, symbol_path):
+async def probe(
+    adapter, template, sha256, source_root, output_root, symbol_path,
+    *, population=Population.HISTORICAL,
+):
+    if not isinstance(population, Population):
+        raise ValueError("select an explicit populated-template population mode")
     require_template(template, sha256)
     definition = symbols.symbol_library(symbol_path)
+    targets = TARGETS
+    if population is not Population.HISTORICAL:
+        targets = {target: target.replace("_", "-") for target in material_sources.TARGETS}
     sources = {
         target: (source_root / f"{target.replace('_', '-')}.SLDPRT").resolve(
             strict=True
         )
-        for target in TARGETS
+        for target in targets
     }
-    expected = title.pilot.require_sources(sources, sources)
+    expected = (
+        title.pilot.require_sources(sources, sources)
+        if population is Population.HISTORICAL
+        else material_sources.require_sources(sources)
+    )
     expected.update(
         {
             str(template): sha256,
@@ -319,7 +366,9 @@ async def probe(adapter, template, sha256, source_root, output_root, symbol_path
         adapter.ownership.register_source(Path(path))
     report = {
         "status": "running",
-        "scope": "minimal one-view rocker/lever; baked title format with normal setup; full recipes pending",
+        "scope": "minimal one-view linked fields; normal setup; full recipes/PMI acceptance pending",
+        "population": population.value,
+        "targets": list(targets),
         "inputs_before": expected,
         "revision": title.pilot.benchmark.revision("HEAD"),
         "helpers": title.pilot.helper_fingerprints(),
@@ -337,14 +386,22 @@ async def probe(adapter, template, sha256, source_root, output_root, symbol_path
     errors = []
     checkpoint()
     try:
-        for target, source_title in TARGETS.items():
+        for target, source_title in targets.items():
             # one_trial derives native basenames from its directory name; retain
             # the fresh run nonce here, not a repeated 'rocker_arm' basename.
             trial_dir = directory / f"{directory.name}-{target}"
             trial_dir.mkdir()
             adapter.ownership.register_directory(trial_dir)
-            control = PopulatedControl(template, sha256, checkpoint, definition)
+            control = PopulatedControl(
+                template, sha256, checkpoint, definition, population=population
+            )
             report["setups"][target] = control.setup
+            source_options = {}
+            if population is not Population.HISTORICAL:
+                source_options = {
+                    "source_manifest": material_sources.TARGETS[target],
+                    "view_scale": (1.0, 10.0) if target == "tube_frame" else title.SCALE,
+                }
             trial = await title.one_trial(
                 adapter,
                 title.Variant.BASELINE,
@@ -357,6 +414,7 @@ async def probe(adapter, template, sha256, source_root, output_root, symbol_path
                 source_title=source_title,
                 factory=control.factory,
                 observe_output=control.observe,
+                **source_options,
             )
             trial["target"] = target
             trial["acceptance_issues"] = [
@@ -418,6 +476,10 @@ def main(argv=None):
     parser.add_argument("--template-sha256", required=True)
     parser.add_argument("--source-root", type=Path, required=True)
     parser.add_argument("--symbol-library", type=Path, required=True)
+    parser.add_argument(
+        "--population", type=Population, choices=list(Population),
+        default=Population.HISTORICAL,
+    )
     parser.add_argument("--report-root", type=Path, default=ROOT / "cad/out/reports")
     parser.add_argument("--worker", action="store_true")
     args = parser.parse_args(argv)
@@ -441,6 +503,7 @@ def main(argv=None):
                 source_root,
                 args.report_root.resolve(),
                 args.symbol_library.resolve(strict=True),
+                population=args.population,
             )
         )
     import dodo
@@ -459,6 +522,8 @@ def main(argv=None):
             str(args.report_root.resolve()),
             "--symbol-library",
             str(args.symbol_library.resolve(strict=True)),
+            "--population",
+            args.population.value,
             "--worker",
         ],
         "populated baked template control",
