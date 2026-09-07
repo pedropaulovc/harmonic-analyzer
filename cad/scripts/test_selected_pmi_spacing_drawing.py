@@ -98,6 +98,28 @@ def test_even_spacing_replaces317_with_one313_call_on_the_same_exact_bank(bank):
         annotation.Select2.assert_called_once_with(True, 0)
 
 
+def test_autoarrange_uses_one2976_call_without_first_running313_or317(bank):
+    adapter, view, annotations, selected = bank
+    row = {}
+    probe.space_imported_pmi(
+        adapter,
+        view,
+        annotations,
+        row,
+        lambda: None,
+        arrangement=probe.PmiArrangement.AUTO_ARRANGE,
+    )
+    adapter.swApp.IsCommandEnabled.assert_called_once_with(2976)
+    adapter.swApp.RunCommand.assert_called_once_with(2976, "")
+    assert row["command"] == 2976
+    assert [item["type"] for item in row["selections"]] == [13, 13, 36]
+    assert all(item["identity"] == 1 for item in row["selections"])
+    assert selected == []
+    assert adapter.currentModel.ClearSelection2.call_count == 2
+    for annotation in annotations:
+        annotation.Select2.assert_called_once_with(True, 0)
+
+
 @pytest.mark.parametrize(
     "mode",
     [
@@ -319,7 +341,9 @@ def test_true_native_return_cannot_pass_without_readable_actual_motion(scene, mo
         assert any("did not move" in message for message in report["failures"])
 
 
-@pytest.mark.parametrize("variant", ["space-tightly-down", "space-evenly-down"])
+@pytest.mark.parametrize(
+    "variant", ["space-tightly-down", "space-evenly-down", "auto-arrange"]
+)
 def test_right_only_selector_is_forwarded_and_front_rejected_before_native(
     tmp_path, monkeypatch, variant
 ):
