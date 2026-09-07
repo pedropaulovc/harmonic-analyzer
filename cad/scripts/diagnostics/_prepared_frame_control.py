@@ -1,6 +1,6 @@
 """Explicit diagnostic-only document-frame interception; never a production policy."""
 
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from dataclasses import asdict
 from enum import StrEnum
 import json
@@ -14,6 +14,7 @@ import _drawing_template_viewport as viewports
 
 class FramePolicy(StrEnum):
     UNCHANGED = "unchanged"
+    CAPTURE_ONLY = "capture_only"
     MEASURED_RESTORE = "measured_restore"
 
 
@@ -44,16 +45,15 @@ def failure_input(policy, spec, template, receipt_path, receipt_sha):
     if not isinstance(policy, FramePolicy):
         raise ValueError("frame control requires an explicit policy enum")
     if policy is FramePolicy.UNCHANGED:
-        if receipt_path is not None or receipt_sha is not None:
-            raise ValueError("failure receipt requires measured_restore")
-        return None
+        if receipt_path is None and receipt_sha is None:
+            return None
     if (
         receipt_path is None
         or not isinstance(receipt_sha, str)
         or len(receipt_sha) != 64
         or any(c not in "0123456789abcdef" for c in receipt_sha)
     ):
-        raise ValueError("measured_restore requires a pinned failure receipt")
+        raise ValueError("frame observation requires a pinned failure receipt")
     path = Path(receipt_path).resolve(strict=True)
     if prepared._sha(path) != receipt_sha:
         raise RuntimeError("failure receipt SHA-256 differs")
@@ -103,14 +103,16 @@ def intercept(adapter, policy, evidence):
     The first control admits NO baseline documents. This avoids assuming that
     document-window FrameState changes cannot affect another SDI/MDI window.
     Each write requires the same owned model, record and native model-view handle.
+    CAPTURE_ONLY replaces only the getter function; the production restore
+    binding and its rejection order are untouched in that baseline arm.
     """
     if policy is FramePolicy.UNCHANGED:
         yield
         return
-    if policy is not FramePolicy.MEASURED_RESTORE:
+    if policy not in (FramePolicy.CAPTURE_ONLY, FramePolicy.MEASURED_RESTORE):
         raise ValueError("unsupported frame-control policy")
     app = adapter.swApp
-    evidence.update(status="running", baseline_frames=[], restores=[])
+    evidence.update(status="running", baseline_frames=[], captures=[], restores=[])
     documents = prepared._documents(app)
     evidence["initial_inventory"] = [prepared._state(model) for model in documents]
     if documents:
@@ -123,6 +125,7 @@ def intercept(adapter, policy, evidence):
     def capture(model):
         value = original_capture(model)
         value["document_frame"] = frame(_early_bound(model.ActiveView, "IModelView"))
+        evidence["captures"].append(value)
         return value
 
     def restore(native_app, model, target, observation):
@@ -192,10 +195,10 @@ def intercept(adapter, policy, evidence):
 
     errors = []
     try:
-        with (
-            patch.object(viewports, "capture", capture),
-            patch.object(viewports, "restore", restore),
-        ):
+        with ExitStack() as patches:
+            patches.enter_context(patch.object(viewports, "capture", capture))
+            if policy is FramePolicy.MEASURED_RESTORE:
+                patches.enter_context(patch.object(viewports, "restore", restore))
             yield
     except Exception as error:
         errors.append(error)
@@ -222,6 +225,8 @@ def intercept(adapter, policy, evidence):
         status="failed" if failed else "passed",
         mechanism_outcome="failed"
         if failed
+        else "capture_only_no_frame_writes"
+        if policy is FramePolicy.CAPTURE_ONLY
         else "restored_observed_pixel_drift"
         if pixel_restores
         else "restored_measured_frame_only"

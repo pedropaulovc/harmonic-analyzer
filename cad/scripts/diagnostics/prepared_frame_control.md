@@ -170,3 +170,76 @@ No such perturbation is implemented or authorized here. The production retry
 has instead reproduced the actual failure, so comparing its creation/activation
 order with this diagnostic's preliminary normal drawing is the next narrower
 investigation before inventing a perturbation.
+
+## Actual preparation order: next accessor-only baseline
+
+The production retry's
+`pending-09f01092e507-vao_atut/receipt.json` (SHA-256
+`436ceb10b7fa52f0ef809576ba08bb18dd91ad6f980e1ded523ec11d4e54814d`)
+failed after 21.772163 seconds inside its preparation timer. Its preparation
+inputs, initial viewport and entire failed restore observation are exactly equal
+to the original production failure. The successful diagnostic uses those same
+preparation inputs and initial viewport, but has two additional mutation groups:
+
+1. A normal blank is created, measured, printed and closed before the accessor.
+2. Captured-viewport mode assigns Scale2 and Translation3 and calls GraphicsRedraw2
+   at **both** preparation CREATE exits, before the production preparer's own
+   snapshot/restore. These are not frame setters, but are absent in production.
+
+The subsequent production cone-pivot-screw drawing also stopped at this boundary:
+`pending-09f01092e507-dn6v_vzy/receipt.json`, SHA-256
+`e5ae56a4ad0ea4071d2f7308e71c2c348e8ce60b658bdf67e7fd8f6ff765f28d`,
+24.626965 preparation seconds. It requests the same 4:1/two-decimal template
+specification and records the same initial/failed pixel rectangles, empty
+baseline and no cleanup error. Neither failed drawing had reached source-model
+opening or annotation creation. This makes the shared preparation order/spec a
+more direct control target than either part's geometry.
+
+Both paths ultimately close via the same adapter `close_model(save=False)`.
+Their connection policies differ: the production runner also sets application
+visibility/automation preferences, calls CloseAllDocuments and pins the part
+template; the owned diagnostic attaches without those mutations. The diagnostic
+ownership wrapper adds native inventory/identity readbacks too. No evidence yet
+attributes the pixel-box difference to any one of these factors.
+
+The new explicit `--scope accessor_only` creates no preliminary blank and performs
+no CREATE-exit viewport restoration. It calls the real production accessor once,
+with its existing owned CREATE/SAVE_AS contexts and unique cache root: exactly two
+blank creations and one DRWDOT save if it reaches verification. There is no HIT
+access, extra factory, part open, or independent normal/printed trial. The
+production before/after defaults gate, retained native receipt, immutable input
+hashes, exact-owned cleanup and empty initial/final inventory remain required.
+There is deliberately **no PDF/PNG preservation claim** in this narrow scope.
+
+The default frame policy for this scope is `capture_only`. It replaces only the
+capture getter, adding the five raw native Frame* fields to the production
+viewport snapshots. It does not wrap the restore function, perform a preliminary
+restore snapshot, write a frame field, or move the pixel-box refusal. The explicit
+`unchanged` policy is a no-interception arm; `measured_restore` remains available
+as a separate later candidate, not the first reproduction. All arms require the
+same failed-receipt/template/spec/revision pins.
+
+Proposed first invocation under a separately approved seat, same environment as
+above (not run by this agent):
+
+```powershell
+uv run --no-sync python cad/scripts/diagnostics/probe_prepared_template_cache.py `
+  --scope accessor_only --expected-pid 31860 --scale 4 1 --decimals 2 `
+  --frame-policy capture_only `
+  --failure-receipt C:/src/harmonic-analyzer/cad/out/prepared-drawing-templates/pending-09f01092e507-2yl_jg8x/receipt.json `
+  --failure-receipt-sha256 66814a0291ddb4ab5a33acf43807a2cdc16398cb287747d4499dfa40f2136a1c
+```
+
+This preserves the production **preparation mutation order**, not an identical
+whole-process initialization. If it reproduces identical Frame* fields with a
+different visible pixel box, a later single-factor candidate could defer only
+pixel-box equality until after the already-existing scale/pan/redraw operations,
+retaining final exact full viewport equality. That is not implemented here;
+neither resizing nor redraw is assumed necessary before the baseline is measured.
+
+Accessor-only offline verification: 238 tests passed in 14.22 seconds
+(`run-tlkhxs26`), including the original five-file viewport/cache/ownership set
+and `test_prepared_accessor_order_drawing.py`. The default capture-only mock
+reproduces the production one-pixel rejection after two creations/one save with
+zero extra viewport or frame writes; the original restore binding remains exact.
+These tests are not native evidence for capture-only failure or recovery.
