@@ -36,8 +36,51 @@ names or diameters do not replace `ISldWorks.IsSame == 1`. Explicit-position sur
 finishes use the same identity witness after their existing rebuild. The existing
 native-placement paths and coordinate-based unmigrated PMI paths remain unchanged.
 
-The shared guards also apply to the existing explicit-entity cone-gear-shaft PMI
-and finish calls; those require adjacent native verification before release.
+## Native acceptance scope
+
+The shared explicit-position finish guard affects **12 production recipes and
+13 finish calls**, not only cone-gear-shaft. The first two native checkpoints are
+the migrated fulcrum and pivot recipes; passing them does not accept the remaining
+ten existing callers. Each needs its unchanged full recipe, attachment/view
+witnesses, saved/reopened content and printed/render inspection. Stop a diagnostic
+invocation on its first failure; a separate target needs an explicit new run.
+
+| Checkpoint | Recipe (`draw_*.py`) | Explicit-position finish calls | Native attachment type |
+|---|---|---:|---|
+| First | `fulcrum_shaft` | 1 | EDGE |
+| Second | `pivot_shaft` | 1 | FACE |
+| Remaining | `cone_gear_shaft` | 2 | FACE |
+| Remaining | `alignment_pinion` | 1 | EDGE |
+| Remaining | `crank_drive_gear` | 1 | EDGE |
+| Remaining | `crank_pinion` | 1 | EDGE |
+| Remaining | `crankshaft` | 1 | SILHOUETTE (46) |
+| Remaining | `cylinder_gear` | 1 | EDGE |
+| Remaining | `rack_pinion` | 1 | EDGE |
+| Remaining | `spring_hook` | 1 | SILHOUETTE (46) |
+| Remaining | `transgear_feed_pinion` | 1 | EDGE |
+| Remaining | `transgear_pinion` | 1 | EDGE |
+
+The typed-PMI guard covers eight newly explicit rows in the two shafts and two
+existing cone-gear-shaft rows (datum A and journal cylindricity). Cone tip runout
+remains on its coordinate route. Other coordinate-only PMI and finish calls, and
+native-position finish calls without `symbol_xy`, do not enter the new guard.
+The production callers are direct imports/calls, not hidden behind a shared
+recipe wrapper. The separate typography diagnostic
+`probe_drawing_annotation_layout.py` also creates one explicit-position finish
+and is an affected diagnostic consumer, not a thirteenth production recipe.
+
+Re-run the call-site inventory from this revision with:
+
+```powershell
+rg -n -A 14 -g '*.py' -g '!test_*' 'add_surface_finish\(' cad/scripts
+rg -n -g '*.py' -g '!test_*' 'add_surface_finish|project_part_pmi' cad/scripts
+```
+
+For the finish list, select calls providing `symbol_xy` and either `entity` or
+`edge_entity`; absent `entity_type` means EDGE. The second search exposes imports,
+aliases and helper references for the transitive-consumer review. No native
+success, silhouette identity behavior, or visual acceptance is inferred from this
+source inventory.
 
 Re-runnable offline proof:
 
