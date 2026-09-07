@@ -305,3 +305,19 @@ its native receipt SHA-256 is
 Neither artifact changed on the hit. This run exported no PDF/PNG and opened no
 model, so printed sketch/logo preservation and complete recipe acceptance are
 still unproved. The helper stays opt-in.
+
+### Printed-format control
+
+The same probe accepts `--printed-format compare`. It adds one production
+PDF-only export and 300-DPI PNG per normal/prepared-miss/prepared-hit trial,
+without a native drawing save or model view. It requires identical full-sheet
+pixels, PDF page size, text characters and unrounded PDF glyph boxes against
+the normal positive control. Raw native defaults are measured again after each
+export and must remain exact. Any difference stops before the next trial.
+
+This checks printed appearance including sheet-format lines and logos at the
+production preview resolution, not equality of every underlying PDF vector
+command or future template variant. PDFs are retained for zoomed visual
+inspection. Export/render/readback times are separate from setup timings. The
+original template and published cache artifacts remain hash-guarded. Native
+printed results and full-recipe validation are still pending for this option.

@@ -1,7 +1,8 @@
 """Owned blank-drawing control for the opt-in production template cache.
 
 One normal setup, one prepared MISS and one HIT; no part/model opens, model views,
-trial saves, PDF/PNG exports or model-linked-title acceptance. Only the production
+trial native saves or model-linked-title acceptance. Optional printed-format
+comparison exports PDF/PNG for each trial without saving the drawing. Only the production
 MISS saves one owned DRWDOT. Requires frozen source, AUTOSTART=0, remote cache off,
 an explicit existing SW PID and the parent machine-global COM seat.
 """
@@ -11,6 +12,7 @@ from __future__ import annotations
 import argparse
 from contextlib import contextmanager
 from dataclasses import asdict
+from enum import StrEnum
 import json
 import os
 from pathlib import Path
@@ -30,6 +32,12 @@ from _drawing_template_defaults import compare_defaults, snapshot_defaults  # no
 import _telemetry  # noqa: E402
 from diagnostics import _owned_native_documents as ownership  # noqa: E402
 from diagnostics import _owned_native_session as session  # noqa: E402
+from diagnostics import probe_retained_drawing_export as printed  # noqa: E402
+
+
+class PrintedFormat(StrEnum):
+    SKIP = "skip"
+    COMPARE = "compare"
 
 
 def require_environment(expected_pid):
@@ -50,6 +58,7 @@ def runtime_inputs(adapter, spec):
         Path(ownership.__file__).resolve(),
         Path(session.__file__).resolve(),
         ROOT / "dodo.py",
+        Path(printed.__file__).resolve(),
     ]
     return {
         "preparation": prepared.preparation_inputs(adapter, spec),
@@ -95,7 +104,68 @@ def blank_witness(adapter):
     return {"kind": 3, "path": "", "sheet_count": 1, "model_view_count": 0}
 
 
-async def trial(adapter, spec, entry, directory, row, expected, checkpoint):
+def printed_witness(adapter, directory):
+    """Production PDF export plus exact pixels and PDF glyph positions, not CAD edits."""
+    import pypdfium2 as pdfium
+
+    pdf, png = directory / "format.pdf", directory / "format.png"
+    if pdf.exists() or png.exists():
+        raise RuntimeError("printed format needs fresh PDF/PNG targets")
+    printed.export_pdf_only(adapter, pdf)
+    common.render_pdf_png(pdf, png)
+    with pdfium.PdfDocument(str(pdf)) as document:
+        if len(document) != 1:
+            raise RuntimeError("blank format export must have one PDF page")
+        page = document[0]
+        textpage = page.get_textpage()
+        glyphs = [
+            {
+                "text": textpage.get_text_range(i, 1),
+                "box_pt": list(textpage.get_charbox(i)),
+            }
+            for i in range(textpage.count_chars())
+        ]
+        if not glyphs:
+            raise RuntimeError("blank format positive control has no PDF text")
+        page_size = list(page.get_size())
+    return {
+        "pdf": str(pdf),
+        "png": str(png),
+        "sha256": {"pdf": prepared._sha(pdf), "png": prepared._sha(png)},
+        "page_size_pt": page_size,
+        "glyphs": glyphs,
+        "scope": "300-DPI full-sheet pixels and exact PDF text glyphs; not raw vector-command equality",
+    }
+
+
+def compare_printed(before, after):
+    if (
+        before["page_size_pt"] != after["page_size_pt"]
+        or before["glyphs"] != after["glyphs"]
+    ):
+        raise RuntimeError("prepared blank PDF page or exact text glyphs differ")
+    for snapshot in (before, after):
+        for kind in ("pdf", "png"):
+            if prepared._sha(snapshot[kind]) != snapshot["sha256"][kind]:
+                raise RuntimeError("printed format artifact changed after capture")
+    delta = printed.compare_png(Path(before["png"]), Path(after["png"]))
+    if delta["changed_pixel_count"]:
+        raise RuntimeError(f"prepared blank printed format differs: {delta}")
+    return delta
+
+
+async def trial(
+    adapter,
+    spec,
+    entry,
+    directory,
+    row,
+    expected,
+    checkpoint,
+    *,
+    printed_format=PrintedFormat.SKIP,
+    printed_expected=None,
+):
     errors = []
     row.update(status="running", phase="setup")
     start = time.perf_counter()
@@ -123,6 +193,19 @@ async def trial(adapter, spec, entry, directory, row, expected, checkpoint):
             row["defaults"] = snapshot_defaults(adapter, spec)
             if expected is not None:
                 compare_defaults(expected, row["defaults"])
+        if printed_format is PrintedFormat.COMPARE:
+            row["phase"] = "printed_format"
+            checkpoint()
+            with timed(row, "printed_seconds"):
+                row["printed"] = printed_witness(adapter, directory)
+                if printed_expected is not None:
+                    row["printed_delta"] = compare_printed(
+                        printed_expected, row["printed"]
+                    )
+            with timed(row, "post_print_witness_seconds"):
+                row["after_print_defaults"] = snapshot_defaults(adapter, spec)
+                compare_defaults(row["defaults"], row["after_print_defaults"])
+                row["after_print_blank"] = blank_witness(adapter)
     except Exception as error:
         row.update(error=repr(error), failed_phase=row["phase"])
         errors.append(error)
@@ -145,7 +228,11 @@ async def trial(adapter, spec, entry, directory, row, expected, checkpoint):
         raise ExceptionGroup("blank template trial/cleanup failed", errors)
 
 
-async def probe(adapter, spec, report_root, expected_pid):
+async def probe(
+    adapter, spec, report_root, expected_pid, *, printed_format=PrintedFormat.SKIP
+):
+    if not isinstance(printed_format, PrintedFormat):
+        raise ValueError("printed format requires an explicit policy enum")
     require_environment(expected_pid)
     if int(adapter.swApp.GetProcessID()) != expected_pid:
         raise RuntimeError(
@@ -173,6 +260,7 @@ async def probe(adapter, spec, report_root, expected_pid):
             cwd=ROOT,
         ).stdout.strip(),
         "scope": "blank_setup_cache_miss_hit_only",
+        "printed_format": printed_format.value,
         "spec": asdict(spec),
         "source_template": {"path": str(original), "sha256": original_sha},
         "runtime_inputs": pinned,
@@ -251,7 +339,15 @@ async def probe(adapter, spec, report_root, expected_pid):
         adapter.ownership.register_directory(trial_dir)
         row = {"variant": variant}
         report["trials"].append(row)
-        await trial(adapter, spec, entry, trial_dir, row, expected, checkpoint)
+        options = {}
+        if printed_format is PrintedFormat.COMPARE:
+            options = {
+                "printed_format": printed_format,
+                "printed_expected": report["trials"][0].get("printed"),
+            }
+        await trial(
+            adapter, spec, entry, trial_dir, row, expected, checkpoint, **options
+        )
         guard(variant + "_after_cleanup")
         return row["defaults"]
 
@@ -357,6 +453,12 @@ def main(argv=None):
     parser.add_argument("--scale", type=float, nargs=2, default=(2.0, 1.0))
     parser.add_argument("--decimals", type=int, choices=(2, 3), default=2)
     parser.add_argument(
+        "--printed-format",
+        type=PrintedFormat,
+        choices=tuple(PrintedFormat),
+        default=PrintedFormat.SKIP,
+    )
+    parser.add_argument(
         "--report-root",
         type=Path,
         default=ROOT / "cad/out/reports/prepared-template-cache",
@@ -372,6 +474,7 @@ def main(argv=None):
                 spec,
                 args.report_root.resolve(),
                 args.expected_pid,
+                printed_format=args.printed_format,
             )
         )
     import dodo
@@ -386,6 +489,8 @@ def main(argv=None):
             *map(str, spec.scale),
             "--decimals",
             str(spec.decimals),
+            "--printed-format",
+            args.printed_format.value,
             "--report-root",
             str(args.report_root.resolve()),
             "--worker",
