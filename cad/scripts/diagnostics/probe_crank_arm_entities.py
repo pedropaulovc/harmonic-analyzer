@@ -35,10 +35,10 @@ TOKEN = SOURCE.with_name(".crank-arm.execution")
 EXPECTED_SOURCE_SHA = "cfde03558f6ca85ef096080d322f32621f62063d5994108fba54a5028a65b4d3"
 BASELINE = "19431a0088519bd8755b941a3da73a699c0ed7e1"
 BASELINE_DRAWING_REPORT = (
-    ROOT / "cad/out/reports/crank-arm-entities-6x1gg817/measurements.json"
+    ROOT / "cad/out/reports/crank-arm-entities-uc6rpju9/measurements.json"
 )
 BASELINE_DRAWING_REPORT_SHA = (
-    "e24efe0444d38f0cfcdafb3eb9413623807d28f36d700256ca0ef0fae71b2c06"
+    "6e00b42ca53fe0d4557ee7ae98044f016683c6ad1a4cb5ea8568b36fa529815d"
 )
 
 

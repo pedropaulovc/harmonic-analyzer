@@ -200,48 +200,70 @@ ScopedEntity = FeatureFace | FaceBoundary | EdgeAdjacentFace
 class _ScopedEntities:
     """Resolve a small ownership chain; never fall back to a body traversal."""
 
-    def __init__(self, model: Any):
+    def __init__(self, model: Any, requests: Iterable[ScopedEntity]):
         self.model = model
         self.resolved: dict[ScopedEntity, Any] = {}
-        self.feature_faces: dict[str, tuple[Any, ...]] = {}
+        self.feature_requests: dict[str, dict[FeatureFace, None]] = {}
+        self.boundary_requests: dict[FeatureFace, dict[FaceBoundary, None]] = {}
+        self.adjacent_requests: dict[FaceBoundary, dict[EdgeAdjacentFace, None]] = {}
+        for spec in requests:
+            if isinstance(spec, EdgeAdjacentFace):
+                self.adjacent_requests.setdefault(spec.edge, {})[spec] = None
+                spec = spec.edge
+            if isinstance(spec, FaceBoundary):
+                self.boundary_requests.setdefault(spec.face, {})[spec] = None
+                spec = spec.face
+            self.feature_requests.setdefault(spec.feature_name, {})[spec] = None
 
     def resolve(self, spec: ScopedEntity) -> Any:
         if spec not in self.resolved:
-            self.resolved[spec] = self._resolve(spec)
+            self._resolve(spec)
         return self.resolved[spec]
 
-    def _resolve(self, spec: ScopedEntity) -> Any:
+    def _faces(self, faces: Iterable[Any], requests: Iterable[FeatureFace | EdgeAdjacentFace], *, scope: str) -> None:
+        # Use selector values only to group requests. Native wrappers are never
+        # keys or identity witnesses; every returned candidate is still counted.
+        indexed = {str(index): selector for index, selector in enumerate(requests)}
+        matches = _resolve_face_requests(
+            faces, {key: selector.face for key, selector in indexed.items()}, scope=scope,
+        )
+        self.resolved.update({indexed[key]: face for key, face in matches.items()})
+
+    def _resolve(self, spec: ScopedEntity) -> None:
         if isinstance(spec, FeatureFace):
-            if spec.feature_name not in self.feature_faces:
-                with _telemetry.span("drawing.feature_faces", feature=spec.feature_name) as span:
-                    part = _early_bound(self.model, "IPartDoc")
-                    feature = part.FeatureByName(spec.feature_name)
-                    if feature is None:
-                        raise RuntimeError(f"model feature {spec.feature_name!r} is missing")
-                    self.feature_faces[spec.feature_name] = tuple(_early_bound(feature, "IFeature").GetFaces() or ())
-                    span.set_attribute("faces", len(self.feature_faces[spec.feature_name]))
-            return _resolve_face_requests(
-                self.feature_faces[spec.feature_name], {"face": spec.face}, scope=f"feature {spec.feature_name}",
-            )["face"]
+            with _telemetry.span("drawing.feature_faces", feature=spec.feature_name) as span:
+                part = _early_bound(self.model, "IPartDoc")
+                feature = part.FeatureByName(spec.feature_name)
+                if feature is None:
+                    raise RuntimeError(f"model feature {spec.feature_name!r} is missing")
+                faces = tuple(_early_bound(feature, "IFeature").GetFaces() or ())
+                span.set_attribute("faces", len(faces))
+            self._faces(faces, self.feature_requests[spec.feature_name], scope=f"feature {spec.feature_name}")
+            return
         if isinstance(spec, EdgeAdjacentFace):
             edge = _early_bound(self.resolve(spec.edge), "IEdge")
-            return _resolve_face_requests(
+            self._faces(
                 (face for face in edge.GetTwoAdjacentFaces2() or () if face is not None),
-                {"face": spec.face}, scope=f"adjacent to {spec.edge!r}",
-            )["face"]
+                self.adjacent_requests[spec.edge], scope=f"adjacent to {spec.edge!r}",
+            )
+            return
         face = _early_bound(self.resolve(spec.face), "IFace2")
-        matches = []
-        kinds = frozenset({type(spec.edge)})
-        with _telemetry.span("drawing.collect_edges", scope=f"boundary of {spec.face!r}", roles=1) as span:
+        matches: dict[FaceBoundary, list[Any]] = {request: [] for request in self.boundary_requests[spec.face]}
+        kinds = frozenset(type(request.edge) for request in matches)
+        with _telemetry.span("drawing.collect_edges", scope=f"boundary of {spec.face!r}", roles=len(matches)) as span:
             edges = tuple(face.GetEdges() or ())
             span.set_attribute("edges", len(edges))
             for edge in edges:
                 geometry = _edge_geometry(edge, kinds=kinds)
-                if geometry is not None and geometry.matches(spec.edge):
-                    matches.append(geometry.entity)
-        if len(matches) != 1:
-            raise RuntimeError(f"{spec!r} matched {len(matches)} edges; expected exactly one face boundary")
-        return matches[0]
+                for request, candidates in matches.items():
+                    if isinstance(request.edge, CircleEdge) and isinstance(geometry, _Circle) and geometry.matches(request.edge):
+                        candidates.append(geometry.entity)
+                    if isinstance(request.edge, LineEdge) and isinstance(geometry, _Line) and geometry.matches(request.edge):
+                        candidates.append(geometry.entity)
+        for request, candidates in matches.items():
+            if len(candidates) != 1:
+                raise RuntimeError(f"{request!r} matched {len(candidates)} edges; expected exactly one face boundary")
+        self.resolved.update({request: candidates[0] for request, candidates in matches.items()})
 
 
 class ModelEntities:
@@ -252,8 +274,8 @@ class ModelEntities:
 
     @_telemetry.traced("drawing.resolve_model_entities")
     def resolve(self, roles: Mapping[str, CircleEdge | LineEdge | ModelVertex | FaceSpec | ScopedEntity]) -> dict[str, Any]:
-        scoped = _ScopedEntities(self.model)
         scoped_roles = {key: spec for key, spec in roles.items() if isinstance(spec, (FeatureFace, FaceBoundary, EdgeAdjacentFace))}
+        scoped = _ScopedEntities(self.model, scoped_roles.values())
         resolved = {key: scoped.resolve(spec) for key, spec in scoped_roles.items()}
         edge_roles = {key: spec for key, spec in roles.items() if isinstance(spec, (CircleEdge, LineEdge))}
         vertex_roles = {key: spec for key, spec in roles.items() if isinstance(spec, ModelVertex)}
