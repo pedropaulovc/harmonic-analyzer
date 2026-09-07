@@ -226,3 +226,51 @@ The first integrated-main offline invocation passed 1266 recipe tests (91.37 s)
 and four isolation tests (9.77 s); graph and cache gates were current from their
 successful prior runs. Log `offline-gates-main550.log` has SHA-256
 `7104f56504b921ce64208888a4d1c472f7d87d87aedf953303ad1c868a8edee1`.
+
+## Initial native baseline preserved
+
+The initial-main `build_bare` process exited zero at
+2026-09-07 20:55:26.9240104 UTC, after 9360.3890202 seconds. Its 108 part tasks
+and eight FULL assembly tasks all passed. There were no ERROR spans, retries,
+recoveries, fatal watchdog signals or malformed telemetry records. Cache probes
+and post-seat probes missed; all 116 stores were disabled. Log-only unresponsive
+window episodes resolved without intervention. This is baseline construction,
+not candidate full-pipeline acceptance.
+
+The attach-only, seat-locked post-build inventory found the licensed PID 18748
+with no open documents. The closed snapshot preserves 1848 files, including all
+native artifacts, exact execution tokens, recipe/fingerprint/DOF sidecars, the
+genuine ledger, runtime sources, logs and the disclosed baseline reporter.
+Seven subassembly previews and the completed top render were inspected; their
+hashes and visibility limits are retained. These are initial-main previews,
+not a substitute for updated-main/candidate inspection.
+
+| Receipt | SHA-256 |
+|---|---|
+| `initial-main-after-build.json` in native checkout | `c2489af28b59fffa7961cd2bf408614760ce0aae44c18a0b2531d7d5fc3ce1fd` |
+| `initial-main-build-history-summary.json` in code checkout | `9b1bfff91f580e04eca947b3aef42ce1020cc513ee9ec1f1690cba848b7ceeaa` |
+| `D:/harmonic-assembly-granularity-evidence/native-initial-main-c6/manifest.json` | `a530ae6a79e995e3df80f56d85fcb0e7222bcb61665dca074ec97a5ed13bee55` |
+| Code checkout `cad/out/reports/assembly-granularity-delivery/native-initial-main-c6.zip` | `9676a0759e4eafba4e2c37c4dfb64064fa08dd2a72134bc3b916a9bf8a4d6515` |
+
+Every compressed archive member was re-read and matched against the manifest;
+the archive is 98484897 bytes on C:. D: temporary storage is not the only copy.
+The history summary also includes two pre-build inventory tasks; its process
+interval and the separately observed exit receipt distinguish baseline work.
+
+Main was re-fetched and remains `55056d49`, with adapter `2269009e`. Only after
+preservation, the native checkout moved there and completed `uv sync --frozen`.
+Its normal `build_bare` update started at 20:59:20 UTC with cache transfers off,
+using its existing genuine artifacts and ledger. Source/config/template/adapter
+hashes and Git state are captured before/after by the wrapper. No other
+worktree's artifacts or execution tokens were copied into it.
+
+The latest-code child review at `95be2a5a` is clean across all 23 files. Complete
+cache `cr-687-95be2a5a-full-cache` and actual diff/source verification are retained;
+receipt `cr-687-95be2a5a-cache-verification.json` has SHA-256
+`9a6f888573941f3ed49a8f85f04f1a1cfe8b4fc84ccdd85695099c6f9c66662e`.
+Post-guard offline validation passed 1266 recipe tests (92.35 s), with graph,
+isolation and cache gates current. Log `offline-gates-snapshot-guard.log` has
+SHA-256 `1ceb3781f3835dcab7b1fd1d1e48fd05ae9bbb5528b392687da0654817b1fc52`.
+GitHub later returned `graphql_rate_limit`; the exact error is retained and
+missing watcher output is not counted as approval. Candidate native full-build,
+zero-COM repeat, same-main comparison and final visual acceptance remain pending.
