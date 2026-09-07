@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import ast
 import math
 from pathlib import Path
+from unittest.mock import Mock
 
 import _fit_limits
 import build_cone_gear_shaft as part
@@ -12,6 +14,7 @@ import draw_cone_gear_shaft as drawing
 import pytest
 from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_layout_check import LeaderSegment, _segment_crosses_box
 
 
 def test_section_fits_are_toleranced_on_the_model() -> None:
@@ -178,3 +181,95 @@ def test_part_stamps_make_critical_properties() -> None:
     assert "1018" in str(config["material"])
     assert config["finish"]
     assert int(config["quantity"]) == 1
+
+
+@pytest.mark.parametrize("key", ["datum:A", "journal_cylindricity", "tip_runout"])
+def test_actual_pmi_request_changes_only_the_two_fcf_origins(key) -> None:
+    """Pin requested layout and attachment inputs, not a predicted native route."""
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    calls = [
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "project_part_pmi"
+    ]
+    assert len(calls) == 1
+    adapter, side, end, pivot_face, pivot_edge = (object() for _ in range(5))
+    big_end_x = drawing.SIDE_CENTER[0] + drawing.SHAFT_LENGTH / 2000.0
+    tip_top = (
+        drawing.SIDE_CENTER[0] - drawing.SHAFT_LENGTH / 2000.0 + 0.016,
+        drawing.SIDE_CENTER[1] + drawing.SECTION_DIAS[-1] / 2000.0,
+    )
+    project = Mock()
+    scope = dict(
+        vars(drawing), adapter=adapter, side=side, end=end,
+        pivot_face=pivot_face, pivot_edge=pivot_edge,
+        big_end_x=big_end_x, tip_top=tip_top, project_part_pmi=project,
+    )
+    eval(compile(ast.Expression(calls[0]), drawing.__file__, "eval"), scope)
+    project.assert_called_once()
+    assert project.call_args.args == (adapter,)
+    request = project.call_args.kwargs
+    assert set(request) == {"placements", "datums", "controls", "label"}
+    assert request["datums"] is cone_gear_shaft_spec.PART_DATUMS
+    assert request["controls"] is cone_gear_shaft_spec.GEOMETRIC_CONTROLS
+    assert request["label"] == "cone gear shaft PMI"
+    expected = {
+        "datum:A": drawing.PmiDrawingPlacement(
+            view=side,
+            position=(big_end_x - drawing.JOURNAL_END / 1000.0, 0.252),
+            entity=pivot_face, attachment_type="FACE",
+        ),
+        "journal_cylindricity": drawing.PmiDrawingPlacement(
+            view=end, position=(0.100, 0.085), edge_entity=pivot_edge,
+        ),
+        "tip_runout": drawing.PmiDrawingPlacement(
+            view=side, position=(0.110, 0.245),
+            attachment_xy=tip_top, attachment_type="SILHOUETTE",
+        ),
+    }
+    assert set(request["placements"]) == set(expected)
+    assert request["placements"][key] == expected[key]
+
+
+def test_fcf_candidate_preserves_all_five_diameter_placements() -> None:
+    assert drawing.END_KEEP == {
+        "Sec0Dia": (0.105, 0.144),
+        "Sec1Dia": (0.105, 0.132),
+        "Sec2Dia": (0.105, 0.120),
+        "Sec3Dia": (0.105, 0.108),
+        "Sec4Dia": (0.105, 0.096),
+    }
+
+
+@pytest.mark.parametrize(
+    "label, segment, native_text_box, pdf_glyph_box",
+    [
+        (
+            "tip_runout / Ra1.6 digit 1",
+            (0.06365000000000001, 0.2415, 0.06673180796252925, 0.215396875),
+            (0.05790040655400003, 0.219592874825377,
+             0.07169733988733336, 0.2251727414920437),
+            (0.0658887592316, 0.220616055806, 0.0667477561103, 0.224018066067),
+        ),
+        (
+            "journal_cylindricity / Sec2Dia final 0",
+            (0.14365, 0.1385, 0.04364964647689436, 0.08333114327407104),
+            (0.0958628981390595, 0.115517777646203,
+             0.108812364805726, 0.121097644312869),
+            (0.105073668247, 0.116461700524, 0.107361017863, 0.120027040609),
+        ),
+    ],
+)
+def test_retained_old_fcf_routes_cross_native_text_and_pdf_glyph_bounds(
+    label, segment, native_text_box, pdf_glyph_box
+) -> None:
+    """y25nr2w2 evidence repro; no synthetic candidate leader is tested here.
+
+    pilot.json SHA 5f6e6a4fc524c95147d3231fee20c0f92392b17c1bf3b6c515defe41d2857c92.
+    PDFium glyph boxes use lower-left sheet coordinates, converted to metres.
+    Box crossings corroborate the inspected PNG, not a general ink-outline proof.
+    """
+    line = LeaderSegment(label, "gdt", *segment)
+    assert _segment_crosses_box(line, native_text_box, inset=0.0)
+    assert _segment_crosses_box(line, pdf_glyph_box, inset=0.0)
