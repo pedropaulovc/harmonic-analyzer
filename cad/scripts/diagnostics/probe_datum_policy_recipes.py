@@ -88,6 +88,21 @@ def target_order(targets=None):
     return order
 
 
+def selected_callout_contract(
+    candidate, source_observation, callout_storage, source_authoring
+):
+    """Reject unsupported recipe/experiment ABIs before attach or owned writes."""
+    if source_observation is None:
+        return None
+    from diagnostics._callout_recipe_contract import recipe_contract, require_experiment
+
+    contract = recipe_contract(benchmark.recipe_source(candidate, "alignment_pinion"))
+    require_experiment(
+        contract, lower_text=callout_storage, source_authoring=source_authoring
+    )
+    return contract
+
+
 def adapter_fingerprints():
     """Fingerprint the imported editable package, not an empty worktree submodule."""
     import solidworks_mcp
@@ -607,7 +622,14 @@ async def pilot(
     from diagnostics._source_callout_authoring import require_selection
 
     require_selection(
-        source_callout_authoring, callout_storage, source_observation, drawing_save, order
+        source_callout_authoring,
+        callout_storage,
+        source_observation,
+        drawing_save,
+        order,
+    )
+    callout_contract = selected_callout_contract(
+        candidate, source_observation, callout_storage, source_callout_authoring
     )
     protected_targets = tuple(dict.fromkeys((*ORDER, *order)))
     if linear_control is not None:
@@ -677,6 +699,19 @@ async def pilot(
             module = benchmark.load_recipe(
                 candidate, target, trial_dir, source=copy_source
             )
+            if callout_contract is not None:
+                from diagnostics._callout_recipe_contract import recipe_contract
+
+                if (
+                    recipe_contract(
+                        (trial_dir / "recipe-source.py").read_text(encoding="utf-8")
+                    )
+                    is not callout_contract
+                ):
+                    raise RuntimeError(
+                        "loaded recipe callout contract changed after preflight"
+                    )
+                trial["callout_contract"] = callout_contract.value
             entity_acceptance = None
             manifest = TARGETS[target]
             entity_handles = after_entities = reopened_entities = None
@@ -780,9 +815,11 @@ async def pilot(
                     trial["source_before"],
                     source_handles,
                     lambda: source_dimensions(source_model, target, copy_source),
+                    callout_contract=callout_contract,
                     **(
                         {"drawing_reader": callout_control.boundary_snapshot}
-                        if callout_control is not None else {}
+                        if callout_control is not None
+                        else {}
                     ),
                 )
             if linear_control is not None:
@@ -1164,6 +1201,12 @@ def main(argv=None):
     if args.factory is not None:
         require_factory_environment()
     candidate = benchmark.revision(args.candidate)
+    selected_callout_contract(
+        candidate,
+        args.source_observation,
+        args.callout_storage,
+        args.source_callout_authoring,
+    )
     source_root, guard_root = (
         args.source_root.resolve(strict=True),
         args.guard_root.resolve(strict=True),

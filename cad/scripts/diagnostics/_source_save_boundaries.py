@@ -23,6 +23,7 @@ from _common import _early_bound
 import _drawing_common as drawing
 from diagnostics import probe_drawing_attachments as attachments
 from diagnostics._source_dimension_snapshot import finite, tolerance
+from diagnostics._callout_recipe_contract import CalloutContract
 
 
 class SourceObservation(StrEnum):
@@ -56,9 +57,24 @@ def require_targets(variant, order):
 
 class SourceSaveBoundaries:
     def __init__(
-        self, adapter, module, trial, checkpoint, source, before, handles, reader,
-        *, drawing_reader=None,
+        self,
+        adapter,
+        module,
+        trial,
+        checkpoint,
+        source,
+        before,
+        handles,
+        reader,
+        *,
+        callout_contract,
+        drawing_reader=None,
     ):
+        if not isinstance(callout_contract, CalloutContract):
+            raise ValueError(
+                "source observations require an explicit versioned callout contract"
+            )
+        self.callout_contract = callout_contract
         self.adapter, self.module, self.source = adapter, module, source
         self.path = Path(trial["copy_source"]).resolve()
         self.before, self.handles, self.reader = before, handles, reader
@@ -75,6 +91,7 @@ class SourceSaveBoundaries:
             "source": str(self.path),
             "scope": "one named source display; no generic annotation/BREP scan; no save-policy change",
             "banks": [],
+            "callout_contract": callout_contract.value,
         }
         if set(handles) != {DIMENSION} or set(before["dimensions"]) != {DIMENSION}:
             raise RuntimeError(
@@ -306,7 +323,7 @@ class SourceSaveBoundaries:
         self.capture("initial")
         originals = {
             name: getattr(self.module, name)
-            for name in ("set_dimension_callouts", "set_dimension_precision")
+            for name in (self.callout_contract.helper_name, "set_dimension_precision")
         }
         drawing_originals = self._drawing_originals()
         original_save = drawing.save_drawing
