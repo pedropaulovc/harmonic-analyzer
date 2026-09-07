@@ -23,6 +23,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_entities import CircleEdge, FaceBoundary, FeatureFace, ModelEntities
 from _surface_finish import surface_finish_by_key
 from pivot_shaft_spec import (
     GEOMETRIC_CONTROLS,
@@ -63,11 +64,6 @@ RIGHT_CENTER = (
 # title block's 0.064 top rule).
 ISO_CENTER = (0.320, 0.120)
 
-# The shaft's flank in the *Right view: a 6.35-dia cylinder at 1:1, so its top
-# silhouette runs ~3.2 mm above the view centre. The bearing Ra anchors HERE
-# rather than on the front view's end circle -- see the finish block below.
-SHAFT_FLANK_Y = RIGHT_CENTER[1] + SHAFT_DIA * SHEET_SCALE[0] / 2000.0
-
 FRONT_KEEP = {
     # x=0.030, not the bbox-derived 0.017: horizontal text made this callout
     # ~25 mm wide ("+0.00/-0.02"), so centred that far left it ran over the
@@ -80,6 +76,23 @@ RIGHT_KEEP = {
 }
 # Size tolerances live on the source-model dimensions; the sheet renders them natively.
 DIMENSION_CALLOUTS: dict[str, str] = {}
+
+# End rims are boundaries of their controlled Shaft faces. Former side-view
+# silhouette picks use the actual bearing cylinder, independent of sheet XY.
+_CONTROL_FACES = {row.key: FeatureFace("Shaft", row.face) for row in GEOMETRIC_CONTROLS}
+_FRONT_RIM = CircleEdge(SHAFT_DIA / 2, (0, 0, -SHAFT_LENGTH / 2), (0, 0, 1))
+ENTITY_ROLES = {
+    "datum:A": FaceBoundary(FeatureFace("Shaft", PART_DATUMS[0].face), _FRONT_RIM),
+    "bearing_cylindricity": _CONTROL_FACES["bearing_cylindricity"],
+    "plus_z_end_perpendicularity": FaceBoundary(
+        _CONTROL_FACES["plus_z_end_perpendicularity"],
+        CircleEdge(SHAFT_DIA / 2, (0, 0, SHAFT_LENGTH / 2), (0, 0, 1)),
+    ),
+    "minus_z_end_perpendicularity": FaceBoundary(_CONTROL_FACES["minus_z_end_perpendicularity"], _FRONT_RIM),
+    "bearing_finish": FeatureFace(
+        "Shaft", surface_finish_by_key(SURFACE_FINISHES, "pivot_bearing").face,
+    ),
+}
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -128,6 +141,7 @@ async def build(adapter: Any) -> dict[str, str]:
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
+    entities = ModelEntities(front.ReferencedDocument).resolve(ENTITY_ROLES)
 
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
@@ -154,10 +168,6 @@ async def build(adapter: Any) -> dict[str, str]:
 
     left_end = (RIGHT_CENTER[0] - SHAFT_LENGTH / 2000.0, RIGHT_CENTER[1])
     right_end = (RIGHT_CENTER[0] + SHAFT_LENGTH / 2000.0, RIGHT_CENTER[1])
-    end_top = (
-        FRONT_CENTER[0],
-        FRONT_CENTER[1] + SHAFT_DIA * END_VIEW_SCALE / 2000.0,
-    )
     # GD&T is model PMI (pivot_shaft_spec.PART_DATUMS/GEOMETRIC_CONTROLS,
     # authored by build_pivot_shaft) — project it and place it where the
     # hand-authored symbols used to sit (sheet-LEFT of the *Right view is the
@@ -171,24 +181,24 @@ async def build(adapter: Any) -> dict[str, str]:
             "datum:A": PmiDrawingPlacement(
                 view=front,
                 position=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.024),
-                attachment_xy=end_top,
+                entity=entities["datum:A"],
                 position_tolerance_m=0.00002,
             ),
             "bearing_cylindricity": PmiDrawingPlacement(
                 view=right,
                 position=(RIGHT_CENTER[0] - 0.045, 0.236),
-                attachment_xy=(RIGHT_CENTER[0] - 0.045, SHAFT_FLANK_Y),
-                attachment_type="SILHOUETTE",
+                entity=entities["bearing_cylindricity"],
+                attachment_type="FACE",
             ),
             "plus_z_end_perpendicularity": PmiDrawingPlacement(
                 view=right,
                 position=(left_end[0] - 0.042, 0.180),
-                attachment_xy=left_end,
+                entity=entities["plus_z_end_perpendicularity"],
             ),
             "minus_z_end_perpendicularity": PmiDrawingPlacement(
                 view=right,
                 position=(right_end[0] + 0.014, 0.180),
-                attachment_xy=right_end,
+                entity=entities["minus_z_end_perpendicularity"],
             ),
         },
         datums=PART_DATUMS,
@@ -198,17 +208,17 @@ async def build(adapter: Any) -> dict[str, str]:
     # The bearing finish controls the shaft's CYLINDRICAL face, which the side
     # view shows edge-on -- so it anchors to the flank there instead of to the
     # front view's end circle (from which the leader had to run the whole way
-    # back across the side view). A cylinder carries no model edge along its
-    # side, so the pick is a SILHOUETTE entity (as in draw_transgear_stub).
+    # back across the side view). Select the controlled cylinder itself, not a
+    # silhouette located by sheet coordinates.
     # The Ra text renders ABOVE the arm (ASME Y14.36), reaching y~0.236.
     add_surface_finish(
         adapter,
         right,
-        edge_xy=(RIGHT_CENTER[0] + 0.045, SHAFT_FLANK_Y),
+        entity=entities["bearing_finish"],
         symbol_xy=(RIGHT_CENTER[0] + 0.045, 0.222),
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bearing"),
         label="pivot bearing finish",
-        entity_type="SILHOUETTE",
+        entity_type="FACE",
     )
 
     # 0.020: a note is left-aligned on its anchor, so the ink starts here. The
