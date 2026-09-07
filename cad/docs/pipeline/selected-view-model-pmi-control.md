@@ -153,3 +153,24 @@ records the 15.013326 s attempt, unchanged source/runtime guards and clean
 empty-to-empty cleanup. Rotation matching corrects the diagnostic, not the
 model-PMI importer. Rotation arrays must be finite, orthonormal and uniquely
 matched within 1e-9; projected views need no invented name.
+
+### Right-view import has complete PMI coverage
+
+At `26baadce`, adapter `e77bfda4`, PID 31860, the Front matrix positive control
+passed and exactly one projected view matched the source Right rotation. Both
+imports selected that exact native view (count 1, type 12, `IsSame == 1`). GTol
+import returned two items in 0.024126800 s; datum import returned A in
+0.013330900 s. All three had the correct source face identity, typed content,
+visible/non-dangling state and exact view ownership. Returned handles matched
+the new inventory without duplicates; the coverage failure list was empty.
+
+Receipt `selected-view-pmi-vx_7_s57/observations.json`, SHA-256
+`91a2e336a5a1349f00c90553784c4a3223f397b8f65cd51b3d5c83caa7d7a217`,
+records the 28.820601 s diagnostic. Original/template/copied-source and runtime
+fingerprints passed; owned cleanup returned the empty baseline without error.
+The retained PNG was inspected: datum A is readable, but both tolerance frames
+have the same native position and overlap. Native save/PDF export again added
+`Drawing View2/DetailItem1` (center mark), stopping the unchanged full-inventory
+gate before cold reopen. There is no complete-sheet acceptance or production
+performance claim. Native insertion of all three items into one selected view
+is now positively established for this source; their layout remains unfinished.
