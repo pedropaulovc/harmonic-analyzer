@@ -5,6 +5,9 @@ The parent takes the pipeline's COM seat lock. Only a uniquely named drawing
 copy under cad/out/reports/drawing-attachments is modified. The JSON report
 records every phase and excludes unsupported annotation/geometry kinds from
 the checked count. This compares geometry signatures, not persistent entity IDs.
+Supported drawing-view silhouettes retain exact raw curve/endpoints/surface
+geometry and validate their native view; this is not source-topology identity.
+Their dedicated VIEW observer's persistent-ID/face checks remain independent.
 Datums attached to one model IDisplayDimension have a separate semantic attachment
 witness: exact native view/target identity, source feature/parameter identity,
 configuration, value and tolerance. They are not counted as checked geometry.
@@ -39,6 +42,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "cad/scripts"))
 
 from _common import _early_bound, check  # noqa: E402
+from diagnostics import _silhouette_attachment_witness as silhouette  # noqa: E402
 from diagnostics._owned_native_documents import run_copy_diagnostic  # noqa: E402
 from diagnostics._owned_native_session import require_owned_diagnostic_environment  # noqa: E402
 from _part_pmi import _face_geometry  # noqa: E402
@@ -46,7 +50,7 @@ import _telemetry  # noqa: E402
 from solidworks_mcp.adapters.com_variant import double_array  # noqa: E402
 
 _ANNOTATIONS = {2, 4, 5, 7}  # swAnnotationType_e: datum, dimension, GTol, finish
-_ENTITY_KINDS = {1, 2, 3}  # swSelectType_e: edge, face, vertex
+_ENTITY_KINDS = {1, 2, 3, 46}  # swSelectType_e: edge, face, vertex, silhouette
 _SURFACES = {4001, 4002, 4003, 4004, 4005}  # analytic ISurface identities
 _LAYOUT_TOLERANCE = 1e-8
 
@@ -469,7 +473,9 @@ def snapshot(model, *, app, dimension_values="system"):
                 continue
             try:
                 checked[key] = tuple(
-                    geometry(entity, kind)
+                    ("silhouette", silhouette.snapshot(app, view, entity)[0])
+                    if kind == 46
+                    else geometry(entity, kind)
                     for entity, kind in zip(entities, kinds, strict=True)
                 )
             except UnsupportedGeometry as error:
