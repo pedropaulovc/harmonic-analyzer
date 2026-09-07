@@ -753,6 +753,10 @@ async def pilot(
                     trial["source_before"],
                     source_handles,
                     lambda: source_dimensions(source_model, target, copy_source),
+                    **(
+                        {"drawing_reader": callout_control.boundary_snapshot}
+                        if callout_control is not None else {}
+                    ),
                 )
             if linear_control is not None:
                 build_kwargs.update(

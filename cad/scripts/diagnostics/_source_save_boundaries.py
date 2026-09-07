@@ -39,11 +39,13 @@ def require_targets(variant, order):
 
 class SourceSaveBoundaries:
     def __init__(
-        self, adapter, module, trial, checkpoint, source, before, handles, reader
+        self, adapter, module, trial, checkpoint, source, before, handles, reader,
+        *, drawing_reader=None,
     ):
         self.adapter, self.module, self.source = adapter, module, source
         self.path = Path(trial["copy_source"]).resolve()
         self.before, self.handles, self.reader = before, handles, reader
+        self.drawing_reader = drawing_reader
         self.checkpoint = checkpoint
         self.stages = []
         self.display = None
@@ -171,6 +173,11 @@ class SourceSaveBoundaries:
             self.initial_display_type = row["display"]["type"]
             if any(type(value) is not str for value in row["display"]["text"].values()):
                 raise RuntimeError("source display returned nonstring text")
+            # The initial bank precedes drawing creation. Subsequent optional
+            # reads inspect drawing-owned storage without querying it on a part.
+            # Text loss is retained here; built/cold acceptance still rejects it.
+            if self.drawing_reader is not None and label != "initial":
+                row["drawing"] = self.drawing_reader()
             row["dirty_after_read"] = self.source.GetSaveFlag()
             if any(
                 type(row[key]) is not bool
