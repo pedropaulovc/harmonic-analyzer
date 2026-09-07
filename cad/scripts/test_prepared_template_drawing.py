@@ -584,6 +584,111 @@ def test_raw_defaults_reject_hidden_sheet_format(blank_sheet):
         defaults.compare_defaults(before, after)
 
 
+@pytest.fixture
+def lazy_note_extent(blank_sheet, monkeypatch):
+    from _drawing_view_packing import Rect
+
+    # Exact X values from pending-541278447690-37kvnlsy/receipt.json. The
+    # measurement captures the settled native box after reading display data.
+    old_extent = [
+        0.4024436674473067,
+        0.020899381733021083,
+        0.0,
+        0.4141235035128806,
+        0.02457018735362998,
+        0.0,
+    ]
+    new_extent = [
+        0.40077511943793903,
+        0.020899381733021083,
+        0.0,
+        0.4154583419203746,
+        0.02457018735362998,
+        0.0,
+    ]
+    state = SimpleNamespace(extent=old_extent, settled=new_extent, calls=[])
+
+    class Note:
+        LockPosition = False
+
+        def GetText(self):
+            state.calls.append("text")
+            return "UNIT: mm"
+
+        @property
+        def PropertyLinkedText(self):
+            state.calls.append("link")
+            return 'UNIT: $PRP:"UnitOfMeasure"'
+
+        def GetExtent(self):
+            state.calls.append("extent")
+            return state.extent
+
+        def GetTextJustification(self):
+            return 2
+
+        def GetTextVerticalJustification(self):
+            return 0
+
+    @dataclass
+    class NativeNoteBounds:
+        name: str
+        body: Rect
+        envelope: Rect
+
+    note = Note()
+    annotation = SimpleNamespace(
+        GetType=lambda: 6, GetSpecificAnnotation=lambda: note, Visible=1
+    )
+    view = blank_sheet.adapter.currentModel.GetFirstView()
+    view.GetAnnotations().append(annotation)
+    previous = defaults.annotation_box
+
+    def measure(adapter, actual):
+        if actual is not annotation:
+            return previous(adapter, actual)
+        state.calls.append("native_measurement")
+        state.extent = list(state.settled)
+        box = Rect(
+            state.settled[0], state.settled[1], state.settled[3], state.settled[4]
+        )
+        return NativeNoteBounds("generated UNIT note", box, box)
+
+    monkeypatch.setattr(defaults, "annotation_box", measure)
+    state.snapshot = lambda: defaults.snapshot_defaults(
+        blank_sheet.adapter, blank_sheet.spec
+    )
+    return state
+
+
+def test_note_raw_extent_is_read_after_text_link_and_native_measurement(
+    lazy_note_extent,
+):
+    before = lazy_note_extent.snapshot()
+    note = next(row for row in before["sheet_notes"] if row["text"] == "UNIT: mm")
+    assert lazy_note_extent.calls == ["text", "link", "native_measurement", "extent"]
+    assert note["extent"] == lazy_note_extent.settled
+    assert note["extent"][0] == note["measured"]["body"]["xmin"]
+    assert note["extent"][3] == note["measured"]["body"]["xmax"]
+    defaults.compare_defaults(before, lazy_note_extent.snapshot())
+
+
+def test_settled_note_extent_drift_still_fails_exact_comparison(lazy_note_extent):
+    before = lazy_note_extent.snapshot()
+    lazy_note_extent.settled[0] += 1e-12
+    with pytest.raises(RuntimeError, match="raw defaults"):
+        defaults.compare_defaults(before, lazy_note_extent.snapshot())
+
+
+def test_raw_extent_only_drift_is_not_waived_when_measured_body_matches(lazy_note_extent):
+    before = lazy_note_extent.snapshot()
+    after = deepcopy(before)
+    note = next(row for row in after["sheet_notes"] if row["text"] == "UNIT: mm")
+    note["extent"][0] += 1e-12
+    with pytest.raises(RuntimeError, match="raw defaults"):
+        defaults.compare_defaults(before, after)
+
+
 def test_native_save_requires_owned_document_still_active(native, monkeypatch):
     def switch_active(*args):
         native.adapter.swApp.ActiveDoc = native.source

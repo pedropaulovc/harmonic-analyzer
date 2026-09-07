@@ -236,18 +236,25 @@ def snapshot_defaults(adapter, spec):
             other_kinds.append(kind)
             continue
         note = _early_bound(annotation.GetSpecificAnnotation(), "INote")
-        extent = list(note.GetExtent() or ())
-        if len(extent) != 6 or not all(math.isfinite(n) for n in extent):
-            raise RuntimeError("sheet note has invalid native extent")
         row = {
             "text": str(note.GetText() or ""),
             "linked_text": str(note.PropertyLinkedText or ""),
-            "extent": extent,
             "visible": int(annotation.Visible),
             "horizontal_justification": int(note.GetTextJustification()),
             "vertical_justification": int(note.GetTextVerticalJustification()),
             "position_lock": "locked" if note.LockPosition else "unlocked",
         }
+        if row["text"] and row["visible"] == 1:
+            measured = asdict(annotation_box(adapter, annotation))
+            measured.pop("name")
+            row["measured"] = measured
+        # The UNIT note's early extent differed from the later native measurement
+        # within one snapshot (receipt 1xvbtz_u). Read this raw observation after
+        # content/measurement, not before them. Exact comparison is unchanged.
+        extent = list(note.GetExtent() or ())
+        if len(extent) != 6 or not all(math.isfinite(n) for n in extent):
+            raise RuntimeError("sheet note has invalid native extent")
+        row["extent"] = extent
         if not row["text"] and row["linked_text"]:
             row["zero_ink"] = _empty_link(annotation, note)
             empty_extents.append(
@@ -257,10 +264,6 @@ def snapshot_defaults(adapter, spec):
                     "extent": row.pop("extent"),
                 }
             )
-        if row["text"] and row["visible"] == 1:
-            measured = asdict(annotation_box(adapter, annotation))
-            measured.pop("name")
-            row["measured"] = measured
         notes.append(_plain(row))
     if other_kinds:
         raise RuntimeError(f"unsupported blank-sheet annotation kinds: {other_kinds}")
