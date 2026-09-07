@@ -10,7 +10,7 @@ nominals come from the fastener catalog via ``fillister_screw_spec``.
 from __future__ import annotations
 
 import argparse
-from fillister_screw_spec import SIDE_DIMENSION_CALLOUTS
+from fillister_screw_spec import SIDE_DIMENSION_CALLOUTS, DIMENSION_TEXT
 import sys
 from typing import Any
 
@@ -25,7 +25,6 @@ from _drawing_common import (
     read_required_properties,
     set_dimension_callouts,
     verify_dimension_callouts,
-    set_dimension_text,
     set_hidden_lines_removed,
     stamp_drawing_summary,
 )
@@ -138,8 +137,10 @@ async def build(
         view=side,
         source_model=callout_source_model,
     )
-    set_dimension_text(
-        adapter, side_annotations, {"ShankDia": "#4-40 UNC-2A"}
+    verify_dimension_callouts(
+        adapter, side_annotations, DIMENSION_TEXT,
+        feature_name="ShankProfile", view=side,
+        source_model=callout_source_model, location="all",
     )
 
     # 0.020: the note is left-aligned on its anchor, clearing the 12.7 mm zone
