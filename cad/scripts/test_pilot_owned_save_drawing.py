@@ -13,6 +13,7 @@ from diagnostics import _native_drawing_save_control as native_save
 from diagnostics import _owned_native_documents as owned
 from diagnostics import _source_save_boundaries as boundaries
 from diagnostics import probe_datum_policy_recipes as pilot
+from diagnostics._model_dimension_coverage import SemanticCoverage
 from test_benchmark_drawing_recipes import recipe
 from test_datum_policy_recipes_drawing import fixture_sources
 from test_owned_native_documents_drawing import Model, native as native
@@ -27,7 +28,8 @@ async def test_pilot_owned_save_reconciles_before_source_after_bank(
     monkeypatch.setattr(pilot, "ORDER", ("alignment_pinion",))
     sources, guards = fixture_sources(tmp_path, monkeypatch)
     monkeypatch.setitem(
-        pilot.TARGETS, "alignment_pinion", NS(view_roles={}, entity_labels=())
+        pilot.TARGETS, "alignment_pinion",
+        NS(view_roles={}, entity_labels=(), coverage=SemanticCoverage.GEOMETRY),
     )
     code = (
         recipe(Path("unused.SLDPRT"))

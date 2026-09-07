@@ -15,6 +15,7 @@ from diagnostics import probe_datum_policy_recipes as pilot
 from diagnostics import _drawing_lower_text_control as lower
 from diagnostics import _source_save_boundaries as source
 from diagnostics._native_drawing_save_control import DrawingSave
+from diagnostics._model_dimension_coverage import SemanticCoverage
 
 
 @pytest.mark.parametrize("route", ["parent", "worker"])
@@ -101,7 +102,8 @@ async def test_pilot_field_observer_order_and_fresh_cold_handles(
     monkeypatch.setattr(pilot, "ORDER", ("alignment_pinion",))
     source_root, guard_root = fixture_sources(tmp_path, monkeypatch)
     monkeypatch.setitem(
-        pilot.TARGETS, "alignment_pinion", NS(view_roles={}, entity_labels=())
+        pilot.TARGETS, "alignment_pinion",
+        NS(view_roles={}, entity_labels=(), coverage=SemanticCoverage.GEOMETRY),
     )
     monkeypatch.setattr(
         pilot.benchmark,
