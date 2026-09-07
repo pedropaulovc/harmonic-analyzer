@@ -39,7 +39,7 @@ def _nonzero(values, label):
         raise RuntimeError(f"{label}: zero native direction")
 
 
-def surface_witness(face):
+def surface_witness(face, *, evidence=None):
     """Raw supported surface, never an approximate IFace2.GetBox identity proxy."""
     if face is None:
         raise RuntimeError("silhouette face is null")
@@ -55,7 +55,7 @@ def surface_witness(face):
             raise RuntimeError(
                 f"BSURF Identity: expected native integer, got {raw_identity!r}"
             )
-        return bsurface.snapshot(face, surface)
+        return bsurface.snapshot(face, surface, evidence=evidence)
     # swSurfaceTypes_e: explicit bounded initial repertoire. Cones and other
     # surfaces require their own native positive control, not guessed arrays.
     fields = {4001: ("PlaneParams", 6), 4002: ("CylinderParams", 7)}
@@ -76,10 +76,13 @@ def snapshot(app, view, entity, *, evidence=None):
     silhouette = _early_bound(entity, "ISilhouetteEdge")
     same(app, silhouette.GetView(), view, label="silhouette owning view")
     face = silhouette.GetFace()
-    face_data = surface_witness(face)
+    face_data = surface_witness(
+        face, evidence=evidence.setdefault("face_surface", {}) if evidence is not None else None
+    )
     if evidence is not None:
-        # Retain successful surface readback if a later curve/endpoint getter
-        # rejects. A partial record is evidence, never a successful snapshot.
+        # Replace a completed surface journal with its unchanged geometry bank.
+        # Failed surface reads retain their partial journal instead. Neither a
+        # partial journal nor a later curve rejection is a successful snapshot.
         evidence["face_surface"] = face_data
     raw_curve = silhouette.GetCurve()
     if raw_curve is None:

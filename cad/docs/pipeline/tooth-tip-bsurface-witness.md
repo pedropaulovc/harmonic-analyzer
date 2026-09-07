@@ -45,6 +45,43 @@ $report | Select-Object status, elapsed_seconds, runtime_final_guard_errors
 Get-Content "$base/ownership.json"
 ```
 
+## First BSURF native attempt and partial-read journal
+
+At `599d3ac483817c94d766e783228cc71b5a9daff2`, the prepared
+`crank_drive_gear` trial in `datum-policy-ous640en/pilot.json` reached
+`GetControlPoints(1,6)` and rejected its `None` return: four native doubles were
+required. The sequential reader had validated `(1,1)` through `(1,5)` first.
+It did not retain their values or the preceding parameter/grid metadata, so this
+receipt cannot establish the actual row/column counts or explain the null.
+The tooth-tip FCF still did not reach insertion. This is a failed read request,
+not a finding that BSURF readback is unsupported.
+
+- Pilot SHA256: `cef8018e814e2fddb9a04f36f9b77e4143eccf5641e439c3f1f3bafbfd2814d6`.
+- Recipe: 58.822418600087985 s; pilot: 142.81831939995755 s. These include the failed
+  diagnostic and are not a performance comparison.
+- Original and copied gear hashes remained `a5a2e0882336d622a7e93fae4d326cb059e7d91758e536488fcc6bf6de4ce93f`.
+  Final runtime guard errors were empty.
+- Ownership SHA256: `d6317fa06161ee68bc31019a36fc294cc97934d92a86e5bec37ebfd33d264055`.
+  All four protected hashes (rocker, channel, crank gear and template) remained
+  exact; initial/final inventories were empty and cleanup had no error.
+
+The follow-up journals validated parameterization, grid counts, orders, senses
+and knots before requesting the grid. It also retains each raw metadata return
+with its type and each requested `(row, column)` with its actual result,
+including `None`, or the getter exception. Partial data stays in the existing
+selected/attached evidence sink when validation fails. A completed geometry
+bank has the same fields and exact comparison as before; a partial journal
+never becomes an accepted snapshot. Journal encoding errors are recorded
+without replacing the original native validation failure. No getters are
+repeated and no calls, indices, tolerance, or acceptance rules change.
+
+The official `GetControlPoints` contract and generated 2026 ABI both take
+integer arguments in **Row, Column** order. The documented bounds are one
+through the respective row/column counts; the C# example reads `(2,3)`.
+Neither a zero-based nor a transposed request is justified by this receipt.
+The next native control can compare the documented example index and boundary
+indices against the now-retained counts. Its result remains untested.
+
 ## Supported request, not an exactness assumption
 
 The bundled official **Get B-Spline Surface Parameterization Data (C#)** example
@@ -87,8 +124,9 @@ null-as-empty conversion is not assumed. Native getter failures propagate
 without retries. The `diagnostic.silhouette.bsurface` span exposes getter cost.
 
 `_silhouette_attachment_witness` adds only the 4006 reader and an optional
-partial-evidence sink. A successful surface read survives a subsequent curve
-rejection in the existing selected/attached stage; partial evidence cannot pass.
+partial-evidence sink. Partial surface metadata survives a surface getter
+rejection; a successful surface read survives a subsequent curve rejection
+in the existing selected/attached stage. Partial evidence cannot pass.
 Plane/cylinder readers, supported line/circle curve predicates, drawing-scoped
 native persistent IDs, owning-view/underlying-face `IsSame`, exact same-session
 raw comparison, and the existing fresh cold role resolution remain intact.
@@ -106,7 +144,18 @@ The 10-file focused/adjacent suite passed 379 tests in 21.35 s
 (`run-ruj4091n`); Ruff F/RUF043 and `git diff --check` passed. These are COM-free
 control-shape tests, not native success.
 
-Native integration remains pending. Use the existing pilot after source review
+For the partial-read follow-up, three fail-first cases reproduced the missing
+surface journal (`run-3atzjyb2`): a null sixth vector, a thrown sixth getter, and
+an invalid native count. The synthetic grid does not infer the missing native
+counts. Added controls preserve partial parameter arrays and the original
+validation error if journal encoding fails, and prove that successful geometry
+and native call counts are unchanged. The ten-file adjacent suite passed
+389 tests in 20.02 s (`run-pb9a7cir`); Ruff F/RUF043/RUF059 and
+`git diff --check` passed. Native execution of this journaling follow-up remains
+pending.
+
+The first native attempt failed as recorded above; complete native acceptance
+remains pending. Use the existing pilot after source review
 and confirmed exclusive seat ownership/current PID; the prepared factory keeps
 the preceding failure's setup arm. Stop at the first failure; no second variant
 or fallback is authorized by this command. Freeze the actual imported adapter
@@ -122,7 +171,7 @@ uv run --no-sync python cad/scripts/diagnostics/probe_datum_policy_recipes.py `
   --guard-root C:/src/harmonic-analyzer/cad/out/sldprt
 ```
 
-Untested: the actual 4006 metadata/grid call shape, tooth-tip silhouette curve
+Untested: a complete successful 4006 metadata/grid read, tooth-tip silhouette curve
 class, repeated/attached/cold raw coefficient stability, FCF native insertion
 and printed clearance, full-recipe source-copy preservation and total runtime.
 Existing native source hashes and owned lifecycle are not waived by this reader.

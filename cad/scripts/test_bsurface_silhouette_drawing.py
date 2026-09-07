@@ -1,6 +1,7 @@
 """Documented B-surface readback shape; no native success inferred from doubles."""
 
 from copy import deepcopy
+import json
 from types import SimpleNamespace as NS
 from unittest.mock import Mock, call
 
@@ -292,6 +293,126 @@ def test_successful_bsurface_read_is_retained_when_later_curve_kind_rejects(bsur
     assert evidence["expected"]["face_surface"]["identity"] == 4006
     assert len(evidence["expected"]["face_surface"]["bspline"]["control_points"]) == 2
     c.surface.GetBSurfParams3.assert_called_once()
+
+
+@pytest.mark.parametrize("failure", ["null", "native_error"])
+def test_failed_sixth_point_preserves_metadata_indices_and_raw_results(bsurface, failure):
+    c = bsurface
+    c.data.ControlPointColumnCount = 8
+    c.data.ControlPointDimension = 4
+    c.data.UKnots = (0.0,) * 3 + (0.1, 0.2, 0.3, 0.4, 0.5) + (1.0,) * 3
+    primary = OSError("native sixth point failed")
+
+    def point(row, column):
+        if (row, column) == (1, 6):
+            if failure == "native_error":
+                raise primary
+            return None
+        return (row * 0.001, column * 0.002, -0.0, 2.0)
+
+    c.data.GetControlPoints.side_effect = point
+    evidence = {}
+    with pytest.raises((RuntimeError, OSError)) as raised:
+        witness.require_same(
+            c.app, c.view, c.entity, c.entity, drawing=c.app.drawing,
+            label="tooth tip", evidence=evidence,
+        )
+    if failure == "native_error":
+        assert raised.value is primary
+    else:
+        assert "GetControlPoints(1,6)" in str(raised.value)
+    partial = evidence["expected"]["face_surface"]
+    assert partial["read_request"]["tolerance_m"] == 0.01
+    assert partial["parameterization"]["UProperties"] == (13737,)
+    assert partial["bspline"]["UOrder"] == 3
+    assert partial["bspline"]["ControlPointRowCount"] == 2
+    assert partial["bspline"]["ControlPointColumnCount"] == 8
+    assert partial["bspline"]["ControlPointDimension"] == 4
+    assert partial["bspline"]["UKnots"] == c.data.UKnots
+    assert partial["bspline"]["VKnots"] == c.data.VKnots
+    assert partial["raw_bspline"]["ControlPointColumnCount"]["value"] == 8
+    points = partial["control_point_reads"]
+    assert [(row["row"], row["column"]) for row in points] == [(1, column) for column in range(1, 7)]
+    assert [item["value"] for item in points[0]["returned"]["value"]] == [0.001, 0.002, -0.0, 2.0]
+    if failure == "native_error":
+        assert points[-1]["returned"]["error"] == repr(primary)
+    else:
+        assert points[-1]["returned"] == {"type": "builtins.NoneType", "value": None}
+    assert "control_points" not in partial["bspline"]
+    assert "actual" not in evidence
+    assert c.data.GetControlPoints.call_args_list == [call(1, column) for column in range(1, 7)]
+    c.surface.GetBSurfParams3.assert_called_once_with(False, False, c.parameterization, 0.01)
+    json.dumps(evidence, allow_nan=False)
+
+
+def test_invalid_raw_count_is_retained_before_integer_validation(bsurface):
+    c = bsurface
+    c.data.ControlPointColumnCount = True
+    evidence = {}
+    with pytest.raises(RuntimeError, match="ControlPointColumnCount"):
+        witness.snapshot(c.app, c.view, c.entity, evidence=evidence)
+    partial = evidence["face_surface"]
+    assert partial["raw_bspline"]["ControlPointColumnCount"] == {"type": "builtins.bool", "value": True}
+    assert partial["bspline"]["VOrder"] == 2
+    assert "ControlPointColumnCount" not in partial["bspline"]
+    c.data.GetControlPoints.assert_not_called()
+
+
+def test_successful_journal_does_not_change_geometry_or_repeat_native_reads(bsurface):
+    c = bsurface
+    before = witness.bsurface.snapshot(c.face, c.surface)
+    calls = c.data.GetControlPoints.call_args_list[:]
+    c.data.GetControlPoints.reset_mock()
+    c.surface.Parameterization2.reset_mock()
+    c.surface.GetBSurfParams3.reset_mock()
+    c.face.GetUVBounds.reset_mock()
+    c.face.FaceInSurfaceSense.reset_mock()
+    evidence = {}
+    after = witness.bsurface.snapshot(c.face, c.surface, evidence=evidence)
+    assert after == before
+    assert evidence["bspline"] == before["bspline"]
+    assert evidence["parameterization"] == before["parameterization"]
+    assert len(evidence["control_point_reads"]) == 8
+    assert c.data.GetControlPoints.call_args_list == calls
+    c.surface.Parameterization2.assert_called_once_with()
+    c.surface.GetBSurfParams3.assert_called_once_with(False, False, c.parameterization, 0.01)
+    c.face.GetUVBounds.assert_called_once_with()
+    c.face.FaceInSurfaceSense.assert_called_once_with()
+    json.dumps(evidence, allow_nan=False)
+
+
+def test_journal_encoder_error_does_not_replace_null_vector_rejection(bsurface, monkeypatch):
+    c = bsurface
+    c.data.GetControlPoints.return_value = None
+    c.data.GetControlPoints.side_effect = None
+    secondary = ValueError("raw encoder failed")
+    monkeypatch.setattr(witness.bsurface, "_raw_return", Mock(side_effect=secondary))
+    evidence = {}
+    with pytest.raises(RuntimeError, match=r"GetControlPoints\(1,1\): expected 3 native doubles, got None"):
+        witness.snapshot(c.app, c.view, c.entity, evidence=evidence)
+    returned = evidence["face_surface"]["control_point_reads"][0]["returned"]
+    assert returned == {
+        "type": "builtins.NoneType", "observation_error": repr(secondary),
+    }
+    c.data.GetControlPoints.assert_called_once_with(1, 1)
+
+
+def test_failed_parameter_array_retains_validated_prefix_and_actual_raw(bsurface):
+    c = bsurface
+    c.parameterization.UProperties = None
+    evidence = {}
+    with pytest.raises(RuntimeError, match="UProperties"):
+        witness.snapshot(c.app, c.view, c.entity, evidence=evidence)
+    partial = evidence["face_surface"]
+    assert partial["parameterization"]["UPropertyNumber"] == 1
+    assert partial["parameterization"]["UMaxBoundType"] == 13735
+    assert partial["raw_parameterization"]["UProperties"] == {
+        "type": "builtins.NoneType", "value": None,
+    }
+    assert "UProperties" not in partial["parameterization"]
+    assert "bspline" not in partial
+    c.surface.GetBSurfParams3.assert_not_called()
+    c.data.GetControlPoints.assert_not_called()
 
 
 def test_surface_and_face_sense_and_periodic_straddling_bounds_remain_distinct(
