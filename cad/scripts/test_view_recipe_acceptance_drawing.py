@@ -510,7 +510,13 @@ def test_fresh_crank_end_roles_require_two_distinct_end_stations(values):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("target", ["alignment_pinion", "crankshaft"])
+@pytest.mark.parametrize(
+    "target",
+    [
+        "alignment_pinion", "crankshaft", "crank_drive_gear", "crank_pinion",
+        "cylinder_gear", "rack_pinion", "transgear_feed_pinion", "transgear_pinion",
+    ],
+)
 @pytest.mark.parametrize("mode", ["normal", "title_failure", "source_saved"])
 async def test_view_enrollment_reuses_full_owned_pilot_without_model_reverse_mapping(
     tmp_path, monkeypatch, target, mode
