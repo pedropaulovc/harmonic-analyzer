@@ -368,6 +368,7 @@ def test_actual_fingerprint_contains_preparation_and_adapter_closure(monkeypatch
         "cad/scripts/_drawing_common.py",
         "cad/scripts/_drawing_prepared_template.py",
         "cad/scripts/_drawing_template_defaults.py",
+        "cad/scripts/_drawing_native_display_data.py",
         "cad/scripts/_drawing_annotation_bounds.py",
         "cad/scripts/_drawing_view_packing.py",
         "uv.lock",
@@ -382,6 +383,7 @@ def test_actual_fingerprint_contains_preparation_and_adapter_closure(monkeypatch
     [
         "_drawing_prepared_template.py",
         "_drawing_template_defaults.py",
+        "_drawing_native_display_data.py",
         "_drawing_annotation_bounds.py",
         "_drawing_view_packing.py",
     ],

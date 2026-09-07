@@ -1,7 +1,6 @@
 """Blank-template SF symbols are preserved, never normalized or omitted."""
 
-from dataclasses import asdict, dataclass, replace
-import json
+from dataclasses import dataclass
 from types import SimpleNamespace
 
 import pytest
@@ -9,8 +8,69 @@ import pytest
 import _drawing_common as common
 from _drawing_prepared_template import TemplateSpec
 import _drawing_template_defaults as defaults
-from _drawing_annotation_bounds import AnnotationBounds, Segment, TextRun
-from _drawing_view_packing import Rect
+
+
+class NativeDisplay:
+    """Documented native array shapes; no derived bounds or GDI substitution."""
+
+    def __init__(self):
+        self.primitives = {
+            "Line": [[0, 0, 0, 0, 0.12, 0.04, 0, 0.13, 0.045, 0]],
+            "Arc": [
+                [0, 0, 0, 0, 0.13, 0.04, 0, 0.12, 0.05, 0, 0.12, 0.04, 0, 0, 0, 1, 1]
+            ],
+            "PolyLine": [[0, 0, 0, 0, 0, 0, 2, 0.12, 0.04, 0, 0.13, 0.045, 0]],
+            "Triangle": [[0.12, 0.04, 0, 0.13, 0.04, 0, 0.13, 0.05, 0, 1, 0]],
+            "ArrowHead": [[0.12, 0.04, 0, 1, 0, 0, 0.002, 0.001, 0, 0, 0, 1]],
+            "Polygon": [[0, 0, 0, 0, 3, 0.12, 0.04, 0, 0.13, 0.04, 0, 0.13, 0.05, 0]],
+            "Ellipse": [],
+            "Parabola": [],
+            "Point": [],
+        }
+        self.text = {
+            "value": "3.2",
+            "position": [0.125, 0.045, 0],
+            "height_m": 0.0013229166666666667,
+            "font": "Century Gothic",
+            "angle_rad": 0.125,
+            "reference": 1,
+            "inverted": 0,
+            "plane": None,
+            "line_spacing": 1.0,
+        }
+        self.leaders = [[0.12, 0.04, 0, 0.12, 0.035, 0, 0.115, 0.035, 0]]
+        for kind, rows in self.primitives.items():
+            setattr(self, f"Get{kind}Count", lambda rows=rows: len(rows))
+        for kind, method in (
+            ("Line", "GetLineAtIndex3"),
+            ("Arc", "GetArcAtIndex2"),
+            ("PolyLine", "GetPolylineAtIndex2"),
+            ("Triangle", "GetTriangleAtIndex"),
+            ("ArrowHead", "GetArrowHeadAtIndex2"),
+            ("Polygon", "GetPolygonAtIndex"),
+        ):
+            setattr(self, method, lambda index, kind=kind: self.primitives[kind][index])
+        for field, method in (
+            ("value", "GetTextAtIndex"),
+            ("position", "GetTextPositionAtIndex"),
+            ("height_m", "GetTextHeightAtIndex"),
+            ("font", "GetTextFontAtIndex"),
+            ("angle_rad", "GetTextAngleAtIndex"),
+            ("reference", "GetTextRefPositionAtIndex"),
+            ("inverted", "GetTextInvertAtIndex"),
+            ("plane", "GetTextPlaneAtIndex"),
+            ("line_spacing", "GetTextLineSpacingAtIndex"),
+        ):
+            setattr(self, method, lambda index, field=field: self.text[field])
+
+    def GetTextCount(self):
+        return 1
+
+    def GetPolylineSizeAtIndex2(self, index):
+        return len(self.primitives["PolyLine"][index])
+
+    def GetPolygonSizeAtIndex(self, index):
+        return len(self.primitives["Polygon"][index])
 
 
 @pytest.fixture
@@ -88,20 +148,14 @@ def scene(monkeypatch):
         GetUseDocTextFormat=lambda index: True,
     )
     specific.GetAnnotation = lambda: annotation
-    box = Rect(0.1, 0.03, 0.15, 0.055)
-    measured = AnnotationBounds(
-        "generated SF",
-        7,
-        (0.12, 0.04),
-        box,
-        box,
-        (box,),
-        (TextRun("3.2", (0.125, 0.045), 0.00635, "Century Gothic", 0.125, 0, 0),),
-        (Segment((0.12, 0.04), (0.12, 0.035)),),
-        ("Century Gothic", 0.00635, 24),
-        (Segment((0.12, 0.04), (0.13, 0.045)),),
-        (box,),
-    )
+    data = NativeDisplay()
+    data.text["height_m"] = fmt.CharHeight
+    annotation.GetDisplayData = lambda: data
+    annotation.GetName = lambda: "generated SF"
+    annotation.GetLeaderCount = lambda: len(data.leaders)
+    annotation.GetMultiJogLeaderCount = lambda: 0
+    annotation.GetLeaderStyle = lambda: 2
+    annotation.GetLeaderPointsAtIndex = lambda index: data.leaders[index]
     edge_note = SimpleNamespace(
         GetText=lambda: common._METRIC_EDGE_BREAK_NOTE,
         PropertyLinkedText="",
@@ -146,17 +200,48 @@ def scene(monkeypatch):
         state=state,
         calls=calls,
         annotations=annotations,
-        measured=measured,
+        data=data,
     )
+
+    def note_bounds_only(adapter, ann):
+        assert ann is edge, "SF preservation must not depend on a derived box"
+        return NoteBounds()
+
     monkeypatch.setattr(
         defaults,
         "annotation_box",
-        lambda adapter, ann: result.measured if ann is annotation else NoteBounds(),
+        note_bounds_only,
     )
     result.snapshot = lambda: defaults.snapshot_defaults(
         adapter, TemplateSpec((2, 1), 2)
     )
     return result
+
+
+@pytest.fixture
+def raw_scene(scene):
+    scene.fmt.CharHeight = 0.0013229166666666667
+    scene.data.text["height_m"] = scene.fmt.CharHeight
+    scene.fmt.CharHeightInPts = 5
+    scene.fmt.IsHeightSpecifiedInPts = lambda: True
+    scene.adapter.currentModel.GetType = lambda: 3
+    scene.adapter.swApp.RevisionNumber = lambda: "34.3.0"
+    return scene
+
+
+def test_native_five_point_template_sf_uses_raw_data_not_font_calibration(
+    raw_scene, monkeypatch
+):
+    from _drawing_annotation_bounds import annotation_box
+
+    # Same native format tuple as receipt y18kfdkk: this production estimator
+    # really rejects it, before any GDI call. Raw equality needs no estimator.
+    with pytest.raises(ValueError, match="uncalibrated native text font/style"):
+        annotation_box(raw_scene.adapter, raw_scene.annotation)
+    monkeypatch.setattr(defaults, "annotation_box", annotation_box)
+    row = defaults._surface_finish_snapshot(raw_scene.adapter, raw_scene.annotation)
+    assert row["native_display"]["texts"][0] == raw_scene.data.text
+    assert row["format"]["height_points"] == 5
 
 
 def test_real_shaped_blank_template_preserves_both_surface_finishes(scene):
@@ -173,12 +258,19 @@ def test_real_shaped_blank_template_preserves_both_surface_finishes(scene):
     assert row["position"] == [0.12, 0.04, 0]
     assert row["format"]["font"] == "Century Gothic"
     assert row["format"]["use_document_format"] is True
-    assert row["measured"]["native_strokes"][0]["end"] == [0.13, 0.045]
-    assert row["measured"]["leader_segments"] and row["measured"]["leader_decorations"]
-    assert row["measured"]["text_runs"][0]["position"] == [0.125, 0.045]
-    complete_measurement = asdict(scene.measured)
-    complete_measurement.pop("name")
-    assert row["measured"] == json.loads(json.dumps(complete_measurement))
+    display = row["native_display"]
+    assert display["texts"] == [scene.data.text]
+    assert display["leaders"] == scene.data.leaders
+    assert display["primitives"] == {
+        kind: rows
+        for kind, rows in scene.data.primitives.items()
+        if kind not in {"Ellipse", "Parabola", "Point"}
+    }
+    assert display["counts"] == {
+        "Text": 1,
+        **{kind: len(rows) for kind, rows in scene.data.primitives.items()},
+    }
+    assert snapshot["sheet_notes"][0]["measured"] == {"kind": 6}
 
 
 @pytest.mark.parametrize(
@@ -213,7 +305,7 @@ def test_symbol_subtype_changes_are_preserved_and_rejected(scene, symbol, field,
 def test_generated_name_and_enumeration_order_are_not_cross_document_identity(scene):
     before = scene.snapshot()
     scene.annotations.reverse()
-    scene.measured = replace(scene.measured, name="new native generated identifier")
+    scene.annotation.GetName = lambda: "new native generated identifier"
     defaults.compare_defaults(before, scene.snapshot())
 
 
@@ -256,7 +348,7 @@ def test_remaining_native_font_properties_are_not_dropped(scene, property_name, 
         "multiplicity",
     ],
 )
-def test_symbol_semantics_formats_and_full_measured_geometry_are_exact(scene, change):
+def test_symbol_semantics_formats_and_raw_native_geometry_are_exact(scene, change):
     before = scene.snapshot()
     if change == "text":
         scene.state["text"][5] = "1.6"
@@ -277,17 +369,9 @@ def test_symbol_semantics_formats_and_full_measured_geometry_are_exact(scene, ch
     if change == "visibility":
         scene.annotation.Visible = 3
     if change == "stroke":
-        scene.measured = replace(
-            scene.measured,
-            native_strokes=(Segment((0.12, 0.04), (0.13 + 1e-12, 0.045)),),
-        )
+        scene.data.primitives["Line"][0][7] += 1e-12
     if change == "text_position":
-        scene.measured = replace(
-            scene.measured,
-            text_runs=(
-                replace(scene.measured.text_runs[0], position=(0.125 + 1e-12, 0.045)),
-            ),
-        )
+        scene.data.text["position"][0] += 1e-12
     if change == "multiplicity":
         scene.annotations.pop()
     with pytest.raises(RuntimeError, match="raw defaults"):
@@ -356,4 +440,160 @@ def test_unresolved_surface_finish_capture_is_not_accepted(scene, bad):
     if bad == "angle":
         scene.specific.GetAngle = lambda: float("nan")
     with pytest.raises((RuntimeError, ValueError)):
+        scene.snapshot()
+
+
+@pytest.mark.parametrize(
+    "kind,index",
+    [
+        (kind, index)
+        for kind, rows in NativeDisplay().primitives.items()
+        for row in rows
+        for index in range(len(row))
+        if (kind, index)
+        not in {("PolyLine", 0), ("PolyLine", 1), ("PolyLine", 6), ("Polygon", 4)}
+    ],
+)
+def test_every_raw_primitive_slot_is_compared_without_projection_or_rounding(
+    scene, kind, index
+):
+    before = scene.snapshot()
+    scene.data.primitives[kind][0][index] += 1e-12
+    with pytest.raises(RuntimeError, match="raw defaults"):
+        defaults.compare_defaults(before, scene.snapshot())
+
+
+@pytest.mark.parametrize(
+    "field,new",
+    [
+        ("value", "1.6"),
+        ("position", [0.125, 0.045, 1e-12]),
+        ("height_m", 0.00635 + 1e-12),
+        ("font", "Arial"),
+        ("angle_rad", 0.125 + 1e-12),
+        ("reference", 0),
+        ("inverted", 1),
+        ("plane", [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]),
+        ("plane", []),
+        ("line_spacing", 1.0 + 1e-12),
+    ],
+)
+def test_all_raw_text_fields_are_preserved_without_font_calibration(scene, field, new):
+    before = scene.snapshot()
+    scene.data.text[field] = new
+    with pytest.raises(RuntimeError, match="raw defaults"):
+        defaults.compare_defaults(before, scene.snapshot())
+
+
+@pytest.mark.parametrize("index", range(9))
+def test_raw_nine_element_text_plane_drift_is_not_dropped(scene, index):
+    scene.data.text["plane"] = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+    before = scene.snapshot()
+    scene.data.text["plane"][index] += 1e-12
+    with pytest.raises(RuntimeError, match="raw defaults"):
+        defaults.compare_defaults(before, scene.snapshot())
+
+
+@pytest.mark.parametrize("index", range(9))
+def test_every_native_leader_xyz_coordinate_is_exact(scene, index):
+    before = scene.snapshot()
+    scene.data.leaders[0][index] += 1e-12
+    with pytest.raises(RuntimeError, match="raw defaults"):
+        defaults.compare_defaults(before, scene.snapshot())
+
+
+@pytest.mark.parametrize("kind", ["Ellipse", "Parabola", "Point"])
+def test_unimplemented_native_primitives_fail_instead_of_partial_capture(scene, kind):
+    scene.data.primitives[kind].append([0])
+    with pytest.raises(ValueError, match="unsupported native primitive"):
+        scene.snapshot()
+
+
+@pytest.mark.parametrize("kind", ["Text", *NativeDisplay().primitives])
+@pytest.mark.parametrize("count", [-1, 0.5, float("nan")])
+def test_raw_native_counts_must_be_complete_and_integral(scene, kind, count):
+    setattr(scene.data, f"Get{kind}Count", lambda: count)
+    with pytest.raises(ValueError, match="native primitive inventory"):
+        scene.snapshot()
+
+
+@pytest.mark.parametrize(
+    "kind", ["Line", "Arc", "PolyLine", "Triangle", "ArrowHead", "Polygon"]
+)
+def test_unknown_raw_primitive_array_shape_is_not_accepted(scene, kind):
+    scene.data.primitives[kind][0].append(0.0)
+    with pytest.raises(ValueError, match="native"):
+        scene.snapshot()
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        "null_data",
+        "nonfinite_unused",
+        "polyline_type",
+        "polyline_datasize",
+        "polyline_count",
+        "polygon_count",
+        "polyline_size",
+        "polygon_size",
+        "text_xyz",
+        "text_plane",
+        "text_plane_nan",
+        "text_height",
+        "text_value",
+        "text_font",
+        "text_reference",
+        "text_spacing",
+        "multi_jog",
+        "leader_style",
+        "leader_count",
+        "leader_points",
+        "no_leader_nonzero_count",
+    ],
+)
+def test_malformed_raw_native_data_is_rejected(scene, bad):
+    if bad == "null_data":
+        scene.annotation.GetDisplayData = lambda: None
+    if bad == "nonfinite_unused":
+        scene.data.primitives["Arc"][0][2] = float("nan")
+    if bad == "polyline_type":
+        scene.data.primitives["PolyLine"][0][0] = 100
+    if bad == "polyline_datasize":
+        scene.data.primitives["PolyLine"][0][1] = 1
+    if bad == "polyline_count":
+        scene.data.primitives["PolyLine"][0][6] = 2.5
+    if bad == "polygon_count":
+        scene.data.primitives["Polygon"][0][4] = 3.5
+    if bad == "polyline_size":
+        scene.data.GetPolylineSizeAtIndex2 = lambda index: 14
+    if bad == "polygon_size":
+        scene.data.GetPolygonSizeAtIndex = lambda index: 15
+    if bad == "text_xyz":
+        scene.data.text["position"] = [0.12, 0.04]
+    if bad == "text_plane":
+        scene.data.text["plane"] = [0.0]
+    if bad == "text_plane_nan":
+        scene.data.text["plane"] = [float("nan")] * 9
+    if bad == "text_height":
+        scene.data.text["height_m"] = 0.0
+    if bad == "text_value":
+        scene.data.text["value"] = 3.2
+    if bad == "text_font":
+        scene.data.text["font"] = None
+    if bad == "text_reference":
+        scene.data.text["reference"] = 6
+    if bad == "text_spacing":
+        scene.data.text["line_spacing"] = float("nan")
+    if bad == "multi_jog":
+        scene.annotation.GetMultiJogLeaderCount = lambda: 1
+    if bad == "leader_style":
+        scene.annotation.GetLeaderStyle = lambda: 4
+    if bad == "leader_count":
+        scene.annotation.GetLeaderCount = lambda: -1
+    if bad == "leader_points":
+        scene.data.leaders[0].append(0.0)
+    if bad == "no_leader_nonzero_count":
+        scene.annotation.GetLeaderStyle = lambda: 0
+    with pytest.raises(ValueError, match="native"):
         scene.snapshot()
