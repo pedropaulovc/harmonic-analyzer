@@ -116,3 +116,49 @@ After integration, the seven selected COM-free gates passed at `e5a970bc`:
 `check:recipe` ran **3,655 tests in 53.86 s**; six other gates were current.
 Telemetry: `cad/out/reports/pytest-telemetry/run-5ufhufmj`. This is not the full
 native pipeline merge gate, and the lever remains visually unaccepted.
+
+## Next bounded variant: native radial spacing
+
+The same owned-copy diagnostic now accepts
+`--arrangement radial_space_evenly`. It makes exactly one
+`IModelDocExtension.AlignDimensions(1, 0.001)` call on the five front-view
+radius/diameter annotations: `NoseRadius`, `TipRadius`, `FulcrumDia`, `RD4`,
+`RD5`. The captured semantic `display_type` bank and a fresh native
+`IDisplayDimension.Type2` read must agree exactly (5 = radius, 6 = diameter).
+All ten front-view annotations retain their exact native identity/owner checks;
+the five linear dimensions are not selected or permitted to move.
+
+The local `AlignDimensions`, `swAlignDimensionType_e`, `IDisplayDimension.Type2`
+and `swDimensionType_e` references provide the API contract. The bundled
+Auto-arrange C# example establishes the selected drawing-dimension call shape.
+The official [dimension-palette help](https://help.solidworks.com/2016/english/solidworks/sldworks/r_dim_palette_alignment_tools.htm)
+describes linear/radial spacing inside the existing nearest/farthest placement
+range; its Stagger operation targets linear dimensions. The current
+[command reference](https://help.solidworks.com/2026/english/api/swcommands/SolidWorks.Interop.swcommands~SolidWorks.Interop.swcommands.swCommands_e.html)
+also names the native Space Evenly/Radial tool. These contracts justify this
+separate radial experiment, not a claim that it clears obstacles or fixes the
+two retained leaders. No coordinate search, position setter, leader editor,
+additional rebuild, automatic second variant or changed global preference is
+introduced. Actual movement is read back, never inferred from a true return.
+
+After source review and an exclusive seat grant, from the frozen candidate
+checkout with its own venv and exact runtime inputs:
+
+```powershell
+$env:HARMONIC_SW_AUTOSTART='0'
+$env:HARMONIC_REMOTE_CACHE_MODE='off'
+# Set HARMONIC_DIAGNOSTIC_SW_PID to the confirmed existing native PID first.
+uv run python cad/scripts/diagnostics/probe_dimension_arrangement.py --receipt C:/src/harmonic-analyzer/cad/out/reports/datum-policy-i2i_oplt/pilot.json --arrangement radial_space_evenly
+```
+
+The default `--arrangement auto_arrange` preserves the original ten-dimension
+positive baseline/control. Each invocation operates on fresh exact owned copies,
+not the output of another variant. Initial archived drawing/source comparison,
+both known crossing repros, all dimension values/tolerances/BASIC, exact native
+attachments, fixed-annotation content/geometry, post-export witnesses and final
+hash/cleanup checks remain. Both variants retain the same all-view crossing gate:
+independent linear/top-view intersections can still reject radial spacing, even
+if its two intended leaders improve. The PDF remains diagnostic-only; there is
+no native save or production recipe change. Offline selection/safety tests do
+not prove native movement, saved persistence or a performance benefit. Native
+execution of the radial variant is pending.
