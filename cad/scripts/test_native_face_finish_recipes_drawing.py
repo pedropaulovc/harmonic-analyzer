@@ -172,6 +172,9 @@ def test_native_face_helper_uses_no_leader_and_keeps_exact_selected_identity(
     monkeypatch, identity
 ):
     adapter, view, face, annotation = native_context(monkeypatch)
+    annotation.OwnerType = 0
+    annotation.Owner = view
+    annotation.GetAttachedEntityTypes.return_value = (2,)
     adapter.swApp.IsSame.side_effect = None
     adapter.swApp.IsSame.return_value = identity
 
@@ -191,7 +194,12 @@ def test_native_face_helper_uses_no_leader_and_keeps_exact_selected_identity(
         with pytest.raises(RuntimeError, match="attached to a different entity"):
             insert()
     view.SelectEntity.assert_called_once_with(face, False)
-    adapter.swApp.IsSame.assert_called_once_with(face, face)
+    if identity == 1:
+        assert [call.args for call in adapter.swApp.IsSame.call_args_list] == [
+            (face, face), (view, view), (face, face),
+        ]
+    else:
+        adapter.swApp.IsSame.assert_called_once_with(face, face)
     args = adapter.currentModel.Extension.InsertSurfaceFinishSymbol3.call_args.args
     assert args[1:5] == (0, 0.0, 0.0, 0.0)
     annotation.SetPosition2.assert_not_called()
