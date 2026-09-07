@@ -1036,10 +1036,20 @@ async def pilot(
                         adapter, reopened_entities, phase="reopened"
                     )
                 )
-                if (
-                    trial["explicit_entities_built"]
-                    != trial["explicit_entities_reopened"]
-                ):
+                if manifest.view_roles:
+                    trial["explicit_entity_comparison"] = entity_acceptance.compare_cold(
+                        trial["explicit_entities_built"],
+                        trial["explicit_entities_reopened"],
+                    )
+                    explicit_changed = (
+                        trial["explicit_entity_comparison"]["status"] != "passed"
+                    )
+                else:
+                    explicit_changed = (
+                        trial["explicit_entities_built"]
+                        != trial["explicit_entities_reopened"]
+                    )
+                if explicit_changed:
                     raise RuntimeError(
                         "cold reopen changed explicit annotation role/geometry/view"
                     )
