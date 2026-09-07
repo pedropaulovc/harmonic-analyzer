@@ -1,5 +1,10 @@
 # Assembly recipe granularity: VM2 evidence
 
+> Historical #677 experiment on its drawing parent and adapter. These results
+> are not current integration acceptance or schedule. See the
+> [new integration evidence](assembly-granularity-integration-results.md) and
+> [project board](https://github.com/users/pedropaulovc/projects/1).
+
 This is the Batch A experiment record requested by
 `second-vm-assembly-batch-2.md` on the drawing parent branch. Portfolio status
 belongs on the [project](https://github.com/users/pedropaulovc/projects/1).
