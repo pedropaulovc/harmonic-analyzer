@@ -408,7 +408,10 @@ NET_RACK_TRAVEL_PER_CRANK_REV = (
 # A spare for this subsystem, so it rides here as a flat sibling of
 # the mounted T24; placing it loose at the TOP level would clash on leaf name
 # with the T12/T24 instances nested in drive-train / this sub.
-SPARE_GEAR_POS = (160.0, BASE_DECK_Y, -15.0)  # machine +X (west) of the platen
+# Keep the loose T18 on the deck, ahead of the nameplate. At the previous
+# Z=-15 storage station, lowering onto the deck intersected the nameplate;
+# Z=-75 leaves 5 mm between the T18 tip envelope and the plate's Z=-50 edge.
+SPARE_GEAR_POS = (160.0, BASE_DECK_Y, -75.0)
 
 # --- fasteners ----------------------------------------------------------------
 # Platen-clip screws: through the clips' end holes into the platen's edge

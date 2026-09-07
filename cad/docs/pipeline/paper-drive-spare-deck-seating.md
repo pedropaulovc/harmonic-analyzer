@@ -1,5 +1,33 @@
 # Paper-drive spare sprocket seating
 
+## September 7 native counterexample and revised placement
+
+The first candidate at `e864524b2cc559a04ef90c4d8884771fb2ad2b34`
+kept X/Z fixed and lowered Y to the deck. Its paper-drive subassembly passed,
+but the complete top assembly rejected **605.55 mm^3** of interference between
+`frame-1/nameplate-1` and `paper-drive-1/transgear-removable-3`.
+Repro: run the full `uv run python -m doit -n 4` at that commit. Retained
+`cad/out/reports/telemetry/{logs,traces}.jsonl` and the assembly build log in
+`C:/src/ha-perf-spare-deck-seating` record the failure. The first run stopped
+on a modal/low-memory session; the restarted run reached this actual geometric
+counterexample and failed in 119.4 seconds for the top task.
+
+The earlier inference that the existing footprint was clear was incomplete:
+it checked the base rim but omitted the nameplate. Its shared specification
+places the plate at X=159.25..214.25, Z=-50..50, Y=50.8..52.3. The spare at
+X=160/Z=-15 overlaps that footprint. No interference exemption was added.
+
+The revised storage station is **(160, STACK_HEIGHT, -75) mm**. The T18 tip
+radius is 20 mm, so its Z envelope ends at -55, 5 mm before the plate's -50
+edge. It remains a flat, fixed, loose T18 in paper-drive with the same rotation;
+only its storage Y/Z change. A new envelope test fails at the first candidate
+(`5 <= -55` is false). This is a conservative offline clearance check, not
+native contact or full-model clearance evidence. The full build, saved contact
+readback, and fresh oblique visual inspection remain required.
+
+The original candidate analysis below is retained as provenance; its
+"only Y changes" proposal was rejected by the full-model test above.
+
 The horizontal grey wheel in the isolated paper-drive render is the intentional
 loose T18 speed-change sprocket, not a detached driven wheel. Its support is the
 base in `frame.SLDASM`; the top assembly inserts frame and paper-drive at identity.

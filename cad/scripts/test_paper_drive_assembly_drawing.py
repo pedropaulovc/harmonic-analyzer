@@ -12,6 +12,7 @@ import build_paper_drive_assembly as assembly
 import build_transgear_removable as sprocket
 import draw_paper_drive_assembly as drawing
 import harmonic_base_spec as base
+import nameplate_spec as nameplate
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -55,8 +56,8 @@ def test_spare_sprocket_transformed_underside_contacts_base_deck(monkeypatch):
     assert top[1] == pytest.approx(
         base.STACK_HEIGHT + sprocket.FACE_WIDTH, rel=0, abs=1e-9
     )
-    assert (underside[0], underside[2]) == (160.0, -15.0)
-    assert (top[0], top[2]) == (160.0, -15.0)
+    assert (underside[0], underside[2]) == (160.0, -75.0)
+    assert (top[0], top[2]) == (160.0, -75.0)
 
 
 def test_spare_t18_footprint_is_on_flat_deck_not_raised_rim(monkeypatch):
@@ -69,6 +70,31 @@ def test_spare_t18_footprint_is_on_flat_deck_not_raised_rim(monkeypatch):
         world = _spare_world_point(monkeypatch, [x, y, z])
         assert abs(world[0]) < base.TOP_LENGTH / 2.0 - base.LIP_W
         assert abs(world[2]) < base.TOP_WIDTH / 2.0 - base.LIP_W
+
+
+def test_spare_storage_clears_nameplate_envelope_by_five_mm(monkeypatch):
+    # Native top gate rejected the first deck-seating candidate: retaining
+    # X=160/Z=-15 intersected the brass nameplate by 605.55 mm^3.
+    teeth = dict(sprocket.CONFIGS)["T18"]
+    radius = (
+        sprocket.gear_facts(teeth, sprocket.DP_GEAR, sprocket.PA_DEG)["Ra"]
+        * sprocket.IN
+    )
+    plate_corners = [
+        nameplate.mount_point(point)
+        for point in product(
+            (0.0, nameplate.PLATE_WIDTH),
+            (0.0, nameplate.PLATE_HEIGHT),
+            (-nameplate.PLATE_THICKNESS, 0.0),
+        )
+    ]
+    spare_max_z = max(
+        _spare_world_point(monkeypatch, [x, y, z])[2]
+        for x, y, z in product(
+            (-radius, radius), (-radius, radius), (0.0, sprocket.FACE_WIDTH)
+        )
+    )
+    assert spare_max_z <= min(point[2] for point in plate_corners) - 5.0
 
 
 def test_spare_remains_fixed_t18_sibling_with_original_rotation():
