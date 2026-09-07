@@ -1,4 +1,8 @@
-"""One fresh rocker then lever recipe build with the combined native datum policy.
+"""Fresh selected recipe builds with the combined native datum policy.
+
+Default order is rocker then lever. Repeat --target to select an explicit order,
+for example --target channel_lever for the independent lever-only control.
+Both registered original/guard source pairs remain hash-protected for any order.
 
 Run only under an explicitly granted COM seat, attaching to the expected existing
 SolidWorks process with automatic launch/recovery disabled. Production recipes
@@ -50,6 +54,20 @@ EXPECTED_PART_HASHES = {
     "rocker_arm": "3bfb6da45b91e5a73b24c74baf81141899149e3c327aa943930baed3fba4d4a0",
     "channel_lever": "6a994561f19487029c938cd7cca5047acbdfbf686020514be538ef5a632e0841",
 }
+
+
+def target_order(targets=None):
+    """Choose only recipes with the pilot's exact source and semantic manifests."""
+    if targets is None:
+        return ORDER
+    if isinstance(targets, str):
+        raise ValueError("targets must be a sequence of recipe names")
+    order = tuple(targets)
+    if not order or any(target not in EXPECTED_PART_HASHES for target in order):
+        raise ValueError("select a nonempty order from the registered pilot recipes")
+    if len(set(order)) != len(order):
+        raise ValueError("each selected recipe may run only once per invocation")
+    return order
 
 
 def adapter_fingerprints():
@@ -205,7 +223,10 @@ def compare_drawing_reopen(before, after):
     return compare_reopened_annotations(before["annotations"], after["annotations"])
 
 
-async def pilot(adapter, candidate, source_root, guard_root, output_root):
+async def pilot(
+    adapter, candidate, source_root, guard_root, output_root, *, targets=None
+):
+    order = target_order(targets)
     output_root.mkdir(parents=True, exist_ok=True)
     directory = Path(tempfile.mkdtemp(prefix="datum-policy-", dir=output_root))
     adapter.ownership.register_directory(directory)
@@ -223,7 +244,7 @@ async def pilot(adapter, candidate, source_root, guard_root, output_root):
         "status": "running",
         "candidate": candidate,
         "helper_revision": benchmark.revision("HEAD"),
-        "order": ORDER,
+        "order": order,
         "trials": [],
         "scope": "one functional build per recipe; no speedup/full-pipeline claim",
         "source_witness_scope": "exact original/copy disk hashes and named recipe dimension identities/values/tolerances/BASIC; not full in-memory source immutability",
@@ -241,7 +262,7 @@ async def pilot(adapter, candidate, source_root, guard_root, output_root):
             adapter.ownership.register_source(path)
         report["helpers"] = helper_fingerprints()
         report["imported_adapter"] = adapter_fingerprints()
-        for target in ORDER:
+        for target in order:
             trial = {"target": target, "status": "running"}
             report["trials"].append(trial)
             trial_dir = directory / target
@@ -384,8 +405,15 @@ def main(argv=None):
     parser.add_argument("--guard-root", type=Path, required=True)
     parser.add_argument("--report-root", type=Path, default=ROOT / "cad/out/reports")
     parser.add_argument("--candidate", default="HEAD")
+    parser.add_argument(
+        "--target",
+        action="append",
+        choices=tuple(EXPECTED_PART_HASHES),
+        help="repeat to choose recipe order; default: rocker_arm then channel_lever",
+    )
     parser.add_argument("--worker", action="store_true")
     args = parser.parse_args(argv)
+    order = target_order(args.target)
     require_owned_diagnostic_environment()  # before dodo._run in the parent
     candidate = benchmark.revision(args.candidate)
     source_root, guard_root = (
@@ -407,6 +435,7 @@ def main(argv=None):
                 str(args.report_root.resolve()),
                 "--candidate",
                 candidate,
+                *(argument for target in order for argument in ("--target", target)),
                 "--worker",
             ],
             "combined datum-policy functional pilot",
@@ -416,7 +445,12 @@ def main(argv=None):
         return 0
     return run_copy_diagnostic(
         lambda adapter: pilot(
-            adapter, candidate, source_root, guard_root, args.report_root.resolve()
+            adapter,
+            candidate,
+            source_root,
+            guard_root,
+            args.report_root.resolve(),
+            targets=order,
         )
     )
 
