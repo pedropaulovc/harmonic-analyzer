@@ -98,13 +98,13 @@ SHA-256 `18685f9bcd6c5aa1c491049f2d0419945e8e488a887eac0fe323d3fe20113cf6`.
 Recipe time was 304.0719047 seconds; total pilot time was 401.7324599 seconds.
 These observation-heavy times are not production performance measurements.
 
-Exactly one type46 entity was selected. Its expected face bank completed all
+Exactly one type 46 entity was selected. Its expected face bank completed all
 5 logical rows by 25 columns, then the curve reader raised
 `unsupported or contradictory silhouette curve kind`. The selected-stage partial
 bank contains only `face_surface`; no actual/attached or cold curve acceptance
 was reached. Final runtime guard errors were empty.
 
-The selector returned candidate index8 after recording all nine candidates'
+The selector returned candidate index 8 after recording all nine candidates'
 endpoints. It did not read their curve classification. Surface identity4006
 identifies a B-surface, not the silhouette's curve family. The old reader coerced
 `IsLine()` and `IsCircle()` to booleans and discarded both raw returns. Therefore
