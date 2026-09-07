@@ -1,6 +1,7 @@
 # Prepared template: full-recipe functional control
 
-This diagnostic is implemented and offline-tested, **not natively accepted**.
+The prepared rocker arm passed the native full-recipe control below. Production
+rollout, the remaining recipes and complete printed acceptance are still pending.
 Blank normal/MISS/HIT raw and printed controls do not prove a model-linked sheet
 survives native save, cold reopen and rendering. This extends the existing owned
 rocker/lever pilot to test that remaining path, without changing any recipe or
@@ -50,3 +51,50 @@ fingerprints receive final guards even after a recipe failure; any additional
 guard failures are reported together with the original error. Native cleanup
 remains the shared exact-owned-document lifecycle. No full pipeline gate, visual
 acceptance, production rollout, or conflict probability is established offline.
+
+## Native rocker result
+
+Both commands ran separately at frozen root `b67a12c6`, adapter `e77bfda4`,
+attached to SolidWorks PID 31860 with autostart disabled and remote cache off.
+The normal arm ended with exit 1; after reviewing its exact title failure and
+clean ownership/input guards, the prepared arm ran and ended with exit 0.
+
+| observation | normal | prepared |
+| --- | ---: | ---: |
+| inner drawing setup | 4.118858 s | 1.114317 s |
+| prepared read-only hit lookup | n/a | 0.043964 s |
+| complete recipe, including initial save/PDF/PNG | 77.624137 s | 75.812367 s |
+| pilot, including witnesses and cache creation | 138.661691 s | 170.735294 s |
+| cold annotation comparison | failed | passed |
+
+Prepared creation on the fresh cache miss took 28.331258 s, outside recipe
+timing. Its hit plus setup took 1.158281 s. This one ordered pair supports the
+setup improvement; the 1.811770 s whole-recipe difference is not a fleet-wide
+speedup estimate. The slower total prepared pilot includes first materialization
+and a completed acceptance path that the failed normal arm did not finish.
+
+The normal arm rejected exactly three TITLE X-coordinate observations, all
+shifted 7.225209847 mm. The prepared arm used no title setter and passed the
+unchanged cold comparator. Its 187 reported coordinate roundoffs were at most
+1.942891e-16 m; no substantive annotation change was accepted. Thus left
+justification is not the only demonstrated way to stabilize this title: a
+prepared blank template also worked for the full rocker recipe. The mechanism
+behind that difference has not been isolated.
+
+Both trials kept original source/guard hashes, owned source-copy bytes, template,
+helper/config and actual adapter inputs unchanged. Prepared MISS/HIT artifact
+hashes matched, as did final cache guards. Both owned document tables returned
+to their initially empty state without cleanup errors.
+
+Receipts under `cad/out/reports/`:
+
+- Normal: `datum-policy-aq_ueh8h/pilot.json`, SHA-256
+  `953611d82747c790e17d363b16bd6277c958386c8408e661b2813d5eb012c71a`.
+- Prepared: `datum-policy-8idxoxuz/pilot.json`, SHA-256
+  `962f8b832d55f6a8e245961f7a941ab8bdb143fe2d092855ddcab2a99473c99b`.
+
+The prepared initial PNG was inspected: dimensions, datums, GTol, surface finish,
+views and manufacturing notes are visible. The existing revision-cell overflow
+remains, so this is not full visual acceptance. This pilot compares native cold
+annotations, not a second cold PDF/PNG export. The dedicated title control's
+zero-pixel result must not be attributed to this separate prepared-template run.
