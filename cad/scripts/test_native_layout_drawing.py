@@ -11,7 +11,15 @@ from _drawing_view_packing import Axis, AxisOrder, Rect
 
 @pytest.fixture(autouse=True)
 def isolated_failure_reports(monkeypatch, tmp_path):
-    monkeypatch.setattr(native, "_FAILURE_REPORT_ROOT", tmp_path, raising=False)
+    monkeypatch.setattr(native, "_FAILURE_REPORT_ROOT", tmp_path)
+
+
+def test_failure_report_fixture_rejects_a_missing_runtime_constant(monkeypatch, tmp_path):
+    with monkeypatch.context() as scoped:
+        scoped.delattr(native, "_FAILURE_REPORT_ROOT")
+        with pytest.raises(AttributeError, match="_FAILURE_REPORT_ROOT"):
+            isolated_failure_reports.__wrapped__(scoped, tmp_path)
+        assert not hasattr(native, "_FAILURE_REPORT_ROOT")
 
 
 @pytest.mark.parametrize("overflow_m", [0.5, 2e-12])

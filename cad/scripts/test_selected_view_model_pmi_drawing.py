@@ -16,6 +16,24 @@ ROTATIONS = {
 }
 
 
+def test_documented_named_view_call_uses_the_runtime_null_callout_shape():
+    from pathlib import Path
+    import re
+
+    document = Path(__file__).parent.parent / "docs/pipeline/selected-view-model-pmi-control.md"
+    text = document.read_text(encoding="utf-8")
+    match = re.search(r"`(SelectByID2\([^`]+)`", text)
+    assert match is not None
+    selected, callout = Mock(), object()
+    null_callout = Mock(return_value=callout)
+    eval(
+        compile(match[1], str(document), "eval"),
+        {"SelectByID2": selected, "name": "Native View", "null_callout": null_callout},
+    )
+    null_callout.assert_called_once_with()
+    selected.assert_called_once_with("Native View", "DRAWINGVIEW", 0, 0, 0, False, 0, callout, 0)
+
+
 def native_fixture(monkeypatch):
     monkeypatch.setattr(probe, "_early_bound", lambda value, _: value)
     monkeypatch.setattr(probe, "null_callout", lambda: None)

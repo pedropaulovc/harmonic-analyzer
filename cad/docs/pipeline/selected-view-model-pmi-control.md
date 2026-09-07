@@ -19,8 +19,10 @@ the three orthographic views and chooses their scale/positions. The unique nativ
 not identify it.
 
 Before **each** import, it activates then explicitly selects the actual view name
-using `SelectByID2(name, "DRAWINGVIEW", 0, 0, 0, False, 0, null, 0)`. It requires
-exactly one selected object, type 12, and `IsSame(GetSelectedObject6(1,-1), view)`.
+using `SelectByID2(name, "DRAWINGVIEW", 0, 0, 0, False, 0, null_callout(), 0)`.
+`null_callout` is imported from `solidworks_mcp.adapters.pywin32_adapter`.
+The control requires exactly one selected object, type 12, and
+`IsSame(GetSelectedObject6(1,-1), view)`.
 The zeros are the documented named-view selection shape, not feature picks.
 It then calls precisely:
 
