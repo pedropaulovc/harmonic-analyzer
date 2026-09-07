@@ -98,13 +98,38 @@ def snapshot(app, view, entity):
     }, face
 
 
+def _record_identity_controls(app, expected, actual, before_face, after_face, evidence):
+    """Characterize a rejected native identity without changing its verdict."""
+    controls = evidence.setdefault("identity_controls", {})
+    pairs = {
+        "expected_self": (expected, expected),
+        "actual_self": (actual, actual),
+        "reverse_pair": (actual, expected),
+        "expected_face_self": (before_face, before_face),
+        "actual_face_self": (after_face, after_face),
+        "face_pair": (before_face, after_face),
+    }
+    for name, pair in pairs.items():
+        try:
+            controls[name] = {"result": int(app.IsSame(*pair))}
+        except Exception as error:
+            # Evidence must not replace the already established identity failure.
+            controls[name] = {"error": repr(error)}
+
+
 def require_same(app, view, expected, actual, *, label, evidence):
     """Record both raw snapshots before exact entity/face/geometry acceptance."""
     before, before_face = snapshot(app, view, expected)
     evidence["expected"] = before
     after, after_face = snapshot(app, view, actual)
     evidence["actual"] = after
-    same(app, expected, actual, label=f"{label} silhouette entity")
+    try:
+        same(app, expected, actual, label=f"{label} silhouette entity")
+    except RuntimeError:
+        _record_identity_controls(
+            app, expected, actual, before_face, after_face, evidence
+        )
+        raise
     same(app, before_face, after_face, label=f"{label} silhouette face")
     if before != after:
         raise RuntimeError(f"{label}: silhouette raw geometry changed: {evidence!r}")
