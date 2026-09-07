@@ -14,6 +14,58 @@ from diagnostics import _owned_native_documents as owned
 from test_owned_native_documents_drawing import Model, native  # noqa: F401
 
 
+@pytest.mark.parametrize("returned", [True, False, None])
+def test_edit_rebuild_is_one_checked_pre_save_call_without_redraw(
+    monkeypatch, returned
+):
+    calls = []
+    model = SimpleNamespace(
+        EditRebuild3=Mock(side_effect=lambda: calls.append("edit_rebuild") or returned),
+        GraphicsRedraw2=Mock(
+            side_effect=AssertionError("redraw is a different variant")
+        ),
+    )
+    adapter = SimpleNamespace(
+        currentModel=model,
+        ownership=SimpleNamespace(
+            saving_as=lambda _: __import__("contextlib").nullcontext()
+        ),
+    )
+    observer = SimpleNamespace(record=lambda stage: calls.append(stage))
+    monkeypatch.setattr(probe.common, "apply_custom_properties", lambda *_: None)
+
+    def save(current, path, *, artifact_context, **kwargs):
+        for kind, target in (("drawing", path), ("pdf", kwargs["pdf_path"])):
+            with artifact_context(kind, target):
+                calls.append(kind)
+
+    monkeypatch.setattr(probe.drawing, "save_drawing", save)
+
+    def run():
+        with probe.finalizer_observations(
+            adapter, observer, probe.Variant.EDIT_REBUILD
+        ) as counts:
+            probe.common.apply_custom_properties(adapter, {"UNIT_DISPLAY": "MM"})
+            probe.drawing.save_drawing(adapter, "owned.SLDDRW", pdf_path="owned.pdf")
+        return counts
+
+    if returned is True:
+        assert run()["edit_rebuild"] == 1
+        assert (
+            calls.index("before_native_save")
+            < calls.index("edit_rebuild")
+            < calls.index("after_pre_save_edit_rebuild")
+            < calls.index("drawing")
+            < calls.index("pdf")
+        )
+    else:
+        with pytest.raises(RuntimeError, match="EditRebuild3"):
+            run()
+        assert "drawing" not in calls and "pdf" not in calls
+    model.EditRebuild3.assert_called_once_with()
+    model.GraphicsRedraw2.assert_not_called()
+
+
 def glyphs(dx=0.0, dy=0.0):
     return {
         "page_size_pt": (1224.0, 792.0),
@@ -68,7 +120,10 @@ def test_glyph_invalid_content_or_geometry_is_never_a_positive_control(field):
 @pytest.mark.parametrize(
     "classification", ["unchanged", "subpixel_delta", "nonrigid_delta"]
 )
-def test_candidate_is_not_even_started_without_reproduction(classification):
+@pytest.mark.parametrize(
+    "candidate", [probe.Variant.REDRAW, probe.Variant.EDIT_REBUILD]
+)
+def test_candidate_is_not_even_started_without_reproduction(classification, candidate):
     calls = []
 
     async def trial(variant):
@@ -78,7 +133,7 @@ def test_candidate_is_not_even_started_without_reproduction(classification):
             "png_delta": {"changed_pixel_count": 100},
         }
 
-    result = asyncio.run(probe.run_pair(trial))
+    result = asyncio.run(probe.run_pair(trial, candidate))
     assert calls == [probe.Variant.BASELINE]
     assert result == "inconclusive_baseline_not_reproduced"
 
@@ -91,15 +146,18 @@ def test_reproduced_pdf_without_changed_pixels_is_not_candidate_authority():
         }
 
     with pytest.raises(RuntimeError, match="pixels"):
-        asyncio.run(probe.run_pair(trial))
+        asyncio.run(probe.run_pair(trial, probe.Variant.REDRAW))
 
 
-def test_candidate_runs_once_after_baseline_and_keeps_failure():
+@pytest.mark.parametrize(
+    "candidate", [probe.Variant.REDRAW, probe.Variant.EDIT_REBUILD]
+)
+def test_candidate_runs_once_after_baseline_and_keeps_failure(candidate):
     calls = []
 
     async def trial(variant):
         calls.append(variant)
-        if variant is probe.Variant.REDRAW:
+        if variant is candidate:
             raise RuntimeError("native failed")
         return {
             "printed": {"classification": "reproduced"},
@@ -107,8 +165,31 @@ def test_candidate_runs_once_after_baseline_and_keeps_failure():
         }
 
     with pytest.raises(RuntimeError, match="native failed"):
-        asyncio.run(probe.run_pair(trial))
-    assert calls == [probe.Variant.BASELINE, probe.Variant.REDRAW]
+        asyncio.run(probe.run_pair(trial, candidate))
+    assert calls == [probe.Variant.BASELINE, candidate]
+
+
+@pytest.mark.parametrize("candidate", [probe.Variant.BASELINE, "pre_save_edit_rebuild"])
+def test_pair_requires_an_explicit_candidate_enum_before_baseline(candidate):
+    trial = Mock(side_effect=AssertionError("must reject before native trial"))
+    with pytest.raises(ValueError):
+        asyncio.run(probe.run_pair(trial, candidate))
+    trial.assert_not_called()
+
+
+@pytest.mark.parametrize("candidate", [[], ["baseline"], ["unknown"]])
+def test_cli_rejects_missing_or_invalid_candidate_before_environment(
+    monkeypatch, candidate
+):
+    environment = Mock(side_effect=AssertionError("CLI must reject first"))
+    monkeypatch.setattr(probe, "require_owned_diagnostic_environment", environment)
+    arguments = ["--source", "part.SLDPRT", "--guard-source", "guard.SLDPRT"]
+    if candidate:
+        arguments.extend(("--candidate", *candidate))
+    with pytest.raises(SystemExit) as error:
+        probe.main(arguments)
+    assert error.value.code == 2
+    environment.assert_not_called()
 
 
 @pytest.mark.parametrize("variant", list(probe.Variant))
@@ -116,7 +197,10 @@ def test_finalizer_hooks_preserve_call_order_and_only_candidate_redraws(
     monkeypatch, variant
 ):
     calls = []
-    model = SimpleNamespace(GraphicsRedraw2=lambda: calls.append("redraw"))
+    model = SimpleNamespace(
+        GraphicsRedraw2=lambda: calls.append("redraw"),
+        EditRebuild3=lambda: calls.append("edit_rebuild") or True,
+    )
     ownership = SimpleNamespace()
 
     @contextmanager
@@ -158,6 +242,7 @@ def test_finalizer_hooks_preserve_call_order_and_only_candidate_redraws(
         "drawing": 1,
         "pdf": 1,
         "redraw": int(variant is probe.Variant.REDRAW),
+        "edit_rebuild": int(variant is probe.Variant.EDIT_REBUILD),
     }
     assert (
         calls.index("after_property_link_before_unit")
@@ -175,6 +260,7 @@ def test_finalizer_hooks_preserve_call_order_and_only_candidate_redraws(
         < calls.index(("native", "pdf"))
     )
     assert calls.count("redraw") == int(variant is probe.Variant.REDRAW)
+    assert calls.count("edit_rebuild") == int(variant is probe.Variant.EDIT_REBUILD)
     if variant is probe.Variant.REDRAW:
         assert (
             calls.index("before_native_save")
@@ -210,6 +296,8 @@ def test_environment_rejected_before_parent_native_wrapper(monkeypatch, tmp_path
             [
                 "--source",
                 str(tmp_path / "missing"),
+                "--candidate",
+                probe.Variant.EDIT_REBUILD.value,
                 "--guard-source",
                 str(tmp_path / "missing"),
             ]
@@ -236,7 +324,7 @@ def test_candidate_result_is_only_a_printed_observation(outcome):
             "png_delta": {"changed_pixel_count": 0 if outcome == "stable" else 1},
         }
 
-    assert asyncio.run(probe.run_pair(trial)) == (
+    assert asyncio.run(probe.run_pair(trial, probe.Variant.REDRAW)) == (
         "candidate_printed_stable" if outcome == "stable" else "candidate_not_stable"
     )
     assert calls == [probe.Variant.BASELINE, probe.Variant.REDRAW]
@@ -565,7 +653,11 @@ def test_owned_fresh_pair_preserves_originals_and_two_visible_baseline_docs(
 
     async def callback(adapter):
         return await probe.probe(
-            adapter, native.source, native.source, tmp_path / "reports"
+            adapter,
+            native.source,
+            native.source,
+            tmp_path / "reports",
+            probe.Variant.REDRAW,
         )
 
     if mode in ("normal", "not_reproduced"):

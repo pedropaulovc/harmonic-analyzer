@@ -2,6 +2,8 @@
 
 Status: native baseline reproduced the printed shift; the one pre-save redraw
 did not prevent it. This diagnostic does not change production finalization.
+The next independently selected candidate, one checked pre-save `EditRebuild3`,
+is prepared offline but has not run natively.
 
 The retained rocker control proved a real printed change: cold reopening moved
 all ten `rocker-arm` title glyphs right by about 7.22523 mm, while the note anchor,
@@ -32,8 +34,11 @@ unchanged, including its existing sheet checks and native/PDF/PNG output path.
    boxes, PNG pixel differences and every native annotation leaf delta.
 3. Only if this fresh baseline reproduces a rigid printed displacement of at least
    one 300-DPI pixel, with changed PNG pixels, run an independent fresh candidate.
-   It adds exactly one documented `GraphicsRedraw2()` before native save. It has
-   identical observations plus one post-redraw title snapshot.
+   Select exactly one candidate: `pre_save_redraw` adds one `GraphicsRedraw2()`;
+   `pre_save_edit_rebuild` adds one checked `EditRebuild3()`. Both occur before
+   native save, with identical observations plus one post-operation title snapshot.
+   The rebuild candidate does not also redraw or force-rebuild. A return other
+   than native `True` stops before SLDDRW/PDF output.
 
 `unchanged`, subpixel or non-rigid baseline deltas are **inconclusive** and prevent
 candidate execution. The 0.001-point rigid-residual threshold only classifies the
@@ -75,6 +80,11 @@ obsolete in favor of `IModelView.GraphicsRedraw`, but this experiment deliberate
 uses the existing project's documented no-argument form. No success boolean is
 invented. `INote.SetTextJustification` documents a redraw requirement after text
 changes; it does not prove this unchanged-justification title issue has that cause.
+`IModelDoc2.EditRebuild3` and `Rebuild_Example_VB` document a no-argument boolean
+operation in the active document's context. The existing observer checks that
+exact active owned drawing immediately before the call. Its success return is
+not evidence that the title's printed position changed; the same glyph/pixel
+comparison and cold-reopen witnesses determine that result.
 
 Only after main-agent source review and an exclusive native seat grant:
 
@@ -82,7 +92,7 @@ Only after main-agent source review and an exclusive native seat grant:
 $env:HARMONIC_SW_AUTOSTART = '0'
 $env:HARMONIC_REMOTE_CACHE_MODE = 'off'
 $env:HARMONIC_DIAGNOSTIC_SW_PID = '<granted-existing-PID>'
-uv run --no-project --python C:/src/harmonic-analyzer/.venv/Scripts/python.exe python cad/scripts/diagnostics/probe_fresh_title_update.py --source C:/src/ha-perf-channel/cad/out/sldprt/rocker-arm.SLDPRT --guard-source C:/src/harmonic-analyzer/cad/out/sldprt/rocker-arm.SLDPRT
+uv run --no-project --python C:/src/harmonic-analyzer/.venv/Scripts/python.exe python cad/scripts/diagnostics/probe_fresh_title_update.py --candidate pre_save_edit_rebuild --source C:/src/ha-perf-channel/cad/out/sldprt/rocker-arm.SLDPRT --guard-source C:/src/harmonic-analyzer/cad/out/sldprt/rocker-arm.SLDPRT
 ```
 
 Run from the isolated frozen `ha-perf-title-update` checkout. Its source copies,
@@ -111,6 +121,8 @@ finished with exit 0 and diagnostic outcome `candidate_not_stable` on
 2026-09-06, 17:33:57–17:36:19 PDT. The candidate ran only because the fresh
 baseline satisfied the printed-displacement and changed-pixel gate. There was
 no retry or additional native operation after the invocation.
+That historical revision selected redraw internally; the current CLI requires
+an explicit candidate. Its original raw receipt and conclusions remain unchanged.
 
 - Trace: `0xdd6bf5200f4839777a72b1424c036716`; task 142.160844 s.
 - Report: `C:/src/ha-perf-title-update/cad/out/reports/fresh-title-_bp8u5uy/title-update.json`.
