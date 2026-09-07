@@ -13,6 +13,7 @@ import _common
 import _drawing_build
 import _drawing_common as common
 from diagnostics import _source_callout_authoring as control
+from diagnostics._model_dimension_coverage import SemanticCoverage
 from diagnostics import _source_dimension_snapshot as source_snapshot
 from diagnostics import _source_save_boundaries as boundaries
 from diagnostics import _native_drawing_save_control as saves
@@ -263,7 +264,9 @@ async def owned_pilot_case(
     monkeypatch.setattr(pilot, "ORDER", ("alignment_pinion",))
     sources, guards = fixture_sources(tmp_path, monkeypatch)
     monkeypatch.setitem(
-        pilot.TARGETS, "alignment_pinion", NS(view_roles={}, entity_labels=())
+        pilot.TARGETS,
+        "alignment_pinion",
+        NS(view_roles={}, entity_labels=(), coverage=SemanticCoverage.GEOMETRY),
     )
     monkeypatch.setattr(pilot.benchmark, "recipe_source", lambda *_: verifier_recipe())
     monkeypatch.setattr(pilot.benchmark, "revision", lambda _: "frozen")
@@ -307,10 +310,6 @@ async def owned_pilot_case(
                 Type=2,
                 GetMinValue2=lambda: (0, -0.00004),
                 GetMaxValue2=lambda: (0, -0.00002),
-                # Factory save boundaries still use the scalar getters; the
-                # separate top-stack consumer migration removes those calls.
-                GetMinValue=lambda: -0.00004,
-                GetMaxValue=lambda: -0.00002,
             ),
         )
 

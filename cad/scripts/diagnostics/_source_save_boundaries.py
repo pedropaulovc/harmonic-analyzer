@@ -22,7 +22,7 @@ import time
 from _common import _early_bound
 import _drawing_common as drawing
 from diagnostics import probe_drawing_attachments as attachments
-from diagnostics._source_dimension_snapshot import finite, tolerance
+from diagnostics._source_dimension_snapshot import tolerance, tolerance_limits
 from diagnostics._callout_recipe_contract import CalloutContract
 
 
@@ -175,10 +175,14 @@ class SourceSaveBoundaries:
                 raise RuntimeError("source boundary raw dimension value changed")
             self.initial_value = raw_values[0]
             native_tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+            tolerance_type = tolerance(dimension)
+            limits = tolerance_limits(native_tolerance)
             row["tolerance"] = {
-                **tolerance(dimension),
-                "minimum": finite(native_tolerance.GetMinValue()),
-                "maximum": finite(native_tolerance.GetMaxValue()),
+                **tolerance_type,
+                "minimum": limits["tolerance_min"],
+                "minimum_status": limits["tolerance_min_status"],
+                "maximum": limits["tolerance_max"],
+                "maximum_status": limits["tolerance_max_status"],
             }
             if (
                 self.initial_tolerance is not None

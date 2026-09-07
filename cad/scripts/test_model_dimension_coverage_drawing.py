@@ -60,8 +60,8 @@ def context(monkeypatch, tmp_path):
                 role.name, f"{key}@{path.stem}.Part", (index + 1) / 1000, 4
             )
             parameter.GetToleranceType = lambda: 4
-            parameter.Tolerance.GetMinValue = lambda: -0.0001
-            parameter.Tolerance.GetMaxValue = lambda: 0.0001
+            parameter.Tolerance.GetMinValue2 = lambda: (0, -0.0001)
+            parameter.Tolerance.GetMaxValue2 = lambda: (0, 0.0001)
             parameters[key] = parameter
             texts = {str(i): "" for i in range(1, 9)}
             if role.name == "ShankDia":
@@ -241,6 +241,7 @@ def test_real_generic_inventory_keeps_exclusions_but_declared_bank_is_complete(c
         "count",
         "source_value",
         "source_tolerance",
+        "source_tolerance_status",
         "source_text",
         "numeric",
         "text",
@@ -287,9 +288,12 @@ def test_declared_bank_rejects_wrong_or_incomplete_native_witness(context, chang
             0.003000000000000001,
         )
     if change == "source_tolerance":
-        c.current.parameters["HeadHt@Head"].Tolerance.GetMaxValue = lambda: (
-            0.000100000000001
+        c.current.parameters["HeadHt@Head"].Tolerance.GetMaxValue2 = lambda: (
+            0,
+            0.000100000000001,
         )
+    if change == "source_tolerance_status":
+        c.current.parameters["HeadHt@Head"].Tolerance.GetMaxValue2 = lambda: (1, 0.0001)
     if change == "source_text":
         c.current.source_displays["HeadHt@Head"].text["2"] = "changed"
     if change == "numeric":
@@ -449,7 +453,8 @@ def test_native_padded_printed_run_is_retained_without_numeric_or_text_waiver(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "mode", ["normal", "wrong_parameter", "cold_raw_drift", "build_failure"]
+    "mode",
+    ["normal", "wrong_parameter", "cold_raw_drift", "cold_status_drift", "build_failure"],
 )
 async def test_actual_pilot_composes_declared_bank_and_fresh_cold_readers(
     context, monkeypatch, tmp_path, mode
@@ -504,8 +509,14 @@ async def test_actual_pilot_composes_declared_bank_and_fresh_cold_readers(
         else:
             c.reopen()
             if mode == "cold_raw_drift":
-                c.current.parameters["HeadHt@Head"].Tolerance.GetMaxValue = lambda: (
-                    0.000100000000001
+                c.current.parameters["HeadHt@Head"].Tolerance.GetMaxValue2 = lambda: (
+                    0,
+                    0.000100000000001,
+                )
+            if mode == "cold_status_drift":
+                c.current.parameters["HeadHt@Head"].Tolerance.GetMaxValue2 = lambda: (
+                    1,
+                    0.0001,
                 )
         return NS(is_success=True, data={})
 
@@ -565,6 +576,11 @@ async def test_actual_pilot_composes_declared_bank_and_fresh_cold_readers(
         assert len(trial["model_dimension_coverage"]["captures"]) == 2
         assert trial["status"] == "passed" and c.adapter.currentModel is None
         assert len(opened) == 2 and len(closed) == 3
-    if mode == "cold_raw_drift":
+    if mode in ("cold_raw_drift", "cold_status_drift"):
         assert trial["status"] == "failed" and "built" in trial
         assert "raw source bank changed" in trial["error"]
+    if mode == "cold_status_drift":
+        row = trial["model_dimension_coverage"]["captures"][-1]
+        native = row["source"]["dimensions"]["HeadHt@Head"]["native"]
+        assert native["tolerance_max"] == 0.0001
+        assert native["tolerance_max_status"] == 1

@@ -9,6 +9,7 @@ from unittest.mock import Mock
 import pytest
 
 from diagnostics import _source_save_boundaries as control
+from diagnostics._model_dimension_coverage import SemanticCoverage
 from diagnostics import probe_datum_policy_recipes as pilot
 
 
@@ -20,7 +21,11 @@ def bank(tmp_path, monkeypatch):
     )
     path = tmp_path / "alignment-copy.SLDPRT"
     path.write_bytes(b"exact original")
-    native_tol = NS(Type=2, GetMinValue=lambda: -0.00004, GetMaxValue=lambda: -0.00002)
+    native_tol = NS(
+        Type=2,
+        GetMinValue2=lambda: (0, -0.00004),
+        GetMaxValue2=lambda: (0, -0.00002),
+    )
     dimension = NS(
         FullName="ArborBoreDia@ArborBoreProfile@alignment-copy.Part",
         Tolerance=native_tol,
@@ -237,7 +242,7 @@ def test_post_read_rejects_semantic_identity_or_unsupported_read(bank, mode):
     if mode == "tolerance":
         bank.native_tol.Type = 1
     if mode == "limits":
-        bank.native_tol.GetMaxValue = lambda: 0.0
+        bank.native_tol.GetMaxValue2 = lambda: (0, 0.0)
     if mode == "parameter":
         bank.handles[control.DIMENSION] = object()
     if mode == "display":
@@ -249,7 +254,7 @@ def test_post_read_rejects_semantic_identity_or_unsupported_read(bank, mode):
     if mode == "precision":
         bank.display.GetPrimaryPrecision2 = lambda: float("nan")
     if mode == "nonfinite":
-        bank.native_tol.GetMinValue = lambda: float("nan")
+        bank.native_tol.GetMinValue2 = lambda: (0, float("nan"))
     if mode == "type":
         bank.display.Type2 = 4
     if mode == "nonfinite_value":
@@ -440,7 +445,9 @@ async def test_pilot_wraps_real_recipe_and_retains_banks_before_hash_failure(
     monkeypatch.setattr(pilot, "ORDER", ("alignment_pinion",))
     sources, guards = fixture_sources(tmp_path, monkeypatch)
     monkeypatch.setitem(
-        pilot.TARGETS, "alignment_pinion", NS(view_roles={}, entity_labels=())
+        pilot.TARGETS,
+        "alignment_pinion",
+        NS(view_roles={}, entity_labels=(), coverage=SemanticCoverage.GEOMETRY),
     )
     monkeypatch.setattr(
         pilot.benchmark,
