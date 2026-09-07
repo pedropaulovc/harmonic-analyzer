@@ -99,8 +99,9 @@ inventories were empty, and cleanup had no error.
 
 `HARMONIC_BSURF_GRID_CONTROL=boundary-domain` explicitly enables a separate
 raw observation group before the unchanged full grid. Missing variable or `off`
-adds no calls; any other value is rejected in parent/worker routing before COM
-and at the direct surface entry. An opt-in surface read requires an evidence
+adds no calls; `column-row-grid` selects the separate full proposed-domain
+observation described below. Other values are rejected in parent/worker routing
+before COM and at the direct surface entry. An opt-in surface read requires an evidence
 sink. The pilot records its mode as `bsurf_grid_control`; the surface journal
 stores `grid_control` with the requested indices, literal returns and exceptions.
 
@@ -202,7 +203,10 @@ then repeated/attached/cold identity and printed manufacturing acceptance.
 ordinary reader. It replaces the eleven boundary observations for that run;
 it does not run both observation modes or alter the native approximation request.
 For the observed grid this means 125 queries, including `(25,5)`. The existing
-4096-vector total budget is checked before any control-point request.
+4096-vector per-grid budget is checked before any control-point request. The
+control and ordinary reader each have that bound: at most 8192 combined reads.
+For the observed surface, 125 control queries precede the ordinary reader's
+six calls through its existing `(1,6)` rejection, totaling 131 requests.
 
 Each record names the actual positional arguments `first` and `second` and
 retains the raw return or getter exception. Finite-vector validation checks the
@@ -255,8 +259,8 @@ containment test is imposed. UV bounds are not trim loops or full BREP; the
 official method directs combined surface/trim extraction to `GetTrimCurves2`,
 which this diagnostic does not call or claim to capture.
 
-Read-budget limits are 32 orders, 64 properties per direction and 4096 total
-control vectors, not claimed API limits. Unknown enums, nulls, unsupported
+Read-budget limits are 32 orders, 64 properties per direction and 4096 control
+vectors per grid, not claimed API limits. Unknown enums, nulls, unsupported
 types, nonfinite values, malformed lengths/ranges or excessive grids fail
 before acceptance. Zero-property arrays must be actual empty arrays; undocumented
 null-as-empty conversion is not assumed. Native getter failures propagate

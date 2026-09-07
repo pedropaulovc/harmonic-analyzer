@@ -11,6 +11,7 @@ from unittest.mock import Mock
 import pytest
 
 from diagnostics import _source_save_boundaries as control
+from diagnostics._tooth_selector_observation import ToothObservation
 from test_source_save_boundaries_drawing import bank as source_bank
 
 
@@ -375,6 +376,10 @@ async def test_real_entity_and_source_observers_compose_in_actual_pilot_scope(
         nullcontext=nullcontext,
         patch=pilot.patch,
         owned_save_drawing=pilot.owned_save_drawing,
+        observe_selector=pilot.observe_selector,
+        source_model=bank.source,
+        trial=bank.trial,
+        tooth_observation=ToothObservation.OFF,
     )
     exec(
         compile(ast.fix_missing_locations(harness), "<pilot observer scope>", "exec"),
