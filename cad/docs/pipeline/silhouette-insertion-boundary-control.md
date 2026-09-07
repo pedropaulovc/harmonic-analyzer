@@ -2,7 +2,7 @@
 
 This diagnostic preserves the failing production identity gate. It does not
 accept a silhouette because its geometry or persistent-reference bytes match.
-It has not yet run natively.
+The two native boundary runs below retain the rejection unchanged.
 
 ## Retained failures
 
@@ -89,3 +89,50 @@ Offline tests:
 ```powershell
 uv run python -m pytest -q cad/scripts/test_silhouette_insertion_control_drawing.py cad/scripts/test_silhouette_identity_control_drawing.py cad/scripts/test_view_recipe_acceptance_drawing.py
 ```
+
+## Native boundary results, 2026-09-07
+
+Both runs used frozen root `9ef1f724`, adapter `25bc99b1`, attached PID 31860,
+the existing prepared full-recipe pilot, and unchanged exact source pins.
+
+| target | receipt under `cad/out/reports/` | receipt SHA-256 | recipe / pilot seconds |
+| --- | --- | --- | --- |
+| spring hook | `datum-policy-ydaui7tb/pilot.json` | `f104572a9040639e0cc8e53184421484766ea2043c914fcfbe4129ac984bbe71` | 57.885665 / 174.864755 |
+| crankshaft | `datum-policy-atp42a38/pilot.json` | `3d6028992a30070518ad86a09b662249c810f48d52192c7b059b70648a1d2c52` | 76.701219 / 227.780206 |
+
+These timings include proactive instrumentation and failure capture, not an
+uninstrumented performance comparison. Both failure captures completed without
+secondary errors. Original/source-copy hashes and source observations remained
+unchanged; final runtime guards were empty. Neither recipe reached successful
+built/cold acceptance.
+
+In both runs, expected/selected references passed their own native and persistent
+self controls. Expected, selected, stored pre-insertion references and the fresh
+role resolution compared equal with native PID1. The attached entity passed its
+own self controls but compared PID0 against the expected entity **already after
+styling, before the existing clear/rebuild**. The same partition persisted after
+rebuild. This rules out that rebuild as the onset of this mismatch; it does not
+isolate insertion from the intervening text/leader/position/style calls.
+
+All five owning-view checks and all 21 underlying-face native comparisons passed
+in both runs. Spring's five complete raw geometry snapshots were exactly equal.
+Crank's selected/fresh versus attached snapshots differed only in the line's
+x origin/start/end: `-1.9880494890015018e-17` versus
+`3.4865694628900976e-19` metres. Its cylindrical-surface parameters and remaining
+curve/endpoint values were exact. Thus an exact raw-coordinate comparison is not
+a demonstrated replacement for persistent object equality across these paths.
+No geometric tolerance or alternate acceptance was introduced.
+
+The generic type-46 observer also captured spring's actual attached silhouette:
+the retained failure bank now has accepted semantics rather than the previous
+`checked_empty` rejection. That geometry observation does not prove persistent
+object identity and did not bypass the production rejection.
+
+The next candidate is explicit attachment to the already controlled cylindrical
+FACE with native symbol placement, not relaxed silhouette identity. This matches
+the surface-finish control's physical target while avoiding the need to assert
+that view-returned and annotation-returned silhouette objects share a persistent
+ID. Its native insertion, saved/reopened face identity and printed placement
+still need separate proof. The original silhouette PID/raw-equality tests stay
+unchanged. The integrated four-file diagnostic test run passed 174 tests in
+13.84 s (`pytest-telemetry/run-rdhph0pf`).
