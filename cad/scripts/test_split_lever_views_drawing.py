@@ -15,6 +15,8 @@ from channel_lever_spec import DRAWING_DIMENSIONS, SOURCE_BASIC_DIMENSIONS
 def built(monkeypatch, tmp_path):
     events = []
     views = []
+    retained = {}
+    created = {}
     entities = {
         name: object()
         for name in (
@@ -60,10 +62,12 @@ def built(monkeypatch, tmp_path):
 
     def retain(adapter, view, *, keep, view_label):
         events.append(("retain", view, tuple(keep), view_label))
-        return [
+        bank = [
             SimpleNamespace(name=name, GetSpecificAnnotation=lambda name=name: name)
             for name in keep
         ]
+        retained[view_label] = {item.name: item for item in bank}
+        return bank
 
     monkeypatch.setattr(recipe, "retain_view_dimensions", retain)
     monkeypatch.setattr(recipe, "dimension_name", lambda adapter, ann: ann.name)
@@ -80,13 +84,16 @@ def built(monkeypatch, tmp_path):
 
     def dimension(adapter, view, **kw):
         events.append(("dimension", view, kw))
-        return kw["label"]
+        annotation = object()
+        display = SimpleNamespace(label=kw["label"], GetAnnotation=lambda: annotation)
+        created[kw["label"]] = display
+        return display
 
     monkeypatch.setattr(recipe, "add_entity_dimension", dimension)
     monkeypatch.setattr(
         recipe,
         "set_basic_dimension",
-        lambda adapter, value, **kw: events.append(("basic", value)),
+        lambda adapter, value, **kw: events.append(("basic", value.label)),
     )
     monkeypatch.setattr(recipe, "_force_dimension_black", lambda *args, **kw: None)
     for name, event in (
@@ -109,6 +116,11 @@ def built(monkeypatch, tmp_path):
         "auto_arrange_view_dimensions",
         lambda adapter, bank, **kw: events.append(("arrange", bank, kw)),
     )
+    monkeypatch.setattr(
+        recipe,
+        "align_channel_lever_basic_pairs",
+        lambda adapter, **kw: events.append(("parallel", kw)),
+    )
 
     def layout(adapter, **kw):
         events.append(("layout", kw))
@@ -123,7 +135,33 @@ def built(monkeypatch, tmp_path):
             adapter, drawing_factory=drawing_factory, source=source, layout=layout
         )
     )
-    return SimpleNamespace(events=events, views=views, entities=entities, result=result)
+    return SimpleNamespace(
+        events=events,
+        views=views,
+        entities=entities,
+        result=result,
+        retained=retained,
+        created=created,
+    )
+
+
+def test_parallel_spacing_receives_exact_created_retained_handles_before_layout(built):
+    calls = [
+        (index, row[1])
+        for index, row in enumerate(built.events)
+        if row[0] == "parallel"
+    ]
+    assert len(calls) == 1
+    index, call = calls[0]
+    assert call["front"] is built.views[0]
+    assert call["holes"] is built.views[1]
+    assert call["bar_length"] is built.retained["profile"]["BarLength"]
+    assert call["tip_centre_x"] is built.retained["profile"]["TipCentreX"]
+    assert (
+        call["bar_pin_c2c"] is built.created["fulcrum-to-bar-pin c2c"].GetAnnotation()
+    )
+    assert call["spring_c2c"] is built.created["fulcrum-to-spring c2c"].GetAnnotation()
+    assert built.events[index + 1][0] == "layout"
 
 
 def test_five_views_split_exact_original_eleven_dimensions(built):

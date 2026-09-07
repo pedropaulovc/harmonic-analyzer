@@ -1,5 +1,8 @@
 # Lever named linear-pair control
 
+The original control below is historical (`db33e21f` and matching tooling).
+Current production extraction and acceptance instructions are recorded at the end.
+
 This is an opt-in diagnostic, not a production layout change or a speedup claim.
 The five-view lever's retained PDF shows two remaining BASIC-box conflicts:
 `BarLength` (169 mm) crosses `TipCentreX` (182.80 mm) in the profile view;
@@ -160,3 +163,53 @@ extra/jogged/ambiguous/open/diagonal geometry, unsafe arrows and value mutation.
 The original body-height-plus-1 mm formula assertion was replaced only after its
 native contradiction was explicitly raised; manufacturing equality assertions
 and final crossing gates are unchanged.
+
+## Production extraction after the successful owned control
+
+The owned calibrated lever control at `db33e21f` / adapter `e77bfda` passed its
+full recipe, original final crossing gate and cold reopen. Receipt
+`cad/out/reports/datum-policy-xqvch22r/pilot.json`, SHA-256
+`517ada4c2d942df3cad3cf779facfae5c29c736a39996f0738e0f04538dac4d6`,
+records both pair clearances as `0.0009999999999999731` m. Original/source-copy
+and runtime guards remained unchanged. Main's PNG inspection confirmed those
+dimension crossings were gone; the then-original template footer remained a
+separate visual defect. Recipe time `192.4409066` s includes diagnostic scans;
+total `318.6252783` s is diagnostic time, not a production speed measurement.
+
+`_drawing_parallel_dimensions.align_channel_lever_basic_pairs` now applies that
+same bounded mechanism in the real recipe immediately before its layout call.
+It consumes the retained BarLength/TipCentreX annotations and the two already
+created center-distance display annotations. It measures exactly four native
+footprints before and four after. It preserves exact display/parameter/annotation/
+owner/attachment identities, configured native values, BASIC state, text and
+format, and checks drawing/sheet/view context before each native mutation and
+after readback. Two document-local offset write/readbacks precede exactly one
+`AlignParallelDimensions` call per pair. No whole-document diagnostic scans,
+feature-coordinate picks, position setters or retry loop enter production.
+
+The typed pure BASIC-frame/line/extension recognition, pair geometry, required
+pitch and observed clearance are shared with the diagnostic. Existing nominal
+1 nm recognition is not a mutation tolerance: before/after native parameter
+values remain exact. The 1/0.5 paper-pitch gains are explicitly limited to the
+observed lever MODEL/type11 and DRAWING_REFERENCE/type2 pairs at view scale0.5;
+unrecognized scale, class, ordering or native stroke inventory fails. The final
+whole-sheet crossing/packing/manufacturing gate is unchanged.
+
+The extracted production helper still requires an integrated native recipe run;
+the diagnostic's success does not prove a separately implemented capture/selection
+path ran successfully. Offline checks pin eight footprint reads, two commands,
+exact mutations, no scene enumeration, shared geometry, recipe hook order and
+the production dependency boundary:
+
+Production owned acceptance must **omit `--linear-dimensions`**. The old
+diagnostic rejects recipes that already import the production spacing helper,
+before diagnostic measurement or mutation, to prevent double alignment. To replay
+`db33e21f`, use that revision's matching tooling in an independent checkout/venv
+with a newly authorized exclusive seat. Passing `--candidate db33e21f` to current
+tooling is not sufficient: the current loader intentionally requires the new
+factory ABI, which that historical revision predates. No compatibility shim or
+production bypass flag is added.
+
+```powershell
+uv run python -m pytest cad/scripts/test_parallel_dimensions_drawing.py cad/scripts/test_linear_dimension_arrangement_drawing.py cad/scripts/test_channel_lever_drawing.py -q
+```
