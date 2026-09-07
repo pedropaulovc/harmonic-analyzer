@@ -32,7 +32,7 @@ leaders through the corresponding text/frame regions.
 
 Repeat without SolidWorks:
 
-```
+```powershell
 uv run python cad/scripts/diagnostics/audit_dimension_leader_crossings.py
 uv run python -m pytest cad/scripts/test_dimension_crossing_evidence_drawing.py
 ```

@@ -261,8 +261,9 @@ failure evidence had no errors, and owned cleanup restored the empty baseline.
 The four PMI items were visible in the failed-scene PNG, but SF insertion,
 native save, full cold reopen and complete-sheet acceptance were not reached.
 
-Production now declares `AnnotationEntityContext.MODEL` on the two shafts' four
-PMI roles and their finish. The validator first requires exact annotation owner,
+Production now declares `AnnotationEntityContext.MODEL` on each shaft's four
+PMI roles and its finish: eight PMI roles and two finishes across both shafts.
+The validator first requires exact annotation owner,
 attachment count/type and view identity, then maps the actual attached drawing
 edge/face through the referenced source **part** extension and requires
 `IsSame(expected_original_role, mapped) == 1`. Null mappings, read errors and

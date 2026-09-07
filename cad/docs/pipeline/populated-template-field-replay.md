@@ -20,7 +20,8 @@ RAL 6005 alkyd enamel, SSPC-SP3, 40-60 um DFT; mask all bores
 ```
 
 Native display data contains two ordered text runs: the first ends with
-`DFT; `, and the second is `mask all bores`. Their Y origins are
+`DFT;` followed by one ASCII space (U+0020), and the second is `mask all bores`.
+Their Y origins are
 0.03626423529842122 and 0.03308923533679171 m. Concatenation equals the complete
 native text exactly, including its space.
 
