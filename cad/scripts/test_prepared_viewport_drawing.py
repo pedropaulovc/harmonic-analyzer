@@ -4,6 +4,7 @@ import asyncio
 from copy import deepcopy
 import inspect
 import json
+import math
 from pathlib import Path
 import re
 from types import SimpleNamespace
@@ -751,6 +752,79 @@ def test_shared_restore_preserves_failed_native_context_observations(scene, faul
         assert scene.calls == []
     if fault == "translation_readback":
         assert observation["after"]["translation3"] != target["translation3"]
+
+
+@pytest.mark.parametrize(
+    "readback",
+    [1.0, 1.5, math.nextafter(2.0, 0.0)],
+    ids=["ignored", "clamped", "one_ulp_low"],
+)
+def test_shared_restore_rejected_scale_stops_before_translation_and_redraw(
+    scene, monkeypatch, readback
+):
+    model = scene.Drawing()
+    scene.native.app.ActiveDoc = model
+    view = model.ActiveView
+    view._scale = 2.0
+    target = probe.viewports.capture(model)
+    view._scale = 1.0
+    view._translation[0] += 0.02
+    before = probe.viewports.capture(model)
+
+    def rejected_scale(native_view, value):
+        scene.calls.append(("scale", value))
+        native_view._scale = readback
+
+    monkeypatch.setattr(scene.View, "Scale2", scene.View.Scale2.setter(rejected_scale))
+    observation = {}
+    with pytest.raises(RuntimeError) as caught:
+        probe.viewports.restore(scene.native.app, model, target, observation)
+
+    assert observation["status"] == "failed"
+    assert observation["target"] == target
+    assert observation["before"] == before
+    assert observation["after_scale"]["scale2"] == readback
+    assert observation["after_scale"]["scale2"] != target["scale2"]
+    assert observation["after_scale"]["orientation3"] == target["orientation3"]
+    # A final readback already rejected these setters, but only after these
+    # unneeded translation/vector/redraw operations had occurred.
+    assert scene.calls == [("scale", 2.0)]
+    assert scene.vectors == []
+    assert view._translation == before["translation3"]
+    assert "after" not in observation
+    assert str(caught.value) == "native viewport scale assignment did not persist"
+    assert observation["error"] == repr(caught.value)
+
+
+def test_shared_restore_accepted_scale_keeps_exact_translation_and_redraw_sequence(
+    scene,
+):
+    model = scene.Drawing()
+    scene.native.app.ActiveDoc = model
+    view = model.ActiveView
+    view._scale = 2.0
+    target = probe.viewports.capture(model)
+    view._scale = 1.0
+    view._translation[0] += 0.02
+    scene.faults["pan_drift"] = True
+    observation = {}
+
+    probe.viewports.restore(scene.native.app, model, target, observation)
+
+    assert observation["status"] == "passed"
+    assert observation["after_scale"]["scale2"] == target["scale2"]
+    assert observation["after_scale"]["translation3"] != target["translation3"]
+    assert observation["after"] == target
+    assert [call[0] for call in scene.calls] == [
+        "scale",
+        "create_vector",
+        "translation",
+        "redraw",
+    ]
+    assert len(scene.vectors) == 1
+    assert scene.calls[0] == ("scale", 2.0)
+    assert scene.calls[2][1] is scene.vectors[0]
+    assert scene.calls[3] == ("redraw", 2.0)
 
 
 def test_shared_viewport_module_has_no_diagnostic_dependency():

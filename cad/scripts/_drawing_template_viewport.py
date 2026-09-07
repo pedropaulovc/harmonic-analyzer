@@ -85,6 +85,8 @@ def restore(app, model, target, observation):
         view = _early_bound(model.ActiveView, "IModelView")
         view.Scale2 = target["scale2"]
         observation["after_scale"] = capture(model)
+        if observation["after_scale"]["scale2"] != target["scale2"]:
+            raise RuntimeError("native viewport scale assignment did not persist")
         if observation["after_scale"]["orientation3"] != target["orientation3"]:
             raise RuntimeError("native Scale2 changed the viewport orientation")
         assign_translation(app, view, target["translation3"])
