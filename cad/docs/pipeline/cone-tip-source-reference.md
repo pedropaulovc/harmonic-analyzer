@@ -1,9 +1,10 @@
 # Cone-tip source-owned reference text
 
-The production candidate authors the observed reference prefix/suffix in the
-part build and verifies their import read-only. The native source build and
-clean-before-finalization import control passed; saved-drawing cold-reopen and
-printed acceptance are still pending. Geometry, marked
+Production authors the observed reference prefix/suffix in the part build and
+verifies their import read-only. The native source build, clean-before-finalization
+import control and full owned drawing/cold replay passed; the latter ran at
+`f6370560303f9025f6cd48ab9230edc0fd0410dd` with a visually inspected built PNG.
+This does not complete the affected-build/final-stack gate. Geometry, marked
 dimensions, tolerances, catalog thread and drawing layout are unchanged.
 
 ## Retained native attribution
@@ -84,7 +85,7 @@ changing its bytes invalidates those recipes even though only cone-tip uses the
 new modes. The changed tip spec also reaches cone-tip-block, already in those
 35. Do not reuse old native acceptance as evidence for the new recipe digest.
 
-After review/integration, the native runner should:
+The original native validation sequence was:
 
 1. Build `part:cone_tip_adjuster` through normal doit, retaining the new artifact
    and execution-token hashes. Do not pre-edit source pins or reuse the old SHA.
@@ -132,4 +133,41 @@ cleanup preserved the already-open clean source, with no probe/cleanup error.
 The acceptance manifest and its two exact-pin fixtures now name this actual
 builder output. No token restamp, automatic pin discovery or diagnostic source
 save was used. The control intentionally stopped before finalization, so native
-drawing save, cold drawing reopen, PDF/PNG and full affected-build gates remain.
+drawing save, cold drawing reopen and PDF/PNG were not proved by that control.
+The later full replay below supplies the drawing evidence; the full affected-build
+gate remains separate.
+
+## Full owned drawing and cold replay, 2026-09-07
+
+At frozen `f6370560303f9025f6cd48ab9230edc0fd0410dd`, the prepared-factory
+`cone_tip_adjuster` row passed in
+`cad/out/reports/datum-policy-e0vlt1wm/pilot.json`, SHA-256
+`66a97d1528ee5eefc6ac85ee24f2e9115946b32f843c55100eefb29519ed27b5`.
+The original and uniquely copied source retained the authored `18d0c166...efbf2`
+identity above, including after recipe save, closing all owned documents,
+fresh drawing/source reopen and final close. All five required source dimension
+records and configuration `Default` matched before, after and cold; the existing
+same-session source-handle checks also passed. This is the named dimension bank,
+not full in-memory source immutability.
+
+Built/cold drawing semantics, measured annotations and view layout were exact:
+the comparator recorded zero rejected, coordinate-roundoff or zero-Z differences.
+Native drawing/PDF/PNG artifacts were retained. The main runner inspected the
+built PNG, including the reference diameter and unchanged thread callout. There
+was no separate cold PDF/PNG export or pixel-equivalence comparison.
+
+The recipe took **24.9530979 s**, including **1.6674348 s** setup. Separate
+prepared-cache miss/hit accessors took **46.5258049 / 0.0519504 s**. The entire
+three-target pilot took **651.7559998 s**, including guards, preparation and
+cold witnesses but excluding parent lock/attach and outer cleanup. Concurrent
+offline tests used the same host; this is not an isolated performance comparison.
+
+The second row, `cone_pivot_screw`, also passed; the batch nevertheless failed
+on the third target, `cone_gear_shaft`, at its explicit pivot-journal-finish
+attachment check. The shared ownership receipt (SHA-256
+`f5c57baa5383ec38faa10368a6dcdb3057c43bb55ea3f77b38e72990866ad7d5`)
+retains that probe error, no cleanup error, and the same already-open clean
+cone-tip part as its initial/final inventory. All five protected originals and
+template/cache/helper/adapter guards matched; runtime final errors were empty.
+The [fastener report](../../scripts/diagnostics/fastener_source_manifest.md#full-cold-replay-of-both-fasteners-2026-09-07)
+records both passing rows without treating the failed batch as green.
