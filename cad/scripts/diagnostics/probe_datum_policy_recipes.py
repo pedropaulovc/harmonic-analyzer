@@ -42,6 +42,7 @@ from diagnostics import probe_drawing_attachments as attachments  # noqa: E402
 from diagnostics.probe_source_basic_dimensions import part_dimensions  # noqa: E402
 from diagnostics._owned_native_documents import DocumentKind, run_copy_diagnostic  # noqa: E402
 from diagnostics._owned_native_session import require_owned_diagnostic_environment  # noqa: E402
+from diagnostics._reopen_annotation_comparison import compare_reopened_annotations  # noqa: E402
 import _telemetry  # noqa: E402
 
 ORDER = ("rocker_arm", "channel_lever")
@@ -193,6 +194,17 @@ def compare_drawing(app, before, after):
         )
 
 
+def compare_drawing_reopen(before, after):
+    """Keep all attachment/source semantics exact; report coordinate noise only."""
+    attachments.compare(
+        before["semantics"], after["semantics"], "saved production reopen"
+    )
+    attachments.check_layout(
+        before["layout"], after["layout"], "saved production reopen"
+    )
+    return compare_reopened_annotations(before["annotations"], after["annotations"])
+
+
 async def pilot(adapter, candidate, source_root, guard_root, output_root):
     output_root.mkdir(parents=True, exist_ok=True)
     directory = Path(tempfile.mkdtemp(prefix="datum-policy-", dir=output_root))
@@ -311,7 +323,14 @@ async def pilot(adapter, candidate, source_root, guard_root, output_root):
                     source=copy_source,
                     configuration=trial["source_before"]["configuration"],
                 )
-            compare_drawing(adapter.swApp, trial["built"], trial["reopened"])
+            trial["reopen_annotation_comparison"] = compare_drawing_reopen(
+                trial["built"], trial["reopened"]
+            )
+            if trial["reopen_annotation_comparison"]["status"] != "passed":
+                raise RuntimeError(
+                    "saved production reopen changed native annotation layout: "
+                    f"{trial['reopen_annotation_comparison']['rejected']}"
+                )
             reopened_source = adapter.swApp.GetOpenDocumentByName(str(copy_source))
             trial["source_reopened"], _ = source_dimensions(
                 reopened_source, target, copy_source

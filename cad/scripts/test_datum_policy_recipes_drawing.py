@@ -111,11 +111,12 @@ async def test_one_fresh_recipe_each_in_order_and_stop_first_failure(
 
     monkeypatch.setattr(probe, "drawing_witness", drawing_witness)
 
-    def compare(_app, before, after):
+    def compare(before, after):
         if before != after:
             raise RuntimeError("saved annotation changed")
+        return {"status": "passed", "rejected": [], "coordinate_roundoff": []}
 
-    monkeypatch.setattr(probe, "compare_drawing", compare)
+    monkeypatch.setattr(probe, "compare_drawing_reopen", compare)
     adapter = Adapter(mode)
     output_root = tmp_path / "reports"
     if mode == "normal":
@@ -382,10 +383,11 @@ async def test_owned_dirty_part_copies_preserve_real_baseline_lifecycle(
         },
     )
 
-    def compare(_app, before, after):
+    def compare(before, after):
         assert before == after
+        return {"status": "passed", "rejected": [], "coordinate_roundoff": []}
 
-    monkeypatch.setattr(probe, "compare_drawing", compare)
+    monkeypatch.setattr(probe, "compare_drawing_reopen", compare)
     references, built = {}, []
     initial_open = native.adapter.open_model
 
