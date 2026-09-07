@@ -20,10 +20,12 @@ sys.path[:0] = [str(ROOT), str(ROOT / "cad/scripts")]
 
 import _assembly  # noqa: E402
 import _telemetry  # noqa: E402
+from _assembly_mass_properties import read_resolved_mass_properties  # noqa: E402
 from diagnostics._owned_native_session import require_owned_diagnostic_environment, run_owned_diagnostic  # noqa: E402
-from diagnostics.probe_assembly_health_targets import OwnedAssembly, checkpoint, digest  # noqa: E402
+from diagnostics.probe_assembly_health_targets import OwnedAssembly, checkpoint  # noqa: E402
 
 BASELINE = "fd973ea2e6ebf8c35bbefa85b6648767de5bedd2"
+CANDIDATE = "9a4944febdf26d0acad0578a480a746ad1c799a8"
 
 
 def instrument(source, record):
@@ -42,7 +44,8 @@ def instrument(source, record):
             record["rows"] = ast.literal_eval(record["hash_input"])
             return hashlib.sha256(value)
 
-    namespace = {**vars(_assembly), "hashlib": HashWitness}
+    namespace = {**vars(_assembly), "hashlib": HashWitness,
+                 "read_resolved_mass_properties": read_resolved_mass_properties}
     exec(compile(ast.Module(body=[node], type_ignores=[]), "<exact-fingerprint-ast>", "exec"), namespace)
     return namespace["assembly_geometry_digest"]
 
@@ -52,11 +55,12 @@ async def probe(adapter, assembly):
     report_path = directory / "measurements.json"
     source = ROOT / f"cad/out/sldasm/{assembly}.SLDASM"
     old = subprocess.check_output(["git", "show", f"{BASELINE}:cad/scripts/_assembly.py"], cwd=ROOT, text=True)
-    current = (ROOT / "cad/scripts/_assembly.py").read_text(encoding="utf-8")
+    current = subprocess.check_output(["git", "show", f"{CANDIDATE}:cad/scripts/_assembly.py"], cwd=ROOT, text=True)
     report = {
         "status": "running", "assembly": assembly, "baseline_commit": BASELINE,
-        "candidate_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
-        "source_sha256": {"baseline": hashlib.sha256(old.encode()).hexdigest(), "candidate": digest(ROOT / "cad/scripts/_assembly.py")},
+        "candidate_commit": CANDIDATE,
+        "harness_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
+        "source_sha256": {"baseline": hashlib.sha256(old.encode()).hexdigest(), "candidate": hashlib.sha256(current.encode()).hexdigest()},
         "saved_fingerprint": (source.parent / f".{assembly}.massprops.sha").read_text().strip(),
         "trials": [], "start_unix_ns": time.time_ns(),
     }

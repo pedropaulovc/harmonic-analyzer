@@ -567,17 +567,9 @@ def digest_trial(monkeypatch):
         adapter.currentModel.Extension.NeedsRebuild2 = state.status_after_rebuild
         return state.rebuilt
 
-    original_model = adapter.currentModel
-
-    def properties(caller, *, expected_model: object, expected_configuration: str):
-        assert caller is adapter
-        assert expected_model is original_model
-        assert expected_configuration == configuration.Name
+    async def properties():
         calls.append(("mass", configuration.Name))
-        return mass
-
-    def forbidden_mass_read():
-        pytest.fail("geometry digest must not call the rebuilding adapter mass reader")
+        return SimpleNamespace(is_success=True, data=mass)
 
     def component_list(top_only):
         calls.append(("poses", configuration.Name, top_only))
@@ -585,11 +577,10 @@ def digest_trial(monkeypatch):
 
     adapter.list_configurations = configs
     adapter.set_active_configuration = activate
-    adapter.get_mass_properties = forbidden_mass_read
+    adapter.get_mass_properties = properties
     adapter.currentModel.ForceRebuild3 = rebuild
     adapter.currentModel.GetComponents = component_list
     monkeypatch.setattr(_assembly, "_early_bound", lambda value, _interface: value)
-    monkeypatch.setattr(_assembly, "read_resolved_mass_properties", properties)
     return SimpleNamespace(
         digest=lambda: asyncio.run(_assembly.assembly_geometry_digest(adapter, "test-assembly")),
         adapter=adapter, calls=calls, state=state, configuration=configuration,
@@ -1015,3 +1006,75 @@ def test_part_change_resume_rejects_changed_or_incomplete_proof(saved_part_chang
         trial.edges[trial.control].add(external)
     with pytest.raises(RuntimeError):
         trial.validate()
+
+
+def test_saved_fingerprint_instrument_preserves_exact_signed_zero_hash_input():
+    import math
+    from diagnostics.probe_saved_fingerprint_rows import instrument
+
+    source = """
+@unused_decorator
+async def assembly_geometry_digest(adapter, asm_name):
+    rows = [(asm_name, (-0.0, 0.0), ('part-1', (0.1298, -0.0)))]
+    return hashlib.sha256(repr(rows).encode('utf-8')).hexdigest()
+"""
+    record = {}
+    fingerprint = asyncio.run(instrument(source, record)(None, "Default"))
+    expected = "[('Default', (-0.0, 0.0), ('part-1', (0.1298, -0.0)))]"
+    assert record["hash_input"] == expected
+    assert fingerprint == hashlib.sha256(expected.encode("utf-8")).hexdigest()
+    assert fingerprint != hashlib.sha256(expected.replace("-0.0", "0.0").encode("utf-8")).hexdigest()
+    row = record["rows"][0]
+    assert math.copysign(1.0, row[1][0]) == -1.0
+    assert math.copysign(1.0, row[1][1]) == 1.0
+    assert math.copysign(1.0, row[2][1][1]) == -1.0
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "",
+        "def assembly_geometry_digest(adapter, asm_name):\n    return 'sync'\n",
+        "async def assembly_geometry_digest(adapter, asm_name):\n    return 'one'\n"
+        "async def assembly_geometry_digest(adapter, asm_name):\n    return 'two'\n",
+    ],
+)
+def test_saved_fingerprint_instrument_rejects_missing_or_duplicate_function(source):
+    from diagnostics.probe_saved_fingerprint_rows import instrument
+
+    record = {}
+    with pytest.raises(RuntimeError, match="expected exactly one fingerprint function"):
+        instrument(source, record)
+    assert record == {}
+
+
+def test_saved_fingerprint_instrument_binds_candidate_reader_after_production_withdrawal(monkeypatch):
+    from diagnostics import probe_saved_fingerprint_rows as probe
+
+    model = object()
+    adapter = SimpleNamespace(currentModel=model)
+    calls = []
+
+    def read(caller, *, expected_model, expected_configuration):
+        assert caller is adapter and expected_model is model
+        calls.append(expected_configuration)
+        return SimpleNamespace(mass=12.5)
+
+    monkeypatch.delattr(probe._assembly, "read_resolved_mass_properties", raising=False)
+    monkeypatch.setattr(probe, "read_resolved_mass_properties", read)
+    source = """
+from _assembly_mass_properties import read_resolved_mass_properties
+
+async def assembly_geometry_digest(adapter, asm_name):
+    mass = read_resolved_mass_properties(
+        adapter, expected_model=adapter.currentModel, expected_configuration='Default'
+    )
+    rows = [(asm_name, mass.mass)]
+    return hashlib.sha256(repr(rows).encode('utf-8')).hexdigest()
+"""
+    record = {}
+    fingerprint = asyncio.run(probe.instrument(source, record)(adapter, "paper-drive"))
+    expected = "[('paper-drive', 12.5)]"
+    assert calls == ["Default"]
+    assert record["hash_input"] == expected
+    assert fingerprint == hashlib.sha256(expected.encode("utf-8")).hexdigest()

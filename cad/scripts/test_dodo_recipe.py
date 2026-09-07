@@ -225,19 +225,9 @@ def isolated_assembly_helper_keys(tmp_path, monkeypatch):
     }
     part_tasks = {task["name"]: task for task in dodo.task_part()}
     assembly_tasks = {task["name"]: task for task in dodo.task_assembly()}
-    verify_deps = {
-        f"soundness:{task['name']}": task["file_dep"]
-        for task in dodo.task_verify_soundness()
-    }
-    verify_deps.update(
-        {task["name"]: task["file_dep"]
-         for task in dodo.task_verify() if task["name"] == "kinematics"}
-    )
     sources = {
         path for recipe in assembly_recipes.values() for path in recipe
-    } | {
-        path for task in part_tasks.values() for path in task["file_dep"]
-    } | {path for dependencies in verify_deps.values() for path in dependencies}
+    } | {path for task in part_tasks.values() for path in task["file_dep"]}
     mapped = {}
     for path in sources:
         original = Path(path).resolve()
@@ -258,17 +248,6 @@ def isolated_assembly_helper_keys(tmp_path, monkeypatch):
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(b"a" * 64 + b"\n")
 
-    # Verification also reads generated DOF manifests. These are controlled
-    # fixture inputs, never the manifests next to this VM's live assemblies.
-    for dependencies in verify_deps.values():
-        for dependency in dependencies:
-            path = Path(dependency)
-            if not path.is_relative_to(fixture_root) or path.exists():
-                continue
-            assert path.resolve().is_relative_to(fixture_root.resolve()), path
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text("{}\n", encoding="utf-8")
-
     recipes = {
         stem: [mapped[path] for path in paths]
         for stem, paths in assembly_recipes.items()
@@ -276,10 +255,6 @@ def isolated_assembly_helper_keys(tmp_path, monkeypatch):
     part_deps = {
         stem: [mapped[path] for path in task["file_dep"]]
         for stem, task in part_tasks.items()
-    }
-    verify_deps = {
-        name: [mapped[path] for path in dependencies]
-        for name, dependencies in verify_deps.items()
     }
     monkeypatch.setattr(dodo, "_recipe_files", lambda stem: recipes[stem])
     monkeypatch.setattr(dodo, "_part_file_deps", lambda _script, stem: part_deps[stem])
@@ -308,9 +283,6 @@ def isolated_assembly_helper_keys(tmp_path, monkeypatch):
             "parts": {
                 stem: dodo._cache_key(paths) for stem, paths in part_deps.items()
             },
-            "verify": {
-                name: dodo._digest_files(paths) for name, paths in verify_deps.items()
-            },
         }
 
     return dodo, fixture_root, snapshot
@@ -322,7 +294,6 @@ def isolated_assembly_helper_keys(tmp_path, monkeypatch):
         ("_assembly_patterns", {"drive_train", "frame", "magnifier", "paper_drive"}),
         ("_assembly_couplings", {"drive_train", "paper_drive"}),
         ("_assembly", None),
-        ("_assembly_mass_properties", None),
     ],
 )
 def test_assembly_helper_edits_change_only_real_recipe_and_cache_consumers(
@@ -345,19 +316,6 @@ def test_assembly_helper_edits_change_only_real_recipe_and_cache_consumers(
     assert changed("assemblies") == expected | {"harmonic_analyzer"}
     assert changed("part_recipes") == set()
     assert changed("parts") == set()
-    if helper == "_assembly_mass_properties":
-        # This helper is a construction input, not verification-only logic.
-        # Soundness/kinematics track its edits through their existing model
-        # recipe digests; these are dependency fingerprints, not cache keys.
-        verify_tasks = [*dodo.task_verify_soundness(), *dodo.task_verify()]
-        assert all(
-            copied_helper.name not in {Path(path).name for path in task["file_dep"]}
-            for task in verify_tasks
-        )
-        assert changed("verify") == {
-            *(f"soundness:{stem}" for stem in dodo.ASSEMBLY_ORDER),
-            "kinematics",
-        }
 
 
 def test_assembly_depends_on_exact_child_execution_identities():

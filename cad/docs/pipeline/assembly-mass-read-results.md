@@ -2,8 +2,10 @@
 
 Batch B follows accepted Batch A, `aff115c4` (native candidate `840b0a42`),
 on branch `perf/assembly-mass-read`. The adapter remains
-`e77bfda4de1962625da8a9a859eb0bbaf1e6f10f`. Stationary and real changed-part
-comparisons passed; production assembly acceptance remains pending.
+`e77bfda4de1962625da8a9a859eb0bbaf1e6f10f`. **Batch B outcome: bounded negative.**
+The drive-train comparisons passed, but paper-drive failed fingerprint equivalence
+after the full candidate fleet passed its gates. The broad production change was
+withdrawn; diagnostics and all evidence remain. Production behavior is Batch A's.
 Portfolio status belongs on the [project](https://github.com/users/pedropaulovc/projects/1).
 
 ## Hypothesis and scope
@@ -268,9 +270,9 @@ Trace `0x23655ca6ff077f29d26863eadfb9c46b`: 79 spans, zero errors,
 `cad/out/reports/assembly-mass-read/part-change-profile.json`, SHA-256
 `447c060a4d9f6ee29dda986a24fc6de29315c3b48270dce680febb143dd50db3`.
 
-## Production integration
+## Withdrawn production integration
 
-`assembly_geometry_digest` now captures its expected native document and calls
+Candidate `9a4944febdf26d0acad0578a480a746ad1c799a8` captured its expected native document and called
 the statically imported assembly-only direct reader after the callers' checked
 solve. Explicit configuration/rest rebuilds, pose rows, rounding, fingerprint
 decisions and all validation/save gates remain unchanged. The adapter is not
@@ -278,8 +280,133 @@ modified. The helper checks active/current document identity, exact configuratio
 and clean rebuild state before and after reading the same legacy mass API; a
 missing, malformed or nonfinite result fails without a fallback.
 
-The helper is a real transitive construction/refresh input of all eight assemblies,
-not a verify-only module hidden from recipe discovery. Production acceptance,
-same-recipe child-identity propagation and the final zero-COM no-op follow this
-code-complete checkpoint. The primary agent still owns the full drawing-inclusive
-stack gate; every PR still requires its own clean Codex review.
+The helper was a real transitive construction/refresh input of all eight assemblies,
+not a verify-only module hidden from recipe discovery. Actual before/after reports
+showed eight changed assembly recipes/keys and 108 unchanged leaf keys; isolated
+tests also proved all nine soundness/kinematics dependency fingerprints changed.
+These integration-only tests were withdrawn with the production call-site change.
+The strict reader remains diagnostic-only and is still banned from leaf parts.
+
+### Full candidate fleet: gates passed, equivalence rejected
+
+At frozen `9a4944fe`, cache-off `doit -n 4 build_bare verify:soundness
+verify:kinematics` ran 2026-09-07 06:16:21.032902–07:00:47.822712 UTC:
+2666.792489 s wall, exit 0. All 108 parts skipped; all eight assemblies rebuilt;
+all eight saved soundness checks and kinematics passed. No native failure,
+retry, recovery or auto-repair occurred. The subsequent `build_bare` skipped all
+116 producers in 10.950166 s, zero COM work.
+
+| Native task | Seconds | Trace ID |
+| --- | ---: | --- |
+| frame build | 112.539611 | `0xcd92a4ac00b154b16c6c4bdff0536b60` |
+| drive-train build | 671.679561 | `0x3b1d001b94bf14446e775017e7f7d306` |
+| summing build | 33.453012 | `0xfe10bdda23ba6b6493b751cbd5786c8f` |
+| pen build | 25.556665 | `0xb7cbee8a1b60c913da8c51705f7d2735` |
+| magnifier build | 39.420292 | `0xaefc89bbac07d1d35ddbad30281d2d58` |
+| channel build | 284.274744 | `0xb7cc2e842ab7ba4521b776498613d4b8` |
+| paper-drive build | 200.651874 | `0xf5514f7b71586619d1e733e9d711286b` |
+| top build | 528.308621 | `0x26c19d278625b2022dfaa39db5cddf8f` |
+| drive-train saved soundness | 187.093847 | `0xd9983743f70bbff3d208aaa0df42144a` |
+| pen saved soundness | 10.861786 | `0x5f29ba200d6536ad8d37bc21fbe48ea5` |
+| summing saved soundness | 14.271377 | `0x9bc127cca4ea077e449c8138cb2c53c3` |
+| magnifier saved soundness | 12.881613 | `0x737ff25d5c66f65544c75963ac36f9fd` |
+| frame saved soundness | 41.989658 | `0x19cf9fbb0946eaf749723bd5f0ec00e2` |
+| channel saved soundness | 31.491498 | `0x44b8e9d8ce6b5c485eb60e0e8ed1e373` |
+| paper-drive saved soundness | 50.586961 | `0xe2e23414553909faccab7dc3f87d0cc6` |
+| top saved soundness | 260.318802 | `0x051029ac638d1fd74643fe97ee97dccc` |
+| kinematics | 146.007013 | `0x3083b636eaba278c9fa67f252459a28e` |
+
+Fresh drive-train fingerprint time was 5.557115 s versus baseline 128.552266 s;
+mass collection was 0.883490 s versus 123.119657 s. Its task total fell from
+723.499224 to 671.679561 s, while other solver phases grew: final rebuild
+108.30→156.19 s and free-DOF validation 122.06→138.69 s. One fresh construction
+per variant is not a repeated whole-build speed estimate. The candidate fleet
+was slower overall than Batch A's 2532.233880 s; no fleet-wide speedup is claimed.
+Candidate exclusive profile: `cad/out/reports/assembly-mass-read/fresh-candidate-profile.json`,
+SHA-256 `943ab36c875d97b161fdacdd367185793f98bc5126d2d82fdcbd11209080e441`.
+
+All eight fresh isometric PNGs were inspected. No obvious placement or geometry
+regression was visible; dense edges limit fine-contact inspection. All 116 native
+SHA-256 values matched execution tokens; all 108 parts were byte-identical to
+baseline. All six DOF manifests and **seven of eight** fingerprint sidecars
+matched. Paper-drive's differing fingerprint triggered the rejection below.
+
+The provisional closed snapshot retains its original name
+`cad/out/reports/assembly-mass-read/accepted-9a4944fe/`; **that name is not an
+acceptance verdict**. Its manifest is
+`accepted-9a4944fe-manifest.json`, SHA-256
+`53331219346a0757abc11f5e54bdc7b775cb7809b6aad5429181accdd299767e`.
+Before the snapshot, an exact-close diagnostic first tried a still-referenced
+hidden part and stopped safely (trace `0xd000336870316efb54cd40e023c8bd69`).
+Root-first cleanup then closed all 114 owned documents without saving and proved
+an empty session (`0xeb8aad671e55ec0be3d53982c1858ac2`). This cleanup attempt is
+retained separately from the successful native build.
+
+### Paper-drive counterexample
+
+`probe_saved_fingerprint_rows.py` records the exact fingerprint function AST's
+hash-input bytes, without changing its rows or rounding. On the same owned saved
+paper-drive model, run `0ce76c19` measured cold candidate → baseline → candidate,
+with no preparatory solve before the cold read and no saves anywhere:
+
+| Read | Seconds | Fingerprint |
+| --- | ---: | --- |
+| Cold candidate | 6.449839 | `8b5055785df708a2a3f14f5190d1804842e2eddf9965420a7bc4b97dfb730c18` |
+| Baseline, including its deep rebuild | 28.637939 | `da348bb75ab369308361923dd296a3e88200edb0b08124e10cde3146be94c273` |
+| Candidate after baseline | 6.756636 | `da348bb75ab369308361923dd296a3e88200edb0b08124e10cde3146be94c273` |
+
+All three mass rows were identical. Exactly two of 123 component-pose rows
+differed across the baseline rebuild: `transgear-removable-2`'s rounded Y changed
+from 0.1298 to 0.1299 metres; `transgear-thumbnut-1` changed signed-zero rotation
+entries. The rounded position change does **not** establish a full 0.1 mm raw
+motion; raw transform deltas were not captured. Post-baseline A/B rows were exact.
+The cold fingerprint matched the old baseline sidecar, not the new candidate's
+`2df532188379156739b22a85070324d0277009acaf57efdb20d39ad1a9f09785`.
+All 25 native input byte hashes were unchanged after close.
+
+This disproves the broad claim that removing the extra rebuild preserves every
+assembly fingerprint. It does not show stale native mass values: the observed
+mass rows matched, while a rebuild changed pose rows. Full construction copies
+the assembly before fingerprinting its source and later reconciles the copy;
+the sidecar is not recomputed after reconciliation. The precise raw-motion versus
+rounding contribution at that boundary remains untested. No gate, pose row,
+tolerance or rounding policy was weakened to hide the mismatch.
+
+Raw evidence: `cad/out/reports/saved-fingerprint-rows-49tnlrf4/measurements.json`,
+SHA-256 `75de995e4265be222d4c93b9a5825087ab7b7e75971184111c954008e2b8a91d`;
+trace `0x0ea6f52b058fa3b6775cea2028337885`. The retained diagnostic now pins both
+historical function revisions explicitly, so withdrawing production integration
+cannot silently turn it into a baseline/baseline comparison.
+
+```powershell
+# Same cache-off, attach-only, expected-PID environment as the earlier probes.
+uv run python cad/scripts/diagnostics/probe_saved_fingerprint_rows.py paper-drive
+```
+
+### Withdrawal and delivery boundary
+
+Production `_assembly.py` and the construction dependency graph are restored to
+accepted Batch A. The experimental native set is preserved; the local eight
+assemblies, sidecars, renders, closed build database and gate stamps were restored
+from `assembly-cache-granularity/accepted-840b0a42`. All 116 restored native hashes
+and execution tokens match that accepted manifest; leaf parts were not overwritten.
+Text line endings were normalized on the restored core file; Git-canonical source
+is identical, and the existing recipe checker canonicalizes line endings.
+
+The same-recipe/new-child-identity candidate trial was **not run**: equivalence
+had already failed, so the candidate was withdrawn before further acceptance.
+Batch A and #676 retain their own completed native acceptance and identity evidence.
+The diagnostics-only Batch B does not alter their native recipes or behavior.
+
+Remaining ranked opportunities: a drive-train-only direct-read candidate with
+its own full acceptance; raw pose/save-boundary investigation for paper-drive;
+then the measured scalar static locks and repeated pattern-transform reads.
+Untested here: restricting the optimization to drive-train, changing solve order,
+changing API version or normalizing signed zeros. The broad candidate is rejected
+under the recorded native inputs—not a claim that the native mass API is unusable.
+
+The primary agent still owns the drawing-inclusive stack gate and account setup
+for Codex review. CodeRabbit's one test-style request was fixed in `0ce76c19`
+(101 focused tests and explicit B018 passed). No PR was merged or parent deleted.
+This small series proves neither a less-than-5% conflict rate nor remote-cache
+hit-rate improvement; cache transfers remained disabled.
