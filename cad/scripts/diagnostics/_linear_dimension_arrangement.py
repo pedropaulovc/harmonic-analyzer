@@ -299,7 +299,7 @@ class ParallelLinearControl:
         }
         trial["linear_dimension_control"] = report
 
-        def controlled(actual_adapter, views, *args, **kwargs):
+        def controlled(actual_adapter, *, views, **kwargs):
             self.calls += 1
             if actual_adapter is not adapter or self.calls != 1:
                 raise RuntimeError(
@@ -358,7 +358,7 @@ class ParallelLinearControl:
                         )
                     checkpoint()
                 # All original manufacturing/packing/crossing gates remain mandatory.
-                return original(adapter, views, *args, **kwargs)
+                return original(adapter, views=views, **kwargs)
             except Exception as error:
                 report["error"] = repr(error)
                 try:
