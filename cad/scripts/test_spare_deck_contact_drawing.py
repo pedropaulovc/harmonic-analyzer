@@ -128,7 +128,9 @@ async def test_owned_inputs_are_resolved_local_bytes_not_producer_authentication
     assert owner.hashes[str(c.local)] == ownership.digest(c.local)
     assert owner.hashes[str(c.local)] != ownership.digest(c.foreign)
     assert owner.identity(c.child) == (str(c.local), 1)
-    assert all(row["unchanged"] for row in owner.input_evidence().values())
+    input_rows = owner.input_evidence().values()
+    assert all(row["status"] == "unchanged" for row in input_rows)
+    assert all(row["unchanged"] for row in input_rows)
     c.app.GetDocumentDependencies2.assert_called_once_with(
         str(c.source), True, True, False
     )
