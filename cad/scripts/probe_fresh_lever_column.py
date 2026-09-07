@@ -115,8 +115,10 @@ def source_basic(adapter, source):
 
 
 async def probe(adapter, source: Path, original_drawing: Path):
+    reports = CAD_ROOT / "out/reports"
+    reports.mkdir(parents=True, exist_ok=True)
     directory = Path(
-        tempfile.mkdtemp(prefix="coherent-lever-column-", dir=CAD_ROOT / "out/reports")
+        tempfile.mkdtemp(prefix="coherent-lever-column-", dir=reports)
     )
     adapter.ownership.register_directory(directory)
     for original in (source, original_drawing):

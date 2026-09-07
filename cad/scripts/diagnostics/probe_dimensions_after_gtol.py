@@ -120,6 +120,7 @@ def compare(adapter, before, after, handles, stage):
     }
 
 
+@_telemetry.traced("diagnostic.dimensions_after_gtol")
 async def probe(adapter, source, directory):
     from diagnostics._owned_native_documents import save_drawing
 

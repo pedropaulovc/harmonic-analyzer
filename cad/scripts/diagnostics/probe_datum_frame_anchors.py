@@ -196,6 +196,7 @@ def compare(app, before, before_handles, after, after_handles):
             raise RuntimeError(f"{name}: export moved native datum")
 
 
+@_telemetry.traced("diagnostic.datum_frame_anchors")
 async def probe(adapter, source, directory):
     from diagnostics._owned_native_documents import save_drawing
 
