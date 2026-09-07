@@ -333,11 +333,12 @@ def validate_gtol_leader_clearance(measurements_by_view):
             raise RuntimeError(
                 f"{view}: final measured GTol leader/text-cell crossings: {json.dumps({'crossings': crossings, 'native_geometry': {name: asdict(row) for name, row in geometry.items()}})}"
             )
+        reverse_segments = {
+            name: (*row.native_strokes, *row.native_leader_segments)
+            for name, row in measurements.items()
+        }
         reverse_crossings = crossing_records(
-            {
-                name: (*row.native_strokes, *row.native_leader_segments)
-                for name, row in measurements.items()
-            },
+            reverse_segments,
             {
                 name: _TextCells(row.kind, (row.body,), row.text_runs)
                 for name, row in measurements.items()
@@ -346,6 +347,31 @@ def validate_gtol_leader_clearance(measurements_by_view):
             {name: row.leader_decorations for name, row in measurements.items()},
         )
         if reverse_crossings:
+            # Failure-only detail from the same final measured bank. Keep the
+            # original hit indices and identify their native inventory, so a
+            # "leader" label cannot misidentify center/body ink post-hoc.
+            for crossing in reverse_crossings:
+                name = crossing["leader_annotation"]
+                source = measurements[name]
+                display_count = len(source.native_strokes)
+                crossing["source_kind"] = source.kind
+                crossing["source_segments"] = [
+                    {
+                        "combined_index": index,
+                        "inventory": "native_strokes"
+                        if index < display_count
+                        else "native_leader_segments",
+                        "inventory_index": index
+                        if index < display_count
+                        else index - display_count,
+                        **asdict(reverse_segments[name][index]),
+                    }
+                    for index in crossing["segments"]
+                ]
+                crossing["source_decorations"] = [
+                    {"index": index, "bounds": source.leader_decorations[index].bounds}
+                    for index in crossing["decorations"]
+                ]
             raise RuntimeError(
                 f"{view}: final annotation stroke/GTol-body crossings: "
                 f"{json.dumps(reverse_crossings)}"
