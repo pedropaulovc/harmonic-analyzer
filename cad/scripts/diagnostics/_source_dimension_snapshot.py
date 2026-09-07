@@ -12,9 +12,48 @@ from __future__ import annotations
 import json
 import math
 from collections import Counter
+from enum import IntEnum
 from types import SimpleNamespace
 
 from _common import _early_bound, _iter_features, _read_member
+
+
+class ToleranceValueStatus(IntEnum):
+    """swDimensionToleranceWarning_e: status, not a Boolean success flag."""
+
+    VALID_FOR_TYPE = 0
+    NOT_VALID_FOR_TYPE = 1
+
+
+def _tolerance_limit(result, label):
+    # Generated early-bound Get{Min,Max}Value2: (INT status, OUT DOUBLE value).
+    # The historical native recovery proves both (0, value) and (1, 0.0).
+    if type(result) is not tuple or len(result) != 2:
+        raise RuntimeError(f"source tolerance {label} is not a status/value tuple")
+    status, value = result
+    if type(status) is not int or status not in (0, 1):
+        raise RuntimeError(f"source tolerance {label} has unknown status: {status!r}")
+    if type(value) is not float or not math.isfinite(value):
+        raise RuntimeError(f"source tolerance {label} is not a finite native double")
+    return ToleranceValueStatus(status), value
+
+
+def tolerance_limits(native):
+    """Preserve applicability and raw values; status 1 does not prove a limit.
+
+    GetMinValue2/GetMaxValue2 return swDimensionToleranceWarning_e plus an out
+    double. BASIC/NONE can legitimately report NOT_VALID_FOR_TYPE. Keep that
+    state AND the unrounded returned scalar in the exact before/after bank;
+    never replace it with a fabricated valid zero or retry an obsolete getter.
+    """
+    minimum_status, minimum = _tolerance_limit(native.GetMinValue2(), "minimum")
+    maximum_status, maximum = _tolerance_limit(native.GetMaxValue2(), "maximum")
+    return {
+        "tolerance_min": minimum,
+        "tolerance_min_status": minimum_status,
+        "tolerance_max": maximum,
+        "tolerance_max_status": maximum_status,
+    }
 
 
 def tolerance(dimension):
@@ -129,9 +168,7 @@ def dimension_snapshot(app, model, path, *, required):
                 native = {
                     "value_system": finite(values[0]),
                     **tolerance(dimension),
-                    # Existing supported getter shape, no alternate-call fallback.
-                    "tolerance_min": finite(tol.GetMinValue()),
-                    "tolerance_max": finite(tol.GetMaxValue()),
+                    **tolerance_limits(tol),
                 }
                 if name in handles and int(app.IsSame(handles[name], dimension)) != 1:
                     raise RuntimeError(
