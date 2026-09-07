@@ -219,10 +219,11 @@ def test_real_cache_miss_hit_preserves_baseline_and_exact_one_save(scene):
     assert scene.original.read_bytes() == b"immutable source template"
     assert all(row["status"] == "passed" for row in report["guards"])
     assert scene.viewport_calls == [
+        ("redraw", 1.0),
         ("scale", 1.0),
         ("translation", (0.02, 0.002, 0.0)),
         ("redraw", 1.0),
-    ]  # The production preparer restores its verification document once.
+    ]  # One verification redraw, then the unchanged production restore.
     assert all(
         "viewport_control" not in row
         for row in (*report["operation_scopes"], *report["trials"])
@@ -376,6 +377,7 @@ def test_distinct_new_document_pan_is_rejected_by_unchanged_normal_control(scene
     assert report["status"] == "failed"
     assert report["accessors"][0]["status"] == "failed"
     assert scene.viewport_calls == [
+        ("redraw", 1.0),
         ("scale", 1.0),
         ("translation", (0.02, 0.002, 0.0)),
         ("redraw", 1.0),
@@ -413,11 +415,10 @@ def test_captured_viewport_applies_to_both_prepare_creates_and_miss_hit_trials(
     report, _ = scene.report()
     assert report["status"] == "passed"
     assert exports == ["normal", "prepared_miss", "prepared_hit"]
-    assert [call[0] for call in scene.viewport_calls] == [
-        "scale",
-        "translation",
-        "redraw",
-    ] * 5  # Four diagnostic creations plus the production verification restore.
+    restore_calls = ["scale", "translation", "redraw"]
+    assert [call[0] for call in scene.viewport_calls] == (
+        restore_calls * 2 + ["redraw"] + restore_calls * 3
+    )  # Both CREATE scopes exit before the new production verification redraw.
     controls = [
         row["viewport_control"]
         for row in report["operation_scopes"]

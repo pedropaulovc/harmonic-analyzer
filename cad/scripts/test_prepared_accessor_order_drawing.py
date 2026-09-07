@@ -57,7 +57,9 @@ def test_accessor_first_reproduces_actual_no_resize_failure_without_priming(
     assert len(f.scene.created) == 2 and len(f.scene.saves) == 1
     assert f.scene.native.app.closes == f.scene.created
     assert f.scene.native.app.documents == []
-    assert f.writes == f.scene.viewport_calls == []
+    assert f.writes == []
+    # Only the earlier owned redraw; pixel refusal still prevents scale/pan writes.
+    assert f.scene.viewport_calls == [("redraw", 1.0)]
     retained = list(Path(report["cache_root"]).glob("pending-*/receipt.json"))
     assert len(retained) == 1
     receipt = json.loads(retained[0].read_text())
@@ -98,6 +100,7 @@ def test_same_accessor_order_can_select_measured_restore_without_other_extra_wor
     assert len(f.scene.created) == 2 and len(f.scene.saves) == 1
     assert f.writes == list(f.measured.items())
     assert [row[0] for row in f.scene.viewport_calls] == [
+        "redraw",
         "scale",
         "translation",
         "redraw",
