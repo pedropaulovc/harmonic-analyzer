@@ -383,18 +383,40 @@ async def probe(adapter, source, directory):
         report.update(status="failed", operation_error=repr(error))
         raise
     finally:
+        primary = sys.exception()
+        errors = []
         try:
             await close()
-        finally:
-            report["source_hashes_after"] = {
-                name: file_digest(Path(name)) for name in report["source_hashes"]
-            }
+        except Exception as error:
+            report["cleanup_error"] = repr(error)
+            errors.append(error)
+        report["source_hashes_after"] = after = {}
+        for name in report["source_hashes"]:
+            try:
+                after[name] = file_digest(Path(name))
+            except Exception as error:
+                after[name] = {"error": repr(error)}
+                errors.append(error)
+        if report["source_hashes"] != after:
+            error = RuntimeError("BASIC control changed an original source part or drawing, or could not verify its final hash")
+            report["source_guard_error"] = repr(error)
+            errors.append(error)
+        if errors:
+            report["status"] = "failed"
+            report["finalization_errors"] = [repr(error) for error in errors]
+        try:
             report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
             _telemetry.info(f"source BASIC dimension observations: {report_path}")
-            if report["source_hashes"] != report["source_hashes_after"]:
-                raise RuntimeError(
-                    "BASIC control changed an original source part or drawing"
-                )
+        except Exception as error:
+            report["report_error"] = repr(error)
+            errors.append(error)
+        if primary is not None:
+            for error in errors:
+                primary.add_note(f"BASIC control finalization ({report_path}): {error!r}")
+        elif errors:
+            for error in errors[:-1]:
+                errors[-1].add_note(f"Earlier BASIC control finalization error: {error!r}")
+            raise errors[-1]
     return {"report": str(report_path)}
 
 

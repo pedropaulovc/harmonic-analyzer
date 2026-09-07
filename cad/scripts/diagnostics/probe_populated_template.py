@@ -74,6 +74,11 @@ def preferences(adapter):
 
 def require_linked_preferences(blank, current):
     """finalize_drawing explicitly changes only the sheet property-source mode."""
+    missing = current.keys() - blank.keys()
+    if missing:
+        raise RuntimeError(
+            f"populated preferences expose keys absent from blank defaults: {sorted(missing)}"
+        )
     expected = {key: deepcopy(blank[key]) for key in current}
     properties = expected.get("sheet_properties", [])
     if len(properties) != 8 or properties[7] != 1:
