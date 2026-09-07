@@ -119,3 +119,22 @@ direct-callback factor bypass. The added regressions failed in 15 cases against
 `ce8d7236` (`run-bnwwg4ck`); three existing rejection controls already passed.
 After correction, 256 focused/adjacent tests passed (`run-tm_5ds8b`), retaining
 the original error object when a failing recipe also dirties its copied source.
+
+## First native capture: property serialization, before recipe execution
+
+The `197cb571` run stopped before the recipe. Its retained receipt is
+`slotted-attachment-capture-06no8kxz/capture.json`, SHA
+`c9d955abaf0e5e4bf6e46fe974028e6405fce7b1f0cfea23ea22c173eec1d254`.
+Compared with the producer readback above, Generator and End View Note are exact.
+Manufacturing Notes changes only from 954 to 970 characters: its 16 LF separators
+are serialized as CRLF after reopening the owned copy. All 17 lines are otherwise
+exact. The source is clean before and after, final guard errors are empty, and
+the receipt remains failed / not accepted. No drawing attachment slots were read.
+
+The diagnostic now compares native source-property and linked-note strings with
+the spec after replacing CRLF with LF only. Raw strings remain in the receipt;
+built/cold comparisons remain exact. Lone CRs, other controls, spaces, changed
+lines and truncation are not normalized. Source pins, specs and drawing bodies
+are unchanged. Four actual callback/linked-note regressions failed before this
+correction (`run-0ohpgb2z`); 275 focused/adjacent tests then passed
+(`run-8sx01hls`). A native rerun is still required.

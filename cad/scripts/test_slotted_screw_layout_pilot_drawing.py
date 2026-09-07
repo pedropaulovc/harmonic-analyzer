@@ -16,6 +16,31 @@ def rectangle(xmin=0.05, ymin=0.10, xmax=0.08, ymax=0.15):
     return dict(xmin=xmin, ymin=ymin, xmax=xmax, ymax=ymax)
 
 
+@pytest.mark.parametrize(
+    "actual",
+    [
+        "FIRST\rSECOND",
+        "FIRST\r\r\nSECOND",
+        "FIRST\tSECOND",
+        "FIRST\vSECOND",
+        "FIRST\x00\nSECOND",
+        "FIRST\x85SECOND",
+        "FIRST\u2028SECOND",
+        "FIRST\nCHANGED",
+        "FIRST\nSECON",
+        "FIRST\nSECOND\n",
+        "FIRST\n SECOND",
+        " FIRST\nSECOND",
+        None,
+        1,
+        b"FIRST\nSECOND",
+    ],
+)
+def test_native_spec_text_rejects_every_nonserialization_change(actual):
+    with pytest.raises(RuntimeError, match="exact text differs"):
+        witness._require_spec_text(actual, "FIRST\nSECOND", "exact text differs")
+
+
 @pytest.fixture
 def scene():
     # These arbitrary keys/values are synthetic. Native types/IDs come only from
@@ -302,16 +327,19 @@ def test_capture_retains_primary_and_all_guard_evidence(
             raise primary
 
     record = {}
-    operation = lambda: witness.capture(
-        c.adapter,
-        phase=phase,
-        bank=c.bank,
-        handles=c.handles,
-        source=c.source,
-        outputs=c.outputs,
-        record=record,
-        checkpoint=checkpoint,
-    )
+
+    def operation():
+        return witness.capture(
+            c.adapter,
+            phase=phase,
+            bank=c.bank,
+            handles=c.handles,
+            source=c.source,
+            outputs=c.outputs,
+            record=record,
+            checkpoint=checkpoint,
+        )
+
     expected_failure = failure not in ("none", "export") or (
         failure == "export" and phase is witness.CapturePhase.REOPENED
     )
@@ -337,8 +365,10 @@ def test_capture_retains_primary_and_all_guard_evidence(
         )
 
 
+@pytest.mark.parametrize("property_ending", ["\n", "\r\n"])
+@pytest.mark.parametrize("note_ending", ["\n", "\r\n"])
 def test_sheet_reader_uses_actual_views_native_properties_and_linked_notes(
-    live_scene, monkeypatch
+    live_scene, monkeypatch, property_ending, note_ending
 ):
     c = live_scene
     native_views = []
@@ -364,7 +394,9 @@ def test_sheet_reader_uses_actual_views_native_properties_and_linked_notes(
         lambda _: {str(i): view for i, view in enumerate(native_views)},
     )
     texts = {
-        "Manufacturing Notes": witness.spec.DRAWING_NOTES,
+        "Manufacturing Notes": witness.spec.DRAWING_NOTES.replace(
+            "\n", property_ending
+        ),
         "End View Note": witness.spec.END_VIEW_NOTE,
     }
     c.part.GetCustomInfoValue = lambda configuration, name: texts[name]
@@ -376,13 +408,18 @@ def test_sheet_reader_uses_actual_views_native_properties_and_linked_notes(
         }
         note = NS(
             PropertyLinkedText=witness.property_link(name),
-            GetText=lambda value=value: value,
+            GetText=lambda value=value: value.replace("\r\n", "\n").replace(
+                "\n", note_ending
+            ),
         )
         c.handles[key] = (NS(GetSpecificAnnotation=lambda note=note: note),)
     result = witness.sheet_witness(c.adapter, c.model, c.part, c.bank, c.handles)
     assert result["geometry"]["drawable_m"] == pytest.approx([0.012, 0.01, 0.421, 0.27])
     assert result["source_notes"] == texts
-    assert {name: row["text"] for name, row in result["notes"].items()} == texts
+    assert {name: row["text"] for name, row in result["notes"].items()} == {
+        name: value.replace("\r\n", "\n").replace("\n", note_ending)
+        for name, value in texts.items()
+    }
     note.PropertyLinkedText = witness.property_link("Wrong property")
     with pytest.raises(RuntimeError, match="linked manufacturing note"):
         witness.sheet_witness(c.adapter, c.model, c.part, c.bank, c.handles)
@@ -532,6 +569,7 @@ def test_incomplete_or_mixed_enrollment_contract_fails_before_environment(
     "failure",
     [
         "none",
+        "crlf_notes",
         "wrong_hash",
         "wrong_producer",
         "initial_dirty",
@@ -598,7 +636,9 @@ async def test_actual_capture_callback_preserves_source_scope_and_nonacceptance(
         "Generator": "wrong producer"
         if failure == "wrong_producer"
         else "harmonic-analyzer @ 3c0c4a97",
-        "Manufacturing Notes": witness.spec.DRAWING_NOTES,
+        "Manufacturing Notes": witness.spec.DRAWING_NOTES.replace("\n", "\r\n")
+        if failure == "crlf_notes"
+        else witness.spec.DRAWING_NOTES,
         "End View Note": witness.spec.END_VIEW_NOTE,
     }[key]
     adapter.swApp.GetOpenDocumentByName = lambda path: (
@@ -702,17 +742,20 @@ async def test_actual_capture_callback_preserves_source_scope_and_nonacceptance(
             return []
 
     reports = tmp_path / "reports"
-    operation = lambda: pilot.pilot(
-        adapter,
-        witness.PRODUCER_REVISION,
-        source_root,
-        guard_root,
-        reports,
-        targets=("slotted_screw",),
-        setup_controller=Setup(),
-        layout_observation=witness.LayoutObservation.CAPTURE_ONLY,
-    )
-    if failure == "none":
+
+    def operation():
+        return pilot.pilot(
+            adapter,
+            witness.PRODUCER_REVISION,
+            source_root,
+            guard_root,
+            reports,
+            targets=("slotted_screw",),
+            setup_controller=Setup(),
+            layout_observation=witness.LayoutObservation.CAPTURE_ONLY,
+        )
+
+    if failure in ("none", "crlf_notes"):
         result = await operation()
         assert result["acceptance"] == "not_accepted"
     else:
@@ -732,12 +775,27 @@ async def test_actual_capture_callback_preserves_source_scope_and_nonacceptance(
     (receipt,) = reports.glob("*/capture.json")
     report = json.loads(receipt.read_text(encoding="utf-8"))
     assert report["acceptance"] == "not_accepted"
-    assert report["status"] == ("capture_only" if failure == "none" else "failed")
+    assert report["status"] == (
+        "capture_only" if failure in ("none", "crlf_notes") else "failed"
+    )
+    if failure == "crlf_notes":
+        # Native 06no8kxz vs producer _seyh1jg: 17 exact lines, 16 inserted CRs.
+        raw = report["source_properties"]["Manufacturing Notes"]
+        assert len(raw) == 970 and raw.count("\r\n") == 16
+        assert len(witness.spec.DRAWING_NOTES) == 954
+        assert raw == witness.spec.DRAWING_NOTES.replace("\n", "\r\n")
     assert "reopened" not in report and "comparison" not in report
     assert all(path.read_bytes() == expected for path, expected in originals.items())
     assert len(report["sources_after"]) == 7
     assert events[-1] == "factory_final_guards" and events.count("close") == 2
-    if failure in ("source_drift", "copy_drift", "runtime_drift", "cleanup", "none"):
+    if failure in (
+        "source_drift",
+        "copy_drift",
+        "runtime_drift",
+        "cleanup",
+        "none",
+        "crlf_notes",
+    ):
         assert report["annotations"] == {"raw": "retained slots"}
         assert len(scopes) == 1
         assert report["recipe_seconds"] >= 0

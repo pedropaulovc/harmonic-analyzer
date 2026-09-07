@@ -236,6 +236,12 @@ def _state(model, part):
     return {"drawing_dirty": values[0], "source_dirty": values[1]}
 
 
+def _require_spec_text(actual, expected, label):
+    """Compare native LF/CRLF serialization only; callers retain raw readbacks."""
+    if not isinstance(actual, str) or actual.replace("\r\n", "\n") != expected:
+        raise RuntimeError(label)
+
+
 def sheet_witness(adapter, model, part, bank, handles):
     """Documented sheet metres; no coordinate, scale or text setters."""
     drawing = _early_bound(model, "IDrawingDoc")
@@ -270,8 +276,12 @@ def sheet_witness(adapter, model, part, bank, handles):
     source_text = read_required_properties(
         part, tuple(expected), required=tuple(expected)
     )
-    if source_text != expected:
-        raise RuntimeError("slotted exact source manufacturing notes changed")
+    for name, expected_text in expected.items():
+        _require_spec_text(
+            source_text[name],
+            expected_text,
+            "slotted exact source manufacturing notes changed",
+        )
     notes = {}
     for key, row in bank["annotations"].items():
         semantic = row["semantic"]
@@ -281,8 +291,13 @@ def sheet_witness(adapter, model, part, bank, handles):
         note = _early_bound(annotation.GetSpecificAnnotation(), "INote")
         linked, text = note.PropertyLinkedText, note.GetText()
         matches = [name for name in expected if linked == property_link(name)]
-        if len(matches) != 1 or matches[0] in notes or text != expected[matches[0]]:
+        if len(matches) != 1 or matches[0] in notes:
             raise RuntimeError(f"{key}: exact linked manufacturing note changed")
+        _require_spec_text(
+            text,
+            expected[matches[0]],
+            f"{key}: exact linked manufacturing note changed",
+        )
         notes[matches[0]] = {"annotation_key": key, "link": linked, "text": text}
     if notes.keys() != expected.keys():
         raise RuntimeError("slotted linked note inventory is incomplete")
@@ -663,12 +678,16 @@ async def capture_only(
             required=("Generator", "Manufacturing Notes", "End View Note"),
         )
         report["source_properties"] = properties
-        if properties != {
+        for name, expected_text in {
             "Generator": "harmonic-analyzer @ 3c0c4a97",
             "Manufacturing Notes": spec.DRAWING_NOTES,
             "End View Note": spec.END_VIEW_NOTE,
-        }:
-            raise RuntimeError("slotted capture source producer/notes differ")
+        }.items():
+            _require_spec_text(
+                properties[name],
+                expected_text,
+                "slotted capture source producer/notes differ",
+            )
         adapter.ownership.assert_current_owned()
         _same(adapter.swApp, source_model, adapter.currentModel, "pre-build source")
         _same(
