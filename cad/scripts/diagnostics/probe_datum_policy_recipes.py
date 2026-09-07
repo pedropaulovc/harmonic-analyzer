@@ -887,6 +887,11 @@ async def pilot(
                     phase="reopened",
                     annotations=trial["reopened"]["annotations"],
                 )
+                # These rows contain raw parameter values and exact names/text,
+                # not geometry coordinates or native handles from closed docs.
+                # Retain both observations before rejecting any cold drift.
+                if trial["callout_storage_built"] != trial["callout_storage_reopened"]:
+                    raise RuntimeError("cold reopen lower-text mapping changed")
             trial["reopen_annotation_comparison"] = compare_drawing_reopen(
                 trial["built"], trial["reopened"]
             )

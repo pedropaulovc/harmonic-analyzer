@@ -3,6 +3,7 @@
 from contextlib import contextmanager
 import asyncio
 import json
+import math
 from pathlib import Path
 import sys
 from types import SimpleNamespace as NS
@@ -82,7 +83,7 @@ def test_direct_selection_rejects_strings_or_wrong_scope(variant, order):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("mode", ["normal", "source_drift", "cold_loss"])
+@pytest.mark.parametrize("mode", ["normal", "source_drift", "cold_loss", "cold_raw_drift"])
 async def test_pilot_field_observer_order_and_fresh_cold_handles(
     monkeypatch, tmp_path, mode
 ):
@@ -112,12 +113,15 @@ async def test_pilot_field_observer_order_and_fresh_cold_handles(
     monkeypatch.setattr(pilot, "source_dimensions", dimensions)
 
     class Boundaries:
-        def __init__(self, *args):
-            pass
+        def __init__(self, *args, drawing_reader):
+            assert drawing_reader.__self__.__class__ is Field
+            assert drawing_reader.__func__ is Field.boundary_snapshot
+            self.drawing_reader = drawing_reader
 
         @contextmanager
         def observe(self):
             events.append("source_enter")
+            assert self.drawing_reader() == {"observed_lower_text": ""}
             yield
             events.append("source_exit")
 
@@ -138,12 +142,22 @@ async def test_pilot_field_observer_order_and_fresh_cold_handles(
         def require_used(self):
             events.append("field_checked")
 
+        def boundary_snapshot(self):
+            return {"observed_lower_text": ""}
+
         def snapshot(self, actual_adapter, handles, *, phase, annotations):
             assert actual_adapter is adapter
             assert handles == {"bore": warm if phase == "built" else cold}
             assert annotations == {"observed": phase}
             events.append(phase)
-            return {"lower_text": "THRU - REAM\nPRESS FIT"}
+            row = {"lower_text": "THRU - REAM\nPRESS FIT"}
+            if mode == "cold_raw_drift":
+                raw = 0.008000000001785
+                row["parameters"] = (
+                    ("ArborBoreDia", "ArborBoreDia@ArborBoreProfile@copy.Part", 0,
+                     raw if phase == "built" else math.nextafter(raw, math.inf)),
+                )
+            return row
 
     monkeypatch.setattr(source, "SourceSaveBoundaries", Boundaries)
     monkeypatch.setattr(lower, "LowerTextControl", Field)
@@ -188,6 +202,16 @@ async def test_pilot_field_observer_order_and_fresh_cold_handles(
     if mode == "source_drift":
         assert events[6:] == []
         assert result["runtime_final_guard_errors"]
+        return
+    if mode == "cold_raw_drift":
+        trial = result["trials"][0]
+        before = trial["callout_storage_built"]["parameters"][0][-1]
+        after = trial["callout_storage_reopened"]["parameters"][0][-1]
+        assert before != after
+        assert round(before, 12) == round(after, 12)
+        assert events[6:] == ["built", "reopened"]
+        assert "lower-text mapping changed" in result["error"]
+        assert result["runtime_final_guard_errors"] == []
         return
     assert events[6:] == ["built", "reopened", "cold_comparison"]
     assert result["trials"][0]["callout_storage_built"] == {

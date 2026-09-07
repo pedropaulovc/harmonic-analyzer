@@ -225,6 +225,44 @@ class LowerTextControl:
         if self.calls != 1 or self.report["operation"].get("status") != "passed":
             raise RuntimeError("lower-text requires one completed callout operation")
 
+    def _fresh_rows(self, adapter, source_handles):
+        self._require_manifest(source_handles)
+        model = self._drawing(adapter)
+        matches = []
+        for sheet in _early_bound(model, "IDrawingDoc").GetViews() or ():
+            for raw_view in sheet:
+                view = _early_bound(raw_view, "IView")
+                for raw in view.GetAnnotations() or ():
+                    annotation = _early_bound(raw, "IAnnotation")
+                    if annotation.GetType() != 4:
+                        continue
+                    display = _early_bound(
+                        annotation.GetSpecificAnnotation(), "IDisplayDimension"
+                    )
+                    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+                    if dimension is None:
+                        raise RuntimeError("lower-text inventory has null parameter")
+                    if "@".join(dimension.FullName.split("@")[:2]) != DIMENSION:
+                        continue
+                    matches.append(self._read(annotation, source_handles, view=view))
+        if len(matches) != 1:
+            raise RuntimeError("lower-text fresh inventory needs one exact dimension")
+        self._same(model, self._drawing(adapter), "snapshot drawing")
+        key, row, _ = matches[0]
+        return {key: row}
+
+    def boundary_snapshot(self):
+        """Observe loss without accepting it or reading source-part lower text.
+
+        For the nested source observer's non-initial banks only: the original
+        source handles remain valid in this one open recipe context. Built/cold
+        acceptance instead uses snapshot with phase-fresh source handles.
+        No generic IDisplayData/text geometry is read and no setter is called.
+        """
+        if self.lifetime is not _Lifetime.ACTIVE:
+            raise RuntimeError("lower-text boundary read requires the active context")
+        return self._fresh_rows(self.adapter, self.handles)
+
     def snapshot(self, adapter, source_handles, *, phase, annotations):
         """Fresh drawing displays + supplied phase-fresh parameter handles only.
 
@@ -237,35 +275,8 @@ class LowerTextControl:
         record = self.report["snapshots"][phase] = {"rows": {}}
         try:
             self.require_used()
-            self._require_manifest(source_handles)
-            model = self._drawing(adapter)
-            matches = []
-            for sheet in _early_bound(model, "IDrawingDoc").GetViews() or ():
-                for raw_view in sheet:
-                    view = _early_bound(raw_view, "IView")
-                    for raw in view.GetAnnotations() or ():
-                        annotation = _early_bound(raw, "IAnnotation")
-                        if annotation.GetType() != 4:
-                            continue
-                        display = _early_bound(
-                            annotation.GetSpecificAnnotation(), "IDisplayDimension"
-                        )
-                        dimension = _early_bound(display.GetDimension2(0), "IDimension")
-                        if dimension is None:
-                            raise RuntimeError(
-                                "lower-text inventory has null parameter"
-                            )
-                        if "@".join(dimension.FullName.split("@")[:2]) != DIMENSION:
-                            continue
-                        matches.append(
-                            self._read(annotation, source_handles, view=view)
-                        )
-            if len(matches) != 1:
-                raise RuntimeError(
-                    "lower-text fresh inventory needs one exact dimension"
-                )
-            key, row, _ = matches[0]
-            record["rows"][key] = row
+            record["rows"] = self._fresh_rows(adapter, source_handles)
+            ((key, row),) = record["rows"].items()
             if row["lower_text"] != TEXT:
                 raise RuntimeError("fresh drawing lost exact lower text")
             if key not in annotations:
@@ -281,7 +292,6 @@ class LowerTextControl:
             ) >= lines.index(wanted[1]):
                 raise RuntimeError("lower-text requested lines are not both displayed")
             row["displayed_lines"] = wanted
-            self._same(model, self._drawing(adapter), "snapshot drawing")
             record["status"] = "passed"
             return record["rows"]
         except BaseException as error:
