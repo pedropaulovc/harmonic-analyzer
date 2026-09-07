@@ -6,7 +6,7 @@ must not make every manufacturing print depend on the native-layout pilot.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Mapping, Sequence
+from typing import TYPE_CHECKING, Any, Callable, Mapping, Sequence
 
 from _common import _early_bound
 from _drawing_common import _TITLE_BLOCK_LEFT_M, _TITLE_BLOCK_TOP_M
@@ -14,6 +14,7 @@ from _drawing_native_callouts import DatumLeaderPolicy
 import _telemetry
 
 if TYPE_CHECKING:
+    from _drawing_annotation_bounds import AnnotationBounds
     from _drawing_native_layout import AxisLink, LayoutNote, NativeLayoutReport
     from _drawing_view_packing import AxisOrder
 
@@ -27,6 +28,10 @@ def repair_project_drawing_layout(
     orderings: Sequence[AxisOrder] = (),
     notes: Sequence[LayoutNote] = (),
     datum_leader_policy: DatumLeaderPolicy = DatumLeaderPolicy.EXISTING,
+    additional_annotation_validation: Callable[
+        [Mapping[str, Mapping[str, AnnotationBounds]]], Mapping[str, Any]
+    ]
+    | None = None,
 ) -> NativeLayoutReport:
     """Space native callouts and pack the complete measured single-sheet drawing.
 
@@ -34,6 +39,9 @@ def repair_project_drawing_layout(
     attachments. It preserves view scale, annotation content and text format.
     Initial recipe coordinates seed native placement; they never identify model
     geometry or substitute for measured final fit. An unfit sheet is not exported.
+    Optional additional validation receives the existing fresh final snapshot
+    only AFTER the mandatory GTol gate; it cannot replace that gate or require
+    another annotation scan. Exceptions prevent layout acceptance/export.
     """
     from _drawing_annotation_bounds import annotation_box
     from _drawing_leader_clearance import validate_gtol_leader_clearance
@@ -53,6 +61,16 @@ def repair_project_drawing_layout(
         for view, result in clearance.items():
             _telemetry.info(
                 "final native GTol clearance witnessed",
+                view=view,
+                clearance_report=json.dumps(result),
+                measurement_source="fresh_final_packing",
+            )
+        if additional_annotation_validation is None:
+            return
+        additional = additional_annotation_validation(measurements_by_view)
+        for view, result in additional.items():
+            _telemetry.info(
+                "additional native annotation clearance witnessed",
                 view=view,
                 clearance_report=json.dumps(result),
                 measurement_source="fresh_final_packing",

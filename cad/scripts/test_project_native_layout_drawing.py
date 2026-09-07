@@ -235,3 +235,78 @@ def test_final_clearance_logs_fresh_report_once_without_remeasurement(
         row["view"]: json.loads(row["clearance_report"]) for row in records
     } == result
     assert all(row["measurement_source"] == "fresh_final_packing" for row in records)
+
+
+@pytest.mark.parametrize("failure", ["none", "gtol", "additional"])
+@pytest.mark.parametrize(
+    "status", [native.NativeLayoutStatus.APPLIED, native.NativeLayoutStatus.UNCHANGED]
+)
+def test_additional_final_gate_cannot_replace_gtol_or_repeat_measurements(
+    monkeypatch, failure, status
+):
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _: value)
+    sheet = SimpleNamespace(GetProperties2=lambda: (8, 12, 1, 1, 0, 0.4318, 0.2794, 0))
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(GetCurrentSheet=lambda: sheet)
+    )
+    handoffs = (Mock(), Mock())
+    monkeypatch.setattr(
+        handoff_module, "AnnotationMeasurementHandoff", Mock(side_effect=handoffs)
+    )
+    monkeypatch.setattr(callouts, "arrange_native_callouts", Mock())
+    monkeypatch.setattr(gtol, "arrange_native_gtol_columns", Mock())
+    measure = Mock(side_effect=AssertionError("no additional COM measurement"))
+    monkeypatch.setattr(bounds_module, "annotation_box", measure)
+    measurements = {"front": {"exact-fresh-native-row": object()}}
+    calls = []
+
+    def validate(stage, actual):
+        assert actual is measurements
+        calls.append(stage)
+        if stage == failure:
+            raise RuntimeError(f"{stage} exact crossing evidence")
+        return {"front": {"crossings": []}}
+
+    monkeypatch.setattr(
+        clearance_module,
+        "validate_gtol_leader_clearance",
+        lambda rows: validate("gtol", rows),
+    )
+    def additional(rows):
+        return validate("additional", rows)
+
+    def pack(*args, **kwargs):
+        kwargs["final_annotation_validation"](measurements)
+        return Report(status=status, reason="complete final witness")
+
+    monkeypatch.setattr(native, "repair_native_layout", Mock(side_effect=pack))
+    log = Mock()
+    monkeypatch.setattr(drawing._telemetry, "info", log)
+    if failure != "none":
+        with pytest.raises(RuntimeError, match=f"{failure} exact crossing evidence"):
+            drawing.repair_project_drawing_layout(
+                adapter,
+                views={"front": object()},
+                additional_annotation_validation=additional,
+            )
+    else:
+        assert (
+            drawing.repair_project_drawing_layout(
+                adapter,
+                views={"front": object()},
+                additional_annotation_validation=additional,
+            ).status
+            is status
+        )
+    assert calls == (["gtol"] if failure == "gtol" else ["gtol", "additional"])
+    measure.assert_not_called()
+    for handoff in handoffs:
+        handoff.close.assert_called_once_with()
+    records = [
+        row.kwargs
+        for row in log.call_args_list
+        if row.args[0] == "additional native annotation clearance witnessed"
+    ]
+    assert len(records) == (1 if failure == "none" else 0)
+    if records:
+        assert records[0]["measurement_source"] == "fresh_final_packing"
