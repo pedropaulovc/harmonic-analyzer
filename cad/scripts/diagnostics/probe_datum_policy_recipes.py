@@ -23,6 +23,9 @@ ownership preserves the user's visible lever and unsaved Draw2 throughout.
 Every successful recipe gets a fresh saved/reopened geometry, dimension/BASIC,
 annotation-content/layout and source-parameter witness. Stop at the first failure.
 The named parameter witnesses do not prove full in-memory source immutability.
+Failed trials retain fresh native observations and PDF/PNG evidence when the
+exact active drawing is owned. Evidence errors never replace the original
+failure; no native drawing/source save or additional successful-trial reads.
 """
 
 from __future__ import annotations
@@ -171,6 +174,10 @@ def require_copy_hash(trial, phase):
 
 
 def drawing_witness(adapter, *, source, configuration):
+    return _drawing_witness(adapter, source=source, configuration=configuration)[0]
+
+
+def _drawing_witness(adapter, *, source, configuration):
     semantics = attachments.snapshot(adapter.currentModel, app=adapter.swApp)
     if not semantics["models"]:
         raise RuntimeError("functional pilot has no captured drawing view models")
@@ -191,12 +198,12 @@ def drawing_witness(adapter, *, source, configuration):
         raise RuntimeError(
             "functional pilot needs nonempty geometry/dimensions without dimension exclusions"
         )
-    annotations, _ = shoulder.all_annotation_layout(adapter)
+    annotations, handles = shoulder.all_annotation_layout(adapter)
     return {
         "semantics": semantics,
         "annotations": annotations,
         "layout": attachments.layout(adapter.currentModel),
-    }
+    }, handles
 
 
 def compare_drawing(app, before, after):
@@ -224,6 +231,220 @@ def compare_drawing_reopen(before, after):
         before["layout"], after["layout"], "saved production reopen"
     )
     return compare_reopened_annotations(before["annotations"], after["annotations"])
+
+
+def _failure_document(adapter, output):
+    """Never infer ownership from currentModel or from an output directory."""
+    record = adapter.ownership.assert_current_owned()
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    output = Path(output).resolve()
+    if (
+        output not in record.paths
+        or output.parent not in adapter.ownership.directories
+        or int(model.GetType()) != int(DocumentKind.DRAWING)
+    ):
+        raise RuntimeError("failure evidence requires the trial's exact owned DRAWING")
+    path = str(model.GetPathName())
+    if path and Path(path).resolve() != output:
+        raise RuntimeError("failure drawing has an unexpected native path")
+    return {
+        "path": path,
+        "title": str(model.GetTitle()),
+        "kind": int(model.GetType()),
+        "dirty": bool(model.GetSaveFlag()),
+        "visible": bool(model.Visible),
+    }
+
+
+def retain_failed_drawing(adapter, trial, output, checkpoint):
+    """Failure-only observations; the caller must re-raise its original error.
+
+    Reuses the existing PDF-only native helper (empty native target), not recipe
+    finalization. No rebuild, native/source save, layout or cleanup occurs here.
+    Complete measured rows and native handles are checked across export; known
+    measurement exclusions remain explicit. The outer pilot retains its source
+    and factory guards, and the owned runner still owns cleanup.
+    """
+    from diagnostics import probe_retained_drawing_export as printed
+
+    evidence = {
+        "primary_error": trial["error"],
+        "scope": "failed native scene, measured annotation ink and geometry/dimension witnesses; PDF-only export; no cold/native-save acceptance",
+        "errors": [],
+    }
+    trial["failure_evidence"] = evidence
+    output = Path(output).resolve()
+    receipt = output.parent / "failure-evidence.json"
+    handles = {}
+
+    def persist():
+        for phase, action in (
+            (
+                "evidence_checkpoint",
+                lambda: receipt.write_text(
+                    json.dumps(evidence, indent=2), encoding="utf-8"
+                ),
+            ),
+            ("pilot_checkpoint", checkpoint),
+        ):
+            try:
+                action()
+            except Exception as error:
+                evidence["errors"].append({"phase": phase, "error": repr(error)})
+
+    def observe(phase, action):
+        try:
+            with _telemetry.span(
+                "diagnostic.datum_policy.failure_evidence", phase=phase
+            ):
+                evidence[phase] = action()
+        except Exception as error:
+            evidence["errors"].append({"phase": phase, "error": repr(error)})
+
+    # Refuse existing evidence before any write; never overwrite an earlier
+    # observation, and do not inspect/export a borrowed or replaced document.
+    observe("ownership", lambda: _failure_document(adapter, output))
+    if "ownership" not in evidence:
+        return
+    if any(
+        (output.parent / name).exists()
+        for name in ("failure-evidence.json", "failure.pdf", "failure.png")
+    ):
+        evidence["errors"].append(
+            {"phase": "targets", "error": "failure evidence targets already exist"}
+        )
+        return
+    evidence["receipt"] = str(receipt)
+    evidence["document_before"] = evidence.pop("ownership")
+    persist()
+
+    def hashes():
+        paths = {"source_copy": Path(trial["copy_source"]), "native_drawing": output}
+        if "original_source" in trial:
+            paths["original_source"] = Path(trial["original_source"])
+        return {
+            name: {
+                "path": str(path),
+                "sha256": attachments.file_digest(path) if path.is_file() else None,
+            }
+            for name, path in paths.items()
+        }
+
+    def scene(phase):
+        _failure_document(adapter, output)
+        source = Path(trial["copy_source"]).resolve(strict=True)
+        source_model = _early_bound(
+            adapter.swApp.GetOpenDocumentByName(str(source)), "IModelDoc2"
+        )
+        source_values, source_handles = source_dimensions(
+            source_model, trial["target"], source
+        )
+        drawing, annotation_handles = _drawing_witness(
+            adapter,
+            source=source,
+            configuration=trial["source_before"]["configuration"],
+        )
+        handles[phase] = (
+            adapter.currentModel,
+            source_model,
+            source_handles,
+            annotation_handles,
+        )
+        return {
+            "drawing": drawing,
+            "source": source_values,
+            "source_document": {
+                "path": str(source_model.GetPathName()),
+                "title": str(source_model.GetTitle()),
+                "kind": int(source_model.GetType()),
+                "dirty": bool(source_model.GetSaveFlag()),
+                "visible": bool(source_model.Visible),
+            },
+        }
+
+    observe("hashes_before", hashes)
+    observe("before", lambda: scene("before"))
+    persist()
+    pdf, png = output.parent / "failure.pdf", output.parent / "failure.png"
+
+    def pdf_export():
+        _failure_document(adapter, output)
+        printed.export_pdf_only(adapter, pdf)
+        return {"path": str(pdf), "sha256": attachments.file_digest(pdf)}
+
+    def render():
+        printed.render_pdf_png(pdf, png)
+        return {"path": str(png), "sha256": attachments.file_digest(png)}
+
+    observe("pdf", pdf_export)
+    persist()
+    if "pdf" in evidence:
+        observe("png", render)
+        persist()
+    # Always observe post-export state/hashes, even if export or rasterization
+    # failed. Independent phases retain these when a full snapshot is rejected.
+    observe("document_after", lambda: _failure_document(adapter, output))
+    observe("hashes_after", hashes)
+    observe("after", lambda: scene("after"))
+    persist()
+
+    def unchanged():
+        for field in ("document", "hashes"):
+            if evidence[f"{field}_before"] != evidence[f"{field}_after"]:
+                raise RuntimeError(f"failure PDF export changed {field}")
+        before, after = evidence["before"], evidence["after"]
+        if before["source_document"] != after["source_document"]:
+            raise RuntimeError("failure PDF export changed the source document state")
+        first, last = handles["before"], handles["after"]
+        if any(
+            int(adapter.swApp.IsSame(a, b)) != 1 for a, b in zip(first[:2], last[:2])
+        ):
+            raise RuntimeError("failure export replaced drawing/source native identity")
+        require_same_source(
+            before["source"],
+            after["source"],
+            "failure PDF export",
+            app=adapter.swApp,
+            handles_before=first[2],
+            handles_after=last[2],
+        )
+        compare_drawing(adapter.swApp, before["drawing"], after["drawing"])
+        shoulder.compare_all_annotation_layout(
+            adapter.swApp,
+            before["drawing"]["annotations"],
+            after["drawing"]["annotations"],
+            first[3],
+            last[3],
+        )
+        if before["drawing"]["annotations"] != after["drawing"]["annotations"]:
+            raise RuntimeError(
+                "failure PDF export changed raw native annotation measurements"
+            )
+        return (
+            "exact captured state and identity unchanged; original trial still failed"
+        )
+
+    if all(
+        name in evidence
+        for name in (
+            "document_after",
+            "hashes_before",
+            "hashes_after",
+            "before",
+            "after",
+        )
+    ):
+        observe("export_preservation", unchanged)
+    if "before" in evidence:
+        observe(
+            "recipe_source_preservation",
+            lambda: require_same_source(
+                trial["source_before"],
+                evidence["before"]["source"],
+                "failed recipe before evidence export",
+            ),
+        )
+    persist()
 
 
 async def pilot(
@@ -261,6 +482,7 @@ async def pilot(
         "source_witness_scope": "exact original/copy disk hashes and named recipe dimension identities/values/tolerances/BASIC; not full in-memory source immutability",
     }
     report_path = directory / "pilot.json"
+    failure_output = None
     pilot_started = time.perf_counter()
     report["elapsed_scope"] = (
         "pilot source guards, preparation, recipe and cold witnesses; excludes parent lock/attach and outer owned-session cleanup"
@@ -278,6 +500,7 @@ async def pilot(
         report["helpers"] = helper_fingerprints()
         report["imported_adapter"] = adapter_fingerprints()
         for target in order:
+            failure_output = None
             trial = {"target": target, "status": "running"}
             report["trials"].append(trial)
             trial_dir = directory / target
@@ -297,6 +520,7 @@ async def pilot(
             module = benchmark.load_recipe(
                 candidate, target, trial_dir, source=copy_source
             )
+            failure_output = module.OUTPUTS.slddrw
             await adapter.close_owned_documents()
             if setup_controller is not None:
                 await setup_controller.configure(adapter, module, trial, trial_dir)
@@ -397,6 +621,14 @@ async def pilot(
         report.update(status="failed", error=repr(error))
         if report["trials"]:
             report["trials"][-1].update(status="failed", error=repr(error))
+        if failure_output is not None:
+            try:
+                checkpoint()
+                retain_failed_drawing(
+                    adapter, report["trials"][-1], failure_output, checkpoint
+                )
+            except Exception as evidence_error:
+                report["trials"][-1]["failure_evidence_error"] = repr(evidence_error)
         raise
     finally:
         primary_error = sys.exception()
