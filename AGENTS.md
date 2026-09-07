@@ -118,6 +118,10 @@ credit:
 2. **One clean review** — either CodeRabbit or Codex reviewed the latest code
    and found nothing, or its findings were addressed and re-reviewed clean.
    One reviewer is sufficient; approval from both is not required.
+   When PR review quota is exhausted, a clean local CodeRabbit CLI review also
+   qualifies. Use Windows, retain the complete report and exact reviewed
+   head/base commits, and address/re-review findings. A skipped, quota-limited
+   or unauthenticated run is not a clean review.
 3. **Visual inspection of renders** — an eye pass over the rendered PNGs of
    every part/assembly the PR touched (regenerate them if stale or hard to
    read; move the camera off the standard axes when needed). The CAD gates
