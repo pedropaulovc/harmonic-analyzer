@@ -11,7 +11,7 @@ the sheet runs 2:1; the isometric stays 1:1.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_pen_frame.py pen-frame
+    uv run python -m doit drawing:pen_frame
 """
 
 from __future__ import annotations

@@ -14,7 +14,7 @@ crowd the tall length view).
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_tube_frame.py tube-frame
+    uv run python -m doit drawing:tube_frame
 """
 
 from __future__ import annotations

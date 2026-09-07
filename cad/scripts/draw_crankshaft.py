@@ -12,7 +12,7 @@ view bottom, the #9 cross-hole facing the viewer as a circle at station 4).
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_crankshaft.py crankshaft
+    uv run python -m doit drawing:crankshaft
 """
 
 from __future__ import annotations

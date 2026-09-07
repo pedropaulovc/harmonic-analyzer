@@ -12,7 +12,7 @@ is 457 mm long, so the whole sheet runs 1:2; the front elevation drops to 1:4.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_harmonic_base.py harmonic-base
+    uv run python -m doit drawing:harmonic_base
 """
 
 from __future__ import annotations

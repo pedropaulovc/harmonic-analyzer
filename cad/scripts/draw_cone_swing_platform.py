@@ -12,7 +12,7 @@ end views run 1:2; the isometric runs 1:3.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_cone_swing_platform.py cone-swing-platform
+    uv run python -m doit drawing:cone_swing_platform
 """
 
 from __future__ import annotations

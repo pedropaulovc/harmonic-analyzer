@@ -11,7 +11,7 @@ marked dimension imports into the front view (handle axis horizontal).
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_crank_handle.py crank-handle
+    uv run python -m doit drawing:crank_handle
 """
 
 from __future__ import annotations

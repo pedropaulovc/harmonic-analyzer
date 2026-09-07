@@ -12,7 +12,7 @@ is tiny, so the sheet runs 3:1; the isometric drops to 2:1.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_output_fixture.py output-fixture
+    uv run python -m doit drawing:output_fixture
 """
 
 from __future__ import annotations

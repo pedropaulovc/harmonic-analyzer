@@ -7,7 +7,7 @@ sits clear of the title block.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_pinion_cam_pin.py pinion-cam-pin
+    uv run python -m doit drawing:pinion_cam_pin
 """
 
 from __future__ import annotations

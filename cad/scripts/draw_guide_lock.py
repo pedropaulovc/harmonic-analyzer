@@ -11,7 +11,7 @@ needs only the face view (front), one thickness view (right) and the iso.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_guide_lock.py guide-lock
+    uv run python -m doit drawing:guide_lock
 """
 
 from __future__ import annotations

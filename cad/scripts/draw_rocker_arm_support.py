@@ -12,7 +12,7 @@ runs 1:1; the isometric carries a 1:2 override.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_rocker_arm_support.py rocker-arm-support
+    uv run python -m doit drawing:rocker_arm_support
 """
 
 from __future__ import annotations

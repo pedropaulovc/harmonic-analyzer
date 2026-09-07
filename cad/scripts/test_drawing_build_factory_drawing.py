@@ -73,6 +73,15 @@ def test_registry_and_factory_recipe_coverage_match():
     )
 
 
+@pytest.mark.parametrize("drawing", DRAWINGS, ids=lambda item: item.name)
+def test_recipe_usage_does_not_bypass_required_machine_seat(drawing):
+    import ast
+    import re
+
+    docstring = ast.get_docstring(ast.parse(drawing.script.read_text())) or ""
+    assert not re.search(r"uv run python[^\n]*draw_\w+\.py", docstring)
+
+
 def test_prepared_runtime_is_a_real_drawing_cache_input_only():
     import dodo
     from _buildgraph import ASSEMBLY_ORDER, module_deps_of, part_scripts

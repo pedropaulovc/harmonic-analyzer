@@ -10,7 +10,7 @@ explicit 1:1 override so it stays clear of the title block.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_crank_arm.py crank-arm
+    uv run python -m doit drawing:crank_arm
 """
 
 from __future__ import annotations
