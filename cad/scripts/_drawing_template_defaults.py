@@ -189,14 +189,14 @@ def _surface_finish_snapshot(adapter, annotation):
 
 def snapshot_defaults(adapter, spec):
     """Capture the existing blank-sheet setup contract, without native setters."""
-    import _drawing_common as common
+    import _drawing_sheet_setup as sheet_setup
 
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     ddoc = _early_bound(model, "IDrawingDoc")
     sheet = _early_bound(ddoc.GetCurrentSheet(), "ISheet")
     if sheet is None:
         raise RuntimeError("template has no sheet")
-    common.assert_asme_b_sheet(
+    sheet_setup.assert_asme_b_sheet(
         adapter, sheet, phase="prepared defaults", scale=spec.scale
     )
     groups = tuple(ddoc.GetViews() or ())
@@ -216,13 +216,13 @@ def snapshot_defaults(adapter, spec):
     styles = {
         name: int(
             model.Extension.GetUserPreferenceInteger(
-                common._PREF_DIM_TEXT_AND_LEADER_STYLE,
+                sheet_setup._PREF_DIM_TEXT_AND_LEADER_STYLE,
                 option,
             )
         )
-        for name, option in common._DIM_DETAILING_SCOPES.items()
+        for name, option in sheet_setup._DIM_DETAILING_SCOPES.items()
     }
-    if any(value != common._BROKEN_LEADER_HORIZONTAL_TEXT for value in styles.values()):
+    if any(value != sheet_setup._BROKEN_LEADER_HORIZONTAL_TEXT for value in styles.values()):
         raise RuntimeError(f"prepared dimension styles differ: {styles}")
     sheet_view = _early_bound(ddoc.GetFirstView(), "IView")
     notes, finishes, empty_extents, other_kinds = [], [], [], []
@@ -269,8 +269,8 @@ def snapshot_defaults(adapter, spec):
         raise RuntimeError(f"unsupported blank-sheet annotation kinds: {other_kinds}")
     normalized = [" ".join(row["text"].upper().split()) for row in notes]
     if (
-        normalized.count(common._METRIC_EDGE_BREAK_NOTE) != 1
-        or common._OLD_EDGE_BREAK_NOTE in normalized
+        normalized.count(sheet_setup._METRIC_EDGE_BREAK_NOTE) != 1
+        or sheet_setup._OLD_EDGE_BREAK_NOTE in normalized
     ):
         raise RuntimeError("metric edge-break note did not persist exactly once")
     if not ddoc.GetEditSheet():

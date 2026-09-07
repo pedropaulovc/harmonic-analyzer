@@ -193,7 +193,7 @@ def scene(native, monkeypatch, tmp_path):  # noqa: F811
     monkeypatch.setattr(probe, "_early_bound", lambda value, _: value)
     monkeypatch.setattr(probe.viewports, "_early_bound", lambda value, _: value)
     monkeypatch.setattr(probe.base, "_early_bound", lambda value, _: value)
-    monkeypatch.setattr(probe.base.common, "new_drawing", create)
+    monkeypatch.setattr(probe.base.sheet_setup, "new_drawing", create)
     monkeypatch.setattr(probe, "snapshot_defaults", snapshot)
     monkeypatch.setattr(probe, "printed_snapshot", printed)
     monkeypatch.setattr(

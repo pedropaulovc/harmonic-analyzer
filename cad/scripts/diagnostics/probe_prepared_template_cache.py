@@ -25,6 +25,8 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "cad/scripts"))
 
+import _drawing_sheet_setup as sheet_setup  # noqa: E402
+
 from _common import _early_bound  # noqa: E402
 import _drawing_common as common  # noqa: E402
 import _drawing_prepared_template as prepared  # noqa: E402
@@ -190,7 +192,7 @@ async def trial(
                 ),
             ):
                 if entry is None:
-                    common.new_project_drawing(
+                    sheet_setup.new_project_drawing(
                         adapter, scale=spec.scale, decimals=spec.decimals
                     )
                 if entry is not None:
@@ -284,7 +286,7 @@ async def probe(
         tempfile.mkdtemp(prefix="prepared-template-cache-", dir=report_root)
     )
     adapter.ownership.register_directory(directory)
-    original = common.PROJECT_DRWDOT.resolve(strict=True)
+    original = sheet_setup.PROJECT_DRWDOT.resolve(strict=True)
     adapter.ownership.register_source(original)
     cache_root = directory / "cache"
     pinned = runtime_inputs(adapter, spec)

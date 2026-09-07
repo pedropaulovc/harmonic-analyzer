@@ -2,7 +2,7 @@
 
 The doit action already owns the machine COM seat. Materialization completes
 before the recipe opens its source. The normal initializer stays in
-``_drawing_common``: preparation calls it, never this runner (no recursion).
+``_drawing_sheet_setup``: preparation calls it, never this runner (no recursion).
 Owned diagnostics may materialize with their CREATE/SAVE_AS scopes first, then
 pass ``prepared_drawing_factory(adapter, entry)`` into the same recipe contract.
 No process-global factory replacement or adapter mode is involved.
@@ -11,7 +11,7 @@ No process-global factory replacement or adapter mode is involved.
 from enum import StrEnum
 from typing import Any, Callable
 
-import _drawing_common as common
+import _drawing_sheet_setup as sheet_setup
 import _drawing_prepared_template as prepared
 from _drawing_prepared_template import TemplateSpec
 from _common import run_build
@@ -63,7 +63,7 @@ class ProjectDrawingFactory:
 
 def normal_drawing_factory(adapter, spec: TemplateSpec) -> ProjectDrawingFactory:
     """Explicit normal-setup control for owned diagnostics, never a fallback."""
-    return ProjectDrawingFactory(adapter, spec, common.new_project_drawing, "normal")
+    return ProjectDrawingFactory(adapter, spec, sheet_setup.new_project_drawing, "normal")
 
 
 def prepared_drawing_factory(

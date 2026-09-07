@@ -19,8 +19,9 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "cad/scripts"))
 
+import _drawing_sheet_setup as sheet_setup  # noqa: E402
+
 from _common import _early_bound, check  # noqa: E402
-import _drawing_common as common  # noqa: E402
 from solidworks_mcp.adapters.solidworks import drawing  # noqa: E402
 from diagnostics._owned_native_documents import (  # noqa: E402
     DocumentKind,
@@ -64,7 +65,7 @@ def trace_setters(model, decimals, rows, checkpoint):
 async def capture(adapter, report_root, decimals):
     if decimals not in (2, 3):
         raise ValueError("bounded unit control supports precision 2 or 3")
-    template = common.PROJECT_DRWDOT.resolve(strict=True)
+    template = sheet_setup.PROJECT_DRWDOT.resolve(strict=True)
     report_root.mkdir(parents=True, exist_ok=True)
     directory = Path(tempfile.mkdtemp(prefix="unit-defaults-", dir=report_root))
     adapter.ownership.register_directory(directory)
@@ -89,8 +90,8 @@ async def capture(adapter, report_root, decimals):
             model = drawing.new_drawing(
                 adapter,
                 template=str(template),
-                width=common.ASME_B_WIDTH_M,
-                height=common.ASME_B_HEIGHT_M,
+                width=sheet_setup.ASME_B_WIDTH_M,
+                height=sheet_setup.ASME_B_HEIGHT_M,
             )
         model = _early_bound(model, "IModelDoc2")
         report["before"] = read_units(model)
@@ -105,8 +106,8 @@ async def capture(adapter, report_root, decimals):
             model = drawing.new_drawing(
                 adapter,
                 template=str(template),
-                width=common.ASME_B_WIDTH_M,
-                height=common.ASME_B_HEIGHT_M,
+                width=sheet_setup.ASME_B_WIDTH_M,
+                height=sheet_setup.ASME_B_HEIGHT_M,
             )
         report["helper_before"] = read_units(_early_bound(model, "IModelDoc2"))
         checkpoint()

@@ -21,7 +21,8 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "cad/scripts"))
 
-import _drawing_common as common  # noqa: E402
+import _drawing_sheet_setup as sheet_setup  # noqa: E402
+
 import _telemetry  # noqa: E402
 from diagnostics import _baked_template_layout as layout  # noqa: E402
 from diagnostics import _baked_template_gaps as gaps  # noqa: E402
@@ -35,11 +36,11 @@ from diagnostics._owned_native_session import require_owned_diagnostic_environme
 
 def bare_drawing(adapter, template):
     """Deliberately bypass normal metric/style normalization during authoring."""
-    return common.new_drawing(
+    return sheet_setup.new_drawing(
         adapter,
         template=str(template),
-        width=common.ASME_B_WIDTH_M,
-        height=common.ASME_B_HEIGHT_M,
+        width=sheet_setup.ASME_B_WIDTH_M,
+        height=sheet_setup.ASME_B_HEIGHT_M,
     )
 
 
@@ -47,7 +48,7 @@ async def transform(adapter, directory, report, checkpoint, population=None):
     derived = directory / f"{directory.name}.DRWDOT"
     report["derived_template"] = str(derived)
     with adapter.ownership.creating_document(DocumentKind.DRAWING, derived):
-        bare_drawing(adapter, common.PROJECT_DRWDOT)
+        bare_drawing(adapter, sheet_setup.PROJECT_DRWDOT)
     report["before"], handles, lines = layout.blank_snapshot(adapter)
     report["plan"] = layout.layout_plan(report["before"]["notes"], lines)
     label_plan, phase_scope = layout.blank_label_plan, layout.blank_phase_scope
@@ -152,14 +153,14 @@ async def probe(
     population_sha256=None,
 ):
     expected = {
-        str(common.PROJECT_DRWDOT): pilot.attachments.file_digest(common.PROJECT_DRWDOT)
+        str(sheet_setup.PROJECT_DRWDOT): pilot.attachments.file_digest(sheet_setup.PROJECT_DRWDOT)
     }
     population = None
     if policy is gaps.LayoutPolicy.POPULATED_GAPS:
         if population_path is None or population_sha256 is None:
             raise ValueError("populated-gaps requires an exact receipt path and SHA256")
         population = gaps.read_population(
-            population_path, population_sha256, expected[str(common.PROJECT_DRWDOT)]
+            population_path, population_sha256, expected[str(sheet_setup.PROJECT_DRWDOT)]
         )
         expected[str(population_path)] = population_sha256
     elif (

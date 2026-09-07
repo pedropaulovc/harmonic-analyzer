@@ -7,6 +7,8 @@ is not proof that populated linked fields fit; that needs instantiated drawings.
 
 from __future__ import annotations
 
+import _drawing_sheet_setup as sheet_setup
+
 from copy import deepcopy
 import json
 from _drawing_native_display_data import native_display_data
@@ -85,8 +87,6 @@ def note_inventory(adapter):
 
 
 def blank_snapshot(adapter):
-    import _drawing_common as drawing
-
     model = cells.required(adapter.currentModel, "IModelDoc2")
     ddoc = cells.required(model, "IDrawingDoc")
     groups = tuple(ddoc.GetViews() or ())
@@ -104,9 +104,9 @@ def blank_snapshot(adapter):
         },
         "dimension_styles": {
             name: model.Extension.GetUserPreferenceInteger(
-                drawing._PREF_DIM_TEXT_AND_LEADER_STYLE, option
+                sheet_setup._PREF_DIM_TEXT_AND_LEADER_STYLE, option
             )
-            for name, option in drawing._DIM_DETAILING_SCOPES.items()
+            for name, option in sheet_setup._DIM_DETAILING_SCOPES.items()
         },
         "sheet_properties": sheet.GetProperties2(),
         "sheet_format_visible": sheet.SheetFormatVisible,
