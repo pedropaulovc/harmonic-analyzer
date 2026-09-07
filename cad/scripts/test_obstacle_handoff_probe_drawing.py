@@ -7,7 +7,9 @@ import json
 import pytest
 
 import probe_callout_obstacle_handoff as control
+from diagnostics import _owned_native_documents as owned
 from solidworks_mcp.adapters.solidworks import drawing as native_drawing
+from test_owned_native_documents_drawing import native as native
 
 
 @pytest.mark.parametrize("outcome", ["success", "witness_failure"])
@@ -62,7 +64,7 @@ def test_worker_requires_explicit_seat_before_run_build(monkeypatch, tmp_path):
     ],
 )
 async def test_ab_copies_preserve_originals_and_retain_failed_checkpoints(
-    monkeypatch, tmp_path, change
+    monkeypatch, tmp_path, native, change
 ):
     root = tmp_path / "cad"
     source, part = tmp_path / "original.SLDDRW", tmp_path / "source.SLDPRT"
@@ -71,42 +73,36 @@ async def test_ab_copies_preserve_originals_and_retain_failed_checkpoints(
     source_hash = control.hashlib.sha256(source.read_bytes()).hexdigest()
     paths, comparisons = [], []
     state = {"phase": "open"}
-    from contextlib import nullcontext
     from unittest.mock import Mock
 
-    adapter = SimpleNamespace(
-        currentModel=None,
-        swApp=object(),
-        ownership=SimpleNamespace(
-            register_directory=Mock(),
-            register_source=Mock(),
-            saving_as=lambda _: nullcontext(),
-        ),
-    )
+    adapter = owned.DiagnosticAdapter(native.adapter)
+    scopes = Mock(wraps=adapter.ownership.saving_as)
+    monkeypatch.setattr(adapter.ownership, "saving_as", scopes)
+    original_open = owned.DiagnosticAdapter.open_model
 
-    async def open_model(path):
+    async def open_model(self, path):
+        assert self is adapter
         resolved = Path(path).resolve()
         assert resolved.is_relative_to(root / "out/reports")
         assert resolved not in (source, part)
         assert resolved.is_file()
         paths.append(resolved)
         state["phase"] = "reopened" if resolved.stem.endswith("-observed") else "open"
-        actual = source if change == "wrong_copy" else resolved
-        adapter.currentModel = SimpleNamespace(GetPathName=lambda: str(actual))
-        return SimpleNamespace(is_success=True, data={})
+        result = await original_open(self, path)
+        if change == "wrong_copy":
+            # Inject the wrong readback at the worker's boundary, after the
+            # separately tested ownership-open guard, to retain its own gate.
+            adapter.currentModel.path = str(source)
+        return result
 
-    async def close_model(*, save):
-        assert save is False
-        assert Path(adapter.currentModel.GetPathName()) not in (source, part)
-        adapter.currentModel = None
-        return SimpleNamespace(is_success=True, data={})
-
-    adapter.open_model, adapter.close_model = open_model, close_model
+    monkeypatch.setattr(owned.DiagnosticAdapter, "open_model", open_model)
     view = SimpleNamespace(
         ReferencedDocument=SimpleNamespace(GetPathName=lambda: str(part))
     )
 
-    def save_drawing(_adapter, target, *, pdf_path):
+    def save_drawing(_adapter, target, *, pdf_path, artifact_context):
+        assert _adapter is adapter
+        record = adapter.ownership.assert_current_owned()
         current = Path(adapter.currentModel.GetPathName())
         output = Path(target)
         assert output != current  # Native SaveAs must not delete its open input.
@@ -114,10 +110,17 @@ async def test_ab_copies_preserve_originals_and_retain_failed_checkpoints(
             output.parent == current.parent
             and output.parent.parent == root / "out/reports"
         )
-        output.write_bytes(b"observed drawing")
-        if change != "missing_pdf":
-            Path(pdf_path).write_bytes(b"observed pdf")
-        adapter.currentModel = SimpleNamespace(GetPathName=lambda: str(output))
+        with artifact_context("drawing", target):
+            assert adapter.ownership.assert_current_owned() is record
+            output.write_bytes(b"observed drawing")
+            record.handle.path, record.handle.title = str(output), output.name
+        assert adapter.ownership.assert_current_owned() is record
+        assert record.state["path"] == str(output)
+        with artifact_context("pdf", pdf_path):
+            assert adapter.ownership.assert_current_owned() is record
+            if change != "missing_pdf":
+                Path(pdf_path).write_bytes(b"observed pdf")
+        assert adapter.ownership.assert_current_owned() is record
 
     def run_layout(_adapter, views, notes, mode, row, directory):
         assert views == {"front": view} and notes == ()
@@ -184,6 +187,12 @@ async def test_ab_copies_preserve_originals_and_retain_failed_checkpoints(
     assert source.read_bytes() == b"original drawing"
     if change != "wrong_copy":
         assert adapter.currentModel is None
+        assert native.app.documents == []
+    assert [call.args for call in scopes.call_args_list] == [
+        (str(Path(row["copy"]).with_stem(Path(row["copy"]).stem + "-observed")),)
+        for row in report["modes"].values()
+        if "after" in row
+    ]
     if change == "none":
         assert report["measurement_reads_saved"] == 2
         assert report["layout_seconds_saved"] == 1
