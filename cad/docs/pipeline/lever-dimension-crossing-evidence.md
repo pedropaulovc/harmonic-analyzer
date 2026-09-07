@@ -64,3 +64,22 @@ candidate is authorized by this proposal.
 `SpaceEvenly=1` and `Stagger=3` are documented independent alignment alternatives,
 but untested here. This evidence neither claims AutoArrange cannot solve the
 layout nor that a repeated call will solve it. No production gate is weakened.
+
+The offline-tested candidate is now
+`diagnostics/probe_dimension_arrangement.py --receipt <pilot.json>`. It requires
+`HARMONIC_SW_AUTOSTART=0`, `HARMONIC_REMOTE_CACHE_MODE=off`, an explicit existing
+`HARMONIC_DIAGNOSTIC_SW_PID`, and a separately granted native seat. It has not
+been run. Exact owned copies are linked while the drawing is closed; only that
+owned drawing's reference bytes may change. Original artifacts and the copied
+part are never saved. Helpers, imported adapter, every original input and both
+copies have final hash witnesses even after operation or cleanup failure.
+
+This control uses fresh symbol-aware measurements, rejects unsupported visible
+annotations and half-hidden state 2, and records every dimension stroke against
+every other dimension/datum/GTol/note/surface-finish body in its view. Exact own
+annotation joins are excluded; unsupported dimension-attached datums fail before
+mutation. These whole-body cells may include whitespace. A conservative cell
+intersection is a gate failure, not necessarily glyph-ink intersection. The two
+specific closed-frame crossings above have the stronger native-stroke proof.
+Post-operation PDF output, if present, is diagnostic even when a gate fails;
+there is no native-save, accepted-sheet claim or automatic second candidate.
