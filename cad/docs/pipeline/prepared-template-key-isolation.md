@@ -79,3 +79,28 @@ the changed diagnostic/factory tests, buildgraph and part-isolation tests. Recei
 `cad/out/reports/pytest-telemetry/run-zzj63tct`. Unused/undefined-name lint and
 `git diff --check` also passed. No COM calls or managed native outputs were changed
 by this task.
+
+## Native acceptance after extraction
+
+At `21cb9d7f`, adapter `e77bfda4`, PID 31860, the owned prepared pivot/rocker
+pilot passed in 339.974 s. Receipt
+`cad/out/reports/datum-policy-8xtdrxmd/pilot.json` has SHA-256
+`887166852289ea2938f47ea772775af5e5b8ca0848c87aaa36ecc9921f9c10aa`.
+
+| Recipe | Isolated MISS / HIT | Inherited setup | Recipe, including setup |
+|---|---:|---:|---:|
+| pivot shaft, 1:1 | 36.114 / 0.044 s | 1.261 s | 20.881 s |
+| rocker arm, 1:2 | 36.701 / 0.053 s | 1.136 s | 88.899 s |
+
+Both drawings passed source, annotation, attachment and cold-reopen acceptance.
+Pivot's annotation comparison was exact. Rocker had no rejected changes and
+187 coordinate-only floating-point differences, at most 1.943e-16 m, within the
+existing comparator's recorded numerical budgets. No comparator or source-value
+tolerance was changed for this run. Both PNGs were visually inspected: dimensions,
+datum/control associations and title text remained readable.
+
+Both original/copied sources kept exact hashes through all save/close/reopen
+checkpoints. Owned cleanup succeeded and restored only the original clean,
+visible pivot part/drawing; final runtime guards were empty. These two different
+scale specifications validate the extracted native preparation boundary. They
+do not replace the final all-drawing build or establish an A/B fleet speedup.
