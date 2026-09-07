@@ -19,7 +19,7 @@ from diagnostics import probe_source_basic_dimensions as parameters
 
 FASTENERS = {
     "cone_tip_adjuster": (
-        "8e2ce51d8e7ca47f9ca5a8e5c743d1d6a0f0cd749e10195a54e2140117bf12f4",
+        "f3578ac2b2ab95e478bc7bd72c316ebab057c125d5244af6fa2c3e12f4d48468",
         {
             "BodyProfile": {"BodyDiaDim"},
             "Body": {"BodyLenDim"},
@@ -44,6 +44,9 @@ FASTENERS = {
 OBSERVED_UNAPPROVED_TIP = (
     "55cc336009f1a837e5c9fb5afbea4cc06d6658c17dcb0aaef86294762f555194"
 )
+HISTORICAL_TIP = (
+    "8e2ce51d8e7ca47f9ca5a8e5c743d1d6a0f0cd749e10195a54e2140117bf12f4"
+)
 
 
 @pytest.mark.parametrize("target", FASTENERS)
@@ -62,7 +65,9 @@ def test_fasteners_are_explicit_pinned_targets_with_exact_spec_manifests(target)
 
 
 @pytest.mark.parametrize("target", FASTENERS)
-@pytest.mark.parametrize("digest", [None, "0" * 64, OBSERVED_UNAPPROVED_TIP])
+@pytest.mark.parametrize(
+    "digest", [None, "0" * 64, OBSERVED_UNAPPROVED_TIP, HISTORICAL_TIP]
+)
 def test_fastener_input_never_accepts_a_different_source_or_repins(
     monkeypatch, tmp_path, target, digest
 ):
