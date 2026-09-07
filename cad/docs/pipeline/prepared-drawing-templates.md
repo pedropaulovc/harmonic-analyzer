@@ -51,6 +51,7 @@ loudly rather than being overwritten. No reset/retry is built in.
 Preparation creates two blank drawings: current setup saved once as DRWDOT,
 then a fresh instance of that DRWDOT. It compares raw units, all ten dimension
 style scopes, sheet properties, linked-note expressions/multiplicity, fonts,
+horizontal/vertical note justification, position locks, sheet-format visibility,
 and measured visible note content. No floats are rounded: represented native
 coordinates also compare exactly. This stricter comparison has **not yet been
 run natively** and may reject a representational change; any later numerical
@@ -63,6 +64,8 @@ control proved that such no-ink extents can collapse on instantiation. All raw
 extent observations remain in the receipt. Unsupported non-note annotations
 on a blank sheet fail; they are not silently omitted. This is a template-default
 witness, not a manufacturing-sheet geometry proof.
+It does not inventory the sheet-format sketch or logos; full rendered/vector
+inspection remains required before rollout and is not implied by this receipt.
 
 The native save preserves the proven complete legacy call shape:
 `ClearSelection2(True); IModelDoc2.SaveAs3(path, 0, 0)`. The integer return is
@@ -79,6 +82,9 @@ can be cleaned up because current setup assigns `adapter.currentModel` only in
 that call: exact baseline-plus-one-new-handle inventory and active identity are
 still required. A changed user active document or extra native document stops
 cleanup and retains the failure, rather than guessing ownership from its title.
+Native save requires the owned handle still be both active and the adapter's
+current model. Case-insensitive duplicate or empty document titles are refused
+before save/close because the adapter's `CloseDoc` route identifies by title.
 
 Owned diagnostics supply `operation_context(TemplateOperation, exact_path)`:
 CREATE maps to their `ownership.creating_document(DocumentKind.DRAWING, path)`;
