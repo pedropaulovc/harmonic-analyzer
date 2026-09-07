@@ -24,6 +24,7 @@ import fulcrum_shaft_spec
 import pivot_shaft_spec
 import rocker_arm_notes
 from diagnostics._recipe_view_roles import VIEW_ROLES, ViewRole
+from diagnostics._model_dimension_coverage import ModelDimensionRole, SemanticCoverage
 
 
 @dataclass(frozen=True)
@@ -34,6 +35,9 @@ class RecipeTarget:
     basic: dict[str, set[str]] = field(default_factory=dict)
     entity_labels: dict[str, str] = field(default_factory=dict)
     view_roles: dict[str, ViewRole] = field(default_factory=dict)
+    coverage: SemanticCoverage = SemanticCoverage.GEOMETRY
+    model_dimensions: tuple[ModelDimensionRole, ...] = ()
+    model_views: tuple[str, ...] = ()
 
 
 def _shaft_labels(stem, spec):
@@ -87,6 +91,28 @@ TARGETS = {
         "e7b48995c9f2e87af473219edfca1500a14e77bd353a330c64883011ab4fb60d",
         "fillister_screw_spec",
         fillister_screw_spec.DRAWING_DIMENSIONS,
+        coverage=SemanticCoverage.MODEL_DIMENSIONS_ONLY,
+        model_views=("*Right", "*Back", "*Isometric"),
+        model_dimensions=(
+            ModelDimensionRole("HeadProfile", "HeadDia", "*Back", 6, (10,)),
+            ModelDimensionRole(
+                "ShankProfile",
+                "ShankDia",
+                "*Right",
+                6,
+                (10,),
+                (fillister_screw_spec.THREAD_DESIGNATION,),
+            ),
+            ModelDimensionRole("Head", "HeadHt", "*Right", 2, ()),
+            ModelDimensionRole(
+                "Shank",
+                "ShankLg",
+                "*Right",
+                2,
+                (),
+                (fillister_screw_spec.SIDE_DIMENSION_CALLOUTS["ShankLg"],),
+            ),
+        ),
     ),
 }
 
