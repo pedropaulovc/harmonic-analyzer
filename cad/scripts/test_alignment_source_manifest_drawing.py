@@ -34,11 +34,20 @@ UNCHANGED = {
     "transgear_pinion": "4c079ba522ccf79fa90e75afa23303ba4c2f6541232e608525368e4cbb56d335",
 }
 
+AUTHORED_GEARS = {
+    "crank_drive_gear": "a5a2e0882336d622a7e93fae4d326cb059e7d91758e536488fcc6bf6de4ce93f",
+    "crank_pinion": "1b3a9dc571e1256459a10dd7e2d0815d35d41c284bf8665a9546751ac242ef24",
+    "cylinder_gear": "b436e33215ced1c3791cfd4095f49b376258edc1d4896f86656cd1b569a966f9",
+    "rack_pinion": "6591e6a5abf67a5a541ae8d4ee9542795bf37b5bfcb18121ee4636e963096fa7",
+    "transgear_feed_pinion": "93bc3466e0066f267d66223fc6ac2eed020ebdc10b665981f6685f1947f33d74",
+    "transgear_pinion": "989b42c133984a367517dfeb43f96bdf4201a2c899c4b2c9801d8ab7cb41e6c0",
+}
 
-def test_only_alignment_source_pin_migrates_to_the_actual_authored_output():
-    # Explicit 16 -> 17 enrollment preserves every existing pin and role.
-    # The new tip's pin was separately migrated after its real production rebuild.
-    expected = UNCHANGED | {
+
+def test_source_pins_match_explicit_actual_production_output_migrations():
+    # Keep the original source inventory as provenance. Only named, observed
+    # production builds replace those inputs; replay cannot discover new pins.
+    expected = UNCHANGED | AUTHORED_GEARS | {
         "alignment_pinion": AUTHORED_SOURCE,
         "cone_tip_adjuster": "18d0c1669c8de923420655d621f58d24afe404bc1d3a5a787930ebeeb2fefbf2",
         "cone_pivot_screw": "515019088b41d329b45f0487b9241123751ecac7d6c116481930ae9c45e89c36",
@@ -47,6 +56,28 @@ def test_only_alignment_source_pin_migrates_to_the_actual_authored_output():
     assert {key: row.source_sha256 for key, row in manifest.TARGETS.items()} == expected
     assert pilot.EXPECTED_PART_HASHES == expected
     assert len(expected) == 17
+
+
+@pytest.mark.parametrize("target", AUTHORED_GEARS)
+@pytest.mark.parametrize("source_state", ["historical", "authored", "unknown"])
+def test_gear_replay_rejects_old_or_unknown_bytes_without_repinning(
+    monkeypatch, tmp_path, target, source_state
+):
+    path = tmp_path / (target.replace("_", "-") + ".SLDPRT")
+    digest = {
+        "historical": UNCHANGED[target],
+        "authored": AUTHORED_GEARS[target],
+        "unknown": "0" * 64,
+    }[source_state]
+    before = dict(pilot.EXPECTED_PART_HASHES)
+    monkeypatch.setattr(pilot.attachments, "file_digest", lambda _: digest)
+    sources = {target: path}
+    if source_state == "authored":
+        assert pilot.require_sources(sources, sources) == {str(path): digest}
+    else:
+        with pytest.raises(RuntimeError, match="exact immutable source hash mismatch"):
+            pilot.require_sources(sources, sources)
+    assert pilot.EXPECTED_PART_HASHES == before
 
 
 @pytest.mark.parametrize("digest", [OLD_SOURCE, "0" * 64, AUTHORED_SOURCE])
