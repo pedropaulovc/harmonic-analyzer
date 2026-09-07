@@ -1,6 +1,10 @@
 # Independent assembly validation on vm-solidworks
 
-Execution evidence for [the second-VM handoff](second-vm-assembly-handoff.md).
+> Historical VM2 evidence on the source/adapter revisions below, not a full-build
+> acceptance for the main-based extraction. See the
+> [health-only extraction boundary](assembly-health-main-extraction.md).
+
+Execution evidence for the second-VM handoff.
 The initial saved-channel check and complete assembly fleet passed soundness and
 kinematics. Paired measurements support the implemented top-level health target
 enumeration; the candidate fleet and incremental identity checks passed.

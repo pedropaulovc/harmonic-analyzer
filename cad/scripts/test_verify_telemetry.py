@@ -36,6 +36,8 @@ import types
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 # Export nowhere (no Aspire probe / OTLP retries) BEFORE the spine configures.
 os.environ.setdefault("OTEL_EXPORTER_OTLP_ENDPOINT", "")
 
