@@ -242,3 +242,43 @@ No PDF, saved drawing or cold-reopen acceptance was produced by this attempt.
 At this code checkpoint the seven offline gates were current, including 4,143
 recipe tests (`pytest-telemetry/run-jatvb_dw`, 86.84 s); this remains distinct
 from full native pipeline acceptance.
+
+### Cold source-PMI position serialization boundary
+
+Receipt `selected-view-pmi-dw50mqvy/observations.json`, SHA-256
+`d1c551feb949197d0915d94aa4cbbe3df0c6f8812bf48816a229c6468ce1ef0f`,
+reached native/PDF save with unchanged live source/drawing witnesses, then
+rejected its cold source witness. The diagnostic took 70.760989 s, not a paired
+performance measurement. Original/template/copied-source and runtime fingerprints
+remained exact. Cold drawing/export acceptance was not reached.
+
+The committed [full source snapshot fixture](evidence/selected-view-pmi-dw50mqvy-source-cold.json)
+replays every source leaf: the only differences are three `pmi/*/position_m/0`
+coordinates. Datum A changes from `5.832380380939283e-19` to
+`5.8323803809392685e-19` m (-1.4444474582904269e-33 m, 15 component ULP).
+Both FCFs change from `3.061616940311174e-19` to `3.06161694031216e-19` m
+(9.860761315262648e-32 m, 2048 component ULP). All remaining position axes,
+PMI names/signatures/visibility/owner/face witnesses, and source dimension,
+tolerance and display inventories are exact. This is an observed-inventory
+comparison, not a full source BREP equivalence proof.
+
+Only the **cold source-PMI position vectors** now use the existing 16-ULP and
+1e-14 m caps with ULP measured at the largest absolute component of the before
+and after XYZ vectors. Both bounds must hold. The resulting per-axis budgets
+are 2.7755575615628914e-17 m for the datum and 5.551115123125783e-17 m for
+each FCF. Raw coordinates, deltas and budgets remain in the receipt; no value
+is rounded or overwritten. Types, keys, inventory order/multiplicity, content,
+identity and geometry fields remain exact; nonfinite values reject. Source
+dimension/geometry/hash gates and the drawing comparator are unchanged.
+
+After cold reopen, the fresh source snapshot and dimension handles become the
+baseline for the existing post-PDF-export read. That comparison is exact
+same-session again, including native handle identity. There are no additional
+COM reads or new native calls. The retained three tiny deltas pass the pure
+cold replay and fail the live replay; tests also reject either bound exceeded,
+source/content/type mutations and post-reopened-export drift. Native acceptance
+of this correction is pending a separately granted run.
+
+```powershell
+uv run python -m pytest cad/scripts/test_source_pmi_comparison_drawing.py cad/scripts/test_selected_view_model_pmi_drawing.py cad/scripts/test_reopen_annotation_comparison_drawing.py -q
+```

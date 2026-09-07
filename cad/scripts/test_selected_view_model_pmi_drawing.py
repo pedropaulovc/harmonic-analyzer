@@ -2,6 +2,7 @@
 
 from types import SimpleNamespace
 from unittest.mock import Mock
+import math
 
 import pytest
 
@@ -276,7 +277,17 @@ def test_parent_environment_fails_before_native_wrapper(tmp_path, monkeypatch, f
 @pytest.mark.parametrize("arrangement", [None, probe.PmiArrangement.SPACE_TIGHTLY_DOWN])
 @pytest.mark.parametrize(
     "mode",
-    ["passed", "missing_pmi", "cold_title", "copy_saved", "view_creation_failed"],
+    [
+        "passed",
+        "missing_pmi",
+        "cold_title",
+        "copy_saved",
+        "view_creation_failed",
+        "cold_source_roundoff",
+        "live_source_roundoff",
+        "reopened_export_source_roundoff",
+        "reopened_export_source_identity",
+    ],
 )
 async def test_owned_control_exports_failures_but_never_saves_original_or_ignores_copy_drift(
     native,  # noqa: F811 - imported pytest fixture
@@ -310,9 +321,26 @@ async def test_owned_control_exports_failures_but_never_saves_original_or_ignore
         probe.pilot, "adapter_fingerprints", lambda: {"adapter": "same"}
     )
     source_records = valid_records()
-    monkeypatch.setattr(
-        probe.pmi, "source_snapshot", lambda *_: deepcopy(source_records)
-    )
+    for row in source_records:
+        row["position_m"] = tuple(float(value) for value in row["position_m"])
+    source_reads = []
+
+    def read_source(_app, model):
+        source_reads.append(model)
+        rows = deepcopy(source_records)
+        if mode == "live_source_roundoff" and len(source_reads) > 1:
+            rows[0]["position_m"] = (math.nextafter(0.1, math.inf), 0.1, 0.0)
+        if (
+            mode in {"cold_source_roundoff", "reopened_export_source_roundoff"}
+            and model is not source_reads[0]
+        ):
+            value = math.nextafter(0.1, math.inf)
+            if mode == "reopened_export_source_roundoff" and phase.get("cold_exported"):
+                value = math.nextafter(value, math.inf)
+            rows[0]["position_m"] = (value, 0.1, 0.0)
+        return rows
+
+    monkeypatch.setattr(probe.pmi, "source_snapshot", read_source)
     dimensions = {
         "configuration": "Default",
         "features": ["StubProfile"],
@@ -321,7 +349,15 @@ async def test_owned_control_exports_failures_but_never_saves_original_or_ignore
     monkeypatch.setattr(
         probe,
         "dimension_snapshot",
-        lambda app, model, path, required: (deepcopy(dimensions), {"D": model}),
+        lambda app, model, path, required: (
+            deepcopy(dimensions),
+            {
+                "D": object()
+                if mode == "reopened_export_source_identity"
+                and phase.get("cold_exported")
+                else model
+            },
+        ),
     )
     records = deepcopy(source_records)
     view_label = "Front" if arrangement is None else "Right"
@@ -445,11 +481,12 @@ async def test_owned_control_exports_failures_but_never_saves_original_or_ignore
         Path(pdf_path).write_bytes(b"pdf")
 
     monkeypatch.setattr(probe, "save_drawing", save)
-    monkeypatch.setattr(
-        probe.retained,
-        "export_pdf_only",
-        lambda adapter, path: path.write_bytes(b"cold pdf"),
-    )
+
+    def export_cold(adapter, path):
+        phase["cold_exported"] = True
+        path.write_bytes(b"cold pdf")
+
+    monkeypatch.setattr(probe.retained, "export_pdf_only", export_cold)
     monkeypatch.setattr(
         probe.pmi, "render_pdf_png", lambda pdf, png: png.write_bytes(b"png")
     )
@@ -465,7 +502,10 @@ async def test_owned_control_exports_failures_but_never_saves_original_or_ignore
             arrangement=arrangement,
         )
 
-    if mode == "passed":
+    expected_status = (
+        "passed" if mode in {"passed", "cold_source_roundoff"} else "failed"
+    )
+    if expected_status == "passed":
         await owned_callback(native.adapter, callback)
     else:
         with pytest.raises((RuntimeError, ExceptionGroup)):
@@ -478,10 +518,14 @@ async def test_owned_control_exports_failures_but_never_saves_original_or_ignore
     assert template.read_bytes() == b"unchanged template"
     (receipt,) = (tmp_path / "reports").glob("*/observations.json")
     report = json.loads(receipt.read_text())
-    assert report["status"] == ("passed" if mode == "passed" else "failed")
+    assert report["status"] == expected_status
     assert report["inputs_before"] == report["inputs_after"]
     assert report["visual_review"] == "pending"
-    if arrangement is None or mode in {"missing_pmi", "view_creation_failed"}:
+    if arrangement is None or mode in {
+        "missing_pmi",
+        "view_creation_failed",
+        "live_source_roundoff",
+    }:
         spacing.assert_not_called()
         spacing_comparison.assert_not_called()
     else:
@@ -493,6 +537,19 @@ async def test_owned_control_exports_failures_but_never_saves_original_or_ignore
             == report["source_after_arrangement"]["dimensions"]
         )
         assert report["requested_arrangement"] == "space-tightly-down"
+    if mode in {"cold_source_roundoff", "reopened_export_source_roundoff"}:
+        cold = report["source_reopened"]["pmi_comparison"]
+        live = report["source_after_reopened_export"]["pmi_comparison"]
+        assert cold["boundary"] == "cold_reopen" and cold["status"] == "passed"
+        assert len(cold["coordinate_roundoff"]) == 1
+        assert live["boundary"] == "same_session" and live["coordinate_roundoff"] == []
+        assert live["status"] == expected_status
+    if mode == "reopened_export_source_identity":
+        assert "source native dimension identity changed" in report["operation_error"]
+        assert (
+            report["source_after_reopened_export"]["pmi_comparison"]["status"]
+            == "passed"
+        )
     if mode == "view_creation_failed":
         assert not report["artifacts"] and not report["imports"]
         assert "third-angle views rejected" in report["operation_error"]
@@ -501,6 +558,13 @@ async def test_owned_control_exports_failures_but_never_saves_original_or_ignore
     if arrangement is not None and mode == "missing_pmi":
         assert not report["artifacts"]
         assert "requires complete initial coverage" in report["operation_error"]
+        return
+    if mode == "live_source_roundoff":
+        assert not report["artifacts"]
+        comparison = report["source_after_import"]["pmi_comparison"]
+        assert comparison["status"] == "failed"
+        assert comparison["boundary"] == "same_session"
+        assert not comparison["coordinate_roundoff"]
         return
     assert "initial" in report["artifacts"]
     if mode != "copy_saved":
