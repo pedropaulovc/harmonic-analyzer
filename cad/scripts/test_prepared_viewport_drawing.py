@@ -44,10 +44,13 @@ def scene(native, monkeypatch, tmp_path):  # noqa: F811
     native.app.documents.append(baseline)
     native.app.ActiveDoc = baseline
     native.app.GetProcessID = lambda: 123
-    calls, faults, created = [], {}, []
+    calls, faults, created, vectors = [], {}, [], []
 
     class View:
         _scale = 1.0
+
+        def __init__(self):
+            self._translation = [0.012, -0.005, 0.0]
 
         @property
         def Scale2(self):
@@ -59,13 +62,48 @@ def scene(native, monkeypatch, tmp_path):  # noqa: F811
             if faults.get("clamp") and value == 2:
                 return
             self._scale = value
+            if faults.get("pan_drift"):
+                self._translation[0] += 0.01
 
         @property
         def Transform(self):
-            return SimpleNamespace(ArrayData=(1.0,) * 16)
+            matrix = [1.0] * 16
+            matrix[9:12] = self._translation
+            matrix[12] = self._scale
+            return SimpleNamespace(ArrayData=matrix)
+
+        @property
+        def Translation3(self):
+            return SimpleNamespace(ArrayData=tuple(self._translation))
+
+        @Translation3.setter
+        def Translation3(self, vector):
+            calls.append(("translation", vector))
+            self._translation = list(vector.ArrayData)
+            if faults.get("translation_readback"):
+                self._translation[0] += 1e-12
+
+        @property
+        def Orientation3(self):
+            matrix = [1.0] * 16
+            if faults.get("orientation") and self._scale == 2:
+                matrix[0] += 1e-12
+            return SimpleNamespace(ArrayData=matrix)
 
         def GetVisibleBox(self):
             return (0, 0, 1200, 800)
+
+    def create_vector(values):
+        calls.append(("create_vector", values))
+        if faults.get("null_vector"):
+            return None
+        vector = SimpleNamespace(
+            ArrayData=tuple(values.value if hasattr(values, "value") else values)
+        )
+        vectors.append(vector)
+        return vector
+
+    native.app.GetMathUtility = lambda: SimpleNamespace(CreateVector=create_vector)
 
     annotation = SimpleNamespace(GetName=lambda: "Note1", GetType=lambda: 6)
     sheet_view = SimpleNamespace(GetAnnotations=lambda: [annotation])
@@ -102,6 +140,7 @@ def scene(native, monkeypatch, tmp_path):  # noqa: F811
         scale = adapter.currentModel.ActiveView.Scale2
         calls.append(("snapshot", scale))
         extent = [0.1, 0.2, 0.0, 0.3, 0.4, 0.0]
+        extent[0] += adapter.currentModel.ActiveView._translation[0]
         if scale == 2:
             extent[0] += 0.000044
         if faults.get("restore") and len([r for r in calls if r[0] == "redraw"]) == 3:
@@ -162,10 +201,11 @@ def scene(native, monkeypatch, tmp_path):  # noqa: F811
     monkeypatch.setattr(probe, "runtime_inputs", lambda adapter, spec: {"frozen": 1})
     reports = tmp_path / "reports"
 
-    def run():
+    def run(**kwargs):
         return asyncio.run(
             owned.owned_callback(
-                native.adapter, lambda adapter: probe.probe(adapter, pins, reports, 123)
+                native.adapter,
+                lambda adapter: probe.probe(adapter, pins, reports, 123, **kwargs),
             )
         )
 
@@ -308,6 +348,8 @@ def test_invalid_native_viewport_is_not_coerced(scene, scale, transform, pixels)
         ActiveView=SimpleNamespace(
             Scale2=scale,
             Transform=SimpleNamespace(ArrayData=transform),
+            Translation3=SimpleNamespace(ArrayData=(0.0, 0.0, 0.0)),
+            Orientation3=SimpleNamespace(ArrayData=(1.0,) * 16),
             GetVisibleBox=lambda: pixels,
         ),
     )
@@ -414,6 +456,93 @@ def test_cropped_preview_cannot_hide_uncropped_bottom_row_change(monkeypatch):
         probe.compare_appearance(before, after)
     with pytest.raises(RuntimeError, match="unavailable"):
         probe.compare_appearance(before, {})
+
+
+def test_original_translation_controls_scale_setter_pan_drift(scene):
+    scene.faults["pan_drift"] = True
+    scene.run(translation=probe.Translation.ORIGINAL)
+    report = scene.report()
+    assert report["status"] == "passed"
+    assert report["translation"] == "original"
+    assert len(scene.vectors) == 3
+    assert len({id(vector) for vector in scene.vectors}) == 3
+    requests = [item[1] for item in scene.calls if item[0] == "create_vector"]
+    for request in requests:
+        if hasattr(request, "varianttype"):
+            assert request.varianttype == 8197  # VT_ARRAY | VT_R8
+    original = report["initial_viewport"]["translation3"]
+    for arm in report["arms"]:
+        assert arm["after_scale_viewport"]["translation3"] != original
+        assert arm["viewport"]["translation3"] == original
+        assert (
+            arm["viewport"]["orientation3"]
+            == report["initial_viewport"]["orientation3"]
+        )
+    assert report["comparisons"]["a_a_strict_defaults"]["status"] == "passed"
+
+
+def test_zoom_only_pan_failure_remains_failed_without_translation_writes(scene):
+    scene.faults["pan_drift"] = True
+    with pytest.raises(Exception):
+        scene.run()
+    report = scene.report()
+    assert report["translation"] == "native"
+    assert report["comparisons"]["a_a_strict_defaults"]["status"] == "failed"
+    assert report["comparisons"]["a_a_viewport"]["status"] == "failed"
+    assert not scene.vectors
+    assert not [call for call in scene.calls if call[0] == "translation"]
+
+
+@pytest.mark.parametrize(
+    "fault", ["translation_readback", "null_vector", "orientation"]
+)
+def test_controlled_translation_rejects_failed_native_readback_before_measurement(
+    scene, fault
+):
+    scene.faults[fault] = True
+    with pytest.raises(Exception):
+        scene.run(translation=probe.Translation.ORIGINAL)
+    report = scene.report()
+    assert report["status"] == "failed"
+    assert "defaults" not in report["arms"][-1]
+    assert scene.native.app.documents == [scene.baseline]
+
+
+def test_controlled_translation_cli_forwards_same_policy_to_owned_worker(
+    scene, monkeypatch
+):
+    import dodo
+
+    calls = []
+    monkeypatch.setattr(dodo, "_run", lambda argv, *a, **k: calls.append(argv))
+    args = [
+        "--expected-pid",
+        "123",
+        "--receipt",
+        str(scene.receipt),
+        "--receipt-sha256",
+        scene.pins["receipt"]["sha256"],
+        "--template",
+        str(scene.template),
+        "--template-sha256",
+        scene.pins["template"]["sha256"],
+        "--translation",
+        "original",
+    ]
+    assert probe.main(args) == 0
+    assert calls[0][calls[0].index("--translation") + 1] == "original"
+    observed = []
+
+    async def worker(*args, **kwargs):
+        observed.append(kwargs["translation"])
+        return 0
+
+    monkeypatch.setattr(probe, "probe", worker)
+    monkeypatch.setattr(
+        probe.owned, "run_copy_diagnostic", lambda callback: asyncio.run(callback(None))
+    )
+    assert probe.main([*args, "--worker"]) == 0
+    assert observed == [probe.Translation.ORIGINAL]
 
 
 def test_complete_supported_object_inventory_and_flat_paths_are_exact(

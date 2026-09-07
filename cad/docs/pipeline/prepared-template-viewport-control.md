@@ -81,4 +81,50 @@ uv run python cad/scripts/diagnostics/probe_prepared_viewport.py `
 
 The parent runner acquires the existing machine-global seat. The worker only
 attaches to the approved running instance and preserves unrelated visible
-documents. This commit provides offline tests; it contains no native outcome.
+documents. The initial control commit provided offline tests only; its later
+native result is retained below.
+
+## Zoom-only native result and controlled-translation follow-up
+
+At root `ddf232ba`, the zoom-only control completed as **failed**, receipt
+`cad/out/reports/prepared-viewport/prepared-viewport-3375jkd8/measurements.json`,
+SHA-256 `f40200f604630f70030d0c7cc0699b68ea26a81a87408d06a0985291eb6dd67a`.
+All three per-arm export-default/viewport checks, A/B and A/A text/style/native
+stroke semantics, PDF glyphs, supported paths and complete object inventories
+passed. All uncropped 5100×3301 RGB rasters have identical pixel SHA-256
+`58270d9f1ad721417deef0f717dd2b16b247198092c4416e19ec2be62a4c922f`.
+Input hashes stayed exact, ownership returned empty→empty and cleanup succeeded.
+
+Strict A/A raw defaults and viewport equality failed. Although `Scale2` returned
+to the initial value, screen-space translation changed by +113.881013359 px in
+X and −7.570898485 px in Y. Thus this was **not the same viewport**; it does not
+prove instability at a fixed viewport or a printed-ink mutation.
+
+The initial transform gives 333.709601874 µm/pixel, matching the original failed
+preparation's two extent-delta clusters. Zoomed pitch is 166.854800937 µm/pixel.
+Every visible-note X extent in every arm maps to an integer pixel endpoint
+within 4.55e−13 px. A/A pixel endpoint changes of 113 or 114 px, against the
+113.881013359 px viewport translation, explain the measured −294.002617140 µm
+and +39.706984733 µm sheet-coordinate changes. Native glyph anchors/positions
+remain exact. These are measured viewport-dependent extent observations, not
+permission to drop the raw defaults gate.
+
+The independent next variant adds `--translation original` to the command above.
+The default `--translation native` retains the zoom-only mechanism. Both now
+record the original `Translation3.ArrayData` and `Orientation3.ArrayData` before
+any Scale2 setter. The new variant creates a **fresh** native MathVector from
+the original three translation components after each absolute Scale2 assignment,
+assigns it through `Translation3`, and requires exact translation readback and
+unchanged orientation. It does not derive native translation from PDF/screen
+coordinates, write orientation, or touch sheet/annotation positions. All strict
+A/A, export, semantic and image checks are unchanged. The new variant has only
+offline mock verification until its own reviewed native receipt exists.
+
+Bundled contracts additionally inspected:
+[Translation3](https://help.solidworks.com/2026/English/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.IModelView~Translation3.html),
+[Orientation3](https://help.solidworks.com/2026/English/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.IModelView~Orientation3.html),
+[CreateVector](https://help.solidworks.com/2026/English/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.IMathUtility~CreateVector.html),
+and [MathVector.ArrayData](https://help.solidworks.com/2026/English/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.IMathVector~ArrayData.html).
+The official “Get Angle of Hole Not Normal to a Face” example creates a vector
+from three doubles. This is a call-shape reference, not proof that restoring
+viewport translation will make this native template's A/A defaults exact.
