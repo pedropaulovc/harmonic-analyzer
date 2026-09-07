@@ -346,7 +346,9 @@ class ViewEntityAcceptance:
                     )
                 row["resolver"] = role.resolver.value
                 row["resolver_side_effect"] = (
-                    "activate_view" if role.resolver == ViewResolver.SHANK else "none"
+                    "activate_view"
+                    if role.resolver in (ViewResolver.SHANK, ViewResolver.SHANK_FACE)
+                    else "none"
                 )
                 resolved = role.resolve(self.module, adapter, view)
                 if resolved is None:
