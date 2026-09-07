@@ -210,9 +210,8 @@ async def build(
         raise RuntimeError("failed to add ASME center mark to shaft end view")
 
     pivot_edge = _outer_end_edge(adapter, end)
-    # Leader anchor points for the surface-finish symbols (sheet meters).
+    # Existing PMI placement references (sheet meters).
     big_end_x = SIDE_CENTER[0] + SHAFT_LENGTH / 2000.0
-    pivot_top = (big_end_x - 0.020, SIDE_CENTER[1] + SECTION_DIAS[0] / 2000.0)
     tip_top = (
         SIDE_CENTER[0] - SHAFT_LENGTH / 2000.0 + 0.016,
         SIDE_CENTER[1] + SECTION_DIAS[-1] / 2000.0,
@@ -248,25 +247,23 @@ async def build(
         controls=GEOMETRIC_CONTROLS,
         label="cone gear shaft PMI",
     )
+    # Both finishes qualify whole cylinders. Keep their exact selected faces
+    # and let SolidWorks place attached no-leader symbols, as on crankshaft.
     add_surface_finish(
         adapter,
         side,
-        symbol_xy=(0.255, 0.242),
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_journal"),
         label="pivot journal finish",
         entity_type="FACE",
         entity=pivot_face,
-        leader_attach_xy=pivot_top,
     )
     add_surface_finish(
         adapter,
         side,
-        symbol_xy=(0.102, 0.240),
         control=surface_finish_by_key(SURFACE_FINISHES, "tip_journal"),
         label="tip journal finish",
         entity_type="FACE",
         entity=tip_face,
-        leader_attach_xy=(tip_top[0] + 0.010, tip_top[1]),
     )
 
     # Notes block sits lower-left, below the enlarged end view (its bottom
