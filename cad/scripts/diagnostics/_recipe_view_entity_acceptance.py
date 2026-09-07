@@ -143,6 +143,9 @@ class ViewEntityAcceptance:
 
     @contextmanager
     def observe(self, adapter, unused_source_entities=None):
+        from diagnostics._silhouette_insertion_control import InsertionBoundaries
+
+        insertion = InsertionBoundaries(self, adapter)
         original_select = drawing._select_annotation_entity
         originals = {
             name: getattr(drawing, name)
@@ -230,6 +233,7 @@ class ViewEntityAcceptance:
                     )
                 self.initial_geometry[label] = row["selected_geometry"]
                 self.selected[label] = (expected, actual, view)
+                insertion.selected(label, row)
             return result
 
         def wrap(name, original):
@@ -300,7 +304,8 @@ class ViewEntityAcceptance:
                         raise RuntimeError(f"recipe has an unexpected {name} alias")
                     patches.append((owner, name, original))
                     setattr(owner, name, replacement)
-            yield
+            with insertion.observe():
+                yield
         finally:
             for owner, name, original in reversed(patches):
                 setattr(owner, name, original)
