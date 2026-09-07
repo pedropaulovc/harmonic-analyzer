@@ -185,3 +185,29 @@ retain exact native identities/values/tolerance types through export. All fresh
 attachment, dimension, annotation-handle and view-layout gates pass. Cleanup
 preserved the clean visible lever part and dirty visible unsaved Draw2, with no
 cleanup error. No second native invocation followed this completed control.
+
+## Operator-interrupted follow-up
+
+The next functional attempt at `1e94a7d34145089f7f2e4d572891917d9ab79d11`
+stopped during drawing creation, before view/layout construction or native/PDF/PNG
+export. The user reported accidentally closing SolidWorks at that moment. Receipt:
+`cad/out/reports/datum-policy-jvywuzfu/pilot.json`; adjacent `ownership.json`.
+The recipe interval was 2.394 s and the COM error was `RPC_E_DISCONNECTED`
+(`-2147417848`) while reading the newly created document's path.
+
+The four protected original/root-guard hashes and owned rocker-copy hash remained
+exact. The old visible lever and unsaved Draw2 were no longer in the native
+inventory, so ownership correctly refused normal cleanup and reported the
+baseline as changed. No automatic retry or restart occurred inside that probe.
+Keep this attempt as an operator interruption, not successful placement evidence
+or a demonstrated algorithm failure. The revised GTol placement still needs a
+completed native trial.
+
+After checking that SolidWorks was closed and that its configured recovery folder
+contained no Draw2 recovery file, the main agent invoked the existing licensed
+launcher under the seat lock. The pinned `e77bfda4` adapter's child-environment
+repair was exercised by the actual `CATSTART` launch: initiated 2026-09-06
+17:30:06 local time, connected at 17:32:02. A new read-only inventory found PID
+31860 with no open documents and no blocking modal. This is a successful cold
+launch observation without the earlier CEF error, not proof about the unsaved
+Draw2 contents or a fleet launch-failure rate.
