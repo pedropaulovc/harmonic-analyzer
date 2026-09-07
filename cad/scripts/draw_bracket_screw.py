@@ -5,6 +5,9 @@ the head-height and under-head length as inserted model dimensions, a head-end v
 carrying the two marked model diameters (head OD and the shank/thread minor Ø
 with its UNC-2A designation), plus an isometric.  Built on the Front plane (axis
 +Z), so the profile lies HORIZONTAL with the head at the right end.
+
+Run through the doit-managed SolidWorks seat:
+    uv run python -m doit drawing:bracket_screw
 """
 
 from __future__ import annotations

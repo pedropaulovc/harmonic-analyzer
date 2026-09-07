@@ -366,7 +366,7 @@ def test_initial_silhouette_witness_survives_later_native_mutation(
     if fault == "same_handle_geometry_changed":
         entity.GetEndPoint = lambda: NS(ArrayData=(0.003, 0, 0.10000000000000002))
     with pytest.raises(
-        RuntimeError, match="silhouette face|geometry changed since selection"
+        RuntimeError, match=r"silhouette face|geometry changed since selection"
     ):
         bank.witness.drawing_snapshot(bank.adapter, phase="built")
     row = bank.witness.context_report["stages"][-1]
@@ -428,7 +428,7 @@ def test_explicit_call_cannot_be_silently_omitted_from_manifest(bank):
 
 def test_partial_alias_setup_failure_restores_all_wrappers(bank):
     bank.module.add_feature_control_frame = lambda *_: None
-    with pytest.raises(RuntimeError, match="unexpected.*alias"):
+    with pytest.raises(RuntimeError, match=r"unexpected.*alias"):
         with bank.witness.observe(bank.adapter):
             raise AssertionError("must fail before entering")
     assert bank.module.add_datum_feature is bank.originals["add_datum_feature"]
@@ -580,7 +580,7 @@ async def test_view_enrollment_reuses_full_owned_pilot_without_model_reverse_map
             adapter, "candidate", source_root, source_root, root, targets=(target,)
         )
     else:
-        with pytest.raises(RuntimeError, match="source copy changed|annotation layout"):
+        with pytest.raises(RuntimeError, match=r"source copy changed|annotation layout"):
             await pilot.pilot(
                 adapter, "candidate", source_root, source_root, root, targets=(target,)
             )
