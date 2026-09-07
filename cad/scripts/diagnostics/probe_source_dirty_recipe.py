@@ -1,4 +1,4 @@
-"""Locate the first arbor recipe boundary that dirties an OWNED source-part copy.
+"""Locate the first selected recipe boundary that dirties an OWNED source copy.
 
 This diagnostic is not a drawing build or a claim that dirty sources are harmless.
 The exact original is hash-protected and never opened. A unique-basename byte
@@ -18,8 +18,10 @@ particular inner COM setter caused the transition. No save/export is allowed.
 
 IFeature.GetFirst/GetNextDisplayDimension enumerate feature/subfeature dimensions
 in unspecified order. No display-toggle prerequisite is written by this probe;
-coverage is reported as the observed inventory and must include all five arbor
-manufacturing dimensions. Missing support fails rather than claiming completeness.
+coverage is reported as the observed inventory and must include the selected
+target's required manufacturing dimensions. Both registered targets require five.
+Missing support fails rather than claiming completeness. Arbor remains the default;
+cone_tip_adjuster is an explicit independent control, with no automatic next trial.
 
 R2026x observation, 2026-09-06, frozen 99eadbe7, trace
 0x8d83b3f3456fe76a203b3f0b2b6c84e4: baseline getters, new drawing, three view
@@ -39,6 +41,8 @@ from __future__ import annotations
 
 import argparse
 from contextlib import contextmanager
+from dataclasses import dataclass
+from enum import StrEnum
 from functools import wraps
 import inspect
 import json
@@ -47,13 +51,15 @@ import shutil
 import sys
 import tempfile
 import time
+from types import ModuleType
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "cad/scripts"))
 
 from _common import check  # noqa: E402
-from arbor_pedestal_spec import DRAWING_DIMENSIONS  # noqa: E402
+import arbor_pedestal_spec  # noqa: E402
+import cone_tip_adjuster_spec  # noqa: E402
 from diagnostics import benchmark_drawing_recipes as benchmark  # noqa: E402
 from diagnostics.probe_datum_policy_recipes import (  # noqa: E402
     adapter_fingerprints,
@@ -72,12 +78,40 @@ class DiagnosticStop(BaseException):
     """Expected diagnostic stop; must bypass _attempt's Exception handlers."""
 
 
-def dimension_snapshot(app, model, path):
-    return _source_snapshot(app, model, path, required=DRAWING_DIMENSIONS)
+class Target(StrEnum):
+    ARBOR_PEDESTAL = "arbor_pedestal"
+    CONE_TIP_ADJUSTER = "cone_tip_adjuster"
+
+
+@dataclass(frozen=True)
+class RecipeTarget:
+    spec: ModuleType
+    copy_prefix: str
+
+
+TARGETS = {
+    Target.ARBOR_PEDESTAL: RecipeTarget(arbor_pedestal_spec, "arbor"),
+    Target.CONE_TIP_ADJUSTER: RecipeTarget(cone_tip_adjuster_spec, "cone-tip-adjuster"),
+}
+
+
+def require_target(target):
+    if not isinstance(target, Target):
+        raise ValueError("source-dirty target requires an explicit registered enum")
+    return TARGETS[target]
+
+
+def dimension_snapshot(app, model, path, *, target=Target.ARBOR_PEDESTAL):
+    required = require_target(target).spec.DRAWING_DIMENSIONS
+    return _source_snapshot(app, model, path, required=required)
 
 
 class DirtyMonitor:
-    def __init__(self, app, model, path, report, checkpoint):
+    def __init__(
+        self, app, model, path, report, checkpoint, *, target=Target.ARBOR_PEDESTAL
+    ):
+        require_target(target)
+        self.target = target
         self.app, self.model, self.path = app, model, path
         self.report, self.checkpoint = report, checkpoint
         self.handles, self.stack = {}, []
@@ -107,7 +141,7 @@ class DirtyMonitor:
         before = self.flag()
         self.report["baseline_save_flag"] = {"before": before}
         self.report["baseline"], self.handles = dimension_snapshot(
-            self.app, self.model, self.path
+            self.app, self.model, self.path, target=self.target
         )
         after = self.flag()
         self.report["baseline_save_flag"]["after"] = after
@@ -157,7 +191,9 @@ class DirtyMonitor:
             return
         self.report["stop"] = {**event, "reason": "first_dirty_boundary"}
         self.checkpoint()
-        actual, handles = dimension_snapshot(self.app, self.model, self.path)
+        actual, handles = dimension_snapshot(
+            self.app, self.model, self.path, target=self.target
+        )
         initial = self.report["baseline"]["dimensions"]
         rows = actual["dimensions"]
         self.report["stop"].update(
@@ -258,7 +294,16 @@ def instrument_recipe(module, monitor):
             setattr(owner, name, original)
 
 
-async def probe(adapter, source, expected_hash, candidate, report_root):
+async def probe(
+    adapter,
+    source,
+    expected_hash,
+    candidate,
+    report_root,
+    *,
+    target=Target.ARBOR_PEDESTAL,
+):
+    selected = require_target(target)
     report_root.mkdir(parents=True, exist_ok=True)
     directory = Path(tempfile.mkdtemp(prefix="source-dirty-", dir=report_root))
     adapter.ownership.register_directory(directory)
@@ -268,6 +313,14 @@ async def probe(adapter, source, expected_hash, candidate, report_root):
         "events": [],
         "source": str(source),
         "candidate": candidate,
+        "target": target.value,
+        "source_spec": selected.spec.__name__,
+        "required_dimensions": sorted(
+            f"{name}@{feature}"
+            for feature, names in selected.spec.DRAWING_DIMENSIONS.items()
+            for name in names
+        ),
+        "scope": "one selected recipe; observed source dimensions/text; first dirty boundary or before finalization; no save/export",
         "helper_revision": benchmark.revision("HEAD"),
     }
     report_path = directory / "source-dirty.json"
@@ -277,12 +330,12 @@ async def probe(adapter, source, expected_hash, candidate, report_root):
 
     checkpoint()
     _telemetry.info("source dirty boundary diagnostic", report=str(report_path))
-    copied = directory / f"arbor-{directory.name}.SLDPRT"
+    copied = directory / f"{selected.copy_prefix}-{directory.name}.SLDPRT"
     try:
         report["original_before"] = file_digest(source)
         if report["original_before"] != expected_hash:
             raise RuntimeError(
-                "original arbor source does not match reviewed exact hash"
+                f"original {target.value} source does not match reviewed exact hash"
             )
         shutil.copy2(source, copied)
         report["copy_before"] = file_digest(copied)
@@ -292,16 +345,21 @@ async def probe(adapter, source, expected_hash, candidate, report_root):
         report["helpers"] = helper_fingerprints()
         report["imported_adapter"] = adapter_fingerprints()
         module = benchmark.load_recipe(
-            candidate, "arbor_pedestal", directory, source=copied
+            candidate, target.value, directory, source=copied
         )
         from _drawing_build import normal_drawing_factory
 
         drawing_factory = normal_drawing_factory(adapter, module.TEMPLATE_SPEC)
         report["recipe_sha256"] = file_digest(directory / "recipe-source.py")
-        check("open owned arbor copy", await adapter.open_model(str(copied)))
+        check(f"open owned {target.value} copy", await adapter.open_model(str(copied)))
         adapter.ownership.assert_current_owned()
         monitor = DirtyMonitor(
-            adapter.swApp, adapter.currentModel, copied, report, checkpoint
+            adapter.swApp,
+            adapter.currentModel,
+            copied,
+            report,
+            checkpoint,
+            target=target,
         )
         try:
             monitor.baseline()
@@ -351,6 +409,9 @@ async def probe(adapter, source, expected_hash, candidate, report_root):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--target", type=Target, choices=tuple(Target), default=Target.ARBOR_PEDESTAL
+    )
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--expected-sha256", required=True)
     parser.add_argument("--candidate", default="HEAD")
@@ -373,6 +434,8 @@ def main(argv=None):
             [
                 sys.executable,
                 str(Path(__file__).resolve()),
+                "--target",
+                args.target.value,
                 "--source",
                 str(source),
                 "--expected-sha256",
@@ -390,7 +453,12 @@ def main(argv=None):
         return 0
     return run_copy_diagnostic(
         lambda adapter: probe(
-            adapter, source, args.expected_sha256, candidate, args.report_root.resolve()
+            adapter,
+            source,
+            args.expected_sha256,
+            candidate,
+            args.report_root.resolve(),
+            target=args.target,
         )
     )
 
