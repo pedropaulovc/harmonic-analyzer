@@ -16,6 +16,7 @@ PILOTS = {
     "draw_pen_marker.py",
     "draw_pen_v_block.py",
     "draw_rocker_arm.py",
+    "draw_slotted_screw.py",
 }
 NATIVE_LAYOUT_HELPERS = {
     "_drawing_leader_clearance.py",

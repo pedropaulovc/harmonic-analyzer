@@ -1,11 +1,10 @@
 r"""Create the curated machinist drawing for the rig hold-down slotted screw.
 
-Uniform fastener slice (see draw_fillister_screw.py): a profile side view with
-the head-height and under-head length (the vertical profile cannot point-select
-the edge-on shoulder/tip, so both ship as the head/shank extrude-DEPTH model
-dimensions HeadHt/ShankLg in the side view), a head-end view
-carrying the two marked model diameters (head OD and the shank/thread minor Ø
-with its UNC-2A designation), plus an isometric.  Authored on the Top plane
+The profile imports the named head-height and under-head length dimensions
+HeadHt/ShankLg. The head-end view carries the marked head diameter, and the
+linked manufacturing note defines the thread. An isometric completes the sheet.
+SolidWorks arranges the dimensions before measured whole-sheet packing.
+Authored on the Top plane
 (axis +Y), so it stands VERTICAL in the profile view (head up).
 """
 
@@ -21,6 +20,7 @@ from _drawing_build import ProjectDrawingFactory, TemplateSpec, run_drawing_buil
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
+    auto_arrange_view_dimensions,
     curate_view_dimensions,
     finalize_drawing,
     read_required_properties,
@@ -28,7 +28,10 @@ from _drawing_common import (
     set_hidden_lines_removed,
     stamp_drawing_summary,
 )
+from _drawing_native_layout import LayoutNote
+from _drawing_project_layout import repair_project_drawing_layout
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_view_packing import Axis, AxisOrder
 from slotted_screw_spec import (
     HEAD_H,
     SHANK_LEN,
@@ -48,8 +51,8 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# #8-32 x 18 mm: 6:1 draws the ~20.5 mm length as ~123 mm and the head OD (8)
-# as ~48 mm.
+# Keep the production scale; native measurement includes dimension-line tails
+# when packing the complete view, not just the solid's projected size.
 SHEET_SCALE = (6.0, 1.0)
 TEMPLATE_SPEC = TemplateSpec(scale=SHEET_SCALE, decimals=2)
 _S = SHEET_SCALE[0] / 1000.0  # sheet meters per model mm
@@ -57,8 +60,8 @@ _S = SHEET_SCALE[0] / 1000.0  # sheet meters per model mm
 # Authored on the Top plane, axis +Y: head at y in [0, HEAD_H] (top), shank at
 # y in [-SHANK_LEN, 0] (bottom).  Head-end circle in the *Top view; the profile
 # (axis VERTICAL, head up) in the *Front view.
-# The side view sits high so the ~108 mm profile clears the wide manufacturing
-# note that anchors just above the title block.
+# These positions seed native arrangement. Measured packing moves complete
+# decorated views and their captions clear of notes and sheet-zone boundaries.
 END_CENTER = (0.075, 0.190)
 SIDE_CENTER = (0.190, 0.190)
 ISO_CENTER = (0.315, 0.175)
@@ -74,14 +77,13 @@ _HEAD_END_Y = _side_y(HEAD_H)  # head outer face (top)
 _JUNCTION_Y = _side_y(0.0)  # head/shank step
 _SHANK_END_Y = _side_y(-SHANK_LEN)  # shank tip (bottom)
 
-# Head-end view: the two concentric marked diameters, leadered clear to the left.
+# Head-end view: the marked head diameter, initially placed to the left.
 END_KEEP = {
     "HeadDia": (0.030, END_CENTER[1] + 0.026),
 }
 DIMENSION_CALLOUTS: dict[str, str] = {}
 
-# Side view: the head-height and under-head length as the extrude-depth model
-# dims (the vertical profile cannot point-select the edge-on shoulder/tip).
+# Side view: named head-height and under-head extrude-depth model dimensions.
 SIDE_KEEP = {
     "HeadHt": (SIDE_CENTER[0] + 0.052, (_HEAD_END_Y + _JUNCTION_Y) / 2.0),
     "ShankLg": (SIDE_CENTER[0] + 0.052, (_JUNCTION_Y + _SHANK_END_Y) / 2.0),
@@ -147,8 +149,22 @@ async def build(
     # inserted and positioned to the right of the vertical profile.
     curate_view_dimensions(adapter, side, keep=SIDE_KEEP, view_label="side")
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.105)
-    add_property_linked_note(adapter, "End View Note", END_CENTER[0] - 0.020, 0.250)
+    manufacturing = add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.105)
+    caption = add_property_linked_note(adapter, "End View Note", END_CENTER[0] - 0.020, 0.250)
+
+    auto_arrange_view_dimensions(adapter, (side, end, iso))
+    repair_project_drawing_layout(
+        adapter,
+        views={"side": side, "end": end, "iso": iso},
+        orderings=(
+            AxisOrder(Axis.X, "end", "side"),
+            AxisOrder(Axis.X, "side", "iso"),
+        ),
+        notes=(
+            LayoutNote("manufacturing", manufacturing.GetAnnotation()),
+            LayoutNote("end-caption", caption.GetAnnotation(), "end"),
+        ),
+    )
 
     return await finalize_drawing(
         adapter,
