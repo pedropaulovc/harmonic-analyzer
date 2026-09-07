@@ -1,5 +1,6 @@
 from types import SimpleNamespace as NS
 import asyncio
+import json
 from unittest.mock import Mock
 
 import pytest
@@ -48,6 +49,154 @@ def test_missing_reference_never_becomes_a_comparison(monkeypatch):
     control.persistent_controls(extension, {"expected": object()}, records)
     assert "empty" in records["expected"]["error"]
     assert records["compare.expected.selected"] == {"status": "missing_reference"}
+
+
+@pytest.mark.parametrize("raw", [None, (), (1, 2, 255), bytearray((1, 2)), [[1, 2]], "native text", False])
+def test_raw_return_shape_survives_before_unchanged_reference_validation(raw):
+    extension = NS(GetPersistReference3=lambda _: raw, IsSamePersistentID=lambda *_: 1)
+    records = {}
+    control.persistent_controls(extension, {"expected": object()}, records)
+    observation = records["raw_returns"]["expected"]
+    assert observation["type"] == f"{type(raw).__module__}.{type(raw).__qualname__}"
+    json.dumps(observation, allow_nan=False)
+    if type(raw) is tuple and raw:
+        assert observation["value"] == [1, 2, 255]
+        assert records["expected"] == {"value": raw}
+    else:
+        assert "error" in records["expected"]
+        assert records["compare.expected.selected"] == {"status": "missing_reference"}
+    if type(raw) is bytearray:
+        assert observation["value"] == [1, 2]
+
+
+def test_real_variant_metadata_is_observed_but_never_unwrapped_into_accepted_bytes():
+    client = pytest.importorskip("win32com.client")
+    pythoncom = pytest.importorskip("pythoncom")
+    raw = client.VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_UI1, (1, 2, 255))
+    extension = NS(GetPersistReference3=lambda _: raw)
+    records = {}
+    control.persistent_controls(extension, {"expected": object()}, records)
+    observed = records["raw_returns"]["expected"]
+    assert observed["type"] == "win32com.client.VARIANT"
+    assert observed["variant_type"] == pythoncom.VT_ARRAY | pythoncom.VT_UI1
+    assert observed["value"]["value"] == [1, 2, 255]
+    assert "wrong type" in records["expected"]["error"]
+    assert records["compare.expected.expected"] == {"status": "missing_reference"}
+    json.dumps(observed, allow_nan=False)
+
+
+def test_fake_variant_attributes_are_not_treated_as_native_variant():
+    class NotVariant:
+        @property
+        def value(self):
+            pytest.fail("do not guess a VARIANT by its attributes")
+
+        @property
+        def varianttype(self):
+            pytest.fail("do not guess a VARIANT by its attributes")
+
+    raw = NotVariant()
+    observation = control._raw_return(raw)
+    assert observation["encoding"] == "unsupported_object_repr"
+    assert "variant_type" not in observation
+
+
+@pytest.mark.parametrize("raw", [float("nan"), float("inf"), memoryview(b"abc"), {"nested": (True, 1.5, None)}])
+def test_invalid_reference_shapes_remain_complete_json_safe_observations(raw):
+    observed = control._raw_return(raw)
+    assert observed["type"] == f"{type(raw).__module__}.{type(raw).__qualname__}"
+    json.dumps(observed, allow_nan=False)
+
+
+@pytest.mark.parametrize("outcome", ["passed", "missing", "wrong_name", "wrong_type", "empty_reference", "status_error", "wrong_object", "wrong_shape", "unknown_self", "borrowed"])
+def test_owned_source_hook_feature_positive_control_uses_exact_handle_and_round_trip(owned_scene, outcome):
+    from diagnostics._owned_native_documents import Ownership
+
+    scene = owned_scene
+    feature = NS(Name="Hook", GetTypeName2=lambda: "Sweep")
+    scene.source.FeatureByName = Mock(return_value=feature)
+    reference = (9, 8, 7)
+    original_reference = scene.source.Extension.GetPersistReference3
+    feature_reads = []
+
+    def get_reference(entity):
+        if entity is feature:
+            feature_reads.append(entity)
+            return None if outcome == "empty_reference" else reference
+        return original_reference(entity)
+
+    scene.source.Extension.GetPersistReference3 = get_reference
+    returned = (feature, 0)
+    if outcome == "status_error":
+        returned = feature, 1
+    if outcome == "wrong_object":
+        returned = object(), 0
+    if outcome == "wrong_shape":
+        returned = [feature, 0]
+    resolver = scene.source.Extension.GetObjectByPersistReference3 = Mock(return_value=returned)
+    if outcome == "missing":
+        scene.source.FeatureByName.return_value = None
+    if outcome == "wrong_name":
+        feature.Name = "OtherFeature"
+    if outcome == "wrong_type":
+        feature.GetTypeName2 = lambda: "ProfileFeature"
+    if outcome == "unknown_self":
+        scene.source.Extension.IsSamePersistentID = lambda *_: -1
+    source_record = scene.adapter.ownership._record(scene.source)
+    if outcome == "borrowed":
+        source_record.ownership = Ownership.REFERENCE
+    records = {}
+    control._source_feature_control(scene.adapter, scene.source, records)
+    row = records["source_feature_control"]
+    assert row["status"] == ("passed" if outcome == "passed" else "failed")
+    assert row["name"] == "Hook" and row["context"] == "source"
+    assert scene.adapter.currentModel is scene.native.app.ActiveDoc is scene.drawing
+    if outcome == "borrowed":
+        scene.source.FeatureByName.assert_not_called()
+        source_record.ownership = Ownership.COPY
+    else:
+        scene.source.FeatureByName.assert_called_once_with("Hook")
+    if outcome in ("missing", "wrong_name", "wrong_type", "borrowed"):
+        assert feature_reads == []
+        resolver.assert_not_called()
+    else:
+        assert feature_reads == [feature]
+        assert row["native_self"] == 1
+        assert "feature" in row["raw_returns"]
+        if outcome == "empty_reference":
+            resolver.assert_not_called()
+            assert row["raw_returns"]["feature"] == {"type": "builtins.NoneType", "value": None}
+        else:
+            resolver.assert_called_once_with(reference)
+            assert row["reference"] == reference
+    if outcome == "passed":
+        assert row["persistent_self"] == 1
+        assert row["roundtrip"]["native_same"] == 1
+        assert row["roundtrip"]["error_code"] == {"type": "builtins.int", "value": 0}
+    json.dumps(records, allow_nan=False)
+    assert_owned_cleanup(scene)
+
+
+def test_hook_feature_queries_remain_inside_both_document_dirty_brackets(owned_scene):
+    scene = owned_scene
+    feature = NS(Name="Hook", GetTypeName2=lambda: "Sweep")
+
+    def lookup(name):
+        assert name == "Hook"
+        scene.source.dirty = True
+        return feature
+
+    scene.source.FeatureByName = lookup
+    original = scene.source.Extension.GetPersistReference3
+    scene.source.Extension.GetPersistReference3 = lambda entity: (1, 2) if entity is feature else original(entity)
+    scene.source.Extension.GetObjectByPersistReference3 = lambda reference: (feature, 0)
+    evidence = {}
+    control.capture(scene.adapter, scene.bank.view, scene.expected, scene.selected, evidence)
+    rows = evidence["persistent_identity_control"]
+    assert rows["source_feature_control"]["status"] == "passed"
+    assert rows["source"]["dirty_before"] is False and rows["source"]["dirty_after"] is True
+    assert rows["drawing"]["dirty_before"] is rows["drawing"]["dirty_after"] is False
+    assert_owned_cleanup(scene)
 
 
 def test_capture_never_drives_unowned_document_or_replaces_original_error():
