@@ -69,7 +69,7 @@ TARGETS = {
         entity_labels=_shaft_labels("pivot", pivot_shaft_spec),
     ),
     "cone_tip_adjuster": RecipeTarget(
-        "f3578ac2b2ab95e478bc7bd72c316ebab057c125d5244af6fa2c3e12f4d48468",
+        "18d0c1669c8de923420655d621f58d24afe404bc1d3a5a787930ebeeb2fefbf2",
         "cone_tip_adjuster_spec",
         cone_tip_adjuster_spec.DRAWING_DIMENSIONS,
     ),

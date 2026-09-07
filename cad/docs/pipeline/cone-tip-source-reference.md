@@ -1,8 +1,9 @@
 # Cone-tip source-owned reference text
 
 The production candidate authors the observed reference prefix/suffix in the
-part build and verifies their import read-only. Native source-build, cold-import
-and printed acceptance of this candidate are still pending. Geometry, marked
+part build and verifies their import read-only. The native source build and
+clean-before-finalization import control passed; saved-drawing cold-reopen and
+printed acceptance are still pending. Geometry, marked
 dimensions, tolerances, catalog thread and drawing layout are unchanged.
 
 ## Retained native attribution
@@ -98,3 +99,36 @@ After review/integration, the native runner should:
 No COM, source part rebuild, cache publication or source-pin change was executed
 while preparing this candidate. A fresh fillister whole-text migration is a
 separate follow-up, not implicitly covered by these reference-field checks.
+
+## Native source build and clean import
+
+The real cache-disabled `doit -a part:cone_tip_adjuster` build at frozen
+`c77ed41eb66e914737bc14ba73a5420f1b4d8cf8` passed: task 80.443439 s,
+`part.build` 79.301386 s, trace `0x87d900f724ad3b4518891e2a04249acd`.
+The 83,667-byte saved part and its producer execution token both read
+`18d0c1669c8de923420655d621f58d24afe404bc1d3a5a787930ebeeb2fefbf2`.
+The prior `f3578ac2...48468` part and token remain in
+`cad/out/reports/tip-before-reference-authoring-dd89429e19184220a24ce86cb031b517/`.
+
+The subsequent owned-copy control at that same frozen head passed through
+the drawing recipe to `clean_before_finalize`: all **105 observations were
+clean**, ending at 33.2241202 s. Receipt:
+`cad/out/reports/source-dirty-ioy1d3sh/source-dirty.json`, SHA-256
+`dfda3b758b11d241ff29d16ee193505da786478c05d5ddd922a32c9a917e56d1`.
+The reopened part's two observed BodyDiaDim displays retained prefix/definition
+`(<MOD-DIAM>`, suffix/definition `)`, thread-above `5/16-18 UNC-2A`, empty
+below fields, and numeric visibility `True`. The exact imported presentation
+checks passed without a drawing-side text write.
+
+Comparing the ten observed source-dimension records with the earlier source
+bank, after removing only the diagnostic document-name suffix and applying
+those four intended fields to the two BodyDiaDim display rows, found no other
+difference. All observed values, tolerance bounds/types, markings and precision
+were unchanged. This is a dimension/display-bank comparison, not a complete
+BREP comparison. Original/copy bytes stayed at the new SHA throughout; owned
+cleanup preserved the already-open clean source, with no probe/cleanup error.
+
+The acceptance manifest and its two exact-pin fixtures now name this actual
+builder output. No token restamp, automatic pin discovery or diagnostic source
+save was used. The control intentionally stopped before finalization, so native
+drawing save, cold drawing reopen, PDF/PNG and full affected-build gates remain.
