@@ -3,7 +3,7 @@
 Composes the safe all-view control without modifying it. Uses a fresh unique
 transgear-stub bytecopy, three native orthographic views and exactly two imports.
 Default only changes AllViews to False. Each explicit Right-only spacing option
-runs one native 317 OR 313 command on the three imported annotations, with no setter,
+runs one native 317, 313 OR 2976 command on the three imported annotations, with no setter,
 manual position, additional command or retry.
 Missing coverage remains a failed observation even when diagnostic exports exist.
 """
@@ -47,11 +47,13 @@ from diagnostics._source_pmi_comparison import SourcePmiBoundary, compare_source
 class PmiArrangement(StrEnum):
     SPACE_TIGHTLY_DOWN = "space-tightly-down"
     SPACE_EVENLY_DOWN = "space-evenly-down"
+    AUTO_ARRANGE = "auto-arrange"
 
 
 PMI_SPACING_COMMANDS = {
     PmiArrangement.SPACE_TIGHTLY_DOWN: 317,
     PmiArrangement.SPACE_EVENLY_DOWN: 313,
+    PmiArrangement.AUTO_ARRANGE: 2976,
 }
 
 
