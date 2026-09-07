@@ -152,6 +152,26 @@ for an existing moved copy; initial production save still uses the actual owned
 save helper. Subsequent native runs freeze every Python file, including tests.
 Both original and copied source retained their original SHA after this failure.
 
+Frozen run `wlp6wb24` at `b974b038` passed the complete composed callback: all
+fourteen explicit attachments, raw source/drawing values, BASIC/arc conditions,
+first cold annotations, moved/scaled semantics, in-place save, fresh second-cold
+handles and annotations, original/copy/token hashes, and factory guards. Its
+instrumented recipe took 25.794955 s; this includes diagnostic witnesses and is
+not comparable to uninstrumented production timings. Receipts:
+
+```text
+crank-arm-entities-wlp6wb24/measurements.json 165ae86b1666ceae8a5d5f30ed6fb9574fe9ab4ca8386f87de9dda7beaeabd3f
+crank-arm-entities-wlp6wb24/ownership.json 26fb86db154a46f4410368e7874fc0a2633e432ee554d963c2d4154f5262bf4e
+crank-arm-entities-wlp6wb24/cold.png 2ccf3ee2689ee7648605e60b7174bf13023ab4746bb908c47d9914d035a96aa9
+```
+
+The subsequent layout adjustment moves only the two transverse dimension text
+positions: the pivot value clears the arm outline, and the dimple value sits
+between its extension lines. A production run passed with this layout
+(18.129079 s, trace `0x82a593ff79a401a75d3855caa0bbaa07`). Fresh native PDF detail
+windows are now rendered at 600 dpi before and after cold reopen; they do not
+modify the vector PDF or source geometry.
+
 ## Commands and gate status
 
 ```powershell
@@ -167,17 +187,53 @@ The crank-only diagnostic deliberately pins this VM's genuine source and native
 baseline receipt. Another VM must generate and retain its own baseline; these
 pins are not fleet registration or permission to reuse this VM's artifacts.
 
-Ninety focused tests passed (`run-x4hrhhsy`, 1.80 s): crank recipe, entity
-diagnostic, full mocked recipe, shared resolver and `test_surface_finish_ownership_a.py`.
-Additional full-composed callback tests and raw-dimension/requirements negatives
-are being completed before the next frozen run. The tests execute the loaded
-production recipe, not merely diagnostic wrappers.
+The expanded focused suite passed 134 tests (`run-bc9feyn7`, 3.54 s), including
+the actual loaded recipe inside the full mocked callback, wrong source/view,
+missing/ambiguous roles, both fresh-handle cold lifetimes, actual in-place save,
+save/export/final-guard failures and raw native manufacturing negatives. The
+tests do not replace real native acceptance.
+
+`doit -n 4 check:graph check:partiso check:recipe` passed graph (83 tests) and
+isolation (4 tests), but recipe returned 6142 passes and two failures
+(`run-ftjlmi6q`, 265.91 s). One failure was introduced here: a fleet contract
+requires the original `callout_source_model = adapter.currentModel` capture.
+That capture and verifier arguments have been restored without changing the
+entity-bank ownership checks.
+
+The other failure is already in the pinned baseline:
+`test_fillister_is_not_silently_enrolled_in_full_owned_pilot` asserts that
+`fillister_screw` is absent from `TARGETS`, while
+`diagnostics/_recipe_acceptance_targets.py` explicitly registers it. Both files
+are unchanged from `bc593d784fba08fc6552224767a460338f51b664`. The test also
+fails alone (`run-t80pghl0`, 0.63 s):
+
+```powershell
+git diff bc593d784fba08fc6552224767a460338f51b664 -- cad/scripts/test_fillister_first_dirty_drawing.py cad/scripts/diagnostics/_recipe_acceptance_targets.py
+uv run python -m pytest cad/scripts/test_fillister_first_dirty_drawing.py::test_fillister_is_not_silently_enrolled_in_full_owned_pilot -q --tb=short
+```
+
+No shared registry/test was changed. This deliberate-test contradiction needs
+coordination with the parent owner before the full build gate can be green.
 
 PR [#682](https://github.com/pedropaulovc/harmonic-analyzer/pull/682) targets the
 unchanged drawing parent. CodeRabbit skipped automatic review on the non-default
 base, and the explicit review was rate-limited (comment 5572490004). Use the
 installed Windows `C:/Users/pedro/AppData/Local/Programs/coderabbit/cr.exe` with
 `review --agent --committed --base-commit <exact merge-base>`. No billing changes.
+
+Local review at `b974b038`, merge-base `bc593d784fba08fc6552224767a460338f51b664`,
+completed with one finding. Full structured output is
+`cad/out/reports/crank-arm-local-review-3.log`, SHA-256
+`cc33fbc43142c40f81208fb6ae6e0ce7cecd2fb36592d1cd752272836633973e`.
+It claims datum B requires `symbol_xy` and surface finish rejects
+`entity_context`. Those are not the signatures at this checkout: the unchanged
+pinned `_drawing_common.py:439` declares `symbol_xy=None` for `add_datum_feature`,
+and line 1061 declares both `symbol_xy=None` and `entity_context` for
+`add_surface_finish`. With an explicit entity, native datum placement is
+supported. The handoff specifically requires MODEL context for source-owned
+finish entities. Real native run `wlp6wb24` executes both calls and passes their
+exact attachment/cold checks. No TypeError occurs. This is evidence against the
+finding, not a clean review verdict; a contextualized re-review is still required.
 
 Full frozen native replay, final production rerun, fresh readable detail crops,
 final print acceptance, clean latest-head review and the full graph build gate

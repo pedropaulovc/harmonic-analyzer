@@ -177,7 +177,8 @@ async def build(
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
     check("open crank-arm source", await adapter.open_model(str(SOURCE)))
-    source_model = require_source(adapter, adapter.currentModel)
+    callout_source_model = adapter.currentModel
+    source_model = require_source(adapter, callout_source_model)
     if int(adapter.swApp.IsSame(adapter.swApp.ActiveDoc, source_model)) != 1:
         raise RuntimeError("crank-arm source is not active before entity resolution")
     bank = ModelEntities(source_model).resolve(ENTITY_ROLES)
@@ -257,7 +258,7 @@ async def build(
         {"ShaftBoreDia": DIMENSION_CALLOUTS["ShaftBoreDia"]},
         feature_name="ShaftBoreProfile",
         view=front,
-        source_model=source_model,
+        source_model=callout_source_model,
     )
     verify_dimension_callouts(
         adapter,
@@ -265,7 +266,7 @@ async def build(
         {"DimpleDia": DIMENSION_CALLOUTS["DimpleDia"]},
         feature_name="DimpleProfile",
         view=front,
-        source_model=source_model,
+        source_model=callout_source_model,
     )
     set_dimension_precision(adapter, callouts, {"ShaftBoreDia": 3})
     add_entity_dimension(
@@ -291,7 +292,7 @@ async def build(
         adapter,
         front,
         entities=entities(front, "side_c", "pivot"),
-        text_xy=(0.240, FRONT_CENTER[1]),
+        text_xy=(0.255, FRONT_CENTER[1] - 0.008),
         label="handle-pivot transverse location",
         orientation="vertical",
     )
@@ -305,7 +306,7 @@ async def build(
         adapter,
         front,
         entities=entities(front, "side_c", "dimple"),
-        text_xy=(0.158, FRONT_CENTER[1]),
+        text_xy=(0.160, FRONT_CENTER[1] - 0.008),
         label="dimple transverse location from datum C",
         orientation="vertical",
     )
