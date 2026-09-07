@@ -10,7 +10,7 @@ an explicit existing SW PID and the parent machine-global COM seat.
 from __future__ import annotations
 
 import argparse
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from dataclasses import asdict
 from enum import StrEnum
 import json
@@ -35,6 +35,7 @@ from _drawing_template_defaults import compare_defaults, snapshot_defaults  # no
 import _telemetry  # noqa: E402
 from diagnostics import _owned_native_documents as ownership  # noqa: E402
 from diagnostics import _owned_native_session as session  # noqa: E402
+from diagnostics import _prepared_frame_control as frames  # noqa: E402
 from diagnostics import probe_retained_drawing_export as printed  # noqa: E402
 
 
@@ -68,6 +69,7 @@ def runtime_inputs(adapter, spec):
         ROOT / "dodo.py",
         Path(printed.__file__).resolve(),
         Path(viewports.__file__).resolve(),
+        Path(frames.__file__).resolve(),
     ]
     return {
         "preparation": prepared.preparation_inputs(adapter, spec),
@@ -271,23 +273,42 @@ async def probe(
     *,
     printed_format=PrintedFormat.SKIP,
     viewport=Viewport.NORMAL,
+    frame_policy=frames.FramePolicy.UNCHANGED,
+    failure_receipt=None,
+    failure_receipt_sha256=None,
 ):
     if not isinstance(printed_format, PrintedFormat):
         raise ValueError("printed format requires an explicit policy enum")
     if not isinstance(viewport, Viewport):
         raise ValueError("viewport requires an explicit policy enum")
+    if frame_policy is frames.FramePolicy.MEASURED_RESTORE and (
+        viewport is not Viewport.CAPTURED or printed_format is not PrintedFormat.COMPARE
+    ):
+        raise ValueError(
+            "measured_restore requires captured viewport and printed comparison"
+        )
+    original = sheet_setup.PROJECT_DRWDOT.resolve(strict=True)
+    failure_pin = frames.failure_input(
+        frame_policy, spec, original, failure_receipt, failure_receipt_sha256
+    )
     require_environment(expected_pid)
     if int(adapter.swApp.GetProcessID()) != expected_pid:
         raise RuntimeError(
             "running native PID differs from the explicitly approved PID"
         )
+    if (
+        failure_pin is not None
+        and str(adapter.swApp.RevisionNumber()) != failure_pin["solidworks_revision"]
+    ):
+        raise RuntimeError("frame control native revision differs from failure receipt")
     report_root.mkdir(parents=True, exist_ok=True)
     directory = Path(
         tempfile.mkdtemp(prefix="prepared-template-cache-", dir=report_root)
     )
     adapter.ownership.register_directory(directory)
-    original = sheet_setup.PROJECT_DRWDOT.resolve(strict=True)
     adapter.ownership.register_source(original)
+    if failure_pin is not None:
+        adapter.ownership.register_source(Path(failure_pin["receipt"]["path"]))
     cache_root = directory / "cache"
     pinned = runtime_inputs(adapter, spec)
     original_sha = prepared._sha(original)
@@ -305,6 +326,9 @@ async def probe(
         "scope": "blank_setup_cache_miss_hit_only",
         "printed_format": printed_format.value,
         "viewport": viewport.value,
+        "frame_policy": frame_policy.value,
+        "frame_failure_input": failure_pin,
+        "frame_control": {},
         "spec": asdict(spec),
         "source_template": {"path": str(original), "sha256": original_sha},
         "runtime_inputs": pinned,
@@ -320,6 +344,7 @@ async def probe(
     cached = {}
     pending_directories = set()
     errors = []
+    controls = ExitStack()
 
     def checkpoint():
         report_path.write_text(
@@ -331,6 +356,7 @@ async def probe(
         report["guards"].append(row)
         try:
             with timed(row, "seconds"):
+                frames.require_failure_input_unchanged(failure_pin)
                 row["source_sha256"] = prepared._sha(original)
                 row["runtime_inputs"] = runtime_inputs(adapter, spec)
                 row["cached_artifacts"] = {path: prepared._sha(path) for path in cached}
@@ -416,6 +442,9 @@ async def probe(
 
     checkpoint()
     try:
+        controls.enter_context(
+            frames.intercept(adapter, frame_policy, report["frame_control"])
+        )
         guard("before_normal")
         normal = await run_trial("normal", None, None)
         if viewport is Viewport.CAPTURED:
@@ -498,6 +527,11 @@ async def probe(
             report["cleanup_error"] = repr(error)
             errors.append(error)
         try:
+            controls.close()
+        except Exception as error:
+            report["frame_control_cleanup_error"] = repr(error)
+            errors.append(error)
+        try:
             guard("finally")
         except Exception as error:
             report["final_guard_error"] = repr(error)
@@ -521,6 +555,14 @@ def main(argv=None):
         "--viewport", type=Viewport, choices=tuple(Viewport), default=Viewport.NORMAL
     )
     parser.add_argument(
+        "--frame-policy",
+        type=frames.FramePolicy,
+        choices=tuple(frames.FramePolicy),
+        default=frames.FramePolicy.UNCHANGED,
+    )
+    parser.add_argument("--failure-receipt", type=Path)
+    parser.add_argument("--failure-receipt-sha256")
+    parser.add_argument(
         "--printed-format",
         type=PrintedFormat,
         choices=tuple(PrintedFormat),
@@ -535,6 +577,13 @@ def main(argv=None):
     args = parser.parse_args(argv)
     require_environment(args.expected_pid)
     spec = prepared.TemplateSpec(tuple(args.scale), args.decimals)
+    frames.failure_input(
+        args.frame_policy,
+        spec,
+        sheet_setup.PROJECT_DRWDOT,
+        args.failure_receipt,
+        args.failure_receipt_sha256,
+    )
     if args.worker:
         return ownership.run_copy_diagnostic(
             lambda adapter: probe(
@@ -544,10 +593,21 @@ def main(argv=None):
                 args.expected_pid,
                 printed_format=args.printed_format,
                 viewport=args.viewport,
+                frame_policy=args.frame_policy,
+                failure_receipt=args.failure_receipt,
+                failure_receipt_sha256=args.failure_receipt_sha256,
             )
         )
     import dodo
 
+    frame_arguments = ["--frame-policy", args.frame_policy.value]
+    if args.failure_receipt is not None:
+        frame_arguments += [
+            "--failure-receipt",
+            str(args.failure_receipt.resolve()),
+            "--failure-receipt-sha256",
+            args.failure_receipt_sha256,
+        ]
     dodo._run(
         [
             sys.executable,
@@ -562,6 +622,7 @@ def main(argv=None):
             args.printed_format.value,
             "--viewport",
             args.viewport.value,
+            *frame_arguments,
             "--report-root",
             str(args.report_root.resolve()),
             "--worker",
