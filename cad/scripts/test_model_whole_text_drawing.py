@@ -15,6 +15,21 @@ TEXT = "#4-40 UNC-2A"
 EXPECTED = {1: TEXT, 2: "", 3: "", 4: "", 5: TEXT, 6: "", 7: "", 8: ""}
 
 
+@pytest.mark.parametrize("visible,expected", [(True, "visible"), (False, "hidden")])
+def test_native_boolean_is_validated_locally_then_transmitted_as_enum(
+    reference, visible, expected
+):
+    reference.display.ShowDimensionValue = visible
+    fields, visibility = author._dimension_presentation(reference.display)
+    assert fields == tuple(reference.fields[part] for part in range(1, 9))
+    assert type(visibility) is author.NumericVisibility
+    assert visibility.value == expected
+    assert author._whole_text_presentation(TEXT) == (
+        tuple(EXPECTED[part] for part in range(1, 9)),
+        author.NumericVisibility.HIDDEN,
+    )
+
+
 @pytest.fixture
 def whole(reference):
     def set_text(slot, text):
