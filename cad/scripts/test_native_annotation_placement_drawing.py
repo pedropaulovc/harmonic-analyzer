@@ -191,6 +191,10 @@ def test_explicit_placement_remains_available_for_unmigrated_recipes(
     monkeypatch, kind, keyword
 ):
     adapter, view, entity, annotation = native_context(monkeypatch)
+    # Explicit-position SF now witnesses its real native attachment and owner.
+    annotation.Owner = view
+    annotation.OwnerType = 0
+    annotation.GetAttachedEntityTypes.return_value = (1,)
     insert(kind, adapter, view, entity, **{keyword: (0.12, 0.18)})
     annotation.SetPosition2.assert_called_once_with(0.12, 0.18, 0.0)
     drawing._project_native_gtol_selection.assert_not_called()
