@@ -37,11 +37,17 @@ def scene(monkeypatch, tmp_path):
         return True, 0, 2
 
     model.Extension = SimpleNamespace(SaveAs3=modern)
-    adapter = SimpleNamespace(currentModel=model)
+    adapter = SimpleNamespace(
+        currentModel=model, swApp=SimpleNamespace(ActiveDoc=model)
+    )
 
     class Ownership:
         def assert_current_owned(self):
             assert adapter.currentModel is model
+            if adapter.swApp.ActiveDoc is not model:
+                raise RuntimeError(
+                    "native write requires the exact owned active document"
+                )
             events.append("owned")
 
         @contextmanager
@@ -333,6 +339,48 @@ def test_saving_as_guard_rejects_before_any_stale_file_removal(scene):
             common.save_drawing(scene.adapter, str(scene.native))
     assert scene.native.read_bytes() == b"protected"
     assert scene.records[0]["status"] == "failed"
+
+
+@pytest.mark.parametrize("changed_at", ["drawing", "pdf", "png"])
+def test_artifact_context_active_doc_change_refuses_before_delete_or_save(
+    scene, changed_at
+):
+    paths = {"drawing": scene.native, "pdf": scene.pdf, "png": scene.png}
+    for path in paths.values():
+        path.write_bytes(b"retained stale artifact")
+
+    @contextmanager
+    def context(kind, path):
+        if kind == changed_at:
+            # The source observer/checkpoint runs after the outer SaveAs guard.
+            # Its activation must not be mistaken for owned currentModel state.
+            scene.adapter.swApp.ActiveDoc = object()
+            assert scene.adapter.currentModel is scene.model
+        yield
+
+    original = common.save_drawing
+    with pytest.raises(RuntimeError, match="exact owned active document"):
+        with control.native_drawing_save_control(
+            scene.adapter, control.DrawingSave.EXTENSION_SILENT, records=scene.records
+        ):
+            common.save_drawing(
+                scene.adapter,
+                str(scene.native),
+                pdf_path=str(scene.pdf),
+                png_path=str(scene.png),
+                artifact_context=context,
+            )
+    assert common.save_drawing is original
+    assert scene.records[0]["status"] == "failed"
+    changed_index = tuple(paths).index(changed_at)
+    for kind in tuple(paths)[changed_index:]:
+        assert paths[kind].read_bytes() == b"retained stale artifact"
+    actual_saves = [
+        row
+        for row in scene.events
+        if isinstance(row, tuple) and row[0] in {"modern", "legacy"}
+    ]
+    assert len(actual_saves) == changed_index
 
 
 def test_unknown_variant_does_not_replace_alias(scene):
