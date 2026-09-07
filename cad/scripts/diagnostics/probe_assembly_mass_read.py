@@ -187,6 +187,8 @@ async def probe(adapter, directory, blocks):
                             trial["fingerprint"] = await _assembly.assembly_geometry_digest(observer, owner.source.stem)
                         finally:
                             trial["elapsed_s"] = time.perf_counter() - started
+                    if not trial["mass_properties"]:
+                        raise RuntimeError("fingerprint bypassed the mass observer; rerun at the recorded pre-integration revision")
                     if variant is Variant.BASELINE and (
                         len(trial["rebuilds"]) != len(trial["mass_properties"])
                         or any(row.get("result") is not True for row in trial["rebuilds"])

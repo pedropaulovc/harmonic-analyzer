@@ -745,3 +745,129 @@ def test_assembly_profile_timestamp_offsets_and_interval_union_are_exact():
     assert timestamp_ns("2026-09-07T00:00:00.123456789Z") == timestamp_ns("2026-09-06T17:00:00.123456789-07:00")
     assert timestamp_ns("2026-09-07T00:00:00.000000001Z") - timestamp_ns("2026-09-07T00:00:00Z") == 1
     assert union_ns([(5, 9), (1, 7), (10, 12), (3, 3)]) == 10
+
+
+@pytest.fixture
+def native_fixture_owner(tmp_path, monkeypatch):
+    from diagnostics import probe_assembly_part_change as probe
+    from solidworks_mcp.adapters.base import AdapterResult, AdapterResultStatus
+
+    monkeypatch.setattr(probe, "_early_bound", lambda value, _interface: value)
+    path = tmp_path / "copy.SLDPRT"
+    path.write_bytes(b"copied native input")
+    documents, closed = [], []
+    app = SimpleNamespace(ActiveDoc=None)
+    app.GetDocuments = lambda: tuple(documents)
+    app.GetDocumentDependencies2 = lambda *_args: ()
+    app.IsSame = lambda left, right: int(left.native_id == right.native_id)
+    model = SimpleNamespace(native_id=1, path=path, title="copy.SLDPRT")
+    model.GetPathName = lambda: str(model.path)
+    model.GetTitle = lambda: model.title
+    model.GetType = lambda: 1
+
+    def close(title):
+        closed.append(title)
+        documents[:] = [doc for doc in documents if doc.GetTitle() != title]
+        if app.ActiveDoc is not None and app.ActiveDoc.GetTitle() == title:
+            app.ActiveDoc = None
+
+    def forbidden(*_args):
+        pytest.fail("raw broad close/save must never run in fixture cleanup")
+
+    model.Save3 = forbidden
+    app.CloseDoc = close
+    app.CloseAllDocuments = forbidden
+    adapter = SimpleNamespace(swApp=app, currentModel=None, _attempt=_Adapter._attempt)
+    state = SimpleNamespace(open_status=AdapterResultStatus.SUCCESS, open_calls=[])
+
+    async def open_model(requested):
+        state.open_calls.append(requested)
+        documents.append(model)
+        app.ActiveDoc = adapter.currentModel = model
+        return AdapterResult(status=state.open_status, error="synthetic open rejection")
+
+    adapter.open_model = open_model
+    owner = probe.FixtureOwner(adapter, tmp_path)
+    owner.register({path}, {path: set()})
+    wrapped = probe.FixtureAdapter(owner, probe.Variant.BASELINE, [])
+    return SimpleNamespace(
+        probe=probe, path=path, owner=owner, wrapped=wrapped, model=model,
+        adapter=adapter, app=app, documents=documents, closed=closed, state=state,
+    )
+
+
+def test_part_change_owner_closes_only_claimed_titles_without_save(native_fixture_owner):
+    trial = native_fixture_owner
+    asyncio.run(trial.wrapped.open_model(str(trial.path)))
+    assert trial.wrapped.currentModel is trial.model
+    assert trial.wrapped.swApp.CloseAllDocuments(True) is True
+    assert trial.closed == ["copy.SLDPRT"]
+    assert trial.documents == []
+    assert trial.adapter.currentModel is None
+    # A new native lifetime may reuse the path, but gets claimed afresh.
+    trial.model.native_id = 2
+    asyncio.run(trial.wrapped.open_model(str(trial.path)))
+    assert trial.wrapped.currentModel.native_id == 2
+    trial.owner.close()
+
+
+def test_part_change_owner_rejects_foreign_document_before_any_close(native_fixture_owner, tmp_path):
+    trial = native_fixture_owner
+    asyncio.run(trial.wrapped.open_model(str(trial.path)))
+    foreign = SimpleNamespace(
+        GetPathName=lambda: str(tmp_path / "unregistered.SLDPRT"),
+        GetTitle=lambda: "unregistered.SLDPRT", native_id=99,
+    )
+    trial.documents.append(foreign)
+    with pytest.raises(trial.probe.OwnershipError):
+        trial.wrapped._attempt(lambda: trial.wrapped.swApp.CloseAllDocuments(True))
+    assert trial.closed == []
+    assert len(trial.documents) == 2
+    with pytest.raises(trial.probe.OwnershipError):
+        trial.wrapped.currentModel
+
+
+def test_part_change_owner_latches_raw_cleanup_errors_through_attempt(native_fixture_owner):
+    trial = native_fixture_owner
+    asyncio.run(trial.wrapped.open_model(str(trial.path)))
+
+    def failed_close(_title):
+        raise RuntimeError("synthetic native close failure")
+
+    trial.app.CloseDoc = failed_close
+    with pytest.raises(trial.probe.OwnershipError, match="synthetic native close failure"):
+        trial.wrapped._attempt(lambda: trial.wrapped.swApp.CloseAllDocuments(True))
+    with pytest.raises(trial.probe.OwnershipError):
+        asyncio.run(trial.wrapped.open_model(str(trial.path)))
+    assert len(trial.state.open_calls) == 1
+
+
+def test_part_change_owner_rejects_failed_open_but_can_close_claimed_copy(native_fixture_owner):
+    from solidworks_mcp.adapters.base import AdapterResultStatus
+
+    trial = native_fixture_owner
+    trial.state.open_status = AdapterResultStatus.ERROR
+    with pytest.raises(trial.probe.OwnershipError, match="fixture open failed"):
+        asyncio.run(trial.wrapped.open_model(str(trial.path)))
+    with pytest.raises(trial.probe.OwnershipError):
+        trial.wrapped.currentModel
+    trial.owner.close()
+    assert trial.closed == ["copy.SLDPRT"]
+
+
+def test_part_change_owner_rejects_same_handle_path_change(native_fixture_owner, tmp_path):
+    trial = native_fixture_owner
+    asyncio.run(trial.wrapped.open_model(str(trial.path)))
+    trial.model.path = tmp_path / "foreign-after-save-as.SLDPRT"
+    with pytest.raises(trial.probe.OwnershipError):
+        trial.wrapped.currentModel
+    assert trial.closed == []
+
+
+def test_part_change_owner_rejects_unregistered_open_without_delegation(native_fixture_owner, tmp_path):
+    trial = native_fixture_owner
+    foreign = tmp_path / "foreign.SLDPRT"
+    foreign.write_bytes(b"not registered")
+    with pytest.raises(trial.probe.OwnershipError):
+        asyncio.run(trial.wrapped.open_model(str(foreign)))
+    assert trial.state.open_calls == []

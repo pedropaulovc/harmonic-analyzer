@@ -158,3 +158,38 @@ legacy unit/tensor mapping, strict malformed/state rejection, golden fingerprint
 rows, pose-only changes and configuration-switch failure/rest handling
 (`run-spiaovl8`, 0.53 s). Ruff and whitespace checks pass. The production
 fingerprint still calls the original adapter at this checkpoint.
+
+## Copied dependent-part trial
+
+`probe_assembly_part_change.py` is the next native acceptance diagnostic.
+It copies all 39 native inputs, verifies byte equality, relinks closed references
+and proves both saved and live dependency closure before any native write.
+A relinked unchanged legacy control must reproduce the saved fingerprint, pass
+DOF/health/interference and reopen clean. Independent A/B copies then change only
+the existing copied crank-handle `PivotBoreDia` global from 6.125 to 6.225 mm.
+The 58 mm through-bore must remove 56.258070444 mm³; named dimension readback,
+an unchanged-value equation control and unchanged unrelated equations establish
+that this is the intended change. This deliberately exceeds the production
+drawing tolerance and is never written to a production part or configuration.
+
+Both variants run the unchanged real refresh function, all three required gates
+and independent cold-reopen checks. AutoMateRepair is refused before it can act.
+The diagnostic redirects only its process-local assembly/PNG output directories;
+its lifecycle wrapper closes only exact registered copies and latches ownership
+failures even across the adapter's best-effort calls. Original native files and
+hidden sidecars are hashed before/after, including their path membership.
+
+Run both comparison diagnostics **at their recorded pre-integration source
+revision**. They require the original production fingerprint's adapter-read seam
+and reject an unobserved mass read; running against a later direct-read production
+function must not produce a vacuous A/B success.
+
+```powershell
+uv run python cad/scripts/diagnostics/probe_assembly_part_change.py
+```
+
+The same cache-off/autostart-off/inventoried-PID environment applies. Source,
+configuration and dependencies stay frozen throughout each native attempt.
+Native results are pending. Before launch, the enrolled focused module passes
+83 tests (including scoped-close, failed-open, latched-cleanup and same-handle
+path-change contracts); Ruff and CLI import/help checks pass.
