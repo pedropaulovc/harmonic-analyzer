@@ -6,7 +6,7 @@ sheet/template, import, curation, and export behavior lives in
 ``_drawing_common``.
 
 The lever is a long thin third-class lever (~186 mm nose-to-tip, 9.5 mm tall,
-3.0 mm thick).  The sheet runs at 1:1 with a small 1:4 isometric; the 3.0 x 9.5
+3.0 mm thick).  The sheet runs at 1:2 with a small 1:4 isometric; the 3.0 x 9.5
 section is dimensioned on a right end view.
 
 Run with SolidWorks open::
@@ -80,7 +80,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (1.0, 1.0)  # 1:1
+SHEET_SCALE = (1.0, 2.0)  # 1:2; leave room for the measured annotation envelopes.
 
 _NOSE_R = BAR_TALL / 2.0  # 4.75
 _BBOX_CX = (-_NOSE_R + TIP_END_X) / 2.0  # front-view X centre
@@ -94,19 +94,23 @@ ISO_CENTER = (0.360, 0.210)
 
 
 def _sheet_xy(mx: float, my: float) -> tuple[float, float]:
-    """Sheet (x, y) of a model point in the bbox-centred front view (1:1)."""
+    """Project model millimetres to front-view text seeds at the declared scale."""
+    ratio = SHEET_SCALE[0] / SHEET_SCALE[1]
     return (
-        FRONT_CENTER[0] + (mx - _BBOX_CX) / 1000.0,
-        FRONT_CENTER[1] + my / 1000.0,
+        FRONT_CENTER[0] + ratio * (mx - _BBOX_CX) / 1000.0,
+        FRONT_CENTER[1] + ratio * my / 1000.0,
     )
 
 
 def _top_xy(mx: float, mz: float) -> tuple[float, float]:
-    """Sheet (x, y) of a model (x, z) point in the top view (1:1, x aligned
-    with the front view, centred on the plate's mid-thickness)."""
+    """Project model (x, z) millimetres to top-view text seeds at sheet scale.
+
+    X aligns with the front view; Z is centred on the plate's mid-thickness.
+    """
+    ratio = SHEET_SCALE[0] / SHEET_SCALE[1]
     return (
-        TOP_CENTER[0] + (mx - _BBOX_CX) / 1000.0,
-        TOP_CENTER[1] + mz / 1000.0,
+        TOP_CENTER[0] + ratio * (mx - _BBOX_CX) / 1000.0,
+        TOP_CENTER[1] + ratio * mz / 1000.0,
     )
 
 
@@ -228,12 +232,12 @@ async def build(
         },
     )
 
-    front = place_view(adapter, str(source), "*Front", *FRONT_CENTER, scale=(1, 1))
-    right = place_view(adapter, str(source), "*Right", *RIGHT_CENTER, scale=(1, 1))
+    front = place_view(adapter, str(source), "*Front", *FRONT_CENTER, scale=SHEET_SCALE)
+    right = place_view(adapter, str(source), "*Right", *RIGHT_CENTER, scale=SHEET_SCALE)
     # Top view (2026-09-02): the integral O12 x 7.06 fulcrum hub hides the whole
     # 3 x 9.5 plate section in the end view, so the plate thickness and the
     # broad-face datum are read here, along the length clear of the hub.
-    top = place_view(adapter, str(source), "*Top", *TOP_CENTER, scale=(1, 1))
+    top = place_view(adapter, str(source), "*Top", *TOP_CENTER, scale=SHEET_SCALE)
     iso = place_view(adapter, str(source), "*Isometric", *ISO_CENTER, scale=(1, 4))
     for view in (right, top, iso):
         set_hidden_lines_removed(adapter, view)
