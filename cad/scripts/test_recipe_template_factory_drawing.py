@@ -13,9 +13,9 @@ from diagnostics import _recipe_template_factory as factory
 def model_fixture(tmp_path, monkeypatch):
     original = tmp_path / "original.DRWDOT"
     original.write_bytes(b"protected template")
-    monkeypatch.setattr(factory.common, "PROJECT_DRWDOT", original)
+    monkeypatch.setattr(factory.sheet_setup, "PROJECT_DRWDOT", original)
     normal = Mock(return_value=("draw", "sheet"))
-    monkeypatch.setattr(factory.common, "new_project_drawing", normal)
+    monkeypatch.setattr(factory.sheet_setup, "new_project_drawing", normal)
     monkeypatch.setattr(
         factory.pilot, "helper_fingerprints", lambda: {"helper": "same"}
     )
@@ -54,7 +54,7 @@ async def test_normal_factory_records_only_original_setup(tmp_path, monkeypatch)
     selected = await controller.configure(adapter, module, trial, tmp_path)
     assert events == []
     assert not hasattr(module, "new_project_drawing")
-    assert factory.common.new_project_drawing is normal
+    assert factory.sheet_setup.new_project_drawing is normal
     assert selected(adapter, property_view="Front", scale=(1, 2)) == (
         "draw",
         "sheet",
@@ -182,7 +182,7 @@ async def test_primary_setup_error_and_final_input_drift_are_both_visible(
     monkeypatch.setattr(
         factory.pilot, "adapter_fingerprints", lambda: {"adapter": "changed"}
     )
-    factory.common.PROJECT_DRWDOT.write_bytes(b"changed")
+    factory.sheet_setup.PROJECT_DRWDOT.write_bytes(b"changed")
     errors = controller.final_guards()
     assert len(errors) == 2
 

@@ -64,7 +64,7 @@ def setup_scene(native, monkeypatch, tmp_path):  # noqa: F811
         "blank_linked_extent_observations": [{"extent": [0, 0, 0, 0, 1, 0]}],
     }
     monkeypatch.setattr(probe, "_early_bound", lambda value, _: value)
-    monkeypatch.setattr(probe.defaults.common, "PROJECT_DRWDOT", original)
+    monkeypatch.setattr(probe.defaults.sheet_setup, "PROJECT_DRWDOT", original)
     monkeypatch.setattr(
         probe.defaults,
         "runtime_fingerprints",
@@ -112,7 +112,7 @@ def setup_scene(native, monkeypatch, tmp_path):  # noqa: F811
 
     monkeypatch.setattr(probe.defaults, "prepare_template", prepare)
     monkeypatch.setattr(
-        probe.defaults.common,
+        probe.defaults.sheet_setup,
         "new_project_drawing",
         lambda adapter, **kwargs: setup(adapter, "baseline"),
     )
@@ -247,7 +247,7 @@ def test_inner_setup_timer_excludes_ownership_witness_and_cleanup(
         ownership=SimpleNamespace(creating_document=creation),
         close_owned_documents=close,
     )
-    monkeypatch.setattr(probe.defaults.common, "new_project_drawing", setup)
+    monkeypatch.setattr(probe.defaults.sheet_setup, "new_project_drawing", setup)
     monkeypatch.setattr(probe, "blank_drawing_witness", lambda adapter: {})
     monkeypatch.setattr(probe.defaults, "defaults_snapshot", witness)
     row = {"variant": "baseline"}

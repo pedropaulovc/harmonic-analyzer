@@ -17,7 +17,7 @@ from test_owned_native_documents_drawing import Model, native  # noqa: F401
 
 def fixture_sources(tmp_path, monkeypatch):
     # Keep the real single-use factory; only its native blank-creation leaf is fake.
-    monkeypatch.setattr(_drawing_build.common, "new_project_drawing", Mock())
+    monkeypatch.setattr(_drawing_build.sheet_setup, "new_project_drawing", Mock())
     source_root, guard_root = tmp_path / "sources", tmp_path / "guards"
     source_root.mkdir()
     guard_root.mkdir()

@@ -319,11 +319,11 @@ async def probe(
         with adapter.ownership.creating_document(
             owned.DocumentKind.DRAWING, directory / "unsaved.SLDDRW"
         ):
-            model = base.common.new_drawing(
+            model = base.sheet_setup.new_drawing(
                 adapter,
                 template=pins["template"]["path"],
-                width=base.common.ASME_B_WIDTH_M,
-                height=base.common.ASME_B_HEIGHT_M,
+                width=base.sheet_setup.ASME_B_WIDTH_M,
+                height=base.sheet_setup.ASME_B_HEIGHT_M,
             )
             _early_bound(model, "IDrawingDoc").EditSheet()
             model.ViewZoomtofit2()

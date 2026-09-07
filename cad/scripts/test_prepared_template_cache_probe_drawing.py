@@ -148,14 +148,14 @@ def scene(native, monkeypatch, tmp_path):  # noqa: F811
             ArrayData=tuple(values.value if hasattr(values, "value") else values)
         )
     )
-    monkeypatch.setattr(probe.common, "PROJECT_DRWDOT", original)
-    monkeypatch.setattr(probe.common, "new_drawing", create)
+    monkeypatch.setattr(probe.sheet_setup, "PROJECT_DRWDOT", original)
+    monkeypatch.setattr(probe.sheet_setup, "new_drawing", create)
     monkeypatch.setattr(
-        probe.common,
+        probe.sheet_setup,
         "new_project_drawing",
         lambda adapter, **kwargs: (create(adapter, **kwargs), object()),
     )
-    monkeypatch.setattr(probe.common, "assert_asme_b_sheet", lambda *a, **k: None)
+    monkeypatch.setattr(probe.sheet_setup, "assert_asme_b_sheet", lambda *a, **k: None)
     monkeypatch.setattr(probe, "snapshot_defaults", snapshot)
     monkeypatch.setattr(probe.prepared, "snapshot_defaults", snapshot)
     monkeypatch.setattr(

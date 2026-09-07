@@ -166,7 +166,7 @@ def test_same_factory_adapter_spec_single_use_and_success_witness(monkeypatch, k
     adapter = object()
     spec = runner.TemplateSpec((1, 2), 3)
     native = Mock(return_value=("drawing", "sheet"))
-    monkeypatch.setattr(runner.common, "new_project_drawing", native)
+    monkeypatch.setattr(runner.sheet_setup, "new_project_drawing", native)
     monkeypatch.setattr(runner.prepared, "inherited_drawing", native)
     factory = (
         runner.normal_drawing_factory(adapter, spec)
@@ -196,7 +196,7 @@ def test_failed_creation_is_not_retryable_or_successful(monkeypatch):
     import _drawing_build as runner
 
     native = Mock(side_effect=RuntimeError("native failed after creation"))
-    monkeypatch.setattr(runner.common, "new_project_drawing", native)
+    monkeypatch.setattr(runner.sheet_setup, "new_project_drawing", native)
     adapter = object()
     factory = runner.normal_drawing_factory(adapter, runner.TemplateSpec())
     with pytest.raises(RuntimeError, match="native failed after creation"):

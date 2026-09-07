@@ -5,6 +5,8 @@ path. Materialization occurs before opening the owned part or entering the
 recipe's drawing-creation scope. No shared helper/recipe globals are patched.
 """
 
+import _drawing_sheet_setup as sheet_setup
+
 from contextlib import contextmanager
 from dataclasses import asdict
 from enum import StrEnum
@@ -12,7 +14,6 @@ import os
 from pathlib import Path
 import time
 
-import _drawing_common as common
 import _drawing_prepared_template as prepared
 from _drawing_build import normal_drawing_factory, prepared_drawing_factory
 import _telemetry
@@ -58,7 +59,7 @@ class RecipeTemplateFactory:
                 "helpers": pilot.helper_fingerprints(),
                 "adapter": pilot.adapter_fingerprints(),
             }
-        original = common.PROJECT_DRWDOT.resolve(strict=True)
+        original = sheet_setup.PROJECT_DRWDOT.resolve(strict=True)
         adapter.ownership.register_source(original)
         self.inputs[str(original)] = prepared._sha(original)
         row = {
