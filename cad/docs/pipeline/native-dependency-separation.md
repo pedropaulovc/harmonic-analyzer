@@ -1,6 +1,7 @@
 # Native recipe dependency separation
 
-Offline candidate based on `a89a27b0b4f6b77b666a6d0418a013c07bd56436`.
+Offline candidate developed against `a89a27b0b4f6b77b666a6d0418a013c07bd56436`
+and rebased onto `b60838991855066d652ef825b5be1cd68ea63835` for publication.
 This improves future edits; it does **not** make stale artifacts reusable in the
 current build. Native execution, full-stack acceptance and clean review remain
 separate gates.
@@ -23,7 +24,8 @@ The four maps previously reached three unrelated scalar consumers:
 still invalidate those genuine consumers. No manufacturing text, dimension
 selection, native call sequence, placement, tolerance or acceptance predicate is
 changed. Existing assertions use the new owning module where the data moved.
-The intentional fillister pilot-enrollment disagreement is not resolved here.
+Parent commit `b6083899` separately resolves the fillister pilot-enrollment
+contract with the user's approval; this extraction preserves that contract.
 
 `_common.py`, `dodo.py`, `_buildgraph.py`, adapter source, assembly pattern/coupling
 helpers and VM2's turned-part recipes are unchanged. The remaining 31 callout
@@ -85,15 +87,32 @@ migration check, not a review of every changed file or a native acceptance gate.
 Map expressions and runtime object identity remain separately checked by the
 fleet/fillister contracts, including definitions moved into new modules.
 
-The final complete COM-free recipe gate produced **6,807 passed, one failed** in
-168.35 s. The sole failure is the unchanged
+## Historical and current offline evidence
+
+Before rebasing onto `b6083899`, the complete COM-free recipe gate at
+`6e929de3` produced **6,807 passed, one failed** in 168.35 s. The sole failure was the
 `test_fillister_is_not_silently_enrolled_in_full_owned_pilot` assertion that
 `fillister_screw` is absent from `TARGETS`, conflicting with its explicit existing
-enrollment. Neither that assertion nor the enrollment/source pin is changed.
-The run is therefore not a green recipe gate. Its complete log is retained at
-`cad/out/logs/check-recipe.log`, with isolated telemetry in
+enrollment. That run was not green. Its complete log is preserved at
+`cad/out/reports/dependency-separation/historical-6e929de3/check-recipe.log`,
+with isolated telemetry in
 `cad/out/reports/pytest-telemetry/run-d4gyopfh`. Graph passed 89 tests and part
 isolation passed four tests; neither result covers native execution.
+
+After rebasing, the actual recipe gate at `43da6496` passed **6,808 tests** in
+190.51 s (`run-av2fdg48`). The parent correction pins explicit dimension-only
+enrollment, the original source SHA, model views and four dimension roles; it
+does not remove enrollment or alter the source artifact. The green recipe log
+is retained at
+`cad/out/reports/dependency-separation/coderabbit-43da6496/check-recipe.log`.
+
+The review follow-up retains the original prefix-isolation assertion and adds
+an empty-change assertion covering the four drawing recipes in its fixture.
+A counterexample inserts a prefix dependency into only the pivot-post drawing's
+actual dependency list. It failed before the stricter assertion because the
+original check accepted that drawing-only invalidation (`run-e4_irrlz`).
+Results for later reviewed heads belong in the PR evidence; this section does
+not claim native acceptance or a clean review.
 
 Local exact-input evidence is retained under
 `cad/out/reports/dependency-separation/`: `audit_candidate.py` and `candidate.json`.

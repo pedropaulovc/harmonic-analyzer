@@ -112,6 +112,17 @@ def test_unused_prefix_implementation_invalidates_no_native_producer(recipes):
     )
     changed = changed_by(helper)
     assert not {name for name in changed if not name.startswith("drawing:")}
+    assert not changed
+
+
+def test_unused_prefix_isolation_rejects_drawing_only_dependency(recipes, monkeypatch):
+    dodo, files, changed_by = recipes
+    helper = dodo.SCRIPTS_DIR / "_dimension_prefix.py"
+    drawing = "drawing:cone_pivot_post"
+    monkeypatch.setitem(files, drawing, [*files[drawing], str(helper.resolve())])
+    assert changed_by(helper) == {drawing}
+    with pytest.raises(AssertionError, match="drawing:cone_pivot_post"):
+        test_unused_prefix_implementation_invalidates_no_native_producer(recipes)
 
 
 @pytest.mark.parametrize("stem", CALLOUTS)
