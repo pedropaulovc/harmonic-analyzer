@@ -213,3 +213,26 @@ production bypass flag is added.
 ```powershell
 uv run python -m pytest cad/scripts/test_parallel_dimensions_drawing.py cad/scripts/test_linear_dimension_arrangement_drawing.py cad/scripts/test_channel_lever_drawing.py -q
 ```
+
+### First production extraction run: raw display binding error
+
+At frozen root `eaf09464` / adapter `e77bfda4` / existing PID 31860, the full
+lever recipe with the explicit normal factory failed before either parallel
+command. `AddDimension2` returned a raw dispatch: calling its late-bound
+`GetAnnotation()` invoked the returned annotation's nonexistent default member
+and raised `DISP_E_MEMBERNOTFOUND`. The recipe now binds both returned handles
+as `IDisplayDimension` before reading their annotations. The same exact four
+annotations still enter the helper; no new feature search or fallback is added.
+
+Receipt `datum-policy-gyx30dw5/pilot.json` has SHA-256
+`cb52ce7b8639dcda4abff317648e019b96416a0f805d2d3d1f1c864ee7822bff`.
+Original/copy source hashes and runtime guards remained exact, and owned cleanup
+restored the empty baseline. Failure evidence itself was incomplete: its two
+semantic scans rejected the unsaved drawing-reference owner `Draw90.Drawing`.
+This receipt is neither a spacing nor a cold-layout success. The saved-owner
+assumption in failure capture needs its own diagnostic correction.
+
+The fail-first fixture now rejects direct raw `GetAnnotation` access and checks
+both explicit bindings plus the original exact four-handle call. All 59 focused
+recipe/spacing tests pass, including the unchanged call-shape and manufacturing
+assertions. A fresh native invocation is required to validate this binding fix.
