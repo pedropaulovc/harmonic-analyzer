@@ -34,7 +34,30 @@ The full `uv run python -m doit -n 4` at
 `f82021edfff36155b765b50e99c4e2d3e1610bea` exited zero on September 7.
 It rebuilt paper-drive and the top assembly, regenerated their drawings, and
 passed soundness and kinematics. The recipe gate passed 1,186 tests. Native
-contact readback, fresh render inspection and latest-head review remain open.
+contact and visual results follow below; latest-head build/review remain open.
+
+## Saved contact and visual inspection
+
+The [saved contact diagnostic](spare-deck-contact-diagnostic.md#accepted-native-contact)
+passed at `dad339f0`: exact T18/native-instance checks, opposing support normals,
+0.0 m plane separation and 0.0 m trimmed-face contact distance. All 114 saved
+input hashes and before/after document states were unchanged; owned cleanup
+left the session empty.
+
+Fresh paper-drive and complete-top production renders were inspected. An
+additional native close-up at the same saved top used the bundled Zoom to Region
+example: transform the eight corners of X=115..230, Y=35..110, Z=-115..25 mm by
+the active view orientation, then pass their extrema to `ViewZoomTo2` and export
+the current view at 2000x1500. No component was hidden or moved and no model saved.
+The receipt is `cad/out/reports/spare-deck-views-dxm_cfcg/views.json`.
+
+The isometric close-up clearly shows the spare seated on the deck, clear of the
+nameplate, column and rim. Its PNG SHA-256 is
+`4720ba0e1f11eec61f6f649162f8ee85d5abce7ebe5e3f82789194c5e35517e9`.
+The front view is occluded by the rim and does not prove seating; the top view
+shows clearance but is partly occluded by the lever bank. The oblique view and
+native contact measurement provide the seating evidence. All input hashes stayed
+unchanged after the three view captures, and owned cleanup left no documents open.
 
 The original candidate analysis below is retained as provenance; its
 "only Y changes" proposal was rejected by the full-model test above.
@@ -114,5 +137,5 @@ this geometry change, rebuild paper-drive and the containing top assembly, retai
 actual T18 configuration/transform and underside/deck contact readbacks, run the
 unchanged soundness/kinematics gates, and inspect fresh top-level side/oblique
 renders showing the seating and surrounding clearance. The full pipeline and
-review merge gates still apply. The revised build result is recorded above;
-contact and visual acceptance are not yet claimed.
+review merge gates still apply. The revised build, contact and visual results
+are recorded above; final head-specific gates remain required before merge.

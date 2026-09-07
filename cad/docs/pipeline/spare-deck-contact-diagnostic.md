@@ -45,7 +45,8 @@ The closest-point query uses the trimmed face rather than its infinite surface.
 Offline tests cover gap/penetration, disjoint trimmed faces, wrong configuration,
 parent/face ownership, replaced instances, malformed native returns and error
 preservation. The three checkpoint-error tests failed before error aggregation
-was added. All 32 tests then passed. **Native contact acceptance is still pending.**
+was added. All 32 tests then passed. Inventory and dependency-query regressions
+bring the current focused suite to 40 passing tests.
 
 ## Cold dependency-query correction
 
@@ -58,3 +59,21 @@ with no open documents and no observed working-directory change. The owner
 now uses that native search result, still rejects any resolved foreign path,
 and preserves query and directory-restoration failures together. It never
 rewrites a dependency path by filename or edits the saved assemblies.
+
+## Accepted native contact
+
+At `dad339f028b1138460a4921aa48ae5b2eaaf9e68`, the committed command above
+passed in 92.472299 seconds on SW revision 34.3.0, PID 42080. The receipt is
+`cad/out/reports/spare-deck-contact-87y4um_o/contact.json` in the spare-seating
+checkout. Its exact top input is
+`bc94ae616f6a1d196db3213bf9a4021c1e09ecc0c2345b324b4d5b81b7b42355`.
+
+The configured T18 body had 77 faces and the base had 232. Each returned exactly
+one matching support plane, with native component ownership and local coordinates
+verified. The measured plane separation and trimmed-face point distance were
+both 0.0 m. Both points were `(0.15400000006200001, 0.0508, -0.075)` m in the
+complete top's frame. Before/after document states matched, all 114 input hashes
+were unchanged, and the observed final document inventory was empty.
+
+The review's possible coplanar-face ambiguity did not occur in this model.
+The selector still rejects ambiguity; no split-face fallback was added.
