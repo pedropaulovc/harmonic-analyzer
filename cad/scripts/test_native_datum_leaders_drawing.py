@@ -303,6 +303,12 @@ def test_same_side_overlapping_datums_fail_before_global_write(monkeypatch):
 def test_template_native_ink_change_is_not_excluded_from_global_witness(monkeypatch):
     adapter, view, datum, dimension, state, measure, run = policy_setup(monkeypatch)
     native = object()
+    records = []
+    monkeypatch.setattr(
+        leaders._telemetry,
+        "error",
+        lambda message, **kw: records.append((message, kw)),
+    )
     monkeypatch.setattr(
         leaders,
         "_sheet_witness",
@@ -310,6 +316,14 @@ def test_template_native_ink_change_is_not_excluded_from_global_witness(monkeypa
     )
     with pytest.raises(RuntimeError, match="fixed template ink"):
         run()
+    [record] = [
+        fields for message, fields in records
+        if message == "native fixed template ink preservation failed"
+    ]
+    assert record["native_identity"] == 1
+    assert record["before_visible"] == record["after_visible"] == 1
+    assert record["before_snapshot"] != record["after_snapshot"]
+    assert "ink" in record["before_snapshot"] and "ink" in record["after_snapshot"]
 
 
 def test_outboard_extension_steps_past_actual_fixed_dimension_text(monkeypatch):
