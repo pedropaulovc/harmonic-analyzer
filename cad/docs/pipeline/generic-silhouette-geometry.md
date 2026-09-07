@@ -3,8 +3,10 @@
 Spring-hook receipt `datum-policy-_pfvu2ct/pilot.json` rejected only
 `checked_empty`: three dimensions had complete semantics, but their sketch10/11
 attachments were excluded and the sole surface finish's type46 attachment was
-also excluded. The dedicated VIEW bank had already read that silhouette.
-This is missing generic coverage, not evidence of a detached annotation.
+also excluded. The dedicated VIEW bank already supports raw silhouette reads
+and passed selection, but post-insertion attachment identity failed separately.
+The empty generic bank is missing coverage, not evidence of a detached
+annotation; the next native run must read the actual attached silhouette.
 
 The generic snapshot now uses the existing
 `_silhouette_attachment_witness.snapshot(app, view, entity)` once per supported
