@@ -40,12 +40,43 @@ repeat that same 7.225209847 mm shift. Text `rocker-arm`, Century Gothic font,
 height, angle, reference point, anchor, native note extent and measured body are
 exactly equal. The native extent remains
 (0.36106367681498824, 0.04025453864168621,
-0.3977717330210772, 0.047262440281030466) m. Whether the final printed title moved
-or a cached display-data origin refreshed is **unproven**. The strict witness
-therefore remains failed. The other 187 numeric differences are at most
+0.3977717330210772, 0.047262440281030466) m. At this checkpoint the printed effect
+was unproven; the later no-setter export below confirms actual printed movement.
+The strict witness remained failed. The other 187 numeric differences are at most
 1.942890293094024e-16 m; a future finite-coordinate-only representation tolerance
 would need an explicit field contract and negative displacement tests. No such
 tolerance or gate change is part of this evidence commit.
+
+### Dedicated cold-reopen coordinate comparison
+
+The functional pilot now uses `_reopen_annotation_comparison.py` only at its
+cold-reopen boundary. Explicit coordinate leaves receive the smaller of 16 ULP
+at their observed magnitude and 1e-14 m; both operands must be finite floats.
+The measured 187 differences are at most eight ULP. The chosen budget gives a
+small representation margin without becoming a geometric clearance tolerance.
+It is not a guarantee that every future native coordinate delta fits this bound.
+
+Mapped fields are annotation/text anchors, line endpoints, and known native or
+measured rectangle coordinates. For the mixed native line arrays, only slots
+4-9 are positions; color/type/style/weight remain exact. Arc arrays and text
+planes remain exact until their schema is explicitly mapped. Container types,
+keys, lengths and ordering, text, XML, fonts, sizes, angles, widths, enums,
+visibility and measurement-support exclusions are all still compared exactly.
+The full native and measured annotation rows are checked, not only the generic
+display subset. Every classified coordinate delta retains its original values.
+
+The committed 190-leaf fixture exercises the distinction: 187 coordinate deltas
+are classified as roundoff; all three 7.225 mm title-origin deltas remain errors.
+The exact leaf audit, same-session annotation/handle comparison, retained-export
+before/after witness, source-dimension gates and template `compare_exact` are
+unchanged. One-ULP attachment-signature mutations still fail the existing exact
+archive test. Two ownership-test mocks target the new cold-only call site; their
+preservation/failure assertions are unchanged.
+
+This removes a demonstrated false cold-reopen failure, not the title bug or a
+missing attachment-identity proof. Cold comparisons currently check attachment
+signatures; equal-signature reattachment requires a separate persistent-reference
+witness. A successful fresh corrected drawing remains necessary for acceptance.
 
 ## Confirmed visual collision
 
