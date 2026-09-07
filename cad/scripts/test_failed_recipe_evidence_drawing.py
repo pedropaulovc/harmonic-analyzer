@@ -151,6 +151,121 @@ def test_real_pdf_only_helper_receives_empty_native_target(scene, monkeypatch):
     assert not scene.native.app.closes
 
 
+@pytest.mark.parametrize("failure", ["checked", "dimensions", "dimensions_excluded"])
+def test_failed_semantic_coverage_retains_rejected_snapshot_not_acceptance(
+    scene, monkeypatch, failure
+):
+    snapshot = {
+        "models": {
+            "front": {"path": scene.trial["copy_source"], "configuration": "Default"}
+        },
+        "checked": {"edge": ({"radius": 0.001},)},
+        "excluded": {
+            "front/sf/8": {"reason": "attachment kind not checked", "kinds": (46,)}
+        },
+        "dimensions": {"RD1": {"value_system": 0.024}},
+        "dimensions_excluded": {},
+        "dimension_observations": {"RD1": [{"full_name": "RD1@View1@Draw90.Drawing"}]},
+        "semantic_attachments": {},
+    }
+    snapshot[failure] = (
+        {"RD2": {"reason": "annotation has no concrete display dimension"}}
+        if failure == "dimensions_excluded"
+        else {}
+    )
+    monkeypatch.setattr(probe, "_drawing_semantics", DRAWING_SEMANTICS)
+    read = Mock(return_value=snapshot)
+    monkeypatch.setattr(probe.attachments, "snapshot", read)
+    result = retain(scene)
+    assert {row["phase"] for row in result["errors"]} == {
+        "before.semantics",
+        "after.semantics",
+    }
+    for row in result["errors"]:
+        assert row["snapshot"] is snapshot
+        assert row["validation"]["failed_conditions"] == [
+            "dimensions_excluded_nonempty"
+            if failure == "dimensions_excluded"
+            else f"{failure}_empty"
+        ]
+    assert all(
+        "semantics" not in result[phase]["drawing"] for phase in ("before", "after")
+    )
+    assert "semantic_preservation" not in result
+    assert result["completeness"] == "partial"
+    assert scene.trial["status"] == "failed"
+    assert result["primary_error"] == scene.trial["error"]
+    assert result["raw_preservation"] == result["source_preservation"] == "unchanged"
+    assert read.call_count == 2
+    scene.export.assert_called_once()
+    receipt = json.loads((scene.native.directory / "failure-evidence.json").read_text())
+    for row in receipt["errors"]:
+        assert row["snapshot"] == json.loads(json.dumps(snapshot))
+        assert row["validation"]["counts"][failure] == len(snapshot[failure])
+
+
+@pytest.mark.asyncio
+async def test_primary_semantic_coverage_snapshot_survives_failed_retention(
+    tmp_path, monkeypatch
+):
+    source_root, guard_root = fixture_sources(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        probe.benchmark, "recipe_source", lambda *_: recipe(Path("unused.SLDPRT"))
+    )
+    monkeypatch.setattr(probe.benchmark, "revision", lambda _: "frozen")
+    monkeypatch.setattr(probe, "helper_fingerprints", lambda: {"helper": "same"})
+    monkeypatch.setattr(probe, "adapter_fingerprints", lambda: {"adapter": "same"})
+    monkeypatch.setattr(
+        probe, "source_dimensions", lambda *_: ({"configuration": "Default"}, {})
+    )
+    snapshots = []
+
+    def snapshot(*_, **__):
+        source = adapter.drawn[-1][1]
+        result = {
+            "models": {"front": {"path": str(source), "configuration": "Default"}},
+            "checked": {},
+            "excluded": {
+                "sf": {"reason": "attachment kind not checked", "kinds": (46,)}
+            },
+            "dimensions": {"RD1": {"value_system": 0.024}},
+            "dimensions_excluded": {},
+            "semantic_attachments": {},
+            "dimension_observations": {},
+        }
+        snapshots.append(result)
+        return result
+
+    monkeypatch.setattr(probe.attachments, "snapshot", snapshot)
+    capture = Mock(side_effect=RuntimeError("independent evidence failure"))
+    monkeypatch.setattr(probe, "retain_failed_drawing", capture)
+    adapter = Adapter("normal")
+    with pytest.raises(probe.DrawingSemanticCoverageError) as raised:
+        await probe.pilot(
+            adapter,
+            "frozen",
+            source_root,
+            guard_root,
+            tmp_path / "reports",
+            targets=("channel_lever",),
+        )
+    assert len(snapshots) == len(adapter.drawn) == 1
+    assert raised.value.snapshot is snapshots[0]
+    capture.assert_called_once()
+    (path,) = (tmp_path / "reports").glob("*/pilot.json")
+    report = json.loads(path.read_text())
+    trial = report["trials"][0]
+    assert report["status"] == trial["status"] == "failed"
+    assert report["error"] == trial["error"] == repr(raised.value)
+    assert trial["semantic_failure"] == {
+        "snapshot": json.loads(json.dumps(snapshots[0])),
+        "validation": raised.value.validation,
+    }
+    assert "independent evidence failure" in trial["failure_evidence_error"]
+    assert "built" not in trial and "reopened" not in trial
+    assert report["runtime_final_guard_errors"] == []
+
+
 def test_unsaved_semantic_rejection_retains_raw_measurements_and_independent_checks(
     scene, monkeypatch
 ):
