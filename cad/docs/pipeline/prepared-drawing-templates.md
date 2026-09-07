@@ -69,11 +69,19 @@ named text slots after `GetTextCount`, orientation/angle, lay/profile, GOST and
 attachment/extra-leader properties, visibility, native XYZ, all sixteen raw
 `ITextFormat` properties, `IsHeightSpecifiedInPts` and document-format inheritance.
 This includes underline/strikeout, spacing, escapement/slant and text direction,
-not only typeface and height. The complete existing `annotation_box` measurement
-retains text runs, bodies/envelopes, strokes, leaders and decorations; only its
-generated annotation name is excluded from cross-document comparison. The native
-`ISFSymbol.GetAnnotation` round-trip must match the enumerated annotation before
-capture. Rows form an exact multiset, preserving duplicate symbols. Other
+not only typeface and height. For SF preservation, `_drawing_native_display_data`
+captures native `IDisplayData` directly, not a GDI-estimated text box: all ten
+primitive counts; complete line/arc/polyline/triangle/arrowhead/polygon arrays;
+text strings, XYZ, height, font, angle, reference, inversion, plane matrix and
+line spacing; ordinary leader count/style and every native XYZ point. Native
+array order, normals, color/style fields and even documented unused slots stay
+unrounded. Null/empty text planes remain distinct observations; nine-element
+planes are retained without projecting them. The reader rejects malformed
+arrays, unknown polyline forms, ellipses/parabolas/points and multi-jog leaders
+instead of certifying partial data. Text-in-box APIs document table-cell scope
+and are not called for SFs. No native name is used as cross-document identity.
+The `ISFSymbol.GetAnnotation` round-trip must match the enumerated annotation
+before capture. Rows form an exact multiset, preserving duplicate symbols. Other
 non-note kinds and unsupported symbol enums still fail, rather than disappearing
 from the witness. This is a template-default witness, not a manufacturing-sheet
 geometry proof.
@@ -209,3 +217,27 @@ font, inheritance, placement, native internal geometry and unknown kinds.
 This extends the validator; it does not normalize or remove either symbol.
 The expanded normal/miss/hit sequence still needs native acceptance, followed
 by blank export/visual and full-recipe cold-reopen checks before rollout.
+
+### Raw SF capture replaces the layout font estimator
+
+The next normal control, frozen root `15c20ab73220dc0cf2517603555cd251ec8d0a77`,
+completed the added native SF/font getters, then the derived `annotation_box`
+rejected the actual font tuple `('Century Gothic', 0.0013229166666666667, 5,
+True, 1.0, False, False)`. Normal setup took 2.9748459 s; the failed witness took
+1.1059245 s. Cache accessor/save/miss/hit still had not run.
+
+Receipt: `prepared-template-cache-y18kfdkk/measurements.json` under the same root
+report directory, SHA-256
+`b249fb9e60394f3fd18a51596e1049c641e4cddf73c9801798340b20d3ab7c21`.
+Ownership records empty baseline/final inventories, no cleanup error and the
+same unchanged original template SHA as above.
+
+The wrong assumption was that preserving template content needed the layout
+estimator's calibrated font bounds. The committed regression uses the real
+estimator to reproduce this exact 5-point rejection, then requires the raw SF
+capture to succeed with that same native format. Existing font calibration is
+unchanged. Prior derived-geometry assertions were replaced with stricter raw
+array/component drift checks, not removed. The notes path remains unchanged.
+This raw equality check does not prove printed sketch/logo geometry or rendering;
+blank PDF/vector/visual comparison and full-recipe acceptance remain required.
+The revised raw normal/miss/hit sequence has not yet run natively.

@@ -13,6 +13,7 @@ import math
 
 from _common import _early_bound
 from _drawing_annotation_bounds import _native_counts, annotation_box
+from _drawing_native_display_data import native_display_data
 
 
 def _plain(value):
@@ -182,9 +183,7 @@ def _surface_finish_snapshot(adapter, annotation):
                 f"unsupported template surface finish texture: {texture}"
             )
         row["surface_texture"] = texture
-    measured = asdict(annotation_box(adapter, annotation))
-    measured.pop("name")  # Native generated IDs are not a cross-document identity.
-    row["measured"] = measured
+    row["native_display"] = native_display_data(annotation)
     return _plain(row)
 
 
