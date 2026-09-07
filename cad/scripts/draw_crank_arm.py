@@ -402,13 +402,7 @@ async def build(
         front,
         entity=entities(front, "shaft")[0],
         entity_context=AnnotationEntityContext.MODEL,
-        symbol_xy=(0.022, 0.125),
-        # Route the finish arrow to the bottom of the already-selected rim,
-        # clear of datum B's native lower-left arrow. This is not a feature pick.
-        leader_attach_xy=(
-            _sheet_x(0.0),
-            FRONT_CENTER[1] - SHAFT_BORE_DIA * SHEET_SCALE[0] / 2000.0,
-        ),
+        # Native placement avoids a separate arrow competing with datum B.
         control=surface_finish_by_key(SURFACE_FINISHES, "shaft_bore"),
         label="shaft bore finish",
     )
