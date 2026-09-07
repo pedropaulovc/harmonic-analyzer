@@ -24,6 +24,7 @@ sys.path.insert(0, str(ROOT / "cad/scripts"))
 
 from _common import _early_bound  # noqa: E402
 from _drawing_template_defaults import compare_defaults, snapshot_defaults  # noqa: E402
+from solidworks_mcp.adapters.com_variant import double_array  # noqa: E402
 from diagnostics import _owned_native_documents as owned  # noqa: E402
 from diagnostics import _populated_template_symbols as symbols  # noqa: E402
 from diagnostics import probe_prepared_template_cache as base  # noqa: E402
@@ -38,6 +39,11 @@ class Arm(StrEnum):
 class Comparison(StrEnum):
     EXACT = "exact"
     OBSERVATION = "observation"
+
+
+class Translation(StrEnum):
+    NATIVE = "native"
+    ORIGINAL = "original"
 
 
 def read_inputs(receipt_path, receipt_sha, template_path, template_sha):
@@ -88,13 +94,20 @@ def viewport(model):
     view = _early_bound(model.ActiveView, "IModelView")
     scale = view.Scale2
     transform = tuple(view.Transform.ArrayData)
+    translation = tuple(_early_bound(view.Translation3, "IMathVector").ArrayData)
+    orientation = tuple(_early_bound(view.Orientation3, "IMathTransform").ArrayData)
     pixels = tuple(view.GetVisibleBox())
     if (
         type(scale) not in (int, float)
         or not math.isfinite(scale)
         or scale <= 0
         or len(transform) != 16
-        or any(type(x) not in (int, float) or not math.isfinite(x) for x in transform)
+        or len(translation) != 3
+        or len(orientation) != 16
+        or any(
+            type(x) not in (int, float) or not math.isfinite(x)
+            for x in (*transform, *translation, *orientation)
+        )
         or len(pixels) != 4
         or any(type(x) is not int for x in pixels)
         or pixels[0] >= pixels[2]
@@ -104,6 +117,8 @@ def viewport(model):
     return {
         "scale2": scale,
         "transform": list(transform),
+        "translation3": list(translation),
+        "orientation3": list(orientation),
         "visible_box_pixels": list(pixels),
         "document_visibility": "visible",
     }
@@ -251,7 +266,11 @@ def equal(before, after):
         raise RuntimeError("exact captured fields differ")
 
 
-async def probe(adapter, pins, report_root, expected_pid):
+async def probe(
+    adapter, pins, report_root, expected_pid, *, translation=Translation.NATIVE
+):
+    if not isinstance(translation, Translation):
+        raise ValueError("viewport translation requires an explicit policy enum")
     base.require_environment(expected_pid)
     if int(adapter.swApp.GetProcessID()) != expected_pid:
         raise RuntimeError("running native PID differs")
@@ -267,6 +286,7 @@ async def probe(adapter, pins, report_root, expected_pid):
     report = {
         "status": "running",
         "scope": "one owned blank, viewport-only Scale2 A/B/A",
+        "translation": translation.value,
         "inputs": pins,
         "runtime_inputs": frozen,
         "expected_pid": expected_pid,
@@ -346,6 +366,7 @@ async def probe(adapter, pins, report_root, expected_pid):
             {"name": name, "kind": kind} for name, kind in bank[1]
         ]
         initial = viewport(model)
+        report["initial_viewport"] = initial
         view = _early_bound(model.ActiveView, "IModelView")
         for arm in Arm:
             same_bank(adapter, bank)
@@ -356,8 +377,32 @@ async def probe(adapter, pins, report_root, expected_pid):
             row = {"variant": arm.value, "target_scale2": target}
             report["arms"].append(row)
             view.Scale2 = target
+            row["after_scale_viewport"] = viewport(model)
+            if row["after_scale_viewport"]["orientation3"] != initial["orientation3"]:
+                raise RuntimeError("native Scale2 changed the original orientation")
+            if translation is Translation.ORIGINAL:
+                row["translation_target"] = initial["translation3"]
+                math_utility = _early_bound(
+                    adapter.swApp.GetMathUtility(), "IMathUtility"
+                )
+                vector = math_utility.CreateVector(
+                    double_array(initial["translation3"])
+                )
+                if vector is None:
+                    raise RuntimeError("native CreateVector returned null")
+                vector = _early_bound(vector, "IMathVector")
+                if list(vector.ArrayData) != initial["translation3"]:
+                    raise RuntimeError("fresh native translation vector differs")
+                view.Translation3 = vector
             model.GraphicsRedraw2()  # Identical documented redraw in every arm.
             row["viewport"] = viewport(model)
+            if row["viewport"]["orientation3"] != initial["orientation3"]:
+                raise RuntimeError("native viewport orientation changed")
+            if (
+                translation is Translation.ORIGINAL
+                and row["viewport"]["translation3"] != initial["translation3"]
+            ):
+                raise RuntimeError("native original Translation3 readback differs")
             if row["viewport"]["scale2"] != target:
                 raise RuntimeError("native viewport scale assignment did not persist")
             row["defaults"] = snapshot_defaults(adapter, spec)
@@ -451,6 +496,12 @@ def main(argv=None):
     parser.add_argument("--template-sha256", required=True)
     parser.add_argument("--expected-pid", type=int, required=True)
     parser.add_argument(
+        "--translation",
+        type=Translation,
+        choices=tuple(Translation),
+        default=Translation.NATIVE,
+    )
+    parser.add_argument(
         "--report-root", type=Path, default=ROOT / "cad/out/reports/prepared-viewport"
     )
     parser.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
@@ -462,7 +513,11 @@ def main(argv=None):
     if args.worker:
         return owned.run_copy_diagnostic(
             lambda adapter: probe(
-                adapter, pins, args.report_root.resolve(), args.expected_pid
+                adapter,
+                pins,
+                args.report_root.resolve(),
+                args.expected_pid,
+                translation=args.translation,
             )
         )
     import dodo
@@ -481,6 +536,8 @@ def main(argv=None):
             pins["template"]["sha256"],
             "--expected-pid",
             str(args.expected_pid),
+            "--translation",
+            args.translation.value,
             "--report-root",
             str(args.report_root.resolve()),
             "--worker",
