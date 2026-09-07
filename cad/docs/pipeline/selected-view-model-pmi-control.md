@@ -133,11 +133,23 @@ while preserving the shared typed PMI content.
 `--orientation '*Right'` now changes only the selected native orientation; the
 default remains `*Front`. Each invocation uses a fresh source bytecopy and makes
 the same two imports exactly once. `*Top` is also selectable. The requested
-orientation must resolve uniquely through `IView.GetOrientationName`; neither
-view order nor position substitutes for identity. All original coverage,
+orientation must match the source's `GetStandardViewRotation` and the drawing
+view's `ModelToViewTransform` rotation. The named Front view must first match
+the source Front matrix as a positive control of the coordinate convention.
+Neither view order nor position substitutes for identity. All original coverage,
 source/native identity, layout, export and cleanup checks remain unchanged.
 
 This tests whether the missing Front datum is view-dependent, using the earlier
 all-view datum import as the positive control. There is no annotation repositioning
 or center-mark exemption, so existing frame overlap or export inventory changes
 can still reject the candidate even if datum import succeeds.
+
+The first Right attempt at `43247c6f` stopped before import because its selector
+incorrectly expected `GetOrientationName` to name the two projected views.
+Both returned an empty string, exactly as that method's bundled documentation
+specifies. Receipt `selected-view-pmi-nuwwyl5k/observations.json`, SHA-256
+`266ad1767fb46b532e3a52a3685cd94652586e62caf846a2abec2df8b7b9a01b`,
+records the 15.013326 s attempt, unchanged source/runtime guards and clean
+empty-to-empty cleanup. Rotation matching corrects the diagnostic, not the
+model-PMI importer. Rotation arrays must be finite, orthonormal and uniquely
+matched within 1e-9; projected views need no invented name.
