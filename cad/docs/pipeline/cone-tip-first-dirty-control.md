@@ -1,5 +1,9 @@
 # Cone-tip source first-dirty control
 
+Historical pre-run design below. The subsequent native control localized the
+source write; its exact receipt and the separately proposed migration are in
+[cone-tip source-owned reference text](cone-tip-source-reference.md).
+
 This diagnostic-only extension is based on `fb958fda`. It does not change the
 source part, drawing recipe, reference notation, save policy or acceptance gates.
 The new tip target has not run natively yet.

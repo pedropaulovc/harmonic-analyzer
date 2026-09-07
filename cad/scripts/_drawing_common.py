@@ -2120,7 +2120,7 @@ def verify_dimension_callouts(
     feature_name: str,
     view: Any,
     source_model: Any,
-    location: Literal["above", "below"] = "below",
+    location: Literal["above", "below", "prefix", "suffix"] = "below",
 ) -> None:
     """Verify imported text against the caller's intended view and source PART.
 
@@ -2129,7 +2129,7 @@ def verify_dimension_callouts(
     """
     from _drawing_marks import _named_dimension
 
-    text_part = {"above": 3, "below": 4}[location]  # swDimensionTextParts_e
+    text_part = {"above": 3, "below": 4, "prefix": 1, "suffix": 2}[location]
     model = adapter.currentModel
     if model is None or _early_bound(model, "IModelDoc2").GetType() != 3:  # swDocDRAWING
         raise RuntimeError("imported dimension callout verification requires a DRAWING")
@@ -2180,6 +2180,24 @@ def verify_dimension_callouts(
         require_same(source_dimension, dimension, "source parameter")
         if display.IsHoleCallout() is not False:
             raise RuntimeError(f"dimension {name!r}: GetText does not support hole callouts")
+        if location in ("prefix", "suffix"):
+            from _model_dimension_callouts import _reference_presentation
+
+            source_display = _early_bound(_source_display, "IDisplayDimension")
+            if source_display.IsHoleCallout() is not False:
+                raise RuntimeError(f"dimension {name!r}: source GetText does not support hole callouts")
+            expected = _reference_presentation(source_display)
+            actual = _reference_presentation(display)
+            if (
+                expected[text_part - 1] != text
+                or expected[text_part + 3] != text
+                or actual != expected
+            ):
+                raise RuntimeError(
+                    f"{name}@{feature_name}: imported reference presentation differs: "
+                    f"source={expected!r}, drawing={actual!r}, requested={text!r}"
+                )
+            continue
         actual = display.GetText(text_part)
         if actual != text:
             raise RuntimeError(
@@ -2371,11 +2389,12 @@ def set_reference_dimensions(
     notation.  Keyed on the parametric name so a value collision can never
     parenthesize the wrong dimension.  Fails loud if any name is unmatched.
 
-    ``IDisplayDimension.ShowParenthesis`` only affects "text above the dimension
-    line", which a leadered diameter callout does not have (it sets the flag but
-    renders nothing), so instead bracket the value with a "(" prefix and ")"
-    suffix via ``SetText`` — the same proven channel ``set_dimension_callouts``
-    uses for the below-text — which renders on any dimension form.
+    This helper uses the observed prefix/suffix representation, including the
+    diameter token. The cone-tip first-dirty control demonstrated that editing
+    these imported fields also dirties its source part; that recipe now authors
+    them in the source build. See pipeline/cone-tip-source-reference.md.
+    ShowParenthesis with its documented redraw has not been tested here; the
+    former claim that it renders nothing on leadered diameters was unproved.
     """
     text_prefix = 1  # swDimensionTextParts_e.swDimensionTextPrefix
     text_suffix = 2  # swDimensionTextParts_e.swDimensionTextSuffix

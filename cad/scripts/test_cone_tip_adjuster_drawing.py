@@ -50,7 +50,18 @@ def test_thread_callout_is_the_catalog_thread() -> None:
     assert '"5/16-18"' not in part_source
     assert "IEntity" in part_source
     assert "import_cosmetic_threads" in drawing_source
-    assert "set_reference_dimensions(adapter, front_annotations" in drawing_source
+    assert "set_reference_dimensions" not in drawing_source
+    assert part.REFERENCE_PREFIXES is drawing.REFERENCE_PREFIXES is cone_tip_adjuster_spec.REFERENCE_PREFIXES
+    assert part.REFERENCE_SUFFIXES is drawing.REFERENCE_SUFFIXES is cone_tip_adjuster_spec.REFERENCE_SUFFIXES
+    assert drawing.REFERENCE_PREFIXES == {"BodyDiaDim": "(<MOD-DIAM>"}
+    assert drawing.REFERENCE_SUFFIXES == {"BodyDiaDim": ")"}
+    assert 'author_model_callouts(adapter, "BodyProfile", REFERENCE_PREFIXES, location="prefix")' in part_source
+    assert 'author_model_callouts(adapter, "BodyProfile", REFERENCE_SUFFIXES, location="suffix")' in part_source
+    assert part_source.index('location="above"') < part_source.index('location="prefix"') < part_source.index('location="suffix"') < part_source.index('return await save_part_and_images(')
+    assert 'adapter, front_annotations, REFERENCE_PREFIXES' in drawing_source
+    assert 'adapter, front_annotations, REFERENCE_SUFFIXES' in drawing_source
+    assert 'source_model=callout_source_model, location="prefix"' in drawing_source
+    assert 'source_model=callout_source_model, location="suffix"' in drawing_source
     assert cone_tip_adjuster_spec.BODY_DIA == 6.2
     assert part.CHAMFER == drawing.CHAMFER == 0.4
     assert 'name_last_feature(adapter, "ThreadStartChamfers")' in part_source
