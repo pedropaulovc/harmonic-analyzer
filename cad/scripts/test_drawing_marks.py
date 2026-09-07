@@ -118,9 +118,8 @@ def test_dimension_prefix_helper_has_an_operation_span(
         def __init__(self) -> None:
             self.prefix = ""
 
-        def SetText(self, _part: int, prefix: str) -> bool:
+        def SetText(self, _part: int, prefix: str) -> None:
             self.prefix = prefix
-            return True
 
         def GetText(self, _part: int) -> str:
             return self.prefix
@@ -136,6 +135,110 @@ def test_dimension_prefix_helper_has_an_operation_span(
 
     assert display.prefix == "REF "
     assert spans == [("dim.prefix", {"label": "GripAngle"})]
+
+
+@pytest.mark.parametrize("prefix", ["REF ", "", "2X "])
+def test_dimension_prefix_accepts_void_setter_with_exact_readback(
+    monkeypatch: pytest.MonkeyPatch, prefix: str
+) -> None:
+    calls = []
+    text = {}
+
+    def set_text(part, value):
+        calls.append(("set", part, value))
+        text[part] = value
+
+    def get_text(part):
+        calls.append(("get", part))
+        return text[part]
+
+    display = SimpleNamespace(SetText=set_text, GetText=get_text)
+    monkeypatch.setattr(
+        _drawing_marks, "_named_dimension", lambda *_args: (display, object())
+    )
+    monkeypatch.setattr(_drawing_marks, "_early_bound", lambda value, _type: value)
+
+    _drawing_marks.set_dimension_prefix(object(), "GripAngleDim", "GripAngle", prefix)
+
+    assert calls == [("set", 1, prefix), ("get", 1)]
+
+
+@pytest.mark.parametrize(
+    ("prefix", "observed"), [("REF ", "REF"), ("REF ", ""), ("", None)]
+)
+def test_dimension_prefix_rejects_mismatched_or_null_readback(
+    monkeypatch: pytest.MonkeyPatch, prefix: str, observed: str | None
+) -> None:
+    calls = []
+    display = SimpleNamespace(
+        SetText=lambda part, value: calls.append((part, value)),
+        GetText=lambda _part: observed,
+    )
+    monkeypatch.setattr(
+        _drawing_marks, "_named_dimension", lambda *_args: (display, object())
+    )
+    monkeypatch.setattr(_drawing_marks, "_early_bound", lambda value, _type: value)
+
+    with pytest.raises(
+        RuntimeError, match="GripAngle@GripAngleDim: prefix did not persist"
+    ):
+        _drawing_marks.set_dimension_prefix(
+            object(), "GripAngleDim", "GripAngle", prefix
+        )
+
+    assert calls == [(1, prefix)]
+
+
+@pytest.mark.parametrize("failure_stage", ["setter", "getter"])
+@pytest.mark.parametrize("failure_type", ["runtime", "com"])
+def test_dimension_prefix_propagates_native_exception_through_operation_span(
+    monkeypatch: pytest.MonkeyPatch, failure_stage: str, failure_type: str
+) -> None:
+    failure = RuntimeError("COM call rejected")
+    if failure_type == "com":
+        # Construct only the native exception, never a COM adapter/server.
+        failure = pytest.importorskip("pywintypes").com_error(
+            -2147352567, "COM call rejected", None, None
+        )
+    calls, spans, caught_in_span = [], [], []
+
+    def set_text(part, value):
+        calls.append(("set", part, value))
+        if failure_stage == "setter":
+            raise failure
+
+    def get_text(part):
+        calls.append(("get", part))
+        raise failure
+
+    @contextmanager
+    def capture_span(name, **attributes):
+        spans.append((name, attributes))
+        try:
+            yield
+        except Exception as error:
+            caught_in_span.append(error)
+            raise
+
+    display = SimpleNamespace(SetText=set_text, GetText=get_text)
+    monkeypatch.setattr(
+        _drawing_marks, "_named_dimension", lambda *_args: (display, object())
+    )
+    monkeypatch.setattr(_drawing_marks, "_early_bound", lambda value, _type: value)
+    monkeypatch.setattr(_drawing_marks._telemetry, "span", capture_span)
+
+    with pytest.raises(type(failure), match="COM call rejected") as caught:
+        _drawing_marks.set_dimension_prefix(
+            object(), "GripAngleDim", "GripAngle", "REF "
+        )
+
+    assert caught.value is failure
+    assert caught_in_span == [failure]
+    assert spans == [("dim.prefix", {"label": "GripAngle"})]
+    expected = [("set", 1, "REF ")]
+    if failure_stage == "getter":
+        expected.append(("get", 1))
+    assert calls == expected
 
 
 @pytest.mark.parametrize(
