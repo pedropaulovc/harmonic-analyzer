@@ -38,6 +38,7 @@ from diagnostics import probe_retained_drawing_export as retained  # noqa: E402
 from diagnostics._owned_native_documents import run_copy_diagnostic  # noqa: E402
 from diagnostics._owned_native_session import require_owned_diagnostic_environment  # noqa: E402
 from solidworks_mcp.adapters.pywin32_adapter import null_callout  # noqa: E402
+import _telemetry  # noqa: E402
 
 RECEIPT_SHA = "bd281f36661a6d52001c6104806df241e31df834e3529c65eb59eeedd399e119"
 ARTIFACT_SHA = {
@@ -356,6 +357,7 @@ def compare_measured(before, after, movable=()):
                 raise RuntimeError(f"{view}/{name}: arranged text/format changed")
 
 
+@_telemetry.traced("diagnostic.dimension_arrangement")
 async def probe(adapter, receipt, output_root, *, arrangement=Arrangement.AUTO_ARRANGE):
     if not isinstance(arrangement, Arrangement):
         raise ValueError("native arrangement requires its explicit policy enum")
@@ -598,9 +600,11 @@ def main(argv=None):
     args = parser.parse_args(argv)
     arrangement = Arrangement(args.arrangement)
     require_owned_diagnostic_environment()
+    pid = os.environ.get("HARMONIC_DIAGNOSTIC_SW_PID", "")
     if (
         os.environ.get("HARMONIC_REMOTE_CACHE_MODE") != "off"
-        or int(os.environ.get("HARMONIC_DIAGNOSTIC_SW_PID", "0")) <= 0
+        or not pid.isdecimal()
+        or int(pid) <= 0
     ):
         raise RuntimeError("diagnostic requires cache off and an explicit existing PID")
     receipt = args.receipt.resolve(strict=True)

@@ -515,7 +515,7 @@ def main():
     if args.child_paths:
         parser.error("Unexpected positional paths")
     if not math.isfinite(args.timeout) or not 1 <= args.timeout <= 900:
-        parser.error("--timeout must be within1–900 seconds")
+        parser.error("--timeout must be within 1-900 seconds")
     outcome = launch_once(
         args.mode, report_root=args.report_root.resolve(), timeout_s=args.timeout
     )

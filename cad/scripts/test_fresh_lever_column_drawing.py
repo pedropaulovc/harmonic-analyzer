@@ -40,11 +40,13 @@ async def test_explicit_source_is_used_before_recipe_drives_native_application(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("change", ["none", "basic", "source_bytes", "wrong_output"])
+@pytest.mark.parametrize("report_root", ["present", "absent"])
 async def test_fresh_baseline_uses_unique_outputs_and_preserves_source_witnesses(
-    monkeypatch, tmp_path, change
+    monkeypatch, tmp_path, change, report_root
 ):
     root = tmp_path / "cad"
-    (root / "out/reports").mkdir(parents=True)
+    if report_root == "present":
+        (root / "out/reports").mkdir(parents=True)
     source, original = tmp_path / "current.SLDPRT", tmp_path / "original.SLDDRW"
     source.write_bytes(b"current-native-part")
     original.write_bytes(b"unchanged-old-native-drawing")

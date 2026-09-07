@@ -262,7 +262,10 @@ def datum_state(adapter, bore, annotation):
         )
     entities = tuple(annotation.GetAttachedEntities3() or ())
     kinds = tuple(int(v) for v in annotation.GetAttachedEntityTypes() or ())
-    if int(annotation.GetAttachedEntityCount3()) != len(entities):
+    if (
+        int(annotation.GetAttachedEntityCount3()) != len(entities)
+        or len(kinds) != len(entities)
+    ):
         raise RuntimeError("datum native attachment count changed")
     binding_error = None
     try:
@@ -528,6 +531,7 @@ def require_explicit_attachment(observations):
             )
 
 
+@_telemetry.traced("diagnostic.datum_dimension_attachment")
 async def probe(adapter, source, directory, mode="paired_dimensions"):
     from diagnostics._owned_native_documents import save_drawing
 

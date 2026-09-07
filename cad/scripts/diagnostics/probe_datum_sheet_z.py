@@ -175,6 +175,7 @@ def baseline_matches(expected, actual):
             raise RuntimeError(f"fresh datum copy changed baseline {field}")
 
 
+@_telemetry.traced("diagnostic.datum_sheet_z")
 async def probe(adapter, sources, directory):
     from diagnostics._owned_native_documents import save_drawing
 

@@ -589,6 +589,7 @@ def set_shoulder(tag, policy):
     }
 
 
+@_telemetry.traced("diagnostic.datum_shoulder")
 async def probe(
     adapter, source, directory, mode=ControlMode.DOCUMENT_LENGTH, *, part=None
 ):
