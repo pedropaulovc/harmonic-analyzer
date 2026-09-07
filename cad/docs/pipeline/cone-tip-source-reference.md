@@ -36,7 +36,8 @@ The rerunnable control and command are in
 [cone-tip first-dirty control](cone-tip-first-dirty-control.md). To replay that
 historical call shape, use its exact `--candidate 5e773756` and the pinned
 pre-migration part bytes; do not treat a newly rebuilt source as that control.
-Execution always requires a fresh native seat grant and explicit current PID.
+Execution requires confirmed exclusive seat ownership and explicit current PID;
+testing is already authorized, not a request for another user approval.
 
 ## Implementation and deliberate contract changes
 
