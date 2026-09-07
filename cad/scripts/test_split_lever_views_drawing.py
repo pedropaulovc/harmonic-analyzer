@@ -17,6 +17,8 @@ def built(monkeypatch, tmp_path):
     views = []
     retained = {}
     created = {}
+    created_annotations = {}
+    bound_displays = {}
     entities = {
         name: object()
         for name in (
@@ -85,11 +87,28 @@ def built(monkeypatch, tmp_path):
     def dimension(adapter, view, **kw):
         events.append(("dimension", view, kw))
         annotation = object()
-        display = SimpleNamespace(label=kw["label"], GetAnnotation=lambda: annotation)
+
+        class RawDisplay:
+            label = kw["label"]
+
+            @property
+            def GetAnnotation(self):
+                raise AssertionError("bind IDisplayDimension before GetAnnotation")
+
+        display = RawDisplay()
+        bound_displays[id(display)] = SimpleNamespace(GetAnnotation=lambda: annotation)
         created[kw["label"]] = display
+        created_annotations[kw["label"]] = annotation
         return display
 
     monkeypatch.setattr(recipe, "add_entity_dimension", dimension)
+
+    def early_bound(value, interface):
+        assert interface == "IDisplayDimension"
+        events.append(("bind_display", value))
+        return bound_displays[id(value)]
+
+    monkeypatch.setattr(recipe, "_early_bound", early_bound, raising=False)
     monkeypatch.setattr(
         recipe,
         "set_basic_dimension",
@@ -142,6 +161,7 @@ def built(monkeypatch, tmp_path):
         result=result,
         retained=retained,
         created=created,
+        created_annotations=created_annotations,
     )
 
 
@@ -158,9 +178,13 @@ def test_parallel_spacing_receives_exact_created_retained_handles_before_layout(
     assert call["bar_length"] is built.retained["profile"]["BarLength"]
     assert call["tip_centre_x"] is built.retained["profile"]["TipCentreX"]
     assert (
-        call["bar_pin_c2c"] is built.created["fulcrum-to-bar-pin c2c"].GetAnnotation()
+        call["bar_pin_c2c"] is built.created_annotations["fulcrum-to-bar-pin c2c"]
     )
-    assert call["spring_c2c"] is built.created["fulcrum-to-spring c2c"].GetAnnotation()
+    assert call["spring_c2c"] is built.created_annotations["fulcrum-to-spring c2c"]
+    assert [row[1] for row in built.events if row[0] == "bind_display"] == [
+        built.created["fulcrum-to-bar-pin c2c"],
+        built.created["fulcrum-to-spring c2c"],
+    ]
     assert built.events[index + 1][0] == "layout"
 
 
