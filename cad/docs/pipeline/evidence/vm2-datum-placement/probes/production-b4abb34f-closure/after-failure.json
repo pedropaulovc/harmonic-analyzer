@@ -1,0 +1,11 @@
+{
+  "kind": "vm2-datum-read-only-ownership",
+  "utc": "2026-09-08T05:35:42.121105+00:00",
+  "root": "C:\\src\\ha-datum-placement-main",
+  "head": "b4abb34fdd01a63d42f0c74c60a53da04e4245d6",
+  "probe_sha256": "5b0755731fafa00668b8baa5124459ec612c00c1a20dc686880e82b057f3fc61",
+  "pid": 18748,
+  "revision": "34.3.0",
+  "documents": [],
+  "status": "read_only_complete"
+}

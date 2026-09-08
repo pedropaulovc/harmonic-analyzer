@@ -100,8 +100,9 @@ def test_bore_annotations_use_explicit_nonconflicting_selectors() -> None:
             assert "edge_xy=bore_top" not in source, module.__name__
             assert "edge_xy=bore_bottom" not in source, module.__name__
             assert source.count("entity=bore_edge") == 1, module.__name__
-            assert "_add_bore_finish(adapter, front, bore_edge)" in source, module.__name__
-            assert '_early_bound(bore_edge, "IEntity").Select4(False, data)' in source, module.__name__
+            assert "add_rack_bore_finish(adapter, front, bore_edge, symbol_xy=BORE_FINISH_POSITION)" in source, module.__name__
+            helper_source = Path(module.add_rack_bore_finish.__code__.co_filename).read_text(encoding="utf-8")
+            assert '_early_bound(bore_edge, "IEntity").Select4(False, data)' in helper_source, module.__name__
             assert source.count("add_native_axis_datum(") == 1, module.__name__
             assert "radius_m=BORE_DIA / 2000.0" in source, module.__name__
             assert "stability_tolerance_m=0.0001" in source, module.__name__

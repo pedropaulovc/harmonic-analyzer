@@ -7,6 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 
+import _rack_bore_finish as finish_helper
 import build_rack_pinion as part
 import draw_rack_pinion as drawing
 import rack_pinion_spec as spec
@@ -59,8 +60,9 @@ def test_native_gdt_controls_bore_datum_and_finish() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_native_axis_datum(") == 1
     assert source.count("add_feature_control_frame(") == 1
-    assert source.count("_add_bore_finish(adapter, front, bore_edge)") == 1
-    assert source.count("InsertSurfaceFinishSymbol3(") == 1
+    assert source.count("add_rack_bore_finish(adapter, front, bore_edge, symbol_xy=BORE_FINISH_POSITION)") == 1
+    helper_source = Path(finish_helper.__file__).read_text(encoding="utf-8")
+    assert helper_source.count("InsertSurfaceFinishSymbol3(") == 1
     assert drawing.DIMENSION_CALLOUTS == {"BoreDia": "THRU - REAM"}
     assert model_toleranced_dimensions(part) == {
         ("BoreProfile", "BoreDia"): "*deviations(BORE_DIA_BAND)"
@@ -101,16 +103,17 @@ def test_finish_layout_preserves_semantic_bore_and_separates_native_datum() -> N
         drawing.FRONT_CENTER[0] + 0.058, drawing.FRONT_CENTER[1] - 0.062,
     )
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    finish = source[source.index("def _add_bore_finish("):source.index("async def build(")]
-    assert "*BORE_FINISH_POSITION" in finish
+    assert "add_rack_bore_finish(adapter, front, bore_edge, symbol_xy=BORE_FINISH_POSITION)" in source
+    finish = Path(finish_helper.__file__).read_text(encoding="utf-8")
+    assert "*symbol_xy" in finish
     assert "_early_bound(bore_edge, \"IEntity\").Select4(False, data)" in finish
     assert "rim_xy = model_point_in_view(" in finish
     assert "(BORE_DIA / 2000.0, 0.0, FACE_WIDTH / 1000.0)" in finish
     assert "_validate_surface_finish_control_face(" in finish
     for forbidden in ("SetPosition", "SetLeaderAttachmentPointAtIndex", "SetAttachedEntities"):
         assert forbidden not in finish
-    assert "IsSame(finish_entities[0], bore_edge)) != 1" in source
-    assert "finish_annotation.IsDangling()" in source
+    assert "IsSame(finish_entities[0], bore_edge)) != 1" in finish
+    assert "finish_annotation.IsDangling()" in finish
 
 
 def test_surface_finish_is_part_owned_authored_and_consumed() -> None:
@@ -122,7 +125,12 @@ def test_surface_finish_is_part_owned_authored_and_consumed() -> None:
     part_source = "".join(Path(part.__file__).read_text(encoding="utf-8").split())
     assert "surface_finishes=SURFACE_FINISHES" in part_source
     sheet_source = "".join(Path(drawing.__file__).read_text(encoding="utf-8").split())
-    assert 'control=surface_finish_by_key(SURFACE_FINISHES,"bore")' in sheet_source
+    helper_source = "".join(Path(finish_helper.__file__).read_text(encoding="utf-8").split())
+    assert drawing.add_rack_bore_finish is finish_helper.add_rack_bore_finish
+    assert finish_helper.SURFACE_FINISHES is spec.SURFACE_FINISHES
+    assert finish_helper.BORE_DIA == spec.BORE_DIA
+    assert finish_helper.FACE_WIDTH == spec.FACE_WIDTH
+    assert 'control=surface_finish_by_key(SURFACE_FINISHES,"bore")' in helper_source
     assert "roughness_ra=" not in sheet_source
 
 
@@ -235,10 +243,10 @@ def finish_insertion(monkeypatch):
         if state.face_result == "reject":
             raise RuntimeError("test face control mismatch")
 
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
-    monkeypatch.setattr(drawing, "_validate_surface_finish_control_face", validate)
-    monkeypatch.setattr(drawing, "model_point_in_view", project)
-    state.run = lambda: drawing._add_bore_finish(adapter, front, edge)
+    monkeypatch.setattr(finish_helper, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(finish_helper, "_validate_surface_finish_control_face", validate)
+    monkeypatch.setattr(finish_helper, "model_point_in_view", project)
+    state.run = lambda: finish_helper.add_rack_bore_finish(adapter, front, edge, symbol_xy=drawing.BORE_FINISH_POSITION)
     state.edge = edge
     return state
 
