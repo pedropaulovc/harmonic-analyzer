@@ -8,7 +8,7 @@ from typing import Any, Literal
 
 import _config
 import _telemetry
-from _common import _early_bound, check
+from _common import _early_bound, apply_custom_properties, check
 from _drawing_common import (
     ASME_B_HEIGHT_M,
     ASME_B_WIDTH_M,
@@ -49,8 +49,7 @@ _PROPERTIES = (
     "Number",
     "Revision",
     "Title",
-    "Material Specification",
-    "Finish",
+    "Material",
     "Stock Name",
     "Supplier",
     "Supplier SKUs",
@@ -175,6 +174,56 @@ def _literal_note(adapter: Any, text: str, x: float, y: float) -> Any:
     return note
 
 
+@_telemetry.traced("drawing.purchased_title_block")
+def _purchased_title_block(
+    adapter: Any, draw: Any, *, material: str, finish: str
+) -> list[tuple[Any, str, str]]:
+    """Retarget this drawing's material/finish cells, never the saved template."""
+    apply_custom_properties(adapter, {"Finish": finish}, model=draw)
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    sheet_view = ddoc.GetFirstView()
+    if sheet_view is None:
+        raise RuntimeError("purchased drawing template has no sheet view")
+    sheet_view = _early_bound(sheet_view, "IView")
+    replacements = {
+        property_link("Material Specification"): (property_link("Material"), material),
+        property_link("Finish"): ('$PRP:"Finish"', finish),
+    }
+    matched = {token: 0 for token in replacements}
+    notes = []
+    for annotation in sheet_view.GetAnnotations() or ():
+        annotation = _early_bound(annotation, "IAnnotation")
+        if annotation.GetType() != 6:  # swAnnotationType_e.swNote
+            continue
+        specific = annotation.GetSpecificAnnotation()
+        if specific is None:
+            raise RuntimeError("purchased title-block note has no INote")
+        note = _early_bound(specific, "INote")
+        raw = str(note.PropertyLinkedText)
+        linked_text = raw
+        resolved_text = raw
+        for token, (replacement, value) in replacements.items():
+            occurrences = raw.count(token)
+            if occurrences:
+                matched[token] += occurrences
+                linked_text = linked_text.replace(token, replacement)
+                resolved_text = resolved_text.replace(token, value)
+        if linked_text == raw:
+            continue
+        # Preserve the existing note, annotation formatting and all surrounding
+        # label text; only these exact property-link tokens change ownership.
+        note.PropertyLinkedText = linked_text
+        if note.PropertyLinkedText != linked_text:
+            raise RuntimeError(f"purchased title-block link did not persist: {raw!r}")
+        notes.append((note, linked_text, resolved_text))
+    if any(count != 1 for count in matched.values()):
+        raise RuntimeError(
+            "purchased template must contain exactly one Material Specification "
+            f"and one Finish property link: {matched!r}"
+        )
+    return notes
+
+
 async def build_purchased_fastener_drawing(
     adapter: Any, spec: DrawingSpec
 ) -> dict[str, str]:
@@ -193,9 +242,15 @@ async def build_purchased_fastener_drawing(
             raise RuntimeError(f"opened purchased part is not {source}")
         properties = read_required_properties(model, _PROPERTIES, required=_PROPERTIES)
         registry = _config.parts(stock.part_name)
+        finish = registry["finish"]
+        if not isinstance(finish, str) or not finish.strip():
+            raise RuntimeError(
+                f"{stock.part_name}: registered purchased finish is empty"
+            )
         expected = {
             "Number": str(registry["number"]),
             "Title": str(registry["title"]),
+            "Material": str(registry["material"]),
             "Stock Name": stock.stock_name,
             "Supplier": stock.supplier,
             "Supplier SKUs": ", ".join(stock.skus),
@@ -207,6 +262,9 @@ async def build_purchased_fastener_drawing(
                 )
 
     draw, sheet = new_project_drawing(adapter)
+    title_block_notes = _purchased_title_block(
+        adapter, draw, material=properties["Material"], finish=finish
+    )
     title = f"{properties['Title']} — Purchased Part Reference Drawing"
     with _telemetry.span("drawing.purchased_summary"):
         stamp_drawing_summary(
@@ -311,6 +369,15 @@ async def build_purchased_fastener_drawing(
 
     with _telemetry.span("drawing.purchased_native_contract"):
         _rebuild(draw, phase="linked notes and final layout")
+        for note, linked_text, resolved_text in title_block_notes:
+            if (
+                note.PropertyLinkedText != linked_text
+                or note.GetText() != resolved_text
+            ):
+                raise RuntimeError(
+                    "purchased title-block property did not resolve from its "
+                    f"expected source: {linked_text!r}"
+                )
         actual = list(iter_views(adapter))
         orientations = tuple(view.GetOrientationName() for view in actual)
         if len(actual) != 4 or set(orientations) != {
