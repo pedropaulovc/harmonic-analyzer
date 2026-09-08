@@ -144,7 +144,11 @@ def note_layout(monkeypatch, tmp_path):
         GetProperties2=lambda: (3, 0, 1, 1, 0, 0.4318, 0.2794, 0),
         GetZoneMargin=lambda code: state.zone_margin,
     )
-    model = SimpleNamespace(
+    class CallableModel(SimpleNamespace):
+        def __call__(self):
+            raise AssertionError("ActiveDoc is a COM property, not a callable method")
+
+    model = CallableModel(
         GetType=lambda: 3, GetCurrentSheet=lambda: sheet,
     )
 
@@ -273,3 +277,9 @@ def test_native_measurement_switch_cannot_reach_setter_or_save(note_layout, name
     with pytest.raises(RuntimeError, match="active drawing"):
         note_layout.run()
     assert not any(event[0] in {"move", "finalize"} for event in note_layout.events)
+
+
+def test_callable_active_document_is_read_as_property(note_layout):
+    assert callable(note_layout.adapter.swApp.ActiveDoc)
+    assert note_layout.run() == {"status": "saved"}
+    assert ("finalize",) in note_layout.events

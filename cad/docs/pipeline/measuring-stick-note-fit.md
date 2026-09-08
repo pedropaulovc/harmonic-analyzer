@@ -49,3 +49,28 @@ The owning native validation must still rebuild this drawing from its genuine
 source, retain the measured before/after bounds and source guards, and inspect
 the complete saved PDF/PNG. Offline bounds tests do not prove native font metrics,
 saved printed content or cold-reopen persistence.
+
+## First native attempt: property access rejected before measurement
+
+The normal `doit drawing:measuring_stick` attempt at testing integration
+`4013c480cbcd79c865a0cff59c02e3d2d548f3ae` failed before its first note extent
+read. The guard passed `ISldWorks.ActiveDoc` through `_get_attr_or_call`, which
+called the returned callable COM document. Native dispatch rejected that extra
+call with `-2147352573`, "Member not found". This is a caller bug, not evidence
+that the note cannot fit. No translation or finalization was reached.
+
+The completed raw log was copied unchanged before any rerun from
+`C:/src/ha-foundations-integration/cad/out/logs/drawing-measuring_stick.log` to
+the owning worktree's ignored report
+`cad/out/reports/measuring-stick-note-fit/native-4013-drawing-measuring_stick.log`.
+Both SHA-256 reads were
+`fb93c555b67075cfdc730b952a5099881f9dc79a5638dd687301ac92856ccfd4`.
+
+The correction reads the documented early-bound `app.ActiveDoc` property
+directly and retains the same native identity predicate. The callback fixture
+now makes the returned document callable and raises if anything invokes it;
+the new regression failed first with the same call chain (run-m_rpu1zc).
+The related `Visible` property returns a Boolean, while `GetType`, `GetExtent`
+and `GetSpecificAnnotation` are methods. Their existing reads do not perform
+this extra document invocation. Native fit and printed-content acceptance
+remain pending after the correction.

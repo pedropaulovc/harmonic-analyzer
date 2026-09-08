@@ -101,7 +101,7 @@ def _require_note_drawing(adapter: Any, model: Any, sheet: Any) -> None:
     """GetExtent is invalid on invisible documents; never force visibility."""
     app = _early_bound(adapter.swApp, "ISldWorks")
     drawing = _early_bound(model, "IDrawingDoc")
-    for actual in (adapter.currentModel, adapter._get_attr_or_call(app, "ActiveDoc")):
+    for actual in (adapter.currentModel, app.ActiveDoc):
         same = app.IsSame(model, actual)
         if type(same) is not int or same != 1:
             raise RuntimeError("measuring-stick note layout lost the active drawing")
