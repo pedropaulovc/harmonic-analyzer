@@ -107,6 +107,10 @@ def main():
             recipe.add_datum_feature = original
             draw = _early_bound(adapter.currentModel, "IModelDoc2")
             view, kwargs = captured["view"], dict(captured["kwargs"])
+            report["prepared_drawing"] = {
+                "title": str(draw.GetTitle()), "path": str(draw.GetPathName()),
+                "source": str(source), "datum_view": str(view.GetName2()),
+            }
             report["original_call"] = kwargs.copy()
             report["view_position"] = list(view.Position)
             report["view_scale"] = list(view.ScaleRatio)
@@ -210,6 +214,7 @@ def main():
                         raise RuntimeError(f"diagnostic SaveAs3 rejected: {suffix}: {code!r}")
                     report["exports"][suffix]["sha256"] = digest(path)
                 common.render_pdf_png(output / "partial.pdf", output / "partial.png", expected_pages=1)
+                report["exports"]["png"] = {"path": str(output / "partial.png"), "sha256": digest(output / "partial.png")}
             report["position_after_save"] = list(annotation.GetPosition() or ())
             report["source_sha256_after"] = digest(source)
             if report["source_sha256_after"] != report["source_sha256_before"]:
@@ -220,10 +225,25 @@ def main():
             documents = [_early_bound(raw, "IModelDoc2") for raw in app.GetDocuments() or ()]
             if any(Path(str(doc.GetPathName())).resolve() not in allowed for doc in documents):
                 raise RuntimeError("unexpected document remains; nothing closed")
-            for doc in sorted(documents, key=lambda item: int(item.GetType()) != 3):
-                app.CloseDoc(str(doc.GetTitle()))
+            targets = [(str(doc.GetPathName()), str(doc.GetTitle()), int(doc.GetType())) for doc in documents]
+            if any(not row[1] for row in targets) or len({row[1].casefold() for row in targets}) != len(targets):
+                raise RuntimeError("ambiguous close titles; nothing closed")
+            report["closed_without_save"] = []
+            for target_path, title, _kind in sorted(targets, key=lambda row: row[2] != 3):
+                current = [_early_bound(raw, "IModelDoc2") for raw in app.GetDocuments() or ()]
+                pairs = [(str(doc.GetPathName()), str(doc.GetTitle())) for doc in current]
+                if any(pair not in [(row[0], row[1]) for row in targets] for pair in pairs):
+                    raise RuntimeError("unexpected document appeared during closure")
+                if (target_path, title) not in pairs:
+                    continue
+                app.CloseDoc(title)
+                report["closed_without_save"].append({"path": target_path, "title": title})
+                checkpoint()
             if app.GetDocuments() or app.ActiveDoc is not None:
                 raise RuntimeError("probe did not return an empty inventory")
+            report["source_sha256_after_close"] = digest(source)
+            if report["source_sha256_after_close"] != report["source_sha256_before"]:
+                raise RuntimeError("probe closure changed source bytes")
             report["status"] = "observed_and_closed"
         except Exception as error:
             report.update(status="failed", error=repr(error))

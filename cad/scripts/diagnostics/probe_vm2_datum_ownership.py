@@ -24,8 +24,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output", type=Path)
     parser.add_argument("--worker", action="store_true")
-    parser.add_argument("--close-owned-failure-from", type=Path)
-    parser.add_argument("--close-owned-probe-from", type=Path)
+    closure = parser.add_mutually_exclusive_group()
+    closure.add_argument("--close-owned-failure-from", type=Path)
+    closure.add_argument("--close-owned-probe-from", type=Path)
     parser.add_argument("--inventory-witness", type=Path)
     args = parser.parse_args()
     output = args.output.resolve()
@@ -150,9 +151,28 @@ def main():
                 if len(rows) != 2 or len(parts) != 1 or len(drawings) != 1:
                     raise RuntimeError("expected exactly the probe source and one drawing")
                 part, drawing = parts[0], drawings[0]
-                if Path(part["path"]).resolve() != source or drawing["path"]:
-                    raise RuntimeError("expected own source and an unsaved probe drawing")
-                if part["saved_sha256_before"] != witness["source_sha256_before"]:
+                if Path(part["path"]).resolve() != source:
+                    raise RuntimeError("expected own source")
+                expected_source_hash = witness["source_sha256_before"]
+                if not drawing["path"]:
+                    prepared = witness.get("prepared_drawing", {})
+                    if prepared.get("title") != drawing["title"] or prepared.get("path") != "" or prepared.get("source") != str(source):
+                        raise RuntimeError("failed receipt does not identify this unsaved drawing")
+                if drawing["path"]:
+                    saved = witness.get("exports", {}).get("SLDDRW", {})
+                    if drawing["path"] != saved.get("path") or Path(drawing["path"]).resolve() != witness_path.parent / "partial.SLDDRW":
+                        raise RuntimeError("unexpected saved probe drawing")
+                    if drawing["saved_sha256_before"] != saved.get("sha256") or drawing["state"] != "clean" or part["state"] != "clean":
+                        raise RuntimeError("saved failed-probe evidence changed")
+                    if witness.get("error") != "RuntimeError('diagnostic export changed saved source bytes')":
+                        raise RuntimeError("saved closure permits only the recorded export identity failure")
+                    expected_source_hash = witness["source_sha256_after"]
+                    report["retained_source_identity_failure"] = {
+                        "before_probe": witness["source_sha256_before"],
+                        "after_probe": expected_source_hash,
+                        "acceptance": "failed; closure does not repair or accept identity drift",
+                    }
+                if part["saved_sha256_before"] != expected_source_hash:
                     raise RuntimeError("source changed after failed probe")
                 views = drawing["views"]
                 if len(views) != 4 or views[0]["reference_path"] is not None:
@@ -162,12 +182,22 @@ def main():
                 if len({row["title"] for row in rows}) != 2:
                     raise RuntimeError("ambiguous document titles")
                 report["closure_witness"] = {"path": str(witness_path), "sha256": digest(witness_path)}
+                report["closed_without_save"] = []
                 checkpoint()
                 for target in (drawing, part):
+                    present = [_early_bound(raw, "IModelDoc2") for raw in app.GetDocuments() or ()]
+                    current = [(str(doc.GetPathName()), str(doc.GetTitle())) for doc in present]
+                    allowed = {(row["path"], row["title"]) for row in rows}
+                    if any(pair not in allowed for pair in current):
+                        raise RuntimeError("unowned document appeared during closure")
+                    if (target["path"], target["title"]) not in current:
+                        continue
                     app.CloseDoc(target["title"])
+                    report["closed_without_save"].append({"path": target["path"], "title": target["title"]})
+                    checkpoint()
                 if app.GetDocuments() or app.ActiveDoc is not None:
                     raise RuntimeError("probe closure did not empty the session")
-                if digest(source) != witness["source_sha256_before"]:
+                if digest(source) != expected_source_hash:
                     raise RuntimeError("source bytes changed during probe closure")
                 report["status"] = "owned_probe_closed_without_save_bytes_unchanged"
             if args.close_owned_failure_from:
