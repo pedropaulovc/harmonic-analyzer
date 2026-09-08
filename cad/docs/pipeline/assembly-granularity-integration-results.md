@@ -1,9 +1,12 @@
 # Assembly granularity integration evidence
 
-This run follows `second-vm-assembly-granularity-integration.md` at
-`29c6ec1eea9456cc7403cab8e5e6c3fb4df02979`. Validation is in progress;
-no historical #677 timing or native artifact is used as new acceptance.
-VM1 owns integration and merging. Portfolio status belongs on the
+This is a historical record of the run following
+`second-vm-assembly-granularity-integration.md` at
+`29c6ec1eea9456cc7403cab8e5e6c3fb4df02979`, not current acceptance or schedule.
+Current closeout evidence is recorded in
+[PR #717](https://github.com/pedropaulovc/harmonic-analyzer/pull/717).
+No historical #677 timing or native artifact is used as new acceptance.
+Portfolio status belongs on the
 [project board](https://github.com/users/pedropaulovc/projects/1).
 
 ## Inputs and extraction

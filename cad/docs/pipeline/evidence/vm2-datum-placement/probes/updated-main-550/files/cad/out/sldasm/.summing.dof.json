@@ -1,0 +1,38 @@
+{
+  "stem": "summing",
+  "specs": [
+    {
+      "key": "lever_rock",
+      "kind": "angle",
+      "entities": [
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane@summing-lever-1",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "summing-lever-1",
+        [
+          -15.0,
+          979.7,
+          3.0875877804265315
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "angle": 0.0
+      }
+    }
+  ]
+}

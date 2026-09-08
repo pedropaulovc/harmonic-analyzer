@@ -39,7 +39,8 @@ def main():
     head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     adapter = subprocess.check_output(["git", "-C", "SolidworksMCP-python", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     scripts = [ROOT / f"cad/scripts/{name}" for name in (
-        "draw_pinion_lift_rod.py", "draw_rack_pinion.py", "_native_axis_datum.py", "_drawing_common.py")]
+        "draw_pinion_lift_rod.py", "draw_rack_pinion.py", "_native_axis_datum.py",
+        "_rack_bore_finish.py", "_drawing_common.py")]
     report = {"kind": "vm2-normal-datum-drawing-tasks", "head": head, "adapter": adapter,
               "command": command, "cwd": str(ROOT), "status": "running",
               "started_utc": datetime.now(timezone.utc).isoformat(),

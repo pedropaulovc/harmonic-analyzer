@@ -1,0 +1,4 @@
+{"type":"review_context","reviewType":"committed","currentBranch":"fix/pinion-datum-placement","baseBranch":"perf/assembly-source-dependencies-isolated","baseCommit":"55056d4990d38ebb461f343d3002fc90731b9e73","workingDirectory":"C:/src/ha-datum-placement-main"}
+{"type":"status","phase":"connecting","status":"connecting_to_review_service"}
+{"type":"error","errorType":"payload_too_large","message":"Review failed: diff too large. Try rebasing onto your base branch to reduce the number of changed files, or split the diff into smaller chunks.","recoverable":false,"details":{"cause":{"name":"TRPCWebSocketClosedError"},"name":"TRPCClientError"}}
+Error: WebSocket closed

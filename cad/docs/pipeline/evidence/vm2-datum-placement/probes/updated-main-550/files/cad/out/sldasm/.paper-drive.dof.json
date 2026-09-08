@@ -1,0 +1,38 @@
+{
+  "stem": "paper-drive",
+  "specs": [
+    {
+      "key": "crank_spin",
+      "kind": "angle",
+      "entities": [
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane@transgear-removable-2",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "transgear-removable-2",
+        [
+          -129.33630593573417,
+          129.85,
+          -156.2
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "angle": 0.0
+      }
+    }
+  ]
+}

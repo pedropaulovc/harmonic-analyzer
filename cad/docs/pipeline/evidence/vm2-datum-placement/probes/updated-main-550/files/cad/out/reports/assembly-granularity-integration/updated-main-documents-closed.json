@@ -1,0 +1,696 @@
+{
+  "root": "C:\\src\\ha-assembly-granularity-integration",
+  "head": "55056d4990d38ebb461f343d3002fc90731b9e73",
+  "pid": 18748,
+  "revision": "34.3.0",
+  "documents_before": [
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\harmonic-base.SLDPRT",
+      "title": "harmonic-base.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\tube-frame.SLDPRT",
+      "title": "tube-frame.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\rocker-arm-support.SLDPRT",
+      "title": "rocker-arm-support.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\lag-screw.SLDPRT",
+      "title": "lag-screw.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\top-frame.SLDPRT",
+      "title": "top-frame.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\nameplate.SLDPRT",
+      "title": "nameplate.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\fillister-screw.SLDPRT",
+      "title": "fillister-screw.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\frame-side-screw.SLDPRT",
+      "title": "frame-side-screw.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\gooseneck-set-screw.SLDPRT",
+      "title": "gooseneck-set-screw.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\cylinder-gear-shaft.SLDPRT",
+      "title": "cylinder-gear-shaft.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\arbor-pedestal.SLDPRT",
+      "title": "arbor-pedestal.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\cylinder-end-disc.SLDPRT",
+      "title": "cylinder-end-disc.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\dome-cap-screw.SLDPRT",
+      "title": "dome-cap-screw.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\cone-swing-platform.SLDPRT",
+      "title": "cone-swing-platform.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\cone-pivot-post.SLDPRT",
+      "title": "cone-pivot-post.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\cone-tip-block.SLDPRT",
+      "title": "cone-tip-block.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\cone-tip-bushing.SLDPRT",
+      "title": "cone-tip-bushing.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\cone-tip-adjuster.SLDPRT",
+      "title": "cone-tip-adjuster.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\cone-tip-pinch-screw.SLDPRT",
+      "title": "cone-tip-pinch-screw.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\cone-lock-knob.SLDPRT",
+      "title": "cone-lock-knob.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\cone-pivot-screw.SLDPRT",
+      "title": "cone-pivot-screw.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\swing-stop-screw.SLDPRT",
+      "title": "swing-stop-screw.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\alignment-pinion.SLDPRT",
+      "title": "alignment-pinion.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\pinion-bracket.SLDPRT",
+      "title": "pinion-bracket.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\pinion-pivot-block.SLDPRT",
+      "title": "pinion-pivot-block.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\pinion-pivot-shaft.SLDPRT",
+      "title": "pinion-pivot-shaft.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\pinion-lift-rod.SLDPRT",
+      "title": "pinion-lift-rod.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\pinion-spring.SLDPRT",
+      "title": "pinion-spring.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\pinion-cam-pin.SLDPRT",
+      "title": "pinion-cam-pin.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\pinion-cam.SLDPRT",
+      "title": "pinion-cam.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\pinion-lever.SLDPRT",
+      "title": "pinion-lever.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\pinion-handle.SLDPRT",
+      "title": "pinion-handle.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\pinion-arbor.SLDPRT",
+      "title": "pinion-arbor.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\slotted-screw.SLDPRT",
+      "title": "slotted-screw.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\foot-screw.SLDPRT",
+      "title": "foot-screw.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\cone-gear-shaft.SLDPRT",
+      "title": "cone-gear-shaft.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\crank-drive-gear.SLDPRT",
+      "title": "crank-drive-gear.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\cone-gear.SLDPRT",
+      "title": "cone-gear.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\cylinder-gear.SLDPRT",
+      "title": "cylinder-gear.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\crankshaft.SLDPRT",
+      "title": "crankshaft.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\crank-pinion.SLDPRT",
+      "title": "crank-pinion.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\crank-arm.SLDPRT",
+      "title": "crank-arm.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\crank-pin.SLDPRT",
+      "title": "crank-pin.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\crank-pin-ring.SLDPRT",
+      "title": "crank-pin-ring.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\crank-pin-eye.SLDPRT",
+      "title": "crank-pin-eye.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\crank-handle.SLDPRT",
+      "title": "crank-handle.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\pivot-shaft.SLDPRT",
+      "title": "pivot-shaft.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\fulcrum-shaft.SLDPRT",
+      "title": "fulcrum-shaft.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\pivot-bracket.SLDPRT",
+      "title": "pivot-bracket.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\fulcrum-keeper.SLDPRT",
+      "title": "fulcrum-keeper.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\rocker-arm.SLDPRT",
+      "title": "rocker-arm.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\connecting-rod.SLDPRT",
+      "title": "connecting-rod.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\amplitude-bar.SLDPRT",
+      "title": "amplitude-bar.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\channel-lever.SLDPRT",
+      "title": "channel-lever.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\channel-spring-installed.SLDPRT",
+      "title": "channel-spring-installed.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\spring-hook.SLDPRT",
+      "title": "spring-hook.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\knife-mount.SLDPRT",
+      "title": "knife-mount.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\knife-hanger-stud.SLDPRT",
+      "title": "knife-hanger-stud.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\summing-lever.SLDPRT",
+      "title": "summing-lever.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\boss-hook.SLDPRT",
+      "title": "boss-hook.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\counter-spring.SLDPRT",
+      "title": "counter-spring.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\gooseneck.SLDPRT",
+      "title": "gooseneck.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\wheel-bar.SLDPRT",
+      "title": "wheel-bar.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\column-clamp-front.SLDPRT",
+      "title": "column-clamp-front.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\column-clamp-back.SLDPRT",
+      "title": "column-clamp-back.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\clamp-screw.SLDPRT",
+      "title": "clamp-screw.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\magnifying-lever.SLDPRT",
+      "title": "magnifying-lever.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\magnifying-bracket.SLDPRT",
+      "title": "magnifying-bracket.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\magnifying-clamp.SLDPRT",
+      "title": "magnifying-clamp.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\thumb-screw.SLDPRT",
+      "title": "thumb-screw.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\magnifying-vertical-rod.SLDPRT",
+      "title": "magnifying-vertical-rod.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\output-fixture.SLDPRT",
+      "title": "output-fixture.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\wheel-axle.SLDPRT",
+      "title": "wheel-axle.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\wheel-axle-nut.SLDPRT",
+      "title": "wheel-axle-nut.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\magnifying-wheel.SLDPRT",
+      "title": "magnifying-wheel.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\lever-wire.SLDPRT",
+      "title": "lever-wire.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\pen-hanger.SLDPRT",
+      "title": "pen-hanger.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\pen-rod.SLDPRT",
+      "title": "pen-rod.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\pen-v-block.SLDPRT",
+      "title": "pen-v-block.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\pen-marker.SLDPRT",
+      "title": "pen-marker.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\pen-frame.SLDPRT",
+      "title": "pen-frame.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\pen-set-screw.SLDPRT",
+      "title": "pen-set-screw.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\pen-wire.SLDPRT",
+      "title": "pen-wire.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\hanger-screw.SLDPRT",
+      "title": "hanger-screw.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\support-bar.SLDPRT",
+      "title": "support-bar.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\platen.SLDPRT",
+      "title": "platen.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\platen-rack.SLDPRT",
+      "title": "platen-rack.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\platen-guide.SLDPRT",
+      "title": "platen-guide.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\guide-lock.SLDPRT",
+      "title": "guide-lock.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\platen-clip.SLDPRT",
+      "title": "platen-clip.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\platen-paper.SLDPRT",
+      "title": "platen-paper.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\transgear-bracket.SLDPRT",
+      "title": "transgear-bracket.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\bracket-screw.SLDPRT",
+      "title": "bracket-screw.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\transgear-stub.SLDPRT",
+      "title": "transgear-stub.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\transgear-latch.SLDPRT",
+      "title": "transgear-latch.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\rack-pinion.SLDPRT",
+      "title": "rack-pinion.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\transgear-feed-pinion.SLDPRT",
+      "title": "transgear-feed-pinion.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\latch-hook.SLDPRT",
+      "title": "latch-hook.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\transgear-knob-shaft.SLDPRT",
+      "title": "transgear-knob-shaft.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\transgear-pinion.SLDPRT",
+      "title": "transgear-pinion.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\transgear-removable.SLDPRT",
+      "title": "transgear-removable.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\transgear-thumbnut.SLDPRT",
+      "title": "transgear-thumbnut.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\chain-inner-link.SLDPRT",
+      "title": "chain-inner-link.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\chain-outer-link.SLDPRT",
+      "title": "chain-outer-link.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\measuring-stick.SLDPRT",
+      "title": "measuring-stick.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\measuring-stick-stop.SLDPRT",
+      "title": "measuring-stick-stop.SLDPRT",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldasm\\harmonic-analyzer.SLDASM",
+      "title": "harmonic-analyzer.SLDASM",
+      "save_state": "dirty"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldasm\\frame.SLDASM",
+      "title": "frame.SLDASM",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldasm\\drive-train.SLDASM",
+      "title": "drive-train.SLDASM",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldasm\\channel.SLDASM",
+      "title": "channel.SLDASM",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldasm\\summing.SLDASM",
+      "title": "summing.SLDASM",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldasm\\magnifier.SLDASM",
+      "title": "magnifier.SLDASM",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldasm\\pen.SLDASM",
+      "title": "pen.SLDASM",
+      "save_state": "clean"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldasm\\paper-drive.SLDASM",
+      "title": "paper-drive.SLDASM",
+      "save_state": "clean"
+    }
+  ],
+  "status": "refused_dirty_documents",
+  "closed": [],
+  "hashes_before": {
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\harmonic-base.SLDPRT": "7c1a70158c2f0cd6a968e1cdd139083fad6f076b83f7dcdbb408466e9a3f5bf2",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\tube-frame.SLDPRT": "ad7cbad12f5d2e31f26da0dc9dd1bd2f5aed1cecd5e5139cb7fd87876d152232",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\rocker-arm-support.SLDPRT": "ca6b620186cfac55ab7eea29cacd9875098b1435d4ab3b3534db0f086b3b7085",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\lag-screw.SLDPRT": "50694b69ce65dee542e87f89648a1240856e315ae787d5c8cc9d5c55f3bfb8ea",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\top-frame.SLDPRT": "5892537b8f2286e2528ae6ba059cc1257f9f2d405e63783b338eb301a48138b1",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\nameplate.SLDPRT": "e609730be395b3fa8dc04eec69a9406f6386f053a709c6ee042360f442054772",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\fillister-screw.SLDPRT": "03fd4a3a97085515addae4de3be0aa378ff7bbf2cd4213d8a1e33fdbaceb332f",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\frame-side-screw.SLDPRT": "00e55ebbcc81de1075d9b2838067c476c87230a1dca7c2a1c741196d3fd46607",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\gooseneck-set-screw.SLDPRT": "aada2b3aa9ebdd678c8163a3136ae7a006592a81fb243e7f8ef0938f6c7151dc",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\cylinder-gear-shaft.SLDPRT": "a49007686313c447e0665c557d42edceef7cea7331dc0fbd039345d315cfba18",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\arbor-pedestal.SLDPRT": "822d0fbeb04dba3a4b3f0ded254236d812862cad31a7dcba15dd9c08785d0739",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\cylinder-end-disc.SLDPRT": "5015c51637896a5a403b758833e1e395cdd93c9b7f5d5b73a57ce0785bf27b7c",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\dome-cap-screw.SLDPRT": "35aa6a11f83e7f17069439e5a03b8e53b1f810d62450184b84465a0168c3544c",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\cone-swing-platform.SLDPRT": "db3ebe20d0d3112a0ae359e4a95b6266e32d891f8a822d9c3eff5a74a922af9b",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\cone-pivot-post.SLDPRT": "4328ee06575637631924b4d1c9ceb5579d4a38e9f0ec21e8adfe41ba1bbca7b7",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\cone-tip-block.SLDPRT": "b5ea8c908a517d247ffed9b8424cae849985401d5e78b64b96152e971a2dd77b",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\cone-tip-bushing.SLDPRT": "f9a386fba2bfc32090dbe13364d43ca4201abff874f0303eafb6aa799a883311",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\cone-tip-adjuster.SLDPRT": "2bf255f637458f044d129dc684f532a25068ef3e383a50dcdaa03d997ff0972c",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\cone-tip-pinch-screw.SLDPRT": "c0b22ee1dcb208424af0593e2dab5f3a1f54f9815a3653862e693c37a3c70027",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\cone-lock-knob.SLDPRT": "6ba6ab58752f6ba6f797e42a94a010a86161d6198fa9ee398bd85a205bd626e8",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\cone-pivot-screw.SLDPRT": "5107928eedbecde27b9d83624441d2489a7e1ab294ab3a33510aeef119d6f45e",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\swing-stop-screw.SLDPRT": "47316113bd873fe1fcfb4818ee65ce0cafd9873b09467675afb1b560dd6ec6df",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\alignment-pinion.SLDPRT": "baf0256c4d9a02baaa2eec656db6696656553ebeb34f072e6f0cd1a7e098403b",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\pinion-bracket.SLDPRT": "3ebcdf55fbd12708c02ae4fd0fd27ca89c87df782dcab8538f42553210e275b5",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\pinion-pivot-block.SLDPRT": "242a65d1e9a1ae367318b7b3c86fae2f76967b520e1c0e3f6798decf799cd7f8",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\pinion-pivot-shaft.SLDPRT": "7f03d50b6901f40b9e1f5a127b38f5e31f2f97f1ca1c66570a6fe7a777ef792a",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\pinion-lift-rod.SLDPRT": "84cd6a8b444779e1713f4c007cc41934decbcde261c80b97620e810121b33d72",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\pinion-spring.SLDPRT": "c40a3feaeeb0daa11ee3ab49c5363f89bf7d86b4849e086286d342e118531f3c",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\pinion-cam-pin.SLDPRT": "38456047ce98d29213b537a2445e1227a166162147fc6c331768e814a7cd5586",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\pinion-cam.SLDPRT": "a5504896d39395af631707fb6b45ebce60e8d1fd6e44a2004b98f632232d38f1",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\pinion-lever.SLDPRT": "8e6372763d7b0b0fa8f84674a490240d46554ff94f9445df44f65604aa684ac3",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\pinion-handle.SLDPRT": "a76296d06b51ce99b47c1976a1df1674cfe6dba21580caf2845cf4178114e5ef",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\pinion-arbor.SLDPRT": "1691821e59f6464668c1c180ea1431f5f869d381a0d96ff33a37c501b2647fa3",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\slotted-screw.SLDPRT": "89445aa5e2d465c724e621974db2e4c906a54676604ef2aade02a6f822f25110",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\foot-screw.SLDPRT": "0a2d6082713fb36268f8a00a0141b6ca5c696ad8c1e91ce66c75d5b25625ff6d",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\cone-gear-shaft.SLDPRT": "0255b7d844dad413cb5444effeccb8b7b2afa2bc35935487212af4ff397a16ee",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\crank-drive-gear.SLDPRT": "d12c5cbde1d7b0e427e7b7bd564bb57f1a2a021574d729f6887670f934f9c2cc",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\cone-gear.SLDPRT": "1c48f594ecf7839823ffcf7b4555919beea2e58fc2b3143b4af4c908c6850de7",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\cylinder-gear.SLDPRT": "110efd5c6557848a323533289f6bad16db09a04b06356607f64fa690409eeb88",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\crankshaft.SLDPRT": "73ed575385bcec69d2e30fdbdf8845a0cbf821a8a0cbbc4f1b4221862cdb021d",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\crank-pinion.SLDPRT": "3e8f11019d5c4af858995df42d410fa58350bcdada348aa3e078539c0ce7dd4f",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\crank-arm.SLDPRT": "5a98da674ec680c7b1e02359861b426b7a391c3a279a22ae99cb633caca94690",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\crank-pin.SLDPRT": "b42c3e94b4cca44b20a8e33be00d17110ae660c44f3b225de82807aa6f73e9b5",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\crank-pin-ring.SLDPRT": "8b68bab4bd2cd80d39474b3d68d40dcc58e899ab0aefe2387887f3714a960fa3",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\crank-pin-eye.SLDPRT": "78bcb1821b136edf6ed12f8c163e298cd2b7883e942a5bab156d553c44cff96d",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\crank-handle.SLDPRT": "95d66afd97e615b72e35b6048e1a17ecc5241339bed2dfdeb0df9bf28289d8a3",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\pivot-shaft.SLDPRT": "d6b1ba29a30cd2a2e6757ba6361462b820246712d7f20c2f8b4ee9d13ad99d97",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\fulcrum-shaft.SLDPRT": "b95f73a6f7a9e344b3f608d80b88ee0dc080a28c55f0a393303301a0273eddbe",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\pivot-bracket.SLDPRT": "53517df8bd3d26ac9cf81e6f554e0c587d2e51bd3a9e490308781410c328be91",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\fulcrum-keeper.SLDPRT": "031d21af15839d07fda93295e7719e5b9883353948da682110e8d06f48169e74",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\rocker-arm.SLDPRT": "5279c89d3ddf15e5e4d73b01b6e4a79b07be171ea03ed6f71370f969cb6a3938",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\connecting-rod.SLDPRT": "4176aee677aade3e95bd5540e5cb2fdf28da4d7f626fb74efef057c3619c7d1f",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\amplitude-bar.SLDPRT": "9e1a11d4b2001860e44db1c7e059d05090b0ad5ff77f910d2b9feae94f93a6e1",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\channel-lever.SLDPRT": "16ebfa31f76a18a5b6ecbb6f5655bc6b0d651271cc7e22e2a38e614bb6a25872",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\channel-spring-installed.SLDPRT": "ef54877638b197095d6f7f16878787ae5356c6d3d81558add3f74a73a8c0f2e7",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\spring-hook.SLDPRT": "003afc2512e93f9b797d02c397df5a8d3218059d5604101ed902c37531177b56",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\knife-mount.SLDPRT": "20f095e3f4bce0cebd35182b9ed28249c2e13331a3b3017d86a457ba5c0376fa",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\knife-hanger-stud.SLDPRT": "01c459cb21c2b740726955d3e2021489fb7569a4bfc3363758e2cbfeb62c4593",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\summing-lever.SLDPRT": "9eb90438ff63b4ec9395ce54603105d2729d67e2c9a36cc62cbc3a9ce01182ad",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\boss-hook.SLDPRT": "44736d5a2cf34720fc46060067ddc4144e9533afa934770bc115b57f0d505241",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\counter-spring.SLDPRT": "82bc429f8ad3a586fbe653ce0543de35d8184b9235f57e4ea93665b78f14967c",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\gooseneck.SLDPRT": "cc7f043102e2d2a4a9246fbdb8d03966617d3334e1efeefd306aaf2895048b98",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\wheel-bar.SLDPRT": "06fb9aa1955d67972c8b70c0a4f40e41aa2f1d263b0d559e8d95c21f1e2b92ca",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\column-clamp-front.SLDPRT": "1e0c4d97c9f079c779ed9b6b1109654f1b308170133fbc60ec67367cdf3be8c8",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\column-clamp-back.SLDPRT": "5bcce75c6322aec85da689fbdd2567f5f6fae22670e706947f893ddb9a45a63a",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\clamp-screw.SLDPRT": "b404bd0ee342aba0a1f89876156cab85bbc116e9f5c684834878d5406d5d9763",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\magnifying-lever.SLDPRT": "256fa18dc03026d11a29c54d2270ff8dbeb6c33d8b822d6cb65248d18cb57a91",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\magnifying-bracket.SLDPRT": "9f0a0714ce06e1518d8eccc6d0da23975bee23ad29db94b8081429bc63b43fc4",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\magnifying-clamp.SLDPRT": "e34dc4809baf0f9c7e3f685b4a345829ebf8d0f8b88da77ef58c222195f6f01a",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\thumb-screw.SLDPRT": "4d020a04b5cf6a14d4de0b6e32eb136420966a144a2e665f27518e97cbdce788",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\magnifying-vertical-rod.SLDPRT": "18bb513f893699a1a8102c5998467c5deac20dea5cc2e82192d0f3a87d8363f6",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\output-fixture.SLDPRT": "061a32519bccc48072ba44e5f60441d07d2eed25ced254bd044304653df88892",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\wheel-axle.SLDPRT": "0d85b233f9799a72ef1a33fad6e7d808634679856c4957c93c1a500a13923780",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\wheel-axle-nut.SLDPRT": "2365c892d25ce63c163b5d5a0b8a7b11ae38aedf5b6e2d1250e929644186af6c",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\magnifying-wheel.SLDPRT": "98d7fd9e32b15726682574ba758e7fce11d7dc6a45dd0c92c7b53813278008ad",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\lever-wire.SLDPRT": "78e5ff7fd292724716d617db7190f095bf66a5ea7ba0758bc83b1460078eeb24",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\pen-hanger.SLDPRT": "0eeef1a50ccf821a0637b6d8fb2ec6ccb0c42d60a59a93aac3d27db621641a3b",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\pen-rod.SLDPRT": "32ca15d519c7a547106f372dfcdac30d6ee83343787f1a1805db61c6f1c54c63",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\pen-v-block.SLDPRT": "23d2bb87434254865a44dfb01dd709cef7d227805e516de46708e9507bfe87d9",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\pen-marker.SLDPRT": "ab8184bf849796c46072962476ceaf8dd5490c566de776fad167ad78bb249945",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\pen-frame.SLDPRT": "c0439c3fe216fd2b794f7e9c363f63d740e6645fe075991b83b812746b7ff35c",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\pen-set-screw.SLDPRT": "b14163a4a0f08ef8c9b1ef64aefa674441f3d8e907dd07661a46f6b25578f3f3",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\pen-wire.SLDPRT": "42841665e51a77b20b24fb06a7743336a35d37c0ca1a154b5714e16bfdb78d3c",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\hanger-screw.SLDPRT": "81c80ad98575b31fabf5014046eda552126f57d27b45208a52bffb5a627422a7",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\support-bar.SLDPRT": "380b2c59b438788e5d8e3ab83ce2c03ed561b7ddec06c452aae1683b374c081a",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\platen.SLDPRT": "033fceea3e10d3da133151614e201a7c969054e0b5dbd0a2de65cb12750a209c",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\platen-rack.SLDPRT": "887ad997bc06f9e831931d9ae994cebabe4b6917ef030337d3e09e5db1cf3fc6",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\platen-guide.SLDPRT": "800ff77a3c32dd33626706386f0cebc7593055f0968f4190bdf10e7be12661a4",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\guide-lock.SLDPRT": "f0acf550e299cb3ddbd29a6919144bab8dda7bf8b1e298f3c6703753ec6c7451",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\platen-clip.SLDPRT": "b68deb505523eab7bc894f544d668d35c1d8fd2ddc7e22483c89fef72a8fc4bb",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\platen-paper.SLDPRT": "16da1d33512460bfed4834d92de1f5471b372833eb7c6af550d53651886a7dde",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\transgear-bracket.SLDPRT": "a783919dfeabb176e188690dbee5c89cf8f97b740133599d5ff66b57ece52d0d",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\bracket-screw.SLDPRT": "9101dcaf10658c8b2c256946a03e2988811045d0120de8da743bcd5e015255ff",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\transgear-stub.SLDPRT": "7a1e15bd2eef352f3cbb5093c2d16be48b07fb1fa6b997554ca0769ad24b7a9d",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\transgear-latch.SLDPRT": "b9d5a2f774da529574196fc605e888c30a5d3fadb0f117292c6feaa96c71d959",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\rack-pinion.SLDPRT": "479b45ec0412d09b233a1c3c89cce2c95c6543dd1e5cacaca6bfb09db2cd34ba",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\transgear-feed-pinion.SLDPRT": "8b2e2caedc85a29a8d0c1d35888ff1d187c329babcf7cc71427a543247f6d75c",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\latch-hook.SLDPRT": "3af8215436556ff897794f63d769f75031472422250296483abe4b687ffcf18b",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\transgear-knob-shaft.SLDPRT": "27ad4f35762afbb2377c902bb28d86a29bea40eefe68a5aae00c0c6282f45538",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\transgear-pinion.SLDPRT": "f1ad8e7a39d47dc8a39b8a38bcac39975b364fbf605b07a55106303a94ffc85c",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\transgear-removable.SLDPRT": "278448bb0517f78d0860fb5682fb66087108ec7448241c800dd91d82353ba0a1",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\transgear-thumbnut.SLDPRT": "321bab30cab8fbbf5d19556cde4c6164490ea3c8e4a37da2a206e0745ba15728",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\chain-inner-link.SLDPRT": "cd8873d36af54ed5acb0ef44a3450a5943110e8886f28ff650828f48a2184898",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\chain-outer-link.SLDPRT": "fcf49aee787059b807e1c1f42b69eca926d69fe2e364e29cf8b4798af8d40a34",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\measuring-stick.SLDPRT": "278bc635784e914d9fb66f954a50d7f8d595731d8651bb83e7a001660b33776a",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\measuring-stick-stop.SLDPRT": "4c5cf46a0da5f8d44d9777bd24bf2db075fe236589d61bbdc0f4f461dc781b72",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldasm\\harmonic-analyzer.SLDASM": "b7fd8a9a380e4afa871b2461281e8c45348196a71cbe3aa56ad116bf4df0284a",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldasm\\frame.SLDASM": "aa4c4f72df40567d4e60ad597f7ba2c1ddff4751b61109cc92647dc0229f55da",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldasm\\drive-train.SLDASM": "d4d0fdb23d8b8eaa0b863bc66c369d88dfc60ded53ebd4e24dccd5d28acef2c1",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldasm\\channel.SLDASM": "fb04f2a00d8f2cc21bb168a538f5d4f4cdf49f5aa2041307ccf8ad96834ffd32",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldasm\\summing.SLDASM": "5512bd62c67de53c7c8cbef49c3d9d776a829e916aa4f3930fdd706d60705b4e",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldasm\\magnifier.SLDASM": "123dbb855446a2245a36d6be9da8b418d933e6e9b98d441b71fd8e5bb6e01350",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldasm\\pen.SLDASM": "24c6417cb63174add7f6f9fffc8cec8c2d73f7e980cb674f386d2cd5ad8a7ae5",
+    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldasm\\paper-drive.SLDASM": "ac32d28457b992b963d97381683578cddbee909e01143ce77f23144a1c39f807"
+  }
+}

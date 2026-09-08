@@ -1,0 +1,148 @@
+{
+  "stem": "drive-train",
+  "specs": [
+    {
+      "key": "cone_swing",
+      "kind": "angle",
+      "entities": [
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane@cone-swing-platform-1",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "cone-swing-platform-1",
+        [
+          -87.68263981674521,
+          50.8,
+          96.01937088764276
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "angle": 12.518222183287952
+      }
+    },
+    {
+      "key": "pinion_swing",
+      "kind": "angle",
+      "entities": [
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane@pinion-bracket-1",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "pinion-bracket-1",
+        [
+          -12.11336674735969,
+          62.8,
+          -72.16241221957347
+        ]
+      ],
+      "witness": [
+        [
+          0.0,
+          28.0,
+          0.0
+        ],
+        [
+          -16.077263315132342,
+          90.518,
+          -72.16241221957347
+        ]
+      ],
+      "flip": false,
+      "params": {
+        "angle": 171.86142554806733
+      }
+    },
+    {
+      "key": "pinion_cam",
+      "kind": "angle",
+      "entities": [
+        {
+          "entity_type": "PLANE",
+          "name": "Top Plane@pinion-lift-rod-1",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "pinion-lift-rod-1",
+        [
+          0.38663325264031023,
+          64.65619117891471,
+          -110.91241221957347
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "angle": 90.0
+      }
+    },
+    {
+      "key": "crank_angle",
+      "kind": "angle",
+      "entities": [
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane@crank-arm-1",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "crank-handle-1",
+        [
+          -129.33641086675604,
+          54.84999988599999,
+          -174.99999999997965
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "angle": 90.0
+      }
+    }
+  ]
+}
