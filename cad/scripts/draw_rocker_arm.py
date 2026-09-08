@@ -27,7 +27,7 @@ from _gtol_spec import PlanarFace
 from rocker_arm_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
-from _common import CAD_ROOT, check
+from _common import CAD_ROOT, _early_bound, check
 from _drawing_build import ProjectDrawingFactory, TemplateSpec, run_drawing_build
 from _drawing_project_layout import DatumLeaderPolicy, repair_project_drawing_layout
 from _drawing_common import (
@@ -120,6 +120,8 @@ TOP_KEEP: tuple[str, ...] = ()
 async def build(
     adapter: Any, *, drawing_factory: ProjectDrawingFactory
 ) -> dict[str, str]:
+    if RIGHT_KEEP:
+        raise ValueError("rocker right view requires an empty dimension contract")
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
@@ -296,6 +298,16 @@ async def build(
             LayoutNote("iso-caption", caption.GetAnnotation(), "iso"),
         ),
     )
+    # Read the final native inventory without importing/deleting model items.
+    # swAnnotationType_e.swDisplayDimension=4 includes every returned entry;
+    # hidden, unnamed and null entries must not satisfy an empty contract.
+    right_dimensions = _early_bound(right, "IView").GetAnnotationsByType(4)
+    right_dimensions = () if right_dimensions is None else tuple(right_dimensions)
+    if right_dimensions:
+        raise RuntimeError(
+            "rocker right view must contain no display dimensions: "
+            f"actual_count={len(right_dimensions)}"
+        )
     return await finalize_drawing(
         adapter,
         OUTPUTS,
