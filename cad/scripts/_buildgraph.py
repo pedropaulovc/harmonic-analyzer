@@ -1101,6 +1101,12 @@ def _drawing_registry_reads(text: str) -> frozenset[str] | None:
     registry_names = {"_drawing_registry", "DRAWINGS", "DRAWINGS_BY_NAME"}
     allowed_exports = {"DrawingSpec", "PROJECT_DRWDOT", "DRAWINGS_BY_NAME"}
     for node in nodes:
+        if (
+            isinstance(node, ast.Constant)
+            and isinstance(node.value, str)
+            and node.value.rsplit(".", 1)[-1] == "_drawing_registry"
+        ):
+            return None  # string aliases can escape the static import graph
         if isinstance(node, ast.Import):
             if any(
                 alias.name.rsplit(".", 1)[-1] == "_drawing_registry"
@@ -1113,7 +1119,9 @@ def _drawing_registry_reads(text: str) -> frozenset[str] | None:
                 and node.module.rsplit(".", 1)[-1] == "_drawing_registry"
             )
             for alias in node.names:
-                if alias.name == "*":
+                if alias.name in {"*", "import_module"} or (
+                    node.module == "sys" and alias.name == "modules"
+                ):
                     return None
                 if registry:
                     if alias.asname is not None or alias.name not in allowed_exports:
@@ -1123,11 +1131,21 @@ def _drawing_registry_reads(text: str) -> frozenset[str] | None:
 
     rows = set()
     for node in nodes:
-        if isinstance(node, ast.Attribute) and node.attr in registry_names:
+        if isinstance(node, ast.Attribute) and (
+            node.attr in registry_names or node.attr in {"import_module", "modules"}
+        ):
             return None
         if not isinstance(node, ast.Name):
             continue
-        if node.id in {"eval", "exec", "globals", "locals", "vars", "__import__"}:
+        if node.id in {
+            "eval",
+            "exec",
+            "globals",
+            "locals",
+            "vars",
+            "__import__",
+            "import_module",
+        }:
             return None
         if node.id not in registry_names:
             continue

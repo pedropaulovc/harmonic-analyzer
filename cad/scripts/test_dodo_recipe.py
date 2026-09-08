@@ -366,8 +366,30 @@ def test_registry_imported_helper_remains_in_complete_drawing_closure(
         "import _drawing_registry as registry\ndef expose():\n    return registry\n",
         "from _drawing_registry import DRAWINGS_BY_NAME as rows\n"
         "def lookup():\n    return rows.get('platen_guide')\n",
+        "import importlib\n"
+        "registry = importlib.import_module('_drawing_registry')\n"
+        "OTHER = registry.DRAWINGS_BY_NAME['crank_arm']\n",
+        "import sys\n"
+        "registry = sys.modules['_drawing_registry']\n"
+        "OTHER = registry.DRAWINGS_BY_NAME['crank_arm']\n",
+        "from importlib import import_module as load\n"
+        "registry = load('_drawing_' + 'registry')\n"
+        "OTHER = registry.DRAWINGS_BY_NAME['crank_arm']\n",
+        "REGISTRY_NAME = '_drawing_registry'\n"
+        "def other_row(loader):\n"
+        "    return loader(REGISTRY_NAME).DRAWINGS_BY_NAME['crank_arm']\n",
     ],
-    ids=["whole", "other-row", "dynamic", "escaped-module", "unknown-mapping-call"],
+    ids=[
+        "whole",
+        "other-row",
+        "dynamic",
+        "escaped-module",
+        "unknown-mapping-call",
+        "dynamic-import",
+        "sys-modules",
+        "computed-module-import",
+        "escaped-module-name",
+    ],
 )
 def test_unclassified_transitive_registry_consumers_keep_full_dependency(
     isolated_drawing_keys, consumer
