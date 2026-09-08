@@ -97,14 +97,20 @@ def harness(monkeypatch, tmp_path):
     plane_face = SimpleNamespace(GetSurface=lambda: plane)
     body = object()
     edge = SimpleNamespace(
-        GetBody=lambda: body,
+        GetBody=lambda: object(),  # drawing-context body is not the source body
         GetCurve=lambda: circle,
         GetTwoAdjacentFaces2=lambda: (cylinder_face, plane_face),
+    )
+    canonical_edge = SimpleNamespace(
+        GetBody=lambda: body,
+        GetCurve=lambda: edge.GetCurve(),
+        GetTwoAdjacentFaces2=lambda: edge.GetTwoAdjacentFaces2(),
     )
     annotation = Annotation(edge)
     tag = Tag(annotation)
     state = SimpleNamespace(
-        edge=edge, body=body, circle=circle, cylinder=cylinder, plane=plane,
+        edge=edge, canonical_edge=canonical_edge, body=body,
+        circle=circle, cylinder=cylinder, plane=plane,
         cylinder_face=cylinder_face, plane_face=plane_face,
         annotation=annotation, tag=tag, selected=edge,
         selection_calls=[], equality_calls=[], rebuild_calls=0,
@@ -150,12 +156,14 @@ def harness(monkeypatch, tmp_path):
     state.source_path = tmp_path / "rack-pinion.SLDPRT"
     state.source_path.write_bytes(b"offline source identity fixture")
     state.reference = SimpleNamespace(
+        Extension=SimpleNamespace(GetCorrespondingEntity2=lambda _edge: canonical_edge),
         GetType=lambda: 1,
         GetPathName=lambda: str(state.source_path),
         GetBodies2=lambda kind, visible: (body,),
     )
     state.view = SimpleNamespace(
         ReferencedDocument=state.reference, GetDatumTags=lambda: state.tags,
+        GetCorrespondingEntity=lambda _edge: edge,
     )
     monkeypatch.setattr(common, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(axis, "_early_bound", lambda value, _kind: value)
@@ -230,7 +238,7 @@ def test_native_keeps_position_and_never_calls_setposition(harness, limit):
     assert harness.tag.GetLabel() == "A"
     assert harness.tag.Shoulder is True
     assert sum(a is harness.edge and b is harness.edge
-               for a, b in harness.equality_calls) == 3
+               for a, b in harness.equality_calls) == 5
 
 
 @pytest.mark.parametrize("limit", LIMITS)
@@ -255,7 +263,9 @@ def test_native_enforces_unchanged_xy_drift_boundary(harness, limit, drift):
 
 
 @pytest.mark.parametrize("field", ("stability_tolerance_m", "radius_m"))
-@pytest.mark.parametrize("value", (0.0, -1.0, math.nan, math.inf, -math.inf))
+@pytest.mark.parametrize("value", (
+    0.0, -1.0, math.nan, math.inf, -math.inf, True, False, "0.0001", None,
+))
 def test_native_rejects_invalid_numeric_contract_before_com(harness, field, value):
     with pytest.raises(ValueError, match="finite and positive"):
         native(harness, **{field: value})
@@ -358,7 +368,7 @@ def test_native_rejects_selected_edge_mismatch_before_insertion(harness, equalit
         harness.selected = object()
     if equality == "unknown":
         harness.equality_mode = "unknown_edge"
-    with pytest.raises(RuntimeError, match="selected a different datum edge"):
+    with pytest.raises(RuntimeError, match="selected a different datum edge|roundtrip"):
         native(harness)
     assert harness.insert_calls == 0
 
@@ -369,7 +379,7 @@ def test_native_rejects_selected_edge_mismatch_before_insertion(harness, equalit
     (
         ("empty", "one attached edge"), ("multiple", "one attached edge"),
         ("null", "one attached edge"), ("wrong_type", "one attached edge"),
-        ("wrong_edge", "different edge"), ("unknown", "different edge"),
+        ("wrong_edge", "different edge"), ("unknown", "different edge|roundtrip"),
         ("dangling", "dangling"), ("label", "label did not persist"),
     ),
 )
@@ -523,9 +533,9 @@ def test_native_verifies_source_and_body_again_after_rebuild(
         if defect == "null_body":
             harness.reference.GetBodies2 = lambda *_args: (None,)
         if defect == "edge_body_missing":
-            harness.edge.GetBody = lambda: None
+            harness.canonical_edge.GetBody = lambda: None
         if defect == "edge_wrong_body":
-            harness.edge.GetBody = lambda: object()
+            harness.canonical_edge.GetBody = lambda: object()
         if defect == "body_equality_unknown":
             original = harness.adapter.swApp.IsSame
             harness.adapter.swApp.IsSame = lambda a, b: (
@@ -619,3 +629,82 @@ def test_native_source_path_must_name_an_existing_part(harness):
         native(harness, source_path=harness.source_path.with_name("missing.SLDPRT"))
     with pytest.raises(ValueError, match="existing SLDPRT file"):
         native(harness, source_path=harness.source_path.parent)
+
+
+def test_native_maps_view_edge_through_source_and_back_at_both_stages(harness):
+    mappings = []
+
+    def to_source(edge):
+        assert edge is harness.edge
+        mappings.append("source")
+        return harness.canonical_edge
+
+    def to_view(edge):
+        assert edge is harness.canonical_edge
+        mappings.append("view")
+        return harness.edge
+
+    harness.reference.Extension.GetCorrespondingEntity2 = to_source
+    harness.view.GetCorrespondingEntity = to_view
+    assert harness.edge.GetBody() is not harness.body
+    assert harness.canonical_edge.GetBody() is harness.body
+    assert native(harness) is harness.tag
+    assert mappings == ["source", "view", "source", "view"]
+    assert harness.annotation.attached == (harness.edge,)
+
+
+@pytest.mark.parametrize("stage", ("initial", "rebuild"))
+@pytest.mark.parametrize("defect", (
+    "source_missing", "view_missing", "wrong_view_edge", "roundtrip_unknown",
+    "wrong_source_body",
+))
+def test_native_rejects_missing_or_wrong_correspondence(harness, stage, defect):
+    def corrupt():
+        if defect == "source_missing":
+            harness.reference.Extension.GetCorrespondingEntity2 = lambda _edge: None
+        if defect == "view_missing":
+            harness.view.GetCorrespondingEntity = lambda _edge: None
+        if defect == "wrong_view_edge":
+            # Same geometric attributes are not a substitute for exact identity.
+            other = SimpleNamespace(**vars(harness.edge))
+            harness.view.GetCorrespondingEntity = lambda _edge: other
+        if defect == "roundtrip_unknown":
+            harness.equality_mode = "unknown_edge"
+        if defect == "wrong_source_body":
+            other = SimpleNamespace(**vars(harness.canonical_edge))
+            other.GetBody = lambda: object()
+            harness.reference.Extension.GetCorrespondingEntity2 = lambda _edge: other
+
+    if stage == "initial":
+        corrupt()
+    if stage == "rebuild":
+        harness.on_rebuild = corrupt
+    with pytest.raises(RuntimeError, match="correspondence|roundtrip|different source body"):
+        native(harness)
+    if stage == "initial":
+        assert harness.insert_calls == 0
+
+
+@pytest.mark.parametrize("geometry", ("circle", "cylinder"))
+@pytest.mark.parametrize("index,value", ((0, False), (5, True), (6, "0.0025")))
+def test_native_rejects_boolean_or_string_geometry(harness, geometry, index, value):
+    field = "CircleParams" if geometry == "circle" else "CylinderParams"
+    target = getattr(harness, geometry)
+    params = list(getattr(target, field))
+    params[index] = value
+    setattr(target, field, params)
+    with pytest.raises(RuntimeError, match="invalid datum axis"):
+        native(harness)
+    assert harness.insert_calls == 0
+
+
+@pytest.mark.parametrize("stage", ("initial", "rebuild"))
+@pytest.mark.parametrize("value", (True, False, "0.21"))
+def test_native_rejects_boolean_or_string_positions(harness, stage, value):
+    position = (value, 0.167, 0.0015)
+    if stage == "initial":
+        harness.annotation.position = position
+    if stage == "rebuild":
+        harness.on_rebuild = lambda: setattr(harness.annotation, "position", position)
+    with pytest.raises(RuntimeError, match="invalid position"):
+        native(harness)

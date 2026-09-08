@@ -93,23 +93,43 @@ def assert_annotation_state(state, baseline=None):
         raise RuntimeError("datum shoulder state changed from first cold open")
 
 
-def edge_ownership(app, edge, source_part):
-    """Read the actual owning body; equal radius alone does not identify it."""
+def edge_ownership(app, edge, source_part, source_extension, view):
+    """Map view topology to the source, require exact roundtrip and body identity."""
+    from _common import _early_bound
+
     bodies = tuple(source_part.GetBodies2(0, False) or ())  # swSolidBody, including hidden bodies
     if len(bodies) != 1 or bodies[0] is None:
         raise RuntimeError(f"expected one source solid body, got {len(bodies)}")
-    body = edge.GetBody()
+    raw_model_edge = source_extension.GetCorrespondingEntity2(edge)
+    if raw_model_edge is None:
+        raise RuntimeError("no corresponding canonical source edge")
+    model_edge = _early_bound(raw_model_edge, "IEdge")
+    roundtrip = view.GetCorrespondingEntity(model_edge)
+    if roundtrip is None:
+        raise RuntimeError("canonical edge has no corresponding drawing-view edge")
+    edge_self = int(app.IsSame(edge, edge))
+    roundtrip_equality = int(app.IsSame(roundtrip, edge))
+    if edge_self != 1 or roundtrip_equality != 1:
+        raise RuntimeError(f"edge correspondence roundtrip mismatch: self={edge_self}, roundtrip={roundtrip_equality}")
+    body = model_edge.GetBody()
     if body is None:
-        raise RuntimeError("datum edge has no owning body")
+        raise RuntimeError("canonical datum edge has no owning body")
     self_equality = int(app.IsSame(bodies[0], bodies[0]))
     equality = int(app.IsSame(body, bodies[0]))
     if self_equality != 1 or equality != 1:
         raise RuntimeError(f"datum edge body identity mismatch: self={self_equality}, source={equality}")
-    faces = tuple(edge.GetTwoAdjacentFaces2() or ())
+    faces = tuple(model_edge.GetTwoAdjacentFaces2() or ())
     if len(faces) != 2 or any(face is None for face in faces):
         raise RuntimeError("datum edge must have exactly two nonnull adjacent faces")
-    return faces, {"source_solid_body_count": len(bodies), "source_body_self_equality": self_equality,
-                   "edge_body_same_as_source": equality, "adjacent_face_count": len(faces)}
+    drawing_body = edge.GetBody()
+    return model_edge, faces, {
+        "source_solid_body_count": len(bodies), "source_body_self_equality": self_equality,
+        "canonical_edge_body_same_as_source": equality, "adjacent_face_count": len(faces),
+        "mapped_model_edge": "present", "view_edge_self_equality": edge_self,
+        "roundtrip_edge_same": roundtrip_equality,
+        "canonical_edge_vs_view_edge": int(app.IsSame(model_edge, edge)),
+        "drawing_edge_body_vs_source_body": int(app.IsSame(drawing_body, bodies[0])) if drawing_body is not None else None,
+    }
 
 
 def assert_translated_ink(initial, moved, shift):
@@ -241,12 +261,22 @@ def main():
             edge = _early_bound(attached[0], "IEdge")
             if expected_edge is not None and int(app.IsSame(edge, expected_edge)) != 1:
                 raise RuntimeError("datum attaches to a different resolved edge")
-            faces, ownership = edge_ownership(app, edge, _early_bound(reference, "IPartDoc"))
+            model_edge, faces, ownership = edge_ownership(
+                app, edge, _early_bound(reference, "IPartDoc"),
+                _early_bound(reference.Extension, "IModelDocExtension"), view,
+            )
             curve = _early_bound(edge.GetCurve(), "ICurve")
             if not curve.IsCircle():
                 raise RuntimeError("datum edge is not circular")
             circle = list(curve.CircleParams)
             assert_axis(circle, radius)
+            model_curve = _early_bound(model_edge.GetCurve(), "ICurve")
+            if not model_curve.IsCircle():
+                raise RuntimeError("canonical datum edge is not circular")
+            model_circle = list(model_curve.CircleParams)
+            assert_axis(model_circle, radius)
+            if math.dist(model_circle, circle) > 1e-8:
+                raise RuntimeError("canonical source circle differs from drawing-view circle")
             cylinders = []
             for face in faces:
                 surface = _early_bound(_early_bound(face, "IFace2").GetSurface(), "ISurface")
@@ -261,7 +291,8 @@ def main():
             row = {"stage": name, "position": position, "view_position": list(view.Position),
                    "view_scale": list(view.ScaleRatio), "circle": circle, "cylinder": cylinders[0],
                    "attachment_type": 1, "resolved_edge_same": int(app.IsSame(edge, expected_edge)) if expected_edge is not None else None,
-                   "source_sha256": digest(source), "body_ownership": ownership}
+                   "source_sha256": digest(source), "body_ownership": ownership,
+                   "canonical_circle": model_circle}
             report["stages"].append(row)
             row["datum_lines"] = [list(tags[0].GetLineAtIndex(index)) for index in range(tags[0].GetLineCount())]
             row["datum_triangles"] = [list(tags[0].GetTriangleAtIndex(index)) for index in range(tags[0].GetTriangleCount())]

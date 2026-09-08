@@ -19,6 +19,7 @@ def probe(tmp_path, monkeypatch):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     monkeypatch.setattr(module, "ROOT", tmp_path.resolve())
+    monkeypatch.setitem(sys.modules, "_common", SimpleNamespace(_early_bound=lambda value, _kind: value))
     monkeypatch.setitem(sys.modules, "pinion_lift_rod_spec", SimpleNamespace(ROD_DIA=6.35, __file__=__file__))
     monkeypatch.setitem(sys.modules, "rack_pinion_spec", SimpleNamespace(BORE_DIA=5.0, __file__=__file__))
     for stem in ("pinion-lift-rod", "rack-pinion"):
@@ -143,8 +144,10 @@ def test_edge_requires_exactly_two_nonnull_adjacent_faces(probe, faces):
     app = SimpleNamespace(IsSame=lambda left, right: int(left is right))
     edge = SimpleNamespace(GetBody=lambda: body, GetTwoAdjacentFaces2=lambda: faces)
     source = SimpleNamespace(GetBodies2=lambda *_args: [body])
+    extension = SimpleNamespace(GetCorrespondingEntity2=lambda _edge: edge)
+    view = SimpleNamespace(GetCorrespondingEntity=lambda _edge: edge)
     with pytest.raises(RuntimeError, match="exactly two nonnull adjacent faces"):
-        probe.edge_ownership(app, edge, source)
+        probe.edge_ownership(app, edge, source, extension, view)
 
 
 def test_same_radius_edge_from_different_body_is_rejected(probe):
@@ -153,33 +156,88 @@ def test_same_radius_edge_from_different_body_is_rejected(probe):
     app = SimpleNamespace(IsSame=lambda left, right: int(left is right))
     edge = SimpleNamespace(GetBody=lambda: other_body)
     source = SimpleNamespace(GetBodies2=lambda *_args: [body])
+    extension = SimpleNamespace(GetCorrespondingEntity2=lambda _edge: edge)
+    view = SimpleNamespace(GetCorrespondingEntity=lambda _edge: edge)
     with pytest.raises(RuntimeError, match="body identity mismatch"):
-        probe.edge_ownership(app, edge, source)
+        probe.edge_ownership(app, edge, source, extension, view)
 
 
 def test_edge_owning_body_positive_control_and_readbacks(probe):
-    body = object()
+    body, view_body = object(), object()
     faces = (object(), object())
     app = SimpleNamespace(IsSame=lambda left, right: int(left is right))
-    edge = SimpleNamespace(GetBody=lambda: body, GetTwoAdjacentFaces2=lambda: faces)
+    edge = SimpleNamespace(GetBody=lambda: view_body)
+    model_edge = SimpleNamespace(GetBody=lambda: body, GetTwoAdjacentFaces2=lambda: faces)
+    mapped_calls, roundtrip_calls = [], []
+
+    def map_to_model(selected):
+        mapped_calls.append(selected)
+        return model_edge
+
+    def map_to_view(canonical):
+        roundtrip_calls.append(canonical)
+        return edge
+
+    extension = SimpleNamespace(GetCorrespondingEntity2=map_to_model)
+    view = SimpleNamespace(GetCorrespondingEntity=map_to_view)
     calls = []
 
     def get_bodies(kind, visible_only):
         calls.append((kind, visible_only))
         return [body]
 
-    actual_faces, state = probe.edge_ownership(app, edge, SimpleNamespace(GetBodies2=get_bodies))
+    canonical, actual_faces, state = probe.edge_ownership(
+        app, edge, SimpleNamespace(GetBodies2=get_bodies), extension, view
+    )
+    assert canonical is model_edge
     assert actual_faces == faces
     assert calls == [(0, False)]
+    assert mapped_calls == [edge]
+    assert roundtrip_calls == [model_edge]
     assert state == {"source_solid_body_count": 1, "source_body_self_equality": 1,
-                     "edge_body_same_as_source": 1, "adjacent_face_count": 2}
+                     "canonical_edge_body_same_as_source": 1, "adjacent_face_count": 2,
+                     "mapped_model_edge": "present", "view_edge_self_equality": 1,
+                     "roundtrip_edge_same": 1, "canonical_edge_vs_view_edge": 0,
+                     "drawing_edge_body_vs_source_body": 0}
 
 
 @pytest.mark.parametrize("count", [0, 2])
 def test_ambiguous_source_solid_body_rejected(probe, count):
     source = SimpleNamespace(GetBodies2=lambda *_args: [object() for _ in range(count)])
     with pytest.raises(RuntimeError, match="expected one source solid body"):
-        probe.edge_ownership(None, None, source)
+        probe.edge_ownership(None, None, source, None, None)
+
+
+@pytest.mark.parametrize("missing", ["canonical", "roundtrip"])
+def test_missing_entity_correspondence_is_rejected_without_fallback(probe, missing):
+    body, edge = object(), object()
+    source = SimpleNamespace(GetBodies2=lambda *_args: [body])
+    extension = SimpleNamespace(GetCorrespondingEntity2=lambda _edge: None if missing == "canonical" else edge)
+    view = SimpleNamespace(GetCorrespondingEntity=lambda _edge: None)
+    with pytest.raises(RuntimeError, match="corresponding"):
+        probe.edge_ownership(None, edge, source, extension, view)
+
+
+@pytest.mark.parametrize("equality", [0, -1])
+def test_wrong_or_unknown_roundtrip_identity_is_rejected(probe, equality):
+    body, edge, canonical, roundtrip = object(), object(), object(), object()
+    source = SimpleNamespace(GetBodies2=lambda *_args: [body])
+    extension = SimpleNamespace(GetCorrespondingEntity2=lambda _edge: canonical)
+    view = SimpleNamespace(GetCorrespondingEntity=lambda _edge: roundtrip)
+    app = SimpleNamespace(IsSame=lambda left, right: 1 if left is right else equality)
+    with pytest.raises(RuntimeError, match="roundtrip mismatch"):
+        probe.edge_ownership(app, edge, source, extension, view)
+
+
+def test_unknown_canonical_body_identity_is_rejected(probe):
+    body, canonical_body, edge = object(), object(), object()
+    canonical = SimpleNamespace(GetBody=lambda: canonical_body)
+    source = SimpleNamespace(GetBodies2=lambda *_args: [body])
+    extension = SimpleNamespace(GetCorrespondingEntity2=lambda _edge: canonical)
+    view = SimpleNamespace(GetCorrespondingEntity=lambda _edge: edge)
+    app = SimpleNamespace(IsSame=lambda left, right: 1 if left is right else -1)
+    with pytest.raises(RuntimeError, match="body identity mismatch"):
+        probe.edge_ownership(app, edge, source, extension, view)
 
 
 def test_translation_rejects_stale_triangle_even_with_current_lines(probe):

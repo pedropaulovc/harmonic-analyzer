@@ -20,8 +20,10 @@ def _axis_parameters(
     parameters: Sequence[float], *, radius_m: float, label: str
 ) -> None:
     """Match the circle/cylinder to the intended origin-Z axis and radius."""
-    values = tuple(float(value) for value in parameters)
-    if len(values) != 7 or not all(math.isfinite(value) for value in values):
+    values = tuple(parameters)
+    if len(values) != 7 or not all(
+        type(value) in (int, float) and math.isfinite(value) for value in values
+    ):
         raise RuntimeError(f"{label}: invalid datum axis parameters {values!r}")
     # Geometric identification bounds from the native lifecycle positive
     # control; independent of manufacturing and sheet-position tolerances.
@@ -49,7 +51,18 @@ def _validate_source_edge(
     bodies = tuple(part.GetBodies2(0, False) or ())  # swBodyType_e.swSolidBody
     if len(bodies) != 1 or bodies[0] is None:
         raise RuntimeError(f"{label}: source must have exactly one solid body")
-    edge = _early_bound(entity, "IEdge")
+    # Drawing-context edges and their bodies are not the source-part objects.
+    # Map into the verified source, then require the exact view-edge roundtrip;
+    # neither same-radius geometry nor a raw cross-context body comparison
+    # establishes this correspondence (native receipt: body-correspondence.json).
+    extension = _early_bound(model.Extension, "IModelDocExtension")
+    canonical = extension.GetCorrespondingEntity2(entity)
+    if canonical is None:
+        raise RuntimeError(f"{label}: drawing edge has no source correspondence")
+    roundtrip = view.GetCorrespondingEntity(canonical)
+    if roundtrip is None or int(app.IsSame(roundtrip, entity)) != 1:
+        raise RuntimeError(f"{label}: datum source-to-view roundtrip is missing or different")
+    edge = _early_bound(canonical, "IEdge")
     body = edge.GetBody()
     if body is None or int(app.IsSame(body, bodies[0])) != 1:
         raise RuntimeError(f"{label}: datum edge belongs to a different source body")
@@ -108,8 +121,10 @@ def _readback(
         raise RuntimeError(f"{label}: native datum is dangling")
     if str(tag.GetLabel()) != datum:
         raise RuntimeError(f"datum feature label did not persist ({label})")
-    position = tuple(float(value) for value in annotation.GetPosition() or ())
-    if len(position) != 3 or not all(math.isfinite(value) for value in position):
+    position = tuple(annotation.GetPosition() or ())
+    if len(position) != 3 or not all(
+        type(value) in (int, float) and math.isfinite(value) for value in position
+    ):
         raise RuntimeError(f"{label}: native datum has invalid position {position!r}")
     return (
         (position[0], position[1]),
@@ -132,9 +147,15 @@ def add_native_axis_datum(
     """
     if entity is None:
         raise ValueError(f"{label}: native datum requires an explicit EDGE entity")
-    if not math.isfinite(stability_tolerance_m) or stability_tolerance_m <= 0.0:
+    if (
+        type(stability_tolerance_m) not in (int, float)
+        or not math.isfinite(stability_tolerance_m) or stability_tolerance_m <= 0.0
+    ):
         raise ValueError(f"{label}: native stability tolerance must be finite and positive")
-    if radius_m is None or not math.isfinite(radius_m) or radius_m <= 0.0:
+    if (
+        type(radius_m) not in (int, float)
+        or not math.isfinite(radius_m) or radius_m <= 0.0
+    ):
         raise ValueError(f"{label}: native radius must be finite and positive")
     if not datum or len(datum) > 2:
         raise ValueError(f"{label}: datum label must contain one or two characters")
