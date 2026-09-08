@@ -92,6 +92,88 @@ def test_candidate_budget_uses_immutable_seed_and_actual_native_route(
         assert moves[2][1] == pytest.approx(0.0054029914697259)
 
 
+@pytest.mark.parametrize(
+    "interval,first_direction",
+    [
+        # The UP distance was observed in the arbor failure. The 30 mm DOWN
+        # boundary is a synthetic solver control, not a native arbor result.
+        ((-0.03, 1.4823470246941766 - policy._POSITION_EPSILON_M), "down"),
+        ((-1.4823470246941766, 0.03), "up"),
+        ((-0.03, 0.03), "up"),  # Exact cost ties retain generator order.
+    ],
+)
+@pytest.mark.parametrize("native_result", ["nearest-clear", "nearest-blocked"])
+def test_each_side_tries_smaller_solver_displacement_before_far_clear_candidate(
+    monkeypatch, interval, first_direction, native_result
+):
+    leaders, cells, _ = lever_crossing_fixture()
+    blocked_route = LeaderGeometry(
+        leaders["frame"], native_all_around_fixture()["frame"]
+    )
+    annotation = object()
+    seed = {
+        "frame": SimpleNamespace(
+            position=(0.3, 0.165, 0),
+            body=Rect(0.3, 0.158, 0.34, 0.165),
+            annotation=annotation,
+        )
+    }
+    cells["frame"] = SimpleNamespace(kind=5, text_boxes=(), text_runs=())
+    candidates = policy._nearest_vertical_candidates([interval])
+    # Keep the public prediction contract UP/DOWN: only native attempt order
+    # changes. All distances come from the real bounded interval solver.
+    assert [candidate.direction.value for candidate in candidates] == ["up", "down"]
+    ordered = sorted(candidates, key=lambda candidate: abs(candidate.dy_m))
+    assert ordered[0].direction.value == first_direction
+    moves, reads = [], []
+
+    def move(original, deltas, stage):
+        assert original is seed
+        dx, dy = deltas["frame"]
+        moves.append((stage, dx, dy))
+        return {
+            "frame": SimpleNamespace(
+                position=(0.3 + dx, 0.165 + dy, 0),
+                body=seed["frame"].body.translated((dx, dy)),
+                annotation=annotation,
+            )
+        }
+
+    def read(actual_annotation):
+        assert actual_annotation is annotation
+        stage, _, dy = moves[-1]
+        reads.append(stage)
+        if dy == 0 or (native_result == "nearest-blocked" and dy == ordered[0].dy_m):
+            return blocked_route
+        return LeaderGeometry((), ())
+
+    monkeypatch.setattr(policy, "_move_bank", move)
+    monkeypatch.setattr(
+        policy, "column_vertical_candidates", lambda *a, **k: candidates
+    )
+    predicted, actual, attempts = policy._place_clear_column(
+        seed,
+        seed,
+        cells,
+        Rect(0.08, 0.148, 0.287, 0.172),
+        (),
+        gap_m=0.002,
+        read_geometry=read,
+    )
+    assert moves[0][2] == moves[1][2] == 0
+    assert moves[2][2] == ordered[0].dy_m
+    assert moves[2][0].endswith(f"-{first_direction}")
+    expected_count = 3 if native_result == "nearest-clear" else 4
+    assert len(moves) == len(reads) == len(attempts) == expected_count
+    if native_result == "nearest-blocked":
+        assert attempts[2]["crossings"]
+        assert moves[3][2] == ordered[1].dy_m
+    assert not attempts[-1]["crossings"]
+    assert attempts[-1]["body_clearance"] == "clear"
+    assert predicted["frame"].position == (0.3 + moves[-1][1], 0.165 + moves[-1][2], 0)
+    assert actual["frame"] == LeaderGeometry((), ())
+
+
 def test_zero_absolute_offset_is_not_mistaken_for_noop_after_another_candidate(
     monkeypatch,
 ):

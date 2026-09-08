@@ -634,9 +634,9 @@ def _place_clear_column(
         )
 
     # Test both horizontal sides first, then each side's nearest free UP/DOWN
-    # intervals. Reverse order tries the most recently observed native side
-    # first; the successful lever control is RIGHT then UP. Targets ALWAYS use
-    # the same immutable seed, even when an earlier native route was rejected.
+    # intervals by displacement. Reverse order retains the latest native side
+    # first; stable cost ties retain UP/DOWN order. Targets ALWAYS use the same
+    # immutable seed, even when an earlier native route was rejected.
     for side, dx in sides:
         predicted, geometry, crossings, body_clear = screen((dx, 0.0), side.value)
         if body_clear is _Clearance.CLEAR and not crossings:
@@ -651,7 +651,7 @@ def _place_clear_column(
             obstacles=(outline, *obstacles),
             gap_m=gap_m,
         )
-        for candidate in candidates:
+        for candidate in sorted(candidates, key=lambda item: abs(item.dy_m)):
             predicted, actual, hits, body_clear = screen(
                 (dx, candidate.dy_m), f"{side.value}-{candidate.direction.value}"
             )
