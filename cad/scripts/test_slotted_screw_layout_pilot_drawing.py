@@ -439,6 +439,9 @@ def test_sheet_reader_uses_actual_views_native_properties_and_linked_notes(
         "numeric_prefix",
         "numeric_suffix",
         "extra_text",
+        "prefix_straddles_body",
+        "prefix_outside_body",
+        "unrelated_word",
     ],
 )
 def test_required_pdf_text_is_literal_unique_and_inside_native_body(scene, damage):
@@ -467,8 +470,27 @@ def test_required_pdf_text_is_literal_unique_and_inside_native_body(scene, damag
                 "box_pt": [149, 290, 150, 295],
             }
         )
+    if damage in ("prefix_straddles_body", "prefix_outside_body"):
+        # Body xmin is .05m = 141.732...pt. The entire PDF token is12.50.
+        glyphs.insert(
+            0,
+            {
+                "text": "1",
+                "box_pt": [
+                    140,
+                    290,
+                    143 if damage == "prefix_straddles_body" else 141,
+                    295,
+                ],
+            },
+        )
+    if damage == "unrelated_word":
+        glyphs[:0] = [
+            {"text": "OTHER", "box_pt": [10, 20, 30, 30]},
+            {"text": "\n", "box_pt": [0, 0, 0, 0]},
+        ]
     printed = {"page_size_pt": [1224, 792], "glyphs": glyphs}
-    if damage != "none":
+    if damage not in ("none", "unrelated_word"):
         with pytest.raises(RuntimeError, match="printed text|finite"):
             witness.require_pdf_content(printed, {"notes": {}}, bank)
         return

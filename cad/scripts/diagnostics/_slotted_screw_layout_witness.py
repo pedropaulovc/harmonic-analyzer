@@ -366,6 +366,19 @@ def read_pdf(pdf, png):
 def require_pdf_content(printed, sheet, bank):
     """Require unique literal runs in their own native body; no symbol guessing."""
     page_width, page_height = _values(printed["page_size_pt"], 2, "PDF page")
+    words, word = [], []
+    for glyph in printed["glyphs"]:
+        text = glyph["text"]
+        if not isinstance(text, str):
+            raise RuntimeError("PDF glyph text has an unsupported type")
+        if not text.strip():
+            if word:
+                words.append(word)
+                word = []
+            continue
+        word.append((text, _values(glyph["box_pt"], 4, "PDF glyph")))
+    if word:
+        words.append(word)
     expected = {row["annotation_key"]: [row["text"]] for row in sheet["notes"].values()}
     expected.update(
         {
@@ -378,20 +391,24 @@ def require_pdf_content(printed, sheet, bank):
         body = _rect(bank["annotations"][key]["measurement"]["body"])
         body_pt = Rect(*(value * 72.0 / 0.0254 for value in body.bounds))
         characters = []
-        for glyph in printed["glyphs"]:
-            text = glyph["text"]
-            if not isinstance(text, str):
-                raise RuntimeError("PDF glyph text has an unsupported type")
-            if not text.strip():
+        for word in words:
+            if not any(
+                xmin < body_pt.xmax
+                and xmax > body_pt.xmin
+                and ymin < body_pt.ymax
+                and ymax > body_pt.ymin
+                for _, (xmin, ymin, xmax, ymax) in word
+            ):
                 continue
-            xmin, ymin, xmax, ymax = _values(glyph["box_pt"], 4, "PDF glyph")
-            if (
+            if not all(
                 0 <= xmin < xmax <= page_width
                 and 0 <= ymin < ymax <= page_height
                 and body_pt.xmin <= xmin <= xmax <= body_pt.xmax
                 and body_pt.ymin <= ymin <= ymax <= body_pt.ymax
+                for _, (xmin, ymin, xmax, ymax) in word
             ):
-                characters.append(text)
+                raise RuntimeError(f"{key}: printed text word crosses its native body")
+            characters.extend(text for text, _ in word)
         actual = "".join(characters)
         required = ["".join(value.split()) for value in values if value.strip()]
         if (

@@ -201,3 +201,13 @@ Eight fail-first cases (`run-tng4ta5j`) reproduced the status, dependency, numer
 PDF and real ownership-scope failures. The scope tests include the original
 RuntimeError, cancellation and keyboard interruption; no assertion was weakened.
 Fresh native dimension/source/view roundtrips and reviewed enrollment remain next.
+
+The next full-base review (`732b23af`) found one further print false-pass: an
+extra prefix could be discarded when it lay partly or entirely outside the
+annotation body. Two fail-first cases reproduced it (`run-26c50vod`), with an
+unrelated separate word elsewhere on the page retained as a positive control.
+The witness now groups complete PDF words before applying containment; any word
+that intersects the native body must fit there in full. It then compares the
+complete literal sequence. All390 focused/adjacent cases pass (`run-zph4_zyj`).
+This is a correction to the staged print checker, not an observed native export
+defect or a new acceptance result.
