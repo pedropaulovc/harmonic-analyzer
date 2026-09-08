@@ -108,6 +108,11 @@ def script_for(stem: str) -> Path:
     return SCRIPTS_DIR / f"build_{stem}.py"
 
 
+class _SourceAvailability(Enum):
+    AVAILABLE = "available"
+    FUTURE = "future"
+
+
 class _AssemblySources:
     """Bounded enumeration of source arguments, not log/error/documentation text.
 
@@ -177,15 +182,31 @@ class _AssemblySources:
             return self.nodes[scope]
         return [*self.nodes[scope], *self.nodes[self.tree]]
 
+    def availability_before(self, item: ast.AST, node: ast.AST) -> _SourceAvailability:
+        """Include lexical, deferred-global and possible prior-iteration writes."""
+        if self.scopes[node] is not self.tree and self.scopes[item] is self.tree:
+            return _SourceAvailability.AVAILABLE
+        if (
+            getattr(item, "lineno", 0), getattr(item, "col_offset", 0)
+        ) < (node.lineno, node.col_offset):
+            return _SourceAvailability.AVAILABLE
+        ancestors = set()
+        cursor = item
+        while cursor in self.parents:
+            cursor = self.parents[cursor]
+            ancestors.add(cursor)
+        cursor = node
+        while cursor in self.parents:
+            cursor = self.parents[cursor]
+            if isinstance(cursor, (ast.For, ast.AsyncFor, ast.While)) and cursor in ancestors:
+                return _SourceAvailability.AVAILABLE
+        return _SourceAvailability.FUTURE
+
     def bindings(self, node: ast.Name, trail: frozenset[ast.AST]) -> list[ast.AST]:
         found = []
         scope = self.scopes[node]
         for item in self.scope_nodes(node):
-            late_global = scope is not self.tree and self.scopes[item] is self.tree
-            if not late_global and (
-                getattr(item, "lineno", 0),
-                getattr(item, "col_offset", 0),
-            ) >= (node.lineno, node.col_offset):
+            if self.availability_before(item, node) is _SourceAvailability.FUTURE:
                 continue
             if (
                 isinstance(item, ast.AugAssign)
@@ -254,9 +275,7 @@ class _AssemblySources:
             for item in self.items(binding, trail)
         ]
         for item in self.scope_nodes(node):
-            available = getattr(item, "lineno", 0) < node.lineno or (
-                self.scopes[node] is not self.tree and self.scopes[item] is self.tree
-            )
+            available = self.availability_before(item, node) is _SourceAvailability.AVAILABLE
             if isinstance(item, (ast.Assign, ast.AnnAssign)):
                 targets = (
                     item.targets if isinstance(item, ast.Assign) else [item.target]
@@ -342,19 +361,170 @@ class _AssemblySources:
                 ):
                     self.fail(item)
 
+    def direct_mapping_bindings(self, node: ast.AST, owner: ast.Name) -> list[ast.AST]:
+        """Read direct owner assignments without interpreting generated row shapes."""
+        found = []
+        for item in self.scope_nodes(node):
+            if self.availability_before(item, node) is _SourceAvailability.FUTURE:
+                continue
+            if (
+                isinstance(item, ast.AugAssign)
+                and isinstance(item.target, ast.Name)
+                and item.target.id == owner.id
+            ):
+                self.fail(item)
+            targets = (
+                item.targets if isinstance(item, ast.Assign)
+                else [item.target] if isinstance(item, (ast.AnnAssign, ast.NamedExpr))
+                else []
+            )
+            if any(isinstance(target, ast.Name) and target.id == owner.id for target in targets):
+                if item.value is not None:
+                    found.append(item.value)
+        return found
+
+    def prepared_row_selections(self, node: ast.AST, owner: ast.Name) -> set[ast.AST]:
+        """Recognize selection from the same unescaped collection prepared earlier."""
+        found = set()
+        for value in self.direct_mapping_bindings(node, owner):
+            if not isinstance(value, ast.Subscript) or not isinstance(value.value, ast.Name):
+                continue
+            collection = value.value
+            loops = [
+                item for item in self.scope_nodes(node)
+                if isinstance(item, ast.For)
+                and isinstance(item.target, ast.Name) and item.target.id == owner.id
+                and isinstance(item.iter, ast.Name) and item.iter.id == collection.id
+                and self.availability_before(item, value) is _SourceAvailability.AVAILABLE
+            ]
+            if not loops:
+                continue
+            for loop in loops:
+                if set(self.bindings(loop.iter, frozenset())) != set(self.bindings(collection, frozenset())):
+                    self.fail(value)  # collection was rebound after its rows were prepared
+            for use in self.scope_nodes(node):
+                if not isinstance(use, ast.Name) or use.id != collection.id or not isinstance(use.ctx, ast.Load):
+                    continue
+                parent = self.parents[use]
+                if isinstance(parent, ast.Subscript) and parent.value is use and isinstance(parent.ctx, ast.Load):
+                    assignment = self.parents[parent]
+                    if (
+                        isinstance(assignment, ast.Assign)
+                        and assignment.value is parent
+                        and len(assignment.targets) == 1
+                        and isinstance(assignment.targets[0], ast.Name)
+                        and assignment.targets[0].id == owner.id
+                    ):
+                        continue
+                if parent in loops and parent.iter is use:
+                    continue
+                self.fail(use)  # collection alias/mutation/opaque consumer is unsupported
+            found.add(value)
+        return found
+
+    def validate_mapping_owner_bindings(
+        self, node: ast.AST, owner: ast.Name, key: ast.AST, prepared_rows: set[ast.AST]
+    ) -> None:
+        """Reject bindings outside direct assignments or proven row preparation.
+
+        A prior literal initializer must not hide a loop/unpacked/opaque binding
+        that changes which mapping a keyed source read actually consumes.
+        """
+        prepared_loops = {
+            loop
+            for value in prepared_rows
+            for loop in self.scope_nodes(node)
+            if isinstance(loop, ast.For)
+            and isinstance(loop.target, ast.Name) and loop.target.id == owner.id
+            and isinstance(loop.iter, ast.Name) and loop.iter.id == value.value.id
+            and self.availability_before(loop, value) is _SourceAvailability.AVAILABLE
+        }
+        for item in self.scope_nodes(node):
+            if self.availability_before(item, node) is _SourceAvailability.FUTURE:
+                continue
+            if (
+                isinstance(item, ast.Subscript)
+                and isinstance(item.ctx, (ast.Store, ast.Del))
+                and isinstance(item.value, ast.Name) and item.value.id == owner.id
+            ):
+                if (
+                    isinstance(item.slice, ast.Constant) and isinstance(key, ast.Constant)
+                    and item.slice.value != key.value
+                ):
+                    continue
+                parent = self.parents[item]
+                if not isinstance(parent, ast.Assign):
+                    # field_writes interprets direct assignments only. Loop,
+                    # context, unpacked and deleted targets must not disappear.
+                    self.fail(parent)
+            if (
+                isinstance(item, ast.Name)
+                and item.id == owner.id
+                and isinstance(item.ctx, (ast.Store, ast.Del))
+            ):
+                parent = self.parents[item]
+                if parent in prepared_loops:
+                    continue
+                if isinstance(parent, (ast.Assign, ast.AnnAssign, ast.NamedExpr)):
+                    # Only direct name targets are interpreted above. A nested
+                    # unpacking target has a Tuple/List/Starred parent instead.
+                    continue
+                self.fail(parent)
+            if isinstance(item, ast.arg) and item.arg == owner.id:
+                self.fail(item)
+            if isinstance(item, ast.alias):
+                bound = item.asname or item.name.split(".")[0]
+                if bound == owner.id or item.name == "*":
+                    self.fail(item)
+            if isinstance(
+                item,
+                (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef,
+                 ast.ExceptHandler, ast.MatchAs, ast.MatchStar),
+            ):
+                if item.name == owner.id:
+                    self.fail(item)
+            if isinstance(item, ast.MatchMapping) and item.rest == owner.id:
+                self.fail(item)
+
     def field_writes(
         self, node: ast.AST, owner: ast.AST, key: ast.AST | None
     ) -> list[ast.AST]:
         found = []
-        if key is None:
-            if not isinstance(owner, ast.Name):
-                self.fail(node)
-            for initial in self.bindings(owner, frozenset()):
-                if not isinstance(initial, ast.Dict) or any(
-                    value is None for value in initial.keys
-                ):
-                    self.fail(initial)
+        if not isinstance(owner, ast.Name):
+            self.fail(node)
+        # Keep generated rows' explicit field-write contract: their non-source
+        # shape need not be interpreted. Direct map assignments still cannot hide
+        # an initial source, opaque rebinding or whole-container augmentation.
+        initial_values = (
+            self.bindings(owner, frozenset()) if key is None
+            else self.direct_mapping_bindings(node, owner)
+        )
+        prepared_rows = self.prepared_row_selections(node, owner) if key is not None else set()
+        if key is not None:
+            # The get/items path already uses full bindings(), including literal
+            # loop owners. This guard closes the newer direct-mapping path only.
+            self.validate_mapping_owner_bindings(node, owner, key, prepared_rows)
+        for initial in initial_values:
+            if initial in prepared_rows:
+                continue
+            if not isinstance(initial, ast.Dict) or any(
+                value is None for value in initial.keys
+            ):
+                self.fail(initial)
+            if key is None:
                 found.extend(initial.values)
+                continue
+            for field, value in zip(initial.keys, initial.values, strict=True):
+                if ast.dump(field) == ast.dump(key):
+                    found.append(value)
+                    continue
+                if (
+                    isinstance(field, ast.Constant)
+                    and isinstance(key, ast.Constant)
+                    and field.value != key.value
+                ):
+                    continue
+                self.fail(initial)
         for item in self.scope_nodes(node):
             if (
                 isinstance(item, (ast.Assign, ast.AnnAssign, ast.NamedExpr))
@@ -401,10 +571,16 @@ class _AssemblySources:
                     target.value
                 ) != ast.dump(owner):
                     continue
+                if key is not None and self.availability_before(item, node) is _SourceAvailability.FUTURE:
+                    continue
                 if key is not None and ast.dump(target.slice) != ast.dump(key):
-                    continue
-                if key is not None and item.lineno >= node.lineno:
-                    continue
+                    if (
+                        isinstance(target.slice, ast.Constant)
+                        and isinstance(key, ast.Constant)
+                        and target.slice.value != key.value
+                    ):
+                        continue
+                    self.fail(item)  # different key syntax can still alias the read
                 found.append(item.value)
         if not found:
             self.fail(node)

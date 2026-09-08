@@ -220,6 +220,519 @@ await place_component(adapter, part, p, r, q)
     ) == {"rocker_arm", "rocker_arm_support"}
 
 
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        (
+            "SPECS = {}\nSPECS['main'] = 'rocker-arm'\n"
+            "async def build(adapter):\n"
+            "    await place_component(adapter, SPECS['main'], p, r, q)\n"
+            "SPECS['main'] = 'rocker-arm-support'\n",
+            {"rocker_arm", "rocker_arm_support"},
+        ),
+        (
+            "SPECS = {}\nSPECS['main'] = 'rocker-arm'\n"
+            "await place_component(adapter, SPECS['main'], p, r, q)\n"
+            "SPECS['main'] = 'rocker-arm-support'\n",
+            {"rocker_arm"},
+        ),
+        (
+            "async def build(adapter):\n"
+            "    specs = {}\n    specs['main'] = 'rocker-arm'\n"
+            "    await place_component(adapter, specs['main'], p, r, q)\n"
+            "    specs['main'] = 'rocker-arm-support'\n",
+            {"rocker_arm"},
+        ),
+        (
+            "specs = {}\nspecs['main'] = 'rocker-arm'\n"
+            "specs['main'] = 'rocker-arm-support'; "
+            "await place_component(adapter, specs['main'], p, r, q)\n",
+            {"rocker_arm", "rocker_arm_support"},
+        ),
+        (
+            "specs = {}\nspecs['main'] = 'rocker-arm'\n"
+            "await place_component(adapter, specs['main'], p, r, q); "
+            "specs['main'] = 'rocker-arm-support'\n",
+            {"rocker_arm"},
+        ),
+    ],
+)
+def test_keyed_source_writes_respect_scope_and_statement_order(
+    tmp_path, monkeypatch, source, expected
+):
+    assert _source_references(
+        tmp_path, monkeypatch, source, ("rocker_arm", "rocker_arm_support")
+    ) == expected
+
+
+@pytest.fixture(
+    params=[
+        (
+            "part = 'rocker-arm'",
+            "await place_component(adapter, part, p, r, q)",
+            "part = 'rocker-arm-support'",
+        ),
+        (
+            "specs = {}; specs['main'] = 'rocker-arm'",
+            "await place_component(adapter, specs['main'], p, r, q)",
+            "specs['main'] = 'rocker-arm-support'",
+        ),
+        (
+            "specs = [{'part': 'rocker-arm'}]",
+            "await place_components_batch(adapter, specs)",
+            "specs.append({'part': 'rocker-arm-support'})",
+        ),
+    ],
+    ids=["name", "keyed-field", "manifest-append"],
+)
+def loop_source_form(request):
+    return request.param
+
+
+@pytest.mark.parametrize("loop", ["for index in (0, 1):", "while remaining:"])
+def test_loop_carried_source_writes_keep_next_iteration_edges(
+    tmp_path, monkeypatch, loop_source_form, loop
+):
+    initial, sink, mutation = loop_source_form
+    source = (
+        "async def build(adapter):\n"
+        f"    {initial}\n"
+        "    remaining = 2\n"
+        f"    {loop}\n"
+        f"        {sink}\n"
+        f"        {mutation}\n"
+        "        remaining -= 1\n"
+    )
+    assert _source_references(
+        tmp_path, monkeypatch, source, ("rocker_arm", "rocker_arm_support")
+    ) == {"rocker_arm", "rocker_arm_support"}
+
+
+@pytest.mark.parametrize("loop", ["for index in (0, 1):", "while remaining:"])
+def test_writes_after_loop_do_not_change_earlier_source_sink(
+    tmp_path, monkeypatch, loop_source_form, loop
+):
+    initial, sink, mutation = loop_source_form
+    source = (
+        "async def build(adapter):\n"
+        f"    {initial}\n"
+        "    remaining = 2\n"
+        f"    {loop}\n"
+        f"        {sink}\n"
+        "        remaining -= 1\n"
+        f"    {mutation}\n"
+    )
+    assert _source_references(
+        tmp_path, monkeypatch, source, ("rocker_arm", "rocker_arm_support")
+    ) == {"rocker_arm"}
+
+
+@pytest.mark.parametrize(
+    ("write_key", "read_key"),
+    [("key", "'main'"), ("'main'", "key"), ("other_key", "key")],
+)
+def test_potentially_aliasing_keyed_source_writes_fail_closed(
+    tmp_path, monkeypatch, write_key, read_key
+):
+    source = (
+        "async def build(adapter):\n"
+        "    specs = {}\n"
+        "    key = 'main'\n"
+        "    other_key = 'main'\n"
+        f"    specs[{read_key}] = 'rocker-arm'\n"
+        f"    specs[{write_key}] = 'rocker-arm-support'\n"
+        f"    await place_component(adapter, specs[{read_key}], p, r, q)\n"
+    )
+    with pytest.raises(ValueError, match=r"[Uu]nresolved assembly source"):
+        _source_references(
+            tmp_path, monkeypatch, source, ("rocker_arm", "rocker_arm_support")
+        )
+
+
+def test_distinct_literal_keyed_writes_do_not_add_other_source(tmp_path, monkeypatch):
+    source = (
+        "async def build(adapter):\n"
+        "    specs = {}\n"
+        "    specs['main'] = 'rocker-arm'\n"
+        "    specs['other'] = 'rocker-arm-support'\n"
+        "    await place_component(adapter, specs['main'], p, r, q)\n"
+    )
+    assert _source_references(
+        tmp_path, monkeypatch, source, ("rocker_arm", "rocker_arm_support")
+    ) == {"rocker_arm"}
+
+
+def test_potential_key_alias_written_after_source_sink_is_not_available(
+    tmp_path, monkeypatch
+):
+    source = (
+        "async def build(adapter):\n"
+        "    specs = {}\n"
+        "    specs['main'] = 'rocker-arm'\n"
+        "    key = 'main'\n"
+        "    await place_component(adapter, specs['main'], p, r, q)\n"
+        "    specs[key] = 'rocker-arm-support'\n"
+    )
+    assert _source_references(
+        tmp_path, monkeypatch, source, ("rocker_arm", "rocker_arm_support")
+    ) == {"rocker_arm"}
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "specs |= {'main': 'rocker-arm-support'}",
+        "specs = runtime_sources()",
+        "specs: dict = runtime_sources()",
+    ],
+    ids=["dict-union-assignment", "opaque-rebind", "annotated-opaque-rebind"],
+)
+def test_keyed_source_owner_mutation_or_unknown_rebind_fails_closed(
+    tmp_path, monkeypatch, mutation
+):
+    source = (
+        "async def build(adapter):\n"
+        "    specs = {}\n"
+        "    specs['main'] = 'rocker-arm'\n"
+        f"    {mutation}\n"
+        "    await place_component(adapter, specs['main'], p, r, q)\n"
+    )
+    with pytest.raises(ValueError, match=r"[Uu]nresolved assembly source"):
+        _source_references(
+            tmp_path, monkeypatch, source, ("rocker_arm", "rocker_arm_support")
+        )
+
+
+@pytest.mark.parametrize(
+    ("assignments", "expected"),
+    [
+        (
+            "specs = {'main': 'rocker-arm', 'unused': 'not-a-part'}\n"
+            "specs['main'] = 'rocker-arm-support'",
+            {"rocker_arm", "rocker_arm_support"},
+        ),
+        (
+            "specs = {}\n"
+            "specs['main'] = 'rocker-arm'\n"
+            "specs = {'main': 'rocker-arm-support', 'unused': 'not-a-part'}",
+            {"rocker_arm", "rocker_arm_support"},
+        ),
+        (
+            "specs = {'main': 'rocker-arm', 'unused': 'not-a-part'}\n"
+            "specs = {'main': 'rocker-arm-support', 'unused': 'still-not-a-part'}\n"
+            "specs['main'] = 'pen-rod'",
+            {"rocker_arm", "rocker_arm_support", "pen_rod"},
+        ),
+        (
+            "specs: dict = {'main': 'rocker-arm', 'unused': 'not-a-part'}\n"
+            "specs: dict = {'main': 'rocker-arm-support', 'unused': 'still-not-a-part'}\n"
+            "specs['main'] = 'pen-rod'",
+            {"rocker_arm", "rocker_arm_support", "pen_rod"},
+        ),
+    ],
+    ids=["initial-literal", "rebound-literal", "initial-and-rebound", "annotated-literals"],
+)
+def test_keyed_source_initial_and_rebound_literals_keep_matching_values(
+    tmp_path, monkeypatch, assignments, expected
+):
+    source = (
+        "async def build(adapter):\n"
+        + "".join(f"    {line}\n" for line in assignments.splitlines())
+        + "    await place_component(adapter, specs['main'], p, r, q)\n"
+    )
+    assert _source_references(
+        tmp_path, monkeypatch, source,
+        ("rocker_arm", "rocker_arm_support", "pen_rod"),
+    ) == expected
+
+
+def test_keyed_source_literal_initialization_ignores_distinct_literal_keys(
+    tmp_path, monkeypatch
+):
+    source = (
+        "async def build(adapter):\n"
+        "    specs = {'main': 'rocker-arm', 'unused': 'not-a-part'}\n"
+        "    specs['other'] = 'also-not-a-part'\n"
+        "    await place_component(adapter, specs['main'], p, r, q)\n"
+    )
+    assert _source_references(tmp_path, monkeypatch, source) == {"rocker_arm"}
+
+
+def test_generated_row_selection_preserves_prepared_source_provenance(
+    tmp_path, monkeypatch
+):
+    source = (
+        "async def build(adapter):\n"
+        "    rows = make_rows()\n"
+        "    for spec in rows:\n"
+        "        spec['part'] = 'rocker-arm'\n"
+        "    spec = rows[index]\n"
+        "    await place_component(adapter, spec['part'], p, r, q)\n"
+    )
+    assert _source_references(tmp_path, monkeypatch, source) == {"rocker_arm"}
+
+
+def test_keyed_field_loop_cannot_hide_actual_inserted_source(tmp_path, monkeypatch):
+    import asyncio
+
+    source = '''async def build(adapter):
+    specs = {"main": "rocker-arm"}
+    for specs["main"] in ("rocker-arm-support",):
+        await place_component(adapter, specs["main"], p, r, q)
+'''
+    consumed = []
+
+    async def record(_adapter, part, *_args):
+        consumed.append(part)
+
+    namespace = {"place_component": record, "p": None, "r": None, "q": None}
+    exec(source, namespace)
+    asyncio.run(namespace["build"](None))
+    assert consumed == ["rocker-arm-support"]
+    with pytest.raises(ValueError, match="[Uu]nresolved assembly source"):
+        _source_references(tmp_path, monkeypatch, source, ("rocker_arm", "rocker_arm_support"))
+
+
+@pytest.fixture(params=[
+    "for specs['main'] in ('rocker-arm-support',):\n    pass",
+    "async for specs['main'] in runtime_rows():\n    pass",
+    "for ignored, specs['main'] in runtime_rows():\n    pass",
+    "ignored, specs['main'] = runtime_pair()",
+    "with runtime_source() as specs['main']:\n    pass",
+    "async with runtime_source() as specs['main']:\n    pass",
+    "[None for specs['main'] in ('rocker-arm-support',)]",
+    "del specs['main']",
+], ids=["for", "async-for", "unpacked-for", "unpacked-assignment", "with",
+        "async-with", "comprehension", "delete"])
+def unsupported_keyed_field_binding(request):
+    return request.param
+
+
+def test_unsupported_keyed_field_bindings_fail_closed(
+    tmp_path, monkeypatch, unsupported_keyed_field_binding
+):
+    source = (
+        "async def build(adapter):\n"
+        "    specs = {'main': 'rocker-arm'}\n"
+        + "".join(f"    {line}\n" for line in unsupported_keyed_field_binding.splitlines())
+        + "    await place_component(adapter, specs['main'], p, r, q)\n"
+    )
+    with pytest.raises(ValueError, match="[Uu]nresolved assembly source"):
+        _source_references(tmp_path, monkeypatch, source, ("rocker_arm", "rocker_arm_support"))
+
+
+def test_unavailable_keyed_field_bindings_do_not_change_earlier_sink(
+    tmp_path, monkeypatch, unsupported_keyed_field_binding
+):
+    source = (
+        "async def build(adapter):\n"
+        "    specs = {'main': 'rocker-arm'}\n"
+        "    await place_component(adapter, specs['main'], p, r, q)\n"
+        + "".join(f"    {line}\n" for line in unsupported_keyed_field_binding.splitlines())
+    )
+    assert _source_references(tmp_path, monkeypatch, source) == {"rocker_arm"}
+
+
+def test_different_keyed_field_bindings_leave_source_field_unchanged(
+    tmp_path, monkeypatch, unsupported_keyed_field_binding
+):
+    source = (
+        "async def build(adapter):\n"
+        "    specs = {'main': 'rocker-arm'}\n"
+        + "".join(f"    {line}\n" for line in unsupported_keyed_field_binding.replace("'main'", "'other'").splitlines())
+        + "    await place_component(adapter, specs['main'], p, r, q)\n"
+    )
+    assert _source_references(tmp_path, monkeypatch, source) == {"rocker_arm"}
+
+
+def test_later_keyed_field_loop_binding_can_reach_next_iteration(tmp_path, monkeypatch):
+    source = (
+        "async def build(adapter):\n"
+        "    specs = {'main': 'rocker-arm'}\n"
+        "    for index in (0, 1):\n"
+        "        await place_component(adapter, specs['main'], p, r, q)\n"
+        "        for specs['main'] in ('rocker-arm-support',):\n"
+        "            pass\n"
+    )
+    with pytest.raises(ValueError, match="[Uu]nresolved assembly source"):
+        _source_references(tmp_path, monkeypatch, source, ("rocker_arm", "rocker_arm_support"))
+
+
+def test_keyed_source_loop_owner_cannot_hide_actual_inserted_source(tmp_path, monkeypatch):
+    import asyncio
+
+    source = '''async def build(adapter):
+    specs = {"main": "rocker-arm"}
+    for specs in ({"main": "rocker-arm-support"},):
+        await place_component(adapter, specs["main"], p, r, q)
+'''
+    consumed = []
+
+    async def record(_adapter, part, *_args):
+        consumed.append(part)
+
+    namespace = {"place_component": record, "p": None, "r": None, "q": None}
+    exec(source, namespace)
+    asyncio.run(namespace["build"](None))
+    assert consumed == ["rocker-arm-support"]
+    with pytest.raises(ValueError, match="[Uu]nresolved assembly source"):
+        _source_references(tmp_path, monkeypatch, source, ("rocker_arm", "rocker_arm_support"))
+
+
+@pytest.fixture(params=[
+    "for specs in ({'main': 'rocker-arm-support'},):\n    pass",
+    "async for specs in runtime_rows():\n    pass",
+    "for ignored, specs in runtime_rows():\n    pass",
+    "for ignored, (specs,) in runtime_rows():\n    pass",
+    "ignored, specs = runtime_pair()",
+    "ignored, (specs,) = runtime_pair()",
+    "ignored, *specs = runtime_pair()",
+    "with runtime_mapping() as specs:\n    pass",
+    "async with runtime_mapping() as specs:\n    pass",
+    "try:\n    raise RuntimeError\nexcept RuntimeError as specs:\n    pass",
+    "import unknown_mapping as specs",
+    "from unknown_module import mapping as specs",
+    "def specs():\n    pass",
+    "class specs:\n    pass",
+    "match runtime_value:\n    case specs:\n        pass",
+], ids=["for", "async-for", "unpacked-for", "nested-for", "unpacked-assignment",
+        "nested-assignment", "starred-assignment", "with", "async-with", "except",
+        "import", "from-import", "function", "class", "match"])
+def opaque_mapping_owner_binding(request):
+    return request.param
+
+
+def test_keyed_source_opaque_owner_rebindings_fail_closed(
+    tmp_path, monkeypatch, opaque_mapping_owner_binding
+):
+    source = (
+        "async def build(adapter):\n"
+        "    specs = {'main': 'rocker-arm'}\n"
+        + "".join(f"    {line}\n" for line in opaque_mapping_owner_binding.splitlines())
+        + "    await place_component(adapter, specs['main'], p, r, q)\n"
+    )
+    with pytest.raises(ValueError, match="[Uu]nresolved assembly source"):
+        _source_references(tmp_path, monkeypatch, source, ("rocker_arm", "rocker_arm_support"))
+
+
+def test_keyed_source_unavailable_owner_rebindings_do_not_change_earlier_sink(
+    tmp_path, monkeypatch, opaque_mapping_owner_binding
+):
+    source = (
+        "async def build(adapter):\n"
+        "    specs = {'main': 'rocker-arm'}\n"
+        "    await place_component(adapter, specs['main'], p, r, q)\n"
+        + "".join(f"    {line}\n" for line in opaque_mapping_owner_binding.splitlines())
+    )
+    assert _source_references(tmp_path, monkeypatch, source) == {"rocker_arm"}
+
+
+def test_keyed_source_other_owner_bindings_do_not_change_unchanged_mapping(
+    tmp_path, monkeypatch, opaque_mapping_owner_binding
+):
+    source = (
+        "async def build(adapter):\n"
+        "    specs = {'main': 'rocker-arm'}\n"
+        + "".join(f"    {line}\n" for line in opaque_mapping_owner_binding.replace("specs", "other").splitlines())
+        + "    await place_component(adapter, specs['main'], p, r, q)\n"
+    )
+    assert _source_references(tmp_path, monkeypatch, source) == {"rocker_arm"}
+
+
+@pytest.mark.parametrize("argument", ["specs", "*specs", "**specs"])
+def test_keyed_source_parameter_shadowing_cannot_reuse_module_initializer(
+    tmp_path, monkeypatch, argument
+):
+    source = (
+        "specs = {'main': 'rocker-arm'}\n"
+        f"async def build(adapter, {argument}):\n"
+        "    await place_component(adapter, specs['main'], p, r, q)\n"
+    )
+    with pytest.raises(ValueError, match="[Uu]nresolved assembly source"):
+        _source_references(tmp_path, monkeypatch, source)
+
+
+def test_mapping_get_keeps_existing_literal_loop_owner_enumeration(tmp_path, monkeypatch):
+    source = (
+        "for specs in ({'main': 'rocker-arm'},):\n"
+        "    await place_component(adapter, specs.get('main'), p, r, q)\n"
+    )
+    assert _source_references(tmp_path, monkeypatch, source) == {"rocker_arm"}
+
+
+def test_keyed_source_later_loop_owner_binding_can_reach_next_iteration(tmp_path, monkeypatch):
+    source = (
+        "async def build(adapter):\n"
+        "    specs = {'main': 'rocker-arm'}\n"
+        "    for index in (0, 1):\n"
+        "        await place_component(adapter, specs['main'], p, r, q)\n"
+        "        for specs in ({'main': 'rocker-arm-support'},):\n"
+        "            pass\n"
+    )
+    with pytest.raises(ValueError, match="[Uu]nresolved assembly source"):
+        _source_references(tmp_path, monkeypatch, source, ("rocker_arm", "rocker_arm_support"))
+
+
+def test_prepared_mapping_owner_cannot_be_rebound_by_another_loop(tmp_path, monkeypatch):
+    source = (
+        "async def build(adapter):\n"
+        "    rows = make_rows()\n"
+        "    for spec in rows:\n"
+        "        spec['part'] = 'rocker-arm'\n"
+        "    spec = rows[index]\n"
+        "    for spec in ({'part': 'rocker-arm-support'},):\n"
+        "        pass\n"
+        "    await place_component(adapter, spec['part'], p, r, q)\n"
+    )
+    with pytest.raises(ValueError, match="[Uu]nresolved assembly source"):
+        _source_references(tmp_path, monkeypatch, source, ("rocker_arm", "rocker_arm_support"))
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "rows.append({'part': 'rocker-arm-support'})",
+        "mutate(rows)",
+        "mutate(items=rows)",
+        "alias = rows",
+        "alias: list = rows",
+        "rows = make_rows()",
+        "rows[0]['part'] = 'rocker-arm-support'",
+        "mutate(rows[0])",
+        "alias = rows[0]",
+    ],
+    ids=["append", "opaque-consumer", "keyword-consumer", "alias", "annotated-alias", "rebind",
+         "selected-field-write", "selected-opaque-consumer", "selected-alias"],
+)
+def test_generated_row_selection_rejects_lost_collection_provenance(
+    tmp_path, monkeypatch, mutation
+):
+    source = (
+        "async def build(adapter):\n"
+        "    rows = make_rows()\n"
+        "    for spec in rows:\n"
+        "        spec['part'] = 'rocker-arm'\n"
+        f"    {mutation}\n"
+        "    spec = rows[index]\n"
+        "    await place_component(adapter, spec['part'], p, r, q)\n"
+    )
+    with pytest.raises(ValueError, match=r"[Uu]nresolved assembly source"):
+        _source_references(
+            tmp_path, monkeypatch, source, ("rocker_arm", "rocker_arm_support")
+        )
+
+
+def test_late_global_keyed_source_write_cannot_hide_unknown_value(tmp_path, monkeypatch):
+    source = (
+        "SPECS = {}\nSPECS['main'] = 'rocker-arm'\n"
+        "async def build(adapter):\n"
+        "    await place_component(adapter, SPECS['main'], p, r, q)\n"
+        "SPECS['main'] = runtime_part()\n"
+    )
+    with pytest.raises(ValueError, match=r"[Uu]nresolved assembly source"):
+        _source_references(tmp_path, monkeypatch, source)
+
+
 def test_later_module_manifest_appends_are_not_silently_lost(tmp_path, monkeypatch):
     source = """parts = []
 async def build(adapter):
@@ -227,6 +740,44 @@ async def build(adapter):
 parts.append({'part': 'rocker-arm'})
 """
     assert _source_references(tmp_path, monkeypatch, source) == {"rocker_arm"}
+
+
+@pytest.mark.parametrize("separator", ["\n", "; "])
+def test_manifest_appends_before_use_preserve_source_edges(tmp_path, monkeypatch, separator):
+    source = separator.join([
+        "parts = []",
+        "parts.append({'part': 'rocker-arm'})",
+        "await place_components_batch(adapter, parts)",
+    ])
+    assert _source_references(tmp_path, monkeypatch, source) == {"rocker_arm"}
+
+
+@pytest.mark.parametrize("separator", ["\n", "; "])
+def test_manifest_appends_after_module_use_do_not_add_sources(tmp_path, monkeypatch, separator):
+    source = separator.join([
+        "parts = []",
+        "await place_components_batch(adapter, parts)",
+        "parts.append({'part': 'rocker-arm'})",
+    ])
+    assert _source_references(tmp_path, monkeypatch, source) == set()
+
+
+@pytest.mark.parametrize("separator", ["\n", "; "])
+@pytest.mark.parametrize("mutation", [
+    "alias = parts",
+    "alias: list = parts",
+    "mutate(parts)",
+    "mutate(items=parts)",
+    "parts.extend(runtime_parts())",
+])
+def test_manifest_mutations_before_use_fail_closed(tmp_path, monkeypatch, separator, mutation):
+    source = separator.join([
+        "parts = [{'part': 'rocker-arm'}]",
+        mutation,
+        "await place_components_batch(adapter, parts)",
+    ])
+    with pytest.raises(ValueError, match=r"[Uu]nresolved assembly source"):
+        _source_references(tmp_path, monkeypatch, source)
 
 
 @pytest.mark.parametrize(
