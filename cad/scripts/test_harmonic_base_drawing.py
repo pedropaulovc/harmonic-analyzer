@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import math
+import asyncio
 from pathlib import Path
 import re
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -21,6 +24,57 @@ from cone_pivot_post_installation import (
 from cone_lock_knob_spec import WASHER_DIA as KNOB_WASHER_DIA
 from _drawing_registry import DRAWINGS_BY_NAME
 from swing_stop_screw_spec import SHANK_DIA as STOP_SHANK_DIA
+
+
+def test_actual_recipe_packs_validated_table_and_original_linked_notes_before_export(
+    monkeypatch,
+) -> None:
+    events = []
+    table, top, side = object(), object(), object()
+    manufacturing, caption = object(), object()
+    views = iter((top, side))
+    notes = iter((manufacturing, caption))
+    adapter = SimpleNamespace(currentModel=object(), open_model=AsyncMock())
+    monkeypatch.setattr(drawing, "SOURCE", SimpleNamespace(is_file=lambda: True))
+    for name in (
+        "check", "read_required_properties", "stamp_drawing_summary",
+        "set_hidden_lines_removed", "curate_view_dimensions", "add_datum_feature",
+        "add_feature_control_frame",
+    ):
+        monkeypatch.setattr(drawing, name, lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(drawing, "place_view", lambda *_args, **_kwargs: next(views))
+    monkeypatch.setattr(drawing, "auto_center_marks", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(
+        drawing, "_visible_hole_table_entities",
+        lambda *_args: (tuple(object() for _ in range(17)), object(), object()),
+    )
+    monkeypatch.setattr(
+        drawing, "_visible_side_datum_edges", lambda *_args: (object(), object()),
+    )
+    monkeypatch.setattr(drawing, "insert_hole_table", lambda *_args, **_kwargs: table)
+    monkeypatch.setattr(
+        drawing, "add_property_linked_note", lambda *_args, **_kwargs: next(notes),
+    )
+
+    def pack(actual, **kwargs):
+        assert actual is adapter
+        assert kwargs == dict(
+            table=table, views={"top": top, "side": side},
+            manufacturing_note=manufacturing, side_note=caption,
+        )
+        events.append("pack")
+
+    async def export(*_args, **_kwargs):
+        events.append("export")
+        return {"drawing": "validated"}
+
+    monkeypatch.setattr(drawing, "repair_harmonic_base_layout", pack, raising=False)
+    monkeypatch.setattr(drawing, "finalize_drawing", export)
+    result = asyncio.run(
+        drawing.build(adapter, drawing_factory=lambda *_args, **_kwargs: (object(), object()))
+    )
+    assert events == ["pack", "export"]
+    assert result == {"drawing": "validated"}
 
 
 def test_required_drawing_paths() -> None:
