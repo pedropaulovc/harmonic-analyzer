@@ -341,8 +341,8 @@ def _drill_tapped_holes(adapter, holes_xz, y_face_mm: float):
     if place_sk is None:
         raise RuntimeError("hole wizard: placement sketch not found")
 
-    math = adapter.swApp.GetMathUtility()
-    math = _early_bound(math, "IMathUtility")
+    math_utility = adapter.swApp.GetMathUtility()
+    math_utility = _early_bound(math_utility, "IMathUtility")
     xform = place_sk.ModelToSketchTransform  # model -> sketch
     xform = _early_bound(xform, "IMathTransform")
     y_face = y_face_mm / 1000.0
@@ -350,7 +350,7 @@ def _drill_tapped_holes(adapter, holes_xz, y_face_mm: float):
     def _sketch_xy(hx, hz):
         arr = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8,
                       [hx / 1000.0, y_face, hz / 1000.0])
-        mpt = math.CreatePoint(arr)
+        mpt = math_utility.CreatePoint(arr)
         mpt = _early_bound(mpt, "IMathPoint")
         spt = mpt.MultiplyTransform(xform)
         spt = _early_bound(spt, "IMathPoint")
