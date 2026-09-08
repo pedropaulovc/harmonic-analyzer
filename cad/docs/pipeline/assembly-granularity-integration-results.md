@@ -274,3 +274,89 @@ SHA-256 `1ceb3781f3835dcab7b1fd1d1e48fd05ae9bbb5528b392687da0654817b1fc52`.
 GitHub later returned `graphql_rate_limit`; the exact error is retained and
 missing watcher output is not counted as approval. Candidate native full-build,
 zero-COM repeat, same-main comparison and final visual acceptance remain pending.
+
+## Native validation blocker and unchanged reproduction
+
+The stack is not merge-ready. Parent #686 is `cf8b3f8063ff14258a59aa97c0e59de87136e2a0`;
+the candidate tested here is child #687 at `2d10203b0d554e1d53fb5f13d84951412afb4a82`.
+Main was fetched again before the reproduction and remains
+`55056d4990d38ebb461f343d3002fc90731b9e73`; adapter remains
+`2269009ed56712867826516f4406afc98a0c2814`. VM1 owns correction coordination,
+integration and merging. No protected PR or drawing source was changed.
+
+The updated-main `build_bare` baseline passed in 1252.578826 seconds. It rebuilt
+paper-drive FULL and refreshed the top assembly; its other six assemblies and
+108 parts were current from this checkout's initial baseline construction.
+The closed snapshot preserves 1856 files. Its manifest SHA-256 is
+`2bbab87b02b55141689d0b96fae047154651ebc4a1725067d8626684fabec9b7`.
+The verified 98735049-byte archive is at code checkout
+`cad/out/reports/assembly-granularity-delivery/native-main-550.zip`, SHA-256
+`eb2b31272d95e6a87e1478605612f1ca123805df45dc3ce1832c0c4d46dbf9a0`.
+The original close guard refused the dirty top assembly. A separately recorded,
+bounded no-save closure discarded its post-save CSV-export BOM table and proved
+all 114 owned saved model hashes unchanged. Both receipts remain preserved.
+
+The candidate's cache-disabled `uv run python -m doit -n 4` ran from
+2026-09-07 21:36:48.993767 UTC to 22:24:30.759186 UTC, 2861.758145 seconds,
+and exited **2**. All 12 offline checks passed, including 1266 recipe tests,
+146 graph tests and four isolation tests. Seven FULL assembly tasks and
+37 production drawings passed. Two production drawing tasks failed below.
+The top assembly, saved soundness/kinematics and the remaining drawing fleet
+were not reached. Seven fresh assembly isometric PNGs were inspected with no
+obvious gross defect; the top candidate image and assembly print checks remain
+unaccepted. The raw telemetry also contains mocked test tasks/errors; the raw
+receipt is retained unchanged and is rejected, not presented as acceptance.
+
+An unchanged, cache-disabled retry of just the two failed tasks ran from
+2026-09-08 00:19:47.832855 UTC to 00:20:25.855035 UTC, 38.020772 seconds,
+and exited **2**. Both part dependencies were current. Both drawing failures
+reproduced with exactly the same requested and returned positions:
+
+| Drawing / datum A | Requested sheet position, m | Returned sheet position, m | Error / limit |
+|---|---|---|---|
+| `pinion_lift_rod`, lift rod axis | `(0.055, 0.22899999999999998)` | `(0.05499999999999966, 0.22897646401719635)` | 23.536 / 20 micrometres |
+| `rack_pinion`, bore axis | `(0.22, 0.20099999999999998)` | `(0.21999999999999942, 0.20083662770023045)` | 163.372 / 100 micrometres |
+
+These errors compare datum-symbol sheet positions after `SetPosition2` and
+`GetPosition` in `_drawing_common.add_datum_feature`. They are not measurements
+of manufacturing geometry. The two drawing scripts, the common drawing helper,
+both part builders, configuration and templates have no diff against main.
+The retry's before/after source hashes, head and adapter remain unchanged.
+This proves reproduction on the candidate using unchanged main drawing code;
+it does not claim that a full main drawing build was run.
+
+Reproduce through the native checkout's own uv environment and the normal
+seat-locked doit tasks, with the licensed SolidWorks session already attached:
+
+```powershell
+$env:HARMONIC_SW_AUTOSTART = '0'
+$env:HARMONIC_REMOTE_CACHE_MODE = 'off'
+uv run python -m doit -n 4 drawing:pinion_lift_rod drawing:rack_pinion
+```
+
+The post-retry no-save close guard refused an unsaved document with empty path,
+title `Draw109 - Sheet1`, and dirty state. It closed nothing. That document is
+left intact because the guard cannot establish ownership from its path. Do not
+restart or close the session indiscriminately. No native build remains active.
+
+Receipts under native checkout
+`cad/out/reports/assembly-granularity-integration/`:
+
+| Receipt | SHA-256 |
+|---|---|
+| `candidate-2d-full.log` | `79183f3588264ae6df306ac73cb81447d6231650dc30db0486d58957f42f3ed0` |
+| `candidate-2d-datum-retry-process.json` | `395b96c33637782495b1eec7506975887bf8231db6b93ba59635a7199469fda6` |
+| `candidate-2d-datum-retry-full.log` | `a7ec86f9a83f2ff9bc7717f940e19c238a494f0352e0c613ddab89853184061f` |
+
+The code checkout retains `candidate-2d-datum-retry-summary.json`, SHA-256
+`78a32ddbe768e59150b419ba0d4931b77dc44c7c9b9c1c4f08c7d891e23e86cf`,
+with exactly two ERROR drawing tasks and the recorded telemetry boundaries.
+The first-failure per-task logs remain separately preserved before retry.
+
+Completion requires a coordinated correction for these unchanged drawing checks,
+then a successful full candidate build, complete same-main geometry/DOF and
+native identity comparison, all required renders/prints, a closed candidate
+snapshot and an exact-head zero-COM full repeat. No tolerance was loosened, token
+restamped, freshness ledger rewritten or output tree deleted. Both PRs remain
+open; the existing clean local CodeRabbit reviews cover the latest code, while
+this subsequent evidence-only update is outside their exact reviewed diffs.
