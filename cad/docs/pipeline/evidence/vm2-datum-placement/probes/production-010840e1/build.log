@@ -1,0 +1,40 @@
+  xx  [   20.0s + 20.0s] drawing.build failed: rack bore finish lost its semantic edge attachment
+  xx  [   20.1s +  0.0s] build draw_rack_pinion failed: rack bore finish lost its semantic edge attachment
+Traceback (most recent call last):
+  File "C:\src\ha-datum-placement-main\cad\scripts\_common.py", line 2128, in run_build
+    artefacts = asyncio.run(_run())
+  File "C:\Users\pedro\AppData\Roaming\uv\python\cpython-3.14-windows-x86_64-none\Lib\asyncio\runners.py", line 204, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "C:\Users\pedro\AppData\Roaming\uv\python\cpython-3.14-windows-x86_64-none\Lib\asyncio\runners.py", line 127, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\pedro\AppData\Roaming\uv\python\cpython-3.14-windows-x86_64-none\Lib\asyncio\base_events.py", line 719, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "C:\src\ha-datum-placement-main\cad\scripts\_common.py", line 2107, in _run
+    return await build(adapter)
+           ^^^^^^^^^^^^^^^^^^^^
+  File "C:\src\ha-datum-placement-main\cad\scripts\draw_rack_pinion.py", line 180, in build
+    raise RuntimeError("rack bore finish lost its semantic edge attachment")
+RuntimeError: rack bore finish lost its semantic edge attachment
+  xx  [   32.0s + 32.0s] task drawing:rack_pinion failed: drawing:rack_pinion failed (exit 1)
+-- part:pinion_lift_rod
+-- part:rack_pinion
+.  drawing:pinion_lift_rod
+.  drawing:rack_pinion
+TaskError - taskid:drawing:rack_pinion
+PythonAction Error
+Traceback (most recent call last):
+  File "C:\src\ha-datum-placement-main\.venv\Lib\site-packages\doit\action.py", line 473, in execute
+    returned_value = self.py_callable(*self.args, **kwargs)
+  File "C:\src\ha-datum-placement-main\dodo.py", line 1489, in _cached_drawing_action
+    _exec_com(cmd, label, log_stem=f"drawing-{stem}")
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\src\ha-datum-placement-main\dodo.py", line 842, in _exec_com
+    _exec(cmd, label, log_stem)
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\src\ha-datum-placement-main\dodo.py", line 603, in _exec
+    raise RuntimeError(f"{label} failed (exit {rc})")
+RuntimeError: drawing:rack_pinion failed (exit 1)
+
