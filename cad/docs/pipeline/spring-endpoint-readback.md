@@ -42,11 +42,80 @@ native body count or identify the responsible helix/sweep argument.
 
 ## Native readback scope
 
-The owned-copy native reader is being prepared. No native readback has run.
-It must preserve named helix definition, sketch-space profile geometry with its
-native model-to-sketch transform, evaluated CoilBody face/edge endpoints, all-solid
-body identities, original/copy hashes, dirty state and no-save cleanup.
+`diagnostics/probe_spring_endpoints.py` reads only a unique-basename bytecopy.
+No native readback has run. The source, execution token, copied bytes, runtime
+HEAD, helper files and actual imported adapter are checked before and after the
+read. It uses the existing attach-only parent/worker and machine-wide seat lock;
+it never opens the original, selects geometry, rebuilds, redraws, saves or exports.
+An unrelated visible borrowed document remains outside its close targets.
+
+The reader captures these independent groups and their elapsed read times:
+
+- Exact named feature inventory: `Helix/Spiral1`, `HelixBaseProfile`, `WireProfile`
+  and `CoilBody`, including native self-identities. Missing, duplicate or wrong-type
+  names fail rather than choosing a similar feature.
+- `IHelixFeatureData` definition properties, with raw direction/taper/angle values.
+- Both circular profiles in sketch space, their full native transform arrays and
+  centers transformed into model space using native math objects.
+- All solid bodies from `IPartDoc.GetBodies2(0, False)`, including hidden bodies.
+  Native body identity must be distinct; body count is observed, not required to
+  equal one. `GetBodyBox` is explicitly approximate and is not used to prove a gap.
+- `CoilBody.GetFaces()` boundary edges: surface kind, plane data where applicable,
+  exact owning-body identity, native curve kind, trim/tag/sense/start/end fields,
+  and circle parameters for circular edges. This is an endpoint witness, not a
+  complete BREP or spline-coefficient comparison.
+
+The read budgets are 256 features, 16 solids, 64 coil faces, 64 edges per face and
+256 face-edge occurrences in total. Raw returned numbers are not rounded,
+reordered or normalized. Unsupported shapes and getter failures remain failures;
+the partial receipt retains preceding values. Each group brackets current/active/
+named document identity and native dirty state. Final hashes, cleanup and runtime
+checks are attempted even after interruption, without replacing the primary error.
+
+## Documented native calls and remaining proof
+
+The bundled official `IFeature.GetTypeName2` table maps `Helix` to
+`IHelixFeatureData`, `ProfileFeature` to `ISketch`, and `Sweep` to
+`ISweepFeatureData`. The *Change Pitch of Helix* example reads the definition
+through `GetDefinition`; the probe copies no setter from it. The *Evaluate Curves
+Defined in Sketch Space* example supplies the read-only math sequence:
+`ModelToSketchTransform.Inverse()` → `GetMathUtility().CreatePoint(center)` →
+`MultiplyTransform(inverse)` → `ArrayData`. The center uses the existing adapter's
+typed double-array marshalling (`VT_ARRAY | VT_R8`). No sketch-edit operations
+are used.
+
+`IEdge.GetCurveParams3` requires `GetCurve` first. `ICurveParamData.Sense=False`
+changes the endpoint interpretation; the receipt keeps that flag and both raw
+points instead of silently swapping them. None of these reads establishes that
+the stored model is connected or that the assumed +X helix phase is correct.
 The documented IHelixFeatureData interface exposes definition properties but no
-endpoint method. Any unsupported endpoint exposure must remain explicitly
-unmeasured, not calculated and labeled native. No angle, lead, tolerance, feature,
-surface or export change is part of this investigation.
+endpoint method, so direct helix endpoints are explicitly unmeasured. No cast to
+`IReferenceCurve` is attempted. No angle, lead, tolerance, feature, surface or export
+change is part of this investigation.
+
+After the active build has ended and the operator confirms exclusive seat
+ownership, run from this clean candidate checkout. The source path names the
+separate protected producer; it is not derived from the diagnostic runtime path.
+Use a newly confirmed running PID, not a historical PID from another receipt:
+
+```powershell
+$confirmedSpringPid = Read-Host 'Confirmed current SOLIDWORKS PID on the exclusive seat'
+$env:HARMONIC_SW_AUTOSTART = '0'
+$env:HARMONIC_DIAGNOSTIC_SW_PID = $confirmedSpringPid
+$env:HARMONIC_REMOTE_CACHE_MODE = 'off'
+$springCandidate = git rev-parse HEAD
+uv run --frozen python cad/scripts/diagnostics/probe_spring_endpoints.py `
+  --source C:/src/ha-foundations-integration/cad/out/sldprt/channel-spring-installed.SLDPRT `
+  --candidate $springCandidate
+```
+
+The command refuses an absent/mismatched source token, dirty runtime, foreign
+adapter import, wrong adapter revision or implicit PID before entering the COM
+parent. It cannot launch SOLIDWORKS. If the seat needs a licensed restart, use the
+existing licensed-launch procedure before this command, not a COM startup path.
+
+Offline tests exercise the actual owned callback with native-shaped doubles,
+including two-body readback, borrowed dirty work, unsupported arrays/types,
+partial getter errors, interruption and cleanup/checkpoint failures. Both new test
+modules and diagnostic scripts are dependencies of the existing `check:recipe`
+gate. These tests do not prove native getter success, model topology, or a repair.

@@ -2210,6 +2210,7 @@ def task_check():
         SCRIPTS_DIR / "test_surface_finish.py",
         SCRIPTS_DIR / "test_surface_finish_ownership_a.py",
         SCRIPTS_DIR / "test_spring_mesh_gap.py",
+        SCRIPTS_DIR / "test_spring_endpoint_probe.py",
         # One offline contract file per manufacturing drawing (test_*_drawing.py),
         # so registering a drawing auto-enrolls its contracts here.
         *sorted(SCRIPTS_DIR.glob("test_*_drawing.py")),
