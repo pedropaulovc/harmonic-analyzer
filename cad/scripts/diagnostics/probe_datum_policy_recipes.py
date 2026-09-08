@@ -1328,7 +1328,11 @@ def main(argv=None):
     parser.add_argument(
         "--layout-observation", type=slotted_layout.LayoutObservation,
         choices=tuple(slotted_layout.LayoutObservation),
-        help="slotted-only border/full-page print witness; requires explicit native source enrollment",
+        help=(
+            "slotted-only border/full-page print witness; capture_only collects "
+            "enrollment evidence without acceptance; baseline/candidate require "
+            "reviewed native enrollment"
+        ),
     )
     parser.add_argument(
         "--factory",

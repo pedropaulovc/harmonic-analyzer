@@ -3,7 +3,9 @@
 from copy import deepcopy
 import asyncio
 import json
+import os
 from pathlib import Path
+import subprocess
 from types import SimpleNamespace as NS
 from unittest.mock import Mock
 
@@ -570,6 +572,7 @@ def test_incomplete_or_mixed_enrollment_contract_fails_before_environment(
     [
         "none",
         "crlf_notes",
+        "linked_reports",
         "wrong_hash",
         "wrong_producer",
         "initial_dirty",
@@ -645,8 +648,12 @@ async def test_actual_capture_callback_preserves_source_scope_and_nonacceptance(
         source if Path(path) == owned["source"] else None
     )
     adapter.ownership.directories = set()
-    adapter.ownership.register_directory = adapter.ownership.directories.add
-    adapter.ownership.assert_current_owned = lambda: NS(paths={owned["native"]})
+    adapter.ownership.register_directory = lambda path: (
+        adapter.ownership.directories.add(Path(path).resolve())
+    )
+    adapter.ownership.assert_current_owned = lambda: NS(
+        paths={owned["native"].resolve()} if owned["native"] is not None else set()
+    )
     from contextlib import contextmanager
 
     @contextmanager
@@ -671,7 +678,11 @@ async def test_actual_capture_callback_preserves_source_scope_and_nonacceptance(
 
     async def draw(outputs, actual_source):
         events.append("recipe")
-        assert actual_source == owned["source"]
+        if failure == "linked_reports":
+            # The real AST loader canonicalizes SOURCE, not the native open input.
+            assert actual_source == owned["source"].resolve()
+        else:
+            assert actual_source == owned["source"]
         if failure in ("recipe_dirty", "build_dirty"):
             source.GetSaveFlag = lambda: True
         if failure in ("build", "build_dirty"):
@@ -742,6 +753,20 @@ async def test_actual_capture_callback_preserves_source_scope_and_nonacceptance(
             return []
 
     reports = tmp_path / "reports"
+    if failure == "linked_reports":
+        destination = tmp_path / "actual-reports"
+        destination.mkdir()
+        if os.name == "nt":
+            # Directory junctions need no Windows symlink privilege.
+            subprocess.run(
+                ["cmd", "/c", "mklink", "/J", str(reports), str(destination)],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        else:
+            reports.symlink_to(destination, target_is_directory=True)
+        assert reports.resolve() == destination and reports != destination
 
     def operation():
         return pilot.pilot(
@@ -755,7 +780,7 @@ async def test_actual_capture_callback_preserves_source_scope_and_nonacceptance(
             layout_observation=witness.LayoutObservation.CAPTURE_ONLY,
         )
 
-    if failure in ("none", "crlf_notes"):
+    if failure in ("none", "crlf_notes", "linked_reports"):
         result = await operation()
         assert result["acceptance"] == "not_accepted"
     else:
@@ -776,7 +801,9 @@ async def test_actual_capture_callback_preserves_source_scope_and_nonacceptance(
     report = json.loads(receipt.read_text(encoding="utf-8"))
     assert report["acceptance"] == "not_accepted"
     assert report["status"] == (
-        "capture_only" if failure in ("none", "crlf_notes") else "failed"
+        "capture_only"
+        if failure in ("none", "crlf_notes", "linked_reports")
+        else "failed"
     )
     if failure == "crlf_notes":
         # Native 06no8kxz vs producer _seyh1jg: 17 exact lines, 16 inserted CRs.
@@ -784,6 +811,9 @@ async def test_actual_capture_callback_preserves_source_scope_and_nonacceptance(
         assert len(raw) == 970 and raw.count("\r\n") == 16
         assert len(witness.spec.DRAWING_NOTES) == 954
         assert raw == witness.spec.DRAWING_NOTES.replace("\n", "\r\n")
+    if failure == "linked_reports":
+        assert reports in Path(report["copy_source"]).parents
+        assert Path(report["copy_source"]).resolve() != Path(report["copy_source"])
     assert "reopened" not in report and "comparison" not in report
     assert all(path.read_bytes() == expected for path, expected in originals.items())
     assert len(report["sources_after"]) == 7
@@ -795,6 +825,7 @@ async def test_actual_capture_callback_preserves_source_scope_and_nonacceptance(
         "cleanup",
         "none",
         "crlf_notes",
+        "linked_reports",
     ):
         assert report["annotations"] == {"raw": "retained slots"}
         assert len(scopes) == 1

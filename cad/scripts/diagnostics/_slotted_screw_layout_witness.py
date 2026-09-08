@@ -223,7 +223,7 @@ def _owned_context(adapter, source, native):
     if (
         part is None
         or part.GetType() != 1
-        or Path(part.GetPathName()).resolve() != source
+        or Path(part.GetPathName()).resolve() != Path(source).resolve()
     ):
         raise RuntimeError("slotted capture requires the exact open copied PART")
     return model, part
@@ -650,7 +650,7 @@ async def capture_only(
         source_model = _early_bound(adapter.currentModel, "IModelDoc2")
         if (
             source_model.GetType() != 1
-            or Path(source_model.GetPathName()).resolve() != copy_source
+            or Path(source_model.GetPathName()).resolve() != copy_source.resolve()
         ):
             raise RuntimeError("slotted capture opened the wrong copied source")
         _same(
