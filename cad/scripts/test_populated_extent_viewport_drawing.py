@@ -685,6 +685,7 @@ def test_actual_geometry_reader_and_super_observer_cross_json_boundary_without_h
 
     notes, _, _ = populated()
     notes["title"]["text"] = "tube-frame"
+    notes["material"]["horizontal"] = 1
     notes["material"]["vertical"] = 1
     for name in ("title", "dwg", "rev"):
         notes[name]["horizontal"] = 1
