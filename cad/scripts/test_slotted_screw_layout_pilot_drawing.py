@@ -768,8 +768,23 @@ async def test_actual_capture_callback_preserves_source_scope_and_nonacceptance(
         return {"raw": "retained slots"}, {"handle": parameter}
 
     monkeypatch.setattr(pilot.shoulder, "all_annotation_layout", annotation_snapshot)
+
+    def background_snapshot(actual_adapter, annotations, handles, directory, setup):
+        assert actual_adapter is adapter and annotations == {"raw": "retained slots"}
+        assert handles == {"handle": parameter} and directory.parent == reports
+        assert isinstance(setup, Setup)
+        events.append("background_snapshot")
+        return {"annotations": {}}
+
+    monkeypatch.setattr(witness, "capture_sheet_background", background_snapshot)
     monkeypatch.setattr(
-        witness, "capture_roles", lambda *_: {"observed": "not an acceptance manifest"}
+        witness,
+        "capture_roles",
+        lambda *_, background: (
+            {"observed": "not an acceptance manifest"}
+            if background == {"annotations": {}}
+            else pytest.fail("missing background")
+        ),
     )
 
     class Setup:
@@ -883,6 +898,7 @@ async def test_actual_capture_callback_preserves_source_scope_and_nonacceptance(
         assert report["annotations"] == {"raw": "retained slots"}
         assert len(scopes) == 1
         assert report["recipe_seconds"] >= 0
+        assert events.count("background_snapshot") == 1
     if failure == "raw_capture":
         assert report["capture_final"]["source_dirty"] is True
         assert report["final_guard_errors"] and primary.__notes__
@@ -895,6 +911,149 @@ async def test_actual_capture_callback_preserves_source_scope_and_nonacceptance(
         assert report["sources_after"][report["copy_source"]] == digest
     if failure == "build_dirty":
         assert any("source dirty" in note for note in primary.__notes__)
+
+
+@pytest.fixture
+def sheet_background(tmp_path, monkeypatch):
+    retained = json.loads(
+        (Path(__file__).parent / "fixtures/slotted_hidden_sheet_finish.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    path = tmp_path / "cache" / "entry" / "receipt.json"
+    path.parent.mkdir(parents=True)
+    prepared = {
+        "status": "passed",
+        "before": {"sheet_surface_finishes": [retained["prepared_hidden_sf"]]},
+        "after": {"sheet_surface_finishes": [deepcopy(retained["prepared_hidden_sf"])]},
+    }
+    path.write_text(json.dumps(prepared), encoding="utf-8")
+    digest = witness.attachments.file_digest(path)
+    controller = NS(
+        inputs={str(path): digest},
+        row={
+            "variant": "prepared",
+            "accessors": [
+                {
+                    "kind": kind,
+                    "status": "passed",
+                    "path": str(path.with_name("prepared.DRWDOT")),
+                    "artifacts": {str(path): digest},
+                }
+                for kind in ("miss", "hit")
+            ],
+        },
+    )
+    sheet = object()
+    adapter = NS(
+        currentModel=NS(GetCurrentSheet=lambda: sheet),
+        swApp=NS(IsSame=lambda a, b: int(a is b)),
+    )
+    key = retained["annotation_key"]
+    monkeypatch.setattr(witness, "_early_bound", lambda value, _: value)
+    return NS(
+        raw={key: retained["annotation"]},
+        handles={key: (NS(Owner=sheet),)},
+        directory=tmp_path,
+        controller=controller,
+        adapter=adapter,
+        key=key,
+        path=path,
+        prepared=prepared,
+    )
+
+
+@pytest.mark.parametrize(
+    "damage",
+    [
+        "none",
+        "line",
+        "position",
+        "text",
+        "visible",
+        "attached",
+        "null_slot",
+        "dangling",
+        "owner",
+        "owner_type",
+        "owner_null",
+        "duplicate",
+        "missing",
+        "missing_guard",
+        "receipt_hash",
+        "prepared_changed",
+        "prepared_duplicate",
+        "wrong_kind",
+        "bool_kind",
+        "bool_coordinate",
+        "incomplete_accessors",
+    ],
+)
+def test_retained_hidden_sheet_background_is_exact_and_capture_only(
+    sheet_background, damage
+):
+    c = sheet_background
+    row = c.raw[c.key]
+    if damage == "line":
+        row["generic"]["lines"][0][7] += 1e-12
+    if damage == "position":
+        row["position"][0] = 1e-12
+    if damage == "text":
+        row["generic"]["texts"] = [{"value": "unexpected"}]
+    if damage == "visible":
+        row["semantic"]["visible"] = 1
+    if damage == "attached":
+        row["semantic"]["attachment_types"] = [2]
+    if damage == "null_slot":
+        row["semantic"]["null_attachments"] = [True]
+    if damage == "dangling":
+        row["semantic"]["dangling"] = True
+    if damage == "owner":
+        c.handles[c.key][0].Owner = object()
+    if damage == "owner_type":
+        row["semantic"]["owner_type"] = 0
+    if damage == "owner_null":
+        row["semantic"]["owner_null"] = True
+    if damage == "duplicate":
+        c.raw["duplicate"] = deepcopy(row)
+    if damage == "missing":
+        c.raw.clear()
+    if damage == "missing_guard":
+        c.controller.inputs.clear()
+    if damage == "receipt_hash":
+        c.path.write_text("changed", encoding="utf-8")
+    if damage in ("prepared_changed", "prepared_duplicate"):
+        rows = c.prepared["after"]["sheet_surface_finishes"]
+        if damage == "prepared_changed":
+            rows[0]["position"][0] = 1e-12
+        else:
+            rows.append(deepcopy(rows[0]))
+        c.path.write_text(json.dumps(c.prepared), encoding="utf-8")
+        digest = witness.attachments.file_digest(c.path)
+        c.controller.inputs[str(c.path)] = digest
+        for accessor in c.controller.row["accessors"]:
+            accessor["artifacts"][str(c.path)] = digest
+    if damage == "wrong_kind":
+        row["semantic"]["kind"] = 99
+    if damage == "bool_kind":
+        row["semantic"]["owner_type"] = True
+    if damage == "bool_coordinate":
+        row["position"][0] = False
+    if damage == "incomplete_accessors":
+        c.controller.row["accessors"].pop()
+    if damage != "none":
+        with pytest.raises(RuntimeError, match="slotted|hidden sheet SF"):
+            witness.capture_sheet_background(
+                c.adapter, c.raw, c.handles, c.directory, c.controller
+            )
+        return
+    observed = witness.capture_sheet_background(
+        c.adapter, c.raw, c.handles, c.directory, c.controller
+    )
+    assert observed["annotations"] == c.raw
+    assert observed["annotations"][c.key] is not row
+    assert observed["scope"].startswith("capture_only")
+    assert observed["sha256"] == c.controller.inputs[str(c.path)]
 
 
 @pytest.mark.asyncio
@@ -978,10 +1137,14 @@ async def test_capture_rejects_every_nondefault_environment_factor_before_native
         "wrong_view",
         "missing",
         "extra",
+        "retained_hidden",
+        "retained_hidden_changed",
+        "retained_unknown",
+        "retained_unknown_template",
     ],
 )
 def test_raw_role_capture_reuses_slots_and_proves_live_native_identity(
-    monkeypatch, damage
+    monkeypatch, damage, sheet_background
 ):
     parameters, raw, handles, views = {}, {}, {}, {}
     part = NS(Parameter=lambda role: parameters[role])
@@ -1034,13 +1197,45 @@ def test_raw_role_capture_reuses_slots_and_proves_live_native_identity(
     if damage == "extra":
         raw["extra"] = deepcopy(raw[key])
         handles["extra"] = handles[key]
-    if damage != "none":
+    if damage.startswith("retained_"):
+        raw.update(sheet_background.raw)
+        handles.update(sheet_background.handles)
+        adapter.currentModel = sheet_background.adapter.currentModel
+    if damage.startswith("retained_unknown"):
+        raw["unknown"] = {
+            "semantic": {
+                "kind": 99,
+                "owner_type": 2 if damage == "retained_unknown_template" else 1,
+            }
+        }
+    if damage != "none" and not damage.startswith("retained_"):
         with pytest.raises(
             RuntimeError, match="identity|inventory|native view|missing"
         ):
             witness.capture_roles(adapter, raw, handles, part, source_handles)
         return
-    observed = witness.capture_roles(adapter, raw, handles, part, source_handles)
+    background = None
+    if damage.startswith("retained_"):
+        background = witness.capture_sheet_background(
+            adapter,
+            raw,
+            handles,
+            sheet_background.directory,
+            sheet_background.controller,
+        )
+    if damage.startswith("retained_unknown") or damage == "retained_hidden_changed":
+        if damage == "retained_hidden_changed":
+            raw[sheet_background.key]["position"][0] = 1e-12
+        with pytest.raises(
+            RuntimeError, match="unexpected annotation|background changed"
+        ):
+            witness.capture_roles(
+                adapter, raw, handles, part, source_handles, background=background
+            )
+        return
+    observed = witness.capture_roles(
+        adapter, raw, handles, part, source_handles, background=background
+    )
     assert observed.keys() == witness.DIMENSION_VIEWS.keys()
     assert all(
         row["attachment_types"] == (99,) and row["display_type"] == 97

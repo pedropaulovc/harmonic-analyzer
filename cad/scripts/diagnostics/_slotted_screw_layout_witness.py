@@ -505,14 +505,128 @@ def compare_cold(mode, record):
     record["comparison"] = "exact_print_and_declared_border_passed"
 
 
-def capture_roles(adapter, annotations, handles, part, source_handles):
+def _exact_json(value):
+    return json.dumps(value, sort_keys=True, allow_nan=False)
+
+
+def capture_sheet_background(adapter, annotations, handles, directory, controller):
+    """Classify the one retained hidden sheet SF for capture only, not acceptance."""
+    accessors = controller.row["accessors"]
+    if (
+        controller.row["variant"] != "prepared"
+        or [row["kind"] for row in accessors] != ["miss", "hit"]
+        or any(row["status"] != "passed" for row in accessors)
+    ):
+        raise RuntimeError("slotted background needs passed prepared miss/hit evidence")
+    paths = {Path(row["path"]).resolve().with_name("receipt.json") for row in accessors}
+    if len(paths) != 1:
+        raise RuntimeError("slotted background preparation receipt is ambiguous")
+    (path,) = paths
+    if not path.is_relative_to(Path(directory).resolve() / "cache"):
+        raise RuntimeError("slotted background receipt escaped the owned cache")
+    expected_sha = controller.inputs.get(str(path))
+    if expected_sha is None or any(
+        row["artifacts"].get(str(path)) != expected_sha for row in accessors
+    ):
+        raise RuntimeError("slotted background receipt lacks its exact input guard")
+    payload = path.read_bytes()
+    if hashlib.sha256(payload).hexdigest() != expected_sha:
+        raise RuntimeError("slotted background preparation receipt changed")
+    prepared = json.loads(payload)
+    hidden = [
+        [
+            row
+            for row in prepared[phase]["sheet_surface_finishes"]
+            if row["visible"] == 3
+        ]
+        for phase in ("before", "after")
+    ]
+    if (
+        prepared["status"] != "passed"
+        or any(len(rows) != 1 for rows in hidden)
+        or _exact_json(hidden[0]) != _exact_json(hidden[1])
+    ):
+        raise RuntimeError(
+            "slotted hidden template SF evidence is incomplete or changed"
+        )
+    expected = hidden[0][0]
+    display = expected["native_display"]
+    if (
+        expected["kind"] != 7
+        or expected["attached"] is not False
+        or expected["extra_leader"] is not False
+        or expected["text_count"] != 0
+        or any(value != "" for value in expected["text_fields"].values())
+        or display["leaders"] != []
+        or display["texts"] != []
+        or any(value for kind, value in display["counts"].items() if kind != "Line")
+        or display["counts"]["Line"] != len(display["primitives"]["Line"])
+    ):
+        raise RuntimeError("slotted hidden template SF has unexpected content")
+    projection = {
+        "position": expected["position"],
+        "lines": display["primitives"]["Line"],
+        "arcs": display["primitives"]["Arc"],
+        "texts": display["texts"],
+        "leaders": display["leaders"],
+    }
+    matched = {}
+    for key, row in annotations.items():
+        semantic = row["semantic"]
+        if semantic["kind"] != 7 or semantic["owner_type"] != 1:
+            continue
+        expected_semantic = {
+            "kind": 7,
+            "owner_type": 1,
+            "owner_null": False,
+            "visible": 3,
+            "dangling": False,
+            "attachment_types": [],
+            "null_attachments": [],
+            "texts": [],
+        }
+        actual = {
+            "position": row["position"],
+            **row["generic"],
+            "leaders": row["native"]["leaders"],
+        }
+        if _exact_json(semantic) != _exact_json(expected_semantic) or _exact_json(
+            actual
+        ) != _exact_json(projection):
+            raise RuntimeError(f"{key}: hidden sheet SF differs from prepared evidence")
+        matched[key] = json.loads(_exact_json(row))
+    if len(matched) != 1:
+        raise RuntimeError("slotted hidden sheet SF is missing or duplicated")
+    sheet = _early_bound(adapter.currentModel, "IDrawingDoc").GetCurrentSheet()
+    for key in matched:
+        _same(adapter.swApp, handles[key][0].Owner, sheet, "hidden SF sheet owner")
+    return {
+        "scope": "capture_only background projection; not cross-document native identity or acceptance",
+        "prepared_receipt": str(path),
+        "sha256": expected_sha,
+        "projection": projection,
+        "annotations": matched,
+    }
+
+
+def capture_roles(
+    adapter, annotations, handles, part, source_handles, *, background=None
+):
     """Read fresh parameter/view identity and the already captured raw slots."""
     roles = {}
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     views = attachments.views(model)
     for key, row in annotations.items():
         semantic = row["semantic"]
-        if semantic["owner_type"] == 2 or semantic["kind"] == 6:
+        if background is not None and key in background["annotations"]:
+            if _exact_json(row) != _exact_json(background["annotations"][key]):
+                raise RuntimeError(
+                    "slotted classified background changed before role capture"
+                )
+            continue
+        if semantic["kind"] == 6 or (
+            semantic["owner_type"] == 2 and semantic["kind"] == 7
+        ):
             continue
         if semantic["kind"] != 4:
             raise RuntimeError("slotted capture found an unexpected annotation role")
@@ -729,8 +843,17 @@ async def capture_only(
         report["capture_before"] = _state(model, part)
         report["annotations"], handles = pilot.shoulder.all_annotation_layout(adapter)
         checkpoint()  # Keep raw slots even if a later role/identity check rejects.
+        report["sheet_background"] = capture_sheet_background(
+            adapter, report["annotations"], handles, directory, setup_controller
+        )
+        checkpoint()
         report["roles"] = capture_roles(
-            adapter, report["annotations"], handles, part, source_handles
+            adapter,
+            report["annotations"],
+            handles,
+            part,
+            source_handles,
+            background=report["sheet_background"],
         )
         report["source_after"], after_handles = source_reads.dimension_snapshot(
             adapter.swApp,

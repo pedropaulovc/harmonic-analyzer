@@ -1,0 +1,292 @@
+{
+  "capture_sha256": "49ea2049b7b9db54ad8a19c7ccd33b48c2119e1f38f514660a683f533e4f3817",
+  "prepared_receipt_sha256": "cee1c2b0d50f5a9d7dd873d9293ebff5ae214c951358da5c1ed6338787e884b7",
+  "annotation_key": "Sheet1/DetailItem324",
+  "annotation": {
+    "semantic": {
+      "kind": 7,
+      "owner_type": 1,
+      "owner_null": false,
+      "visible": 3,
+      "dangling": false,
+      "attachment_types": [],
+      "null_attachments": [],
+      "texts": []
+    },
+    "generic": {
+      "lines": [
+        [
+          0,
+          0,
+          0,
+          -1,
+          0,
+          0,
+          0,
+          -0.0054991,
+          0.009524999999999999,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          -1,
+          0,
+          0,
+          0,
+          0.01070229,
+          0.01814195,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          -1,
+          0.0038874699999999996,
+          0.014253845,
+          0,
+          -0.0038874699999999996,
+          0.014253845,
+          0
+        ]
+      ],
+      "arcs": [],
+      "texts": []
+    },
+    "position": [
+      0,
+      0,
+      0
+    ],
+    "native": {
+      "name": "DetailItem324",
+      "kind": 7,
+      "anchor": [
+        0,
+        0
+      ],
+      "text_runs": [],
+      "lines": [
+        {
+          "start": [
+            0,
+            0
+          ],
+          "end": [
+            -0.0054991,
+            0.009524999999999999
+          ],
+          "width_m": 0
+        },
+        {
+          "start": [
+            0,
+            0
+          ],
+          "end": [
+            0.01070229,
+            0.01814195
+          ],
+          "width_m": 0
+        },
+        {
+          "start": [
+            0.0038874699999999996,
+            0.014253845
+          ],
+          "end": [
+            -0.0038874699999999996,
+            0.014253845
+          ],
+          "width_m": 0
+        }
+      ],
+      "leaders": [],
+      "primitive_boxes": [],
+      "note_extent": null,
+      "format_signature": [],
+      "leader_boxes": []
+    },
+    "measurement": {
+      "name": "DetailItem324",
+      "kind": 7,
+      "anchor": [
+        0,
+        0
+      ],
+      "body": {
+        "xmin": -0.0054991,
+        "ymin": 0,
+        "xmax": 0.01070229,
+        "ymax": 0.01814195
+      },
+      "envelope": {
+        "xmin": -0.0054991,
+        "ymin": 0,
+        "xmax": 0.01070229,
+        "ymax": 0.01814195
+      },
+      "text_boxes": [],
+      "text_runs": [],
+      "leader_segments": [],
+      "format_signature": [],
+      "native_strokes": [
+        {
+          "start": [
+            0,
+            0
+          ],
+          "end": [
+            -0.0054991,
+            0.009524999999999999
+          ],
+          "width_m": 0
+        },
+        {
+          "start": [
+            0,
+            0
+          ],
+          "end": [
+            0.01070229,
+            0.01814195
+          ],
+          "width_m": 0
+        },
+        {
+          "start": [
+            0.0038874699999999996,
+            0.014253845
+          ],
+          "end": [
+            -0.0038874699999999996,
+            0.014253845
+          ],
+          "width_m": 0
+        }
+      ],
+      "leader_decorations": [],
+      "native_leader_segments": []
+    }
+  },
+  "prepared_hidden_sf": {
+    "all_around": false,
+    "angle": 0,
+    "attached": false,
+    "direction_of_lay": 0,
+    "extra_leader": false,
+    "format": {
+      "backwards": false,
+      "bold": false,
+      "character_spacing_factor": 1,
+      "escapement_rad": 0,
+      "font": "Century Gothic",
+      "height_in_points": false,
+      "height_m": 0.00635,
+      "height_points": 24,
+      "italic": false,
+      "line_length_m": 0,
+      "line_spacing": 0.001,
+      "oblique_angle": 0,
+      "strikeout": false,
+      "underline": false,
+      "upside_down": false,
+      "use_document_format": true,
+      "vertical": false,
+      "width_factor": 1
+    },
+    "gost_default_symbol": false,
+    "gost_notation": false,
+    "kind": 7,
+    "native_display": {
+      "counts": {
+        "Arc": 0,
+        "ArrowHead": 0,
+        "Ellipse": 0,
+        "Line": 3,
+        "Parabola": 0,
+        "Point": 0,
+        "PolyLine": 0,
+        "Polygon": 0,
+        "Text": 0,
+        "Triangle": 0
+      },
+      "leader_count": 0,
+      "leader_style": 0,
+      "leaders": [],
+      "multi_jog_leader_count": 0,
+      "primitives": {
+        "Arc": [],
+        "ArrowHead": [],
+        "Line": [
+          [
+            0,
+            0,
+            0,
+            -1,
+            0,
+            0,
+            0,
+            -0.0054991,
+            0.009524999999999999,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            -1,
+            0,
+            0,
+            0,
+            0.01070229,
+            0.01814195,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            -1,
+            0.0038874699999999996,
+            0.014253845,
+            0,
+            -0.0038874699999999996,
+            0.014253845,
+            0
+          ]
+        ],
+        "PolyLine": [],
+        "Polygon": [],
+        "Triangle": []
+      },
+      "texts": []
+    },
+    "orientation": 1,
+    "position": [
+      0,
+      0,
+      0
+    ],
+    "profile_angle": 0.78539816339745,
+    "profile_direction": 0,
+    "symbol": 0,
+    "text_count": 0,
+    "text_fields": {
+      "material_removal_allowance": "",
+      "maximum_roughness": "",
+      "minimum_roughness": "",
+      "other_roughness_value": "",
+      "production_method": "",
+      "roughness_spacing": "",
+      "roughness_value_1": "",
+      "roughness_value_2": "",
+      "roughness_value_3": "",
+      "sampling_length": ""
+    },
+    "visible": 3
+  }
+}
+

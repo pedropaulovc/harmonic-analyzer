@@ -147,3 +147,34 @@ an additional cleanup failure. The checkpoint failure is now retained separately
 and attached to the original exception. A checkpoint-only failure still fails the
 capture. All 281 focused/adjacent tests pass (`run-at1bbxns`); this correction
 changes neither native operations nor acceptance predicates.
+
+## Native recipe saved; capture stopped on hidden sheet background
+
+The `119ebdd7` recipe completed in 15.527312599937432 seconds and saved its
+owned drawing/PDF/PNG. The capture then failed before parameter/view roundtrips
+on hidden sheet surface-finish symbol `Sheet1/DetailItem324`. Receipt
+`slotted-attachment-capture-uwahsqs8/capture.json` has SHA
+`49ea2049b7b9db54ad8a19c7ccd33b48c2119e1f38f514660a683f533e4f3817`.
+Source/copy hashes and native dirty flags remain unchanged; final guard errors
+are empty. This is neither complete capture nor cold acceptance.
+
+The prepared receipt, SHA
+`cee1c2b0d50f5a9d7dd873d9293ebff5ae214c951358da5c1ed6338787e884b7`,
+contains exactly one hidden surface-finish row, unchanged before/after. Its
+position `[0,0,0]`, three raw lines, and empty arc/text/leader banks match the
+captured symbol exactly. Owner type 1 denotes DrawingSheet; visibility 3 means
+hidden. The complete drawing bank has three visible view dimensions, two view
+notes, 43 template notes, one visible template finish and this hidden sheet finish.
+
+The capture-only classifier reads that hash-guarded preparation evidence and
+requires one exact matching hidden sheet finish with no attachments or dangling
+state, plus native identity with the current sheet owner. It retains the raw row
+as a background observation. Missing, duplicated, changed and unknown rows fail.
+This comparison is not native identity across documents, nor approval of hidden
+background in the accepting layout/print contract. It adds no full annotation scan.
+
+The raw dimension tuples are HeadHt `[]/[]`, ShankLg `[]/[]`, and HeadDia
+`[10]/[false]` (attachment types/null slots). They are observations only: none of
+the required parameter/view roundtrips ran, so the accepting 18th target remains
+unenrolled. The retained hidden-row fixture reproduced the capture failure before
+the classifier (`run-ys870xon`); exact source/view/parameter checks still follow it.
