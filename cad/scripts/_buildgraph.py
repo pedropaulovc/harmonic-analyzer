@@ -422,6 +422,55 @@ class _AssemblySources:
             found.add(value)
         return found
 
+    def validate_mapping_owner_bindings(
+        self, node: ast.AST, owner: ast.Name, prepared_rows: set[ast.AST]
+    ) -> None:
+        """Reject bindings outside direct assignments or proven row preparation.
+
+        A prior literal initializer must not hide a loop/unpacked/opaque binding
+        that changes which mapping a keyed source read actually consumes.
+        """
+        prepared_loops = {
+            loop
+            for value in prepared_rows
+            for loop in self.scope_nodes(node)
+            if isinstance(loop, ast.For)
+            and isinstance(loop.target, ast.Name) and loop.target.id == owner.id
+            and isinstance(loop.iter, ast.Name) and loop.iter.id == value.value.id
+            and self.availability_before(loop, value) is _SourceAvailability.AVAILABLE
+        }
+        for item in self.scope_nodes(node):
+            if self.availability_before(item, node) is _SourceAvailability.FUTURE:
+                continue
+            if (
+                isinstance(item, ast.Name)
+                and item.id == owner.id
+                and isinstance(item.ctx, (ast.Store, ast.Del))
+            ):
+                parent = self.parents[item]
+                if parent in prepared_loops:
+                    continue
+                if isinstance(parent, (ast.Assign, ast.AnnAssign, ast.NamedExpr)):
+                    # Only direct name targets are interpreted above. A nested
+                    # unpacking target has a Tuple/List/Starred parent instead.
+                    continue
+                self.fail(parent)
+            if isinstance(item, ast.arg) and item.arg == owner.id:
+                self.fail(item)
+            if isinstance(item, ast.alias):
+                bound = item.asname or item.name.split(".")[0]
+                if bound == owner.id or item.name == "*":
+                    self.fail(item)
+            if isinstance(
+                item,
+                (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef,
+                 ast.ExceptHandler, ast.MatchAs, ast.MatchStar),
+            ):
+                if item.name == owner.id:
+                    self.fail(item)
+            if isinstance(item, ast.MatchMapping) and item.rest == owner.id:
+                self.fail(item)
+
     def field_writes(
         self, node: ast.AST, owner: ast.AST, key: ast.AST | None
     ) -> list[ast.AST]:
@@ -436,6 +485,10 @@ class _AssemblySources:
             else self.direct_mapping_bindings(node, owner)
         )
         prepared_rows = self.prepared_row_selections(node, owner) if key is not None else set()
+        if key is not None:
+            # The get/items path already uses full bindings(), including literal
+            # loop owners. This guard closes the newer direct-mapping path only.
+            self.validate_mapping_owner_bindings(node, owner, prepared_rows)
         for initial in initial_values:
             if initial in prepared_rows:
                 continue

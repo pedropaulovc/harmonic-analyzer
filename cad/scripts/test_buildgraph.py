@@ -566,6 +566,42 @@ def test_keyed_source_parameter_shadowing_cannot_reuse_module_initializer(
         _source_references(tmp_path, monkeypatch, source)
 
 
+def test_mapping_get_keeps_existing_literal_loop_owner_enumeration(tmp_path, monkeypatch):
+    source = (
+        "for specs in ({'main': 'rocker-arm'},):\n"
+        "    await place_component(adapter, specs.get('main'), p, r, q)\n"
+    )
+    assert _source_references(tmp_path, monkeypatch, source) == {"rocker_arm"}
+
+
+def test_keyed_source_later_loop_owner_binding_can_reach_next_iteration(tmp_path, monkeypatch):
+    source = (
+        "async def build(adapter):\n"
+        "    specs = {'main': 'rocker-arm'}\n"
+        "    for index in (0, 1):\n"
+        "        await place_component(adapter, specs['main'], p, r, q)\n"
+        "        for specs in ({'main': 'rocker-arm-support'},):\n"
+        "            pass\n"
+    )
+    with pytest.raises(ValueError, match="[Uu]nresolved assembly source"):
+        _source_references(tmp_path, monkeypatch, source, ("rocker_arm", "rocker_arm_support"))
+
+
+def test_prepared_mapping_owner_cannot_be_rebound_by_another_loop(tmp_path, monkeypatch):
+    source = (
+        "async def build(adapter):\n"
+        "    rows = make_rows()\n"
+        "    for spec in rows:\n"
+        "        spec['part'] = 'rocker-arm'\n"
+        "    spec = rows[index]\n"
+        "    for spec in ({'part': 'rocker-arm-support'},):\n"
+        "        pass\n"
+        "    await place_component(adapter, spec['part'], p, r, q)\n"
+    )
+    with pytest.raises(ValueError, match="[Uu]nresolved assembly source"):
+        _source_references(tmp_path, monkeypatch, source, ("rocker_arm", "rocker_arm_support"))
+
+
 @pytest.mark.parametrize(
     "mutation",
     [
