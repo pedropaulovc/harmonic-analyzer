@@ -256,7 +256,7 @@ def main():
                 patches.enter_context(patch.object(adapter, "open_model", observed_open))
                 patches.enter_context(patch.object(adapter, "_attempt", observed_attempt))
                 patches.enter_context(patch.object(recipe, "new_project_drawing", observed_new))
-                patches.enter_context(patch.object(recipe, "add_datum_feature", boundary))
+                patches.enter_context(patch.object(recipe, "add_native_axis_datum", boundary))
                 for owner, name in (
                     (recipe, "place_view"), (recipe, "set_hidden_lines_removed"),
                     (recipe, "auto_center_marks"), (common, "insert_marked_dimensions"),

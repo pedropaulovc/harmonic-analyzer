@@ -37,5 +37,8 @@ SHA-256 witnesses:
 - Raw JUnit report at `cad/out/reports/datum-placement/native-helper-fail-first.xml`:
   `0653459ee0207e170a344c0bb6dcefcf72991b4b755fcfcf1f49cc5e10c20423`
 
-The complete individual failure messages are retained in the raw JUnit report;
-the report itself is still local and must be published with correction evidence.
+The complete individual failures are published in
+[the original JUnit report](probes/native-helper-fail-first.xml). The exact
+[test source](probes/native-helper-regressions.py.txt) is also retained without
+enrolling the unimplemented native mode in the production test suite. Copy it to
+the command's named test path to reproduce this baseline red run.

@@ -12,7 +12,6 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
     add_feature_control_frame,
     add_property_linked_note,
     add_surface_finish,
@@ -25,6 +24,8 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _gear_drawing_entities import visible_circle_edge
+from _native_axis_datum import add_native_axis_datum
 from _surface_finish import surface_finish_by_key
 from pinion_lift_rod_spec import CAP_SAG, ROD_DIA, ROD_LEN, SURFACE_FINISHES
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -143,34 +144,21 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to rod end view")
 
-    # Pick the end circle at 12 o'clock, because the symbol goes straight ABOVE
-    # it. Picked at 3 o'clock (the +r,0 point) with the symbol at 12, the tag
-    # fought SetPosition2's along-the-edge rule -- on a CIRCLE the permitted set
-    # IS the circumference, so the symbol collapsed to the nearest circle point
-    # and its Y went inert: the requested 17.6 mm standoff rendered as ~1 mm,
-    # too little for the ~3 mm attachment triangle, which then overlapped the
-    # box and struck through the "A". Picking the clock position the symbol
-    # actually sits at lets the leader run radially out to it -- the same
-    # spelling draw_pivot_shaft.py / draw_pivot_bushing.py use. No gate sees
-    # this: a datum symbol exposes no GetExtent, so only the render shows it.
-    end_top = (
-        FRONT_CENTER[0],
-        FRONT_CENTER[1] + ROD_DIA * END_VIEW_SCALE / 2000.0,
-    )
+    # The circular boundary controls the adjacent cylindrical bearing axis.
+    # SolidWorks chooses the datum position; 20 um bounds rebuild stability.
+    rod_edge = visible_circle_edge(adapter, front, ROD_DIA)
     # In the *Right view the part's +Z (crowned back end) points screen-left,
     # so the flat front end (z=0) is the RIGHT silhouette edge.
     flat_end = (RIGHT_CENTER[0] + HALF_SPAN, RIGHT_CENTER[1])
-    add_datum_feature(
+    add_native_axis_datum(
         adapter,
         front,
-        edge_xy=end_top,
-        symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.024),
+        entity=rod_edge,
+        source_path=SOURCE,
+        radius_m=ROD_DIA / 2000.0,
         datum="A",
         label="lift rod axis",
-        # SolidWorks normalizes this circular-edge datum 16.83 um along the
-        # permitted circumference. Bound that measured API read-back locally;
-        # all unrestricted datum placements retain the 1 um default.
-        position_tolerance_m=0.00002,
+        stability_tolerance_m=0.00002,
     )
     # Cylindricity and the bearing finish both control the rod's CYLINDRICAL
     # face, which the side view shows edge-on -- so both anchor to its flank

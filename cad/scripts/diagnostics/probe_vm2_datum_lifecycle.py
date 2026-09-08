@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
 import hashlib
+import importlib
 import json
 import math
 import os
@@ -32,24 +33,125 @@ def assert_axis(values, radius):
         raise RuntimeError(f"datum does not control the intended Z-axis cylinder: {values}")
 
 
+def lifecycle_inputs(input_path, *, mode, ink_refresh, rack_dimension_location):
+    """Resolve pinned local inputs before attaching; never invent a witness."""
+    path = Path(input_path).resolve(strict=True)
+    if not path.is_file():
+        raise ValueError("lifecycle input must be a file")
+    if mode == "production":
+        if ink_refresh != "cold":
+            raise ValueError("production lifecycle requires --ink-refresh cold")
+        if rack_dimension_location != "original":
+            raise ValueError("production layout must already come from its recipe")
+        specifications = {
+            "pinion-lift-rod": ("pinion_lift_rod_spec", "ROD_DIA", 0.00002),
+            "rack-pinion": ("rack_pinion_spec", "BORE_DIA", 0.0001),
+        }
+        matches = [stem for stem in specifications
+                   if path == ROOT / "cad/out/slddrw" / f"{stem}.SLDDRW"]
+        if len(matches) != 1:
+            raise ValueError("production input must be one of the two exact own pipeline drawings")
+        stem = matches[0]
+        module_name, diameter_name, limit = specifications[stem]
+        specification = importlib.import_module(module_name)
+        radius = getattr(specification, diameter_name) / 2000.0
+        if not math.isfinite(radius) or radius <= 0:
+            raise ValueError("production specification radius must be positive and finite")
+        source = (ROOT / "cad/out/sldprt" / f"{stem}.SLDPRT").resolve(strict=True)
+        if source.parent != ROOT / "cad/out/sldprt":
+            raise ValueError("production source leaves own pipeline output")
+        return {"mode": mode, "source": source, "original": path,
+                "radius_m": radius, "position_tolerance_m": limit,
+                "specification_path": str(Path(specification.__file__).resolve()),
+                "specification_sha256": digest(specification.__file__)}
+    if mode != "partial":
+        raise ValueError("unknown lifecycle input mode")
+    if not path.is_relative_to(ROOT / "cad/out/reports"):
+        raise ValueError("witness must belong to this checkout")
+    witness = json.loads(path.read_text(encoding="utf-8"))
+    if witness["status"] != "observed_and_closed" or witness["selection"] != "edge":
+        raise RuntimeError("requires completed semantic-edge insertion witness")
+    source = Path(witness["source"]).resolve(strict=True)
+    original = Path(witness["exports"]["SLDDRW"]["path"]).resolve(strict=True)
+    if source.parent != ROOT / "cad/out/sldprt" or not original.is_relative_to(ROOT / "cad/out/reports"):
+        raise RuntimeError("input leaves own experiment")
+    if digest(original) != witness["exports"]["SLDDRW"]["sha256"] or digest(source) != witness["source_sha256_after"]:
+        raise RuntimeError("input identity changed since insertion witness")
+    return {"mode": mode, "source": source, "original": original,
+            "radius_m": witness["target_circle"][6],
+            "position_tolerance_m": witness["original_call"]["position_tolerance_m"],
+            "witness": witness, "witness_path": path}
+
+
+def assert_annotation_state(state, baseline=None):
+    """Require a non-dangling tag and preserve both native shoulder readbacks."""
+    if state["is_dangling"] is not False:
+        raise RuntimeError("datum annotation is dangling")
+    if baseline is None:
+        return
+    if any(state[key] != baseline[key] for key in ("shoulder", "forced_shoulder")):
+        raise RuntimeError("datum shoulder state changed from first cold open")
+
+
+def edge_ownership(app, edge, source_part):
+    """Read the actual owning body; equal radius alone does not identify it."""
+    bodies = tuple(source_part.GetBodies2(0, False) or ())  # swSolidBody, including hidden bodies
+    if len(bodies) != 1 or bodies[0] is None:
+        raise RuntimeError(f"expected one source solid body, got {len(bodies)}")
+    body = edge.GetBody()
+    if body is None:
+        raise RuntimeError("datum edge has no owning body")
+    self_equality = int(app.IsSame(bodies[0], bodies[0]))
+    equality = int(app.IsSame(body, bodies[0]))
+    if self_equality != 1 or equality != 1:
+        raise RuntimeError(f"datum edge body identity mismatch: self={self_equality}, source={equality}")
+    faces = tuple(edge.GetTwoAdjacentFaces2() or ())
+    if len(faces) != 2 or any(face is None for face in faces):
+        raise RuntimeError("datum edge must have exactly two nonnull adjacent faces")
+    return faces, {"source_solid_body_count": len(bodies), "source_body_self_equality": self_equality,
+                   "edge_body_same_as_source": equality, "adjacent_face_count": len(faces)}
+
+
+def assert_translated_ink(initial, moved, shift):
+    """Reject partially stale arrays, even if one updated line contains the anchor."""
+    maximum = 0.0
+    for field, offsets in (("datum_lines", (1, 4)), ("datum_triangles", (0, 3, 6)),
+                           ("dimension_lines", (4, 7)), ("dimension_triangles", (0, 3, 6))):
+        if len(initial[field]) != len(moved[field]):
+            raise RuntimeError(f"translated {field} primitive count changed")
+        for before, after in zip(initial[field], moved[field], strict=True):
+            for offset in offsets:
+                expected = [before[offset + index] + shift[index] for index in range(2)]
+                actual = after[offset:offset + 2]
+                if len(actual) != 2 or not all(math.isfinite(value) for value in actual):
+                    raise RuntimeError(f"invalid translated {field} primitive")
+                maximum = max(maximum, math.dist(expected, actual))
+    if maximum > 1e-8:
+        raise RuntimeError(f"translated ink remains stale: error={maximum} m")
+    return maximum
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("witness", type=Path)
+    parser.add_argument("witness", type=Path, help="insertion receipt, or exact pipeline SLDDRW with --production")
     parser.add_argument("output", type=Path)
     parser.add_argument("--worker", action="store_true")
     parser.add_argument("--rack-dimension-location", choices=("original", "above"), default="original")
     parser.add_argument("--ink-refresh", choices=("redraw", "cold"), default="redraw")
+    parser.add_argument("--production", action="store_true")
     args = parser.parse_args()
     witness_path = args.witness.resolve(strict=True)
     output = args.output.resolve()
-    if not witness_path.is_relative_to(ROOT / "cad/out/reports"):
-        raise ValueError("witness must belong to this checkout")
     if not output.is_relative_to(ROOT / "cad/out/reports") or output.exists():
         raise ValueError("choose a new own report directory")
     if Path(sys.prefix).resolve() != ROOT / ".venv":
         raise RuntimeError("requires own uv environment")
     if os.environ.get("HARMONIC_SW_AUTOSTART") != "0" or not os.environ.get("HARMONIC_DIAGNOSTIC_SW_PID"):
         raise RuntimeError("requires attach-only mode and inventoried PID")
+    lifecycle_inputs(
+        witness_path, mode="production" if args.production else "partial",
+        ink_refresh=args.ink_refresh, rack_dimension_location=args.rack_dimension_location,
+    )
     from _common import _early_bound, check
     from _drawing_common import dimension_name, model_point_in_view, render_pdf_png
     from _gear_drawing_entities import visible_circle_edge
@@ -60,15 +162,12 @@ def main():
         app = adapter.swApp
         if app.GetDocuments() or app.ActiveDoc is not None:
             raise RuntimeError("requires an empty seat; no documents closed")
-        witness = json.loads(witness_path.read_text(encoding="utf-8"))
-        if witness["status"] != "observed_and_closed" or witness["selection"] != "edge":
-            raise RuntimeError("requires completed semantic-edge insertion witness")
-        source = Path(witness["source"]).resolve(strict=True)
-        original = Path(witness["exports"]["SLDDRW"]["path"]).resolve(strict=True)
-        if source.parent != ROOT / "cad/out/sldprt" or not original.is_relative_to(ROOT / "cad/out/reports"):
-            raise RuntimeError("input leaves own experiment")
-        if digest(original) != witness["exports"]["SLDDRW"]["sha256"] or digest(source) != witness["source_sha256_after"]:
-            raise RuntimeError("input identity changed since insertion witness")
+        inputs = lifecycle_inputs(
+            witness_path, mode="production" if args.production else "partial",
+            ink_refresh=args.ink_refresh, rack_dimension_location=args.rack_dimension_location,
+        )
+        source, original = inputs["source"], inputs["original"]
+        radius, limit = inputs["radius_m"], inputs["position_tolerance_m"]
         output.mkdir(parents=True)
         working = output / f"{source.stem}-lifecycle.SLDDRW"
         shutil.copyfile(original, working)
@@ -77,17 +176,27 @@ def main():
         receipt = output / "receipt.json"
         report = {
             "kind": "vm2-datum-lifecycle", "status": "running",
-            "scope": "copied partial probe drawing, not complete production print acceptance",
+            "scope": ("complete production drawing lifecycle; first cold open is baseline, no pre-save insertion proof"
+                      if inputs["mode"] == "production" else
+                      "copied partial probe drawing, not complete production print acceptance"),
             "head": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
             "adapter": subprocess.check_output(["git", "-C", "SolidworksMCP-python", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
-            "probe_sha256": digest(__file__), "witness": str(witness_path), "witness_sha256": digest(witness_path),
+            "probe_sha256": digest(__file__), "input_mode": inputs["mode"],
+            "radius_m": radius, "position_tolerance_m": limit,
             "source": str(source), "source_sha256_before": digest(source),
             "original": str(original), "original_sha256": digest(original),
             "working": str(working), "pid": int(app.GetProcessID()), "revision": str(app.RevisionNumber()),
             "started_utc": datetime.now(timezone.utc).isoformat(), "stages": [], "closures": [],
             "rack_dimension_location": args.rack_dimension_location,
             "ink_refresh": args.ink_refresh,
+            "annotation_state_readbacks": [],
         }
+        if inputs["mode"] == "partial":
+            report.update(witness=str(witness_path), witness_sha256=digest(witness_path))
+        if inputs["mode"] == "production":
+            report.update(specification_path=inputs["specification_path"],
+                          specification_sha256=inputs["specification_sha256"],
+                          placement_reference="first_cold_open_baseline_no_pre_save_witness")
         started = time.perf_counter()
 
         def checkpoint():
@@ -120,6 +229,11 @@ def main():
             if len(tags) != 1 or str(tags[0].GetLabel()) != "A":
                 raise RuntimeError("expected exactly datum A")
             annotation = _early_bound(tags[0].GetAnnotation(), "IAnnotation")
+            state = {"stage": name, "is_dangling": bool(annotation.IsDangling()),
+                     "shoulder": bool(tags[0].Shoulder), "forced_shoulder": bool(tags[0].ForcedShoulder)}
+            report["annotation_state_readbacks"].append(state)
+            checkpoint()
+            assert_annotation_state(state, report["annotation_state_readbacks"][0])
             attached = tuple(annotation.GetAttachedEntities3() or ())
             types = tuple(annotation.GetAttachedEntityTypes() or ())
             if types != (1,) or len(attached) != 1 or attached[0] is None:
@@ -127,16 +241,14 @@ def main():
             edge = _early_bound(attached[0], "IEdge")
             if expected_edge is not None and int(app.IsSame(edge, expected_edge)) != 1:
                 raise RuntimeError("datum attaches to a different resolved edge")
+            faces, ownership = edge_ownership(app, edge, _early_bound(reference, "IPartDoc"))
             curve = _early_bound(edge.GetCurve(), "ICurve")
             if not curve.IsCircle():
                 raise RuntimeError("datum edge is not circular")
             circle = list(curve.CircleParams)
-            radius = witness["target_circle"][6]
             assert_axis(circle, radius)
             cylinders = []
-            for face in edge.GetTwoAdjacentFaces2() or ():
-                if face is None:
-                    raise RuntimeError("datum edge has a missing adjacent face")
+            for face in faces:
                 surface = _early_bound(_early_bound(face, "IFace2").GetSurface(), "ISurface")
                 if surface.IsCylinder():
                     cylinders.append(list(surface.CylinderParams))
@@ -149,7 +261,7 @@ def main():
             row = {"stage": name, "position": position, "view_position": list(view.Position),
                    "view_scale": list(view.ScaleRatio), "circle": circle, "cylinder": cylinders[0],
                    "attachment_type": 1, "resolved_edge_same": int(app.IsSame(edge, expected_edge)) if expected_edge is not None else None,
-                   "source_sha256": digest(source)}
+                   "source_sha256": digest(source), "body_ownership": ownership}
             report["stages"].append(row)
             row["datum_lines"] = [list(tags[0].GetLineAtIndex(index)) for index in range(tags[0].GetLineCount())]
             row["datum_triangles"] = [list(tags[0].GetTriangleAtIndex(index)) for index in range(tags[0].GetTriangleCount())]
@@ -192,7 +304,7 @@ def main():
             drawing = _early_bound(draw, "IDrawingDoc")
             view = _early_bound(drawing.GetFirstView(), "IView").GetNextView()
             view = _early_bound(view, "IView")
-            edge = visible_circle_edge(adapter, view, witness["target_circle"][6] * 2000)
+            edge = visible_circle_edge(adapter, view, radius * 2000)
             return draw, view, edge
 
         def export(draw, name):
@@ -239,9 +351,9 @@ def main():
                 if math.dist(list(dimension.GetPosition())[:2], (previous[0], 0.213)) > 1e-8:
                     raise RuntimeError("rack diameter layout readback differs")
             initial = observe(view, "cold_open", edge)
-            limit = witness["original_call"]["position_tolerance_m"]
-            if math.dist(initial["position"][:2], witness["position_after_save"][:2]) > limit:
-                raise RuntimeError("cold reopen exceeded unchanged placement tolerance")
+            if inputs["mode"] == "partial":
+                if math.dist(initial["position"][:2], inputs["witness"]["position_after_save"][:2]) > limit:
+                    raise RuntimeError("cold reopen exceeded unchanged placement tolerance")
             export(draw, "cold_open")
             shift = (0.008, 0.005)
             requested = [initial["view_position"][index] + shift[index] for index in range(2)]
@@ -256,6 +368,7 @@ def main():
             report["translation_error_m"] = math.dist(moved["position"][:2], expected)
             if report["translation_error_m"] > limit:
                 raise RuntimeError("datum did not follow view within unchanged tolerance")
+            report["translation_ink_error_m"] = assert_translated_ink(initial, moved, shift)
             export(draw, "moved")
             ratio = list(initial["view_scale"])
             view.ScaleRatio = double_array([ratio[0] * 1.25, ratio[1]])
@@ -301,9 +414,12 @@ def main():
         return run_owned_diagnostic(probe)
     import dodo
     with dodo._com_seat("VM2 datum lifecycle probe"):
-        dodo._exec([sys.executable, str(Path(__file__).resolve()), str(witness_path), str(output), "--worker",
-                    "--rack-dimension-location", args.rack_dimension_location,
-                    "--ink-refresh", args.ink_refresh], "VM2 datum lifecycle probe")
+        command = [sys.executable, str(Path(__file__).resolve()), str(witness_path), str(output), "--worker",
+                   "--rack-dimension-location", args.rack_dimension_location,
+                   "--ink-refresh", args.ink_refresh]
+        if args.production:
+            command.append("--production")
+        dodo._exec(command, "VM2 datum lifecycle probe")
     return 0
 
 

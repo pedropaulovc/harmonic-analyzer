@@ -96,6 +96,15 @@ def test_bore_annotations_use_explicit_nonconflicting_selectors() -> None:
     for module in DRAWING_MODULES:
         source = Path(module.__file__).read_text(encoding="utf-8")
         assert "bore_edge = visible_circle_edge(" in source, module.__name__
+        if module is draw_rack_pinion:
+            assert "edge_xy=bore_top" not in source, module.__name__
+            assert "edge_xy=bore_bottom" not in source, module.__name__
+            assert source.count("entity=bore_edge") == 2, module.__name__
+            assert source.count("add_native_axis_datum(") == 1, module.__name__
+            assert "radius_m=BORE_DIA / 2000.0" in source, module.__name__
+            assert "stability_tolerance_m=0.0001" in source, module.__name__
+            assert "shoulder=True" in source, module.__name__
+            continue
         if module in CRANK_PAIR_MODULES:
             assert "edge_xy=bore_top" not in source, module.__name__
             assert source.count("entity=bore_edge") == 2, module.__name__

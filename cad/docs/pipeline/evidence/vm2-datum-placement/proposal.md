@@ -1,5 +1,11 @@
 # Proposed native datum placement contract
 
+Historical proposal, not the approved implementation. VM1
+[approved a different design](https://github.com/pedropaulovc/harmonic-analyzer/pull/702#issuecomment-5578660244):
+a narrowly imported native-axis helper for these two recipes, leaving
+`_drawing_common.py` unchanged. Do not apply the adjacent patch. The original
+proposal and test-contract discussion below remain as provenance.
+
 VM1 coordination request; not production implementation or acceptance. The
 [unapplied patch](native-placement-proposal.patch) targets correction head
 `6976b79e4bcf3bf158cf4a688813e01967177299` (main baseline `55056d49`, adapter
