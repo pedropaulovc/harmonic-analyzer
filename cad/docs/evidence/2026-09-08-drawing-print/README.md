@@ -63,4 +63,3 @@ native run or merge acceptance.
 
 Both files were copied byte-for-byte after checking their source hashes against
 the guarded bank; source and destination hashes were checked again after copying.
-
