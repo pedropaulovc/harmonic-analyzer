@@ -259,3 +259,113 @@ def test_translation_rejects_stale_triangle_even_with_current_lines(probe):
     moved["datum_triangles"] = initial["datum_triangles"]
     with pytest.raises(RuntimeError, match="ink remains stale"):
         probe.assert_translated_ink(initial, moved, shift)
+
+
+@pytest.fixture
+def finish_stage():
+    return {
+        "position": [0.1, 0.1, 0],
+        "datum_lines": [[0, 0.1, 0.1, 0, 0.11, 0.1, 0]],
+        "datum_triangles": [[0.11, 0.1, 0, 0.112, 0.1, 0, 0.11, 0.102, 0, 1, 0]],
+        "projected_rim_center": [0.2, 0.2], "projected_rim_radius_m": 0.005,
+        "finish_count": 1, "finish_position": [0.25, 0.15, 0],
+        "finish_is_dangling": False, "finish_attachment_types": [1],
+        "finish_attachment_count": 1, "finish_edge_same": [1],
+        "finish_text_count": 1, "finish_roughness": "Ra 1.6",
+        "finish_leaders": [[0.205, 0.2, 0, 0.25, 0.15, 0]],
+        "finish_lines": [[0, 0, -1, -1, 0.25, 0.15, 0, 0.26, 0.155, 0]],
+        "finish_triangles": [],
+    }
+
+
+def test_finish_positive_control_attachment_rim_and_clearance(probe, finish_stage):
+    result = probe.assert_rack_finish(finish_stage)
+    assert result["finish_rim_error_m"] < 1e-8
+    assert result["finish_datum_line_triangle_clearance_m"] > 0.001
+
+
+@pytest.mark.parametrize("field, value, message", [
+    ("finish_count", 0, "intended bore edge"),
+    ("finish_is_dangling", True, "intended bore edge"),
+    ("finish_attachment_count", 2, "intended bore edge"),
+    ("finish_attachment_types", [2], "intended bore edge"),
+    ("finish_edge_same", [0], "intended bore edge"),
+    ("finish_edge_same", [-1], "intended bore edge"),
+    ("finish_edge_same", [None], "intended bore edge"),
+    ("finish_roughness", "Ra 3.2", "Ra 1.6"),
+    ("finish_text_count", 0, "Ra 1.6"),
+    ("finish_position", [float("nan"), 0, 0], "finish position"),
+    ("finish_leaders", [], "exactly one leader"),
+    ("finish_leaders", [[0, 0]], "leader points"),
+    ("finish_leaders", [[float("nan"), 0, 0, 0, 0, 0]], "leader points"),
+    ("finish_leaders", [[0.21, 0.2, 0, 0.25, 0.15, 0]], "terminate on intended bore rim"),
+    ("finish_lines", [], "display lines"),
+    ("finish_lines", [[0, 0]], "primitive"),
+    ("finish_triangles", None, "primitive collection"),
+])
+def test_finish_corrupt_or_missing_readbacks_reject(probe, finish_stage, field, value, message):
+    finish_stage[field] = value
+    with pytest.raises((RuntimeError, ValueError), match=message):
+        probe.assert_rack_finish(finish_stage)
+
+
+def test_finish_leader_crossing_datum_is_not_hidden_by_separate_display_lines(probe, finish_stage):
+    finish_stage["finish_leaders"] = [[0.205, 0.2, 0, 0.1, 0.1, 0]]
+    with pytest.raises(RuntimeError, match="ink clearance"):
+        probe.assert_rack_finish(finish_stage)
+
+
+def test_finish_reader_uses_annotation_display_data_and_exact_roughness_slot(probe, finish_stage):
+    edge, calls = object(), []
+
+    def text_count():
+        calls.append("count")
+        return 1
+
+    def text(slot):
+        calls.append(slot)
+        return "Ra 1.6"
+
+    symbol = SimpleNamespace(GetTextCount=text_count, GetText=text)
+    data = SimpleNamespace(GetLineCount=lambda: 1, GetTriangleCount=lambda: 0,
+                           GetLineAtIndex2=lambda _index: finish_stage["finish_lines"][0])
+    annotation = SimpleNamespace(
+        GetType=lambda: 7, GetSpecificAnnotation=lambda: symbol, GetDisplayData=lambda: data,
+        GetPosition=lambda: finish_stage["finish_position"], IsDangling=lambda: False,
+        GetAttachedEntities3=lambda: [edge], GetAttachedEntityTypes=lambda: [1],
+        GetLeaderCount=lambda: 1, GetLeaderPointsAtIndex=lambda _index: finish_stage["finish_leaders"][0],
+    )
+    view = SimpleNamespace(GetAnnotations=lambda: [SimpleNamespace(GetType=lambda: 6), annotation])
+    app = SimpleNamespace(IsSame=lambda left, right: int(left is right))
+    actual = probe.read_rack_finish(app, view, edge)
+    assert calls == ["count", 8]
+    assert actual == {key: value for key, value in finish_stage.items() if key.startswith("finish_")}
+    finish_stage.update(actual)
+    probe.assert_rack_finish(finish_stage)
+
+
+@pytest.mark.parametrize("count", [0, 2])
+def test_finish_reader_rejects_absent_or_multiple_symbols(probe, count):
+    view = SimpleNamespace(GetAnnotations=lambda: [SimpleNamespace(GetType=lambda: 7) for _ in range(count)])
+    with pytest.raises(RuntimeError, match="exactly one rack surface-finish"):
+        probe.read_rack_finish(None, view, None)
+
+
+@pytest.mark.parametrize("stale", ["finish_lines", "finish_triangles", "finish_leaders"])
+def test_finish_primitive_translation_rejects_stale_arrays(probe, finish_stage, stale):
+    initial = deepcopy(finish_stage)
+    initial["dimension_lines"] = deepcopy(initial["finish_lines"])
+    initial["dimension_triangles"] = []
+    initial["finish_triangles"] = [[0.25, 0.15, 0, 0.251, 0.15, 0, 0.25, 0.151, 0, 1, 0]]
+    moved, shift = deepcopy(initial), (0.008, 0.005)
+    for field, offsets in (("datum_lines", (1, 4)), ("datum_triangles", (0, 3, 6)),
+                           ("dimension_lines", (4, 7)), ("finish_lines", (4, 7)),
+                           ("finish_triangles", (0, 3, 6)), ("finish_leaders", (0, 3))):
+        for row in moved[field]:
+            for offset in offsets:
+                row[offset] += shift[0]
+                row[offset + 1] += shift[1]
+    assert probe.assert_translated_ink(initial, moved, shift) == 0
+    moved[stale] = initial[stale]
+    with pytest.raises(RuntimeError, match="ink remains stale"):
+        probe.assert_translated_ink(initial, moved, shift)

@@ -10,6 +10,11 @@ import sys
 import time
 
 ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT / "cad/scripts"))
+
+from _drawing_registry import DRAWINGS_BY_NAME  # noqa: E402
+
+SPECS = tuple(DRAWINGS_BY_NAME[name] for name in ("pinion_lift_rod", "rack_pinion"))
 
 
 def digest(path):
@@ -30,8 +35,7 @@ def main():
         raise RuntimeError("requires attach-only mode and remote cache off")
     command = [sys.executable, "-m", "doit", "-n", "4",
                "drawing:pinion_lift_rod", "drawing:rack_pinion"]
-    sources = [ROOT / f"cad/out/sldprt/{stem}.SLDPRT"
-               for stem in ("pinion-lift-rod", "rack-pinion")]
+    sources = [ROOT / f"cad/out/sldprt/{spec.artifact_stem}.SLDPRT" for spec in SPECS]
     head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     adapter = subprocess.check_output(["git", "-C", "SolidworksMCP-python", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     scripts = [ROOT / f"cad/scripts/{name}" for name in (
@@ -53,8 +57,7 @@ def main():
                   source_sha256_after={str(path): digest(path) for path in sources},
                   script_sha256_after={str(path): digest(path) for path in scripts},
                   log_sha256=digest(output / "build.log"))
-    outputs = [ROOT / f"cad/out/{folder}/{stem}{suffix}" for stem in ("pinion-lift-rod", "rack-pinion")
-               for folder, suffix in (("slddrw", ".SLDDRW"), ("pdf", ".pdf"), ("png", "_drawing.png"))]
+    outputs = [spec.outputs[key] for spec in SPECS for key in ("slddrw", "pdf", "png")]
     report["outputs"] = {str(path): digest(path) for path in outputs if path.is_file()}
     current_head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     report["head_after"] = current_head

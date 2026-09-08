@@ -135,12 +135,23 @@ def edge_ownership(app, edge, source_part, source_extension, view):
 def assert_translated_ink(initial, moved, shift):
     """Reject partially stale arrays, even if one updated line contains the anchor."""
     maximum = 0.0
-    for field, offsets in (("datum_lines", (1, 4)), ("datum_triangles", (0, 3, 6)),
-                           ("dimension_lines", (4, 7)), ("dimension_triangles", (0, 3, 6))):
+    fields = [("datum_lines", (1, 4)), ("datum_triangles", (0, 3, 6)),
+              ("dimension_lines", (4, 7)), ("dimension_triangles", (0, 3, 6))]
+    if any(field in initial or field in moved for field in ("finish_lines", "finish_triangles", "finish_leaders")):
+        fields.extend([("finish_lines", (4, 7)), ("finish_triangles", (0, 3, 6)),
+                       ("finish_leaders", None)])
+    for field, offsets in fields:
+        if field not in initial or field not in moved:
+            raise RuntimeError(f"missing translated {field} primitives")
         if len(initial[field]) != len(moved[field]):
             raise RuntimeError(f"translated {field} primitive count changed")
         for before, after in zip(initial[field], moved[field], strict=True):
-            for offset in offsets:
+            row_offsets = offsets
+            if field == "finish_leaders":
+                if len(before) not in (6, 9) or len(after) != len(before):
+                    raise RuntimeError("invalid translated finish leader primitive")
+                row_offsets = range(0, len(before), 3)
+            for offset in row_offsets:
                 expected = [before[offset + index] + shift[index] for index in range(2)]
                 actual = after[offset:offset + 2]
                 if len(actual) != 2 or not all(math.isfinite(value) for value in actual):
@@ -149,6 +160,81 @@ def assert_translated_ink(initial, moved, shift):
     if maximum > 1e-8:
         raise RuntimeError(f"translated ink remains stale: error={maximum} m")
     return maximum
+
+
+def read_rack_finish(app, view, expected_edge):
+    """Read one finish symbol through documented annotation/display interfaces."""
+    from _common import _early_bound
+
+    annotations = [_early_bound(raw, "IAnnotation") for raw in view.GetAnnotations() or ()]
+    finishes = [annotation for annotation in annotations if int(annotation.GetType()) == 7]  # swSFSymbol
+    if len(finishes) != 1:
+        raise RuntimeError(f"expected exactly one rack surface-finish annotation, got {len(finishes)}")
+    annotation = finishes[0]
+    symbol = _early_bound(annotation.GetSpecificAnnotation(), "ISFSymbol")
+    text_count = int(symbol.GetTextCount())
+    roughness = str(symbol.GetText(8) or "") if text_count > 0 else ""  # swSFSymbolRoughnessValue1
+    attached = tuple(annotation.GetAttachedEntities3() or ())
+    types = list(annotation.GetAttachedEntityTypes() or ())
+    raw_data = annotation.GetDisplayData()  # ISFSymbol has no GetDisplayData method.
+    if raw_data is None:
+        raise RuntimeError("rack finish annotation returned no display data")
+    data = _early_bound(raw_data, "IDisplayData")
+    return {
+        "finish_count": len(finishes), "finish_position": list(annotation.GetPosition() or ()),
+        "finish_is_dangling": bool(annotation.IsDangling()), "finish_attachment_types": types,
+        "finish_attachment_count": len(attached),
+        "finish_edge_same": [int(app.IsSame(edge, expected_edge)) if edge is not None else None for edge in attached],
+        "finish_text_count": text_count, "finish_roughness": roughness,
+        "finish_leaders": [list(annotation.GetLeaderPointsAtIndex(index) or ())
+                           for index in range(annotation.GetLeaderCount())],
+        "finish_lines": [list(data.GetLineAtIndex2(index) or ()) for index in range(data.GetLineCount())],
+        "finish_triangles": [list(data.GetTriangleAtIndex(index) or ()) for index in range(data.GetTriangleCount())],
+    }
+
+
+def assert_rack_finish(stage):
+    """Gate attachment, actual leader endpoints and line/triangle separation.
+
+    Display primitives and derived leader segments are measured against datum
+    ink. This does not measure text glyph outlines or text-versus-gear overlap.
+    """
+    from diagnostics.analyze_vm2_datum_clearance import assert_clearance, finite_row
+
+    if (stage.get("finish_count") != 1 or stage.get("finish_is_dangling") is not False
+            or stage.get("finish_attachment_count") != 1 or stage.get("finish_attachment_types") != [1]
+            or stage.get("finish_edge_same") != [1]):
+        raise RuntimeError("rack finish is not a non-dangling annotation attached to the intended bore edge")
+    if stage.get("finish_text_count", 0) <= 0 or stage.get("finish_roughness", "").strip() != "Ra 1.6":
+        raise RuntimeError("rack finish roughness does not read Ra 1.6")
+    if not finite_row(stage.get("finish_position"), 3):
+        raise RuntimeError("invalid rack finish position")
+    leaders = stage.get("finish_leaders")
+    if not isinstance(leaders, (list, tuple)) or len(leaders) != 1:
+        raise RuntimeError("rack finish requires exactly one leader")
+    leader = leaders[0]
+    if not (finite_row(leader, 6) or finite_row(leader, 9)):
+        raise RuntimeError("invalid rack finish leader points")
+    center, radius = stage.get("projected_rim_center"), stage.get("projected_rim_radius_m")
+    if not finite_row(center, 2) or not finite_row([radius], 1) or radius <= 0:
+        raise RuntimeError("invalid projected rack bore rim")
+    points = [leader[index:index + 3] for index in range(0, len(leader), 3)]
+    rim_error = min(abs(math.dist(point[:2], center) - radius) for point in (points[0], points[-1]))
+    if rim_error > 1e-8:
+        raise RuntimeError(f"rack finish leader does not terminate on intended bore rim: {rim_error} m")
+    if not stage.get("finish_lines"):
+        raise RuntimeError("missing rack finish display lines")
+    # Adapt the documented display-line representation (4 metadata + 2 XYZ)
+    # without modifying raw finish_lines/finish_leaders in the receipt.
+    leader_segments = [[0, 0, -1, -1, *start, *end] for start, end in zip(points, points[1:])]
+    comparison = {
+        "position": stage["position"], "datum_lines": stage["datum_lines"],
+        "datum_triangles": stage["datum_triangles"], "dimension_position": stage["finish_position"],
+        "dimension_lines": [*stage["finish_lines"], *leader_segments],
+        "dimension_triangles": stage.get("finish_triangles"),
+    }
+    separation = assert_clearance(comparison)
+    return {"finish_rim_error_m": rim_error, "finish_datum_line_triangle_clearance_m": separation}
 
 
 def main():
@@ -314,6 +400,10 @@ def main():
             row["dimension_triangles"] = [list(data.GetTriangleAtIndex(index)) for index in range(data.GetTriangleCount())]
             if not row["datum_lines"] or not row["datum_triangles"] or not row["dimension_lines"]:
                 raise RuntimeError("missing datum/dimension ink primitives")
+            if inputs["mode"] == "production" and source.stem == "rack-pinion":
+                row.update(read_rack_finish(app, view, edge))
+                checkpoint()
+                row.update(assert_rack_finish(row))
             checkpoint()
             if row["source_sha256"] != report["source_sha256_before"]:
                 raise RuntimeError("lifecycle changed saved source bytes")

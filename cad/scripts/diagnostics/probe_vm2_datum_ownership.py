@@ -1,4 +1,4 @@
-"""Inventory the seat; optionally discard only the witnessed failed rack drawing."""
+"""Inventory the seat; optionally close witnessed own probes or production outputs."""
 
 from __future__ import annotations
 
@@ -25,7 +25,6 @@ def main():
     parser.add_argument("output", type=Path)
     parser.add_argument("--worker", action="store_true")
     closure = parser.add_mutually_exclusive_group()
-    closure.add_argument("--close-owned-failure-from", type=Path)
     closure.add_argument("--close-owned-probe-from", type=Path)
     closure.add_argument("--close-production-from", type=Path)
     parser.add_argument("--inventory-witness", type=Path)
@@ -254,64 +253,6 @@ def main():
                 if digest(source) != expected_source_hash:
                     raise RuntimeError("source bytes changed during probe closure")
                 report["status"] = "owned_probe_closed_without_save_bytes_unchanged"
-            if args.close_owned_failure_from:
-                witness_path = args.close_owned_failure_from.resolve(strict=True)
-                witness = json.loads(witness_path.read_text(encoding="utf-8"))
-                if witness["status"] != "read_only_complete":
-                    raise RuntimeError("requires a successful read-only ownership receipt")
-                for field in ("root", "pid", "revision", "documents"):
-                    if witness[field] != report[field]:
-                        raise RuntimeError(f"ownership changed since witness: {field}")
-                expected_part = (
-                    "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\rack-pinion.SLDPRT"
-                )
-                rows = report["documents"]
-                parts = [row for row in rows if row["type"] == 1]
-                drawings = [row for row in rows if row["type"] == 3]
-                if len(rows) != 2 or len(parts) != 1 or len(drawings) != 1:
-                    raise RuntimeError("close permits only the witnessed two-document failure")
-                part, drawing = parts[0], drawings[0]
-                if part["path"] != expected_part or drawing["path"]:
-                    raise RuntimeError("failed-drawing source ownership mismatch")
-                if drawing["title"] != "Draw109 - Sheet1":
-                    raise RuntimeError("unexpected unsaved drawing title")
-                views = drawing["views"]
-                if len(views) != 4 or views[0]["reference_path"] is not None:
-                    raise RuntimeError("unexpected failed-drawing view inventory")
-                if any(view["reference_path"] != expected_part for view in views[1:]):
-                    raise RuntimeError("drawing references an unowned model")
-                datums = [datum for view in views for datum in view["datums"]]
-                if len(datums) != 1 or datums[0] != {
-                    "label": "A",
-                    "position": [0.21999999999999942, 0.20083662770023045, 0.0015],
-                    "attachment_types": [1],
-                    "attachment_count": 1,
-                    "null_attachment_indices": [],
-                }:
-                    raise RuntimeError("datum does not match the retained retry failure")
-                report["closure_witness"] = {
-                    "path": str(witness_path), "sha256": digest(witness_path)
-                }
-                report["closed_without_save"] = []
-                checkpoint()
-                for target in (drawing, part):
-                    present = [
-                        _early_bound(raw, "IModelDoc2") for raw in app.GetDocuments() or ()
-                    ]
-                    titles = [str(doc.GetTitle()) for doc in present]
-                    if target["title"] not in titles:
-                        continue
-                    if titles.count(target["title"]) != 1:
-                        raise RuntimeError("ambiguous document title")
-                    app.CloseDoc(target["title"])
-                    report["closed_without_save"].append(target["title"])
-                    checkpoint()
-                if app.GetDocuments() or app.ActiveDoc is not None:
-                    raise RuntimeError("owned failure closure did not empty the session")
-                report["saved_sha256_after_close"] = digest(expected_part)
-                if report["saved_sha256_after_close"] != part["saved_sha256_before"]:
-                    raise RuntimeError("saved source changed during no-save closure")
-                report["status"] = "owned_failure_closed_without_save_bytes_unchanged"
         except Exception as error:
             report.update(status="failed", error=repr(error))
             raise
@@ -324,8 +265,6 @@ def main():
     import dodo
     with dodo._com_seat("VM2 datum read-only ownership"):
         command = [sys.executable, str(Path(__file__).resolve()), str(output), "--worker"]
-        if args.close_owned_failure_from:
-            command.extend(["--close-owned-failure-from", str(args.close_owned_failure_from.resolve())])
         if args.close_owned_probe_from:
             command.extend(["--close-owned-probe-from", str(args.close_owned_probe_from.resolve())])
         if args.close_production_from:
