@@ -183,13 +183,15 @@ def snapshot(adapter, state):
                     "viewport control has ambiguous surface-finish identity"
                 )
             bank[key] = annotation
-    return {
-        "notes": notes,
-        "surface_finishes": finishes,
-        "template_geometry": geometry,
-        "preferences": preferences(adapter),
-        "views": view_rows,
-    }, bank
+    return layout.plain(
+        {
+            "notes": notes,
+            "surface_finishes": finishes,
+            "template_geometry": geometry,
+            "preferences": preferences(adapter),
+            "views": view_rows,
+        }
+    ), bank
 
 
 def semantics(raw):
@@ -227,7 +229,7 @@ def screen_basis(app, view):
                 _early_bound(mapped, "IMathPoint").ArrayData, 3, "screen basis"
             )
         )
-    return result
+    return layout.plain(result)
 
 
 def observe(adapter, state, directory, record, checkpoint):
