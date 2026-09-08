@@ -1,0 +1,401 @@
+diff --git a/cad/scripts/_drawing_common.py b/cad/scripts/_drawing_common.py
+--- a/cad/scripts/_drawing_common.py
++++ b/cad/scripts/_drawing_common.py
+@@ -394,41 +394,158 @@
+     )
+ 
+ 
+-@_telemetry.traced("drawing.datum_feature", label_param="label")
+-def add_datum_feature(
+-    adapter: Any,
+-    view: Any,
+-    *,
+-    edge_xy: tuple[float, float] | None = None,
+-    edge_entity: Any | None = None,
+-    symbol_xy: tuple[float, float],
+-    datum: str,
+-    label: str,
+-    entity_type: str = "EDGE",
+-    entity: Any | None = None,
+-    annotation: Any | None = None,
+-    shoulder: bool = False,
+-    position_tolerance_m: float = 1.5e-5,
+-    callout_below: str = "",
+-) -> Any:
+-    """Attach a native datum-feature symbol to a drawing-view edge.
+-
+-    ``entity_type`` widens the pick for entities that are not model edges —
+-    a revolve's flank lines are ``"SILHOUETTE"`` edges.
+-    """
+-    draw = adapter.currentModel
+-    if annotation is None:
+-        _select_annotation_entity(
+-            adapter,
+-            view,
+-            edge_xy=edge_xy,
+-            edge_entity=edge_entity,
+-            entity=entity,
+-            entity_type=entity_type,
+-            label=label,
+-        )
++def _validate_datum_axis_parameters(
++    parameters: Sequence[float], *, radius_m: float, label: str
++) -> None:
++    """Require the intended circular/cylindrical surface on the origin Z axis."""
++    values = tuple(float(value) for value in parameters)
++    if len(values) != 7 or not all(math.isfinite(value) for value in values):
++        raise RuntimeError(f"{label}: invalid datum axis parameters {values!r}")
++    # Geometry-identification bounds used by the native lifecycle probe;
++    # independent of the unchanged sheet-position and manufacturing tolerances.
++    if max(
++        abs(values[0]), abs(values[1]), abs(values[3]), abs(values[4]),
++        abs(abs(values[5]) - 1.0), abs(values[6] - radius_m),
++    ) > 1e-8:
++        raise RuntimeError(f"{label}: datum does not control the intended Z axis")
++
++
++def _validate_native_datum_z_axis_edge(
++    entity: Any, *, radius_m: float, label: str
++) -> None:
++    """Require a circular boundary of exactly one intended Z-axis cylinder."""
++    edge = _early_bound(entity, "IEdge")
++    raw_curve = edge.GetCurve()
++    if raw_curve is None:
++        raise RuntimeError(f"{label}: datum edge has no curve")
++    curve = _early_bound(raw_curve, "ICurve")
++    if not curve.IsCircle():
++        raise RuntimeError(f"{label}: datum edge is not circular")
++    _validate_datum_axis_parameters(
++        curve.CircleParams or (), radius_m=radius_m, label=label
++    )
++    cylinders = []
++    for raw_face in edge.GetTwoAdjacentFaces2() or ():
++        if raw_face is None:
++            raise RuntimeError(f"{label}: datum edge has a missing adjacent face")
++        face = _early_bound(raw_face, "IFace2")
++        raw_surface = face.GetSurface()
++        if raw_surface is None:
++            raise RuntimeError(f"{label}: adjacent datum face has no surface")
++        surface = _early_bound(raw_surface, "ISurface")
++        if surface.IsCylinder():
++            cylinders.append(tuple(surface.CylinderParams or ()))
++    if len(cylinders) != 1:
++        raise RuntimeError(
++            f"{label}: datum edge bounds {len(cylinders)} cylinders; expected one"
++        )
++    _validate_datum_axis_parameters(
++        cylinders[0], radius_m=radius_m, label=label
++    )
++
++
++def _native_datum_readback(
++    adapter: Any, tag: Any, entity: Any, *, datum: str, label: str
++) -> tuple[float, float]:
++    """Prove edge attachment and label before returning finite sheet XY."""
++    raw_annotation = tag.GetAnnotation()
++    if raw_annotation is None:
++        raise RuntimeError(f"{label}: native datum has no annotation")
++    annotation = _early_bound(raw_annotation, "IAnnotation")
++    attached = tuple(annotation.GetAttachedEntities3() or ())
++    types = tuple(annotation.GetAttachedEntityTypes() or ())
++    if len(attached) != 1 or types != (1,) or attached[0] is None:
++        raise RuntimeError(
++            f"{label}: native datum needs one attached edge; "
++            f"count={len(attached)}, types={types!r}"
++        )
++    # swObjectSame = 1; different (0) and unknown (-1) both fail.
++    if int(adapter.swApp.IsSame(attached[0], entity)) != 1:
++        raise RuntimeError(f"{label}: native datum attached to a different edge")
++    if annotation.IsDangling():
++        raise RuntimeError(f"{label}: native datum is dangling")
++    if str(tag.GetLabel()) != datum:
++        raise RuntimeError(f"datum feature label did not persist ({label})")
++    position = tuple(float(value) for value in annotation.GetPosition() or ())
++    if len(position) != 3 or not all(math.isfinite(value) for value in position):
++        raise RuntimeError(f"{label}: native datum has invalid position {position!r}")
++    return position[0], position[1]
++
++
++@_telemetry.traced("drawing.datum_feature", label_param="label")
++def add_datum_feature(
++    adapter: Any,
++    view: Any,
++    *,
++    edge_xy: tuple[float, float] | None = None,
++    edge_entity: Any | None = None,
++    symbol_xy: tuple[float, float] | None = None,
++    datum: str,
++    label: str,
++    entity_type: str = "EDGE",
++    entity: Any | None = None,
++    annotation: Any | None = None,
++    shoulder: bool = False,
++    position_tolerance_m: float = 1.5e-5,
++    callout_below: str = "",
++    placement: Literal["requested", "native"] = "requested",
++    native_z_axis_radius_m: float | None = None,
++) -> Any:
++    """Attach a native datum-feature symbol to a drawing-view edge.
++
++    ``entity_type`` widens the pick for entities that are not model edges —
++    a revolve's flank lines are ``"SILHOUETTE"`` edges.
++
++    ``native`` explicitly opts an entity-selected origin-Z cylinder into
++    SolidWorks-chosen placement. The unchanged ``position_tolerance_m`` bounds
++    XY movement across rebuild, not distance from a requested sheet point.
++    Print clearance and cold-reopen acceptance still need the lifecycle gate.
++    """
++    if placement not in {"requested", "native"}:
++        raise ValueError(f"unknown datum placement: {placement!r}")
++    if placement == "requested" and symbol_xy is None:
++        raise ValueError(f"{label}: requested placement requires symbol_xy")
++    if placement == "requested" and native_z_axis_radius_m is not None:
++        raise ValueError(f"{label}: native Z-axis radius requires native placement")
++    if placement == "native":
++        if (
++            entity is None or entity_type != "EDGE"
++            or any(value is not None for value in (
++                edge_xy, edge_entity, annotation, symbol_xy,
++            ))
++        ):
++            raise ValueError(
++                f"{label}: native placement requires only an explicit EDGE entity"
++            )
++        if not math.isfinite(position_tolerance_m) or position_tolerance_m <= 0.0:
++            raise ValueError(f"{label}: native tolerance must be finite and positive")
++        if (
++            native_z_axis_radius_m is None
++            or not math.isfinite(native_z_axis_radius_m)
++            or native_z_axis_radius_m <= 0.0
++        ):
++            raise ValueError(f"{label}: native radius must be finite and positive")
++        _validate_native_datum_z_axis_edge(
++            entity, radius_m=native_z_axis_radius_m, label=label
++        )
++    draw = adapter.currentModel
++    if annotation is None:
++        selected_entity = _select_annotation_entity(
++            adapter,
++            view,
++            edge_xy=edge_xy,
++            edge_entity=edge_entity,
++            entity=entity,
++            entity_type=entity_type,
++            label=label,
++        )
++        if (
++            placement == "native"
++            and int(adapter.swApp.IsSame(selected_entity, entity)) != 1
++        ):
++            raise RuntimeError(f"{label}: drawing selected a different datum edge")
+     else:
+         ddoc = _early_bound(draw, "IDrawingDoc")
+         name = view_name(adapter, view)
+         if not ddoc.ActivateView(name):
+             raise RuntimeError(f"failed to activate {label} drawing view {name!r}")
+@@ -479,8 +596,33 @@
+     tag_annotation = _sw_type_info.early_bound_or_flag(
+         tag.GetAnnotation(), "IAnnotation", "GetPosition", "SetPosition2"
+     )
++    if placement == "native":
++        if callout_below and not tag.SetText(4, callout_below):
++            raise RuntimeError(f"failed to set datum callout text ({label})")
++        baseline_xy = _native_datum_readback(
++            adapter, tag, entity, datum=datum, label=label
++        )
++        baseline_shoulder = bool(tag.Shoulder)
++        if shoulder and not baseline_shoulder:
++            raise RuntimeError(f"{label}: native datum shoulder did not persist")
++        draw.ClearSelection2(True)
++        if not draw.EditRebuild3():
++            raise RuntimeError(f"{label}: native datum rebuild failed")
++        actual_xy = _native_datum_readback(
++            adapter, tag, entity, datum=datum, label=label
++        )
++        if bool(tag.Shoulder) != baseline_shoulder:
++            raise RuntimeError(f"{label}: native datum shoulder changed on rebuild")
++        position_error = math.dist(actual_xy, baseline_xy)
++        if position_error > position_tolerance_m:
++            raise RuntimeError(
++                f"datum {datum} native position did not persist ({label}): "
++                f"{actual_xy}; baseline={baseline_xy}, "
++                f"error={position_error:.6g} m, limit={position_tolerance_m:.6g} m"
++            )
++        return tag
+     if not tag_annotation.SetPosition2(symbol_xy[0], symbol_xy[1], 0.0):
+         raise RuntimeError(f"failed to position datum {datum} ({label})")
+     actual_position = tag_annotation.GetPosition()
+     position_error = (
+         math.inf
+diff --git a/cad/scripts/draw_pinion_lift_rod.py b/cad/scripts/draw_pinion_lift_rod.py
+--- a/cad/scripts/draw_pinion_lift_rod.py
++++ b/cad/scripts/draw_pinion_lift_rod.py
+@@ -24,8 +24,9 @@
+     set_hidden_lines_removed,
+     stamp_drawing_summary,
+ )
+ from _drawing_registry import DRAWINGS_BY_NAME
++from _gear_drawing_entities import visible_circle_edge
+ from _surface_finish import surface_finish_by_key
+ from pinion_lift_rod_spec import CAP_SAG, ROD_DIA, ROD_LEN, SURFACE_FINISHES
+ from solidworks_mcp.adapters.solidworks.drawing import (
+     auto_center_marks,
+@@ -143,34 +144,22 @@
+     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
+         raise RuntimeError("failed to add ASME center mark to rod end view")
+ 
+-    # Pick the end circle at 12 o'clock, because the symbol goes straight ABOVE
+-    # it. Picked at 3 o'clock (the +r,0 point) with the symbol at 12, the tag
+-    # fought SetPosition2's along-the-edge rule -- on a CIRCLE the permitted set
+-    # IS the circumference, so the symbol collapsed to the nearest circle point
+-    # and its Y went inert: the requested 17.6 mm standoff rendered as ~1 mm,
+-    # too little for the ~3 mm attachment triangle, which then overlapped the
+-    # box and struck through the "A". Picking the clock position the symbol
+-    # actually sits at lets the leader run radially out to it -- the same
+-    # spelling draw_pivot_shaft.py / draw_pivot_bushing.py use. No gate sees
+-    # this: a datum symbol exposes no GetExtent, so only the render shows it.
+-    end_top = (
+-        FRONT_CENTER[0],
+-        FRONT_CENTER[1] + ROD_DIA * END_VIEW_SCALE / 2000.0,
+-    )
+-    # In the *Right view the part's +Z (crowned back end) points screen-left,
+-    # so the flat front end (z=0) is the RIGHT silhouette edge.
+-    flat_end = (RIGHT_CENTER[0] + HALF_SPAN, RIGHT_CENTER[1])
+-    add_datum_feature(
+-        adapter,
+-        front,
+-        edge_xy=end_top,
+-        symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.024),
+-        datum="A",
+-        label="lift rod axis",
+-        # SolidWorks normalizes this circular-edge datum 16.83 um along the
+-        # permitted circumference. Bound that measured API read-back locally;
+-        # all unrestricted datum placements retain the 1 um default.
++    # Select the circular boundary of the rod's cylindrical bearing face.
++    # SolidWorks chooses the datum position; the helper verifies its axis,
++    # attachment identity and unchanged 20 um rebuild-stability limit.
++    rod_edge = visible_circle_edge(adapter, front, ROD_DIA)
++    # In the *Right view the part's +Z (crowned back end) points screen-left,
++    # so the flat front end (z=0) is the RIGHT silhouette edge.
++    flat_end = (RIGHT_CENTER[0] + HALF_SPAN, RIGHT_CENTER[1])
++    add_datum_feature(
++        adapter,
++        front,
++        entity=rod_edge,
++        placement="native",
++        native_z_axis_radius_m=ROD_DIA / 2000.0,
++        datum="A",
++        label="lift rod axis",
+         position_tolerance_m=0.00002,
+     )
+     # Cylindricity and the bearing finish both control the rod's CYLINDRICAL
+     # face, which the side view shows edge-on -- so both anchor to its flank
+diff --git a/cad/scripts/draw_rack_pinion.py b/cad/scripts/draw_rack_pinion.py
+--- a/cad/scripts/draw_rack_pinion.py
++++ b/cad/scripts/draw_rack_pinion.py
+@@ -57,12 +57,12 @@
+ RIGHT_CENTER = (0.320, 0.175)
+ ISO_CENTER = (0.383, 0.210)  # 0.388 clipped the zone border right by 1.4 mm
+ 
+-BORE_R = BORE_DIA * VIEW_SCALE[0] / 2000.0
+-HALF_OD = OUTSIDE_DIA * VIEW_SCALE[0] / 2000.0
+-FRONT_FACE_X = RIGHT_CENTER[0] - FACE_WIDTH * VIEW_SCALE[0] / 2000.0
+-
+-FRONT_KEEP = {
+-    "BoreDia": (FRONT_CENTER[0] - 0.062, FRONT_CENTER[1] - 0.038),
++HALF_OD = OUTSIDE_DIA * VIEW_SCALE[0] / 2000.0
++FRONT_FACE_X = RIGHT_CENTER[0] - FACE_WIDTH * VIEW_SCALE[0] / 2000.0
++
++FRONT_KEEP = {
++    # Approach from upper-left, clear of native datum A below-left.
++    "BoreDia": (FRONT_CENTER[0] - 0.062, FRONT_CENTER[1] + 0.038),
+ }
+ DIMENSION_CALLOUTS = {
+     # Reamed slip fit on the stud's turned Ø5 front seat (nominal-or-under, like
+@@ -131,12 +131,12 @@
+         raise RuntimeError("failed to add ASME center mark to disc bore")
+     bore_edge = visible_circle_edge(adapter, front, BORE_DIA)
+ 
+-    bore_top = (FRONT_CENTER[0], FRONT_CENTER[1] + BORE_R)
+-    add_datum_feature(
+-        adapter,
+-        front,
+-        edge_xy=bore_top,
+-        symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.026),
++    add_datum_feature(
++        adapter,
++        front,
++        entity=bore_edge,
++        placement="native",
++        native_z_axis_radius_m=BORE_DIA / 2000.0,
+         datum="A",
+         label="rack pinion bore axis",
+         shoulder=True,
+diff --git a/cad/scripts/test_pinion_lift_rod_drawing.py b/cad/scripts/test_pinion_lift_rod_drawing.py
+--- a/cad/scripts/test_pinion_lift_rod_drawing.py
++++ b/cad/scripts/test_pinion_lift_rod_drawing.py
+@@ -81,8 +81,12 @@
+     assert source.count("add_datum_feature(") == 1
+     datum_a = source[source.index("add_datum_feature(") :]
+     datum_a = datum_a[: datum_a.index("    )")]
+-    assert "edge_xy=end_top" in datum_a
+-    assert "symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.024)" in datum_a
++    assert "rod_edge = visible_circle_edge(adapter, front, ROD_DIA)" in source
++    assert "entity=rod_edge" in datum_a
++    assert 'placement="native"' in datum_a
++    assert "native_z_axis_radius_m=ROD_DIA / 2000.0" in datum_a
++    assert "edge_xy=" not in datum_a
++    assert "symbol_xy=" not in datum_a
+     assert 'datum="A"' in datum_a
+     assert 'label="lift rod axis"' in datum_a
+     assert "position_tolerance_m=0.00002" in datum_a
+diff --git a/cad/scripts/test_rack_pinion_drawing.py b/cad/scripts/test_rack_pinion_drawing.py
+--- a/cad/scripts/test_rack_pinion_drawing.py
++++ b/cad/scripts/test_rack_pinion_drawing.py
+@@ -63,7 +63,25 @@
+     }
+ 
+ 
++def test_native_axis_datum_keeps_limit_and_separates_bore_dimension() -> None:
++    source = Path(drawing.__file__).read_text(encoding="utf-8")
++    datum_a = source[source.index("add_datum_feature(") :]
++    datum_a = datum_a[: datum_a.index("    )")]
++    assert "entity=bore_edge" in datum_a
++    assert 'placement="native"' in datum_a
++    assert "native_z_axis_radius_m=BORE_DIA / 2000.0" in datum_a
++    assert "position_tolerance_m=0.0001" in datum_a
++    assert "shoulder=True" in datum_a
++    assert "edge_xy=" not in datum_a
++    assert "symbol_xy=" not in datum_a
++    assert drawing.FRONT_KEEP["BoreDia"] == (
++        drawing.FRONT_CENTER[0] - 0.062,
++        drawing.FRONT_CENTER[1] + 0.038,
++    )
++    assert drawing.DIMENSION_PRECISION == {"BoreDia": 2}
++
++
+ def test_part_stamps_make_critical_properties() -> None:
+     source = Path(part.__file__).read_text(encoding="utf-8")
+     assert "apply_drawing_properties" in source
+     assert "clear_dimensions_for_drawing" in source
+diff --git a/cad/scripts/test_gear_drawing_batch_contract.py b/cad/scripts/test_gear_drawing_batch_contract.py
+--- a/cad/scripts/test_gear_drawing_batch_contract.py
++++ b/cad/scripts/test_gear_drawing_batch_contract.py
+@@ -96,8 +96,17 @@
+     for module in DRAWING_MODULES:
+         source = Path(module.__file__).read_text(encoding="utf-8")
+         assert "bore_edge = visible_circle_edge(" in source, module.__name__
++        if module is draw_rack_pinion:
++            assert "edge_xy=bore_top" not in source, module.__name__
++            assert "edge_xy=bore_bottom" not in source, module.__name__
++            assert source.count("entity=bore_edge") == 2, module.__name__
++            assert source.count('placement="native"') == 1, module.__name__
++            assert "native_z_axis_radius_m=BORE_DIA / 2000.0" in source
++            assert "position_tolerance_m=0.0001" in source, module.__name__
++            assert "shoulder=True" in source, module.__name__
++            continue
+         if module in CRANK_PAIR_MODULES:
+             assert "edge_xy=bore_top" not in source, module.__name__
+             assert source.count("entity=bore_edge") == 2, module.__name__
+             assert source.count("leader_attach_xy=(") == 1, module.__name__
+             assert "position_tolerance_m=0.080" in source, module.__name__

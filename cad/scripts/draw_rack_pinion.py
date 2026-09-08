@@ -14,16 +14,16 @@ from typing import Any
 from rack_pinion_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
-from _common import CAD_ROOT, check
+from _common import CAD_ROOT, _early_bound, check
 from _drawing_build import ProjectDrawingFactory, TemplateSpec, run_drawing_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
     add_feature_control_frame,
     add_property_linked_note,
     add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
+    model_point_in_view,
     read_required_properties,
     verify_dimension_callouts,
     set_dimension_precision,
@@ -32,6 +32,7 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
+from _native_axis_datum import add_native_axis_datum
 from _surface_finish import surface_finish_by_key
 from rack_pinion_spec import BORE_DIA, FACE_WIDTH, OUTSIDE_DIA, SURFACE_FINISHES
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -58,13 +59,14 @@ VIEW_SCALE = (1, 1)
 FRONT_CENTER = (0.220, 0.175)
 RIGHT_CENTER = (0.320, 0.175)
 ISO_CENTER = (0.383, 0.210)  # 0.388 clipped the zone border right by 1.4 mm
+BORE_FINISH_POSITION = (FRONT_CENTER[0] + 0.058, FRONT_CENTER[1] - 0.062)
 
-BORE_R = BORE_DIA * VIEW_SCALE[0] / 2000.0
 HALF_OD = OUTSIDE_DIA * VIEW_SCALE[0] / 2000.0
 FRONT_FACE_X = RIGHT_CENTER[0] - FACE_WIDTH * VIEW_SCALE[0] / 2000.0
 
 FRONT_KEEP = {
-    "BoreDia": (FRONT_CENTER[0] - 0.062, FRONT_CENTER[1] - 0.038),
+    # Approach from upper-left, clear of native datum A below-left.
+    "BoreDia": (FRONT_CENTER[0] - 0.062, FRONT_CENTER[1] + 0.038),
 }
 
 DIMENSION_PRECISION = {"BoreDia": 2}
@@ -136,16 +138,16 @@ async def build(
         raise RuntimeError("failed to add ASME center mark to disc bore")
     bore_edge = visible_circle_edge(adapter, front, BORE_DIA)
 
-    bore_top = (FRONT_CENTER[0], FRONT_CENTER[1] + BORE_R)
-    add_datum_feature(
+    add_native_axis_datum(
         adapter,
         front,
-        edge_xy=bore_top,
-        symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.026),
+        entity=bore_edge,
+        source_path=SOURCE,
+        radius_m=BORE_DIA / 2000.0,
         datum="A",
         label="rack pinion bore axis",
         shoulder=True,
-        position_tolerance_m=0.0001,
+        stability_tolerance_m=0.0001,
     )
     add_feature_control_frame(
         adapter,
@@ -157,14 +159,30 @@ async def build(
         datums=("A",),
         label="disc face squareness to bore",
     )
-    add_surface_finish(
+    # Keep the finish text outside the enlarged view and approach the opposite
+    # side of the bore from datum A. The pick remains the semantic bore edge;
+    # this projected point controls the leader attachment, not entity selection.
+    finish = add_surface_finish(
         adapter,
         front,
-        symbol_xy=(FRONT_CENTER[0] + 0.014, FRONT_CENTER[1] - 0.055),
+        symbol_xy=BORE_FINISH_POSITION,
         control=surface_finish_by_key(SURFACE_FINISHES, "bore"),
         label="rack pinion bore finish",
         entity=bore_edge,
+        leader_attach_xy=model_point_in_view(
+            adapter, front, (BORE_DIA / 2000.0, 0.0, FACE_WIDTH / 1000.0),
+            label="rack bore finish rim point",
+        ),
     )
+    finish_annotation = _early_bound(finish.GetAnnotation(), "IAnnotation")
+    finish_entities = tuple(finish_annotation.GetAttachedEntities3() or ())
+    if (
+        tuple(finish_annotation.GetAttachedEntityTypes() or ()) != (1,)
+        or len(finish_entities) != 1 or finish_entities[0] is None
+        or int(adapter.swApp.IsSame(finish_entities[0], bore_edge)) != 1
+        or finish_annotation.IsDangling()
+    ):
+        raise RuntimeError("rack bore finish lost its semantic edge attachment")
 
     add_property_linked_note(adapter, "Gear Data", 0.018, 0.262)
     add_property_linked_note(adapter, "Manufacturing Notes", 0.018, 0.095)

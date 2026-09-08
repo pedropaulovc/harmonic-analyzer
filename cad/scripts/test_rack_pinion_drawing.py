@@ -54,13 +54,30 @@ def test_manufacturing_notes_present() -> None:
 
 def test_native_gdt_controls_bore_datum_and_finish() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 1
+    assert source.count("add_native_axis_datum(") == 1
     assert source.count("add_feature_control_frame(") == 1
     assert source.count("add_surface_finish(") == 1
     assert drawing.DIMENSION_CALLOUTS == {"BoreDia": "THRU - REAM"}
     assert model_toleranced_dimensions(part) == {
         ("BoreProfile", "BoreDia"): "*deviations(BORE_DIA_BAND)"
     }
+
+
+def test_native_axis_datum_preserves_stability_limit_and_clear_layout() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    datum_a = source[source.index("add_native_axis_datum("):]
+    datum_a = datum_a[:datum_a.index("    )")]
+    assert "entity=bore_edge" in datum_a
+    assert "source_path=SOURCE" in datum_a
+    assert "radius_m=BORE_DIA / 2000.0" in datum_a
+    assert "stability_tolerance_m=0.0001" in datum_a
+    assert "shoulder=True" in datum_a
+    assert "edge_xy=" not in datum_a
+    assert "symbol_xy=" not in datum_a
+    assert drawing.FRONT_KEEP["BoreDia"] == (
+        drawing.FRONT_CENTER[0] - 0.062, drawing.FRONT_CENTER[1] + 0.038,
+    )
+    assert drawing.DIMENSION_PRECISION == {"BoreDia": 2}
 
 
 def test_part_stamps_make_critical_properties() -> None:
@@ -73,6 +90,20 @@ def test_part_stamps_make_critical_properties() -> None:
     assert config["material_specification"] == "C36000 free-machining brass"
     assert config["finish"] == "gear teeth cut; polished brass"
     assert int(config["quantity"]) == 1
+
+
+def test_finish_layout_preserves_semantic_bore_and_separates_native_datum() -> None:
+    assert drawing.BORE_FINISH_POSITION == (
+        drawing.FRONT_CENTER[0] + 0.058, drawing.FRONT_CENTER[1] - 0.062,
+    )
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    finish = source[source.index("finish = add_surface_finish("):]
+    assert "symbol_xy=BORE_FINISH_POSITION" in finish
+    assert "entity=bore_edge" in finish
+    assert "leader_attach_xy=model_point_in_view(" in finish
+    assert "(BORE_DIA / 2000.0, 0.0, FACE_WIDTH / 1000.0)" in finish
+    assert "IsSame(finish_entities[0], bore_edge)) != 1" in finish
+    assert "finish_annotation.IsDangling()" in finish
 
 
 def test_surface_finish_is_part_owned_authored_and_consumed() -> None:

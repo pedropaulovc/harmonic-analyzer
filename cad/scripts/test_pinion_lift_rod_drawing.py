@@ -78,15 +78,19 @@ def test_linked_notes_define_remaining_bearing_rod_operations() -> None:
 
 def test_native_gdt_controls_rod_form_orientation_and_finish() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 1
-    datum_a = source[source.index("add_datum_feature(") :]
+    assert source.count("add_native_axis_datum(") == 1
+    datum_a = source[source.index("add_native_axis_datum(") :]
     datum_a = datum_a[: datum_a.index("    )")]
-    assert "edge_xy=end_top" in datum_a
-    assert "symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.024)" in datum_a
+    assert "rod_edge = visible_circle_edge(adapter, front, ROD_DIA)" in source
+    assert "entity=rod_edge" in datum_a
+    assert "source_path=SOURCE" in datum_a
+    assert "radius_m=ROD_DIA / 2000.0" in datum_a
+    assert "edge_xy=" not in datum_a
+    assert "symbol_xy=" not in datum_a
     assert 'datum="A"' in datum_a
     assert 'label="lift rod axis"' in datum_a
-    assert "position_tolerance_m=0.00002" in datum_a
-    assert source.count("position_tolerance_m=0.00002") == 1
+    assert "stability_tolerance_m=0.00002" in datum_a
+    assert source.count("stability_tolerance_m=0.00002") == 1
     assert source.count("add_feature_control_frame(") == 2
     assert source.count('characteristic="cylindricity"') == 1
     # Only the flat front end -- the crowned back end carries no

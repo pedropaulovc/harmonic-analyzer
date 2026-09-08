@@ -1,0 +1,238 @@
+{
+  "kind": "vm2-datum-lifecycle",
+  "status": "passed",
+  "scope": "copied partial probe drawing, not complete production print acceptance",
+  "head": "6976b79e4bcf3bf158cf4a688813e01967177299",
+  "adapter": "2269009ed56712867826516f4406afc98a0c2814",
+  "probe_sha256": "20ea3d83b66251e6fad4006e23c70f60fcdb8ca46f22636ee1f2b3fbcb57709e",
+  "witness": "C:\\src\\ha-datum-placement-main\\cad\\out\\reports\\datum-placement\\rod-edge-native\\receipt.json",
+  "witness_sha256": "437d8507209620d8eff04cabfd5aa42c4b41e1324b91e901288a9beb14a23923",
+  "source": "C:\\src\\ha-datum-placement-main\\cad\\out\\sldprt\\pinion-lift-rod.SLDPRT",
+  "source_sha256_before": "59f635b07d5b1edb91ea828c0f9f8f8285cbcbbe17ce188cddeafef8ae08e8db",
+  "original": "C:\\src\\ha-datum-placement-main\\cad\\out\\reports\\datum-placement\\rod-edge-native\\partial.SLDDRW",
+  "original_sha256": "bf10eed94d4aba860f6d5ad7770a1c3f4461425509b647fe58900b96398dcdd2",
+  "working": "C:\\src\\ha-datum-placement-main\\cad\\out\\reports\\datum-placement\\rod-native-lifecycle-1\\pinion-lift-rod-lifecycle.SLDDRW",
+  "pid": 18748,
+  "revision": "34.3.0",
+  "started_utc": "2026-09-08T02:57:29.053322+00:00",
+  "stages": [
+    {
+      "stage": "cold_open",
+      "position": [
+        0.050763247944471825,
+        0.18920846961121315,
+        0.200800000228
+      ],
+      "view_position": [
+        0.055,
+        0.205
+      ],
+      "view_scale": [
+        2.0,
+        1.0
+      ],
+      "circle": [
+        0.0,
+        0.0,
+        0.202000000114,
+        0.0,
+        0.0,
+        1.0,
+        0.003175
+      ],
+      "cylinder": [
+        0.0,
+        0.0,
+        0.202000000114,
+        -0.0,
+        -0.0,
+        -1.0,
+        0.003175
+      ],
+      "attachment_type": 1,
+      "resolved_edge_same": 1,
+      "source_sha256": "59f635b07d5b1edb91ea828c0f9f8f8285cbcbbe17ce188cddeafef8ae08e8db",
+      "exports": {
+        "C:\\src\\ha-datum-placement-main\\cad\\out\\reports\\datum-placement\\rod-native-lifecycle-1\\cold_open.pdf": "2ee1290c9f2b3d25638262bd99e66c81cdc35c6afb0aeb8f24e88f5a92eebc02",
+        "C:\\src\\ha-datum-placement-main\\cad\\out\\reports\\datum-placement\\rod-native-lifecycle-1\\cold_open.png": "d9afadc953000dc37d9350b752ab23730ce095927455eedeecbf455130c9c57c"
+      }
+    },
+    {
+      "stage": "moved",
+      "position": [
+        0.058763247944471825,
+        0.19420846961121316,
+        0.200800000228
+      ],
+      "view_position": [
+        0.063,
+        0.21
+      ],
+      "view_scale": [
+        2.0,
+        1.0
+      ],
+      "circle": [
+        0.0,
+        0.0,
+        0.202000000114,
+        0.0,
+        0.0,
+        1.0,
+        0.003175
+      ],
+      "cylinder": [
+        0.0,
+        0.0,
+        0.202000000114,
+        -0.0,
+        -0.0,
+        -1.0,
+        0.003175
+      ],
+      "attachment_type": 1,
+      "resolved_edge_same": 1,
+      "source_sha256": "59f635b07d5b1edb91ea828c0f9f8f8285cbcbbe17ce188cddeafef8ae08e8db",
+      "exports": {
+        "C:\\src\\ha-datum-placement-main\\cad\\out\\reports\\datum-placement\\rod-native-lifecycle-1\\moved.pdf": "aebdbfd3d3f3987dbdef42466cf85f909c02f918a113b5de96e48e6363576c78",
+        "C:\\src\\ha-datum-placement-main\\cad\\out\\reports\\datum-placement\\rod-native-lifecycle-1\\moved.png": "fe384ffbf60347a45d370a507c6134683265548e378d95f2e25a7a80580058c7"
+      }
+    },
+    {
+      "stage": "scaled",
+      "position": [
+        0.05835188134580817,
+        0.19267519410710313,
+        0.2510000002849999
+      ],
+      "view_position": [
+        0.063,
+        0.21
+      ],
+      "view_scale": [
+        2.5,
+        1.0
+      ],
+      "circle": [
+        0.0,
+        0.0,
+        0.202000000114,
+        0.0,
+        0.0,
+        1.0,
+        0.003175
+      ],
+      "cylinder": [
+        0.0,
+        0.0,
+        0.202000000114,
+        -0.0,
+        -0.0,
+        -1.0,
+        0.003175
+      ],
+      "attachment_type": 1,
+      "resolved_edge_same": 1,
+      "source_sha256": "59f635b07d5b1edb91ea828c0f9f8f8285cbcbbe17ce188cddeafef8ae08e8db",
+      "exports": {
+        "C:\\src\\ha-datum-placement-main\\cad\\out\\reports\\datum-placement\\rod-native-lifecycle-1\\scaled.pdf": "1e256ecb5e4851497da5289cd829357ecda75b13bc899173e89eca9304609cd4",
+        "C:\\src\\ha-datum-placement-main\\cad\\out\\reports\\datum-placement\\rod-native-lifecycle-1\\scaled.png": "9372670dd8cae7c9fe145c8d2ad7ae09567601e5a4e04d3163b9f965e760ebd8"
+      }
+    },
+    {
+      "stage": "restored",
+      "position": [
+        0.050763247944471825,
+        0.18920846961121315,
+        0.200800000228
+      ],
+      "view_position": [
+        0.055,
+        0.205
+      ],
+      "view_scale": [
+        2.0,
+        1.0
+      ],
+      "circle": [
+        0.0,
+        0.0,
+        0.202000000114,
+        0.0,
+        0.0,
+        1.0,
+        0.003175
+      ],
+      "cylinder": [
+        0.0,
+        0.0,
+        0.202000000114,
+        -0.0,
+        -0.0,
+        -1.0,
+        0.003175
+      ],
+      "attachment_type": 1,
+      "resolved_edge_same": 1,
+      "source_sha256": "59f635b07d5b1edb91ea828c0f9f8f8285cbcbbe17ce188cddeafef8ae08e8db"
+    },
+    {
+      "stage": "second_cold_open",
+      "position": [
+        0.050763247944471825,
+        0.18920846961121315,
+        0.200800000228
+      ],
+      "view_position": [
+        0.055,
+        0.205
+      ],
+      "view_scale": [
+        2.0,
+        1.0
+      ],
+      "circle": [
+        0.0,
+        0.0,
+        0.202000000114,
+        0.0,
+        0.0,
+        1.0,
+        0.003175
+      ],
+      "cylinder": [
+        0.0,
+        0.0,
+        0.202000000114,
+        -0.0,
+        -0.0,
+        -1.0,
+        0.003175
+      ],
+      "attachment_type": 1,
+      "resolved_edge_same": 1,
+      "source_sha256": "59f635b07d5b1edb91ea828c0f9f8f8285cbcbbe17ce188cddeafef8ae08e8db",
+      "exports": {
+        "C:\\src\\ha-datum-placement-main\\cad\\out\\reports\\datum-placement\\rod-native-lifecycle-1\\second_cold_open.pdf": "e67ef38d9a74b81f78896c31b0959dc8b303b051d89c61360e7b601ec8e9c7b5",
+        "C:\\src\\ha-datum-placement-main\\cad\\out\\reports\\datum-placement\\rod-native-lifecycle-1\\second_cold_open.png": "d9afadc953000dc37d9350b752ab23730ce095927455eedeecbf455130c9c57c"
+      }
+    }
+  ],
+  "closures": [
+    {
+      "path": "C:\\src\\ha-datum-placement-main\\cad\\out\\reports\\datum-placement\\rod-native-lifecycle-1\\pinion-lift-rod-lifecycle.SLDDRW",
+      "title": "pinion-lift-rod-lifecycle - Sheet1"
+    },
+    {
+      "path": "C:\\src\\ha-datum-placement-main\\cad\\out\\reports\\datum-placement\\rod-native-lifecycle-1\\pinion-lift-rod-lifecycle.SLDDRW",
+      "title": "pinion-lift-rod-lifecycle - Sheet1"
+    }
+  ],
+  "translation_error_m": 0.0,
+  "restore_error_m": 0.0,
+  "second_reopen_error_m": 0.0,
+  "source_sha256_after": "59f635b07d5b1edb91ea828c0f9f8f8285cbcbbe17ce188cddeafef8ae08e8db",
+  "working_sha256": "5b495ba56f62dc8fbe374be6838930fffdd59f44c1cf8e4a03c1c52e6fbe8d0b",
+  "elapsed_s": 8.413801099988632,
+  "ended_utc": "2026-09-08T02:57:37.467162+00:00"
+}
