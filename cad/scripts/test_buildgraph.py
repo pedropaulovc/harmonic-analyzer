@@ -472,6 +472,92 @@ def test_generated_row_selection_preserves_prepared_source_provenance(
     assert _source_references(tmp_path, monkeypatch, source) == {"rocker_arm"}
 
 
+def test_keyed_field_loop_cannot_hide_actual_inserted_source(tmp_path, monkeypatch):
+    import asyncio
+
+    source = '''async def build(adapter):
+    specs = {"main": "rocker-arm"}
+    for specs["main"] in ("rocker-arm-support",):
+        await place_component(adapter, specs["main"], p, r, q)
+'''
+    consumed = []
+
+    async def record(_adapter, part, *_args):
+        consumed.append(part)
+
+    namespace = {"place_component": record, "p": None, "r": None, "q": None}
+    exec(source, namespace)
+    asyncio.run(namespace["build"](None))
+    assert consumed == ["rocker-arm-support"]
+    with pytest.raises(ValueError, match="[Uu]nresolved assembly source"):
+        _source_references(tmp_path, monkeypatch, source, ("rocker_arm", "rocker_arm_support"))
+
+
+@pytest.fixture(params=[
+    "for specs['main'] in ('rocker-arm-support',):\n    pass",
+    "async for specs['main'] in runtime_rows():\n    pass",
+    "for ignored, specs['main'] in runtime_rows():\n    pass",
+    "ignored, specs['main'] = runtime_pair()",
+    "with runtime_source() as specs['main']:\n    pass",
+    "async with runtime_source() as specs['main']:\n    pass",
+    "[None for specs['main'] in ('rocker-arm-support',)]",
+    "del specs['main']",
+], ids=["for", "async-for", "unpacked-for", "unpacked-assignment", "with",
+        "async-with", "comprehension", "delete"])
+def unsupported_keyed_field_binding(request):
+    return request.param
+
+
+def test_unsupported_keyed_field_bindings_fail_closed(
+    tmp_path, monkeypatch, unsupported_keyed_field_binding
+):
+    source = (
+        "async def build(adapter):\n"
+        "    specs = {'main': 'rocker-arm'}\n"
+        + "".join(f"    {line}\n" for line in unsupported_keyed_field_binding.splitlines())
+        + "    await place_component(adapter, specs['main'], p, r, q)\n"
+    )
+    with pytest.raises(ValueError, match="[Uu]nresolved assembly source"):
+        _source_references(tmp_path, monkeypatch, source, ("rocker_arm", "rocker_arm_support"))
+
+
+def test_unavailable_keyed_field_bindings_do_not_change_earlier_sink(
+    tmp_path, monkeypatch, unsupported_keyed_field_binding
+):
+    source = (
+        "async def build(adapter):\n"
+        "    specs = {'main': 'rocker-arm'}\n"
+        "    await place_component(adapter, specs['main'], p, r, q)\n"
+        + "".join(f"    {line}\n" for line in unsupported_keyed_field_binding.splitlines())
+    )
+    assert _source_references(tmp_path, monkeypatch, source) == {"rocker_arm"}
+
+
+def test_different_keyed_field_bindings_leave_source_field_unchanged(
+    tmp_path, monkeypatch, unsupported_keyed_field_binding
+):
+    source = (
+        "async def build(adapter):\n"
+        "    specs = {'main': 'rocker-arm'}\n"
+        + "".join(f"    {line}\n" for line in unsupported_keyed_field_binding.replace("'main'", "'other'").splitlines())
+        + "    await place_component(adapter, specs['main'], p, r, q)\n"
+    )
+    assert _source_references(tmp_path, monkeypatch, source) == {"rocker_arm"}
+
+
+def test_later_keyed_field_loop_binding_can_reach_next_iteration(tmp_path, monkeypatch):
+    source = (
+        "async def build(adapter):\n"
+        "    specs = {'main': 'rocker-arm'}\n"
+        "    for index in (0, 1):\n"
+        "        await place_component(adapter, specs['main'], p, r, q)\n"
+        "        for specs['main'] in ('rocker-arm-support',):\n"
+        "            pass\n"
+    )
+    with pytest.raises(ValueError, match="[Uu]nresolved assembly source"):
+        _source_references(tmp_path, monkeypatch, source, ("rocker_arm", "rocker_arm_support"))
+
+
 def test_keyed_source_loop_owner_cannot_hide_actual_inserted_source(tmp_path, monkeypatch):
     import asyncio
 
