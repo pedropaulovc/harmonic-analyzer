@@ -104,6 +104,8 @@ from _buildgraph import (  # noqa: E402
     artefact_for,
     config_files_of,
     data_deps_of,
+    drawing_registry_reads_selected,
+    drawing_registry_recipe,
     machine_family_files,
     module_deps_of,
     part_row_files,
@@ -1420,6 +1422,17 @@ def _assembly_cache_outputs(stem: str) -> list[Path]:
     return outs
 
 
+def _drawing_registry_dep(stem: str, registry: Path) -> str:
+    """Selected row plus shared implementation; one-time drawing key migration."""
+    recipe = drawing_registry_recipe(
+        registry.read_text(encoding="utf-8"), DRAWINGS_BY_NAME[stem]
+    )
+    return _write_digest_sidecar(
+        CAD_OUT / ".drawing-registry" / f"{stem}.digest",
+        hashlib.md5(recipe.encode("utf-8")).hexdigest(),
+    )
+
+
 def _drawing_file_deps(stem: str) -> list[str]:
     """Inputs for both doit freshness and the shared drawing-cache key.
 
@@ -1429,7 +1442,17 @@ def _drawing_file_deps(stem: str) -> list[str]:
     """
     spec = DRAWINGS_BY_NAME[stem]
     script = spec.script.resolve()
-    runtime = [*_helper_deps(script), _submodule_dep()]
+    # Traverse first: helpers imported BY the registry must remain dependencies.
+    runtime = _helper_deps(script)
+    registry = (SCRIPTS_DIR / "_drawing_registry.py").resolve()
+    if str(registry) in runtime:
+        consumers = sorted({script, *(Path(path) for path in runtime)} - {registry})
+        if drawing_registry_reads_selected(
+            tuple(path.read_text(encoding="utf-8") for path in consumers), stem
+        ):
+            runtime = [path for path in runtime if Path(path).resolve() != registry]
+            runtime.append(_drawing_registry_dep(stem, registry))
+    runtime.append(_submodule_dep())
     if spec.source_kind == "assembly":
         # Assembly-sourced drawings need the same exact-identity signal as
         # part-sourced drawings. The recipe-stable .SLDASM digest preserves

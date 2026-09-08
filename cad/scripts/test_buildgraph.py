@@ -10,6 +10,7 @@ from __future__ import annotations
 import sys
 import ast
 from collections import Counter
+from dataclasses import asdict, field, make_dataclass, replace
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
@@ -35,6 +36,51 @@ from _buildgraph import (  # noqa: E402
 )
 from _assembly import assembly_title_properties  # noqa: E402
 from _common import part_properties  # noqa: E402
+
+
+@pytest.mark.parametrize(
+    "declaration",
+    [
+        "",
+        "DRAWINGS = ()\nDRAWINGS = ()\n",
+        "DRAWINGS = build_drawings()\n",
+        "DRAWINGS = tuple(rows)\n",
+        "DRAWINGS = (*extra_rows,)\n",
+        "DRAWINGS = (DrawingSpec(name=choose_name()),)\n",
+        "DRAWINGS = (DrawingSpec(**row),)\n",
+    ],
+    ids=[
+        "missing",
+        "duplicate",
+        "factory",
+        "computed-tuple",
+        "spread",
+        "computed-field",
+        "kwargs",
+    ],
+)
+def test_drawing_registry_projection_rejects_executable_row_declarations(declaration):
+    from _drawing_registry import DRAWINGS_BY_NAME
+
+    with pytest.raises(ValueError):
+        bg.drawing_registry_recipe(declaration, DRAWINGS_BY_NAME["platen_guide"])
+
+
+def test_drawing_registry_projection_tracks_new_selected_dataclass_fields():
+    from _drawing_registry import DRAWINGS_BY_NAME, DrawingSpec
+
+    source = (SCRIPTS_DIR / "_drawing_registry.py").read_text(encoding="utf-8")
+    extended_spec = make_dataclass(
+        "ExtendedDrawingSpec",
+        [("finish_note", str, field(default="plain"))],
+        bases=(DrawingSpec,),
+        frozen=True,
+    )(**asdict(DRAWINGS_BY_NAME["platen_guide"]))
+    before = bg.drawing_registry_recipe(source, extended_spec)
+    after = bg.drawing_registry_recipe(
+        source, replace(extended_spec, finish_note="black oxide")
+    )
+    assert before != after
 
 
 def _helper_names(stem_script: str) -> set[str]:

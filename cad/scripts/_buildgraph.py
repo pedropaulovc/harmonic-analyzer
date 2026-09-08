@@ -16,7 +16,9 @@ from __future__ import annotations
 
 import ast
 import functools
+import json
 import re
+from dataclasses import asdict, fields
 from enum import Enum
 from pathlib import Path
 
@@ -186,9 +188,10 @@ class _AssemblySources:
         """Include lexical, deferred-global and possible prior-iteration writes."""
         if self.scopes[node] is not self.tree and self.scopes[item] is self.tree:
             return _SourceAvailability.AVAILABLE
-        if (
-            getattr(item, "lineno", 0), getattr(item, "col_offset", 0)
-        ) < (node.lineno, node.col_offset):
+        if (getattr(item, "lineno", 0), getattr(item, "col_offset", 0)) < (
+            node.lineno,
+            node.col_offset,
+        ):
             return _SourceAvailability.AVAILABLE
         ancestors = set()
         cursor = item
@@ -198,7 +201,10 @@ class _AssemblySources:
         cursor = node
         while cursor in self.parents:
             cursor = self.parents[cursor]
-            if isinstance(cursor, (ast.For, ast.AsyncFor, ast.While)) and cursor in ancestors:
+            if (
+                isinstance(cursor, (ast.For, ast.AsyncFor, ast.While))
+                and cursor in ancestors
+            ):
                 return _SourceAvailability.AVAILABLE
         return _SourceAvailability.FUTURE
 
@@ -275,7 +281,9 @@ class _AssemblySources:
             for item in self.items(binding, trail)
         ]
         for item in self.scope_nodes(node):
-            available = self.availability_before(item, node) is _SourceAvailability.AVAILABLE
+            available = (
+                self.availability_before(item, node) is _SourceAvailability.AVAILABLE
+            )
             if isinstance(item, (ast.Assign, ast.AnnAssign)):
                 targets = (
                     item.targets if isinstance(item, ast.Assign) else [item.target]
@@ -374,11 +382,16 @@ class _AssemblySources:
             ):
                 self.fail(item)
             targets = (
-                item.targets if isinstance(item, ast.Assign)
-                else [item.target] if isinstance(item, (ast.AnnAssign, ast.NamedExpr))
+                item.targets
+                if isinstance(item, ast.Assign)
+                else [item.target]
+                if isinstance(item, (ast.AnnAssign, ast.NamedExpr))
                 else []
             )
-            if any(isinstance(target, ast.Name) and target.id == owner.id for target in targets):
+            if any(
+                isinstance(target, ast.Name) and target.id == owner.id
+                for target in targets
+            ):
                 if item.value is not None:
                     found.append(item.value)
         return found
@@ -387,26 +400,44 @@ class _AssemblySources:
         """Recognize selection from the same unescaped collection prepared earlier."""
         found = set()
         for value in self.direct_mapping_bindings(node, owner):
-            if not isinstance(value, ast.Subscript) or not isinstance(value.value, ast.Name):
+            if not isinstance(value, ast.Subscript) or not isinstance(
+                value.value, ast.Name
+            ):
                 continue
             collection = value.value
             loops = [
-                item for item in self.scope_nodes(node)
+                item
+                for item in self.scope_nodes(node)
                 if isinstance(item, ast.For)
-                and isinstance(item.target, ast.Name) and item.target.id == owner.id
-                and isinstance(item.iter, ast.Name) and item.iter.id == collection.id
-                and self.availability_before(item, value) is _SourceAvailability.AVAILABLE
+                and isinstance(item.target, ast.Name)
+                and item.target.id == owner.id
+                and isinstance(item.iter, ast.Name)
+                and item.iter.id == collection.id
+                and self.availability_before(item, value)
+                is _SourceAvailability.AVAILABLE
             ]
             if not loops:
                 continue
             for loop in loops:
-                if set(self.bindings(loop.iter, frozenset())) != set(self.bindings(collection, frozenset())):
-                    self.fail(value)  # collection was rebound after its rows were prepared
+                if set(self.bindings(loop.iter, frozenset())) != set(
+                    self.bindings(collection, frozenset())
+                ):
+                    self.fail(
+                        value
+                    )  # collection was rebound after its rows were prepared
             for use in self.scope_nodes(node):
-                if not isinstance(use, ast.Name) or use.id != collection.id or not isinstance(use.ctx, ast.Load):
+                if (
+                    not isinstance(use, ast.Name)
+                    or use.id != collection.id
+                    or not isinstance(use.ctx, ast.Load)
+                ):
                     continue
                 parent = self.parents[use]
-                if isinstance(parent, ast.Subscript) and parent.value is use and isinstance(parent.ctx, ast.Load):
+                if (
+                    isinstance(parent, ast.Subscript)
+                    and parent.value is use
+                    and isinstance(parent.ctx, ast.Load)
+                ):
                     assignment = self.parents[parent]
                     if (
                         isinstance(assignment, ast.Assign)
@@ -418,7 +449,9 @@ class _AssemblySources:
                         continue
                 if parent in loops and parent.iter is use:
                     continue
-                self.fail(use)  # collection alias/mutation/opaque consumer is unsupported
+                self.fail(
+                    use
+                )  # collection alias/mutation/opaque consumer is unsupported
             found.add(value)
         return found
 
@@ -435,8 +468,10 @@ class _AssemblySources:
             for value in prepared_rows
             for loop in self.scope_nodes(node)
             if isinstance(loop, ast.For)
-            and isinstance(loop.target, ast.Name) and loop.target.id == owner.id
-            and isinstance(loop.iter, ast.Name) and loop.iter.id == value.value.id
+            and isinstance(loop.target, ast.Name)
+            and loop.target.id == owner.id
+            and isinstance(loop.iter, ast.Name)
+            and loop.iter.id == value.value.id
             and self.availability_before(loop, value) is _SourceAvailability.AVAILABLE
         }
         for item in self.scope_nodes(node):
@@ -445,10 +480,12 @@ class _AssemblySources:
             if (
                 isinstance(item, ast.Subscript)
                 and isinstance(item.ctx, (ast.Store, ast.Del))
-                and isinstance(item.value, ast.Name) and item.value.id == owner.id
+                and isinstance(item.value, ast.Name)
+                and item.value.id == owner.id
             ):
                 if (
-                    isinstance(item.slice, ast.Constant) and isinstance(key, ast.Constant)
+                    isinstance(item.slice, ast.Constant)
+                    and isinstance(key, ast.Constant)
                     and item.slice.value != key.value
                 ):
                     continue
@@ -478,8 +515,14 @@ class _AssemblySources:
                     self.fail(item)
             if isinstance(
                 item,
-                (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef,
-                 ast.ExceptHandler, ast.MatchAs, ast.MatchStar),
+                (
+                    ast.FunctionDef,
+                    ast.AsyncFunctionDef,
+                    ast.ClassDef,
+                    ast.ExceptHandler,
+                    ast.MatchAs,
+                    ast.MatchStar,
+                ),
             ):
                 if item.name == owner.id:
                     self.fail(item)
@@ -496,10 +539,13 @@ class _AssemblySources:
         # shape need not be interpreted. Direct map assignments still cannot hide
         # an initial source, opaque rebinding or whole-container augmentation.
         initial_values = (
-            self.bindings(owner, frozenset()) if key is None
+            self.bindings(owner, frozenset())
+            if key is None
             else self.direct_mapping_bindings(node, owner)
         )
-        prepared_rows = self.prepared_row_selections(node, owner) if key is not None else set()
+        prepared_rows = (
+            self.prepared_row_selections(node, owner) if key is not None else set()
+        )
         if key is not None:
             # The get/items path already uses full bindings(), including literal
             # loop owners. This guard closes the newer direct-mapping path only.
@@ -571,7 +617,11 @@ class _AssemblySources:
                     target.value
                 ) != ast.dump(owner):
                     continue
-                if key is not None and self.availability_before(item, node) is _SourceAvailability.FUTURE:
+                if (
+                    key is not None
+                    and self.availability_before(item, node)
+                    is _SourceAvailability.FUTURE
+                ):
                     continue
                 if key is not None and ast.dump(target.slice) != ast.dump(key):
                     if (
@@ -844,9 +894,7 @@ def _local_modules() -> dict[str, Path]:
         # do not treat arbitrary folders as namespace packages: that would make
         # external/tooling trees appear to be geometry dependencies.
         if any(
-            not (
-                SCRIPTS_DIR.joinpath(*directories[:depth]) / "__init__.py"
-            ).is_file()
+            not (SCRIPTS_DIR.joinpath(*directories[:depth]) / "__init__.py").is_file()
             for depth in range(1, len(directories) + 1)
         ):
             continue
@@ -859,6 +907,7 @@ def _local_modules() -> dict[str, Path]:
         if module_parts:
             out[".".join(module_parts)] = path
     return out
+
 
 @functools.lru_cache(maxsize=None)
 def _module_by_path() -> dict[Path, str]:
@@ -960,6 +1009,154 @@ def module_deps_of(script: Path) -> list[str]:
         result.add(mod)
         frontier |= set(_direct_local_imports(mods[mod].resolve())) - result
     return sorted(str(mods[m].resolve()) for m in result)
+
+
+@functools.lru_cache(maxsize=32)
+def _drawing_registry_source(
+    text: str, field_names: tuple[str, ...]
+) -> tuple[str, tuple[tuple[object, str], ...]]:
+    """Cache immutable source projections, never parsed ASTs or selected values."""
+    tree = ast.parse(text)
+    declarations = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Name)
+        and node.id == "DRAWINGS"
+        and isinstance(node.ctx, ast.Store)
+    ]
+    declaration = next(
+        (
+            node
+            for node in tree.body
+            if isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "DRAWINGS"
+        ),
+        None,
+    )
+    if len(declarations) != 1 or declaration is None:
+        raise ValueError("drawing registry requires one declarative DRAWINGS tuple")
+    if not isinstance(declaration.value, ast.Tuple):
+        raise ValueError("drawing registry requires a declarative DRAWINGS tuple")
+    rows = []
+    for row in declaration.value.elts:
+        if (
+            not isinstance(row, ast.Call)
+            or not isinstance(row.func, ast.Name)
+            or row.func.id != "DrawingSpec"
+            or any(keyword.arg is None for keyword in row.keywords)
+            or len(row.args) > len(field_names)
+        ):
+            raise ValueError("drawing registry rows must be literal DrawingSpec calls")
+        try:
+            values = {
+                name: ast.literal_eval(value)
+                for name, value in zip(field_names, row.args)
+            }
+            for keyword in row.keywords:
+                if keyword.arg in values:
+                    raise ValueError("duplicate drawing field")
+                values[keyword.arg] = ast.literal_eval(keyword.value)
+        except (ValueError, TypeError) as exc:
+            raise ValueError(
+                "drawing registry rows must contain only literals"
+            ) from exc
+        rows.append((values.get("name"), ast.dump(row, include_attributes=False)))
+    declaration.value = ast.Tuple(elts=[], ctx=ast.Load())
+    return ast.dump(tree, include_attributes=False), tuple(rows)
+
+
+def drawing_registry_recipe(text: str, spec: object) -> str:
+    """Project declarative row data without dropping shared registry semantics.
+
+    Reject executable row expressions rather than silently removing their effects.
+    The selected source row also tracks edits before an importing caller reloads
+    its dataclass instance. AST locations and source line endings are irrelevant.
+    """
+    shared, rows = _drawing_registry_source(
+        text, tuple(field.name for field in fields(spec))
+    )
+    selected = [source for name, source in rows if name == getattr(spec, "name")]
+    if len(selected) != 1:
+        raise ValueError("drawing registry must contain exactly one selected row")
+    return json.dumps(
+        {
+            "shared": shared,
+            "selected_source": selected[0],
+            "selected_fields": asdict(spec),
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    )
+
+
+@functools.lru_cache(maxsize=512)
+def _drawing_registry_reads(text: str) -> frozenset[str] | None:
+    """Cache a source's literal row read set; None denotes an unclassified use."""
+    nodes = tuple(ast.walk(ast.parse(text)))
+    parents = {
+        id(child): node for node in nodes for child in ast.iter_child_nodes(node)
+    }
+    registry_names = {"_drawing_registry", "DRAWINGS", "DRAWINGS_BY_NAME"}
+    allowed_exports = {"DrawingSpec", "PROJECT_DRWDOT", "DRAWINGS_BY_NAME"}
+    for node in nodes:
+        if isinstance(node, ast.Import):
+            if any(
+                alias.name.rsplit(".", 1)[-1] == "_drawing_registry"
+                for alias in node.names
+            ):
+                return None
+        elif isinstance(node, ast.ImportFrom):
+            registry = (
+                node.module is not None
+                and node.module.rsplit(".", 1)[-1] == "_drawing_registry"
+            )
+            for alias in node.names:
+                if alias.name == "*":
+                    return None
+                if registry:
+                    if alias.asname is not None or alias.name not in allowed_exports:
+                        return None
+                elif alias.name in registry_names or alias.asname in registry_names:
+                    return None
+
+    rows = set()
+    for node in nodes:
+        if isinstance(node, ast.Attribute) and node.attr in registry_names:
+            return None
+        if not isinstance(node, ast.Name):
+            continue
+        if node.id in {"eval", "exec", "globals", "locals", "vars", "__import__"}:
+            return None
+        if node.id not in registry_names:
+            continue
+        parent = parents.get(id(node))
+        if node.id == "DRAWINGS_BY_NAME" and (
+            isinstance(parent, ast.Subscript)
+            and parent.value is node
+            and isinstance(parent.ctx, ast.Load)
+            and isinstance(parent.slice, ast.Constant)
+            and isinstance(parent.slice.value, str)
+        ):
+            rows.add(parent.slice.value)
+            continue
+        return None
+    return frozenset(rows)
+
+
+def drawing_registry_reads_selected(texts: tuple[str, ...], stem: str) -> bool:
+    """Whether a complete consumer closure uses only the selected registry row.
+
+    Only the current schema/template imports and literal selected index lookups
+    can narrow. Module imports, aliases, re-exports and unclassified uses retain
+    the full file; this deliberately does not attempt general Python dataflow.
+    """
+    for text in texts:
+        rows = _drawing_registry_reads(text)
+        if rows is None or any(name != stem for name in rows):
+            return False
+    return True
 
 
 def data_deps_of(script: Path) -> list[str]:
