@@ -186,7 +186,7 @@ def _purchased_title_block(
         raise RuntimeError("purchased drawing template has no sheet view")
     sheet_view = _early_bound(sheet_view, "IView")
     replacements = {
-        property_link("Material Specification"): (property_link("Material"), material),
+        property_link("Material"): (property_link("Material"), material),
         property_link("Finish"): ('$PRP:"Finish"', finish),
     }
     matched = {token: 0 for token in replacements}
@@ -208,17 +208,18 @@ def _purchased_title_block(
                 matched[token] += occurrences
                 linked_text = linked_text.replace(token, replacement)
                 resolved_text = resolved_text.replace(token, value)
-        if linked_text == raw:
+        if resolved_text == raw:
             continue
         # Preserve the existing note, annotation formatting and all surrounding
         # label text; only these exact property-link tokens change ownership.
-        note.PropertyLinkedText = linked_text
+        if linked_text != raw:
+            note.PropertyLinkedText = linked_text
         if note.PropertyLinkedText != linked_text:
             raise RuntimeError(f"purchased title-block link did not persist: {raw!r}")
         notes.append((note, linked_text, resolved_text))
     if any(count != 1 for count in matched.values()):
         raise RuntimeError(
-            "purchased template must contain exactly one Material Specification "
+            "purchased template must contain exactly one Material "
             f"and one Finish property link: {matched!r}"
         )
     return notes
@@ -295,7 +296,7 @@ async def build_purchased_fastener_drawing(
     scale = _fit_views(draw, views)
 
     with _telemetry.span("drawing.purchased_property_link"):
-        values = tuple(sheet.GetProperties2())
+        values = tuple(adapter._get_attr_or_call(sheet, "GetProperties2"))
         if len(values) != 8:
             raise RuntimeError(
                 f"purchased drawing has incomplete sheet properties: {values!r}"
@@ -316,7 +317,7 @@ async def build_purchased_fastener_drawing(
         if not first_name:
             raise RuntimeError("purchased front view has no native name")
         sheet.CustomPropertyView = first_name
-        values = tuple(sheet.GetProperties2())
+        values = tuple(adapter._get_attr_or_call(sheet, "GetProperties2"))
         if (
             len(values) != 8
             or bool(values[4])
@@ -403,12 +404,17 @@ async def build_purchased_fastener_drawing(
                     f"{name}: purchased view leaves its cell/border: {box!r}"
                 )
         for note, linked_text, resolved_text, cell in notes:
+            actual_link = note.PropertyLinkedText
+            actual_text = note.GetText()
+            # INote.GetText uses CRLF; PropertyLinkedText preserves authored LF.
             if (
-                note.PropertyLinkedText != linked_text
-                or note.GetText() != resolved_text
+                actual_link != linked_text
+                or actual_text.replace("\r\n", "\n") != resolved_text
             ):
                 raise RuntimeError(
-                    f"purchased note did not resolve from its expected source: {linked_text!r}"
+                    f"purchased note readback mismatch: expected link={linked_text!r}, "
+                    f"actual link={actual_link!r}, expected text={resolved_text!r}, "
+                    f"actual text={actual_text!r}"
                 )
             box = _box(note.GetExtent(), label=linked_text, kind="note")
             if not _inside(box, cell) or not _inside(box, border):

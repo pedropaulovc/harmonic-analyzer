@@ -48,3 +48,17 @@ Ground rules (mirrored in the diagnostics themselves): the vendor files are
 opened read-only and NEVER saved or modified; everything derived from them
 (harvest dumps, replicas, renders, reports) goes only under the gitignored
 `cad/out/`.
+
+## Reference drawings
+
+Each of the 19 production part identities above has a registered `drawing:`
+task, including identities that share a supplier SKU. The sheets show front,
+top, right and isometric views, with the stock description and ordering SKU.
+They are purchased-part identification sheets; their general tolerance and
+edge-break notes do not apply.
+
+For example, `uv run python build.py drawing:knife_hanger_washer` writes
+`cad/out/slddrw/knife-hanger-washer.SLDDRW`,
+`cad/out/pdf/knife-hanger-washer.pdf` and
+`cad/out/png/knife-hanger-washer_drawing.png`. Run these tasks through the
+pipeline so they acquire the shared SolidWorks seat lock.
