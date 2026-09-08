@@ -100,7 +100,7 @@ def test_part_stamps_make_critical_properties() -> None:
 
 def test_finish_layout_preserves_semantic_bore_and_separates_native_datum() -> None:
     assert drawing.BORE_FINISH_POSITION == (
-        drawing.FRONT_CENTER[0] + 0.058, drawing.FRONT_CENTER[1] - 0.062,
+        drawing.FRONT_CENTER[0] + 0.058, drawing.FRONT_CENTER[1] - 0.070,
     )
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "add_rack_bore_finish(adapter, front, bore_edge, symbol_xy=BORE_FINISH_POSITION)" in source
