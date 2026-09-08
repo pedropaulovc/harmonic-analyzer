@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sys
 
-from _common import run_build
+from _common import PANEL_BLACK, run_build
 from _fastener_catalog import fastener
 from _holes import HoleSpec
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
@@ -32,7 +32,9 @@ STUD_BOTTOM_CLEARANCE = 0.25
 PLUG_TAP_LEAD = 5.0 * THREAD_PITCH
 
 
-def require_seat_fit(seat: HoleSpec, plate_thickness: float, stud_length: float) -> None:
+def require_seat_fit(
+    seat: HoleSpec, plate_thickness: float, stud_length: float
+) -> None:
     """Check plate-clamping and collar-on-bare-base poses of this stock screw."""
     if (
         seat.kind != "tapped"
@@ -66,6 +68,7 @@ async def build(adapter) -> dict[str, str]:
             ),
         ),
         material=MATERIAL,
+        color=PANEL_BLACK,
     )
 
 
