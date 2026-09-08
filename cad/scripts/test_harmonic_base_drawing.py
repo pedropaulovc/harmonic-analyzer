@@ -26,10 +26,14 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from swing_stop_screw_spec import SHANK_DIA as STOP_SHANK_DIA
 
 
+@pytest.mark.parametrize("rejection", ["packing", "sheet_creation", "sheet_activation"])
 def test_actual_recipe_packs_validated_table_and_original_linked_notes_before_export(
     monkeypatch,
+    rejection,
 ) -> None:
     events = []
+    ownership = []
+    sheets = SimpleNamespace(names=(), active=None)
     table, top, side = object(), object(), object()
     manufacturing, caption = object(), object()
     views = iter((top, side))
@@ -44,11 +48,41 @@ def test_actual_recipe_packs_validated_table_and_original_linked_notes_before_ex
         "curate_view_dimensions",
         "add_datum_feature",
         "add_feature_control_frame",
-        "create_blank_drawing_sheets",
-        "activate_harmonic_base_sheet",
     ):
         monkeypatch.setattr(drawing, name, lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(drawing, "place_view", lambda *_args, **_kwargs: next(views))
+
+    def create_sheets(actual, names, *, label):
+        assert actual is adapter
+        assert label == "harmonic-base"
+        assert names == ("PLAN AND HOLE TABLE", "MANUFACTURING")
+        assert ownership == []
+        sheets.names = names
+
+    def activate_sheet(actual, name):
+        assert actual is adapter
+        assert name in sheets.names
+        sheets.active = name
+
+    def place_view(actual, _source, orientation, *_coordinates, scale):
+        assert actual is adapter
+        owner, expected_scale = {
+            "*Top": ("PLAN AND HOLE TABLE", (1, 2)),
+            "*Front": ("MANUFACTURING", (1, 4)),
+        }[orientation]
+        assert sheets.active == owner
+        assert scale == expected_scale
+        ownership.append((orientation, owner))
+        return next(views)
+
+    def linked_note(actual, property_name, *_coordinates, **_kwargs):
+        assert actual is adapter
+        assert sheets.active == "MANUFACTURING"
+        ownership.append((property_name, sheets.active))
+        return next(notes)
+
+    monkeypatch.setattr(drawing, "create_blank_drawing_sheets", create_sheets)
+    monkeypatch.setattr(drawing, "activate_harmonic_base_sheet", activate_sheet)
+    monkeypatch.setattr(drawing, "place_view", place_view)
     monkeypatch.setattr(drawing, "auto_center_marks", lambda *_args, **_kwargs: True)
     monkeypatch.setattr(
         drawing,
@@ -64,7 +98,7 @@ def test_actual_recipe_packs_validated_table_and_original_linked_notes_before_ex
     monkeypatch.setattr(
         drawing,
         "add_property_linked_note",
-        lambda *_args, **_kwargs: next(notes),
+        linked_note,
     )
 
     def pack(actual, **kwargs):
@@ -77,7 +111,8 @@ def test_actual_recipe_packs_validated_table_and_original_linked_notes_before_ex
         )
         events.append("pack")
 
-    async def export(*_args, **_kwargs):
+    async def export(*_args, **kwargs):
+        assert kwargs["expected_sheet_names"] == sheets.names
         events.append("export")
         return {"drawing": "validated"}
 
@@ -90,25 +125,38 @@ def test_actual_recipe_packs_validated_table_and_original_linked_notes_before_ex
     )
     assert events == ["pack", "export"]
     assert result == {"drawing": "validated"}
+    assert ownership == [
+        ("*Top", "PLAN AND HOLE TABLE"),
+        ("*Front", "MANUFACTURING"),
+        ("Manufacturing Notes", "MANUFACTURING"),
+        ("Side View Note", "MANUFACTURING"),
+    ]
 
-    # A measured no-fit must stop this actual coroutine before export too.
+    # Sheet setup and measured no-fit failures must all stop the real coroutine.
     events.clear()
+    ownership.clear()
+    sheets.names, sheets.active = (), None
     views = iter((top, side))
     notes = iter((manufacturing, caption))
 
     def reject(*_args, **_kwargs):
-        events.append("pack-rejected")
-        raise RuntimeError("native print no_fit")
+        events.append(f"{rejection}-rejected")
+        raise RuntimeError(f"native {rejection} rejected")
 
-    monkeypatch.setattr(drawing, "repair_harmonic_base_layout", reject)
-    with pytest.raises(RuntimeError, match="native print no_fit"):
+    rejected_function = {
+        "packing": "repair_harmonic_base_layout",
+        "sheet_creation": "create_blank_drawing_sheets",
+        "sheet_activation": "activate_harmonic_base_sheet",
+    }[rejection]
+    monkeypatch.setattr(drawing, rejected_function, reject)
+    with pytest.raises(RuntimeError, match=f"native {rejection} rejected"):
         asyncio.run(
             drawing.build(
                 adapter,
                 drawing_factory=lambda *_args, **_kwargs: (object(), object()),
             )
         )
-    assert events == ["pack-rejected"]
+    assert events == [f"{rejection}-rejected"]
 
 
 def test_required_drawing_paths() -> None:
