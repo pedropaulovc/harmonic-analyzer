@@ -8,7 +8,7 @@ No table text, font, padding, column width, view scale or source entity is edite
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, replace
+from dataclasses import asdict, dataclass, fields, replace
 import json
 import math
 from typing import Any
@@ -217,6 +217,58 @@ def _box(state, position):
     return Rect(x, y - sum(state.heights), x + sum(state.widths), y)
 
 
+class TableCompactionReadbackError(RuntimeError):
+    """Retain the rejected native table witness without changing its fit policy."""
+
+    def __init__(self, evidence):
+        super().__init__(
+            "harmonic-base compaction changed table content/font/width/padding/anchor"
+        )
+        self.evidence = evidence
+        self.add_note("Native table compaction readback: " + json.dumps(evidence))
+
+
+def _compaction_readback_error(expected, actual, position, annotation, actual_heights):
+    changed = [
+        field.name
+        for field in fields(expected)
+        if getattr(expected, field.name) != getattr(actual, field.name)
+    ]
+    actual_position, position_error = None, None
+    try:
+        actual_position = _position(annotation)
+    except Exception as error:
+        # This extra read is failure-only diagnostics. It must not replace the
+        # already-established preservation failure with a secondary COM error.
+        position_error = repr(error)
+    if actual_position != position:
+        changed.append("position")
+    evidence = {
+        "changed_fields": changed,
+        "expected_state": asdict(expected),
+        "actual_state": asdict(actual),
+        "expected_position": position,
+        "actual_position": actual_position,
+        "position_read_error": position_error,
+        "actual_heights": tuple(actual_heights),
+    }
+    failure = TableCompactionReadbackError(evidence)
+    try:
+        _telemetry.error(
+            str(failure),
+            changed_fields=changed,
+            actual_heights=tuple(actual_heights),
+            expected_position=position,
+            actual_position=actual_position,
+            expected_state=json.dumps(evidence["expected_state"]),
+            actual_state=json.dumps(evidence["actual_state"]),
+            position_read_error=position_error,
+        )
+    except Exception as error:
+        failure.add_note(f"Native table readback telemetry failed: {error!r}")
+    return failure
+
+
 @_telemetry.traced("drawing.harmonic_base.compact_table")
 def _compact_table(adapter, table, annotation, drawable, title_block):
     before = _table_state(table)
@@ -242,9 +294,14 @@ def _compact_table(adapter, table, annotation, drawable, title_block):
             )
         actual_heights.append(actual)
     expected = replace(before, heights=tuple(actual_heights))
-    if _table_state(table) != expected or _position(annotation) != position:
-        raise RuntimeError(
-            "harmonic-base compaction changed table content/font/width/padding/anchor"
+    actual = _table_state(table)
+    if actual != expected or _position(annotation) != position:
+        raise _compaction_readback_error(
+            expected,
+            actual,
+            position,
+            annotation,
+            actual_heights,
         )
     target = (
         drawable.xmax - sum(expected.widths) - _HEADROOM_M,
