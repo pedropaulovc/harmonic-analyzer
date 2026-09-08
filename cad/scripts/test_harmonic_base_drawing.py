@@ -44,6 +44,8 @@ def test_actual_recipe_packs_validated_table_and_original_linked_notes_before_ex
         "curate_view_dimensions",
         "add_datum_feature",
         "add_feature_control_frame",
+        "create_blank_drawing_sheets",
+        "activate_harmonic_base_sheet",
     ):
         monkeypatch.setattr(drawing, name, lambda *_args, **_kwargs: None)
     monkeypatch.setattr(drawing, "place_view", lambda *_args, **_kwargs: next(views))

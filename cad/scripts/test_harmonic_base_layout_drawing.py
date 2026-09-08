@@ -1,9 +1,9 @@
-"""Actual table-compaction and native-packer contracts without a COM seat."""
+"""Two-sheet table preservation and actual native-packer controls, without COM."""
 
 from __future__ import annotations
 
 from copy import deepcopy
-from dataclasses import replace
+import json
 from types import SimpleNamespace
 
 import pytest
@@ -47,8 +47,7 @@ class Table:
         self.annotation = Annotation(
             "hole-table", Rect(0.274, -0.014, 0.418, 0.256), kind=14
         )
-        self.heights = [0.015] * 18
-        self.minimums = [0.008] + [0.006] * 17
+        self.heights = [0.010318318595770792] + [0.011322391897878521] * 17
         self.widths = [0.028, 0.028, 0.028, 0.060]
         self.gaps = [0.001] * 18
         self.locks = [False] * 18
@@ -56,7 +55,6 @@ class Table:
         self.fonts = [[_font() for _col in range(4)] for _row in range(18)]
         self.font = _font()
         self.row_writes = []
-        self.on_row = lambda _row: None
         self.split = (0, 0, 1, 0, 17)
 
     def GetAnnotation(self):
@@ -94,9 +92,7 @@ class Table:
 
     def SetRowHeight(self, row, height, options):
         self.row_writes.append((row, height, options))
-        self.heights[row] = max(height, self.minimums[row])
-        self.on_row(row)
-        return self.heights[row]
+        raise AssertionError("production must not compact or resize native rows")
 
 
 def _measure(_adapter, annotation):
@@ -147,7 +143,36 @@ def setup(monkeypatch):
     sheet.GetProperties2 = lambda: (0, 0, 1, 2, 0, 0.4318, 0.2794, 0)
     sheet.GetZoneMargin = lambda _index: 0.0127
     sheet_view.GetTableAnnotations = lambda: [table]
+    sheet_view.annotations = [table.annotation]
+    sheet_view.next = top
+    top.next = None
+    manufacturing_view = View("manufacturing-sheet", Rect(0, 0, 0.4318, 0.2794))
+    manufacturing_view.annotations = [manufacturing, caption]
+    manufacturing_view.next = side
+    manufacturing_view.GetTableAnnotations = lambda: []
     top.GetTableAnnotations = side.GetTableAnnotations = lambda: []
+    side.next = None
+    state = SimpleNamespace(active="PLAN AND HOLE TABLE", activations=[], rebuilds=[])
+    sheet.GetName = lambda: state.active
+    adapter.currentModel.GetSheetNames = lambda: (
+        "PLAN AND HOLE TABLE",
+        "MANUFACTURING",
+    )
+    adapter.currentModel.GetFirstView = lambda: (
+        sheet_view if state.active == "PLAN AND HOLE TABLE" else manufacturing_view
+    )
+
+    def activate(name):
+        state.activations.append(name)
+        state.active = name
+        return True
+
+    def rebuild():
+        state.rebuilds.append(state.active)
+        return True
+
+    adapter.currentModel.ActivateSheet = activate
+    adapter.currentModel.EditRebuild3 = rebuild
     options = dict(
         table=table,
         views={"top": top, "side": side},
@@ -160,214 +185,157 @@ def setup(monkeypatch):
         top=top,
         side=side,
         sheet_view=sheet_view,
+        manufacturing_view=manufacturing_view,
+        state=state,
         manufacturing=manufacturing,
         caption=caption,
         options=options,
     )
 
 
-def _compact(setup):
-    drawable, title = layout._sheet_bounds(setup.adapter)
-    return layout._compact_table(
-        setup.adapter,
-        setup.table,
-        setup.table.annotation,
-        drawable,
-        title,
+def test_two_sheet_packer_never_compacts_and_preserves_complete_resolved_table(setup):
+    before = layout._table_state(setup.table)
+    caption_before = setup.caption.position
+    reports = layout.repair_harmonic_base_layout(setup.adapter, **setup.options)
+    assert tuple(reports) == ("PLAN AND HOLE TABLE", "MANUFACTURING")
+    assert setup.state.rebuilds[0] == "PLAN AND HOLE TABLE"
+    assert setup.table.row_writes == []
+    assert layout._table_state(setup.table) == before
+    assert setup.top.ScaleRatio == (1.0, 2.0)
+    assert setup.side.ScaleRatio == (1.0, 4.0)
+    assert len(setup.table.annotation.moves) == 1
+    assert setup.table.annotation.position == pytest.approx((0.0132, 0.2662, 0.0))
+    plan, manufacturing = reports.values()
+    assert plan.status is NativeLayoutStatus.APPLIED
+    assert set(plan.after_bounds) == {"view:top"}
+    assert set(manufacturing.after_bounds) == {"view:side", "note:manufacturing"}
+    table_bounds = layout._box(before, setup.table.annotation.position)
+    assert table_bounds in plan.fixed_bounds.values()
+    assert table_bounds not in manufacturing.fixed_bounds.values()
+    for report in reports.values():
+        for box in report.after_bounds.values():
+            assert box.xmin >= report.drawable.xmin
+            assert box.ymin >= report.drawable.ymin
+            assert box.xmax <= report.drawable.xmax
+            assert box.ymax <= report.drawable.ymax
+    assert setup.caption.position[:2] == pytest.approx(
+        tuple(
+            a + b
+            for a, b in zip(
+                caption_before[:2], manufacturing.translations["view:side"], strict=True
+            )
+        )
+    )
+    assert setup.state.active == "PLAN AND HOLE TABLE"
+
+
+def test_checked_resolution_logs_exact_precision_change_before_freezing(
+    setup, monkeypatch
+):
+    setup.table.cells[1][3] = "DIA 9 THRU"
+    records = []
+    monkeypatch.setattr(
+        layout._telemetry,
+        "info",
+        lambda message, **attrs: records.append((message, attrs)),
     )
 
+    def resolve():
+        setup.table.cells[1][3] = "DIA 9.00 THRU"
+        return True
 
-def test_native_minimum_readbacks_preserve_all_cells_formats_and_padding(setup):
-    before = layout._table_state(setup.table)
-    result = _compact(setup)
-    assert result == replace(before, heights=tuple(setup.table.minimums))
-    assert setup.table.row_writes == [(row, 0.0, 0) for row in range(18)]
-    assert setup.table.annotation.GetPosition() == pytest.approx((0.2746, 0.2662, 0.0))
-    assert layout._box(
-        result, setup.table.annotation.GetPosition()
-    ).bounds == pytest.approx((0.2746, 0.1562, 0.4186, 0.2662))
+    setup.adapter.currentModel.EditRebuild3 = resolve
+    reports = layout.repair_harmonic_base_layout(setup.adapter, **setup.options)
+    assert len(reports) == 2
+    record = next(attrs for _message, attrs in records if "text_changes" in attrs)
+    assert json.loads(record["text_changes"]) == [
+        {"row": 1, "column": 3, "before": "DIA 9 THRU", "after": "DIA 9.00 THRU"}
+    ]
+    assert json.loads(record["before_state"])["cells"][7][2] == "DIA 9 THRU"
+    assert json.loads(record["resolved_state"])["cells"][7][2] == "DIA 9.00 THRU"
+    assert setup.table.cells[1][3] == "DIA 9.00 THRU"
+    assert setup.table.row_writes == []
 
 
-@pytest.mark.parametrize("result", [0.0, -1.0, float("nan"), float("inf"), 0.016])
-def test_bad_native_row_height_stops_before_table_or_view_movement(setup, result):
-    setup.table.SetRowHeight = lambda *_args: result
-    with pytest.raises(RuntimeError, match="row 0 rejected minimum height"):
-        _compact(setup)
+@pytest.mark.parametrize("result", [False, OSError("native rebuild failed")])
+def test_resolution_rebuild_failure_stops_before_positioning(setup, result):
+    def rebuild():
+        if isinstance(result, BaseException):
+            raise result
+        return result
+
+    setup.adapter.currentModel.EditRebuild3 = rebuild
+    with pytest.raises((RuntimeError, OSError), match="rebuild.*failed") as caught:
+        layout.repair_harmonic_base_layout(setup.adapter, **setup.options)
+    if isinstance(result, BaseException):
+        assert caught.value is result
     assert setup.table.annotation.moves == []
     assert setup.top.moves == setup.side.moves == []
 
 
-def test_row_readback_mismatch_stops_before_later_rows_or_anchor_write(setup):
-    original = setup.table.SetRowHeight
-
-    def mismatch(row, height, options):
-        original(row, height, options)
-        return 0.007
-
-    setup.table.SetRowHeight = mismatch
-    with pytest.raises(RuntimeError, match="row 0 height readback differs"):
-        _compact(setup)
-    assert setup.table.row_writes == [(0, 0.0, 0)]
-    assert setup.table.annotation.moves == []
-
-
-def test_native_row_exception_is_retained_without_downstream_writes(setup):
-    error = RuntimeError("native row setter rejected this cell")
-
-    def reject(row):
-        if row == 2:
-            raise error
-
-    setup.table.on_row = reject
-    with pytest.raises(
-        RuntimeError, match="native row setter rejected this cell"
-    ) as caught:
-        _compact(setup)
-    assert caught.value is error
-    assert setup.table.row_writes == [(row, 0.0, 0) for row in range(3)]
-    assert setup.table.annotation.moves == []
-
-
 @pytest.mark.parametrize("field", layout._FORMAT_FIELDS)
-def test_any_last_cell_font_field_change_during_compaction_is_rejected(setup, field):
-    def drift(row):
-        if row != 17:
-            return
+def test_resolution_cannot_change_any_last_cell_font_field(setup, field):
+    def rebuild():
         fmt = setup.table.fonts[17][3]
         before = getattr(fmt, field)
         setattr(fmt, field, "Other font" if isinstance(before, str) else before + 0.25)
+        return True
 
-    setup.table.on_row = drift
-    with pytest.raises(RuntimeError, match="compaction changed table content/font"):
-        _compact(setup)
+    setup.adapter.currentModel.EditRebuild3 = rebuild
+    with pytest.raises(
+        layout.TableReadbackError, match="rebuild changed table formatting"
+    ):
+        layout.repair_harmonic_base_layout(setup.adapter, **setup.options)
     assert setup.table.annotation.moves == []
 
 
 @pytest.mark.parametrize(
-    "change", ["text", "table_font", "points_mode", "width", "gap", "lock", "anchor"]
+    "change", ["table_font", "points_mode", "width", "gap", "lock", "anchor", "height"]
 )
-def test_other_table_drift_is_rejected_before_positioning(setup, change):
-    def drift(row):
-        if row != 17:
-            return
-        table = setup.table
-        if change == "text":
-            table.cells[17][3] = "WRONG DRILL SIZE"
+def test_resolution_cannot_change_other_table_geometry_or_metadata(setup, change):
+    def rebuild():
         if change == "table_font":
-            table.font.CharHeight = 0.002
+            setup.table.font.CharHeight = 0.002
         if change == "points_mode":
-            table.fonts[17][3].IsHeightSpecifiedInPts = lambda: True
+            setup.table.fonts[17][3].IsHeightSpecifiedInPts = lambda: True
         if change == "width":
-            table.widths[3] += 0.001
+            setup.table.widths[3] += 0.001
         if change == "gap":
-            table.gaps[17] += 0.001
+            setup.table.gaps[17] += 0.001
         if change == "lock":
-            table.locks[17] = True
+            setup.table.locks[17] = True
         if change == "anchor":
-            table.annotation.position = (0.273, 0.256, 0.0)
+            setup.table.annotation.position = (0.273, 0.256, 0.0)
+        if change == "height":
+            setup.table.heights[17] += 0.001
+        return True
 
-    setup.table.on_row = drift
-    with pytest.raises(RuntimeError, match="compaction changed table content/font"):
-        _compact(setup)
-    assert setup.table.annotation.moves == []
-
-
-@pytest.mark.parametrize("change", ["locks", "position"])
-def test_failed_compaction_retains_expected_actual_heights_and_changed_fields(
-    setup,
-    monkeypatch,
-    change,
-):
-    before = layout._table_state(setup.table)
-    original_position = setup.table.annotation.position
-    records = []
-    monkeypatch.setattr(
-        layout._telemetry,
-        "error",
-        lambda message, **attrs: records.append((message, attrs)),
-    )
-
-    def drift(row):
-        if row != 17:
-            return
-        if change == "locks":
-            setup.table.locks[0] = True
-        if change == "position":
-            setup.table.annotation.position = (0.274, 0.250, 0.0)
-
-    setup.table.on_row = drift
+    setup.adapter.currentModel.EditRebuild3 = rebuild
     with pytest.raises(
-        RuntimeError, match="compaction changed table content/font"
-    ) as caught:
-        _compact(setup)
-    evidence = caught.value.evidence
-    assert evidence["changed_fields"] == [change]
-    assert evidence["actual_heights"] == tuple(setup.table.minimums)
-    assert evidence["expected_position"] == original_position
-    assert evidence["actual_position"] == setup.table.annotation.position
-    assert evidence["expected_state"]["heights"] == tuple(setup.table.minimums)
-    assert evidence["expected_state"]["cells"] == before.cells
-    assert evidence["actual_state"]["cells"] == before.cells
-    assert evidence["position_read_error"] is None
-    assert records[0][1]["changed_fields"] == [change]
-    assert records[0][1]["actual_heights"] == tuple(setup.table.minimums)
+        layout.TableReadbackError, match="rebuild changed table formatting"
+    ):
+        layout.repair_harmonic_base_layout(setup.adapter, **setup.options)
     assert setup.table.annotation.moves == []
-
-
-@pytest.mark.parametrize("secondary", ["position", "telemetry"])
-def test_failed_compaction_diagnostics_cannot_replace_preservation_failure(
-    setup, monkeypatch, secondary
-):
-    error = OSError(f"native {secondary} diagnostic failed")
-    telemetry_error = layout._telemetry.error
-
-    def drift(row):
-        if row != 17:
-            return
-        setup.table.locks[0] = True
-
-        def reject(*_args, **_kwargs):
-            raise error
-
-        if secondary == "position":
-            monkeypatch.setattr(setup.table.annotation, "GetPosition", reject)
-        if secondary == "telemetry":
-
-            def reject_diagnostic(message, **attrs):
-                # Exercise this newly inserted write, not the existing outer
-                # telemetry span's separate exception-reporting boundary.
-                if "expected_state" in attrs:
-                    raise error
-                return telemetry_error(message, **attrs)
-
-            monkeypatch.setattr(layout._telemetry, "error", reject_diagnostic)
-
-    setup.table.on_row = drift
-    with pytest.raises(
-        layout.TableCompactionReadbackError,
-        match="compaction changed table content/font",
-    ) as caught:
-        _compact(setup)
-    evidence = caught.value.evidence
-    assert evidence["actual_heights"] == tuple(setup.table.minimums)
-    assert evidence["actual_state"]["locks"][0] == 1
-    assert evidence["expected_state"]["locks"][0] == 0
-    assert "locks" in evidence["changed_fields"]
-    if secondary == "position":
-        assert evidence["actual_position"] is None
-        assert evidence["position_read_error"] == repr(error)
-    if secondary == "telemetry":
-        assert any(repr(error) in note for note in caught.value.__notes__)
-        assert evidence["position_read_error"] is None
-    assert setup.table.annotation.moves == []
-    assert setup.top.moves == setup.side.moves == []
 
 
 @pytest.mark.parametrize(
     "inventory",
-    ["tables", "annotations", "unknown_table", "unknown_annotation", "null_annotation"],
+    [
+        "tables",
+        "annotations",
+        "unknown_table",
+        "unknown_annotation",
+        "null_annotation",
+        "manufacturing_table",
+        "manufacturing_annotation",
+        "wrong_top",
+        "wrong_side",
+        "extra_view",
+    ],
 )
-def test_missing_or_unknown_native_table_is_rejected_before_any_write(setup, inventory):
+def test_both_sheet_inventories_are_proven_before_any_table_or_view_movement(
+    setup, inventory
+):
     if inventory == "tables":
         setup.sheet_view.GetTableAnnotations = lambda: []
     if inventory == "annotations":
@@ -378,10 +346,22 @@ def test_missing_or_unknown_native_table_is_rejected_before_any_write(setup, inv
         setup.sheet_view.annotations.append(Table().annotation)
     if inventory == "null_annotation":
         setup.sheet_view.annotations.append(None)
+    if inventory == "manufacturing_table":
+        setup.manufacturing_view.GetTableAnnotations = lambda: [setup.table]
+    if inventory == "manufacturing_annotation":
+        setup.manufacturing_view.annotations.append(setup.table.annotation)
+    if inventory == "wrong_top":
+        setup.sheet_view.next = setup.side
+    if inventory == "wrong_side":
+        setup.manufacturing_view.next = setup.top
+    if inventory == "extra_view":
+        setup.top.next = setup.side
     with pytest.raises(
-        RuntimeError, match="missing from native|unexpected|contains null"
+        RuntimeError,
+        match="missing from native|unexpected|contains null|ownership differs",
     ):
         layout.repair_harmonic_base_layout(setup.adapter, **setup.options)
+    assert setup.state.rebuilds == []
     assert setup.table.row_writes == []
     assert setup.table.annotation.moves == []
     assert setup.top.moves == setup.side.moves == []
@@ -409,11 +389,31 @@ def test_changed_native_table_shape_or_anchor_is_rejected_before_writes(
     assert setup.table.annotation.moves == []
 
 
+@pytest.mark.parametrize("failure", ["names", "activate", "readback"])
+def test_sheet_activation_contract_fails_before_native_table_changes(setup, failure):
+    if failure == "names":
+        setup.adapter.currentModel.GetSheetNames = lambda: (
+            "MANUFACTURING",
+            "PLAN AND HOLE TABLE",
+        )
+    if failure == "activate":
+        setup.adapter.currentModel.ActivateSheet = lambda _name: False
+    if failure == "readback":
+        setup.adapter.currentModel.GetCurrentSheet().GetName = lambda: "wrong sheet"
+    with pytest.raises(
+        RuntimeError, match="sheet names/order|activate sheet|sheet readback"
+    ):
+        layout.repair_harmonic_base_layout(setup.adapter, **setup.options)
+    assert setup.state.rebuilds == []
+    assert setup.table.annotation.moves == []
+    assert setup.top.moves == setup.side.moves == []
+
+
 @pytest.mark.parametrize(
     "movement,message",
     [
-        ("reject", "rejected measured upper-right"),
-        ("ignore", "did not reach measured upper-right"),
+        ("reject", "rejected measured upper-left"),
+        ("ignore", "changed during table placement"),
     ],
 )
 def test_table_anchor_failure_is_not_reported_as_measured_fit(setup, movement, message):
@@ -423,60 +423,22 @@ def test_table_anchor_failure_is_not_reported_as_measured_fit(setup, movement, m
     assert setup.top.moves == setup.side.moves == []
 
 
-def test_native_minimum_too_tall_reports_no_fit_without_moving_any_anchor(setup):
-    setup.table.minimums = [0.014] * 18
-    with pytest.raises(RuntimeError, match="compacted table no_fit"):
+def test_unchanged_table_too_tall_reports_no_fit_without_compaction(setup):
+    setup.table.heights = [0.015] * 18
+    with pytest.raises(RuntimeError, match="unchanged table no_fit"):
         layout.repair_harmonic_base_layout(setup.adapter, **setup.options)
-    assert setup.table.heights == [0.014] * 18
+    assert setup.table.heights == [0.015] * 18
+    assert setup.table.row_writes == []
     assert setup.table.annotation.moves == []
     assert setup.top.moves == setup.side.moves == []
 
 
-def test_actual_packer_moves_views_and_caption_around_the_exact_measured_table(setup):
-    table_before = layout._table_state(setup.table)
-    caption_before = setup.caption.position
-    result = layout.repair_harmonic_base_layout(setup.adapter, **setup.options)
-    assert result.status is NativeLayoutStatus.APPLIED
-    assert setup.top.moves
-    assert setup.top.ScaleRatio == (1.0, 2.0)
-    assert setup.side.ScaleRatio == (1.0, 4.0)
-    assert layout._table_state(setup.table) == replace(
-        table_before, heights=tuple(setup.table.minimums)
-    )
-    assert len(setup.table.annotation.moves) == 1  # Never moved by the packer.
-    table_bounds = layout._box(
-        layout._table_state(setup.table), setup.table.annotation.position
-    )
-    assert table_bounds in result.fixed_bounds.values()
-    assert setup.caption.position[:2] == pytest.approx(
-        tuple(
-            a + b
-            for a, b in zip(
-                caption_before[:2], result.translations["view:side"], strict=True
-            )
-        )
-    )
-    for box in result.after_bounds.values():
-        assert box.xmin >= result.drawable.xmin
-        assert box.ymin >= result.drawable.ymin
-        assert box.xmax <= result.drawable.xmax
-        assert box.ymax <= result.drawable.ymax
-        assert (
-            max(
-                table_bounds.xmin - box.xmax,
-                box.xmin - table_bounds.xmax,
-                table_bounds.ymin - box.ymax,
-                box.ymin - table_bounds.ymax,
-            )
-            >= 0.002 - 1e-12
-        )
-
-
-def test_actual_packer_no_fit_preserves_deliberate_view_scales(setup):
-    setup.top.rectangle = Rect(0, 0, 0.45, 0.15)
+@pytest.mark.parametrize("view", ["top", "side"])
+def test_either_sheet_no_fit_preserves_deliberate_view_scales(setup, view):
+    getattr(setup, view).rectangle = Rect(0, 0, 0.45, 0.15)
     with pytest.raises(RuntimeError, match="native print no_fit"):
         layout.repair_harmonic_base_layout(setup.adapter, **setup.options)
-    assert setup.top.moves == setup.side.moves == []
+    assert getattr(setup, view).moves == []
     assert setup.top.ScaleRatio == (1.0, 2.0)
     assert setup.side.ScaleRatio == (1.0, 4.0)
 
@@ -498,15 +460,25 @@ def test_callable_active_document_dispatch_is_read_as_property_not_invoked(setup
 
     model = CallableDocument(**vars(setup.adapter.currentModel))
     setup.adapter.currentModel = setup.adapter.swApp.ActiveDoc = model
-    result = layout.repair_harmonic_base_layout(setup.adapter, **setup.options)
-    assert result.status is NativeLayoutStatus.APPLIED
+    reports = layout.repair_harmonic_base_layout(setup.adapter, **setup.options)
+    assert len(reports) == 2
 
 
-@pytest.mark.parametrize("change", ["cell", "font", "height", "replace", "unknown"])
-def test_rebuild_table_drift_cannot_pass_final_packing(setup, change):
+@pytest.mark.parametrize(
+    "change", ["cell", "precision", "font", "height", "replace", "unknown"]
+)
+def test_post_resolution_table_drift_cannot_pass_final_packing(setup, change):
+    calls = []
+    setup.table.cells[17][3] = "DIA 9 THRU"
+
     def rebuild():
+        calls.append(setup.state.active)
+        if len(calls) == 1:
+            return True
         if change == "cell":
             setup.table.cells[17][3] = "WRONG FINAL SIZE"
+        if change == "precision":
+            setup.table.cells[17][3] = "DIA 9.00 THRU"
         if change == "font":
             setup.table.fonts[17][3].CharHeight = 0.002
         if change == "height":
@@ -523,3 +495,51 @@ def test_rebuild_table_drift_cannot_pass_final_packing(setup, change):
         match="changed during packing|replaced/unknown|unexpected native table",
     ):
         layout.repair_harmonic_base_layout(setup.adapter, **setup.options)
+
+
+def test_failed_position_read_with_unchanged_state_retains_structured_evidence(setup):
+    expected = layout._table_state(setup.table)
+    position = setup.table.annotation.position
+    error = OSError("native GetPosition failed")
+
+    def reject():
+        raise error
+
+    setup.table.annotation.GetPosition = reject
+    with pytest.raises(
+        layout.TableReadbackError, match="changed during readback"
+    ) as caught:
+        layout._preserve_table(
+            setup.table, setup.table.annotation, expected, position, phase="readback"
+        )
+    assert caught.value.evidence["position_read_error"] == repr(error)
+    assert caught.value.evidence["changed_fields"] == ["position"]
+    assert (
+        caught.value.evidence["expected_state"] == caught.value.evidence["actual_state"]
+    )
+    assert caught.value.evidence["actual_heights"] == expected.heights
+
+
+def test_failed_preservation_telemetry_does_not_replace_exact_cell_evidence(
+    setup, monkeypatch
+):
+    expected = layout._table_state(setup.table)
+    setup.table.cells[17][3] = "WRONG FINAL SIZE"
+    error = OSError("diagnostic writer failed")
+
+    def reject(*_args, **_kwargs):
+        raise error
+
+    monkeypatch.setattr(layout._telemetry, "error", reject)
+    with pytest.raises(
+        layout.TableReadbackError, match="changed during readback"
+    ) as caught:
+        layout._preserve_table(
+            setup.table,
+            setup.table.annotation,
+            expected,
+            setup.table.annotation.position,
+            phase="readback",
+        )
+    assert caught.value.evidence["changed_fields"] == ["cells"]
+    assert any(repr(error) in note for note in caught.value.__notes__)

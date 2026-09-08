@@ -1,4 +1,4 @@
-"""Compact the base's one native hole table and pack its unchanged print.
+"""Pack the base's unchanged native table and views on two checked sheets.
 
 This is deliberately recipe-local: the general annotation reader does not
 support tables. Native row/column spans bound this exact, unsplit 18x4 table;
@@ -8,7 +8,7 @@ No table text, font, padding, column width, view scale or source entity is edite
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, fields, replace
+from dataclasses import asdict, dataclass, fields
 import json
 import math
 from typing import Any
@@ -43,6 +43,7 @@ _FORMAT_FIELDS = (
 _GAP_M = 0.002
 _HEADROOM_M = 0.0005  # Same planning reserve as repair_project_drawing_layout.
 _POSITION_TOLERANCE_M = 1e-8
+SHEET_NAMES = ("PLAN AND HOLE TABLE", "MANUFACTURING")
 
 
 def _format_signature(raw: Any) -> tuple:
@@ -154,14 +155,31 @@ def _position(annotation):
     return result
 
 
-def _inventory(adapter, table, expected_annotation):
-    """Prove both native enumerations contain only the exact returned table."""
+def activate_harmonic_base_sheet(adapter, name):
+    """Activate an exact member of this two-sheet drawing, with native readback."""
     app = _early_bound(adapter.swApp, "ISldWorks")
     active = app.ActiveDoc  # Object-valued PROPERTY; never invoke its COM dispatch.
     if active is None or int(app.IsSame(active, adapter.currentModel)) != 1:
         raise RuntimeError("harmonic-base table owner is not the active drawing")
+    if int(adapter.currentModel.GetType()) != 3:
+        raise RuntimeError("harmonic-base print layout requires an active drawing")
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    if name not in SHEET_NAMES or tuple(drawing.GetSheetNames() or ()) != SHEET_NAMES:
+        raise RuntimeError("harmonic-base sheet names/order differ from two-sheet plan")
+    if not drawing.ActivateSheet(name):
+        raise RuntimeError(f"harmonic-base failed to activate sheet {name!r}")
+    sheet = drawing.GetCurrentSheet()
+    if sheet is None or _early_bound(sheet, "ISheet").GetName() != name:
+        raise RuntimeError(f"harmonic-base active sheet readback differs: {name!r}")
+
+
+def _inventory(adapter, view, table=None, expected_annotation=None):
+    """Prove this sheet has exactly its one view and its declared table, if any."""
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    expected_view = view
     view = drawing.GetFirstView()
+    if view is None:
+        raise RuntimeError("harmonic-base sheet has no native sheet view")
     seen = []
     table_count = annotation_count = 0
     while view is not None:
@@ -170,7 +188,11 @@ def _inventory(adapter, table, expected_annotation):
             raise RuntimeError("harmonic-base table inventory repeats a native view")
         seen.append(view)
         for raw in view.GetTableAnnotations() or ():
-            if raw is None or int(adapter.swApp.IsSame(table, raw)) != 1:
+            if (
+                table is None
+                or raw is None
+                or int(adapter.swApp.IsSame(table, raw)) != 1
+            ):
                 raise RuntimeError("harmonic-base has an unexpected native table")
             table_count += 1
         for raw in view.GetAnnotations() or ():
@@ -181,11 +203,16 @@ def _inventory(adapter, table, expected_annotation):
             actual = _early_bound(raw, "IAnnotation")
             if int(actual.GetType()) != 14:
                 continue
-            if int(adapter.swApp.IsSame(expected_annotation, actual)) != 1:
+            if (
+                expected_annotation is None
+                or int(adapter.swApp.IsSame(expected_annotation, actual)) != 1
+            ):
                 raise RuntimeError("harmonic-base has an unexpected table annotation")
             annotation_count += 1
         view = view.GetNextView()
-    if table_count == 0 or annotation_count == 0:
+    if len(seen) != 2 or int(adapter.swApp.IsSame(seen[1], expected_view)) != 1:
+        raise RuntimeError("harmonic-base sheet view ownership differs from plan")
+    if table is not None and (table_count == 0 or annotation_count == 0):
         raise RuntimeError(
             "harmonic-base exact table is missing from native table/annotation inventory: "
             f"tables={table_count}, annotations={annotation_count}"
@@ -217,100 +244,121 @@ def _box(state, position):
     return Rect(x, y - sum(state.heights), x + sum(state.widths), y)
 
 
-class TableCompactionReadbackError(RuntimeError):
-    """Retain the rejected native table witness without changing its fit policy."""
+class TableReadbackError(RuntimeError):
+    """Retain exact native table evidence; never normalize text to hide a change."""
 
-    def __init__(self, evidence):
-        super().__init__(
-            "harmonic-base compaction changed table content/font/width/padding/anchor"
-        )
+    def __init__(self, message, evidence):
+        super().__init__(message)
         self.evidence = evidence
-        self.add_note("Native table compaction readback: " + json.dumps(evidence))
+        self.add_note("Native table readback: " + json.dumps(evidence))
 
 
-def _compaction_readback_error(expected, actual, position, annotation, actual_heights):
-    changed = [
+def _changed_fields(expected, actual):
+    return [
         field.name
         for field in fields(expected)
         if getattr(expected, field.name) != getattr(actual, field.name)
     ]
-    actual_position, position_error = None, None
-    try:
-        actual_position = _position(annotation)
-    except Exception as error:
-        # This extra read is failure-only diagnostics. It must not replace the
-        # already-established preservation failure with a secondary COM error.
-        position_error = repr(error)
+
+
+def _table_evidence(expected, actual, position, actual_position, position_error=None):
+    changed = _changed_fields(expected, actual)
     if actual_position != position:
         changed.append("position")
-    evidence = {
+    return {
         "changed_fields": changed,
         "expected_state": asdict(expected),
         "actual_state": asdict(actual),
         "expected_position": position,
         "actual_position": actual_position,
         "position_read_error": position_error,
-        "actual_heights": tuple(actual_heights),
+        "actual_heights": actual.heights,
+        "text_changes": [
+            {"row": old[0], "column": old[1], "before": old[2], "after": new[2]}
+            for old, new in zip(expected.cells, actual.cells, strict=True)
+            if old[2] != new[2]
+        ],
     }
-    failure = TableCompactionReadbackError(evidence)
+
+
+def _reject_table(message, evidence):
+    failure = TableReadbackError(message, evidence)
     try:
         _telemetry.error(
             str(failure),
-            changed_fields=changed,
-            actual_heights=tuple(actual_heights),
-            expected_position=position,
-            actual_position=actual_position,
+            changed_fields=evidence["changed_fields"],
+            actual_heights=evidence["actual_heights"],
+            expected_position=evidence["expected_position"],
+            actual_position=evidence["actual_position"],
             expected_state=json.dumps(evidence["expected_state"]),
             actual_state=json.dumps(evidence["actual_state"]),
-            position_read_error=position_error,
+            position_read_error=evidence["position_read_error"],
         )
     except Exception as error:
         failure.add_note(f"Native table readback telemetry failed: {error!r}")
-    return failure
+    raise failure
 
 
-@_telemetry.traced("drawing.harmonic_base.compact_table")
-def _compact_table(adapter, table, annotation, drawable, title_block):
-    before = _table_state(table)
-    position = _position(annotation)
-    _telemetry.info(
-        "harmonic-base native table before compaction",
-        table_state=json.dumps(asdict(before)),
-        position=position,
-    )
-    actual_heights = []
-    for row, original in enumerate(before.heights):
-        # SetRowHeight documents native minimum clamping. Zero requests that
-        # minimum; option 0 permits the TABLE to shrink, not adjacent rows to grow.
-        actual = float(table.SetRowHeight(row, 0.0, 0))
-        if not math.isfinite(actual) or actual <= 0 or actual > original:
-            raise RuntimeError(
-                f"harmonic-base row {row} rejected minimum height: {actual}"
-            )
-        readback = float(table.GetRowHeight(row))
-        if readback != actual:
-            raise RuntimeError(
-                f"harmonic-base row {row} height readback differs: {actual}, {readback}"
-            )
-        actual_heights.append(actual)
-    expected = replace(before, heights=tuple(actual_heights))
+def _preserve_table(
+    table, annotation, expected, position, *, phase, position_tolerance_m=0.0
+):
     actual = _table_state(table)
-    if actual != expected or _position(annotation) != position:
-        raise _compaction_readback_error(
-            expected,
-            actual,
-            position,
-            annotation,
-            actual_heights,
-        )
-    target = (
-        drawable.xmax - sum(expected.widths) - _HEADROOM_M,
-        drawable.ymax - _HEADROOM_M,
-        position[2],
+    actual_position, error = None, None
+    try:
+        actual_position = _position(annotation)
+    except Exception as failure:
+        error = repr(failure)
+    evidence = _table_evidence(expected, actual, position, actual_position, error)
+    if (
+        error is None
+        and "position" in evidence["changed_fields"]
+        and math.dist(position, actual_position) <= position_tolerance_m
+    ):
+        evidence["changed_fields"].remove("position")
+    if evidence["changed_fields"]:
+        _reject_table(f"harmonic-base table changed during {phase}", evidence)
+    return actual_position
+
+
+@_telemetry.traced("drawing.harmonic_base.resolve_table")
+def _resolve_table(adapter, table, annotation):
+    """Observe native rebuild resolution before freezing the exact display."""
+    before, position = _table_state(table), _position(annotation)
+    if not adapter.currentModel.EditRebuild3():
+        raise RuntimeError("harmonic-base table resolution rebuild failed")
+    after, actual_position = _table_state(table), _position(annotation)
+    evidence = _table_evidence(before, after, position, actual_position)
+    _telemetry.info(
+        "harmonic-base native table display resolved before preservation witness",
+        changed_fields=evidence["changed_fields"],
+        text_changes=json.dumps(evidence["text_changes"]),
+        before_state=json.dumps(evidence["expected_state"]),
+        resolved_state=json.dumps(evidence["actual_state"]),
+        before_position=position,
+        resolved_position=actual_position,
     )
+
+    # Only the native text display may resolve in this explicit pre-witness
+    # phase. Log its exact spelling/precision, never numeric-equate it away.
+    # Fonts, row geometry, use-doc flags, widths, padding and anchor stay fixed.
+    def cell_metadata(state):
+        return tuple(cell[:2] + cell[3:] for cell in state.cells)
+
+    if set(evidence["changed_fields"]) - {"cells"} or cell_metadata(
+        before
+    ) != cell_metadata(after):
+        _reject_table(
+            "harmonic-base rebuild changed table formatting/geometry", evidence
+        )
+    return after, actual_position
+
+
+@_telemetry.traced("drawing.harmonic_base.place_table")
+def _place_table(table, annotation, expected, position, drawable, title_block):
+    target = (drawable.xmin + _HEADROOM_M, drawable.ymax - _HEADROOM_M, position[2])
     bounds = _box(expected, target)
     _telemetry.info(
-        "harmonic-base native table minimum-height readback",
+        "harmonic-base unchanged native table placement",
         row_heights=expected.heights,
         target=target,
         bounds=bounds.bounds,
@@ -325,19 +373,19 @@ def _compact_table(adapter, table, annotation, drawable, title_block):
         )
     ):
         raise RuntimeError(
-            f"harmonic-base compacted table no_fit: {bounds.bounds}, drawable={drawable.bounds}"
+            f"harmonic-base unchanged table no_fit: {bounds.bounds}, drawable={drawable.bounds}"
         )
     if not annotation.SetPosition2(*target):
-        raise RuntimeError("harmonic-base table rejected measured upper-right position")
-    if math.dist(_position(annotation), target) > _POSITION_TOLERANCE_M:
-        raise RuntimeError(
-            "harmonic-base table did not reach measured upper-right position"
-        )
-    if _table_state(table) != expected:
-        raise RuntimeError(
-            "harmonic-base table placement changed content/font/row geometry"
-        )
-    return expected
+        raise RuntimeError("harmonic-base table rejected measured upper-left position")
+    # Exact table text/geometry plus strict position: no formatted equivalence.
+    return _preserve_table(
+        table,
+        annotation,
+        expected,
+        target,
+        phase="table placement",
+        position_tolerance_m=_POSITION_TOLERANCE_M,
+    )
 
 
 @_telemetry.traced("drawing.harmonic_base.native_layout")
@@ -349,14 +397,22 @@ def repair_harmonic_base_layout(
     manufacturing_note: Any,
     side_note: Any,
 ):
-    """Place the complete original-size base print or reject before export."""
-    if int(adapter.currentModel.GetType()) != 3:
-        raise RuntimeError("harmonic-base print layout requires an active drawing")
+    """Pack both original-size sheets, rejecting any missing owner or failed fit."""
+    if set(views) != {"top", "side"}:
+        raise ValueError("harmonic-base layout requires exactly top and side views")
     table = _early_bound(table, "ITableAnnotation")
     annotation = _annotation(table)
-    _inventory(adapter, table, annotation)  # Before ANY native layout write.
+    activate_harmonic_base_sheet(adapter, SHEET_NAMES[0])
+    _inventory(adapter, views["top"], table, annotation)
+    activate_harmonic_base_sheet(adapter, SHEET_NAMES[1])
+    _inventory(adapter, views["side"])
+    activate_harmonic_base_sheet(adapter, SHEET_NAMES[0])
+    expected, position = _resolve_table(adapter, table, annotation)
+    _inventory(adapter, views["top"], table, annotation)
     drawable, title_block = _sheet_bounds(adapter)
-    expected = _compact_table(adapter, table, annotation, drawable, title_block)
+    position = _place_table(
+        table, annotation, expected, position, drawable, title_block
+    )
 
     def measure(actual_adapter, actual_annotation):
         actual_annotation = _early_bound(actual_annotation, "IAnnotation")
@@ -369,12 +425,8 @@ def repair_harmonic_base_layout(
             raise RuntimeError(
                 "harmonic-base measurement encountered a replaced/unknown table"
             )
-        state = _table_state(table)
-        if state != expected:
-            raise RuntimeError(
-                "harmonic-base table content/font/row geometry changed during packing"
-            )
-        position = _position(actual_annotation)
+        _preserve_table(table, actual_annotation, expected, position, phase="packing")
+        state = expected
         bounds = _box(state, position)
         # The occupied table rectangle is native grid geometry, not fabricated
         # glyph metrics. All 72 cell values/fonts are in the immutable signature.
@@ -401,25 +453,48 @@ def repair_harmonic_base_layout(
             follows_view="side",
         ),
     )
-    report = repair_native_layout(
+    plan_report = repair_native_layout(
         adapter,
-        views=views,
+        views={"top": views["top"]},
         title_block=title_block,
         measure_annotation=measure,
-        notes=notes,
         gap_m=_GAP_M,
         planning_headroom_m=_HEADROOM_M,
         final_annotation_validation=validate_gtol_leader_clearance,
     )
-    _inventory(adapter, table, annotation)
-    if _table_state(table) != expected:
-        raise RuntimeError("harmonic-base final table witness changed")
+    _require_fit(plan_report, SHEET_NAMES[0])
+    _inventory(adapter, views["top"], table, annotation)
+    _preserve_table(table, annotation, expected, position, phase="plan final readback")
+    activate_harmonic_base_sheet(adapter, SHEET_NAMES[1])
+    _inventory(adapter, views["side"])
+    _, manufacturing_title = _sheet_bounds(adapter)
+    manufacturing_report = repair_native_layout(
+        adapter,
+        views={"side": views["side"]},
+        notes=notes,
+        title_block=manufacturing_title,
+        measure_annotation=annotation_box,
+        gap_m=_GAP_M,
+        planning_headroom_m=_HEADROOM_M,
+        final_annotation_validation=validate_gtol_leader_clearance,
+    )
+    _require_fit(manufacturing_report, SHEET_NAMES[1])
+    _inventory(adapter, views["side"])
+    activate_harmonic_base_sheet(adapter, SHEET_NAMES[0])
+    _inventory(adapter, views["top"], table, annotation)
+    _preserve_table(
+        table, annotation, expected, position, phase="both sheets final readback"
+    )
+    return {SHEET_NAMES[0]: plan_report, SHEET_NAMES[1]: manufacturing_report}
+
+
+def _require_fit(report, sheet_name):
     _telemetry.info(
-        "harmonic-base native print layout measured",
+        "harmonic-base native print sheet measured",
+        sheet=sheet_name,
         layout_report=json.dumps(asdict(report), default=lambda value: value.value),
     )
     if report.status in (NativeLayoutStatus.NO_FIT, NativeLayoutStatus.SEARCH_LIMIT):
         raise RuntimeError(
-            f"harmonic-base native print {report.status.value}: {report.reason}"
+            f"harmonic-base native print {report.status.value} ({sheet_name}): {report.reason}"
         )
-    return report
