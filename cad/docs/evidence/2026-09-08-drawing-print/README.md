@@ -6,7 +6,10 @@ Historical evidence for follow-up, not a fix or a native acceptance result. The
 Two of the 51 successfully saved drawing sheets lose manufacturing-note content
 at the page edge. The images below are unmodified production PNGs, including the
 original watermark. They are retained for the content-loss issue; other
-presentation findings are listed in the audit for follow-up under #451.
+presentation findings are listed in the audit for follow-up under
+[#451](https://github.com/pedropaulovc/harmonic-analyzer/issues/451).
+The blocking content loss is tracked in
+[#712](https://github.com/pedropaulovc/harmonic-analyzer/issues/712).
 
 ## Measuring-stick
 
@@ -29,7 +32,7 @@ DATUM B LONG SIDE caption also lies across model outlines.
 - Producer: `3c0c4a97e69ead5f04fa760b8aa507c16143172d`; adapter
   `25bc99b1ae39d8c0e004867e9b5c0f2068f2abc2`.
 - Run started 2026-09-08 00:13:37 UTC. The successful-task set was frozen at
-  02:15:03.0402156 UTC; the full run later reported arbor_pedestal no_fit.
+  02:15:03.0402156 UTC. The full run ended with arbor_pedestal no_fit.
 - All 51 sheets were viewed individually. All 51 PDFs contain one page and their
   independent 300 dpi PDFium previews match the production PNGs, reproducing
   only the existing 5100×3301-to-5100×3300 rounding crop.
