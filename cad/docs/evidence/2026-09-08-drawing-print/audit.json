@@ -1,0 +1,4343 @@
+{
+  "schema": "production-drawing-eye-audit/v1",
+  "verdict": "not_clean_print",
+  "producer": {
+    "checkout": "C:/src/ha-foundations-integration",
+    "head": "3c0c4a97e69ead5f04fa760b8aa507c16143172d",
+    "adapter": "25bc99b1ae39d8c0e004867e9b5c0f2068f2abc2",
+    "run_start_utc": "2026-09-08T00:13:37.0000000+00:00",
+    "cutoff_utc": "2026-09-08T02:15:03.0402156+00:00"
+  },
+  "guard_interval": {
+    "before_utc": "2026-09-08T02:17:51.3968311+00:00",
+    "after_utc": "2026-09-08T02:28:59.7941270+00:00",
+    "artifacts": 153,
+    "result": "all_unchanged"
+  },
+  "inspection": {
+    "sheets": 51,
+    "pdf_pages": 51,
+    "method": "Each complete original 5100x3300 PNG viewed individually. Every one-page PDF independently rendered with PDFium at 300 dpi and compared to its PNG.",
+    "render_rounding": "Existing production one-row crop 5100x3301 to 5100x3300 reproduced; no production images changed.",
+    "pixel_comparisons": "51 equal",
+    "scope": "Static print audit only; not native/cold identity, complete dimension/manufacturing validation or a successful full build. Full run stopped on arbor_pedestal after these 51 successful drawings."
+  },
+  "classification_counts": {
+    "readable": 18,
+    "readable_with_limit": 11,
+    "title_overflow": 5,
+    "dimension_callout_collision": 8,
+    "crowded_annotation_region": 4,
+    "page_clipping_blocker": 2,
+    "explicit_unreleased_scope": 1,
+    "border_overflow_and_collision": 1,
+    "border_overflow": 1
+  },
+  "baseline_attribution": {
+    "base": "55056d4990d38ebb461f343d3002fc90731b9e73",
+    "head": "3c0c4a97e69ead5f04fa760b8aa507c16143172d",
+    "verdict": "unknown_native_baseline",
+    "facts": "Measuring-stick and harmonic-base builder/spec and recipe placement calls unchanged; drawing entry/factory and shared finalizer/template changed. add_property_linked_note and insert_hole_table AST unchanged. Cone-tip datum/layout coordinates unchanged; callouts moved to source author/read-only verification. No same-source native print baseline at 55056 was compared.",
+    "source_file_evidence": [
+      {
+        "path": "cad/scripts/draw_measuring_stick.py",
+        "base_blob": "b147b25e14a67a6af4c03a9e188259592cd96e59",
+        "head_blob": "c264ffa8e2dc83f3e86bfabf644edadf12c35812",
+        "comparison": "changed_or_added"
+      },
+      {
+        "path": "cad/scripts/draw_harmonic_base.py",
+        "base_blob": "123e294adc4fa1d9e538b7dac29b5c55ef33e691",
+        "head_blob": "27cea42cdf51ac3758d2771b8b6ec4540aa6c741",
+        "comparison": "changed_or_added"
+      },
+      {
+        "path": "cad/scripts/draw_cone_tip_block.py",
+        "base_blob": "5da1ce6371732c5447db66fbf541fc0db2e5e8ca",
+        "head_blob": "360b9179f63c94a8f39b751b364a980ef5497170",
+        "comparison": "changed_or_added"
+      },
+      {
+        "path": "cad/scripts/draw_gooseneck_set_screw.py",
+        "base_blob": "c172140d1890e9aa05ff82d14338900d8af110c9",
+        "head_blob": "1ec7061e4f4ca8ae300f4fd9e844a3c2cdf6f07b",
+        "comparison": "changed_or_added"
+      },
+      {
+        "path": "cad/scripts/draw_transgear_feed_pinion.py",
+        "base_blob": "77694a2f898c45265a3a045facc3af5436f629b8",
+        "head_blob": "162a99297b8b4e3f95f008a54adc1da911936b47",
+        "comparison": "changed_or_added"
+      },
+      {
+        "path": "cad/scripts/draw_channel_spring_installed.py",
+        "base_blob": "1f26c101ce6c37197f6d4b74c1031f16d38fc90d",
+        "head_blob": "b30c1fba85e7863ffbba33cc88bae10531549ca3",
+        "comparison": "changed_or_added"
+      },
+      {
+        "path": "cad/scripts/draw_tube_frame.py",
+        "base_blob": "bcab536fa74177dd6af234333d7c71951d034d96",
+        "head_blob": "85276c4517a94a3953dda68e732f30af9be72a62",
+        "comparison": "changed_or_added"
+      },
+      {
+        "path": "cad/scripts/draw_crank_handle.py",
+        "base_blob": "57ba3e066738e3536d7fb839b0247dcc34192183",
+        "head_blob": "17a58fc23918d42e52dc1aaf8e5737621d2a6f23",
+        "comparison": "changed_or_added"
+      },
+      {
+        "path": "cad/scripts/build_measuring_stick.py",
+        "base_blob": "6e08a099022af82c6be5a236e97009c38490d3a1",
+        "head_blob": "6e08a099022af82c6be5a236e97009c38490d3a1",
+        "comparison": "identical"
+      },
+      {
+        "path": "cad/scripts/build_harmonic_base.py",
+        "base_blob": "368b103c06dc68bc6dea1524083412ab8efbc48c",
+        "head_blob": "368b103c06dc68bc6dea1524083412ab8efbc48c",
+        "comparison": "identical"
+      },
+      {
+        "path": "cad/scripts/build_cone_tip_block.py",
+        "base_blob": "9cca5b800560e57362a3919306af05c1b6fb07d1",
+        "head_blob": "aa8b3af8fba7c97f288e6d8982c97c816729bc93",
+        "comparison": "changed_or_added"
+      },
+      {
+        "path": "cad/scripts/build_gooseneck_set_screw.py",
+        "base_blob": "f5de8dcc2e228131670a46b46e2b0d48686d3fc8",
+        "head_blob": "f5de8dcc2e228131670a46b46e2b0d48686d3fc8",
+        "comparison": "identical"
+      },
+      {
+        "path": "cad/scripts/build_transgear_feed_pinion.py",
+        "base_blob": "1753d6c803b0ea121f98e8d3f789e1081e1b4c1e",
+        "head_blob": "c679c3e9a2e705945bf09a8f55b756b715b482c4",
+        "comparison": "changed_or_added"
+      },
+      {
+        "path": "cad/scripts/build_channel_spring_installed.py",
+        "base_blob": "081a58169b8856bf81af69e851e880cc1de425ed",
+        "head_blob": "081a58169b8856bf81af69e851e880cc1de425ed",
+        "comparison": "identical"
+      },
+      {
+        "path": "cad/scripts/build_tube_frame.py",
+        "base_blob": "242d05af03c7909b1c06db94f9f1c10c617c110e",
+        "head_blob": "242d05af03c7909b1c06db94f9f1c10c617c110e",
+        "comparison": "identical"
+      },
+      {
+        "path": "cad/scripts/build_crank_handle.py",
+        "base_blob": "da95c541122a34a3fd2870de7a1d5fbfa892152b",
+        "head_blob": "6dc6ec56e188dd6671276647a29b4d66662ee6a6",
+        "comparison": "changed_or_added"
+      },
+      {
+        "path": "cad/scripts/measuring_stick_spec.py",
+        "base_blob": "ef03f4ce33d7182fc4cc222c00706c5dffefa97a",
+        "head_blob": "ef03f4ce33d7182fc4cc222c00706c5dffefa97a",
+        "comparison": "identical"
+      },
+      {
+        "path": "cad/scripts/harmonic_base_spec.py",
+        "base_blob": "304056c36faa064ff766938ca514441a8100deff",
+        "head_blob": "304056c36faa064ff766938ca514441a8100deff",
+        "comparison": "identical"
+      },
+      {
+        "path": "cad/scripts/cone_tip_block_spec.py",
+        "base_blob": "a08a3f71420babb0d8d007e19c20b67070d9b362",
+        "head_blob": "28f8c49acbac2c51125db2b63c3a043f80f41e61",
+        "comparison": "changed_or_added"
+      },
+      {
+        "path": "cad/scripts/_drawing_common.py",
+        "base_blob": "11c59681a7506dd466abf54d9f484b59a1b5c5f1",
+        "head_blob": "c7f3b660020e945f50158551feba6b0a479d2e3c",
+        "comparison": "changed_or_added"
+      },
+      {
+        "path": "cad/scripts/_drawing_prepared_template.py",
+        "base_blob": null,
+        "head_blob": "e9722421daae40e1270534d713fc8f734be5d24b",
+        "comparison": "changed_or_added"
+      },
+      {
+        "path": "cad/scripts/_drawing_build.py",
+        "base_blob": null,
+        "head_blob": "7e7829020254c2296f1b22d3f81383bbb8feef7b",
+        "comparison": "changed_or_added"
+      },
+      {
+        "path": "cad/scripts/_fastener_drawing.py",
+        "base_blob": "6902c4b610b483990cfb88bf90396e7e86cf1e95",
+        "head_blob": "28f7067d41bf74c821ee16e7036db629fb69cb1d",
+        "comparison": "changed_or_added"
+      },
+      {
+        "path": "cad/templates/harmonic-analyzer.DRWDOT",
+        "base_blob": "0023983dc6a001917e075969d5b54dcf61d3b967",
+        "head_blob": "82bbbd804ff5b23fbfb06b541399f07da4de4052",
+        "comparison": "changed_or_added"
+      }
+    ],
+    "common_function_evidence": [
+      {
+        "name": "add_property_linked_note",
+        "ast_equal": true,
+        "base_line": 1065,
+        "head_line": 1350
+      },
+      {
+        "name": "finalize_drawing",
+        "ast_equal": false,
+        "base_line": 4500,
+        "head_line": 4941
+      },
+      {
+        "name": "insert_hole_table",
+        "ast_equal": true,
+        "base_line": 2439,
+        "head_line": 2827
+      }
+    ]
+  },
+  "items": [
+    {
+      "name": "fulcrum-shaft",
+      "sheet": 1,
+      "classification": "readable",
+      "observation": "Main 182.00 length, end diameter/tolerance, FCFs, datum, notes and title are legible; no full-sheet clipping observed. End-view leaders converge but remain traceable at this resolution.",
+      "task": {
+        "name": "task drawing:fulcrum_shaft",
+        "trace_id": "0x3b4efd1297bc879822da4a1636858e10",
+        "span_id": "0x5648689f2905fc64",
+        "start": "2026-09-08T01:49:57.227471Z",
+        "end": "2026-09-08T01:50:30.864635Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0x3b4efd1297bc879822da4a1636858e10",
+        "span_id": "0xfb271dd0d2fa35de",
+        "start": "2026-09-08T01:49:58.340488Z",
+        "end": "2026-09-08T01:50:30.635105Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\fulcrum-shaft.SLDDRW",
+          "bytes": 116003,
+          "mtime_utc": "2026-09-08T01:50:29.1562524Z",
+          "sha256": "c4e72d1121a514a3de6f639638e9119283859b8d6a4a899711153d5117397569",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\fulcrum-shaft.SLDDRW",
+            "bytes": 116003,
+            "mtime_utc": "2026-09-08T01:50:29.1562524Z",
+            "sha256": "c4e72d1121a514a3de6f639638e9119283859b8d6a4a899711153d5117397569",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\fulcrum-shaft.pdf",
+          "bytes": 51846,
+          "mtime_utc": "2026-09-08T01:50:30.3407248Z",
+          "sha256": "16f3101872b11b9e468945e683be1788be3859e1901c3497cbdc3226884d13bb",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\fulcrum-shaft.pdf",
+            "bytes": 51846,
+            "mtime_utc": "2026-09-08T01:50:30.3407248Z",
+            "sha256": "16f3101872b11b9e468945e683be1788be3859e1901c3497cbdc3226884d13bb",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\fulcrum-shaft_drawing.png",
+          "bytes": 465162,
+          "mtime_utc": "2026-09-08T01:50:30.6104642Z",
+          "sha256": "fa06eec1c502ad1a2aa4085c2a952a9784931bbe60a1c54f2bb222d3e8a31f3b",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\fulcrum-shaft_drawing.png",
+            "bytes": 465162,
+            "mtime_utc": "2026-09-08T01:50:30.6104642Z",
+            "sha256": "fa06eec1c502ad1a2aa4085c2a952a9784931bbe60a1c54f2bb222d3e8a31f3b",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "slotted-screw",
+      "sheet": 1,
+      "classification": "readable",
+      "observation": "Three views, 8.00/2.50/22.00 dimensions and all 17 note lines are readable. Upper head-height tail remains inside the border. Exact source identities and cold acceptance are outside this eye pass.",
+      "task": {
+        "name": "task drawing:slotted_screw",
+        "trace_id": "0x2302b4bfd1d72d5ffaf4f938b5552ca3",
+        "span_id": "0x2d010066d0f17558",
+        "start": "2026-09-08T01:53:33.211811Z",
+        "end": "2026-09-08T01:53:55.254153Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0x2302b4bfd1d72d5ffaf4f938b5552ca3",
+        "span_id": "0x35fe80be803abd6b",
+        "start": "2026-09-08T01:53:34.696430Z",
+        "end": "2026-09-08T01:53:54.965087Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\slotted-screw.SLDDRW",
+          "bytes": 147230,
+          "mtime_utc": "2026-09-08T01:53:52.9530438Z",
+          "sha256": "b7f1bb940fa460524bfc28c0628877b9c6af5ab5d3e534fa5035e5ab088d75b9",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\slotted-screw.SLDDRW",
+            "bytes": 147230,
+            "mtime_utc": "2026-09-08T01:53:52.9530438Z",
+            "sha256": "b7f1bb940fa460524bfc28c0628877b9c6af5ab5d3e534fa5035e5ab088d75b9",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\slotted-screw.pdf",
+          "bytes": 53529,
+          "mtime_utc": "2026-09-08T01:53:54.5199962Z",
+          "sha256": "2305f1d319b66be391426cfabc321577ab3d8c59ea0d948d4c47e3dc6f1d3115",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\slotted-screw.pdf",
+            "bytes": 53529,
+            "mtime_utc": "2026-09-08T01:53:54.5199962Z",
+            "sha256": "2305f1d319b66be391426cfabc321577ab3d8c59ea0d948d4c47e3dc6f1d3115",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\slotted-screw_drawing.png",
+          "bytes": 878407,
+          "mtime_utc": "2026-09-08T01:53:54.9398863Z",
+          "sha256": "be0698dd9454ff6d5e95fe82b8a7a1ef55378eb19518490e1dcef603a3f8c5f7",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\slotted-screw_drawing.png",
+            "bytes": 878407,
+            "mtime_utc": "2026-09-08T01:53:54.9398863Z",
+            "sha256": "be0698dd9454ff6d5e95fe82b8a7a1ef55378eb19518490e1dcef603a3f8c5f7",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "cone-tip-adjuster",
+      "sheet": 1,
+      "classification": "readable",
+      "observation": "Parenthesized reference diameter, thread designation, cup/slot dimensions, FCFs and complete lower note block are legible. Several leaders converge at small end-view centers; no clipped value observed.",
+      "task": {
+        "name": "task drawing:cone_tip_adjuster",
+        "trace_id": "0xa364264cd45e1a1388704e30d48b7ea2",
+        "span_id": "0x6b675799e99a9a02",
+        "start": "2026-09-08T01:53:55.282820Z",
+        "end": "2026-09-08T01:54:13.562630Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0xa364264cd45e1a1388704e30d48b7ea2",
+        "span_id": "0x41001601a9e57de5",
+        "start": "2026-09-08T01:53:56.416355Z",
+        "end": "2026-09-08T01:54:13.244711Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\cone-tip-adjuster.SLDDRW",
+          "bytes": 162409,
+          "mtime_utc": "2026-09-08T01:54:11.2457078Z",
+          "sha256": "816c26557c2feee5e6c5b8c03f310510d2a4511b8935e93806a19941130c6626",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\cone-tip-adjuster.SLDDRW",
+            "bytes": 162409,
+            "mtime_utc": "2026-09-08T01:54:11.2457078Z",
+            "sha256": "816c26557c2feee5e6c5b8c03f310510d2a4511b8935e93806a19941130c6626",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\cone-tip-adjuster.pdf",
+          "bytes": 59088,
+          "mtime_utc": "2026-09-08T01:54:12.7998917Z",
+          "sha256": "c15c41cd2572322c0829d9b8df1b05be7e6300e6be7b3f1aa2cf0555f56fd6f1",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\cone-tip-adjuster.pdf",
+            "bytes": 59088,
+            "mtime_utc": "2026-09-08T01:54:12.7998917Z",
+            "sha256": "c15c41cd2572322c0829d9b8df1b05be7e6300e6be7b3f1aa2cf0555f56fd6f1",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\cone-tip-adjuster_drawing.png",
+          "bytes": 722404,
+          "mtime_utc": "2026-09-08T01:54:13.1944719Z",
+          "sha256": "e8138f417da93e17f6a69f66c3954fdd9649823b42de1b2c2a378fe1c444a3d3",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\cone-tip-adjuster_drawing.png",
+            "bytes": 722404,
+            "mtime_utc": "2026-09-08T01:54:13.1944719Z",
+            "sha256": "e8138f417da93e17f6a69f66c3954fdd9649823b42de1b2c2a378fe1c444a3d3",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "pinion-spring",
+      "sheet": 1,
+      "classification": "readable_with_limit",
+      "observation": "Formed profile, top view, dimensions and full notes are legible. Gray hole callout has lower contrast but remains readable; tiny tip geometry/attachment cannot be certified visually.",
+      "task": {
+        "name": "task drawing:pinion_spring",
+        "trace_id": "0x0d733c7885f8dcaae7934fb58a60f2fe",
+        "span_id": "0x654469198cb6ed79",
+        "start": "2026-09-08T01:54:13.608973Z",
+        "end": "2026-09-08T01:54:30.772765Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0x0d733c7885f8dcaae7934fb58a60f2fe",
+        "span_id": "0xb86901fe0f1c486f",
+        "start": "2026-09-08T01:54:14.930357Z",
+        "end": "2026-09-08T01:54:30.477764Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\pinion-spring.SLDDRW",
+          "bytes": 147763,
+          "mtime_utc": "2026-09-08T01:54:28.5641807Z",
+          "sha256": "dbd8bd275c55c248d4dde7c9d47ebde4f1fc5cff8e4d7d3cde57ba07501da948",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\pinion-spring.SLDDRW",
+            "bytes": 147763,
+            "mtime_utc": "2026-09-08T01:54:28.5641807Z",
+            "sha256": "dbd8bd275c55c248d4dde7c9d47ebde4f1fc5cff8e4d7d3cde57ba07501da948",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\pinion-spring.pdf",
+          "bytes": 53292,
+          "mtime_utc": "2026-09-08T01:54:30.0083235Z",
+          "sha256": "c8618481ed48f1b6cc75713f986c627039d924a4bc963e52379c9e36a4845fc2",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\pinion-spring.pdf",
+            "bytes": 53292,
+            "mtime_utc": "2026-09-08T01:54:30.0083235Z",
+            "sha256": "c8618481ed48f1b6cc75713f986c627039d924a4bc963e52379c9e36a4845fc2",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\pinion-spring_drawing.png",
+          "bytes": 835255,
+          "mtime_utc": "2026-09-08T01:54:30.4446110Z",
+          "sha256": "623e53b64bcd47f42c345403d679021715dab809f4aea1489ef112359aeb6eff",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\pinion-spring_drawing.png",
+            "bytes": 835255,
+            "mtime_utc": "2026-09-08T01:54:30.4446110Z",
+            "sha256": "623e53b64bcd47f42c345403d679021715dab809f4aea1489ef112359aeb6eff",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "foot-screw",
+      "sheet": 1,
+      "classification": "readable",
+      "observation": "Three views, principal dimensions, complete thread/slot notes and title fields are legible without obvious clipping.",
+      "task": {
+        "name": "task drawing:foot_screw",
+        "trace_id": "0x9c2cce9ac0ea568cb8bb96ff94b07df5",
+        "span_id": "0x0b70e38e98aec2ea",
+        "start": "2026-09-08T01:54:30.806886Z",
+        "end": "2026-09-08T01:54:39.911755Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0x9c2cce9ac0ea568cb8bb96ff94b07df5",
+        "span_id": "0x6f904114328e5822",
+        "start": "2026-09-08T01:54:31.894519Z",
+        "end": "2026-09-08T01:54:39.633100Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\foot-screw.SLDDRW",
+          "bytes": 147576,
+          "mtime_utc": "2026-09-08T01:54:37.8970055Z",
+          "sha256": "73a9bd9d835967af6dbe7656956411b82e836b9a0acb5cb4ea9c45bd57da51ef",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\foot-screw.SLDDRW",
+            "bytes": 147576,
+            "mtime_utc": "2026-09-08T01:54:37.8970055Z",
+            "sha256": "73a9bd9d835967af6dbe7656956411b82e836b9a0acb5cb4ea9c45bd57da51ef",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\foot-screw.pdf",
+          "bytes": 54169,
+          "mtime_utc": "2026-09-08T01:54:39.2195237Z",
+          "sha256": "6b5c8cf8b892a749ed07f29262fa45103bc981183c72c391587f34cd736bc760",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\foot-screw.pdf",
+            "bytes": 54169,
+            "mtime_utc": "2026-09-08T01:54:39.2195237Z",
+            "sha256": "6b5c8cf8b892a749ed07f29262fa45103bc981183c72c391587f34cd736bc760",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\foot-screw_drawing.png",
+          "bytes": 873760,
+          "mtime_utc": "2026-09-08T01:54:39.6073681Z",
+          "sha256": "bfe8983c9ff56779725685ae38add8370f770468cc4281a739130e90d3245cfd",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\foot-screw_drawing.png",
+            "bytes": 873760,
+            "mtime_utc": "2026-09-08T01:54:39.6073681Z",
+            "sha256": "bfe8983c9ff56779725685ae38add8370f770468cc4281a739130e90d3245cfd",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "gooseneck-set-screw",
+      "sheet": 1,
+      "classification": "title_overflow",
+      "observation": "PART wraps onto a second line across its lower cell border and overlaps DWG. NO. label. Main dimensions and complete notes remain legible. Confirmed print presentation defect; no source correctness inference.",
+      "task": {
+        "name": "task drawing:gooseneck_set_screw",
+        "trace_id": "0x6aebac33b0d43ea0304d67343e4c98be",
+        "span_id": "0xca43de7d2e49ce3e",
+        "start": "2026-09-08T01:54:39.965296Z",
+        "end": "2026-09-08T01:54:50.855615Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0x6aebac33b0d43ea0304d67343e4c98be",
+        "span_id": "0x4da931506ce4a07f",
+        "start": "2026-09-08T01:54:40.963823Z",
+        "end": "2026-09-08T01:54:50.496623Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\gooseneck-set-screw.SLDDRW",
+          "bytes": 140447,
+          "mtime_utc": "2026-09-08T01:54:48.3854432Z",
+          "sha256": "59e406a79e5866f79fe5edfe7b065ecc43694e21363577c90800e1b128b1cc85",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\gooseneck-set-screw.SLDDRW",
+            "bytes": 140447,
+            "mtime_utc": "2026-09-08T01:54:48.3854432Z",
+            "sha256": "59e406a79e5866f79fe5edfe7b065ecc43694e21363577c90800e1b128b1cc85",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\gooseneck-set-screw.pdf",
+          "bytes": 52221,
+          "mtime_utc": "2026-09-08T01:54:49.9325251Z",
+          "sha256": "45a91f44993ecf3a9dd16f48c3203a7e890a3f0f99e21a76139e2a996cc0f121",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\gooseneck-set-screw.pdf",
+            "bytes": 52221,
+            "mtime_utc": "2026-09-08T01:54:49.9325251Z",
+            "sha256": "45a91f44993ecf3a9dd16f48c3203a7e890a3f0f99e21a76139e2a996cc0f121",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\gooseneck-set-screw_drawing.png",
+          "bytes": 830861,
+          "mtime_utc": "2026-09-08T01:54:50.4457634Z",
+          "sha256": "0984adbe01ee30872fcfcf68385bc3eeb7fad72247343d68d9d89e53600b099c",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\gooseneck-set-screw_drawing.png",
+            "bytes": 830861,
+            "mtime_utc": "2026-09-08T01:54:50.4457634Z",
+            "sha256": "0984adbe01ee30872fcfcf68385bc3eeb7fad72247343d68d9d89e53600b099c",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "rocker-arm",
+      "sheet": 1,
+      "classification": "readable_with_limit",
+      "observation": "Basic dimensions and full seven-item note block are visible; last line fits just above lower border. Gray reference/hole dimensions have reduced contrast. End-hole leader convergence is dense; attachment correctness is not an image claim.",
+      "task": {
+        "name": "task drawing:rocker_arm",
+        "trace_id": "0xeb4e7b008563de7d19d8febaf8c1fd7a",
+        "span_id": "0x747a9ba6df7fdedf",
+        "start": "2026-09-08T01:56:08.053964Z",
+        "end": "2026-09-08T01:57:22.926636Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0xeb4e7b008563de7d19d8febaf8c1fd7a",
+        "span_id": "0x95f5faec813d7ccf",
+        "start": "2026-09-08T01:56:09.146156Z",
+        "end": "2026-09-08T01:57:22.642799Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\rocker-arm.SLDDRW",
+          "bytes": 144902,
+          "mtime_utc": "2026-09-08T01:57:20.9742081Z",
+          "sha256": "f2d0dc3c93edaad3925a1e72cf7a3bbe21a1d896c115df90375fc556beabe97f",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\rocker-arm.SLDDRW",
+            "bytes": 144902,
+            "mtime_utc": "2026-09-08T01:57:20.9742081Z",
+            "sha256": "f2d0dc3c93edaad3925a1e72cf7a3bbe21a1d896c115df90375fc556beabe97f",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\rocker-arm.pdf",
+          "bytes": 54540,
+          "mtime_utc": "2026-09-08T01:57:22.2967215Z",
+          "sha256": "d6eeb07b38a37b99ed54688d9c027e3385655382ae9083909af687ea18ac620c",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\rocker-arm.pdf",
+            "bytes": 54540,
+            "mtime_utc": "2026-09-08T01:57:22.2967215Z",
+            "sha256": "d6eeb07b38a37b99ed54688d9c027e3385655382ae9083909af687ea18ac620c",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\rocker-arm_drawing.png",
+          "bytes": 733466,
+          "mtime_utc": "2026-09-08T01:57:22.5973495Z",
+          "sha256": "3ff2482846b27b64e772d0b8d936de6de464941aa4f789ca7a4da61c62e2a179",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\rocker-arm_drawing.png",
+            "bytes": 733466,
+            "mtime_utc": "2026-09-08T01:57:22.5973495Z",
+            "sha256": "3ff2482846b27b64e772d0b8d936de6de464941aa4f789ca7a4da61c62e2a179",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "transgear-pinion",
+      "sheet": 1,
+      "classification": "readable",
+      "observation": "Gear data, bore tolerance/THRU-REAM, end-face FCF and full notes are readable. Tooth profile/count correctness requires source checks.",
+      "task": {
+        "name": "task drawing:transgear_pinion",
+        "trace_id": "0xa59201eb1467d0411d2b2a042de036b2",
+        "span_id": "0xb497a62cad2c012a",
+        "start": "2026-09-08T01:57:22.954992Z",
+        "end": "2026-09-08T01:57:36.067971Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0xa59201eb1467d0411d2b2a042de036b2",
+        "span_id": "0x1f38b7e59db4726e",
+        "start": "2026-09-08T01:57:23.916067Z",
+        "end": "2026-09-08T01:57:35.750919Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\transgear-pinion.SLDDRW",
+          "bytes": 159227,
+          "mtime_utc": "2026-09-08T01:57:33.9360739Z",
+          "sha256": "a0ba873df5dec8e1f398f5aaffc13fbcb6adc23f4f99b74c2e4f8f78161fb0f5",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\transgear-pinion.SLDDRW",
+            "bytes": 159227,
+            "mtime_utc": "2026-09-08T01:57:33.9360739Z",
+            "sha256": "a0ba873df5dec8e1f398f5aaffc13fbcb6adc23f4f99b74c2e4f8f78161fb0f5",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\transgear-pinion.pdf",
+          "bytes": 56598,
+          "mtime_utc": "2026-09-08T01:57:35.3349286Z",
+          "sha256": "86b7346bda7c0cbfb617f2413ef1765334c46c1da1bb2da2fe23c1d98bd58dde",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\transgear-pinion.pdf",
+            "bytes": 56598,
+            "mtime_utc": "2026-09-08T01:57:35.3349286Z",
+            "sha256": "86b7346bda7c0cbfb617f2413ef1765334c46c1da1bb2da2fe23c1d98bd58dde",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\transgear-pinion_drawing.png",
+          "bytes": 675482,
+          "mtime_utc": "2026-09-08T01:57:35.7246035Z",
+          "sha256": "eb133f3cdc312fba65c7ebf61badf651f05d6f5679f8c2c16d57e9dfa04fe3be",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\transgear-pinion_drawing.png",
+            "bytes": 675482,
+            "mtime_utc": "2026-09-08T01:57:35.7246035Z",
+            "sha256": "eb133f3cdc312fba65c7ebf61badf651f05d6f5679f8c2c16d57e9dfa04fe3be",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "transgear-stub",
+      "sheet": 1,
+      "classification": "readable",
+      "observation": "Stepped diameters/lengths, FCFs, datum, slot isometric and full two-line note block are readable; no clear clipped text.",
+      "task": {
+        "name": "task drawing:transgear_stub",
+        "trace_id": "0x3f6d2b2bd99e4dc5c9cef4265addb2f6",
+        "span_id": "0xe2a141dde76b290c",
+        "start": "2026-09-08T01:57:36.123894Z",
+        "end": "2026-09-08T01:57:49.638887Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0x3f6d2b2bd99e4dc5c9cef4265addb2f6",
+        "span_id": "0x3a821bc81e19e386",
+        "start": "2026-09-08T01:57:37.154720Z",
+        "end": "2026-09-08T01:57:49.344863Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\transgear-stub.SLDDRW",
+          "bytes": 138967,
+          "mtime_utc": "2026-09-08T01:57:47.5894667Z",
+          "sha256": "df6f452fc9a59150b56eee6bb351146a9353e653bf7d0ec15235b04e08169843",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\transgear-stub.SLDDRW",
+            "bytes": 138967,
+            "mtime_utc": "2026-09-08T01:57:47.5894667Z",
+            "sha256": "df6f452fc9a59150b56eee6bb351146a9353e653bf7d0ec15235b04e08169843",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\transgear-stub.pdf",
+          "bytes": 56313,
+          "mtime_utc": "2026-09-08T01:57:48.9218204Z",
+          "sha256": "e0871463ae964187d749c7e29c378146181ed685ff40293cb5c5b58337a22f0e",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\transgear-stub.pdf",
+            "bytes": 56313,
+            "mtime_utc": "2026-09-08T01:57:48.9218204Z",
+            "sha256": "e0871463ae964187d749c7e29c378146181ed685ff40293cb5c5b58337a22f0e",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\transgear-stub_drawing.png",
+          "bytes": 585310,
+          "mtime_utc": "2026-09-08T01:57:49.3075782Z",
+          "sha256": "3b47d3e6c74cd8c0749991902dd525bc512746ff0b1614f82812e99f37acf793",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\transgear-stub_drawing.png",
+            "bytes": 585310,
+            "mtime_utc": "2026-09-08T01:57:49.3075782Z",
+            "sha256": "3b47d3e6c74cd8c0749991902dd525bc512746ff0b1614f82812e99f37acf793",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "tube-frame",
+      "sheet": 1,
+      "classification": "title_overflow",
+      "observation": "Complete length/end views, FCFs and five notes are readable. MATERIAL wraps below its cell into the geometric-tolerancing footer area; FINISH is densely packed. This is a visible title-field fit defect, consistent with the deferred template work.",
+      "task": {
+        "name": "task drawing:tube_frame",
+        "trace_id": "0x0cf4ea0f8acde33ea30a95a7deaf8711",
+        "span_id": "0xe6d036cbf0535af3",
+        "start": "2026-09-08T01:57:49.675767Z",
+        "end": "2026-09-08T01:58:01.004506Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0x0cf4ea0f8acde33ea30a95a7deaf8711",
+        "span_id": "0x672c18d900fdd490",
+        "start": "2026-09-08T01:57:50.752757Z",
+        "end": "2026-09-08T01:58:00.745296Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\tube-frame.SLDDRW",
+          "bytes": 140046,
+          "mtime_utc": "2026-09-08T01:57:58.9617537Z",
+          "sha256": "8c47670d83467cd7eae6200681def69e45085b09d0fc3de8f3890f98cbe05c82",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\tube-frame.SLDDRW",
+            "bytes": 140046,
+            "mtime_utc": "2026-09-08T01:57:58.9617537Z",
+            "sha256": "8c47670d83467cd7eae6200681def69e45085b09d0fc3de8f3890f98cbe05c82",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\tube-frame.pdf",
+          "bytes": 52445,
+          "mtime_utc": "2026-09-08T01:58:00.3026396Z",
+          "sha256": "fc60bbc7256d2a3165193f338d531819172fc4bc68db9615ecb2cefa8a4d86d5",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\tube-frame.pdf",
+            "bytes": 52445,
+            "mtime_utc": "2026-09-08T01:58:00.3026396Z",
+            "sha256": "fc60bbc7256d2a3165193f338d531819172fc4bc68db9615ecb2cefa8a4d86d5",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\tube-frame_drawing.png",
+          "bytes": 713379,
+          "mtime_utc": "2026-09-08T01:58:00.7214248Z",
+          "sha256": "0e6c0bad9cb3b3ee6c92e7bb394a27f568e70577795f6376af399f94a8d35a2b",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\tube-frame_drawing.png",
+            "bytes": 713379,
+            "mtime_utc": "2026-09-08T01:58:00.7214248Z",
+            "sha256": "0e6c0bad9cb3b3ee6c92e7bb394a27f568e70577795f6376af399f94a8d35a2b",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "clamp-screw",
+      "sheet": 1,
+      "classification": "readable",
+      "observation": "Dimensions and complete thread/slot note block are legible; no obvious border or title collision.",
+      "task": {
+        "name": "task drawing:clamp_screw",
+        "trace_id": "0x7c2a0f07bebccbeda91b004d2c8c2484",
+        "span_id": "0xa0f6104d539caef7",
+        "start": "2026-09-08T01:58:01.053873Z",
+        "end": "2026-09-08T01:58:09.466104Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0x7c2a0f07bebccbeda91b004d2c8c2484",
+        "span_id": "0xb7515639a7c785d4",
+        "start": "2026-09-08T01:58:01.991879Z",
+        "end": "2026-09-08T01:58:09.222177Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\clamp-screw.SLDDRW",
+          "bytes": 146858,
+          "mtime_utc": "2026-09-08T01:58:07.3852357Z",
+          "sha256": "8df4d15e9555048c191b798b7f7c980fb9b5e6f88e94f12061181c5193d5227a",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\clamp-screw.SLDDRW",
+            "bytes": 146858,
+            "mtime_utc": "2026-09-08T01:58:07.3852357Z",
+            "sha256": "8df4d15e9555048c191b798b7f7c980fb9b5e6f88e94f12061181c5193d5227a",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\clamp-screw.pdf",
+          "bytes": 53567,
+          "mtime_utc": "2026-09-08T01:58:08.7663255Z",
+          "sha256": "e151edff2c44bc1dc07460b333ae01701c235d2ef7037f3bfbb7107d97285729",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\clamp-screw.pdf",
+            "bytes": 53567,
+            "mtime_utc": "2026-09-08T01:58:08.7663255Z",
+            "sha256": "e151edff2c44bc1dc07460b333ae01701c235d2ef7037f3bfbb7107d97285729",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\clamp-screw_drawing.png",
+          "bytes": 877450,
+          "mtime_utc": "2026-09-08T01:58:09.1988551Z",
+          "sha256": "b770cb55a06e06f6029fd8bce97b726598213419df9f5637587ef5a847f0b23b",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\clamp-screw_drawing.png",
+            "bytes": 877450,
+            "mtime_utc": "2026-09-08T01:58:09.1988551Z",
+            "sha256": "b770cb55a06e06f6029fd8bce97b726598213419df9f5637587ef5a847f0b23b",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "bracket-screw",
+      "sheet": 1,
+      "classification": "readable",
+      "observation": "Three views, dimensions, thread/slot notes and title are legible without obvious clipping.",
+      "task": {
+        "name": "task drawing:bracket_screw",
+        "trace_id": "0xbed864210d535d5878b8b60097c1a5e1",
+        "span_id": "0x512f9ce50872fc59",
+        "start": "2026-09-08T01:58:09.505382Z",
+        "end": "2026-09-08T01:58:18.196423Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0xbed864210d535d5878b8b60097c1a5e1",
+        "span_id": "0x01845579e3981770",
+        "start": "2026-09-08T01:58:10.544755Z",
+        "end": "2026-09-08T01:58:17.914981Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\bracket-screw.SLDDRW",
+          "bytes": 148736,
+          "mtime_utc": "2026-09-08T01:58:16.1030470Z",
+          "sha256": "a91ceb56d454914cb47fdbdb3048dced7b77fd89cbc1fbd553730dc5f47a5690",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\bracket-screw.SLDDRW",
+            "bytes": 148736,
+            "mtime_utc": "2026-09-08T01:58:16.1030470Z",
+            "sha256": "a91ceb56d454914cb47fdbdb3048dced7b77fd89cbc1fbd553730dc5f47a5690",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\bracket-screw.pdf",
+          "bytes": 54320,
+          "mtime_utc": "2026-09-08T01:58:17.4822834Z",
+          "sha256": "207b259cf651cca0df9e8c0fbe95153c4b1a0d8d7767353efbcfd576a627aa96",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\bracket-screw.pdf",
+            "bytes": 54320,
+            "mtime_utc": "2026-09-08T01:58:17.4822834Z",
+            "sha256": "207b259cf651cca0df9e8c0fbe95153c4b1a0d8d7767353efbcfd576a627aa96",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\bracket-screw_drawing.png",
+          "bytes": 890848,
+          "mtime_utc": "2026-09-08T01:58:17.8940786Z",
+          "sha256": "1284148f2ba3482dd6d486837afdb71777932b63b147146d7793059140812a19",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\bracket-screw_drawing.png",
+            "bytes": 890848,
+            "mtime_utc": "2026-09-08T01:58:17.8940786Z",
+            "sha256": "1284148f2ba3482dd6d486837afdb71777932b63b147146d7793059140812a19",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "transgear-feed-pinion",
+      "sheet": 1,
+      "classification": "title_overflow",
+      "observation": "Gear data, bore/FCF and complete notes are readable; wrapped PART second line overlaps DWG. NO. label.",
+      "task": {
+        "name": "task drawing:transgear_feed_pinion",
+        "trace_id": "0xd8e8343a37a3842608885d386430c56e",
+        "span_id": "0xc559f052c88f88d6",
+        "start": "2026-09-08T01:58:18.237880Z",
+        "end": "2026-09-08T01:58:31.088901Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0xd8e8343a37a3842608885d386430c56e",
+        "span_id": "0x7bdcf2dc665c376c",
+        "start": "2026-09-08T01:58:19.256428Z",
+        "end": "2026-09-08T01:58:30.824979Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\transgear-feed-pinion.SLDDRW",
+          "bytes": 160279,
+          "mtime_utc": "2026-09-08T01:58:29.0221044Z",
+          "sha256": "278becfdae7cdb128426ad1b68697a6a29775298ebcd7de7dd90dc57a42788a9",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\transgear-feed-pinion.SLDDRW",
+            "bytes": 160279,
+            "mtime_utc": "2026-09-08T01:58:29.0221044Z",
+            "sha256": "278becfdae7cdb128426ad1b68697a6a29775298ebcd7de7dd90dc57a42788a9",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\transgear-feed-pinion.pdf",
+          "bytes": 56691,
+          "mtime_utc": "2026-09-08T01:58:30.3734546Z",
+          "sha256": "c4c4d0d8d45d2543e5b97933597606ca963dad79bad061d6cc02c718c0ae27df",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\transgear-feed-pinion.pdf",
+            "bytes": 56691,
+            "mtime_utc": "2026-09-08T01:58:30.3734546Z",
+            "sha256": "c4c4d0d8d45d2543e5b97933597606ca963dad79bad061d6cc02c718c0ae27df",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\transgear-feed-pinion_drawing.png",
+          "bytes": 736581,
+          "mtime_utc": "2026-09-08T01:58:30.7949163Z",
+          "sha256": "bb3dfe91ceaed5f07bbaaacccc62527ef92cbdd9957051f67a1047979597a29b",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\transgear-feed-pinion_drawing.png",
+            "bytes": 736581,
+            "mtime_utc": "2026-09-08T01:58:30.7949163Z",
+            "sha256": "bb3dfe91ceaed5f07bbaaacccc62527ef92cbdd9957051f67a1047979597a29b",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "spring-hook",
+      "sheet": 1,
+      "classification": "readable",
+      "observation": "Three views, 7.60/2.50/1.40 dimensions, finish and four notes are legible; no clipped value observed.",
+      "task": {
+        "name": "task drawing:spring_hook",
+        "trace_id": "0xb75479a2e795c7cdcbf4346deb99a84f",
+        "span_id": "0xea521014731466bf",
+        "start": "2026-09-08T01:58:31.120877Z",
+        "end": "2026-09-08T01:58:49.478505Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0xb75479a2e795c7cdcbf4346deb99a84f",
+        "span_id": "0xec4a34a70624655c",
+        "start": "2026-09-08T01:58:32.100963Z",
+        "end": "2026-09-08T01:58:49.225579Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\spring-hook.SLDDRW",
+          "bytes": 138394,
+          "mtime_utc": "2026-09-08T01:58:47.7157659Z",
+          "sha256": "38b4350439100606f23fe8de6d02213ae0791743d46b8f118cfe68ca048fbc2c",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\spring-hook.SLDDRW",
+            "bytes": 138394,
+            "mtime_utc": "2026-09-08T01:58:47.7157659Z",
+            "sha256": "38b4350439100606f23fe8de6d02213ae0791743d46b8f118cfe68ca048fbc2c",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\spring-hook.pdf",
+          "bytes": 53161,
+          "mtime_utc": "2026-09-08T01:58:48.9202576Z",
+          "sha256": "be4517bb3e9bcc95e4ac1fa8c15d14bc3a0d6715f91ab637442ad91157d2805f",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\spring-hook.pdf",
+            "bytes": 53161,
+            "mtime_utc": "2026-09-08T01:58:48.9202576Z",
+            "sha256": "be4517bb3e9bcc95e4ac1fa8c15d14bc3a0d6715f91ab637442ad91157d2805f",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\spring-hook_drawing.png",
+          "bytes": 497361,
+          "mtime_utc": "2026-09-08T01:58:49.2066854Z",
+          "sha256": "f3bc1ce23fae51b8ec7a2686522951f8b396e8ee041b13363acd9ad52be0e4c6",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\spring-hook_drawing.png",
+            "bytes": 497361,
+            "mtime_utc": "2026-09-08T01:58:49.2066854Z",
+            "sha256": "f3bc1ce23fae51b8ec7a2686522951f8b396e8ee041b13363acd9ad52be0e4c6",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "cone-tip-block",
+      "sheet": 1,
+      "classification": "dimension_callout_collision",
+      "observation": "Datum B triangle/stem overlaps 14.00 width text and datum D overlaps 12.00 depth text. Diagonal leader crosses 5/16-18 Tapped Hole text; FCF caption reaches isometric outline. Dense bottom notes remain visible but small. Not a clean print.",
+      "task": {
+        "name": "task drawing:cone_tip_block",
+        "trace_id": "0x0b3117f7b2f81ab62112469d6720ef79",
+        "span_id": "0x708c3fc02dc1292f",
+        "start": "2026-09-08T01:58:49.529317Z",
+        "end": "2026-09-08T01:59:10.110579Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0x0b3117f7b2f81ab62112469d6720ef79",
+        "span_id": "0x6063067584bf25ed",
+        "start": "2026-09-08T01:58:50.501082Z",
+        "end": "2026-09-08T01:59:09.880029Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\cone-tip-block.SLDDRW",
+          "bytes": 191719,
+          "mtime_utc": "2026-09-08T01:59:08.2129683Z",
+          "sha256": "fd2c36241b9ff0eec060128e1c29b75902f49b18d39114f537181b69b404e5ec",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\cone-tip-block.SLDDRW",
+            "bytes": 191719,
+            "mtime_utc": "2026-09-08T01:59:08.2129683Z",
+            "sha256": "fd2c36241b9ff0eec060128e1c29b75902f49b18d39114f537181b69b404e5ec",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\cone-tip-block.pdf",
+          "bytes": 59507,
+          "mtime_utc": "2026-09-08T01:59:09.4798742Z",
+          "sha256": "238833a92cec834add06348ab0456abafb47cecfd009dc395fc31b97129eb16b",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\cone-tip-block.pdf",
+            "bytes": 59507,
+            "mtime_utc": "2026-09-08T01:59:09.4798742Z",
+            "sha256": "238833a92cec834add06348ab0456abafb47cecfd009dc395fc31b97129eb16b",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\cone-tip-block_drawing.png",
+          "bytes": 984093,
+          "mtime_utc": "2026-09-08T01:59:09.8164980Z",
+          "sha256": "8508b5a6218fce0c9782251c810b09a5d9ab22b25fc1218407425386c08a100b",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\cone-tip-block_drawing.png",
+            "bytes": 984093,
+            "mtime_utc": "2026-09-08T01:59:09.8164980Z",
+            "sha256": "8508b5a6218fce0c9782251c810b09a5d9ab22b25fc1218407425386c08a100b",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "connecting-rod",
+      "sheet": 1,
+      "classification": "crowded_annotation_region",
+      "observation": "Ring diameter/tolerance/BORE labels crowd and touch the ring outline and leaders; 8.00 lies tightly between shank outlines. Values remain readable at this scale, but clean stroke separation is not established. Notes and title fit.",
+      "task": {
+        "name": "task drawing:connecting_rod",
+        "trace_id": "0x478a46c33a483b1ff6f8ffb6700f4a94",
+        "span_id": "0x7bd21899b56d435e",
+        "start": "2026-09-08T01:59:10.152528Z",
+        "end": "2026-09-08T01:59:23.217961Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0x478a46c33a483b1ff6f8ffb6700f4a94",
+        "span_id": "0x007e6b26669f2c0d",
+        "start": "2026-09-08T01:59:11.091014Z",
+        "end": "2026-09-08T01:59:23.016969Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\connecting-rod.SLDDRW",
+          "bytes": 143212,
+          "mtime_utc": "2026-09-08T01:59:21.5703944Z",
+          "sha256": "5a61ac04a0811078ec79427b9d2276ac42a6ec963f5e31ef0e51acc2a948d11f",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\connecting-rod.SLDDRW",
+            "bytes": 143212,
+            "mtime_utc": "2026-09-08T01:59:21.5703944Z",
+            "sha256": "5a61ac04a0811078ec79427b9d2276ac42a6ec963f5e31ef0e51acc2a948d11f",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\connecting-rod.pdf",
+          "bytes": 56283,
+          "mtime_utc": "2026-09-08T01:59:22.7132777Z",
+          "sha256": "b1b2707a5a45ef7497036d6e1296014bcc6c4665eb952e93b16be0ec03a4f251",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\connecting-rod.pdf",
+            "bytes": 56283,
+            "mtime_utc": "2026-09-08T01:59:22.7132777Z",
+            "sha256": "b1b2707a5a45ef7497036d6e1296014bcc6c4665eb952e93b16be0ec03a4f251",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\connecting-rod_drawing.png",
+          "bytes": 662086,
+          "mtime_utc": "2026-09-08T01:59:22.9870788Z",
+          "sha256": "4e086a110049cb270fa4bee48bb9ba5ea465fac9d79a136f2817c0f23ca23df1",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\connecting-rod_drawing.png",
+            "bytes": 662086,
+            "mtime_utc": "2026-09-08T01:59:22.9870788Z",
+            "sha256": "4e086a110049cb270fa4bee48bb9ba5ea465fac9d79a136f2817c0f23ca23df1",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "channel-spring-installed",
+      "sheet": 1,
+      "classification": "title_overflow",
+      "observation": "Complete spring data and both views are visible. Wrapped PART second line overlaps DWG. NO. label. Fine coil/end connections are too small for geometry/continuity proof.",
+      "task": {
+        "name": "task drawing:channel_spring_installed",
+        "trace_id": "0x4ee6f605ba9772570bca0707d0c68ac5",
+        "span_id": "0xe8f66e2053b7a58a",
+        "start": "2026-09-08T01:59:23.251513Z",
+        "end": "2026-09-08T01:59:32.151335Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0x4ee6f605ba9772570bca0707d0c68ac5",
+        "span_id": "0x5672691dc3c58dca",
+        "start": "2026-09-08T01:59:24.204110Z",
+        "end": "2026-09-08T01:59:31.915480Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\channel-spring-installed.SLDDRW",
+          "bytes": 1247762,
+          "mtime_utc": "2026-09-08T01:59:30.3015359Z",
+          "sha256": "a14b1b21ee12cdb78ae82ebf35230eb79432a0ae099671d86cb2d55f59eb758a",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\channel-spring-installed.SLDDRW",
+            "bytes": 1247762,
+            "mtime_utc": "2026-09-08T01:59:30.3015359Z",
+            "sha256": "a14b1b21ee12cdb78ae82ebf35230eb79432a0ae099671d86cb2d55f59eb758a",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\channel-spring-installed.pdf",
+          "bytes": 66374,
+          "mtime_utc": "2026-09-08T01:59:31.5761452Z",
+          "sha256": "d9f900d108ccd209214adda1152a7cda91e991d86e089f0c5375a5fd1f9173f5",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\channel-spring-installed.pdf",
+            "bytes": 66374,
+            "mtime_utc": "2026-09-08T01:59:31.5761452Z",
+            "sha256": "d9f900d108ccd209214adda1152a7cda91e991d86e089f0c5375a5fd1f9173f5",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\channel-spring-installed_drawing.png",
+          "bytes": 720726,
+          "mtime_utc": "2026-09-08T01:59:31.8982624Z",
+          "sha256": "ce62cb0927f10dca71409f6e8415224bb63bc0007e48768a754e10e003f5590c",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\channel-spring-installed_drawing.png",
+            "bytes": 720726,
+            "mtime_utc": "2026-09-08T01:59:31.8982624Z",
+            "sha256": "ce62cb0927f10dca71409f6e8415224bb63bc0007e48768a754e10e003f5590c",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "magnifying-clamp",
+      "sheet": 1,
+      "classification": "dimension_callout_collision",
+      "observation": "The front-view upper horizontal edge/extension line runs through the THRU - SLIP FIT diameter-6-rod callout; nearby finish text is tight to the right outline. Main values and full notes are readable, but the sheet is not cleanly separated.",
+      "task": {
+        "name": "task drawing:magnifying_clamp",
+        "trace_id": "0x1048530f06e438289665df2fed1b86d9",
+        "span_id": "0x5df94032aa744685",
+        "start": "2026-09-08T01:59:32.186285Z",
+        "end": "2026-09-08T01:59:46.296113Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0x1048530f06e438289665df2fed1b86d9",
+        "span_id": "0x302d4dea4c8a7c6e",
+        "start": "2026-09-08T01:59:33.082797Z",
+        "end": "2026-09-08T01:59:45.996018Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\magnifying-clamp.SLDDRW",
+          "bytes": 154448,
+          "mtime_utc": "2026-09-08T01:59:44.4261757Z",
+          "sha256": "6492ec0ec712c83db538c5b60e7066a10f3ba8939366b62343ee22c51fceb8c7",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\magnifying-clamp.SLDDRW",
+            "bytes": 154448,
+            "mtime_utc": "2026-09-08T01:59:44.4261757Z",
+            "sha256": "6492ec0ec712c83db538c5b60e7066a10f3ba8939366b62343ee22c51fceb8c7",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\magnifying-clamp.pdf",
+          "bytes": 55597,
+          "mtime_utc": "2026-09-08T01:59:45.6119413Z",
+          "sha256": "97c350ba3a60f31c0c05ec0e42fa862cc017671b4a87afec3be9fc0523d9e079",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\magnifying-clamp.pdf",
+            "bytes": 55597,
+            "mtime_utc": "2026-09-08T01:59:45.6119413Z",
+            "sha256": "97c350ba3a60f31c0c05ec0e42fa862cc017671b4a87afec3be9fc0523d9e079",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\magnifying-clamp_drawing.png",
+          "bytes": 697801,
+          "mtime_utc": "2026-09-08T01:59:45.9547552Z",
+          "sha256": "911ff7d52d0e7aea2b548f6566025267b4a7a7b75e29116890ec49e21bc5154b",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\magnifying-clamp_drawing.png",
+            "bytes": 697801,
+            "mtime_utc": "2026-09-08T01:59:45.9547552Z",
+            "sha256": "911ff7d52d0e7aea2b548f6566025267b4a7a7b75e29116890ec49e21bc5154b",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "cone-gear-shaft",
+      "sheet": 1,
+      "classification": "crowded_annotation_region",
+      "observation": "Five end diameters/tolerances, axial stations, FCFs and full note block are readable. Large-end Ra 1.6 lies over shaft/centerline ink; fine separation of those strokes is not clean. No cut-off text observed.",
+      "task": {
+        "name": "task drawing:cone_gear_shaft",
+        "trace_id": "0x3036beb1080308369194f9fc3ac7ddb3",
+        "span_id": "0x4c13caa42ac9f5e4",
+        "start": "2026-09-08T01:59:46.334640Z",
+        "end": "2026-09-08T02:00:03.516470Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0x3036beb1080308369194f9fc3ac7ddb3",
+        "span_id": "0xd165b9decec8f22c",
+        "start": "2026-09-08T01:59:47.443479Z",
+        "end": "2026-09-08T02:00:03.219082Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\cone-gear-shaft.SLDDRW",
+          "bytes": 154182,
+          "mtime_utc": "2026-09-08T02:00:01.3047638Z",
+          "sha256": "34fc214aba381aa7026712eebbb21fdc19e41ebf225defa19210db8d57693aac",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\cone-gear-shaft.SLDDRW",
+            "bytes": 154182,
+            "mtime_utc": "2026-09-08T02:00:01.3047638Z",
+            "sha256": "34fc214aba381aa7026712eebbb21fdc19e41ebf225defa19210db8d57693aac",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\cone-gear-shaft.pdf",
+          "bytes": 55837,
+          "mtime_utc": "2026-09-08T02:00:02.8220911Z",
+          "sha256": "0419c58c86eaeb884fd83be99fd3225b215cf759974de74dcd24a8b16bf0150e",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\cone-gear-shaft.pdf",
+            "bytes": 55837,
+            "mtime_utc": "2026-09-08T02:00:02.8220911Z",
+            "sha256": "0419c58c86eaeb884fd83be99fd3225b215cf759974de74dcd24a8b16bf0150e",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\cone-gear-shaft_drawing.png",
+          "bytes": 895714,
+          "mtime_utc": "2026-09-08T02:00:03.1774319Z",
+          "sha256": "85578bae3f634fd0ac20c0361b9c339b4d6b79c688a9c99de70f419be89bbf33",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\cone-gear-shaft_drawing.png",
+            "bytes": 895714,
+            "mtime_utc": "2026-09-08T02:00:03.1774319Z",
+            "sha256": "85578bae3f634fd0ac20c0361b9c339b4d6b79c688a9c99de70f419be89bbf33",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "cone-gear",
+      "sheet": 1,
+      "classification": "readable_with_limit",
+      "observation": "Complete gear-family table and notes, bore dimension, datum and FCF are visible. Fine 120-tooth edges alias in side view; tooth-form accuracy is not established by the preview.",
+      "task": {
+        "name": "task drawing:cone_gear",
+        "trace_id": "0x14165a13ce5c93daa34080149d76e354",
+        "span_id": "0x274c21c2bcc2d69c",
+        "start": "2026-09-08T02:00:03.568216Z",
+        "end": "2026-09-08T02:00:28.196769Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0x14165a13ce5c93daa34080149d76e354",
+        "span_id": "0xc758277e2df3afd4",
+        "start": "2026-09-08T02:00:04.784352Z",
+        "end": "2026-09-08T02:00:27.975498Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\cone-gear.SLDDRW",
+          "bytes": 422988,
+          "mtime_utc": "2026-09-08T02:00:26.4912751Z",
+          "sha256": "c443ed2b0a8acb4dcb91c37b947879e26b46f5d66703b3cacb28bbbc046ca0d7",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\cone-gear.SLDDRW",
+            "bytes": 422988,
+            "mtime_utc": "2026-09-08T02:00:26.4912751Z",
+            "sha256": "c443ed2b0a8acb4dcb91c37b947879e26b46f5d66703b3cacb28bbbc046ca0d7",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\cone-gear.pdf",
+          "bytes": 84750,
+          "mtime_utc": "2026-09-08T02:00:27.6039984Z",
+          "sha256": "8103e4e5cb24abef639f3ed75175eb070e607034133d256cd510f4948810435b",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\cone-gear.pdf",
+            "bytes": 84750,
+            "mtime_utc": "2026-09-08T02:00:27.6039984Z",
+            "sha256": "8103e4e5cb24abef639f3ed75175eb070e607034133d256cd510f4948810435b",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\cone-gear_drawing.png",
+          "bytes": 1045904,
+          "mtime_utc": "2026-09-08T02:00:27.9456076Z",
+          "sha256": "f0ae1a91d1ad60a0d5663a64648f6029d9a23c0869ff2dffe179fc337985f745",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\cone-gear_drawing.png",
+            "bytes": 1045904,
+            "mtime_utc": "2026-09-08T02:00:27.9456076Z",
+            "sha256": "f0ae1a91d1ad60a0d5663a64648f6029d9a23c0869ff2dffe179fc337985f745",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "pinion-pivot-shaft",
+      "sheet": 1,
+      "classification": "dimension_callout_collision",
+      "observation": "End-diameter diagonal leader runs through the 0.00/-0.02 tolerance stack. Main length, profile FCF, notes and title remain legible; this end callout is not cleanly separated.",
+      "task": {
+        "name": "task drawing:pinion_pivot_shaft",
+        "trace_id": "0xe4b9eff383f17da01dd10bde45a3c96d",
+        "span_id": "0xe142789d7dbd2168",
+        "start": "2026-09-08T02:00:28.227335Z",
+        "end": "2026-09-08T02:00:39.186577Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0xe4b9eff383f17da01dd10bde45a3c96d",
+        "span_id": "0xe51ade5c8c304370",
+        "start": "2026-09-08T02:00:29.211435Z",
+        "end": "2026-09-08T02:00:38.982120Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\pinion-pivot-shaft.SLDDRW",
+          "bytes": 142438,
+          "mtime_utc": "2026-09-08T02:00:37.4850315Z",
+          "sha256": "5158a293c0708ac73bc62543ebca906059757aa9858ed5b001a9e9689e330830",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\pinion-pivot-shaft.SLDDRW",
+            "bytes": 142438,
+            "mtime_utc": "2026-09-08T02:00:37.4850315Z",
+            "sha256": "5158a293c0708ac73bc62543ebca906059757aa9858ed5b001a9e9689e330830",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\pinion-pivot-shaft.pdf",
+          "bytes": 53551,
+          "mtime_utc": "2026-09-08T02:00:38.6975273Z",
+          "sha256": "ca64bcf042208be2d8e47a190ad88e5a72e10a7d7ea38fd87004eef25d3d4971",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\pinion-pivot-shaft.pdf",
+            "bytes": 53551,
+            "mtime_utc": "2026-09-08T02:00:38.6975273Z",
+            "sha256": "ca64bcf042208be2d8e47a190ad88e5a72e10a7d7ea38fd87004eef25d3d4971",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\pinion-pivot-shaft_drawing.png",
+          "bytes": 698957,
+          "mtime_utc": "2026-09-08T02:00:38.9649431Z",
+          "sha256": "c718d7ce56a50e35594e00ac2e9d946a1d6a3730ed11da3afd2e5752acacb36d",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\pinion-pivot-shaft_drawing.png",
+            "bytes": 698957,
+            "mtime_utc": "2026-09-08T02:00:38.9649431Z",
+            "sha256": "c718d7ce56a50e35594e00ac2e9d946a1d6a3730ed11da3afd2e5752acacb36d",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "measuring-stick",
+      "sheet": 1,
+      "classification": "page_clipping_blocker",
+      "observation": "Manufacturing-note block runs below sheet border, overlaps SOLIDWORKS footer and is cut by page bottom. Later note text is not fully printable. Main scale/200.00/8.00 views are visible, but complete-print acceptance fails.",
+      "task": {
+        "name": "task drawing:measuring_stick",
+        "trace_id": "0x77395c518f1398e3d24809d67fc71f0f",
+        "span_id": "0x30cf69957c742796",
+        "start": "2026-09-08T02:00:39.217692Z",
+        "end": "2026-09-08T02:00:48.351951Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0x77395c518f1398e3d24809d67fc71f0f",
+        "span_id": "0x8c1b7c5fc3a6456e",
+        "start": "2026-09-08T02:00:40.121081Z",
+        "end": "2026-09-08T02:00:48.097554Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\measuring-stick.SLDDRW",
+          "bytes": 607099,
+          "mtime_utc": "2026-09-08T02:00:46.4645463Z",
+          "sha256": "a3a230e1ba91efd1cea4bae2b03912ca838e62a773088c8e518a3355e6f1b9fb",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\measuring-stick.SLDDRW",
+            "bytes": 607099,
+            "mtime_utc": "2026-09-08T02:00:46.4645463Z",
+            "sha256": "a3a230e1ba91efd1cea4bae2b03912ca838e62a773088c8e518a3355e6f1b9fb",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\measuring-stick.pdf",
+          "bytes": 65190,
+          "mtime_utc": "2026-09-08T02:00:47.7743881Z",
+          "sha256": "0786d24bbb4e6cfd938c34aec269e3b7443ac7d0643446bf4777d37784b70f79",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\measuring-stick.pdf",
+            "bytes": 65190,
+            "mtime_utc": "2026-09-08T02:00:47.7743881Z",
+            "sha256": "0786d24bbb4e6cfd938c34aec269e3b7443ac7d0643446bf4777d37784b70f79",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\measuring-stick_drawing.png",
+          "bytes": 974229,
+          "mtime_utc": "2026-09-08T02:00:48.0862234Z",
+          "sha256": "a826ab15c5e955e81452bf39154040f8493e8c51a809453eced84b88a9d8d123",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\measuring-stick_drawing.png",
+            "bytes": 974229,
+            "mtime_utc": "2026-09-08T02:00:48.0862234Z",
+            "sha256": "a826ab15c5e955e81452bf39154040f8493e8c51a809453eced84b88a9d8d123",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ],
+      "extracted_pdf_text_not_visibility_proof": " 200.00 \r\n 8.00 \r\n0 1 2 3 4 5 6 7 8 9 10\r\n1. FINISHED BAR 200.00 X 8.00 X 3.00; RULE THE BROAD FACE\r\n SHOWN. SCALE SPAN 142.00; THE 10 TICK 0.50 +/-0.25 FROM\r\n THE FAR END.\r\n2. ENGRAVE 11 FULL TICKS (VALUES 0 THRU 10). THE 0 TICK\r\n IS THE DATUM: TICK N AT 14.20 X N FROM THE 0 TICK,\r\n EACH WITHIN +/-0.05 OF ITS OWN POSITION\r\n (NONCUMULATIVE; 0-TO-10 SPAN 142.00 REF). NINE MINOR\r\n TICKS PER DIVISION AT 1.42 PITCH, 1.80 +/-0.10 UP FROM\r\n THE BOTTOM EDGE SHOWN, SAME SLOT SECTION.\r\n SLOTS: SQUARE BOTTOM, 0.40 +/-0.05 WIDE, 0.50 +/-0.05\r\n DEEP NORMAL TO THE RULED FACE; EACH FULL TICK RUNS\r\n 3.00 +/-0.10 UP FROM THE BOTTOM EDGE SHOWN. ONE\r\n HALF-DIVISION TICK BETWEEN 0 + 1: SAME SLOT SECTION,\r\n 4.00 +/-0.10 UP FROM THE BOTTOM EDGE.\r\n3. ENGRAVE 2.00 +/-0.10 HIGH ASME Y14.2 VERTICAL GOTHIC\r\n NUMERALS 0 THRU 10, STROKE WIDTH 0.30 +/-0.10, TURNED\r\n 90 DEG: DIGIT TOPS TOWARD THE 10 END (READ WITH THE\r\n 10 END UP). NUMERALS 0-9 START 0.60 +/-0.10 PAST THEIR\r\n FULL TICK TOWARD 10; THE 10 NUMERAL ENDS 0.60 +/-0.10\r\n SHORT OF ITS TICK. TICK-SIDE END OF EACH NUMERAL\r\n 3.60 +/-0.10 ABOVE THE BOTTOM EDGE SHOWN (0.60 BEYOND\r\n THE FULL-TICK ENDS). DEPTH 0.50 +/-0.05, SAME SLOT\r\n SECTION AS THE TICKS. BLACK-FILL ALL ENGRAVING: FLAT\r\n BLACK ENAMEL WIPE-FILLED, CURED BEFORE FINAL POLISH.\r\n4. TICK VALUES ARE ALSO SHOWN OFFSET BELOW THE BAR FOR\r\n LEGIBILITY; THE ENGRAVED NUMERALS ARE PER NOTE 3.\r\nRULED FACE SCALE 1:1\r\nISOMETRIC VIEW SCALE 1:2\r\nC26000 brass, half-hard\r\nmeasuring-stick\r\nv32\r\nDO NOT SCALE DRAWING\r\nMHA-046\r\nUNLESS OTHERWISE SPECIFIED, TOLERANCES\r\nSCALE: 1:1 DWG. NO. REV\r\nPART\r\npolished\r\nFINISH\r\nMATERIAL\r\nINTERPRET GEOMETRIC TOLERANCING\r\nPER: ASME Y14.5-2018 UNIT: mm\r\n.XXX\r\n±0.13\r\n.XX\r\n±0.51 ±1°\r\nREMOVE BURRS AND BREAK SHARP EDGES R0.25 OR CHAMFER 0.25 MAX\r\n© 2026 Pedro Paulo Vezza Campos\r\nAlbert Michelson's Harmonic Analyzer\r\nA Project For Hobby Machinists Ra 3.2\r\nA A\r\nB B\r\nC C\r\nD D\r\n4\r\n4\r\n3\r\n3\r\n2\r\n2\r\n1\r\n1\r\nDRILLED HOLES\r\n+0.10 / 0\r\n \r\nSOLIDWORKS Maker Product. For Personal Use Only."
+    },
+    {
+      "name": "boss-hook",
+      "sheet": 1,
+      "classification": "readable",
+      "observation": "Three principal dimensions, full five-note block and title are readable. No clear clipping/collision.",
+      "task": {
+        "name": "task drawing:boss_hook",
+        "trace_id": "0x7f324f6a648c6cf171a925d26c45af49",
+        "span_id": "0xffd7ca54e27aeb78",
+        "start": "2026-09-08T02:00:48.415198Z",
+        "end": "2026-09-08T02:00:56.621765Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0x7f324f6a648c6cf171a925d26c45af49",
+        "span_id": "0xe0a698b9c1e0b226",
+        "start": "2026-09-08T02:00:49.397442Z",
+        "end": "2026-09-08T02:00:56.368294Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\boss-hook.SLDDRW",
+          "bytes": 147201,
+          "mtime_utc": "2026-09-08T02:00:54.7699290Z",
+          "sha256": "fc0942a89ce8003876471ebb43158038e219a8bf2691b4b76b79319e07849831",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\boss-hook.SLDDRW",
+            "bytes": 147201,
+            "mtime_utc": "2026-09-08T02:00:54.7699290Z",
+            "sha256": "fc0942a89ce8003876471ebb43158038e219a8bf2691b4b76b79319e07849831",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\boss-hook.pdf",
+          "bytes": 53586,
+          "mtime_utc": "2026-09-08T02:00:56.0658227Z",
+          "sha256": "b227eecd9590cb8a8872a859dff59abe2ac9073a53bcbfbd7e072aa3ff8ce195",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\boss-hook.pdf",
+            "bytes": 53586,
+            "mtime_utc": "2026-09-08T02:00:56.0658227Z",
+            "sha256": "b227eecd9590cb8a8872a859dff59abe2ac9073a53bcbfbd7e072aa3ff8ce195",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\boss-hook_drawing.png",
+          "bytes": 586909,
+          "mtime_utc": "2026-09-08T02:00:56.3517569Z",
+          "sha256": "376ba8818ed3362994cd26e94c36de70bda2fa6c1fc5faf8c186867858490782",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\boss-hook_drawing.png",
+            "bytes": 586909,
+            "mtime_utc": "2026-09-08T02:00:56.3517569Z",
+            "sha256": "376ba8818ed3362994cd26e94c36de70bda2fa6c1fc5faf8c186867858490782",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "alignment-pinion",
+      "sheet": 1,
+      "classification": "readable_with_limit",
+      "observation": "THRU - REAM / PRESS FIT prints with both tolerance values; complete gear/fit notes and title are legible. Dense long-pinion tooth lines merge at overview scale; exact form is not visually established.",
+      "task": {
+        "name": "task drawing:alignment_pinion",
+        "trace_id": "0xd2ef2fb95dabca0371920099dcdcfa8d",
+        "span_id": "0xfc70ed09c3ef6ed2",
+        "start": "2026-09-08T02:00:56.668473Z",
+        "end": "2026-09-08T02:01:12.871862Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0xd2ef2fb95dabca0371920099dcdcfa8d",
+        "span_id": "0xe67fadffd30cbe20",
+        "start": "2026-09-08T02:00:57.721703Z",
+        "end": "2026-09-08T02:01:12.672169Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\alignment-pinion.SLDDRW",
+          "bytes": 202661,
+          "mtime_utc": "2026-09-08T02:01:11.2275743Z",
+          "sha256": "5e95881efeb86c71fe90beb4b6a0e85f71e29be8bb5b34b19ebb132fd81661e8",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\alignment-pinion.SLDDRW",
+            "bytes": 202661,
+            "mtime_utc": "2026-09-08T02:01:11.2275743Z",
+            "sha256": "5e95881efeb86c71fe90beb4b6a0e85f71e29be8bb5b34b19ebb132fd81661e8",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\alignment-pinion.pdf",
+          "bytes": 56627,
+          "mtime_utc": "2026-09-08T02:01:12.3709124Z",
+          "sha256": "b6861a90a304945610ef36b5d2c33ecbebe88ddd3c5c86af1efc8d85eaed781a",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\alignment-pinion.pdf",
+            "bytes": 56627,
+            "mtime_utc": "2026-09-08T02:01:12.3709124Z",
+            "sha256": "b6861a90a304945610ef36b5d2c33ecbebe88ddd3c5c86af1efc8d85eaed781a",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\alignment-pinion_drawing.png",
+          "bytes": 695688,
+          "mtime_utc": "2026-09-08T02:01:12.6535564Z",
+          "sha256": "65de4ff652512ac1ea1fd4892604c859ffcff3fdfd33eb94e2b4c8e6648f8dbc",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\alignment-pinion_drawing.png",
+            "bytes": 695688,
+            "mtime_utc": "2026-09-08T02:01:12.6535564Z",
+            "sha256": "65de4ff652512ac1ea1fd4892604c859ffcff3fdfd33eb94e2b4c8e6648f8dbc",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "cylinder-gear-shaft",
+      "sheet": 1,
+      "classification": "crowded_annotation_region",
+      "observation": "Length, full notes and FCFs are legible. End-diameter tolerance stack is tightly packed against the circle/leader; clean clearance is uncertain at the overview.",
+      "task": {
+        "name": "task drawing:cylinder_gear_shaft",
+        "trace_id": "0x7684af4e2578b1e2b8f075b3fb3ecb8f",
+        "span_id": "0x8270ff1fdbf3d503",
+        "start": "2026-09-08T02:01:12.923779Z",
+        "end": "2026-09-08T02:01:23.272591Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0x7684af4e2578b1e2b8f075b3fb3ecb8f",
+        "span_id": "0xb343e6906499063a",
+        "start": "2026-09-08T02:01:13.804218Z",
+        "end": "2026-09-08T02:01:23.086167Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\cylinder-gear-shaft.SLDDRW",
+          "bytes": 119530,
+          "mtime_utc": "2026-09-08T02:01:21.7213283Z",
+          "sha256": "17935fcf06eb827f8a7e888a597767034f717984723220b6c4119388bd47781c",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\cylinder-gear-shaft.SLDDRW",
+            "bytes": 119530,
+            "mtime_utc": "2026-09-08T02:01:21.7213283Z",
+            "sha256": "17935fcf06eb827f8a7e888a597767034f717984723220b6c4119388bd47781c",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\cylinder-gear-shaft.pdf",
+          "bytes": 52273,
+          "mtime_utc": "2026-09-08T02:01:22.8143196Z",
+          "sha256": "e71fec23cdfe733cf76ea314ff32ccf7d10bd2b5bb6e04bca41b72161b8d51af",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\cylinder-gear-shaft.pdf",
+            "bytes": 52273,
+            "mtime_utc": "2026-09-08T02:01:22.8143196Z",
+            "sha256": "e71fec23cdfe733cf76ea314ff32ccf7d10bd2b5bb6e04bca41b72161b8d51af",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\cylinder-gear-shaft_drawing.png",
+          "bytes": 486339,
+          "mtime_utc": "2026-09-08T02:01:23.0654832Z",
+          "sha256": "80aadfeb5229adde1faa386af342df9e22787f2b6981c6cc66c393a3c32a53b0",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\cylinder-gear-shaft_drawing.png",
+            "bytes": 486339,
+            "mtime_utc": "2026-09-08T02:01:23.0654832Z",
+            "sha256": "80aadfeb5229adde1faa386af342df9e22787f2b6981c6cc66c393a3c32a53b0",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "fillister-screw",
+      "sheet": 1,
+      "classification": "dimension_callout_collision",
+      "observation": "Thread-only #4-40 UNC-2A prints without residual numeric diameter and all notes are visible. Vertical dimension/centerline strokes pass through the 4.00/UNDERHEAD LENGTH text region; this is not a pristine layout.",
+      "task": {
+        "name": "task drawing:fillister_screw",
+        "trace_id": "0x027011444a3c5dd8e281ac39771159b9",
+        "span_id": "0x8c66003d01bd620c",
+        "start": "2026-09-08T02:01:23.328411Z",
+        "end": "2026-09-08T02:01:32.859058Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0x027011444a3c5dd8e281ac39771159b9",
+        "span_id": "0xac186a568d1ececb",
+        "start": "2026-09-08T02:01:24.233505Z",
+        "end": "2026-09-08T02:01:32.588097Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\fillister-screw.SLDDRW",
+          "bytes": 153214,
+          "mtime_utc": "2026-09-08T02:01:30.9639999Z",
+          "sha256": "4772eccde4c07ffa9e023df2800194ed1df3b89060455e9a438385b2102fed64",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\fillister-screw.SLDDRW",
+            "bytes": 153214,
+            "mtime_utc": "2026-09-08T02:01:30.9639999Z",
+            "sha256": "4772eccde4c07ffa9e023df2800194ed1df3b89060455e9a438385b2102fed64",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\fillister-screw.pdf",
+          "bytes": 54853,
+          "mtime_utc": "2026-09-08T02:01:32.2481372Z",
+          "sha256": "7ab0fb18dc18da16cc3c05beeee1f63e0d5f6f662f59b7a58b91aa328b44cd19",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\fillister-screw.pdf",
+            "bytes": 54853,
+            "mtime_utc": "2026-09-08T02:01:32.2481372Z",
+            "sha256": "7ab0fb18dc18da16cc3c05beeee1f63e0d5f6f662f59b7a58b91aa328b44cd19",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\fillister-screw_drawing.png",
+          "bytes": 936998,
+          "mtime_utc": "2026-09-08T02:01:32.5613796Z",
+          "sha256": "fb979f6cd62a996f9191c0d50d317031c89293f7b335b7fe42f0522258f2c7a0",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\fillister-screw_drawing.png",
+            "bytes": 936998,
+            "mtime_utc": "2026-09-08T02:01:32.5613796Z",
+            "sha256": "fb979f6cd62a996f9191c0d50d317031c89293f7b335b7fe42f0522258f2c7a0",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "knife-mount",
+      "sheet": 1,
+      "classification": "dimension_callout_collision",
+      "observation": "29.37 vertical dimension line passes through the diameter-12.00 THRU callout text. Other values, FCF, tapped-hole label and complete notes are legible.",
+      "task": {
+        "name": "task drawing:knife_mount",
+        "trace_id": "0x73d8109aab0fed6576db51c26986b996",
+        "span_id": "0x6fd21ec3a99f2356",
+        "start": "2026-09-08T02:01:32.908058Z",
+        "end": "2026-09-08T02:01:45.442028Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0x73d8109aab0fed6576db51c26986b996",
+        "span_id": "0xc9404c8a3190b7ed",
+        "start": "2026-09-08T02:01:33.911604Z",
+        "end": "2026-09-08T02:01:45.210262Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\knife-mount.SLDDRW",
+          "bytes": 164334,
+          "mtime_utc": "2026-09-08T02:01:43.4793673Z",
+          "sha256": "d49c45ff8b0ae555c2cefb54838e789ad3454a5dd6915fff2687d5afc53a2a92",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\knife-mount.SLDDRW",
+            "bytes": 164334,
+            "mtime_utc": "2026-09-08T02:01:43.4793673Z",
+            "sha256": "d49c45ff8b0ae555c2cefb54838e789ad3454a5dd6915fff2687d5afc53a2a92",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\knife-mount.pdf",
+          "bytes": 59000,
+          "mtime_utc": "2026-09-08T02:01:44.8459088Z",
+          "sha256": "ba49e924bac3f6cd1b0440bef779d727a341193023cb09f7d560a471ebe64fd3",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\knife-mount.pdf",
+            "bytes": 59000,
+            "mtime_utc": "2026-09-08T02:01:44.8459088Z",
+            "sha256": "ba49e924bac3f6cd1b0440bef779d727a341193023cb09f7d560a471ebe64fd3",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\knife-mount_drawing.png",
+          "bytes": 773556,
+          "mtime_utc": "2026-09-08T02:01:45.1837280Z",
+          "sha256": "882dfa33d47f34448aa25c5bcf34197f5a9539fd67ab98d6189c498c24e517f5",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\knife-mount_drawing.png",
+            "bytes": 773556,
+            "mtime_utc": "2026-09-08T02:01:45.1837280Z",
+            "sha256": "882dfa33d47f34448aa25c5bcf34197f5a9539fd67ab98d6189c498c24e517f5",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "crank-arm",
+      "sheet": 1,
+      "classification": "crowded_annotation_region",
+      "observation": "All views, notes and labeled dimensions are visible. Left bore/radius leaders converge tightly; gray 8.00/BASIC and hole labels overlap projected/internal lines. Their values can be read but clean separation and native attachment are not certified.",
+      "task": {
+        "name": "task drawing:crank_arm",
+        "trace_id": "0xee4756b2867bc8c52b23a75c0ca009f1",
+        "span_id": "0xd878ca4658b063d3",
+        "start": "2026-09-08T02:01:45.473622Z",
+        "end": "2026-09-08T02:02:08.083452Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0xee4756b2867bc8c52b23a75c0ca009f1",
+        "span_id": "0xae97eaea1efbbb65",
+        "start": "2026-09-08T02:01:46.408008Z",
+        "end": "2026-09-08T02:02:07.832080Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\crank-arm.SLDDRW",
+          "bytes": 182660,
+          "mtime_utc": "2026-09-08T02:02:06.1498279Z",
+          "sha256": "99ba8ca86cbef2d9d5b67053875d70074475ea6e5bd2da83c1dfca618f2cb56a",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\crank-arm.SLDDRW",
+            "bytes": 182660,
+            "mtime_utc": "2026-09-08T02:02:06.1498279Z",
+            "sha256": "99ba8ca86cbef2d9d5b67053875d70074475ea6e5bd2da83c1dfca618f2cb56a",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\crank-arm.pdf",
+          "bytes": 61164,
+          "mtime_utc": "2026-09-08T02:02:07.4142181Z",
+          "sha256": "ba4b152084f345d244f3c347ad5f3feaf07b819d968d68eabd05344879646139",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\crank-arm.pdf",
+            "bytes": 61164,
+            "mtime_utc": "2026-09-08T02:02:07.4142181Z",
+            "sha256": "ba4b152084f345d244f3c347ad5f3feaf07b819d968d68eabd05344879646139",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\crank-arm_drawing.png",
+          "bytes": 797596,
+          "mtime_utc": "2026-09-08T02:02:07.7685492Z",
+          "sha256": "f74ed664f928eb636c9b101d29b6d624ea715a0325ce1c5adb5efc93417d69f5",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\crank-arm_drawing.png",
+            "bytes": 797596,
+            "mtime_utc": "2026-09-08T02:02:07.7685492Z",
+            "sha256": "f74ed664f928eb636c9b101d29b6d624ea715a0325ce1c5adb5efc93417d69f5",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "hanger-screw",
+      "sheet": 1,
+      "classification": "readable",
+      "observation": "Three views and complete dimension-by-note/thread block are readable; no graphical dimensions are invented by this audit.",
+      "task": {
+        "name": "task drawing:hanger_screw",
+        "trace_id": "0x8084a0a45b9907942c424cb4c3a88289",
+        "span_id": "0x5213e67682bcacc5",
+        "start": "2026-09-08T02:02:08.128640Z",
+        "end": "2026-09-08T02:02:14.924761Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0x8084a0a45b9907942c424cb4c3a88289",
+        "span_id": "0x9f66a2aefdb7c9e6",
+        "start": "2026-09-08T02:02:09.143203Z",
+        "end": "2026-09-08T02:02:14.676290Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\hanger-screw.SLDDRW",
+          "bytes": 137636,
+          "mtime_utc": "2026-09-08T02:02:13.1993079Z",
+          "sha256": "0b954c25f5ce9c3d592061fb261004fcca8fc9f5993245afabafe70b519f98a7",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\hanger-screw.SLDDRW",
+            "bytes": 137636,
+            "mtime_utc": "2026-09-08T02:02:13.1993079Z",
+            "sha256": "0b954c25f5ce9c3d592061fb261004fcca8fc9f5993245afabafe70b519f98a7",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\hanger-screw.pdf",
+          "bytes": 51845,
+          "mtime_utc": "2026-09-08T02:02:14.3554144Z",
+          "sha256": "5f8d2492c0927bf242801c7a3ff82c3148c48fa9be70aacf9599d06374678004",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\hanger-screw.pdf",
+            "bytes": 51845,
+            "mtime_utc": "2026-09-08T02:02:14.3554144Z",
+            "sha256": "5f8d2492c0927bf242801c7a3ff82c3148c48fa9be70aacf9599d06374678004",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\hanger-screw_drawing.png",
+          "bytes": 825184,
+          "mtime_utc": "2026-09-08T02:02:14.6514223Z",
+          "sha256": "2f92d7754bd0cf1272bc460fa1c1a64557e5486205d6a52e2c4cf38dda6a042d",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\hanger-screw_drawing.png",
+            "bytes": 825184,
+            "mtime_utc": "2026-09-08T02:02:14.6514223Z",
+            "sha256": "2f92d7754bd0cf1272bc460fa1c1a64557e5486205d6a52e2c4cf38dda6a042d",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "swing-stop-screw",
+      "sheet": 1,
+      "classification": "readable",
+      "observation": "Three views, diameter and full underhead/thread/slot note block are readable without obvious clipping.",
+      "task": {
+        "name": "task drawing:swing_stop_screw",
+        "trace_id": "0xda426257d5e53d4de36b47b4e3b816c7",
+        "span_id": "0x036a51f9fdce0f02",
+        "start": "2026-09-08T02:02:14.961048Z",
+        "end": "2026-09-08T02:02:22.064063Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0xda426257d5e53d4de36b47b4e3b816c7",
+        "span_id": "0x483d530862a526ce",
+        "start": "2026-09-08T02:02:15.959621Z",
+        "end": "2026-09-08T02:02:21.820474Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\swing-stop-screw.SLDDRW",
+          "bytes": 147595,
+          "mtime_utc": "2026-09-08T02:02:20.3814277Z",
+          "sha256": "24c8ef38ef6993e158494db3decafa8694d02fa593e7eca7daf1ec652534eef3",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\swing-stop-screw.SLDDRW",
+            "bytes": 147595,
+            "mtime_utc": "2026-09-08T02:02:20.3814277Z",
+            "sha256": "24c8ef38ef6993e158494db3decafa8694d02fa593e7eca7daf1ec652534eef3",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\swing-stop-screw.pdf",
+          "bytes": 53805,
+          "mtime_utc": "2026-09-08T02:02:21.4953084Z",
+          "sha256": "d311ca4e5519bdf5781c9a4f08ba509f94c2f2bf4532458e640352933e548017",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\swing-stop-screw.pdf",
+            "bytes": 53805,
+            "mtime_utc": "2026-09-08T02:02:21.4953084Z",
+            "sha256": "d311ca4e5519bdf5781c9a4f08ba509f94c2f2bf4532458e640352933e548017",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\swing-stop-screw_drawing.png",
+          "bytes": 882216,
+          "mtime_utc": "2026-09-08T02:02:21.7964100Z",
+          "sha256": "34a3a1bef7849af6a662fd2f1a83e419bd2ac82c74f01c50b9bcb7020eb9d2de",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\swing-stop-screw_drawing.png",
+            "bytes": 882216,
+            "mtime_utc": "2026-09-08T02:02:21.7964100Z",
+            "sha256": "34a3a1bef7849af6a662fd2f1a83e419bd2ac82c74f01c50b9bcb7020eb9d2de",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "crank-handle",
+      "sheet": 1,
+      "classification": "title_overflow",
+      "observation": "Grip dimensions/FCFs and full profile notes are legible. Three-line FINISH spills into MATERIAL label/value region; template presentation defect.",
+      "task": {
+        "name": "task drawing:crank_handle",
+        "trace_id": "0xe588d5a59b35b50da3ba6b8f57ee1c90",
+        "span_id": "0x7244ef3dfff4dc32",
+        "start": "2026-09-08T02:02:22.114530Z",
+        "end": "2026-09-08T02:02:35.157552Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0xe588d5a59b35b50da3ba6b8f57ee1c90",
+        "span_id": "0xb6da35aa2615ab09",
+        "start": "2026-09-08T02:02:23.110023Z",
+        "end": "2026-09-08T02:02:34.920936Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\crank-handle.SLDDRW",
+          "bytes": 197251,
+          "mtime_utc": "2026-09-08T02:02:33.3386253Z",
+          "sha256": "30262735c9da540c981a4a624e567fb261e5214b615f0995b7e98d3e3d132ed2",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\crank-handle.SLDDRW",
+            "bytes": 197251,
+            "mtime_utc": "2026-09-08T02:02:33.3386253Z",
+            "sha256": "30262735c9da540c981a4a624e567fb261e5214b615f0995b7e98d3e3d132ed2",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\crank-handle.pdf",
+          "bytes": 59628,
+          "mtime_utc": "2026-09-08T02:02:34.5447267Z",
+          "sha256": "33182951a289ea317c54298735cf0bc85a082b3f9afeb8b00de532c1c90f4165",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\crank-handle.pdf",
+            "bytes": 59628,
+            "mtime_utc": "2026-09-08T02:02:34.5447267Z",
+            "sha256": "33182951a289ea317c54298735cf0bc85a082b3f9afeb8b00de532c1c90f4165",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\crank-handle_drawing.png",
+          "bytes": 983489,
+          "mtime_utc": "2026-09-08T02:02:34.8880850Z",
+          "sha256": "c9c79da20a614fc2732cd497940635d6be1dfbb812f9e37d23f1e276d75de99f",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\crank-handle_drawing.png",
+            "bytes": 983489,
+            "mtime_utc": "2026-09-08T02:02:34.8880850Z",
+            "sha256": "c9c79da20a614fc2732cd497940635d6be1dfbb812f9e37d23f1e276d75de99f",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "crankshaft",
+      "sheet": 1,
+      "classification": "dimension_callout_collision",
+      "observation": "BEARING JOURNAL/Ra 1.6 text crosses the shaft outline/centerline; bottom BASIC 4.00 is crossed by extension ink. Dimensions/notes remain reconstructable, but stroke separation is not clean.",
+      "task": {
+        "name": "task drawing:crankshaft",
+        "trace_id": "0x396b5ec45902bcdd0964ded1a63761ac",
+        "span_id": "0xfdff5d000b325095",
+        "start": "2026-09-08T02:02:35.210502Z",
+        "end": "2026-09-08T02:02:48.055864Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0x396b5ec45902bcdd0964ded1a63761ac",
+        "span_id": "0xea7644bb23e55c78",
+        "start": "2026-09-08T02:02:36.188910Z",
+        "end": "2026-09-08T02:02:47.834523Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\crankshaft.SLDDRW",
+          "bytes": 147862,
+          "mtime_utc": "2026-09-08T02:02:46.3462565Z",
+          "sha256": "2c0c7d01b00eab5e575325490809795d0107de4ffce139060c7a4b21ff137720",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\crankshaft.SLDDRW",
+            "bytes": 147862,
+            "mtime_utc": "2026-09-08T02:02:46.3462565Z",
+            "sha256": "2c0c7d01b00eab5e575325490809795d0107de4ffce139060c7a4b21ff137720",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\crankshaft.pdf",
+          "bytes": 55559,
+          "mtime_utc": "2026-09-08T02:02:47.4950676Z",
+          "sha256": "fb588c2fabaf5e05291418868cc54386f9090bcabf036a13e5255b0a2493ce51",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\crankshaft.pdf",
+            "bytes": 55559,
+            "mtime_utc": "2026-09-08T02:02:47.4950676Z",
+            "sha256": "fb588c2fabaf5e05291418868cc54386f9090bcabf036a13e5255b0a2493ce51",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\crankshaft_drawing.png",
+          "bytes": 673044,
+          "mtime_utc": "2026-09-08T02:02:47.7883063Z",
+          "sha256": "8628a713f07194bb82673442c4956d3643ce8f48649ee52667dd11b15a2cae15",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\crankshaft_drawing.png",
+            "bytes": 673044,
+            "mtime_utc": "2026-09-08T02:02:47.7883063Z",
+            "sha256": "8628a713f07194bb82673442c4956d3643ce8f48649ee52667dd11b15a2cae15",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "lever-wire",
+      "sheet": 1,
+      "classification": "explicit_unreleased_scope",
+      "observation": "All notes are readable and expressly say formed hook, hub wrap and developed cut length are undefined; DO NOT RELEASE is printed. This is a declared manufacturing-definition limit, not a newly inferred missing geometry defect. Slender views do not resolve endpoints.",
+      "task": {
+        "name": "task drawing:lever_wire",
+        "trace_id": "0x1d7fd108a83c60395cd0bf7ce30baf39",
+        "span_id": "0x6b0f5abed7bef87e",
+        "start": "2026-09-08T02:02:48.118395Z",
+        "end": "2026-09-08T02:02:54.758109Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0x1d7fd108a83c60395cd0bf7ce30baf39",
+        "span_id": "0x266232e9454aa7e4",
+        "start": "2026-09-08T02:02:49.068886Z",
+        "end": "2026-09-08T02:02:54.560656Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\lever-wire.SLDDRW",
+          "bytes": 108778,
+          "mtime_utc": "2026-09-08T02:02:53.0975291Z",
+          "sha256": "8eb4fcf05996166d3bd29a2a44a45aa1c6f273154eae279e63680d64344c84a8",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\lever-wire.SLDDRW",
+            "bytes": 108778,
+            "mtime_utc": "2026-09-08T02:02:53.0975291Z",
+            "sha256": "8eb4fcf05996166d3bd29a2a44a45aa1c6f273154eae279e63680d64344c84a8",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\lever-wire.pdf",
+          "bytes": 49792,
+          "mtime_utc": "2026-09-08T02:02:54.3311069Z",
+          "sha256": "26011524d685746dfc5913098d4a01cab08e30c25de5257f896c7d574a7980e1",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\lever-wire.pdf",
+            "bytes": 49792,
+            "mtime_utc": "2026-09-08T02:02:54.3311069Z",
+            "sha256": "26011524d685746dfc5913098d4a01cab08e30c25de5257f896c7d574a7980e1",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\lever-wire_drawing.png",
+          "bytes": 435684,
+          "mtime_utc": "2026-09-08T02:02:54.5490031Z",
+          "sha256": "ca3b9b1e6808d70752156bdf6345eefbe5af0d4904764258bcce0e82dab2245c",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\lever-wire_drawing.png",
+            "bytes": 435684,
+            "mtime_utc": "2026-09-08T02:02:54.5490031Z",
+            "sha256": "ca3b9b1e6808d70752156bdf6345eefbe5af0d4904764258bcce0e82dab2245c",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "lag-screw",
+      "sheet": 1,
+      "classification": "readable",
+      "observation": "Driver-face slot, 22/63/6 dimensions and all thread/slot notes are legible within the sheet. Thread shape is explicitly omitted in views; no native thread validation inferred.",
+      "task": {
+        "name": "task drawing:lag_screw",
+        "trace_id": "0x1a79464acf7e495cd3abf2f277140c03",
+        "span_id": "0xd7a2d800e384b9a7",
+        "start": "2026-09-08T02:02:54.820120Z",
+        "end": "2026-09-08T02:03:02.878641Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0x1a79464acf7e495cd3abf2f277140c03",
+        "span_id": "0xea7aba5691a05ddb",
+        "start": "2026-09-08T02:02:55.796451Z",
+        "end": "2026-09-08T02:03:02.547235Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\lag-screw.SLDDRW",
+          "bytes": 148252,
+          "mtime_utc": "2026-09-08T02:03:00.8716361Z",
+          "sha256": "1ad1885134681011760873c61223fdd08721fd919a5870da8419631b2d5652a5",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\lag-screw.SLDDRW",
+            "bytes": 148252,
+            "mtime_utc": "2026-09-08T02:03:00.8716361Z",
+            "sha256": "1ad1885134681011760873c61223fdd08721fd919a5870da8419631b2d5652a5",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\lag-screw.pdf",
+          "bytes": 53995,
+          "mtime_utc": "2026-09-08T02:03:02.1612387Z",
+          "sha256": "00560a37b48551c4a4fd903df53892e08ca5c7593d851b0c30feb40ed62dc14a",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\lag-screw.pdf",
+            "bytes": 53995,
+            "mtime_utc": "2026-09-08T02:03:02.1612387Z",
+            "sha256": "00560a37b48551c4a4fd903df53892e08ca5c7593d851b0c30feb40ed62dc14a",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\lag-screw_drawing.png",
+          "bytes": 868523,
+          "mtime_utc": "2026-09-08T02:03:02.5215939Z",
+          "sha256": "1ce768b3bc60dda97421f575135e8437ba105a52f8c98f88c6f0d81938e4146d",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\lag-screw_drawing.png",
+            "bytes": 868523,
+            "mtime_utc": "2026-09-08T02:03:02.5215939Z",
+            "sha256": "1ce768b3bc60dda97421f575135e8437ba105a52f8c98f88c6f0d81938e4146d",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "platen-guide",
+      "sheet": 1,
+      "classification": "readable_with_limit",
+      "observation": "Nine-row hole table, location tags, datums and FCFs are legible. End-view 10.00 extension/arrow region is dense; exact attachment and small clearances are not certified by this eye pass.",
+      "task": {
+        "name": "task drawing:platen_guide",
+        "trace_id": "0x2182884383636b82e201d7873058d428",
+        "span_id": "0x3455144ad10240ee",
+        "start": "2026-09-08T02:03:02.943472Z",
+        "end": "2026-09-08T02:03:19.649273Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0x2182884383636b82e201d7873058d428",
+        "span_id": "0x2ce61f8b37309121",
+        "start": "2026-09-08T02:03:04.029683Z",
+        "end": "2026-09-08T02:03:19.392939Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\platen-guide.SLDDRW",
+          "bytes": 173934,
+          "mtime_utc": "2026-09-08T02:03:17.2601722Z",
+          "sha256": "6edbd6083ca69df54bbe89c747ac42ad3309075772536980ef532670e736a516",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\platen-guide.SLDDRW",
+            "bytes": 173934,
+            "mtime_utc": "2026-09-08T02:03:17.2601722Z",
+            "sha256": "6edbd6083ca69df54bbe89c747ac42ad3309075772536980ef532670e736a516",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\platen-guide.pdf",
+          "bytes": 60524,
+          "mtime_utc": "2026-09-08T02:03:18.9474716Z",
+          "sha256": "dd8edc9461077f0f0d00a219675794a01914cb30acaf27eef0911b88e38aa373",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\platen-guide.pdf",
+            "bytes": 60524,
+            "mtime_utc": "2026-09-08T02:03:18.9474716Z",
+            "sha256": "dd8edc9461077f0f0d00a219675794a01914cb30acaf27eef0911b88e38aa373",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\platen-guide_drawing.png",
+          "bytes": 781148,
+          "mtime_utc": "2026-09-08T02:03:19.3747701Z",
+          "sha256": "ad26ca482b091c7cf24daa07655a331068f49a006fba0e07904e442b6d3f956f",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\platen-guide_drawing.png",
+            "bytes": 781148,
+            "mtime_utc": "2026-09-08T02:03:19.3747701Z",
+            "sha256": "ad26ca482b091c7cf24daa07655a331068f49a006fba0e07904e442b6d3f956f",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "channel-lever",
+      "sheet": 1,
+      "classification": "readable_with_limit",
+      "observation": "Five-view layout shows separated BASIC length pairs and legible FCFs; all eight manufacturing notes fit, with the last line close to the lower border. Gray reference annotations are lower contrast; no new cold/identity acceptance inferred.",
+      "task": {
+        "name": "task drawing:channel_lever",
+        "trace_id": "0x65c4608b80a7285b5a34a0412d554e20",
+        "span_id": "0xaabf9a265cb02e60",
+        "start": "2026-09-08T02:03:19.707841Z",
+        "end": "2026-09-08T02:06:26.815279Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0x65c4608b80a7285b5a34a0412d554e20",
+        "span_id": "0xc2a636b3855c50d5",
+        "start": "2026-09-08T02:03:20.711244Z",
+        "end": "2026-09-08T02:06:26.316881Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\channel-lever.SLDDRW",
+          "bytes": 168830,
+          "mtime_utc": "2026-09-08T02:06:22.4982606Z",
+          "sha256": "f2847b8efafb6356a94fcb1c5b5a71ce4bed98a3f28d51a134a276019422bde9",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\channel-lever.SLDDRW",
+            "bytes": 168830,
+            "mtime_utc": "2026-09-08T02:06:22.4982606Z",
+            "sha256": "f2847b8efafb6356a94fcb1c5b5a71ce4bed98a3f28d51a134a276019422bde9",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\channel-lever.pdf",
+          "bytes": 59289,
+          "mtime_utc": "2026-09-08T02:06:25.1258276Z",
+          "sha256": "b9d9e4a7f30e978f7b3b88b19e6f50f96244dadb3ba5d5a58b1ce2b9767ab7c6",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\channel-lever.pdf",
+            "bytes": 59289,
+            "mtime_utc": "2026-09-08T02:06:25.1258276Z",
+            "sha256": "b9d9e4a7f30e978f7b3b88b19e6f50f96244dadb3ba5d5a58b1ce2b9767ab7c6",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\channel-lever_drawing.png",
+          "bytes": 869804,
+          "mtime_utc": "2026-09-08T02:06:25.8206523Z",
+          "sha256": "ff86c7255450812b31d9f0068addd4134047ca7b9d8966f69c1733d640b65b70",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\channel-lever_drawing.png",
+            "bytes": 869804,
+            "mtime_utc": "2026-09-08T02:06:25.8206523Z",
+            "sha256": "ff86c7255450812b31d9f0068addd4134047ca7b9d8966f69c1733d640b65b70",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "pinion-handle",
+      "sheet": 1,
+      "classification": "dimension_callout_collision",
+      "observation": "Vertical extension/model strokes run through 10.00/BORE DEPTH and BODY HOLE; REAM THRU text; the OAL extension also traverses two FCF bodies. Notes and numeric values remain visible, but the annotation layout is not clean.",
+      "task": {
+        "name": "task drawing:pinion_handle",
+        "trace_id": "0x0f1c9ad360532481c76b4123de84ecc0",
+        "span_id": "0x078ba5be5c67049a",
+        "start": "2026-09-08T02:06:26.874227Z",
+        "end": "2026-09-08T02:07:13.639066Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0x0f1c9ad360532481c76b4123de84ecc0",
+        "span_id": "0x14051d22b6c6561e",
+        "start": "2026-09-08T02:06:29.874162Z",
+        "end": "2026-09-08T02:07:13.316844Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\pinion-handle.SLDDRW",
+          "bytes": 192421,
+          "mtime_utc": "2026-09-08T02:07:11.0790023Z",
+          "sha256": "d6d0159376de7d197d00b14245cb9eea0538af1908f0ac1f0628b1c9551a2556",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\pinion-handle.SLDDRW",
+            "bytes": 192421,
+            "mtime_utc": "2026-09-08T02:07:11.0790023Z",
+            "sha256": "d6d0159376de7d197d00b14245cb9eea0538af1908f0ac1f0628b1c9551a2556",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\pinion-handle.pdf",
+          "bytes": 60901,
+          "mtime_utc": "2026-09-08T02:07:12.7571176Z",
+          "sha256": "e0bf91b60d57691bf6488064af1f3b48023463e9c315ab899a78103df3f5366d",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\pinion-handle.pdf",
+            "bytes": 60901,
+            "mtime_utc": "2026-09-08T02:07:12.7571176Z",
+            "sha256": "e0bf91b60d57691bf6488064af1f3b48023463e9c315ab899a78103df3f5366d",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\pinion-handle_drawing.png",
+          "bytes": 973498,
+          "mtime_utc": "2026-09-08T02:07:13.2139311Z",
+          "sha256": "1b9faeb6d7d11099ca83d3dc745fbead1f800c063fec1a5ee78cea1b5f29454f",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\pinion-handle_drawing.png",
+            "bytes": 973498,
+            "mtime_utc": "2026-09-08T02:07:13.2139311Z",
+            "sha256": "1b9faeb6d7d11099ca83d3dc745fbead1f800c063fec1a5ee78cea1b5f29454f",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "rocker-arm-support",
+      "sheet": 1,
+      "classification": "readable",
+      "observation": "Four-row hole table, three orthographic views, isometric, datums, FCFs and complete notes/title are legible. No full manufacturing/identity certification inferred from the print.",
+      "task": {
+        "name": "task drawing:rocker_arm_support",
+        "trace_id": "0x0649aa27b340cc2da04be14ee162d3f2",
+        "span_id": "0xcbf4250a4f95cb37",
+        "start": "2026-09-08T02:07:13.682229Z",
+        "end": "2026-09-08T02:07:37.259026Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0x0649aa27b340cc2da04be14ee162d3f2",
+        "span_id": "0xc52917b1230e4506",
+        "start": "2026-09-08T02:07:15.018413Z",
+        "end": "2026-09-08T02:07:36.983129Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\rocker-arm-support.SLDDRW",
+          "bytes": 195735,
+          "mtime_utc": "2026-09-08T02:07:35.2122886Z",
+          "sha256": "8e689707a17d454892b8a9ed06e106739807f5826869e85a76c9a42c9eb73917",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\rocker-arm-support.SLDDRW",
+            "bytes": 195735,
+            "mtime_utc": "2026-09-08T02:07:35.2122886Z",
+            "sha256": "8e689707a17d454892b8a9ed06e106739807f5826869e85a76c9a42c9eb73917",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\rocker-arm-support.pdf",
+          "bytes": 59113,
+          "mtime_utc": "2026-09-08T02:07:36.5711767Z",
+          "sha256": "8a9b20fdb8fc9af7b876f8bb97a8ad9fad6a5c0cd0e9475998d7df09f79e252e",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\rocker-arm-support.pdf",
+            "bytes": 59113,
+            "mtime_utc": "2026-09-08T02:07:36.5711767Z",
+            "sha256": "8a9b20fdb8fc9af7b876f8bb97a8ad9fad6a5c0cd0e9475998d7df09f79e252e",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\rocker-arm-support_drawing.png",
+          "bytes": 900975,
+          "mtime_utc": "2026-09-08T02:07:36.9597709Z",
+          "sha256": "f515406c164911b70fdc162d6c6dfd380e234a1e2bb9210c34409a62171d0b06",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\rocker-arm-support_drawing.png",
+            "bytes": 900975,
+            "mtime_utc": "2026-09-08T02:07:36.9597709Z",
+            "sha256": "f515406c164911b70fdc162d6c6dfd380e234a1e2bb9210c34409a62171d0b06",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "pinion-cam",
+      "sheet": 1,
+      "classification": "border_overflow_and_collision",
+      "observation": "The Ø10.32 callout begins outside the left drawing border (still inside the PDF page). A vertical extension stroke crosses the 1.40 ±0.05/BOTH END FACES region. All notes are visible; the annotation layout is not clean.",
+      "task": {
+        "name": "task drawing:pinion_cam",
+        "trace_id": "0xea166c9fa5280d267440fe065d30bb20",
+        "span_id": "0x4250e621792eccc6",
+        "start": "2026-09-08T02:07:37.293412Z",
+        "end": "2026-09-08T02:08:26.932040Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0xea166c9fa5280d267440fe065d30bb20",
+        "span_id": "0xf67e7bb12933b3f0",
+        "start": "2026-09-08T02:07:38.363361Z",
+        "end": "2026-09-08T02:08:26.299172Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\pinion-cam.SLDDRW",
+          "bytes": 169355,
+          "mtime_utc": "2026-09-08T02:08:22.8991966Z",
+          "sha256": "08d9abcea1a87aeabbd22dcedffa75f77382cbe9f61f01d42a25a341a86c06fc",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\pinion-cam.SLDDRW",
+            "bytes": 169355,
+            "mtime_utc": "2026-09-08T02:08:22.8991966Z",
+            "sha256": "08d9abcea1a87aeabbd22dcedffa75f77382cbe9f61f01d42a25a341a86c06fc",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\pinion-cam.pdf",
+          "bytes": 60120,
+          "mtime_utc": "2026-09-08T02:08:25.6287242Z",
+          "sha256": "4472ad28a7b35dd38d3e9ca27f38244a035072ec3e469bcbd785c3af7a4589d2",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\pinion-cam.pdf",
+            "bytes": 60120,
+            "mtime_utc": "2026-09-08T02:08:25.6287242Z",
+            "sha256": "4472ad28a7b35dd38d3e9ca27f38244a035072ec3e469bcbd785c3af7a4589d2",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\pinion-cam_drawing.png",
+          "bytes": 954532,
+          "mtime_utc": "2026-09-08T02:08:26.2107468Z",
+          "sha256": "e0e22fee95049cc8ead20199c3ab626fee059603956b7398e80270217284d204",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\pinion-cam_drawing.png",
+            "bytes": 954532,
+            "mtime_utc": "2026-09-08T02:08:26.2107468Z",
+            "sha256": "e0e22fee95049cc8ead20199c3ab626fee059603956b7398e80270217284d204",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "frame-side-screw",
+      "sheet": 1,
+      "classification": "readable",
+      "observation": "Three views, 7/3/12.70 dimensions and all thread/slot manufacturing notes fit and are legible.",
+      "task": {
+        "name": "task drawing:frame_side_screw",
+        "trace_id": "0xc2b2bfe96ea9faff484fa98258f5a4d4",
+        "span_id": "0x51f6ee0da04c423f",
+        "start": "2026-09-08T02:08:27.007627Z",
+        "end": "2026-09-08T02:08:51.389595Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0xc2b2bfe96ea9faff484fa98258f5a4d4",
+        "span_id": "0xf3e6ec2eeaef9278",
+        "start": "2026-09-08T02:08:29.807485Z",
+        "end": "2026-09-08T02:08:50.831130Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\frame-side-screw.SLDDRW",
+          "bytes": 146366,
+          "mtime_utc": "2026-09-08T02:08:47.7258156Z",
+          "sha256": "9bcfac784adda746708ff7eded4123b7cba406421610e2a363d9af65c203bf67",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\frame-side-screw.SLDDRW",
+            "bytes": 146366,
+            "mtime_utc": "2026-09-08T02:08:47.7258156Z",
+            "sha256": "9bcfac784adda746708ff7eded4123b7cba406421610e2a363d9af65c203bf67",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\frame-side-screw.pdf",
+          "bytes": 53862,
+          "mtime_utc": "2026-09-08T02:08:50.1075310Z",
+          "sha256": "e3496897159f7e28e664c0c352e8ba1746271f01d197b1f3960a1256a1404797",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\frame-side-screw.pdf",
+            "bytes": 53862,
+            "mtime_utc": "2026-09-08T02:08:50.1075310Z",
+            "sha256": "e3496897159f7e28e664c0c352e8ba1746271f01d197b1f3960a1256a1404797",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\frame-side-screw_drawing.png",
+          "bytes": 861883,
+          "mtime_utc": "2026-09-08T02:08:50.7619806Z",
+          "sha256": "25668b0cad7f836581932a2d14761408d686bf6dd26552413613c6e761eba319",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\frame-side-screw_drawing.png",
+            "bytes": 861883,
+            "mtime_utc": "2026-09-08T02:08:50.7619806Z",
+            "sha256": "25668b0cad7f836581932a2d14761408d686bf6dd26552413613c6e761eba319",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "harmonic-base",
+      "sheet": 1,
+      "classification": "page_clipping_blocker",
+      "observation": "Manufacturing note block extends below the lower border and is clipped at the actual page edge. Hole-table rows F1–F4 overlap the lower-right side view, dimension/FCF text and title/footer. DATUM B LONG SIDE caption is crossed by the base outline. Complete print is not readable.",
+      "task": {
+        "name": "task drawing:harmonic_base",
+        "trace_id": "0x0b1aa1634cfdf95150eb031e1f68c529",
+        "span_id": "0xcd69563961a5cb20",
+        "start": "2026-09-08T02:08:51.470598Z",
+        "end": "2026-09-08T02:09:34.739422Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0x0b1aa1634cfdf95150eb031e1f68c529",
+        "span_id": "0x5970c9c261740ba3",
+        "start": "2026-09-08T02:08:54.045007Z",
+        "end": "2026-09-08T02:09:34.509906Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\harmonic-base.SLDDRW",
+          "bytes": 342491,
+          "mtime_utc": "2026-09-08T02:09:32.6934424Z",
+          "sha256": "711629b7eaace788ce525a9a9ae953ad2fb76c603219d88f08adf11eb08fa351",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\harmonic-base.SLDDRW",
+            "bytes": 342491,
+            "mtime_utc": "2026-09-08T02:09:32.6934424Z",
+            "sha256": "711629b7eaace788ce525a9a9ae953ad2fb76c603219d88f08adf11eb08fa351",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\harmonic-base.pdf",
+          "bytes": 72509,
+          "mtime_utc": "2026-09-08T02:09:34.0505785Z",
+          "sha256": "85ee188a0ff46f820da7417f71b7f082eb5d4718f4d031af37bdef9eedee9635",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\harmonic-base.pdf",
+            "bytes": 72509,
+            "mtime_utc": "2026-09-08T02:09:34.0505785Z",
+            "sha256": "85ee188a0ff46f820da7417f71b7f082eb5d4718f4d031af37bdef9eedee9635",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\harmonic-base_drawing.png",
+          "bytes": 1455402,
+          "mtime_utc": "2026-09-08T02:09:34.4290945Z",
+          "sha256": "ad36202a0d474faf60a789c97ce9f4d41818f2c5ddd6798858970a4ec016337d",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\harmonic-base_drawing.png",
+            "bytes": 1455402,
+            "mtime_utc": "2026-09-08T02:09:34.4290945Z",
+            "sha256": "ad36202a0d474faf60a789c97ce9f4d41818f2c5ddd6798858970a4ec016337d",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ],
+      "extracted_pdf_text_not_visibility_proof": " 457.20 \r\nA1 279.40 \r\nB1\r\nC1\r\nC2\r\nC3\r\nD1\r\nD2\r\nD3\r\nD4\r\nE1\r\nE2\r\nE3\r\nE4\r\nF1\r\nF2\r\nF3\r\nF4\r\n0.20 A B C\r\nE1-E4 DIA 13 THRU\r\n0.50 A B C\r\nA1, B1, C1-C3, D1-D4, F1-F4\r\n0.10 A\r\nDATUM B LONG SIDE\r\n0.10 A B\r\nDATUM C LEFT END\r\nB\r\nC\r\nX\r\nY\r\n0\r\n0\r\n1. MACHINE FROM SOLID STOCK TO THE FINISHED PROFILE SHOWN; NO DRAFT.\r\n PAD-TO-FLANGE ROOT R0.50 MAX; LOWER FLANGE 12.70 THICK;\r\n DECK 50.80, TOTAL HEIGHT 53.30 OVER THE RIM.\r\n2. UPPER PAD 444.50 X 266.70;\r\n NEAR LONG SIDE 6.35 +/-0.10 FROM B;\r\n NEAR LEFT END 6.35 +/-0.10 FROM C.\r\n3. DATUM A = UNDERSIDE FACE; B = LONG-SIDE FACE; C = LEFT-END FACE;\r\n HOLE-TABLE ORIGIN = B-C. LOCATIONS ARE BASIC.\r\n4. FOUR DIA 13.00 THRU / DIA 23.00 X 6.50 DEEP C'BORES OPEN FROM\r\n UNDERSIDE. PLAN RIMS AT E1-E4 ARE THE DIA 13.00 THRU FEATURES.\r\n C'BORE AND THRU-HOLE AXES: LEAST-SQUARES CYLINDER FITS OVER\r\n FULL SURFACES; SEPARATION AT C'BORE MOUTH/BOTTOM: 0.05 MAX.\r\n5. A1/B1/C1-C3/D1-D4/F1-F4 ARE BLIND TAPPED.\r\n5A. STAMP SERIAL \"2\" 3.50 HIGH X 0.30 DEEP ON THE RIM TOP\r\n BESIDE THE NAMEPLATE (SEE MODEL); BRIGHT, UNPAINTED.\r\n6. DURING COATING, MASK DATUM A/B/C FACES AND ALL BORES/THREADS;\r\n COAT PAD SIDES, ROOTS AND RIM. DECK INSIDE THE RIM: BLACK\r\n ENAMEL, SAME SYSTEM AND DFT AS THE FINISH CALLOUT.\r\n7. VERTICAL PLAN CORNERS: FLANGE R22.22, PAD AND RIM R15.88\r\n (CONCENTRIC), RIM INNER CORNERS R8.88, ALL FULL HEIGHT.\r\n FLANGE TOP RIM, RIM TOP AND UNDERSIDE RIM C1.59 X 45 DEG.\r\n8. RAISED RIM 7.00 WIDE X 2.50 HIGH, OUTER FACES FLUSH WITH THE\r\n PAD SIDES; DECK STAYS AT 50.80.\r\nFRONT VIEW 1:4\r\n0.10 A\r\nA\r\nTAG X LOC \r\n(BASIC)\r\nY LOC \r\n(BASIC) SIZE\r\nA1 88.93 137.37 3.45 9.00\r\n8-32 UNC - 2B 6.00\r\nB1 140.92 43.68 3.80 10.00\r\n10-24 UNC - 2B 10.00\r\nC1 168.21 34.11 2.26 11.00\r\n4-40 UNC - 2B 7.70\r\nC2 168.21 232.11 2.26 11.00\r\n4-40 UNC - 2B 7.70\r\nC3 236.09 65.66 2.26 11.00\r\n4-40 UNC - 2B 7.70\r\nD1 209.24 54.61 3.45 7.00\r\n8-32 UNC - 2B 3.50\r\nD2 209.24 234.61 3.45 7.00\r\n8-32 UNC - 2B 3.50\r\nD3 236.24 54.61 3.45 7.00\r\n8-32 UNC - 2B 3.50\r\nD4 236.24 234.61 3.45 7.00\r\n8-32 UNC - 2B 3.50\r\nE1 284.04 79.38 13.00 THRU ALL\r\n 23.00 6.50\r\nE2 284.04 200.02 13.00 THRU ALL\r\n 23.00 6.50\r\nE3 318.96 79.38 13.00 THRU ALL\r\n 23.00 6.50\r\nE4 318.96 200.02 13.00 THRU ALL\r\n 23.00 6.50\r\nF1 392.35 94.20 2.26 9.00\r\n4-40 UNC - 2B 6.00\r\nF2 392.35 185.20 2.26 9.00\r\n4-40 UNC - 2B 6.00\r\nF3 438.35 94.20 2.26 9.00\r\n4-40 UNC - 2B 6.00\r\nF4 438.35 185.20 2.26 9.00\r\n4-40 UNC - 2B 6.00\r\nASTM A48 Class 30 gray cast iron\r\nharmonic-base\r\nv32\r\nDO NOT SCALE DRAWING\r\nMHA-035\r\nUNLESS OTHERWISE SPECIFIED, TOLERANCES\r\nSCALE: 1:2 DWG. NO. REV\r\nPART\r\nSSPC-SP3;ALKYD PRIMER 25-40um;RAL6000 \r\nALKYD ENAMEL 50-85um;75-125um TOTAL DFT\r\nFINISH\r\nMATERIAL\r\nINTERPRET GEOMETRIC TOLERANCING\r\nPER: ASME Y14.5-2018 UNIT: mm\r\n.XXX\r\n±0.13\r\n.XX\r\n±0.51 ±1°\r\nREMOVE BURRS AND BREAK SHARP EDGES R0.25 OR CHAMFER 0.25 MAX\r\n© 2026 Pedro Paulo Vezza Campos\r\nAlbert Michelson's Harmonic Analyzer\r\nA Project For Hobby Machinists Ra 3.2\r\nA A\r\nB B\r\nC C\r\nD D\r\n4\r\n4\r\n3\r\n3\r\n2\r\n2\r\n1\r\n1\r\nDRILLED HOLES\r\n+0.10 / 0\r\n \r\nSOLIDWORKS Maker Product. For Personal Use Only."
+    },
+    {
+      "name": "gooseneck",
+      "sheet": 1,
+      "classification": "readable_with_limit",
+      "observation": "Elevation, bend radius, arm length and all seven notes are legible and fit. Isometric scale caption touches the lower tube endpoint; small screw/plug details are not resolved by this sheet.",
+      "task": {
+        "name": "task drawing:gooseneck",
+        "trace_id": "0x850b06d66b808df3f8c6ff4a6043600d",
+        "span_id": "0x398908d731cc4250",
+        "start": "2026-09-08T02:09:34.795994Z",
+        "end": "2026-09-08T02:09:42.545614Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0x850b06d66b808df3f8c6ff4a6043600d",
+        "span_id": "0xadf7b4c88487d6ea",
+        "start": "2026-09-08T02:09:35.801100Z",
+        "end": "2026-09-08T02:09:42.289215Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\gooseneck.SLDDRW",
+          "bytes": 159921,
+          "mtime_utc": "2026-09-08T02:09:40.5928093Z",
+          "sha256": "30d89fee134debd559a88db8cc05fcf7d3a97154c95c4e548efaef9488e60c2b",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\gooseneck.SLDDRW",
+            "bytes": 159921,
+            "mtime_utc": "2026-09-08T02:09:40.5928093Z",
+            "sha256": "30d89fee134debd559a88db8cc05fcf7d3a97154c95c4e548efaef9488e60c2b",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\gooseneck.pdf",
+          "bytes": 54730,
+          "mtime_utc": "2026-09-08T02:09:41.9351767Z",
+          "sha256": "4eba6c6a22b557ed186a53ced7f60d99546e5b98291772438ad9aa37c99de503",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\gooseneck.pdf",
+            "bytes": 54730,
+            "mtime_utc": "2026-09-08T02:09:41.9351767Z",
+            "sha256": "4eba6c6a22b557ed186a53ced7f60d99546e5b98291772438ad9aa37c99de503",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\gooseneck_drawing.png",
+          "bytes": 832285,
+          "mtime_utc": "2026-09-08T02:09:42.2725229Z",
+          "sha256": "41612692019b96d9210f3efebb2fc6ca2e07fe71edadb80077bb1f2c7f7eecc0",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\gooseneck_drawing.png",
+            "bytes": 832285,
+            "mtime_utc": "2026-09-08T02:09:42.2725229Z",
+            "sha256": "41612692019b96d9210f3efebb2fc6ca2e07fe71edadb80077bb1f2c7f7eecc0",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "pinion-lever",
+      "sheet": 1,
+      "classification": "dimension_callout_collision",
+      "observation": "Ra1.6 finish symbol overlaps the lower runout FCF body, and a diagonal crown leader crosses the 2.00/end-wall callout. Full notes and values are visible; the isometric scale caption touches the title-block upper rule.",
+      "task": {
+        "name": "task drawing:pinion_lever",
+        "trace_id": "0x1d58c6263805f252354380192618ad7c",
+        "span_id": "0x3de6a45683923a9a",
+        "start": "2026-09-08T02:09:42.578266Z",
+        "end": "2026-09-08T02:10:10.399527Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0x1d58c6263805f252354380192618ad7c",
+        "span_id": "0x61ca239b05ac22a8",
+        "start": "2026-09-08T02:09:43.596496Z",
+        "end": "2026-09-08T02:10:10.150194Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\pinion-lever.SLDDRW",
+          "bytes": 173696,
+          "mtime_utc": "2026-09-08T02:10:08.5698024Z",
+          "sha256": "9a72680812e049186ddcba0365a36d23a9ad03fddf5199027361bcc44073e464",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\pinion-lever.SLDDRW",
+            "bytes": 173696,
+            "mtime_utc": "2026-09-08T02:10:08.5698024Z",
+            "sha256": "9a72680812e049186ddcba0365a36d23a9ad03fddf5199027361bcc44073e464",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\pinion-lever.pdf",
+          "bytes": 57736,
+          "mtime_utc": "2026-09-08T02:10:09.7725421Z",
+          "sha256": "a6e7bb9d94c5688478adb667f9c068b16ae4bbd0f6376c83e842cc824e69d802",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\pinion-lever.pdf",
+            "bytes": 57736,
+            "mtime_utc": "2026-09-08T02:10:09.7725421Z",
+            "sha256": "a6e7bb9d94c5688478adb667f9c068b16ae4bbd0f6376c83e842cc824e69d802",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\pinion-lever_drawing.png",
+          "bytes": 1016121,
+          "mtime_utc": "2026-09-08T02:10:10.1073969Z",
+          "sha256": "4dabf41a2d034a422051c928ae5da0c6d75f95c7c39465281ab48e9794ad8022",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\pinion-lever_drawing.png",
+            "bytes": 1016121,
+            "mtime_utc": "2026-09-08T02:10:10.1073969Z",
+            "sha256": "4dabf41a2d034a422051c928ae5da0c6d75f95c7c39465281ab48e9794ad8022",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "cone-lock-knob",
+      "sheet": 1,
+      "classification": "readable_with_limit",
+      "observation": "Diameters, thread designation, axial dimensions, dome radius, FCFs and notes are legible. Top centerline extends past the inner border but not beyond the page.",
+      "task": {
+        "name": "task drawing:cone_lock_knob",
+        "trace_id": "0x7dedc07255678eb1fa839c5c90f689dc",
+        "span_id": "0x816fc70f54d6b582",
+        "start": "2026-09-08T02:10:10.424661Z",
+        "end": "2026-09-08T02:10:24.702259Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0x7dedc07255678eb1fa839c5c90f689dc",
+        "span_id": "0x19d532910d07c312",
+        "start": "2026-09-08T02:10:11.401752Z",
+        "end": "2026-09-08T02:10:24.419313Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\cone-lock-knob.SLDDRW",
+          "bytes": 162026,
+          "mtime_utc": "2026-09-08T02:10:22.3704898Z",
+          "sha256": "9bda32e89f380f215d1c26a0984671ee5c51897c4bf539cffb14adc9b9fdf3dc",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\cone-lock-knob.SLDDRW",
+            "bytes": 162026,
+            "mtime_utc": "2026-09-08T02:10:22.3704898Z",
+            "sha256": "9bda32e89f380f215d1c26a0984671ee5c51897c4bf539cffb14adc9b9fdf3dc",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\cone-lock-knob.pdf",
+          "bytes": 57576,
+          "mtime_utc": "2026-09-08T02:10:24.0001509Z",
+          "sha256": "600e5931f1720fd565c3411837e25dc1efc260dba09ef2a8a92d809ccce8f57c",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\cone-lock-knob.pdf",
+            "bytes": 57576,
+            "mtime_utc": "2026-09-08T02:10:24.0001509Z",
+            "sha256": "600e5931f1720fd565c3411837e25dc1efc260dba09ef2a8a92d809ccce8f57c",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\cone-lock-knob_drawing.png",
+          "bytes": 685852,
+          "mtime_utc": "2026-09-08T02:10:24.3682054Z",
+          "sha256": "3cc938513fc128b4f6281775d3a1ef687e6a147bb80e1c50699fbcd3c595e99d",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\cone-lock-knob_drawing.png",
+            "bytes": 685852,
+            "mtime_utc": "2026-09-08T02:10:24.3682054Z",
+            "sha256": "3cc938513fc128b4f6281775d3a1ef687e6a147bb80e1c50699fbcd3c595e99d",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "output-fixture",
+      "sheet": 1,
+      "classification": "border_overflow",
+      "observation": "All four manufacturing notes and three view dimensions are legible, but wrapped note line starts (including note 2/3) extend outside the left inner drawing border. They are still within the PDF page.",
+      "task": {
+        "name": "task drawing:output_fixture",
+        "trace_id": "0xeb1c473c6a554a05f4f5774a8b2ea52a",
+        "span_id": "0x78c5ca231adc10e2",
+        "start": "2026-09-08T02:10:24.749836Z",
+        "end": "2026-09-08T02:10:33.892941Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0xeb1c473c6a554a05f4f5774a8b2ea52a",
+        "span_id": "0x13acd73f9142fc06",
+        "start": "2026-09-08T02:10:25.814909Z",
+        "end": "2026-09-08T02:10:33.630326Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\output-fixture.SLDDRW",
+          "bytes": 143909,
+          "mtime_utc": "2026-09-08T02:10:31.9041256Z",
+          "sha256": "c7eef1d4f4db13149bc0184cbcf898b5579b82e17bf8177de0cf5474303d2827",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\output-fixture.SLDDRW",
+            "bytes": 143909,
+            "mtime_utc": "2026-09-08T02:10:31.9041256Z",
+            "sha256": "c7eef1d4f4db13149bc0184cbcf898b5579b82e17bf8177de0cf5474303d2827",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\output-fixture.pdf",
+          "bytes": 56781,
+          "mtime_utc": "2026-09-08T02:10:33.3074883Z",
+          "sha256": "7c514b0975d42978989b10a49713e6e287751e04ac676d90e3093ba633571c1e",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\output-fixture.pdf",
+            "bytes": 56781,
+            "mtime_utc": "2026-09-08T02:10:33.3074883Z",
+            "sha256": "7c514b0975d42978989b10a49713e6e287751e04ac676d90e3093ba633571c1e",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\output-fixture_drawing.png",
+          "bytes": 702084,
+          "mtime_utc": "2026-09-08T02:10:33.6129456Z",
+          "sha256": "1f4db3be61d5a785c25142b2ab2930665def3e1e107c678ee2b5649ce45ac9fc",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\output-fixture_drawing.png",
+            "bytes": 702084,
+            "mtime_utc": "2026-09-08T02:10:33.6129456Z",
+            "sha256": "1f4db3be61d5a785c25142b2ab2930665def3e1e107c678ee2b5649ce45ac9fc",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "pen-wire",
+      "sheet": 1,
+      "classification": "readable_with_limit",
+      "observation": "Straight blank, 62.70 length and all three manufacturing notes are legible within the border. The notes explicitly defer forming/termination to assembly; thin endpoints are not a connection proof.",
+      "task": {
+        "name": "task drawing:pen_wire",
+        "trace_id": "0xf8268447b1856d2e26fbcaae02d404fe",
+        "span_id": "0x24949e8f32ba8a1f",
+        "start": "2026-09-08T02:10:33.942029Z",
+        "end": "2026-09-08T02:10:41.833869Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0xf8268447b1856d2e26fbcaae02d404fe",
+        "span_id": "0xd62018fb7f6616d2",
+        "start": "2026-09-08T02:10:35.144905Z",
+        "end": "2026-09-08T02:10:41.559783Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\pen-wire.SLDDRW",
+          "bytes": 120019,
+          "mtime_utc": "2026-09-08T02:10:39.9103477Z",
+          "sha256": "1270526d57448cc49ce855ee1587aa710f34482e753ca887efeadfe0646c28de",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\pen-wire.SLDDRW",
+            "bytes": 120019,
+            "mtime_utc": "2026-09-08T02:10:39.9103477Z",
+            "sha256": "1270526d57448cc49ce855ee1587aa710f34482e753ca887efeadfe0646c28de",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\pen-wire.pdf",
+          "bytes": 51281,
+          "mtime_utc": "2026-09-08T02:10:41.2568314Z",
+          "sha256": "05e6a783bdb0a84527bd2ed48acf2653ccd1f08349e0b089790965abc563e78f",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\pen-wire.pdf",
+            "bytes": 51281,
+            "mtime_utc": "2026-09-08T02:10:41.2568314Z",
+            "sha256": "05e6a783bdb0a84527bd2ed48acf2653ccd1f08349e0b089790965abc563e78f",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\pen-wire_drawing.png",
+          "bytes": 594888,
+          "mtime_utc": "2026-09-08T02:10:41.5433302Z",
+          "sha256": "3db4495b817b2bd40117ef80b92377317b458e926f6ada35b3c94fcb6be53bc6",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\pen-wire_drawing.png",
+            "bytes": 594888,
+            "mtime_utc": "2026-09-08T02:10:41.5433302Z",
+            "sha256": "3db4495b817b2bd40117ef80b92377317b458e926f6ada35b3c94fcb6be53bc6",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "cone-pivot-screw",
+      "sheet": 1,
+      "classification": "readable",
+      "observation": "Thread-end, side, slot and isometric views, thread designation, FCFs and all notes are legible. Head/shoulder frames are separated and center references retained; this is a current output eye pass, not a new cold proof.",
+      "task": {
+        "name": "task drawing:cone_pivot_screw",
+        "trace_id": "0x2fa73be61d6c19593743513eebb8af46",
+        "span_id": "0x145424e04cb71289",
+        "start": "2026-09-08T02:10:41.860519Z",
+        "end": "2026-09-08T02:11:38.762754Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0x2fa73be61d6c19593743513eebb8af46",
+        "span_id": "0xb0baf3f60335fa16",
+        "start": "2026-09-08T02:10:43.132709Z",
+        "end": "2026-09-08T02:11:38.497429Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\cone-pivot-screw.SLDDRW",
+          "bytes": 171813,
+          "mtime_utc": "2026-09-08T02:11:36.6022123Z",
+          "sha256": "41776689bfee2d6d01f18db41cb3cbd35e2b11bc5d5ae619fd1bb4251e65d526",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\cone-pivot-screw.SLDDRW",
+            "bytes": 171813,
+            "mtime_utc": "2026-09-08T02:11:36.6022123Z",
+            "sha256": "41776689bfee2d6d01f18db41cb3cbd35e2b11bc5d5ae619fd1bb4251e65d526",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\cone-pivot-screw.pdf",
+          "bytes": 59356,
+          "mtime_utc": "2026-09-08T02:11:38.0371791Z",
+          "sha256": "095be10e93c3a7e098cfa8890cd395665d41f8793029e84df1a68950872cf97b",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\cone-pivot-screw.pdf",
+            "bytes": 59356,
+            "mtime_utc": "2026-09-08T02:11:38.0371791Z",
+            "sha256": "095be10e93c3a7e098cfa8890cd395665d41f8793029e84df1a68950872cf97b",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\cone-pivot-screw_drawing.png",
+          "bytes": 866214,
+          "mtime_utc": "2026-09-08T02:11:38.4493735Z",
+          "sha256": "c841eb37a982becc4b6bf06c9d3cc794bda8dc3b9cbf6433e0291b1a0a4a1729",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\cone-pivot-screw_drawing.png",
+            "bytes": 866214,
+            "mtime_utc": "2026-09-08T02:11:38.4493735Z",
+            "sha256": "c841eb37a982becc4b6bf06c9d3cc794bda8dc3b9cbf6433e0291b1a0a4a1729",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "pinion-cam-pin",
+      "sheet": 1,
+      "classification": "readable_with_limit",
+      "observation": "Final-size tolerance, crown radius/profile, seated-end flatness and all notes are legible. Several leaders cross one another away from text; exact endpoint identities and tiny crown shape are not certified.",
+      "task": {
+        "name": "task drawing:pinion_cam_pin",
+        "trace_id": "0xa7a1e20630094d038de94e760b1a09dc",
+        "span_id": "0x410405050947445f",
+        "start": "2026-09-08T02:11:38.795537Z",
+        "end": "2026-09-08T02:11:56.459663Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0xa7a1e20630094d038de94e760b1a09dc",
+        "span_id": "0xa29c9cded00b1d6e",
+        "start": "2026-09-08T02:11:39.814890Z",
+        "end": "2026-09-08T02:11:56.158201Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\pinion-cam-pin.SLDDRW",
+          "bytes": 142290,
+          "mtime_utc": "2026-09-08T02:11:54.2102038Z",
+          "sha256": "3dd72952a3b21196a4d4d5bc89d691d2274cf07dc88bba4be10f651b57847d72",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\pinion-cam-pin.SLDDRW",
+            "bytes": 142290,
+            "mtime_utc": "2026-09-08T02:11:54.2102038Z",
+            "sha256": "3dd72952a3b21196a4d4d5bc89d691d2274cf07dc88bba4be10f651b57847d72",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\pinion-cam-pin.pdf",
+          "bytes": 54106,
+          "mtime_utc": "2026-09-08T02:11:55.7673645Z",
+          "sha256": "872981eb38d0d49a9da2ee5e79791f50bf9785857264e7fe5dab74b32dfc8e6f",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\pinion-cam-pin.pdf",
+            "bytes": 54106,
+            "mtime_utc": "2026-09-08T02:11:55.7673645Z",
+            "sha256": "872981eb38d0d49a9da2ee5e79791f50bf9785857264e7fe5dab74b32dfc8e6f",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\pinion-cam-pin_drawing.png",
+          "bytes": 657523,
+          "mtime_utc": "2026-09-08T02:11:56.1214695Z",
+          "sha256": "2d071c7243645038631cd66dc864868f30619249e87c2282650c428fb1f490ce",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\pinion-cam-pin_drawing.png",
+            "bytes": 657523,
+            "mtime_utc": "2026-09-08T02:11:56.1214695Z",
+            "sha256": "2d071c7243645038631cd66dc864868f30619249e87c2282650c428fb1f490ce",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "magnifying-lever",
+      "sheet": 1,
+      "classification": "readable",
+      "observation": "Three views, R3 both-ends callout, 162 to far dome centre and full notes are legible with space around them.",
+      "task": {
+        "name": "task drawing:magnifying_lever",
+        "trace_id": "0xf36ebc6c90146226b6b0df29fe1096f4",
+        "span_id": "0xa395a669f224faf3",
+        "start": "2026-09-08T02:13:00.555974Z",
+        "end": "2026-09-08T02:13:11.991737Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0xf36ebc6c90146226b6b0df29fe1096f4",
+        "span_id": "0xeeaa90f4652020cb",
+        "start": "2026-09-08T02:13:01.837863Z",
+        "end": "2026-09-08T02:13:11.737658Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\magnifying-lever.SLDDRW",
+          "bytes": 135240,
+          "mtime_utc": "2026-09-08T02:13:09.8464017Z",
+          "sha256": "2c79c5cbf7ffa2f79cae3812bdb0e16440fe8a306e0c5417aad35dbba7d8a694",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\magnifying-lever.SLDDRW",
+            "bytes": 135240,
+            "mtime_utc": "2026-09-08T02:13:09.8464017Z",
+            "sha256": "2c79c5cbf7ffa2f79cae3812bdb0e16440fe8a306e0c5417aad35dbba7d8a694",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\magnifying-lever.pdf",
+          "bytes": 51561,
+          "mtime_utc": "2026-09-08T02:13:11.3710561Z",
+          "sha256": "8e8179c932ab991bf3debe173513ce9eab24723eb636c814939373799960d874",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\magnifying-lever.pdf",
+            "bytes": 51561,
+            "mtime_utc": "2026-09-08T02:13:11.3710561Z",
+            "sha256": "8e8179c932ab991bf3debe173513ce9eab24723eb636c814939373799960d874",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\magnifying-lever_drawing.png",
+          "bytes": 498625,
+          "mtime_utc": "2026-09-08T02:13:11.7114407Z",
+          "sha256": "9efd1e8896f88fc2ab1d7cc5f7ac6bee4b0d99f025a23e6d8eb12f9c54e8095b",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\magnifying-lever_drawing.png",
+            "bytes": 498625,
+            "mtime_utc": "2026-09-08T02:13:11.7114407Z",
+            "sha256": "9efd1e8896f88fc2ab1d7cc5f7ac6bee4b0d99f025a23e6d8eb12f9c54e8095b",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "guide-lock",
+      "sheet": 1,
+      "classification": "readable_with_limit",
+      "observation": "Main dimensions, BASIC locations, datums, hole-position FCF and full notes are legible within the sheet. Gray BASIC/hole callouts are lower contrast; no native attachment acceptance inferred.",
+      "task": {
+        "name": "task drawing:guide_lock",
+        "trace_id": "0xc920e254d6adfa62bd99a751181e3e8b",
+        "span_id": "0x039334a544e6cdcc",
+        "start": "2026-09-08T02:13:12.019145Z",
+        "end": "2026-09-08T02:13:28.152805Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0xc920e254d6adfa62bd99a751181e3e8b",
+        "span_id": "0x70a9d02edb2fd919",
+        "start": "2026-09-08T02:13:13.085642Z",
+        "end": "2026-09-08T02:13:27.915743Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\guide-lock.SLDDRW",
+          "bytes": 128744,
+          "mtime_utc": "2026-09-08T02:13:26.3283551Z",
+          "sha256": "2149510597c54c49b3c129b108454b4e4082563e630765e7543a74ffdc88da09",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\guide-lock.SLDDRW",
+            "bytes": 128744,
+            "mtime_utc": "2026-09-08T02:13:26.3283551Z",
+            "sha256": "2149510597c54c49b3c129b108454b4e4082563e630765e7543a74ffdc88da09",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\guide-lock.pdf",
+          "bytes": 54412,
+          "mtime_utc": "2026-09-08T02:13:27.6116838Z",
+          "sha256": "16b4a41569a8a6c655356ff908b60a84ced7e965e83ba88db85034075be06881",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\guide-lock.pdf",
+            "bytes": 54412,
+            "mtime_utc": "2026-09-08T02:13:27.6116838Z",
+            "sha256": "16b4a41569a8a6c655356ff908b60a84ced7e965e83ba88db85034075be06881",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\guide-lock_drawing.png",
+          "bytes": 511239,
+          "mtime_utc": "2026-09-08T02:13:27.8878087Z",
+          "sha256": "bb958c2e1a89e3ddd926776b07da421192779c010e8c0dec0ebccb74a83473f7",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\guide-lock_drawing.png",
+            "bytes": 511239,
+            "mtime_utc": "2026-09-08T02:13:27.8878087Z",
+            "sha256": "bb958c2e1a89e3ddd926776b07da421192779c010e8c0dec0ebccb74a83473f7",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    },
+    {
+      "name": "pen-frame",
+      "sheet": 1,
+      "classification": "readable",
+      "observation": "Three views, 25.25/40 dimensions and complete asymmetry/depth/thread notes are legible and within the border. Fine thread geometry is not established by this print.",
+      "task": {
+        "name": "task drawing:pen_frame",
+        "trace_id": "0x419ca5d8e6afd805be4b36edf0a95147",
+        "span_id": "0xf8862451b63f002a",
+        "start": "2026-09-08T02:13:28.215959Z",
+        "end": "2026-09-08T02:13:36.218034Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "build": {
+        "name": "drawing.build",
+        "trace_id": "0x419ca5d8e6afd805be4b36edf0a95147",
+        "span_id": "0x468cf38262895945",
+        "start": "2026-09-08T02:13:29.193119Z",
+        "end": "2026-09-08T02:13:35.994266Z",
+        "status": {
+          "status_code": "OK"
+        }
+      },
+      "files": [
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\pen-frame.SLDDRW",
+          "bytes": 123995,
+          "mtime_utc": "2026-09-08T02:13:34.3863228Z",
+          "sha256": "164fc2a4ac004a72e795560d20faf20fd1de63d5ef52e278364c4fd1e17ff38d",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\slddrw\\pen-frame.SLDDRW",
+            "bytes": 123995,
+            "mtime_utc": "2026-09-08T02:13:34.3863228Z",
+            "sha256": "164fc2a4ac004a72e795560d20faf20fd1de63d5ef52e278364c4fd1e17ff38d",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\pen-frame.pdf",
+          "bytes": 51276,
+          "mtime_utc": "2026-09-08T02:13:35.7016042Z",
+          "sha256": "0379fc2a9edc576886708469702f0b8f74a3350f3e4a6d5484bd765b399193b0",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\pdf\\pen-frame.pdf",
+            "bytes": 51276,
+            "mtime_utc": "2026-09-08T02:13:35.7016042Z",
+            "sha256": "0379fc2a9edc576886708469702f0b8f74a3350f3e4a6d5484bd765b399193b0",
+            "comparison": "unchanged"
+          }
+        },
+        {
+          "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\pen-frame_drawing.png",
+          "bytes": 559942,
+          "mtime_utc": "2026-09-08T02:13:35.9773577Z",
+          "sha256": "7dedb3af8a7de93fd9e994fd52ce183114cb14649fc7aa1e6f66912e8767bea7",
+          "final": {
+            "path": "C:\\src\\ha-foundations-integration\\cad\\out\\png\\pen-frame_drawing.png",
+            "bytes": 559942,
+            "mtime_utc": "2026-09-08T02:13:35.9773577Z",
+            "sha256": "7dedb3af8a7de93fd9e994fd52ce183114cb14649fc7aa1e6f66912e8767bea7",
+            "comparison": "unchanged"
+          }
+        }
+      ],
+      "pdf": [
+        {
+          "page": 1,
+          "points": [
+            1224,
+            792
+          ],
+          "pixels": [
+            5100,
+            3300
+          ],
+          "preview_comparison": "equal"
+        }
+      ]
+    }
+  ]
+}
