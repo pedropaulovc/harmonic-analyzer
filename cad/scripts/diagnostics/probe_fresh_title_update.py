@@ -608,7 +608,10 @@ async def one_trial(
 ):
     """Reuse exact lifecycle for a second explicit source/factory diagnostic.
 
-    Optional observation is read-only. Original update experiments retain their
+    Optional observation does not edit drawing content. The explicit tube
+    viewport diagnostic varies only IModelView zoom and restores its complete
+    initial viewport in finally; ordinary observers remain read-only.
+    Original update experiments retain their
     default rocker manifest, production factory and baseline reproduction gate.
     The material population arm explicitly supplies its locally pinned manifest
     and a 1:10 tube view; sheet defaults and all ownership/source gates remain.
@@ -621,11 +624,15 @@ async def one_trial(
         source_manifest is not None
         and expected.get(str(source)) != source_manifest.source_sha256
     ):
-        raise RuntimeError("explicit source manifest hash does not match protected input")
+        raise RuntimeError(
+            "explicit source manifest hash does not match protected input"
+        )
     witness_options = {} if source_manifest is None else {"manifest": source_manifest}
 
     def source_witness(model):
-        return pilot.source_dimensions(model, source_target, copy_source, **witness_options)
+        return pilot.source_dimensions(
+            model, source_target, copy_source, **witness_options
+        )
 
     source_sha = expected[str(source)]
     trial_dir = directory / variant.value
@@ -793,8 +800,8 @@ async def one_trial(
         trial["after_cold_pdf"], after_cold_handles = retained.capture_drawing(
             adapter, copy_source, trial["source_before"]["configuration"]
         )
-        trial["source_after_cold_pdf"], after_cold_source_handles = (
-            source_witness(reopened_source)
+        trial["source_after_cold_pdf"], after_cold_source_handles = source_witness(
+            reopened_source
         )
         pilot.require_same_source(
             trial["source_reopened"],

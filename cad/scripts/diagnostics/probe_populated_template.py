@@ -50,6 +50,7 @@ class Population(StrEnum):
     MATERIAL_BASELINE = "material-baseline"
     MATERIAL_CENTER = "material-center"
     MATERIAL_FINISH = "material-finish"
+    TUBE_EXTENT_VIEWPORT = "tube-extent-viewport"
 
 
 def require_template(path, sha256):
@@ -139,8 +140,13 @@ def property_source(adapter, source, source_path, configuration):
 
 class PopulatedControl:
     def __init__(
-        self, template, sha256, checkpoint, symbol_definition,
-        *, population=Population.HISTORICAL,
+        self,
+        template,
+        sha256,
+        checkpoint,
+        symbol_definition,
+        *,
+        population=Population.HISTORICAL,
     ):
         self.template, self.sha256, self.checkpoint = template, sha256, checkpoint
         self.symbol_definition = symbol_definition
@@ -248,15 +254,21 @@ class PopulatedControl:
                 link = fields.VALUE_LINKS["material"]
                 name = layout.unique_note(notes, link=link)
                 material_sources.require_material_value(
-                    notes[name], expected[link],
+                    notes[name],
+                    expected[link],
                     expected_vertical=1
-                    if self.population in (Population.MATERIAL_CENTER, Population.MATERIAL_FINISH) else 0,
+                    if self.population
+                    in (Population.MATERIAL_CENTER, Population.MATERIAL_FINISH)
+                    else 0,
                 )
             except RuntimeError as error:
-                issues.append({
-                    "field": "material", "kind": "explicit_material_contract",
-                    "error": str(error),
-                })
+                issues.append(
+                    {
+                        "field": "material",
+                        "kind": "explicit_material_contract",
+                        "error": str(error),
+                    }
+                )
         for link, value in expected.items():
             try:
                 name = layout.unique_note(notes, link=link)
@@ -333,28 +345,116 @@ class PopulatedControl:
         self.checkpoint()
 
 
+class TubeViewportControl(PopulatedControl):
+    """Same normal factory; only the explicit diagnostic observer writes viewport."""
+
+    def __init__(self, template, sha256, checkpoint, definition, directory, evidence):
+        super().__init__(
+            template,
+            sha256,
+            checkpoint,
+            definition,
+            population=Population.MATERIAL_FINISH,
+        )
+        self.directory, self.evidence = directory, evidence
+
+    def factory(self, adapter, **kwargs):
+        from diagnostics import _populated_extent_viewport as extent
+
+        result = super().factory(adapter, **kwargs)
+        if extent.prepared.semantic_defaults(
+            self.setup["normalized_blank_defaults"]
+        ) != extent.prepared.semantic_defaults(self.evidence["original_blank"]):
+            raise RuntimeError("retained tube blank non-extent defaults differ")
+        extent.observe(
+            adapter,
+            extent.State.BLANK,
+            self.directory / "blank-viewport",
+            self.setup.setdefault("blank_viewport", {}),
+            self.checkpoint,
+        )
+        return result
+
+    def observe(self, adapter, phase, trial, pdf):
+        from diagnostics import _populated_extent_viewport as extent
+
+        super().observe(adapter, phase, trial, pdf)
+        if phase == "built":
+            # Keep the complete fit failure, but isolate viewport from content.
+            old, new = self.evidence["original_loaded"], trial["linked_fields"][phase]
+            for key in (
+                "notes",
+                "surface_finishes",
+                "template_geometry",
+                "preferences",
+                "expected_link_values",
+            ):
+                before, after = old[key], new[key]
+                if key == "notes":
+                    before, after = (
+                        extent.semantics({"notes": value})["notes"]
+                        for value in (before, after)
+                    )
+                if before != after:
+                    raise RuntimeError(f"retained tube loaded non-extent {key} differ")
+            extent.observe(
+                adapter,
+                extent.State.POPULATED,
+                self.directory / "populated-viewport",
+                trial.setdefault("populated_viewport", {}),
+                self.checkpoint,
+            )
+
+
 async def probe(
-    adapter, template, sha256, source_root, output_root, symbol_path,
-    *, population=Population.HISTORICAL,
+    adapter,
+    template,
+    sha256,
+    source_root,
+    output_root,
+    symbol_path,
+    *,
+    population=Population.HISTORICAL,
+    retained_receipts=None,
 ):
     if not isinstance(population, Population):
         raise ValueError("select an explicit populated-template population mode")
     require_template(template, sha256)
     definition = symbols.symbol_library(symbol_path)
     targets = TARGETS
-    if population is not Population.HISTORICAL:
-        targets = {target: target.replace("_", "-") for target in material_sources.TARGETS}
-    sources = {
-        target: (source_root / f"{target.replace('_', '-')}.SLDPRT").resolve(
-            strict=True
+    evidence = None
+    if population is Population.TUBE_EXTENT_VIEWPORT:
+        from diagnostics import _populated_extent_viewport as extent
+
+        if source_root is not None or retained_receipts is None:
+            raise ValueError(
+                "tube viewport requires retained receipts, never a producer source root"
+            )
+        evidence = extent.read_inputs(template, sha256, *retained_receipts)
+        targets = {"tube_frame": "tube-frame"}
+        sources = {"tube_frame": Path(evidence["source"])}
+        expected = dict(evidence["expected"])
+    if population is not Population.TUBE_EXTENT_VIEWPORT:
+        if retained_receipts is not None or source_root is None:
+            raise ValueError(
+                "normal population requires a source root and no retained receipts"
+            )
+    if population not in (Population.HISTORICAL, Population.TUBE_EXTENT_VIEWPORT):
+        targets = {
+            target: target.replace("_", "-") for target in material_sources.TARGETS
+        }
+    if population is not Population.TUBE_EXTENT_VIEWPORT:
+        sources = {
+            target: (source_root / f"{target.replace('_', '-')}.SLDPRT").resolve(
+                strict=True
+            )
+            for target in targets
+        }
+        expected = (
+            title.pilot.require_sources(sources, sources)
+            if population is Population.HISTORICAL
+            else material_sources.require_sources(sources)
         )
-        for target in targets
-    }
-    expected = (
-        title.pilot.require_sources(sources, sources)
-        if population is Population.HISTORICAL
-        else material_sources.require_sources(sources)
-    )
     expected.update(
         {
             str(template): sha256,
@@ -383,6 +483,14 @@ async def probe(
         "setups": {},
         "errors": [],
     }
+    if evidence is not None:
+        report["retained_evidence"] = evidence
+        report["scope"] = (
+            "one retained tube: blank/populated viewport A/B/A; fit observations, not production acceptance"
+        )
+        report["viewport_runtime"] = extent.prepared.runtime_inputs(
+            adapter, TemplateSpec(title.SCALE, 2)
+        )
     path = directory / "populated-template.json"
 
     def checkpoint():
@@ -397,15 +505,23 @@ async def probe(
             trial_dir = directory / f"{directory.name}-{target}"
             trial_dir.mkdir()
             adapter.ownership.register_directory(trial_dir)
-            control = PopulatedControl(
-                template, sha256, checkpoint, definition, population=population
+            control = (
+                TubeViewportControl(
+                    template, sha256, checkpoint, definition, trial_dir, evidence
+                )
+                if evidence is not None
+                else PopulatedControl(
+                    template, sha256, checkpoint, definition, population=population
+                )
             )
             report["setups"][target] = control.setup
             source_options = {}
             if population is not Population.HISTORICAL:
                 source_options = {
                     "source_manifest": material_sources.TARGETS[target],
-                    "view_scale": (1.0, 10.0) if target == "tube_frame" else title.SCALE,
+                    "view_scale": (1.0, 10.0)
+                    if target == "tube_frame"
+                    else title.SCALE,
                 }
             trial = await title.one_trial(
                 adapter,
@@ -437,7 +553,22 @@ async def probe(
                         {"kind": name, "error": "strict unchanged gate failed"}
                     )
             checkpoint()
-        if any(trial["acceptance_issues"] for trial in report["trials"]):
+        if evidence is not None:
+            # Only the bounds question is observational. Wrong properties,
+            # source/default drift and cold/pixel changes are still failures.
+            unexpected = [
+                issue
+                for trial in report["trials"]
+                for issue in trial["acceptance_issues"]
+                if issue["kind"] != "native_fit"
+            ]
+            if unexpected:
+                raise RuntimeError(
+                    f"tube viewport has non-extent acceptance failures: {unexpected}"
+                )
+        if evidence is None and any(
+            trial["acceptance_issues"] for trial in report["trials"]
+        ):
             raise RuntimeError(
                 "populated template has unresolved acceptance issues; every field/phase retained"
             )
@@ -460,6 +591,10 @@ async def probe(
             )
             if report["adapter"] != title.pilot.adapter_fingerprints():
                 raise RuntimeError("imported adapter changed")
+            if evidence is not None and report[
+                "viewport_runtime"
+            ] != extent.prepared.runtime_inputs(adapter, TemplateSpec(title.SCALE, 2)):
+                raise RuntimeError("viewport diagnostic runtime inputs changed")
         except Exception as error:
             errors.append(error)
         report.update(
@@ -472,17 +607,28 @@ async def probe(
             errors.append(error)
     if errors:
         raise ExceptionGroup("populated template control failed", errors)
-    return {"report": str(path), "outcome": "minimal_populated_template_passed"}
+    return {
+        "report": str(path),
+        "outcome": "tube_viewport_observed_not_fit_accepted"
+        if evidence is not None
+        else "minimal_populated_template_passed",
+    }
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--template", type=Path, required=True)
     parser.add_argument("--template-sha256", required=True)
-    parser.add_argument("--source-root", type=Path, required=True)
+    parser.add_argument("--source-root", type=Path)
+    parser.add_argument("--retained-population", type=Path)
+    parser.add_argument("--retained-population-sha256")
+    parser.add_argument("--retained-ownership-sha256")
+    parser.add_argument("--retained-blank-sha256")
     parser.add_argument("--symbol-library", type=Path, required=True)
     parser.add_argument(
-        "--population", type=Population, choices=list(Population),
+        "--population",
+        type=Population,
+        choices=list(Population),
         default=Population.HISTORICAL,
     )
     parser.add_argument("--report-root", type=Path, default=ROOT / "cad/out/reports")
@@ -494,10 +640,27 @@ def main(argv=None):
         or not os.environ.get("HARMONIC_DIAGNOSTIC_SW_PID", "").isdecimal()
     ):
         raise RuntimeError("populated control requires remote off and expected PID")
-    template, source_root = (
-        args.template.resolve(strict=True),
-        args.source_root.resolve(strict=True),
+    template = args.template.resolve(strict=True)
+    source_root = args.source_root.resolve(strict=True) if args.source_root else None
+    retained_receipts = None
+    receipts = (
+        args.retained_population,
+        args.retained_population_sha256,
+        args.retained_ownership_sha256,
+        args.retained_blank_sha256,
     )
+    if args.population is Population.TUBE_EXTENT_VIEWPORT:
+        if source_root is not None or not all(receipts):
+            raise ValueError(
+                "tube viewport requires all retained receipt pins and no source root"
+            )
+        retained_receipts = (receipts[0].resolve(strict=True), *receipts[1:])
+    if args.population is not Population.TUBE_EXTENT_VIEWPORT and (
+        source_root is None or any(receipts)
+    ):
+        raise ValueError(
+            "normal population requires source root and no retained receipt pins"
+        )
     require_template(template, args.template_sha256)
     if args.worker:
         return run_copy_diagnostic(
@@ -509,6 +672,7 @@ def main(argv=None):
                 args.report_root.resolve(),
                 args.symbol_library.resolve(strict=True),
                 population=args.population,
+                retained_receipts=retained_receipts,
             )
         )
     import dodo
@@ -521,8 +685,20 @@ def main(argv=None):
             str(template),
             "--template-sha256",
             args.template_sha256,
-            "--source-root",
-            str(source_root),
+            *(
+                ["--source-root", str(source_root)]
+                if retained_receipts is None
+                else [
+                    "--retained-population",
+                    str(retained_receipts[0]),
+                    "--retained-population-sha256",
+                    retained_receipts[1],
+                    "--retained-ownership-sha256",
+                    retained_receipts[2],
+                    "--retained-blank-sha256",
+                    retained_receipts[3],
+                ]
+            ),
             "--report-root",
             str(args.report_root.resolve()),
             "--symbol-library",
