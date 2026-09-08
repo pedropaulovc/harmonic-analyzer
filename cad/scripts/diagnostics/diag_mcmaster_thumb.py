@@ -1,6 +1,6 @@
 r"""Shared recipe for the McMaster 91882A* knurled-head thumb screws.
 
-Two sizes (#4-40 x 7/16" and 1/4"-20 x 5/16"), one parametric recipe,
+Two sizes (#4-40 x 7/16" and 1/4"-20 x 3/4"), one parametric recipe,
 straight from the vendor tree: shank extrude + tip chamfer P*0.75 ->
 collar boss -> head boss -> Chamfer2 (HH/10 on head top rim, head bottom
 rim, collar bottom rim) -> Fillet1 (HH*0.1 at the collar-top/
@@ -14,7 +14,7 @@ mirrored across the groove's start meridian, both circular-patterned x90
 Vendor equations: Chamfer1 = P*.75, Chamfer2 = HH/10, Fillet1 = HH*.1,
 root flat D1 = P/8, knurl pattern count = (360/2deg)*.5 = 90.
 
-Per-part entry points: ``diag_build_91882A221.py`` / ``diag_build_91882A412.py``.
+Per-part entry points: ``diag_build_91882A221.py`` / ``diag_build_91882A425.py``.
 """
 
 from __future__ import annotations
@@ -43,7 +43,7 @@ THUMB_SPECS = {
     "91882A221": dict(major_r=2.8448 / 2.0, pitch=0.635, length=11.1125,
                       collar_r=6.35 / 2.0, collar_h=2.38125,
                       head_r=9.525 / 2.0, head_h=2.38125),
-    "91882A412": dict(major_r=6.35 / 2.0, pitch=1.27, length=7.9375,
+    "91882A425": dict(major_r=6.35 / 2.0, pitch=1.27, length=19.05,
                       collar_r=12.7 / 2.0, collar_h=9.525,
                       head_r=25.4 / 2.0, head_h=6.35),
 }

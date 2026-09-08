@@ -91,6 +91,8 @@ from _interference_contracts import allowed_interference_pairs
 from build_hanger_screw import SHANK_LEN as HANGER_SHANK_LEN
 from pen_wire_geom import WHEEL_BAR_Y, WHEEL_MID_Z
 from wheel_bar_geom import BAR_DEPTH as WHEEL_BAR_DEPTH
+from wheel_bar_geom import HANGER_SCREW_MACHINE_X
+from build_pen_hanger import SCREW_HOLE_XY as HANGER_TAP_XY
 from build_pen_hanger import STRAP_Z as HANGER_STRAP_Z
 from build_pen_set_screw import HEAD_STACK_LEN as PEN_SET_HEAD_STACK_LEN
 from build_pen_set_screw import SHANK_LEN as PEN_SET_SHANK_LEN
@@ -285,7 +287,13 @@ assert math.isclose(PEN_WIRE_BOTTOM[1] + PEN_WIRE_LEN, WHEEL_BAR_Y, abs_tol=1e-9
 # wheel-bar back face; the exact stock shank passes through the 9 mm bar and
 # 3 mm strap, then retains clearance to the magnifying-wheel rim.
 BAR_BACK_Z = HANGER_POS[2] + max(HANGER_STRAP_Z) + WHEEL_BAR_DEPTH
-HANGER_SCREW_POS = (-5.5, WHEEL_BAR_Y, BAR_BACK_Z)
+HANGER_SCREW_POS = (
+    HANGER_POS[0] + HANGER_TAP_XY[0],
+    HANGER_POS[1] + HANGER_TAP_XY[1],
+    BAR_BACK_Z,
+)
+assert math.isclose(HANGER_SCREW_POS[0], HANGER_SCREW_MACHINE_X, abs_tol=1e-9)
+assert math.isclose(HANGER_SCREW_POS[1], WHEEL_BAR_Y, abs_tol=1e-9)
 HANGER_SCREW_TIP_Z = HANGER_SCREW_POS[2] - HANGER_SHANK_LEN
 HANGER_STRAP_FRONT_Z = HANGER_POS[2] + min(HANGER_STRAP_Z)
 WHEEL_RIM_BACK_Z = WHEEL_MID_Z + WHEEL_RIM_AXIAL / 2.0

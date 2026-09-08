@@ -260,7 +260,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 range(1, 5),
                 "rocker-arm-support",
                 12.7,
-                12.30376,
+                10.716,
                 6.35,
             ),
             **_expected_numbered_pairs(
@@ -398,7 +398,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 "frame-1/harmonic-base",
                 6.35,
                 5.105,
-                1.5875,
+                12.7,
             ),
             **_expected_numbered_pairs(
                 "drive-train-1/swing-stop-screw",
@@ -406,7 +406,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 "frame-1/harmonic-base",
                 4.1656,
                 3.454,
-                6.0,
+                15.525,
             ),
             **_expected_numbered_pairs(
                 "drive-train-1/slotted-screw",

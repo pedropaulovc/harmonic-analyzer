@@ -62,7 +62,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _holes import HoleSpec, blind_cut_dia_mm, blind_hole_volume_mm3, wizard_holes
+from _holes import DRILL_POINT_H, HoleSpec, blind_cut_dia_mm, blind_hole_volume_mm3, wizard_holes
 from harmonic_base_spec import (
     BOTTOM_LENGTH,
     BOTTOM_THICKNESS,
@@ -90,12 +90,13 @@ from build_cone_pivot_screw import (
 )
 from build_cone_lock_knob import (
     COLLAR_DIA as LOCK_COLLAR_DIA,
+    PLUG_TAP_LEAD as LOCK_PLUG_TAP_LEAD,
+    STUD_BOTTOM_CLEARANCE as LOCK_STUD_BOTTOM_CLEARANCE,
     STUD_LEN as LOCK_STUD_LEN,
     THREAD as LOCK_THREAD,
 )
 from build_cone_swing_platform import PLATE_T, swing_hardware_geometry
 from build_swing_stop_screw import (
-    EMBED_LEN as STOP_EMBED_LEN,
     SHANK_DIA as STOP_SHANK_DIA,
     THREAD as STOP_THREAD,
 )
@@ -192,16 +193,19 @@ STOP_SCREW_XZ = SWING_HARDWARE_GEOMETRY.stop_xz
 PIVOT_THREAD_BOTTOM_CLEARANCE = 2.0
 PIVOT_HOLE_DEPTH = PIVOT_THREAD_ENGAGEMENT + PIVOT_THREAD_BOTTOM_CLEARANCE
 
-# The lock stud passes through the 6.35-mm platform and uses the extra stock
-# length in a real 1/4-20 base seat, with 0.25 mm below the installed tip.
+# The 19.05-mm stock stud enters 12.70 through the platform, or its full
+# length when the collar fences the disengaged notch on the bare base.
+# Full threads clear that deepest pose by 0.25; a five-pitch plug-tap lead
+# fits below them, before the separate 118-degree drill point.
 LOCK_STUD_ENGAGEMENT = LOCK_STUD_LEN - PLATE_T
-LOCK_STUD_BOTTOM_CLEARANCE = 0.25
-LOCK_SCREW_HOLE_DEPTH = LOCK_STUD_ENGAGEMENT + LOCK_STUD_BOTTOM_CLEARANCE
-LOCK_SCREW_DRILL_DEPTH = 4.0
+LOCK_SCREW_HOLE_DEPTH = LOCK_STUD_LEN + LOCK_STUD_BOTTOM_CLEARANCE
+LOCK_SCREW_DRILL_DEPTH = LOCK_SCREW_HOLE_DEPTH + LOCK_PLUG_TAP_LEAD
 
-# The stock stop wrapper retains exactly 6 mm embedded in its #8-32 seat.
-STOP_SCREW_HOLE_DEPTH = STOP_EMBED_LEN
-STOP_SCREW_DRILL_DEPTH = 9.0
+# The shared 25.4-mm stock stop keeps its original 9.875-mm exposed height.
+# A 16-mm full thread clears the 15.525-mm embed; 4 mm below it accommodates
+# the #8-32 plug tap's five-pitch lead (3.96875), before the drill point.
+STOP_SCREW_HOLE_DEPTH = 16.0
+STOP_SCREW_DRILL_DEPTH = 20.0
 
 # Alignment-pinion rig hold-downs, blind from the TOP face in the same
 # machine-handed convention: four #8-32 seats under the two pivot blocks
@@ -335,6 +339,51 @@ STOP_SCREW_HOLE_DIA = blind_cut_dia_mm(STOP_SEAT_SPEC)
 BLOCK_SCREW_HOLE_DIA = blind_cut_dia_mm(BLOCK_SEAT_SPEC)
 FOOT_SCREW_HOLE_DIA = blind_cut_dia_mm(FOOT_SEAT_SPEC)
 NAMEPLATE_SCREW_HOLE_DIA = blind_cut_dia_mm(NAMEPLATE_SEAT_SPEC)
+
+# The deeper lock drill must remain in the solid upper pad and clear every
+# other vertical cavity. Bounding the hold-down counterbores over their full
+# height is conservative; their actual bores are smaller at the lock depth.
+LOCK_DRILL_BOTTOM_WALL = (
+    TOP_THICKNESS - LOCK_SCREW_DRILL_DEPTH
+    - LOCK_SCREW_HOLE_DIA / 2.0 * DRILL_POINT_H
+)
+if LOCK_DRILL_BOTTOM_WALL < 1.5 * LOCK_SCREW_HOLE_DIA:
+    raise AssertionError("cone-lock drill leaves less than 1.5 diameters of upper-pad wall")
+LOCK_NEAREST_CAVITY_WALL = min(
+    math.dist(LOCK_KNOB_XZ, xz) - (LOCK_SCREW_HOLE_DIA + dia) / 2.0
+    for points, dia in (
+        (HOLE_XZ, CBORE_DIA),
+        ((PIVOT_SCREW_XZ,), PIVOT_SCREW_HOLE_DIA),
+        ((STOP_SCREW_XZ,), STOP_SCREW_HOLE_DIA),
+        (BLOCK_SCREW_XZ, BLOCK_SCREW_HOLE_DIA),
+        (FOOT_SCREW_XZ, FOOT_SCREW_HOLE_DIA),
+        (NAMEPLATE_SCREW_XZ, NAMEPLATE_SCREW_HOLE_DIA),
+    )
+    for xz in points
+)
+if LOCK_NEAREST_CAVITY_WALL < LOCK_SCREW_HOLE_DIA:
+    raise AssertionError("cone-lock drill crowds another base cavity")
+
+STOP_DRILL_BOTTOM_WALL = (
+    TOP_THICKNESS - STOP_SCREW_DRILL_DEPTH
+    - STOP_SCREW_HOLE_DIA / 2.0 * DRILL_POINT_H
+)
+if STOP_DRILL_BOTTOM_WALL < 1.5 * STOP_SCREW_HOLE_DIA:
+    raise AssertionError("swing-stop drill leaves less than 1.5 diameters of upper-pad wall")
+STOP_NEAREST_CAVITY_WALL = min(
+    math.dist(STOP_SCREW_XZ, xz) - (STOP_SCREW_HOLE_DIA + dia) / 2.0
+    for points, dia in (
+        (HOLE_XZ, CBORE_DIA),
+        ((PIVOT_SCREW_XZ,), PIVOT_SCREW_HOLE_DIA),
+        ((LOCK_KNOB_XZ,), LOCK_SCREW_HOLE_DIA),
+        (BLOCK_SCREW_XZ, BLOCK_SCREW_HOLE_DIA),
+        (FOOT_SCREW_XZ, FOOT_SCREW_HOLE_DIA),
+        (NAMEPLATE_SCREW_XZ, NAMEPLATE_SCREW_HOLE_DIA),
+    )
+    for xz in points
+)
+if STOP_NEAREST_CAVITY_WALL < STOP_SCREW_HOLE_DIA:
+    raise AssertionError("swing-stop drill crowds another base cavity")
 
 MM3_PER_IN3 = IN**3
 

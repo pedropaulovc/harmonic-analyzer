@@ -43,7 +43,7 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
     "cone-lock-knob": _stock(
         "cone-lock-knob",
         "Steel Raised Knurled-Head Thumb Screw",
-        "91882A412",
+        "91882A425",
     ),
     "cone-pivot-screw": _stock(
         "cone-pivot-screw",
@@ -123,7 +123,7 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
     "swing-stop-screw": _stock(
         "swing-stop-screw",
         "Steel Narrow Fillister Head Slotted Screw",
-        "90280A196",
+        "90280A199",
     ),
     "thumb-screw": _stock(
         "thumb-screw",

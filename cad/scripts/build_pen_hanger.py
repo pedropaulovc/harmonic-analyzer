@@ -8,8 +8,8 @@ VERTICAL, so the channel is cut along Y through the block (an M6.4 fix:
 the first build wrongly tunnelled it along Z). The block reaches
 forward (-Z in the machine) so the pen rod hangs clear of the platen
 paper plane while the strap stays flush on the bar. The M6.10 fastener pass
-adds a #8-32 tap near the strap top (local (-8.5, 70.7) = machine
-(-5.5, 575.7): placed IDENTITY at machine x +3, locals map directly)
+adds a #8-32 tap near the strap top (local (-6, 70.7) = machine
+(-3, 575.7): placed IDENTITY at machine x +3, locals map directly)
 for the hanger-screw shank coming through the bar FROM BEHIND (the
 magnifying wheel's rim back face passes 1.0 in front of the strap, so no
 front-side head fits).
@@ -61,8 +61,10 @@ from _drawing_marks import (
 )
 from _holes import TAP_DRILL_MM, HoleSpec, wizard_holes
 from build_hanger_screw import SHANK_DIA as HANGER_SCREW_DIA
-from wheel_bar_geom import BAR_LENGTH as WHEEL_BAR_LENGTH
-from wheel_bar_geom import SCREW_HOLE_X as WHEEL_BAR_SCREW_HOLE_X
+from wheel_bar_geom import (
+    HANGER_SCREW_LOCAL_X,
+    HANGER_STRAP_TOP_LEFT_X,
+)
 from pen_hanger_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
@@ -86,28 +88,30 @@ STRAP_Z = (15.1, 18.1)  # strap 3 thick, flush with the block back (derived)
 STRAP_TOP_Y = 75.7  # machine 580.7: bar top after the ch30 p002 wheel-bar
 # re-anchor (y 575.7) -- the strap stretches up to the raised bar while the
 # guide block stays put on the pen line (the pen geometry did not move)
-STRAP_TOP_X = (-16.0, 0.0)  # 16 wide at the bar (low; lean runs machine-east)
+STRAP_TOP_X = (HANGER_STRAP_TOP_LEFT_X, 0.0)  # 16 wide at the bar (low)
 STRAP_BOT_X = (-5.0, 5.0)  # 10 wide at the block (low)
 # M6.10: the selected hanger screw threads into the strap near its top through
 # an exact #8-32 tapped Hole Wizard feature.
 SCREW_TAP_SPEC = HoleSpec("tapped", "#8-32")
-SCREW_HOLE_XY = (-8.5, 70.7)  # machine (-5.5, 575.7) = block centre +3 + local:
-# within the strap/bar overlap east of the bar's free end; strap band at
-# y 70.7 is local -15.3..0.3, leaving ample strap-edge wall.
-_OVERLAP_BAND = 2.0 * (
-    WHEEL_BAR_LENGTH / 2.0 - abs(WHEEL_BAR_SCREW_HOLE_X)
-)
-HANGER_THREAD_OVERLAP_WALL = (_OVERLAP_BAND - HANGER_SCREW_DIA) / 2.0
-if HANGER_THREAD_OVERLAP_WALL <= 0.0:
-    raise AssertionError("stock #8 hanger thread cannot fit the bar/strap overlap")
+SCREW_HOLE_XY = (HANGER_SCREW_LOCAL_X, 70.7)
+# Exact tapered-land bounds at the tap centre. The clearance bore's bar-end
+# ligament is checked in build_wheel_bar; the receiver uses the thread major
+# diameter here, not the tap-drill diameter.
 
-_STRAP_T = (SCREW_HOLE_XY[1] - BLOCK_HALF) / (STRAP_TOP_Y - BLOCK_HALF)
+_STRAP_RISE = STRAP_TOP_Y - BLOCK_HALF
+_STRAP_T = (SCREW_HOLE_XY[1] - BLOCK_HALF) / _STRAP_RISE
 _STRAP_LEFT_X = STRAP_BOT_X[0] + _STRAP_T * (STRAP_TOP_X[0] - STRAP_BOT_X[0])
 _STRAP_RIGHT_X = STRAP_BOT_X[1] + _STRAP_T * (STRAP_TOP_X[1] - STRAP_BOT_X[1])
-HANGER_THREAD_STRAP_WALL = (
-    min(SCREW_HOLE_XY[0] - _STRAP_LEFT_X, _STRAP_RIGHT_X - SCREW_HOLE_XY[0])
-    - HANGER_SCREW_DIA / 2.0
-)
+# Perpendicular distances to the four straight edges, not horizontal slices:
+# a circular thread envelope must remain inside the whole tapered polygon.
+HANGER_THREAD_STRAP_WALL = min(
+    (SCREW_HOLE_XY[0] - _STRAP_LEFT_X)
+    / math.hypot(1.0, (STRAP_TOP_X[0] - STRAP_BOT_X[0]) / _STRAP_RISE),
+    (_STRAP_RIGHT_X - SCREW_HOLE_XY[0])
+    / math.hypot(1.0, (STRAP_TOP_X[1] - STRAP_BOT_X[1]) / _STRAP_RISE),
+    SCREW_HOLE_XY[1] - BLOCK_HALF,
+    STRAP_TOP_Y - SCREW_HOLE_XY[1],
+) - HANGER_SCREW_DIA / 2.0
 if HANGER_THREAD_STRAP_WALL <= 0.0:
     raise AssertionError("stock #8 hanger thread breaks through the tapered strap")
 

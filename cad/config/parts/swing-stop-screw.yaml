@@ -3,9 +3,9 @@ swing-stop-screw:
   number: MHA-095
   stock_name: Steel Narrow Fillister Head Slotted Screw
   supplier: McMaster-Carr
-  supplier_skus: [90280A196]
+  supplier_skus: [90280A199]
   material: Plain Carbon Steel
-  material_specification: Steel, McMaster-Carr 90280A196
+  material_specification: Steel, McMaster-Carr 90280A199
   finish: zinc plated
   quantity: 1
   tolerance_class: machined_block

@@ -8,7 +8,7 @@ _EXPECTED = {
     # Stable production stem: (McMaster SKU(s), MHA number, fleet quantity).
     "bracket-screw": (("90280A194",), "MHA-108", 2),
     "clamp-screw": (("90280A201",), "MHA-107", 6),
-    "cone-lock-knob": (("91882A412",), "MHA-093", 1),
+    "cone-lock-knob": (("91882A425",), "MHA-093", 1),
     "cone-pivot-screw": (("91829A560",), "MHA-094", 1),
     "cone-tip-adjuster": (("94025A150",), "MHA-097", 1),
     "cone-tip-pinch-screw": (("90280A108",), "MHA-098", 1),
@@ -22,7 +22,7 @@ _EXPECTED = {
     "lag-screw": (("91783A722",), "MHA-039", 4),
     "pen-set-screw": (("99607A213",), "MHA-052", 1),
     "slotted-screw": (("90280A199",), "MHA-101", 4),
-    "swing-stop-screw": (("90280A196",), "MHA-095", 1),
+    "swing-stop-screw": (("90280A199",), "MHA-095", 1),
     "thumb-screw": (("91882A221",), "MHA-075", 2),
     "knife-hanger-washer": (("90126A211",), "MHA-131", 2),
 }
@@ -51,6 +51,17 @@ def test_purchased_config_preserves_bom_identity_and_quantity() -> None:
             assert "quantity" not in row
         else:
             assert int(row["quantity"]) == quantity
+
+
+def test_shared_stop_stock_reduces_inventory_without_changing_fleet_quantity() -> None:
+    stock_skus = {sku for spec in FASTENERS.values() for sku in spec.skus}
+    assert len(stock_skus) == 16
+    shared_quantity = sum(
+        int(_config.parts(stem)["quantity"])
+        for stem, spec in FASTENERS.items()
+        if "90280A199" in spec.skus
+    )
+    assert shared_quantity == 5
 
 
 def test_special_bom_titles_remain_machine_specific() -> None:

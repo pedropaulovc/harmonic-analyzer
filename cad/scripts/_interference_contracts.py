@@ -11,6 +11,17 @@ from __future__ import annotations
 import math
 from collections.abc import Iterable, Mapping
 
+from crank_arm_spec import (
+    ARM_WIDTH as _ARM_W,
+    PIN_HOLE_DIA as _ARM_PILOT,
+    SHAFT_BORE_DIA as _ARM_BORE,
+)
+from crank_pin_spec import (
+    BIG_END_DIA as _PIN_D0,
+    PIN_LENGTH as _PIN_L,
+    SMALL_END_DIA as _PIN_D1,
+)
+from crankshaft_spec import SHAFT_DIA as _CS_DIA
 from pinion_bracket_geometry import PIN_BORE, PIN_SEAT
 from pinion_cam_pin_geometry import PIN_DIA
 
@@ -52,9 +63,6 @@ _CAM_PIN_GATE_LIMIT_MM3 = 1.10 * _CAM_PIN_OVERLAP_MM3
 # them together at assembly, so the nominal 1:48 pin overlaps both pilots.
 # Bound each overlap at 1.10 x the analytic frustum-minus-cylinder volume
 # over the span the pin crosses (arm hub minus its shaft bore; shaft diameter).
-from crank_arm_spec import ARM_WIDTH as _ARM_W, PIN_HOLE_DIA as _ARM_PILOT, SHAFT_BORE_DIA as _ARM_BORE  # noqa: E402
-from crank_pin_spec import BIG_END_DIA as _PIN_D0, PIN_LENGTH as _PIN_L, SMALL_END_DIA as _PIN_D1  # noqa: E402
-from crankshaft_spec import SHAFT_DIA as _CS_DIA  # noqa: E402
 
 _CS_PILOT = 4.978  # #9 drill (build_crankshaft's wizard cross-hole)
 _PIN_PROUD = 3.85  # build_drive_train_assembly.PIN_PROUD (kept in step by test)
@@ -78,7 +86,9 @@ _BORE_S0 = _PIN_PROUD + (_ARM_W - _ARM_BORE) / 2.0
 _BORE_S1 = _BORE_S0 + _ARM_BORE
 _CS_S0 = _PIN_PROUD + (_ARM_W - _CS_DIA) / 2.0
 _CS_S1 = _CS_S0 + _CS_DIA
-_CRANK_PIN_ARM_MM3 = _pin_overlap(_ARM_S0, _BORE_S0, _ARM_PILOT) + _pin_overlap(_BORE_S1, _ARM_S1, _ARM_PILOT)
+_CRANK_PIN_ARM_MM3 = _pin_overlap(_ARM_S0, _BORE_S0, _ARM_PILOT) + _pin_overlap(
+    _BORE_S1, _ARM_S1, _ARM_PILOT
+)
 _CRANK_PIN_SHAFT_MM3 = _pin_overlap(_CS_S0, _CS_S1, _CS_PILOT)
 
 # Independent SolidWorks-kernel observations for the exact stock bodies in
@@ -114,7 +124,7 @@ _FRAME_ALLOWED_PAIRS = {
         "lag-screw",
         range(1, 5),
         "rocker-arm-support",
-        _smooth_annulus_limit_mm3(12.7, 12.30376, 6.35),
+        _smooth_annulus_limit_mm3(12.7, 10.716, 6.35),
     ),
     **_numbered_pairs(
         "frame-side-screw",
@@ -237,13 +247,13 @@ _HARMONIC_ANALYZER_ALLOWED_PAIRS = {
         "drive-train-1/cone-lock-knob",
         range(1, 2),
         "frame-1/harmonic-base",
-        _smooth_annulus_limit_mm3(6.35, 5.105, 1.5875),
+        _smooth_annulus_limit_mm3(6.35, 5.105, 12.7),
     ),
     **_numbered_pairs(
         "drive-train-1/swing-stop-screw",
         range(1, 2),
         "frame-1/harmonic-base",
-        _smooth_annulus_limit_mm3(4.1656, 3.454, 6.0),
+        _smooth_annulus_limit_mm3(4.1656, 3.454, 15.525),
     ),
     **_numbered_pairs(
         "drive-train-1/slotted-screw",

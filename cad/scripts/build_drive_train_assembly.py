@@ -681,6 +681,7 @@ from build_cone_lock_knob import (  # noqa: E402
     STUD_DIA as KNOB_STUD_DIA,
     STUD_LEN as KNOB_STUD_LEN,
     THREAD as KNOB_THREAD,
+    require_seat_fit as require_lock_seat_fit,
 )
 from build_cone_pivot_screw import (  # noqa: E402
     HEAD_DIA as PSCREW_HEAD_DIA,
@@ -695,6 +696,7 @@ from build_swing_stop_screw import (  # noqa: E402
     PROUD_LEN as STOP_PROUD_LEN,
     SHANK_LEN as STOP_SHANK_LEN,
     THREAD as STOP_THREAD,
+    require_seat_fit as require_stop_seat_fit,
 )
 from build_harmonic_base import (  # noqa: E402
     BLOCK_SCREW_HOLE_DEPTH as BASE_BLOCK_HOLE_DEPTH,
@@ -705,12 +707,10 @@ from build_harmonic_base import (  # noqa: E402
     FOOT_SCREW_XZ as BASE_FOOT_XZ,
     LOCK_KNOB_XZ as BASE_LOCK_XZ,
     LOCK_SEAT_SPEC as BASE_LOCK_SEAT_SPEC,
-    LOCK_SCREW_HOLE_DEPTH as BASE_LOCK_HOLE_DEPTH,
     LOCK_STUD_ENGAGEMENT as BASE_LOCK_ENGAGEMENT,
     PIVOT_HOLE_DEPTH as BASE_PIVOT_HOLE_DEPTH,
     PIVOT_SEAT_SPEC as BASE_PIVOT_SEAT_SPEC,
     PIVOT_SCREW_XZ as BASE_PIVOT_XZ,
-    STOP_SCREW_HOLE_DEPTH as BASE_STOP_HOLE_DEPTH,
     STOP_SEAT_SPEC as BASE_STOP_SEAT_SPEC,
     STOP_SCREW_XZ as BASE_STOP_XZ,
     SWING_HARDWARE_GEOMETRY as BASE_SWING_HARDWARE,
@@ -1125,8 +1125,7 @@ if PLAT_SLOT_W - KNOB_STUD_DIA < 0.5:
     raise AssertionError("lock stud has <0.5 clearance in the platform notch")
 if abs(BASE_LOCK_ENGAGEMENT - (KNOB_STUD_LEN - PLAT_T)) > 1e-9:
     raise AssertionError("base lock engagement does not use the stock stud excess")
-if BASE_LOCK_HOLE_DEPTH - BASE_LOCK_ENGAGEMENT < 0.25 - 1e-9:
-    raise AssertionError("cone-lock base tap lacks 0.25 mm bottom clearance")
+require_lock_seat_fit(BASE_LOCK_SEAT_SPEC, PLAT_T, KNOB_STUD_LEN)
 
 # The stock knurled head is much wider than the former simplified knob.  Keep
 # its base seat outside a conservative plan-envelope of every adjacent gear;
@@ -1160,8 +1159,8 @@ if abs(_SEAT_ANCHOR_M[0] - X_CRANK) > 0.05:
     )
 
 # The collar controls notch-exit travel; the larger knurled head controls
-# external clearance. The stock stop keeps 6 mm embedded and therefore stands
-# 9.875 mm proud without changing its base-top production placement frame.
+# external clearance. The shared stock stop keeps 15.525 mm embedded and
+# therefore preserves its 9.875-mm proud height and base-top placement frame.
 DISENGAGE_DEG = BASE_SWING_HARDWARE.disengage_deg
 STOP_X, STOP_Z = BASE_SWING_HARDWARE.stop_xz
 _STOP_CONTACT = BASE_SWING_HARDWARE.stop_contact_xz
@@ -1171,8 +1170,7 @@ if math.dist((STOP_X, STOP_Z), BASE_STOP_XZ) > 1e-9:
 _require_tapped_thread("swing stop", STOP_THREAD, BASE_STOP_SEAT_SPEC)
 if abs(STOP_PROUD_LEN - (STOP_SHANK_LEN - STOP_EMBED_LEN)) > 1e-9:
     raise AssertionError("swing-stop proud length is not stock length minus embed")
-if abs(BASE_STOP_HOLE_DEPTH - STOP_EMBED_LEN) > 1e-9:
-    raise AssertionError("base stop thread depth does not retain the 6 mm embed")
+require_stop_seat_fit(BASE_STOP_SEAT_SPEC, PLAT_T)
 if _STOP_ENGAGED_GAP < 2.0:
     raise AssertionError(
         f"stop screw within {_STOP_ENGAGED_GAP:.2f} of the engaged plate edge "

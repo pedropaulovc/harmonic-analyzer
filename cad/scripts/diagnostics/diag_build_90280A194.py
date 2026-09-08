@@ -1,6 +1,6 @@
 r"""McMaster 90280A194 -- steel narrow fillister head slotted screw.
 
-One of the five 90280A* sizes built by the shared parametric recipe in
+One of the supported 90280A* sizes built by the shared parametric recipe in
 ``diag_mcmaster_fillister.py`` (see its docstring for the vendor laws).
 
 Run standalone (SolidWorks open)::

@@ -1,4 +1,10 @@
-"""Build the rocker-support hold-down screw from McMaster 91783A722."""
+"""Build the 1/2-13 UNC-2A hold-down screw from McMaster 91783A722.
+
+The supplier's downloaded SLDPRT uses a 0.453571 mm visual helix, not the
+catalog's nominal 25.4/13 mm thread pitch. Preserve that vendor representation
+without treating its visual grooves as a manufacturing thread specification.
+The receiving foot must be tapped 1/2-13 UNC-2B.
+"""
 
 from __future__ import annotations
 
@@ -13,6 +19,7 @@ from diagnostics.diag_build_91783A722 import (
     RH_HH,
     RH_LEN,
     RH_MAJOR_R,
+    RH_THREAD_LEN,
     build_91783A722,
 )
 
@@ -24,6 +31,10 @@ HEAD_DIA = 2.0 * RH_HEAD_R
 HEAD_H = RH_HH
 SHANK_DIA = 2.0 * RH_MAJOR_R
 SHANK_LEN = RH_LEN
+THREAD_LEN = RH_THREAD_LEN  # supplier minimum threaded length
+THREAD_SIZE = "1/2-13"  # authenticated McMaster 91783A722 catalog designation
+THREAD_CLASS = "2A"
+THREAD_PITCH = 25.4 / 13.0  # nominal purchased thread, NOT the vendor visual helix
 
 
 async def build(adapter) -> dict[str, str]:

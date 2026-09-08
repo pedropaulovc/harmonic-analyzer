@@ -23,11 +23,11 @@ Holes (all along local Z, the machine front-back axis):
   column +197 - centre +109; ears at +-17.5,
   _clamp_arc.EAR_HOLE_Z): heads on the bar's front face, threading into
   the back arc -- exactly the support-bar stack.
-* 1x #8 close-clearance pen-hanger screw hole at local (-114.5, 0)
-  (machine (-5.5, 575.7) = local + 109), taking the screw from behind
-  the bar. The centre is 2.5 from the free end; the standard Ø4.572
-  clearance leaves 0.214 mm of real end wall, checked below rather than
-  weakening the selected fastener or its standard fit.
+* 1x #8 close-clearance pen-hanger screw hole at local (-112, 0)
+  (machine (-3, 575.7) = local + 109), taking the screw from behind
+  the bar. The centre is 5.0 from the fixed free end; the standard Ø4.572
+  clearance leaves 2.714 mm nominal end wall, with a 2.0 mm finished
+  minimum after the hole-size and end-referenced station tolerances.
 
 Run (SolidWorks already open)::
 
@@ -55,6 +55,7 @@ from _common import (
     volume_check,
 )
 from _holes import CLEARANCE_MM, HoleSpec, blind_cut_dia_mm, wizard_holes
+import _config
 from build_hanger_screw import SHANK_DIA as HANGER_SCREW_DIA
 from _drawing_marks import (
     apply_drawing_properties,
@@ -70,6 +71,7 @@ from wheel_bar_geom import (
     CLAMP_HOLE_SIZE,
     CLAMP_HOLE_X,
     PEN_HANGER_HOLE_FIT,
+    require_hanger_end_wall,
     SCREW_HOLE_X,
 )
 from wheel_bar_spec import (
@@ -86,19 +88,16 @@ MATERIAL = "Plain Carbon Steel"
 # Hole Wizard size.
 PEN_HANGER_HOLE_SIZE = "#8"
 PEN_HANGER_HOLE_DIA = CLEARANCE_MM[(PEN_HANGER_HOLE_SIZE, PEN_HANGER_HOLE_FIT)]
-SCREW_HOLE_SPEC = HoleSpec(
-    "clearance", PEN_HANGER_HOLE_SIZE, fit=PEN_HANGER_HOLE_FIT
-)
+SCREW_HOLE_SPEC = HoleSpec("clearance", PEN_HANGER_HOLE_SIZE, fit=PEN_HANGER_HOLE_FIT)
 # The clamp-screw shanks pass through #8 normal-clearance holes.
 CLAMP_HOLE_SPEC = HoleSpec("clearance", CLAMP_HOLE_SIZE, fit=CLAMP_HOLE_FIT)
 PEN_HANGER_DIAMETRAL_CLEARANCE = PEN_HANGER_HOLE_DIA - HANGER_SCREW_DIA
 if PEN_HANGER_DIAMETRAL_CLEARANCE <= 0.0:
     raise AssertionError("standard #8 hanger clearance binds on the stock screw")
-PEN_HANGER_END_WALL = (
-    BAR_LENGTH / 2.0 - abs(SCREW_HOLE_X) - PEN_HANGER_HOLE_DIA / 2.0
+PEN_HANGER_HOLE_DIA_TOL = float(_config.title_block("drilled_hole")["plus_mm"])
+PEN_HANGER_END_WALL = require_hanger_end_wall(
+    SCREW_HOLE_X, PEN_HANGER_HOLE_DIA, PEN_HANGER_HOLE_DIA_TOL
 )
-if PEN_HANGER_END_WALL <= 0.0:
-    raise AssertionError("standard #8 hanger clearance breaks through the bar end")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -129,9 +128,15 @@ async def build(adapter) -> dict[str, str]:
     bar = SketchDims()
     check("create_sketch bar", await adapter.create_sketch("Front"))
     await define_centered_rectangle(
-        adapter, BAR_LENGTH / 2.0, BAR_SIDE / 2.0, "bar", dims=bar,
-        name_width="Length", drive_width='"BarLength"',
-        name_depth="Side", drive_depth='"BarSide"',
+        adapter,
+        BAR_LENGTH / 2.0,
+        BAR_SIDE / 2.0,
+        "bar",
+        dims=bar,
+        name_width="Length",
+        drive_width='"BarLength"',
+        name_depth="Side",
+        drive_depth='"BarSide"',
     )
     await ensure_fully_defined(adapter, "bar sketch")
     check("exit_sketch bar", await adapter.exit_sketch())
@@ -158,9 +163,12 @@ async def build(adapter) -> dict[str, str]:
     screw_dia = blind_cut_dia_mm(SCREW_HOLE_SPEC)
     clamp_dia = blind_cut_dia_mm(CLAMP_HOLE_SPEC)
     screw_cut = wizard_holes(
-        adapter, SCREW_HOLE_SPEC,
+        adapter,
+        SCREW_HOLE_SPEC,
         [[SCREW_HOLE_X, 0.0, front_z]],
-        (0.0, 0.0, -1.0), "pen-hanger screw hole (#8 clearance)", name="ScrewHole",
+        (0.0, 0.0, -1.0),
+        "pen-hanger screw hole (#8 clearance)",
+        name="ScrewHole",
         expect_dia_mm=PEN_HANGER_HOLE_DIA,
         placement_dims=[(("ScrewHoleCx", '-"ScrewHoleX"'), (None, None))],
     )
@@ -169,9 +177,12 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "bar with screw hole", expected, 1.0)
 
     wizard_holes(
-        adapter, CLAMP_HOLE_SPEC,
+        adapter,
+        CLAMP_HOLE_SPEC,
         [[x, 0.0, front_z] for x in CLAMP_HOLE_X],
-        (0.0, 0.0, -1.0), "clamp-screw clearance holes (#8)", name="ClampHoles",
+        (0.0, 0.0, -1.0),
+        "clamp-screw clearance holes (#8)",
+        name="ClampHoles",
         expect_dia_mm=CLAMP_HOLE_DIA,
     )
     expected -= 2.0 * math.pi * (clamp_dia / 2.0) ** 2 * BAR_DEPTH

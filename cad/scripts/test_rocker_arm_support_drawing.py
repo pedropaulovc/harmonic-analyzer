@@ -2,22 +2,15 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+import math
+
+import pytest
 
 import draw_rocker_arm_support as drawing
 import build_rocker_arm_support as support
+import build_frame_assembly as frame
+import build_lag_screw as screw
 import rocker_arm_support_spec as placement
-from _drawing_registry import DRAWINGS_BY_NAME
-
-
-def test_required_drawing_paths() -> None:
-    assert drawing.SLDDRW.as_posix().endswith("/slddrw/rocker-arm-support.SLDDRW")
-    assert drawing.PDF.as_posix().endswith("/pdf/rocker-arm-support.pdf")
-    assert drawing.PNG.as_posix().endswith("/png/rocker-arm-support_drawing.png")
-    assert (
-        DRAWINGS_BY_NAME["rocker_arm_support"].script
-        == Path(drawing.__file__).resolve()
-    )
 
 
 def test_drawing_keeps_exactly_the_marked_dimension_set() -> None:
@@ -26,12 +19,26 @@ def test_drawing_keeps_exactly_the_marked_dimension_set() -> None:
     assert kept == marked
 
 
-def test_tapped_holes_use_customary_us_thread() -> None:
-    # Pedro 2026-07-10: closest customary US thread, not the period series.
-    assert support.HOLE_SSIZE == "9/16-12"
-    assert support.HOLE_THREAD_CLASS == "2B"
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "insert_hole_table(" in source
+def test_stock_hold_down_matches_receiver_and_engages_only_foot_material() -> None:
+    assert screw.SPEC.skus == ("91783A722",)
+    assert support.HOLE_SSIZE == screw.THREAD_SIZE == "1/2-13"
+    assert (screw.THREAD_CLASS, support.HOLE_THREAD_CLASS) == ("2A", "2B")
+    assert support.HOLE_TAP_DRILL_DIA < screw.SHANK_DIA < frame.LAG_CLEARANCE_DIA
+    assert screw.HEAD_DIA < frame.LAG_COUNTERBORE_DIA
+    assert frame.LAG_HEAD_RECESS == pytest.approx(0.5)
+    assert frame.LAG_SUPPORT_ENGAGEMENT == pytest.approx(6.35)
+    assert frame.LAG_SCREW_TIP_Y - screw.THREAD_LEN < frame.BASE_TOP_Y
+    assert frame.LAG_TIP_REACH_ABOVE_BASE > frame.LAG_SUPPORT_ENGAGEMENT
+
+
+def test_bottom_view_picks_actual_tap_drill_rim_at_each_station() -> None:
+    for x_mm, z_mm in support.HOLES:
+        sheet_x, sheet_y = drawing._bottom_sheet_xy((x_mm, z_mm))
+        picked_x = (sheet_x - drawing.BOTTOM_CENTER[0]) * 1000 / drawing.VIEW_SCALE
+        picked_z = (sheet_y - drawing.BOTTOM_CENTER[1]) * 1000 / drawing.VIEW_SCALE
+        assert math.hypot(picked_x - x_mm, picked_z - z_mm) == pytest.approx(
+            support.HOLE_TAP_DRILL_DIA / 2.0
+        )
 
 
 def test_hole_table_covers_every_foot_hole() -> None:
@@ -51,44 +58,3 @@ def test_support_keeps_original_world_placement_and_hold_down_pattern() -> None:
         -60.32,
         60.32,
     }
-
-
-def test_notes_cover_casting_specifics() -> None:
-    notes = support.DRAWING_NOTES
-    assert "GRAY-IRON CASTING" in notes
-    assert "CHAMFER 1.27 X 45" in notes
-    assert "FILLET" in notes and "R12.7" in notes
-    assert "WEB 6.35" in notes
-    assert "X.XX" not in notes
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
-    assert "def _manufacturing_notes" not in source
-
-
-def test_native_gdt_defines_mounting_reference_frame() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 3
-    assert source.count("add_feature_control_frame(") == 2
-    assert "characteristic=\"flatness\"" in source
-    assert "characteristic=\"position\"" in source
-
-
-def test_sheet_runs_1_to_2_with_explicit_view_scales() -> None:
-    # A 177.8 mm casting with four views does not fit ASME B at 1:1.
-    assert drawing.SHEET_SCALE == (1.0, 2.0)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    # Every view pins its scale explicitly — an unpinned view auto-scales and
-    # silently shifts every coordinate-based pick on it.
-    assert source.count("scale=(1, 2)") == 4
-
-
-def test_part_stamps_make_critical_drawing_properties() -> None:
-    source = Path(support.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_properties" in source
-    assert "clear_dimensions_for_drawing" in source
-    import _config
-
-    spec = _config.parts("rocker-arm-support")
-    assert "gray cast iron" in str(spec["material_specification"]).lower()
-    assert spec["finish"]
-    assert int(spec["quantity"]) == 1

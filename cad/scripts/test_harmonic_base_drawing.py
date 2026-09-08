@@ -86,6 +86,82 @@ def test_blind_taps_have_drill_and_tap_runout_clearance() -> None:
         assert spec.depth_mm - thread_depth >= 0.25
 
 
+
+def test_cone_lock_seats_on_plate_and_bare_base_with_useful_threads() -> None:
+    import build_cone_lock_knob as knob
+    from _holes import DRILL_POINT_H, blind_hole_volume_mm3
+
+    knob.require_seat_fit(part.LOCK_SEAT_SPEC, platform.PLATE_T, knob.STUD_LEN)
+    assert knob.STUD_LEN - platform.PLATE_T == pytest.approx(12.7)
+    assert knob.STUD_LEN - platform.PLATE_T - knob.TIP_CHAMFER >= 1.5 * knob.STUD_DIA
+    assert part.LOCK_SEAT_SPEC.overrides_mm["ThreadDepth"] - knob.STUD_LEN >= 0.25
+    assert part.LOCK_SEAT_SPEC.depth_mm == pytest.approx(25.65)
+    drill_tip_depth = (
+        part.LOCK_SEAT_SPEC.depth_mm + part.LOCK_SCREW_HOLE_DIA / 2.0 * DRILL_POINT_H
+    )
+    assert part.TOP_THICKNESS - drill_tip_depth >= 1.5 * part.LOCK_SCREW_HOLE_DIA
+    assert part.LOCK_NEAREST_CAVITY_WALL >= part.LOCK_SCREW_HOLE_DIA
+    # Volume includes the added drilling length AND its terminal point.
+    radius = part.LOCK_SCREW_HOLE_DIA / 2.0
+    assert blind_hole_volume_mm3(
+        part.LOCK_SCREW_HOLE_DIA, part.LOCK_SEAT_SPEC.depth_mm
+    ) == pytest.approx(math.pi * radius**2 * (25.65 + radius * DRILL_POINT_H / 3.0))
+
+
+def test_cone_lock_rejects_short_stock_even_in_a_deep_receiver() -> None:
+    import build_cone_lock_knob as knob
+
+    with pytest.raises(AssertionError, match="useful thread engagement"):
+        knob.require_seat_fit(part.LOCK_SEAT_SPEC, platform.PLATE_T, 7.9375)
+
+
+def test_cone_lock_rejects_a_receiver_that_only_clears_the_plate_pose() -> None:
+    import build_cone_lock_knob as knob
+    from dataclasses import replace
+
+    seat = replace(
+        part.LOCK_SEAT_SPEC,
+        overrides_mm={"ThreadDepth": knob.STUD_LEN - platform.PLATE_T + 0.25},
+    )
+    with pytest.raises(AssertionError, match="collar seats"):
+        knob.require_seat_fit(seat, platform.PLATE_T, knob.STUD_LEN)
+
+
+def test_cone_lock_requires_plug_tap_lead_beyond_full_thread_depth() -> None:
+    import build_cone_lock_knob as knob
+    from dataclasses import replace
+
+    seat = replace(
+        part.LOCK_SEAT_SPEC,
+        depth_mm=part.LOCK_SEAT_SPEC.overrides_mm["ThreadDepth"] + 0.25,
+    )
+    with pytest.raises(AssertionError, match="plug-tap lead"):
+        knob.require_seat_fit(seat, platform.PLATE_T, knob.STUD_LEN)
+
+
+def test_shared_stop_preserves_exposed_geometry_with_a_deeper_clear_seat() -> None:
+    import build_swing_stop_screw as stop
+
+    stop.require_seat_fit(part.STOP_SEAT_SPEC, platform.PLATE_T)
+    assert stop.PROUD_LEN == pytest.approx(9.875)
+    assert stop.EMBED_LEN - stop.TIP_CHAMFER >= stop.SHANK_DIA
+    assert stop.PROUD_LEN - platform.PLATE_T - stop.UNDERHEAD_FILLET - 0.51 >= 1.0
+    assert part.STOP_SEAT_SPEC.overrides_mm["ThreadDepth"] - stop.EMBED_LEN >= 0.25
+    assert part.STOP_DRILL_BOTTOM_WALL >= 1.5 * part.STOP_SCREW_HOLE_DIA
+    assert part.STOP_NEAREST_CAVITY_WALL >= part.STOP_SCREW_HOLE_DIA
+
+
+def test_shared_stop_rejects_the_former_shallow_receiver() -> None:
+    from dataclasses import replace
+    import build_swing_stop_screw as stop
+
+    seat = replace(
+        part.STOP_SEAT_SPEC, depth_mm=9.0, overrides_mm={"ThreadDepth": 6.0}
+    )
+    with pytest.raises(AssertionError, match="bottoms"):
+        stop.require_seat_fit(seat, platform.PLATE_T)
+
+
 def test_nameplate_seats_are_derived_from_the_plate_mount() -> None:
     """The four #4-40 taps sit under the plate's corner holes carried through
     its mount transform (nameplate_spec), cut from the deck the plate lies on."""

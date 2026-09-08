@@ -117,6 +117,7 @@ from column_clamp_front_geom import ARC_DEPTH as ARC_FRONT_DEPTH  # noqa: E402
 from wheel_bar_geom import (  # noqa: E402
     BAR_DEPTH as WHEEL_BAR_DEPTH,
     CLAMP_HOLE_X as BAR_CLAMP_HOLE_LOCAL_X,
+    WHEEL_BAR_X0,
 )
 
 BAR_BACK_Z = COLUMN_Z - ARC_FRONT_DEPTH  # -129.9
@@ -201,7 +202,6 @@ FIXTURE_Y0 = 915.7  # collar y 915.7..923.7 on the vertical rod (rode down 10.3)
 
 # --- wheel -------------------------------------------------------------------
 WHEEL_X = 53.0
-WHEEL_BAR_X0 = 109.0  # wheel-bar centre: span -8 .. +226 (29 past the west column)
 # Clamp screws flank the column line, closing the stack bar -> front arc ->
 # back arc with heads on the bar's front face (ch30 p002 / support-bar idiom).
 # (west screw first -- keeps the component instance order of the mirrored-era

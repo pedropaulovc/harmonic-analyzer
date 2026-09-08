@@ -7,8 +7,8 @@ sheet/template, import, curation, and export behavior lives in
 
 The support is a green-painted gray-iron casting: a trapezoidal wall with a
 square window cut from both faces (leaving a central web), a rounded/chamfered
-window rim, and four 9/16-12 UNC tapped holes up through the foot.  The sheet
-runs 1:1; the isometric carries a 1:2 override.
+window rim, and four 1/2-13 UNC-2B tapped holes up through the foot. The sheet
+runs 1:2, with each view's scale pinned explicitly.
 
 Run with SolidWorks open::
 
@@ -40,7 +40,9 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from build_rocker_arm_support import BOSS_DEPTH, CHAMFER, HALF_Y, HOLES, WIDE
+from build_rocker_arm_support import (
+    BOSS_DEPTH, CHAMFER, HALF_Y, HOLES, HOLE_SSIZE, HOLE_TAP_DRILL_DIA, WIDE,
+)
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -109,16 +111,12 @@ RIGHT_KEEP = {
 HOLE_TABLE_ANCHOR = (0.270, 0.130)
 
 
-# 9/16-12 tap drill (the modeled hole) — the edge pick must land ON the rim.
-_TAP_DRILL_DIA_MM = 12.30376
-
-
 def _bottom_sheet_xy(hole_xz: tuple[float, float]) -> tuple[float, float]:
     """Sheet pick point ON a foot hole's rim (model X, Z in mm), bottom view."""
     x_mm, z_mm = hole_xz
     return (
         BOTTOM_CENTER[0] + x_mm * VIEW_SCALE / 1000.0,
-        BOTTOM_CENTER[1] + (z_mm + _TAP_DRILL_DIA_MM / 2.0) * VIEW_SCALE / 1000.0,
+        BOTTOM_CENTER[1] + (z_mm + HOLE_TAP_DRILL_DIA / 2.0) * VIEW_SCALE / 1000.0,
     )
 
 
@@ -172,7 +170,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # central web band and cavity floor, so "window cut from both faces,
     # leaving the web" is visible rather than prose-only.
     set_hidden_lines_visible(adapter, right)
-    removed_thread_notes = remove_notes_matching(adapter, "9/16-12")
+    removed_thread_notes = remove_notes_matching(adapter, HOLE_SSIZE)
     _telemetry.info(
         f"removed {removed_thread_notes} redundant automatic thread note(s)"
     )
@@ -183,7 +181,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add ASME center marks to bottom view")
 
     # Foot corner datum + the four tapped holes: the native hole table carries
-    # every X/Y station and the 9/16-12 tap callout.
+    # every X/Y station and the native 1/2-13 UNC-2B tap callout.
     insert_hole_table(
         adapter,
         bottom,

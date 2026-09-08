@@ -1,6 +1,6 @@
 r"""Reproduction script: rocker-arm support (manual feature-tree replay).
 
-An exact feature-tree replay of ``rocker-arm-support.SLDPRT`` -- a
+Feature-tree replay of ``rocker-arm-support.SLDPRT`` with stock-compatible foot taps: a
 thin-walled cast bracket: a trapezoidal wedge wall (wide foot, narrow top)
 stood **Y-up**, lightened by a square window that opens on the two big front/
 back faces, with a mounting foot drilled by four tapped holes (bored vertically
@@ -16,20 +16,19 @@ source's tree STRUCTURE and sketch construction but with SEMANTIC feature names
 (the convention of the other tracked parts) rather than the source's generic
 auto-names. The tree is Wall (``Boss-Extrude1``) -> CavityCut/WindowCut1/
 WindowCut2 (``Cut-Extrude2/3/4``) -> CornerFillet (``Fillet3``) ->
-FootTappedHoles (``9/16-12 Tapped Hole1``, HoleWzd) -> RimChamfer
+FootTappedHoles (1/2-13 UNC-2B, HoleWzd) -> RimChamfer
 (``Chamfer2``). The trapezoid lives on the **Right plane** (sketch-x -> model Z
 taper, sketch-y -> model Y height, mid-plane extrude along X); the window/cavity
 cuts use SINGLE origin-centred squares on the **Front plane** (matching the
-source's window/cavity sketches). The per-stage ``volume_check`` targets are the
-real part's measured volumes (rotation-invariant, so unchanged by orientation),
-so any geometry drift fails loudly:
+source's window/cavity sketches). Through CornerFillet, the per-stage
+``volume_check`` targets are the source part's measured volumes. The foot-hole
+target subtracts four cylindrical tap drills from the measured CornerFillet
+volume; the final target also subtracts the unchanged measured window-rim
+chamfer removal. These post-hole targets are analytic expectations, not new
+SolidWorks measurements, and retain the original 200 mm³ check tolerance.
 
-    Wall      1 271 363 | CavityCut       622 708 | WindowCut1 434 257
-    WindowCut2  245 806 | CornerFillet    246 685 | FootTappedHoles 243 665
-    RimChamfer  240 512
-
-Geometry (mm), all from the source part (model frame: X = extrude/width,
-Y = height with the wide foot at Y=-88.9, Z = wall thickness / window depth):
+Geometry (mm), source casting with the corrected receiving thread (model frame:
+X = extrude/width, Y = height with the wide foot at Y=-88.9, Z = wall thickness):
 
 * **Wall** -- trapezoid, wide foot ``Z ±31.75`` at ``Y=-88.9`` tapering to
   ``Z ±8.4665`` at ``Y=+88.9``; mid-plane extrude 177.8 (``X ±88.9``).
@@ -45,10 +44,10 @@ Y = height with the wide foot at Y=-88.9, Z = wall thickness / window depth):
 * **CornerFillet** -- R12.7 on the four inner-frame corner edges (concave: adds
   material).
 * **FootTappedHoles** -- a single Hole Wizard (``HoleWzd``) feature, 4x
-  9/16-12 ANSI-inch bottoming tapped holes (Ø12.30376 tap drill), drilled up
-  through the foot from the bottom face (Y=-88.9) at ``(X ±60.32, Z ±17.46)``,
-  through-next. One feature with four placement points, matching the source
-  (no separate placement sketch).
+  1/2-13 UNC-2B ANSI-inch straight taps (Ø10.716 tap drill), drilled up
+  through the 6.35 mm foot from the bottom face (Y=-88.9) at
+  ``(X ±60.32, Z ±17.46)``. Hole and thread end conditions are through-all.
+  One feature carries all four placement points.
 * **RimChamfer** -- 1.27 mm / 45° on the 12 inner-frame opening edges plus the
   two slant faces, the two trapezoid (±X) faces, and one fillet face, with
   tangent propagation -- i.e. the whole window rim.
@@ -69,6 +68,7 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
+import math
 import sys
 
 from _common import (
@@ -92,6 +92,7 @@ from _common import (
     set_global,
     volume_check,
 )
+from _holes import TAP_DRILL_MM
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -115,6 +116,7 @@ BOSS_DEPTH = 177.8  # mid-plane extrude along X (X ±88.9)
 CAV = 63.5         # 127 mm square half (Cut-Extrude2)
 BIG = 82.55        # 165.1 mm square half (Cut-Extrude3/4)
 WEB = 3.175        # window-cut start-offset; the 2*WEB band left as the web
+FOOT_THICKNESS = HALF_Y - BIG
 
 FILLET_R = 12.7
 FILLET_EDGES = [  # four inner-frame corner edges (run along Z through the web)
@@ -147,8 +149,17 @@ SW_WZD_TAP = 4                 # swWzdGeneralHoleTypes_e.swWzdTap (straight tap)
 SW_STD_ANSI_INCH = 0           # swWzdHoleStandards_e.swStandardAnsiInch
 SW_HOLE_FASTENER_TYPE = 27     # ANSI-inch straight tapped hole
 SW_END_THROUGH_ALL = 1         # swEndCondThroughAll / swEndThreadTypeTHROUGH_ALL
-HOLE_SSIZE = "9/16-12"
+HOLE_SSIZE = "1/2-13"
 HOLE_THREAD_CLASS = "2B"  # customary US class for a general tapped hole
+HOLE_TAP_DRILL_DIA = TAP_DRILL_MM[HOLE_SSIZE]
+
+# Measured source CornerFillet volume minus four through-drill cylinders.
+# The window-rim chamfer never reaches these bores; its measured removal stays
+# 3153 mm³. Neither target below is claimed as a new native measurement.
+FOOT_TAPPED_VOLUME = (
+    246_685 - len(HOLES) * math.pi / 4.0 * HOLE_TAP_DRILL_DIA**2 * FOOT_THICKNESS
+)
+RIM_CHAMFER_VOLUME = FOOT_TAPPED_VOLUME - 3_153
 
 CHAMFER = 1.27     # leg, 45°
 CHAMFER_EDGES = [  # 12 inner-frame opening edges, both web faces (Z = ±WEB)
@@ -380,6 +391,17 @@ def _drill_tapped_holes(adapter, holes_xz, y_face_mm: float):
         raise RuntimeError("hole wizard: ModifyDefinition failed")
     model.EditRebuild3()
     persisted = _early_bound(feat.GetDefinition(), "IWizardHoleFeatureData2")
+    if str(persisted.FastenerSize) != HOLE_SSIZE:
+        raise RuntimeError(
+            f"hole wizard: thread size did not persist: {persisted.FastenerSize!r}"
+        )
+    if int(persisted.EndCondition) != SW_END_THROUGH_ALL:
+        raise RuntimeError("hole wizard: through-all hole end condition did not persist")
+    drill_mm = float(persisted.ThruTapDrillDiameter) * 1000.0
+    if not math.isclose(drill_mm, HOLE_TAP_DRILL_DIA, abs_tol=0.001):
+        raise RuntimeError(
+            f"hole wizard: expected {HOLE_TAP_DRILL_DIA} mm tap drill, got {drill_mm}"
+        )
     if str(persisted.ThreadClass) != HOLE_THREAD_CLASS:
         raise RuntimeError(
             f"hole wizard: thread class did not persist: {persisted.ThreadClass!r}"
@@ -505,15 +527,15 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "CornerFillet", 246_685, 200)
 
     # 6. FootTappedHoles: ONE Hole Wizard (HoleWzd) feature with four placement
-    #    points, 9/16-12 UNC-2B straight tapped holes drilled up through the
+    #    points, 1/2-13 UNC-2B straight tapped holes drilled up through the
     #    foot from the bottom face (Y=-HALF_Y) at (X ±60.32, Z ±17.46),
     #    through-all. Only the 6.35 mm foot tip (Y -88.9..-82.55) carries
     #    material along the bore -- the window cuts opened everything above -- so
-    #    through-next drills exactly that band, matching the source's measured
-    #    volume. One feature, no separate placement sketch (matches the source).
+    #    the through-all cut removes four cylinders of FOOT_THICKNESS.
+    #    One feature, no separate placement sketch (matches the source).
     _drill_tapped_holes(adapter, HOLES, y_face_mm=-HALF_Y)
     name_last_feature(adapter, "FootTappedHoles")
-    await volume_check(adapter, "FootTappedHoles", 243_665, 200)
+    await volume_check(adapter, "FootTappedHoles", FOOT_TAPPED_VOLUME, 200)
 
     # 7. RimChamfer: 1.27 mm / 45° around the whole window rim -- the 12 inner-
     #    frame opening edges plus the slant/trapezoid/fillet faces, tangent-
@@ -521,7 +543,7 @@ async def build(adapter) -> dict[str, str]:
     check("chamfer", await adapter.add_chamfer(
         CHAMFER, CHAMFER_EDGES, face_points=CHAMFER_FACES, tangent_propagation=True))
     name_last_feature(adapter, "RimChamfer")
-    await volume_check(adapter, "RimChamfer", 240_512, 200)
+    await volume_check(adapter, "RimChamfer", RIM_CHAMFER_VOLUME, 200)
 
     # Apply the deferred drive equations now that the whole model + a rebuild
     # exist, so every named-dim target resolves. Each equation evaluates to the
@@ -531,7 +553,7 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
-    await volume_check(adapter, "driven part (equations neutral)", 240_512, 200)
+    await volume_check(adapter, "driven part (equations neutral)", RIM_CHAMFER_VOLUME, 200)
 
     # Manufacturing drawing support: mark exactly the print's dimensions and
     # stamp the make-critical title-block properties.

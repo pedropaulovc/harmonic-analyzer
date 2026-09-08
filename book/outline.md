@@ -60,7 +60,7 @@ Each chapter ends with **"Now make:"** — a real part from the machine.
 | 11 | Parting off to a length tolerance | the 19 `pivot-bushing` + 19 `lever-bushing` sets — **length sets the 7.0565 mm channel pitch** |
 | 12 | Slender work: steadies and followers | `cone-gear-shaft` (Ø0.79 × 34 mm tip journal in steel, 43:1) |
 | 13 | Milling: squaring, profiling, edges | `rocker-arm` (R800 concave top edge as a 2D profile, ×20) |
-| 14 | Hole patterns and tapping | `rocker-arm-support` (4× 9/16-12), the 20 Ø2.0 spring holes |
+| 14 | Hole patterns and tapping | `rocker-arm-support` (4× 1/2-13 UNC-2B, `cad/scripts/build_rocker_arm_support.py`), the 20 Ø2.0 spring holes |
 | 15 | Indexing and the dividing head | `cylinder-gear` 0.4 mm alignment notches, co-phased |
 | 16 | **Making your own gear cutters** | Eureka-method form cutters for DP 49.82 — **off-the-shelf cutters for this pitch do not exist** |
 | 17 | **Cutting the gears** | first `cone-gear` (T120, the easy end) |

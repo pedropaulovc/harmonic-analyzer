@@ -602,9 +602,9 @@ sections:
         - ch30 GT (cone_back); p.18 tip clamp + v4_t00471 (7:49 full tip-stack geometry)
         - med (GT-anchored)
       - - '`cone-lock-knob` (clamps the swing plate engaged/disengaged)'
-        - 'McMaster-Carr 91882A412 steel raised knurled-head thumb screw: Ø25.4 head over an Ø12.7 × 9.525 collar, with a 1/4-20 stud (Ø6.35) 7.9375 long; the collar seats on the plate top and the stud passes through the open notch into the base tap.'
+        - 'McMaster-Carr 91882A425 steel raised knurled-head thumb screw: Ø25.4 head over an Ø12.7 × 9.525 collar, with a 1/4-20 stud (Ø6.35) 19.05 long; the collar seats on the plate top and the stud passes through the open notch into the base tap. Through the 6.35 plate, engagement is 12.70 gross and 11.7475 full-profile after the 0.9525 tip chamfer. The base has 19.30 full thread depth and 25.65 drill depth before the drill point, accepting the full stud when the collar seats on the bare base.'
         - 'base-bolted STATIC at (−100.076, −112.048), collar seat y 57.15; the PLATE is the mover. Loosen the knob and its open notch sweeps past the stationary stud 2.610 mm to the mouth, then swings clear (3.013° total from the southern 33-mm notch-seat cascade). The exact Ø25.4 head clears the pivot post and the T120/64T gear row; tightened with no plate under it, the collar fences the mouth and locks the plate DISENGAGED ("Unscrewing this knob allows the cone gear set to swing away", v4 6:48).'
-        - McMaster-Carr 91882A412 recipe + v4_t00411 ("knob" label) + v4_t00417 top view; ch12 p.16 text
+        - McMaster-Carr 91882A425 recipe (`cad/scripts/diagnostics/diag_mcmaster_thumb.py`); engagement and depths from `cad/scripts/build_cone_lock_knob.py` and `cad/scripts/build_harmonic_base.py`; v4_t00411 ("knob" label) + v4_t00417 top view; ch12 p.16 text
         - high (stock dimensions exact; function and placement derived)
       - - '`cone-pivot-screw` (the physical p1 pivot pin)'
         - 'McMaster-Carr 91829A560 slotted 18-8 stainless precision shoulder screw — head Ø9.525 × 4.7625, ground Ø6.35 shoulder × 6.35, followed by a 9.525-long #10-24 UNC-2A threaded tail; 15.875 total under-head length; tail engages a matching blind #10-24 UNC-2B base tap 11.525 deep (2.00 bottom clearance)'
@@ -612,9 +612,9 @@ sections:
         - McMaster-Carr 91829A560 model + v4 top stills (slotted head at the plate tip)
         - med (role high, dims low)
       - - '`swing-stop-screw` (p1 travel limit)'
-        - 'McMaster-Carr 90280A196 steel narrow fillister-head slotted screw: head Ø6.858 × 3.9624, #8-32 shank Ø4.1656 × 15.875; 6.0 embedded in the base leaves 9.875 proud above it.'
+        - 'McMaster-Carr 90280A199 steel narrow fillister-head slotted screw, shared with slotted-screw: head Ø6.858 × 3.9624, #8-32 shank Ø4.1656 × 25.4; 15.525 embedded in the base leaves 9.875 proud above it. The base receiver has 16.0 full thread depth and 20.0 drill depth before the drill point.'
         - 'base-threaded STATIC at (−137.064, +0.841), derived so the 223.354-long plate''s EAST taper edge just touches the shank flank at the 3.013° disengaged swing. The disengage swing walks the knob stud out of the notch mouth and advances the east edge onto the stop; the engaged edge retains 5.527 mm signed clearance (derived and asserted against the base hole).'
-        - McMaster-Carr 90280A196 recipe + user review (v4: small screw the platform bumps against); position derived from the notch/knob geometry
+        - 'McMaster-Carr 90280A199 recipe (`cad/scripts/diagnostics/diag_mcmaster_fillister.py`); embed and receiver depths from `cad/scripts/build_swing_stop_screw.py` and `cad/scripts/build_harmonic_base.py`; user review (v4: small screw the platform bumps against); position derived from the notch/knob geometry'
         - high (stock dimensions exact; function and placement derived)
       - - '`cone-tip-bushing` (T006 spacer on the tip stub)'
         - brass sleeve Ø6 × 4, Ø0.79 (1/32") bore
@@ -760,7 +760,7 @@ sections:
         - 'ball x photo-measured 66…81, ball y 252–255 in both 0°/180° views; y = support apex 228.6 + ball rise 25.2. The fixed support remains at its old world location while the channel bank recenters to z +3.088 and the longer rocker lever reaches drum x −60.394.'
         - med (x, y photo + frame; dia low)
       - - Support casting ×1 (windowed rocker-arm support)
-        - 'green 177.8 × 177.8 windowed casting, 63.5 thick tapering to 16.94 at the apex, authored window-normal local Z and installed Ry+90 at its original machine location (+72.9, 0). Three measured p2 reliefs follow the recentered pivot rig while retaining the guarded ligaments to the source-replayed 9/16-12 hold-down taps.'
+        - 'green 177.8 × 177.8 windowed casting, 63.5 thick tapering to 16.94 at the apex, authored window-normal local Z and installed Ry+90 at its original machine location (+72.9, 0). Three measured p2 reliefs follow the recentered pivot rig while retaining the guarded ligaments to the four 1/2-13 UNC-2B hold-down taps (`cad/scripts/build_rocker_arm_support.py`).'
         - 'front view: triangle base spans x −130…−44 (≈86), apex at −81 ± 6. M6.9 REINSTATED the windowed-frame reading M6.3/M6.5 refuted: ch30 p008 (+x side, brightened) plainly shows the windowed portal frame (~184 wide, ~127 window). The p008 uprights read ~28–40 deep and near-uniform → side depth 40 → 20 (supersedes the legacy 63.5 → 16.9 strong taper). M6.5''s refutation of a second free-standing SOUTH frustum stands (the calibrated v3 side view shows ONE frustum at the back, z +69..+134 footprint; the south ball is gripped by the clevis). M6.12: photo Z-scale is perspective-compressed, so the casting''s Z geometry stays anchored on the mechanically-locked neighbours (both pivot balls, the channel grid, the parked stick z ≤ −118; the "ch25 handle z ≥ −98" pin is OBSOLETE — the restored ch30-GT alignment pinion carries its tee handle at z −144, well south of the plate — the band now rests on the stick + photo read alone).'
         - photo + legacy height
         - med
@@ -769,8 +769,8 @@ sections:
         - original support placement retained; apex top at y = 228.6
         - med
       - - Hold-down lag screws ×4 (M6.10)
-        - '9/16-12 screws rise through the base into the support''s source-replayed four-tap pattern at machine (x, z) = (55.44 or 90.36, −60.32 or +60.32); base holes and counterbores consume this shared transformed contract.'
-        - the support's 63.5 mounting-hole pitch (`build_rocker_arm_support.py`); placed in frame.SLDASM (`build_lag_screw.py`)
+        - 'McMaster 91783A722 1/2-13 UNC-2A screws rise through the base into the support''s four 1/2-13 UNC-2B through taps at machine (x, z) = (55.44 or 90.36, −60.32 or +60.32); base holes and counterbores consume this shared transformed contract. The 6.35-thick support foot uses a Ø10.716 tap drill (Ø10.72 displayed; 27/64 in). The vendor model''s 56 TPI visual helix is not the manufacturing thread specification.'
+        - 'four-hole pattern and foot thickness from `cad/scripts/build_rocker_arm_support.py`, tap drill from `cad/scripts/_holes.py`; purchased thread and vendor-helix distinction from `cad/scripts/build_lag_screw.py`; placed in frame.SLDASM'
         - low
       - - Pivot brackets ×2 (replaced the chrome ball mounts 2026-09)
         - 'black L-bracket (2026-09-02, was a T): foot 16 wide (fits the support''s 16.93 apex) × 6 × 24 running INBOARD from the ear with two Ø4.2 holes on its centreline, ear stub 14 × 6 carrying a Ø16 chrome ball at 25.2 above the foot with the Ø6.5 shaft bore through the ball; north bracket turned Ry180 in channel.SLDASM'
@@ -1017,9 +1017,9 @@ sections:
         - derived
         - med
       - - Lever fulcrum
-        - 'Ø6.5 pivot hole at 0; common Ø6.35 × 182 shaft (`fulcrum-shaft`) along Z at (x, y, centre-z) = (+199.9, 1061.4, +3.088), with black end keepers (`fulcrum-keeper`, MHA-120) on the rail top face 1036.2: ball centres z 3.088 ± 88.75 = −85.662/+91.838 (2.25 inboard of the shaft ends), feet screwed by #10-24 frame-side screws (MHA-117) into tapped rail holes at z 3.088 ± 74.0 = −70.912/+77.088; Ø12 × 4.0565 spacer bushings ×19'
+        - 'Ø6.5 pivot hole at 0; common Ø6.35 × 182 shaft (`fulcrum-shaft`) along Z at (x, y, centre-z) = (+199.9, 1061.4, +3.088), with black end keepers (`fulcrum-keeper`, MHA-120) on the rail top face 1036.2: ball centres z 3.088 ± 88.75 = −85.662/+91.838 (2.25 inboard of the shaft ends), feet screwed by #8-32 frame-side screws (MHA-117) into tapped rail holes at z 3.088 ± 74.0 = −70.912/+77.088; Ø12 × 4.0565 spacer bushings ×19'
         - —
-        - 'p.40 bottom-left clevis+ball = the shaft END mount (mirror of the rocker pivot design); rail top = 1061.4 − 25.2 = 1036.2; ch30 px measurement anchored on column pitch + GT rescale + ch19 closeups (2026-08-02 rederive)'
+        - 'p.40 bottom-left clevis+ball = the shaft END mount (mirror of the rocker pivot design); rail top = 1061.4 − 25.2 = 1036.2; ch30 px measurement anchored on column pitch + GT rescale + ch19 closeups (2026-08-02 rederive); thread from `cad/scripts/build_frame_side_screw.py` and `cad/scripts/build_top_frame.py` KEEPER_TAP_SPEC'
         - measured
         - med
       - raw: '| Lever tip | bar steps to a 6.0-tall centred tab at x 169 (p.39/p.41), rounded r3 tip, Ø4 spring-hook hole at 177.8, 8 mm overhang; fork/clip fittings deferred (photogrammetry 195527397) | — | p.39, p.40; the Ø3 photo read is infeasible — the spring''s r 2.75 Ø1-wire eye threading the 3.0 plate needs eye-drop margins |√(ρ²−1.5²)−D| ≤ hole_r − 0.1 at ρ = 2.25/3.25, best ~0.05 through Ø3, ~0.3 through Ø4 (M6.3 toroid solve) | scaled→derived | med |'
@@ -1060,8 +1060,8 @@ sections:
         - ch. 17 rows (2026-08-02 rederive)
         - med
       - - Top frame (NEW part)
-        - 'green cast ring around the 4 columns at z ±112 (column pitch 394 × 224, plan centre z 0) — ONE casting absorbing the old top-crossbar and gooseneck clamp. Rail band y 999.7..1036.2 (H 36.5; assembly insert TOP_FRAME_MID_Y 1017.95); side rails 34.2 wide, outer faces x ±214.1 / inner ±179.9; front/rear rails 38.0 wide, outer z ±131.0 / inner ±93.0; corner bosses Ø52.2 at (±197, ±112), y 993.4..1040.7 (proud 4.5 above the rail top, hanging 6.3 below the bottom), bored Ø25.5 through, tapped #10-24 side-screw holes with Ø9 × 0.5 spot-faces; integral FULL-height crossbar 22 wide on the knife line, spanning z −93..+93 flush top and bottom, 2 stud clearance holes Ø13.49 at z −83.972/+90.148, plan gussets ~18 × 18 at the rail junctions; gooseneck hub on the east rail (full-height rib 27 wide centred z +3.088 at the rail-face planes, Ø17.0 bore through along Y, underside boss Ø30 proud 8.0 + 2 V-gussets, tapped 1/4-20 set-screw hole along X at y 1017.95 with a 16 × 16 × 2 cast pocket); recessed web panels (flanges 8.0; web 12.7 (0.5 in) thick centred on each rail — setback 10.75/face side rails, 12.65/face front-rear) on BOTH faces of all 4 rails.'
-        - 'ch30 px measurement anchored on column pitch + GT rescale + ch19 closeups (2026-08-02 rederive)'
+        - 'green cast ring around the 4 columns at z ±112 (column pitch 394 × 224, plan centre z 0) — ONE casting absorbing the old top-crossbar and gooseneck clamp. Rail band y 999.7..1036.2 (H 36.5; assembly insert TOP_FRAME_MID_Y 1017.95); side rails 34.2 wide, outer faces x ±214.1 / inner ±179.9; front/rear rails 38.0 wide, outer z ±131.0 / inner ±93.0; corner bosses Ø52.2 at (±197, ±112), y 993.4..1040.7 (proud 4.5 above the rail top, hanging 6.3 below the bottom), bored Ø25.5 through, tapped #8-32 side-screw holes with Ø9 × 0.5 spot-faces; integral FULL-height crossbar 22 wide on the knife line, spanning z −93..+93 flush top and bottom, 2 stud clearance holes Ø13.49 at z −83.972/+90.148, plan gussets ~18 × 18 at the rail junctions; gooseneck hub on the east rail (full-height rib 27 wide centred z +3.088 at the rail-face planes, Ø17.0 bore through along Y, underside boss Ø30 proud 8.0 + 2 V-gussets, tapped 1/4-20 set-screw hole along X at y 1017.95 with a 16 × 16 × 2 cast pocket); recessed web panels (flanges 8.0; web 12.7 (0.5 in) thick centred on each rail — setback 10.75/face side rails, 12.65/face front-rear) on BOTH faces of all 4 rails.'
+        - 'ch30 px measurement anchored on column pitch + GT rescale + ch19 closeups (2026-08-02 rederive); side-screw thread from `cad/scripts/build_frame_side_screw.py` and `cad/scripts/build_top_frame.py` SIDE_TAP_SPEC'
         - measured/med
       - - Ball mounts ×2
         - 'rocker pair at seats y 228.6: z −107.912 and +84.588; the lever pair is SUPERSEDED by fulcrum-keeper end brackets (`fulcrum-keeper`, MHA-120, AISI 1018 black oxide, qty 2) on the rail top face 1036.2 (ch17 p.40 clevis+ball; ch30 top view: black brackets + slotted screws, no chrome posts) — 2026-08-02 remount. Keeper: foot 26 × 14 × 8 (pad ends z-extent 85.34 < boss circle 85.9; underside relieved to +4.8 over the 4.5-proud boss land), lug 14 wide × 6 thick, crown Ø14 about the shaft axis (25.2 above the seat), Ø9.5 pressed ball bored Ø6.5 for the Ø6.35 shaft end. The channel/summing families share the +3.088 recentered residual while the support and columns retain their original stations. Rocker-pair part itself unchanged.'
@@ -1740,9 +1740,9 @@ sections:
         - scaled + derived
         - low
       - - Hanger screw ×1 (M6.10)
-        - 'AF-7 hex head × 2.5 + Ø3.5 × 12.5 shank at machine (−5.5, 575.7), driven from BEHIND the bar (the wheel rim back face passes 1.0 in front of the strap — no front-side head fits): head on the bar back face (z −128.9), shank through the bar''s Ø3.8 hole + the strap''s Ø3.6 hole, tip 0.5 behind the strap front face (−141.9); hole 0.6 off the bar''s free-end face (machine −8)'
+        - 'McMaster 93075A194 hex-head #8-32 screw, driven from behind the wheel bar into the tapped pen-hanger strap. Hole station: wheel-bar local x −112, machine (x, y) = (−3, 575.7), hanger local x −6. The bar''s Ø4.572 close-clearance hole is centred 5.0 from the fixed free end (machine x −8), leaving 2.714 nominal end wall; the strap receiver remains #8-32.'
         - —
-        - p.60–63 (the strap is bolted to the bar)
+        - 'p.60–63 (the strap is bolted to the bar); stock wrapper `cad/scripts/build_hanger_screw.py`; station and end wall from `cad/scripts/build_wheel_bar.py` / `cad/scripts/wheel_bar_geom.py`; receiver from `cad/scripts/build_pen_hanger.py`'
         - scaled + derived
         - low
       - - Pen marker

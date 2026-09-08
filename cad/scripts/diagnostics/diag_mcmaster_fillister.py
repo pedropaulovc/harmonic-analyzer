@@ -1,6 +1,6 @@
 r"""Shared recipe for the McMaster 90280A* narrow fillister head screws.
 
-Five sizes, one parametric recipe: the vendor drives every derived number
+Four sizes, one parametric recipe: the vendor drives every derived number
 off 5 named dims via equations, reproduced here:
 
 - slot width = HeadDia*0.135, slot depth = width*1.5 (from the dome apex)
@@ -47,7 +47,6 @@ FILLISTER_SIZES = {
     # part:        (major dia, length, head height, head dia, pitch)
     "90280A108": (2.8448, 9.525, 2.7178, 4.6482, 0.635),
     "90280A194": (4.1656, 12.7, 3.9624, 6.858, 0.79375),
-    "90280A196": (4.1656, 15.875, 3.9624, 6.858, 0.79375),
     "90280A199": (4.1656, 25.4, 3.9624, 6.858, 0.79375),
     "90280A201": (4.1656, 31.75, 3.9624, 6.858, 0.79375),
 }

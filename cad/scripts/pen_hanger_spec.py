@@ -8,6 +8,8 @@ exactly ``DRAWING_DIMENSIONS`` across its per-view keep map.
 
 from __future__ import annotations
 
+from wheel_bar_geom import HANGER_SCREW_LOCAL_X, HANGER_STRAP_TOP_LEFT_X
+
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  The guide-block width and the tapered strap (bottom width, top
@@ -44,7 +46,8 @@ DRAWING_NOTES = "\n".join(
         "   NO EXPOSED GAP >0.10; CUMULATIVE VOID LENGTH 0.50 MAX",
         "   ON EITHER SEAM (VISUAL, BOTH SEAMS).",
         "4. DRILL + TAP #8-32 UNC-2B THRU 3.00 STRAP FROM BACK.",
-        "   AXIS 5.00 +/-0.05 VERTICALLY BELOW TOP EDGE + 7.50",
+        "   AXIS 5.00 +/-0.05 VERTICALLY BELOW TOP EDGE + "
+        f"{HANGER_SCREW_LOCAL_X - HANGER_STRAP_TOP_LEFT_X:.2f}",
         "   +/-0.05 HORIZONTALLY RIGHT OF FRONT-VIEW TOP-LEFT CORNER.",
     )
 )

@@ -22,6 +22,8 @@ from wheel_bar_geom import (  # noqa: F401 (re-export)
     PEN_HANGER_HOLE_DIA,
     PEN_HANGER_HOLE_FIT,
     PEN_HANGER_HOLE_SIZE,
+    PEN_HANGER_MIN_END_WALL,
+    PEN_HANGER_STATION_TOL,
     SCREW_HOLE_X,
 )
 
@@ -56,6 +58,8 @@ DRAWING_NOTES = "\n".join(
         f"{CLAMP_HOLE_SIZE} {CLAMP_HOLE_FIT.upper()} PAIR AT "
         f"{CLAMP_HOLE_X[0] - _LEFT_END:.1f} AND "
         f"{CLAMP_HOLE_X[1] - _LEFT_END:.1f}.",
+        f"PEN-HANGER END STATION +/-{PEN_HANGER_STATION_TOL:.2f}; "
+        f"FINISHED END WALL {PEN_HANGER_MIN_END_WALL:.2f} MIN.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"

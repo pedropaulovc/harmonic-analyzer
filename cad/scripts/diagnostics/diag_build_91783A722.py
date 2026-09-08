@@ -1,7 +1,14 @@
-r"""McMaster 91783A722 -- 18-8 SS slotted round head screw, 1/2" x 2-1/2".
+r"""McMaster 91783A722 -- 18-8 SS slotted round head screw, 1/2-13 x 2-1/2".
 
-56 TPI, partially threaded (Minimum Thread Length 38.1).  All laws from the
-vendor equations + solved sketches: slot = HD*.135 wide x 1.5x deep from
+The purchased thread is nominally 1/2-13 UNC-2A, partially threaded (minimum
+thread length 38.1 mm). The vendor CAD uses a nonnominal visual helix: the
+2026-09-08 read-only ``diag_dump_part`` harvest of the official SLDPRT found
+``Thread Pitch@Sketch1`` and ``D4@Helix/Spiral1`` both 0.453571 mm, with
+141 turns over 63.953571 mm. Replay that representation unchanged; it is NOT
+a physical 56-TPI screw or a manufacturing tap specification.
+
+All geometry laws below follow vendor equations + solved sketches:
+slot = HD*.135 wide x 1.5x deep from
 the apex, band = HH*.1, Fillet3 = HH*.02 on BOTH band rims (after the
 slot), tip chamfer 45 deg x 0.7P, cutter identical to the fillister law
 (root flat P/8 at root_r spanning 3P/8..P/2, corners root_r+7P/16*sqrt3
@@ -48,7 +55,7 @@ RH_MAJOR_R = 12.7 / 2.0
 RH_LEN = 63.5
 RH_HH = 9.017
 RH_HEAD_R = 20.6502 / 2.0
-RH_PITCH = 25.4 / 56.0     # stored 0.453571
+RH_PITCH = 25.4 / 56.0     # vendor visual pitch 0.453571 mm; nominal thread is 13 TPI
 RH_THREAD_LEN = 38.1       # Minimum Thread Length@Sketch1
 
 
