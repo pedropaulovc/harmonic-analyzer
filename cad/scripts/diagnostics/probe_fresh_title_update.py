@@ -624,15 +624,11 @@ async def one_trial(
         source_manifest is not None
         and expected.get(str(source)) != source_manifest.source_sha256
     ):
-        raise RuntimeError(
-            "explicit source manifest hash does not match protected input"
-        )
+        raise RuntimeError("explicit source manifest hash does not match protected input")
     witness_options = {} if source_manifest is None else {"manifest": source_manifest}
 
     def source_witness(model):
-        return pilot.source_dimensions(
-            model, source_target, copy_source, **witness_options
-        )
+        return pilot.source_dimensions(model, source_target, copy_source, **witness_options)
 
     source_sha = expected[str(source)]
     trial_dir = directory / variant.value
@@ -800,8 +796,8 @@ async def one_trial(
         trial["after_cold_pdf"], after_cold_handles = retained.capture_drawing(
             adapter, copy_source, trial["source_before"]["configuration"]
         )
-        trial["source_after_cold_pdf"], after_cold_source_handles = source_witness(
-            reopened_source
+        trial["source_after_cold_pdf"], after_cold_source_handles = (
+            source_witness(reopened_source)
         )
         pilot.require_same_source(
             trial["source_reopened"],

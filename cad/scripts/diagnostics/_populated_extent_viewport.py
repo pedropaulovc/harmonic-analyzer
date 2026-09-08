@@ -4,6 +4,7 @@ from copy import deepcopy
 from enum import StrEnum
 import hashlib
 import json
+import math
 from pathlib import Path
 import re
 
@@ -37,6 +38,8 @@ def read_inputs(template, template_sha, receipt, receipt_sha, owner_sha, blank_s
     """Validate historical copy proof without opening any old producer/token path."""
     from _drawing_sheet_setup import PROJECT_DRWDOT
 
+    if hashlib.sha256(template.read_bytes()).hexdigest() != template_sha:
+        raise RuntimeError("retained derived template SHA256 differs")
     receipt = Path(receipt).resolve(strict=True)
     owner_path, blank_path = (
         receipt.parent / "ownership.json",
@@ -146,13 +149,21 @@ def snapshot(adapter, state):
     views = [_early_bound(raw, "IView") for raw in groups[0]]
     view_rows = []
     for view in views[1:]:
+        scale = view.ScaleDecimal
+        if type(scale) not in (int, float) or not math.isfinite(scale) or scale <= 0:
+            raise RuntimeError("viewport control has invalid drawing view scale")
         view_rows.append(
             {
                 "name": str(view.GetName2()),
                 "position": layout.cells.finite(
                     view.Position, 2, "drawing view position"
                 ),
-                "scale": view.ScaleDecimal,
+                "scale": scale,
+                "model_to_view_transform": layout.cells.finite(
+                    view.ModelToViewTransform.ArrayData,
+                    16,
+                    "drawing model-to-view transform",
+                ),
                 "configuration": str(view.ReferencedConfiguration),
                 "source": str(view.ReferencedDocument.GetPathName()),
             }
@@ -163,6 +174,15 @@ def snapshot(adapter, state):
     for index, view in enumerate(views[1:]):
         bank[f"view:{index}"] = view
         bank[f"source:{index}"] = view.ReferencedDocument
+    for raw in views[0].GetAnnotations() or ():
+        annotation = _early_bound(raw, "IAnnotation")
+        if int(annotation.GetType()) == 7:
+            key = "surface_finish:" + str(annotation.GetName())
+            if key in bank:
+                raise RuntimeError(
+                    "viewport control has ambiguous surface-finish identity"
+                )
+            bank[key] = annotation
     return {
         "notes": notes,
         "surface_finishes": finishes,
@@ -218,6 +238,18 @@ def observe(adapter, state, directory, record, checkpoint):
     adapter.ownership.assert_current_owned()
     initial = viewport.capture(model)
     view = _early_bound(model.ActiveView, "IModelView")
+
+    def require_view():
+        adapter.ownership.assert_current_owned()
+        if (
+            int(adapter.swApp.IsSame(model, adapter.currentModel)) != 1
+            or int(adapter.swApp.IsSame(view, model.ActiveView)) != 1
+        ):
+            raise RuntimeError(
+                "viewport control exact owned drawing/viewport handle changed"
+            )
+
+    require_view()
     original, bank = snapshot(adapter, state)
     record.update(
         state=state.value,
@@ -233,9 +265,7 @@ def observe(adapter, state, directory, record, checkpoint):
         for arm in prepared.Arm:
             row = {"arm": arm.value}
             record["arms"].append(row)
-            adapter.ownership.assert_current_owned()
-            if int(adapter.swApp.IsSame(view, model.ActiveView)) != 1:
-                raise RuntimeError("viewport control active viewport handle changed")
+            require_view()
             if arm is prepared.Arm.ZOOM:
                 target = initial["scale2"] * 2
                 view.Scale2 = target
@@ -278,6 +308,7 @@ def observe(adapter, state, directory, record, checkpoint):
             arm_dir.mkdir(parents=True)
             adapter.ownership.register_directory(arm_dir)
             row["printed"] = prepared.printed_snapshot(adapter, arm_dir)
+            require_view()
             row["after_pdf"], current = snapshot(adapter, state)
             require_identity(adapter.swApp, bank, current)
             if (
@@ -298,6 +329,7 @@ def observe(adapter, state, directory, record, checkpoint):
         errors.append(error)
     finally:
         try:
+            require_view()
             viewport.restore(adapter.swApp, model, initial, record["restoration"])
             restored, current = snapshot(adapter, state)
             require_identity(adapter.swApp, bank, current)
@@ -307,6 +339,7 @@ def observe(adapter, state, directory, record, checkpoint):
                     "viewport control finally restored drawing state differs"
                 )
         except BaseException as error:
+            record["restoration"].update(status="failed", error=repr(error))
             if not any(error is previous for previous in errors):
                 errors.append(error)
             else:

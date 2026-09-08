@@ -497,6 +497,15 @@ async def probe(
         path.write_text(json.dumps(report, indent=2, allow_nan=False), encoding="utf-8")
 
     errors = []
+
+    def retain_error(error):
+        if evidence is not None and any(error is previous for previous in errors):
+            error.add_note(
+                "same exception object recurred during tube viewport cleanup/checkpoint"
+            )
+            return
+        errors.append(error)
+
     checkpoint()
     try:
         for target, source_title in targets.items():
@@ -572,13 +581,17 @@ async def probe(
             raise RuntimeError(
                 "populated template has unresolved acceptance issues; every field/phase retained"
             )
-    except Exception as error:
-        errors.append(error)
+    except BaseException as error:
+        if evidence is None and not isinstance(error, Exception):
+            raise
+        retain_error(error)
     finally:
         try:
             await adapter.close_owned_documents()
-        except Exception as error:
-            errors.append(error)
+        except BaseException as error:
+            if evidence is None and not isinstance(error, Exception):
+                raise
+            retain_error(error)
         report["inputs_after"] = title.retained.final_hashes(expected)
         try:
             title.retained.require_hashes(
@@ -595,18 +608,28 @@ async def probe(
                 "viewport_runtime"
             ] != extent.prepared.runtime_inputs(adapter, TemplateSpec(title.SCALE, 2)):
                 raise RuntimeError("viewport diagnostic runtime inputs changed")
-        except Exception as error:
-            errors.append(error)
+        except BaseException as error:
+            if evidence is None and not isinstance(error, Exception):
+                raise
+            retain_error(error)
         report.update(
-            status="failed" if errors else "passed",
+            status="failed"
+            if errors
+            else "observed"
+            if evidence is not None
+            else "passed",
             errors=[repr(error) for error in errors],
         )
         try:
             checkpoint()
-        except Exception as error:
-            errors.append(error)
+        except BaseException as error:
+            if evidence is None and not isinstance(error, Exception):
+                raise
+            retain_error(error)
+            if evidence is not None:
+                report.update(status="failed", errors=[repr(item) for item in errors])
     if errors:
-        raise ExceptionGroup("populated template control failed", errors)
+        raise BaseExceptionGroup("populated template control failed", errors)
     return {
         "report": str(path),
         "outcome": "tube_viewport_observed_not_fit_accepted"
@@ -662,6 +685,11 @@ def main(argv=None):
             "normal population requires source root and no retained receipt pins"
         )
     require_template(template, args.template_sha256)
+    if retained_receipts is not None:
+        from diagnostics import _populated_extent_viewport as extent
+
+        # Fail before entering the native seat; the worker validates again.
+        extent.read_inputs(template, args.template_sha256, *retained_receipts)
     if args.worker:
         return run_copy_diagnostic(
             lambda adapter: probe(
