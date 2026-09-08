@@ -1,0 +1,38 @@
+{
+  "stem": "pen",
+  "specs": [
+    {
+      "key": "pen_travel",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "PLANE",
+          "name": "Top Plane@pen-rod-1",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Top Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "pen-rod-1",
+        [
+          3.0,
+          368.0,
+          -159.5
+        ]
+      ],
+      "witness": null,
+      "flip": true,
+      "params": {
+        "distance": 368.0
+      }
+    }
+  ]
+}

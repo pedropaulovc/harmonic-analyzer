@@ -1,0 +1,252 @@
+{
+  "kind": "vm2-datum-read-only-ownership",
+  "utc": "2026-09-08T02:18:30.780083+00:00",
+  "root": "C:\\src\\ha-datum-placement-main",
+  "head": "d57429b7b9d2f3807b0be6ef8bf9f9a1bbb0e251",
+  "probe_sha256": "4b81af2dc941e25ff67c65cea2d1eac66c2981b43ad1a46f2ddc3679ec961395",
+  "pid": 18748,
+  "revision": "34.3.0",
+  "documents": [
+    {
+      "path": "C:\\src\\ha-datum-placement-main\\cad\\out\\sldprt\\pinion-lift-rod.SLDPRT",
+      "title": "pinion-lift-rod.SLDPRT",
+      "type": 1,
+      "state": "clean",
+      "views": [],
+      "saved_sha256_before": "59f635b07d5b1edb91ea828c0f9f8f8285cbcbbe17ce188cddeafef8ae08e8db",
+      "saved_sha256_after": "59f635b07d5b1edb91ea828c0f9f8f8285cbcbbe17ce188cddeafef8ae08e8db"
+    },
+    {
+      "path": "",
+      "title": "Draw112 - Sheet1",
+      "type": 3,
+      "state": "dirty",
+      "views": [
+        {
+          "name": "Sheet1",
+          "reference_name": "",
+          "reference_path": null,
+          "datums": [],
+          "annotations": [
+            {
+              "type": 7,
+              "dimension_name": null
+            },
+            {
+              "type": 7,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            }
+          ]
+        },
+        {
+          "name": "Drawing View1",
+          "reference_name": "C:\\src\\ha-datum-placement-main\\cad\\out\\sldprt\\pinion-lift-rod.SLDPRT",
+          "reference_path": "C:\\src\\ha-datum-placement-main\\cad\\out\\sldprt\\pinion-lift-rod.SLDPRT",
+          "datums": [],
+          "annotations": [
+            {
+              "type": 4,
+              "dimension_name": "RodDia"
+            }
+          ]
+        },
+        {
+          "name": "Drawing View2",
+          "reference_name": "C:\\src\\ha-datum-placement-main\\cad\\out\\sldprt\\pinion-lift-rod.SLDPRT",
+          "reference_path": "C:\\src\\ha-datum-placement-main\\cad\\out\\sldprt\\pinion-lift-rod.SLDPRT",
+          "datums": [],
+          "annotations": [
+            {
+              "type": 4,
+              "dimension_name": "Depth"
+            }
+          ]
+        },
+        {
+          "name": "Drawing View3",
+          "reference_name": "C:\\src\\ha-datum-placement-main\\cad\\out\\sldprt\\pinion-lift-rod.SLDPRT",
+          "reference_path": "C:\\src\\ha-datum-placement-main\\cad\\out\\sldprt\\pinion-lift-rod.SLDPRT",
+          "datums": [],
+          "annotations": []
+        }
+      ]
+    }
+  ],
+  "status": "owned_probe_closed_without_save_bytes_unchanged",
+  "closure_witness": {
+    "path": "C:\\src\\ha-datum-placement-main\\cad\\out\\reports\\datum-placement\\rod-dimension-requested\\receipt.json",
+    "sha256": "e82dcea769a7c5e33038ad1279c85e468b95bccbcb9514d61aa0c553177879b0"
+  }
+}

@@ -16,10 +16,8 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
     add_feature_control_frame,
     add_property_linked_note,
-    add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -31,8 +29,9 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
-from _surface_finish import surface_finish_by_key
-from rack_pinion_spec import BORE_DIA, FACE_WIDTH, OUTSIDE_DIA, SURFACE_FINISHES
+from _native_axis_datum import add_native_axis_datum
+from _rack_bore_finish import add_rack_bore_finish
+from rack_pinion_spec import BORE_DIA, FACE_WIDTH, OUTSIDE_DIA
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -56,13 +55,14 @@ VIEW_SCALE = (1, 1)
 FRONT_CENTER = (0.220, 0.175)
 RIGHT_CENTER = (0.320, 0.175)
 ISO_CENTER = (0.383, 0.210)  # 0.388 clipped the zone border right by 1.4 mm
+BORE_FINISH_POSITION = (FRONT_CENTER[0] + 0.058, FRONT_CENTER[1] - 0.070)
 
-BORE_R = BORE_DIA * VIEW_SCALE[0] / 2000.0
 HALF_OD = OUTSIDE_DIA * VIEW_SCALE[0] / 2000.0
 FRONT_FACE_X = RIGHT_CENTER[0] - FACE_WIDTH * VIEW_SCALE[0] / 2000.0
 
 FRONT_KEEP = {
-    "BoreDia": (FRONT_CENTER[0] - 0.062, FRONT_CENTER[1] - 0.038),
+    # Approach from upper-left, clear of native datum A below-left.
+    "BoreDia": (FRONT_CENTER[0] - 0.062, FRONT_CENTER[1] + 0.038),
 }
 DIMENSION_CALLOUTS = {
     # Reamed slip fit on the stud's turned Ø5 front seat (nominal-or-under, like
@@ -73,6 +73,8 @@ DIMENSION_CALLOUTS = {
     "BoreDia": "THRU - REAM",
 }
 DIMENSION_PRECISION = {"BoreDia": 2}
+
+
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -131,16 +133,16 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add ASME center mark to disc bore")
     bore_edge = visible_circle_edge(adapter, front, BORE_DIA)
 
-    bore_top = (FRONT_CENTER[0], FRONT_CENTER[1] + BORE_R)
-    add_datum_feature(
+    add_native_axis_datum(
         adapter,
         front,
-        edge_xy=bore_top,
-        symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.026),
+        entity=bore_edge,
+        source_path=SOURCE,
+        radius_m=BORE_DIA / 2000.0,
         datum="A",
         label="rack pinion bore axis",
         shoulder=True,
-        position_tolerance_m=0.0001,
+        stability_tolerance_m=0.0001,
     )
     add_feature_control_frame(
         adapter,
@@ -152,14 +154,9 @@ async def build(adapter: Any) -> dict[str, str]:
         datums=("A",),
         label="disc face squareness to bore",
     )
-    add_surface_finish(
-        adapter,
-        front,
-        symbol_xy=(FRONT_CENTER[0] + 0.014, FRONT_CENTER[1] - 0.055),
-        control=surface_finish_by_key(SURFACE_FINISHES, "bore"),
-        label="rack pinion bore finish",
-        entity=bore_edge,
-    )
+    # Explicit entity selection supplies the insertion point. No post-insertion
+    # endpoint setter: that setter drops the semantic association on this symbol.
+    add_rack_bore_finish(adapter, front, bore_edge, symbol_xy=BORE_FINISH_POSITION)
 
     add_property_linked_note(adapter, "Gear Data", 0.018, 0.262)
     add_property_linked_note(adapter, "Manufacturing Notes", 0.018, 0.095)

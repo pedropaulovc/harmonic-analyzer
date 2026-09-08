@@ -1,0 +1,108 @@
+  xx  [    6.7s +  6.7s] drawing.native_axis_datum failed: lift rod axis: datum edge belongs to a different source body
+  xx  [    6.8s +  0.0s] drawing.build failed: lift rod axis: datum edge belongs to a different source body
+  xx  [    6.8s +  0.0s] build draw_pinion_lift_rod failed: lift rod axis: datum edge belongs to a different source body
+Traceback (most recent call last):
+  File "C:\src\ha-datum-placement-main\cad\scripts\_common.py", line 2128, in run_build
+    artefacts = asyncio.run(_run())
+  File "C:\Users\pedro\AppData\Roaming\uv\python\cpython-3.14-windows-x86_64-none\Lib\asyncio\runners.py", line 204, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "C:\Users\pedro\AppData\Roaming\uv\python\cpython-3.14-windows-x86_64-none\Lib\asyncio\runners.py", line 127, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\pedro\AppData\Roaming\uv\python\cpython-3.14-windows-x86_64-none\Lib\asyncio\base_events.py", line 719, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "C:\src\ha-datum-placement-main\cad\scripts\_common.py", line 2107, in _run
+    return await build(adapter)
+           ^^^^^^^^^^^^^^^^^^^^
+  File "C:\src\ha-datum-placement-main\cad\scripts\draw_pinion_lift_rod.py", line 153, in build
+    add_native_axis_datum(
+    ~~~~~~~~~~~~~~~~~~~~~^
+        adapter,
+        ^^^^^^^^
+    ...<6 lines>...
+        stability_tolerance_m=0.00002,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\src\ha-datum-placement-main\cad\scripts\_telemetry.py", line 955, in wrap
+    return fn(*args, **kwargs)
+  File "C:\src\ha-datum-placement-main\cad\scripts\_native_axis_datum.py", line 149, in add_native_axis_datum
+    _validate_source_edge(app, view, entity, source_path, radius_m=radius_m, label=label)
+    ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\src\ha-datum-placement-main\cad\scripts\_native_axis_datum.py", line 55, in _validate_source_edge
+    raise RuntimeError(f"{label}: datum edge belongs to a different source body")
+RuntimeError: lift rod axis: datum edge belongs to a different source body
+  xx  [    8.2s +  8.2s] task drawing:pinion_lift_rod failed: drawing:pinion_lift_rod failed (exit 1)
+  xx  [   19.7s + 19.7s] drawing.native_axis_datum failed: rack pinion bore axis: datum edge belongs to a different source body
+  xx  [   19.7s +  0.0s] drawing.build failed: rack pinion bore axis: datum edge belongs to a different source body
+  xx  [   19.7s +  0.0s] build draw_rack_pinion failed: rack pinion bore axis: datum edge belongs to a different source body
+Traceback (most recent call last):
+  File "C:\src\ha-datum-placement-main\cad\scripts\_common.py", line 2128, in run_build
+    artefacts = asyncio.run(_run())
+  File "C:\Users\pedro\AppData\Roaming\uv\python\cpython-3.14-windows-x86_64-none\Lib\asyncio\runners.py", line 204, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "C:\Users\pedro\AppData\Roaming\uv\python\cpython-3.14-windows-x86_64-none\Lib\asyncio\runners.py", line 127, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\pedro\AppData\Roaming\uv\python\cpython-3.14-windows-x86_64-none\Lib\asyncio\base_events.py", line 719, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "C:\src\ha-datum-placement-main\cad\scripts\_common.py", line 2107, in _run
+    return await build(adapter)
+           ^^^^^^^^^^^^^^^^^^^^
+  File "C:\src\ha-datum-placement-main\cad\scripts\draw_rack_pinion.py", line 134, in build
+    add_native_axis_datum(
+    ~~~~~~~~~~~~~~~~~~~~~^
+        adapter,
+        ^^^^^^^^
+    ...<7 lines>...
+        stability_tolerance_m=0.0001,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\src\ha-datum-placement-main\cad\scripts\_telemetry.py", line 955, in wrap
+    return fn(*args, **kwargs)
+  File "C:\src\ha-datum-placement-main\cad\scripts\_native_axis_datum.py", line 149, in add_native_axis_datum
+    _validate_source_edge(app, view, entity, source_path, radius_m=radius_m, label=label)
+    ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\src\ha-datum-placement-main\cad\scripts\_native_axis_datum.py", line 55, in _validate_source_edge
+    raise RuntimeError(f"{label}: datum edge belongs to a different source body")
+RuntimeError: rack pinion bore axis: datum edge belongs to a different source body
+  xx  [   27.8s + 27.8s] task drawing:rack_pinion failed: drawing:rack_pinion failed (exit 1)
+-- part:pinion_lift_rod
+-- part:rack_pinion
+.  drawing:pinion_lift_rod
+.  drawing:rack_pinion
+TaskError - taskid:drawing:pinion_lift_rod
+PythonAction Error
+Traceback (most recent call last):
+  File "C:\src\ha-datum-placement-main\.venv\Lib\site-packages\doit\action.py", line 473, in execute
+    returned_value = self.py_callable(*self.args, **kwargs)
+  File "C:\src\ha-datum-placement-main\dodo.py", line 1489, in _cached_drawing_action
+    _exec_com(cmd, label, log_stem=f"drawing-{stem}")
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\src\ha-datum-placement-main\dodo.py", line 842, in _exec_com
+    _exec(cmd, label, log_stem)
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\src\ha-datum-placement-main\dodo.py", line 603, in _exec
+    raise RuntimeError(f"{label} failed (exit {rc})")
+RuntimeError: drawing:pinion_lift_rod failed (exit 1)
+
+TaskError - taskid:drawing:rack_pinion
+PythonAction Error
+Traceback (most recent call last):
+  File "C:\src\ha-datum-placement-main\.venv\Lib\site-packages\doit\action.py", line 473, in execute
+    returned_value = self.py_callable(*self.args, **kwargs)
+  File "C:\src\ha-datum-placement-main\dodo.py", line 1489, in _cached_drawing_action
+    _exec_com(cmd, label, log_stem=f"drawing-{stem}")
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\src\ha-datum-placement-main\dodo.py", line 842, in _exec_com
+    _exec(cmd, label, log_stem)
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\src\ha-datum-placement-main\dodo.py", line 603, in _exec
+    raise RuntimeError(f"{label} failed (exit {rc})")
+RuntimeError: drawing:rack_pinion failed (exit 1)
+

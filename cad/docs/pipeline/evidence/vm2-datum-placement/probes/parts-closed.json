@@ -1,0 +1,23 @@
+{
+  "root": "C:\\src\\ha-datum-placement-main",
+  "head": "521564403fc06d968558ffa4d76b56d2abf35208",
+  "pid": 18748,
+  "revision": "34.3.0",
+  "documents_before": [
+    {
+      "path": "C:\\src\\ha-datum-placement-main\\cad\\out\\sldprt\\rack-pinion.SLDPRT",
+      "title": "rack-pinion.SLDPRT",
+      "save_state": "clean"
+    }
+  ],
+  "status": "closed_without_save_bytes_unchanged",
+  "closed": [
+    "C:\\src\\ha-datum-placement-main\\cad\\out\\sldprt\\rack-pinion.SLDPRT"
+  ],
+  "hashes_before": {
+    "C:\\src\\ha-datum-placement-main\\cad\\out\\sldprt\\rack-pinion.SLDPRT": "1cce146435cf80cac5d9827bd76e0b6948764ed314f5304956e08acc1e46bd96"
+  },
+  "hashes_after": {
+    "C:\\src\\ha-datum-placement-main\\cad\\out\\sldprt\\rack-pinion.SLDPRT": "1cce146435cf80cac5d9827bd76e0b6948764ed314f5304956e08acc1e46bd96"
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "kind": "vm2-datum-one-variable-probe",
+  "selection": "dimension",
+  "placement": "native",
+  "part": "pinion_lift_rod",
+  "source": "C:\\src\\ha-datum-placement-main\\cad\\out\\sldprt\\pinion-lift-rod.SLDPRT",
+  "source_sha256_before": "59f635b07d5b1edb91ea828c0f9f8f8285cbcbbe17ce188cddeafef8ae08e8db",
+  "head": "31039af828e6293413be0222329720ad0f1b9692",
+  "adapter": "2269009ed56712867826516f4406afc98a0c2814",
+  "probe_sha256": "1419d863b935a22333402784f9f19831a003b81cedda84b63f69e4333cc67ec0",
+  "recipe_sha256": "8dcc4bcb7131ee5652477a793d181777e5f6196fd0d342f6dddffa6823fffae9",
+  "helper_sha256": "d64281f8509c8d1a270c22eb35871bcf5846585c9f8b9c8389d11182c7eece9d",
+  "pid": 18748,
+  "revision": "34.3.0",
+  "started_utc": "2026-09-08T02:19:12.415215+00:00",
+  "status": "failed",
+  "scope": "partial diagnostic sheet, not acceptance",
+  "original_call": {
+    "edge_xy": [
+      0.055,
+      0.21134999999999998
+    ],
+    "symbol_xy": [
+      0.055,
+      0.22899999999999998
+    ],
+    "datum": "A",
+    "label": "lift rod axis",
+    "position_tolerance_m": 2e-05
+  },
+  "view_position": [
+    0.055,
+    0.205
+  ],
+  "view_scale": [
+    2.0,
+    1.0
+  ],
+  "target_circle": [
+    0.0,
+    0.0,
+    0.202000000114,
+    0.0,
+    0.0,
+    1.0,
+    0.003175
+  ],
+  "target_self_equality": 1,
+  "dimension_names": [
+    "RodDia"
+  ],
+  "error": "RuntimeError('failed native-control dimension selection')",
+  "elapsed_s": 5.103776199975982,
+  "ended_utc": "2026-09-08T02:19:17.519018+00:00"
+}

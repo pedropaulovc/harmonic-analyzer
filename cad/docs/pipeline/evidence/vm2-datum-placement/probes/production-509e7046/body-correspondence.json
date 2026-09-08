@@ -1,0 +1,52 @@
+{
+  "kind": "vm2-body-correspondence",
+  "source": "C:\\src\\ha-datum-placement-main\\cad\\out\\sldprt\\rack-pinion.SLDPRT",
+  "source_sha256_before": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+  "documents_before": [
+    {
+      "path": "C:\\src\\ha-datum-placement-main\\cad\\out\\sldprt\\rack-pinion.SLDPRT",
+      "title": "rack-pinion.SLDPRT",
+      "type": 1,
+      "state": "dirty"
+    },
+    {
+      "path": "",
+      "title": "Draw122 - Sheet1",
+      "type": 3,
+      "state": "dirty"
+    }
+  ],
+  "body_self_same": 1,
+  "edge_body_self_same": 1,
+  "drawing_edge_body_vs_source_body": 0,
+  "mapped_model_edge": "present",
+  "mapped_edge_body_vs_source_body": 1,
+  "mapped_edge_vs_input": 0,
+  "mapped_circle": [
+    0.0,
+    0.0,
+    0.003,
+    -0.0,
+    -0.0,
+    -1.0,
+    0.002499999953
+  ],
+  "roundtrip_edge_same": 1,
+  "roundtrip_body_same": 1,
+  "source_sha256_after": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+  "documents_after": [
+    {
+      "path": "C:\\src\\ha-datum-placement-main\\cad\\out\\sldprt\\rack-pinion.SLDPRT",
+      "title": "rack-pinion.SLDPRT",
+      "type": 1,
+      "state": "dirty"
+    },
+    {
+      "path": "",
+      "title": "Draw122 - Sheet1",
+      "type": 3,
+      "state": "dirty"
+    }
+  ],
+  "status": "read_only_complete"
+}

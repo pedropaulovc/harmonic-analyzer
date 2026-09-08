@@ -1,0 +1,247 @@
+{
+  "kind": "vm2-datum-read-only-ownership",
+  "utc": "2026-09-08T03:39:34.509653+00:00",
+  "root": "C:\\src\\ha-datum-placement-main",
+  "head": "509e70460507f33f860ea6727a6fea8c4410ad50",
+  "probe_sha256": "1742bace55bfcb30e0c54d653abba686df3d700859bd7e122e3037a4c7933fe0",
+  "pid": 18748,
+  "revision": "34.3.0",
+  "documents": [
+    {
+      "path": "C:\\src\\ha-datum-placement-main\\cad\\out\\sldprt\\rack-pinion.SLDPRT",
+      "title": "rack-pinion.SLDPRT",
+      "type": 1,
+      "state": "dirty",
+      "views": [],
+      "saved_sha256_before": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+      "saved_sha256_after": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90"
+    },
+    {
+      "path": "",
+      "title": "Draw122 - Sheet1",
+      "type": 3,
+      "state": "dirty",
+      "views": [
+        {
+          "name": "Sheet1",
+          "reference_name": "",
+          "reference_path": null,
+          "datums": [],
+          "annotations": [
+            {
+              "type": 7,
+              "dimension_name": null
+            },
+            {
+              "type": 7,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            },
+            {
+              "type": 6,
+              "dimension_name": null
+            }
+          ]
+        },
+        {
+          "name": "Drawing View1",
+          "reference_name": "C:\\src\\ha-datum-placement-main\\cad\\out\\sldprt\\rack-pinion.SLDPRT",
+          "reference_path": "C:\\src\\ha-datum-placement-main\\cad\\out\\sldprt\\rack-pinion.SLDPRT",
+          "datums": [],
+          "annotations": [
+            {
+              "type": 4,
+              "dimension_name": "BoreDia"
+            },
+            {
+              "type": 13,
+              "dimension_name": null
+            }
+          ]
+        },
+        {
+          "name": "Drawing View2",
+          "reference_name": "C:\\src\\ha-datum-placement-main\\cad\\out\\sldprt\\rack-pinion.SLDPRT",
+          "reference_path": "C:\\src\\ha-datum-placement-main\\cad\\out\\sldprt\\rack-pinion.SLDPRT",
+          "datums": [],
+          "annotations": []
+        },
+        {
+          "name": "Drawing View3",
+          "reference_name": "C:\\src\\ha-datum-placement-main\\cad\\out\\sldprt\\rack-pinion.SLDPRT",
+          "reference_path": "C:\\src\\ha-datum-placement-main\\cad\\out\\sldprt\\rack-pinion.SLDPRT",
+          "datums": [],
+          "annotations": []
+        }
+      ]
+    }
+  ],
+  "status": "read_only_complete"
+}

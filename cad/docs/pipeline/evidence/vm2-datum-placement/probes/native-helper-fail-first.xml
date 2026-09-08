@@ -1,0 +1,771 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="95" skipped="0" tests="98" time="3.283" timestamp="2026-09-07T20:25:21.923026-07:00" hostname="vm-solidworks"><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_original_requested_failures_still_reject[lift rod axis-requested0-actual0-2e-05]" time="0.006" /><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_original_requested_failures_still_reject[rack pinion bore axis-requested1-actual1-0.0001]" time="0.003" /><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_requested_default_still_positions_once" time="0.001" /><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_keeps_position_and_never_calls_setposition[2e-05]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:205: in test_native_keeps_position_and_never_calls_setposition
+    assert native(harness, position_tolerance_m=limit, shoulder=True) is harness.tag
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_keeps_position_and_never_calls_setposition[0.0001]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:205: in test_native_keeps_position_and_never_calls_setposition
+    assert native(harness, position_tolerance_m=limit, shoulder=True) is harness.tag
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_enforces_unchanged_xy_drift_boundary[below-2e-05]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:231: in test_native_enforces_unchanged_xy_drift_boundary
+    assert native(harness, position_tolerance_m=limit) is harness.tag
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_enforces_unchanged_xy_drift_boundary[below-0.0001]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:231: in test_native_enforces_unchanged_xy_drift_boundary
+    assert native(harness, position_tolerance_m=limit) is harness.tag
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_enforces_unchanged_xy_drift_boundary[exact-2e-05]" time="0.003"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:231: in test_native_enforces_unchanged_xy_drift_boundary
+    assert native(harness, position_tolerance_m=limit) is harness.tag
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_enforces_unchanged_xy_drift_boundary[exact-0.0001]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:231: in test_native_enforces_unchanged_xy_drift_boundary
+    assert native(harness, position_tolerance_m=limit) is harness.tag
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_enforces_unchanged_xy_drift_boundary[above-2e-05]" time="0.003"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:229: in test_native_enforces_unchanged_xy_drift_boundary
+    native(harness, position_tolerance_m=limit)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_enforces_unchanged_xy_drift_boundary[above-0.0001]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:229: in test_native_enforces_unchanged_xy_drift_boundary
+    native(harness, position_tolerance_m=limit)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_enforces_unchanged_xy_drift_boundary[diagonal-2e-05]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:229: in test_native_enforces_unchanged_xy_drift_boundary
+    native(harness, position_tolerance_m=limit)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_enforces_unchanged_xy_drift_boundary[diagonal-0.0001]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:229: in test_native_enforces_unchanged_xy_drift_boundary
+    native(harness, position_tolerance_m=limit)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_invalid_numeric_contract_before_com[0.0-position_tolerance_m]" time="0.003"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:239: in test_native_rejects_invalid_numeric_contract_before_com
+    native(harness, **{field: value})
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_invalid_numeric_contract_before_com[0.0-native_z_axis_radius_m]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:239: in test_native_rejects_invalid_numeric_contract_before_com
+    native(harness, **{field: value})
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_invalid_numeric_contract_before_com[-1.0-position_tolerance_m]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:239: in test_native_rejects_invalid_numeric_contract_before_com
+    native(harness, **{field: value})
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_invalid_numeric_contract_before_com[-1.0-native_z_axis_radius_m]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:239: in test_native_rejects_invalid_numeric_contract_before_com
+    native(harness, **{field: value})
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_invalid_numeric_contract_before_com[nan-position_tolerance_m]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:239: in test_native_rejects_invalid_numeric_contract_before_com
+    native(harness, **{field: value})
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_invalid_numeric_contract_before_com[nan-native_z_axis_radius_m]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:239: in test_native_rejects_invalid_numeric_contract_before_com
+    native(harness, **{field: value})
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_invalid_numeric_contract_before_com[inf-position_tolerance_m]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:239: in test_native_rejects_invalid_numeric_contract_before_com
+    native(harness, **{field: value})
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_invalid_numeric_contract_before_com[inf-native_z_axis_radius_m]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:239: in test_native_rejects_invalid_numeric_contract_before_com
+    native(harness, **{field: value})
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_invalid_numeric_contract_before_com[-inf-position_tolerance_m]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:239: in test_native_rejects_invalid_numeric_contract_before_com
+    native(harness, **{field: value})
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_invalid_numeric_contract_before_com[-inf-native_z_axis_radius_m]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:239: in test_native_rejects_invalid_numeric_contract_before_com
+    native(harness, **{field: value})
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_nonsemantic_or_conflicting_selectors[changes0]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:254: in test_native_rejects_nonsemantic_or_conflicting_selectors
+    native(harness, **changes)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_nonsemantic_or_conflicting_selectors[changes1]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:254: in test_native_rejects_nonsemantic_or_conflicting_selectors
+    native(harness, **changes)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_nonsemantic_or_conflicting_selectors[changes2]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:254: in test_native_rejects_nonsemantic_or_conflicting_selectors
+    native(harness, **changes)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_nonsemantic_or_conflicting_selectors[changes3]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:254: in test_native_rejects_nonsemantic_or_conflicting_selectors
+    native(harness, **changes)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_nonsemantic_or_conflicting_selectors[changes4]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:254: in test_native_rejects_nonsemantic_or_conflicting_selectors
+    native(harness, **changes)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_nonsemantic_or_conflicting_selectors[changes5]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:254: in test_native_rejects_nonsemantic_or_conflicting_selectors
+    native(harness, **changes)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_requires_expected_radius" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:261: in test_native_requires_expected_radius
+    native(harness, native_z_axis_radius_m=None)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_wrong_axis_radius_or_nonfinite_geometry[0-0.01-circle]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:280: in test_native_rejects_wrong_axis_radius_or_nonfinite_geometry
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_wrong_axis_radius_or_nonfinite_geometry[0-0.01-cylinder]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:280: in test_native_rejects_wrong_axis_radius_or_nonfinite_geometry
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_wrong_axis_radius_or_nonfinite_geometry[1--0.01-circle]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:280: in test_native_rejects_wrong_axis_radius_or_nonfinite_geometry
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_wrong_axis_radius_or_nonfinite_geometry[1--0.01-cylinder]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:280: in test_native_rejects_wrong_axis_radius_or_nonfinite_geometry
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_wrong_axis_radius_or_nonfinite_geometry[3-1.0-circle]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:280: in test_native_rejects_wrong_axis_radius_or_nonfinite_geometry
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_wrong_axis_radius_or_nonfinite_geometry[3-1.0-cylinder]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:280: in test_native_rejects_wrong_axis_radius_or_nonfinite_geometry
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_wrong_axis_radius_or_nonfinite_geometry[4-1.0-circle]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:280: in test_native_rejects_wrong_axis_radius_or_nonfinite_geometry
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_wrong_axis_radius_or_nonfinite_geometry[4-1.0-cylinder]" time="0.003"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:280: in test_native_rejects_wrong_axis_radius_or_nonfinite_geometry
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_wrong_axis_radius_or_nonfinite_geometry[5-0.0-circle]" time="0.003"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:280: in test_native_rejects_wrong_axis_radius_or_nonfinite_geometry
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_wrong_axis_radius_or_nonfinite_geometry[5-0.0-cylinder]" time="0.003"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:280: in test_native_rejects_wrong_axis_radius_or_nonfinite_geometry
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_wrong_axis_radius_or_nonfinite_geometry[6-0.005-circle]" time="0.003"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:280: in test_native_rejects_wrong_axis_radius_or_nonfinite_geometry
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_wrong_axis_radius_or_nonfinite_geometry[6-0.005-cylinder]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:280: in test_native_rejects_wrong_axis_radius_or_nonfinite_geometry
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_wrong_axis_radius_or_nonfinite_geometry[2-nan-circle]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:280: in test_native_rejects_wrong_axis_radius_or_nonfinite_geometry
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_wrong_axis_radius_or_nonfinite_geometry[2-nan-cylinder]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:280: in test_native_rejects_wrong_axis_radius_or_nonfinite_geometry
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_wrong_axis_radius_or_nonfinite_geometry[6-inf-circle]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:280: in test_native_rejects_wrong_axis_radius_or_nonfinite_geometry
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_wrong_axis_radius_or_nonfinite_geometry[6-inf-cylinder]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:280: in test_native_rejects_wrong_axis_radius_or_nonfinite_geometry
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_missing_or_malformed_geometry[None-circle]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:290: in test_native_rejects_missing_or_malformed_geometry
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_missing_or_malformed_geometry[None-cylinder]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:290: in test_native_rejects_missing_or_malformed_geometry
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_missing_or_malformed_geometry[params1-circle]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:290: in test_native_rejects_missing_or_malformed_geometry
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_missing_or_malformed_geometry[params1-cylinder]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:290: in test_native_rejects_missing_or_malformed_geometry
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_missing_or_malformed_geometry[params2-circle]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:290: in test_native_rejects_missing_or_malformed_geometry
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_missing_or_malformed_geometry[params2-cylinder]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:290: in test_native_rejects_missing_or_malformed_geometry
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_missing_or_malformed_geometry[params3-circle]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:290: in test_native_rejects_missing_or_malformed_geometry
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_missing_or_malformed_geometry[params3-cylinder]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:290: in test_native_rejects_missing_or_malformed_geometry
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_accepts_both_axis_directions_and_axial_origin[-1.0]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:298: in test_native_accepts_both_axis_directions_and_axial_origin
+    assert native(harness) is harness.tag
+           ^^^^^^^^^^^^^^^
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_accepts_both_axis_directions_and_axial_origin[1.0]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:298: in test_native_accepts_both_axis_directions_and_axial_origin
+    assert native(harness) is harness.tag
+           ^^^^^^^^^^^^^^^
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_missing_or_ambiguous_topology[curve_missing-no curve]" time="0.003"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:325: in test_native_rejects_missing_or_ambiguous_topology
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_missing_or_ambiguous_topology[not_circle-not circular]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:325: in test_native_rejects_missing_or_ambiguous_topology
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_missing_or_ambiguous_topology[face_missing-missing adjacent face]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:325: in test_native_rejects_missing_or_ambiguous_topology
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_missing_or_ambiguous_topology[surface_missing-no surface]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:325: in test_native_rejects_missing_or_ambiguous_topology
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_missing_or_ambiguous_topology[no_cylinder-bounds 0 cylinders]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:325: in test_native_rejects_missing_or_ambiguous_topology
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_missing_or_ambiguous_topology[two_cylinders-bounds 2 cylinders]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:325: in test_native_rejects_missing_or_ambiguous_topology
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_selected_edge_mismatch_before_insertion[different]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:336: in test_native_rejects_selected_edge_mismatch_before_insertion
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_selected_edge_mismatch_before_insertion[unknown]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:336: in test_native_rejects_selected_edge_mismatch_before_insertion
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_revalidates_attachment_and_label[empty-one attached edge-initial]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:387: in test_native_revalidates_attachment_and_label
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_revalidates_attachment_and_label[empty-one attached edge-rebuild]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:387: in test_native_revalidates_attachment_and_label
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_revalidates_attachment_and_label[multiple-one attached edge-initial]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:387: in test_native_revalidates_attachment_and_label
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_revalidates_attachment_and_label[multiple-one attached edge-rebuild]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:387: in test_native_revalidates_attachment_and_label
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_revalidates_attachment_and_label[null-one attached edge-initial]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:387: in test_native_revalidates_attachment_and_label
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_revalidates_attachment_and_label[null-one attached edge-rebuild]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:387: in test_native_revalidates_attachment_and_label
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_revalidates_attachment_and_label[wrong_type-one attached edge-initial]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:387: in test_native_revalidates_attachment_and_label
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_revalidates_attachment_and_label[wrong_type-one attached edge-rebuild]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:387: in test_native_revalidates_attachment_and_label
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_revalidates_attachment_and_label[wrong_edge-different edge-initial]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:387: in test_native_revalidates_attachment_and_label
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_revalidates_attachment_and_label[wrong_edge-different edge-rebuild]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:387: in test_native_revalidates_attachment_and_label
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_revalidates_attachment_and_label[unknown-different edge-initial]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:387: in test_native_revalidates_attachment_and_label
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_revalidates_attachment_and_label[unknown-different edge-rebuild]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:387: in test_native_revalidates_attachment_and_label
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_revalidates_attachment_and_label[dangling-dangling-initial]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:387: in test_native_revalidates_attachment_and_label
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_revalidates_attachment_and_label[dangling-dangling-rebuild]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:387: in test_native_revalidates_attachment_and_label
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_revalidates_attachment_and_label[label-label did not persist-initial]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:387: in test_native_revalidates_attachment_and_label
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_revalidates_attachment_and_label[label-label did not persist-rebuild]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:387: in test_native_revalidates_attachment_and_label
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_invalid_position_at_both_readbacks[None-initial]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:401: in test_native_rejects_invalid_position_at_both_readbacks
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_invalid_position_at_both_readbacks[None-rebuild]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:401: in test_native_rejects_invalid_position_at_both_readbacks
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_invalid_position_at_both_readbacks[position1-initial]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:401: in test_native_rejects_invalid_position_at_both_readbacks
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_invalid_position_at_both_readbacks[position1-rebuild]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:401: in test_native_rejects_invalid_position_at_both_readbacks
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_invalid_position_at_both_readbacks[position2-initial]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:401: in test_native_rejects_invalid_position_at_both_readbacks
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_invalid_position_at_both_readbacks[position2-rebuild]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:401: in test_native_rejects_invalid_position_at_both_readbacks
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_invalid_position_at_both_readbacks[position3-initial]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:401: in test_native_rejects_invalid_position_at_both_readbacks
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_invalid_position_at_both_readbacks[position3-rebuild]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:401: in test_native_rejects_invalid_position_at_both_readbacks
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_invalid_position_at_both_readbacks[position4-initial]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:401: in test_native_rejects_invalid_position_at_both_readbacks
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_invalid_position_at_both_readbacks[position4-rebuild]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:401: in test_native_rejects_invalid_position_at_both_readbacks
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_requires_requested_shoulder_to_persist[initial]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:411: in test_native_requires_requested_shoulder_to_persist
+    native(harness, shoulder=True)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_requires_requested_shoulder_to_persist[rebuild]" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:411: in test_native_requires_requested_shoulder_to_persist
+    native(harness, shoulder=True)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_accepts_solidworks_forced_shoulder_without_explicit_request" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:416: in test_native_accepts_solidworks_forced_shoulder_without_explicit_request
+    assert native(harness) is harness.tag
+           ^^^^^^^^^^^^^^^
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_rebuild_failure" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:423: in test_native_rejects_rebuild_failure
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_insert_failure" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:430: in test_native_rejects_insert_failure
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_setlabel_failure" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:436: in test_native_rejects_setlabel_failure
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_keeps_callout_and_checks_rejection" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:440: in test_native_keeps_callout_and_checks_rejection
+    assert native(harness, callout_below="AXIS") is harness.tag
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase><testcase classname="cad.scripts.test_vm2_native_datum_placement" name="test_native_rejects_missing_annotation" time="0.002"><failure message="TypeError: add_datum_feature() got an unexpected keyword argument 'placement'">cad\scripts\test_vm2_native_datum_placement.py:450: in test_native_rejects_missing_annotation
+    native(harness)
+cad\scripts\test_vm2_native_datum_placement.py:156: in native
+    return common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cad\scripts\_telemetry.py:955: in wrap
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+E   TypeError: add_datum_feature() got an unexpected keyword argument 'placement'</failure></testcase></testsuite></testsuites>

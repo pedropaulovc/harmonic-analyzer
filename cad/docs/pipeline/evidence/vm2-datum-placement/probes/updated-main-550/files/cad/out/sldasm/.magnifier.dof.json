@@ -1,0 +1,104 @@
+{
+  "stem": "magnifier",
+  "specs": [
+    {
+      "key": "lever_rock",
+      "kind": "angle",
+      "entities": [
+        {
+          "entity_type": "PLANE",
+          "name": "Top Plane@magnifying-lever-1",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Top Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "magnifying-lever-1",
+        [
+          200.0,
+          979.7,
+          -128.3
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "angle": 0.0
+      }
+    },
+    {
+      "key": "wire_swing",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "POINT",
+          "name": "HubPoint",
+          "point": [],
+          "mark": 0,
+          "component": "lever-wire-1"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Front Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "lever-wire-1",
+        [
+          63.323546946322296,
+          573.0833459443252,
+          -142.77
+        ]
+      ],
+      "witness": null,
+      "flip": true,
+      "params": {
+        "distance": 142.77
+      }
+    },
+    {
+      "key": "wire_spin",
+      "kind": "angle",
+      "entities": [
+        {
+          "entity_type": "PLANE",
+          "name": "Front Plane@lever-wire-1",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "lever-wire-1",
+        [
+          63.323546946322296,
+          573.0833459443252,
+          -142.77
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "angle": 89.8076809852398
+      }
+    }
+  ]
+}

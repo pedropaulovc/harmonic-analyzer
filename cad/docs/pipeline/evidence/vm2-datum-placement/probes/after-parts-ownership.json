@@ -1,0 +1,21 @@
+{
+  "kind": "vm2-datum-read-only-ownership",
+  "utc": "2026-09-08T02:07:00.413871+00:00",
+  "root": "C:\\src\\ha-datum-placement-main",
+  "head": "521564403fc06d968558ffa4d76b56d2abf35208",
+  "probe_sha256": "b0fdf9afa87abcb89a39119a020697a5c121693724b1cf55e73f139eff848c43",
+  "pid": 18748,
+  "revision": "34.3.0",
+  "documents": [
+    {
+      "path": "C:\\src\\ha-datum-placement-main\\cad\\out\\sldprt\\rack-pinion.SLDPRT",
+      "title": "rack-pinion.SLDPRT",
+      "type": 1,
+      "state": "clean",
+      "views": [],
+      "saved_sha256_before": "1cce146435cf80cac5d9827bd76e0b6948764ed314f5304956e08acc1e46bd96",
+      "saved_sha256_after": "1cce146435cf80cac5d9827bd76e0b6948764ed314f5304956e08acc1e46bd96"
+    }
+  ],
+  "status": "read_only_complete"
+}

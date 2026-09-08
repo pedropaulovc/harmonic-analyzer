@@ -1,0 +1,58 @@
+........................................................................ [  4%]
+........................................................................ [  9%]
+........................................................................ [ 14%]
+........................................................................ [ 19%]
+........................................................................ [ 23%]
+........................................................................ [ 28%]
+......................F................................................. [ 33%]
+........................................................................ [ 38%]
+........................................................................ [ 43%]
+........................................................................ [ 47%]
+........................................................................ [ 52%]
+........................................................................ [ 57%]
+........................................................................ [ 62%]
+........................................................................ [ 67%]
+........................................................................ [ 71%]
+........................................................................ [ 76%]
+........................................................................ [ 81%]
+........................................................................ [ 86%]
+........................................................................ [ 90%]
+........................................................................ [ 95%]
+................................................................         [100%]
+================================== FAILURES ===================================
+_________ test_drawing_fleet_owns_placement_not_manufacturing_values __________
+
+    def test_drawing_fleet_owns_placement_not_manufacturing_values() -> None:
+        scripts = Path(__file__).parent.glob("draw_*.py")
+        violations = drawing_fleet_specification_violations(scripts)
+>       assert not violations, "drawing-owned manufacturing specifications:\n" + "\n".join(
+            str(item) for item in violations
+        )
+E       AssertionError: drawing-owned manufacturing specifications:
+E         C:\src\ha-datum-placement-main\cad\scripts\draw_rack_pinion.py:119:30: drawing-spec-string: 'Ra {...}'
+E         C:\src\ha-datum-placement-main\cad\scripts\draw_rack_pinion.py:145:80: drawing-spec-string: 'Ra {...}'
+E       assert not (DrawingSpecificationViolation(filename='C:\\src\\ha-datum-placement-main\\cad\\scripts\\draw_rack_pinion.py', line=11...ment-main\\cad\\scripts\\draw_rack_pinion.py', line=145, column=79, rule='drawing-spec-string', evidence="'Ra {...}'"))
+
+cad\scripts\test_drawing_specification_purity.py:349: AssertionError
+=========================== short test summary info ===========================
+FAILED cad/scripts/test_drawing_specification_purity.py::test_drawing_fleet_owns_placement_not_manufacturing_values
+1 failed, 1503 passed in 70.00s (0:01:10)
+  xx  [   72.0s + 72.0s] task check recipe failed: check recipe failed (exit 1)
+-- check:graph
+-- check:partiso
+.  check:recipe
+TaskError - taskid:check:recipe
+PythonAction Error
+Traceback (most recent call last):
+  File "C:\src\ha-datum-placement-main\.venv\Lib\site-packages\doit\action.py", line 473, in execute
+    returned_value = self.py_callable(*self.args, **kwargs)
+  File "C:\src\ha-datum-placement-main\dodo.py", line 1066, in _run_stamped
+    _run(cmd, label, log_stem=Path(stamp).stem, com=com)
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\src\ha-datum-placement-main\dodo.py", line 911, in _run
+    (_exec_com if com else _exec)(cmd, label, log_stem)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\src\ha-datum-placement-main\dodo.py", line 603, in _exec
+    raise RuntimeError(f"{label} failed (exit {rc})")
+RuntimeError: check recipe failed (exit 1)
+
