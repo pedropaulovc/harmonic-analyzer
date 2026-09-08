@@ -62,7 +62,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _holes import DRILL_POINT_H, HoleSpec, blind_cut_dia_mm, blind_hole_volume_mm3, wizard_holes
+from _holes import DRILL_POINT_H, THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm, blind_hole_volume_mm3, wizard_holes
 from harmonic_base_spec import (
     BOTTOM_LENGTH,
     BOTTOM_THICKNESS,
@@ -100,6 +100,13 @@ from build_swing_stop_screw import (
     SHANK_DIA as STOP_SHANK_DIA,
     THREAD as STOP_THREAD,
 )
+from build_slotted_screw import SHANK_LEN as BLOCK_SCREW_LEN
+from build_foot_screw import SHANK_LEN as FOOT_SCREW_LEN
+from build_fillister_screw import SHANK_LEN as NAMEPLATE_SCREW_LEN
+from build_swing_stop_screw import EMBED_LEN as STOP_ENGAGEMENT
+from pinion_pivot_block_spec import BLOCK_HEIGHT
+from pinion_spring_geometry import THICK as SPRING_THICKNESS
+from arbor_pedestal_spec import FOOT_HEIGHT as PEDESTAL_FLANGE_THICKNESS
 from rocker_arm_support_spec import SUPPORT_HOLD_DOWN_XZ
 
 import _telemetry
@@ -189,9 +196,12 @@ SWING_HARDWARE_GEOMETRY = swing_hardware_geometry(
 LOCK_KNOB_XZ = SWING_HARDWARE_GEOMETRY.lock_xz
 STOP_SCREW_XZ = SWING_HARDWARE_GEOMETRY.stop_xz
 
-# Blind #10-24 UNC-2B pivot tap: only the distinct threaded tail enters.
-PIVOT_THREAD_BOTTOM_CLEARANCE = 2.0
-PIVOT_HOLE_DEPTH = PIVOT_THREAD_ENGAGEMENT + PIVOT_THREAD_BOTTOM_CLEARANCE
+# Blind #10-24 UNC-2B bottoming tap: only the 9.525-mm threaded tail enters.
+# Full threads extend 0.25 past the tip; the 12-mm cylindrical drill leaves
+# 2.225 mm for the bottoming tap's two-pitch lead before the drill point.
+PIVOT_THREAD_BOTTOM_CLEARANCE = 0.25
+PIVOT_SCREW_HOLE_DEPTH = PIVOT_THREAD_ENGAGEMENT + PIVOT_THREAD_BOTTOM_CLEARANCE
+PIVOT_SCREW_DRILL_DEPTH = 12.0
 
 # The 19.05-mm stock stud enters 12.70 through the platform, or its full
 # length when the collar fences the disengaged notch on the bare base.
@@ -221,8 +231,9 @@ BLOCK_SCREW_XZ = tuple(
     (x + MECHANISM_X_SHIFT, z + MECHANISM_Z_SHIFT) for x, z in _FORMER_BLOCK_SCREW_XZ
 )
 # Stock 25.4-mm slotted screws penetrate 6.65 mm below each 18.75-mm block.
-BLOCK_SCREW_HOLE_DEPTH = 6.9  # stock engagement + 0.25 bottom clearance
+BLOCK_SCREW_HOLE_DEPTH = 6.9  # stock engagement + 0.25 tip reserve
 BLOCK_SCREW_DRILL_DEPTH = 10.0
+# Bottoming tap: 3.1 mm runout exceeds two #8-32 pitches (1.5875 mm).
 _FORMER_FOOT_SCREW_XZ = (
     (13.179270253802283, 70.95),  # spring foot: 28 reach keeps its screw head
     # clear of the unchanged rocker-arm-support casting after the rig recenter
@@ -234,11 +245,12 @@ FOOT_SCREW_XZ = tuple(
     (x + MECHANISM_X_SHIFT, z + MECHANISM_Z_SHIFT) for x, z in _FORMER_FOOT_SCREW_XZ
 )
 # The stock 9.525-mm foot screw penetrates 8.725 mm below the 0.8-mm spring.
-FOOT_SCREW_HOLE_DEPTH = 8.975  # stock engagement + 0.25 bottom clearance
+FOOT_SCREW_HOLE_DEPTH = 8.975  # stock engagement + 0.25 tip reserve
 FOOT_SCREW_DRILL_DEPTH = 11.0
+# Bottoming tap: 2.025 mm runout exceeds two #4-40 pitches (1.27 mm).
 
 # Maker's nameplate seats (2026-09-02 ch26 p.71 re-derive: four brass slotted
-# round-head screws hold the plate at its corners), blind from the TOP face
+# fillister-head screws hold the plate at its corners), blind from the TOP face
 # like the other seats. The stations are the plate's four corner screw holes
 # (nameplate_spec.SCREW_XY, plate-local) carried through the plate's mount
 # transform into the machine frame -- nameplate_spec.MOUNT_HOLE_XZ, the ONE
@@ -251,7 +263,7 @@ FOOT_SCREW_DRILL_DEPTH = 11.0
 NAMEPLATE_SCREW_XZ = nameplate_spec.MOUNT_HOLE_XZ
 # The stock brass fillister's 6.35-mm shank passes through the 1.5-mm plate,
 # engaging 4.85 mm of the existing 6.0-mm #4-40 thread. The drill extends
-# 3.0 mm deeper for the tap's runout.
+# 3.0 mm deeper for the bottoming tap's two-pitch lead (1.27 mm).
 NAMEPLATE_SCREW_HOLE_DEPTH = 6.0
 NAMEPLATE_SCREW_DRILL_DEPTH = 9.0
 if abs(nameplate_spec.MOUNT_BACK_Y - STACK_HEIGHT) > 1e-9:
@@ -287,11 +299,12 @@ if NAMEPLATE_RIM_CLEARANCE < 1.0:
 # HoleSpec designation; tap-drill diameters remain manufacturing geometry and
 # are not compared to purchased fasteners' major-diameter solids.
 PIVOT_SEAT_SPEC = HoleSpec(
-    "tapped",
+    "tapped_bottoming",
     PIVOT_THREAD,
     end="blind",
-    depth_mm=PIVOT_HOLE_DEPTH,
+    depth_mm=PIVOT_SCREW_DRILL_DEPTH,
     thread_class="2B",
+    overrides_mm={"ThreadDepth": PIVOT_SCREW_HOLE_DEPTH},
 )
 LOCK_SEAT_SPEC = HoleSpec(
     "tapped",
@@ -310,7 +323,7 @@ STOP_SEAT_SPEC = HoleSpec(
     overrides_mm={"ThreadDepth": STOP_SCREW_HOLE_DEPTH},
 )
 BLOCK_SEAT_SPEC = HoleSpec(
-    "tapped",
+    "tapped_bottoming",
     "#8-32",
     end="blind",
     depth_mm=BLOCK_SCREW_DRILL_DEPTH,
@@ -318,7 +331,7 @@ BLOCK_SEAT_SPEC = HoleSpec(
     overrides_mm={"ThreadDepth": BLOCK_SCREW_HOLE_DEPTH},
 )
 FOOT_SEAT_SPEC = HoleSpec(
-    "tapped",
+    "tapped_bottoming",
     "#4-40",
     end="blind",
     depth_mm=FOOT_SCREW_DRILL_DEPTH,
@@ -326,7 +339,7 @@ FOOT_SEAT_SPEC = HoleSpec(
     overrides_mm={"ThreadDepth": FOOT_SCREW_HOLE_DEPTH},
 )
 NAMEPLATE_SEAT_SPEC = HoleSpec(
-    "tapped",
+    "tapped_bottoming",
     "#4-40",
     end="blind",
     depth_mm=NAMEPLATE_SCREW_DRILL_DEPTH,
@@ -339,6 +352,68 @@ STOP_SCREW_HOLE_DIA = blind_cut_dia_mm(STOP_SEAT_SPEC)
 BLOCK_SCREW_HOLE_DIA = blind_cut_dia_mm(BLOCK_SEAT_SPEC)
 FOOT_SCREW_HOLE_DIA = blind_cut_dia_mm(FOOT_SEAT_SPEC)
 NAMEPLATE_SCREW_HOLE_DIA = blind_cut_dia_mm(NAMEPLATE_SEAT_SPEC)
+
+
+def require_blind_seat_fit(
+    label: str, seat: HoleSpec, engagement: float, *, tip_reserve: float = 0.25
+) -> None:
+    """Keep a stock screw in full threads above a manufacturable tap lead."""
+    if seat.kind not in ("tapped", "tapped_bottoming") or seat.end != "blind":
+        raise AssertionError(f"{label}: base seat must be a native blind tap")
+    thread_depth = seat.overrides_mm.get("ThreadDepth", seat.depth_mm)
+    if not math.isfinite(tip_reserve) or tip_reserve <= 0.0:
+        raise AssertionError(f"{label}: tip reserve must be finite and positive")
+    if not all(math.isfinite(value) and value > 0.0 for value in (
+        engagement, thread_depth, seat.depth_mm
+    )):
+        raise AssertionError(f"{label}: engagement and depths must be finite and positive")
+    if engagement < THREAD_MAJOR_MM[seat.size]:
+        raise AssertionError(f"{label}: less than one diameter of full-thread engagement")
+    if thread_depth - engagement < tip_reserve - 1e-9:
+        raise AssertionError(f"{label}: screw bottoms before seating in full threads")
+    pitch = 25.4 / float(seat.size.rsplit("-", 1)[1])
+    lead_pitches = 2.0 if seat.kind == "tapped_bottoming" else 5.0
+    if seat.depth_mm - thread_depth < lead_pitches * pitch - 1e-9:
+        tap = "bottoming" if seat.kind == "tapped_bottoming" else "plug"
+        raise AssertionError(f"{label}: drill lacks {lead_pitches:g}-pitch {tap}-tap lead")
+
+
+# Guard the deepest installed stock insertion in all six native seat groups.
+# The foot group also serves the thicker pedestal flange, with less insertion.
+for _label, _seat, _engagement in (
+    ("cone pivot", PIVOT_SEAT_SPEC, PIVOT_THREAD_ENGAGEMENT),
+    ("cone lock", LOCK_SEAT_SPEC, LOCK_STUD_LEN),
+    ("swing stop", STOP_SEAT_SPEC, STOP_ENGAGEMENT),
+    ("pinion block", BLOCK_SEAT_SPEC, BLOCK_SCREW_LEN - BLOCK_HEIGHT),
+    ("spring foot", FOOT_SEAT_SPEC, FOOT_SCREW_LEN - SPRING_THICKNESS),
+    ("pedestal foot", FOOT_SEAT_SPEC, FOOT_SCREW_LEN - PEDESTAL_FLANGE_THICKNESS),
+    ("nameplate", NAMEPLATE_SEAT_SPEC, NAMEPLATE_SCREW_LEN - nameplate_spec.PLATE_THICKNESS),
+):
+    require_blind_seat_fit(_label, _seat, _engagement)
+
+# Include the pivot's deeper cylindrical drill and its separate 118-degree
+# point in the upper-pad wall check. Full-height cavity envelopes conservatively
+# bound every neighboring bore, irrespective of which face it starts from.
+PIVOT_DRILL_BOTTOM_WALL = (
+    TOP_THICKNESS - PIVOT_SEAT_SPEC.depth_mm
+    - PIVOT_SCREW_HOLE_DIA / 2.0 * DRILL_POINT_H
+)
+if PIVOT_DRILL_BOTTOM_WALL < 1.5 * PIVOT_SCREW_HOLE_DIA:
+    raise AssertionError("cone-pivot drill leaves less than 1.5 diameters of upper-pad wall")
+PIVOT_NEAREST_CAVITY_WALL = min(
+    math.dist(PIVOT_SCREW_XZ, xz) - (PIVOT_SCREW_HOLE_DIA + dia) / 2.0
+    for points, dia in (
+        (HOLE_XZ, CBORE_DIA),
+        ((LOCK_KNOB_XZ,), LOCK_SCREW_HOLE_DIA),
+        ((STOP_SCREW_XZ,), STOP_SCREW_HOLE_DIA),
+        (BLOCK_SCREW_XZ, BLOCK_SCREW_HOLE_DIA),
+        (FOOT_SCREW_XZ, FOOT_SCREW_HOLE_DIA),
+        (NAMEPLATE_SCREW_XZ, NAMEPLATE_SCREW_HOLE_DIA),
+    )
+    for xz in points
+)
+if PIVOT_NEAREST_CAVITY_WALL < PIVOT_SCREW_HOLE_DIA:
+    raise AssertionError("cone-pivot drill crowds another base cavity")
 
 # The deeper lock drill must remain in the solid upper pad and clear every
 # other vertical cavity. Bounding the hold-down counterbores over their full
@@ -590,23 +665,20 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "TopPlate")
     _telemetry.info(f"volume after top plate: {await _volume(adapter):.1f} mm^3")
 
-    # M6.10 fastener holes + lag-head recesses: ONE native Hole Wizard
-    # counterbored 9/16 FILLISTER feature (4 placement points) drilled from
-    # the UNDERSIDE face, so the model carries the real fastener designation
-    # (memory/fastener-policy-us-customary; fillister = the round slotted head
-    # -- the hex-bolt table SKIPS 9/16, and the lag screw's round Ø22 head IS
-    # a fillister shape). The through Ø13 / recess Ø23x6.5 are the
-    # PHOTO-MEASURED artefact dims -- the standard table would cut Ø14.7/Ø21.4
-    # and visibly move the underside -- preserved as explicit definition
-    # overrides. CBORE_XZ == HOLE_XZ (all four heads recessed), so the pair of
-    # concentric cuts collapses into the one counterbore feature.
+    # One native 1/2 FILLISTER counterbore feature, four points from UNDERSIDE.
+    # The 1/2 token matches the purchased 1/2-13 screw's nominal size; the
+    # fillister table describes its round slotted head. Exact geometry remains
+    # Ø13 through / Ø23 x 9.517 recess for the Ø20.6502 x 9.017 stock head,
+    # with 0.5 mm recess below the underside. Explicit definition overrides
+    # preserve these fits instead of substituting standard-table dimensions.
+    # CBORE_XZ == HOLE_XZ: all four heads share the concentric counterbore cut.
     total = BOTTOM_THICKNESS + TOP_THICKNESS
     pre_holes = await _volume(adapter)
     fastener_cut = wizard_holes(
         adapter,
         HoleSpec(
             "counterbore_fillister",
-            "9/16",
+            "1/2",
             overrides_mm={
                 "HoleDiameter": HOLE_DIA,
                 "CounterBoreDiameter": CBORE_DIA,
@@ -615,7 +687,7 @@ async def build(adapter) -> dict[str, str]:
         ),
         [[x, 0.0, z] for x, z in HOLE_XZ],
         (0.0, -1.0, 0.0),
-        "lag-screw counterbored holes (9/16)",
+        "lag-screw counterbored holes (1/2)",
         name="FastenerHoles",
         placement_dims=[
             (
@@ -653,7 +725,7 @@ async def build(adapter) -> dict[str, str]:
             "PivotSeat",
             PIVOT_SEAT_SPEC,
             (PIVOT_SCREW_XZ,),
-            f"cone-pivot screw tapped seat ({PIVOT_THREAD} UNC-2B)",
+            f"cone-pivot screw bottoming-tapped seat ({PIVOT_THREAD} UNC-2B)",
         ),
         (
             "LockSeat",
@@ -671,19 +743,19 @@ async def build(adapter) -> dict[str, str]:
             "BlockScrewHoles",
             BLOCK_SEAT_SPEC,
             BLOCK_SCREW_XZ,
-            "pinion-pivot-block tapped seats (#8-32)",
+            "pinion-pivot-block bottoming-tapped seats (#8-32)",
         ),
         (
             "FootScrewHoles",
             FOOT_SEAT_SPEC,
             FOOT_SCREW_XZ,
-            "foot-screw tapped seats (#4-40)",
+            "foot-screw bottoming-tapped seats (#4-40)",
         ),
         (
             "NameplateSeats",
             NAMEPLATE_SEAT_SPEC,
             NAMEPLATE_SCREW_XZ,
-            "nameplate fillister-screw tapped seats (#4-40)",
+            "nameplate fillister-screw bottoming-tapped seats (#4-40)",
         ),
     ):
         dia = blind_cut_dia_mm(spec)

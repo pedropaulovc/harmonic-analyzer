@@ -7,8 +7,8 @@ in git** (see the `cad/references/mcmaster/*.SLDPRT` rule in the root
 for redistribution in a public repository.
 
 To populate the directory, download each part's SOLIDWORKS model from its
-`https://www.mcmaster.com/<part-number>/` product page (free, no account
-needed) and save it here as `<part-number>.SLDPRT`.
+`https://www.mcmaster.com/<part-number>/` product page and save it here as
+`<part-number>.SLDPRT`. Sign in if requested.
 
 Parts referenced by the production fastener fleet and its reusable diagnostic
 recipes:
@@ -34,6 +34,15 @@ recipes:
 
 The cone-lock and swing-stop selections follow `cad/scripts/build_cone_lock_knob.py`
 and `cad/scripts/build_swing_stop_screw.py`.
+
+Catalog specifications checked on September 8, 2026:
+
+- [91783A722](https://www.mcmaster.com/91783A722/) is a 1/2-13 UNC,
+  class 2A screw. Its downloaded SolidWorks model uses a 56-TPI visual helix;
+  use the catalog thread designation for the mating tap.
+- [91882A425](https://www.mcmaster.com/91882A425/) is black-oxide steel,
+  with a 1/4-20 thread and a 19.05 mm (3/4 in) stud. The catalog's material
+  field supplies the finish specification absent from the CAD properties.
 
 Ground rules (mirrored in the diagnostics themselves): the vendor files are
 opened read-only and NEVER saved or modified; everything derived from them

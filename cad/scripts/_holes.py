@@ -1,9 +1,8 @@
 """Native Hole Wizard (``HoleWzd``) features for part scripts.
 
-Generalized from ``build_rocker_arm_support._drill_tapped_holes`` -- the proven
-live idiom (one 4-point 9/16-12 foot-tap feature) -- so every fastener hole in
-the model can be a REAL wizard hole carrying its thread designation instead of
-a plain circle cut:
+Uses the multi-point pattern in
+``build_rocker_arm_support._drill_tapped_holes`` (one four-point 1/2-13
+foot-tap feature) so each fastener hole carries its native thread designation:
 
 1. ``CreateDefinition(swFmHoleWzd)`` -> ``InitializeHole(type, standard,
    fastener, size, end)`` -> property overrides -> select the placement face
@@ -173,13 +172,13 @@ class HoleSpec:
 
     Attributes:
         kind: A ``_KINDS`` key -- picks the wizard hole type + fastener table.
-        size: Wizard-table size token for the kind (``"#8-32"``, ``"9/16-12"``
+        size: Wizard-table size token for the kind (``"#8-32"``, ``"1/2-13"``
             for taps; ``"#8"``, ``"5/16"`` for clearances; ``"#47"`` for number
             drills; the bolt size for counterbores).
         end: ``"through_all"`` | ``"blind"`` | ``"through_next"``.
         depth_mm: Hole depth for a blind end (mm; the wizard's HoleDepth).
-        thread_class: Tap class (``"2B"`` default policy; the support's foot
-            taps keep their as-built ``"1B"``). Ignored for non-taps.
+        thread_class: Native tap class (``"2B"`` by default).
+            Ignored for non-taps.
         fit: Clearance fit (``"normal"`` default) -- clearance kind only.
         overrides_mm: Requested ``IWizardHoleFeatureData2`` property values in
             mm (``"HoleDiameter"``, ``"CounterBoreDiameter"``,
@@ -433,9 +432,7 @@ def wizard_holes(
         dia = blind_cut_dia_mm(spec) / 1000.0
         ang = 2.0594885  # 118-degree drill point
         if hole_type == 4:
-            blind_thread_depth_mm = spec.overrides_mm.get(
-                "ThreadDepth", spec.depth_mm
-            )
+            blind_thread_depth_mm = spec.overrides_mm.get("ThreadDepth", spec.depth_mm)
             if not 0.0 < blind_thread_depth_mm <= spec.depth_mm:
                 raise ValueError(
                     f"hole wizard {label}: blind tap thread depth "
@@ -444,8 +441,18 @@ def wizard_holes(
                 )
             thread_depth = blind_thread_depth_mm / 1000.0
             vals = [
-                thread_depth, -1, -1, -1, -1, ang,
-                1, _ENDS["blind"], -1, -1, -1, -1,
+                thread_depth,
+                -1,
+                -1,
+                -1,
+                -1,
+                ang,
+                1,
+                _ENDS["blind"],
+                -1,
+                -1,
+                -1,
+                -1,
             ]
             tclass = spec.thread_class
         else:
@@ -854,8 +861,7 @@ def wizard_hole_on_cylinder(
             continue
         box = tuple(float(value) for value in candidate.GetBox())
         if any(
-            point_m[i] < box[i] - tolerance_m
-            or point_m[i] > box[i + 3] + tolerance_m
+            point_m[i] < box[i] - tolerance_m or point_m[i] > box[i + 3] + tolerance_m
             for i in range(3)
         ):
             continue
@@ -941,9 +947,7 @@ def wizard_hole_on_cylinder(
             )
             check(
                 f"constrain radial hole placement {label} to {plane_name}",
-                _add_sketch_constraint_impl(
-                    adapter, point_id, plane_id, "coincident"
-                ),
+                _add_sketch_constraint_impl(adapter, point_id, plane_id, "coincident"),
             )
     except BaseException as error:
         active_error = error

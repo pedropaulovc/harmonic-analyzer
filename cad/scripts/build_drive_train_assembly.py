@@ -708,12 +708,12 @@ from build_harmonic_base import (  # noqa: E402
     LOCK_KNOB_XZ as BASE_LOCK_XZ,
     LOCK_SEAT_SPEC as BASE_LOCK_SEAT_SPEC,
     LOCK_STUD_ENGAGEMENT as BASE_LOCK_ENGAGEMENT,
-    PIVOT_HOLE_DEPTH as BASE_PIVOT_HOLE_DEPTH,
     PIVOT_SEAT_SPEC as BASE_PIVOT_SEAT_SPEC,
     PIVOT_SCREW_XZ as BASE_PIVOT_XZ,
     STOP_SEAT_SPEC as BASE_STOP_SEAT_SPEC,
     STOP_SCREW_XZ as BASE_STOP_XZ,
     SWING_HARDWARE_GEOMETRY as BASE_SWING_HARDWARE,
+    require_blind_seat_fit as require_base_seat_fit,
 )
 from harmonic_base_spec import (  # noqa: E402
     TOP_LENGTH as BASE_TOP_LENGTH,
@@ -857,9 +857,11 @@ from cone_gear_shaft_spec import (  # noqa: E402
 )
 
 
-def _require_tapped_thread(label: str, screw_thread: str, hole_spec) -> None:
-    """Require a native tapped Hole Wizard seat for the exact screw thread."""
-    if hole_spec.kind != "tapped" or hole_spec.size != screw_thread:
+def _require_tapped_thread(
+    label: str, screw_thread: str, hole_spec, *, kind: str = "tapped"
+) -> None:
+    """Require the specified native tap tooling for the exact screw thread."""
+    if hole_spec.kind != kind or hole_spec.size != screw_thread:
         raise AssertionError(
             f"{label}: screw {screw_thread} does not match "
             f"{hole_spec.kind} hole {hole_spec.size}"
@@ -1093,9 +1095,10 @@ if (
     PLAT_PIVOT_RELIEF_DIA - PSCREW_HEAD_DIA
 ) / 2.0 + 1e-9 < PLAT_PIVOT_HEAD_RADIAL_CLEARANCE:
     raise AssertionError("platform pivot relief lacks required radial head clearance")
-_require_tapped_thread("cone pivot", PSCREW_THREAD, BASE_PIVOT_SEAT_SPEC)
-if BASE_PIVOT_HOLE_DEPTH - PSCREW_THREAD_TAIL_LEN < 1.5:
-    raise AssertionError("base pivot tap lacks blind-hole bottom clearance")
+_require_tapped_thread(
+    "cone pivot", PSCREW_THREAD, BASE_PIVOT_SEAT_SPEC, kind="tapped_bottoming"
+)
+require_base_seat_fit("cone pivot", BASE_PIVOT_SEAT_SPEC, PSCREW_THREAD_TAIL_LEN)
 # The pivot-screw head sits on the plate top at station PIVOT_STATION; the
 # tip block (also on the plate) ends at station 191.  The stock 3/8-in head
 # retains at least 0.20 mm air to its north face.
@@ -1799,7 +1802,9 @@ if abs(STRAP_PIVOT_BORE - 6.35) > 1e-9:
 # #8 clearance holes and engage 6.65 mm in the base's #8-32 UNC-2B seats.
 BLOCK_TOP_Y = PIVOT_Y + (BLOCK_HEIGHT - BLOCK_BORE_UP)
 _require_clearance_size("pinion block", BSCREW_THREAD, BLOCK_SCREW_HOLE_SPEC)
-_require_tapped_thread("pinion block base seat", BSCREW_THREAD, BASE_BLOCK_SEAT_SPEC)
+_require_tapped_thread(
+    "pinion block base seat", BSCREW_THREAD, BASE_BLOCK_SEAT_SPEC, kind="tapped_bottoming"
+)
 _BLOCK_SCREW_ENGAGEMENT = BSCREW_SHANK_LEN - BLOCK_HEIGHT
 if _BLOCK_SCREW_ENGAGEMENT < 1.0:
     raise AssertionError("block screw barely engages the base")
@@ -1824,7 +1829,9 @@ for _want, _have in zip(_BLOCK_SCREW_XZ, BASE_BLOCK_XZ, strict=True):
 # pedestal's normal #4 clearances into the base's #4-40 UNC-2B seats.
 _require_clearance_size("pinion spring foot", FSCREW_THREAD, SPR_HOLE_SPEC)
 _require_clearance_size("arbor pedestal foot", FSCREW_THREAD, ARBOR_PED_HOLE_SPEC)
-_require_tapped_thread("foot-screw base seat", FSCREW_THREAD, BASE_FOOT_SEAT_SPEC)
+_require_tapped_thread(
+    "foot-screw base seat", FSCREW_THREAD, BASE_FOOT_SEAT_SPEC, kind="tapped_bottoming"
+)
 if FSCREW_SHANK_LEN - ARBOR_PED_FLANGE_T < 2.0:
     raise AssertionError("foot screw barely engages the base at the pedestal")
 if FSCREW_SHANK_LEN - SPRING_T > BASE_FOOT_HOLE_DEPTH - 0.25:
