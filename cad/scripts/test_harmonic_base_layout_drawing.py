@@ -272,6 +272,97 @@ def test_other_table_drift_is_rejected_before_positioning(setup, change):
     assert setup.table.annotation.moves == []
 
 
+@pytest.mark.parametrize("change", ["locks", "position"])
+def test_failed_compaction_retains_expected_actual_heights_and_changed_fields(
+    setup,
+    monkeypatch,
+    change,
+):
+    before = layout._table_state(setup.table)
+    original_position = setup.table.annotation.position
+    records = []
+    monkeypatch.setattr(
+        layout._telemetry,
+        "error",
+        lambda message, **attrs: records.append((message, attrs)),
+    )
+
+    def drift(row):
+        if row != 17:
+            return
+        if change == "locks":
+            setup.table.locks[0] = True
+        if change == "position":
+            setup.table.annotation.position = (0.274, 0.250, 0.0)
+
+    setup.table.on_row = drift
+    with pytest.raises(
+        RuntimeError, match="compaction changed table content/font"
+    ) as caught:
+        _compact(setup)
+    evidence = caught.value.evidence
+    assert evidence["changed_fields"] == [change]
+    assert evidence["actual_heights"] == tuple(setup.table.minimums)
+    assert evidence["expected_position"] == original_position
+    assert evidence["actual_position"] == setup.table.annotation.position
+    assert evidence["expected_state"]["heights"] == tuple(setup.table.minimums)
+    assert evidence["expected_state"]["cells"] == before.cells
+    assert evidence["actual_state"]["cells"] == before.cells
+    assert evidence["position_read_error"] is None
+    assert records[0][1]["changed_fields"] == [change]
+    assert records[0][1]["actual_heights"] == tuple(setup.table.minimums)
+    assert setup.table.annotation.moves == []
+
+
+@pytest.mark.parametrize("secondary", ["position", "telemetry"])
+def test_failed_compaction_diagnostics_cannot_replace_preservation_failure(
+    setup, monkeypatch, secondary
+):
+    error = OSError(f"native {secondary} diagnostic failed")
+    telemetry_error = layout._telemetry.error
+
+    def drift(row):
+        if row != 17:
+            return
+        setup.table.locks[0] = True
+
+        def reject(*_args, **_kwargs):
+            raise error
+
+        if secondary == "position":
+            monkeypatch.setattr(setup.table.annotation, "GetPosition", reject)
+        if secondary == "telemetry":
+
+            def reject_diagnostic(message, **attrs):
+                # Exercise this newly inserted write, not the existing outer
+                # telemetry span's separate exception-reporting boundary.
+                if "expected_state" in attrs:
+                    raise error
+                return telemetry_error(message, **attrs)
+
+            monkeypatch.setattr(layout._telemetry, "error", reject_diagnostic)
+
+    setup.table.on_row = drift
+    with pytest.raises(
+        layout.TableCompactionReadbackError,
+        match="compaction changed table content/font",
+    ) as caught:
+        _compact(setup)
+    evidence = caught.value.evidence
+    assert evidence["actual_heights"] == tuple(setup.table.minimums)
+    assert evidence["actual_state"]["locks"][0] == 1
+    assert evidence["expected_state"]["locks"][0] == 0
+    assert "locks" in evidence["changed_fields"]
+    if secondary == "position":
+        assert evidence["actual_position"] is None
+        assert evidence["position_read_error"] == repr(error)
+    if secondary == "telemetry":
+        assert any(repr(error) in note for note in caught.value.__notes__)
+        assert evidence["position_read_error"] is None
+    assert setup.table.annotation.moves == []
+    assert setup.top.moves == setup.side.moves == []
+
+
 @pytest.mark.parametrize(
     "inventory",
     ["tables", "annotations", "unknown_table", "unknown_annotation", "null_annotation"],
