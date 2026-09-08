@@ -360,3 +360,27 @@ snapshot and an exact-head zero-COM full repeat. No tolerance was loosened, toke
 restamped, freshness ledger rewritten or output tree deleted. Both PRs remain
 open; the existing clean local CodeRabbit reviews cover the latest code, while
 this subsequent evidence-only update is outside their exact reviewed diffs.
+
+### Partial-run dependency comparison
+
+The four captured reporter JSON files now compare cleanly: all 108 leaf names,
+keys and complete recipe input maps are unchanged across main, parser,
+split-before and split-after-failed-native. All 106 execution-input digests
+exposed by those reports are unchanged, including both failed drawing parts.
+The reports do not expose leaf tokens for `chain_sprocket` and `hex_bolt`, so
+this comparison does not prove all 108 native identities. Seven assembly token
+input digests changed after FULL construction, the top key changed transitively,
+and all eight split assembly recipes stayed unchanged.
+
+The JSON-only comparator exited zero; its 22 synthetic tests passed in 0.38 s.
+This is partial-run structural evidence, not native acceptance or a root-cause
+finding for the drawing failures. No native file, token or ledger was read by
+the comparator. Code-checkout receipt hashes:
+
+| Receipt | SHA-256 |
+|---|---|
+| `four-reporter-comparison-after-partial-failed-native.json` | `cf527178cefc800a0f0c1f271863f4136cf36045811120ec678c6d433cd3a7af` |
+| `partial-failed-native-dependency-interpretation.json` | `90681c4f7290ff4a2388182acd4cd5aea91d97d7fc70d6f261a009522ff0eadd` |
+
+Native `split-2d-after-failed-native.json` has SHA-256
+`0eb474bdbb11d5d46424564de86713c9aeb7678ad64b6dc989375f1dca737cc3`.
