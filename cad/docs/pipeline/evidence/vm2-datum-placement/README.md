@@ -48,3 +48,9 @@ coordinate-specific assertion require
 [VM1 coordination](https://github.com/pedropaulovc/harmonic-analyzer/pull/698#issuecomment-5577757811).
 The ordinary finalizer on this baseline does not prove cold-reopen, move/scale or
 attachment identity. Dedicated native evidence must cover those checks.
+
+## Native probe results
+
+[The probe report](probe-results.md) records semantic-edge and diameter-dimension
+trials, their partial prints, the rack export identity failure, and the remaining
+acceptance work. These trials have not established a production correction.

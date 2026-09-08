@@ -1,0 +1,98 @@
+{
+  "kind": "vm2-datum-one-variable-probe",
+  "selection": "dimension",
+  "placement": "requested",
+  "part": "pinion_lift_rod",
+  "source": "C:\\src\\ha-datum-placement-main\\cad\\out\\sldprt\\pinion-lift-rod.SLDPRT",
+  "source_sha256_before": "59f635b07d5b1edb91ea828c0f9f8f8285cbcbbe17ce188cddeafef8ae08e8db",
+  "head": "31039af828e6293413be0222329720ad0f1b9692",
+  "adapter": "2269009ed56712867826516f4406afc98a0c2814",
+  "probe_sha256": "1419d863b935a22333402784f9f19831a003b81cedda84b63f69e4333cc67ec0",
+  "recipe_sha256": "8dcc4bcb7131ee5652477a793d181777e5f6196fd0d342f6dddffa6823fffae9",
+  "helper_sha256": "d64281f8509c8d1a270c22eb35871bcf5846585c9f8b9c8389d11182c7eece9d",
+  "pid": 18748,
+  "revision": "34.3.0",
+  "started_utc": "2026-09-08T02:18:53.232418+00:00",
+  "status": "observed_and_closed",
+  "scope": "partial diagnostic sheet, not acceptance",
+  "original_call": {
+    "edge_xy": [
+      0.055,
+      0.21134999999999998
+    ],
+    "symbol_xy": [
+      0.055,
+      0.22899999999999998
+    ],
+    "datum": "A",
+    "label": "lift rod axis",
+    "position_tolerance_m": 2e-05
+  },
+  "view_position": [
+    0.055,
+    0.205
+  ],
+  "view_scale": [
+    2.0,
+    1.0
+  ],
+  "target_circle": [
+    0.0,
+    0.0,
+    0.202000000114,
+    0.0,
+    0.0,
+    1.0,
+    0.003175
+  ],
+  "target_self_equality": 1,
+  "dimension_names": [
+    "RodDia"
+  ],
+  "production_helper": {
+    "status": "rejected",
+    "error": "datum A position did not persist (lift rod axis): (0.0, 0.22899999999999998); requested=(0.055, 0.22899999999999998), error=0.055 m, limit=2e-05 m"
+  },
+  "datum": {
+    "label": "A",
+    "position": [
+      0.0,
+      0.22899999999999998,
+      0.0
+    ],
+    "shoulder": false,
+    "forced_shoulder": false,
+    "attachment_types": [],
+    "attachment_count": 0,
+    "same_as_target_edge": [],
+    "same_as_dimension": [],
+    "leaders": []
+  },
+  "requested_xy_error_m": 0.055,
+  "within_original_xy_limit": false,
+  "position_after_rebuild": [
+    0.0,
+    0.22899999999999998,
+    0.0
+  ],
+  "exports": {
+    "SLDDRW": {
+      "return": 0,
+      "path": "C:\\src\\ha-datum-placement-main\\cad\\out\\reports\\datum-placement\\rod-dimension-requested-typed\\partial.SLDDRW",
+      "sha256": "f7e64e7e85d46685a75bac1b283b96d07063f839d3516fc1002d0634ec6b842a"
+    },
+    "pdf": {
+      "return": 0,
+      "path": "C:\\src\\ha-datum-placement-main\\cad\\out\\reports\\datum-placement\\rod-dimension-requested-typed\\partial.pdf",
+      "sha256": "bdcfc110594474e9b9d00aad8e5c203bf05cc148afa87b7b80e8a9ef246a7eb9"
+    }
+  },
+  "position_after_save": [
+    0.0,
+    0.22899999999999998,
+    0.0
+  ],
+  "source_sha256_after": "59f635b07d5b1edb91ea828c0f9f8f8285cbcbbe17ce188cddeafef8ae08e8db",
+  "elapsed_s": 7.041715400002431,
+  "ended_utc": "2026-09-08T02:19:00.274169+00:00"
+}

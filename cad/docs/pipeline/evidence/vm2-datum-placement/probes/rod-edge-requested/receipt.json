@@ -1,0 +1,99 @@
+{
+  "kind": "vm2-datum-one-variable-probe",
+  "selection": "edge",
+  "placement": "requested",
+  "part": "pinion_lift_rod",
+  "source": "C:\\src\\ha-datum-placement-main\\cad\\out\\sldprt\\pinion-lift-rod.SLDPRT",
+  "source_sha256_before": "59f635b07d5b1edb91ea828c0f9f8f8285cbcbbe17ce188cddeafef8ae08e8db",
+  "head": "521564403fc06d968558ffa4d76b56d2abf35208",
+  "adapter": "2269009ed56712867826516f4406afc98a0c2814",
+  "probe_sha256": "9e494f11c1102a7af404f135e118e2fd6e08ff6ea372f896ece853ae60ca729a",
+  "recipe_sha256": "8dcc4bcb7131ee5652477a793d181777e5f6196fd0d342f6dddffa6823fffae9",
+  "helper_sha256": "d64281f8509c8d1a270c22eb35871bcf5846585c9f8b9c8389d11182c7eece9d",
+  "pid": 18748,
+  "revision": "34.3.0",
+  "started_utc": "2026-09-08T02:09:46.139510+00:00",
+  "status": "observed_and_closed",
+  "scope": "partial diagnostic sheet, not acceptance",
+  "original_call": {
+    "edge_xy": [
+      0.055,
+      0.21134999999999998
+    ],
+    "symbol_xy": [
+      0.055,
+      0.22899999999999998
+    ],
+    "datum": "A",
+    "label": "lift rod axis",
+    "position_tolerance_m": 2e-05
+  },
+  "view_position": [
+    0.055,
+    0.205
+  ],
+  "view_scale": [
+    2.0,
+    1.0
+  ],
+  "target_circle": [
+    0.0,
+    0.0,
+    0.202000000114,
+    0.0,
+    0.0,
+    1.0,
+    0.003175
+  ],
+  "target_self_equality": 1,
+  "production_helper": {
+    "status": "rejected",
+    "error": "datum A position did not persist (lift rod axis): (0.05500000000000015, 0.19430287392280807); requested=(0.055, 0.22899999999999998), error=0.0346971 m, limit=2e-05 m"
+  },
+  "datum": {
+    "label": "A",
+    "position": [
+      0.05500000000000015,
+      0.19430287392280807,
+      0.200800000228
+    ],
+    "shoulder": false,
+    "forced_shoulder": false,
+    "attachment_types": [
+      1
+    ],
+    "attachment_count": 1,
+    "same_as_target_edge": [
+      1
+    ],
+    "same_as_dimension": [],
+    "leaders": []
+  },
+  "requested_xy_error_m": 0.034697126077191914,
+  "within_original_xy_limit": false,
+  "position_after_rebuild": [
+    0.05500000000000015,
+    0.19430287392280807,
+    0.200800000228
+  ],
+  "exports": {
+    "SLDDRW": {
+      "return": 0,
+      "path": "C:\\src\\ha-datum-placement-main\\cad\\out\\reports\\datum-placement\\rod-edge-requested\\partial.SLDDRW",
+      "sha256": "1f638147420309c8133719ea24ab4e2cf0e9f130a3c7b1e158f7563b306c4871"
+    },
+    "pdf": {
+      "return": 0,
+      "path": "C:\\src\\ha-datum-placement-main\\cad\\out\\reports\\datum-placement\\rod-edge-requested\\partial.pdf",
+      "sha256": "1b9a5ee5924d681ca5ca217de69e0b8811c3ba3ef62b740d63ea95dfdc6dfd81"
+    }
+  },
+  "position_after_save": [
+    0.05500000000000015,
+    0.19430287392280807,
+    0.200800000228
+  ],
+  "source_sha256_after": "59f635b07d5b1edb91ea828c0f9f8f8285cbcbbe17ce188cddeafef8ae08e8db",
+  "elapsed_s": 7.535220699966885,
+  "ended_utc": "2026-09-08T02:09:53.674769+00:00"
+}

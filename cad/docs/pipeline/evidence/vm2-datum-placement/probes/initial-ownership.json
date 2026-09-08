@@ -1,0 +1,67 @@
+{
+  "kind": "vm2-datum-read-only-ownership",
+  "utc": "2026-09-08T02:01:00.007197+00:00",
+  "root": "C:\\src\\ha-datum-placement-main",
+  "head": "ad06adb82d00d7b6eb8c4064e75a77ff8ee07a46",
+  "probe_sha256": "d39684e4b74669a7ee2033bcee9fb4e189ab25bf793daeb3b76a6adc32460912",
+  "pid": 18748,
+  "revision": "34.3.0",
+  "documents": [
+    {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\rack-pinion.SLDPRT",
+      "title": "rack-pinion.SLDPRT",
+      "type": 1,
+      "state": "dirty",
+      "views": [],
+      "saved_sha256_before": "479b45ec0412d09b233a1c3c89cce2c95c6543dd1e5cacaca6bfb09db2cd34ba",
+      "saved_sha256_after": "479b45ec0412d09b233a1c3c89cce2c95c6543dd1e5cacaca6bfb09db2cd34ba"
+    },
+    {
+      "path": "",
+      "title": "Draw109 - Sheet1",
+      "type": 3,
+      "state": "dirty",
+      "views": [
+        {
+          "name": "Sheet1",
+          "reference_name": "",
+          "reference_path": null,
+          "datums": []
+        },
+        {
+          "name": "Drawing View1",
+          "reference_name": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\rack-pinion.SLDPRT",
+          "reference_path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\rack-pinion.SLDPRT",
+          "datums": [
+            {
+              "label": "A",
+              "position": [
+                0.21999999999999942,
+                0.20083662770023045,
+                0.0015
+              ],
+              "attachment_types": [
+                1
+              ],
+              "attachment_count": 1,
+              "null_attachment_indices": []
+            }
+          ]
+        },
+        {
+          "name": "Drawing View2",
+          "reference_name": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\rack-pinion.SLDPRT",
+          "reference_path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\rack-pinion.SLDPRT",
+          "datums": []
+        },
+        {
+          "name": "Drawing View3",
+          "reference_name": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\rack-pinion.SLDPRT",
+          "reference_path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\sldprt\\rack-pinion.SLDPRT",
+          "datums": []
+        }
+      ]
+    }
+  ],
+  "status": "read_only_complete"
+}
