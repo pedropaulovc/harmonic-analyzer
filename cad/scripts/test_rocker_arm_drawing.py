@@ -135,8 +135,7 @@ def test_surface_finish_is_part_owned_authored_and_consumed() -> None:
     assert "surface_finishes=SURFACE_FINISHES" in part_source
     sheet_source = "".join(Path(drawing.__file__).read_text(encoding="utf-8").split())
     assert (
-        'control=surface_finish_by_key(SURFACE_FINISHES,"pivot_bore")'
-        in sheet_source
+        'control=surface_finish_by_key(SURFACE_FINISHES,"pivot_bore")' in sheet_source
     )
     assert "roughness_ra=" not in sheet_source
 
@@ -166,21 +165,35 @@ def _right_inventory_context(tmp_path, monkeypatch, inventory, *, introduced_at)
     factory = Mock(return_value=(adapter.currentModel, object()))
     monkeypatch.setattr(drawing, "place_view", Mock(side_effect=(front, right, iso)))
     for name in (
-        "read_required_properties", "stamp_drawing_summary",
-        "set_hidden_lines_removed", "set_hidden_lines_visible",
-        "add_native_hole_callout", "add_entity_dimension", "set_basic_dimension",
-        "add_datum_feature", "add_surface_finish", "add_feature_control_frame",
+        "read_required_properties",
+        "stamp_drawing_summary",
+        "set_hidden_lines_removed",
+        "set_hidden_lines_visible",
+        "add_native_hole_callout",
+        "add_entity_dimension",
+        "set_basic_dimension",
+        "add_datum_feature",
+        "add_surface_finish",
+        "add_feature_control_frame",
         "auto_arrange_view_dimensions",
     ):
         monkeypatch.setattr(drawing, name, Mock())
     monkeypatch.setattr(drawing, "auto_center_marks", Mock(return_value=True))
     monkeypatch.setattr(
-        drawing, "add_property_linked_note",
-        Mock(side_effect=lambda *_: SimpleNamespace(GetAnnotation=Mock(return_value=object()))),
+        drawing,
+        "add_property_linked_note",
+        Mock(
+            side_effect=lambda *_: SimpleNamespace(
+                GetAnnotation=Mock(return_value=object())
+            )
+        ),
     )
     monkeypatch.setattr(
-        drawing, "ModelEntities",
-        lambda _: SimpleNamespace(resolve=lambda roles: {key: object() for key in roles}),
+        drawing,
+        "ModelEntities",
+        lambda _: SimpleNamespace(
+            resolve=lambda roles: {key: object() for key in roles}
+        ),
     )
     retain = Mock()
     monkeypatch.setattr(drawing, "retain_view_dimensions", retain)
@@ -192,7 +205,9 @@ def _right_inventory_context(tmp_path, monkeypatch, inventory, *, introduced_at)
         if introduced_at == "layout":
             state["inventory"] = inventory
 
-    monkeypatch.setattr(drawing, "repair_project_drawing_layout", Mock(side_effect=layout))
+    monkeypatch.setattr(
+        drawing, "repair_project_drawing_layout", Mock(side_effect=layout)
+    )
 
     async def finalize(*_args, **_kwargs):
         events.append("finalize")
@@ -201,8 +216,15 @@ def _right_inventory_context(tmp_path, monkeypatch, inventory, *, introduced_at)
     finalizer = AsyncMock(side_effect=finalize)
     monkeypatch.setattr(drawing, "finalize_drawing", finalizer)
     return SimpleNamespace(
-        adapter=adapter, factory=factory, right=right, front=front, iso=iso,
-        state=state, events=events, retain=retain, finalizer=finalizer,
+        adapter=adapter,
+        factory=factory,
+        right=right,
+        front=front,
+        iso=iso,
+        state=state,
+        events=events,
+        retain=retain,
+        finalizer=finalizer,
     )
 
 
@@ -224,7 +246,9 @@ def test_final_right_inventory_rejects_any_entry_before_finalize(
     context = _right_inventory_context(
         tmp_path, monkeypatch, inventory, introduced_at=introduced_at
     )
-    with pytest.raises(RuntimeError, match="rocker right view must contain no display dimensions"):
+    with pytest.raises(
+        RuntimeError, match="rocker right view must contain no display dimensions"
+    ):
         asyncio.run(drawing.build(context.adapter, drawing_factory=context.factory))
     context.finalizer.assert_not_awaited()
     context.retain.assert_called_once_with(
@@ -233,7 +257,9 @@ def test_final_right_inventory_rejects_any_entry_before_finalize(
     context.right.GetAnnotationsByType.assert_called_once_with(4)
     assert context.events == ["layout", "read-right"]
     assert context.state["inventory"] is inventory
-    assert inventory == ([None] if kind == "null" else [dimension] * (2 if kind == "duplicate" else 1))
+    assert inventory == (
+        [None] if kind == "null" else [dimension] * (2 if kind == "duplicate" else 1)
+    )
 
 
 @pytest.mark.parametrize("inventory", [None, (), []])
@@ -243,12 +269,14 @@ def test_final_right_inventory_native_empty_result_preserves_normal_finalize(
     context = _right_inventory_context(
         tmp_path, monkeypatch, inventory, introduced_at="creation"
     )
-    assert asyncio.run(drawing.build(context.adapter, drawing_factory=context.factory)) == {
-        "drawing": "COM-free result"
-    }
+    assert asyncio.run(
+        drawing.build(context.adapter, drawing_factory=context.factory)
+    ) == {"drawing": "COM-free result"}
     context.finalizer.assert_awaited_once_with(
-        context.adapter, drawing.OUTPUTS,
-        pdf_title="Rocker Arm Manufacturing Drawing", scale=drawing.SHEET_SCALE,
+        context.adapter,
+        drawing.OUTPUTS,
+        pdf_title="Rocker Arm Manufacturing Drawing",
+        scale=drawing.SHEET_SCALE,
     )
     context.retain.assert_called_once_with(
         context.adapter, context.front, keep=drawing.FRONT_KEEP, view_label="front"
@@ -265,7 +293,9 @@ def test_final_right_inventory_preserves_native_getter_error(tmp_path, monkeypat
     context = _right_inventory_context(
         tmp_path, monkeypatch, native_error, introduced_at="creation"
     )
-    with pytest.raises(RuntimeError, match="native right annotation inventory failed") as caught:
+    with pytest.raises(
+        RuntimeError, match="native right annotation inventory failed"
+    ) as caught:
         asyncio.run(drawing.build(context.adapter, drawing_factory=context.factory))
     assert caught.value is native_error
     context.finalizer.assert_not_awaited()
@@ -273,10 +303,16 @@ def test_final_right_inventory_preserves_native_getter_error(tmp_path, monkeypat
     assert context.events == ["layout", "read-right"]
 
 
-def test_right_inventory_contract_cannot_silently_become_nonempty(tmp_path, monkeypatch):
-    context = _right_inventory_context(tmp_path, monkeypatch, (), introduced_at="creation")
+def test_right_inventory_contract_cannot_silently_become_nonempty(
+    tmp_path, monkeypatch
+):
+    context = _right_inventory_context(
+        tmp_path, monkeypatch, (), introduced_at="creation"
+    )
     monkeypatch.setattr(drawing, "RIGHT_KEEP", ("Unexpected",))
-    with pytest.raises(ValueError, match="rocker right view requires an empty dimension contract"):
+    with pytest.raises(
+        ValueError, match="rocker right view requires an empty dimension contract"
+    ):
         asyncio.run(drawing.build(context.adapter, drawing_factory=context.factory))
     context.adapter.open_model.assert_not_awaited()
     context.factory.assert_not_called()
