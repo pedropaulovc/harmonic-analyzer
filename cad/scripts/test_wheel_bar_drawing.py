@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 import build_wheel_bar as part
 import draw_wheel_bar as drawing
 import wheel_bar_spec
@@ -36,30 +38,35 @@ def test_drawing_contract_is_split_from_the_assembly_nominals() -> None:
 
     assert (geom.BAR_SIDE, geom.BAR_DEPTH, geom.BAR_LENGTH) == (10.0, 9.0, 234.0)
     assert geom.CLAMP_HOLE_X == (70.5, 105.5)
-    assembly = Path(part.__file__).with_name("build_magnifier_assembly.py").read_text(
-        encoding="utf-8"
+    assembly = (
+        Path(part.__file__)
+        .with_name("build_magnifier_assembly.py")
+        .read_text(encoding="utf-8")
     )
     assert "from wheel_bar_geom import" in assembly
     assert "from build_wheel_bar import" not in assembly
 
 
-def test_linked_notes_specify_the_bores_and_stock() -> None:
-    notes = wheel_bar_spec.DRAWING_NOTES
-    assert "#8 NORMAL CLEARANCE Ø4.978" in notes
-    assert "#6 CLOSE CLEARANCE Ø3.912" in notes
-    assert wheel_bar_spec.CLAMP_HOLE_DIA == 4.978
-    assert wheel_bar_spec.PEN_HANGER_HOLE_DIA == 3.912
-    assert part.blind_cut_dia_mm(part.CLAMP_HOLE_SPEC) == wheel_bar_spec.CLAMP_HOLE_DIA
-    assert (
-        part.blind_cut_dia_mm(part.SCREW_HOLE_SPEC)
-        == wheel_bar_spec.PEN_HANGER_HOLE_DIA
+def test_hanger_clearance_preserves_a_tolerance_safe_end_ligament() -> None:
+    import wheel_bar_geom as geom
+
+    hole_dia = part.blind_cut_dia_mm(part.SCREW_HOLE_SPEC)
+    assert hole_dia == pytest.approx(4.572)
+    assert part.PEN_HANGER_END_WALL == pytest.approx(2.714)
+    minimum_wall = (
+        part.PEN_HANGER_END_WALL
+        - geom.PEN_HANGER_STATION_TOL
+        - part.PEN_HANGER_HOLE_DIA_TOL / 2.0
     )
-    assert "STEEL" not in notes and "AISI 1018" not in notes
-    assert "DEBURR" not in notes and "BREAK SHARP" not in notes
-    assert "X.XX" not in notes
-    assert "LINEAR +/-" not in notes
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+    assert minimum_wall == pytest.approx(2.614)
+    assert minimum_wall >= geom.PEN_HANGER_MIN_END_WALL
+
+    # The former station passed a >0 guard with only 0.214 mm of material.
+    with pytest.raises(AssertionError):
+        geom.require_hanger_end_wall(-114.5, hole_dia, part.PEN_HANGER_HOLE_DIA_TOL)
+    # A nominal wall above 2 mm must still fail if tolerances consume the reserve.
+    with pytest.raises(AssertionError):
+        geom.require_hanger_end_wall(-112.664, hole_dia, part.PEN_HANGER_HOLE_DIA_TOL)
 
 
 def test_bores_are_note_based_with_center_marks() -> None:

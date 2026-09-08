@@ -62,12 +62,12 @@ depth):
   base's blind #4-40 taps (build_harmonic_base NAMEPLATE_SCREW_XZ -- the same
   nameplate_spec derivation). Same single-mate fix-all treatment.
 
-Hold-down: four 9/16-12 lag screws come up through the base into the support
-foot's tapped holes. The base was re-drilled to the foot's pattern (4 holes at
+Hold-down: four stock 1/2-13 UNC-2A screws come up through the base into the
+support foot's 1/2-13 UNC-2B taps. The base uses the foot's pattern (4 holes at
 local X +/-60.32, Z +/-17.46 -> machine x 55.44/90.36,
 z -60.32/+60.32; see
 build_harmonic_base.py HOLE_XZ) with O23 head counterbores on its underside, and
-the lag screws (build_lag_screw.py, resized to the 9/16-12 foot tap) are
+the stock screws (build_lag_screw.py, vendor geometry without resizing) are
 inserted at their exact authored transforms and locked to the fixed base. The
 screws do NOT constrain the support. Every rigid frame member uses this same
 single-mate strategy; transform readback remains the fail-loud placement
@@ -87,6 +87,7 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
+import math
 import sys
 
 from _common import (
@@ -117,11 +118,12 @@ from build_harmonic_base import (
     NAMEPLATE_SCREW_HOLE_DEPTH,
     NAMEPLATE_SCREW_XZ,
 )
+from _interference_contracts import allowed_interference_pairs
 from cone_pivot_post_installation import (
     FRAME_FRONT_COLUMN_Z,
     FRAME_REAR_COLUMN_Z,
 )
-from fillister_screw_spec import SHANK_LEN as NAMEPLATE_SCREW_SHANK_LEN
+from build_fillister_screw import SHANK_LEN as NAMEPLATE_SCREW_SHANK_LEN
 from nameplate_spec import (
     MOUNT_EULER as NAMEPLATE_EULER,
     MOUNT_FRONT_Y as NAMEPLATE_FRONT_Y,
@@ -135,6 +137,27 @@ from rocker_arm_support_spec import (
     SUPPORT_WORLD_SEAT_Y,
     SUPPORT_WORLD_X,
     SUPPORT_WORLD_Z,
+)
+from build_gooseneck_set_screw import SHANK_LEN as GOOSENECK_SHANK_LEN
+from build_frame_side_screw import SHANK_LEN as SIDE_SCREW_SHANK_LEN
+from build_harmonic_base import (
+    CBORE_DIA as LAG_COUNTERBORE_DIA,
+    HOLE_DIA as LAG_CLEARANCE_DIA,
+    LAG_COUNTERBORE_DEPTH,
+)
+from build_lag_screw import (
+    HEAD_DIA as LAG_HEAD_DIA,
+    HEAD_H as LAG_HEAD_H,
+    SHANK_DIA as LAG_SHANK_DIA,
+    SHANK_LEN as LAG_SHANK_LEN,
+    THREAD_CLASS as LAG_THREAD_CLASS,
+    THREAD_LEN as LAG_THREAD_LEN,
+    THREAD_SIZE as LAG_THREAD_SIZE,
+)
+from build_rocker_arm_support import (
+    FOOT_THICKNESS as LAG_FOOT_THICKNESS,
+    HOLE_SSIZE as LAG_RECEIVER_THREAD_SIZE,
+    HOLE_THREAD_CLASS as LAG_RECEIVER_THREAD_CLASS,
 )
 
 ASM_NAME = "frame"
@@ -155,19 +178,37 @@ SUPPORT_SEAT_Y = SUPPORT_WORLD_SEAT_Y  # rocker-arm-support's origin is
 SUPPORT_EULER = [0.0, 90.0, 0.0]
 SUPPORT_ROWS = ROT_Y_POS90
 
-# Rocker-support hold-down: four 9/16-12 lag screws (build_lag_screw.py)
-# constrained coaxial with the base clearance holes (and the support foot's tapped
-# holes above them) by concentric + seat mates -- see build(). The
+# Rocker-support hold-down: four stock 1/2-13 screws (build_lag_screw.py),
+# coaxial with the base clearance holes and support foot taps via authored
+# transforms; one seed lock mate and a native grid retain that placement.
 # stations are the foot's tapped pattern in the machine frame: local X +/-60.32,
 # Z +/-17.46 turned +90deg about Y -> machine x 72.9 -/+ 17.46 = 55.44/90.36,
-# z SUPPORT_Z +/-60.32 (these ARE the base HOLE_XZ machine positions). The screw is authored
-# head-down at IDENTITY, so the placement point is the station and y is the under-
-# head plane: machine y 6.5 (the base underside counterbore depth) sets the O22
-# head recessed in the base underside, the O12 shank rising through the base into
-# the O12.30 tapped foot hole. Placed on its exact machine transform (like the
-# support); constrained by concentric + seat + spin-pin mates (see build()).
+# z SUPPORT_Z +/-60.32 (these ARE the base HOLE_XZ machine positions). The screw
+# is authored head-down at IDENTITY, so its under-head plane follows the harmonic
+# base's exported underside counterbore depth. This keeps the stock head recessed
+# 0.5 mm while its shank rises through the base into the support's tapped foot.
 LAG_SCREW_XZ = SUPPORT_HOLD_DOWN_XZ
-LAG_SCREW_UNDER_HEAD_Y = 6.5
+LAG_SCREW_UNDER_HEAD_Y = LAG_COUNTERBORE_DEPTH
+LAG_HEAD_RECESS = LAG_COUNTERBORE_DEPTH - LAG_HEAD_H
+LAG_SCREW_TIP_Y = LAG_SCREW_UNDER_HEAD_Y + LAG_SHANK_LEN
+LAG_TIP_REACH_ABOVE_BASE = LAG_SCREW_TIP_Y - BASE_TOP_Y
+# Only the foot contains tapped material; protrusion into the open window is
+# not engagement. Use the catalog's minimum threaded span, not visual pitch.
+LAG_SUPPORT_ENGAGEMENT = max(
+    0.0,
+    min(LAG_SCREW_TIP_Y, BASE_TOP_Y + LAG_FOOT_THICKNESS)
+    - max(BASE_TOP_Y, LAG_SCREW_TIP_Y - LAG_THREAD_LEN),
+)
+if LAG_THREAD_SIZE != LAG_RECEIVER_THREAD_SIZE:
+    raise AssertionError("stock hold-down and support tap nominal threads must match")
+if (LAG_THREAD_CLASS, LAG_RECEIVER_THREAD_CLASS) != ("2A", "2B"):
+    raise AssertionError("stock hold-down requires class 2A external / 2B internal threads")
+if LAG_CLEARANCE_DIA <= LAG_SHANK_DIA or LAG_COUNTERBORE_DIA <= LAG_HEAD_DIA:
+    raise AssertionError("base bores must clear the unmodified stock hold-down")
+if not math.isclose(LAG_HEAD_RECESS, 0.5, abs_tol=1e-9):
+    raise AssertionError("lag-screw counterbore must recess the stock head by 0.5 mm")
+if not math.isclose(LAG_SUPPORT_ENGAGEMENT, LAG_FOOT_THICKNESS, abs_tol=1e-9):
+    raise AssertionError("stock hold-down thread must span the entire support foot")
 
 TOP_FRAME_MID_Y = 1017.95  # casting mid-plane: side rails 34.2 / front-rear
 # rails 38 wide x 36.5 tall, band y 999.7..1036.2; corner bosses rise to
@@ -178,30 +219,30 @@ TOP_FRAME_MID_Y = 1017.95  # casting mid-plane: side rails 34.2 / front-rear
 # bearing plane and the head ABOVE it (+Y), so the placement point is the
 # under-head seat and the rotation turns local +Y toward the head side. ---
 #
-# frame-side-screw: 4x #10-24 UNC x 12.7 slotted cheese-head screws pin the
-# casting's four corner bosses (Ø52.2 at x ±197, z ±112) against the columns,
+# frame-side-screw: 4x selected stock #8-32 UNC slotted cheese-head screws pin
+# the casting's four corner bosses (Ø52.2 at x ±197, z ±112) against the columns,
 # screwed from OUTSIDE the frame: front bosses from the front (head -Z), rear
 # bosses from the rear (head +Z), axes along Z at (x ±197, y TOP_FRAME_MID_Y).
 # The under-head plane seats on the boss spot-face (Ø9 x 0.5 into the boss
 # extreme z ±138.1) at z ±137.6; local +Y -> -Z for the front pair
 # (ROT_X_NEG90, euler [-90,0,0]) and +Y -> +Z for the rear pair (ROT_X_POS90,
-# euler [90,0,0]) point the 12.7 shank inboard: tips at z ±124.9, 0.2 clear
-# of the column surface z ±124.7 (tapped #10-24 boss holes live in the
-# top-frame part).
+# euler [90,0,0]) point the stock shank inboard. The selected SKU determines
+# the derived tip station and its clearance from the column surface.
 SIDE_SCREW_HEAD_Z = 137.6  # under-head seat station (spot-faced boss face)
+SIDE_SCREW_TIP_Z = SIDE_SCREW_HEAD_Z - SIDE_SCREW_SHANK_LEN
+SIDE_SCREW_COLUMN_CLEARANCE = SIDE_SCREW_TIP_Z - 124.7
+if SIDE_SCREW_COLUMN_CLEARANCE <= 0.0:
+    raise AssertionError("frame-side screw tip reaches the column surface")
 #
-# gooseneck-set-screw: 1x 1/4-20 UNC x 16 square-head set screw gripping the
+# gooseneck-set-screw: 1x 1/4-20 UNC square-head set screw gripping the
 # gooseneck post through the casting's east-hub tapped rib hole, axis along X
 # at (y TOP_FRAME_MID_Y, z 3.088 -- the hub/post centreline). Entered from the
 # east outer face x -214.1: local +Y -> -X (rot_z_rows(90), euler [0,0,90])
-# points the 16 shank inboard, tip at x -205.15 = 0.15 CLEAR (outboard) of the
-# Ø16 post surface at x -205 (post centre -197) -- the first build pinned the
-# tip at -204.85, 0.15 INSIDE the post (1.39 mm^3 top-level interference),
-# under-head plane at x -221.15 (bearing face 7.05 off the outer face,
-# the contract standoff), square head outboard to -227.15.
+# points the exact stock shank inboard while retaining its cup tip at x -205.15,
+# 0.15 clear (outboard) of the Ø16 post surface at x -205.
 GOOSENECK_HUB_Z = 3.088  # gooseneck bore centreline (unchanged position)
 SET_SCREW_TIP_X = -205.15  # 0.15 clear (outboard) of the Ø16 post surface -205
-SET_SCREW_UNDER_HEAD_X = SET_SCREW_TIP_X - 16.0  # -221.15 under-head plane
+SET_SCREW_UNDER_HEAD_X = SET_SCREW_TIP_X - GOOSENECK_SHANK_LEN
 
 # Maker's nameplate (book ch. 26, pp. 70-71): the 100 x 55 brass plate lies FLAT
 # on the base top, decorated side up, on the EAST (+X) face. The mount
@@ -226,17 +267,15 @@ if any(
 # #4-40 taps (build_harmonic_base NAMEPLATE_SCREW_XZ -- the plate's own
 # corner holes carried through the mount transform: x 209.75/163.75,
 # z +/-45.5). The part is authored axis along local +Z with the origin at the
-# UNDER-HEAD bearing plane, head at -Z (build_fillister_screw: head -2.2..0,
-# shank 0..+4), so the placement point is the under-head seat on the plate's
-# decorated face (y NAMEPLATE_FRONT_Y 52.3) and ROT_X_POS90 (euler [90,0,0])
-# turns local +Z -> -Y: the 4.0 shank drops through the 1.5 plate into the
-# tap (2.5 buried, tip y 48.3 in a 6.0 thread), the head rides 52.3..54.5
-# above the deck rim (53.3). The under-head plane seats FLUSH on the plate
-# face, exactly as the paper-drive seats the same screw on its clips: the
-# interference gate ignores coincident contact
-# (TreatCoincidenceAsInterference off), so no 0.25 air gap is owed. The Ø2.0
-# modelled shank sits inside the Ø2.261 tap drill, the repo's foot-screw
-# convention, so no allowed-interference pair is needed.
+# UNDER-HEAD bearing plane, head at -Z. The stock wrapper preserves that frame,
+# so the placement point is the under-head seat on the plate's decorated face
+# (y NAMEPLATE_FRONT_Y 52.3) and ROT_X_POS90 (euler [90,0,0]) turns local +Z
+# -> -Y. The stock 6.35 shank passes through the 1.5 plate with 4.85 engaged
+# in the existing 6.0 thread; the 2.7178 head sits above the deck rim.
+# The under-head plane seats FLUSH on the plate face, exactly as the
+# paper-drive seats the same screw on its clips. The stock external thread
+# engages the matching #4-40 base seat rather than using a tap-drill-sized
+# simplified shank.
 NAMEPLATE_SCREW_EULER = [90.0, 0.0, 0.0]
 NAMEPLATE_SCREW_ROWS = ROT_X_POS90
 if NAMEPLATE_SCREW_STATIONS != NAMEPLATE_SCREW_XZ:
@@ -359,12 +398,12 @@ async def build(adapter) -> dict[str, str]:
     )
     assert_component_placed(adapter, support_name, support_target, SUPPORT_ROWS)
 
-    # Hold-down: four 9/16-12 lag screws coaxial with the support foot's tapped
+    # Hold-down: four stock 1/2-13 screws coaxial with the support foot's tapped
     # holes (and the base clearance holes below them). The authored support pose
     # seats its foot exactly on the base top at the derived machine stations, so the
-    # screw at each station rises through the base clearance hole -- its O22 head
-    # recessed in the base underside counterbore -- into the O12.30 tapped foot
-    # hole. Authored head-down (IDENTITY) on its exact machine transform,
+    # screw rises through the O13 base clearance hole with its O20.6502 head
+    # recessed in the O23 underside counterbore, into the 1/2-13 UNC-2B foot
+    # tap (O10.716 drill). Authored head-down (IDENTITY) on its machine transform,
     # not grounded. Each seed uses one lock mate to the fixed base; its exact
     # transform carries the physical coaxiality and head-seat position, and the
     # readback assertion proves the mate did not move it. One real-mated seed and
@@ -468,7 +507,7 @@ async def build(adapter) -> dict[str, str]:
         )
         assert_component_placed(adapter, np_screw, np_target, NAMEPLATE_SCREW_ROWS)
 
-    # Corner-boss side screws: one #10-24 cheese-head per boss, screwed from
+    # Corner-boss side screws: one #8-32 cheese-head per boss, screwed from
     # OUTSIDE the frame (front pair from -Z, rear pair from +Z), under-head
     # seat on the boss spot-face at z -/+137.6 (see SIDE_SCREW_HEAD_Z). Rigid
     # fasteners -> the frame's single-mate fix-all strategy: placed on their
@@ -521,7 +560,10 @@ async def build(adapter) -> dict[str, str]:
     assert_component_placed(adapter, set_screw, set_target, set_rows)
 
     assert_components_fully_defined(adapter)
-    check_no_interference(adapter)
+    check_no_interference(
+        adapter,
+        allowed_pairs=allowed_interference_pairs(ASM_NAME),
+    )
     # Title-block identity for the assembly drawing (draw_frame_assembly.py):
     # assembly_title_properties supplies the Title/Generator and TOL_* cells
     # finalize_drawing requires without consulting the part registry;

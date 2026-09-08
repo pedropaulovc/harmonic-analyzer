@@ -43,7 +43,7 @@ macro (low). The engraving geometry IS the traced photo (the DXF).
 Mounting (2026-09-02 re-derive off ch26 p.71 ``page001_img01``): FOUR brass
 slotted round-head screws, one per corner, heads riding the pinstripe corners
 in the border band. They are the shared #4-40 brass ``fillister-screw``
-(``_fastener_catalog``; Ø2.0 modelled shank, Ø5.5 head), so the plate carries
+(``_fastener_catalog``; stock Ø2.8448 major diameter, Ø4.6482 head), so the plate carries
 four #4 CLOSE clearance holes (wizard Ø3.048, the build_guide_lock idiom) and
 the harmonic base carries four blind #4-40 taps under them. The plate envelope,
 the screw stations and the mount transform live in ``nameplate_spec`` (pure
@@ -147,8 +147,8 @@ ENGRAVING_POSITION = (
     ENGRAVING_CENTER[1] - ENGRAVING_SCALE * ENGRAVING_RAW_CENTER[1],
 )
 
-# Four corner mounting screws (the shared #4-40 brass fillister-screw, Ø2.0
-# modelled shank) at SCREW_XY in the border band: #4 clearance, CLOSE fit
+# Four corner mounting screws (the shared stock #4-40 brass fillister-screw,
+# Ø2.8448 major diameter) at SCREW_XY in the border band: #4 CLOSE clearance
 # (Ø3.048 -- the same HoleSpec build_guide_lock cuts for the same screw;
 # memory/fastener-policy-us-customary). History: the holes were #2-56 normal
 # fit Ø2.591 from a "#2 screw" guess; the 2026-09-02 p.71 re-read sized the

@@ -37,6 +37,17 @@ reproduces the same identity token and can restore its matched downstream output
 with no COM work; another artifact misses and rebuilds/refreshes once. Assembly
 tokens propagate the guarantee through subassembly levels to the top model.
 
+Drawing recipes include the selected `_drawing_registry.py` row and the shared
+registry implementation, recorded under `cad/out/.drawing-registry/`. Adding or
+editing another row does not invalidate an independent drawing. Shared helper,
+template, schema and source-model identity changes still invalidate it. Consumers
+that read other rows or use an unclassified registry access retain the full
+registry dependency.
+
+Switching to these per-drawing dependencies changes existing drawing cache keys
+once. It does not reuse legacy keys; subsequent unrelated row changes stay
+isolated. A scoped drawing build need not regenerate the rest of the fleet.
+
 The `file_dep` set for a COM task also folds the **`SolidworksMCP-python`
 submodule** — the vendored COM adapter (`solidworks_mcp`) is imported at runtime
 by `_common`/`_assembly` (mate/plane/feature creation), so its source is a genuine

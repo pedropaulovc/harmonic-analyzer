@@ -19,7 +19,7 @@ TODO
 
 TODO
 
-## Tapping: the only real threads in the machine are 4× 9/16-12
+## Tapping the rocker-arm support feet
 
 TODO
 
@@ -37,7 +37,9 @@ TODO
 
 ::: {.callout-tip}
 ## Now make
-`rocker-arm-support` foot holes (4× 9/16-12, tap drill Ø12.30).
+`rocker-arm-support` foot holes: 4× 1/2-13 UNC-2B through the 6.35 mm foot,
+tap drill Ø10.716 mm (Ø10.72 displayed; 27/64 in), from
+`cad/scripts/build_rocker_arm_support.py` and `cad/scripts/_holes.py`.
 :::
 
 ---
@@ -45,4 +47,6 @@ TODO
 **Sources for this chapter**
 
 - `cad/docs/machining-dfm.md` (`rocker-arm-support`, `summing-lever`)
+- `cad/scripts/build_rocker_arm_support.py` (foot thickness, four-hole pattern and thread class)
+- `cad/scripts/_holes.py` (`TAP_DRILL_MM["1/2-13"]`)
 

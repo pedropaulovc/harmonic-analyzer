@@ -1,0 +1,64 @@
+# McMaster-Carr vendor models (supplied locally, never tracked)
+
+The `.SLDPRT` files this directory holds at build time are © McMaster-Carr —
+vendor CAD downloads for the stock fasteners the machine uses. They are **not
+in git** (see the `cad/references/mcmaster/*.SLDPRT` rule in the root
+`.gitignore`): McMaster provides them to customers for product evaluation, not
+for redistribution in a public repository.
+
+To populate the directory, download each part's SOLIDWORKS model from its
+`https://www.mcmaster.com/<part-number>/` product page and save it here as
+`<part-number>.SLDPRT`. Sign in if requested.
+
+Parts referenced by the production fastener fleet and its reusable diagnostic
+recipes:
+
+| part number | production part stem(s) | stock item |
+|---|---|---|
+| 90114A511 | `fillister-screw` | Brass Fillister Head Slotted Screw |
+| 90126A211 | `knife-hanger-washer` | Zinc-Plated Steel SAE Washer |
+| 90280A108 | `cone-tip-pinch-screw`, `foot-screw` | Steel Narrow Fillister Head Slotted Screw |
+| 90280A194 | `bracket-screw`, `frame-side-screw` | Steel Narrow Fillister Head Slotted Screw |
+| 90280A199 | `slotted-screw`, `swing-stop-screw` | Steel Narrow Fillister Head Slotted Screw |
+| 90280A201 | `clamp-screw` | Steel Narrow Fillister Head Slotted Screw |
+| 91247A720 | `knife-hanger-stud` | Medium-Strength Grade 5 Steel Hex Head Screw |
+| 91410A538 | `gooseneck-set-screw` | Steel Square-Head Cup-Point Set Screw |
+| 91783A722 | `lag-screw` | 18-8 Stainless Steel Round Head Slotted Screw |
+| 91829A560 | `cone-pivot-screw` | Slotted 18-8 Stainless Steel Precision Shoulder Screw |
+| 91882A221 | `thumb-screw` | Steel Raised Knurled-Head Thumb Screw |
+| 91882A425 | `cone-lock-knob` | Steel Raised Knurled-Head Thumb Screw |
+| 92865A585 | `hex-bolt` | Medium-Strength Grade 5 Steel Hex Head Screw |
+| 93075A194 | `hanger-screw` | Low-Strength Zinc-Plated Steel Hex Head Screw |
+| 94025A150 | `cone-tip-adjuster` | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
+| 99607A213 | `pen-set-screw` | Stainless Steel Flared-Collar Knurled-Head Thumb Screw |
+
+The cone-lock and swing-stop selections follow `cad/scripts/build_cone_lock_knob.py`
+and `cad/scripts/build_swing_stop_screw.py`.
+
+Catalog specifications checked on September 8, 2026:
+
+- [91783A722](https://www.mcmaster.com/91783A722/) is a 1/2-13 UNC,
+  class 2A screw. Its downloaded SolidWorks model uses a 56-TPI visual helix;
+  use the catalog thread designation for the mating tap.
+- [91882A425](https://www.mcmaster.com/91882A425/) is black-oxide steel,
+  with a 1/4-20 thread and a 19.05 mm (3/4 in) stud. The catalog's material
+  field supplies the finish specification absent from the CAD properties.
+
+Ground rules (mirrored in the diagnostics themselves): the vendor files are
+opened read-only and NEVER saved or modified; everything derived from them
+(harvest dumps, replicas, renders, reports) goes only under the gitignored
+`cad/out/`.
+
+## Reference drawings
+
+Each of the 19 production part identities above has a registered `drawing:`
+task, including identities that share a supplier SKU. The sheets show front,
+top, right and isometric views, with the stock description and ordering SKU.
+They are purchased-part identification sheets; their general tolerance and
+edge-break notes do not apply.
+
+For example, `uv run python build.py drawing:knife_hanger_washer` writes
+`cad/out/slddrw/knife-hanger-washer.SLDDRW`,
+`cad/out/pdf/knife-hanger-washer.pdf` and
+`cad/out/png/knife-hanger-washer_drawing.png`. Run these tasks through the
+pipeline so they acquire the shared SolidWorks seat lock.

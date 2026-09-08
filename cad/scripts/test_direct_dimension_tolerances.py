@@ -4,10 +4,8 @@ from __future__ import annotations
 
 import build_alignment_pinion
 import build_arbor_pedestal
-import build_cone_lock_knob
 import build_cone_pivot_post
 import build_cone_swing_platform
-import build_cone_tip_adjuster
 import build_cone_tip_block
 import build_cone_tip_bushing
 import build_connecting_rod
@@ -21,7 +19,6 @@ import build_top_frame
 import build_tube_frame
 import alignment_pinion_spec
 import arbor_pedestal_spec
-import cone_lock_knob_spec
 import cone_pivot_post_spec
 import cone_swing_platform_spec
 import cone_tip_block_spec
@@ -40,7 +37,6 @@ from _drawing_contract import model_toleranced_dimensions
 def test_direct_tolerance_values_are_named_in_part_specs() -> None:
     assert alignment_pinion_spec.ARBOR_BORE_BAND == (-0.020, -0.040)
     assert arbor_pedestal_spec.BORE_DIA_BAND == (0.055, 0.025)
-    assert cone_lock_knob_spec.WASHER_THICKNESS_TOLERANCE_MM == 0.10
     assert cone_pivot_post_spec.TURNED_DIAMETER_TOLERANCE_MM == 0.05
     assert cone_pivot_post_spec.CRANK_BORE_TOLERANCE_MM == 0.025
     assert cone_tip_block_spec.BLOCK_HEIGHT_BAND == (0.05, 0.00)
@@ -67,7 +63,6 @@ def test_direct_tolerances_are_owned_by_named_model_dimensions() -> None:
         build_arbor_pedestal: {
             ("BoreProfile", "BoreDia"): "*deviations(BORE_DIA_BAND)"
         },
-        build_cone_lock_knob: {("Washer", "WasherT"): "WASHER_THICKNESS_TOLERANCE_MM"},
         build_cone_pivot_post: {
             ("MainBodyProfile", "MainBodyDia"): "TURNED_DIAMETER_TOLERANCE_MM",
             ("HeadProfile", "HeadDia"): "TURNED_DIAMETER_TOLERANCE_MM",
@@ -78,12 +73,6 @@ def test_direct_tolerances_are_owned_by_named_model_dimensions() -> None:
         build_cone_tip_bushing: {
             ("BoreProfile", "BoreDiaDim"): "*deviations(BORE_DIA_BAND)",
             ("Body", "Depth"): "LENGTH_TOLERANCE_MM",
-        },
-        build_cone_tip_adjuster: {
-            ("Body", "BodyLenDim"): "GENERAL_TOL_MM",
-            ("SlotProfile", "SlotWDim"): "GENERAL_TOL_MM",
-            ("CupProfile", "CupDiaDim"): "*deviations(CUP_DIA_BAND)",
-            ("Cup", "CupDepth"): "GENERAL_TOL_MM",
         },
         build_connecting_rod: {
             ("StrapBoreProfile", "StrapBoreDia"): "*deviations(RING_BORE_DIA_BAND)"

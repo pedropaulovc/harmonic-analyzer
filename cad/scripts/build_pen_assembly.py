@@ -87,11 +87,22 @@ from _assembly import (
     write_dof_manifest,
 )
 from _transforms import IDENTITY, euler_from_rows, rot_z_rows
+from _interference_contracts import allowed_interference_pairs
+from build_hanger_screw import SHANK_LEN as HANGER_SHANK_LEN
+from pen_wire_geom import WHEEL_BAR_Y, WHEEL_MID_Z
+from wheel_bar_geom import BAR_DEPTH as WHEEL_BAR_DEPTH
+from wheel_bar_geom import HANGER_SCREW_MACHINE_X
+from build_pen_hanger import SCREW_HOLE_XY as HANGER_TAP_XY
+from build_pen_hanger import STRAP_Z as HANGER_STRAP_Z
+from build_pen_set_screw import HEAD_STACK_LEN as PEN_SET_HEAD_STACK_LEN
+from build_pen_set_screw import SHANK_LEN as PEN_SET_SHANK_LEN
+from build_pen_set_screw import SHANK_DIA as PEN_SET_SHANK_DIA
+from build_pen_set_screw import TIP_CHAMFER as PEN_SET_TIP_CHAMFER
+from magnifying_wheel_geom import RIM_AXIAL as WHEEL_RIM_AXIAL
 
 ASM_NAME = "pen"
 
 # --- machine anchors ---------------------------------------------------------
-WHEEL_BAR_Y = 575.7  # the wheel-bar the pen-hanger clamps (magnifier.SLDASM)
 PAPER_FRONT_Z = -143.4  # recording paper front face (build_paper_drive_assembly:
 # platen front -142.9, the sheet planted 0.5 proud)
 CLEARANCE = 0.25  # interference-gate margin convention
@@ -134,7 +145,6 @@ from build_pen_frame import (  # noqa: E402
     RAIL_END,
     RAIL_SIDE,
 )
-from pen_set_screw_spec import KNOB_LENGTH, SHANK_LEN  # noqa: E402
 
 BLOCK_YAW_DEG = 45.0  # v4_t00603: the nib meets the paper at 45 degrees
 _C = math.cos(math.radians(BLOCK_YAW_DEG))
@@ -176,13 +186,15 @@ MARKER_AXIS_LOCAL_Y = GROOVE_DEPTH - BARREL_DIA / 2.0 - CLEARANCE  # 0.25
 assert GROOVE_WIDTH >= BARREL_DIA + 2 * CLEARANCE
 # Solve the nib's block-local x from the paper stand-off: machine z of a
 # local (x, ., 8) point is VBLOCK_POS.z - x*cos + 8*sin.
-MARKER_TIP_LOCAL_X = -(
-    (PAPER_FRONT_Z - CLEARANCE) - VBLOCK_POS[2] - (BLOCK_DEPTH / 2.0) * _S
-) / _C
+MARKER_TIP_LOCAL_X = (
+    -((PAPER_FRONT_Z - CLEARANCE) - VBLOCK_POS[2] - (BLOCK_DEPTH / 2.0) * _S) / _C
+)
 assert MARKER_TIP_LOCAL_X < 0.0 < MARKER_TIP_LOCAL_X + BARREL_TOP_Y - BLOCK_LENGTH, (
     "marker must pass right through the block: nib past the rear face, body past the front"
 )
-MARKER_POS = _block_to_machine((MARKER_TIP_LOCAL_X, MARKER_AXIS_LOCAL_Y, BLOCK_DEPTH / 2.0))
+MARKER_POS = _block_to_machine(
+    (MARKER_TIP_LOCAL_X, MARKER_AXIS_LOCAL_Y, BLOCK_DEPTH / 2.0)
+)
 # Marker local +Y -> block local +X (the barrel runs forward along the groove):
 # spin -90 about Z (Y -> X) then the block's yaw.
 _YAW_ROWS = BLOCK_ROWS
@@ -208,9 +220,15 @@ FRAME_TOP_GAP = 0.1
 # (a 1.0 gap measured from the flat left 0.04 of overlap, 0.01 mm^3).
 FRAME_ROD_GAP = 1.0
 ROD_HALF_DIAGONAL = ROD_SECTION / math.sqrt(2.0)  # 3.54
-FRAME_X_CENTER_LOCAL = ROD_BORE_LOCAL[0] + ROD_HALF_DIAGONAL + FRAME_ROD_GAP + FRAME_DEPTH / 2.0
-assert OUTER_WIDTH - 2 * RAIL_SIDE >= BLOCK_DEPTH + 2.0, "stirrup window must pass the block"
-assert FRAME_X_CENTER_LOCAL + FRAME_DEPTH / 2.0 < BLOCK_LENGTH, "stirrup off the block end"
+FRAME_X_CENTER_LOCAL = (
+    ROD_BORE_LOCAL[0] + ROD_HALF_DIAGONAL + FRAME_ROD_GAP + FRAME_DEPTH / 2.0
+)
+assert OUTER_WIDTH - 2 * RAIL_SIDE >= BLOCK_DEPTH + 2.0, (
+    "stirrup window must pass the block"
+)
+assert FRAME_X_CENTER_LOCAL + FRAME_DEPTH / 2.0 < BLOCK_LENGTH, (
+    "stirrup off the block end"
+)
 _FRAME_ORIGIN_LOCAL = (
     FRAME_X_CENTER_LOCAL + FRAME_DEPTH / 2.0,  # frame z 0 is its rear face
     BLOCK_HEIGHT + FRAME_TOP_GAP + RAIL_END - OUTER_HEIGHT,  # bottom outer face
@@ -219,17 +237,25 @@ _FRAME_ORIGIN_LOCAL = (
 FRAME_POS = _block_to_machine(_FRAME_ORIGIN_LOCAL)
 FRAME_ROWS = [[_C, 0.0, _S], [0.0, 1.0, 0.0], [-_S, 0.0, _C]]  # yaw -45
 FRAME_ROT = euler_from_rows(FRAME_ROWS)
-# Thumb screw (build_pen_set_screw: axis +X from the knob's outer face at x 0,
-# knob 0..KNOB_LENGTH, shank to KNOB_LENGTH + SHANK_LEN): stood on end (+X ->
-# +Y) on the frame's screw axis, its tip CLEARANCE under the marker barrel.
+# Stock thumb screw: local +X runs from the outer head face through the
+# head/shoulder stack and shank. Turn +X upward on the frame's screw axis;
+# its flat tip is tangent to the underside of the centred marker barrel.
 SET_SCREW_ROWS = rot_z_rows(90.0)  # X -> +Y
 SET_SCREW_ROT = euler_from_rows(SET_SCREW_ROWS)
 _MARKER_BOTTOM_LOCAL_Y = MARKER_AXIS_LOCAL_Y - BARREL_DIA / 2.0
-_SCREW_TIP_LOCAL_Y = _MARKER_BOTTOM_LOCAL_Y - CLEARANCE
+_SCREW_TIP_LOCAL_Y = _MARKER_BOTTOM_LOCAL_Y
+PEN_SET_OVERALL_REACH = PEN_SET_HEAD_STACK_LEN + PEN_SET_SHANK_LEN
+PEN_SET_TIP_RADIUS = PEN_SET_SHANK_DIA / 2.0 - PEN_SET_TIP_CHAMFER
+if PEN_SET_TIP_RADIUS <= 0.0:
+    raise AssertionError("pen-set stock tip chamfer consumes its tip face")
 SET_SCREW_POS = _block_to_machine(
-    (FRAME_X_CENTER_LOCAL, _SCREW_TIP_LOCAL_Y - KNOB_LENGTH - SHANK_LEN, BLOCK_DEPTH / 2.0)
+    (
+        FRAME_X_CENTER_LOCAL,
+        _SCREW_TIP_LOCAL_Y - PEN_SET_OVERALL_REACH,
+        BLOCK_DEPTH / 2.0,
+    )
 )
-assert _SCREW_TIP_LOCAL_Y - KNOB_LENGTH - SHANK_LEN + KNOB_LENGTH < _FRAME_ORIGIN_LOCAL[1], (
+assert _SCREW_TIP_LOCAL_Y - PEN_SET_SHANK_LEN < _FRAME_ORIGIN_LOCAL[1], (
     "the knob must stand below the stirrup's bottom rail"
 )
 
@@ -257,12 +283,26 @@ assert math.isclose(PEN_WIRE_BOTTOM[1] + PEN_WIRE_LEN, WHEEL_BAR_Y, abs_tol=1e-9
 )
 
 # --- M6.10 fastener ----------------------------------------------------------
-# Pen-hanger screw from BEHIND the bar (the wheel rim passes 1.0 in front
-# of the strap, so no front-side head fits): AF-7 head on the bar back
-# face (-129.9 -- the 9-deep support-bar stock seated on the clamp arc,
-# build_magnifier_assembly BAR_BACK_Z), O3.5 shank through the bar + strap
-# holes, tip 0.5 behind the strap front face (-141.9).
-HANGER_SCREW_POS = (-5.5, WHEEL_BAR_Y, -129.9)
+# Pen-hanger screw from BEHIND the bar. Its under-head frame follows the shared
+# wheel-bar back face; the exact stock shank passes through the 9 mm bar and
+# 3 mm strap, then retains clearance to the magnifying-wheel rim.
+BAR_BACK_Z = HANGER_POS[2] + max(HANGER_STRAP_Z) + WHEEL_BAR_DEPTH
+HANGER_SCREW_POS = (
+    HANGER_POS[0] + HANGER_TAP_XY[0],
+    HANGER_POS[1] + HANGER_TAP_XY[1],
+    BAR_BACK_Z,
+)
+assert math.isclose(HANGER_SCREW_POS[0], HANGER_SCREW_MACHINE_X, abs_tol=1e-9)
+assert math.isclose(HANGER_SCREW_POS[1], WHEEL_BAR_Y, abs_tol=1e-9)
+HANGER_SCREW_TIP_Z = HANGER_SCREW_POS[2] - HANGER_SHANK_LEN
+HANGER_STRAP_FRONT_Z = HANGER_POS[2] + min(HANGER_STRAP_Z)
+WHEEL_RIM_BACK_Z = WHEEL_MID_Z + WHEEL_RIM_AXIAL / 2.0
+HANGER_THREAD_PROTRUSION = HANGER_STRAP_FRONT_Z - HANGER_SCREW_TIP_Z
+HANGER_TIP_TO_RIM = HANGER_SCREW_TIP_Z - WHEEL_RIM_BACK_Z
+if HANGER_THREAD_PROTRUSION <= 0.0:
+    raise AssertionError("stock hanger screw does not pass through the tapped strap")
+if HANGER_TIP_TO_RIM <= 0.0:
+    raise AssertionError("stock hanger screw tip reaches the magnifying-wheel rim")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -430,7 +470,10 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     write_dof_manifest(ASM_NAME)
-    check_no_interference(adapter)
+    check_no_interference(
+        adapter,
+        allowed_pairs=allowed_interference_pairs(ASM_NAME),
+    )
     # Title-block identity for the assembly drawing (draw_pen_assembly.py):
     # assembly_title_properties supplies the Title/Generator and TOL_* cells
     # finalize_drawing requires without consulting the part registry; material and

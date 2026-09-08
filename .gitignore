@@ -462,3 +462,8 @@ migration-baseline-bootstrap/
 # Scratch output from local preview smoke runs.
 preview-smoke/
 preview-smoke-2/
+
+# McMaster-Carr vendor CAD models — (c) McMaster-Carr, redistributable to
+# customers but not in a public repo, so they are supplied locally (download
+# from mcmaster.com per cad/references/mcmaster/README.md) and never tracked.
+cad/references/mcmaster/*.SLDPRT

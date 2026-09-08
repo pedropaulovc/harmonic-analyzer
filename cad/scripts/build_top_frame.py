@@ -14,7 +14,7 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   outer faces z -/+131, window z -/+93.
 * Corner bosses O52.2 spanning y 993.4..1040.7 (proud 4.5 above the rail
   top, hanging 6.3 below the underside -- ch19 img04 / p002+p006 corner
-  crops), bored O25.5 around the O25.4 columns, each with a #10-24 side
+  crops), bored O25.5 around the O25.4 columns, each with a #8-32 side
   screw tapped into its z face (front pair from the front, rear pair from
   the rear; O9 x 0.9 spot-face on the boss cylinder) pressing the column:
   the screws that hold the frame to the tube-frame.
@@ -171,10 +171,15 @@ SET_TAP_SPEC = HoleSpec("tapped", "1/4-20", end="blind", depth_mm=8.0)
 SPOTFACE_DIA = 9.0
 SPOTFACE_PLANE = abs(FRAME_FRONT_COLUMN_Z) + BOSS_DIA / 2.0 + 0.4  # z -/+138.5
 SPOTFACE_FLOOR = SPOTFACE_PLANE - 0.9  # planar seat z -/+137.6
-SIDE_TAP_SPEC = HoleSpec("tapped", "#10-24", end="blind", depth_mm=14.0)
+SIDE_TAP_SPEC = HoleSpec("tapped", "#8-32", end="blind", depth_mm=14.0)
+SIDE_SCREW_XS = (-COLUMN_X, COLUMN_X)
+SIDE_SCREW_FACES = (
+    ("front", -1.0, True),
+    ("rear", 1.0, False),
+)
 
 # --- Fulcrum keepers (west rail top face; shaft-end brackets, ch17 p.40) ----
-KEEPER_TAP_SPEC = HoleSpec("tapped", "#10-24", end="blind", depth_mm=10.0)
+KEEPER_TAP_SPEC = HoleSpec("tapped", "#8-32", end="blind", depth_mm=10.0)
 KEEPER_TAP_X = 199.9  # fulcrum line (build_channel_assembly FULCRUM[0])
 KEEPER_TAP_Z_FRONT = SUMMING_Z - 74.0  # -70.912
 KEEPER_TAP_Z_REAR = SUMMING_Z + 74.0  # +77.088
@@ -216,7 +221,7 @@ if STUD_Z_REAR + STUD_HOLE_DIA / 2.0 >= INNER_Z + GUSSET:
     raise AssertionError("rear hanger-stud hole escapes the junction material")
 if HUB_GUSSET_T / 2.0 > WEB_T / 2.0:
     raise AssertionError("hub V-gussets escape the east-rail web")
-if abs(KEEPER_TAP_X - COLUMN_X) + TAP_DRILL_MM["#10-24"] / 2.0 > WEB_T / 2.0:
+if abs(KEEPER_TAP_X - COLUMN_X) + TAP_DRILL_MM[KEEPER_TAP_SPEC.size] / 2.0 > WEB_T / 2.0:
     raise AssertionError("keeper taps break out of the west-rail web")
 
 
@@ -366,8 +371,8 @@ def _spotface_removal() -> float:
 
 
 def _side_tap_removal() -> float:
-    """Material one #10-24 x 14 tap removes (break-in to the curved bore)."""
-    r_h = TAP_DRILL_MM["#10-24"] / 2.0
+    """Material one #8-32 x 14 tap removes (break-in to the curved bore)."""
+    r_h = TAP_DRILL_MM[SIDE_TAP_SPEC.size] / 2.0
     r_v = BORE_DIA / 2.0
     step = 0.005
     vol = 0.0
@@ -885,7 +890,7 @@ async def build(adapter) -> dict[str, str]:
     # 9. Side-screw spot-faces: O9 x 0.9 flats on the curved boss z-faces
     #    (planar seats the tapped holes need).
     v_spot = _spotface_removal()
-    for side, sign, reverse in (("front", -1.0, True), ("rear", 1.0, False)):
+    for side, sign, reverse in SIDE_SCREW_FACES:
         spot_plane = check(
             f"create_plane spotface {side}",
             await adapter.create_plane(
@@ -902,13 +907,13 @@ async def build(adapter) -> dict[str, str]:
             await adapter.create_sketch(getattr(spot_plane, "name", spot_plane)),
         )
         ref_planes.append(str(getattr(spot_plane, "name", spot_plane)))
-        for k, sx in enumerate((-1.0, 1.0)):
+        for k, x in enumerate(SIDE_SCREW_XS):
             await define_circle(
                 adapter,
-                sx * COLUMN_X,
+                x,
                 0.0,
                 SPOTFACE_DIA / 2.0,
-                f"spotface {side} ({sx:+.0f})",
+                f"spotface {side} (x={x:+.0f})",
                 dims=spot,
                 names=(f"S{k}X", None, f"S{k}Dia"),
             )
@@ -926,7 +931,10 @@ async def build(adapter) -> dict[str, str]:
         )
         name_last_feature(adapter, f"SpotFace{side.capitalize()}")
         volume = await volume_check(
-            adapter, f"spotface {side}", volume - 2.0 * v_spot, 0.2 * v_spot + 15.0
+            adapter,
+            f"spotface {side}",
+            volume - len(SIDE_SCREW_XS) * v_spot,
+            0.2 * v_spot + 15.0,
         )
 
     # 10. Column bores (through the boss stacks).
@@ -1004,22 +1012,22 @@ async def build(adapter) -> dict[str, str]:
     v_studs = 2.0 * math.pi * (STUD_HOLE_DIA / 2.0) ** 2 * RING_HEIGHT
     volume = await volume_check(adapter, "hanger stud holes", volume - v_studs, 60.0)
 
-    # 13. Side-screw taps (#10-24 x 14 blind): one per boss, on the
+    # 13. Side-screw taps (#8-32 x 14 blind): one per boss, on the
     #     spot-face seats, breaking into the column bores. ONE feature per
     #     side with BOTH positions (the two spot floors are co-planar
     #     disjoint faces sharing one placement sketch -- the StudHoles
     #     idiom); opposed blind holes cannot share a feature across sides,
     #     the drill direction is per-feature.
     v_side_tap = _side_tap_removal()
-    for feat, z_face in (
-        ("SideTapsFront", -SPOTFACE_FLOOR),
-        ("SideTapsRear", SPOTFACE_FLOOR),
-    ):
-        normal = (0.0, 0.0, -1.0 if z_face < 0 else 1.0)
+    for side, sign, _reverse in SIDE_SCREW_FACES:
+        feat = f"SideTaps{side.capitalize()}"
+        z_face = sign * SPOTFACE_FLOOR
+        normal = (0.0, 0.0, sign)
+        tap_points = [[x, 0.0, z_face] for x in SIDE_SCREW_XS]
         wizard_holes(
             adapter,
             SIDE_TAP_SPEC,
-            [[-COLUMN_X, 0.0, z_face], [COLUMN_X, 0.0, z_face]],
+            tap_points,
             normal,
             f"side screw taps {feat}",
             name=feat,
@@ -1028,7 +1036,7 @@ async def build(adapter) -> dict[str, str]:
         volume = await volume_check(
             adapter,
             f"side taps {feat}",
-            volume - 2.0 * v_side_tap,
+            volume - len(tap_points) * v_side_tap,
             0.1 * v_side_tap + 15.0,
         )
 
@@ -1048,7 +1056,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, "gooseneck set tap", volume - v_set_tap, 0.1 * v_set_tap + 10.0
     )
 
-    # 15. Fulcrum-keeper taps (#10-24 x 10 blind) into the west rail TOP
+    # 15. Fulcrum-keeper taps (#8-32 x 10 blind) into the west rail TOP
     #     face: the two shaft-end keeper brackets' feet (ch17 p.40; the
     #     lever-pair ball mounts are replaced by keepers in channel.SLDASM).
     #     Solid flange + 12.7-thick web under both points -- exact blind
@@ -1065,7 +1073,9 @@ async def build(adapter) -> dict[str, str]:
         name="KeeperTaps",
         # blind tap: no expect_dia_mm (definition reads 0.0 on blinds)
     )
-    v_keeper = 2.0 * blind_hole_volume_mm3(TAP_DRILL_MM["#10-24"], 10.0)
+    v_keeper = 2.0 * blind_hole_volume_mm3(
+        TAP_DRILL_MM[KEEPER_TAP_SPEC.size], KEEPER_TAP_SPEC.depth_mm
+    )
     volume = await volume_check(adapter, "keeper taps", volume - v_keeper, 10.0)
 
     # 16. Internal T-root fillets: R3 along the reentrant junction where

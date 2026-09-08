@@ -76,6 +76,9 @@ import sys
 import tempfile
 import time
 from pathlib import Path
+import yaml as _yaml
+from doit.dependency import CHECKERS, Dependency, JsonDB, MD5Checker
+from filelock import FileLock, Timeout  # noqa: E402
 
 # Every build/verify/export task routes its subprocess through ``_run``, which
 # streams the child's stdout through this doit parent process -- and tees it to
@@ -89,9 +92,6 @@ for _stream in (sys.stdout, sys.stderr):
     if _reconfigure is not None:
         _reconfigure(encoding="utf-8", errors="replace")
 
-import yaml as _yaml
-from doit.dependency import CHECKERS, Dependency, JsonDB, MD5Checker
-from filelock import FileLock, Timeout  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "cad" / "scripts"))
 
@@ -104,6 +104,8 @@ from _buildgraph import (  # noqa: E402
     artefact_for,
     config_files_of,
     data_deps_of,
+    drawing_registry_reads_selected,
+    drawing_registry_recipe,
     machine_family_files,
     module_deps_of,
     part_row_files,
@@ -751,17 +753,23 @@ def _sw_commit_gb() -> float | None:
         kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
         kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
         psapi.GetProcessMemoryInfo.argtypes = [
-            wintypes.HANDLE, ctypes.POINTER(_MemoryCountersEx), wintypes.DWORD,
+            wintypes.HANDLE,
+            ctypes.POINTER(_MemoryCountersEx),
+            wintypes.DWORD,
         ]
         total = 0
         for pid in pids:
-            handle = kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+            handle = kernel32.OpenProcess(
+                0x1000, False, pid
+            )  # PROCESS_QUERY_LIMITED_INFORMATION
             if not handle:
                 continue
             try:
                 counters = _MemoryCountersEx()
                 counters.cb = ctypes.sizeof(counters)
-                if psapi.GetProcessMemoryInfo(handle, ctypes.byref(counters), counters.cb):
+                if psapi.GetProcessMemoryInfo(
+                    handle, ctypes.byref(counters), counters.cb
+                ):
                     total += int(counters.PrivateUsage)
             finally:
                 kernel32.CloseHandle(handle)
@@ -795,7 +803,9 @@ def _sw_preflight() -> None:
             commit_gb=round(commit, 1),
             budget_gb=budget,
         )
-        _telemetry.event("sw.memory_restart", commit_gb=round(commit, 1), budget_gb=budget)
+        _telemetry.event(
+            "sw.memory_restart", commit_gb=round(commit, 1), budget_gb=budget
+        )
         state = _sw_lifecycle.force_recover()
         if state != _sw_lifecycle.CONNECTED_STATE:
             state = _sw_lifecycle.wait_until_ready()
@@ -1412,6 +1422,17 @@ def _assembly_cache_outputs(stem: str) -> list[Path]:
     return outs
 
 
+def _drawing_registry_dep(stem: str, registry: Path) -> str:
+    """Selected row plus shared implementation; one-time drawing key migration."""
+    recipe = drawing_registry_recipe(
+        registry.read_text(encoding="utf-8"), DRAWINGS_BY_NAME[stem]
+    )
+    return _write_digest_sidecar(
+        CAD_OUT / ".drawing-registry" / f"{stem}.digest",
+        hashlib.md5(recipe.encode("utf-8")).hexdigest(),
+    )
+
+
 def _drawing_file_deps(stem: str) -> list[str]:
     """Inputs for both doit freshness and the shared drawing-cache key.
 
@@ -1421,7 +1442,17 @@ def _drawing_file_deps(stem: str) -> list[str]:
     """
     spec = DRAWINGS_BY_NAME[stem]
     script = spec.script.resolve()
-    runtime = [*_helper_deps(script), _submodule_dep()]
+    # Traverse first: helpers imported BY the registry must remain dependencies.
+    runtime = _helper_deps(script)
+    registry = (SCRIPTS_DIR / "_drawing_registry.py").resolve()
+    if str(registry) in runtime:
+        consumers = sorted({script, *(Path(path) for path in runtime)} - {registry})
+        if drawing_registry_reads_selected(
+            tuple(path.read_text(encoding="utf-8") for path in consumers), stem
+        ):
+            runtime = [path for path in runtime if Path(path).resolve() != registry]
+            runtime.append(_drawing_registry_dep(stem, registry))
+    runtime.append(_submodule_dep())
     if spec.source_kind == "assembly":
         # Assembly-sourced drawings need the same exact-identity signal as
         # part-sourced drawings. The recipe-stable .SLDASM digest preserves
@@ -2208,10 +2239,8 @@ def task_check():
         # One offline contract file per manufacturing drawing (test_*_drawing.py),
         # so registering a drawing auto-enrolls its contracts here.
         *sorted(SCRIPTS_DIR.glob("test_*_drawing.py")),
-        # Cross-sheet ownership checks whose filename intentionally does not match
+        # Cross-sheet ownership checks whose filenames intentionally do not match
         # the one-file-per-drawing discovery pattern above.
-        SCRIPTS_DIR / "test_fastener_drawing_metadata.py",
-        SCRIPTS_DIR / "test_remaining_fastener_drawings.py",
         SCRIPTS_DIR / "test_pen_summing_drawing_batch_contract.py",
         # Was omitted while its two siblings above were enrolled, so NO gate ran
         # it: converting channel to a three-view diagram left it reading
@@ -2341,7 +2370,10 @@ def task_check():
                 *module_deps_of(SCRIPTS_DIR / "test_dxf_text.py"),
                 str(
                     (
-                        REPO_ROOT / "cad" / "references" / "measuring-stick-numerals.dxf"
+                        REPO_ROOT
+                        / "cad"
+                        / "references"
+                        / "measuring-stick-numerals.dxf"
                     ).resolve()
                 ),
             ],

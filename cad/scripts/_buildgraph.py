@@ -16,7 +16,9 @@ from __future__ import annotations
 
 import ast
 import functools
+import json
 import re
+from dataclasses import asdict, fields
 from enum import Enum
 from pathlib import Path
 
@@ -186,9 +188,10 @@ class _AssemblySources:
         """Include lexical, deferred-global and possible prior-iteration writes."""
         if self.scopes[node] is not self.tree and self.scopes[item] is self.tree:
             return _SourceAvailability.AVAILABLE
-        if (
-            getattr(item, "lineno", 0), getattr(item, "col_offset", 0)
-        ) < (node.lineno, node.col_offset):
+        if (getattr(item, "lineno", 0), getattr(item, "col_offset", 0)) < (
+            node.lineno,
+            node.col_offset,
+        ):
             return _SourceAvailability.AVAILABLE
         ancestors = set()
         cursor = item
@@ -198,7 +201,10 @@ class _AssemblySources:
         cursor = node
         while cursor in self.parents:
             cursor = self.parents[cursor]
-            if isinstance(cursor, (ast.For, ast.AsyncFor, ast.While)) and cursor in ancestors:
+            if (
+                isinstance(cursor, (ast.For, ast.AsyncFor, ast.While))
+                and cursor in ancestors
+            ):
                 return _SourceAvailability.AVAILABLE
         return _SourceAvailability.FUTURE
 
@@ -275,7 +281,9 @@ class _AssemblySources:
             for item in self.items(binding, trail)
         ]
         for item in self.scope_nodes(node):
-            available = self.availability_before(item, node) is _SourceAvailability.AVAILABLE
+            available = (
+                self.availability_before(item, node) is _SourceAvailability.AVAILABLE
+            )
             if isinstance(item, (ast.Assign, ast.AnnAssign)):
                 targets = (
                     item.targets if isinstance(item, ast.Assign) else [item.target]
@@ -374,11 +382,16 @@ class _AssemblySources:
             ):
                 self.fail(item)
             targets = (
-                item.targets if isinstance(item, ast.Assign)
-                else [item.target] if isinstance(item, (ast.AnnAssign, ast.NamedExpr))
+                item.targets
+                if isinstance(item, ast.Assign)
+                else [item.target]
+                if isinstance(item, (ast.AnnAssign, ast.NamedExpr))
                 else []
             )
-            if any(isinstance(target, ast.Name) and target.id == owner.id for target in targets):
+            if any(
+                isinstance(target, ast.Name) and target.id == owner.id
+                for target in targets
+            ):
                 if item.value is not None:
                     found.append(item.value)
         return found
@@ -387,26 +400,44 @@ class _AssemblySources:
         """Recognize selection from the same unescaped collection prepared earlier."""
         found = set()
         for value in self.direct_mapping_bindings(node, owner):
-            if not isinstance(value, ast.Subscript) or not isinstance(value.value, ast.Name):
+            if not isinstance(value, ast.Subscript) or not isinstance(
+                value.value, ast.Name
+            ):
                 continue
             collection = value.value
             loops = [
-                item for item in self.scope_nodes(node)
+                item
+                for item in self.scope_nodes(node)
                 if isinstance(item, ast.For)
-                and isinstance(item.target, ast.Name) and item.target.id == owner.id
-                and isinstance(item.iter, ast.Name) and item.iter.id == collection.id
-                and self.availability_before(item, value) is _SourceAvailability.AVAILABLE
+                and isinstance(item.target, ast.Name)
+                and item.target.id == owner.id
+                and isinstance(item.iter, ast.Name)
+                and item.iter.id == collection.id
+                and self.availability_before(item, value)
+                is _SourceAvailability.AVAILABLE
             ]
             if not loops:
                 continue
             for loop in loops:
-                if set(self.bindings(loop.iter, frozenset())) != set(self.bindings(collection, frozenset())):
-                    self.fail(value)  # collection was rebound after its rows were prepared
+                if set(self.bindings(loop.iter, frozenset())) != set(
+                    self.bindings(collection, frozenset())
+                ):
+                    self.fail(
+                        value
+                    )  # collection was rebound after its rows were prepared
             for use in self.scope_nodes(node):
-                if not isinstance(use, ast.Name) or use.id != collection.id or not isinstance(use.ctx, ast.Load):
+                if (
+                    not isinstance(use, ast.Name)
+                    or use.id != collection.id
+                    or not isinstance(use.ctx, ast.Load)
+                ):
                     continue
                 parent = self.parents[use]
-                if isinstance(parent, ast.Subscript) and parent.value is use and isinstance(parent.ctx, ast.Load):
+                if (
+                    isinstance(parent, ast.Subscript)
+                    and parent.value is use
+                    and isinstance(parent.ctx, ast.Load)
+                ):
                     assignment = self.parents[parent]
                     if (
                         isinstance(assignment, ast.Assign)
@@ -418,7 +449,9 @@ class _AssemblySources:
                         continue
                 if parent in loops and parent.iter is use:
                     continue
-                self.fail(use)  # collection alias/mutation/opaque consumer is unsupported
+                self.fail(
+                    use
+                )  # collection alias/mutation/opaque consumer is unsupported
             found.add(value)
         return found
 
@@ -435,8 +468,10 @@ class _AssemblySources:
             for value in prepared_rows
             for loop in self.scope_nodes(node)
             if isinstance(loop, ast.For)
-            and isinstance(loop.target, ast.Name) and loop.target.id == owner.id
-            and isinstance(loop.iter, ast.Name) and loop.iter.id == value.value.id
+            and isinstance(loop.target, ast.Name)
+            and loop.target.id == owner.id
+            and isinstance(loop.iter, ast.Name)
+            and loop.iter.id == value.value.id
             and self.availability_before(loop, value) is _SourceAvailability.AVAILABLE
         }
         for item in self.scope_nodes(node):
@@ -445,10 +480,12 @@ class _AssemblySources:
             if (
                 isinstance(item, ast.Subscript)
                 and isinstance(item.ctx, (ast.Store, ast.Del))
-                and isinstance(item.value, ast.Name) and item.value.id == owner.id
+                and isinstance(item.value, ast.Name)
+                and item.value.id == owner.id
             ):
                 if (
-                    isinstance(item.slice, ast.Constant) and isinstance(key, ast.Constant)
+                    isinstance(item.slice, ast.Constant)
+                    and isinstance(key, ast.Constant)
                     and item.slice.value != key.value
                 ):
                     continue
@@ -478,8 +515,14 @@ class _AssemblySources:
                     self.fail(item)
             if isinstance(
                 item,
-                (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef,
-                 ast.ExceptHandler, ast.MatchAs, ast.MatchStar),
+                (
+                    ast.FunctionDef,
+                    ast.AsyncFunctionDef,
+                    ast.ClassDef,
+                    ast.ExceptHandler,
+                    ast.MatchAs,
+                    ast.MatchStar,
+                ),
             ):
                 if item.name == owner.id:
                     self.fail(item)
@@ -496,10 +539,13 @@ class _AssemblySources:
         # shape need not be interpreted. Direct map assignments still cannot hide
         # an initial source, opaque rebinding or whole-container augmentation.
         initial_values = (
-            self.bindings(owner, frozenset()) if key is None
+            self.bindings(owner, frozenset())
+            if key is None
             else self.direct_mapping_bindings(node, owner)
         )
-        prepared_rows = self.prepared_row_selections(node, owner) if key is not None else set()
+        prepared_rows = (
+            self.prepared_row_selections(node, owner) if key is not None else set()
+        )
         if key is not None:
             # The get/items path already uses full bindings(), including literal
             # loop owners. This guard closes the newer direct-mapping path only.
@@ -571,7 +617,11 @@ class _AssemblySources:
                     target.value
                 ) != ast.dump(owner):
                     continue
-                if key is not None and self.availability_before(item, node) is _SourceAvailability.FUTURE:
+                if (
+                    key is not None
+                    and self.availability_before(item, node)
+                    is _SourceAvailability.FUTURE
+                ):
                     continue
                 if key is not None and ast.dump(target.slice) != ast.dump(key):
                     if (
@@ -788,21 +838,24 @@ def references_of(asm_stem: str) -> list[str]:
 
 @functools.lru_cache(maxsize=1)
 def _local_modules() -> dict[str, Path]:
-    """Every local importable module a build script may pull in transitively, by
-    module name: the ``_*.py`` helpers, sibling ``build_*.py`` scripts, AND any
-    other sibling module a build script imports (e.g. ``pen_driver`` ->
-    ``truth_model``, which ``build_pen_assembly`` pulls in and which read
-    ``_config``).
+    """Every local importable module a build script may pull in transitively,
+    keyed by its dotted module path.
+
+    This includes top-level modules (the ``_*.py`` helpers, sibling
+    ``build_*.py`` scripts, and ordinary siblings) plus modules recursively
+    contained in real Python packages below :data:`SCRIPTS_DIR`.  A package's
+    ``__init__.py`` is keyed by the package name itself, while its children use
+    names such as ``diagnostics.diag_mcmaster_fillister``.  Directories without
+    ``__init__.py`` are not searched as namespace packages, and ``tests`` and
+    ``__pycache__`` trees are never build inputs.
 
     A part/assembly can reuse another module -- e.g.
     ``build_channel_spring_installed`` imports ``build_channel_spring.build_spring``,
     or ``build_pen_assembly`` imports ``pen_driver.install`` -- so the closure must
     follow those edges, or an edit to that reused module (or the config IT reads)
     would leave the dependent target reported up to date (codex review). Following
-    ALL sibling modules (not just ``_*``/``build_*``) closes a config
-    under-invalidation: ``pen_driver``/``truth_model`` embed machine/output +
-    channels values into the saved pen assembly, but were previously invisible to
-    ``module_deps_of``/``config_files_of``.
+    ALL local modules (not just ``_*``/``build_*``) closes config and recipe
+    under-invalidation.
 
     Excludes the build-GRAPH tooling (``_buildgraph`` + one-shot extraction
     scripts) and the test modules, which are never a geometry input. Standalone CLI
@@ -827,49 +880,123 @@ def _local_modules() -> dict[str, Path]:
         "_watchdog.py",
     }
     out: dict[str, Path] = {}
-    for p in sorted(SCRIPTS_DIR.glob("*.py")):
-        if p.name not in skip and not p.name.startswith("test_"):
-            out[p.stem] = p
+    for path in sorted(SCRIPTS_DIR.rglob("*.py")):
+        relative = path.relative_to(SCRIPTS_DIR)
+        directories = relative.parts[:-1]
+        if (
+            path.name in skip
+            or path.name.startswith("test_")
+            or any(part in {"tests", "__pycache__"} for part in directories)
+        ):
+            continue
+
+        # Descendants are importable only through actual packages.  Deliberately
+        # do not treat arbitrary folders as namespace packages: that would make
+        # external/tooling trees appear to be geometry dependencies.
+        if any(
+            not (SCRIPTS_DIR.joinpath(*directories[:depth]) / "__init__.py").is_file()
+            for depth in range(1, len(directories) + 1)
+        ):
+            continue
+
+        module_parts = (
+            relative.parent.parts
+            if path.name == "__init__.py"
+            else relative.with_suffix("").parts
+        )
+        if module_parts:
+            out[".".join(module_parts)] = path
     return out
 
 
 @functools.lru_cache(maxsize=None)
-def _direct_local_imports(path: Path) -> frozenset[str]:
-    """Local module names (helpers + build scripts) imported ANYWHERE in ``path``
-    -- top-level or lazily inside a function, e.g. ``_common``'s ``import
-    _config`` or ``build_channel_spring_installed``'s ``from build_channel_spring
-    import ...``. A dotted import keeps only its leading segment so ``import
-    _common`` and ``from _common import x`` both resolve to ``_common``.
+def _module_by_path() -> dict[Path, str]:
+    """Reverse of :func:`_local_modules`, keyed by resolved path."""
+    return {path.resolve(): name for name, path in _local_modules().items()}
 
-    Only the import MODULE is matched against the local set; imported NAMES are
-    ignored, so ``from _gear import build_fixed_gear`` resolves to ``_gear`` (a
-    helper) and never mistakes the ``build_fixed_gear`` function for a module.
+
+@functools.lru_cache(maxsize=None)
+def _direct_local_imports(path: Path) -> frozenset[str]:
+    """Local dotted module names imported ANYWHERE in ``path``.
+
+    Imports may be top-level or lazy inside a function.  Each import is resolved
+    against the local module map only, choosing its most specific local dotted
+    prefix: ``import diagnostics.recipe`` and ``from diagnostics.recipe import
+    build`` therefore select ``diagnostics.recipe``, not merely
+    ``diagnostics``.  Package ``__init__.py`` ancestors are included because
+    Python executes them while importing a child.  For ``from package import
+    child``, a local ``package.child`` module is included conservatively as well.
+    Absolute and package-relative imports are supported; site/external packages
+    cannot enter the closure because no filesystem/import-system lookup occurs.
     """
     mods = _local_modules()
     found: set[str] = set()
+
+    def resolve(name: str) -> str | None:
+        candidate = name
+        while candidate:
+            if candidate in mods:
+                return candidate
+            candidate = candidate.rpartition(".")[0]
+        return None
+
+    def add(name: str) -> None:
+        module = resolve(name)
+        if module is None:
+            return
+        found.add(module)
+        parent = module.rpartition(".")[0]
+        while parent:
+            package_path = mods.get(parent)
+            if package_path is not None and package_path.name == "__init__.py":
+                found.add(parent)
+            parent = parent.rpartition(".")[0]
+
+    current_module = _module_by_path().get(path.resolve())
     tree = ast.parse(path.read_text(encoding="utf-8"))
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
-            for a in node.names:
-                found.add(a.name.split(".")[0])
+            for alias in node.names:
+                add(alias.name)
         elif isinstance(node, ast.ImportFrom):
-            if node.level == 0 and node.module:
-                found.add(node.module.split(".")[0])
-    return frozenset(found & mods.keys())
+            if node.level == 0:
+                base = node.module
+            elif current_module is not None:
+                package = (
+                    current_module.split(".")
+                    if path.name == "__init__.py"
+                    else current_module.split(".")[:-1]
+                )
+                keep = len(package) - node.level + 1
+                if keep < 1:
+                    continue
+                base_parts = package[:keep]
+                if node.module:
+                    base_parts.extend(node.module.split("."))
+                base = ".".join(base_parts)
+            else:
+                continue
+
+            if not base:
+                continue
+            add(base)
+            for alias in node.names:
+                if alias.name != "*":
+                    add(f"{base}.{alias.name}")
+    return frozenset(found)
 
 
 def module_deps_of(script: Path) -> list[str]:
-    """Resolved paths of every local module (``_*.py`` helper or sibling
-    ``build_*.py`` script) ``script`` transitively imports -- the EXACT
-    geometry-input edges for doit's ``file_dep``.
+    """Resolved paths of every local Python module ``script`` transitively
+    imports -- the exact geometry-input edges for doit's ``file_dep``.
 
-    This replaces the old blanket "every ``_*.py`` is a dep of every build"
-    rule: a leaf part that imports only ``_common`` no longer rebuilds when an
-    assembly-only helper (``_assembly``) or an unrelated one (``_gear``) changes.
-    Because it follows REAL Python imports transitively (``_chain_link -> _chain
-    -> _common``; ``_common -> _config``; ``build_channel_spring_installed ->
-    _spring -> _features``), it can never under-invalidate so long as
-    a script imports what it uses -- which Python enforces at run time. The BFS is
+    Local modules include top-level helpers/build recipes and recursively
+    discovered package modules.  This replaces the old blanket "every ``_*.py``
+    is a dep of every build" rule: a leaf importing only ``_common`` no longer
+    rebuilds for unrelated helpers, while dotted imports such as
+    ``diagnostics.diag_build_90280A194`` retain their exact recipe chain.
+    Following real imports transitively prevents under-invalidation so long as a
+    script imports what it uses, which Python enforces at run time.  The BFS is
     cycle-safe (``build_motion_study`` <-> ``build_motion_study_springs``).
     """
     mods = _local_modules()
@@ -882,6 +1009,172 @@ def module_deps_of(script: Path) -> list[str]:
         result.add(mod)
         frontier |= set(_direct_local_imports(mods[mod].resolve())) - result
     return sorted(str(mods[m].resolve()) for m in result)
+
+
+@functools.lru_cache(maxsize=32)
+def _drawing_registry_source(
+    text: str, field_names: tuple[str, ...]
+) -> tuple[str, tuple[tuple[object, str], ...]]:
+    """Cache immutable source projections, never parsed ASTs or selected values."""
+    tree = ast.parse(text)
+    declarations = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Name)
+        and node.id == "DRAWINGS"
+        and isinstance(node.ctx, ast.Store)
+    ]
+    declaration = next(
+        (
+            node
+            for node in tree.body
+            if isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "DRAWINGS"
+        ),
+        None,
+    )
+    if len(declarations) != 1 or declaration is None:
+        raise ValueError("drawing registry requires one declarative DRAWINGS tuple")
+    if not isinstance(declaration.value, ast.Tuple):
+        raise ValueError("drawing registry requires a declarative DRAWINGS tuple")
+    rows = []
+    for row in declaration.value.elts:
+        if (
+            not isinstance(row, ast.Call)
+            or not isinstance(row.func, ast.Name)
+            or row.func.id != "DrawingSpec"
+            or any(keyword.arg is None for keyword in row.keywords)
+            or len(row.args) > len(field_names)
+        ):
+            raise ValueError("drawing registry rows must be literal DrawingSpec calls")
+        try:
+            values = {
+                name: ast.literal_eval(value)
+                for name, value in zip(field_names, row.args)
+            }
+            for keyword in row.keywords:
+                if keyword.arg in values:
+                    raise ValueError("duplicate drawing field")
+                values[keyword.arg] = ast.literal_eval(keyword.value)
+        except (ValueError, TypeError) as exc:
+            raise ValueError(
+                "drawing registry rows must contain only literals"
+            ) from exc
+        rows.append((values.get("name"), ast.dump(row, include_attributes=False)))
+    declaration.value = ast.Tuple(elts=[], ctx=ast.Load())
+    return ast.dump(tree, include_attributes=False), tuple(rows)
+
+
+def drawing_registry_recipe(text: str, spec: object) -> str:
+    """Project declarative row data without dropping shared registry semantics.
+
+    Reject executable row expressions rather than silently removing their effects.
+    The selected source row also tracks edits before an importing caller reloads
+    its dataclass instance. AST locations and source line endings are irrelevant.
+    """
+    shared, rows = _drawing_registry_source(
+        text, tuple(field.name for field in fields(spec))
+    )
+    selected = [source for name, source in rows if name == getattr(spec, "name")]
+    if len(selected) != 1:
+        raise ValueError("drawing registry must contain exactly one selected row")
+    return json.dumps(
+        {
+            "shared": shared,
+            "selected_source": selected[0],
+            "selected_fields": asdict(spec),
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    )
+
+
+@functools.lru_cache(maxsize=512)
+def _drawing_registry_reads(text: str) -> frozenset[str] | None:
+    """Cache a source's literal row read set; None denotes an unclassified use."""
+    nodes = tuple(ast.walk(ast.parse(text)))
+    parents = {
+        id(child): node for node in nodes for child in ast.iter_child_nodes(node)
+    }
+    registry_names = {"_drawing_registry", "DRAWINGS", "DRAWINGS_BY_NAME"}
+    allowed_exports = {"DrawingSpec", "PROJECT_DRWDOT", "DRAWINGS_BY_NAME"}
+    for node in nodes:
+        if (
+            isinstance(node, ast.Constant)
+            and isinstance(node.value, str)
+            and node.value.rsplit(".", 1)[-1] == "_drawing_registry"
+        ):
+            return None  # string aliases can escape the static import graph
+        if isinstance(node, ast.Import):
+            if any(
+                alias.name.rsplit(".", 1)[-1] == "_drawing_registry"
+                for alias in node.names
+            ):
+                return None
+        elif isinstance(node, ast.ImportFrom):
+            registry = (
+                node.module is not None
+                and node.module.rsplit(".", 1)[-1] == "_drawing_registry"
+            )
+            for alias in node.names:
+                if alias.name in {"*", "import_module"} or (
+                    node.module == "sys" and alias.name == "modules"
+                ):
+                    return None
+                if registry:
+                    if alias.asname is not None or alias.name not in allowed_exports:
+                        return None
+                elif alias.name in registry_names or alias.asname in registry_names:
+                    return None
+
+    rows = set()
+    for node in nodes:
+        if isinstance(node, ast.Attribute) and (
+            node.attr in registry_names or node.attr in {"import_module", "modules"}
+        ):
+            return None
+        if not isinstance(node, ast.Name):
+            continue
+        if node.id in {
+            "eval",
+            "exec",
+            "globals",
+            "locals",
+            "vars",
+            "__import__",
+            "import_module",
+        }:
+            return None
+        if node.id not in registry_names:
+            continue
+        parent = parents.get(id(node))
+        if node.id == "DRAWINGS_BY_NAME" and (
+            isinstance(parent, ast.Subscript)
+            and parent.value is node
+            and isinstance(parent.ctx, ast.Load)
+            and isinstance(parent.slice, ast.Constant)
+            and isinstance(parent.slice.value, str)
+        ):
+            rows.add(parent.slice.value)
+            continue
+        return None
+    return frozenset(rows)
+
+
+def drawing_registry_reads_selected(texts: tuple[str, ...], stem: str) -> bool:
+    """Whether a complete consumer closure uses only the selected registry row.
+
+    Only the current schema/template imports and literal selected index lookups
+    can narrow. Module imports, aliases, re-exports and unclassified uses retain
+    the full file; this deliberately does not attempt general Python dataflow.
+    """
+    for text in texts:
+        rows = _drawing_registry_reads(text)
+        if rows is None or any(name != stem for name in rows):
+            return False
+    return True
 
 
 def data_deps_of(script: Path) -> list[str]:

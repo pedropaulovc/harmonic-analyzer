@@ -8,12 +8,14 @@ exactly ``DRAWING_DIMENSIONS`` across its per-view keep map.
 
 from __future__ import annotations
 
+from wheel_bar_geom import HANGER_SCREW_LOCAL_X, HANGER_STRAP_TOP_LEFT_X
+
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  The guide-block width and the tapered strap (bottom width, top
 # run, rise) are marked -- all Front-plane sketch dims, so they import cleanly
 # into the single front profile view.  The 5.4 square pen-rod channel, the block
-# depth/reach and the #6-32 hanger hole are carried in the notes / native callout
+# depth/reach and the #8-32 hanger hole are carried in the notes / native callout
 # (the channel dim lives on a Top-plane sketch and the hole is a native Hole
 # Wizard feature, neither a clean front-view import). ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
@@ -43,8 +45,9 @@ DRAWING_NOTES = "\n".join(
         "   CONTINUOUS FILLET VISIBLE ALONG THE FULL BACK SEAM.",
         "   NO EXPOSED GAP >0.10; CUMULATIVE VOID LENGTH 0.50 MAX",
         "   ON EITHER SEAM (VISUAL, BOTH SEAMS).",
-        "4. DRILL + TAP #6-32 UNC-2B THRU 3.00 STRAP FROM BACK.",
-        "   AXIS 5.00 +/-0.05 VERTICALLY BELOW TOP EDGE + 7.50",
+        "4. DRILL + TAP #8-32 UNC-2B THRU 3.00 STRAP FROM BACK.",
+        "   AXIS 5.00 +/-0.05 VERTICALLY BELOW TOP EDGE + "
+        f"{HANGER_SCREW_LOCAL_X - HANGER_STRAP_TOP_LEFT_X:.2f}",
         "   +/-0.05 HORIZONTALLY RIGHT OF FRONT-VIEW TOP-LEFT CORNER.",
     )
 )

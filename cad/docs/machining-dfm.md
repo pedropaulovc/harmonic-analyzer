@@ -52,9 +52,10 @@ geometry is casting-shaped, not milling-shaped.
     the intended stock is a **brass bar block** (trivial) — the script constant looks stale. Reconcile
     before it reaches a drawing (gap below).
 
-- **Almost every hole is 2.5D and almost nothing is threaded.** Only `rocker-arm-support` has real
-  threads (4× 9/16-12 tapped foot holes). No keyways anywhere — gears are **soldered** to their
-  shafts (cone) or ride **free on an arbor** (cylinder). That simplifies the whole build.
+- `rocker-arm-support` has four **1/2-13 UNC-2B through-tapped foot holes**, matching the
+  purchased 91783A722 hold-down screws (`build_rocker_arm_support.py`, `build_lag_screw.py`).
+  Other receivers are threaded too; the `knife-mount` hanger-stud seat is one example.
+  No keyways anywhere — gears are **soldered** to their shafts (cone) or ride **free on an arbor** (cylinder).
 
 ---
 
@@ -95,7 +96,7 @@ geometry is casting-shaped, not milling-shaped.
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
 | **`rocker-arm`** ×20 | flat steel plate **2.5 mm** thick, ~270×21 | **top edge = R800 concave arc** (the amplitude-bar rides ON it) — it is the **2D OUTLINE of the plate, NOT a concave pocket/face**; bottom edge R816 concentric; Ø6.5 pivot bore + Ø2.0 rod-pin bore, both through the plate | none severe — pivot bore is **inherently square** (drilled through flat stock, one setup); no slot, no internal corner | **1** (all features one plane) | **CNC 2.5D profile** (×20 identical) or bandsaw+template; the R800 is profiled, not form-cut |
-| **`rocker-arm-support`** | modeled **Gray Cast Iron casting**, trapezoidal wedge, 6.35 mm shell walls | square window/cavity cuts with **R12.7-relieved** internal corners; **4× 9/16-12 tapped foot holes** (tap drill Ø12.30, through-next); RimChamfer 1.27 | square internal corners already relieved to R12.7 — cannot be cut sharper; thin 6.35 shell | foot-hole drilling = **1 setup** normal to the seat face | **cast** body + machine foot holes/rim |
+| **`rocker-arm-support`** | modeled **Gray Cast Iron casting**, trapezoidal wedge, 6.35 mm shell walls | square window/cavity cuts with **R12.7-relieved** internal corners; **4× 1/2-13 UNC-2B tapped foot holes** through the 6.35 mm foot, tap drill Ø10.716 mm (Ø10.72 displayed; 27/64 in), from `build_rocker_arm_support.py` and `_holes.py`; RimChamfer 1.27 | square internal corners already relieved to R12.7 — cannot be cut sharper; thin 6.35 shell | foot-hole drilling = **1 setup** normal to the seat face | **cast** body + machine foot holes/rim |
 
 ---
 

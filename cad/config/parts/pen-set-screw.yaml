@@ -1,9 +1,13 @@
 pen-set-screw:
+  title: Stainless Steel Flared-Collar Knurled-Head Thumb Screw
   number: MHA-052
-  material: UNS C36000 per ASTM B16/B16M-24
-  material_specification: UNS C36000 per ASTM B16/B16M-24
-  finish: uncoated, bright
+  stock_name: Stainless Steel Flared-Collar Knurled-Head Thumb Screw
+  supplier: McMaster-Carr
+  supplier_skus: [99607A213]
+  material: 18-8 stainless steel
+  material_specification: 18-8 stainless steel, McMaster-Carr 99607A213
+  finish: plain
   quantity: 1
   tolerance_class: machined_block
   fit_class: fastener_clearance
-  process: "machined (brass)"
+  process: purchased

@@ -49,6 +49,7 @@ independent witness that no feature was missed.
 
 from __future__ import annotations
 
+import inspect
 import json
 import math
 import sys
@@ -87,12 +88,22 @@ def _g(obj, name, default=None):
     default DISPID), so calling a returned COM object as if it were an
     unresolved method raises and the value vanishes into the default -- the
     reason an earlier version of this probe reported every sketch as absent.
+
+    Rejecting via bare ``callable(v)`` over-corrected: a *valid* ``CDispatch``
+    result (``GetSpecificFeature2`` -> the sketch, ``GetSurface`` -> the
+    surface) is itself callable and was discarded along with the failed
+    accessors, which nulled every sketch/surface in the dump. Only a plain
+    Python method/function -- what ``_read_member`` hands back when the
+    zero-argument invocation was rejected -- is a failed accessor; a COM
+    dispatch is harvested data.
     """
     try:
         v = _read_member(obj, name)
     except Exception:  # noqa: BLE001
         return default
-    return default if v is None else v
+    if v is None or inspect.ismethod(v) or inspect.isfunction(v):
+        return default
+    return v
 
 
 def _mm(v):
@@ -225,7 +236,7 @@ def _feature_data(feat, type_name):
     if raw is None:
         return None
     out: dict = {}
-    if type_name in ("Extrusion", "ICE"):  # boss AND cut extrudes
+    if type_name in ("Extrusion", "ICE", "BossThin", "CutThin"):  # boss AND cut extrudes
         d = _early_bound(raw, "IExtrudeFeatureData2")
         for key, meth, args in (
             ("depth1_mm", "GetDepth", (True,)),
@@ -243,12 +254,25 @@ def _feature_data(feat, type_name):
                 _deg(v) if key.endswith("_deg") else v)
         for prop in ("ReverseDirection", "BothDirections", "Merge", "FlipSideToCut",
                      "NormalCut", "IsBaseExtrude", "IsBossFeature", "IsThinFeature",
-                     "CapEnds", "FromType", "FromOffsetDistance"):
+                     "ThinWallType", "CapEnds", "FromType", "FromOffsetDistance"):
             v = _g(d, prop)
             if v is None:
                 continue
             out[prop] = _mm(v) if prop == "FromOffsetDistance" else v
-    elif type_name in ("RevolveBoss", "RevolveCut", "Revolve"):
+        for key, meth, args in (
+                ("wall_forward_mm", "GetWallThickness", (True,)),
+                ("wall_reverse_mm", "GetWallThickness", (False,)),
+                ("cap_mm", "CapThickness", ())):
+            try:
+                v = getattr(d, meth)(*args) if args else _g(d, meth)
+            except Exception as exc:  # noqa: BLE001
+                _telemetry.debug(
+                    f"feature dump: {type_name}.{meth} unavailable: {exc}")
+                continue
+            if v is not None:
+                out[key] = _mm(v)
+    elif type_name in ("RevolveBoss", "RevolveCut", "Revolve", "Revolution",
+                       "RevCut"):
         d = _early_bound(raw, "IRevolveFeatureData2")
         for key, prop in (("angle_deg", "GetRevolutionAngle"),
                           ("reverse", "ReverseDirection"), ("type", "Type"),
@@ -268,10 +292,56 @@ def _feature_data(feat, type_name):
                 continue
             out[key] = _mm(v) if key.endswith("_mm") else (
                 _deg(v) if key.endswith("_deg") else v)
+        # The constraint data says HOW the plane is defined; the resolved
+        # transform says WHERE it landed -- the number a replica script needs
+        # (this is how the vendor Split plane was located at the undercut
+        # land bottom).
+        rp = _g(feat, "GetSpecificFeature2")
+        if rp is not None:
+            xf = _g(_early_bound(rp, "IRefPlane"), "Transform")
+            if xf is not None:
+                arr = _g(_early_bound(xf, "IMathTransform"), "ArrayData")
+                if arr is not None:
+                    out["origin_mm"] = [_mm(v) for v in list(arr)[9:12]]
+                    out["rotation"] = [round(float(v), 9)
+                                       for v in list(arr)[0:9]]
+    elif type_name == "Helix":
+        d = _early_bound(raw, "IHelixFeatureData")
+        for key, prop in (("pitch_mm", "Pitch"), ("height_mm", "Height"),
+                          ("revolutions", "Revolution"),
+                          ("clockwise", "Clockwise"),
+                          ("reverse", "ReverseDirection"),
+                          ("start_angle_deg", "StartingAngle"),
+                          ("defined_by", "DefinedBy"),
+                          ("variable_pitch", "VariablePitch")):
+            v = _g(d, prop)
+            if v is None:
+                continue
+            out[key] = _mm(v) if key.endswith("_mm") else (
+                _deg(v) if key.endswith("_deg") else v)
+    elif type_name in ("SweepCut", "Sweep", "SweepSurface"):
+        d = _early_bound(raw, "ISweepFeatureData")
+        # The options a re-authored InsertCutSwept5/CreateFeature call must
+        # pass -- reading these live off the vendor's Cut-Sweep1 is what
+        # cracked the 91829A560 thread (AlignWithEndFaces + swMinimumTwist).
+        for prop in ("AlignWithEndFaces", "TwistControlType",
+                     "PathAlignmentType", "Direction", "MergeSmoothFaces",
+                     "MaintainTangency", "AdvancedSmoothing",
+                     "StartTangencyType", "EndTangencyType", "FeatureScope",
+                     "AutoSelect", "ThinFeature", "CircularProfile",
+                     "TangentPropagation"):
+            v = _g(d, prop)
+            if v is not None:
+                out[prop] = v
     elif type_name == "Fillet":
         d = _early_bound(raw, "ISimpleFilletFeatureData2")
         for key, prop in (("type", "Type"), ("radius_mm", "DefaultRadius"),
-                          ("propagate", "PropagateToTangentFaces")):
+                          ("propagate", "PropagateToTangentFaces"),
+                          ("asymmetric", "AsymmetricFillet"),
+                          ("distance_mm", "DefaultDistance"),
+                          ("multi_radius", "IsMultipleRadius"),
+                          ("conic_type", "ConicTypeForCrossSectionProfile"),
+                          ("conic_rho_or_radius", "DefaultConicRhoOrRadius")):
             v = _g(d, prop)
             if v is None:
                 continue
@@ -285,6 +355,51 @@ def _feature_data(feat, type_name):
                 continue
             out[key] = _mm(v) if key.endswith("_mm") else (
                 _deg(v) if key.endswith("_deg") else v)
+    elif type_name == "CirPattern":
+        d = _early_bound(raw, "ICircularPatternFeatureData")
+        for key, prop in (("spacing_deg", "Spacing"),
+                          ("instances", "TotalInstances"),
+                          ("equal_spacing", "EqualSpacing"),
+                          ("reverse", "ReverseDirection"),
+                          ("symmetric", "Symmetric"),
+                          ("geometry_pattern", "GeometryPattern"),
+                          ("axis_type", "GetAxisType")):
+            v = _g(d, prop)
+            if v is None:
+                continue
+            out[key] = _deg(v) if key.endswith("_deg") else v
+    elif type_name == "MirrorPattern":
+        d = _early_bound(raw, "IMirrorPatternFeatureData")
+        for key, prop in (("plane_type", "GetMirrorPlaneType"),
+                          ("geometry_pattern", "GeometryPattern"),
+                          ("feature_count", "GetPatternFeatureCount")):
+            v = _g(d, prop)
+            if v is not None:
+                out[key] = v
+    elif type_name == "CombineBodies":
+        d = _early_bound(raw, "ICombineBodiesFeatureData")
+        for key, prop in (("operation", "OperationType"),  # swBodyOperationType_e
+                          ("body_count", "GetBodiesToCombineCount")):
+            v = _g(d, prop)
+            if v is not None:
+                out[key] = v
+    elif type_name == "Split":
+        d = _early_bound(raw, "ISplitBodyFeatureData")
+        for key, prop in (("consume", "Consume"),
+                          ("split_body_count", "GetSplitBodiesCount"),
+                          ("trim_tool_count", "GetTrimToolsCount")):
+            v = _g(d, prop)
+            if v is not None:
+                out[key] = v
+    elif type_name == "RefAxis":
+        # Definition data says HOW; the resolved endpoints say WHERE.
+        ax = _g(feat, "GetSpecificFeature2")
+        if ax is not None:
+            params = _g(_early_bound(ax, "IRefAxis"), "GetRefAxisParams")
+            if params is not None:
+                vals = [_mm(v) for v in list(params)]
+                out["start_mm"] = vals[0:3]
+                out["end_mm"] = vals[3:6]
     elif type_name == "HoleWzd":
         d = _early_bound(raw, "IWizardHoleFeatureData2")
         # Readable WITHOUT AccessSelections (the _holes.py read-back path).

@@ -82,3 +82,21 @@ def test_part_stamps_make_critical_properties() -> None:
     assert "1018" in str(config["material_specification"])
     assert config["finish"]
     assert int(config["quantity"]) == 1
+
+
+def test_crank_keeper_ring_threads_the_pin_hole_clear_of_the_arm() -> None:
+    import build_crank_pin_ring as ring
+    import build_drive_train_assembly as drive
+    import pytest
+
+    radial_clearance = (crank_pin_spec.RING_HOLE_DIA - ring.WIRE_DIA) / 2.0
+    pin_radius = ring.PIN_DIA_AT_HOLE / 2.0
+    assert radial_clearance >= 0.1
+    assert ring.STRAIGHT_HALF - pin_radius - ring.WIRE_DIA / 2.0 >= 0.25
+    assert ring.LOOP_WIDTH - pin_radius - ring.WIRE_DIA / 2.0 >= 0.25
+    assert drive.PIN_PROUD == pytest.approx(
+        crank_pin_spec.RING_HOLE_X
+        + ring.WIRE_DIA / 2.0
+        + drive.CRANK_RING_ARM_CLEARANCE
+    )
+    assert drive.CRANK_RING_Y == pytest.approx(drive.Y_CRANK)

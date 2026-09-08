@@ -1,4 +1,4 @@
-r"""Create the curated pen-hanger hex-screw drawing."""
+"""Create the purchased reference drawing for the hanger screw."""
 
 from __future__ import annotations
 
@@ -7,44 +7,21 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, run_build
-from _drawing_common import DrawingOutputs
+from _common import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
-from _fastener_drawing import FastenerSheet, build_fastener_sheet
+from _purchased_fastener_drawing import build_purchased_fastener_drawing
 
 
 SPEC = DRAWINGS_BY_NAME["hanger_screw"]
-PART_STEM = SPEC.artifact_stem
-SOURCE = CAD_ROOT / "out" / "sldprt" / f"{PART_STEM}.SLDPRT"
-OUTPUTS = DrawingOutputs(**SPEC.outputs)
-SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
-
-SHEET_SCALE = (7.0, 1.0)
-END_KEEP: dict[str, tuple[float, float]] = {}
-DIMENSION_CALLOUTS: dict[str, str] = {}
-RECIPE = FastenerSheet(
-    title="Hanger Screw Manufacturing Drawing",
-    keywords="hanger screw; hex-head machine screw; made part",
-    scale=SHEET_SCALE,
-    side_view="*Right",
-    end_view="*Front",
-    side_center=(0.190, 0.150),
-    end_center=(0.070, 0.150),
-    iso_center=(0.310, 0.170),
-    end_keep=END_KEEP,
-    dimension_callouts=DIMENSION_CALLOUTS,
-)
 
 
 async def build(adapter: Any) -> dict[str, str]:
-    return await build_fastener_sheet(
-        adapter, source=SOURCE, property_view=PART_STEM, outputs=OUTPUTS, recipe=RECIPE
-    )
+    return await build_purchased_fastener_drawing(adapter, SPEC)
 
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("part", choices=[PART_STEM])
+    parser.add_argument("part", choices=[SPEC.artifact_stem])
     return parser.parse_args()
 
 

@@ -7,7 +7,7 @@ in ``_drawing_common``.
 
 The pen hanger is a black tapered steel strap (3 thick, 10 -> 16 wide) rising
 from a 12 x 12 guide block; the block carries a 5.4 square vertical channel the
-pen rod slides in, and a #6-32 tapped hanger-screw hole passes through the strap
+pen rod slides in, and a #8-32 tapped hanger-screw hole passes through the strap
 top from behind.  The part is tall and narrow (~82 x 22), so the front profile is
 the sole ortho view at 2:1 with an isometric to its right.
 
@@ -152,7 +152,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # Do not add a native callout here: R2026x renders a through tapped Hole
     # Wizard feature as the contradictory "thread depth 0.00".  The linked
-    # manufacturing note carries the complete #6-32 UNC-2B THRU requirement,
+    # manufacturing note carries the complete #8-32 UNC-2B THRU requirement,
     # while the center mark and modeled hole remain associative.
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.115, 0.150)

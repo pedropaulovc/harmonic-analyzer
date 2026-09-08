@@ -87,28 +87,34 @@ MATERIAL = "Plain Carbon Steel"  # black-finished steel, like the platform it ri
 # from the same values the print annotates (BLOCK_X/BLOCK_Z/BLOCK_HEIGHT,
 # threads, pinch height, slit width).
 # --- adjuster + pinch lock (item 5, v4_t00471 / 7:49) ------------------------
-# Adjuster interface: native 5/16-18 blind TAPPED hole from the NORTH face --
-# the Ø6.2 cone-tip-adjuster threads in. NOTE: the old bore was Ø7.9
-# line-to-line; the 5/16-18 tap drill is Ø6.528, so the cup narrows 7.9 ->
-# 6.528 (per fastener policy we take the true tap-drill, NOT an override to the
-# artefact Ø). ADJUSTER_BORE_DIA is the tap-drill, used by the slit + interlock
-# geometry below (NOT imported by the assembly, so the shrink is self-contained).
-ADJUSTER_BORE_DEPTH = ADJUSTER_DEPTH  # from the NORTH face
+# Native 5/16-18 blind tapped adjuster receiver from the north face. Its
+# tap-drill diameter is manufacturing geometry, distinct from the purchased
+# screw's true major-diameter solid.
+ADJUSTER_BORE_DEPTH = ADJUSTER_DEPTH
 ADJUSTER_BORE_SPEC = HoleSpec(
-    "tapped", ADJUSTER_THREAD, end="blind", depth_mm=ADJUSTER_BORE_DEPTH)
-ADJUSTER_BORE_DIA = blind_cut_dia_mm(ADJUSTER_BORE_SPEC)  # 6.528 tap drill
-SHAFT_PASSAGE_RADIUS = SHAFT_PASSAGE_DIA / 2.0
-# Pinch screw cross-bore, along local X: native #3-48 TAPPED hole -- the Ø1.7
-# cone-tip-pinch-screw threads in (build_cone_tip_pinch_screw SHANK_DIA = 1.7 =
-# 1.994 - 0.3; the drive-train assembly asserts bore - shank in [0.15, 0.45],
-# which needs this Ø1.994 tap-drill, not the old Ø2.4). PINCH_BORE_DIA is
-# imported by the assembly as TIP_PINCH_BORE_DIA.
-PINCH_BORE_SPEC = HoleSpec("tapped", PINCH_THREAD)
-PINCH_BORE_DIA = blind_cut_dia_mm(PINCH_BORE_SPEC)  # 1.994 tap drill
-PINCH_CLEARANCE_SPEC = HoleSpec(
-    "clearance", "#3", end="blind", depth_mm=(BLOCK_X - SLIT_W) / 2.0
+    "tapped",
+    ADJUSTER_THREAD,
+    end="blind",
+    depth_mm=ADJUSTER_BORE_DEPTH,
+    thread_class="2B",
 )
-PINCH_BORE_Y = PINCH_HEIGHT  # between the counterbore top and the block top
+ADJUSTER_BORE_DIA = blind_cut_dia_mm(ADJUSTER_BORE_SPEC)
+SHAFT_PASSAGE_RADIUS = SHAFT_PASSAGE_DIA / 2.0
+
+# McMaster 90280A108 is a #4-40 screw. The near jaw receives a normal-fit #4
+# clearance hole; the far jaw carries the coaxial #4-40 UNC-2B thread.
+PINCH_BORE_SPEC = HoleSpec("tapped", PINCH_THREAD, thread_class="2B")
+PINCH_BORE_DIA = blind_cut_dia_mm(PINCH_BORE_SPEC)
+PINCH_CLEARANCE_SPEC = HoleSpec(
+    "clearance",
+    "#4",
+    fit="normal",
+    end="blind",
+    depth_mm=(BLOCK_X - SLIT_W) / 2.0,
+)
+if abs(blind_cut_dia_mm(PINCH_CLEARANCE_SPEC) - PINCH_CLEARANCE_DIA) > 1e-9:
+    raise AssertionError("pinch clearance spec disagrees with Hole Wizard #4 normal fit")
+PINCH_BORE_Y = PINCH_HEIGHT
 
 # The pinch cross-bore must land wholly in the material band between the
 # adjuster counterbore's top and the block top, and the slit must cross it.
@@ -211,9 +217,9 @@ async def build(adapter) -> dict[str, str]:
     volume = await volume_check(adapter, "block", v_block, 0.005 * v_block)
 
     # Non-bearing shaft-tip passage, coaxial with the adjuster. The external
-    # brass bushing supports the shaft; this Ø2 opening only lets the Ø0.794 tip
-    # reach the adjuster's Ø2 blind cup. It is cut first so the later blind-tap
-    # volume subtracts only material not already removed by this passage.
+    # brass bushing supports the Ø0.794 tip; this opening only admits the tip
+    # to the exact 94025A150 conical cup apex. It is cut first so the later
+    # blind-tap volume subtracts only material not already removed here.
     passage = SketchDims()
     check("create_sketch shaft passage", await adapter.create_sketch("Front"))
     await define_circle(
@@ -272,10 +278,9 @@ async def build(adapter) -> dict[str, str]:
     )
     volume = await volume_check(adapter, "adjuster bore", volume - v_cb, 0.03 * v_cb)
 
-    # Top slit + perpendicular pinch screw (the McMaster 61815K41 pattern,
-    # locking the ADJUSTER's threads): 1.2-wide slit from the top down past
-    # the bore line, and an O2.4 cross-bore above the counterbore for the
-    # pinch screw that squeezes it closed.
+    # Top slit + perpendicular pinch screw: the 1.2-wide slit runs below the
+    # cross-bore so the exact McMaster 90280A108 #4-40 screw can squeeze the
+    # two jaws around the adjuster thread.
     check("create_plane BlockTop", await adapter.create_plane(
         CreatePlaneParameters(mode="offset", base_plane="Top Plane",
                               offset=BLOCK_HEIGHT)))
@@ -298,18 +303,16 @@ async def build(adapter) -> dict[str, str]:
         adapter, "top slit", volume - _slit_removed(), 0.02 * _slit_removed()
     )
 
-    # Pinch screw cross-bore: native #3-48 tap through both jaws, followed by a
-    # #3 NORMAL clearance through the +X near jaw only.  The resulting finished
-    # feature is the conventional pinch joint: screw slips through the head-side
-    # jaw and pulls against threads in the far jaw.
-    # along local X at (y = PINCH_BORE_Y, z = 0), drilled from the +X block face
-    # (a clean planar rectangle -- the top slit only removes the |x|<SLIT_W/2
-    # centre). The top slit splits it into two solid halves, so a through-all
-    # cut removes the tap-drill cylinder over (BLOCK_X - SLIT_W) of solid.
+    # Pinch screw cross-bore: native #4-40 tap through both jaws, followed by a
+    # normal-fit #4 clearance through the +X near jaw only. The screw slips
+    # through the head-side jaw and pulls against threads in the far jaw.
+    # Both features run along local X at (y = PINCH_BORE_Y, z = 0) from the +X
+    # block face. The slit splits the cylinder into two solid halves, so the
+    # through cut removes tap-drill area over (BLOCK_X - SLIT_W) of material.
     pinch_cut = wizard_holes(
         adapter, PINCH_BORE_SPEC,
         [[BLOCK_X / 2.0, PINCH_BORE_Y, 0.0]],
-        (1.0, 0.0, 0.0), "pinch tapped hole (#3-48)", name="PinchBore",
+        (1.0, 0.0, 0.0), "pinch tapped hole (#4-40)", name="PinchBore",
         placement_dims=[((None, None), ("PinchZ", '"PinchBoreY"'))],
     )
     drive_jobs += pinch_cut.placement_drive_jobs
@@ -319,7 +322,7 @@ async def build(adapter) -> dict[str, str]:
     pinch_clearance = wizard_holes(
         adapter, PINCH_CLEARANCE_SPEC,
         [[BLOCK_X / 2.0, PINCH_BORE_Y, 0.0]],
-        (1.0, 0.0, 0.0), "pinch near-jaw clearance (#3 normal)",
+        (1.0, 0.0, 0.0), "pinch near-jaw clearance (#4 normal)",
         name="PinchClearance",
         placement_dims=[((None, None), ("PinchZ", '"PinchBoreY"'))],
     )

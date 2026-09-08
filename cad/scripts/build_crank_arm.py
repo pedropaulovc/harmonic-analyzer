@@ -90,6 +90,10 @@ MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 # cut: it is a precision running fit, not a twist-drill hole.)
 
 THROUGH_CUT_DEPTH = 40.0  # mid-plane total; > any extent it crosses
+ANCHOR_HOLE_SPEC = HoleSpec(
+    "tapped_bottoming", "#4-40", end="blind", depth_mm=ANCHOR_DRILL_DEPTH,
+    overrides_mm={"ThreadDepth": ANCHOR_THREAD_DEPTH},
+)
 
 
 async def _volume(adapter) -> float:
@@ -260,10 +264,7 @@ async def build(adapter) -> dict[str, str]:
     # brass fillister-screw clamps the wire eyelet's tail under its head.
     anchor_cut = wizard_holes(
         adapter,
-        HoleSpec(
-            "tapped", "#4-40", end="blind", depth_mm=ANCHOR_DRILL_DEPTH,
-            overrides_mm={"ThreadDepth": ANCHOR_THREAD_DEPTH},
-        ),
+        ANCHOR_HOLE_SPEC,
         [[ANCHOR_SCREW_X, ANCHOR_SCREW_Y, ARM_THICKNESS]],
         (0.0, 0.0, 1.0),
         "keeper-ring anchor tap (#4-40)",

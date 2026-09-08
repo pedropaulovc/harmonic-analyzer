@@ -10,7 +10,6 @@ import build_alignment_pinion
 import build_arbor_pedestal
 import build_cone_gear
 import build_cone_gear_shaft
-import build_cone_pivot_screw
 import build_cone_tip_bushing
 import build_connecting_rod
 import build_crank_arm
@@ -21,7 +20,6 @@ import build_cylinder_gear
 import build_cylinder_gear_shaft
 import cone_gear_shaft_spec
 import cone_gear_spec
-import cone_pivot_screw_spec
 import cone_tip_bushing_spec
 import connecting_rod_spec
 import crank_arm_spec
@@ -34,7 +32,6 @@ import draw_alignment_pinion
 import draw_arbor_pedestal
 import draw_cone_gear
 import draw_cone_gear_shaft
-import draw_cone_pivot_screw
 import draw_cone_tip_bushing
 import draw_connecting_rod
 import draw_crank_arm
@@ -44,7 +41,7 @@ import draw_crankshaft
 import draw_cylinder_gear
 import draw_cylinder_gear_shaft
 from _gtol_spec import CylinderFace
-from _surface_finish import GROUND_UM, MACHINED_UM, SurfaceFinishControl
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 
 CASES = (
@@ -101,21 +98,6 @@ CASES = (
                 MACHINED_UM,
                 CylinderFace(
                     cone_gear_shaft_spec.SECTION_DIAS[-1], tolerance_mm=0.01
-                ),
-            ),
-        ),
-    ),
-    (
-        cone_pivot_screw_spec,
-        build_cone_pivot_screw,
-        draw_cone_pivot_screw,
-        (
-            SurfaceFinishControl(
-                "ground_shoulder",
-                GROUND_UM,
-                CylinderFace(
-                    cone_pivot_screw_spec.SHOULDER_DIA,
-                    contains_y_mm=-cone_pivot_screw_spec.SHOULDER_LEN / 2.0,
                 ),
             ),
         ),

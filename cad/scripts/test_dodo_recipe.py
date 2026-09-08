@@ -12,6 +12,8 @@ import os
 import re
 import time
 from pathlib import Path
+import sys
+from types import ModuleType
 
 import pytest
 
@@ -139,6 +141,310 @@ def test_release_revision_source_invalidates_native_and_drawing_tasks():
     assert revision_source in drawing["file_dep"]
 
 
+@pytest.fixture
+def isolated_drawing_keys(tmp_path, monkeypatch):
+    """Copy real drawing closures; keep all native inputs and writes isolated."""
+    import _buildgraph as bg
+
+    dodo = _load_dodo()
+    stems = ("platen_guide", "bracket_screw", "pen_assembly")
+    release_relative = dodo.RELEASE_VERSION_FILE.relative_to(REPO_ROOT)
+    sources = {dodo.RELEASE_VERSION_FILE}
+    for stem in stems:
+        spec = dodo.DRAWINGS_BY_NAME[stem]
+        sources.update((spec.script, *spec.assets))
+        sources.update(Path(path) for path in dodo._helper_deps(spec.script))
+    contents = {
+        path.resolve().relative_to(REPO_ROOT): path.read_bytes() for path in sources
+    }
+
+    def clear_closure():
+        bg._direct_local_imports.cache_clear()
+        bg._module_by_path.cache_clear()
+        bg._local_modules.cache_clear()
+
+    def checkout(name="repo", *, crlf=False):
+        root = tmp_path / name
+        scripts = root / "cad" / "scripts"
+        for relative, content in contents.items():
+            copied = root / relative
+            copied.parent.mkdir(parents=True, exist_ok=True)
+            if crlf and copied.suffix == ".py":
+                content = content.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
+            copied.write_bytes(content)
+        monkeypatch.setattr(dodo, "REPO_ROOT", root)
+        monkeypatch.setattr(dodo._cache, "REPO_ROOT", root)
+        monkeypatch.setattr(dodo, "SCRIPTS_DIR", scripts)
+        monkeypatch.setattr(bg, "SCRIPTS_DIR", scripts)
+        monkeypatch.setattr(dodo, "CAD_OUT", root / "cad" / "out")
+        monkeypatch.setattr(bg, "CAD_OUT", dodo.CAD_OUT)
+        monkeypatch.setattr(
+            dodo,
+            "RELEASE_VERSION_FILE",
+            root / release_relative,
+        )
+        adapter = root / ".adapter.digest"
+        adapter.write_bytes(b"fixed drawing adapter\n")
+        monkeypatch.setattr(dodo, "_submodule_dep", lambda: str(adapter))
+        native_recipe = root / "native-recipe.py"
+        native_recipe.write_bytes(b"MODEL_DIMENSION = 1\n")
+        monkeypatch.setattr(
+            dodo, "_part_file_deps", lambda _script, _stem: [str(native_recipe)]
+        )
+        monkeypatch.setattr(dodo, "_recipe_files", lambda _stem: [str(native_recipe)])
+        monkeypatch.setattr(dodo, "references_of", lambda _stem: ())
+
+        def reload_registry():
+            path = scripts / "_drawing_registry.py"
+            module = ModuleType("_isolated_drawing_registry")
+            module.__file__ = str(path)
+            monkeypatch.setitem(sys.modules, module.__name__, module)
+            # Compile current bytes directly: same-size, same-second row edits
+            # must not be hidden by Python's timestamp-based .pyc cache.
+            exec(compile(path.read_bytes(), str(path), "exec"), module.__dict__)
+            monkeypatch.setattr(dodo, "DRAWINGS_BY_NAME", module.DRAWINGS_BY_NAME)
+
+        reload_registry()
+        index = {}
+        for stem in stems:
+            spec = dodo.DRAWINGS_BY_NAME[stem]
+            kind = spec.source_kind
+            source = Path(
+                dodo._sldasm(spec.part)
+                if kind == "assembly"
+                else dodo._sldprt(spec.part)
+            )
+            token = Path(
+                dodo._assembly_execution_token(spec.part)
+                if kind == "assembly"
+                else dodo._part_execution_token(spec.part)
+            )
+            source.parent.mkdir(parents=True, exist_ok=True)
+            source.write_bytes(b"fixed native model identity")
+            token.write_bytes(b"a" * 64 + b"\n")
+            index[dodo._artefact_key(str(source))] = (kind, spec.part)
+        dodo._ARTEFACT_INDEX = index
+
+        def snapshot():
+            reload_registry()
+            clear_closure()
+            dodo._ARTEFACT_DIGEST_MEMO.clear()
+            result = {}
+            for stem in stems:
+                deps = dodo._drawing_file_deps(stem)
+                assert all(
+                    Path(path).resolve().is_relative_to(root.resolve()) for path in deps
+                ), stem
+                result[stem] = (dodo._digest_files(deps), dodo._cache_key(deps))
+            return result
+
+        return dodo, root, snapshot
+
+    try:
+        yield checkout
+    finally:
+        clear_closure()
+
+
+@pytest.mark.parametrize("change", ["edit", "add"])
+def test_unrelated_drawing_rows_preserve_freshness_and_cache_keys(
+    isolated_drawing_keys, change
+):
+    dodo, root, snapshot = isolated_drawing_keys()
+    before = snapshot()
+    generated = {
+        Path(path)
+        for stem in before
+        for path in dodo._drawing_file_deps(stem)
+        if Path(path).is_relative_to(dodo.CAD_OUT) and Path(path).suffix == ".digest"
+    }
+    old_time = 1_600_000_000_000_000_000
+    for path in generated:
+        os.utime(path, ns=(old_time, old_time))
+    persisted = {
+        path: (path.read_bytes(), path.stat().st_mtime_ns) for path in generated
+    }
+    registry = root / "cad" / "scripts" / "_drawing_registry.py"
+    text = registry.read_text(encoding="utf-8")
+    if change == "edit":
+        text = text.replace(
+            'artifact_stem="crank-arm"', 'artifact_stem="crank-arm-new"'
+        )
+    else:
+        text = text.replace(
+            "DRAWINGS: tuple[DrawingSpec, ...] = (",
+            "DRAWINGS: tuple[DrawingSpec, ...] = (\n"
+            '    DrawingSpec("unrelated", "unrelated", "unrelated", "draw_unrelated.py"),',
+        )
+    registry.write_text(text, encoding="utf-8")
+    assert snapshot() == before
+    assert generated, "drawing projection must have a persisted freshness input"
+    assert {
+        path: (path.read_bytes(), path.stat().st_mtime_ns) for path in generated
+    } == persisted
+
+
+def test_selected_drawing_row_changes_only_its_freshness_and_cache_key(
+    isolated_drawing_keys,
+):
+    _dodo, root, snapshot = isolated_drawing_keys()
+    before = snapshot()
+    registry = root / "cad" / "scripts" / "_drawing_registry.py"
+    registry.write_text(
+        registry.read_text(encoding="utf-8").replace(
+            'artifact_stem="platen-guide"', 'artifact_stem="platen-guide-revised"'
+        ),
+        encoding="utf-8",
+    )
+    after = snapshot()
+    assert all(a != b for a, b in zip(before["platen_guide"], after["platen_guide"]))
+    for stem in ("bracket_screw", "pen_assembly"):
+        assert after[stem] == before[stem]
+
+
+@pytest.mark.parametrize(
+    "member", ["shared_registry", "transitive_helper", "template", "revision"]
+)
+def test_shared_drawing_inputs_invalidate_freshness_and_cache_keys(
+    isolated_drawing_keys, member
+):
+    dodo, root, snapshot = isolated_drawing_keys()
+    before = snapshot()
+    scripts = root / "cad" / "scripts"
+    if member == "shared_registry":
+        path = scripts / "_drawing_registry.py"
+        path.write_text(
+            path.read_text(encoding="utf-8").replace(
+                'f"{self.artifact_stem}_drawing.png"',
+                'f"{self.artifact_stem}_preview.png"',
+            ),
+            encoding="utf-8",
+        )
+    elif member == "revision":
+        dodo.RELEASE_VERSION_FILE.write_text("next_revision: v999\n", encoding="utf-8")
+    else:
+        path = {
+            "transitive_helper": scripts / "_drawing_common.py",
+            "template": next(iter(dodo.DRAWINGS_BY_NAME["platen_guide"].assets)),
+        }[member]
+        path.write_bytes(path.read_bytes() + b"\n# changed shared input\n")
+    after = snapshot()
+    for stem in before:
+        assert all(a != b for a, b in zip(before[stem], after[stem])), stem
+
+
+def test_registry_imported_helper_remains_in_complete_drawing_closure(
+    isolated_drawing_keys, monkeypatch
+):
+    _dodo, root, snapshot = isolated_drawing_keys()
+    scripts = root / "cad" / "scripts"
+    helper = scripts / "_drawing_recipe_extra.py"
+    helper.write_text("VALUE = 1\n", encoding="utf-8")
+    module = ModuleType("_drawing_recipe_extra")
+    exec(compile(helper.read_bytes(), str(helper), "exec"), module.__dict__)
+    monkeypatch.setitem(sys.modules, module.__name__, module)
+    registry = scripts / "_drawing_registry.py"
+    registry.write_text(
+        registry.read_text(encoding="utf-8")
+        + "\nfrom _drawing_recipe_extra import VALUE\n",
+        encoding="utf-8",
+    )
+    before = snapshot()
+    helper.write_text("VALUE = 2\n", encoding="utf-8")
+    after = snapshot()
+    for stem in before:
+        assert all(a != b for a, b in zip(before[stem], after[stem])), stem
+
+
+@pytest.mark.parametrize(
+    "consumer",
+    [
+        "from _drawing_registry import DRAWINGS\nALL_DRAWINGS = tuple(DRAWINGS)\n",
+        "from _drawing_registry import DRAWINGS_BY_NAME\nOTHER = DRAWINGS_BY_NAME['crank_arm']\n",
+        "from _drawing_registry import DRAWINGS_BY_NAME\n"
+        "def select(name):\n    return DRAWINGS_BY_NAME[name]\n",
+        "import _drawing_registry as registry\ndef expose():\n    return registry\n",
+        "from _drawing_registry import DRAWINGS_BY_NAME as rows\n"
+        "def lookup():\n    return rows.get('platen_guide')\n",
+        "import importlib\n"
+        "registry = importlib.import_module('_drawing_registry')\n"
+        "OTHER = registry.DRAWINGS_BY_NAME['crank_arm']\n",
+        "import sys\n"
+        "registry = sys.modules['_drawing_registry']\n"
+        "OTHER = registry.DRAWINGS_BY_NAME['crank_arm']\n",
+        "from importlib import import_module as load\n"
+        "registry = load('_drawing_' + 'registry')\n"
+        "OTHER = registry.DRAWINGS_BY_NAME['crank_arm']\n",
+        "REGISTRY_NAME = '_drawing_registry'\n"
+        "def other_row(loader):\n"
+        "    return loader(REGISTRY_NAME).DRAWINGS_BY_NAME['crank_arm']\n",
+    ],
+    ids=[
+        "whole",
+        "other-row",
+        "dynamic",
+        "escaped-module",
+        "unknown-mapping-call",
+        "dynamic-import",
+        "sys-modules",
+        "computed-module-import",
+        "escaped-module-name",
+    ],
+)
+def test_unclassified_transitive_registry_consumers_keep_full_dependency(
+    isolated_drawing_keys, consumer
+):
+    _dodo, root, snapshot = isolated_drawing_keys()
+    scripts = root / "cad" / "scripts"
+    helper = scripts / "_drawing_common.py"
+    helper.write_text(
+        helper.read_text(encoding="utf-8") + "\n" + consumer, encoding="utf-8"
+    )
+    before = snapshot()
+    registry = scripts / "_drawing_registry.py"
+    registry.write_text(
+        registry.read_text(encoding="utf-8").replace(
+            'artifact_stem="crank-arm"', 'artifact_stem="crank-arm-revised"'
+        ),
+        encoding="utf-8",
+    )
+    after = snapshot()
+    for stem in before:
+        assert all(a != b for a, b in zip(before[stem], after[stem])), stem
+
+
+def test_drawing_registry_keys_are_checkout_and_eol_independent(isolated_drawing_keys):
+    _dodo, _root, snapshot = isolated_drawing_keys("lf")
+    before = snapshot()
+    _dodo, _root, snapshot = isolated_drawing_keys("crlf", crlf=True)
+    assert snapshot() == before
+
+
+@pytest.mark.parametrize("stem", ["platen_guide", "pen_assembly"])
+def test_drawing_projection_preserves_exact_native_execution_identity(
+    isolated_drawing_keys, stem
+):
+    dodo, _root, snapshot = isolated_drawing_keys()
+    before = snapshot()
+    spec = dodo.DRAWINGS_BY_NAME[stem]
+    assembly = spec.source_kind == "assembly"
+    source = dodo._sldasm(spec.part) if assembly else dodo._sldprt(spec.part)
+    token = (
+        dodo._assembly_execution_token(spec.part)
+        if assembly
+        else dodo._part_execution_token(spec.part)
+    )
+    Path(source).write_bytes(b"same recipe with foreign persistent-reference IDs")
+    assert snapshot() == before, (
+        "recipe identity deliberately ignores native save bytes"
+    )
+    Path(token).write_bytes(b"b" * 64 + b"\n")
+    after = snapshot()
+    assert all(a != b for a, b in zip(before[stem], after[stem]))
+    for other in before.keys() - {stem}:
+        assert after[other] == before[other]
+
+
 def test_execution_identity_is_stable_for_same_artifact(tmp_path, monkeypatch):
     dodo = _load_dodo()
     part = tmp_path / "part.SLDPRT"
@@ -192,14 +498,12 @@ def isolated_assembly_helper_keys(tmp_path, monkeypatch):
             dodo, f"_submodule_{tier}_dep", lambda path=str(sidecar): path
         )
 
-    assembly_recipes = {
-        stem: dodo._recipe_files(stem) for stem in dodo.ASSEMBLY_ORDER
-    }
+    assembly_recipes = {stem: dodo._recipe_files(stem) for stem in dodo.ASSEMBLY_ORDER}
     part_tasks = {task["name"]: task for task in dodo.task_part()}
     assembly_tasks = {task["name"]: task for task in dodo.task_assembly()}
-    sources = {
-        path for recipe in assembly_recipes.values() for path in recipe
-    } | {path for task in part_tasks.values() for path in task["file_dep"]}
+    sources = {path for recipe in assembly_recipes.values() for path in recipe} | {
+        path for task in part_tasks.values() for path in task["file_dep"]
+    }
     mapped = {}
     for path in sources:
         original = Path(path).resolve()
@@ -243,9 +547,7 @@ def isolated_assembly_helper_keys(tmp_path, monkeypatch):
         dodo._ARTEFACT_DIGEST_MEMO.clear()
         # Generate again after redirecting recipe paths; the discovery-time
         # assembly_tasks above are used only to initialize isolated targets.
-        current_assembly_tasks = {
-            task["name"]: task for task in dodo.task_assembly()
-        }
+        current_assembly_tasks = {task["name"]: task for task in dodo.task_assembly()}
         for stem, task in current_assembly_tasks.items():
             assert task["file_dep"] == dodo._assembly_file_deps(stem)
             assert all(
@@ -287,11 +589,15 @@ def test_assembly_helper_edits_change_only_real_recipe_and_cache_consumers(
     before = snapshot()
     copied_helper = root / "cad" / "scripts" / f"{helper}.py"
     assert copied_helper.is_file(), f"missing real helper input: {helper}"
-    copied_helper.write_bytes(copied_helper.read_bytes() + b"\n# isolated key mutation\n")
+    copied_helper.write_bytes(
+        copied_helper.read_bytes() + b"\n# isolated key mutation\n"
+    )
     after = snapshot()
 
     def changed(group):
-        return {stem for stem in before[group] if before[group][stem] != after[group][stem]}
+        return {
+            stem for stem in before[group] if before[group][stem] != after[group][stem]
+        }
 
     assert changed("recipes") == expected
     # Parent keys legitimately include child recipe digests before their exact
@@ -1110,45 +1416,6 @@ def test_part_tasks_cover_every_stem_once(monkeypatch):
     assert len(names) == len(set(names))
 
 
-def test_drawing_runtime_lock_and_source_dependency(monkeypatch):
-    """Drawings use the runtime COM lock and depend directly on their source part,
-    without false assembly/export ordering edges."""
-    dodo = _load_dodo()
-    monkeypatch.setenv("HARMONIC_BUILD_ORDER_SEED", "seat-A")
-    drawing = "drawing:platen_guide"
-
-    task = next(task for task in dodo.task_drawing() if task["name"] == "platen_guide")
-    assert "task_dep" not in task
-    cad_deps = [path for path in task["file_dep"] if path.lower().endswith(".sldprt")]
-    assert cad_deps == [dodo._sldprt("platen_guide")]
-    assert not any(path.lower().endswith(".sldasm") for path in task["file_dep"])
-    assert dodo._part_execution_token("platen_guide") in task["file_dep"]
-    action, args = task["actions"][0]
-    assert action is dodo._cached_drawing_action
-    assert args == ["platen_guide"]
-    dep_names = {Path(path).name for path in task["file_dep"]}
-    assert {
-        "platen-guide.SLDPRT",
-        "draw_platen_guide.py",
-        "_drawing_common.py",
-        "_drawing_registry.py",
-        "_holes.py",
-        "_common.py",
-        ".solidworks-mcp-submodule.digest",
-    } <= dep_names
-    assert {Path(path).name for path in task["targets"]} == {
-        "platen-guide.SLDDRW",
-        "platen-guide.pdf",
-        "platen-guide_drawing.png",
-    }
-    assert "harmonic-analyzer.drwdot" in {name.lower() for name in dep_names}
-
-    build_deps = set(dodo.task_build()["task_dep"])
-    bare_deps = set(dodo.task_build_bare()["task_dep"])
-    assert drawing in build_deps
-    assert drawing not in bare_deps
-
-
 def test_assembly_artefact_digest_folds_in_refs():
     """An assembly's stable digest folds its own recipe together with each referenced
     artefact's digest, recursively -- so a leaf-part input change propagates up to
@@ -1869,8 +2136,16 @@ def test_modal_dialog_exit_code_is_a_solidworks_failure():
 def test_sw_preflight_restarts_only_past_the_commit_budget(monkeypatch):
     dodo = _load_dodo()
     calls: list[str] = []
-    monkeypatch.setattr(dodo._sw_lifecycle, "force_recover", lambda: calls.append("recover") or "connected")
-    monkeypatch.setattr(dodo._sw_lifecycle, "wait_until_ready", lambda: calls.append("wait") or "connected")
+    monkeypatch.setattr(
+        dodo._sw_lifecycle,
+        "force_recover",
+        lambda: calls.append("recover") or "connected",
+    )
+    monkeypatch.setattr(
+        dodo._sw_lifecycle,
+        "wait_until_ready",
+        lambda: calls.append("wait") or "connected",
+    )
     monkeypatch.setenv("HARMONIC_SW_MAX_COMMIT_GB", "40")
 
     monkeypatch.setattr(dodo, "_sw_commit_gb", lambda: 12.5)
@@ -1881,7 +2156,9 @@ def test_sw_preflight_restarts_only_past_the_commit_budget(monkeypatch):
     dodo._sw_preflight()
     assert calls == ["recover"]
 
-    monkeypatch.setattr(dodo, "_sw_commit_gb", lambda: None)  # not running / probe glitch
+    monkeypatch.setattr(
+        dodo, "_sw_commit_gb", lambda: None
+    )  # not running / probe glitch
     dodo._sw_preflight()
     assert calls == ["recover"]
 
@@ -1894,8 +2171,16 @@ def test_sw_preflight_restarts_only_past_the_commit_budget(monkeypatch):
 def test_sw_preflight_waits_out_a_slow_cold_start(monkeypatch):
     dodo = _load_dodo()
     calls: list[str] = []
-    monkeypatch.setattr(dodo._sw_lifecycle, "force_recover", lambda: calls.append("recover") or "starting")
-    monkeypatch.setattr(dodo._sw_lifecycle, "wait_until_ready", lambda: calls.append("wait") or "connected")
+    monkeypatch.setattr(
+        dodo._sw_lifecycle,
+        "force_recover",
+        lambda: calls.append("recover") or "starting",
+    )
+    monkeypatch.setattr(
+        dodo._sw_lifecycle,
+        "wait_until_ready",
+        lambda: calls.append("wait") or "connected",
+    )
     monkeypatch.setenv("HARMONIC_SW_MAX_COMMIT_GB", "40")
     monkeypatch.setattr(dodo, "_sw_commit_gb", lambda: 66.3)
     dodo._sw_preflight()
@@ -1909,4 +2194,3 @@ def test_sw_preflight_budget_rejects_non_finite_overrides(monkeypatch):
         assert dodo._sw_max_commit_gb() == dodo._SW_MAX_COMMIT_GB_DEFAULT, raw
     monkeypatch.setenv("HARMONIC_SW_MAX_COMMIT_GB", "12.5")
     assert dodo._sw_max_commit_gb() == 12.5
-

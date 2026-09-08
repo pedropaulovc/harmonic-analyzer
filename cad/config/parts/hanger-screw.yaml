@@ -1,9 +1,13 @@
 hanger-screw:
+  title: Low-Strength Zinc-Plated Steel Hex Head Screw
   number: MHA-034
-  material: 12L14 (UNS G12144) per ASTM A108-24
-  material_specification: 12L14 (UNS G12144) per ASTM A108-24
-  finish: black oxide per MIL-DTL-13924, Class 1; oil sealed
+  stock_name: Low-Strength Zinc-Plated Steel Hex Head Screw
+  supplier: McMaster-Carr
+  supplier_skus: [93075A194]
+  material: Plain Carbon Steel
+  material_specification: Low-strength steel, McMaster-Carr 93075A194
+  finish: zinc plated
   quantity: 1
   tolerance_class: machined_block
   fit_class: fastener_clearance
-  process: "machined (steel)"
+  process: purchased

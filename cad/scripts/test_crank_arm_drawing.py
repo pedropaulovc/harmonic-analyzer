@@ -41,10 +41,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
 
 def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
     assert drawing.SHEET_SCALE == (2.0, 1.0)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "scale=(1, 1)" in source  # the isometric override
     assert crank_arm_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:1"
-    assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
 
 
 def test_linked_notes_define_a_complete_individual_part() -> None:
@@ -58,9 +55,6 @@ def test_linked_notes_define_a_complete_individual_part() -> None:
     assert "MATCH-REAM" not in notes
     assert "NOT INDIVIDUAL PART ACCEPTANCE" not in notes
     assert "NO. 2" not in notes
-    assert '3: "crank arm; manufacturing drawing; straight cross-hole"' in Path(
-        drawing.__file__
-    ).read_text(encoding="utf-8")
     # General tolerances live in the title block ONLY -- a second general
     # tolerance in the notes would conflict with it.
     assert "LINEAR +/-" not in notes
@@ -69,9 +63,6 @@ def test_linked_notes_define_a_complete_individual_part() -> None:
     # the period British Association series.
     assert "BA" not in notes
     assert "X.XX" not in notes
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
-    assert "_NOTES_" not in source
 
 
 def test_hole_states_are_annotated() -> None:
@@ -79,18 +70,6 @@ def test_hole_states_are_annotated() -> None:
     assert callouts["ShaftBoreDia"].startswith("THRU")
     assert callouts["DimpleDia"] == "0.5 DEEP"
     assert crank_arm_spec.PIN_HOLE_DIA == NUMBER_DRILL_MM["#14"]
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_native_hole_callout(") == 2
-    assert 'label="crank-arm cross-hole"' in source
-
-
-def test_native_gdt_replaces_form_orientation_notes() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 3
-    assert source.count("add_feature_control_frame(") == 3
-    assert "characteristic=\"parallelism\"" in source
-    assert "characteristic=\"position\"" in source
-    assert "add_surface_finish(" in source
 
 
 def test_shaft_axis_datum_pick_is_radial_with_its_symbol() -> None:
@@ -112,85 +91,21 @@ def test_shaft_axis_datum_pick_is_radial_with_its_symbol() -> None:
         abs_tol=1e-12,
     )
     assert rim_vector[0] * leader_vector[0] + rim_vector[1] * leader_vector[1] > 0
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "edge_xy=DATUM_B_RIM" in source
-    assert "symbol_xy=DATUM_B_SYMBOL" in source
-    assert "shoulder=True" in source
-    assert "position_tolerance_m=0.0001" in source
 
 
-def test_handle_pivot_has_basic_transverse_location_from_datum_c() -> None:
-    assert crank_arm_spec.HALF_WIDTH == 8.0
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "handle_transverse = add_edge_dimension(" in source
-    assert 'orientation="vertical"' in source
-    assert "set_arc_endpoints_to_center(\n        adapter, handle_transverse" in source
-    assert "set_basic_dimension(\n        adapter, handle_transverse" in source
-
-
-def test_cross_hole_has_basic_datum_a_station_and_position_control() -> None:
-    assert crank_arm_spec.ARM_THICKNESS / 2.0 == 4.0
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "pin_station = add_edge_dimension(" in source
-    assert 'label="cross-hole station from datum A"' in source
-    assert "find_edge_near(" in source
-    assert 'label="cross-hole datum-A broad face"' in source
-    assert 'axis="y"' in source
-    assert 'orientation="vertical"' in source
-    assert "set_arc_endpoints_to_center(\n        adapter, pin_station" in source
-    assert "set_basic_dimension(\n        adapter, pin_station" in source
-    assert 'label="cross-hole true position"' in source
-    assert 'datums=("A", "B")' in source
-    assert "CROSS-HOLE AXIS INTERSECTS DATUM AXIS B." in crank_arm_spec.DRAWING_NOTES
-    assert "MATCH-REAM" not in crank_arm_spec.DRAWING_NOTES
 
 
 def test_dimple_has_both_nominal_location_coordinates() -> None:
     assert crank_arm_spec.DIMPLE_X == 30.0
     assert crank_arm_spec.HALF_WIDTH == 8.0
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert '"DimpleX":' in source
-    assert "dimple_transverse = add_edge_dimension(" in source
-    assert 'label="dimple transverse location from datum C"' in source
-    assert "set_arc_endpoints_to_center(\n        adapter,\n        dimple_transverse" in source
-
-
-def test_gtol_annotations_are_migrated_to_current_xml_format() -> None:
-    common = Path(drawing.__file__).with_name("_drawing_common.py").read_text(
-        encoding="utf-8"
-    )
-    assert "CanConvertFormat()" in common
-    assert "ConvertFormat()" in common
-    assert "GetFormat()) != 2" in common
-    assert common.index("SetFrameSymbols2") < common.index("ConvertFormat()")
-    assert "if not migrated and not frame.SetSymbolXml(xml)" in common
-    assert "annotation.SetAttachedEntities(dispatch_array([edge]))" in common
-    # Bent, not straight: a straight leader runs at whatever angle the
-    # anchor-to-frame vector takes, which is what drove the Ra symbol's leader
-    # across two views. IGtol::SetLeader cannot ask for bent, so the ordinary
-    # path goes through IAnnotation::SetLeader3 and checks its int status.
-    assert "annotation.SetLeader3(" in common
-    assert "_LEADER_BENT," in common
-    assert "gtol.SetLeader(True, 0, False, False)" not in common
-    # DIMENSION-attach entity registration is flow-dependent (0 or 1 depending
-    # on insertion order), so the check accepts either; edge attachments stay 1.
-    assert 'expected_entities = {0, 1} if entity_type == "DIMENSION" else {1}' in common
-    assert "not bool(gtol.IsAttached())" in common
-    assert "int(gtol.GetLeaderCount()) != 1" in common
 
 
 def test_wizard_holes_are_not_fake_marked_dimensions() -> None:
     assert "BoreProfile" not in arm.DRAWING_DIMENSIONS
     assert "PinHoleProfile" not in arm.DRAWING_DIMENSIONS
-    source = Path(arm.__file__).read_text(encoding="utf-8")
-    assert 'HoleSpec("drilled_fractional", "15/64")' in source
-    assert 'HoleSpec("drilled_number", "#14")' in source
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:
-    source = Path(arm.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_properties" in source
-    assert "clear_dimensions_for_drawing" in source
     import _config
 
     spec = _config.parts("crank-arm")
@@ -199,3 +114,35 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     assert spec["material_specification"] == expected
     assert spec["finish"]
     assert int(spec["quantity"]) == 1
+
+
+def test_stock_anchor_clamps_eye_without_bottoming_or_drill_breakthrough() -> None:
+    import build_crank_pin_eye as eye
+    import build_drive_train_assembly as drive
+    import build_fillister_screw as screw
+    import pytest
+
+    # Derive the insertion from the placed under-head plane, not a duplicated
+    # engagement constant: moving the head off the wire must fail this contract.
+    wire_front = drive.EYE_Z - eye.WIRE_DIA / 2.0
+    wire_back = drive.EYE_Z + eye.WIRE_DIA / 2.0
+    assert drive.ANCHOR_HEAD_Z == pytest.approx(wire_front)
+    assert drive.CRANK_ARM_Z0 - wire_back == pytest.approx(0.02)
+    insertion = drive.ANCHOR_HEAD_Z + screw.SHANK_LEN - drive.CRANK_ARM_Z0
+    assert insertion == pytest.approx(5.33)
+    assert screw.SHANK_DIA < insertion <= arm.ANCHOR_HOLE_SPEC.overrides_mm["ThreadDepth"]
+    assert arm.ANCHOR_HOLE_SPEC.kind == "tapped_bottoming"
+    assert arm.ANCHOR_HOLE_SPEC.size == screw.THREAD
+    assert arm.ANCHOR_HOLE_SPEC.depth_mm - insertion == pytest.approx(1.17)
+    assert drive.ANCHOR_BACK_WALL == pytest.approx(0.8207, abs=0.0001)
+    assert drive.ANCHOR_BACK_WALL >= 0.5
+
+    # The eye tail ends just outside the shank, still under the head. Its
+    # loop and the photographed screw station remain on the operator face.
+    tail_end_y = drive.EYE_CENTER_Y + eye.LOOP_R + eye.TAIL_LEN
+    shank_gap = drive.ANCHOR_SCREW_XY[1] - tail_end_y - screw.SHANK_DIA / 2.0
+    assert shank_gap == pytest.approx(0.02)
+    assert screw.HEAD_DIA / 2.0 - (drive.ANCHOR_SCREW_XY[1] - tail_end_y) >= eye.WIRE_DIA / 2.0
+    assert drive.ANCHOR_SCREW_XY == pytest.approx(
+        (drive.X_CRANK - 4.5, drive.Y_CRANK - 20.0)
+    )

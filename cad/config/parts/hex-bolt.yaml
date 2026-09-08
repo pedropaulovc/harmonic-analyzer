@@ -1,6 +1,12 @@
 hex-bolt:
+  title: Medium-Strength Grade 5 Steel Hex Head Screw
   number: MHA-036
+  stock_name: Medium-Strength Grade 5 Steel Hex Head Screw
+  supplier: McMaster-Carr
+  supplier_skus: [92865A585]
   material: Plain Carbon Steel
+  material_specification: Grade 5 steel, McMaster-Carr 92865A585
+  finish: zinc plated
   tolerance_class: machined_block
   fit_class: fastener_clearance
-  process: "machined (steel)"
+  process: purchased

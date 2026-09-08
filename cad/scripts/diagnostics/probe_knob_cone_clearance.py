@@ -1,12 +1,14 @@
-r"""Exact sweep of cone-lock-knob radial offset against rotating cone gear #2.
+r"""Exact sweep of the cone-lock knob against rotating cone gear #1.
 
 The knob is stationary while the cone train rotates.  This throwaway assembly
-tests candidate platform-local knob X stations over one complete tooth pitch of
-the second cone gear and reports the worst exact SolidWorks interference volume.
+compares the retired northern lock station with the production southern station
+over one complete tooth pitch and reports the worst exact SolidWorks
+interference volume.
 """
 
 from __future__ import annotations
 
+import math
 import sys
 from pathlib import Path
 
@@ -74,8 +76,8 @@ def _pair_volume(adapter, wanted: tuple[str, str]) -> float:
 
 async def build(adapter) -> dict[str, str]:
     check("create_assembly", await adapter.create_assembly())
-    teeth = _config.cone_teeth(1)
-    station = dta.SHAFT_T120_STATION + dta.GEAR_AXIS_SHIFT + dta.SEAT_PITCH
+    teeth = _config.cone_teeth(0)
+    station = dta.SHAFT_T120_STATION + dta.GEAR_AXIS_SHIFT
     centre = dta.cone_station(station)
     gear_position = [
         centre[0] - dta.CONE_FACE / 2.0 * dta.SIN_I,
@@ -90,9 +92,19 @@ async def build(adapter) -> dict[str, str]:
         dta.ROT_Y_INCLINE,
         ground=True,
         configuration=f"T{teeth:03d}",
-        label=f"cone gear #2 T{teeth:03d}",
+        label=f"cone gear #1 T{teeth:03d}",
     )
-    knob_x, knob_z = dta._plate_local_to_machine(24.5, dta.PLAT_SLOT_E_Z)
+    former_x = 27.5
+    former_z = dta._POST_LOCAL_Z + math.sqrt(
+        (
+            dta.KNOB_HEAD_DIA / 2.0
+            + dta.POST_BLOCK_DIA / 2.0
+            + dta.PLAT_LOCK_HEAD_POST_CLEARANCE
+        )
+        ** 2
+        - former_x**2
+    )
+    knob_x, knob_z = dta._plate_local_to_machine(former_x, former_z)
     knob_position = [knob_x, dta.Y_BASE_TOP + dta.PLAT_T, knob_z]
     knob = await place_component(
         adapter,
@@ -105,12 +117,13 @@ async def build(adapter) -> dict[str, str]:
     )
     pair = tuple(sorted((gear, knob)))
     pitch = 360.0 / teeth
-    candidates = tuple(
-        dict.fromkeys((24.5, dta.PLAT_SLOT_E_X, 27.0, 28.0, 28.5, 29.0, 29.5))
-    )
-    worst_by_x: dict[float, float] = {}
-    for local_x in candidates:
-        knob_x, knob_z = dta._plate_local_to_machine(local_x, dta.PLAT_SLOT_E_Z)
+    candidates = {
+        "former northern station": (former_x, former_z),
+        "production southern station": (dta.PLAT_SLOT_E_X, dta.PLAT_SLOT_E_Z),
+    }
+    worst_by_station: dict[str, float] = {}
+    for label, (local_x, local_z) in candidates.items():
+        knob_x, knob_z = dta._plate_local_to_machine(local_x, local_z)
         knob_position = [knob_x, dta.Y_BASE_TOP + dta.PLAT_T, knob_z]
         _put_transform(adapter, knob, dta.IDENTITY, knob_position)
         worst = 0.0
@@ -119,19 +132,20 @@ async def build(adapter) -> dict[str, str]:
             rows = compose_rows(rot_z_rows(phase), dta.ROT_Y_INCLINE)
             _put_transform(adapter, gear, rows, gear_position)
             worst = max(worst, _pair_volume(adapter, pair))
-        log(f"knob local X {local_x:4.1f} mm: worst {worst:.4f} mm^3")
-        worst_by_x[local_x] = worst
-    if worst_by_x[24.5] < 0.0005:
-        raise RuntimeError("24.5 mm collision positive control unexpectedly cleared")
-    selected_worst = worst_by_x[dta.PLAT_SLOT_E_X]
+        log(f"{label} local ({local_x:.1f}, {local_z:.1f}) mm: worst {worst:.4f} mm^3")
+        worst_by_station[label] = worst
+    if worst_by_station["former northern station"] < 0.0005:
+        raise RuntimeError(
+            "former northern station positive control unexpectedly cleared"
+        )
+    selected_worst = worst_by_station["production southern station"]
     if selected_worst >= 0.0005:
         raise RuntimeError(
-            f"selected knob station {dta.PLAT_SLOT_E_X:.1f} mm collides: "
-            f"worst {selected_worst:.4f} mm^3"
+            f"production lock station collides: worst {selected_worst:.4f} mm^3"
         )
     log(
-        f"selected knob station {dta.PLAT_SLOT_E_X:.1f} mm clears; "
-        f"24.5 mm positive control worst {worst_by_x[24.5]:.4f} mm^3"
+        "production southern lock station clears; former northern station "
+        f"positive control worst {worst_by_station['former northern station']:.4f} mm^3"
     )
     return {}
 

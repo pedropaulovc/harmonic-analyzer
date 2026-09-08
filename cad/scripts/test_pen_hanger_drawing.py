@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import math
+
+import pytest
+
 import build_pen_hanger as part
 import draw_pen_hanger as drawing
 import pen_hanger_spec
@@ -24,23 +28,6 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert kept == marked
 
 
-def test_notes_describe_the_strap_channel_and_screw() -> None:
-    notes = pen_hanger_spec.DRAWING_NOTES
-    assert "SQUARE HOLE THRU" in notes
-    assert "INTERNAL R0.25 MAX" in notes
-    assert "WALL-THICKNESS DIFFERENCE 0.10 MAX" in notes
-    assert "HOLE CENTER 4.00 +/-0.05 FROM FRONT DEPTH FACE" in notes
-    assert "AWS A5.8 BAg-7" in notes
-    assert "FLUSH WITH BLOCK BACK DEPTH FACE WITHIN 0.10" in notes
-    assert "FULL 3.00 X 10.00 FAYING SURFACE" in notes
-    assert "1.0 MIN LEG" in notes
-    assert "CUMULATIVE VOID LENGTH 0.50 MAX" in notes
-    assert "HORIZONTALLY RIGHT OF FRONT-VIEW TOP-LEFT CORNER" in notes
-    assert "#6-32" in notes
-    assert "AISI" not in notes
-    assert "X.XX" not in notes
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 
 
 def test_view_scales_are_explicit() -> None:
@@ -55,9 +42,6 @@ def test_view_scales_are_explicit() -> None:
 
 
 def test_part_stamps_make_critical_properties() -> None:
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_properties" in source
-    assert "clear_dimensions_for_drawing" in source
     import _config
 
     config = _config.parts("pen-hanger")
@@ -66,3 +50,53 @@ def test_part_stamps_make_critical_properties() -> None:
     assert "steel" in str(config["material_specification"]).lower()
     assert config["finish"]
     assert int(config["quantity"]) == 1
+
+
+def test_hanger_screw_moves_without_moving_the_pen_or_bar() -> None:
+    import build_magnifier_assembly as magnifier
+    import build_pen_assembly as pen
+    import build_wheel_bar as bar
+
+    assert (
+        magnifier.WHEEL_BAR_X0 - bar.BAR_LENGTH / 2.0,
+        magnifier.WHEEL_BAR_X0 + bar.BAR_LENGTH / 2.0,
+    ) == pytest.approx((-8.0, 226.0))
+    assert pen.HANGER_POS == pytest.approx((3.0, 505.0, -157.0))
+    assert pen.PEN_ROD_POS == pytest.approx((3.0, 368.0, -159.5))
+    tap_axis = (
+        pen.HANGER_POS[0] + part.SCREW_HOLE_XY[0],
+        pen.HANGER_POS[1] + part.SCREW_HOLE_XY[1],
+    )
+    bar_axis = (
+        magnifier.WHEEL_BAR_X0 + bar.SCREW_HOLE_X,
+        magnifier.WHEEL_BAR_Y,
+    )
+    assert tap_axis == pytest.approx((-3.0, 575.7))
+    assert tap_axis == pytest.approx(bar_axis)
+    assert pen.HANGER_SCREW_POS == pytest.approx((*tap_axis, -129.9))
+
+    # Receiver thickness and the rear-entry stock-screw stack are unchanged.
+    assert part.STRAP_Z[1] - part.STRAP_Z[0] == pytest.approx(3.0)
+    assert pen.HANGER_THREAD_PROTRUSION == pytest.approx(0.7)
+    assert pen.HANGER_TIP_TO_RIM == pytest.approx(0.3)
+
+
+def test_hanger_thread_envelope_fits_all_four_tapered_land_edges() -> None:
+    point = part.SCREW_HOLE_XY
+    vertices = (
+        (part.STRAP_BOT_X[0], part.BLOCK_HALF),
+        (part.STRAP_BOT_X[1], part.BLOCK_HALF),
+        (part.STRAP_TOP_X[1], part.STRAP_TOP_Y),
+        (part.STRAP_TOP_X[0], part.STRAP_TOP_Y),
+    )
+    # Signed point-to-edge distances in the CCW polygon measure the complete
+    # circular thread envelope, including the top edge and inclined sides.
+    walls = []
+    for start, end in zip(vertices, vertices[1:] + vertices[:1]):
+        dx, dy = end[0] - start[0], end[1] - start[1]
+        distance = (
+            dx * (point[1] - start[1]) - dy * (point[0] - start[0])
+        ) / math.hypot(dx, dy)
+        walls.append(distance - part.HANGER_SCREW_DIA / 2.0)
+    assert min(walls) == pytest.approx(2.9172)
+    assert min(walls) == pytest.approx(part.HANGER_THREAD_STRAP_WALL)

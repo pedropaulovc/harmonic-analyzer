@@ -107,8 +107,32 @@ def test_platen_guide_hole_stations_match_native_wizard_features() -> None:
         tuple(guide.GUIDE_LENGTH * fraction for fraction in (0.1, 0.3, 0.5, 0.7, 0.9))
     )
     source = Path(guide.__file__).read_text(encoding="utf-8")
-    assert 'HoleSpec("clearance", "#4")' in source
-    assert '"tapped_bottoming", "#4-40"' in source
+    assert source.count('"tapped_bottoming", "#4-40"') == 3
+    assert "lock_spec = HoleSpec(" in source
+    assert "screw_spec = HoleSpec(" in source
+
+
+def test_drawing_splits_front_and_rear_blind_tap_tables() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert '"*Back", FRONT_VIEW_X_M, BACK_VIEW_Y_M' in source
+    assert source.count("insert_hole_table(") == 2
+    assert 'starting_hole_tag="B"' in source
+    assert source.count("hole_entities=") == 2
+    assert "for station in BLIND_X" in source
+    assert "for station in THROUGH_X" in source
+
+
+def test_platen_guide_blind_taps_keep_drill_depth_and_engagement_distinct() -> None:
+    assert guide.LOCK_SCREW_HOLE_DEPTH == pytest.approx(
+        guide.LOCK_SCREW_THREAD_ENGAGEMENT + guide.LOCK_SCREW_BOTTOM_CLEARANCE
+    )
+    assert guide.SCREW_HOLE_DEPTH == pytest.approx(
+        guide.GUIDE_SCREW_THREAD_ENGAGEMENT + guide.GUIDE_SCREW_BOTTOM_CLEARANCE
+    )
+    assert guide.LOCK_SCREW_BOTTOM_CLEARANCE > 0.0
+    assert guide.GUIDE_SCREW_BOTTOM_CLEARANCE > 0.0
+    source = Path(guide.__file__).read_text(encoding="utf-8")
+    assert source.count('overrides_mm={"ThreadDepth":') == 2
 
 
 def test_drawing_contract_imports_without_pywin32() -> None:
@@ -166,15 +190,12 @@ def test_drawing_tolerances_follow_feature_function_not_display_zeros() -> None:
 def test_native_gdt_replaces_datum_flatness_parallelism_notes() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_datum_feature(") == 3
-    assert (
-        'label="guide bottom edge",\n        position_tolerance_m=0.0001'
-        in source
-    )
+    assert 'label="guide bottom edge",\n        position_tolerance_m=0.0001' in source
     assert source.count("position_tolerance_m=0.0001") == 1
     assert source.count("add_feature_control_frame(") == 3
-    assert "characteristic=\"flatness\"" in source
-    assert "characteristic=\"parallelism\"" in source
-    assert "characteristic=\"position\"" in source
+    assert 'characteristic="flatness"' in source
+    assert 'characteristic="parallelism"' in source
+    assert 'characteristic="position"' in source
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
     assert "def _manufacturing_notes" not in source
 
@@ -187,9 +208,9 @@ def test_datum_b_surface_symbol_is_clear_of_every_hole_axis() -> None:
     assert drawing.DATUM_B_SYMBOL_X_M == pytest.approx(
         drawing.FRONT_LEFT_X_M + guide.GUIDE_LENGTH * 0.6 / 1000.0
     )
-    assert min(abs(drawing.DATUM_B_SYMBOL_X_M - x) for x in hole_axis_x) == pytest.approx(
-        (guide.GUIDE_LENGTH * 0.1 - guide.LOCK_SCREW_DX) / 1000.0
-    )
+    assert min(
+        abs(drawing.DATUM_B_SYMBOL_X_M - x) for x in hole_axis_x
+    ) == pytest.approx((guide.GUIDE_LENGTH * 0.1 - guide.LOCK_SCREW_DX) / 1000.0)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "def _bottom_surface_edge(" in source
     assert 'visible_view_entities(view, 1, label="platen-guide bottom edge")' in source
@@ -200,16 +221,12 @@ def test_datum_b_surface_symbol_is_clear_of_every_hole_axis() -> None:
 
 
 def test_gdt_xml_and_note_links_use_native_drawing_contracts() -> None:
-    xml = _gtol_frame_xml(
-        "position", "0.20", datums=("A", "B", "C"), diameter=True
-    )
+    xml = _gtol_frame_xml("position", "0.20", datums=("A", "B", "C"), diameter=True)
     assert "GTOL-POSI" in xml
     assert "<PrimaryRangeSymbol>phi</PrimaryRangeSymbol>" in xml
     assert xml.count("<DatumCompartment>") == 3
     assert property_link("Manufacturing Notes") == '$PRPSHEET:"Manufacturing Notes"'
-    assert "GTOL-SPROF" in _gtol_frame_xml(
-        "profile_surface", "0.10", datums=("C",)
-    )
+    assert "GTOL-SPROF" in _gtol_frame_xml("profile_surface", "0.10", datums=("C",))
 
 
 def test_pdf_metadata_is_project_owned(tmp_path: Path) -> None:
@@ -293,9 +310,13 @@ def test_release_stages_all_drawing_formats(tmp_path: Path, monkeypatch) -> None
         "platen_guide:slddrw": "slddrw/platen-guide.SLDDRW",
     }
     assert (stage / "solidworks" / "platen-guide.SLDDRW").read_bytes() == b"slddrw"
-    assert (stage / "solidworks" / "platen-guide.SLDPRT").read_bytes() == b"referenced model"
+    assert (
+        stage / "solidworks" / "platen-guide.SLDPRT"
+    ).read_bytes() == b"referenced model"
     assert (stage / "slddrw" / "platen-guide.SLDDRW").read_bytes() == b"slddrw"
-    assert (stage / "slddrw" / "platen-guide.SLDPRT").read_bytes() == b"referenced model"
+    assert (
+        stage / "slddrw" / "platen-guide.SLDPRT"
+    ).read_bytes() == b"referenced model"
 
 
 def test_release_accepts_pack_rewrite_of_same_original_source(
