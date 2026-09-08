@@ -244,8 +244,14 @@ def main():
                 raise RuntimeError("readback changed saved source/control bytes")
             if args.close_failed:
                 report["closed_without_save"] = []
-                for target in (failed, next(doc for doc in docs if int(doc.GetType()) == 1)):
-                    target_path, target_title = str(target.GetPathName()), str(target.GetTitle())
+                # Closing a drawing can also unload its source. Retain names
+                # from the verified inventory, never dereference closed handles.
+                for target_path, target_title, _kind, _state in sorted(after, key=lambda row: row[2] != 3):
+                    present = [str(_early_bound(raw, "IModelDoc2").GetPathName()) for raw in app.GetDocuments() or ()]
+                    if target_path not in present:
+                        report["closed_without_save"].append({"path": target_path, "title": target_title, "state": "already_unloaded"})
+                        checkpoint()
+                        continue
                     app.CloseDoc(target_title)
                     report["closed_without_save"].append({"path": target_path, "title": target_title})
                     checkpoint()
