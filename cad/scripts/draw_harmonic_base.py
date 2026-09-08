@@ -31,6 +31,7 @@ from _drawing_common import (
     add_datum_feature,
     add_feature_control_frame,
     add_property_linked_note,
+    create_blank_drawing_sheets,
     curate_view_dimensions,
     finalize_drawing,
     insert_hole_table,
@@ -39,7 +40,11 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _drawing_harmonic_base_layout import repair_harmonic_base_layout
+from _drawing_harmonic_base_layout import (
+    SHEET_NAMES,
+    activate_harmonic_base_sheet,
+    repair_harmonic_base_layout,
+)
 from build_harmonic_base import (
     BLOCK_SCREW_HOLE_DIA,
     BLOCK_SCREW_XZ,
@@ -89,9 +94,9 @@ if abs((BOTTOM_REAR_Z - BOTTOM_FRONT_Z) - BOTTOM_WIDTH) > 1e-12:
     raise AssertionError("base drawing extents disagree with the overall depth")
 
 # Sheet layout (meters).  The plan (top) carries the footprint + the hole
-# pattern; the front elevation (1:4) shows the stepped stack; the hole
-# table sits upper-right and the notes fill the lower-left.  The plan runs at the
-# sheet's 1:2; only the 1:4 isometric carries a scale note.
+# pattern on PLAN AND HOLE TABLE; the front elevation (1:4) and unchanged
+# manufacturing notes occupy MANUFACTURING. These initial authoring coordinates
+# preserve entity-pick contracts; final placement uses measured sheet geometry.
 TOP_CENTER = (0.130, 0.163)
 SIDE_CENTER = (0.345, 0.075)
 
@@ -328,13 +333,17 @@ async def build(
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
+    create_blank_drawing_sheets(adapter, SHEET_NAMES, label="harmonic-base")
     # Explicit per-view scale: a view placed without one can silently auto-scale,
     # which shifts every coordinate-based pick on it.
+    activate_harmonic_base_sheet(adapter, SHEET_NAMES[0])
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 2))
+    set_hidden_lines_removed(adapter, top)
+    activate_harmonic_base_sheet(adapter, SHEET_NAMES[1])
     side = place_view(adapter, str(SOURCE), "*Front", *SIDE_CENTER, scale=(1, 4))
-    for view in (top, side):
-        set_hidden_lines_removed(adapter, view)
+    set_hidden_lines_removed(adapter, side)
 
+    activate_harmonic_base_sheet(adapter, SHEET_NAMES[0])
     curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the base hole pattern")
@@ -342,8 +351,6 @@ async def build(
     hole_entities, datum_b_edge, datum_c_edge = _visible_hole_table_entities(
         adapter, top
     )
-    datum_a_edge, top_pad_edge = _visible_side_datum_edges(adapter, side)
-
     # One complete hole table: four underside counterbores followed by every
     # top-side blind swing/pinion seat. Non-basic X/Y headers let the title-block
     # tolerance govern A1-A4; note 4 supplies the tighter seat-only tolerance.
@@ -365,6 +372,8 @@ async def build(
         basic_locations=True,
         label="harmonic-base mounting",
     )
+    activate_harmonic_base_sheet(adapter, SHEET_NAMES[1])
+    datum_a_edge, top_pad_edge = _visible_side_datum_edges(adapter, side)
     add_datum_feature(
         adapter,
         side,
@@ -377,6 +386,7 @@ async def build(
         entity=datum_a_edge,
         shoulder=True,
     )
+    activate_harmonic_base_sheet(adapter, SHEET_NAMES[0])
     add_datum_feature(
         adapter,
         top,
@@ -444,6 +454,7 @@ async def build(
         label="datum C perpendicularity to A and B",
         entity=datum_c_edge,
     )
+    activate_harmonic_base_sheet(adapter, SHEET_NAMES[1])
     add_feature_control_frame(
         adapter,
         side,
@@ -473,6 +484,7 @@ async def build(
         OUTPUTS,
         pdf_title="Harmonic Base Manufacturing Drawing",
         scale=SHEET_SCALE,
+        expected_sheet_names=SHEET_NAMES,
         redundant_note_substrings=("Tapped Hole",),
         # Five Hole Wizard tapped groups (pivot, stop, block, foot, nameplate
         # seats); all five imported generic notes are replaced by the native
