@@ -1,0 +1,1 @@
+>>  drawing:measuring_stick: C:\src\ha-foundations-integration\.venv\Scripts\python.exe C:\src\ha-foundations-integration\cad\scripts\draw_measuring_stick.py measuring-stick
