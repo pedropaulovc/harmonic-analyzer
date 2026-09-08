@@ -700,6 +700,7 @@ async def capture_only(
             raise RuntimeError("slotted source property reads changed dirty state")
         checkpoint()
         started = time.perf_counter()
+        recipe_error = None
         try:
             with adapter.ownership.creating_document(
                 DocumentKind.DRAWING, module.OUTPUTS.slddrw
@@ -707,9 +708,18 @@ async def capture_only(
                 with patch("_drawing_common.save_drawing", save_drawing):
                     artifacts = await module.build(adapter, drawing_factory=factory)
             setup_controller.require_used()
+        except BaseException as error:
+            recipe_error = error
+            raise
         finally:
             report["recipe_seconds"] = time.perf_counter() - started
-            checkpoint()
+            try:
+                checkpoint()
+            except BaseException as error:
+                if recipe_error is None:
+                    raise
+                report["recipe_checkpoint_errors"] = [repr(error)]
+                recipe_error.add_note(f"slotted recipe checkpoint: {error!r}")
         report["artifacts"] = pilot.benchmark.validate_artifacts(
             artifacts, module.OUTPUTS
         )

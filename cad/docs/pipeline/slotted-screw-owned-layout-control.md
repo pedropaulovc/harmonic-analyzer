@@ -138,3 +138,12 @@ lines and truncation are not normalized. Source pins, specs and drawing bodies
 are unchanged. Four actual callback/linked-note regressions failed before this
 correction (`run-0ohpgb2z`); 275 focused/adjacent tests then passed
 (`run-8sx01hls`). A native rerun is still required.
+
+The full-base Windows Codex review of `119ebdd7` found a separate diagnostic
+failure-path bug: a report-write failure in the recipe-timing `finally` block
+could replace the original recipe exception. Four combined-failure regressions
+reproduced it (`run-_6726qqt`), including cancellation, keyboard interruption and
+an additional cleanup failure. The checkpoint failure is now retained separately
+and attached to the original exception. A checkpoint-only failure still fails the
+capture. All 281 focused/adjacent tests pass (`run-at1bbxns`); this correction
+changes neither native operations nor acceptance predicates.

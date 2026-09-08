@@ -582,6 +582,11 @@ def test_incomplete_or_mixed_enrollment_contract_fails_before_environment(
         "recipe_dirty",
         "build_dirty",
         "build",
+        "build_checkpoint",
+        "cancel_checkpoint",
+        "keyboard_checkpoint",
+        "build_checkpoint_cleanup",
+        "timing_checkpoint",
         "raw_capture",
         "source_drift",
         "copy_drift",
@@ -619,7 +624,30 @@ async def test_actual_capture_callback_preserves_source_scope_and_nonacceptance(
     fingerprint = {"adapter": "same"}
     monkeypatch.setattr(pilot, "adapter_fingerprints", lambda: dict(fingerprint))
     monkeypatch.setattr(witness, "_early_bound", lambda value, _: value)
-    primary = RuntimeError(f"original {failure} failure")
+    primary_type = {
+        "cancel_checkpoint": asyncio.CancelledError,
+        "keyboard_checkpoint": KeyboardInterrupt,
+        "timing_checkpoint": PermissionError,
+    }.get(failure, RuntimeError)
+    primary = primary_type(f"original {failure} failure")
+    checkpoint_error = PermissionError("secondary checkpoint sharing violation")
+    cleanup_error = RuntimeError("secondary owned cleanup failure")
+    checkpoint_failures = []
+    original_write = Path.write_text
+
+    def write_report(path, data, *args, **kwargs):
+        if (
+            "checkpoint" in failure
+            and path.name == "capture.json"
+            and '"recipe_seconds"' in data
+            and not checkpoint_failures
+        ):
+            error = primary if failure == "timing_checkpoint" else checkpoint_error
+            checkpoint_failures.append(error)
+            raise error
+        return original_write(path, data, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "write_text", write_report)
     events, scopes = [], []
     adapter = Adapter("normal")
     source = NS(GetType=lambda: 1, GetSaveFlag=lambda: False)
@@ -675,6 +703,8 @@ async def test_actual_capture_callback_preserves_source_scope_and_nonacceptance(
         adapter.currentModel = adapter.swApp.ActiveDoc = None
         if failure == "cleanup" and len(events) > 2:
             raise primary
+        if failure == "build_checkpoint_cleanup" and len(events) > 2:
+            raise cleanup_error
 
     async def draw(outputs, actual_source):
         events.append("recipe")
@@ -685,7 +715,14 @@ async def test_actual_capture_callback_preserves_source_scope_and_nonacceptance(
             assert actual_source == owned["source"]
         if failure in ("recipe_dirty", "build_dirty"):
             source.GetSaveFlag = lambda: True
-        if failure in ("build", "build_dirty"):
+        if failure in (
+            "build",
+            "build_dirty",
+            "build_checkpoint",
+            "cancel_checkpoint",
+            "keyboard_checkpoint",
+            "build_checkpoint_cleanup",
+        ):
             raise primary
         owned["native"] = outputs.slddrw
         adapter.currentModel = adapter.swApp.ActiveDoc = model
@@ -784,7 +821,7 @@ async def test_actual_capture_callback_preserves_source_scope_and_nonacceptance(
         result = await operation()
         assert result["acceptance"] == "not_accepted"
     else:
-        with pytest.raises(RuntimeError) as caught:
+        with pytest.raises(primary_type) as caught:
             await operation()
         if failure in (
             "build",
@@ -792,6 +829,11 @@ async def test_actual_capture_callback_preserves_source_scope_and_nonacceptance(
             "raw_capture",
             "cleanup",
             "initial_getter_error",
+            "build_checkpoint",
+            "cancel_checkpoint",
+            "keyboard_checkpoint",
+            "build_checkpoint_cleanup",
+            "timing_checkpoint",
         ):
             assert caught.value is primary
     if failure == "wrong_hash":
@@ -818,6 +860,17 @@ async def test_actual_capture_callback_preserves_source_scope_and_nonacceptance(
     assert all(path.read_bytes() == expected for path, expected in originals.items())
     assert len(report["sources_after"]) == 7
     assert events[-1] == "factory_final_guards" and events.count("close") == 2
+    if "checkpoint" in failure:
+        assert checkpoint_failures and report["error"] == repr(primary)
+        assert report["source_dirty_before"] is False
+        assert report["source_dirty_final"] is False
+        assert report["recipe_seconds"] >= 0
+        if failure != "timing_checkpoint":
+            assert report["recipe_checkpoint_errors"] == [repr(checkpoint_error)]
+            assert any(repr(checkpoint_error) in note for note in primary.__notes__)
+        if failure == "build_checkpoint_cleanup":
+            assert report["final_guard_errors"] == [repr(cleanup_error)]
+            assert any(repr(cleanup_error) in note for note in primary.__notes__)
     if failure in (
         "source_drift",
         "copy_drift",
