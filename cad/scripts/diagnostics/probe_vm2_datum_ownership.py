@@ -25,6 +25,8 @@ def main():
     parser.add_argument("output", type=Path)
     parser.add_argument("--worker", action="store_true")
     parser.add_argument("--close-owned-failure-from", type=Path)
+    parser.add_argument("--close-owned-probe-from", type=Path)
+    parser.add_argument("--inventory-witness", type=Path)
     args = parser.parse_args()
     output = args.output.resolve()
     if not output.is_relative_to(ROOT / "cad/out/reports") or output.exists():
@@ -89,8 +91,18 @@ def main():
                             if reference is not None else None
                         ),
                         "datums": [],
+                        "annotations": [],
                     }
                     row["views"].append(view_row)
+                    from _drawing_common import dimension_name
+                    for raw_annotation in view.GetAnnotations() or ():
+                        annotation = _early_bound(raw_annotation, "IAnnotation")
+                        annotation_type = int(annotation.GetType())
+                        view_row["annotations"].append({
+                            "type": annotation_type,
+                            "dimension_name": dimension_name(adapter, annotation)
+                            if annotation_type == 4 else None,
+                        })
                     for raw_tag in view.GetDatumTags() or ():
                         tag = _early_bound(raw_tag, "IDatumTag")
                         annotation = _early_bound(tag.GetAnnotation(), "IAnnotation")
@@ -112,6 +124,52 @@ def main():
                     if row["saved_sha256_after"] != row["saved_sha256_before"]:
                         raise RuntimeError("saved document bytes changed during inventory")
             report["status"] = "read_only_complete"
+            if args.close_owned_probe_from:
+                if args.inventory_witness is None:
+                    raise RuntimeError("probe closure requires a prior read-only inventory")
+                previous = json.loads(args.inventory_witness.read_text(encoding="utf-8"))
+                if previous["status"] != "read_only_complete":
+                    raise RuntimeError("prior inventory was not successful")
+                for field in ("root", "pid", "revision", "documents"):
+                    if previous[field] != report[field]:
+                        raise RuntimeError(f"probe ownership changed since inventory: {field}")
+                witness_path = args.close_owned_probe_from.resolve(strict=True)
+                if not witness_path.is_relative_to(ROOT / "cad/out/reports/datum-placement"):
+                    raise RuntimeError("probe witness is outside own reports")
+                witness = json.loads(witness_path.read_text(encoding="utf-8"))
+                if witness["kind"] != "vm2-datum-one-variable-probe" or witness["status"] != "failed":
+                    raise RuntimeError("requires a failed own probe receipt")
+                if (witness["pid"], witness["revision"]) != (report["pid"], report["revision"]):
+                    raise RuntimeError("probe seat identity changed")
+                source = Path(witness["source"]).resolve(strict=True)
+                if source.parent != ROOT / "cad/out/sldprt" or source.stem not in {"pinion-lift-rod", "rack-pinion"}:
+                    raise RuntimeError("probe source is outside the two owned parts")
+                rows = report["documents"]
+                parts = [row for row in rows if row["type"] == 1]
+                drawings = [row for row in rows if row["type"] == 3]
+                if len(rows) != 2 or len(parts) != 1 or len(drawings) != 1:
+                    raise RuntimeError("expected exactly the probe source and one drawing")
+                part, drawing = parts[0], drawings[0]
+                if Path(part["path"]).resolve() != source or drawing["path"]:
+                    raise RuntimeError("expected own source and an unsaved probe drawing")
+                if part["saved_sha256_before"] != witness["source_sha256_before"]:
+                    raise RuntimeError("source changed after failed probe")
+                views = drawing["views"]
+                if len(views) != 4 or views[0]["reference_path"] is not None:
+                    raise RuntimeError("unexpected probe drawing view inventory")
+                if any(Path(view["reference_path"]).resolve() != source for view in views[1:]):
+                    raise RuntimeError("probe drawing references an unowned source")
+                if len({row["title"] for row in rows}) != 2:
+                    raise RuntimeError("ambiguous document titles")
+                report["closure_witness"] = {"path": str(witness_path), "sha256": digest(witness_path)}
+                checkpoint()
+                for target in (drawing, part):
+                    app.CloseDoc(target["title"])
+                if app.GetDocuments() or app.ActiveDoc is not None:
+                    raise RuntimeError("probe closure did not empty the session")
+                if digest(source) != witness["source_sha256_before"]:
+                    raise RuntimeError("source bytes changed during probe closure")
+                report["status"] = "owned_probe_closed_without_save_bytes_unchanged"
             if args.close_owned_failure_from:
                 witness_path = args.close_owned_failure_from.resolve(strict=True)
                 witness = json.loads(witness_path.read_text(encoding="utf-8"))
@@ -184,6 +242,10 @@ def main():
         command = [sys.executable, str(Path(__file__).resolve()), str(output), "--worker"]
         if args.close_owned_failure_from:
             command.extend(["--close-owned-failure-from", str(args.close_owned_failure_from.resolve())])
+        if args.close_owned_probe_from:
+            command.extend(["--close-owned-probe-from", str(args.close_owned_probe_from.resolve())])
+        if args.inventory_witness:
+            command.extend(["--inventory-witness", str(args.inventory_witness.resolve())])
         dodo._exec(
             command,
             "VM2 datum read-only ownership",

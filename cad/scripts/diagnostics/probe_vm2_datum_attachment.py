@@ -125,10 +125,11 @@ def main():
             dimension = None
             if args.selection == "dimension":
                 name = "RodDia" if args.part == "pinion_lift_rod" else "BoreDia"
-                matches = [
-                    annotation for annotation in view.GetAnnotations() or ()
-                    if common.dimension_name(adapter, annotation) == name
-                ]
+                annotations = [_early_bound(raw, "IAnnotation") for raw in view.GetAnnotations() or ()]
+                dimensions = [annotation for annotation in annotations if int(annotation.GetType()) == 4]
+                names = [common.dimension_name(adapter, annotation) for annotation in dimensions]
+                report["dimension_names"] = names
+                matches = [annotation for annotation, actual in zip(dimensions, names) if actual == name]
                 if len(matches) != 1:
                     raise RuntimeError(f"expected exactly one {name} dimension")
                 dimension = _early_bound(matches[0], "IAnnotation")
