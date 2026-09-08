@@ -126,10 +126,21 @@ diff checks passed. The [new offline log](probes/correction-reviews/correction-o
 records 1,504 recipe tests passing in 62.11 s; graph/part-isolation tasks were
 current and did not rerun. The original earlier review reports/logs are preserved.
 
+The separate [native/publication audit](probes/correction-reviews/native-review-f9c8bddf.md)
+found no actionable issue after 144 receipt assertions, six independent full-sheet
+PNG inspections and exact-byte checks of the 66-file evidence publication at
+`9ecef40d`. Its scope and remaining integration limits are recorded in the addendum.
+
 This is independent agent review, not CodeRabbit approval. The local full-diff
 CodeRabbit CLI failed with `payload_too_large`; GitHub's full-review command was
 skipped because 251 files exceeded its 100-file limit. Neither reviewed the full
 diff successfully. No reduced review is represented as full coverage.
+
+VM1 subsequently published its own independent Codex full-diff review of the
+same `f9c8bddf` head in [comment 5580102359](https://github.com/pedropaulovc/harmonic-analyzer/pull/702#issuecomment-5580102359):
+no actionable code findings, with the code-review gate accepted separately from
+native/integration acceptance. Its report SHA-256 is
+`0f9c0eb98c554340ba406a30a60921bb2b153c9e64d17b7131b96b49cb7a2f0e`.
 
 VM1 reports its `64c3dab4` build ended successfully, but it contains the old failing
 placement. VM1 must preserve that run and integrate this correction on a new head,
