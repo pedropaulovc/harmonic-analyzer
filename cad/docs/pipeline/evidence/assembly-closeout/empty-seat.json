@@ -1,0 +1,11 @@
+{
+  "kind": "vm2-datum-read-only-ownership",
+  "utc": "2026-09-08T06:28:26.988269+00:00",
+  "root": "C:\\src\\ha-assembly-closeout-independent",
+  "head": "2d8618ca17fdcae69c32a67b9aa0f2f23e1ecee2",
+  "probe_sha256": "c14c54196311997932eb36d214233cc6881a67ab0a855e113401bd29546be84d",
+  "pid": 45848,
+  "revision": "34.3.0",
+  "documents": [],
+  "status": "read_only_complete"
+}

@@ -1,0 +1,1034 @@
+{
+  "kind": "vm2-datum-lifecycle",
+  "status": "passed",
+  "scope": "complete production drawing lifecycle; first cold open is baseline, no pre-save insertion proof",
+  "head": "2d8618ca17fdcae69c32a67b9aa0f2f23e1ecee2",
+  "adapter": "2269009ed56712867826516f4406afc98a0c2814",
+  "probe_sha256": "b36828d10e74e4e2039e64189787dd1ef2527a7302f11e9c420cc37c656cb7da",
+  "input_mode": "production",
+  "radius_m": 0.003175,
+  "position_tolerance_m": 2e-05,
+  "source": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\sldprt\\pinion-lift-rod.SLDPRT",
+  "source_sha256_before": "67b81aa3719a23e04aa4313a2fe2c06434d958a79f743dd8e4f37ef680786ef5",
+  "original": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\slddrw\\pinion-lift-rod.SLDDRW",
+  "original_sha256": "d876ea0bf029b3e0465733031c534712bf0993a38b58255ee8a7e882115fe187",
+  "working": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\rod-lifecycle-2d8618ca\\pinion-lift-rod-lifecycle.SLDDRW",
+  "pid": 45848,
+  "revision": "34.3.0",
+  "started_utc": "2026-09-08T06:25:54.756317+00:00",
+  "stages": [
+    {
+      "stage": "cold_open",
+      "position": [
+        0.050763247944471825,
+        0.18920846961121315,
+        0.200800000228
+      ],
+      "view_position": [
+        0.055,
+        0.205
+      ],
+      "view_scale": [
+        2.0,
+        1.0
+      ],
+      "circle": [
+        0.0,
+        0.0,
+        0.202000000114,
+        0.0,
+        0.0,
+        1.0,
+        0.003175
+      ],
+      "cylinder": [
+        0.0,
+        0.0,
+        0.202000000114,
+        -0.0,
+        -0.0,
+        -1.0,
+        0.003175
+      ],
+      "attachment_type": 1,
+      "resolved_edge_same": 1,
+      "source_sha256": "67b81aa3719a23e04aa4313a2fe2c06434d958a79f743dd8e4f37ef680786ef5",
+      "body_ownership": {
+        "source_solid_body_count": 1,
+        "source_body_self_equality": 1,
+        "canonical_edge_body_same_as_source": 1,
+        "adjacent_face_count": 2,
+        "mapped_model_edge": "present",
+        "view_edge_self_equality": 1,
+        "roundtrip_edge_same": 1,
+        "canonical_edge_vs_view_edge": 0,
+        "drawing_edge_body_vs_source_body": 0
+      },
+      "canonical_circle": [
+        0.0,
+        0.0,
+        0.202000000114,
+        0.0,
+        0.0,
+        1.0,
+        0.003175
+      ],
+      "datum_lines": [
+        [
+          0.0,
+          0.053354533605345325,
+          0.19886689798355983,
+          0.200800000228,
+          0.050763247944471825,
+          0.18920846961121315,
+          0.200800000228
+        ],
+        [
+          0.0,
+          0.050763247944471825,
+          0.18920846961121315,
+          0.200800000228,
+          0.04441324794447182,
+          0.18920846961121315,
+          0.200800000228
+        ],
+        [
+          0.0,
+          0.04441324794447182,
+          0.18570846961121315,
+          0.200800000228,
+          0.037413247944471824,
+          0.18570846961121315,
+          0.200800000228
+        ],
+        [
+          0.0,
+          0.037413247944471824,
+          0.18570846961121315,
+          0.200800000228,
+          0.037413247944471824,
+          0.19270846961121316,
+          0.200800000228
+        ],
+        [
+          0.0,
+          0.037413247944471824,
+          0.19270846961121316,
+          0.200800000228,
+          0.04441324794447182,
+          0.19270846961121316,
+          0.200800000228
+        ],
+        [
+          0.0,
+          0.04441324794447182,
+          0.19270846961121316,
+          0.200800000228,
+          0.04441324794447182,
+          0.18570846961121315,
+          0.200800000228
+        ]
+      ],
+      "datum_triangles": [
+        [
+          0.052002353633216786,
+          0.19922967797608213,
+          0.200800000228,
+          0.054706713577473864,
+          0.19850411799103754,
+          0.200800000228,
+          0.05271966861843132,
+          0.1965005830323349,
+          0.200800000228,
+          1.0,
+          0.0
+        ]
+      ],
+      "projected_rim_center": [
+        0.055,
+        0.205
+      ],
+      "projected_rim_radius_m": 0.00635,
+      "datum_rim_error_m": 1.3010426069826053e-17,
+      "dimension_position": [
+        0.0323,
+        0.213,
+        -0.20299999999999999
+      ],
+      "dimension_lines": [
+        [
+          0.0,
+          0.0,
+          -1.0,
+          -1.0,
+          0.049361598725574087,
+          0.207920775764853,
+          -0.20299999999999996,
+          0.04829303925931456,
+          0.2084743054695427,
+          -0.20299999999999996
+        ],
+        [
+          0.0,
+          0.0,
+          -1.0,
+          -1.0,
+          0.060638401274425845,
+          0.202079224235147,
+          -0.203,
+          0.049361598725574087,
+          0.207920775764853,
+          -0.20299999999999996
+        ],
+        [
+          0.0,
+          0.0,
+          -1.0,
+          -1.0,
+          0.04829303925931456,
+          0.2084743054695427,
+          -0.20299999999999996,
+          0.01789446074068546,
+          0.2084743054695427,
+          -0.20299999999999987
+        ]
+      ],
+      "dimension_triangles": [],
+      "datum_diameter_line_triangle_clearance_m": 0.005902836735894279,
+      "exports": {
+        "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\rod-lifecycle-2d8618ca\\cold_open.pdf": "1b2a21cb36f4b28b37d9a2e86aca0ba3ec282cd53b8df3db354ec11d03d2076f",
+        "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\rod-lifecycle-2d8618ca\\cold_open.png": "1a30965e715e1218b8556adc72e138ade11407b2dc8f5d82eca60002a89eeabb"
+      }
+    },
+    {
+      "stage": "moved",
+      "position": [
+        0.058763247944471825,
+        0.19420846961121316,
+        0.200800000228
+      ],
+      "view_position": [
+        0.063,
+        0.21
+      ],
+      "view_scale": [
+        2.0,
+        1.0
+      ],
+      "circle": [
+        0.0,
+        0.0,
+        0.202000000114,
+        0.0,
+        0.0,
+        1.0,
+        0.003175
+      ],
+      "cylinder": [
+        0.0,
+        0.0,
+        0.202000000114,
+        -0.0,
+        -0.0,
+        -1.0,
+        0.003175
+      ],
+      "attachment_type": 1,
+      "resolved_edge_same": 1,
+      "source_sha256": "67b81aa3719a23e04aa4313a2fe2c06434d958a79f743dd8e4f37ef680786ef5",
+      "body_ownership": {
+        "source_solid_body_count": 1,
+        "source_body_self_equality": 1,
+        "canonical_edge_body_same_as_source": 1,
+        "adjacent_face_count": 2,
+        "mapped_model_edge": "present",
+        "view_edge_self_equality": 1,
+        "roundtrip_edge_same": 1,
+        "canonical_edge_vs_view_edge": 0,
+        "drawing_edge_body_vs_source_body": 0
+      },
+      "canonical_circle": [
+        0.0,
+        0.0,
+        0.202000000114,
+        0.0,
+        0.0,
+        1.0,
+        0.003175
+      ],
+      "datum_lines": [
+        [
+          0.0,
+          0.061354533605345325,
+          0.20386689798355984,
+          0.200800000228,
+          0.058763247944471825,
+          0.19420846961121316,
+          0.200800000228
+        ],
+        [
+          0.0,
+          0.058763247944471825,
+          0.19420846961121316,
+          0.200800000228,
+          0.05241324794447182,
+          0.19420846961121316,
+          0.200800000228
+        ],
+        [
+          0.0,
+          0.05241324794447182,
+          0.19070846961121315,
+          0.200800000228,
+          0.045413247944471824,
+          0.19070846961121315,
+          0.200800000228
+        ],
+        [
+          0.0,
+          0.045413247944471824,
+          0.19070846961121315,
+          0.200800000228,
+          0.045413247944471824,
+          0.19770846961121316,
+          0.200800000228
+        ],
+        [
+          0.0,
+          0.045413247944471824,
+          0.19770846961121316,
+          0.200800000228,
+          0.05241324794447182,
+          0.19770846961121316,
+          0.200800000228
+        ],
+        [
+          0.0,
+          0.05241324794447182,
+          0.19770846961121316,
+          0.200800000228,
+          0.05241324794447182,
+          0.19070846961121315,
+          0.200800000228
+        ]
+      ],
+      "datum_triangles": [
+        [
+          0.06000235363321679,
+          0.20422967797608213,
+          0.200800000228,
+          0.06270671357747386,
+          0.20350411799103754,
+          0.200800000228,
+          0.06071966861843132,
+          0.2015005830323349,
+          0.200800000228,
+          1.0,
+          0.0
+        ]
+      ],
+      "projected_rim_center": [
+        0.063,
+        0.21
+      ],
+      "projected_rim_radius_m": 0.00635,
+      "datum_rim_error_m": 1.3010426069826053e-17,
+      "dimension_position": [
+        0.0403,
+        0.218,
+        -0.20299999999999999
+      ],
+      "dimension_lines": [
+        [
+          0.0,
+          0.0,
+          -1.0,
+          -1.0,
+          0.057361598725574094,
+          0.212920775764853,
+          -0.20299999999999996,
+          0.05629303925931451,
+          0.21347430546954274,
+          -0.20299999999999996
+        ],
+        [
+          0.0,
+          0.0,
+          -1.0,
+          -1.0,
+          0.06863840127442584,
+          0.207079224235147,
+          -0.203,
+          0.057361598725574094,
+          0.212920775764853,
+          -0.20299999999999996
+        ],
+        [
+          0.0,
+          0.0,
+          -1.0,
+          -1.0,
+          0.05629303925931451,
+          0.21347430546954274,
+          -0.20299999999999996,
+          0.025894460740685465,
+          0.21347430546954274,
+          -0.20299999999999987
+        ]
+      ],
+      "dimension_triangles": [],
+      "datum_diameter_line_triangle_clearance_m": 0.005902836735894279,
+      "exports": {
+        "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\rod-lifecycle-2d8618ca\\moved.pdf": "f613183f681a1492235e815ede8c7570b4353a1c81502f23f2a22a031c0ba7c4",
+        "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\rod-lifecycle-2d8618ca\\moved.png": "414550b808052b3f4ce03893148b7bebb15c25fd8191b7b1a2acf637910e5530"
+      }
+    },
+    {
+      "stage": "scaled",
+      "position": [
+        0.05835188134580817,
+        0.19267519410710313,
+        0.2510000002849999
+      ],
+      "view_position": [
+        0.063,
+        0.21
+      ],
+      "view_scale": [
+        2.5,
+        1.0
+      ],
+      "circle": [
+        0.0,
+        0.0,
+        0.202000000114,
+        0.0,
+        0.0,
+        1.0,
+        0.003175
+      ],
+      "cylinder": [
+        0.0,
+        0.0,
+        0.202000000114,
+        -0.0,
+        -0.0,
+        -1.0,
+        0.003175
+      ],
+      "attachment_type": 1,
+      "resolved_edge_same": 1,
+      "source_sha256": "67b81aa3719a23e04aa4313a2fe2c06434d958a79f743dd8e4f37ef680786ef5",
+      "body_ownership": {
+        "source_solid_body_count": 1,
+        "source_body_self_equality": 1,
+        "canonical_edge_body_same_as_source": 1,
+        "adjacent_face_count": 2,
+        "mapped_model_edge": "present",
+        "view_edge_self_equality": 1,
+        "roundtrip_edge_same": 1,
+        "canonical_edge_vs_view_edge": 0,
+        "drawing_edge_body_vs_source_body": 0
+      },
+      "canonical_circle": [
+        0.0,
+        0.0,
+        0.202000000114,
+        0.0,
+        0.0,
+        1.0,
+        0.003175
+      ],
+      "datum_lines": [
+        [
+          0.0,
+          0.06094316700668166,
+          0.2023336224794498,
+          0.2510000002849999,
+          0.05835188134580817,
+          0.19267519410710313,
+          0.2510000002849999
+        ],
+        [
+          0.0,
+          0.05835188134580817,
+          0.19267519410710313,
+          0.2510000002849999,
+          0.05200188134580817,
+          0.19267519410710313,
+          0.2510000002849999
+        ],
+        [
+          0.0,
+          0.05200188134580817,
+          0.18917519410710312,
+          0.2510000002849999,
+          0.04500188134580817,
+          0.18917519410710312,
+          0.2510000002849999
+        ],
+        [
+          0.0,
+          0.04500188134580817,
+          0.18917519410710312,
+          0.2510000002849999,
+          0.04500188134580817,
+          0.19617519410710313,
+          0.2510000002849999
+        ],
+        [
+          0.0,
+          0.04500188134580817,
+          0.19617519410710313,
+          0.2510000002849999,
+          0.05200188134580817,
+          0.19617519410710313,
+          0.2510000002849999
+        ],
+        [
+          0.0,
+          0.05200188134580817,
+          0.19617519410710313,
+          0.2510000002849999,
+          0.05200188134580817,
+          0.18917519410710312,
+          0.2510000002849999
+        ]
+      ],
+      "datum_triangles": [
+        [
+          0.05959098703455312,
+          0.2026964024719721,
+          0.2510000002849999,
+          0.0622953469788102,
+          0.2019708424869275,
+          0.2510000002849999,
+          0.060308302019767654,
+          0.19996730752822486,
+          0.2510000002849999,
+          1.0,
+          0.0
+        ]
+      ],
+      "projected_rim_center": [
+        0.063,
+        0.21
+      ],
+      "projected_rim_radius_m": 0.0079375,
+      "datum_rim_error_m": 8.673617379884035e-18,
+      "dimension_position": [
+        0.034625,
+        0.22,
+        -0.25375000000000003
+      ],
+      "dimension_lines": [
+        [
+          0.0,
+          0.0,
+          -1.0,
+          -1.0,
+          0.05574037026056688,
+          0.21320962338855173,
+          -0.25375000000000003,
+          0.050618039259314525,
+          0.21547430546954272,
+          -0.25375000000000003
+        ],
+        [
+          0.0,
+          0.0,
+          -1.0,
+          -1.0,
+          0.07025962973943307,
+          0.2067903766114482,
+          -0.25375000000000003,
+          0.05574037026056688,
+          0.21320962338855173,
+          -0.25375000000000003
+        ],
+        [
+          0.0,
+          0.0,
+          -1.0,
+          -1.0,
+          0.050618039259314525,
+          0.21547430546954272,
+          -0.25375000000000003,
+          0.020219460740685452,
+          0.21547430546954272,
+          -0.25375
+        ]
+      ],
+      "dimension_triangles": [],
+      "datum_diameter_line_triangle_clearance_m": 0.007628394517432172,
+      "exports": {
+        "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\rod-lifecycle-2d8618ca\\scaled.pdf": "7185543af6ddacc49e1dbba4fc059f886a42cd9adfe050d0d76b10f600756086",
+        "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\rod-lifecycle-2d8618ca\\scaled.png": "91b999e45a69374d3c4ae3a51329dffa2009faf22b759f263f8ac49306158037"
+      }
+    },
+    {
+      "stage": "restored",
+      "position": [
+        0.050763247944471825,
+        0.18920846961121315,
+        0.200800000228
+      ],
+      "view_position": [
+        0.055,
+        0.205
+      ],
+      "view_scale": [
+        2.0,
+        1.0
+      ],
+      "circle": [
+        0.0,
+        0.0,
+        0.202000000114,
+        0.0,
+        0.0,
+        1.0,
+        0.003175
+      ],
+      "cylinder": [
+        0.0,
+        0.0,
+        0.202000000114,
+        -0.0,
+        -0.0,
+        -1.0,
+        0.003175
+      ],
+      "attachment_type": 1,
+      "resolved_edge_same": 1,
+      "source_sha256": "67b81aa3719a23e04aa4313a2fe2c06434d958a79f743dd8e4f37ef680786ef5",
+      "body_ownership": {
+        "source_solid_body_count": 1,
+        "source_body_self_equality": 1,
+        "canonical_edge_body_same_as_source": 1,
+        "adjacent_face_count": 2,
+        "mapped_model_edge": "present",
+        "view_edge_self_equality": 1,
+        "roundtrip_edge_same": 1,
+        "canonical_edge_vs_view_edge": 0,
+        "drawing_edge_body_vs_source_body": 0
+      },
+      "canonical_circle": [
+        0.0,
+        0.0,
+        0.202000000114,
+        0.0,
+        0.0,
+        1.0,
+        0.003175
+      ],
+      "datum_lines": [
+        [
+          0.0,
+          0.053354533605345325,
+          0.19886689798355983,
+          0.200800000228,
+          0.050763247944471825,
+          0.18920846961121315,
+          0.200800000228
+        ],
+        [
+          0.0,
+          0.050763247944471825,
+          0.18920846961121315,
+          0.200800000228,
+          0.04441324794447182,
+          0.18920846961121315,
+          0.200800000228
+        ],
+        [
+          0.0,
+          0.04441324794447182,
+          0.18570846961121315,
+          0.200800000228,
+          0.037413247944471824,
+          0.18570846961121315,
+          0.200800000228
+        ],
+        [
+          0.0,
+          0.037413247944471824,
+          0.18570846961121315,
+          0.200800000228,
+          0.037413247944471824,
+          0.19270846961121316,
+          0.200800000228
+        ],
+        [
+          0.0,
+          0.037413247944471824,
+          0.19270846961121316,
+          0.200800000228,
+          0.04441324794447182,
+          0.19270846961121316,
+          0.200800000228
+        ],
+        [
+          0.0,
+          0.04441324794447182,
+          0.19270846961121316,
+          0.200800000228,
+          0.04441324794447182,
+          0.18570846961121315,
+          0.200800000228
+        ]
+      ],
+      "datum_triangles": [
+        [
+          0.052002353633216786,
+          0.19922967797608213,
+          0.200800000228,
+          0.054706713577473864,
+          0.19850411799103754,
+          0.200800000228,
+          0.05271966861843132,
+          0.1965005830323349,
+          0.200800000228,
+          1.0,
+          0.0
+        ]
+      ],
+      "projected_rim_center": [
+        0.055,
+        0.205
+      ],
+      "projected_rim_radius_m": 0.00635,
+      "datum_rim_error_m": 1.3010426069826053e-17,
+      "dimension_position": [
+        0.0323,
+        0.213,
+        -0.20299999999999999
+      ],
+      "dimension_lines": [
+        [
+          0.0,
+          0.0,
+          -1.0,
+          -1.0,
+          0.049361598725574087,
+          0.207920775764853,
+          -0.20299999999999996,
+          0.04829303925931456,
+          0.2084743054695427,
+          -0.20299999999999996
+        ],
+        [
+          0.0,
+          0.0,
+          -1.0,
+          -1.0,
+          0.060638401274425845,
+          0.202079224235147,
+          -0.203,
+          0.049361598725574087,
+          0.207920775764853,
+          -0.20299999999999996
+        ],
+        [
+          0.0,
+          0.0,
+          -1.0,
+          -1.0,
+          0.04829303925931456,
+          0.2084743054695427,
+          -0.20299999999999996,
+          0.01789446074068546,
+          0.2084743054695427,
+          -0.20299999999999987
+        ]
+      ],
+      "dimension_triangles": [],
+      "datum_diameter_line_triangle_clearance_m": 0.005902836735894279
+    },
+    {
+      "stage": "second_cold_open",
+      "position": [
+        0.050763247944471825,
+        0.18920846961121315,
+        0.200800000228
+      ],
+      "view_position": [
+        0.055,
+        0.205
+      ],
+      "view_scale": [
+        2.0,
+        1.0
+      ],
+      "circle": [
+        0.0,
+        0.0,
+        0.202000000114,
+        0.0,
+        0.0,
+        1.0,
+        0.003175
+      ],
+      "cylinder": [
+        0.0,
+        0.0,
+        0.202000000114,
+        -0.0,
+        -0.0,
+        -1.0,
+        0.003175
+      ],
+      "attachment_type": 1,
+      "resolved_edge_same": 1,
+      "source_sha256": "67b81aa3719a23e04aa4313a2fe2c06434d958a79f743dd8e4f37ef680786ef5",
+      "body_ownership": {
+        "source_solid_body_count": 1,
+        "source_body_self_equality": 1,
+        "canonical_edge_body_same_as_source": 1,
+        "adjacent_face_count": 2,
+        "mapped_model_edge": "present",
+        "view_edge_self_equality": 1,
+        "roundtrip_edge_same": 1,
+        "canonical_edge_vs_view_edge": 0,
+        "drawing_edge_body_vs_source_body": 0
+      },
+      "canonical_circle": [
+        0.0,
+        0.0,
+        0.202000000114,
+        0.0,
+        0.0,
+        1.0,
+        0.003175
+      ],
+      "datum_lines": [
+        [
+          0.0,
+          0.053354533605345325,
+          0.19886689798355983,
+          0.200800000228,
+          0.050763247944471825,
+          0.18920846961121315,
+          0.200800000228
+        ],
+        [
+          0.0,
+          0.050763247944471825,
+          0.18920846961121315,
+          0.200800000228,
+          0.04441324794447182,
+          0.18920846961121315,
+          0.200800000228
+        ],
+        [
+          0.0,
+          0.04441324794447182,
+          0.18570846961121315,
+          0.200800000228,
+          0.037413247944471824,
+          0.18570846961121315,
+          0.200800000228
+        ],
+        [
+          0.0,
+          0.037413247944471824,
+          0.18570846961121315,
+          0.200800000228,
+          0.037413247944471824,
+          0.19270846961121316,
+          0.200800000228
+        ],
+        [
+          0.0,
+          0.037413247944471824,
+          0.19270846961121316,
+          0.200800000228,
+          0.04441324794447182,
+          0.19270846961121316,
+          0.200800000228
+        ],
+        [
+          0.0,
+          0.04441324794447182,
+          0.19270846961121316,
+          0.200800000228,
+          0.04441324794447182,
+          0.18570846961121315,
+          0.200800000228
+        ]
+      ],
+      "datum_triangles": [
+        [
+          0.052002353633216786,
+          0.19922967797608213,
+          0.200800000228,
+          0.054706713577473864,
+          0.19850411799103754,
+          0.200800000228,
+          0.05271966861843132,
+          0.1965005830323349,
+          0.200800000228,
+          1.0,
+          0.0
+        ]
+      ],
+      "projected_rim_center": [
+        0.055,
+        0.205
+      ],
+      "projected_rim_radius_m": 0.00635,
+      "datum_rim_error_m": 1.3010426069826053e-17,
+      "dimension_position": [
+        0.0323,
+        0.213,
+        -0.20299999999999999
+      ],
+      "dimension_lines": [
+        [
+          0.0,
+          0.0,
+          -1.0,
+          -1.0,
+          0.049361598725574087,
+          0.207920775764853,
+          -0.20299999999999996,
+          0.04829303925931456,
+          0.2084743054695427,
+          -0.20299999999999996
+        ],
+        [
+          0.0,
+          0.0,
+          -1.0,
+          -1.0,
+          0.060638401274425845,
+          0.202079224235147,
+          -0.203,
+          0.049361598725574087,
+          0.207920775764853,
+          -0.20299999999999996
+        ],
+        [
+          0.0,
+          0.0,
+          -1.0,
+          -1.0,
+          0.04829303925931456,
+          0.2084743054695427,
+          -0.20299999999999996,
+          0.01789446074068546,
+          0.2084743054695427,
+          -0.20299999999999987
+        ]
+      ],
+      "dimension_triangles": [],
+      "datum_diameter_line_triangle_clearance_m": 0.005902836735894279,
+      "exports": {
+        "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\rod-lifecycle-2d8618ca\\second_cold_open.pdf": "344dfa04dd562566ed07d0ea0c046e48c5525b060eab28d062062fc2899a68c5",
+        "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\rod-lifecycle-2d8618ca\\second_cold_open.png": "1a30965e715e1218b8556adc72e138ade11407b2dc8f5d82eca60002a89eeabb"
+      }
+    }
+  ],
+  "closures": [
+    {
+      "path": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\rod-lifecycle-2d8618ca\\pinion-lift-rod-lifecycle.SLDDRW",
+      "title": "pinion-lift-rod-lifecycle - Sheet1"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\rod-lifecycle-2d8618ca\\pinion-lift-rod-lifecycle.SLDDRW",
+      "title": "pinion-lift-rod-lifecycle - Sheet1"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\rod-lifecycle-2d8618ca\\pinion-lift-rod-lifecycle.SLDDRW",
+      "title": "pinion-lift-rod-lifecycle - Sheet1"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\rod-lifecycle-2d8618ca\\pinion-lift-rod-lifecycle.SLDDRW",
+      "title": "pinion-lift-rod-lifecycle - Sheet1"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\rod-lifecycle-2d8618ca\\pinion-lift-rod-lifecycle.SLDDRW",
+      "title": "pinion-lift-rod-lifecycle - Sheet1"
+    }
+  ],
+  "rack_dimension_location": "original",
+  "ink_refresh": "cold",
+  "annotation_state_readbacks": [
+    {
+      "stage": "cold_open",
+      "is_dangling": false,
+      "shoulder": true,
+      "forced_shoulder": true
+    },
+    {
+      "stage": "moved",
+      "is_dangling": false,
+      "shoulder": true,
+      "forced_shoulder": true
+    },
+    {
+      "stage": "scaled",
+      "is_dangling": false,
+      "shoulder": true,
+      "forced_shoulder": true
+    },
+    {
+      "stage": "restored",
+      "is_dangling": false,
+      "shoulder": true,
+      "forced_shoulder": true
+    },
+    {
+      "stage": "second_cold_open",
+      "is_dangling": false,
+      "shoulder": true,
+      "forced_shoulder": true
+    }
+  ],
+  "specification_path": "C:\\src\\ha-assembly-closeout-independent\\cad\\scripts\\pinion_lift_rod_spec.py",
+  "specification_sha256": "f66468274283f43f8ce3d7bee079466f44e4ddf49542a674e83cd8c7c6f41110",
+  "placement_reference": "first_cold_open_baseline_no_pre_save_witness",
+  "ink_refreshes": [
+    {
+      "stage": "moved",
+      "view_position": [
+        0.063,
+        0.21
+      ],
+      "view_scale": [
+        2.0,
+        1.0
+      ]
+    },
+    {
+      "stage": "scaled",
+      "view_position": [
+        0.063,
+        0.21
+      ],
+      "view_scale": [
+        2.5,
+        1.0
+      ]
+    },
+    {
+      "stage": "restored",
+      "view_position": [
+        0.055,
+        0.205
+      ],
+      "view_scale": [
+        2.0,
+        1.0
+      ]
+    }
+  ],
+  "translation_error_m": 0.0,
+  "translation_ink_error_m": 5.594315114139762e-17,
+  "restore_error_m": 0.0,
+  "second_reopen_error_m": 0.0,
+  "source_sha256_after": "67b81aa3719a23e04aa4313a2fe2c06434d958a79f743dd8e4f37ef680786ef5",
+  "working_sha256": "602139c98dc2f8c0a5c27d72472af57fe8cc9898877abc710a599c0e9be3a3e0",
+  "elapsed_s": 21.12217139999848,
+  "ended_utc": "2026-09-08T06:26:15.878515+00:00"
+}

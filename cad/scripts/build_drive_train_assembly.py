@@ -175,19 +175,13 @@ from _assembly import (
     apply_component_color,
     assert_component_placed,
     assert_free_dof_necessity,
-    assert_pattern_targets,
     check_no_interference,
     coincident_mate,
     component_transform,
     distance_driver,
-    gear_mate,
-    gear_mates_batch,
-    linear_component_pattern,
-    grid_component_pattern,
     lock_mate,
     named_ref,
     parallel_mate,
-    PatternDirection,
     place_component,
     reledger_to_solved,
     reset_dof_manifest,
@@ -195,6 +189,16 @@ from _assembly import (
     suspend_automatic_assembly_rebuilds,
     whats_wrong,
     write_dof_manifest,
+)
+from _assembly_couplings import (
+    gear_mate,
+    gear_mates_batch,
+)
+from _assembly_patterns import (
+    assert_pattern_targets,
+    linear_component_pattern,
+    grid_component_pattern,
+    PatternDirection,
 )
 from _interference_contracts import allowed_interference_pairs
 

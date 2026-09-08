@@ -1,0 +1,261 @@
+{
+  "kind": "partial-shared-title-field-visual-batch",
+  "head": "64c3dab4875354a7d44d709539e001db920a0377",
+  "pinned_utc": "2026-09-08T05:07:33.126996+00:00",
+  "scope": "initial filename list only; maximum 20; exact source PNG byte copies; no later arrivals",
+  "excluded_prior_batch_names": [
+    "alignment-pinion_drawing.png",
+    "boss-hook_drawing.png",
+    "bracket-screw_drawing.png",
+    "channel-spring-installed_drawing.png",
+    "clamp-screw_drawing.png",
+    "cone-gear-shaft_drawing.png",
+    "cone-gear_drawing.png",
+    "cone-tip-adjuster_drawing.png",
+    "cone-tip-block_drawing.png",
+    "connecting-rod_drawing.png",
+    "fillister-screw_drawing.png",
+    "foot-screw_drawing.png",
+    "fulcrum-shaft_drawing.png",
+    "gooseneck-set-screw_drawing.png",
+    "magnifying-clamp_drawing.png",
+    "measuring-stick_drawing.png",
+    "pinion-lift-rod_drawing.png",
+    "pinion-pivot-shaft_drawing.png",
+    "pinion-spring_drawing.png",
+    "rack-pinion_drawing.png",
+    "rocker-arm_drawing.png",
+    "slotted-screw_drawing.png",
+    "spring-hook_drawing.png",
+    "transgear-feed-pinion_drawing.png",
+    "transgear-pinion_drawing.png",
+    "transgear-stub_drawing.png",
+    "tube-frame_drawing.png"
+  ],
+  "initial_remainder_names": [
+    "channel-lever_drawing.png",
+    "crank-arm_drawing.png",
+    "crank-handle_drawing.png",
+    "crankshaft_drawing.png",
+    "cylinder-gear-shaft_drawing.png",
+    "hanger-screw_drawing.png",
+    "harmonic-base_drawing.png",
+    "knife-mount_drawing.png",
+    "lag-screw_drawing.png",
+    "platen-guide_drawing.png",
+    "swing-stop-screw_drawing.png"
+  ],
+  "selected_count": 11,
+  "unselected_at_pin": [],
+  "files": [
+    {
+      "name": "channel-lever_drawing.png",
+      "source": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\png\\channel-lever_drawing.png",
+      "sha256": "0a7f714a9b3853b391502732c31df11514111fd794c297e73713e7231afb4bca",
+      "bytes": 867333,
+      "mtime_ns": 1788843991367114400,
+      "mtime_utc": "2026-09-08T05:06:31.367114+00:00",
+      "pinned_copy": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch3-images\\channel-lever_drawing.png",
+      "width": 5100,
+      "height": 3300,
+      "title_crop_box_px": [
+        3060,
+        2508,
+        5100,
+        3300
+      ],
+      "title_crop": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch3-images\\channel-lever_drawing_title.png",
+      "title_crop_sha256": "62b82a071fab212b03faeaebe55d99e2f1b57f8ce74cf16b2ffc6f099da4ace6"
+    },
+    {
+      "name": "crank-arm_drawing.png",
+      "source": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\png\\crank-arm_drawing.png",
+      "sha256": "ccf9d22cf570d3f5ca694961776c243a6408bc2da911b141535f1bee84d76863",
+      "bytes": 801545,
+      "mtime_ns": 1788843820989633200,
+      "mtime_utc": "2026-09-08T05:03:40.989633+00:00",
+      "pinned_copy": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch3-images\\crank-arm_drawing.png",
+      "width": 5100,
+      "height": 3300,
+      "title_crop_box_px": [
+        3060,
+        2508,
+        5100,
+        3300
+      ],
+      "title_crop": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch3-images\\crank-arm_drawing_title.png",
+      "title_crop_sha256": "f95642ff64ed4395fb83ec50061af9f304c55bf79210d6524fd295ad6519b219"
+    },
+    {
+      "name": "crank-handle_drawing.png",
+      "source": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\png\\crank-handle_drawing.png",
+      "sha256": "429e3bb1a5b979d5cd6f6d4e20019c9e96d7a42b5f404a817bb615eba139c32d",
+      "bytes": 983526,
+      "mtime_ns": 1788843958337646300,
+      "mtime_utc": "2026-09-08T05:05:58.337646+00:00",
+      "pinned_copy": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch3-images\\crank-handle_drawing.png",
+      "width": 5100,
+      "height": 3300,
+      "title_crop_box_px": [
+        3060,
+        2508,
+        5100,
+        3300
+      ],
+      "title_crop": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch3-images\\crank-handle_drawing_title.png",
+      "title_crop_sha256": "c36fdeec27792d9c1de7b4e776ff78d33ffe7d66f47d3f271ff654db336c1f0d"
+    },
+    {
+      "name": "crankshaft_drawing.png",
+      "source": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\png\\crankshaft_drawing.png",
+      "sha256": "49514f763466bf8cd7f1ad62c871481f93cfde21dd3a656bc77ff8dbbe87beaa",
+      "bytes": 700076,
+      "mtime_ns": 1788843895206051500,
+      "mtime_utc": "2026-09-08T05:04:55.206052+00:00",
+      "pinned_copy": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch3-images\\crankshaft_drawing.png",
+      "width": 5100,
+      "height": 3300,
+      "title_crop_box_px": [
+        3060,
+        2508,
+        5100,
+        3300
+      ],
+      "title_crop": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch3-images\\crankshaft_drawing_title.png",
+      "title_crop_sha256": "14efa2879e499c9bc2909c42ad9c7b8a5098e8e06f8c50cd51ebb3b495507e29"
+    },
+    {
+      "name": "cylinder-gear-shaft_drawing.png",
+      "source": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\png\\cylinder-gear-shaft_drawing.png",
+      "sha256": "aae7738b1510563c3cb0c961660e268578c504f5d728d8ac58f41718952d26e4",
+      "bytes": 492182,
+      "mtime_ns": 1788843839892951600,
+      "mtime_utc": "2026-09-08T05:03:59.892951+00:00",
+      "pinned_copy": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch3-images\\cylinder-gear-shaft_drawing.png",
+      "width": 5100,
+      "height": 3300,
+      "title_crop_box_px": [
+        3060,
+        2508,
+        5100,
+        3300
+      ],
+      "title_crop": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch3-images\\cylinder-gear-shaft_drawing_title.png",
+      "title_crop_sha256": "bd4a05721a3e872efd017de0d6789b6289b93808d6b58dc5fe1143510ba74e1b"
+    },
+    {
+      "name": "hanger-screw_drawing.png",
+      "source": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\png\\hanger-screw_drawing.png",
+      "sha256": "2f92d7754bd0cf1272bc460fa1c1a64557e5486205d6a52e2c4cf38dda6a042d",
+      "bytes": 825184,
+      "mtime_ns": 1788843851038043900,
+      "mtime_utc": "2026-09-08T05:04:11.038044+00:00",
+      "pinned_copy": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch3-images\\hanger-screw_drawing.png",
+      "width": 5100,
+      "height": 3300,
+      "title_crop_box_px": [
+        3060,
+        2508,
+        5100,
+        3300
+      ],
+      "title_crop": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch3-images\\hanger-screw_drawing_title.png",
+      "title_crop_sha256": "36f1380047337cf4ee471527a117d0140681d6ebe1bbc15f55ded8937fe749a0"
+    },
+    {
+      "name": "harmonic-base_drawing.png",
+      "source": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\png\\harmonic-base_drawing.png",
+      "sha256": "a7a8c94f594d0562c9c4864d7240e43202cc88c0630d3b162b6d8d36b7ce48a9",
+      "bytes": 1454993,
+      "mtime_ns": 1788844032174036000,
+      "mtime_utc": "2026-09-08T05:07:12.174036+00:00",
+      "pinned_copy": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch3-images\\harmonic-base_drawing.png",
+      "width": 5100,
+      "height": 3300,
+      "title_crop_box_px": [
+        3060,
+        2508,
+        5100,
+        3300
+      ],
+      "title_crop": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch3-images\\harmonic-base_drawing_title.png",
+      "title_crop_sha256": "12453192db99181bfa70ef41f575e74dc4aa92dd4ffcc4176f6ed3325b909988"
+    },
+    {
+      "name": "knife-mount_drawing.png",
+      "source": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\png\\knife-mount_drawing.png",
+      "sha256": "123e37d6f23cebd2cc2fb99d0777fe5e4d1ceb1a2a5a099fd96a2fa2d23fdbfd",
+      "bytes": 780596,
+      "mtime_ns": 1788844051360059400,
+      "mtime_utc": "2026-09-08T05:07:31.360059+00:00",
+      "pinned_copy": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch3-images\\knife-mount_drawing.png",
+      "width": 5100,
+      "height": 3300,
+      "title_crop_box_px": [
+        3060,
+        2508,
+        5100,
+        3300
+      ],
+      "title_crop": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch3-images\\knife-mount_drawing_title.png",
+      "title_crop_sha256": "2cf8194532789aa377fbf9623f50ae1c6f6b206beba04b81f7b52b4170d117cb"
+    },
+    {
+      "name": "lag-screw_drawing.png",
+      "source": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\png\\lag-screw_drawing.png",
+      "sha256": "1ce768b3bc60dda97421f575135e8437ba105a52f8c98f88c6f0d81938e4146d",
+      "bytes": 868523,
+      "mtime_ns": 1788843936859871200,
+      "mtime_utc": "2026-09-08T05:05:36.859871+00:00",
+      "pinned_copy": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch3-images\\lag-screw_drawing.png",
+      "width": 5100,
+      "height": 3300,
+      "title_crop_box_px": [
+        3060,
+        2508,
+        5100,
+        3300
+      ],
+      "title_crop": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch3-images\\lag-screw_drawing_title.png",
+      "title_crop_sha256": "4df34dd7cd1e7a28bf445210f565f4be029e70d2bb9a18fb5c5d97ee75e37fa0"
+    },
+    {
+      "name": "platen-guide_drawing.png",
+      "source": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\png\\platen-guide_drawing.png",
+      "sha256": "bae36d33f530cfa224ab03a6850b0fbfa0475af38e26dbbc1f1952080c7a6882",
+      "bytes": 781496,
+      "mtime_ns": 1788843923573434300,
+      "mtime_utc": "2026-09-08T05:05:23.573434+00:00",
+      "pinned_copy": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch3-images\\platen-guide_drawing.png",
+      "width": 5100,
+      "height": 3300,
+      "title_crop_box_px": [
+        3060,
+        2508,
+        5100,
+        3300
+      ],
+      "title_crop": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch3-images\\platen-guide_drawing_title.png",
+      "title_crop_sha256": "f92d863640c47bb58a480700fdae48f899d38bc86421428243a8f9453899a3d8"
+    },
+    {
+      "name": "swing-stop-screw_drawing.png",
+      "source": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\png\\swing-stop-screw_drawing.png",
+      "sha256": "34a3a1bef7849af6a662fd2f1a83e419bd2ac82c74f01c50b9bcb7020eb9d2de",
+      "bytes": 882216,
+      "mtime_ns": 1788843863743098000,
+      "mtime_utc": "2026-09-08T05:04:23.743098+00:00",
+      "pinned_copy": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch3-images\\swing-stop-screw_drawing.png",
+      "width": 5100,
+      "height": 3300,
+      "title_crop_box_px": [
+        3060,
+        2508,
+        5100,
+        3300
+      ],
+      "title_crop": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch3-images\\swing-stop-screw_drawing_title.png",
+      "title_crop_sha256": "01f7dd64f877ad8218bbe2226baacbb2fa4eea30fbd3271ffa95f5bc4339214a"
+    }
+  ]
+}

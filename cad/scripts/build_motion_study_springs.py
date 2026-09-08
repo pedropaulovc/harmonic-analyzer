@@ -40,6 +40,8 @@ from _common import (
 from _assembly import (
     coincident_mate,
     component_named_ref,
+)
+from _assembly_couplings import (
     gear_mate,
 )
 from build_motion_study import (

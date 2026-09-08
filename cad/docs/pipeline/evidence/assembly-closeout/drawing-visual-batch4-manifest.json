@@ -1,0 +1,244 @@
+{
+  "kind": "partial-shared-title-field-visual-batch",
+  "head": "64c3dab4875354a7d44d709539e001db920a0377",
+  "pinned_utc": "2026-09-08T05:12:06.138393+00:00",
+  "scope": "initial filename list only; exact PNG copies; cap20; exclude earlier batch manifest names",
+  "previous_manifests": [
+    {
+      "path": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch1-manifest.json",
+      "sha256": "c942cec88c31d686944b8277c057519eb7280c0e2a11deca0324308e2652e461"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch2-manifest.json",
+      "sha256": "d052d759370304e2ce98c0de3a9a8e24b796220decc926776ab5702da5b54fb6"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch3-manifest.json",
+      "sha256": "bcaa783f9c7e98363633e4d1a82f1311d3acd4211c5bc7494ff6fa8847f7065d"
+    }
+  ],
+  "excluded_count": 38,
+  "files": [
+    {
+      "name": "cone-pivot-screw_drawing.png",
+      "source": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\png\\cone-pivot-screw_drawing.png",
+      "sha256": "f96c7af2227269c540ca0c758aff093130a286530482fc6ff2d81cc3086d9422",
+      "bytes": 905906,
+      "mtime_ns": 1788844253522694500,
+      "mtime_utc": "2026-09-08T05:10:53.522695+00:00",
+      "pinned_copy": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch4-images\\cone-pivot-screw_drawing.png",
+      "width": 5100,
+      "height": 3300,
+      "title_crop_box_px": [
+        3060,
+        2508,
+        5100,
+        3300
+      ]
+    },
+    {
+      "name": "frame-side-screw_drawing.png",
+      "source": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\png\\frame-side-screw_drawing.png",
+      "sha256": "25668b0cad7f836581932a2d14761408d686bf6dd26552413613c6e761eba319",
+      "bytes": 861883,
+      "mtime_ns": 1788844195361549500,
+      "mtime_utc": "2026-09-08T05:09:55.361550+00:00",
+      "pinned_copy": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch4-images\\frame-side-screw_drawing.png",
+      "width": 5100,
+      "height": 3300,
+      "title_crop_box_px": [
+        3060,
+        2508,
+        5100,
+        3300
+      ]
+    },
+    {
+      "name": "gooseneck_drawing.png",
+      "source": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\png\\gooseneck_drawing.png",
+      "sha256": "41612692019b96d9210f3efebb2fc6ca2e07fe71edadb80077bb1f2c7f7eecc0",
+      "bytes": 832285,
+      "mtime_ns": 1788844181130246100,
+      "mtime_utc": "2026-09-08T05:09:41.130246+00:00",
+      "pinned_copy": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch4-images\\gooseneck_drawing.png",
+      "width": 5100,
+      "height": 3300,
+      "title_crop_box_px": [
+        3060,
+        2508,
+        5100,
+        3300
+      ]
+    },
+    {
+      "name": "guide-lock_drawing.png",
+      "source": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\png\\guide-lock_drawing.png",
+      "sha256": "1259192f93eff0ad72ca283d11862ac25c25d5e1524cac88d85837d147a63075",
+      "bytes": 511281,
+      "mtime_ns": 1788844168272790300,
+      "mtime_utc": "2026-09-08T05:09:28.272790+00:00",
+      "pinned_copy": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch4-images\\guide-lock_drawing.png",
+      "width": 5100,
+      "height": 3300,
+      "title_crop_box_px": [
+        3060,
+        2508,
+        5100,
+        3300
+      ]
+    },
+    {
+      "name": "lever-wire_drawing.png",
+      "source": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\png\\lever-wire_drawing.png",
+      "sha256": "ca3b9b1e6808d70752156bdf6345eefbe5af0d4904764258bcce0e82dab2245c",
+      "bytes": 435684,
+      "mtime_ns": 1788844142665089900,
+      "mtime_utc": "2026-09-08T05:09:02.665090+00:00",
+      "pinned_copy": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch4-images\\lever-wire_drawing.png",
+      "width": 5100,
+      "height": 3300,
+      "title_crop_box_px": [
+        3060,
+        2508,
+        5100,
+        3300
+      ]
+    },
+    {
+      "name": "output-fixture_drawing.png",
+      "source": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\png\\output-fixture_drawing.png",
+      "sha256": "f920a3c6f85e1e03e077a68173d4ed472290b7b926d39a384ede3c97f109bcbb",
+      "bytes": 702032,
+      "mtime_ns": 1788844268054567700,
+      "mtime_utc": "2026-09-08T05:11:08.054568+00:00",
+      "pinned_copy": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch4-images\\output-fixture_drawing.png",
+      "width": 5100,
+      "height": 3300,
+      "title_crop_box_px": [
+        3060,
+        2508,
+        5100,
+        3300
+      ]
+    },
+    {
+      "name": "pen-frame_drawing.png",
+      "source": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\png\\pen-frame_drawing.png",
+      "sha256": "6421d8d21a126c982f7e241eb24582505c42e4cd986f46735025848008b8180a",
+      "bytes": 574085,
+      "mtime_ns": 1788844281317455900,
+      "mtime_utc": "2026-09-08T05:11:21.317456+00:00",
+      "pinned_copy": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch4-images\\pen-frame_drawing.png",
+      "width": 5100,
+      "height": 3300,
+      "title_crop_box_px": [
+        3060,
+        2508,
+        5100,
+        3300
+      ]
+    },
+    {
+      "name": "pen-wire_drawing.png",
+      "source": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\png\\pen-wire_drawing.png",
+      "sha256": "3db4495b817b2bd40117ef80b92377317b458e926f6ada35b3c94fcb6be53bc6",
+      "bytes": 594888,
+      "mtime_ns": 1788844316454889200,
+      "mtime_utc": "2026-09-08T05:11:56.454889+00:00",
+      "pinned_copy": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch4-images\\pen-wire_drawing.png",
+      "width": 5100,
+      "height": 3300,
+      "title_crop_box_px": [
+        3060,
+        2508,
+        5100,
+        3300
+      ]
+    },
+    {
+      "name": "pinion-cam-pin_drawing.png",
+      "source": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\png\\pinion-cam-pin_drawing.png",
+      "sha256": "74e0fc5ab2282c14b41a0e0c54ea71d4fe7748f740a43c6845076b78e01748cc",
+      "bytes": 664270,
+      "mtime_ns": 1788844303970829200,
+      "mtime_utc": "2026-09-08T05:11:43.970829+00:00",
+      "pinned_copy": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch4-images\\pinion-cam-pin_drawing.png",
+      "width": 5100,
+      "height": 3300,
+      "title_crop_box_px": [
+        3060,
+        2508,
+        5100,
+        3300
+      ]
+    },
+    {
+      "name": "pinion-cam_drawing.png",
+      "source": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\png\\pinion-cam_drawing.png",
+      "sha256": "8475f12fb663817243700190a3ebb267aa57e0ce155a542408876f48d49b2bc0",
+      "bytes": 968653,
+      "mtime_ns": 1788844131008521100,
+      "mtime_utc": "2026-09-08T05:08:51.008521+00:00",
+      "pinned_copy": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch4-images\\pinion-cam_drawing.png",
+      "width": 5100,
+      "height": 3300,
+      "title_crop_box_px": [
+        3060,
+        2508,
+        5100,
+        3300
+      ]
+    },
+    {
+      "name": "pinion-handle_drawing.png",
+      "source": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\png\\pinion-handle_drawing.png",
+      "sha256": "7c39f88471380104b197900806f2b0d22807f193a04ce636944cfb6b6ec8ce61",
+      "bytes": 980059,
+      "mtime_ns": 1788844080356798000,
+      "mtime_utc": "2026-09-08T05:08:00.356798+00:00",
+      "pinned_copy": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch4-images\\pinion-handle_drawing.png",
+      "width": 5100,
+      "height": 3300,
+      "title_crop_box_px": [
+        3060,
+        2508,
+        5100,
+        3300
+      ]
+    },
+    {
+      "name": "pinion-lever_drawing.png",
+      "source": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\png\\pinion-lever_drawing.png",
+      "sha256": "ac807a98cb9ddc7d9e9aa8b41e79f459aa58d7ba38e3e10b6f63119e3ec0b150",
+      "bytes": 1022039,
+      "mtime_ns": 1788844223593543700,
+      "mtime_utc": "2026-09-08T05:10:23.593544+00:00",
+      "pinned_copy": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch4-images\\pinion-lever_drawing.png",
+      "width": 5100,
+      "height": 3300,
+      "title_crop_box_px": [
+        3060,
+        2508,
+        5100,
+        3300
+      ]
+    },
+    {
+      "name": "rocker-arm-support_drawing.png",
+      "source": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\png\\rocker-arm-support_drawing.png",
+      "sha256": "5209fc256ed183e2ec32f2460220407a6b64fc661a8d9f40eccfa5fa0944b5bf",
+      "bytes": 900829,
+      "mtime_ns": 1788844107242304300,
+      "mtime_utc": "2026-09-08T05:08:27.242304+00:00",
+      "pinned_copy": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch4-images\\rocker-arm-support_drawing.png",
+      "width": 5100,
+      "height": 3300,
+      "title_crop_box_px": [
+        3060,
+        2508,
+        5100,
+        3300
+      ]
+    }
+  ]
+}

@@ -13,6 +13,8 @@ import re
 import time
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -168,6 +170,137 @@ def test_execution_identity_tracker_migrates_missing_and_legacy_tokens(tmp_path)
     assert tracker(None, {}) is True
 
 
+@pytest.fixture
+def isolated_assembly_helper_keys(tmp_path, monkeypatch):
+    """Real discovered dependency sets and key functions, copied input bytes only.
+
+    Discovery reads source but never native outputs. All artifacts, execution
+    tokens, and synthetic adapter dependencies live under this fixture before
+    task generation; changing a helper cannot race a concurrent CAD build.
+    """
+    import _buildgraph
+
+    dodo = _load_dodo()
+    fixture_root = tmp_path / "repo"
+    fixture_root.mkdir()
+    monkeypatch.setattr(dodo, "CAD_OUT", fixture_root / "cad" / "out")
+    monkeypatch.setattr(_buildgraph, "CAD_OUT", dodo.CAD_OUT)
+    for tier in ("part", "assembly"):
+        sidecar = fixture_root / f".adapter-{tier}.digest"
+        sidecar.write_text(f"fixed {tier} adapter input\n", encoding="utf-8")
+        monkeypatch.setattr(
+            dodo, f"_submodule_{tier}_dep", lambda path=str(sidecar): path
+        )
+
+    assembly_recipes = {
+        stem: dodo._recipe_files(stem) for stem in dodo.ASSEMBLY_ORDER
+    }
+    part_tasks = {task["name"]: task for task in dodo.task_part()}
+    assembly_tasks = {task["name"]: task for task in dodo.task_assembly()}
+    sources = {
+        path for recipe in assembly_recipes.values() for path in recipe
+    } | {path for task in part_tasks.values() for path in task["file_dep"]}
+    mapped = {}
+    for path in sources:
+        original = Path(path).resolve()
+        if original.is_relative_to(fixture_root):
+            mapped[path] = str(original)
+            continue
+        copied = fixture_root / original.relative_to(REPO_ROOT)
+        assert copied.resolve().is_relative_to(fixture_root.resolve())
+        copied.parent.mkdir(parents=True, exist_ok=True)
+        if original.exists():
+            copied.write_bytes(original.read_bytes())
+        mapped[path] = str(copied)
+
+    for task in [*part_tasks.values(), *assembly_tasks.values()]:
+        for target in task["targets"]:
+            path = Path(target)
+            assert path.resolve().is_relative_to(fixture_root.resolve()), path
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b"a" * 64 + b"\n")
+
+    recipes = {
+        stem: [mapped[path] for path in paths]
+        for stem, paths in assembly_recipes.items()
+    }
+    part_deps = {
+        stem: [mapped[path] for path in task["file_dep"]]
+        for stem, task in part_tasks.items()
+    }
+    monkeypatch.setattr(dodo, "_recipe_files", lambda stem: recipes[stem])
+    monkeypatch.setattr(dodo, "_part_file_deps", lambda _script, stem: part_deps[stem])
+    monkeypatch.setattr(dodo, "REPO_ROOT", fixture_root)
+    monkeypatch.setattr(dodo._cache, "REPO_ROOT", fixture_root)
+    dodo._ARTEFACT_INDEX = None
+    dodo._ARTEFACT_DIGEST_MEMO.clear()
+    for stem, task in assembly_tasks.items():
+        assert dodo._assembly_file_deps(stem) == [
+            mapped.get(path, path) for path in task["file_dep"]
+        ]
+
+    def snapshot():
+        dodo._ARTEFACT_DIGEST_MEMO.clear()
+        # Generate again after redirecting recipe paths; the discovery-time
+        # assembly_tasks above are used only to initialize isolated targets.
+        current_assembly_tasks = {
+            task["name"]: task for task in dodo.task_assembly()
+        }
+        for stem, task in current_assembly_tasks.items():
+            assert task["file_dep"] == dodo._assembly_file_deps(stem)
+            assert all(
+                Path(path).resolve().is_relative_to(fixture_root.resolve())
+                for path in task["file_dep"]
+            ), stem
+        return {
+            "recipes": {
+                stem: dodo._digest_files(paths) for stem, paths in recipes.items()
+            },
+            "assemblies": {
+                stem: dodo._cache_key(task["file_dep"])
+                for stem, task in current_assembly_tasks.items()
+            },
+            "part_recipes": {
+                stem: dodo._digest_files(paths) for stem, paths in part_deps.items()
+            },
+            "parts": {
+                stem: dodo._cache_key(paths) for stem, paths in part_deps.items()
+            },
+        }
+
+    return dodo, fixture_root, snapshot
+
+
+@pytest.mark.parametrize(
+    ("helper", "consumers"),
+    [
+        ("_assembly_patterns", {"drive_train", "frame", "magnifier", "paper_drive"}),
+        ("_assembly_couplings", {"drive_train", "paper_drive"}),
+        ("_assembly", None),
+    ],
+)
+def test_assembly_helper_edits_change_only_real_recipe_and_cache_consumers(
+    isolated_assembly_helper_keys, helper, consumers
+):
+    dodo, root, snapshot = isolated_assembly_helper_keys
+    expected = set(dodo.ASSEMBLY_ORDER) if consumers is None else consumers
+    before = snapshot()
+    copied_helper = root / "cad" / "scripts" / f"{helper}.py"
+    assert copied_helper.is_file(), f"missing real helper input: {helper}"
+    copied_helper.write_bytes(copied_helper.read_bytes() + b"\n# isolated key mutation\n")
+    after = snapshot()
+
+    def changed(group):
+        return {stem for stem in before[group] if before[group][stem] != after[group][stem]}
+
+    assert changed("recipes") == expected
+    # Parent keys legitimately include child recipe digests before their exact
+    # execution tokens change. This is not a direct top-level FULL rebuild.
+    assert changed("assemblies") == expected | {"harmonic_analyzer"}
+    assert changed("part_recipes") == set()
+    assert changed("parts") == set()
+
+
 def test_assembly_depends_on_exact_child_execution_identities():
     """Issue #301: recipe-equal CAD files can carry different PIDs/rebuild stamps."""
     dodo = _load_dodo()
@@ -180,6 +313,98 @@ def test_assembly_depends_on_exact_child_execution_identities():
                 else dodo._part_execution_token(ref)
             )
             assert token in deps, f"assembly:{stem} lacks exact identity for {ref}"
+
+
+def test_assembly_file_deps_drop_only_non_inserted_source_targets():
+    dodo = _load_dodo()
+    removed = {
+        "frame": ("gooseneck", "rocker_arm"),
+        "drive_train": ("harmonic_base", "channel"),
+        "channel": ("cylinder_gear", "frame"),
+    }
+    for assembly, sources in removed.items():
+        dependencies = set(dodo._assembly_file_deps(assembly))
+        for source in sources:
+            if source in dodo.ASSEMBLY_ORDER:
+                target = dodo._sldasm(source)
+                token = dodo._assembly_execution_token(source)
+            else:
+                target = dodo._sldprt(source)
+                token = dodo._part_execution_token(source)
+            assert target not in dependencies, (assembly, source)
+            assert token not in dependencies, (assembly, source)
+
+
+def test_source_graph_cache_keys_preserve_real_transitive_identity_edges(
+    tmp_path, monkeypatch
+):
+    """Actual DAG, isolated recipe bytes/tokens: never read a live builder's files."""
+    import _buildgraph
+
+    dodo = _load_dodo()
+    monkeypatch.setattr(dodo, "CAD_OUT", tmp_path / "out")
+    monkeypatch.setattr(_buildgraph, "CAD_OUT", dodo.CAD_OUT)
+    recipes = {}
+    part_tokens = {}
+    assembly_tokens = {}
+    for kind, stems in (("part", dodo.part_stems()), ("assembly", dodo.ASSEMBLY_ORDER)):
+        for stem in stems:
+            recipe = tmp_path / f"{kind}-{stem}.input"
+            recipe.write_text(f"source recipe for {kind}:{stem}\n")
+            recipes[kind, stem] = str(recipe)
+            target = Path(dodo._sldprt(stem) if kind == "part" else dodo._sldasm(stem))
+            token = Path(
+                dodo._part_execution_token(stem)
+                if kind == "part"
+                else dodo._assembly_execution_token(stem)
+            )
+            assert target.resolve().is_relative_to(tmp_path.resolve()), target
+            assert token.resolve().is_relative_to(tmp_path.resolve()), token
+            target.parent.mkdir(parents=True, exist_ok=True)
+            token.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(b"CAD identity A")
+            token.write_text("a" * 64 + "\n")
+            (part_tokens if kind == "part" else assembly_tokens)[stem] = token
+    monkeypatch.setattr(dodo, "_recipe_files", lambda stem: [recipes["assembly", stem]])
+    monkeypatch.setattr(
+        dodo, "_part_file_deps", lambda _script, stem: [recipes["part", stem]]
+    )
+
+    def keys():
+        dodo._ARTEFACT_DIGEST_MEMO.clear()
+        return {
+            stem: dodo._cache_key(dodo._assembly_file_deps(stem))
+            for stem in dodo.ASSEMBLY_ORDER
+        }
+
+    def changed(before, after):
+        return {stem for stem in before if before[stem] != after[stem]}
+
+    baseline = keys()
+    cases = {
+        "rocker_arm": {"channel"},
+        "gooseneck": {"summing"},
+        "harmonic_base": {"frame"},
+        "cylinder_gear": {"drive_train"},
+        "frame_side_screw": {"frame", "channel"},
+    }
+    for source, expected in cases.items():
+        part_tokens[source].write_text("b" * 64 + "\n")
+        assert changed(baseline, keys()) == expected, source
+        part_tokens[source].write_text("a" * 64 + "\n")
+
+    # A real channel-child identity refresh restamps channel, then invalidates
+    # top-level CAD. It must never traverse the removed channel->drive edge.
+    part_tokens["rocker_arm"].write_text("b" * 64 + "\n")
+    channel_dirty = keys()
+    assembly_tokens["channel"].write_text("c" * 64 + "\n")
+    assert changed(channel_dirty, keys()) == {"harmonic_analyzer"}
+    assembly_tokens["channel"].write_text("a" * 64 + "\n")
+    part_tokens["rocker_arm"].write_text("a" * 64 + "\n")
+
+    # Recipe changes propagate recursively even before execution tokens change.
+    Path(recipes["part", "rocker_arm"]).write_text("changed rocker geometry recipe\n")
+    assert changed(baseline, keys()) == {"channel", "harmonic_analyzer"}
 
 
 def test_verify_gates_depend_on_exact_assembly_identities():
@@ -1411,6 +1636,15 @@ def test_submodule_digest_is_location_independent(tmp_path):
     assert digest_under(tmp_path / "A") == digest_under(tmp_path / "B"), (
         "identical submodule content must hash equally across checkout roots"
     )
+
+
+def test_recipe_gate_enrolls_component_pattern_contract_once():
+    dodo = _load_dodo()
+    recipe = next(task for task in dodo.task_check() if task["name"] == "recipe")
+    contract = str(dodo.SCRIPTS_DIR / "test_component_patterns.py")
+    assert recipe["actions"][0][1][0].count(contract) == 1
+    assert recipe["file_dep"].count(contract) == 1
+    assert str(dodo.SCRIPTS_DIR / "_assembly_patterns.py") in recipe["file_dep"]
 
 
 def test_recipe_gate_tracks_sources_imported_by_its_tests():

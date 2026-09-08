@@ -71,20 +71,22 @@ from _assembly import (
     assembly_title_properties,
     assert_component_placed,
     assert_free_dof_necessity,
-    assert_pattern_targets,
     check_no_interference,
     coincident_mate,
     component_named_ref,
     component_origin,
     distance_driver,
-    linear_component_pattern,
     lock_mate,
     named_ref,
-    PatternDirection,
     place_component,
     reset_dof_manifest,
     save_assembly_and_images,
     write_dof_manifest,
+)
+from _assembly_patterns import (
+    assert_pattern_targets,
+    linear_component_pattern,
+    PatternDirection,
 )
 from _transforms import (
     IDENTITY,
