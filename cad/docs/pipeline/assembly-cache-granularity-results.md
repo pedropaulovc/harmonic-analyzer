@@ -1,5 +1,11 @@
 # Assembly recipe granularity: VM2 evidence
 
+Historical VM2 record, retained from `dd5e5b2a`. The measurements below belong to
+the stated VM2 inputs, not the VM1 integration onto `3c0c4a97` / adapter `25bc99b1`.
+That integration requires its own full native build and visual checks. See the
+[later VM2 record](https://github.com/pedropaulovc/harmonic-analyzer/blob/439f8dec448e540cf61e3153b74b216336fe3f7d/cad/docs/pipeline/assembly-granularity-integration-results.md)
+for the completed baselines and failed candidate run; they are not new-tree acceptance.
+
 This is the Batch A experiment record requested by
 `second-vm-assembly-batch-2.md` on the drawing parent branch. Portfolio status
 belongs on the [project](https://github.com/users/pedropaulovc/projects/1).
@@ -13,7 +19,7 @@ Native acceptance and post-extraction results are pending.
 - Host: `vm-solidworks`; SolidWorks 2026 SP3, RevisionNumber `34.3.0`.
 - Closed native baseline: `cad/out/reports/assembly-vm2/identity-accepted/`.
   Its 116 artifact/identity pairs and six DOF manifests are recorded in
-  [the preceding batch](assembly-vm2-results.md).
+  [the preceding batch](https://github.com/pedropaulovc/harmonic-analyzer/blob/dd5e5b2a644bda03be3e7787eda03fdb2cb646b1/cad/docs/pipeline/assembly-vm2-results.md).
 
 The planned extraction moves pattern construction and specialized couplings
 without changing function bodies. Canonical insertion/placement, pose ledger,

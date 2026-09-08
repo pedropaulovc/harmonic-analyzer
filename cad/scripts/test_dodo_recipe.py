@@ -1817,6 +1817,15 @@ def test_recipe_gate_tracks_sources_imported_by_its_tests():
     ), "the pen/summing metadata contract must execute under check:recipe"
 
 
+def test_recipe_gate_enrolls_component_pattern_contract_once():
+    dodo = _load_dodo()
+    recipe = next(task for task in dodo.task_check() if task["name"] == "recipe")
+    contract = str(dodo.SCRIPTS_DIR / "test_component_patterns.py")
+    assert recipe["actions"][0][1][0].count(contract) == 1
+    assert recipe["file_dep"].count(contract) == 1
+    assert str(dodo.SCRIPTS_DIR / "_assembly_patterns.py") in recipe["file_dep"]
+
+
 def test_recipe_gate_enrolls_every_drawing_batch_contract_once():
     dodo = _load_dodo()
     recipe = next(task for task in dodo.task_check() if task["name"] == "recipe")

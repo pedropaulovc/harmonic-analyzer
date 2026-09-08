@@ -1,5 +1,20 @@
 # Assembly granularity integration evidence
 
+Historical VM2 snapshot through `95be2a5a`, preserved below. Its initial pending
+statements are not current status. The [later record at `439f8dec`](https://github.com/pedropaulovc/harmonic-analyzer/blob/439f8dec448e540cf61e3153b74b216336fe3f7d/cad/docs/pipeline/assembly-granularity-integration-results.md)
+records completed main baselines, seven successful candidate assembly builds and
+a failed full candidate pipeline at `2d10203b` / adapter `2269009e`. It does not
+accept the VM1 integration onto `3c0c4a97` / adapter `25bc99b1`.
+
+The VM1 integration reuses `dd5e5b2a` and `95be2a5a`; it does not import the VM2
+parser or adapter. Unlike the historical conflict resolution below, it retains
+VM1's channel-only `_channel_pose` regression and all newer VM1 tests/imports,
+including `_model_provenance`. `test_component_patterns.py` is explicitly enrolled
+in `check:recipe`, with a regression checking actual argv and dependencies.
+The dependency reporter remains the incoming implementation. Native artifacts,
+source pins, execution tokens, cache entries and ledgers are not transplanted.
+Current portfolio status remains on the [project](https://github.com/users/pedropaulovc/projects/1).
+
 This run follows `second-vm-assembly-granularity-integration.md` at
 `29c6ec1eea9456cc7403cab8e5e6c3fb4df02979`. Validation is in progress;
 no historical #677 timing or native artifact is used as new acceptance.
