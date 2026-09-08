@@ -5,6 +5,7 @@ from contextlib import nullcontext
 import importlib.util
 import json
 from pathlib import Path
+import subprocess
 import sys
 from types import SimpleNamespace
 
@@ -302,9 +303,66 @@ def test_saved_export_failure_closure_retains_failure_and_checks_exact_evidence(
 
 def attachment_run(h, selection="edge"):
     module = h.load("probe_vm2_datum_attachment")
+    # These tests isolate downstream guards using a fake recipe; separate tests
+    # below execute the real historical-version guard, before the fake runner.
+    h.monkeypatch.setattr(module, "require_historical_recipe", lambda _part: None)
     output = h.reports / "attachment"
     h.invoke(module, "pinion_lift_rod", selection, "requested", output)
     return json.loads((output / "receipt.json").read_text())
+
+
+@pytest.mark.parametrize("part", ["pinion_lift_rod", "rack_pinion"])
+def test_exact_historical_recipe_is_supported(harness, part):
+    h = harness
+    module = h.load("probe_vm2_datum_attachment")
+    calls = []
+
+    def git_hash(command, **kwargs):
+        calls.append((command, kwargs))
+        return module.HISTORICAL_RECIPE_BLOBS[part] + "\n"
+
+    h.monkeypatch.setattr(module.subprocess, "check_output", git_hash)
+    module.require_historical_recipe(part)
+    relative = f"cad/scripts/draw_{part}.py"
+    assert calls == [(["git", "hash-object", "--path", relative, str(h.root / relative)],
+                      {"cwd": h.root, "text": True})]
+
+
+@pytest.mark.parametrize("old_helper", ["present", "absent"])
+def test_unsupported_recipe_rejects_before_runner_or_output(harness, old_helper):
+    h = harness
+    module = h.load("probe_vm2_datum_attachment")
+    if old_helper == "absent":
+        del h.recipe.add_datum_feature
+    h.monkeypatch.setattr(h.modules["diagnostics._owned_native_session"], "run_owned_diagnostic",
+                          lambda _callback: pytest.fail("historical guard attached to COM"))
+    output = h.reports / "unsupported"
+    with pytest.raises(RuntimeError, match="historical attachment probe does not support") as error:
+        h.invoke(module, "pinion_lift_rod", "edge", "requested", output)
+    assert module.HISTORICAL_REPLAY_COMMIT in str(error.value)
+    assert "--production --ink-refresh cold" in str(error.value)
+    assert not output.exists()
+    assert h.app.closed_titles == []
+
+
+def test_git_recipe_hash_normalizes_crlf_without_ignoring_other_changes(tmp_path, monkeypatch):
+    monkeypatch.setattr(sys, "path", sys.path.copy())
+    spec = importlib.util.spec_from_file_location(
+        "vm2_historical_hash", Path(__file__).with_name("probe_vm2_datum_attachment.py")
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    monkeypatch.setattr(module, "ROOT", tmp_path.resolve())
+    subprocess.run(["git", "init", "--quiet", str(tmp_path)], check=True)
+    subprocess.run(["git", "config", "--local", "core.autocrlf", "true"], cwd=tmp_path, check=True)
+    path = tmp_path / "cad/scripts/draw_pinion_lift_rod.py"
+    path.parent.mkdir(parents=True)
+    path.write_bytes(b"def build():\n    return 1\n")
+    expected = module.historical_recipe_blob("pinion_lift_rod")
+    path.write_bytes(b"def build():\r\n    return 1\r\n")
+    assert module.historical_recipe_blob("pinion_lift_rod") == expected
+    path.write_bytes(b"def build():\r\n    return 2\r\n")
+    assert module.historical_recipe_blob("pinion_lift_rod") != expected
 
 
 def test_attachment_closure_skips_stale_part_and_hashes_final_evidence(harness):

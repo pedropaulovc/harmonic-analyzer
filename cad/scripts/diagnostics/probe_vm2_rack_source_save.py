@@ -62,6 +62,18 @@ def assert_manufacturing_preserved(expected, actual):
         raise RuntimeError(f"BoreDia nominal/tolerance changed: {expected!r} -> {actual!r}")
 
 
+def validate_bore_observation(dimensions, phase):
+    """Never accept vacuous identity/tolerance checks after model-item import."""
+    expected_counts = {"before_import": 0, "imported": 1}
+    if phase not in expected_counts:
+        raise ValueError(f"unknown drawing dimension observation phase: {phase!r}")
+    if len(dimensions) != expected_counts[phase]:
+        raise RuntimeError(
+            f"BoreDia observation {phase}: expected {expected_counts[phase]} "
+            f"drawing dimensions, found {len(dimensions)}"
+        )
+
+
 def instrument_attempt(original_attempt, checkpoint):
     """Observe named mutators without recursively observing readback getters."""
     def observed(operation, *positional, **keywords):
@@ -143,6 +155,7 @@ def main():
         source_dimension = None
         initial_manufacturing = None
         known_draw_annotations = []
+        annotation_phase = "before_import"
         saved_hash = baseline_hash
 
         def flush():
@@ -180,7 +193,9 @@ def main():
                     if common.dimension_name(adapter, ann) == "BoreDia"
                 ]
                 row["source_dirty_after_readback"] = bool(source_model.GetSaveFlag())
+                row["dimension_observation_phase"] = annotation_phase
                 flush()
+                validate_bore_observation(row["drawing_dimensions"], annotation_phase)
                 if row["source_dirty_before_readback"] != row["source_dirty_after_readback"]:
                     raise RuntimeError("readback instrumentation changed the source dirty flag")
                 actual = row["source_dimension"]["manufacturing"]
@@ -207,10 +222,12 @@ def main():
 
         def wrap(label, operation, *, remember=False):
             def observed(*positional, **keywords):
+                nonlocal annotation_phase
                 checkpoint(f"before:{label}")
                 result = operation(*positional, **keywords)
                 if remember:
                     known_draw_annotations[:] = list(result or ())
+                    annotation_phase = "imported"
                 checkpoint(f"after:{label}")
                 return result
             return observed

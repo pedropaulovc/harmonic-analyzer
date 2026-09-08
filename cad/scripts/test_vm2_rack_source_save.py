@@ -13,6 +13,7 @@ from diagnostics.probe_vm2_rack_source_save import (
     assert_manufacturing_preserved,
     instrument_attempt,
     manufacturing_state,
+    validate_bore_observation,
 )
 
 
@@ -96,6 +97,27 @@ def test_native_exception_propagates_instead_of_becoming_default():
     observed = instrument_attempt(lambda *_args: None, lambda _label: None)
     with pytest.raises(RuntimeError, match="native SetText failure"):
         observed(lambda: native.SetText(4, "THRU - REAM"))
+
+
+@pytest.mark.parametrize("dimensions", [[], [{}, {}]])
+def test_imported_bore_observation_rejects_missing_or_duplicate_readbacks(dimensions):
+    with pytest.raises(RuntimeError, match="expected 1 drawing dimensions"):
+        validate_bore_observation(dimensions, "imported")
+
+
+def test_bore_observation_requires_exactly_one_after_import():
+    validate_bore_observation([{"same_as_source_dimension": 1}], "imported")
+
+
+def test_views_only_control_can_observe_no_imported_dimension():
+    validate_bore_observation([], "before_import")
+    with pytest.raises(RuntimeError, match="expected 0 drawing dimensions"):
+        validate_bore_observation([{}], "before_import")
+
+
+def test_unknown_dimension_observation_phase_fails():
+    with pytest.raises(ValueError, match="unknown drawing dimension"):
+        validate_bore_observation([], "unknown")
 
 
 # These are recorded September 8 native controls, not fabricated observations
@@ -202,7 +224,7 @@ def test_published_native_controls_pin_settext_dirtying_and_native_save(mode):
     "missing_checkpoint", "unknown_checkpoint", "stale_probe", "dirty_on_open",
     "dirty_from_readback", "dirty_before_settext", "write_before_native_save",
     "write_at_pdf", "tolerance_change", "nominal_change", "wrong_dimension",
-    "no_change_snapshot", "save_rejected", "missing_closure",
+    "no_change_snapshot", "save_rejected", "missing_closure", "missing_bore_readback",
 ])
 def test_real_receipt_causation_rejects_missing_or_contradictory_evidence(damage):
     receipt = deepcopy(load_native_receipt("full"))
@@ -236,6 +258,8 @@ def test_real_receipt_causation_rejects_missing_or_contradictory_evidence(damage
         receipt["exports"][0]["return"] = 1
     elif damage == "missing_closure":
         receipt["closed_without_explicit_save"] = []
+    elif damage == "missing_bore_readback":
+        rows[-2]["drawing_dimensions"] = []
     with pytest.raises(AssertionError):
         assert_native_causation(receipt, "full")
 

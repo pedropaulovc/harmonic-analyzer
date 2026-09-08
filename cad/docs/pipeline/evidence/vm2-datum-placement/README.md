@@ -54,3 +54,22 @@ attachment identity. Dedicated native evidence must cover those checks.
 [The probe report](probe-results.md) records semantic-edge and diameter-dimension
 trials, their partial prints, the rack export identity failure, and the remaining
 acceptance work. These trials have not established a production correction.
+
+## Historical attachment-probe replay
+
+`probe_vm2_datum_attachment.py` belongs to the pre-migration coordinate-datum
+experiment. It supports only the two recipe versions retained at
+`6976b79e4bcf3bf158cf4a688813e01967177299` and rejects changed recipes before
+attaching to SolidWorks or creating a receipt. Its Git-blob guard normalizes
+checkout line endings; it does not accept changed code merely because the old
+helper name is still present.
+
+Replay that commit in a separate isolated worktree with its pinned adapter
+`2269009ed56712867826516f4406afc98a0c2814`, its own environment, and freshly
+validated own source artifacts. Preserve the archived receipts and accepted
+native outputs. Do not substitute the migrated helper into this experiment:
+that would change what its coordinate/edge/dimension comparisons measure.
+
+For current complete pipeline drawings, use `probe_vm2_datum_lifecycle.py` with
+`--production --ink-refresh cold`. That mode takes the first cold open as its
+baseline and does not claim an insertion or pre-save witness.

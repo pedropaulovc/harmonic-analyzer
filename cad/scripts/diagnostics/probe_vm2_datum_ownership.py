@@ -27,6 +27,7 @@ def main():
     closure = parser.add_mutually_exclusive_group()
     closure.add_argument("--close-owned-failure-from", type=Path)
     closure.add_argument("--close-owned-probe-from", type=Path)
+    closure.add_argument("--close-production-from", type=Path)
     parser.add_argument("--inventory-witness", type=Path)
     args = parser.parse_args()
     output = args.output.resolve()
@@ -125,6 +126,59 @@ def main():
                     if row["saved_sha256_after"] != row["saved_sha256_before"]:
                         raise RuntimeError("saved document bytes changed during inventory")
             report["status"] = "read_only_complete"
+            if args.close_production_from:
+                if args.inventory_witness is None:
+                    raise RuntimeError("production closure requires a prior inventory")
+                previous = json.loads(args.inventory_witness.read_text(encoding="utf-8"))
+                if previous["status"] != "read_only_complete":
+                    raise RuntimeError("prior inventory was not successful")
+                for field in ("root", "pid", "revision", "documents"):
+                    if previous[field] != report[field]:
+                        raise RuntimeError(f"production ownership changed: {field}")
+                witness_path = args.close_production_from.resolve(strict=True)
+                if not witness_path.is_relative_to(ROOT / "cad/out/reports/datum-placement"):
+                    raise RuntimeError("production witness leaves own reports")
+                witness = json.loads(witness_path.read_text(encoding="utf-8"))
+                if witness["kind"] != "vm2-normal-datum-drawing-tasks" or witness["status"] != "passed":
+                    raise RuntimeError("requires a successful normal production receipt")
+                allowed = {}
+                for stem in ("pinion-lift-rod", "rack-pinion"):
+                    source = ROOT / f"cad/out/sldprt/{stem}.SLDPRT"
+                    drawing = ROOT / f"cad/out/slddrw/{stem}.SLDDRW"
+                    allowed[str(source)] = (1, witness["source_sha256_after"][str(source)], source)
+                    allowed[str(drawing)] = (3, witness["outputs"][str(drawing)], source)
+                rows = report["documents"]
+                titles = [row["title"].casefold() for row in rows]
+                if any(not title for title in titles) or len(set(titles)) != len(titles):
+                    raise RuntimeError("ambiguous production close titles")
+                for row in rows:
+                    if row["path"] not in allowed or row["state"] != "clean":
+                        raise RuntimeError("unowned or dirty production document; refusing closure")
+                    doc_type, expected_hash, source = allowed[row["path"]]
+                    if row["type"] != doc_type or row["saved_sha256_before"] != expected_hash:
+                        raise RuntimeError("production document identity changed")
+                    if doc_type == 3 and any(
+                        view["reference_path"] not in (None, str(source)) for view in row["views"]
+                    ):
+                        raise RuntimeError("production drawing references another source")
+                report["closure_witness"] = {"path": str(witness_path), "sha256": digest(witness_path)}
+                report["closed_without_save"] = []
+                checkpoint()
+                for target in sorted(rows, key=lambda row: row["type"] != 3):
+                    present = [_early_bound(raw, "IModelDoc2") for raw in app.GetDocuments() or ()]
+                    current = [(str(doc.GetPathName()), str(doc.GetTitle())) for doc in present]
+                    if any(pair not in {(row["path"], row["title"]) for row in rows} for pair in current):
+                        raise RuntimeError("unowned document appeared during closure")
+                    if (target["path"], target["title"]) not in current:
+                        continue
+                    app.CloseDoc(target["title"])
+                    report["closed_without_save"].append(target["path"])
+                    checkpoint()
+                if app.GetDocuments() or app.ActiveDoc is not None:
+                    raise RuntimeError("production closure did not empty the seat")
+                if any(digest(Path(path)) != expected_hash for path, (_, expected_hash, _) in allowed.items()):
+                    raise RuntimeError("production bytes changed during no-save closure")
+                report["status"] = "production_closed_without_save_bytes_unchanged"
             if args.close_owned_probe_from:
                 if args.inventory_witness is None:
                     raise RuntimeError("probe closure requires a prior read-only inventory")
@@ -274,6 +328,8 @@ def main():
             command.extend(["--close-owned-failure-from", str(args.close_owned_failure_from.resolve())])
         if args.close_owned_probe_from:
             command.extend(["--close-owned-probe-from", str(args.close_owned_probe_from.resolve())])
+        if args.close_production_from:
+            command.extend(["--close-production-from", str(args.close_production_from.resolve())])
         if args.inventory_witness:
             command.extend(["--inventory-witness", str(args.inventory_witness.resolve())])
         dodo._exec(

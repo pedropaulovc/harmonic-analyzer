@@ -1,8 +1,13 @@
-"""Compare one datum selection/placement delta on a fresh diagnostic drawing.
+"""Historical coordinate-datum experiment, before the production helper migration.
 
 Runs the unchanged recipe only up to its datum call, then observes the production
 helper or a native insertion control. Partial sheets are diagnostic evidence,
 never production outputs or completed print acceptance. No source is saved.
+
+Supported recipe versions are pinned to 6976b79e4bcf3bf158cf4a688813e01967177299.
+Current recipes use add_native_axis_datum and are deliberately rejected before
+COM attachment. Validate current pipeline drawings with probe_vm2_datum_lifecycle
+--production --ink-refresh cold; do not reinterpret this historical experiment.
 """
 
 from __future__ import annotations
@@ -21,6 +26,30 @@ import time
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path[:0] = [str(ROOT), str(ROOT / "cad/scripts")]
+HISTORICAL_REPLAY_COMMIT = "6976b79e4bcf3bf158cf4a688813e01967177299"
+HISTORICAL_RECIPE_BLOBS = {
+    "pinion_lift_rod": "a95acf171a8b005e53b93dbb5319450cff71b09a",
+    "rack_pinion": "a8f00d149d55d23115d149eeb77b31aefc1d1f48",
+}
+
+
+def historical_recipe_blob(part):
+    """Apply Git's checkout text filters so Windows CRLF is not version drift."""
+    relative = f"cad/scripts/draw_{part}.py"
+    return subprocess.check_output(
+        ["git", "hash-object", "--path", relative, str(ROOT / relative)],
+        cwd=ROOT, text=True,
+    ).strip()
+
+
+def require_historical_recipe(part):
+    if historical_recipe_blob(part) != HISTORICAL_RECIPE_BLOBS[part]:
+        raise RuntimeError(
+            f"historical attachment probe does not support the current {part} recipe; "
+            f"replay {HISTORICAL_REPLAY_COMMIT} in a separate isolated worktree with its pinned adapter, "
+            "or validate current pipeline drawings with probe_vm2_datum_lifecycle.py "
+            "--production --ink-refresh cold"
+        )
 
 
 def digest(path):
@@ -43,6 +72,7 @@ def main():
     output = args.output.resolve()
     if not output.is_relative_to(ROOT / "cad/out/reports") or output.exists():
         raise ValueError("choose a new output directory inside this checkout's reports")
+    require_historical_recipe(args.part)
     if Path(sys.prefix).resolve() != ROOT / ".venv":
         raise RuntimeError("use this checkout's own uv environment")
     if os.environ.get("HARMONIC_SW_AUTOSTART") != "0":
