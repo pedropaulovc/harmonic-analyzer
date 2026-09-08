@@ -283,9 +283,7 @@ def _visible_side_datum_edges(adapter: Any, view: Any) -> tuple[Any, Any]:
 
     # The side silhouette's top edge is the raised rim's top (RIM_TOP), not the
     # deck: the deck sits LIP_H below it inside the rim.
-    return _at_height(0.0, "underside datum A"), _at_height(
-        RIM_TOP / 1000.0, "rim top"
-    )
+    return _at_height(0.0, "underside datum A"), _at_height(RIM_TOP / 1000.0, "rim top")
 
 
 async def build(
@@ -463,8 +461,11 @@ async def build(
     side_note = add_property_linked_note(adapter, "Side View Note", 0.260, 0.095)
 
     repair_harmonic_base_layout(
-        adapter, table=hole_table, views={"top": top, "side": side},
-        manufacturing_note=manufacturing_note, side_note=side_note,
+        adapter,
+        table=hole_table,
+        views={"top": top, "side": side},
+        manufacturing_note=manufacturing_note,
+        side_note=side_note,
     )
 
     return await finalize_drawing(
