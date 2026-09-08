@@ -178,3 +178,26 @@ The raw dimension tuples are HeadHt `[]/[]`, ShankLg `[]/[]`, and HeadDia
 the required parameter/view roundtrips ran, so the accepting 18th target remains
 unenrolled. The retained hidden-row fixture reproduced the capture failure before
 the classifier (`run-ys870xon`); exact source/view/parameter checks still follow it.
+
+## Full-base review and retained-receipt corrections
+
+The complete Windows Codex review of `6f25cfb5` found three P2 issues. The capture
+now records a recipe exception before the real ownership scope exits, retaining
+any scope-checkpoint error separately. The staged PDF witness requires the entire
+literal native text sequence inside each body, so `12.50`, `2.501`, or extra text
+cannot pass for `2.50`. The retained JSON fixture is an explicit `check:recipe`
+dependency. Neither the source pins nor the production layout was changed.
+
+An independent replay of the actual raw capture and preparation receipt also
+reproduced a status mismatch: preparation records `validated`, while its accessor
+records `passed`. The classifier now checks the preparation contract. The fixture
+also preserves native integral floats (`0.0` and `-1.0`) as floats instead of
+reserializing them as integers. Its complete annotation, both prepared rows and
+both receipt hashes were rechecked against the retained files. The classifier
+then passed those actual files offline with only current-sheet owner handles
+mocked; this is not a native call or acceptance result.
+
+Eight fail-first cases (`run-tng4ta5j`) reproduced the status, dependency, numeric
+PDF and real ownership-scope failures. The scope tests include the original
+RuntimeError, cancellation and keyboard interruption; no assertion was weakened.
+Fresh native dimension/source/view roundtrips and reviewed enrollment remain next.

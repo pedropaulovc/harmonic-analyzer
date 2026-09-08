@@ -428,7 +428,18 @@ def test_sheet_reader_uses_actual_views_native_properties_and_linked_notes(
 
 
 @pytest.mark.parametrize(
-    "damage", ["none", "off_page", "outside_body", "missing", "ambiguous", "nonfinite"]
+    "damage",
+    [
+        "none",
+        "off_page",
+        "outside_body",
+        "missing",
+        "ambiguous",
+        "nonfinite",
+        "numeric_prefix",
+        "numeric_suffix",
+        "extra_text",
+    ],
 )
 def test_required_pdf_text_is_literal_unique_and_inside_native_body(scene, damage):
     bank, _ = scene
@@ -447,6 +458,15 @@ def test_required_pdf_text_is_literal_unique_and_inside_native_body(scene, damag
         glyphs *= 2
     if damage == "nonfinite":
         glyphs[0]["box_pt"][0] = float("nan")
+    if damage == "numeric_prefix":
+        glyphs.insert(0, {"text": "1", "box_pt": [144, 290, 145, 295]})
+    if damage in ("numeric_suffix", "extra_text"):
+        glyphs.append(
+            {
+                "text": "1" if damage == "numeric_suffix" else "wrong",
+                "box_pt": [149, 290, 150, 295],
+            }
+        )
     printed = {"page_size_pt": [1224, 792], "glyphs": glyphs}
     if damage != "none":
         with pytest.raises(RuntimeError, match="printed text|finite"):
@@ -587,6 +607,9 @@ def test_incomplete_or_mixed_enrollment_contract_fails_before_environment(
         "keyboard_checkpoint",
         "build_checkpoint_cleanup",
         "timing_checkpoint",
+        "build_owner_exit",
+        "cancel_owner_exit",
+        "keyboard_owner_exit",
         "raw_capture",
         "source_drift",
         "copy_drift",
@@ -628,10 +651,13 @@ async def test_actual_capture_callback_preserves_source_scope_and_nonacceptance(
         "cancel_checkpoint": asyncio.CancelledError,
         "keyboard_checkpoint": KeyboardInterrupt,
         "timing_checkpoint": PermissionError,
+        "cancel_owner_exit": asyncio.CancelledError,
+        "keyboard_owner_exit": KeyboardInterrupt,
     }.get(failure, RuntimeError)
     primary = primary_type(f"original {failure} failure")
     checkpoint_error = PermissionError("secondary checkpoint sharing violation")
     cleanup_error = RuntimeError("secondary owned cleanup failure")
+    scope_error = PermissionError("secondary ownership receipt sharing violation")
     checkpoint_failures = []
     original_write = Path.write_text
 
@@ -690,6 +716,17 @@ async def test_actual_capture_callback_preserves_source_scope_and_nonacceptance(
         yield
 
     adapter.ownership.creating_document = creating
+    if failure.endswith("owner_exit"):
+        from diagnostics._owned_native_documents import DiagnosticDocuments
+        from types import MethodType
+
+        adapter.ownership.creation = None
+        adapter.ownership._output = lambda value: Path(value)
+        adapter.ownership.inventory = Mock()
+        adapter.ownership.checkpoint = Mock(side_effect=scope_error)
+        adapter.ownership.creating_document = MethodType(
+            DiagnosticDocuments.creating_document, adapter.ownership
+        )
 
     async def open_model(path):
         owned["source"] = Path(path)
@@ -722,6 +759,9 @@ async def test_actual_capture_callback_preserves_source_scope_and_nonacceptance(
             "cancel_checkpoint",
             "keyboard_checkpoint",
             "build_checkpoint_cleanup",
+            "build_owner_exit",
+            "cancel_owner_exit",
+            "keyboard_owner_exit",
         ):
             raise primary
         owned["native"] = outputs.slddrw
@@ -849,6 +889,9 @@ async def test_actual_capture_callback_preserves_source_scope_and_nonacceptance(
             "keyboard_checkpoint",
             "build_checkpoint_cleanup",
             "timing_checkpoint",
+            "build_owner_exit",
+            "cancel_owner_exit",
+            "keyboard_owner_exit",
         ):
             assert caught.value is primary
     if failure == "wrong_hash":
@@ -875,6 +918,14 @@ async def test_actual_capture_callback_preserves_source_scope_and_nonacceptance(
     assert all(path.read_bytes() == expected for path, expected in originals.items())
     assert len(report["sources_after"]) == 7
     assert events[-1] == "factory_final_guards" and events.count("close") == 2
+    if failure.endswith("owner_exit"):
+        adapter.ownership.checkpoint.assert_called_once_with()
+        assert adapter.ownership.creation is None
+        assert report["error"] == repr(primary)
+        assert report["recipe_scope_errors"] == [repr(scope_error)]
+        assert any(repr(scope_error) in note for note in primary.__notes__)
+        assert report["source_dirty_before"] is False
+        assert report["source_dirty_final"] is False
     if "checkpoint" in failure:
         assert checkpoint_failures and report["error"] == repr(primary)
         assert report["source_dirty_before"] is False
@@ -923,7 +974,7 @@ def sheet_background(tmp_path, monkeypatch):
     path = tmp_path / "cache" / "entry" / "receipt.json"
     path.parent.mkdir(parents=True)
     prepared = {
-        "status": "passed",
+        "status": retained["prepared_status"],
         "before": {"sheet_surface_finishes": [retained["prepared_hidden_sf"]]},
         "after": {"sheet_surface_finishes": [deepcopy(retained["prepared_hidden_sf"])]},
     }
@@ -961,6 +1012,29 @@ def sheet_background(tmp_path, monkeypatch):
         path=path,
         prepared=prepared,
     )
+
+
+def test_retained_sheet_fixture_preserves_preparer_status_and_native_numeric_types(
+    sheet_background,
+):
+    c = sheet_background
+    assert c.prepared["status"] == "validated"
+    assert type(c.raw[c.key]["position"][0]) is float
+    assert type(c.raw[c.key]["generic"]["lines"][0][3]) is float
+    assert (
+        type(c.prepared["before"]["sheet_surface_finishes"][0]["position"][0]) is float
+    )
+    assert type(c.raw[c.key]["semantic"]["kind"]) is int
+
+
+def test_actual_recipe_gate_tracks_retained_slotted_fixture():
+    from test_dodo_recipe import _load_dodo
+
+    task = next(row for row in _load_dodo().task_check() if row["name"] == "recipe")
+    test_path = Path(__file__).resolve()
+    fixture_path = test_path.parent / "fixtures/slotted_hidden_sheet_finish.json"
+    assert str(test_path) in task["actions"][0][1][0]
+    assert str(fixture_path) in task["file_dep"]
 
 
 @pytest.mark.parametrize(

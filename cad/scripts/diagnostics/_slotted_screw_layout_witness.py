@@ -394,8 +394,10 @@ def require_pdf_content(printed, sheet, bank):
                 characters.append(text)
         actual = "".join(characters)
         required = ["".join(value.split()) for value in values if value.strip()]
-        if not required or any(
-            not value or actual.count(value) != 1 for value in required
+        if (
+            not required
+            or actual != "".join(required)
+            or any(not value or actual.count(value) != 1 for value in required)
         ):
             raise RuntimeError(
                 f"{key}: exact printed text is absent, ambiguous or outside native body"
@@ -542,7 +544,7 @@ def capture_sheet_background(adapter, annotations, handles, directory, controlle
         for phase in ("before", "after")
     ]
     if (
-        prepared["status"] != "passed"
+        prepared["status"] != "validated"
         or any(len(rows) != 1 for rows in hidden)
         or _exact_json(hidden[0]) != _exact_json(hidden[1])
     ):
@@ -820,9 +822,17 @@ async def capture_only(
                 DocumentKind.DRAWING, module.OUTPUTS.slddrw
             ):
                 with patch("_drawing_common.save_drawing", save_drawing):
-                    artifacts = await module.build(adapter, drawing_factory=factory)
+                    try:
+                        artifacts = await module.build(adapter, drawing_factory=factory)
+                    except BaseException as error:
+                        recipe_error = error
+                        raise
             setup_controller.require_used()
         except BaseException as error:
+            if recipe_error is not None and error is not recipe_error:
+                report["recipe_scope_errors"] = [repr(error)]
+                recipe_error.add_note(f"slotted recipe ownership scope: {error!r}")
+                raise recipe_error from error
             recipe_error = error
             raise
         finally:

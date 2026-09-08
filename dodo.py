@@ -2364,6 +2364,9 @@ def task_check():
                 *recipe_test_deps,
                 *_CONFIG_YAMLS,
                 str(PROJECT_DRWDOT.resolve()),
+                str(
+                    (SCRIPTS_DIR / "fixtures" / "slotted_hidden_sheet_finish.json").resolve()
+                ),
             ],
             "cmd": [*pytest_cmd, *(str(path) for path in recipe_tests)],
         },
