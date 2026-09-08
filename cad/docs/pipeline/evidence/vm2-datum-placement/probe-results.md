@@ -1,5 +1,11 @@
 # Datum attachment probe results
 
+Historical report of the pre-migration investigation, not current recipe or
+PR status. The unchanged-recipe statements below describe that experiment.
+See [complete production checks](production-checks.md) and the later
+[rack finish cold-reopen failure](rack-finish-failure-372acd6e.md); current work
+is tracked in [#702](https://github.com/pedropaulovc/harmonic-analyzer/pull/702).
+
 The correction remains incomplete. Production recipes, shared helpers, adapter,
 manufacturing checks and both placement limits are unchanged. Work remaining is
 tracked in [#703](https://github.com/pedropaulovc/harmonic-analyzer/issues/703);

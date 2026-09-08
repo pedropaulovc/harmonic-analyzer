@@ -369,3 +369,62 @@ def test_finish_primitive_translation_rejects_stale_arrays(probe, finish_stage, 
     moved[stale] = initial[stale]
     with pytest.raises(RuntimeError, match="ink remains stale"):
         probe.assert_translated_ink(initial, moved, shift)
+
+
+EVIDENCE = Path(__file__).resolve().parents[2] / "docs/pipeline/evidence/vm2-datum-placement/probes"
+
+
+def recorded_diameter_stage(folder, index=0):
+    """Read archived native observations without altering their historical status."""
+    receipt = json.loads((EVIDENCE / folder / "receipt.json").read_bytes())
+    return receipt, deepcopy(receipt["stages"][index])
+
+
+def test_production_diameter_gate_rejects_recorded_original_overlap(probe):
+    receipt, stage = recorded_diameter_stage("rack-native-lifecycle-original")
+    assert receipt["status"] == "passed"  # historical observation, not ink acceptance
+    with pytest.raises(RuntimeError, match="ink clearance 0 m"):
+        probe.assert_production_diameter_clearance(stage, "production")
+    assert "datum_diameter_line_triangle_clearance_m" not in stage
+
+
+@pytest.mark.parametrize("stem", ("rack", "rod"))
+@pytest.mark.parametrize("index", range(5))
+def test_production_diameter_gate_checks_each_recorded_cold_stage(probe, stem, index):
+    _, stage = recorded_diameter_stage(f"{stem}-production-lifecycle-33696944", index)
+    probe.assert_production_diameter_clearance(stage, "production")
+    measured = stage["datum_diameter_line_triangle_clearance_m"]
+    assert measured >= 0.001
+    if stem == "rack":
+        expected = 0.002521455399822 if stage["stage"] == "scaled" else 0.001947243456304
+        assert measured == pytest.approx(expected, abs=1e-14)
+
+
+@pytest.mark.parametrize("field", ("datum_lines", "datum_triangles", "dimension_lines"))
+def test_production_diameter_gate_rejects_missing_recorded_ink(probe, field):
+    _, stage = recorded_diameter_stage("rack-production-lifecycle-33696944")
+    stage[field] = []
+    with pytest.raises(ValueError, match="missing"):
+        probe.assert_production_diameter_clearance(stage, "production")
+
+
+def test_production_diameter_gate_rejects_actual_stale_moved_ink(probe):
+    _, stage = recorded_diameter_stage("rack-native-lifecycle-above", 1)
+    with pytest.raises(ValueError, match="annotation anchor"):
+        probe.assert_production_diameter_clearance(stage, "production")
+
+
+@pytest.mark.parametrize("folder,index", [
+    ("rack-native-lifecycle-original", 0), ("rack-native-lifecycle-above", 1),
+])
+def test_partial_diameter_readbacks_remain_observations(probe, folder, index):
+    receipt, stage = recorded_diameter_stage(folder, index)
+    original = deepcopy(stage)
+    probe.assert_production_diameter_clearance(stage, "partial")
+    assert stage == original
+    assert receipt["status"] == "passed"
+
+
+def test_diameter_gate_rejects_unknown_mode(probe):
+    with pytest.raises(ValueError, match="unknown lifecycle input mode"):
+        probe.assert_production_diameter_clearance({}, "unknown")

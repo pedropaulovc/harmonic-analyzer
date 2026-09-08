@@ -1,5 +1,12 @@
 # Rack finish attachment control
 
+Historical immediate-readback experiment, not a persistent-placement result.
+The later [rebuild and cold-reopen control](rack-finish-failure-372acd6e.md)
+returned the leader to the crowded datum location. The sequence recommended
+below therefore did not establish a production correction. Raw observations
+remain unchanged; follow [#702](https://github.com/pedropaulovc/harmonic-analyzer/pull/702)
+for current work.
+
 The first complete rack finish-layout trial at `010840e1` failed before saving:
 the strict semantic attachment guard rejected the repositioned finish. Both
 source hashes remained unchanged. The failed run's `outputs` field records

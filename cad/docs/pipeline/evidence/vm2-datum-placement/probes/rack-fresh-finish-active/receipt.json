@@ -1,0 +1,136 @@
+{
+  "kind": "vm2-rack-finish-attachment-control",
+  "status": "failed",
+  "head": "66e5d88ef6efced5f402a2631dd51eee2489eeda",
+  "probe_sha256": "2fad67668faff1e1cf317ccc236057901e2b0b1fe6ef53c33f84d49d93d2832b",
+  "ownership_sha256": "60731f6b86a05025e32d46e2079da8282239dbe7efb549d7ced967c6c992a376",
+  "source_sha256_before": "24eb4236303c758016d2340bd6cfbee63ffed63e2f5a73bfb99f889adbaac418",
+  "control_sha256_before": "d6f6920616a1bbb1e04ea4db3b205b71678e0938cb9354458f8015523a3177aa",
+  "mode": "fresh_insert",
+  "observations": [
+    {
+      "finish_count": 1,
+      "finish_position": [
+        0.278,
+        0.11299999999999999,
+        0.003
+      ],
+      "finish_is_dangling": false,
+      "finish_attachment_types": [
+        1
+      ],
+      "finish_attachment_count": 1,
+      "finish_edge_same": [
+        1
+      ],
+      "finish_text_count": 1,
+      "finish_roughness": "Ra 1.6",
+      "finish_leaders": [
+        [
+          0.281175,
+          0.11299999999999999,
+          0.003,
+          0.27165,
+          0.11299999999999999,
+          0.003,
+          0.21804349740134313,
+          0.17344369111470476,
+          0.0015
+        ]
+      ],
+      "finish_lines": [
+        [
+          0.0,
+          0.0,
+          -1.0,
+          -1.0,
+          0.281175,
+          0.11299999999999999,
+          0.003,
+          0.27165,
+          0.11299999999999999,
+          0.003
+        ],
+        [
+          0.0,
+          0.0,
+          -1.0,
+          -1.0,
+          0.27165,
+          0.11299999999999999,
+          0.003,
+          0.21804349740134313,
+          0.17344369111470476,
+          0.0015
+        ],
+        [
+          0.0,
+          0.0,
+          -1.0,
+          -1.0,
+          0.278,
+          0.11299999999999999,
+          0.0,
+          0.27250090000000005,
+          0.122525,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          -1.0,
+          -1.0,
+          0.2834991,
+          0.122525,
+          0.0,
+          0.27250090000000005,
+          0.122525,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          -1.0,
+          -1.0,
+          0.278,
+          0.11299999999999999,
+          0.0,
+          0.28870229000000003,
+          0.13114194999999998,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          -1.0,
+          -1.0,
+          0.28188747000000003,
+          0.12725384499999998,
+          0.0,
+          0.27411253,
+          0.12725384499999998,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          -1.0,
+          -1.0,
+          0.28870229000000003,
+          0.13114194999999998,
+          0.0,
+          0.31545167189384804,
+          0.13114194999999998,
+          0.0
+        ]
+      ],
+      "finish_triangles": [],
+      "stage": "failed_repositioned_finish",
+      "path": "C:\\src\\ha-datum-placement-main\\cad\\out\\reports\\datum-placement\\rack-production-lifecycle-372acd6e\\rack-pinion-lifecycle.SLDDRW",
+      "title": "rack-pinion-lifecycle - Sheet1"
+    }
+  ],
+  "active_before": "C:\\src\\ha-datum-placement-main\\cad\\out\\reports\\datum-placement\\rack-production-lifecycle-372acd6e\\rack-pinion-lifecycle.SLDDRW",
+  "activation_return": "(<COMObject ActivateDoc3>, 0)",
+  "error": "RuntimeError('could not select the copied finish')"
+}

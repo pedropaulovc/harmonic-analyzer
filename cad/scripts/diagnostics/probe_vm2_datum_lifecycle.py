@@ -193,6 +193,17 @@ def read_rack_finish(app, view, expected_edge):
     }
 
 
+def assert_production_diameter_clearance(stage, mode):
+    """Gate current production ink; historical partial probes remain observations."""
+    if mode == "partial":
+        return
+    if mode != "production":
+        raise ValueError("unknown lifecycle input mode")
+    from diagnostics.analyze_vm2_datum_clearance import assert_clearance
+
+    stage["datum_diameter_line_triangle_clearance_m"] = assert_clearance(stage)
+
+
 def assert_rack_finish(stage):
     """Gate attachment, actual leader endpoints and line/triangle separation.
 
@@ -400,6 +411,8 @@ def main():
             row["dimension_triangles"] = [list(data.GetTriangleAtIndex(index)) for index in range(data.GetTriangleCount())]
             if not row["datum_lines"] or not row["datum_triangles"] or not row["dimension_lines"]:
                 raise RuntimeError("missing datum/dimension ink primitives")
+            checkpoint()
+            assert_production_diameter_clearance(row, inputs["mode"])
             if inputs["mode"] == "production" and source.stem == "rack-pinion":
                 row.update(read_rack_finish(app, view, edge))
                 checkpoint()
