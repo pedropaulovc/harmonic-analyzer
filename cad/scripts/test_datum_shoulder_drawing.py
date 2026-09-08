@@ -322,13 +322,20 @@ def test_native_runner_never_clears_existing_documents(monkeypatch, stage):
         calls.append("disconnect")
 
     async def callback(adapter):
+        assert adapter.swApp is app
         assert documents == [original]
         calls.append("probe")
         if stage == "failure":
             raise ValueError("probe failed")
 
-    adapter = SimpleNamespace(disconnect=disconnect)
-    monkeypatch.setattr(session, "attach_running", lambda _: calls.append("attach"))
+    app = SimpleNamespace(CloseAllDocuments=lambda _: documents.clear())
+    adapter = SimpleNamespace(disconnect=disconnect, swApp=None)
+
+    def attach(target):
+        calls.append("attach")
+        target.swApp = app
+
+    monkeypatch.setattr(session, "attach_running", attach)
     monkeypatch.setattr(session._watchdog, "start", lambda: calls.append("start"))
     monkeypatch.setattr(session._watchdog, "stop", lambda: calls.append("stop"))
     if stage == "failure":

@@ -293,7 +293,7 @@ def test_measured_spacing_preserves_all_existing_native_semantics(scene):
     ],
 )
 def test_spacing_cannot_waive_source_frame_or_native_inventory_changes(scene, mode):
-    _, before, after, _, handles = scene
+    _, _before, after, _, handles = scene
     key = next(iter(handles))
     changed_handles = dict(handles)
     if mode == "sheet":

@@ -251,7 +251,7 @@ def test_previously_unhit_upper_cell_must_not_force_bank_above_a_clear_gap():
     geometry, cells = half_scale_lever_fixture()
     hits = crossings(geometry, cells)
     cells["higher-dimension"] = SimpleNamespace(
-        kind=4, text_boxes=(Rect(0.21, 0.18, 0.218, 0.185),)
+        kind=4, text_boxes=(Rect(0.21, 0.18, 0.218, 0.185),), text_runs=()
     )
     up, _ = policy.column_vertical_candidates(hits, geometry, cells)
     # The old maximum-frontier contract was deliberately superseded by the
