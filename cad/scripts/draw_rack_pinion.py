@@ -34,6 +34,7 @@ from _gear_drawing_entities import visible_circle_edge
 from _native_axis_datum import add_native_axis_datum
 from _surface_finish import surface_finish_by_key
 from rack_pinion_spec import BORE_DIA, FACE_WIDTH, OUTSIDE_DIA, SURFACE_FINISHES
+from solidworks_mcp.adapters.com_variant import dispatch_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -75,6 +76,53 @@ DIMENSION_CALLOUTS = {
     "BoreDia": "THRU - REAM",
 }
 DIMENSION_PRECISION = {"BoreDia": 2}
+
+
+def _reattach_bore_finish(adapter: Any, front: Any, bore_edge: Any, finish: Any) -> None:
+    """Retain the right-rim point while restoring the semantic edge attachment.
+
+    The native point setter leaves this symbol with no attached entity. Selecting
+    the already-resolved edge with view-scoped point data before reattachment
+    preserves the right-rim route; reattachment without that selection restores
+    the old left-rim route (finish-point-trials.json native positive control).
+    """
+    draw = _early_bound(adapter.currentModel, "IModelDoc2")
+    draw.ClearSelection2(True)
+    manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    raw_data = manager.CreateSelectData()
+    if raw_data is None:
+        raise RuntimeError("rack bore finish has no selection data")
+    data = _early_bound(raw_data, "ISelectData")
+    data.View = front
+    data.X, data.Y = model_point_in_view(
+        adapter, front, (BORE_DIA / 2000.0, 0.0, FACE_WIDTH / 1000.0),
+        label="rack bore finish semantic rim point",
+    )
+    data.Z = FACE_WIDTH / 2000.0
+    if not _early_bound(bore_edge, "IEntity").Select4(False, data):
+        raise RuntimeError("rack bore finish semantic edge selection failed")
+    if int(manager.GetSelectedObjectCount2(-1)) != 1:
+        raise RuntimeError("rack bore finish requires exactly one selected edge")
+    selected = manager.GetSelectedObject6(1, -1)
+    if selected is None or int(adapter.swApp.IsSame(selected, bore_edge)) != 1:
+        raise RuntimeError("rack bore finish selected the wrong semantic edge")
+    raw_annotation = finish.GetAnnotation()
+    if raw_annotation is None:
+        raise RuntimeError("rack bore finish has no annotation")
+    finish_annotation = _early_bound(raw_annotation, "IAnnotation")
+    if not finish_annotation.SetAttachedEntities(dispatch_array([bore_edge])):
+        raise RuntimeError("rack bore finish semantic reattachment failed")
+    draw.ClearSelection2(True)
+    if not draw.EditRebuild3():
+        raise RuntimeError("rack bore finish reattachment rebuild failed")
+    finish_entities = tuple(finish_annotation.GetAttachedEntities3() or ())
+    if (
+        tuple(finish_annotation.GetAttachedEntityTypes() or ()) != (1,)
+        or len(finish_entities) != 1 or finish_entities[0] is None
+        or int(adapter.swApp.IsSame(finish_entities[0], bore_edge)) != 1
+        or finish_annotation.IsDangling()
+    ):
+        raise RuntimeError("rack bore finish lost its semantic edge attachment")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -169,15 +217,7 @@ async def build(adapter: Any) -> dict[str, str]:
             label="rack bore finish rim point",
         ),
     )
-    finish_annotation = _early_bound(finish.GetAnnotation(), "IAnnotation")
-    finish_entities = tuple(finish_annotation.GetAttachedEntities3() or ())
-    if (
-        tuple(finish_annotation.GetAttachedEntityTypes() or ()) != (1,)
-        or len(finish_entities) != 1 or finish_entities[0] is None
-        or int(adapter.swApp.IsSame(finish_entities[0], bore_edge)) != 1
-        or finish_annotation.IsDangling()
-    ):
-        raise RuntimeError("rack bore finish lost its semantic edge attachment")
+    _reattach_bore_finish(adapter, front, bore_edge, finish)
 
     add_property_linked_note(adapter, "Gear Data", 0.018, 0.262)
     add_property_linked_note(adapter, "Manufacturing Notes", 0.018, 0.095)

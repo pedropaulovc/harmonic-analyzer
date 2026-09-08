@@ -1,0 +1,23 @@
+{
+  "kind": "vm2-preserved-receipt-disposition",
+  "receipt": "receipt.json",
+  "receipt_sha256": "0c75ec299392ea6717f3642f742a8101fb77f75ab69bf060d98920872d824f79",
+  "raw_reported_status": "passed",
+  "status": "superseded_invalid_anchor",
+  "reason": "The moved and scaled datum_lines contain no vertex matching the current annotation position. These stages read stale datum primitives, so their ink-anchor and clearance results are invalid.",
+  "invalid_stages": ["moved", "scaled"],
+  "acceptance": "Do not use this receipt as passing datum-lifecycle or print-clearance acceptance. The original bytes remain unchanged as diagnostic provenance.",
+  "review_comment": "https://github.com/pedropaulovc/harmonic-analyzer/pull/702#discussion_r3954174352",
+  "superseded_by": [
+    {
+      "receipt": "../rack-native-lifecycle-cold-ink/receipt.json",
+      "receipt_sha256": "90271464f0154eeba94da796fae1a7babee973a34a3b04ceaa529a4b969b6a72",
+      "scope": "Corrected partial-drawing experiment with cold reopen before ink measurement."
+    },
+    {
+      "receipt": "../rack-production-lifecycle-33696944/receipt.json",
+      "receipt_sha256": "37513573f03209baeff2a5c25646e6e4cb236564d6993d0e97bfc7ca4e798d2a",
+      "scope": "Later production-drawing lifecycle observation at 33696944cad86ba285eecebb94d5a539c04e5593; not acceptance of a newer head or the retained integration stack."
+    }
+  ]
+}
