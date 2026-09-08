@@ -1,4 +1,4 @@
-"""Cold-open and move/scale a copied VM2 datum drawing; never save its source."""
+"""Cold-open and move/scale a copied VM2 datum drawing; guard source bytes."""
 
 from __future__ import annotations
 
@@ -37,6 +37,8 @@ def main():
     parser.add_argument("witness", type=Path)
     parser.add_argument("output", type=Path)
     parser.add_argument("--worker", action="store_true")
+    parser.add_argument("--rack-dimension-location", choices=("original", "above"), default="original")
+    parser.add_argument("--ink-refresh", choices=("redraw", "cold"), default="redraw")
     args = parser.parse_args()
     witness_path = args.witness.resolve(strict=True)
     output = args.output.resolve()
@@ -49,7 +51,7 @@ def main():
     if os.environ.get("HARMONIC_SW_AUTOSTART") != "0" or not os.environ.get("HARMONIC_DIAGNOSTIC_SW_PID"):
         raise RuntimeError("requires attach-only mode and inventoried PID")
     from _common import _early_bound, check
-    from _drawing_common import render_pdf_png
+    from _drawing_common import dimension_name, model_point_in_view, render_pdf_png
     from _gear_drawing_entities import visible_circle_edge
     from diagnostics._owned_native_session import run_owned_diagnostic
     from solidworks_mcp.adapters.com_variant import double_array
@@ -83,6 +85,8 @@ def main():
             "original": str(original), "original_sha256": digest(original),
             "working": str(working), "pid": int(app.GetProcessID()), "revision": str(app.RevisionNumber()),
             "started_utc": datetime.now(timezone.utc).isoformat(), "stages": [], "closures": [],
+            "rack_dimension_location": args.rack_dimension_location,
+            "ink_refresh": args.ink_refresh,
         }
         started = time.perf_counter()
 
@@ -108,6 +112,7 @@ def main():
                 raise RuntimeError("active document remains")
 
         def observe(view, name, expected_edge=None):
+            _early_bound(adapter.currentModel, "IModelDoc2").GraphicsRedraw2()
             reference = _early_bound(view.ReferencedDocument, "IModelDoc2")
             if Path(str(reference.GetPathName())).resolve() != source:
                 raise RuntimeError("drawing reference resolved to another source")
@@ -146,10 +151,38 @@ def main():
                    "attachment_type": 1, "resolved_edge_same": int(app.IsSame(edge, expected_edge)) if expected_edge is not None else None,
                    "source_sha256": digest(source)}
             report["stages"].append(row)
+            row["datum_lines"] = [list(tags[0].GetLineAtIndex(index)) for index in range(tags[0].GetLineCount())]
+            row["datum_triangles"] = [list(tags[0].GetTriangleAtIndex(index)) for index in range(tags[0].GetTriangleCount())]
+            points = [tuple(line[offset:offset + 2]) for line in row["datum_lines"] for offset in (1, 4)]
+            if not points or min(math.dist(point, position[:2]) for point in points) > 1e-8:
+                raise RuntimeError("datum primitives do not contain the current annotation anchor")
+            center = model_point_in_view(adapter, view, tuple(circle[:3]), label="datum rim center")
+            rim_radius = radius * row["view_scale"][0] / row["view_scale"][1]
+            row["projected_rim_center"] = center
+            row["projected_rim_radius_m"] = rim_radius
+            row["datum_rim_error_m"] = min(abs(math.dist(point, center) - rim_radius) for point in points)
+            if row["datum_rim_error_m"] > 1e-8:
+                raise RuntimeError("datum ink no longer terminates on the projected intended rim")
+            dimension = diameter_annotation(view)
+            display = _early_bound(dimension.GetSpecificAnnotation(), "IDisplayDimension")
+            data = _early_bound(display.GetDisplayData(), "IDisplayData")
+            row["dimension_position"] = list(dimension.GetPosition())
+            row["dimension_lines"] = [list(data.GetLineAtIndex2(index)) for index in range(data.GetLineCount())]
+            row["dimension_triangles"] = [list(data.GetTriangleAtIndex(index)) for index in range(data.GetTriangleCount())]
+            if not row["datum_lines"] or not row["datum_triangles"] or not row["dimension_lines"]:
+                raise RuntimeError("missing datum/dimension ink primitives")
             checkpoint()
             if row["source_sha256"] != report["source_sha256_before"]:
                 raise RuntimeError("lifecycle changed saved source bytes")
             return row
+
+        def diameter_annotation(view):
+            name = "RodDia" if source.stem == "pinion-lift-rod" else "BoreDia"
+            annotations = [_early_bound(raw, "IAnnotation") for raw in view.GetAnnotations() or ()]
+            matches = [item for item in annotations if int(item.GetType()) == 4 and dimension_name(adapter, item) == name]
+            if len(matches) != 1:
+                raise RuntimeError(f"expected exactly one {name}")
+            return matches[0]
 
         async def open_drawing():
             check("cold open datum lifecycle drawing", await adapter.open_model(str(working)))
@@ -173,9 +206,38 @@ def main():
             report["stages"][-1]["exports"] = {str(path): digest(path) for path in (pdf, png)}
             checkpoint()
 
+        async def refresh_ink(draw, view, edge, name):
+            if args.ink_refresh == "redraw":
+                return draw, view, edge
+            before = {"stage": name, "view_position": list(view.Position),
+                      "view_scale": list(view.ScaleRatio)}
+            result = draw.SaveAs3(str(working), 0, 0)
+            if type(result) is not int or result != 0:
+                raise RuntimeError(f"save {name} drawing rejected: {result!r}")
+            close_owned()
+            draw, view, edge = await open_drawing()
+            if math.dist(before["view_position"], list(view.Position)) > 1e-8:
+                raise RuntimeError("cold ink refresh changed view position")
+            if math.dist(before["view_scale"], list(view.ScaleRatio)) > 1e-10:
+                raise RuntimeError("cold ink refresh changed view scale")
+            report.setdefault("ink_refreshes", []).append(before)
+            checkpoint()
+            return draw, view, edge
+
         checkpoint()
         try:
             draw, view, edge = await open_drawing()
+            if args.rack_dimension_location == "above":
+                if source.stem != "rack-pinion":
+                    raise RuntimeError("rack layout delta is only valid for rack-pinion")
+                dimension = diameter_annotation(view)
+                previous = list(dimension.GetPosition())
+                if not dimension.SetPosition2(previous[0], 0.213, previous[2]):
+                    raise RuntimeError("rack diameter layout change rejected")
+                if not draw.EditRebuild3():
+                    raise RuntimeError("rack diameter layout rebuild rejected")
+                if math.dist(list(dimension.GetPosition())[:2], (previous[0], 0.213)) > 1e-8:
+                    raise RuntimeError("rack diameter layout readback differs")
             initial = observe(view, "cold_open", edge)
             limit = witness["original_call"]["position_tolerance_m"]
             if math.dist(initial["position"][:2], witness["position_after_save"][:2]) > limit:
@@ -186,6 +248,7 @@ def main():
             view.Position = double_array(requested)
             if not draw.EditRebuild3():
                 raise RuntimeError("move rebuild rejected")
+            draw, view, edge = await refresh_ink(draw, view, edge, "moved")
             moved = observe(view, "moved", edge)
             if math.dist(moved["view_position"], requested) > 1e-8:
                 raise RuntimeError("view did not move as requested")
@@ -198,6 +261,7 @@ def main():
             view.ScaleRatio = double_array([ratio[0] * 1.25, ratio[1]])
             if not draw.EditRebuild3():
                 raise RuntimeError("scale rebuild rejected")
+            draw, view, edge = await refresh_ink(draw, view, edge, "scaled")
             scaled = observe(view, "scaled", edge)
             if abs(scaled["view_scale"][0] / scaled["view_scale"][1] - ratio[0] / ratio[1] * 1.25) > 1e-10:
                 raise RuntimeError("scale readback rejected")
@@ -206,6 +270,7 @@ def main():
             view.Position = double_array(initial["view_position"])
             if not draw.EditRebuild3():
                 raise RuntimeError("restore rebuild rejected")
+            draw, view, edge = await refresh_ink(draw, view, edge, "restored")
             restored = observe(view, "restored", edge)
             report["restore_error_m"] = math.dist(restored["position"][:2], initial["position"][:2])
             if report["restore_error_m"] > limit:
@@ -236,7 +301,9 @@ def main():
         return run_owned_diagnostic(probe)
     import dodo
     with dodo._com_seat("VM2 datum lifecycle probe"):
-        dodo._exec([sys.executable, str(Path(__file__).resolve()), str(witness_path), str(output), "--worker"], "VM2 datum lifecycle probe")
+        dodo._exec([sys.executable, str(Path(__file__).resolve()), str(witness_path), str(output), "--worker",
+                    "--rack-dimension-location", args.rack_dimension_location,
+                    "--ink-refresh", args.ink_refresh], "VM2 datum lifecycle probe")
     return 0
 
 
