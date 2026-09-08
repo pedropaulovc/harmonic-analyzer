@@ -1,0 +1,288 @@
+{
+  "kind": "partial-shared-title-field-visual-batch",
+  "head": "64c3dab4875354a7d44d709539e001db920a0377",
+  "pinned_utc": "2026-09-08T05:03:39.353246+00:00",
+  "scope": "initial filename list only; maximum 20; exact source PNG byte copies; no later arrivals",
+  "excluded_batch1_names": [
+    "clamp-screw_drawing.png",
+    "cone-tip-adjuster_drawing.png",
+    "foot-screw_drawing.png",
+    "fulcrum-shaft_drawing.png",
+    "gooseneck-set-screw_drawing.png",
+    "pinion-lift-rod_drawing.png",
+    "pinion-pivot-shaft_drawing.png",
+    "pinion-spring_drawing.png",
+    "rack-pinion_drawing.png",
+    "rocker-arm_drawing.png",
+    "slotted-screw_drawing.png",
+    "transgear-feed-pinion_drawing.png",
+    "transgear-stub_drawing.png",
+    "tube-frame_drawing.png"
+  ],
+  "initial_remainder_names": [
+    "alignment-pinion_drawing.png",
+    "boss-hook_drawing.png",
+    "bracket-screw_drawing.png",
+    "channel-spring-installed_drawing.png",
+    "cone-gear-shaft_drawing.png",
+    "cone-gear_drawing.png",
+    "cone-tip-block_drawing.png",
+    "connecting-rod_drawing.png",
+    "fillister-screw_drawing.png",
+    "magnifying-clamp_drawing.png",
+    "measuring-stick_drawing.png",
+    "spring-hook_drawing.png",
+    "transgear-pinion_drawing.png"
+  ],
+  "selected_count": 13,
+  "unselected_at_pin": [],
+  "files": [
+    {
+      "name": "alignment-pinion_drawing.png",
+      "source": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\png\\alignment-pinion_drawing.png",
+      "sha256": "c3fec5ba493d2894858e3ad2c7340d3c3b184bee304b66d990733102596a3084",
+      "bytes": 701505,
+      "mtime_ns": 1788843787792267300,
+      "mtime_utc": "2026-09-08T05:03:07.792267+00:00",
+      "pinned_copy": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch2-images\\alignment-pinion_drawing.png",
+      "width": 5100,
+      "height": 3300,
+      "title_crop_box_px": [
+        3060,
+        2508,
+        5100,
+        3300
+      ],
+      "title_crop": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch2-images\\alignment-pinion_drawing_title.png",
+      "title_crop_sha256": "431cae38a1f3b1fdfb12fd5b8a9230d554b2ba02554ccb9e383945d991f35c9b"
+    },
+    {
+      "name": "boss-hook_drawing.png",
+      "source": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\png\\boss-hook_drawing.png",
+      "sha256": "376ba8818ed3362994cd26e94c36de70bda2fa6c1fc5faf8c186867858490782",
+      "bytes": 586909,
+      "mtime_ns": 1788843749606657400,
+      "mtime_utc": "2026-09-08T05:02:29.606658+00:00",
+      "pinned_copy": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch2-images\\boss-hook_drawing.png",
+      "width": 5100,
+      "height": 3300,
+      "title_crop_box_px": [
+        3060,
+        2508,
+        5100,
+        3300
+      ],
+      "title_crop": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch2-images\\boss-hook_drawing_title.png",
+      "title_crop_sha256": "4e94c4979cd8811adb08534da8ec932ac02e1c449967993e83a8878aa8330e1a"
+    },
+    {
+      "name": "bracket-screw_drawing.png",
+      "source": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\png\\bracket-screw_drawing.png",
+      "sha256": "1284148f2ba3482dd6d486837afdb71777932b63b147146d7793059140812a19",
+      "bytes": 890848,
+      "mtime_ns": 1788843563032642600,
+      "mtime_utc": "2026-09-08T04:59:23.032643+00:00",
+      "pinned_copy": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch2-images\\bracket-screw_drawing.png",
+      "width": 5100,
+      "height": 3300,
+      "title_crop_box_px": [
+        3060,
+        2508,
+        5100,
+        3300
+      ],
+      "title_crop": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch2-images\\bracket-screw_drawing_title.png",
+      "title_crop_sha256": "afb39fad001b68f4fef24535eef2325b9d3929a878870c36caf1ff105aa4351c"
+    },
+    {
+      "name": "channel-spring-installed_drawing.png",
+      "source": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\png\\channel-spring-installed_drawing.png",
+      "sha256": "ce62cb0927f10dca71409f6e8415224bb63bc0007e48768a754e10e003f5590c",
+      "bytes": 720726,
+      "mtime_ns": 1788843606496128500,
+      "mtime_utc": "2026-09-08T05:00:06.496129+00:00",
+      "pinned_copy": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch2-images\\channel-spring-installed_drawing.png",
+      "width": 5100,
+      "height": 3300,
+      "title_crop_box_px": [
+        3060,
+        2508,
+        5100,
+        3300
+      ],
+      "title_crop": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch2-images\\channel-spring-installed_drawing_title.png",
+      "title_crop_sha256": "951cd3ba0fe9a1c9dd7d4e1c89d61134a026bf061e1a42d97c97289f3e321b4c"
+    },
+    {
+      "name": "cone-gear-shaft_drawing.png",
+      "source": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\png\\cone-gear-shaft_drawing.png",
+      "sha256": "67582d51305e6a88196b81c9454b35326036b1e15d848caa12a5193310752b20",
+      "bytes": 928473,
+      "mtime_ns": 1788843716928409700,
+      "mtime_utc": "2026-09-08T05:01:56.928410+00:00",
+      "pinned_copy": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch2-images\\cone-gear-shaft_drawing.png",
+      "width": 5100,
+      "height": 3300,
+      "title_crop_box_px": [
+        3060,
+        2508,
+        5100,
+        3300
+      ],
+      "title_crop": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch2-images\\cone-gear-shaft_drawing_title.png",
+      "title_crop_sha256": "9812872752a08a7c6dbc9e326fbf58c58d756cb9744dcfc3210607d7a8685f6a"
+    },
+    {
+      "name": "cone-gear_drawing.png",
+      "source": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\png\\cone-gear_drawing.png",
+      "sha256": "356f531641f3c91acdfe4efebcc620861ccadb5ba05fbf39befa3e8656297637",
+      "bytes": 1060545,
+      "mtime_ns": 1788843695585323000,
+      "mtime_utc": "2026-09-08T05:01:35.585323+00:00",
+      "pinned_copy": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch2-images\\cone-gear_drawing.png",
+      "width": 5100,
+      "height": 3300,
+      "title_crop_box_px": [
+        3060,
+        2508,
+        5100,
+        3300
+      ],
+      "title_crop": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch2-images\\cone-gear_drawing_title.png",
+      "title_crop_sha256": "9dc6ed62005e9895f09e0d048875d4738218bfee3de123963c5281c642fbe8c8"
+    },
+    {
+      "name": "cone-tip-block_drawing.png",
+      "source": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\png\\cone-tip-block_drawing.png",
+      "sha256": "9db414979a19e540c9fb244fe8de03aaeea0d68a0614386bc43316a7487bb9d7",
+      "bytes": 984732,
+      "mtime_ns": 1788843549787716100,
+      "mtime_utc": "2026-09-08T04:59:09.787716+00:00",
+      "pinned_copy": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch2-images\\cone-tip-block_drawing.png",
+      "width": 5100,
+      "height": 3300,
+      "title_crop_box_px": [
+        3060,
+        2508,
+        5100,
+        3300
+      ],
+      "title_crop": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch2-images\\cone-tip-block_drawing_title.png",
+      "title_crop_sha256": "5554d32267d18d3f46be22e2171054b165b0a137a6885e2eb999427f6ec42483"
+    },
+    {
+      "name": "connecting-rod_drawing.png",
+      "source": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\png\\connecting-rod_drawing.png",
+      "sha256": "7f28571fe4ceb3e2e512d378fff46ac528bacf4b9fbcbb5d9b84c76ffd504be9",
+      "bytes": 667714,
+      "mtime_ns": 1788843657201349900,
+      "mtime_utc": "2026-09-08T05:00:57.201350+00:00",
+      "pinned_copy": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch2-images\\connecting-rod_drawing.png",
+      "width": 5100,
+      "height": 3300,
+      "title_crop_box_px": [
+        3060,
+        2508,
+        5100,
+        3300
+      ],
+      "title_crop": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch2-images\\connecting-rod_drawing_title.png",
+      "title_crop_sha256": "bcacc678bebbe6eaa2971e4ae1b793e3d8b11776a59eed96048dd8a4445ad282"
+    },
+    {
+      "name": "fillister-screw_drawing.png",
+      "source": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\png\\fillister-screw_drawing.png",
+      "sha256": "fb979f6cd62a996f9191c0d50d317031c89293f7b335b7fe42f0522258f2c7a0",
+      "bytes": 936998,
+      "mtime_ns": 1788843764676223800,
+      "mtime_utc": "2026-09-08T05:02:44.676224+00:00",
+      "pinned_copy": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch2-images\\fillister-screw_drawing.png",
+      "width": 5100,
+      "height": 3300,
+      "title_crop_box_px": [
+        3060,
+        2508,
+        5100,
+        3300
+      ],
+      "title_crop": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch2-images\\fillister-screw_drawing_title.png",
+      "title_crop_sha256": "c05d62835c33df0f516836f46eb891e1094eaad9aa22496ddeb27890166e27fe"
+    },
+    {
+      "name": "magnifying-clamp_drawing.png",
+      "source": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\png\\magnifying-clamp_drawing.png",
+      "sha256": "4fb295b49883aab106f5503a282e84a656f187dd3bb420d44d86615e3348bcc8",
+      "bytes": 703966,
+      "mtime_ns": 1788843736912706900,
+      "mtime_utc": "2026-09-08T05:02:16.912707+00:00",
+      "pinned_copy": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch2-images\\magnifying-clamp_drawing.png",
+      "width": 5100,
+      "height": 3300,
+      "title_crop_box_px": [
+        3060,
+        2508,
+        5100,
+        3300
+      ],
+      "title_crop": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch2-images\\magnifying-clamp_drawing_title.png",
+      "title_crop_sha256": "49482e6cfa80df3f9bb53749fc788a3482a9720b3d833784fd77ce91d38f9cf1"
+    },
+    {
+      "name": "measuring-stick_drawing.png",
+      "source": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\png\\measuring-stick_drawing.png",
+      "sha256": "a826ab15c5e955e81452bf39154040f8493e8c51a809453eced84b88a9d8d123",
+      "bytes": 974229,
+      "mtime_ns": 1788843637226599500,
+      "mtime_utc": "2026-09-08T05:00:37.226599+00:00",
+      "pinned_copy": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch2-images\\measuring-stick_drawing.png",
+      "width": 5100,
+      "height": 3300,
+      "title_crop_box_px": [
+        3060,
+        2508,
+        5100,
+        3300
+      ],
+      "title_crop": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch2-images\\measuring-stick_drawing_title.png",
+      "title_crop_sha256": "f899f768ecfb3cc59a060faf1d90c695b3cfd00785895c6aaf52a89c4e5da24c"
+    },
+    {
+      "name": "spring-hook_drawing.png",
+      "source": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\png\\spring-hook_drawing.png",
+      "sha256": "8c3954ceba5be1fcda36603b17f18adc01052229e555c235749d7428c28db325",
+      "bytes": 506006,
+      "mtime_ns": 1788843593081934900,
+      "mtime_utc": "2026-09-08T04:59:53.081935+00:00",
+      "pinned_copy": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch2-images\\spring-hook_drawing.png",
+      "width": 5100,
+      "height": 3300,
+      "title_crop_box_px": [
+        3060,
+        2508,
+        5100,
+        3300
+      ],
+      "title_crop": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch2-images\\spring-hook_drawing_title.png",
+      "title_crop_sha256": "c82c4afee75a087dcea133b0d6d06844ff156ca195e6b6276eff7eccc0c2b5e6"
+    },
+    {
+      "name": "transgear-pinion_drawing.png",
+      "source": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\png\\transgear-pinion_drawing.png",
+      "sha256": "db51eedfa4567f51b801d2b6d8d09556a20b1c795a96a2a9bce1fb02cd62d676",
+      "bytes": 681677,
+      "mtime_ns": 1788843624285525300,
+      "mtime_utc": "2026-09-08T05:00:24.285525+00:00",
+      "pinned_copy": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch2-images\\transgear-pinion_drawing.png",
+      "width": 5100,
+      "height": 3300,
+      "title_crop_box_px": [
+        3060,
+        2508,
+        5100,
+        3300
+      ],
+      "title_crop": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch2-images\\transgear-pinion_drawing_title.png",
+      "title_crop_sha256": "f8c46e14a975e66c2c2ab177a2dbc3ea702bd262db2c0cee263b9a535bd2d74d"
+    }
+  ]
+}

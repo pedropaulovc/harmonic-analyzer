@@ -1,0 +1,154 @@
+{
+  "kind": "partial-shared-title-field-visual-batch",
+  "head": "64c3dab4875354a7d44d709539e001db920a0377",
+  "pinned_utc": "2026-09-08T05:36:14.275836+00:00",
+  "scope": "initial filename list only; exact PNG copies; cap20; exclude batches1-6 manifest names",
+  "previous_manifests": [
+    {
+      "path": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch1-manifest.json",
+      "sha256": "c942cec88c31d686944b8277c057519eb7280c0e2a11deca0324308e2652e461"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch2-manifest.json",
+      "sha256": "d052d759370304e2ce98c0de3a9a8e24b796220decc926776ab5702da5b54fb6"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch3-manifest.json",
+      "sha256": "bcaa783f9c7e98363633e4d1a82f1311d3acd4211c5bc7494ff6fa8847f7065d"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch4-manifest.json",
+      "sha256": "4e2bb2016d7fe7b2314471d1117c0c476550faccc1d94cb67b13764758f6cd79"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch5-manifest.json",
+      "sha256": "ce949606641a64b6415568d67208e994a5d2206cd0c103228116464c1dae195d"
+    },
+    {
+      "path": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch6-manifest.json",
+      "sha256": "0cea86195d5079e7f789c19321ea37ec60bde0264c6e598a3ad8598de74bb8da"
+    }
+  ],
+  "excluded_count": 82,
+  "files": [
+    {
+      "name": "channel-assembly_drawing.png",
+      "source": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\png\\channel-assembly_drawing.png",
+      "sha256": "2d9a424e87627b2e60f13554932484e3151d2deb77f863b057f1930b7b974662",
+      "bytes": 584225,
+      "mtime_ns": 1788845180506086100,
+      "mtime_utc": "2026-09-08T05:26:20.506086+00:00",
+      "pinned_copy": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch7-images\\channel-assembly_drawing.png",
+      "width": 5100,
+      "height": 3300,
+      "title_crop_box_px": [
+        3060,
+        2508,
+        5100,
+        3300
+      ]
+    },
+    {
+      "name": "frame-assembly_drawing.png",
+      "source": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\png\\frame-assembly_drawing.png",
+      "sha256": "ee191d1d8754093cbc6de908b48e15ebab93bb187d81dd165c304784df74adae",
+      "bytes": 664066,
+      "mtime_ns": 1788845133858749500,
+      "mtime_utc": "2026-09-08T05:25:33.858749+00:00",
+      "pinned_copy": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch7-images\\frame-assembly_drawing.png",
+      "width": 5100,
+      "height": 3300,
+      "title_crop_box_px": [
+        3060,
+        2508,
+        5100,
+        3300
+      ]
+    },
+    {
+      "name": "fulcrum-keeper_drawing.png",
+      "source": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\png\\fulcrum-keeper_drawing.png",
+      "sha256": "9b322208841a32f45f5552cf9be5e5137cdfaf9c1c93398b956ae2da40a22029",
+      "bytes": 770302,
+      "mtime_ns": 1788845094474857900,
+      "mtime_utc": "2026-09-08T05:24:54.474858+00:00",
+      "pinned_copy": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch7-images\\fulcrum-keeper_drawing.png",
+      "width": 5100,
+      "height": 3300,
+      "title_crop_box_px": [
+        3060,
+        2508,
+        5100,
+        3300
+      ]
+    },
+    {
+      "name": "magnifier-assembly_drawing.png",
+      "source": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\png\\magnifier-assembly_drawing.png",
+      "sha256": "fb7d8e9bc79d51b47419cf2fe98d1ee8f66e3019734cbbd787cb2d1ea0fa337f",
+      "bytes": 464889,
+      "mtime_ns": 1788845161017849900,
+      "mtime_utc": "2026-09-08T05:26:01.017850+00:00",
+      "pinned_copy": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch7-images\\magnifier-assembly_drawing.png",
+      "width": 5100,
+      "height": 3300,
+      "title_crop_box_px": [
+        3060,
+        2508,
+        5100,
+        3300
+      ]
+    },
+    {
+      "name": "magnifying-wheel_drawing.png",
+      "source": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\png\\magnifying-wheel_drawing.png",
+      "sha256": "c8255bd8cf6b1859c8c532ef344a4d60279e21b45e91f3d3120cbb6e57d84b83",
+      "bytes": 979983,
+      "mtime_ns": 1788845114436639300,
+      "mtime_utc": "2026-09-08T05:25:14.436639+00:00",
+      "pinned_copy": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch7-images\\magnifying-wheel_drawing.png",
+      "width": 5100,
+      "height": 3300,
+      "title_crop_box_px": [
+        3060,
+        2508,
+        5100,
+        3300
+      ]
+    },
+    {
+      "name": "paper-drive-assembly_drawing.png",
+      "source": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\png\\paper-drive-assembly_drawing.png",
+      "sha256": "9dd60212bbf65ceaa500b4490c51564cac8774ad659f66bcf3fd61f8e45d5e4a",
+      "bytes": 499888,
+      "mtime_ns": 1788845148477318600,
+      "mtime_utc": "2026-09-08T05:25:48.477319+00:00",
+      "pinned_copy": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch7-images\\paper-drive-assembly_drawing.png",
+      "width": 5100,
+      "height": 3300,
+      "title_crop_box_px": [
+        3060,
+        2508,
+        5100,
+        3300
+      ]
+    },
+    {
+      "name": "summing-assembly_drawing.png",
+      "source": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\png\\summing-assembly_drawing.png",
+      "sha256": "8511f6b1c329af2a00adec5e7541a0ebd132ad972f46b14b6249e7b7f0ad6c1e",
+      "bytes": 512497,
+      "mtime_ns": 1788845218489186500,
+      "mtime_utc": "2026-09-08T05:26:58.489187+00:00",
+      "pinned_copy": "C:\\src\\ha-assembly-closeout-independent\\cad\\out\\reports\\closeout-verification\\title-fields-batch7-images\\summing-assembly_drawing.png",
+      "width": 5100,
+      "height": 3300,
+      "title_crop_box_px": [
+        3060,
+        2508,
+        5100,
+        3300
+      ]
+    }
+  ]
+}
