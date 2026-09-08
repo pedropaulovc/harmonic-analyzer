@@ -34,8 +34,29 @@ uv run --frozen python -m doit -n 4 drawing:pinion_lift_rod drawing:rack_pinion
 
 Datum A readback errors were 23.536 micrometres versus a 20-micrometre limit for
 pinion_lift_rod, and 163.372 versus 100 micrometres for rack_pinion. Both are
-symbol-position errors, not manufacturing geometry errors. The reports contain
-exact requested/returned positions and hashes. Reuse those failures as evidence;
+symbol-position errors, not manufacturing geometry errors. The immutable
+[VM2 failure summary at 439f8dec](https://github.com/pedropaulovc/harmonic-analyzer/blob/439f8dec448e540cf61e3153b74b216336fe3f7d/cad/docs/pipeline/assembly-granularity-integration-results.md#native-validation-blocker-and-unchanged-reproduction)
+contains both exact readbacks and the raw-receipt hashes:
+
+| Datum A | Requested sheet position, m | Returned sheet position, m |
+|---|---|---|
+| pinion_lift_rod, lift rod axis | `(0.055, 0.22899999999999998)` | `(0.05499999999999966, 0.22897646401719635)` |
+| rack_pinion, bore axis | `(0.22, 0.20099999999999998)` | `(0.21999999999999942, 0.20083662770023045)` |
+
+Both rows come from the same unchanged retry. Its raw files remain on VM2 under
+`cad/out/reports/assembly-granularity-integration/`:
+
+| Checkout | Receipt | SHA-256 recorded in the linked summary |
+|---|---|---|
+| `C:/src/ha-assembly-granularity-integration` | `candidate-2d-datum-retry-full.log` | `a7ec86f9a83f2ff9bc7717f940e19c238a494f0352e0c613ddab89853184061f` |
+| `C:/src/ha-assembly-granularity-integration` | `candidate-2d-datum-retry-process.json` | `395b96c33637782495b1eec7506975887bf8231db6b93ba59635a7199469fda6` |
+| `C:/src/ha-assembly-granularity-staging` | `candidate-2d-datum-retry-summary.json` | `78a32ddbe768e59150b419ba0d4931b77dc44c7c9b9c1c4f08c7d891e23e86cf` |
+
+These are source-reported hashes, not a VM1 verification of the raw bytes. A
+fresh clone can retrieve the summary, but not these ignored files. VM2 should
+verify their hashes and publish the originals as tracked evidence or downloadable
+artifacts, with immutable links, before claiming a portable raw-evidence bundle.
+Keep the originals unchanged. Use the published readbacks to begin investigation;
 do not repeatedly rerun the same unchanged case without testing a specific delta.
 
 ## Ownership and correction
