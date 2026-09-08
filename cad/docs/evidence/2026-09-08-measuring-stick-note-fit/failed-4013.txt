@@ -1,0 +1,43 @@
+>>  drawing:measuring_stick: C:\src\ha-foundations-integration\.venv\Scripts\python.exe C:\src\ha-foundations-integration\cad\scripts\draw_measuring_stick.py measuring-stick
+  xx  [    5.3s +  5.3s] drawing.measuring_stick_note_fit failed: (-2147352573, 'Member not found.', None, None)
+  xx  [    5.3s +  0.0s] drawing.build failed: (-2147352573, 'Member not found.', None, None)
+  xx  [    5.3s +  0.0s] build draw_measuring_stick failed: (-2147352573, 'Member not found.', None, None)
+Traceback (most recent call last):
+  File "C:\src\ha-foundations-integration\cad\scripts\_common.py", line 2128, in run_build
+    artefacts = asyncio.run(_run())
+  File "C:\Users\pedro\AppData\Roaming\uv\python\cpython-3.14.0-windows-x86_64-none\Lib\asyncio\runners.py", line 204, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "C:\Users\pedro\AppData\Roaming\uv\python\cpython-3.14.0-windows-x86_64-none\Lib\asyncio\runners.py", line 127, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\pedro\AppData\Roaming\uv\python\cpython-3.14.0-windows-x86_64-none\Lib\asyncio\base_events.py", line 719, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "C:\src\ha-foundations-integration\cad\scripts\_common.py", line 2107, in _run
+    return await build(adapter)
+           ^^^^^^^^^^^^^^^^^^^^
+  File "C:\src\ha-foundations-integration\cad\scripts\_drawing_build.py", line 110, in with_prepared_factory
+    artifacts = await build(adapter, drawing_factory=factory)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\src\ha-foundations-integration\cad\scripts\draw_measuring_stick.py", line 253, in build
+    _fit_manufacturing_note(adapter, drawing_model, sheet, note, front_caption, iso_caption, iso)
+    ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\src\ha-foundations-integration\cad\scripts\_telemetry.py", line 965, in wrap
+    return fn(*args, **kwargs)
+  File "C:\src\ha-foundations-integration\cad\scripts\draw_measuring_stick.py", line 137, in _fit_manufacturing_note
+    annotation, before = _note_bounds(adapter, model, sheet, note, "Manufacturing Notes")
+                         ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\src\ha-foundations-integration\cad\scripts\draw_measuring_stick.py", line 120, in _note_bounds
+    _require_note_drawing(adapter, model, sheet)
+    ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\src\ha-foundations-integration\cad\scripts\draw_measuring_stick.py", line 104, in _require_note_drawing
+    for actual in (adapter.currentModel, adapter._get_attr_or_call(app, "ActiveDoc")):
+                                         ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\src\ha-foundations-integration\SolidworksMCP-python\src\solidworks_mcp\adapters\pywin32_adapter.py", line 1935, in _get_attr_or_call
+    return attr() if callable(attr) else attr
+           ~~~~^^
+  File "C:\src\ha-foundations-integration\.venv\Lib\site-packages\win32com\client\dynamic.py", line 214, in __call__
+    self._oleobj_.Invoke(*allArgs), self._olerepr_.defaultDispatchName, None
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+pywintypes.com_error: (-2147352573, 'Member not found.', None, None)
