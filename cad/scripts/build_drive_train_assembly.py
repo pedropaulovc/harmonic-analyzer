@@ -547,7 +547,8 @@ if PINION_TOOTH_Z + PINION_FACE / 2.0 > CRANKSHAFT_Z0 + CRANKSHAFT_LENGTH:
 # The crankshaft's named seat datums (the flip-free coincident seats for the
 # keyed chain -- see _seat_on_crank) must sit exactly at this module's
 # authored stations.
-from build_crank_arm import ARM_THICKNESS  # noqa: E402
+from build_crank_arm import ANCHOR_HOLE_SPEC, ARM_THICKNESS  # noqa: E402
+from _holes import DRILL_POINT_H, blind_cut_dia_mm  # noqa: E402
 from build_crankshaft import (  # noqa: E402
     SEAT_ARM as CS_SEAT_ARM,
     SEAT_PINION as CS_SEAT_PINION,
@@ -571,7 +572,7 @@ from build_crank_pin_eye import (  # noqa: E402
     WIRE_DIA as EYE_WIRE_DIA,
 )
 from crank_arm_spec import ANCHOR_SCREW_X, ANCHOR_SCREW_Y, ANCHOR_THREAD_DEPTH  # noqa: E402
-from fillister_screw_spec import (  # noqa: E402
+from build_fillister_screw import (  # noqa: E402
     SHANK_DIA as ANCHOR_SCREW_SHANK_DIA,
     SHANK_LEN as ANCHOR_SCREW_SHANK_LEN,
 )
@@ -605,10 +606,19 @@ EYE_Z = CRANK_ARM_Z0 - EYE_WIRE_DIA / 2.0 - ANCHOR_AIR
 EYE_CENTER_Y = ANCHOR_SCREW_XY[1] - (
     ANCHOR_SCREW_SHANK_DIA / 2.0 + ANCHOR_AIR + EYE_TAIL_LEN + EYE_LOOP_R
 )
-if ANCHOR_SCREW_SHANK_LEN - EYE_WIRE_DIA - ANCHOR_AIR > ANCHOR_THREAD_DEPTH:
+ANCHOR_THREAD_ENGAGEMENT = ANCHOR_HEAD_Z + ANCHOR_SCREW_SHANK_LEN - CRANK_ARM_Z0
+ANCHOR_BOTTOM_CLEARANCE = ANCHOR_HOLE_SPEC.depth_mm - ANCHOR_THREAD_ENGAGEMENT
+ANCHOR_BACK_WALL = ARM_THICKNESS - (
+    ANCHOR_HOLE_SPEC.depth_mm + blind_cut_dia_mm(ANCHOR_HOLE_SPEC) / 2.0 * DRILL_POINT_H
+)
+if ANCHOR_THREAD_ENGAGEMENT > ANCHOR_THREAD_DEPTH:
     raise AssertionError("anchor screw bottoms in the crank arm's tap")
-if ANCHOR_SCREW_SHANK_LEN - EYE_WIRE_DIA - ANCHOR_AIR < 2.0:
+if ANCHOR_THREAD_ENGAGEMENT < 2.0:
     raise AssertionError("anchor screw has under 2.0 thread engagement in the arm")
+if ANCHOR_BOTTOM_CLEARANCE < 0.5:
+    raise AssertionError("anchor screw has under 0.5 clearance to the drill shoulder")
+if ANCHOR_BACK_WALL < 0.5:
+    raise AssertionError("anchor tap drill leaves under 0.5 back-face wall")
 # = the plate's NORTH face (-167): the placed rows compose a Ry(180), so the
 # +z-extruded plate fills CRANK_ARM_Z0..here running machine -z from the
 # origin. Both the place_component z and the crankshaft's SeatArm datum

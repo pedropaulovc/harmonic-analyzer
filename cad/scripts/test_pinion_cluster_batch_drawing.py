@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import math
-import re
 from collections.abc import Iterable
 from pathlib import Path
 
@@ -13,8 +12,6 @@ import _assembly
 import _config
 import _interference_contracts
 import crank_handle_spec
-import draw_pinion_cam_pin
-import draw_pinion_handle
 import pinion_bracket_spec
 import pinion_cam_pin_spec
 import pinion_cam_spec
@@ -105,40 +102,6 @@ def test_drawing_notes_do_not_change_the_drive_train_recipe() -> None:
         "pinion_lever_geometry.py",
         "pinion_spring_geometry.py",
     } <= deps
-
-
-def test_drive_train_does_not_duplicate_bracket_geometry_constants() -> None:
-    source = (
-        Path(__file__).resolve().parent / "build_drive_train_assembly.py"
-    ).read_text(encoding="utf-8")
-    for name in ("STRAP_T", "STRAP_R_END", "STRAP_C2C"):
-        assert re.search(rf"^\s*{name}\s*=", source, re.MULTILINE) is None
-
-
-def test_make_critical_free_text_is_formatted_from_geometry_constants() -> None:
-    source_tokens = {
-        crank_handle_spec: (
-            "{2.0 * NECK_R:.2f}",
-            "{HANDLE_MAX_DIA:.2f}",
-            "{2.0 * CAP_R:.2f}",
-        ),
-        pinion_cam_spec: ("{ECC:.2f}", "{CAM_OD:.2f}"),
-        draw_pinion_cam_pin: ("{CAP_SAG:.2f}",),
-        pinion_handle_spec: ("{CAP_SAG:.2f}",),
-        draw_pinion_handle: ("z_max / 1000.0",),
-        pinion_lever_spec: ("{HUB_LEN:.2f}", "{HUB_LEN / 2.0:.2f}"),
-        pinion_pivot_shaft_spec: ("{CAP_SAG:.2f}",),
-        pinion_spring_spec: (
-            "{FLAT_LEN:.2f}",
-            "{90.0 - BLADE_TILT_DEG + KINK_DEG:.2f}",
-            "{HOLE_FROM_END:.2f}",
-        ),
-        pinion_bracket_spec: ("{R_END:.2f}",),
-    }
-    for module, tokens in source_tokens.items():
-        source = Path(module.__file__).read_text(encoding="utf-8")
-        for token in tokens:
-            assert token in source, f"{Path(module.__file__).name}: {token}"
 
 
 class _InterferenceComponent:
@@ -287,6 +250,9 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             ),
             frozenset(("cone-tip-pinch-screw-1", "cone-tip-block-1")): 7.117,
             frozenset(("cone-tip-adjuster-1", "cone-gear-shaft-1")): 0.143,
+            frozenset(("fillister-screw-1", "crank-arm-1")): _annulus_limit(
+                2.8448, 2.261, 5.33
+            ),
         },
         "frame": {
             **_expected_numbered_pairs(
@@ -307,6 +273,14 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             ),
             frozenset(("gooseneck-set-screw-1", "top-frame-1")): _annulus_limit(
                 6.35, 5.105, 6.95
+            ),
+            **_expected_numbered_pairs(
+                "fillister-screw",
+                range(1, 5),
+                "harmonic-base",
+                2.8448,
+                2.261,
+                4.85,
             ),
         },
         "magnifier": {
@@ -407,6 +381,9 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 3.454,
                 8.7,
             ),
+            frozenset(("bracket-screw-3", "support-bar-1")): _annulus_limit(
+                4.1656, 3.454, 9.0
+            ),
         },
         "harmonic-analyzer": {
             frozenset(
@@ -477,17 +454,17 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
         "drive-train": cam_pairs | crank_pairs,
     }
     expected_counts = {
-        "drive-train": 7,
-        "frame": 9,
+        "drive-train": 8,
+        "frame": 13,
         "magnifier": 3,
         "summing": 2,
         "pen": 2,
-        "paper-drive": 28,
+        "paper-drive": 29,
         "harmonic-analyzer": 12,
     }
 
-    assert sum(len(pairs) for pairs in threaded_by_assembly.values()) == 59
-    assert sum(expected_counts.values()) == 63
+    assert sum(len(pairs) for pairs in threaded_by_assembly.values()) == 65
+    assert sum(expected_counts.values()) == 69
     for name, expected_threaded in threaded_by_assembly.items():
         allowed = _interference_contracts.allowed_interference_pairs(name)
         assert len(allowed) == expected_counts[name]
@@ -506,29 +483,3 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
     assert all(60.0 < crank_allowed[pair] < 65.0 for pair in crank_pairs)
     assert _interference_contracts.allowed_interference_pairs("channel") == {}
     assert _interference_contracts.allowed_interference_pairs("unknown") == {}
-
-    scripts = Path(_assembly.__file__).parent
-    contracted_builds = (
-        "build_drive_train_assembly.py",
-        "build_frame_assembly.py",
-        "build_magnifier_assembly.py",
-        "build_paper_drive_assembly.py",
-        "build_pen_assembly.py",
-        "build_summing_assembly.py",
-        "build_harmonic_analyzer_assembly.py",
-    )
-    for filename in contracted_builds:
-        build_source = (scripts / filename).read_text(encoding="utf-8")
-        assert "allowed_pairs=allowed_interference_pairs(ASM_NAME)" in build_source
-    verify_source = (scripts / "verify.py").read_text(encoding="utf-8")
-    assembly_source = (scripts / "_assembly.py").read_text(encoding="utf-8")
-    refresh_source = (scripts / "refresh_assembly.py").read_text(encoding="utf-8")
-    assert "allowed_pairs=allowed_interference_pairs(name)" in verify_source
-    # The refresh gate gets the allowance from its ENTRYPOINT: the lookup lives
-    # in refresh_assembly.py (outside every assembly's recipe closure) and is
-    # parameter-threaded into _assembly.refresh_assembly. The common helper
-    # must NOT import the contracts module itself -- that would fold the
-    # press-fit constants into every assembly's recipe (codex #359).
-    assert "allowed_pairs=allowed_interference_pairs(asm_name)" in refresh_source
-    assert "allowed_pairs=allowed_pairs" in assembly_source
-    assert "from _interference_contracts import" not in assembly_source

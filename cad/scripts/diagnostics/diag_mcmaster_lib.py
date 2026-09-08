@@ -31,6 +31,7 @@ from __future__ import annotations
 import json
 import math
 import sys
+from contextlib import contextmanager
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -69,7 +70,8 @@ def vendor_truth(part_no: str) -> dict:
     path = REPORTS_DIR / f"mcmaster-{part_no}-dump.json"
     if not path.exists():
         raise FileNotFoundError(
-            f"no harvest for {part_no}: run diag_dump_part.py first ({path})")
+            f"no harvest for {part_no}: run diag_dump_part.py first ({path})"
+        )
     return json.loads(path.read_text(encoding="utf-8"))
 
 
@@ -88,8 +90,10 @@ def mass_properties(adapter) -> dict:
     return {
         "volume_mm3": round(float(_read_member(mp, "Volume")) * 1e9, 4),
         "surface_mm2": round(float(_read_member(mp, "SurfaceArea")) * 1e6, 4),
-        "com_mm": [round(float(v) * 1000.0, 6)
-                   for v in (_read_member(mp, "CenterOfMass") or [])],
+        "com_mm": [
+            round(float(v) * 1000.0, 6)
+            for v in (_read_member(mp, "CenterOfMass") or [])
+        ],
     }
 
 
@@ -114,15 +118,21 @@ async def export_views(adapter, stem: str) -> dict[str, str]:
     out = {}
     for view in ("front", "isometric"):
         img = (OUT_DIR / f"{stem}_{view}.png").resolve()
-        check(f"export_image {stem} {view}", await adapter.export_image({
-            "file_path": str(img), "format_type": "png",
-            "width": 1600, "height": 1000, "view_orientation": view,
-        }))
+        check(
+            f"export_image {stem} {view}",
+            await adapter.export_image(
+                {
+                    "file_path": str(img),
+                    "format_type": "png",
+                    "width": 1600,
+                    "height": 1000,
+                    "view_orientation": view,
+                }
+            ),
+        )
         out[view] = str(img)
     return out
 
-
-from contextlib import contextmanager
 
 # swUserPreferenceToggle_e (values read from swconst.tlb on this install)
 _SW_SKETCH_AUTOMATIC_RELATIONS = 9
@@ -141,8 +151,10 @@ def no_sketch_inference(adapter):
     toggles off.  (AddToDB also suppresses snapping but leaves contours
     the boss revolve rejects.)"""
     app = adapter.swApp
-    prev = [bool(app.GetUserPreferenceToggle(t))
-            for t in (_SW_SKETCH_AUTOMATIC_RELATIONS, _SW_SKETCH_INFERENCE)]
+    prev = [
+        bool(app.GetUserPreferenceToggle(t))
+        for t in (_SW_SKETCH_AUTOMATIC_RELATIONS, _SW_SKETCH_INFERENCE)
+    ]
     app.SetUserPreferenceToggle(_SW_SKETCH_AUTOMATIC_RELATIONS, False)
     app.SetUserPreferenceToggle(_SW_SKETCH_INFERENCE, False)
     try:
@@ -212,8 +224,14 @@ def split_at_plane(adapter, plane_name: str, feature_name: str) -> list[dict]:
     return out
 
 
-def thread_sweep_cut(adapter, profile: str, path: str, body_name: str | None,
-                     feature_name: str, tangency: tuple[int, int] = (1, 1)):
+def thread_sweep_cut(
+    adapter,
+    profile: str,
+    path: str,
+    body_name: str | None,
+    feature_name: str,
+    tangency: tuple[int, int] = (1, 1),
+):
     """The decoded vendor Cut-Sweep: obsolete ``InsertCutSwept5`` with the
     profile at mark 1, the helix at mark 4 and (optionally) an explicit
     SOLIDBODY scope -- the modern CreateDefinition path fails body-scoped
@@ -237,24 +255,31 @@ def thread_sweep_cut(adapter, profile: str, path: str, body_name: str | None,
     ):
         raise RuntimeError(f"cannot select body {body_name!r} for scope")
     feature_manager = _flag_feature_methods(
-        model.FeatureManager, "IFeatureManager", "InsertCutSwept5")
+        model.FeatureManager, "IFeatureManager", "InsertCutSwept5"
+    )
     with _telemetry.span("feature.thread_sweep_cut", label=feature_name):
         swept = feature_manager.InsertCutSwept5(
             False,  # Propagate
-            True,   # Alignment (vendor AlignWithEndFaces=True)
-            0,      # TwistCtrlOption: swTwistControlFollowPath
+            True,  # Alignment (vendor AlignWithEndFaces=True)
+            0,  # TwistCtrlOption: swTwistControlFollowPath
             False,  # KeepTangency
             False,  # BAdvancedSmoothing
             *tangency,  # Start/EndMatchingType (per-part vendor value)
-            False, 0.0, 0.0, 0,  # thin body
-            10,     # PathAlign: swMinimumTwist (vendor PathAlignmentType)
-            scoped,          # UseFeatScope
-            not scoped,      # UseAutoSelect
-            0.0,    # TwistAngle
-            True,   # BMergeSmoothFaces
-            False, False, False,  # assembly scope
-            False, 0.0,  # CircularProfile
-            -1,     # Direction (vendor)
+            False,
+            0.0,
+            0.0,
+            0,  # thin body
+            10,  # PathAlign: swMinimumTwist (vendor PathAlignmentType)
+            scoped,  # UseFeatScope
+            not scoped,  # UseAutoSelect
+            0.0,  # TwistAngle
+            True,  # BMergeSmoothFaces
+            False,
+            False,
+            False,  # assembly scope
+            False,
+            0.0,  # CircularProfile
+            -1,  # Direction (vendor)
         )
     model.ClearSelection2(True)
     if swept is None:
@@ -263,8 +288,7 @@ def thread_sweep_cut(adapter, profile: str, path: str, body_name: str | None,
     return swept
 
 
-def thread_sweep_cut_modern(adapter, profile: str, path: str,
-                            feature_name: str):
+def thread_sweep_cut_modern(adapter, profile: str, path: str, feature_name: str):
     """Modern sweep-cut authoring: CreateDefinition(swFmSweepCut) with the
     vendor's exact read-back option values, then CreateFeature.  The
     obsolete InsertCutSwept5 under-removes ~0.4% of the groove volume vs
@@ -279,8 +303,7 @@ def thread_sweep_cut_modern(adapter, profile: str, path: str,
     SW_FM_SWEEP_CUT = 18  # swFeatureNameID_e.swFmSweepCut
     model = adapter.currentModel
     fm = model.FeatureManager
-    data = _early_bound(fm.CreateDefinition(SW_FM_SWEEP_CUT),
-                        "ISweepFeatureData")
+    data = _early_bound(fm.CreateDefinition(SW_FM_SWEEP_CUT), "ISweepFeatureData")
     model.ClearSelection2(True)
     if not _select_named_feature(adapter, profile, 1, False):
         raise RuntimeError(f"cannot select sweep profile {profile!r} (mark 1)")
@@ -288,8 +311,8 @@ def thread_sweep_cut_modern(adapter, profile: str, path: str,
         raise RuntimeError(f"cannot select sweep path {path!r} (mark 4)")
     # Vendor Cut-Sweep option set (read off their feature data).
     data.AlignWithEndFaces = True
-    data.TwistControlType = 0       # swTwistControlFollowPath
-    data.PathAlignmentType = 10     # swMinimumTwist
+    data.TwistControlType = 0  # swTwistControlFollowPath
+    data.PathAlignmentType = 10  # swMinimumTwist
     data.Direction = -1
     data.MergeSmoothFaces = True
     data.MaintainTangency = False
@@ -297,13 +320,13 @@ def thread_sweep_cut_modern(adapter, profile: str, path: str,
     data.StartTangencyType = 1
     data.EndTangencyType = 1
     data.AutoSelect = True
-    with _telemetry.span("feature.thread_sweep_cut_modern",
-                         label=feature_name):
+    with _telemetry.span("feature.thread_sweep_cut_modern", label=feature_name):
         swept = fm.CreateFeature(data)
     model.ClearSelection2(True)
     if swept is None:
-        raise RuntimeError(f"CreateFeature (sweep cut) returned None for "
-                           f"{feature_name}")
+        raise RuntimeError(
+            f"CreateFeature (sweep cut) returned None for {feature_name}"
+        )
     name_last_feature(adapter, feature_name)
     return swept
 
@@ -320,7 +343,8 @@ def combine_union(adapter, feature_name: str = "BodyUnion"):
         raise RuntimeError(f"combine needs >=2 bodies, got {len(bl)}")
     model.ClearSelection2(True)
     comb = model.FeatureManager.InsertCombineFeature(
-        SW_BODY_ADD, None,
+        SW_BODY_ADD,
+        None,
         VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_DISPATCH, bl),
     )
     if comb is None:
@@ -329,16 +353,24 @@ def combine_union(adapter, feature_name: str = "BodyUnion"):
     return comb
 
 
-def insert_helix(adapter, pitch_mm: float, revolutions: float, *,
-                 clockwise: bool = True, reversed_dir: bool = False,
-                 start_angle_rad: float, feature_name: str):
+def insert_helix(
+    adapter,
+    pitch_mm: float,
+    revolutions: float,
+    *,
+    clockwise: bool = True,
+    reversed_dir: bool = False,
+    start_angle_rad: float,
+    feature_name: str,
+):
     """InsertHelix on the ACTIVE sketch (it consumes it)."""
     from _common import name_last_feature
 
     adapter.currentModel.InsertHelix(
         reversed_dir,
         clockwise,
-        False, False,  # Tapered / Outward
+        False,
+        False,  # Tapered / Outward
         0,  # swHelixDefinedByPitchAndRevolution
         0.0,  # Height (derived)
         pitch_mm / 1000.0,
@@ -376,8 +408,11 @@ async def gate_and_save(adapter, part_no: str, truth: dict) -> dict:
     com_map = getattr(adapter, "_mcm_com_map", None)
     exp_com = com_map(v_com) if com_map else v_com
 
-    deltas = ([round(a - b, 4) for a, b in zip(areas, v_faces)]
-              if len(areas) == len(v_faces) else None)
+    deltas = (
+        [round(a - b, 4) for a, b in zip(areas, v_faces)]
+        if len(areas) == len(v_faces)
+        else None
+    )
     top_k = sorted(areas)[-FACE_TOP_K:]
     v_top_k = sorted(v_faces)[-FACE_TOP_K:]
     report = {
@@ -408,10 +443,12 @@ async def gate_and_save(adapter, part_no: str, truth: dict) -> dict:
     mass_problems = []
     if abs(report["volume_delta"]) > vol_tol:
         mass_problems.append(
-            f"volume delta {report['volume_delta']:+.4f} mm^3 (tol {vol_tol:.4f})")
+            f"volume delta {report['volume_delta']:+.4f} mm^3 (tol {vol_tol:.4f})"
+        )
     if abs(report["surface_delta"]) > surf_tol:
         mass_problems.append(
-            f"surface delta {report['surface_delta']:+.4f} mm^2 (tol {surf_tol:.4f})")
+            f"surface delta {report['surface_delta']:+.4f} mm^2 (tol {surf_tol:.4f})"
+        )
     problems.extend(mass_problems)
     if len(areas) != len(v_faces):
         problems.append(f"face count {len(areas)} != vendor {len(v_faces)}")
@@ -419,19 +456,16 @@ async def gate_and_save(adapter, part_no: str, truth: dict) -> dict:
         face_tol = max(0.06, max(v_faces) * 1e-3)
         worst = max(abs(d) for d in deltas)
         if worst > face_tol:
-            problems.append(
-                f"face area max delta {worst:.4f} (tol {face_tol:.4f})")
+            problems.append(f"face area max delta {worst:.4f} (tol {face_tol:.4f})")
     else:
         face_tol = max(0.06, max(v_faces) * 1e-3)
-        worst = max(
-            abs(a - b) for a, b in zip(top_k, v_top_k, strict=True))
+        worst = max(abs(a - b) for a, b in zip(top_k, v_top_k, strict=True))
         if worst > face_tol:
             problems.append(
-                f"top-{FACE_TOP_K} face area max delta {worst:.4f} "
-                f"(tol {face_tol:.4f})")
+                f"top-{FACE_TOP_K} face area max delta {worst:.4f} (tol {face_tol:.4f})"
+            )
     com = props["com_mm"]
-    if com and exp_com and any(
-            abs(a - b) > 0.02 for a, b in zip(com, exp_com)):
+    if com and exp_com and any(abs(a - b) > 0.02 for a, b in zip(com, exp_com)):
         problems.append(f"COM {com} != expected {exp_com}")
 
     # Save FIRST so a gate failure still leaves the model on disk to inspect.
@@ -448,21 +482,27 @@ async def gate_and_save(adapter, part_no: str, truth: dict) -> dict:
     # both bodies to STL and compare trimesh volume/area, which is
     # integrator-independent (the 92865A585 pair agrees to 1e-4 mm^3).
     vendor_selfincons = abs(sum(v_faces) - v_surf)
-    if (mass_problems and len(mass_problems) == len(problems)
-            and vendor_selfincons > max(0.10, v_surf * 1e-4)):
+    if (
+        mass_problems
+        and len(mass_problems) == len(problems)
+        and vendor_selfincons > max(0.10, v_surf * 1e-4)
+    ):
         _telemetry.warn(
             f"{part_no}: vendor mass block self-inconsistent by "
-            f"{vendor_selfincons:.4f} mm^2 -- arbitrating via STL")
+            f"{vendor_selfincons:.4f} mm^2 -- arbitrating via STL"
+        )
         import trimesh
+
         rep_stl = OUT_DIR / f"{part_no}-replica.stl"
         ven_stl = OUT_DIR / f"{part_no}-vendor.stl"
         # export each from a FRESH open -- exporting the live session doc
         # produced a truncated mesh (stale selection state)
         await close_all(adapter)
-        for src, dst in ((replica, rep_stl),
-                         (MCMASTER_DIR / f"{part_no}.SLDPRT", ven_stl)):
-            check(f"open for STL {src.name}",
-                  await adapter.open_model(str(src)))
+        for src, dst in (
+            (replica, rep_stl),
+            (MCMASTER_DIR / f"{part_no}.SLDPRT", ven_stl),
+        ):
+            check(f"open for STL {src.name}", await adapter.open_model(str(src)))
             m = _early_bound(adapter.currentModel, "IModelDoc2")
             m.ClearSelection2(True)
             if m.SaveAs3(str(dst), 0, 2) not in (0, True):
@@ -482,27 +522,32 @@ async def gate_and_save(adapter, part_no: str, truth: dict) -> dict:
             _telemetry.warn(
                 f"{part_no}: STL arbitration PASSED "
                 f"(dv {stl_dv:+.4f} mm^3, da {stl_da:+.4f} mm^2) -- "
-                f"vendor mass block overruled")
+                f"vendor mass block overruled"
+            )
             problems = [p for p in problems if p not in mass_problems]
         else:
             problems.append(
-                f"STL arbitration failed too: dv {stl_dv:+.4f}, da {stl_da:+.4f}")
+                f"STL arbitration failed too: dv {stl_dv:+.4f}, da {stl_da:+.4f}"
+            )
         report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
 
     if problems:
         raise RuntimeError(
-            f"{part_no} replica differs from vendor: " + "; ".join(problems))
+            f"{part_no} replica differs from vendor: " + "; ".join(problems)
+        )
     _telemetry.success(
         f"{part_no} replica matches vendor: volume {props['volume_mm3']:.4f} "
         f"mm^3 (vendor {v_vol}), {len(areas)} faces "
-        f"[{report['face_gate']} gate]")
+        f"[{report['face_gate']} gate]"
+    )
     return artefacts
 
 
 async def close_all(adapter):
     """Discard every open document (the vendor part is NEVER saved)."""
     closed = adapter._attempt(
-        lambda: adapter.swApp.CloseAllDocuments(True), default=False)
+        lambda: adapter.swApp.CloseAllDocuments(True), default=False
+    )
     if not closed:
         raise RuntimeError("CloseAllDocuments failed")
     adapter.currentModel = None
@@ -512,8 +557,10 @@ async def render_vendor(adapter, part_no: str) -> dict[str, str]:
     """Open the vendor part read-only for the eyeball pair, render, close."""
     vendor = MCMASTER_DIR / f"{part_no}.SLDPRT"
     check(f"open vendor {part_no}", await adapter.open_model(str(vendor)))
-    out = {f"vendor_{k}": p
-           for k, p in (await export_views(adapter, f"{part_no}-vendor")).items()}
+    out = {
+        f"vendor_{k}": p
+        for k, p in (await export_views(adapter, f"{part_no}-vendor")).items()
+    }
     await close_all(adapter)
     return out
 

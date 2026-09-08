@@ -12,7 +12,7 @@ _EXPECTED = {
     "cone-pivot-screw": (("91829A560",), "MHA-094", 1),
     "cone-tip-adjuster": (("94025A150",), "MHA-097", 1),
     "cone-tip-pinch-screw": (("90280A108",), "MHA-098", 1),
-    "fillister-screw": (("90114A511",), "MHA-030", 22),
+    "fillister-screw": (("90114A511",), "MHA-030", 27),
     "foot-screw": (("90280A108",), "MHA-103", 3),
     "frame-side-screw": (("90280A194",), "MHA-117", 6),
     "gooseneck-set-screw": (("91410A538",), "MHA-118", 1),
@@ -24,7 +24,7 @@ _EXPECTED = {
     "slotted-screw": (("90280A199",), "MHA-101", 4),
     "swing-stop-screw": (("90280A196",), "MHA-095", 1),
     "thumb-screw": (("91882A221",), "MHA-075", 2),
-    "knife-hanger-washer": (("90126A211",), "MHA-121", 2),
+    "knife-hanger-washer": (("90126A211",), "MHA-131", 2),
 }
 
 

@@ -47,6 +47,8 @@ from build_harmonic_base import (
     FOOT_SCREW_XZ,
     HOLE_DIA,
     HOLE_XZ,
+    LOCK_KNOB_XZ,
+    LOCK_SCREW_HOLE_DIA,
     NAMEPLATE_SCREW_HOLE_DIA,
     NAMEPLATE_SCREW_XZ,
     PIVOT_SCREW_HOLE_DIA,
@@ -137,9 +139,9 @@ ALL_HOLES = (
     (*STOP_SCREW_XZ, STOP_SCREW_HOLE_DIA),
     *((x, z, BLOCK_SCREW_HOLE_DIA) for x, z in BLOCK_SCREW_XZ),
     *((x, z, FOOT_SCREW_HOLE_DIA) for x, z in FOOT_SCREW_XZ),
-    # Appended LAST so hole_entities[8] (the tapped-position FCF's block-hole
-    # anchor) keeps its index.
+    # Keep later seat groups after the existing FCF anchors.
     *((x, z, NAMEPLATE_SCREW_HOLE_DIA) for x, z in NAMEPLATE_SCREW_XZ),
+    (*LOCK_KNOB_XZ, LOCK_SCREW_HOLE_DIA),
 )
 
 
@@ -341,8 +343,8 @@ async def build(adapter: Any) -> dict[str, str]:
     datum_a_edge, top_pad_edge = _visible_side_datum_edges(adapter, side)
 
     # One complete hole table: four underside counterbores followed by every
-    # top-side blind swing/pinion seat. Non-basic X/Y headers let the title-block
-    # tolerance govern A1-A4; note 4 supplies the tighter seat-only tolerance.
+    # top-side blind tapped seat. Basic locations use the family-specific
+    # position tolerances below.
     insert_hole_table(
         adapter,
         top,
@@ -351,8 +353,7 @@ async def build(adapter: Any) -> dict[str, str]:
         datum_axes=(datum_b_edge, datum_c_edge),
         hole_entities=hole_entities,
         # Every printed LOC is re-derived from the shared stations: X from the
-        # C face (x = -L/2), Y from the B face (z = +W/2) -- proven against
-        # the seat (A1 stop, B1 pivot, E1-E4 lags all exact).
+        # C face (x = -L/2), Y from the B face (z = +W/2).
         expected_locations_mm=tuple(
             (x + BOTTOM_LENGTH / 2.0, BOTTOM_WIDTH / 2.0 - z)
             for x, z, _diameter in ALL_HOLES
@@ -399,7 +400,7 @@ async def build(adapter: Any) -> dict[str, str]:
         tolerance=GEOMETRIC_TOLERANCES_MM["through-hole true position"],
         datums=("A", "B", "C"),
         diameter=True,
-        quantity="E1-E4 DIA 13 THRU",
+        quantity="4X DIA 13 THRU",
         label="through-hole true position",
         entity=hole_entities[2],
     )
@@ -411,10 +412,8 @@ async def build(adapter: Any) -> dict[str, str]:
         tolerance=GEOMETRIC_TOLERANCES_MM["tapped-hole true position"],
         datums=("A", "B", "C"),
         diameter=True,
-        # Tag letters follow each wizard group's first hole in XY order
-        # (swHoleTableTagOrder_XY): A stop, B pivot, C foot, D block, E lags,
-        # F the nameplate seats at x 163.75/209.75 (the east-most group).
-        quantity="A1, B1, C1-C3, D1-D4, F1-F4",
+        # Native tag letters may change when a seat group is added.
+        quantity="ALL BLIND TAPPED HOLES",
         label="tapped-hole true position",
         entity=hole_entities[8],
     )

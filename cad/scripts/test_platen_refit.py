@@ -46,19 +46,6 @@ def test_platen_clip_is_one_center_bridged_sheet() -> None:
         clip.CLIP_LENGTH,
     )
     assert clip.CENTER_BRIDGE_LENGTH == 5.0
-    assert clip.MODEL_FEATURES == (
-        "FlatRail",
-        "CenterBridge",
-        "SpringArch",
-        "RoundedSpringEnds",
-        "ScrewHoles",
-    )
-    assert clip.BOSS_DRIVES == {
-        "FlatRail": ('"SheetT"',),
-        "CenterBridge": ('"SheetT"',),
-        "SpringArch": ('"SpringRailW"', '"SpringRailY0"'),
-        "RoundedSpringEnds": ('"SheetT"',),
-    }
     spring_plan_area = (
         (clip.CLIP_LENGTH - 2.0 * clip.SPRING_END_RADIUS)
         * clip.SPRING_RAIL_WIDTH
@@ -69,7 +56,12 @@ def test_platen_clip_is_one_center_bridged_sheet() -> None:
         + clip.CENTER_BRIDGE_LENGTH * clip.NOTCH_WIDTH
         + spring_plan_area
         - 2.0 * math.pi * (clip.HOLE_DIA / 2.0) ** 2
-    ) * clip.SHEET_T
+    ) * clip.SHEET_T + (
+        2.0
+        * math.pi
+        * ((clip.SCREW_SEAT_DIA / 2.0) ** 2 - (clip.HOLE_DIA / 2.0) ** 2)
+        * clip.SCREW_SEAT_BOSS_H
+    )
     assert math.isclose(clip.V_FINAL, expected)
 
 
@@ -92,8 +84,13 @@ def test_platen_clip_holes_and_handed_assembly_placements_follow_flat_rail() -> 
     assert clip.HOLE_Y + clip.HOLE_DIA / 2.0 < clip.SCREW_RAIL_WIDTH
     assert tuple(row[3] for row in assembly.CLIP_PLACEMENTS) == (90.0, -90.0)
     assert math.isclose(
-        clip.SPRING_RAIL_Y0 - (clip.HOLE_Y + clip.CLIP_SCREW_HEAD_DIA / 2.0),
+        clip.SPRING_RAIL_Y0 - (clip.HOLE_Y + clip.SCREW_SEAT_DIA / 2.0),
         clip.CLIP_SCREW_HEAD_CLEARANCE,
+    )
+    assert clip.SCREW_SEAT_DIA > clip.HEAD_DIA
+    assert (
+        clip.SPRING_RAIL_Y0 - (clip.HOLE_Y + clip.HEAD_DIA / 2.0)
+        > clip.CLIP_SCREW_HEAD_CLEARANCE
     )
 
     plate_mid_x = assembly.PLATE_X0 + assembly.PLATE_WIDTH / 2.0

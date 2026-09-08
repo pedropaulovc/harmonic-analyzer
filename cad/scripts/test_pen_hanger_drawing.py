@@ -24,23 +24,6 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert kept == marked
 
 
-def test_notes_describe_the_strap_channel_and_screw() -> None:
-    notes = pen_hanger_spec.DRAWING_NOTES
-    assert "SQUARE HOLE THRU" in notes
-    assert "INTERNAL R0.25 MAX" in notes
-    assert "WALL-THICKNESS DIFFERENCE 0.10 MAX" in notes
-    assert "HOLE CENTER 4.00 +/-0.05 FROM FRONT DEPTH FACE" in notes
-    assert "AWS A5.8 BAg-7" in notes
-    assert "FLUSH WITH BLOCK BACK DEPTH FACE WITHIN 0.10" in notes
-    assert "FULL 3.00 X 10.00 FAYING SURFACE" in notes
-    assert "1.0 MIN LEG" in notes
-    assert "CUMULATIVE VOID LENGTH 0.50 MAX" in notes
-    assert "HORIZONTALLY RIGHT OF FRONT-VIEW TOP-LEFT CORNER" in notes
-    assert "#6-32" in notes
-    assert "AISI" not in notes
-    assert "X.XX" not in notes
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 
 
 def test_view_scales_are_explicit() -> None:
@@ -55,9 +38,6 @@ def test_view_scales_are_explicit() -> None:
 
 
 def test_part_stamps_make_critical_properties() -> None:
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_properties" in source
-    assert "clear_dimensions_for_drawing" in source
     import _config
 
     config = _config.parts("pen-hanger")

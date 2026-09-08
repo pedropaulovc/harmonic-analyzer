@@ -76,6 +76,9 @@ import sys
 import tempfile
 import time
 from pathlib import Path
+import yaml as _yaml
+from doit.dependency import CHECKERS, Dependency, JsonDB, MD5Checker
+from filelock import FileLock, Timeout  # noqa: E402
 
 # Every build/verify/export task routes its subprocess through ``_run``, which
 # streams the child's stdout through this doit parent process -- and tees it to
@@ -89,9 +92,6 @@ for _stream in (sys.stdout, sys.stderr):
     if _reconfigure is not None:
         _reconfigure(encoding="utf-8", errors="replace")
 
-import yaml as _yaml
-from doit.dependency import CHECKERS, Dependency, JsonDB, MD5Checker
-from filelock import FileLock, Timeout  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "cad" / "scripts"))
 
@@ -751,17 +751,23 @@ def _sw_commit_gb() -> float | None:
         kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
         kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
         psapi.GetProcessMemoryInfo.argtypes = [
-            wintypes.HANDLE, ctypes.POINTER(_MemoryCountersEx), wintypes.DWORD,
+            wintypes.HANDLE,
+            ctypes.POINTER(_MemoryCountersEx),
+            wintypes.DWORD,
         ]
         total = 0
         for pid in pids:
-            handle = kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+            handle = kernel32.OpenProcess(
+                0x1000, False, pid
+            )  # PROCESS_QUERY_LIMITED_INFORMATION
             if not handle:
                 continue
             try:
                 counters = _MemoryCountersEx()
                 counters.cb = ctypes.sizeof(counters)
-                if psapi.GetProcessMemoryInfo(handle, ctypes.byref(counters), counters.cb):
+                if psapi.GetProcessMemoryInfo(
+                    handle, ctypes.byref(counters), counters.cb
+                ):
                     total += int(counters.PrivateUsage)
             finally:
                 kernel32.CloseHandle(handle)
@@ -795,7 +801,9 @@ def _sw_preflight() -> None:
             commit_gb=round(commit, 1),
             budget_gb=budget,
         )
-        _telemetry.event("sw.memory_restart", commit_gb=round(commit, 1), budget_gb=budget)
+        _telemetry.event(
+            "sw.memory_restart", commit_gb=round(commit, 1), budget_gb=budget
+        )
         state = _sw_lifecycle.force_recover()
         if state != _sw_lifecycle.CONNECTED_STATE:
             state = _sw_lifecycle.wait_until_ready()
@@ -2339,7 +2347,10 @@ def task_check():
                 *module_deps_of(SCRIPTS_DIR / "test_dxf_text.py"),
                 str(
                     (
-                        REPO_ROOT / "cad" / "references" / "measuring-stick-numerals.dxf"
+                        REPO_ROOT
+                        / "cad"
+                        / "references"
+                        / "measuring-stick-numerals.dxf"
                     ).resolve()
                 ),
             ],

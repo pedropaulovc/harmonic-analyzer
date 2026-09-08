@@ -9,13 +9,13 @@ from _fastener_catalog import fastener
 from _holes import TAP_DRILL_MM
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
 from diagnostics.diag_build_91829A560 import (
-    HEAD_DIA,
+    HEAD_DIA as HEAD_DIA,
     HEAD_T,
-    SHOULDER_DIA,
-    SHOULDER_LEN,
+    SHOULDER_DIA as SHOULDER_DIA,
+    SHOULDER_LEN as SHOULDER_LEN,
     THREAD_LEN,
     THREAD_MAJOR,
-    UNDERHEAD_LEN,
+    UNDERHEAD_LEN as UNDERHEAD_LEN,
     build_91829A560,
 )
 

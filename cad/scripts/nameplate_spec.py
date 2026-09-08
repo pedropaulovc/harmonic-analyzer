@@ -1,7 +1,6 @@
 r"""Pure-data contract shared by the nameplate, its base seats and the frame.
 
-PURE DATA, no SolidWorks/COM imports (the ``harmonic_base_spec`` /
-``fillister_screw_spec`` split). Three scripts read it and none may import the
+PURE DATA, no SolidWorks/COM imports. Three scripts read it and none may import the
 others:
 
 * ``build_nameplate`` -- the plate envelope and its four corner screw stations
@@ -92,4 +91,6 @@ MOUNT_HOLE_XZ = tuple(
 if MOUNT_NORMAL != (0.0, 1.0, 0.0):
     raise AssertionError(f"nameplate does not lie flat face-up: normal {MOUNT_NORMAL}")
 if any(abs(mount_point((x, y, 0.0))[1] - MOUNT_FRONT_Y) > 1e-12 for x, y in SCREW_XY):
-    raise AssertionError("nameplate screw stations are not coplanar with the front face")
+    raise AssertionError(
+        "nameplate screw stations are not coplanar with the front face"
+    )

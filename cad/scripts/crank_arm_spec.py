@@ -63,8 +63,9 @@ DIMPLE_X = 30.0  # on the arm near the boss (low)
 ANCHOR_SCREW_X = 20.0  # along the arm from the shaft axis (low)
 ANCHOR_SCREW_Y = 4.5  # off the arm centreline toward the local +y edge (machine -X
 # once placed; low). Kept POSITIVE: a driven placement dim is a magnitude.
-ANCHOR_THREAD_DEPTH = 5.0  # #4-40 tap thread in the 8 plate
-ANCHOR_DRILL_DEPTH = 6.5  # tap-drill depth: 1.5 wall left on the back face
+ANCHOR_THREAD_DEPTH = 5.5  # full #4-40 thread for 5.33 stock-screw insertion
+ANCHOR_DRILL_DEPTH = 6.5  # cylindrical depth; bottoming tap leaves 1.0 lead room
+# The 118-degree drill point extends another 0.679: back-face wall is 0.821.
 
 SURFACE_FINISHES = (
     SurfaceFinishControl("shaft_bore", MACHINED_UM, CylinderFace(SHAFT_BORE_DIA)),
@@ -98,7 +99,8 @@ DRAWING_NOTES = "\n".join(
         "CROSS-HOLE AXIS INTERSECTS DATUM AXIS B.",
         "DIMPLE: <MOD-DIAM>8 FLAT-BOTTOM, 0.50 +0.20/-0.10 DEEP; LOCATION +/-0.25.",
         "DIMPLE AND ANCHOR TAP ON THE HANDLE-SIDE (FRONT) FACE.",
-        "ANCHOR TAP: #4-40 UNC-2B X 5.0 DEEP, DRILL 6.5 DEEP (DO NOT BREAK THROUGH).",
+        f"ANCHOR TAP: #4-40 UNC-2B X {ANCHOR_THREAD_DEPTH:.1f} FULL THREAD DEEP; BOTTOMING TAP.",
+        f"ANCHOR DRILL: {ANCHOR_DRILL_DEPTH:.1f} DEEP (DO NOT BREAK THROUGH).",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

@@ -92,6 +92,10 @@ _ADJUSTER_THRUST_GATE_LIMIT_MM3 = 0.13 * 1.10
 _DRIVE_TRAIN_ALLOWED_PAIRS = {
     frozenset(("crank-pin-1", "crank-arm-1")): 1.10 * _CRANK_PIN_ARM_MM3,
     frozenset(("crank-pin-1", "crankshaft-1")): 1.10 * _CRANK_PIN_SHAFT_MM3,
+    # Stock 6.35 shank minus the 1.0 eye wire and 0.02 face clearance.
+    frozenset(("fillister-screw-1", "crank-arm-1")): _smooth_annulus_limit_mm3(
+        2.8448, 2.261, 5.33
+    ),
     frozenset(("pinion-bracket-1", "pinion-cam-pin-1")): _CAM_PIN_GATE_LIMIT_MM3,
     frozenset(("pinion-bracket-2", "pinion-cam-pin-2")): _CAM_PIN_GATE_LIMIT_MM3,
     frozenset(("cone-tip-adjuster-1", "cone-tip-block-1")): _smooth_annulus_limit_mm3(
@@ -212,6 +216,10 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
         range(1, 3),
         "support-bar",
         _smooth_annulus_limit_mm3(4.1656, 3.454, 8.7),
+    ),
+    # The front latch uses the third stock screw through the support bar's 9-mm tap.
+    frozenset(("bracket-screw-3", "support-bar-1")): _smooth_annulus_limit_mm3(
+        4.1656, 3.454, 9.0
     ),
 }
 
