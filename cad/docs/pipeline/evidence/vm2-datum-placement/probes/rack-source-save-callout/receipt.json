@@ -1,0 +1,1530 @@
+{
+  "kind": "vm2-rack-reference-save-cause",
+  "mode": "callout",
+  "baseline": "C:\\src\\ha-datum-placement-main\\cad\\out\\reports\\datum-placement\\rack-fresh-source-baseline\\rack-pinion.SLDPRT",
+  "baseline_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+  "source": "C:\\src\\ha-datum-placement-main\\cad\\out\\reports\\datum-placement\\rack-source-save-callout\\rack-pinion.SLDPRT",
+  "source_sha256_initial": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+  "head": "a371f49448b9c7fb300b77152c59cb2874889657",
+  "adapter": "2269009ed56712867826516f4406afc98a0c2814",
+  "probe_sha256": "e13074e7aecda1dddc91d6252c4ea8b08d54b92257aac24790b2d0f375bd0bf4",
+  "recipe_sha256": "95043886df0142cfad60647d3dddaabba05b8c7514b1a8fde121843602599742",
+  "helper_sha256": "d64281f8509c8d1a270c22eb35871bcf5846585c9f8b9c8389d11182c7eece9d",
+  "pid": 18748,
+  "revision": "34.3.0",
+  "started_utc": "2026-09-08T03:22:28.646599+00:00",
+  "scope": "partial diagnostic, no datum or manufacturing acceptance",
+  "status": "observed_and_closed",
+  "checkpoints": [
+    {
+      "label": "before:open_model",
+      "utc": "2026-09-08T03:22:28.647658+00:00",
+      "source_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90"
+    },
+    {
+      "label": "after:open_model",
+      "utc": "2026-09-08T03:22:30.284492+00:00",
+      "source_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+      "source_dirty_before_readback": false,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [],
+      "source_dirty_after_readback": false
+    },
+    {
+      "label": "before:new_project_drawing",
+      "utc": "2026-09-08T03:22:31.066355+00:00",
+      "source_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+      "source_dirty_before_readback": false,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [],
+      "source_dirty_after_readback": false
+    },
+    {
+      "label": "before:COM:SetText",
+      "utc": "2026-09-08T03:22:33.435787+00:00",
+      "source_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+      "source_dirty_before_readback": false,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [],
+      "source_dirty_after_readback": false
+    },
+    {
+      "label": "after:COM:SetText",
+      "utc": "2026-09-08T03:22:33.799324+00:00",
+      "source_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+      "source_dirty_before_readback": false,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [],
+      "source_dirty_after_readback": false
+    },
+    {
+      "label": "after:new_project_drawing",
+      "utc": "2026-09-08T03:22:34.811979+00:00",
+      "source_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+      "source_dirty_before_readback": false,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [],
+      "source_dirty_after_readback": false,
+      "drawing_dirty": true
+    },
+    {
+      "label": "before:place_view",
+      "utc": "2026-09-08T03:22:35.217509+00:00",
+      "source_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+      "source_dirty_before_readback": false,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [],
+      "source_dirty_after_readback": false,
+      "drawing_dirty": true
+    },
+    {
+      "label": "after:place_view",
+      "utc": "2026-09-08T03:22:35.684844+00:00",
+      "source_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+      "source_dirty_before_readback": false,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [],
+      "source_dirty_after_readback": false,
+      "drawing_dirty": true
+    },
+    {
+      "label": "before:place_view",
+      "utc": "2026-09-08T03:22:36.094139+00:00",
+      "source_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+      "source_dirty_before_readback": false,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [],
+      "source_dirty_after_readback": false,
+      "drawing_dirty": true
+    },
+    {
+      "label": "after:place_view",
+      "utc": "2026-09-08T03:22:36.565572+00:00",
+      "source_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+      "source_dirty_before_readback": false,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [],
+      "source_dirty_after_readback": false,
+      "drawing_dirty": true
+    },
+    {
+      "label": "before:place_view",
+      "utc": "2026-09-08T03:22:36.950205+00:00",
+      "source_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+      "source_dirty_before_readback": false,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [],
+      "source_dirty_after_readback": false,
+      "drawing_dirty": true
+    },
+    {
+      "label": "after:place_view",
+      "utc": "2026-09-08T03:22:37.366068+00:00",
+      "source_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+      "source_dirty_before_readback": false,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [],
+      "source_dirty_after_readback": false,
+      "drawing_dirty": true
+    },
+    {
+      "label": "before:set_hidden_lines_removed",
+      "utc": "2026-09-08T03:22:37.731892+00:00",
+      "source_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+      "source_dirty_before_readback": false,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [],
+      "source_dirty_after_readback": false,
+      "drawing_dirty": true
+    },
+    {
+      "label": "after:set_hidden_lines_removed",
+      "utc": "2026-09-08T03:22:38.086289+00:00",
+      "source_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+      "source_dirty_before_readback": false,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [],
+      "source_dirty_after_readback": false,
+      "drawing_dirty": true
+    },
+    {
+      "label": "before:set_hidden_lines_removed",
+      "utc": "2026-09-08T03:22:38.460161+00:00",
+      "source_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+      "source_dirty_before_readback": false,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [],
+      "source_dirty_after_readback": false,
+      "drawing_dirty": true
+    },
+    {
+      "label": "after:set_hidden_lines_removed",
+      "utc": "2026-09-08T03:22:38.836103+00:00",
+      "source_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+      "source_dirty_before_readback": false,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [],
+      "source_dirty_after_readback": false,
+      "drawing_dirty": true
+    },
+    {
+      "label": "before:set_hidden_lines_removed",
+      "utc": "2026-09-08T03:22:39.207271+00:00",
+      "source_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+      "source_dirty_before_readback": false,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [],
+      "source_dirty_after_readback": false,
+      "drawing_dirty": true
+    },
+    {
+      "label": "after:set_hidden_lines_removed",
+      "utc": "2026-09-08T03:22:39.571436+00:00",
+      "source_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+      "source_dirty_before_readback": false,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [],
+      "source_dirty_after_readback": false,
+      "drawing_dirty": true
+    },
+    {
+      "label": "before:insert_marked_dimensions",
+      "utc": "2026-09-08T03:22:39.937498+00:00",
+      "source_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+      "source_dirty_before_readback": false,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [],
+      "source_dirty_after_readback": false,
+      "drawing_dirty": true
+    },
+    {
+      "label": "after:insert_marked_dimensions",
+      "utc": "2026-09-08T03:22:40.400779+00:00",
+      "source_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+      "source_dirty_before_readback": false,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [
+        {
+          "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+          "manufacturing": {
+            "system_value_m": 0.004999999906,
+            "tolerance_type": 2,
+            "tolerance_min_m": 2.9999999999999997e-05,
+            "tolerance_max_m": 5e-05
+          },
+          "text_above": "",
+          "text_below": "",
+          "primary_precision": -2,
+          "same_as_source_dimension": 1
+        }
+      ],
+      "source_dirty_after_readback": false,
+      "drawing_dirty": true
+    },
+    {
+      "label": "before:delete_unnamed_imports",
+      "utc": "2026-09-08T03:22:40.841037+00:00",
+      "source_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+      "source_dirty_before_readback": false,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [
+        {
+          "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+          "manufacturing": {
+            "system_value_m": 0.004999999906,
+            "tolerance_type": 2,
+            "tolerance_min_m": 2.9999999999999997e-05,
+            "tolerance_max_m": 5e-05
+          },
+          "text_above": "",
+          "text_below": "",
+          "primary_precision": -2,
+          "same_as_source_dimension": 1
+        }
+      ],
+      "source_dirty_after_readback": false,
+      "drawing_dirty": true
+    },
+    {
+      "label": "after:delete_unnamed_imports",
+      "utc": "2026-09-08T03:22:41.385246+00:00",
+      "source_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+      "source_dirty_before_readback": false,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [
+        {
+          "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+          "manufacturing": {
+            "system_value_m": 0.004999999906,
+            "tolerance_type": 2,
+            "tolerance_min_m": 2.9999999999999997e-05,
+            "tolerance_max_m": 5e-05
+          },
+          "text_above": "",
+          "text_below": "",
+          "primary_precision": -2,
+          "same_as_source_dimension": 1
+        }
+      ],
+      "source_dirty_after_readback": false,
+      "drawing_dirty": true
+    },
+    {
+      "label": "before:curate_dimensions",
+      "utc": "2026-09-08T03:22:41.853746+00:00",
+      "source_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+      "source_dirty_before_readback": false,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [
+        {
+          "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+          "manufacturing": {
+            "system_value_m": 0.004999999906,
+            "tolerance_type": 2,
+            "tolerance_min_m": 2.9999999999999997e-05,
+            "tolerance_max_m": 5e-05
+          },
+          "text_above": "",
+          "text_below": "",
+          "primary_precision": -2,
+          "same_as_source_dimension": 1
+        }
+      ],
+      "source_dirty_after_readback": false,
+      "drawing_dirty": true
+    },
+    {
+      "label": "before:COM:SetPosition",
+      "utc": "2026-09-08T03:22:42.320506+00:00",
+      "source_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+      "source_dirty_before_readback": false,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [
+        {
+          "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+          "manufacturing": {
+            "system_value_m": 0.004999999906,
+            "tolerance_type": 2,
+            "tolerance_min_m": 2.9999999999999997e-05,
+            "tolerance_max_m": 5e-05
+          },
+          "text_above": "",
+          "text_below": "",
+          "primary_precision": -2,
+          "same_as_source_dimension": 1
+        }
+      ],
+      "source_dirty_after_readback": false,
+      "drawing_dirty": true
+    },
+    {
+      "label": "after:COM:SetPosition",
+      "utc": "2026-09-08T03:22:42.753002+00:00",
+      "source_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+      "source_dirty_before_readback": false,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [
+        {
+          "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+          "manufacturing": {
+            "system_value_m": 0.004999999906,
+            "tolerance_type": 2,
+            "tolerance_min_m": 2.9999999999999997e-05,
+            "tolerance_max_m": 5e-05
+          },
+          "text_above": "",
+          "text_below": "",
+          "primary_precision": -2,
+          "same_as_source_dimension": 1
+        }
+      ],
+      "source_dirty_after_readback": false,
+      "drawing_dirty": true
+    },
+    {
+      "label": "before:COM:EditRebuild3",
+      "utc": "2026-09-08T03:22:43.162591+00:00",
+      "source_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+      "source_dirty_before_readback": false,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [
+        {
+          "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+          "manufacturing": {
+            "system_value_m": 0.004999999906,
+            "tolerance_type": 2,
+            "tolerance_min_m": 2.9999999999999997e-05,
+            "tolerance_max_m": 5e-05
+          },
+          "text_above": "",
+          "text_below": "",
+          "primary_precision": -2,
+          "same_as_source_dimension": 1
+        }
+      ],
+      "source_dirty_after_readback": false,
+      "drawing_dirty": true
+    },
+    {
+      "label": "after:COM:EditRebuild3",
+      "utc": "2026-09-08T03:22:43.653833+00:00",
+      "source_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+      "source_dirty_before_readback": false,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [
+        {
+          "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+          "manufacturing": {
+            "system_value_m": 0.004999999906,
+            "tolerance_type": 2,
+            "tolerance_min_m": 2.9999999999999997e-05,
+            "tolerance_max_m": 5e-05
+          },
+          "text_above": "",
+          "text_below": "",
+          "primary_precision": -2,
+          "same_as_source_dimension": 1
+        }
+      ],
+      "source_dirty_after_readback": false,
+      "drawing_dirty": true
+    },
+    {
+      "label": "after:curate_dimensions",
+      "utc": "2026-09-08T03:22:44.086518+00:00",
+      "source_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+      "source_dirty_before_readback": false,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [
+        {
+          "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+          "manufacturing": {
+            "system_value_m": 0.004999999906,
+            "tolerance_type": 2,
+            "tolerance_min_m": 2.9999999999999997e-05,
+            "tolerance_max_m": 5e-05
+          },
+          "text_above": "",
+          "text_below": "",
+          "primary_precision": -2,
+          "same_as_source_dimension": 1
+        }
+      ],
+      "source_dirty_after_readback": false,
+      "drawing_dirty": true
+    },
+    {
+      "label": "before:curate_dimensions",
+      "utc": "2026-09-08T03:22:44.552129+00:00",
+      "source_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+      "source_dirty_before_readback": false,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [
+        {
+          "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+          "manufacturing": {
+            "system_value_m": 0.004999999906,
+            "tolerance_type": 2,
+            "tolerance_min_m": 2.9999999999999997e-05,
+            "tolerance_max_m": 5e-05
+          },
+          "text_above": "",
+          "text_below": "",
+          "primary_precision": -2,
+          "same_as_source_dimension": 1
+        }
+      ],
+      "source_dirty_after_readback": false,
+      "drawing_dirty": true
+    },
+    {
+      "label": "before:COM:SetPosition",
+      "utc": "2026-09-08T03:22:45.021857+00:00",
+      "source_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+      "source_dirty_before_readback": false,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [
+        {
+          "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+          "manufacturing": {
+            "system_value_m": 0.004999999906,
+            "tolerance_type": 2,
+            "tolerance_min_m": 2.9999999999999997e-05,
+            "tolerance_max_m": 5e-05
+          },
+          "text_above": "",
+          "text_below": "",
+          "primary_precision": -2,
+          "same_as_source_dimension": 1
+        }
+      ],
+      "source_dirty_after_readback": false,
+      "drawing_dirty": true
+    },
+    {
+      "label": "after:COM:SetPosition",
+      "utc": "2026-09-08T03:22:45.474413+00:00",
+      "source_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+      "source_dirty_before_readback": false,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [
+        {
+          "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+          "manufacturing": {
+            "system_value_m": 0.004999999906,
+            "tolerance_type": 2,
+            "tolerance_min_m": 2.9999999999999997e-05,
+            "tolerance_max_m": 5e-05
+          },
+          "text_above": "",
+          "text_below": "",
+          "primary_precision": -2,
+          "same_as_source_dimension": 1
+        }
+      ],
+      "source_dirty_after_readback": false,
+      "drawing_dirty": true
+    },
+    {
+      "label": "before:COM:EditRebuild3",
+      "utc": "2026-09-08T03:22:45.981425+00:00",
+      "source_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+      "source_dirty_before_readback": false,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [
+        {
+          "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+          "manufacturing": {
+            "system_value_m": 0.004999999906,
+            "tolerance_type": 2,
+            "tolerance_min_m": 2.9999999999999997e-05,
+            "tolerance_max_m": 5e-05
+          },
+          "text_above": "",
+          "text_below": "",
+          "primary_precision": -2,
+          "same_as_source_dimension": 1
+        }
+      ],
+      "source_dirty_after_readback": false,
+      "drawing_dirty": true
+    },
+    {
+      "label": "after:COM:EditRebuild3",
+      "utc": "2026-09-08T03:22:46.681552+00:00",
+      "source_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+      "source_dirty_before_readback": false,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [
+        {
+          "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+          "manufacturing": {
+            "system_value_m": 0.004999999906,
+            "tolerance_type": 2,
+            "tolerance_min_m": 2.9999999999999997e-05,
+            "tolerance_max_m": 5e-05
+          },
+          "text_above": "",
+          "text_below": "",
+          "primary_precision": -2,
+          "same_as_source_dimension": 1
+        }
+      ],
+      "source_dirty_after_readback": false,
+      "drawing_dirty": true
+    },
+    {
+      "label": "after:curate_dimensions",
+      "utc": "2026-09-08T03:22:47.198331+00:00",
+      "source_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+      "source_dirty_before_readback": false,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [
+        {
+          "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+          "manufacturing": {
+            "system_value_m": 0.004999999906,
+            "tolerance_type": 2,
+            "tolerance_min_m": 2.9999999999999997e-05,
+            "tolerance_max_m": 5e-05
+          },
+          "text_above": "",
+          "text_below": "",
+          "primary_precision": -2,
+          "same_as_source_dimension": 1
+        }
+      ],
+      "source_dirty_after_readback": false,
+      "drawing_dirty": true
+    },
+    {
+      "label": "before:set_dimension_callouts",
+      "utc": "2026-09-08T03:22:47.697111+00:00",
+      "source_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+      "source_dirty_before_readback": false,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [
+        {
+          "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+          "manufacturing": {
+            "system_value_m": 0.004999999906,
+            "tolerance_type": 2,
+            "tolerance_min_m": 2.9999999999999997e-05,
+            "tolerance_max_m": 5e-05
+          },
+          "text_above": "",
+          "text_below": "",
+          "primary_precision": -2,
+          "same_as_source_dimension": 1
+        }
+      ],
+      "source_dirty_after_readback": false,
+      "drawing_dirty": true
+    },
+    {
+      "label": "before:COM:SetText",
+      "utc": "2026-09-08T03:22:48.370336+00:00",
+      "source_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+      "source_dirty_before_readback": false,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [
+        {
+          "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+          "manufacturing": {
+            "system_value_m": 0.004999999906,
+            "tolerance_type": 2,
+            "tolerance_min_m": 2.9999999999999997e-05,
+            "tolerance_max_m": 5e-05
+          },
+          "text_above": "",
+          "text_below": "",
+          "primary_precision": -2,
+          "same_as_source_dimension": 1
+        }
+      ],
+      "source_dirty_after_readback": false,
+      "drawing_dirty": true
+    },
+    {
+      "label": "after:COM:SetText",
+      "utc": "2026-09-08T03:22:49.209788+00:00",
+      "source_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+      "source_dirty_before_readback": true,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "THRU - REAM",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [
+        {
+          "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+          "manufacturing": {
+            "system_value_m": 0.004999999906,
+            "tolerance_type": 2,
+            "tolerance_min_m": 2.9999999999999997e-05,
+            "tolerance_max_m": 5e-05
+          },
+          "text_above": "",
+          "text_below": "THRU - REAM",
+          "primary_precision": -2,
+          "same_as_source_dimension": 1
+        }
+      ],
+      "source_dirty_after_readback": true,
+      "drawing_dirty": true
+    },
+    {
+      "label": "after:set_dimension_callouts",
+      "utc": "2026-09-08T03:22:49.885176+00:00",
+      "source_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+      "source_dirty_before_readback": true,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "THRU - REAM",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [
+        {
+          "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+          "manufacturing": {
+            "system_value_m": 0.004999999906,
+            "tolerance_type": 2,
+            "tolerance_min_m": 2.9999999999999997e-05,
+            "tolerance_max_m": 5e-05
+          },
+          "text_above": "",
+          "text_below": "THRU - REAM",
+          "primary_precision": -2,
+          "same_as_source_dimension": 1
+        }
+      ],
+      "source_dirty_after_readback": true,
+      "drawing_dirty": true
+    },
+    {
+      "label": "omitted:set_dimension_precision",
+      "utc": "2026-09-08T03:22:50.540461+00:00",
+      "source_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+      "source_dirty_before_readback": true,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "THRU - REAM",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [
+        {
+          "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+          "manufacturing": {
+            "system_value_m": 0.004999999906,
+            "tolerance_type": 2,
+            "tolerance_min_m": 2.9999999999999997e-05,
+            "tolerance_max_m": 5e-05
+          },
+          "text_above": "",
+          "text_below": "THRU - REAM",
+          "primary_precision": -2,
+          "same_as_source_dimension": 1
+        }
+      ],
+      "source_dirty_after_readback": true,
+      "drawing_dirty": true
+    },
+    {
+      "label": "before:auto_center_marks",
+      "utc": "2026-09-08T03:22:51.022311+00:00",
+      "source_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+      "source_dirty_before_readback": true,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "THRU - REAM",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [
+        {
+          "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+          "manufacturing": {
+            "system_value_m": 0.004999999906,
+            "tolerance_type": 2,
+            "tolerance_min_m": 2.9999999999999997e-05,
+            "tolerance_max_m": 5e-05
+          },
+          "text_above": "",
+          "text_below": "THRU - REAM",
+          "primary_precision": -2,
+          "same_as_source_dimension": 1
+        }
+      ],
+      "source_dirty_after_readback": true,
+      "drawing_dirty": true
+    },
+    {
+      "label": "after:auto_center_marks",
+      "utc": "2026-09-08T03:22:51.451050+00:00",
+      "source_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+      "source_dirty_before_readback": true,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "THRU - REAM",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [
+        {
+          "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+          "manufacturing": {
+            "system_value_m": 0.004999999906,
+            "tolerance_type": 2,
+            "tolerance_min_m": 2.9999999999999997e-05,
+            "tolerance_max_m": 5e-05
+          },
+          "text_above": "",
+          "text_below": "THRU - REAM",
+          "primary_precision": -2,
+          "same_as_source_dimension": 1
+        }
+      ],
+      "source_dirty_after_readback": true,
+      "drawing_dirty": true
+    },
+    {
+      "label": "before_datum",
+      "utc": "2026-09-08T03:23:03.559999+00:00",
+      "source_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+      "source_dirty_before_readback": true,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "THRU - REAM",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [
+        {
+          "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+          "manufacturing": {
+            "system_value_m": 0.004999999906,
+            "tolerance_type": 2,
+            "tolerance_min_m": 2.9999999999999997e-05,
+            "tolerance_max_m": 5e-05
+          },
+          "text_above": "",
+          "text_below": "THRU - REAM",
+          "primary_precision": -2,
+          "same_as_source_dimension": 1
+        }
+      ],
+      "source_dirty_after_readback": true,
+      "drawing_dirty": true
+    },
+    {
+      "label": "before:drawing_rebuild",
+      "utc": "2026-09-08T03:23:03.984690+00:00",
+      "source_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+      "source_dirty_before_readback": true,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "THRU - REAM",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [
+        {
+          "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+          "manufacturing": {
+            "system_value_m": 0.004999999906,
+            "tolerance_type": 2,
+            "tolerance_min_m": 2.9999999999999997e-05,
+            "tolerance_max_m": 5e-05
+          },
+          "text_above": "",
+          "text_below": "THRU - REAM",
+          "primary_precision": -2,
+          "same_as_source_dimension": 1
+        }
+      ],
+      "source_dirty_after_readback": true,
+      "drawing_dirty": true
+    },
+    {
+      "label": "after:drawing_rebuild",
+      "utc": "2026-09-08T03:23:04.464153+00:00",
+      "source_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+      "source_dirty_before_readback": true,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "THRU - REAM",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [
+        {
+          "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+          "manufacturing": {
+            "system_value_m": 0.004999999906,
+            "tolerance_type": 2,
+            "tolerance_min_m": 2.9999999999999997e-05,
+            "tolerance_max_m": 5e-05
+          },
+          "text_above": "",
+          "text_below": "THRU - REAM",
+          "primary_precision": -2,
+          "same_as_source_dimension": 1
+        }
+      ],
+      "source_dirty_after_readback": true,
+      "drawing_dirty": true
+    },
+    {
+      "label": "before:SaveAs3:SLDDRW",
+      "utc": "2026-09-08T03:23:04.896978+00:00",
+      "source_sha256": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90",
+      "source_dirty_before_readback": true,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "THRU - REAM",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [
+        {
+          "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+          "manufacturing": {
+            "system_value_m": 0.004999999906,
+            "tolerance_type": 2,
+            "tolerance_min_m": 2.9999999999999997e-05,
+            "tolerance_max_m": 5e-05
+          },
+          "text_above": "",
+          "text_below": "THRU - REAM",
+          "primary_precision": -2,
+          "same_as_source_dimension": 1
+        }
+      ],
+      "source_dirty_after_readback": true,
+      "drawing_dirty": true
+    },
+    {
+      "label": "after:SaveAs3:SLDDRW",
+      "utc": "2026-09-08T03:23:07.316154+00:00",
+      "source_sha256": "03543e8283c5ddfccc64d33ebed50ca16fe51df06732a5464329f46cfdc5baff",
+      "source_dirty_before_readback": false,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "THRU - REAM",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [
+        {
+          "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+          "manufacturing": {
+            "system_value_m": 0.004999999906,
+            "tolerance_type": 2,
+            "tolerance_min_m": 2.9999999999999997e-05,
+            "tolerance_max_m": 5e-05
+          },
+          "text_above": "",
+          "text_below": "THRU - REAM",
+          "primary_precision": -2,
+          "same_as_source_dimension": 1
+        }
+      ],
+      "source_dirty_after_readback": false,
+      "drawing_dirty": false,
+      "source_change_copy": "C:\\src\\ha-datum-placement-main\\cad\\out\\reports\\datum-placement\\rack-source-save-callout\\source-change-046.SLDPRT"
+    },
+    {
+      "label": "before:SaveAs3:pdf",
+      "utc": "2026-09-08T03:23:07.858972+00:00",
+      "source_sha256": "03543e8283c5ddfccc64d33ebed50ca16fe51df06732a5464329f46cfdc5baff",
+      "source_dirty_before_readback": false,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "THRU - REAM",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [
+        {
+          "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+          "manufacturing": {
+            "system_value_m": 0.004999999906,
+            "tolerance_type": 2,
+            "tolerance_min_m": 2.9999999999999997e-05,
+            "tolerance_max_m": 5e-05
+          },
+          "text_above": "",
+          "text_below": "THRU - REAM",
+          "primary_precision": -2,
+          "same_as_source_dimension": 1
+        }
+      ],
+      "source_dirty_after_readback": false,
+      "drawing_dirty": false
+    },
+    {
+      "label": "after:SaveAs3:pdf",
+      "utc": "2026-09-08T03:23:08.811874+00:00",
+      "source_sha256": "03543e8283c5ddfccc64d33ebed50ca16fe51df06732a5464329f46cfdc5baff",
+      "source_dirty_before_readback": false,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "THRU - REAM",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [
+        {
+          "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+          "manufacturing": {
+            "system_value_m": 0.004999999906,
+            "tolerance_type": 2,
+            "tolerance_min_m": 2.9999999999999997e-05,
+            "tolerance_max_m": 5e-05
+          },
+          "text_above": "",
+          "text_below": "THRU - REAM",
+          "primary_precision": -2,
+          "same_as_source_dimension": 1
+        }
+      ],
+      "source_dirty_after_readback": false,
+      "drawing_dirty": false
+    },
+    {
+      "label": "before:close",
+      "utc": "2026-09-08T03:23:09.281861+00:00",
+      "source_sha256": "03543e8283c5ddfccc64d33ebed50ca16fe51df06732a5464329f46cfdc5baff",
+      "source_dirty_before_readback": false,
+      "source_dimension": {
+        "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+        "manufacturing": {
+          "system_value_m": 0.004999999906,
+          "tolerance_type": 2,
+          "tolerance_min_m": 2.9999999999999997e-05,
+          "tolerance_max_m": 5e-05
+        },
+        "text_above": "",
+        "text_below": "THRU - REAM",
+        "primary_precision": -2,
+        "same_as_source_dimension": 1
+      },
+      "drawing_dimensions": [
+        {
+          "full_name": "BoreDia@BoreProfile@rack-pinion.Part",
+          "manufacturing": {
+            "system_value_m": 0.004999999906,
+            "tolerance_type": 2,
+            "tolerance_min_m": 2.9999999999999997e-05,
+            "tolerance_max_m": 5e-05
+          },
+          "text_above": "",
+          "text_below": "THRU - REAM",
+          "primary_precision": -2,
+          "same_as_source_dimension": 1
+        }
+      ],
+      "source_dirty_after_readback": false,
+      "drawing_dirty": false
+    },
+    {
+      "label": "after:close",
+      "utc": "2026-09-08T03:23:10.450455+00:00",
+      "source_sha256": "03543e8283c5ddfccc64d33ebed50ca16fe51df06732a5464329f46cfdc5baff"
+    }
+  ],
+  "exports": [
+    {
+      "path": "C:\\src\\ha-datum-placement-main\\cad\\out\\reports\\datum-placement\\rack-source-save-callout\\partial.SLDDRW",
+      "return": 0,
+      "sha256": "3fb641589f63e37861aa9c0ca526467c01c7a3e974cc2f9b033654258199b128"
+    },
+    {
+      "path": "C:\\src\\ha-datum-placement-main\\cad\\out\\reports\\datum-placement\\rack-source-save-callout\\partial.pdf",
+      "return": 0,
+      "sha256": "d9e53bfd33e1adb24fb97cc01db12975c37eee9d13649d259292bdc2a11bdc69"
+    }
+  ],
+  "source_manufacturing_initial": {
+    "system_value_m": 0.004999999906,
+    "tolerance_type": 2,
+    "tolerance_min_m": 2.9999999999999997e-05,
+    "tolerance_max_m": 5e-05
+  },
+  "preparation_boundary": "before_datum",
+  "closed_without_explicit_save": [
+    "C:\\src\\ha-datum-placement-main\\cad\\out\\reports\\datum-placement\\rack-source-save-callout\\partial.SLDDRW",
+    "C:\\src\\ha-datum-placement-main\\cad\\out\\reports\\datum-placement\\rack-source-save-callout\\rack-pinion.SLDPRT"
+  ],
+  "source_sha256_final": "03543e8283c5ddfccc64d33ebed50ca16fe51df06732a5464329f46cfdc5baff",
+  "elapsed_s": 41.90397830004804,
+  "ended_utc": "2026-09-08T03:23:10.459186+00:00",
+  "baseline_sha256_final": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90"
+}

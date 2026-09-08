@@ -1,0 +1,44 @@
+{
+  "kind": "vm2-normal-datum-drawing-tasks",
+  "head": "509e70460507f33f860ea6727a6fea8c4410ad50",
+  "adapter": "2269009ed56712867826516f4406afc98a0c2814",
+  "command": [
+    "C:\\src\\ha-datum-placement-main\\.venv\\Scripts\\python.exe",
+    "-m",
+    "doit",
+    "-n",
+    "4",
+    "drawing:pinion_lift_rod",
+    "drawing:rack_pinion"
+  ],
+  "cwd": "C:\\src\\ha-datum-placement-main",
+  "status": "failed",
+  "started_utc": "2026-09-08T03:37:49.750765+00:00",
+  "source_sha256_before": {
+    "C:\\src\\ha-datum-placement-main\\cad\\out\\sldprt\\pinion-lift-rod.SLDPRT": "59f635b07d5b1edb91ea828c0f9f8f8285cbcbbe17ce188cddeafef8ae08e8db",
+    "C:\\src\\ha-datum-placement-main\\cad\\out\\sldprt\\rack-pinion.SLDPRT": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90"
+  },
+  "script_sha256_before": {
+    "C:\\src\\ha-datum-placement-main\\cad\\scripts\\draw_pinion_lift_rod.py": "f4672588149bbbbd52c808ea04fb2a703d16e4686dee25b60fa3d9981e5630af",
+    "C:\\src\\ha-datum-placement-main\\cad\\scripts\\draw_rack_pinion.py": "b3bb478a9912b04fd0019a5ed7ce4cdc872f7937f098e9477040f21f9112fa07",
+    "C:\\src\\ha-datum-placement-main\\cad\\scripts\\_native_axis_datum.py": "300b5d153f6d82c624b79b0989c3f2e9752b688a7dfde23e4b917b7bbe4e1a8e",
+    "C:\\src\\ha-datum-placement-main\\cad\\scripts\\_drawing_common.py": "d64281f8509c8d1a270c22eb35871bcf5846585c9f8b9c8389d11182c7eece9d"
+  },
+  "scope": "two normal drawing tasks; not full retained-stack acceptance",
+  "exit_code": 2,
+  "elapsed_s": 63.23558540001977,
+  "ended_utc": "2026-09-08T03:38:52.989887+00:00",
+  "source_sha256_after": {
+    "C:\\src\\ha-datum-placement-main\\cad\\out\\sldprt\\pinion-lift-rod.SLDPRT": "59f635b07d5b1edb91ea828c0f9f8f8285cbcbbe17ce188cddeafef8ae08e8db",
+    "C:\\src\\ha-datum-placement-main\\cad\\out\\sldprt\\rack-pinion.SLDPRT": "aa70ef6a9907311ccc78cf3bd5de4252e887a78aeef10a99652037be1161ef90"
+  },
+  "script_sha256_after": {
+    "C:\\src\\ha-datum-placement-main\\cad\\scripts\\draw_pinion_lift_rod.py": "f4672588149bbbbd52c808ea04fb2a703d16e4686dee25b60fa3d9981e5630af",
+    "C:\\src\\ha-datum-placement-main\\cad\\scripts\\draw_rack_pinion.py": "b3bb478a9912b04fd0019a5ed7ce4cdc872f7937f098e9477040f21f9112fa07",
+    "C:\\src\\ha-datum-placement-main\\cad\\scripts\\_native_axis_datum.py": "300b5d153f6d82c624b79b0989c3f2e9752b688a7dfde23e4b917b7bbe4e1a8e",
+    "C:\\src\\ha-datum-placement-main\\cad\\scripts\\_drawing_common.py": "d64281f8509c8d1a270c22eb35871bcf5846585c9f8b9c8389d11182c7eece9d"
+  },
+  "log_sha256": "79e83de112abdc216389ae5cbf8591e69b8bcac3046c80ac2bd17a44a7c2c055",
+  "outputs": {},
+  "head_after": "509e70460507f33f860ea6727a6fea8c4410ad50"
+}
