@@ -18,6 +18,13 @@ PILOTS = {
     "draw_rocker_arm.py",
     "draw_slotted_screw.py",
 }
+DIRECT_TABLE_LAYOUT = {
+    "draw_harmonic_base.py": {
+        "_drawing_harmonic_base_layout.py",
+        "_drawing_native_layout.py",
+        "_drawing_leader_clearance.py",
+    },
+}
 NATIVE_LAYOUT_HELPERS = {
     "_drawing_leader_clearance.py",
     "_drawing_measurement_handoff.py",
@@ -58,6 +65,11 @@ def test_only_explicit_native_layout_pilots_include_the_full_native_helper_closu
         "_drawing_template_defaults.py",
     } <= closure
     expected = NATIVE_LAYOUT_HELPERS | {"_drawing_project_layout.py"}
+    if script.name in DIRECT_TABLE_LAYOUT:
+        required = DIRECT_TABLE_LAYOUT[script.name]
+        assert required <= closure
+        assert not closure & (expected - required)
+        return
     if script.name in PILOTS:
         assert expected <= closure
         return
@@ -66,3 +78,45 @@ def test_only_explicit_native_layout_pilots_include_the_full_native_helper_closu
 
 def test_every_declared_pilot_is_an_actual_recipe():
     assert PILOTS <= {path.name for path in SCRIPTS.glob("draw_*.py")}
+    assert DIRECT_TABLE_LAYOUT.keys() <= {
+        path.name for path in SCRIPTS.glob("draw_*.py")
+    }
+    assert not PILOTS & DIRECT_TABLE_LAYOUT.keys()
+
+
+@pytest.mark.parametrize(
+    "missing", sorted(DIRECT_TABLE_LAYOUT["draw_harmonic_base.py"])
+)
+def test_direct_table_layout_requires_every_declared_helper(monkeypatch, missing):
+    script = SCRIPTS / "draw_harmonic_base.py"
+    closure = module_deps_of(script)
+    monkeypatch.setattr(
+        "test_project_layout_dependencies_drawing.module_deps_of",
+        lambda _script: [path for path in closure if Path(path).name != missing],
+    )
+    with pytest.raises(AssertionError, match=missing.replace(".", r"\.")):
+        test_only_explicit_native_layout_pilots_include_the_full_native_helper_closure(
+            script
+        )
+
+
+@pytest.mark.parametrize(
+    "extra",
+    sorted(
+        (NATIVE_LAYOUT_HELPERS | {"_drawing_project_layout.py"})
+        - DIRECT_TABLE_LAYOUT["draw_harmonic_base.py"]
+    ),
+)
+def test_direct_table_layout_rejects_unrequested_arrangement_helpers(
+    monkeypatch, extra
+):
+    script = SCRIPTS / "draw_harmonic_base.py"
+    closure = module_deps_of(script)
+    monkeypatch.setattr(
+        "test_project_layout_dependencies_drawing.module_deps_of",
+        lambda _script: [*closure, str(SCRIPTS / extra)],
+    )
+    with pytest.raises(AssertionError, match=extra.replace(".", r"\.")):
+        test_only_explicit_native_layout_pilots_include_the_full_native_helper_closure(
+            script
+        )

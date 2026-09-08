@@ -39,6 +39,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_harmonic_base_layout import repair_harmonic_base_layout
 from build_harmonic_base import (
     BLOCK_SCREW_HOLE_DIA,
     BLOCK_SCREW_XZ,
@@ -282,9 +283,7 @@ def _visible_side_datum_edges(adapter: Any, view: Any) -> tuple[Any, Any]:
 
     # The side silhouette's top edge is the raised rim's top (RIM_TOP), not the
     # deck: the deck sits LIP_H below it inside the rim.
-    return _at_height(0.0, "underside datum A"), _at_height(
-        RIM_TOP / 1000.0, "rim top"
-    )
+    return _at_height(0.0, "underside datum A"), _at_height(RIM_TOP / 1000.0, "rim top")
 
 
 async def build(
@@ -348,7 +347,7 @@ async def build(
     # One complete hole table: four underside counterbores followed by every
     # top-side blind swing/pinion seat. Non-basic X/Y headers let the title-block
     # tolerance govern A1-A4; note 4 supplies the tighter seat-only tolerance.
-    insert_hole_table(
+    hole_table = insert_hole_table(
         adapter,
         top,
         datum_xy=_DATUM_XY,
@@ -456,10 +455,18 @@ async def build(
         entity=top_pad_edge,
     )
 
-    add_property_linked_note(
+    manufacturing_note = add_property_linked_note(
         adapter, "Manufacturing Notes", 0.016, 0.075, char_height=0.0025
     )
-    add_property_linked_note(adapter, "Side View Note", 0.260, 0.095)
+    side_note = add_property_linked_note(adapter, "Side View Note", 0.260, 0.095)
+
+    repair_harmonic_base_layout(
+        adapter,
+        table=hole_table,
+        views={"top": top, "side": side},
+        manufacturing_note=manufacturing_note,
+        side_note=side_note,
+    )
 
     return await finalize_drawing(
         adapter,
