@@ -423,7 +423,7 @@ class _AssemblySources:
         return found
 
     def validate_mapping_owner_bindings(
-        self, node: ast.AST, owner: ast.Name, prepared_rows: set[ast.AST]
+        self, node: ast.AST, owner: ast.Name, key: ast.AST, prepared_rows: set[ast.AST]
     ) -> None:
         """Reject bindings outside direct assignments or proven row preparation.
 
@@ -442,6 +442,21 @@ class _AssemblySources:
         for item in self.scope_nodes(node):
             if self.availability_before(item, node) is _SourceAvailability.FUTURE:
                 continue
+            if (
+                isinstance(item, ast.Subscript)
+                and isinstance(item.ctx, (ast.Store, ast.Del))
+                and isinstance(item.value, ast.Name) and item.value.id == owner.id
+            ):
+                if (
+                    isinstance(item.slice, ast.Constant) and isinstance(key, ast.Constant)
+                    and item.slice.value != key.value
+                ):
+                    continue
+                parent = self.parents[item]
+                if not isinstance(parent, ast.Assign):
+                    # field_writes interprets direct assignments only. Loop,
+                    # context, unpacked and deleted targets must not disappear.
+                    self.fail(parent)
             if (
                 isinstance(item, ast.Name)
                 and item.id == owner.id
@@ -488,7 +503,7 @@ class _AssemblySources:
         if key is not None:
             # The get/items path already uses full bindings(), including literal
             # loop owners. This guard closes the newer direct-mapping path only.
-            self.validate_mapping_owner_bindings(node, owner, prepared_rows)
+            self.validate_mapping_owner_bindings(node, owner, key, prepared_rows)
         for initial in initial_values:
             if initial in prepared_rows:
                 continue
