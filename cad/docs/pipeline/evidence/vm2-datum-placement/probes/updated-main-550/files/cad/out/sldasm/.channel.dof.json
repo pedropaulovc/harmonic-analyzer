@@ -1,0 +1,1985 @@
+{
+  "stem": "channel",
+  "specs": [
+    {
+      "key": "rocker_angle_00",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis2@rocker-arm-1",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Top Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "rocker-arm-1",
+        [
+          72.89999969029941,
+          245.8,
+          -63.21241221957348
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "distance": 262.25606926732064
+      }
+    },
+    {
+      "key": "rod_swing_00",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis1@connecting-rod-1",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "connecting-rod-1",
+        [
+          -60.16743330150342,
+          99.15503928778881,
+          -67.26241221957348
+        ]
+      ],
+      "witness": null,
+      "flip": true,
+      "params": {
+        "distance": 60.16743330150342
+      }
+    },
+    {
+      "key": "bar_amplitude_00",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis2@amplitude-bar-1",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "amplitude-bar-1",
+        [
+          76.075,
+          259.4453002904405,
+          -66.38741221957348
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "distance": 72.9
+      }
+    },
+    {
+      "key": "rocker_angle_01",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis2@rocker-arm-2",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Top Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "rocker-arm-2",
+        [
+          72.89999969029941,
+          245.8,
+          -56.15591221957348
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "distance": 262.25606926732064
+      }
+    },
+    {
+      "key": "rod_swing_01",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis1@connecting-rod-2",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "connecting-rod-2",
+        [
+          -60.16743330150342,
+          99.15503928778881,
+          -60.20591221957348
+        ]
+      ],
+      "witness": null,
+      "flip": true,
+      "params": {
+        "distance": 60.16743330150342
+      }
+    },
+    {
+      "key": "bar_amplitude_01",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis2@amplitude-bar-2",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "amplitude-bar-2",
+        [
+          76.075,
+          259.4453002904405,
+          -59.33091221957348
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "distance": 72.9
+      }
+    },
+    {
+      "key": "rocker_angle_02",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis2",
+          "point": [],
+          "mark": 0,
+          "component": "rocker-arm-3"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Top Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "rocker-arm-3",
+        [
+          72.89999969029944,
+          245.8,
+          -49.09941221957348
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "distance": 262.25606926732064
+      }
+    },
+    {
+      "key": "rod_swing_02",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis1",
+          "point": [],
+          "mark": 0,
+          "component": "connecting-rod-3"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "connecting-rod-3",
+        [
+          -60.16743330662001,
+          99.15503936132369,
+          -53.14941221957347
+        ]
+      ],
+      "witness": null,
+      "flip": true,
+      "params": {
+        "distance": 60.16743330662001
+      }
+    },
+    {
+      "key": "bar_amplitude_02",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis2",
+          "point": [],
+          "mark": 0,
+          "component": "amplitude-bar-3"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "amplitude-bar-3",
+        [
+          76.074999980647,
+          259.4453002404444,
+          -52.27441221957348
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "distance": 72.899999980647
+      }
+    },
+    {
+      "key": "rocker_angle_03",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis2",
+          "point": [],
+          "mark": 0,
+          "component": "rocker-arm-4"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Top Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "rocker-arm-4",
+        [
+          72.8999996902994,
+          245.8,
+          -42.04291221957348
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "distance": 262.2560692673207
+      }
+    },
+    {
+      "key": "rod_swing_03",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis1",
+          "point": [],
+          "mark": 0,
+          "component": "connecting-rod-4"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "connecting-rod-4",
+        [
+          -60.16743330662001,
+          99.15503936132372,
+          -46.09291221957347
+        ]
+      ],
+      "witness": null,
+      "flip": true,
+      "params": {
+        "distance": 60.16743330662001
+      }
+    },
+    {
+      "key": "bar_amplitude_03",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis2",
+          "point": [],
+          "mark": 0,
+          "component": "amplitude-bar-4"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "amplitude-bar-4",
+        [
+          76.07499998063642,
+          259.44530024044474,
+          -45.21791221957348
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "distance": 72.89999998063642
+      }
+    },
+    {
+      "key": "rocker_angle_04",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis2",
+          "point": [],
+          "mark": 0,
+          "component": "rocker-arm-5"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Top Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "rocker-arm-5",
+        [
+          72.89999969029938,
+          245.8,
+          -34.98641221957348
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "distance": 262.25606926732064
+      }
+    },
+    {
+      "key": "rod_swing_04",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis1",
+          "point": [],
+          "mark": 0,
+          "component": "connecting-rod-5"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "connecting-rod-5",
+        [
+          -60.167433306620005,
+          99.15503936132372,
+          -39.03641221957347
+        ]
+      ],
+      "witness": null,
+      "flip": true,
+      "params": {
+        "distance": 60.167433306620005
+      }
+    },
+    {
+      "key": "bar_amplitude_04",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis2",
+          "point": [],
+          "mark": 0,
+          "component": "amplitude-bar-5"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "amplitude-bar-5",
+        [
+          76.07499998063642,
+          259.44530024044474,
+          -38.16141221957348
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "distance": 72.89999998063642
+      }
+    },
+    {
+      "key": "rocker_angle_05",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis2",
+          "point": [],
+          "mark": 0,
+          "component": "rocker-arm-6"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Top Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "rocker-arm-6",
+        [
+          72.89999969029944,
+          245.8,
+          -27.92991221957348
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "distance": 262.25606926732064
+      }
+    },
+    {
+      "key": "rod_swing_05",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis1",
+          "point": [],
+          "mark": 0,
+          "component": "connecting-rod-6"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "connecting-rod-6",
+        [
+          -60.16743330662001,
+          99.15503936132372,
+          -31.979912219573478
+        ]
+      ],
+      "witness": null,
+      "flip": true,
+      "params": {
+        "distance": 60.16743330662001
+      }
+    },
+    {
+      "key": "bar_amplitude_05",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis2",
+          "point": [],
+          "mark": 0,
+          "component": "amplitude-bar-6"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "amplitude-bar-6",
+        [
+          76.07499998063642,
+          259.44530024044474,
+          -31.10491221957348
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "distance": 72.89999998063642
+      }
+    },
+    {
+      "key": "rocker_angle_06",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis2",
+          "point": [],
+          "mark": 0,
+          "component": "rocker-arm-7"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Top Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "rocker-arm-7",
+        [
+          72.89999969029944,
+          245.8,
+          -20.873412219573478
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "distance": 262.25606926732064
+      }
+    },
+    {
+      "key": "rod_swing_06",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis1",
+          "point": [],
+          "mark": 0,
+          "component": "connecting-rod-7"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "connecting-rod-7",
+        [
+          -60.167433306620005,
+          99.1550393613237,
+          -24.923412219573475
+        ]
+      ],
+      "witness": null,
+      "flip": true,
+      "params": {
+        "distance": 60.167433306620005
+      }
+    },
+    {
+      "key": "bar_amplitude_06",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis2",
+          "point": [],
+          "mark": 0,
+          "component": "amplitude-bar-7"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "amplitude-bar-7",
+        [
+          76.07499998064263,
+          259.44530024044474,
+          -24.04841221957348
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "distance": 72.89999998064263
+      }
+    },
+    {
+      "key": "rocker_angle_07",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis2",
+          "point": [],
+          "mark": 0,
+          "component": "rocker-arm-8"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Top Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "rocker-arm-8",
+        [
+          72.89999969029941,
+          245.80000000000004,
+          -13.81691221957348
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "distance": 262.2560692673207
+      }
+    },
+    {
+      "key": "rod_swing_07",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis1",
+          "point": [],
+          "mark": 0,
+          "component": "connecting-rod-8"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "connecting-rod-8",
+        [
+          -60.167433306620005,
+          99.15503936132369,
+          -17.866912219573475
+        ]
+      ],
+      "witness": null,
+      "flip": true,
+      "params": {
+        "distance": 60.167433306620005
+      }
+    },
+    {
+      "key": "bar_amplitude_07",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis2",
+          "point": [],
+          "mark": 0,
+          "component": "amplitude-bar-8"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "amplitude-bar-8",
+        [
+          76.07499997959526,
+          259.4453002404403,
+          -16.99191221957348
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "distance": 72.89999997959526
+      }
+    },
+    {
+      "key": "rocker_angle_08",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis2",
+          "point": [],
+          "mark": 0,
+          "component": "rocker-arm-9"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Top Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "rocker-arm-9",
+        [
+          72.8999996902994,
+          245.79999999999998,
+          -6.760412219573484
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "distance": 262.25606926732064
+      }
+    },
+    {
+      "key": "rod_swing_08",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis1",
+          "point": [],
+          "mark": 0,
+          "component": "connecting-rod-9"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "connecting-rod-9",
+        [
+          -60.167433306620005,
+          99.15503936132369,
+          -10.810412219573482
+        ]
+      ],
+      "witness": null,
+      "flip": true,
+      "params": {
+        "distance": 60.167433306620005
+      }
+    },
+    {
+      "key": "bar_amplitude_08",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis2",
+          "point": [],
+          "mark": 0,
+          "component": "amplitude-bar-9"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "amplitude-bar-9",
+        [
+          76.07499997959526,
+          259.44530024044053,
+          -9.935412219573482
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "distance": 72.89999997959526
+      }
+    },
+    {
+      "key": "rocker_angle_09",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis2",
+          "point": [],
+          "mark": 0,
+          "component": "rocker-arm-10"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Top Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "rocker-arm-10",
+        [
+          72.8999996902994,
+          245.79999999999998,
+          0.29608778042651546
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "distance": 262.25606926732064
+      }
+    },
+    {
+      "key": "rod_swing_09",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis1",
+          "point": [],
+          "mark": 0,
+          "component": "connecting-rod-10"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "connecting-rod-10",
+        [
+          -60.16743330662,
+          99.15503936132372,
+          -3.7539122195734826
+        ]
+      ],
+      "witness": null,
+      "flip": true,
+      "params": {
+        "distance": 60.16743330662
+      }
+    },
+    {
+      "key": "bar_amplitude_09",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis2",
+          "point": [],
+          "mark": 0,
+          "component": "amplitude-bar-10"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "amplitude-bar-10",
+        [
+          76.07499997959526,
+          259.4453002404405,
+          -2.878912219573482
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "distance": 72.89999997959526
+      }
+    },
+    {
+      "key": "rocker_angle_10",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis2",
+          "point": [],
+          "mark": 0,
+          "component": "rocker-arm-11"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Top Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "rocker-arm-11",
+        [
+          72.89999969029942,
+          245.80000000000004,
+          7.352587780426516
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "distance": 262.25606926732064
+      }
+    },
+    {
+      "key": "rod_swing_10",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis1",
+          "point": [],
+          "mark": 0,
+          "component": "connecting-rod-11"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "connecting-rod-11",
+        [
+          -60.16743330662,
+          99.15503936132372,
+          3.3025877804265176
+        ]
+      ],
+      "witness": null,
+      "flip": true,
+      "params": {
+        "distance": 60.16743330662
+      }
+    },
+    {
+      "key": "bar_amplitude_10",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis2",
+          "point": [],
+          "mark": 0,
+          "component": "amplitude-bar-11"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "amplitude-bar-11",
+        [
+          76.07499997959526,
+          259.4453002404407,
+          4.177587780426518
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "distance": 72.89999997959526
+      }
+    },
+    {
+      "key": "rocker_angle_11",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis2",
+          "point": [],
+          "mark": 0,
+          "component": "rocker-arm-12"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Top Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "rocker-arm-12",
+        [
+          72.89999969029942,
+          245.80000000000004,
+          14.409087780426523
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "distance": 262.25606926732064
+      }
+    },
+    {
+      "key": "rod_swing_11",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis1",
+          "point": [],
+          "mark": 0,
+          "component": "connecting-rod-12"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "connecting-rod-12",
+        [
+          -60.16743330662,
+          99.15503936132372,
+          10.359087780426526
+        ]
+      ],
+      "witness": null,
+      "flip": true,
+      "params": {
+        "distance": 60.16743330662
+      }
+    },
+    {
+      "key": "bar_amplitude_11",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis2",
+          "point": [],
+          "mark": 0,
+          "component": "amplitude-bar-12"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "amplitude-bar-12",
+        [
+          76.07499997959526,
+          259.4453002404407,
+          11.234087780426524
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "distance": 72.89999997959526
+      }
+    },
+    {
+      "key": "rocker_angle_12",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis2",
+          "point": [],
+          "mark": 0,
+          "component": "rocker-arm-13"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Top Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "rocker-arm-13",
+        [
+          72.89999969029942,
+          245.80000000000004,
+          21.465587780426517
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "distance": 262.25606926732064
+      }
+    },
+    {
+      "key": "rod_swing_12",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis1",
+          "point": [],
+          "mark": 0,
+          "component": "connecting-rod-13"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "connecting-rod-13",
+        [
+          -60.16743330662,
+          99.15503936132372,
+          17.415587780426517
+        ]
+      ],
+      "witness": null,
+      "flip": true,
+      "params": {
+        "distance": 60.16743330662
+      }
+    },
+    {
+      "key": "bar_amplitude_12",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis2",
+          "point": [],
+          "mark": 0,
+          "component": "amplitude-bar-13"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "amplitude-bar-13",
+        [
+          76.07499997959526,
+          259.4453002404407,
+          18.290587780426517
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "distance": 72.89999997959526
+      }
+    },
+    {
+      "key": "rocker_angle_13",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis2",
+          "point": [],
+          "mark": 0,
+          "component": "rocker-arm-14"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Top Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "rocker-arm-14",
+        [
+          72.89999969029942,
+          245.80000000000004,
+          28.522087780426524
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "distance": 262.25606926732064
+      }
+    },
+    {
+      "key": "rod_swing_13",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis1",
+          "point": [],
+          "mark": 0,
+          "component": "connecting-rod-14"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "connecting-rod-14",
+        [
+          -60.16743330662,
+          99.15503936132372,
+          24.472087780426527
+        ]
+      ],
+      "witness": null,
+      "flip": true,
+      "params": {
+        "distance": 60.16743330662
+      }
+    },
+    {
+      "key": "bar_amplitude_13",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis2",
+          "point": [],
+          "mark": 0,
+          "component": "amplitude-bar-14"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "amplitude-bar-14",
+        [
+          76.07499997959526,
+          259.4453002404407,
+          25.347087780426524
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "distance": 72.89999997959526
+      }
+    },
+    {
+      "key": "rocker_angle_14",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis2",
+          "point": [],
+          "mark": 0,
+          "component": "rocker-arm-15"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Top Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "rocker-arm-15",
+        [
+          72.89999969029942,
+          245.80000000000004,
+          35.57858778042652
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "distance": 262.25606926732064
+      }
+    },
+    {
+      "key": "rod_swing_14",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis1",
+          "point": [],
+          "mark": 0,
+          "component": "connecting-rod-15"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "connecting-rod-15",
+        [
+          -60.16743330662,
+          99.15503936132372,
+          31.528587780426527
+        ]
+      ],
+      "witness": null,
+      "flip": true,
+      "params": {
+        "distance": 60.16743330662
+      }
+    },
+    {
+      "key": "bar_amplitude_14",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis2",
+          "point": [],
+          "mark": 0,
+          "component": "amplitude-bar-15"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "amplitude-bar-15",
+        [
+          76.07499997959526,
+          259.4453002404407,
+          32.40358778042652
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "distance": 72.89999997959526
+      }
+    },
+    {
+      "key": "rocker_angle_15",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis2",
+          "point": [],
+          "mark": 0,
+          "component": "rocker-arm-16"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Top Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "rocker-arm-16",
+        [
+          72.89999969029942,
+          245.80000000000004,
+          42.63508778042651
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "distance": 262.25606926732064
+      }
+    },
+    {
+      "key": "rod_swing_15",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis1",
+          "point": [],
+          "mark": 0,
+          "component": "connecting-rod-16"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "connecting-rod-16",
+        [
+          -60.16743330662,
+          99.15503936132372,
+          38.58508778042652
+        ]
+      ],
+      "witness": null,
+      "flip": true,
+      "params": {
+        "distance": 60.16743330662
+      }
+    },
+    {
+      "key": "bar_amplitude_15",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis2",
+          "point": [],
+          "mark": 0,
+          "component": "amplitude-bar-16"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "amplitude-bar-16",
+        [
+          76.07499997959526,
+          259.4453002404407,
+          39.46008778042651
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "distance": 72.89999997959526
+      }
+    },
+    {
+      "key": "rocker_angle_16",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis2",
+          "point": [],
+          "mark": 0,
+          "component": "rocker-arm-17"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Top Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "rocker-arm-17",
+        [
+          72.89999969029942,
+          245.80000000000004,
+          49.69158778042652
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "distance": 262.25606926732064
+      }
+    },
+    {
+      "key": "rod_swing_16",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis1",
+          "point": [],
+          "mark": 0,
+          "component": "connecting-rod-17"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "connecting-rod-17",
+        [
+          -60.16743330662,
+          99.15503936132372,
+          45.641587780426526
+        ]
+      ],
+      "witness": null,
+      "flip": true,
+      "params": {
+        "distance": 60.16743330662
+      }
+    },
+    {
+      "key": "bar_amplitude_16",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis2",
+          "point": [],
+          "mark": 0,
+          "component": "amplitude-bar-17"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "amplitude-bar-17",
+        [
+          76.07499997959526,
+          259.4453002404407,
+          46.51658778042652
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "distance": 72.89999997959526
+      }
+    },
+    {
+      "key": "rocker_angle_17",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis2",
+          "point": [],
+          "mark": 0,
+          "component": "rocker-arm-18"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Top Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "rocker-arm-18",
+        [
+          72.89999969029942,
+          245.80000000000004,
+          56.74808778042651
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "distance": 262.25606926732064
+      }
+    },
+    {
+      "key": "rod_swing_17",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis1",
+          "point": [],
+          "mark": 0,
+          "component": "connecting-rod-18"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "connecting-rod-18",
+        [
+          -60.16743330662,
+          99.15503936132372,
+          52.69808778042652
+        ]
+      ],
+      "witness": null,
+      "flip": true,
+      "params": {
+        "distance": 60.16743330662
+      }
+    },
+    {
+      "key": "bar_amplitude_17",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis2",
+          "point": [],
+          "mark": 0,
+          "component": "amplitude-bar-18"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "amplitude-bar-18",
+        [
+          76.07499997959526,
+          259.4453002404407,
+          53.57308778042651
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "distance": 72.89999997959526
+      }
+    },
+    {
+      "key": "rocker_angle_18",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis2",
+          "point": [],
+          "mark": 0,
+          "component": "rocker-arm-19"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Top Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "rocker-arm-19",
+        [
+          72.89999969029942,
+          245.80000000000004,
+          63.80458778042652
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "distance": 262.25606926732064
+      }
+    },
+    {
+      "key": "rod_swing_18",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis1",
+          "point": [],
+          "mark": 0,
+          "component": "connecting-rod-19"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "connecting-rod-19",
+        [
+          -60.16743330662,
+          99.15503936132372,
+          59.754587780426526
+        ]
+      ],
+      "witness": null,
+      "flip": true,
+      "params": {
+        "distance": 60.16743330662
+      }
+    },
+    {
+      "key": "bar_amplitude_18",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis2",
+          "point": [],
+          "mark": 0,
+          "component": "amplitude-bar-19"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "amplitude-bar-19",
+        [
+          76.07499997959526,
+          259.4453002404407,
+          60.62958778042652
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "distance": 72.89999997959526
+      }
+    },
+    {
+      "key": "rocker_angle_19",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis2",
+          "point": [],
+          "mark": 0,
+          "component": "rocker-arm-20"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Top Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "rocker-arm-20",
+        [
+          72.89999969029942,
+          245.80000000000004,
+          70.86108778042652
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "distance": 262.25606926732064
+      }
+    },
+    {
+      "key": "rod_swing_19",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis1",
+          "point": [],
+          "mark": 0,
+          "component": "connecting-rod-20"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "connecting-rod-20",
+        [
+          -60.167433306620005,
+          99.15503936132372,
+          66.8110877804265
+        ]
+      ],
+      "witness": null,
+      "flip": true,
+      "params": {
+        "distance": 60.167433306620005
+      }
+    },
+    {
+      "key": "bar_amplitude_19",
+      "kind": "distance",
+      "entities": [
+        {
+          "entity_type": "AXIS",
+          "name": "Axis2",
+          "point": [],
+          "mark": 0,
+          "component": "amplitude-bar-20"
+        },
+        {
+          "entity_type": "PLANE",
+          "name": "Right Plane",
+          "point": [],
+          "mark": 0,
+          "component": ""
+        }
+      ],
+      "verify": [
+        "amplitude-bar-20",
+        [
+          76.07499997959526,
+          259.4453002404407,
+          67.68608778042652
+        ]
+      ],
+      "witness": null,
+      "flip": false,
+      "params": {
+        "distance": 72.89999997959526
+      }
+    }
+  ]
+}
