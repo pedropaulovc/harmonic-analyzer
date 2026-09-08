@@ -1,0 +1,918 @@
+{
+  "kind": "telemetry-summary",
+  "created_utc": "2026-09-08T00:21:01.574930+00:00",
+  "root": "C:\\src\\ha-assembly-granularity-integration",
+  "utility_sha256": "03cfe0f691f8c163604b40d9f84868e6a60c6af543ced06c9dcac386918d70dc",
+  "start_marker": {
+    "kind": "telemetry-boundary",
+    "root": "C:\\src\\ha-assembly-granularity-integration",
+    "capture_started_utc": "2026-09-08T00:19:46.829687+00:00",
+    "capture_finished_utc": "2026-09-08T00:19:46.856417+00:00",
+    "files": {
+      "traces": {
+        "relative_path": "cad/out/reports/telemetry/traces.jsonl",
+        "exists": true,
+        "bytes": 5472922,
+        "lines": 7840,
+        "sha256": "19415c433ff744f8f6875e2bebfa8883649ec33c5453fd011caeef3a8f243724",
+        "newline_terminated": true
+      },
+      "logs": {
+        "relative_path": "cad/out/reports/telemetry/logs.jsonl",
+        "exists": true,
+        "bytes": 12676629,
+        "lines": 16012,
+        "sha256": "227bc4ced83832ce393009e2cd98abcb580273cdf949e6c0d740abead9d11e14",
+        "newline_terminated": true
+      },
+      "cache": {
+        "relative_path": "cad/out/reports/cache.jsonl",
+        "exists": false,
+        "bytes": 0,
+        "lines": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "newline_terminated": true
+      }
+    }
+  },
+  "end_marker": {
+    "kind": "telemetry-boundary",
+    "root": "C:\\src\\ha-assembly-granularity-integration",
+    "capture_started_utc": "2026-09-08T00:20:39.645428+00:00",
+    "capture_finished_utc": "2026-09-08T00:20:39.671902+00:00",
+    "files": {
+      "traces": {
+        "relative_path": "cad/out/reports/telemetry/traces.jsonl",
+        "exists": true,
+        "bytes": 5506461,
+        "lines": 7877,
+        "sha256": "c6e2cf6b51661408f1c410d6f343dc3da8d23ed447be7f581f3b692e28436348",
+        "newline_terminated": true
+      },
+      "logs": {
+        "relative_path": "cad/out/reports/telemetry/logs.jsonl",
+        "exists": true,
+        "bytes": 12704928,
+        "lines": 16041,
+        "sha256": "1cda4d6caa005a89765b62c592e52b08aa5cffff1e2f214b22d161b4edfaa1c9",
+        "newline_terminated": true
+      },
+      "cache": {
+        "relative_path": "cad/out/reports/cache.jsonl",
+        "exists": false,
+        "bytes": 0,
+        "lines": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "newline_terminated": true
+      }
+    }
+  },
+  "intervals": {
+    "traces": {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\reports\\telemetry\\traces.jsonl",
+      "start_byte": 5472922,
+      "end_byte": 5506461,
+      "interval_sha256": "58a9760ab9c6fb1e698e308e5aa203e47104f269f29ce9165c261b4fa08137d2",
+      "start_newline_terminated": true,
+      "end_newline_terminated": true,
+      "invalid_records": []
+    },
+    "logs": {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\reports\\telemetry\\logs.jsonl",
+      "start_byte": 12676629,
+      "end_byte": 12704928,
+      "interval_sha256": "c28a8ab09d40150aac0cb3e0e7b7f3816edc09bc706d9bc5cc1c1ca8d1cf7d52",
+      "start_newline_terminated": true,
+      "end_newline_terminated": true,
+      "invalid_records": []
+    },
+    "cache": {
+      "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\reports\\cache.jsonl",
+      "start_byte": 0,
+      "end_byte": 0,
+      "interval_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "start_newline_terminated": true,
+      "end_newline_terminated": true,
+      "invalid_records": []
+    }
+  },
+  "exit_code_supplied_by_caller": 2,
+  "boundary_wall_seconds": 52.789011,
+  "trace_interval": {
+    "span_count": 37,
+    "trace_ids": [
+      "0x4203c1a6d53932840900e625a12847e0",
+      "0x5b7da3a7a8d35ef7cf0051a0ce7b06c4",
+      "0x6b2e4efe64c7b48bf3d68f05ffbe089c",
+      "0x9ffc64cb656c3a77c953817d85ed50d1",
+      "0xd70bc0d5712dfa853cfa83c9112a4cbc",
+      "0xe842f41c3982be1365d91e6ce6a1d4f1",
+      "0xec0ec7e992195e6ced0cdf10d600242f",
+      "0xfb4cfddd1667fe7877a3628ffa8b2930"
+    ],
+    "earliest_span_start": "2026-09-08T00:19:58.539274Z",
+    "latest_span_end": "2026-09-08T00:20:25.683069Z"
+  },
+  "tasks": [
+    {
+      "name": "task drawing:pinion_lift_rod",
+      "trace_id": "0x6b2e4efe64c7b48bf3d68f05ffbe089c",
+      "span_id": "0x01778cca749ecf83",
+      "parent_id": null,
+      "start": "2026-09-08T00:19:59.213732Z",
+      "end": "2026-09-08T00:20:06.355494Z",
+      "seconds": 7.141762,
+      "status": {
+        "status_code": "ERROR",
+        "description": "drawing:pinion_lift_rod failed (exit 1)"
+      },
+      "attributes": {
+        "harmonic.depth": 0,
+        "label": "drawing:pinion_lift_rod",
+        "seat_wait_s": 0.0,
+        "cache": "miss"
+      }
+    },
+    {
+      "name": "task drawing:rack_pinion",
+      "trace_id": "0xfb4cfddd1667fe7877a3628ffa8b2930",
+      "span_id": "0x3185d35b64ca45ad",
+      "parent_id": null,
+      "start": "2026-09-08T00:20:06.391376Z",
+      "end": "2026-09-08T00:20:25.683069Z",
+      "seconds": 19.291693,
+      "status": {
+        "status_code": "ERROR",
+        "description": "drawing:rack_pinion failed (exit 1)"
+      },
+      "attributes": {
+        "harmonic.depth": 0,
+        "label": "drawing:rack_pinion",
+        "seat_wait_s": 6.37,
+        "cache": "miss"
+      }
+    }
+  ],
+  "task_counts": {
+    "drawing/ERROR": 2
+  },
+  "task_seconds_sum": 26.433455,
+  "task_seat_wait_seconds_sum": 6.37,
+  "assembly_modes": {},
+  "native_build_spans": [
+    {
+      "name": "drawing.build",
+      "trace_id": "0x6b2e4efe64c7b48bf3d68f05ffbe089c",
+      "span_id": "0xcbe38d6f7811b60e",
+      "parent_id": "0x01778cca749ecf83",
+      "start": "2026-09-08T00:20:00.477201Z",
+      "end": "2026-09-08T00:20:06.138164Z",
+      "seconds": 5.660963,
+      "status": {
+        "status_code": "ERROR",
+        "description": "datum A position did not persist (lift rod axis): (0.05499999999999966, 0.22897646401719635); requested=(0.055, 0.22899999999999998), error=2.3536e-05 m, limit=2e-05 m"
+      },
+      "attributes": {
+        "harmonic.depth": 0,
+        "target": "pinion_lift_rod"
+      }
+    },
+    {
+      "name": "drawing.build",
+      "trace_id": "0xfb4cfddd1667fe7877a3628ffa8b2930",
+      "span_id": "0x59eccda5794fdb24",
+      "parent_id": "0x3185d35b64ca45ad",
+      "start": "2026-09-08T00:20:07.640970Z",
+      "end": "2026-09-08T00:20:25.499338Z",
+      "seconds": 17.858368,
+      "status": {
+        "status_code": "ERROR",
+        "description": "datum A position did not persist (rack pinion bore axis): (0.21999999999999942, 0.20083662770023045); requested=(0.22, 0.20099999999999998), error=0.000163372 m, limit=0.0001 m"
+      },
+      "attributes": {
+        "harmonic.depth": 0,
+        "target": "rack_pinion"
+      }
+    }
+  ],
+  "native_activity_spans": [
+    {
+      "name": "sw.connect",
+      "trace_id": "0x6b2e4efe64c7b48bf3d68f05ffbe089c",
+      "span_id": "0xbdb2c15bad97ca3c",
+      "parent_id": "0x01778cca749ecf83",
+      "start": "2026-09-08T00:20:00.400123Z",
+      "end": "2026-09-08T00:20:00.477038Z",
+      "seconds": 0.076915,
+      "status": {
+        "status_code": "OK"
+      },
+      "attributes": {
+        "harmonic.depth": 0
+      }
+    },
+    {
+      "name": "drawing.build",
+      "trace_id": "0x6b2e4efe64c7b48bf3d68f05ffbe089c",
+      "span_id": "0xcbe38d6f7811b60e",
+      "parent_id": "0x01778cca749ecf83",
+      "start": "2026-09-08T00:20:00.477201Z",
+      "end": "2026-09-08T00:20:06.138164Z",
+      "seconds": 5.660963,
+      "status": {
+        "status_code": "ERROR",
+        "description": "datum A position did not persist (lift rod axis): (0.05499999999999966, 0.22897646401719635); requested=(0.055, 0.22899999999999998), error=2.3536e-05 m, limit=2e-05 m"
+      },
+      "attributes": {
+        "harmonic.depth": 0,
+        "target": "pinion_lift_rod"
+      }
+    },
+    {
+      "name": "sw.disconnect",
+      "trace_id": "0x6b2e4efe64c7b48bf3d68f05ffbe089c",
+      "span_id": "0xe8a1262e1d48795c",
+      "parent_id": "0x01778cca749ecf83",
+      "start": "2026-09-08T00:20:06.138379Z",
+      "end": "2026-09-08T00:20:06.155374Z",
+      "seconds": 0.016995,
+      "status": {
+        "status_code": "OK"
+      },
+      "attributes": {
+        "harmonic.depth": 0
+      }
+    },
+    {
+      "name": "sw.connect",
+      "trace_id": "0xfb4cfddd1667fe7877a3628ffa8b2930",
+      "span_id": "0x4de1c5bae7299737",
+      "parent_id": "0x3185d35b64ca45ad",
+      "start": "2026-09-08T00:20:07.374978Z",
+      "end": "2026-09-08T00:20:07.640637Z",
+      "seconds": 0.265659,
+      "status": {
+        "status_code": "OK"
+      },
+      "attributes": {
+        "harmonic.depth": 0
+      }
+    },
+    {
+      "name": "drawing.build",
+      "trace_id": "0xfb4cfddd1667fe7877a3628ffa8b2930",
+      "span_id": "0x59eccda5794fdb24",
+      "parent_id": "0x3185d35b64ca45ad",
+      "start": "2026-09-08T00:20:07.640970Z",
+      "end": "2026-09-08T00:20:25.499338Z",
+      "seconds": 17.858368,
+      "status": {
+        "status_code": "ERROR",
+        "description": "datum A position did not persist (rack pinion bore axis): (0.21999999999999942, 0.20083662770023045); requested=(0.22, 0.20099999999999998), error=0.000163372 m, limit=0.0001 m"
+      },
+      "attributes": {
+        "harmonic.depth": 0,
+        "target": "rack_pinion"
+      }
+    },
+    {
+      "name": "sw.disconnect",
+      "trace_id": "0xfb4cfddd1667fe7877a3628ffa8b2930",
+      "span_id": "0x24b89ef38c16ea85",
+      "parent_id": "0x3185d35b64ca45ad",
+      "start": "2026-09-08T00:20:25.499649Z",
+      "end": "2026-09-08T00:20:25.517458Z",
+      "seconds": 0.017809,
+      "status": {
+        "status_code": "OK"
+      },
+      "attributes": {
+        "harmonic.depth": 0
+      }
+    }
+  ],
+  "native_activity_count": 6,
+  "error_spans": [
+    {
+      "name": "drawing.datum_feature",
+      "context": {
+        "trace_id": "0x6b2e4efe64c7b48bf3d68f05ffbe089c",
+        "span_id": "0xf280665622ab41e6",
+        "trace_state": "[]"
+      },
+      "kind": "SpanKind.INTERNAL",
+      "parent_id": "0xcbe38d6f7811b60e",
+      "start_time": "2026-09-08T00:20:05.698257Z",
+      "end_time": "2026-09-08T00:20:06.136022Z",
+      "status": {
+        "status_code": "ERROR",
+        "description": "datum A position did not persist (lift rod axis): (0.05499999999999966, 0.22897646401719635); requested=(0.055, 0.22899999999999998), error=2.3536e-05 m, limit=2e-05 m"
+      },
+      "attributes": {
+        "harmonic.depth": 1,
+        "label": "lift rod axis"
+      },
+      "events": [
+        {
+          "name": "exception",
+          "timestamp": "2026-09-08T00:20:06.135692Z",
+          "attributes": {
+            "exception.type": "RuntimeError",
+            "exception.message": "datum A position did not persist (lift rod axis): (0.05499999999999966, 0.22897646401719635); requested=(0.055, 0.22899999999999998), error=2.3536e-05 m, limit=2e-05 m",
+            "exception.stacktrace": "Traceback (most recent call last):\n  File \"C:\\src\\ha-assembly-granularity-integration\\cad\\scripts\\_telemetry.py\", line 898, in span\n    yield sp\n  File \"C:\\src\\ha-assembly-granularity-integration\\cad\\scripts\\_telemetry.py\", line 955, in wrap\n    return fn(*args, **kwargs)\n  File \"C:\\src\\ha-assembly-granularity-integration\\cad\\scripts\\_drawing_common.py\", line 494, in add_datum_feature\n    raise RuntimeError(\n    ...<4 lines>...\n    )\nRuntimeError: datum A position did not persist (lift rod axis): (0.05499999999999966, 0.22897646401719635); requested=(0.055, 0.22899999999999998), error=2.3536e-05 m, limit=2e-05 m\n",
+            "exception.escaped": "False"
+          }
+        }
+      ],
+      "links": [],
+      "resource": {
+        "attributes": {
+          "telemetry.sdk.language": "python",
+          "telemetry.sdk.name": "opentelemetry",
+          "telemetry.sdk.version": "1.39.1",
+          "service.name": "drawing-export",
+          "service.namespace": "harmonic-analyzer",
+          "service.version": "dev"
+        },
+        "schema_url": ""
+      }
+    },
+    {
+      "name": "drawing.build",
+      "context": {
+        "trace_id": "0x6b2e4efe64c7b48bf3d68f05ffbe089c",
+        "span_id": "0xcbe38d6f7811b60e",
+        "trace_state": "[]"
+      },
+      "kind": "SpanKind.INTERNAL",
+      "parent_id": "0x01778cca749ecf83",
+      "start_time": "2026-09-08T00:20:00.477201Z",
+      "end_time": "2026-09-08T00:20:06.138164Z",
+      "status": {
+        "status_code": "ERROR",
+        "description": "datum A position did not persist (lift rod axis): (0.05499999999999966, 0.22897646401719635); requested=(0.055, 0.22899999999999998), error=2.3536e-05 m, limit=2e-05 m"
+      },
+      "attributes": {
+        "harmonic.depth": 0,
+        "target": "pinion_lift_rod"
+      },
+      "events": [
+        {
+          "name": "exception",
+          "timestamp": "2026-09-08T00:20:06.137859Z",
+          "attributes": {
+            "exception.type": "RuntimeError",
+            "exception.message": "datum A position did not persist (lift rod axis): (0.05499999999999966, 0.22897646401719635); requested=(0.055, 0.22899999999999998), error=2.3536e-05 m, limit=2e-05 m",
+            "exception.stacktrace": "Traceback (most recent call last):\n  File \"C:\\src\\ha-assembly-granularity-integration\\cad\\scripts\\_telemetry.py\", line 911, in aspan\n    yield sp\n  File \"C:\\src\\ha-assembly-granularity-integration\\cad\\scripts\\_common.py\", line 2107, in _run\n    return await build(adapter)\n           ^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\src\\ha-assembly-granularity-integration\\cad\\scripts\\draw_pinion_lift_rod.py\", line 163, in build\n    add_datum_feature(\n    ~~~~~~~~~~~~~~~~~^\n        adapter,\n        ^^^^^^^^\n    ...<8 lines>...\n        position_tolerance_m=0.00002,\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    )\n    ^\n  File \"C:\\src\\ha-assembly-granularity-integration\\cad\\scripts\\_telemetry.py\", line 955, in wrap\n    return fn(*args, **kwargs)\n  File \"C:\\src\\ha-assembly-granularity-integration\\cad\\scripts\\_drawing_common.py\", line 494, in add_datum_feature\n    raise RuntimeError(\n    ...<4 lines>...\n    )\nRuntimeError: datum A position did not persist (lift rod axis): (0.05499999999999966, 0.22897646401719635); requested=(0.055, 0.22899999999999998), error=2.3536e-05 m, limit=2e-05 m\n",
+            "exception.escaped": "False"
+          }
+        }
+      ],
+      "links": [],
+      "resource": {
+        "attributes": {
+          "telemetry.sdk.language": "python",
+          "telemetry.sdk.name": "opentelemetry",
+          "telemetry.sdk.version": "1.39.1",
+          "service.name": "drawing-export",
+          "service.namespace": "harmonic-analyzer",
+          "service.version": "dev"
+        },
+        "schema_url": ""
+      }
+    },
+    {
+      "name": "task drawing:pinion_lift_rod",
+      "context": {
+        "trace_id": "0x6b2e4efe64c7b48bf3d68f05ffbe089c",
+        "span_id": "0x01778cca749ecf83",
+        "trace_state": "[]"
+      },
+      "kind": "SpanKind.INTERNAL",
+      "parent_id": null,
+      "start_time": "2026-09-08T00:19:59.213732Z",
+      "end_time": "2026-09-08T00:20:06.355494Z",
+      "status": {
+        "status_code": "ERROR",
+        "description": "drawing:pinion_lift_rod failed (exit 1)"
+      },
+      "attributes": {
+        "harmonic.depth": 0,
+        "label": "drawing:pinion_lift_rod",
+        "seat_wait_s": 0.0,
+        "cache": "miss"
+      },
+      "events": [
+        {
+          "name": "exception",
+          "timestamp": "2026-09-08T00:20:06.354921Z",
+          "attributes": {
+            "exception.type": "RuntimeError",
+            "exception.message": "drawing:pinion_lift_rod failed (exit 1)",
+            "exception.stacktrace": "Traceback (most recent call last):\n  File \"C:\\src\\ha-assembly-granularity-integration\\cad\\scripts\\_telemetry.py\", line 898, in span\n    yield sp\n  File \"C:\\src\\ha-assembly-granularity-integration\\dodo.py\", line 1489, in _cached_drawing_action\n    _exec_com(cmd, label, log_stem=f\"drawing-{stem}\")\n    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\src\\ha-assembly-granularity-integration\\dodo.py\", line 842, in _exec_com\n    _exec(cmd, label, log_stem)\n    ~~~~~^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\src\\ha-assembly-granularity-integration\\dodo.py\", line 603, in _exec\n    raise RuntimeError(f\"{label} failed (exit {rc})\")\nRuntimeError: drawing:pinion_lift_rod failed (exit 1)\n",
+            "exception.escaped": "False"
+          }
+        }
+      ],
+      "links": [],
+      "resource": {
+        "attributes": {
+          "telemetry.sdk.language": "python",
+          "telemetry.sdk.name": "opentelemetry",
+          "telemetry.sdk.version": "1.39.1",
+          "service.name": "drawing-export",
+          "service.namespace": "harmonic-analyzer",
+          "service.version": "dev"
+        },
+        "schema_url": ""
+      }
+    },
+    {
+      "name": "drawing.datum_feature",
+      "context": {
+        "trace_id": "0xfb4cfddd1667fe7877a3628ffa8b2930",
+        "span_id": "0x6f18e8c2765759d0",
+        "trace_state": "[]"
+      },
+      "kind": "SpanKind.INTERNAL",
+      "parent_id": "0x59eccda5794fdb24",
+      "start_time": "2026-09-08T00:20:25.117232Z",
+      "end_time": "2026-09-08T00:20:25.496387Z",
+      "status": {
+        "status_code": "ERROR",
+        "description": "datum A position did not persist (rack pinion bore axis): (0.21999999999999942, 0.20083662770023045); requested=(0.22, 0.20099999999999998), error=0.000163372 m, limit=0.0001 m"
+      },
+      "attributes": {
+        "harmonic.depth": 1,
+        "label": "rack pinion bore axis"
+      },
+      "events": [
+        {
+          "name": "exception",
+          "timestamp": "2026-09-08T00:20:25.495980Z",
+          "attributes": {
+            "exception.type": "RuntimeError",
+            "exception.message": "datum A position did not persist (rack pinion bore axis): (0.21999999999999942, 0.20083662770023045); requested=(0.22, 0.20099999999999998), error=0.000163372 m, limit=0.0001 m",
+            "exception.stacktrace": "Traceback (most recent call last):\n  File \"C:\\src\\ha-assembly-granularity-integration\\cad\\scripts\\_telemetry.py\", line 898, in span\n    yield sp\n  File \"C:\\src\\ha-assembly-granularity-integration\\cad\\scripts\\_telemetry.py\", line 955, in wrap\n    return fn(*args, **kwargs)\n  File \"C:\\src\\ha-assembly-granularity-integration\\cad\\scripts\\_drawing_common.py\", line 494, in add_datum_feature\n    raise RuntimeError(\n    ...<4 lines>...\n    )\nRuntimeError: datum A position did not persist (rack pinion bore axis): (0.21999999999999942, 0.20083662770023045); requested=(0.22, 0.20099999999999998), error=0.000163372 m, limit=0.0001 m\n",
+            "exception.escaped": "False"
+          }
+        }
+      ],
+      "links": [],
+      "resource": {
+        "attributes": {
+          "telemetry.sdk.language": "python",
+          "telemetry.sdk.name": "opentelemetry",
+          "telemetry.sdk.version": "1.39.1",
+          "service.name": "drawing-export",
+          "service.namespace": "harmonic-analyzer",
+          "service.version": "dev"
+        },
+        "schema_url": ""
+      }
+    },
+    {
+      "name": "drawing.build",
+      "context": {
+        "trace_id": "0xfb4cfddd1667fe7877a3628ffa8b2930",
+        "span_id": "0x59eccda5794fdb24",
+        "trace_state": "[]"
+      },
+      "kind": "SpanKind.INTERNAL",
+      "parent_id": "0x3185d35b64ca45ad",
+      "start_time": "2026-09-08T00:20:07.640970Z",
+      "end_time": "2026-09-08T00:20:25.499338Z",
+      "status": {
+        "status_code": "ERROR",
+        "description": "datum A position did not persist (rack pinion bore axis): (0.21999999999999942, 0.20083662770023045); requested=(0.22, 0.20099999999999998), error=0.000163372 m, limit=0.0001 m"
+      },
+      "attributes": {
+        "harmonic.depth": 0,
+        "target": "rack_pinion"
+      },
+      "events": [
+        {
+          "name": "exception",
+          "timestamp": "2026-09-08T00:20:25.499051Z",
+          "attributes": {
+            "exception.type": "RuntimeError",
+            "exception.message": "datum A position did not persist (rack pinion bore axis): (0.21999999999999942, 0.20083662770023045); requested=(0.22, 0.20099999999999998), error=0.000163372 m, limit=0.0001 m",
+            "exception.stacktrace": "Traceback (most recent call last):\n  File \"C:\\src\\ha-assembly-granularity-integration\\cad\\scripts\\_telemetry.py\", line 911, in aspan\n    yield sp\n  File \"C:\\src\\ha-assembly-granularity-integration\\cad\\scripts\\_common.py\", line 2107, in _run\n    return await build(adapter)\n           ^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\src\\ha-assembly-granularity-integration\\cad\\scripts\\draw_rack_pinion.py\", line 135, in build\n    add_datum_feature(\n    ~~~~~~~~~~~~~~~~~^\n        adapter,\n        ^^^^^^^^\n    ...<6 lines>...\n        position_tolerance_m=0.0001,\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    )\n    ^\n  File \"C:\\src\\ha-assembly-granularity-integration\\cad\\scripts\\_telemetry.py\", line 955, in wrap\n    return fn(*args, **kwargs)\n  File \"C:\\src\\ha-assembly-granularity-integration\\cad\\scripts\\_drawing_common.py\", line 494, in add_datum_feature\n    raise RuntimeError(\n    ...<4 lines>...\n    )\nRuntimeError: datum A position did not persist (rack pinion bore axis): (0.21999999999999942, 0.20083662770023045); requested=(0.22, 0.20099999999999998), error=0.000163372 m, limit=0.0001 m\n",
+            "exception.escaped": "False"
+          }
+        }
+      ],
+      "links": [],
+      "resource": {
+        "attributes": {
+          "telemetry.sdk.language": "python",
+          "telemetry.sdk.name": "opentelemetry",
+          "telemetry.sdk.version": "1.39.1",
+          "service.name": "drawing-export",
+          "service.namespace": "harmonic-analyzer",
+          "service.version": "dev"
+        },
+        "schema_url": ""
+      }
+    },
+    {
+      "name": "task drawing:rack_pinion",
+      "context": {
+        "trace_id": "0xfb4cfddd1667fe7877a3628ffa8b2930",
+        "span_id": "0x3185d35b64ca45ad",
+        "trace_state": "[]"
+      },
+      "kind": "SpanKind.INTERNAL",
+      "parent_id": null,
+      "start_time": "2026-09-08T00:20:06.391376Z",
+      "end_time": "2026-09-08T00:20:25.683069Z",
+      "status": {
+        "status_code": "ERROR",
+        "description": "drawing:rack_pinion failed (exit 1)"
+      },
+      "attributes": {
+        "harmonic.depth": 0,
+        "label": "drawing:rack_pinion",
+        "seat_wait_s": 6.37,
+        "cache": "miss"
+      },
+      "events": [
+        {
+          "name": "exception",
+          "timestamp": "2026-09-08T00:20:25.682638Z",
+          "attributes": {
+            "exception.type": "RuntimeError",
+            "exception.message": "drawing:rack_pinion failed (exit 1)",
+            "exception.stacktrace": "Traceback (most recent call last):\n  File \"C:\\src\\ha-assembly-granularity-integration\\cad\\scripts\\_telemetry.py\", line 898, in span\n    yield sp\n  File \"C:\\src\\ha-assembly-granularity-integration\\dodo.py\", line 1489, in _cached_drawing_action\n    _exec_com(cmd, label, log_stem=f\"drawing-{stem}\")\n    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\src\\ha-assembly-granularity-integration\\dodo.py\", line 842, in _exec_com\n    _exec(cmd, label, log_stem)\n    ~~~~~^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\src\\ha-assembly-granularity-integration\\dodo.py\", line 603, in _exec\n    raise RuntimeError(f\"{label} failed (exit {rc})\")\nRuntimeError: drawing:rack_pinion failed (exit 1)\n",
+            "exception.escaped": "False"
+          }
+        }
+      ],
+      "links": [],
+      "resource": {
+        "attributes": {
+          "telemetry.sdk.language": "python",
+          "telemetry.sdk.name": "opentelemetry",
+          "telemetry.sdk.version": "1.39.1",
+          "service.name": "drawing-export",
+          "service.namespace": "harmonic-analyzer",
+          "service.version": "dev"
+        },
+        "schema_url": ""
+      }
+    }
+  ],
+  "error_retry_recovery_logs": [
+    {
+      "body": "drawing.datum_feature failed: datum A position did not persist (lift rod axis): (0.05499999999999966, 0.22897646401719635); requested=(0.055, 0.22899999999999998), error=2.3536e-05 m, limit=2e-05 m",
+      "severity_number": 17,
+      "severity_text": "ERROR",
+      "attributes": {
+        "code.file.path": "C:\\src\\ha-assembly-granularity-integration\\cad\\scripts\\_telemetry.py",
+        "code.function.name": "error",
+        "code.line.number": 818
+      },
+      "dropped_attributes": 0,
+      "timestamp": "2026-09-08T00:20:06.135742Z",
+      "observed_timestamp": "2026-09-08T00:20:06.135777Z",
+      "trace_id": "0x6b2e4efe64c7b48bf3d68f05ffbe089c",
+      "span_id": "0xf280665622ab41e6",
+      "trace_flags": 1,
+      "resource": {
+        "attributes": {
+          "telemetry.sdk.language": "python",
+          "telemetry.sdk.name": "opentelemetry",
+          "telemetry.sdk.version": "1.39.1",
+          "service.name": "drawing-export",
+          "service.namespace": "harmonic-analyzer",
+          "service.version": "dev"
+        },
+        "schema_url": ""
+      },
+      "event_name": ""
+    },
+    {
+      "body": "drawing.build failed: datum A position did not persist (lift rod axis): (0.05499999999999966, 0.22897646401719635); requested=(0.055, 0.22899999999999998), error=2.3536e-05 m, limit=2e-05 m",
+      "severity_number": 17,
+      "severity_text": "ERROR",
+      "attributes": {
+        "code.file.path": "C:\\src\\ha-assembly-granularity-integration\\cad\\scripts\\_telemetry.py",
+        "code.function.name": "error",
+        "code.line.number": 818
+      },
+      "dropped_attributes": 0,
+      "timestamp": "2026-09-08T00:20:06.137889Z",
+      "observed_timestamp": "2026-09-08T00:20:06.137914Z",
+      "trace_id": "0x6b2e4efe64c7b48bf3d68f05ffbe089c",
+      "span_id": "0xcbe38d6f7811b60e",
+      "trace_flags": 1,
+      "resource": {
+        "attributes": {
+          "telemetry.sdk.language": "python",
+          "telemetry.sdk.name": "opentelemetry",
+          "telemetry.sdk.version": "1.39.1",
+          "service.name": "drawing-export",
+          "service.namespace": "harmonic-analyzer",
+          "service.version": "dev"
+        },
+        "schema_url": ""
+      },
+      "event_name": ""
+    },
+    {
+      "body": "build draw_pinion_lift_rod failed: datum A position did not persist (lift rod axis): (0.05499999999999966, 0.22897646401719635); requested=(0.055, 0.22899999999999998), error=2.3536e-05 m, limit=2e-05 m",
+      "severity_number": 17,
+      "severity_text": "ERROR",
+      "attributes": {
+        "code.file.path": "C:\\src\\ha-assembly-granularity-integration\\cad\\scripts\\_telemetry.py",
+        "code.function.name": "error",
+        "code.line.number": 818,
+        "exception.type": "RuntimeError",
+        "exception.message": "datum A position did not persist (lift rod axis): (0.05499999999999966, 0.22897646401719635); requested=(0.055, 0.22899999999999998), error=2.3536e-05 m, limit=2e-05 m",
+        "exception.stacktrace": "Traceback (most recent call last):\n  File \"C:\\src\\ha-assembly-granularity-integration\\cad\\scripts\\_common.py\", line 2128, in run_build\n    artefacts = asyncio.run(_run())\n  File \"C:\\Users\\pedro\\AppData\\Roaming\\uv\\python\\cpython-3.14-windows-x86_64-none\\Lib\\asyncio\\runners.py\", line 204, in run\n    return runner.run(main)\n           ~~~~~~~~~~^^^^^^\n  File \"C:\\Users\\pedro\\AppData\\Roaming\\uv\\python\\cpython-3.14-windows-x86_64-none\\Lib\\asyncio\\runners.py\", line 127, in run\n    return self._loop.run_until_complete(task)\n           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^\n  File \"C:\\Users\\pedro\\AppData\\Roaming\\uv\\python\\cpython-3.14-windows-x86_64-none\\Lib\\asyncio\\base_events.py\", line 719, in run_until_complete\n    return future.result()\n           ~~~~~~~~~~~~~^^\n  File \"C:\\src\\ha-assembly-granularity-integration\\cad\\scripts\\_common.py\", line 2107, in _run\n    return await build(adapter)\n           ^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\src\\ha-assembly-granularity-integration\\cad\\scripts\\draw_pinion_lift_rod.py\", line 163, in build\n    add_datum_feature(\n    ~~~~~~~~~~~~~~~~~^\n        adapter,\n        ^^^^^^^^\n    ...<8 lines>...\n        position_tolerance_m=0.00002,\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    )\n    ^\n  File \"C:\\src\\ha-assembly-granularity-integration\\cad\\scripts\\_telemetry.py\", line 955, in wrap\n    return fn(*args, **kwargs)\n  File \"C:\\src\\ha-assembly-granularity-integration\\cad\\scripts\\_drawing_common.py\", line 494, in add_datum_feature\n    raise RuntimeError(\n    ...<4 lines>...\n    )\nRuntimeError: datum A position did not persist (lift rod axis): (0.05499999999999966, 0.22897646401719635); requested=(0.055, 0.22899999999999998), error=2.3536e-05 m, limit=2e-05 m\n"
+      },
+      "dropped_attributes": 0,
+      "timestamp": "2026-09-08T00:20:06.156236Z",
+      "observed_timestamp": "2026-09-08T00:20:06.156265Z",
+      "trace_id": "0x6b2e4efe64c7b48bf3d68f05ffbe089c",
+      "span_id": "0x01778cca749ecf83",
+      "trace_flags": 1,
+      "resource": {
+        "attributes": {
+          "telemetry.sdk.language": "python",
+          "telemetry.sdk.name": "opentelemetry",
+          "telemetry.sdk.version": "1.39.1",
+          "service.name": "drawing-export",
+          "service.namespace": "harmonic-analyzer",
+          "service.version": "dev"
+        },
+        "schema_url": ""
+      },
+      "event_name": ""
+    },
+    {
+      "body": "task drawing:pinion_lift_rod failed: drawing:pinion_lift_rod failed (exit 1)",
+      "severity_number": 17,
+      "severity_text": "ERROR",
+      "attributes": {
+        "code.file.path": "C:\\src\\ha-assembly-granularity-integration\\cad\\scripts\\_telemetry.py",
+        "code.function.name": "error",
+        "code.line.number": 818
+      },
+      "dropped_attributes": 0,
+      "timestamp": "2026-09-08T00:20:06.354990Z",
+      "observed_timestamp": "2026-09-08T00:20:06.355058Z",
+      "trace_id": "0x6b2e4efe64c7b48bf3d68f05ffbe089c",
+      "span_id": "0x01778cca749ecf83",
+      "trace_flags": 1,
+      "resource": {
+        "attributes": {
+          "telemetry.sdk.language": "python",
+          "telemetry.sdk.name": "opentelemetry",
+          "telemetry.sdk.version": "1.39.1",
+          "service.name": "harmonic-analyzer",
+          "service.namespace": "harmonic-analyzer",
+          "service.version": "dev"
+        },
+        "schema_url": ""
+      },
+      "event_name": ""
+    },
+    {
+      "body": "drawing.datum_feature failed: datum A position did not persist (rack pinion bore axis): (0.21999999999999942, 0.20083662770023045); requested=(0.22, 0.20099999999999998), error=0.000163372 m, limit=0.0001 m",
+      "severity_number": 17,
+      "severity_text": "ERROR",
+      "attributes": {
+        "code.file.path": "C:\\src\\ha-assembly-granularity-integration\\cad\\scripts\\_telemetry.py",
+        "code.function.name": "error",
+        "code.line.number": 818
+      },
+      "dropped_attributes": 0,
+      "timestamp": "2026-09-08T00:20:25.496038Z",
+      "observed_timestamp": "2026-09-08T00:20:25.496081Z",
+      "trace_id": "0xfb4cfddd1667fe7877a3628ffa8b2930",
+      "span_id": "0x6f18e8c2765759d0",
+      "trace_flags": 1,
+      "resource": {
+        "attributes": {
+          "telemetry.sdk.language": "python",
+          "telemetry.sdk.name": "opentelemetry",
+          "telemetry.sdk.version": "1.39.1",
+          "service.name": "drawing-export",
+          "service.namespace": "harmonic-analyzer",
+          "service.version": "dev"
+        },
+        "schema_url": ""
+      },
+      "event_name": ""
+    },
+    {
+      "body": "drawing.build failed: datum A position did not persist (rack pinion bore axis): (0.21999999999999942, 0.20083662770023045); requested=(0.22, 0.20099999999999998), error=0.000163372 m, limit=0.0001 m",
+      "severity_number": 17,
+      "severity_text": "ERROR",
+      "attributes": {
+        "code.file.path": "C:\\src\\ha-assembly-granularity-integration\\cad\\scripts\\_telemetry.py",
+        "code.function.name": "error",
+        "code.line.number": 818
+      },
+      "dropped_attributes": 0,
+      "timestamp": "2026-09-08T00:20:25.499090Z",
+      "observed_timestamp": "2026-09-08T00:20:25.499123Z",
+      "trace_id": "0xfb4cfddd1667fe7877a3628ffa8b2930",
+      "span_id": "0x59eccda5794fdb24",
+      "trace_flags": 1,
+      "resource": {
+        "attributes": {
+          "telemetry.sdk.language": "python",
+          "telemetry.sdk.name": "opentelemetry",
+          "telemetry.sdk.version": "1.39.1",
+          "service.name": "drawing-export",
+          "service.namespace": "harmonic-analyzer",
+          "service.version": "dev"
+        },
+        "schema_url": ""
+      },
+      "event_name": ""
+    },
+    {
+      "body": "build draw_rack_pinion failed: datum A position did not persist (rack pinion bore axis): (0.21999999999999942, 0.20083662770023045); requested=(0.22, 0.20099999999999998), error=0.000163372 m, limit=0.0001 m",
+      "severity_number": 17,
+      "severity_text": "ERROR",
+      "attributes": {
+        "code.file.path": "C:\\src\\ha-assembly-granularity-integration\\cad\\scripts\\_telemetry.py",
+        "code.function.name": "error",
+        "code.line.number": 818,
+        "exception.type": "RuntimeError",
+        "exception.message": "datum A position did not persist (rack pinion bore axis): (0.21999999999999942, 0.20083662770023045); requested=(0.22, 0.20099999999999998), error=0.000163372 m, limit=0.0001 m",
+        "exception.stacktrace": "Traceback (most recent call last):\n  File \"C:\\src\\ha-assembly-granularity-integration\\cad\\scripts\\_common.py\", line 2128, in run_build\n    artefacts = asyncio.run(_run())\n  File \"C:\\Users\\pedro\\AppData\\Roaming\\uv\\python\\cpython-3.14-windows-x86_64-none\\Lib\\asyncio\\runners.py\", line 204, in run\n    return runner.run(main)\n           ~~~~~~~~~~^^^^^^\n  File \"C:\\Users\\pedro\\AppData\\Roaming\\uv\\python\\cpython-3.14-windows-x86_64-none\\Lib\\asyncio\\runners.py\", line 127, in run\n    return self._loop.run_until_complete(task)\n           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^\n  File \"C:\\Users\\pedro\\AppData\\Roaming\\uv\\python\\cpython-3.14-windows-x86_64-none\\Lib\\asyncio\\base_events.py\", line 719, in run_until_complete\n    return future.result()\n           ~~~~~~~~~~~~~^^\n  File \"C:\\src\\ha-assembly-granularity-integration\\cad\\scripts\\_common.py\", line 2107, in _run\n    return await build(adapter)\n           ^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\src\\ha-assembly-granularity-integration\\cad\\scripts\\draw_rack_pinion.py\", line 135, in build\n    add_datum_feature(\n    ~~~~~~~~~~~~~~~~~^\n        adapter,\n        ^^^^^^^^\n    ...<6 lines>...\n        position_tolerance_m=0.0001,\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    )\n    ^\n  File \"C:\\src\\ha-assembly-granularity-integration\\cad\\scripts\\_telemetry.py\", line 955, in wrap\n    return fn(*args, **kwargs)\n  File \"C:\\src\\ha-assembly-granularity-integration\\cad\\scripts\\_drawing_common.py\", line 494, in add_datum_feature\n    raise RuntimeError(\n    ...<4 lines>...\n    )\nRuntimeError: datum A position did not persist (rack pinion bore axis): (0.21999999999999942, 0.20083662770023045); requested=(0.22, 0.20099999999999998), error=0.000163372 m, limit=0.0001 m\n"
+      },
+      "dropped_attributes": 0,
+      "timestamp": "2026-09-08T00:20:25.518234Z",
+      "observed_timestamp": "2026-09-08T00:20:25.518264Z",
+      "trace_id": "0xfb4cfddd1667fe7877a3628ffa8b2930",
+      "span_id": "0x3185d35b64ca45ad",
+      "trace_flags": 1,
+      "resource": {
+        "attributes": {
+          "telemetry.sdk.language": "python",
+          "telemetry.sdk.name": "opentelemetry",
+          "telemetry.sdk.version": "1.39.1",
+          "service.name": "drawing-export",
+          "service.namespace": "harmonic-analyzer",
+          "service.version": "dev"
+        },
+        "schema_url": ""
+      },
+      "event_name": ""
+    },
+    {
+      "body": "task drawing:rack_pinion failed: drawing:rack_pinion failed (exit 1)",
+      "severity_number": 17,
+      "severity_text": "ERROR",
+      "attributes": {
+        "code.file.path": "C:\\src\\ha-assembly-granularity-integration\\cad\\scripts\\_telemetry.py",
+        "code.function.name": "error",
+        "code.line.number": 818
+      },
+      "dropped_attributes": 0,
+      "timestamp": "2026-09-08T00:20:25.682696Z",
+      "observed_timestamp": "2026-09-08T00:20:25.682751Z",
+      "trace_id": "0xfb4cfddd1667fe7877a3628ffa8b2930",
+      "span_id": "0x3185d35b64ca45ad",
+      "trace_flags": 1,
+      "resource": {
+        "attributes": {
+          "telemetry.sdk.language": "python",
+          "telemetry.sdk.name": "opentelemetry",
+          "telemetry.sdk.version": "1.39.1",
+          "service.name": "harmonic-analyzer",
+          "service.namespace": "harmonic-analyzer",
+          "service.version": "dev"
+        },
+        "schema_url": ""
+      },
+      "event_name": ""
+    }
+  ],
+  "cache_spans": [
+    {
+      "name": "cache.probe drawing:pinion_lift_rod",
+      "trace_id": "0x4203c1a6d53932840900e625a12847e0",
+      "span_id": "0xe30891b96cded0de",
+      "parent_id": null,
+      "start": "2026-09-08T00:19:58.539274Z",
+      "end": "2026-09-08T00:19:59.210193Z",
+      "seconds": 0.670919,
+      "status": {
+        "status_code": "OK"
+      },
+      "attributes": {
+        "harmonic.depth": 0,
+        "label": "drawing:pinion_lift_rod",
+        "cache": "miss"
+      }
+    },
+    {
+      "name": "cache.reprobe drawing:pinion_lift_rod",
+      "trace_id": "0xd70bc0d5712dfa853cfa83c9112a4cbc",
+      "span_id": "0x448970b6b2c82f49",
+      "parent_id": null,
+      "start": "2026-09-08T00:19:59.212759Z",
+      "end": "2026-09-08T00:19:59.212785Z",
+      "seconds": 2.6e-05,
+      "status": {
+        "status_code": "OK"
+      },
+      "attributes": {
+        "harmonic.depth": 0,
+        "label": "drawing:pinion_lift_rod",
+        "cache": "miss"
+      }
+    },
+    {
+      "name": "cache.probe drawing:rack_pinion",
+      "trace_id": "0x9ffc64cb656c3a77c953817d85ed50d1",
+      "span_id": "0x80f04cb5d00828a1",
+      "parent_id": null,
+      "start": "2026-09-08T00:19:59.210485Z",
+      "end": "2026-09-08T00:20:00.015568Z",
+      "seconds": 0.805083,
+      "status": {
+        "status_code": "OK"
+      },
+      "attributes": {
+        "harmonic.depth": 0,
+        "label": "drawing:rack_pinion",
+        "cache": "miss"
+      }
+    },
+    {
+      "name": "cache.reprobe drawing:rack_pinion",
+      "trace_id": "0xe842f41c3982be1365d91e6ce6a1d4f1",
+      "span_id": "0x38339a3d782c5201",
+      "parent_id": null,
+      "start": "2026-09-08T00:20:06.390154Z",
+      "end": "2026-09-08T00:20:06.390203Z",
+      "seconds": 4.9e-05,
+      "status": {
+        "status_code": "OK"
+      },
+      "attributes": {
+        "harmonic.depth": 0,
+        "label": "drawing:rack_pinion",
+        "cache": "miss"
+      }
+    }
+  ],
+  "cache_dispositions": {
+    "cache.probe/miss": 2,
+    "cache.reprobe/miss": 2
+  },
+  "cache_events": [],
+  "cross_start_boundary_spans": [],
+  "console": {
+    "path": "C:\\src\\ha-assembly-granularity-integration\\cad\\out\\reports\\assembly-granularity-integration\\candidate-2d-datum-retry-full.log",
+    "bytes": 6764,
+    "sha256": "a7ec86f9a83f2ff9bc7717f940e19c238a494f0352e0c613ddab89853184061f",
+    "dispositions": [
+      {
+        "marker": "--",
+        "task": "part:pinion_lift_rod",
+        "line": "-- part:pinion_lift_rod"
+      },
+      {
+        "marker": "--",
+        "task": "part:rack_pinion",
+        "line": "-- part:rack_pinion"
+      },
+      {
+        "marker": ".",
+        "task": "drawing:pinion_lift_rod",
+        "line": ".  drawing:pinion_lift_rod"
+      },
+      {
+        "marker": ".",
+        "task": "drawing:rack_pinion",
+        "line": ".  drawing:rack_pinion"
+      }
+    ],
+    "disposition_counts": {
+      "--": 2,
+      ".": 2
+    },
+    "error_lines": [
+      "Traceback (most recent call last):",
+      "Traceback (most recent call last):",
+      "TaskError - taskid:drawing:pinion_lift_rod",
+      "Traceback (most recent call last):",
+      "TaskError - taskid:drawing:rack_pinion",
+      "Traceback (most recent call last):"
+    ]
+  },
+  "limits": [
+    "Task duration sums are not wall time; independent tasks can overlap, and seat waits are reported separately.",
+    "Zero-COM acceptance requires clean boundaries, zero native activity and zero COM task executions; this utility does not replace process/ownership validation.",
+    "Absence of completed spans during an active task is not absence of COM activity. Mark boundaries only after the previous invocation exits.",
+    "Exit code is caller-supplied, never inferred from a quiet or missing process."
+  ]
+}

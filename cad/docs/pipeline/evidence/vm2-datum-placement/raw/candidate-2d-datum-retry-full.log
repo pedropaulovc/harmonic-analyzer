@@ -1,0 +1,106 @@
+  xx  [    6.6s +  6.6s] drawing.datum_feature failed: datum A position did not persist (lift rod axis): (0.05499999999999966, 0.22897646401719635); requested=(0.055, 0.22899999999999998), error=2.3536e-05 m, limit=2e-05 m
+  xx  [    6.6s +  0.0s] drawing.build failed: datum A position did not persist (lift rod axis): (0.05499999999999966, 0.22897646401719635); requested=(0.055, 0.22899999999999998), error=2.3536e-05 m, limit=2e-05 m
+  xx  [    6.7s +  0.0s] build draw_pinion_lift_rod failed: datum A position did not persist (lift rod axis): (0.05499999999999966, 0.22897646401719635); requested=(0.055, 0.22899999999999998), error=2.3536e-05 m, limit=2e-05 m
+Traceback (most recent call last):
+  File "C:\src\ha-assembly-granularity-integration\cad\scripts\_common.py", line 2128, in run_build
+    artefacts = asyncio.run(_run())
+  File "C:\Users\pedro\AppData\Roaming\uv\python\cpython-3.14-windows-x86_64-none\Lib\asyncio\runners.py", line 204, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "C:\Users\pedro\AppData\Roaming\uv\python\cpython-3.14-windows-x86_64-none\Lib\asyncio\runners.py", line 127, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\pedro\AppData\Roaming\uv\python\cpython-3.14-windows-x86_64-none\Lib\asyncio\base_events.py", line 719, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "C:\src\ha-assembly-granularity-integration\cad\scripts\_common.py", line 2107, in _run
+    return await build(adapter)
+           ^^^^^^^^^^^^^^^^^^^^
+  File "C:\src\ha-assembly-granularity-integration\cad\scripts\draw_pinion_lift_rod.py", line 163, in build
+    add_datum_feature(
+    ~~~~~~~~~~~~~~~~~^
+        adapter,
+        ^^^^^^^^
+    ...<8 lines>...
+        position_tolerance_m=0.00002,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\src\ha-assembly-granularity-integration\cad\scripts\_telemetry.py", line 955, in wrap
+    return fn(*args, **kwargs)
+  File "C:\src\ha-assembly-granularity-integration\cad\scripts\_drawing_common.py", line 494, in add_datum_feature
+    raise RuntimeError(
+    ...<4 lines>...
+    )
+RuntimeError: datum A position did not persist (lift rod axis): (0.05499999999999966, 0.22897646401719635); requested=(0.055, 0.22899999999999998), error=2.3536e-05 m, limit=2e-05 m
+  xx  [    8.1s +  8.1s] task drawing:pinion_lift_rod failed: drawing:pinion_lift_rod failed (exit 1)
+  xx  [   18.8s + 18.8s] drawing.datum_feature failed: datum A position did not persist (rack pinion bore axis): (0.21999999999999942, 0.20083662770023045); requested=(0.22, 0.20099999999999998), error=0.000163372 m, limit=0.0001 m
+  xx  [   18.8s +  0.0s] drawing.build failed: datum A position did not persist (rack pinion bore axis): (0.21999999999999942, 0.20083662770023045); requested=(0.22, 0.20099999999999998), error=0.000163372 m, limit=0.0001 m
+  xx  [   18.9s +  0.0s] build draw_rack_pinion failed: datum A position did not persist (rack pinion bore axis): (0.21999999999999942, 0.20083662770023045); requested=(0.22, 0.20099999999999998), error=0.000163372 m, limit=0.0001 m
+Traceback (most recent call last):
+  File "C:\src\ha-assembly-granularity-integration\cad\scripts\_common.py", line 2128, in run_build
+    artefacts = asyncio.run(_run())
+  File "C:\Users\pedro\AppData\Roaming\uv\python\cpython-3.14-windows-x86_64-none\Lib\asyncio\runners.py", line 204, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "C:\Users\pedro\AppData\Roaming\uv\python\cpython-3.14-windows-x86_64-none\Lib\asyncio\runners.py", line 127, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\pedro\AppData\Roaming\uv\python\cpython-3.14-windows-x86_64-none\Lib\asyncio\base_events.py", line 719, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "C:\src\ha-assembly-granularity-integration\cad\scripts\_common.py", line 2107, in _run
+    return await build(adapter)
+           ^^^^^^^^^^^^^^^^^^^^
+  File "C:\src\ha-assembly-granularity-integration\cad\scripts\draw_rack_pinion.py", line 135, in build
+    add_datum_feature(
+    ~~~~~~~~~~~~~~~~~^
+        adapter,
+        ^^^^^^^^
+    ...<6 lines>...
+        position_tolerance_m=0.0001,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\src\ha-assembly-granularity-integration\cad\scripts\_telemetry.py", line 955, in wrap
+    return fn(*args, **kwargs)
+  File "C:\src\ha-assembly-granularity-integration\cad\scripts\_drawing_common.py", line 494, in add_datum_feature
+    raise RuntimeError(
+    ...<4 lines>...
+    )
+RuntimeError: datum A position did not persist (rack pinion bore axis): (0.21999999999999942, 0.20083662770023045); requested=(0.22, 0.20099999999999998), error=0.000163372 m, limit=0.0001 m
+  xx  [   26.7s + 26.7s] task drawing:rack_pinion failed: drawing:rack_pinion failed (exit 1)
+-- part:pinion_lift_rod
+-- part:rack_pinion
+.  drawing:pinion_lift_rod
+.  drawing:rack_pinion
+TaskError - taskid:drawing:pinion_lift_rod
+PythonAction Error
+Traceback (most recent call last):
+  File "C:\src\ha-assembly-granularity-integration\.venv\Lib\site-packages\doit\action.py", line 473, in execute
+    returned_value = self.py_callable(*self.args, **kwargs)
+  File "C:\src\ha-assembly-granularity-integration\dodo.py", line 1489, in _cached_drawing_action
+    _exec_com(cmd, label, log_stem=f"drawing-{stem}")
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\src\ha-assembly-granularity-integration\dodo.py", line 842, in _exec_com
+    _exec(cmd, label, log_stem)
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\src\ha-assembly-granularity-integration\dodo.py", line 603, in _exec
+    raise RuntimeError(f"{label} failed (exit {rc})")
+RuntimeError: drawing:pinion_lift_rod failed (exit 1)
+
+TaskError - taskid:drawing:rack_pinion
+PythonAction Error
+Traceback (most recent call last):
+  File "C:\src\ha-assembly-granularity-integration\.venv\Lib\site-packages\doit\action.py", line 473, in execute
+    returned_value = self.py_callable(*self.args, **kwargs)
+  File "C:\src\ha-assembly-granularity-integration\dodo.py", line 1489, in _cached_drawing_action
+    _exec_com(cmd, label, log_stem=f"drawing-{stem}")
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\src\ha-assembly-granularity-integration\dodo.py", line 842, in _exec_com
+    _exec(cmd, label, log_stem)
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\src\ha-assembly-granularity-integration\dodo.py", line 603, in _exec
+    raise RuntimeError(f"{label} failed (exit {rc})")
+RuntimeError: drawing:rack_pinion failed (exit 1)
+
