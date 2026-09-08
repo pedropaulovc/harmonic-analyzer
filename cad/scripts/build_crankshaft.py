@@ -4,9 +4,9 @@ Stepped steel shaft in the green v2 post bearing at the base corner:
 an integral Ø11.388 journal runs over local stations 32.755105572..104.789505572,
 while the crank arm on the outboard end (affixed by a removable tapered
 pin so the crankshaft gear can be changed), chain sprocket and the 4:1
-drive pinion retain their existing 3/8-in seats. Modeled with the
-tapered-pin cross-hole; the crank arm/pin/handle and the gears are separate parts
-(`build_crank_arm.py` etc., gears in M4).
+drive pinion retain their existing 3/8-in seats. Modeled with the shallow
+coaxial #0-80 retainer tap and the independent tapered-pin cross-hole; the
+crank arm, end cap, pin/handle, and gears are separate parts.
 
 Dimensions: cad/DIMENSIONS.md "Chapter 11" - dia legacy (med), length
 derived from eight-views 8/8 pedestal proportions (low).
@@ -51,23 +51,29 @@ from _fit_limits import deviations
 from _holes import (
     NUMBER_DRILL_MM,
     HoleSpec,
+    blind_cut_dia_mm,
+    blind_hole_volume_mm3,
     cross_hole_volume_mm3,
     wizard_hole_on_cylinder,
+    wizard_holes,
 )
 from _part_pmi import author_part_pmi
 from crankshaft_spec import (
     CRANK_END_NOTE,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
-    JOURNAL_DIA_BAND,
     END_VIEW_NOTE,
     JOURNAL_DIA,
+    JOURNAL_DIA_BAND,
     JOURNAL_LENGTH,
     JOURNAL_START,
     PIN_HOLE_HEIGHT,
+    RETAINER_THREAD,
     SHAFT_DIA,
     SHAFT_DIA_BAND,
     SHAFT_LENGTH,
+    SHAFT_TAP_DRILL_DEPTH,
+    SHAFT_THREAD_DEPTH,
     SURFACE_FINISHES,
 )
 
@@ -206,6 +212,35 @@ async def build(adapter) -> dict[str, str]:
         0.005 * v_with_journal,
     )
 
+    # Coaxial crank-end retainer tap: a shallow #0-80 bottoming Hole Wizard
+    # feature from the outboard end face.  Its complete 118-degree point leaves
+    # the specified web before the finished 1:48 taper-pin bore.
+    retainer_tap = HoleSpec(
+        "tapped_bottoming",
+        RETAINER_THREAD,
+        end="blind",
+        depth_mm=SHAFT_TAP_DRILL_DEPTH,
+        overrides_mm={"ThreadDepth": SHAFT_THREAD_DEPTH},
+    )
+    wizard_holes(
+        adapter,
+        retainer_tap,
+        [[0.0, 0.0, 0.0]],
+        (0.0, -1.0, 0.0),
+        "crank-end retaining tap (#0-80 bottoming)",
+        name="RetainerTap",
+    )
+    v_retainer_tap = blind_hole_volume_mm3(
+        blind_cut_dia_mm(retainer_tap), SHAFT_TAP_DRILL_DEPTH
+    )
+    v_with_retainer_tap = v_with_journal - v_retainer_tap
+    await volume_check(
+        adapter,
+        "shaft + bearing journal + crank-end tap",
+        v_with_retainer_tap,
+        0.02 * v_retainer_tap,
+    )
+
     check(
         "create_plane PinHoleStationPlane",
         await adapter.create_plane(
@@ -237,8 +272,8 @@ async def build(adapter) -> dict[str, str]:
     # integrated numerically (probe-exact; replaces the old ~178 as-built
     # constant for the retired Ø5.0).
     v_pin = cross_hole_volume_mm3(NUMBER_DRILL_MM["#9"], SHAFT_DIA)
-    v_final = v_with_journal - v_pin
-    await volume_check(adapter, "shaft + pin hole", v_final, 0.02 * v_pin)
+    v_final = v_with_retainer_tap - v_pin
+    await volume_check(adapter, "shaft + retainer tap + pin hole", v_final, 0.02 * v_pin)
 
     # Apply the deferred drive equations after the whole model + a rebuild
     # exists, then re-check neutrality (each equation evaluates to the as-built

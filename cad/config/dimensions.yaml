@@ -246,6 +246,12 @@ sections:
         - 'shortened 2026-09 (ch12 p.19: the shaft ends just past the inboard pinion with a capped end — no 34 mm bare stub out the column back); the crank plane stays at the ch30 GT read (arm hub z −175..−167, T12 chain wheel −157.5, pedestal cylinder front face −121.4) — the shaft spans z −175..−53 (`crankshaft_spec.py`)'
         - derived
         - med
+      - - Crankshaft outboard retainer (2026-09-03)
+        - 'separate bright brass stack on the crank-arm boss: Ø16 × Ø1.8 × 1.0 annular cap (MHA-131) retained by a #0-80 slotted brass fillister screw (MHA-132), Ø1.10 × 1.55 under head with Ø4.0 × 1.6 head and 0.6 × 0.45 slot; shaft carries a 3/64-in (Ø1.191) bottoming tap drill 0.58 deep and 0.55 full thread'
+        - —
+        - 'ch11 p.14 and ch23 p.59 outboard crank-hub views; #0-80 derived from the finished 1:48 transverse taper envelope: 1.732 engaged turns, 0.208 web after drill point, 0.596 screw-tip clearance'
+        - photo + derived
+        - cap topology high; dimensions low
   - prose: |2
 
       Construction (stated): wooden handle stained black, rotates on a pivot; metal crank
@@ -1221,11 +1227,11 @@ sections:
         - stated
         - high (feature)
       - - Gooseneck
-        - 'Ø16 chrome tube: vertical leg machine x 197 (east column line), y 880..1390 — geometry UNCHANGED by the 2026-08-02 rederive; the post drops ≈120 below the rail underside (999.7, unchanged) and ends in a free tip, passing through the Ø17 clearance bore in the top-frame''s east-rail hub and gripped by the hub''s square-head set screw (clamp deleted); 180° bend R 51; tip leg x 95 — plumb above the boss hook — ending y 1378; lug + Ø4 X-pin at y 1373 carries the spring''s top loop'
+        - 'Ø16 chrome tube: vertical leg machine x 197, y 880..1390, passing through the top-frame Ø17 hub bore and gripped by its square-head set screw; 180° bend R51; tip arm ends at machine x 101.75 on centreline y 1373.3. An AISI 1018 end plug carries an axial #6-32 screw with Ø3.6 exposed shank and Ø10 × 2 round head; its outer face has the photographed 45° diagonal driver slot, 0.80 wide × 0.80 deep'
         - —
-        - 'tip drop: ch. 7 back-left ¾ view (page001_img17) — free tip clear of the columns at image y 491, machine 880 by frame-height scale (41 mm/26 px), cross-checked by the Ø16 silhouette (10 px). Leg-top/bend: 0.515 px/mm + p3 90° page; tip "slotted screw" modeled as lug + pin -- SUPERSEDED 2026-09-02 (ch19 p.45 page001_img02): a #6-32 slotted screw driven AXIALLY into the arm''s plugged end face (Ø3.6 shank, Ø10 head), the counter spring''s top eye hanging on the shank against the head; arm centreline lowered 1386 -> 1373.3 and shortened to end at machine x 101.75 so the eye stays at (95, 1370.7) (`gooseneck_geom.py`)'
+        - 'tube position from ch7/ch30 scale fits; axial spring screw and diagonal slot from ch19 p.45 page001_img02 close-up; the counter spring eye hangs on the exposed shank against the head'
         - scaled + derived
-        - leg-top med, drop med
+        - leg-top med, screw topology high, slot size low
       - - Gooseneck clamp
         - 'deleted — square-head set screw in the top-frame hub, book p.45 ("a square-head screw pinches the post in its socket" — the screw survives as gooseneck-set-screw, 1/4-20 square head 10 × 10 × 6)'
         - —
@@ -1746,11 +1752,11 @@ sections:
         - scaled + derived
         - low
       - - Pen marker
-        - 'Ø8 barrel, 5-tall conical tip, 110 overall (a full-length marker: ~75 shows in front of the block on ch30 p002/p004 and v4_t00612); collar/ferrule detail omitted'
+        - 'regular Fine Point marker silhouette, independently revolved: 123.11 overall × Ø12.24 maximum, with narrow writing point/holder neck, tapered shoulder, gently flared barrel and rounded/tapered rear; black body. The writing point remains 0.25 off the recording paper and the wider body seats on the open groove mouth rather than being buried in it'
         - —
-        - p.60–63, ch30 p002/p004, v4_t00612
-        - scaled
-        - low
+        - 'user identification 2026-09-03 + ch24 page001_img02/ch30 body silhouette; online Printables model 253375 supplied envelope dimensions only (CC BY-NC-SA asset not imported or reproduced)'
+        - measured envelope + project-authored profile
+        - envelope med, intermediate profile low
   - prose: |2
 
       Notes: brass frame holds the marker in a v-block; v-block on a square brass rod
@@ -1767,9 +1773,10 @@ sections:
       (z −144.3) clears the paper front (−143.4). V-block origin (−9.73, 364,
       −155.59), yawed +45° about Y (its length runs forward + east): the rod bore
       (local x 10, z 8) on the rod axis with the rod 14 into it; marker in the
-      bottom groove along the block length, axis 0.25 under the groove roof,
-      nib at (−10.35, 364.25, −143.65) = 0.25 off the paper front at paper
-      mid-height, barrel running 110 forward to (67.4, ., −221.4). Stirrup frame
+      bottom groove along the block length, resting on the two open mouth edges;
+      point at (−10.35, 364.25, −143.65) = 0.25 off the paper front at paper
+      mid-height, with the 123.11-long Fine Point body extending forward along
+      the same +45° groove axis. Stirrup frame
       yawed −45° with its window round the block section (1.0 a side, top rail
       0.1 above the block top), 1.0 forward of the rod's front face; thumb screw
       stood on end (+X → +Y) on the frame's screw axis, knob outer face y 340,

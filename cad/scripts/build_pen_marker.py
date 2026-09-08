@@ -1,12 +1,11 @@
-r"""Reproduction script: pen marker (book ch. 24, pp. 60-63).
+r"""Reproduction script: regular Fine Point pen marker (book ch. 24).
 
-The marking pen itself: a round barrel with a conical tip, held by the
-pen rod's v-block at ~12 degrees so the tip rides the platen paper.
-Modeled as a plain barrel + cone (the book pen's collar/ferrule detail
-omitted -- simplification).
+The marker is an independently authored, sparse revolved silhouette: a narrow
+writing end and holder neck, a tapered shoulder, a gently flared barrel, and a
+rounded/tapered closed rear.  Its 123.11 mm by 12.24 mm product envelope is a
+dimensional fact only; no third-party mesh or mesh topology is used.
 
-Layout: axis +Y from the tip at the origin; cone 12 tall, barrel to
-y 60. Dimensions: cad/DIMENSIONS.md ch. 24 (M6.4, low).
+Layout: axis +Y from the paper-contact writing point at the origin.
 
 Run (SolidWorks already open)::
 
@@ -15,11 +14,10 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
-import math
 import sys
 
 from _common import (
-    POLISHED_STEEL,
+    PANEL_BLACK,
     SketchDims,
     add_line_chain,
     apply_color,
@@ -44,13 +42,25 @@ from _drawing_marks import (
 )
 from _part_pmi import author_part_pmi
 from pen_marker_spec import (
-    BARREL_DIA,
-    BARREL_TOP_Y,
-    CONE_H,
+    BARREL_FLARE_Y,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     ISOMETRIC_VIEW_NOTE,
+    MAX_DIAMETER,
+    OVERALL_LENGTH,
+    PROFILE_STATIONS,
+    REAR_ROUND_DIAMETER,
+    REAR_ROUND_Y,
+    REAR_TAPER_DIAMETER,
+    REAR_TAPER_Y,
+    SHOULDER_DIAMETER,
+    SHOULDER_Y,
     SURFACE_FINISHES,
+    TIP_POINT_DIAMETER,
+    TIP_POINT_Y,
+    TIP_NECK_DIAMETER,
+    TIP_NECK_Y,
+    revolved_profile_volume_mm3,
 )
 
 PART_NAME = "pen-marker"
@@ -62,42 +72,76 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
-    # Editable knobs (Tools > Equations): barrel diameter, the barrel top, and
-    # the tip-cone height. The mm suffix is load-bearing -- this is an INCH
-    # document and the equation manager reads BARE numbers in document units (an
-    # unsuffixed 60 = 60 in, blowing the part up 25.4x).
-    await set_global(adapter, "BarrelDia", f"{BARREL_DIA}mm")
-    await set_global(adapter, "BarrelTopY", f"{BARREL_TOP_Y}mm")
-    await set_global(adapter, "ConeH", f"{CONE_H}mm")
+    # Every silhouette station is editable in Tools > Equations.  Explicit mm
+    # suffixes are load-bearing because the template document uses inches.
+    await set_global(adapter, "OverallLength", f"{OVERALL_LENGTH}mm")
+    await set_global(adapter, "MaxDiameter", f"{MAX_DIAMETER}mm")
+    await set_global(adapter, "TipPointY", f"{TIP_POINT_Y}mm")
+    await set_global(adapter, "TipPointDia", f"{TIP_POINT_DIAMETER}mm")
+    await set_global(adapter, "TipNeckY", f"{TIP_NECK_Y}mm")
+    await set_global(adapter, "TipNeckDia", f"{TIP_NECK_DIAMETER}mm")
+    await set_global(adapter, "ShoulderY", f"{SHOULDER_Y}mm")
+    await set_global(adapter, "ShoulderDia", f"{SHOULDER_DIAMETER}mm")
+    await set_global(adapter, "BarrelFlareY", f"{BARREL_FLARE_Y}mm")
+    await set_global(adapter, "RearTaperY", f"{REAR_TAPER_Y}mm")
+    await set_global(adapter, "RearTaperDia", f"{REAR_TAPER_DIAMETER}mm")
+    await set_global(adapter, "RearRoundY", f"{REAR_ROUND_Y}mm")
+    await set_global(adapter, "RearRoundDia", f"{REAR_ROUND_DIAMETER}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
-    r = BARREL_DIA / 2.0
     profile_dims = SketchDims()
     check("create_sketch profile", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     check(
         "axis centerline",
-        await adapter.add_centerline(0.0, 0.0, 0.0, BARREL_TOP_Y),
+        await adapter.add_centerline(0.0, 0.0, 0.0, OVERALL_LENGTH),
     )
-    profile_pts = [
-        (0.0, 0.0),
-        (r, CONE_H),
-        (r, BARREL_TOP_Y),
-        (0.0, BARREL_TOP_Y),
-    ]
+    profile_pts = [(radius, axial_y) for axial_y, radius in PROFILE_STATIONS]
     profile = await add_line_chain(adapter, profile_pts)
     set_sketch_direct_db(adapter, False)
-    # The centerline merged into the tip/top profile corners at creation,
-    # so the closed chain's own constraints define it too.
-    # Emission order (anchor vertex 0 at origin = 0 dims; then segments 0..2,
-    # segment 3 closes onto the anchor): segment 0 is general (cone flank ->
-    # horizontal r then vertical ConeH), segment 1 is vertical (barrel side ->
-    # BarrelTopY - ConeH), segment 2 is horizontal (barrel top -> r).
+    # Vertex 0 is the writing point at the origin.  Each sloped flank emits
+    # radial then axial distance; the centerline closure emits no duplicate
+    # dimension.  The drives below therefore expose every authored station
+    # while keeping the sketch fully constrained and equation-neutral.
     await define_polygon_chain(
-        adapter, profile, profile_pts, label="marker", dims=profile_dims,
-        names=["ConeRadius", "ConeH", "BarrelLen", "BarrelRadius"],
-        drives=['"BarrelDia" / 2', '"ConeH"', '"BarrelTopY" - "ConeH"', '"BarrelDia" / 2'],
+        adapter,
+        profile,
+        profile_pts,
+        label="marker",
+        dims=profile_dims,
+        names=[
+            "TipPointRadius",
+            "TipPointY",
+            "TipNeckRadialRise",
+            "TipNeckRun",
+            "ShoulderRadialRise",
+            "ShoulderRun",
+            "FlareRadialRise",
+            "FlareRun",
+            "RearTaperRadialDrop",
+            "RearTaperRun",
+            "RearRoundRadialDrop",
+            "RearRoundRun",
+            "RearClosureRadius",
+            "RearClosureRun",
+        ],
+        drives=[
+            '"TipPointDia" / 2',
+            '"TipPointY"',
+            '("TipNeckDia" - "TipPointDia") / 2',
+            '"TipNeckY" - "TipPointY"',
+            '("ShoulderDia" - "TipNeckDia") / 2',
+            '"ShoulderY" - "TipNeckY"',
+            '("MaxDiameter" - "ShoulderDia") / 2',
+            '"BarrelFlareY" - "ShoulderY"',
+            '("MaxDiameter" - "RearTaperDia") / 2',
+            '"RearTaperY" - "BarrelFlareY"',
+            '("RearTaperDia" - "RearRoundDia") / 2',
+            '"RearRoundY" - "RearTaperY"',
+            '"RearRoundDia" / 2',
+            '"OverallLength" - "RearRoundY"',
+        ],
     )
     await ensure_fully_defined(adapter, "marker profile")
     check("exit_sketch profile", await adapter.exit_sketch())
@@ -106,7 +150,7 @@ async def build(adapter) -> dict[str, str]:
     check("revolve marker", await adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "Marker")
 
-    expected = math.pi * r * r * (CONE_H / 3.0 + (BARREL_TOP_Y - CONE_H))
+    expected = revolved_profile_volume_mm3()
     await volume_check(adapter, "marker", expected, 0.005 * expected)
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
@@ -118,9 +162,9 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "driven marker (equations neutral)", expected, 0.005 * expected)
 
     await apply_material(adapter, MATERIAL)
-    # The ch24 macro shows a bright nickel/steel marker body, not brass —
-    # keep the brass mass model, override the display colour.
-    await apply_color(adapter, POLISHED_STEEL)
+    # A regular Fine Point marker reads as a dark molded body in the assembly;
+    # retain the configured mass material while overriding only its appearance.
+    await apply_color(adapter, PANEL_BLACK)
     await report_mass_properties(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

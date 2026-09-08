@@ -86,6 +86,7 @@ DIAMETER_TOLERANCE_MM = 0.005
 # expectations from these pinned values; diag_hole_wizard.py re-proves the
 # representative cases by measured volume.
 TAP_DRILL_MM = {  # taps cut the tap-drill diameter (TAP_DRILL column)
+    "#0-80": 1.191,
     "#2-56": 1.778,
     "#3-48": 1.994,
     "#4-40": 2.261,
@@ -98,6 +99,7 @@ TAP_DRILL_MM = {  # taps cut the tap-drill diameter (TAP_DRILL column)
     "9/16-12": 12.304,
 }
 THREAD_MAJOR_MM = {  # basic external-thread major diameters (ASME B1.1)
+    "#0-80": 1.524,
     "#2-56": 2.184,
     "#3-48": 2.515,
     "#4-40": 2.845,
@@ -196,6 +198,11 @@ class HoleSpec:
     thread_class: str = "2B"
     fit: str = "normal"
     overrides_mm: dict[str, float] = field(default_factory=dict)
+
+
+def _blind_tap_thread_depth_m(spec: HoleSpec) -> float:
+    """Return the HoleWizard5 tap-depth slot, honoring the caller's override."""
+    return spec.overrides_mm.get("ThreadDepth", spec.depth_mm) / 1000.0
 
 
 @dataclass
@@ -432,7 +439,21 @@ def wizard_holes(
         dia = blind_cut_dia_mm(spec) / 1000.0
         ang = 2.0594885  # 118-degree drill point
         if hole_type == 4:
-            vals = [d, -1, -1, -1, -1, ang, 1, _ENDS["blind"], -1, -1, -1, -1]
+            thread_depth = _blind_tap_thread_depth_m(spec)
+            vals = [
+                thread_depth,
+                -1,
+                -1,
+                -1,
+                -1,
+                ang,
+                1,
+                _ENDS["blind"],
+                -1,
+                -1,
+                -1,
+                -1,
+            ]
             tclass = spec.thread_class
         else:
             fit = _FITS[spec.fit] if spec.kind == "clearance" else -1
@@ -666,6 +687,8 @@ def wizard_holes(
                 pinned_mm=round(pinned_dia_mm, 4),
             )
     for k, v in spec.overrides_mm.items():
+        if spec.end == "blind" and hole_type == 4 and k == "ThreadDepth":
+            continue
         edits.append((k, v / 1000.0))
         if k == "HoleDiameter":
             # the through-hole knob of a counterbore is ThruHoleDiameter;

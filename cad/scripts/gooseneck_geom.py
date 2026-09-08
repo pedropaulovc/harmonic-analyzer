@@ -35,5 +35,8 @@ SCREW_HEAD_DIA = 10.0  # slotted round head (low): wider than the eye's 8.9
 # its underside (axis - 5.0 = 1368.3) clears the coil's top wire (1368.0)
 # by 0.3 where the two overlap in x (build_summing_assembly proves it)
 SCREW_HEAD_T = 2.0  # head thickness (low)
+SCREW_SLOT_W = 0.8  # p.45 axial end view: diagonal driver slot width (low)
+SCREW_SLOT_D = 0.8  # matching depth documented on the gooseneck print (low)
+SCREW_SLOT_ANGLE_DEG = 45.0  # diagonal across the outer head face, not axis-aligned
 PLUG_T = 6.0  # end plug capping the bore behind the screw: 6.0 gives the
 # #6-32 tap ~7 full threads (a 2.0 cap would hold ~2.5) (derived)

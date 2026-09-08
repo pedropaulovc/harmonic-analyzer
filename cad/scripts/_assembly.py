@@ -2148,8 +2148,14 @@ _ALLOWED_FREE_STEMS: dict[str, tuple[str, ...]] = {
     "summing": ("summing-lever", "boss-hook"),
     # The carriage riders (v-block, marker, stirrup frame, thumb screw) are
     # lock-mated to the free rod and read under-constrained with it.
-    "pen": ("pen-rod", "pen-marker", "pen-wire", "pen-v-block", "pen-frame",
-            "pen-set-screw"),
+    "pen": (
+        "pen-rod",
+        "pen-marker",
+        "pen-wire",
+        "pen-v-block",
+        "pen-frame",
+        "pen-set-screw",
+    ),
     "drive-train": (
         "alignment-pinion",
         "cone-gear",
@@ -2161,6 +2167,11 @@ _ALLOWED_FREE_STEMS: dict[str, tuple[str, ...]] = {
         "cone-tip-bushing",
         "cone-tip-pinch-screw",
         "crank-arm",
+        # These lock-mated retainer pieces ride the crank's free spin; they do
+        # not add DOF, but SolidWorks reports every member of the rigid group
+        # under-constrained with its driving crankshaft.
+        "crank-end-washer",
+        "crank-retainer-screw",
         "crank-drive-gear",
         "crank-handle",
         "crank-pin",

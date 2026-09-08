@@ -114,6 +114,10 @@ FASTENERS: dict[str, FastenerSpec] = {
         "cone-tip-pinch-screw", "#3-48", 8.0, 1.7,
         HeadStyle.FILLISTER, DriveStyle.SLOT,
     ),
+    "crank-retainer-screw": _brass(
+        "crank-retainer-screw", "#0-80", 1.55, 1.10,
+        HeadStyle.FILLISTER, DriveStyle.SLOT,
+    ),
     "fillister-screw": _brass(
         "fillister-screw", "#4-40", 4.0, 2.0,
         HeadStyle.FILLISTER, DriveStyle.SLOT,
