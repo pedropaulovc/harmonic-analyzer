@@ -31,6 +31,18 @@ def curve_control_from_environment():
         ) from error
 
 
+def require_explicit_observation(control):
+    """Do not silently change the observer when requesting a native curve trial."""
+    field = "HARMONIC_TOOTH_SELECTOR_OBSERVATION"
+    if control is CurveControl.BCURVE_3005 and field not in os.environ:
+        raise ValueError(
+            f"{field}: bcurve-3005 requires an explicit off or endpoints choice; "
+            "endpoints matches the retained yqlnp5v5 control"
+        )
+    # The existing observation parser validates the chosen enum before routing.
+    # This guard neither enables the observer nor changes its default elsewhere.
+
+
 @traced("diagnostic.silhouette.bcurve_3005")
 def snapshot(curve, evidence):
     """Read once, journal before validating, and keep all unnormalized values."""

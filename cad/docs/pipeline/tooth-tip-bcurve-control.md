@@ -83,16 +83,69 @@ $env:HARMONIC_SW_AUTOSTART = '0'
 $env:HARMONIC_REMOTE_CACHE_MODE = 'off'
 $env:HARMONIC_BSURF_GRID_CONTROL = 'column-row-reader'
 $env:HARMONIC_SILHOUETTE_CURVE_CONTROL = 'bcurve-3005'
+$env:HARMONIC_TOOTH_SELECTOR_OBSERVATION = 'endpoints'
 uv run --frozen python cad/scripts/diagnostics/probe_datum_policy_recipes.py `
   --source-root C:/src/harmonic-analyzer/cad/out/sldprt `
   --guard-root C:/src/harmonic-analyzer/cad/out/sldprt `
   --candidate <frozen-commit> --factory prepared --target crank_drive_gear
 ```
 
-Invalid curve-control values fail before COM routing. With the control absent
-or `off`, no new native curve getters run. The two controls are independent;
+Invalid curve-control values fail before COM routing. A `bcurve-3005` pilot also
+requires an explicit valid `HARMONIC_TOOTH_SELECTOR_OBSERVATION` choice before
+creating outputs or routing COM. `endpoints` matches the retained yqlnp5v5
+observer; explicit `off` remains available for a distinct control. Missing is
+not silently treated as `off` for this trial. Nothing enables the observer
+automatically. With the curve control absent or `off`, no new native curve
+getters run. The surface and curve controls remain independent;
 enabling the curve reader does not adopt the experimental surface indexing as
 a default or bypass its evidence-sink requirement.
+
+## First 3005 trial stopped before the reader
+
+The first invocation at `66019661afa869f2f25e4063d8c6ad357588f580` used the
+column-row and B-curve controls above but omitted the observer environment
+variable. Its receipt records `tooth_selector_observation: off`, unlike the
+earlier `endpoints` control. It is not a single-factor comparison. The earlier
+baseline also contained two borrowed clean foundation crank-arm documents;
+this invocation's baseline was empty.
+
+The last completed span was `drawing.pick_circle_edge` at
+2026-09-07T23:46:29.514719Z: 24.992014 s, 577 edges, 65 circles. A read-only
+process stack sample then located the wait inside the unchanged
+`IView.GetVisibleEntities2(component, 4)` call, before any B-curve reader call.
+At 2026-09-08T00:01:35.954237Z the watchdog aborted the worker with exit 87
+after 906 s without activity, naming `span-start drawing.visible_entity_scan`.
+The parent exited 1; its seat log records 965.95 s held. There is no 3005 getter,
+attachment, save or cold verdict from this attempt.
+
+Retained under this checkout's `cad/out/reports/`:
+
+- `datum-policy-d9g2g156/pilot.json`, SHA-256
+  `c4d55b659369eeaf3b89d476954b5f2adca58f32abcad39aa46533d9eb8ce02f`.
+- `datum-policy-d9g2g156/ownership.json`, SHA-256
+  `708ca034ca920062ae580ca5e248e855cc6458a2248d4ec49bd04ccdd523f91e`.
+- `telemetry/traces.jsonl` and `logs.jsonl`, task trace
+  `0x8f2ab41a7760b59be176234c4e84ef3e`; the watchdog row itself has no ambient
+  trace ID and is identified by its exact timestamp, signal and exit code above.
+
+The hard exit left the pilot marked `running` and ownership at an earlier
+checkpoint. Its null cleanup error and one-part inventory are **not final
+cleanup evidence**. Independent post-timeout reads matched all three protected
+originals and the template. The owned copy also matched
+`a5a2e0882336d622a7e93fae4d326cb059e7d91758e536488fcc6bf6de4ce93f` through a
+read-only shared stream; the ordinary hash reader first hit a sharing violation.
+Recovery is a separate operation, not a successful finalizer for this receipt.
+
+The earlier yqlnp5v5 run's scan took 22.120781 s and returned nine silhouettes
+with one matching candidate. Another retained `endpoints` run, ige5b_1i, took
+233.632537 s for the same nine-result scan. Both used the same exact source hash;
+the yqlnp5v5 and d9g2g156 canonical template key also matches. These observations
+do not establish what caused the timeout or any observer timing effect.
+
+The observer adds entry/exit ownership and drawing/view identity checks plus
+native view position, scale and transform reads. It forwards the single actual
+enumeration and endpoint reads without duplicating them. The next matched
+replay names it explicitly; it does not assume those extra getters cure a wait.
 
 ## Offline checks and remaining native work
 

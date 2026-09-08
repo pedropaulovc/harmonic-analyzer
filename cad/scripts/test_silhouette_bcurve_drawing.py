@@ -16,6 +16,7 @@ from test_silhouette_attachment_witness_drawing import (
     fixture,
 )
 from test_view_recipe_acceptance_drawing import bank as bank, silhouette_bank
+from test_tooth_selector_observation_drawing import scene as scene
 
 
 @pytest.fixture
@@ -353,12 +354,77 @@ async def test_actual_pilot_retains_explicit_control_on_success_and_failure(
     )
 
     monkeypatch.setenv("HARMONIC_SILHOUETTE_CURVE_CONTROL", control)
+    # This is an intentional observer-off control, not the matched tooth replay.
+    monkeypatch.setenv("HARMONIC_TOOTH_SELECTOR_OBSERVATION", "off")
     await exercise_pilot(tmp_path, monkeypatch, mode, ("channel_lever",))
     (path,) = (tmp_path / "reports").glob("*/pilot.json")
     assert (
         json.loads(path.read_text(encoding="utf-8"))["silhouette_curve_control"]
         == control
     )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("entry", ["main", "pilot"])
+async def test_bcurve_requires_explicit_observer_before_routing(
+    tmp_path, monkeypatch, entry
+):
+    monkeypatch.setenv("HARMONIC_SILHOUETTE_CURVE_CONTROL", "bcurve-3005")
+    monkeypatch.delenv("HARMONIC_TOOTH_SELECTOR_OBSERVATION", raising=False)
+    with pytest.raises(
+        ValueError, match="HARMONIC_TOOTH_SELECTOR_OBSERVATION.*explicit"
+    ):
+        if entry == "main":
+            pilot.main(["--help"])
+            return
+        await pilot.pilot(
+            object(), "candidate", tmp_path, tmp_path, tmp_path / "reports"
+        )
+    assert not (tmp_path / "reports").exists()
+
+
+@pytest.mark.parametrize("observer", ["off", "endpoints"])
+def test_explicit_observer_values_are_accepted_before_help(monkeypatch, observer):
+    monkeypatch.setenv("HARMONIC_SILHOUETTE_CURVE_CONTROL", "bcurve-3005")
+    monkeypatch.setenv("HARMONIC_TOOTH_SELECTOR_OBSERVATION", observer)
+    with pytest.raises(SystemExit) as raised:
+        pilot.main(["--help"])
+    assert raised.value.code == 0
+
+
+@pytest.mark.parametrize("observer", ["", "ENDPOINTS", "unknown"])
+def test_invalid_explicit_observer_still_rejects_before_help(monkeypatch, observer):
+    monkeypatch.setenv("HARMONIC_SILHOUETTE_CURVE_CONTROL", "bcurve-3005")
+    monkeypatch.setenv("HARMONIC_TOOTH_SELECTOR_OBSERVATION", observer)
+    with pytest.raises(ValueError, match="HARMONIC_TOOTH_SELECTOR_OBSERVATION"):
+        pilot.main(["--help"])
+
+
+def test_default_curve_control_does_not_require_observer(monkeypatch):
+    monkeypatch.delenv("HARMONIC_SILHOUETTE_CURVE_CONTROL", raising=False)
+    monkeypatch.delenv("HARMONIC_TOOTH_SELECTOR_OBSERVATION", raising=False)
+    with pytest.raises(SystemExit) as raised:
+        pilot.main(["--help"])
+    assert raised.value.code == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("outcome", ["passed", "radius_rejected"])
+async def test_matched_endpoints_control_reaches_actual_pilot_and_keeps_guards(
+    tmp_path, monkeypatch, scene, outcome
+):
+    from test_tooth_selector_observation_drawing import (
+        test_actual_owned_pilot_scope_retains_journal_and_source_guards as exercise_pilot,
+    )
+
+    monkeypatch.setenv("HARMONIC_SILHOUETTE_CURVE_CONTROL", "bcurve-3005")
+    await exercise_pilot(
+        scene=scene, monkeypatch=monkeypatch, tmp_path=tmp_path, outcome=outcome
+    )
+    (path,) = (tmp_path / "reports").glob("*/pilot.json")
+    report = json.loads(path.read_text(encoding="utf-8"))
+    assert report["silhouette_curve_control"] == "bcurve-3005"
+    assert report["tooth_selector_observation"] == "endpoints"
 
 
 def test_real_recipe_gate_enrolls_control_tests_and_reader_exactly_once():

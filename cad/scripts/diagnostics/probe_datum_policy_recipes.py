@@ -69,7 +69,9 @@ from diagnostics._recipe_acceptance_targets import TARGETS  # noqa: E402
 from diagnostics._recipe_entity_acceptance import EntityAcceptance  # noqa: E402
 from diagnostics._recipe_view_entity_acceptance import ViewEntityAcceptance  # noqa: E402
 from diagnostics._bsurface_attachment_witness import grid_control_from_environment  # noqa: E402
-from diagnostics._silhouette_bcurve_witness import curve_control_from_environment  # noqa: E402
+from diagnostics._silhouette_bcurve_witness import (  # noqa: E402
+    curve_control_from_environment, require_explicit_observation,
+)
 from diagnostics._tooth_selector_observation import (  # noqa: E402
     observation_from_environment, observe_selector,
     require_targets as require_tooth_targets,
@@ -685,6 +687,7 @@ async def pilot(
 ):
     grid_control = grid_control_from_environment()
     curve_control = curve_control_from_environment()
+    require_explicit_observation(curve_control)
     tooth_observation = observation_from_environment()
     order = target_order(targets)
     require_tooth_targets(tooth_observation, order)
@@ -1232,7 +1235,8 @@ async def pilot(
 
 
 def main(argv=None):
-    curve_control_from_environment()  # invalid control refuses before COM routing
+    curve_control = curve_control_from_environment()
+    require_explicit_observation(curve_control)  # refuse before COM routing
     grid_control_from_environment()  # invalid opt-in refuses before parent/worker COM routing
     tooth_observation = observation_from_environment()
     from diagnostics._source_callout_authoring import (
