@@ -688,7 +688,7 @@ def test_relinked_title_cold_readback_requires_exact_full_font(field):
 def test_title_resolved_and_generic_positions_are_separate_raw_observations(
     monkeypatch,
 ):
-    adapter, _, annotation, note, raw = title_native(monkeypatch)
+    adapter, _, _annotation, _note, raw = title_native(monkeypatch)
     trial = {}
     observer = probe.TitleObserver(adapter, trial, Mock())
     before = observer.record("before_native_save")
