@@ -675,3 +675,157 @@ def test_actual_single_tube_composition_uses_retained_copy_and_keeps_fit_observa
             issue["kind"] == "native_fit"
             for issue in report["trials"][0]["acceptance_issues"]
         )
+
+
+@pytest.mark.parametrize("fault", ["none", "coordinate", "transform", "font"])
+def test_actual_geometry_reader_and_super_observer_cross_json_boundary_without_hiding_drift(
+    tmp_path, monkeypatch, fault
+):
+    from test_populated_template_drawing import populated
+
+    notes, _, _ = populated()
+    notes["title"]["text"] = "tube-frame"
+    notes["material"]["vertical"] = 1
+    for name in ("title", "dwg", "rev"):
+        notes[name]["horizontal"] = 1
+    notes["dwg"]["font"]["CharHeight"] = notes["rev"]["font"]["CharHeight"] = 0.0035
+    source_path = tmp_path / "tube-copy.SLDPRT"
+    source = SimpleNamespace(
+        GetPathName=lambda: str(source_path),
+        GetType=lambda: 1,
+        SummaryInfo=lambda _: "tube-frame",
+        GetCustomInfoValue=lambda _, key: {
+            "Number": "MHA-071",
+            "Revision": "v32",
+            "Material": "Steel",
+            "Finish": "Plain",
+        }[key],
+    )
+    matrix = (
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+    )
+    inverse = SimpleNamespace(ArrayData=matrix)
+    transform = SimpleNamespace(ArrayData=matrix, Inverse=lambda: inverse)
+    start, end = (
+        SimpleNamespace(X=0.1, Y=0.2, Z=0.0),
+        SimpleNamespace(X=0.2, Y=0.2, Z=0.0),
+    )
+    line = SimpleNamespace(
+        GetType=lambda: 0,
+        GetID=lambda: (1, 0),
+        ConstructionGeometry=False,
+        GetStartPoint2=lambda: start,
+        GetEndPoint2=lambda: end,
+    )
+    sketch = SimpleNamespace(
+        ModelToSketchTransform=transform, GetSketchSegments=lambda: (line,)
+    )
+    sheet = SimpleNamespace(GetTemplateSketch=lambda: sketch)
+
+    def create_point(values):
+        xyz = tuple(values.value)
+
+        def multiply(actual):
+            assert actual is inverse
+            return SimpleNamespace(ArrayData=xyz)
+
+        return SimpleNamespace(MultiplyTransform=multiply)
+
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(
+            GetCurrentSheet=lambda: sheet, GetCustomInfoValue=lambda *_: ""
+        ),
+        swApp=SimpleNamespace(
+            GetOpenDocumentByName=lambda _: source,
+            GetMathUtility=lambda: SimpleNamespace(CreatePoint=create_point),
+        ),
+    )
+    # Keep the real template_lines reader and real superclass observer. Only
+    # the COM-facing interfaces and independent PDF/ownership seams are faked.
+    monkeypatch.setattr(probe.layout.cells, "_early_bound", lambda value, _: value)
+    monkeypatch.setattr(
+        probe.layout, "note_inventory", lambda _: (deepcopy(notes), {}, [])
+    )
+    preferences = {"sheet_properties": [2, 12, 1, 2, 0, 0.4318, 0.2794, 0]}
+    monkeypatch.setattr(probe, "preferences", lambda _: deepcopy(preferences))
+    monkeypatch.setattr(
+        probe, "property_source", lambda *_: {"identity": "exact_native_source"}
+    )
+    known = {"kind": "native_fit", "field": "material", "error": "retained overrun"}
+    monkeypatch.setattr(
+        probe.fields,
+        "field_audit",
+        lambda *_args, **_kwargs: {"fields": {}, "issues": [deepcopy(known)]},
+    )
+    baseline = probe.PopulatedControl(
+        tmp_path / "derived.DRWDOT",
+        "0" * 64,
+        Mock(),
+        {},
+        population=probe.Population.MATERIAL_FINISH,
+    )
+    baseline.setup["normalized_blank_defaults"] = deepcopy(preferences)
+    baseline.setup["normalized_blank_defaults"]["sheet_properties"][7] = 1
+    before_trial = {
+        "source_copy": str(source_path),
+        "source_before": {"configuration": "Default"},
+    }
+    baseline.observe(adapter, "built", before_trial, tmp_path / "prior.pdf")
+    live = before_trial["linked_fields"]["built"]
+    assert isinstance(live["template_geometry"]["model_to_sketch"], tuple)
+    assert isinstance(
+        live["template_geometry"]["segments"][0]["sheet_points"][0], tuple
+    )
+    archived = json.loads(json.dumps(live))
+    assert isinstance(archived["template_geometry"]["model_to_sketch"], list)
+    control = probe.TubeViewportControl(
+        tmp_path / "derived.DRWDOT",
+        "0" * 64,
+        Mock(),
+        {},
+        tmp_path,
+        {"original_loaded": archived},
+    )
+    control.setup["normalized_blank_defaults"] = deepcopy(
+        baseline.setup["normalized_blank_defaults"]
+    )
+    observation = Mock()
+    monkeypatch.setattr(extent, "observe", observation)
+    if fault == "coordinate":
+        end.X += 1e-12
+    if fault == "transform":
+        transform.ArrayData = (matrix[0] + 1e-12, *matrix[1:])
+    if fault == "font":
+        notes["material"]["font"]["CharHeight"] += 1e-12
+    trial = {
+        "source_copy": str(source_path),
+        "source_before": {"configuration": "Default"},
+    }
+    if fault != "none":
+        field = "notes" if fault == "font" else "template_geometry"
+        with pytest.raises(
+            RuntimeError, match=f"retained tube loaded non-extent {field} differ"
+        ):
+            control.observe(adapter, "built", trial, tmp_path / "fresh.pdf")
+        observation.assert_not_called()
+        return
+    control.observe(adapter, "built", trial, tmp_path / "fresh.pdf")
+    observation.assert_called_once()
+    assert observation.call_args.args[1] is extent.State.POPULATED
+    assert trial["linked_fields"]["built"]["fit"]["issues"] == [known]
+    assert trial["linked_fields"]["built"]["fit"]["status"] == "failed"

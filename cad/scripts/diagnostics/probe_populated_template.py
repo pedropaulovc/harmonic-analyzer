@@ -389,7 +389,7 @@ class TubeViewportControl(PopulatedControl):
                 "preferences",
                 "expected_link_values",
             ):
-                before, after = old[key], new[key]
+                before, after = layout.plain(old[key]), layout.plain(new[key])
                 if key == "notes":
                     before, after = (
                         extent.semantics({"notes": value})["notes"]
