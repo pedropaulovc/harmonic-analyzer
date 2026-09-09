@@ -277,7 +277,7 @@ async def build(adapter) -> dict[str, str]:
 
     # Tapered-pin cross-hole: pilot below the No. 2 taper pin's small end, then
     # taper-reamed with the shaft at assembly.
-    # number drill (Ø4.978) along global Y through the boss + shaft bore at
+    # number drill (Ø4.623) along global Y through the boss + shaft bore at
     # mid-thickness (memory/fastener-policy-us-customary). Drilled from the +Y
     # side face (a pristine planar face, normal +Y) at (x 0, z ArmThickness/2);
     # through-all is geometrically identical to the old mid-plane cut.

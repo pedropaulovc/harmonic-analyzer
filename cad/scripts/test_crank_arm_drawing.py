@@ -109,7 +109,9 @@ def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:
 
 def test_only_the_reamed_bore_prints_three_decimals() -> None:
     source = _source()
-    assert '{"ShaftBoreDia": 3}' in source
+    assert drawing.DIMENSION_PRECISION == {"ShaftBoreDia": 3}
+    assert source.count("set_dimension_precision(") == 1
+    assert "DIMENSION_PRECISION," in source
     assert crank_arm_spec.SHAFT_BORE_BAND == (0.05, 0.00)
     build_source = Path(arm.__file__).read_text(encoding="utf-8")
     assert "set_dimension_bilateral_tolerance(" in build_source

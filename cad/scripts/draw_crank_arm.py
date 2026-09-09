@@ -116,6 +116,7 @@ DIMENSION_CALLOUTS = {
     # Two decimals so the block's .XX tolerance governs the depth.
     "DimpleDia": "FLAT-BOTTOM 0.50 DEEP",
 }
+DIMENSION_PRECISION = {"ShaftBoreDia": 3}
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -194,7 +195,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_precision(
         adapter,
         [*front_annotations, *top_annotations, *right_annotations],
-        {"ShaftBoreDia": 3},
+        DIMENSION_PRECISION,
     )
     # Arm width (16): dimension the principal view's long top/bottom edges,
     # picked on the straight run clear of every hole, with the dimension
