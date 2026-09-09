@@ -41,9 +41,10 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _hole_spec import blind_cut_dia_mm
 
 from guide_lock_spec import (
-    HOLE_DIA_MM,
+    HOLE_SPEC,
     HOLE_XY,
     LOCK_HEIGHT,
     LOCK_THICK,
@@ -90,7 +91,7 @@ def _sheet_y(model_y_mm: float) -> float:
 # Handy picks derived from the layout above.
 LEFT_EDGE_X = _sheet_x(0.0)
 BOTTOM_EDGE_Y = _sheet_y(0.0)
-HOLE_R_SHEET = HOLE_DIA_MM * SHEET_SCALE[0] / 2000.0
+HOLE_R_SHEET = blind_cut_dia_mm(HOLE_SPEC) * SHEET_SCALE[0] / 2000.0
 HOLE_Y_SHEET = _sheet_y(HOLE_XY[0][1])
 HOLE_1_X_SHEET = _sheet_x(HOLE_XY[0][0])
 HOLE_2_X_SHEET = _sheet_x(HOLE_XY[1][0])
@@ -135,7 +136,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE
+        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
     stamp_drawing_summary(
         adapter,
@@ -291,6 +292,7 @@ async def build(adapter: Any) -> dict[str, str]:
         OUTPUTS,
         pdf_title="Guide Lock Manufacturing Drawing",
         scale=SHEET_SCALE,
+        layout=SPEC.layout,
     )
 
 

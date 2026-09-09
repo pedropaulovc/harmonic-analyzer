@@ -41,12 +41,13 @@ from _drawing_common import (
     set_hidden_lines_visible,
     stamp_drawing_summary,
 )
+from _hole_spec import blind_cut_dia_mm
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from connecting_rod_spec import (
     CENTER_DISTANCE,
     HEAD_TOP_Y,
-    PIN_HOLE_DIA,
+    PIN_HOLE_SPEC,
     RING_BORE_DIA,
     RING_BOTTOM_Y,
     SURFACE_FINISHES,
@@ -68,6 +69,7 @@ OUTPUTS = DrawingOutputs(
 SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
+_PIN_HOLE_DIA = blind_cut_dia_mm(PIN_HOLE_SPEC)
 
 SHEET_SCALE = (1.0, 1.0)  # 1:1
 
@@ -127,7 +129,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE
+        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
     stamp_drawing_summary(
         adapter,
@@ -169,7 +171,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # pick snapped to the crown arc (read 145.07); the left rim is unambiguously
     # on the pin circle, clear of the wider crown.
     ring_rim = _sheet_xy(-RING_BORE_DIA / 2.0, 0.0)
-    pin_rim = _sheet_xy(-PIN_HOLE_DIA / 2.0, CENTER_DISTANCE)
+    pin_rim = _sheet_xy(-_PIN_HOLE_DIA / 2.0, CENTER_DISTANCE)
     centre_distance = add_edge_dimension(
         adapter,
         front,
@@ -180,7 +182,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_basic_dimension(adapter, centre_distance, label="rod centre distance")
 
-    # Rocker pin hole native callout (the #47 wizard hole in the head).
+    # Rocker pin hole native callout.
     add_native_hole_callout(
         adapter,
         front,
@@ -237,7 +239,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # text; anchoring the FCF at the same point crossed the two leaders (layout
     # audit).  Attach the frame at 3 o'clock and keep it in a higher lane so
     # its whole leader stays clear of the callout path.
-    pin_fcf_rim = _sheet_xy(PIN_HOLE_DIA / 2.0, CENTER_DISTANCE)
+    pin_fcf_rim = _sheet_xy(_PIN_HOLE_DIA / 2.0, CENTER_DISTANCE)
     add_feature_control_frame(
         adapter,
         front,
@@ -258,6 +260,7 @@ async def build(adapter: Any) -> dict[str, str]:
         OUTPUTS,
         pdf_title="Connecting Rod Manufacturing Drawing",
         scale=SHEET_SCALE,
+        layout=SPEC.layout,
     )
 
 

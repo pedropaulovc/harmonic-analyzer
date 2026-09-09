@@ -63,25 +63,27 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _holes import CLEARANCE_MM, HoleSpec, wizard_holes
+from _holes import wizard_holes
 from build_frame_side_screw import HEAD_DIA as FRAME_SIDE_HEAD_DIA
-from build_frame_side_screw import HEAD_H as FRAME_SIDE_HEAD_H
 from build_frame_side_screw import SHANK_DIA as FRAME_SIDE_SHANK_DIA
 from fulcrum_keeper_spec import (
     BALL_DIA,
     BORE_DIA,
+    CBORE_DEPTH_MM,
     CBORE_DIA_MM,
     CROWN_DIA,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     FOOT_H,
     FOOT_REACH,
+    HOLE_DIA_MM,
     ISOMETRIC_VIEW_NOTE,
     KEEPER_WIDTH,
     LUG_HALF_T,
     PAD_END_X,
     RELIEF_H,
     SCREW_X,
+    SCREW_HOLE_SPEC,
     SHAFT_AXIS_H,
 )
 
@@ -94,21 +96,10 @@ LUG_T = 2.0 * LUG_HALF_T  # 6.0 lug thickness along X
 SOCKET_CUT_DEPTH = 10.0
 BORE_CUT_DEPTH = 12.0
 
-# The keeper's foot screw: #8 close-clearance drill with a cheese-head
-# counterbore. The Ø9.5 artefact recess stays, while its depth follows the exact
-# replacement head so the bearing face remains flush.
-CBORE_DEPTH_MM = FRAME_SIDE_HEAD_H
-SCREW_HOLE_DIA_MM = CLEARANCE_MM[("#8", "close")]
-SCREW_HOLE_SPEC = HoleSpec(
-    "counterbore_fillister",
-    "#8",
-    overrides_mm={
-        "HoleDiameter": SCREW_HOLE_DIA_MM,
-        "CounterBoreDiameter": CBORE_DIA_MM,
-        "CounterBoreDepth": CBORE_DEPTH_MM,
-    },
-)
-if SCREW_HOLE_DIA_MM <= FRAME_SIDE_SHANK_DIA:
+# The keeper's foot screw is the part-owned #8 close-clearance counterbore.
+# The Ø9.5 artefact recess stays, while its depth follows the exact replacement
+# head so the bearing face remains flush.
+if HOLE_DIA_MM <= FRAME_SIDE_SHANK_DIA:
     raise AssertionError("standard #8 keeper clearance binds on the stock screw")
 if CBORE_DIA_MM <= FRAME_SIDE_HEAD_DIA:
     raise AssertionError("keeper counterbore does not clear the stock screw head")
@@ -299,7 +290,7 @@ async def build(adapter) -> dict[str, str]:
         [[SCREW_X, FOOT_H, 0.0]],
         (0.0, 1.0, 0.0),
         "keeper foot screw hole (#8 cbore)",
-        expect_dia_mm=SCREW_HOLE_DIA_MM,
+        expect_dia_mm=HOLE_DIA_MM,
         name="FootScrewHole",
     )
     v_cb = math.pi * (screw_hole.cbore_dia_mm / 2.0) ** 2 * screw_hole.cbore_depth_mm

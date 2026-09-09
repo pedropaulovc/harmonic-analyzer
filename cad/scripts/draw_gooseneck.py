@@ -50,7 +50,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (1.0, 3.0)   # 1:3 whole sheet (~506 mm tall post)
+SHEET_SCALE = (1.0, 3.0)  # 1:3 whole sheet (~506 mm tall post)
 
 # Sheet layout (meters).  The elevation (front) shows the goose-neck profile
 # (leg + bend + arm) right of centre so the notes clear it; the isometric (1:4)
@@ -107,7 +107,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE
+        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
     stamp_drawing_summary(
         adapter,
@@ -140,6 +140,7 @@ async def build(adapter: Any) -> dict[str, str]:
         OUTPUTS,
         pdf_title="Gooseneck Post Manufacturing Drawing",
         scale=SHEET_SCALE,
+        layout=SPEC.layout,
     )
 
 

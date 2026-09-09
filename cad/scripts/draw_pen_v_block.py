@@ -50,8 +50,6 @@ from pen_v_block_spec import (
     BORE_X,
     CHAMFER,
     SCREW_HOLE_XY,
-    GROOVE_DEPTH,
-    GROOVE_WIDTH,
     GROOVE_Z0,
     SURFACE_FINISHES,
 )
@@ -169,7 +167,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE
+        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
     stamp_drawing_summary(
         adapter,
@@ -228,7 +226,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # around the view center. The bottom edge is interrupted by the marker
     # groove (GROOVE_Z0..GROOVE_Z0 + GROOVE_WIDTH across the depth), so pick
     # it on the remaining land beside the groove, not at mid-depth.
-    _bottom_land_x = RIGHT_CENTER[0] - RIGHT_HALF_Z + GROOVE_Z0 / 2.0 * SHEET_SCALE[0] / 1000.0
+    _bottom_land_x = (
+        RIGHT_CENTER[0] - RIGHT_HALF_Z + GROOVE_Z0 / 2.0 * SHEET_SCALE[0] / 1000.0
+    )
     add_edge_dimension(
         adapter,
         right,
@@ -364,6 +364,7 @@ async def build(adapter: Any) -> dict[str, str]:
         OUTPUTS,
         pdf_title="Pen V-Block Manufacturing Drawing",
         scale=SHEET_SCALE,
+        layout=SPEC.layout,
     )
 
 

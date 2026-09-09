@@ -40,11 +40,8 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
 )
-from _holes import blind_cut_dia_mm
-from build_cone_swing_platform import (
-    PIVOT_HOLE_SPEC,
-    POST_MOUNT_SPEC,
-)
+from _hole_spec import blind_cut_dia_mm
+from cone_swing_platform_spec import PIVOT_HOLE_SPEC, POST_MOUNT_SPEC
 
 
 SPEC = DRAWINGS_BY_NAME["cone_swing_platform"]
@@ -59,7 +56,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (1.0, 3.0)   # 1:2 plan keeps the 266 mm envelope in-zone
+SHEET_SCALE = (1.0, 3.0)  # 1:3 sheet; the 1:2 plan keeps the 266 mm envelope in-zone
 
 # Sheet layout (meters).  The 1:2 plan is the main definition view; the
 # isometric and an end view occupy the open right-hand field.
@@ -105,9 +102,12 @@ def _add_cone_axis_centerline(adapter: Any, view: Any) -> tuple[float, float]:
     pivot_centers: list[tuple[float, float]] = []
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
     for component in components:
-        edges = adapter._attempt(
-            lambda c=component: view.GetVisibleEntities2(c, 1), default=()
-        ) or ()
+        edges = (
+            adapter._attempt(
+                lambda c=component: view.GetVisibleEntities2(c, 1), default=()
+            )
+            or ()
+        )
         for raw_edge in edges:
             edge = _early_bound(raw_edge, "IEdge")
             curve = _early_bound(edge.GetCurve(), "ICurve")
@@ -173,9 +173,12 @@ def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any]:
     mount_edges: list[Any] = []
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
     for component in components:
-        edges = adapter._attempt(
-            lambda c=component: view.GetVisibleEntities2(c, 1), default=()
-        ) or ()
+        edges = (
+            adapter._attempt(
+                lambda c=component: view.GetVisibleEntities2(c, 1), default=()
+            )
+            or ()
+        )
         for raw_edge in edges:
             edge = _early_bound(raw_edge, "IEdge")
             curve = _early_bound(edge.GetCurve(), "ICurve")
@@ -222,7 +225,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE
+        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
     stamp_drawing_summary(
         adapter,
@@ -288,6 +291,7 @@ async def build(adapter: Any) -> dict[str, str]:
         OUTPUTS,
         pdf_title="Cone Swing Platform Manufacturing Drawing",
         scale=SHEET_SCALE,
+        layout=SPEC.layout,
     )
 
 

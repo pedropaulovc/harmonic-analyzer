@@ -55,9 +55,8 @@ from _drawing_marks import (
 )
 from _fit_limits import deviations
 from cone_tip_block_spec import (
+    ADJUSTER_BORE_SPEC,
     ADJUSTER_AXIS_HEIGHT,
-    ADJUSTER_DEPTH,
-    ADJUSTER_THREAD,
     BLOCK_HEIGHT,
     BLOCK_HEIGHT_BAND,
     BLOCK_X,
@@ -65,19 +64,15 @@ from cone_tip_block_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     PINCH_CLEARANCE_DIA,
+    PINCH_BORE_SPEC,
+    PINCH_CLEARANCE_SPEC,
     PINCH_HEIGHT,
-    PINCH_THREAD,
     SHAFT_PASSAGE_DIA,
     SLIT_DEPTH,
     SLIT_W,
 )
-from _holes import (
-    DRILL_POINT_H,
-    HoleSpec,
-    blind_cut_dia_mm,
-    blind_hole_volume_mm3,
-    wizard_holes,
-)
+from _hole_spec import DRILL_POINT_H, blind_cut_dia_mm
+from _holes import blind_hole_volume_mm3, wizard_holes
 
 PART_NAME = "cone-tip-block"
 MATERIAL = "Plain Carbon Steel"  # black-finished steel, like the platform it rides
@@ -90,30 +85,13 @@ MATERIAL = "Plain Carbon Steel"  # black-finished steel, like the platform it ri
 # Native 5/16-18 blind tapped adjuster receiver from the north face. Its
 # tap-drill diameter is manufacturing geometry, distinct from the purchased
 # screw's true major-diameter solid.
-ADJUSTER_BORE_DEPTH = ADJUSTER_DEPTH
-ADJUSTER_BORE_SPEC = HoleSpec(
-    "tapped",
-    ADJUSTER_THREAD,
-    end="blind",
-    depth_mm=ADJUSTER_BORE_DEPTH,
-    thread_class="2B",
-)
 ADJUSTER_BORE_DIA = blind_cut_dia_mm(ADJUSTER_BORE_SPEC)
 SHAFT_PASSAGE_RADIUS = SHAFT_PASSAGE_DIA / 2.0
 
+ADJUSTER_BORE_DEPTH = ADJUSTER_BORE_SPEC.depth_mm
 # McMaster 90280A108 is a #4-40 screw. The near jaw receives a normal-fit #4
 # clearance hole; the far jaw carries the coaxial #4-40 UNC-2B thread.
-PINCH_BORE_SPEC = HoleSpec("tapped", PINCH_THREAD, thread_class="2B")
 PINCH_BORE_DIA = blind_cut_dia_mm(PINCH_BORE_SPEC)
-PINCH_CLEARANCE_SPEC = HoleSpec(
-    "clearance",
-    "#4",
-    fit="normal",
-    end="blind",
-    depth_mm=(BLOCK_X - SLIT_W) / 2.0,
-)
-if abs(blind_cut_dia_mm(PINCH_CLEARANCE_SPEC) - PINCH_CLEARANCE_DIA) > 1e-9:
-    raise AssertionError("pinch clearance spec disagrees with Hole Wizard #4 normal fit")
 PINCH_BORE_Y = PINCH_HEIGHT
 
 # The pinch cross-bore must land wholly in the material band between the
@@ -258,7 +236,9 @@ async def build(adapter) -> dict[str, str]:
     adjuster_cut = wizard_holes(
         adapter, ADJUSTER_BORE_SPEC,
         [[0.0, ADJUSTER_AXIS_HEIGHT, BLOCK_Z / 2.0]],
-        (0.0, 0.0, 1.0), "adjuster tapped hole (5/16-18 blind)", name="AdjusterBore",
+        (0.0, 0.0, 1.0),
+        f"adjuster tapped hole ({ADJUSTER_BORE_SPEC.size} blind)",
+        name="AdjusterBore",
         placement_dims=[((None, None), ("CbZ", '"AdjusterAxisHeight"'))],
     )
     drive_jobs += adjuster_cut.placement_drive_jobs
@@ -312,7 +292,9 @@ async def build(adapter) -> dict[str, str]:
     pinch_cut = wizard_holes(
         adapter, PINCH_BORE_SPEC,
         [[BLOCK_X / 2.0, PINCH_BORE_Y, 0.0]],
-        (1.0, 0.0, 0.0), "pinch tapped hole (#4-40)", name="PinchBore",
+        (1.0, 0.0, 0.0),
+        f"pinch tapped hole ({PINCH_BORE_SPEC.size})",
+        name="PinchBore",
         placement_dims=[((None, None), ("PinchZ", '"PinchBoreY"'))],
     )
     drive_jobs += pinch_cut.placement_drive_jobs
@@ -322,8 +304,10 @@ async def build(adapter) -> dict[str, str]:
     pinch_clearance = wizard_holes(
         adapter, PINCH_CLEARANCE_SPEC,
         [[BLOCK_X / 2.0, PINCH_BORE_Y, 0.0]],
-        (1.0, 0.0, 0.0), "pinch near-jaw clearance (#4 normal)",
+        (1.0, 0.0, 0.0),
+        f"pinch near-jaw clearance ({PINCH_CLEARANCE_SPEC.size} normal)",
         name="PinchClearance",
+        expect_dia_mm=PINCH_CLEARANCE_DIA,
         placement_dims=[((None, None), ("PinchZ", '"PinchBoreY"'))],
     )
     drive_jobs += pinch_clearance.placement_drive_jobs

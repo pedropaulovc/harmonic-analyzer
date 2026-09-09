@@ -9,6 +9,7 @@ import draw_pinion_pivot_block as drawing
 import build_pinion_pivot_block as block
 from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+from _hole_spec import blind_cut_dia_mm
 
 
 def test_surface_finish_is_part_owned_and_consumed_by_key() -> None:
@@ -112,17 +113,16 @@ def test_wizard_holes_are_not_fake_marked_dimensions() -> None:
     # The hold-down holes are a native Hole Wizard feature: their size comes
     # from the clearance standard, so no ScrewHoles dimension may be hand-marked.
     assert not any("Screw" in feature for feature in block.DRAWING_DIMENSIONS)
-    source = Path(block.__file__).read_text(encoding="utf-8")
-    assert 'HoleSpec("clearance", "#8")' in source
 
 
-def test_spec_screw_diameter_matches_the_clearance_table() -> None:
-    # The spec stays COM-free and records the #8 normal-clearance diameter used
-    # for drawing layout; pin it to the table the part build actually cuts with.
-    from _holes import CLEARANCE_MM
-
-    assert pinion_pivot_block_spec.SCREW_HOLE_DIA == CLEARANCE_MM[("#8", "normal")]
-    assert block.SCREW_HOLE_DIA == pinion_pivot_block_spec.SCREW_HOLE_DIA
+def test_screw_hole_contract_is_part_owned_and_resolved() -> None:
+    spec = pinion_pivot_block_spec.SCREW_HOLE_SPEC
+    assert block.SCREW_HOLE_SPEC is spec
+    assert spec.kind == "clearance"
+    assert spec.size == "#8"
+    assert spec.fit == "normal"
+    assert pinion_pivot_block_spec.SCREW_HOLE_DIA == blind_cut_dia_mm(spec)
+    assert drawing.SCREW_HOLE_DIA == blind_cut_dia_mm(spec)
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:

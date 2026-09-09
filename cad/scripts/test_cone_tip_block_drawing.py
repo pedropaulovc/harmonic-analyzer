@@ -68,7 +68,10 @@ def test_notes_specify_adjuster_and_functional_pinch_joint() -> None:
     assert 'adapter, "Manufacturing Notes", 0.020, 0.088, char_height=0.0025' in source
     part_source = Path(part.__file__).read_text(encoding="utf-8")
     assert 'name="PinchClearance"' in part_source
-    assert part.PINCH_THREAD == cone_tip_block_spec.PINCH_THREAD == "#4-40"
+    assert cone_tip_block_spec.PINCH_THREAD == "#4-40"
+    assert part.PINCH_BORE_SPEC is cone_tip_block_spec.PINCH_BORE_SPEC
+    assert part.PINCH_BORE_SPEC.size == cone_tip_block_spec.PINCH_THREAD
+    assert part.PINCH_CLEARANCE_SPEC is cone_tip_block_spec.PINCH_CLEARANCE_SPEC
     assert part.PINCH_CLEARANCE_SPEC.kind == "clearance"
     assert part.PINCH_CLEARANCE_SPEC.size == "#4"
     assert part.PINCH_CLEARANCE_SPEC.fit == "normal"

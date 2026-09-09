@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import subprocess
 import sys
 import zipfile
@@ -14,7 +16,7 @@ import cut_release
 import draw_platen_guide as drawing
 import build_platen_guide as guide
 import _drawing_common as drawing_common
-from _drawing_registry import DRAWINGS, PROJECT_DRWDOT
+from _drawing_registry import DRAWINGS, DRAWING_TEMPLATES, DrawingLayout
 from _drawing_common import (
     _contact_preview_grid,
     _gtol_frame_xml,
@@ -22,7 +24,8 @@ from _drawing_common import (
     render_pdf_png,
     sanitize_pdf_metadata,
 )
-from _holes import CLEARANCE_MM, TAP_DRILL_MM
+from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM, blind_cut_dia_mm
+from platen_guide_spec import TAPPED_HOLE_SPEC
 
 
 def test_platen_guide_native_front_is_hole_entry_face() -> None:
@@ -71,10 +74,22 @@ def test_five_page_contact_preview_preserves_aspect_and_unused_cell(
         append_images=pages[1:],
         resolution=72,
     )
-    monkeypatch.setattr(drawing_common, "ASME_B_DPI", 30)
-    monkeypatch.setattr(drawing_common, "ASME_B_PNG_SIZE", (510, 330))
+    monkeypatch.setitem(
+        drawing_common.DRAWING_TEMPLATES,
+        DrawingLayout.LANDSCAPE,
+        replace(
+            DRAWING_TEMPLATES[DrawingLayout.LANDSCAPE],
+            dpi=30,
+            pixel_size=(510, 330),
+        ),
+    )
 
-    render_pdf_png(pdf, png, expected_pages=5)
+    render_pdf_png(
+        pdf,
+        png,
+        layout=DrawingLayout.LANDSCAPE,
+        expected_pages=5,
+    )
 
     with Image.open(png) as preview:
         assert preview.size == (510, 330)
@@ -86,9 +101,51 @@ def test_five_page_contact_preview_preserves_aspect_and_unused_cell(
         assert preview.getpixel((85, 10)) == (255, 255, 255)
 
 
+def test_portrait_raster_crops_pdfium_width_rounding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import pypdfium2 as pdfium
+    from pypdf import PdfWriter
+
+    pdf = tmp_path / "portrait-width-plus-one.pdf"
+    png = tmp_path / "portrait.png"
+    writer = PdfWriter()
+    writer.add_blank_page(width=793, height=1224)
+    writer.write(pdf)
+    monkeypatch.setitem(
+        drawing_common.DRAWING_TEMPLATES,
+        DrawingLayout.PORTRAIT,
+        replace(
+            DRAWING_TEMPLATES[DrawingLayout.PORTRAIT],
+            dpi=30,
+            pixel_size=(330, 510),
+        ),
+    )
+    document = pdfium.PdfDocument(str(pdf))
+    page = document[0]
+    uncropped = page.render(scale=30 / 72).to_pil()
+    page.close()
+    document.close()
+    assert uncropped.size == (331, 510)
+    uncropped.close()
+
+    render_pdf_png(pdf, png, layout=DrawingLayout.PORTRAIT)
+
+    with Image.open(png) as preview:
+        assert preview.size == (330, 510)
+        assert preview.info["dpi"] == pytest.approx((30, 30), abs=0.1)
+
+
 def test_drawing_hole_sizes_follow_unc_policy() -> None:
+    assert guide.TAPPED_HOLE_SPEC is TAPPED_HOLE_SPEC
     assert drawing.THREAD_DESIGNATION == "#4-40 UNC-2B"
-    assert drawing.THREAD_TAP_DRILL_MM == TAP_DRILL_MM["#4-40"]
+    assert drawing.THREAD_TAP_DRILL_MM == blind_cut_dia_mm(TAPPED_HOLE_SPEC)
+    assert drawing.THREAD_MAJOR_DIA_MM == THREAD_MAJOR_MM[TAPPED_HOLE_SPEC.size]
+    assert TAPPED_HOLE_SPEC.end == "blind"
+    assert TAPPED_HOLE_SPEC.depth_mm == guide.SCREW_HOLE_DEPTH
+    assert TAPPED_HOLE_SPEC.overrides_mm["ThreadDepth"] == pytest.approx(
+        guide.GUIDE_SCREW_THREAD_ENGAGEMENT
+    )
     assert CLEARANCE_MM[("#4", "normal")] == 3.264
 
 
@@ -107,9 +164,10 @@ def test_platen_guide_hole_stations_match_native_wizard_features() -> None:
         tuple(guide.GUIDE_LENGTH * fraction for fraction in (0.1, 0.3, 0.5, 0.7, 0.9))
     )
     source = Path(guide.__file__).read_text(encoding="utf-8")
-    assert source.count('"tapped_bottoming", "#4-40"') == 3
-    assert "lock_spec = HoleSpec(" in source
-    assert "screw_spec = HoleSpec(" in source
+    assert source.count("replace(") == 1
+    assert source.count("TAPPED_HOLE_SPEC,") == 1
+    assert "screw_spec = TAPPED_HOLE_SPEC" in source
+    assert '"tapped_bottoming", "#4-40"' not in source
 
 
 def test_drawing_splits_front_and_rear_blind_tap_tables() -> None:
@@ -131,8 +189,13 @@ def test_platen_guide_blind_taps_keep_drill_depth_and_engagement_distinct() -> N
     )
     assert guide.LOCK_SCREW_BOTTOM_CLEARANCE > 0.0
     assert guide.GUIDE_SCREW_BOTTOM_CLEARANCE > 0.0
-    source = Path(guide.__file__).read_text(encoding="utf-8")
-    assert source.count('overrides_mm={"ThreadDepth":') == 2
+    assert guide.LOCK_TAPPED_HOLE_SPEC.end == "blind"
+    assert guide.LOCK_TAPPED_HOLE_SPEC.depth_mm == pytest.approx(
+        guide.LOCK_SCREW_HOLE_DEPTH
+    )
+    assert guide.LOCK_TAPPED_HOLE_SPEC.overrides_mm["ThreadDepth"] == pytest.approx(
+        guide.LOCK_SCREW_THREAD_ENGAGEMENT
+    )
 
 
 def test_drawing_contract_imports_without_pywin32() -> None:
@@ -257,13 +320,60 @@ def test_pdf_metadata_preserves_multisheet_packages(tmp_path: Path) -> None:
     assert reader.metadata.title == "Four-Sheet Drawing"
 
 
-def test_drawing_registry_is_unique_and_extensible() -> None:
+def test_drawing_template_layout_contracts() -> None:
+    assert {
+        layout: (
+            template.path.name,
+            template.width_m,
+            template.height_m,
+            template.dpi,
+            template.pixel_size,
+            template.title_block_left_m,
+            template.title_block_top_m,
+        )
+        for layout, template in DRAWING_TEMPLATES.items()
+    } == {
+        DrawingLayout.LANDSCAPE: (
+            "harmonic-analyzer-landscape.DRWDOT",
+            0.4318,
+            0.2794,
+            300,
+            (5100, 3300),
+            0.216,
+            0.066,
+        ),
+        DrawingLayout.PORTRAIT: (
+            "harmonic-analyzer-portrait.DRWDOT",
+            0.2794,
+            0.4318,
+            300,
+            (3300, 5100),
+            0.0636,
+            0.066,
+        ),
+    }
+    assert all(
+        template.path.is_file() and template.path.stat().st_size > 0
+        for template in DRAWING_TEMPLATES.values()
+    )
+
+
+def test_drawing_registry_is_unique_and_selects_layout_assets() -> None:
     assert len({spec.name for spec in DRAWINGS}) == len(DRAWINGS)
     assert len({spec.part for spec in DRAWINGS}) == len(DRAWINGS)
     outputs = [path for spec in DRAWINGS for path in spec.outputs.values()]
     assert len(set(outputs)) == len(outputs)
-    assert PROJECT_DRWDOT.suffix.lower() == ".drwdot"
-    assert PROJECT_DRWDOT.is_file() and PROJECT_DRWDOT.stat().st_size > 0
+    assert {
+        spec.name for spec in DRAWINGS if spec.layout is DrawingLayout.PORTRAIT
+    } == {"tube_frame"}
+    assert all(
+        spec.layout is DrawingLayout.LANDSCAPE
+        for spec in DRAWINGS
+        if spec.name != "tube_frame"
+    )
+    assert all(
+        spec.assets == (DRAWING_TEMPLATES[spec.layout].path,) for spec in DRAWINGS
+    )
 
 
 def test_release_stages_all_drawing_formats(tmp_path: Path, monkeypatch) -> None:

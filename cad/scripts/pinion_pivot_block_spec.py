@@ -23,6 +23,8 @@ part marks and the drawing keeps EXACTLY ``DRAWING_DIMENSIONS``.
 
 from __future__ import annotations
 
+from _hole_spec import HoleSpec, blind_cut_dia_mm
+
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
@@ -47,7 +49,8 @@ LIFT_BORE_RISE = 1.8561911789147132  # 2026-09 re-solve for the short near-
 # re-proven at import by build_drive_train_assembly's park-gap band).
 SCREW_HALF_SPACING = 13.5  # hold-down hole centres out past the bores: 0.6 web
 # to the bore wall, 0.9 rim to the block end
-SCREW_HOLE_DIA = 4.978  # #8 normal clearance; drawing view math only
+SCREW_HOLE_SPEC = HoleSpec("clearance", "#8")
+SCREW_HOLE_DIA = blind_cut_dia_mm(SCREW_HOLE_SPEC)
 
 # Derived spans (equations of the primitives above).
 BLOCK_TOP_Y = BLOCK_HEIGHT - BORE_UP  # +4.0: block top above the pivot axis

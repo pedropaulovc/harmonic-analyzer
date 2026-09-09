@@ -53,7 +53,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (3.0, 1.0)   # 3:1 whole sheet (Ø10 collar)
+SHEET_SCALE = (3.0, 1.0)  # 3:1 whole sheet (Ø10 collar)
 
 # Sheet layout (meters).  The side (front) view carries the cross hole + height;
 # the end (top) view above it carries the two concentric diameters; the
@@ -103,7 +103,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE
+        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
     stamp_drawing_summary(
         adapter,
@@ -142,6 +142,7 @@ async def build(adapter: Any) -> dict[str, str]:
         OUTPUTS,
         pdf_title="Output Fixture Collar Manufacturing Drawing",
         scale=SHEET_SCALE,
+        layout=SPEC.layout,
     )
 
 

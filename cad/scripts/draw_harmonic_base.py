@@ -313,7 +313,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE
+        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
     stamp_drawing_summary(
         adapter,
@@ -464,6 +464,7 @@ async def build(adapter: Any) -> dict[str, str]:
         # Pivot, lock, stop, block, foot, and nameplate seats are six Hole
         # Wizard tapped groups; the native table replaces their generic notes.
         expected_redundant_notes=6,
+        layout=SPEC.layout,
     )
 
 

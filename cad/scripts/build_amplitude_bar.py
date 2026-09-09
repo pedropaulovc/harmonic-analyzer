@@ -51,7 +51,8 @@ from _common import (
     set_global,
     volume_check,
 )
-from _holes import NUMBER_DRILL_MM, HoleSpec, wizard_holes
+from _hole_spec import blind_cut_dia_mm
+from _holes import wizard_holes
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -63,6 +64,7 @@ from amplitude_bar_spec import (
     DRAWING_NOTES,
     END_VIEW_NOTE,
     ISOMETRIC_VIEW_NOTE,
+    TOP_PIN_HOLE_SPEC,
 )
 
 import _telemetry
@@ -198,32 +200,28 @@ async def build(adapter) -> dict[str, str]:
     # longer has. Evaluates to the as-built BAR_DEPTH, so it stays neutral.
     drive_jobs.append(("D1@Bar", '"BarDepth"'))
 
-    # Top pin hole: was a plain Ø2.0 cut, now a native Hole Wizard #47 number
-    # drill (Ø1.994) along global X through the top-slot cheeks, hanging the bar
-    # from the channel lever's bar pin (memory/fastener-policy-us-customary).
-    # Drilled from the +X side face (a clean planar face, normal +X) at mid-depth;
-    # through-all clears both cheeks, and the slot gap between them removes nothing.
-    # The removed volume is asserted against the two-cheek analytic (±2), so a
-    # mislocated hole fails LOUD.
+    # Native number-drill hole through the top-slot cheeks. The removed volume
+    # is asserted against both cheeks so a misplaced hole fails loud.
     res = await adapter.get_mass_properties()
     vol_before = res.data.volume
     _telemetry.info(f"volume before top pin hole: {vol_before:.1f} mm^3")
     pin_y = BAR_LENGTH - TOP_PIN_DROP
-    pin_dia = NUMBER_DRILL_MM["#47"]
-    # cheeks total = bar width - slot width (the bore removes material only in the
-    # two cheeks; the slot gap between them is already void)
+    pin_dia = blind_cut_dia_mm(TOP_PIN_HOLE_SPEC)
     expected_removed = math.pi * (pin_dia / 2.0) ** 2 * (BAR_WIDTH - TOP_NOTCH_WIDTH)
     pin_cut = wizard_holes(
         adapter,
-        HoleSpec("drilled_number", "#47"),
+        TOP_PIN_HOLE_SPEC,
         [[BAR_WIDTH, pin_y, BAR_DEPTH / 2.0]],
         (1.0, 0.0, 0.0),
-        "top pin hole (#47)",
+        f"top pin hole ({TOP_PIN_HOLE_SPEC.size})",
         name="TopPinHole",
-        placement_dims=[(
-            ("TopPinX", '"BarDepth" / 2'),
-            ("TopPinY", '"BarLength" - "TopPinDrop"'),
-        )],
+        expect_dia_mm=pin_dia,
+        placement_dims=[
+            (
+                ("TopPinX", '"BarDepth" / 2'),
+                ("TopPinY", '"BarLength" - "TopPinDrop"'),
+            )
+        ],
     )
     drive_jobs += pin_cut.placement_drive_jobs
     res = await adapter.get_mass_properties()

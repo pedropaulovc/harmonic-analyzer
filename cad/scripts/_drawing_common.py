@@ -1,8 +1,8 @@
 """Project drawing framework shared by every manufacturing print.
 
 Raw project-agnostic COM calls remain in ``solidworks_mcp``.  This layer owns
-the harmonic-analyzer book policy: ASME B landscape, the checked-in template,
-exact PDF/PNG output, and fail-loud multi-leader callouts.
+the harmonic-analyzer book policy: explicit ASME B orientation, checked-in
+templates, exact PDF/PNG output, and fail-loud multi-leader callouts.
 Part-specific views, dimensions, and notes belong in ``draw_<part>.py``.
 """
 
@@ -20,7 +20,7 @@ from typing import Any, Iterable, Literal, Sequence
 
 import _config
 import _telemetry
-from _common import _early_bound
+from _common import _build_id, _early_bound, apply_custom_properties
 from _gtol_spec import GTOL_SYMBOLS as _GTOL_SYMBOLS
 from _gtol_spec import gtol_frame_xml as _gtol_frame_xml
 from _surface_finish import SurfaceFinishControl
@@ -32,7 +32,7 @@ from _drawing_layout_check import (
     audit_layout,
     format_findings,
 )
-from _drawing_registry import PROJECT_DRWDOT
+from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.com_variant import (
     bool_array,
@@ -126,8 +126,6 @@ _SF_BOX_DOWN_M = 0.0
 _ANNOT_DIM = 4
 _NOMINAL_DIM_HALF_M = 0.004
 
-_OLD_EDGE_BREAK_NOTE = "REMOVE BURRS AND BREAK SHARP EDGES R.01 OR CHAMFER .01 MAX"
-_METRIC_EDGE_BREAK_NOTE = "REMOVE BURRS AND BREAK SHARP EDGES R0.25 OR CHAMFER 0.25 MAX"
 
 # swLeaderStyle_e.swBENT / swLeaderSide_e.swLS_SMART. Every leadered annotation
 # is bent: a straight leader runs at whatever angle its anchor-to-text vector
@@ -179,27 +177,6 @@ _NOMINAL_BALLOON_HALF_M = 0.006
 # is MEASURED per sheet (INote::GetBalloonInfo -- 4.72 mm on pen-assembly), so
 # this is only the clearance between them, not a stand-in for the circle itself.
 _BALLOON_CLEARANCE_M = 0.0015
-
-# The hand-made harmonic-analyzer.DRWDOT bakes its title block in as sheet-
-# format lines + notes rather than a queryable ITitleBlock (sheet.TitleBlock is
-# None), so its occupied region is reserved here as a fixed keep-out box. Any
-# element overlapping it fails the audit, so content can never land on the title
-# block (Codex #269 threads 4). These MUST track the manual template -- if the
-# title block moves, re-measure with the sheet-view annotation dump (probe via
-# _iter_view_annotations on a fresh drawing; last measured 2026-07-13: notes
-# span x 0.2672..0.4229, y <= 0.0611, borders a couple of mm outside).
-#
-# The block runs from its left rule up to its top rule, extending to the
-# sheet's right and bottom edges. The third-angle projection symbol lives
-# INSIDE the block (bottom-center cell), so it needs no separate keep-out.
-_TITLE_BLOCK_LEFT_M = 0.264
-_TITLE_BLOCK_TOP_M = 0.064
-
-
-ASME_B_WIDTH_M = 0.4318
-ASME_B_HEIGHT_M = 0.2794
-ASME_B_PNG_SIZE = (5100, 3300)
-ASME_B_DPI = 300
 
 
 @dataclass(frozen=True)
@@ -1213,8 +1190,15 @@ def add_native_hole_callout(
     callout_xy: tuple[float, float],
     label: str,
     edge: Any | None = None,
+    process: str | None = None,
 ) -> Any:
     """Insert an associative Hole Wizard callout on a selected drawing edge.
+
+    ``process`` is the shop instruction a machinist reads first -- ``"DRILL"``,
+    ``"15/64 DRILL"``, ``"REAM"`` -- written into the callout's PREFIX
+    compartment so the sheet reads ``15/64 DRILL <MOD-DIAM>5.95 THRU ALL``
+    (Harvey #13: say drill or ream; drawing-simplicity-policy.md rule 7).  The
+    size and depth stay native and associative; only the prefix is text.
 
     The callout DISPLAYS the part's hole tolerance; it does not own one. Set the
     fit on the hole feature in the SLDPRT (``_holes.wizard_holes``'s
@@ -1246,6 +1230,25 @@ def add_native_hole_callout(
     )
     if not annotation.SetPosition2(callout_xy[0], callout_xy[1], 0.0):
         raise RuntimeError(f"failed to position native hole callout ({label})")
+    if process:
+        # A Hole Wizard callout keeps its whole format string
+        # (``<MOD-DIAM><DIM> THRU ALL``) in the PREFIX compartment, so the
+        # process is PREPENDED to what is there -- replacing it silently drops
+        # the size and depth (measured 2026-09-02: the sheet read "#14 DRILL").
+        display = _sw_type_info.early_bound_or_flag(
+            display, "IDisplayDimension", "SetText", "GetText"
+        )
+        existing = str(display.GetText(1) or "")  # swDimensionTextPrefix
+        if not existing.strip():
+            raise RuntimeError(f"hole callout has no format text to prefix ({label})")
+        prefix = process.rstrip() + " " + existing.lstrip()
+        display.SetText(1, prefix)
+        if str(display.GetText(1) or "") != prefix:
+            raise RuntimeError(
+                f"hole callout process prefix did not persist ({label}): "
+                f"{display.GetText(1)!r}"
+            )
+        _telemetry.debug(f"hole callout {label}: prefix {prefix!r}")
     draw.ClearSelection2(True)
     draw.EditRebuild3()
     return display
@@ -1256,6 +1259,7 @@ def add_native_hole_callout(
 # template's title block reads via $PRPSHEET. finalize_drawing requires them on
 # the linked model so a stale part can't ship blank tolerance cells.
 TITLE_BLOCK_TOLERANCE_PROPERTIES = (
+    "TOL_LIN_X",
     "TOL_LIN_XX",
     "TOL_LIN_XXX",
     "TOL_ANG",
@@ -1266,8 +1270,20 @@ TITLE_BLOCK_TOLERANCE_PROPERTIES = (
     # that predates the TOL_HOLE_* stamp must fail loud here, not ship blank.
     "TOL_HOLE_MINUS",
     "TOL_HOLE_PLUS",
+    # Edge-break and thread rows (2026-09 template): $PRPSHEET links, so a
+    # source part that predates the stamp would print "REMOVE BURRS AND BREAK
+    # SHARP EDGES  OR CHAMFER  MAX" -- fail loud instead.
+    "TOL_EDGE_BREAK_R",
+    "TOL_CHAMFER_MAX",
+    "THREAD_TYPE",
+    "THREAD_CLASS",
 )
 TITLE_BLOCK_REVISION_PROPERTY = "Revision"
+# The copyright line's year ($PRPSHEET:{COPYRIGHT_YEAR}); required like the
+# tolerance rows so a stale source model cannot print "(c)  Pedro ...".
+TITLE_BLOCK_COPYRIGHT_PROPERTY = "COPYRIGHT_YEAR"
+# Stamped on the drawing document itself at finalize (see _common._build_id).
+DRAWING_BUILD_ID_PROPERTY = "BUILD_ID"
 
 
 def read_required_properties(
@@ -1345,6 +1361,39 @@ def import_cosmetic_threads(adapter: Any, view: Any) -> tuple[int, int]:
     return seed_count, instance_count
 
 
+# swUserPreferenceIntegerValue_e system colours, read off swconst.tlb R2026x
+# (the docs print no integer).  A drawing-ADDED dimension or callout is a
+# "non-imported annotation" and SolidWorks draws it in a grey that exports at
+# ~level 128 -- the 75.00 / (93.00) / hole callouts read pale beside the black
+# model-imported dimensions (machinist review 2026-09-02: "plotted in very
+# pale gray ... reducing arm's-length readability"; Lipton: faint lines are
+# for accountants).  Both books want every line on the print pressed hard.
+_PREF_COLOR_NON_IMPORTED_ANNOTATION = 232
+_PREF_COLOR_IMPORTED_DRIVEN_ANNOTATION = 113
+_COLORREF_BLACK = 0
+
+
+def _pin_annotation_ink(adapter: Any) -> None:
+    """Pin the seat's driven / non-imported annotation colours to black.
+
+    System (seat) preferences, so every sheet the seat exports gets the same
+    ink; read back after each write so a rejected write fails loud instead of
+    shipping pale dimensions.
+    """
+    sw = _early_bound(adapter.swApp, "ISldWorks")
+    for pref in (
+        _PREF_COLOR_NON_IMPORTED_ANNOTATION,
+        _PREF_COLOR_IMPORTED_DRIVEN_ANNOTATION,
+    ):
+        if int(sw.GetUserPreferenceIntegerValue(pref)) == _COLORREF_BLACK:
+            continue
+        if not sw.SetUserPreferenceIntegerValue(pref, _COLORREF_BLACK):
+            raise RuntimeError(f"failed to set annotation colour pref {pref}")
+        if int(sw.GetUserPreferenceIntegerValue(pref)) != _COLORREF_BLACK:
+            raise RuntimeError(f"annotation colour pref {pref} did not persist")
+        _telemetry.debug(f"annotation colour pref {pref} pinned to black")
+
+
 def _pin_dimension_text_and_leader_style(draw: Any) -> None:
     """Force every dimension on ``draw`` to a bent leader with HORIZONTAL text.
 
@@ -1383,13 +1432,14 @@ def _pin_dimension_text_and_leader_style(draw: Any) -> None:
 def new_project_drawing(
     adapter: Any,
     *,
+    layout: DrawingLayout,
     property_view: str | None = None,
     scale: tuple[float, float] = (1.0, 1.0),
     decimals: int = 2,
 ) -> tuple[Any, Any]:
-    """Create a drawing from the hand-made project template.
+    """Create a drawing from the selected hand-made project template.
 
-    The template embeds its own ASME B sheet format (title block, tolerance
+    Each template embeds its own ASME B sheet format (title block, tolerance
     block, projection symbol), so there is no SetupSheet6 format re-apply; the
     only per-drawing knobs are the sheet scale (here) and WHICH view's model
     feeds the sheet's $PRPSHEET property links -- linked in finalize_drawing,
@@ -1398,16 +1448,15 @@ def new_project_drawing(
     ``property_view`` is accepted for compatibility and unused.
     """
     _ = property_view
-    if not PROJECT_DRWDOT.is_file() or PROJECT_DRWDOT.stat().st_size == 0:
-        raise FileNotFoundError(
-            f"project drawing standard is missing: {PROJECT_DRWDOT}"
-        )
+    template = DRAWING_TEMPLATES[layout]
+    if not template.path.is_file() or template.path.stat().st_size == 0:
+        raise FileNotFoundError(f"project drawing standard is missing: {template.path}")
 
     draw = new_drawing(
         adapter,
-        template=str(PROJECT_DRWDOT),
-        width=ASME_B_WIDTH_M,
-        height=ASME_B_HEIGHT_M,
+        template=str(template.path),
+        width=template.width_m,
+        height=template.height_m,
     )
     ddoc = _early_bound(
         draw, "IDrawingDoc"
@@ -1418,7 +1467,6 @@ def new_project_drawing(
     # format and view geometry is inert (all typed SelectByID2 picks fail).
     # EditSheet() drops back to the sheet layer; idempotent when already there.
     ddoc.EditSheet()
-    _normalize_metric_edge_break_note(adapter, ddoc)
     sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
     if sheet is None:
         raise RuntimeError("project drawing template has no current sheet")
@@ -1427,9 +1475,14 @@ def new_project_drawing(
     # display (an exact inch conversion like 9.525) can pass decimals=3.
     set_units_mm(adapter, decimals=decimals)
     _pin_dimension_text_and_leader_style(draw)
+    _pin_annotation_ink(adapter)
     if not sheet.SetScale(float(scale[0]), float(scale[1]), True, False):
-        raise RuntimeError(f"failed to force ASME B sheet to {scale[0]:g}:{scale[1]:g}")
-    assert_asme_b_sheet(adapter, sheet, phase="initial setup", scale=scale)
+        raise RuntimeError(
+            f"failed to force drawing sheet to {scale[0]:g}:{scale[1]:g}"
+        )
+    assert_asme_b_sheet(
+        adapter, sheet, layout=layout, phase="initial setup", scale=scale
+    )
     # Normalize the viewport: sheet-coordinate picks (the hole-table datum
     # vertex / hole rims) hit-test with a PIXEL tolerance mapped through the
     # current zoom, and a hand-saved template opens at whatever zoom it was
@@ -1520,59 +1573,6 @@ def create_blank_drawing_sheets(
 
 
 @_telemetry.traced("drawing.normalize_edge_break")
-def _normalize_metric_edge_break_note(adapter: Any, ddoc: Any) -> None:
-    """Replace the template's inch-origin edge break with its metric value."""
-    sheet_view = adapter._attempt(lambda: ddoc.GetFirstView())
-    if sheet_view is None:
-        raise RuntimeError("drawing template has no sheet view for note normalization")
-    annotations = (
-        adapter._attempt(
-            lambda: adapter._get_attr_or_call(sheet_view, "GetAnnotations")
-        )
-        or []
-    )
-    matched = 0
-    for annotation in annotations:
-        annotation = _sw_type_info.early_bound_or_flag(
-            annotation, "IAnnotation", "GetType", "GetSpecificAnnotation"
-        )
-        if int(adapter._get_attr_or_call(annotation, "GetType") or 0) != _ANNOT_NOTE:
-            continue
-        specific = adapter._attempt(
-            lambda a=annotation: adapter._get_attr_or_call(a, "GetSpecificAnnotation")
-        )
-        if specific is None:
-            continue
-        note = _sw_type_info.early_bound_or_flag(
-            specific, "INote", "GetText", "SetText"
-        )
-        raw = str(adapter._get_attr_or_call(note, "GetText") or "")
-        normalized = " ".join(raw.upper().split())
-        if normalized not in {_OLD_EDGE_BREAK_NOTE, _METRIC_EDGE_BREAK_NOTE}:
-            continue
-        matched += 1
-        if normalized == _METRIC_EDGE_BREAK_NOTE:
-            continue
-        changed = adapter._attempt(
-            lambda n=note: n.SetText(_METRIC_EDGE_BREAK_NOTE), default=False
-        )
-        if not changed:
-            raise RuntimeError("failed to replace drawing edge-break note")
-        applied = " ".join(
-            str(adapter._get_attr_or_call(note, "GetText") or "").upper().split()
-        )
-        if applied != _METRIC_EDGE_BREAK_NOTE:
-            raise RuntimeError(
-                f"drawing edge-break note replacement did not persist: {applied!r}"
-            )
-    if matched != 1:
-        raise RuntimeError(
-            "drawing template must contain exactly one recognized edge-break "
-            f"note, found {matched}"
-        )
-    _telemetry.event("drawing.edge_break_normalized", value_mm=0.25)
-
-
 def set_hidden_lines_removed(adapter: Any, view: Any) -> None:
     ok = adapter._attempt(
         lambda: view.SetDisplayMode4(False, 2, False, False, True), default=False
@@ -1592,7 +1592,12 @@ def set_hidden_lines_visible(adapter: Any, view: Any) -> None:
 
 
 def assert_asme_b_sheet(
-    adapter: Any, sheet: Any, *, phase: str, scale: tuple[float, float] = (1.0, 1.0)
+    adapter: Any,
+    sheet: Any,
+    *,
+    layout: DrawingLayout,
+    phase: str,
+    scale: tuple[float, float] = (1.0, 1.0),
 ) -> None:
     properties = list(adapter._get_attr_or_call(sheet, "GetProperties2") or [])
     if len(properties) < 7:
@@ -1604,11 +1609,14 @@ def assert_asme_b_sheet(
             f"{phase}: drawing sheet scale is not "
             f"{scale[0]:g}:{scale[1]:g}: {properties!r}"
         )
+    template = DRAWING_TEMPLATES[layout]
     if (
-        abs(properties[5] - ASME_B_WIDTH_M) > 1e-6
-        or abs(properties[6] - ASME_B_HEIGHT_M) > 1e-6
+        abs(properties[5] - template.width_m) > 1e-6
+        or abs(properties[6] - template.height_m) > 1e-6
     ):
-        raise RuntimeError(f"{phase}: drawing sheet is not ASME B size: {properties!r}")
+        raise RuntimeError(
+            f"{phase}: drawing sheet is not {layout.value} ASME B size: {properties!r}"
+        )
 
 
 def _contact_preview_grid(page_count: int) -> tuple[int, int]:
@@ -1622,19 +1630,25 @@ def _contact_preview_grid(page_count: int) -> tuple[int, int]:
 
 
 @_telemetry.traced("drawing.render_png")
-def render_pdf_png(pdf: Path, png: Path, *, expected_pages: int = 1) -> None:
+def render_pdf_png(
+    pdf: Path,
+    png: Path,
+    *,
+    layout: DrawingLayout,
+    expected_pages: int = 1,
+) -> None:
     """Render a drawing PDF to its preview PNG.
 
-    Single-sheet drawings retain the historical one-page 300 dpi preview.
-    Multi-sheet drawings use the registered preview path for a contact sheet,
-    keeping the doit/cache/release artifact contract to one PNG. The historical
-    2x2 layout is retained through four pages; larger drawings use the smallest
-    near-square grid that fits every page. Exact page images for a review can be
-    rendered from the packaged vector PDF.
+    Single-sheet drawings retain a one-page 300 dpi preview. Multi-sheet
+    drawings use the registered preview path for a contact sheet, keeping the
+    doit/cache/release artifact contract to one PNG. The historical 2x2 layout
+    is retained through four pages; larger drawings use the smallest near-square
+    grid that fits every page.
     """
     import pypdfium2 as pdfium
     from PIL import Image
 
+    template = DRAWING_TEMPLATES[layout]
     document = pdfium.PdfDocument(str(pdf))
     if len(document) != expected_pages:
         raise RuntimeError(
@@ -1643,46 +1657,51 @@ def render_pdf_png(pdf: Path, png: Path, *, expected_pages: int = 1) -> None:
     images: list[Any] = []
     for index in range(expected_pages):
         page = document[index]
-        image = page.render(scale=ASME_B_DPI / 72.0).to_pil()
+        image = page.render(scale=template.dpi / 72.0).to_pil()
         page.close()
-        if image.size == (ASME_B_PNG_SIZE[0], ASME_B_PNG_SIZE[1] + 1):
-            image = image.crop((0, 0, *ASME_B_PNG_SIZE))
-        if image.size != ASME_B_PNG_SIZE:
+        expected_width, expected_height = template.pixel_size
+        actual_width, actual_height = image.size
+        if (
+            actual_width in (expected_width, expected_width + 1)
+            and actual_height in (expected_height, expected_height + 1)
+            and image.size != template.pixel_size
+        ):
+            image = image.crop((0, 0, expected_width, expected_height))
+        if image.size != template.pixel_size:
             document.close()
             raise RuntimeError(
-                f"ASME B PNG page {index + 1} is {image.size}, "
-                f"expected {ASME_B_PNG_SIZE}"
+                f"{layout.value} ASME B PNG page {index + 1} is {image.size}, "
+                f"expected {template.pixel_size}"
             )
         images.append(image)
     document.close()
     png.parent.mkdir(parents=True, exist_ok=True)
     if expected_pages == 1:
-        images[0].save(png, dpi=(ASME_B_DPI, ASME_B_DPI))
+        images[0].save(png, dpi=(template.dpi, template.dpi))
         return
 
     columns, rows = _contact_preview_grid(expected_pages)
-    cell_size = (ASME_B_PNG_SIZE[0] // columns, ASME_B_PNG_SIZE[1] // rows)
+    cell_size = (
+        template.pixel_size[0] // columns,
+        template.pixel_size[1] // rows,
+    )
     scale = min(
-        cell_size[0] / ASME_B_PNG_SIZE[0],
-        cell_size[1] / ASME_B_PNG_SIZE[1],
+        cell_size[0] / template.pixel_size[0],
+        cell_size[1] / template.pixel_size[1],
     )
     preview_size = (
-        round(ASME_B_PNG_SIZE[0] * scale),
-        round(ASME_B_PNG_SIZE[1] * scale),
+        round(template.pixel_size[0] * scale),
+        round(template.pixel_size[1] * scale),
     )
-    contact = Image.new("RGB", ASME_B_PNG_SIZE, "white")
+    contact = Image.new("RGB", template.pixel_size, "white")
     for index, image in enumerate(images):
         cell = image.resize(preview_size, Image.Resampling.LANCZOS)
         column = index % columns
         row = index // columns
-        contact.paste(
-            cell,
-            (
-                column * cell_size[0] + (cell_size[0] - preview_size[0]) // 2,
-                row * cell_size[1] + (cell_size[1] - preview_size[1]) // 2,
-            ),
-        )
-    contact.save(png, dpi=(ASME_B_DPI, ASME_B_DPI))
+        x = column * cell_size[0] + (cell_size[0] - preview_size[0]) // 2
+        y = row * cell_size[1] + (cell_size[1] - preview_size[1]) // 2
+        contact.paste(cell.convert("RGB"), (x, y))
+    contact.save(png, dpi=(template.dpi, template.dpi))
 
 
 def sanitize_pdf_metadata(pdf: Path, *, title: str, expected_pages: int = 1) -> None:
@@ -2338,15 +2357,13 @@ def visible_view_entities(view: Any, entity_kind: int, *, label: str) -> list[An
     return entities
 
 
-@_telemetry.traced("drawing.arc_center_endpoints", label_param="label")
-def set_arc_endpoints_to_center(adapter: Any, dimension: Any, *, label: str) -> Any:
-    """Re-anchor a dimension's circular endpoint(s) to the arc CENTER.
+_ARC_END_CENTER = 1  # swArcEndCondition_e.swArcEndConditionCenter
+_ARC_END_MAX = 3  # swArcEndCondition_e.swArcEndConditionMax (furthest point)
 
-    A line-to-circle dimension keeps SolidWorks' default tangent/min-max arc
-    condition, so the value locates the rim instead of the axis — off by the
-    hole radius. Verify each flipped endpoint sticks; fail loud when the
-    dimension has no circular endpoint at all.
-    """
+
+def _set_arc_endpoints(
+    adapter: Any, dimension: Any, *, condition: int, label: str
+) -> Any:
     display = _sw_type_info.early_bound_or_flag(
         dimension, "IDisplayDimension", "GetDimension"
     )
@@ -2356,21 +2373,46 @@ def set_arc_endpoints_to_center(adapter: Any, dimension: Any, *, label: str) -> 
     for index in (1, 2):
         if int(model_dimension.GetArcEndCondition(index)) == 0:
             continue
-        result = int(
-            model_dimension.SetArcEndCondition(index, 1)  # swArcEndConditionCenter
-        )
+        result = int(model_dimension.SetArcEndCondition(index, condition))
         if result != 0:
             raise RuntimeError(
-                f"failed to set {label} endpoint {index} to arc center "
-                f"(SolidWorks result {result})"
+                f"failed to set {label} endpoint {index} to arc condition "
+                f"{condition} (SolidWorks result {result})"
             )
         draw.GraphicsRedraw2()
-        if int(model_dimension.GetArcEndCondition(index)) != 1:
-            raise RuntimeError(f"{label} did not retain center arc condition")
+        if int(model_dimension.GetArcEndCondition(index)) != condition:
+            raise RuntimeError(f"{label} did not retain arc condition {condition}")
         arc_end_set = True
     if not arc_end_set:
         raise RuntimeError(f"{label} has no circular endpoint")
     return dimension
+
+
+@_telemetry.traced("drawing.arc_center_endpoints", label_param="label")
+def set_arc_endpoints_to_center(adapter: Any, dimension: Any, *, label: str) -> Any:
+    """Re-anchor a dimension's circular endpoint(s) to the arc CENTER.
+
+    A line-to-circle dimension keeps SolidWorks' default tangent/min-max arc
+    condition, so the value locates the rim instead of the axis — off by the
+    hole radius. Verify each flipped endpoint sticks; fail loud when the
+    dimension has no circular endpoint at all.
+    """
+    return _set_arc_endpoints(
+        adapter, dimension, condition=_ARC_END_CENTER, label=label
+    )
+
+
+@_telemetry.traced("drawing.arc_max_endpoints", label_param="label")
+def set_arc_endpoints_to_max(adapter: Any, dimension: Any, *, label: str) -> Any:
+    """Re-anchor a dimension's circular endpoint(s) to the arc's FURTHEST point.
+
+    The overall length of a part with a rounded end runs to the arc's extreme,
+    not its centre (a centre-anchored "overall" reads short by the radius and
+    gets the stock sawn short -- Harvey #25).  SolidWorks resolves a
+    line-to-arc pick to the centre by default, so the far-tangent condition is
+    set explicitly and verified.
+    """
+    return _set_arc_endpoints(adapter, dimension, condition=_ARC_END_MAX, label=label)
 
 
 def set_basic_dimension(adapter: Any, dimension: Any, *, label: str) -> Any:
@@ -4292,7 +4334,7 @@ def _leader_segments_of(
 
 
 def collect_layout_elements(
-    adapter: Any,
+    adapter: Any, *, layout: DrawingLayout
 ) -> tuple[list[LayoutElement], list[LeaderSegment], DrawableRegion]:
     """Gather every drawing element, its leader geometry, and the drawable region.
 
@@ -4330,6 +4372,12 @@ def collect_layout_elements(
     if len(properties) < 7:
         raise RuntimeError(f"cannot read sheet size to audit layout: {properties!r}")
     width, height = float(properties[5]), float(properties[6])
+    template = DRAWING_TEMPLATES[layout]
+    if abs(width - template.width_m) > 1e-6 or abs(height - template.height_m) > 1e-6:
+        raise RuntimeError(
+            f"drawing layout is {width:g} x {height:g} m, expected "
+            f"{template.width_m:g} x {template.height_m:g} m for {layout.value}"
+        )
 
     elements: list[LayoutElement] = []
     leaders: list[LeaderSegment] = []
@@ -4458,17 +4506,19 @@ def collect_layout_elements(
         LayoutElement(
             "title-block",
             "titleblock",
-            _TITLE_BLOCK_LEFT_M,
+            template.title_block_left_m,
             0.0,
             width,
-            _TITLE_BLOCK_TOP_M,
+            template.title_block_top_m,
         )
     )
     region = sheet_drawable_region(adapter, sheet, width=width, height=height)
     return elements, leaders, region
 
 
-def check_drawing_layout(adapter: Any, *, stem: str = "") -> None:
+def check_drawing_layout(
+    adapter: Any, *, layout: DrawingLayout, stem: str = ""
+) -> None:
     """Diagnose a colliding, border-crossing, or leader-crossed layout.
 
     This is an explicit diagnostic, not part of the drawing build hot path.
@@ -4481,7 +4531,7 @@ def check_drawing_layout(adapter: Any, *, stem: str = "") -> None:
     :func:`_spread_balloons`). The ratchet was deleted with the defect.
     """
     with _telemetry.span("drawing.layout_audit"):
-        elements, leaders, region = collect_layout_elements(adapter)
+        elements, leaders, region = collect_layout_elements(adapter, layout=layout)
         overlaps, overflows, crossings = audit_layout(elements, region, leaders=leaders)
         if not overlaps and not overflows and not crossings:
             _telemetry.success(
@@ -4503,6 +4553,7 @@ async def finalize_drawing(
     adapter: Any,
     outputs: DrawingOutputs,
     *,
+    layout: DrawingLayout,
     pdf_title: str,
     scale: tuple[float, float] = (1.0, 1.0),
     redundant_note_substrings: Sequence[str] = (),
@@ -4515,6 +4566,12 @@ async def finalize_drawing(
         drawing_model, "IDrawingDoc"
     )  # IDrawingDoc view for drawing-only methods (same dispatch)
     drawing_model.ClearSelection2(True)
+    # The sheet's own build identifier (title block "BUILD $PRP:{BUILD_ID}"):
+    # a DRAWING-document property, not a $PRPSHEET link, so it names the build
+    # that made this sheet even when the part it shows is older.
+    apply_custom_properties(
+        adapter, {DRAWING_BUILD_ID_PROPERTY: _build_id()}, model=drawing_model
+    )
     sheet_names = tuple(adapter._get_attr_or_call(ddoc, "GetSheetNames") or ())
     if not sheet_names:
         raise RuntimeError("finished drawing has no sheets")
@@ -4542,7 +4599,11 @@ async def finalize_drawing(
                 f"failed to set final drawing sheet {sheet_name!r} scale"
             )
         assert_asme_b_sheet(
-            adapter, sheet, phase=f"before save {sheet_name}", scale=scale
+            adapter,
+            sheet,
+            layout=layout,
+            phase=f"before save {sheet_name}",
+            scale=scale,
         )
         properties = list(adapter._get_attr_or_call(sheet, "GetProperties2") or [])
         if len(properties) < 8:
@@ -4574,6 +4635,7 @@ async def finalize_drawing(
             assert_asme_b_sheet(
                 adapter,
                 sheet,
+                layout=layout,
                 phase=f"explicit property source {sheet_name}",
                 scale=scale,
             )
@@ -4601,21 +4663,17 @@ async def finalize_drawing(
         )
         read_required_properties(
             linked_model,
-            (*TITLE_BLOCK_TOLERANCE_PROPERTIES, TITLE_BLOCK_REVISION_PROPERTY),
+            (
+                *TITLE_BLOCK_TOLERANCE_PROPERTIES,
+                TITLE_BLOCK_REVISION_PROPERTY,
+                TITLE_BLOCK_COPYRIGHT_PROPERTY,
+            ),
             required=(
                 *TITLE_BLOCK_TOLERANCE_PROPERTIES,
                 TITLE_BLOCK_REVISION_PROPERTY,
+                TITLE_BLOCK_COPYRIGHT_PROPERTY,
             ),
         )
-
-    # The title block's UNIT cell links $PRP:"UNIT_DISPLAY" (a DRAWING-doc
-    # property, unlike the $PRPSHEET part-property links), so the declared unit
-    # always tracks what set_units_mm actually configured. Flip to "IN" with
-    # the inch migration (#290) -- a hardcoded IN cell over mm dimensions would
-    # read as inch values and get machined at the wrong scale (Codex P1).
-    from _common import apply_custom_properties
-
-    apply_custom_properties(adapter, {"UNIT_DISPLAY": "MM"})
 
     # Explicit recipe-requested cleanup remains sheet-scoped. Layout and view
     # appearance are otherwise left exactly as SolidWorks produced them.
@@ -4651,7 +4709,12 @@ async def finalize_drawing(
     if set(artifacts) != {"drawing", "pdf"}:
         raise RuntimeError(f"drawing save/export incomplete: {artifacts!r}")
     sanitize_pdf_metadata(outputs.pdf, title=pdf_title, expected_pages=len(sheet_names))
-    render_pdf_png(outputs.pdf, outputs.png, expected_pages=len(sheet_names))
+    render_pdf_png(
+        outputs.pdf,
+        outputs.png,
+        layout=layout,
+        expected_pages=len(sheet_names),
+    )
     artifacts["png"] = str(outputs.png.resolve())
     if set(artifacts) != {"drawing", "pdf", "png"}:
         raise RuntimeError(f"drawing export incomplete: {artifacts!r}")

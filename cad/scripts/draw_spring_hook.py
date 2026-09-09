@@ -107,9 +107,9 @@ def _shank_silhouette(adapter: Any, view: Any) -> Any:
         end_xyz = adapter._get_attr_or_call(end, "ArrayData")
         if not start_xyz or not end_xyz:
             continue
-        length = sum(
-            (float(a) - float(b)) ** 2 for a, b in zip(start_xyz, end_xyz)
-        ) ** 0.5
+        length = (
+            sum((float(a) - float(b)) ** 2 for a, b in zip(start_xyz, end_xyz)) ** 0.5
+        )
         midpoint_x = (float(start_xyz[0]) + float(end_xyz[0])) / 2.0
         candidates.append((length, midpoint_x, silhouette))
     span = _telemetry.trace.get_current_span()
@@ -168,7 +168,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE
+        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
     stamp_drawing_summary(
         adapter,
@@ -213,6 +213,7 @@ async def build(adapter: Any) -> dict[str, str]:
         OUTPUTS,
         pdf_title="Spring Hook Manufacturing Drawing",
         scale=SHEET_SCALE,
+        layout=SPEC.layout,
     )
 
 

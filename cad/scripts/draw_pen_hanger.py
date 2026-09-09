@@ -59,12 +59,14 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (2.0, 1.0)   # 2:1 whole sheet (~82 mm tall part)
+SHEET_SCALE = (2.0, 1.0)  # 2:1 whole sheet (~82 mm tall part)
 VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]  # 2.0 sheet-mm per model-mm / 1000
 
 # Front-view model bounding box (X-Y profile of the strap + block).
-_BBOX_X = (min(STRAP_TOP_X[0], STRAP_BOT_X[0], -BLOCK_HALF),
-           max(STRAP_TOP_X[1], STRAP_BOT_X[1], BLOCK_HALF))
+_BBOX_X = (
+    min(STRAP_TOP_X[0], STRAP_BOT_X[0], -BLOCK_HALF),
+    max(STRAP_TOP_X[1], STRAP_BOT_X[1], BLOCK_HALF),
+)
 _BBOX_Y = (-BLOCK_HALF, STRAP_TOP_Y)
 _BBOX_CX = (_BBOX_X[0] + _BBOX_X[1]) / 2.0
 _BBOX_CY = (_BBOX_Y[0] + _BBOX_Y[1]) / 2.0
@@ -127,7 +129,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE
+        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
     stamp_drawing_summary(
         adapter,
@@ -165,6 +167,7 @@ async def build(adapter: Any) -> dict[str, str]:
         OUTPUTS,
         pdf_title="Pen Hanger Manufacturing Drawing",
         scale=SHEET_SCALE,
+        layout=SPEC.layout,
     )
 
 

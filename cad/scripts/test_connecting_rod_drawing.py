@@ -10,6 +10,7 @@ import draw_connecting_rod as drawing
 import build_connecting_rod as rod
 from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+from _hole_spec import blind_cut_dia_mm
 
 
 def test_required_drawing_paths() -> None:
@@ -41,6 +42,16 @@ def test_draw_view_math_matches_the_spec() -> None:
     assert connecting_rod_spec.HEAD_HEIGHT == rod.HEAD_HEIGHT
     assert connecting_rod_spec.HEAD_CROWN_ABOVE_PIN == rod.HEAD_CROWN_ABOVE_PIN
     assert connecting_rod_spec.HEAD_THICKNESS == rod.HEAD_THICKNESS
+
+
+def test_pin_hole_is_part_owned_and_drawing_geometry_is_derived() -> None:
+    assert rod.PIN_HOLE_SPEC is connecting_rod_spec.PIN_HOLE_SPEC
+    assert drawing.PIN_HOLE_SPEC is connecting_rod_spec.PIN_HOLE_SPEC
+    assert drawing._PIN_HOLE_DIA == blind_cut_dia_mm(connecting_rod_spec.PIN_HOLE_SPEC)
+    source = Path(rod.__file__).read_text(encoding="utf-8")
+    assert "HoleSpec(" not in source
+    assert "\n        PIN_HOLE_SPEC," in source
+    assert "expect_dia_mm=blind_cut_dia_mm(PIN_HOLE_SPEC)" in source
 
 
 def test_sheet_runs_at_1_to_1_with_1_to_2_isometric() -> None:

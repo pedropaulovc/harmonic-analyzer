@@ -29,6 +29,17 @@ from typing import Any
 
 import _telemetry
 from _common import _early_bound
+from _hole_spec import (
+    CLEARANCE_MM as CLEARANCE_MM,
+    DRILL_POINT_H,
+    FRACTIONAL_DRILL_MM as FRACTIONAL_DRILL_MM,
+    LETTER_DRILL_MM as LETTER_DRILL_MM,
+    NUMBER_DRILL_MM as NUMBER_DRILL_MM,
+    TAP_DRILL_MM as TAP_DRILL_MM,
+    THREAD_MAJOR_MM as THREAD_MAJOR_MM,
+    HoleSpec,
+    blind_cut_dia_mm,
+)
 
 PlacementDimension = tuple[str | None, str | None]
 PlacementDimensions = tuple[PlacementDimension, PlacementDimension]
@@ -79,84 +90,6 @@ _FITS = {"close": 0, "normal": 1, "loose": 2}  # swWzdHoleScrewClearanceTypes_e
 # (the #8-normal probe drifted ~0.5).
 DIAMETER_TOLERANCE_MM = 0.005
 
-# Cut diameters (mm) from this seat's wizard database and live feature probes.
-# HoleDiameter commonly reads 0.0; a plain through hole's usable value is in
-# ThruHoleDiameter (live #4 normal = 0.0032639 m). Scripts take analytic volume
-# expectations from these pinned values; diag_hole_wizard.py re-proves the
-# representative cases by measured volume.
-TAP_DRILL_MM = {  # taps cut the tap-drill diameter (TAP_DRILL column)
-    "#2-56": 1.778,
-    "#3-48": 1.994,
-    "#4-40": 2.261,
-    "#6-32": 2.705,
-    "#8-32": 3.454,
-    "#10-24": 3.797,
-    "1/4-20": 5.105,
-    "5/16-18": 6.528,
-    "1/2-13": 10.716,
-    "9/16-12": 12.304,
-}
-THREAD_MAJOR_MM = {  # basic external-thread major diameters (ASME B1.1)
-    "#2-56": 2.184,
-    "#3-48": 2.515,
-    "#4-40": 2.845,
-    "#6-32": 3.505,
-    "#8-32": 4.166,
-    "#10-24": 4.826,
-    "1/4-20": 6.350,
-    "5/16-18": 7.938,
-    "1/2-13": 12.700,
-    "9/16-12": 14.288,
-}
-CLEARANCE_MM = {  # (size, fit) -> hole diameter (CLOSE/NORMAL/LOOSE_FIT)
-    ("#2", "close"): 2.388,
-    ("#2", "normal"): 2.591,
-    ("#2", "loose"): 2.946,
-    ("#3", "close"): 2.692,
-    ("#3", "normal"): 2.946,
-    ("#3", "loose"): 3.251,
-    ("#4", "close"): 3.048,
-    ("#4", "normal"): 3.264,
-    ("#4", "loose"): 3.658,
-    ("#6", "close"): 3.912,
-    ("#6", "normal"): 4.318,
-    ("#6", "loose"): 4.699,
-    ("#8", "close"): 4.572,
-    ("#8", "normal"): 4.978,
-    ("#8", "loose"): 5.410,
-    ("1/4", "close"): 6.756,
-    ("1/4", "normal"): 7.137,
-    ("1/4", "loose"): 7.544,
-    ("5/16", "close"): 8.331,
-    ("5/16", "normal"): 8.738,
-    ("5/16", "loose"): 9.119,
-    ("1/2", "close"): 13.492,
-    ("1/2", "normal"): 14.288,
-    ("1/2", "loose"): 15.081,
-    ("9/16", "close"): 14.684,
-    ("9/16", "normal"): 15.080,
-    ("9/16", "loose"): 15.479,
-}
-NUMBER_DRILL_MM = {  # number drills cut DIAMETER exactly
-    "#9": 4.978,
-    "#19": 4.216,
-    "#20": 4.089,
-    "#21": 4.039,
-    "#29": 3.454,
-    "#14": 4.623,
-    "#37": 2.642,
-    "#43": 2.261,
-    "#47": 1.994,
-    "#54": 1.397,
-}
-FRACTIONAL_DRILL_MM = {"1/8": 3.175, "3/16": 4.763, "15/64": 5.953}
-LETTER_DRILL_MM = {"F": 6.528, "V": 9.576}  # V = 0.377in (transgear stud seat)
-
-# 118-degree drill point: tip height = r * cot(59 deg). A BLIND wizard hole's
-# depth runs to the flat shoulder; the point extends beyond it (probe: #4-40
-# blind 6mm removed 25.0 vs 24.1 cylinder -- exactly the cone term).
-DRILL_POINT_H = 0.60086
-
 
 def blind_hole_volume_mm3(dia_mm: float, depth_mm: float) -> float:
     """Analytic volume of one blind wizard hole (cylinder + drill point)."""
@@ -164,37 +97,6 @@ def blind_hole_volume_mm3(dia_mm: float, depth_mm: float) -> float:
 
     r = dia_mm / 2.0
     return math.pi * r * r * depth_mm + math.pi / 3.0 * r * r * (r * DRILL_POINT_H)
-
-
-@dataclass
-class HoleSpec:
-    """One Hole Wizard hole definition (all instances of a feature share it).
-
-    Attributes:
-        kind: A ``_KINDS`` key -- picks the wizard hole type + fastener table.
-        size: Wizard-table size token for the kind (``"#8-32"``, ``"1/2-13"``
-            for taps; ``"#8"``, ``"5/16"`` for clearances; ``"#47"`` for number
-            drills; the bolt size for counterbores).
-        end: ``"through_all"`` | ``"blind"`` | ``"through_next"``.
-        depth_mm: Hole depth for a blind end (mm; the wizard's HoleDepth).
-        thread_class: Native tap class (``"2B"`` by default).
-            Ignored for non-taps.
-        fit: Clearance fit (``"normal"`` default) -- clearance kind only.
-        overrides_mm: Requested ``IWizardHoleFeatureData2`` property values in
-            mm (``"HoleDiameter"``, ``"CounterBoreDiameter"``,
-            ``"CounterBoreDepth"``, ...). A blind tap's ``"ThreadDepth"`` is
-            passed in HoleWizard5's supported Tap Thread Depth slot at feature
-            creation; other values are applied through ModifyDefinition. Use
-            ONLY to preserve a dimension the standard table would move.
-    """
-
-    kind: str
-    size: str
-    end: str = "through_all"
-    depth_mm: float = 0.0
-    thread_class: str = "2B"
-    fit: str = "normal"
-    overrides_mm: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass
@@ -207,28 +109,6 @@ class WizardHoleResult:
     cbore_dia_mm: float = 0.0
     cbore_depth_mm: float = 0.0
     placement_drive_jobs: list[tuple[str, str]] = field(default_factory=list)
-
-
-def blind_cut_dia_mm(spec: HoleSpec) -> float:
-    """The pinned cut diameter a blind ``spec`` must pass to HoleWizard5."""
-    if spec.kind in ("tapped", "tapped_bottoming"):
-        table, key = TAP_DRILL_MM, spec.size
-    elif spec.kind == "clearance":
-        table, key = CLEARANCE_MM, (spec.size, spec.fit)
-    elif spec.kind == "drilled_number":
-        table, key = NUMBER_DRILL_MM, spec.size
-    elif spec.kind == "drilled_fractional":
-        table, key = FRACTIONAL_DRILL_MM, spec.size
-    elif spec.kind == "drilled_letter":
-        table, key = LETTER_DRILL_MM, spec.size
-    else:
-        raise ValueError(f"blind is not supported for kind {spec.kind!r}")
-    if key not in table:
-        raise ValueError(
-            f"size {key!r} not pinned for {spec.kind!r} -- add it to the "
-            "table in _holes.py (values from the wizard-database dump)"
-        )
-    return table[key]
 
 
 def find_planar_face(model, normal, points_mm, tol_mm: float = 1.0):

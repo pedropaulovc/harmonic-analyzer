@@ -11,9 +11,10 @@ from __future__ import annotations
 import math
 from collections.abc import Iterable, Mapping
 
+from _hole_spec import blind_cut_dia_mm
 from crank_arm_spec import (
     ARM_WIDTH as _ARM_W,
-    PIN_HOLE_DIA as _ARM_PILOT,
+    PIN_HOLE_SPEC as _ARM_PILOT_SPEC,
     SHAFT_BORE_DIA as _ARM_BORE,
 )
 from crank_pin_spec import (
@@ -79,6 +80,8 @@ def _pin_overlap(s0: float, s1: float, hole_dia: float) -> float:
         total += max(0.0, math.pi / 4.0 * (d * d - hole_dia * hole_dia)) * (s1 - s0) / n
     return total
 
+
+_ARM_PILOT = blind_cut_dia_mm(_ARM_PILOT_SPEC)
 
 # hub -X face at s = PIN_PROUD; the shaft bore occupies the middle ARM_BORE of the hub
 _ARM_S0, _ARM_S1 = _PIN_PROUD, _PIN_PROUD + _ARM_W

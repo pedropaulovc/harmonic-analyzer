@@ -54,7 +54,8 @@ from _common import (
     set_global,
     volume_check,
 )
-from _holes import CLEARANCE_MM, HoleSpec, blind_cut_dia_mm, wizard_holes
+from _hole_spec import blind_cut_dia_mm
+from _holes import wizard_holes
 import _config
 from build_hanger_screw import SHANK_DIA as HANGER_SCREW_DIA
 from _drawing_marks import (
@@ -67,12 +68,12 @@ from wheel_bar_geom import (
     BAR_LENGTH,
     BAR_SIDE,
     CLAMP_HOLE_DIA,
-    CLAMP_HOLE_FIT,
-    CLAMP_HOLE_SIZE,
+    CLAMP_HOLE_SPEC,
     CLAMP_HOLE_X,
-    PEN_HANGER_HOLE_FIT,
-    require_hanger_end_wall,
+    PEN_HANGER_HOLE_DIA,
+    PEN_HANGER_HOLE_SPEC,
     SCREW_HOLE_X,
+    require_hanger_end_wall,
 )
 from wheel_bar_spec import (
     DRAWING_DIMENSIONS,
@@ -83,14 +84,7 @@ from wheel_bar_spec import (
 PART_NAME = "wheel-bar"
 MATERIAL = "Plain Carbon Steel"
 
-# Bar section + hole stations live in wheel_bar_geom (imported above). The
-# selected hanger screw is #8-32, so the bar uses the exact #8 close-clearance
-# Hole Wizard size.
-PEN_HANGER_HOLE_SIZE = "#8"
-PEN_HANGER_HOLE_DIA = CLEARANCE_MM[(PEN_HANGER_HOLE_SIZE, PEN_HANGER_HOLE_FIT)]
-SCREW_HOLE_SPEC = HoleSpec("clearance", PEN_HANGER_HOLE_SIZE, fit=PEN_HANGER_HOLE_FIT)
-# The clamp-screw shanks pass through #8 normal-clearance holes.
-CLAMP_HOLE_SPEC = HoleSpec("clearance", CLAMP_HOLE_SIZE, fit=CLAMP_HOLE_FIT)
+# Bar section, hole stations, and standard clearance specs live in wheel_bar_geom.
 PEN_HANGER_DIAMETRAL_CLEARANCE = PEN_HANGER_HOLE_DIA - HANGER_SCREW_DIA
 if PEN_HANGER_DIAMETRAL_CLEARANCE <= 0.0:
     raise AssertionError("standard #8 hanger clearance binds on the stock screw")
@@ -160,11 +154,11 @@ async def build(adapter) -> dict[str, str]:
     # through the bar + front arc, threading into the back arc). Positions are
     # the photo layout.
     front_z = -BAR_DEPTH / 2.0
-    screw_dia = blind_cut_dia_mm(SCREW_HOLE_SPEC)
+    screw_dia = blind_cut_dia_mm(PEN_HANGER_HOLE_SPEC)
     clamp_dia = blind_cut_dia_mm(CLAMP_HOLE_SPEC)
     screw_cut = wizard_holes(
         adapter,
-        SCREW_HOLE_SPEC,
+        PEN_HANGER_HOLE_SPEC,
         [[SCREW_HOLE_X, 0.0, front_z]],
         (0.0, 0.0, -1.0),
         "pen-hanger screw hole (#8 clearance)",

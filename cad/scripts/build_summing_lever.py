@@ -89,7 +89,8 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
-from _holes import NUMBER_DRILL_MM, HoleSpec, wizard_holes
+from _hole_spec import blind_cut_dia_mm
+from _holes import wizard_holes
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -102,7 +103,15 @@ from summing_lever_notes import (
     DRAWING_NOTES,
     ISOMETRIC_VIEW_NOTE,
 )
-from summing_lever_spec import SURFACE_FINISHES
+from summing_lever_spec import (
+    CHANNEL_PITCH,
+    CHANNEL_Z0,
+    HOLE_COUNT,
+    HOLE_SPEC,
+    HOLE_X,
+    HOLE_Z_OFFSET,
+    SURFACE_FINISHES,
+)
 
 PART_NAME = "summing-lever"
 MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
@@ -124,22 +133,7 @@ SUM_CURV = 0.3 * IN  # summation plate side curvature                7.62
 ANCHOR_R = 0.375 * IN  # summation anchor outer radius               9.525
 ANCHOR_H = 0.75 * IN  # summation anchor height                     19.05
 
-# --- spring-hole registration (machine channel bank, NOT the tiny .cs holes) -
-# The 20 channel SPRING-HOOKS seat in these holes (the springs themselves no
-# longer thread the plate -- a separate open hook fastener does, per
-# build_spring_hook.py / build_channel_assembly.py). Each hole holds a hook shank;
-# its arm reaches +X back to the still-vertical spring eye above the plate.
-HOLE_DIA = 2.0  # snug bore for the O1.4 spring-hook shank (0.3 radial clearance);
-# was O4.5 (sized when the spring eye threaded the plate) -- far too big for the
-# little hook shank that now seats here (the spring eye links the hook arm above)
-HOLE_X = 39.85  # 37.10 (the spring-eye column) + 2.75: local +X maps to WORLD -X
-# (world_x = 15 - local_x), so +2.75 local seats the hook shank one arm-offset to
-# world -X of the eye, where its +X (world) arm reaches back to the eye (derived)
-HOLE_COUNT = 20
-CHANNEL_Z0 = -67.1  # frame channel j=0 (DIMENSIONS.md ch6)
-CHANNEL_PITCH = 7.0565
-HOLE_Z_OFFSET = 0.8  # coaxial with the spring axis (z_j + 0.8): no lead threads
-# the bore anymore, so the old -2.75 lead offset is dropped (hook shank is on-axis)
+# The 20 channel spring-hook shanks seat in the part-owned native-hole pattern.
 # The plate is a true coplanar casting -- mid-plane ON the pivot (.cs shape):
 # placed at the knife line y=979.7 it spans 977.16..982.24, so the top registers
 # at machine 982.24 (the whole summing chain dropped 10.3 with the top-frame
@@ -299,29 +293,25 @@ async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> Non
     # march covers the field and a reversal runs off the plate, and the
     # analytic volume gate below resolves a single missing hole -- a flip
     # cannot pass silently.
-    # The seed was a plain Ø2.0 cut; it is now a native Hole Wizard #47 number
-    # drill (Ø1.994) so the model carries the real drill
-    # (memory/fastener-policy-us-customary). Drilled +Y from the plate TOP face
-    # (normal +Y, at model y = +PLATE_T/2) through the 5.08 plate. The Top-plane
-    # sketch mapped world Z to -sketchY, so the seed's world Z is HOLE_Z[-1]. The
-    # feature keeps the name "SpringHoleSeed" so the linear pattern below still
-    # references it by name; wizard_holes returns that name for the pattern's
-    # feature list.
-    seed_dia = NUMBER_DRILL_MM["#47"]
+    # Native number-drill seed for the patterned spring-hook seats.
+    seed_dia = blind_cut_dia_mm(HOLE_SPEC)
     seed_result = wizard_holes(
         adapter,
-        HoleSpec("drilled_number", "#47"),
+        HOLE_SPEC,
         [[HOLE_X, PLATE_T / 2.0, HOLE_Z[-1]]],
         (0.0, 1.0, 0.0),
-        f"spring hole seed (station j={HOLE_COUNT - 1}, #47)",
+        f"spring hole seed (station j={HOLE_COUNT - 1}, {HOLE_SPEC.size})",
         name="SpringHoleSeed",
-        placement_dims=[(
-            ("HoleSeedX", '"HoleX"'),
+        expect_dia_mm=seed_dia,
+        placement_dims=[
             (
-                "HoleSeedStation",
-                f'"ChannelZ0" + {HOLE_COUNT - 1} * "ChannelPitch" + "HoleZOffset"',
-            ),
-        )],
+                ("HoleSeedX", '"HoleX"'),
+                (
+                    "HoleSeedStation",
+                    f'"ChannelZ0" + {HOLE_COUNT - 1} * "ChannelPitch" + "HoleZOffset"',
+                ),
+            )
+        ],
     )
     drive_jobs += seed_result.placement_drive_jobs
     seed_cut = seed_result.name

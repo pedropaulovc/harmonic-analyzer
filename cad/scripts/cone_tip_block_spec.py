@@ -1,6 +1,8 @@
 r"""Pure-data dimensional contract shared by the cone-tip-block part and drawing."""
 
 from __future__ import annotations
+from _hole_spec import HoleSpec, blind_cut_dia_mm
+
 
 from build_cone_tip_adjuster import CUP_DIA as SHAFT_PASSAGE_DIA
 
@@ -22,9 +24,23 @@ ADJUSTER_DEPTH = 8.0
 # continuous envelope without reviving the removed fictional journal fit.
 PINCH_THREAD = "#4-40"  # cross-bore tapped hole that squeezes the top slit
 PINCH_HEIGHT = 38.918
-PINCH_CLEARANCE_DIA = 3.264
 SLIT_W = 1.2  # top clamp slit width
 SLIT_DEPTH = 8.0  # slit cut down from the top face to 32.718
+ADJUSTER_BORE_SPEC = HoleSpec(
+    "tapped",
+    ADJUSTER_THREAD,
+    end="blind",
+    depth_mm=ADJUSTER_DEPTH,
+)
+PINCH_BORE_SPEC = HoleSpec("tapped", PINCH_THREAD)
+PINCH_CLEARANCE_SPEC = HoleSpec(
+    "clearance",
+    "#4",
+    fit="normal",
+    end="blind",
+    depth_mm=(BLOCK_X - SLIT_W) / 2.0,
+)
+PINCH_CLEARANCE_DIA = blind_cut_dia_mm(PINCH_CLEARANCE_SPEC)
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BlockProfile": {"Width", "Depth"},

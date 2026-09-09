@@ -10,8 +10,6 @@ import _config
 import _telemetry
 from _common import _early_bound, apply_custom_properties, check
 from _drawing_common import (
-    ASME_B_HEIGHT_M,
-    ASME_B_WIDTH_M,
     TITLE_BLOCK_TOLERANCE_PROPERTIES,
     DrawingOutputs,
     add_property_linked_note,
@@ -24,7 +22,7 @@ from _drawing_common import (
     sheet_drawable_region,
     stamp_drawing_summary,
 )
-from _drawing_registry import DrawingSpec
+from _drawing_registry import DRAWING_TEMPLATES, DrawingSpec
 from _fastener_catalog import fastener
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -231,6 +229,7 @@ async def build_purchased_fastener_drawing(
     """Export Front/Top/Right plus Isometric without fabrication dimensions or PMI."""
     stock = fastener(spec.artifact_stem)
     source = spec.source
+    template = DRAWING_TEMPLATES[spec.layout]
     if spec.source_kind != "part" or source.stem != stock.part_name:
         raise ValueError(f"purchased drawing source identity mismatch: {spec!r}")
     if not source.is_file():
@@ -262,7 +261,7 @@ async def build_purchased_fastener_drawing(
                     f"{stock.part_name}: stale source {name} {properties[name]!r} != {value!r}"
                 )
 
-    draw, sheet = new_project_drawing(adapter)
+    draw, sheet = new_project_drawing(adapter, layout=spec.layout)
     title_block_notes = _purchased_title_block(
         adapter, draw, material=properties["Material"], finish=finish
     )
@@ -327,7 +326,13 @@ async def build_purchased_fastener_drawing(
             raise RuntimeError(
                 "purchased drawing third-angle/property-source settings did not persist"
             )
-        assert_asme_b_sheet(adapter, sheet, phase="purchased layout", scale=scale)
+        assert_asme_b_sheet(
+            adapter,
+            sheet,
+            layout=spec.layout,
+            phase="purchased layout",
+            scale=scale,
+        )
 
     notes = []
     with _telemetry.span("drawing.purchased_annotations"):
@@ -389,7 +394,10 @@ async def build_purchased_fastener_drawing(
             )
         views_by_orientation = dict(zip(orientations, actual, strict=True))
         region = sheet_drawable_region(
-            adapter, sheet, width=ASME_B_WIDTH_M, height=ASME_B_HEIGHT_M
+            adapter,
+            sheet,
+            width=template.width_m,
+            height=template.height_m,
         )
         border = (region.xmin, region.ymin, region.xmax, region.ymax)
         for name, _, cell in _VIEW_CELLS:
@@ -426,6 +434,7 @@ async def build_purchased_fastener_drawing(
     return await finalize_drawing(
         adapter,
         DrawingOutputs(slddrw=paths["slddrw"], pdf=paths["pdf"], png=paths["png"]),
+        layout=spec.layout,
         pdf_title=title,
         scale=scale,
     )

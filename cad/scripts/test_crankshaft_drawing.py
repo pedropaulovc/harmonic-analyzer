@@ -10,7 +10,7 @@ import crankshaft_spec
 import draw_crankshaft as drawing
 from _drawing_registry import DRAWINGS_BY_NAME
 import _holes as hole_wizard
-from _holes import NUMBER_DRILL_MM
+from _hole_spec import blind_cut_dia_mm
 
 
 def test_required_drawing_paths() -> None:
@@ -54,10 +54,10 @@ def test_v2_post_journal_recloses_the_hardware_seats() -> None:
     assert "ExtrusionParameters(depth=JOURNAL_LENGTH)" in source
 
 
-def test_cross_hole_matches_the_wizard_drill_and_build_station() -> None:
-    # The spec mirrors the #9 wizard drill table so the drawing stays COM-free;
-    # a drill-size change in _holes must move the spec (and this test) with it.
-    assert crankshaft_spec.PIN_HOLE_DIA == NUMBER_DRILL_MM["#9"]
+def test_cross_hole_is_part_owned_and_build_station_is_driven() -> None:
+    assert part.PIN_HOLE_SPEC is crankshaft_spec.PIN_HOLE_SPEC
+    assert drawing.PIN_HOLE_SPEC is crankshaft_spec.PIN_HOLE_SPEC
+    assert drawing._PIN_HOLE_DIA == blind_cut_dia_mm(crankshaft_spec.PIN_HOLE_SPEC)
     assert part.PIN_HOLE_HEIGHT is crankshaft_spec.PIN_HOLE_HEIGHT
     assert crankshaft_spec.PIN_HOLE_HEIGHT == 4.0
     build_source = Path(part.__file__).read_text(encoding="utf-8")
@@ -65,9 +65,13 @@ def test_cross_hole_matches_the_wizard_drill_and_build_station() -> None:
     assert 'name_last_feature(adapter, "PinHoleStationPlane")' in build_source
     assert "[-SHAFT_DIA / 2.0, PIN_HOLE_HEIGHT, 0.0]" in build_source
     assert 'point_planes=("PinHoleStationPlane", "Front Plane")' in build_source
+    assert "HoleSpec(" not in build_source
+    assert "\n        PIN_HOLE_SPEC," in build_source
+    assert "pin_hole_dia = blind_cut_dia_mm(PIN_HOLE_SPEC)" in build_source
+    assert "cross_hole_volume_mm3(pin_hole_dia, SHAFT_DIA)" in build_source
     hole_source = Path(hole_wizard.__file__).read_text(encoding="utf-8")
     assert "face_candidates.append(candidate)" in hole_source
-    assert '_add_sketch_constraint_impl(' in hole_source
+    assert "_add_sketch_constraint_impl(" in hole_source
     notes = crankshaft_spec.DRAWING_NOTES
     assert "#9" not in notes
     assert "TAPER PIN" in notes

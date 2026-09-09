@@ -13,6 +13,7 @@ from _drawing_common import (
     new_project_drawing,
     read_required_properties,
 )
+from _drawing_registry import DrawingLayout
 from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 
@@ -22,6 +23,7 @@ async def build_simple_three_view_drawing(
     *,
     source: Path,
     outputs: DrawingOutputs,
+    layout: DrawingLayout,
     sheet_scale: tuple[float, float],
     front_center: tuple[float, float],
     right_center: tuple[float, float],
@@ -54,7 +56,7 @@ async def build_simple_three_view_drawing(
             "Quantity",
         ),
     )
-    new_project_drawing(adapter, scale=sheet_scale)
+    new_project_drawing(adapter, layout=layout, scale=sheet_scale)
 
     for view_name, center in (
         ("*Front", front_center),
@@ -72,6 +74,7 @@ async def build_simple_three_view_drawing(
     return await finalize_drawing(
         adapter,
         outputs,
+        layout=layout,
         pdf_title=pdf_title,
         scale=sheet_scale,
     )

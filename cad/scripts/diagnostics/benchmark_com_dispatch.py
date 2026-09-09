@@ -26,6 +26,12 @@ def _args() -> argparse.Namespace:
         "--workload", choices=("layout", "features", "mates"), default="layout"
     )
     parser.add_argument(
+        "--layout",
+        choices=("landscape", "portrait"),
+        default="landscape",
+        help="drawing orientation used by the layout workload",
+    )
+    parser.add_argument(
         "--mode",
         choices=("early", "flag"),
         default="early",
@@ -42,7 +48,11 @@ def _args() -> argparse.Namespace:
 
 
 async def _run(
-    model_path: Path, repo: Path, workload: str, mode: str = "early"
+    model_path: Path,
+    repo: Path,
+    workload: str,
+    mode: str = "early",
+    layout_name: str = "landscape",
 ) -> dict[str, Any]:
     if not os.environ.get("HARMONIC_COM_SEAT"):
         raise RuntimeError("benchmark must run inside dodo._com_seat")
@@ -120,7 +130,10 @@ async def _run(
         sw_type_info.early_bound_or_flag = _flag_mode_early_bound_or_flag
     try:
         with _telemetry.span(
-            "benchmark.com_dispatch", model=str(model_path), workload=workload
+            "benchmark.com_dispatch",
+            model=str(model_path),
+            workload=workload,
+            layout=layout_name,
         ):
             with _telemetry.span("benchmark.connect"):
                 await adapter.connect()
@@ -134,9 +147,13 @@ async def _run(
                 started = time.perf_counter()
                 if workload == "layout":
                     import _drawing_common
+                    from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout
 
-                    elements, width, height = (
-                        _drawing_common.collect_layout_elements(adapter)
+                    layout = DrawingLayout(layout_name)
+                    elements, _leaders, _region = (
+                        _drawing_common.collect_layout_elements(
+                            adapter, layout=layout
+                        )
                     )
                     signature = [
                         [
@@ -152,7 +169,10 @@ async def _run(
                         for element in elements
                     ]
                     item_count = len(elements)
-                    workload_data: dict[str, Any] = {"sheet": [width, height]}
+                    template = DRAWING_TEMPLATES[layout]
+                    workload_data: dict[str, Any] = {
+                        "sheet": [template.width_m, template.height_m]
+                    }
                 elif workload == "features":
                     result = await adapter.list_features(include_suppressed=True)
                     if not result.is_success:
@@ -222,7 +242,9 @@ async def _run(
 
 def main() -> int:
     args = _args()
-    result = asyncio.run(_run(args.model, args.repo, args.workload, args.mode))
+    result = asyncio.run(
+        _run(args.model, args.repo, args.workload, args.mode, args.layout)
+    )
     print(json.dumps(result, sort_keys=True))
     return 0
 

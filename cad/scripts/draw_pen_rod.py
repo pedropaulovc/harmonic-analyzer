@@ -25,6 +25,7 @@ from _drawing_common import (
     set_hidden_lines_visible,
     stamp_drawing_summary,
 )
+from _hole_spec import blind_cut_dia_mm
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from pen_rod_spec import (
@@ -32,7 +33,7 @@ from pen_rod_spec import (
     PART_DATUMS,
     ROD_LENGTH,
     SURFACE_FINISHES,
-    WIRE_HOLE_DIA,
+    WIRE_HOLE_SPEC,
     WIRE_HOLE_Y,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -52,6 +53,7 @@ OUTPUTS = DrawingOutputs(
 SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
+_WIRE_HOLE_DIA = blind_cut_dia_mm(WIRE_HOLE_SPEC)
 
 SHEET_SCALE = (1.0, 1.0)
 TOP_VIEW_SCALE = 4.0
@@ -111,7 +113,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE
+        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
     stamp_drawing_summary(
         adapter,
@@ -148,8 +150,8 @@ async def build(adapter: Any) -> dict[str, str]:
     front_side = (FRONT_CENTER[0] - 0.0025, FRONT_CENTER[1])
     front_far_side = (FRONT_CENTER[0] + 0.0025, FRONT_CENTER[1])
     hole_center_y = front_bottom[1] + WIRE_HOLE_Y / 1000.0
-    hole_bottom = (FRONT_CENTER[0], hole_center_y - WIRE_HOLE_DIA / 2000.0)
-    hole_side = (FRONT_CENTER[0] + WIRE_HOLE_DIA / 2000.0, hole_center_y)
+    hole_bottom = (FRONT_CENTER[0], hole_center_y - _WIRE_HOLE_DIA / 2000.0)
+    hole_side = (FRONT_CENTER[0] + _WIRE_HOLE_DIA / 2000.0, hole_center_y)
 
     add_edge_dimension(
         adapter,
@@ -234,55 +236,8 @@ async def build(adapter: Any) -> dict[str, str]:
         label="pen-rod slide face finish",
     )
 
-    # 0.015 -- centred in the corridor. The tight window is REAL: this note is
-    # 246.2 mm of text in a 251.2 mm corridor, bounded at BOTH ends, so 0.020 (the
-    # safe anchor on every other sheet) drives the tail into the title block.
-    #
-    # ALL NUMBERS BELOW ARE MEASURED ON THE REBUILT 2026-07-16 SHEET, black-ink
-    # only (threshold 200 sees the gray frame rule too; the note is black, the rule
-    # is gray, and they are 0.6 mm apart -- only the black/gray split separates
-    # them, an ALL-ink bbox reads the rule as the note's first glyph). Note ink at
-    # anchor 0.013 measured x 0.0134..0.2596, i.e. ink_start = anchor + 0.0004.
-    #
-    # The bounds, tighter of drawn-vs-gated on each side:
-    #     left   drawn rule right edge 0.0128 | gate bound (12.7 zone margin) 0.0127
-    #     right  drawn title block     0.2658 | gate bound _TITLE_BLOCK_LEFT_M 0.264
-    # so the governing corridor is 0.0128 -> 0.264 = 251.2 mm, slack 5.0 mm, and
-    # centring puts ink at 0.0154..0.2616: 2.6 mm off the drawn rule, 2.4 mm off
-    # the gate's keep-out, 4.2 mm off the drawn block. At the previous 0.013 the
-    # note cleared both ends but sat 0.6 mm off the left rule with 6.2 mm unused on
-    # the right -- legal, but visually jammed and inside render noise of touching.
-    #
-    # THE TITLE BLOCK DID NOT TRANSLATE WITH THE FRAME, and that is the whole
-    # story here. A superseded comment predicted the tail would overrun the block
-    # by ~0.1 mm, reasoning that the block is format geometry that moved with the
-    # re-centred frame (keep-out 0.2672 -> ~0.2640, corridor MOVED not widened).
-    # The block stayed put. Proof, measured: the block's horizontal cell rules
-    # still run out to x=0.4223 -- exactly where the OLD right frame rule sat
-    # (0.4221..0.4225) -- while the frame's right rule is now at 0.4188..0.4192.
-    # The rules moved inward ~3.3 mm; the block did not follow AT FIRST, so it
-    # protruded past the frame -- a template defect since FIXED (Codex #334): the
-    # DRWDOT title-block right rules were re-anchored inward onto the frame
-    # border. Measured on the current render, the frame's right rule and the
-    # block's right rule now COINCIDE at x=0.4189 (both 0.4188..0.4192), no
-    # protrusion. The note corridor is governed by the block's LEFT edge
-    # (0.2658), which did not move, so this placement is unchanged; the corridor
-    # WIDENED rather than moved:
-    #     old  0.2658 - 0.0159 = 249.9 mm
-    #     now  0.2658 - 0.0126 = 253.2 mm
-    # which is the ~3.3 mm of new room the ORIGINAL comment claimed and the
-    # superseded one denied.
-    #
-    # The 0.2672 in that superseded comment was NOT an error: the block's leftmost
-    # BLACK TEXT measures 0.2675 (its outer RULE is 0.2658). Both are real bounds;
-    # text is the tighter keep-out for a note on this y band. Do not "correct" it
-    # to the rule. (It is also within 0.3 mm of the old TOP rule's y=0.2672 --
-    # a coincidence that makes an axis-confusion story look compelling and wrong.)
-    #
-    # It cannot move UP: the band above is the Ra body, the Section callout, then
-    # the view. 5 mm of slack on a 246 mm note is fragile by construction and no
-    # anchor fixes that; shortening the "Manufacturing Notes" property is the only
-    # durable answer, and that is a content call.
+    # The manufacturing note is wider than most sheets' notes. Keep its anchor
+    # near the left zone margin; the layout audit owns the title-block clearance.
     add_property_linked_note(adapter, "Manufacturing Notes", 0.015, 0.058)
     add_property_linked_note(adapter, "Top View Note", 0.036, 0.266)
 
@@ -291,6 +246,7 @@ async def build(adapter: Any) -> dict[str, str]:
         OUTPUTS,
         pdf_title="Pen Rod Manufacturing Drawing",
         scale=SHEET_SCALE,
+        layout=SPEC.layout,
     )
 
 

@@ -46,7 +46,6 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _holes import TAP_DRILL_MM
 from output_fixture_spec import (
     COLLAR_DIA,
     COLLAR_HEIGHT,
@@ -67,16 +66,8 @@ MATERIAL = "Brass"  # see _common.apply_material docstring
 # - The Ø5 vertical rod slides through the coaxial ROD_BORE_DIA bore -- an
 #   engineered 0.2 mm running/slip fit, NOT a drilled hole, so it stays a plain
 #   dimensioned cut (a nearest-drill Hole Wizard fit would slop the slide).
-# - The cross hole is DESIGNED as a #4-40 tapped thumb-screw hole, but it
-#   pierces the CURVED collar wall RADIALLY -- no planar seat for wizard_holes
-#   -- so it stays a plain cut at the #4-40 tap-drill diameter as the geometric
-#   stand-in. No interference either way: the assembly OMITS this thumb screw
-#   (the cross hole doubles as the wire tie) and the mating Ø2.0 shank fits.
-if CROSS_HOLE_DIA != TAP_DRILL_MM["#4-40"]:  # spec is pure data; pin it here
-    raise RuntimeError(
-        f"output_fixture_spec.CROSS_HOLE_DIA {CROSS_HOLE_DIA} != "
-        f"#4-40 tap drill {TAP_DRILL_MM['#4-40']}"
-    )
+# The cross hole is a radial plain cut because the curved collar has no planar
+# Hole Wizard seat. Its diameter still derives from the part-owned tap spec.
 THROUGH_CUT_DEPTH = 40.0  # mid-plane total; > any extent crossed
 
 # HookAnchorPoint: where the lever-wire's hook BALL JOINT grabs the fixture.
@@ -215,7 +206,8 @@ async def build(adapter) -> dict[str, str]:
     model = adapter.currentModel
     # Top-plane sketch mapping (x, y) -> (X, -Z); the offset plane inherits it.
     sk_point = model.SketchManager.CreatePoint(
-        HOOK_ANCHOR_LOCAL[0] / 1000.0, -HOOK_ANCHOR_LOCAL[2] / 1000.0, 0.0)
+        HOOK_ANCHOR_LOCAL[0] / 1000.0, -HOOK_ANCHOR_LOCAL[2] / 1000.0, 0.0
+    )
     if sk_point is None:
         raise RuntimeError("hook anchor sketch point creation failed")
     set_sketch_direct_db(adapter, False)

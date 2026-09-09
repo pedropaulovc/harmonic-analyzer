@@ -47,7 +47,8 @@ from _common import (
     set_global,
     volume_check,
 )
-from _holes import HoleSpec, wizard_holes
+from _hole_spec import blind_cut_dia_mm
+from _holes import wizard_holes
 
 import _telemetry
 from _drawing_marks import (
@@ -59,10 +60,9 @@ from _drawing_marks import (
 from _fit_limits import deviations
 from _part_pmi import author_part_pmi
 from crank_arm_spec import (
-    ANCHOR_DRILL_DEPTH,
     ANCHOR_SCREW_X,
     ANCHOR_SCREW_Y,
-    ANCHOR_THREAD_DEPTH,
+    ANCHOR_HOLE_SPEC,
     ARM_C2C,
     ARM_END_X,
     ARM_THICKNESS,
@@ -73,6 +73,8 @@ from crank_arm_spec import (
     DRAWING_NOTES,
     DRAWING_DIMENSIONS,
     HALF_WIDTH,
+    HANDLE_PIVOT_HOLE_SPEC,
+    PIN_HOLE_SPEC,
     ISOMETRIC_VIEW_NOTE,
     SHAFT_BORE_DIA,
     SHAFT_BORE_BAND,
@@ -83,17 +85,8 @@ from crank_arm_spec import (
 PART_NAME = "crank-arm"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
-# (The old PivotBoreDia Ø6.0 and PinHoleDia Ø5.0 constants are gone: the handle-
-# pivot hole and the tapered-pin cross-hole are now native Hole Wizard features
-# whose diameters come from the drill standard -- 15/64 (Ø5.953) and #14 (Ø4.623)
-# -- not equation-driven sketch dims. The 3/8 shaft bore stays a reamed circle
-# cut: it is a precision running fit, not a twist-drill hole.)
 
 THROUGH_CUT_DEPTH = 40.0  # mid-plane total; > any extent it crosses
-ANCHOR_HOLE_SPEC = HoleSpec(
-    "tapped_bottoming", "#4-40", end="blind", depth_mm=ANCHOR_DRILL_DEPTH,
-    overrides_mm={"ThreadDepth": ANCHOR_THREAD_DEPTH},
-)
 
 
 async def _volume(adapter) -> float:
@@ -206,17 +199,16 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "ShaftBore")
 
-    # Handle-pivot hole: was a plain Ø6.0 cut, now a native Hole Wizard 15/64
-    # fractional drill (Ø5.953) at the handle-pivot centre (ARM_C2C), drilled +Z
-    # through the 8 mm plate (memory/fastener-policy-us-customary). Cut while the
-    # body is still prismatic (~15 faces) -- wizard_holes enumerates every face.
+    # Handle-pivot native fractional-drill hole at the handle-pivot centre,
+    # drilled +Z through the plate while the body is still prismatic.
     pivot_cut = wizard_holes(
         adapter,
-        HoleSpec("drilled_fractional", "15/64"),
+        HANDLE_PIVOT_HOLE_SPEC,
         [[ARM_C2C, 0.0, ARM_THICKNESS]],
         (0.0, 0.0, 1.0),
-        "handle-pivot hole (15/64)",
+        f"handle-pivot hole ({HANDLE_PIVOT_HOLE_SPEC.size})",
         name="PivotBore",
+        expect_dia_mm=blind_cut_dia_mm(HANDLE_PIVOT_HOLE_SPEC),
         placement_dims=[(("PivotBoreX", '"ArmC2C"'), (None, None))],
     )
     drive_jobs += pivot_cut.placement_drive_jobs
@@ -276,18 +268,16 @@ async def build(adapter) -> dict[str, str]:
     _telemetry.info(f"volume after anchor tap: {vol:.1f} mm^3")
 
     # Tapered-pin cross-hole: pilot below the No. 2 taper pin's small end, then
-    # taper-reamed with the shaft at assembly.
-    # number drill (Ø4.978) along global Y through the boss + shaft bore at
-    # mid-thickness (memory/fastener-policy-us-customary). Drilled from the +Y
-    # side face (a pristine planar face, normal +Y) at (x 0, z ArmThickness/2);
-    # through-all is geometrically identical to the old mid-plane cut.
+    # taper-reamed with the shaft at assembly. Drill along global Y through the
+    # boss + shaft bore at mid-thickness.
     pin_cut = wizard_holes(
         adapter,
-        HoleSpec("drilled_number", "#14"),
+        PIN_HOLE_SPEC,
         [[0.0, HALF_WIDTH, ARM_THICKNESS / 2.0]],
         (0.0, 1.0, 0.0),
-        "tapered-pin cross-hole (#14)",
+        f"tapered-pin cross-hole ({PIN_HOLE_SPEC.size})",
         name="PinHole",
+        expect_dia_mm=blind_cut_dia_mm(PIN_HOLE_SPEC),
         placement_dims=[((None, None), ("PinHoleZ", '"ArmThickness" / 2'))],
     )
     drive_jobs += pin_cut.placement_drive_jobs

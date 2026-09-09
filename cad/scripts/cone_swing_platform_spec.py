@@ -8,6 +8,8 @@ exactly ``DRAWING_DIMENSIONS`` and imports the plate's plan geometry from
 
 from __future__ import annotations
 
+from _hole_spec import HoleSpec, blind_cut_dia_mm
+
 from cone_pivot_post_spec import BORE_HEIGHT as POST_CONE_BORE_HEIGHT
 from crank_drive_gear_spec import OUTSIDE_DIA as CRANK_GEAR_OUTSIDE_DIA
 
@@ -18,6 +20,9 @@ PIVOT_BEARING_RELIEF_DEPTH = 0.25
 PIVOT_HEAD_RADIAL_CLEARANCE = 0.4875
 PIVOT_BEARING_THICKNESS = PLATE_THICKNESS - PIVOT_BEARING_RELIEF_DEPTH
 PLATE_LENGTH_TOLERANCE_MM = 0.25
+PIVOT_HOLE_SPEC = HoleSpec("clearance", "1/4", fit="close")
+PIVOT_HOLE_DIA = blind_cut_dia_mm(PIVOT_HOLE_SPEC)
+
 
 # The recentered DP25.731 gear is smaller than the intermediate DP24.74 gear;
 # its complete swept OD now clears the platform top, so the obsolete scallop is
@@ -30,7 +35,8 @@ if CRANK_GEAR_PLATFORM_CLEARANCE < 0.5:
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows. Only the overall axial length is marked. The axis-relative edge
 # offsets in the notes define each end without duplicating north/south widths. ---
-POST_MOUNT_THREAD = "1/4-20"
+POST_MOUNT_SPEC = HoleSpec("tapped", "1/4-20")
+POST_MOUNT_TAP_DIA = blind_cut_dia_mm(POST_MOUNT_SPEC)
 
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
@@ -52,7 +58,7 @@ DRAWING_NOTES = "\n".join(
         f"   TOP RELIEF DIA {PIVOT_BEARING_RELIEF_DIAMETER:.2f} X "
         f"{PIVOT_BEARING_RELIEF_DEPTH:.2f} DEEP;",
         f"   LOCAL BEARING THICKNESS {PIVOT_BEARING_THICKNESS:.2f} +/-0.05.",
-        f"4. POST MOUNT: 2X {POST_MOUNT_THREAD} UNC-2B THRU PER PLAN-VIEW CALLOUT.",
+        f"4. POST MOUNT: 2X {POST_MOUNT_SPEC.size} UNC-2B THRU PER PLAN-VIEW CALLOUT.",
         "   PAIR CENTROID ON CONE AXIS, 192.174 +/-0.10 SOUTH OF PIVOT; 26.887",
         "   +/-0.10 PITCH ON A LINE 12.5182 +/-0.10 DEG NORTH OF WEST.",
         "5. LOCK NOTCH 8.000 +0.100/0 WIDE; FULL-R CLOSED END (R4.000 REF).",

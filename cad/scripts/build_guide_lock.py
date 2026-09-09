@@ -45,10 +45,12 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _holes import HoleSpec, blind_cut_dia_mm, wizard_holes
+from _hole_spec import blind_cut_dia_mm
+from _holes import wizard_holes
 from guide_lock_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
+    HOLE_SPEC,
     HOLE_XY,
     ISOMETRIC_VIEW_NOTE,
     LOCK_HEIGHT,
@@ -71,9 +73,8 @@ MATERIAL = "Plain Carbon Steel"
 # field report: a 12-tall plate topped out AT the bar's bottom edge and
 # retained nothing at the bottom stations -- 15 keeps a 3 overlap.)
 # Stock 90114A511 shanks pass through the lock plates before threading into the
-# guide's rear-face #4-40 receivers. The #4 CLOSE clearance is the existing
-# placement interface and still leaves positive diametral clearance.
-HOLE_SPEC = HoleSpec("clearance", "#4", fit="close")
+# guide's rear-face #4-40 receivers. The part-owned #4 CLOSE clearance is the
+# existing placement interface and still leaves positive diametral clearance.
 HOLE_DIA = blind_cut_dia_mm(HOLE_SPEC)
 if HOLE_DIA < FILLISTER_SHANK_DIA:
     raise AssertionError("stock fillister shank does not clear the guide lock")

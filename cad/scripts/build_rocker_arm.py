@@ -74,7 +74,8 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
-from _holes import NUMBER_DRILL_MM, HoleSpec, wizard_holes
+from _hole_spec import blind_cut_dia_mm
+from _holes import wizard_holes
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -84,7 +85,13 @@ from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from rocker_arm_notes import DRAWING_NOTES, ISOMETRIC_VIEW_NOTE
 from rocker_arm_notes import DRAWING_DIMENSIONS
-from rocker_arm_spec import ARM_THICKNESS as SPEC_ARM_THICKNESS, HUB_DIA, HUB_LENGTH, SURFACE_FINISHES
+from rocker_arm_spec import (
+    ARM_THICKNESS as SPEC_ARM_THICKNESS,
+    HUB_DIA,
+    HUB_LENGTH,
+    ROD_HOLE_SPEC,
+    SURFACE_FINISHES,
+)
 import _config
 
 PART_NAME = "rocker-arm"
@@ -103,7 +110,7 @@ if abs(HUB_LENGTH - _config.machine("channels", "station_pitch_mm")) > 1e-6:
 HUB_PROUD = (HUB_LENGTH - ARM_THICKNESS) / 2.0  # 2.278 each face
 if ARM_THICKNESS != SPEC_ARM_THICKNESS:
     raise AssertionError("rocker_arm_spec.ARM_THICKNESS drifted from the build")
-# rod pin hole: was Ø2.0 drill, now #47 (Ø1.994) native Hole Wizard feature
+# The rod-pin native drill identity is part-owned by rocker_arm_spec.
 ROD_HOLE_X = 127.3738 - MECHANISM_X_SHIFT
 # bottom-arc end (132.76): solved so the pin sits DIRECTLY ABOVE the phased cam
 # lobe (machine X is DRUM_X + ECC*sin(1.5 deg), lobe UP at the
@@ -422,19 +429,15 @@ async def build(adapter) -> dict[str, str]:
         adapter, "Right Plane", 0.0, "Top Plane", _mid_y(0.0), "pivot bore"
     )
 
-    # Connecting-rod pin hole near the rod-side tip, LOW in the strap (5.3 above
-    # the bottom edge, ch14 fan photo -- the pivot hole stays mid-depth): was a
-    # plain Ø2.0 cut, now a native Hole Wizard #47 number drill (Ø1.994) drilled
-    # +Z through the 2.5 strap at (ROD_HOLE_X, ROD_HOLE_Y)
-    # (memory/fastener-policy-us-customary). The pivot hole stays a Ø6.5 circle
-    # cut. Through-all is geometrically identical to the old mid-plane cut.
+    # Connecting-rod pin hole near the rod-side tip, low in the strap.
     rod_cut = wizard_holes(
         adapter,
-        HoleSpec("drilled_number", "#47"),
+        ROD_HOLE_SPEC,
         [[ROD_HOLE_X, ROD_HOLE_Y, ARM_THICKNESS / 2.0]],
         (0.0, 0.0, 1.0),
-        "rod pin hole (#47)",
+        f"rod pin hole ({ROD_HOLE_SPEC.size})",
         name="RodHole",
+        expect_dia_mm=blind_cut_dia_mm(ROD_HOLE_SPEC),
         placement_dims=[(("RodPinX", '"RodHoleX"'), (None, None))],
     )
     drive_jobs += rod_cut.placement_drive_jobs
@@ -461,7 +464,7 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # The pivot bore runs the full hub length; the rod bore only the 2.5 strap.
-    rod_dia = NUMBER_DRILL_MM["#47"]
+    rod_dia = blind_cut_dia_mm(ROD_HOLE_SPEC)
     v_pivot = math.pi * (PIVOT_HOLE_DIA / 2.0) ** 2 * HUB_LENGTH
     v_rod = math.pi * (rod_dia / 2.0) ** 2 * ARM_THICKNESS
     # The tip faces are cut into the SKETCH profile (not a 3D chamfer feature), so

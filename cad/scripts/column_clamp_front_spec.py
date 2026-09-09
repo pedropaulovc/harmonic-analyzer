@@ -4,11 +4,9 @@ drawing (``draw_column_clamp_front.py``).
 
 PURE DATA, no SolidWorks/COM imports (the ``<part>_spec.py`` split -- see
 ``crank_arm_spec.py`` for the pattern rationale).  The geometry itself is cut by
-the SHARED semi-arc builder (``_clamp_arc.build_arc``), so the nominals here are
-drawing-side mirrors of the builder's constants; the offline lockstep test
-(``test_column_clamp_front_drawing.py``) asserts each one equals its
-``_clamp_arc`` / ``_holes`` source, so a builder change that isn't mirrored here
-fails before any SolidWorks build.
+the SHARED semi-arc builder (``_clamp_arc.build_arc``), while the part-owned
+hole contract lives in ``column_clamp_front_geom`` for reuse without drawing
+dependencies.
 """
 
 from __future__ import annotations
@@ -24,6 +22,7 @@ from column_clamp_front_geom import (  # noqa: F401
     BORE_RADIUS,
     COLUMN_BORE,
     EAR_HOLE_DIA,
+    EAR_HOLE_SPEC,
     EAR_HOLE_Z,
     EAR_SPACING,
 )

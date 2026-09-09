@@ -11,23 +11,23 @@ print-note edit would move the assemblies' recipe digest and force a needless
 full rebuild.  ``_spec`` re-exports these for its drawing-side consumers and adds
 only the drawing data.
 
-Nominals mirror the SHARED semi-arc builder (``_clamp_arc.build_arc``); the
-offline lockstep test (``test_column_clamp_front_drawing.py``) asserts each one
-equals its ``_clamp_arc`` / ``_holes`` source (through ``_spec``).
+The shared builder and drawings consume the exact part-owned hole contract
+below; only the arc-envelope constants mirror ``_clamp_arc``.
 """
 
 from __future__ import annotations
 
+from _hole_spec import HoleSpec, blind_cut_dia_mm
+
 # --- Nominal geometry (book ch. 21/22, ch30 p005; layout memory/paper-drive-
-# rework.md E2).  Mirrors: ARC_DEPTH = build_column_clamp_front.DEPTH; the rest
-# = _clamp_arc constants; EAR_HOLE_DIA = the #8-clearance normal-fit table
-# diameter (_holes.CLEARANCE_MM). ---
+# rework.md E2). ---
 ARC_DEPTH = 17.9  # bar back face to the column-axis plane
 ARC_WIDTH = 48.0  # lateral span, ear tip to ear tip
 ARC_HEIGHT = 16.0  # along the column (2 * _clamp_arc.ARC_HALF_H)
 COLUMN_BORE = 25.6  # half-cylinder relief: slides on the O25.4 column
 EAR_HOLE_Z = 17.5  # ear screw line flanks the column
-EAR_HOLE_DIA = 4.978  # #8 clearance, normal fit (ANSI-inch wizard table)
+EAR_HOLE_SPEC = HoleSpec("clearance", "#8")
+EAR_HOLE_DIA = blind_cut_dia_mm(EAR_HOLE_SPEC)
 
 # Derived spans (equations of the primitives above).
 EAR_SPACING = 2.0 * EAR_HOLE_Z  # 35.0: ear-hole centre to centre

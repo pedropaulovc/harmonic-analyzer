@@ -57,7 +57,8 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
-from _holes import HoleSpec, wizard_holes
+from _hole_spec import blind_cut_dia_mm
+from _holes import wizard_holes
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -75,6 +76,7 @@ from connecting_rod_spec import (
     HEAD_HEIGHT,
     HEAD_THICKNESS,
     HEAD_WIDTH,
+    PIN_HOLE_SPEC,
     RING_BORE_DIA,
     RING_BORE_DIA_BAND,
     RING_THICKNESS,
@@ -107,8 +109,8 @@ MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
 # into the shank. The head is SHORTER than the arm depth and the pin sits
 # HIGH in the head / LOW in the arm (crown only 2.4 above the pin).
 HEAD_SHOULDER_RISE = 1.2  # shoulder taper height (width 8 -> 10, photo ~1.2)
-# rocker-arm rod-end pin hole (ch14): was Ø2.0 drill, now #47 (Ø1.994) native
-# Hole Wizard feature; diameter is imported from connecting_rod_spec.
+# The rocker-arm rod-end pin hole is a native Hole Wizard number-drill feature;
+# its identity lives in connecting_rod_spec.
 THROUGH_CUT_DEPTH = 20.0  # mid-plane total; > any local thickness
 
 RING_OUTER_RADIUS = RING_BORE_DIA / 2.0 + RING_WALL  # 20.4
@@ -142,7 +144,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "HeadShoulderRise", f"{HEAD_SHOULDER_RISE}mm")
     await set_global(adapter, "HeadThickness", f"{HEAD_THICKNESS}mm")
     # (The old PinHoleDia knob is gone: the rocker pin hole is now a native Hole
-    # Wizard #47 feature whose diameter comes from the drill standard.)
+    # Wizard feature whose standard diameter is part-owned.)
     await set_global(adapter, "RingOuterRadius", '"RingBoreDia" / 2 + "RingWall"')
     await set_global(adapter, "ShankStartY", '"RingBoreDia" / 2 - 0.5mm')
     await set_global(
@@ -349,18 +351,17 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "StrapBore")
 
     # Rocker pin hole through the head (high in the crown, 2.4 below the crown
-    # top): was a plain Ø2.0 cut, now a native Hole Wizard #47 number drill
-    # (Ø1.994) at (0, CENTER_DISTANCE) drilled +Z through the 2.5 mm head
-    # (memory/fastener-policy-us-customary). Through-all is geometrically
+    # top), drilled +Z through the 2.5 mm head. Through-all is geometrically
     # identical to the old mid-plane both-directions cut.
     pin_cut = wizard_holes(
         adapter,
-        HoleSpec("drilled_number", "#47"),
+        PIN_HOLE_SPEC,
         [[0.0, CENTER_DISTANCE, HEAD_THICKNESS / 2.0]],
         (0.0, 0.0, 1.0),
-        "rocker pin hole (#47)",
+        "rocker pin hole",
         name="PinHole",
         placement_dims=[((None, None), ("PinCz", '"CenterDistance"'))],
+        expect_dia_mm=blind_cut_dia_mm(PIN_HOLE_SPEC),
     )
     drive_jobs += pin_cut.placement_drive_jobs
     res = await adapter.get_mass_properties()

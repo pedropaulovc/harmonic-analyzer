@@ -23,6 +23,7 @@ from typing import Any
 from channel_lever_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
+from _hole_spec import blind_cut_dia_mm
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
@@ -42,11 +43,13 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from channel_lever_spec import (
+    BAR_PIN_HOLE_SPEC,
     BAR_PIN_X,
     BAR_TALL,
     LEVER_SPRING_X,
     LEVER_THICKNESS,
     PIVOT_HOLE_DIA,
+    SPRING_EYE_HOLE_SPEC,
     TIP_END_X,
 )
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
@@ -75,8 +78,8 @@ SHEET_SCALE = (1.0, 1.0)  # 1:1
 
 _NOSE_R = BAR_TALL / 2.0  # 4.75
 _BBOX_CX = (-_NOSE_R + TIP_END_X) / 2.0  # front-view X centre
-_SPRING_HOLE_DIA = 4.039  # #21 drill
-_BAR_PIN_DIA = 1.994  # #47 drill
+_SPRING_HOLE_DIA = blind_cut_dia_mm(SPRING_EYE_HOLE_SPEC)
+_BAR_PIN_DIA = blind_cut_dia_mm(BAR_PIN_HOLE_SPEC)
 
 FRONT_CENTER = (0.150, 0.155)
 RIGHT_CENTER = (0.295, 0.155)
@@ -178,7 +181,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE
+        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
     stamp_drawing_summary(
         adapter,
@@ -250,7 +253,9 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # Section thickness (3.0) in the top view at mid-length (clear of the hub);
     # bar height (9.5) on the front profile at the same station.
-    _mid_x = (BAR_PIN_X + LEVER_SPRING_X) / 2.0 - 60.0  # ~92: between the hub and the tab
+    _mid_x = (
+        BAR_PIN_X + LEVER_SPRING_X
+    ) / 2.0 - 60.0  # ~92: between the hub and the tab
     add_edge_dimension(
         adapter,
         top,
@@ -299,7 +304,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # Complete datum reference frame: A is a broad machined face (primary), B
     # is the functional fulcrum-bore axis (secondary), and C is the top narrow
     # face (tertiary clocking).  The two BASIC hole locations reference A|B|C.
-    broad_face = _top_xy(_mid_x - 25.0, LEVER_THICKNESS / 2.0)  # the broad face's edge line, top view
+    broad_face = _top_xy(
+        _mid_x - 25.0, LEVER_THICKNESS / 2.0
+    )  # the broad face's edge line, top view
     add_datum_feature(
         adapter,
         top,
@@ -408,6 +415,7 @@ async def build(adapter: Any) -> dict[str, str]:
         OUTPUTS,
         pdf_title="Channel Lever Manufacturing Drawing",
         scale=SHEET_SCALE,
+        layout=SPEC.layout,
     )
 
 

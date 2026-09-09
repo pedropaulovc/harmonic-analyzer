@@ -48,12 +48,8 @@ from _drawing_marks import (
     set_dimension_bilateral_tolerance,
 )
 from _fit_limits import deviations
-from _holes import (
-    NUMBER_DRILL_MM,
-    HoleSpec,
-    cross_hole_volume_mm3,
-    wizard_hole_on_cylinder,
-)
+from _hole_spec import blind_cut_dia_mm
+from _holes import cross_hole_volume_mm3, wizard_hole_on_cylinder
 from _part_pmi import author_part_pmi
 from crankshaft_spec import (
     CRANK_END_NOTE,
@@ -64,6 +60,7 @@ from crankshaft_spec import (
     JOURNAL_DIA,
     JOURNAL_LENGTH,
     JOURNAL_START,
+    PIN_HOLE_SPEC,
     PIN_HOLE_HEIGHT,
     SHAFT_DIA,
     SHAFT_DIA_BAND,
@@ -82,10 +79,9 @@ MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 # stayed, so the shaft spans -175..-53 (2026-09: shortened to end 6.2 past
 # the 16T's north face, ch12 page002_img02). The arm/handle sweep entirely in front
 # of the chain plane and cannot foul the chain when turning (book ch30
-# p005/p002). Pin cross-hole: #9 drill (Ø4.978, wizard) through local X at
-# station 4.0, coaxial with the crank arm's local-Y pilot after the arm's
-# assembly transform.  Both land at the arm mid-plane and are taper-reamed
-# together for MHA-024.
+# p005/p002). The number-drilled pin cross-hole passes through local X at station
+# 4.0, coaxial with the crank arm's local-Y pilot after the arm's assembly
+# transform. Both are taper-reamed together for MHA-024.
 # Keyed-chain seat stations (local +Y from the outboard origin): named datum
 # planes the T12 chain wheel and the 16T pinion mate COINCIDENT to in the
 # assembly (the frame CboreSeat idiom). Coincident replaces the old unsigned
@@ -220,23 +216,24 @@ async def build(adapter) -> dict[str, str]:
     )
     drive_jobs += [(pin_station_dim[0], '"PinHoleHeight"')]
 
-    # Tapered-pin cross-hole through the crank seat: a native Hole Wizard #9
-    # drill placed radially on the shaft's -X side, away from the +X seam.
+    # Tapered-pin cross-hole through the crank seat, drilled radially on the
+    # shaft's -X side, away from the +X seam.
     # Exact host-face selection keeps the hole on the intended Ø9.525 crank
     # seat. Coincidence to the driven station plane and Front Plane constrains
     # only axial station and clocking; the radial coordinate follows ShaftDia.
+    pin_hole_dia = blind_cut_dia_mm(PIN_HOLE_SPEC)
     wizard_hole_on_cylinder(
         adapter,
-        HoleSpec("drilled_number", "#9"),
+        PIN_HOLE_SPEC,
         [-SHAFT_DIA / 2.0, PIN_HOLE_HEIGHT, 0.0],
-        "tapered-pin cross-hole (#9)",
+        "tapered-pin cross-hole",
         name="PinHole",
         point_planes=("PinHoleStationPlane", "Front Plane"),
     )
     # Cross-drill removal = the perpendicular cylinder-cylinder intersection,
     # integrated numerically (probe-exact; replaces the old ~178 as-built
     # constant for the retired Ø5.0).
-    v_pin = cross_hole_volume_mm3(NUMBER_DRILL_MM["#9"], SHAFT_DIA)
+    v_pin = cross_hole_volume_mm3(pin_hole_dia, SHAFT_DIA)
     v_final = v_with_journal - v_pin
     await volume_check(adapter, "shaft + pin hole", v_final, 0.02 * v_pin)
 

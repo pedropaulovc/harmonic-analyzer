@@ -82,7 +82,9 @@ def _add_end_diameter(
     each end.
     """
     draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
+    ddoc = _early_bound(
+        draw, "IDrawingDoc"
+    )  # IDrawingDoc view for drawing-only methods (same dispatch)
     name = view_name(adapter, view)
     if not ddoc.ActivateView(name):
         raise RuntimeError(f"failed to activate drawing view {name!r} ({label})")
@@ -98,9 +100,7 @@ def _add_end_diameter(
     draw.ClearSelection2(True)
     if display is None:
         raise RuntimeError(f"failed to add the {label} diameter dimension")
-    display = _sw_type_info.early_bound_or_flag(
-        display, "IDisplayDimension", "SetText"
-    )
+    display = _sw_type_info.early_bound_or_flag(display, "IDisplayDimension", "SetText")
     # An edge-on circle can come in as a radial dimension; force the
     # doubled/diameter display (no-op on dimension types it does not apply to).
     adapter._attempt(lambda: setattr(display, "Diametric", True))
@@ -136,7 +136,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE
+        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
     stamp_drawing_summary(
         adapter,
@@ -202,6 +202,7 @@ async def build(adapter: Any) -> dict[str, str]:
         OUTPUTS,
         pdf_title="Crank Pin Manufacturing Drawing",
         scale=SHEET_SCALE,
+        layout=SPEC.layout,
     )
 
 

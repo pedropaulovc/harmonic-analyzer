@@ -6,6 +6,7 @@ SLDDRW recipes from one source (see build_arbor_pedestal.py for the geometry).
 
 from __future__ import annotations
 
+from _hole_spec import HoleSpec, blind_cut_dia_mm
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
@@ -25,38 +26,10 @@ DOME_DIA = 2.0 * TOP_RADIUS  # 20.0: the round head around the clamp bore
 BORE_DIA = 0.375 * MM_PER_IN  # 9.525: the 3/8 in cylinder-arbor journal
 BORE_DIA_BAND = (0.055, 0.025)  # running bore; (upper, lower) deviations
 BORE_HEIGHT = 39.718  # v2 post journal axis: 6.35 platform + 33.368 boss height
-SCREW_THREAD = "#4"  # flange hold-down clearance hole
-# The #4 NORMAL clearance the wizard ACTUALLY cuts on this seat.
-#
-# 2026-07-26, settled against the wizard DATABASE rather than a build log.
-# `diagnostics/diag_hole_wizard_tables.py` dumps the seat's own Screw Clearances
-# table via ISldWorks::GetHoleStandardsData; the "#4" row reads
-#
-#     ['#4', '0.116', '0.1285', '0.136', ...]   # close / normal / loose, INCHES
-#
-# so normal fit is 0.1285 in = 3.2639 mm, matching _holes.CLEARANCE_MM's 3.264.
-# A from-scratch rebuild the same day cut exactly that ("1x #4 clearance
-# (Ø3.264)"), and HoleSpec.fit defaults to "normal", so the whole chain agrees.
-#
-# This pin was briefly 3.2512, read from an earlier build log. That value is NOT
-# a "#4" entry in the seat's table OR in _holes.CLEARANCE_MM -- it is exactly
-# ("#3", "loose") = 3.251. So the earlier reading was a wrong-size/fit
-# resolution, not the seat's table moving, and pinning it baked a #3-loose-sized
-# hole into a #4 clearance. Read the DATABASE, not the log line: the log echoes
-# whatever was cut, so it cannot distinguish "the table says so" from "we asked
-# for the wrong row".
-#
-# The guard that caught this worked exactly as written -- build_arbor_pedestal
-# asserts the created hole matches this pin to 0.005 mm. It stayed silent for
-# months only because part:arbor_pedestal was being restored from the remote
-# cache; the first real rebuild after a _common.py change surfaced it at once.
-# Kept as a literal rather than sourced from _holes.CLEARANCE_MM on purpose:
-# this module is pure data with no imports, and pulling in _holes would drag
-# _common/_telemetry into its dependency closure and re-key both the part and
-# the drawing. The literal is instead pinned TO the resolver by
-# `test_arbor_pedestal_drawing.test_screw_clearance_tracks_the_hole_resolver`,
-# so the duplicate cannot drift again without a gate going red.
-SCREW_CLEARANCE_DIA = 3.264
+SCREW_HOLE_SPEC = HoleSpec("clearance", "#4")
+SCREW_HOLE_DIA = blind_cut_dia_mm(SCREW_HOLE_SPEC)
+# Existing drawing view geometry consumes this descriptive public name.
+SCREW_CLEARANCE_DIA = SCREW_HOLE_DIA
 
 SURFACE_FINISHES = (
     SurfaceFinishControl(
@@ -90,7 +63,7 @@ DRAWING_NOTES = "\n".join(
         "NEAR/FAR FACES FROM D; PROFILE 0.10",
         f"A | B | D; RESULTING STRAP THICKNESS {STRAP_T:.2f} REF.",
         "DIMENSIONS AND GD&T APPLY BEFORE COATING; MASK ARBOR BORE, "
-        f"DIA {SCREW_CLEARANCE_DIA:.2f}",
+        f"DIA {SCREW_HOLE_DIA:.2f}",
         "HOLE, FOOT SEAT A, LEFT SIDE B, AND PROFILE-CONTROLLED SURFACES.",
     )
 )

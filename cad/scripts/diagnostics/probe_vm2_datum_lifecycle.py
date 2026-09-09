@@ -271,6 +271,7 @@ def main():
     )
     from _common import _early_bound, check
     from _drawing_common import dimension_name, model_point_in_view, render_pdf_png
+    from _drawing_registry import DrawingLayout
     from _gear_drawing_entities import visible_circle_edge
     from diagnostics._owned_native_session import run_owned_diagnostic
     from solidworks_mcp.adapters.com_variant import double_array
@@ -448,7 +449,12 @@ def main():
             if type(result) is not int or result != 0 or not pdf.is_file():
                 raise RuntimeError(f"PDF export rejected: {result!r}")
             png = output / f"{name}.png"
-            render_pdf_png(pdf, png, expected_pages=1)
+            render_pdf_png(
+                pdf,
+                png,
+                layout=DrawingLayout.LANDSCAPE,
+                expected_pages=1,
+            )
             report["stages"][-1]["exports"] = {str(path): digest(path) for path in (pdf, png)}
             checkpoint()
 

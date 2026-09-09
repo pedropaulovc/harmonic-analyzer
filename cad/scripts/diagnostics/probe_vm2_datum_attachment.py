@@ -83,6 +83,7 @@ def main():
         raise RuntimeError("disable remote cache transfers")
     from _common import _early_bound
     import _drawing_common as common
+    from _drawing_registry import DrawingLayout
     from _gear_drawing_entities import visible_circle_edge
     from diagnostics._owned_native_session import run_owned_diagnostic
     from solidworks_mcp.adapters.com_variant import null_callout
@@ -243,7 +244,12 @@ def main():
                     if type(code) is not int or code != 0 or not path.is_file():
                         raise RuntimeError(f"diagnostic SaveAs3 rejected: {suffix}: {code!r}")
                     report["exports"][suffix]["sha256"] = digest(path)
-                common.render_pdf_png(output / "partial.pdf", output / "partial.png", expected_pages=1)
+                common.render_pdf_png(
+                    output / "partial.pdf",
+                    output / "partial.png",
+                    layout=DrawingLayout.LANDSCAPE,
+                    expected_pages=1,
+                )
                 report["exports"]["png"] = {"path": str(output / "partial.png"), "sha256": digest(output / "partial.png")}
             report["position_after_save"] = list(annotation.GetPosition() or ())
             report["source_sha256_after"] = digest(source)

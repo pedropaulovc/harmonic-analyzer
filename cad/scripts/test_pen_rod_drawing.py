@@ -9,7 +9,7 @@ import draw_pen_rod as drawing
 import pen_rod_spec
 from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
-from _holes import NUMBER_DRILL_MM
+from _hole_spec import blind_cut_dia_mm, drill_process
 
 
 def test_surface_finish_is_part_owned_and_consumed_by_key() -> None:
@@ -44,10 +44,16 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     )
 
 
-def test_wire_hole_matches_the_number_drill_standard() -> None:
-    assert pen_rod_spec.WIRE_HOLE_DIA == NUMBER_DRILL_MM[pen_rod_spec.WIRE_HOLE_DRILL]
-    assert pen_rod_spec.WIRE_HOLE_DRILL == "#47"
+def test_wire_hole_is_part_owned_and_consumers_derive_from_it() -> None:
+    assert part.WIRE_HOLE_SPEC is pen_rod_spec.WIRE_HOLE_SPEC
+    assert drawing.WIRE_HOLE_SPEC is pen_rod_spec.WIRE_HOLE_SPEC
+    assert drawing._WIRE_HOLE_DIA == blind_cut_dia_mm(pen_rod_spec.WIRE_HOLE_SPEC)
     assert pen_rod_spec.WIRE_HOLE_Y < pen_rod_spec.ROD_LENGTH
+    part_source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "HoleSpec(" not in part_source
+    assert "\n        WIRE_HOLE_SPEC," in part_source
+    assert "expect_dia_mm=blind_cut_dia_mm(WIRE_HOLE_SPEC)" in part_source
+    assert "wire_cut.hole_dia_mm" in part_source
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_native_hole_callout(") == 1
     # Two located dims for the wire hole: along the rod (length) AND across the
@@ -65,7 +71,7 @@ def test_linked_notes_define_remaining_square_rod_operations() -> None:
         ("Rod", "Depth"): "*deviations(SECTION_BAND)",
     }
     assert "V-BLOCK" in notes
-    assert "#47" in notes
+    assert drill_process(pen_rod_spec.WIRE_HOLE_SPEC) in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source

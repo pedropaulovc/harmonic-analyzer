@@ -372,9 +372,11 @@ HOOK_ARM_HEIGHT = HOOK_SHANK_RISE + HOOK_ELBOW_R  # 9.1: shank base -> arm centr
 # Bushing OD radii (for the concentric "rides the shaft" seat): the bushing OD
 # face is the unambiguous concentric reference -- it is the only geometry at this
 # radius in the inter-channel gap (the shaft is Ø6.35, the OD Ø10/Ø12).
+from _hole_spec import blind_cut_dia_mm  # noqa: E402
 from rocker_arm_spec import HUB_DIA as ROCKER_HUB_DIA, HUB_LENGTH as ROCKER_HUB_LENGTH  # noqa: E402
 from channel_lever_spec import HUB_LENGTH as LEVER_HUB_LENGTH  # noqa: E402
 from build_pivot_bracket import FOOT_H as PIVOT_BRACKET_FOOT_H  # noqa: E402
+from summing_lever_spec import HOLE_SPEC as SUMMING_SPRING_HOLE_SPEC  # noqa: E402
 
 # --- summing-lever plate interface (build_summing_lever.py) ------------------
 # The corrected .cs lever is a coplanar casting: the plate is mid-plane ON the
@@ -384,7 +386,7 @@ from build_pivot_bracket import FOOT_H as PIVOT_BRACKET_FOOT_H  # noqa: E402
 # elongate a net 5.8 vs the pre-rederive pose (installed body 61.98 -> 67.78).
 PLATE_TOP_Y = 982.24
 PLATE_THICKNESS = 5.1
-PLATE_HOLE_DIA = 2.0  # snug bore for the O1.4 hook shank (build_summing_lever.HOLE_DIA)
+PLATE_HOLE_DIA = blind_cut_dia_mm(SUMMING_SPRING_HOLE_SPEC)
 
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
 
@@ -882,7 +884,7 @@ def _assert_hook_fastener(eye_y: float) -> None:
     ring_above_plate = eye_ring_bottom - PLATE_TOP_Y
     shank_poke = shank_top - PLATE_TOP_Y  # shank fills the bore + protrudes
     seat_drop = plate_bottom - shank_base  # shank base reaches the bore mouth
-    bore_clear = PLATE_HOLE_DIA / 2.0 - hook_r  # shank O1.4 in O2.0 bore
+    bore_clear = PLATE_HOLE_DIA / 2.0 - hook_r
     ring_clear = (SPRING_LOOP_R - wire_r) - hook_r  # eye inner radius vs arm wire
     body = (eye_y - PLATE_EYE_Y) - SPRING_TOP_LEAD - SPRING_BOTTOM_LEAD
     if eye_above_plate < 0.5 or ring_above_plate < 0.3:
@@ -1262,9 +1264,7 @@ async def build(adapter) -> dict[str, str]:
         # itself (swFeatureErrorMateIlldefine, 2026-09-02). Channel 0 is the
         # single global Z anchor. The spin is a freed DOF: recorded, not
         # authored, so the rocker swings about its pivot.
-        axial = (
-            ("distance", rocker_by_channel[0], j * PITCH) if j >= 1 else ("datum",)
-        )
+        axial = ("distance", rocker_by_channel[0], j * PITCH) if j >= 1 else ("datum",)
         await _revolute(
             adapter,
             rocker,

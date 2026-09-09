@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import math
 
-from _holes import HoleSpec, blind_cut_dia_mm
+from _hole_spec import HoleSpec, blind_cut_dia_mm
 
 THICK = 0.8
 WIDTH = 4.0

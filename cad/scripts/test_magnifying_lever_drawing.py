@@ -26,10 +26,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert kept == marked
     # A callout can only annotate a dimension the print actually shows.
     assert set(drawing.DIMENSION_CALLOUTS) <= kept
-    assert (drawing.ROD_DIA, drawing.ROD_LENGTH) == (
-        magnifying_lever_spec.ROD_DIA,
-        magnifying_lever_spec.ROD_LENGTH,
-    )
+    assert drawing.ROD_LENGTH == magnifying_lever_spec.ROD_LENGTH
 
 
 def test_drawing_contract_is_split_from_the_assembly_nominals() -> None:

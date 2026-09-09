@@ -2,6 +2,7 @@ r"""Pure-data dimensional contract shared by the crankshaft and its drawing."""
 
 from __future__ import annotations
 
+from _hole_spec import HoleSpec
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
@@ -39,11 +40,9 @@ SURFACE_FINISHES = (
         production_method="BEARING JOURNAL",
     ),
 )
-# Tapered-pin cross-hole: a native Hole Wizard #9 number drill radially through
-# the crank seat (axis along Z). The diameter comes from the wizard drill table
-# (_holes.NUMBER_DRILL_MM["#9"]); the value is mirrored here so the drawing's
-# view math and notes stay COM-free.
-PIN_HOLE_DIA = 4.978
+# Tapered-pin cross-hole: a native number drill radially through the crank seat
+# (axis along Z).
+PIN_HOLE_SPEC = HoleSpec("drilled_number", "#9")
 PIN_HOLE_HEIGHT = 4.0  # arm mid-plane above the outboard end
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
