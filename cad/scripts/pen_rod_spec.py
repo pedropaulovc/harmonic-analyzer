@@ -2,6 +2,7 @@ r"""Pure-data dimensional contract shared by the pen rod and drawing."""
 
 from __future__ import annotations
 
+from _hole_spec import HoleSpec, drill_process
 from _gtol_spec import GeometricControl, PartDatum, PlanarFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
@@ -11,8 +12,7 @@ ROD_LENGTH = 150.0  # ch30 p002 / v4_t00603: the rod runs from the hanger guide
 # down to the v-block at paper mid-height (was 120 with the block grounded)
 SECTION_BAND = (0.00, -0.05)
 WIRE_HOLE_Y = 145.0  # wire tie-off near the top (build_pen_assembly imports this)
-WIRE_HOLE_DRILL = "#47"  # number drill (see _holes.NUMBER_DRILL_MM)
-WIRE_HOLE_DIA = 1.994
+WIRE_HOLE_SPEC = HoleSpec("drilled_number", "#47")
 
 # Geometric controls, authored on the model as plain annotations by the part build
 # (_part_pmi.author_part_pmi) and IMPORTED onto the sheet — the sheet types no
@@ -54,7 +54,7 @@ DRAWING_NOTES = "\n".join(
     (
         "USE DRAWN SQUARE BRASS BAR; KEEP FACES STRAIGHT AND SMOOTH - THE "
         "ROD SLIDES IN THE V-BLOCK GUIDE.",
-        "DRILL WIRE HOLE #47 THRU; DEBURR BOTH FACES.",
+        f"{drill_process(WIRE_HOLE_SPEC)} WIRE HOLE THRU; DEBURR BOTH FACES.",
     )
 )
 TOP_VIEW_NOTE = "TOP VIEW SCALE 4:1"

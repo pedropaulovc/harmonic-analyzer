@@ -8,6 +8,7 @@ import amplitude_bar_spec
 import draw_amplitude_bar as drawing
 import build_amplitude_bar as bar
 from _drawing_registry import DRAWINGS_BY_NAME
+from _hole_spec import blind_cut_dia_mm, drill_process
 
 
 def test_required_drawing_paths() -> None:
@@ -27,6 +28,8 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
 def test_part_geometry_matches_the_spec() -> None:
     assert amplitude_bar_spec.BAR_LENGTH == bar.BAR_LENGTH
     assert amplitude_bar_spec.BAR_WIDTH == bar.BAR_WIDTH
+    assert bar.TOP_PIN_HOLE_SPEC is amplitude_bar_spec.TOP_PIN_HOLE_SPEC
+    assert blind_cut_dia_mm(amplitude_bar_spec.TOP_PIN_HOLE_SPEC) == 1.994
 
 
 def test_sheet_runs_at_1_to_4_with_1_to_8_isometric() -> None:
@@ -45,7 +48,7 @@ def test_linked_notes_carry_the_notches_and_hole() -> None:
     notes = amplitude_bar_spec.DRAWING_NOTES
     assert "BOTTOM NOTCH" in notes
     assert "TOP NOTCH" in notes
-    assert "#47 DRILL" in notes
+    assert drill_process(amplitude_bar_spec.TOP_PIN_HOLE_SPEC) in notes
     assert "LINEAR +/-" not in notes
     assert "STEEL" not in notes
     assert "CHROME" not in notes

@@ -40,11 +40,8 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
 )
-from _holes import blind_cut_dia_mm
-from build_cone_swing_platform import (
-    PIVOT_HOLE_SPEC,
-    POST_MOUNT_SPEC,
-)
+from _hole_spec import blind_cut_dia_mm
+from cone_swing_platform_spec import PIVOT_HOLE_SPEC, POST_MOUNT_SPEC
 
 
 SPEC = DRAWINGS_BY_NAME["cone_swing_platform"]

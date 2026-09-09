@@ -50,7 +50,9 @@ def test_drawing_contract_is_split_from_the_assembly_nominals() -> None:
 def test_hanger_clearance_preserves_a_tolerance_safe_end_ligament() -> None:
     import wheel_bar_geom as geom
 
-    hole_dia = part.blind_cut_dia_mm(part.SCREW_HOLE_SPEC)
+    assert part.PEN_HANGER_HOLE_SPEC is geom.PEN_HANGER_HOLE_SPEC
+    assert part.CLAMP_HOLE_SPEC is geom.CLAMP_HOLE_SPEC
+    hole_dia = part.blind_cut_dia_mm(geom.PEN_HANGER_HOLE_SPEC)
     assert hole_dia == pytest.approx(4.572)
     assert part.PEN_HANGER_END_WALL == pytest.approx(2.714)
     minimum_wall = (

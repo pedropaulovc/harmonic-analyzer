@@ -24,6 +24,7 @@ without SolidWorks in ~1 s.
 """
 
 from __future__ import annotations
+from _hole_spec import HoleSpec
 
 from _surface_finish import SurfaceFinishControl
 
@@ -50,7 +51,8 @@ SQUARE_END_OVERHANG = 10.0  # square end past the pivot (low)
 SHAFT_BORE_DIA = 0.375 * MM_PER_IN  # 9.525: 3/8" crankshaft (med); the legacy 9.5
 SHAFT_BORE_BAND = (0.05, 0.00)  # (upper, lower) deviations
 # rounding left the bore 0.025 smaller than the shaft (caught in M6.2)
-PIN_HOLE_DIA = 4.623  # ANSI #14 drill table value used by Hole Wizard
+PIN_HOLE_SPEC = HoleSpec("drilled_number", "#14")
+HANDLE_PIVOT_HOLE_SPEC = HoleSpec("drilled_fractional", "15/64")
 DIMPLE_DIA = 8.0  # fiducial indentation (low)
 DIMPLE_DEPTH = 0.5  # fiducial indentation (low)
 DIMPLE_X = 30.0  # on the arm near the boss (low)
@@ -64,6 +66,13 @@ ANCHOR_SCREW_Y = 4.5  # off the arm centreline toward the local +y edge (machine
 # once placed; low). Kept POSITIVE: a driven placement dim is a magnitude.
 ANCHOR_THREAD_DEPTH = 5.5  # full #4-40 thread for 5.33 stock-screw insertion
 ANCHOR_DRILL_DEPTH = 6.5  # cylindrical depth; bottoming tap leaves 1.0 lead room
+ANCHOR_HOLE_SPEC = HoleSpec(
+    "tapped_bottoming",
+    "#4-40",
+    end="blind",
+    depth_mm=ANCHOR_DRILL_DEPTH,
+    overrides_mm={"ThreadDepth": ANCHOR_THREAD_DEPTH},
+)
 # The 118-degree drill point extends another 0.679: back-face wall is 0.821.
 
 # No roughness callouts: the arm is pinned to its crankshaft, so nothing runs
@@ -92,13 +101,13 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_NOTES = "\n".join(
     (
         "SHAFT BORE CENTRED ACROSS 16 WIDTH.",
-        "HANDLE PIVOT: 15/64 DRILL THRU.",
         "THE CROSS-HOLE CALLOUT IS THE FINISHED SIZE FOR THIS PART.",
         "CROSS-HOLE AXIS INTERSECTS SHAFT AXIS.",
         "DIMPLE: <MOD-DIAM>8 FLAT-BOTTOM, 0.50 +0.20/-0.10 DEEP; LOCATION +/-0.25.",
         "DIMPLE AND ANCHOR TAP ON THE HANDLE-SIDE (FRONT) FACE.",
-        f"ANCHOR TAP: #4-40 UNC-2B X {ANCHOR_THREAD_DEPTH:.1f} FULL THREAD DEEP; BOTTOMING TAP.",
-        f"ANCHOR DRILL: {ANCHOR_DRILL_DEPTH:.1f} DEEP (DO NOT BREAK THROUGH).",
+        f"ANCHOR TAP: {ANCHOR_HOLE_SPEC.size} UNC-{ANCHOR_HOLE_SPEC.thread_class}"
+        f" X {ANCHOR_THREAD_DEPTH:.1f} FULL THREAD DEEP; BOTTOMING TAP.",
+        f"ANCHOR DRILL: {ANCHOR_HOLE_SPEC.depth_mm:.1f} DEEP (DO NOT BREAK THROUGH).",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

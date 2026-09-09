@@ -76,7 +76,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
     set_dimension_symmetric_tolerance,
 )
-from _holes import HoleSpec, blind_cut_dia_mm, wizard_holes
+from _holes import wizard_holes
 from _visibility import blank_reference_geometry
 from build_cone_lock_knob import HEAD_DIA as LOCK_HEAD_DIA
 from cone_swing_platform_spec import (
@@ -84,14 +84,17 @@ from cone_swing_platform_spec import (
     DRAWING_NOTES,
     END_VIEW_NOTE,
     ISOMETRIC_VIEW_NOTE,
-    PLATE_THICKNESS,
     PIVOT_BEARING_RELIEF_DEPTH,
     PIVOT_BEARING_RELIEF_DIAMETER,
     PIVOT_BEARING_THICKNESS,
     PIVOT_HEAD_RADIAL_CLEARANCE,  # noqa: F401 -- public verify contract
+    PIVOT_HOLE_DIA,
+    PIVOT_HOLE_SPEC,
     PLATE_LENGTH_TOLERANCE_MM,
+    PLATE_THICKNESS,
     PLAN_VIEW_NOTE,
-    POST_MOUNT_THREAD,
+    POST_MOUNT_SPEC,
+    POST_MOUNT_TAP_DIA,
 )
 
 PART_NAME = "cone-swing-platform"
@@ -110,8 +113,6 @@ NORTH_OVERHANG = 7.0  # pivot -> north edge (plate continues past the pivot)
 # Clearance over the O6.35 pivot-screw shoulder: the plate swings ON the screw
 # (build_cone_pivot_screw). 1/4 clearance CLOSE fit (Ø6.756, the wizard twin of
 # the old Ø6.5 artefact dim).
-PIVOT_HOLE_SPEC = HoleSpec("clearance", "1/4", fit="close")
-PIVOT_HOLE_DIA = blind_cut_dia_mm(PIVOT_HOLE_SPEC)
 
 THROUGH_CUT_DEPTH = 40.0  # mid-plane total (both_directions splits it half per
 # side of the sketch plane); must exceed 2x any extent crossed
@@ -141,8 +142,6 @@ POST_MOUNT_X = POST_MOUNT_HALF_PITCH * _COS_I
 POST_MOUNT_DZ = POST_MOUNT_HALF_PITCH * _SIN_I
 POST_MOUNT_WEST_XZ = (POST_MOUNT_X, POST_LOCAL_Z + POST_MOUNT_DZ)
 POST_MOUNT_EAST_XZ = (-POST_MOUNT_X, POST_LOCAL_Z - POST_MOUNT_DZ)
-POST_MOUNT_SPEC = HoleSpec("tapped", POST_MOUNT_THREAD)
-POST_MOUNT_TAP_DIA = blind_cut_dia_mm(POST_MOUNT_SPEC)
 
 # Fail before COM if the v2 foot ever drifts off the tapered plate.  Distance
 # is normal to each straight boundary, not merely an axis-aligned half-width.

@@ -18,6 +18,7 @@ from typing import Any
 from platen_guide_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
+from _hole_spec import THREAD_MAJOR_MM, blind_cut_dia_mm
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
@@ -38,6 +39,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from build_platen_guide import GUIDE_LENGTH
 from build_platen_guide import HOLE_X as THROUGH_X
 from build_platen_guide import SCREW_STATION_X as BLIND_X
+from platen_guide_spec import TAPPED_HOLE_SPEC
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     auto_center_marks,
@@ -75,10 +77,10 @@ DATUM_B_SYMBOL_X_M = FRONT_LEFT_X_M + (BLIND_X[2] + BLIND_X[3]) / 2000.0
 HOLE_TABLE_X_M = 0.020
 REAR_HOLE_TABLE_X_M = 0.205
 HOLE_TABLE_Y_M = 0.258
-THREAD_DESIGNATION = "#4-40 UNC-2B"
-THREAD_MAJOR_DIA_MM = 2.845
-THREAD_PITCH_MM = 25.4 / 40.0
-THREAD_TAP_DRILL_MM = 2.261
+THREAD_DESIGNATION = f"{TAPPED_HOLE_SPEC.size} UNC-{TAPPED_HOLE_SPEC.thread_class}"
+THREAD_MAJOR_DIA_MM = THREAD_MAJOR_MM[TAPPED_HOLE_SPEC.size]
+THREAD_PITCH_MM = 25.4 / int(TAPPED_HOLE_SPEC.size.rsplit("-", 1)[1])
+THREAD_TAP_DRILL_MM = blind_cut_dia_mm(TAPPED_HOLE_SPEC)
 
 
 def _bottom_surface_edge(view: Any) -> Any:

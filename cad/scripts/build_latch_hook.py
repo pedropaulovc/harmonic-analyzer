@@ -62,7 +62,7 @@ STRIP_T = 0.8  # spring strip
 BEND_R = 45.0  # centreline bend radius
 ARC_LEN = 27.0  # centreline length screw -> free tip (chord ~26.6)
 EYE_DIA = 8.0  # round eye about the screw hole (1.8 wall around Ø4.4)
-HOLE_DIA = 4.4  # #8 bracket-screw clearance
+HOLE_DIA = 4.4  # explicit custom close clearance for the #8 bracket screw
 
 TIP_R = STRIP_W / 2.0
 OUTER_R = BEND_R + STRIP_W / 2.0

@@ -11,6 +11,7 @@ import draw_rocker_arm as drawing
 import build_rocker_arm as arm
 from _drawing_registry import DRAWINGS_BY_NAME
 from cone_pivot_post_installation import MECHANISM_X_SHIFT
+from _hole_spec import blind_cut_dia_mm
 
 
 def test_required_drawing_paths() -> None:
@@ -43,6 +44,8 @@ def test_draw_view_math_matches_the_spec() -> None:
     assert rocker_arm_spec.BOT_ARC_LEN == arm.BOT_ARC_LEN
     assert rocker_arm_spec.TIP_FACE == arm.TIP_FACE
     assert rocker_arm_spec.ROD_HOLE_X == arm.ROD_HOLE_X
+    assert arm.ROD_HOLE_SPEC is rocker_arm_spec.ROD_HOLE_SPEC
+    assert drawing._ROD_HOLE_DIA == blind_cut_dia_mm(rocker_arm_spec.ROD_HOLE_SPEC)
 
 
 def test_rod_pin_follows_the_recentered_cam_and_recloses_neutral_y() -> None:

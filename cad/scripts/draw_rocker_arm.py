@@ -26,6 +26,7 @@ from _gear_drawing_entities import visible_circle_edge
 from rocker_arm_spec import ARM_DEPTH, GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
+from _hole_spec import blind_cut_dia_mm
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
@@ -51,6 +52,7 @@ from rocker_arm_spec import (
     PIVOT_HOLE_DIA,
     R_TOP,
     ROD_HOLE_X,
+    ROD_HOLE_SPEC,
     ROD_HOLE_Y,
     SURFACE_FINISHES,
     TIP_FACE,
@@ -82,7 +84,7 @@ _S = SHEET_SCALE[0] / SHEET_SCALE[1]  # sheet-mm per model-mm (0.5)
 # Front-view model bbox: X symmetric about 0, Y from the centre bottom (0) up to
 # the top-arc tip (TOP_END_Y).
 _PIVOT_MID_Y = 8.0  # pivot bore centre = ArmDepth / 2
-_ROD_HOLE_DIA = 1.994  # #47 drill
+_ROD_HOLE_DIA = blind_cut_dia_mm(ROD_HOLE_SPEC)
 _BBOX_CY = TOP_END_Y / 2.0
 
 FRONT_CENTER = (0.180, 0.175)

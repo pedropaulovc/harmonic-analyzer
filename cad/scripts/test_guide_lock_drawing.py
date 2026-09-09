@@ -8,7 +8,7 @@ import build_guide_lock as lock
 import draw_guide_lock as drawing
 import guide_lock_spec
 from _drawing_registry import DRAWINGS_BY_NAME
-from _holes import CLEARANCE_MM
+from _hole_spec import blind_cut_dia_mm
 
 
 def test_required_drawing_paths() -> None:
@@ -34,12 +34,17 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert lock.HOLE_XY is guide_lock_spec.HOLE_XY
 
 
-def test_spec_hole_diameter_matches_the_wizard_clearance_table() -> None:
-    # The drawing's COM-free pinned copy of the #4 CLOSE clearance drill must
-    # track the wizard table the part build actually cuts from.
-    assert guide_lock_spec.HOLE_DIA_MM == CLEARANCE_MM[("#4", "close")]
-    source = Path(lock.__file__).read_text(encoding="utf-8")
-    assert 'HoleSpec("clearance", "#4", fit="close")' in source
+def test_hole_contract_is_part_owned_and_resolved() -> None:
+    spec = guide_lock_spec.HOLE_SPEC
+    assert lock.HOLE_SPEC is spec
+    assert drawing.HOLE_SPEC is spec
+    assert spec.kind == "clearance"
+    assert spec.size == "#4"
+    assert spec.fit == "close"
+    assert lock.HOLE_DIA == blind_cut_dia_mm(spec)
+    assert drawing.HOLE_R_SHEET == (
+        blind_cut_dia_mm(spec) * drawing.SHEET_SCALE[0] / 2000.0
+    )
 
 
 def test_sheet_runs_at_4_to_1_with_2_to_1_isometric() -> None:

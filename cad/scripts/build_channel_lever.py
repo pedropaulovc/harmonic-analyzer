@@ -59,7 +59,8 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
-from _holes import NUMBER_DRILL_MM, HoleSpec, wizard_holes
+from _hole_spec import blind_cut_dia_mm
+from _holes import wizard_holes
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -67,11 +68,13 @@ from _drawing_marks import (
 )
 from _saved_part_guard import require_saved_drawing_properties
 from channel_lever_spec import (
+    BAR_PIN_HOLE_SPEC,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     ISOMETRIC_VIEW_NOTE,
     HUB_DIA,
     HUB_LENGTH,
+    SPRING_EYE_HOLE_SPEC,
 )
 
 PART_NAME = "channel-lever"
@@ -86,12 +89,8 @@ if abs(HUB_LENGTH - _config.machine("channels", "station_pitch_mm")) > 1e-6:
     raise AssertionError("channel_lever_spec.HUB_LENGTH must equal the channel station pitch")
 HUB_PROUD = (HUB_LENGTH - LEVER_THICKNESS) / 2.0  # 2.028 each face
 BAR_PIN_X = 127.0  # 5" from the fulcrum (bar line -72.9, fulcrum -199.9)
-# bar pin hole: was Ø2.0 drill, now #47 (Ø1.994) native Hole Wizard feature.
-# spring eye hole: was Ø4.0 drill, now #21 (Ø4.039) native Hole Wizard feature
-# -- sized so the spring's O5.5-mean O1-wire eye threads the tab with ~0.3
-# margins; the O3 photo read (low) is infeasible. build_channel_assembly.py
-# _assert_spring_threading checks threading against its own SPRING_HOLE_DIA=4.0
-# (the #21 bore is 0.039 wider -> slightly MORE clearance, still fine).
+# Standard native drill holes for the amplitude-bar pin and spring eye are
+# part-owned by channel_lever_spec.
 TAB_START_X = 169.0  # bar steps down to the end tab (p.39/p.41, low)
 TAB_HALF = 3.0  # tab 6.0 tall, centred on the bar axis
 TIP_RADIUS = 3.0  # rounded tab tip; tip overhang = 182.8 + 3 - 177.8 = 8
@@ -294,33 +293,31 @@ async def build(adapter) -> dict[str, str]:
     expected -= v_fulcrum
     await volume_check(adapter, "fulcrum hole", expected, 0.005 * expected)
 
-    # Bar-pin hole (was Ø2.0 cut, now #47 Ø1.994) and spring-eye hole (was Ø4.0
-    # cut, now #21 Ø4.039): native Hole Wizard through-holes drilled +Z through
-    # the 3 mm lever (memory/fastener-policy-us-customary). Two specs -> two
-    # feature calls, both on the +Z front face; each is fully inside the material
-    # (the spring eye rides the 6.0 tab, Ø4.039 < 6.0), so removal is pi*r^2*t.
-    bar_dia = NUMBER_DRILL_MM["#47"]
+    # Native Hole Wizard through-holes drilled +Z through the lever.
+    bar_dia = blind_cut_dia_mm(BAR_PIN_HOLE_SPEC)
     bar_pin_cut = wizard_holes(
         adapter,
-        HoleSpec("drilled_number", "#47"),
+        BAR_PIN_HOLE_SPEC,
         [[BAR_PIN_X, 0.0, LEVER_THICKNESS / 2.0]],
         (0.0, 0.0, 1.0),
-        "bar-pin hole (#47)",
+        f"bar-pin hole ({BAR_PIN_HOLE_SPEC.size})",
         name="BarPinHole",
+        expect_dia_mm=bar_dia,
         placement_dims=[(("BarPinCx", '"BarPinX"'), (None, None))],
     )
     drive_jobs += bar_pin_cut.placement_drive_jobs
     expected -= math.pi * (bar_dia / 2.0) ** 2 * LEVER_THICKNESS
     await volume_check(adapter, "bar-pin hole", expected, 0.005 * expected)
 
-    spring_dia = NUMBER_DRILL_MM["#21"]
+    spring_dia = blind_cut_dia_mm(SPRING_EYE_HOLE_SPEC)
     spring_cut = wizard_holes(
         adapter,
-        HoleSpec("drilled_number", "#21"),
+        SPRING_EYE_HOLE_SPEC,
         [[LEVER_SPRING_X, 0.0, LEVER_THICKNESS / 2.0]],
         (0.0, 0.0, 1.0),
-        "spring-eye hole (#21)",
+        f"spring-eye hole ({SPRING_EYE_HOLE_SPEC.size})",
         name="SpringHole",
+        expect_dia_mm=spring_dia,
         placement_dims=[(("SpringCx", '"LeverSpringX"'), (None, None))],
     )
     drive_jobs += spring_cut.placement_drive_jobs

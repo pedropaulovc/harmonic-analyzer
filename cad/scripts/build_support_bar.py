@@ -48,7 +48,8 @@ from _common import (
     set_global,
     volume_check,
 )
-from _holes import HoleSpec, blind_cut_dia_mm, wizard_holes
+from _hole_spec import HoleSpec, blind_cut_dia_mm
+from _holes import wizard_holes
 from build_clamp_screw import HEAD_H as CLAMP_HEAD_H
 
 PART_NAME = "support-bar"
@@ -67,10 +68,11 @@ CLAMP_SCREW_DX = 17.5  # clamp screws flank each column
 CLAMP_HEAD_RECESS = 0.2
 CLAMP_CBORE_DIA = 8.5
 CLAMP_CBORE_DEPTH = CLAMP_HEAD_H + CLAMP_HEAD_RECESS
-CLAMP_HOLE_DIA = 4.978
+CLAMP_THROUGH_HOLE_SPEC = HoleSpec("clearance", "#8")
+CLAMP_HOLE_DIA = blind_cut_dia_mm(CLAMP_THROUGH_HOLE_SPEC)
 CLAMP_HOLE_SPEC = HoleSpec(
     "counterbore_fillister",
-    "#8",
+    CLAMP_THROUGH_HOLE_SPEC.size,
     overrides_mm={
         "HoleDiameter": CLAMP_HOLE_DIA,
         "CounterBoreDiameter": CLAMP_CBORE_DIA,

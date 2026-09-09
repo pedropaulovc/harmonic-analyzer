@@ -73,6 +73,8 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
+from _hole_spec import HoleSpec, blind_cut_dia_mm
+
 
 PART_NAME = "pivot-bracket"
 MATERIAL = "Plain Carbon Steel"  # black-finished steel (ch14 p.27)
@@ -89,7 +91,8 @@ BORE_H = 25.2  # shaft axis above the seat (unchanged: the rocker pivot stays
 # at machine y 253.8 on the 228.6 support apex)
 BALL_DIA = 16.0  # bright pivot ball on the ear (ch14 page002_img01)
 BORE_DIA = 6.5  # O6.35 shaft, 0.15 diametral clearance
-HOLE_DIA = 4.2  # #19-drill hold-down clearance
+HOLD_DOWN_HOLE_SPEC = HoleSpec("drilled_number", "#19")
+HOLE_DIA = blind_cut_dia_mm(HOLD_DOWN_HOLE_SPEC)
 HOLE_Z = (9.0, 17.0)  # hold-down holes on x = 0, inside the foot's free run
 
 BALL_R = BALL_DIA / 2.0

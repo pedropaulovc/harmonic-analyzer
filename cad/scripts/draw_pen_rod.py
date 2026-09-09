@@ -25,6 +25,7 @@ from _drawing_common import (
     set_hidden_lines_visible,
     stamp_drawing_summary,
 )
+from _hole_spec import blind_cut_dia_mm
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from pen_rod_spec import (
@@ -32,7 +33,7 @@ from pen_rod_spec import (
     PART_DATUMS,
     ROD_LENGTH,
     SURFACE_FINISHES,
-    WIRE_HOLE_DIA,
+    WIRE_HOLE_SPEC,
     WIRE_HOLE_Y,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -52,6 +53,7 @@ OUTPUTS = DrawingOutputs(
 SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
+_WIRE_HOLE_DIA = blind_cut_dia_mm(WIRE_HOLE_SPEC)
 
 SHEET_SCALE = (1.0, 1.0)
 TOP_VIEW_SCALE = 4.0
@@ -148,8 +150,8 @@ async def build(adapter: Any) -> dict[str, str]:
     front_side = (FRONT_CENTER[0] - 0.0025, FRONT_CENTER[1])
     front_far_side = (FRONT_CENTER[0] + 0.0025, FRONT_CENTER[1])
     hole_center_y = front_bottom[1] + WIRE_HOLE_Y / 1000.0
-    hole_bottom = (FRONT_CENTER[0], hole_center_y - WIRE_HOLE_DIA / 2000.0)
-    hole_side = (FRONT_CENTER[0] + WIRE_HOLE_DIA / 2000.0, hole_center_y)
+    hole_bottom = (FRONT_CENTER[0], hole_center_y - _WIRE_HOLE_DIA / 2000.0)
+    hole_side = (FRONT_CENTER[0] + _WIRE_HOLE_DIA / 2000.0, hole_center_y)
 
     add_edge_dimension(
         adapter,

@@ -31,6 +31,7 @@ import sys
 from typing import Any
 
 import _telemetry
+from _hole_spec import blind_cut_dia_mm, drill_process
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
@@ -58,7 +59,8 @@ from crank_arm_spec import (
     ARM_THICKNESS,
     DIMPLE_X,
     HALF_WIDTH,
-    PIN_HOLE_DIA,
+    HANDLE_PIVOT_HOLE_SPEC,
+    PIN_HOLE_SPEC,
     SHAFT_BORE_DIA,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -78,6 +80,9 @@ OUTPUTS = DrawingOutputs(
 SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
+_HANDLE_PIVOT_HOLE_DIA = blind_cut_dia_mm(HANDLE_PIVOT_HOLE_SPEC)
+_PIN_HOLE_DIA = blind_cut_dia_mm(PIN_HOLE_SPEC)
+
 
 SHEET_SCALE = (2.0, 1.0)
 
@@ -220,13 +225,13 @@ async def build(adapter: Any) -> dict[str, str]:
     # to, read from the bore axis (one origin per view).
     handle_edge = (
         _sheet_x(ARM_C2C),
-        FRONT_CENTER[1] + (15.0 / 64.0 * 25.4) * SHEET_SCALE[0] / 2000.0,
+        FRONT_CENTER[1] + _HANDLE_PIVOT_HOLE_DIA * SHEET_SCALE[0] / 2000.0,
     )
     add_edge_dimension(
         adapter,
         front,
         p0=(_sheet_x(0.0), FRONT_CENTER[1] + SHAFT_BORE_DIA / 1000.0),
-        p1=(_sheet_x(ARM_C2C), FRONT_CENTER[1] + 15.0 / 64.0 * 25.4 / 1000.0),
+        p1=(_sheet_x(ARM_C2C), FRONT_CENTER[1] + _HANDLE_PIVOT_HOLE_DIA / 1000.0),
         text_xy=(_sheet_x(ARM_C2C / 2.0), 0.102),
         label="shaft-to-handle-pivot location",
     )
@@ -257,7 +262,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # drill as its prefix.  The note says its axis passes through the bore axis.
     pin_edge = (
         _sheet_x(0.0),
-        TOP_CENTER[1] + PIN_HOLE_DIA * SHEET_SCALE[0] / 2000.0,
+        TOP_CENTER[1] + _PIN_HOLE_DIA * SHEET_SCALE[0] / 2000.0,
     )
     pin_station = add_edge_dimension(
         adapter,
@@ -289,7 +294,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=pin_edge,
         callout_xy=(0.120, 0.230),
         label="crank-arm cross-hole",
-        process="#14 DRILL",
+        process=drill_process(PIN_HOLE_SPEC),
     )
     # Handle pivot hole: above and just right of the arm, arrow on the hole's
     # top rim. Keeping it on the handle end avoids crossing the full principal
@@ -300,7 +305,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=handle_edge,
         callout_xy=(0.258, 0.172),
         label="handle pivot hole",
-        process="15/64 DRILL",
+        process=drill_process(HANDLE_PIVOT_HOLE_SPEC),
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.060)

@@ -22,6 +22,7 @@ centre) is x = 0; the foot reaches inboard (-X).
 
 from __future__ import annotations
 
+from _hole_spec import HoleSpec, blind_cut_dia_mm
 
 # --- Nominal geometry (mm). Derived against the 2026-08-02 top-frame
 # contract: rail top face y=1036.2, fulcrum shaft axis y=1061.4 (+25.2),
@@ -41,9 +42,19 @@ BORE_DIA = 6.5  # shaft clearance bore through the ball (shaft is Ø6.35)
 # Screw hole: one #8 close-clearance drill + counterbore in the pad centre.
 # The under-head plane sits at FOOT_H - CBORE_DEPTH.
 SCREW_X = -14.75  # pad centre: (-23 + -6.5) / 2
-HOLE_DIA_MM = 4.572  # #8 close-clearance drill (0.180 in)
+SCREW_CLEARANCE_SPEC = HoleSpec("clearance", "#8", fit="close")
+HOLE_DIA_MM = blind_cut_dia_mm(SCREW_CLEARANCE_SPEC)
 CBORE_DIA_MM = 9.5  # retained artefact recess clears the Ø6.858 stock head
 CBORE_DEPTH_MM = 3.9624  # exact McMaster 90280A194 head height
+SCREW_HOLE_SPEC = HoleSpec(
+    "counterbore_fillister",
+    SCREW_CLEARANCE_SPEC.size,
+    overrides_mm={
+        "HoleDiameter": HOLE_DIA_MM,
+        "CounterBoreDiameter": CBORE_DIA_MM,
+        "CounterBoreDepth": CBORE_DEPTH_MM,
+    },
+)
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows. The ball/socket/bore stack and the wizard screw hole ship as

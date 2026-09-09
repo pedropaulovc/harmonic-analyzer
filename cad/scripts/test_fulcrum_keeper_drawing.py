@@ -9,6 +9,7 @@ import draw_fulcrum_keeper as drawing
 import fulcrum_keeper_spec
 import _config
 from _drawing_registry import DRAWINGS_BY_NAME
+from build_frame_side_screw import HEAD_H as FRAME_SIDE_HEAD_H
 
 
 def test_required_drawing_paths() -> None:
@@ -39,14 +40,19 @@ def test_geometry_matches_the_top_frame_contract() -> None:
 
 
 def test_screw_hole_seats_the_frame_side_screw() -> None:
-    # The counterbore must clear the exact migrated stock head, and the native
-    # #8 close-clearance drill must clear its full modeled thread envelope.
+    hole = fulcrum_keeper_spec.SCREW_HOLE_SPEC
+    assert part.SCREW_HOLE_SPEC is hole
+    assert hole.kind == "counterbore_fillister"
+    assert hole.size == "#8"
+    assert hole.overrides_mm == {
+        "HoleDiameter": fulcrum_keeper_spec.HOLE_DIA_MM,
+        "CounterBoreDiameter": fulcrum_keeper_spec.CBORE_DIA_MM,
+        "CounterBoreDepth": fulcrum_keeper_spec.CBORE_DEPTH_MM,
+    }
+    assert fulcrum_keeper_spec.HOLE_DIA_MM > part.FRAME_SIDE_SHANK_DIA
     assert fulcrum_keeper_spec.CBORE_DIA_MM > part.FRAME_SIDE_HEAD_DIA
-    assert fulcrum_keeper_spec.CBORE_DEPTH_MM == part.CBORE_DEPTH_MM
-    assert fulcrum_keeper_spec.HOLE_DIA_MM == part.SCREW_HOLE_DIA_MM
-    assert part.SCREW_HOLE_DIA_MM > part.FRAME_SIDE_SHANK_DIA
+    assert fulcrum_keeper_spec.CBORE_DEPTH_MM == FRAME_SIDE_HEAD_H
     source = Path(part.__file__).read_text(encoding="utf-8")
-    assert '"counterbore_fillister"' in source
     assert 'name="FootScrewHole"' in source
 
 

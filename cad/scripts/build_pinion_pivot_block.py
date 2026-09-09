@@ -52,7 +52,8 @@ from _drawing_marks import (
     set_dimension_bilateral_tolerance,
 )
 from _fit_limits import deviations
-from _holes import HoleSpec, blind_cut_dia_mm, wizard_holes
+from _hole_spec import blind_cut_dia_mm
+from _holes import wizard_holes
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from pinion_pivot_block_spec import (
@@ -67,6 +68,7 @@ from pinion_pivot_block_spec import (
     DRAWING_NOTES,
     ISOMETRIC_VIEW_NOTE,
     LIFT_BORE_RISE,
+    SCREW_HOLE_SPEC,
     SCREW_HALF_SPACING,
     SURFACE_FINISHES,
 )
@@ -82,11 +84,9 @@ _SAVED_DRAWING_PROPERTIES = (
     "Isometric View Note",
 )
 
-# Slotted-screw pass-throughs use the established normal #8 clearance fit for
+# Slotted-screw pass-throughs use the part-owned normal #8 clearance fit for
 # the exact Ø4.1656 stock major diameter. The base receivers remain separate
 # native #8-32 tapped seats.
-SCREW_HOLE_SPEC = HoleSpec("clearance", "#8")
-SCREW_HOLE_DIA = blind_cut_dia_mm(SCREW_HOLE_SPEC)
 
 
 async def build(adapter) -> dict[str, str]:
@@ -178,7 +178,7 @@ async def build(adapter) -> dict[str, str]:
     # clearance feature (2 through-all instances), drilled from the block
     # bottom while the block is still prismatic. Top-sketch (u,v)->(X,-Z), so
     # sketch v -BLOCK_DEPTH/2 is model z = +BLOCK_DEPTH/2.
-    screw_dia = SCREW_HOLE_DIA
+    screw_dia = blind_cut_dia_mm(SCREW_HOLE_SPEC)
     screw_cut = wizard_holes(
         adapter,
         SCREW_HOLE_SPEC,

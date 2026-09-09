@@ -8,17 +8,15 @@ keeps cannot silently drift.
 """
 
 from __future__ import annotations
+from _hole_spec import HoleSpec, blind_cut_dia_mm
 
 
-# Collar nominals -- the SINGLE source: ``build_output_fixture`` imports these
-# to cut the part and ``draw_output_fixture`` reads them for its view math, so
-# the print and the part cannot drift (codex review #361).  Kept literal here
-# so the module stays pure data; the build pins CROSS_HOLE_DIA against
-# ``_holes.TAP_DRILL_MM["#4-40"]`` and the offline drawing test re-asserts it.
+# Collar and hole nominals are the single source consumed by the build and drawing.
 COLLAR_DIA = 10.0
 COLLAR_HEIGHT = 8.0
 ROD_BORE_DIA = 5.2
-CROSS_HOLE_DIA = 2.261  # #4-40 tap drill (radial cross hole at mid-height)
+CROSS_HOLE_SPEC = HoleSpec("tapped", "#4-40")
+CROSS_HOLE_DIA = blind_cut_dia_mm(CROSS_HOLE_SPEC)
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  The end view carries the two concentric diameters (collar OD +
@@ -45,7 +43,7 @@ DRAWING_NOTES = "\n".join(
         "   FROM THE ROD-BORE AXIS 0.10 MAX, PERPENDICULAR TO IT",
         "   +/-1 DEG. DRILL <MOD-DIAM>2.26 THRU BOTH WALLS (<MOD-DIAM>2.26",
         "   SHOWN IS THE UNTAPPED WALL). TAP THE ENTRY WALL ONLY",
-        "   #4-40 UNC-2B RH THRU TO THE ROD BORE.",
+        f"   {CROSS_HOLE_SPEC.size} UNC-{CROSS_HOLE_SPEC.thread_class} RH THRU TO THE ROD BORE.",
         "4. BREAK BORE + CROSS-HOLE EDGES 0.10 MAX.",
     )
 )

@@ -12,6 +12,8 @@ build_summing_lever.py.
 from __future__ import annotations
 
 import math
+from _hole_spec import HoleSpec
+
 
 from _gtol_spec import PlanarFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
@@ -55,8 +57,8 @@ SURFACE_FINISHES = (
 )
 
 # 20 channel-spring holes (#47 seed + linear pattern).
+HOLE_SPEC = HoleSpec("drilled_number", "#47")
 HOLE_X = 39.85
-HOLE_DIA = 1.994  # #47 drill
 HOLE_COUNT = 20
 CHANNEL_Z0 = -67.1
 CHANNEL_PITCH = 7.0565

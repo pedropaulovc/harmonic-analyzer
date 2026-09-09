@@ -24,7 +24,8 @@ from _drawing_common import (
     render_pdf_png,
     sanitize_pdf_metadata,
 )
-from _holes import CLEARANCE_MM, TAP_DRILL_MM
+from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM, blind_cut_dia_mm
+from platen_guide_spec import TAPPED_HOLE_SPEC
 
 
 def test_platen_guide_native_front_is_hole_entry_face() -> None:
@@ -136,8 +137,10 @@ def test_portrait_raster_crops_pdfium_width_rounding(
 
 
 def test_drawing_hole_sizes_follow_unc_policy() -> None:
+    assert guide.TAPPED_HOLE_SPEC is TAPPED_HOLE_SPEC
     assert drawing.THREAD_DESIGNATION == "#4-40 UNC-2B"
-    assert drawing.THREAD_TAP_DRILL_MM == TAP_DRILL_MM["#4-40"]
+    assert drawing.THREAD_TAP_DRILL_MM == blind_cut_dia_mm(TAPPED_HOLE_SPEC)
+    assert drawing.THREAD_MAJOR_DIA_MM == THREAD_MAJOR_MM[TAPPED_HOLE_SPEC.size]
     assert CLEARANCE_MM[("#4", "normal")] == 3.264
 
 
@@ -156,9 +159,9 @@ def test_platen_guide_hole_stations_match_native_wizard_features() -> None:
         tuple(guide.GUIDE_LENGTH * fraction for fraction in (0.1, 0.3, 0.5, 0.7, 0.9))
     )
     source = Path(guide.__file__).read_text(encoding="utf-8")
-    assert source.count('"tapped_bottoming", "#4-40"') == 3
-    assert "lock_spec = HoleSpec(" in source
-    assert "screw_spec = HoleSpec(" in source
+    assert source.count("replace(") == 2
+    assert source.count("TAPPED_HOLE_SPEC,") == 2
+    assert '"tapped_bottoming", "#4-40"' not in source
 
 
 def test_drawing_splits_front_and_rear_blind_tap_tables() -> None:

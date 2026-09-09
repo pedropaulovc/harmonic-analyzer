@@ -26,6 +26,7 @@ from typing import Any
 from summing_lever_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
+from _hole_spec import blind_cut_dia_mm
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
@@ -50,7 +51,7 @@ from summing_lever_spec import (
     ANCHOR_R,
     CHANNEL_PITCH,
     HEX_DEPTH,
-    HOLE_DIA,
+    HOLE_SPEC,
     HOLE_X,
     HOLE_Z_FIRST,
     PLATE_L,
@@ -71,6 +72,8 @@ OUTPUTS = DrawingOutputs(
     pdf=SPEC.outputs["pdf"],
     png=SPEC.outputs["png"],
 )
+HOLE_DIA = blind_cut_dia_mm(HOLE_SPEC)
+
 SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png

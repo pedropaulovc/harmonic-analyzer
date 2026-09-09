@@ -8,6 +8,7 @@ import channel_lever_spec
 import draw_channel_lever as drawing
 import build_channel_lever as lever
 from _drawing_registry import DRAWINGS_BY_NAME
+from _hole_spec import blind_cut_dia_mm
 
 
 def test_required_drawing_paths() -> None:
@@ -33,6 +34,14 @@ def test_draw_view_math_matches_the_spec() -> None:
     assert channel_lever_spec.LEVER_SPRING_X == lever.LEVER_SPRING_X
     assert channel_lever_spec.BAR_PIN_X == lever.BAR_PIN_X
     assert channel_lever_spec.PIVOT_HOLE_DIA == lever.PIVOT_HOLE_DIA
+    assert lever.BAR_PIN_HOLE_SPEC is channel_lever_spec.BAR_PIN_HOLE_SPEC
+    assert lever.SPRING_EYE_HOLE_SPEC is channel_lever_spec.SPRING_EYE_HOLE_SPEC
+    assert drawing._BAR_PIN_DIA == blind_cut_dia_mm(
+        channel_lever_spec.BAR_PIN_HOLE_SPEC
+    )
+    assert drawing._SPRING_HOLE_DIA == blind_cut_dia_mm(
+        channel_lever_spec.SPRING_EYE_HOLE_SPEC
+    )
 
 
 def test_sheet_runs_at_1_to_1_with_1_to_4_isometric() -> None:

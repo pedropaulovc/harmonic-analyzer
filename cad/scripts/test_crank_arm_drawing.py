@@ -13,7 +13,7 @@ import crank_arm_spec
 import draw_crank_arm as drawing
 import build_crank_arm as arm
 from _drawing_registry import DRAWINGS_BY_NAME
-from _holes import NUMBER_DRILL_MM
+from _hole_spec import blind_cut_dia_mm, drill_process
 
 
 def _source() -> str:
@@ -51,7 +51,7 @@ def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
 
 def test_notes_are_specific_and_never_repeat_the_title_block() -> None:
     notes = crank_arm_spec.DRAWING_NOTES
-    assert "15/64 DRILL THRU" in notes
+    assert "HANDLE PIVOT" not in notes
     assert "HANDLE PIVOT CENTRED" not in notes
     assert "FINISHED SIZE FOR THIS PART" in notes
     assert "MHA-026" not in notes and "MHA-024" not in notes
@@ -77,14 +77,15 @@ def test_hole_callouts_state_size_and_process() -> None:
     assert callouts["ShaftBoreDia"].startswith("REAM THRU")
     assert "3/8 IN" in callouts["ShaftBoreDia"]
     assert callouts["DimpleDia"] == "FLAT-BOTTOM 0.50 DEEP"  # .XX -> block tol
-    assert crank_arm_spec.PIN_HOLE_DIA == NUMBER_DRILL_MM["#14"]
+    assert blind_cut_dia_mm(crank_arm_spec.PIN_HOLE_SPEC) == 4.623
+    assert blind_cut_dia_mm(crank_arm_spec.HANDLE_PIVOT_HOLE_SPEC) == 5.953
+    assert drill_process(crank_arm_spec.PIN_HOLE_SPEC) == "#14 DRILL"
+    assert drill_process(crank_arm_spec.HANDLE_PIVOT_HOLE_SPEC) == "15/64 DRILL"
     source = _source()
     assert source.count("add_native_hole_callout(") == 2
     assert 'label="crank-arm cross-hole"' in source
     assert 'label="handle pivot hole"' in source
-    # Harvey #13: the callout says DRILL; the drill number rides as its prefix.
-    assert 'process="#14 DRILL"' in source
-    assert 'process="15/64 DRILL"' in source
+    assert source.count("process=drill_process(") == 2
 
 
 def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:
@@ -194,11 +195,13 @@ def test_stock_anchor_clamps_eye_without_bottoming_or_drill_breakthrough() -> No
     insertion = drive.ANCHOR_HEAD_Z + screw.SHANK_LEN - drive.CRANK_ARM_Z0
     assert insertion == pytest.approx(5.33)
     assert (
-        screw.SHANK_DIA < insertion <= arm.ANCHOR_HOLE_SPEC.overrides_mm["ThreadDepth"]
+        screw.SHANK_DIA
+        < insertion
+        <= crank_arm_spec.ANCHOR_HOLE_SPEC.overrides_mm["ThreadDepth"]
     )
-    assert arm.ANCHOR_HOLE_SPEC.kind == "tapped_bottoming"
-    assert arm.ANCHOR_HOLE_SPEC.size == screw.THREAD
-    assert arm.ANCHOR_HOLE_SPEC.depth_mm - insertion == pytest.approx(1.17)
+    assert crank_arm_spec.ANCHOR_HOLE_SPEC.kind == "tapped_bottoming"
+    assert crank_arm_spec.ANCHOR_HOLE_SPEC.size == screw.THREAD
+    assert crank_arm_spec.ANCHOR_HOLE_SPEC.depth_mm - insertion == pytest.approx(1.17)
     assert drive.ANCHOR_BACK_WALL == pytest.approx(0.8207, abs=0.0001)
     assert drive.ANCHOR_BACK_WALL >= 0.5
 

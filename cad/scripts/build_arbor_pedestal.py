@@ -71,13 +71,13 @@ from arbor_pedestal_spec import (
     FOOT_DEPTH,
     FOOT_HEIGHT,
     FOOT_WIDTH,
-    SCREW_CLEARANCE_DIA,
-    SCREW_THREAD,
+    SCREW_HOLE_DIA,
+    SCREW_HOLE_SPEC,
     STRAP_T,
     SURFACE_FINISHES,
     TOP_RADIUS,
 )
-from _holes import DIAMETER_TOLERANCE_MM, HoleSpec, wizard_holes
+from _holes import DIAMETER_TOLERANCE_MM, wizard_holes
 
 PART_NAME = "arbor-pedestal"
 MATERIAL = "Gray Cast Iron"  # black japanned casting (t00393)
@@ -91,8 +91,6 @@ MATERIAL = "Gray Cast Iron"  # black japanned casting (t00393)
 # #4 normal-clearance pass-through for the exact Ø2.8448 x 9.525 stock
 # foot screw. Its 4.525-mm pedestal engagement enters the base past this
 # 5.0-mm flange.
-SCREW_HOLE_SPEC = HoleSpec("clearance", SCREW_THREAD)
-SCREW_HOLE_DIA = SCREW_CLEARANCE_DIA  # 3.264, resolver-pinned normal fit
 SCREW_Z = -5.0  # hole centre on the exposed flange, local z (machine -95.5)
 
 BORE_RADIUS = BORE_DIA / 2.0
@@ -276,17 +274,14 @@ async def build(adapter) -> dict[str, str]:
     )
     # Same constant wizard_holes corrects against, so this can never demand a
     # precision the wizard declines to deliver (the dead band -- see _holes).
-    if abs(screw_cut.hole_dia_mm - SCREW_CLEARANCE_DIA) > DIAMETER_TOLERANCE_MM:
+    if abs(screw_cut.hole_dia_mm - SCREW_HOLE_DIA) > DIAMETER_TOLERANCE_MM:
         raise RuntimeError(
-            f"flange hold-down hole cut Ø{screw_cut.hole_dia_mm:.4f} != spec "
-            f"SCREW_CLEARANCE_DIA Ø{SCREW_CLEARANCE_DIA} -- wizard_holes should "
-            f"have forced it to within {DIAMETER_TOLERANCE_MM} mm, so either the "
-            "spec pin no longer matches _holes.CLEARANCE_MM or the override "
-            "write was rejected; dump the table with "
-            "diagnostics/diag_hole_wizard_tables.py before touching the pin"
+            f"flange hold-down hole cut Ø{screw_cut.hole_dia_mm:.4f} != "
+            f"part-owned spec Ø{SCREW_HOLE_DIA}; wizard_holes should have forced "
+            f"it to within {DIAMETER_TOLERANCE_MM} mm"
         )
     drive_jobs += screw_cut.placement_drive_jobs
-    v_hole = math.pi * (SCREW_CLEARANCE_DIA / 2.0) ** 2 * FOOT_HEIGHT
+    v_hole = math.pi * (SCREW_HOLE_DIA / 2.0) ** 2 * FOOT_HEIGHT
     volume = await volume_check(adapter, "screw hole", volume - v_hole, 0.02 * v_hole)
     v_final = volume
 

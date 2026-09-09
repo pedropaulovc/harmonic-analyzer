@@ -11,6 +11,7 @@ import build_cone_swing_platform as part
 import cone_swing_platform_spec
 import draw_cone_swing_platform as drawing
 from _drawing_registry import DRAWINGS_BY_NAME
+from _hole_spec import blind_cut_dia_mm
 
 
 def test_required_drawing_paths() -> None:
@@ -127,9 +128,19 @@ def test_v2_post_foot_and_mount_pattern_cascade() -> None:
     assert math.isclose(west_z - part.POST_LOCAL_Z, part.POST_MOUNT_DZ)
     assert math.isclose(east_z - part.POST_LOCAL_Z, -part.POST_MOUNT_DZ)
     assert math.isclose(math.hypot(west_x - east_x, west_z - east_z), 2.0 * half)
+    assert part.POST_MOUNT_SPEC is cone_swing_platform_spec.POST_MOUNT_SPEC
+    assert drawing.POST_MOUNT_SPEC is cone_swing_platform_spec.POST_MOUNT_SPEC
     assert part.POST_MOUNT_SPEC.kind == "tapped"
-    assert part.POST_MOUNT_SPEC.size == cone_swing_platform_spec.POST_MOUNT_THREAD
+    assert part.POST_MOUNT_SPEC.size == "1/4-20"
     assert part.POST_MOUNT_SPEC.end == "through_all"
+    assert cone_swing_platform_spec.POST_MOUNT_TAP_DIA == blind_cut_dia_mm(
+        part.POST_MOUNT_SPEC
+    )
+    assert part.PIVOT_HOLE_SPEC is cone_swing_platform_spec.PIVOT_HOLE_SPEC
+    assert drawing.PIVOT_HOLE_SPEC is cone_swing_platform_spec.PIVOT_HOLE_SPEC
+    assert cone_swing_platform_spec.PIVOT_HOLE_DIA == blind_cut_dia_mm(
+        part.PIVOT_HOLE_SPEC
+    )
 
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert 'name="PostMountHoles"' in source

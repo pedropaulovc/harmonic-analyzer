@@ -1,14 +1,14 @@
 r"""Create the curated machinist drawing for the crankshaft.
 
-The SLDPRT remains authoritative.  This recipe supplies only the crankshaft
-views, dimension layout, the #9 cross-hole callout, and manufacturing notes;
-every shared sheet/template, import, curation, and export behavior lives in
+The SLDPRT remains authoritative. This recipe supplies the crankshaft views,
+dimension layout, cross-hole callout, and manufacturing notes; every shared
+sheet/template, import, curation, and export behavior lives in
 ``_drawing_common``.
 
 The model's shaft axis runs along +Y (outboard/crank end at the origin), so
 the standard side views show the shaft VERTICAL: the crank-end face is the
 ``*Bottom`` orientation and the length view is ``*Right`` (outboard end at the
-view bottom, the #9 cross-hole facing the viewer as a circle at station 4).
+view bottom, the cross-hole facing the viewer as a circle at station 4).
 
 Run with SolidWorks open::
 
@@ -45,13 +45,14 @@ from _drawing_common import (
     stamp_drawing_summary,
     add_view_centerline,
 )
+from _hole_spec import blind_cut_dia_mm
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from crankshaft_spec import (
     JOURNAL_DIA,
     JOURNAL_LENGTH,
     JOURNAL_START,
-    PIN_HOLE_DIA,
+    PIN_HOLE_SPEC,
     PIN_HOLE_HEIGHT,
     SHAFT_DIA,
     SHAFT_LENGTH,
@@ -75,6 +76,7 @@ OUTPUTS = DrawingOutputs(
 SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
+_PIN_HOLE_DIA = blind_cut_dia_mm(PIN_HOLE_SPEC)
 
 SHEET_SCALE = (1.0, 1.0)
 END_VIEW_SCALE = 2.0
@@ -91,8 +93,8 @@ DATUM_A_RIGHT = (
 
 # Derived sheet anchors (meters).
 _SIDE_BOTTOM = RIGHT_CENTER[1] - SHAFT_LENGTH / 2000.0  # outboard end edge
-# The #9 cross-hole faces the viewer in the side view: its centre sits at
-# station PIN_HOLE_HEIGHT above the outboard (bottom) end.
+# The cross-hole faces the viewer in the side view; its centre sits at station
+# PIN_HOLE_HEIGHT above the outboard (bottom) end.
 _PIN_CENTER = (
     RIGHT_CENTER[0],
     _SIDE_BOTTOM + PIN_HOLE_HEIGHT / 1000.0,
@@ -190,8 +192,8 @@ def _visible_journal_silhouette(adapter: Any, view: Any) -> Any:
 
 
 def _visible_cross_hole_edge(adapter: Any, view: Any) -> Any:
-    """Return a visible rim edge adjacent to the modeled #9 cylindrical face."""
-    expected_radius_m = PIN_HOLE_DIA / 2000.0
+    """Return a visible rim edge adjacent to the modeled pin-hole cylinder."""
+    expected_radius_m = _PIN_HOLE_DIA / 2000.0
     candidates: list[Any] = []
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
     for component in components:
@@ -221,8 +223,8 @@ def _visible_cross_hole_edge(adapter: Any, view: Any) -> Any:
                 break
     if not candidates:
         raise RuntimeError(
-            f"crankshaft side view has no visible edge adjacent to the "
-            f"#9 cylindrical face at radius {expected_radius_m:g} m"
+            "crankshaft side view has no visible edge adjacent to the pin-hole "
+            f"cylindrical face at radius {expected_radius_m:g} m"
         )
     return candidates[0]
 
@@ -326,7 +328,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # SolidWorks classifies a solid circular end silhouette under the same
     # AutoInsertCenterMarks2 "hole" bit as a bored circle; the end view gets the
-    # ASME centre mark, the side view marks the #9 cross-hole circle.
+    # ASME centre mark, the side view marks the cross-hole circle.
     for view, label in ((front, "end"), (right, "side")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME center marks to {label} view")
@@ -383,7 +385,7 @@ async def build(adapter: Any) -> dict[str, str]:
         entity=far_end_edge,
     )
 
-    # The #9 tapered-pin cross-hole: the associative wizard callout carries the
+    # The tapered-pin cross-hole's associative wizard callout carries the
     # Ø/THRU specification. The axial station is the imported model-owned
     # PinHeight dimension above and takes the title-block linear tolerance.
     cross_hole_edge = _visible_cross_hole_edge(adapter, right)
@@ -391,7 +393,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         right,
         p0=(RIGHT_CENTER[0] - SHAFT_DIA / 2000.0, _SIDE_BOTTOM),
-        p1=(RIGHT_CENTER[0], _PIN_CENTER[1] + PIN_HOLE_DIA / 2000.0),
+        p1=(RIGHT_CENTER[0], _PIN_CENTER[1] + _PIN_HOLE_DIA / 2000.0),
         text_xy=(0.125, 0.090),
         label="cross-hole station",
         orientation="vertical",

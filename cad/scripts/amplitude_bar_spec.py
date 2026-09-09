@@ -11,6 +11,8 @@ square section, and carries the two small end notches in the notes.
 """
 
 from __future__ import annotations
+from _hole_spec import HoleSpec, drill_process
+
 
 MM_PER_IN = 25.4
 
@@ -26,6 +28,7 @@ BOTTOM_NOTCH_HEIGHT = 0.09375 * MM_PER_IN  # 2.381
 TOP_NOTCH_WIDTH = 0.125 * MM_PER_IN  # 3.175
 TOP_NOTCH_HEIGHT = 0.5 * MM_PER_IN  # 12.7
 TOP_PIN_DROP = 0.25 * MM_PER_IN  # 6.35 hole centre below the bar top
+TOP_PIN_HOLE_SPEC = HoleSpec("drilled_number", "#47")
 
 # --- Derived. ---
 TOP_PIN_Y = BAR_LENGTH - TOP_PIN_DROP  # 801.95
@@ -52,7 +55,7 @@ DRAWING_NOTES = "\n".join(
         "   OPPOSITE ENDS, CENTRED ON THE WIDTH",
         "   WITHIN 0.10, IN ONE COMMON PLANE;",
         "   ROOTS R0.40 MAX.",
-        "3. TOP PIN HOLE #47 DRILL THRU BOTH",
+        f"3. TOP PIN HOLE {drill_process(TOP_PIN_HOLE_SPEC)} THRU BOTH",
         "   TOP-NOTCH CHEEKS AT MID-DEPTH,",
         "   6.35 BELOW THE BAR TOP.",
         "4. BOTTOM NOTCH FLOOR: Ra 0.8.",

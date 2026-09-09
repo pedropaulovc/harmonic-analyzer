@@ -9,6 +9,7 @@ import summing_lever_spec
 import draw_summing_lever as drawing
 import build_summing_lever as lever
 from _drawing_registry import DRAWINGS_BY_NAME
+from _hole_spec import blind_cut_dia_mm
 
 
 def test_required_drawing_paths() -> None:
@@ -40,6 +41,8 @@ def test_draw_view_math_matches_the_spec() -> None:
     assert summing_lever_spec.HOLE_X == lever.HOLE_X
     assert summing_lever_spec.HOLE_COUNT == lever.HOLE_COUNT
     assert summing_lever_spec.CHANNEL_PITCH == lever.CHANNEL_PITCH
+    assert lever.HOLE_SPEC is summing_lever_spec.HOLE_SPEC
+    assert drawing.HOLE_DIA == blind_cut_dia_mm(summing_lever_spec.HOLE_SPEC)
 
 
 def test_sheet_runs_at_1_to_2_with_1_to_4_isometric() -> None:

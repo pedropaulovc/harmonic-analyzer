@@ -8,6 +8,8 @@ test cross-checks the load-bearing ones).
 """
 
 from __future__ import annotations
+from _hole_spec import HoleSpec
+
 
 # --- Nominal geometry (DIMENSIONS.md "Chapter 17"). ---
 LEVER_SPRING_X = 177.8  # fulcrum -> spring-hole c2c, 7"
@@ -15,6 +17,8 @@ BAR_TALL = 9.5  # bar height
 LEVER_THICKNESS = 3.0
 PIVOT_HOLE_DIA = 6.5  # fulcrum bore riding the 6.35 fulcrum shaft
 BAR_PIN_X = 127.0  # fulcrum -> bar-pin c2c, 5"
+BAR_PIN_HOLE_SPEC = HoleSpec("drilled_number", "#47")
+SPRING_EYE_HOLE_SPEC = HoleSpec("drilled_number", "#21")
 TAB_START_X = 169.0  # bar steps down to the end tab
 TAB_HALF = 3.0  # tab 6.0 tall
 TIP_RADIUS = 3.0  # rounded tab tip

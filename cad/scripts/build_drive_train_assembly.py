@@ -475,7 +475,15 @@ CRANK_ARM_Z0 = CRANKSHAFT_Z0  # arm PLATE south face: the hub band is
 # the chain when the crank turns (user, book p005). The placed pose composes a
 # Ry(180) (the plate's local +z extrusion runs machine -z), so the component
 # ORIGIN sits at the north face -- see CRANK_ARM_ORIGIN_Z.
-from crank_arm_spec import ARM_C2C, ARM_WIDTH  # noqa: E402
+from crank_arm_spec import (  # noqa: E402
+    ANCHOR_HOLE_SPEC,
+    ANCHOR_SCREW_X,
+    ANCHOR_SCREW_Y,
+    ANCHOR_THREAD_DEPTH,
+    ARM_C2C,
+    ARM_THICKNESS,
+    ARM_WIDTH,
+)
 from crankshaft_spec import PIN_HOLE_HEIGHT  # noqa: E402  # 75: handle pivot from the
 
 # shaft axis (2026-09 front-view re-derive, see crank_arm_spec; was 66 from the
@@ -547,8 +555,7 @@ if PINION_TOOTH_Z + PINION_FACE / 2.0 > CRANKSHAFT_Z0 + CRANKSHAFT_LENGTH:
 # The crankshaft's named seat datums (the flip-free coincident seats for the
 # keyed chain -- see _seat_on_crank) must sit exactly at this module's
 # authored stations.
-from build_crank_arm import ANCHOR_HOLE_SPEC, ARM_THICKNESS  # noqa: E402
-from _holes import DRILL_POINT_H, blind_cut_dia_mm  # noqa: E402
+from _hole_spec import DRILL_POINT_H, blind_cut_dia_mm  # noqa: E402
 from build_crankshaft import (  # noqa: E402
     SEAT_ARM as CS_SEAT_ARM,
     SEAT_PINION as CS_SEAT_PINION,
@@ -571,7 +578,6 @@ from build_crank_pin_eye import (  # noqa: E402
     TAIL_LEN as EYE_TAIL_LEN,
     WIRE_DIA as EYE_WIRE_DIA,
 )
-from crank_arm_spec import ANCHOR_SCREW_X, ANCHOR_SCREW_Y, ANCHOR_THREAD_DEPTH  # noqa: E402
 from build_fillister_screw import (  # noqa: E402
     SHANK_DIA as ANCHOR_SCREW_SHANK_DIA,
     SHANK_LEN as ANCHOR_SCREW_SHANK_LEN,
@@ -669,12 +675,12 @@ from build_cone_swing_platform import (  # noqa: E402
     PIVOT_BEARING_RELIEF_DIAMETER as PLAT_PIVOT_RELIEF_DIA,
     PIVOT_BEARING_THICKNESS as PLAT_PIVOT_BEARING_T,
     PIVOT_HEAD_RADIAL_CLEARANCE as PLAT_PIVOT_HEAD_RADIAL_CLEARANCE,
-    PIVOT_HOLE_DIA as PLAT_PIVOT_HOLE_DIA,
     SLOT_E_X as PLAT_SLOT_E_X,
     SLOT_E_Z as PLAT_SLOT_E_Z,
     SLOT_W as PLAT_SLOT_W,
     WEST_HALF_S as PLAT_WEST_S,
 )
+from cone_swing_platform_spec import PIVOT_HOLE_DIA as PLAT_PIVOT_HOLE_DIA  # noqa: E402
 from build_cone_lock_knob import (  # noqa: E402
     HEAD_DIA as KNOB_HEAD_DIA,
     WASHER_DIA as KNOB_WASHER_DIA,  # noqa: F401 - verify footprint contract
@@ -723,10 +729,10 @@ from build_arbor_pedestal import (  # noqa: E402
     FOOT_DEPTH as ARBOR_PED_DEPTH,
     FOOT_HEIGHT as ARBOR_PED_FLANGE_T,
     FOOT_WIDTH as ARBOR_PED_WIDTH,
-    SCREW_HOLE_SPEC as ARBOR_PED_HOLE_SPEC,
     SCREW_Z as ARBOR_PED_SCREW_Z,
     STRAP_T as ARBOR_PED_STRAP_T,
 )
+from arbor_pedestal_spec import SCREW_HOLE_SPEC as ARBOR_PED_HOLE_SPEC  # noqa: E402
 
 # --- ch25 pinion swing rig part constants (PR7: imported, not hardcoded) ----
 from build_alignment_pinion import (  # noqa: E402
@@ -758,8 +764,8 @@ from build_pinion_pivot_block import (  # noqa: E402
     BORE_UP as BLOCK_BORE_UP,
     LIFT_BORE_RISE,
     SCREW_HALF_SPACING as BLOCK_SCREW_HALF,
-    SCREW_HOLE_SPEC as BLOCK_SCREW_HOLE_SPEC,
 )
+from pinion_pivot_block_spec import SCREW_HOLE_SPEC as BLOCK_SCREW_HOLE_SPEC  # noqa: E402
 from pinion_cam_geometry import (  # noqa: E402
     BORE as CAM_BORE_DIA,
     BOSS_DIA as CAM_BOSS_DIA,
@@ -824,15 +830,15 @@ from build_cone_pivot_post import (  # noqa: E402
     CRANK_BOSS_LENGTH as POST_CRANK_BOSS_LENGTH,
     CRANK_BOSS_START_Z as POST_CRANK_BOSS_START_Z,
 )
-from build_cone_tip_block import (  # noqa: E402
-    ADJUSTER_BORE_DEPTH as TIP_ADJ_BORE_DEPTH,
+from cone_tip_block_spec import (  # noqa: E402
     ADJUSTER_BORE_SPEC as TIP_ADJ_BORE_SPEC,
     ADJUSTER_AXIS_HEIGHT as TIP_ADJUSTER_AXIS_HEIGHT,
+    ADJUSTER_DEPTH as TIP_ADJ_BORE_DEPTH,
     BLOCK_X as TIP_BLOCK_X,
     BLOCK_Z as TIP_BLOCK_Z,
     PINCH_BORE_SPEC as TIP_PINCH_BORE_SPEC,
-    PINCH_BORE_Y as TIP_PINCH_Y,
     PINCH_CLEARANCE_SPEC as TIP_PINCH_CLEARANCE_SPEC,
+    PINCH_HEIGHT as TIP_PINCH_Y,
     SHAFT_PASSAGE_DIA as TIP_SHAFT_PASSAGE_DIA,
     SLIT_W as TIP_SLIT_W,
 )

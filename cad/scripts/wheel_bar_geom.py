@@ -9,6 +9,8 @@ it imports geometry from, so the drawing contract must NOT live here.
 """
 
 from __future__ import annotations
+from _hole_spec import HoleSpec, blind_cut_dia_mm
+
 
 # --- bar section + length (DIMENSIONS.md ch21; M6.8 ch30 8-view pass) ----------
 BAR_SIDE = 10.0  # tall (Y)
@@ -27,15 +29,11 @@ HANGER_STRAP_TOP_LEFT_X = -16.0
 HANGER_SCREW_MACHINE_X = WHEEL_BAR_X0 + SCREW_HOLE_X
 HANGER_SCREW_LOCAL_X = HANGER_SCREW_MACHINE_X - HANGER_ORIGIN_X
 
-# Native Hole Wizard clearance contracts.  Keep the exact cut diameters beside
-# the stations so the part and its note-based drawing cannot disagree about
-# which clearance fit a machinist must drill.
-PEN_HANGER_HOLE_SIZE = "#8"
-PEN_HANGER_HOLE_FIT = "close"
-PEN_HANGER_HOLE_DIA = 4.572
-CLAMP_HOLE_SIZE = "#8"
-CLAMP_HOLE_FIT = "normal"
-CLAMP_HOLE_DIA = 4.978
+# Native Hole Wizard clearance contracts shared by build, drawing, and assemblies.
+PEN_HANGER_HOLE_SPEC = HoleSpec("clearance", "#8", fit="close")
+PEN_HANGER_HOLE_DIA = blind_cut_dia_mm(PEN_HANGER_HOLE_SPEC)
+CLAMP_HOLE_SPEC = HoleSpec("clearance", "#8")
+CLAMP_HOLE_DIA = blind_cut_dia_mm(CLAMP_HOLE_SPEC)
 
 # Finished material remaining between the clearance bore and the free end.
 # This is a manufacturing ligament requirement, not a screw tear-out rating.

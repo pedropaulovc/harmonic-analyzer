@@ -23,10 +23,10 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _holes import HoleSpec
 from column_clamp_front_spec import (
     ARC_DEPTH,
     DRAWING_DIMENSIONS,
+    EAR_HOLE_SPEC,
     DRAWING_NOTES,
     ISOMETRIC_VIEW_NOTE,
 )
@@ -36,12 +36,15 @@ PART_NAME = "column-clamp-front"
 DEPTH = ARC_DEPTH  # bar back face to the column-axis plane
 # The O3.9 clamp-screw shanks PASS THROUGH here (front arc = bar side):
 # #8 clearance (normal fit Ø4.978; nearest UNC to the ~Ø4 screw).
-HOLE_SPEC = HoleSpec("clearance", "#8")
 
 
 async def build(adapter) -> dict[str, str]:
     await build_arc(
-        adapter, part_name=PART_NAME, depth=DEPTH, front=True, hole_spec=HOLE_SPEC
+        adapter,
+        part_name=PART_NAME,
+        depth=DEPTH,
+        front=True,
+        hole_spec=EAR_HOLE_SPEC,
     )
     # Manufacturing drawing support, applied AFTER the shared builder's gated
     # save (the marks live only in this front arc, so the shared _clamp_arc

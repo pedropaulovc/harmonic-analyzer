@@ -10,6 +10,7 @@ import arbor_pedestal_spec
 import build_arbor_pedestal as part
 import draw_arbor_pedestal as drawing
 from _drawing_registry import DRAWINGS_BY_NAME
+from _hole_spec import blind_cut_dia_mm
 
 
 def test_required_drawing_paths() -> None:
@@ -51,27 +52,14 @@ def test_arbor_bore_closes_the_configured_running_fit() -> None:
     assert tuple(round(value, 3) for value in clearances) == expected
 
 
-def test_screw_clearance_tracks_the_hole_resolver() -> None:
-    """The hand-pinned diameter must equal what the hole resolver would give.
-
-    ``arbor_pedestal_spec`` keeps ``SCREW_CLEARANCE_DIA`` as a LITERAL on
-    purpose -- it is a pure-data module, and importing ``_holes`` would pull
-    ``_common``/``_telemetry`` into its dependency closure and re-key both the
-    part and the drawing. The cost of that choice is a duplicated constant, and
-    this duplicate has now drifted twice (3.2512 <-> 3.264), each time only
-    surfacing when a real rebuild replaced a remote-cache restore.
-
-    A test can import both without touching the part's closure, so the drift is
-    pinned here instead: the literal, ``_holes.CLEARANCE_MM``, and the seat's
-    own wizard table (``#4`` normal = 0.1285 in) must all agree.
-    """
-    import _holes
-
-    assert arbor_pedestal_spec.SCREW_CLEARANCE_DIA == _holes.CLEARANCE_MM[("#4", "normal")]
-    # 0.1285 in is the seat's Screw Clearances row, read via
-    # diagnostics/diag_hole_wizard_tables.py -- the authority the build asserts
-    # against. Rounded to the resolver's 3 dp.
-    assert round(0.1285 * 25.4, 3) == arbor_pedestal_spec.SCREW_CLEARANCE_DIA
+def test_screw_hole_contract_is_part_owned() -> None:
+    spec = arbor_pedestal_spec.SCREW_HOLE_SPEC
+    assert part.SCREW_HOLE_SPEC is spec
+    assert spec.kind == "clearance"
+    assert spec.size == "#4"
+    assert spec.fit == "normal"
+    assert arbor_pedestal_spec.SCREW_HOLE_DIA == blind_cut_dia_mm(spec)
+    assert part.SCREW_HOLE_DIA == blind_cut_dia_mm(spec)
 
 
 def test_no_dead_band_between_wizard_correction_and_the_builder_assert() -> None:

@@ -38,7 +38,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from build_pinion_spring import (
+from pinion_spring_geometry import (
     BEND_EXIT,
     FLAT_TIP,
     FOOT_END,

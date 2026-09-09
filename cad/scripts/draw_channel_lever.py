@@ -23,6 +23,7 @@ from typing import Any
 from channel_lever_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
+from _hole_spec import blind_cut_dia_mm
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
@@ -42,11 +43,13 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from channel_lever_spec import (
+    BAR_PIN_HOLE_SPEC,
     BAR_PIN_X,
     BAR_TALL,
     LEVER_SPRING_X,
     LEVER_THICKNESS,
     PIVOT_HOLE_DIA,
+    SPRING_EYE_HOLE_SPEC,
     TIP_END_X,
 )
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
@@ -75,8 +78,8 @@ SHEET_SCALE = (1.0, 1.0)  # 1:1
 
 _NOSE_R = BAR_TALL / 2.0  # 4.75
 _BBOX_CX = (-_NOSE_R + TIP_END_X) / 2.0  # front-view X centre
-_SPRING_HOLE_DIA = 4.039  # #21 drill
-_BAR_PIN_DIA = 1.994  # #47 drill
+_SPRING_HOLE_DIA = blind_cut_dia_mm(SPRING_EYE_HOLE_SPEC)
+_BAR_PIN_DIA = blind_cut_dia_mm(BAR_PIN_HOLE_SPEC)
 
 FRONT_CENTER = (0.150, 0.155)
 RIGHT_CENTER = (0.295, 0.155)

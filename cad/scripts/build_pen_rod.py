@@ -47,7 +47,8 @@ from _drawing_marks import (
 from _fit_limits import deviations
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
-from _holes import NUMBER_DRILL_MM, HoleSpec, wizard_holes
+from _hole_spec import blind_cut_dia_mm
+from _holes import wizard_holes
 from pen_rod_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
@@ -58,6 +59,7 @@ from pen_rod_spec import (
     SECTION_BAND,
     SURFACE_FINISHES,
     TOP_VIEW_NOTE,
+    WIRE_HOLE_SPEC,
     WIRE_HOLE_Y,
 )
 
@@ -77,9 +79,8 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "RodSection", f"{ROD_SECTION}mm")
     await set_global(adapter, "RodLength", f"{ROD_LENGTH}mm")
     await set_global(adapter, "WireHoleY", f"{WIRE_HOLE_Y}mm")
-    # (The old WireHoleDia/WireHoleY knobs are gone: the wire hole is now a native
-    # Hole Wizard feature whose diameter comes from the #47 drill standard, not an
-    # equation-driven sketch dim.)
+    # (The old WireHoleDia knob is gone: the wire hole is now a native Hole
+    # Wizard feature whose standard diameter is part-owned.)
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -120,23 +121,21 @@ async def build(adapter) -> dict[str, str]:
     v_rod = ROD_SECTION * ROD_SECTION * ROD_LENGTH
     await volume_check(adapter, "rod", v_rod, 0.005 * v_rod)
 
-    # Wire tie-off hole near the top: was a plain Ø2.0 cut, now a native Hole
-    # Wizard #47 number drill (Ø1.994) so the model carries the real drill
-    # (memory/fastener-policy-us-customary). Drilled +Z through the 5 mm square
-    # section (Z 0..ROD_SECTION) at (0, WIRE_HOLE_Y); through-all is geometrically
+    # Wire tie-off hole near the top, drilled +Z through the 5 mm square section
+    # (Z 0..ROD_SECTION) at (0, WIRE_HOLE_Y). Through-all is geometrically
     # identical to the old mid-plane both-directions cut.
     wire_cut = wizard_holes(
         adapter,
-        HoleSpec("drilled_number", "#47"),
+        WIRE_HOLE_SPEC,
         [[0.0, WIRE_HOLE_Y, ROD_SECTION]],
         (0.0, 0.0, 1.0),
-        "wire tie-off hole (#47)",
+        "wire tie-off hole",
         name="WireHole",
         placement_dims=[((None, None), ("WireZ", '"WireHoleY"'))],
+        expect_dia_mm=blind_cut_dia_mm(WIRE_HOLE_SPEC),
     )
     drive_jobs += wire_cut.placement_drive_jobs
-    wire_dia = NUMBER_DRILL_MM["#47"]
-    v_wire = math.pi * (wire_dia / 2.0) ** 2 * ROD_SECTION
+    v_wire = math.pi * (wire_cut.hole_dia_mm / 2.0) ** 2 * ROD_SECTION
     v_final = v_rod - v_wire
     await volume_check(adapter, "wire hole", v_final, 0.005 * v_rod)
 
