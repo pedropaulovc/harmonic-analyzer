@@ -4,10 +4,10 @@ Black tapered bearing post that clamps the south end of the stationary
 cylinder arbor. The gears spin freely on the arbor (dimensions.yaml
 ch. 13 "M6.2 keyway refutation"), so the post only holds the arbor
 still. Still `t00393` / keyframe `v4_pinion_008` (engineerguy video 4)
-show its true shape -- NOT the old plain green block: a black japanned
-casting, a low rectangular foot flange carrying a thin strap that
-tapers up to a semicircular dome around the arbor clamp bore
-(base:top width ~1.2 in the frame, scaled off the 120T gear OD 62.2).
+show its true shape -- NOT the old plain green block: a black-finished
+ferrous pedestal, likely steel plate but equally machinable from gray iron,
+with a low rectangular foot flange carrying a thin strap that tapers up to a
+semicircular dome around the arbor clamp bore
 
 Layout: foot flange standing on the Top plane, centred at the origin
 in plan (X width x Z depth); tapered strap up +Y, FLUSH with the
@@ -67,7 +67,6 @@ from arbor_pedestal_spec import (
     BORE_DIA_BAND,
     BORE_HEIGHT,
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
     FOOT_DEPTH,
     FOOT_HEIGHT,
     FOOT_WIDTH,
@@ -80,7 +79,7 @@ from arbor_pedestal_spec import (
 from _holes import DIAMETER_TOLERANCE_MM, wizard_holes
 
 PART_NAME = "arbor-pedestal"
-MATERIAL = "Gray Cast Iron"  # black japanned casting (t00393)
+MATERIAL = "Plain Carbon Steel"  # photo-likely steel; gray iron remains permitted
 
 # Geometry comes from arbor_pedestal_spec — the drawing's single source of the
 # marked dimensions — so a spec correction rebuilds the SLDPRT from the same
@@ -123,9 +122,15 @@ async def build(adapter) -> dict[str, str]:
     foot = SketchDims()
     check("create_sketch foot", await adapter.create_sketch("Top"))
     await define_centered_rectangle(
-        adapter, FOOT_WIDTH / 2.0, FOOT_DEPTH / 2.0, "foot", dims=foot,
-        name_width="Width", drive_width='"FootWidth"',
-        name_depth="Depth", drive_depth='"FootDepth"',
+        adapter,
+        FOOT_WIDTH / 2.0,
+        FOOT_DEPTH / 2.0,
+        "foot",
+        dims=foot,
+        name_width="Width",
+        drive_width='"FootWidth"',
+        name_depth="Depth",
+        drive_depth='"FootDepth"',
     )
     await ensure_fully_defined(adapter, "foot sketch")
     check("exit_sketch foot", await adapter.exit_sketch())
@@ -142,24 +147,25 @@ async def build(adapter) -> dict[str, str]:
     v_foot = FOOT_WIDTH * FOOT_DEPTH * FOOT_HEIGHT
     volume = await volume_check(adapter, "foot", v_foot, 0.005 * v_foot)
 
-    # Tapered strap: an isosceles trapezoid on the Front plane, root buried in
-    # the foot (bottom edge on the Top plane, y 0), flanks narrowing FootWidth
-    # -> 2 x TopRadius at the bore height, mid-plane extruded StrapThickness.
-    # Fully defined by: both horizontals, both width dims, the root corner
-    # anchored to the origin (on-axis y 0 -> one h-dist dim), the rise dim and
-    # the top corner's h-dist -- 8 coordinate constraints for 4 free vertices,
-    # no redundancy (the flanks' endpoints merged at creation carry none).
-    half_root = FOOT_WIDTH / 2.0
+    # Tapered strap: an isosceles trapezoid on the Front plane, beginning on
+    # the foot's top face and narrowing to 2 x TopRadius at the bore height.
+    # Starting at the real foot/strap junction avoids a buried profile edge
+    # appearing as a false full-width seam in the manufacturing view.
+    w_at_foot_top = (
+        FOOT_WIDTH - (FOOT_WIDTH - 2.0 * TOP_RADIUS) * FOOT_HEIGHT / BORE_HEIGHT
+    )
+    half_root = w_at_foot_top / 2.0
+    strap_rise = BORE_HEIGHT - FOOT_HEIGHT
     strap = SketchDims()
     check("create_sketch strap", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     bottom = check(
         "strap bottom",
-        await adapter.add_line(-half_root, 0.0, half_root, 0.0),
+        await adapter.add_line(-half_root, FOOT_HEIGHT, half_root, FOOT_HEIGHT),
     )
     check(
         "strap flank right",
-        await adapter.add_line(half_root, 0.0, TOP_RADIUS, BORE_HEIGHT),
+        await adapter.add_line(half_root, FOOT_HEIGHT, TOP_RADIUS, BORE_HEIGHT),
     )
     top = check(
         "strap top",
@@ -167,20 +173,31 @@ async def build(adapter) -> dict[str, str]:
     )
     check(
         "strap flank left",
-        await adapter.add_line(-TOP_RADIUS, BORE_HEIGHT, -half_root, 0.0),
+        await adapter.add_line(-TOP_RADIUS, BORE_HEIGHT, -half_root, FOOT_HEIGHT),
     )
     set_sketch_direct_db(adapter, False)
     for ent in (bottom, top):
-        check("strap horizontal", await adapter.add_sketch_constraint(ent, None, "horizontal"))
+        check(
+            "strap horizontal",
+            await adapter.add_sketch_constraint(ent, None, "horizontal"),
+        )
     check(
         "dimension strap root width",
-        await adapter.add_sketch_dimension(bottom, None, "linear", FOOT_WIDTH),
+        await adapter.add_sketch_dimension(bottom, None, "linear", w_at_foot_top),
     )
-    strap.record("StrapRootWidth", '"FootWidth"')
+    strap.record(
+        "StrapRootWidth",
+        '"FootWidth" - ("FootWidth" - "TopRadius" * 2) * "FootHeight" / "BoreHeight"',
+    )
     await anchor_point_to_origin(
-        adapter, f"{bottom}.start", -half_root, 0.0, "strap root corner"
+        adapter, f"{bottom}.start", -half_root, FOOT_HEIGHT, "strap root corner"
     )
-    strap.record("RootCornerX", '"FootWidth" / 2')
+    strap.record(
+        "RootCornerX",
+        '("FootWidth" - ("FootWidth" - "TopRadius" * 2) * '
+        '"FootHeight" / "BoreHeight") / 2',
+    )
+    strap.record("RootCornerY", '"FootHeight"')
     check(
         "dimension strap top width",
         await adapter.add_sketch_dimension(top, None, "linear", 2.0 * TOP_RADIUS),
@@ -189,10 +206,10 @@ async def build(adapter) -> dict[str, str]:
     check(
         "dimension strap rise",
         await adapter.add_sketch_dimension(
-            f"{top}.start", f"{bottom}.end", "vertical_distance", BORE_HEIGHT
+            f"{top}.start", f"{bottom}.end", "vertical_distance", strap_rise
         ),
     )
-    strap.record("StrapRise", '"BoreHeight"')
+    strap.record("StrapRise", '"BoreHeight" - "FootHeight"')
     check(
         "dimension top corner x",
         await adapter.add_sketch_dimension(
@@ -208,10 +225,8 @@ async def build(adapter) -> dict[str, str]:
     # the extrude starts at an offset instead of straddling the mid-plane.
     extrude_at_offset(adapter, STRAP_T, FOOT_DEPTH / 2.0 - STRAP_T)
     name_last_feature(adapter, "Strap")
-    a_trap = (FOOT_WIDTH + 2.0 * TOP_RADIUS) / 2.0 * BORE_HEIGHT
-    w_at_foot_top = FOOT_WIDTH - (FOOT_WIDTH - 2.0 * TOP_RADIUS) * FOOT_HEIGHT / BORE_HEIGHT
-    a_overlap = (FOOT_WIDTH + w_at_foot_top) / 2.0 * FOOT_HEIGHT
-    v_strap = (a_trap - a_overlap) * STRAP_T
+    a_strap = (w_at_foot_top + 2.0 * TOP_RADIUS) / 2.0 * strap_rise
+    v_strap = a_strap * STRAP_T
     volume = await volume_check(adapter, "strap", volume + v_strap, 0.005 * v_strap)
 
     # Dome: a full circle boss centred on the bore station; its upper half
@@ -222,7 +237,12 @@ async def build(adapter) -> dict[str, str]:
     dome = SketchDims()
     check("create_sketch dome", await adapter.create_sketch("Front"))
     await define_circle(
-        adapter, 0.0, BORE_HEIGHT, TOP_RADIUS, "dome", dims=dome,
+        adapter,
+        0.0,
+        BORE_HEIGHT,
+        TOP_RADIUS,
+        "dome",
+        dims=dome,
         names=("DomeX", "DomeCy", "DomeDia"),
         drives=(None, '"BoreHeight"', '"TopRadius" * 2'),
     )
@@ -241,7 +261,12 @@ async def build(adapter) -> dict[str, str]:
     bore = SketchDims()
     check("create_sketch bore", await adapter.create_sketch("Front"))
     await define_circle(
-        adapter, 0.0, BORE_HEIGHT, BORE_RADIUS, "bore", dims=bore,
+        adapter,
+        0.0,
+        BORE_HEIGHT,
+        BORE_RADIUS,
+        "bore",
+        dims=bore,
         names=("BoreX", "BoreHeight", "BoreDia"),
         drives=(None, '"BoreHeight"', '"BoreDia"'),
     )
@@ -267,9 +292,12 @@ async def build(adapter) -> dict[str, str]:
     # bolts the casting to the base. The foot bottom is a clean rectangle (the
     # strap/dome/bore are all above it), so find_planar_face resolves cleanly.
     screw_cut = wizard_holes(
-        adapter, SCREW_HOLE_SPEC,
+        adapter,
+        SCREW_HOLE_SPEC,
         [[0.0, 0.0, SCREW_Z]],
-        (0.0, -1.0, 0.0), "flange hold-down hole (#4 clearance)", name="ScrewHole",
+        (0.0, -1.0, 0.0),
+        "flange hold-down hole (#4 clearance)",
+        name="ScrewHole",
         placement_dims=[((None, None), ("ScrewZ", '"ScrewZ"'))],
     )
     # Same constant wizard_holes corrects against, so this can never demand a
@@ -291,7 +319,9 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
-    await volume_check(adapter, "driven pedestal (equations neutral)", v_final, 0.01 * v_bore)
+    await volume_check(
+        adapter, "driven pedestal (equations neutral)", v_final, 0.01 * v_bore
+    )
     set_dimension_bilateral_tolerance(
         adapter, "BoreProfile", "BoreDia", *deviations(BORE_DIA_BAND)
     )
@@ -303,11 +333,7 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
-    apply_drawing_properties(
-        adapter,
-        PART_NAME,
-        {"Manufacturing Notes": DRAWING_NOTES},
-    )
+    apply_drawing_properties(adapter, PART_NAME)
     return await save_part_and_images(adapter, PART_NAME)
 
 

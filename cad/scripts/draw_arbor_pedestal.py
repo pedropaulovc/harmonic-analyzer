@@ -12,7 +12,6 @@ from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_native_hole_callout,
-    add_property_linked_note,
     add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
@@ -43,6 +42,7 @@ from arbor_pedestal_spec import (
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
+    dimension_name,
     place_view,
     view_name,
 )
@@ -64,13 +64,14 @@ SHEET_SCALE = (2.0, 1.0)  # 49.718 mm tall; 2:1 keeps the strap and bore legible
 _S = SHEET_SCALE[0] / 1000.0  # sheet meters per model mm
 
 # The casting spans model y 0 (foot seat) to 49.718 (dome top); centre the
-# front elevation on that midpoint. Third-angle: the 24x16 foot plan sits
-# above the elevation, with the isometric to the right.
+# front elevation on that midpoint. The plan is staggered above/right of the
+# elevation so its dimensions stay well inside the border and the three views
+# form a balanced composition rather than one crowded vertical stack.
 _PART_MID_Y = (
     BORE_HEIGHT + TOP_RADIUS
 ) / 2.0  # foot 0 .. dome top (bore + dome radius)
 FRONT_CENTER = (0.100, 0.150)
-TOP_CENTER = (0.100, 0.245)
+TOP_CENTER = (0.225, 0.215)
 ISO_CENTER = (0.335, 0.150)
 
 
@@ -84,14 +85,14 @@ def _front_y(model_y: float) -> float:
 FRONT_KEEP = {
     "Width": (FRONT_CENTER[0], _front_y(0.0) + 0.032),
     "FootHt": (FRONT_CENTER[0] - 0.030, _front_y(FOOT_HEIGHT / 2.0)),
-    "BoreDia": (FRONT_CENTER[0] + 0.068, _front_y(BORE_HEIGHT) - 0.004),
+    "BoreDia": (FRONT_CENTER[0] + 0.050, _front_y(BORE_HEIGHT) - 0.004),
     "StrapTopWidth": (
         FRONT_CENTER[0],
         _front_y(BORE_HEIGHT + TOP_RADIUS) + 0.008,
     ),
 }
 TOP_KEEP = {
-    "Depth": (TOP_CENTER[0] + 0.065, TOP_CENTER[1]),
+    "Depth": (TOP_CENTER[0] + 0.070, TOP_CENTER[1] - 0.006),
 }
 DIMENSION_CALLOUTS = {
     "BoreDia": "REAM THRU",
@@ -179,6 +180,26 @@ def _top_depth_edge(adapter: Any, view: Any, z_mm: float, *, label: str) -> Any:
     return max(candidates, key=lambda item: item[0])[1]
 
 
+def _top_width_edge(adapter: Any, view: Any, x_mm: float, *, label: str) -> Any:
+    """Return a plan-view edge at one modeled width station."""
+    candidates: list[tuple[float, Any]] = []
+    for raw_edge in visible_view_entities(view, 1, label=f"{label} plan edges"):
+        edge = _early_bound(raw_edge, "IEdge")
+        start = edge.GetStartVertex()
+        end = edge.GetEndVertex()
+        if start is None or end is None:
+            continue
+        start = _early_bound(start, "IVertex")
+        end = _early_bound(end, "IVertex")
+        p0 = tuple(float(value) * 1000.0 for value in start.GetPoint())
+        p1 = tuple(float(value) * 1000.0 for value in end.GetPoint())
+        if abs(p0[0] - x_mm) <= 0.01 and abs(p1[0] - x_mm) <= 0.01:
+            candidates.append((abs(p1[2] - p0[2]), edge))
+    if not candidates:
+        raise RuntimeError(f"plan view has no {label} edge at x={x_mm:.3f} mm")
+    return max(candidates, key=lambda item: item[0])[1]
+
+
 def _circle_entity(adapter: Any, view: Any, radius_mm: float, *, label: str) -> Any:
     candidates: list[tuple[float, Any]] = []
     for raw_edge in visible_view_entities(view, 1, label=f"{label} circles"):
@@ -223,6 +244,31 @@ def _add_radial_dimension(
         raise RuntimeError(f"failed to create {label} radial dimension")
     draw.EditRebuild3()
     return display
+
+
+@_telemetry.traced("drawing.diameter_second_arrow", label_param="label")
+def _disable_diameter_second_arrow(
+    adapter: Any,
+    annotations: list[Any],
+    *,
+    dimension: str,
+    label: str,
+) -> None:
+    """Remove a diameter dimension's optional arrow across the far side."""
+    for raw_annotation in annotations:
+        annotation = _early_bound(raw_annotation, "IAnnotation")
+        if dimension_name(adapter, annotation) != dimension:
+            continue
+        display = annotation.GetSpecificAnnotation()
+        if display is None:
+            raise RuntimeError(f"dimension {dimension!r} has no display annotation")
+        display = _early_bound(display, "IDisplayDimension")
+        display.SetSecondArrow(False, False)
+        if bool(display.GetUseDocSecondArrow()) or bool(display.GetSecondArrow()):
+            raise RuntimeError(f"failed to disable {label} far-side arrow")
+        adapter.currentModel.GraphicsRedraw2()
+        return
+    raise RuntimeError(f"dimension {dimension!r} not found for {label}")
 
 
 @_telemetry.traced("drawing.arbor.bore_hidden_lines")
@@ -305,17 +351,17 @@ async def build(adapter: Any) -> dict[str, str]:
             "Number",
             "Revision",
             "Title",
+            "Material",
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
         ),
         required=(
             "Number",
+            "Material",
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -328,7 +374,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Cylinder-Arbor Pedestal Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "arbor pedestal; gray-iron casting; arbor clamp bore",
+            3: "arbor pedestal; ferrous stock or casting; arbor clamp bore",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
@@ -352,6 +398,12 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, [*front_annotations, *top_annotations], DIMENSION_CALLOUTS
     )
     set_dimension_precision(adapter, front_annotations, DIMENSION_PRECISION)
+    _disable_diameter_second_arrow(
+        adapter,
+        front_annotations,
+        dimension="BoreDia",
+        label="arbor bore",
+    )
     for view, label in ((front, "front"), (top, "plan")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME center marks to {label} view")
@@ -425,6 +477,9 @@ async def build(adapter: Any) -> dict[str, str]:
         SCREW_HOLE_DIA / 2.0,
         label="flange hold-down hole",
     )
+    foot_left_entity = _top_width_edge(
+        adapter, top, -FOOT_WIDTH / 2.0, label="left foot side"
+    )
     strap_near_entity = _top_depth_edge(
         adapter,
         top,
@@ -440,8 +495,18 @@ async def build(adapter: Any) -> dict[str, str]:
         far_face_entity,
         screw_entity,
         orientation="vertical",
-        position=(0.060, TOP_CENTER[1]),
+        position=(TOP_CENTER[0] - 0.040, TOP_CENTER[1]),
         label="hold-down hole depth location",
+        arc_endpoint="center",
+    )
+    _add_entity_dimension(
+        adapter,
+        top,
+        foot_left_entity,
+        screw_entity,
+        orientation="horizontal",
+        position=(TOP_CENTER[0], TOP_CENTER[1] + 0.0285),
+        label="hold-down hole width location",
         arc_endpoint="center",
     )
     _add_entity_dimension(
@@ -450,7 +515,7 @@ async def build(adapter: Any) -> dict[str, str]:
         strap_near_entity,
         far_face_entity,
         orientation="vertical",
-        position=(0.145, TOP_CENTER[1]),
+        position=(TOP_CENTER[0] + 0.045, TOP_CENTER[1] + 0.006),
         label="strap thickness",
     )
     _screw_r = SCREW_HOLE_DIA / 2.0 * _S
@@ -458,13 +523,9 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         edge_xy=(TOP_CENTER[0] + _screw_r, TOP_CENTER[1] + 0.010),
-        callout_xy=(0.180, 0.260),
+        callout_xy=(TOP_CENTER[0] + 0.080, TOP_CENTER[1] + 0.015),
         label="flange hold-down hole",
         process="DRILL",
-    )
-
-    add_property_linked_note(
-        adapter, "Manufacturing Notes", 0.020, 0.075, char_height=0.0025
     )
 
     return await finalize_drawing(

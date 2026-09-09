@@ -49,11 +49,19 @@ WHAT A COMPLETE ASSEMBLY PACKAGE CONTAINS (the standard you hold it to)
   drawings; repeating them here is clutter. Geometric tolerancing at assembly
   level is rare and only where a plus/minus on an assembly dimension cannot
   say what is needed.
-- Judge whether each sheet fits better in landscape or portrait. Compare them by
-  useful scale of the assembled and exploded views, the space for the BOM and
-  steps, and the resulting empty or crowded areas. Report a clarity defect when
-  rotating the same content would make the package materially easier to read;
-  do not request a rotation for preference alone.
+- The inner drawing border is a hard boundary on every sheet. Every view,
+  dimension, extension line, leader, callout, note, balloon, BOM and step
+  stays wholly inside it, clear of zone labels and the title block, with
+  visible air around the content. Anything touching or spilling through the
+  border is a clarity defect, never minor polish.
+- The view group and tables look intentional and visually balanced in each
+  usable drawing region, not bunched against an edge beside a large dead field.
+  Orthographic alignment is not a reason to crowd the border.
+- Judge whether each sheet fits better in landscape or portrait. Compare them
+  by useful scale of the assembled and exploded views, the space for the BOM
+  and steps, and the resulting empty or crowded areas. Report a clarity defect
+  when rotating the same content would make the package materially easier to
+  read; do not request a rotation for preference alone.
 
 WHAT YOU DO NOT ASK FOR
 Component fabrication detail, material certs, a full inspection plan, torque
@@ -83,10 +91,11 @@ view or item for every finding, and say the fix):
 - over_specification: anything the package carries that the assembly job
   does not need — repeated part tolerances, materials or finishes, GD&T at
   assembly level without cause, notes restating the title block.
-- clarity: what makes you stop and re-read — balloons or leaders crossing,
-  views too small to identify parts, a missing or noncompliant Shaded With
-  Edges isometric, a step order that is hard to follow, an exploded view that
-  does not read.
+- clarity: what makes you stop and re-read — any content touching or outside
+  the inner border, a view group bunched against an edge or visibly unbalanced,
+  balloons or leaders crossing, views too small to identify parts, a missing
+  or noncompliant Shaded With Edges isometric, a step order that is hard to
+  follow, an exploded view that does not read.
 
 - minor: taste and polish.
 An empty list is a valid answer for any category. Never pad a category.

@@ -46,10 +46,3 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     # radius is drawn separately, so both primitives are unambiguous at the bench.
     "StrapProfile": {"StrapTopWidth"},
 }
-
-DRAWING_NOTES = "\n".join(
-    (
-        "MACHINE FROM CONTINUOUS-CAST STOCK; REMOVE AS-CAST SKIN.",
-        "MASK ARBOR BORE, FOOT SEAT, AND HOLD-DOWN HOLE BEFORE COATING.",
-    )
-)
