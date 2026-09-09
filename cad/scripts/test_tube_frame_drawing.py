@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import build_tube_frame as part
 import draw_tube_frame as drawing
 import tube_frame_spec
-from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
 
 
 def test_required_drawing_paths() -> None:
@@ -15,6 +16,7 @@ def test_required_drawing_paths() -> None:
     assert drawing.PDF.as_posix().endswith("/pdf/tube-frame.pdf")
     assert drawing.PNG.as_posix().endswith("/png/tube-frame_drawing.png")
     assert DRAWINGS_BY_NAME["tube_frame"].script == Path(drawing.__file__).resolve()
+    assert DRAWINGS_BY_NAME["tube_frame"].layout is DrawingLayout.PORTRAIT
 
 
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
@@ -63,14 +65,16 @@ def test_notes_and_native_gdt() -> None:
     assert "BORE" not in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+    assert re.search(
+        r'add_property_linked_note\(\s*adapter,\s*"Manufacturing Notes"', source
+    )
     assert source.count("add_datum_feature(") == 1
     assert source.count("add_feature_control_frame(") == 2
     assert 'characteristic="cylindricity"' in source
     assert (
         tube_frame_spec.GEOMETRIC_TOLERANCES_MM["full-length OD cylindricity"] == "0.03"
     )
-    assert "tolerance=GEOMETRIC_TOLERANCES_MM['full-length OD cylindricity']" in source
+    assert 'tolerance=GEOMETRIC_TOLERANCES_MM["full-length OD cylindricity"]' in source
     assert '"BOTTOM END FACE"' in source
     assert '"TOP END FACE"' not in source
     assert "top end perpendicularity" not in tube_frame_spec.GEOMETRIC_TOLERANCES_MM
@@ -85,6 +89,8 @@ def test_view_scales_are_explicit() -> None:
     assert "scale=(1, 5)" in source
     assert "scale=(2, 1)" in source
     assert tube_frame_spec.END_VIEW_NOTE == "END VIEW SCALE 2:1"
+    assert drawing.LENGTH_CENTER == (0.055, 0.220)
+    assert drawing.END_CENTER == (0.190, 0.360)
     assert 'add_property_linked_note(adapter, "End View Note"' in source
 
 

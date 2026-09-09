@@ -569,7 +569,7 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         part="tube_frame",
         artifact_stem="tube-frame",
         script_name="draw_tube_frame.py",
-        layout=DrawingLayout.LANDSCAPE,
+        layout=DrawingLayout.PORTRAIT,
     ),
     DrawingSpec(
         name="cone_swing_platform",
