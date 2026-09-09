@@ -16,10 +16,15 @@ def test_prompts_exist_and_are_calibrated_to_the_policy() -> None:
     # The recalibration that separates this prompt from the gap-hunting ones:
     # the title block is the general spec, and over-specification is a defect.
     for text in (part, assembly):
-        assert "TITLE BLOCK FIRST" in text
-        assert "over_specification" in text
-        assert "Never pad a category" in text
-        assert "landscape or portrait" in " ".join(text.split())
+        normalized = " ".join(text.split())
+        assert "TITLE BLOCK FIRST" in normalized
+        assert "over_specification" in normalized
+        assert "Never pad a category" in normalized
+        assert "landscape or portrait" in normalized
+        assert "Shaded With Edges" in normalized
+        assert "precision/high-quality mode" in normalized
+        assert "wireframe/HLR pictorial" in normalized
+
     assert "loaded gun" in part
     assert "Decimal places" in part
     assert "one-place, two-place and three-place" in part
@@ -527,6 +532,7 @@ def test_every_registered_drawing_has_a_prompt_kind_and_package_source() -> None
             assert package.sources[0].name.endswith("_drawing.png")
         else:
             assert package.sources[0].parent.name == "pdf"
+
 
 def test_main_distinguishes_missing_and_unknown_names(capsys) -> None:
     assert mr.main([]) == 2

@@ -54,6 +54,13 @@ WHAT A GOOD PRINT LOOKS LIKE (the standard you hold it to)
   simple diameter with its band.
 - Hidden lines are present in the orthographic views. Nothing is
   dimensioned to a hidden line; a section or breakout does that job.
+- The sheet has a standard isometric projection for pictorial clarity. It is
+  rendered **Shaded With Edges** in precision/high-quality mode: edges are
+  visible, geometry is not coarse or faceted, and cosmetic threads are not
+  draft quality. A missing isometric, plain shaded view without edges,
+  wireframe/HLR pictorial, or visibly draft-quality isometric is a clarity
+  defect. The isometric does not replace manufacturing views needed to define
+  the part.
 - Dimensions come from one origin per view, the overall length is real and
   conspicuous, turned parts show diameters on the side view with lengths from
   one faced end, slots go to the radius centres, shoulder fillets on turned
@@ -102,7 +109,9 @@ and the feature for every finding, and say the fix):
   band, decimal place or note line the part does not need, one entry each.
 - clarity: what makes you stop and re-read — crossed leaders, text on lines,
   a dimension that reads like an overall but is not, dimensioning to hidden
-  lines, missing hidden lines, a view choice that hides the feature, a
-  turned part dimensioned from both ends.
+  lines, missing hidden lines, a view choice that hides the feature, a missing
+  or noncompliant Shaded With Edges isometric, a turned part dimensioned from
+  both ends.
+
 - minor: taste and polish that would not change how you make the part.
 An empty list is a valid answer for any category. Never pad a category.

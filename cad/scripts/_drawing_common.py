@@ -1572,6 +1572,54 @@ def create_blank_drawing_sheets(
         raise RuntimeError(f"{label}: sheet order mismatch: {actual!r}")
 
 
+# IView::SetDisplayMode4 requires swSHADED plus its explicit Edges flag for
+# "Shaded With Edges". Faceted=False selects precision geometry; the getter may
+# report either swSHADED or the composite swSHADED_EDGES value after the write.
+_SW_SHADED = 3
+_SW_SHADED_EDGES = 7
+
+
+@_telemetry.traced("drawing.shaded_with_edges", label_param="label")
+def set_high_quality_shaded_with_edges(adapter: Any, view: Any, *, label: str) -> None:
+    """Set and verify a precise Shaded With Edges drawing view."""
+    ok = adapter._attempt(
+        lambda: view.SetDisplayMode4(False, _SW_SHADED, False, True, True),
+        default=False,
+    )
+    if not ok:
+        raise RuntimeError(f"{label}: failed to set Shaded With Edges display")
+
+    mode = adapter._attempt(lambda: view.GetDisplayMode2(), default=None)
+    use_parent = adapter._attempt(lambda: view.GetUseParentDisplayMode(), default=None)
+    faceted = adapter._attempt(lambda: view.GetFacettedHlrDisplay(), default=None)
+    edges = adapter._attempt(lambda: view.GetDisplayEdgesInShadedMode(), default=None)
+    cosmetic_threads = adapter._attempt(lambda: view.GetCThreadQuality(), default=None)
+    readback = {
+        "mode": mode,
+        "use_parent": use_parent,
+        "faceted": faceted,
+        "edges": edges,
+        "cosmetic_threads": cosmetic_threads,
+    }
+    if any(value is None for value in readback.values()):
+        raise RuntimeError(f"{label}: incomplete display-mode readback {readback!r}")
+
+    try:
+        mode_value = int(mode)
+    except (TypeError, ValueError) as exc:
+        raise RuntimeError(f"{label}: invalid display mode {mode!r}") from exc
+    if (
+        mode_value not in {_SW_SHADED, _SW_SHADED_EDGES}
+        or bool(use_parent)
+        or bool(faceted)
+        or not bool(edges)
+        or not bool(cosmetic_threads)
+    ):
+        raise RuntimeError(
+            f"{label}: drawing view is not precise Shaded With Edges {readback!r}"
+        )
+
+
 @_telemetry.traced("drawing.normalize_edge_break")
 def set_hidden_lines_removed(adapter: Any, view: Any) -> None:
     ok = adapter._attempt(
@@ -4560,7 +4608,7 @@ async def finalize_drawing(
     expected_redundant_notes: int = 0,
     expected_sheet_names: tuple[str, ...] | None = None,
 ) -> dict[str, str]:
-    """Validate the sheet contract and export SLDDRW, PDF, and rendered PNG."""
+    """Enforce the sheet/view contract and export SLDDRW, PDF, and rendered PNG."""
     drawing_model = adapter.currentModel
     ddoc = _early_bound(
         drawing_model, "IDrawingDoc"
@@ -4585,6 +4633,7 @@ async def finalize_drawing(
     # real view after all views exist, validate the linked model's tolerance and
     # current-release Revision properties, and hold every sheet to the same ASME B
     # contract.
+    isometric_views = 0
     for sheet_name in sheet_names:
         if not ddoc.ActivateSheet(sheet_name):
             raise RuntimeError(f"failed to activate drawing sheet {sheet_name!r}")
@@ -4639,11 +4688,24 @@ async def finalize_drawing(
                 phase=f"explicit property source {sheet_name}",
                 scale=scale,
             )
-        first_view = next(iter_views(adapter), None)
+        views = tuple(iter_views(adapter))
+        first_view = views[0] if views else None
         if first_view is None:
             raise RuntimeError(
                 f"drawing sheet {sheet_name!r} has no view for property links"
             )
+        for view in views:
+            orientation = str(
+                adapter._get_attr_or_call(view, "GetOrientationName") or ""
+            )
+            if orientation.strip().lower() != "*isometric":
+                continue
+            set_high_quality_shaded_with_edges(
+                adapter,
+                view,
+                label=f"{sheet_name} {view_name(adapter, view)!r}",
+            )
+            isometric_views += 1
         first_name = view_name(adapter, first_view)
         sheet.CustomPropertyView = first_name
         sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
@@ -4674,9 +4736,12 @@ async def finalize_drawing(
                 TITLE_BLOCK_COPYRIGHT_PROPERTY,
             ),
         )
+    if not isometric_views:
+        raise RuntimeError("finished drawing has no standard Isometric projection")
 
-    # Explicit recipe-requested cleanup remains sheet-scoped. Layout and view
-    # appearance are otherwise left exactly as SolidWorks produced them.
+    # Explicit recipe-requested cleanup remains sheet-scoped. The finalizer
+    # owns the standard Isometric view's high-quality Shaded With Edges mode;
+    # every other view keeps the appearance authored by its drawing recipe.
     removed_notes = 0
     for sheet_name in sheet_names:
         if not ddoc.ActivateSheet(sheet_name):
