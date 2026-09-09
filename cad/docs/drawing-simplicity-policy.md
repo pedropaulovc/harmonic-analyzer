@@ -1,12 +1,14 @@
 # Drawing simplicity policy
 
-> Governs every generated manufacturing drawing (`cad/scripts/draw_*.py` and
-> the `<part>_spec.py` rows they project). Supersedes the "full GD&T
-> vocabulary, applied functionally" verdict of
-> [`tolerance-gdt-assessment.md`](./tolerance-gdt-assessment.md) §1 wherever
-> the two disagree: that assessment listed what GD&T *could* express; this
-> policy fixes what the prints *do* carry. Enforced by the machinist review
-> (`cad/scripts/machinist_review.py`) and by each sheet's offline contract.
+> Defines the contract for generated manufacturing drawings that have been
+> migrated to it. A sheet opts in through its policy-specific offline contract;
+> legacy sheets retain their previous drawing contract until that migration is
+> complete. Supersedes the "full GD&T vocabulary, applied functionally" verdict
+> of [`tolerance-gdt-assessment.md`](./tolerance-gdt-assessment.md) §1 for those
+> migrated sheets wherever the two disagree: that assessment listed what GD&T
+> *could* express; this policy fixes what the migrated prints *do* carry.
+> Enforced by each migrated sheet's offline contract and by its machinist review
+> (`cad/scripts/machinist_review.py`).
 
 ## Why
 

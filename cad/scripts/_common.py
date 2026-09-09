@@ -1189,7 +1189,12 @@ def _build_id() -> str:
             check=True,
         ).stdout.strip()
 
-    shallow = _git("rev-parse", "--is-shallow-repository").lower()
+    try:
+        shallow = _git("rev-parse", "--is-shallow-repository").lower()
+    except subprocess.CalledProcessError as exc:
+        raise RuntimeError(
+            "cannot determine Git repository depth for the build id"
+        ) from exc
     if shallow != "false":
         raise RuntimeError(
             "cannot compute a release-relative build id from a shallow Git "

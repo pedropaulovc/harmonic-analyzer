@@ -25,9 +25,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     # a rename in one script that isn't mirrored in the other fails here, offline.
     assert part.DRAWING_DIMENSIONS is pen_v_block_spec.DRAWING_DIMENSIONS
     marked = set().union(*pen_v_block_spec.DRAWING_DIMENSIONS.values())
-    kept = (
-        set(drawing.FRONT_KEEP) | set(drawing.TOP_KEEP) | set(drawing.RIGHT_KEEP)
-    )
+    kept = set(drawing.FRONT_KEEP) | set(drawing.TOP_KEEP) | set(drawing.RIGHT_KEEP)
     assert kept == marked
     # A callout can only annotate a dimension the print actually shows.
     assert set(drawing.DIMENSION_CALLOUTS) <= kept
@@ -37,9 +35,9 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
         pen_v_block_spec.BLOCK_HEIGHT,
         pen_v_block_spec.BLOCK_DEPTH,
     )
-    assert (drawing.BORE_X, drawing.GROOVE_WIDTH, drawing.SCREW_HOLE_XY) == (
+    assert (drawing.BORE_X, drawing.GROOVE_Z0, drawing.SCREW_HOLE_XY) == (
         pen_v_block_spec.BORE_X,
-        pen_v_block_spec.GROOVE_WIDTH,
+        pen_v_block_spec.GROOVE_Z0,
         pen_v_block_spec.SCREW_HOLE_XY,
     )
 
@@ -82,17 +80,17 @@ def test_native_gdt_replaces_form_orientation_notes() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_datum_feature(") == 3
     assert source.count("add_feature_control_frame(") == 2
-    assert "characteristic=\"parallelism\"" in source
-    assert "characteristic=\"position\"" in source
+    assert 'characteristic="parallelism"' in source
+    assert 'characteristic="position"' in source
     # Ra 1.6 on BOTH pen bores (the 2X functional pair), one symbol each.
     assert source.count("add_surface_finish(") == 2
     assert all(
         isinstance(control.face, CylinderFace)
         for control in pen_v_block_spec.SURFACE_FINISHES
     )
-    assert {control.face.contains_x_mm for control in pen_v_block_spec.SURFACE_FINISHES} == set(
-        pen_v_block_spec.BORE_X
-    )
+    assert {
+        control.face.contains_x_mm for control in pen_v_block_spec.SURFACE_FINISHES
+    } == set(pen_v_block_spec.BORE_X)
     assert source.count("surface_finish_by_key(SURFACE_FINISHES") == 2
 
 

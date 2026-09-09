@@ -141,6 +141,11 @@ def test_drawing_hole_sizes_follow_unc_policy() -> None:
     assert drawing.THREAD_DESIGNATION == "#4-40 UNC-2B"
     assert drawing.THREAD_TAP_DRILL_MM == blind_cut_dia_mm(TAPPED_HOLE_SPEC)
     assert drawing.THREAD_MAJOR_DIA_MM == THREAD_MAJOR_MM[TAPPED_HOLE_SPEC.size]
+    assert TAPPED_HOLE_SPEC.end == "blind"
+    assert TAPPED_HOLE_SPEC.depth_mm == guide.SCREW_HOLE_DEPTH
+    assert TAPPED_HOLE_SPEC.overrides_mm["ThreadDepth"] == pytest.approx(
+        guide.GUIDE_SCREW_THREAD_ENGAGEMENT
+    )
     assert CLEARANCE_MM[("#4", "normal")] == 3.264
 
 
@@ -159,8 +164,9 @@ def test_platen_guide_hole_stations_match_native_wizard_features() -> None:
         tuple(guide.GUIDE_LENGTH * fraction for fraction in (0.1, 0.3, 0.5, 0.7, 0.9))
     )
     source = Path(guide.__file__).read_text(encoding="utf-8")
-    assert source.count("replace(") == 2
-    assert source.count("TAPPED_HOLE_SPEC,") == 2
+    assert source.count("replace(") == 1
+    assert source.count("TAPPED_HOLE_SPEC,") == 1
+    assert "screw_spec = TAPPED_HOLE_SPEC" in source
     assert '"tapped_bottoming", "#4-40"' not in source
 
 
@@ -183,8 +189,13 @@ def test_platen_guide_blind_taps_keep_drill_depth_and_engagement_distinct() -> N
     )
     assert guide.LOCK_SCREW_BOTTOM_CLEARANCE > 0.0
     assert guide.GUIDE_SCREW_BOTTOM_CLEARANCE > 0.0
-    source = Path(guide.__file__).read_text(encoding="utf-8")
-    assert source.count('overrides_mm={"ThreadDepth":') == 2
+    assert guide.LOCK_TAPPED_HOLE_SPEC.end == "blind"
+    assert guide.LOCK_TAPPED_HOLE_SPEC.depth_mm == pytest.approx(
+        guide.LOCK_SCREW_HOLE_DEPTH
+    )
+    assert guide.LOCK_TAPPED_HOLE_SPEC.overrides_mm["ThreadDepth"] == pytest.approx(
+        guide.LOCK_SCREW_THREAD_ENGAGEMENT
+    )
 
 
 def test_drawing_contract_imports_without_pywin32() -> None:

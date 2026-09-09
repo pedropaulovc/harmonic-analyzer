@@ -1765,6 +1765,24 @@ def test_build_id_rejects_shallow_history_before_count(monkeypatch):
     assert calls == [("rev-parse", "--is-shallow-repository")]
 
 
+def test_build_id_translates_shallow_probe_failure(monkeypatch):
+    import subprocess
+
+    import pytest
+
+    import _common
+
+    def fake_run(command, **_kwargs):
+        raise subprocess.CalledProcessError(129, command, stderr="unknown option")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    with pytest.raises(
+        RuntimeError, match="cannot determine Git repository depth"
+    ) as error:
+        _common._build_id()
+    assert isinstance(error.value.__cause__, subprocess.CalledProcessError)
+
+
 def test_assembly_title_properties_never_read_part_registry_fields():
     props = assembly_title_properties("frame")
     assert set(props) == {
