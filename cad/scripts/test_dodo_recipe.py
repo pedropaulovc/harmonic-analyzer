@@ -144,9 +144,6 @@ def test_release_revision_source_invalidates_native_and_drawing_tasks():
 def test_drawing_tasks_depend_only_on_their_selected_layout_template():
     dodo = _load_dodo()
     tasks = {task["name"]: task for task in dodo.task_drawing()}
-    template_paths = {
-        str(template.path.resolve()) for template in dodo.DRAWING_TEMPLATES.values()
-    }
 
     assert tasks.keys() == dodo.DRAWINGS_BY_NAME.keys()
     for stem, spec in dodo.DRAWINGS_BY_NAME.items():
@@ -154,7 +151,12 @@ def test_drawing_tasks_depend_only_on_their_selected_layout_template():
         assert selected == {str(dodo.DRAWING_TEMPLATES[spec.layout].path.resolve())}, (
             stem
         )
-        assert set(tasks[stem]["file_dep"]) & template_paths == selected, stem
+        template_deps = {
+            str(Path(path).resolve())
+            for path in tasks[stem]["file_dep"]
+            if Path(path).suffix.casefold() == ".drwdot"
+        }
+        assert template_deps == selected, stem
 
 
 @pytest.fixture
