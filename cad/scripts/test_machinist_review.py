@@ -21,6 +21,8 @@ def test_prompts_exist_and_are_calibrated_to_the_policy() -> None:
         assert "Never pad a category" in text
     assert "loaded gun" in part
     assert "Decimal places" in part
+    assert "one-place, two-place and three-place" in part
+    assert "thread class" in part
     assert "Hidden lines" in part
     assert "DRILL or REAM" in part
     assert "granite surface plate" in part and "No CMM" in part
@@ -357,7 +359,7 @@ def test_pdfium_operations_share_one_module_lock(tmp_path: Path, monkeypatch) ->
     monkeypatch.setitem(
         sys.modules, "pypdfium2", types.SimpleNamespace(PdfDocument=FakeDocument)
     )
-    barrier = threading.Barrier(2)
+    barrier = threading.Barrier(2, timeout=5)
     source = tmp_path / "assembly.pdf"
     package = mr.ReviewPackage("assembly", "assembly", (source,))
     workdir = tmp_path / "images"
@@ -464,6 +466,14 @@ def test_write_index_creates_missing_report_directory(tmp_path: Path) -> None:
     assert index == report_dir / "index.md"
     assert index.is_file()
     assert "0/0 packages pass" in index.read_text(encoding="utf-8")
+
+
+def test_write_index_fails_closed_on_stale_report(tmp_path: Path) -> None:
+    stale = tmp_path / "stale.json"
+    stale.write_text('{"name": "old-shape"}', encoding="utf-8")
+
+    with pytest.raises(ValueError, match=r"invalid review report .*stale\.json"):
+        mr.write_index(tmp_path)
 
 
 def test_review_serialises_and_indexes(tmp_path: Path) -> None:

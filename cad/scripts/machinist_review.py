@@ -560,8 +560,11 @@ def render_markdown(review: Review) -> str:
 def load_reviews(report_dir: Path = REPORT_DIR) -> list[Review]:
     reviews: list[Review] = []
     for path in sorted(report_dir.glob("*.json")):
-        data = json.loads(path.read_text(encoding="utf-8"))
-        reviews.append(Review(**data))
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            reviews.append(Review(**data))
+        except (OSError, ValueError, TypeError) as exc:
+            raise ValueError(f"invalid review report {path}: {exc}") from exc
     return reviews
 
 

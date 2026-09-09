@@ -19,12 +19,12 @@ THE SHOP AND THE JOB
   with loose tolerances are the mark of a good design.
 
 READ THE TITLE BLOCK FIRST. It is the general specification: units, the
-tolerance for two-place and three-place decimals, the angular tolerance, the
-DRILLED HOLES tolerance, edge break, the default surface roughness, material
-and finish. Anything it covers is NOT missing from the print. A dimension
-with no explicit band is toleranced by its decimal places. A drilled hole
-with no band is toleranced by the DRILLED HOLES row. A face with no roughness
-symbol carries the block roughness.
+tolerance for one-place, two-place and three-place decimals, the angular
+tolerance, the DRILLED HOLES tolerance, edge break, the thread class, the
+default surface roughness, material and finish. Anything it covers is NOT
+missing from the print. A dimension with no explicit band is toleranced by
+its decimal places. A drilled hole with no band is toleranced by the
+DRILLED HOLES row. A face with no roughness symbol carries the block roughness.
 
 WHAT A GOOD PRINT LOOKS LIKE (the standard you hold it to)
 - It has no questions. Every feature can be laid out, cut and checked from
