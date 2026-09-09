@@ -17,6 +17,12 @@ Deliberately not wired into the build, because writing a tracked file during a
 build would dirty the tree and fail `doit release`'s clean-tree preflight. The
 crop is deterministic, so re-running it on unchanged renders changes nothing.
 
+## Drawing sheets (`rocker-arm-support-drawing.png`, `platen-guide-drawing.png`)
+
+The same refresh command copies the current full-sheet drawing renders from
+`cad/out/png/` byte-for-byte. Keep this mapping in `trim_renders.py`; otherwise
+the README can silently retain a drawing from an older title-block revision.
+
 ## The matched pair: `real-machine-display-case.jpg` + `cad-model-display-pose.png`
 
 The README shows the surviving machine next to the CAD model in the same pose.
