@@ -178,7 +178,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE
+        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
     stamp_drawing_summary(
         adapter,
@@ -250,7 +250,9 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # Section thickness (3.0) in the top view at mid-length (clear of the hub);
     # bar height (9.5) on the front profile at the same station.
-    _mid_x = (BAR_PIN_X + LEVER_SPRING_X) / 2.0 - 60.0  # ~92: between the hub and the tab
+    _mid_x = (
+        BAR_PIN_X + LEVER_SPRING_X
+    ) / 2.0 - 60.0  # ~92: between the hub and the tab
     add_edge_dimension(
         adapter,
         top,
@@ -299,7 +301,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # Complete datum reference frame: A is a broad machined face (primary), B
     # is the functional fulcrum-bore axis (secondary), and C is the top narrow
     # face (tertiary clocking).  The two BASIC hole locations reference A|B|C.
-    broad_face = _top_xy(_mid_x - 25.0, LEVER_THICKNESS / 2.0)  # the broad face's edge line, top view
+    broad_face = _top_xy(
+        _mid_x - 25.0, LEVER_THICKNESS / 2.0
+    )  # the broad face's edge line, top view
     add_datum_feature(
         adapter,
         top,
@@ -408,6 +412,7 @@ async def build(adapter: Any) -> dict[str, str]:
         OUTPUTS,
         pdf_title="Channel Lever Manufacturing Drawing",
         scale=SHEET_SCALE,
+        layout=SPEC.layout,
     )
 
 

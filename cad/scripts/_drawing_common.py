@@ -1,8 +1,8 @@
 """Project drawing framework shared by every manufacturing print.
 
 Raw project-agnostic COM calls remain in ``solidworks_mcp``.  This layer owns
-the harmonic-analyzer book policy: ASME B landscape, the checked-in template,
-exact PDF/PNG output, and fail-loud multi-leader callouts.
+the harmonic-analyzer book policy: explicit ASME B orientation, checked-in
+templates, exact PDF/PNG output, and fail-loud multi-leader callouts.
 Part-specific views, dimensions, and notes belong in ``draw_<part>.py``.
 """
 
@@ -32,7 +32,7 @@ from _drawing_layout_check import (
     audit_layout,
     format_findings,
 )
-from _drawing_registry import PROJECT_DRWDOT
+from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.com_variant import (
     bool_array,
@@ -177,27 +177,6 @@ _NOMINAL_BALLOON_HALF_M = 0.006
 # is MEASURED per sheet (INote::GetBalloonInfo -- 4.72 mm on pen-assembly), so
 # this is only the clearance between them, not a stand-in for the circle itself.
 _BALLOON_CLEARANCE_M = 0.0015
-
-# The hand-made harmonic-analyzer.DRWDOT bakes its title block in as sheet-
-# format lines + notes rather than a queryable ITitleBlock (sheet.TitleBlock is
-# None), so its occupied region is reserved here as a fixed keep-out box. Any
-# element overlapping it fails the audit, so content can never land on the title
-# block (Codex #269 threads 4). These MUST track the manual template -- if the
-# title block moves, re-measure with the sheet-view annotation dump (probe via
-# _iter_view_annotations on a fresh drawing; last measured 2026-07-13: notes
-# span x 0.2672..0.4229, y <= 0.0611, borders a couple of mm outside).
-#
-# The block runs from its left rule up to its top rule, extending to the
-# sheet's right and bottom edges. The third-angle projection symbol lives
-# INSIDE the block (bottom-center cell), so it needs no separate keep-out.
-_TITLE_BLOCK_LEFT_M = 0.264
-_TITLE_BLOCK_TOP_M = 0.064
-
-
-ASME_B_WIDTH_M = 0.4318
-ASME_B_HEIGHT_M = 0.2794
-ASME_B_PNG_SIZE = (5100, 3300)
-ASME_B_DPI = 300
 
 
 @dataclass(frozen=True)
@@ -1261,9 +1240,7 @@ def add_native_hole_callout(
         )
         existing = str(display.GetText(1) or "")  # swDimensionTextPrefix
         if not existing.strip():
-            raise RuntimeError(
-                f"hole callout has no format text to prefix ({label})"
-            )
+            raise RuntimeError(f"hole callout has no format text to prefix ({label})")
         prefix = process.rstrip() + " " + existing.lstrip()
         display.SetText(1, prefix)
         if str(display.GetText(1) or "") != prefix:
@@ -1455,13 +1432,14 @@ def _pin_dimension_text_and_leader_style(draw: Any) -> None:
 def new_project_drawing(
     adapter: Any,
     *,
+    layout: DrawingLayout,
     property_view: str | None = None,
     scale: tuple[float, float] = (1.0, 1.0),
     decimals: int = 2,
 ) -> tuple[Any, Any]:
-    """Create a drawing from the hand-made project template.
+    """Create a drawing from the selected hand-made project template.
 
-    The template embeds its own ASME B sheet format (title block, tolerance
+    Each template embeds its own ASME B sheet format (title block, tolerance
     block, projection symbol), so there is no SetupSheet6 format re-apply; the
     only per-drawing knobs are the sheet scale (here) and WHICH view's model
     feeds the sheet's $PRPSHEET property links -- linked in finalize_drawing,
@@ -1470,16 +1448,15 @@ def new_project_drawing(
     ``property_view`` is accepted for compatibility and unused.
     """
     _ = property_view
-    if not PROJECT_DRWDOT.is_file() or PROJECT_DRWDOT.stat().st_size == 0:
-        raise FileNotFoundError(
-            f"project drawing standard is missing: {PROJECT_DRWDOT}"
-        )
+    template = DRAWING_TEMPLATES[layout]
+    if not template.path.is_file() or template.path.stat().st_size == 0:
+        raise FileNotFoundError(f"project drawing standard is missing: {template.path}")
 
     draw = new_drawing(
         adapter,
-        template=str(PROJECT_DRWDOT),
-        width=ASME_B_WIDTH_M,
-        height=ASME_B_HEIGHT_M,
+        template=str(template.path),
+        width=template.width_m,
+        height=template.height_m,
     )
     ddoc = _early_bound(
         draw, "IDrawingDoc"
@@ -1500,8 +1477,12 @@ def new_project_drawing(
     _pin_dimension_text_and_leader_style(draw)
     _pin_annotation_ink(adapter)
     if not sheet.SetScale(float(scale[0]), float(scale[1]), True, False):
-        raise RuntimeError(f"failed to force ASME B sheet to {scale[0]:g}:{scale[1]:g}")
-    assert_asme_b_sheet(adapter, sheet, phase="initial setup", scale=scale)
+        raise RuntimeError(
+            f"failed to force drawing sheet to {scale[0]:g}:{scale[1]:g}"
+        )
+    assert_asme_b_sheet(
+        adapter, sheet, layout=layout, phase="initial setup", scale=scale
+    )
     # Normalize the viewport: sheet-coordinate picks (the hole-table datum
     # vertex / hole rims) hit-test with a PIXEL tolerance mapped through the
     # current zoom, and a hand-saved template opens at whatever zoom it was
@@ -1592,8 +1573,6 @@ def create_blank_drawing_sheets(
 
 
 @_telemetry.traced("drawing.normalize_edge_break")
-
-
 def set_hidden_lines_removed(adapter: Any, view: Any) -> None:
     ok = adapter._attempt(
         lambda: view.SetDisplayMode4(False, 2, False, False, True), default=False
@@ -1613,7 +1592,12 @@ def set_hidden_lines_visible(adapter: Any, view: Any) -> None:
 
 
 def assert_asme_b_sheet(
-    adapter: Any, sheet: Any, *, phase: str, scale: tuple[float, float] = (1.0, 1.0)
+    adapter: Any,
+    sheet: Any,
+    *,
+    layout: DrawingLayout,
+    phase: str,
+    scale: tuple[float, float] = (1.0, 1.0),
 ) -> None:
     properties = list(adapter._get_attr_or_call(sheet, "GetProperties2") or [])
     if len(properties) < 7:
@@ -1625,11 +1609,14 @@ def assert_asme_b_sheet(
             f"{phase}: drawing sheet scale is not "
             f"{scale[0]:g}:{scale[1]:g}: {properties!r}"
         )
+    template = DRAWING_TEMPLATES[layout]
     if (
-        abs(properties[5] - ASME_B_WIDTH_M) > 1e-6
-        or abs(properties[6] - ASME_B_HEIGHT_M) > 1e-6
+        abs(properties[5] - template.width_m) > 1e-6
+        or abs(properties[6] - template.height_m) > 1e-6
     ):
-        raise RuntimeError(f"{phase}: drawing sheet is not ASME B size: {properties!r}")
+        raise RuntimeError(
+            f"{phase}: drawing sheet is not {layout.value} ASME B size: {properties!r}"
+        )
 
 
 def _contact_preview_grid(page_count: int) -> tuple[int, int]:
@@ -1643,19 +1630,25 @@ def _contact_preview_grid(page_count: int) -> tuple[int, int]:
 
 
 @_telemetry.traced("drawing.render_png")
-def render_pdf_png(pdf: Path, png: Path, *, expected_pages: int = 1) -> None:
+def render_pdf_png(
+    pdf: Path,
+    png: Path,
+    *,
+    layout: DrawingLayout,
+    expected_pages: int = 1,
+) -> None:
     """Render a drawing PDF to its preview PNG.
 
-    Single-sheet drawings retain the historical one-page 300 dpi preview.
-    Multi-sheet drawings use the registered preview path for a contact sheet,
-    keeping the doit/cache/release artifact contract to one PNG. The historical
-    2x2 layout is retained through four pages; larger drawings use the smallest
-    near-square grid that fits every page. Exact page images for a review can be
-    rendered from the packaged vector PDF.
+    Single-sheet drawings retain a one-page 300 dpi preview. Multi-sheet
+    drawings use the registered preview path for a contact sheet, keeping the
+    doit/cache/release artifact contract to one PNG. The historical 2x2 layout
+    is retained through four pages; larger drawings use the smallest near-square
+    grid that fits every page.
     """
     import pypdfium2 as pdfium
     from PIL import Image
 
+    template = DRAWING_TEMPLATES[layout]
     document = pdfium.PdfDocument(str(pdf))
     if len(document) != expected_pages:
         raise RuntimeError(
@@ -1664,46 +1657,51 @@ def render_pdf_png(pdf: Path, png: Path, *, expected_pages: int = 1) -> None:
     images: list[Any] = []
     for index in range(expected_pages):
         page = document[index]
-        image = page.render(scale=ASME_B_DPI / 72.0).to_pil()
+        image = page.render(scale=template.dpi / 72.0).to_pil()
         page.close()
-        if image.size == (ASME_B_PNG_SIZE[0], ASME_B_PNG_SIZE[1] + 1):
-            image = image.crop((0, 0, *ASME_B_PNG_SIZE))
-        if image.size != ASME_B_PNG_SIZE:
+        expected_width, expected_height = template.pixel_size
+        actual_width, actual_height = image.size
+        if (
+            actual_width in (expected_width, expected_width + 1)
+            and actual_height in (expected_height, expected_height + 1)
+            and image.size != template.pixel_size
+        ):
+            image = image.crop((0, 0, expected_width, expected_height))
+        if image.size != template.pixel_size:
             document.close()
             raise RuntimeError(
-                f"ASME B PNG page {index + 1} is {image.size}, "
-                f"expected {ASME_B_PNG_SIZE}"
+                f"{layout.value} ASME B PNG page {index + 1} is {image.size}, "
+                f"expected {template.pixel_size}"
             )
         images.append(image)
     document.close()
     png.parent.mkdir(parents=True, exist_ok=True)
     if expected_pages == 1:
-        images[0].save(png, dpi=(ASME_B_DPI, ASME_B_DPI))
+        images[0].save(png, dpi=(template.dpi, template.dpi))
         return
 
     columns, rows = _contact_preview_grid(expected_pages)
-    cell_size = (ASME_B_PNG_SIZE[0] // columns, ASME_B_PNG_SIZE[1] // rows)
+    cell_size = (
+        template.pixel_size[0] // columns,
+        template.pixel_size[1] // rows,
+    )
     scale = min(
-        cell_size[0] / ASME_B_PNG_SIZE[0],
-        cell_size[1] / ASME_B_PNG_SIZE[1],
+        cell_size[0] / template.pixel_size[0],
+        cell_size[1] / template.pixel_size[1],
     )
     preview_size = (
-        round(ASME_B_PNG_SIZE[0] * scale),
-        round(ASME_B_PNG_SIZE[1] * scale),
+        round(template.pixel_size[0] * scale),
+        round(template.pixel_size[1] * scale),
     )
-    contact = Image.new("RGB", ASME_B_PNG_SIZE, "white")
+    contact = Image.new("RGB", template.pixel_size, "white")
     for index, image in enumerate(images):
         cell = image.resize(preview_size, Image.Resampling.LANCZOS)
         column = index % columns
         row = index // columns
-        contact.paste(
-            cell,
-            (
-                column * cell_size[0] + (cell_size[0] - preview_size[0]) // 2,
-                row * cell_size[1] + (cell_size[1] - preview_size[1]) // 2,
-            ),
-        )
-    contact.save(png, dpi=(ASME_B_DPI, ASME_B_DPI))
+        x = column * cell_size[0] + (cell_size[0] - preview_size[0]) // 2
+        y = row * cell_size[1] + (cell_size[1] - preview_size[1]) // 2
+        contact.paste(cell.convert("RGB"), (x, y))
+    contact.save(png, dpi=(template.dpi, template.dpi))
 
 
 def sanitize_pdf_metadata(pdf: Path, *, title: str, expected_pages: int = 1) -> None:
@@ -4336,7 +4334,7 @@ def _leader_segments_of(
 
 
 def collect_layout_elements(
-    adapter: Any,
+    adapter: Any, *, layout: DrawingLayout
 ) -> tuple[list[LayoutElement], list[LeaderSegment], DrawableRegion]:
     """Gather every drawing element, its leader geometry, and the drawable region.
 
@@ -4374,6 +4372,12 @@ def collect_layout_elements(
     if len(properties) < 7:
         raise RuntimeError(f"cannot read sheet size to audit layout: {properties!r}")
     width, height = float(properties[5]), float(properties[6])
+    template = DRAWING_TEMPLATES[layout]
+    if abs(width - template.width_m) > 1e-6 or abs(height - template.height_m) > 1e-6:
+        raise RuntimeError(
+            f"drawing layout is {width:g} x {height:g} m, expected "
+            f"{template.width_m:g} x {template.height_m:g} m for {layout.value}"
+        )
 
     elements: list[LayoutElement] = []
     leaders: list[LeaderSegment] = []
@@ -4502,17 +4506,19 @@ def collect_layout_elements(
         LayoutElement(
             "title-block",
             "titleblock",
-            _TITLE_BLOCK_LEFT_M,
+            template.title_block_left_m,
             0.0,
             width,
-            _TITLE_BLOCK_TOP_M,
+            template.title_block_top_m,
         )
     )
     region = sheet_drawable_region(adapter, sheet, width=width, height=height)
     return elements, leaders, region
 
 
-def check_drawing_layout(adapter: Any, *, stem: str = "") -> None:
+def check_drawing_layout(
+    adapter: Any, *, layout: DrawingLayout, stem: str = ""
+) -> None:
     """Diagnose a colliding, border-crossing, or leader-crossed layout.
 
     This is an explicit diagnostic, not part of the drawing build hot path.
@@ -4525,7 +4531,7 @@ def check_drawing_layout(adapter: Any, *, stem: str = "") -> None:
     :func:`_spread_balloons`). The ratchet was deleted with the defect.
     """
     with _telemetry.span("drawing.layout_audit"):
-        elements, leaders, region = collect_layout_elements(adapter)
+        elements, leaders, region = collect_layout_elements(adapter, layout=layout)
         overlaps, overflows, crossings = audit_layout(elements, region, leaders=leaders)
         if not overlaps and not overflows and not crossings:
             _telemetry.success(
@@ -4547,6 +4553,7 @@ async def finalize_drawing(
     adapter: Any,
     outputs: DrawingOutputs,
     *,
+    layout: DrawingLayout,
     pdf_title: str,
     scale: tuple[float, float] = (1.0, 1.0),
     redundant_note_substrings: Sequence[str] = (),
@@ -4592,7 +4599,11 @@ async def finalize_drawing(
                 f"failed to set final drawing sheet {sheet_name!r} scale"
             )
         assert_asme_b_sheet(
-            adapter, sheet, phase=f"before save {sheet_name}", scale=scale
+            adapter,
+            sheet,
+            layout=layout,
+            phase=f"before save {sheet_name}",
+            scale=scale,
         )
         properties = list(adapter._get_attr_or_call(sheet, "GetProperties2") or [])
         if len(properties) < 8:
@@ -4624,6 +4635,7 @@ async def finalize_drawing(
             assert_asme_b_sheet(
                 adapter,
                 sheet,
+                layout=layout,
                 phase=f"explicit property source {sheet_name}",
                 scale=scale,
             )
@@ -4663,13 +4675,6 @@ async def finalize_drawing(
             ),
         )
 
-    # The title block's UNIT cell links $PRP:"UNIT_DISPLAY" (a DRAWING-doc
-    # property, unlike the $PRPSHEET part-property links), so the declared unit
-    # always tracks what set_units_mm actually configured. Flip to "IN" with
-    # the inch migration (#290) -- a hardcoded IN cell over mm dimensions would
-    # read as inch values and get machined at the wrong scale (Codex P1).
-    apply_custom_properties(adapter, {"UNIT_DISPLAY": "MM"})
-
     # Explicit recipe-requested cleanup remains sheet-scoped. Layout and view
     # appearance are otherwise left exactly as SolidWorks produced them.
     removed_notes = 0
@@ -4704,7 +4709,12 @@ async def finalize_drawing(
     if set(artifacts) != {"drawing", "pdf"}:
         raise RuntimeError(f"drawing save/export incomplete: {artifacts!r}")
     sanitize_pdf_metadata(outputs.pdf, title=pdf_title, expected_pages=len(sheet_names))
-    render_pdf_png(outputs.pdf, outputs.png, expected_pages=len(sheet_names))
+    render_pdf_png(
+        outputs.pdf,
+        outputs.png,
+        layout=layout,
+        expected_pages=len(sheet_names),
+    )
     artifacts["png"] = str(outputs.png.resolve())
     if set(artifacts) != {"drawing", "pdf", "png"}:
         raise RuntimeError(f"drawing export incomplete: {artifacts!r}")

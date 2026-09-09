@@ -141,6 +141,22 @@ def test_release_revision_source_invalidates_native_and_drawing_tasks():
     assert revision_source in drawing["file_dep"]
 
 
+def test_drawing_tasks_depend_only_on_their_selected_layout_template():
+    dodo = _load_dodo()
+    tasks = {task["name"]: task for task in dodo.task_drawing()}
+    template_paths = {
+        str(template.path.resolve()) for template in dodo.DRAWING_TEMPLATES.values()
+    }
+
+    assert tasks.keys() == dodo.DRAWINGS_BY_NAME.keys()
+    for stem, spec in dodo.DRAWINGS_BY_NAME.items():
+        selected = {str(path.resolve()) for path in spec.assets}
+        assert selected == {str(dodo.DRAWING_TEMPLATES[spec.layout].path.resolve())}, (
+            stem
+        )
+        assert set(tasks[stem]["file_dep"]) & template_paths == selected, stem
+
+
 @pytest.fixture
 def isolated_drawing_keys(tmp_path, monkeypatch):
     """Copy real drawing closures; keep all native inputs and writes isolated."""
@@ -246,6 +262,31 @@ def isolated_drawing_keys(tmp_path, monkeypatch):
         clear_closure()
 
 
+def test_drawing_registry_projection_accepts_only_declarative_layout_members():
+    import _buildgraph as bg
+
+    dodo = _load_dodo()
+    registry = dodo.SCRIPTS_DIR / "_drawing_registry.py"
+    source = registry.read_text(encoding="utf-8")
+    marker = "layout=DrawingLayout.LANDSCAPE,"
+    spec = dodo.DRAWINGS_BY_NAME["platen_guide"]
+
+    for member in ("LANDSCAPE", "PORTRAIT"):
+        candidate = source.replace(
+            marker,
+            f"layout=DrawingLayout.{member},",
+            1,
+        )
+        assert bg.drawing_registry_recipe(candidate, spec)
+
+    executable = source.replace(marker, "layout=choose_layout(),", 1)
+    with pytest.raises(
+        ValueError,
+        match="only literals or DrawingLayout members",
+    ):
+        bg.drawing_registry_recipe(executable, spec)
+
+
 @pytest.mark.parametrize("change", ["edit", "add"])
 def test_unrelated_drawing_rows_preserve_freshness_and_cache_keys(
     isolated_drawing_keys, change
@@ -274,7 +315,8 @@ def test_unrelated_drawing_rows_preserve_freshness_and_cache_keys(
         text = text.replace(
             "DRAWINGS: tuple[DrawingSpec, ...] = (",
             "DRAWINGS: tuple[DrawingSpec, ...] = (\n"
-            '    DrawingSpec("unrelated", "unrelated", "unrelated", "draw_unrelated.py"),',
+            '    DrawingSpec("unrelated", "unrelated", "unrelated", '
+            '"draw_unrelated.py", DrawingLayout.LANDSCAPE),',
         )
     registry.write_text(text, encoding="utf-8")
     assert snapshot() == before
@@ -1925,6 +1967,9 @@ def test_recipe_gate_tracks_sources_imported_by_its_tests():
         "build_platen_guide.py",
         "test_pen_summing_drawing_batch_contract.py",
     } <= deps
+    assert {
+        str(template.path.resolve()) for template in dodo.DRAWING_TEMPLATES.values()
+    } <= set(recipe["file_dep"])
     pytest_command = recipe["actions"][0][1][0]
     assert {
         "test_drawing_marks.py",

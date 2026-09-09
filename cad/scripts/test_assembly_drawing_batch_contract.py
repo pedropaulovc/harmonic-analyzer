@@ -17,7 +17,7 @@ import draw_paper_drive_assembly
 import draw_pen_assembly
 import draw_summing_assembly
 from _drawing_common import DrawingOutputs
-from _drawing_registry import DRAWINGS
+from _drawing_registry import DRAWINGS, DrawingLayout
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -87,6 +87,23 @@ def test_each_recipe_is_only_a_precomputed_shared_builder_call() -> None:
         assert not any(token in source for token in prohibited), drawing.ARTIFACT_STEM
 
 
+def test_each_recipe_forwards_its_registered_layout(monkeypatch) -> None:
+    for drawing in ASSEMBLY_DRAWINGS:
+        forwarded: list[dict[str, object]] = []
+
+        async def build_shared(_adapter, **kwargs):
+            forwarded.append(kwargs)
+            return {"pdf": "forwarded"}
+
+        monkeypatch.setattr(drawing, "build_simple_three_view_drawing", build_shared)
+
+        result = asyncio.run(drawing.build(object()))
+
+        assert result == {"pdf": "forwarded"}
+        assert len(forwarded) == 1
+        assert forwarded[0]["layout"] is drawing.SPEC.layout
+
+
 def test_each_three_view_layout_has_distinct_left_to_right_centers() -> None:
     for drawing in ASSEMBLY_DRAWINGS:
         front_x, _front_y = drawing.FRONT_CENTER
@@ -147,7 +164,7 @@ def test_shared_builder_places_exactly_front_right_and_isometric(
     monkeypatch.setattr(
         _assembly_drawing,
         "new_project_drawing",
-        lambda _adapter, *, scale: calls.append(("new", scale)),
+        lambda _adapter, *, layout, scale: calls.append(("new", layout, scale)),
     )
     monkeypatch.setattr(
         _assembly_drawing,
@@ -157,8 +174,8 @@ def test_shared_builder_places_exactly_front_right_and_isometric(
         ),
     )
 
-    async def finalize(_adapter, actual_outputs, *, pdf_title, scale):
-        calls.append(("finalize", actual_outputs, pdf_title, scale))
+    async def finalize(_adapter, actual_outputs, *, layout, pdf_title, scale):
+        calls.append(("finalize", actual_outputs, layout, pdf_title, scale))
         return {"pdf": str(actual_outputs.pdf)}
 
     monkeypatch.setattr(_assembly_drawing, "finalize_drawing", finalize)
@@ -168,6 +185,7 @@ def test_shared_builder_places_exactly_front_right_and_isometric(
             adapter,
             source=source,
             outputs=outputs,
+            layout=DrawingLayout.PORTRAIT,
             sheet_scale=(1.0, 4.0),
             front_center=(0.1, 0.2),
             right_center=(0.2, 0.2),
@@ -185,3 +203,11 @@ def test_shared_builder_places_exactly_front_right_and_isometric(
     ]
     assert all(call[5] == (1.0, 4.0) for call in view_calls)
     assert result == {"pdf": str(outputs.pdf)}
+    assert ("new", DrawingLayout.PORTRAIT, (1.0, 4.0)) in calls
+    assert (
+        "finalize",
+        outputs,
+        DrawingLayout.PORTRAIT,
+        "Assembly Drawing",
+        (1.0, 4.0),
+    ) in calls

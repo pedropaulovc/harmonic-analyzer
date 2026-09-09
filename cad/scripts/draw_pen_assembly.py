@@ -36,6 +36,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         source=SOURCE,
         outputs=OUTPUTS,
+        layout=SPEC.layout,
         sheet_scale=SHEET_SCALE,
         front_center=FRONT_CENTER,
         right_center=RIGHT_CENTER,

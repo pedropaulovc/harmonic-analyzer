@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import subprocess
 import sys
 import zipfile
@@ -14,7 +16,7 @@ import cut_release
 import draw_platen_guide as drawing
 import build_platen_guide as guide
 import _drawing_common as drawing_common
-from _drawing_registry import DRAWINGS, PROJECT_DRWDOT
+from _drawing_registry import DRAWINGS, DRAWING_TEMPLATES, DrawingLayout
 from _drawing_common import (
     _contact_preview_grid,
     _gtol_frame_xml,
@@ -71,10 +73,22 @@ def test_five_page_contact_preview_preserves_aspect_and_unused_cell(
         append_images=pages[1:],
         resolution=72,
     )
-    monkeypatch.setattr(drawing_common, "ASME_B_DPI", 30)
-    monkeypatch.setattr(drawing_common, "ASME_B_PNG_SIZE", (510, 330))
+    monkeypatch.setitem(
+        drawing_common.DRAWING_TEMPLATES,
+        DrawingLayout.LANDSCAPE,
+        replace(
+            DRAWING_TEMPLATES[DrawingLayout.LANDSCAPE],
+            dpi=30,
+            pixel_size=(510, 330),
+        ),
+    )
 
-    render_pdf_png(pdf, png, expected_pages=5)
+    render_pdf_png(
+        pdf,
+        png,
+        layout=DrawingLayout.LANDSCAPE,
+        expected_pages=5,
+    )
 
     with Image.open(png) as preview:
         assert preview.size == (510, 330)
@@ -84,6 +98,41 @@ def test_five_page_contact_preview_preserves_aspect_and_unused_cell(
             assert preview.getpixel(center) == pytest.approx(color, abs=2)
         assert preview.getpixel((425, 247)) == (255, 255, 255)
         assert preview.getpixel((85, 10)) == (255, 255, 255)
+
+
+def test_portrait_raster_crops_pdfium_width_rounding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import pypdfium2 as pdfium
+    from pypdf import PdfWriter
+
+    pdf = tmp_path / "portrait-width-plus-one.pdf"
+    png = tmp_path / "portrait.png"
+    writer = PdfWriter()
+    writer.add_blank_page(width=793, height=1224)
+    writer.write(pdf)
+    monkeypatch.setitem(
+        drawing_common.DRAWING_TEMPLATES,
+        DrawingLayout.PORTRAIT,
+        replace(
+            DRAWING_TEMPLATES[DrawingLayout.PORTRAIT],
+            dpi=30,
+            pixel_size=(330, 510),
+        ),
+    )
+    document = pdfium.PdfDocument(str(pdf))
+    page = document[0]
+    uncropped = page.render(scale=30 / 72).to_pil()
+    page.close()
+    document.close()
+    assert uncropped.size == (331, 510)
+    uncropped.close()
+
+    render_pdf_png(pdf, png, layout=DrawingLayout.PORTRAIT)
+
+    with Image.open(png) as preview:
+        assert preview.size == (330, 510)
+        assert preview.info["dpi"] == pytest.approx((30, 30), abs=0.1)
 
 
 def test_drawing_hole_sizes_follow_unc_policy() -> None:
@@ -257,13 +306,53 @@ def test_pdf_metadata_preserves_multisheet_packages(tmp_path: Path) -> None:
     assert reader.metadata.title == "Four-Sheet Drawing"
 
 
-def test_drawing_registry_is_unique_and_extensible() -> None:
+def test_drawing_template_layout_contracts() -> None:
+    assert {
+        layout: (
+            template.path.name,
+            template.width_m,
+            template.height_m,
+            template.dpi,
+            template.pixel_size,
+            template.title_block_left_m,
+            template.title_block_top_m,
+        )
+        for layout, template in DRAWING_TEMPLATES.items()
+    } == {
+        DrawingLayout.LANDSCAPE: (
+            "harmonic-analyzer-landscape.DRWDOT",
+            0.4318,
+            0.2794,
+            300,
+            (5100, 3300),
+            0.216,
+            0.066,
+        ),
+        DrawingLayout.PORTRAIT: (
+            "harmonic-analyzer-portrait.DRWDOT",
+            0.2794,
+            0.4318,
+            300,
+            (3300, 5100),
+            0.0636,
+            0.066,
+        ),
+    }
+    assert all(
+        template.path.is_file() and template.path.stat().st_size > 0
+        for template in DRAWING_TEMPLATES.values()
+    )
+
+
+def test_drawing_registry_is_unique_and_selects_layout_assets() -> None:
     assert len({spec.name for spec in DRAWINGS}) == len(DRAWINGS)
     assert len({spec.part for spec in DRAWINGS}) == len(DRAWINGS)
     outputs = [path for spec in DRAWINGS for path in spec.outputs.values()]
     assert len(set(outputs)) == len(outputs)
-    assert PROJECT_DRWDOT.suffix.lower() == ".drwdot"
-    assert PROJECT_DRWDOT.is_file() and PROJECT_DRWDOT.stat().st_size > 0
+    assert all(spec.layout is DrawingLayout.LANDSCAPE for spec in DRAWINGS)
+    assert all(
+        spec.assets == (DRAWING_TEMPLATES[spec.layout].path,) for spec in DRAWINGS
+    )
 
 
 def test_release_stages_all_drawing_formats(tmp_path: Path, monkeypatch) -> None:

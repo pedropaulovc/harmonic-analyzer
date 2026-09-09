@@ -122,8 +122,8 @@ import _artifact_cache as _cache  # noqa: E402  (remote build-artefact cache)
 import _sw_lifecycle  # noqa: E402  (SolidWorks autostart/recover; lazy-imports sw_recovery)
 import _telemetry  # noqa: E402  (observability spine: console logging + tracing)
 from _drawing_registry import (  # noqa: E402
+    DRAWING_TEMPLATES,
     DRAWINGS_BY_NAME,
-    PROJECT_DRWDOT,
 )
 
 REPO_ROOT = Path(__file__).resolve().parent
@@ -2402,7 +2402,10 @@ def task_check():
                 str((REPO_ROOT / "dodo.py").resolve()),
                 *recipe_test_deps,
                 *_CONFIG_YAMLS,
-                str(PROJECT_DRWDOT.resolve()),
+                *sorted(
+                    str(template.path.resolve())
+                    for template in DRAWING_TEMPLATES.values()
+                ),
             ],
             "cmd": [*pytest_cmd, *(str(path) for path in recipe_tests)],
         },

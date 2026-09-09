@@ -134,9 +134,13 @@ async def _run(
                 started = time.perf_counter()
                 if workload == "layout":
                     import _drawing_common
+                    from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout
 
-                    elements, width, height = (
-                        _drawing_common.collect_layout_elements(adapter)
+                    layout = DrawingLayout.LANDSCAPE
+                    elements, _leaders, _region = (
+                        _drawing_common.collect_layout_elements(
+                            adapter, layout=layout
+                        )
                     )
                     signature = [
                         [
@@ -152,7 +156,10 @@ async def _run(
                         for element in elements
                     ]
                     item_count = len(elements)
-                    workload_data: dict[str, Any] = {"sheet": [width, height]}
+                    template = DRAWING_TEMPLATES[layout]
+                    workload_data: dict[str, Any] = {
+                        "sheet": [template.width_m, template.height_m]
+                    }
                 elif workload == "features":
                     result = await adapter.list_features(include_suppressed=True)
                     if not result.is_success:

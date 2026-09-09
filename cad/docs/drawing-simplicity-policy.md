@@ -82,10 +82,15 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
    - Hole callouts state the decimal Ø and the process (`Ø9.525 REAM THRU`,
      `Ø5.95 DRILL THRU`); clearance holes state the size, not the screw;
      taps are `1/4-20 ↧ 12` unless the tap-drill depth matters.
-8. **Layout is clean.** No leader crosses another leader, a view it does not
-   annotate, or a dimension line; no text sits on a line. The layout audit
-   (`_drawing_layout_check`) fails the build on crossings it can see; the eye
-   pass and the machinist review catch the rest.
+8. **Layout is clean and uses the better sheet orientation.** No leader crosses
+   another leader, a view it does not annotate, or a dimension line; no text
+   sits on a line. Choose landscape or portrait according to the view
+   arrangement, useful drawing scale, and space needed by dimensions and notes.
+   A sparse sheet with undersized views has the wrong orientation when rotating
+   the layout would make the same content materially larger or easier to read.
+   Each `DrawingSpec` records the choice explicitly. The layout audit
+   (`_drawing_layout_check`) checks the selected template's border and title-block
+   keep-out; the eye pass and machinist review judge the fit of the content.
 9. **Assembly drawings are judged as complete assembly packages.** Every PDF
    sheet is rendered at full resolution and attached to one blind-review
    invocation. Acceptance cross-checks BOM rows, balloons, setup and assembly

@@ -163,7 +163,9 @@ async def build(adapter: Any) -> dict[str, str]:
             "Manufacturing Notes",
         ),
     )
-    drawing_model, sheet = new_project_drawing(adapter, property_view=PART_STEM)
+    drawing_model, sheet = new_project_drawing(
+        adapter, property_view=PART_STEM, layout=SPEC.layout
+    )
     stamp_drawing_summary(
         adapter,
         drawing_model,
@@ -381,7 +383,10 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)
 
     return await finalize_drawing(
-        adapter, OUTPUTS, pdf_title="Platen Guide Manufacturing Drawing"
+        adapter,
+        OUTPUTS,
+        pdf_title="Platen Guide Manufacturing Drawing",
+        layout=SPEC.layout,
     )
 
 

@@ -48,7 +48,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (2.0, 1.0)   # 2:1 whole sheet (hair-thin 62.7 mm wire)
+SHEET_SCALE = (2.0, 1.0)  # 2:1 whole sheet (hair-thin 62.7 mm wire)
 
 # Sheet layout (meters).  The elevation (front) is the sole ortho view -- the
 # vertical wire -- with the run length to its left; the isometric sits mid-right;
@@ -92,7 +92,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE
+        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
     stamp_drawing_summary(
         adapter,
@@ -121,6 +121,7 @@ async def build(adapter: Any) -> dict[str, str]:
         OUTPUTS,
         pdf_title="Pen Wire Manufacturing Drawing",
         scale=SHEET_SCALE,
+        layout=SPEC.layout,
     )
 
 

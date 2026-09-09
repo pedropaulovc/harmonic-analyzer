@@ -41,7 +41,13 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from build_rocker_arm_support import (
-    BOSS_DEPTH, CHAMFER, HALF_Y, HOLES, HOLE_SSIZE, HOLE_TAP_DRILL_DIA, WIDE,
+    BOSS_DEPTH,
+    CHAMFER,
+    HALF_Y,
+    HOLES,
+    HOLE_SSIZE,
+    HOLE_TAP_DRILL_DIA,
+    WIDE,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -145,7 +151,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE
+        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
     stamp_drawing_summary(
         adapter,
@@ -288,6 +294,7 @@ async def build(adapter: Any) -> dict[str, str]:
         OUTPUTS,
         pdf_title="Rocker-Arm Support Manufacturing Drawing",
         scale=SHEET_SCALE,
+        layout=SPEC.layout,
     )
 
 

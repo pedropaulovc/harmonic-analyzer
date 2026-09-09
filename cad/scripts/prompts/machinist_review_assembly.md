@@ -43,6 +43,11 @@ WHAT A COMPLETE ASSEMBLY PACKAGE CONTAINS (the standard you hold it to)
   drawings; repeating them here is clutter. Geometric tolerancing at assembly
   level is rare and only where a plus/minus on an assembly dimension cannot
   say what is needed.
+- Judge whether each sheet fits better in landscape or portrait. Compare them by
+  useful scale of the assembled and exploded views, the space for the BOM and
+  steps, and the resulting empty or crowded areas. Report a clarity defect when
+  rotating the same content would make the package materially easier to read;
+  do not request a rotation for preference alone.
 
 WHAT YOU DO NOT ASK FOR
 Component fabrication detail, material certs, a full inspection plan, torque

@@ -112,7 +112,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE
+        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
     stamp_drawing_summary(
         adapter,
@@ -158,7 +158,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=(flank_x, LENGTH_CENTER[1]),
         frame_xy=(0.115, 0.205),
         characteristic="cylindricity",
-        tolerance=GEOMETRIC_TOLERANCES_MM['full-length OD cylindricity'],
+        tolerance=GEOMETRIC_TOLERANCES_MM["full-length OD cylindricity"],
         quantity="FULL OD LENGTH",
         label="full-length OD cylindricity",
         entity_type="SILHOUETTE",
@@ -188,6 +188,7 @@ async def build(adapter: Any) -> dict[str, str]:
         OUTPUTS,
         pdf_title="Tube Frame Column Manufacturing Drawing",
         scale=SHEET_SCALE,
+        layout=SPEC.layout,
     )
 
 

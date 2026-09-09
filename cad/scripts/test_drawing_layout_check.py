@@ -20,6 +20,7 @@ from types import SimpleNamespace
 import pytest
 
 import _drawing_common as drawing_common
+from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout
 from _drawing_layout_check import (
     DEFAULT_BOUNDARY_ALLOWANCE_M,
     DEFAULT_OVERLAP_TOL_M,
@@ -149,7 +150,7 @@ def test_live_collector_never_flags_transient_dispatches(monkeypatch):
     model = SimpleNamespace(GetCurrentSheet=sheet, GetFirstView=lambda: sheet_view)
 
     elements, leaders, region = drawing_common.collect_layout_elements(
-        _FakeAdapter(model)
+        _FakeAdapter(model), layout=DrawingLayout.LANDSCAPE
     )
 
     # The drawable region is QUERIED from the sheet's zone margins, never a
@@ -204,7 +205,7 @@ def test_live_collector_includes_sheet_notes_but_excludes_template_notes():
     model = SimpleNamespace(GetCurrentSheet=sheet, GetFirstView=lambda: sheet_view)
 
     elements, leaders, _region = drawing_common.collect_layout_elements(
-        _FakeAdapter(model)
+        _FakeAdapter(model), layout=DrawingLayout.LANDSCAPE
     )
 
     assert leaders == []
@@ -212,6 +213,55 @@ def test_live_collector_includes_sheet_notes_but_excludes_template_notes():
         ("setup-notes", "note"),
         ("title-block", "titleblock"),
     ]
+
+
+def test_portrait_collector_uses_mapped_keepout_and_physical_size():
+    template = DRAWING_TEMPLATES[DrawingLayout.PORTRAIT]
+    zone = {
+        0: ZONE_MARGINS["top"],
+        1: ZONE_MARGINS["bottom"],
+        2: ZONE_MARGINS["right"],
+        3: ZONE_MARGINS["left"],
+    }
+    sheet = SimpleNamespace(
+        GetProperties=lambda: [
+            0.0,
+            0.0,
+            1.0,
+            1.0,
+            0.0,
+            template.width_m,
+            template.height_m,
+        ],
+        GetZoneMargin=lambda code: zone[code],
+    )
+    sheet_view = SimpleNamespace(
+        GetNextView=None,
+        GetAnnotations=[],
+        GetTableAnnotations=[],
+    )
+    model = SimpleNamespace(GetCurrentSheet=sheet, GetFirstView=lambda: sheet_view)
+
+    elements, leaders, region = drawing_common.collect_layout_elements(
+        _FakeAdapter(model), layout=DrawingLayout.PORTRAIT
+    )
+
+    assert leaders == []
+    assert region == DrawableRegion.from_margins(
+        template.width_m, template.height_m, **ZONE_MARGINS
+    )
+    title_block = next(element for element in elements if element.kind == "titleblock")
+    assert (
+        title_block.xmin,
+        title_block.ymin,
+        title_block.xmax,
+        title_block.ymax,
+    ) == (
+        template.title_block_left_m,
+        0.0,
+        template.width_m,
+        template.title_block_top_m,
+    )
 
 
 def test_split_table_box_uses_only_the_rendered_row_range():
@@ -1102,7 +1152,7 @@ def _stub_layout(monkeypatch, leader_crossings):
     monkeypatch.setattr(
         drawing_common,
         "collect_layout_elements",
-        lambda _adapter: ([], [], WHOLE_SHEET),
+        lambda _adapter, *, layout: ([], [], WHOLE_SHEET),
     )
     monkeypatch.setattr(
         drawing_common,
@@ -1113,7 +1163,9 @@ def _stub_layout(monkeypatch, leader_crossings):
 
 def test_a_clean_sheet_passes(monkeypatch):
     _stub_layout(monkeypatch, 0)
-    drawing_common.check_drawing_layout(None, stem="pen-assembly")
+    drawing_common.check_drawing_layout(
+        None, layout=DrawingLayout.LANDSCAPE, stem="pen-assembly"
+    )
 
 
 @pytest.mark.parametrize("stem", ["pen-assembly", "crank-arm", ""])
@@ -1124,7 +1176,9 @@ def test_no_sheet_is_exempt_from_a_leader_crossing(monkeypatch, stem):
     sheet -- named, unnamed, or formerly-grandfathered -- may reintroduce one."""
     _stub_layout(monkeypatch, 1)
     with pytest.raises(RuntimeError):
-        drawing_common.check_drawing_layout(None, stem=stem)
+        drawing_common.check_drawing_layout(
+            None, layout=DrawingLayout.LANDSCAPE, stem=stem
+        )
 
 
 def test_the_grandfather_machinery_is_gone():
@@ -1183,11 +1237,13 @@ def test_the_ratchet_never_excuses_a_leader_across_a_VIEW():
     import _drawing_common as dc
 
     real_collect, real_audit = dc.collect_layout_elements, dc.audit_layout
-    dc.collect_layout_elements = lambda _a: ([], [], WHOLE_SHEET)
+    dc.collect_layout_elements = lambda _a, *, layout: ([], [], WHOLE_SHEET)
     dc.audit_layout = lambda *_a, **_k: ([], [], mixed)
     try:
         with pytest.raises(RuntimeError):
-            dc.check_drawing_layout(None, stem="pen-assembly")
+            dc.check_drawing_layout(
+                None, layout=DrawingLayout.LANDSCAPE, stem="pen-assembly"
+            )
     finally:
         dc.collect_layout_elements, dc.audit_layout = real_collect, real_audit
 

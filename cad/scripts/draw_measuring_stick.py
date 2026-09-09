@@ -52,7 +52,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (1.0, 1.0)   # 1:1 whole sheet (200 mm bar)
+SHEET_SCALE = (1.0, 1.0)  # 1:1 whole sheet (200 mm bar)
 
 # Sheet layout (meters).  The ruled face (front) runs full width across the top;
 # the isometric (1:2) sits mid-right; the notes fill the lower-left.
@@ -69,7 +69,9 @@ FRONT_KEEP = {
 SCALE_LABEL_Y = 0.201
 # Tick-value labels ride the part's own scale layout (1:1 view, mm -> m): tick 0
 # sits SCALE_START_X from the bar's left end, the rest at DIVISION_SPACING pitch.
-SCALE_LABEL_X0 = FRONT_CENTER[0] + (part.SCALE_START_X - part.BODY_LENGTH / 2.0) / 1000.0
+SCALE_LABEL_X0 = (
+    FRONT_CENTER[0] + (part.SCALE_START_X - part.BODY_LENGTH / 2.0) / 1000.0
+)
 SCALE_LABEL_PITCH = part.DIVISION_SPACING / 1000.0
 
 
@@ -120,7 +122,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE
+        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
     stamp_drawing_summary(
         adapter,
@@ -154,6 +156,7 @@ async def build(adapter: Any) -> dict[str, str]:
         OUTPUTS,
         pdf_title="Measuring Stick Manufacturing Drawing",
         scale=SHEET_SCALE,
+        layout=SPEC.layout,
     )
 
 

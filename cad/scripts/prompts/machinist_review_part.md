@@ -65,6 +65,11 @@ WHAT A GOOD PRINT LOOKS LIKE (the standard you hold it to)
   centres OK, match-drill at assembly, a loose-supplied set screw).
 - Leaders do not cross each other, cross another view, or cross a dimension
   line; text does not sit on a line; the sheet is readable at arm's length.
+- Judge whether the views, dimensions and notes fit better on a landscape or
+  portrait ASME sheet. Report a clarity defect when the chosen orientation
+  forces materially smaller views, awkward crowding, or large unusable space
+  that rotating the same content would fix. Do not request a rotation for
+  preference alone.
 
 WHAT YOU DO NOT ASK FOR
 Do not ask for an inspection plan, position frames on ordinary holes,

@@ -19,6 +19,7 @@ def test_prompts_exist_and_are_calibrated_to_the_policy() -> None:
         assert "TITLE BLOCK FIRST" in text
         assert "over_specification" in text
         assert "Never pad a category" in text
+        assert "landscape or portrait" in " ".join(text.split())
     assert "loaded gun" in part
     assert "Decimal places" in part
     assert "one-place, two-place and three-place" in part

@@ -1011,6 +1011,18 @@ def module_deps_of(script: Path) -> list[str]:
     return sorted(str(mods[m].resolve()) for m in result)
 
 
+def _drawing_registry_value(node: ast.AST) -> object:
+    """Read one declarative registry value, including approved enum members."""
+    if (
+        isinstance(node, ast.Attribute)
+        and isinstance(node.value, ast.Name)
+        and node.value.id == "DrawingLayout"
+        and node.attr in {"LANDSCAPE", "PORTRAIT"}
+    ):
+        return node.attr.lower()
+    return ast.literal_eval(node)
+
+
 @functools.lru_cache(maxsize=32)
 def _drawing_registry_source(
     text: str, field_names: tuple[str, ...]
@@ -1050,16 +1062,16 @@ def _drawing_registry_source(
             raise ValueError("drawing registry rows must be literal DrawingSpec calls")
         try:
             values = {
-                name: ast.literal_eval(value)
+                name: _drawing_registry_value(value)
                 for name, value in zip(field_names, row.args)
             }
             for keyword in row.keywords:
                 if keyword.arg in values:
                     raise ValueError("duplicate drawing field")
-                values[keyword.arg] = ast.literal_eval(keyword.value)
+                values[keyword.arg] = _drawing_registry_value(keyword.value)
         except (ValueError, TypeError) as exc:
             raise ValueError(
-                "drawing registry rows must contain only literals"
+                "drawing registry rows must contain only literals or DrawingLayout members"
             ) from exc
         rows.append((values.get("name"), ast.dump(row, include_attributes=False)))
     declaration.value = ast.Tuple(elts=[], ctx=ast.Load())
@@ -1099,7 +1111,12 @@ def _drawing_registry_reads(text: str) -> frozenset[str] | None:
         id(child): node for node in nodes for child in ast.iter_child_nodes(node)
     }
     registry_names = {"_drawing_registry", "DRAWINGS", "DRAWINGS_BY_NAME"}
-    allowed_exports = {"DrawingSpec", "PROJECT_DRWDOT", "DRAWINGS_BY_NAME"}
+    allowed_exports = {
+        "DrawingLayout",
+        "DrawingSpec",
+        "DRAWING_TEMPLATES",
+        "DRAWINGS_BY_NAME",
+    }
     for node in nodes:
         if (
             isinstance(node, ast.Constant)
