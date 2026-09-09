@@ -25,7 +25,7 @@ without SolidWorks in ~1 s.
 
 from __future__ import annotations
 
-from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from _surface_finish import SurfaceFinishControl
 
 # inch -> mm. Mirrors ``_common.IN`` but kept local so the spec pulls in NO COM
 # module (importing ``_common`` would drag the SolidWorks adapter back into the
@@ -72,7 +72,7 @@ ANCHOR_DRILL_DEPTH = 6.5  # cylindrical depth; bottoming tap leaves 1.0 lead roo
 SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
 
 # Derived spans (equations of the primitives above).
-ARM_END_X = ARM_C2C + SQUARE_END_OVERHANG  # 76.0: square end past the shaft-bore origin
+ARM_END_X = ARM_C2C + SQUARE_END_OVERHANG  # 85.0: square end past the shaft-bore origin
 HALF_WIDTH = ARM_WIDTH / 2.0  # 8.0
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
@@ -87,14 +87,14 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "DimpleProfile": {"DimpleX", "DimpleDia"},
 }
 
-# Notes: part-specific process facts only, never a tolerance, never the
-# title block (drawing-simplicity-policy.md rule 6).
+# Notes: part-specific process and exceptional feature-tolerance facts only,
+# never a duplicate of the title block (drawing-simplicity-policy.md rule 6).
 DRAWING_NOTES = "\n".join(
     (
         "SHAFT BORE CENTRED ACROSS 16 WIDTH.",
         "HANDLE PIVOT: 15/64 DRILL THRU.",
         "THE CROSS-HOLE CALLOUT IS THE FINISHED SIZE FOR THIS PART.",
-        "CROSS-HOLE AXIS INTERSECTS DATUM AXIS B.",
+        "CROSS-HOLE AXIS INTERSECTS SHAFT AXIS.",
         "DIMPLE: <MOD-DIAM>8 FLAT-BOTTOM, 0.50 +0.20/-0.10 DEEP; LOCATION +/-0.25.",
         "DIMPLE AND ANCHOR TAP ON THE HANDLE-SIDE (FRONT) FACE.",
         f"ANCHOR TAP: #4-40 UNC-2B X {ANCHOR_THREAD_DEPTH:.1f} FULL THREAD DEEP; BOTTOMING TAP.",
@@ -102,4 +102,3 @@ DRAWING_NOTES = "\n".join(
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
-

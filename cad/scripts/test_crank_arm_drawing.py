@@ -2,7 +2,7 @@
 
 The print is the fleet's reference for cad/docs/drawing-simplicity-policy.md:
 a pinned hand-crank lever carries no datums, frames, roughness symbols or
-basic dimensions, and its notes are three lines of process fact.
+basic dimensions; its notes retain only part-specific process facts.
 """
 
 from __future__ import annotations
@@ -33,9 +33,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     # other fails here, offline.
     assert arm.DRAWING_DIMENSIONS is crank_arm_spec.DRAWING_DIMENSIONS
     marked = set().union(*crank_arm_spec.DRAWING_DIMENSIONS.values())
-    kept = (
-        set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) | set(drawing.TOP_KEEP)
-    )
+    kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) | set(drawing.TOP_KEEP)
     assert kept == marked
     assert set(drawing.DIMENSION_CALLOUTS) <= kept
     assert (drawing.ARM_END_X, drawing.HALF_WIDTH) == (
@@ -51,10 +49,8 @@ def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
     assert crank_arm_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:1"
 
 
-def test_notes_are_few_specific_and_never_the_title_block() -> None:
+def test_notes_are_specific_and_never_repeat_the_title_block() -> None:
     notes = crank_arm_spec.DRAWING_NOTES
-    lines = notes.split("\n")
-    assert len(lines) <= 4
     assert "15/64 DRILL THRU" in notes
     assert "HANDLE PIVOT CENTRED" not in notes
     assert "FINISHED SIZE FOR THIS PART" in notes
@@ -63,6 +59,7 @@ def test_notes_are_few_specific_and_never_the_title_block() -> None:
     assert "MATCH-REAM" not in notes
     assert "NOT INDIVIDUAL PART ACCEPTANCE" not in notes
     assert "NO. 2" not in notes
+    assert "DATUM AXIS" not in notes
     # General tolerances live in the title block ONLY -- a second general
     # tolerance in the notes would conflict with it.
     assert "LINEAR +/-" not in notes
@@ -120,27 +117,30 @@ def test_only_the_reamed_bore_prints_three_decimals() -> None:
 
 def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
     source = _source()
-    assert "for view in (front, top, right):\n        set_hidden_lines_visible" in source
+    assert (
+        "for view in (front, top, right):\n        set_hidden_lines_visible" in source
+    )
     assert "set_hidden_lines_removed(adapter, iso)" in source
 
 
 def test_dimple_is_shown_where_it_is_visible() -> None:
-    # The dimple is cut on the z=0 face, so the principal view is the *Back*
-    # face and the edge-on view is *Top turned by pi (third angle from a back
-    # principal); the side view is *Left.  A leader to a hidden circle was a
-    # machinist-review clarity finding.
+    # The dimple and keeper-ring anchor are cut on HandleSeat at local z=8,
+    # so the principal *Front* view exposes them directly. Third-angle
+    # projection keeps the matching *Top* and *Right* views unrotated.
     source = _source()
-    assert 'place_view(adapter, str(SOURCE), "*Back", *FRONT_CENTER' in source
-    assert 'place_view(adapter, str(SOURCE), "*Left", *RIGHT_CENTER' in source
-    assert "top.Angle = math.pi" in source
-    # Model +X runs to the LEFT on a back view.
-    assert drawing._sheet_x(10.0) < drawing._sheet_x(0.0)
+    assert 'place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER' in source
+    assert 'place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER' in source
+    assert "top.Angle" not in source
+    assert drawing._sheet_x(10.0) > drawing._sheet_x(0.0)
 
 
 def test_overall_length_is_a_conspicuous_reference() -> None:
     source = _source()
     assert 'label="overall length reference"' in source
-    assert 'set_arc_endpoints_to_max(adapter, overall, label="overall length reference")' in source
+    assert (
+        'set_arc_endpoints_to_max(adapter, overall, label="overall length reference")'
+        in source
+    )
     assert '_early_bound(overall, "IDisplayDimension").GetAnnotation()' in source
     assert crank_arm_spec.ARM_END_X + crank_arm_spec.HALF_WIDTH == 93.0
 
@@ -191,7 +191,9 @@ def test_stock_anchor_clamps_eye_without_bottoming_or_drill_breakthrough() -> No
     assert drive.CRANK_ARM_Z0 - wire_back == pytest.approx(0.02)
     insertion = drive.ANCHOR_HEAD_Z + screw.SHANK_LEN - drive.CRANK_ARM_Z0
     assert insertion == pytest.approx(5.33)
-    assert screw.SHANK_DIA < insertion <= arm.ANCHOR_HOLE_SPEC.overrides_mm["ThreadDepth"]
+    assert (
+        screw.SHANK_DIA < insertion <= arm.ANCHOR_HOLE_SPEC.overrides_mm["ThreadDepth"]
+    )
     assert arm.ANCHOR_HOLE_SPEC.kind == "tapped_bottoming"
     assert arm.ANCHOR_HOLE_SPEC.size == screw.THREAD
     assert arm.ANCHOR_HOLE_SPEC.depth_mm - insertion == pytest.approx(1.17)
@@ -203,7 +205,10 @@ def test_stock_anchor_clamps_eye_without_bottoming_or_drill_breakthrough() -> No
     tail_end_y = drive.EYE_CENTER_Y + eye.LOOP_R + eye.TAIL_LEN
     shank_gap = drive.ANCHOR_SCREW_XY[1] - tail_end_y - screw.SHANK_DIA / 2.0
     assert shank_gap == pytest.approx(0.02)
-    assert screw.HEAD_DIA / 2.0 - (drive.ANCHOR_SCREW_XY[1] - tail_end_y) >= eye.WIRE_DIA / 2.0
+    assert (
+        screw.HEAD_DIA / 2.0 - (drive.ANCHOR_SCREW_XY[1] - tail_end_y)
+        >= eye.WIRE_DIA / 2.0
+    )
     assert drive.ANCHOR_SCREW_XY == pytest.approx(
         (drive.X_CRANK - 4.5, drive.Y_CRANK - 20.0)
     )

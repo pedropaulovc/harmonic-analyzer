@@ -5,16 +5,13 @@ views, dimension layout, hole callouts, and manufacturing notes; every shared
 sheet/template, import, curation, and export behavior lives in
 ``_drawing_common``.
 
-The sheet runs at 2:1 (the arm is 84 mm end to end); the isometric carries an
+The sheet runs at 2:1 (the arm is 93 mm end to end); the isometric carries an
 explicit 1:1 override so it stays clear of the title block.
 
-The principal view is the model's *Back* face: the fiducial dimple is cut on
-the z=0 face, so seen from the front it is a hidden circle and its callout
-would point at a dashed line (a machinist-review clarity finding).  Third
-angle from a back principal puts the edge-on view above it rotated 180 deg
-(paper-right is model -X in both), which is the *Top* named view turned by pi.
-The side view is therefore the model's *Left* (the 16 x 8 section is
-symmetric, so the picture is the same).
+The principal view is the model's *Front* face, where the fiducial dimple and
+keeper-ring anchor are authored on ``HandleSeat`` at local z=8 mm. Third-angle
+projection therefore uses the unrotated *Top* and *Right* views; model +X runs
+to paper-right in the principal and top views.
 
 The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): the
 arm is a pinned hand-crank lever, so it carries no datums, no feature-control
@@ -30,7 +27,6 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
-import math
 import sys
 from typing import Any
 
@@ -85,11 +81,11 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (2.0, 1.0)
 
-# Sheet layout (meters).  The principal (back) view's model bbox runs
-# arm-end..-boss in sheet X (84 mm, model +X to the LEFT) and +/-8 in Y; at
-# 2:1 the view is 168 x 32 mm.  Third angle: the edge-on view (carrying the
-# cross-pin hole) sits ABOVE it; the side view (16 x 8 stock section) to its
-# right.
+# Sheet layout (meters).  The principal (front) view's model bbox runs
+# boss..arm-end in sheet X (93 mm overall, model +X to the right) and +/-8 in
+# Y; at 2:1 the view is 186 x 32 mm. Third angle: the edge-on view (carrying
+# the cross-pin hole) sits above it; the side view (16 x 8 stock section) is
+# to its right.
 FRONT_CENTER = (0.145, 0.135)
 TOP_CENTER = (0.145, 0.205)
 RIGHT_CENTER = (0.300, 0.135)
@@ -97,22 +93,19 @@ ISO_CENTER = (0.360, 0.230)
 
 
 def _sheet_x(model_x_mm: float) -> float:
-    """Sheet X of a model-X point in the principal/top views (2:1, bbox-centred).
-
-    The principal is the *Back* view, so model +X runs to the LEFT.
-    """
+    """Sheet X of a model-X point in the principal/top views (2:1, bbox-centred)."""
     bbox_center = (ARM_END_X - HALF_WIDTH) / 2.0
-    return FRONT_CENTER[0] - (model_x_mm - bbox_center) * SHEET_SCALE[0] / 1000.0
+    return FRONT_CENTER[0] + (model_x_mm - bbox_center) * SHEET_SCALE[0] / 1000.0
 
 
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
 # position.  Leadered diameters sit above the arm at each feature's station;
 # the linear chain stacks below the view, smallest span nearest the geometry.
 FRONT_KEEP = {
-    "ArmEndX": (0.100, 0.086),
+    "ArmEndX": (0.190, 0.086),
     "DimpleX": (_sheet_x(DIMPLE_X / 2.0), 0.112),
-    # Below-right of the boss so its leader and the bore's (above) never cross.
-    "BossRadius": (0.250, 0.104),
+    # Left of the boss so its leader and the bore's (above) never cross.
+    "BossRadius": (0.052, 0.104),
     "ShaftBoreDia": (_sheet_x(0.0), 0.172),
     "DimpleDia": (_sheet_x(DIMPLE_X), 0.172),
 }
@@ -167,15 +160,10 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # Explicit per-view scale: a view placed without one can silently
     # auto-scale, which shifts every coordinate-based pick on it.
-    front = place_view(adapter, str(SOURCE), "*Back", *FRONT_CENTER, scale=(2, 1))
+    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(2, 1))
-    right = place_view(adapter, str(SOURCE), "*Left", *RIGHT_CENTER, scale=(2, 1))
+    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(2, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
-    # The edge-on view projects from the BACK principal: *Top turned by pi so
-    # paper-right is model -X in both views (see the module docstring).
-    top.Angle = math.pi
-    if abs(float(top.Angle) - math.pi) > 1e-6:
-        raise RuntimeError(f"top view rotation did not persist: {top.Angle}")
     set_hidden_lines_removed(adapter, iso)
     # Hidden lines stay ON in every orthographic view (Harvey #30 / Lipton):
     # the top view shows the #14 cross-drill meeting the shaft bore, the side
@@ -302,14 +290,14 @@ async def build(adapter: Any) -> dict[str, str]:
         label="crank-arm cross-hole",
         process="#14 DRILL",
     )
-    # Handle pivot hole: above the arm in the diameter-callout row (with the
-    # dimple and bore callouts), arrow on the hole's top rim.  Below the arm
-    # it collided with the 75.00 line or ran into the zone-letter margin.
+    # Handle pivot hole: above and just right of the arm, arrow on the hole's
+    # top rim. Keeping it on the handle end avoids crossing the full principal
+    # view now that model +X runs to paper-right.
     add_native_hole_callout(
         adapter,
         front,
         edge_xy=handle_edge,
-        callout_xy=(0.060, 0.172),
+        callout_xy=(0.258, 0.172),
         label="handle pivot hole",
         process="15/64 DRILL",
     )
