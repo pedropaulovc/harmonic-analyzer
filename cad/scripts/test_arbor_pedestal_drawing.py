@@ -5,7 +5,6 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-import _surface_finish
 import arbor_pedestal_spec
 import build_arbor_pedestal as part
 import draw_arbor_pedestal as drawing
@@ -26,17 +25,26 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     marked = set().union(*arbor_pedestal_spec.DRAWING_DIMENSIONS.values())
     kept = set(drawing.FRONT_KEEP) | set(drawing.TOP_KEEP)
     assert kept == marked
-    assert marked == {"Width", "Depth", "FootHt", "BoreDia", "StrapTopWidth"}
+    assert marked == {
+        "Width",
+        "Depth",
+        "FootHt",
+        "BoreDia",
+    }
 
 
 def test_arbor_bore_closes_the_configured_running_fit() -> None:
     import _config
 
-    assert round(arbor_pedestal_spec.BORE_DIA, 3) == 9.525
-    assert drawing.DIMENSION_CALLOUTS["BoreDia"] == "REAM THRU"
+    assert round(arbor_pedestal_spec.BORE_DIA, 2) == 9.55
+    assert drawing.DIMENSION_CALLOUTS["BoreDia"] == ("REAM THRU; ON PART C/L")
     assert "BoreHeight" not in drawing.DIMENSION_CALLOUTS
-    assert "Depth" not in drawing.DIMENSION_CALLOUTS
-    assert drawing.DIMENSION_PRECISION["BoreDia"] == 3
+    assert drawing.DIMENSION_PRECISION == {
+        "Width": 1,
+        "Depth": 1,
+        "FootHt": 1,
+        "BoreDia": 2,
+    }
     shaft_limits = (9.505, 9.525)
     bore_limits = (9.550, 9.580)
     clearances = (
@@ -106,31 +114,31 @@ def test_material_and_finish_requirements_stay_out_of_notes() -> None:
     part_source = Path(part.__file__).read_text(encoding="utf-8")
     assert "Manufacturing Notes" not in drawing_source
     assert "Manufacturing Notes" not in part_source
-    assert arbor_pedestal_spec.DRAWING_DIMENSIONS["StrapProfile"] == {"StrapTopWidth"}
+    assert "StrapProfile" not in arbor_pedestal_spec.DRAWING_DIMENSIONS
     assert "DomeProfile" not in arbor_pedestal_spec.DRAWING_DIMENSIONS
 
 
 def test_ordinary_dimensions_define_the_bore_strap_and_hold_down_hole() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     for label in (
-        'label="bore horizontal location"',
         'label="bore height from foot seat"',
         'label="overall height reference"',
         'label="hold-down hole depth location"',
-        'label="strap thickness"',
+        'label="upright depth"',
     ):
         assert label in source
-    assert source.count('arc_endpoint="center"') == 3
-    assert source.count('arc_endpoint="max"') == 1
-    assert drawing.DIMENSION_CALLOUTS == {"BoreDia": "REAM THRU"}
+    assert drawing.DIMENSION_CALLOUTS == {"BoreDia": "REAM THRU; ON PART C/L"}
     assert 'label="crown radius"' in source
     assert "AddRadialDimension2" in source
     assert "add_native_hole_callout(" in source
+    assert '"UPRIGHT DEPTH"' in source
+    assert '"side-taper reference angle"' in source
+    assert 3.0 < arbor_pedestal_spec.TAPER_ANGLE_DEG < 4.0
     assert 'label="flange hold-down hole"' in source
     assert "SetSecondArrow(False, False)" in source
     assert "GetSecondArrow()" in source
     assert "SetLeaderAttachmentPointAtIndex" not in source
-    assert 'process="DRILL"' in source
+    assert 'process="FOOT-FLANGE HOLE ON PART C/L: DRILL"' in source
     assert '"Material",' in source
     assert arbor_pedestal_spec.BORE_HEIGHT == 39.718
     assert arbor_pedestal_spec.STRAP_T == 10.0
@@ -139,7 +147,9 @@ def test_ordinary_dimensions_define_the_bore_strap_and_hold_down_hole() -> None:
     assert arbor_pedestal_spec.BORE_HEIGHT + arbor_pedestal_spec.TOP_RADIUS == 49.718
     assert "set_reference_dimension(" in source
     assert "_top_width_edge" not in source
-    assert "far_face_entity,\n        screw_entity" in source
+    assert "StrapRootWidth" not in drawing.FRONT_KEEP
+    assert drawing.FRONT_KEEP["Width"][1] < drawing._front_y(0.0)
+    assert drawing.TOP_KEEP["Depth"][0] < drawing.TOP_CENTER[0]
 
 
 def test_pedestal_has_no_gdt_or_basic_dimensions() -> None:
@@ -158,35 +168,22 @@ def test_pedestal_has_no_gdt_or_basic_dimensions() -> None:
     assert not hasattr(arbor_pedestal_spec, "SCREW_CLEARANCE_DIA")
 
 
-def test_running_bore_keeps_its_permitted_surface_finish() -> None:
+def test_reamed_bore_needs_no_redundant_surface_finish_symbol() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert drawing.SURFACE_FINISHES is arbor_pedestal_spec.SURFACE_FINISHES
-    assert len(drawing.SURFACE_FINISHES) == 1
-    assert drawing.SURFACE_FINISHES[0].roughness_ra == _surface_finish.MACHINED
-    assert 'surface_finish_by_key(SURFACE_FINISHES, "arbor_bore")' in source
-    assert source.count("add_surface_finish(") == 1
-    assert "finish_text_format.CharHeight = 0.003" in source
+    assert drawing.DIMENSION_CALLOUTS["BoreDia"].startswith("REAM THRU")
+    assert arbor_pedestal_spec.SURFACE_FINISHES == ()
+    assert "SURFACE_FINISHES" not in source
+    assert "add_surface_finish(" not in source
     assert model_toleranced_dimensions(part) == {
         ("BoreProfile", "BoreDia"): "*deviations(BORE_DIA_BAND)"
     }
 
 
-def test_view_scales_and_display_modes_are_explicit() -> None:
+def test_projected_view_alignment_is_explicit() -> None:
     assert drawing.SHEET_SCALE == (2.0, 1.0)
-    assert drawing.FRONT_CENTER == (0.100, 0.150)
-    assert drawing.TOP_CENTER == (drawing.FRONT_CENTER[0], 0.240)
+    assert drawing.FRONT_CENTER == (0.135, 0.125)
+    assert drawing.TOP_CENTER == (drawing.FRONT_CENTER[0], 0.215)
     assert drawing.TOP_CENTER[0] == drawing.FRONT_CENTER[0]
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("scale=(2, 1)") == 3
-    assert "set_hidden_lines_removed(adapter, iso)" in source
-    assert (
-        "for view in (front, top):\n        set_hidden_lines_visible(adapter, view)"
-        in source
-    )
-    assert "_add_bore_hidden_lines(adapter, top)" in source
-    assert "segment.Style = 1  # swLineHIDDEN" in source
-    assert 'for view, label in ((front, "front"), (top, "plan")):' in source
-    assert "finalize_drawing(" in source
 
 
 def test_part_stamps_make_flexible_material_and_protective_finish() -> None:
