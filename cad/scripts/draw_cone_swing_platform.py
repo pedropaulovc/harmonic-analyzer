@@ -59,7 +59,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (1.0, 3.0)  # 1:2 plan keeps the 266 mm envelope in-zone
+SHEET_SCALE = (1.0, 3.0)  # 1:3 sheet; the 1:2 plan keeps the 266 mm envelope in-zone
 
 # Sheet layout (meters).  The 1:2 plan is the main definition view; the
 # isometric and an end view occupy the open right-hand field.
