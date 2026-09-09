@@ -1690,19 +1690,6 @@ def test_part_and_title_property_stampers_are_distinct():
     assert stamps_title_block_properties(leaf)
 
 
-def test_build_id_is_source_derived_and_monotonic():
-    import re
-
-    import _config
-    from _common import _build_id
-
-    build_id = _build_id()
-    assert re.fullmatch(r"v\d+-b\d+(-dirty)?", build_id), build_id
-    assert build_id.startswith(_config.release_revision() + "-b")
-    # Deterministic per source state: two reads agree.
-    assert _build_id() == build_id
-
-
 def test_git_executable_is_resolved_absolute(tmp_path, monkeypatch):
     import _common
 

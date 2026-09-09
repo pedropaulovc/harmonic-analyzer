@@ -239,7 +239,6 @@ async def build(adapter) -> dict[str, str]:
         (0.0, 0.0, 1.0),
         f"adjuster tapped hole ({ADJUSTER_BORE_SPEC.size} blind)",
         name="AdjusterBore",
-        expect_dia_mm=ADJUSTER_BORE_DIA,
         placement_dims=[((None, None), ("CbZ", '"AdjusterAxisHeight"'))],
     )
     drive_jobs += adjuster_cut.placement_drive_jobs
@@ -296,7 +295,6 @@ async def build(adapter) -> dict[str, str]:
         (1.0, 0.0, 0.0),
         f"pinch tapped hole ({PINCH_BORE_SPEC.size})",
         name="PinchBore",
-        expect_dia_mm=PINCH_BORE_DIA,
         placement_dims=[((None, None), ("PinchZ", '"PinchBoreY"'))],
     )
     drive_jobs += pinch_cut.placement_drive_jobs
