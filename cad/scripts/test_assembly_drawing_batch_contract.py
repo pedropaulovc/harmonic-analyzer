@@ -114,7 +114,9 @@ def test_each_three_view_layout_has_distinct_left_to_right_centers() -> None:
         assert iso_x - right_x >= 0.065, drawing.ARTIFACT_STEM
 
 
-def test_shared_builder_uses_default_visuals_and_three_named_views() -> None:
+def test_shared_builder_places_named_views_without_per_script_visual_overrides() -> (
+    None
+):
     source = Path(_assembly_drawing.__file__).read_text(encoding="utf-8")
     assert source.count("place_view(") == 1
     assert '("*Front", front_center)' in source

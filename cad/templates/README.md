@@ -36,8 +36,9 @@ production fleet uses landscape; changing a row to portrait switches that
 drawing's template and cache dependency together.
 
 Per-drawing setup sets the sheet scale
-(`_drawing_common.new_project_drawing`) and links each sheet's custom-property
-view to its first drawing view (`_drawing_common.finalize_drawing`).
+(`_drawing_common.new_project_drawing`). `_drawing_common.finalize_drawing`
+links each sheet's custom-property view to its first drawing view and enforces
+the standard isometric projection as high-quality Shaded With Edges.
 
 `third-angle-projection.SLDBLK` is the projection-symbol block embedded in both
 templates and remains the editable source for future template work.

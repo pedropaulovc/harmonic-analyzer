@@ -94,6 +94,66 @@ def test_finalize_exports_once_without_layout_or_reopen_cycles():
     assert "render_pdf_png" in source
 
 
+def _display_view(**overrides):
+    readback = {
+        "mode": 3,
+        "use_parent": False,
+        "faceted": False,
+        "edges": True,
+        "cosmetic_threads": True,
+    }
+    readback.update(overrides)
+    return SimpleNamespace(
+        SetDisplayMode4=lambda *_args: True,
+        GetDisplayMode2=lambda: readback["mode"],
+        GetUseParentDisplayMode=lambda: readback["use_parent"],
+        GetFacettedHlrDisplay=lambda: readback["faceted"],
+        GetDisplayEdgesInShadedMode=lambda: readback["edges"],
+        GetCThreadQuality=lambda: readback["cosmetic_threads"],
+    )
+
+
+def test_high_quality_shaded_with_edges_uses_documented_com_shape():
+    calls = []
+    view = _display_view()
+    view.SetDisplayMode4 = lambda *args: calls.append(args) or True
+
+    drawing_common.set_high_quality_shaded_with_edges(
+        _FakeAdapter(None), view, label="Sheet1 Isometric"
+    )
+
+    assert calls == [(False, 3, False, True, True)]
+
+
+def test_high_quality_shaded_with_edges_rejects_silent_write_failure():
+    view = _display_view()
+    view.SetDisplayMode4 = lambda *_args: False
+
+    with pytest.raises(RuntimeError, match="failed to set Shaded With Edges"):
+        drawing_common.set_high_quality_shaded_with_edges(
+            _FakeAdapter(None), view, label="Sheet1 Isometric"
+        )
+
+
+@pytest.mark.parametrize(
+    ("defect", "value"),
+    (
+        ("mode", 2),
+        ("use_parent", True),
+        ("faceted", True),
+        ("edges", False),
+        ("cosmetic_threads", False),
+    ),
+)
+def test_high_quality_shaded_with_edges_rejects_bad_readback(defect, value):
+    view = _display_view(**{defect: value})
+
+    with pytest.raises(RuntimeError, match="not precise Shaded With Edges"):
+        drawing_common.set_high_quality_shaded_with_edges(
+            _FakeAdapter(None), view, label="Sheet1 Isometric"
+        )
+
+
 def _el(label, x0, y0, x1, y1, kind="view", scope=CollisionScope.ALL, owner=""):
     return LayoutElement(label, kind, x0, y0, x1, y1, scope=scope, owner=owner)
 

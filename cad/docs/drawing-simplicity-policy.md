@@ -74,6 +74,11 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
    not buried in the block. Notes that live in `<part>_notes.py` stay there
    (they are out of the part's rebuild closure by design).
 7. **Views follow the machinist, not the modeller.**
+   - Every drawing package includes a standard isometric projection for
+     pictorial clarity. It is **Shaded With Edges** with precision geometry
+     (draft/faceted quality off) and high-quality cosmetic threads. The
+     isometric supplements the manufacturing views; it never replaces an
+     orthographic, section, or detail view needed to define a feature.
    - Hidden lines ON in every orthographic view (both books); never dimension
      to a hidden line — cut a section or breakout instead.
    - One origin per view; the overall length is real and conspicuous.

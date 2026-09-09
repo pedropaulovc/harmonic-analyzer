@@ -21,6 +21,12 @@ sheet count. Anything it says is not missing.
 WHAT A COMPLETE ASSEMBLY PACKAGE CONTAINS (the standard you hold it to)
 - An assembled view set that shows the finished sub-assembly in its working
   pose, at a scale where every part is identifiable.
+- The package has a standard isometric projection of the finished assembly in
+  its working pose, rendered **Shaded With Edges** in precision/high-quality
+  mode: edges are visible, geometry is not coarse or faceted, and cosmetic
+  threads are not draft quality. A missing isometric, plain shaded view without
+  edges, wireframe/HLR pictorial, or visibly draft-quality isometric is a
+  clarity defect.
 - An exploded view (or sequence of them) that shows how the parts go
   together: order, orientation, which face mates to which.
 - A parts list (BOM) with item number, part number, description and quantity,
@@ -78,7 +84,9 @@ view or item for every finding, and say the fix):
   does not need — repeated part tolerances, materials or finishes, GD&T at
   assembly level without cause, notes restating the title block.
 - clarity: what makes you stop and re-read — balloons or leaders crossing,
-  views too small to identify parts, a step order that is hard to follow, an
-  exploded view that does not read.
+  views too small to identify parts, a missing or noncompliant Shaded With
+  Edges isometric, a step order that is hard to follow, an exploded view that
+  does not read.
+
 - minor: taste and polish.
 An empty list is a valid answer for any category. Never pad a category.

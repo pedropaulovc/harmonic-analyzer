@@ -1,10 +1,12 @@
 # Recipe: assembly drawings
 
 Every assembly drawing is a single ASME B sheet with three model views:
-`*Front`, `*Right`, and `*Isometric`. Assembly drawings intentionally use the
-SolidWorks/template defaults for view display. They do not add BOMs, balloons,
-assembly notes, extra sheets, component isolation, or per-view display-mode
-overrides.
+`*Front`, `*Right`, and `*Isometric`. The orthographic views use the
+SolidWorks/template defaults. `_drawing_common.finalize_drawing` enforces the
+project-wide isometric contract: Shaded With Edges, precision geometry
+(draft/faceted quality off), and high-quality cosmetic threads. Assembly
+drawings do not add BOMs, balloons, assembly notes, extra sheets, component
+isolation, or per-script display-mode overrides.
 
 The shared implementation is `_assembly_drawing.py`. An assembly entry point is
 only responsible for preserving its registry identity, output paths, measured
