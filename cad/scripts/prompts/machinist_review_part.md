@@ -86,10 +86,11 @@ WHAT A GOOD PRINT LOOKS LIKE (the standard you hold it to)
 - Leaders do not cross each other, cross another view, or cross a dimension
   line; text does not sit on a line; the sheet is readable at arm's length.
 - The view group looks intentional and visually balanced in the usable drawing
-  region rather than bunched against one edge beside a large dead field.
-  Orthographic alignment is not a reason to crowd the border: stagger views
-  when that materially improves containment and legibility without making the
-  projection relationship ambiguous.
+  region rather than bunched against one edge beside a large dead field, but
+  correctness comes first. Projected orthographic views preserve ASME
+  alignment: front, top and side views are not staggered for aesthetics.
+  Resolve crowding by moving the aligned group, changing sheet orientation or
+  scale, or moving nonprojected views and annotations.
 - Judge whether the views, dimensions and notes fit better on a landscape or
   portrait ASME sheet. Report a clarity defect when the chosen orientation
   forces materially smaller views, awkward crowding, or large unusable space
@@ -131,11 +132,12 @@ and the feature for every finding, and say the fix):
   band, decimal place or note line the part does not need, or any material
   or finish instruction repeated outside the title block; one entry each.
 - clarity: what makes you stop and re-read — any content touching or outside
-  the inner border, a view group bunched against an edge or visibly unbalanced,
-  crossed leaders, text on lines, a dimension that reads like an overall but
-  is not, dimensioning to hidden lines, missing hidden lines, a view choice
-  that hides the feature, a missing or noncompliant Shaded With Edges
-  isometric, a turned part dimensioned from both ends.
+  the inner border, projected orthographic views that break ASME alignment, a
+  view group bunched against an edge or visibly unbalanced, crossed leaders,
+  text on lines, a dimension that reads like an overall but is not,
+  dimensioning to hidden lines, missing hidden lines, a view choice that hides
+  the feature, a missing or noncompliant Shaded With Edges isometric, a turned
+  part dimensioned from both ends.
 
 - minor: taste and polish that would not change how you make the part.
 An empty list is a valid answer for any category. Never pad a category.

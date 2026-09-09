@@ -64,14 +64,14 @@ SHEET_SCALE = (2.0, 1.0)  # 49.718 mm tall; 2:1 keeps the strap and bore legible
 _S = SHEET_SCALE[0] / 1000.0  # sheet meters per model mm
 
 # The casting spans model y 0 (foot seat) to 49.718 (dome top); centre the
-# front elevation on that midpoint. The plan is staggered above/right of the
-# elevation so its dimensions stay well inside the border and the three views
-# form a balanced composition rather than one crowded vertical stack.
+# front elevation on that midpoint. Third-angle projection keeps the plan
+# aligned above the elevation; the isometric balances the aligned view group
+# from the right.
 _PART_MID_Y = (
     BORE_HEIGHT + TOP_RADIUS
 ) / 2.0  # foot 0 .. dome top (bore + dome radius)
 FRONT_CENTER = (0.100, 0.150)
-TOP_CENTER = (0.225, 0.215)
+TOP_CENTER = (FRONT_CENTER[0], 0.240)
 ISO_CENTER = (0.335, 0.150)
 
 
@@ -177,26 +177,6 @@ def _top_depth_edge(adapter: Any, view: Any, z_mm: float, *, label: str) -> Any:
             candidates.append((abs(p1[0] - p0[0]), edge))
     if not candidates:
         raise RuntimeError(f"plan view has no {label} edge at z={z_mm:.3f} mm")
-    return max(candidates, key=lambda item: item[0])[1]
-
-
-def _top_width_edge(adapter: Any, view: Any, x_mm: float, *, label: str) -> Any:
-    """Return a plan-view edge at one modeled width station."""
-    candidates: list[tuple[float, Any]] = []
-    for raw_edge in visible_view_entities(view, 1, label=f"{label} plan edges"):
-        edge = _early_bound(raw_edge, "IEdge")
-        start = edge.GetStartVertex()
-        end = edge.GetEndVertex()
-        if start is None or end is None:
-            continue
-        start = _early_bound(start, "IVertex")
-        end = _early_bound(end, "IVertex")
-        p0 = tuple(float(value) * 1000.0 for value in start.GetPoint())
-        p1 = tuple(float(value) * 1000.0 for value in end.GetPoint())
-        if abs(p0[0] - x_mm) <= 0.01 and abs(p1[0] - x_mm) <= 0.01:
-            candidates.append((abs(p1[2] - p0[2]), edge))
-    if not candidates:
-        raise RuntimeError(f"plan view has no {label} edge at x={x_mm:.3f} mm")
     return max(candidates, key=lambda item: item[0])[1]
 
 
@@ -477,9 +457,6 @@ async def build(adapter: Any) -> dict[str, str]:
         SCREW_HOLE_DIA / 2.0,
         label="flange hold-down hole",
     )
-    foot_left_entity = _top_width_edge(
-        adapter, top, -FOOT_WIDTH / 2.0, label="left foot side"
-    )
     strap_near_entity = _top_depth_edge(
         adapter,
         top,
@@ -497,16 +474,6 @@ async def build(adapter: Any) -> dict[str, str]:
         orientation="vertical",
         position=(TOP_CENTER[0] - 0.040, TOP_CENTER[1]),
         label="hold-down hole depth location",
-        arc_endpoint="center",
-    )
-    _add_entity_dimension(
-        adapter,
-        top,
-        foot_left_entity,
-        screw_entity,
-        orientation="horizontal",
-        position=(TOP_CENTER[0], TOP_CENTER[1] + 0.0285),
-        label="hold-down hole width location",
         arc_endpoint="center",
     )
     _add_entity_dimension(

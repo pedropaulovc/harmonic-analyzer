@@ -26,6 +26,8 @@ def test_prompts_exist_and_are_calibrated_to_the_policy() -> None:
         assert "wireframe/HLR pictorial" in normalized
         assert "inner drawing border is a hard boundary" in normalized
         assert "visually balanced" in normalized
+        assert "Projected orthographic views preserve ASME alignment" in normalized
+        assert "correctness comes first" in normalized
 
     assert "loaded gun" in part
     assert "Decimal places" in part

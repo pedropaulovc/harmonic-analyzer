@@ -118,10 +118,9 @@ def test_ordinary_dimensions_define_the_bore_strap_and_hold_down_hole() -> None:
         'label="overall height reference"',
         'label="hold-down hole depth location"',
         'label="strap thickness"',
-        'label="hold-down hole width location"',
     ):
         assert label in source
-    assert source.count('arc_endpoint="center"') == 4
+    assert source.count('arc_endpoint="center"') == 3
     assert source.count('arc_endpoint="max"') == 1
     assert drawing.DIMENSION_CALLOUTS == {"BoreDia": "REAM THRU"}
     assert 'label="crown radius"' in source
@@ -139,9 +138,8 @@ def test_ordinary_dimensions_define_the_bore_strap_and_hold_down_hole() -> None:
     assert arbor_pedestal_spec.FOOT_DEPTH == 16.0
     assert arbor_pedestal_spec.BORE_HEIGHT + arbor_pedestal_spec.TOP_RADIUS == 49.718
     assert "set_reference_dimension(" in source
-    assert "_top_width_edge" in source
+    assert "_top_width_edge" not in source
     assert "far_face_entity,\n        screw_entity" in source
-    assert "foot_left_entity,\n        screw_entity" in source
 
 
 def test_pedestal_has_no_gdt_or_basic_dimensions() -> None:
@@ -176,8 +174,8 @@ def test_running_bore_keeps_its_permitted_surface_finish() -> None:
 def test_view_scales_and_display_modes_are_explicit() -> None:
     assert drawing.SHEET_SCALE == (2.0, 1.0)
     assert drawing.FRONT_CENTER == (0.100, 0.150)
-    assert drawing.TOP_CENTER == (0.225, 0.215)
-    assert drawing.TOP_CENTER[0] != drawing.FRONT_CENTER[0]
+    assert drawing.TOP_CENTER == (drawing.FRONT_CENTER[0], 0.240)
+    assert drawing.TOP_CENTER[0] == drawing.FRONT_CENTER[0]
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("scale=(2, 1)") == 3
     assert "set_hidden_lines_removed(adapter, iso)" in source

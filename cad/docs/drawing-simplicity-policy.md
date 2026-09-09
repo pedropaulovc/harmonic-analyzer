@@ -102,11 +102,11 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
    around the content. Touching or spilling through the border is a release
    blocker, not cosmetic polish. No leader crosses another leader, a view it
    does not annotate, or a dimension line; no text sits on a line.
-   Distribute the view group intentionally across the usable drawing region;
-   do not bunch it against one edge while leaving a large dead field.
-   Orthographic views need not share an exact vertical axis when a staggered
-   arrangement gives dimensions room and makes the composition materially
-   clearer, provided their projection relationship remains unambiguous.
+   Projected orthographic views preserve ASME alignment; front, top, and side
+   views are never staggered merely to improve composition. Correctness comes
+   before visual balance. Resolve crowding by moving the aligned view group,
+   choosing a better sheet orientation or scale, or repositioning nonprojected
+   views and annotations.
    Choose landscape or portrait according to the view arrangement, useful
    drawing scale, and space needed by dimensions and notes. A sparse sheet
    with undersized views has the wrong orientation when rotating the layout
