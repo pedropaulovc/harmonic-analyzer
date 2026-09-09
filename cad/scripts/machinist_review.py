@@ -647,9 +647,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     elif args.all:
         packages = all_packages()
     else:
+        if not args.names:
+            print("no drawing names given; use --all, --png or a name", file=sys.stderr)
+            return 2
         unknown = [n for n in args.names if n not in DRAWINGS_BY_NAME]
-        if unknown or not args.names:
-            print(f"unknown or missing drawing names: {unknown}", file=sys.stderr)
+        if unknown:
+            print(f"unknown drawing names: {unknown}", file=sys.stderr)
             return 2
         packages = [package_for(n) for n in args.names]
     if args.missing_ok:

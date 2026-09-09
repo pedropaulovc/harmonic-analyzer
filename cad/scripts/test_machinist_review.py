@@ -527,3 +527,12 @@ def test_every_registered_drawing_has_a_prompt_kind_and_package_source() -> None
             assert package.sources[0].name.endswith("_drawing.png")
         else:
             assert package.sources[0].parent.name == "pdf"
+
+def test_main_distinguishes_missing_and_unknown_names(capsys) -> None:
+    assert mr.main([]) == 2
+    assert capsys.readouterr().err == (
+        "no drawing names given; use --all, --png or a name\n"
+    )
+
+    assert mr.main(["not-a-drawing"]) == 2
+    assert capsys.readouterr().err == "unknown drawing names: ['not-a-drawing']\n"

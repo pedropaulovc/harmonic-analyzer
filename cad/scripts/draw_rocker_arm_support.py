@@ -24,7 +24,7 @@ from typing import Any
 from rocker_arm_support_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
@@ -126,6 +126,41 @@ def _bottom_sheet_xy(hole_xz: tuple[float, float]) -> tuple[float, float]:
     )
 
 
+def _bottom_datum_axes(adapter: Any, view: Any) -> tuple[Any, Any]:
+    """Return the two chamfer-offset datum axes visible in the bottom view."""
+    components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
+    x_axes: list[Any] = []
+    y_axes: list[Any] = []
+    for component in components:
+        edges = (
+            adapter._attempt(
+                lambda c=component: view.GetVisibleEntities2(c, 1),
+                default=(),
+            )
+            or ()
+        )
+        for edge in edges:
+            edge = _early_bound(edge, "IEdge")
+            curve = _early_bound(edge.GetCurve(), "ICurve")
+            if not curve.IsLine():
+                continue
+            parameters = tuple(float(value) for value in curve.LineParams)
+            if (
+                abs(parameters[2] + (WIDE - CHAMFER) / 1000.0) <= 2e-6
+                and abs(parameters[3]) >= 0.99
+            ):
+                x_axes.append(edge)
+            if (
+                abs(parameters[0] + (BOSS_DEPTH / 2.0 - CHAMFER) / 1000.0)
+                <= 2e-6
+                and abs(parameters[5]) >= 0.99
+            ):
+                y_axes.append(edge)
+    if not x_axes or not y_axes:
+        raise RuntimeError("bottom view is missing a chamfer-offset foot datum edge")
+    return x_axes[0], y_axes[0]
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -186,8 +221,10 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, bottom, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to bottom view")
 
-    # Foot corner datum + the four tapped holes: the native hole table carries
-    # every X/Y station and the native 1/2-13 UNC-2B tap callout.
+    # The nominal foot corner is broken by the 1.27-mm rim chamfer. Select the
+    # two straight chamfer-offset edges so SolidWorks uses their stable virtual
+    # intersection instead of whichever nearby chamfer vertex wins a point pick.
+    datum_x_axis, datum_y_axis = _bottom_datum_axes(adapter, bottom)
     insert_hole_table(
         adapter,
         bottom,
@@ -196,12 +233,7 @@ async def build(adapter: Any) -> dict[str, str]:
             BOTTOM_CENTER[1] - WIDE * VIEW_SCALE / 1000.0,
         ),
         hole_points=tuple(_bottom_sheet_xy(hole) for hole in HOLES),
-        # The nominal foot corner (-BossDepth/2, -Wide) is broken by the 1.27
-        # RimChamfer, so the vertex SolidWorks anchors the table on is the
-        # chamfer-edge vertex 1.27 INBOARD on both axes -- the shipped table's
-        # LOCs (27.31/147.95, 13.02/47.94) are pinned here verbatim. The B/C
-        # datum planes sit 1.27 outside this origin; follow-up: anchor via
-        # datum_axes on the virtual B-C intersection like the harmonic base.
+        datum_axes=(datum_x_axis, datum_y_axis),
         expected_locations_mm=tuple(
             (x + BOSS_DEPTH / 2.0 - CHAMFER, z + WIDE - CHAMFER) for x, z in HOLES
         ),
