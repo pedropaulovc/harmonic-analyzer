@@ -5,10 +5,10 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-import _surface_finish
 import arbor_pedestal_spec
 import build_arbor_pedestal as part
 import draw_arbor_pedestal as drawing
+from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import blind_cut_dia_mm
 
@@ -17,10 +17,7 @@ def test_required_drawing_paths() -> None:
     assert drawing.SLDDRW.as_posix().endswith("/slddrw/arbor-pedestal.SLDDRW")
     assert drawing.PDF.as_posix().endswith("/pdf/arbor-pedestal.pdf")
     assert drawing.PNG.as_posix().endswith("/png/arbor-pedestal_drawing.png")
-    assert (
-        DRAWINGS_BY_NAME["arbor_pedestal"].script
-        == Path(drawing.__file__).resolve()
-    )
+    assert DRAWINGS_BY_NAME["arbor_pedestal"].script == Path(drawing.__file__).resolve()
 
 
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
@@ -29,19 +26,25 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     kept = set(drawing.FRONT_KEEP) | set(drawing.TOP_KEEP)
     assert kept == marked
     assert marked == {
-        "Width", "Depth", "FootHt", "BoreDia", "DomeDia"
+        "Width",
+        "Depth",
+        "FootHt",
+        "BoreDia",
     }
 
 
 def test_arbor_bore_closes_the_configured_running_fit() -> None:
     import _config
 
-    assert round(arbor_pedestal_spec.BORE_DIA, 3) == 9.525
-    assert drawing.DIMENSION_CALLOUTS["BoreDia"] == "THRU"
+    assert round(arbor_pedestal_spec.BORE_DIA, 2) == 9.55
+    assert drawing.DIMENSION_CALLOUTS["BoreDia"] == ("REAM THRU; ON PART C/L")
     assert "BoreHeight" not in drawing.DIMENSION_CALLOUTS
-    assert "Depth" not in drawing.DIMENSION_CALLOUTS
-    assert drawing.DIMENSION_PRECISION["BoreDia"] == 3
-    assert "ARBOR BORE LIMITS" not in arbor_pedestal_spec.DRAWING_NOTES
+    assert drawing.DIMENSION_PRECISION == {
+        "Width": 1,
+        "Depth": 1,
+        "FootHt": 1,
+        "BoreDia": 2,
+    }
     shaft_limits = (9.505, 9.525)
     bore_limits = (9.550, 9.580)
     clearances = (
@@ -89,7 +92,10 @@ def test_no_dead_band_between_wizard_correction_and_the_builder_assert() -> None
     )
 
     holes_source = Path(_holes.__file__).read_text(encoding="utf-8")
-    assert "abs(initialized_dia_mm - pinned_dia_mm) > DIAMETER_TOLERANCE_MM" in holes_source
+    assert (
+        "abs(initialized_dia_mm - pinned_dia_mm) > DIAMETER_TOLERANCE_MM"
+        in holes_source
+    )
 
     # The tolerance must sit strictly between the benign rounding gap (the
     # 0.0001 between CLEARANCE_MM's 3.264 and the live 3.2639 -- writing there
@@ -102,100 +108,102 @@ def test_no_dead_band_between_wizard_correction_and_the_builder_assert() -> None
     assert rounding_gap < _holes.DIAMETER_TOLERANCE_MM < wrong_row_drift
 
 
-def test_notes_specify_part_requirements_without_title_block_duplicates() -> None:
-    notes = arbor_pedestal_spec.DRAWING_NOTES
-    assert "MATING ARBOR LIMITS DIA 9.505-9.525 (REF)" in notes
-    assert "STRAP NEAR/FAR FACES" in notes
-    assert "RESULTING STRAP THICKNESS 10.00 REF" in notes
-    assert "MATERIAL" not in notes
-    assert "JAPANNED" not in notes
-    assert "DATUM A" in notes
-    assert "X.XX" not in notes
-    assert "BREAK EDGES" not in notes
-    assert "MACHINE FROM CONTINUOUS-CAST STOCK" in notes
-    assert "DATUM B IS LEFT FOOT SIDE FACE SHOWN" in notes
-    assert "2X STRAIGHT FLANKS JOIN BOXED 24.00 X 5.00 FOOT TOP CORNERS" in notes
-    assert "NO TANGENCY" in notes
-    assert "BOXED 12.00 LOCATES BOTH BORE AND FLANGE-HOLE AXES" in notes
-    assert "BOXED 6.00/16.00 LOCATE STRAP NEAR/FAR FACES FROM D" in notes
-    assert "DIMENSIONS AND GD&T APPLY BEFORE COATING" in notes
-    assert "MASK ARBOR BORE" in notes
-    # 3.26: the seat's wizard-table value for #4 NORMAL (0.1285 in = 3.2639),
-    # which the sheet's native hole callout also prints -- so masking note and
-    # callout agree. See the spec's pin rationale for why the 3.25 reading was
-    # a wrong-row artefact rather than a different seat.
-    assert "DIA 3.26\nHOLE" in notes
-    assert "FOOT SEAT A, LEFT SIDE B" in notes
-    assert "PROFILE-CONTROLLED SURFACES" in notes
-    assert "25-50 um" not in notes
-    assert "TWO COATS" not in notes
+def test_material_and_finish_requirements_stay_out_of_notes() -> None:
+    assert not hasattr(arbor_pedestal_spec, "DRAWING_NOTES")
+    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    part_source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "Manufacturing Notes" not in drawing_source
+    assert "Manufacturing Notes" not in part_source
+    assert "StrapProfile" not in arbor_pedestal_spec.DRAWING_DIMENSIONS
+    assert "DomeProfile" not in arbor_pedestal_spec.DRAWING_DIMENSIONS
+
+
+def test_ordinary_dimensions_define_the_bore_strap_and_hold_down_hole() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)' in source
+    for label in (
+        'label="bore height from foot seat"',
+        'label="overall height reference"',
+        'label="hold-down hole depth location"',
+        'label="upright depth"',
+    ):
+        assert label in source
+    assert drawing.DIMENSION_CALLOUTS == {"BoreDia": "REAM THRU; ON PART C/L"}
+    assert 'label="crown radius"' in source
+    assert "AddRadialDimension2" in source
     assert "add_native_hole_callout(" in source
-    assert 'label="flange-hole location from datum D"' in source
+    assert '"UPRIGHT DEPTH"' in source
+    assert '"side-taper reference angle"' in source
+    assert 3.0 < arbor_pedestal_spec.TAPER_ANGLE_DEG < 4.0
+    assert 'label="flange hold-down hole"' in source
+    assert "SetSecondArrow(False, False)" in source
+    assert "GetSecondArrow()" in source
+    assert "SetLeaderAttachmentPointAtIndex" not in source
+    assert 'process="FOOT-FLANGE HOLE ON PART C/L: DRILL"' in source
+    assert '"Material",' in source
+    assert arbor_pedestal_spec.BORE_HEIGHT == 39.718
+    assert arbor_pedestal_spec.STRAP_T == 10.0
+    assert arbor_pedestal_spec.FOOT_WIDTH == 24.0
+    assert arbor_pedestal_spec.FOOT_DEPTH == 16.0
+    assert arbor_pedestal_spec.BORE_HEIGHT + arbor_pedestal_spec.TOP_RADIUS == 49.718
+    assert "set_reference_dimension(" in source
+    assert "_top_width_edge" not in source
+    assert "StrapRootWidth" not in drawing.FRONT_KEEP
+    assert drawing.FRONT_KEEP["Width"][1] < drawing._front_y(0.0)
+    assert drawing.TOP_KEEP["Depth"][0] < drawing.TOP_CENTER[0]
 
 
-def test_bore_dome_and_mounting_hole_have_inspectable_gdt() -> None:
+def test_pedestal_has_no_gdt_or_basic_dimensions() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'datum="A"' in source
-    assert 'datum="B"' in source
-    assert 'datum="D"' in source
-    assert 'characteristic="position"' in source
-    assert 'characteristic="profile_surface"' in source
-    assert 'quantity="CROWN + 2 FLANKS + FOOT TOP + RIGHT SIDE"' in source
-    assert 'quantity="DATUM D FACE"' in source
-    assert 'datums=("A", "B", "D")' in source
-    assert "leader_attach_xy=" in source
-    assert 'characteristic="flatness"' in source
-    assert 'characteristic="perpendicularity"' in source
-    assert source.count("_add_circle_basic(") == 4  # helper plus three calls
-    assert 'orientation="horizontal"' in source
-    assert 'orientation="vertical"' in source
-    assert "set_arc_endpoints_to_center(" in source
-    assert 'label="flange-hole true position"' in source
-    assert drawing.SURFACE_FINISHES is arbor_pedestal_spec.SURFACE_FINISHES
-    assert drawing.SURFACE_FINISHES[0].roughness_ra == _surface_finish.MACHINED
+    for helper in (
+        "add_datum_feature(",
+        "add_feature_control_frame(",
+        "set_basic_dimension(",
+        "project_part_pmi(",
+    ):
+        assert helper not in source, helper
+    assert "datum=" not in source
+    assert "characteristic=" not in source
+    assert not hasattr(arbor_pedestal_spec, "GEOMETRIC_TOLERANCES_MM")
+    assert not hasattr(arbor_pedestal_spec, "DOME_DIA")
+    assert not hasattr(arbor_pedestal_spec, "SCREW_CLEARANCE_DIA")
+
+
+def test_reamed_running_bore_carries_one_surface_finish_control() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert drawing.DIMENSION_CALLOUTS["BoreDia"].startswith("REAM THRU")
+    assert len(arbor_pedestal_spec.SURFACE_FINISHES) == 1
+    control = arbor_pedestal_spec.SURFACE_FINISHES[0]
+    assert control.key == "arbor_bore"
+    assert control.roughness_um == 1.6
+    assert control.face.contains_y_mm == arbor_pedestal_spec.BORE_HEIGHT
     assert 'surface_finish_by_key(SURFACE_FINISHES, "arbor_bore")' in source
-    assert 'for name in ("Width", "FootHt"):' in source
-    assert 'label="far-face depth coordinate"' in source
-    assert 'label="strap near-face profile"' in source
-    assert 'label="coplanar far-face profile"' in source
-    assert "flank_rise = BORE_HEIGHT - FOOT_HEIGHT" in source
-    assert "(FOOT_WIDTH / 2.0 - TOP_RADIUS) * flank_rise / BORE_HEIGHT" in source
-    common_source = Path(drawing.__file__).with_name("_drawing_common.py").read_text(
-        encoding="utf-8"
-    )
-    assert 'display.SetText(_DIMENSION_TEXT_CALLOUT_BELOW, "")' in common_source
-    assert "BASIC dimension retained below-text" in common_source
-    notes = arbor_pedestal_spec.DRAWING_NOTES
-    assert "CYLINDRICAL ZONE" not in notes
-    assert "FINISH RA" not in notes
+    assert "add_surface_finish(" in source
+    assert model_toleranced_dimensions(part) == {
+        ("BoreProfile", "BoreDia"): "*deviations(BORE_DIA_BAND)"
+    }
 
 
-def test_view_scales_are_explicit() -> None:
+def test_projected_view_alignment_is_explicit() -> None:
     assert drawing.SHEET_SCALE == (2.0, 1.0)
-    assert drawing.FRONT_CENTER == (0.100, 0.150)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("scale=(2, 1)") == 3  # elevation + plan + pictorial
-    assert "frame_xy=(0.185, 0.080)" in source
-    assert "frame_xy=(0.020, 0.105)" in source
+    assert drawing.FRONT_CENTER == (0.135, 0.125)
+    assert drawing.TOP_CENTER == (drawing.FRONT_CENTER[0], 0.215)
+    assert drawing.TOP_CENTER[0] == drawing.FRONT_CENTER[0]
 
 
-def test_part_stamps_make_critical_properties() -> None:
+def test_part_stamps_make_flexible_material_and_protective_finish() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "apply_drawing_properties" in source
     assert "clear_dimensions_for_drawing" in source
+    assert part.MATERIAL == "Plain Carbon Steel"
     import _config
 
     config = _config.parts("arbor-pedestal")
-    assert "A48" in str(config["material_specification"])
-    assert "A48" in str(config["material"])
-    finish = str(config["finish"]).lower()
-    assert "sspc-sp3" in finish
-    assert "black japan varnish" in finish
-    assert "2 coats" in finish
-    assert "25-50um dft" in finish
-    assert "mask" not in finish
-    # Two identical castings: the south pedestal plus the north one rotated
+    assert config["material"] == "LOW-CARBON STEEL OR GRAY IRON"
+    assert config["material_specification"] == "LOW-CARBON STEEL OR GRAY IRON"
+    assert config["finish"] == (
+        "BLACK JAPAN/ENAMEL; MASK BORE AND FOOT SEAT; OIL BARE MACHINED SURFACES"
+    )
+    assert config["process"] == "machined from solid stock or casting"
+    # Two identical pedestals: the south support plus the north one rotated
     # 180 about Y (build_drive_train_assembly places both).
     assert int(config["quantity"]) == 2

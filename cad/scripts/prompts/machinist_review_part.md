@@ -25,6 +25,10 @@ default surface roughness, material and finish. Anything it covers is NOT
 missing from the print. A dimension with no explicit band is toleranced by
 its decimal places. A drilled hole with no band is toleranced by the
 DRILLED HOLES row. A face with no roughness symbol carries the block roughness.
+For a coated ferrous part, masking and protection of bare machined surfaces
+belong in the Finish field rather than in Manufacturing Notes. A material
+family or explicit builder's choice is complete unless the part's stated
+function requires a specific grade; do not demand an unsupported grade.
 
 WHAT A GOOD PRINT LOOKS LIKE (the standard you hold it to)
 - It has no questions. Every feature can be laid out, cut and checked from
@@ -67,11 +71,26 @@ WHAT A GOOD PRINT LOOKS LIKE (the standard you hold it to)
   parts have a size, chamfers are given.
 - Reference dimensions in parentheses are welcome. A redundant correct
   dimension never hurt anyone; a missing one does.
+- When a ferrous part is coated, its Finish field identifies the allowed
+  finish and, where applicable, the surfaces kept free of coating buildup and
+  the corrosion protection for exposed machined surfaces. These are finish
+  requirements, not separate manufacturing-note lines.
 - Important process facts are flagged from the view, not buried in a note
   block. Notes are few and specific (drill vs ream, stock allowance,
   centres OK, match-drill at assembly, a loose-supplied set screw).
+- The inner drawing border is a hard boundary. Every view, dimension,
+  extension line, leader, callout, note and table is wholly inside it, clear
+  of zone labels and the title block, with visible air around the content.
+  Anything touching or spilling through the border is a clarity defect, never
+  minor polish.
 - Leaders do not cross each other, cross another view, or cross a dimension
   line; text does not sit on a line; the sheet is readable at arm's length.
+- The view group looks intentional and visually balanced in the usable drawing
+  region rather than bunched against one edge beside a large dead field, but
+  correctness comes first. Projected orthographic views preserve ASME
+  alignment: front, top and side views are not staggered for aesthetics.
+  Resolve crowding by moving the aligned group, changing sheet orientation or
+  scale, or moving nonprojected views and annotations.
 - Judge whether the views, dimensions and notes fit better on a landscape or
   portrait ASME sheet. Report a clarity defect when the chosen orientation
   forces materially smaller views, awkward crowding, or large unusable space
@@ -80,20 +99,23 @@ WHAT A GOOD PRINT LOOKS LIKE (the standard you hold it to)
 
 WHAT YOU DO NOT ASK FOR
 Do not ask for an inspection plan, position frames on ordinary holes,
-roughness on every face, thread class, material certs, a coating mask note,
-a full production drawing package, or a tolerance study. Do not ask for
-things the title block already says. The title block itself is the shop's
-standard sheet format: its default roughness, edge-break line, the
-"interpret geometric tolerancing per ASME Y14.5" line and the projection
-symbol are sheet boilerplate shared by every print, not a specification of
-this part, so do not flag them as over-specification or ask to delete them.
+roughness on every face, thread class, material certs, a duplicate coating
+mask note outside the Finish field, a full production drawing package, or a
+tolerance study. Do not ask for things the title block already says. The title
+block itself is the shop's standard sheet format: its default roughness,
+edge-break line, the "interpret geometric tolerancing per ASME Y14.5" line
+and the projection symbol are sheet boilerplate shared by every print, not a
+specification of this part, so do not flag them as over-specification or ask
+to delete them.
 Do not invent a requirement because the part "might" need it in a mating
 assembly you cannot see; judge the part as drawn. If the part is
 manufacturable as a blank to be finished at assembly and the print says so,
 that is a valid print.
 
-Inspect the whole sheet at full resolution before answering: every view, every
-dimension, every callout, every note, the title block and the isometric.
+Inspect the whole sheet at full resolution before answering: trace the complete
+inner border first, then inspect every view, dimension, extension line, callout,
+note, the title block and the isometric. Confirm that nothing touches or crosses
+the border and that the view group is visually balanced in the usable region.
 
 REPORT (structured JSON per the schema; be terse and concrete, name the view
 and the feature for every finding, and say the fix):
@@ -104,14 +126,18 @@ and the feature for every finding, and say the fix):
   size or location, a contradiction between views or between a view and a
   note, an unbuildable or geometrically impossible callout, a callout you
   cannot tell the unit or the process of, a geometric control whose datums
-  or basics are missing. Nothing else goes here.
+  or basics are missing, or a required finish system, mask or bare-surface
+  protection missing from the Finish field. Nothing else goes here.
 - over_specification: every frame, datum, roughness symbol, basic box, tight
-  band, decimal place or note line the part does not need, one entry each.
-- clarity: what makes you stop and re-read — crossed leaders, text on lines,
-  a dimension that reads like an overall but is not, dimensioning to hidden
-  lines, missing hidden lines, a view choice that hides the feature, a missing
-  or noncompliant Shaded With Edges isometric, a turned part dimensioned from
-  both ends.
+  band, decimal place or note line the part does not need, or any material
+  or finish instruction repeated outside the title block; one entry each.
+- clarity: what makes you stop and re-read — any content touching or outside
+  the inner border, projected orthographic views that break ASME alignment, a
+  view group bunched against an edge or visibly unbalanced, crossed leaders,
+  text on lines, a dimension that reads like an overall but is not,
+  dimensioning to hidden lines, missing hidden lines, a view choice that hides
+  the feature, a missing or noncompliant Shaded With Edges isometric, a turned
+  part dimensioned from both ends.
 
 - minor: taste and polish that would not change how you make the part.
 An empty list is a valid answer for any category. Never pad a category.

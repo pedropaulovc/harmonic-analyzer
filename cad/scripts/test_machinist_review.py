@@ -24,6 +24,10 @@ def test_prompts_exist_and_are_calibrated_to_the_policy() -> None:
         assert "Shaded With Edges" in normalized
         assert "precision/high-quality mode" in normalized
         assert "wireframe/HLR pictorial" in normalized
+        assert "inner drawing border is a hard boundary" in normalized
+        assert "visually balanced" in normalized
+        assert "Projected orthographic views preserve ASME alignment" in normalized
+        assert "correctness comes first" in normalized
 
     assert "loaded gun" in part
     assert "Decimal places" in part
@@ -34,6 +38,10 @@ def test_prompts_exist_and_are_calibrated_to_the_policy() -> None:
     assert "granite surface plate" in part and "No CMM" in part
     assert "never call a geometric control uninspectable" in part
     assert "datum feature symbols on real, reachable surfaces" in part
+    assert "masking and protection of bare machined surfaces" in part
+    assert "builder's choice is complete" in part
+    assert "required finish system" in part
+    assert "repeated outside the title block" in part
     # Assembly packages are judged as real assembly drawings: exploded view,
     # parts list, balloons, ordered steps -- the current three-view sheets are
     # expected to FAIL this until they are built out.

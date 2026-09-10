@@ -30,7 +30,11 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
 1. **The title block is the general specification.** Units, `.XX` / `.XXX`
    linear tolerances, angular tolerance, the DRILLED HOLES `+0.10 / 0` row,
    edge break, default roughness, material and finish live there and nowhere
-   else. A note or callout never restates them.
+   else. A note or callout never restates them. Where material is non-critical,
+   name the acceptable families as explicit alternatives instead of forcing an
+   unsupported grade or saying "material not critical". For a coated ferrous
+   part, the Finish field also carries any masking and bare-surface corrosion
+   protection; those instructions do not belong in Manufacturing Notes.
 2. **Decimal places carry the tolerance.** A dimension with no explicit band
    is governed by its decimal places. A tighter band goes ON that dimension
    as a native model tolerance (`_drawing_marks.set_dimension_*_tolerance`),
@@ -71,8 +75,10 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
    dimension, never explains what a datum letter is, never narrates design
    intent, and never quotes other part numbers beyond "MATES WITH".
    Important process facts are flagged from the view (leader or flag note),
-   not buried in the block. Notes that live in `<part>_notes.py` stay there
-   (they are out of the part's rebuild closure by design).
+   not buried in the block. Coating application, masking, and oiling belong to
+   the Finish field under rule 1, not this block. Notes that live in
+   `<part>_notes.py` stay there (they are out of the part's rebuild closure by
+   design).
 7. **Views follow the machinist, not the modeller.**
    - Every drawing package includes a standard isometric projection for
      pictorial clarity. It is **Shaded With Edges** with precision geometry
@@ -89,15 +95,26 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
    - Hole callouts state the decimal Ø and the process (`Ø9.525 REAM THRU`,
      `Ø5.95 DRILL THRU`); clearance holes state the size, not the screw;
      taps are `1/4-20 ↧ 12` unless the tap-drill depth matters.
-8. **Layout is clean and uses the better sheet orientation.** No leader crosses
-   another leader, a view it does not annotate, or a dimension line; no text
-   sits on a line. Choose landscape or portrait according to the view
-   arrangement, useful drawing scale, and space needed by dimensions and notes.
-   A sparse sheet with undersized views has the wrong orientation when rotating
-   the layout would make the same content materially larger or easier to read.
-   Each `DrawingSpec` records the choice explicitly. The layout audit
-   (`_drawing_layout_check`) checks the selected template's border and title-block
-   keep-out; the eye pass and machinist review judge the fit of the content.
+8. **Layout is contained, balanced, and uses the better sheet orientation.**
+   The inner drawing border is a hard boundary: every view, dimension,
+   extension line, leader, callout, note, balloon, and table stays wholly
+   inside it, clear of zone labels and the title block, with visible air
+   around the content. Touching or spilling through the border is a release
+   blocker, not cosmetic polish. No leader crosses another leader, a view it
+   does not annotate, or a dimension line; no text sits on a line.
+   Projected orthographic views preserve ASME alignment; front, top, and side
+   views are never staggered merely to improve composition. Correctness comes
+   before visual balance. Resolve crowding by moving the aligned view group,
+   choosing a better sheet orientation or scale, or repositioning nonprojected
+   views and annotations.
+   Choose landscape or portrait according to the view arrangement, useful
+   drawing scale, and space needed by dimensions and notes. A sparse sheet
+   with undersized views has the wrong orientation when rotating the layout
+   would make the same content materially larger or easier to read. Each
+   `DrawingSpec` records the choice explicitly. The layout audit
+   (`_drawing_layout_check`) checks the selected template's border and
+   title-block keep-out; the eye pass and machinist review judge every visible
+   element's containment, balance, and fit.
 9. **Assembly drawings are judged as complete assembly packages.** Every PDF
    sheet is rendered at full resolution and attached to one blind-review
    invocation. Acceptance cross-checks BOM rows, balloons, setup and assembly

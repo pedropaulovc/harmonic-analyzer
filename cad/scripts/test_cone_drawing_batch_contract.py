@@ -36,7 +36,7 @@ def test_notes_do_not_repeat_title_block_metadata() -> None:
     # general edge treatment.  Pivot-ball-mount intentionally tightens its two
     # functional shoulders to 0.10 max, rather than repeating the UOS 0.25 max.
     for part_name, spec in SHEETS:
-        notes = spec.DRAWING_NOTES.upper()
+        notes = getattr(spec, "DRAWING_NOTES", "").upper()
         for duplicate in TITLE_BLOCK_OWNED_NOTE_TEXT:
             assert duplicate not in notes, f"{part_name}: {duplicate}"
 
