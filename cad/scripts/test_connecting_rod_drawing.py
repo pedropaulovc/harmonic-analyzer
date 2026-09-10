@@ -59,7 +59,10 @@ def test_sheet_runs_at_1_to_1_with_1_to_2_isometric() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "scale=(1, 2)" in source  # the isometric override
     assert drawing.LEFT_CENTER == (0.080, 0.171)
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)' in source
+    assert (
+        'add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)'
+        in source
+    )
     assert connecting_rod_notes.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:2"
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
 
@@ -80,7 +83,7 @@ def test_linked_notes_are_functional_and_not_title_block_duplicates() -> None:
     assert "SHANK C/L" not in notes  # the 4.00 BASIC from datum B owns it
     assert "HEAD 10.00 W x 10.50 HIGH, R5.00 CROWN" in notes
     assert "PIN C/L 2.40 BELOW CROWN" in notes  # one line, with the 1X count
-    assert "AS CAST" in notes
+    assert "Ra " not in notes  # the title-block surface row is never restated
     assert "147.67" not in notes  # the BASIC sheet dimension owns it
     assert "LINEAR +/-" not in notes
     assert "BA" not in notes
@@ -131,6 +134,8 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     import _config
 
     spec = _config.parts("connecting-rod")
-    assert spec["material_specification"] == "ASTM A48 Class 30 gray cast iron"
-    assert spec["finish"] == "black rough cast; bore machined"
+    assert spec["material_specification"] == "LOW-CARBON STEEL OR GRAY IRON"
+    assert spec["finish"] == (
+        "BLACK ENAMEL; MASK STRAP BORE + PIN HOLE; OIL BARE MACHINED SURFACES"
+    )
     assert int(spec["quantity"]) == 20

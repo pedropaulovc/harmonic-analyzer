@@ -76,7 +76,7 @@ ANCHOR_HOLE_SPEC = HoleSpec(
 # The 118-degree drill point extends another 0.679: back-face wall is 0.821.
 
 # No roughness callouts: the arm is pinned to its crankshaft, so nothing runs
-# on the bore; the title block's Ra 3.2 covers every face
+# on the bore; every face is "as cast/machined" per the title block
 # (cad/docs/drawing-simplicity-policy.md rule 5).
 SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
 

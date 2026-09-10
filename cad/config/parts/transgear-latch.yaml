@@ -1,5 +1,5 @@
 transgear-latch:
   number: MHA-079
-  material: Plain Carbon Steel
+  material_family: ferrous_noncritical
   tolerance_class: machined_block
   process: "machined (steel)"

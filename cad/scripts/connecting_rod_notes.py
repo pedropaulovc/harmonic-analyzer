@@ -14,10 +14,11 @@ from __future__ import annotations
 # The strap-bore fit rides the Ø30.80 dimension callout (+0.10/0); the ring
 # centre-to-pin distance is a BASIC sheet dimension.  Notes carry only what the
 # sheet does not dimension natively, so no number appears in both places.
-# Kept to 10 display lines: the notes share the left column with the 170 mm
+# Kept to 9 display lines: the notes share the left column with the 170 mm
 # stepped-thickness view (outline ~180 mm tall), and the column between the
 # bottom border and the top zone border is ~186 mm -- a taller block either
-# overlaps the view or pushes it across the border (layout audit).
+# overlaps the view or pushes it across the border (layout audit).  The
+# title-block surface row is never restated here (simplicity policy rule 1).
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  build_connecting_rod marks exactly these. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
@@ -37,7 +38,6 @@ DRAWING_NOTES = "\n".join(
         "   SHOULDERS RISE 1.20 OFF THE 8.00 SHANK.",
         "5. PIN C/L 2.40 BELOW CROWN; PIN HOLE 1X.",
         "6. FILLETS R1.0 MAX; NO DRAFT REQUIRED.",
-        "7. GENERAL Ra 3.2: MACHINED ONLY; OTHERS AS CAST.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"

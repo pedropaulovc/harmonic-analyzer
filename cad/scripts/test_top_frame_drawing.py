@@ -245,7 +245,7 @@ def test_part_stamps_make_critical_properties() -> None:
 
     config = _config.parts("top-frame")
     assert config["material"] == config["material_specification"]
-    assert "gray cast iron" in str(config["material_specification"]).lower()
+    assert config["material_specification"] == "LOW-CARBON STEEL OR GRAY IRON"
     finish = str(config["finish"]).lower()
     assert "sspc-sp3" in finish
     assert "alkyd primer/green enamel" in finish

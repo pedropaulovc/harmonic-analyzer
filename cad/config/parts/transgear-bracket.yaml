@@ -1,5 +1,5 @@
 transgear-bracket:
   number: MHA-109
-  material: Gray Cast Iron
+  material_family: ferrous_noncritical
   tolerance_class: machined_block
   process: "cast + machined"

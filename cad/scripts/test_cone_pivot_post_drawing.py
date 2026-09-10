@@ -98,7 +98,7 @@ def test_journal_axis_table_matches_the_inclined_v2_bore() -> None:
 
 def test_manufacturing_notes_describe_the_bossed_casting() -> None:
     notes = spec.DRAWING_NOTES
-    assert "CAST ASTM A48 CLASS 30" in notes
+    assert "A48" not in notes
     assert "MACHINE FOOT, BOSSES, BORES AND MOUNTING HOLES" in notes
     assert "MAIN-BODY OD" in notes
     assert "INCLINED JOURNAL AXIS" in notes
@@ -216,8 +216,8 @@ def test_part_config_is_a_machined_casting() -> None:
     import _config
 
     config = _config.parts("cone-pivot-post")
-    assert "A48" in str(config["material_specification"])
-    assert "A48" in str(config["material"])
+    assert config["material_specification"] == "LOW-CARBON STEEL OR GRAY IRON"
+    assert config["material"] == "LOW-CARBON STEEL OR GRAY IRON"
     assert "RAL 6005" in str(config["finish"])
     assert "SSPC-SP 3" in str(config["finish"])
     assert "50-75 um DFT" in str(config["finish"])

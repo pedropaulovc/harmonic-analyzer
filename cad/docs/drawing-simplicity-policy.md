@@ -29,12 +29,17 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
 
 1. **The title block is the general specification.** Units, `.XX` / `.XXX`
    linear tolerances, angular tolerance, the DRILLED HOLES `+0.10 / 0` row,
-   edge break, default roughness, material and finish live there and nowhere
-   else. A note or callout never restates them. Where material is non-critical,
-   name the acceptable families as explicit alternatives instead of forcing an
-   unsupported grade or saying "material not critical". For a coated ferrous
-   part, the Finish field also carries any masking and bare-surface corrosion
-   protection; those instructions do not belong in Manufacturing Notes.
+   edge break, the surface row, material and finish live there and nowhere
+   else. A note or callout never restates them. The surface row is a process
+   statement (`CAST/MACHINED`), not a roughness number: a part may
+   be cast or cut from bar, as-cast skin can never meet a number, and "as
+   machined" on a manual machine already lands where a general grade would.
+   Where material is non-critical, name the acceptable families as explicit
+   alternatives (`material_family` in the part registry, e.g.
+   `LOW-CARBON STEEL OR GRAY IRON`) instead of forcing an unsupported grade or
+   saying "material not critical". For a coated ferrous part, the Finish field
+   also carries any masking and bare-surface corrosion protection; those
+   instructions do not belong in Manufacturing Notes.
 2. **Decimal places carry the tolerance.** A dimension with no explicit band
    is governed by its decimal places. A tighter band goes ON that dimension
    as a native model tolerance (`_drawing_marks.set_dimension_*_tolerance`),
@@ -63,10 +68,10 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
    dimension.
 5. **Roughness symbols only on surfaces that run, slide or seat a knife or
    ball.** A `shaft_in_bushing` journal or bore, a `cam_follower_contact`
-   face, the amplitude-bar slide, the knife edge and its seat. Gear seats,
-   register faces, clamp faces and anything else are covered by the block's
-   `Ra 3.2`. `GROUND_UM` (0.8) is reserved for knife edges and pivot-screw
-   shoulders.
+   face, the amplitude-bar slide, the knife edge and its seat carry
+   `MACHINED_UM` (1.6). Gear seats, register faces, clamp faces and anything
+   else are "as cast/machined" per the title block and carry no symbol.
+   `GROUND_UM` (0.8) is reserved for knife edges and pivot-screw shoulders.
 6. **Notes: few, specific, and never a dimension.** At most four short lines
    of part-specific process facts a machinist cannot read off the views:
    drill vs. ream, stock allowance ("16 STOCK OK"), "CENTRES OK", match-drill

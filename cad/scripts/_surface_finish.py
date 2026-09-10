@@ -22,11 +22,11 @@ vocabulary.
    **microinches** — ``Ra 1.6`` on an inch print reads as 1.6 µin, a ~40x finer
    surface than intended and one no shop process produces.
 
-   The repo already holds both conventions: ``cad/config/title_block.yaml``
-   carries ``value_uin: 125`` alongside the display string ``Ra 3.2``.  Nothing
-   reconciles them today.  When issue #290 flips the generated drawings to inch
-   display, this module is the ONE place that has to grow a µin rendering —
-   which is the whole point of collapsing the literals here first.
+   The title block carries no roughness number at all (its surface row is the
+   process statement ``CAST/MACHINED``), so these callouts are the
+   ONLY roughness ink on a sheet — and when issue #290 flips the generated
+   drawings to inch display, this module is the ONE place that has to grow a
+   µin rendering, which is the whole point of collapsing the literals here.
 """
 
 from __future__ import annotations
@@ -44,7 +44,8 @@ from _gtol_spec import FaceSpec, pmi_annotation_name
 GROUND_UM = 0.8
 # MACHINED — the general turned/milled finish for a located or bearing surface
 # that is not ground: reamed bores, gear seats, journal diameters, register
-# faces.  The project's default whenever a surface is called out at all.
+# faces.  The project's default whenever a surface is called out at all; a
+# surface with no callout is "as cast/machined" per the title block.
 MACHINED_UM = 1.6
 
 
@@ -110,7 +111,5 @@ def surface_finish_by_key(
     """Resolve one stable surface-finish row by semantic key."""
     matches = [control for control in controls if control.key == key]
     if len(matches) != 1:
-        raise ValueError(
-            f"surface-finish key {key!r} resolved {len(matches)} controls"
-        )
+        raise ValueError(f"surface-finish key {key!r} resolved {len(matches)} controls")
     return matches[0]

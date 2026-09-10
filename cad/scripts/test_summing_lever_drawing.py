@@ -118,7 +118,7 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     import _config
 
     spec = _config.parts("summing-lever")
-    assert spec["material_specification"] == "ASTM A48 Class 30 gray cast iron"
+    assert spec["material_specification"] == "LOW-CARBON STEEL OR GRAY IRON"
     assert spec["finish"] == "green enamel; knife edges + anchor bore machined"
     assert int(spec["quantity"]) == 1
 
