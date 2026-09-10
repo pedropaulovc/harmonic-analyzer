@@ -58,7 +58,6 @@ from pinion_handle_spec import (
     ISOMETRIC_VIEW_NOTE,
     ROD_DIA,
     ROD_DOWN,
-    ROD_HOLE_REAM_BAND,
     ROD_HOLE_DIA,
     ROD_UP,
     SURFACE_FINISHES,
@@ -362,9 +361,6 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_prefix(adapter, "CapProfile", "CapR", "SR")
     set_dimension_bilateral_tolerance(
         adapter, "Tube", "TubeLen", *deviations(TUBE_LENGTH_BAND)
-    )
-    set_dimension_bilateral_tolerance(
-        adapter, "RodHoleProfile", "RodHoleDia", *deviations(ROD_HOLE_REAM_BAND)
     )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

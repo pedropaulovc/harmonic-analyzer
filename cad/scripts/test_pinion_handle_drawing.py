@@ -109,6 +109,11 @@ def rendered_recipe(monkeypatch, tmp_path):
         for annotation in annotations:
             annotation.reference = annotation.name in names
 
+    def offset(_adapter, annotations, positions):
+        for annotation in annotations:
+            if annotation.name in positions:
+                annotation.text_xy = positions[annotation.name]
+
     def measured(_adapter, view, **kwargs):
         annotation = SimpleNamespace(name=kwargs.pop("label"), view=view, **kwargs)
         dimensions.append(annotation)
@@ -136,6 +141,7 @@ def rendered_recipe(monkeypatch, tmp_path):
     monkeypatch.setattr(drawing, "set_dimension_callouts", callouts)
     monkeypatch.setattr(drawing, "set_dimension_precision", precision)
     monkeypatch.setattr(drawing, "set_reference_dimensions", reference)
+    monkeypatch.setattr(drawing, "offset_dimension_text", offset)
     monkeypatch.setattr(drawing, "_checked_dimension", measured)
     monkeypatch.setattr(drawing, "auto_center_marks", lambda *args, **kwargs: True)
     monkeypatch.setattr(drawing, "_add_body_centerline", lambda *args, **kwargs: None)
@@ -223,10 +229,7 @@ def test_body_dimensions_are_direct_baselines_not_note_substitutes(rendered_reci
         assert forbidden not in spec.DRAWING_NOTES.upper()
 
 
-def test_body_hole_and_socket_fit_limits_remain_native():
-    hole_low = spec.ROD_HOLE_DIA + spec.ROD_HOLE_REAM_BAND[1]
-    hole_high = spec.ROD_HOLE_DIA + spec.ROD_HOLE_REAM_BAND[0]
-    assert (hole_low, hole_high) == pytest.approx((6.000, 6.010))
+def test_socket_fit_limits_remain_native():
     assert (
         spec.TUBE_ID + spec.TUBE_ID_BAND[1],
         spec.TUBE_ID + spec.TUBE_ID_BAND[0],
@@ -239,8 +242,9 @@ def test_recipe_preserves_fine_fit_digits_without_tightening_routine_features(
     dims = rendered_recipe.dimensions
     assert dims["RodDia"].precision == 1
     assert dims["RodDia"].reference
-    assert dims["RodHoleDia"].precision == dims["TubeId"].precision == 3
-    assert dims["GripDia"].precision == dims["TubeOd"].precision == 2
+    assert dims["TubeId"].precision == 3
+    assert dims["RodHoleDia"].precision == 1
+    assert dims["GripDia"].precision == dims["TubeOd"].precision == 1
     assert dims["CapR"].precision == 1
     assert dims["RodSpan"].precision == 1
 

@@ -27,9 +27,8 @@ from pinion_handle_geometry import (
     WALL_T as WALL_T,
 )
 
-# Reamed holes retain native size tolerances. Match the cross rod to its body
-# for a light press fit; routine lengths use the title-block tolerances.
-ROD_HOLE_REAM_BAND = (0.005, -0.005)  # body cross-hole ream tolerance
+# Match the cross rod to its body for a light press fit. Only the arbor socket
+# and its seating depth require native size tolerances.
 TUBE_ID_BAND = REAM_SLIDE
 TUBE_LENGTH_BAND = (0.10, 0.00)
 

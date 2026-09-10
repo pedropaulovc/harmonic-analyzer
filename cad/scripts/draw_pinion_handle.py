@@ -30,6 +30,7 @@ from _drawing_common import (
     finalize_drawing,
     model_point_in_view,
     new_project_drawing,
+    offset_dimension_text,
     read_required_properties,
     set_arc_endpoints_to_center,
     set_arc_endpoints_to_max,
@@ -79,7 +80,7 @@ FRONT_CENTER = (0.075, 0.150)
 RIGHT_CENTER = (0.175, 0.150)
 TOP_CENTER = (0.075, 0.230)
 SECTION_CENTER = (0.295, 0.155)
-ASSEMBLED_CENTER = (0.115, 0.058)
+ASSEMBLED_CENTER = (0.115, 0.090)
 ROD_END_CENTER = (0.220, 0.050)
 ISO_CENTER = (0.355, 0.225)
 SECTION_SCALE = (3, 1)
@@ -91,12 +92,12 @@ FRONT_KEEP = {
     "GripDia": (0.035, 0.175),
     "TubeOd": (0.035, 0.155),
 }
-TOP_KEEP = {"RodHoleDia": (0.120, 0.255), "CapR": (0.035, 0.235)}
+TOP_KEEP = {"RodHoleDia": (0.104, 0.215), "CapR": (0.048, 0.260)}
 SECTION_KEEP = {"TubeLen": (0.347, 0.145), "TubeId": (0.250, 0.114)}
-ASSEMBLED_KEEP = {"RodSpan": (0.115, 0.024)}
+ASSEMBLED_KEEP = {"RodSpan": (0.115, 0.032)}
 ROD_END_KEEP = {"RodDia": (0.220, 0.078)}
 SIDE_DIAMETERS = {"GripDia": (0.228, 0.173), "TubeOd": (0.140, 0.178)}
-ROD_DIAMETER_XY = (0.168, 0.081)
+ROD_DIAMETER_XY = (0.202, 0.106)
 DIMENSION_CALLOUTS = {
     "TubeId": "REAM",
     "TubeLen": "SEATING DEPTH",
@@ -104,12 +105,12 @@ DIMENSION_CALLOUTS = {
     "RodSpan": "OAL",
 }
 DIMENSION_PRECISION = {
-    "GripDia": 2,
-    "TubeOd": 2,
+    "GripDia": 1,
+    "TubeOd": 1,
     "TubeId": 3,
     "TubeLen": 2,
     "CapR": 1,
-    "RodHoleDia": 3,
+    "RodHoleDia": 1,
     "RodDia": 1,
     "RodSpan": 1,
 }
@@ -228,6 +229,10 @@ def _checked_dimension(
         raise RuntimeError(
             f"{label}: measured {measured_mm:g}, expected {expected_mm:g} mm"
         )
+    annotation = _early_bound(native.GetAnnotation(), "IAnnotation")
+    set_dimension_precision(
+        adapter, [annotation], {dimension_name(adapter, annotation): 1}
+    )
     return display
 
 
@@ -424,6 +429,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     set_dimension_precision(adapter, annotations, DIMENSION_PRECISION)
     set_reference_dimensions(adapter, annotations, {"RodDia"})
+    offset_dimension_text(adapter, annotations, {"TubeLen": (0.378, 0.145)})
 
     # Visible shoulders and crown root, all measured from the flat socket end.
     end = (0.0, TUBE_OD / 4.0, HUB_END_Z)
@@ -431,7 +437,7 @@ async def build(adapter: Any) -> dict[str, str]:
         (SHOULDER_Z, 0.188, HUB_END_Z - SHOULDER_Z, "hub projection"),
         (CROWN_ROOT_Z, 0.202, HUB_END_Z - CROWN_ROOT_Z, "socket end to crown root"),
     ):
-        _checked_dimension(
+        baseline = _checked_dimension(
             adapter,
             right,
             p0=end,
@@ -441,6 +447,12 @@ async def build(adapter: Any) -> dict[str, str]:
             expected_mm=expected,
             orientation="horizontal",
         )
+        if station == CROWN_ROOT_Z:
+            # Overall length, sphere radius and grip diameter define this junction.
+            reference = _early_bound(baseline, "IDisplayDimension")
+            reference.ShowParenthesis = True
+            if not reference.ShowParenthesis:
+                raise RuntimeError("crown-root baseline was not shown as reference")
     _checked_dimension(
         adapter,
         right,
@@ -469,7 +481,7 @@ async def build(adapter: Any) -> dict[str, str]:
         assembled,
         p0=(GRIP_DIA / 2.0, 0.0, CROWN_ROOT_Z),
         p1=(0.0, -ROD_DOWN, 0.0),
-        text_xy=(0.080, 0.093),
+        text_xy=(0.080, 0.125),
         label="rod placement from body axis",
         expected_mm=ROD_DOWN,
         orientation="horizontal",
@@ -483,11 +495,11 @@ async def build(adapter: Any) -> dict[str, str]:
     for text, xy in (
         ("BODY", (0.158, 0.120)),
         ("BODY CROSS-HOLE", (0.047, 0.195)),
-        ("CROSS ROD IN BODY", (0.050, 0.115)),
+        ("CROSS ROD IN BODY", (0.058, 0.068)),
     ):
         if add_note(adapter, text, *xy) is None:
             raise RuntimeError(f"failed to add {text} view caption")
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.050, 0.107)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.058, 0.060)
     add_property_linked_note(adapter, "Isometric View Note", 0.322, 0.196)
     return await finalize_drawing(
         adapter,
