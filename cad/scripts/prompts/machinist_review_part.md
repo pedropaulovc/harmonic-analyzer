@@ -84,8 +84,10 @@ WHAT A GOOD PRINT LOOKS LIKE (the standard you hold it to)
   those limits, and its decimal places are just the number's spelling — never
   ask it to grow a decimal place to "match" the band.
 - For every explicit size band, calculate upper minus lower limit: 0.005 mm
-  total is 5 micrometres, equivalent to ±0.0025 mm. First ask whether the
-  function needs that precision; being printed does not establish necessity.
+  total is 5 micrometres, the same width as ±0.0025 mm. Preserve the original
+  nominal and asymmetric limits when checking a fit; equal widths do not mean
+  equal fits. First ask whether the function needs that precision; being
+  printed does not establish necessity.
   Unneeded precision is over_specification even when burdensome to achieve,
   not a capability blocker. A capability blocker requires BOTH an essential
   functional need and a substantiated conflict with the allowed machining or
