@@ -1,0 +1,704 @@
+{
+  "date": "2026-09-10",
+  "scope": "Focused pinion-cam native datum controls, complete corrected drawing and cold reopen only. No tests, lint, full gate, commit or push.",
+  "root_cause": "Bore-bottom selection starts the diagonal B leader on a different circular normal. ForcedShoulder remains true, so the bushing true-to-false helper correction correctly does not apply. The requested point is feasible: the native second identical request reaches it. Selecting the bore at the radial intersection with the unchanged target makes the first placement pass without retries.",
+  "correction": "Caller-only circular pick derived from bore center, sheet radius and existing symbol (0.085,0.105). Shared helper, layout and part geometry unchanged.",
+  "tolerance_decision": "Retain existing 0.003 m caller limit: radial-pick first move and cold readback error 1.8799135478422908e-05 m exceeds the existing 1.5e-05 m helper default. No new tolerance introduced.",
+  "controls": [
+    {
+      "mode": "original",
+      "center": [
+        0.105,
+        0.15495
+      ],
+      "pick": [
+        0.105,
+        0.145395
+      ],
+      "initial": {
+        "position": [
+          0.10487485389098805,
+          0.13539540055330007,
+          0.013500000051000003
+        ],
+        "forced": true,
+        "shoulder": true,
+        "dangling": false,
+        "circles": [
+          [
+            0.0,
+            0.0,
+            0.009000000034000002,
+            0.0,
+            0.0,
+            1.0,
+            0.00318499998
+          ]
+        ]
+      },
+      "moves": [
+        {
+          "request": [
+            0.085,
+            0.105
+          ],
+          "ok": true,
+          "position": [
+            0.08613973091020674,
+            0.10784647795054764,
+            0.013500000051000003
+          ],
+          "forced": true,
+          "error_m": 0.003066174044413423,
+          "rebuilt_position": [
+            0.08613973091020674,
+            0.10784647795054764,
+            0.013500000051000003
+          ],
+          "dangling": false,
+          "attachment_unchanged": true
+        },
+        {
+          "request": [
+            0.085,
+            0.105
+          ],
+          "ok": true,
+          "position": [
+            0.08500000000000062,
+            0.10499999999999976,
+            0.013500000051000003
+          ],
+          "forced": true,
+          "error_m": 6.546139416680338e-16,
+          "rebuilt_position": [
+            0.08500000000000062,
+            0.10499999999999976,
+            0.013500000051000003
+          ],
+          "dangling": false,
+          "attachment_unchanged": true
+        },
+        {
+          "request": [
+            0.085,
+            0.095
+          ],
+          "ok": true,
+          "position": [
+            0.08502938926170331,
+            0.09508809431201495,
+            0.013500000051000003
+          ],
+          "forced": true,
+          "error_m": 9.28673059416122e-05,
+          "rebuilt_position": [
+            0.08502938926170331,
+            0.09508809431201495,
+            0.013500000051000003
+          ],
+          "dangling": false,
+          "attachment_unchanged": true
+        },
+        {
+          "request": [
+            0.085,
+            0.105
+          ],
+          "ok": true,
+          "position": [
+            0.08502847540046732,
+            0.10507111731272263,
+            0.013500000051000003
+          ],
+          "forced": true,
+          "error_m": 7.66062699827035e-05,
+          "rebuilt_position": [
+            0.08502847540046732,
+            0.10507111731272263,
+            0.013500000051000003
+          ],
+          "dangling": false,
+          "attachment_unchanged": true
+        }
+      ]
+    },
+    {
+      "mode": "radial_pick",
+      "center": [
+        0.105,
+        0.15495
+      ],
+      "pick": [
+        0.10144830048885463,
+        0.14607963047091443
+      ],
+      "initial": {
+        "position": [
+          0.09720516406786964,
+          0.13701571568219428,
+          0.013500000051000003
+        ],
+        "forced": true,
+        "shoulder": true,
+        "dangling": false,
+        "circles": [
+          [
+            0.0,
+            0.0,
+            0.009000000034000002,
+            0.0,
+            0.0,
+            1.0,
+            0.00318499998
+          ]
+        ]
+      },
+      "moves": [
+        {
+          "request": [
+            0.085,
+            0.105
+          ],
+          "ok": true,
+          "position": [
+            0.08500698784722582,
+            0.10501745214846042,
+            0.013500000051000003
+          ],
+          "forced": true,
+          "error_m": 1.8799135478422908e-05,
+          "rebuilt_position": [
+            0.08500698784722582,
+            0.10501745214846042,
+            0.013500000051000003
+          ],
+          "dangling": false,
+          "attachment_unchanged": true
+        },
+        {
+          "request": [
+            0.085,
+            0.105
+          ],
+          "ok": true,
+          "position": [
+            0.08500000000000009,
+            0.10499999999999997,
+            0.013500000051000003
+          ],
+          "forced": true,
+          "error_m": 8.777083671441753e-17,
+          "rebuilt_position": [
+            0.08500000000000009,
+            0.10499999999999997,
+            0.013500000051000003
+          ],
+          "dangling": false,
+          "attachment_unchanged": true
+        },
+        {
+          "request": [
+            0.085,
+            0.095
+          ],
+          "ok": true,
+          "position": [
+            0.08502938926170316,
+            0.09508809431201504,
+            0.013500000051000003
+          ],
+          "forced": true,
+          "error_m": 9.286730594164287e-05,
+          "rebuilt_position": [
+            0.08502938926170316,
+            0.09508809431201504,
+            0.013500000051000003
+          ],
+          "dangling": false,
+          "attachment_unchanged": true
+        },
+        {
+          "request": [
+            0.085,
+            0.105
+          ],
+          "ok": true,
+          "position": [
+            0.08502847540046732,
+            0.10507111731272262,
+            0.013500000051000003
+          ],
+          "forced": true,
+          "error_m": 7.660626998269063e-05,
+          "rebuilt_position": [
+            0.08502847540046732,
+            0.10507111731272262,
+            0.013500000051000003
+          ],
+          "dangling": false,
+          "attachment_unchanged": true
+        }
+      ]
+    },
+    {
+      "mode": "vertical_target",
+      "center": [
+        0.105,
+        0.15495
+      ],
+      "pick": [
+        0.105,
+        0.145395
+      ],
+      "initial": {
+        "position": [
+          0.10487485389098805,
+          0.13539540055330007,
+          0.013500000051000003
+        ],
+        "forced": true,
+        "shoulder": true,
+        "dangling": false,
+        "circles": [
+          [
+            0.0,
+            0.0,
+            0.009000000034000002,
+            0.0,
+            0.0,
+            1.0,
+            0.00318499998
+          ]
+        ]
+      },
+      "moves": [
+        {
+          "request": [
+            0.105,
+            0.105
+          ],
+          "ok": true,
+          "position": [
+            0.105,
+            0.10500082722019685,
+            0.013500000051000003
+          ],
+          "forced": false,
+          "error_m": 8.272201968556603e-07,
+          "rebuilt_position": [
+            0.105,
+            0.10500082722019685,
+            0.013500000051000003
+          ],
+          "dangling": false,
+          "attachment_unchanged": true
+        },
+        {
+          "request": [
+            0.105,
+            0.105
+          ],
+          "ok": true,
+          "position": [
+            0.105,
+            0.105,
+            0.013500000051000003
+          ],
+          "forced": false,
+          "error_m": 0.0,
+          "rebuilt_position": [
+            0.105,
+            0.105,
+            0.013500000051000003
+          ],
+          "dangling": false,
+          "attachment_unchanged": true
+        },
+        {
+          "request": [
+            0.105,
+            0.095
+          ],
+          "ok": true,
+          "position": [
+            0.105,
+            0.095,
+            0.013500000051000003
+          ],
+          "forced": false,
+          "error_m": 0.0,
+          "rebuilt_position": [
+            0.105,
+            0.095,
+            0.013500000051000003
+          ],
+          "dangling": false,
+          "attachment_unchanged": true
+        },
+        {
+          "request": [
+            0.105,
+            0.105
+          ],
+          "ok": true,
+          "position": [
+            0.105,
+            0.105,
+            0.013500000051000003
+          ],
+          "forced": false,
+          "error_m": 0.0,
+          "rebuilt_position": [
+            0.105,
+            0.105,
+            0.013500000051000003
+          ],
+          "dangling": false,
+          "attachment_unchanged": true
+        }
+      ]
+    },
+    {
+      "mode": "horizontal_target",
+      "center": [
+        0.105,
+        0.15495
+      ],
+      "pick": [
+        0.105,
+        0.145395
+      ],
+      "initial": {
+        "position": [
+          0.10487485389098805,
+          0.13539540055330007,
+          0.013500000051000003
+        ],
+        "forced": true,
+        "shoulder": true,
+        "dangling": false,
+        "circles": [
+          [
+            0.0,
+            0.0,
+            0.009000000034000002,
+            0.0,
+            0.0,
+            1.0,
+            0.00318499998
+          ]
+        ]
+      },
+      "moves": [
+        {
+          "request": [
+            0.060000000000000005,
+            0.15495
+          ],
+          "ok": true,
+          "position": [
+            0.09521816270490686,
+            0.1549500000316962,
+            0.013500000051000003
+          ],
+          "forced": false,
+          "error_m": 0.03521816270490686,
+          "rebuilt_position": [
+            0.09521816270490686,
+            0.1549500000316962,
+            0.013500000051000003
+          ],
+          "dangling": false,
+          "attachment_unchanged": true
+        },
+        {
+          "request": [
+            0.060000000000000005,
+            0.15495
+          ],
+          "ok": true,
+          "position": [
+            0.060000000000000005,
+            0.15494999999999942,
+            0.013500000051000003
+          ],
+          "forced": false,
+          "error_m": 5.828670879282072e-16,
+          "rebuilt_position": [
+            0.060000000000000005,
+            0.15494999999999942,
+            0.013500000051000003
+          ],
+          "dangling": false,
+          "attachment_unchanged": true
+        },
+        {
+          "request": [
+            0.060000000000000005,
+            0.14495
+          ],
+          "ok": true,
+          "position": [
+            0.060849467873950173,
+            0.14513877063942016,
+            0.013500000051000003
+          ],
+          "forced": true,
+          "error_m": 0.0008701896478242637,
+          "rebuilt_position": [
+            0.060849467873950173,
+            0.14513877063942016,
+            0.013500000051000003
+          ],
+          "dangling": false,
+          "attachment_unchanged": true
+        },
+        {
+          "request": [
+            0.060000000000000005,
+            0.15495
+          ],
+          "ok": true,
+          "position": [
+            0.06084404965288295,
+            0.1549500000007591,
+            0.013500000051000003
+          ],
+          "forced": false,
+          "error_m": 0.0008440496528829486,
+          "rebuilt_position": [
+            0.06084404965288295,
+            0.1549500000007591,
+            0.013500000051000003
+          ],
+          "dangling": false,
+          "attachment_unchanged": true
+        }
+      ]
+    }
+  ],
+  "final_cold_reopen": {
+    "pid": 15560,
+    "revision": "34.3.0",
+    "tags": [
+      {
+        "label": "B",
+        "position": [
+          0.08500698784722582,
+          0.10501745214846042,
+          0.013500000051000003
+        ],
+        "dangling": false,
+        "forced": true,
+        "circles": [
+          [
+            0.0,
+            0.0,
+            0.009000000034000002,
+            0.0,
+            0.0,
+            1.0,
+            0.00318499998
+          ]
+        ],
+        "requested": [
+          0.085,
+          0.105
+        ],
+        "error_m": 1.8799135478422908e-05
+      },
+      {
+        "label": "C",
+        "position": [
+          0.14235212941717085,
+          0.11657280159808653,
+          0.013500000051
+        ],
+        "dangling": false,
+        "forced": true,
+        "circles": [
+          [
+            0.0,
+            -0.001399999994,
+            0.009000000034,
+            0.0,
+            0.0,
+            1.0,
+            0.005159999967
+          ]
+        ]
+      },
+      {
+        "label": "A",
+        "position": [
+          0.0685,
+          0.25,
+          0.004950000040500048
+        ],
+        "dangling": false,
+        "forced": false,
+        "circles": [
+          [
+            0.0,
+            -0.001399999994,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.005159999967
+          ]
+        ]
+      },
+      {
+        "label": "D",
+        "position": [
+          0.1944596997724622,
+          0.17061177148079715,
+          0.010819999973000025
+        ],
+        "dangling": false,
+        "forced": true,
+        "circles": [
+          [
+            0.0,
+            -0.00706,
+            0.0017,
+            0.0,
+            1.0,
+            0.0,
+            0.001599999975
+          ]
+        ]
+      }
+    ],
+    "collar_od": {
+      "name": "CollarOd",
+      "position": [
+        0.035,
+        0.12,
+        -0.013497382240279195
+      ],
+      "system_values_m": [
+        0.010319999934
+      ],
+      "dangling": false
+    },
+    "artifacts": {
+      "cad\\out\\slddrw\\pinion-cam.SLDDRW": "a913b0200894694891423e6e82d5e52e859b4b282f0ff50d9d60bc97e7cbfa7d",
+      "cad\\out\\pdf\\pinion-cam.pdf": "7ba97e1869cd09b34d7edf7ba0731be8aab415ba0a19623a32805ef2cfa12861",
+      "cad\\out\\png\\pinion-cam_drawing.png": "8fc4aeb81d1e27f0092ace1e4220118846b029977a0a9c23cf2282386e6c5222"
+    },
+    "recipe_sha256": "3c267a68d40dd71a141a8b7aebaecb03b7dd7b7df5a80995ae94c5ea9230061b",
+    "remaining_documents": 0
+  },
+  "visual": "Latest whole-sheet PNG inspected: OD 10.32 +/-0.05 callout lies fully inside left inner border with a clear gap. Datum B radial pick, position, bore attachment and all other callouts retained.",
+  "frozen_files": {
+    "cad/scripts/draw_pinion_cam.py": "3c267a68d40dd71a141a8b7aebaecb03b7dd7b7df5a80995ae94c5ea9230061b",
+    "cad/scripts/test_pinion_cam_drawing.py": "38369f03265563b58cf0f66dee4d0dd7d6843222cb776b7fba2e36b340c67c19"
+  },
+  "raw_local_control_receipt": "cad/out/reports/cam-datum-probe/receipt.json",
+  "before_layout_correction": {
+    "pid": 15560,
+    "revision": "34.3.0",
+    "tags": [
+      {
+        "label": "B",
+        "position": [
+          0.08500698784722582,
+          0.10501745214846042,
+          0.013500000051000003
+        ],
+        "forced": true,
+        "dangling": false,
+        "circles": [
+          [
+            0.0,
+            0.0,
+            0.009000000034000002,
+            0.0,
+            0.0,
+            1.0,
+            0.00318499998
+          ]
+        ],
+        "requested": [
+          0.085,
+          0.105
+        ],
+        "error_m": 1.8799135478422908e-05
+      },
+      {
+        "label": "C",
+        "position": [
+          0.14235212941717085,
+          0.11657280159808653,
+          0.013500000051
+        ],
+        "forced": true,
+        "dangling": false,
+        "circles": [
+          [
+            0.0,
+            -0.001399999994,
+            0.009000000034,
+            0.0,
+            0.0,
+            1.0,
+            0.005159999967
+          ]
+        ]
+      },
+      {
+        "label": "A",
+        "position": [
+          0.0685,
+          0.25,
+          0.004950000040500048
+        ],
+        "forced": false,
+        "dangling": false,
+        "circles": [
+          [
+            0.0,
+            -0.001399999994,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.005159999967
+          ]
+        ]
+      },
+      {
+        "label": "D",
+        "position": [
+          0.1944596997724622,
+          0.17061177148079715,
+          0.010819999973000025
+        ],
+        "forced": true,
+        "dangling": false,
+        "circles": [
+          [
+            0.0,
+            -0.00706,
+            0.0017,
+            0.0,
+            1.0,
+            0.0,
+            0.001599999975
+          ]
+        ]
+      }
+    ],
+    "artifacts": {
+      "cad\\out\\slddrw\\pinion-cam.SLDDRW": "a22d21b6f6c6696de4948a2695ac982aca3992a31c44d5efeb9f825cbdb490f5",
+      "cad\\out\\pdf\\pinion-cam.pdf": "35ec5ce9e4334301c168dd84ad0e347c7d1e74888d5b3a20f22efef7f5eda58d",
+      "cad\\out\\png\\pinion-cam_drawing.png": "578fb63a584717276a5156ae4ce7236572fdaa1d6bc9b4b58087a35c6d182834"
+    },
+    "recipe_sha256": "7a216205c7a65ee3846b0b71909d09a583306393a15652cbf6f7050161b50074",
+    "remaining_documents": 0
+  },
+  "layout_correction": "Moved only FRONT_KEEP[CollarOd] from (0.025,0.120) to (0.035,0.120). Complete native regeneration and PNG inspection confirm the existing OD callout now lies inside the left inner border. Native model-dimension readback remains 0.010319999934 m and is not dangling; arrow still targets the OD."
+}

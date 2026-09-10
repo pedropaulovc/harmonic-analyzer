@@ -14,6 +14,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -96,7 +97,7 @@ CAM_R_SHEET = CAM_OD * SHEET_SCALE[0] / 2000.0
 FRONT_KEEP = {
     "BoreDia": (0.045, 0.165),
     "BossProjection": (0.190, 0.120),
-    "CollarOd": (0.025, 0.120),
+    "CollarOd": (0.035, 0.120),
     "CollarCy": (0.170, 0.135),
 }
 TOP_KEEP = {
@@ -211,7 +212,14 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add ASME center marks to boss end view")
 
     bore_center = (FRONT_CENTER[0], _front_y(0.0))
-    bore_bottom = (bore_center[0], bore_center[1] - BORE_R_SHEET)
+    bore_symbol = (0.085, 0.105)
+    bore_leader_dx = bore_symbol[0] - bore_center[0]
+    bore_leader_dy = bore_symbol[1] - bore_center[1]
+    bore_leader_length = math.hypot(bore_leader_dx, bore_leader_dy)
+    bore_datum_edge = (
+        bore_center[0] + BORE_R_SHEET * bore_leader_dx / bore_leader_length,
+        bore_center[1] + BORE_R_SHEET * bore_leader_dy / bore_leader_length,
+    )
     bore_right = (bore_center[0] + BORE_R_SHEET, bore_center[1])
     front_face_x = TOP_CENTER[0] - CAM_LEN * SHEET_SCALE[0] / 2000.0
     bottom_boss_center = (
@@ -240,14 +248,15 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="A",
         label="cam front end face",
     )
-    # SolidWorks restricts this axis-attached tag and live readback normalizes
-    # the requested sheet point by 2.846 mm.  Bound that annotation placement
-    # behavior without changing any part dimension or geometric tolerance.
+    # Select the bore on the ray to B's symbol, not at six o'clock. The diagonal
+    # leader otherwise starts on a different circle normal and its first move
+    # retains a 3.066 mm reorientation offset. The radial pick preserves the
+    # intended symbol location and bore attachment without relaxing its bound.
     add_datum_feature(
         adapter,
         front,
-        edge_xy=bore_bottom,
-        symbol_xy=(0.085, 0.105),
+        edge_xy=bore_datum_edge,
+        symbol_xy=bore_symbol,
         datum="B",
         label="cam final bore axis",
         position_tolerance_m=0.003,
