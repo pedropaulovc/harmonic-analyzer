@@ -30,7 +30,6 @@ from _drawing_common import (
     add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
-    import_cosmetic_threads,
     insert_hole_table,
     new_project_drawing,
     read_required_properties,
@@ -53,9 +52,7 @@ from build_rocker_arm_support import (
 from rocker_arm_support_drawing_spec import SURFACE_FINISHES
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
-    iter_views,
     place_view,
-    view_name,
 )
 
 
@@ -222,60 +219,6 @@ def _add_side_symmetry_centerline(adapter: Any) -> Any:
     return centerline
 
 
-def _remove_isometric_thread_callouts(adapter: Any, view: Any) -> int:
-    """Delete the cosmetic-thread CALLOUT notes on the pictorial view.
-
-    The four foot taps are one Hole Wizard feature whose cosmetic threads ride
-    into every view. In the orthographic views they draw the thread circles
-    the print needs; on the shaded isometric one thread also carries a generic
-    "1/2-13 Tapped Hole" callout that repeats the native hole table. That
-    callout is an ``INote`` reachable ONLY through ``ICThread.ThreadCallout``
-    (never via ``GetFirstAnnotation3``, so a text-match note sweep finds 0),
-    and the threads themselves only enumerate on the finalizer's rebuilt sheet
-    — the ``place_view`` handle sees none, so the view is re-resolved by name.
-    Returns the number of callouts deleted.
-    """
-    wanted = view_name(adapter, view)
-    bound_view = next(
-        _early_bound(v, "IView")
-        for v in iter_views(adapter)
-        if view_name(adapter, v) == wanted
-    )
-    # In-session the threads (and their callout) are unreachable until the
-    # view has explicitly imported them; the export renders them regardless.
-    seeds, _instances = import_cosmetic_threads(adapter, bound_view)
-    callouts: list[Any] = []
-    thread = bound_view.GetFirstCThread()
-    while thread is not None:
-        thread = _early_bound(thread, "ICThread")
-        next_thread = thread.GetNext()
-        note = thread.ThreadCallout
-        if note is not None:
-            callouts.append(_early_bound(note, "INote").GetAnnotation())
-        thread = next_thread
-    _telemetry.info(
-        f"isometric: {seeds} cosmetic thread(s), {len(callouts)} callout(s)"
-    )
-    draw = adapter.currentModel
-    removed = 0
-    for annotation in callouts:
-        annotation = _early_bound(annotation, "IAnnotation")
-        draw.ClearSelection2(True)
-        if not annotation.Select2(False, 0):
-            raise RuntimeError("failed to select an isometric thread callout")
-        draw.EditDelete()
-        removed += 1
-    draw.ClearSelection2(True)
-    return removed
-
-
-def _expect_one_callout_removed(removed: int) -> None:
-    if removed != 1:
-        raise RuntimeError(
-            f"isometric view removed {removed} thread callout(s), expected 1"
-        )
-
-
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -352,6 +295,10 @@ async def build(adapter: Any) -> dict[str, str]:
         label="mounting face finish",
         leader_attach_xy=(RIGHT_CENTER[0] + seat_half_w - 0.002, seat_y),
     )
+    # Attaching the symbol leaves the view's HLV edge set unregenerated (it
+    # still READS hidden-lines-visible but exports a bare taper); the toggle
+    # inside set_hidden_lines_visible regenerates it.
+    set_hidden_lines_visible(adapter, right)
 
     datum_x_axis, datum_y_axis = _bottom_datum_axes(adapter, bottom)
     # No position frame on this part (simplicity policy rule 3/4), so the hole
@@ -384,12 +331,6 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Rocker-Arm Support Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
-        # The cosmetic threads reach the views only on the finalizer's full
-        # rebuild (the view's annotation list is EMPTY during authoring), so
-        # the isometric's callout is removed there, right before export.
-        pre_export=lambda: _expect_one_callout_removed(
-            _remove_isometric_thread_callouts(adapter, iso)
-        ),
     )
 
 

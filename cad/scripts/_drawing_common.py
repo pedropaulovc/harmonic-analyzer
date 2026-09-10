@@ -15,12 +15,17 @@ from collections import Counter
 from dataclasses import dataclass, replace
 from itertools import combinations
 from pathlib import Path
-from typing import Any, Callable, Iterable, Literal, Sequence
+from typing import Any, Iterable, Literal, Sequence
 
 
 import _config
 import _telemetry
-from _common import _build_id, _early_bound, apply_custom_properties
+from _common import (
+    _build_id,
+    _early_bound,
+    _visible_document_paths,
+    apply_custom_properties,
+)
 from _gtol_spec import GTOL_SYMBOLS as _GTOL_SYMBOLS
 from _gtol_spec import gtol_frame_xml as _gtol_frame_xml
 from _surface_finish import SurfaceFinishControl
@@ -1629,14 +1634,30 @@ def set_hidden_lines_removed(adapter: Any, view: Any) -> None:
         raise RuntimeError("failed to set hidden-lines-removed drawing view")
 
 
+_SW_HLV = 1  # swDisplayMode_e.swHIDDEN_GREYED
+_SW_HLR = 2  # swDisplayMode_e.swHIDDEN
+
+
 def set_hidden_lines_visible(adapter: Any, view: Any) -> None:
     """Show hidden edges (greyed) in ``view`` -- for a view whose job is to
-    communicate internal/cross-drilled features."""
-    ok = adapter._attempt(
-        lambda: view.SetDisplayMode4(False, 1, False, False, True), default=False
-    )
-    if not ok:
-        raise RuntimeError("failed to set hidden-lines-visible drawing view")
+    communicate internal/cross-drilled features.
+
+    Always passes through HLR first. ``SetDisplayMode4`` returns False for a
+    same-mode set (a no-op, not a failure), and a view already reading HLV can
+    still export WITHOUT its dashed edges: an annotation attached to it after
+    placement (rocker-arm-support's seat finish symbol, 2026-09-09) leaves the
+    HLV edge set unregenerated and ``UpdateViewDisplayGeometry`` does not
+    rebuild it — only a real mode change does. The toggle makes the call
+    idempotent AND a regen, so recipes re-assert it after annotating a view.
+    """
+    bound = _early_bound(view, "IView")
+    bound.SetDisplayMode4(False, _SW_HLR, False, False, True)
+    bound.SetDisplayMode4(False, _SW_HLV, False, False, True)
+    mode = int(bound.GetDisplayMode2())
+    if mode != _SW_HLV:
+        raise RuntimeError(
+            f"failed to set hidden-lines-visible drawing view (mode reads {mode})"
+        )
 
 
 def assert_asme_b_sheet(
@@ -4607,7 +4628,6 @@ async def finalize_drawing(
     redundant_note_substrings: Sequence[str] = (),
     expected_redundant_notes: int = 0,
     expected_sheet_names: tuple[str, ...] | None = None,
-    pre_export: Callable[[], None] | None = None,
 ) -> dict[str, str]:
     """Enforce the sheet/view contract and export SLDDRW, PDF, and rendered PNG."""
     drawing_model = adapter.currentModel
@@ -4762,13 +4782,20 @@ async def finalize_drawing(
     if removed_notes:
         _telemetry.info(f"removed {removed_notes} redundant final drawing notes")
 
+    # COM can export before SolidWorks recomputes a changed HLR/HLV view's
+    # display geometry: a hidden-lines-visible side view exported as a bare
+    # outline while the reopened SLDDRW (which regenerates on load) showed the
+    # dashed edges. Flush every view's display geometry HERE, after all the
+    # rebuilds above and right before export — the same call at view-placement
+    # time is invalidated again by the later annotation/table imports.
+    for sheet_name in sheet_names:
+        if not ddoc.ActivateSheet(sheet_name):
+            raise RuntimeError(f"failed to activate {sheet_name!r} before export")
+        for view in iter_views(adapter):
+            _early_bound(view, "IView").UpdateViewDisplayGeometry()
+
     if not ddoc.ActivateSheet(sheet_names[0]):
         raise RuntimeError("failed to restore first drawing sheet before export")
-    # A recipe's last word on the fully-rebuilt sheet, e.g. hiding annotations
-    # that only materialise once every model annotation has been imported.
-    if pre_export is not None:
-        drawing_model.ForceRebuild3(False)
-        pre_export()
 
     # Persist the native drawing and PDF once from the fully loaded authored
     # document. Reopen/scale/save cycles are deliberately absent from this hot
@@ -4789,6 +4816,18 @@ async def finalize_drawing(
     artifacts["png"] = str(outputs.png.resolve())
     if set(artifacts) != {"drawing", "pdf", "png"}:
         raise RuntimeError(f"drawing export incomplete: {artifacts!r}")
+    # Release the file: SolidWorks keeps the saved SLDDRW open past the COM
+    # session, and the next run (or a from-scratch rebuild deleting the
+    # target) then hits "in use by another process".
+    title = str(drawing_model.GetTitle())
+    adapter.swApp.CloseDoc(title)
+    still_open = [
+        p
+        for p in _visible_document_paths(adapter)
+        if Path(p).resolve() == outputs.slddrw.resolve()
+    ]
+    if still_open:
+        raise RuntimeError(f"drawing {title!r} did not close after export")
     return artifacts
 
 

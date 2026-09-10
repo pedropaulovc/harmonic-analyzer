@@ -478,6 +478,35 @@ def _drill_tapped_holes(adapter, holes_xz, y_face_mm: float):
         raise RuntimeError(
             "hole wizard: through-all thread end condition did not persist"
         )
+    # The native drawing hole table owns the thread specification; the feature's
+    # cosmetic threads (one sub-feature per hole) would each add a generic
+    # "1/2-13 Tapped Hole" callout on the sheet. Clear only the callout TEXT on
+    # each thread, keeping the thread geometry (its dashed circles are the
+    # hidden lines the views need) and the Hole Wizard data the table reads.
+    subfeature = feat.GetFirstSubFeature()
+    cleared = 0
+    while subfeature is not None:
+        subfeature = _early_bound(subfeature, "IFeature")
+        if subfeature.GetTypeName2() == "CosmeticThread":
+            thread = _early_bound(
+                subfeature.GetDefinition(), "ICosmeticThreadFeatureData"
+            )
+            if not thread.AccessSelections(model, None):
+                raise RuntimeError("cosmetic thread: AccessSelections failed")
+            thread.ThreadCallout = ""
+            if not subfeature.ModifyDefinition(thread._oleobj_, model, null_callout()):
+                raise RuntimeError("cosmetic thread: clearing callout failed")
+            persisted_thread = _early_bound(
+                subfeature.GetDefinition(), "ICosmeticThreadFeatureData"
+            )
+            if persisted_thread.ThreadCallout:
+                raise RuntimeError("cosmetic thread: callout text did not clear")
+            cleared += 1
+        subfeature = subfeature.GetNextSubFeature()
+    if cleared != len(holes_xz):
+        raise RuntimeError(
+            f"expected {len(holes_xz)} foot cosmetic threads, found {cleared}"
+        )
     return feat
 
 
