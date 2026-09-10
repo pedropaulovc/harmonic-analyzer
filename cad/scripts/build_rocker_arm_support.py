@@ -144,12 +144,16 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_NOTES = "\n".join(
     (
         "TAPER, POCKETS + WEB SYMMETRIC ABOUT CENTRE PLANE.",
-        "MACHINE BOTH POCKETS TO LEAVE 6.35 WEB; WALLS NORMAL TO MOUNTING FACE.",
         "POCKET CENTRE 88.9 FROM MOUNTING FACE; POCKET + CAVITY CONCENTRIC.",
         "CAVITY R12.7, 4X; CHAMFER BOTH OUTER POCKET RIMS 1.27 X 45 DEG.",
     )
 )
-TITLE_BLOCK_THREAD_CLASS = ""
+# Flagged from the side view (where the web reads as the dashed pair down the
+# centre) rather than buried in the note block: the one instruction that
+# decides whether the casting survives machining.
+WEB_CALLOUT = "MACHINE BOTH POCKETS; LEAVE 6.35 WEB;\nWALLS NORMAL TO MOUNTING FACE"
+HOLE_THREAD_CLASS = "2B"  # receiver fit for the 2A lag screw (design fact; the
+# title block's THREADS row prints it, the Hole Wizard feature does not)
 
 # Hole Wizard constants (resolved from the SW type library on this seat):
 SW_FM_HOLE_WZD = 25  # swFeatureNameID_e.swFmHoleWzd (CreateDefinition)
@@ -158,7 +162,6 @@ SW_STD_ANSI_INCH = 0  # swWzdHoleStandards_e.swStandardAnsiInch
 SW_HOLE_FASTENER_TYPE = 27  # ANSI-inch straight tapped hole
 SW_END_THROUGH_ALL = 1  # swEndCondThroughAll / swEndThreadTypeTHROUGH_ALL
 HOLE_SSIZE = "1/2-13"
-HOLE_THREAD_CLASS = "2B"  # customary US class for a general tapped hole
 HOLE_TAP_DRILL_DIA = TAP_DRILL_MM[HOLE_SSIZE]
 
 # Measured source CornerFillet volume minus four through-drill cylinders.
@@ -369,7 +372,6 @@ def _drill_tapped_holes(adapter, holes_xz, y_face_mm: float):
         SW_END_THROUGH_ALL,
     )
     for prop, val in (
-        ("ThreadClass", HOLE_THREAD_CLASS),
         ("EndCondition", SW_END_THROUGH_ALL),
         ("ThreadEndCondition", SW_END_THROUGH_ALL),
     ):
@@ -446,11 +448,16 @@ def _drill_tapped_holes(adapter, holes_xz, y_face_mm: float):
 
     # Pre-create late-bound writes can silently drop on SW 2026.  Persist the
     # thread contract through the documented feature-edit flow, then verify the
-    # values that drive native hole callouts/tables.
+    # values that drive native hole callouts/tables. ThreadClass stays EMPTY on
+    # the feature: SolidWorks appends it to every native callout / table row
+    # ("1/2-13 UNC - 2B") only when the feature carries one, and the title
+    # block's THREADS row already says CLASS 2A/2B for every thread UOS — the
+    # 2B receiver fit is a design fact (HOLE_THREAD_CLASS, asserted by the
+    # frame assembly against the lag screw's 2A), not per-hole ink.
     definition = _early_bound(feat.GetDefinition(), "IWizardHoleFeatureData2")
     if not definition.AccessSelections(model, None):
         raise RuntimeError("hole wizard: AccessSelections failed")
-    definition.ThreadClass = HOLE_THREAD_CLASS
+    definition.ThreadClass = ""
     definition.EndCondition = SW_END_THROUGH_ALL
     definition.ThreadEndCondition = SW_END_THROUGH_ALL
     if not feat.ModifyDefinition(definition._oleobj_, model, null_callout()):
@@ -470,9 +477,9 @@ def _drill_tapped_holes(adapter, holes_xz, y_face_mm: float):
         raise RuntimeError(
             f"hole wizard: expected {HOLE_TAP_DRILL_DIA} mm tap drill, got {drill_mm}"
         )
-    if str(persisted.ThreadClass) != HOLE_THREAD_CLASS:
+    if str(persisted.ThreadClass or ""):
         raise RuntimeError(
-            f"hole wizard: thread class did not persist: {persisted.ThreadClass!r}"
+            f"hole wizard: thread class should be blank: {persisted.ThreadClass!r}"
         )
     if int(persisted.ThreadEndCondition) != SW_END_THROUGH_ALL:
         raise RuntimeError(
@@ -721,9 +728,8 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         PART_NAME,
         {
-            # Native Hole Wizard table entry carries 2B; omit the title-block copy.
-            "THREAD_CLASS": TITLE_BLOCK_THREAD_CLASS,
             "Manufacturing Notes": DRAWING_NOTES,
+            "Web Callout": WEB_CALLOUT,
         },
     )
     return await save_part_and_images(adapter, PART_NAME)

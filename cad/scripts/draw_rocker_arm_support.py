@@ -26,6 +26,7 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_property_linked_callout,
     add_property_linked_note,
     add_surface_finish,
     curate_view_dimensions,
@@ -47,6 +48,7 @@ from build_rocker_arm_support import (
     HALF_Y,
     HOLES,
     HOLE_TAP_DRILL_DIA,
+    WEB,
     WIDE,
 )
 from rocker_arm_support_drawing_spec import SURFACE_FINISHES
@@ -125,7 +127,6 @@ def _bottom_sheet_xy(hole_xz: tuple[float, float]) -> tuple[float, float]:
         BOTTOM_CENTER[0] + x_mm * VIEW_SCALE / 1000.0,
         BOTTOM_CENTER[1] + (z_mm + HOLE_TAP_DRILL_DIA / 2.0) * VIEW_SCALE / 1000.0,
     )
-
 
 
 def _bottom_datum_axes(adapter: Any, view: Any) -> tuple[Any, Any]:
@@ -235,6 +236,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
+            "Web Callout",
         ),
         required=(
             "Number",
@@ -242,6 +244,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
+            "Web Callout",
         ),
     )
     drawing_model, sheet = new_project_drawing(
@@ -296,7 +299,22 @@ async def build(adapter: Any) -> dict[str, str]:
         label="mounting face finish",
         leader_attach_xy=(RIGHT_CENTER[0] + seat_half_w - 0.002, seat_y),
     )
-    # Attaching the symbol leaves the view's HLV edge set unregenerated (it
+    # The pocket/web instruction is flagged FROM the view: the callout's arrow
+    # lands on the web's dashed edge (a hidden edge is pickable once the view
+    # regenerates HLV, which the seat symbol above has just invalidated — so
+    # regenerate first). Text is the part-stamped "Web Callout" property.
+    set_hidden_lines_visible(adapter, right)
+    add_property_linked_callout(
+        adapter,
+        right,
+        property_name="Web Callout",
+        edge_xy=(RIGHT_CENTER[0] + WEB * VIEW_SCALE / 1000.0, RIGHT_CENTER[1] + 0.020),
+        # Two lines, parked in the gap between the side view and the isometric
+        # (x 0.215-0.300), above the 177.8 dimension's text so the leader runs
+        # down-left onto the web without crossing it.
+        note_xy=(RIGHT_CENTER[0] + 0.048, RIGHT_CENTER[1] + 0.075),
+    )
+    # Attaching annotations leaves the view's HLV edge set unregenerated (it
     # still READS hidden-lines-visible but exports a bare taper); the toggle
     # inside set_hidden_lines_visible regenerates it.
     set_hidden_lines_visible(adapter, right)

@@ -38,27 +38,40 @@ def test_drawing_keeps_only_one_dimension_for_each_square() -> None:
 def test_manufacturing_notes_define_only_part_specific_processes() -> None:
     lines = support.DRAWING_NOTES.splitlines()
     notes = " ".join(lines)
-    assert len(lines) == 4
+    assert len(lines) == 3
     assert "SYMMETRIC ABOUT CENTRE PLANE" in notes
-    assert "6.35 WEB" in notes
     assert "88.9 FROM MOUNTING FACE" in notes
-    assert "WALLS NORMAL TO MOUNTING FACE" in notes
     assert "CAVITY R12.7, 4X" in notes
     assert "BOTH OUTER POCKET RIMS" in notes
     assert "BOTH TOP OUTER EDGES" not in notes
     # Material may be steel or iron and the seat carries its own symbol, so
-    # the notes neither assert a casting nor restate the mounting face.
+    # the notes neither assert a casting nor restate the mounting face; the
+    # web instruction is flagged from the side view, not buried here.
     assert "CASTING" not in notes
     assert "AS-CAST" not in notes
     assert "MACHINE MOUNTING FACE" not in notes
+    assert "6.35 WEB" not in notes
 
 
-def test_finish_and_thread_class_have_one_authoritative_home() -> None:
+def test_web_instruction_is_a_view_callout() -> None:
+    assert support.WEB_CALLOUT == (
+        "MACHINE BOTH POCKETS; LEAVE 6.35 WEB;\nWALLS NORMAL TO MOUNTING FACE"
+    )
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'property_name="Web Callout"' in source
+
+
+def test_thread_class_lives_in_the_title_block_not_on_the_feature() -> None:
     assert _config.parts(support.PART_NAME)["finish"] == (
         "GREEN ENAMEL; MASK MOUNTING FACE + THREADS; LIGHT OIL BARE MACHINED SURFACES"
     )
+    # 2B is the receiver fit the frame assembly asserts against the 2A lag
+    # screw; the sheet prints it once, in the title block's THREADS row, so
+    # the Hole Wizard feature carries no class (a native callout would repeat it).
     assert support.HOLE_THREAD_CLASS == "2B"
-    assert support.TITLE_BLOCK_THREAD_CLASS == ""
+    source = Path(support.__file__).read_text(encoding="utf-8")
+    assert 'definition.ThreadClass = ""' in source
+    assert "TITLE_BLOCK_THREAD_CLASS" not in source
 
 
 def test_mounting_face_carries_the_seat_finish_symbol_not_a_note() -> None:
