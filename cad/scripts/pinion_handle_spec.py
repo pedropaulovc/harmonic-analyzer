@@ -47,5 +47,5 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # bearing, so it has no local roughness requirement under the simplicity policy.
 SURFACE_FINISHES = ()
 
-DRAWING_NOTES = "CROSS ROD: LIGHT PRESS FIT IN BODY."
+DRAWING_NOTES = "MATCH CROSS ROD TO BODY FOR LIGHT PRESS FIT."
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

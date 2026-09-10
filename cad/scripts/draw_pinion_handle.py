@@ -483,7 +483,7 @@ async def build(adapter: Any) -> dict[str, str]:
     for text, xy in (
         ("BODY", (0.158, 0.120)),
         ("BODY CROSS-HOLE", (0.047, 0.195)),
-        ("ASSEMBLED", (0.092, 0.038)),
+        ("CROSS ROD IN BODY", (0.078, 0.038)),
     ):
         if add_note(adapter, text, *xy) is None:
             raise RuntimeError(f"failed to add {text} view caption")
