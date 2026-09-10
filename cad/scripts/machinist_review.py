@@ -589,8 +589,12 @@ def review_package(
         attempts = attempt + 1
         workdir = Path(tempfile.mkdtemp(prefix="machrev-"))
         attempt_events: list[dict[str, Any]] = []
+        stdout: str | bytes | None = None
+        stderr: str | bytes | None = None
         attempt_record: dict[str, Any] = {
             "attempt": attempts, "cwd": str(workdir), "images": [], "command": None,
+            "outcome": "failed", "error": None, "exit_code": None,
+            "stdout_file": None, "stderr_file": None, "artifacts": [],
         }
         attempt_records.append(attempt_record)
         try:
@@ -636,6 +640,8 @@ def review_package(
                 timeout=timeout_s,
                 cwd=str(workdir),
             )
+            attempt_record["exit_code"] = proc.returncode
+            stdout, stderr = proc.stdout, proc.stderr
             attempt_events = _parse_events(proc.stdout)
             if proc.returncode != 0:
                 raise RuntimeError(
@@ -649,19 +655,46 @@ def review_package(
             verdict_images = list(images)
             success_events = list(attempt_events)
             error = None
+            attempt_record["outcome"] = "succeeded"
             break
         except subprocess.TimeoutExpired as exc:
-            partial_stdout = exc.stdout or ""
+            stdout, stderr = exc.stdout, exc.stderr
+            partial_stdout = stdout or ""
             if isinstance(partial_stdout, bytes):
                 partial_stdout = partial_stdout.decode("utf-8", errors="replace")
             attempt_events = _parse_events(partial_stdout)
             error = f"{type(exc).__name__}: {exc}"
+            attempt_record["outcome"] = "timed_out"
+            attempt_record["error"] = error
             verdict = None
         except Exception as exc:  # noqa: BLE001 - recorded, retried, reported
             error = f"{type(exc).__name__}: {exc}"
+            attempt_record["error"] = error
             verdict = None
         finally:
             events.extend(_tag_events(attempts, attempt_events))
+            retained_dir = report_dir / f"{package.name}.attempts" / workdir.name
+            retained_dir.mkdir(parents=True, exist_ok=True)
+            for stream, content in (("stdout", stdout), ("stderr", stderr)):
+                if content is not None:
+                    path = retained_dir / f"{stream}.txt"
+                    path.write_bytes(
+                        content if isinstance(content, bytes) else content.encode("utf-8")
+                    )
+                    attempt_record[f"{stream}_file"] = str(path)
+            # Inputs are already identified by the source hashes, image paths,
+            # and retained schema. Move generated artifacts rather than copying
+            # the entire workdir (and every drawing image) on each retry.
+            inputs = {Path(image) for image in attempt_record["images"]}
+            inputs.add(workdir / "schema.json")
+            for artifact in sorted(workdir.iterdir()):
+                if artifact in inputs:
+                    continue
+                artifact_dir = retained_dir / "artifacts"
+                artifact_dir.mkdir(exist_ok=True)
+                retained = artifact_dir / artifact.name
+                shutil.move(str(artifact), str(retained))
+                attempt_record["artifacts"].append(str(retained))
             shutil.rmtree(workdir, ignore_errors=True)
 
     _write_events(events_path, events)

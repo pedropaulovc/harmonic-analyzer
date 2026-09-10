@@ -271,6 +271,100 @@ def test_retry_persists_all_attempts_and_cannot_hide_tool_use(
     assert [record["attempt"] for record in records] == [1, 2]
 
 
+@pytest.mark.parametrize("failure", ["nonzero_exit", "invalid_verdict", "timeout"])
+def test_retry_retains_failure_outputs_and_artifacts_after_success(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: str
+) -> None:
+    png = tmp_path / "source.png"
+    png.write_bytes(b"image")
+    report_dir = tmp_path / "reports"
+    calls = 0
+    failed_stdout = 'diagnostic before JSON\n{"type": "turn.failed"}\n'
+    failed_stderr = "reviewer diagnostic: interrupted response\n"
+    invalid_verdict = "incomplete response, not JSON"
+
+    def fake_run(command: list[str], **kwargs: Any):
+        nonlocal calls
+        calls += 1
+        output = Path(command[command.index("-o") + 1])
+        if calls == 1:
+            output.write_text(invalid_verdict, encoding="utf-8")
+            session = Path(kwargs["cwd"]) / "session"
+            session.mkdir()
+            (session / "trace.txt").write_text("failed attempt trace", encoding="utf-8")
+            if failure == "timeout":
+                raise mr.subprocess.TimeoutExpired(
+                    command,
+                    kwargs["timeout"],
+                    output=failed_stdout.encode("utf-8"),
+                    stderr=failed_stderr.encode("utf-8"),
+                )
+            return mr.subprocess.CompletedProcess(
+                command,
+                17 if failure == "nonzero_exit" else 0,
+                stdout=failed_stdout,
+                stderr=failed_stderr,
+            )
+        output.write_text(json.dumps(_clean_verdict()), encoding="utf-8")
+        return mr.subprocess.CompletedProcess(
+            command, 0, stdout='{"type": "turn.completed"}\n', stderr=""
+        )
+
+    monkeypatch.setattr(mr.subprocess, "run", fake_run)
+    review = mr.review_package(
+        mr.ReviewPackage("part", "part", (png,)),
+        reviewer="codex",
+        report_dir=report_dir,
+        retries=1,
+        codex="codex-test",
+    )
+
+    assert review.passed and review.blind
+    assert review.error is None
+    saved = json.loads((report_dir / "part.json").read_text(encoding="utf-8"))
+    failed, succeeded = saved["extra"]["evidence"]["attempts"]
+    assert failed["outcome"] == ("timed_out" if failure == "timeout" else "failed")
+    assert failed["exit_code"] == {
+        "nonzero_exit": 17, "invalid_verdict": 0, "timeout": None,
+    }[failure]
+    assert {
+        "nonzero_exit": "codex exit 17: reviewer diagnostic: interrupted response",
+        "invalid_verdict": "final message is not JSON",
+        "timeout": "TimeoutExpired",
+    }[failure] in failed["error"]
+    assert Path(failed["stdout_file"]).read_text(encoding="utf-8") == failed_stdout
+    assert Path(failed["stderr_file"]).read_text(encoding="utf-8") == failed_stderr
+    artifacts = {Path(path).name: Path(path) for path in failed["artifacts"]}
+    assert artifacts["verdict.json"].read_text(encoding="utf-8") == invalid_verdict
+    assert (artifacts["session"] / "trace.txt").read_text(encoding="utf-8") == (
+        "failed attempt trace"
+    )
+    assert succeeded["outcome"] == "succeeded"
+    assert succeeded["error"] is None
+    assert succeeded["exit_code"] == 0
+    assert Path(succeeded["stdout_file"]).read_text(encoding="utf-8") == (
+        '{"type": "turn.completed"}\n'
+    )
+    assert Path(succeeded["stderr_file"]).read_bytes() == b""
+    success_artifacts = {Path(path).name: Path(path) for path in succeeded["artifacts"]}
+    assert json.loads(success_artifacts["verdict.json"].read_text(encoding="utf-8")) == (
+        _clean_verdict()
+    )
+    for record in (failed, succeeded):
+        assert not Path(record["cwd"]).exists()
+        for path in (record["stdout_file"], record["stderr_file"], *record["artifacts"]):
+            assert Path(path).is_relative_to(report_dir)
+            assert Path(path).exists()
+    events = [
+        json.loads(line)
+        for line in Path(review.events_file).read_text(encoding="utf-8").splitlines()
+    ]
+    assert events == [
+        {"attempt": 1, "event": {"type": "turn.failed"}},
+        {"attempt": 2, "event": {"type": "turn.completed"}},
+    ]
+
+
 def test_retry_requires_image_reads_from_the_successful_attempt(
     tmp_path: Path, monkeypatch
 ) -> None:

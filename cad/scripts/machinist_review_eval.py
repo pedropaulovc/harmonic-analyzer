@@ -207,7 +207,10 @@ def validate_evidence(
         raise ValueError("incomplete invocation history")
     workdirs: set[Path] = set()
     for number, invocation in enumerate(attempts, start=1):
-        if not isinstance(invocation, dict) or set(invocation) != {"attempt", "cwd", "images", "command"} or type(invocation["attempt"]) is not int or invocation["attempt"] != number:
+        if not isinstance(invocation, dict) or set(invocation) != {
+            "attempt", "cwd", "images", "command", "outcome", "error", "exit_code",
+            "stdout_file", "stderr_file", "artifacts",
+        } or type(invocation["attempt"]) is not int or invocation["attempt"] != number:
             raise ValueError("invalid invocation record")
         if not isinstance(invocation["cwd"], str):
             raise ValueError("missing invocation workdir")
@@ -215,14 +218,59 @@ def validate_evidence(
         if not cwd.is_absolute() or cwd in workdirs:
             raise ValueError("invalid or reused neutral workdir")
         workdirs.add(cwd)
+        outcome, error, exit_code = invocation["outcome"], invocation["error"], invocation["exit_code"]
+        if exit_code is not None and type(exit_code) is not int:
+            raise ValueError("invalid invocation exit code")
+        if number == review.attempts:
+            if outcome != "succeeded" or error is not None or exit_code != 0:
+                raise ValueError("final invocation lacks successful process evidence")
+        elif (
+            outcome not in ("failed", "timed_out")
+            or not isinstance(error, str) or not error.strip()
+            or (outcome == "timed_out" and exit_code is not None)
+        ):
+            raise ValueError("invalid failed invocation outcome")
         image_paths = invocation["images"]
         if not isinstance(image_paths, list) or any(not isinstance(path, str) for path in image_paths):
             raise ValueError("invalid authorized image paths")
         images = [Path(path) for path in image_paths]
         command = invocation["command"]
         attempt_events = [row["event"] for row in events if row["attempt"] == number]
+        retained_dir = report_path.parent / f"{package.name}.attempts" / cwd.name
+        for stream in ("stdout", "stderr"):
+            recorded_path = invocation[f"{stream}_file"]
+            if recorded_path is None:
+                if exit_code is not None or (stream == "stdout" and attempt_events):
+                    raise ValueError("missing retained process stream")
+                continue
+            if not isinstance(recorded_path, str):
+                raise ValueError("invalid retained process stream path")
+            path = Path(recorded_path)
+            if path.resolve() != (retained_dir / f"{stream}.txt").resolve() or not path.is_file():
+                raise ValueError("missing or misplaced retained process stream")
+            if stream == "stdout" and mr._parse_events(
+                path.read_bytes().decode("utf-8", errors="replace")
+            ) != attempt_events:
+                raise ValueError("retained stdout differs from retry event history")
+        artifacts = invocation["artifacts"]
+        if not isinstance(artifacts, list) or any(not isinstance(path, str) for path in artifacts):
+            raise ValueError("invalid retained artifact paths")
+        artifact_dir = retained_dir / "artifacts"
+        artifact_paths = [Path(path).resolve() for path in artifacts]
+        if len(set(artifact_paths)) != len(artifact_paths) or any(
+            path.parent != artifact_dir.resolve() or not path.exists() for path in artifact_paths
+        ):
+            raise ValueError("missing or misplaced retained artifact")
+        if set(artifact_paths) != (
+            {path.resolve() for path in artifact_dir.iterdir()} if artifact_dir.exists() else set()
+        ):
+            raise ValueError("incomplete retained artifact inventory")
         if command is None:
-            if attempt_events or number == review.attempts:
+            if (
+                attempt_events or number == review.attempts or outcome != "failed"
+                or exit_code is not None
+                or invocation["stdout_file"] is not None or invocation["stderr_file"] is not None
+            ):
                 raise ValueError("events without a recorded provider invocation")
             continue
         if images != [cwd / "sheet-1.png"]:
@@ -388,6 +436,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         prompts = {v: getattr(args, v).read_bytes() for v in VERSIONS}
         identity = make_identity(manifest, packages, prompts, reviewer=args.reviewer,
                                  model=args.model, effort=args.effort, retries=args.retries, timeout_s=args.timeout)
+        frozen_baseline = manifest.get("baseline_prompt")
+        if (
+            frozen_baseline is not None
+            and args.baseline.resolve() == (args.cases.parent / frozen_baseline["path"]).resolve()
+            and identity["prompts"]["baseline"]["raw_sha256"] != frozen_baseline["sha256"]
+        ):
+            raise ValueError("baseline prompt hash differs from frozen manifest")
         assessments = json.loads(args.assessments.read_text(encoding="utf-8")) if args.assessments else None
         if args.assessments and (
             not isinstance(assessments, dict)

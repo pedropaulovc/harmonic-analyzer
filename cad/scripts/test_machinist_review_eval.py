@@ -33,6 +33,18 @@ def case(tmp_path: Path) -> tuple[dict[str, Any], mr.ReviewPackage]:
 
 
 @pytest.fixture
+def frozen_baseline(tmp_path: Path, case) -> Path:
+    baseline = tmp_path / "baseline.txt"
+    baseline.write_bytes(b"Frozen rubric.\r\n")
+    manifest = {
+        **case[0],
+        "baseline_prompt": {"path": baseline.name, "sha256": mr._sha256(baseline)},
+    }
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    return baseline
+
+
+@pytest.fixture
 def provider(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     state: dict[str, Any] = {
         "calls": [], "mode": "valid", "relative_reads": False,
@@ -90,6 +102,67 @@ def _identity(case, *, prompt: str = "Rubric A", reviewer: str = "codex", model:
         manifest, [package], {"baseline": prompt.encode(), "candidate": b"Rubric B"},
         reviewer=reviewer, model=model, effort="low", retries=0, timeout_s=30,
     )
+
+
+def test_main_rejects_changed_selected_frozen_baseline_before_provider_execution(
+    tmp_path: Path, frozen_baseline: Path, provider, monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    frozen_baseline.write_bytes(frozen_baseline.read_bytes().replace(b"\r\n", b"\n"))
+    candidate = tmp_path / "candidate.txt"
+    candidate.write_bytes(b"Candidate rubric.")
+    report_dir = tmp_path / "reports"
+    monkeypatch.chdir(tmp_path)
+
+    status = evaluation.main([
+        "--cases", str(tmp_path / "manifest.json"),
+        "--baseline", frozen_baseline.name, "--candidate", str(candidate),
+        "--report-dir", str(report_dir), "--reviewer", "codex",
+        "--model", "model-a", "--effort", "low", "--jobs", "1", "--retries", "0",
+    ])
+
+    assert status == 2
+    assert json.loads(capsys.readouterr().out)["error"].startswith("ValueError:")
+    assert provider["calls"] == []
+    assert not report_dir.exists()
+
+
+@pytest.mark.parametrize("selection", ["frozen", "custom"])
+def test_main_accepts_selected_baseline_with_actual_prompt_provenance(
+    tmp_path: Path, frozen_baseline: Path, provider, selection: str,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    baseline = frozen_baseline
+    if selection == "custom":
+        baseline = tmp_path / "custom" / frozen_baseline.name
+        baseline.parent.mkdir()
+        baseline.write_bytes(b"Intentional custom rubric.\r\n")
+        frozen_baseline.write_bytes(b"Corrupted unselected frozen rubric.")
+    candidate = tmp_path / "candidate.txt"
+    candidate.write_bytes(b"Candidate rubric.\r\n")
+    raw_prompts = {"baseline": baseline.read_bytes(), "candidate": candidate.read_bytes()}
+    report_dir = tmp_path / "reports"
+
+    status = evaluation.main([
+        "--cases", str(tmp_path / "manifest.json"),
+        "--baseline", str(baseline), "--candidate", str(candidate),
+        "--report-dir", str(report_dir), "--reviewer", "codex",
+        "--model", "model-a", "--effort", "low", "--jobs", "1", "--retries", "0",
+    ])
+
+    assert status == 0
+    summary = json.loads(capsys.readouterr().out)
+    assert all(result["error"] is None for result in summary["results"])
+    run_dir = report_dir / summary["run_id"]
+    identity = json.loads((run_dir / "identity.json").read_text(encoding="utf-8"))
+    for version, raw in raw_prompts.items():
+        assert identity["prompts"][version]["raw_sha256"] == hashlib.sha256(raw).hexdigest()
+        assert (run_dir / "inputs" / f"{version}.txt").read_bytes() == raw
+        assert any(raw.decode().replace("\r\n", "\n") in call["prompt"] for call in provider["calls"])
+    if selection == "custom":
+        assert identity["prompts"]["baseline"]["raw_sha256"] != (
+            identity["manifest"]["baseline_prompt"]["sha256"]
+        )
 
 
 @pytest.mark.parametrize("reviewer", ["codex", "claude"])
@@ -405,6 +478,89 @@ def test_provenance_content_must_match_identity_not_just_report_hash(
     report_path = directory / result["report"]
     report = json.loads(report_path.read_text(encoding="utf-8"))
     report["extra"]["evidence"][field] += "\n"
+    report_path.write_text(json.dumps(report), encoding="utf-8")
+    result["report_sha256"] = mr._sha256(report_path)
+    result["review"] = report
+    with pytest.raises(ValueError):
+        evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
+
+
+@pytest.mark.parametrize("failure", ["launch", "timeout", "nonzero_exit", "invalid_verdict"])
+def test_complete_retry_evidence_resumes_after_provider_failure(
+    tmp_path: Path, case, provider, monkeypatch: pytest.MonkeyPatch, failure: str,
+) -> None:
+    identity = _identity(case)
+    identity["retries"] = 1
+    directory = tmp_path / "run"
+    provider_run = mr.subprocess.run
+    calls = 0
+
+    def retrying_run(command, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            if failure == "launch":
+                raise OSError("provider could not start")
+            if failure == "timeout":
+                raise mr.subprocess.TimeoutExpired(
+                    command, kwargs["timeout"], output=b'{"type":"turn.started"}\n',
+                    stderr=b"partial diagnostics",
+                )
+            if failure == "invalid_verdict":
+                provider["mode"] = "malformed"
+            process = provider_run(command, **kwargs)
+            provider["mode"] = "valid"
+            if failure == "nonzero_exit":
+                process.returncode = 17
+            return process
+        return provider_run(command, **kwargs)
+
+    monkeypatch.setattr(mr.subprocess, "run", retrying_run)
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert result["error"] is None
+    review = evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
+    failed, succeeded = review.extra["evidence"]["attempts"]
+    assert failed["outcome"] == ("timed_out" if failure == "timeout" else "failed")
+    assert failed["error"]
+    assert failed["exit_code"] == {
+        "launch": None, "timeout": None, "nonzero_exit": 17, "invalid_verdict": 0,
+    }[failure]
+    assert succeeded["outcome"] == "succeeded"
+    assert evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory) == result
+    assert calls == 2
+
+
+@pytest.mark.parametrize("damage", [
+    "unknown_field", "outcome", "exit_code", "stdout_events", "missing_stderr",
+    "artifact_escape", "omitted_artifact",
+])
+def test_retry_provenance_rejects_damage_despite_matching_report_hash(
+    tmp_path: Path, case, provider, damage: str,
+) -> None:
+    identity = _identity(case)
+    directory = tmp_path / "run"
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert result["error"] is None
+    report_path = directory / result["report"]
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    invocation = report["extra"]["evidence"]["attempts"][0]
+    if damage == "unknown_field":
+        invocation["unrecognized"] = True
+    elif damage == "outcome":
+        invocation["outcome"] = "failed"
+        invocation["error"] = "Provider failed."
+    elif damage == "exit_code":
+        invocation["exit_code"] = False
+    elif damage == "stdout_events":
+        Path(invocation["stdout_file"]).write_text('{"type":"turn.started"}\n', encoding="utf-8")
+    elif damage == "missing_stderr":
+        Path(invocation["stderr_file"]).unlink()
+    elif damage == "artifact_escape":
+        outside = tmp_path / "outside.json"
+        outside.write_bytes(Path(invocation["artifacts"][0]).read_bytes())
+        invocation["artifacts"][0] = str(outside)
+    else:
+        invocation["artifacts"] = []
     report_path.write_text(json.dumps(report), encoding="utf-8")
     result["report_sha256"] = mr._sha256(report_path)
     result["review"] = report
