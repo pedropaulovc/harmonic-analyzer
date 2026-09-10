@@ -45,13 +45,11 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
     set_dimension_prefix,
-    set_dimension_symmetric_tolerance,
 )
 from _fit_limits import deviations
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from pinion_handle_spec import (
-    CAP_RADIUS_TOLERANCE_MM,
     CAP_SAG,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
@@ -360,9 +358,6 @@ async def build(adapter) -> dict[str, str]:
     # stamp the make-critical title-block properties.
     set_dimension_bilateral_tolerance(
         adapter, "TubeProfile", "TubeId", *deviations(TUBE_ID_BAND)
-    )
-    set_dimension_symmetric_tolerance(
-        adapter, "CapProfile", "CapR", CAP_RADIUS_TOLERANCE_MM
     )
     set_dimension_prefix(adapter, "CapProfile", "CapR", "SR")
     set_dimension_bilateral_tolerance(

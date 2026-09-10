@@ -31,7 +31,6 @@ from pinion_handle_geometry import (
 # for a light press fit; routine lengths use the title-block tolerances.
 ROD_HOLE_REAM_BAND = (0.005, -0.005)  # body cross-hole ream tolerance
 TUBE_ID_BAND = REAM_SLIDE
-CAP_RADIUS_TOLERANCE_MM = 0.10
 TUBE_LENGTH_BAND = (0.10, 0.00)
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {

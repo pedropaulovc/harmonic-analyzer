@@ -105,6 +105,10 @@ def rendered_recipe(monkeypatch, tmp_path):
         for annotation in annotations:
             annotation.precision = values[annotation.name]
 
+    def reference(_adapter, annotations, names):
+        for annotation in annotations:
+            annotation.reference = annotation.name in names
+
     def measured(_adapter, view, **kwargs):
         annotation = SimpleNamespace(name=kwargs.pop("label"), view=view, **kwargs)
         dimensions.append(annotation)
@@ -131,6 +135,7 @@ def rendered_recipe(monkeypatch, tmp_path):
     monkeypatch.setattr(drawing, "_move_dimension", move)
     monkeypatch.setattr(drawing, "set_dimension_callouts", callouts)
     monkeypatch.setattr(drawing, "set_dimension_precision", precision)
+    monkeypatch.setattr(drawing, "set_reference_dimensions", reference)
     monkeypatch.setattr(drawing, "_checked_dimension", measured)
     monkeypatch.setattr(drawing, "auto_center_marks", lambda *args, **kwargs: True)
     monkeypatch.setattr(drawing, "_add_body_centerline", lambda *args, **kwargs: None)
@@ -233,9 +238,10 @@ def test_recipe_preserves_fine_fit_digits_without_tightening_routine_features(
 ):
     dims = rendered_recipe.dimensions
     assert dims["RodDia"].precision == 1
+    assert dims["RodDia"].reference
     assert dims["RodHoleDia"].precision == dims["TubeId"].precision == 3
     assert dims["GripDia"].precision == dims["TubeOd"].precision == 2
-    assert dims["CapR"].precision == 2
+    assert dims["CapR"].precision == 1
     assert dims["RodSpan"].precision == 1
 
 

@@ -36,6 +36,7 @@ from _drawing_common import (
     set_dimension_callouts,
     set_dimension_precision,
     set_hidden_lines_visible,
+    set_reference_dimensions,
     stamp_drawing_summary,
     view_name,
 )
@@ -98,7 +99,7 @@ SIDE_DIAMETERS = {"GripDia": (0.228, 0.173), "TubeOd": (0.140, 0.178)}
 ROD_DIAMETER_XY = (0.168, 0.081)
 DIMENSION_CALLOUTS = {
     "TubeId": "REAM",
-    "TubeLen": "BORE DEPTH",
+    "TubeLen": "SEATING DEPTH",
     "RodHoleDia": "REAM THRU",
     "RodSpan": "OAL",
 }
@@ -107,7 +108,7 @@ DIMENSION_PRECISION = {
     "TubeOd": 2,
     "TubeId": 3,
     "TubeLen": 2,
-    "CapR": 2,
+    "CapR": 1,
     "RodHoleDia": 3,
     "RodDia": 1,
     "RodSpan": 1,
@@ -422,6 +423,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to delete the empty rod-dimension donor view")
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     set_dimension_precision(adapter, annotations, DIMENSION_PRECISION)
+    set_reference_dimensions(adapter, annotations, {"RodDia"})
 
     # Visible shoulders and crown root, all measured from the flat socket end.
     end = (0.0, TUBE_OD / 4.0, HUB_END_Z)
