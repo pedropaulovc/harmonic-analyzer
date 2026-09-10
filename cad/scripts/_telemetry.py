@@ -566,10 +566,12 @@ class _LiveStderr:
 def _otlp_protocol(signal: str) -> str:
     """Return the standard OTLP transport configured for *signal*."""
     signal_protocol = f"OTEL_EXPORTER_OTLP_{signal.upper()}_PROTOCOL"
-    return os.environ.get(
-        signal_protocol,
-        os.environ.get("OTEL_EXPORTER_OTLP_PROTOCOL", "http/protobuf"),
-    ).lower()
+    protocol = (
+        os.environ.get(signal_protocol)
+        or os.environ.get("OTEL_EXPORTER_OTLP_PROTOCOL")
+        or "http/protobuf"
+    )
+    return protocol.lower()
 
 
 def _otlp_span_processor():

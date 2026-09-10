@@ -403,6 +403,13 @@ def test_otlp_export_honors_standard_transport_env(
                 processor.shutdown()
 
 
+def test_empty_signal_protocol_falls_back_to_global_transport(monkeypatch):
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc")
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_TRACES_PROTOCOL", "")
+
+    assert _telemetry._otlp_protocol("traces") == "grpc"
+
+
 def test_default_otlp_endpoint_is_a_literal_address_never_localhost(monkeypatch):
     """Measured: the first OTLP POST to ``localhost`` cost 2.05 s vs 0.003 s to
     ``127.0.0.1`` -- Windows tries ``::1`` first and the dashboard is IPv4, so every
