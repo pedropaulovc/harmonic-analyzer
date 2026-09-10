@@ -108,20 +108,22 @@ MATERIAL = "Gray Cast Iron"
 
 # Trapezoid (Sketch1) -- wide foot / narrow top, half-extents in mm. On the
 # Right plane: sketch-x -> model Z (taper), sketch-y -> model Y (height).
-WIDE = 31.75       # foot half-width (Z) at Y=-88.9
-NARROW = 8.4665    # top half-width (Z) at Y=+88.9
-HALF_Y = 88.9      # trapezoid half-height (Y)
+WIDE = 31.75  # foot half-width (Z) at Y=-88.9
+NARROW = 8.4665  # top half-width (Z) at Y=+88.9
+HALF_Y = 88.9  # trapezoid half-height (Y)
 BOSS_DEPTH = 177.8  # mid-plane extrude along X (X ±88.9)
 
-CAV = 63.5         # 127 mm square half (Cut-Extrude2)
-BIG = 82.55        # 165.1 mm square half (Cut-Extrude3/4)
-WEB = 3.175        # window-cut start-offset; the 2*WEB band left as the web
+CAV = 63.5  # 127 mm square half (Cut-Extrude2)
+BIG = 82.55  # 165.1 mm square half (Cut-Extrude3/4)
+WEB = 3.175  # window-cut start-offset; the 2*WEB band left as the web
 FOOT_THICKNESS = HALF_Y - BIG
 
 FILLET_R = 12.7
 FILLET_EDGES = [  # four inner-frame corner edges (run along Z through the web)
-    [63.5, 63.5, 0.0], [-63.5, 63.5, 0.0],
-    [63.5, -63.5, 0.0], [-63.5, -63.5, 0.0],
+    [63.5, 63.5, 0.0],
+    [-63.5, 63.5, 0.0],
+    [63.5, -63.5, 0.0],
+    [-63.5, -63.5, 0.0],
 ]
 
 HOLES = [(60.32, 17.46), (-60.32, 17.46), (60.32, -17.46), (-60.32, -17.46)]
@@ -131,24 +133,31 @@ HOLES = [(60.32, 17.46), (-60.32, 17.46), (60.32, -17.46), (-60.32, -17.46)]
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "WallProfile": {"FootSpan", "TopSpan", "WallHeight"},
     "Wall": {"Depth"},
-    "WindowProfile": {"WinWidth", "WinHeight"},
-    "CavityProfile": {"CavWidth", "CavDepth"},
+    # A single associative size plus an SQ callout defines each square.
+    "WindowProfile": {"WinWidth"},
+    "CavityProfile": {"CavWidth"},
 }
 
 DRAWING_NOTES = "\n".join(
     (
-        "GRAY-IRON CASTING; AS-CAST SURFACES +/-0.8.",
-        "WINDOW: CHAMFER 1.27 X 45 DEG ALL AROUND; FILLET R12.7, 4X.",
-        "WINDOW AND CAVITY CENTRED.",
-        "CENTRAL WEB 6.35 THICK AND CENTRED.",
+        "TAPER, POCKETS + WEB SYMMETRIC ABOUT CENTRE PLANE.",
+        "MACHINE BOTH POCKETS TO LEAVE 6.35 WEB; WALLS NORMAL TO MOUNTING FACE.",
+        "POCKET CENTRE 88.9 FROM MOUNTING FACE; POCKET + CAVITY CONCENTRIC.",
+        "CAVITY R12.7, 4X; CHAMFER BOTH OUTER POCKET RIMS 1.27 X 45 DEG.",
+        "CASTING; MACHINE MOUNTING FACE, POCKETS, CAVITY, HOLES + CHAMFERS.",
     )
 )
+DRAWING_FINISH = (
+    "GREEN ENAMEL; MASK MOUNTING FACE + THREADS; LIGHT OIL BARE MACHINED SURFACES"
+)
+TITLE_BLOCK_THREAD_CLASS = ""
+
 # Hole Wizard constants (resolved from the SW type library on this seat):
-SW_FM_HOLE_WZD = 25            # swFeatureNameID_e.swFmHoleWzd (CreateDefinition)
-SW_WZD_TAP = 4                 # swWzdGeneralHoleTypes_e.swWzdTap (straight tap)
-SW_STD_ANSI_INCH = 0           # swWzdHoleStandards_e.swStandardAnsiInch
-SW_HOLE_FASTENER_TYPE = 27     # ANSI-inch straight tapped hole
-SW_END_THROUGH_ALL = 1         # swEndCondThroughAll / swEndThreadTypeTHROUGH_ALL
+SW_FM_HOLE_WZD = 25  # swFeatureNameID_e.swFmHoleWzd (CreateDefinition)
+SW_WZD_TAP = 4  # swWzdGeneralHoleTypes_e.swWzdTap (straight tap)
+SW_STD_ANSI_INCH = 0  # swWzdHoleStandards_e.swStandardAnsiInch
+SW_HOLE_FASTENER_TYPE = 27  # ANSI-inch straight tapped hole
+SW_END_THROUGH_ALL = 1  # swEndCondThroughAll / swEndThreadTypeTHROUGH_ALL
 HOLE_SSIZE = "1/2-13"
 HOLE_THREAD_CLASS = "2B"  # customary US class for a general tapped hole
 HOLE_TAP_DRILL_DIA = TAP_DRILL_MM[HOLE_SSIZE]
@@ -161,17 +170,27 @@ FOOT_TAPPED_VOLUME = (
 )
 RIM_CHAMFER_VOLUME = FOOT_TAPPED_VOLUME - 3_153
 
-CHAMFER = 1.27     # leg, 45°
+CHAMFER = 1.27  # leg, 45°
 CHAMFER_EDGES = [  # 12 inner-frame opening edges, both web faces (Z = ±WEB)
-    [0.0, -63.5, -3.175], [63.5, 0.0, -3.175], [59.78, 59.78, -3.175],
-    [0.0, 63.5, -3.175], [-63.5, 0.0, -3.175], [-59.78, -59.78, -3.175],
-    [0.0, -63.5, 3.175], [-59.78, -59.78, 3.175], [-63.5, 0.0, 3.175],
-    [-59.78, 59.78, 3.175], [0.0, 63.5, 3.175], [63.5, 0.0, 3.175],
+    [0.0, -63.5, -3.175],
+    [63.5, 0.0, -3.175],
+    [59.78, 59.78, -3.175],
+    [0.0, 63.5, -3.175],
+    [-63.5, 0.0, -3.175],
+    [-59.78, -59.78, -3.175],
+    [0.0, -63.5, 3.175],
+    [-59.78, -59.78, 3.175],
+    [-63.5, 0.0, 3.175],
+    [-59.78, 59.78, 3.175],
+    [0.0, 63.5, 3.175],
+    [63.5, 0.0, 3.175],
 ]
 CHAMFER_FACES = [  # whole faces whose every edge is chamfered (tangent-propagated)
-    [0.0, -85.0, 31.24], [0.0, -85.0, -31.24],  # ±Z slant window surrounds
-    [88.9, 0.0, 0.0], [-88.9, 0.0, 0.0],        # front / back trapezoid (±X) faces
-    [59.78, -59.78, 0.0],                        # one inner fillet face
+    [0.0, -85.0, 31.24],
+    [0.0, -85.0, -31.24],  # ±Z slant window surrounds
+    [88.9, 0.0, 0.0],
+    [-88.9, 0.0, 0.0],  # front / back trapezoid (±X) faces
+    [59.78, -59.78, 0.0],  # one inner fillet face
 ]
 
 
@@ -208,12 +227,20 @@ def _select_sketch(adapter, name: str) -> None:
     model = adapter.currentModel
     model.ClearSelection2(True)
     if not model.Extension.SelectByID2(
-            name, "SKETCH", 0, 0, 0, False, 0, null_callout(), 0):
+        name, "SKETCH", 0, 0, 0, False, 0, null_callout(), 0
+    ):
         raise RuntimeError(f"select sketch {name!r} failed")
 
 
-def _cut_through_all(adapter, sketch_name: str, *, both: bool, reverse_dir: bool,
-                     start_offset_mm: float = 0.0, flip_start: bool = False):
+def _cut_through_all(
+    adapter,
+    sketch_name: str,
+    *,
+    both: bool,
+    reverse_dir: bool,
+    start_offset_mm: float = 0.0,
+    flip_start: bool = False,
+):
     """Through-all ``FeatureCut4`` on the named sketch.
 
     ``both`` -> Through-All-Both (the cavity). A single-direction cut with
@@ -230,15 +257,42 @@ def _cut_through_all(adapter, sketch_name: str, *, both: bool, reverse_dir: bool
     _select_sketch(adapter, sketch_name)
 
     through = adapter.constants.get("swEndCondThroughAll", 1)
-    t0 = (adapter.constants.get("swStartOffset", 3) if start_offset_mm
-          else adapter.constants.get("swStartSketchPlane", 0))
+    t0 = (
+        adapter.constants.get("swStartOffset", 3)
+        if start_offset_mm
+        else adapter.constants.get("swStartSketchPlane", 0)
+    )
     # 27-param FeatureCut4: T0/StartOffset/FlipStartOffset are the start-condition
     # tail (26-param is the SW-2025 form).
-    args = (not both, False, reverse_dir, through, through, 0.0, 0.0,
-            False, False, False, False, 0.0, 0.0,
-            False, False, False, False, False,
-            False, True, False, False, False,
-            t0, start_offset_mm / 1000.0, flip_start, False)
+    args = (
+        not both,
+        False,
+        reverse_dir,
+        through,
+        through,
+        0.0,
+        0.0,
+        False,
+        False,
+        False,
+        False,
+        0.0,
+        0.0,
+        False,
+        False,
+        False,
+        False,
+        False,
+        False,
+        True,
+        False,
+        False,
+        False,
+        t0,
+        start_offset_mm / 1000.0,
+        flip_start,
+        False,
+    )
     feat = adapter._attempt(lambda: fm.FeatureCut4(*args), default=None)
     if not feat:
         feat = adapter._attempt(lambda: fm.FeatureCut4(*args[:-1]), default=None)
@@ -257,10 +311,12 @@ def _find_bottom_face(model, holes_xz, y_face_mm: float):
     drill axis comes out along X. Selecting the face OBJECT found by enumeration
     is the reliable path.
     """
-    body = (_early_bound(model, "IPartDoc").GetBodies2(0, False) or [None])[0]  # IPartDoc for GetBodies2
+    body = (_early_bound(model, "IPartDoc").GetBodies2(0, False) or [None])[
+        0
+    ]  # IPartDoc for GetBodies2
     body = _early_bound(body, "IBody2")
     best = None
-    for f in (body.GetFaces() or []):
+    for f in body.GetFaces() or []:
         f = _early_bound(f, "IFace2")
         try:
             n = tuple(f.Normal)
@@ -271,8 +327,10 @@ def _find_bottom_face(model, holes_xz, y_face_mm: float):
         box = [v * 1000 for v in f.GetBox()]
         if abs(box[1] - y_face_mm) > 1.0:  # not on the foot bottom plane
             continue
-        spans = all(box[0] - 1 <= hx <= box[3] + 1 and box[2] - 1 <= hz <= box[5] + 1
-                    for hx, hz in holes_xz)
+        spans = all(
+            box[0] - 1 <= hx <= box[3] + 1 and box[2] - 1 <= hz <= box[5] + 1
+            for hx, hz in holes_xz
+        )
         if spans and (best is None or f.GetArea() > best.GetArea()):
             best = f
     return best
@@ -305,11 +363,17 @@ def _drill_tapped_holes(adapter, holes_xz, y_face_mm: float):
     data = fm.CreateDefinition(SW_FM_HOLE_WZD)
     data = _early_bound(data, "IWizardHoleFeatureData2")
     data.InitializeHole(
-        SW_WZD_TAP, SW_STD_ANSI_INCH, SW_HOLE_FASTENER_TYPE,
-        HOLE_SSIZE, SW_END_THROUGH_ALL)
-    for prop, val in (("ThreadClass", HOLE_THREAD_CLASS),
-                      ("EndCondition", SW_END_THROUGH_ALL),
-                      ("ThreadEndCondition", SW_END_THROUGH_ALL)):
+        SW_WZD_TAP,
+        SW_STD_ANSI_INCH,
+        SW_HOLE_FASTENER_TYPE,
+        HOLE_SSIZE,
+        SW_END_THROUGH_ALL,
+    )
+    for prop, val in (
+        ("ThreadClass", HOLE_THREAD_CLASS),
+        ("EndCondition", SW_END_THROUGH_ALL),
+        ("ThreadEndCondition", SW_END_THROUGH_ALL),
+    ):
         try:
             setattr(data, prop, val)
         except Exception:  # noqa: BLE001
@@ -348,8 +412,9 @@ def _drill_tapped_holes(adapter, holes_xz, y_face_mm: float):
     y_face = y_face_mm / 1000.0
 
     def _sketch_xy(hx, hz):
-        arr = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8,
-                      [hx / 1000.0, y_face, hz / 1000.0])
+        arr = VARIANT(
+            pythoncom.VT_ARRAY | pythoncom.VT_R8, [hx / 1000.0, y_face, hz / 1000.0]
+        )
         mpt = math_utility.CreatePoint(arr)
         mpt = _early_bound(mpt, "IMathPoint")
         spt = mpt.MultiplyTransform(xform)
@@ -358,7 +423,8 @@ def _drill_tapped_holes(adapter, holes_xz, y_face_mm: float):
 
     model.ClearSelection2(True)
     if not model.Extension.SelectByID2(
-            place_name, "SKETCH", 0, 0, 0, False, 0, null_callout(), 0):
+        place_name, "SKETCH", 0, 0, 0, False, 0, null_callout(), 0
+    ):
         raise RuntimeError(f"hole wizard: cannot edit {place_name}")
     model.EditSketch()
     sm = model.SketchManager
@@ -376,7 +442,8 @@ def _drill_tapped_holes(adapter, holes_xz, y_face_mm: float):
     npts = len(place_sk.GetSketchPoints2() or [])
     if npts != len(holes_xz):
         raise RuntimeError(
-            f"hole wizard: expected {len(holes_xz)} placement points, got {npts}")
+            f"hole wizard: expected {len(holes_xz)} placement points, got {npts}"
+        )
 
     # Pre-create late-bound writes can silently drop on SW 2026.  Persist the
     # thread contract through the documented feature-edit flow, then verify the
@@ -396,7 +463,9 @@ def _drill_tapped_holes(adapter, holes_xz, y_face_mm: float):
             f"hole wizard: thread size did not persist: {persisted.FastenerSize!r}"
         )
     if int(persisted.EndCondition) != SW_END_THROUGH_ALL:
-        raise RuntimeError("hole wizard: through-all hole end condition did not persist")
+        raise RuntimeError(
+            "hole wizard: through-all hole end condition did not persist"
+        )
     drill_mm = float(persisted.ThruTapDrillDiameter) * 1000.0
     if not math.isclose(drill_mm, HOLE_TAP_DRILL_DIA, abs_tol=0.001):
         raise RuntimeError(
@@ -424,12 +493,14 @@ async def build(adapter) -> dict[str, str]:
     # tracked parts -- see build_top_frame.py). Lengths carry an explicit `mm`:
     # the part is modelled inch, and the equation manager evaluates bare numbers
     # in DOCUMENT units, so an unsuffixed global would be read as inches.
-    await set_global(adapter, "FootHalf", f"{WIDE}mm")      # trapezoid foot half-width (Z)
-    await set_global(adapter, "TopHalf", f"{NARROW}mm")     # trapezoid top half-width (Z)
+    await set_global(adapter, "FootHalf", f"{WIDE}mm")  # trapezoid foot half-width (Z)
+    await set_global(adapter, "TopHalf", f"{NARROW}mm")  # trapezoid top half-width (Z)
     await set_global(adapter, "HalfHeight", f"{HALF_Y}mm")  # trapezoid half-height (Y)
-    await set_global(adapter, "CavHalf", f"{CAV}mm")        # cavity square half
-    await set_global(adapter, "WindowOuter", f"{BIG}mm")    # window square half
-    await set_global(adapter, "WallWidth", f"{BOSS_DEPTH}mm")  # mid-plane extrude span (X)
+    await set_global(adapter, "CavHalf", f"{CAV}mm")  # cavity square half
+    await set_global(adapter, "WindowOuter", f"{BIG}mm")  # window square half
+    await set_global(
+        adapter, "WallWidth", f"{BOSS_DEPTH}mm"
+    )  # mid-plane extrude span (X)
 
     # Each sketch records its dim names + drive equations inline as it is drawn
     # (per-sketch SketchDims); the (dim@feature, expr) jobs are collected here and
@@ -447,18 +518,39 @@ async def build(adapter) -> dict[str, str]:
     trap_pts = [(-WIDE, -HALF_Y), (WIDE, -HALF_Y), (NARROW, HALF_Y), (-NARROW, HALF_Y)]
     trap_lines = await add_line_chain(adapter, trap_pts)
     await define_polygon_chain(
-        adapter, trap_lines, trap_pts, anchor=0, label="trapezoid", dims=trap,
-        names=["FootAnchorZ", "FootAnchorY", "FootSpan", "TaperRun",
-               "WallHeight", "TopSpan"],
-        drives=['"FootHalf"', '"HalfHeight"', '2 * "FootHalf"',
-                '"FootHalf" - "TopHalf"', '2 * "HalfHeight"', '2 * "TopHalf"'],
+        adapter,
+        trap_lines,
+        trap_pts,
+        anchor=0,
+        label="trapezoid",
+        dims=trap,
+        names=[
+            "FootAnchorZ",
+            "FootAnchorY",
+            "FootSpan",
+            "TaperRun",
+            "WallHeight",
+            "TopSpan",
+        ],
+        drives=[
+            '"FootHalf"',
+            '"HalfHeight"',
+            '2 * "FootHalf"',
+            '"FootHalf" - "TopHalf"',
+            '2 * "HalfHeight"',
+            '2 * "TopHalf"',
+        ],
     )
     await ensure_fully_defined(adapter, "trapezoid")
     check("exit boss", await adapter.exit_sketch())
     name_last_feature(adapter, "WallProfile")
     drive_jobs += trap.apply(adapter, "WallProfile")
-    check("boss", await adapter.create_extrusion(
-        ExtrusionParameters(depth=BOSS_DEPTH, both_directions=True)))
+    check(
+        "boss",
+        await adapter.create_extrusion(
+            ExtrusionParameters(depth=BOSS_DEPTH, both_directions=True)
+        ),
+    )
     name_last_feature(adapter, "Wall")
     depth_dim = name_dimensions(adapter, "Wall", ["Depth"])
     drive_jobs += [(depth_dim[0], '"WallWidth"')]
@@ -482,9 +574,15 @@ async def build(adapter) -> dict[str, str]:
     windows = SketchDims()
     check("sketch windows", await adapter.create_sketch("Front"))
     await define_centered_rectangle(
-        adapter, BIG, BIG, "window", dims=windows,
-        name_width="WinWidth", drive_width='2 * "WindowOuter"',
-        name_depth="WinHeight", drive_depth='2 * "WindowOuter"',
+        adapter,
+        BIG,
+        BIG,
+        "window",
+        dims=windows,
+        name_width="WinWidth",
+        drive_width='2 * "WindowOuter"',
+        name_depth="WinHeight",
+        drive_depth='2 * "WindowOuter"',
     )
     await ensure_fully_defined(adapter, "window")
     check("exit windows", await adapter.exit_sketch())
@@ -494,9 +592,15 @@ async def build(adapter) -> dict[str, str]:
     cavity = SketchDims()
     check("sketch cavity", await adapter.create_sketch("Front"))
     await define_centered_rectangle(
-        adapter, CAV, CAV, "cavity", dims=cavity,
-        name_width="CavWidth", drive_width='2 * "CavHalf"',
-        name_depth="CavDepth", drive_depth='2 * "CavHalf"',
+        adapter,
+        CAV,
+        CAV,
+        "cavity",
+        dims=cavity,
+        name_width="CavWidth",
+        drive_width='2 * "CavHalf"',
+        name_depth="CavDepth",
+        drive_depth='2 * "CavHalf"',
     )
     await ensure_fully_defined(adapter, "cavity")
     check("exit cavity", await adapter.exit_sketch())
@@ -509,15 +613,27 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "CavityCut", 622_708, 200)
 
     # WindowCut1: one window -- Through-All forward, started WEB off-plane.
-    _cut_through_all(adapter, "WindowProfile", both=False, reverse_dir=False,
-                     start_offset_mm=WEB, flip_start=True)
+    _cut_through_all(
+        adapter,
+        "WindowProfile",
+        both=False,
+        reverse_dir=False,
+        start_offset_mm=WEB,
+        flip_start=True,
+    )
     name_last_feature(adapter, "WindowCut1")
     await volume_check(adapter, "WindowCut1", 434_257, 200)
 
     # WindowCut2: the other window -- the SAME WindowProfile, Through-All reverse,
     # started WEB off-plane the other way (leaves the 2*WEB central web).
-    _cut_through_all(adapter, "WindowProfile", both=False, reverse_dir=True,
-                     start_offset_mm=WEB, flip_start=False)
+    _cut_through_all(
+        adapter,
+        "WindowProfile",
+        both=False,
+        reverse_dir=True,
+        start_offset_mm=WEB,
+        flip_start=False,
+    )
     name_last_feature(adapter, "WindowCut2")
     await volume_check(adapter, "WindowCut2", 245_806, 200)
 
@@ -540,8 +656,12 @@ async def build(adapter) -> dict[str, str]:
     # 7. RimChamfer: 1.27 mm / 45° around the whole window rim -- the 12 inner-
     #    frame opening edges plus the slant/trapezoid/fillet faces, tangent-
     #    propagated.
-    check("chamfer", await adapter.add_chamfer(
-        CHAMFER, CHAMFER_EDGES, face_points=CHAMFER_FACES, tangent_propagation=True))
+    check(
+        "chamfer",
+        await adapter.add_chamfer(
+            CHAMFER, CHAMFER_EDGES, face_points=CHAMFER_FACES, tangent_propagation=True
+        ),
+    )
     name_last_feature(adapter, "RimChamfer")
     await volume_check(adapter, "RimChamfer", RIM_CHAMFER_VOLUME, 200)
 
@@ -553,7 +673,9 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
-    await volume_check(adapter, "driven part (equations neutral)", RIM_CHAMFER_VOLUME, 200)
+    await volume_check(
+        adapter, "driven part (equations neutral)", RIM_CHAMFER_VOLUME, 200
+    )
 
     # Manufacturing drawing support: mark exactly the print's dimensions and
     # stamp the make-critical title-block properties.
@@ -562,10 +684,19 @@ async def build(adapter) -> dict[str, str]:
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
 
     await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, CASTING_GREEN)  # green-painted casting, like the base/top-frame
+    await apply_color(
+        adapter, CASTING_GREEN
+    )  # green-painted casting, like the base/top-frame
     await report_mass_properties(adapter)
     apply_drawing_properties(
-        adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES}
+        adapter,
+        PART_NAME,
+        {
+            "Finish": DRAWING_FINISH,
+            # Native Hole Wizard table entry carries 2B; omit the title-block copy.
+            "THREAD_CLASS": TITLE_BLOCK_THREAD_CLASS,
+            "Manufacturing Notes": DRAWING_NOTES,
+        },
     )
     return await save_part_and_images(adapter, PART_NAME)
 
