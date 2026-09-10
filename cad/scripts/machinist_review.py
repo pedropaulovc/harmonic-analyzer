@@ -227,14 +227,26 @@ def _materialize_images(package: ReviewPackage, workdir: Path) -> list[Path]:
     return images
 
 
-def _review_prompt(package: ReviewPackage, sheet_count: int) -> str:
-    prompt = load_prompt(package.kind)
+def _review_prompt(
+    package: ReviewPackage,
+    sheet_count: int,
+    *,
+    reviewer: str = "codex",
+    prompt_text: str | None = None,
+) -> str:
+    prompt = load_prompt(package.kind) if prompt_text is None else prompt_text
     if package.kind == "assembly":
         prompt += (
             "\n\nPACKAGE INPUT\n"
             f"This invocation includes all {sheet_count} sheet images in order. "
             "Return one verdict for the package as a whole. Compare every sheet "
             "against every other sheet before accepting SHIP.\n"
+        )
+    if reviewer == "claude":
+        prompt = (
+            f"Use the Read tool to inspect every copied sheet-1.png through "
+            f"sheet-{sheet_count}.png in order. Do not read any other file. "
+            "Then perform this blind review.\n\n" + prompt
         )
     return prompt
 
@@ -544,6 +556,7 @@ def review_package(
     timeout_s: float = 1800.0,
     claude: str | None = None,
     codex: str | None = None,
+    prompt_text: str | None = None,
 ) -> Review:
     if reviewer not in REVIEWERS:
         raise ValueError(f"unknown reviewer {reviewer!r}; choose one of {REVIEWERS}")
@@ -553,13 +566,9 @@ def review_package(
     executable = (claude if reviewer == "claude" else codex) or shutil.which(reviewer)
     if not executable:
         raise RuntimeError(f"{reviewer} CLI not found on PATH")
-    prompt = _review_prompt(package, sheet_count)
-    if reviewer == "claude":
-        prompt = (
-            f"Use the Read tool to inspect every copied sheet-1.png through "
-            f"sheet-{sheet_count}.png in order. Do not read any other file. "
-            "Then perform this blind review.\n\n" + prompt
-        )
+    prompt = _review_prompt(
+        package, sheet_count, reviewer=reviewer, prompt_text=prompt_text
+    )
     prompt_sha = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
     source_sha = [_sha256(source) for source in package.sources]
     report_dir.mkdir(parents=True, exist_ok=True)
@@ -797,6 +806,10 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--timeout", type=float, default=1800.0, help="seconds per package"
     )
     parser.add_argument("--report-dir", type=Path, default=REPORT_DIR)
+    parser.add_argument(
+        "--prompt-file", type=Path,
+        help="UTF-8 rubric override; package and blind-inspection instructions still apply",
+    )
     parser.add_argument("--index", action="store_true", help="only rebuild index.md")
     parser.add_argument(
         "--missing-ok",
@@ -852,6 +865,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             for package in packages
             if all(source.is_file() for source in package.sources)
         ]
+    prompt_text = (
+        args.prompt_file.read_text(encoding="utf-8")
+        if args.prompt_file is not None else None
+    )
 
     reviews: list[Review] = []
     with ThreadPoolExecutor(max_workers=max(1, args.jobs)) as pool:
@@ -865,6 +882,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 report_dir=report_dir,
                 retries=args.retries,
                 timeout_s=args.timeout,
+                prompt_text=prompt_text,
             ): package
             for package in packages
         }

@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "provenance": {
+    "purpose": "Frozen blind machinist prompt calibration only; this corpus is not native release evidence.",
+    "origin_branch": "review-hobby-shop-tolerances",
+    "origin_parent_commit": "6b24ef04",
+    "origin_parent_commit_note": "Parent revision supplied by the originating task context; generated experiment artifacts were not assigned a separate commit.",
+    "source_experiment": {
+      "directory": "cad/out/reports/prompt-calibration",
+      "manifest_path": "cad/out/reports/prompt-calibration/fixtures/manifest.json",
+      "runner_path": "cad/out/reports/prompt-calibration/run_calibration.py",
+      "generator_path": null,
+      "generator_note": "Fixtures were generated in an Eval cell; no retained generator script exists. Logs and outcomes are not included in this corpus."
+    },
+    "source_drawing": {
+      "origin_branch": "recreate-pinion-handle",
+      "path": "cad/out/png/pinion-handle_drawing.png",
+      "sha256": "3172d96913790520fc35836e75e679768b3b3aeae35bf136119f834658b9c1a7",
+      "role": "Provenance only; not a corpus input or release artifact.",
+      "note": "Historical hash recorded by the original fixture manifest. The native output was subsequently regenerated with a different section orientation; no current pixel comparison against that overwritten source is claimed."
+    },
+    "control_note": "explicit_matched_fit is the frozen unmodified-content control: the original sheet was opened and re-saved through Pillow without annotation edits. PNG re-encoding explains its different file hash; it is not a byte-identical copy of the historical source drawing. This account was supplied by the fixture author; the frozen fixture SHA-256 is authoritative.",
+    "synthetic_note": "The other three cases contain synthetic annotation edits. They are calibration-only fixtures, not native CAD exports or native release evidence.",
+    "path_convention": "Case and baseline paths are relative to this manifest directory. Source provenance paths are relative to the repository root on the named origin branch."
+  },
+  "baseline_prompt": {
+    "path": "baseline.txt",
+    "sha256": "e848a27f1d5c4e08582290d0c6eb12651392a2f7edaed6aad216cf2c2e028fcc",
+    "source_path": "cad/scripts/prompts/machinist_review_part.md",
+    "origin_branch": "recreate-pinion-handle",
+    "historical_claude_effective_sha256": "4ccb7747b31a167ff3e2f6493d6b03bc7983a38d83f12a1235b554ad91adf21e",
+    "historical_effective_hash_source": "cad/out/reports/prompt-calibration/results.json (before cases, one-sheet part review)",
+    "note": "Immutable raw-byte copy of the requested original baseline prompt; SHA-256 includes original encoding and line endings. No baseline-specific source commit was supplied."
+  },
+  "cases": [
+    {
+      "name": "unnecessary_5um_rod_band",
+      "path": "unnecessary_5um_rod_band.png",
+      "kind": "synthetic annotated-sheet fixture",
+      "package_kind": "part",
+      "expected_behavior": "over_specification should identify unnecessary 5 micrometre rod band",
+      "assessment_criteria": [
+        "Identify the unnecessary 5 micrometre rod band as over-specification rather than claiming a manual-shop capability impossibility without evidence.",
+        "Assess recommendation quality as well as finding classification: a proposed replacement tolerance band needs visible functional or fit justification. Merely proposing another unjustified narrow band does not satisfy this case.",
+        "A supported matched-fit alternative is appropriate; the presence of that alternative does not excuse another unjustified recommendation in the same finding. No universal numerical cutoff applies."
+      ],
+      "sha256": "67cf35eb76e12a29fc8428690f745845afc95caf6367430a6dbdedb351fb90dd"
+    },
+    {
+      "name": "explicit_matched_fit",
+      "path": "explicit_matched_fit.png",
+      "kind": "unaltered native sheet control",
+      "package_kind": "part",
+      "expected_behavior": "no rod-fit blocker or demand for numeric interference band",
+      "sha256": "c47ddd060e360cd5d1b6abb8facf1ee4da86e1c961fc873c2cfe6e7762b84ded"
+    },
+    {
+      "name": "contradictory_controlled_fit",
+      "path": "contradictory_controlled_fit.png",
+      "kind": "synthetic annotated-sheet fixture",
+      "package_kind": "part",
+      "expected_behavior": "blocker: controlled shaft cannot guarantee interference with controlled hole",
+      "sha256": "64ad6e6d4e4bbe473491f4bd691f5d3ccf5202d7b3a1245a96b3a1afdbdd3e6d"
+    },
+    {
+      "name": "purchased_precision_pin",
+      "path": "purchased_precision_pin.png",
+      "kind": "synthetic annotated-sheet fixture",
+      "package_kind": "part",
+      "expected_behavior": "do not reject purchased rod precision as unachievable by manual machining; body is matched",
+      "sha256": "908ddf2927c1f8fc79c6899dd4c0bc7a581544e2322db0e003b88c76bb37dfd0"
+    }
+  ]
+}
