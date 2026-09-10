@@ -91,9 +91,15 @@ WHAT A GOOD PRINT LOOKS LIKE (the standard you hold it to)
   finish and, where applicable, the surfaces kept free of coating buildup and
   the corrosion protection for exposed machined surfaces. These are finish
   requirements, not separate manufacturing-note lines.
-- Important process facts are flagged from the view, not buried in a note
-  block. Notes are few and specific (drill vs ream, stock allowance,
-  centres OK, match-drill at assembly, a loose-supplied set screw).
+- The print defines the part by its geometry, never by the method: "MACHINE
+  BOTH POCKETS", "CAST", "MILL FROM SOLID" are not requirements, the
+  dimensioned feature is. A process word is legitimate only where it IS the
+  requirement (REAM for a fit bore, a tap-drill depth that matters,
+  match-drill at assembly). A method instruction in a note or callout is
+  over-specification; where a feature cannot be read off the views, the fix
+  is a view (a section for an internal web), not a note. Notes are few and
+  specific (drill vs ream, stock allowance, centres OK, match-drill at
+  assembly, a loose-supplied set screw).
 - The inner drawing border is a hard boundary. Every view, dimension,
   extension line, leader, callout, note and table is wholly inside it, clear
   of zone labels and the title block, with visible air around the content.

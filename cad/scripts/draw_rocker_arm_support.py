@@ -27,7 +27,6 @@ from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_edge_dimension,
-    add_property_linked_callout,
     add_property_linked_note,
     add_surface_finish,
     create_section_view,
@@ -218,7 +217,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
-            "Web Callout",
         ),
         required=(
             "Number",
@@ -226,7 +224,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
-            "Web Callout",
         ),
     )
     drawing_model, sheet = new_project_drawing(
@@ -332,25 +329,6 @@ async def build(adapter: Any) -> dict[str, str]:
         char_height=0.0025,
         leader_attach_xy=(RIGHT_CENTER[0] + seat_half_w - 0.002, seat_y),
     )
-    # Approach the visible left pocket floor from above-left: the leader
-    # clears TopSpan's left extension and arrow, and stays left of WallHeight.
-    # Only the associative web dimension carries the thickness.
-    web_note = add_property_linked_callout(
-        adapter,
-        right,
-        property_name="Web Callout",
-        edge_xy=(RIGHT_CENTER[0] - half_web, web_y),
-        note_xy=(RIGHT_CENTER[0] - 0.023, RIGHT_CENTER[1] + 0.075),
-    )
-    # A straight leader from the first text line would cross the second.
-    # swBENT + swLS_LEFT gives the diagonal a shoulder outside the text block.
-    web_annotation = _early_bound(web_note.GetAnnotation(), "IAnnotation")
-    if web_annotation.SetLeader3(2, 1, True, False, False, False) != 0:
-        raise RuntimeError("failed to bend the pocket-process leader")
-    web_annotation.BentLeaderLength = 0.010
-    if abs(web_annotation.BentLeaderLength - 0.010) > 1e-9:
-        raise RuntimeError("pocket-process leader shoulder did not persist")
-    set_hidden_lines_visible(adapter, front)
 
     datum_x_axis, datum_y_axis = _bottom_datum_axes(adapter, bottom)
     # No position frame on this part (simplicity policy rule 3/4), so the hole

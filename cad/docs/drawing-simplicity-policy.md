@@ -76,18 +76,23 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
    faces, clamp faces and anything else are "cast/machined" per the title
    block and carry no symbol. `GROUND_UM` (0.8) is reserved for knife edges
    and pivot-screw shoulders.
-6. **Notes: few, specific, and never a dimension.** At most four short lines
-   of part-specific process facts a machinist cannot read off the views:
+6. **Notes: few, specific, never a dimension, never a method.** At most four
+   short lines of part-specific facts a machinist cannot read off the views:
    drill vs. ream, stock allowance ("16 STOCK OK"), "CENTRES OK", match-drill
    at assembly, a loose-supplied set screw, a gear data block. A note never
    restates the title block, never carries a tolerance that belongs on a
    dimension, never explains what a datum letter is, never narrates design
    intent, and never quotes other part numbers beyond "MATES WITH".
-   Important process facts are flagged from the view (leader or flag note),
-   not buried in the block. Coating application, masking, and oiling belong to
-   the Finish field under rule 1, not this block. Notes that live in
-   `<part>_notes.py` stay there (they are out of the part's rebuild closure by
-   design).
+   The print defines the part by its geometry, not by how to make it
+   (ASME Y14.5 §1.4(e)): "MACHINE BOTH POCKETS", "CAST", "MILL FROM SOLID"
+   are not requirements — the dimensioned feature is. A process word is
+   allowed only where it IS the requirement (REAM for a fit bore, a tap
+   drill depth that matters, match-drill at assembly). Where something
+   cannot be read off the views, the fix is a view (a section for an
+   internal web), not a note. Coating application, masking, and oiling
+   belong to the Finish field under rule 1, not this block. Notes that live
+   in `<part>_notes.py` stay there (they are out of the part's rebuild
+   closure by design).
 7. **Views follow the machinist, not the modeller.**
    - Every drawing package includes a standard isometric projection for
      pictorial clarity. It is **Shaded With Edges** with precision geometry

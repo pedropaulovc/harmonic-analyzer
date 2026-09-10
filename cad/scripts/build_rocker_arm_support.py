@@ -148,9 +148,10 @@ DRAWING_NOTES = "\n".join(
         "CAVITY R12.7, 4X; CHAMFER BOTH OUTER POCKET RIMS 1.27 X 45 DEG.",
     )
 )
-# Flagged from a visible edge in section A-A. The associative web
-# thickness dimension carries the size; this property carries only process.
-WEB_CALLOUT = "MACHINE BOTH POCKETS;\nWALLS NORMAL TO MOUNTING FACE"
+# No pocket-process callout: "machine both pockets" dictates method (ASME
+# Y14.5 1.4(e) — define geometry, not process) and the section's 6.35 web
+# dimension already fixes what the pockets must leave; wall squareness rides
+# the title block's ±1°.
 HOLE_THREAD_CLASS = "2B"  # receiver fit for the 2A lag screw (design fact; the
 # title block's THREADS row prints it, the Hole Wizard feature does not)
 
@@ -728,7 +729,6 @@ async def build(adapter) -> dict[str, str]:
         PART_NAME,
         {
             "Manufacturing Notes": DRAWING_NOTES,
-            "Web Callout": WEB_CALLOUT,
         },
     )
     return await save_part_and_images(adapter, PART_NAME)

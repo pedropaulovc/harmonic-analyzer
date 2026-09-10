@@ -61,14 +61,13 @@ def test_manufacturing_notes_define_only_part_specific_processes() -> None:
     assert "6.35 WEB" not in notes
 
 
-def test_web_instruction_is_a_view_callout() -> None:
-    assert support.WEB_CALLOUT == (
-        "MACHINE BOTH POCKETS;\nWALLS NORMAL TO MOUNTING FACE"
-    )
+def test_no_process_callout_on_the_sheet() -> None:
+    # "Machine both pockets" dictates method (ASME Y14.5 1.4(e)); the section's
+    # web dimension defines what the pockets leave, so no callout exists.
+    assert not hasattr(support, "WEB_CALLOUT")
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'property_name="Web Callout"' in source
-    assert "LEAVE" not in support.WEB_CALLOUT
-    assert "6.35" not in support.WEB_CALLOUT
+    assert "add_property_linked_callout" not in source
+    assert "Web Callout" not in source
 
 
 def test_thread_class_lives_in_the_title_block_not_on_the_feature() -> None:
