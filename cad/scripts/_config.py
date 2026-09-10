@@ -192,7 +192,7 @@ def parts(stem: str | None = None) -> dict[str, Any]:
     over the file ``defaults:`` (so revision/confidence fall through)."""
     registry = _parts_registry()
     if stem is None:
-        return registry
+        return {name: dict(row) for name, row in registry.items()}
     if stem not in registry:
         raise KeyError(f"part not in registry: {stem}")
     return {**_doc("parts").get("defaults", {}), **registry[stem]}

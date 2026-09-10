@@ -1673,6 +1673,11 @@ def set_hidden_lines_visible(adapter: Any, view: Any) -> None:
     """
     bound = _early_bound(view, "IView")
     bound.SetDisplayMode4(False, _SW_HLR, False, False, True)
+    mode = int(bound.GetDisplayMode2())
+    if mode != _SW_HLR:
+        raise RuntimeError(
+            f"failed to transition drawing view through HLR (mode reads {mode})"
+        )
     bound.SetDisplayMode4(False, _SW_HLV, False, False, True)
     mode = int(bound.GetDisplayMode2())
     if mode != _SW_HLV:

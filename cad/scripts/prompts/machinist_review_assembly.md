@@ -76,8 +76,9 @@ routing. Do not invent a requirement from a mechanism you cannot see; judge
 the package as drawn.
 
 The attached images ARE the package, one per sheet, already rendered at full
-resolution; read them directly. Do not try to open files, run commands, or
-fetch anything — a review that reaches for a file is discarded. Inspect the
+resolution; inspect them directly with the Read tool. Do not open any other
+file, run commands, or fetch anything — a review that reaches for anything
+beyond the supplied sheet images is discarded. Inspect the
 whole package before answering: every sheet, view, balloon, list row, note and
 title block. Never accept a sheet in isolation.
 Cross-check item numbers, quantities and descriptions across every BOM; every

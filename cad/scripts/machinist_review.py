@@ -571,6 +571,7 @@ def review_package(
     events: list[dict[str, Any]] = []
     allowed_images: list[Path] = []
     verdict_images: list[Path] = []
+    success_events: list[dict[str, Any]] = []
     attempts = 0
     for attempt in range(retries + 1):
         attempts = attempt + 1
@@ -628,6 +629,7 @@ def review_package(
                 else extract_codex_verdict(output, attempt_events)
             )
             verdict_images = list(images)
+            success_events = list(attempt_events)
             error = None
             break
         except subprocess.TimeoutExpired as exc:
@@ -646,10 +648,11 @@ def review_package(
 
     _write_events(events_path, events)
     if reviewer == "claude":
-        tool_events, read_images = _claude_event_evidence(
-            events, allowed_images=allowed_images
+        tool_events, _ = _claude_event_evidence(events, allowed_images=allowed_images)
+        _, read_images = _claude_event_evidence(
+            success_events, allowed_images=verdict_images
         )
-        inspection_proven = set(verdict_images) == read_images
+        inspection_proven = bool(verdict_images) and set(verdict_images) == read_images
         extra = {
             "image_read_events": len(read_images),
             "images_read": sorted(path.name for path in read_images),

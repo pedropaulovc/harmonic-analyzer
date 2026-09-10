@@ -2183,30 +2183,30 @@ def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
         # a new sldexitapp.exe (SolidWorks' crash-report dialog) or 15 min of
         # telemetry silence hard-exits this process so the doit parent can fail
         # the task and release the seat lock; a hung SW window only logs.
-        _watchdog.start()
         adapter = PyWin32Adapter({})
-        async with _telemetry.aspan("sw.connect"):
-            _telemetry.info("connecting to SolidWorks")
-            await adapter.connect()
-            _telemetry.success("connected")
-            # Re-runnable: a previous (possibly failed) build — or a human
-            # inspecting an artefact in the UI — leaves documents open, and
-            # saving over (or deleting) an open path fails. Verified, not
-            # best-effort: a document that refuses to close would surface later
-            # as an opaque save/permission error mid-build. Only VISIBLE
-            # documents count: SolidWorks keeps Toolbox library parts (e.g.
-            # `binding head screw_ai.sldprt` behind a Hole Wizard insert) as
-            # hidden residents that CloseAllDocuments/QuitDoc never release.
-            adapter.swApp.CloseAllDocuments(True)
-            holding = _visible_document_paths(adapter)
-            if holding:
-                raise RuntimeError(
-                    f"{len(holding)} document(s) still open after "
-                    f"CloseAllDocuments: {holding}"
-                )
-            _telemetry.success("CloseAllDocuments (clean session)")
-            _pin_default_part_template(adapter)
+        _watchdog.start()
         try:
+            async with _telemetry.aspan("sw.connect"):
+                _telemetry.info("connecting to SolidWorks")
+                await adapter.connect()
+                _telemetry.success("connected")
+                # Re-runnable: a previous (possibly failed) build — or a human
+                # inspecting an artefact in the UI — leaves documents open, and
+                # saving over (or deleting) an open path fails. Verified, not
+                # best-effort: a document that refuses to close would surface later
+                # as an opaque save/permission error mid-build. Only VISIBLE
+                # documents count: SolidWorks keeps Toolbox library parts (e.g.
+                # `binding head screw_ai.sldprt` behind a Hole Wizard insert) as
+                # hidden residents that CloseAllDocuments/QuitDoc never release.
+                adapter.swApp.CloseAllDocuments(True)
+                holding = _visible_document_paths(adapter)
+                if holding:
+                    raise RuntimeError(
+                        f"{len(holding)} document(s) still open after "
+                        f"CloseAllDocuments: {holding}"
+                    )
+                _telemetry.success("CloseAllDocuments (clean session)")
+                _pin_default_part_template(adapter)
             # Group the build's own operations (inserts, the mate chokepoint, the
             # per-config gates) under ONE ``<kind>.build`` phase span, a sibling of
             # sw.connect/sw.disconnect. This is deliberately NOT the removed
@@ -2221,16 +2221,19 @@ def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
                 return await build(adapter)
         finally:
             # Teardown is its own span so a disconnect failure is attributable
-            # and never a silent gap before process exit.
-            async with _telemetry.aspan("sw.disconnect"):
-                try:
-                    await adapter.disconnect()
-                    _telemetry.success("disconnected")
-                except Exception as exc:  # noqa: BLE001
-                    _telemetry.warn(f"disconnect failed: {exc}")
-            # COM session over: stop the watchdog so a long SolidWorks-free
-            # tail (pure-python post-processing) can't trip the idle timeout.
-            _watchdog.stop()
+            # and never a silent gap before process exit. The watchdog stop is
+            # outermost so telemetry teardown cannot leave it armed.
+            try:
+                async with _telemetry.aspan("sw.disconnect"):
+                    try:
+                        await adapter.disconnect()
+                        _telemetry.success("disconnected")
+                    except Exception as exc:  # noqa: BLE001
+                        _telemetry.warn(f"disconnect failed: {exc}")
+            finally:
+                # COM session over: stop the watchdog so a long SolidWorks-free
+                # tail (pure-python post-processing) can't trip the idle timeout.
+                _watchdog.stop()
 
     # build_session continues the doit task span when one was injected (so we add
     # no duplicate root layer under the spine) and opens a local root only when run

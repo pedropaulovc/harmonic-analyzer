@@ -140,9 +140,10 @@ assembly you cannot see; judge the part as drawn. If the part is
 manufacturable as a blank to be finished at assembly and the print says so,
 that is a valid print.
 
-The attached image IS the sheet, already rendered at full resolution; read it
-directly. Do not try to open files, run commands, or fetch anything — there is
-nothing else to look at, and a review that reaches for a file is discarded.
+The attached image IS the sheet, already rendered at full resolution; inspect
+it directly with the Read tool. Do not open any other file, run commands, or
+fetch anything — there is nothing else to look at, and a review that reaches
+for anything beyond the supplied sheet image is discarded.
 Inspect the whole sheet before answering: trace the complete inner border
 first, then inspect every view, dimension, extension line, callout, note, the
 title block and the isometric. Confirm that nothing touches or crosses the

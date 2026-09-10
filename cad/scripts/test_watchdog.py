@@ -14,10 +14,13 @@ idle timeout is only as good as the instrumentation poking it.
 
 from __future__ import annotations
 
-from pathlib import Path
+import sys
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
+import _common
 import _telemetry
 import _watchdog
 from _watchdog import EXIT_CRASH, EXIT_MODAL_DIALOG, EXIT_OP_TIMEOUT, Watchdog
@@ -46,7 +49,10 @@ def _make(
     now = 10_000.0
     # First call happens in __init__ (the baseline snapshot); every later call
     # (tick) sees the ``crash`` set.
-    seq = [set(baseline or set()), set(crash if crash is not None else baseline or set())]
+    seq = [
+        set(baseline or set()),
+        set(crash if crash is not None else baseline or set()),
+    ]
 
     dog = Watchdog(
         op_timeout=timeout,
@@ -140,7 +146,9 @@ _LOW_MEMORY = (
 )
 
 
-def test_modal_dialog_warns_first_then_is_fatal(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_modal_dialog_warns_first_then_is_fatal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     # 2026-09-02: the low-memory box blocked the seat mid top-assembly build; a
     # first sighting only warns (a transient box must not kill a healthy build),
     # the second consecutive poll aborts with its own exit code so dodo retries
@@ -180,9 +188,15 @@ def test_two_different_transient_dialogs_are_not_one_persistent_one() -> None:
     assert exits == [EXIT_MODAL_DIALOG]
 
 
-def test_modal_dialog_abort_carries_the_dialog_text(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_modal_dialog_abort_carries_the_dialog_text(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     aborts: list[tuple[str, int, dict]] = []
-    monkeypatch.setattr(_watchdog, "_abort", lambda reason, msg, code, **f: aborts.append((reason, code, f)))
+    monkeypatch.setattr(
+        _watchdog,
+        "_abort",
+        lambda reason, msg, code, **f: aborts.append((reason, code, f)),
+    )
     monkeypatch.setattr(_watchdog, "_warn", lambda msg, **f: None)
     dog, _ = _make(dialog_probe=lambda: (0x1234, _LOW_MEMORY))
     dog.tick()
@@ -196,7 +210,9 @@ def test_modal_dialog_abort_carries_the_dialog_text(monkeypatch: pytest.MonkeyPa
 
 def test_crash_outranks_a_pending_modal_dialog() -> None:
     # A crash dialog and a leftover modal can coexist; the crash wins immediately.
-    dog, exits = _make(baseline=set(), crash={4242}, dialog_probe=lambda: (0x1234, _LOW_MEMORY))
+    dog, exits = _make(
+        baseline=set(), crash={4242}, dialog_probe=lambda: (0x1234, _LOW_MEMORY)
+    )
     with pytest.raises(_Exit):
         dog.tick()
     assert exits == [EXIT_CRASH]
@@ -275,20 +291,39 @@ def test_start_logs_the_armed_configuration(monkeypatch: pytest.MonkeyPatch) -> 
         assert _watchdog.start() is not None
     finally:
         _watchdog.stop()
-    assert any("watchdog armed" in m and "900s" in m and "modal-dialog" in m for m in infos)
+    assert any(
+        "watchdog armed" in m and "900s" in m and "modal-dialog" in m for m in infos
+    )
 
 
-def test_run_build_wires_the_watchdog() -> None:
-    # Pin the INTEGRATION, not just the unit: run_build is the single COM entry
-    # and the only caller of start()/stop() -- if a refactor drops either call,
-    # every COM subprocess silently runs unprotected while this gate stays
-    # green (codex #344). Source-text pin (not an import) so the gate needs no
-    # SolidWorks adapter on the machine running it.
-    src = (Path(__file__).with_name("_common.py")).read_text(encoding="utf-8")
-    assert src.count("def run_build(") == 1
-    run_build_src = src.split("def run_build(", 1)[1]
-    assert "_watchdog.start()" in run_build_src, "run_build no longer arms the watchdog"
-    assert "_watchdog.stop()" in run_build_src, "run_build no longer disarms the watchdog"
+def test_run_build_cleans_up_when_session_setup_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter = SimpleNamespace(
+        connect=AsyncMock(),
+        disconnect=AsyncMock(),
+        swApp=SimpleNamespace(CloseAllDocuments=Mock()),
+    )
+    constructor = Mock(return_value=adapter)
+    monkeypatch.setitem(
+        sys.modules,
+        "solidworks_mcp.adapters.pywin32_adapter",
+        SimpleNamespace(PyWin32Adapter=constructor),
+    )
+    monkeypatch.setattr(_common._watchdog, "start", Mock())
+    monkeypatch.setattr(_common._watchdog, "stop", Mock())
+    monkeypatch.setattr(
+        _common, "_visible_document_paths", lambda _adapter: ["stuck.SLDDRW"]
+    )
+    monkeypatch.setattr(_common._telemetry, "shutdown", Mock())
+    monkeypatch.setattr(sys, "argv", ["build_probe.py"])
+    build = AsyncMock()
+
+    assert _common.run_build(build) == 1
+    build.assert_not_awaited()
+    adapter.disconnect.assert_awaited_once_with()
+    _common._watchdog.start.assert_called_once_with()
+    _common._watchdog.stop.assert_called_once_with()
 
 
 def test_span_boundaries_poke_the_heartbeat() -> None:

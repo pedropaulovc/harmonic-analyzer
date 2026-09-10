@@ -318,6 +318,54 @@ def test_retry_persists_all_attempts_and_cannot_hide_tool_use(
     assert [record["attempt"] for record in records] == [1, 2]
 
 
+def test_retry_requires_image_reads_from_the_successful_attempt(
+    tmp_path: Path, monkeypatch
+) -> None:
+    png = tmp_path / "source.png"
+    png.write_bytes(b"image")
+    verdict = _clean_verdict()
+    calls = 0
+
+    def fake_run(command, **_kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            read = {
+                "type": "assistant",
+                "message": {
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "name": "Read",
+                            "input": {"file_path": "sheet-1.png"},
+                        }
+                    ]
+                },
+            }
+            return mr.subprocess.CompletedProcess(
+                command, 1, stdout=json.dumps(read), stderr="failed"
+            )
+        result = {"type": "result", "structured_output": verdict}
+        return mr.subprocess.CompletedProcess(
+            command, 0, stdout=json.dumps(result), stderr=""
+        )
+
+    monkeypatch.setattr(mr.subprocess, "run", fake_run)
+    review = mr.review_package(
+        mr.ReviewPackage("part", "part", (png,)),
+        reviewer="claude",
+        report_dir=tmp_path / "reports",
+        retries=1,
+        claude="claude",
+    )
+
+    assert review.attempts == 2
+    assert review.tool_events == 0
+    assert review.extra["images_read"] == []
+    assert not review.blind
+    assert not review.passed
+
+
 def test_codex_blindness_fails_closed_on_every_tool_or_command() -> None:
     passive = {"type": "agent_message", "text": "review complete"}
     tool = {"type": "item.completed", "item": {"type": "tool_use", "name": "Read"}}

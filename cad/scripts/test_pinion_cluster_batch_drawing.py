@@ -76,6 +76,16 @@ def test_part_numbers_are_unique_across_the_complete_registry() -> None:
     assert duplicates == {}
 
 
+def test_complete_parts_registry_returns_independent_rows() -> None:
+    registry = _config.parts()
+    row = registry["arbor-pedestal"]
+    row["_mutation_probe"] = True
+    try:
+        assert "_mutation_probe" not in _config.parts("arbor-pedestal")
+    finally:
+        row.pop("_mutation_probe", None)
+
+
 def test_new_pin_and_spring_numbers_use_reserved_unique_allocations() -> None:
     assert _config.parts("pinion-cam-pin")["number"] == "MHA-116"
     assert _config.parts("pinion-spring")["number"] == "MHA-114"
