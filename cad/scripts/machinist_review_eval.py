@@ -20,6 +20,9 @@ Use a separate report directory for an independent repeat of identical inputs.
 Concurrent invocations must not share a report directory. Each completed case is
 checkpointed atomically; interrupted/invalid cases rerun without overwriting old
 attempt artifacts. stdout contains only aggregate JSON; telemetry uses stderr.
+The run's inputs/ directory preserves raw baseline.txt, candidate.txt and
+schema.json bytes. Each report's extra.evidence preserves the exact effective
+prompt, schema text and authorized image paths/argv for every provider attempt.
 """
 
 from __future__ import annotations
@@ -48,18 +51,41 @@ def _digest(value: Any) -> str:
     ).hexdigest()
 
 
-def _atomic_json(path: Path, value: Any) -> None:
+def _atomic_bytes(path: Path, content: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile(
-        mode="w", encoding="utf-8", dir=path.parent, suffix=".tmp", delete=False
+        mode="wb", dir=path.parent, suffix=".tmp", delete=False
     ) as stream:
         temporary = Path(stream.name)
-        json.dump(value, stream, indent=2)
-        stream.write("\n")
+        stream.write(content)
     try:
         temporary.replace(path)
     finally:
         temporary.unlink(missing_ok=True)
+
+
+def _atomic_json(path: Path, value: Any) -> None:
+    _atomic_bytes(path, (json.dumps(value, indent=2) + "\n").encode("utf-8"))
+
+
+def persist_inputs(
+    run_dir: Path, identity: dict[str, Any], prompts: dict[str, bytes],
+) -> None:
+    """Freeze replayable input bytes; never replace a mismatched existing input."""
+    inputs = [
+        (f"{version}.txt", prompts[version], identity["prompts"][version]["raw_sha256"])
+        for version in VERSIONS
+    ]
+    inputs.append(("schema.json", mr.SCHEMA_FILE.read_bytes(), identity["schema_sha256"]))
+    for name, content, expected_hash in inputs:
+        if hashlib.sha256(content).hexdigest() != expected_hash:
+            raise ValueError(f"{name}: input changed after run identity was computed")
+        destination = run_dir / "inputs" / name
+        if destination.exists():
+            if mr._sha256(destination) != expected_hash:
+                raise ValueError(f"{name}: preserved input hash mismatch")
+        else:
+            _atomic_bytes(destination, content)
 
 
 def load_cases(manifest: Path) -> tuple[dict[str, Any], list[mr.ReviewPackage]]:
@@ -166,6 +192,64 @@ def validate_evidence(
         for row in events
     ):
         raise ValueError("missing or malformed retry event history")
+    evidence = review.extra.get("evidence")
+    if not isinstance(evidence, dict):
+        raise ValueError("missing preserved invocation evidence")
+    for field, expected_hash in (
+        ("effective_prompt", review.prompt_sha256),
+        ("schema", identity["schema_sha256"]),
+    ):
+        content = evidence.get(field)
+        if not isinstance(content, str) or hashlib.sha256(content.encode("utf-8")).hexdigest() != expected_hash:
+            raise ValueError(f"preserved {field} hash mismatch")
+    attempts = evidence.get("attempts")
+    if not isinstance(attempts, list) or len(attempts) != review.attempts:
+        raise ValueError("incomplete invocation history")
+    workdirs: set[Path] = set()
+    for number, invocation in enumerate(attempts, start=1):
+        if not isinstance(invocation, dict) or set(invocation) != {"attempt", "cwd", "images", "command"} or type(invocation["attempt"]) is not int or invocation["attempt"] != number:
+            raise ValueError("invalid invocation record")
+        if not isinstance(invocation["cwd"], str):
+            raise ValueError("missing invocation workdir")
+        cwd = Path(invocation["cwd"])
+        if not cwd.is_absolute() or cwd in workdirs:
+            raise ValueError("invalid or reused neutral workdir")
+        workdirs.add(cwd)
+        image_paths = invocation["images"]
+        if not isinstance(image_paths, list) or any(not isinstance(path, str) for path in image_paths):
+            raise ValueError("invalid authorized image paths")
+        images = [Path(path) for path in image_paths]
+        command = invocation["command"]
+        attempt_events = [row["event"] for row in events if row["attempt"] == number]
+        if command is None:
+            if attempt_events or number == review.attempts:
+                raise ValueError("events without a recorded provider invocation")
+            continue
+        if images != [cwd / "sheet-1.png"]:
+            raise ValueError("invocation image allowlist differs from package")
+        if not isinstance(command, list) or not command or any(not isinstance(arg, str) for arg in command):
+            raise ValueError("invalid invocation command")
+        expected_command = (
+            mr.build_claude_command(
+                workdir=cwd, images=images, schema=cwd / "schema.json",
+                model=review.model, effort=review.effort, claude=command[0],
+                schema_content=evidence["schema"],
+            )
+            if review.reviewer == "claude"
+            else mr.build_codex_command(
+                workdir=cwd, images=images, schema=cwd / "schema.json",
+                output=cwd / "verdict.json", model=review.model,
+                effort=review.effort, codex=command[0],
+            )
+        )
+        if command != expected_command:
+            raise ValueError("invocation command permissions/settings mismatch")
+        if review.reviewer == "claude":
+            unauthorized, inspected = mr._claude_event_evidence(
+                attempt_events, allowed_images=images
+            )
+            if unauthorized or (number == review.attempts and inspected != {image.resolve() for image in images}):
+                raise ValueError("event history does not prove an authorized blind image review")
     successful = [row["event"] for row in events if row["attempt"] == review.attempts]
     if identity["reviewer"] == "codex":
         if mr.count_codex_tool_events(events):
@@ -180,26 +264,7 @@ def validate_evidence(
         ) and mr.extract_codex_verdict(directory, successful) != review.verdict:
             raise ValueError("report differs from successful Codex event verdict")
     else:
-        for attempt in range(1, review.attempts + 1):
-            attempt_events = [row["event"] for row in events if row["attempt"] == attempt]
-            allowed: set[Path] = set()
-            for node in mr._walk(attempt_events):
-                if isinstance(node, dict) and str(node.get("name", "")).lower() == "read":
-                    arguments = node.get("input")
-                    if isinstance(arguments, dict) and isinstance(arguments.get("file_path"), str):
-                        path = Path(arguments["file_path"])
-                        if path.is_absolute() and path.parent.name.startswith("machrev-") and path.name == "sheet-1.png":
-                            allowed.add(path.resolve())
-            # Relative Read paths are legitimate in the engine's neutral cwd.
-            # If the event stream never names that cwd, a stand-in resolves only
-            # the permitted relative filename; no filesystem access occurs here.
-            if not allowed:
-                allowed.add((directory / "neutral-evidence" / "sheet-1.png").resolve())
-            unauthorized, inspected = mr._claude_event_evidence(
-                attempt_events, allowed_images=tuple(allowed)
-            )
-            if unauthorized or (attempt == review.attempts and len(inspected) != 1):
-                raise ValueError("event history does not prove a blind image review")
+        # Only the engine's pre-invocation allowlists above authorize Read paths.
         if mr.extract_claude_verdict(successful) != review.verdict:
             raise ValueError("report differs from successful Claude event verdict")
     return review
@@ -331,6 +396,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             raise ValueError("assessment run identity mismatch")
         run_dir = args.report_dir.resolve() / _digest(identity)
         _atomic_json(run_dir / "identity.json", identity)
+        persist_inputs(run_dir, identity, prompts)
         results = []
         with ThreadPoolExecutor(max_workers=args.jobs) as pool:
             futures = [pool.submit(

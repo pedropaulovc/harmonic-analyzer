@@ -292,3 +292,121 @@ def test_stale_or_invalid_human_assessments_are_rejected(
         result["error"] = "Model evidence failed validation"
     with pytest.raises(ValueError):
         evaluation.aggregate(identity, [result], assessments)
+
+
+def test_foreign_neutral_directory_read_cannot_redefine_recorded_allowlist(
+    tmp_path: Path, case, provider,
+) -> None:
+    identity = _identity(case, reviewer="claude")
+    directory = tmp_path / "run"
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert result["error"] is None
+    events_path = directory / result["events"]
+    events = [json.loads(line) for line in events_path.read_text(encoding="utf-8").splitlines()]
+    foreign_image = tmp_path / "machrev-foreign" / "sheet-1.png"
+    for row in events:
+        for node in mr._walk(row):
+            if isinstance(node, dict) and node.get("name") == "Read":
+                node["input"]["file_path"] = str(foreign_image)
+    events_path.write_text("\n".join(json.dumps(row) for row in events), encoding="utf-8")
+    result["events_sha256"] = mr._sha256(events_path)
+    (directory / "result.json").write_text(json.dumps(result), encoding="utf-8")
+    assert result["review"]["blind"] is True
+    with pytest.raises(ValueError):
+        evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
+    fresh = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert fresh["error"] is None
+    assert fresh["report"] != result["report"]
+    assert len(provider["calls"]) == 2
+
+
+@pytest.mark.parametrize("reviewer", ["codex", "claude"])
+def test_recorded_permission_bypass_is_rejected_despite_matching_report_hash(
+    tmp_path: Path, case, provider, reviewer: str,
+) -> None:
+    identity = _identity(case, reviewer=reviewer)
+    directory = tmp_path / "run"
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert result["error"] is None
+    report_path = directory / result["report"]
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    command = report["extra"]["evidence"]["attempts"][0]["command"]
+    if reviewer == "codex":
+        command[command.index("--sandbox") + 1] = "danger-full-access"
+    else:
+        command[command.index("--permission-mode") + 1] = "bypassPermissions"
+    report_path.write_text(json.dumps(report), encoding="utf-8")
+    result["report_sha256"] = mr._sha256(report_path)
+    result["review"] = report
+    (directory / "result.json").write_text(json.dumps(result), encoding="utf-8")
+    assert result["review"]["blind"] is True
+    with pytest.raises(ValueError):
+        evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
+    fresh = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert fresh["error"] is None
+    assert fresh["report"] != result["report"]
+    assert len(provider["calls"]) == 2
+
+
+@pytest.mark.parametrize("reviewer", ["codex", "claude"])
+def test_snapshots_recover_exact_inputs_after_original_files_are_overwritten(
+    tmp_path: Path, case, provider, monkeypatch: pytest.MonkeyPatch, reviewer: str,
+) -> None:
+    raw_prompts = {
+        "baseline": "Inspect Ø12.\r\nKeep the justified fit.\r\n".encode("utf-8"),
+        "candidate": "Inspect Ø12 differently.\rUse the drawing.\n".encode("utf-8"),
+    }
+    originals = {version: tmp_path / f"arbitrary-{version}.txt" for version in raw_prompts}
+    for version, original in originals.items():
+        original.write_bytes(raw_prompts[version])
+    schema_bytes = (
+        json.dumps(mr.load_schema(), indent=2).replace("\n", "\r\n") + "\r\n"
+    ).encode("utf-8")
+    original_schema = tmp_path / "arbitrary-schema.json"
+    original_schema.write_bytes(schema_bytes)
+    monkeypatch.setattr(mr, "SCHEMA_FILE", original_schema)
+    package = mr.ReviewPackage(case[1].name, "assembly", case[1].sources)
+    identity = evaluation.make_identity(
+        case[0], [package], {version: path.read_bytes() for version, path in originals.items()},
+        reviewer=reviewer, model="model-a", effort="low", retries=0, timeout_s=30,
+    )
+    run_dir = tmp_path / "run"
+    evaluation.persist_inputs(run_dir, identity, raw_prompts)
+    results = {}
+    for version in raw_prompts:
+        prompt = (run_dir / "inputs" / f"{version}.txt").read_text(encoding="utf-8")
+        results[version] = evaluation.run_case(identity, version, package, prompt, run_dir / version)
+        assert results[version]["error"] is None
+    for original in originals.values():
+        original.write_bytes(b"replacement rubric")
+    original_schema.write_bytes(b"{}")
+    assert (run_dir / "inputs" / "schema.json").read_bytes() == schema_bytes
+    for index, (version, raw) in enumerate(raw_prompts.items()):
+        assert (run_dir / "inputs" / f"{version}.txt").read_bytes() == raw
+        result = results[version]
+        report = json.loads((run_dir / version / result["report"]).read_text(encoding="utf-8"))
+        evidence = report["extra"]["evidence"]
+        assert evidence["effective_prompt"] == provider["calls"][index]["prompt"]
+        assert hashlib.sha256(evidence["effective_prompt"].encode("utf-8")).hexdigest() == (
+            identity["prompts"][version]["effective_sha256"][package.name]
+        )
+        assert evidence["schema"].encode("utf-8") == schema_bytes
+        evaluation.validate_evidence(result, identity, version, package, run_dir / version)
+
+
+@pytest.mark.parametrize("field", ["effective_prompt", "schema"])
+def test_provenance_content_must_match_identity_not_just_report_hash(
+    tmp_path: Path, case, provider, field: str,
+) -> None:
+    identity = _identity(case)
+    directory = tmp_path / "run"
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert result["error"] is None
+    report_path = directory / result["report"]
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    report["extra"]["evidence"][field] += "\n"
+    report_path.write_text(json.dumps(report), encoding="utf-8")
+    result["report_sha256"] = mr._sha256(report_path)
+    result["review"] = report
+    with pytest.raises(ValueError):
+        evaluation.validate_evidence(result, identity, "baseline", case[1], directory)

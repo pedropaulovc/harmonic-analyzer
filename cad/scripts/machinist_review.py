@@ -259,6 +259,7 @@ def build_claude_command(
     model: str,
     effort: str,
     claude: str = "claude",
+    schema_content: str | None = None,
 ) -> list[str]:
     """Return the exact isolated ``claude -p`` argv for one package."""
     if (
@@ -268,7 +269,7 @@ def build_claude_command(
     ):
         raise ValueError("review inputs must be inside the neutral workdir")
     schema_json = json.dumps(
-        json.loads(schema.read_text(encoding="utf-8")),
+        json.loads(schema.read_text(encoding="utf-8") if schema_content is None else schema_content),
         separators=(",", ":"),
     )
     return [
@@ -571,6 +572,7 @@ def review_package(
     )
     prompt_sha = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
     source_sha = [_sha256(source) for source in package.sources]
+    schema_bytes = SCHEMA_FILE.read_bytes()
     report_dir.mkdir(parents=True, exist_ok=True)
     events_path = report_dir / f"{package.name}.events.jsonl"
 
@@ -581,13 +583,19 @@ def review_package(
     allowed_images: list[Path] = []
     verdict_images: list[Path] = []
     success_events: list[dict[str, Any]] = []
+    attempt_records: list[dict[str, Any]] = []
     attempts = 0
     for attempt in range(retries + 1):
         attempts = attempt + 1
         workdir = Path(tempfile.mkdtemp(prefix="machrev-"))
         attempt_events: list[dict[str, Any]] = []
+        attempt_record: dict[str, Any] = {
+            "attempt": attempts, "cwd": str(workdir), "images": [], "command": None,
+        }
+        attempt_records.append(attempt_record)
         try:
             images = _materialize_images(package, workdir)
+            attempt_record["images"] = [str(image) for image in images]
             allowed_images.extend(images)
             if len(images) != sheet_count:
                 raise RuntimeError(
@@ -595,7 +603,7 @@ def review_package(
                     f"expected {sheet_count}"
                 )
             schema = workdir / "schema.json"
-            shutil.copyfile(SCHEMA_FILE, schema)
+            schema.write_bytes(schema_bytes)
             output = workdir / "verdict.json"
             cmd = (
                 build_claude_command(
@@ -617,6 +625,7 @@ def review_package(
                     codex=executable,
                 )
             )
+            attempt_record["command"] = cmd
             proc = subprocess.run(
                 cmd,
                 input=prompt,
@@ -670,6 +679,11 @@ def review_package(
         tool_events = count_codex_tool_events(events)
         inspection_proven = True
         extra = {}
+    extra["evidence"] = {
+        "effective_prompt": prompt,
+        "schema": schema_bytes.decode("utf-8"),
+        "attempts": attempt_records,
+    }
     blind = tool_events == 0 and inspection_proven
     review = Review(
         name=package.name,
