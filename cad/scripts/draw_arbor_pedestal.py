@@ -12,6 +12,7 @@ from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_attached_note,
+    add_surface_finish,
     add_native_hole_callout,
     curate_view_dimensions,
     finalize_drawing,
@@ -27,6 +28,7 @@ from _drawing_common import (
     stamp_drawing_summary,
     visible_view_entities,
 )
+from _surface_finish import surface_finish_by_key
 from _drawing_registry import DRAWINGS_BY_NAME
 from arbor_pedestal_spec import (
     BORE_DIA,
@@ -39,6 +41,7 @@ from arbor_pedestal_spec import (
     TAPER_ANGLE_DEG,
     TAPER_TANGENT_X,
     TAPER_TANGENT_Y,
+    SURFACE_FINISHES,
     TOP_RADIUS,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -409,6 +412,14 @@ async def build(adapter: Any) -> dict[str, str]:
     # avoids a long half-width witness line that visually merges with the taper.
     foot_entity, bore_entity, dome_entity, taper_entity = _front_entities(
         adapter, front
+    )
+    add_surface_finish(
+        adapter,
+        front,
+        symbol_xy=(0.095, _front_y(BORE_HEIGHT) + 0.024),
+        control=surface_finish_by_key(SURFACE_FINISHES, "arbor_bore"),
+        label="arbor bore finish",
+        entity=bore_entity,
     )
     _add_entity_dimension(
         adapter,

@@ -8,6 +8,8 @@ from __future__ import annotations
 from math import atan2, degrees, sqrt
 
 from _hole_spec import HoleSpec, blind_cut_dia_mm
+from _gtol_spec import CylinderFace
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 
 MM_PER_IN = 25.4
@@ -42,7 +44,13 @@ TAPER_ANGLE_DEG = degrees(
 SCREW_HOLE_SPEC = HoleSpec("clearance", "#4")
 SCREW_HOLE_DIA = blind_cut_dia_mm(SCREW_HOLE_SPEC)
 
-SURFACE_FINISHES = ()
+SURFACE_FINISHES = (
+    SurfaceFinishControl(
+        "arbor_bore",
+        MACHINED_UM,
+        CylinderFace(BORE_DIA, contains_y_mm=BORE_HEIGHT),
+    ),
+)
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "FootProfile": {"Width", "Depth"},

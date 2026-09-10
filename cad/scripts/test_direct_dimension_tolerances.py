@@ -36,7 +36,7 @@ from _drawing_contract import model_toleranced_dimensions
 
 def test_direct_tolerance_values_are_named_in_part_specs() -> None:
     assert alignment_pinion_spec.ARBOR_BORE_BAND == (-0.020, -0.040)
-    assert arbor_pedestal_spec.BORE_DIA_BAND == (0.055, 0.025)
+    assert arbor_pedestal_spec.BORE_DIA_BAND == (0.030, 0.000)
     assert cone_pivot_post_spec.TURNED_DIAMETER_TOLERANCE_MM == 0.05
     assert cone_pivot_post_spec.CRANK_BORE_TOLERANCE_MM == 0.025
     assert cone_tip_block_spec.BLOCK_HEIGHT_BAND == (0.05, 0.00)

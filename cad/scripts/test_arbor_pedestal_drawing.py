@@ -168,12 +168,16 @@ def test_pedestal_has_no_gdt_or_basic_dimensions() -> None:
     assert not hasattr(arbor_pedestal_spec, "SCREW_CLEARANCE_DIA")
 
 
-def test_reamed_bore_needs_no_redundant_surface_finish_symbol() -> None:
+def test_reamed_running_bore_carries_one_surface_finish_control() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert drawing.DIMENSION_CALLOUTS["BoreDia"].startswith("REAM THRU")
-    assert arbor_pedestal_spec.SURFACE_FINISHES == ()
-    assert "SURFACE_FINISHES" not in source
-    assert "add_surface_finish(" not in source
+    assert len(arbor_pedestal_spec.SURFACE_FINISHES) == 1
+    control = arbor_pedestal_spec.SURFACE_FINISHES[0]
+    assert control.key == "arbor_bore"
+    assert control.roughness_um == 1.6
+    assert control.face.contains_y_mm == arbor_pedestal_spec.BORE_HEIGHT
+    assert 'surface_finish_by_key(SURFACE_FINISHES, "arbor_bore")' in source
+    assert "add_surface_finish(" in source
     assert model_toleranced_dimensions(part) == {
         ("BoreProfile", "BoreDia"): "*deviations(BORE_DIA_BAND)"
     }
