@@ -37,6 +37,25 @@ For a coated ferrous part, masking and protection of bare machined surfaces
 belong in the Finish field rather than in Manufacturing Notes. A material
 family or explicit builder's choice is complete unless the part's stated
 function requires a specific grade; do not demand an unsupported grade.
+DFM IS PART OF THE GATE. Inspect the depicted part, not only its annotations.
+Ask whether at least one plausible one-off route allowed by the title block can
+produce every visible feature. Pay particular attention to perfectly sharp
+re-entrant corners, cutter or casting access, trapped geometry, vanishing walls,
+and fastener joints. For each joint, distinguish clearance material from the
+actual threaded receiver: do not count screw projection through a clearance
+hole as engagement. Check that usable full threads are long enough for the
+receiver material, that a blind tap has room beyond them for the tap's lead,
+and that the thread major-diameter envelope does not break through a nearby
+wall. A drawing must distinguish required full-thread depth from deeper
+tap-drill depth when both matter; a cosmetic/minor-diameter continuation is not
+evidence that the whole bore must be threaded. A likely geometry defect is a
+blocker even when the print faithfully depicts it: the drawing may be the last
+chance to catch an omission in the source CAD. State that the CAD/source
+decision must be reconciled and why; never invent the missing radius,
+dimension, feature, or process, and never paper it over with a note. Do not
+demand your preferred process or a particular value when another plausible
+allowed route makes the part exactly as drawn.
+
 
 WHAT A GOOD PRINT LOOKS LIKE (the standard you hold it to)
 - It has no questions. Every feature can be laid out, cut and checked from
@@ -65,13 +84,13 @@ WHAT A GOOD PRINT LOOKS LIKE (the standard you hold it to)
   those limits, and its decimal places are just the number's spelling — never
   ask it to grow a decimal place to "match" the band.
 - Hole callouts say what to do: DRILL or REAM plus the decimal size;
-  clearance holes give the size, not the screw; taps are simple
-  (1/4-20 x depth) unless the tap-drill depth matters; press fits are one
-  simple diameter with its band. A native hole TABLE prints each tapped
-  hole in the CAD system's standard two-line form — the tap drill
-  ("Ø10.72 THRU ALL") over the thread ("1/2-13 UNC THRU ALL"). That is the
-  table's format, read by every shop, not an added process constraint; do
-  not ask for the tap-drill line to be removed from a hole table.
+  clearance holes give the size, not the screw. A through tap can stay simple.
+  A blind tap gives the usable full-thread depth and, when it constrains the
+  operation, the separately deeper tap-drill depth; those are not
+  interchangeable. A native hole TABLE may print the tap drill over the thread
+  in the CAD system's standard two-line form. That is the table's format, read
+  by every shop, not an added process constraint; do not ask for the tap-drill
+  line to be removed.
 - Hidden lines are present in the orthographic views. Nothing is
   dimensioned to a hidden line; a section or breakout does that job.
 - The sheet has a standard isometric projection for pictorial clarity. It is
@@ -110,6 +129,12 @@ WHAT A GOOD PRINT LOOKS LIKE (the standard you hold it to)
   A radius dimension line and a diameter dimension line that MEET at the
   centre they share (a crown concentric with its bore) are drawn to that
   centre by convention; that meeting is not a crossing.
+- Dimension text and feature callouts stay outside the part silhouette by
+  default; hole-table tags and section identifiers are not feature callouts.
+  Interior placement is a clarity defect unless a confined detail or genuine
+  sheet-space constraint makes it materially clearer than every exterior
+  option. Convenience is not a reason, and interior text must never mask
+  geometry, hide a feature, or cross a line.
 - The view group looks intentional and visually balanced in the usable drawing
   region rather than bunched against one edge beside a large dead field, but
   correctness comes first. Projected orthographic views preserve ASME

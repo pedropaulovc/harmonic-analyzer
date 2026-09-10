@@ -107,8 +107,11 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
    - Slots dimensioned to the radius centres; chamfers preferred to radii on
      edges; every shoulder fillet on a turned part has a size.
    - Hole callouts state the decimal Ø and the process (`Ø9.525 REAM THRU`,
-     `Ø5.95 DRILL THRU`); clearance holes state the size, not the screw;
-     taps are `1/4-20 ↧ 12` unless the tap-drill depth matters.
+     `Ø5.95 DRILL THRU`); clearance holes state the size, not the screw.
+     A blind tap states its required **full-thread depth**. State the deeper
+     tap-drill depth too when it governs machinability; never let a modeled
+     minor-diameter continuation, merged opposing holes, or a default
+     through-thread callout imply usable thread where none is required.
 8. **Layout is contained, balanced, and uses the better sheet orientation.**
    The inner drawing border is a hard boundary: every view, dimension,
    extension line, leader, callout, note, balloon, and table stays wholly
@@ -116,6 +119,13 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
    around the content. Touching or spilling through the border is a release
    blocker, not cosmetic polish. No leader crosses another leader, a view it
    does not annotate, or a dimension line; no text sits on a line.
+   Dimension text and feature callouts belong outside the depicted part or
+   assembly silhouette by default; hole-table tags, balloons, and section
+   identifiers are not feature callouts. Place text inside a silhouette only
+   when a confined detail or a genuine sheet-space constraint makes that
+   placement materially clearer than every exterior option. Convenience or
+   fixed coordinates are not justification. Interior text never masks
+   geometry, hides a feature, or crosses a line.
    Projected orthographic views preserve ASME alignment; front, top, and side
    views are never staggered merely to improve composition. Correctness comes
    before visual balance. Resolve crowding by moving the aligned view group,
@@ -144,6 +154,19 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
    geometric control is never rejected as uninspectable, only as
    unnecessary. Where a frame is legitimate (rule 3) it is complete: datum
    feature symbols on reachable surfaces and basics for what it locates.
+
+11. **Drawing review is the last DFM backstop, not drawing-only lint.** A
+   review finding that the depicted part is physically impossible, implausible
+   for every process allowed by the title block, contradictory, or missing a
+   necessary physical feature may expose a CAD-model defect even when the
+   drawing faithfully shows the model. Check that signal against the source
+   CAD and primary visual evidence; never silence it with an invented
+   dimension, radius, note, or process callout on the sheet. Fix a
+   uniquely-supported omission in the CAD first, then regenerate the drawing.
+   When the evidence permits materially different geometries or processes,
+   escalate the exact feature, evidence, and viable choices to the user for a
+   decision. A reviewer can still be wrong: validate the premise rather than
+   blindly implementing the proposed fix.
 
 ## The gate
 

@@ -2573,6 +2573,45 @@ def hole_table_template(adapter: Any) -> Path:
     )
 
 
+@_telemetry.traced("drawing.theoretical_datum", label_param="label")
+def create_view_theoretical_datum(
+    adapter: Any,
+    view: Any,
+    *,
+    point_xy: tuple[float, float],
+    label: str,
+) -> Any:
+    """Create a view-owned datum point at a broken theoretical corner.
+
+    ``point_xy`` is in view-local model metres.  A drawing view has no model
+    vertex at a filleted or chamfered theoretical sharp, so this creates a
+    retained user ``ISketchPoint`` in the view's drawing sketch.  Native tables
+    can use that point as their origin while callers derive its coordinates
+    from authoritative model dimensions.
+    """
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    name = view_name(adapter, view)
+    if not drawing.ActivateView(name):
+        raise RuntimeError(f"failed to activate theoretical-datum view {name!r}")
+    sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
+    previous_add_to_db = bool(sketch_manager.AddToDB)
+    previous_display = bool(sketch_manager.DisplayWhenAdded)
+    sketch_manager.AddToDB = True
+    sketch_manager.DisplayWhenAdded = True
+    try:
+        point = sketch_manager.CreatePoint(point_xy[0], point_xy[1], 0.0)
+    finally:
+        sketch_manager.AddToDB = previous_add_to_db
+        sketch_manager.DisplayWhenAdded = previous_display
+    if point is None:
+        raise RuntimeError(f"failed to create {label} theoretical datum point")
+    point = _early_bound(point, "ISketchPoint")
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    return point
+
+
 def insert_hole_table(
     adapter: Any,
     view: Any,
@@ -2580,6 +2619,7 @@ def insert_hole_table(
     datum_xy: tuple[float, float],
     hole_points: Sequence[tuple[float, float]],
     datum_entity: Any | None = None,
+    datum_point: Any | None = None,
     datum_axes: tuple[Any, Any] | None = None,
     hole_entities: Sequence[Any] | None = None,
     expected_locations_mm: Sequence[tuple[float, float]] | None = None,
@@ -2595,13 +2635,12 @@ def insert_hole_table(
     entities topologically may additionally supply ``datum_entity`` and
     ``hole_entities``; those are selected directly with the same hole-table
     marks and the coordinates remain the count/diagnostic contract.  A part
-    whose plan corners are broken (filleted/chamfered) has NO corner vertex to
-    anchor: ``datum_axes=(x_axis_edge, y_axis_edge)`` instead selects the two
-    datum edges (marks 4/8), and SolidWorks anchors the table origin at their
-    VIRTUAL intersection -- the theoretical sharp corner.  ``starting_hole_tag``
-    lets multiple tables on one sheet use distinct tag families.  The table
-    lands with its top-left corner at ``anchor_xy`` and is validated before
-    returning.
+    whose plan corners are broken can supply ``datum_axes=(x_axis_edge,
+    y_axis_edge)`` for initial insertion.  When ``datum_point`` is also
+    supplied, the table's native ``IDatumOrigin`` is then reattached to that
+    view-owned theoretical-corner point.  ``starting_hole_tag`` lets multiple
+    tables on one sheet use distinct tag families.  The table lands with its
+    top-left corner at ``anchor_xy`` and is validated before returning.
     """
     draw = adapter.currentModel
     ddoc = _early_bound(
@@ -2627,7 +2666,9 @@ def insert_hole_table(
         return bool(selectable.Select4(append, selection_data))
 
     if datum_axes is not None and datum_entity is not None:
-        raise ValueError(f"{label} supplied both a datum vertex and datum axes")
+        raise ValueError(f"{label} supplied multiple initial datum sources")
+    if datum_point is not None and datum_axes is None and datum_entity is None:
+        raise ValueError(f"{label} datum point requires an initial datum source")
     if datum_axes is not None:
         x_axis, y_axis = datum_axes
         datum = _select_entity(x_axis, append=False, mark=4) and _select_entity(
@@ -2678,6 +2719,20 @@ def insert_hole_table(
     feature = _sw_type_info.early_bound_or_flag(feature, "IHoleTable")
     feature.CombineSameSize = False
     feature.CombineTags = False
+    if datum_point is not None:
+        draw.ClearSelection2(True)
+        selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+        selection_data = _early_bound(
+            selection_manager.CreateSelectData(), "ISelectData"
+        )
+        selection_data.View = view
+        point = _early_bound(datum_point, "ISketchPoint")
+        if not point.Select4(False, selection_data):
+            raise RuntimeError(f"failed to select {label} theoretical datum point")
+        origin = _early_bound(feature.DatumOrigin, "IDatumOrigin")
+        if not origin.Reattach():
+            raise RuntimeError(f"failed to reattach {label} hole-table datum")
+        draw.ClearSelection2(True)
     adapter.currentModel.EditRebuild3()
     table = _sw_type_info.early_bound(table, "ITableAnnotation")
     # Indexed COM properties such as Text2 are omitted by the late-bound

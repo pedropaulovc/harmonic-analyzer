@@ -57,6 +57,12 @@ WHAT A COMPLETE ASSEMBLY PACKAGE CONTAINS (the standard you hold it to)
   Product. For Personal Use Only." line along the bottom edge is a licence
   watermark the CAD seat imposes, not sheet content: it sits outside the
   inner border by design and cannot be moved or removed, so do not report it.
+- Dimension text and feature callouts stay outside the assembly silhouette by
+  default; balloons and section identifiers are excluded. Interior placement
+  is a clarity defect unless a confined detail or genuine sheet-space
+  constraint makes it materially clearer than every exterior option.
+  Convenience is not a reason, and interior text must never mask geometry,
+  hide a component, or cross a line.
 - The view group and tables look intentional and visually balanced in each
   usable drawing region, not bunched against an edge beside a large dead field,
   but correctness comes first. Projected orthographic views preserve ASME

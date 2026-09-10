@@ -268,10 +268,10 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             **_expected_numbered_pairs(
                 "lag-screw",
                 range(1, 5),
-                "rocker-arm-support",
-                12.7,
-                10.716,
+                "harmonic-base",
                 6.35,
+                5.105,
+                9.2471875,
             ),
             **_expected_numbered_pairs(
                 "frame-side-screw",

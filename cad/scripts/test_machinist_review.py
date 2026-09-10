@@ -40,6 +40,8 @@ def test_prompts_exist_and_are_calibrated_to_the_policy() -> None:
         assert "visually balanced" in normalized
         assert "Projected orthographic views preserve ASME alignment" in normalized
         assert "correctness comes first" in normalized
+        assert "Dimension text and feature callouts stay outside" in normalized
+        assert "Convenience is not a reason" in normalized
 
     assert "loaded gun" in part
     assert "Decimal places" in part
@@ -54,6 +56,20 @@ def test_prompts_exist_and_are_calibrated_to_the_policy() -> None:
     assert "builder's choice is complete" in part
     assert "required finish system" in part
     assert "repeated outside the title block" in part
+    part_text = " ".join(part.split())
+    for item in (
+        "DFM IS PART OF THE GATE",
+        "perfectly sharp re-entrant corners",
+        "last chance to catch an omission in the source CAD",
+        "never invent the missing radius",
+        "another plausible allowed route",
+        "do not count screw projection through a clearance hole as engagement",
+        "usable full threads",
+        "room beyond them for the tap's lead",
+        "thread major-diameter envelope",
+        "full-thread depth from deeper tap-drill depth",
+    ):
+        assert item in part_text
     # Assembly packages are judged as real assembly drawings: exploded view,
     # parts list, balloons, ordered steps -- the current three-view sheets are
     # expected to FAIL this until they are built out.

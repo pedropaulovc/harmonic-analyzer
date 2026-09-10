@@ -36,18 +36,26 @@ physical manufacture, Kickstarter, website and AI story. Learning and
 manufacture share `logbook/` because the same bench entries are the evidence for
 both; manufacture is still a separate workstream on the project board.
 
-Three rules cut across all of them, because they are what the project's
+Four rules cut across all of them, because they are what the project's
 credibility rests on:
 
 1. **The CAD is the source of truth for geometry.** `cad/config/` and
    `cad/scripts/build_*.py` — never a remembered number, never a figure read off
    a render.
-2. **The logbook is the source of truth for process.** No machining operation is
+2. **The drawing-simplicity policy is a required CAD design standard.** Read
+   [`cad/docs/drawing-simplicity-policy.md`](cad/docs/drawing-simplicity-policy.md)
+   before changing CAD geometry or manufacturing drawings. Drawing review is
+   the last DFM backstop: a finding that exposes a plausible model omission,
+   contradiction, or unmanufacturable feature must be reconciled against the
+   source CAD and primary evidence, not papered over on the sheet. Escalate a
+   materially ambiguous geometry or process choice to the user.
+3. **The logbook is the source of truth for process.** No machining operation is
    written up in the book that hasn't been performed and logged. An agent may
    never author a logbook entry.
-3. **Nothing from the 2014 Hammack/Kranz/Carpenter book goes into a commercial
+4. **Nothing from the 2014 Hammack/Kranz/Carpenter book goes into a commercial
    product.** It is free for *non-commercial* use; the book and the campaign are
    commercial. See `kickstarter/campaign/risks.md`.
+
 
 The **minimum merge gate below applies to changes under `cad/`**; a
 prose-only or `web/`-only PR is gated by its own area's rules (and, for `web/`,

@@ -317,6 +317,7 @@ def test_run_build_cleans_up_when_session_setup_fails(
     )
     monkeypatch.setattr(_common._telemetry, "shutdown", Mock())
     monkeypatch.setattr(sys, "argv", ["build_probe.py"])
+    monkeypatch.delenv("TRACEPARENT", raising=False)
     build = AsyncMock()
 
     assert _common.run_build(build) == 1

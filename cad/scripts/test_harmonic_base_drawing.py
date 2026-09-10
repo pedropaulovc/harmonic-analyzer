@@ -56,7 +56,7 @@ def test_plate_geometry_is_single_sourced() -> None:
 
 def test_hole_table_covers_mounting_holes_and_every_hardware_seat() -> None:
     expected_holes = {
-        *((x, z, part.HOLE_DIA) for x, z in part.HOLE_XZ),
+        *((x, z, part.HOLD_DOWN_TAP_DRILL_DIA) for x, z in part.HOLE_XZ),
         (*part.PIVOT_SCREW_XZ, part.PIVOT_SCREW_HOLE_DIA),
         (*part.LOCK_KNOB_XZ, part.LOCK_SCREW_HOLE_DIA),
         (*part.STOP_SCREW_XZ, part.STOP_SCREW_HOLE_DIA),
@@ -64,7 +64,7 @@ def test_hole_table_covers_mounting_holes_and_every_hardware_seat() -> None:
         *((x, z, part.FOOT_SCREW_HOLE_DIA) for x, z in part.FOOT_SCREW_XZ),
         *((x, z, part.NAMEPLATE_SCREW_HOLE_DIA) for x, z in part.NAMEPLATE_SCREW_XZ),
     }
-    # Four lag counterbores and all six tapped groups, with no duplicate picks.
+    # Four support taps and all other blind tapped groups, with no duplicate picks.
     assert len(drawing.ALL_HOLES) == len(expected_holes) == 18
     assert set(drawing.ALL_HOLES) == expected_holes
     assert drawing._plan_xy(0.0, 10.0)[1] < drawing.TOP_CENTER[1]
@@ -78,13 +78,39 @@ def test_plan_view_clears_top_border_and_lower_notes() -> None:
 @pytest.mark.parametrize(
     ("seat", "engagement", "kind", "lead_pitches"),
     (
+        (
+            part.HOLD_DOWN_SEAT_SPEC,
+            part.HOLD_DOWN_ENGAGEMENT,
+            "tapped",
+            5,
+        ),
         (part.PIVOT_SEAT_SPEC, part.PIVOT_THREAD_ENGAGEMENT, "tapped_bottoming", 2),
         (part.LOCK_SEAT_SPEC, part.LOCK_STUD_LEN, "tapped", 5),
         (part.STOP_SEAT_SPEC, part.STOP_ENGAGEMENT, "tapped", 5),
-        (part.BLOCK_SEAT_SPEC, part.BLOCK_SCREW_LEN - part.BLOCK_HEIGHT, "tapped_bottoming", 2),
-        (part.FOOT_SEAT_SPEC, part.FOOT_SCREW_LEN - part.SPRING_THICKNESS, "tapped_bottoming", 2),
-        (part.FOOT_SEAT_SPEC, part.FOOT_SCREW_LEN - part.PEDESTAL_FLANGE_THICKNESS, "tapped_bottoming", 2),
-        (part.NAMEPLATE_SEAT_SPEC, part.NAMEPLATE_SCREW_LEN - part.nameplate_spec.PLATE_THICKNESS, "tapped_bottoming", 2),
+        (
+            part.BLOCK_SEAT_SPEC,
+            part.BLOCK_SCREW_LEN - part.BLOCK_HEIGHT,
+            "tapped_bottoming",
+            2,
+        ),
+        (
+            part.FOOT_SEAT_SPEC,
+            part.FOOT_SCREW_LEN - part.SPRING_THICKNESS,
+            "tapped_bottoming",
+            2,
+        ),
+        (
+            part.FOOT_SEAT_SPEC,
+            part.FOOT_SCREW_LEN - part.PEDESTAL_FLANGE_THICKNESS,
+            "tapped_bottoming",
+            2,
+        ),
+        (
+            part.NAMEPLATE_SEAT_SPEC,
+            part.NAMEPLATE_SCREW_LEN - part.nameplate_spec.PLATE_THICKNESS,
+            "tapped_bottoming",
+            2,
+        ),
     ),
 )
 def test_blind_seats_keep_stock_in_full_threads_above_the_tap_lead(
@@ -108,7 +134,9 @@ def test_pivot_rejects_former_full_threads_to_drill_bottom() -> None:
         part.PIVOT_SEAT_SPEC, kind="tapped", depth_mm=11.525, overrides_mm={}
     )
     with pytest.raises(AssertionError, match="plug-tap lead"):
-        part.require_blind_seat_fit("former pivot", old_seat, part.PIVOT_THREAD_ENGAGEMENT)
+        part.require_blind_seat_fit(
+            "former pivot", old_seat, part.PIVOT_THREAD_ENGAGEMENT
+        )
 
 
 def test_pivot_rejects_stock_bottoming_despite_ample_drill_depth() -> None:
@@ -124,7 +152,9 @@ def test_pivot_rejects_stock_bottoming_despite_ample_drill_depth() -> None:
 def test_base_seat_rejects_nonphysical_tip_reserve(tip_reserve: float) -> None:
     with pytest.raises(AssertionError, match="tip reserve"):
         part.require_blind_seat_fit(
-            "pivot", part.PIVOT_SEAT_SPEC, part.PIVOT_THREAD_ENGAGEMENT,
+            "pivot",
+            part.PIVOT_SEAT_SPEC,
+            part.PIVOT_THREAD_ENGAGEMENT,
             tip_reserve=tip_reserve,
         )
 
@@ -216,9 +246,7 @@ def test_shared_stop_rejects_the_former_shallow_receiver() -> None:
     from dataclasses import replace
     import build_swing_stop_screw as stop
 
-    seat = replace(
-        part.STOP_SEAT_SPEC, depth_mm=9.0, overrides_mm={"ThreadDepth": 6.0}
-    )
+    seat = replace(part.STOP_SEAT_SPEC, depth_mm=9.0, overrides_mm={"ThreadDepth": 6.0})
     with pytest.raises(AssertionError, match="bottoms"):
         stop.require_seat_fit(seat, platform.PLATE_T)
 

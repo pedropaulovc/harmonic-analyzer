@@ -19,7 +19,7 @@ _EXPECTED = {
     "hanger-screw": (("93075A194",), "MHA-034", 1),
     "hex-bolt": (("92865A585",), "MHA-036", None),
     "knife-hanger-stud": (("91247A720",), "MHA-119", 2),
-    "lag-screw": (("91783A722",), "MHA-039", 4),
+    "lag-screw": (("92240A539",), "MHA-039", 4),
     "pen-set-screw": (("99607A213",), "MHA-052", 1),
     "slotted-screw": (("90280A199",), "MHA-101", 4),
     "swing-stop-screw": (("90280A199",), "MHA-095", 1),

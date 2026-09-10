@@ -42,7 +42,7 @@ from diagnostics.diag_build_90280A199 import build_90280A199  # noqa: E402
 from diagnostics.diag_build_90280A201 import build_90280A201  # noqa: E402
 from diagnostics.diag_build_91247A720 import build_91247A720  # noqa: E402
 from diagnostics.diag_build_91410A538 import build_91410A538  # noqa: E402
-from diagnostics.diag_build_91783A722 import build_91783A722  # noqa: E402
+from diagnostics.diag_build_92240A539 import build_92240A539  # noqa: E402
 from diagnostics.diag_build_91882A221 import build_91882A221  # noqa: E402
 from diagnostics.diag_build_91882A425 import build_91882A425  # noqa: E402
 from diagnostics.diag_build_92865A585 import build_92865A585  # noqa: E402
@@ -54,7 +54,7 @@ REGISTRY = {
     "90126A211": build_90126A211,
     "94025A150": build_94025A150,
     "90114A511": build_90114A511,
-    "91783A722": build_91783A722,
+    "92240A539": build_92240A539,
     "91410A538": build_91410A538,
     "93075A194": build_93075A194,
     "92865A585": build_92865A585,
@@ -76,11 +76,13 @@ def _selected_parts() -> list[str]:
     if not args:
         raise SystemExit(
             f"usage: diag_build_mcmaster.py <part_no>...|--all "
-            f"(known: {', '.join(REGISTRY)})")
+            f"(known: {', '.join(REGISTRY)})"
+        )
     unknown = [a for a in args if a not in REGISTRY]
     if unknown:
-        raise SystemExit(f"no builder for: {', '.join(unknown)} "
-                         f"(known: {', '.join(REGISTRY)})")
+        raise SystemExit(
+            f"no builder for: {', '.join(unknown)} (known: {', '.join(REGISTRY)})"
+        )
     return args
 
 

@@ -62,17 +62,18 @@ depth):
   base's blind #4-40 taps (build_harmonic_base NAMEPLATE_SCREW_XZ -- the same
   nameplate_spec derivation). Same single-mate fix-all treatment.
 
-Hold-down: four stock 1/2-13 UNC-2A screws come up through the base into the
-support foot's 1/2-13 UNC-2B taps. The base uses the foot's pattern (4 holes at
-local X +/-60.32, Z +/-17.46 -> machine x 55.44/90.36,
-z -60.32/+60.32; see
-build_harmonic_base.py HOLE_XZ) with O23 head counterbores on its underside, and
-the stock screws (build_lag_screw.py, vendor geometry without resizing) are
-inserted at their exact authored transforms and locked to the fixed base. The
-screws do NOT constrain the support. Every rigid frame member uses this same
-single-mate strategy; transform readback remains the fail-loud placement
-tripwire. Final asserts: every component fixed or ``swFullyConstrained``, and
-zero interferences.
+Hold-down: four stock 1/4-20 UNC-2A hex-head screws install from the top,
+through the support foot's 5/16 clearance drills, into blind 1/4-20 UNC-2B
+seats in the base. The foot pattern transforms from local X +/-60.32,
+Z +/-17.46 to machine x 55.44/90.36, z -60.32/+60.32 (the base's shared
+SUPPORT_HOLD_DOWN_XZ contract). Each McMaster 92240A539 screw bears on the
+bottom of its exact vendor-modeled 0.277813 mm under-head washer transition,
+crosses the 6.35 mm foot, and engages 9.247187 mm = 1.456D in the base. The
+screws are inserted at exact authored transforms and locked to the fixed base;
+they do not constrain the support. Every rigid frame member uses this
+same single-mate strategy; transform readback remains the fail-loud placement
+tripwire. Final asserts: every component fixed or ``swFullyConstrained`` and no
+uncontracted interference.
 
 The 20-channel pitch stations live in the channel subassembly.
 
@@ -113,8 +114,17 @@ from _assembly_patterns import (
     grid_component_pattern,
     PatternDirection,
 )
-from _transforms import ROT_X_NEG90, ROT_X_POS90, ROT_Y_POS90, rot_z_rows, rows_from_euler
+from _transforms import (
+    ROT_X_NEG90,
+    ROT_X_POS90,
+    ROT_Y_POS90,
+    rot_z_rows,
+    rows_from_euler,
+)
 from build_harmonic_base import (
+    HOLD_DOWN_ENGAGEMENT,
+    HOLD_DOWN_THREAD,
+    HOLD_DOWN_THREAD_CLASS,
     NAMEPLATE_SCREW_HOLE_DEPTH,
     NAMEPLATE_SCREW_XZ,
 )
@@ -140,14 +150,9 @@ from rocker_arm_support_spec import (
 )
 from build_gooseneck_set_screw import SHANK_LEN as GOOSENECK_SHANK_LEN
 from build_frame_side_screw import SHANK_LEN as SIDE_SCREW_SHANK_LEN
-from build_harmonic_base import (
-    CBORE_DIA as LAG_COUNTERBORE_DIA,
-    HOLE_DIA as LAG_CLEARANCE_DIA,
-    LAG_COUNTERBORE_DEPTH,
-)
 from build_lag_screw import (
-    HEAD_DIA as LAG_HEAD_DIA,
-    HEAD_H as LAG_HEAD_H,
+    BEARING_OFFSET as LAG_BEARING_OFFSET,
+    HEAD_AF as LAG_HEAD_AF,
     SHANK_DIA as LAG_SHANK_DIA,
     SHANK_LEN as LAG_SHANK_LEN,
     THREAD_CLASS as LAG_THREAD_CLASS,
@@ -156,8 +161,7 @@ from build_lag_screw import (
 )
 from build_rocker_arm_support import (
     FOOT_THICKNESS as LAG_FOOT_THICKNESS,
-    HOLE_SSIZE as LAG_RECEIVER_THREAD_SIZE,
-    HOLE_THREAD_CLASS as LAG_RECEIVER_THREAD_CLASS,
+    HOLE_DIA as LAG_SUPPORT_CLEARANCE_DIA,
 )
 
 ASM_NAME = "frame"
@@ -178,37 +182,35 @@ SUPPORT_SEAT_Y = SUPPORT_WORLD_SEAT_Y  # rocker-arm-support's origin is
 SUPPORT_EULER = [0.0, 90.0, 0.0]
 SUPPORT_ROWS = ROT_Y_POS90
 
-# Rocker-support hold-down: four stock 1/2-13 screws (build_lag_screw.py),
-# coaxial with the base clearance holes and support foot taps via authored
+# Rocker-support hold-down: four stock 1/4-20 x 5/8 hex-head screws,
+# coaxial with the support clearance drills and blind base taps via authored
 # transforms; one seed lock mate and a native grid retain that placement.
-# stations are the foot's tapped pattern in the machine frame: local X +/-60.32,
-# Z +/-17.46 turned +90deg about Y -> machine x 72.9 -/+ 17.46 = 55.44/90.36,
-# z SUPPORT_Z +/-60.32 (these ARE the base HOLE_XZ machine positions). The screw
-# is authored head-down at IDENTITY, so its under-head plane follows the harmonic
-# base's exported underside counterbore depth. This keeps the stock head recessed
-# 0.5 mm while its shank rises through the base into the support's tapped foot.
+# Stations are the foot pattern in the machine frame: local X +/-60.32,
+# Z +/-17.46 turned +90 degrees about Y -> machine x 55.44/90.36 and
+# z SUPPORT_Z +/-60.32. The screw's actual bearing face lies
+# LAG_BEARING_OFFSET below its model origin. Raising that origin by the exact
+# vendor offset seats the washer face on the support without solid overlap;
+# head remains above +Y and shank/tip along -Y.
 LAG_SCREW_XZ = SUPPORT_HOLD_DOWN_XZ
-LAG_SCREW_UNDER_HEAD_Y = LAG_COUNTERBORE_DEPTH
-LAG_HEAD_RECESS = LAG_COUNTERBORE_DEPTH - LAG_HEAD_H
-LAG_SCREW_TIP_Y = LAG_SCREW_UNDER_HEAD_Y + LAG_SHANK_LEN
-LAG_TIP_REACH_ABOVE_BASE = LAG_SCREW_TIP_Y - BASE_TOP_Y
-# Only the foot contains tapped material; protrusion into the open window is
-# not engagement. Use the catalog's minimum threaded span, not visual pitch.
-LAG_SUPPORT_ENGAGEMENT = max(
-    0.0,
-    min(LAG_SCREW_TIP_Y, BASE_TOP_Y + LAG_FOOT_THICKNESS)
-    - max(BASE_TOP_Y, LAG_SCREW_TIP_Y - LAG_THREAD_LEN),
-)
-if LAG_THREAD_SIZE != LAG_RECEIVER_THREAD_SIZE:
-    raise AssertionError("stock hold-down and support tap nominal threads must match")
-if (LAG_THREAD_CLASS, LAG_RECEIVER_THREAD_CLASS) != ("2A", "2B"):
-    raise AssertionError("stock hold-down requires class 2A external / 2B internal threads")
-if LAG_CLEARANCE_DIA <= LAG_SHANK_DIA or LAG_COUNTERBORE_DIA <= LAG_HEAD_DIA:
-    raise AssertionError("base bores must clear the unmodified stock hold-down")
-if not math.isclose(LAG_HEAD_RECESS, 0.5, abs_tol=1e-9):
-    raise AssertionError("lag-screw counterbore must recess the stock head by 0.5 mm")
-if not math.isclose(LAG_SUPPORT_ENGAGEMENT, LAG_FOOT_THICKNESS, abs_tol=1e-9):
-    raise AssertionError("stock hold-down thread must span the entire support foot")
+LAG_SCREW_UNDER_HEAD_Y = BASE_TOP_Y + LAG_FOOT_THICKNESS + LAG_BEARING_OFFSET
+LAG_SCREW_TIP_Y = LAG_SCREW_UNDER_HEAD_Y - LAG_SHANK_LEN
+LAG_BASE_ENGAGEMENT = BASE_TOP_Y - LAG_SCREW_TIP_Y
+if LAG_THREAD_SIZE != HOLD_DOWN_THREAD:
+    raise AssertionError("stock hold-down and base tap nominal threads must match")
+if (LAG_THREAD_CLASS, HOLD_DOWN_THREAD_CLASS) != ("2A", "2B"):
+    raise AssertionError(
+        "stock hold-down requires class 2A external / 2B internal threads"
+    )
+if LAG_SUPPORT_CLEARANCE_DIA <= LAG_SHANK_DIA:
+    raise AssertionError("support clearance drill must clear the stock hold-down shank")
+if LAG_HEAD_AF <= LAG_SUPPORT_CLEARANCE_DIA:
+    raise AssertionError("stock hex head must bear on the support foot")
+if LAG_THREAD_LEN < LAG_SHANK_LEN:
+    raise AssertionError("selected support hold-down must be fully threaded")
+if not math.isclose(LAG_BASE_ENGAGEMENT, HOLD_DOWN_ENGAGEMENT, abs_tol=1e-9):
+    raise AssertionError(
+        "stock hold-down engagement must follow its exact bearing-face geometry"
+    )
 
 TOP_FRAME_MID_Y = 1017.95  # casting mid-plane: side rails 34.2 / front-rear
 # rails 38 wide x 36.5 tall, band y 999.7..1036.2; corner bosses rise to
@@ -398,17 +400,17 @@ async def build(adapter) -> dict[str, str]:
     )
     assert_component_placed(adapter, support_name, support_target, SUPPORT_ROWS)
 
-    # Hold-down: four stock 1/2-13 screws coaxial with the support foot's tapped
-    # holes (and the base clearance holes below them). The authored support pose
-    # seats its foot exactly on the base top at the derived machine stations, so the
-    # screw rises through the O13 base clearance hole with its O20.6502 head
-    # recessed in the O23 underside counterbore, into the 1/2-13 UNC-2B foot
-    # tap (O10.716 drill). Authored head-down (IDENTITY) on its machine transform,
-    # not grounded. Each seed uses one lock mate to the fixed base; its exact
-    # transform carries the physical coaxiality and head-seat position, and the
-    # readback assertion proves the mate did not move it. One real-mated seed and
-    # one native two-direction grid populate the other three holes; both spacings
-    # derive from the same foot-pattern constants as the base hole grid.
+    # Hold-down: four stock 1/4-20 hex-head screws install top-down through the
+    # support foot's 5/16 clearance drills into the base's blind UNC-2B seats.
+    # The authored support pose seats its foot exactly on the base top at the
+    # derived machine stations. IDENTITY keeps each screw head above the foot,
+    # its shank along -Y, and its vendor-modeled washer face on the support;
+    # there is no underside counterbore. Each ungrounded seed uses one lock mate
+    # to the fixed base; its exact transform carries physical coaxiality and head-seat
+    # position, and the readback assertion proves the mate did not move it. One
+    # real-mated seed and one native two-direction grid populate the other three
+    # holes; both spacings derive from the same foot-pattern constants as the
+    # base hole grid.
     bx, bz = LAG_SCREW_XZ[0]
     screw_target = [bx, LAG_SCREW_UNDER_HEAD_Y, bz]
     screw_name = await place_component(
@@ -487,7 +489,7 @@ async def build(adapter) -> dict[str, str]:
     # plane flush on the decorated face, shank down into the base tap (see
     # NAMEPLATE_SCREW_* constants). Rigid fasteners -> the same single-mate
     # fix-all treatment as the frame-side screws below.
-    for (nx, nz) in NAMEPLATE_SCREW_STATIONS:
+    for nx, nz in NAMEPLATE_SCREW_STATIONS:
         tag = f"{'rear' if nz > 0 else 'front'} {'east' if nx > 200.0 else 'west'}"
         np_target = [nx, NAMEPLATE_FRONT_Y, nz]
         np_screw = await place_component(

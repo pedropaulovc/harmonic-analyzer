@@ -37,8 +37,8 @@ import draw_crank_pinion
 import draw_crankshaft
 import draw_cylinder_gear
 import draw_cylinder_gear_shaft
-from _gtol_spec import CylinderFace
-from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from _gtol_spec import CylinderFace, PlanarFace
+from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
 
 
 CASES = (
@@ -64,6 +64,11 @@ CASES = (
                     arbor_pedestal_spec.BORE_DIA,
                     contains_y_mm=arbor_pedestal_spec.BORE_HEIGHT,
                 ),
+            ),
+            SurfaceFinishControl(
+                "foot_seat",
+                SEAT_UM,
+                PlanarFace((0, -1, 0), 0.0),
             ),
         ),
     ),
@@ -93,9 +98,7 @@ CASES = (
             SurfaceFinishControl(
                 "tip_journal",
                 MACHINED_UM,
-                CylinderFace(
-                    cone_gear_shaft_spec.SECTION_DIAS[-1], tolerance_mm=0.01
-                ),
+                CylinderFace(cone_gear_shaft_spec.SECTION_DIAS[-1], tolerance_mm=0.01),
             ),
         ),
     ),

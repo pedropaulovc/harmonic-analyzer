@@ -19,7 +19,7 @@ import rocker_arm_support_spec as placement
 import rocker_arm_support_drawing_spec as drawing_spec
 
 
-def test_drawing_keeps_only_one_dimension_for_each_square() -> None:
+def test_drawing_keeps_only_make_critical_model_dimensions() -> None:
     expected = {
         "FootSpan",
         "TopSpan",
@@ -27,38 +27,41 @@ def test_drawing_keeps_only_one_dimension_for_each_square() -> None:
         "Depth",
         "WinWidth",
         "CavWidth",
+        "PocketRadius",
+        "CavityRadius",
+        "RimChamferSize",
     }
     marked = set().union(*support.DRAWING_DIMENSIONS.values())
     kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
     assert kept == marked == expected
     assert drawing.DIMENSION_CALLOUTS == {
         "WinWidth": "SQ POCKET",
+        "PocketRadius": "8X",
+        "CavityRadius": "4X",
         "CavWidth": "SQ CAVITY THRU",
+        "RimChamferSize": " X 45 DEG\n2 FACES",
     }
-    # Cast envelopes at one place; the machined 6.35 web is a held thickness
-    # at two (routine ±0.51), never "6.4".
     assert drawing.DIMENSION_PRECISION == {
-        **dict.fromkeys(expected, 1),
+        **dict.fromkeys(expected - {"PocketRadius", "RimChamferSize"}, 1),
+        "PocketRadius": 2,
+        "RimChamferSize": 2,
         "WebThickness": 2,
+        "FootThickness": 2,
     }
 
 
-def test_manufacturing_notes_define_only_part_specific_processes() -> None:
-    lines = support.DRAWING_NOTES.splitlines()
-    notes = " ".join(lines)
-    assert len(lines) == 3
-    assert "SYMMETRIC ABOUT CENTRE PLANE" in notes
-    assert "88.9 FROM MOUNTING FACE" in notes
-    assert "CAVITY R12.7, 4X" in notes
-    assert "BOTH OUTER POCKET RIMS" in notes
-    assert "BOTH TOP OUTER EDGES" not in notes
-    # Material may be steel or iron and the seat carries its own symbol, so
-    # the notes neither assert a casting nor restate the mounting face; the
-    # web instruction is flagged from the side view, not buried here.
-    assert "CASTING" not in notes
-    assert "AS-CAST" not in notes
-    assert "MACHINE MOUNTING FACE" not in notes
-    assert "6.35 WEB" not in notes
+def test_pocket_and_cavity_reliefs_are_distinct() -> None:
+    assert support.FILLET_R == 12.7
+    assert {tuple(edge) for edge in support.FILLET_EDGES} == {
+        (x_sign * support.CAV, y_sign * support.CAV, 0.0)
+        for x_sign in (-1, 1)
+        for y_sign in (-1, 1)
+    }
+    assert support.POCKET_FILLET_R == 6.35
+    assert len(support.POCKET_FILLET_EDGES) == 8
+    assert {abs(edge[0]) for edge in support.POCKET_FILLET_EDGES} == {support.BIG}
+    assert {abs(edge[1]) for edge in support.POCKET_FILLET_EDGES} == {support.BIG}
+    assert all(abs(edge[2]) > support.WEB for edge in support.POCKET_FILLET_EDGES)
 
 
 def test_no_process_callout_on_the_sheet() -> None:
@@ -70,16 +73,15 @@ def test_no_process_callout_on_the_sheet() -> None:
     assert "Web Callout" not in source
 
 
-def test_thread_class_lives_in_the_title_block_not_on_the_feature() -> None:
+def test_support_finish_masks_only_the_machined_mounting_face() -> None:
     assert _config.parts(support.PART_NAME)["finish"] == (
-        "GREEN ENAMEL; MASK MOUNTING FACE + THREADS; LIGHT OIL BARE MACHINED SURFACES"
+        "GREEN ENAMEL; MASK MOUNTING FACE; LIGHT OIL BARE MACHINED SURFACES"
     )
-    # 2B is the receiver fit the frame assembly asserts against the 2A lag
-    # screw; the sheet prints it once, in the title block's THREADS row, so
-    # the Hole Wizard feature carries no class (a native callout would repeat it).
-    assert support.HOLE_THREAD_CLASS == "2B"
+    assert support.HOLE_SPEC.kind == "drilled_fractional"
+    assert support.HOLE_SPEC.size == "5/16"
+    assert support.HOLE_DIA == pytest.approx(7.938)
     source = Path(support.__file__).read_text(encoding="utf-8")
-    assert 'definition.ThreadClass = ""' in source
+    assert "ThreadClass" not in source
     assert "TITLE_BLOCK_THREAD_CLASS" not in source
 
 
@@ -108,12 +110,26 @@ def test_native_hole_table_covers_every_foot_hole() -> None:
         (-60.32, -17.46),
     }
     assert set(support.HOLES) == expected_holes
-    assert set(drawing.EXPECTED_HOLE_TABLE_LOCATIONS_MM) == {
-        (147.95, 47.94),
-        (27.31, 47.94),
-        (147.95, 13.02),
-        (27.31, 13.02),
+    assert drawing.HOLE_TABLE_DATUM_XZ_MM == (
+        -support.BOSS_DEPTH / 2.0,
+        -support.WIDE,
+    )
+    x_centres = {x for x, _ in expected_holes}
+    y_centres = {y for _, y in expected_holes}
+    assert round(max(x_centres) - min(x_centres), 2) == 120.64
+    assert round(max(y_centres) - min(y_centres), 2) == 34.92
+    expected_locations = {
+        (
+            round(x + support.BOSS_DEPTH / 2.0, 2),
+            round(z + support.WIDE, 2),
+        )
+        for x, z in expected_holes
     }
+    assert set(drawing.EXPECTED_HOLE_TABLE_LOCATIONS_MM) == expected_locations
+    xs = {x for x, _ in expected_locations}
+    ys = {y for _, y in expected_locations}
+    assert round(min(xs) + max(xs), 2) == support.BOSS_DEPTH
+    assert round(min(ys) + max(ys), 2) == 2.0 * support.WIDE
     points = {drawing._bottom_sheet_xy(hole) for hole in expected_holes}
     assert len(points) == 4
     half_w = support.BOSS_DEPTH / 2.0 * drawing.VIEW_SCALE / 1000.0
@@ -132,25 +148,41 @@ def test_support_has_no_unapproved_gdt_contract() -> None:
     assert not hasattr(placement, "GEOMETRIC_TOLERANCES_MM")
 
 
-def test_stock_hold_down_matches_receiver_and_engages_only_foot_material() -> None:
-    assert screw.SPEC.skus == ("91783A722",)
-    assert support.HOLE_SSIZE == screw.THREAD_SIZE == "1/2-13"
-    assert (screw.THREAD_CLASS, support.HOLE_THREAD_CLASS) == ("2A", "2B")
-    assert support.HOLE_TAP_DRILL_DIA < screw.SHANK_DIA < frame.LAG_CLEARANCE_DIA
-    assert screw.HEAD_DIA < frame.LAG_COUNTERBORE_DIA
-    assert frame.LAG_HEAD_RECESS == pytest.approx(0.5)
-    assert frame.LAG_SUPPORT_ENGAGEMENT == pytest.approx(6.35)
-    assert frame.LAG_SCREW_TIP_Y - screw.THREAD_LEN < frame.BASE_TOP_Y
-    assert frame.LAG_TIP_REACH_ABOVE_BASE > frame.LAG_SUPPORT_ENGAGEMENT
+def test_stock_hold_down_clears_support_and_engages_blind_base_tap() -> None:
+    import build_harmonic_base as base
+
+    assert screw.SPEC.skus == ("92240A539",)
+    assert screw.THREAD_SIZE == base.HOLD_DOWN_THREAD == "1/4-20"
+    assert (screw.THREAD_CLASS, base.HOLD_DOWN_THREAD_CLASS) == ("2A", "2B")
+    assert screw.THREAD_LEN == screw.SHANK_LEN
+    assert screw.SHANK_DIA < support.HOLE_DIA < screw.HEAD_AF
+    assert frame.LAG_SUPPORT_CLEARANCE_DIA == support.HOLE_DIA
+    assert frame.LAG_SCREW_UNDER_HEAD_Y - screw.BEARING_OFFSET == pytest.approx(
+        frame.BASE_TOP_Y + support.FOOT_THICKNESS
+    )
+    assert frame.LAG_BASE_ENGAGEMENT == pytest.approx(base.HOLD_DOWN_ENGAGEMENT)
+    assert base.HOLD_DOWN_ENGAGEMENT == pytest.approx(
+        screw.SHANK_LEN - support.FOOT_THICKNESS - screw.BEARING_OFFSET
+    )
+    assert base.HOLD_DOWN_ENGAGEMENT / screw.SHANK_DIA > 1.45
+    assert base.HOLD_DOWN_THREAD_DEPTH == pytest.approx(
+        base.HOLD_DOWN_ENGAGEMENT + base.HOLD_DOWN_TIP_CLEARANCE
+    )
+    assert base.HOLD_DOWN_DRILL_DEPTH == pytest.approx(
+        base.HOLD_DOWN_THREAD_DEPTH + 5.0 * screw.THREAD_PITCH
+    )
+    assert frame.LAG_SCREW_TIP_Y == pytest.approx(
+        frame.BASE_TOP_Y - base.HOLD_DOWN_ENGAGEMENT
+    )
 
 
-def test_bottom_view_picks_actual_tap_drill_rim_at_each_station() -> None:
+def test_bottom_view_picks_actual_clearance_rim_at_each_station() -> None:
     for x_mm, z_mm in support.HOLES:
         sheet_x, sheet_y = drawing._bottom_sheet_xy((x_mm, z_mm))
         picked_x = (sheet_x - drawing.BOTTOM_CENTER[0]) * 1000 / drawing.VIEW_SCALE
         picked_z = (sheet_y - drawing.BOTTOM_CENTER[1]) * 1000 / drawing.VIEW_SCALE
         assert math.hypot(picked_x - x_mm, picked_z - z_mm) == pytest.approx(
-            support.HOLE_TAP_DRILL_DIA / 2.0
+            support.HOLE_DIA / 2.0
         )
 
 

@@ -1,10 +1,10 @@
 r"""Reproduction script: rocker-arm support (manual feature-tree replay).
 
-Feature-tree replay of ``rocker-arm-support.SLDPRT`` with stock-compatible foot taps: a
-thin-walled cast bracket: a trapezoidal wedge wall (wide foot, narrow top)
-stood **Y-up**, lightened by a square window that opens on the two big front/
-back faces, with a mounting foot drilled by four tapped holes (bored vertically
-up through the foot) and the window rim broken by a fillet + chamfer.
+Feature-tree replay of ``rocker-arm-support.SLDPRT`` with stock-compatible
+hold-down clearance holes: a thin-walled cast bracket with a trapezoidal wedge
+wall (wide foot, narrow top) stood **Y-up**, lightened by a square window that
+opens on the two big front/back faces, with a mounting foot drilled for four
+top-down hex-head screws and the window rim broken by a fillet + chamfer.
 
 The part is oriented to match the source SLDPRT's standard views: the **Front**
 view (along Z) looks square-on at the rounded window; the **Right** view (along
@@ -16,19 +16,20 @@ source's tree STRUCTURE and sketch construction but with SEMANTIC feature names
 (the convention of the other tracked parts) rather than the source's generic
 auto-names. The tree is Wall (``Boss-Extrude1``) -> CavityCut/WindowCut1/
 WindowCut2 (``Cut-Extrude2/3/4``) -> CornerFillet (``Fillet3``) ->
-FootTappedHoles (1/2-13 UNC-2B, HoleWzd) -> RimChamfer
-(``Chamfer2``). The trapezoid lives on the **Right plane** (sketch-x -> model Z
+PocketCornerFillet -> FootClearanceHoles (5/16 DRILL THRU, HoleWzd) ->
+RimChamfer (``Chamfer2``). The trapezoid lives on the **Right plane** (sketch-x -> model Z
 taper, sketch-y -> model Y height, mid-plane extrude along X); the window/cavity
 cuts use SINGLE origin-centred squares on the **Front plane** (matching the
-source's window/cavity sketches). Through CornerFillet, the per-stage
-``volume_check`` targets are the source part's measured volumes. The foot-hole
-target subtracts four cylindrical tap drills from the measured CornerFillet
-volume; the final target also subtracts the unchanged measured window-rim
-chamfer removal. These post-hole targets are analytic expectations, not new
-SolidWorks measurements, and retain the original 200 mm³ check tolerance.
+source's window/cavity sketches). Through PocketCornerFillet, the per-stage
+``volume_check`` targets are native SolidWorks measurements. The foot-hole
+target subtracts four cylindrical clearance drills from the measured fillet
+volume; the final target also subtracts the measured window-rim chamfer
+removal. These post-hole targets are analytic expectations and retain the
+original 200 mm³ check tolerance.
 
-Geometry (mm), source casting with the corrected receiving thread (model frame:
-X = extrude/width, Y = height with the wide foot at Y=-88.9, Z = wall thickness):
+Geometry (mm), source casting with the corrected top-down hold-down interface
+(model frame: X = extrude/width, Y = height with the wide foot at Y=-88.9,
+Z = wall thickness):
 
 * **Wall** -- trapezoid, wide foot ``Z ±31.75`` at ``Y=-88.9`` tapering to
   ``Z ±8.4665`` at ``Y=+88.9``; mid-plane extrude 177.8 (``X ±88.9``).
@@ -41,13 +42,13 @@ X = extrude/width, Y = height with the wide foot at Y=-88.9, Z = wall thickness)
   2*WEB band between them survives as the central web -- the source's
   ``FromOffsetDistance`` / ``ReverseDirection`` pair, reproducing the
   two-sketches-feed-three-cuts tree.
-* **CornerFillet** -- R12.7 on the four inner-frame corner edges (concave: adds
-  material).
-* **FootTappedHoles** -- a single Hole Wizard (``HoleWzd``) feature, 4x
-  1/2-13 UNC-2B ANSI-inch straight taps (Ø10.716 tap drill), drilled up
-  through the 6.35 mm foot from the bottom face (Y=-88.9) at
-  ``(X ±60.32, Z ±17.46)``. Hole and thread end conditions are through-all.
-  One feature carries all four placement points.
+* **CornerFillet** -- R12.7 on the four cavity corner edges.
+* **PocketCornerFillet** -- R6.35 on the four corners of each opposed pocket.
+* **FootClearanceHoles** -- a single Hole Wizard (``HoleWzd``) feature, 4x
+  5/16 in clearance drills through the 6.35 mm foot from its top seat
+  (Y=-82.55) at ``(X ±60.32, Z ±17.46)``. One feature carries all four
+  placement points; the visible 1/4-20 hex-head screws install from the top
+  into blind tapped seats in the harmonic base.
 * **RimChamfer** -- 1.27 mm / 45° on the 12 inner-frame opening edges plus the
   two slant faces, the two trapezoid (±X) faces, and one fillet face, with
   tangent propagation -- i.e. the whole window rim.
@@ -92,7 +93,7 @@ from _common import (
     set_global,
     volume_check,
 )
-from _holes import TAP_DRILL_MM
+from _holes import FRACTIONAL_DRILL_MM, HoleSpec, wizard_holes
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -128,6 +129,25 @@ FILLET_EDGES = [  # four inner-frame corner edges (run along Z through the web)
     [63.5, -63.5, 0.0],
     [-63.5, -63.5, 0.0],
 ]
+POCKET_FILLET_R = 6.35
+
+
+def _wall_half_z_at(y_mm: float) -> float:
+    fraction = (y_mm + HALF_Y) / (2.0 * HALF_Y)
+    return WIDE + (NARROW - WIDE) * fraction
+
+
+POCKET_FILLET_EDGES = [
+    [
+        x_sign * BIG,
+        y_sign * BIG,
+        face_sign * (WEB + _wall_half_z_at(y_sign * BIG)) / 2.0,
+    ]
+    for x_sign in (-1, 1)
+    for y_sign in (-1, 1)
+    for face_sign in (-1, 1)
+]
+POCKET_FILLET_VOLUME = 247_860
 
 HOLES = [(60.32, 17.46), (-60.32, 17.46), (60.32, -17.46), (-60.32, -17.46)]
 
@@ -139,38 +159,20 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     # A single associative size plus an SQ callout defines each square.
     "WindowProfile": {"WinWidth"},
     "CavityProfile": {"CavWidth"},
+    "CornerFillet": {"CavityRadius"},
+    "PocketCornerFillet": {"PocketRadius"},
+    "RimChamfer": {"RimChamferSize"},
 }
 
-DRAWING_NOTES = "\n".join(
-    (
-        "TAPER, POCKETS + WEB SYMMETRIC ABOUT CENTRE PLANE.",
-        "POCKET CENTRE 88.9 FROM MOUNTING FACE; POCKET + CAVITY CONCENTRIC.",
-        "CAVITY R12.7, 4X; CHAMFER BOTH OUTER POCKET RIMS 1.27 X 45 DEG.",
-    )
-)
-# No pocket-process callout: "machine both pockets" dictates method (ASME
-# Y14.5 1.4(e) — define geometry, not process) and the section's 6.35 web
-# dimension already fixes what the pockets must leave; wall squareness rides
-# the title block's ±1°.
-HOLE_THREAD_CLASS = "2B"  # receiver fit for the 2A lag screw (design fact; the
-# title block's THREADS row prints it, the Hole Wizard feature does not)
+HOLE_SPEC = HoleSpec("drilled_fractional", "5/16")
+HOLE_DIA = FRACTIONAL_DRILL_MM[HOLE_SPEC.size]
 
-# Hole Wizard constants (resolved from the SW type library on this seat):
-SW_FM_HOLE_WZD = 25  # swFeatureNameID_e.swFmHoleWzd (CreateDefinition)
-SW_WZD_TAP = 4  # swWzdGeneralHoleTypes_e.swWzdTap (straight tap)
-SW_STD_ANSI_INCH = 0  # swWzdHoleStandards_e.swStandardAnsiInch
-SW_HOLE_FASTENER_TYPE = 27  # ANSI-inch straight tapped hole
-SW_END_THROUGH_ALL = 1  # swEndCondThroughAll / swEndThreadTypeTHROUGH_ALL
-HOLE_SSIZE = "1/2-13"
-HOLE_TAP_DRILL_DIA = TAP_DRILL_MM[HOLE_SSIZE]
-
-# Measured source CornerFillet volume minus four through-drill cylinders.
-# The window-rim chamfer never reaches these bores; its measured removal stays
-# 3153 mm³. Neither target below is claimed as a new native measurement.
-FOOT_TAPPED_VOLUME = (
-    246_685 - len(HOLES) * math.pi / 4.0 * HOLE_TAP_DRILL_DIA**2 * FOOT_THICKNESS
+# Measured PocketCornerFillet volume minus four through clearance drills.
+# The window-rim chamfer removal is measured from that post-hole state.
+FOOT_HOLED_VOLUME = (
+    POCKET_FILLET_VOLUME - len(HOLES) * math.pi / 4.0 * HOLE_DIA**2 * FOOT_THICKNESS
 )
-RIM_CHAMFER_VOLUME = FOOT_TAPPED_VOLUME - 3_153
+RIM_CHAMFER_VOLUME = FOOT_HOLED_VOLUME - 3_153
 
 CHAMFER = 1.27  # leg, 45°
 CHAMFER_EDGES = [  # 12 inner-frame opening edges, both web faces (Z = ±WEB)
@@ -301,219 +303,6 @@ def _cut_through_all(
     model.ClearSelection2(True)
     if not feat:
         raise RuntimeError(f"FeatureCut4 on {sketch_name} failed")
-    return feat
-
-
-def _find_bottom_face(model, holes_xz, y_face_mm: float):
-    """Return the planar foot bottom face (normal ~ (0,-1,0)) whose bounding box
-    spans all ``holes_xz`` -- the face the holes are drilled from.
-
-    SelectByID2 by coordinate is unreliable here: a point on the Y=-88.9 plane
-    resolves to the ±X trapezoid end faces (which also touch that plane), so the
-    drill axis comes out along X. Selecting the face OBJECT found by enumeration
-    is the reliable path.
-    """
-    body = (_early_bound(model, "IPartDoc").GetBodies2(0, False) or [None])[
-        0
-    ]  # IPartDoc for GetBodies2
-    body = _early_bound(body, "IBody2")
-    best = None
-    for f in body.GetFaces() or []:
-        f = _early_bound(f, "IFace2")
-        try:
-            n = tuple(f.Normal)
-        except Exception:  # noqa: BLE001
-            continue
-        if not (abs(n[0]) < 0.01 and n[1] < -0.99 and abs(n[2]) < 0.01):
-            continue
-        box = [v * 1000 for v in f.GetBox()]
-        if abs(box[1] - y_face_mm) > 1.0:  # not on the foot bottom plane
-            continue
-        spans = all(
-            box[0] - 1 <= hx <= box[3] + 1 and box[2] - 1 <= hz <= box[5] + 1
-            for hx, hz in holes_xz
-        )
-        if spans and (best is None or f.GetArea() > best.GetArea()):
-            best = f
-    return best
-
-
-def _drill_tapped_holes(adapter, holes_xz, y_face_mm: float):
-    """Create ONE Hole Wizard (HoleWzd) feature with a placement point at each
-    of ``holes_xz`` (model X,Z in mm), drilled from the foot bottom face at
-    ``y_face_mm``.
-
-    The face is selected as an OBJECT (coordinate selection mis-resolves to the
-    ±X end faces). The wizard is created on that face (one auto point), then its
-    placement sketch is edited: the auto point is moved to hole #0 (SetCoords)
-    and the other points are added (model->sketch via the sketch's
-    ModelToSketchTransform; MathUtility is marshalled with an explicit VARIANT
-    array since a bare Python list does not pass as a safearray). Rebuilt: one
-    HoleWzd feature, N holes, matching the source tree (no separate placement
-    sketch in the design tree).
-    """
-    import pythoncom
-    from win32com.client import VARIANT
-
-    from solidworks_mcp.adapters.pywin32_adapter import null_callout
-
-    model = adapter.currentModel
-    model = _early_bound(model, "IModelDoc2")
-    fm = model.FeatureManager
-    fm = _early_bound(fm, "IFeatureManager")
-
-    data = fm.CreateDefinition(SW_FM_HOLE_WZD)
-    data = _early_bound(data, "IWizardHoleFeatureData2")
-    data.InitializeHole(
-        SW_WZD_TAP,
-        SW_STD_ANSI_INCH,
-        SW_HOLE_FASTENER_TYPE,
-        HOLE_SSIZE,
-        SW_END_THROUGH_ALL,
-    )
-    for prop, val in (
-        ("EndCondition", SW_END_THROUGH_ALL),
-        ("ThreadEndCondition", SW_END_THROUGH_ALL),
-    ):
-        try:
-            setattr(data, prop, val)
-        except Exception:  # noqa: BLE001
-            pass
-
-    bottom = _find_bottom_face(model, holes_xz, y_face_mm)
-    if bottom is None:
-        raise RuntimeError("hole wizard: foot bottom face not found")
-    model.ClearSelection2(True)
-    if not _early_bound(bottom, "IEntity").Select2(False, 0):
-        raise RuntimeError("hole wizard: bottom face Select failed")
-    feat = fm.CreateFeature(data)
-    if feat is None:
-        raise RuntimeError("hole wizard: CreateFeature returned None")
-    feat = _early_bound(feat, "IFeature")
-
-    # locate the wizard's 1-point placement sketch
-    place_sk = place_name = None
-    sub = feat.GetFirstSubFeature()
-    while sub is not None:
-        sub = _early_bound(sub, "IFeature")
-        if str(sub.GetTypeName2()) == "ProfileFeature":
-            sk = sub.GetSpecificFeature2()
-            sk = _early_bound(sk, "ISketch")
-            if len(sk.GetSketchPoints2() or []) == 1:
-                place_sk, place_name = sk, str(sub.Name)
-                break
-        sub = sub.GetNextSubFeature()
-    if place_sk is None:
-        raise RuntimeError("hole wizard: placement sketch not found")
-
-    math_utility = adapter.swApp.GetMathUtility()
-    math_utility = _early_bound(math_utility, "IMathUtility")
-    xform = place_sk.ModelToSketchTransform  # model -> sketch
-    xform = _early_bound(xform, "IMathTransform")
-    y_face = y_face_mm / 1000.0
-
-    def _sketch_xy(hx, hz):
-        arr = VARIANT(
-            pythoncom.VT_ARRAY | pythoncom.VT_R8, [hx / 1000.0, y_face, hz / 1000.0]
-        )
-        mpt = math_utility.CreatePoint(arr)
-        mpt = _early_bound(mpt, "IMathPoint")
-        spt = mpt.MultiplyTransform(xform)
-        spt = _early_bound(spt, "IMathPoint")
-        return list(spt.ArrayData)[:3]
-
-    model.ClearSelection2(True)
-    if not model.Extension.SelectByID2(
-        place_name, "SKETCH", 0, 0, 0, False, 0, null_callout(), 0
-    ):
-        raise RuntimeError(f"hole wizard: cannot edit {place_name}")
-    model.EditSketch()
-    sm = model.SketchManager
-    sm = _early_bound(sm, "ISketchManager")
-    auto = (place_sk.GetSketchPoints2() or [None])[0]
-    auto = _early_bound(auto, "ISketchPoint")
-    sx, sy, sz = _sketch_xy(*holes_xz[0])
-    auto.SetCoords(sx, sy, sz)  # move auto point to hole #0
-    for hx, hz in holes_xz[1:]:
-        sx, sy, sz = _sketch_xy(hx, hz)
-        sm.CreatePoint(sx, sy, sz)
-    model.EditSketch()  # toggle out of the placement sketch
-    model.EditRebuild3()
-
-    npts = len(place_sk.GetSketchPoints2() or [])
-    if npts != len(holes_xz):
-        raise RuntimeError(
-            f"hole wizard: expected {len(holes_xz)} placement points, got {npts}"
-        )
-
-    # Pre-create late-bound writes can silently drop on SW 2026.  Persist the
-    # thread contract through the documented feature-edit flow, then verify the
-    # values that drive native hole callouts/tables. ThreadClass stays EMPTY on
-    # the feature: SolidWorks appends it to every native callout / table row
-    # ("1/2-13 UNC - 2B") only when the feature carries one, and the title
-    # block's THREADS row already says CLASS 2A/2B for every thread UOS — the
-    # 2B receiver fit is a design fact (HOLE_THREAD_CLASS, asserted by the
-    # frame assembly against the lag screw's 2A), not per-hole ink.
-    definition = _early_bound(feat.GetDefinition(), "IWizardHoleFeatureData2")
-    if not definition.AccessSelections(model, None):
-        raise RuntimeError("hole wizard: AccessSelections failed")
-    definition.ThreadClass = ""
-    definition.EndCondition = SW_END_THROUGH_ALL
-    definition.ThreadEndCondition = SW_END_THROUGH_ALL
-    if not feat.ModifyDefinition(definition._oleobj_, model, null_callout()):
-        raise RuntimeError("hole wizard: ModifyDefinition failed")
-    model.EditRebuild3()
-    persisted = _early_bound(feat.GetDefinition(), "IWizardHoleFeatureData2")
-    if str(persisted.FastenerSize) != HOLE_SSIZE:
-        raise RuntimeError(
-            f"hole wizard: thread size did not persist: {persisted.FastenerSize!r}"
-        )
-    if int(persisted.EndCondition) != SW_END_THROUGH_ALL:
-        raise RuntimeError(
-            "hole wizard: through-all hole end condition did not persist"
-        )
-    drill_mm = float(persisted.ThruTapDrillDiameter) * 1000.0
-    if not math.isclose(drill_mm, HOLE_TAP_DRILL_DIA, abs_tol=0.001):
-        raise RuntimeError(
-            f"hole wizard: expected {HOLE_TAP_DRILL_DIA} mm tap drill, got {drill_mm}"
-        )
-    if str(persisted.ThreadClass or ""):
-        raise RuntimeError(
-            f"hole wizard: thread class should be blank: {persisted.ThreadClass!r}"
-        )
-    if int(persisted.ThreadEndCondition) != SW_END_THROUGH_ALL:
-        raise RuntimeError(
-            "hole wizard: through-all thread end condition did not persist"
-        )
-    # The native drawing hole table owns the thread specification; the feature's
-    # cosmetic threads (one sub-feature per hole) would each add a generic
-    # "1/2-13 Tapped Hole" callout on the sheet. Clear only the callout TEXT on
-    # each thread, keeping the thread geometry (its dashed circles are the
-    # hidden lines the views need) and the Hole Wizard data the table reads.
-    subfeature = feat.GetFirstSubFeature()
-    cleared = 0
-    while subfeature is not None:
-        subfeature = _early_bound(subfeature, "IFeature")
-        if subfeature.GetTypeName2() == "CosmeticThread":
-            thread = _early_bound(
-                subfeature.GetDefinition(), "ICosmeticThreadFeatureData"
-            )
-            if not thread.AccessSelections(model, None):
-                raise RuntimeError("cosmetic thread: AccessSelections failed")
-            thread.ThreadCallout = ""
-            if not subfeature.ModifyDefinition(thread._oleobj_, model, null_callout()):
-                raise RuntimeError("cosmetic thread: clearing callout failed")
-            persisted_thread = _early_bound(
-                subfeature.GetDefinition(), "ICosmeticThreadFeatureData"
-            )
-            if persisted_thread.ThreadCallout:
-                raise RuntimeError("cosmetic thread: callout text did not clear")
-            cleared += 1
-        subfeature = subfeature.GetNextSubFeature()
-    if cleared != len(holes_xz):
-        raise RuntimeError(
-            f"expected {len(holes_xz)} foot cosmetic threads, found {cleared}"
-        )
     return feat
 
 
@@ -672,23 +461,34 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "WindowCut2")
     await volume_check(adapter, "WindowCut2", 245_806, 200)
 
-    # 5. CornerFillet: R12.7 on the four inner-frame corner edges (concave -> adds).
-    check("fillet", await adapter.add_fillet(FILLET_R, FILLET_EDGES))
+    # 5. CornerFillet: R12.7 on the four cavity corners.
+    check("fillet cavity corners", await adapter.add_fillet(FILLET_R, FILLET_EDGES))
     name_last_feature(adapter, "CornerFillet")
     await volume_check(adapter, "CornerFillet", 246_685, 200)
+    name_dimensions(adapter, "CornerFillet", ["CavityRadius"])
 
-    # 6. FootTappedHoles: ONE Hole Wizard (HoleWzd) feature with four placement
-    #    points, 1/2-13 UNC-2B straight tapped holes drilled up through the
-    #    foot from the bottom face (Y=-HALF_Y) at (X ±60.32, Z ±17.46),
-    #    through-all. Only the 6.35 mm foot tip (Y -88.9..-82.55) carries
-    #    material along the bore -- the window cuts opened everything above -- so
-    #    the through-all cut removes four cylinders of FOOT_THICKNESS.
-    #    One feature, no separate placement sketch (matches the source).
-    _drill_tapped_holes(adapter, HOLES, y_face_mm=-HALF_Y)
-    name_last_feature(adapter, "FootTappedHoles")
-    await volume_check(adapter, "FootTappedHoles", FOOT_TAPPED_VOLUME, 200)
+    # 6. PocketCornerFillet: R6.35 on both opposed pocket openings.
+    check(
+        "fillet pocket corners",
+        await adapter.add_fillet(POCKET_FILLET_R, POCKET_FILLET_EDGES),
+    )
+    name_last_feature(adapter, "PocketCornerFillet")
+    name_dimensions(adapter, "PocketCornerFillet", ["PocketRadius"])
+    await volume_check(adapter, "PocketCornerFillet", POCKET_FILLET_VOLUME, 20)
 
-    # 7. RimChamfer: 1.27 mm / 45° around the whole window rim -- the 12 inner-
+    # 7. FootClearanceHoles: one native Hole Wizard feature, four 5/16 drills.
+    wizard_holes(
+        adapter,
+        HOLE_SPEC,
+        [[x, -BIG, z] for x, z in HOLES],
+        (0.0, 1.0, 0.0),
+        "rocker-support top-down clearance holes (5/16)",
+        name="FootClearanceHoles",
+        expect_dia_mm=HOLE_DIA,
+    )
+    await volume_check(adapter, "FootClearanceHoles", FOOT_HOLED_VOLUME, 200)
+
+    # 8. RimChamfer: 1.27 mm / 45° around the whole window rim -- the 12 inner-
     #    frame opening edges plus the slant/trapezoid/fillet faces, tangent-
     #    propagated.
     check(
@@ -698,6 +498,7 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "RimChamfer")
+    name_dimensions(adapter, "RimChamfer", ["RimChamferSize"])
     await volume_check(adapter, "RimChamfer", RIM_CHAMFER_VOLUME, 200)
 
     # Apply the deferred drive equations now that the whole model + a rebuild
@@ -724,13 +525,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, CASTING_GREEN
     )  # green-painted casting, like the base/top-frame
     await report_mass_properties(adapter)
-    apply_drawing_properties(
-        adapter,
-        PART_NAME,
-        {
-            "Manufacturing Notes": DRAWING_NOTES,
-        },
-    )
+    apply_drawing_properties(adapter, PART_NAME)
     return await save_part_and_images(adapter, PART_NAME)
 
 

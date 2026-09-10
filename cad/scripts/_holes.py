@@ -1,9 +1,8 @@
 """Native Hole Wizard (``HoleWzd``) features for part scripts.
 
-Uses the multi-point pattern in
-``build_rocker_arm_support._drill_tapped_holes`` (one four-point 1/2-13
-foot-tap feature) so each fastener hole carries its native thread designation:
-
+Uses one multi-point placement sketch per feature so every instance shares one
+native size/thread identity while retaining deterministic, individually driven
+stations:
 1. ``CreateDefinition(swFmHoleWzd)`` -> ``InitializeHole(type, standard,
    fastener, size, end)`` -> property overrides -> select the placement face
    as an OBJECT (coordinate SelectByID2 mis-resolves on bodies whose end faces

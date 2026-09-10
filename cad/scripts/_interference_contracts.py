@@ -12,6 +12,12 @@ import math
 from collections.abc import Iterable, Mapping
 
 from _hole_spec import blind_cut_dia_mm
+from build_harmonic_base import (
+    HOLD_DOWN_ENGAGEMENT as _HOLD_DOWN_ENGAGEMENT,
+    HOLD_DOWN_TAP_DRILL_DIA as _HOLD_DOWN_TAP_DRILL_DIA,
+    HOLD_DOWN_THREAD as _HOLD_DOWN_THREAD,
+)
+from _hole_spec import THREAD_MAJOR_MM
 from crank_arm_spec import (
     ARM_WIDTH as _ARM_W,
     PIN_HOLE_SPEC as _ARM_PILOT_SPEC,
@@ -126,8 +132,12 @@ _FRAME_ALLOWED_PAIRS = {
     **_numbered_pairs(
         "lag-screw",
         range(1, 5),
-        "rocker-arm-support",
-        _smooth_annulus_limit_mm3(12.7, 10.716, 6.35),
+        "harmonic-base",
+        _smooth_annulus_limit_mm3(
+            THREAD_MAJOR_MM[_HOLD_DOWN_THREAD],
+            _HOLD_DOWN_TAP_DRILL_DIA,
+            _HOLD_DOWN_ENGAGEMENT,
+        ),
     ),
     **_numbered_pairs(
         "frame-side-screw",

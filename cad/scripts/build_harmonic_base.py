@@ -62,7 +62,14 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _holes import DRILL_POINT_H, THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm, blind_hole_volume_mm3, wizard_holes
+from _holes import (
+    DRILL_POINT_H,
+    THREAD_MAJOR_MM,
+    HoleSpec,
+    blind_cut_dia_mm,
+    blind_hole_volume_mm3,
+    wizard_holes,
+)
 from harmonic_base_spec import (
     BOTTOM_LENGTH,
     BOTTOM_THICKNESS,
@@ -104,9 +111,14 @@ from build_slotted_screw import SHANK_LEN as BLOCK_SCREW_LEN
 from build_foot_screw import SHANK_LEN as FOOT_SCREW_LEN
 from build_fillister_screw import SHANK_LEN as NAMEPLATE_SCREW_LEN
 from build_swing_stop_screw import EMBED_LEN as STOP_ENGAGEMENT
+from build_lag_screw import (
+    BEARING_OFFSET as HOLD_DOWN_BEARING_OFFSET,
+    SHANK_LEN as HOLD_DOWN_SCREW_LEN,
+)
 from pinion_pivot_block_spec import BLOCK_HEIGHT
 from pinion_spring_geometry import THICK as SPRING_THICKNESS
 from arbor_pedestal_spec import FOOT_HEIGHT as PEDESTAL_FLANGE_THICKNESS
+from build_rocker_arm_support import FOOT_THICKNESS as SUPPORT_FOOT_THICKNESS
 from rocker_arm_support_spec import SUPPORT_HOLD_DOWN_XZ
 
 import _telemetry
@@ -120,16 +132,38 @@ MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
 # per side, thicknesses from the legacy HarmonicBase.cs (photo-verify M2 note).
 IN = 25.4
 
-# Rocker-support hold-down holes (machine = part-local: frame.SLDASM places the
-# base unrotated at the origin).  The support contract transforms its unchanged
+# Rocker-support hold-down seats (machine = part-local: frame.SLDASM places the
+# base unrotated at the origin). The support contract transforms its unchanged
 # four-hole foot pattern through the +90-degree installation and the v2 rear
-# shift.  Base, support, and frame therefore cannot carry three drifting copies.
-HOLE_DIA = 13.0  # Ø12.7 stock lag-screw shank clearance
+# shift. Base, support, and frame therefore cannot carry drifting copies.
+#
+# The selected 1/4-20 x 5/8 screw bears on the bottom of its vendor-modeled
+# 0.277813 mm under-head washer transition. That physical bearing face crosses
+# the 6.35 mm support foot and leaves 9.247187 mm (1.456D) of engagement in
+# this base. Usable full thread extends 0.25 mm beyond the screw tip so it
+# cannot bottom before the head seats. A machine plug tap then needs four lead
+# threads plus one pitch of margin: cylindrical tap-drill depth = full-thread
+# depth + 5P = 15.847187 mm. Keep all three lengths explicit; they are
+# different assembly/manufacturing constraints.
+HOLD_DOWN_THREAD = "1/4-20"
+HOLD_DOWN_THREAD_CLASS = "2B"
+HOLD_DOWN_PITCH = IN / 20.0
+HOLD_DOWN_ENGAGEMENT = (
+    HOLD_DOWN_SCREW_LEN - SUPPORT_FOOT_THICKNESS - HOLD_DOWN_BEARING_OFFSET
+)
+HOLD_DOWN_TIP_CLEARANCE = 0.25
+HOLD_DOWN_THREAD_DEPTH = HOLD_DOWN_ENGAGEMENT + HOLD_DOWN_TIP_CLEARANCE
+HOLD_DOWN_DRILL_DEPTH = HOLD_DOWN_THREAD_DEPTH + 5.0 * HOLD_DOWN_PITCH
+HOLD_DOWN_SEAT_SPEC = HoleSpec(
+    "tapped",
+    HOLD_DOWN_THREAD,
+    end="blind",
+    depth_mm=HOLD_DOWN_DRILL_DEPTH,
+    thread_class=HOLD_DOWN_THREAD_CLASS,
+    overrides_mm={"ThreadDepth": HOLD_DOWN_THREAD_DEPTH},
+)
+HOLD_DOWN_TAP_DRILL_DIA = blind_cut_dia_mm(HOLD_DOWN_SEAT_SPEC)
 HOLE_XZ = SUPPORT_HOLD_DOWN_XZ
-CBORE_DIA = 23.0  # Ø20.6502 stock lag head clearance
-LAG_COUNTERBORE_DEPTH = 9.517  # 9.017 stock head height + 0.5 recess
-CBORE_DEPTH = LAG_COUNTERBORE_DEPTH
-CBORE_XZ = HOLE_XZ  # all four heads counterbored
 
 # Edge finishing (chamfer external, fillet internal; legacy 1/8-1/16 sizes).
 # The machined plate gets 45-degree edge breaks on every external edge: the
@@ -174,8 +208,13 @@ RIM_INNER_R = PAD_CORNER_R - LIP_W  # 8.875: the deck pocket's plan corners
 SERIAL_TEXT = "2"
 SERIAL_HEIGHT_MM = 3.5  # p.70 macro: ~half the lip width (low)
 SERIAL_DEPTH = 0.3  # a stamp, not an engraving
-SERIAL_XZ = (TOP_LENGTH / 2.0 - LIP_W / 2.0, 62.0)  # (218.75, 62): lip centre, 12 past the plate end
-SERIAL_MIRROR_Y = False  # flip if the seat's rim-top sketch frame reads the glyph mirrored
+SERIAL_XZ = (
+    TOP_LENGTH / 2.0 - LIP_W / 2.0,
+    62.0,
+)  # (218.75, 62): lip centre, 12 past the plate end
+SERIAL_MIRROR_Y = (
+    False  # flip if the seat's rim-top sketch frame reads the glyph mirrored
+)
 SERIAL_DXF = REFERENCES_DIR / "base-serial.dxf"
 SERIAL_AREA_MM2 = 3.1029  # pinned from gen_base_serial_dxf's summary (net glyph area)
 RIM_OVERLAP = 1.0  # the ring starts this far below the pad top so it merges
@@ -363,47 +402,62 @@ def require_blind_seat_fit(
     thread_depth = seat.overrides_mm.get("ThreadDepth", seat.depth_mm)
     if not math.isfinite(tip_reserve) or tip_reserve <= 0.0:
         raise AssertionError(f"{label}: tip reserve must be finite and positive")
-    if not all(math.isfinite(value) and value > 0.0 for value in (
-        engagement, thread_depth, seat.depth_mm
-    )):
-        raise AssertionError(f"{label}: engagement and depths must be finite and positive")
+    if not all(
+        math.isfinite(value) and value > 0.0
+        for value in (engagement, thread_depth, seat.depth_mm)
+    ):
+        raise AssertionError(
+            f"{label}: engagement and depths must be finite and positive"
+        )
     if engagement < THREAD_MAJOR_MM[seat.size]:
-        raise AssertionError(f"{label}: less than one diameter of full-thread engagement")
+        raise AssertionError(
+            f"{label}: less than one diameter of full-thread engagement"
+        )
     if thread_depth - engagement < tip_reserve - 1e-9:
         raise AssertionError(f"{label}: screw bottoms before seating in full threads")
     pitch = 25.4 / float(seat.size.rsplit("-", 1)[1])
     lead_pitches = 2.0 if seat.kind == "tapped_bottoming" else 5.0
     if seat.depth_mm - thread_depth < lead_pitches * pitch - 1e-9:
         tap = "bottoming" if seat.kind == "tapped_bottoming" else "plug"
-        raise AssertionError(f"{label}: drill lacks {lead_pitches:g}-pitch {tap}-tap lead")
+        raise AssertionError(
+            f"{label}: drill lacks {lead_pitches:g}-pitch {tap}-tap lead"
+        )
 
 
-# Guard the deepest installed stock insertion in all six native seat groups.
+# Guard the deepest installed stock insertion in all seven native seat groups.
 # The foot group also serves the thicker pedestal flange, with less insertion.
 for _label, _seat, _engagement in (
+    ("rocker support", HOLD_DOWN_SEAT_SPEC, HOLD_DOWN_ENGAGEMENT),
     ("cone pivot", PIVOT_SEAT_SPEC, PIVOT_THREAD_ENGAGEMENT),
     ("cone lock", LOCK_SEAT_SPEC, LOCK_STUD_LEN),
     ("swing stop", STOP_SEAT_SPEC, STOP_ENGAGEMENT),
     ("pinion block", BLOCK_SEAT_SPEC, BLOCK_SCREW_LEN - BLOCK_HEIGHT),
     ("spring foot", FOOT_SEAT_SPEC, FOOT_SCREW_LEN - SPRING_THICKNESS),
     ("pedestal foot", FOOT_SEAT_SPEC, FOOT_SCREW_LEN - PEDESTAL_FLANGE_THICKNESS),
-    ("nameplate", NAMEPLATE_SEAT_SPEC, NAMEPLATE_SCREW_LEN - nameplate_spec.PLATE_THICKNESS),
+    (
+        "nameplate",
+        NAMEPLATE_SEAT_SPEC,
+        NAMEPLATE_SCREW_LEN - nameplate_spec.PLATE_THICKNESS,
+    ),
 ):
     require_blind_seat_fit(_label, _seat, _engagement)
 
-# Include the pivot's deeper cylindrical drill and its separate 118-degree
-# point in the upper-pad wall check. Full-height cavity envelopes conservatively
-# bound every neighboring bore, irrespective of which face it starts from.
+# Include each blind drill's deeper cylindrical cut and separate 118-degree
+# point in the upper-pad wall checks. Full-height cavity envelopes
+# conservatively bound every neighboring bore, irrespective of start face.
 PIVOT_DRILL_BOTTOM_WALL = (
-    TOP_THICKNESS - PIVOT_SEAT_SPEC.depth_mm
+    TOP_THICKNESS
+    - PIVOT_SEAT_SPEC.depth_mm
     - PIVOT_SCREW_HOLE_DIA / 2.0 * DRILL_POINT_H
 )
 if PIVOT_DRILL_BOTTOM_WALL < 1.5 * PIVOT_SCREW_HOLE_DIA:
-    raise AssertionError("cone-pivot drill leaves less than 1.5 diameters of upper-pad wall")
+    raise AssertionError(
+        "cone-pivot drill leaves less than 1.5 diameters of upper-pad wall"
+    )
 PIVOT_NEAREST_CAVITY_WALL = min(
     math.dist(PIVOT_SCREW_XZ, xz) - (PIVOT_SCREW_HOLE_DIA + dia) / 2.0
     for points, dia in (
-        (HOLE_XZ, CBORE_DIA),
+        (HOLE_XZ, THREAD_MAJOR_MM[HOLD_DOWN_THREAD]),
         ((LOCK_KNOB_XZ,), LOCK_SCREW_HOLE_DIA),
         ((STOP_SCREW_XZ,), STOP_SCREW_HOLE_DIA),
         (BLOCK_SCREW_XZ, BLOCK_SCREW_HOLE_DIA),
@@ -416,18 +470,19 @@ if PIVOT_NEAREST_CAVITY_WALL < PIVOT_SCREW_HOLE_DIA:
     raise AssertionError("cone-pivot drill crowds another base cavity")
 
 # The deeper lock drill must remain in the solid upper pad and clear every
-# other vertical cavity. Bounding the hold-down counterbores over their full
-# height is conservative; their actual bores are smaller at the lock depth.
+# other vertical cavity. Bounding the hold-down thread-major envelopes over
+# their full height catches wall breakout rather than only tap-drill overlap.
 LOCK_DRILL_BOTTOM_WALL = (
-    TOP_THICKNESS - LOCK_SCREW_DRILL_DEPTH
-    - LOCK_SCREW_HOLE_DIA / 2.0 * DRILL_POINT_H
+    TOP_THICKNESS - LOCK_SCREW_DRILL_DEPTH - LOCK_SCREW_HOLE_DIA / 2.0 * DRILL_POINT_H
 )
 if LOCK_DRILL_BOTTOM_WALL < 1.5 * LOCK_SCREW_HOLE_DIA:
-    raise AssertionError("cone-lock drill leaves less than 1.5 diameters of upper-pad wall")
+    raise AssertionError(
+        "cone-lock drill leaves less than 1.5 diameters of upper-pad wall"
+    )
 LOCK_NEAREST_CAVITY_WALL = min(
     math.dist(LOCK_KNOB_XZ, xz) - (LOCK_SCREW_HOLE_DIA + dia) / 2.0
     for points, dia in (
-        (HOLE_XZ, CBORE_DIA),
+        (HOLE_XZ, THREAD_MAJOR_MM[HOLD_DOWN_THREAD]),
         ((PIVOT_SCREW_XZ,), PIVOT_SCREW_HOLE_DIA),
         ((STOP_SCREW_XZ,), STOP_SCREW_HOLE_DIA),
         (BLOCK_SCREW_XZ, BLOCK_SCREW_HOLE_DIA),
@@ -440,15 +495,16 @@ if LOCK_NEAREST_CAVITY_WALL < LOCK_SCREW_HOLE_DIA:
     raise AssertionError("cone-lock drill crowds another base cavity")
 
 STOP_DRILL_BOTTOM_WALL = (
-    TOP_THICKNESS - STOP_SCREW_DRILL_DEPTH
-    - STOP_SCREW_HOLE_DIA / 2.0 * DRILL_POINT_H
+    TOP_THICKNESS - STOP_SCREW_DRILL_DEPTH - STOP_SCREW_HOLE_DIA / 2.0 * DRILL_POINT_H
 )
 if STOP_DRILL_BOTTOM_WALL < 1.5 * STOP_SCREW_HOLE_DIA:
-    raise AssertionError("swing-stop drill leaves less than 1.5 diameters of upper-pad wall")
+    raise AssertionError(
+        "swing-stop drill leaves less than 1.5 diameters of upper-pad wall"
+    )
 STOP_NEAREST_CAVITY_WALL = min(
     math.dist(STOP_SCREW_XZ, xz) - (STOP_SCREW_HOLE_DIA + dia) / 2.0
     for points, dia in (
-        (HOLE_XZ, CBORE_DIA),
+        (HOLE_XZ, THREAD_MAJOR_MM[HOLD_DOWN_THREAD]),
         ((PIVOT_SCREW_XZ,), PIVOT_SCREW_HOLE_DIA),
         ((LOCK_KNOB_XZ,), LOCK_SCREW_HOLE_DIA),
         (BLOCK_SCREW_XZ, BLOCK_SCREW_HOLE_DIA),
@@ -562,7 +618,11 @@ async def _paint_deck_black(adapter, deck_y_mm: float) -> None:
             if not normal or float(normal[1]) < 0.99:
                 continue
             box = _com_get(face, "GetBox")
-            if not box or abs(float(box[4]) - y_m) > 1e-6 or abs(float(box[1]) - y_m) > 1e-6:
+            if (
+                not box
+                or abs(float(box[4]) - y_m) > 1e-6
+                or abs(float(box[1]) - y_m) > 1e-6
+            ):
                 continue
             area = float(_com_get(face, "GetArea"))
             if area > target_area:
@@ -664,31 +724,22 @@ async def build(adapter) -> dict[str, str]:
     extrude_at_offset(adapter, TOP_THICKNESS, BOTTOM_THICKNESS)
     name_last_feature(adapter, "TopPlate")
     _telemetry.info(f"volume after top plate: {await _volume(adapter):.1f} mm^3")
+    total = STACK_HEIGHT
 
-    # One native 1/2 FILLISTER counterbore feature, four points from UNDERSIDE.
-    # The 1/2 token matches the purchased 1/2-13 screw's nominal size; the
-    # fillister table describes its round slotted head. Exact geometry remains
-    # Ø13 through / Ø23 x 9.517 recess for the Ø20.6502 x 9.017 stock head,
-    # with 0.5 mm recess below the underside. Explicit definition overrides
-    # preserve these fits instead of substituting standard-table dimensions.
-    # CBORE_XZ == HOLE_XZ: all four heads share the concentric counterbore cut.
-    total = BOTTOM_THICKNESS + TOP_THICKNESS
+    # Four blind native 1/4-20 UNC-2B seats from the support deck. The screws
+    # bear on their vendor-modeled under-head washer faces and pass through
+    # the support's 5/16 clearance drills: 6.35 mm foot + 9.247187 mm (1.456D)
+    # engagement, with 0.25 mm thread beyond each tip. The separate 15.847187 mm
+    # cylindrical drill depth leaves five pitches for plug-tap lead and margin.
+    # No underside counterbore or through clearance remains.
     pre_holes = await _volume(adapter)
     fastener_cut = wizard_holes(
         adapter,
-        HoleSpec(
-            "counterbore_fillister",
-            "1/2",
-            overrides_mm={
-                "HoleDiameter": HOLE_DIA,
-                "CounterBoreDiameter": CBORE_DIA,
-                "CounterBoreDepth": CBORE_DEPTH,
-            },
-        ),
-        [[x, 0.0, z] for x, z in HOLE_XZ],
-        (0.0, -1.0, 0.0),
-        "lag-screw counterbored holes (1/2)",
-        name="FastenerHoles",
+        HOLD_DOWN_SEAT_SPEC,
+        [[x, STACK_HEIGHT, z] for x, z in HOLE_XZ],
+        (0.0, 1.0, 0.0),
+        "rocker-support blind tapped seats (1/4-20 UNC-2B)",
+        name="SupportHoldDownSeats",
         placement_dims=[
             (
                 (f"Hole{i}Cx", _pos_drive(f"Hole{i}X", x)),
@@ -699,16 +750,15 @@ async def build(adapter) -> dict[str, str]:
     )
     drive_jobs += fastener_cut.placement_drive_jobs
     after = await _volume(adapter)
-    v_holes = len(HOLE_XZ) * (
-        math.pi * (HOLE_DIA / 2.0) ** 2 * total
-        + math.pi * ((CBORE_DIA / 2.0) ** 2 - (HOLE_DIA / 2.0) ** 2) * CBORE_DEPTH
+    v_holes = len(HOLE_XZ) * blind_hole_volume_mm3(
+        HOLD_DOWN_TAP_DRILL_DIA, HOLD_DOWN_DRILL_DEPTH
     )
     _telemetry.info(
-        f"volume after fastener holes: {after:.1f} mm^3 (removed analytic {v_holes:.1f})"
+        f"volume after support seats: {after:.1f} mm^3 (removed analytic {v_holes:.1f})"
     )
     if abs((pre_holes - after) - v_holes) > 0.02 * v_holes:
         raise RuntimeError(
-            f"fastener holes removed {pre_holes - after:.1f}, expected {v_holes:.1f}"
+            f"support seats removed {pre_holes - after:.1f}, expected {v_holes:.1f}"
         )
 
     # Cone swing hardware + alignment-pinion rig seats + nameplate seats:
@@ -782,11 +832,16 @@ async def build(adapter) -> dict[str, str]:
     # material: the ring over LIP_H. Top-plane sketch: (x, y) -> (X, -Z).
     half_x, half_z = TOP_LENGTH / 2.0, TOP_WIDTH / 2.0
     outer_pts = [
-        (-half_x, -half_z), (half_x, -half_z), (half_x, half_z), (-half_x, half_z),
+        (-half_x, -half_z),
+        (half_x, -half_z),
+        (half_x, half_z),
+        (-half_x, half_z),
     ]
     inner_pts = [
-        (-half_x + LIP_W, -half_z + LIP_W), (half_x - LIP_W, -half_z + LIP_W),
-        (half_x - LIP_W, half_z - LIP_W), (-half_x + LIP_W, half_z - LIP_W),
+        (-half_x + LIP_W, -half_z + LIP_W),
+        (half_x - LIP_W, -half_z + LIP_W),
+        (half_x - LIP_W, half_z - LIP_W),
+        (-half_x + LIP_W, half_z - LIP_W),
     ]
     check("create_sketch rim", await adapter.create_sketch("Top"))
     outer_lines = await add_line_chain(adapter, outer_pts)
@@ -798,7 +853,9 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "RimProfile")
     extrude_at_offset(adapter, RIM_OVERLAP + LIP_H, total - RIM_OVERLAP)
     name_last_feature(adapter, "Rim")
-    a_ring = TOP_LENGTH * TOP_WIDTH - (TOP_LENGTH - 2.0 * LIP_W) * (TOP_WIDTH - 2.0 * LIP_W)
+    a_ring = TOP_LENGTH * TOP_WIDTH - (TOP_LENGTH - 2.0 * LIP_W) * (
+        TOP_WIDTH - 2.0 * LIP_W
+    )
     v_lip = a_ring * LIP_H
     after = await volume_check(adapter, "raised rim", after + v_lip, 0.01 * v_lip + 5.0)
     deck_top = total + LIP_H
@@ -817,7 +874,11 @@ async def build(adapter) -> dict[str, str]:
         await adapter.add_fillet(
             PAD_CORNER_R,
             [
-                [sx * TOP_LENGTH / 2.0, (BOTTOM_THICKNESS + deck_top) / 2.0, sz * TOP_WIDTH / 2.0]
+                [
+                    sx * TOP_LENGTH / 2.0,
+                    (BOTTOM_THICKNESS + deck_top) / 2.0,
+                    sz * TOP_WIDTH / 2.0,
+                ]
                 for sx in (-1.0, 1.0)
                 for sz in (-1.0, 1.0)
             ],
@@ -833,7 +894,11 @@ async def build(adapter) -> dict[str, str]:
         await adapter.add_fillet(
             FLANGE_CORNER_R,
             [
-                [sx * BOTTOM_LENGTH / 2.0, BOTTOM_THICKNESS / 2.0, sz * BOTTOM_WIDTH / 2.0]
+                [
+                    sx * BOTTOM_LENGTH / 2.0,
+                    BOTTOM_THICKNESS / 2.0,
+                    sz * BOTTOM_WIDTH / 2.0,
+                ]
                 for sx in (-1.0, 1.0)
                 for sz in (-1.0, 1.0)
             ],
@@ -842,7 +907,10 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "FlangeCorners")
     v_flange_corners = _corner_removal(FLANGE_CORNER_R, BOTTOM_THICKNESS)
     after = await volume_check(
-        adapter, "flange plan corners", after - v_flange_corners, 0.01 * v_flange_corners + 2.0
+        adapter,
+        "flange plan corners",
+        after - v_flange_corners,
+        0.01 * v_flange_corners + 2.0,
     )
     check(
         "fillet rim inner corners",
@@ -877,9 +945,7 @@ async def build(adapter) -> dict[str, str]:
             [half_x, y_rim, 0.0],
             [-half_x, y_rim, 0.0],
         ] + [
-            [sx * arc_x, y_rim, sz * arc_z]
-            for sx in (-1.0, 1.0)
-            for sz in (-1.0, 1.0)
+            [sx * arc_x, y_rim, sz * arc_z] for sx in (-1.0, 1.0) for sz in (-1.0, 1.0)
         ]
 
     # Top rims: 1/16 in x 45-degree breaks on the flange's reveal rim and the
@@ -888,7 +954,12 @@ async def build(adapter) -> dict[str, str]:
         "chamfer top rims",
         await adapter.add_chamfer(
             RIM_CHAMFER,
-            _rim_points(BOTTOM_LENGTH / 2.0, BOTTOM_THICKNESS, BOTTOM_WIDTH / 2.0, FLANGE_CORNER_R)
+            _rim_points(
+                BOTTOM_LENGTH / 2.0,
+                BOTTOM_THICKNESS,
+                BOTTOM_WIDTH / 2.0,
+                FLANGE_CORNER_R,
+            )
             + _rim_points(TOP_LENGTH / 2.0, deck_top, TOP_WIDTH / 2.0, PAD_CORNER_R),
         ),
     )
@@ -924,7 +995,9 @@ async def build(adapter) -> dict[str, str]:
         "fillet pad root",
         await adapter.add_fillet(
             PAD_ROOT_R,
-            _rim_points(TOP_LENGTH / 2.0, BOTTOM_THICKNESS, TOP_WIDTH / 2.0, PAD_CORNER_R),
+            _rim_points(
+                TOP_LENGTH / 2.0, BOTTOM_THICKNESS, TOP_WIDTH / 2.0, PAD_CORNER_R
+            ),
         ),
     )
     name_last_feature(adapter, "PadRootFillet")
@@ -944,7 +1017,9 @@ async def build(adapter) -> dict[str, str]:
     serial_plane = check(
         "create_plane rim top",
         await adapter.create_plane(
-            CreatePlaneParameters(mode="offset", base_plane="Top Plane", offset=STACK_HEIGHT + LIP_H)
+            CreatePlaneParameters(
+                mode="offset", base_plane="Top Plane", offset=STACK_HEIGHT + LIP_H
+            )
         ),
     )
     pre_serial = float((await adapter.get_mass_properties()).data.volume)
@@ -970,9 +1045,13 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "Serial")
     removed = pre_serial - float((await adapter.get_mass_properties()).data.volume)
     v_serial = SERIAL_AREA_MM2 * SERIAL_DEPTH
-    _telemetry.info(f"serial stamp removed {removed:.3f} mm^3 (DXF net area {SERIAL_AREA_MM2} x {SERIAL_DEPTH} = {v_serial:.3f})")
+    _telemetry.info(
+        f"serial stamp removed {removed:.3f} mm^3 (DXF net area {SERIAL_AREA_MM2} x {SERIAL_DEPTH} = {v_serial:.3f})"
+    )
     if not 0.75 * v_serial <= removed <= 1.25 * v_serial:
-        raise RuntimeError(f"serial stamp removed {removed:.3f} mm^3, expected ~{v_serial:.3f}")
+        raise RuntimeError(
+            f"serial stamp removed {removed:.3f} mm^3, expected ~{v_serial:.3f}"
+        )
     after -= removed
 
     # Apply the deferred drive equations after the whole model exists, then
