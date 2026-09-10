@@ -131,6 +131,8 @@ _service_name = _resolve_service_name()
 # image's OTLP/HTTP port) with zero env. So `doit ...` / a build script lights up
 # the dashboard's traces+logs the moment it's running -- no OTEL_* exports needed.
 # Override or disable with OTEL_EXPORTER_OTLP_ENDPOINT (set it empty to turn off).
+# HTTP/protobuf remains the default transport. Set the standard
+# ``OTEL_EXPORTER_OTLP_PROTOCOL=grpc`` for collectors such as Azure Monitor Agent.
 #
 # By LITERAL ADDRESS, never the name "localhost". Measured on this seat: the first
 # OTLP POST to ``http://localhost:18890`` cost 2.05 s, and to
@@ -561,21 +563,48 @@ class _LiveStderr:
 # --------------------------------------------------------------------------- #
 
 
+def _otlp_protocol(signal: str) -> str:
+    """Return the standard OTLP transport configured for *signal*."""
+    signal_protocol = f"OTEL_EXPORTER_OTLP_{signal.upper()}_PROTOCOL"
+    return os.environ.get(
+        signal_protocol,
+        os.environ.get("OTEL_EXPORTER_OTLP_PROTOCOL", "http/protobuf"),
+    ).lower()
+
+
 def _otlp_span_processor():
-    """``BatchSpanProcessor`` around the OTLP span exporter, or ``None``."""
+    """``BatchSpanProcessor`` around the configured OTLP span exporter."""
     with contextlib.suppress(Exception):
-        from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
-            OTLPSpanExporter,
-        )
+        protocol = _otlp_protocol("traces")
+        if protocol == "grpc":
+            from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
+                OTLPSpanExporter,
+            )
+        elif protocol == "http/protobuf":
+            from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
+                OTLPSpanExporter,
+            )
+        else:
+            return None
 
         return BatchSpanProcessor(OTLPSpanExporter())
     return None
 
 
 def _otlp_log_processor():
-    """``BatchLogRecordProcessor`` around the OTLP log exporter, or ``None``."""
+    """``BatchLogRecordProcessor`` around the configured OTLP log exporter."""
     with contextlib.suppress(Exception):
-        from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
+        protocol = _otlp_protocol("logs")
+        if protocol == "grpc":
+            from opentelemetry.exporter.otlp.proto.grpc._log_exporter import (
+                OTLPLogExporter,
+            )
+        elif protocol == "http/protobuf":
+            from opentelemetry.exporter.otlp.proto.http._log_exporter import (
+                OTLPLogExporter,
+            )
+        else:
+            return None
 
         return BatchLogRecordProcessor(OTLPLogExporter())
     return None

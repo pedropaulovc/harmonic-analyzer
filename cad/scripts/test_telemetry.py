@@ -87,7 +87,11 @@ def test_console_verbosity_configures_handler_and_spans(monkeypatch):
     original = os.environ.get("HARMONIC_VERBOSITY")
 
     def console_handlers():
-        return [handler for handler in logger.handlers if isinstance(handler, logging.StreamHandler)]
+        return [
+            handler
+            for handler in logger.handlers
+            if isinstance(handler, logging.StreamHandler)
+        ]
 
     try:
         os.environ.pop("HARMONIC_VERBOSITY", None)
@@ -368,6 +372,35 @@ def test_otlp_export_is_batched_off_the_critical_path():
         if type(p).__name__ == "SimpleSpanProcessor"
     ]
     assert simple, "console/file capture must stay on Simple processors"
+
+
+@pytest.mark.parametrize(
+    ("protocol", "module_fragment"),
+    [
+        ("http/protobuf", ".proto.http."),
+        ("grpc", ".proto.grpc."),
+    ],
+)
+def test_otlp_export_honors_standard_transport_env(
+    monkeypatch, protocol, module_fragment
+):
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_PROTOCOL", protocol)
+    monkeypatch.delenv("OTEL_EXPORTER_OTLP_TRACES_PROTOCOL", raising=False)
+    monkeypatch.delenv("OTEL_EXPORTER_OTLP_LOGS_PROTOCOL", raising=False)
+
+    processors = (
+        _telemetry._otlp_span_processor(),
+        _telemetry._otlp_log_processor(),
+    )
+    try:
+        exporters = [processor._batch_processor._exporter for processor in processors]
+        assert all(
+            module_fragment in type(exporter).__module__ for exporter in exporters
+        )
+    finally:
+        for processor in processors:
+            if processor is not None:
+                processor.shutdown()
 
 
 def test_default_otlp_endpoint_is_a_literal_address_never_localhost(monkeypatch):
