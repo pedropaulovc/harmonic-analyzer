@@ -78,7 +78,7 @@ ISO_SCALE = (1.0, 1.0)
 FRONT_CENTER = (0.075, 0.150)
 RIGHT_CENTER = (0.175, 0.150)
 TOP_CENTER = (0.075, 0.230)
-SECTION_CENTER = (0.295, 0.140)
+SECTION_CENTER = (0.295, 0.155)
 ASSEMBLED_CENTER = (0.115, 0.058)
 ROD_END_CENTER = (0.220, 0.050)
 ISO_CENTER = (0.355, 0.225)
@@ -92,7 +92,7 @@ FRONT_KEEP = {
     "TubeOd": (0.035, 0.155),
 }
 TOP_KEEP = {"RodHoleDia": (0.120, 0.255), "CapR": (0.035, 0.235)}
-SECTION_KEEP = {"TubeLen": (0.310, 0.179), "TubeId": (0.355, 0.140)}
+SECTION_KEEP = {"TubeLen": (0.347, 0.145), "TubeId": (0.250, 0.114)}
 ASSEMBLED_KEEP = {"RodSpan": (0.115, 0.024)}
 ROD_END_KEEP = {"RodDia": (0.220, 0.078)}
 SIDE_DIAMETERS = {"GripDia": (0.228, 0.173), "TubeOd": (0.140, 0.178)}
@@ -346,14 +346,14 @@ async def build(adapter: Any) -> dict[str, str]:
         _isolate_body(adapter, view, body, label=label)
         set_hidden_lines_visible(adapter, view)
 
-    # Cut the turned body through the arbor axis, without sectioning a pressed
-    # rod across the socket. The section replaces dimensions to hidden bore edges.
+    # The XZ section contains the arbor axis and cuts normal to the omitted
+    # cross rod, exposing its circular hole as well as the blind axial socket.
     cut_center = _point(adapter, front, (0.0, 0.0, 0.0))
     section = create_section_view(
         adapter,
         front,
-        line_start=(cut_center[0], cut_center[1] - 0.023),
-        line_end=(cut_center[0], cut_center[1] + 0.023),
+        line_start=(cut_center[0] - 0.023, cut_center[1]),
+        line_end=(cut_center[0] + 0.023, cut_center[1]),
         view_xy=SECTION_CENTER,
         section_label="A",
         scale=SECTION_SCALE,
@@ -483,11 +483,11 @@ async def build(adapter: Any) -> dict[str, str]:
     for text, xy in (
         ("BODY", (0.158, 0.120)),
         ("BODY CROSS-HOLE", (0.047, 0.195)),
-        ("CROSS ROD IN BODY", (0.078, 0.038)),
+        ("CROSS ROD IN BODY", (0.050, 0.115)),
     ):
         if add_note(adapter, text, *xy) is None:
             raise RuntimeError(f"failed to add {text} view caption")
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.240, 0.087)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.050, 0.107)
     add_property_linked_note(adapter, "Isometric View Note", 0.322, 0.196)
     return await finalize_drawing(
         adapter,
