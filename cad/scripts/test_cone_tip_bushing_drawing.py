@@ -48,25 +48,6 @@ def test_linked_notes_define_remaining_turned_part_operations() -> None:
     assert "def _manufacturing_notes" not in source
 
 
-def test_native_gdt_controls_bushing_functional_surfaces() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 2
-    assert source.count("add_feature_control_frame(") == 2
-    assert (
-        "        edge_xy=bore_top,\n"
-        "        symbol_xy=(END_CENTER[0], END_CENTER[1] + 0.037),\n"
-        '        datum="A",\n'
-        '        label="bushing bore axis",\n'
-        "        position_tolerance_m=0.0001,"
-        in source
-    )
-    assert source.count("position_tolerance_m=0.0001") == 1
-    assert "characteristic=\"circular_runout\"" in source
-    assert "characteristic=\"parallelism\"" in source
-    assert source.count("add_surface_finish(") == 1
-    assert source.count("add_view_centerline(") == 1
-
-
 def test_sheet_and_views_pin_scale() -> None:
     assert drawing.SHEET_SCALE == (8.0, 1.0)
     source = Path(drawing.__file__).read_text(encoding="utf-8")

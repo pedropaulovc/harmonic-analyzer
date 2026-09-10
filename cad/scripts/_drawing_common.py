@@ -453,6 +453,7 @@ def add_datum_feature(
         "GetLabel",
         "SetText",
         "Shoulder",
+        "ForcedShoulder",
     )
     if not tag.SetLabel(datum):
         raise RuntimeError(f"failed to label datum feature {datum} ({label})")
@@ -461,8 +462,17 @@ def add_datum_feature(
     tag_annotation = _sw_type_info.early_bound_or_flag(
         tag.GetAnnotation(), "IAnnotation", "GetPosition", "SetPosition2"
     )
+    forced_shoulder = bool(tag.ForcedShoulder)
     if not tag_annotation.SetPosition2(symbol_xy[0], symbol_xy[1], 0.0):
         raise RuntimeError(f"failed to position datum {datum} ({label})")
+    if forced_shoulder and not tag.ForcedShoulder:
+        # Moving an angular edge attachment onto a horizontal/vertical ray
+        # removes its forced shoulder (IDatumTag::ForcedShoulder). SolidWorks
+        # first solves that leader transition using the old shoulder geometry;
+        # finish placement in the new mode before checking the same XY contract.
+        # No rebuild is needed, and a still-constrained/failed move must reject.
+        if not tag_annotation.SetPosition2(symbol_xy[0], symbol_xy[1], 0.0):
+            raise RuntimeError(f"failed to position datum {datum} ({label})")
     actual_position = tag_annotation.GetPosition()
     position_error = (
         math.inf
