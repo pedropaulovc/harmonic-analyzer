@@ -26,9 +26,11 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_edge_dimension,
     add_property_linked_callout,
     add_property_linked_note,
     add_surface_finish,
+    create_section_view,
     curate_view_dimensions,
     finalize_drawing,
     insert_hole_table,
@@ -43,7 +45,9 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from build_rocker_arm_support import (
+    BIG,
     BOSS_DEPTH,
+    CAV,
     CHAMFER,
     HALF_Y,
     HOLES,
@@ -73,9 +77,9 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (1.0, 2.0)
 
 # Sheet layout (meters). A 177.8 mm casting with four views needs a 1:2 ASME B
-# sheet. Third-angle projection keeps the taper beside the window face and the
-# tapping setup below it. The projected group sits below the zone strip with
-# enough separation for dimensions and leaders.
+# sheet. Section A-A replaces the side view, exposing the opposed pocket floors
+# and web at the front view's centre cut; the tapping setup stays below. The
+# projected group clears the zone strip, with room for dimensions and leaders.
 VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]
 FRONT_CENTER = (0.085, 0.185)
 RIGHT_CENTER = (0.170, 0.185)
@@ -101,6 +105,7 @@ DIMENSION_PRECISION = {
     "WallHeight": 1,
     "FootSpan": 1,
     "TopSpan": 1,
+    "WebThickness": 2,  # a held thickness: 6.35, routine ±0.51
 }
 RIGHT_KEEP = {
     "WallHeight": (0.197, 0.185),  # 177.8 wall height, right of the taper
@@ -198,29 +203,6 @@ def _right_seat_edge(adapter: Any, view: Any) -> Any:
     return edge
 
 
-def _add_side_symmetry_centerline(adapter: Any) -> Any:
-    """Draw the side-view centre plane that locates the taper and central web."""
-    model = adapter.currentModel
-    drawing = _early_bound(model, "IDrawingDoc")
-    drawing.EditSheet()
-    sketch_manager = _early_bound(model.SketchManager, "ISketchManager")
-    extension = 0.004
-    half_height = HALF_Y * VIEW_SCALE / 1000.0
-    centerline = sketch_manager.CreateCenterLine(
-        RIGHT_CENTER[0],
-        RIGHT_CENTER[1] - half_height - extension,
-        0.0,
-        RIGHT_CENTER[0],
-        RIGHT_CENTER[1] + half_height + extension,
-        0.0,
-    )
-    if centerline is None:
-        raise RuntimeError("failed to create side-view symmetry centerline")
-    model.ClearSelection2(True)
-    model.EditRebuild3()
-    return centerline
-
-
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -261,14 +243,33 @@ async def build(adapter: Any) -> dict[str, str]:
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
+    # swDetailingSectionViewLineStyleDisplay (swconst.tlb R2026x): standard
+    # without connector. The end segments/arrows identify the centre cut
+    # without drawing a line through the front view's square-callout text.
+    extension = _early_bound(drawing_model.Extension, "IModelDocExtension")
+    if not extension.SetUserPreferenceInteger(542, 0, 1):
+        raise RuntimeError("failed to set end-only section cutting line")
+    if extension.GetUserPreferenceInteger(542, 0) != 1:
+        raise RuntimeError("section cutting-line style did not persist")
+
     # Explicit per-view scale: a view placed without one can silently
     # auto-scale, which shifts every coordinate-based pick on it.
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 2))
-    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(1, 2))
+    right = create_section_view(
+        adapter,
+        front,
+        line_start=(FRONT_CENTER[0], FRONT_CENTER[1] - 0.050),
+        line_end=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.050),
+        view_xy=RIGHT_CENTER,
+        section_label="A",
+        scale=(1, 2),
+        label="rocker-arm support centre section",
+    )
     bottom = place_view(adapter, str(SOURCE), "*Bottom", *BOTTOM_CENTER, scale=(1, 2))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
-    for view in (front, right, bottom):
+    for view in (front, bottom):
         set_hidden_lines_visible(adapter, view)
+    set_hidden_lines_removed(adapter, right)
     set_hidden_lines_removed(adapter, iso)
 
     front_dimensions = curate_view_dimensions(
@@ -279,12 +280,43 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     dimensions = [*front_dimensions, *right_dimensions]
     set_dimension_callouts(adapter, dimensions, DIMENSION_CALLOUTS)
-    set_dimension_precision(adapter, dimensions, DIMENSION_PRECISION)
+    set_dimension_precision(
+        adapter,
+        dimensions,
+        {
+            name: digits
+            for name, digits in DIMENSION_PRECISION.items()
+            if name != "WebThickness"
+        },
+    )
+    # Pick the two cut pocket floors in the upper web band, outside the
+    # through cavity. HLR ensures the selected edges are visible section edges.
+    web_y = RIGHT_CENTER[1] + (BIG + CAV) / 2.0 * VIEW_SCALE / 1000.0
+    half_web = WEB * VIEW_SCALE / 1000.0
+    web_dimension = _early_bound(
+        add_edge_dimension(
+            adapter,
+            right,
+            p0=(RIGHT_CENTER[0] - half_web, web_y),
+            p1=(RIGHT_CENTER[0] + half_web, web_y),
+            text_xy=(RIGHT_CENTER[0] + 0.012, RIGHT_CENTER[1] + 0.022),
+            orientation="horizontal",
+            label="section web thickness",
+        ),
+        "IDisplayDimension",
+    )
+    measured = float(
+        _early_bound(web_dimension.GetDimension2(0), "IDimension").SystemValue
+    )
+    if abs(measured * 1000.0 - 2.0 * WEB) > 1e-5:
+        raise RuntimeError(f"section web dimension measured {measured * 1000.0:.6f} mm")
+    web_dimension.SetPrecision3(DIMENSION_PRECISION["WebThickness"], -1, -1, -1)
+    if web_dimension.GetPrimaryPrecision2() != DIMENSION_PRECISION["WebThickness"]:
+        raise RuntimeError("section web dimension precision did not persist")
     if not auto_center_marks(adapter, bottom, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to bottom view")
-    _add_side_symmetry_centerline(adapter)
 
-    # The mounting face is the trapezoid's bottom edge in the right view. The
+    # The mounting face is the trapezoid's visible bottom edge in section A-A. The
     # symbol sits below-right of the foot, past the 63.5 width dimension's
     # right extension line (x ~0.186 at 1:2), with the leader pinned to the
     # seat's right corner so it rises up-left without crossing that dimension.
@@ -300,25 +332,25 @@ async def build(adapter: Any) -> dict[str, str]:
         char_height=0.0025,
         leader_attach_xy=(RIGHT_CENTER[0] + seat_half_w - 0.002, seat_y),
     )
-    # The pocket/web instruction is flagged FROM the view: the callout's arrow
-    # lands on the web's dashed edge (a hidden edge is pickable once the view
-    # regenerates HLV, which the seat symbol above has just invalidated — so
-    # regenerate first). Text is the part-stamped "Web Callout" property.
-    set_hidden_lines_visible(adapter, right)
-    add_property_linked_callout(
+    # Approach the visible left pocket floor from above-left: the leader
+    # clears TopSpan's left extension and arrow, and stays left of WallHeight.
+    # Only the associative web dimension carries the thickness.
+    web_note = add_property_linked_callout(
         adapter,
         right,
         property_name="Web Callout",
-        edge_xy=(RIGHT_CENTER[0] + WEB * VIEW_SCALE / 1000.0, RIGHT_CENTER[1] + 0.020),
-        # Two lines, parked in the gap between the side view and the isometric
-        # (x 0.215-0.300), above the 177.8 dimension's text so the leader runs
-        # down-left onto the web without crossing it.
-        note_xy=(RIGHT_CENTER[0] + 0.048, RIGHT_CENTER[1] + 0.075),
+        edge_xy=(RIGHT_CENTER[0] - half_web, web_y),
+        note_xy=(RIGHT_CENTER[0] - 0.023, RIGHT_CENTER[1] + 0.075),
     )
-    # Attaching annotations leaves the view's HLV edge set unregenerated (it
-    # still READS hidden-lines-visible but exports a bare taper); the toggle
-    # inside set_hidden_lines_visible regenerates it.
-    set_hidden_lines_visible(adapter, right)
+    # A straight leader from the first text line would cross the second.
+    # swBENT + swLS_LEFT gives the diagonal a shoulder outside the text block.
+    web_annotation = _early_bound(web_note.GetAnnotation(), "IAnnotation")
+    if web_annotation.SetLeader3(2, 1, True, False, False, False) != 0:
+        raise RuntimeError("failed to bend the pocket-process leader")
+    web_annotation.BentLeaderLength = 0.010
+    if abs(web_annotation.BentLeaderLength - 0.010) > 1e-9:
+        raise RuntimeError("pocket-process leader shoulder did not persist")
+    set_hidden_lines_visible(adapter, front)
 
     datum_x_axis, datum_y_axis = _bottom_datum_axes(adapter, bottom)
     # No position frame on this part (simplicity policy rule 3/4), so the hole
@@ -339,8 +371,7 @@ async def build(adapter: Any) -> dict[str, str]:
         basic_locations=False,
         label="rocker-arm-support",
     )
-    # Same regen as the side view: the datum walk + hole table leave the
-    # bottom view's HLV edge set stale (it exported the four tap circles and
+    # The datum walk + hole table leave the bottom view's HLV edge set stale (it exported the four tap circles and
     # nothing of the pocket/cavity/web above them).
     set_hidden_lines_visible(adapter, bottom)
 

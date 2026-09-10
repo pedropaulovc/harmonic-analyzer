@@ -148,10 +148,9 @@ DRAWING_NOTES = "\n".join(
         "CAVITY R12.7, 4X; CHAMFER BOTH OUTER POCKET RIMS 1.27 X 45 DEG.",
     )
 )
-# Flagged from the side view (where the web reads as the dashed pair down the
-# centre) rather than buried in the note block: the one instruction that
-# decides whether the casting survives machining.
-WEB_CALLOUT = "MACHINE BOTH POCKETS; LEAVE 6.35 WEB;\nWALLS NORMAL TO MOUNTING FACE"
+# Flagged from a visible edge in section A-A. The associative web
+# thickness dimension carries the size; this property carries only process.
+WEB_CALLOUT = "MACHINE BOTH POCKETS;\nWALLS NORMAL TO MOUNTING FACE"
 HOLE_THREAD_CLASS = "2B"  # receiver fit for the 2A lag screw (design fact; the
 # title block's THREADS row prints it, the Hole Wizard feature does not)
 

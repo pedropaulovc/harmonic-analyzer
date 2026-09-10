@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import math
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 import _config
+import _drawing_common
 
 import draw_rocker_arm_support as drawing
 import build_rocker_arm_support as support
@@ -32,7 +35,12 @@ def test_drawing_keeps_only_one_dimension_for_each_square() -> None:
         "WinWidth": "SQ POCKET",
         "CavWidth": "SQ CAVITY THRU",
     }
-    assert drawing.DIMENSION_PRECISION == dict.fromkeys(expected, 1)
+    # Cast envelopes at one place; the machined 6.35 web is a held thickness
+    # at two (routine ±0.51), never "6.4".
+    assert drawing.DIMENSION_PRECISION == {
+        **dict.fromkeys(expected, 1),
+        "WebThickness": 2,
+    }
 
 
 def test_manufacturing_notes_define_only_part_specific_processes() -> None:
@@ -55,10 +63,12 @@ def test_manufacturing_notes_define_only_part_specific_processes() -> None:
 
 def test_web_instruction_is_a_view_callout() -> None:
     assert support.WEB_CALLOUT == (
-        "MACHINE BOTH POCKETS; LEAVE 6.35 WEB;\nWALLS NORMAL TO MOUNTING FACE"
+        "MACHINE BOTH POCKETS;\nWALLS NORMAL TO MOUNTING FACE"
     )
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'property_name="Web Callout"' in source
+    assert "LEAVE" not in support.WEB_CALLOUT
+    assert "6.35" not in support.WEB_CALLOUT
 
 
 def test_thread_class_lives_in_the_title_block_not_on_the_feature() -> None:
@@ -151,3 +161,71 @@ def test_support_keeps_original_world_placement_and_hold_down_pattern() -> None:
         -60.32,
         60.32,
     }
+
+
+@pytest.mark.parametrize("scale", [0.5, 1.0])
+def test_section_cut_uses_parent_sketch_coordinates(monkeypatch, scale) -> None:
+    """A centre cut must stay centred on a translated, scaled parent view.
+
+    Native CreateLine interprets sheet coordinates a second time: the old
+    helper cut x=42.5 mm off centre at 1:2 and left an unsectioned taper.
+    """
+    origin = drawing.FRONT_CENTER
+    transform = object()
+    points = []
+
+    def make_point(values):
+        points.append(tuple(values))
+
+        def multiply(actual_transform):
+            assert actual_transform is transform
+            return SimpleNamespace(
+                ArrayData=(
+                    (values[0] - origin[0]) / scale,
+                    (values[1] - origin[1]) / scale,
+                    0.0,
+                )
+            )
+
+        return SimpleNamespace(MultiplyTransform=multiply)
+
+    math_utility = SimpleNamespace(CreatePoint=make_point)
+    sketch = SimpleNamespace(ModelToSketchTransform=transform)
+    parent = SimpleNamespace(GetSketch=lambda: sketch)
+    section_definition = Mock()
+    section_definition.SetLabel2.return_value = 0
+    section = Mock()
+    section.GetSection.return_value = section_definition
+    section.SetViewPosition.return_value = True
+    model = Mock()
+    model.ActivateView.return_value = True
+    model.CreateSectionViewAt5.return_value = section
+    adapter = SimpleNamespace(
+        currentModel=model,
+        swApp=SimpleNamespace(GetMathUtility=lambda: math_utility),
+    )
+    monkeypatch.setattr(_drawing_common, "_early_bound", lambda obj, _: obj)
+    monkeypatch.setattr(_drawing_common, "view_name", lambda *_: "Front")
+    monkeypatch.setattr(_drawing_common, "double_array", tuple)
+    monkeypatch.setattr(
+        _drawing_common._sw_type_info, "early_bound_or_flag", lambda obj, *_: obj
+    )
+    start = (origin[0], origin[1] - 0.050)
+    end = (origin[0], origin[1] + 0.050)
+    result = _drawing_common.create_section_view(
+        adapter,
+        parent,
+        line_start=start,
+        line_end=end,
+        view_xy=drawing.RIGHT_CENTER,
+        section_label="A",
+        scale=(1, 2),
+        label="centre cut regression",
+    )
+    assert result is section
+    assert points == [(*start, 0.0), (*end, 0.0)]
+    assert model.SketchManager.CreateLine.call_args.args == pytest.approx(
+        (0.0, -0.050 / scale, 0.0, 0.0, 0.050 / scale, 0.0)
+    )
+    section_definition.SetAutoHatch.assert_called_once_with(True)
+    section_definition.SetLabel2.assert_called_once_with("A")

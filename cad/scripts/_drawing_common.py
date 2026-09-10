@@ -975,8 +975,11 @@ def create_section_view(
 ) -> Any:
     """Create a full, unaligned section from one straight cutting-plane line.
 
-    The coordinates are drawing-sheet meters.  ``ISketchManager.CreateLine``
-    leaves the new sketch segment selected, which is the documented precondition for
+    The public coordinates are drawing-sheet meters; convert them through the
+    parent sketch's transform before CreateLine, which takes view-local sketch
+    coordinates. Passing sheet coordinates directly offsets and scales the cut
+    again (at 1:2, a centre cut can miss the part entirely).
+    ``ISketchManager.CreateLine`` leaves the new segment selected, the precondition for
     ``CreateSectionViewAt5``.  The section is deliberately unaligned so a part
     recipe can place and scale it independently of the parent view.
     """
@@ -987,14 +990,19 @@ def create_section_view(
     if not ddoc.ActivateView(name):
         raise RuntimeError(f"failed to activate section parent view {name!r} ({label})")
     draw.ClearSelection2(True)
-    segment = sketch_manager.CreateLine(
-        float(line_start[0]),
-        float(line_start[1]),
-        0.0,
-        float(line_end[0]),
-        float(line_end[1]),
-        0.0,
-    )
+    parent = _early_bound(parent_view, "IView")
+    sketch = _early_bound(parent.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in (line_start, line_end):
+        point = _early_bound(
+            math_utility.CreatePoint(double_array([float(x), float(y), 0.0])),
+            "IMathPoint",
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    segment = sketch_manager.CreateLine(*points[0], *points[1])
     if segment is None:
         raise RuntimeError(f"failed to create section line ({label})")
     # swCreateSectionView_NotAligned | swCreateSectionView_ScaleWithModel
