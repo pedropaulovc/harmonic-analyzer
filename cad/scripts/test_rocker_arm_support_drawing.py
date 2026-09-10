@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from pathlib import Path
 
 import pytest
 import _config
@@ -12,6 +13,7 @@ import build_rocker_arm_support as support
 import build_frame_assembly as frame
 import build_lag_screw as screw
 import rocker_arm_support_spec as placement
+import rocker_arm_support_drawing_spec as drawing_spec
 
 
 def test_drawing_keeps_only_one_dimension_for_each_square() -> None:
@@ -36,7 +38,7 @@ def test_drawing_keeps_only_one_dimension_for_each_square() -> None:
 def test_manufacturing_notes_define_only_part_specific_processes() -> None:
     lines = support.DRAWING_NOTES.splitlines()
     notes = " ".join(lines)
-    assert len(lines) == 5
+    assert len(lines) == 4
     assert "SYMMETRIC ABOUT CENTRE PLANE" in notes
     assert "6.35 WEB" in notes
     assert "88.9 FROM MOUNTING FACE" in notes
@@ -44,8 +46,11 @@ def test_manufacturing_notes_define_only_part_specific_processes() -> None:
     assert "CAVITY R12.7, 4X" in notes
     assert "BOTH OUTER POCKET RIMS" in notes
     assert "BOTH TOP OUTER EDGES" not in notes
-    assert "CASTING; MACHINE MOUNTING FACE" in notes
+    # Material may be steel or iron and the seat carries its own symbol, so
+    # the notes neither assert a casting nor restate the mounting face.
+    assert "CASTING" not in notes
     assert "AS-CAST" not in notes
+    assert "MACHINE MOUNTING FACE" not in notes
 
 
 def test_finish_and_thread_class_have_one_authoritative_home() -> None:
@@ -54,7 +59,23 @@ def test_finish_and_thread_class_have_one_authoritative_home() -> None:
     )
     assert support.HOLE_THREAD_CLASS == "2B"
     assert support.TITLE_BLOCK_THREAD_CLASS == ""
-    assert drawing.MOUNTING_FACE_CALLOUT == "MACHINED MOUNTING FACE"
+
+
+def test_mounting_face_carries_the_seat_finish_symbol_not_a_note() -> None:
+    # The foot seats on harmonic-base: the one face that MUST be cut on a part
+    # the title block otherwise leaves CAST/MACHINED. It is the -Y face at
+    # y = -HALF_Y (PlanarFace offsets run along the outward normal, so +HALF_Y),
+    # and the drawing places the symbol, not a text callout.
+    (control,) = drawing_spec.SURFACE_FINISHES
+    assert control.key == "mounting_face"
+    assert control.roughness_um == 3.2
+    assert control.face.normal == (0, -1, 0)
+    assert control.face.offset_mm == support.HALF_Y == drawing_spec.HALF_Y
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'surface_finish_by_key(SURFACE_FINISHES, "mounting_face")' in source
+    assert source.count("add_surface_finish(") == 1
+    assert "MOUNTING_FACE_CALLOUT" not in source
+    assert "add_attached_note" not in source
 
 
 def test_native_hole_table_covers_every_foot_hole() -> None:

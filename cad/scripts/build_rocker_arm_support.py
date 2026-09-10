@@ -98,6 +98,8 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
+from _part_pmi import author_part_pmi
+from rocker_arm_support_drawing_spec import HALF_Y, SURFACE_FINISHES
 
 PART_NAME = "rocker-arm-support"
 # The source repro was authored in steel, but this casting is now the machine's
@@ -110,7 +112,8 @@ MATERIAL = "Gray Cast Iron"
 # Right plane: sketch-x -> model Z (taper), sketch-y -> model Y (height).
 WIDE = 31.75  # foot half-width (Z) at Y=-88.9
 NARROW = 8.4665  # top half-width (Z) at Y=+88.9
-HALF_Y = 88.9  # trapezoid half-height (Y)
+# HALF_Y (trapezoid half-height, Y) is imported from the drawing spec: the
+# foot-seat finish control is pinned to that plane.
 BOSS_DEPTH = 177.8  # mid-plane extrude along X (X ±88.9)
 
 CAV = 63.5  # 127 mm square half (Cut-Extrude2)
@@ -144,7 +147,6 @@ DRAWING_NOTES = "\n".join(
         "MACHINE BOTH POCKETS TO LEAVE 6.35 WEB; WALLS NORMAL TO MOUNTING FACE.",
         "POCKET CENTRE 88.9 FROM MOUNTING FACE; POCKET + CAVITY CONCENTRIC.",
         "CAVITY R12.7, 4X; CHAMFER BOTH OUTER POCKET RIMS 1.27 X 45 DEG.",
-        "CASTING; MACHINE MOUNTING FACE, POCKETS, CAVITY, HOLES + CHAMFERS.",
     )
 )
 TITLE_BLOCK_THREAD_CLASS = ""
@@ -679,6 +681,7 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
 
     await apply_material(adapter, MATERIAL)
     await apply_color(

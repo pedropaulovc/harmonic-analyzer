@@ -26,8 +26,8 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_attached_note,
     add_property_linked_note,
+    add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
     insert_hole_table,
@@ -40,6 +40,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _surface_finish import surface_finish_by_key
 from build_rocker_arm_support import (
     BOSS_DEPTH,
     CHAMFER,
@@ -49,6 +50,7 @@ from build_rocker_arm_support import (
     HOLE_TAP_DRILL_DIA,
     WIDE,
 )
+from rocker_arm_support_drawing_spec import SURFACE_FINISHES
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     iter_views,
@@ -92,7 +94,6 @@ DIMENSION_CALLOUTS = {
     "WinWidth": "SQ POCKET",
     "CavWidth": "SQ CAVITY THRU",
 }
-MOUNTING_FACE_CALLOUT = "MACHINED MOUNTING FACE"
 DIMENSION_PRECISION = {
     "Depth": 1,
     "WinWidth": 1,
@@ -160,6 +161,41 @@ def _bottom_datum_axes(adapter: Any, view: Any) -> tuple[Any, Any]:
     if not x_axes or not y_axes:
         raise RuntimeError("bottom view is missing a chamfer-offset foot datum edge")
     return x_axes[0], y_axes[0]
+
+
+def _right_seat_edge(adapter: Any, view: Any) -> Any:
+    """Return the mounting-face edge in the right view: the line at y = -HALF_Y
+    running along Z. A coordinate pick at the trapezoid's bottom lands on the
+    chamfer edges that share that sheet point, so the seat is found by geometry."""
+    components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
+    candidates: list[tuple[float, Any]] = []
+    for component in components:
+        edges = (
+            adapter._attempt(
+                lambda c=component: view.GetVisibleEntities2(c, 1),
+                default=(),
+            )
+            or ()
+        )
+        for edge in edges:
+            edge = _early_bound(edge, "IEdge")
+            curve = _early_bound(edge.GetCurve(), "ICurve")
+            if not curve.IsLine():
+                continue
+            root_y, direction_z = (
+                float(curve.LineParams[1]),
+                abs(float(curve.LineParams[5])),
+            )
+            if abs(root_y + HALF_Y / 1000.0) <= 2e-6 and direction_z >= 0.99:
+                start = _early_bound(edge.GetStartVertex(), "IVertex").GetPoint()
+                end = _early_bound(edge.GetEndVertex(), "IVertex").GetPoint()
+                candidates.append((abs(float(end[2]) - float(start[2])), edge))
+    if not candidates:
+        raise RuntimeError("right view has no model edge on the mounting-face plane")
+    span, edge = max(candidates, key=lambda item: item[0])
+    if span < (2.0 * WIDE - 2.0 * CHAMFER - 0.1) / 1000.0:
+        raise RuntimeError(f"mounting-face edge spans only {span * 1000.0:.3f} mm")
+    return edge
 
 
 def _add_side_symmetry_centerline(adapter: Any) -> Any:
@@ -301,16 +337,20 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add ASME center marks to bottom view")
     _add_side_symmetry_centerline(adapter)
 
-    add_attached_note(
+    # The mounting face is the trapezoid's bottom edge in the right view. The
+    # symbol sits below-right of the foot, past the 63.5 width dimension's
+    # right extension line (x ~0.186 at 1:2), with the leader pinned to the
+    # seat's right corner so it rises up-left without crossing that dimension.
+    seat_y = RIGHT_CENTER[1] - HALF_Y * VIEW_SCALE / 1000.0
+    seat_half_w = WIDE * VIEW_SCALE / 1000.0
+    add_surface_finish(
         adapter,
         right,
-        text=MOUNTING_FACE_CALLOUT,
-        entity_xy=(
-            RIGHT_CENTER[0],
-            RIGHT_CENTER[1] - HALF_Y * VIEW_SCALE / 1000.0,
-        ),
-        note_xy=(0.105, 0.122),
-        label="machined mounting face",
+        edge_entity=_right_seat_edge(adapter, right),
+        symbol_xy=(RIGHT_CENTER[0] + seat_half_w + 0.030, seat_y - 0.030),
+        control=surface_finish_by_key(SURFACE_FINISHES, "mounting_face"),
+        label="mounting face finish",
+        leader_attach_xy=(RIGHT_CENTER[0] + seat_half_w - 0.002, seat_y),
     )
 
     removed_thread_notes = _remove_automatic_thread_notes(adapter)
