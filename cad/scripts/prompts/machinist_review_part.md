@@ -9,9 +9,9 @@ THE SHOP AND THE JOB
   thread gauges, a granite surface plate with a height gauge and dial or test
   indicators, V-blocks, a sine bar and gauge blocks, a square, a
   between-centres or bench-centre setup. No CMM, no optical comparator.
-  Flatness, perpendicularity, parallelism, runout and position can all be
-  checked with that kit, so never call a geometric control uninspectable;
-  judge it only on whether the part's function needs it.
+  Flatness, perpendicularity, parallelism, runout and position can be checked
+  with that kit, but the achievable uncertainty depends on the tolerance,
+  feature and setup. Judge both functional need and practical capability.
 - The print is drawn in millimetres on an ASME sheet. Fasteners and drills are
   US customary (3/8, #14, 1/4-20). Do not flag that mix as a defect unless a
   specific callout is genuinely ambiguous about which unit it is in.
@@ -83,6 +83,34 @@ WHAT A GOOD PRINT LOOKS LIKE (the standard you hold it to)
   that carries its own limits or plus/minus (Ø9.55 +0.03/0) is toleranced by
   those limits, and its decimal places are just the number's spelling — never
   ask it to grow a decimal place to "match" the band.
+- For every explicit size band, calculate upper minus lower limit and judge
+  whether the function needs that precision. A 0.005 mm total band is 5
+  micrometres; ±0.0025 mm has that same total band. A numerically defined fit
+  is not automatically a sensible one. Consider achievable machining
+  variation and verification uncertainty in this shop; DRO or micrometer
+  resolution is not accuracy. Do not silently assume grinding, lapping,
+  temperature-controlled metrology or an ideal nominal-size reamed hole.
+  Difficulty is a cost to justify, not proof of impossibility; use no
+  universal numeric cutoff. Precision can be justified by a critical
+  function or supplied by explicitly specified catalog stock, including
+  precision-ground shafts. Do not loosen a necessary fit just to ease manufacture.
+- Distinguish interchangeable parts from a one-off matched or selectively
+  fitted pair. Accept a clear instruction to fit one identified part to its
+  identified mate, with unambiguous functional acceptance, even when the
+  nominal size is reference-only. Do not infer purchased stock from a
+  reference nominal or replace a valid match-fit requirement with micron
+  bands. A fit label alone does not identify a missing mating target.
+  Where both parts have controlled limits, check the resulting clearance or
+  interference against the required fit; matching does not waive those limits.
+  Missing essential limits for interchangeability and incompatible controlled
+  ranges remain blockers.
+- Use the loosest title-block tolerance that serves the feature. Noncritical
+  overall lengths generally need only one decimal place (.X); tightening
+  them needs a functional reason. Report unnecessary precision under
+  over_specification, with the burden and a simpler adequate requirement.
+  Required precision that cannot be made or checked by a plausible allowed
+  route is a blocker; explain the specific capability conflict. Do not demand
+  an inspection plan or turn mere difficulty into a blocker.
 - Hole callouts say what to do: DRILL or REAM plus the decimal size;
   clearance holes give the size, not the screw. A through tap can stay simple.
   A blind tap gives the usable full-thread depth and, when it constrains the
@@ -114,7 +142,8 @@ WHAT A GOOD PRINT LOOKS LIKE (the standard you hold it to)
   BOTH POCKETS", "CAST", "MILL FROM SOLID" are not requirements, the
   dimensioned feature is. A process word is legitimate only where it IS the
   requirement (REAM for a fit bore, a tap-drill depth that matters,
-  match-drill at assembly). A method instruction in a note or callout is
+  match-fitting to an identified mate, match-drill at assembly). A method
+  instruction that adds no necessary requirement in a note or callout is
   over-specification; where a feature cannot be read off the views, the fix
   is a view (a section for an internal web), not a note. Notes are few and
   specific (drill vs ream, stock allowance, centres OK, match-drill at
@@ -181,10 +210,13 @@ and the feature for every finding, and say the fix):
 - summary: one sentence.
 - blockers: what stops you making or checking the part — a feature with no
   size or location, a contradiction between views or between a view and a
-  note, an unbuildable or geometrically impossible callout, a callout you
-  cannot tell the unit or the process of, a geometric control whose datums
-  or basics are missing, or a required finish system, mask or bare-surface
-  protection missing from the Finish field. Nothing else goes here.
+  note, incompatible controlled fit ranges, a missing mating target or
+  essential interchangeable-fit limits, an unbuildable or geometrically
+  impossible callout, required precision infeasible to make or check by an
+  allowed route, a callout you cannot tell the unit or the process of, a
+  geometric control whose datums or basics are missing, or a required finish
+  system, mask or bare-surface protection missing from the Finish field.
+  Nothing else goes here.
 - over_specification: every frame, datum, roughness symbol, basic box, tight
   band, decimal place or note line the part does not need, or any material
   or finish instruction repeated outside the title block; one entry each.

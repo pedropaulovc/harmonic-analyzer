@@ -36,10 +36,20 @@ WHAT A COMPLETE ASSEMBLY PACKAGE CONTAINS (the standard you hold it to)
   press this bushing to this depth, set this gear mesh with this backlash,
   torque this screw, align this axis to that face within so much. Fits that
   are set at assembly (match-drill, ream in place, shim, adjust) are said so
-  with the target and how to check it.
+  with the identified mate, target and how to check it. For a one-off matched
+  or selectively fitted pair, clear functional acceptance can define the fit;
+  do not demand numeric bands merely because a nominal size is reference-only,
+  or assume that reference nominal means purchased stock. Matching does not
+  waive conflicting controlled limits or essential interchangeability requirements.
 - Assembly-level dimensions and checks: the few positions, gaps, clearances,
   travels, alignments or preloads that only exist once the parts are
-  together, each with a value and a way to measure it.
+  together, each with an unambiguous acceptance criterion and way to check it.
+  Scrutinize explicit bands set at assembly for functional need and achievable
+  setting and verification uncertainty with the stated bench equipment.
+  Calculate the total band, not its half-width; instrument resolution is not
+  accuracy. Unnecessary precision is over_specification; a necessary setting
+  infeasible with the stated route is a blocker. Difficulty alone is not
+  impossibility. Do not reopen fabrication tolerances on unseen part drawings.
 - Setup and adjustment: anything with a parked and an engaged state, an
   adjustment screw, a zero, a spring tension, has its as-shipped state and
   its setting procedure stated without ambiguity.
@@ -100,10 +110,12 @@ view or item for every finding, and say the fix):
 - summary: one sentence.
 - blockers: what stops assembly or setup — no exploded view or order, no
   parts list or balloons, a part visible but unidentified, an assembly fit
-  or adjustment with no value or no procedure, an ambiguous parked/engaged
-  state, inconsistent BOM rows or balloon mappings across sheets, a setup
-  sequence that conflicts across sheets, or any contradiction between sheets
-  or between a view and a note.
+  or adjustment with no mating target, acceptance criterion or procedure,
+  incompatible controlled fit ranges, missing essential interchangeability
+  requirements, a necessary setting infeasible with the stated route, an
+  ambiguous parked/engaged state, inconsistent BOM rows or balloon mappings
+  across sheets, a setup sequence that conflicts across sheets, or any
+  contradiction between sheets or between a view and a note.
 - over_specification: anything the package carries that the assembly job
   does not need — repeated part tolerances, materials or finishes, GD&T at
   assembly level without cause, notes restating the title block.
