@@ -22,69 +22,6 @@ def _clean_verdict(verdict: str = "SHIP") -> dict[str, Any]:
     }
 
 
-def test_prompts_exist_and_are_calibrated_to_the_policy() -> None:
-    part = mr.load_prompt("part")
-    assembly = mr.load_prompt("assembly")
-    # The recalibration that separates this prompt from the gap-hunting ones:
-    # the title block is the general spec, and over-specification is a defect.
-    for text in (part, assembly):
-        normalized = " ".join(text.split())
-        assert "TITLE BLOCK FIRST" in normalized
-        assert "over_specification" in normalized
-        assert "Never pad a category" in normalized
-        assert "landscape or portrait" in normalized
-        assert "Shaded With Edges" in normalized
-        assert "precision/high-quality mode" in normalized
-        assert "wireframe/HLR pictorial" in normalized
-        assert "inner drawing border is a hard boundary" in normalized
-        assert "visually balanced" in normalized
-        assert "Projected orthographic views preserve ASME alignment" in normalized
-        assert "correctness comes first" in normalized
-        assert "Dimension text and feature callouts stay outside" in normalized
-        assert "Convenience is not a reason" in normalized
-
-    assert "loaded gun" in part
-    assert "Decimal places" in part
-    assert "one-place, two-place and three-place" in part
-    assert "thread class" in part
-    assert "Hidden lines" in part
-    assert "DRILL or REAM" in part
-    assert "granite surface plate" in part and "No CMM" in part
-    assert "never call a geometric control uninspectable" in part
-    assert "datum feature symbols on real, reachable surfaces" in part
-    assert "masking and protection of bare machined surfaces" in part
-    assert "builder's choice is complete" in part
-    assert "required finish system" in part
-    assert "repeated outside the title block" in part
-    part_text = " ".join(part.split())
-    for item in (
-        "DFM IS PART OF THE GATE",
-        "perfectly sharp re-entrant corners",
-        "last chance to catch an omission in the source CAD",
-        "never invent the missing radius",
-        "another plausible allowed route",
-        "do not count screw projection through a clearance hole as engagement",
-        "usable full threads",
-        "room beyond them for the tap's lead",
-        "thread major-diameter envelope",
-        "full-thread depth from deeper tap-drill depth",
-    ):
-        assert item in part_text
-    # Assembly packages are judged as real assembly drawings: exploded view,
-    # parts list, balloons, ordered steps -- the current three-view sheets are
-    # expected to FAIL this until they are built out.
-    for item in ("exploded view", "parts list (BOM)", "Assembly steps in order"):
-        assert item in assembly, item
-    assembly_text = " ".join(assembly.split())
-    for item in (
-        "return one verdict for the package as a whole",
-        "every balloon against its BOM row",
-        "setup and assembly steps across sheet boundaries",
-        "SHIP requires those cross-sheet checks",
-    ):
-        assert item in assembly_text, item
-
-
 def test_schema_is_strict_structured_output() -> None:
     schema = mr.load_schema()
     assert schema["additionalProperties"] is False

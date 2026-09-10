@@ -44,12 +44,16 @@ WHAT A COMPLETE ASSEMBLY PACKAGE CONTAINS (the standard you hold it to)
 - Assembly-level dimensions and checks: the few positions, gaps, clearances,
   travels, alignments or preloads that only exist once the parts are
   together, each with an unambiguous acceptance criterion and way to check it.
-  Scrutinize explicit bands set at assembly for functional need and achievable
-  setting and verification uncertainty with the stated bench equipment.
-  Calculate the total band, not its half-width; instrument resolution is not
-  accuracy. Unnecessary precision is over_specification; a necessary setting
-  infeasible with the stated route is a blocker. Difficulty alone is not
-  impossibility. Do not reopen fabrication tolerances on unseen part drawings.
+  For explicit assembly bands, calculate the total band, not its half-width.
+  First ask whether function needs the precision; being printed is not proof.
+  Unneeded precision is over_specification even when burdensome. A capability
+  blocker requires BOTH an essential functional need and a substantiated
+  setting or verification conflict with the stated route; identify both.
+  Instrument resolution is not accuracy. Without stated equipment accuracy,
+  condition or temperature control, describe burden and uncertainty; do not
+  invent quantified capability, stock/catalog limits or categorical
+  impossibility. Use no numeric cutoff. Do not reopen fabrication tolerances
+  on unseen part drawings.
 - Setup and adjustment: anything with a parked and an engaged state, an
   adjustment screw, a zero, a spring tension, has its as-shipped state and
   its setting procedure stated without ambiguity.
@@ -112,8 +116,9 @@ view or item for every finding, and say the fix):
   parts list or balloons, a part visible but unidentified, an assembly fit
   or adjustment with no mating target, acceptance criterion or procedure,
   incompatible controlled fit ranges, missing essential interchangeability
-  requirements, a necessary setting infeasible with the stated route, an
-  ambiguous parked/engaged state, inconsistent BOM rows or balloon mappings
+  requirements, functionally essential precision with a substantiated setting
+  or verification capability conflict as defined above, an ambiguous
+  parked/engaged state, inconsistent BOM rows or balloon mappings
   across sheets, a setup sequence that conflicts across sheets, or any
   contradiction between sheets or between a view and a note.
 - over_specification: anything the package carries that the assembly job

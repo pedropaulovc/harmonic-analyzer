@@ -83,17 +83,23 @@ WHAT A GOOD PRINT LOOKS LIKE (the standard you hold it to)
   that carries its own limits or plus/minus (Ø9.55 +0.03/0) is toleranced by
   those limits, and its decimal places are just the number's spelling — never
   ask it to grow a decimal place to "match" the band.
-- For every explicit size band, calculate upper minus lower limit and judge
-  whether the function needs that precision. A 0.005 mm total band is 5
-  micrometres; ±0.0025 mm has that same total band. A numerically defined fit
-  is not automatically a sensible one. Consider achievable machining
-  variation and verification uncertainty in this shop; DRO or micrometer
-  resolution is not accuracy. Do not silently assume grinding, lapping,
-  temperature-controlled metrology or an ideal nominal-size reamed hole.
-  Difficulty is a cost to justify, not proof of impossibility; use no
-  universal numeric cutoff. Precision can be justified by a critical
-  function or supplied by explicitly specified catalog stock, including
-  precision-ground shafts. Do not loosen a necessary fit just to ease manufacture.
+- For every explicit size band, calculate upper minus lower limit: 0.005 mm
+  total is 5 micrometres, equivalent to ±0.0025 mm. First ask whether the
+  function needs that precision; being printed does not establish necessity.
+  Unneeded precision is over_specification even when burdensome to achieve,
+  not a capability blocker. A capability blocker requires BOTH an essential
+  functional need and a substantiated conflict with the allowed machining or
+  verification route. State that need and the specific conflict.
+  Consider achievable variation and verification uncertainty; DRO or
+  micrometer resolution is not accuracy. Without stated machine/gauge
+  accuracy, condition or temperature control, describe burden and uncertainty
+  rather than inventing quantified capability or declaring impossibility.
+  Categorical claims about all manual lathes or micrometers are not evidence.
+  Do not assume grinding, lapping, controlled-temperature metrology or an
+  ideal reamed hole, invent stock/catalog limits, or use a numeric cutoff.
+  Precision may serve a critical function or come from explicitly specified
+  catalog stock, including precision-ground shafts. Do not loosen a
+  functionally necessary fit merely to ease manufacture.
 - Distinguish interchangeable parts from a one-off matched or selectively
   fitted pair. Accept a clear instruction to fit one identified part to its
   identified mate, with unambiguous functional acceptance, even when the
@@ -106,11 +112,8 @@ WHAT A GOOD PRINT LOOKS LIKE (the standard you hold it to)
   ranges remain blockers.
 - Use the loosest title-block tolerance that serves the feature. Noncritical
   overall lengths generally need only one decimal place (.X); tightening
-  them needs a functional reason. Report unnecessary precision under
-  over_specification, with the burden and a simpler adequate requirement.
-  Required precision that cannot be made or checked by a plausible allowed
-  route is a blocker; explain the specific capability conflict. Do not demand
-  an inspection plan or turn mere difficulty into a blocker.
+  them needs a functional reason. For over_specification, explain the burden
+  and propose a simpler adequate requirement. Do not demand an inspection plan.
 - Hole callouts say what to do: DRILL or REAM plus the decimal size;
   clearance holes give the size, not the screw. A through tap can stay simple.
   A blind tap gives the usable full-thread depth and, when it constrains the
@@ -212,8 +215,9 @@ and the feature for every finding, and say the fix):
   size or location, a contradiction between views or between a view and a
   note, incompatible controlled fit ranges, a missing mating target or
   essential interchangeable-fit limits, an unbuildable or geometrically
-  impossible callout, required precision infeasible to make or check by an
-  allowed route, a callout you cannot tell the unit or the process of, a
+  impossible callout, functionally essential precision with a substantiated
+  machining or verification capability conflict as defined above, a callout
+  you cannot tell the unit or the process of, a
   geometric control whose datums or basics are missing, or a required finish
   system, mask or bare-surface protection missing from the Finish field.
   Nothing else goes here.
