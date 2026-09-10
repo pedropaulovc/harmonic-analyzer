@@ -222,5 +222,5 @@ def test_part_config_is_a_machined_casting() -> None:
     assert "SSPC-SP 3" in str(config["finish"])
     assert "50-75 um DFT" in str(config["finish"])
     assert "boss" in str(config["finish"]).lower()
-    assert "cast + machined" in str(config["process"])
+    assert config["process"] == "machined from solid stock or casting"
     assert int(config["quantity"]) == 1

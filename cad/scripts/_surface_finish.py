@@ -44,9 +44,14 @@ from _gtol_spec import FaceSpec, pmi_annotation_name
 GROUND_UM = 0.8
 # MACHINED — the general turned/milled finish for a located or bearing surface
 # that is not ground: reamed bores, gear seats, journal diameters, register
-# faces.  The project's default whenever a surface is called out at all; a
-# surface with no callout is "as cast/machined" per the title block.
+# faces.  The project's default whenever a running surface is called out.
 MACHINED_UM = 1.6
+# SEAT — a static mating face that locates the part against its neighbour: a
+# pedestal foot on the base, a bolted register.  Nothing runs on it, so the
+# commercial machine finish is enough; it is called out at all only because
+# the title block names no grade ("CAST/MACHINED"), so a seat that MUST be cut
+# on a part that may otherwise be left as-cast has to say so on the face.
+SEAT_UM = 3.2
 
 
 def ra(grade_um: float) -> str:
@@ -61,10 +66,11 @@ def ra(grade_um: float) -> str:
     return f"{grade_um:.1f}"
 
 
-# The two strings the sheets pass. Derived, never typed: a grade retune moves
-# the printed callout with it.
+# The strings the sheets pass. Derived, never typed: a grade retune moves the
+# printed callout with it.
 GROUND = ra(GROUND_UM)
 MACHINED = ra(MACHINED_UM)
+SEAT = ra(SEAT_UM)
 
 
 @dataclass(frozen=True)

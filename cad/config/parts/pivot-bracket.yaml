@@ -1,6 +1,6 @@
 pivot-bracket:
   number: MHA-123
-  material_family: ferrous_noncritical
+  material: Plain Carbon Steel
   finish: "black oxide; bright (polished steel) pivot ball"
   tolerance_class: machined_block
   quantity: 2

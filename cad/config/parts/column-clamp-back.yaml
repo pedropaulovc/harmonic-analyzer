@@ -2,4 +2,4 @@ column-clamp-back:
   number: MHA-106
   material_family: ferrous_noncritical
   tolerance_class: machined_block
-  process: "cast + machined"
+  process: "machined from solid stock or casting"

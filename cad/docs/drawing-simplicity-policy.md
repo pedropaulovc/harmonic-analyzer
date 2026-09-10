@@ -66,12 +66,16 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
 4. **Basic (boxed) dimensions exist only to feed a surviving frame.** Drop the
    box with the frame; the coordinate becomes an ordinary toleranced
    dimension.
-5. **Roughness symbols only on surfaces that run, slide or seat a knife or
-   ball.** A `shaft_in_bushing` journal or bore, a `cam_follower_contact`
-   face, the amplitude-bar slide, the knife edge and its seat carry
-   `MACHINED_UM` (1.6). Gear seats, register faces, clamp faces and anything
-   else are "as cast/machined" per the title block and carry no symbol.
-   `GROUND_UM` (0.8) is reserved for knife edges and pivot-screw shoulders.
+5. **Roughness symbols only on surfaces that run, slide, seat a knife or
+   ball, or locate the part.** A `shaft_in_bushing` journal or bore, a
+   `cam_follower_contact` face, the amplitude-bar slide, the knife edge and
+   its seat carry `MACHINED_UM` (1.6). A static mating seat that locates the
+   part on its neighbour (a pedestal foot on the base) carries `SEAT_UM`
+   (3.2): the title block names no grade, so the one face that MUST be cut
+   on a part that may otherwise stay as-cast says so. Gear seats, register
+   faces, clamp faces and anything else are "cast/machined" per the title
+   block and carry no symbol. `GROUND_UM` (0.8) is reserved for knife edges
+   and pivot-screw shoulders.
 6. **Notes: few, specific, and never a dimension.** At most four short lines
    of part-specific process facts a machinist cannot read off the views:
    drill vs. ream, stock allowance ("16 STOCK OK"), "CENTRES OK", match-drill

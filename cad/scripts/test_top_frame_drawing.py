@@ -253,5 +253,5 @@ def test_part_stamps_make_critical_properties() -> None:
     assert "total" in finish
     assert "color noncritical" in finish
     assert "mask" not in finish
-    assert config["process"] == "cast + machined"
+    assert config["process"] == "machined from solid stock or casting"
     assert int(config["quantity"]) == 1

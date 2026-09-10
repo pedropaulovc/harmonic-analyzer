@@ -4,4 +4,4 @@ guide-lock:
   finish: black oxide
   quantity: 4
   tolerance_class: machined_block
-  process: "machined (steel)"
+  process: "machined from solid stock or casting"

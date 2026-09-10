@@ -8,8 +8,8 @@ from __future__ import annotations
 from math import atan2, degrees, sqrt
 
 from _hole_spec import HoleSpec, blind_cut_dia_mm
-from _gtol_spec import CylinderFace
-from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from _gtol_spec import CylinderFace, PlanarFace
+from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
 
 
 MM_PER_IN = 25.4
@@ -50,6 +50,9 @@ SURFACE_FINISHES = (
         MACHINED_UM,
         CylinderFace(BORE_DIA, contains_y_mm=BORE_HEIGHT),
     ),
+    # The foot seat mates the pedestal to harmonic-base: on a part that may be
+    # left as-cast elsewhere, the one face that MUST be cut says so.
+    SurfaceFinishControl("foot_seat", SEAT_UM, PlanarFace((0, -1, 0), 0.0)),
 )
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {

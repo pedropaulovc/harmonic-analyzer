@@ -5,4 +5,4 @@ magnifying-bracket:
   quantity: 1
   tolerance_class: machined_block
   fit_class: shaft_in_bushing
-  process: "machined (steel)"
+  process: "machined from solid stock or casting"

@@ -421,6 +421,19 @@ async def build(adapter: Any) -> dict[str, str]:
         label="arbor bore finish",
         entity=bore_entity,
     )
+    # Right of the 24.0 width dimension (which ends at the foot's right
+    # corner, x ~0.159) and level with it; the leader is pinned to the seat's
+    # right quarter so it leaves the vee's LEFT side and runs up-left, clear
+    # of the "Ra 3.2" text that hangs right of the anchor.
+    add_surface_finish(
+        adapter,
+        front,
+        symbol_xy=(FRONT_CENTER[0] + 0.036, _front_y(0.0) - 0.016),
+        control=surface_finish_by_key(SURFACE_FINISHES, "foot_seat"),
+        label="foot seat finish",
+        entity=foot_entity,
+        leader_attach_xy=(FRONT_CENTER[0] + FOOT_WIDTH * _S / 4.0, _front_y(0.0)),
+    )
     _add_entity_dimension(
         adapter,
         front,
