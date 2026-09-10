@@ -11,8 +11,6 @@ drawing keeps in lockstep (``test_pinion_handle_drawing.py``).
 from __future__ import annotations
 
 from _fit_limits import REAM_SLIDE
-from _gtol_spec import CylinderFace
-from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from pinion_handle_geometry import (
     CAP_RADIUS as CAP_RADIUS,
     CAP_SAG as CAP_SAG,
@@ -29,21 +27,18 @@ from pinion_handle_geometry import (
     WALL_T as WALL_T,
 )
 
-# Press/ream bands peculiar to this part (per _fit_limits.py's contract, a
-# part-specific band lives beside the nominal it tolerances, not in the shared
-# fit-class table).  Symmetric about each nominal; rendered through
-# :func:`fit_limits` so a nominal retune can never leave the released MAX/MIN
-# text stale (codex #359).
+# Preserve the released press-fit and arbor-bore size bands as native model
+# tolerances. Routine body stations use the title block's two-place band.
 ROD_PRESS_BAND = (0.0025, -0.0025)  # turned cross-rod OD tolerance
 ROD_HOLE_REAM_BAND = (0.005, -0.005)  # body cross-hole ream tolerance
 TUBE_ID_BAND = REAM_SLIDE
-GRIP_LENGTH_TOLERANCE_MM = 0.10
+CAP_RADIUS_TOLERANCE_MM = 0.10
 TUBE_LENGTH_BAND = (0.10, 0.00)
 ROD_SPAN_TOLERANCE_MM = 0.10
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "GripProfile": {"GripDia"},
-    "Grip": {"GripLen"},
+    "CapProfile": {"CapR"},
     "TubeProfile": {"TubeOd", "TubeId"},
     "Tube": {"TubeLen"},
     "RodProfile": {"RodDia"},
@@ -51,34 +46,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "RodHoleProfile": {"RodHoleDia"},
 }
 
-SURFACE_FINISHES = (
-    SurfaceFinishControl(
-        key="final_bore",
-        roughness_um=MACHINED_UM,
-        face=CylinderFace(diameter_mm=TUBE_ID),
-    ),
-)
+# The handle and arbor rotate together. This static socket is not a running
+# bearing, so it has no local roughness requirement under the simplicity policy.
+SURFACE_FINISHES = ()
 
-DRAWING_NOTES = "\n".join(
-    (
-        "DATUM A IS FINAL REAMED BORE AXIS; DATUM B IS FLAT HUB END.",
-        "TURN GRIP, WALL AND HUB IN ONE SETUP. OPPOSITE GRIP FACE:",
-        f"  SPHERICAL CROWN SR{CAP_RADIUS:.2f}+/-0.10; {CAP_SAG:.2f} REF HIGH.",
-        "CROWN ROOT CIRCLE IS AN INTENTIONAL PROFILE BREAK; DO NOT BLEND.",
-        "BODY CROSS-HOLE AXIS POSITION IS CONTROLLED BY THE",
-        "  BOXED BASIC DIMENSION AND ATTACHED <MOD-DIAM>0.05 | A | B FRAME.",
-        f"PRESSED ROD AXIAL PLACEMENT: DATUM A TO LOWER END {ROD_DOWN:.2f}+/-0.10.",
-        f"HUB PROJECTION: DATUM B TO GRIP FACE {TUBE_LEN + WALL_T:.2f} +0.10/-0.00.",
-        "FINAL PART CONSISTS OF TURNED BODY AND PRESSED CROSS ROD.",
-    )
-)
+DRAWING_NOTES = "CROSS ROD: PRESS FIT."
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
-
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "handle grip OD runout": "0.05",
-    "handle hub OD runout": "0.05",
-    "handle flat-end perpendicularity": "0.05",
-    "handle transverse-axis position": "0.05",
-}

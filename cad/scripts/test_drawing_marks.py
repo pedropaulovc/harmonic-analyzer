@@ -104,38 +104,33 @@ def test_angular_tolerance_helper_has_an_operation_span(
     assert spans == [("dim.angular_tolerance", {"label": "GripAngle"})]
 
 
-def test_dimension_prefix_helper_has_an_operation_span(
-    monkeypatch: pytest.MonkeyPatch,
+@pytest.mark.parametrize("accepts_write", [True, False])
+def test_dimension_prefix_uses_native_readback_after_void_setter(
+    monkeypatch: pytest.MonkeyPatch, accepts_write: bool
 ) -> None:
-    spans: list[tuple[str, dict[str, Any]]] = []
-
-    @contextmanager
-    def capture_span(name: str, **attributes: Any):
-        spans.append((name, attributes))
-        yield
-
     class PrefixDisplay:
         def __init__(self) -> None:
-            self.prefix = ""
+            self.prefix = "R"
 
-        def SetText(self, _part: int, prefix: str) -> bool:
-            self.prefix = prefix
-            return True
+        def SetText(self, _part: int, prefix: str) -> None:
+            if accepts_write:
+                self.prefix = prefix
 
         def GetText(self, _part: int) -> str:
             return self.prefix
 
     display = PrefixDisplay()
-    monkeypatch.setattr(_drawing_marks._telemetry, "span", capture_span)
     monkeypatch.setattr(
         _drawing_marks, "_named_dimension", lambda *_args: (display, object())
     )
     monkeypatch.setattr(_drawing_marks, "_early_bound", lambda value, _type: value)
 
-    _drawing_marks.set_dimension_prefix(object(), "GripAngleDim", "GripAngle", "REF ")
-
-    assert display.prefix == "REF "
-    assert spans == [("dim.prefix", {"label": "GripAngle"})]
+    if accepts_write:
+        _drawing_marks.set_dimension_prefix(object(), "CapProfile", "CapR", "SR")
+        assert display.GetText(1) == "SR"
+    else:
+        with pytest.raises(RuntimeError, match="prefix did not persist"):
+            _drawing_marks.set_dimension_prefix(object(), "CapProfile", "CapR", "SR")
 
 
 @pytest.mark.parametrize(
