@@ -45,6 +45,8 @@ WHAT A COMPLETE ASSEMBLY PACKAGE CONTAINS (the standard you hold it to)
   travels, alignments or preloads that only exist once the parts are
   together, each with an unambiguous acceptance criterion and way to check it.
   For explicit assembly bands, calculate the total band, not its half-width.
+  Preserve the original nominal and asymmetric lower and upper limits when
+  checking or replacing a fit; equal total widths do not mean equal fits.
   First ask whether function needs the precision; being printed is not proof.
   Unneeded precision is over_specification even when burdensome. A capability
   blocker requires BOTH an essential functional need and a substantiated
