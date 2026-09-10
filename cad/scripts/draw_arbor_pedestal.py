@@ -419,6 +419,7 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(0.095, _front_y(BORE_HEIGHT) + 0.024),
         control=surface_finish_by_key(SURFACE_FINISHES, "arbor_bore"),
         label="arbor bore finish",
+        char_height=0.0025,
         entity=bore_entity,
     )
     # Right of the 24.0 width dimension (which ends at the foot's right
@@ -431,6 +432,7 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(FRONT_CENTER[0] + 0.036, _front_y(0.0) - 0.016),
         control=surface_finish_by_key(SURFACE_FINISHES, "foot_seat"),
         label="foot seat finish",
+        char_height=0.0025,
         entity=foot_entity,
         leader_attach_xy=(FRONT_CENTER[0] + FOOT_WIDTH * _S / 4.0, _front_y(0.0)),
     )

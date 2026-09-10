@@ -297,6 +297,7 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(RIGHT_CENTER[0] + seat_half_w + 0.030, seat_y - 0.030),
         control=surface_finish_by_key(SURFACE_FINISHES, "mounting_face"),
         label="mounting face finish",
+        char_height=0.0025,
         leader_attach_xy=(RIGHT_CENTER[0] + seat_half_w - 0.002, seat_y),
     )
     # The pocket/web instruction is flagged FROM the view: the callout's arrow

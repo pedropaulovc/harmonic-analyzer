@@ -67,7 +67,11 @@ WHAT A GOOD PRINT LOOKS LIKE (the standard you hold it to)
 - Hole callouts say what to do: DRILL or REAM plus the decimal size;
   clearance holes give the size, not the screw; taps are simple
   (1/4-20 x depth) unless the tap-drill depth matters; press fits are one
-  simple diameter with its band.
+  simple diameter with its band. A native hole TABLE prints each tapped
+  hole in the CAD system's standard two-line form — the tap drill
+  ("Ø10.72 THRU ALL") over the thread ("1/2-13 UNC THRU ALL"). That is the
+  table's format, read by every shop, not an added process constraint; do
+  not ask for the tap-drill line to be removed from a hole table.
 - Hidden lines are present in the orthographic views. Nothing is
   dimensioned to a hidden line; a section or breakout does that job.
 - The sheet has a standard isometric projection for pictorial clarity. It is

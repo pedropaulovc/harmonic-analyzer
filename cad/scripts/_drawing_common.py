@@ -796,6 +796,7 @@ def add_surface_finish(
     entity: Any | None = None,
     leader_attach_xy: tuple[float, float] | None = None,
     production_method: str = "",
+    char_height: float | None = None,
 ) -> Any:
     """Attach a native machining-required surface-finish symbol to an edge.
 
@@ -883,6 +884,8 @@ def add_surface_finish(
         "SetPosition2",
         "SetLeader3",
         "SetLeaderAttachmentPointAtIndex",
+        "GetTextFormat",
+        "SetTextFormat",
     )
     leader_status = int(
         annotation.SetLeader3(
@@ -905,6 +908,16 @@ def add_surface_finish(
         0, leader_attach_xy[0], leader_attach_xy[1], 0.0
     ):
         raise RuntimeError(f"failed to position surface-finish leader ({label})")
+    if char_height is not None:
+        # The symbol scales with its text: a smaller Ra reads as the routine
+        # callout it is instead of a headline (default document height is
+        # the dimension height; ~0.7 of it matches the sheet's note text).
+        text_format = annotation.GetTextFormat(0)
+        if text_format is None:
+            raise RuntimeError(f"surface-finish symbol has no text format ({label})")
+        text_format.CharHeight = float(char_height)
+        if not annotation.SetTextFormat(0, False, text_format):
+            raise RuntimeError(f"failed to set surface-finish text height ({label})")
     draw.ClearSelection2(True)
     draw.EditRebuild3()
     return symbol
