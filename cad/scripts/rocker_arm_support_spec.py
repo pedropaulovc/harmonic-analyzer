@@ -10,7 +10,7 @@ SUPPORT_WORLD_SEAT_Y = 139.7
 SUPPORT_WORLD_Z = ROCKER_SUPPORT_Z
 SUPPORT_HALF_MACHINE_Z = 88.9
 
-# The casting's four 1/2-13 UNC-2B foot taps are fixed in its local frame. Turning
+# The casting's four 5/16 foot clearances are fixed in its local frame. Turning
 # it +90 degrees about machine Y maps local +/-60.32 to machine Z and local
 # +/-17.46 to machine X. The casting remains at its original world station;
 # base and frame import this one transformed pattern.

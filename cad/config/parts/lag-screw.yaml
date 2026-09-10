@@ -1,11 +1,11 @@
 lag-screw:
   title: Rocker-Support Hold-Down Screw
   number: MHA-039
-  stock_name: 18-8 Stainless Steel Round Head Slotted Screw
+  stock_name: 18-8 Stainless Steel Hex Head Screw
   supplier: McMaster-Carr
-  supplier_skus: [91783A722]
+  supplier_skus: [92240A539]
   material: 18-8 stainless steel
-  material_specification: 18-8 stainless steel, McMaster-Carr 91783A722
+  material_specification: 18-8 stainless steel, McMaster-Carr 92240A539
   finish: plain
   quantity: 4
   tolerance_class: machined_block

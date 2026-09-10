@@ -168,16 +168,21 @@ def test_pedestal_has_no_gdt_or_basic_dimensions() -> None:
     assert not hasattr(arbor_pedestal_spec, "SCREW_CLEARANCE_DIA")
 
 
-def test_reamed_running_bore_carries_one_surface_finish_control() -> None:
+def test_running_bore_and_mating_foot_seat_carry_surface_finish_controls() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert drawing.DIMENSION_CALLOUTS["BoreDia"].startswith("REAM THRU")
-    assert len(arbor_pedestal_spec.SURFACE_FINISHES) == 1
-    control = arbor_pedestal_spec.SURFACE_FINISHES[0]
-    assert control.key == "arbor_bore"
-    assert control.roughness_um == 1.6
-    assert control.face.contains_y_mm == arbor_pedestal_spec.BORE_HEIGHT
-    assert 'surface_finish_by_key(SURFACE_FINISHES, "arbor_bore")' in source
-    assert "add_surface_finish(" in source
+    by_key = {c.key: c for c in arbor_pedestal_spec.SURFACE_FINISHES}
+    assert set(by_key) == {"arbor_bore", "foot_seat"}
+    assert by_key["arbor_bore"].roughness_um == 1.6
+    assert by_key["arbor_bore"].face.contains_y_mm == arbor_pedestal_spec.BORE_HEIGHT
+    # The seat is the only face that MUST be cut on a part the title block
+    # otherwise leaves CAST/MACHINED; it is the y=0 plane facing -Y.
+    assert by_key["foot_seat"].roughness_um == 3.2
+    assert by_key["foot_seat"].face.normal == (0, -1, 0)
+    assert by_key["foot_seat"].face.offset_mm == 0.0
+    for key in by_key:
+        assert f'surface_finish_by_key(SURFACE_FINISHES, "{key}")' in source
+    assert source.count("add_surface_finish(") == 2
     assert model_toleranced_dimensions(part) == {
         ("BoreProfile", "BoreDia"): "*deviations(BORE_DIA_BAND)"
     }

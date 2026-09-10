@@ -5,10 +5,10 @@ overall footprint dimensions, the mounting-hole table, and manufacturing notes; 
 shared sheet/template, import, curation, and export behavior lives in
 ``_drawing_common``.
 
-The base is machined from one-piece gray-iron stock: the legacy lower flange and
-upper pad retain their front edges and extend 35.415 mm rearward, with four counterbored
-lag-screw mounting holes, and nine assembly-drilled hardware seats.  The plate
-is 457 mm long, so the whole sheet runs 1:2; the front elevation drops to 1:4.
+The base is machined from one-piece gray-iron stock: the legacy lower flange
+and upper pad retain their front edges and extend 35.415 mm rearward, with four
+blind rocker-support taps and nine other assembly-drilled hardware seats. The
+plate is 457 mm long, so the whole sheet runs 1:2; the front elevation is 1:4.
 
 Run with SolidWorks open::
 
@@ -42,10 +42,9 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from build_harmonic_base import (
     BLOCK_SCREW_HOLE_DIA,
     BLOCK_SCREW_XZ,
-    CBORE_DIA,
     FOOT_SCREW_HOLE_DIA,
     FOOT_SCREW_XZ,
-    HOLE_DIA,
+    HOLD_DOWN_TAP_DRILL_DIA,
     HOLE_XZ,
     LOCK_KNOB_XZ,
     LOCK_SCREW_HOLE_DIA,
@@ -110,9 +109,9 @@ TOP_KEEP = {
     ),
 }
 
-# Hole-table origin corner (the plate's lower-left plan corner) + the four
-# mounting-hole rim picks, all in sheet meters.  The native table reads each
-# hole's real Ø13 THRU / counterbore callout and its X/Y station from the datum.
+# Hole-table origin corner (the plate's lower-left plan corner) plus every
+# visible top-seat rim, all in sheet meters. Native callouts read each hole's
+# size, end condition, thread depth, and station from the authoritative part.
 _DATUM_XY = (
     TOP_CENTER[0] - BOTTOM_LENGTH * VIEW_SCALE / 2000.0,
     TOP_CENTER[1] - BOTTOM_REAR_Z * VIEW_SCALE / 1000.0,
@@ -134,7 +133,7 @@ def _hole_rim(x_mm: float, z_mm: float, diameter_mm: float) -> tuple[float, floa
 
 
 ALL_HOLES = (
-    *((x, z, HOLE_DIA) for x, z in HOLE_XZ),
+    *((x, z, HOLD_DOWN_TAP_DRILL_DIA) for x, z in HOLE_XZ),
     (*PIVOT_SCREW_XZ, PIVOT_SCREW_HOLE_DIA),
     (*STOP_SCREW_XZ, STOP_SCREW_HOLE_DIA),
     *((x, z, BLOCK_SCREW_HOLE_DIA) for x, z in BLOCK_SCREW_XZ),
@@ -180,23 +179,6 @@ def _visible_hole_table_entities(
             if curve.IsLine():
                 parameters = tuple(float(value) for value in curve.LineParams)
                 lines.append((parameters, edge))
-
-    visible_counterbores = [
-        (x_mm, z_mm)
-        for x_mm, z_mm in HOLE_XZ
-        if any(
-            abs(x - x_mm / 1000.0)
-            + abs(z - z_mm / 1000.0)
-            + abs(radius - CBORE_DIA / 2000.0)
-            <= 5e-5
-            for x, z, radius, _edge in circles
-        )
-    ]
-    if visible_counterbores:
-        raise RuntimeError(
-            "underside-only counterbore rims are visible in the top view: "
-            f"{visible_counterbores!r}"
-        )
 
     selected_edges: list[Any] = []
     used: set[int] = set()
@@ -342,7 +324,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     datum_a_edge, top_pad_edge = _visible_side_datum_edges(adapter, side)
 
-    # One complete hole table: four underside counterbores followed by every
+    # One complete hole table: the four blind support seats plus every other
     # top-side blind tapped seat. Basic locations use the family-specific
     # position tolerances below.
     insert_hole_table(
@@ -461,9 +443,9 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Harmonic Base Manufacturing Drawing",
         scale=SHEET_SCALE,
         redundant_note_substrings=("Tapped Hole",),
-        # Pivot, lock, stop, block, foot, and nameplate seats are six Hole
-        # Wizard tapped groups; the native table replaces their generic notes.
-        expected_redundant_notes=6,
+        # Pivot, lock, stop, block, foot, nameplate, and rocker-support seats
+        # are seven Hole Wizard tapped groups; the table replaces generic notes.
+        expected_redundant_notes=7,
         layout=SPEC.layout,
     )
 

@@ -1,8 +1,7 @@
 guide-lock:
   number: MHA-112
-  material: Plain Carbon Steel
-  material_specification: AISI 1018 cold-rolled steel
+  material_family: ferrous_noncritical
   finish: black oxide
   quantity: 4
   tolerance_class: machined_block
-  process: "machined (steel)"
+  process: "machined from solid stock or casting"

@@ -155,15 +155,47 @@ def provenance(doc: str, *keys: str) -> dict[str, Any]:
     return {k: node[k] for k in ("source", "confidence", "notes") if k in node}
 
 
-def parts(stem: str | None = None) -> dict[str, Any]:
-    """The part registry (parts.yaml). With ``stem``, one part's record merged
-    over the file ``defaults:`` (so revision/confidence fall through)."""
+_FAMILY_OWNED_KEYS = ("material", "material_specification")
+
+
+@functools.lru_cache(maxsize=None)
+def _parts_registry() -> dict[str, Any]:
+    """Registry rows with each ``material_family`` replaced by the family's
+    owned keys (naming both the family and an owned key is an error)."""
     doc = _doc("parts")
+    families = doc.get("material_families", {})
+    registry: dict[str, Any] = {}
+    for stem, row in doc["parts"].items():
+        family = row.get("material_family")
+        if family is None:
+            registry[stem] = row
+            continue
+        clash = [k for k in _FAMILY_OWNED_KEYS if k in row]
+        if clash:
+            raise ValueError(
+                f"part {stem!r}: material_family {family!r} owns {clash}; "
+                "drop the explicit keys or the family"
+            )
+        if family not in families:
+            raise KeyError(f"part {stem!r}: unknown material_family {family!r}")
+        expanded = {k: v for k, v in row.items() if k != "material_family"}
+        expanded.update({k: str(families[family][k]) for k in _FAMILY_OWNED_KEYS})
+        registry[stem] = expanded
+    return registry
+
+
+def parts(stem: str | None = None) -> dict[str, Any]:
+    """The part registry (parts.yaml), each row's ``material_family`` expanded
+    to the family's ``material`` / ``material_specification``
+    (``material_families:`` in parts/_defaults.yaml — one approved wording
+    serving every part that names it). With ``stem``, one part's record merged
+    over the file ``defaults:`` (so revision/confidence fall through)."""
+    registry = _parts_registry()
     if stem is None:
-        return doc["parts"]
-    if stem not in doc["parts"]:
+        return {name: dict(row) for name, row in registry.items()}
+    if stem not in registry:
         raise KeyError(f"part not in registry: {stem}")
-    return {**doc.get("defaults", {}), **doc["parts"][stem]}
+    return {**_doc("parts").get("defaults", {}), **registry[stem]}
 
 
 def materials() -> dict[str, Any]:

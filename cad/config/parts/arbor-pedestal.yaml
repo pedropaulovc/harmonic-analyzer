@@ -1,7 +1,6 @@
 arbor-pedestal:
   number: MHA-004
-  material: LOW-CARBON STEEL OR GRAY IRON
-  material_specification: LOW-CARBON STEEL OR GRAY IRON
+  material_family: ferrous_noncritical
   finish: BLACK JAPAN/ENAMEL; MASK BORE AND FOOT SEAT; OIL BARE MACHINED SURFACES
   quantity: 2
   tolerance_class: machined_block

@@ -135,6 +135,40 @@ def test_high_quality_shaded_with_edges_rejects_silent_write_failure():
         )
 
 
+def test_hidden_lines_visible_forces_a_verified_hlr_transition(monkeypatch):
+    mode = {"value": drawing_common._SW_HLV}
+    calls = []
+
+    def set_mode(_use_parent, value, _faceted, _edges, _threads):
+        calls.append(value)
+        mode["value"] = value
+        return True
+
+    view = SimpleNamespace(
+        SetDisplayMode4=set_mode,
+        GetDisplayMode2=lambda: mode["value"],
+    )
+    monkeypatch.setattr(drawing_common, "_early_bound", lambda value, _kind: value)
+
+    drawing_common.set_hidden_lines_visible(_FakeAdapter(None), view)
+
+    assert calls == [drawing_common._SW_HLR, drawing_common._SW_HLV]
+
+
+def test_hidden_lines_visible_rejects_a_stale_hlv_transition(monkeypatch):
+    calls = []
+    view = SimpleNamespace(
+        SetDisplayMode4=lambda _parent, value, *_rest: calls.append(value) or False,
+        GetDisplayMode2=lambda: drawing_common._SW_HLV,
+    )
+    monkeypatch.setattr(drawing_common, "_early_bound", lambda value, _kind: value)
+
+    with pytest.raises(RuntimeError, match="transition drawing view through HLR"):
+        drawing_common.set_hidden_lines_visible(_FakeAdapter(None), view)
+
+    assert calls == [drawing_common._SW_HLR]
+
+
 @pytest.mark.parametrize(
     ("defect", "value"),
     (

@@ -53,7 +53,16 @@ WHAT A COMPLETE ASSEMBLY PACKAGE CONTAINS (the standard you hold it to)
   dimension, extension line, leader, callout, note, balloon, BOM and step
   stays wholly inside it, clear of zone labels and the title block, with
   visible air around the content. Anything touching or spilling through the
-  border is a clarity defect, never minor polish.
+  border is a clarity defect, never minor polish. The "SOLIDWORKS Maker
+  Product. For Personal Use Only." line along the bottom edge is a licence
+  watermark the CAD seat imposes, not sheet content: it sits outside the
+  inner border by design and cannot be moved or removed, so do not report it.
+- Dimension text and feature callouts stay outside the assembly silhouette by
+  default; balloons and section identifiers are excluded. Interior placement
+  is a clarity defect unless a confined detail or genuine sheet-space
+  constraint makes it materially clearer than every exterior option.
+  Convenience is not a reason, and interior text must never mask geometry,
+  hide a component, or cross a line.
 - The view group and tables look intentional and visually balanced in each
   usable drawing region, not bunched against an edge beside a large dead field,
   but correctness comes first. Projected orthographic views preserve ASME
@@ -72,8 +81,12 @@ values for every screw where a general note covers them, or a production
 routing. Do not invent a requirement from a mechanism you cannot see; judge
 the package as drawn.
 
-Inspect the whole package at full resolution before answering: every sheet,
-view, balloon, list row, note and title block. Never accept a sheet in isolation.
+The attached images ARE the package, one per sheet, already rendered at full
+resolution; inspect them directly with the Read tool. Do not open any other
+file, run commands, or fetch anything — a review that reaches for anything
+beyond the supplied sheet images is discarded. Inspect the
+whole package before answering: every sheet, view, balloon, list row, note and
+title block. Never accept a sheet in isolation.
 Cross-check item numbers, quantities and descriptions across every BOM; every
 balloon against its BOM row; setup and assembly steps across sheet boundaries;
 and every repeated dimension, state, note or instruction for contradictions.

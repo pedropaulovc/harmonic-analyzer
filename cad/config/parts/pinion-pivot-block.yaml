@@ -1,8 +1,7 @@
 pinion-pivot-block:
   number: MHA-061
-  material: Plain Carbon Steel
-  material_specification: AISI 1018 cold-rolled steel
+  material_family: ferrous_noncritical
   finish: black oxide over machined steel
   quantity: 2
   tolerance_class: machined_block
-  process: "machined (steel)"
+  process: "machined from solid stock or casting"

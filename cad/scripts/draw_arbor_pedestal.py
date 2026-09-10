@@ -419,7 +419,22 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(0.095, _front_y(BORE_HEIGHT) + 0.024),
         control=surface_finish_by_key(SURFACE_FINISHES, "arbor_bore"),
         label="arbor bore finish",
+        char_height=0.0025,
         entity=bore_entity,
+    )
+    # Right of the 24.0 width dimension (which ends at the foot's right
+    # corner, x ~0.159) and level with it; the leader is pinned to the seat's
+    # right quarter so it leaves the vee's LEFT side and runs up-left, clear
+    # of the "Ra 3.2" text that hangs right of the anchor.
+    add_surface_finish(
+        adapter,
+        front,
+        symbol_xy=(FRONT_CENTER[0] + 0.036, _front_y(0.0) - 0.016),
+        control=surface_finish_by_key(SURFACE_FINISHES, "foot_seat"),
+        label="foot seat finish",
+        char_height=0.0025,
+        entity=foot_entity,
+        leader_attach_xy=(FRONT_CENTER[0] + FOOT_WIDTH * _S / 4.0, _front_y(0.0)),
     )
     _add_entity_dimension(
         adapter,
@@ -456,11 +471,17 @@ async def build(adapter: Any) -> dict[str, str]:
     radius_display = _early_bound(radius_dimension, "IDisplayDimension")
     radius_display.SetText(4, "TANGENT; CONC W/ BORE")
     radius_display.SetPrecision3(1, -1, -1, -1)
+    # The leader runs from the text toward the crown centre; with the default
+    # "extend to the opposite side" it kept going through the bore and crossed
+    # the Ø9.55 dimension at the centre. Stop it at the crown arc.
+    radius_display.ArcExtensionLineOrOppositeSide = False
     if (
         str(radius_display.GetText(4) or "") != "TANGENT; CONC W/ BORE"
         or int(radius_display.GetPrimaryPrecision2()) != 1
+        or bool(radius_display.ArcExtensionLineOrOppositeSide)
     ):
         raise RuntimeError("crown radius annotation did not persist")
+    adapter.currentModel.GraphicsRedraw2()
     add_attached_note(
         adapter,
         front,

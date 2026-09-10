@@ -1,9 +1,8 @@
 magnifying-bracket:
   number: MHA-041
-  material: Plain Carbon Steel
-  material_specification: Plain Carbon Steel
+  material_family: ferrous_noncritical
   finish: machined
   quantity: 1
   tolerance_class: machined_block
   fit_class: shaft_in_bushing
-  process: "machined (steel)"
+  process: "machined from solid stock or casting"

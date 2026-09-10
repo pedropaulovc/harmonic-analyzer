@@ -109,8 +109,8 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     import _config
 
     spec = _config.parts("channel-lever")
-    assert spec["material_specification"] == "ASTM A48 Class 30 gray cast iron"
-    assert spec["material"] == "ASTM A48 Class 30 gray cast iron"
+    assert spec["material_specification"] == "LOW-CARBON STEEL OR GRAY IRON"
+    assert spec["material"] == "LOW-CARBON STEEL OR GRAY IRON"
     assert spec["finish"] == (
         "RAL 6005 alkyd enamel, SSPC-SP3, 40-60 um DFT; mask all bores"
     )

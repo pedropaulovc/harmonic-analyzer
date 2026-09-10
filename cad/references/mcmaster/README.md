@@ -23,7 +23,7 @@ recipes:
 | 90280A201 | `clamp-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 91247A720 | `knife-hanger-stud` | Medium-Strength Grade 5 Steel Hex Head Screw |
 | 91410A538 | `gooseneck-set-screw` | Steel Square-Head Cup-Point Set Screw |
-| 91783A722 | `lag-screw` | 18-8 Stainless Steel Round Head Slotted Screw |
+| 92240A539 | `lag-screw` | 18-8 Stainless Steel Hex Head Screw |
 | 91829A560 | `cone-pivot-screw` | Slotted 18-8 Stainless Steel Precision Shoulder Screw |
 | 91882A221 | `thumb-screw` | Steel Raised Knurled-Head Thumb Screw |
 | 91882A425 | `cone-lock-knob` | Steel Raised Knurled-Head Thumb Screw |
@@ -35,11 +35,13 @@ recipes:
 The cone-lock and swing-stop selections follow `cad/scripts/build_cone_lock_knob.py`
 and `cad/scripts/build_swing_stop_screw.py`.
 
-Catalog specifications checked on September 8, 2026:
+Catalog specifications checked on September 10, 2026:
 
-- [91783A722](https://www.mcmaster.com/91783A722/) is a 1/2-13 UNC,
-  class 2A screw. Its downloaded SolidWorks model uses a 56-TPI visual helix;
-  use the catalog thread designation for the mating tap.
+- [92240A539](https://www.mcmaster.com/92240A539/) is an 18-8 stainless,
+  ASME B18.2.1 standard hex-head screw: 1/4-20 UNC class 2A, 5/8 in long,
+  fully threaded, with a 7/16 in across-flats head 5/32 in high. Its supplied
+  SolidWorks model was harvested read-only and the tracked diagnostic replay
+  matches its 824.0529 mm3 volume, 832.0689 mm2 area, and 22-face multiset.
 - [91882A425](https://www.mcmaster.com/91882A425/) is black-oxide steel,
   with a 1/4-20 thread and a 19.05 mm (3/4 in) stud. The catalog's material
   field supplies the finish specification absent from the CAD properties.

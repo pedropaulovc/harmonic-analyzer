@@ -80,7 +80,12 @@ NUMBER_DRILL_MM = {  # number drills cut diameter exactly
     "#47": 1.994,
     "#54": 1.397,
 }
-FRACTIONAL_DRILL_MM = {"1/8": 3.175, "3/16": 4.763, "15/64": 5.953}
+FRACTIONAL_DRILL_MM = {
+    "1/8": 3.175,
+    "3/16": 4.763,
+    "15/64": 5.953,
+    "5/16": 7.938,
+}
 LETTER_DRILL_MM = {"F": 6.528, "V": 9.576}  # V = 0.377in (transgear stud seat)
 
 # 118-degree drill point: tip height = r * cot(59 deg). A blind wizard hole's

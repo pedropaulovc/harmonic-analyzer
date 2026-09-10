@@ -20,7 +20,12 @@ from typing import Any, Iterable, Literal, Sequence
 
 import _config
 import _telemetry
-from _common import _build_id, _early_bound, apply_custom_properties
+from _common import (
+    _build_id,
+    _early_bound,
+    _visible_document_paths,
+    apply_custom_properties,
+)
 from _gtol_spec import GTOL_SYMBOLS as _GTOL_SYMBOLS
 from _gtol_spec import gtol_frame_xml as _gtol_frame_xml
 from _surface_finish import SurfaceFinishControl
@@ -791,6 +796,7 @@ def add_surface_finish(
     entity: Any | None = None,
     leader_attach_xy: tuple[float, float] | None = None,
     production_method: str = "",
+    char_height: float | None = None,
 ) -> Any:
     """Attach a native machining-required surface-finish symbol to an edge.
 
@@ -878,6 +884,8 @@ def add_surface_finish(
         "SetPosition2",
         "SetLeader3",
         "SetLeaderAttachmentPointAtIndex",
+        "GetTextFormat",
+        "SetTextFormat",
     )
     leader_status = int(
         annotation.SetLeader3(
@@ -900,6 +908,16 @@ def add_surface_finish(
         0, leader_attach_xy[0], leader_attach_xy[1], 0.0
     ):
         raise RuntimeError(f"failed to position surface-finish leader ({label})")
+    if char_height is not None:
+        # The symbol scales with its text: a smaller Ra reads as the routine
+        # callout it is instead of a headline (default document height is
+        # the dimension height; ~0.7 of it matches the sheet's note text).
+        text_format = annotation.GetTextFormat(0)
+        if text_format is None:
+            raise RuntimeError(f"surface-finish symbol has no text format ({label})")
+        text_format.CharHeight = float(char_height)
+        if not annotation.SetTextFormat(0, False, text_format):
+            raise RuntimeError(f"failed to set surface-finish text height ({label})")
     draw.ClearSelection2(True)
     draw.EditRebuild3()
     return symbol
@@ -957,8 +975,11 @@ def create_section_view(
 ) -> Any:
     """Create a full, unaligned section from one straight cutting-plane line.
 
-    The coordinates are drawing-sheet meters.  ``ISketchManager.CreateLine``
-    leaves the new sketch segment selected, which is the documented precondition for
+    The public coordinates are drawing-sheet meters; convert them through the
+    parent sketch's transform before CreateLine, which takes view-local sketch
+    coordinates. Passing sheet coordinates directly offsets and scales the cut
+    again (at 1:2, a centre cut can miss the part entirely).
+    ``ISketchManager.CreateLine`` leaves the new segment selected, the precondition for
     ``CreateSectionViewAt5``.  The section is deliberately unaligned so a part
     recipe can place and scale it independently of the parent view.
     """
@@ -969,14 +990,19 @@ def create_section_view(
     if not ddoc.ActivateView(name):
         raise RuntimeError(f"failed to activate section parent view {name!r} ({label})")
     draw.ClearSelection2(True)
-    segment = sketch_manager.CreateLine(
-        float(line_start[0]),
-        float(line_start[1]),
-        0.0,
-        float(line_end[0]),
-        float(line_end[1]),
-        0.0,
-    )
+    parent = _early_bound(parent_view, "IView")
+    sketch = _early_bound(parent.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in (line_start, line_end):
+        point = _early_bound(
+            math_utility.CreatePoint(double_array([float(x), float(y), 0.0])),
+            "IMathPoint",
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    segment = sketch_manager.CreateLine(*points[0], *points[1])
     if segment is None:
         raise RuntimeError(f"failed to create section line ({label})")
     # swCreateSectionView_NotAligned | swCreateSectionView_ScaleWithModel
@@ -1629,14 +1655,35 @@ def set_hidden_lines_removed(adapter: Any, view: Any) -> None:
         raise RuntimeError("failed to set hidden-lines-removed drawing view")
 
 
+_SW_HLV = 1  # swDisplayMode_e.swHIDDEN_GREYED
+_SW_HLR = 2  # swDisplayMode_e.swHIDDEN
+
+
 def set_hidden_lines_visible(adapter: Any, view: Any) -> None:
     """Show hidden edges (greyed) in ``view`` -- for a view whose job is to
-    communicate internal/cross-drilled features."""
-    ok = adapter._attempt(
-        lambda: view.SetDisplayMode4(False, 1, False, False, True), default=False
-    )
-    if not ok:
-        raise RuntimeError("failed to set hidden-lines-visible drawing view")
+    communicate internal/cross-drilled features.
+
+    Always passes through HLR first. ``SetDisplayMode4`` returns False for a
+    same-mode set (a no-op, not a failure), and a view already reading HLV can
+    still export WITHOUT its dashed edges: an annotation attached to it after
+    placement (rocker-arm-support's seat finish symbol, 2026-09-09) leaves the
+    HLV edge set unregenerated and ``UpdateViewDisplayGeometry`` does not
+    rebuild it — only a real mode change does. The toggle makes the call
+    idempotent AND a regen, so recipes re-assert it after annotating a view.
+    """
+    bound = _early_bound(view, "IView")
+    bound.SetDisplayMode4(False, _SW_HLR, False, False, True)
+    mode = int(bound.GetDisplayMode2())
+    if mode != _SW_HLR:
+        raise RuntimeError(
+            f"failed to transition drawing view through HLR (mode reads {mode})"
+        )
+    bound.SetDisplayMode4(False, _SW_HLV, False, False, True)
+    mode = int(bound.GetDisplayMode2())
+    if mode != _SW_HLV:
+        raise RuntimeError(
+            f"failed to set hidden-lines-visible drawing view (mode reads {mode})"
+        )
 
 
 def assert_asme_b_sheet(
@@ -2526,6 +2573,45 @@ def hole_table_template(adapter: Any) -> Path:
     )
 
 
+@_telemetry.traced("drawing.theoretical_datum", label_param="label")
+def create_view_theoretical_datum(
+    adapter: Any,
+    view: Any,
+    *,
+    point_xy: tuple[float, float],
+    label: str,
+) -> Any:
+    """Create a view-owned datum point at a broken theoretical corner.
+
+    ``point_xy`` is in view-local model metres.  A drawing view has no model
+    vertex at a filleted or chamfered theoretical sharp, so this creates a
+    retained user ``ISketchPoint`` in the view's drawing sketch.  Native tables
+    can use that point as their origin while callers derive its coordinates
+    from authoritative model dimensions.
+    """
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    name = view_name(adapter, view)
+    if not drawing.ActivateView(name):
+        raise RuntimeError(f"failed to activate theoretical-datum view {name!r}")
+    sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
+    previous_add_to_db = bool(sketch_manager.AddToDB)
+    previous_display = bool(sketch_manager.DisplayWhenAdded)
+    sketch_manager.AddToDB = True
+    sketch_manager.DisplayWhenAdded = True
+    try:
+        point = sketch_manager.CreatePoint(point_xy[0], point_xy[1], 0.0)
+    finally:
+        sketch_manager.AddToDB = previous_add_to_db
+        sketch_manager.DisplayWhenAdded = previous_display
+    if point is None:
+        raise RuntimeError(f"failed to create {label} theoretical datum point")
+    point = _early_bound(point, "ISketchPoint")
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    return point
+
+
 def insert_hole_table(
     adapter: Any,
     view: Any,
@@ -2533,6 +2619,7 @@ def insert_hole_table(
     datum_xy: tuple[float, float],
     hole_points: Sequence[tuple[float, float]],
     datum_entity: Any | None = None,
+    datum_point: Any | None = None,
     datum_axes: tuple[Any, Any] | None = None,
     hole_entities: Sequence[Any] | None = None,
     expected_locations_mm: Sequence[tuple[float, float]] | None = None,
@@ -2548,13 +2635,12 @@ def insert_hole_table(
     entities topologically may additionally supply ``datum_entity`` and
     ``hole_entities``; those are selected directly with the same hole-table
     marks and the coordinates remain the count/diagnostic contract.  A part
-    whose plan corners are broken (filleted/chamfered) has NO corner vertex to
-    anchor: ``datum_axes=(x_axis_edge, y_axis_edge)`` instead selects the two
-    datum edges (marks 4/8), and SolidWorks anchors the table origin at their
-    VIRTUAL intersection -- the theoretical sharp corner.  ``starting_hole_tag``
-    lets multiple tables on one sheet use distinct tag families.  The table
-    lands with its top-left corner at ``anchor_xy`` and is validated before
-    returning.
+    whose plan corners are broken can supply ``datum_axes=(x_axis_edge,
+    y_axis_edge)`` for initial insertion.  When ``datum_point`` is also
+    supplied, the table's native ``IDatumOrigin`` is then reattached to that
+    view-owned theoretical-corner point.  ``starting_hole_tag`` lets multiple
+    tables on one sheet use distinct tag families.  The table lands with its
+    top-left corner at ``anchor_xy`` and is validated before returning.
     """
     draw = adapter.currentModel
     ddoc = _early_bound(
@@ -2580,7 +2666,9 @@ def insert_hole_table(
         return bool(selectable.Select4(append, selection_data))
 
     if datum_axes is not None and datum_entity is not None:
-        raise ValueError(f"{label} supplied both a datum vertex and datum axes")
+        raise ValueError(f"{label} supplied multiple initial datum sources")
+    if datum_point is not None and datum_axes is None and datum_entity is None:
+        raise ValueError(f"{label} datum point requires an initial datum source")
     if datum_axes is not None:
         x_axis, y_axis = datum_axes
         datum = _select_entity(x_axis, append=False, mark=4) and _select_entity(
@@ -2631,6 +2719,20 @@ def insert_hole_table(
     feature = _sw_type_info.early_bound_or_flag(feature, "IHoleTable")
     feature.CombineSameSize = False
     feature.CombineTags = False
+    if datum_point is not None:
+        draw.ClearSelection2(True)
+        selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+        selection_data = _early_bound(
+            selection_manager.CreateSelectData(), "ISelectData"
+        )
+        selection_data.View = view
+        point = _early_bound(datum_point, "ISketchPoint")
+        if not point.Select4(False, selection_data):
+            raise RuntimeError(f"failed to select {label} theoretical datum point")
+        origin = _early_bound(feature.DatumOrigin, "IDatumOrigin")
+        if not origin.Reattach():
+            raise RuntimeError(f"failed to reattach {label} hole-table datum")
+        draw.ClearSelection2(True)
     adapter.currentModel.EditRebuild3()
     table = _sw_type_info.early_bound(table, "ITableAnnotation")
     # Indexed COM properties such as Text2 are omitted by the late-bound
@@ -4633,7 +4735,6 @@ async def finalize_drawing(
     # real view after all views exist, validate the linked model's tolerance and
     # current-release Revision properties, and hold every sheet to the same ASME B
     # contract.
-    isometric_views = 0
     for sheet_name in sheet_names:
         if not ddoc.ActivateSheet(sheet_name):
             raise RuntimeError(f"failed to activate drawing sheet {sheet_name!r}")
@@ -4705,7 +4806,6 @@ async def finalize_drawing(
                 view,
                 label=f"{sheet_name} {view_name(adapter, view)!r}",
             )
-            isometric_views += 1
         first_name = view_name(adapter, first_view)
         sheet.CustomPropertyView = first_name
         sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
@@ -4736,12 +4836,10 @@ async def finalize_drawing(
                 TITLE_BLOCK_COPYRIGHT_PROPERTY,
             ),
         )
-    if not isometric_views:
-        raise RuntimeError("finished drawing has no standard Isometric projection")
 
-    # Explicit recipe-requested cleanup remains sheet-scoped. The finalizer
-    # owns the standard Isometric view's high-quality Shaded With Edges mode;
-    # every other view keeps the appearance authored by its drawing recipe.
+    # Explicit recipe-requested cleanup remains sheet-scoped. When a standard
+    # Isometric view is present, the finalizer owns its high-quality Shaded With
+    # Edges mode; every other view keeps the appearance authored by its recipe.
     removed_notes = 0
     for sheet_name in sheet_names:
         if not ddoc.ActivateSheet(sheet_name):
@@ -4760,6 +4858,18 @@ async def finalize_drawing(
         )
     if removed_notes:
         _telemetry.info(f"removed {removed_notes} redundant final drawing notes")
+
+    # COM can export before SolidWorks recomputes a changed HLR/HLV view's
+    # display geometry: a hidden-lines-visible side view exported as a bare
+    # outline while the reopened SLDDRW (which regenerates on load) showed the
+    # dashed edges. Flush every view's display geometry HERE, after all the
+    # rebuilds above and right before export — the same call at view-placement
+    # time is invalidated again by the later annotation/table imports.
+    for sheet_name in sheet_names:
+        if not ddoc.ActivateSheet(sheet_name):
+            raise RuntimeError(f"failed to activate {sheet_name!r} before export")
+        for view in iter_views(adapter):
+            _early_bound(view, "IView").UpdateViewDisplayGeometry()
 
     if not ddoc.ActivateSheet(sheet_names[0]):
         raise RuntimeError("failed to restore first drawing sheet before export")
@@ -4783,6 +4893,18 @@ async def finalize_drawing(
     artifacts["png"] = str(outputs.png.resolve())
     if set(artifacts) != {"drawing", "pdf", "png"}:
         raise RuntimeError(f"drawing export incomplete: {artifacts!r}")
+    # Release the file: SolidWorks keeps the saved SLDDRW open past the COM
+    # session, and the next run (or a from-scratch rebuild deleting the
+    # target) then hits "in use by another process".
+    title = str(drawing_model.GetTitle())
+    adapter.swApp.CloseDoc(title)
+    still_open = [
+        p
+        for p in _visible_document_paths(adapter)
+        if Path(p).resolve() == outputs.slddrw.resolve()
+    ]
+    if still_open:
+        raise RuntimeError(f"drawing {title!r} did not close after export")
     return artifacts
 
 

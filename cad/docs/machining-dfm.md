@@ -52,10 +52,37 @@ geometry is casting-shaped, not milling-shaped.
     the intended stock is a **brass bar block** (trivial) — the script constant looks stale. Reconcile
     before it reaches a drawing (gap below).
 
-- `rocker-arm-support` has four **1/2-13 UNC-2B through-tapped foot holes**, matching the
-  purchased 91783A722 hold-down screws (`build_rocker_arm_support.py`, `build_lag_screw.py`).
-  Other receivers are threaded too; the `knife-mount` hanger-stud seat is one example.
-  No keyways anywhere — gears are **soldered** to their shafts (cone) or ride **free on an arbor** (cylinder).
+- `rocker-arm-support` carries four **5/16 through clearance drills**. Four
+  McMaster 92240A539 1/4-20 UNC-2A × 5/8 in hex-head screws install from the
+  top into blind UNC-2B taps in `harmonic-base`: the exact vendor under-head
+  washer transition seats on the support, leaving 9.247 mm installed engagement
+  (1.456D), 9.497 mm usable full-thread depth (0.25 mm tip clearance), and
+  15.847 mm cylindrical tap-drill depth (full thread + five 1.27 mm pitches).
+  Other receivers are threaded too; the `knife-mount` hanger-stud seat is one
+  example. No keyways anywhere — gears are **soldered** to their shafts (cone)
+  or ride **free on an arbor** (cylinder).
+
+### Blind-thread DFM rule
+
+Applied from the [thread-depth DFM walkthrough](https://www.youtube.com/watch?v=c1o3ZQY25jI)
+(12:30–21:30):
+
+- Specify the **installed engagement**, **usable full-thread depth**, and
+  deeper **tap-drill depth** separately. Screw projection through a clearance
+  part is not engagement, and a modeled tap-minor cylinder is not full thread.
+- Ordinary steel/iron joints rarely need more than 2–3 diameters of engagement;
+  1.5D is adequate here. More thread adds tapping risk without adding useful
+  clamp capacity.
+- A machine plug tap needs four chamfered lead threads plus one pitch of
+  margin beyond the usable full threads. A bottoming tap reduces that allowance
+  to one or two pitches; use it only when the design actually needs threads
+  near the bottom.
+- Model the tap-minor diameter, then check the **major-diameter envelope**
+  against outer walls and neighboring cavities. The drill fitting does not
+  prove the finished thread avoids breakout.
+- About 3D is the practical machine-tapping depth ceiling. If a design demands
+  full thread substantially beyond that, redesign the joint or thread-mill it
+  instead of encoding an optimistic tap callout.
 
 ---
 
@@ -96,7 +123,7 @@ geometry is casting-shaped, not milling-shaped.
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
 | **`rocker-arm`** ×20 | flat steel plate **2.5 mm** thick, ~270×21 | **top edge = R800 concave arc** (the amplitude-bar rides ON it) — it is the **2D OUTLINE of the plate, NOT a concave pocket/face**; bottom edge R816 concentric; Ø6.5 pivot bore + Ø2.0 rod-pin bore, both through the plate | none severe — pivot bore is **inherently square** (drilled through flat stock, one setup); no slot, no internal corner | **1** (all features one plane) | **CNC 2.5D profile** (×20 identical) or bandsaw+template; the R800 is profiled, not form-cut |
-| **`rocker-arm-support`** | modeled **Gray Cast Iron casting**, trapezoidal wedge, 6.35 mm shell walls | square window/cavity cuts with **R12.7-relieved** internal corners; **4× 1/2-13 UNC-2B tapped foot holes** through the 6.35 mm foot, tap drill Ø10.716 mm (Ø10.72 displayed; 27/64 in), from `build_rocker_arm_support.py` and `_holes.py`; RimChamfer 1.27 | square internal corners already relieved to R12.7 — cannot be cut sharper; thin 6.35 shell | foot-hole drilling = **1 setup** normal to the seat face | **cast** body + machine foot holes/rim |
+| **`rocker-arm-support`** | modeled Gray Cast Iron; drawing permits gray iron casting or low-carbon steel stock; trapezoidal wedge, 6.35 mm shell/web | opposed 165.1 mm pockets with **R6.35** internal corners; through cavity with **R12.7** corners; **4× 5/16 through clearance drills** in the 6.35 mm foot for top-down 1/4-20 hex-head screws; RimChamfer 1.27 | 6.35 mm web/shell; from solid stock, each pocket reaches about 28.6 mm at the wide foot. R6.35 is ordinary contour geometry on a PM-25MV and does not need square-corner EDM; a 1/8″ end mill can finish the radius, but its long reach in 1018 favors roughing with a stiffer cutter first | casting route: foot holes/rim; solid-stock route: **2 opposed pocket setups** + foot drilling | cast body, or rough both pockets from 1018 with a larger cutter and finish the R6.35 corners with a 1/8″ end mill; drill the clearance pattern from the seat face |
 
 ---
 

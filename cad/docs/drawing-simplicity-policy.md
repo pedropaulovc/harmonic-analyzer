@@ -29,12 +29,17 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
 
 1. **The title block is the general specification.** Units, `.XX` / `.XXX`
    linear tolerances, angular tolerance, the DRILLED HOLES `+0.10 / 0` row,
-   edge break, default roughness, material and finish live there and nowhere
-   else. A note or callout never restates them. Where material is non-critical,
-   name the acceptable families as explicit alternatives instead of forcing an
-   unsupported grade or saying "material not critical". For a coated ferrous
-   part, the Finish field also carries any masking and bare-surface corrosion
-   protection; those instructions do not belong in Manufacturing Notes.
+   edge break, the surface row, material and finish live there and nowhere
+   else. A note or callout never restates them. The surface row is a process
+   statement (`CAST/MACHINED`), not a roughness number: a part may
+   be cast or cut from bar, as-cast skin can never meet a number, and "as
+   machined" on a manual machine already lands where a general grade would.
+   Where material is non-critical, name the acceptable families as explicit
+   alternatives (`material_family` in the part registry, e.g.
+   `LOW-CARBON STEEL OR GRAY IRON`) instead of forcing an unsupported grade or
+   saying "material not critical". For a coated ferrous part, the Finish field
+   also carries any masking and bare-surface corrosion protection; those
+   instructions do not belong in Manufacturing Notes.
 2. **Decimal places carry the tolerance.** A dimension with no explicit band
    is governed by its decimal places. A tighter band goes ON that dimension
    as a native model tolerance (`_drawing_marks.set_dimension_*_tolerance`),
@@ -61,24 +66,33 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
 4. **Basic (boxed) dimensions exist only to feed a surviving frame.** Drop the
    box with the frame; the coordinate becomes an ordinary toleranced
    dimension.
-5. **Roughness symbols only on surfaces that run, slide or seat a knife or
-   ball.** A `shaft_in_bushing` journal or bore, a `cam_follower_contact`
-   face, the amplitude-bar slide, the knife edge and its seat. Gear seats,
-   register faces, clamp faces and anything else are covered by the block's
-   `Ra 3.2`. `GROUND_UM` (0.8) is reserved for knife edges and pivot-screw
-   shoulders.
-6. **Notes: few, specific, and never a dimension.** At most four short lines
-   of part-specific process facts a machinist cannot read off the views:
+5. **Roughness symbols only on surfaces that run, slide, seat a knife or
+   ball, or locate the part.** A `shaft_in_bushing` journal or bore, a
+   `cam_follower_contact` face, the amplitude-bar slide, the knife edge and
+   its seat carry `MACHINED_UM` (1.6). A static mating seat that locates the
+   part on its neighbour (a pedestal foot on the base) carries `SEAT_UM`
+   (3.2): the title block names no grade, so the one face that MUST be cut
+   on a part that may otherwise stay as-cast says so. Gear seats, register
+   faces, clamp faces and anything else are "cast/machined" per the title
+   block and carry no symbol. `GROUND_UM` (0.8) is reserved for knife edges
+   and pivot-screw shoulders.
+6. **Notes: few, specific, never a dimension, never a method.** At most four
+   short lines of part-specific facts a machinist cannot read off the views:
    drill vs. ream, stock allowance ("16 STOCK OK"), "CENTRES OK", match-drill
    at assembly, a loose-supplied set screw, a gear data block. A note never
    restates the title block, never carries a tolerance that belongs on a
    dimension, never explains what a datum letter is, never narrates design
    intent, and never quotes other part numbers beyond "MATES WITH".
-   Important process facts are flagged from the view (leader or flag note),
-   not buried in the block. Coating application, masking, and oiling belong to
-   the Finish field under rule 1, not this block. Notes that live in
-   `<part>_notes.py` stay there (they are out of the part's rebuild closure by
-   design).
+   The print defines the part by its geometry, not by how to make it
+   (ASME Y14.5 §1.4(e)): "MACHINE BOTH POCKETS", "CAST", "MILL FROM SOLID"
+   are not requirements — the dimensioned feature is. A process word is
+   allowed only where it IS the requirement (REAM for a fit bore, a tap
+   drill depth that matters, match-drill at assembly). Where something
+   cannot be read off the views, the fix is a view (a section for an
+   internal web), not a note. Coating application, masking, and oiling
+   belong to the Finish field under rule 1, not this block. Notes that live
+   in `<part>_notes.py` stay there (they are out of the part's rebuild
+   closure by design).
 7. **Views follow the machinist, not the modeller.**
    - Every drawing package includes a standard isometric projection for
      pictorial clarity. It is **Shaded With Edges** with precision geometry
@@ -93,8 +107,11 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
    - Slots dimensioned to the radius centres; chamfers preferred to radii on
      edges; every shoulder fillet on a turned part has a size.
    - Hole callouts state the decimal Ø and the process (`Ø9.525 REAM THRU`,
-     `Ø5.95 DRILL THRU`); clearance holes state the size, not the screw;
-     taps are `1/4-20 ↧ 12` unless the tap-drill depth matters.
+     `Ø5.95 DRILL THRU`); clearance holes state the size, not the screw.
+     A blind tap states its required **full-thread depth**. State the deeper
+     tap-drill depth too when it governs machinability; never let a modeled
+     minor-diameter continuation, merged opposing holes, or a default
+     through-thread callout imply usable thread where none is required.
 8. **Layout is contained, balanced, and uses the better sheet orientation.**
    The inner drawing border is a hard boundary: every view, dimension,
    extension line, leader, callout, note, balloon, and table stays wholly
@@ -102,6 +119,13 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
    around the content. Touching or spilling through the border is a release
    blocker, not cosmetic polish. No leader crosses another leader, a view it
    does not annotate, or a dimension line; no text sits on a line.
+   Dimension text and feature callouts belong outside the depicted part or
+   assembly silhouette by default; hole-table tags, balloons, and section
+   identifiers are not feature callouts. Place text inside a silhouette only
+   when a confined detail or a genuine sheet-space constraint makes that
+   placement materially clearer than every exterior option. Convenience or
+   fixed coordinates are not justification. Interior text never masks
+   geometry, hides a feature, or crosses a line.
    Projected orthographic views preserve ASME alignment; front, top, and side
    views are never staggered merely to improve composition. Correctness comes
    before visual balance. Resolve crowding by moving the aligned view group,
@@ -130,6 +154,19 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
    geometric control is never rejected as uninspectable, only as
    unnecessary. Where a frame is legitimate (rule 3) it is complete: datum
    feature symbols on reachable surfaces and basics for what it locates.
+
+11. **Drawing review is the last DFM backstop, not drawing-only lint.** A
+   review finding that the depicted part is physically impossible, implausible
+   for every process allowed by the title block, contradictory, or missing a
+   necessary physical feature may expose a CAD-model defect even when the
+   drawing faithfully shows the model. Check that signal against the source
+   CAD and primary visual evidence; never silence it with an invented
+   dimension, radius, note, or process callout on the sheet. Fix a
+   uniquely-supported omission in the CAD first, then regenerate the drawing.
+   When the evidence permits materially different geometries or processes,
+   escalate the exact feature, evidence, and viable choices to the user for a
+   decision. A reviewer can still be wrong: validate the premise rather than
+   blindly implementing the proposed fix.
 
 ## The gate
 

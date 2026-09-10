@@ -9,3 +9,19 @@
 defaults:
   revision: A
   confidence: med
+
+# Material families — the approved title-block wording a part names with
+# `material_family:` INSTEAD of its own `material` / `material_specification`
+# (`_config.parts` expands the family; naming both is an error). One row here
+# is the single source of a fleet-wide alternative, so the wording can never
+# drift across the parts that share it (drawing-simplicity-policy.md rule 1:
+# name acceptable families as explicit alternatives). Lives in this file, not
+# materials.yaml, because every `_config.parts(<stem>)` reader already depends
+# on it (_buildgraph.part_registry_files) — no new dependency edge.
+material_families:
+  # Brackets, clamps, supports, blocks, pedestals: castings in Michelson's
+  # machine that a hobby builder may just as well cut from low-carbon bar or
+  # plate. Neither the mass model nor any fit depends on which.
+  ferrous_noncritical:
+    material: LOW-CARBON STEEL OR GRAY IRON
+    material_specification: LOW-CARBON STEEL OR GRAY IRON

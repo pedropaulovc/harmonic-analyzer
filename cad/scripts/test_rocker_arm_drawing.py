@@ -116,7 +116,7 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     import _config
 
     spec = _config.parts("rocker-arm")
-    assert spec["material_specification"] == "AISI 1018 cold-rolled steel strap"
+    assert spec["material_specification"] == "LOW-CARBON STEEL OR GRAY IRON"
     assert spec["finish"] == "matte black oxide"
     assert int(spec["quantity"]) == 20
 

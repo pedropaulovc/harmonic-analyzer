@@ -24,9 +24,10 @@ to `<part>_spec.py`, a shared catalog, or the model itself.
 So when issue #290 flips generated drawings to inch display, every one of those
 strings keeps its mm/µm number and silently means something else — `+0.00/-0.02`
 becomes twenty-five times looser, `Ra 1.6` reads as 1.6 **µin** (the ips
-convention; `title_block.yaml` already carries `value_uin: 125` beside display
-`Ra 3.2`, and nothing reconciles them). A native model tolerance re-renders;
-`SetText` does not. That is the whole argument.
+convention; the title block itself carries no roughness number — its surface
+row is the process statement `CAST/MACHINED` — so the local
+symbols are the only roughness ink to migrate). A native model tolerance
+re-renders; `SetText` does not. That is the whole argument.
 
 **The mechanism already existed and was used by 2 of ~100 build scripts.**
 `_drawing_marks.set_dimension_{symmetric,bilateral}_tolerance` — read-back

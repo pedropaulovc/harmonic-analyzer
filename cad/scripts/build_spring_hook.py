@@ -63,7 +63,6 @@ from spring_hook_notes import (
     DRAWING_NOTES,
     ISOMETRIC_VIEW_NOTE,
 )
-from spring_hook_spec import SURFACE_FINISHES
 
 PART_NAME = "spring-hook"
 MATERIAL = "Plain Carbon Steel"  # black hardware, like the boss hook
@@ -112,9 +111,12 @@ async def build(adapter) -> dict[str, str]:
     elbow = check(
         "elbow arc",
         await adapter.add_arc(
-            ELBOW_R, SHANK_RISE,            # centre
-            ELBOW_R, SHANK_RISE + ELBOW_R,  # start (arm joint)
-            0.0, SHANK_RISE,                # end (rise joint)
+            ELBOW_R,
+            SHANK_RISE,  # centre
+            ELBOW_R,
+            SHANK_RISE + ELBOW_R,  # start (arm joint)
+            0.0,
+            SHANK_RISE,  # end (rise joint)
         ),
     )
     arm = check(
@@ -147,7 +149,9 @@ async def build(adapter) -> dict[str, str]:
             f"{elbow}.start", f"{elbow}.center", "vertical_points"
         ),
     )
-    check("arm horizontal", await adapter.add_sketch_constraint(arm, None, "horizontal"))
+    check(
+        "arm horizontal", await adapter.add_sketch_constraint(arm, None, "horizontal")
+    )
     await dimension_between(
         adapter, f"{arm}.start", f"{arm}.end", "horizontal_distance", ARM_RUN, "arm run"
     )
@@ -162,7 +166,12 @@ async def build(adapter) -> dict[str, str]:
     profile = SketchDims()
     check("create_sketch wire profile", await adapter.create_sketch("Top"))
     await define_circle(
-        adapter, 0.0, 0.0, ROD_DIA / 2.0, "wire profile", dims=profile,
+        adapter,
+        0.0,
+        0.0,
+        ROD_DIA / 2.0,
+        "wire profile",
+        dims=profile,
         names=("WireCx", "WireCz", "RodDia"),
         drives=(None, None, '"RodDia"'),
     )
@@ -189,7 +198,9 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
-    await volume_check(adapter, "driven hook (equations neutral)", v_expected, 0.05 * v_expected)
+    await volume_check(
+        adapter, "driven hook (equations neutral)", v_expected, 0.05 * v_expected
+    )
 
     # Named shank axis (local Y through the origin) so the hook seats in the plate
     # hole and the assembly can reference it (the spring pulls through the curl in
@@ -204,7 +215,7 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
-    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
+    author_part_pmi(adapter)
     apply_drawing_properties(
         adapter,
         PART_NAME,
@@ -217,8 +228,12 @@ async def build(adapter) -> dict[str, str]:
     require_saved_drawing_properties(
         adapter,
         (
-            "Number", "Material Specification", "Finish", "Quantity",
-            "Manufacturing Notes", "Isometric View Note",
+            "Number",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Manufacturing Notes",
+            "Isometric View Note",
         ),
     )
     return artefacts
