@@ -110,6 +110,13 @@ RIGHT_KEEP = {
 # Top-left anchor; the native four-row table grows down and right while
 # remaining clear of the isometric and title block.
 HOLE_TABLE_ANCHOR = (0.270, 0.130)
+# Independent drawing contract measured from the chamfered datum edges.
+EXPECTED_HOLE_TABLE_LOCATIONS_MM = (
+    (147.95, 47.94),
+    (27.31, 47.94),
+    (147.95, 13.02),
+    (27.31, 13.02),
+)
 
 
 def _bottom_sheet_xy(hole_xz: tuple[float, float]) -> tuple[float, float]:
@@ -320,9 +327,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         hole_points=tuple(_bottom_sheet_xy(hole) for hole in HOLES),
         datum_axes=(datum_x_axis, datum_y_axis),
-        expected_locations_mm=tuple(
-            (x + BOSS_DEPTH / 2.0 - CHAMFER, z + WIDE - CHAMFER) for x, z in HOLES
-        ),
+        expected_locations_mm=EXPECTED_HOLE_TABLE_LOCATIONS_MM,
         anchor_xy=HOLE_TABLE_ANCHOR,
         label="rocker-arm-support",
     )

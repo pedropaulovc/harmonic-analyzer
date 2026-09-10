@@ -147,9 +147,6 @@ DRAWING_NOTES = "\n".join(
         "CASTING; MACHINE MOUNTING FACE, POCKETS, CAVITY, HOLES + CHAMFERS.",
     )
 )
-DRAWING_FINISH = (
-    "GREEN ENAMEL; MASK MOUNTING FACE + THREADS; LIGHT OIL BARE MACHINED SURFACES"
-)
 TITLE_BLOCK_THREAD_CLASS = ""
 
 # Hole Wizard constants (resolved from the SW type library on this seat):
@@ -692,7 +689,6 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         PART_NAME,
         {
-            "Finish": DRAWING_FINISH,
             # Native Hole Wizard table entry carries 2B; omit the title-block copy.
             "THREAD_CLASS": TITLE_BLOCK_THREAD_CLASS,
             "Manufacturing Notes": DRAWING_NOTES,

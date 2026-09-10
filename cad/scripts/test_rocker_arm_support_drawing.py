@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 
 import pytest
+import _config
 
 import draw_rocker_arm_support as drawing
 import build_rocker_arm_support as support
@@ -48,7 +49,7 @@ def test_manufacturing_notes_define_only_part_specific_processes() -> None:
 
 
 def test_finish_and_thread_class_have_one_authoritative_home() -> None:
-    assert support.DRAWING_FINISH == (
+    assert _config.parts(support.PART_NAME)["finish"] == (
         "GREEN ENAMEL; MASK MOUNTING FACE + THREADS; LIGHT OIL BARE MACHINED SURFACES"
     )
     assert support.HOLE_THREAD_CLASS == "2B"
@@ -57,8 +58,20 @@ def test_finish_and_thread_class_have_one_authoritative_home() -> None:
 
 
 def test_native_hole_table_covers_every_foot_hole() -> None:
-    assert len(support.HOLES) == 4
-    points = {drawing._bottom_sheet_xy(hole) for hole in support.HOLES}
+    expected_holes = {
+        (60.32, 17.46),
+        (-60.32, 17.46),
+        (60.32, -17.46),
+        (-60.32, -17.46),
+    }
+    assert set(support.HOLES) == expected_holes
+    assert set(drawing.EXPECTED_HOLE_TABLE_LOCATIONS_MM) == {
+        (147.95, 47.94),
+        (27.31, 47.94),
+        (147.95, 13.02),
+        (27.31, 13.02),
+    }
+    points = {drawing._bottom_sheet_xy(hole) for hole in expected_holes}
     assert len(points) == 4
     half_w = support.BOSS_DEPTH / 2.0 * drawing.VIEW_SCALE / 1000.0
     half_h = support.WIDE * drawing.VIEW_SCALE / 1000.0
