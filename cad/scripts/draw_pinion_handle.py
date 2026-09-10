@@ -109,8 +109,8 @@ DIMENSION_PRECISION = {
     "TubeLen": 2,
     "CapR": 2,
     "RodHoleDia": 3,
-    "RodDia": 4,
-    "RodSpan": 2,
+    "RodDia": 1,
+    "RodSpan": 1,
 }
 
 HUB_END_Z = GRIP_LEN / 2.0 + WALL_T + TUBE_LEN

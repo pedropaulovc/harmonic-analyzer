@@ -11,7 +11,7 @@ import pytest
 import _drawing_marks
 from pinion_cam_pin_spec import PIN_DIA_BAND
 from pinion_cam_spec import BORE_BAND as CAM_BORE_BAND
-from pinion_handle_spec import ROD_HOLE_REAM_BAND, ROD_PRESS_BAND
+from pinion_handle_spec import ROD_HOLE_REAM_BAND
 from pinion_lever_spec import BORE_BAND as LEVER_BORE_BAND
 
 
@@ -138,7 +138,6 @@ def test_dimension_prefix_uses_native_readback_after_void_setter(
     [
         (PIN_DIA_BAND, 3),
         (CAM_BORE_BAND, 3),
-        (ROD_PRESS_BAND, 4),
         (ROD_HOLE_REAM_BAND, 3),
         (LEVER_BORE_BAND, 4),
     ],

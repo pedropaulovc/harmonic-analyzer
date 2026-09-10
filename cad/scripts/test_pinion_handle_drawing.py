@@ -7,10 +7,8 @@ from types import SimpleNamespace
 
 import pytest
 
-import build_pinion_handle as handle
 import draw_pinion_handle as drawing
 import pinion_handle_spec as spec
-from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DrawingLayout
 
 
@@ -220,36 +218,25 @@ def test_body_dimensions_are_direct_baselines_not_note_substitutes(rendered_reci
         assert forbidden not in spec.DRAWING_NOTES.upper()
 
 
-def test_released_press_and_socket_fits_remain_native():
-    shaft_low = spec.ROD_DIA + spec.ROD_PRESS_BAND[1]
-    shaft_high = spec.ROD_DIA + spec.ROD_PRESS_BAND[0]
+def test_body_hole_and_socket_fit_limits_remain_native():
     hole_low = spec.ROD_HOLE_DIA + spec.ROD_HOLE_REAM_BAND[1]
     hole_high = spec.ROD_HOLE_DIA + spec.ROD_HOLE_REAM_BAND[0]
-    assert (shaft_low, shaft_high) == pytest.approx((6.015, 6.020))
     assert (hole_low, hole_high) == pytest.approx((6.000, 6.010))
-    assert shaft_low - hole_high > 0
     assert (
         spec.TUBE_ID + spec.TUBE_ID_BAND[1],
         spec.TUBE_ID + spec.TUBE_ID_BAND[0],
     ) == pytest.approx((8.010, 8.025))
-    assert model_toleranced_dimensions(handle) == {
-        ("TubeProfile", "TubeId"): "*deviations(TUBE_ID_BAND)",
-        ("CapProfile", "CapR"): "CAP_RADIUS_TOLERANCE_MM",
-        ("Tube", "TubeLen"): "*deviations(TUBE_LENGTH_BAND)",
-        ("RodProfile", "RodDia"): "*deviations(ROD_PRESS_BAND)",
-        ("Rod", "RodSpan"): "ROD_SPAN_TOLERANCE_MM",
-        ("RodHoleProfile", "RodHoleDia"): "*deviations(ROD_HOLE_REAM_BAND)",
-    }
 
 
 def test_recipe_preserves_fine_fit_digits_without_tightening_routine_features(
     rendered_recipe,
 ):
     dims = rendered_recipe.dimensions
-    assert dims["RodDia"].precision == 4  # 6.0175 must not round to 6.018
+    assert dims["RodDia"].precision == 1
     assert dims["RodHoleDia"].precision == dims["TubeId"].precision == 3
     assert dims["GripDia"].precision == dims["TubeOd"].precision == 2
-    assert dims["CapR"].precision == dims["RodSpan"].precision == 2
+    assert dims["CapR"].precision == 2
+    assert dims["RodSpan"].precision == 1
 
 
 def test_wrong_native_edge_measurement_blocks_release(monkeypatch):

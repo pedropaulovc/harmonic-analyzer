@@ -62,8 +62,6 @@ from pinion_handle_spec import (
     ROD_DOWN,
     ROD_HOLE_REAM_BAND,
     ROD_HOLE_DIA,
-    ROD_PRESS_BAND,
-    ROD_SPAN_TOLERANCE_MM,
     ROD_UP,
     SURFACE_FINISHES,
     TUBE_ID,
@@ -370,10 +368,6 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "Tube", "TubeLen", *deviations(TUBE_LENGTH_BAND)
     )
-    set_dimension_bilateral_tolerance(
-        adapter, "RodProfile", "RodDia", *deviations(ROD_PRESS_BAND)
-    )
-    set_dimension_symmetric_tolerance(adapter, "Rod", "RodSpan", ROD_SPAN_TOLERANCE_MM)
     set_dimension_bilateral_tolerance(
         adapter, "RodHoleProfile", "RodHoleDia", *deviations(ROD_HOLE_REAM_BAND)
     )

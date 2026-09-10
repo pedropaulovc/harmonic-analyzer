@@ -27,14 +27,12 @@ from pinion_handle_geometry import (
     WALL_T as WALL_T,
 )
 
-# Preserve the released press-fit and arbor-bore size bands as native model
-# tolerances. Routine body stations use the title block's two-place band.
-ROD_PRESS_BAND = (0.0025, -0.0025)  # turned cross-rod OD tolerance
+# Reamed holes retain native size tolerances. Match the cross rod to its body
+# for a light press fit; routine lengths use the title-block tolerances.
 ROD_HOLE_REAM_BAND = (0.005, -0.005)  # body cross-hole ream tolerance
 TUBE_ID_BAND = REAM_SLIDE
 CAP_RADIUS_TOLERANCE_MM = 0.10
 TUBE_LENGTH_BAND = (0.10, 0.00)
-ROD_SPAN_TOLERANCE_MM = 0.10
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "GripProfile": {"GripDia"},
@@ -50,5 +48,5 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # bearing, so it has no local roughness requirement under the simplicity policy.
 SURFACE_FINISHES = ()
 
-DRAWING_NOTES = "CROSS ROD: PRESS FIT."
+DRAWING_NOTES = "CROSS ROD: LIGHT PRESS FIT IN BODY."
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
