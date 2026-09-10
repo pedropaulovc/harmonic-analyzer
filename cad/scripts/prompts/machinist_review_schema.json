@@ -3,7 +3,7 @@
   "additionalProperties": false,
   "required": ["verdict", "summary", "blockers", "over_specification", "clarity", "minor"],
   "properties": {
-    "verdict": { "type": "string", "enum": ["SHIP", "FIX"], "minLength": 1 },
+    "verdict": { "type": "string", "enum": ["SHIP", "FIX"] },
     "summary": { "type": "string", "minLength": 1 },
     "blockers": { "$ref": "#/$defs/findings" },
     "over_specification": { "$ref": "#/$defs/findings" },
