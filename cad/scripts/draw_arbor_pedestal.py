@@ -469,11 +469,17 @@ async def build(adapter: Any) -> dict[str, str]:
     radius_display = _early_bound(radius_dimension, "IDisplayDimension")
     radius_display.SetText(4, "TANGENT; CONC W/ BORE")
     radius_display.SetPrecision3(1, -1, -1, -1)
+    # The leader runs from the text toward the crown centre; with the default
+    # "extend to the opposite side" it kept going through the bore and crossed
+    # the Ø9.55 dimension at the centre. Stop it at the crown arc.
+    radius_display.ArcExtensionLineOrOppositeSide = False
     if (
         str(radius_display.GetText(4) or "") != "TANGENT; CONC W/ BORE"
         or int(radius_display.GetPrimaryPrecision2()) != 1
+        or bool(radius_display.ArcExtensionLineOrOppositeSide)
     ):
         raise RuntimeError("crown radius annotation did not persist")
+    adapter.currentModel.GraphicsRedraw2()
     add_attached_note(
         adapter,
         front,

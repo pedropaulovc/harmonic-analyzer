@@ -15,7 +15,7 @@ from collections import Counter
 from dataclasses import dataclass, replace
 from itertools import combinations
 from pathlib import Path
-from typing import Any, Iterable, Literal, Sequence
+from typing import Any, Callable, Iterable, Literal, Sequence
 
 
 import _config
@@ -4607,6 +4607,7 @@ async def finalize_drawing(
     redundant_note_substrings: Sequence[str] = (),
     expected_redundant_notes: int = 0,
     expected_sheet_names: tuple[str, ...] | None = None,
+    pre_export: Callable[[], None] | None = None,
 ) -> dict[str, str]:
     """Enforce the sheet/view contract and export SLDDRW, PDF, and rendered PNG."""
     drawing_model = adapter.currentModel
@@ -4763,6 +4764,11 @@ async def finalize_drawing(
 
     if not ddoc.ActivateSheet(sheet_names[0]):
         raise RuntimeError("failed to restore first drawing sheet before export")
+    # A recipe's last word on the fully-rebuilt sheet, e.g. hiding annotations
+    # that only materialise once every model annotation has been imported.
+    if pre_export is not None:
+        drawing_model.ForceRebuild3(False)
+        pre_export()
 
     # Persist the native drawing and PDF once from the fully loaded authored
     # document. Reopen/scale/save cycles are deliberately absent from this hot

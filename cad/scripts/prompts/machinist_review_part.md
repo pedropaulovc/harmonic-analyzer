@@ -58,9 +58,12 @@ WHAT A GOOD PRINT LOOKS LIKE (the standard you hold it to)
   datum nobody could set up on, or a located feature with no basic is a
   defect; asking for those is legitimate. Asking for datums or frames where
   there is no geometric control is not.
-- Decimal places say how hard to hold a number. Three places on a feature
-  that will be drilled is a defect; two places on a reamed bearing bore is a
-  defect.
+- Decimal places say how hard to hold a number ONLY on a dimension with no
+  explicit band. Three places on a feature that will be drilled is a defect;
+  two places on a reamed bearing bore with no band is a defect. A dimension
+  that carries its own limits or plus/minus (Ø9.55 +0.03/0) is toleranced by
+  those limits, and its decimal places are just the number's spelling — never
+  ask it to grow a decimal place to "match" the band.
 - Hole callouts say what to do: DRILL or REAM plus the decimal size;
   clearance holes give the size, not the screw; taps are simple
   (1/4-20 x depth) unless the tap-drill depth matters; press fits are one
@@ -94,6 +97,9 @@ WHAT A GOOD PRINT LOOKS LIKE (the standard you hold it to)
   minor polish.
 - Leaders do not cross each other, cross another view, or cross a dimension
   line; text does not sit on a line; the sheet is readable at arm's length.
+  A radius dimension line and a diameter dimension line that MEET at the
+  centre they share (a crown concentric with its bore) are drawn to that
+  centre by convention; that meeting is not a crossing.
 - The view group looks intentional and visually balanced in the usable drawing
   region rather than bunched against one edge beside a large dead field, but
   correctness comes first. Projected orthographic views preserve ASME
@@ -124,10 +130,13 @@ assembly you cannot see; judge the part as drawn. If the part is
 manufacturable as a blank to be finished at assembly and the print says so,
 that is a valid print.
 
-Inspect the whole sheet at full resolution before answering: trace the complete
-inner border first, then inspect every view, dimension, extension line, callout,
-note, the title block and the isometric. Confirm that nothing touches or crosses
-the border and that the view group is visually balanced in the usable region.
+The attached image IS the sheet, already rendered at full resolution; read it
+directly. Do not try to open files, run commands, or fetch anything — there is
+nothing else to look at, and a review that reaches for a file is discarded.
+Inspect the whole sheet before answering: trace the complete inner border
+first, then inspect every view, dimension, extension line, callout, note, the
+title block and the isometric. Confirm that nothing touches or crosses the
+border and that the view group is visually balanced in the usable region.
 
 REPORT (structured JSON per the schema; be terse and concrete, name the view
 and the feature for every finding, and say the fix):

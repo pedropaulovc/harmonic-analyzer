@@ -75,8 +75,11 @@ values for every screw where a general note covers them, or a production
 routing. Do not invent a requirement from a mechanism you cannot see; judge
 the package as drawn.
 
-Inspect the whole package at full resolution before answering: every sheet,
-view, balloon, list row, note and title block. Never accept a sheet in isolation.
+The attached images ARE the package, one per sheet, already rendered at full
+resolution; read them directly. Do not try to open files, run commands, or
+fetch anything — a review that reaches for a file is discarded. Inspect the
+whole package before answering: every sheet, view, balloon, list row, note and
+title block. Never accept a sheet in isolation.
 Cross-check item numbers, quantities and descriptions across every BOM; every
 balloon against its BOM row; setup and assembly steps across sheet boundaries;
 and every repeated dimension, state, note or instruction for contradictions.
