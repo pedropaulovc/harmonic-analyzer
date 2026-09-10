@@ -52,8 +52,11 @@ WHAT A COMPLETE ASSEMBLY PACKAGE CONTAINS (the standard you hold it to)
   Instrument resolution is not accuracy. Without stated equipment accuracy,
   condition or temperature control, describe burden and uncertainty; do not
   invent quantified capability, stock/catalog limits or categorical
-  impossibility. Use no numeric cutoff. Do not reopen fabrication tolerances
-  on unseen part drawings.
+  impossibility. Use no numeric cutoff. Scrutinize proposed replacements the
+  same way: widening a band alone does not justify it. Prefer an adequate
+  general tolerance or functional acceptance; state dependencies on unseen
+  mating limits rather than inventing replacement numbers. Do not reopen
+  fabrication tolerances on unseen part drawings.
 - Setup and adjustment: anything with a parked and an engaged state, an
   adjustment screw, a zero, a spring tension, has its as-shipped state and
   its setting procedure stated without ambiguity.

@@ -112,8 +112,12 @@ WHAT A GOOD PRINT LOOKS LIKE (the standard you hold it to)
   ranges remain blockers.
 - Use the loosest title-block tolerance that serves the feature. Noncritical
   overall lengths generally need only one decimal place (.X); tightening
-  them needs a functional reason. For over_specification, explain the burden
-  and propose a simpler adequate requirement. Do not demand an inspection plan.
+  them needs a functional reason. Apply the same necessity and capability
+  scrutiny to every replacement you propose: a wider band is not justified
+  merely because it is wider. Prefer an adequate general tolerance or explicit
+  matched fitting over another unsupported precision band. If replacement
+  limits depend on unseen mating limits, state that dependency instead of
+  guessing numbers. Explain the burden; do not demand an inspection plan.
 - Hole callouts say what to do: DRILL or REAM plus the decimal size;
   clearance holes give the size, not the screw. A through tap can stay simple.
   A blind tap gives the usable full-thread depth and, when it constrains the
