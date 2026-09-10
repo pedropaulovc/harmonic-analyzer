@@ -4735,7 +4735,6 @@ async def finalize_drawing(
     # real view after all views exist, validate the linked model's tolerance and
     # current-release Revision properties, and hold every sheet to the same ASME B
     # contract.
-    isometric_views = 0
     for sheet_name in sheet_names:
         if not ddoc.ActivateSheet(sheet_name):
             raise RuntimeError(f"failed to activate drawing sheet {sheet_name!r}")
@@ -4807,7 +4806,6 @@ async def finalize_drawing(
                 view,
                 label=f"{sheet_name} {view_name(adapter, view)!r}",
             )
-            isometric_views += 1
         first_name = view_name(adapter, first_view)
         sheet.CustomPropertyView = first_name
         sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
@@ -4838,12 +4836,10 @@ async def finalize_drawing(
                 TITLE_BLOCK_COPYRIGHT_PROPERTY,
             ),
         )
-    if not isometric_views:
-        raise RuntimeError("finished drawing has no standard Isometric projection")
 
-    # Explicit recipe-requested cleanup remains sheet-scoped. The finalizer
-    # owns the standard Isometric view's high-quality Shaded With Edges mode;
-    # every other view keeps the appearance authored by its drawing recipe.
+    # Explicit recipe-requested cleanup remains sheet-scoped. When a standard
+    # Isometric view is present, the finalizer owns its high-quality Shaded With
+    # Edges mode; every other view keeps the appearance authored by its recipe.
     removed_notes = 0
     for sheet_name in sheet_names:
         if not ddoc.ActivateSheet(sheet_name):
