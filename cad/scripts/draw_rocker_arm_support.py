@@ -127,6 +127,7 @@ def _bottom_sheet_xy(hole_xz: tuple[float, float]) -> tuple[float, float]:
     )
 
 
+
 def _bottom_datum_axes(adapter: Any, view: Any) -> tuple[Any, Any]:
     """Return the two chamfer-offset datum axes visible in the bottom view."""
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
@@ -319,6 +320,10 @@ async def build(adapter: Any) -> dict[str, str]:
         basic_locations=False,
         label="rocker-arm-support",
     )
+    # Same regen as the side view: the datum walk + hole table leave the
+    # bottom view's HLV edge set stale (it exported the four tap circles and
+    # nothing of the pocket/cavity/web above them).
+    set_hidden_lines_visible(adapter, bottom)
 
     # x=0.020: a note is left-aligned on its anchor, so the ink starts here. The
     # bound is the 12.7 mm zone margin (~0.0127), which the re-centred frame rule
