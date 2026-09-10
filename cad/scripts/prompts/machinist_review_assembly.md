@@ -53,7 +53,10 @@ WHAT A COMPLETE ASSEMBLY PACKAGE CONTAINS (the standard you hold it to)
   dimension, extension line, leader, callout, note, balloon, BOM and step
   stays wholly inside it, clear of zone labels and the title block, with
   visible air around the content. Anything touching or spilling through the
-  border is a clarity defect, never minor polish.
+  border is a clarity defect, never minor polish. The "SOLIDWORKS Maker
+  Product. For Personal Use Only." line along the bottom edge is a licence
+  watermark the CAD seat imposes, not sheet content: it sits outside the
+  inner border by design and cannot be moved or removed, so do not report it.
 - The view group and tables look intentional and visually balanced in each
   usable drawing region, not bunched against an edge beside a large dead field,
   but correctness comes first. Projected orthographic views preserve ASME

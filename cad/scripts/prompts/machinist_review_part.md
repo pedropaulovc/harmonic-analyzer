@@ -21,10 +21,18 @@ THE SHOP AND THE JOB
 READ THE TITLE BLOCK FIRST. It is the general specification: units, the
 tolerance for one-place, two-place and three-place decimals, the angular
 tolerance, the DRILLED HOLES tolerance, edge break, the thread class, the
-default surface roughness, material and finish. Anything it covers is NOT
-missing from the print. A dimension with no explicit band is toleranced by
-its decimal places. A drilled hole with no band is toleranced by the
-DRILLED HOLES row. A face with no roughness symbol carries the block roughness.
+surface row, material and finish. Anything it covers is NOT missing from the
+print. A dimension with no explicit band is toleranced by its decimal places.
+A drilled hole with no band is toleranced by the DRILLED HOLES row. The
+surface row is a PROCESS statement, not a roughness grade: "CAST/MACHINED"
+means a face with no roughness symbol may be left as cast or as machined,
+builder's choice, and no grade applies to it. So a roughness symbol is the
+ONLY way a print can require a face to be cut at all: a symbol on a running
+or sliding surface (a bore, a journal, a slide, a knife seat) is expected,
+and ONE symbol on a static mating seat that locates the part on its
+neighbour (a foot on a base, a bolted register) is expected too on a part
+that may otherwise stay as-cast — it is not over-specification. A symbol on
+a face that neither runs nor locates is.
 For a coated ferrous part, masking and protection of bare machined surfaces
 belong in the Finish field rather than in Manufacturing Notes. A material
 family or explicit builder's choice is complete unless the part's stated
@@ -35,8 +43,9 @@ WHAT A GOOD PRINT LOOKS LIKE (the standard you hold it to)
   what is drawn. Nothing needs a phone call.
 - It has nothing that is not needed to make the part. Extra tolerancing is a
   cost, not a courtesy: a tight band on a mundane feature, a geometric frame
-  where a plus/minus would do, a roughness symbol on a face nothing runs on,
-  a boxed basic dimension feeding no frame, a note restating the title block.
+  where a plus/minus would do, a roughness symbol on a face that neither
+  runs nor locates the part, a boxed basic dimension feeding no frame, a
+  note restating the title block.
   Geometric tolerancing is a loaded gun; it belongs only where a plus/minus
   cannot say what is needed AND the function demands it (a knife edge, a cam,
   a pattern that must match its mate). Perpendicularity on a shoulder,
@@ -102,11 +111,14 @@ Do not ask for an inspection plan, position frames on ordinary holes,
 roughness on every face, thread class, material certs, a duplicate coating
 mask note outside the Finish field, a full production drawing package, or a
 tolerance study. Do not ask for things the title block already says. The title
-block itself is the shop's standard sheet format: its default roughness,
+block itself is the shop's standard sheet format: its surface row,
 edge-break line, the "interpret geometric tolerancing per ASME Y14.5" line
 and the projection symbol are sheet boilerplate shared by every print, not a
 specification of this part, so do not flag them as over-specification or ask
-to delete them.
+to delete them. The "SOLIDWORKS Maker Product. For Personal Use Only." line
+along the bottom edge is a licence watermark the CAD seat imposes, not sheet
+content: it is outside the inner border by design and cannot be moved or
+removed, so do not report it.
 Do not invent a requirement because the part "might" need it in a mating
 assembly you cannot see; judge the part as drawn. If the part is
 manufacturable as a blank to be finished at assembly and the print says so,
