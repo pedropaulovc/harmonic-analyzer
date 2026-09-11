@@ -15,7 +15,8 @@ from __future__ import annotations
 # --- Marked-dimension contract.  build_summing_lever marks exactly these. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PlateProfile": {"PlateWidth", "PlateLength"},
-    "HexKnifeFrontProfile": {"HexKnifeFrontS1dy", "HexKnifeFrontTopY"},
+    "CylinderProfile": {"CylDia"},
+    "HexKnifeFrontProfile": {"HexKnifeFrontS1dy"},
     "SummationAnchorProfile": {"AnchorOuterDia", "AnchorBoreDia"},
 }
 

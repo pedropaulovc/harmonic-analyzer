@@ -27,13 +27,15 @@ def test_marked_dimensions_are_consumed_once_by_the_manufacturing_views() -> Non
     kept = (
         set(drawing.FRONT_KEEP)
         | set(drawing.TOP_KEEP)
+        | set(drawing.CYLINDER_SECTION_KEEP)
         | set(drawing.KNIFE_SECTION_KEEP)
         | set(drawing.RIGHT_KEEP)
     )
     assert kept == marked
     assert "AnchorBoreDia" in drawing.TOP_KEEP
+    assert "CylDia" in drawing.CYLINDER_SECTION_KEEP
     assert "HexKnifeFrontS1dy" in drawing.KNIFE_SECTION_KEEP
-    assert "HexKnifeFrontTopY" in drawing.KNIFE_SECTION_KEEP
+    assert "HexKnifeFrontTopY" not in kept
 
 
 def test_draw_view_math_matches_authoritative_geometry() -> None:
