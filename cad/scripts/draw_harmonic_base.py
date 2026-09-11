@@ -8,8 +8,8 @@ shared sheet/template, import, curation, and export behavior lives in
 The base is machined from one-piece gray-iron stock: the legacy lower flange and
 upper pad retain their front edges and extend 35.415 mm rearward, with four
 counterbored lag-screw mounting holes and nine assembly-drilled hardware seats.
-The plate is 457 mm long; the front elevation is 1:4 and the pictorial
-isometric is 1:10.
+The plate is 457 mm long, so the whole sheet runs 1:4; the front elevation is
+also 1:4 and the pictorial isometric is 1:10.
 
 Run with SolidWorks open::
 
@@ -83,20 +83,21 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 4.0)  # 1:4 whole sheet keeps this data-dense print legible
-VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]
+PLAN_SCALE = SHEET_SCALE
+VIEW_SCALE = PLAN_SCALE[0] / PLAN_SCALE[1]
 
 if abs((BOTTOM_REAR_Z - BOTTOM_FRONT_Z) - BOTTOM_WIDTH) > 1e-12:
     raise AssertionError("base drawing extents disagree with the overall depth")
 
 # Sheet layout (meters). At 1:4 the plan and its controls occupy the upper-left;
-# the complete native hole table owns the upper-right column. The elevation,
-# notes, and shaded pictorial each have a separate lower band.
-TOP_CENTER = (0.085, 0.205)
-SIDE_CENTER = (0.085, 0.145)
+# the complete native hole table owns the upper-right column. The elevation
+# stays below the plan, while the isometric has its own upper-middle band.
+TOP_CENTER = (0.075, 0.205)
+SIDE_CENTER = (0.075, 0.145)
 ISO_SCALE = (1, 10)
-ISO_CENTER = (0.370, 0.090)
-SIDE_NOTE_XY = (0.020, 0.158)
-ISO_NOTE_XY = (0.315, 0.115)
+ISO_CENTER = (0.180, 0.240)
+SIDE_NOTE_XY = (0.145, 0.185)
+ISO_NOTE_XY = (0.135, 0.212)
 
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
 # position (meters).  Only the bottom plate's overall footprint is marked.
@@ -121,6 +122,7 @@ _DATUM_XY = (
     TOP_CENTER[1] - BOTTOM_REAR_Z * VIEW_SCALE / 1000.0,
 )
 HOLE_TABLE_ANCHOR = (0.220, 0.265)
+HOLE_TABLE_TEXT_HEIGHT = 0.0018
 
 
 def _plan_xy(x_mm: float, z_mm: float) -> tuple[float, float]:
@@ -316,7 +318,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # Explicit per-view scale: a view placed without one can silently auto-scale,
     # which shifts every coordinate-based pick on it.
-    top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 2))
+    top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=PLAN_SCALE)
     side = place_view(adapter, str(SOURCE), "*Front", *SIDE_CENTER, scale=(1, 4))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
     for view in (top, side, iso):
@@ -350,7 +352,7 @@ async def build(adapter: Any) -> dict[str, str]:
         anchor_xy=HOLE_TABLE_ANCHOR,
         basic_locations=True,
         label="harmonic-base mounting",
-        text_height_m=0.002,
+        text_height_m=HOLE_TABLE_TEXT_HEIGHT,
     )
     add_datum_feature(
         adapter,
@@ -397,7 +399,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         top,
-        frame_xy=(0.155, 0.175),
+        frame_xy=(0.145, 0.175),
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["tapped-hole true position"],
         datums=("A", "B", "C"),
@@ -410,7 +412,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         top,
-        frame_xy=(0.060, 0.160),
+        frame_xy=(0.145, 0.160),
         characteristic="perpendicularity",
         tolerance=GEOMETRIC_TOLERANCES_MM["datum B perpendicularity to A"],
         datums=("A",),

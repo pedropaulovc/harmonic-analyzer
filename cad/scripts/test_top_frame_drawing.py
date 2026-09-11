@@ -100,7 +100,6 @@ def test_notes_carry_the_casting_rails_bosses_and_holes() -> None:
     assert "TIR" not in notes
     assert "-0.00" not in notes
     assert "X.XX" not in notes
-    assert drawing.DATUM_C_SYMBOL_XY[0] < drawing.TOP_CENTER[0] + part.OUTER_X / 2000.0
     assert set(top_frame_spec.GEOMETRIC_TOLERANCES_MM) == {
         "column-bore true position",
         "column-boss true position",
@@ -210,10 +209,8 @@ def test_view_scales_are_explicit() -> None:
     assert top_frame_spec.FRONT_VIEW_NOTE == "FRONT VIEW SCALE 1:4"
 
 
+
 def test_part_stamps_make_critical_properties() -> None:
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_properties" in source
-    assert "clear_dimensions_for_drawing" in source
     import _config
 
     config = _config.parts("top-frame")

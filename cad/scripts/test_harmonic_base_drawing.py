@@ -54,6 +54,7 @@ def test_plate_geometry_is_single_sourced() -> None:
     assert math.isclose(harmonic_base_spec.TOP_WIDTH, 10.5 * 25.4)
 
 
+
 def test_hole_table_covers_mounting_holes_and_every_hardware_seat() -> None:
     expected_holes = {
         *((x, z, part.HOLD_DOWN_TAP_DRILL_DIA) for x, z in part.HOLE_XZ),

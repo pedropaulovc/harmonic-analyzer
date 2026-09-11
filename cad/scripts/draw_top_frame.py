@@ -13,6 +13,12 @@ tapped holes (#8-32 side screws and keeper feet, 1/4-20 set screw) stay in
 the notes. The sheet runs 1:2; the front elevation drops to 1:4 and the
 pictorial isometric to 1:10.
 
+The sheet is split into two columns that never share ink: graphics on the
+left (plan on top, front elevation directly beneath it on the same
+centreline, pictorial in the bottom corner beside it) and one note column on
+the right carrying notes 1-5, notes 6-10 and the inspection block stacked in
+reading order between the top border and the title block.
+
 Run with SolidWorks open::
 
     uv run python cad\scripts\draw_top_frame.py top-frame
@@ -89,33 +95,69 @@ PLAN_HALF_Z = abs(FRONT_COLUMN_Z) + BOSS_DIA / 2.0  # 138.1
 BOSS_BAND = RING_HEIGHT + BOSS_ABOVE + BOSS_BELOW  # 47.3
 STUD_X = (BAR_X0 + BAR_X1) / 2.0  # -15.0 crossbar centreline
 
-# Sheet layout (meters). The plan defines the profile, the bore pattern and
-# the hanger-stud holes; the front elevation makes the 36.5 rail band, the
-# 47.3 boss stack and datum A visible.
-TOP_CENTER = (0.135, 0.175)
-FRONT_CENTER = (0.345, 0.130)
-DATUM_C_SYMBOL_XY = (0.210, 0.105)
-# The 446.2 x 276.2 x 47.3 mm envelope fits at 1:10 in the open band below
-# the front elevation and above the title block.
-ISO_CENTER = (0.372, 0.096)
+# --- Sheet regions (metres on the ASME B landscape sheet) ---------------
+# Inner border and title block.  Every view, dimension, datum, feature
+# control frame and note below is placed so its ink stays inside the border
+# and out of the title block.
+SHEET_FRAME_X = (0.0127, 0.4191)
+SHEET_FRAME_Y = (0.0127, 0.2667)
+TITLE_BLOCK_X0 = 0.2181
+TITLE_BLOCK_Y1 = 0.0651
+
+PLAN_HALF_W = PLAN_HALF_X * VIEW_SCALE / 1000.0  # 0.11155 sheet metres
+PLAN_HALF_D = PLAN_HALF_Z * VIEW_SCALE / 1000.0  # 0.06905 sheet metres
+
+# Left edge of the note column, clear of the plan's boss envelope.  Three
+# blocks of 72-character lines only fit the remaining width at the project's
+# 2.5 mm dense-note lettering, so the blocks carry an explicit height.
+NOTE_COLUMN_X = 0.272
+NOTE_CHAR_HEIGHT = 0.0025
+
+# Views.  The plan defines the profile, the bore pattern and the hanger-stud
+# holes; the front elevation -- projected under the plan on the shared
+# centreline -- makes the 36.5 rail band, the 47.3 boss stack and datum A
+# visible; the 446.2 x 276.2 x 47.3 envelope reads at 1:10 in the corner.
+TOP_CENTER = (0.156, 0.178)
+FRONT_CENTER = (0.156, 0.085)
+ISO_CENTER = (0.052, 0.053)
 ISO_SCALE = (1, 10)
-FRONT_VIEW_NOTE_XY = (0.262, 0.112)
-ISO_VIEW_NOTE_XY = (0.262, 0.094)
+
+# Datum features.  A hangs under the front elevation; B and C drop below the
+# plan so neither symbol lands on the profile dimensions that run up the left
+# flank and across the top.
+DATUM_A_SYMBOL_XY = (0.110, 0.070)
+DATUM_B_SYMBOL_XY = (0.050, 0.096)
+DATUM_C_SYMBOL_XY = (0.240, 0.096)
+
+# Feature control frames live inside the 359.8 x 186.0 clear window.  Three
+# stack down the left panel beside the bosses and the gooseneck hub they
+# control; the hanger-stud frame sits in the right panel beside its hole.
+# The 22.00 crossbar band and its 18x18 gussets stay clear between them.
+FCF_BOSS_OD_XY = (0.072, 0.212)
+FCF_GOOSENECK_XY = (0.072, 0.180)
+FCF_COLUMN_BORE_XY = (0.072, 0.148)
+FCF_STUD_HOLE_XY = (0.165, 0.148)
+
+# View captions sit immediately under the view they name.
+TOP_VIEW_NOTE_XY = (0.132, 0.104)
+FRONT_VIEW_NOTE_XY = (0.130, 0.070)
+ISO_VIEW_NOTE_XY = (0.028, 0.033)
+
+# Note column, read top to bottom: notes 1-5 and 6-10 as one group, then the
+# inspection block set apart below it.  Anchors are literal sheet coordinates
+# at the top-left of each block and the text grows downward from there.
+MANUFACTURING_NOTES_XY = (NOTE_COLUMN_X, 0.263)
+MANUFACTURING_NOTES_B_XY = (NOTE_COLUMN_X, 0.191)
+INSPECTION_NOTES_XY = (NOTE_COLUMN_X, 0.131)
 
 
 # Per-view survivors of the marked-dimension import. Width/Depth are the straight
 # rail outside profile, not the boss envelope; note 2 states both explicitly.
+# Both sit far enough off the outline that their text clears the casting, and
+# the Depth text on the left flank still clears the border.
 TOP_KEEP = {
-    "Width": (
-        TOP_CENTER[0],
-        TOP_CENTER[1] + PLAN_HALF_Z * VIEW_SCALE / 1000.0 + 0.012,
-    ),
-    # Depth rides the LEFT flank: the right flank hosts the notes-B block
-    # and the text landed mid-block (eye-pass 2026-08-03).
-    "Depth": (
-        TOP_CENTER[0] - PLAN_HALF_X * VIEW_SCALE / 1000.0 - 0.006,
-        TOP_CENTER[1] - 0.030,
-    ),
+    "Width": (TOP_CENTER[0], TOP_CENTER[1] + PLAN_HALF_D + 0.011),
+    "Depth": (TOP_CENTER[0] - PLAN_HALF_W - 0.0155, TOP_CENTER[1]),
 }
 
 
@@ -296,7 +338,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         front,
-        symbol_xy=(0.285, 0.125),
+        symbol_xy=DATUM_A_SYMBOL_XY,
         datum="A",
         label="finished bottom-face datum",
         entity=datum_a_edge,
@@ -305,7 +347,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         top,
-        symbol_xy=(0.020, 0.175),
+        symbol_xy=DATUM_B_SYMBOL_XY,
         datum="B",
         label="east outer rail-face datum",
         entity=datum_b_edge,
@@ -323,7 +365,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         top,
-        frame_xy=(0.175, 0.150),
+        frame_xy=FCF_COLUMN_BORE_XY,
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["column-bore true position"],
         datums=("A", "B", "C"),
@@ -335,7 +377,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         top,
-        frame_xy=(0.130, 0.220),
+        frame_xy=FCF_BOSS_OD_XY,
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["column-boss true position"],
         datums=("A", "B", "C"),
@@ -347,7 +389,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         top,
-        frame_xy=(0.080, 0.165),
+        frame_xy=FCF_GOOSENECK_XY,
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["gooseneck-bore true position"],
         datums=("A", "B", "C"),
@@ -359,7 +401,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         top,
-        frame_xy=(0.205, 0.125),
+        frame_xy=FCF_STUD_HOLE_XY,
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["hanger-stud-hole true position"],
         datums=("A", "B", "C"),
@@ -369,12 +411,25 @@ async def build(adapter: Any) -> dict[str, str]:
         entity=stud_hole,
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.102)
-    # Stack the two right-hand blocks instead of overlapping them. Both note
-    # anchors are literal sheet coordinates; multi-line text grows upward.
-    add_property_linked_note(adapter, "Manufacturing Notes B", 0.265, 0.154)
-    add_property_linked_note(adapter, "Inspection Notes", 0.260, 0.270)
-    add_property_linked_note(adapter, "Top View Note", 0.280, 0.212)
+    add_property_linked_note(
+        adapter,
+        "Manufacturing Notes",
+        *MANUFACTURING_NOTES_XY,
+        char_height=NOTE_CHAR_HEIGHT,
+    )
+    add_property_linked_note(
+        adapter,
+        "Manufacturing Notes B",
+        *MANUFACTURING_NOTES_B_XY,
+        char_height=NOTE_CHAR_HEIGHT,
+    )
+    add_property_linked_note(
+        adapter,
+        "Inspection Notes",
+        *INSPECTION_NOTES_XY,
+        char_height=NOTE_CHAR_HEIGHT,
+    )
+    add_property_linked_note(adapter, "Top View Note", *TOP_VIEW_NOTE_XY)
     add_property_linked_note(adapter, "Front View Note", *FRONT_VIEW_NOTE_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_VIEW_NOTE_XY)
 
