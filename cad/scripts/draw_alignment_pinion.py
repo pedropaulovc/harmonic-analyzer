@@ -2,8 +2,8 @@ r"""Create the curated manufacturing drawing for the alignment pinion drum (42T)
 
 Follows the batch gear-drawing pattern (see ``draw_cylinder_gear``), adapted for
 a long drum: the *Front end view carries the bore + tooth datum, and the *Right
-profile view shows the full 143 mm face length. Drawn 1:1; no isometric (a long
-thin drum is fully described by the two orthographic views).
+profile view shows the full 143 mm face length. Drawn 1:1, plus the standard
+isometric in the open band below the profile view.
 """
 
 from __future__ import annotations
@@ -57,6 +57,9 @@ SHEET_SCALE = (1.0, 1.0)
 VIEW_SCALE = (1, 1)
 FRONT_CENTER = (0.150, 0.185)  # toothed end view
 RIGHT_CENTER = (0.285, 0.185)  # long drum profile (143 mm face)
+# The 143.2 x 22.4 mm drum projects to about 117 x 79 mm at 1:1, fitting
+# between the profile view and title block without a custom-scale label.
+ISO_CENTER = (0.320, 0.120)
 
 BORE_R = BORE_DIA * VIEW_SCALE[0] / 2000.0
 HALF_OD = OUTSIDE_DIA * VIEW_SCALE[0] / 2000.0
@@ -120,7 +123,8 @@ async def build(adapter: Any) -> dict[str, str]:
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE)
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=VIEW_SCALE)
-    for view in (front, right):
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
+    for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
 
     front_annotations = curate_view_dimensions(

@@ -5,10 +5,11 @@ overall footprint dimensions, the mounting-hole table, and manufacturing notes; 
 shared sheet/template, import, curation, and export behavior lives in
 ``_drawing_common``.
 
-The base is machined from one-piece gray-iron stock: the legacy lower flange
-and upper pad retain their front edges and extend 35.415 mm rearward, with four
-blind rocker-support taps and nine other assembly-drilled hardware seats. The
-plate is 457 mm long, so the whole sheet runs 1:2; the front elevation is 1:4.
+The base is machined from one-piece gray-iron stock: the legacy lower flange and
+upper pad retain their front edges and extend 35.415 mm rearward, with four
+counterbored lag-screw mounting holes and nine assembly-drilled hardware seats.
+The plate is 457 mm long; the front elevation is 1:4 and the pictorial
+isometric is 1:10.
 
 Run with SolidWorks open::
 
@@ -87,12 +88,15 @@ VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]  # 0.5 plan/front sheet-metres-per-
 if abs((BOTTOM_REAR_Z - BOTTOM_FRONT_Z) - BOTTOM_WIDTH) > 1e-12:
     raise AssertionError("base drawing extents disagree with the overall depth")
 
-# Sheet layout (meters).  The plan (top) carries the footprint + the hole
-# pattern; the front elevation (1:4) shows the stepped stack; the hole
-# table sits upper-right and the notes fill the lower-left.  The plan runs at the
-# sheet's 1:2; only the 1:4 isometric carries a scale note.
+# Sheet layout (meters). The plan carries the footprint and hole pattern; the
+# front elevation shows the stepped stack; the hole table sits upper-right and
+# notes fill the lower-left. The 1:10 isometric uses the remaining band below
+# the plan, right of the notes, and left of the title block.
 TOP_CENTER = (0.130, 0.163)
 SIDE_CENTER = (0.345, 0.075)
+ISO_SCALE = (1, 10)
+ISO_CENTER = (0.178, 0.048)
+ISO_NOTE_XY = (0.146, 0.081)
 
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
 # position (meters).  Only the bottom plate's overall footprint is marked.
@@ -284,6 +288,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Manufacturing Notes",
             "Side View Note",
+            "Isometric View Note",
         ),
         required=(
             "Number",
@@ -292,6 +297,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Manufacturing Notes",
             "Side View Note",
+            "Isometric View Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -312,7 +318,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # which shifts every coordinate-based pick on it.
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 2))
     side = place_view(adapter, str(SOURCE), "*Front", *SIDE_CENTER, scale=(1, 4))
-    for view in (top, side):
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
+    for view in (top, side, iso):
         set_hidden_lines_removed(adapter, view)
 
     curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
@@ -436,6 +443,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, "Manufacturing Notes", 0.016, 0.0825, char_height=0.0025
     )
     add_property_linked_note(adapter, "Side View Note", 0.260, 0.095)
+    add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     return await finalize_drawing(
         adapter,

@@ -10,7 +10,8 @@ window, a 36.5-tall webbed ring band, four Ø52.2 corner bosses bored Ø25.5 to
 clamp the columns, a Ø17 gooseneck bore through the east-rail hub, and an
 integral crossbar carrying two Ø13.49 hanger-stud holes.  The side-facing
 tapped holes (#8-32 side screws and keeper feet, 1/4-20 set screw) stay in
-the notes.  The sheet runs 1:2; the front elevation drops to 1:4.
+the notes. The sheet runs 1:2; the front elevation drops to 1:4 and the
+pictorial isometric to 1:10.
 
 Run with SolidWorks open::
 
@@ -94,6 +95,12 @@ STUD_X = (BAR_X0 + BAR_X1) / 2.0  # -15.0 crossbar centreline
 TOP_CENTER = (0.135, 0.175)
 FRONT_CENTER = (0.345, 0.130)
 DATUM_C_SYMBOL_XY = (0.210, 0.105)
+# The 446.2 x 276.2 x 47.3 mm envelope fits at 1:10 in the open band below
+# the front elevation and above the title block.
+ISO_CENTER = (0.372, 0.096)
+ISO_SCALE = (1, 10)
+FRONT_VIEW_NOTE_XY = (0.262, 0.112)
+ISO_VIEW_NOTE_XY = (0.262, 0.094)
 
 
 # Per-view survivors of the marked-dimension import. Width/Depth are the straight
@@ -236,6 +243,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Inspection Notes",
             "Top View Note",
             "Front View Note",
+            "Isometric View Note",
         ),
         required=(
             "Number",
@@ -247,6 +255,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Inspection Notes",
             "Top View Note",
             "Front View Note",
+            "Isometric View Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -265,7 +274,8 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 2))
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 4))
-    for view in (top, front):
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
+    for view in (top, front, iso):
         set_hidden_lines_removed(adapter, view)
 
     curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
@@ -372,7 +382,8 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Manufacturing Notes B", 0.2585, 0.200)
     add_property_linked_note(adapter, "Inspection Notes", 0.2965, 0.260)
     add_property_linked_note(adapter, "Top View Note", 0.280, 0.2055)
-    add_property_linked_note(adapter, "Front View Note", 0.300, 0.0785)
+    add_property_linked_note(adapter, "Front View Note", *FRONT_VIEW_NOTE_XY)
+    add_property_linked_note(adapter, "Isometric View Note", *ISO_VIEW_NOTE_XY)
 
     return await finalize_drawing(
         adapter,
