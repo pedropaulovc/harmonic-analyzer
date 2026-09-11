@@ -28,8 +28,15 @@ OUTSIDE_DIA = (TEETH + 2) / DIAMETRAL_PITCH * MM_PER_IN  # 62.20
 WHOLE_DEPTH = 2.157 / DIAMETRAL_PITCH * MM_PER_IN  # 1.10
 
 # --- machinable blank (build_cylinder_gear.py) ------------------------------
-BORE_DIA = 0.375 * MM_PER_IN  # 9.525 (3/8")
-BORE_DIA_BAND = (0.05, 0.03)  # (upper, lower) deviations
+BORE_DIA = 0.375 * MM_PER_IN  # 9.525 reference nominal; finish to the actual arbor
+BORE_DIAMETRAL_CLEARANCE_MM = (0.030, 0.070)  # (minimum, maximum), matched fit
+BORE_FIT_CALLOUT = (
+    "FINISH BORE THRU; ALL 20 GEARS\n"
+    "MATCH TO FINISHED\n"
+    "CYLINDER-GEAR-SHAFT MHA-028\n"
+    f"{BORE_DIAMETRAL_CLEARANCE_MM[0]:.3f}-{BORE_DIAMETRAL_CLEARANCE_MM[1]:.3f} "
+    "DIAMETRAL CLEARANCE"
+)
 FACE_WIDTH = 3.0
 FACE_WIDTH_TOLERANCE_MM = 0.05
 CAM_DIA = 30.6  # integral eccentric cam disc
@@ -55,7 +62,12 @@ NOTCH_CENTER_X = (
 )
 
 SURFACE_FINISHES = (
-    SurfaceFinishControl("cylinder_gear_bore", MACHINED_UM, CylinderFace(BORE_DIA)),
+    SurfaceFinishControl(
+        "cylinder_gear_bore",
+        MACHINED_UM,
+        CylinderFace(BORE_DIA),
+        production_method="BORE",
+    ),
     SurfaceFinishControl("cam_follower", MACHINED_UM, CylinderFace(CAM_DIA)),
 )
 
@@ -69,6 +81,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "NotchProfile": {"NotchDepth", "NotchWidth"},
 }
 
+def matched_bore_limits(finished_shaft_dia_mm: float) -> tuple[float, float]:
+    """Return finished bore MIN/MAX for the measured mating MHA-028 arbor."""
+    minimum, maximum = BORE_DIAMETRAL_CLEARANCE_MM
+    return finished_shaft_dia_mm + minimum, finished_shaft_dia_mm + maximum
+
+
 
 def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> str:
     """Render an aligned gear/sprocket data block for a property-linked note."""
@@ -78,7 +96,7 @@ def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> 
 GEAR_DATA = gear_data_note(
     [
         ("NUMBER OF TEETH", f"{TEETH}"),
-        ("DIAMETRAL PITCH", f"{DIAMETRAL_PITCH:.2f}"),
+        ("DIAMETRAL PITCH", f"{DIAMETRAL_PITCH:.2f} (NONSTANDARD)"),
         ("MODULE (mm, REF)", f"{MODULE_MM:.3f}"),
         ("PRESSURE ANGLE", f"{PRESSURE_ANGLE_DEG:.1f} DEG"),
         ("PITCH DIAMETER (mm, REF)", f"{PITCH_DIA:.2f}"),

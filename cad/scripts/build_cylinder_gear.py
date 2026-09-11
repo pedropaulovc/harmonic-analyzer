@@ -110,7 +110,6 @@ from _part_pmi import author_part_pmi
 from build_cone_gear import DP, gear_facts  # DP = train diametral_pitch (machine.yaml)
 from cylinder_gear_spec import (
     BORE_DIA as BORE_DIAMETER,
-    BORE_DIA_BAND,
     CAM_DIA as CAM_DIAMETER,
     CAM_DIA_BAND,
     CAM_THICKNESS,
@@ -508,9 +507,6 @@ async def build(adapter) -> dict[str, str]:
         "GearBlank",
         "FaceWidth",
         FACE_WIDTH_TOLERANCE_MM,
-    )
-    set_dimension_bilateral_tolerance(
-        adapter, "BoreProfile", "BoreDia", *deviations(BORE_DIA_BAND)
     )
     set_dimension_bilateral_tolerance(
         adapter, "CamProfile", "CamDia", *deviations(CAM_DIA_BAND)

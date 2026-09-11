@@ -28,6 +28,7 @@ from _drawing_common import (
     set_dimension_precision,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
+    set_reference_dimensions,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -35,6 +36,7 @@ from _gear_drawing_entities import visible_circle_edge
 from _surface_finish import surface_finish_by_key
 from cylinder_gear_spec import (
     BORE_DIA,
+    BORE_FIT_CALLOUT,
     CAM_DIA,
     CAM_THICKNESS,
     ECCENTRICITY,
@@ -69,7 +71,7 @@ GEAR_DATA_POS = (0.015, 0.410)
 MANUFACTURING_NOTES_POS = (0.015, 0.105)
 
 FRONT_KEEP = {
-    "BoreDia": (0.045, 0.210),
+    "BoreDia": (0.080, 0.210),
     "NotchWidth": (0.105, 0.340),
     "NotchDepth": (0.050, 0.325),
     "CamDia": (0.175, 0.325),
@@ -80,8 +82,9 @@ RIGHT_KEEP = {
     "CamThickness": (0.205, 0.345),
 }
 DIMENSION_CALLOUTS = {
-    "BoreDia": "FINISH BORE THRU",
+    "BoreDia": BORE_FIT_CALLOUT,
     "NotchWidth": "ALIGNMENT NOTCH",
+    "NotchDepth": "FROM OD",
 }
 DIMENSION_PRECISION = {
     "BoreDia": 3,
@@ -209,6 +212,7 @@ async def build(adapter: Any) -> dict[str, str]:
     annotations = [*front_annotations, *right_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     set_dimension_precision(adapter, annotations, DIMENSION_PRECISION)
+    set_reference_dimensions(adapter, annotations, {"BoreDia"})
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to cam-side front view")
@@ -248,10 +252,17 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         front,
-        symbol_xy=(0.110, 0.200),
+        symbol_xy=(0.140, 0.200),
         control=surface_finish_by_key(SURFACE_FINISHES, "cylinder_gear_bore"),
         label="cylinder gear bore finish",
         entity=bore_edge,
+        leader_attach_xy=_project_mm(
+            adapter,
+            front,
+            (0.0, -BORE_DIA / 2.0, 0.0),
+            label="bore finish leader attachment",
+        ),
+        char_height=0.0025,
     )
 
     # The follower finish belongs on the cam's cylindrical flank.  The side

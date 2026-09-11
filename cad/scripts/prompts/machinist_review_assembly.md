@@ -36,11 +36,17 @@ WHAT A COMPLETE ASSEMBLY PACKAGE CONTAINS (the standard you hold it to)
   press this bushing to this depth, set this gear mesh with this backlash,
   torque this screw, align this axis to that face within so much. Fits that
   are set at assembly (match-drill, ream in place, shim, adjust) are said so
-  with the identified mate, target and how to check it. For a one-off matched
-  or selectively fitted pair, clear functional acceptance can define the fit;
-  do not demand numeric bands merely because a nominal size is reference-only,
-  or assume that reference nominal means purchased stock. Matching does not
-  waive conflicting controlled limits or essential interchangeability requirements.
+  with the mating part's name and drawing or part number when assigned,
+  target and how to check it. An item reference is sufficient when the
+  package's BOM unambiguously supplies that item's name and assigned number.
+  For a one-off matched or selectively fitted pair, state the required
+  clearance, interference, or unambiguous functional acceptance; specify
+  diametral or radial clearance where applicable. "MATCH FIT" alone is
+  incomplete. When the nominal is reference-only, the finished identified
+  mate and stated acceptance define the fit. Do not demand numeric bands
+  merely because a nominal size is reference-only, or assume that reference
+  nominal means purchased stock. Matching does not waive conflicting
+  controlled limits or essential interchangeability requirements.
 - Assembly-level dimensions and checks: the few positions, gaps, clearances,
   travels, alignments or preloads that only exist once the parts are
   together, each with an unambiguous acceptance criterion and way to check it.
@@ -134,7 +140,8 @@ view or item for every finding, and say the fix):
   view group bunched against an edge or visibly unbalanced, balloons or leaders
   crossing, views too small to identify parts, a missing or noncompliant
   Shaded With Edges isometric, a step order that is hard to follow, an exploded
-  view that does not read.
+  view that does not read, or an otherwise identifiable matched-fit mate
+  missing its name or assigned drawing/part number.
 
 - minor: taste and polish.
 An empty list is a valid answer for any category. Never pad a category.

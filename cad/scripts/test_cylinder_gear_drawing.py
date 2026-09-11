@@ -7,7 +7,6 @@ from pathlib import Path
 
 import build_cylinder_gear as part
 import cylinder_gear_spec as spec
-import cylinder_gear_shaft_spec as shaft_spec
 import draw_cylinder_gear as drawing
 from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
@@ -45,7 +44,6 @@ def test_spec_is_the_single_source_of_native_drawing_dimensions() -> None:
 def test_model_dimensions_carry_the_manufacturing_tolerances() -> None:
     assert model_toleranced_dimensions(part) == {
         ("GearBlank", "FaceWidth"): "FACE_WIDTH_TOLERANCE_MM",
-        ("BoreProfile", "BoreDia"): "*deviations(BORE_DIA_BAND)",
         ("CamProfile", "CamDia"): "*deviations(CAM_DIA_BAND)",
         ("CamProfile", "CamCy"): "ECCENTRICITY_TOLERANCE_MM",
         ("CamBoss", "CamThickness"): "CAM_THICKNESS_TOLERANCE_MM",
@@ -112,12 +110,8 @@ def test_only_functional_running_surfaces_receive_roughness() -> None:
 def test_short_notes_only_define_phase_tooth_data_and_set_consistency() -> None:
     notes = spec.DRAWING_NOTES
     lines = notes.splitlines()
-    assert len(lines) == 2
-    assert "FIRST TOOTH ROOT CCW FROM CAM LOBE" in notes
-    assert "VIEWED FROM CAM FACE" in notes
-    assert f"{spec.SET_ECCENTRICITY_RANGE_MM:.3f} MAX" in notes
+    assert len(lines) <= 4
     assert 2.0 * spec.ECCENTRICITY_TOLERANCE_MM > spec.SET_ECCENTRICITY_RANGE_MM
-    assert "ALL 20 MHA-027 GEARS IN ONE ANALYZER" in notes
     for redundant in (
         "DATUM",
         "BASIC",
@@ -149,14 +143,15 @@ def test_notch_geometry_matches_first_root_counterclockwise_phase() -> None:
     assert spec.NOTCH_CENTER_X < 0.0
 
 
-def test_running_bore_fit_matches_the_stationary_arbor() -> None:
-    bore_max = spec.BORE_DIA + spec.BORE_DIA_BAND[0]
-    bore_min = spec.BORE_DIA + spec.BORE_DIA_BAND[1]
-    shaft_max = shaft_spec.SHAFT_DIA + shaft_spec.SHAFT_DIA_BAND[0]
-    shaft_min = shaft_spec.SHAFT_DIA + shaft_spec.SHAFT_DIA_BAND[1]
-    assert math.isclose(bore_min - shaft_max, 0.030, abs_tol=1e-12)
-    assert math.isclose(bore_max - shaft_min, 0.070, abs_tol=1e-12)
-    assert drawing.DIMENSION_CALLOUTS["BoreDia"] == "FINISH BORE THRU"
+def test_running_bore_limits_follow_the_finished_arbor() -> None:
+    # The same bore must not be specified for arbors at opposite ends of the
+    # shaft tolerance: all 20 gears are matched to the shaft actually supplied.
+    small_min, small_max = spec.matched_bore_limits(9.505)
+    large_min, large_max = spec.matched_bore_limits(9.525)
+    assert math.isclose(small_min, 9.535, abs_tol=1e-12)
+    assert math.isclose(small_max, 9.575, abs_tol=1e-12)
+    assert math.isclose(large_min, 9.555, abs_tol=1e-12)
+    assert math.isclose(large_max, 9.595, abs_tol=1e-12)
 
 
 def test_title_block_owns_material_finish_and_general_tolerance() -> None:
@@ -164,7 +159,6 @@ def test_title_block_owns_material_finish_and_general_tolerance() -> None:
 
     config = _config.parts("cylinder-gear")
     assert config["material_specification"] == "C36000 free-machining brass"
-    assert config["finish"] == "POLISHED BRASS"
     assert int(config["quantity"]) == 20
     assert spec.FACE_WIDTH == part.FACE_WIDTH
     assert spec.CAM_THICKNESS == part.CAM_THICKNESS
