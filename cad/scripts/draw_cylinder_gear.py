@@ -39,11 +39,8 @@ from cylinder_gear_spec import (
     CAM_THICKNESS,
     ECCENTRICITY,
     FACE_WIDTH,
-    NOTCH_CENTER_X,
-    NOTCH_FLOOR_RADIUS,
-    NOTCH_DEPTH,
+    OVERALL_THICKNESS,
     SURFACE_FINISHES,
-    TIP_RADIUS,
 )
 from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
 
@@ -76,8 +73,10 @@ MANUFACTURING_NOTES_POS = (0.015, 0.105)
 FRONT_KEEP = {
     "BoreDia": (0.025, 0.235),
     "NotchWidth": (0.070, 0.335),
+    "NotchDepth": (0.018, 0.320),
 }
 RIGHT_KEEP = {
+    "FaceWidth": (0.140, 0.220),
     "CamThickness": (0.140, 0.345),
 }
 BACK_KEEP = {
@@ -93,9 +92,11 @@ DIMENSION_CALLOUTS = {
 DIMENSION_PRECISION = {
     "BoreDia": 3,
     "CamDia": 2,
+    "FaceWidth": 2,
     "CamCy": 3,
     "CamThickness": 2,
     "NotchWidth": 2,
+    "NotchDepth": 1,
 }
 
 
@@ -223,50 +224,36 @@ async def build(adapter: Any) -> dict[str, str]:
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME center marks to {label} view")
 
-    # The gear blank width is visible in the right view but the mesh-critical
-    # fixed-gear builder intentionally carries no marked sketch dimensions.
-    # Read the actual end edges and fail if they no longer equal the shared spec.
-    gear_pick_y = -0.75 * TIP_RADIUS
-    _checked_edge_dimension(
+    # Face width and cam width remain the two authoritative axial dimensions.
+    # The policy also requires a conspicuous overall length, so show the measured
+    # end-to-end stack as a checked REFERENCE dimension rather than closing an
+    # independently toleranced dimension chain.
+    cam_bore_wall = CAM_DIA / 2.0 - ECCENTRICITY - BORE_DIA / 2.0
+    overall_pick_y = -(BORE_DIA / 2.0 + cam_bore_wall / 2.0)
+    overall = _checked_edge_dimension(
         adapter,
         right,
         p0=_project_mm(
-            adapter, right, (0.0, gear_pick_y, 0.0), label="gear front edge"
+            adapter,
+            right,
+            (0.0, overall_pick_y, 0.0),
+            label="overall gear front edge",
         ),
         p1=_project_mm(
             adapter,
             right,
-            (0.0, gear_pick_y, FACE_WIDTH),
-            label="gear rear edge",
+            (0.0, overall_pick_y, OVERALL_THICKNESS),
+            label="overall cam rear edge",
         ),
-        text_xy=(RIGHT_CENTER[0], 0.220),
-        label="gear face width",
-        expected_mm=FACE_WIDTH,
-        precision=3,
+        text_xy=(RIGHT_CENTER[0], 0.200),
+        label="overall axial thickness",
+        expected_mm=OVERALL_THICKNESS,
+        precision=1,
         orientation="horizontal",
     )
-
-    # The kerf rectangle deliberately overshoots the tooth tip so the cut opens;
-    # its sketch height is not the manufacturing depth.  Dimension the real
-    # tooth-tip-to-floor depth in the gear-side view and verify it against spec.
-    _checked_edge_dimension(
-        adapter,
-        front,
-        p0=_project_mm(
-            adapter, front, (0.0, TIP_RADIUS, 0.0), label="notch tooth tip"
-        ),
-        p1=_project_mm(
-            adapter,
-            front,
-            (NOTCH_CENTER_X, NOTCH_FLOOR_RADIUS, 0.0),
-            label="notch floor",
-        ),
-        text_xy=(0.018, 0.320),
-        label="alignment notch depth",
-        expected_mm=NOTCH_DEPTH,
-        precision=1,
-        orientation="vertical",
-    )
+    overall.ShowParenthesis = True
+    if not overall.ShowParenthesis:
+        raise RuntimeError("overall axial thickness was not shown as reference")
 
     bore_edge = visible_circle_edge(adapter, front, BORE_DIA)
     add_surface_finish(

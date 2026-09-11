@@ -31,16 +31,19 @@ WHOLE_DEPTH = 2.157 / DIAMETRAL_PITCH * MM_PER_IN  # 1.10
 BORE_DIA = 0.375 * MM_PER_IN  # 9.525 (3/8")
 BORE_DIA_BAND = (0.05, 0.03)  # (upper, lower) deviations
 FACE_WIDTH = 3.0
+FACE_WIDTH_TOLERANCE_MM = 0.05
 CAM_DIA = 30.6  # integral eccentric cam disc
 CAM_DIA_BAND = (0.0, -0.05)  # (upper, lower) deviations
 CAM_THICKNESS = 3.5
 CAM_THICKNESS_TOLERANCE_MM = 0.05
+OVERALL_THICKNESS = FACE_WIDTH + CAM_THICKNESS
 ECCENTRICITY = 8.64  # cam axis offset from the bore axis
 ECCENTRICITY_TOLERANCE_MM = 0.025
 SET_ECCENTRICITY_RANGE_MM = 0.025
 NOTCH_WIDTH = 0.4  # alignment saw-kerf
 NOTCH_WIDTH_BAND = (0.10, 0.0)  # (upper, lower) deviations
 NOTCH_DEPTH = 3.0
+NOTCH_DEPTH_TOLERANCE_MM = 0.2
 TIP_RADIUS = OUTSIDE_DIA / 2.0
 NOTCH_FLOOR_RADIUS = TIP_RADIUS - NOTCH_DEPTH
 # +Y is a tooth crest.  The phase kerf is the first root counter-clockwise
@@ -56,14 +59,14 @@ SURFACE_FINISHES = (
     SurfaceFinishControl("cam_follower", MACHINED_UM, CylinderFace(CAM_DIA)),
 )
 
-# Marked model dimensions are the authoritative bore/cam/kerf requirements.
-# Gear face width and notch depth are checked directly against source geometry
-# when their drawing dimensions are created.
+# Marked model dimensions are the authoritative blank, bore, cam and kerf
+# requirements.  The sheet adds only a checked reference overall thickness.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
+    "GearBlank": {"FaceWidth"},
     "BoreProfile": {"BoreDia"},
     "CamProfile": {"CamDia", "CamCy"},
     "CamBoss": {"CamThickness"},
-    "NotchProfile": {"NotchWidth"},
+    "NotchProfile": {"NotchDepth", "NotchWidth"},
 }
 
 

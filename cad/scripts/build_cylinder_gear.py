@@ -76,12 +76,15 @@ from _common import (
     IN,
     SketchDims,
     _flag,
+    _feature_by_name,
     _read_member,
     add_line_chain,
     anchor_point_to_origin,
     apply_material,
     check,
     define_circle,
+    dimension_between,
+    dump_dimensions,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
@@ -117,10 +120,12 @@ from cylinder_gear_spec import (
     ECCENTRICITY,
     ECCENTRICITY_TOLERANCE_MM,
     FACE_WIDTH,
+    FACE_WIDTH_TOLERANCE_MM,
     GEAR_DATA,
     NOTCH_CENTER_X,
     NOTCH_DEPTH,
     NOTCH_FLOOR_RADIUS,
+    NOTCH_DEPTH_TOLERANCE_MM,
     NOTCH_WIDTH,
     NOTCH_WIDTH_BAND,
     OUTSIDE_DIA,
@@ -273,10 +278,16 @@ async def build(adapter) -> dict[str, str]:
     # finished model, after a rebuild).
     drive_jobs: list[tuple[str, str]] = []
 
-    # Toothed disc (blank + gap + 120x pattern, z = 0..FACE_WIDTH); the
-    # volume must reproduce the cone gear's T120 configuration. Mesh-critical
-    # geometry -- left fully literal (no SketchDims, no driving).
+    # Toothed disc (blank + gap + 120x pattern, z = 0..FACE_WIDTH).  The shared
+    # helper intentionally leaves gear geometry literal, but this part's released
+    # print needs the original ±0.05 blank width.  Give the first extrusion and
+    # its depth stable semantic names, then drive and tolerance that real model
+    # dimension.
     v_teeth = await build_fixed_gear(adapter, TEETH, FACE_WIDTH, dp=DP)
+    _feature_by_name(adapter, "Boss-Extrude1").Name = "GearBlank"
+    _telemetry.success("feature 'Boss-Extrude1' -> 'GearBlank'")
+    gear_depth = name_dimensions(adapter, "GearBlank", ["FaceWidth"])
+    drive_jobs += [(gear_depth[0], '"FaceWidth"')]
     volume = v_teeth
 
     # ------------------------------------------------------------------
@@ -357,6 +368,15 @@ async def build(adapter) -> dict[str, str]:
             (NOTCH_X - NOTCH_WIDTH / 2.0, NOTCH_OUTER),
         ],
     )
+    depth_witness = check(
+        "notch depth construction witness",
+        await adapter.add_centerline(
+            NOTCH_X,
+            NOTCH_FLOOR,
+            0.0,
+            RA_MM,
+        ),
+    )
     set_sketch_direct_db(adapter, False)
     bottom, right, top, left = notch
     for ent, relation in (
@@ -366,16 +386,6 @@ async def build(adapter) -> dict[str, str]:
         (left, "vertical"),
     ):
         check(f"notch {relation}", await adapter.add_sketch_constraint(ent, None, relation))
-    # Record each manual dim into SketchDims in CREATION order (the crank-pin
-    # pattern): width, then height, then the two anchor dims the general-case
-    # anchor_point_to_origin emits (horizontal X, then vertical Z). The width and
-    # height carry clean global knobs; the anchor position is the +Y valley
-    # centreline (X) and the kerf floor (Z) -- both derived from the gear tip
-    # radius / valley angle (mesh geometry), so they are NAMED for readability but
-    # left UNDRIVEN (no clean editable knob; driving them off RA_MM would couple
-    # the kerf placement to the meshing profile). NOTCH_OUTER - NOTCH_FLOOR
-    # collapses to NOTCH_DEPTH + NOTCH_CLEARANCE (RA_MM cancels), so the height IS
-    # cleanly knob-driven.
     check(
         "dimension notch width",
         await adapter.add_sketch_dimension(bottom, None, "linear", NOTCH_WIDTH),
@@ -388,11 +398,38 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     notch_dims.record("NotchHeight", '"NotchDepth" + "NotchClearance"')
-    await anchor_point_to_origin(
-        adapter, f"{bottom}.start", NOTCH_X - NOTCH_WIDTH / 2.0, NOTCH_FLOOR, "notch corner"
+    # The construction witness makes the depth a real, source-driven model
+    # dimension.  Its start is the floor midpoint and its end is the actual
+    # +Y tooth crest, so the imported drawing dimension has deterministic
+    # extension origins and reads 3.0 rather than selecting a nearby involute.
+    check(
+        "notch witness floor midpoint",
+        await adapter.add_sketch_constraint(
+            f"{depth_witness}.start", bottom, "midpoint"
+        ),
     )
-    notch_dims.record("NotchAnchorX", None)
-    notch_dims.record("NotchAnchorZ", None)
+    await anchor_point_to_origin(
+        adapter, f"{depth_witness}.end", 0.0, RA_MM, "notch tooth crest"
+    )
+    notch_dims.record("NotchTipRadius", None)
+    await dimension_between(
+        adapter,
+        f"{depth_witness}.end",
+        f"{depth_witness}.start",
+        "horizontal_distance",
+        abs(NOTCH_X),
+        "notch root phase",
+    )
+    notch_dims.record("NotchCenterX", None)
+    await dimension_between(
+        adapter,
+        f"{depth_witness}.start",
+        f"{depth_witness}.end",
+        "vertical_distance",
+        NOTCH_DEPTH,
+        "notch depth",
+    )
+    notch_dims.record("NotchDepth", '"NotchDepth"')
     await ensure_fully_defined(adapter, "notch sketch")
     check("exit_sketch notch", await adapter.exit_sketch())
     name_last_feature(adapter, "NotchProfile")
@@ -445,13 +482,33 @@ async def build(adapter) -> dict[str, str]:
 
     # Apply the deferred drive equations now -- after the whole model + a rebuild
     # exists, so every target resolves. Each equation evaluates to the value just
-    # built, so the geometry must not move; the re-check is the proof. Only the
-    # auxiliary cam/notch/bore dims are driven -- the tooth-gap geometry stays
-    # literal (volume_check here is from _gear, the same one used above).
+    # built, so the geometry must not move; the re-check is the proof. The
+    # blank-width and auxiliary cam/notch/bore dimensions are driven; the tooth
+    # profile itself stays literal (volume_check here is the same one used above).
     await force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
+    notch_readback = {
+        str(row["full_name"]).split("@", 1)[0]: float(row["value_mm"])
+        for row in dump_dimensions(adapter, "NotchProfile")
+    }
+    for name, expected in (
+        ("NotchTipRadius", RA_MM),
+        ("NotchCenterX", abs(NOTCH_X)),
+        ("NotchDepth", NOTCH_DEPTH),
+    ):
+        actual = notch_readback.get(name)
+        if actual is None or not math.isclose(actual, expected, abs_tol=1e-6):
+            raise RuntimeError(
+                f"{name}@NotchProfile readback {actual!r}, expected {expected:g} mm"
+            )
+    set_dimension_symmetric_tolerance(
+        adapter,
+        "GearBlank",
+        "FaceWidth",
+        FACE_WIDTH_TOLERANCE_MM,
+    )
     set_dimension_bilateral_tolerance(
         adapter, "BoreProfile", "BoreDia", *deviations(BORE_DIA_BAND)
     )
@@ -473,6 +530,12 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "NotchProfile", "NotchWidth", *deviations(NOTCH_WIDTH_BAND)
     )
+    set_dimension_symmetric_tolerance(
+        adapter,
+        "NotchProfile",
+        "NotchDepth",
+        NOTCH_DEPTH_TOLERANCE_MM,
+    )
     volume = await volume_check(
         adapter, "driven cylinder gear (equations neutral)", volume, 0.01 * v_bore
     )
@@ -480,9 +543,8 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
 
-    # Mark exactly the fitted bore, functional cam and phase-kerf dimensions;
-    # the drawing adds checked source-geometry dimensions for gear-face width
-    # and notch depth.
+    # Mark exactly the blank, fitted bore, functional cam and phase-kerf
+    # dimensions.  The drawing adds only a checked reference overall thickness.
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

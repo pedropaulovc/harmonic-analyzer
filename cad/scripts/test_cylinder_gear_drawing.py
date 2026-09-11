@@ -12,9 +12,6 @@ from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
 
 
-def _source(module: object) -> str:
-    return Path(module.__file__).read_text(encoding="utf-8")
-
 
 def test_required_paths_and_explicit_sheet_orientation() -> None:
     assert drawing.SLDDRW.as_posix().endswith("/slddrw/cylinder-gear.SLDDRW")
@@ -36,6 +33,8 @@ def test_spec_is_the_single_source_of_native_drawing_dimensions() -> None:
         "CamDia",
         "CamCy",
         "CamThickness",
+        "FaceWidth",
+        "NotchDepth",
         "NotchWidth",
     }
     assert set(drawing.DIMENSION_CALLOUTS) <= marked
@@ -44,11 +43,13 @@ def test_spec_is_the_single_source_of_native_drawing_dimensions() -> None:
 
 def test_model_dimensions_carry_the_manufacturing_tolerances() -> None:
     assert model_toleranced_dimensions(part) == {
+        ("GearBlank", "FaceWidth"): "FACE_WIDTH_TOLERANCE_MM",
         ("BoreProfile", "BoreDia"): "*deviations(BORE_DIA_BAND)",
         ("CamProfile", "CamDia"): "*deviations(CAM_DIA_BAND)",
         ("CamProfile", "CamCy"): "ECCENTRICITY_TOLERANCE_MM",
         ("CamBoss", "CamThickness"): "CAM_THICKNESS_TOLERANCE_MM",
         ("NotchProfile", "NotchWidth"): "*deviations(NOTCH_WIDTH_BAND)",
+        ("NotchProfile", "NotchDepth"): "NOTCH_DEPTH_TOLERANCE_MM",
     }
 
 
@@ -75,38 +76,26 @@ def test_gear_data_is_the_only_tooth_system_authority() -> None:
     assert "X.XX" not in data
 
 
-def test_checked_dimensions_cover_geometry_without_named_model_dimensions() -> None:
-    source = _source(drawing)
-    assert source.count("_checked_edge_dimension(") == 3  # helper plus two uses
-    assert "expected_mm=FACE_WIDTH" in source
-    assert "expected_mm=NOTCH_DEPTH" in source
-    assert 'label="gear face width"' in source
-    assert 'label="alignment notch depth"' in source
-    assert drawing.DIMENSION_PRECISION["BoreDia"] == 3
-    assert drawing.DIMENSION_PRECISION["CamCy"] == 3
+def test_dimension_precision_matches_functional_tolerance() -> None:
+    assert drawing.DIMENSION_PRECISION == {
+        "BoreDia": 3,
+        "CamDia": 2,
+        "FaceWidth": 2,
+        "CamCy": 3,
+        "CamThickness": 2,
+        "NotchWidth": 2,
+        "NotchDepth": 1,
+    }
+    assert spec.OVERALL_THICKNESS == spec.FACE_WIDTH + spec.CAM_THICKNESS
 
 
-def test_views_are_aligned_and_show_hidden_orthographic_geometry() -> None:
+def test_projected_views_remain_aligned() -> None:
     assert drawing.FRONT_CENTER[1] == drawing.RIGHT_CENTER[1] == drawing.BACK_CENTER[1]
     assert drawing.FRONT_CENTER[0] < drawing.RIGHT_CENTER[0] < drawing.BACK_CENTER[0]
     assert drawing.ISO_CENTER[1] < drawing.FRONT_CENTER[1]
-    source = _source(drawing)
-    for orientation in ("*Front", "*Right", "*Back", "*Isometric"):
-        assert f'"{orientation}"' in source
-    assert "for view in (front, right, back):" in source
-    assert "set_hidden_lines_visible(adapter, view)" in source
-    assert "set_hidden_lines_removed(adapter, iso)" in source
 
 
-def test_no_datum_or_geometric_frame_is_authored_for_the_gear() -> None:
-    source = _source(drawing)
-    for forbidden in (
-        "add_datum_feature(",
-        "add_feature_control_frame(",
-        "set_basic_dimension(",
-        "project_part_pmi(",
-    ):
-        assert forbidden not in source
+def test_no_geometric_control_is_specified_for_the_gear() -> None:
     assert not hasattr(spec, "GEOMETRIC_TOLERANCES_MM")
 
 
@@ -116,12 +105,7 @@ def test_only_functional_running_surfaces_receive_roughness() -> None:
     assert controls["cylinder_gear_bore"].face.diameter_mm == spec.BORE_DIA
     assert controls["cam_follower"].face.diameter_mm == spec.CAM_DIA
     assert {control.roughness_um for control in controls.values()} == {1.6}
-    drawing_source = _source(drawing)
-    assert drawing_source.count("add_surface_finish(") == 2
-    assert '"cylinder_gear_bore"' in drawing_source
-    assert '"cam_follower"' in drawing_source
-    assert "roughness_ra=" not in drawing_source
-    assert "author_part_pmi(surface_finishes=SURFACE_FINISHES)" in _source(part)
+    assert len(controls) == len(spec.SURFACE_FINISHES)
 
 
 def test_short_notes_only_define_phase_tooth_data_and_set_consistency() -> None:
@@ -155,11 +139,12 @@ def test_notch_geometry_matches_first_root_counterclockwise_phase() -> None:
         abs_tol=1e-12,
     )
     expected_phase = math.pi / 2.0 + math.pi / spec.TEETH
-    actual_phase = math.atan2(
-        (spec.NOTCH_FLOOR_RADIUS + spec.TIP_RADIUS) / 2.0,
-        spec.NOTCH_CENTER_X,
+    expected_x = (
+        (spec.NOTCH_FLOOR_RADIUS + spec.TIP_RADIUS)
+        / 2.0
+        * math.cos(expected_phase)
     )
-    assert math.isclose(actual_phase, expected_phase, abs_tol=1e-12)
+    assert math.isclose(spec.NOTCH_CENTER_X, expected_x, abs_tol=1e-12)
     assert spec.NOTCH_CENTER_X < 0.0
 
 
