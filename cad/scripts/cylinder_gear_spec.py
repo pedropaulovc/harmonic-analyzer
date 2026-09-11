@@ -41,8 +41,14 @@ FACE_WIDTH = 3.0
 FACE_WIDTH_TOLERANCE_MM = 0.05
 CAM_DIA = 30.6  # integral eccentric cam disc
 CAM_DIA_BAND = (0.0, -0.05)  # (upper, lower) deviations
-CAM_THICKNESS = 3.5
-CAM_THICKNESS_TOLERANCE_MM = 0.05
+CAM_THICKNESS = 3.5  # reference nominal; axial fit governs the finished thickness
+CAM_AXIAL_FIT_CALLOUT = (
+    "FIT TO CONNECTING ROD MHA-017\n"
+    "SUPPORT FULL RING WIDTH\n"
+    "THROUGHOUT OPERATION\n"
+    "FREE MOVEMENT; NO AXIAL BINDING\n"
+    "OR ADJACENT-PART CONTACT"
+)
 OVERALL_THICKNESS = FACE_WIDTH + CAM_THICKNESS
 ECCENTRICITY = 8.64  # cam axis offset from the bore axis
 ECCENTRICITY_TOLERANCE_MM = 0.025
@@ -71,8 +77,8 @@ SURFACE_FINISHES = (
     SurfaceFinishControl("cam_follower", MACHINED_UM, CylinderFace(CAM_DIA)),
 )
 
-# Marked model dimensions are the authoritative blank, bore, cam and kerf
-# requirements.  The sheet adds only a checked reference overall thickness.
+# Marked model dimensions locate the blank, bore, cam and kerf. Bore diameter
+# and cam thickness are reference nominals with finished-fit callouts.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "GearBlank": {"FaceWidth"},
     "BoreProfile": {"BoreDia"},

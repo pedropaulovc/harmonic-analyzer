@@ -20,6 +20,7 @@ from _drawing_common import (
     add_property_linked_note,
     add_surface_finish,
     curate_view_dimensions,
+    dimension_name,
     finalize_drawing,
     model_point_in_view,
     new_project_drawing,
@@ -28,6 +29,7 @@ from _drawing_common import (
     set_dimension_precision,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
+    set_reference_dimension,
     set_reference_dimensions,
     stamp_drawing_summary,
 )
@@ -37,6 +39,7 @@ from _surface_finish import surface_finish_by_key
 from cylinder_gear_spec import (
     BORE_DIA,
     BORE_FIT_CALLOUT,
+    CAM_AXIAL_FIT_CALLOUT,
     CAM_DIA,
     CAM_THICKNESS,
     ECCENTRICITY,
@@ -79,7 +82,7 @@ FRONT_KEEP = {
 }
 RIGHT_KEEP = {
     "FaceWidth": (0.205, 0.220),
-    "CamThickness": (0.205, 0.345),
+    "CamThickness": (0.205, 0.360),
 }
 DIMENSION_CALLOUTS = {
     "BoreDia": BORE_FIT_CALLOUT,
@@ -91,7 +94,7 @@ DIMENSION_PRECISION = {
     "CamDia": 2,
     "FaceWidth": 2,
     "CamCy": 3,
-    "CamThickness": 2,
+    "CamThickness": 1,
     "NotchWidth": 2,
     "NotchDepth": 1,
 }
@@ -213,14 +216,26 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     set_dimension_precision(adapter, annotations, DIMENSION_PRECISION)
     set_reference_dimensions(adapter, annotations, {"BoreDia"})
+    cam_thickness_annotations = [
+        annotation
+        for annotation in right_annotations
+        if dimension_name(adapter, annotation) == "CamThickness"
+    ]
+    if len(cam_thickness_annotations) != 1:
+        raise RuntimeError("expected one cam thickness reference dimension")
+    cam_thickness_display = set_reference_dimension(
+        adapter, cam_thickness_annotations[0], label="cam thickness reference"
+    )
+    # Keep the fit with the nominal in the linear dimension's primary text.
+    # Its callout-above slot did not render in the native export.
+    cam_thickness_prefix = f"{CAM_AXIAL_FIT_CALLOUT}\n("
+    cam_thickness_display.SetText(1, cam_thickness_prefix)
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to cam-side front view")
 
-    # Face width and cam width remain the two authoritative axial dimensions.
-    # The policy also requires a conspicuous overall length, so show the measured
-    # end-to-end stack as a checked REFERENCE dimension rather than closing an
-    # independently toleranced dimension chain.
+    # Face width is controlled; cam thickness is fitted to the connecting rod.
+    # Show the measured nominal end-to-end stack as a checked REFERENCE overall.
     cam_bore_wall = CAM_DIA / 2.0 - ECCENTRICITY - BORE_DIA / 2.0
     overall_pick_y = -(BORE_DIA / 2.0 + cam_bore_wall / 2.0)
     overall = _checked_edge_dimension(
@@ -296,6 +311,14 @@ async def build(adapter: Any) -> dict[str, str]:
         *MANUFACTURING_NOTES_POS,
         char_height=0.0025,
     )
+    # Check the complete native requirement after all annotation formatting.
+    drawing_model.EditRebuild3()
+    drawing_model.GraphicsRedraw2()
+    if (
+        str(cam_thickness_display.GetText(1) or "") != cam_thickness_prefix
+        or str(cam_thickness_display.GetText(2) or "") != ")"
+    ):
+        raise RuntimeError("cam thickness reference/axial-fit text did not persist")
     return await finalize_drawing(
         adapter,
         OUTPUTS,

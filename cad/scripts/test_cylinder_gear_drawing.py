@@ -46,7 +46,6 @@ def test_model_dimensions_carry_the_manufacturing_tolerances() -> None:
         ("GearBlank", "FaceWidth"): "FACE_WIDTH_TOLERANCE_MM",
         ("CamProfile", "CamDia"): "*deviations(CAM_DIA_BAND)",
         ("CamProfile", "CamCy"): "ECCENTRICITY_TOLERANCE_MM",
-        ("CamBoss", "CamThickness"): "CAM_THICKNESS_TOLERANCE_MM",
         ("NotchProfile", "NotchWidth"): "*deviations(NOTCH_WIDTH_BAND)",
         ("NotchProfile", "NotchDepth"): "NOTCH_DEPTH_TOLERANCE_MM",
     }
@@ -81,7 +80,7 @@ def test_dimension_precision_matches_functional_tolerance() -> None:
         "CamDia": 2,
         "FaceWidth": 2,
         "CamCy": 3,
-        "CamThickness": 2,
+        "CamThickness": 1,
         "NotchWidth": 2,
         "NotchDepth": 1,
     }

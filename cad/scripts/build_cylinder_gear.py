@@ -24,8 +24,8 @@ Features, in order:
 3. Integral eccentric cam (book ch. 13, pp. 22-25): one of the 20 cams that
    convert each gear's rotation into the near-sinusoidal reciprocation of its
    connecting rod (displacement = ECCENTRICITY x sin(theta)). Disc OD 30.6 mm,
-   thickness 3.5 mm (the 4.5 mm inter-face gap minus 0.5 mm air per side; the
-   axial budget rides the unchanged 7.0565 channel pitch), centre offset +Y by
+   reference thickness 3.5 mm (finished axial fit supports the connecting-rod
+   ring without binding or adjacent-part contact), centre offset +Y by
    the 8.64 mm eccentricity, boss-extruded z = 3..6.5 from an offset reference
    plane (cam disc centred on the bore, offset +Y by the eccentricity -- the
    lobe points +Y, the NOTCH side: the ch14 end views prove the rocker tips sit
@@ -113,7 +113,6 @@ from cylinder_gear_spec import (
     CAM_DIA as CAM_DIAMETER,
     CAM_DIA_BAND,
     CAM_THICKNESS,
-    CAM_THICKNESS_TOLERANCE_MM,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     ECCENTRICITY,
@@ -516,12 +515,6 @@ async def build(adapter) -> dict[str, str]:
         "CamProfile",
         "CamCy",
         ECCENTRICITY_TOLERANCE_MM,
-    )
-    set_dimension_symmetric_tolerance(
-        adapter,
-        "CamBoss",
-        "CamThickness",
-        CAM_THICKNESS_TOLERANCE_MM,
     )
     set_dimension_bilateral_tolerance(
         adapter, "NotchProfile", "NotchWidth", *deviations(NOTCH_WIDTH_BAND)
