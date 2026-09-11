@@ -2651,10 +2651,10 @@ def insert_hole_table(
     y_axis_edge)`` for initial insertion.  When ``datum_point`` is also
     supplied, the table's native ``IDatumOrigin`` is then reattached to that
     view-owned theoretical-corner point.  ``starting_hole_tag`` lets multiple
-    tables on one sheet use distinct tag families.  Optional text and row
-    heights keep dense schedules inside their reserved regions.  The table
-    lands with its top-left corner at ``anchor_xy`` and is validated before
-    returning.
+    tables on one sheet use distinct tag families.  Optional text and requested
+    row heights keep dense schedules inside their reserved regions; SOLIDWORKS
+    may clamp a row to the minimum required by its content.  The table lands
+    with its top-left corner at ``anchor_xy`` and is validated before returning.
     """
     draw = adapter.currentModel
     ddoc = _early_bound(
@@ -2815,20 +2815,29 @@ def insert_hole_table(
     if row_height_m is not None:
         if row_height_m <= 0.0:
             raise ValueError(f"{label} hole table row height must be positive")
-        for row in range(rows):
-            applied_height = float(table.SetRowHeight(row, row_height_m, 0))
-            if abs(applied_height - row_height_m) > 1e-6:
-                raise RuntimeError(
-                    f"{label} hole table row {row} height did not persist: "
-                    f"{applied_height:g} m"
-                )
+        applied_heights = tuple(
+            float(table.SetRowHeight(row, row_height_m, 0)) for row in range(rows)
+        )
+        if any(height <= 0.0 for height in applied_heights):
+            raise RuntimeError(
+                f"{label} hole table rejected row sizing: {applied_heights!r}"
+            )
         adapter.currentModel.EditRebuild3()
         persisted_heights = tuple(float(table.GetRowHeight(row)) for row in range(rows))
-        if any(abs(height - row_height_m) > 1e-6 for height in persisted_heights):
+        if any(
+            abs(persisted - applied) > 1e-6
+            for persisted, applied in zip(
+                persisted_heights, applied_heights, strict=True
+            )
+        ):
             raise RuntimeError(
                 f"{label} hole table row heights changed after rebuild: "
-                f"{persisted_heights!r}"
+                f"applied={applied_heights!r}, persisted={persisted_heights!r}"
             )
+        _telemetry.success(
+            f"{label} hole table row heights applied: requested={row_height_m:g} m, "
+            f"actual_total={sum(persisted_heights):g} m"
+        )
     _telemetry.success(f"native hole table inserted: {rows - 1} holes, header={header}")
     return table
 
