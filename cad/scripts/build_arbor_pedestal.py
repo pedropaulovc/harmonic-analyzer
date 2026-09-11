@@ -60,6 +60,7 @@ from _drawing_marks import (
     set_dimension_bilateral_tolerance,
 )
 from _fit_limits import deviations
+from _named_views import name_rear_isometric
 from _part_pmi import author_part_pmi
 from arbor_pedestal_spec import (
     BORE_DIA,
@@ -69,8 +70,10 @@ from arbor_pedestal_spec import (
     FOOT_DEPTH,
     FOOT_HEIGHT,
     FOOT_WIDTH,
+    PICTORIAL_VIEW,
     SCREW_HOLE_DIA,
     SCREW_HOLE_SPEC,
+    SCREW_Z,
     STRAP_T,
     SURFACE_FINISHES,
     TAPER_TANGENT_X,
@@ -91,8 +94,7 @@ CAD_APPEARANCE = (0.28, 0.28, 0.30)  # neutral charcoal keeps drawing edges legi
 # Keeps the arbor's 7.5 engagement from the north face; the -Z flange carries
 # #4 normal-clearance pass-through for the exact Ø2.8448 x 9.525 stock
 # foot screw. Its 4.525-mm pedestal engagement enters the base past this
-# 5.0-mm flange.
-SCREW_Z = -5.0  # hole centre on the exposed flange, local z (machine -95.5)
+# 5.0-mm flange. SCREW_Z (spec) centres the hole on that flange (machine -95.5).
 
 BORE_RADIUS = BORE_DIA / 2.0
 
@@ -329,6 +331,9 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
+    # The print's pictorial: the hold-down hole sits on the -Z flange, behind
+    # the strap in the standard isometric, so the part owns a rear one.
+    name_rear_isometric(adapter, PICTORIAL_VIEW)
     apply_drawing_properties(adapter, PART_NAME)
     return await save_part_and_images(adapter, PART_NAME)
 

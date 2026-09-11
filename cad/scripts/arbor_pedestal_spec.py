@@ -43,6 +43,10 @@ TAPER_ANGLE_DEG = degrees(
 )
 SCREW_HOLE_SPEC = HoleSpec("clearance", "#4")
 SCREW_HOLE_DIA = blind_cut_dia_mm(SCREW_HOLE_SPEC)
+# Hold-down hole centre, model Z: mid-way across the exposed -Z flange lip
+# (the strap is flush with the foot's +Z face, so the lip is the far
+# FOOT_DEPTH - STRAP_T band).
+SCREW_Z = (FOOT_DEPTH / 2.0 - STRAP_T - FOOT_DEPTH / 2.0) / 2.0
 
 SURFACE_FINISHES = (
     SurfaceFinishControl(
@@ -62,3 +66,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     # complete upright profile without redundant endpoint widths.
     "BoreProfile": {"BoreDia"},
 }
+
+# Part-owned pictorial for the print (see _named_views): the standard isometric
+# turned 180 deg about Y so the -Z flange and its hold-down hole face the viewer.
+PICTORIAL_VIEW = "Rear Isometric"
