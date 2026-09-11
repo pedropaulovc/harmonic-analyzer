@@ -12,9 +12,10 @@ and flow into geometry and into part custom properties. The build scripts read n
 classes; they do not hardcode clearance numbers.
 
 The whole-device performance benchmark that constrains this allocation is
-[`michelson-1898-trial-accuracy.md`](./michelson-1898-trial-accuracy.md): approximately
-0.7% full-scale mean absolute coefficient error and 2% maximum published coefficient error.
-Those are assembled-machine output errors, not percentages to apply directly to part dimensions.
+[`michelson-1898-trial-accuracy.md`](./michelson-1898-trial-accuracy.md):
+approximately 0.7% full-scale mean absolute coefficient error, with 2% as the
+largest individual difference in the published tables. These are assembled-machine
+output results, not percentages to apply directly to part dimensions.
 
 ## Fit classes (interfaces that must carry a rule)
 
