@@ -352,7 +352,7 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         part="summing_lever",
         artifact_stem="summing-lever",
         script_name="draw_summing_lever.py",
-        layout=DrawingLayout.LANDSCAPE,
+        layout=DrawingLayout.PORTRAIT,
     ),
     DrawingSpec(
         name="pinion_bracket",
