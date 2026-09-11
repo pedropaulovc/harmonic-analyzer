@@ -194,12 +194,21 @@ def _signal_otlp_endpoint(endpoint: str, signal: str, protocol: str) -> str:
     return urllib.parse.urlunsplit(parsed._replace(path=signal_path))
 
 
-def _resolve_otlp_endpoint(signal: str) -> str | None:
+def _resolve_otlp_endpoint(
+    signal: str,
+    *,
+    local_endpoints: dict[str, str | None] | None = None,
+    pending_warnings: list[tuple[str, str, str]] | None = None,
+) -> str | None:
     """Return the configured endpoint for *signal*, or a reachable local default.
 
     A signal-specific endpoint wins verbatim. An explicitly empty value disables
     that signal. A global or local HTTP base gains the standard ``/v1/<signal>``
     path before it is pinned into the signal-specific exporter variable.
+
+    ``local_endpoints`` shares reachability decisions within one configuration
+    pass. Signals using the same protocol therefore probe its local collector
+    once, while a later forced configuration can detect a collector state change.
     """
     signal_endpoint = f"OTEL_EXPORTER_OTLP_{signal.upper()}_ENDPOINT"
     env = os.environ.get(signal_endpoint)
@@ -209,11 +218,22 @@ def _resolve_otlp_endpoint(signal: str) -> str | None:
     env = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
     if env is not None:
         return _signal_otlp_endpoint(env, signal, protocol) if env else None
-    endpoints = _DEFAULT_OTLP_ENDPOINTS.get(protocol)
-    if endpoints is None:
-        _warn_otlp_processor(signal.rstrip("s"), protocol, "unsupported protocol")
-        return None
-    endpoint = next((e for e in endpoints if _endpoint_listening(e)), None)
+    if local_endpoints is not None and protocol in local_endpoints:
+        endpoint = local_endpoints[protocol]
+    else:
+        endpoints = _DEFAULT_OTLP_ENDPOINTS.get(protocol)
+        if endpoints is None:
+            _warn_otlp_processor(
+                signal.rstrip("s"),
+                protocol,
+                "unsupported protocol",
+                pending_warnings=pending_warnings,
+            )
+            endpoint = None
+        else:
+            endpoint = next((e for e in endpoints if _endpoint_listening(e)), None)
+        if local_endpoints is not None:
+            local_endpoints[protocol] = endpoint
     if endpoint is None:
         return None
     return _signal_otlp_endpoint(endpoint, signal, protocol)
@@ -592,7 +612,16 @@ def _otlp_protocol(signal: str) -> str:
     return protocol.strip().lower()
 
 
-def _warn_otlp_processor(signal: str, protocol: str, reason: str) -> None:
+def _warn_otlp_processor(
+    signal: str,
+    protocol: str,
+    reason: str,
+    *,
+    pending_warnings: list[tuple[str, str, str]] | None = None,
+) -> None:
+    if pending_warnings is not None:
+        pending_warnings.append((signal, protocol, reason))
+        return
     logging.getLogger(_LOGGER_NAME).warning(
         "OTLP %s export is disabled for protocol %r: %s",
         signal,
@@ -601,7 +630,7 @@ def _warn_otlp_processor(signal: str, protocol: str, reason: str) -> None:
     )
 
 
-def _otlp_span_processor():
+def _otlp_span_processor(*, pending_warnings: list[tuple[str, str, str]] | None = None):
     """``BatchSpanProcessor`` around the configured OTLP span exporter."""
     protocol = _otlp_protocol("traces")
     try:
@@ -614,16 +643,23 @@ def _otlp_span_processor():
                 OTLPSpanExporter,
             )
         else:
-            _warn_otlp_processor("trace", protocol, "unsupported protocol")
+            _warn_otlp_processor(
+                "trace",
+                protocol,
+                "unsupported protocol",
+                pending_warnings=pending_warnings,
+            )
             return None
 
         return BatchSpanProcessor(OTLPSpanExporter())
     except Exception as exc:
-        _warn_otlp_processor("trace", protocol, str(exc))
+        _warn_otlp_processor(
+            "trace", protocol, str(exc), pending_warnings=pending_warnings
+        )
         return None
 
 
-def _otlp_log_processor():
+def _otlp_log_processor(*, pending_warnings: list[tuple[str, str, str]] | None = None):
     """``BatchLogRecordProcessor`` around the configured OTLP log exporter."""
     protocol = _otlp_protocol("logs")
     try:
@@ -636,12 +672,19 @@ def _otlp_log_processor():
                 OTLPLogExporter,
             )
         else:
-            _warn_otlp_processor("log", protocol, "unsupported protocol")
+            _warn_otlp_processor(
+                "log",
+                protocol,
+                "unsupported protocol",
+                pending_warnings=pending_warnings,
+            )
             return None
 
         return BatchLogRecordProcessor(OTLPLogExporter())
     except Exception as exc:
-        _warn_otlp_processor("log", protocol, str(exc))
+        _warn_otlp_processor(
+            "log", protocol, str(exc), pending_warnings=pending_warnings
+        )
         return None
 
 
@@ -679,12 +722,19 @@ def configure(*, console: bool = True, force: bool = False) -> None:
     console_level = _console_level()
 
     # Resolve each OTLP target once. When no endpoint is explicit, probe the local
-    # collector port that matches that signal's selected protocol. Pin the result
-    # into the signal-specific standard variable so exporters and every build
-    # subprocess inherit the same decision without another probe.
+    # collector port that matches that signal's selected protocol. Signals sharing
+    # a protocol reuse its result within this configuration pass. Pin reachable
+    # targets into signal-specific standard variables so every build subprocess
+    # inherits the same decision without another probe.
+    local_endpoints: dict[str, str | None] = {}
+    pending_otlp_warnings: list[tuple[str, str, str]] = []
     otlp_endpoints: dict[str, str | None] = {}
     for signal in ("traces", "logs"):
-        otlp_endpoints[signal] = _resolve_otlp_endpoint(signal)
+        otlp_endpoints[signal] = _resolve_otlp_endpoint(
+            signal,
+            local_endpoints=local_endpoints,
+            pending_warnings=pending_otlp_warnings,
+        )
         if otlp_endpoints[signal]:
             os.environ.setdefault(
                 f"OTEL_EXPORTER_OTLP_{signal.upper()}_ENDPOINT",
@@ -731,7 +781,7 @@ def configure(*, console: bool = True, force: bool = False) -> None:
                 )
             )
     if otlp_endpoints["traces"]:
-        processor = _otlp_span_processor()
+        processor = _otlp_span_processor(pending_warnings=pending_otlp_warnings)
         if processor is not None:
             _span_processors.append(processor)
 
@@ -756,7 +806,7 @@ def configure(*, console: bool = True, force: bool = False) -> None:
                 )
             )
     if otlp_endpoints["logs"]:
-        processor = _otlp_log_processor()
+        processor = _otlp_log_processor(pending_warnings=pending_otlp_warnings)
         if processor is not None:
             logger_provider.add_log_record_processor(processor)
     set_logger_provider(logger_provider)
@@ -777,6 +827,8 @@ def configure(*, console: bool = True, force: bool = False) -> None:
         stream.setFormatter(_FriendlyFormatter())
         stream.setLevel(console_level)
         pylog.addHandler(stream)
+    for signal, protocol, reason in pending_otlp_warnings:
+        _warn_otlp_processor(signal, protocol, reason)
 
 
 def get_logger() -> logging.Logger:

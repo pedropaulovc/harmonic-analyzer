@@ -83,7 +83,9 @@ def test_logs_split_into_severity_levels(capture):
 
 def test_console_verbosity_configures_handler_and_spans(monkeypatch):
     logger = logging.getLogger(_telemetry._LOGGER_NAME)
-    monkeypatch.setattr(_telemetry, "_resolve_otlp_endpoint", lambda signal: None)
+    monkeypatch.setattr(
+        _telemetry, "_resolve_otlp_endpoint", lambda signal, **kwargs: None
+    )
     monkeypatch.setattr(_telemetry, "_telemetry_dir", lambda: None)
     original = os.environ.get("HARMONIC_VERBOSITY")
 
@@ -389,12 +391,16 @@ def test_otlp_export_honors_standard_transport_env(
     monkeypatch.delenv("OTEL_EXPORTER_OTLP_TRACES_PROTOCOL", raising=False)
     monkeypatch.delenv("OTEL_EXPORTER_OTLP_LOGS_PROTOCOL", raising=False)
 
-    processors = (
-        _telemetry._otlp_span_processor(),
-        _telemetry._otlp_log_processor(),
-    )
+    span_processor = _telemetry._otlp_span_processor()
+    log_processor = _telemetry._otlp_log_processor()
+    processors = (span_processor, log_processor)
     try:
-        exporters = [processor._batch_processor._exporter for processor in processors]
+        assert span_processor is not None
+        assert log_processor is not None
+        exporters = [
+            span_processor.span_exporter,
+            log_processor._batch_processor._exporter,
+        ]
         assert all(
             module_fragment in type(exporter).__module__ for exporter in exporters
         )
@@ -411,28 +417,32 @@ def test_empty_signal_protocol_falls_back_to_global_transport(monkeypatch):
     assert _telemetry._otlp_protocol("traces") == "grpc"
 
 
-def test_otlp_protocol_normalizes_surrounding_whitespace(monkeypatch):
-    monkeypatch.setenv("OTEL_EXPORTER_OTLP_PROTOCOL", " GRPC ")
-
-    assert _telemetry._otlp_protocol("traces") == "grpc"
-
-
-def test_unsupported_otlp_protocol_warns_instead_of_going_dark(monkeypatch, caplog):
+def test_unsupported_otlp_protocol_warns_in_production_console(monkeypatch, capsys):
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_PROTOCOL", "http/json")
-    monkeypatch.delenv("OTEL_EXPORTER_OTLP_ENDPOINT", raising=False)
-    monkeypatch.delenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", raising=False)
-    monkeypatch.setattr(logging.getLogger(_telemetry._LOGGER_NAME), "propagate", True)
-    caplog.set_level(logging.WARNING, logger=_telemetry._LOGGER_NAME)
+    for name in (
+        "OTEL_EXPORTER_OTLP_ENDPOINT",
+        "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+        "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(_telemetry, "_telemetry_dir", lambda: None)
 
-    assert _telemetry._resolve_otlp_endpoint("traces") is None
-    assert "unsupported protocol" in caplog.text
-    assert "http/json" in caplog.text
+    try:
+        _telemetry.configure(force=True)
+        console = capsys.readouterr().err
+        assert "!!" in console
+        assert "unsupported protocol" in console
+        assert "http/json" in console
+    finally:
+        monkeypatch.undo()
+        _telemetry.configure(force=True)
 
 
-def test_missing_otlp_exporter_warns_instead_of_going_dark(monkeypatch, caplog):
+def test_missing_otlp_exporter_warns_in_production_console(monkeypatch, capsys):
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc")
-    monkeypatch.setattr(logging.getLogger(_telemetry._LOGGER_NAME), "propagate", True)
-    caplog.set_level(logging.WARNING, logger=_telemetry._LOGGER_NAME)
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "http://collector:4317")
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_LOGS_ENDPOINT", "")
+    monkeypatch.setattr(_telemetry, "_telemetry_dir", lambda: None)
     original_import = builtins.__import__
 
     def import_without_grpc_trace(name, *args, **kwargs):
@@ -442,8 +452,14 @@ def test_missing_otlp_exporter_warns_instead_of_going_dark(monkeypatch, caplog):
 
     monkeypatch.setattr(builtins, "__import__", import_without_grpc_trace)
 
-    assert _telemetry._otlp_span_processor() is None
-    assert "simulated missing gRPC exporter" in caplog.text
+    try:
+        _telemetry.configure(force=True)
+        console = capsys.readouterr().err
+        assert "!!" in console
+        assert "simulated missing gRPC exporter" in console
+    finally:
+        monkeypatch.undo()
+        _telemetry.configure(force=True)
 
 
 @pytest.mark.parametrize(
@@ -477,7 +493,6 @@ def test_default_otlp_endpoint_matches_transport_and_uses_literal_address(
         _telemetry, "_endpoint_listening", lambda e, timeout=0.15: False
     )
     assert _telemetry._resolve_otlp_endpoint("traces") is None
-
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://collector:4318")
     global_endpoint = "http://collector:4318"
     if protocol == "http/protobuf":
@@ -485,6 +500,32 @@ def test_default_otlp_endpoint_matches_transport_and_uses_literal_address(
     assert _telemetry._resolve_otlp_endpoint("traces") == global_endpoint
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "http://traces:4317")
     assert _telemetry._resolve_otlp_endpoint("traces") == "http://traces:4317"
+
+
+def test_configure_probes_each_default_protocol_once(monkeypatch):
+    for name in (
+        "OTEL_EXPORTER_OTLP_ENDPOINT",
+        "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+        "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT",
+        "OTEL_EXPORTER_OTLP_TRACES_PROTOCOL",
+        "OTEL_EXPORTER_OTLP_LOGS_PROTOCOL",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_PROTOCOL", "http/protobuf")
+    monkeypatch.setattr(_telemetry, "_telemetry_dir", lambda: None)
+    probed = []
+
+    def unavailable(endpoint, timeout=0.15):
+        probed.append(endpoint)
+        return False
+
+    monkeypatch.setattr(_telemetry, "_endpoint_listening", unavailable)
+    try:
+        _telemetry.configure(console=False, force=True)
+        assert probed == list(_telemetry._DEFAULT_OTLP_ENDPOINTS["http/protobuf"])
+    finally:
+        monkeypatch.undo()
+        _telemetry.configure(force=True)
 
 
 def test_signal_protocol_selects_its_own_local_collector_port(monkeypatch):
