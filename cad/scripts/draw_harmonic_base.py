@@ -96,7 +96,7 @@ TOP_CENTER = (0.230, 0.205)
 SIDE_CENTER = (0.230, 0.145)
 ISO_SCALE = (1, 10)
 ISO_CENTER = (0.350, 0.240)
-SIDE_NOTE_XY = (0.305, 0.170)
+SIDE_NOTE_XY = (0.170, 0.128)
 ISO_NOTE_XY = (0.305, 0.212)
 
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
@@ -445,10 +445,10 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     add_property_linked_note(
-        adapter, "Manufacturing Notes", 0.170, 0.125, char_height=0.002
+        adapter, "Manufacturing Notes", 0.170, 0.115, char_height=0.002
     )
     add_property_linked_note(
-        adapter, "Manufacturing Notes B", 0.305, 0.125, char_height=0.002
+        adapter, "Manufacturing Notes B", 0.305, 0.115, char_height=0.002
     )
     add_property_linked_note(adapter, "Side View Note", *SIDE_NOTE_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
