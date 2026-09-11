@@ -86,13 +86,13 @@ def _front_y(model_y: float) -> float:
 FRONT_KEEP = {
     "Width": (FRONT_CENTER[0], _front_y(0.0) - 0.025),
     "FootHt": (FRONT_CENTER[0] - 0.030, _front_y(FOOT_HEIGHT / 2.0)),
-    "BoreDia": (FRONT_CENTER[0] + 0.050, _front_y(BORE_HEIGHT) - 0.004),
+    "BoreDia": (FRONT_CENTER[0] + 0.065, _front_y(BORE_HEIGHT) - 0.004),
 }
 TOP_KEEP = {
     "Depth": (TOP_CENTER[0] - 0.070, TOP_CENTER[1] - 0.010),
 }
 DIMENSION_CALLOUTS = {
-    "BoreDia": "REAM THRU; ON PART C/L",
+    "BoreDia": "REAM OR BORE THRU; ON PART C/L",
 }
 DIMENSION_PRECISION = {
     "Width": 1,
@@ -529,7 +529,7 @@ async def build(adapter: Any) -> dict[str, str]:
             adapter,
             "FOOT HOLE HIDDEN AT REAR",
             ISO_CENTER[0] - 0.050,
-            0.070,
+            0.078,
         )
         is None
     ):
