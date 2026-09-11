@@ -2638,6 +2638,7 @@ def insert_hole_table(
     label: str,
     starting_hole_tag: str = "A",
     text_height_m: float | None = None,
+    row_height_m: float | None = None,
 ) -> Any:
     """Insert the model-associated TAG/X LOC/Y LOC/SIZE hole table on ``view``.
 
@@ -2650,8 +2651,10 @@ def insert_hole_table(
     y_axis_edge)`` for initial insertion.  When ``datum_point`` is also
     supplied, the table's native ``IDatumOrigin`` is then reattached to that
     view-owned theoretical-corner point.  ``starting_hole_tag`` lets multiple
-    tables on one sheet use distinct tag families.  The table lands with its
-    top-left corner at ``anchor_xy`` and is validated before returning.
+    tables on one sheet use distinct tag families.  Optional text and row
+    heights keep dense schedules inside their reserved regions.  The table
+    lands with its top-left corner at ``anchor_xy`` and is validated before
+    returning.
     """
     draw = adapter.currentModel
     ddoc = _early_bound(
@@ -2809,6 +2812,23 @@ def insert_hole_table(
         raise RuntimeError(f"native hole-table header is unexpected: {header!r}")
     if expected_locations_mm is not None:
         _check_hole_table_locations(contents, expected_locations_mm, label=label)
+    if row_height_m is not None:
+        if row_height_m <= 0.0:
+            raise ValueError(f"{label} hole table row height must be positive")
+        for row in range(rows):
+            applied_height = float(table.SetRowHeight(row, row_height_m, 0))
+            if abs(applied_height - row_height_m) > 1e-6:
+                raise RuntimeError(
+                    f"{label} hole table row {row} height did not persist: "
+                    f"{applied_height:g} m"
+                )
+        adapter.currentModel.EditRebuild3()
+        persisted_heights = tuple(float(table.GetRowHeight(row)) for row in range(rows))
+        if any(abs(height - row_height_m) > 1e-6 for height in persisted_heights):
+            raise RuntimeError(
+                f"{label} hole table row heights changed after rebuild: "
+                f"{persisted_heights!r}"
+            )
     _telemetry.success(f"native hole table inserted: {rows - 1} holes, header={header}")
     return table
 

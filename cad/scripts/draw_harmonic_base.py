@@ -123,6 +123,7 @@ _DATUM_XY = (
 )
 HOLE_TABLE_ANCHOR = (0.220, 0.265)
 HOLE_TABLE_TEXT_HEIGHT = 0.0016
+HOLE_TABLE_ROW_HEIGHT = 0.009
 
 
 def _plan_xy(x_mm: float, z_mm: float) -> tuple[float, float]:
@@ -352,6 +353,7 @@ async def build(adapter: Any) -> dict[str, str]:
         anchor_xy=HOLE_TABLE_ANCHOR,
         basic_locations=True,
         label="harmonic-base mounting",
+        row_height_m=HOLE_TABLE_ROW_HEIGHT,
         text_height_m=HOLE_TABLE_TEXT_HEIGHT,
     )
     add_datum_feature(
