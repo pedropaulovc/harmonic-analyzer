@@ -61,7 +61,8 @@ def test_assembly_fallback_still_requires_current_scene_and_glb(
 
 
 def test_subassembly_fallback_does_not_require_a_scene(
-    tmp_path: Path, monkeypatch,
+    tmp_path: Path,
+    monkeypatch,
 ) -> None:
     src = tmp_path / "sldasm" / "frame.SLDASM"
     gltf = tmp_path / "gltf"
@@ -72,7 +73,10 @@ def test_subassembly_fallback_does_not_require_a_scene(
     monkeypatch.setattr(export_models, "src_digest", lambda _src: None)
 
     assert not export_models.asm_source_changed(
-        "frame", src, {}, require_scene=False,
+        "frame",
+        src,
+        {},
+        require_scene=False,
     )
 
 
@@ -84,7 +88,8 @@ def test_release_inventory_reuses_build_owned_pngs(tmp_path: Path, monkeypatch) 
     monkeypatch.setattr(export_models, "OUT_BOXES", tmp_path / "scene-cache")
 
     files = export_models._release_inventory(
-        ["sample_part"], ["sample_assembly"],
+        ["sample_part"],
+        ["sample_assembly"],
         {
             "generated-spring": [("Default", "generated-spring")],
             "sample-part": [("C1", "sample-part--c1")],
@@ -114,7 +119,7 @@ def test_scene_inventory_keeps_generated_default_meshes(tmp_path: Path) -> None:
         '{"unit":"mm","components":['
         '{"part":"generated-spring","cfg":"Default","mesh":"generated-spring"},'
         '{"part":"gear","cfg":"T12","mesh":"gear--t12"}'
-        ']}',
+        "]}",
         encoding="utf-8",
     )
 
@@ -128,20 +133,21 @@ def test_scene_inventory_keeps_generated_default_meshes(tmp_path: Path) -> None:
 
 
 def test_all_scene_inventory_unions_every_release_scene(
-    tmp_path: Path, monkeypatch,
+    tmp_path: Path,
+    monkeypatch,
 ) -> None:
     boxes = tmp_path / "boxes"
     boxes.mkdir()
     (boxes / "assembly-a.json").write_text(
         '{"unit":"mm","components":['
         '{"part":"shared","cfg":"Default","mesh":"shared"},'
-        '{"part":"gear","cfg":"T12","mesh":"gear--t12"}]}' ,
+        '{"part":"gear","cfg":"T12","mesh":"gear--t12"}]}',
         encoding="utf-8",
     )
     (boxes / "assembly-b.json").write_text(
         '{"unit":"mm","components":['
         '{"part":"shared","cfg":"Default","mesh":"shared"},'
-        '{"part":"spring","cfg":"C1","mesh":"spring--c1"}]}' ,
+        '{"part":"spring","cfg":"C1","mesh":"spring--c1"}]}',
         encoding="utf-8",
     )
     monkeypatch.setattr(export_models, "OUT_BOXES", boxes)
@@ -161,7 +167,8 @@ def test_invalid_scene_is_not_fresh(tmp_path: Path) -> None:
 
 
 def test_scene_with_retired_component_source_requires_owner_rescan(
-    tmp_path: Path, monkeypatch,
+    tmp_path: Path,
+    monkeypatch,
 ) -> None:
     scene = tmp_path / "scene.json"
     native = tmp_path / "sldprt"
@@ -170,7 +177,7 @@ def test_scene_with_retired_component_source_requires_owner_rescan(
         '{"unit":"mm","components":['
         '{"part":"current-part","cfg":"Default","mesh":"current-part"},'
         '{"part":"retired-part","cfg":"Default","mesh":"retired-part"}'
-        ']}',
+        "]}",
         encoding="utf-8",
     )
     monkeypatch.setattr(export_models, "OUT_SLDPRT", native)
@@ -216,7 +223,8 @@ def test_forced_export_regenerates_existing_certified_png(tmp_path: Path) -> Non
 
 
 def test_certified_output_hash_is_memoized_per_export(
-    tmp_path: Path, monkeypatch,
+    tmp_path: Path,
+    monkeypatch,
 ) -> None:
     output = tmp_path / "sample.STL"
     output.write_bytes(b"neutral")
@@ -254,10 +262,15 @@ def test_zero_byte_neutral_outputs_are_stale(tmp_path: Path, monkeypatch) -> Non
     monkeypatch.setattr(export_models, "src_digest", lambda _src: "recipe-v1")
 
     assert export_models.part_stl_stale(
-        "sample", "sample", {"sample": (1, 1, 1)}, {"sample": "recipe-v1"},
+        "sample",
+        "sample",
+        {"sample": (1, 1, 1)},
+        {"sample": "recipe-v1"},
     )
     assert export_models.manifest_part_stale(
-        "sample", {"sample": (1, 1, 1)}, {"sample": "recipe-v1"},
+        "sample",
+        {"sample": (1, 1, 1)},
+        {"sample": "recipe-v1"},
     )
 
 
@@ -277,7 +290,8 @@ def test_neutral_save_is_silent_and_suppresses_stl_info(tmp_path: Path) -> None:
 
 
 def test_saved_active_and_configuration_exports_share_one_part_open(
-    tmp_path: Path, monkeypatch,
+    tmp_path: Path,
+    monkeypatch,
 ) -> None:
     sldprt = tmp_path / "sldprt"
     sldasm = tmp_path / "sldasm"
@@ -286,10 +300,12 @@ def test_saved_active_and_configuration_exports_share_one_part_open(
     step = tmp_path / "step"
     boxes = tmp_path / "boxes"
     png = tmp_path / "png"
-    for path in (sldprt / "sample-part.SLDPRT",
-                 sldasm / "harmonic-analyzer.SLDASM",
-                 stl / "sample-part.STL",
-                 gltf / "harmonic-analyzer.glb"):
+    for path in (
+        sldprt / "sample-part.SLDPRT",
+        sldasm / "harmonic-analyzer.SLDASM",
+        stl / "sample-part.STL",
+        gltf / "harmonic-analyzer.glb",
+    ):
         _write(path, time.time())
     boxes.mkdir(parents=True)
     _write(png / "harmonic-analyzer/harmonic-analyzer_isometric.png", time.time())
@@ -322,7 +338,9 @@ def test_saved_active_and_configuration_exports_share_one_part_open(
             return ["T24", "C1"]
 
         def SaveAs3(self, path: str, _version: int, _options: int) -> int:
-            Path(path).write_bytes(self.ConfigurationManager.ActiveConfiguration.Name.encode())
+            Path(path).write_bytes(
+                self.ConfigurationManager.ActiveConfiguration.Name.encode()
+            )
             return 1
 
     class _Sw:
@@ -361,21 +379,29 @@ def test_saved_active_and_configuration_exports_share_one_part_open(
     monkeypatch.setattr(export_models, "exporter_untrusted", lambda: False)
     monkeypatch.setattr(export_models, "_certified_outputs", lambda: {})
     monkeypatch.setattr(
-        export_models, "_certified_output_changed", lambda *_args: False,
+        export_models,
+        "_certified_output_changed",
+        lambda *_args: False,
     )
-    monkeypatch.setattr(export_models, "load_colors", lambda: {"sample-part": (1, 1, 1)})
     monkeypatch.setattr(
-        export_models, "load_src_digests",
+        export_models, "load_colors", lambda: {"sample-part": (1, 1, 1)}
+    )
+    monkeypatch.setattr(
+        export_models,
+        "load_src_digests",
         lambda: {"sample-part": "part-v1", "harmonic-analyzer": "asm-v1"},
     )
     monkeypatch.setattr(
-        export_models, "src_digest",
+        export_models,
+        "src_digest",
         lambda path: "asm-v1" if path.suffix == ".SLDASM" else "part-v1",
     )
     monkeypatch.setattr(export_models, "set_export_prefs", lambda _adapter: {})
     monkeypatch.setattr(export_models, "restore_export_prefs", lambda *_args: None)
     monkeypatch.setattr(export_models, "doc_rgb", lambda _doc: (1, 1, 1))
-    monkeypatch.setattr(export_models, "stamp_render_cache_current", lambda _paths: None)
+    monkeypatch.setattr(
+        export_models, "stamp_render_cache_current", lambda _paths: None
+    )
     monkeypatch.setattr(export_models, "refresh_comparison_gallery", lambda: True)
     repaired_pngs: list[str] = []
 
@@ -384,7 +410,8 @@ def test_saved_active_and_configuration_exports_share_one_part_open(
 
     monkeypatch.setattr(export_models, "export_build_png", _repair_png)
     monkeypatch.setattr(
-        export_models, "run_build",
+        export_models,
+        "run_build",
         lambda build: (asyncio.run(build(adapter)), 0)[1],
     )
     monkeypatch.setattr(sys, "argv", ["export_models.py"])
@@ -398,7 +425,8 @@ def test_saved_active_and_configuration_exports_share_one_part_open(
 
 
 def test_current_gallery_skips_redundant_composite_and_index(
-    tmp_path: Path, monkeypatch,
+    tmp_path: Path,
+    monkeypatch,
 ) -> None:
     comparisons = tmp_path / "comparisons"
     tools = comparisons / "tools"
@@ -406,10 +434,12 @@ def test_current_gallery_skips_redundant_composite_and_index(
     reference = tmp_path / "reference.png"
     reference.write_bytes(b"reference")
     manifest = {
-        "pairs": [{
-            "id": "sample",
-            "reference": {"path": "reference.png"},
-        }],
+        "pairs": [
+            {
+                "id": "sample",
+                "reference": {"path": "reference.png"},
+            }
+        ],
     }
     (comparisons / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     render_tool = tools / "render_offline.py"
@@ -419,7 +449,8 @@ def test_current_gallery_skips_redundant_composite_and_index(
     for tool in (render_tool, worker_tool, composite_tool, gallery_tool):
         tool.write_text(tool.name, encoding="utf-8")
     (comparisons / "scores.json").write_text(
-        json.dumps({"sample": {"score": 1.0}}), encoding="utf-8",
+        json.dumps({"sample": {"score": 1.0}}),
+        encoding="utf-8",
     )
     for path in (
         comparisons / "index.html",
@@ -472,7 +503,8 @@ def test_current_gallery_skips_redundant_composite_and_index(
     monkeypatch.setattr(export_models, "_run_tool", _run_composite_refresh)
     assert export_models.refresh_comparison_gallery()
     assert [Path(cmd[2]).name for cmd in calls] == [
-        "render_offline.py", "gallery.py",
+        "render_offline.py",
+        "gallery.py",
     ]
 
     export_models.GALLERY_STAMP.unlink()
@@ -480,18 +512,27 @@ def test_current_gallery_skips_redundant_composite_and_index(
     monkeypatch.setattr(export_models, "_run_tool", _run)
     assert export_models.refresh_comparison_gallery()
     assert [Path(cmd[2]).name for cmd in calls] == [
-        "render_offline.py", "composite.py", "gallery.py",
+        "render_offline.py",
+        "composite.py",
+        "gallery.py",
     ]
     assert calls[0] == ["uv", "run", str(render_tool)]
 
 
-def test_gallery_missing_blender_fails_export_loudly(tmp_path: Path, monkeypatch) -> None:
+def test_gallery_missing_blender_fails_export_loudly(
+    tmp_path: Path, monkeypatch
+) -> None:
     comparisons = tmp_path / "comparisons"
     tools = comparisons / "tools"
     tools.mkdir(parents=True)
     manifest = {"pairs": []}
     (comparisons / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
-    for name in ("render_offline.py", "blender_worker.py", "composite.py", "gallery.py"):
+    for name in (
+        "render_offline.py",
+        "blender_worker.py",
+        "composite.py",
+        "gallery.py",
+    ):
         (tools / name).write_text(name, encoding="utf-8")
 
     monkeypatch.setattr(export_models, "REPO", tmp_path)
@@ -542,7 +583,8 @@ def test_gallery_digest_includes_blender_worker(tmp_path: Path, monkeypatch) -> 
 
 
 def test_render_diff_local_source_uses_top_scene(
-    tmp_path: Path, monkeypatch,
+    tmp_path: Path,
+    monkeypatch,
 ) -> None:
     module_path = Path(__file__).parents[1] / "comparisons" / "tools" / "render_diff.py"
     spec = importlib.util.spec_from_file_location("render_diff_under_test", module_path)
@@ -558,7 +600,8 @@ def test_render_diff_local_source_uses_top_scene(
     boxes.mkdir()
     (boxes / "channel.json").write_text('{"scene": "channel"}', encoding="utf-8")
     (boxes / "harmonic-analyzer.json").write_text(
-        '{"scene": "top"}', encoding="utf-8",
+        '{"scene": "top"}',
+        encoding="utf-8",
     )
 
     assert render_diff.LocalSource(tmp_path).scene() == {"scene": "top"}
@@ -574,13 +617,15 @@ def test_gallery_with_missing_score_is_incomplete(tmp_path: Path, monkeypatch) -
 
 
 def test_rendered_pair_parser_ignores_composite_progress() -> None:
-    assert export_models._rendered_pair_ids([
-        "  OK  pair-a",
-        "  OK  [1/2] pair-a: score 88.2 (1s)",
-        "  REFRESHED  pair-c",
-        "  OK  pair-b",
-        "composites done",
-    ]) == {"pair-a", "pair-b", "pair-c"}
+    assert export_models._rendered_pair_ids(
+        [
+            "  OK  pair-a",
+            "  OK  [1/2] pair-a: score 88.2 (1s)",
+            "  REFRESHED  pair-c",
+            "  OK  pair-b",
+            "composites done",
+        ]
+    ) == {"pair-a", "pair-b", "pair-c"}
 
 
 def test_routine_view_cleanup_preserves_configuration_renders(tmp_path: Path) -> None:
@@ -640,7 +685,10 @@ def test_sanitize_glb_drops_mismatched_texcoord_and_untextures_the_material(
         "meshes": [
             {
                 "primitives": [
-                    {"attributes": {"POSITION": 0, "TEXCOORD_0": 1, "NORMAL": 2}, "material": 0},
+                    {
+                        "attributes": {"POSITION": 0, "TEXCOORD_0": 1, "NORMAL": 2},
+                        "material": 0,
+                    },
                     {"attributes": {"POSITION": 3, "TEXCOORD_0": 4}, "material": 0},
                 ]
             }
@@ -650,7 +698,13 @@ def test_sanitize_glb_drops_mismatched_texcoord_and_untextures_the_material(
     glb.write_bytes(_glb_bytes(gltf))
     dropped = export_models.sanitize_glb(glb)
     assert dropped == [
-        {"mesh": 0, "primitive": 0, "attribute": "TEXCOORD_0", "count": 576, "positions": 580}
+        {
+            "mesh": 0,
+            "primitive": 0,
+            "attribute": "TEXCOORD_0",
+            "count": 576,
+            "positions": 580,
+        }
     ]
     fixed = _read_glb_json(glb)
     prims = fixed["meshes"][0]["primitives"]
@@ -730,7 +784,10 @@ def test_sanitize_glb_keeps_textures_on_surviving_uv_sets(tmp_path: Path) -> Non
     assert clone["name"] == "decal-untextured"
     # the slot on the dropped set is gone; the slots on TEXCOORD_1 survive
     assert "metallicRoughnessTexture" not in clone["pbrMetallicRoughness"]
-    assert clone["pbrMetallicRoughness"]["baseColorTexture"] == {"index": 0, "texCoord": 1}
+    assert clone["pbrMetallicRoughness"]["baseColorTexture"] == {
+        "index": 0,
+        "texCoord": 1,
+    }
     assert clone["normalTexture"] == {"index": 2, "texCoord": 1}
     # the source material is untouched
     assert "metallicRoughnessTexture" in fixed["materials"][0]["pbrMetallicRoughness"]
@@ -764,7 +821,9 @@ def test_sanitize_glb_honours_khr_texture_transform_tex_coord(tmp_path: Path) ->
                 "normalTexture": {
                     "index": 1,
                     "texCoord": 1,
-                    "extensions": {"KHR_texture_transform": {"texCoord": 0, "scale": [2, 2]}},
+                    "extensions": {
+                        "KHR_texture_transform": {"texCoord": 0, "scale": [2, 2]}
+                    },
                 },
                 # extension present WITHOUT texCoord -> top-level 1 rules -> keep
                 "occlusionTexture": {
