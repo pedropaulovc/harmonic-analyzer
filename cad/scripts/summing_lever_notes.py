@@ -11,32 +11,24 @@ mount.  Imported ONLY by ``build_summing_lever`` and the offline drawing test.
 
 from __future__ import annotations
 
-from summing_lever_spec import HEX_DEPTH, HEX_H, HEX_W, PLATE_L, PLATE_T
-
 # --- Marked-dimension contract.  build_summing_lever marks exactly these. ---
+# The body length, trunnions, hex, thicknesses and hole pattern are dimensioned
+# natively on the sheet between picked model edges (draw_summing_lever), so
+# only the three sketch-owned sizes ride the model-dimension import.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "PlateProfile": {"PlateWidth", "PlateLength"},
+    "PlateProfile": {"PlateWidth"},
     "CylinderProfile": {"CylDia"},
     "SummationAnchorProfile": {"AnchorOuterDia"},
 }
 
-# The spring-hole pattern (count, size, row X, start offset, pitch) and the
-# anchor-eye size/location are dimensioned NATIVELY on the sheet (basic
-# coordinates + position frames); the notes must not repeat those numbers.
-# Note 4 lists the machined features explicitly -- the sheet also carries the
-# 20X controlled spring-hole pattern, so "only knife edges and anchor bore"
-# would contradict it (codex #354).
+# Two process facts a machinist cannot read off the views
+# (cad/docs/drawing-simplicity-policy.md rule 6): the summation arm and rib
+# curves are cast/pattern contours the print does not dimension, and the
+# knife edges are the one exception to the title block's edge break.
 DRAWING_NOTES = "\n".join(
     (
-        f"1. HEX TRUNNIONS {HEX_W:.2f} W x {HEX_H:.2f} HIGH,",
-        f"   {HEX_DEPTH:.2f} LONG EACH END; VERTEX UP IS",
-        "   THE KNIFE EDGE.",
-        f"2. COEFFICIENT PLATE {PLATE_T:.2f} THICK.",
-        f"3. PIVOT CYLINDER {PLATE_L:.2f} LONG; NO BORE.",
-        "4. CAST PART: UNDIMENSIONED CONTOURS",
-        "   PER SUPPLIED MODEL/PATTERN. MACHINE",
-        "   THE KNIFE EDGES, SPRING HOLES,",
-        "   AND ANCHOR BORE ONLY.",
+        "1. UNDIMENSIONED CONTOURS PER SUPPLIED MODEL.",
+        "2. KNIFE EDGES SHARP; DO NOT BREAK.",
     )
 )
-ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"
+ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:5"
