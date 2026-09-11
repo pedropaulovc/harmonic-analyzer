@@ -185,22 +185,38 @@ def _endpoint_listening(endpoint: str, timeout: float = 0.15) -> bool:
         return False
 
 
+def _signal_otlp_endpoint(endpoint: str, signal: str, protocol: str) -> str:
+    """Convert an OTLP base endpoint to the signal endpoint the exporter expects."""
+    if protocol != "http/protobuf":
+        return endpoint
+    parsed = urllib.parse.urlsplit(endpoint)
+    signal_path = f"{parsed.path.rstrip('/')}/v1/{signal}"
+    return urllib.parse.urlunsplit(parsed._replace(path=signal_path))
+
+
 def _resolve_otlp_endpoint(signal: str) -> str | None:
     """Return the configured endpoint for *signal*, or a reachable local default.
 
-    A signal-specific endpoint wins over the global endpoint. An explicitly empty
-    value disables that signal. Without either setting, probe the local collector
-    port for the signal's selected protocol, IPv4 first and then IPv6.
+    A signal-specific endpoint wins verbatim. An explicitly empty value disables
+    that signal. A global or local HTTP base gains the standard ``/v1/<signal>``
+    path before it is pinned into the signal-specific exporter variable.
     """
     signal_endpoint = f"OTEL_EXPORTER_OTLP_{signal.upper()}_ENDPOINT"
     env = os.environ.get(signal_endpoint)
     if env is not None:
         return env or None
+    protocol = _otlp_protocol(signal)
     env = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
     if env is not None:
-        return env or None
-    endpoints = _DEFAULT_OTLP_ENDPOINTS.get(_otlp_protocol(signal), ())
-    return next((e for e in endpoints if _endpoint_listening(e)), None)
+        return _signal_otlp_endpoint(env, signal, protocol) if env else None
+    endpoints = _DEFAULT_OTLP_ENDPOINTS.get(protocol)
+    if endpoints is None:
+        _warn_otlp_processor(signal.rstrip("s"), protocol, "unsupported protocol")
+        return None
+    endpoint = next((e for e in endpoints if _endpoint_listening(e)), None)
+    if endpoint is None:
+        return None
+    return _signal_otlp_endpoint(endpoint, signal, protocol)
 
 
 _T0 = time.perf_counter()

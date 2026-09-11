@@ -419,10 +419,12 @@ def test_otlp_protocol_normalizes_surrounding_whitespace(monkeypatch):
 
 def test_unsupported_otlp_protocol_warns_instead_of_going_dark(monkeypatch, caplog):
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_PROTOCOL", "http/json")
+    monkeypatch.delenv("OTEL_EXPORTER_OTLP_ENDPOINT", raising=False)
+    monkeypatch.delenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", raising=False)
     monkeypatch.setattr(logging.getLogger(_telemetry._LOGGER_NAME), "propagate", True)
     caplog.set_level(logging.WARNING, logger=_telemetry._LOGGER_NAME)
 
-    assert _telemetry._otlp_span_processor() is None
+    assert _telemetry._resolve_otlp_endpoint("traces") is None
     assert "unsupported protocol" in caplog.text
     assert "http/json" in caplog.text
 
@@ -445,11 +447,11 @@ def test_missing_otlp_exporter_warns_instead_of_going_dark(monkeypatch, caplog):
 
 
 @pytest.mark.parametrize(
-    ("protocol", "port"),
-    [("http/protobuf", 18890), ("grpc", 18889)],
+    ("protocol", "port", "path"),
+    [("http/protobuf", 18890, "/v1/traces"), ("grpc", 18889, "")],
 )
 def test_default_otlp_endpoint_matches_transport_and_uses_literal_address(
-    monkeypatch, protocol, port
+    monkeypatch, protocol, port, path
 ):
     """The local collector exposes separate HTTP and gRPC ports. Probe the port
     for the selected transport without paying Windows' slow localhost fallback."""
@@ -463,11 +465,13 @@ def test_default_otlp_endpoint_matches_transport_and_uses_literal_address(
     )
 
     monkeypatch.setattr(_telemetry, "_endpoint_listening", lambda e, timeout=0.15: True)
-    assert _telemetry._resolve_otlp_endpoint("traces") == f"http://127.0.0.1:{port}"
+    assert (
+        _telemetry._resolve_otlp_endpoint("traces") == f"http://127.0.0.1:{port}{path}"
+    )
 
     v6_only = lambda e, timeout=0.15: e.startswith("http://[::1]")  # noqa: E731
     monkeypatch.setattr(_telemetry, "_endpoint_listening", v6_only)
-    assert _telemetry._resolve_otlp_endpoint("traces") == f"http://[::1]:{port}"
+    assert _telemetry._resolve_otlp_endpoint("traces") == f"http://[::1]:{port}{path}"
 
     monkeypatch.setattr(
         _telemetry, "_endpoint_listening", lambda e, timeout=0.15: False
@@ -475,7 +479,10 @@ def test_default_otlp_endpoint_matches_transport_and_uses_literal_address(
     assert _telemetry._resolve_otlp_endpoint("traces") is None
 
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://collector:4318")
-    assert _telemetry._resolve_otlp_endpoint("traces") == "http://collector:4318"
+    global_endpoint = "http://collector:4318"
+    if protocol == "http/protobuf":
+        global_endpoint += "/v1/traces"
+    assert _telemetry._resolve_otlp_endpoint("traces") == global_endpoint
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "http://traces:4317")
     assert _telemetry._resolve_otlp_endpoint("traces") == "http://traces:4317"
 
@@ -489,7 +496,7 @@ def test_signal_protocol_selects_its_own_local_collector_port(monkeypatch):
     monkeypatch.setattr(_telemetry, "_endpoint_listening", lambda e, timeout=0.15: True)
 
     assert _telemetry._resolve_otlp_endpoint("traces") == "http://127.0.0.1:18889"
-    assert _telemetry._resolve_otlp_endpoint("logs") == "http://127.0.0.1:18890"
+    assert _telemetry._resolve_otlp_endpoint("logs") == "http://127.0.0.1:18890/v1/logs"
 
 
 def test_empty_signal_endpoint_disables_only_that_signal(monkeypatch):
@@ -498,7 +505,7 @@ def test_empty_signal_endpoint_disables_only_that_signal(monkeypatch):
     monkeypatch.delenv("OTEL_EXPORTER_OTLP_LOGS_ENDPOINT", raising=False)
 
     assert _telemetry._resolve_otlp_endpoint("traces") is None
-    assert _telemetry._resolve_otlp_endpoint("logs") == "http://collector:4318"
+    assert _telemetry._resolve_otlp_endpoint("logs") == "http://collector:4318/v1/logs"
 
 
 def test_event_records_span_event_on_current_span(capture):
