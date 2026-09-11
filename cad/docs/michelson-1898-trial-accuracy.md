@@ -18,10 +18,17 @@ Source: A. A. Michelson and S. W. Stratton, “A New Harmonic Analyzer,” *Amer
 
 Repository scan: [`28_Michelsons_1898_Paper.pdf`](../../references/albert-michelsons-harmonic-analyzer/28_Michelsons_1898_Paper.pdf), SHA-256 `640058610cd84bb467d08d84ec2d759a71d7c26bf41205324097d67009f5733a`.
 
-The four landscape PDF pages were inspected at 300 dpi. The numerical comparisons below
-are transcribed from the printed `obs.`, `calc.`, and `Δ` tables on journal pp. 10–11.
-Derived statistics use the printed `Δ = observed − calculated` values, normalized to the
-greatest tabulated term (`100`).
+The four landscape PDF pages were rendered at 300 dpi for inspection, but their
+embedded source rasters are about 100 dpi; upsampling adds no source detail. The
+numerical comparisons below are transcribed from the printed `obs.`, `calc.`, and
+`Δ` tables on journal pp. 10–11. Derived absolute statistics use the printed `Δ`
+column, normalized to the greatest tabulated term (`100`).
+
+Two printed signs disagree with subtraction of the adjacent values: Figure 11
+`n = 19` prints `Δ = 0.5` beside `obs. = −3.5` and `calc. = −3.0`, while Figure 12
+`n = 8` prints `Δ = −0.8` beside `obs. = 8.8` and `calc. = 8.0`. These apparent
+typesetting errors do not affect any absolute-error statistic. Signed means below
+treat the printed `Δ` signs literally and are therefore transcription-sensitive.
 
 The grid-paper figures were inspected independently. In the extracted JPEGs, a minor
 grid square is about four pixels wide and traces are about one to three pixels thick.
@@ -35,7 +42,7 @@ Three primary statements govern the interpretation:
 
 - journal p. 11, Figure 11 trial: “The average error is only 0·65 of one per cent. of the
   value of the greatest term”;
-- journal p. 11, Figure 12 trial: “Here the average error is only 0·7 per cent. of the
+- journal p. 11, Figure 12 trial: “Here the average error is only 0·7 per cent of the
   value of the greatest term”;
 - journal p. 13: the machine saves substantial labor “in cases where an error of one or
   two per cent is unimportant.”
@@ -56,7 +63,7 @@ The paper also mentions encouraging results from an earlier **20-element** machi
 
 ## Trial 1 — rectangular input, Figure 11
 
-For a function constant from `0` to `a` and zero elsewhere, the exact cosine coefficient is
+For a function constant from `0` to `a` and zero elsewhere, the exact integral underlying its cosine coefficient is
 
 $$
 \int_0^a \cos(kx)\,dx =
@@ -91,7 +98,7 @@ Derived from those same twenty printed differences:
 | Mean absolute error | **0.65% FS** |
 | Root-mean-square error | **0.91% FS** |
 | Maximum absolute error | **2.0% FS** |
-| Mean signed error | **−0.30% FS** |
+| Mean signed `Δ` (printed signs) | **−0.30% FS** |
 | Coefficients within ±1% FS | **17/20** |
 
 Averaging all 21 printed rows gives `0.619%`. The source does not identify which zero
@@ -125,8 +132,10 @@ Journal p. 11 prints thirteen rows (`n = 0…12`). Its `Δ` sequence is:
 The authors report an average error of **0.7% of the greatest term**. The paper
 calls these the “first twelve terms” while printing 13 rows (`n = 0…12`).
 Averaging all 13 gives `0.723%`; averaging `n = 0…11` gives `0.692%`. Both round
-to the printed `0.7%`, so the intended denominator cannot be recovered. The
-primary table below uses all 13 printed rows:
+to the printed `0.7%`. The Figure 11-style harmonic-only interpretation
+`n = 1…12` gives `0.783%`, which rounds to `0.8%` and is therefore excluded.
+The intended denominator cannot be distinguished between the first two readings.
+The primary table below uses all 13 printed rows:
 
 $$
 \operatorname{MAE}_{12} = \frac{9.4}{13} = 0.723\%\ \text{full scale}.
@@ -137,7 +146,7 @@ $$
 | Mean absolute error | **0.72% FS** |
 | Root-mean-square error | **0.90% FS** |
 | Maximum absolute error | **1.6% FS** |
-| Mean signed error | **+0.14% FS** |
+| Mean signed `Δ` (printed signs) | **+0.14% FS** |
 | Coefficients within ±1% FS | **10/13** |
 
 ![Figure 12 (journal p. 11): Gaussian coefficient trial, grid trace, and printed observed/calculated table](../../references/albert-michelsons-harmonic-analyzer/ch28_images/page004_img04.jpeg)
@@ -157,12 +166,12 @@ Combining the 20 coefficients used in the Figure 11 average with all 13 Figure 1
 | Mean absolute error | **0.679% FS** |
 | Root-mean-square error | **0.907% FS** |
 | Maximum absolute error | **2.0% FS** |
-| Mean signed error | **−0.127% FS** |
+| Mean signed `Δ` (printed signs) | **−0.127% FS** |
 | Coefficients within ±1% FS | **27/33 (82%)** |
 
 Using the alternative Figure 12 interpretation (`n = 0…11`) gives 32 pooled values:
-`0.666% FS` MAE, `0.900% FS` RMS, `−0.166% FS` mean signed error, and `27/32`
-within `±1% FS`.
+`0.666% FS` MAE, `0.900% FS` RMS, `−0.166% FS` mean of the printed signed `Δ`,
+and `27/32` within `±1% FS`.
 
 This pooled value is a descriptive summary, not a confidence interval: the two functions
 were chosen demonstrations, not random samples from a defined population. The printed
