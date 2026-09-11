@@ -89,15 +89,15 @@ VIEW_SCALE = PLAN_SCALE[0] / PLAN_SCALE[1]
 if abs((BOTTOM_REAR_Z - BOTTOM_FRONT_Z) - BOTTOM_WIDTH) > 1e-12:
     raise AssertionError("base drawing extents disagree with the overall depth")
 
-# Sheet layout (meters). At 1:4 the plan and its controls occupy the upper-left;
-# the complete native hole table owns the upper-right column. The elevation
-# stays below the plan, while the isometric has its own upper-middle band.
-TOP_CENTER = (0.075, 0.205)
-SIDE_CENTER = (0.075, 0.145)
+# Sheet layout (meters). The full-height native hole table owns the left
+# column, where it may extend below the title-block top without entering that
+# right-side keep-out. Views, controls, and notes occupy the remaining field.
+TOP_CENTER = (0.230, 0.205)
+SIDE_CENTER = (0.230, 0.145)
 ISO_SCALE = (1, 10)
-ISO_CENTER = (0.180, 0.240)
-SIDE_NOTE_XY = (0.145, 0.185)
-ISO_NOTE_XY = (0.135, 0.212)
+ISO_CENTER = (0.350, 0.240)
+SIDE_NOTE_XY = (0.305, 0.170)
+ISO_NOTE_XY = (0.305, 0.212)
 
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
 # position (meters).  Only the bottom plate's overall footprint is marked.
@@ -121,9 +121,8 @@ _DATUM_XY = (
     TOP_CENTER[0] - BOTTOM_LENGTH * VIEW_SCALE / 2000.0,
     TOP_CENTER[1] - BOTTOM_REAR_Z * VIEW_SCALE / 1000.0,
 )
-HOLE_TABLE_ANCHOR = (0.220, 0.265)
+HOLE_TABLE_ANCHOR = (0.015, 0.265)
 HOLE_TABLE_TEXT_HEIGHT = 0.0016
-HOLE_TABLE_ROW_HEIGHT = 0.009
 
 
 def _plan_xy(x_mm: float, z_mm: float) -> tuple[float, float]:
@@ -353,7 +352,6 @@ async def build(adapter: Any) -> dict[str, str]:
         anchor_xy=HOLE_TABLE_ANCHOR,
         basic_locations=True,
         label="harmonic-base mounting",
-        row_height_m=HOLE_TABLE_ROW_HEIGHT,
         text_height_m=HOLE_TABLE_TEXT_HEIGHT,
     )
     add_datum_feature(
@@ -362,7 +360,7 @@ async def build(adapter: Any) -> dict[str, str]:
         # Keep the native datum triangle directly on the visible underside
         # edge.  The former far-left position produced a long leader that read
         # like an unattached free-standing tag at print scale.
-        symbol_xy=(0.050, SIDE_CENTER[1] - STACK_HEIGHT / 8000.0),
+        symbol_xy=(0.205, SIDE_CENTER[1] - STACK_HEIGHT / 8000.0),
         datum="A",
         label="machined underside datum",
         entity=datum_a_edge,
@@ -371,7 +369,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         top,
-        symbol_xy=(0.060, _DATUM_XY[1] - 0.010),
+        symbol_xy=(0.210, _DATUM_XY[1] - 0.010),
         datum="B",
         label="machined long-side datum",
         entity=datum_b_edge,
@@ -389,7 +387,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         top,
-        frame_xy=(0.155, 0.205),
+        frame_xy=(0.310, 0.205),
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["through-hole true position"],
         datums=("A", "B", "C"),
@@ -401,7 +399,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         top,
-        frame_xy=(0.145, 0.175),
+        frame_xy=(0.300, 0.175),
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["tapped-hole true position"],
         datums=("A", "B", "C"),
@@ -414,7 +412,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         top,
-        frame_xy=(0.145, 0.160),
+        frame_xy=(0.300, 0.160),
         characteristic="perpendicularity",
         tolerance=GEOMETRIC_TOLERANCES_MM["datum B perpendicularity to A"],
         datums=("A",),
@@ -425,7 +423,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         top,
-        frame_xy=(0.020, 0.185),
+        frame_xy=(0.170, 0.185),
         characteristic="perpendicularity",
         tolerance=GEOMETRIC_TOLERANCES_MM["datum C perpendicularity to A and B"],
         datums=("A", "B"),
@@ -436,7 +434,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         side,
-        frame_xy=(0.145, 0.145),
+        frame_xy=(0.300, 0.145),
         characteristic="parallelism",
         tolerance=GEOMETRIC_TOLERANCES_MM["top-pad parallelism to A"],
         datums=("A",),
@@ -445,7 +443,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     add_property_linked_note(
-        adapter, "Manufacturing Notes", 0.016, 0.120, char_height=0.0025
+        adapter, "Manufacturing Notes", 0.170, 0.125, char_height=0.002
     )
     add_property_linked_note(adapter, "Side View Note", *SIDE_NOTE_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
