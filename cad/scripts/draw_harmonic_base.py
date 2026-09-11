@@ -122,7 +122,7 @@ _DATUM_XY = (
     TOP_CENTER[1] - BOTTOM_REAR_Z * VIEW_SCALE / 1000.0,
 )
 HOLE_TABLE_ANCHOR = (0.220, 0.265)
-HOLE_TABLE_TEXT_HEIGHT = 0.0018
+HOLE_TABLE_TEXT_HEIGHT = 0.0016
 
 
 def _plan_xy(x_mm: float, z_mm: float) -> tuple[float, float]:

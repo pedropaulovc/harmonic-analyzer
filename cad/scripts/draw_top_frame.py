@@ -95,30 +95,21 @@ PLAN_HALF_Z = abs(FRONT_COLUMN_Z) + BOSS_DIA / 2.0  # 138.1
 BOSS_BAND = RING_HEIGHT + BOSS_ABOVE + BOSS_BELOW  # 47.3
 STUD_X = (BAR_X0 + BAR_X1) / 2.0  # -15.0 crossbar centreline
 
-# --- Sheet regions (metres on the ASME B landscape sheet) ---------------
-# Inner border and title block.  Every view, dimension, datum, feature
-# control frame and note below is placed so its ink stays inside the border
-# and out of the title block.
-SHEET_FRAME_X = (0.0127, 0.4191)
-SHEET_FRAME_Y = (0.0127, 0.2667)
-TITLE_BLOCK_X0 = 0.2181
-TITLE_BLOCK_Y1 = 0.0651
 
 PLAN_HALF_W = PLAN_HALF_X * VIEW_SCALE / 1000.0  # 0.11155 sheet metres
 PLAN_HALF_D = PLAN_HALF_Z * VIEW_SCALE / 1000.0  # 0.06905 sheet metres
 
-# Left edge of the note column, clear of the plan's boss envelope.  Three
-# blocks of 72-character lines only fit the remaining width at the project's
-# 2.5 mm dense-note lettering, so the blocks carry an explicit height.
-NOTE_COLUMN_X = 0.272
-NOTE_CHAR_HEIGHT = 0.0025
+# The note column starts beyond the plan and its right-side leaders. Dense
+# 2 mm lettering keeps the longest prescribed line inside the inner border.
+NOTE_COLUMN_X = 0.308
+NOTE_CHAR_HEIGHT = 0.002
 
 # Views.  The plan defines the profile, the bore pattern and the hanger-stud
 # holes; the front elevation -- projected under the plan on the shared
 # centreline -- makes the 36.5 rail band, the 47.3 boss stack and datum A
 # visible; the 446.2 x 276.2 x 47.3 envelope reads at 1:10 in the corner.
-TOP_CENTER = (0.156, 0.178)
-FRONT_CENTER = (0.156, 0.085)
+TOP_CENTER = (0.136, 0.178)
+FRONT_CENTER = (0.136, 0.085)
 ISO_CENTER = (0.052, 0.053)
 ISO_SCALE = (1, 10)
 
@@ -157,7 +148,7 @@ INSPECTION_NOTES_XY = (NOTE_COLUMN_X, 0.131)
 # the Depth text on the left flank still clears the border.
 TOP_KEEP = {
     "Width": (TOP_CENTER[0], TOP_CENTER[1] + PLAN_HALF_D + 0.011),
-    "Depth": (TOP_CENTER[0] - PLAN_HALF_W - 0.0155, TOP_CENTER[1]),
+    "Depth": (TOP_CENTER[0] - PLAN_HALF_W - 0.005, TOP_CENTER[1]),
 }
 
 
