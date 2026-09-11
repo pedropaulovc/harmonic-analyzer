@@ -28,6 +28,7 @@ CYL_R = 0.5 * MM_PER_IN  # 12.70 pivot-cylinder radius
 SUM_H = 3.0 * MM_PER_IN  # 76.20 summation reach (-X)
 ANCHOR_R = 0.375 * MM_PER_IN  # 9.525 summation-anchor outer radius
 ANCHOR_BORE_R = 1.5  # 3.0 dia counter-spring hook seat
+ANCHOR_H = 0.75 * MM_PER_IN  # 19.05 anchor boss height along Y
 
 # hex knife-edge trunnion (vertex-up).
 HEX_W = 8.653
@@ -74,6 +75,7 @@ HOLE_END_OFFSET_FIRST = HOLE_Z_FIRST + PLATE_L / 2.0  # 9.90 from -Z end
 HOLE_END_OFFSET_LAST = PLATE_L / 2.0 - HOLE_Z_LAST  # 8.43 from +Z end
 HEX_Z_INNER = PLATE_L / 2.0  # trunnion inboard face flush with the body end (76.20)
 HEX_Z_OUTER = HEX_Z_INNER + HEX_DEPTH  # outboard face overhangs the body (97.92)
+OVERALL_Z = 2.0 * HEX_Z_OUTER  # 195.834 trunnion end to trunnion end
 
 # Drawing prose + marked-dimension contract (DRAWING_DIMENSIONS /
 # DRAWING_NOTES / ISOMETRIC_VIEW_NOTE) live in ``summing_lever_notes`` --
@@ -82,8 +84,9 @@ HEX_Z_OUTER = HEX_Z_INNER + HEX_DEPTH  # outboard face overhangs the body (97.92
 # closures (codex #354).
 
 
-# Manufacturing GD&T limits consumed by the part's drawing projection.
+# The spring pattern is the surviving rule-3 geometric control.  The physical
+# knife ridge remains datum B for that pattern, but carries no invented shared
+# straightness zone; its two like profiles use ordinary size/alignment limits.
 GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "summation anchor position": "0.30",
     "spring-hole pattern position": "0.30",
 }
