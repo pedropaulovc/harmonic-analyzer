@@ -84,7 +84,7 @@ def _front_y(model_y: float) -> float:
 # Front elevation carries the foot, fitted arbor bore, bore height, and the
 # tangent concentric crown. The plan carries depth and foot-hole placement.
 FRONT_KEEP = {
-    "Width": (FRONT_CENTER[0], _front_y(0.0) - 0.006),
+    "Width": (FRONT_CENTER[0], _front_y(0.0) - 0.025),
     "FootHt": (FRONT_CENTER[0] - 0.030, _front_y(FOOT_HEIGHT / 2.0)),
     "BoreDia": (FRONT_CENTER[0] + 0.050, _front_y(BORE_HEIGHT) - 0.004),
 }
@@ -232,14 +232,17 @@ def _route_diameter_leader_to_near_side(
         if display is None:
             raise RuntimeError(f"dimension {dimension!r} has no display annotation")
         display = _early_bound(display, "IDisplayDimension")
-        # swLeaderLineSecond (2) selects the half nearest this right-side text;
-        # enable its arrow explicitly instead of inheriting the document default.
-        display.LeaderVisibility = 2
-        display.SetSecondArrow(False, True)
+        # Keep the arrow outside the bore with no opposite-side arrow.
+        display.ArrowSide = 1  # swDimArrowsOutside
+        display.SetSecondArrow(False, False)
+        display.LeaderVisibility = 1  # swLeaderLineFirst
+        display.DisplayAsLinear = True
         if (
-            int(display.LeaderVisibility) != 2
+            int(display.ArrowSide) != 1
+            or int(display.LeaderVisibility) != 1
+            or not bool(display.DisplayAsLinear)
             or bool(display.GetUseDocSecondArrow())
-            or not bool(display.GetSecondArrow())
+            or bool(display.GetSecondArrow())
         ):
             raise RuntimeError(f"failed to route {label} leader to the near side")
         adapter.currentModel.GraphicsRedraw2()
@@ -408,18 +411,17 @@ async def build(adapter: Any) -> dict[str, str]:
         char_height=0.0025,
         entity=bore_entity,
     )
-    # Above and right of the foot, wholly outside the taper silhouette. Its
-    # short leader reaches the seat from above, never crossing the 24.0 width
-    # dimension or either extension line below the foot.
+    # Keep the finish leader below the seat, inside the width extension lines
+    # and above the lowered width dimension.
     add_surface_finish(
         adapter,
         front,
-        symbol_xy=(FRONT_CENTER[0] + 0.036, _front_y(0.0) + 0.015),
+        symbol_xy=(FRONT_CENTER[0] + 0.006, _front_y(0.0) - 0.010),
         control=surface_finish_by_key(SURFACE_FINISHES, "foot_seat"),
         label="foot seat finish",
         char_height=0.0025,
         entity=foot_entity,
-        leader_attach_xy=(FRONT_CENTER[0] + FOOT_WIDTH * _S / 4.0, _front_y(0.0)),
+        leader_attach_xy=(FRONT_CENTER[0] - 0.010, _front_y(0.0)),
     )
     _add_entity_dimension(
         adapter,
@@ -522,12 +524,15 @@ async def build(adapter: Any) -> dict[str, str]:
         label="flange hold-down hole",
         process="FOOT-FLANGE HOLE ON PART C/L: DRILL",
     )
-    if add_note(
-        adapter,
-        "FOOT HOLE HIDDEN AT REAR",
-        ISO_CENTER[0] - 0.050,
-        0.070,
-    ) is None:
+    if (
+        add_note(
+            adapter,
+            "FOOT HOLE HIDDEN AT REAR",
+            ISO_CENTER[0] - 0.050,
+            0.070,
+        )
+        is None
+    ):
         raise RuntimeError("failed to add isometric foot-hole qualifier")
     return await finalize_drawing(
         adapter,
