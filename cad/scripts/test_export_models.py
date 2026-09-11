@@ -541,10 +541,17 @@ def test_gallery_digest_includes_blender_worker(tmp_path: Path, monkeypatch) -> 
     assert export_models._gallery_input_digest(manifest) != before
 
 
-def test_render_diff_local_source_uses_top_scene(tmp_path: Path) -> None:
+def test_render_diff_local_source_uses_top_scene(
+    tmp_path: Path, monkeypatch,
+) -> None:
     module_path = Path(__file__).parents[1] / "comparisons" / "tools" / "render_diff.py"
     spec = importlib.util.spec_from_file_location("render_diff_under_test", module_path)
     assert spec is not None and spec.loader is not None
+    monkeypatch.setitem(
+        sys.modules,
+        "osmesa_win",
+        SimpleNamespace(enable_offscreen_gl=lambda: None),
+    )
     render_diff = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(render_diff)
     boxes = tmp_path / "boxes"
