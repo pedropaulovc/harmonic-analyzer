@@ -2637,6 +2637,7 @@ def insert_hole_table(
     basic_locations: bool = True,
     label: str,
     starting_hole_tag: str = "A",
+    text_height_m: float | None = None,
 ) -> Any:
     """Insert the model-associated TAG/X LOC/Y LOC/SIZE hole table on ``view``.
 
@@ -2745,6 +2746,20 @@ def insert_hole_table(
         draw.ClearSelection2(True)
     adapter.currentModel.EditRebuild3()
     table = _sw_type_info.early_bound(table, "ITableAnnotation")
+    if text_height_m is not None:
+        text_format = table.GetTextFormat()
+        if text_format is None:
+            raise RuntimeError(f"{label} hole table has no text format")
+        text_format.CharHeight = float(text_height_m)
+        if not table.SetTextFormat(False, text_format):
+            raise RuntimeError(f"failed to size the {label} hole table text")
+        adapter.currentModel.EditRebuild3()
+        persisted_height = float(table.GetTextFormat().CharHeight)
+        if abs(persisted_height - text_height_m) > 1e-6:
+            raise RuntimeError(
+                f"{label} hole table text height did not persist: "
+                f"{persisted_height:g} m"
+            )
     # Indexed COM properties such as Text2 are omitted by the late-bound
     # dispatch returned from IHoleTableAnnotation.  Wrap the same dispatch in
     # its generated early-bound interface before using the setter.

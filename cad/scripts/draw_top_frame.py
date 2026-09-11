@@ -369,19 +369,12 @@ async def build(adapter: Any) -> dict[str, str]:
         entity=stud_hole,
     )
 
-    # y=0.102 (physical 0.204): the finishing rework left note 1 one line
-    # taller than the original block and note 5's tail printed on the
-    # bottom border at y=0.100 -- one line-height up restores the margin.
     add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.102)
-    # NOTE anchors pass through IAnnotation::SetPosition, which this 2:1
-    # sheet MULTIPLIES by the sheet scale -- physical = 2x the argument
-    # (Inspection Notes (0.270, 0.255) render at (0.54, 0.51); the first
-    # notes-B anchor (0.560, 0.300) landed off-sheet at (1.12, 0.60)).
-    # (0.259, 0.089) -> physical (0.518, 0.178): the free band between
-    # the FRONT VIEW label and the title block top edge.
-    add_property_linked_note(adapter, "Manufacturing Notes B", 0.2585, 0.200)
-    add_property_linked_note(adapter, "Inspection Notes", 0.2965, 0.260)
-    add_property_linked_note(adapter, "Top View Note", 0.280, 0.2055)
+    # Stack the two right-hand blocks instead of overlapping them. Both note
+    # anchors are literal sheet coordinates; multi-line text grows upward.
+    add_property_linked_note(adapter, "Manufacturing Notes B", 0.265, 0.154)
+    add_property_linked_note(adapter, "Inspection Notes", 0.260, 0.270)
+    add_property_linked_note(adapter, "Top View Note", 0.280, 0.212)
     add_property_linked_note(adapter, "Front View Note", *FRONT_VIEW_NOTE_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_VIEW_NOTE_XY)
 
