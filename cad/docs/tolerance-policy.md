@@ -7,9 +7,18 @@ Fits are therefore shared parameters applied uniformly, never per-part magic num
 
 ## Source of truth
 
-Fit classes and clearances live in [`cad/config/tolerances.yaml`](../cad/config/tolerances.yaml)
+Fit classes and clearances live in [`cad/config/tolerances.yaml`](../config/tolerances.yaml)
 and flow into geometry and into part custom properties. The build scripts read named fit
 classes; they do not hardcode clearance numbers.
+
+The whole-device performance benchmark that constrains this allocation is
+[`michelson-1898-trial-accuracy.md`](./michelson-1898-trial-accuracy.md):
+approximately 0.7% full-scale mean absolute coefficient error on the historical
+80-element machine. It is a comparison value, not a demonstrated target for this
+project's 20 channels. The 2% value is the largest observed table entry, not a
+guaranteed envelope or acceptance criterion. These are assembled-machine output
+results, not percentages to apply directly to part dimensions; derive dimensional
+limits through sensitivity analysis and assembled-machine verification.
 
 ## Fit classes (interfaces that must carry a rule)
 

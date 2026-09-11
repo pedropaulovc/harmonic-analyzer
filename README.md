@@ -163,8 +163,8 @@ glTF exports plus the drawing PDFs.
   (Articulate Noise Books, 2014). Free to read, and the reason this project
   exists at all.
 - engineerguy, ["A Machine That Uses Gears to Add Sines and Cosines"](https://www.youtube.com/playlist?list=PL2FF649D0C4407B30)
-- Michelson & Stratton, "A New Harmonic Analyzer", *American Journal of Science*
-  25 (1898): 1-13.
+- Michelson & Stratton, "A New Harmonic Analyzer", *American Journal of Science*,
+  fourth series 5, no. 25 (1898): 1–13.
 
 This project is independent of those authors and the University of Illinois, and
 is not endorsed by any of them.
