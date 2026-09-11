@@ -1049,6 +1049,114 @@ def create_section_view(
     return section
 
 
+_SW_DET_VIEW_STANDARD = 0  # swDetViewStyle_e.swDetViewSTANDARD
+_SW_DET_CIRCLE_CIRCLE = 1  # swDetCircleShowType_e.swDetCircleCIRCLE
+
+
+@_telemetry.traced("drawing.detail_view", label_param="label")
+def create_detail_view(
+    adapter: Any,
+    parent_view: Any,
+    *,
+    center: tuple[float, float],
+    radius: float,
+    view_xy: tuple[float, float],
+    detail_label: str,
+    scale: tuple[int, int],
+    label: str,
+) -> Any:
+    """Create an enlarged detail of the circle ``center``/``radius`` on ``parent_view``.
+
+    ``center``, ``radius`` and ``view_xy`` are drawing-sheet meters; the circle
+    is converted through the parent sketch's transform exactly as the section
+    helper converts its cutting line (``CreateCircle`` takes view-local sketch
+    coordinates). The circle stays selected, the precondition for
+    ``CreateDetailViewAt4``; the detail is created unaligned at ``view_xy`` so a
+    recipe places and scales it independently of the parent.
+    """
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
+    name = view_name(adapter, parent_view)
+    if not ddoc.ActivateView(name):
+        raise RuntimeError(f"failed to activate detail parent view {name!r} ({label})")
+    draw.ClearSelection2(True)
+    parent = _early_bound(parent_view, "IView")
+    sketch = _early_bound(parent.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in (center, (center[0] + radius, center[1])):
+        point = _early_bound(
+            math_utility.CreatePoint(double_array([float(x), float(y), 0.0])),
+            "IMathPoint",
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    circle = sketch_manager.CreateCircle(*points[0], *points[1])
+    if circle is None:
+        raise RuntimeError(f"failed to sketch the detail circle ({label})")
+    detail = ddoc.CreateDetailViewAt4(
+        float(view_xy[0]),
+        float(view_xy[1]),
+        0.0,
+        _SW_DET_VIEW_STANDARD,
+        float(scale[0]),
+        float(scale[1]),
+        detail_label,
+        _SW_DET_CIRCLE_CIRCLE,
+        True,  # full outline
+        False,  # jagged outline
+        False,  # no outline
+        5,  # shape intensity (unused without a jagged outline)
+    )
+    if detail is None:
+        raise RuntimeError(f"failed to create detail view ({label})")
+    detail = _sw_type_info.early_bound_or_flag(
+        detail, "IView", "GetDetail", "SetViewPosition", "GetOutline"
+    )
+    detail.ScaleRatio = double_array([float(scale[0]), float(scale[1])])
+    # A view's position is the centre of its WHOLE model's box, and a detail
+    # clips that model to the circle -- so the visible circle lands offset by
+    # (circle centre - model centre) x scale (measured: the summing-lever hex
+    # landed 80 mm right of the requested point, off the sheet). Place, read
+    # the clipped outline back, and shift by the residual.
+    position = [float(view_xy[0]), float(view_xy[1])]
+    for _attempt in range(2):
+        if not detail.SetViewPosition(double_array(position), False):
+            raise RuntimeError(f"failed to position detail view ({label})")
+        draw.EditRebuild3()
+        outline = [float(value) for value in (detail.GetOutline() or ())]
+        if len(outline) < 4:
+            raise RuntimeError(f"detail view has no outline ({label})")
+        residual = (
+            view_xy[0] - (outline[0] + outline[2]) / 2.0,
+            view_xy[1] - (outline[1] + outline[3]) / 2.0,
+        )
+        if max(abs(residual[0]), abs(residual[1])) <= 0.0005:
+            break
+        position = [position[0] + residual[0], position[1] + residual[1]]
+    else:
+        raise RuntimeError(
+            f"detail view did not centre on {view_xy!r} ({label}): "
+            f"residual {residual!r}"
+        )
+    detail_circle = detail.GetDetail()
+    if detail_circle is None:
+        raise RuntimeError(f"detail view has no detail circle ({label})")
+    detail_circle = _sw_type_info.early_bound_or_flag(
+        detail_circle, "IDetailCircle", "GetLabel"
+    )
+    applied = str(detail_circle.GetLabel() or "")
+    if applied != detail_label:
+        raise RuntimeError(
+            f"detail label did not persist ({label}): {applied!r} != {detail_label!r}"
+        )
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    return detail
+
+
 @_telemetry.traced("drawing.model_point_projection", label_param="label")
 def model_point_in_view(
     adapter: Any,

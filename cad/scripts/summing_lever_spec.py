@@ -16,7 +16,7 @@ from _hole_spec import HoleSpec
 
 
 from _gtol_spec import PlanarFace
-from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from _surface_finish import GROUND_UM, SurfaceFinishControl
 
 MM_PER_IN = 25.4
 
@@ -44,10 +44,12 @@ KNIFE_FACE_NORMAL = (
 )
 KNIFE_FACE_OFFSET = KNIFE_FACE_NORMAL[1] * HEX_H / 2.0
 
+# The knife edge is the one surface the lever runs on; the policy reserves the
+# ground grade for knife edges (cad/docs/drawing-simplicity-policy.md rule 5).
 SURFACE_FINISHES = (
     SurfaceFinishControl(
         "knife_edge_ridge",
-        MACHINED_UM,
+        GROUND_UM,
         PlanarFace(
             KNIFE_FACE_NORMAL,
             KNIFE_FACE_OFFSET,
@@ -82,8 +84,9 @@ HEX_Z_OUTER = HEX_Z_INNER + HEX_DEPTH  # outboard face overhangs the body (97.92
 # closures (codex #354).
 
 
-# Manufacturing GD&T limits consumed by the part's drawing projection.
+# The one geometric control the policy allowlists for this part: the 20-hole
+# spring pattern, located off the knife edge (A) and a plate end (B). The
+# anchor eye is a cast feature and carries an ordinary coordinate.
 GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "summation anchor position": "0.30",
     "spring-hole pattern position": "0.30",
 }
