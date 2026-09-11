@@ -38,6 +38,7 @@ BORE_FIT_CALLOUT = (
     "DIAMETRAL CLEARANCE"
 )
 FACE_WIDTH = 3.0
+# Face width controls mesh engagement across the mating cone-gear family.
 FACE_WIDTH_TOLERANCE_MM = 0.05
 CAM_DIA = 30.6  # integral eccentric cam disc
 CAM_DIA_BAND = (0.0, -0.05)  # (upper, lower) deviations
@@ -117,5 +118,6 @@ DRAWING_NOTES = "\n".join(
         "ALIGNMENT NOTCH IS FIRST TOOTH ROOT CCW FROM CAM LOBE AS VIEWED FROM CAM FACE.",
         "CAM ECCENTRICITY RANGE ACROSS ALL 20 MHA-027 GEARS IN ONE ANALYZER: "
         f"{SET_ECCENTRICITY_RANGE_MM:.3f} MAX.",
+        "MATES WITH CONE GEAR FAMILY MHA-013.",
     )
 )
