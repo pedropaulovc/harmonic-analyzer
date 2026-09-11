@@ -11,7 +11,6 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_attached_note,
     add_surface_finish,
     add_native_hole_callout,
     curate_view_dimensions,
@@ -38,13 +37,11 @@ from arbor_pedestal_spec import (
     FOOT_WIDTH,
     SCREW_HOLE_DIA,
     STRAP_T,
-    TAPER_ANGLE_DEG,
-    TAPER_TANGENT_X,
-    TAPER_TANGENT_Y,
     SURFACE_FINISHES,
     TOP_RADIUS,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     dimension_name,
     place_view,
@@ -106,11 +103,10 @@ DIMENSION_PRECISION = {
 
 
 @_telemetry.traced("drawing.arbor.front_entity_scan")
-def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any]:
-    """Return the foot-seat, arbor-bore, crown, and taper entities."""
+def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any]:
+    """Return the foot-seat, arbor-bore, and tangent crown entities."""
     foot_candidates: list[tuple[float, Any]] = []
     bore_candidates: list[tuple[float, float, Any]] = []
-    taper_candidates: list[tuple[float, Any]] = []
     for raw_edge in visible_view_entities(view, 1, label="pedestal front edges"):
         edge = _early_bound(raw_edge, "IEdge")
         curve = edge.GetCurve()
@@ -129,18 +125,6 @@ def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any]:
         p1 = tuple(float(value) * 1000.0 for value in end.GetPoint())
         if abs(p0[1]) <= 0.01 and abs(p1[1]) <= 0.01:
             foot_candidates.append((abs(p1[0] - p0[0]), edge))
-        endpoints = sorted(
-            ((abs(p0[0]), p0[1]), (abs(p1[0]), p1[1])), key=lambda p: p[1]
-        )
-        root, tangent = endpoints
-        taper_error = (
-            abs(root[0] - FOOT_WIDTH / 2.0)
-            + abs(root[1] - FOOT_HEIGHT)
-            + abs(tangent[0] - TAPER_TANGENT_X)
-            + abs(tangent[1] - TAPER_TANGENT_Y)
-        )
-        if taper_error <= 0.05:
-            taper_candidates.append((taper_error, edge))
     if not foot_candidates:
         raise RuntimeError("front view has no model edge on the foot-seat plane")
     foot_span, foot_edge = max(foot_candidates, key=lambda item: item[0])
@@ -162,10 +146,7 @@ def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any]:
     )
     if abs(dome_radius - TOP_RADIUS) > 0.01 or abs(dome_height - BORE_HEIGHT) > 0.01:
         raise RuntimeError("front view has no circular dome edge")
-    if not taper_candidates:
-        raise RuntimeError("front view has no edge matching the tangent side taper")
-    taper_edge = min(taper_candidates, key=lambda item: item[0])[1]
-    return foot_edge, bore_edge, dome_edge, taper_edge
+    return foot_edge, bore_edge, dome_edge
 
 
 def _top_depth_edge(adapter: Any, view: Any, z_mm: float, *, label: str) -> Any:
@@ -234,15 +215,15 @@ def _add_radial_dimension(
     return display
 
 
-@_telemetry.traced("drawing.diameter_second_arrow", label_param="label")
-def _disable_diameter_second_arrow(
+@_telemetry.traced("drawing.diameter_near_side_leader", label_param="label")
+def _route_diameter_leader_to_near_side(
     adapter: Any,
     annotations: list[Any],
     *,
     dimension: str,
     label: str,
 ) -> None:
-    """Remove a diameter dimension's optional arrow across the far side."""
+    """Keep only the diameter leader ending at the circumference by its text."""
     for raw_annotation in annotations:
         annotation = _early_bound(raw_annotation, "IAnnotation")
         if dimension_name(adapter, annotation) != dimension:
@@ -251,9 +232,16 @@ def _disable_diameter_second_arrow(
         if display is None:
             raise RuntimeError(f"dimension {dimension!r} has no display annotation")
         display = _early_bound(display, "IDisplayDimension")
-        display.SetSecondArrow(False, False)
-        if bool(display.GetUseDocSecondArrow()) or bool(display.GetSecondArrow()):
-            raise RuntimeError(f"failed to disable {label} far-side arrow")
+        # swLeaderLineSecond (2) selects the half nearest this right-side text;
+        # enable its arrow explicitly instead of inheriting the document default.
+        display.LeaderVisibility = 2
+        display.SetSecondArrow(False, True)
+        if (
+            int(display.LeaderVisibility) != 2
+            or bool(display.GetUseDocSecondArrow())
+            or not bool(display.GetSecondArrow())
+        ):
+            raise RuntimeError(f"failed to route {label} leader to the near side")
         adapter.currentModel.GraphicsRedraw2()
         return
     raise RuntimeError(f"dimension {dimension!r} not found for {label}")
@@ -397,7 +385,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_precision(
         adapter, [*front_annotations, *top_annotations], DIMENSION_PRECISION
     )
-    _disable_diameter_second_arrow(
+    _route_diameter_leader_to_near_side(
         adapter,
         front_annotations,
         dimension="BoreDia",
@@ -410,9 +398,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # Bore and foot hole are explicitly placed on the part centreline. This
     # avoids a long half-width witness line that visually merges with the taper.
-    foot_entity, bore_entity, dome_entity, taper_entity = _front_entities(
-        adapter, front
-    )
+    foot_entity, bore_entity, dome_entity = _front_entities(adapter, front)
     add_surface_finish(
         adapter,
         front,
@@ -422,14 +408,13 @@ async def build(adapter: Any) -> dict[str, str]:
         char_height=0.0025,
         entity=bore_entity,
     )
-    # Right of the 24.0 width dimension (which ends at the foot's right
-    # corner, x ~0.159) and level with it; the leader is pinned to the seat's
-    # right quarter so it leaves the vee's LEFT side and runs up-left, clear
-    # of the "Ra 3.2" text that hangs right of the anchor.
+    # Above and right of the foot, wholly outside the taper silhouette. Its
+    # short leader reaches the seat from above, never crossing the 24.0 width
+    # dimension or either extension line below the foot.
     add_surface_finish(
         adapter,
         front,
-        symbol_xy=(FRONT_CENTER[0] + 0.036, _front_y(0.0) - 0.016),
+        symbol_xy=(FRONT_CENTER[0] + 0.036, _front_y(0.0) + 0.015),
         control=surface_finish_by_key(SURFACE_FINISHES, "foot_seat"),
         label="foot seat finish",
         char_height=0.0025,
@@ -482,17 +467,6 @@ async def build(adapter: Any) -> dict[str, str]:
     ):
         raise RuntimeError("crown radius annotation did not persist")
     adapter.currentModel.GraphicsRedraw2()
-    add_attached_note(
-        adapter,
-        front,
-        text=(
-            f"UPRIGHT ROOT = {FOOT_WIDTH:.1f}; "
-            f"TAPER {TAPER_ANGLE_DEG:.2f}<MOD-DEG>/SIDE (REF)"
-        ),
-        entity=taper_entity,
-        note_xy=(0.200, _front_y(23.0)),
-        label="side-taper reference angle",
-    )
     screw_entity = _circle_entity(
         adapter,
         top,
@@ -527,13 +501,13 @@ async def build(adapter: Any) -> dict[str, str]:
         position=(TOP_CENTER[0] + 0.045, TOP_CENTER[1] + 0.010),
         label="upright depth",
     )
-    for raw_dimension, label in (
-        (hold_down_dimension, "hold-down hole depth location"),
-        (upright_dimension, "upright depth"),
+    for raw_dimension, label, precision in (
+        (hold_down_dimension, "hold-down hole depth location", 2),
+        (upright_dimension, "upright depth", 1),
     ):
         display = _early_bound(raw_dimension, "IDisplayDimension")
-        display.SetPrecision3(1, -1, -1, -1)
-        if int(display.GetPrimaryPrecision2()) != 1:
+        display.SetPrecision3(precision, -1, -1, -1)
+        if int(display.GetPrimaryPrecision2()) != precision:
             raise RuntimeError(f"{label} precision did not persist")
         if label == "upright depth":
             display.SetText(4, "UPRIGHT DEPTH")
@@ -548,6 +522,13 @@ async def build(adapter: Any) -> dict[str, str]:
         label="flange hold-down hole",
         process="FOOT-FLANGE HOLE ON PART C/L: DRILL",
     )
+    if add_note(
+        adapter,
+        "FOOT HOLE HIDDEN AT REAR",
+        ISO_CENTER[0] - 0.050,
+        0.070,
+    ) is None:
+        raise RuntimeError("failed to add isometric foot-hole qualifier")
     return await finalize_drawing(
         adapter,
         OUTPUTS,

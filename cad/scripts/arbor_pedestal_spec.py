@@ -5,7 +5,7 @@ SLDDRW recipes from one source (see build_arbor_pedestal.py for the geometry).
 """
 
 from __future__ import annotations
-from math import atan2, degrees, sqrt
+from math import sqrt
 
 from _hole_spec import HoleSpec, blind_cut_dia_mm
 from _gtol_spec import CylinderFace, PlanarFace
@@ -37,9 +37,6 @@ TAPER_TANGENT_Y = (
     BORE_HEIGHT
     + (-(TOP_RADIUS**2) * _CENTER_RISE + TOP_RADIUS * _ROOT_HALF_WIDTH * _TANGENT_DISC)
     / _TANGENT_DENOM
-)
-TAPER_ANGLE_DEG = degrees(
-    atan2(_ROOT_HALF_WIDTH - TAPER_TANGENT_X, TAPER_TANGENT_Y - FOOT_HEIGHT)
 )
 SCREW_HOLE_SPEC = HoleSpec("clearance", "#4")
 SCREW_HOLE_DIA = blind_cut_dia_mm(SCREW_HOLE_SPEC)

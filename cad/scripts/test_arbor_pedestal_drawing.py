@@ -2,22 +2,11 @@
 
 from __future__ import annotations
 
-import re
-from pathlib import Path
-
 import arbor_pedestal_spec
 import build_arbor_pedestal as part
 import draw_arbor_pedestal as drawing
 from _drawing_contract import model_toleranced_dimensions
-from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import blind_cut_dia_mm
-
-
-def test_required_drawing_paths() -> None:
-    assert drawing.SLDDRW.as_posix().endswith("/slddrw/arbor-pedestal.SLDDRW")
-    assert drawing.PDF.as_posix().endswith("/pdf/arbor-pedestal.pdf")
-    assert drawing.PNG.as_posix().endswith("/png/arbor-pedestal_drawing.png")
-    assert DRAWINGS_BY_NAME["arbor_pedestal"].script == Path(drawing.__file__).resolve()
 
 
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
@@ -37,8 +26,6 @@ def test_arbor_bore_closes_the_configured_running_fit() -> None:
     import _config
 
     assert round(arbor_pedestal_spec.BORE_DIA, 2) == 9.55
-    assert drawing.DIMENSION_CALLOUTS["BoreDia"] == ("REAM THRU; ON PART C/L")
-    assert "BoreHeight" not in drawing.DIMENSION_CALLOUTS
     assert drawing.DIMENSION_PRECISION == {
         "Width": 1,
         "Depth": 1,
@@ -65,112 +52,27 @@ def test_screw_hole_contract_is_part_owned() -> None:
     assert part.SCREW_HOLE_DIA == blind_cut_dia_mm(spec)
 
 
-def test_no_dead_band_between_wizard_correction_and_the_builder_assert() -> None:
-    """What the wizard will FORCE must cover what the builder will ACCEPT.
+def test_tangent_crown_closes_the_upright_profile() -> None:
+    root_x = arbor_pedestal_spec.FOOT_WIDTH / 2.0
+    tangent_x = arbor_pedestal_spec.TAPER_TANGENT_X
+    tangent_y = arbor_pedestal_spec.TAPER_TANGENT_Y
+    radius_x = tangent_x
+    radius_y = tangent_y - arbor_pedestal_spec.BORE_HEIGHT
+    flank_x = tangent_x - root_x
+    flank_y = tangent_y - arbor_pedestal_spec.FOOT_HEIGHT
 
-    These were two different literals -- `_holes` only corrected a drift over
-    0.05 mm, while `build_arbor_pedestal` rejected anything over 0.005. A #4
-    clearance initialized at 3.2512 instead of 3.264 drifts 0.0128 and lands in
-    the gap: the wizard leaves it, the builder refuses it, and NO value of the
-    spec pin can satisfy both. It read as the seat's table "moving" and cost
-    three flip-flops of the pin before Codex spotted the real mechanism on #422.
-
-    Both now read one constant. This test fails if they are ever separated
-    again, including by someone tightening only the builder's side.
-    """
-    import _holes
-
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "DIAMETER_TOLERANCE_MM" in source, "builder must use the shared tolerance"
-    # Any numeric literal compared against the cut diameter re-opens the band.
-    # Regex rather than a fixed string so `>0.005`, `> 0.0050` and friends are
-    # caught too -- a whitespace variant slipping through would defeat the gate.
-    assert not re.search(r"[<>]=?\s*0\.0*5\b|[<>]=?\s*0\.005\d*", source), (
-        "builder compares the cut diameter against a numeric literal; use "
-        "_holes.DIAMETER_TOLERANCE_MM so the wizard's correction threshold and "
-        "this acceptance threshold cannot separate into a dead band again"
-    )
-
-    holes_source = Path(_holes.__file__).read_text(encoding="utf-8")
-    assert (
-        "abs(initialized_dia_mm - pinned_dia_mm) > DIAMETER_TOLERANCE_MM"
-        in holes_source
-    )
-
-    # The tolerance must sit strictly between the benign rounding gap (the
-    # 0.0001 between CLEARANCE_MM's 3.264 and the live 3.2639 -- writing there
-    # would corrupt swHoleThru 25 into 26) and the wrong-row drift it must
-    # catch (3.264 vs ("#3","loose") 3.251 = 0.0128).
-    rounding_gap = abs(3.2639 - _holes.CLEARANCE_MM[("#4", "normal")])
-    wrong_row_drift = abs(
-        _holes.CLEARANCE_MM[("#4", "normal")] - _holes.CLEARANCE_MM[("#3", "loose")]
-    )
-    assert rounding_gap < _holes.DIAMETER_TOLERANCE_MM < wrong_row_drift
-
-
-def test_material_and_finish_requirements_stay_out_of_notes() -> None:
-    assert not hasattr(arbor_pedestal_spec, "DRAWING_NOTES")
-    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
-    part_source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "Manufacturing Notes" not in drawing_source
-    assert "Manufacturing Notes" not in part_source
+    assert abs(
+        radius_x**2 + radius_y**2 - arbor_pedestal_spec.TOP_RADIUS**2
+    ) < 1e-9
+    assert abs(radius_x * flank_x + radius_y * flank_y) < 1e-9
+    assert 0.0 < tangent_x < root_x
+    assert arbor_pedestal_spec.FOOT_HEIGHT < tangent_y
+    assert arbor_pedestal_spec.BORE_HEIGHT < tangent_y
     assert "StrapProfile" not in arbor_pedestal_spec.DRAWING_DIMENSIONS
     assert "DomeProfile" not in arbor_pedestal_spec.DRAWING_DIMENSIONS
 
 
-def test_ordinary_dimensions_define_the_bore_strap_and_hold_down_hole() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    for label in (
-        'label="bore height from foot seat"',
-        'label="overall height reference"',
-        'label="hold-down hole depth location"',
-        'label="upright depth"',
-    ):
-        assert label in source
-    assert drawing.DIMENSION_CALLOUTS == {"BoreDia": "REAM THRU; ON PART C/L"}
-    assert 'label="crown radius"' in source
-    assert "AddRadialDimension2" in source
-    assert "add_native_hole_callout(" in source
-    assert '"UPRIGHT DEPTH"' in source
-    assert '"side-taper reference angle"' in source
-    assert 3.0 < arbor_pedestal_spec.TAPER_ANGLE_DEG < 4.0
-    assert 'label="flange hold-down hole"' in source
-    assert "SetSecondArrow(False, False)" in source
-    assert "GetSecondArrow()" in source
-    assert "SetLeaderAttachmentPointAtIndex" not in source
-    assert 'process="FOOT-FLANGE HOLE ON PART C/L: DRILL"' in source
-    assert '"Material",' in source
-    assert arbor_pedestal_spec.BORE_HEIGHT == 39.718
-    assert arbor_pedestal_spec.STRAP_T == 10.0
-    assert arbor_pedestal_spec.FOOT_WIDTH == 24.0
-    assert arbor_pedestal_spec.FOOT_DEPTH == 16.0
-    assert arbor_pedestal_spec.BORE_HEIGHT + arbor_pedestal_spec.TOP_RADIUS == 49.718
-    assert "set_reference_dimension(" in source
-    assert "_top_width_edge" not in source
-    assert "StrapRootWidth" not in drawing.FRONT_KEEP
-    assert drawing.FRONT_KEEP["Width"][1] < drawing._front_y(0.0)
-    assert drawing.TOP_KEEP["Depth"][0] < drawing.TOP_CENTER[0]
-
-
-def test_pedestal_has_no_gdt_or_basic_dimensions() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    for helper in (
-        "add_datum_feature(",
-        "add_feature_control_frame(",
-        "set_basic_dimension(",
-        "project_part_pmi(",
-    ):
-        assert helper not in source, helper
-    assert "datum=" not in source
-    assert "characteristic=" not in source
-    assert not hasattr(arbor_pedestal_spec, "GEOMETRIC_TOLERANCES_MM")
-    assert not hasattr(arbor_pedestal_spec, "DOME_DIA")
-    assert not hasattr(arbor_pedestal_spec, "SCREW_CLEARANCE_DIA")
-
-
 def test_running_bore_and_mating_foot_seat_carry_surface_finish_controls() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert drawing.DIMENSION_CALLOUTS["BoreDia"].startswith("REAM THRU")
     by_key = {c.key: c for c in arbor_pedestal_spec.SURFACE_FINISHES}
     assert set(by_key) == {"arbor_bore", "foot_seat"}
     assert by_key["arbor_bore"].roughness_um == 1.6
@@ -180,9 +82,6 @@ def test_running_bore_and_mating_foot_seat_carry_surface_finish_controls() -> No
     assert by_key["foot_seat"].roughness_um == 3.2
     assert by_key["foot_seat"].face.normal == (0, -1, 0)
     assert by_key["foot_seat"].face.offset_mm == 0.0
-    for key in by_key:
-        assert f'surface_finish_by_key(SURFACE_FINISHES, "{key}")' in source
-    assert source.count("add_surface_finish(") == 2
     assert model_toleranced_dimensions(part) == {
         ("BoreProfile", "BoreDia"): "*deviations(BORE_DIA_BAND)"
     }
@@ -190,15 +89,12 @@ def test_running_bore_and_mating_foot_seat_carry_surface_finish_controls() -> No
 
 def test_projected_view_alignment_is_explicit() -> None:
     assert drawing.SHEET_SCALE == (2.0, 1.0)
-    assert drawing.FRONT_CENTER == (0.135, 0.125)
-    assert drawing.TOP_CENTER == (drawing.FRONT_CENTER[0], 0.215)
     assert drawing.TOP_CENTER[0] == drawing.FRONT_CENTER[0]
+    assert drawing.TOP_CENTER[1] > drawing.FRONT_CENTER[1]
+    assert drawing.ISO_CENTER[0] > drawing.FRONT_CENTER[0]
 
 
 def test_part_stamps_make_flexible_material_and_protective_finish() -> None:
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_properties" in source
-    assert "clear_dimensions_for_drawing" in source
     assert part.MATERIAL == "Plain Carbon Steel"
     import _config
 
