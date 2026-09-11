@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import math
 
+import _config
+
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
@@ -18,9 +20,7 @@ MM_PER_IN = 25.4
 
 # --- gear tooth system (build_cylinder_gear.py / gear_train.yaml) ------------
 TEETH = 120
-DIAMETRAL_PITCH = (
-    49.82  # train DP (= 122*25.4/62.2), cad/config/machine/gear_train.yaml
-)
+DIAMETRAL_PITCH = _config.machine("gear_train", "diametral_pitch")
 PRESSURE_ANGLE_DEG = 14.5
 MODULE_MM = MM_PER_IN / DIAMETRAL_PITCH  # 0.510
 PITCH_DIA = TEETH / DIAMETRAL_PITCH * MM_PER_IN  # 61.18
