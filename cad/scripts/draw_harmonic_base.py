@@ -287,6 +287,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Title",
             "Material Specification",
             "Finish",
+            "Manufacturing Notes B",
             "Quantity",
             "Manufacturing Notes",
             "Side View Note",
@@ -297,6 +298,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
+            "Manufacturing Notes B",
             "Manufacturing Notes",
             "Side View Note",
             "Isometric View Note",
@@ -444,6 +446,9 @@ async def build(adapter: Any) -> dict[str, str]:
 
     add_property_linked_note(
         adapter, "Manufacturing Notes", 0.170, 0.125, char_height=0.002
+    )
+    add_property_linked_note(
+        adapter, "Manufacturing Notes B", 0.305, 0.125, char_height=0.002
     )
     add_property_linked_note(adapter, "Side View Note", *SIDE_NOTE_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
