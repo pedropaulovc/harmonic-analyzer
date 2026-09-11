@@ -131,8 +131,8 @@ _service_name = _resolve_service_name()
 # local collector with zero env. So `doit ...` / a build script lights up the
 # dashboard's traces+logs the moment it is running -- no OTEL_* exports needed.
 # Override or disable with OTEL_EXPORTER_OTLP_ENDPOINT (set it empty to turn off).
-# HTTP/protobuf remains the default transport. Set the standard
-# ``OTEL_EXPORTER_OTLP_PROTOCOL=grpc`` for collectors such as Azure Monitor Agent.
+# HTTP/protobuf remains the default transport. Collectors such as Azure Monitor
+# Agent require both their explicit endpoint variables and ``OTEL_EXPORTER_OTLP_PROTOCOL=grpc``.
 #
 # By LITERAL ADDRESS, never the name "localhost". Measured on this seat: the first
 # OTLP POST to ``http://localhost:18890`` cost 2.05 s, and to
