@@ -87,6 +87,7 @@ from _common import (
     force_rebuild,
     name_bore_axis,
     name_last_feature,
+    name_dimensions,
     report_mass_properties,
     run_build,
     save_part_and_images,
@@ -98,17 +99,33 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
 )
 from _fit_limits import deviations
 from _gear import build_fixed_gear, volume_check
 from _part_pmi import author_part_pmi
 from build_cone_gear import DP, gear_facts  # DP = train diametral_pitch (machine.yaml)
 from cylinder_gear_spec import (
+    BORE_DIA as BORE_DIAMETER,
     BORE_DIA_BAND,
+    CAM_DIA as CAM_DIAMETER,
+    CAM_DIA_BAND,
+    CAM_THICKNESS,
+    CAM_THICKNESS_TOLERANCE_MM,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
+    ECCENTRICITY,
+    ECCENTRICITY_TOLERANCE_MM,
+    FACE_WIDTH,
     GEAR_DATA,
+    NOTCH_CENTER_X,
+    NOTCH_DEPTH,
+    NOTCH_FLOOR_RADIUS,
+    NOTCH_WIDTH,
+    NOTCH_WIDTH_BAND,
+    OUTSIDE_DIA,
     SURFACE_FINISHES,
+    TEETH,
 )
 
 import _telemetry
@@ -116,40 +133,20 @@ import _telemetry
 PART_NAME = "cylinder-gear"
 MATERIAL = "Brass"  # ch. 13 text p.22: polished brass
 
-TEETH = 120  # DIMENSIONS.md ch13: derived from gear law k/80 (high)
-FACE_WIDTH = 3.0  # DIMENSIONS.md ch13: 0.38 face/pitch x 7.5 axial pitch (scaled, med)
-CAM_DIAMETER = 30.6  # DIMENSIONS.md ch13: integral cam bearing diameter; the rod ring
-# bore Ø30.8 measured on the p.25 overlay (Ø29.83 at the gear-OD scale) confirms it (med)
-CAM_THICKNESS = 3.5  # DIMENSIONS.md ch13: axial-budget (7.0565 channel pitch, unchanged) (med)
-ECCENTRICITY = 8.64  # DIMENSIONS.md ch13: cam throw MEASURED from the ch14 end-view ROM
-# fit (2026-07-02): tip half-amplitude 9.458 mm over the 20-tip least-squares cos fit at
-# the channel-pitch scale, x r_pin/r_tipface = 127.37/139.5. Supersedes the scaled-0.6022
-# legacy 3.06 (the lobe also flips to +Y -- see the module docstring). (med)
-BORE_DIAMETER = 0.375 * IN  # 9.525 DIMENSIONS.md ch13: cam bore (legacy, med)
-NOTCH_DEPTH = 3.0  # DIMENSIONS.md ch13: alignment notch depth, text p.22 (high)
-# The notch is "just a slit" cut with a SAW between two teeth -- the p.23 photo
-# labelled "notch" shows a thin kerf, and the real gears are NOT missing a tooth
-# (all 120 stay complete). So it is a narrow saw kerf seated in the tooth VALLEY
-# nearest +Y, 3 mm deep, leaving the flanking crests intact. The book gives only
-# the depth; the kerf width is a slitting-saw value (low; supersedes the legacy
-# 3.0 square and the interim missing-tooth slit).
-NOTCH_WIDTH = 0.4  # DIMENSIONS.md ch13: alignment-notch saw-kerf width (low)
+# The dimensional sources live in cylinder_gear_spec.  These public aliases
+# remain importable for the assembly recipes that consume the cam package.
 NOTCH_CLEARANCE = 1.5  # kerf overshoot past the OD so the cut always opens (geom)
 
 BORE_RADIUS = BORE_DIAMETER / 2.0
 
 FACTS = gear_facts(TEETH, DP)  # inches; same DP/PA as the cone set by construction
-RA_MM = FACTS["Ra"] * IN  # 31.10 -- gear OD/2 = 2.449"/2 = 62.2/2 (low, ch13 scaling)
+RA_MM = OUTSIDE_DIA / 2.0
 RB_MM = FACTS["Rb"] * IN
-NOTCH_FLOOR = RA_MM - NOTCH_DEPTH
+NOTCH_FLOOR = NOTCH_FLOOR_RADIUS
 NOTCH_OUTER = RA_MM + NOTCH_CLEARANCE  # clearance past the OD so the cut always opens
-# +Y (90 deg = 30*gamma) is a tooth CREST at 120 T, so the kerf cannot sit on
-# +Y without deleting that tooth. Seat the (axis-aligned, near-vertical) kerf in
-# the adjacent root valley at 90 deg + gamma/2: its centreline x is the valley
-# radius projected onto X. Over the kerf's short radial span the valley is ~1.5
-# deg off vertical, so a vertical slot at this x stays inside the gap (verified:
-# all 120 crests remain, removed solid ~0.60 mm^2).
-NOTCH_X = (NOTCH_FLOOR + RA_MM) / 2.0 * math.cos(math.pi / 2.0 + FACTS["Gamma"] / 2.0)
+# +Y is a tooth crest.  The spec owns the first-root-CCW kerf centre so the
+# part and the drawing's phase/depth picks cannot drift.
+NOTCH_X = NOTCH_CENTER_X
 
 THROUGH_ALL = FACE_WIDTH + CAM_THICKNESS + 2.0  # bore cut depth
 
@@ -293,23 +290,33 @@ async def build(adapter) -> dict[str, str]:
             )
         ),
     )
-    # Cam disc: ordinary auxiliary circle, centre offset +Y by the eccentricity.
-    # On-axis in X (x 0 -> no X dim); the +Y offset is one centre dim (displayed
-    # as the unsigned magnitude, so it drives to +"Eccentricity") plus diameter.
+    # Cam disc: ordinary auxiliary circle, centred +Y from the bore.  A sketch
+    # on this custom offset plane emits both centre coordinates even though
+    # x=0, so record all three dimensions and mark only the useful Y offset and
+    # diameter for the drawing.
+    cam = SketchDims()
     check(f"create_sketch cam on {plane.name}", await adapter.create_sketch(plane.name))
-    # On a custom offset plane the x=0 anchor still emits an X dim (3 dims, not
-    # the 2 a Front/Top origin circle would), so the helper's recorded count
-    # can't be predicted here -- name the feature but record no dims (like the
-    # gooseneck sweep profile). CamDiameter/Eccentricity stay declared as knobs.
-    await define_circle(adapter, 0.0, ECCENTRICITY, CAM_DIAMETER / 2.0, "cam disc")
+    await define_circle(
+        adapter,
+        0.0,
+        ECCENTRICITY,
+        CAM_DIAMETER / 2.0,
+        "cam disc",
+        dims=cam,
+        names=("CamCx", "CamCy", "CamDia"),
+        drives=(None, '"Eccentricity"', '"CamDiameter"'),
+    )
     await ensure_fully_defined(adapter, "cam sketch")
     check("exit_sketch cam", await adapter.exit_sketch())
     name_last_feature(adapter, "CamProfile")
+    drive_jobs += cam.apply(adapter, "CamProfile")
     check(
         "extrude cam",
         await adapter.create_extrusion(ExtrusionParameters(depth=CAM_THICKNESS)),
     )
     name_last_feature(adapter, "CamBoss")
+    cam_depth = name_dimensions(adapter, "CamBoss", ["CamThickness"])
+    drive_jobs += [(cam_depth[0], '"CamThickness"')]
     v_cam = math.pi * (CAM_DIAMETER / 2.0) ** 2 * CAM_THICKNESS
     volume = await volume_check(adapter, "cam boss", volume + v_cam, 0.005 * v_cam)
 
@@ -448,6 +455,24 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "BoreProfile", "BoreDia", *deviations(BORE_DIA_BAND)
     )
+    set_dimension_bilateral_tolerance(
+        adapter, "CamProfile", "CamDia", *deviations(CAM_DIA_BAND)
+    )
+    set_dimension_symmetric_tolerance(
+        adapter,
+        "CamProfile",
+        "CamCy",
+        ECCENTRICITY_TOLERANCE_MM,
+    )
+    set_dimension_symmetric_tolerance(
+        adapter,
+        "CamBoss",
+        "CamThickness",
+        CAM_THICKNESS_TOLERANCE_MM,
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "NotchProfile", "NotchWidth", *deviations(NOTCH_WIDTH_BAND)
+    )
     volume = await volume_check(
         adapter, "driven cylinder gear (equations neutral)", volume, 0.01 * v_bore
     )
@@ -455,8 +480,9 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
 
-    # Mark the bore as the single manufacturing model dimension and stamp the
-    # title-block + gear-data properties the curated drawing reads.
+    # Mark exactly the fitted bore, functional cam and phase-kerf dimensions;
+    # the drawing adds checked source-geometry dimensions for gear-face width
+    # and notch depth.
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

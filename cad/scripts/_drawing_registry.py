@@ -464,7 +464,7 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         part="cylinder_gear",
         artifact_stem="cylinder-gear",
         script_name="draw_cylinder_gear.py",
-        layout=DrawingLayout.LANDSCAPE,
+        layout=DrawingLayout.PORTRAIT,
     ),
     DrawingSpec(
         name="cone_gear",

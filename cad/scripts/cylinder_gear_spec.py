@@ -1,15 +1,14 @@
-r"""Pure-data dimensional contract shared by the cylinder gear and its drawing.
+r"""Pure-data dimensional contract for the cylinder gear and its drawing.
 
-The gear-drawing pattern (shared by every gear/pinion sheet in this batch): the
-BLANK is dimensioned in the views (bore, face width) while the TEETH are
-specified by the GEAR DATA block below -- an involute gear has no single
-circular OD edge to dimension, so pitch/outside diameter and the tooth system
-live in the data table (standard AGMA/ASME gear-drawing practice). Keep the
-GEAR DATA field order/wording identical across the batch so the sheets diff
-cleanly.
+The involute tooth system lives in ``GEAR_DATA`` because an involute outline
+has no authoritative circular edge to dimension.  Ordinary blank, cam and
+notch geometry stays in named model dimensions or checked drawing dimensions,
+so the sheet has one source for each manufacturing requirement.
 """
 
 from __future__ import annotations
+
+import math
 
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
@@ -33,20 +32,38 @@ BORE_DIA = 0.375 * MM_PER_IN  # 9.525 (3/8")
 BORE_DIA_BAND = (0.05, 0.03)  # (upper, lower) deviations
 FACE_WIDTH = 3.0
 CAM_DIA = 30.6  # integral eccentric cam disc
+CAM_DIA_BAND = (0.0, -0.05)  # (upper, lower) deviations
 CAM_THICKNESS = 3.5
+CAM_THICKNESS_TOLERANCE_MM = 0.05
 ECCENTRICITY = 8.64  # cam axis offset from the bore axis
+ECCENTRICITY_TOLERANCE_MM = 0.025
+SET_ECCENTRICITY_RANGE_MM = 0.025
 NOTCH_WIDTH = 0.4  # alignment saw-kerf
+NOTCH_WIDTH_BAND = (0.10, 0.0)  # (upper, lower) deviations
 NOTCH_DEPTH = 3.0
+TIP_RADIUS = OUTSIDE_DIA / 2.0
+NOTCH_FLOOR_RADIUS = TIP_RADIUS - NOTCH_DEPTH
+# +Y is a tooth crest.  The phase kerf is the first root counter-clockwise
+# from the cam lobe, half a circular pitch away, and is cut as a vertical slot.
+NOTCH_CENTER_X = (
+    (NOTCH_FLOOR_RADIUS + TIP_RADIUS)
+    / 2.0
+    * math.cos(math.pi / 2.0 + math.pi / TEETH)
+)
 
 SURFACE_FINISHES = (
     SurfaceFinishControl("cylinder_gear_bore", MACHINED_UM, CylinderFace(BORE_DIA)),
+    SurfaceFinishControl("cam_follower", MACHINED_UM, CylinderFace(CAM_DIA)),
 )
 
-# Only the bore is a marked MODEL dimension (the single source of the critical
-# mounting fit). OD / pitch dia / tooth system are carried by the GEAR DATA
-# note; face width is a drawing-added reference dimension.
+# Marked model dimensions are the authoritative bore/cam/kerf requirements.
+# Gear face width and notch depth are checked directly against source geometry
+# when their drawing dimensions are created.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BoreProfile": {"BoreDia"},
+    "CamProfile": {"CamDia", "CamCy"},
+    "CamBoss": {"CamThickness"},
+    "NotchProfile": {"NotchWidth"},
 }
 
 
@@ -64,28 +81,14 @@ GEAR_DATA = gear_data_note(
         ("PITCH DIAMETER (mm, REF)", f"{PITCH_DIA:.2f}"),
         ("OUTSIDE DIAMETER (mm)", f"{OUTSIDE_DIA:.2f} +0/-0.10"),
         ("WHOLE DEPTH (mm)", f"{WHOLE_DEPTH:.2f} +0.05/0"),
-        ("FACE WIDTH (mm)", f"{FACE_WIDTH:.2f} +/-0.05"),
         ("TOOTH FORM", "INVOLUTE, FULL DEPTH"),
     ]
 )
 
 DRAWING_NOTES = "\n".join(
     (
-        "DIAMETRAL PITCH CONTROLS TEETH; MODULE/PD ARE REF.",
-        "CUT TEETH PER GEAR DATA.",
-        "GEAR TEETH: CIRCULAR RUNOUT 0.05 MAX ABOUT DATUM A, MEASURED AT THE TOOTH TIPS.",
-        f"ECCENTRIC CAM (FAR FACE): Ø{CAM_DIA:.2f} +0/-0.05, {CAM_THICKNESS:.2f} +/-0.05 THK",
-        f"  BEYOND GEAR FACE; AXIS OFFSET {ECCENTRICITY:.3f} +/-0.025 FROM BORE TOWARD NOTCH.",
-        "CAM FOLLOWER O.D. SURFACE: Ra 1.6.",
-        "CAM AXIS LIES IN THE RADIAL PLANE THROUGH BORE AXIS + NOTCH CENTERLINE (0 DEG BASIC).",
-        f"NOTCH: SAW KERF {NOTCH_WIDTH:.2f} +0.10/0 WIDE X {NOTCH_DEPTH:.1f} +/-0.2 RADIAL DEEP",
-        "  MEASURED FROM THE TOOTH TIP O.D., THRU FULL FACE WIDTH, TOOTH VALLEY AT TOP.",
-        "SET QC (20-GEAR ANALYZER SET): RANGE OF MEASURED CAM AXIS OFFSETS 0.025 MAX.",
+        "TOOTH FORM PER GEAR DATA.",
+        "ALIGNMENT NOTCH IS FIRST TOOTH ROOT CCW FROM CAM LOBE AS VIEWED FROM GEAR FACE.",
+        f"CAM ECCENTRICITY RANGE ACROSS THE SET: {SET_ECCENTRICITY_RANGE_MM:.3f} MAX.",
     )
 )
-
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "gear face squareness to bore": "0.05",
-}
