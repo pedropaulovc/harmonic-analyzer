@@ -59,7 +59,11 @@ The paper also mentions encouraging results from an earlier **20-element** machi
 For a function constant from `0` to `a` and zero elsewhere, the exact cosine coefficient is
 
 $$
-\int_0^a \cos(kx)\,dx = \frac{\sin(ka)}{k}.
+\int_0^a \cos(kx)\,dx =
+\begin{cases}
+a, & k = 0,\\
+\dfrac{\sin(ka)}{k}, & k \ne 0.
+\end{cases}
 $$
 
 For `a = 4.0`, journal p. 10 prints observed and calculated coefficients and their differences. The published `Δ` sequence for `n = 0…20` is:

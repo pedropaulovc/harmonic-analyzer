@@ -13,9 +13,11 @@ classes; they do not hardcode clearance numbers.
 
 The whole-device performance benchmark that constrains this allocation is
 [`michelson-1898-trial-accuracy.md`](./michelson-1898-trial-accuracy.md):
-approximately 0.7% full-scale mean absolute coefficient error, with 2% as the
-largest individual difference in the published tables. These are assembled-machine
-output results, not percentages to apply directly to part dimensions.
+approximately 0.7% full-scale mean absolute coefficient error for historical
+comparison. The 2% value is the largest observed table entry, not a guaranteed
+envelope or acceptance criterion. These are assembled-machine output results,
+not percentages to apply directly to part dimensions; derive dimensional limits
+through sensitivity analysis and assembled-machine verification.
 
 ## Fit classes (interfaces that must carry a rule)
 
