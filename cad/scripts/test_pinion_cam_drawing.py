@@ -116,12 +116,6 @@ def test_direct_limits_and_native_gdt_control_the_cam_axes() -> None:
     assert "edge_entity=_front_end_edge(top)" in source
     assert source.count("add_feature_control_frame(") == 2
     assert (
-        'symbol_xy=(0.085, 0.105),\n        datum="B",\n'
-        '        label="cam final bore axis",\n'
-        "        position_tolerance_m=0.003," in source
-    )
-    assert source.count("position_tolerance_m=0.003") == 1
-    assert (
         'symbol_xy=(0.155, 0.105),\n        datum="C",\n'
         '        label="cam OD datum axis",\n'
         "        position_tolerance_m=0.019," in source

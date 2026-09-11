@@ -238,10 +238,9 @@ def set_dimension_prefix(
     """Set and verify a model display dimension's native prefix text."""
     display, _ = _named_dimension(adapter, feature_name, dimension_name)
     display = _early_bound(display, "IDisplayDimension")
-    if not display.SetText(1, prefix):  # swDimensionTextParts_e.swDimensionTextPrefix
-        raise RuntimeError(
-            f"{dimension_name}@{feature_name}: failed to set prefix {prefix!r}"
-        )
+    # SetText is void in the native API. Its return value cannot indicate
+    # success; the persisted prefix is the authoritative result.
+    display.SetText(1, prefix)  # swDimensionTextParts_e.swDimensionTextPrefix
     if str(display.GetText(1) or "") != prefix:
         raise RuntimeError(
             f"{dimension_name}@{feature_name}: prefix did not persist as {prefix!r}"

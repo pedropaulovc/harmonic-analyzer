@@ -1,158 +1,293 @@
-"""Offline contracts for the pinion-turning-handle drawing."""
+"""Behavioral release contract for the simplicity-policy pinion-handle sheet."""
 
 from __future__ import annotations
 
-from pathlib import Path
+import asyncio
+from types import SimpleNamespace
 
-import pinion_handle_spec
+import pytest
+
 import draw_pinion_handle as drawing
-import build_pinion_handle as handle
-from _drawing_contract import model_toleranced_dimensions
-from _drawing_registry import DRAWINGS_BY_NAME
+import pinion_handle_spec as spec
+from _drawing_registry import DrawingLayout
 
 
-def test_required_drawing_paths() -> None:
-    assert drawing.SLDDRW.as_posix().endswith("/slddrw/pinion-handle.SLDDRW")
-    assert drawing.PDF.as_posix().endswith("/pdf/pinion-handle.pdf")
-    assert drawing.PNG.as_posix().endswith("/png/pinion-handle_drawing.png")
-    assert DRAWINGS_BY_NAME["pinion_handle"].script == Path(drawing.__file__).resolve()
+@pytest.fixture
+def rendered_recipe(monkeypatch, tmp_path):
+    """Exercise the recipe without COM, observing its manufacturing view package."""
+    source = tmp_path / "pinion-handle.SLDPRT"
+    source.touch()
+    monkeypatch.setattr(drawing, "SOURCE", source)
+    model = SimpleNamespace(EditRebuild3=lambda: True)
+    adapter = SimpleNamespace(currentModel=model)
+
+    async def open_model(_path):
+        return True
+
+    adapter.open_model = open_model
+    views, dimensions, notes = [], [], []
+    monkeypatch.setattr(drawing, "check", lambda _label, result: result)
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "_source_bodies", lambda _model: ("body", "rod"))
+    monkeypatch.setattr(drawing, "read_required_properties", lambda *args, **kwargs: {})
+    monkeypatch.setattr(
+        drawing, "new_project_drawing", lambda *args, **kwargs: (model, None)
+    )
+    monkeypatch.setattr(drawing, "stamp_drawing_summary", lambda *args: None)
+
+    def place(_adapter, _source, orientation, x, y, *, scale):
+        view = SimpleNamespace(
+            orientation=orientation,
+            xy=(x, y),
+            scale=scale,
+            body=None,
+            hidden=False,
+            Angle=0.0,
+            annotations=[],
+            section=False,
+        )
+        views.append(view)
+        return view
+
+    def section(_adapter, parent, **kwargs):
+        view = place(
+            _adapter, source, "section", *kwargs["view_xy"], scale=kwargs["scale"]
+        )
+        view.section = True
+        view.parent = parent
+        view.body = parent.body
+        return view
+
+    def delete(_adapter, view):
+        views.remove(view)
+        return True
+
+    monkeypatch.setattr(drawing, "place_view", place)
+    monkeypatch.setattr(drawing, "create_section_view", section)
+    monkeypatch.setattr(drawing, "delete_view", delete)
+    monkeypatch.setattr(drawing, "iter_views", lambda _adapter: iter(views))
+    monkeypatch.setattr(drawing, "view_name", lambda _adapter, view: str(id(view)))
+    monkeypatch.setattr(
+        drawing,
+        "_isolate_body",
+        lambda _a, view, body, **kw: setattr(view, "body", body),
+    )
+    monkeypatch.setattr(
+        drawing,
+        "set_hidden_lines_visible",
+        lambda _a, view: setattr(view, "hidden", True),
+    )
+    monkeypatch.setattr(
+        drawing, "_point", lambda _a, _v, xyz: (xyz[0] / 1000, xyz[1] / 1000)
+    )
+
+    def curate(_adapter, view, *, keep, view_label):
+        result = [
+            SimpleNamespace(name=name, view=view, text_xy=xy)
+            for name, xy in keep.items()
+        ]
+        view.annotations.extend(result)
+        dimensions.extend(result)
+        return result
+
+    def move(_adapter, annotation, target, position, *, source_view):
+        annotation.view.annotations.remove(annotation)
+        annotation.view = target
+        annotation.text_xy = position
+        target.annotations.append(annotation)
+        return annotation
+
+    def callouts(_adapter, annotations, values):
+        for annotation in annotations:
+            annotation.callout = values.get(annotation.name, "")
+
+    def precision(_adapter, annotations, values):
+        for annotation in annotations:
+            annotation.precision = values[annotation.name]
+
+    def reference(_adapter, annotations, names):
+        for annotation in annotations:
+            annotation.reference = annotation.name in names
+
+    def offset(_adapter, annotations, positions):
+        for annotation in annotations:
+            if annotation.name in positions:
+                annotation.text_xy = positions[annotation.name]
+
+    def measured(_adapter, view, **kwargs):
+        annotation = SimpleNamespace(name=kwargs.pop("label"), view=view, **kwargs)
+        dimensions.append(annotation)
+        return annotation
+
+    def forbidden(*args, **kwargs):
+        pytest.fail(
+            "pinion handle is not allowlisted for geometric controls or roughness"
+        )
+
+    for name in (
+        "add_datum_feature",
+        "add_feature_control_frame",
+        "add_surface_finish",
+        "set_basic_dimension",
+        "set_basic_dimensions",
+        "project_part_pmi",
+    ):
+        monkeypatch.setattr(drawing, name, forbidden, raising=False)
+    monkeypatch.setattr(drawing, "curate_view_dimensions", curate)
+    monkeypatch.setattr(
+        drawing, "dimension_name", lambda _a, annotation: annotation.name
+    )
+    monkeypatch.setattr(drawing, "_move_dimension", move)
+    monkeypatch.setattr(drawing, "set_dimension_callouts", callouts)
+    monkeypatch.setattr(drawing, "set_dimension_precision", precision)
+    monkeypatch.setattr(drawing, "set_reference_dimensions", reference)
+    monkeypatch.setattr(drawing, "offset_dimension_text", offset)
+    monkeypatch.setattr(drawing, "_checked_dimension", measured)
+    monkeypatch.setattr(drawing, "auto_center_marks", lambda *args, **kwargs: True)
+    monkeypatch.setattr(drawing, "_add_body_centerline", lambda *args, **kwargs: None)
+    monkeypatch.setattr(drawing, "add_note", lambda *args: object())
+    monkeypatch.setattr(
+        drawing, "add_property_linked_note", lambda _a, name, *xy: notes.append(name)
+    )
+
+    async def finalize(_adapter, outputs, **kwargs):
+        return {"layout": kwargs["layout"], "outputs": outputs}
+
+    monkeypatch.setattr(drawing, "finalize_drawing", finalize)
+    result = asyncio.run(drawing.build(adapter))
+    return SimpleNamespace(
+        views=views,
+        dimensions={item.name: item for item in dimensions},
+        notes=notes,
+        result=result,
+    )
 
 
-def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
-    assert handle.DRAWING_DIMENSIONS is pinion_handle_spec.DRAWING_DIMENSIONS
-    assert handle.SURFACE_FINISHES is pinion_handle_spec.SURFACE_FINISHES
-    assert drawing.SURFACE_FINISHES is pinion_handle_spec.SURFACE_FINISHES
-    marked = set().union(*pinion_handle_spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) | set(drawing.TOP_KEEP)
-    assert kept == marked
-    assert set(drawing.DIMENSION_CALLOUTS) <= kept
+def test_policy_views_expose_both_components_and_blind_socket(rendered_recipe):
+    package = rendered_recipe
+    orthographic = [view for view in package.views if view.orientation != "*Isometric"]
+    assert all(view.hidden for view in orthographic)
+    (iso,) = [view for view in package.views if view.orientation == "*Isometric"]
+    assert iso.body is None and iso.Angle == 0.0
+    assert package.result["layout"] == DrawingLayout.LANDSCAPE
+    (section,) = [view for view in package.views if view.section]
+    assert section.body == section.parent.body == "body"
+    hole = package.dimensions["RodHoleDia"]
+    assert hole.view.body == "body" and hole.view.orientation == "*Top"
+    assert "REAM" in hole.callout and "THRU" in hole.callout
+    bore = package.dimensions["TubeId"]
     assert (
-        drawing.TUBE_ID,
-        drawing.ROD_UP,
-        drawing.ROD_DOWN,
-        drawing.ROD_DIA,
-    ) == (
-        pinion_handle_spec.TUBE_ID,
-        pinion_handle_spec.ROD_UP,
-        pinion_handle_spec.ROD_DOWN,
-        pinion_handle_spec.ROD_DIA,
+        bore.view is section and "REAM" in bore.callout and "THRU" not in bore.callout
     )
+    assert package.dimensions["TubeLen"].view is section
+    rod = package.dimensions["RodDia"]
+    assert rod.view is package.dimensions["RodSpan"].view
+    assert abs(rod.view.Angle) == pytest.approx(1.5707963267948966)
+    for name in ("GripDia", "TubeOd"):
+        assert package.dimensions[name].view.orientation == "*Right"
+    front = section.parent
+    top = hole.view
+    right = package.dimensions["GripDia"].view
+    assert front.xy[0] == top.xy[0]
+    assert front.xy[1] == right.xy[1]
+    assert not spec.SURFACE_FINISHES
 
 
-def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
-    assert drawing.SHEET_SCALE == (2.0, 1.0)
-    assert drawing.TOP_CENTER[1] >= 0.110
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "scale=(1, 1)" in source  # the isometric override
-    assert pinion_handle_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:1"
-    assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
+def test_body_dimensions_are_direct_baselines_not_note_substitutes(rendered_recipe):
+    dimensions = rendered_recipe.dimensions
+    axial = [
+        dimensions[name]
+        for name in (
+            "hub projection",
+            "socket end to crown root",
+            "body overall length",
+        )
+    ]
+    assert {item.p0 for item in axial} == {(0.0, spec.TUBE_OD / 4.0, drawing.HUB_END_Z)}
+    assert all(item.orientation == "horizontal" for item in axial)
+    assert [item.expected_mm for item in axial] == pytest.approx([12.0, 21.0, 24.0])
+    assert dimensions["socket end to cross-hole axis"].expected_mm == pytest.approx(
+        16.5
+    )
+    assert dimensions["socket end to cross-hole axis"].center
+    assert dimensions["rod placement from body axis"].expected_mm == pytest.approx(32.0)
+    assert dimensions["rod placement from body axis"].center
+    marked = set().union(*spec.DRAWING_DIMENSIONS.values())
+    assert marked <= dimensions.keys()
+    assert "Manufacturing Notes" in rendered_recipe.notes
+    assert 1 <= len(spec.DRAWING_NOTES.splitlines()) <= 4
+    assert not any(character.isdigit() for character in spec.DRAWING_NOTES)
+    for forbidden in (
+        "DATUM",
+        "BASIC",
+        "+/-",
+        "MATERIAL",
+        "TOLERANCE",
+        "FINISH",
+        "TURN ",
+    ):
+        assert forbidden not in spec.DRAWING_NOTES.upper()
 
 
-def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
-    notes = pinion_handle_spec.DRAWING_NOTES
-    assert "SPHERICAL CROWN" in notes
-    assert "DATUM A" in notes and "DATUM B" in notes
-    assert "LINEAR +/-" not in notes
-    assert "BREAK ALL" not in notes
-    assert "X.XX" not in notes
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
-
-
-def test_handle_interfaces_are_fully_released_for_manufacture() -> None:
-    notes = pinion_handle_spec.DRAWING_NOTES
-    assert "RELEASE HOLD" not in notes
-    assert "AT ASSEMBLY" not in notes
-    assert "DOWEL" not in notes
-    assert "PRESSED CROSS ROD" in notes
-    assert drawing.DIMENSION_CALLOUTS["RodDia"] == "PRESS ROD"
-    assert drawing.DIMENSION_CALLOUTS["RodHoleDia"] == "BODY HOLE; REAM THRU"
-    assert 6.015 <= pinion_handle_spec.ROD_DIA <= 6.020
-    assert 6.000 <= pinion_handle_spec.ROD_HOLE_DIA <= 6.010
-    source = Path(handle.__file__).read_text(encoding="utf-8")
-    assert "merge_result=False" in source
-    assert 'name_last_feature(adapter, "RodHole")' in source
-
-
-def test_drive_train_clearance_uses_the_released_rod_diameter() -> None:
-    assembly = Path(handle.__file__).with_name("build_drive_train_assembly.py")
-    source = assembly.read_text(encoding="utf-8")
-    assert "ROD_DIA as HANDLE_ROD_DIA" in source
-    assert "HANDLE_Z - HANDLE_ROD_DIA / 2.0" in source
-
-
-def test_unique_feature_dimensions_and_direct_bore_limits() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 2
-    assert source.count("add_feature_control_frame(") == 4
+def test_socket_fit_limits_remain_native():
     assert (
-        'label="handle final bore axis",\n        position_tolerance_m=0.0001' in source
+        spec.TUBE_ID + spec.TUBE_ID_BAND[1],
+        spec.TUBE_ID + spec.TUBE_ID_BAND[0],
+    ) == pytest.approx((8.010, 8.025))
+
+
+def test_recipe_preserves_fine_fit_digits_without_tightening_routine_features(
+    rendered_recipe,
+):
+    dims = rendered_recipe.dimensions
+    assert dims["RodDia"].precision == 1
+    assert dims["RodDia"].reference
+    assert dims["TubeId"].precision == 3
+    assert dims["RodHoleDia"].precision == 1
+    assert dims["GripDia"].precision == dims["TubeOd"].precision == 1
+    assert dims["CapR"].precision == 1
+    assert dims["RodSpan"].precision == 1
+
+
+def test_wrong_native_edge_measurement_blocks_release(monkeypatch):
+    display = SimpleNamespace(
+        GetDimension2=lambda _index: SimpleNamespace(SystemValue=0.023)
     )
-    assert source.count("position_tolerance_m=0.0001") == 1
-    assert source.count("add_surface_finish(") == 1
-    assert 'surface_finish_by_key(SURFACE_FINISHES, "final_bore")' in source
-    assert "author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)" in Path(
-        handle.__file__
-    ).read_text(encoding="utf-8")
-    assert {"GripLen", "TubeLen", "RodSpan"} <= set().union(
-        *pinion_handle_spec.DRAWING_DIMENSIONS.values()
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "_point", lambda _a, _v, xyz: xyz[:2])
+    monkeypatch.setattr(drawing, "add_edge_dimension", lambda *args, **kwargs: display)
+    with pytest.raises(RuntimeError, match="measured 23, expected 24"):
+        drawing._checked_dimension(
+            None,
+            None,
+            p0=(0, 0, 16.5),
+            p1=(0, 0, -7.5),
+            text_xy=(0.1, 0.2),
+            label="body overall",
+            expected_mm=24.0,
+            orientation="horizontal",
+        )
+
+
+def test_refused_native_dimension_move_blocks_release(monkeypatch):
+    display = SimpleNamespace(
+        GetNameForSelection=lambda: "TubeId@TubeProfile@Drawing View1"
     )
-    assert model_toleranced_dimensions(handle) == {
-        ("TubeProfile", "TubeId"): "*deviations(TUBE_ID_BAND)",
-        ("Grip", "GripLen"): "GRIP_LENGTH_TOLERANCE_MM",
-        ("Tube", "TubeLen"): "*deviations(TUBE_LENGTH_BAND)",
-        ("RodProfile", "RodDia"): "*deviations(ROD_PRESS_BAND)",
-        ("Rod", "RodSpan"): "ROD_SPAN_TOLERANCE_MM",
-        ("RodHoleProfile", "RodHoleDia"): "*deviations(ROD_HOLE_REAM_BAND)",
-    }
-    assert drawing.DIMENSION_CALLOUTS["TubeId"] == "FINAL REAM"
-    assert "CYL. LENGTH" in drawing.DIMENSION_CALLOUTS["GripLen"]
-    assert drawing.DIMENSION_CALLOUTS["TubeLen"] == "BORE DEPTH"
-    assert drawing.DIMENSION_CALLOUTS["RodSpan"] == "OAL"
-    assert "HUB PROJECTION: DATUM B TO GRIP FACE 12.00 +0.10/-0.00" in (
-        pinion_handle_spec.DRAWING_NOTES
+    annotation = SimpleNamespace(name="TubeId", GetSpecificAnnotation=lambda: display)
+    target = SimpleNamespace(GetAnnotations=lambda: ())
+    model = SimpleNamespace(
+        ClearSelection2=lambda *_args: None,
+        EditRebuild3=lambda: True,
+        DragModelDimension=lambda *_args: None,
+        ActivateView=lambda *_args: True,
+        Extension=SimpleNamespace(SelectByID2=lambda *_args: True),
     )
-    assert (
-        f"DATUM A TO LOWER END {pinion_handle_spec.ROD_DOWN:.2f}+/-0.10"
-        in pinion_handle_spec.DRAWING_NOTES
-    )
-
-
-def test_transverse_axis_uses_basic_location_and_position_control() -> None:
-    notes = pinion_handle_spec.DRAWING_NOTES
-    assert "BOXED BASIC DIMENSION" in notes
-    assert "POSITION IS CONTROLLED" in notes
-    assert "MID-LENGTH WITHIN" not in notes
-    assert "INTERSECTS A WITHIN" not in notes
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'characteristic="position"' in source
-    assert 'datums=("A", "B")' in source
-    assert "diameter=True" in source
-    assert "add_edge_dimension(" in source
-    assert "set_basic_dimension(" in source
-    assert "set_reference_dimension(" not in source
-    assert drawing.FRONT_KEEP["RodSpan"] == (0.115, 0.245)
-    assert drawing.FRONT_KEEP["TubeId"][0] >= 0.075
-    assert "frame_xy=(0.315, 0.155)" in source
-    assert 'quantity="BODY CROSS-HOLE AXIS BEFORE PRESSING"' in source
-    assert "BODY CROSS-HOLE VIEW - LOOKING ALONG HOLE AXIS - SCALE 2:1" in source
-
-
-def test_crown_has_one_toleranced_form_control() -> None:
-    notes = pinion_handle_spec.DRAWING_NOTES
-    assert f"SR{pinion_handle_spec.CAP_RADIUS:.2f}+/-0.10" in notes
-    assert f"{pinion_handle_spec.CAP_SAG:.2f} REF HIGH" in notes
-    assert "2.00+/-0.10 HIGH" not in notes
-
-
-def test_part_stamps_make_critical_drawing_properties() -> None:
-    source = Path(handle.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_properties" in source
-    assert "clear_dimensions_for_drawing" in source
-    import _config
-
-    spec = _config.parts("pinion-handle")
-    assert spec["material"] == spec["material_specification"]
-    assert spec["material_specification"]
-    assert spec["finish"]
-    assert int(spec["quantity"]) == 1
+    adapter = SimpleNamespace(currentModel=model)
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "dimension_name", lambda _a, item: item.name)
+    monkeypatch.setattr(drawing, "view_name", lambda *_args: "socket section")
+    monkeypatch.setattr(drawing, "null_callout", lambda: None)
+    with pytest.raises(RuntimeError, match="native dimension did not move"):
+        drawing._move_dimension(
+            adapter, annotation, target, (0.3, 0.14), source_view=object()
+        )

@@ -36,10 +36,29 @@ WHAT A COMPLETE ASSEMBLY PACKAGE CONTAINS (the standard you hold it to)
   press this bushing to this depth, set this gear mesh with this backlash,
   torque this screw, align this axis to that face within so much. Fits that
   are set at assembly (match-drill, ream in place, shim, adjust) are said so
-  with the target and how to check it.
+  with the identified mate, target and how to check it. For a one-off matched
+  or selectively fitted pair, clear functional acceptance can define the fit;
+  do not demand numeric bands merely because a nominal size is reference-only,
+  or assume that reference nominal means purchased stock. Matching does not
+  waive conflicting controlled limits or essential interchangeability requirements.
 - Assembly-level dimensions and checks: the few positions, gaps, clearances,
   travels, alignments or preloads that only exist once the parts are
-  together, each with a value and a way to measure it.
+  together, each with an unambiguous acceptance criterion and way to check it.
+  For explicit assembly bands, calculate the total band, not its half-width.
+  Preserve the original nominal and asymmetric lower and upper limits when
+  checking or replacing a fit; equal total widths do not mean equal fits.
+  First ask whether function needs the precision; being printed is not proof.
+  Unneeded precision is over_specification even when burdensome. A capability
+  blocker requires BOTH an essential functional need and a substantiated
+  setting or verification conflict with the stated route; identify both.
+  Instrument resolution is not accuracy. Without stated equipment accuracy,
+  condition or temperature control, describe burden and uncertainty; do not
+  invent quantified capability, stock/catalog limits or categorical
+  impossibility. Use no numeric cutoff. Scrutinize proposed replacements the
+  same way: widening a band alone does not justify it. Prefer an adequate
+  general tolerance or functional acceptance; state dependencies on unseen
+  mating limits rather than inventing replacement numbers. Do not reopen
+  fabrication tolerances on unseen part drawings.
 - Setup and adjustment: anything with a parked and an engaged state, an
   adjustment screw, a zero, a spring tension, has its as-shipped state and
   its setting procedure stated without ambiguity.
@@ -100,10 +119,13 @@ view or item for every finding, and say the fix):
 - summary: one sentence.
 - blockers: what stops assembly or setup — no exploded view or order, no
   parts list or balloons, a part visible but unidentified, an assembly fit
-  or adjustment with no value or no procedure, an ambiguous parked/engaged
-  state, inconsistent BOM rows or balloon mappings across sheets, a setup
-  sequence that conflicts across sheets, or any contradiction between sheets
-  or between a view and a note.
+  or adjustment with no mating target, acceptance criterion or procedure,
+  incompatible controlled fit ranges, missing essential interchangeability
+  requirements, functionally essential precision with a substantiated setting
+  or verification capability conflict as defined above, an ambiguous
+  parked/engaged state, inconsistent BOM rows or balloon mappings
+  across sheets, a setup sequence that conflicts across sheets, or any
+  contradiction between sheets or between a view and a note.
 - over_specification: anything the package carries that the assembly job
   does not need — repeated part tolerances, materials or finishes, GD&T at
   assembly level without cause, notes restating the title block.

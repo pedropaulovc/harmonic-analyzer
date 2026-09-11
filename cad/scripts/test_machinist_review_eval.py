@@ -1,0 +1,568 @@
+"""Offline regressions for resumable, blind prompt-evaluation evidence."""
+
+from __future__ import annotations
+
+import base64
+from copy import deepcopy
+import hashlib
+import json
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+import machinist_review as mr
+import machinist_review_eval as evaluation
+
+
+@pytest.fixture
+def case(tmp_path: Path) -> tuple[dict[str, Any], mr.ReviewPackage]:
+    image = tmp_path / "frozen.png"
+    image.write_bytes(base64.b64decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aD1sAAAAASUVORK5CYII="
+    ))
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(json.dumps({
+        "schema_version": 1,
+        "cases": [{"name": "fit_case", "path": image.name,
+                   "sha256": mr._sha256(image), "package_kind": "part",
+                   "expected_behavior": "Recognize the fit while preserving unrelated blockers."}],
+    }), encoding="utf-8")
+    data, packages = evaluation.load_cases(manifest)
+    return data, packages[0]
+
+
+@pytest.fixture
+def frozen_baseline(tmp_path: Path, case) -> Path:
+    baseline = tmp_path / "baseline.txt"
+    baseline.write_bytes(b"Frozen rubric.\r\n")
+    manifest = {
+        **case[0],
+        "baseline_prompt": {"path": baseline.name, "sha256": mr._sha256(baseline)},
+    }
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    return baseline
+
+
+@pytest.fixture
+def provider(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
+    state: dict[str, Any] = {
+        "calls": [], "mode": "valid", "relative_reads": False,
+        "verdict": {
+            "verdict": "FIX", "summary": "Fit is justified; a hole remains unlocated.",
+            "blockers": [{"where": "front view", "issue": "Hole location is absent.",
+                          "fix": "Locate the hole from the datum edges."}],
+            "over_specification": [], "clarity": [], "minor": [],
+        },
+    }
+
+    def fake_run(command: list[str], **kwargs: Any):
+        cwd = Path(kwargs["cwd"])
+        images = sorted(cwd.glob("sheet-*.png"))
+        state["calls"].append({
+            "command": command, "prompt": kwargs["input"], "cwd": cwd,
+            "files": {path.name for path in cwd.iterdir()},
+            "images": [path.read_bytes() for path in images],
+        })
+        verdict = deepcopy(state["verdict"])
+        if state["mode"] == "invalid_schema":
+            del verdict["blockers"]
+        text = "not JSON" if state["mode"] == "malformed" else json.dumps(verdict)
+        if "exec" in command:
+            Path(command[command.index("-o") + 1]).write_text(text, encoding="utf-8")
+            events = [{"type": "item.completed", "item": {
+                "id": "item_0", "type": "agent_message", "text": text,
+            }}, {"type": "turn.completed", "usage": {
+                "input_tokens": 10, "cached_input_tokens": 0, "output_tokens": 10,
+            }}]
+        else:
+            events = [{"type": "assistant", "message": {"content": [{
+                "type": "tool_use", "id": f"read_{index}", "name": "Read",
+                "input": {"file_path": image.name if state["relative_reads"] else str(image)},
+            }]}} for index, image in enumerate(images)]
+            events.append({"type": "result", "subtype": "success", "is_error": False,
+                           "result": text})
+        if state["mode"] == "unblind":
+            events.insert(0, {"type": "item.completed", "item": {
+                "id": "command_0", "type": "command_execution", "command": "pwd",
+                "aggregated_output": str(cwd), "exit_code": 0, "status": "completed",
+            }})
+        return mr.subprocess.CompletedProcess(
+            command, 0, stdout="\n".join(json.dumps(event) for event in events), stderr="",
+        )
+
+    monkeypatch.setattr(mr.shutil, "which", lambda executable: executable)
+    monkeypatch.setattr(mr.subprocess, "run", fake_run)
+    return state
+
+
+def _identity(case, *, prompt: str = "Rubric A", reviewer: str = "codex", model: str = "model-a"):
+    manifest, package = case
+    return evaluation.make_identity(
+        manifest, [package], {"baseline": prompt.encode(), "candidate": b"Rubric B"},
+        reviewer=reviewer, model=model, effort="low", retries=0, timeout_s=30,
+    )
+
+
+def test_main_rejects_changed_selected_frozen_baseline_before_provider_execution(
+    tmp_path: Path, frozen_baseline: Path, provider, monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    frozen_baseline.write_bytes(frozen_baseline.read_bytes().replace(b"\r\n", b"\n"))
+    candidate = tmp_path / "candidate.txt"
+    candidate.write_bytes(b"Candidate rubric.")
+    report_dir = tmp_path / "reports"
+    monkeypatch.chdir(tmp_path)
+
+    status = evaluation.main([
+        "--cases", str(tmp_path / "manifest.json"),
+        "--baseline", frozen_baseline.name, "--candidate", str(candidate),
+        "--report-dir", str(report_dir), "--reviewer", "codex",
+        "--model", "model-a", "--effort", "low", "--jobs", "1", "--retries", "0",
+    ])
+
+    assert status == 2
+    assert json.loads(capsys.readouterr().out)["error"].startswith("ValueError:")
+    assert provider["calls"] == []
+    assert not report_dir.exists()
+
+
+@pytest.mark.parametrize("selection", ["frozen", "custom"])
+def test_main_accepts_selected_baseline_with_actual_prompt_provenance(
+    tmp_path: Path, frozen_baseline: Path, provider, selection: str,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    baseline = frozen_baseline
+    if selection == "custom":
+        baseline = tmp_path / "custom" / frozen_baseline.name
+        baseline.parent.mkdir()
+        baseline.write_bytes(b"Intentional custom rubric.\r\n")
+        frozen_baseline.write_bytes(b"Corrupted unselected frozen rubric.")
+    candidate = tmp_path / "candidate.txt"
+    candidate.write_bytes(b"Candidate rubric.\r\n")
+    raw_prompts = {"baseline": baseline.read_bytes(), "candidate": candidate.read_bytes()}
+    report_dir = tmp_path / "reports"
+
+    status = evaluation.main([
+        "--cases", str(tmp_path / "manifest.json"),
+        "--baseline", str(baseline), "--candidate", str(candidate),
+        "--report-dir", str(report_dir), "--reviewer", "codex",
+        "--model", "model-a", "--effort", "low", "--jobs", "1", "--retries", "0",
+    ])
+
+    assert status == 0
+    summary = json.loads(capsys.readouterr().out)
+    assert all(result["error"] is None for result in summary["results"])
+    run_dir = report_dir / summary["run_id"]
+    identity = json.loads((run_dir / "identity.json").read_text(encoding="utf-8"))
+    for version, raw in raw_prompts.items():
+        assert identity["prompts"][version]["raw_sha256"] == hashlib.sha256(raw).hexdigest()
+        assert (run_dir / "inputs" / f"{version}.txt").read_bytes() == raw
+        assert any(raw.decode().replace("\r\n", "\n") in call["prompt"] for call in provider["calls"])
+    if selection == "custom":
+        assert identity["prompts"]["baseline"]["raw_sha256"] != (
+            identity["manifest"]["baseline_prompt"]["sha256"]
+        )
+
+
+@pytest.mark.parametrize("reviewer", ["codex", "claude"])
+def test_override_reaches_model_and_hash_without_losing_package_context(
+    tmp_path: Path, case, provider, reviewer: str,
+) -> None:
+    _, part = case
+    assembly = mr.ReviewPackage(part.name, "assembly", part.sources)
+    reviews = []
+    for index, (package, prompt) in enumerate([
+        (part, ""), (assembly, ""), (assembly, "Rubric A"), (assembly, "Rubric B"),
+    ]):
+        identity = _identity((case[0], package), prompt=prompt, reviewer=reviewer)
+        result = evaluation.run_case(identity, "baseline", package, prompt, tmp_path / str(index))
+        assert result["error"] is None
+        reviews.append(result["review"])
+        sent = provider["calls"][-1]["prompt"]
+        assert result["review"]["prompt_sha256"] == hashlib.sha256(sent.encode()).hexdigest()
+        assert identity["prompts"]["baseline"]["effective_sha256"][package.name] == result["review"]["prompt_sha256"]
+    part_input, assembly_input, baseline_input, candidate_input = [
+        call["prompt"] for call in provider["calls"]
+    ]
+    assert assembly_input != part_input
+    assert baseline_input.replace("Rubric A", "", 1) == assembly_input
+    assert candidate_input.replace("Rubric B", "", 1) == assembly_input
+    assert reviews[2]["prompt_sha256"] != reviews[3]["prompt_sha256"]
+    if reviewer == "claude":
+        assert part_input.strip()
+    for call in provider["calls"]:
+        assert call["files"] == {"sheet-1.png", "schema.json"}
+        assert call["images"] == [part.sources[0].read_bytes()]
+        assert call["cwd"] != part.sources[0].parent
+        assert str(part.sources[0]) not in call["prompt"]
+        assert part.name not in call["prompt"]
+        assert all(str(part.sources[0]) not in argument for argument in call["command"])
+
+
+@pytest.mark.parametrize("reviewer", ["codex", "claude"])
+def test_matching_fix_evidence_resumes_without_model_execution(
+    tmp_path: Path, case, provider, reviewer: str,
+) -> None:
+    provider["relative_reads"] = True
+    identity = _identity(case, reviewer=reviewer)
+    directory = tmp_path / "run"
+    first = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert first["error"] is None
+    assert first["review"]["verdict"]["verdict"] == "FIX"
+    assert first["review"]["passed"] is False
+    assert evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory) == first
+    assert len(provider["calls"]) == 1
+    summary = evaluation.aggregate(identity, [first])
+    assert summary["results"][0]["outcome"] == "unassessed"
+    assert summary["counts"]["baseline"] == {"pass": 0, "fail": 0, "unassessed": 1, "invalid": 0}
+
+
+@pytest.mark.parametrize("change", ["prompt", "image", "model"])
+def test_changed_identity_executes_fresh_model_without_overwriting_old_evidence(
+    tmp_path: Path, case, provider, change: str,
+) -> None:
+    directory = tmp_path / "run"
+    first = evaluation.run_case(_identity(case), "baseline", case[1], "Rubric A", directory)
+    assert first["error"] is None
+    old_report = (directory / first["report"]).read_bytes()
+    prompt, model = "Rubric A", "model-a"
+    if change == "prompt":
+        prompt = "New rubric"
+    elif change == "image":
+        case[1].sources[0].write_bytes(case[1].sources[0].read_bytes() + b"changed")
+        case[0]["cases"][0]["sha256"] = mr._sha256(case[1].sources[0])
+    else:
+        model = "model-b"
+    identity = _identity(case, prompt=prompt, model=model)
+    fresh = evaluation.run_case(identity, "baseline", case[1], prompt, directory)
+    assert fresh["error"] is None
+    assert fresh["run_id"] != first["run_id"]
+    assert fresh["report"] != first["report"]
+    assert (directory / first["report"]).read_bytes() == old_report
+    assert len(provider["calls"]) == 2
+    if change == "prompt":
+        assert provider["calls"][-1]["prompt"] == prompt
+    elif change == "image":
+        assert provider["calls"][-1]["images"] != provider["calls"][0]["images"]
+    else:
+        command = provider["calls"][-1]["command"]
+        assert command[command.index("-m") + 1] == model
+    assert evaluation.run_case(identity, "baseline", case[1], prompt, directory) == fresh
+    assert len(provider["calls"]) == 2
+
+
+@pytest.mark.parametrize("mode", ["malformed", "invalid_schema", "unblind"])
+def test_invalid_model_evidence_is_not_scored_or_resumed(
+    tmp_path: Path, case, provider, mode: str,
+) -> None:
+    identity = _identity(case)
+    directory = tmp_path / "run"
+    provider["mode"] = mode
+    invalid = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert invalid["error"] is not None
+    assert evaluation.aggregate(identity, [invalid])["results"][0]["outcome"] == "invalid"
+    with pytest.raises(ValueError):
+        evaluation.validate_evidence(invalid, identity, "baseline", case[1], directory)
+    provider["mode"] = "valid"
+    fresh = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert fresh["error"] is None
+    assert fresh["report"] != invalid["report"]
+    assert len(provider["calls"]) == 2
+
+
+@pytest.mark.parametrize("damage", [
+    "hash", "malformed_report", "verdict_schema", "blind_flag", "event_verdict", "cached_review",
+])
+def test_checkpoint_rejects_damaged_or_inconsistent_evidence(
+    tmp_path: Path, case, provider, damage: str,
+) -> None:
+    identity = _identity(case)
+    directory = tmp_path / "run"
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert result["error"] is None
+    report = directory / result["report"]
+    content = json.loads(report.read_text(encoding="utf-8"))
+    if damage == "cached_review":
+        result["review"]["verdict"]["blockers"] = []
+    else:
+        if damage == "verdict_schema":
+            content["verdict"]["blockers"] = "missing"
+        elif damage == "blind_flag":
+            content["blind"] = False
+        else:
+            content["verdict"]["summary"] = "Different from the model's recorded answer."
+        report.write_text("{" if damage == "malformed_report" else json.dumps(content), encoding="utf-8")
+        if damage != "hash":
+            result["report_sha256"] = mr._sha256(report)
+            result["review"] = content
+    (directory / "result.json").write_text(json.dumps(result), encoding="utf-8")
+    with pytest.raises(ValueError):
+        evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
+    fresh = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert fresh["error"] is None
+    assert fresh["report"] != result["report"]
+    assert len(provider["calls"]) == 2
+
+
+def _assessment(result, outcome: str = "pass") -> dict[str, Any]:
+    return {"schema_version": 1, "run_id": result["run_id"], "assessments": {
+        "baseline": {result["case"]: {
+            "report_sha256": result["report_sha256"], "outcome": outcome,
+            "justification": "The fit is accepted without hiding the unrelated missing hole location.",
+            "evidence": ["/blockers/0", "/over_specification"],
+        }},
+    }}
+
+
+@pytest.mark.parametrize("outcome", ["pass", "fail"])
+def test_human_targeted_assessment_is_independent_of_whole_sheet_fix(
+    tmp_path: Path, case, provider, outcome: str,
+) -> None:
+    identity = _identity(case)
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", tmp_path / "run")
+    assert result["error"] is None
+    assessments = _assessment(result, outcome)
+    if outcome == "fail":
+        assessments["assessments"]["baseline"][result["case"]]["justification"] = (
+            "The unrelated blocker is reported, but the targeted fit explanation is insufficient."
+        )
+    summary = evaluation.aggregate(identity, [result], assessments)
+    assert summary["results"][0]["outcome"] == outcome
+    assert summary["counts"]["baseline"][outcome] == 1
+    assert summary["counts"]["baseline"]["unassessed"] == 0
+    assert summary["results"][0]["review"]["passed"] is False
+    assert result.get("outcome") is None
+
+
+@pytest.mark.parametrize("damage", [
+    "run_id", "report_hash", "missing_finding", "bad_reference", "empty_reason",
+    "extra_field", "null_assessment", "invalid_evidence",
+])
+def test_stale_or_invalid_human_assessments_are_rejected(
+    tmp_path: Path, case, provider, damage: str,
+) -> None:
+    identity = _identity(case)
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", tmp_path / "run")
+    assert result["error"] is None
+    assessments = _assessment(result)
+    assessment = assessments["assessments"]["baseline"][result["case"]]
+    if damage == "run_id":
+        assessments["run_id"] = "0" * 64
+    elif damage == "report_hash":
+        assessment["report_sha256"] = "0" * 64
+    elif damage == "missing_finding":
+        assessment["evidence"] = ["/blockers/1"]
+    elif damage == "bad_reference":
+        assessment["evidence"] = ["/verdict"]
+    elif damage == "empty_reason":
+        assessment["justification"] = " "
+    elif damage == "extra_field":
+        assessment["automatic_score"] = 1
+    elif damage == "null_assessment":
+        assessments["assessments"]["baseline"][result["case"]] = None
+    else:
+        result["error"] = "Model evidence failed validation"
+    with pytest.raises(ValueError):
+        evaluation.aggregate(identity, [result], assessments)
+
+
+def test_foreign_neutral_directory_read_cannot_redefine_recorded_allowlist(
+    tmp_path: Path, case, provider,
+) -> None:
+    identity = _identity(case, reviewer="claude")
+    directory = tmp_path / "run"
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert result["error"] is None
+    events_path = directory / result["events"]
+    events = [json.loads(line) for line in events_path.read_text(encoding="utf-8").splitlines()]
+    foreign_image = tmp_path / "machrev-foreign" / "sheet-1.png"
+    for row in events:
+        for node in mr._walk(row):
+            if isinstance(node, dict) and node.get("name") == "Read":
+                node["input"]["file_path"] = str(foreign_image)
+    events_path.write_text("\n".join(json.dumps(row) for row in events), encoding="utf-8")
+    result["events_sha256"] = mr._sha256(events_path)
+    (directory / "result.json").write_text(json.dumps(result), encoding="utf-8")
+    assert result["review"]["blind"] is True
+    with pytest.raises(ValueError):
+        evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
+    fresh = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert fresh["error"] is None
+    assert fresh["report"] != result["report"]
+    assert len(provider["calls"]) == 2
+
+
+@pytest.mark.parametrize("reviewer", ["codex", "claude"])
+def test_recorded_permission_bypass_is_rejected_despite_matching_report_hash(
+    tmp_path: Path, case, provider, reviewer: str,
+) -> None:
+    identity = _identity(case, reviewer=reviewer)
+    directory = tmp_path / "run"
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert result["error"] is None
+    report_path = directory / result["report"]
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    command = report["extra"]["evidence"]["attempts"][0]["command"]
+    if reviewer == "codex":
+        command[command.index("--sandbox") + 1] = "danger-full-access"
+    else:
+        command[command.index("--permission-mode") + 1] = "bypassPermissions"
+    report_path.write_text(json.dumps(report), encoding="utf-8")
+    result["report_sha256"] = mr._sha256(report_path)
+    result["review"] = report
+    (directory / "result.json").write_text(json.dumps(result), encoding="utf-8")
+    assert result["review"]["blind"] is True
+    with pytest.raises(ValueError):
+        evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
+    fresh = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert fresh["error"] is None
+    assert fresh["report"] != result["report"]
+    assert len(provider["calls"]) == 2
+
+
+@pytest.mark.parametrize("reviewer", ["codex", "claude"])
+def test_snapshots_recover_exact_inputs_after_original_files_are_overwritten(
+    tmp_path: Path, case, provider, monkeypatch: pytest.MonkeyPatch, reviewer: str,
+) -> None:
+    raw_prompts = {
+        "baseline": "Inspect Ø12.\r\nKeep the justified fit.\r\n".encode("utf-8"),
+        "candidate": "Inspect Ø12 differently.\rUse the drawing.\n".encode("utf-8"),
+    }
+    originals = {version: tmp_path / f"arbitrary-{version}.txt" for version in raw_prompts}
+    for version, original in originals.items():
+        original.write_bytes(raw_prompts[version])
+    schema_bytes = (
+        json.dumps(mr.load_schema(), indent=2).replace("\n", "\r\n") + "\r\n"
+    ).encode("utf-8")
+    original_schema = tmp_path / "arbitrary-schema.json"
+    original_schema.write_bytes(schema_bytes)
+    monkeypatch.setattr(mr, "SCHEMA_FILE", original_schema)
+    package = mr.ReviewPackage(case[1].name, "assembly", case[1].sources)
+    identity = evaluation.make_identity(
+        case[0], [package], {version: path.read_bytes() for version, path in originals.items()},
+        reviewer=reviewer, model="model-a", effort="low", retries=0, timeout_s=30,
+    )
+    run_dir = tmp_path / "run"
+    evaluation.persist_inputs(run_dir, identity, raw_prompts)
+    results = {}
+    for version in raw_prompts:
+        prompt = (run_dir / "inputs" / f"{version}.txt").read_text(encoding="utf-8")
+        results[version] = evaluation.run_case(identity, version, package, prompt, run_dir / version)
+        assert results[version]["error"] is None
+    for original in originals.values():
+        original.write_bytes(b"replacement rubric")
+    original_schema.write_bytes(b"{}")
+    assert (run_dir / "inputs" / "schema.json").read_bytes() == schema_bytes
+    for index, (version, raw) in enumerate(raw_prompts.items()):
+        assert (run_dir / "inputs" / f"{version}.txt").read_bytes() == raw
+        result = results[version]
+        report = json.loads((run_dir / version / result["report"]).read_text(encoding="utf-8"))
+        evidence = report["extra"]["evidence"]
+        assert evidence["effective_prompt"] == provider["calls"][index]["prompt"]
+        assert hashlib.sha256(evidence["effective_prompt"].encode("utf-8")).hexdigest() == (
+            identity["prompts"][version]["effective_sha256"][package.name]
+        )
+        assert evidence["schema"].encode("utf-8") == schema_bytes
+        evaluation.validate_evidence(result, identity, version, package, run_dir / version)
+
+
+@pytest.mark.parametrize("field", ["effective_prompt", "schema"])
+def test_provenance_content_must_match_identity_not_just_report_hash(
+    tmp_path: Path, case, provider, field: str,
+) -> None:
+    identity = _identity(case)
+    directory = tmp_path / "run"
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert result["error"] is None
+    report_path = directory / result["report"]
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    report["extra"]["evidence"][field] += "\n"
+    report_path.write_text(json.dumps(report), encoding="utf-8")
+    result["report_sha256"] = mr._sha256(report_path)
+    result["review"] = report
+    with pytest.raises(ValueError):
+        evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
+
+
+@pytest.mark.parametrize("failure", ["launch", "timeout", "nonzero_exit", "invalid_verdict"])
+def test_complete_retry_evidence_resumes_after_provider_failure(
+    tmp_path: Path, case, provider, monkeypatch: pytest.MonkeyPatch, failure: str,
+) -> None:
+    identity = _identity(case)
+    identity["retries"] = 1
+    directory = tmp_path / "run"
+    provider_run = mr.subprocess.run
+    calls = 0
+
+    def retrying_run(command, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            if failure == "launch":
+                raise OSError("provider could not start")
+            if failure == "timeout":
+                raise mr.subprocess.TimeoutExpired(
+                    command, kwargs["timeout"], output=b'{"type":"turn.started"}\n',
+                    stderr=b"partial diagnostics",
+                )
+            if failure == "invalid_verdict":
+                provider["mode"] = "malformed"
+            process = provider_run(command, **kwargs)
+            provider["mode"] = "valid"
+            if failure == "nonzero_exit":
+                process.returncode = 17
+            return process
+        return provider_run(command, **kwargs)
+
+    monkeypatch.setattr(mr.subprocess, "run", retrying_run)
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert result["error"] is None
+    review = evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
+    failed, succeeded = review.extra["evidence"]["attempts"]
+    assert failed["outcome"] == ("timed_out" if failure == "timeout" else "failed")
+    assert failed["error"]
+    assert failed["exit_code"] == {
+        "launch": None, "timeout": None, "nonzero_exit": 17, "invalid_verdict": 0,
+    }[failure]
+    assert succeeded["outcome"] == "succeeded"
+    assert evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory) == result
+    assert calls == 2
+
+
+@pytest.mark.parametrize("damage", [
+    "unknown_field", "outcome", "exit_code", "stdout_events", "missing_stderr",
+    "artifact_escape", "omitted_artifact",
+])
+def test_retry_provenance_rejects_damage_despite_matching_report_hash(
+    tmp_path: Path, case, provider, damage: str,
+) -> None:
+    identity = _identity(case)
+    directory = tmp_path / "run"
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert result["error"] is None
+    report_path = directory / result["report"]
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    invocation = report["extra"]["evidence"]["attempts"][0]
+    if damage == "unknown_field":
+        invocation["unrecognized"] = True
+    elif damage == "outcome":
+        invocation["outcome"] = "failed"
+        invocation["error"] = "Provider failed."
+    elif damage == "exit_code":
+        invocation["exit_code"] = False
+    elif damage == "stdout_events":
+        Path(invocation["stdout_file"]).write_text('{"type":"turn.started"}\n', encoding="utf-8")
+    elif damage == "missing_stderr":
+        Path(invocation["stderr_file"]).unlink()
+    elif damage == "artifact_escape":
+        outside = tmp_path / "outside.json"
+        outside.write_bytes(Path(invocation["artifacts"][0]).read_bytes())
+        invocation["artifacts"][0] = str(outside)
+    else:
+        invocation["artifacts"] = []
+    report_path.write_text(json.dumps(report), encoding="utf-8")
+    result["report_sha256"] = mr._sha256(report_path)
+    result["review"] = report
+    with pytest.raises(ValueError):
+        evaluation.validate_evidence(result, identity, "baseline", case[1], directory)

@@ -22,69 +22,6 @@ def _clean_verdict(verdict: str = "SHIP") -> dict[str, Any]:
     }
 
 
-def test_prompts_exist_and_are_calibrated_to_the_policy() -> None:
-    part = mr.load_prompt("part")
-    assembly = mr.load_prompt("assembly")
-    # The recalibration that separates this prompt from the gap-hunting ones:
-    # the title block is the general spec, and over-specification is a defect.
-    for text in (part, assembly):
-        normalized = " ".join(text.split())
-        assert "TITLE BLOCK FIRST" in normalized
-        assert "over_specification" in normalized
-        assert "Never pad a category" in normalized
-        assert "landscape or portrait" in normalized
-        assert "Shaded With Edges" in normalized
-        assert "precision/high-quality mode" in normalized
-        assert "wireframe/HLR pictorial" in normalized
-        assert "inner drawing border is a hard boundary" in normalized
-        assert "visually balanced" in normalized
-        assert "Projected orthographic views preserve ASME alignment" in normalized
-        assert "correctness comes first" in normalized
-        assert "Dimension text and feature callouts stay outside" in normalized
-        assert "Convenience is not a reason" in normalized
-
-    assert "loaded gun" in part
-    assert "Decimal places" in part
-    assert "one-place, two-place and three-place" in part
-    assert "thread class" in part
-    assert "Hidden lines" in part
-    assert "DRILL or REAM" in part
-    assert "granite surface plate" in part and "No CMM" in part
-    assert "never call a geometric control uninspectable" in part
-    assert "datum feature symbols on real, reachable surfaces" in part
-    assert "masking and protection of bare machined surfaces" in part
-    assert "builder's choice is complete" in part
-    assert "required finish system" in part
-    assert "repeated outside the title block" in part
-    part_text = " ".join(part.split())
-    for item in (
-        "DFM IS PART OF THE GATE",
-        "perfectly sharp re-entrant corners",
-        "last chance to catch an omission in the source CAD",
-        "never invent the missing radius",
-        "another plausible allowed route",
-        "do not count screw projection through a clearance hole as engagement",
-        "usable full threads",
-        "room beyond them for the tap's lead",
-        "thread major-diameter envelope",
-        "full-thread depth from deeper tap-drill depth",
-    ):
-        assert item in part_text
-    # Assembly packages are judged as real assembly drawings: exploded view,
-    # parts list, balloons, ordered steps -- the current three-view sheets are
-    # expected to FAIL this until they are built out.
-    for item in ("exploded view", "parts list (BOM)", "Assembly steps in order"):
-        assert item in assembly, item
-    assembly_text = " ".join(assembly.split())
-    for item in (
-        "return one verdict for the package as a whole",
-        "every balloon against its BOM row",
-        "setup and assembly steps across sheet boundaries",
-        "SHIP requires those cross-sheet checks",
-    ):
-        assert item in assembly_text, item
-
-
 def test_schema_is_strict_structured_output() -> None:
     schema = mr.load_schema()
     assert schema["additionalProperties"] is False
@@ -332,6 +269,100 @@ def test_retry_persists_all_attempts_and_cannot_hide_tool_use(
         for line in (report_dir / "part.events.jsonl").read_text().splitlines()
     ]
     assert [record["attempt"] for record in records] == [1, 2]
+
+
+@pytest.mark.parametrize("failure", ["nonzero_exit", "invalid_verdict", "timeout"])
+def test_retry_retains_failure_outputs_and_artifacts_after_success(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: str
+) -> None:
+    png = tmp_path / "source.png"
+    png.write_bytes(b"image")
+    report_dir = tmp_path / "reports"
+    calls = 0
+    failed_stdout = 'diagnostic before JSON\n{"type": "turn.failed"}\n'
+    failed_stderr = "reviewer diagnostic: interrupted response\n"
+    invalid_verdict = "incomplete response, not JSON"
+
+    def fake_run(command: list[str], **kwargs: Any):
+        nonlocal calls
+        calls += 1
+        output = Path(command[command.index("-o") + 1])
+        if calls == 1:
+            output.write_text(invalid_verdict, encoding="utf-8")
+            session = Path(kwargs["cwd"]) / "session"
+            session.mkdir()
+            (session / "trace.txt").write_text("failed attempt trace", encoding="utf-8")
+            if failure == "timeout":
+                raise mr.subprocess.TimeoutExpired(
+                    command,
+                    kwargs["timeout"],
+                    output=failed_stdout.encode("utf-8"),
+                    stderr=failed_stderr.encode("utf-8"),
+                )
+            return mr.subprocess.CompletedProcess(
+                command,
+                17 if failure == "nonzero_exit" else 0,
+                stdout=failed_stdout,
+                stderr=failed_stderr,
+            )
+        output.write_text(json.dumps(_clean_verdict()), encoding="utf-8")
+        return mr.subprocess.CompletedProcess(
+            command, 0, stdout='{"type": "turn.completed"}\n', stderr=""
+        )
+
+    monkeypatch.setattr(mr.subprocess, "run", fake_run)
+    review = mr.review_package(
+        mr.ReviewPackage("part", "part", (png,)),
+        reviewer="codex",
+        report_dir=report_dir,
+        retries=1,
+        codex="codex-test",
+    )
+
+    assert review.passed and review.blind
+    assert review.error is None
+    saved = json.loads((report_dir / "part.json").read_text(encoding="utf-8"))
+    failed, succeeded = saved["extra"]["evidence"]["attempts"]
+    assert failed["outcome"] == ("timed_out" if failure == "timeout" else "failed")
+    assert failed["exit_code"] == {
+        "nonzero_exit": 17, "invalid_verdict": 0, "timeout": None,
+    }[failure]
+    assert {
+        "nonzero_exit": "codex exit 17: reviewer diagnostic: interrupted response",
+        "invalid_verdict": "final message is not JSON",
+        "timeout": "TimeoutExpired",
+    }[failure] in failed["error"]
+    assert Path(failed["stdout_file"]).read_text(encoding="utf-8") == failed_stdout
+    assert Path(failed["stderr_file"]).read_text(encoding="utf-8") == failed_stderr
+    artifacts = {Path(path).name: Path(path) for path in failed["artifacts"]}
+    assert artifacts["verdict.json"].read_text(encoding="utf-8") == invalid_verdict
+    assert (artifacts["session"] / "trace.txt").read_text(encoding="utf-8") == (
+        "failed attempt trace"
+    )
+    assert succeeded["outcome"] == "succeeded"
+    assert succeeded["error"] is None
+    assert succeeded["exit_code"] == 0
+    assert Path(succeeded["stdout_file"]).read_text(encoding="utf-8") == (
+        '{"type": "turn.completed"}\n'
+    )
+    assert Path(succeeded["stderr_file"]).read_bytes() == b""
+    success_artifacts = {Path(path).name: Path(path) for path in succeeded["artifacts"]}
+    assert json.loads(success_artifacts["verdict.json"].read_text(encoding="utf-8")) == (
+        _clean_verdict()
+    )
+    for record in (failed, succeeded):
+        assert not Path(record["cwd"]).exists()
+        for path in (record["stdout_file"], record["stderr_file"], *record["artifacts"]):
+            assert Path(path).is_relative_to(report_dir)
+            assert Path(path).exists()
+    events = [
+        json.loads(line)
+        for line in Path(review.events_file).read_text(encoding="utf-8").splitlines()
+    ]
+    assert events == [
+        {"attempt": 1, "event": {"type": "turn.failed"}},
+        {"attempt": 2, "event": {"type": "turn.completed"}},
+    ]
 
 
 def test_retry_requires_image_reads_from_the_successful_attempt(

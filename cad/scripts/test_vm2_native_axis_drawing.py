@@ -2,7 +2,7 @@
 
 The original requested-position failures below are copied from the published
 candidate-2d-datum-retry-full.log. Native cases exercise the separately approved
-two-recipe helper; the existing general datum helper is unchanged.
+two-recipe helper; requested cases also cover initial leader-mode transitions.
 """
 
 from __future__ import annotations
@@ -60,6 +60,7 @@ class Tag:
         self._shoulder = False
         self.text_result = True
         self.text_calls = []
+        self.ForcedShoulder = False
 
     def GetAnnotation(self):
         return self.annotation
@@ -226,6 +227,48 @@ def test_requested_default_still_positions_once(harness):
     assert tag is harness.tag
     assert harness.annotation.set_calls == [(0.2, 0.25, 0.0)]
     assert harness.rebuild_calls == 1
+
+
+@pytest.mark.parametrize("settled_error", (0.0, 0.00012))
+def test_requested_position_after_forced_shoulder_removal(harness, settled_error):
+    requested = (0.085, 0.227)
+    harness.tag.ForcedShoulder = True
+
+    def move(x, y, z):
+        # Native bushing: the first move removes the angled shoulder but leaves
+        # its old offset. Only a move in the settled mode can reach the request.
+        error = 0.00012048159759714405 if harness.tag.ForcedShoulder else settled_error
+        harness.tag.ForcedShoulder = False
+        harness.annotation.position = (x, y - error, z)
+        return True
+
+    harness.annotation.SetPosition2 = move
+    kwargs = dict(
+        edge_xy=(0.085, 0.193175), symbol_xy=requested, datum="A",
+        label="bushing bore axis", position_tolerance_m=0.0001,
+    )
+    if settled_error:
+        with pytest.raises(RuntimeError, match="position did not persist"):
+            common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+    else:
+        tag = common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+        assert tag.GetAnnotation().GetPosition()[:2] == requested
+
+
+def test_requested_position_rejects_failed_settled_move(harness):
+    harness.tag.ForcedShoulder = True
+
+    def move(_x, _y, _z):
+        was_forced = harness.tag.ForcedShoulder
+        harness.tag.ForcedShoulder = False
+        return was_forced
+
+    harness.annotation.SetPosition2 = move
+    with pytest.raises(RuntimeError, match="failed to position datum"):
+        common.add_datum_feature(
+            harness.adapter, harness.view, edge_xy=(0.085, 0.193175),
+            symbol_xy=(0.085, 0.227), datum="A", label="bushing bore axis",
+        )
 
 
 @pytest.mark.parametrize("limit", LIMITS)

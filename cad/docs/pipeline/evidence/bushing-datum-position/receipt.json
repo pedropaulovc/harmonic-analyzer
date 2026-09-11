@@ -1,0 +1,1824 @@
+{
+  "date": "2026-09-10",
+  "base_commit": "dbb8c4e3",
+  "scope": "Bushing-only native controls and complete drawing; no project-wide validation or pytest executed.",
+  "api_sources": [
+    "https://help.solidworks.com/2026/english/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.IDatumTag~ForcedShoulder.html",
+    "https://help.solidworks.com/2026/english/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.IAnnotation~SetPosition2.html"
+  ],
+  "interpretation": "First move changes ForcedShoulder from true to false and retains old shoulder-dependent position offset. A second identical request in the settled leader mode reaches the original coordinate without rebuilding. Only this transition gets a finishing move; the original position tolerance is unchanged.",
+  "controls": {
+    "pid": 15560,
+    "revision": "34.3.0",
+    "source_sha256": "61985d25cb40314f9466869973883ea1b517a0a7a1f3073013e954d2f262a7d8",
+    "cases": [
+      {
+        "mode": "original",
+        "requested_attachment": [
+          0.085,
+          0.193175
+        ],
+        "selected_point": [],
+        "selected_circle": [],
+        "moves": [
+          {
+            "requested": [
+              0.085,
+              0.227
+            ],
+            "ok": true,
+            "immediate": {
+              "position": [
+                0.08499999999999937,
+                0.22687951840240286,
+                0.015999999488000013
+              ],
+              "attachments": [
+                {
+                  "circle": [
+                    0.0,
+                    0.004,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.000396875
+                  ]
+                }
+              ],
+              "attachment_types": [
+                1
+              ],
+              "dangling": false,
+              "shoulder": false,
+              "forced_shoulder": false
+            },
+            "rebuild_ok": true,
+            "after_rebuild": {
+              "position": [
+                0.08499999999999937,
+                0.22687951840240286,
+                0.015999999488000013
+              ],
+              "attachments": [
+                {
+                  "circle": [
+                    0.0,
+                    0.004,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.000396875
+                  ]
+                }
+              ],
+              "attachment_types": [
+                1
+              ],
+              "dangling": false,
+              "shoulder": false,
+              "forced_shoulder": false
+            },
+            "error_m": 0.00012048159759714405
+          },
+          {
+            "requested": [
+              0.085,
+              0.237
+            ],
+            "ok": true,
+            "immediate": {
+              "position": [
+                0.08499999999999919,
+                0.237,
+                0.015999999488
+              ],
+              "attachments": [
+                {
+                  "circle": [
+                    0.0,
+                    0.004,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.000396875
+                  ]
+                }
+              ],
+              "attachment_types": [
+                1
+              ],
+              "dangling": false,
+              "shoulder": false,
+              "forced_shoulder": false
+            },
+            "rebuild_ok": true,
+            "after_rebuild": {
+              "position": [
+                0.08499999999999919,
+                0.237,
+                0.015999999488
+              ],
+              "attachments": [
+                {
+                  "circle": [
+                    0.0,
+                    0.004,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.000396875
+                  ]
+                }
+              ],
+              "attachment_types": [
+                1
+              ],
+              "dangling": false,
+              "shoulder": false,
+              "forced_shoulder": false
+            },
+            "error_m": 8.187894806610529e-16
+          },
+          {
+            "requested": [
+              0.085,
+              0.227
+            ],
+            "ok": true,
+            "immediate": {
+              "position": [
+                0.08499999999999935,
+                0.22699999999999998,
+                0.015999999488
+              ],
+              "attachments": [
+                {
+                  "circle": [
+                    0.0,
+                    0.004,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.000396875
+                  ]
+                }
+              ],
+              "attachment_types": [
+                1
+              ],
+              "dangling": false,
+              "shoulder": false,
+              "forced_shoulder": false
+            },
+            "rebuild_ok": true,
+            "after_rebuild": {
+              "position": [
+                0.08499999999999935,
+                0.22699999999999998,
+                0.015999999488
+              ],
+              "attachments": [
+                {
+                  "circle": [
+                    0.0,
+                    0.004,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.000396875
+                  ]
+                }
+              ],
+              "attachment_types": [
+                1
+              ],
+              "dangling": false,
+              "shoulder": false,
+              "forced_shoulder": false
+            },
+            "error_m": 6.528463040355634e-16
+          }
+        ],
+        "initial": {
+          "position": [
+            0.08388898479217922,
+            0.20312807183892553,
+            0.015999999488000013
+          ],
+          "attachments": [
+            {
+              "circle": [
+                0.0,
+                0.004,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.000396875
+              ]
+            }
+          ],
+          "attachment_types": [
+            1
+          ],
+          "dangling": false,
+          "shoulder": true,
+          "forced_shoulder": true
+        },
+        "after_export": {
+          "position": [
+            0.08499999999999935,
+            0.22699999999999998,
+            0.015999999488
+          ],
+          "attachments": [
+            {
+              "circle": [
+                0.0,
+                0.004,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.000396875
+              ]
+            }
+          ],
+          "attachment_types": [
+            1
+          ],
+          "dangling": false,
+          "shoulder": false,
+          "forced_shoulder": false
+        }
+      },
+      {
+        "mode": "exact_selection",
+        "requested_attachment": [
+          0.085,
+          0.193175
+        ],
+        "selected_point": [],
+        "selected_circle": [],
+        "moves": [
+          {
+            "requested": [
+              0.085,
+              0.227
+            ],
+            "ok": true,
+            "immediate": {
+              "position": [
+                0.08499999999999937,
+                0.22687951840240286,
+                0.015999999488000013
+              ],
+              "attachments": [
+                {
+                  "circle": [
+                    0.0,
+                    0.004,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.000396875
+                  ]
+                }
+              ],
+              "attachment_types": [
+                1
+              ],
+              "dangling": false,
+              "shoulder": false,
+              "forced_shoulder": false
+            },
+            "rebuild_ok": true,
+            "after_rebuild": {
+              "position": [
+                0.08499999999999937,
+                0.22687951840240286,
+                0.015999999488000013
+              ],
+              "attachments": [
+                {
+                  "circle": [
+                    0.0,
+                    0.004,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.000396875
+                  ]
+                }
+              ],
+              "attachment_types": [
+                1
+              ],
+              "dangling": false,
+              "shoulder": false,
+              "forced_shoulder": false
+            },
+            "error_m": 0.00012048159759714405
+          },
+          {
+            "requested": [
+              0.085,
+              0.237
+            ],
+            "ok": true,
+            "immediate": {
+              "position": [
+                0.08499999999999919,
+                0.237,
+                0.015999999488
+              ],
+              "attachments": [
+                {
+                  "circle": [
+                    0.0,
+                    0.004,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.000396875
+                  ]
+                }
+              ],
+              "attachment_types": [
+                1
+              ],
+              "dangling": false,
+              "shoulder": false,
+              "forced_shoulder": false
+            },
+            "rebuild_ok": true,
+            "after_rebuild": {
+              "position": [
+                0.08499999999999919,
+                0.237,
+                0.015999999488
+              ],
+              "attachments": [
+                {
+                  "circle": [
+                    0.0,
+                    0.004,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.000396875
+                  ]
+                }
+              ],
+              "attachment_types": [
+                1
+              ],
+              "dangling": false,
+              "shoulder": false,
+              "forced_shoulder": false
+            },
+            "error_m": 8.187894806610529e-16
+          },
+          {
+            "requested": [
+              0.085,
+              0.227
+            ],
+            "ok": true,
+            "immediate": {
+              "position": [
+                0.08499999999999935,
+                0.22699999999999998,
+                0.015999999488
+              ],
+              "attachments": [
+                {
+                  "circle": [
+                    0.0,
+                    0.004,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.000396875
+                  ]
+                }
+              ],
+              "attachment_types": [
+                1
+              ],
+              "dangling": false,
+              "shoulder": false,
+              "forced_shoulder": false
+            },
+            "rebuild_ok": true,
+            "after_rebuild": {
+              "position": [
+                0.08499999999999935,
+                0.22699999999999998,
+                0.015999999488
+              ],
+              "attachments": [
+                {
+                  "circle": [
+                    0.0,
+                    0.004,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.000396875
+                  ]
+                }
+              ],
+              "attachment_types": [
+                1
+              ],
+              "dangling": false,
+              "shoulder": false,
+              "forced_shoulder": false
+            },
+            "error_m": 6.528463040355634e-16
+          }
+        ],
+        "selection_set_ok": true,
+        "selection_point_after": [
+          0.085,
+          0.193175,
+          0.0
+        ],
+        "initial": {
+          "position": [
+            0.08388898479217922,
+            0.20312807183892553,
+            0.015999999488000013
+          ],
+          "attachments": [
+            {
+              "circle": [
+                0.0,
+                0.004,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.000396875
+              ]
+            }
+          ],
+          "attachment_types": [
+            1
+          ],
+          "dangling": false,
+          "shoulder": true,
+          "forced_shoulder": true
+        },
+        "after_export": {
+          "position": [
+            0.08499999999999935,
+            0.22699999999999998,
+            0.015999999488
+          ],
+          "attachments": [
+            {
+              "circle": [
+                0.0,
+                0.004,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.000396875
+              ]
+            }
+          ],
+          "attachment_types": [
+            1
+          ],
+          "dangling": false,
+          "shoulder": false,
+          "forced_shoulder": false
+        }
+      },
+      {
+        "mode": "shoulder",
+        "requested_attachment": [
+          0.085,
+          0.193175
+        ],
+        "selected_point": [],
+        "selected_circle": [],
+        "moves": [
+          {
+            "requested": [
+              0.085,
+              0.227
+            ],
+            "ok": true,
+            "immediate": {
+              "position": [
+                0.08499999999999937,
+                0.22687951840240286,
+                0.015999999488000013
+              ],
+              "attachments": [
+                {
+                  "circle": [
+                    0.0,
+                    0.004,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.000396875
+                  ]
+                }
+              ],
+              "attachment_types": [
+                1
+              ],
+              "dangling": false,
+              "shoulder": true,
+              "forced_shoulder": false
+            },
+            "rebuild_ok": true,
+            "after_rebuild": {
+              "position": [
+                0.08499999999999937,
+                0.22687951840240286,
+                0.015999999488000013
+              ],
+              "attachments": [
+                {
+                  "circle": [
+                    0.0,
+                    0.004,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.000396875
+                  ]
+                }
+              ],
+              "attachment_types": [
+                1
+              ],
+              "dangling": false,
+              "shoulder": true,
+              "forced_shoulder": false
+            },
+            "error_m": 0.00012048159759714405
+          },
+          {
+            "requested": [
+              0.085,
+              0.237
+            ],
+            "ok": true,
+            "immediate": {
+              "position": [
+                0.08499999999999919,
+                0.237,
+                0.015999999488
+              ],
+              "attachments": [
+                {
+                  "circle": [
+                    0.0,
+                    0.004,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.000396875
+                  ]
+                }
+              ],
+              "attachment_types": [
+                1
+              ],
+              "dangling": false,
+              "shoulder": true,
+              "forced_shoulder": false
+            },
+            "rebuild_ok": true,
+            "after_rebuild": {
+              "position": [
+                0.08499999999999919,
+                0.237,
+                0.015999999488
+              ],
+              "attachments": [
+                {
+                  "circle": [
+                    0.0,
+                    0.004,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.000396875
+                  ]
+                }
+              ],
+              "attachment_types": [
+                1
+              ],
+              "dangling": false,
+              "shoulder": true,
+              "forced_shoulder": false
+            },
+            "error_m": 8.187894806610529e-16
+          },
+          {
+            "requested": [
+              0.085,
+              0.227
+            ],
+            "ok": true,
+            "immediate": {
+              "position": [
+                0.08499999999999935,
+                0.22699999999999998,
+                0.015999999488
+              ],
+              "attachments": [
+                {
+                  "circle": [
+                    0.0,
+                    0.004,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.000396875
+                  ]
+                }
+              ],
+              "attachment_types": [
+                1
+              ],
+              "dangling": false,
+              "shoulder": true,
+              "forced_shoulder": false
+            },
+            "rebuild_ok": true,
+            "after_rebuild": {
+              "position": [
+                0.08499999999999935,
+                0.22699999999999998,
+                0.015999999488
+              ],
+              "attachments": [
+                {
+                  "circle": [
+                    0.0,
+                    0.004,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.000396875
+                  ]
+                }
+              ],
+              "attachment_types": [
+                1
+              ],
+              "dangling": false,
+              "shoulder": true,
+              "forced_shoulder": false
+            },
+            "error_m": 6.528463040355634e-16
+          }
+        ],
+        "initial": {
+          "position": [
+            0.08388898479217922,
+            0.20312807183892553,
+            0.015999999488000013
+          ],
+          "attachments": [
+            {
+              "circle": [
+                0.0,
+                0.004,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.000396875
+              ]
+            }
+          ],
+          "attachment_types": [
+            1
+          ],
+          "dangling": false,
+          "shoulder": true,
+          "forced_shoulder": true
+        },
+        "after_export": {
+          "position": [
+            0.08499999999999935,
+            0.22699999999999998,
+            0.015999999488
+          ],
+          "attachments": [
+            {
+              "circle": [
+                0.0,
+                0.004,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.000396875
+              ]
+            }
+          ],
+          "attachment_types": [
+            1
+          ],
+          "dangling": false,
+          "shoulder": true,
+          "forced_shoulder": false
+        }
+      }
+    ],
+    "source_unchanged": false
+  },
+  "sequencing_controls": {
+    "pid": 15560,
+    "revision": "34.3.0",
+    "source_sha256": "ae1132f8b3c94d59c0aa2fa4632e6a2088c3d73ea6076d971ee6cafd7657c1e4",
+    "cases": [
+      {
+        "mode": "repeat_no_rebuild",
+        "requested_attachment": [
+          0.085,
+          0.193175
+        ],
+        "selected_point": [],
+        "selected_circle": [],
+        "moves": [
+          {
+            "requested": [
+              0.085,
+              0.227
+            ],
+            "ok": true,
+            "immediate": {
+              "position": [
+                0.08499999999999937,
+                0.22687951840240286,
+                0.015999999488000013
+              ],
+              "attachments": [
+                {
+                  "circle": [
+                    0.0,
+                    0.004,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.000396875
+                  ]
+                }
+              ],
+              "attachment_types": [
+                1
+              ],
+              "dangling": false,
+              "shoulder": false,
+              "forced_shoulder": false
+            },
+            "rebuild_ok": null,
+            "after_rebuild": {
+              "position": [
+                0.08499999999999937,
+                0.22687951840240286,
+                0.015999999488000013
+              ],
+              "attachments": [
+                {
+                  "circle": [
+                    0.0,
+                    0.004,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.000396875
+                  ]
+                }
+              ],
+              "attachment_types": [
+                1
+              ],
+              "dangling": false,
+              "shoulder": false,
+              "forced_shoulder": false
+            },
+            "error_m": 0.00012048159759714405
+          },
+          {
+            "requested": [
+              0.085,
+              0.227
+            ],
+            "ok": true,
+            "immediate": {
+              "position": [
+                0.08499999999999935,
+                0.227,
+                0.015999999488000013
+              ],
+              "attachments": [
+                {
+                  "circle": [
+                    0.0,
+                    0.004,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.000396875
+                  ]
+                }
+              ],
+              "attachment_types": [
+                1
+              ],
+              "dangling": false,
+              "shoulder": false,
+              "forced_shoulder": false
+            },
+            "rebuild_ok": null,
+            "after_rebuild": {
+              "position": [
+                0.08499999999999935,
+                0.227,
+                0.015999999488000013
+              ],
+              "attachments": [
+                {
+                  "circle": [
+                    0.0,
+                    0.004,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.000396875
+                  ]
+                }
+              ],
+              "attachment_types": [
+                1
+              ],
+              "dangling": false,
+              "shoulder": false,
+              "forced_shoulder": false
+            },
+            "error_m": 6.522560269672795e-16
+          },
+          {
+            "requested": [
+              0.085,
+              0.237
+            ],
+            "ok": true,
+            "immediate": {
+              "position": [
+                0.08499999999999919,
+                0.237,
+                0.015999999488000013
+              ],
+              "attachments": [
+                {
+                  "circle": [
+                    0.0,
+                    0.004,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.000396875
+                  ]
+                }
+              ],
+              "attachment_types": [
+                1
+              ],
+              "dangling": false,
+              "shoulder": false,
+              "forced_shoulder": false
+            },
+            "rebuild_ok": null,
+            "after_rebuild": {
+              "position": [
+                0.08499999999999919,
+                0.237,
+                0.015999999488000013
+              ],
+              "attachments": [
+                {
+                  "circle": [
+                    0.0,
+                    0.004,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.000396875
+                  ]
+                }
+              ],
+              "attachment_types": [
+                1
+              ],
+              "dangling": false,
+              "shoulder": false,
+              "forced_shoulder": false
+            },
+            "error_m": 8.187894806610529e-16
+          }
+        ],
+        "initial": {
+          "position": [
+            0.08388898479217922,
+            0.20312807183892553,
+            0.015999999488000013
+          ],
+          "attachments": [
+            {
+              "circle": [
+                0.0,
+                0.004,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.000396875
+              ]
+            }
+          ],
+          "attachment_types": [
+            1
+          ],
+          "dangling": false,
+          "shoulder": true,
+          "forced_shoulder": true
+        },
+        "after_export": {
+          "position": [
+            0.08499999999999919,
+            0.237,
+            0.015999999488000013
+          ],
+          "attachments": [
+            {
+              "circle": [
+                0.0,
+                0.004,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.000396875
+              ]
+            }
+          ],
+          "attachment_types": [
+            1
+          ],
+          "dangling": false,
+          "shoulder": false,
+          "forced_shoulder": false
+        }
+      },
+      {
+        "mode": "pre_rebuild",
+        "requested_attachment": [
+          0.085,
+          0.193175
+        ],
+        "selected_point": [],
+        "selected_circle": [],
+        "moves": [
+          {
+            "requested": [
+              0.085,
+              0.227
+            ],
+            "ok": true,
+            "immediate": {
+              "position": [
+                0.08499999999999937,
+                0.22687951840240286,
+                0.015999999488
+              ],
+              "attachments": [
+                {
+                  "circle": [
+                    0.0,
+                    0.004,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.000396875
+                  ]
+                }
+              ],
+              "attachment_types": [
+                1
+              ],
+              "dangling": false,
+              "shoulder": false,
+              "forced_shoulder": false
+            },
+            "rebuild_ok": true,
+            "after_rebuild": {
+              "position": [
+                0.08499999999999937,
+                0.22687951840240286,
+                0.015999999488
+              ],
+              "attachments": [
+                {
+                  "circle": [
+                    0.0,
+                    0.004,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.000396875
+                  ]
+                }
+              ],
+              "attachment_types": [
+                1
+              ],
+              "dangling": false,
+              "shoulder": false,
+              "forced_shoulder": false
+            },
+            "error_m": 0.00012048159759714405
+          },
+          {
+            "requested": [
+              0.085,
+              0.227
+            ],
+            "ok": true,
+            "immediate": {
+              "position": [
+                0.08499999999999935,
+                0.22699999999999998,
+                0.015999999488
+              ],
+              "attachments": [
+                {
+                  "circle": [
+                    0.0,
+                    0.004,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.000396875
+                  ]
+                }
+              ],
+              "attachment_types": [
+                1
+              ],
+              "dangling": false,
+              "shoulder": false,
+              "forced_shoulder": false
+            },
+            "rebuild_ok": true,
+            "after_rebuild": {
+              "position": [
+                0.08499999999999935,
+                0.22699999999999998,
+                0.015999999488
+              ],
+              "attachments": [
+                {
+                  "circle": [
+                    0.0,
+                    0.004,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.000396875
+                  ]
+                }
+              ],
+              "attachment_types": [
+                1
+              ],
+              "dangling": false,
+              "shoulder": false,
+              "forced_shoulder": false
+            },
+            "error_m": 6.528463040355634e-16
+          },
+          {
+            "requested": [
+              0.085,
+              0.237
+            ],
+            "ok": true,
+            "immediate": {
+              "position": [
+                0.08499999999999919,
+                0.237,
+                0.015999999488
+              ],
+              "attachments": [
+                {
+                  "circle": [
+                    0.0,
+                    0.004,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.000396875
+                  ]
+                }
+              ],
+              "attachment_types": [
+                1
+              ],
+              "dangling": false,
+              "shoulder": false,
+              "forced_shoulder": false
+            },
+            "rebuild_ok": true,
+            "after_rebuild": {
+              "position": [
+                0.08499999999999919,
+                0.237,
+                0.015999999488
+              ],
+              "attachments": [
+                {
+                  "circle": [
+                    0.0,
+                    0.004,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.000396875
+                  ]
+                }
+              ],
+              "attachment_types": [
+                1
+              ],
+              "dangling": false,
+              "shoulder": false,
+              "forced_shoulder": false
+            },
+            "error_m": 8.187894806610529e-16
+          }
+        ],
+        "initial": {
+          "position": [
+            0.08388898479217922,
+            0.20312807183892553,
+            0.015999999488000013
+          ],
+          "attachments": [
+            {
+              "circle": [
+                0.0,
+                0.004,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.000396875
+              ]
+            }
+          ],
+          "attachment_types": [
+            1
+          ],
+          "dangling": false,
+          "shoulder": true,
+          "forced_shoulder": true
+        },
+        "after_export": {
+          "position": [
+            0.08499999999999919,
+            0.237,
+            0.015999999488
+          ],
+          "attachments": [
+            {
+              "circle": [
+                0.0,
+                0.004,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.000396875
+              ]
+            }
+          ],
+          "attachment_types": [
+            1
+          ],
+          "dangling": false,
+          "shoulder": false,
+          "forced_shoulder": false
+        }
+      },
+      {
+        "mode": "no_shoulder",
+        "requested_attachment": [
+          0.085,
+          0.193175
+        ],
+        "selected_point": [],
+        "selected_circle": [],
+        "moves": [
+          {
+            "requested": [
+              0.085,
+              0.227
+            ],
+            "ok": true,
+            "immediate": {
+              "position": [
+                0.08499999999999937,
+                0.22687951840240286,
+                0.015999999488000013
+              ],
+              "attachments": [
+                {
+                  "circle": [
+                    0.0,
+                    0.004,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.000396875
+                  ]
+                }
+              ],
+              "attachment_types": [
+                1
+              ],
+              "dangling": false,
+              "shoulder": false,
+              "forced_shoulder": false
+            },
+            "rebuild_ok": true,
+            "after_rebuild": {
+              "position": [
+                0.08499999999999937,
+                0.22687951840240286,
+                0.015999999488000013
+              ],
+              "attachments": [
+                {
+                  "circle": [
+                    0.0,
+                    0.004,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.000396875
+                  ]
+                }
+              ],
+              "attachment_types": [
+                1
+              ],
+              "dangling": false,
+              "shoulder": false,
+              "forced_shoulder": false
+            },
+            "error_m": 0.00012048159759714405
+          },
+          {
+            "requested": [
+              0.085,
+              0.227
+            ],
+            "ok": true,
+            "immediate": {
+              "position": [
+                0.08499999999999935,
+                0.227,
+                0.015999999488
+              ],
+              "attachments": [
+                {
+                  "circle": [
+                    0.0,
+                    0.004,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.000396875
+                  ]
+                }
+              ],
+              "attachment_types": [
+                1
+              ],
+              "dangling": false,
+              "shoulder": false,
+              "forced_shoulder": false
+            },
+            "rebuild_ok": true,
+            "after_rebuild": {
+              "position": [
+                0.08499999999999935,
+                0.227,
+                0.015999999488
+              ],
+              "attachments": [
+                {
+                  "circle": [
+                    0.0,
+                    0.004,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.000396875
+                  ]
+                }
+              ],
+              "attachment_types": [
+                1
+              ],
+              "dangling": false,
+              "shoulder": false,
+              "forced_shoulder": false
+            },
+            "error_m": 6.522560269672795e-16
+          },
+          {
+            "requested": [
+              0.085,
+              0.237
+            ],
+            "ok": true,
+            "immediate": {
+              "position": [
+                0.08499999999999919,
+                0.237,
+                0.015999999488
+              ],
+              "attachments": [
+                {
+                  "circle": [
+                    0.0,
+                    0.004,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.000396875
+                  ]
+                }
+              ],
+              "attachment_types": [
+                1
+              ],
+              "dangling": false,
+              "shoulder": false,
+              "forced_shoulder": false
+            },
+            "rebuild_ok": true,
+            "after_rebuild": {
+              "position": [
+                0.08499999999999919,
+                0.237,
+                0.015999999488
+              ],
+              "attachments": [
+                {
+                  "circle": [
+                    0.0,
+                    0.004,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.000396875
+                  ]
+                }
+              ],
+              "attachment_types": [
+                1
+              ],
+              "dangling": false,
+              "shoulder": false,
+              "forced_shoulder": false
+            },
+            "error_m": 8.187894806610529e-16
+          }
+        ],
+        "initial": {
+          "position": [
+            0.08388898479217922,
+            0.20312807183892553,
+            0.015999999488000013
+          ],
+          "attachments": [
+            {
+              "circle": [
+                0.0,
+                0.004,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.000396875
+              ]
+            }
+          ],
+          "attachment_types": [
+            1
+          ],
+          "dangling": false,
+          "shoulder": true,
+          "forced_shoulder": true
+        },
+        "after_export": {
+          "position": [
+            0.08499999999999919,
+            0.237,
+            0.015999999488
+          ],
+          "attachments": [
+            {
+              "circle": [
+                0.0,
+                0.004,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.000396875
+              ]
+            }
+          ],
+          "attachment_types": [
+            1
+          ],
+          "dangling": false,
+          "shoulder": false,
+          "forced_shoulder": false
+        }
+      },
+      {
+        "mode": "clear_selection",
+        "requested_attachment": [
+          0.085,
+          0.193175
+        ],
+        "selected_point": [],
+        "selected_circle": [],
+        "moves": [
+          {
+            "requested": [
+              0.085,
+              0.227
+            ],
+            "ok": true,
+            "immediate": {
+              "position": [
+                0.08499999999999937,
+                0.22687951840240286,
+                0.015999999488000013
+              ],
+              "attachments": [
+                {
+                  "circle": [
+                    0.0,
+                    0.004,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.000396875
+                  ]
+                }
+              ],
+              "attachment_types": [
+                1
+              ],
+              "dangling": false,
+              "shoulder": false,
+              "forced_shoulder": false
+            },
+            "rebuild_ok": true,
+            "after_rebuild": {
+              "position": [
+                0.08499999999999937,
+                0.22687951840240286,
+                0.015999999488000013
+              ],
+              "attachments": [
+                {
+                  "circle": [
+                    0.0,
+                    0.004,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.000396875
+                  ]
+                }
+              ],
+              "attachment_types": [
+                1
+              ],
+              "dangling": false,
+              "shoulder": false,
+              "forced_shoulder": false
+            },
+            "error_m": 0.00012048159759714405
+          },
+          {
+            "requested": [
+              0.085,
+              0.227
+            ],
+            "ok": true,
+            "immediate": {
+              "position": [
+                0.08499999999999935,
+                0.227,
+                0.015999999488
+              ],
+              "attachments": [
+                {
+                  "circle": [
+                    0.0,
+                    0.004,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.000396875
+                  ]
+                }
+              ],
+              "attachment_types": [
+                1
+              ],
+              "dangling": false,
+              "shoulder": false,
+              "forced_shoulder": false
+            },
+            "rebuild_ok": true,
+            "after_rebuild": {
+              "position": [
+                0.08499999999999935,
+                0.227,
+                0.015999999488
+              ],
+              "attachments": [
+                {
+                  "circle": [
+                    0.0,
+                    0.004,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.000396875
+                  ]
+                }
+              ],
+              "attachment_types": [
+                1
+              ],
+              "dangling": false,
+              "shoulder": false,
+              "forced_shoulder": false
+            },
+            "error_m": 6.522560269672795e-16
+          },
+          {
+            "requested": [
+              0.085,
+              0.237
+            ],
+            "ok": true,
+            "immediate": {
+              "position": [
+                0.08499999999999919,
+                0.237,
+                0.015999999488
+              ],
+              "attachments": [
+                {
+                  "circle": [
+                    0.0,
+                    0.004,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.000396875
+                  ]
+                }
+              ],
+              "attachment_types": [
+                1
+              ],
+              "dangling": false,
+              "shoulder": false,
+              "forced_shoulder": false
+            },
+            "rebuild_ok": true,
+            "after_rebuild": {
+              "position": [
+                0.08499999999999919,
+                0.237,
+                0.015999999488
+              ],
+              "attachments": [
+                {
+                  "circle": [
+                    0.0,
+                    0.004,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.000396875
+                  ]
+                }
+              ],
+              "attachment_types": [
+                1
+              ],
+              "dangling": false,
+              "shoulder": false,
+              "forced_shoulder": false
+            },
+            "error_m": 8.187894806610529e-16
+          }
+        ],
+        "initial": {
+          "position": [
+            0.08388898479217922,
+            0.20312807183892553,
+            0.015999999488000013
+          ],
+          "attachments": [
+            {
+              "circle": [
+                0.0,
+                0.004,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.000396875
+              ]
+            }
+          ],
+          "attachment_types": [
+            1
+          ],
+          "dangling": false,
+          "shoulder": true,
+          "forced_shoulder": true
+        },
+        "after_export": {
+          "position": [
+            0.08499999999999919,
+            0.237,
+            0.015999999488
+          ],
+          "attachments": [
+            {
+              "circle": [
+                0.0,
+                0.004,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.000396875
+              ]
+            }
+          ],
+          "attachment_types": [
+            1
+          ],
+          "dangling": false,
+          "shoulder": false,
+          "forced_shoulder": false
+        }
+      }
+    ],
+    "source_unchanged": true
+  },
+  "final_cold_reopen": {
+    "pid": 15560,
+    "revision": "34.3.0",
+    "tags": [
+      {
+        "label": "A",
+        "view": "Drawing View1",
+        "position": [
+          0.08499999999999935,
+          0.2270000000000001,
+          0.015999999488
+        ],
+        "dangling": false,
+        "forced_shoulder": false,
+        "attachment_types": [
+          1
+        ],
+        "circles": [
+          [
+            0.0,
+            0.004,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.000396875
+          ]
+        ],
+        "requested": [
+          0.085,
+          0.227
+        ],
+        "position_error_m": 6.575494449202543e-16
+      },
+      {
+        "label": "B",
+        "view": "Drawing View2",
+        "position": [
+          0.178,
+          0.154,
+          0.0
+        ],
+        "dangling": false,
+        "forced_shoulder": false,
+        "attachment_types": [
+          1
+        ],
+        "circles": [
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.000396875
+          ]
+        ]
+      }
+    ],
+    "artifacts": {
+      "cad\\out\\slddrw\\cone-tip-bushing.SLDDRW": "ad02c1b8dd4e13d642bf1ff4897ce1ea154a99299c06864473d26ed94be4bb0f",
+      "cad\\out\\pdf\\cone-tip-bushing.pdf": "5574fe35f2b4e1b64cc77b1eaf421222d646e5bd3034269a793a7a1a5fb397b9",
+      "cad\\out\\png\\cone-tip-bushing_drawing.png": "ce1d1bd129b449b01aa6876a09e04be019dac6579a9d63a159711784fedbba98"
+    },
+    "remaining_documents": 0
+  },
+  "input_note": "The copied gate input was resaved in the isolated worktree by native drawing exports. No original-checkout input was modified. Empty selected_circle/selected_point fields are initial selection API readbacks, not attachment witnesses; datum attachments contain the authoritative circular bore geometry.",
+  "reference_mapping": "No LSP tool mounted. Bounded grep mapped 35 direct drawing callers, project_part_pmi, and existing actual helper tests in test_vm2_native_axis_drawing.py. Helper signature and callsites unchanged; no scheduler/cache/dependency changes.",
+  "visual": "Final complete PNG inspected: datum A outside OD with triangle on bore; legible box and separate runout arrow; datum B below side view; original layout retained."
+}

@@ -227,14 +227,26 @@ def _materialize_images(package: ReviewPackage, workdir: Path) -> list[Path]:
     return images
 
 
-def _review_prompt(package: ReviewPackage, sheet_count: int) -> str:
-    prompt = load_prompt(package.kind)
+def _review_prompt(
+    package: ReviewPackage,
+    sheet_count: int,
+    *,
+    reviewer: str = "codex",
+    prompt_text: str | None = None,
+) -> str:
+    prompt = load_prompt(package.kind) if prompt_text is None else prompt_text
     if package.kind == "assembly":
         prompt += (
             "\n\nPACKAGE INPUT\n"
             f"This invocation includes all {sheet_count} sheet images in order. "
             "Return one verdict for the package as a whole. Compare every sheet "
             "against every other sheet before accepting SHIP.\n"
+        )
+    if reviewer == "claude":
+        prompt = (
+            f"Use the Read tool to inspect every copied sheet-1.png through "
+            f"sheet-{sheet_count}.png in order. Do not read any other file. "
+            "Then perform this blind review.\n\n" + prompt
         )
     return prompt
 
@@ -247,6 +259,7 @@ def build_claude_command(
     model: str,
     effort: str,
     claude: str = "claude",
+    schema_content: str | None = None,
 ) -> list[str]:
     """Return the exact isolated ``claude -p`` argv for one package."""
     if (
@@ -256,7 +269,7 @@ def build_claude_command(
     ):
         raise ValueError("review inputs must be inside the neutral workdir")
     schema_json = json.dumps(
-        json.loads(schema.read_text(encoding="utf-8")),
+        json.loads(schema.read_text(encoding="utf-8") if schema_content is None else schema_content),
         separators=(",", ":"),
     )
     return [
@@ -544,6 +557,7 @@ def review_package(
     timeout_s: float = 1800.0,
     claude: str | None = None,
     codex: str | None = None,
+    prompt_text: str | None = None,
 ) -> Review:
     if reviewer not in REVIEWERS:
         raise ValueError(f"unknown reviewer {reviewer!r}; choose one of {REVIEWERS}")
@@ -553,15 +567,12 @@ def review_package(
     executable = (claude if reviewer == "claude" else codex) or shutil.which(reviewer)
     if not executable:
         raise RuntimeError(f"{reviewer} CLI not found on PATH")
-    prompt = _review_prompt(package, sheet_count)
-    if reviewer == "claude":
-        prompt = (
-            f"Use the Read tool to inspect every copied sheet-1.png through "
-            f"sheet-{sheet_count}.png in order. Do not read any other file. "
-            "Then perform this blind review.\n\n" + prompt
-        )
+    prompt = _review_prompt(
+        package, sheet_count, reviewer=reviewer, prompt_text=prompt_text
+    )
     prompt_sha = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
     source_sha = [_sha256(source) for source in package.sources]
+    schema_bytes = SCHEMA_FILE.read_bytes()
     report_dir.mkdir(parents=True, exist_ok=True)
     events_path = report_dir / f"{package.name}.events.jsonl"
 
@@ -572,13 +583,23 @@ def review_package(
     allowed_images: list[Path] = []
     verdict_images: list[Path] = []
     success_events: list[dict[str, Any]] = []
+    attempt_records: list[dict[str, Any]] = []
     attempts = 0
     for attempt in range(retries + 1):
         attempts = attempt + 1
         workdir = Path(tempfile.mkdtemp(prefix="machrev-"))
         attempt_events: list[dict[str, Any]] = []
+        stdout: str | bytes | None = None
+        stderr: str | bytes | None = None
+        attempt_record: dict[str, Any] = {
+            "attempt": attempts, "cwd": str(workdir), "images": [], "command": None,
+            "outcome": "failed", "error": None, "exit_code": None,
+            "stdout_file": None, "stderr_file": None, "artifacts": [],
+        }
+        attempt_records.append(attempt_record)
         try:
             images = _materialize_images(package, workdir)
+            attempt_record["images"] = [str(image) for image in images]
             allowed_images.extend(images)
             if len(images) != sheet_count:
                 raise RuntimeError(
@@ -586,7 +607,7 @@ def review_package(
                     f"expected {sheet_count}"
                 )
             schema = workdir / "schema.json"
-            shutil.copyfile(SCHEMA_FILE, schema)
+            schema.write_bytes(schema_bytes)
             output = workdir / "verdict.json"
             cmd = (
                 build_claude_command(
@@ -608,6 +629,7 @@ def review_package(
                     codex=executable,
                 )
             )
+            attempt_record["command"] = cmd
             proc = subprocess.run(
                 cmd,
                 input=prompt,
@@ -618,6 +640,8 @@ def review_package(
                 timeout=timeout_s,
                 cwd=str(workdir),
             )
+            attempt_record["exit_code"] = proc.returncode
+            stdout, stderr = proc.stdout, proc.stderr
             attempt_events = _parse_events(proc.stdout)
             if proc.returncode != 0:
                 raise RuntimeError(
@@ -631,19 +655,46 @@ def review_package(
             verdict_images = list(images)
             success_events = list(attempt_events)
             error = None
+            attempt_record["outcome"] = "succeeded"
             break
         except subprocess.TimeoutExpired as exc:
-            partial_stdout = exc.stdout or ""
+            stdout, stderr = exc.stdout, exc.stderr
+            partial_stdout = stdout or ""
             if isinstance(partial_stdout, bytes):
                 partial_stdout = partial_stdout.decode("utf-8", errors="replace")
             attempt_events = _parse_events(partial_stdout)
             error = f"{type(exc).__name__}: {exc}"
+            attempt_record["outcome"] = "timed_out"
+            attempt_record["error"] = error
             verdict = None
         except Exception as exc:  # noqa: BLE001 - recorded, retried, reported
             error = f"{type(exc).__name__}: {exc}"
+            attempt_record["error"] = error
             verdict = None
         finally:
             events.extend(_tag_events(attempts, attempt_events))
+            retained_dir = report_dir / f"{package.name}.attempts" / workdir.name
+            retained_dir.mkdir(parents=True, exist_ok=True)
+            for stream, content in (("stdout", stdout), ("stderr", stderr)):
+                if content is not None:
+                    path = retained_dir / f"{stream}.txt"
+                    path.write_bytes(
+                        content if isinstance(content, bytes) else content.encode("utf-8")
+                    )
+                    attempt_record[f"{stream}_file"] = str(path)
+            # Inputs are already identified by the source hashes, image paths,
+            # and retained schema. Move generated artifacts rather than copying
+            # the entire workdir (and every drawing image) on each retry.
+            inputs = {Path(image) for image in attempt_record["images"]}
+            inputs.add(workdir / "schema.json")
+            for artifact in sorted(workdir.iterdir()):
+                if artifact in inputs:
+                    continue
+                artifact_dir = retained_dir / "artifacts"
+                artifact_dir.mkdir(exist_ok=True)
+                retained = artifact_dir / artifact.name
+                shutil.move(str(artifact), str(retained))
+                attempt_record["artifacts"].append(str(retained))
             shutil.rmtree(workdir, ignore_errors=True)
 
     _write_events(events_path, events)
@@ -661,6 +712,11 @@ def review_package(
         tool_events = count_codex_tool_events(events)
         inspection_proven = True
         extra = {}
+    extra["evidence"] = {
+        "effective_prompt": prompt,
+        "schema": schema_bytes.decode("utf-8"),
+        "attempts": attempt_records,
+    }
     blind = tool_events == 0 and inspection_proven
     review = Review(
         name=package.name,
@@ -797,6 +853,10 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--timeout", type=float, default=1800.0, help="seconds per package"
     )
     parser.add_argument("--report-dir", type=Path, default=REPORT_DIR)
+    parser.add_argument(
+        "--prompt-file", type=Path,
+        help="UTF-8 rubric override; package and blind-inspection instructions still apply",
+    )
     parser.add_argument("--index", action="store_true", help="only rebuild index.md")
     parser.add_argument(
         "--missing-ok",
@@ -852,6 +912,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             for package in packages
             if all(source.is_file() for source in package.sources)
         ]
+    prompt_text = (
+        args.prompt_file.read_text(encoding="utf-8")
+        if args.prompt_file is not None else None
+    )
 
     reviews: list[Review] = []
     with ThreadPoolExecutor(max_workers=max(1, args.jobs)) as pool:
@@ -865,6 +929,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 report_dir=report_dir,
                 retries=args.retries,
                 timeout_s=args.timeout,
+                prompt_text=prompt_text,
             ): package
             for package in packages
         }

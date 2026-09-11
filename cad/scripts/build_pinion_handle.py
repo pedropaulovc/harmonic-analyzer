@@ -1,23 +1,11 @@
 r"""Reproduction script: pinion turning handle (book ch. 25).
 
-The bright tee on the alignment pinion's front arbor (p. 67/68): the
-operator turns it to rotate all 20 engaged cylinder gears as one. PR7
-re-derivation from ``page002_img07`` (its own Ø6 cross rod = 10 px/mm):
-the grip is NOT a ball but a short fat CYLINDER (Ø23) with a slightly
-domed south cap; the cross-rod arms are near-symmetric 42/43 (the old
-+68 long arm was a p002 misread); and the hub is a BLIND TUBULAR CAP
-(OD 10.5, ID 8) swallowed over the arbor stub -- the stub is thicker
-steel now (Ø8, build_alignment_pinion), and the cap's dome-less north
-rim rides it.
+The current photo-derived geometry is a short Ø15 grip with a spherical crown
+and a 65 mm press-fit cross rod. The arbor axis is Z; the grip spans
+-GRIP_LEN/2..+GRIP_LEN/2, followed by WALL_T and the blind TUBE_LEN socket.
+The cross rod spans -ROD_DOWN..+ROD_UP along Y and remains a separate solid.
 
-Layout: arbor axis Z; the CROSS ROD plane is the part origin (z 0 --
-what the assembly's HANDLE_Z positions). Grip cylinder z -7..+7, domed
-cap (sagitta 2) proud of z -7; blind wall z +7..+9; tube annulus z
-+9..+19 (the Ø8 stub seats inside); cross rod along Y, arms -42..+43,
-built LAST so nothing crosses an axis.
-
-Volume gate (mm^3): grip + cap (spherical-cap formula) + wall + annulus
-- reamed body hole + separate pressed rod.
+Volume gate: grip + spherical cap + wall + annulus - body hole + pressed rod.
 
 Dimensions: cad/config/dimensions.yaml "Chapter 25".
 
@@ -56,7 +44,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_tolerance,
+    set_dimension_prefix,
 )
 from _fit_limits import deviations
 from _part_pmi import author_part_pmi
@@ -66,15 +54,11 @@ from pinion_handle_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     GRIP_DIA,
-    GRIP_LENGTH_TOLERANCE_MM,
     GRIP_LEN,
     ISOMETRIC_VIEW_NOTE,
     ROD_DIA,
     ROD_DOWN,
-    ROD_HOLE_REAM_BAND,
     ROD_HOLE_DIA,
-    ROD_PRESS_BAND,
-    ROD_SPAN_TOLERANCE_MM,
     ROD_UP,
     SURFACE_FINISHES,
     TUBE_ID,
@@ -99,7 +83,7 @@ _SAVED_DRAWING_PROPERTIES = (
 GRIP_R = GRIP_DIA / 2.0
 ROD_R = ROD_DIA / 2.0
 ROD_HOLE_R = ROD_HOLE_DIA / 2.0
-CAP_R = (GRIP_R**2 + CAP_SAG**2) / (2.0 * CAP_SAG)  # 34.06 crown sphere radius
+CAP_R = (GRIP_R**2 + CAP_SAG**2) / (2.0 * CAP_SAG)
 
 V_GRIP = math.pi * GRIP_R**2 * GRIP_LEN
 V_CAP = math.pi * CAP_SAG**2 * (3.0 * CAP_R - CAP_SAG) / 3.0  # 419.6
@@ -154,7 +138,7 @@ async def build(adapter) -> dict[str, str]:
 
     drive_jobs: list[tuple[str, str]] = []
 
-    # Grip cylinder z -7..+7 (on-axis circle: only the diameter is a dim).
+    # Cylindrical grip centered on the cross-rod plane.
     grip = SketchDims()
     check("create_sketch grip", await adapter.create_sketch("Front"))
     await define_circle(
@@ -246,8 +230,7 @@ async def build(adapter) -> dict[str, str]:
     expected += V_CAP
     await volume_check(adapter, "cap", expected, 0.03 * V_CAP)
 
-    # Blind wall disc (z +7..+9) then the tube annulus (z +9..+19): the cap
-    # hub the Ø8 arbor stub seats into.
+    # Blind wall followed by the annular socket over the arbor stub.
     wall = SketchDims()
     check("create_sketch wall", await adapter.create_sketch("Front"))
     await define_circle(
@@ -375,18 +358,9 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "TubeProfile", "TubeId", *deviations(TUBE_ID_BAND)
     )
-    set_dimension_symmetric_tolerance(
-        adapter, "Grip", "GripLen", GRIP_LENGTH_TOLERANCE_MM
-    )
+    set_dimension_prefix(adapter, "CapProfile", "CapR", "SR")
     set_dimension_bilateral_tolerance(
         adapter, "Tube", "TubeLen", *deviations(TUBE_LENGTH_BAND)
-    )
-    set_dimension_bilateral_tolerance(
-        adapter, "RodProfile", "RodDia", *deviations(ROD_PRESS_BAND)
-    )
-    set_dimension_symmetric_tolerance(adapter, "Rod", "RodSpan", ROD_SPAN_TOLERANCE_MM)
-    set_dimension_bilateral_tolerance(
-        adapter, "RodHoleProfile", "RodHoleDia", *deviations(ROD_HOLE_REAM_BAND)
     )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
