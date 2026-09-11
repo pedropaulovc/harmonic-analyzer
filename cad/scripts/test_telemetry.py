@@ -545,6 +545,7 @@ def test_signal_protocol_selects_its_own_local_collector_port(monkeypatch):
 
 
 def test_empty_signal_endpoint_disables_only_that_signal(monkeypatch):
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_PROTOCOL", "http/protobuf")
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://collector:4318")
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "")
     monkeypatch.delenv("OTEL_EXPORTER_OTLP_LOGS_ENDPOINT", raising=False)
