@@ -86,7 +86,7 @@ def _front_y(model_y: float) -> float:
 FRONT_KEEP = {
     "Width": (FRONT_CENTER[0], _front_y(0.0) - 0.025),
     "FootHt": (FRONT_CENTER[0] - 0.030, _front_y(FOOT_HEIGHT / 2.0)),
-    "BoreDia": (FRONT_CENTER[0] + 0.065, _front_y(BORE_HEIGHT) - 0.004),
+    "BoreDia": (FRONT_CENTER[0] + 0.065, _front_y(BORE_HEIGHT) - 0.025),
 }
 TOP_KEEP = {
     "Depth": (TOP_CENTER[0] - 0.070, TOP_CENTER[1] - 0.010),
@@ -405,11 +405,15 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         front,
-        symbol_xy=(0.095, _front_y(BORE_HEIGHT) + 0.024),
+        symbol_xy=(FRONT_CENTER[0], _front_y(BORE_HEIGHT) - 0.025),
         control=surface_finish_by_key(SURFACE_FINISHES, "arbor_bore"),
         label="arbor bore finish",
         char_height=0.0025,
         entity=bore_entity,
+        leader_attach_xy=(
+            FRONT_CENTER[0] - BORE_DIA * _S / (2.0 * 2.0**0.5),
+            _front_y(BORE_HEIGHT) - BORE_DIA * _S / (2.0 * 2.0**0.5),
+        ),
     )
     # Keep the finish leader below the seat, inside the width extension lines
     # and above the lowered width dimension.
