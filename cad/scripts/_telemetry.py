@@ -218,20 +218,19 @@ def _resolve_otlp_endpoint(
     env = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
     if env is not None:
         return _signal_otlp_endpoint(env, signal, protocol) if env else None
+    endpoints = _DEFAULT_OTLP_ENDPOINTS.get(protocol)
+    if endpoints is None:
+        _warn_otlp_processor(
+            signal.rstrip("s"),
+            protocol,
+            "unsupported protocol",
+            pending_warnings=pending_warnings,
+        )
+        return None
     if local_endpoints is not None and protocol in local_endpoints:
         endpoint = local_endpoints[protocol]
     else:
-        endpoints = _DEFAULT_OTLP_ENDPOINTS.get(protocol)
-        if endpoints is None:
-            _warn_otlp_processor(
-                signal.rstrip("s"),
-                protocol,
-                "unsupported protocol",
-                pending_warnings=pending_warnings,
-            )
-            endpoint = None
-        else:
-            endpoint = next((e for e in endpoints if _endpoint_listening(e)), None)
+        endpoint = next((e for e in endpoints if _endpoint_listening(e)), None)
         if local_endpoints is not None:
             local_endpoints[protocol] = endpoint
     if endpoint is None:

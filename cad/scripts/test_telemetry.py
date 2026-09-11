@@ -418,6 +418,7 @@ def test_empty_signal_protocol_falls_back_to_global_transport(monkeypatch):
 
 
 def test_unsupported_otlp_protocol_warns_in_production_console(monkeypatch, capsys):
+    monkeypatch.delenv("HARMONIC_VERBOSITY", raising=False)
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_PROTOCOL", "http/json")
     for name in (
         "OTEL_EXPORTER_OTLP_ENDPOINT",
@@ -433,12 +434,15 @@ def test_unsupported_otlp_protocol_warns_in_production_console(monkeypatch, caps
         assert "!!" in console
         assert "unsupported protocol" in console
         assert "http/json" in console
+        assert "OTLP trace export is disabled" in console
+        assert "OTLP log export is disabled" in console
     finally:
         monkeypatch.undo()
         _telemetry.configure(force=True)
 
 
 def test_missing_otlp_exporter_warns_in_production_console(monkeypatch, capsys):
+    monkeypatch.delenv("HARMONIC_VERBOSITY", raising=False)
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc")
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "http://collector:4317")
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_LOGS_ENDPOINT", "")
