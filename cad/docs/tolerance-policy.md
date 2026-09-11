@@ -11,6 +11,11 @@ Fit classes and clearances live in [`cad/config/tolerances.yaml`](../cad/config/
 and flow into geometry and into part custom properties. The build scripts read named fit
 classes; they do not hardcode clearance numbers.
 
+The whole-device performance benchmark that constrains this allocation is
+[`michelson-1898-trial-accuracy.md`](./michelson-1898-trial-accuracy.md): approximately
+0.7% full-scale mean absolute coefficient error and 2% maximum published coefficient error.
+Those are assembled-machine output errors, not percentages to apply directly to part dimensions.
+
 ## Fit classes (interfaces that must carry a rule)
 
 | Interface | Class | Intent |
