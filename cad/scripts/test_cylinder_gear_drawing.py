@@ -7,6 +7,7 @@ from pathlib import Path
 
 import build_cylinder_gear as part
 import cylinder_gear_spec as spec
+import cylinder_gear_shaft_spec as shaft_spec
 import draw_cylinder_gear as drawing
 from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
@@ -27,7 +28,7 @@ def test_required_paths_and_explicit_sheet_orientation() -> None:
 def test_spec_is_the_single_source_of_native_drawing_dimensions() -> None:
     assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) | set(drawing.BACK_KEEP)
+    kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
     assert kept == marked == {
         "BoreDia",
         "CamDia",
@@ -90,8 +91,8 @@ def test_dimension_precision_matches_functional_tolerance() -> None:
 
 
 def test_projected_views_remain_aligned() -> None:
-    assert drawing.FRONT_CENTER[1] == drawing.RIGHT_CENTER[1] == drawing.BACK_CENTER[1]
-    assert drawing.FRONT_CENTER[0] < drawing.RIGHT_CENTER[0] < drawing.BACK_CENTER[0]
+    assert drawing.FRONT_CENTER[1] == drawing.RIGHT_CENTER[1]
+    assert drawing.FRONT_CENTER[0] < drawing.RIGHT_CENTER[0]
     assert drawing.ISO_CENTER[1] < drawing.FRONT_CENTER[1]
 
 
@@ -111,12 +112,12 @@ def test_only_functional_running_surfaces_receive_roughness() -> None:
 def test_short_notes_only_define_phase_tooth_data_and_set_consistency() -> None:
     notes = spec.DRAWING_NOTES
     lines = notes.splitlines()
-    assert 1 <= len(lines) <= 4
-    assert "TOOTH FORM PER GEAR DATA." in lines
+    assert len(lines) == 2
     assert "FIRST TOOTH ROOT CCW FROM CAM LOBE" in notes
+    assert "VIEWED FROM CAM FACE" in notes
     assert f"{spec.SET_ECCENTRICITY_RANGE_MM:.3f} MAX" in notes
     assert 2.0 * spec.ECCENTRICITY_TOLERANCE_MM > spec.SET_ECCENTRICITY_RANGE_MM
-    assert "ACROSS THE SET" in notes
+    assert "ALL 20 MHA-027 GEARS IN ONE ANALYZER" in notes
     for redundant in (
         "DATUM",
         "BASIC",
@@ -146,6 +147,16 @@ def test_notch_geometry_matches_first_root_counterclockwise_phase() -> None:
     )
     assert math.isclose(spec.NOTCH_CENTER_X, expected_x, abs_tol=1e-12)
     assert spec.NOTCH_CENTER_X < 0.0
+
+
+def test_running_bore_fit_matches_the_stationary_arbor() -> None:
+    bore_max = spec.BORE_DIA + spec.BORE_DIA_BAND[0]
+    bore_min = spec.BORE_DIA + spec.BORE_DIA_BAND[1]
+    shaft_max = shaft_spec.SHAFT_DIA + shaft_spec.SHAFT_DIA_BAND[0]
+    shaft_min = shaft_spec.SHAFT_DIA + shaft_spec.SHAFT_DIA_BAND[1]
+    assert math.isclose(bore_min - shaft_max, 0.030, abs_tol=1e-12)
+    assert math.isclose(bore_max - shaft_min, 0.070, abs_tol=1e-12)
+    assert drawing.DIMENSION_CALLOUTS["BoreDia"] == "FINISH BORE THRU"
 
 
 def test_title_block_owns_material_finish_and_general_tolerance() -> None:

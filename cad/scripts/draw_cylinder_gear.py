@@ -1,9 +1,9 @@
 r"""Create the simplicity-policy manufacturing drawing for the cylinder gear.
 
-The portrait sheet uses one aligned third-angle row: the gear-side front view
-shows the phase notch, the right view shows the axial stack, and the cam-side
-back view exposes the eccentric follower disc.  A standard isometric supplies
-pictorial clarity without replacing those manufacturing views.
+The portrait sheet uses one aligned third-angle row: the cam-side front view
+shows the eccentric follower, bore and phase notch, while the right view shows
+the axial stack.  A standard isometric supplies pictorial clarity without
+replacing those manufacturing views.
 """
 
 from __future__ import annotations
@@ -58,35 +58,29 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 # Portrait makes the 62.2 mm gear materially larger than the old landscape
-# 1:1 layout.  Front -> right -> back is an aligned third-angle row; the back
-# view is necessary because the cam is completely hidden behind the gear in
-# the front view and dimensions must never attach to hidden lines.
+# 1:1 layout.  The cam-side front view exposes every radial feature, so a
+# redundant opposite face view would only consume the exterior dimension lanes.
 SHEET_SCALE = (3.0, 2.0)
 VIEW_SCALE = (3, 2)
-FRONT_CENTER = (0.070, 0.270)
-RIGHT_CENTER = (0.140, 0.270)
-BACK_CENTER = (0.210, 0.270)
+FRONT_CENTER = (0.105, 0.270)
+RIGHT_CENTER = (0.205, 0.270)
 ISO_CENTER = (0.165, 0.145)
 GEAR_DATA_POS = (0.015, 0.410)
 MANUFACTURING_NOTES_POS = (0.015, 0.105)
 
 FRONT_KEEP = {
-    "BoreDia": (0.025, 0.235),
-    "NotchWidth": (0.070, 0.335),
-    "NotchDepth": (0.018, 0.320),
+    "BoreDia": (0.045, 0.210),
+    "NotchWidth": (0.105, 0.340),
+    "NotchDepth": (0.050, 0.325),
+    "CamDia": (0.175, 0.325),
+    "CamCy": (0.160, 0.260),
 }
 RIGHT_KEEP = {
-    "FaceWidth": (0.140, 0.220),
-    "CamThickness": (0.140, 0.345),
-}
-BACK_KEEP = {
-    "CamDia": (0.210, 0.340),
-    # The eccentricity lies between two internal centres; keeping its text in
-    # the open centre of the cam is clearer than a long leader through teeth.
-    "CamCy": (0.183, 0.278),
+    "FaceWidth": (0.205, 0.220),
+    "CamThickness": (0.205, 0.345),
 }
 DIMENSION_CALLOUTS = {
-    "BoreDia": "REAM THRU",
+    "BoreDia": "FINISH BORE THRU",
     "NotchWidth": "ALIGNMENT NOTCH",
 }
 DIMENSION_PRECISION = {
@@ -199,12 +193,11 @@ async def build(adapter: Any) -> dict[str, str]:
     right = place_view(
         adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=VIEW_SCALE
     )
-    back = place_view(adapter, str(SOURCE), "*Back", *BACK_CENTER, scale=VIEW_SCALE)
     iso = place_view(
         adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE
     )
     set_hidden_lines_removed(adapter, iso)
-    for view in (front, right, back):
+    for view in (front, right):
         set_hidden_lines_visible(adapter, view)
 
     front_annotations = curate_view_dimensions(
@@ -213,16 +206,12 @@ async def build(adapter: Any) -> dict[str, str]:
     right_annotations = curate_view_dimensions(
         adapter, right, keep=RIGHT_KEEP, view_label="right"
     )
-    back_annotations = curate_view_dimensions(
-        adapter, back, keep=BACK_KEEP, view_label="back"
-    )
-    annotations = [*front_annotations, *right_annotations, *back_annotations]
+    annotations = [*front_annotations, *right_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     set_dimension_precision(adapter, annotations, DIMENSION_PRECISION)
 
-    for view, label in ((front, "gear-side front"), (back, "cam-side back")):
-        if not auto_center_marks(adapter, view, holes=True, size=0.0025):
-            raise RuntimeError(f"failed to add ASME center marks to {label} view")
+    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
+        raise RuntimeError("failed to add ASME center marks to cam-side front view")
 
     # Face width and cam width remain the two authoritative axial dimensions.
     # The policy also requires a conspicuous overall length, so show the measured
@@ -245,7 +234,7 @@ async def build(adapter: Any) -> dict[str, str]:
             (0.0, overall_pick_y, OVERALL_THICKNESS),
             label="overall cam rear edge",
         ),
-        text_xy=(RIGHT_CENTER[0], 0.200),
+        text_xy=(RIGHT_CENTER[0] + 0.020, 0.200),
         label="overall axial thickness",
         expected_mm=OVERALL_THICKNESS,
         precision=1,
@@ -259,7 +248,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         front,
-        symbol_xy=(0.030, 0.205),
+        symbol_xy=(0.110, 0.200),
         control=surface_finish_by_key(SURFACE_FINISHES, "cylinder_gear_bore"),
         label="cylinder gear bore finish",
         entity=bore_edge,
@@ -281,7 +270,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         right,
         edge_xy=cam_flank,
-        symbol_xy=(cam_flank[0] + 0.010, 0.335),
+        symbol_xy=(0.220, 0.310),
         control=surface_finish_by_key(SURFACE_FINISHES, "cam_follower"),
         label="cam follower finish",
         entity_type="SILHOUETTE",
