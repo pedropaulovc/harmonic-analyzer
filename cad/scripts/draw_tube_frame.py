@@ -7,9 +7,9 @@ import, curation, and export behavior lives in ``_drawing_common``.
 The tube axis runs along +Y, so the length view is the ``*Front`` orientation
 (tube vertical) and the annulus end view is ``*Top``.  The portrait sheet uses
 the long axis for the ~994 mm overall column at 1:5; the end view carries an
-explicit 2:1 override so the Ø25.4/Ø19.3 annulus is legible.  A plain polished
-tube with a domed top is fully described by the length view + annulus end view
-+ notes, so no isometric is drawn.
+explicit 2:1 override so the 25.4/19.3 mm annulus is legible. The standard
+1:10 isometric is pictorial only; the length and annulus views still define
+the part.
 
 Run with SolidWorks open::
 
@@ -62,12 +62,14 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 5.0)  # 1:5 whole sheet (~990 mm column)
 END_VIEW_SCALE = 2.0
+ISO_VIEW_SCALE = (1, 10)
 
-# Sheet layout (meters).  The length view (tube vertical) hugs the far left,
-# full sheet height; the annulus end view sits upper-right at 2:1.  The notes
-# fill the clear mid band to the RIGHT of the thin tube (so they never cross it).
+# Sheet layout (meters). The length view hugs the far left; the annulus end
+# view sits upper-right; notes fill the clear middle band. The isometric fits
+# in the lower-right field between the notes and title block.
 LENGTH_CENTER = (0.055, 0.220)
 END_CENTER = (0.190, 0.360)
+ISO_CENTER = (0.205, 0.140)
 
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
 # position (meters).  Diameters live on the end view, the length on the tube view.
@@ -98,6 +100,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Manufacturing Notes",
             "End View Note",
+            "Isometric View Note",
             "Length View Note",
         ),
         required=(
@@ -107,6 +110,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Manufacturing Notes",
             "End View Note",
+            "Isometric View Note",
             "Length View Note",
         ),
     )
@@ -126,7 +130,11 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     length = place_view(adapter, str(SOURCE), "*Front", *LENGTH_CENTER, scale=(1, 5))
     end = place_view(adapter, str(SOURCE), "*Top", *END_CENTER, scale=(2, 1))
-    set_hidden_lines_removed(adapter, end)
+    iso = place_view(
+        adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_VIEW_SCALE
+    )
+    for view in (end, iso):
+        set_hidden_lines_removed(adapter, view)
     # The length view carries the bore as greyed hidden lines, so the wall shows.
     set_hidden_lines_visible(adapter, length)
 
@@ -182,6 +190,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, "Manufacturing Notes", 0.115, 0.225, char_height=0.0025
     )
     add_property_linked_note(adapter, "End View Note", 0.155, 0.318)
+    add_property_linked_note(adapter, "Isometric View Note", 0.170, 0.085)
     add_property_linked_note(adapter, "Length View Note", 0.020, 0.083)
 
     return await finalize_drawing(

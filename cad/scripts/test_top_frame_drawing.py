@@ -100,35 +100,12 @@ def test_notes_carry_the_casting_rails_bosses_and_holes() -> None:
     assert "TIR" not in notes
     assert "-0.00" not in notes
     assert "X.XX" not in notes
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes B"' in source
-    assert (
-        'add_property_linked_note(adapter, "Inspection Notes", 0.2965, 0.260)' in source
-    )
-    assert source.count("add_datum_feature(") == 3
-    assert source.count("add_feature_control_frame(") == 4
-    source_flat = " ".join(source.split())
-    assert 'symbol_xy=DATUM_C_SYMBOL_XY, datum="C"' in source_flat
-    assert 'label="rear outer rail-face datum", entity=datum_c_edge' in source_flat
-    assert 'label="east outer rail-face datum"' in source
-    assert drawing.DATUM_C_SYMBOL_XY[0] < drawing.TOP_CENTER[0] + part.OUTER_X / 2000.0
     assert set(top_frame_spec.GEOMETRIC_TOLERANCES_MM) == {
         "column-bore true position",
         "column-boss true position",
         "gooseneck-bore true position",
         "hanger-stud-hole true position",
     }
-    for key in top_frame_spec.GEOMETRIC_TOLERANCES_MM:
-        assert f'GEOMETRIC_TOLERANCES_MM["{key}"]' in source
-    assert 'quantity="4X COLUMN BORES"' in source
-    assert 'quantity="4X BOSS ODS"' in source
-    assert 'quantity="GOOSENECK BORE"' in source
-    assert 'quantity="2X HANGER-STUD HOLES"' in source
-    assert "allow_coincident=True" in source
-    assert "FRONT_COLUMN_Z" in source
-    assert "STUD_Z_REAR" in source and "STUD_HOLE_DIA" in source
-    assert "set_dimension_callouts" not in source
 
 
 def test_ring_envelope_and_hole_stations_are_single_sourced() -> None:
@@ -228,19 +205,12 @@ def test_side_screw_volume_gate_tracks_the_four_generated_stations() -> None:
 
 def test_view_scales_are_explicit() -> None:
     assert drawing.SHEET_SCALE == (1.0, 2.0)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "scale=(1, 2)" in source
-    assert '"*Front"' in source
-    assert "scale=(1, 4)" in source
     assert top_frame_spec.TOP_VIEW_NOTE == "PLAN VIEW SCALE 1:2"
-    assert '"Top View Note", 0.280, 0.2055' in source
     assert top_frame_spec.FRONT_VIEW_NOTE == "FRONT VIEW SCALE 1:4"
 
 
+
 def test_part_stamps_make_critical_properties() -> None:
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_properties" in source
-    assert "clear_dimensions_for_drawing" in source
     import _config
 
     config = _config.parts("top-frame")

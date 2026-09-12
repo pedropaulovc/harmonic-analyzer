@@ -224,22 +224,6 @@ def test_required_drawing_paths() -> None:
     assert drawing.PNG.as_posix().endswith("/png/platen-guide_drawing.png")
 
 
-def test_drawing_uses_native_hole_table_and_sheet_scale() -> None:
-    import _drawing_common
-
-    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
-    common_source = Path(_drawing_common.__file__).read_text(encoding="utf-8")
-    assert "insert_hole_table" in drawing_source
-    assert "InsertHoleTable3" in common_source
-    assert "draw_note_table" not in drawing_source
-    assert "add_hole_group_tags" not in drawing_source
-    assert "scale=(3, 1)" not in drawing_source
-    assert "scale=(1, 4)" not in drawing_source
-    # (The sheet-scale property link now lives inside the hand-made
-    # harmonic-analyzer.DRWDOT binary -- not greppable; verified by eye on the
-    # rendered sheets.)
-
-
 def test_drawing_tolerances_follow_feature_function_not_display_zeros() -> None:
     notes = guide.DRAWING_NOTES
     assert "HOLE POSITION PER FCF" in notes

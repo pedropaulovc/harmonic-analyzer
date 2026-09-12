@@ -12,6 +12,7 @@ log<->trace correlation, and cross-process trace-context propagation.
 from __future__ import annotations
 
 import asyncio
+import builtins
 import json
 import logging
 import os
@@ -34,7 +35,65 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import _telemetry  # noqa: E402
+_OTLP_ENV_NAMES = (
+    "OTEL_EXPORTER_OTLP_ENDPOINT",
+    "OTEL_EXPORTER_OTLP_PROTOCOL",
+    "OTEL_EXPORTER_OTLP_TIMEOUT",
+    "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+    "OTEL_EXPORTER_OTLP_TRACES_PROTOCOL",
+    "OTEL_EXPORTER_OTLP_TRACES_TIMEOUT",
+    "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT",
+    "OTEL_EXPORTER_OTLP_LOGS_PROTOCOL",
+    "OTEL_EXPORTER_OTLP_LOGS_TIMEOUT",
+)
+_original_otlp_environment = {name: os.environ.get(name) for name in _OTLP_ENV_NAMES}
+try:
+    for _name in _OTLP_ENV_NAMES:
+        os.environ.pop(_name, None)
+    os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = ""
+    import _telemetry  # noqa: E402
+finally:
+    for _name in _OTLP_ENV_NAMES:
+        os.environ.pop(_name, None)
+    os.environ.update(
+        {
+            name: value
+            for name, value in _original_otlp_environment.items()
+            if value is not None
+        }
+    )
+
+
+def _log_exporter(processor):
+    """Return the exporter across supported OTel batch-processor layouts."""
+    batch_processor = getattr(processor, "_batch_processor", None)
+    if batch_processor is not None:
+        return batch_processor._exporter
+    return processor._exporter
+
+
+@pytest.fixture(autouse=True)
+def deterministic_otlp_environment(monkeypatch):
+    """Keep every test offline, then restore a clean provider and caller env."""
+    for name in _OTLP_ENV_NAMES:
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+    yield
+
+    monkeypatch.undo()
+    _telemetry.shutdown()
+    restored = {name: os.environ.get(name) for name in _OTLP_ENV_NAMES}
+    try:
+        for name in _OTLP_ENV_NAMES:
+            os.environ.pop(name, None)
+        os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = ""
+        _telemetry.configure(force=True)
+    finally:
+        for name in _OTLP_ENV_NAMES:
+            os.environ.pop(name, None)
+        os.environ.update(
+            {name: value for name, value in restored.items() if value is not None}
+        )
 
 
 @pytest.fixture
@@ -82,32 +141,29 @@ def test_logs_split_into_severity_levels(capture):
 
 def test_console_verbosity_configures_handler_and_spans(monkeypatch):
     logger = logging.getLogger(_telemetry._LOGGER_NAME)
-    monkeypatch.setattr(_telemetry, "_resolve_otlp_endpoint", lambda: None)
+    monkeypatch.setattr(
+        _telemetry, "_resolve_otlp_endpoint", lambda signal, **kwargs: None
+    )
     monkeypatch.setattr(_telemetry, "_telemetry_dir", lambda: None)
-    original = os.environ.get("HARMONIC_VERBOSITY")
 
     def console_handlers():
-        return [handler for handler in logger.handlers if isinstance(handler, logging.StreamHandler)]
+        return [
+            handler
+            for handler in logger.handlers
+            if isinstance(handler, logging.StreamHandler)
+        ]
 
-    try:
-        os.environ.pop("HARMONIC_VERBOSITY", None)
-        _telemetry.configure(force=True)
-        (handler,) = console_handlers()
-        assert handler.level == logging.WARNING
-        assert _telemetry._span_processors == []
+    monkeypatch.delenv("HARMONIC_VERBOSITY", raising=False)
+    _telemetry.configure(force=True)
+    (handler,) = console_handlers()
+    assert handler.level == logging.WARNING
+    assert _telemetry._span_processors == []
 
-        os.environ["HARMONIC_VERBOSITY"] = "success"
-        _telemetry.configure(force=True)
-        (handler,) = console_handlers()
-        assert handler.level == _telemetry.SUCCESS
-        assert _telemetry._span_processors == []
-    finally:
-        if original is None:
-            os.environ.pop("HARMONIC_VERBOSITY", None)
-        else:
-            os.environ["HARMONIC_VERBOSITY"] = original
-        monkeypatch.undo()
-        _telemetry.configure(force=True)
+    monkeypatch.setenv("HARMONIC_VERBOSITY", "success")
+    _telemetry.configure(force=True)
+    (handler,) = console_handlers()
+    assert handler.level == _telemetry.SUCCESS
+    assert _telemetry._span_processors == []
 
 
 def test_span_records_exception_and_sets_error_status(capture):
@@ -370,31 +426,280 @@ def test_otlp_export_is_batched_off_the_critical_path():
     assert simple, "console/file capture must stay on Simple processors"
 
 
-def test_default_otlp_endpoint_is_a_literal_address_never_localhost(monkeypatch):
-    """Measured: the first OTLP POST to ``localhost`` cost 2.05 s vs 0.003 s to
-    ``127.0.0.1`` -- Windows tries ``::1`` first and the dashboard is IPv4, so every
-    process ate a failed connect (per process, holding the seat). Defaults are literal
-    addresses, IPv4 first, with the v6 loopback as a fallback so a v6-only dashboard
-    still exports."""
+@pytest.mark.parametrize(
+    ("protocol", "module_fragment"),
+    [
+        ("http/protobuf", ".proto.http."),
+        ("grpc", ".proto.grpc."),
+    ],
+)
+def test_otlp_export_honors_standard_transport_env(
+    monkeypatch, protocol, module_fragment
+):
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_PROTOCOL", protocol)
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_TRACES_PROTOCOL", protocol)
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_LOGS_PROTOCOL", protocol)
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "http://127.0.0.1:4317")
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_LOGS_ENDPOINT", "http://127.0.0.1:4318")
+    span_processor = _telemetry._otlp_span_processor()
+    log_processor = _telemetry._otlp_log_processor()
+    processors = (span_processor, log_processor)
+    try:
+        assert span_processor is not None
+        assert log_processor is not None
+        exporters = [
+            span_processor.span_exporter,
+            _log_exporter(log_processor),
+        ]
+        assert all(
+            module_fragment in type(exporter).__module__ for exporter in exporters
+        )
+    finally:
+        for processor in processors:
+            if processor is not None:
+                processor.shutdown()
+
+
+@pytest.mark.parametrize("signal", ("traces", "logs"))
+def test_otlp_export_honors_signal_specific_timeout(monkeypatch, signal):
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc")
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_TIMEOUT", "30000")
+    monkeypatch.setenv(f"OTEL_EXPORTER_OTLP_{signal.upper()}_TIMEOUT", "17000")
+    monkeypatch.setenv(
+        f"OTEL_EXPORTER_OTLP_{signal.upper()}_ENDPOINT", "http://127.0.0.1:4317"
+    )
+
+    if signal == "traces":
+        processor = _telemetry._otlp_span_processor()
+        exporter = processor.span_exporter
+    else:
+        processor = _telemetry._otlp_log_processor()
+        exporter = _log_exporter(processor)
+    try:
+        assert exporter._timeout == 17.0
+    finally:
+        processor.shutdown()
+
+
+def test_empty_signal_protocol_falls_back_to_global_transport(monkeypatch):
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc")
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_TRACES_PROTOCOL", "")
+
+    assert _telemetry._otlp_protocol("traces") == "grpc"
+
+
+def test_unsupported_otlp_protocol_warns_in_production_console(monkeypatch, capsys):
+    monkeypatch.delenv("HARMONIC_VERBOSITY", raising=False)
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_PROTOCOL", "http/json")
+    for name in (
+        "OTEL_EXPORTER_OTLP_ENDPOINT",
+        "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+        "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(_telemetry, "_telemetry_dir", lambda: None)
+
+    _telemetry.configure(force=True)
+    console = capsys.readouterr().err
+    assert "!!" in console
+    assert "unsupported protocol" in console
+    assert "http/json" in console
+    assert "OTLP trace export is disabled" in console
+    assert "OTLP log export is disabled" in console
+
+
+def test_missing_otlp_exporter_warns_in_production_console(monkeypatch, capsys):
+    monkeypatch.delenv("HARMONIC_VERBOSITY", raising=False)
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc")
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "http://collector:4317")
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_LOGS_ENDPOINT", "")
+    monkeypatch.setattr(_telemetry, "_telemetry_dir", lambda: None)
+    original_import = builtins.__import__
+
+    def import_without_grpc_trace(name, *args, **kwargs):
+        if name == "opentelemetry.exporter.otlp.proto.grpc.trace_exporter":
+            raise ImportError("simulated missing gRPC exporter")
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", import_without_grpc_trace)
+    _telemetry.configure(force=True)
+    console = capsys.readouterr().err
+    assert "!!" in console
+    assert "simulated missing gRPC exporter" in console
+
+
+@pytest.mark.parametrize(
+    ("protocol", "port", "path"),
+    [("http/protobuf", 18890, "/v1/traces"), ("grpc", 18889, "")],
+)
+def test_default_otlp_endpoint_matches_transport_and_uses_literal_address(
+    monkeypatch, protocol, port, path
+):
+    """The local collector exposes separate HTTP and gRPC ports. Probe the port
+    for the selected transport without paying Windows' slow localhost fallback."""
     monkeypatch.delenv("OTEL_EXPORTER_OTLP_ENDPOINT", raising=False)
-    assert not any("localhost" in e for e in _telemetry._DEFAULT_OTLP_ENDPOINTS)
+    monkeypatch.delenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", raising=False)
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_PROTOCOL", protocol)
+    assert not any(
+        "localhost" in endpoint
+        for endpoints in _telemetry._DEFAULT_OTLP_ENDPOINTS.values()
+        for endpoint in endpoints
+    )
 
     monkeypatch.setattr(_telemetry, "_endpoint_listening", lambda e, timeout=0.15: True)
-    assert _telemetry._resolve_otlp_endpoint() == "http://127.0.0.1:18890"
+    assert (
+        _telemetry._resolve_otlp_endpoint("traces") == f"http://127.0.0.1:{port}{path}"
+    )
 
     v6_only = lambda e, timeout=0.15: e.startswith("http://[::1]")  # noqa: E731
     monkeypatch.setattr(_telemetry, "_endpoint_listening", v6_only)
-    assert _telemetry._resolve_otlp_endpoint() == "http://[::1]:18890"
+    assert _telemetry._resolve_otlp_endpoint("traces") == f"http://[::1]:{port}{path}"
 
     monkeypatch.setattr(
         _telemetry, "_endpoint_listening", lambda e, timeout=0.15: False
     )
-    assert _telemetry._resolve_otlp_endpoint() is None, (
-        "nothing listening: export nowhere"
+    assert _telemetry._resolve_otlp_endpoint("traces") is None
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://collector:4318")
+    global_endpoint = "http://collector:4318"
+    if protocol == "http/protobuf":
+        global_endpoint += "/v1/traces"
+    assert _telemetry._resolve_otlp_endpoint("traces") == global_endpoint
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "http://traces:4317")
+    assert _telemetry._resolve_otlp_endpoint("traces") == "http://traces:4317"
+
+
+def test_schemeless_local_grpc_endpoint_is_normalized(monkeypatch):
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc")
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "127.0.0.1:4317")
+    monkeypatch.setattr(
+        _telemetry, "_endpoint_listening", lambda endpoint, timeout=0.15: True
     )
 
+    assert _telemetry._resolve_otlp_endpoint("traces") == "http://127.0.0.1:4317"
+
+
+@pytest.mark.parametrize(
+    "endpoint",
+    (
+        "http://localhost:4317",
+        "http://127.0.0.2:4317",
+        "http://0.0.0.0:4317",
+        "http://[::ffff:127.0.0.1]:4317",
+    ),
+)
+def test_explicit_local_grpc_endpoint_is_probed(monkeypatch, endpoint):
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc")
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", endpoint)
+    monkeypatch.setattr(
+        _telemetry, "_endpoint_listening", lambda endpoint, timeout=0.15: False
+    )
+    pending = []
+
+    assert _telemetry._resolve_otlp_endpoint("traces", pending_warnings=pending) is None
+    assert pending[0][:2] == ("trace", "grpc")
+    assert "local endpoint is unavailable" in pending[0][2]
+
+
+def test_schemeless_remote_grpc_endpoint_keeps_stock_secure_target(monkeypatch):
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc")
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "collector:4317")
+    pending = []
+
+    assert (
+        _telemetry._resolve_otlp_endpoint("traces", pending_warnings=pending)
+        == "collector:4317"
+    )
+    assert pending == []
+
+
+def test_configure_pins_endpoint_protocol_pair(monkeypatch):
+    for name in (
+        "OTEL_EXPORTER_OTLP_ENDPOINT",
+        "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+        "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT",
+        "OTEL_EXPORTER_OTLP_TRACES_PROTOCOL",
+        "OTEL_EXPORTER_OTLP_LOGS_PROTOCOL",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc")
+    monkeypatch.setattr(
+        _telemetry, "_endpoint_listening", lambda endpoint, timeout=0.15: True
+    )
+    monkeypatch.setattr(_telemetry, "_telemetry_dir", lambda: None)
+    monkeypatch.setattr(_telemetry, "_otlp_span_processor", lambda **kwargs: None)
+    monkeypatch.setattr(_telemetry, "_otlp_log_processor", lambda **kwargs: None)
+
+    _telemetry.configure(console=False, force=True)
+    assert os.environ["OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"] == (
+        "http://127.0.0.1:18889"
+    )
+    assert os.environ["OTEL_EXPORTER_OTLP_LOGS_ENDPOINT"] == ("http://127.0.0.1:18889")
+    assert os.environ["OTEL_EXPORTER_OTLP_TRACES_PROTOCOL"] == "grpc"
+    assert os.environ["OTEL_EXPORTER_OTLP_LOGS_PROTOCOL"] == "grpc"
+
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_PROTOCOL", "http/protobuf")
+    assert _telemetry._otlp_protocol("traces") == "grpc"
+    assert _telemetry._resolve_otlp_endpoint("traces") == "http://127.0.0.1:18889"
+
+
+def test_configure_rewrites_signal_endpoint_to_normalized_value(monkeypatch):
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc")
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "127.0.0.1:4317")
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_LOGS_ENDPOINT", "")
+    monkeypatch.setattr(
+        _telemetry, "_endpoint_listening", lambda endpoint, timeout=0.15: True
+    )
+    monkeypatch.setattr(_telemetry, "_telemetry_dir", lambda: None)
+    monkeypatch.setattr(_telemetry, "_otlp_span_processor", lambda **kwargs: None)
+
+    _telemetry.configure(console=False, force=True)
+
+    assert os.environ["OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"] == ("http://127.0.0.1:4317")
+    assert os.environ["OTEL_EXPORTER_OTLP_TRACES_PROTOCOL"] == "grpc"
+
+
+def test_configure_probes_each_default_protocol_once(monkeypatch):
+    for name in (
+        "OTEL_EXPORTER_OTLP_ENDPOINT",
+        "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+        "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT",
+        "OTEL_EXPORTER_OTLP_TRACES_PROTOCOL",
+        "OTEL_EXPORTER_OTLP_LOGS_PROTOCOL",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_PROTOCOL", "http/protobuf")
+    monkeypatch.setattr(_telemetry, "_telemetry_dir", lambda: None)
+    probed = []
+
+    def unavailable(endpoint, timeout=0.15):
+        probed.append(endpoint)
+        return False
+
+    monkeypatch.setattr(_telemetry, "_endpoint_listening", unavailable)
+    _telemetry.configure(console=False, force=True)
+    assert probed == list(_telemetry._DEFAULT_OTLP_ENDPOINTS["http/protobuf"])
+
+
+def test_signal_protocol_selects_its_own_local_collector_port(monkeypatch):
+    monkeypatch.delenv("OTEL_EXPORTER_OTLP_ENDPOINT", raising=False)
+    monkeypatch.delenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", raising=False)
+    monkeypatch.delenv("OTEL_EXPORTER_OTLP_LOGS_ENDPOINT", raising=False)
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_PROTOCOL", "http/protobuf")
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_TRACES_PROTOCOL", "grpc")
+    monkeypatch.setattr(_telemetry, "_endpoint_listening", lambda e, timeout=0.15: True)
+
+    assert _telemetry._resolve_otlp_endpoint("traces") == "http://127.0.0.1:18889"
+    assert _telemetry._resolve_otlp_endpoint("logs") == "http://127.0.0.1:18890/v1/logs"
+
+
+def test_empty_signal_endpoint_disables_only_that_signal(monkeypatch):
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_PROTOCOL", "http/protobuf")
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://collector:4318")
-    assert _telemetry._resolve_otlp_endpoint() == "http://collector:4318", "env wins"
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "")
+    monkeypatch.delenv("OTEL_EXPORTER_OTLP_LOGS_ENDPOINT", raising=False)
+
+    assert _telemetry._resolve_otlp_endpoint("traces") is None
+    assert _telemetry._resolve_otlp_endpoint("logs") == "http://collector:4318/v1/logs"
 
 
 def test_event_records_span_event_on_current_span(capture):

@@ -77,6 +77,9 @@ DATUM_B_SYMBOL_X_M = FRONT_LEFT_X_M + (BLIND_X[2] + BLIND_X[3]) / 2000.0
 HOLE_TABLE_X_M = 0.020
 REAR_HOLE_TABLE_X_M = 0.205
 HOLE_TABLE_Y_M = 0.258
+ISO_CENTER = (0.375, 0.150)
+ISO_SCALE = (1, 4)
+ISO_NOTE_XY = (0.342, 0.128)
 THREAD_DESIGNATION = f"{TAPPED_HOLE_SPEC.size} UNC-{TAPPED_HOLE_SPEC.thread_class}"
 THREAD_MAJOR_DIA_MM = THREAD_MAJOR_MM[TAPPED_HOLE_SPEC.size]
 THREAD_PITCH_MM = 25.4 / int(TAPPED_HOLE_SPEC.size.rsplit("-", 1)[1])
@@ -154,6 +157,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Title",
             "Material Specification",
             "Finish",
+            "Isometric View Note",
             "Quantity",
             "Manufacturing Notes",
         ),
@@ -162,6 +166,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
+            "Isometric View Note",
             "Manufacturing Notes",
         ),
     )
@@ -186,10 +191,8 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, str(SOURCE), "*Back", FRONT_VIEW_X_M, BACK_VIEW_Y_M, scale=(1, 1)
     )
     right = place_view(adapter, str(SOURCE), "*Right", 0.370, 0.110, scale=(1, 1))
-    # The lock screws now enter blind receivers from the rear.  A rear
-    # orthographic view replaces the decorative isometric so both entry faces
-    # remain directly inspectable and selectable by their native hole tables.
-    for view in (front, back, right):
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
+    for view in (front, back, right, iso):
         set_hidden_lines_removed(adapter, view)
 
     thread_seeds, thread_instances = import_cosmetic_threads(adapter, front)
@@ -383,6 +386,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # bound is the 12.7 mm zone margin (~0.0127), which the re-centred frame rule
     # now matches (~0.0126); 0.020 clears both, and the audit enforces it.
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)
+    add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     return await finalize_drawing(
         adapter,
