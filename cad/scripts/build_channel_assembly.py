@@ -5,7 +5,7 @@ output: connecting rods riding the integral cams, the rocker-arm seesaw
 bank on its pivot shaft, the amplitude bars running UP the spine, and the
 top-lever bank on its fulcrum shaft with the channel springs hanging from
 the lever tips, each caught at the plate by a little open hook fastener.
-128 components:
+7 * CHANNELS + 8 components (148 at 20 channels):
 
 Coordinates are machine frame (#151: crank at machine -X, output side -Z;
 the M6.8 mirror layer is gone).
@@ -27,6 +27,7 @@ the M6.8 mirror layer is gone).
 * rocker-arm x20, connecting-rod x20, amplitude-bar x20, channel-lever
   x20 (2026-09-02: the arms and levers carry INTEGRAL hubs whose faces
   set the station pitch -- the 19 + 19 spacer bushings are retired),
+  rod-pivot-pin x20 (plain installed peened pins locked to their rods),
   channel-spring-installed x20 (M6.4: the stretched in-machine spring --
   the free 32 mm part stays for the ch. 17 table-top inset),
   spring-hook x20 (the open J-hook fastener seating each spring's bottom
@@ -36,7 +37,7 @@ Default mechanism state (DIMENSIONS.md "Channel & top-frame layout"):
 cylinder-gear notches +Y (cosine alignment), integral cam lobes +Y (UP,
 the top of the stroke -- the ch14 end views show the 0-crank tip row
 dead level at the stroke top), rod rings concentric on the cams at the
-phased ``(RING_CENTER.x, RING_CENTER.y, z_j - 3.25)`` centres - the cam carries the gears'
+phased ``(RING_CENTER.x, RING_CENTER.y, z_j + CHANNEL_MID_DZ)`` centres - the cam carries the gears'
 +1.5 deg tooth-phase rotation. Everything downstream is SOLVED here, not
 hard-coded: the rod-pin point is the intersection of the r 127.58 lever
 circle about the pivot with the r ROD_C2C circle about the ring centre
@@ -50,7 +51,7 @@ re-derive rest pose); the spring's top eye hangs 3.37 below the
 lever spring hole so its ring threads the O4 hole without touching (margins
 asserted > 0.1); the bottom eye now sits just ABOVE the plate (no longer
 threading it) on the arm of a spring-hook fastener whose shank seats in the
-plate's O2.0 bore (at z_j + 0.8, on the spring axis, one arm-offset +X of the eye)
+plate's bore (at z_j + CHANNEL_MID_DZ, on the spring axis, one arm-offset +X of the eye)
 -- the plate itself (the summing-lever) lives in summing.SLDASM, checked at
 the top level.
 
@@ -58,25 +59,23 @@ Orientation notes: the amplitude bar is rotated 90 deg about its long
 axis (Ry(-90), machine frame) so its end slots and O2 top pin hole run
 across Z, straddling the 2.5 arm / 3.0 lever; the spring's end-hook ring
 lies perpendicular to the lever face. Channel
-stations: z_j = -64.0124 + 7.0565 j, arm/bar/lever mid-planes at z_j + 0.8,
-cam/rod plane z_j - 3.25 (rod tip strap face-flush against the arm).
+stations: z_j = Z0 + PITCH * j; the cam, rod fork, rocker, bar mid-width,
+lever and spring holes share z_j + CHANNEL_MID_DZ.
 
-Mated-DOF strategy: nothing is grounded except the pivot-shaft seed (the
-lone SolidWorks auto-fix). Every other part is held by SEMANTIC, contact-
-faithful mates -- the radial fit at each real interface is a concentric/
-coincident pivot, and the axial Z is a coincident mid-plane wherever parts
-share a channel slice:
+Mated-DOF strategy: the pivot-shaft seed is the lone SolidWorks auto-fix;
+keepers, springs and hooks are grounded cosmetic structure. The moving chain
+uses contact-faithful mates: radial fits are concentric/coincident pivots,
+and axial seats are coincident mid-planes wherever parts share a channel:
   * rocker/lever concentric on the shaft OD; rod/bar coincident axis-to-
     axis on the named bore axes (the revolute radials);
   * the rocker is each channel's Z ANCHOR: channel 0 sits on the Front
-    datum; every other rocker is a PITCH distance off the previous
-    channel's rocker mid-plane (hub face on hub face);
-    the lever and the amplitude bar are seated COINCIDENT to the rocker's
-    mid-plane (lever Front plane / bar MidWidth plane), so a channel's
+    datum; every other rocker sits j * PITCH off channel 0's rocker;
+    the rod, lever and amplitude bar are seated COINCIDENT to the rocker's
+    mid-plane (rod/lever Front plane / bar MidWidth plane), so a channel's
     parts share ONE Z reference;
-  * free-space structure with no in-subassembly contact partner (fulcrum-
-    shaft, ball mounts, springs, spring-hooks) is datum-located by three
-    orthogonal plane distances (the #110 frame-column idiom).
+  * free-space structure (fulcrum shaft, pivot brackets and keeper screws)
+    is datum-located; installed rod pins lock to their actual rods after
+    all four-part slices are copied and landed, adding no operational DOF.
 Each of the rocker/rod/bar joints keeps its operational DOF genuinely
 FREE (rocker swing + rod follow + bar amplitude -- 3 live DOF per
 channel); each freed DOF's drive spec is recorded into the assembly's
@@ -95,18 +94,12 @@ Only the SEED channels are authored mate-by-mate: channel 0 (the global
 Z anchor) plus the first channel >= 1 of each distinct amplitude value.
 Every other channel is ONE CopyWithMates2 of its seed's 4-part slice
 (rocker + rod + bar + lever, 9 mates -- see _cwm.py for the pinned
-native-call contract). The J1a axial dim is re-pointed to THIS channel's
-PREVIOUS channel's rocker (Repeat=false + NewEntityToMateTo) at the local PITCH
-seat -- the SAME per-gap neighbour idiom the authored channels use --
-so a copy is topologically identical to an authored channel, not chained
-to the seed's bushing on a cumulative ladder. The copied mates pin a copy only up
-to its 3 free operational DOF, so its design pose is PUT (no solve)
-right after the copy and one closing rebuild solves everything from
-that consistent state. The call's return value lies, so each copy is
-then proven from the model -- pose = seed pose translated down-spine,
-per-part mate count = the seed's, constrained status under-constrained
--- and its 3 freed-DOF drive specs are recorded exactly like an
-authored channel's, its pose re-anchored into the ledger.
+native-call contract). The J1a axial dim is re-pointed to channel 0's
+rocker (Repeat=false + NewEntityToMateTo) at j * PITCH, matching the
+authored path. Copies are landed by transient drives and then freed;
+pose, mate counts and constrained status are read back before adding
+the separate rod-pivot pins. Each copy's three freed-DOF drive specs and
+solved pose ledger are recorded exactly like an authored channel's.
 
 The cams themselves live in drive-train.SLDASM (integral with the
 cylinder gears); the frame, supports and top-frame ring in frame.SLDASM.
@@ -151,6 +144,7 @@ from _assembly import (
     concentric_mate,
     delete_assembly_feature,
     distance_driver,
+    lock_mate,
     named_ref,
     place_component,
     place_components_batch,
@@ -163,11 +157,9 @@ from _assembly import (
 )
 from _cwm import (
     component_constrained_status,
-    component_distance_mate_flip,
     component_mate_count,
     component_mate_dump,
     copy_with_mates,
-    ensure_component_distance_mate_flip,
     external_mate_rows,
     mates_with_owners,
     put_component_pose,
@@ -189,6 +181,7 @@ from build_fulcrum_keeper import (
     CBORE_DEPTH_MM as KEEPER_CBORE_DEPTH,
     FOOT_H as KEEPER_FOOT_H,
 )
+from channel_axial_spec import CHANNEL_MID_DZ
 from build_cylinder_gear import ECCENTRICITY as CAM_ECC  # cam lobe throw (mm):
 
 # imported, NOT copied, so the rod ring stays concentric with the cam when the
@@ -231,8 +224,6 @@ if abs(Z0 - CHANNEL_Z0) > 1e-9:
     raise AssertionError(
         f"channels.station_z0_mm {Z0:g} != installation contract {CHANNEL_Z0:g}"
     )
-ARM_MID_DZ = 0.8  # arm/bar/lever mid-planes at z_j + 0.8
-CAM_DZ = -3.25  # end-for-end cylinder gear: cam / rod-ring plane at z_j - 3.25
 
 # --- rocker bank ------------------------------------------------------------
 PIVOT = (72.9, 253.8)  # rocker pivot shaft axis (x, y); machine frame (crank at -X)
@@ -312,10 +303,10 @@ CHANNEL_BANK_REAR_SHIFT = MECHANISM_Z_SHIFT
 # station arm stack's mid-plane, PIVOT_BRACKET_OFF either side -- ear faces
 # 6.7 clear of the outermost arms, feet inside the rocker-arm-support's
 # +-88.9 top (it is the only stand; the old south "A-frame" is gone).
-_STACK_MID_Z = Z0 + ARM_MID_DZ + 19 * PITCH / 2.0  # 3.83 (the full machine)
+_STACK_MID_Z = Z0 + CHANNEL_MID_DZ + 19 * PITCH / 2.0  # full 20-station bank
 PIVOT_BRACKET_OFF = 78.0
 PIVOT_BRACKET_Z = (_STACK_MID_Z - PIVOT_BRACKET_OFF, _STACK_MID_Z + PIVOT_BRACKET_OFF)
-PIVOT_SHAFT_Z = _STACK_MID_Z  # the 170 shaft spans -81.2..88.8: 4 past each ear
+PIVOT_SHAFT_Z = _STACK_MID_Z  # 170-long shaft: 4 past each bracket ear
 RAIL_TOP_Y = 1036.2  # new top-frame casting top face (was 1040.7; the rederive
 # dropped the rail top 4.5 -- the ball-mount seats and the whole fulcrum chain
 # follow)
@@ -485,7 +476,7 @@ def _copied_chain_instances(adapter: Any, j: int) -> dict[str, str]:
 
 # The free-build slice: J1 radial+axial, J2 coaxial+axial, J4 radial+axial,
 # J3 radial+axial, J5 = 9 mates, of which 3 are EXTERNAL (J1 radial on the
-# pivot-shaft, J1a axial dim to the previous rocker -- the ONLY external dim --
+# pivot-shaft, J1a axial dim to channel 0's rocker -- the ONLY external dim --
 # and J4 radial on the fulcrum-shaft). A mate-scheme change moves these:
 # update them consciously, the slot audit below fails loud.
 SLICE_MATES = 9
@@ -1145,10 +1136,10 @@ async def build(adapter) -> dict[str, str]:
 
     # No spacer bushings (2026-09-02): the rocker arms and channel levers
     # carry integral hubs one PITCH long, so each channel's rocker takes its
-    # axial (Z) seat as a PITCH distance off the PREVIOUS channel's rocker
-    # mid-plane (hub face on hub face, the #110 neighbour idiom), and the
-    # lever rides coincident to its own rocker. rocker_by_channel[j] is the
-    # rocker instance every later neighbour seat refers to.
+    # axial (Z) seat as j * PITCH off channel 0's rocker mid-plane
+    # (hub face on hub face, the #110 neighbour idiom). Rod and lever
+    # ride coincident to their own rocker. rocker_by_channel[0] is the
+    # shared authored anchor for every later channel.
     rocker_by_channel: dict[int, str] = {}
     if abs(ROCKER_HUB_LENGTH - PITCH) > 1e-6 or abs(LEVER_HUB_LENGTH - PITCH) > 1e-6:
         raise RuntimeError("hub lengths must equal the station pitch")
@@ -1176,13 +1167,8 @@ async def build(adapter) -> dict[str, str]:
     arm_origin_dx = ARM_PIVOT_LOCAL_Y * math.sin(t)  # -(0,8)*Rz offset
     arm_origin_dy = ARM_PIVOT_LOCAL_Y * math.cos(t)
 
-    # The springs and the two bushing banks are grounded repeated structure, but
-    # they are placed EXPLICITLY per channel (springs in the loop, bushings in
-    # each inter-channel gap) rather than seeded once and replicated by a
-    # LocalLinearPattern. The pattern's direction sense is read from the shaft's
-    # cosmetic repeated structure. The bushing banks are seed+pattern off the
-    # BankZ reference axis (see the block above the loop); the springs and
-    # spring-hooks are per-channel GROUNDED cosmetic parts (Pedro 2026-07-09,
+    # Springs and spring-hooks are per-channel GROUNDED cosmetic parts
+    # (Pedro 2026-07-09,
     # v018 perf review): no operational DOF, no in-subassembly contact partner,
     # and a pose fully computed at insert time (the per-channel amplitude tilt
     # is baked into spring_rows), so the placement transform IS the final pose
@@ -1209,7 +1195,7 @@ async def build(adapter) -> dict[str, str]:
         loop below). Appends the channel's freed-DOF keys and returns the
         part -> instance map (the copyable slice)."""
         zj = z_station(j)
-        z_mid = zj + ARM_MID_DZ
+        z_mid = zj + CHANNEL_MID_DZ
         # Bar rotated Ry(-90) (machine frame: local X slot -> +Z, local Z depth ->
         # -X, the mirror of the pre-#151 Ry(+90)) then swung by st['bar_tilt']
         # about Z. Lever gets the Ry(180) z-plane turn like the rocker/rod.
@@ -1228,7 +1214,7 @@ async def build(adapter) -> dict[str, str]:
         rod = await place_component(
             adapter,
             "connecting-rod",
-            [RING_CENTER[0], RING_CENTER[1], zj + CAM_DZ],
+            [RING_CENTER[0], RING_CENTER[1], z_mid],
             euler_from_rows(rod_rows),
             rod_rows,
             ground=False,
@@ -1283,7 +1269,7 @@ async def build(adapter) -> dict[str, str]:
         # replacing the old design-pose pin to the global datums. The rod's pin
         # bore (Axis2@rod) is made coaxial with the rocker's rod bore (Axis2@rocker)
         # -- a coincident of two named axes (AddMate5 rejects concentric on axes);
-        # a distance to the rocker's Front plane pins Z; and the swing about the
+        # coincident Front planes center the rocker inside the fork; the swing about the
         # pin is a freed DOF (recorded on the rod's cam-ring bore Axis1@rod, not
         # authored) so the rod follows the rocker. NB the cam ring's external
         # journal (the cylinder-gear lobe) lives at the TOP level only; this
@@ -1300,12 +1286,11 @@ async def build(adapter) -> dict[str, str]:
             label=f"J2 rod ch{j:02d} coaxial pin <- {rocker}",
             verify=(rod, rod_tgt),
         )
-        await distance_driver(
+        await coincident_mate(
             adapter,
             named_ref(f"Front Plane@{rod}", "PLANE"),
             named_ref(f"Front Plane@{rocker}", "PLANE"),
-            rod_tgt[2] - z_mid,
-            label=f"J2 rod ch{j:02d} axial d={abs(rod_tgt[2] - z_mid):.2f} <- {rocker}",
+            label=f"J2 rod ch{j:02d} axial coincident mid-plane <- {rocker}",
             verify=(rod, rod_tgt),
         )
         await spin_driver(
@@ -1479,10 +1464,8 @@ async def build(adapter) -> dict[str, str]:
                 f"J1a seed value {dim['mm']:.3f} mm != {seed_j} x PITCH"
                 f" {seed_j * PITCH:.3f} -- the axial anchor moved"
             )
-        # The seed's J1a side is CARRIED to each copy (flips[dim_slot]) via the
-        # Repeat=false + own-bushing idiom, so any seed side is honoured; the
-        # authored neighbour idiom (#110) produces flip=False. No always-positive
-        # ladder is needed anymore (see the copy site + _cwm.py module doc).
+        # Carry the seed's J1a side via flips[dim_slot] when rebinding the
+        # external channel-0 rocker reference (Repeat=false).
         arrays = {
             p: list(component_transform(adapter, n)) for p, n in seed_comps.items()
         }
@@ -1495,11 +1478,6 @@ async def build(adapter) -> dict[str, str]:
             "n": len(rows),
             "dim_slot": slot,
             "dim_flip": bool(dim["flip"]),
-            "rod_axial_flip": component_distance_mate_flip(
-                adapter,
-                seed_comps["connecting-rod"],
-                abs(CAM_DZ - ARM_MID_DZ),
-            ),
             "arrays": arrays,
             "mate_counts": mate_counts,
             "rocker_off": world_point(
@@ -1518,15 +1496,14 @@ async def build(adapter) -> dict[str, str]:
     # is always authored (it is the single global Z anchor -- its J1a is a
     # ROOT-datum distance at a negative station, so it is never a copy seed).
     # The first channel >= 1 of each amplitude value is authored as that group's
-    # SEED (its J1a anchors PITCH off the previous channel's rocker); every later
-    # same-amplitude channel is ONE CopyWithMates2 of the seed's 4-part slice
-    # with the J1a slot re-pointed (Repeat=false) to ITS previous rocker at the
-    # same local PITCH. With the current all-neutral preset that is 2 authored
-    # + (CHANNELS-2) copies; a restored square preset degrades gracefully (each
-    # distinct a_j authors once).
+    # SEED; every later same-amplitude channel copies its four-part slice.
+    # J1a retains channel 0's rocker reference at j * PITCH. The all-neutral
+    # preset has two authored chains plus CHANNELS-2 copies; distinct
+    # amplitudes each author one seed.
     seed_by_amp: dict[float, tuple[int, dict[str, str]]] = {}
-    slots_by_seed: dict[int, tuple[int, int, dict[str, list[float]]]] = {}
+    slots_by_seed: dict[int, dict[str, Any]] = {}
     copied: list[dict[str, Any]] = []
+    rod_by_channel: dict[int, str] = {}
     for j in range(CHANNELS):
         st = solve_state(amplitudes[j])  # this channel's bar/lever pose
         amp_key = round(amplitudes[j], 6)
@@ -1534,6 +1511,7 @@ async def build(adapter) -> dict[str, str]:
         if seed is None:
             comps = await _author_channel(j, st)
             rocker_by_channel[j] = comps["rocker-arm"]
+            rod_by_channel[j] = comps["connecting-rod"]
             if j >= 1:
                 seed_by_amp[amp_key] = (j, comps)
             continue
@@ -1546,10 +1524,9 @@ async def build(adapter) -> dict[str, str]:
         # Re-point ONLY the J1a slot to channel 0's rocker (the hub-stack anchor;
         # Repeat=false + NewEntityToMateTo) at j * PITCH -- exactly
         # the authored #110 neighbour idiom -- honouring the seed's side via
-        # flips[dim_slot]. The other two external slots (J1 radial on the shared
-        # pivot-shaft) keep the seed's references (Repeat=true), the measured
-        # mixed-array idiom. This drops the old cumulative always-positive ladder
-        # off the seed's bushing (see _cwm.py module doc).
+        # flips[dim_slot]. The other two external slots (J1 radial on the
+        # pivot-shaft and J4 radial on the fulcrum-shaft) retain the seed's
+        # references (Repeat=true).
         prev_rocker = rocker_by_channel[0]  # the hub-stack anchor (authored channel 0)
         values = [0.0] * n_slice
         values[dim_slot] = (j * PITCH) / 1000.0
@@ -1572,12 +1549,7 @@ async def build(adapter) -> dict[str, str]:
         )
         comps = _copied_chain_instances(adapter, j)
         rocker_by_channel[j] = comps["rocker-arm"]
-        ensure_component_distance_mate_flip(
-            adapter,
-            comps["connecting-rod"],
-            abs(CAM_DZ - ARM_MID_DZ),
-            slice_info["rod_axial_flip"],
-        )
+        rod_by_channel[j] = comps["connecting-rod"]
         # Land the copy on its DESIGN pose by pinning its 3 operational DOF
         # with TRANSIENT drivers, then deleting them. The chain's DOF are
         # genuinely free, so the copied mates pin the copy only up to the
@@ -1818,8 +1790,33 @@ async def build(adapter) -> dict[str, str]:
             )
             free_dof_keys.append(f"bar_amplitude_{j:02d}")
 
+    # Moving hardware stays OUTSIDE the four-part/nine-mate CWM slice. Read
+    # each landed rod's actual transform, not the neutral XY solution: the
+    # installed pin journal is centered on its Axis2 and locked to that rod.
     for j in range(CHANNELS):
-        z_mid = z_station(j) + ARM_MID_DZ
+        rod = rod_by_channel[j]
+        transform = component_transform(adapter, rod)
+        pin_rows = [list(transform[0:3]), list(transform[3:6]), list(transform[6:9])]
+        pin_position = world_point(adapter, rod, ROD_PIN_BORE_LOCAL)
+        pin = await place_component(
+            adapter,
+            "rod-pivot-pin",
+            pin_position,
+            euler_from_rows(pin_rows),
+            pin_rows,
+            ground=False,
+            configuration="Default",
+            label=f"rod-pivot-pin ch{j:02d} installed",
+        )
+        await lock_mate(
+            adapter,
+            named_ref(f"Front Plane@{pin}", "PLANE"),
+            named_ref(f"Front Plane@{rod}", "PLANE"),
+            label=f"rod-pivot-pin ch{j:02d} locked to rod",
+        )
+
+    for j in range(CHANNELS):
+        z_mid = z_station(j) + CHANNEL_MID_DZ
         # Return spring (ground; cosmetic) -- placed PER CHANNEL spanning this
         # channel's (moving) lever eye to the FIXED summing-plate hole, at the
         # measured gap length (parametric-springs memory / task #10). NOT a fixed
@@ -1880,8 +1877,8 @@ async def build(adapter) -> dict[str, str]:
             }
         )
 
-    # Insert the cosmetic bank (springs + spring-hooks; the bushings were
-    # patterned before the loop) in ONE AddComponents3 + ONE FixComponent
+    # Insert the cosmetic bank (springs + spring-hooks) in ONE
+    # AddComponents3 + ONE FixComponent
     # (ground=True). GROUNDED, not semantically mated -- PURELY a
     # build-performance measure (Pedro 2026-07-09, reversing the #110
     # treatment for THIS bank only; no kinematic or gate semantics change,

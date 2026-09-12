@@ -1,4 +1,9 @@
-"""Native custom rod-pivot pin; head face at Z=0, thread pointing +Z."""
+"""Installed peened pivot, centered on Z=0 with two plain formed heads.
+
+Default is the unchanged finished assembly envelope. OneHeadedBlank contains
+one preformed head and a plain 1 mm upset tail instead of the second head.
+The allowance is a reconstruction design size; no forming operation is claimed.
+"""
 
 from __future__ import annotations
 
@@ -6,10 +11,16 @@ import math
 import sys
 
 from _common import (
-    apply_material, check, define_circle, define_centered_rectangle,
-    ensure_fully_defined, force_rebuild, name_dimensions, name_last_feature,
+    SketchDims, _early_bound, _feature_by_name, apply_material, check,
+    define_circle, ensure_fully_defined,
+    extrude_at_offset, force_rebuild, name_dimensions, name_last_feature,
     run_build, save_part_and_images, volume_check,
 )
+from _drawing_marks import (
+    apply_drawing_properties, clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from rod_pivot_pin_notes import DRAWING_NOTES
 import rod_pivot_spec as pivot
 
 PART_NAME = "rod-pivot-pin"
@@ -17,65 +28,95 @@ MATERIAL = "Plain Carbon Steel"
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import AddThreadParameters, ExtrusionParameters
+    from solidworks_mcp.adapters.base import CreateConfigurationParameters, ExtrusionParameters
+    from solidworks_mcp.adapters.com_variant import null_variant
 
     check("create pivot pin", await adapter.create_part())
-    shoulder_end = pivot.PIN_HEAD_THICKNESS + pivot.PIN_SHOULDER_LENGTH
-    for feature, diameter, length in (
-        ("Head", pivot.PIN_HEAD_DIA, pivot.PIN_HEAD_THICKNESS),
-        ("Shoulder", pivot.PIN_SHOULDER_DIA, shoulder_end),
-        ("ThreadBlank", pivot.THREAD_MAJOR, pivot.PIN_LENGTH),
+    for feature, diameter, length, offset, flip in (
+        ("Journal", pivot.PIN_JOURNAL_DIA, pivot.PIN_GRIP_LENGTH, None, False),
+        ("FormedHeadLeft", pivot.PIN_HEAD_DIA, pivot.PIN_HEAD_THICKNESS,
+         pivot.PIN_GRIP_LENGTH / 2.0, True),
+        ("FormedHeadRight", pivot.PIN_HEAD_DIA, pivot.PIN_HEAD_THICKNESS,
+         pivot.PIN_GRIP_LENGTH / 2.0, False),
     ):
+        dims = SketchDims()
         check(f"sketch {feature}", await adapter.create_sketch("Front"))
-        await define_circle(adapter, 0.0, 0.0, diameter / 2.0, feature)
+        await define_circle(
+            adapter, 0.0, 0.0, diameter / 2.0, feature, dims=dims,
+            names=(None, None, "Diameter"),
+        )
         await ensure_fully_defined(adapter, feature)
         check(f"exit {feature}", await adapter.exit_sketch())
         name_last_feature(adapter, f"{feature}Profile")
-        check(f"extrude {feature}", await adapter.create_extrusion(ExtrusionParameters(depth=length)))
+        dims.apply(adapter, f"{feature}Profile")
+        if offset is None:
+            check(f"extrude {feature}", await adapter.create_extrusion(
+                ExtrusionParameters(depth=length, both_directions=True)
+            ))
+        else:
+            extrude_at_offset(adapter, length, offset, flip=flip)
         name_last_feature(adapter, feature)
-        name_dimensions(adapter, feature, ["Length"])
+        # Offset heads also carry a native start-offset dimension; their profile
+        # diameter and actual axial feature dimensions remain native/editable.
+        if offset is None:
+            name_dimensions(adapter, feature, ["GripLength"])
 
-    # A narrow relief lets the shoulder seat without a partial thread fouling it.
-    check("sketch thread relief", await adapter.create_sketch("Front"))
-    await define_circle(adapter, 0.0, 0.0, pivot.THREAD_MAJOR / 2.0 + 0.1, "relief outside")
-    await define_circle(adapter, 0.0, 0.0, pivot.PIN_THREAD_RELIEF_DIA / 2.0, "relief root")
-    await ensure_fully_defined(adapter, "thread relief")
-    check("exit thread relief", await adapter.exit_sketch())
-    name_last_feature(adapter, "ThreadReliefProfile")
-    check("cut thread relief", await adapter.create_cut_extrude(ExtrusionParameters(
-        depth=pivot.PIN_THREAD_RELIEF_LENGTH, start_offset=shoulder_end,
-        reverse_direction=True,
-    )))
-    name_last_feature(adapter, "ThreadRelief")
-
-    check("sketch driver slot", await adapter.create_sketch("Front"))
-    await define_centered_rectangle(adapter, pivot.PIN_HEAD_DIA / 2.0 + 0.2, pivot.PIN_SLOT_WIDTH / 2.0, "driver slot")
-    await ensure_fully_defined(adapter, "driver slot")
-    check("exit driver slot", await adapter.exit_sketch())
-    name_last_feature(adapter, "DriverSlotProfile")
-    check("cut driver slot", await adapter.create_cut_extrude(ExtrusionParameters(
-        depth=pivot.PIN_SLOT_DEPTH, reverse_direction=True,
-    )))
-    name_last_feature(adapter, "DriverSlot")
     await force_rebuild(adapter)
-    r = pivot.PIN_HEAD_DIA / 2.0
-    half_slot = pivot.PIN_SLOT_WIDTH / 2.0
-    slot_area = 2.0 * (half_slot * math.sqrt(r * r - half_slot * half_slot) + r * r * math.asin(half_slot / r))
     volume = math.pi / 4.0 * (
-        pivot.PIN_HEAD_DIA**2 * pivot.PIN_HEAD_THICKNESS
-        + pivot.PIN_SHOULDER_DIA**2 * pivot.PIN_SHOULDER_LENGTH
-        + pivot.THREAD_MAJOR**2 * pivot.PIN_THREAD_LENGTH
-        - (pivot.THREAD_MAJOR**2 - pivot.PIN_THREAD_RELIEF_DIA**2) * pivot.PIN_THREAD_RELIEF_LENGTH
-    ) - slot_area * pivot.PIN_SLOT_DEPTH
-    await volume_check(adapter, "recessed pivot pin", volume, 0.002 * volume)
-    check("pivot pin external thread", await adapter.add_thread(AddThreadParameters(
-        edge_point=[pivot.THREAD_MAJOR / 2.0, 0.0, pivot.PIN_LENGTH],
-        standard="ansi_inch", size=pivot.THREAD_SIZE,
-        diameter=pivot.THREAD_TAP_DRILL, end_type="blind",
-        depth=pivot.PIN_THREAD_LENGTH - pivot.PIN_THREAD_RELIEF_LENGTH,
-        note=f"{pivot.THREAD_SIZE} UNF-2A",
-    )))
+        pivot.PIN_JOURNAL_DIA**2 * pivot.PIN_GRIP_LENGTH
+        + 2.0 * pivot.PIN_HEAD_DIA**2 * pivot.PIN_HEAD_THICKNESS
+    )
+    await volume_check(adapter, "installed peened pivot", volume, 0.002 * volume)
+
+    # A real alternate physical state, not an annotation pretending the
+    # installed two-headed pin can be inserted through the fork.
+    check("create one-headed blank configuration", await adapter.create_configuration(
+        CreateConfigurationParameters(
+            name=pivot.PIN_BLANK_CONFIGURATION,
+            description="One preformed head; plain upset stock before assembly",
+        )
+    ))
+    check("activate blank", await adapter.set_active_configuration(pivot.PIN_BLANK_CONFIGURATION))
+
+    def suppress(feature_name: str, state: int) -> None:
+        feature = _early_bound(_feature_by_name(adapter, feature_name), "IFeature")
+        # swSuppressFeature=0 / swUnSuppressFeature=1; swThisConfiguration=1.
+        if not feature.SetSuppression2(state, 1, null_variant()):
+            raise RuntimeError(f"cannot set suppression of {feature_name}")
+
+    suppress("FormedHeadRight", 0)
+    check("sketch upset tail", await adapter.create_sketch("Front"))
+    tail_dims = SketchDims()
+    await define_circle(
+        adapter, 0.0, 0.0, pivot.PIN_JOURNAL_DIA / 2.0, "upset tail",
+        dims=tail_dims, names=(None, None, "TailDiameter"),
+    )
+    await ensure_fully_defined(adapter, "upset tail")
+    check("exit upset tail", await adapter.exit_sketch())
+    name_last_feature(adapter, "UpsetTailProfile")
+    tail_dims.apply(adapter, "UpsetTailProfile")
+    extrude_at_offset(adapter, pivot.PIN_UPSET_ALLOWANCE, pivot.PIN_GRIP_LENGTH / 2.0)
+    name_last_feature(adapter, "UpsetTail")
+    await force_rebuild(adapter)
+    name_dimensions(adapter, "UpsetTail", ["UpsetAllowance", "TailStartOffset"])
+    blank_volume = math.pi / 4.0 * (
+        pivot.PIN_JOURNAL_DIA**2 * (pivot.PIN_GRIP_LENGTH + pivot.PIN_UPSET_ALLOWANCE)
+        + pivot.PIN_HEAD_DIA**2 * pivot.PIN_HEAD_THICKNESS
+    )
+    await volume_check(adapter, "one-headed pivot blank", blank_volume, 0.002 * blank_volume)
+
+    check("restore installed configuration", await adapter.set_active_configuration("Default"))
+    suppress("UpsetTail", 0)
+    suppress("FormedHeadRight", 1)
+    await force_rebuild(adapter)
+    await volume_check(adapter, "restored installed peened pivot", volume, 0.002 * volume)
+    clear_dimensions_for_drawing(adapter)
+    mark_dimensions_for_drawing(adapter, "Journal", ["GripLength"])
+    mark_dimensions_for_drawing(adapter, "UpsetTail", ["UpsetAllowance"])
+    for feature in ("Journal", "FormedHeadLeft", "FormedHeadRight"):
+        mark_dimensions_for_drawing(adapter, f"{feature}Profile", ["Diameter"])
     await apply_material(adapter, MATERIAL)
+    apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})
     return await save_part_and_images(adapter, PART_NAME)
 
 

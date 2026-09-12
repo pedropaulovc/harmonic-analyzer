@@ -53,8 +53,8 @@ from _assembly import (  # noqa: E402
     component_transform,
     place_component,
 )
+from channel_axial_spec import CHANNEL_MID_DZ  # noqa: E402
 from build_channel_assembly import (  # noqa: E402
-    ARM_MID_DZ,
     IDENTITY,
     PITCH,
     PIVOT,
@@ -66,7 +66,7 @@ from build_channel_assembly import (  # noqa: E402
 )
 
 N_COPIES = 8
-GAP_Z = [z_station(j) + ARM_MID_DZ - PITCH / 2.0 for j in range(1, 12)]
+GAP_Z = [z_station(j) + CHANNEL_MID_DZ - PITCH / 2.0 for j in range(1, 12)]
 PIVOT_OD_PT = [PIVOT[0] + SHAFT_R, PIVOT[1], 0.0]
 SEED_MATES = 3  # concentric + Front-plane distance + Top-plane parallel
 DIST_IDX = 1  # the distance mate's position in the seed's mate order

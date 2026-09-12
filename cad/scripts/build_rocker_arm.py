@@ -76,7 +76,6 @@ from _common import (
 )
 from _hole_spec import blind_cut_dia_mm
 from _holes import wizard_holes
-from rod_pivot_spec import ROCKER_RECESS_DIA, ROCKER_RECESS_DEPTH
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -225,8 +224,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "HubDia", f"{HUB_DIA}mm")
     await set_global(adapter, "HubLength", f"{HUB_LENGTH}mm")
     await set_global(adapter, "RodHoleX", f"{ROD_HOLE_X}mm")
-    # The rod-pivot pin runs in this #47 bore; its visible head is recessed
-    # in the local -Z face and its thread seats in the connecting rod.
+    # Plain #47 running bore between the connecting rod's two fork cheeks.
     await set_global(adapter, "ThroughCutDepth", f"{THROUGH_CUT_DEPTH}mm")
     await set_global(adapter, "RTop", '"CurveRadius"')
     await set_global(adapter, "RBottom", '"CurveRadius" + "ArmDepth"')
@@ -440,29 +438,6 @@ async def build(adapter) -> dict[str, str]:
         placement_dims=[(("RodPinX", '"RodHoleX"'), (None, None))],
     )
     drive_jobs += rod_cut.placement_drive_jobs
-    # Local -Z is the photo-visible world +Z face after channel Ry(180).
-    recess_sd = SketchDims()
-    check("create_sketch pivot recess", await adapter.create_sketch("Front"))
-    await define_circle(
-        adapter, ROD_HOLE_X, ROD_HOLE_Y, ROCKER_RECESS_DIA / 2.0,
-        "pivot head recess", dims=recess_sd,
-        names=("RecessCx", "RecessCy", "RecessDia"),
-        drives=('"RodHoleX"', None, None),
-    )
-    await ensure_fully_defined(adapter, "pivot recess")
-    check("exit_sketch pivot recess", await adapter.exit_sketch())
-    name_last_feature(adapter, "PivotRecessProfile")
-    drive_jobs += recess_sd.apply(adapter, "PivotRecessProfile")
-    check(
-        "cut visible pivot head recess",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(
-                depth=ROCKER_RECESS_DEPTH, start_offset=ARM_THICKNESS / 2.0,
-                flip_start_offset=True, reverse_direction=True,
-            )
-        ),
-    )
-    name_last_feature(adapter, "PivotHeadRecess")
     # Named axis through the rod-pin bore (Axis2 = (Right+ROD_HOLE_X) ∩ (Top+hole_y)).
     await name_bore_axis(
         adapter,
@@ -489,11 +464,10 @@ async def build(adapter) -> dict[str, str]:
     rod_dia = blind_cut_dia_mm(ROD_HOLE_SPEC)
     v_pivot = math.pi * (PIVOT_HOLE_DIA / 2.0) ** 2 * HUB_LENGTH
     v_rod = math.pi * (rod_dia / 2.0) ** 2 * ARM_THICKNESS
-    v_recess = math.pi / 4.0 * (ROCKER_RECESS_DIA**2 - rod_dia**2) * ROCKER_RECESS_DEPTH
     # The tip faces are cut into the SKETCH profile (not a 3D chamfer feature), so
     # _strap_area already accounts for them: the bored-strap volume is tight.
     v_measured = await volume_check(
-        adapter, "bored strap + hub", v_strap + v_hub - v_pivot - v_rod - v_recess, 0.01 * v_strap
+        adapter, "bored strap + hub", v_strap + v_hub - v_pivot - v_rod, 0.01 * v_strap
     )
 
     # Apply the deferred drive equations now -- after the whole model + a rebuild

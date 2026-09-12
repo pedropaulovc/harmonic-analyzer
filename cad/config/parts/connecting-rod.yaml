@@ -1,7 +1,7 @@
 connecting-rod:
   number: MHA-017
   material_family: ferrous_noncritical
-  finish: BLACK ENAMEL; MASK STRAP BORE, PIN THREAD AND PIVOT SEATING FACES; OIL BARE MACHINED SURFACES
+  finish: BLACK ENAMEL; MASK STRAP BORE, PIVOT BORES AND INNER FORK FACES; OIL BARE MACHINED SURFACES
   quantity: 20
   tolerance_class: machined_block
   fit_class: cam_follower_contact

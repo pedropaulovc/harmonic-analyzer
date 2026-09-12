@@ -385,17 +385,8 @@ def wizard_holes(
         data = fm.CreateDefinition(SW_FM_HOLE_WZD)
         data = _early_bound(data, "IWizardHoleFeatureData2")
         data.InitializeHole(hole_type, _STD_ANSI_INCH, fastener, spec.size, end)
-        if hole_type == 4:  # taps carry a class + their own thread end condition
-            # Preserve the existing create path while native class readback is
-            # investigated separately from the proven cut-diameter correction.
-            for prop, val in (
-                ("ThreadClass", spec.thread_class),
-                ("ThreadEndCondition", end),
-            ):
-                try:
-                    setattr(data, prop, val)
-                except Exception:  # noqa: BLE001
-                    pass
+        if hole_type == 4:
+            data.ThreadEndCondition = end
         feat = fm.CreateFeature(data)
         if feat is None:
             raise RuntimeError(
@@ -616,6 +607,30 @@ def wizard_holes(
             raise RuntimeError(f"hole wizard {label}: ModifyDefinition failed")
         model.EditRebuild3()
         defn = _early_bound(feat.GetDefinition(), "IWizardHoleFeatureData2")
+
+    if hole_type == 4:
+        # Native taps lose pre-create ThreadClass assignments. A post-create
+        # edit persists through save/reopen (#2-56 and #0-80 native controls).
+        if not defn.AccessSelections(model, None):
+            raise RuntimeError(f"hole wizard {label}: thread-class AccessSelections failed")
+        try:
+            defn.ThreadClass = spec.thread_class
+            if not feat.ModifyDefinition(defn._oleobj_, model, null_callout()):
+                raise RuntimeError(f"hole wizard {label}: thread-class ModifyDefinition failed")
+        except Exception as exc:
+            try:
+                defn.ReleaseSelectionAccess()
+            except Exception as release_error:
+                exc.add_note(f"thread-class selection cleanup also failed: {release_error}")
+            raise
+        model.EditRebuild3()
+        defn = _early_bound(feat.GetDefinition(), "IWizardHoleFeatureData2")
+        actual_class = str(defn.ThreadClass or "").strip()
+        if actual_class != spec.thread_class:
+            raise RuntimeError(
+                f"hole wizard {label}: native thread class {actual_class!r} "
+                f"!= requested {spec.thread_class!r}"
+            )
 
     def _dim(prop: str) -> float:
         try:

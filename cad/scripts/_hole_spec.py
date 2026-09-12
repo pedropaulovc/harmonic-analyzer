@@ -79,7 +79,7 @@ NUMBER_DRILL_MM = {  # number drills cut diameter exactly
     "#14": 4.623,
     "#37": 2.642,
     "#43": 2.261,
-    "#47": 1.994,
+    "#47": 1.9939,  # .0785 in; exact standard conversion, native ANSI BREP verified
     "#54": 1.397,
 }
 FRACTIONAL_DRILL_MM = {

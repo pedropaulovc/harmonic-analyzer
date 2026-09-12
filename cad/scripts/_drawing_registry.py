@@ -313,6 +313,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="rod_pivot_pin",
+        part="rod_pivot_pin",
+        artifact_stem="rod-pivot-pin",
+        script_name="draw_rod_pivot_pin.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="channel_lever",
         part="channel_lever",
         artifact_stem="channel-lever",

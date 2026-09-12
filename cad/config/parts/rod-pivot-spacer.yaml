@@ -1,8 +1,0 @@
-rod-pivot-spacer:
-  number: MHA-133
-  material: Brass
-  material_specification: C36000 free-machining brass
-  finish: machined; oil finished bore and thrust faces
-  quantity: 20
-  tolerance_class: machined_block
-  process: "machined (brass)"

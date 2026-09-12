@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import math
 from _hole_spec import HoleSpec
+from channel_axial_spec import CHANNEL_MID_DZ
 
 
 from _gtol_spec import PlanarFace
@@ -62,16 +63,16 @@ HOLE_X = 39.85
 HOLE_COUNT = 20
 CHANNEL_Z0 = -67.1
 CHANNEL_PITCH = 7.0565
-HOLE_Z_OFFSET = 0.8
+HOLE_Z_OFFSET = CHANNEL_MID_DZ
 
 # --- Derived. ---
 CYL_DIA = 2.0 * CYL_R  # 25.4
 TIP_X = -SUM_H  # -76.20 summation tip / anchor X
-HOLE_Z_FIRST = CHANNEL_Z0 + HOLE_Z_OFFSET  # -66.3
-HOLE_Z_LAST = CHANNEL_Z0 + CHANNEL_PITCH * (HOLE_COUNT - 1) + HOLE_Z_OFFSET  # 67.77
+HOLE_Z_FIRST = CHANNEL_Z0 + HOLE_Z_OFFSET
+HOLE_Z_LAST = CHANNEL_Z0 + CHANNEL_PITCH * (HOLE_COUNT - 1) + HOLE_Z_OFFSET
 HOLE_EDGE_OFFSET = PLATE_W - HOLE_X  # 4.60 from the free +X plate edge
-HOLE_END_OFFSET_FIRST = HOLE_Z_FIRST + PLATE_L / 2.0  # 9.90 from -Z end
-HOLE_END_OFFSET_LAST = PLATE_L / 2.0 - HOLE_Z_LAST  # 8.43 from +Z end
+HOLE_END_OFFSET_FIRST = HOLE_Z_FIRST + PLATE_L / 2.0
+HOLE_END_OFFSET_LAST = PLATE_L / 2.0 - HOLE_Z_LAST
 HEX_Z_INNER = PLATE_L / 2.0  # trunnion inboard face flush with the body end (76.20)
 HEX_Z_OUTER = HEX_Z_INNER + HEX_DEPTH  # outboard face overhangs the body (97.92)
 

@@ -244,24 +244,26 @@ expect(CH, "fulcrum-keeper-2", [c.FULCRUM[0], c.RAIL_TOP_Y, c.FULCRUM_SHAFT_Z - 
 expect(CH, "frame-side-screw-1", [c.FULCRUM[0], c.RAIL_TOP_Y + c.KEEPER_SCREW_SEAT_H, c.FULCRUM_SHAFT_Z + c.KEEPER_SCREW_Z_OFF], IDENTITY, "keeper foot screw +z")
 expect(CH, "frame-side-screw-2", [c.FULCRUM[0], c.RAIL_TOP_Y + c.KEEPER_SCREW_SEAT_H, c.FULCRUM_SHAFT_Z - c.KEEPER_SCREW_Z_OFF], IDENTITY, "keeper foot screw -z")
 _SOLV = dict(pos_tol=0.005, row_tol=1e-5)
-for j in range(1, 20):
-    z_gap = c.z_station(j) + c.ARM_MID_DZ - c.PITCH / 2.0
-    expect(CH, f"pivot-bushing-{j}", [c.PIVOT[0], c.PIVOT[1], z_gap], IDENTITY,
-           f"pivot-bushing gap {j - 1}", **_SOLV)
-    expect(CH, f"lever-bushing-{j}", [c.FULCRUM[0], c.FULCRUM[1], z_gap], IDENTITY,
-           f"lever-bushing gap {j - 1}", **_SOLV)
 phi0 = math.radians(st0["lever_tilt"])
 hole_x_0 = c.FULCRUM[0] - c.LEVER_SPRING_X * math.cos(phi0)
 for j in range(20):
     zj = c.z_station(j)
-    z_mid = zj + c.ARM_MID_DZ
+    z_mid = zj + c.CHANNEL_MID_DZ
     st = c.solve_state(amplitudes[j])
     expect(CH, f"rocker-arm-{j + 1}",
            [c.PIVOT[0] - arm_dx, c.PIVOT[1] - arm_dy, z_mid], arm_rows,
            f"rocker-arm ch{j:02d}", **_SOLV)
     expect(CH, f"connecting-rod-{j + 1}",
-           [c.RING_CENTER[0], c.RING_CENTER[1], zj + c.CAM_DZ], rod_rows,
+           [c.RING_CENTER[0], c.RING_CENTER[1], z_mid], rod_rows,
            f"connecting-rod ch{j:02d}", **_SOLV)
+    pin_local = c.ROD_PIN_BORE_LOCAL
+    pin_world = [
+        sum(pin_local[k] * rod_rows[k][axis] for k in range(3))
+        + (c.RING_CENTER[0], c.RING_CENTER[1], z_mid)[axis]
+        for axis in range(3)
+    ]
+    expect(CH, f"rod-pivot-pin-{j + 1}", pin_world, rod_rows,
+           f"rod-pivot-pin ch{j:02d} installed", **_SOLV)
     expect(CH, f"amplitude-bar-{j + 1}",
            [st["bar_origin_x"], st["bar_origin_y"], z_mid - c.BAR_WIDTH / 2.0],
            rows_from_euler([st["bar_tilt"], -90.0, 0.0]),

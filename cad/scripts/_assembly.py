@@ -1605,7 +1605,10 @@ def write_dof_manifest(name: str) -> Any:
 # with operational free DOF. Shared by incremental refresh and verify:soundness
 # so neither path can save/approve a stray freedom the other rejects.
 _ALLOWED_FREE_STEMS: dict[str, tuple[str, ...]] = {
-    "channel": ("rocker-arm", "connecting-rod", "amplitude-bar", "channel-lever"),
+    "channel": (
+        "rocker-arm", "connecting-rod", "amplitude-bar", "channel-lever",
+        "rod-pivot-pin",
+    ),
     "summing": ("summing-lever", "boss-hook"),
     # The carriage riders (v-block, marker, stirrup frame, thumb screw) are
     # lock-mated to the free rod and read under-constrained with it.

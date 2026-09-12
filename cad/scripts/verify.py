@@ -145,7 +145,9 @@ _MOTION_SWEEP_DEG = [0.0, 30.0, 45.0, 90.0, 135.0, 180.0, 225.0, 270.0, 315.0, 3
 # Generous vs the 5.25e-05 mm the de-risk probe achieved -- this is a fidelity
 # gate on the equation chain + doc-unit handling, not a numeric-precision race.
 _MOTION_TOL_MM = 1e-2
-_MOVING_CHANNEL_STEMS = ("rocker-arm", "connecting-rod", "amplitude-bar", "channel-lever")
+_MOVING_CHANNEL_STEMS = (
+    "rocker-arm", "connecting-rod", "amplitude-bar", "channel-lever", "rod-pivot-pin",
+)
 _INSTANCE_SUFFIX = re.compile(r"-\d+$")
 # Crank-drive gear mate: either side carries one of these in its component name.
 _CRANK_GEAR_TOKENS = ("crank-pinion", "crank-drive-gear")
@@ -439,12 +441,12 @@ def assert_channel_independence(adapter: Any) -> None:
 
     The decoherence test the docs ask for (each channel runs at its own harmonic)
     is a motion-solver run -- tracked, not wired here. But its structural
-    precondition IS statically checkable: the four moving parts must be 20
-    individually-mated instances, not pattern slaves (a pattern instance is a
-    rigid, DOF-less copy and could never articulate independently). Counting 20 of
-    each stem is the tripwire that a rebuild did not collapse the channels into a
-    component pattern -- the single most important "no pattern for moving parts"
-    invariant (spec §5 / handoff §8), checked at the level that owns them.
+    precondition IS statically checkable: the four chain parts and their
+    rod-pivot pins must each have CHANNELS individually-mated instances,
+    not pattern slaves (a rigid, DOF-less copy cannot articulate independently).
+    Counting each stem catches dropped or duplicated channels at the
+    subassembly that owns them; the motion-solver run remains the proof of
+    independent articulation.
     """
     stems = [_INSTANCE_SUFFIX.sub("", n) for n in component_names(adapter)]
     counts = {stem: stems.count(stem) for stem in _MOVING_CHANNEL_STEMS}

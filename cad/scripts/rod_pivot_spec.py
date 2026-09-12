@@ -1,98 +1,110 @@
-"""Single rod/rocker pivot prototype: nominal geometry and measured matched fits.
+"""Centered two-cheek rod fork with a plain, peened pivot pin.
 
-The photograph establishes the recessed joint envelope, not internal dimensions.
-These dimensions implement the approved removable shoulder-pin architecture.
-The head is recessed in the rocker's local -Z face (world +Z under the
-channel's Ry(180) transform). Its shoulder seats on the rod's local -Z face;
-the #0-80 tip threads into the rod. The pin turns with the rod inside the
-rocker bearing. This handedness preserves the visible head, without claiming
-that the photograph resolves the historical thread direction.
+The photographs establish two black cheeks straddling the silver rocker, not
+prong dimensions or retention details. Peening is the user's reconstruction
+choice, not a historically verified fastener. Cheek, flare, root and head sizes
+are design dimensions; the 2.5 mm rocker thickness is photograph-callout data.
+All dimensions are mm. There is no axial rod/rocker center offset or spacer.
 """
 
 from __future__ import annotations
 
-from _fit_limits import REAM_SLIDE
-from _hole_spec import HoleSpec, NUMBER_DRILL_MM, TAP_DRILL_MM, THREAD_MAJOR_MM
+import math
 
-THREAD_SIZE = "#0-80"
-THREAD_PITCH_MM = 25.4 / 80.0
-THREAD_MAJOR = THREAD_MAJOR_MM[THREAD_SIZE]
-THREAD_TAP_DRILL = TAP_DRILL_MM[THREAD_SIZE]
-ROD_THREAD_SPEC = HoleSpec("tapped", THREAD_SIZE, thread_class="2B")
-ROD_HEAD_THICKNESS = 2.5
+from _hole_spec import HoleSpec, NUMBER_DRILL_MM
+
 ROCKER_THICKNESS = 2.5
-ROD_TO_ROCKER_CENTER_DISTANCE = 4.05
-ROCKER_RECESS_DIA = 3.2
-ROCKER_RECESS_DEPTH = 1.0
-PIN_HEAD_DIA = 3.0
-PIN_HEAD_THICKNESS = 0.8
-PIN_SLOT_WIDTH = 0.4
-PIN_SLOT_DEPTH = 0.3
-PIN_SHOULDER_DIA = 1.98
-PIN_DIAMETRAL_CLEARANCE = (REAM_SLIDE[1], REAM_SLIDE[0])
+FORK_CHEEK_THICKNESS = 1.25
 JOINT_ENDFLOAT_MIN = 0.02
 JOINT_ENDFLOAT_MAX = 0.05
 JOINT_ENDFLOAT_NOMINAL = (JOINT_ENDFLOAT_MIN + JOINT_ENDFLOAT_MAX) / 2.0
-CAM_CENTER_RESIDUAL_MAX = 0.05
-SPACER_ID = 2.05
-SPACER_OD = 3.0
-SPACER_LENGTH = ROD_TO_ROCKER_CENTER_DISTANCE - (ROD_HEAD_THICKNESS + ROCKER_THICKNESS) / 2.0
-PIN_SHOULDER_LENGTH = ROCKER_THICKNESS - ROCKER_RECESS_DEPTH + SPACER_LENGTH + JOINT_ENDFLOAT_NOMINAL
-PIN_THREAD_LENGTH = 2.2
-PIN_THREAD_RELIEF_LENGTH = 0.2
-PIN_THREAD_RELIEF_DIA = 1.10
-ROD_THREAD_ENTRY_CHAMFER = 0.10
-THREAD_TIP_CLEARANCE_MIN = 0.10
-PIN_LENGTH = PIN_HEAD_THICKNESS + PIN_SHOULDER_LENGTH + PIN_THREAD_LENGTH
+FORK_SLOT_NOMINAL = ROCKER_THICKNESS + JOINT_ENDFLOAT_NOMINAL
+FORK_OUTER_THICKNESS = FORK_SLOT_NOMINAL + 2.0 * FORK_CHEEK_THICKNESS
+# Short transition, comparable to the photographed head height, not measured.
+FORK_FLARE_LENGTH = 6.0
+# Round-ended slot: this explicit root avoids a sharp internal fork crotch.
+FORK_ROOT_RADIUS = FORK_SLOT_NOMINAL / 2.0
+FORK_ROOT_CENTER_BELOW_PIN = 7.0
+FORK_HOLE_SPEC = HoleSpec("drilled_number", "#47")
+ROCKER_HOLE_SPEC = HoleSpec("drilled_number", "#47")
 ROCKER_BORE_NOMINAL = NUMBER_DRILL_MM["#47"]
+PIN_JOURNAL_DIA = 1.98
+PIN_DIAMETRAL_CLEARANCE = (0.010, 0.025)
+PIN_HEAD_DIA = 3.0
+PIN_HEAD_THICKNESS = 0.4
+# Final formed-head acceptance (reconstruction design, not a load rating).
+# Measure the minimum continuous bearing-rim thickness separately from the
+# maximum axial head height; a thin-edged dome must not pass on height alone.
+PIN_HEAD_DIAMETER_MIN = 2.80
+PIN_HEAD_RIM_THICKNESS_MIN = 0.30
+PIN_HEAD_RADIAL_OVERLAP_MIN = 0.35
+PIN_NEIGHBOR_CLEARANCE_MIN = 0.50
+# Installed representation: flat inner head faces touch the outer cheeks.
+# Peening must not close the finished fork slot or clamp the moving rocker.
+PIN_GRIP_LENGTH = FORK_OUTER_THICKNESS
+PIN_LENGTH = PIN_GRIP_LENGTH + 2.0 * PIN_HEAD_THICKNESS
+
+# Physical manufacturing state: one preformed head, plain journal and upset
+# stock beyond the matched grip. This is a design allowance, not a prediction
+# or certification of a forming operation.
+PIN_BLANK_CONFIGURATION = "OneHeadedBlank"
+PIN_UPSET_ALLOWANCE = 1.0
 
 
 def check_measured_joint(
-    *, rod_head: float, rocker: float, recess: float, sleeve: float,
-    shoulder: float, head: float, thread: float, bore: float, journal: float,
-    target_center_distance: float, station_pitch: float,
+    *, fork_gap: float, rocker: float, cheek_left: float, cheek_right: float,
+    head_left: float, head_right: float, bore: float, journal: float,
+    head_dia_left: float, head_dia_right: float,
+    head_rim_left: float, head_rim_right: float,
+    ear_bore_left: float, ear_bore_right: float, station_pitch: float,
 ) -> dict[str, float]:
-    """Check measured faces/diameters, never assume nominal plate thicknesses.
+    """Check finished fit, geometric retention and neighboring clearance.
 
-    Sleeve is fitted to locate the rod at mid-endfloat. Shoulder length is
-    matched to remaining rocker bearing land + finished sleeve + required float.
-    The returned full-thread engagement deducts the specified relief and entry
-    chamfer; it is a geometric value, not a load-rating certification.
+    Head_left/right are maximum axial heights; head_rim_left/right are minimum
+    continuous thicknesses around the load-bearing annuli. Measure diameters
+    at the retaining rims, not a wider unsupported crown. Reject cracked or
+    discontinuous heads and verify free pivoting separately: scalar sizes
+    cannot certify peening quality, load capacity or fatigue life.
     """
-    bearing_land = rocker - recess
-    endfloat = shoulder - sleeve - bearing_land
-    center_distance = (rod_head + rocker) / 2.0 + sleeve + endfloat / 2.0
-    center_error = abs(center_distance - target_center_distance)
+    measurements = (
+        fork_gap, rocker, cheek_left, cheek_right, head_left, head_right,
+        bore, journal, head_dia_left, head_dia_right, head_rim_left,
+        head_rim_right, ear_bore_left, ear_bore_right, station_pitch,
+    )
+    if any(not math.isfinite(v) or v <= 0.0 for v in measurements):
+        raise ValueError("rod pivot requires finite positive finished dimensions")
+    endfloat = fork_gap - rocker
     diametral_clearance = bore - journal
-    head_recess = recess - head - endfloat
-    tip_clearance = rod_head - thread
-    envelope = rod_head + rocker + sleeve + endfloat
-    neighbor_clearance = station_pitch - envelope
+    envelope = cheek_left + fork_gap + cheek_right + head_left + head_right
+    overlap_left = (head_dia_left - ear_bore_left) / 2.0
+    overlap_right = (head_dia_right - ear_bore_right) / 2.0
     values = {
-        "bearing_land_mm": bearing_land,
         "endfloat_mm": endfloat,
-        "center_distance_mm": center_distance,
-        "center_residual_mm": center_error,
         "diametral_clearance_mm": diametral_clearance,
-        "minimum_head_recess_mm": head_recess,
-        "thread_tip_clearance_mm": tip_clearance,
-        "full_thread_engagement_mm": thread - PIN_THREAD_RELIEF_LENGTH - ROD_THREAD_ENTRY_CHAMFER,
         "axial_envelope_mm": envelope,
-        "neighbor_clearance_mm": neighbor_clearance,
+        "axial_envelope_max_mm": station_pitch - PIN_NEIGHBOR_CLEARANCE_MIN,
+        "neighbor_clearance_mm": station_pitch - envelope,
+        "head_overlap_left_mm": overlap_left,
+        "head_overlap_right_mm": overlap_right,
+        "minimum_head_rim_mm": min(head_rim_left, head_rim_right),
     }
     failures = []
-    if bearing_land <= 0.0 or sleeve <= 0.0:
-        failures.append("nonpositive bearing land or spacer")
     if not JOINT_ENDFLOAT_MIN - 1e-9 <= endfloat <= JOINT_ENDFLOAT_MAX + 1e-9:
-        failures.append("endfloat outside matched-fit range")
-    if center_error > CAM_CENTER_RESIDUAL_MAX + 1e-9:
-        failures.append("rod midpoint outside cam-center allowance")
+        failures.append("post-peening sideplay outside matched-fit range")
     if not PIN_DIAMETRAL_CLEARANCE[0] - 1e-9 <= diametral_clearance <= PIN_DIAMETRAL_CLEARANCE[1] + 1e-9:
         failures.append("journal diametral clearance outside running-fit range")
-    if head_recess < 0.0 or tip_clearance < THREAD_TIP_CLEARANCE_MIN - 1e-9:
-        failures.append("pin projects beyond its permitted envelope")
-    if neighbor_clearance <= 0.0:
-        failures.append("neighbor channel envelopes overlap")
+    if min(ear_bore_left, ear_bore_right) < journal:
+        failures.append("journal does not pass through both fork ears")
+    if min(head_dia_left, head_dia_right) < PIN_HEAD_DIAMETER_MIN - 1e-9:
+        failures.append("retaining head diameter below minimum")
+    if min(overlap_left, overlap_right) < PIN_HEAD_RADIAL_OVERLAP_MIN - 1e-9:
+        failures.append("insufficient retaining overlap over fork bore")
+    if min(head_rim_left, head_rim_right) < PIN_HEAD_RIM_THICKNESS_MIN - 1e-9:
+        failures.append("continuous head bearing rim too thin")
+    if head_rim_left > head_left or head_rim_right > head_right:
+        failures.append("rim thickness exceeds measured maximum head height")
+    if values["neighbor_clearance_mm"] < PIN_NEIGHBOR_CLEARANCE_MIN - 1e-9:
+        failures.append("formed heads exceed neighboring-station envelope")
     if failures:
         raise ValueError(f"rod pivot rejected: {failures}; measured={values}")
     return values

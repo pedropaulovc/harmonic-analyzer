@@ -72,13 +72,12 @@ from solidworks_mcp.adapters.solidworks.assembly import (  # noqa: E402
     _mate_group_subfeatures,
     _read_member,
 )
+from channel_axial_spec import CHANNEL_MID_DZ  # noqa: E402
 from build_channel_assembly import (  # noqa: E402
     ARM_ARC_CENTER_LOCAL_Y,
-    ARM_MID_DZ,
     ARM_PIVOT_LOCAL_Y,
     BAR_FOOT_LOCAL,
     BAR_WIDTH,
-    CAM_DZ,
     FULCRUM,
     IDENTITY,
     LEVER_BAR_PIN_BORE_LOCAL,
@@ -198,7 +197,7 @@ async def _seed_chain(adapter, j: int, bushing: str) -> tuple[dict[str, str], li
     t0 = time.perf_counter()
     st = solve_state(0.0)  # neutral amplitude for every station
     zj = z_station(j)
-    z_mid = zj + ARM_MID_DZ
+    z_mid = zj + CHANNEL_MID_DZ
     arm_rows = compose_rows(rot_z_rows(st["arm_tilt"]), ROT_Y_180)
     rod_rows = compose_rows(rot_z_rows(st["rod_tilt"]), ROT_Y_180)
     t = math.radians(st["arm_tilt"])
@@ -215,7 +214,7 @@ async def _seed_chain(adapter, j: int, bushing: str) -> tuple[dict[str, str], li
     )
     rod = await place_component(
         adapter, "connecting-rod",
-        [RING_CENTER[0], RING_CENTER[1], zj + CAM_DZ],
+        [RING_CENTER[0], RING_CENTER[1], z_mid],
         euler_from_rows(rod_rows), rod_rows,
         ground=False, label=f"connecting-rod ch{j:02d} (slice seed)",
     )
@@ -251,7 +250,7 @@ async def _seed_chain(adapter, j: int, bushing: str) -> tuple[dict[str, str], li
     dims += [0.0, PITCH / 2.0,
              _spin_dim_value(pivot_w, (rocker_rod_pin[0], rocker_rod_pin[1]))]
 
-    # J2 rod: coaxial(dead) + axial distance + spin pin (production body,
+    # J2 rod: coaxial(dead) + coincident mid-plane(dead) + spin pin (production body,
     # free_dof_key omitted -> hard).
     rod_tgt = _org(adapter, rod)
     rod_ring = world_point(adapter, rod, ROD_STRAP_BORE_LOCAL)
@@ -260,11 +259,10 @@ async def _seed_chain(adapter, j: int, bushing: str) -> tuple[dict[str, str], li
         adapter, named_ref(f"Axis2@{rocker}", "AXIS"), named_ref(f"Axis2@{rod}", "AXIS"),
         label=f"J2 rod ch{j:02d} coaxial pin <- {rocker}", verify=(rod, rod_tgt),
     )
-    await distance_driver(
+    await coincident_mate(
         adapter, named_ref(f"Front Plane@{rod}", "PLANE"),
         named_ref(f"Front Plane@{rocker}", "PLANE"),
-        rod_tgt[2] - z_mid,
-        label=f"J2 rod ch{j:02d} axial d={abs(rod_tgt[2] - z_mid):.2f} <- {rocker}",
+        label=f"J2 rod ch{j:02d} axial coincident mid-plane <- {rocker}",
         verify=(rod, rod_tgt),
     )
     # The rod-swing pin is authored so the UPRIGHT branch is the FALSE
@@ -314,7 +312,7 @@ async def _seed_chain(adapter, j: int, bushing: str) -> tuple[dict[str, str], li
                                    (rod_ring[0], rod_ring[1]))
         log("rod spin: NO False-side formulation found -- copies will lean "
             "on the FlipDimension repair")
-    dims += [0.0, abs(rod_tgt[2] - z_mid), spin_val]
+    dims += [0.0, 0.0, spin_val]
 
     # J4 lever revolute: concentric(dead) + coincident mid-plane(dead), no
     # spin (closed by J5).
@@ -437,7 +435,7 @@ async def build(adapter) -> dict[str, str]:
     )
     # The anchor bushing in the gap below the seed channel, seated the
     # production way (concentric + Front-datum distance + anti-spin).
-    z_gap = z_station(SEED_J) + ARM_MID_DZ - PITCH / 2.0
+    z_gap = z_station(SEED_J) + CHANNEL_MID_DZ - PITCH / 2.0
     bushing = await place_component(
         adapter, "pivot-bushing", [PIVOT[0], PIVOT[1], z_gap],
         [0.0, 0.0, 0.0], IDENTITY, ground=False,

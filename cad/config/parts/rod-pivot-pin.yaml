@@ -1,8 +1,8 @@
 rod-pivot-pin:
   number: MHA-132
   material: Plain Carbon Steel
-  material_specification: AISI 1018 cold-finished steel
-  finish: bright machined; oil finished bearing and threaded surfaces
+  material_specification: AISI 1018 low-carbon steel, annealed; not hardened
+  finish: bright; oil finished pivot surfaces
   quantity: 20
   tolerance_class: machined_block
-  process: "machined (steel)"
+  process: "machined (steel); second head peened at assembly"
