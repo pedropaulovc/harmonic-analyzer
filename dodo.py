@@ -2547,6 +2547,7 @@ def task_check():
                     # it cannot be imported offline): module_deps_of cannot see it.
                     str((SCRIPTS_DIR / "build_channel_assembly.py").resolve()),
                     str((SCRIPTS_DIR / "channel_spring_installed_notes.py").resolve()),
+                    str((SCRIPTS_DIR / "measuring_stick_spec.py").resolve()),
                     str((CONFIG_DIR / "error_budget.yaml").resolve()),
                     str((CONFIG_DIR / "tolerances.yaml").resolve()),
                     str((CONFIG_DIR / "machine" / "amplitude.yaml").resolve()),

@@ -122,6 +122,7 @@ def test_drawing_limits_agree_with_the_budget(budget):
     GD&T zone, fit band) carries the SAME number as error_budget.yaml."""
     import channel_spring_installed_notes
     import cylinder_gear_spec
+    import measuring_stick_spec
     import summing_lever_spec
 
     feats = budget["critical_features"]
@@ -135,9 +136,13 @@ def test_drawing_limits_agree_with_the_budget(budget):
         in cylinder_gear_spec.DRAWING_NOTES
     ), "cylinder-gear drawing note carries a different cam-phase tolerance"
     assert (
-        f"ALL 20 WITHIN +/-{feats['spring_rate']['tolerance']:.1f}% OF THE SET MEAN"
+        f"ALL 20 WITHIN +/-{feats['spring_rate']['tolerance']:.2f}% OF THE SET MEAN"
         in channel_spring_installed_notes.DRAWING_NOTES
     ), "spring spec sheet carries a different matching requirement"
+    assert (
+        f"SETTING ERROR +/-{feats['station_setting']['tolerance']:.2f} MAX PER BAR"
+        in measuring_stick_spec.DRAWING_NOTES
+    ), "measuring-stick drawing carries a different setting allowance"
     zone = float(
         summing_lever_spec.GEOMETRIC_TOLERANCES_MM["spring-hole pattern position"]
     )
@@ -171,6 +176,9 @@ def test_assembly_imports_the_shared_stations_instead_of_copying():
     )
     assert re.search(
         r"^from rocker_arm_spec import CURVE_RADIUS as ARM_TOP_RADIUS", src, re.M
+    )
+    assert "disc = ARM_TOP_RADIUS**2" in src, (
+        "solve_state no longer rides the imported radius"
     )
     for name in ("PIVOT", "FULCRUM", "ARM_ARC_CENTER_LOCAL_Y", "ARM_TOP_RADIUS"):
         assert not re.search(rf"^{name}\s*=", src, re.M), (

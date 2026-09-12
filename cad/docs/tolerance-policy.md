@@ -144,16 +144,16 @@ pools the all-ones, half-rectangle, Gaussian and alternating inputs; "pair" is c
 | lever bar-pin arm | 0.10 mm | 0.007 | 0.04 | 0.07 | 0.68 | DRO/CNC hole position |
 | lever spring-hook arm | 0.10 mm | 0.005 | 0.03 | 0.05 | 0.96 | DRO/CNC hole position |
 | summing hook arm | 0.15 mm | 0.032 | 0.18 | 0.35 | 0.22 | ½ of the 0.30 pattern-position zone |
-| **spring rate** | **1.5 %** | **0.126** | **0.70** | **1.41** | 0.53 | **matched by measurement** (on the spec sheet), stock is ±10 % |
+| **spring rate** | **1.25 %** | **0.105** | **0.58** | **1.17** | 0.53 | **matched by measurement** — spec-sheet `SET QC`: two hanging loads at eye c-c 60/70, bin from stock (±10 %) |
 | cam phase | 0.25° | 0.035 | 0.19 | 0.22 | 0.36 | lobe and notch indexed in one setup (on the drawing) |
 | mesh lag spread | 0.14° | 0.019 | 0.11 | 0.12 | 0.36 | derived from the 0.05–0.20 backlash band |
-| station setting (setup) | 0.20 mm | 0.028 | 0.20 | 0.82 | 0.12 | measuring-stick reading, vernier-graduated |
-| **all combined** | | **0.143** | **0.77** | **1.90** | | targets 0.30 / 1.5 / 2.0 |
+| station setting (setup) | 0.25 mm | 0.035 | 0.25 | 1.03 | 0.12 | stick drawing note 5: interpolate to 1/5 of the 1.42 minor division (0.28 step) — what the released stick can deliver |
+| **all combined** | | **0.126** | **0.68** | **1.82** | | targets 0.30 / 1.5 / 2.0 |
 
 The budget closes with a factor of two in hand on the broad inputs and just inside the
 two-channel consistency target. Read it as follows.
 
-- **The spring is the tolerance problem, not the machining.** At ±1.5 % matched it is half the
+- **The spring is the tolerance problem, not the machining.** At ±1.25 % matched it is 40 % of the
   scatter; stock springs at ±10 % would alone give ~0.8 % MAE and ~9 % worst-case on sparse
   spectra — more than the whole benchmark. The matching requirement is a manufacturing output:
   the spring spec sheet's `SET QC` note (`channel_spring_installed_notes.DRAWING_NOTES`,
@@ -202,7 +202,9 @@ the specification.
    bar alone, slide it until the fundamental vanishes (the model says −0.52 mm from the pivot
    zero). Graduate or calibrate the stick from single-channel runs, not from a ruler — the gain
    deviates from linear by up to 1.8 % and differs between +d and −d (table above), and Michelson's
-   own stick was "hand stamped, unevenly spaced" for the same reason.
+   own stick was "hand stamped, unevenly spaced" for the same reason. Set each bar by
+   interpolating to 1/5 of the stick's 1.42 mm minor division (stick drawing note 5): a 0.28 mm
+   step gives ±0.14 mm rounding, ±0.25 mm with eye and parallax — the budget's setting term.
 2. **Calibration run**: every bar at full scale, one full period. The k = 0 reading above the
    mean line is $K\cdot 20\cdot d_\text{max}$; this $K$ scales every trial and removes all
    common-mode gain.
@@ -223,7 +225,7 @@ the specification.
 
 | trial | procedure | detects | pass |
 |---|---|---|---|
-| channel consistency | each bar alone at full scale, read the k = 0 amplitude | spring rate, eccentricity, arms, summing holes (gain scatter) | every channel within ±2 % of the mean (the budget's combined worst case is ±2.4 %); an outlier is a spring to swap |
+| channel consistency | each bar alone at full scale, read the k = 0 amplitude | spring rate, eccentricity, arms, summing holes (gain scatter) | every channel within ±2 % of the mean (the budget's combined worst case is ±2.1 %); an outlier is a spring to swap |
 | channel phase | same runs, zero-crossing position vs. expected | cam-to-notch, mesh lag | ≤ 0.4° each (0.25° + 0.14° budgeted) |
 | hysteresis | one bar at full scale, crank forward then back slowly | knife edge, wheel bearing, wire preload | proposed: trace width ≤ 1 % of that channel's stroke (an edge rolling-resistance length ≤ 0.005 mm at the derived load) |
 | null station | one bar near zero, find the station of vanishing fundamental | slide-arc height, stick zero | record; stamp the stick from it |
