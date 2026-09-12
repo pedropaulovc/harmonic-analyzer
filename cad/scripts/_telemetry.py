@@ -130,7 +130,8 @@ _service_name = _resolve_service_name()
 # Project default: ship OTLP to a local **.NET Aspire dashboard** through the
 # local collector with zero env. So `doit ...` / a build script lights up the
 # dashboard's traces+logs the moment it is running -- no OTEL_* exports needed.
-# Override or disable with OTEL_EXPORTER_OTLP_ENDPOINT (set it empty to turn off).
+# Override or disable a signal with its signal-specific endpoint variable.  The
+# global endpoint applies only when the signal-specific variable is absent.
 # HTTP/protobuf remains the default transport. Collectors such as Azure Monitor
 # Agent require both their explicit endpoint variables and ``OTEL_EXPORTER_OTLP_PROTOCOL=grpc``.
 #
@@ -185,8 +186,23 @@ def _endpoint_listening(endpoint: str, timeout: float = 0.15) -> bool:
         return False
 
 
+def _normalize_otlp_endpoint(endpoint: str, protocol: str) -> str:
+    """Validate an OTLP URL and normalize schemeless local gRPC targets."""
+    endpoint = endpoint.strip()
+    parsed = urllib.parse.urlsplit(endpoint)
+    if protocol == "grpc" and not parsed.netloc:
+        local = urllib.parse.urlsplit(f"http://{endpoint}")
+        if local.hostname in {"127.0.0.1", "::1"}:
+            return urllib.parse.urlunsplit(local)
+        raise ValueError("gRPC endpoint requires an http:// or https:// scheme")
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ValueError("endpoint requires an http:// or https:// URL")
+    return endpoint
+
+
 def _signal_otlp_endpoint(endpoint: str, signal: str, protocol: str) -> str:
     """Convert an OTLP base endpoint to the signal endpoint the exporter expects."""
+    endpoint = _normalize_otlp_endpoint(endpoint, protocol)
     if protocol != "http/protobuf":
         return endpoint
     parsed = urllib.parse.urlsplit(endpoint)
@@ -194,9 +210,26 @@ def _signal_otlp_endpoint(endpoint: str, signal: str, protocol: str) -> str:
     return urllib.parse.urlunsplit(parsed._replace(path=signal_path))
 
 
+def _explicit_endpoint_available(
+    endpoint: str, endpoint_cache: dict[str, str | None] | None
+) -> bool:
+    """Probe explicit loopback collectors once; trust non-local configured URLs."""
+    parsed = urllib.parse.urlsplit(endpoint)
+    if parsed.hostname not in {"127.0.0.1", "::1"}:
+        return True
+    cache_key = f"explicit:{parsed.scheme}://{parsed.netloc}"
+    if endpoint_cache is not None and cache_key in endpoint_cache:
+        return endpoint_cache[cache_key] is not None
+    available = _endpoint_listening(endpoint)
+    if endpoint_cache is not None:
+        endpoint_cache[cache_key] = endpoint if available else None
+    return available
+
+
 def _resolve_otlp_endpoint(
     signal: str,
     *,
+    protocol: str | None = None,
     local_endpoints: dict[str, str | None] | None = None,
     pending_warnings: list[tuple[str, str, str]] | None = None,
 ) -> str | None:
@@ -208,18 +241,20 @@ def _resolve_otlp_endpoint(
 
     ``local_endpoints`` shares reachability decisions within the initial
     configuration pass, so signals using the same protocol probe its local
-    collector once before their resolved signal endpoints are pinned.
+    collector once before their resolved signal endpoints are pinned. Explicit
+    loopback endpoints are also probed once so an unavailable local collector
+    cannot stall every process during exporter shutdown.
     """
     signal_endpoint = f"OTEL_EXPORTER_OTLP_{signal.upper()}_ENDPOINT"
-    env = os.environ.get(signal_endpoint)
-    if env is not None:
-        return env or None
-    protocol = _otlp_protocol(signal)
-    env = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
-    if env is not None:
-        return _signal_otlp_endpoint(env, signal, protocol) if env else None
-    endpoints = _DEFAULT_OTLP_ENDPOINTS.get(protocol)
-    if endpoints is None:
+    configured = os.environ.get(signal_endpoint)
+    is_signal_endpoint = configured is not None
+    if configured is None:
+        configured = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
+    if configured is not None and not configured:
+        return None
+
+    protocol = protocol or _otlp_protocol(signal)
+    if protocol not in _DEFAULT_OTLP_ENDPOINTS:
         _warn_otlp_processor(
             signal.rstrip("s"),
             protocol,
@@ -227,6 +262,31 @@ def _resolve_otlp_endpoint(
             pending_warnings=pending_warnings,
         )
         return None
+
+    if configured is not None:
+        try:
+            endpoint = _normalize_otlp_endpoint(configured, protocol)
+            if not is_signal_endpoint:
+                endpoint = _signal_otlp_endpoint(endpoint, signal, protocol)
+        except ValueError as exc:
+            _warn_otlp_processor(
+                signal.rstrip("s"),
+                protocol,
+                str(exc),
+                pending_warnings=pending_warnings,
+            )
+            return None
+        if not _explicit_endpoint_available(endpoint, local_endpoints):
+            _warn_otlp_processor(
+                signal.rstrip("s"),
+                protocol,
+                "configured loopback endpoint is unavailable",
+                pending_warnings=pending_warnings,
+            )
+            return None
+        return endpoint
+
+    endpoints = _DEFAULT_OTLP_ENDPOINTS[protocol]
     if local_endpoints is not None and protocol in local_endpoints:
         endpoint = local_endpoints[protocol]
     else:
@@ -720,25 +780,36 @@ def configure(*, console: bool = True, force: bool = False) -> None:
     want_console = console
     console_level = _console_level()
 
-    # Resolve each OTLP target once. When no endpoint is explicit, probe the local
-    # collector port that matches that signal's selected protocol. Signals sharing
-    # a protocol reuse its result within this configuration pass. Pin reachable
-    # targets into signal-specific standard variables so every build subprocess
-    # inherits the same decision without another probe.
+    # Bound exporter retries before any processors are constructed. An unavailable
+    # collector must not make every short-lived build process hold the COM seat
+    # through the OpenTelemetry SDK's longer default shutdown deadline.
+    os.environ.setdefault("OTEL_EXPORTER_OTLP_TIMEOUT", "1")
+
+    # Resolve each OTLP target once. Probe the local collector port that matches
+    # each signal's selected protocol; signals sharing a protocol reuse the result
+    # within this configuration pass. Pin each reachable endpoint together with
+    # its protocol so every child inherits one internally consistent decision.
     local_endpoints: dict[str, str | None] = {}
     pending_otlp_warnings: list[tuple[str, str, str]] = []
     otlp_endpoints: dict[str, str | None] = {}
     for signal in ("traces", "logs"):
+        protocol = _otlp_protocol(signal)
         otlp_endpoints[signal] = _resolve_otlp_endpoint(
             signal,
+            protocol=protocol,
             local_endpoints=local_endpoints,
             pending_warnings=pending_otlp_warnings,
         )
-        if otlp_endpoints[signal]:
-            os.environ.setdefault(
-                f"OTEL_EXPORTER_OTLP_{signal.upper()}_ENDPOINT",
-                otlp_endpoints[signal],
-            )
+        if not otlp_endpoints[signal]:
+            continue
+        os.environ.setdefault(
+            f"OTEL_EXPORTER_OTLP_{signal.upper()}_ENDPOINT",
+            otlp_endpoints[signal],
+        )
+        os.environ.setdefault(
+            f"OTEL_EXPORTER_OTLP_{signal.upper()}_PROTOCOL",
+            protocol,
+        )
 
     resource = Resource.create(
         {

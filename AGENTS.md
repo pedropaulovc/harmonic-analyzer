@@ -768,22 +768,25 @@ scripts that `from _common import log, check` are instrumented unchanged.
   loopback addresses, never `localhost`**: Windows resolves `localhost` to `::1`
   first, costing ~2 s per failed connection on this seat. During initial
   configuration, `_resolve_otlp_endpoint` tries IPv4 then IPv6 once per selected
-  protocol and pins the resolved signal endpoints. OTLP/HTTP-protobuf uses port
-  `18890`; OTLP/gRPC uses `18889`. Choose transport with
-  `OTEL_EXPORTER_OTLP_PROTOCOL`, `OTEL_EXPORTER_OTLP_TRACES_PROTOCOL`, or
+  protocol and pins each reachable signal endpoint together with its protocol.
+  OTLP/HTTP-protobuf uses port `18890`; OTLP/gRPC uses `18889`. Choose transport
+  with `OTEL_EXPORTER_OTLP_PROTOCOL`, `OTEL_EXPORTER_OTLP_TRACES_PROTOCOL`, or
   `OTEL_EXPORTER_OTLP_LOGS_PROTOCOL`. `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` and
-  `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` win verbatim; an explicitly empty value
-  disables only that signal. HTTP global/default bases gain `/v1/traces` or
-  `/v1/logs`. Unsupported protocols and exporter-initialization failures disable
-  that signal and emit a warning through the configured console/file logging
-  spine. Second,
-  OTLP export is **batched** (`BatchSpanProcessor` /
-  `BatchLogRecordProcessor`), never on the calling thread—a build subprocess
-  holds the COM seat for its whole life. Console + `.jsonl` stay on Simple
-  processors (live console; capture that cannot lose a record to a queue). The
-  batch trade is safe only because `shutdown()` flushes both providers on both
-  exit paths (`run_build`'s tail and the watchdog before `os._exit`). Net:
-  ~4 s per process of pure telemetry overhead removed across ~110 COM tasks.
+  `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` win; an explicitly empty value disables only
+  that signal. Explicit loopback endpoints are probed once. A schemeless literal
+  loopback gRPC target is normalized to `http://`; a schemeless remote target is
+  rejected rather than silently downgrading transport security. HTTP global/default
+  bases gain `/v1/traces` or `/v1/logs`. Unsupported protocols, unavailable explicit
+  loopback collectors, and exporter-initialization failures disable that signal and
+  emit a warning through the configured console/file logging spine. Second, OTLP
+  export is **batched** (`BatchSpanProcessor` / `BatchLogRecordProcessor`), never on
+  the calling thread—a build subprocess holds the COM seat for its whole life.
+  Console + `.jsonl` stay on Simple processors (live console; capture that cannot
+  lose a record to a queue). The batch trade is safe only because `shutdown()`
+  flushes both providers on both exit paths (`run_build`'s tail and the watchdog
+  before `os._exit`); exporter retry deadlines default to one second unless the
+  operator overrides `OTEL_EXPORTER_OTLP_TIMEOUT`. Net: ~4 s per process of pure
+  telemetry overhead removed across ~110 COM tasks.
 - **Where it goes.** Console (stderr) by default; full span/log JSON is also
   captured (best-effort, never fatal) under `cad/out/reports/telemetry/`
   (`traces.jsonl` / `logs.jsonl`, gitignored). Pass `configure(console=False)` to
