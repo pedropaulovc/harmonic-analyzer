@@ -35,6 +35,7 @@ import contextlib
 import contextvars
 import functools
 import inspect
+import ipaddress
 import logging
 import os
 import socket
@@ -170,11 +171,9 @@ def _console_level() -> int:
 def _endpoint_listening(endpoint: str, timeout: float = 0.15) -> bool:
     """True if something is accepting TCP on ``endpoint``'s host:port.
 
-    A cheap reachability probe so the DEFAULT endpoint is used only when the
-    Aspire dashboard is actually up: without it a build with no dashboard would
-    pay per-span OTLP export retries (a headless/CI build must never slow down
-    just because telemetry has nowhere to go). An explicit env endpoint skips the
-    probe -- if you set it, you mean it.
+    A cheap reachability probe so default and explicit local endpoints are used
+    only when their collectors are actually up. Without it, a headless build can
+    pay OTLP export retries at shutdown merely because local telemetry is absent.
     """
     try:
         parsed = urllib.parse.urlsplit(endpoint)
@@ -186,15 +185,35 @@ def _endpoint_listening(endpoint: str, timeout: float = 0.15) -> bool:
         return False
 
 
+def _is_local_otlp_host(host: str | None) -> bool:
+    """Return whether *host* names a loopback or wildcard local interface."""
+    if host == "localhost":
+        return True
+    if host is None:
+        return False
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    if address.is_loopback or address.is_unspecified:
+        return True
+    mapped = getattr(address, "ipv4_mapped", None)
+    return mapped is not None and mapped.is_loopback
+
+
 def _normalize_otlp_endpoint(endpoint: str, protocol: str) -> str:
-    """Validate an OTLP URL and normalize schemeless local gRPC targets."""
+    """Validate HTTP URLs and normalize schemeless local gRPC targets."""
     endpoint = endpoint.strip()
     parsed = urllib.parse.urlsplit(endpoint)
-    if protocol == "grpc" and not parsed.netloc:
+    if protocol == "grpc":
+        if parsed.netloc:
+            return endpoint
         local = urllib.parse.urlsplit(f"http://{endpoint}")
-        if local.hostname in {"127.0.0.1", "::1"}:
+        if _is_local_otlp_host(local.hostname):
             return urllib.parse.urlunsplit(local)
-        raise ValueError("gRPC endpoint requires an http:// or https:// scheme")
+        # Preserve the gRPC exporter's stock behavior: schemeless remote targets
+        # use a secure channel. Plaintext remote collectors require ``http://``.
+        return endpoint
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         raise ValueError("endpoint requires an http:// or https:// URL")
     return endpoint
@@ -213,9 +232,9 @@ def _signal_otlp_endpoint(endpoint: str, signal: str, protocol: str) -> str:
 def _explicit_endpoint_available(
     endpoint: str, endpoint_cache: dict[str, str | None] | None
 ) -> bool:
-    """Probe explicit loopback collectors once; trust non-local configured URLs."""
+    """Probe explicit local collectors once; trust non-local configured targets."""
     parsed = urllib.parse.urlsplit(endpoint)
-    if parsed.hostname not in {"127.0.0.1", "::1"}:
+    if not _is_local_otlp_host(parsed.hostname):
         return True
     cache_key = f"explicit:{parsed.scheme}://{parsed.netloc}"
     if endpoint_cache is not None and cache_key in endpoint_cache:
@@ -671,6 +690,11 @@ def _otlp_protocol(signal: str) -> str:
     return protocol.strip().lower()
 
 
+def _otlp_export_timeout() -> float:
+    """Return the per-export deadline in seconds used by OTel Python."""
+    return float(os.environ.get("OTEL_EXPORTER_OTLP_TIMEOUT", "1"))
+
+
 def _warn_otlp_processor(
     signal: str,
     protocol: str,
@@ -710,7 +734,7 @@ def _otlp_span_processor(*, pending_warnings: list[tuple[str, str, str]] | None 
             )
             return None
 
-        return BatchSpanProcessor(OTLPSpanExporter())
+        return BatchSpanProcessor(OTLPSpanExporter(timeout=_otlp_export_timeout()))
     except Exception as exc:
         _warn_otlp_processor(
             "trace", protocol, str(exc), pending_warnings=pending_warnings
@@ -739,7 +763,7 @@ def _otlp_log_processor(*, pending_warnings: list[tuple[str, str, str]] | None =
             )
             return None
 
-        return BatchLogRecordProcessor(OTLPLogExporter())
+        return BatchLogRecordProcessor(OTLPLogExporter(timeout=_otlp_export_timeout()))
     except Exception as exc:
         _warn_otlp_processor(
             "log", protocol, str(exc), pending_warnings=pending_warnings
@@ -780,10 +804,8 @@ def configure(*, console: bool = True, force: bool = False) -> None:
     want_console = console
     console_level = _console_level()
 
-    # Bound exporter retries before any processors are constructed. An unavailable
-    # collector must not make every short-lived build process hold the COM seat
-    # through the OpenTelemetry SDK's longer default shutdown deadline.
-    os.environ.setdefault("OTEL_EXPORTER_OTLP_TIMEOUT", "1")
+    # Resolve before constructing processors. Each exporter call gets a one-second
+    # default below; batch shutdown can still make one call per queued batch.
 
     # Resolve each OTLP target once. Probe the local collector port that matches
     # each signal's selected protocol; signals sharing a protocol reuse the result
@@ -802,14 +824,10 @@ def configure(*, console: bool = True, force: bool = False) -> None:
         )
         if not otlp_endpoints[signal]:
             continue
-        os.environ.setdefault(
-            f"OTEL_EXPORTER_OTLP_{signal.upper()}_ENDPOINT",
-            otlp_endpoints[signal],
-        )
-        os.environ.setdefault(
-            f"OTEL_EXPORTER_OTLP_{signal.upper()}_PROTOCOL",
-            protocol,
-        )
+        os.environ[f"OTEL_EXPORTER_OTLP_{signal.upper()}_ENDPOINT"] = otlp_endpoints[
+            signal
+        ]
+        os.environ[f"OTEL_EXPORTER_OTLP_{signal.upper()}_PROTOCOL"] = protocol
 
     resource = Resource.create(
         {

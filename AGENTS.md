@@ -773,19 +773,21 @@ scripts that `from _common import log, check` are instrumented unchanged.
   with `OTEL_EXPORTER_OTLP_PROTOCOL`, `OTEL_EXPORTER_OTLP_TRACES_PROTOCOL`, or
   `OTEL_EXPORTER_OTLP_LOGS_PROTOCOL`. `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` and
   `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` win; an explicitly empty value disables only
-  that signal. Explicit loopback endpoints are probed once. A schemeless literal
-  loopback gRPC target is normalized to `http://`; a schemeless remote target is
-  rejected rather than silently downgrading transport security. HTTP global/default
-  bases gain `/v1/traces` or `/v1/logs`. Unsupported protocols, unavailable explicit
-  loopback collectors, and exporter-initialization failures disable that signal and
-  emit a warning through the configured console/file logging spine. Second, OTLP
-  export is **batched** (`BatchSpanProcessor` / `BatchLogRecordProcessor`), never on
-  the calling thread—a build subprocess holds the COM seat for its whole life.
-  Console + `.jsonl` stay on Simple processors (live console; capture that cannot
-  lose a record to a queue). The batch trade is safe only because `shutdown()`
-  flushes both providers on both exit paths (`run_build`'s tail and the watchdog
-  before `os._exit`); exporter retry deadlines default to one second unless the
-  operator overrides `OTEL_EXPORTER_OTLP_TIMEOUT`. Net: ~4 s per process of pure
+  that signal. Explicit local endpoints, including `localhost`, are probed once.
+  A schemeless local gRPC target is normalized to `http://`; a schemeless remote
+  gRPC target keeps the stock exporter behavior and uses a secure channel.
+  Plaintext remote collectors therefore require an explicit `http://` URL. HTTP
+  global/default bases gain `/v1/traces` or `/v1/logs`. Unsupported protocols,
+  unavailable explicit local collectors, and exporter-initialization failures
+  disable that signal and emit a warning through the configured console/file
+  logging spine. Second, OTLP export is **batched** (`BatchSpanProcessor` /
+  `BatchLogRecordProcessor`), never on the calling thread—a build subprocess holds
+  the COM seat for its whole life. Console + `.jsonl` stay on Simple processors
+  (live console; capture that cannot lose a record to a queue). The batch trade is
+  safe only because `shutdown()` flushes both providers on both exit paths
+  (`run_build`'s tail and the watchdog before `os._exit`). Each OTel Python export
+  call defaults to a one-second retry deadline, configurable with
+  `OTEL_EXPORTER_OTLP_TIMEOUT`; shutdown can make one call per queued batch. Net:
   telemetry overhead removed across ~110 COM tasks.
 - **Where it goes.** Console (stderr) by default; full span/log JSON is also
   captured (best-effort, never fatal) under `cad/out/reports/telemetry/`
