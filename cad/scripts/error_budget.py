@@ -331,10 +331,10 @@ def nominal_design_errors(
     A bar parked at the pivot zero still moves -- the null station lies at
     ``null_station()`` < 0, unreachable -- so every channel reads as ordinate
     (d_i - d0)/d_max: a COMMON lift of ``null_lift`` = -d0/d_max on every
-    channel. Lifts leave k >= 1 invariant and raise the k=0 reading by
-    N * null_lift, which the operator knows; pass ``null_lift`` to apply that
-    correction to the k=0 normalisation (the buildable form of "zero the stick
-    at the null station"). ``correct_second_harmonic`` applies the readout
+    channel. Under the 20-element rule a lift reads N*lift at k=0 and -lift at
+    every odd k; pass ``null_lift`` to subtract that known vector after the
+    k=0 normalisation (the buildable form of "zero the stick at the null
+    station"). ``correct_second_harmonic`` applies the readout
     correction of tolerance-policy.md: the operator subtracts
     sum_i x_i kappa_i cos(2 i theta_k) using the per-station kappa table."""
     grid = np.arange(1440) * 2.0 * math.pi / 1440
@@ -379,9 +379,9 @@ def nominal_design_errors(
             np.sum(x_read)
         )
         measured -= (cos_2k @ c2s) / scale
-        # the lift is common to every channel, so it rides only k=0 (the
-        # cos(i*theta_k) sum vanishes for k >= 1 on 20 harmonics at theta_k=k*pi/20
-        # only up to the machine's own quadrature); subtract the known amount.
+        # the lift is common to every channel; under the 20-element rule it reads
+        # 20*lift at k=0 and -lift at every ODD k (sum cos(i k pi/20) = -1 for odd
+        # k, 0 for even k >= 2) -- subtract that whole vector, as the procedure says.
         measured -= ideal_coefficients(np.full(N_ELEMENTS, null_lift))
         e = coefficient_errors_pct(measured, x)
         out[name] = {"mae": float(np.mean(np.abs(e))), "max": float(np.max(np.abs(e)))}

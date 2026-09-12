@@ -115,8 +115,8 @@ are not a pure cosine. From the report (gain measured from the null station):
 
 Stations are non-negative: the built CAD keeps every bar on the lifting side of the pivot
 (`build_channel_assembly` rejects `amplitude_mm < 0`), so a signed input function is **lifted by a
-constant** before analysis — its coefficients for k ≥ 1 are unchanged and the k = 0 reading is
-corrected by the constant. The ledger's "opposite end = 180° phase reversal" is not a mode of the
+constant** before analysis and the constant's lift vector ($20c$ at k = 0, $-c$ at odd k under
+the 20-element rule) is subtracted from the readings. The ledger's "opposite end = 180° phase reversal" is not a mode of the
 CAD as built and is not budgeted.
 
 - **Slider-crank distortion**: rod/throw ratio $e/L$ = 8.64/163.1 gives a second harmonic of
@@ -131,8 +131,11 @@ CAD as built and is not budgeted.
   it is ignored). The null station is on the side of the pivot the CAD cannot build, so it is
   **not** where the stick zero goes; because the gain from the null is linear to 0.2 % over the
   range, every bar reads as ordinate $(d_i - d_0)/d_\text{max}$ — a **known common lift of
-  0.041** on every channel, which leaves k ≥ 1 untouched and is subtracted from the k = 0
-  reading.
+  0.041** on every channel. Under the machine's own 20-element rule a constant lift $\ell$ reads
+  as $20\ell$ at k = 0 and $-\ell$ at every **odd** k ($\sum_{i=1}^{20}\cos(ik\pi/20) = -1$ for
+  odd k, 0 for even k ≥ 2), so the correction is a fixed vector subtracted from every trial —
+  not a k = 0 adjustment alone (ignoring the odd-k term would leave 0.2 % on a broad input and
+  2 % on the two-channel case).
 - **Gain non-uniformity** +0.9 % to +1.1 % across the range, once measured from the null station.
 
 All three are deterministic functions of the design, so they are removed by procedure, not by
@@ -220,8 +223,10 @@ the specification.
 
 1. **Zero the measuring stick at the pivot** (every station ≥ 0, the only side the CAD builds)
    and **measure the null lift** on the assembled machine: one bar at the stick zero, read its
-   k = 0 amplitude as a fraction of a full-scale bar's (the model says 0.041). Every trial's
-   k = 0 reading then carries 20 × that lift, subtracted before normalising. Graduate or
+   k = 0 amplitude as a fraction of a full-scale bar's (the model says $\ell$ = 0.041). Every
+   trial then carries the lift vector $L_k = \sum_i \ell\cos(ik\pi/20)$ = $20\ell$ at k = 0,
+   $-\ell$ at odd k, 0 at even k ≥ 2 — subtract it from every reading (in ordinate units, after
+   normalising). Graduate or
    calibrate the stick from single-channel runs, not from a ruler — the gain deviates from
    linear by 0.9–1.1 % across the range (table above), and Michelson's own stick was "hand
    stamped, unevenly spaced" for the same reason. Set each bar by interpolating to 1/5 of the
@@ -232,8 +237,9 @@ the specification.
    gain, including the magnifier setting, so the magnifier may be reset per trial to bring the
    k = 0 term to the full stroke (the CAD's `pen_driver` maps the trace peak onto the stroke).
 3. **Lift signed inputs**: every bar stays on the lifting side of the pivot (the CAD realises
-   no negative station), so add a constant to a signed function before setting the bars; the
-   k ≥ 1 coefficients are unchanged and the k = 0 reading is corrected by the constant.
+   no negative station), so add a constant $c$ to a signed function before setting the bars and
+   subtract its lift vector ($20c$ at k = 0, $-c$ at odd k) from the readings, exactly as for
+   the null lift.
 4. **Mean-line zero**: for each trial, take the zero as the mean of the trace over one full
    period, not the pen's neutral position. This removes the one-sided-swing DC, spring-preload
    scatter, strap-clearance offsets and tare drift in one step.
@@ -254,7 +260,7 @@ the specification.
 | channel consistency | each bar alone at full scale, read the k = 0 amplitude | spring rate, eccentricity, arms, summing holes (gain scatter) | every channel within ±2 % of the mean (the budget's combined worst case is ±2.1 %); an outlier is a spring to swap |
 | channel phase | same runs, zero-crossing position vs. expected | cam-to-notch, mesh lag | ≤ 0.4° each (0.25° + 0.14° budgeted) |
 | hysteresis | one bar at full scale, crank forward then back slowly | knife edge, wheel bearing, wire preload | proposed: trace width ≤ 1 % of that channel's stroke (an edge rolling-resistance length ≤ 0.005 mm at the derived load) |
-| null lift | one bar at the stick zero, read its k = 0 amplitude vs a full-scale bar | slide-arc height, contact offset | record (model: 0.041); subtract 20× it from every trial's k = 0 |
+| null lift | one bar at the stick zero, read its k = 0 amplitude vs a full-scale bar | slide-arc height, contact offset | record (model: 0.041); subtract its lift vector (20ℓ at k = 0, −ℓ at odd k) from every trial |
 | broad-input benchmark | Michelson's Gaussian ($e^{-(0.1i)^2}$) and half-range rectangle, corrected readout | everything | MAE ≈ 0.7 %, max ≈ 2 % of the greatest term — historical parity |
 | sparse-input stress | channels 1 and 20 alone | consistency without averaging | worst coefficient ≤ 2 % |
 

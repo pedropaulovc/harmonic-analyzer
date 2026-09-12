@@ -173,6 +173,17 @@ def test_fixed_magnifier_readout_is_scored_on_the_worst_broad_input(budget):
     assert any(b.startswith("readout") for b in eb.budget_closes(r))
 
 
+def test_lift_vector_is_what_the_procedure_subtracts():
+    """A common lift l reads 20*l at k=0 and -l at every ODD k under the machine's
+    own 20-element rule -- the vector the policy tells the operator to subtract.
+    A k=0-only correction would leave l at every odd coefficient."""
+    lift = 0.041
+    lv = eb.ideal_coefficients(np.full(eb.N_ELEMENTS, lift))
+    assert lv[0] == pytest.approx(eb.N_ELEMENTS * lift)
+    assert np.allclose(lv[1::2], -lift)
+    assert np.allclose(lv[2::2], 0.0, atol=1e-12)
+
+
 def test_reference_inputs_stay_on_the_lifting_side():
     """build_channel_assembly rejects amplitude_mm < 0, so no reference input may
     put a bar at a negative station."""

@@ -135,4 +135,4 @@ critical_features:
     nominal: null
     quantity: ordinate
     class: setup
-    holds: "measuring-stick reading: interpolate to 1/5 of the 1.42 minor division (0.28 step, +/-0.14 rounding) plus eye/parallax -- stick drawing note 5; the stick zero is set at the assembled machine's NULL station (tolerance-policy.md), not at the pivot"
+    holds: "measuring-stick reading: interpolate to 1/5 of the 1.42 minor division (0.28 step, +/-0.14 rounding) plus eye/parallax -- stick drawing note 5; the 0 tick sits at the rocker pivot axis (every station >= 0) and the measured null lift vector is subtracted from every trial (tolerance-policy.md)"
