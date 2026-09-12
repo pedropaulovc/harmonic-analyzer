@@ -39,6 +39,17 @@ allocation_share:
 # k*pi/20).  See error_budget.py:reference_inputs for the definitions.
 reference_inputs: [all_ones, rect_half, gaussian_a0p1, alternating, pair_1_20]
 
+# Readout-only inputs (the timebase term in the report). The feed is the
+# paper-drive law with the T12 crank / T24 knob removable set mounted
+# (build_paper_drive_assembly.NET_RACK_TRAVEL_PER_CRANK_REV, 0.5 chain *
+# 12/120 gear * pi * 10.16 rack PD = 1.596); swapping to T24/T12 multiplies it
+# by the coarse ratio. Illustrative for the doc's readout guidance -- no gate
+# or drawing limit rides on it, which is why it is a documented input here
+# rather than an import of the SolidWorks-bound assembly module.
+readout:
+  platen_feed_mm_per_crank_turn: 1.596
+  coarse_gear_set_feed_ratio: 4.0
+
 monte_carlo:
   draws: 4000
   seed: 20260912

@@ -51,19 +51,10 @@ import counter_spring_spec
 import cylinder_gear_spec
 import rocker_arm_spec
 import summing_lever_spec
+from channel_frame_geom import LEVER_FULCRUM_XY, ROCKER_PIVOT_XY
 
 BUDGET_YAML = _config.CONFIG_DIR / "error_budget.yaml"
 
-# Machine-frame stations the channel assembly places the mechanism at
-# (build_channel_assembly.py PIVOT / FULCRUM / ARM_ARC_CENTER_LOCAL_Y) and the
-# platen feed law (build_paper_drive_assembly.NET_RACK_TRAVEL_PER_CRANK_REV,
-# T12 crank / T24 knob mounted). Copied here as plain numbers so this module
-# stays out of the assemblies' rebuild closures (they import SolidWorks);
-# test_error_budget.py pins them against the assembly modules where importable.
-ROCKER_PIVOT_XY = (72.9, 253.8)
-LEVER_FULCRUM_XY = (199.9, 1061.4)
-ARM_ARC_CENTER_LOCAL_Y = 816.0
-PLATEN_FEED_MM_PER_CRANK_TURN = 1.596
 CRANK_TURNS_PER_PERIOD = 80  # gear k turns k/80 rev per crank turn (ch. 29 gear law)
 
 N_ELEMENTS = 20
@@ -98,7 +89,7 @@ def nominal() -> Nominal:
         pin_x=rocker_arm_spec.ROD_HOLE_X,
         pin_y=rocker_arm_spec.ROD_HOLE_Y - rocker_arm_spec.PIVOT_MID_Y,
         arc_r=rocker_arm_spec.CURVE_RADIUS,
-        arc_cy=ARM_ARC_CENTER_LOCAL_Y - rocker_arm_spec.PIVOT_MID_Y,
+        arc_cy=rocker_arm_spec.CENTER_Y - rocker_arm_spec.PIVOT_MID_Y,
         fulcrum_dx=LEVER_FULCRUM_XY[0] - ROCKER_PIVOT_XY[0],
         fulcrum_dy=LEVER_FULCRUM_XY[1] - ROCKER_PIVOT_XY[1],
         bar_pin_arm=channel_lever_spec.BAR_PIN_X,
@@ -442,6 +433,10 @@ def monte_carlo(budget: dict[str, Any], nom: Nominal) -> dict[str, Any]:
     mc = budget["monte_carlo"]
     rng = np.random.default_rng(int(mc["seed"]))
     draws = int(mc["draws"])
+    if mc["distribution"] != "uniform":
+        raise ValueError(
+            f"unsupported Monte Carlo distribution: {mc['distribution']!r}"
+        )
     feats = budget["critical_features"]
     sens = gain_sensitivities(nom)
     inputs = reference_inputs()
@@ -500,7 +495,7 @@ def monte_carlo(budget: dict[str, Any], nom: Nominal) -> dict[str, Any]:
 # --------------------------------------------------------------------------
 
 
-def closed_form_terms(nom: Nominal) -> dict[str, Any]:
+def closed_form_terms(nom: Nominal, budget: dict[str, Any]) -> dict[str, Any]:
     u_fs = (
         linear_gain(nom) * nom.d_max
     )  # hook displacement of one channel at full station
@@ -540,23 +535,25 @@ def closed_form_terms(nom: Nominal) -> dict[str, Any]:
     # Timebase: reading at the wrong theta. d(A_k)/d(theta) = -sum i x_i sin(i theta_k),
     # RMS over k, in % FS per rad of FUNDAMENTAL angle. One fundamental period is
     # CRANK_TURNS_PER_PERIOD crank turns (gear k turns k/80 per crank turn), so a
-    # 0.1 mm abscissa reading at the modelled platen feed, or stopping the crank
-    # on an index within +/-8 deg, convert as below.
+    # 0.1 mm abscissa reading at the configured platen feed, or stopping the
+    # crank on an index within +/-8 deg, convert as below.
     slope = {}
     for name, x in reference_inputs().items():
         s = -np.sin(np.outer(THETA_K, HARMONICS)) @ (x * HARMONICS)
         fs = np.max(np.abs(ideal_coefficients(x)))
         slope[name] = float(np.sqrt(np.mean(s * s)) / fs * 100.0)
+    feed = float(budget["readout"]["platen_feed_mm_per_crank_turn"])
+    coarse = float(budget["readout"]["coarse_gear_set_feed_ratio"])
     rad_per_crank_turn = 2.0 * math.pi / CRANK_TURNS_PER_PERIOD
-    rad_per_0p1mm = 0.1 / PLATEN_FEED_MM_PER_CRANK_TURN * rad_per_crank_turn
+    rad_per_0p1mm = 0.1 / feed * rad_per_crank_turn
     rad_per_8deg_crank = 8.0 / 360.0 * rad_per_crank_turn
     timebase = {
         "pct_fs_per_rad_rms": slope,
-        "platen_feed_mm_per_crank_turn": PLATEN_FEED_MM_PER_CRANK_TURN,
+        "platen_feed_mm_per_crank_turn": feed,
         "pct_fs_all_ones_per_0p1mm_abscissa": slope["all_ones"] * rad_per_0p1mm,
         "pct_fs_all_ones_per_0p1mm_abscissa_coarse_gears": slope["all_ones"]
         * rad_per_0p1mm
-        / 4.0,
+        / coarse,
         "pct_fs_all_ones_crank_index_8deg": slope["all_ones"] * rad_per_8deg_crank,
     }
     return {
@@ -592,7 +589,7 @@ def build_report(budget: dict[str, Any] | None = None) -> dict[str, Any]:
         "gain_sensitivities": gain_sensitivities(nom),
         "finite_difference_check": finite_difference_check(nom),
         "monte_carlo": monte_carlo(budget, nom),
-        "closed_form": closed_form_terms(nom),
+        "closed_form": closed_form_terms(nom, budget),
         "targets": budget["targets"],
         "benchmark": budget["benchmark"],
     }
