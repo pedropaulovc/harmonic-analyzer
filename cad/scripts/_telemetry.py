@@ -691,14 +691,24 @@ def _otlp_protocol(signal: str) -> str:
 
 
 def _otlp_export_timeout(signal: str) -> float:
-    """Return the configured OTLP timeout in exporter-native seconds."""
+    """Return a finite OTLP timeout in exporter-native seconds."""
     signal_timeout = f"OTEL_EXPORTER_OTLP_{signal.upper()}_TIMEOUT"
-    configured_timeout = os.environ.get(signal_timeout) or os.environ.get(
-        "OTEL_EXPORTER_OTLP_TIMEOUT"
-    )
-    if configured_timeout is None:
-        return 1.0
-    return float(configured_timeout) / 1000
+    for name in (signal_timeout, "OTEL_EXPORTER_OTLP_TIMEOUT"):
+        configured_timeout = (os.environ.get(name) or "").strip()
+        if not configured_timeout:
+            continue
+        try:
+            timeout_milliseconds = int(configured_timeout)
+        except ValueError:
+            timeout_milliseconds = -1
+        if 0 < timeout_milliseconds <= 2_147_483_647:
+            return timeout_milliseconds / 1000
+        logging.getLogger(_LOGGER_NAME).warning(
+            "Ignoring invalid %s=%r; expected 1..2147483647 milliseconds",
+            name,
+            configured_timeout,
+        )
+    return 1.0
 
 
 def _warn_otlp_processor(

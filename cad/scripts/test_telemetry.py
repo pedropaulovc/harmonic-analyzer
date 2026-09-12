@@ -64,11 +64,14 @@ finally:
     )
 
 
-def _log_exporter(processor):
+def _exporter_of(processor):
     """Return the exporter across supported OTel batch-processor layouts."""
     batch_processor = getattr(processor, "_batch_processor", None)
     if batch_processor is not None:
         return batch_processor._exporter
+    span_exporter = getattr(processor, "span_exporter", None)
+    if span_exporter is not None:
+        return span_exporter
     return processor._exporter
 
 
@@ -448,8 +451,8 @@ def test_otlp_export_honors_standard_transport_env(
         assert span_processor is not None
         assert log_processor is not None
         exporters = [
-            span_processor.span_exporter,
-            _log_exporter(log_processor),
+            _exporter_of(span_processor),
+            _exporter_of(log_processor),
         ]
         assert all(
             module_fragment in type(exporter).__module__ for exporter in exporters
@@ -468,17 +471,37 @@ def test_otlp_export_honors_signal_specific_timeout(monkeypatch, signal):
     monkeypatch.setenv(
         f"OTEL_EXPORTER_OTLP_{signal.upper()}_ENDPOINT", "http://127.0.0.1:4317"
     )
-
     if signal == "traces":
         processor = _telemetry._otlp_span_processor()
-        exporter = processor.span_exporter
     else:
         processor = _telemetry._otlp_log_processor()
-        exporter = _log_exporter(processor)
+    exporter = _exporter_of(processor)
     try:
         assert exporter._timeout == 17.0
     finally:
         processor.shutdown()
+
+
+def test_otlp_export_timeout_fallback_and_global_precedence(monkeypatch):
+    assert _telemetry._otlp_export_timeout("traces") == 1.0
+
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_TIMEOUT", "30000")
+    assert _telemetry._otlp_export_timeout("traces") == 30.0
+
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_TRACES_TIMEOUT", " ")
+    assert _telemetry._otlp_export_timeout("traces") == 30.0
+
+
+@pytest.mark.parametrize("invalid_timeout", ("-1", "0", "1.5", "invalid"))
+def test_invalid_otlp_export_timeout_warns_and_falls_back(
+    monkeypatch, capsys, invalid_timeout
+):
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_TRACES_TIMEOUT", invalid_timeout)
+
+    assert _telemetry._otlp_export_timeout("traces") == 1.0
+    assert (
+        "Ignoring invalid OTEL_EXPORTER_OTLP_TRACES_TIMEOUT" in capsys.readouterr().err
+    )
 
 
 def test_empty_signal_protocol_falls_back_to_global_transport(monkeypatch):
