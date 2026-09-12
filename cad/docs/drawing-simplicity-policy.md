@@ -186,7 +186,10 @@ verdict a blind senior machinist gives each drawing package under the calibrated
 prompt in `cad/scripts/prompts/`. Parts use their single PNG; assemblies render
 every PDF page and submit all sheet images to one review. A package passes when
 the verdict is `SHIP` with no blocker, no over-specification and no clarity
-finding. Minor findings are recorded, not gating. Each part's
-`test_<part>_drawing.py` pins the simplified state (no frames unless allowlisted,
-note line count, hidden lines on) so the fleet cannot regrow the complexity
-between reviews.
+finding. Minor findings are recorded, not gating. Regression tests must defend
+observable manufacturing contracts and plausible failures, not fixed note wording,
+line counts, or mocked API-call sequences. Native drawing generation must verify
+persisted dimension values, tolerances, reference state, and required view modes;
+the exported sheet review checks clarity and unnecessary annotations. Add focused
+behavioral tests for uncertain boundaries, without duplicating native readback
+checks with mocks.

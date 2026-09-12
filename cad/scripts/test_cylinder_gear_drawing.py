@@ -1,9 +1,13 @@
-"""Finished bore-fit contracts shared by the native gear and its drawing."""
+"""Finished-fit and tooth-system contracts consumed by the native drawing."""
 
 from __future__ import annotations
 
+import runpy
+
 import pytest
 
+import _config
+from build_cone_gear import gear_facts
 import cylinder_gear_shaft_spec as arbor
 import cylinder_gear_spec as spec
 
@@ -20,3 +24,20 @@ def test_native_bore_represents_a_finished_running_fit() -> None:
     minimum, maximum = spec.matched_bore_limits(arbor.SHAFT_DIA)
     assert minimum <= spec.BORE_DIA <= maximum
     assert spec.BORE_DIA - arbor.SHAFT_DIA == pytest.approx(0.050)
+
+
+def test_blank_and_tooth_profile_follow_the_same_configured_pitch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configured_pitch = 40.0  # Deliberately differs from the current machine setting.
+    original_machine = _config.machine
+
+    def machine_value(*keys: str):
+        if keys == ("gear_train", "diametral_pitch"):
+            return configured_pitch
+        return original_machine(*keys)
+
+    monkeypatch.setattr(_config, "machine", machine_value)
+    dimensions = runpy.run_path(spec.__file__)
+    profile = gear_facts(dimensions["TEETH"], configured_pitch)
+    assert dimensions["OUTSIDE_DIA"] / 2.0 == pytest.approx(profile["Ra"] * 25.4)
