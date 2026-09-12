@@ -94,6 +94,13 @@ whole allocation:
 > 20 **cams**, and (c) **channel-to-channel consistency**. Relax everywhere the book itself shows
 > wear, hand-work, or a designed-in adjustment.
 
+> **Quantified since:** the sensitivities, the nominal-design residual (slider-crank second
+> harmonic, null station), the Monte Carlo allocation and the readout procedure are computed
+> by `cad/scripts/error_budget.py` and applied in
+> [`tolerance-policy.md`](./tolerance-policy.md). Two corrections to the intuition above: the
+> **spring-rate match** dominates the channel scatter (the cams and lever arms are cheap), and the
+> knife edge matters for *hysteresis*, not gain.
+
 The book is unusually explicit about where it is *forgiving*, and those are direct licences to
 loosen: the cone↔cylinder mesh runs at an oblique angle with "distinct wear patterns" (partial
 engagement is tolerated and the centre distance is deliberately adjustable); the connecting rods
