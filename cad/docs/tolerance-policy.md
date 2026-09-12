@@ -127,13 +127,17 @@ CAD as built and is not budgeted.
 - **Null station −3.62 mm** (foot-axis x from the pivot): the notch roof touches the arc
   3.175 mm from the foot axis (`amplitude_bar_spec.BAR_WIDTH/2`) and the arc's low point sits
   8 mm above the pivot centreline, so a bar at the geometric zero still moves — 18 idle bars at
-  "zero" add a coherent 3.6 %-of-a-channel error each (up to 34 % on a two-channel input if the
-  stick is zeroed at the pivot).
+  "zero" add a coherent 4.1 %-of-full-scale error each (up to 29 % max on a two-channel input if
+  it is ignored). The null station is on the side of the pivot the CAD cannot build, so it is
+  **not** where the stick zero goes; because the gain from the null is linear to 0.2 % over the
+  range, every bar reads as ordinate $(d_i - d_0)/d_\text{max}$ — a **known common lift of
+  0.041** on every channel, which leaves k ≥ 1 untouched and is subtracted from the k = 0
+  reading.
 - **Gain non-uniformity** +0.9 % to +1.1 % across the range, once measured from the null station.
 
 All three are deterministic functions of the design, so they are removed by procedure, not by
-tolerance (readout section below). With the stick zeroed at the null station and the
-second-harmonic correction applied, the nominal residual falls to ≤ 0.02 % MAE / 0.09 % max on
+tolerance (readout section below). With the null lift subtracted from k = 0 and the
+second-harmonic correction applied, the nominal residual falls to ≤ 0.02 % MAE / 0.11 % max on
 every reference input — the "+c2 corrected" column of the report.
 Lengthening the rod would remove it by design but is not photo-faithful; the correction is the
 period-appropriate answer (the machine computes, the operator corrects a known table).
@@ -195,7 +199,7 @@ two-channel consistency target. Read it as follows.
 |---|---|---|---|
 | term | assumption (`error_budget.yaml reserved:`) | value | allowance |
 |---|---|---:|---:|
-| nominal residual after correction | null-station zero + 2nd-harmonic correction | 0.018 % MAE | 0.05 |
+| nominal residual after correction | null lift on k = 0 + 2nd-harmonic correction | 0.019 % MAE | 0.05 |
 | ordinate readout | the CAD's **15 mm half-stroke** (`output.yaml pen_trace_half_mm`, asserted by `verify:kinematics`) read to ±0.075 mm (half a 0.15 mm technical-pen line against the grid), **with the magnifier set per trial so the greatest (k = 0) term spans the stroke** — the CAD's `pen_driver` convention and Michelson's normalisation. That needs 2.0–2.4× the all-ones magnification for the broad inputs (10× for the two-channel case): the open magnifier-range item. At a fixed all-ones setting the broad-input worst case is 1.2 % (`greatest_term_spans_stroke: false` in the yaml scores it and fails the gate) | 0.50 % FS | 0.50 — the 0.5-unit quantisation of Michelson's own tables |
 | timebase | read coefficient k with the crank stopped on its index at 2k turns, index repeatable to ±8° (uniform), scored on the worst reference input (the lifted square, 252 % FS/rad) — vs 1.24 % FS per 0.1 mm of abscissa at the CAD's 1.596 mm/turn feed (`paper_drive_geom`), 0.31 % with the coarse T24/T12 set | 0.25 % FS | 0.30 |
 | knife-edge hysteresis | hardened edge on a hardened seat, rolling-resistance length 0.005 mm at the derived 1.5 kN edge load (2.2 % of one channel's stroke per 0.01 mm); *measure* as trace width on a slow reversal | 0.06 % FS | 0.10 |
@@ -214,14 +218,15 @@ machining.
 The Monte Carlo and the residual numbers above hold only under this procedure; it is part of
 the specification.
 
-1. **Zero the measuring stick at the null station**, found on the assembled machine: with one
-   bar alone, slide it until the fundamental vanishes (the model says −3.62 mm of foot-axis
-   travel from the pivot zero, the notch-roof contact being 3.175 mm off the foot axis).
-   Graduate or calibrate the stick from single-channel runs, not from a ruler — the gain
-   deviates from linear by 0.9–1.6 % across the range (table above), and Michelson's
-   own stick was "hand stamped, unevenly spaced" for the same reason. Set each bar by
-   interpolating to 1/5 of the stick's 1.42 mm minor division (stick drawing note 5): a 0.28 mm
-   step gives ±0.14 mm rounding, ±0.25 mm with eye and parallax — the budget's setting term.
+1. **Zero the measuring stick at the pivot** (every station ≥ 0, the only side the CAD builds)
+   and **measure the null lift** on the assembled machine: one bar at the stick zero, read its
+   k = 0 amplitude as a fraction of a full-scale bar's (the model says 0.041). Every trial's
+   k = 0 reading then carries 20 × that lift, subtracted before normalising. Graduate or
+   calibrate the stick from single-channel runs, not from a ruler — the gain deviates from
+   linear by 0.9–1.1 % across the range (table above), and Michelson's own stick was "hand
+   stamped, unevenly spaced" for the same reason. Set each bar by interpolating to 1/5 of the
+   stick's 1.42 mm minor division (stick drawing note 5): a 0.28 mm step gives ±0.14 mm
+   rounding, ±0.25 mm with eye and parallax — the budget's setting term.
 2. **Normalise each trial by its own k = 0 reading**, which equals $\sum_i x_i$ (the operator
    set the bars) — Michelson's normalisation to the greatest term. This removes all common-mode
    gain, including the magnifier setting, so the magnifier may be reset per trial to bring the
@@ -249,7 +254,7 @@ the specification.
 | channel consistency | each bar alone at full scale, read the k = 0 amplitude | spring rate, eccentricity, arms, summing holes (gain scatter) | every channel within ±2 % of the mean (the budget's combined worst case is ±2.1 %); an outlier is a spring to swap |
 | channel phase | same runs, zero-crossing position vs. expected | cam-to-notch, mesh lag | ≤ 0.4° each (0.25° + 0.14° budgeted) |
 | hysteresis | one bar at full scale, crank forward then back slowly | knife edge, wheel bearing, wire preload | proposed: trace width ≤ 1 % of that channel's stroke (an edge rolling-resistance length ≤ 0.005 mm at the derived load) |
-| null station | one bar near zero, find the station of vanishing fundamental | slide-arc height, stick zero | record; stamp the stick from it |
+| null lift | one bar at the stick zero, read its k = 0 amplitude vs a full-scale bar | slide-arc height, contact offset | record (model: 0.041); subtract 20× it from every trial's k = 0 |
 | broad-input benchmark | Michelson's Gaussian ($e^{-(0.1i)^2}$) and half-range rectangle, corrected readout | everything | MAE ≈ 0.7 %, max ≈ 2 % of the greatest term — historical parity |
 | sparse-input stress | channels 1 and 20 alone | consistency without averaging | worst coefficient ≤ 2 % |
 

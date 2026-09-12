@@ -320,16 +320,23 @@ def second_harmonic(u: np.ndarray, grid: np.ndarray) -> float:
 
 
 def nominal_design_errors(
-    nom: Nominal, stick_zero: float = 0.0, correct_second_harmonic: bool = False
+    nom: Nominal,
+    null_lift: float = 0.0,
+    correct_second_harmonic: bool = False,
 ) -> dict[str, dict[str, float]]:
     """Coefficient errors of the NOMINAL machine (no tolerances) through the
-    exact kinematics, per reference input. ``stick_zero`` offsets every station
-    (the measuring-stick zero relative to the pivot). Every channel is summed,
-    including those at station 0: the slide arc sits above the pivot, so a
-    zero-station bar still moves a little (that is what the null station is).
-    ``correct_second_harmonic`` applies the readout correction of
-    tolerance-policy.md: the operator subtracts sum_i x_i kappa_i cos(2 i theta_k)
-    using the per-station kappa of the calibration table."""
+    exact kinematics, per reference input, every bar on the lifting side
+    (station = x_i * d_max >= 0, the only poses the CAD builds).
+
+    A bar parked at the pivot zero still moves -- the null station lies at
+    ``null_station()`` < 0, unreachable -- so every channel reads as ordinate
+    (d_i - d0)/d_max: a COMMON lift of ``null_lift`` = -d0/d_max on every
+    channel. Lifts leave k >= 1 invariant and raise the k=0 reading by
+    N * null_lift, which the operator knows; pass ``null_lift`` to apply that
+    correction to the k=0 normalisation (the buildable form of "zero the stick
+    at the null station"). ``correct_second_harmonic`` applies the readout
+    correction of tolerance-policy.md: the operator subtracts
+    sum_i x_i kappa_i cos(2 i theta_k) using the per-station kappa table."""
     grid = np.arange(1440) * 2.0 * math.pi / 1440
     cycle: dict[float, np.ndarray] = {}
 
@@ -361,16 +368,21 @@ def nominal_design_errors(
     cos_2k = np.cos(2.0 * np.outer(THETA_K, HARMONICS))
     out: dict[str, dict[str, float]] = {}
     for name, x in reference_inputs().items():
-        stations = x * nom.d_max + stick_zero
+        stations = x * nom.d_max
+        x_read = x + null_lift  # what the machine actually sums, per channel
         c2s = c2(stations)  # trace units, per channel
         trace = trace_for(stations)
-        measured = read_coefficients(trace, x, c2_total=float(c2s.sum()))
+        measured = read_coefficients(trace, x_read, c2_total=float(c2s.sum()))
         # the correction table is in trace units; convert with the trial's scale
         zero = float(np.mean(trace(PERIOD)))
         scale = (float(trace(THETA_K[:1])[0]) - zero - float(c2s.sum())) / float(
-            np.sum(x)
+            np.sum(x_read)
         )
         measured -= (cos_2k @ c2s) / scale
+        # the lift is common to every channel, so it rides only k=0 (the
+        # cos(i*theta_k) sum vanishes for k >= 1 on 20 harmonics at theta_k=k*pi/20
+        # only up to the machine's own quadrature); subtract the known amount.
+        measured -= ideal_coefficients(np.full(N_ELEMENTS, null_lift))
         e = coefficient_errors_pct(measured, x)
         out[name] = {"mae": float(np.mean(np.abs(e))), "max": float(np.max(np.abs(e)))}
     return out
@@ -658,11 +670,14 @@ def build_report(budget: dict[str, Any] | None = None) -> dict[str, Any]:
         "linear_gain_mm_per_mm": linear_gain(nom),
         "null_station_mm": d0,
         "harmonics": {f"{d:+.0f}": harmonic_content(d, nom, null=d0) for d in stations},
+        "null_lift_ordinate": -d0 / nom.d_max,
         "nominal_design_errors": {
-            "stick_zero_at_pivot": nominal_design_errors(nom),
-            "stick_zero_at_null_station": nominal_design_errors(nom, stick_zero=d0),
-            "null_station_and_c2_corrected": nominal_design_errors(
-                nom, stick_zero=d0, correct_second_harmonic=True
+            "uncorrected": nominal_design_errors(nom),
+            "null_lift_corrected": nominal_design_errors(
+                nom, null_lift=-d0 / nom.d_max
+            ),
+            "null_lift_and_c2_corrected": nominal_design_errors(
+                nom, null_lift=-d0 / nom.d_max, correct_second_harmonic=True
             ),
         },
         "gain_sensitivities": gain_sensitivities(nom),
@@ -691,6 +706,7 @@ def _print_report(r: dict[str, Any], budget: dict[str, Any]) -> None:
     )
     p(
         f"linear gain: {r['linear_gain_mm_per_mm']:.5f} mm hook per mm station;  NULL station: {r['null_station_mm']:+.3f} mm"
+        f" (unreachable) = a common lift of {r['null_lift_ordinate']:.4f} ordinate on every bar"
     )
     p("\n## 1. Nominal design (no tolerances) -- harmonic content of one channel")
     p(f"{'station':>8} {'gain/linear':>12} {'DC/c1':>8} {'c2/c1':>8} {'c3/c1':>8}")
@@ -702,13 +718,13 @@ def _print_report(r: dict[str, Any], budget: dict[str, Any]) -> None:
         "\ncoefficient error of the NOMINAL machine through the calibrated readout, % of greatest term:"
     )
     p(
-        f"{'input':>16} {'stick@pivot':>14} {'max':>7} {'stick@null':>12} {'max':>7} {'+c2 corrected':>14} {'max':>7}"
+        f"{'input':>16} {'uncorrected':>14} {'max':>7} {'+null lift':>12} {'max':>7} {'+c2 corrected':>14} {'max':>7}"
     )
     nde = r["nominal_design_errors"]
     a, b, c3 = (
-        nde["stick_zero_at_pivot"],
-        nde["stick_zero_at_null_station"],
-        nde["null_station_and_c2_corrected"],
+        nde["uncorrected"],
+        nde["null_lift_corrected"],
+        nde["null_lift_and_c2_corrected"],
     )
     for name in a:
         p(
@@ -764,7 +780,7 @@ def closure(r: dict[str, Any], budget: dict[str, Any]) -> dict[str, float]:
     corrected nominal residual is systematic and adds; scatter, readout,
     timebase and knife are independent and combine root-sum-square."""
     cf = r["closed_form"]
-    nde = r["nominal_design_errors"]["null_station_and_c2_corrected"]
+    nde = r["nominal_design_errors"]["null_lift_and_c2_corrected"]
     broad = [n for n in budget["reference_inputs"] if n != "pair_1_20"]
     terms = {
         "nominal_residual_mae": max(nde[n]["mae"] for n in broad),

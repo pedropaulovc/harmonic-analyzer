@@ -96,17 +96,24 @@ def test_second_harmonic_correction_removes_the_nominal_residual(report):
     assert 0.010 < h["c2"] / h["c1"] < 0.020
     nde = report["nominal_design_errors"]
     for name in ("all_ones", "rect_half", "gaussian_a0p1"):
-        assert nde["stick_zero_at_null_station"][name]["max"] > 1.0
-        assert nde["null_station_and_c2_corrected"][name]["mae"] < 0.05
-        assert nde["null_station_and_c2_corrected"][name]["max"] < 0.10
+        assert nde["uncorrected"][name]["max"] > 1.0
+        assert nde["null_lift_and_c2_corrected"][name]["mae"] < 0.05
+        assert nde["null_lift_and_c2_corrected"][name]["max"] < 0.12
 
 
-def test_null_station_is_below_the_pivot_zero(report, nom):
+def test_null_station_is_unreachable_and_handled_as_a_lift(report, nom):
     """The notch-roof contact sits contact_dx off the foot axis and the slide arc
-    above the pivot centreline, so a bar at the pivot zero still moves: the
-    stick zero belongs at the null station, just past -contact_dx."""
+    above the pivot centreline, so a bar at the pivot zero still moves; the null
+    station lies past -contact_dx, on the side the CAD cannot build, so it is
+    handled as a known common lift on every channel, never as a negative
+    station."""
     d0 = report["null_station_mm"]
     assert -nom.contact_dx - 1.0 < d0 < -nom.contact_dx
+    assert report["null_lift_ordinate"] == pytest.approx(-d0 / nom.d_max)
+    # the lift alone (no c2 correction) removes the idle-bar error on the pair input
+    nde = report["nominal_design_errors"]
+    assert nde["uncorrected"]["pair_1_20"]["max"] > 5.0
+    assert nde["null_lift_corrected"]["pair_1_20"]["max"] < 3.5
     assert (
         abs(eb.harmonic_content(d0, nom)["c1"]) < 1e-3 * eb.linear_gain(nom) * nom.d_max
     )
