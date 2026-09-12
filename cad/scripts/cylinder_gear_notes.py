@@ -11,6 +11,11 @@ BORE_FIT_CALLOUT = (
     f"{spec.BORE_DIAMETRAL_CLEARANCE_MM[0]:.3f}-{spec.BORE_DIAMETRAL_CLEARANCE_MM[1]:.3f} "
     "DIAMETRAL CLEARANCE"
 )
+# TODO(#744): validate the forked rod and centered channel bank in the native
+# assembly. The drawing requirement below does not certify that integration.
+# TODO(#743): establish physical shaft-end retention and measured bank endplay,
+# then prove full ring support through the stroke and every allowed axial position.
+# Static assembly mates and the 3.5 mm reference cam width are not that proof.
 CAM_AXIAL_FIT_CALLOUT = (
     "FIT TO CONNECTING ROD MHA-017\n"
     "SUPPORT FULL RING WIDTH\n"
