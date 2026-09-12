@@ -239,12 +239,30 @@ def test_shipped_readout_procedure_carries_every_correction(report, nom):
     doc = eb.readout_procedure(report, nom)
     rows = eb.calibration_table(nom)
     assert rows[0][0] == 0.0 and rows[-1][0] == nom.d_max
-    assert f"| {rows[0][0]:6.1f} | {rows[0][1]:+.4f} |" in doc  # idle-bar read ordinate
+    assert f"| {rows[0][1]:+.4f} | {rows[0][0]:6.1f} |" in doc  # idle-bar read ordinate
+    assert f"one numbered division = {eb.STICK_DIVISION_MM:.2f} mm" in doc
+    assert "look up the\n**stick reading**" in doc
     assert f"\\ell = {report['null_lift_ordinate']:.4f}" in doc
     assert "-c$ at every odd $k$" in doc
     assert "\\kappa_i \\cos(2 i \\theta_k)" in doc
     assert "crank stopped on its index" in doc
     assert "ONE direction" in doc
+
+
+def test_stick_division_matches_the_engraved_scale():
+    """The procedure converts stations to stick readings with the same division
+    the stick drawing engraves (note 2: TICK N AT 14.20 x N), and the drawing
+    says the scale is linear in station -- the ordinate is a table lookup."""
+    import measuring_stick_spec
+
+    assert (
+        f"TICK N AT {eb.STICK_DIVISION_MM:.2f} X N"
+        in measuring_stick_spec.DRAWING_NOTES
+    )
+    assert (
+        f"SCALE IS LINEAR IN STATION (1 DIVISION = {eb.STICK_DIVISION_MM:.2f})"
+        in measuring_stick_spec.DRAWING_NOTES
+    )
 
 
 def test_reference_inputs_stay_on_the_lifting_side():

@@ -145,9 +145,9 @@ CAD as built and is not budgeted.
   2 % on the two-channel case).
 - **Gain non-uniformity** 1.0 % to 2.5 % across the range, once measured from the null station —
   large enough that a millimetre-ruled stick is wrong by up to 0.06 % MAE / 0.33 % max on the
-  Gaussian input. The stick is therefore **graduated in read ordinate** from the model's
-  station table (the shipped `READOUT.md`), which is what Michelson's "hand stamped, unevenly
-  spaced" stick was.
+  Gaussian input. The stick stays a linear rule (14.20 mm per division, as engraved); the
+  ordinate → stick-reading conversion is a **table lookup** in the shipped `READOUT.md` — the
+  same correction Michelson built into his "hand stamped, unevenly spaced" stick.
 
 All three are deterministic functions of the design, so they are removed by procedure, not by
 tolerance (readout section below). With the calibrated stick, the read-vs-set vector subtracted
@@ -213,7 +213,7 @@ two-channel consistency target. Read it as follows.
 |---|---|---|---|
 | term | assumption (`error_budget.yaml reserved:`) | value | allowance |
 |---|---|---:|---:|
-| nominal residual after correction | calibrated stick + read-vs-set vector + 2nd-harmonic correction (all in the shipped `READOUT.md`) | 0.016 % MAE | 0.05 |
+| nominal residual after correction | table-lookup setting + read-vs-set vector + 2nd-harmonic correction (all in the shipped `READOUT.md`) | 0.016 % MAE | 0.05 |
 | ordinate readout | the CAD's **15 mm half-stroke** (`output.yaml pen_trace_half_mm`, asserted by `verify:kinematics`) read to ±0.075 mm (half a 0.15 mm technical-pen line against the grid), **with the magnifier set per trial so the greatest (k = 0) term spans the stroke** — the CAD's `pen_driver` convention and Michelson's normalisation. That needs 2.0–2.4× the all-ones magnification for the broad inputs (10× for the two-channel case): the open magnifier-range item. At a fixed all-ones setting the broad-input worst case is 1.2 % (`greatest_term_spans_stroke: false` in the yaml scores it and fails the gate) | 0.50 % FS | 0.50 — the 0.5-unit quantisation of Michelson's own tables |
 | timebase | read coefficient k with the crank stopped on its index at 2k turns, index repeatable to ±8° (uniform), scored on the worst reference input (the lifted square, 252 % FS/rad) — vs 1.24 % FS per 0.1 mm of abscissa at the CAD's 1.596 mm/turn feed (`paper_drive_geom`), 0.31 % with the coarse T24/T12 set | 0.25 % FS | 0.30 |
 | knife-edge hysteresis | hardened edge on a hardened seat, rolling-resistance length 0.005 mm at the derived 2.3 kN edge load — the 20 channel preloads (1.5 kN) **plus** the counter spring's balancing reaction (0.8 kN at the 76.2 mm arm), both bearing on the knife (3.4 % of one channel's stroke per 0.01 mm); *measure* as trace width on a slow reversal | 0.09 % FS | 0.10 |
@@ -233,10 +233,11 @@ The Monte Carlo and the residual numbers above hold only under this procedure; i
 the specification.
 
 1. **Zero the measuring stick at the pivot** (every station ≥ 0, the only side the CAD builds)
-   and **graduate the stick in read ordinate** from single-channel runs (the model's station
-   table ships as `READOUT.md` in the release bundle): one bar alone at each station, its k = 0
-   amplitude as a fraction of a full-scale bar's. An idle bar at the stick zero reads
-   $\ell$ = 0.029, not 0. Every trial then carries the read-vs-set vector
+   and **set each bar by table lookup**: the stick is engraved linear in station (14.20 mm per
+   division), the ordinate is not, so the wanted ordinate's stick reading comes from the
+   ordinate → station table in the shipped `READOUT.md` (verify it on the assembled machine
+   from single-channel runs: one bar alone at each station, its k = 0 amplitude as a fraction of
+   a full-scale bar's). An idle bar at the stick zero reads $\ell$ = 0.029, not 0. Every trial then carries the read-vs-set vector
    $\sum_i (x^{read}_i - x^{set}_i)\cos(ik\pi/20)$ — for idle bars $20\ell$ at k = 0, $-\ell$ at
    odd k, 0 at even k ≥ 2 — subtracted from every reading (in ordinate units, after
    normalising). Graduate or
@@ -277,7 +278,7 @@ the specification.
 | channel consistency | each bar alone at full scale, read the k = 0 amplitude | spring rate, eccentricity, arms, summing holes (gain scatter) | every channel within ±2 % of the mean (the budget's combined worst case is ±2.1 %); an outlier is a spring to swap |
 | channel phase | same runs, zero-crossing position vs. expected | cam-to-notch, mesh lag | ≤ 0.4° each (0.25° + 0.14° budgeted) |
 | hysteresis | one bar at full scale, crank forward then back slowly | knife edge, wheel bearing, wire preload | proposed: trace width ≤ 1 % of that channel's stroke (an edge rolling-resistance length ≤ 0.005 mm at the derived load) |
-| stick calibration | one bar alone at each station, k = 0 amplitude vs a full-scale bar | slide-arc height, contact offset, gain curvature | graduate the stick; idle bar reads ≈ 0.029; subtract the read-vs-set vector (20ℓ at k = 0, −ℓ at odd k) from every trial |
+| station table check | one bar alone at each station, k = 0 amplitude vs a full-scale bar | slide-arc height, contact offset, gain curvature | matches the `READOUT.md` table; idle bar reads ≈ 0.029; subtract the read-vs-set vector (20ℓ at k = 0, −ℓ at odd k) from every trial |
 | broad-input benchmark | Michelson's Gaussian ($e^{-(0.1i)^2}$) and half-range rectangle, corrected readout | everything | MAE ≈ 0.7 %, max ≈ 2 % of the greatest term — historical parity |
 | sparse-input stress | channels 1 and 20 alone | consistency without averaging | worst coefficient ≤ 2 % |
 
