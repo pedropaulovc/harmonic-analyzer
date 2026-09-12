@@ -299,7 +299,7 @@ def _resolve_otlp_endpoint(
             _warn_otlp_processor(
                 signal.rstrip("s"),
                 protocol,
-                "configured loopback endpoint is unavailable",
+                "configured local endpoint is unavailable",
                 pending_warnings=pending_warnings,
             )
             return None
@@ -690,9 +690,14 @@ def _otlp_protocol(signal: str) -> str:
     return protocol.strip().lower()
 
 
-def _otlp_export_timeout() -> float:
-    """Return the per-export deadline in seconds used by OTel Python."""
-    return float(os.environ.get("OTEL_EXPORTER_OTLP_TIMEOUT", "1"))
+def _otlp_export_timeout(signal: str) -> float:
+    """Return the signal-specific or global per-export deadline in seconds."""
+    signal_timeout = f"OTEL_EXPORTER_OTLP_{signal.upper()}_TIMEOUT"
+    return float(
+        os.environ.get(signal_timeout)
+        or os.environ.get("OTEL_EXPORTER_OTLP_TIMEOUT")
+        or "1"
+    )
 
 
 def _warn_otlp_processor(
@@ -734,7 +739,9 @@ def _otlp_span_processor(*, pending_warnings: list[tuple[str, str, str]] | None 
             )
             return None
 
-        return BatchSpanProcessor(OTLPSpanExporter(timeout=_otlp_export_timeout()))
+        return BatchSpanProcessor(
+            OTLPSpanExporter(timeout=_otlp_export_timeout("traces"))
+        )
     except Exception as exc:
         _warn_otlp_processor(
             "trace", protocol, str(exc), pending_warnings=pending_warnings
@@ -763,7 +770,9 @@ def _otlp_log_processor(*, pending_warnings: list[tuple[str, str, str]] | None =
             )
             return None
 
-        return BatchLogRecordProcessor(OTLPLogExporter(timeout=_otlp_export_timeout()))
+        return BatchLogRecordProcessor(
+            OTLPLogExporter(timeout=_otlp_export_timeout("logs"))
+        )
     except Exception as exc:
         _warn_otlp_processor(
             "log", protocol, str(exc), pending_warnings=pending_warnings

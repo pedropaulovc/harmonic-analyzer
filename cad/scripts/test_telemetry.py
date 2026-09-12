@@ -41,8 +41,10 @@ _OTLP_ENV_NAMES = (
     "OTEL_EXPORTER_OTLP_TIMEOUT",
     "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
     "OTEL_EXPORTER_OTLP_TRACES_PROTOCOL",
+    "OTEL_EXPORTER_OTLP_TRACES_TIMEOUT",
     "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT",
     "OTEL_EXPORTER_OTLP_LOGS_PROTOCOL",
+    "OTEL_EXPORTER_OTLP_LOGS_TIMEOUT",
 )
 _original_otlp_environment = {name: os.environ.get(name) for name in _OTLP_ENV_NAMES}
 try:
@@ -71,6 +73,7 @@ def deterministic_otlp_environment(monkeypatch):
     yield
 
     monkeypatch.undo()
+    _telemetry.shutdown()
     restored = {name: os.environ.get(name) for name in _OTLP_ENV_NAMES}
     try:
         for name in _OTLP_ENV_NAMES:
@@ -449,6 +452,27 @@ def test_otlp_export_honors_standard_transport_env(
                 processor.shutdown()
 
 
+@pytest.mark.parametrize("signal", ("traces", "logs"))
+def test_otlp_export_honors_signal_specific_timeout(monkeypatch, signal):
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc")
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_TIMEOUT", "30")
+    monkeypatch.setenv(f"OTEL_EXPORTER_OTLP_{signal.upper()}_TIMEOUT", "17")
+    monkeypatch.setenv(
+        f"OTEL_EXPORTER_OTLP_{signal.upper()}_ENDPOINT", "http://127.0.0.1:4317"
+    )
+
+    if signal == "traces":
+        processor = _telemetry._otlp_span_processor()
+        exporter = processor.span_exporter
+    else:
+        processor = _telemetry._otlp_log_processor()
+        exporter = processor._batch_processor._exporter
+    try:
+        assert exporter._timeout == 17.0
+    finally:
+        processor.shutdown()
+
+
 def test_empty_signal_protocol_falls_back_to_global_transport(monkeypatch):
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc")
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_TRACES_PROTOCOL", "")
@@ -565,7 +589,7 @@ def test_explicit_local_grpc_endpoint_is_probed(monkeypatch, endpoint):
 
     assert _telemetry._resolve_otlp_endpoint("traces", pending_warnings=pending) is None
     assert pending[0][:2] == ("trace", "grpc")
-    assert "loopback endpoint is unavailable" in pending[0][2]
+    assert "local endpoint is unavailable" in pending[0][2]
 
 
 def test_schemeless_remote_grpc_endpoint_keeps_stock_secure_target(monkeypatch):
