@@ -45,6 +45,15 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
    as a native model tolerance (`_drawing_marks.set_dimension_*_tolerance`),
    never in a note and never as a frame. Three decimals mean "hold it"; two
    mean "routine". Do not print three decimals on a routine feature.
+   A matched-fit callout identifies the mating part by name and its drawing
+   or part number when assigned, and states the required clearance,
+   interference, or unambiguous functional acceptance. Specify diametral or
+   radial clearance where applicable. "MATCH FIT" alone is incomplete.
+   When the nominal is reference-only, the finished identified mate and the
+   stated acceptance define the fit; the nominal does not. Any retained
+   dimensional limits still apply. On assembly sheets, an item reference may
+   supply the identity when the package's BOM gives that item's name and
+   assigned drawing or part number unambiguously.
 3. **Geometric tolerancing is a last resort.** A feature-control frame (and
    the datums it needs) appears only where a ± on a dimension cannot express
    the requirement AND the machine's error model rewards it
@@ -82,12 +91,14 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
    at assembly, a loose-supplied set screw, a gear data block. A note never
    restates the title block, never carries a tolerance that belongs on a
    dimension, never explains what a datum letter is, never narrates design
-   intent, and never quotes other part numbers beyond "MATES WITH".
+   intent, and quotes other part numbers only to identify mating parts.
    The print defines the part by its geometry, not by how to make it
    (ASME Y14.5 §1.4(e)): "MACHINE BOTH POCKETS", "CAST", "MILL FROM SOLID"
    are not requirements — the dimensioned feature is. A process word is
    allowed only where it IS the requirement (REAM for a fit bore, a tap
-   drill depth that matters, match-drill at assembly). Where something
+   drill depth that matters, matched fitting to an identified mate with stated
+   acceptance, match-drill at assembly). Matched-fit requirements belong on
+   the feature callout or assembly step, not in a general note. Where something
    cannot be read off the views, the fix is a view (a section for an
    internal web), not a note. Coating application, masking, and oiling
    belong to the Finish field under rule 1, not this block. Notes that live
