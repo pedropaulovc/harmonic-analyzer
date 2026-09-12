@@ -206,9 +206,9 @@ def _resolve_otlp_endpoint(
     that signal. A global or local HTTP base gains the standard ``/v1/<signal>``
     path before it is pinned into the signal-specific exporter variable.
 
-    ``local_endpoints`` shares reachability decisions within one configuration
-    pass. Signals using the same protocol therefore probe its local collector
-    once, while a later forced configuration can detect a collector state change.
+    ``local_endpoints`` shares reachability decisions within the initial
+    configuration pass, so signals using the same protocol probe its local
+    collector once before their resolved signal endpoints are pinned.
     """
     signal_endpoint = f"OTEL_EXPORTER_OTLP_{signal.upper()}_ENDPOINT"
     env = os.environ.get(signal_endpoint)

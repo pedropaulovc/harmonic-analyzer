@@ -766,10 +766,11 @@ scripts that `from _common import log, check` are instrumented unchanged.
 - **Telemetry must not cost seat time.** Two measured traps, both fixed, both worth
   remembering before adding an exporter. First, default endpoints are **literal
   loopback addresses, never `localhost`**: Windows resolves `localhost` to `::1`
-  first, costing ~2 s per failed connection on this seat. `_resolve_otlp_endpoint`
-  tries IPv4 then IPv6 once per selected protocol and configuration pass:
-  OTLP/HTTP-protobuf uses port `18890`; OTLP/gRPC uses `18889`. Choose transport
-  with `OTEL_EXPORTER_OTLP_PROTOCOL`, `OTEL_EXPORTER_OTLP_TRACES_PROTOCOL`, or
+  first, costing ~2 s per failed connection on this seat. During initial
+  configuration, `_resolve_otlp_endpoint` tries IPv4 then IPv6 once per selected
+  protocol and pins the resolved signal endpoints. OTLP/HTTP-protobuf uses port
+  `18890`; OTLP/gRPC uses `18889`. Choose transport with
+  `OTEL_EXPORTER_OTLP_PROTOCOL`, `OTEL_EXPORTER_OTLP_TRACES_PROTOCOL`, or
   `OTEL_EXPORTER_OTLP_LOGS_PROTOCOL`. `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` and
   `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` win verbatim; an explicitly empty value
   disables only that signal. HTTP global/default bases gain `/v1/traces` or
