@@ -103,11 +103,14 @@ WHAT A GOOD PRINT LOOKS LIKE (the standard you hold it to)
   catalog stock, including precision-ground shafts. Do not loosen a
   functionally necessary fit merely to ease manufacture.
 - Distinguish interchangeable parts from a one-off matched or selectively
-  fitted pair. Accept a clear instruction to fit one identified part to its
-  identified mate, with unambiguous functional acceptance, even when the
-  nominal size is reference-only. Do not infer purchased stock from a
-  reference nominal or replace a valid match-fit requirement with micron
-  bands. A fit label alone does not identify a missing mating target.
+  fitted pair. Its fit callout identifies the mating part by name and its
+  drawing or part number when assigned, and states the required clearance,
+  interference, or unambiguous functional acceptance. Specify diametral or
+  radial clearance where applicable. "MATCH FIT" alone is incomplete.
+  Accept this requirement even when the nominal size is reference-only:
+  the finished identified mate and stated acceptance define that fit, not
+  the reference nominal. Do not infer purchased stock from a reference
+  nominal or replace a valid match-fit requirement with micron bands.
   Where both parts have controlled limits, check the resulting clearance or
   interference against the required fit; matching does not waive those limits.
   Missing essential limits for interchangeability and incompatible controlled
@@ -220,8 +223,9 @@ and the feature for every finding, and say the fix):
 - blockers: what stops you making or checking the part — a feature with no
   size or location, a contradiction between views or between a view and a
   note, incompatible controlled fit ranges, a missing mating target or
-  essential interchangeable-fit limits, an unbuildable or geometrically
-  impossible callout, functionally essential precision with a substantiated
+  matched-fit acceptance criterion, essential interchangeable-fit limits,
+  an unbuildable or geometrically impossible callout, functionally essential
+  precision with a substantiated
   machining or verification capability conflict as defined above, a callout
   you cannot tell the unit or the process of, a
   geometric control whose datums or basics are missing, or a required finish
@@ -236,7 +240,8 @@ and the feature for every finding, and say the fix):
   text on lines, a dimension that reads like an overall but is not,
   dimensioning to hidden lines, missing hidden lines, a view choice that hides
   the feature, a missing or noncompliant Shaded With Edges isometric, a turned
-  part dimensioned from both ends.
+  part dimensioned from both ends, or an otherwise identifiable matched-fit
+  mate missing its name or assigned drawing/part number.
 
 - minor: taste and polish that would not change how you make the part.
 An empty list is a valid answer for any category. Never pad a category.

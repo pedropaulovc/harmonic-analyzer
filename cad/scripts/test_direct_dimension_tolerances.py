@@ -14,7 +14,6 @@ import build_crank_drive_gear
 import build_crank_handle
 import build_crank_pinion
 import build_crankshaft
-import build_cylinder_gear
 import build_top_frame
 import build_tube_frame
 import alignment_pinion_spec
@@ -28,7 +27,6 @@ import crank_arm_spec
 import crank_drive_gear_spec
 import crank_pinion_spec
 import crankshaft_spec
-import cylinder_gear_spec
 import top_frame_spec
 import tube_frame_spec
 from _drawing_contract import model_toleranced_dimensions
@@ -48,7 +46,6 @@ def test_direct_tolerance_values_are_named_in_part_specs() -> None:
     assert crank_pinion_spec.BORE_DIA_BAND == (0.050, 0.030)
     assert crankshaft_spec.SHAFT_DIA_BAND == (0.00, -0.02)
     assert crankshaft_spec.JOURNAL_DIA_BAND == (0.00, -0.02)
-    assert cylinder_gear_spec.BORE_DIA_BAND == (0.05, 0.03)
     assert cone_swing_platform_spec.PLATE_LENGTH_TOLERANCE_MM == 0.25
     assert tube_frame_spec.OUTER_DIA_BAND == (0.00, -0.05)
     assert tube_frame_spec.COLUMN_LENGTH_TOLERANCE_MM == 0.25
@@ -92,7 +89,6 @@ def test_direct_tolerances_are_owned_by_named_model_dimensions() -> None:
             ("ShaftProfile", "ShaftDiaDim"): "*deviations(SHAFT_DIA_BAND)",
             ("JournalProfile", "JournalDiaDim"): "*deviations(JOURNAL_DIA_BAND)",
         },
-        build_cylinder_gear: {("BoreProfile", "BoreDia"): "*deviations(BORE_DIA_BAND)"},
         build_cone_swing_platform: {
             ("PlateProfile", "PlateLenDim"): "PLATE_LENGTH_TOLERANCE_MM"
         },
