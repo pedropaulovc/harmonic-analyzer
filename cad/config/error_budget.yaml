@@ -67,6 +67,15 @@ reserved:
   knife:                           # summing-lever knife-edge hysteresis (stall)
     rolling_resistance_mm: 0.005   # hardened edge on a hardened seat; MEASURE as trace width on reversal
     allowance_pct: 0.10
+    # The knife load is the 20 channel preloads PLUS the counter spring's
+    # balancing reaction (20*preload*a/b). The CAD's counter spring
+    # (counter_spring_spec: 0.51 N/mm, at most ~28 mm of extension in its
+    # 325.3 installed body) cannot supply that reaction -- the spring pair is
+    # unbalanced ~50x and the machine as modelled has no static operating
+    # point. That is an OPEN DESIGN ITEM (tolerance-policy.md), not a budget
+    # assumption: check:budget fails on it unless waived here, and the waiver
+    # is the record that the closure below is conditional on resolving it.
+    waive_static_balance: true
 
 monte_carlo:
   draws: 4000

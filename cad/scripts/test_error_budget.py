@@ -186,10 +186,9 @@ def test_lift_vector_is_what_the_procedure_subtracts():
 
 def test_station_setting_scatter_never_goes_below_the_pivot(nom):
     """Setting error at a zero ordinate is one-sided (a bar cannot be set below
-    the pivot): a draw with every idle bar at -tol must read exactly like one at
-    the pivot (clipped, not mirrored), and the mean of the one-sided band
-    (+tol/2) is the known lift the operator subtracts, so THAT draw reads as
-    error-free."""
+    the pivot): the symmetric draw is folded onto [0, +tol], so a draw at -tol
+    reads exactly like one at +tol, and the band's mean (+tol/2) is the known
+    lift the operator subtracts, so THAT draw reads as error-free."""
     x = eb.reference_inputs()["pair_1_20"]
     sens = eb.gain_sensitivities(nom)
     tol = 0.25
@@ -199,9 +198,27 @@ def test_station_setting_scatter_never_goes_below_the_pivot(nom):
         dev = {"station_setting": np.where(idle, offset, 0.0)}
         return eb._channel_model(x, nom, dev, sens, tol)[0]
 
-    assert np.allclose(read(-tol), read(0.0), atol=1e-12)
-    assert np.max(np.abs(read(tol / 2.0))) < 1e-9
+    assert np.allclose(read(-tol), read(tol), atol=1e-12)  # folded, not clipped
+    assert np.max(np.abs(read(tol / 2.0))) < 1e-9  # the band's mean is the known lift
     assert np.max(np.abs(read(0.0))) > 0.5  # the residual scatter is real, at odd k
+
+
+def test_unbalanced_counter_spring_fails_unless_waived(budget, report):
+    """The CAD's counter spring cannot supply the reaction the channel
+    preloads need; the report says so, and the gate fails on it unless the
+    yaml records the waiver (the open design item)."""
+    knife = report["closed_form"]["knife"]
+    assert knife["static_balance"] is False
+    assert knife["counter_spring_available_N"] < 0.1 * knife["counter_spring_needed_N"]
+    strict = {
+        **budget,
+        "reserved": {
+            **budget["reserved"],
+            "knife": {**budget["reserved"]["knife"], "waive_static_balance": False},
+        },
+    }
+    bad = eb.budget_closes(eb.build_report(strict))
+    assert any(b.startswith("counter spring cannot balance") for b in bad), bad
 
 
 def test_reference_inputs_stay_on_the_lifting_side():

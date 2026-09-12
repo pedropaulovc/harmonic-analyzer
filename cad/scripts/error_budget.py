@@ -482,6 +482,10 @@ def _channel_model(
             # at the stick zero), so it is subtracted the same way; only the
             # scatter about that mean survives. The measured mean is applied as
             # the same known lift vector on every channel.
+            # Draws come in uniform on [-tol, +tol]; fold the unreachable half
+            # onto the reachable one so an idle bar's error is uniform on
+            # [0, +tol] (mean tol/2), not a point mass at the pivot (mean tol/4).
+            v = np.where((x == 0.0)[None, :], np.abs(v), v)
             d = np.maximum(d + v, 0.0)
             lift = np.where(x == 0.0, setting_tol / 2.0, 0.0) / nom.d_max
         else:
@@ -586,13 +590,25 @@ def closed_form_terms(nom: Nominal, budget: dict[str, Any]) -> dict[str, Any]:
         channel_spring_installed_spec.INSTALLED_BODY_LENGTH
         - channel_spring_installed_spec.FREE_BODY_LENGTH
     )
-    counter_force = N_ELEMENTS * preload * nom.sum_arm / nom.counter_arm
-    knife_load = N_ELEMENTS * preload + counter_force
+    counter_needed = N_ELEMENTS * preload * nom.sum_arm / nom.counter_arm
+    # What the CAD's counter spring can actually supply: rate x the extension
+    # its geometry allows. The part carries no free length; close-wound its
+    # 165 x 1.8 body would be COIL_COUNT * WIRE_DIA, so the installed 325.3 body
+    # is at most that much extension.
+    counter_max_ext = (
+        counter_spring_spec.COIL_BODY_LENGTH
+        - counter_spring_spec.COIL_COUNT * counter_spring_spec.WIRE_DIA
+    )
+    counter_available = nom.counter_rate * counter_max_ext
+    knife_load = N_ELEMENTS * preload + counter_needed
     f_r = float(res["knife"]["rolling_resistance_mm"])
     stall_one = 100.0 * knife_load * f_r / (nom.spring_rate * nom.sum_arm * u_fs)
     knife = {
         "assumed_preload_N_per_spring": preload,
-        "balancing_counter_spring_N": counter_force,
+        "counter_spring_needed_N": counter_needed,
+        "counter_spring_available_N": counter_available,
+        "counter_spring_max_extension_mm": counter_max_ext,
+        "static_balance": counter_available >= counter_needed,
         "assumed_knife_load_N": knife_load,
         "assumed_rolling_resistance_mm": f_r,
         "stall_pct_of_one_channel_fs": stall_one,
@@ -709,6 +725,9 @@ def build_report(budget: dict[str, Any] | None = None) -> dict[str, Any]:
         "reserved_allowance": {
             k: float(v["allowance_pct"]) for k, v in budget["reserved"].items()
         },
+        "counter_spring_balance_waived": bool(
+            budget["reserved"]["knife"].get("waive_static_balance", False)
+        ),
     }
     r["closure"] = closure(r, budget)
     return r
@@ -835,6 +854,13 @@ def budget_closes(r: dict[str, Any]) -> list[str]:
     for k in ("nominal_residual_mae", "readout", "timebase", "knife"):
         if cl[k] > allow[k]:
             bad.append(f"{k} {cl[k]:.3f} > allowance {allow[k]}")
+    knife = r["closed_form"]["knife"]
+    if not knife["static_balance"] and not r["counter_spring_balance_waived"]:
+        bad.append(
+            "counter spring cannot balance the channel preload: "
+            f"{knife['counter_spring_available_N']:.0f} N available vs "
+            f"{knife['counter_spring_needed_N']:.0f} N needed"
+        )
     if cl["total_mae"] > r["benchmark"]["mae_fs_pct"]:
         bad.append(
             f"total MAE {cl['total_mae']:.3f} > benchmark {r['benchmark']['mae_fs_pct']}"
@@ -854,6 +880,14 @@ def _main() -> int:
     else:
         _print_report(r, budget)
         bad = budget_closes(r)
+        knife = r["closed_form"]["knife"]
+        if not knife["static_balance"] and r["counter_spring_balance_waived"]:
+            print(
+                "\nWAIVED: counter spring cannot balance the channel preload "
+                f"({knife['counter_spring_available_N']:.0f} N available vs "
+                f"{knife['counter_spring_needed_N']:.0f} N needed) -- closure is "
+                "conditional on resolving the spring pair (tolerance-policy.md)"
+            )
         print("\nBUDGET:", "closes" if not bad else "; ".join(bad))
     return 0 if not budget_closes(r) else 1
 

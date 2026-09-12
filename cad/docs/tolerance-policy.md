@@ -163,8 +163,8 @@ pools the all-ones, half-rectangle, Gaussian and lifted-square (odd channels on)
 | **spring rate** | **1.25 %** | **0.107** | **0.58** | **1.13** | 0.55 | **matched by measurement** — spec-sheet `SET QC`: two hanging loads at eye c-c 60/70, bin from stock (±10 %) |
 | cam phase | 0.25° | 0.038 | 0.21 | 0.22 | 0.33 | lobe and notch indexed in one setup (on the drawing) |
 | mesh lag spread | 0.14° | 0.021 | 0.11 | 0.12 | 0.33 | derived from the 0.05–0.20 backlash band |
-| station setting (setup) | 0.25 mm | 0.036 | 0.26 | 1.23 | 0.10 | stick drawing note 5: interpolate to 1/5 of the 1.42 minor division (0.28 step) — what the released stick can deliver |
-| **all combined** | | **0.130** | **0.69** | **1.56** | | targets 0.30 / 1.5 / 2.0 |
+| station setting (setup) | 0.25 mm | 0.033 | 0.24 | 0.64 | 0.20 | stick drawing note 5: interpolate to 1/5 of the 1.42 minor division (0.28 step) — what the released stick can deliver |
+| **all combined** | | **0.128** | **0.68** | **1.55** | | targets 0.30 / 1.5 / 2.0 |
 
 The budget closes with a factor of two in hand on the broad inputs and just inside the
 two-channel consistency target. Read it as follows.
@@ -234,8 +234,8 @@ the specification.
    rounding, ±0.25 mm with eye and parallax — the budget's setting term. A bar at a zero
    ordinate cannot be set below the pivot, so its setting error is one-sided [0, +0.25]; the
    mean of that (0.125 mm) is a lift of the same kind as the null lift and is folded into the
-   measured lift, so only the scatter about it survives (the Monte Carlo clips at the pivot and
-   subtracts the known mean).
+   measured lift, so only the scatter about it survives (the Monte Carlo samples the one-sided
+   band and subtracts its known mean).
 2. **Normalise each trial by its own k = 0 reading**, which equals $\sum_i x_i$ (the operator
    set the bars) — Michelson's normalisation to the greatest term. This removes all common-mode
    gain, including the magnifier setting, so the magnifier may be reset per trial to bring the
@@ -303,10 +303,16 @@ are the concrete realizations of the classes above, being lifted into `tolerance
 
 ## Open items the budget exposed
 
-- **Spring rate and preload are not specified anywhere**; the 2.13 N/mm and 76 N per spring
-  used for the knife-load estimate are derived from wire geometry (low confidence), and that
-  preload does not balance against the modelled counter spring (0.51 N/mm would need ~1.5 m of
-  extension). Specify both as requirements; the hysteresis term scales with the edge load.
+- **The spring pair is unbalanced as modelled — the machine has no static operating point.**
+  The 20 channel springs at their derived 2.13 N/mm × 35.8 mm preload pull 1.5 kN on the
+  39.85 mm arm; balance needs 0.8 kN from the counter spring on the 76.2 mm arm, and the CAD's
+  counter spring (0.51 N/mm, at most ~28 mm of extension in its 325.3 mm installed body) can
+  supply ~15 N — a 50× shortfall. Every rate here is derived from wire geometry (low
+  confidence), so the resolution is a spring specification, not a budget change: either the
+  channel preload is far lower than the modelled stretch implies (a longer free length), or the
+  counter spring is far stiffer, or both. `check:budget` reports the imbalance and fails on it
+  unless `reserved.knife.waive_static_balance` is set; the waiver is set, and **the closure
+  above is conditional on resolving this**. The knife term is computed at the balanced load.
 - **Magnification bookkeeping**: the lever is stated "up to 4×", the wheel 5× by geometry,
   and the model uses a single `magnify_factor` 4.0. The readout term is the budget's largest at
   the configured 15 mm half-stroke; a reconciled, larger stroke (changed in `output.yaml` and
