@@ -9,6 +9,7 @@ replacing those manufacturing views.
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -27,11 +28,11 @@ from _drawing_common import (
     read_required_properties,
     set_dimension_callouts,
     set_dimension_precision,
-    set_hidden_lines_removed,
     set_hidden_lines_visible,
     set_reference_dimension,
     set_reference_dimensions,
     stamp_drawing_summary,
+    view_name,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
@@ -44,9 +45,13 @@ from cylinder_gear_spec import (
     CAM_THICKNESS,
     ECCENTRICITY,
     FACE_WIDTH,
+    NOTCH_CENTER_X,
+    NOTCH_FLOOR_RADIUS,
     OVERALL_THICKNESS,
     SURFACE_FINISHES,
+    TIP_RADIUS,
 )
+from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
 
 
@@ -71,14 +76,19 @@ FRONT_CENTER = (0.105, 0.270)
 RIGHT_CENTER = (0.205, 0.270)
 ISO_CENTER = (0.165, 0.145)
 GEAR_DATA_POS = (0.015, 0.410)
-MANUFACTURING_NOTES_POS = (0.015, 0.105)
+MANUFACTURING_NOTES_POS = (0.015, 0.085)
+NOTCH_DETAIL_CENTER = (0.060, 0.155)
+NOTCH_DETAIL_SCALE = (6, 1)
+NOTCH_DETAIL_RADIUS_MM = 4.0
+NOTCH_DETAIL_DIMENSIONS = {
+    "NotchWidth": (0.060, 0.188),
+    "NotchDepth": (0.025, 0.155),
+}
 
 FRONT_KEEP = {
-    "BoreDia": (0.080, 0.210),
-    "NotchWidth": (0.105, 0.340),
-    "NotchDepth": (0.050, 0.325),
+    "BoreDia": (0.065, 0.360),
     "CamDia": (0.175, 0.325),
-    "CamCy": (0.160, 0.260),
+    "CamCy": (0.175, 0.279),
 }
 RIGHT_KEEP = {
     "FaceWidth": (0.205, 0.220),
@@ -113,6 +123,152 @@ def _project_mm(
         tuple(value / 1000.0 for value in xyz_mm),
         label=label,
     )
+
+
+def _notch_detail(adapter: Any, front: Any) -> Any:
+    """Enlarge the actual kerf and its neighbouring teeth, without redrawing them."""
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    parent = _early_bound(front, "IView")
+    if not ddoc.ActivateView(view_name(adapter, front)):
+        raise RuntimeError("failed to activate notch-detail parent")
+    draw.ClearSelection2(True)
+    center = _project_mm(
+        adapter,
+        front,
+        (NOTCH_CENTER_X, (TIP_RADIUS + NOTCH_FLOOR_RADIUS) / 2.0, 0.0),
+        label="notch detail center",
+    )
+    radius = NOTCH_DETAIL_RADIUS_MM * VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0
+    sketch = _early_bound(parent.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in (center, (center[0] + radius, center[1])):
+        point = _early_bound(
+            math_utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
+    if sketch_manager.CreateCircle(*points[0], *points[1]) is None:
+        raise RuntimeError("failed to create notch-detail fence")
+    detail = ddoc.CreateDetailViewAt4(
+        *NOTCH_DETAIL_CENTER, 0.0,
+        0,  # swDetViewSTANDARD
+        *NOTCH_DETAIL_SCALE,
+        "A",
+        1,  # swDetCircleCIRCLE
+        True, False, False, 5,
+    )
+    if detail is None:
+        raise RuntimeError("failed to create native notch detail")
+    detail = _early_bound(detail, "IView")
+    detail.ScaleRatio = double_array([float(value) for value in NOTCH_DETAIL_SCALE])
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    initial_outline = tuple(float(value) for value in detail.GetOutline())
+    initial_position = tuple(float(value) for value in detail.Position)
+    if len(initial_outline) != 4 or len(initial_position) != 2:
+        raise RuntimeError(
+            f"invalid native notch detail bounds: {initial_outline!r}, {initial_position!r}"
+        )
+    # A cropped view's Position is not its visible crop center. Translate the
+    # native origin by the measured outline-center error, rather than assigning
+    # the requested crop center directly to that origin.
+    positioned_origin = tuple(
+        initial_position[axis] + NOTCH_DETAIL_CENTER[axis]
+        - (initial_outline[axis] + initial_outline[axis + 2]) / 2.0
+        for axis in range(2)
+    )
+    if not detail.SetViewPosition(double_array(list(positioned_origin)), False):
+        raise RuntimeError("failed to position notch detail")
+    draw.EditRebuild3()
+    ratio = tuple(float(value) for value in detail.ScaleRatio)
+    final_outline = tuple(float(value) for value in detail.GetOutline())
+    if len(final_outline) != 4:
+        raise RuntimeError(f"invalid final notch detail bounds: {final_outline!r}")
+    outline_center = (
+        (final_outline[0] + final_outline[2]) / 2.0,
+        (final_outline[1] + final_outline[3]) / 2.0,
+    )
+    if len(ratio) != 2 or not math.isclose(
+        ratio[0] / ratio[1], NOTCH_DETAIL_SCALE[0] / NOTCH_DETAIL_SCALE[1]
+    ):
+        raise RuntimeError(f"notch detail scale did not persist: {ratio!r}")
+    if math.dist(outline_center, NOTCH_DETAIL_CENTER) > 0.0001:
+        raise RuntimeError(
+            f"notch detail outline center did not persist: "
+            f"initial_outline={initial_outline!r}, initial_position={initial_position!r}, "
+            f"requested_origin={positioned_origin!r}, final_outline={final_outline!r}"
+        )
+    _telemetry.info(
+        f"notch detail position: initial_outline={initial_outline!r}, "
+        f"initial_position={initial_position!r}, origin={positioned_origin!r}, "
+        f"final_outline={final_outline!r}, crop_center={outline_center!r}"
+    )
+    return detail
+
+
+def _notch_dimension_state(dimension: Any) -> tuple[Any, ...]:
+    """Snapshot the native model parameter, not formatted drawing text."""
+    dimension = _early_bound(dimension, "IDimension")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    return (
+        str(dimension.FullName),
+        float(dimension.SystemValue),
+        int(tolerance.Type),
+        tolerance.GetMinValue2(),
+        tolerance.GetMaxValue2(),
+    )
+
+
+def _check_notch_dimensions(
+    adapter: Any,
+    front: Any,
+    right: Any,
+    detail: Any,
+    original: dict[str, tuple[Any, ...]],
+) -> list[Any]:
+    """Require one native detail annotation matching each original part parameter."""
+    target_name = view_name(adapter, detail)
+    target_annotations = [
+        _early_bound(item, "IAnnotation")
+        for item in (_early_bound(detail, "IView").GetAnnotations() or ())
+    ]
+    target_names = [dimension_name(adapter, item) for item in target_annotations]
+    other_names = {
+        view_name(adapter, view): [
+            dimension_name(adapter, _early_bound(item, "IAnnotation"))
+            for item in (_early_bound(view, "IView").GetAnnotations() or ())
+        ]
+        for view in (front, right)
+    }
+    for name, text_xy in NOTCH_DETAIL_DIMENSIONS.items():
+        matches = [
+            item for item, item_name in zip(target_annotations, target_names, strict=True)
+            if item_name == name
+        ]
+        if len(matches) != 1 or any(name in names for names in other_names.values()):
+            raise RuntimeError(
+                f"notch dimension {name} lacks unique detail authority: "
+                f"other_views={other_names!r}; "
+                f"target={target_name!r} names={target_names!r}"
+            )
+        display = _early_bound(matches[0].GetSpecificAnnotation(), "IDisplayDimension")
+        state = _notch_dimension_state(display.GetDimension2(0))
+        if state != original[name]:
+            raise RuntimeError(
+                f"native notch dimension {name} differs from source part: "
+                f"source={original[name]!r}, detail={state!r}"
+            )
+        position = tuple(float(value) for value in matches[0].GetPosition())
+        if math.dist(position[:2], text_xy) > 0.0001:
+            raise RuntimeError(f"notch dimension {name} position did not persist")
+    return [
+        annotation for annotation, name in zip(target_annotations, target_names, strict=True)
+        if name in NOTCH_DETAIL_DIMENSIONS
+    ]
 
 
 def _checked_edge_dimension(
@@ -199,20 +355,39 @@ async def build(adapter: Any) -> dict[str, str]:
     right = place_view(
         adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=VIEW_SCALE
     )
-    iso = place_view(
+    place_view(
         adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE
     )
-    set_hidden_lines_removed(adapter, iso)
     for view in (front, right):
         set_hidden_lines_visible(adapter, view)
 
+    detail = _notch_detail(adapter, front)
+    set_hidden_lines_visible(adapter, detail)
+    # HLV changes remain pending until Windows repaints. This documented view
+    # barrier makes the new display geometry available synchronously to import.
+    _early_bound(detail, "IView").UpdateViewDisplayGeometry()
+    source_model = _early_bound(
+        _early_bound(front, "IView").ReferencedDocument, "IModelDoc2"
+    )
+    original_notch = {
+        name: _notch_dimension_state(source_model.Parameter(f"{name}@NotchProfile"))
+        for name in NOTCH_DETAIL_DIMENSIONS
+    }
+    # Author the notch dimensions directly in their final view before any
+    # parent-view import can claim them or leave deleted-display history.
+    curate_view_dimensions(
+        adapter, detail, keep=NOTCH_DETAIL_DIMENSIONS, view_label="notch detail"
+    )
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
     )
     right_annotations = curate_view_dimensions(
         adapter, right, keep=RIGHT_KEEP, view_label="right"
     )
-    annotations = [*front_annotations, *right_annotations]
+    detail_annotations = _check_notch_dimensions(
+        adapter, front, right, detail, original_notch
+    )
+    annotations = [*front_annotations, *right_annotations, *detail_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     set_dimension_precision(adapter, annotations, DIMENSION_PRECISION)
     set_reference_dimensions(adapter, annotations, {"BoreDia"})
@@ -267,14 +442,14 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         front,
-        symbol_xy=(0.140, 0.200),
+        symbol_xy=(0.030, 0.310),
         control=surface_finish_by_key(SURFACE_FINISHES, "cylinder_gear_bore"),
         label="cylinder gear bore finish",
         entity=bore_edge,
         leader_attach_xy=_project_mm(
             adapter,
             front,
-            (0.0, -BORE_DIA / 2.0, 0.0),
+            (-BORE_DIA / (2.0 * math.sqrt(2.0)), BORE_DIA / (2.0 * math.sqrt(2.0)), 0.0),
             label="bore finish leader attachment",
         ),
         char_height=0.0025,
@@ -300,6 +475,8 @@ async def build(adapter: Any) -> dict[str, str]:
         control=surface_finish_by_key(SURFACE_FINISHES, "cam_follower"),
         label="cam follower finish",
         entity_type="SILHOUETTE",
+        leader_attach_xy=cam_flank,
+        char_height=0.0025,
     )
 
     add_property_linked_note(

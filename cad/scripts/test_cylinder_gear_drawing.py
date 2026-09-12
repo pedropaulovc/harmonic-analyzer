@@ -27,7 +27,11 @@ def test_required_paths_and_explicit_sheet_orientation() -> None:
 def test_spec_is_the_single_source_of_native_drawing_dimensions() -> None:
     assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
+    kept = (
+        set(drawing.FRONT_KEEP)
+        | set(drawing.RIGHT_KEEP)
+        | set(drawing.NOTCH_DETAIL_DIMENSIONS)
+    )
     assert kept == marked == {
         "BoreDia",
         "CamDia",
