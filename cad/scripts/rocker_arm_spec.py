@@ -19,13 +19,14 @@ from _hole_spec import HoleSpec
 from cone_pivot_post_installation import MECHANISM_X_SHIFT
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from rod_pivot_spec import ROCKER_THICKNESS
 
 # --- Nominal geometry (DIMENSIONS.md "Chapter 14"). These MUST match the
 # constants in build_rocker_arm.py (the test cross-checks the load-bearing
 # ones), so the drawing's view math reads the same solid the part builds. ---
 CURVE_RADIUS = 800.0  # top-edge arc radius = amplitude-bar length (stated)
 ARM_DEPTH = 16.0  # perpendicular top-to-bottom depth (p.29 callout)
-ARM_THICKNESS = 2.5  # plate thickness, Z (p.27 callout)
+ARM_THICKNESS = ROCKER_THICKNESS  # plate thickness, Z (p.27 callout)
 TOP_ARC_LEN = 292.1  # top edge arc length = 11.5" (ch.30 back view)
 BOT_ARC_LEN = 266.7  # bottom edge arc length = 10.5" (ch.30 back-view sketch)
 TIP_FACE = 5.588  # 0.22" tip face, perpendicular to the top edge

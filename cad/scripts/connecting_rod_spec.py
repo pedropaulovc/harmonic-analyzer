@@ -10,9 +10,9 @@ is the drift alarm the offline test enforces.
 
 from __future__ import annotations
 
-from _hole_spec import HoleSpec
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from rod_pivot_spec import ROD_HEAD_THICKNESS, ROD_THREAD_SPEC
 
 # --- Nominal geometry (DIMENSIONS.md "Chapter 13 - Connecting rods"). ---
 CENTER_DISTANCE = 163.1010299795349  # fixed-post recenter; level arm, plumb rod
@@ -25,8 +25,8 @@ SHANK_THICKNESS = 2.5
 HEAD_WIDTH = 10.0  # across the tombstone cheeks
 HEAD_HEIGHT = 10.5  # crown top -> shoulder root
 HEAD_CROWN_ABOVE_PIN = 2.4  # crown top above the pin centre
-HEAD_THICKNESS = 2.5
-PIN_HOLE_SPEC = HoleSpec("drilled_number", "#47")
+HEAD_THICKNESS = ROD_HEAD_THICKNESS
+PIN_HOLE_SPEC = ROD_THREAD_SPEC
 
 # --- Derived spans (mirror build_connecting_rod). ---
 RING_OUTER_RADIUS = RING_BORE_DIA / 2.0 + RING_WALL  # 20.4
