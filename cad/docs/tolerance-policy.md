@@ -163,8 +163,8 @@ pools the all-ones, half-rectangle, Gaussian and lifted-square (odd channels on)
 | **spring rate** | **1.25 %** | **0.107** | **0.58** | **1.13** | 0.55 | **matched by measurement** — spec-sheet `SET QC`: two hanging loads at eye c-c 60/70, bin from stock (±10 %) |
 | cam phase | 0.25° | 0.038 | 0.21 | 0.22 | 0.33 | lobe and notch indexed in one setup (on the drawing) |
 | mesh lag spread | 0.14° | 0.021 | 0.11 | 0.12 | 0.33 | derived from the 0.05–0.20 backlash band |
-| station setting (setup) | 0.25 mm | 0.038 | 0.26 | 1.24 | 0.10 | stick drawing note 5: interpolate to 1/5 of the 1.42 minor division (0.28 step) — what the released stick can deliver |
-| **all combined** | | **0.130** | **0.69** | **1.72** | | targets 0.30 / 1.5 / 2.0 |
+| station setting (setup) | 0.25 mm | 0.036 | 0.26 | 1.23 | 0.10 | stick drawing note 5: interpolate to 1/5 of the 1.42 minor division (0.28 step) — what the released stick can deliver |
+| **all combined** | | **0.130** | **0.69** | **1.56** | | targets 0.30 / 1.5 / 2.0 |
 
 The budget closes with a factor of two in hand on the broad inputs and just inside the
 two-channel consistency target. Read it as follows.
@@ -205,7 +205,7 @@ two-channel consistency target. Read it as follows.
 | nominal residual after correction | null lift on k = 0 + 2nd-harmonic correction | 0.019 % MAE | 0.05 |
 | ordinate readout | the CAD's **15 mm half-stroke** (`output.yaml pen_trace_half_mm`, asserted by `verify:kinematics`) read to ±0.075 mm (half a 0.15 mm technical-pen line against the grid), **with the magnifier set per trial so the greatest (k = 0) term spans the stroke** — the CAD's `pen_driver` convention and Michelson's normalisation. That needs 2.0–2.4× the all-ones magnification for the broad inputs (10× for the two-channel case): the open magnifier-range item. At a fixed all-ones setting the broad-input worst case is 1.2 % (`greatest_term_spans_stroke: false` in the yaml scores it and fails the gate) | 0.50 % FS | 0.50 — the 0.5-unit quantisation of Michelson's own tables |
 | timebase | read coefficient k with the crank stopped on its index at 2k turns, index repeatable to ±8° (uniform), scored on the worst reference input (the lifted square, 252 % FS/rad) — vs 1.24 % FS per 0.1 mm of abscissa at the CAD's 1.596 mm/turn feed (`paper_drive_geom`), 0.31 % with the coarse T24/T12 set | 0.25 % FS | 0.30 |
-| knife-edge hysteresis | hardened edge on a hardened seat, rolling-resistance length 0.005 mm at the derived 1.5 kN edge load (2.2 % of one channel's stroke per 0.01 mm); *measure* as trace width on a slow reversal | 0.06 % FS | 0.10 |
+| knife-edge hysteresis | hardened edge on a hardened seat, rolling-resistance length 0.005 mm at the derived 2.3 kN edge load — the 20 channel preloads (1.5 kN) **plus** the counter spring's balancing reaction (0.8 kN at the 76.2 mm arm), both bearing on the knife (3.4 % of one channel's stroke per 0.01 mm); *measure* as trace width on a slow reversal | 0.09 % FS | 0.10 |
 | **total** | residual + RSS(scatter 0.130, readout, timebase, knife) | **0.60 % MAE** | **0.7 benchmark** |
 
 `check:budget` fails if any term overruns its allowance or the total overruns the benchmark, so a
@@ -231,7 +231,11 @@ the specification.
    linear by 0.9–1.1 % across the range (table above), and Michelson's own stick was "hand
    stamped, unevenly spaced" for the same reason. Set each bar by interpolating to 1/5 of the
    stick's 1.42 mm minor division (stick drawing note 5): a 0.28 mm step gives ±0.14 mm
-   rounding, ±0.25 mm with eye and parallax — the budget's setting term.
+   rounding, ±0.25 mm with eye and parallax — the budget's setting term. A bar at a zero
+   ordinate cannot be set below the pivot, so its setting error is one-sided [0, +0.25]; the
+   mean of that (0.125 mm) is a lift of the same kind as the null lift and is folded into the
+   measured lift, so only the scatter about it survives (the Monte Carlo clips at the pivot and
+   subtracts the known mean).
 2. **Normalise each trial by its own k = 0 reading**, which equals $\sum_i x_i$ (the operator
    set the bars) — Michelson's normalisation to the greatest term. This removes all common-mode
    gain, including the magnifier setting, so the magnifier may be reset per trial to bring the

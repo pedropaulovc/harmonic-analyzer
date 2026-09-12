@@ -455,23 +455,35 @@ def _channel_model(
     nom: Nominal,
     dev: dict[str, np.ndarray],
     sens: dict[str, float],
+    setting_tol: float = 0.0,
 ) -> np.ndarray:
     """A_k read from a linear-gain machine whose channel i has gain g_i and
     phase phi_i built from the drawn deviations ``dev[feature]`` (draws x 20),
     normalised by the trial's own k=0 reading (= sum x_i, known to the
     operator). Pure cosines have a zero mean line, so only the scale step of the
-    readout is modelled here. Returns e_k in % FS, shape (draws, K_MAX+1)."""
+    readout is modelled here. ``setting_tol`` is the station-setting half-width
+    the ``station_setting`` draws were taken from (needed for the one-sided
+    mean, below). Returns e_k in % FS, shape (draws, K_MAX+1)."""
     draws = next(iter(dev.values())).shape[0]
     log_g = np.zeros((draws, N_ELEMENTS))
     phi = np.zeros((draws, N_ELEMENTS))
     d = np.broadcast_to(x * nom.d_max, (draws, N_ELEMENTS)).copy()
+    lift = np.zeros(N_ELEMENTS)
     for key, v in dev.items():
         if key in sens:
             log_g += np.log1p(sens[key] / 100.0 * v)
         elif key in ("cam_phase", "mesh_lag_spread"):
             phi += np.radians(v)
         elif key == "station_setting":
-            d += v
+            # A bar cannot be set below the pivot (build_channel_assembly rejects
+            # amplitude_mm < 0): the setting error at a zero ordinate is one-sided,
+            # [0, +tol]. Its MEAN is a coherent lift identical in kind to the
+            # null lift the procedure measures on the assembled machine (one bar
+            # at the stick zero), so it is subtracted the same way; only the
+            # scatter about that mean survives. The measured mean is applied as
+            # the same known lift vector on every channel.
+            d = np.maximum(d + v, 0.0)
+            lift = np.where(x == 0.0, setting_tol / 2.0, 0.0) / nom.d_max
         else:
             raise KeyError(f"no model for feature {key}")
     g = np.exp(log_g)
@@ -479,7 +491,8 @@ def _channel_model(
         THETA_K[None, :, None] * HARMONICS[None, None, :] + phi[:, None, :]
     )  # draws,k,i
     r = np.einsum("di,dki->dk", g * d, cos_k)
-    measured = r * (float(np.sum(x)) / r[:, :1])
+    x_read = x + lift  # what the operator knows the machine is summing
+    measured = r * (float(np.sum(x_read)) / r[:, :1]) - ideal_coefficients(lift)
     ideal = ideal_coefficients(x)
     return 100.0 * (measured - ideal[None, :]) / np.max(np.abs(ideal))
 
@@ -514,7 +527,9 @@ def monte_carlo(budget: dict[str, Any], nom: Nominal) -> dict[str, Any]:
         per_input = {}
         pooled = []
         for name in names:
-            e = _channel_model(inputs[name], nom, dev, sens)
+            e = _channel_model(
+                inputs[name], nom, dev, sens, feats["station_setting"]["tolerance"]
+            )
             per_input[name] = {
                 "mae": float(np.mean(np.abs(e))),
                 "rms": float(np.sqrt(np.mean(e * e))),
@@ -559,20 +574,25 @@ def closed_form_terms(nom: Nominal, budget: dict[str, Any]) -> dict[str, Any]:
         linear_gain(nom) * nom.d_max
     )  # hook displacement of one channel at full station
     # Knife-edge hysteresis: the lever stalls while the moment error is below
-    # T_f = N * f_r (N = total spring load on the edge, f_r = rolling-resistance
-    # length of the edge). With D = sum s a^2 + S b^2 the equivalent hook-position
-    # error is a*T_f/D and ONE channel's full-scale hook motion s*a^2*u_fs/D, so
-    # the ratio T_f/(s*a*u_fs) needs no D. Against the all-ones full scale (every
-    # channel at u_fs) the stall is that ratio / N.
+    # T_f = N * f_r (N = total normal load on the edge, f_r = rolling-resistance
+    # length of the edge). The 20 channel preloads pull one side of the lever
+    # down; static balance needs the counter spring to pull the other side down
+    # with moment 20 * preload * a = F_c * b, and BOTH loads bear on the knife:
+    # N = 20 * preload * (1 + a / b). With D = sum s a^2 + S b^2 the equivalent
+    # hook-position error is a*T_f/D and ONE channel's full-scale hook motion
+    # s*a^2*u_fs/D, so the ratio T_f/(s*a*u_fs) needs no D. Against the
+    # all-ones full scale (every channel at u_fs) the stall is that ratio / N.
     preload = nom.spring_rate * (
         channel_spring_installed_spec.INSTALLED_BODY_LENGTH
         - channel_spring_installed_spec.FREE_BODY_LENGTH
     )
-    knife_load = N_ELEMENTS * preload
+    counter_force = N_ELEMENTS * preload * nom.sum_arm / nom.counter_arm
+    knife_load = N_ELEMENTS * preload + counter_force
     f_r = float(res["knife"]["rolling_resistance_mm"])
     stall_one = 100.0 * knife_load * f_r / (nom.spring_rate * nom.sum_arm * u_fs)
     knife = {
         "assumed_preload_N_per_spring": preload,
+        "balancing_counter_spring_N": counter_force,
         "assumed_knife_load_N": knife_load,
         "assumed_rolling_resistance_mm": f_r,
         "stall_pct_of_one_channel_fs": stall_one,

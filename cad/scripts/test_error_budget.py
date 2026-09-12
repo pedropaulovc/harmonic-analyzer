@@ -184,6 +184,26 @@ def test_lift_vector_is_what_the_procedure_subtracts():
     assert np.allclose(lv[2::2], 0.0, atol=1e-12)
 
 
+def test_station_setting_scatter_never_goes_below_the_pivot(nom):
+    """Setting error at a zero ordinate is one-sided (a bar cannot be set below
+    the pivot): a draw with every idle bar at -tol must read exactly like one at
+    the pivot (clipped, not mirrored), and the mean of the one-sided band
+    (+tol/2) is the known lift the operator subtracts, so THAT draw reads as
+    error-free."""
+    x = eb.reference_inputs()["pair_1_20"]
+    sens = eb.gain_sensitivities(nom)
+    tol = 0.25
+    idle = (x == 0.0)[None, :]
+
+    def read(offset: float) -> np.ndarray:
+        dev = {"station_setting": np.where(idle, offset, 0.0)}
+        return eb._channel_model(x, nom, dev, sens, tol)[0]
+
+    assert np.allclose(read(-tol), read(0.0), atol=1e-12)
+    assert np.max(np.abs(read(tol / 2.0))) < 1e-9
+    assert np.max(np.abs(read(0.0))) > 0.5  # the residual scatter is real, at odd k
+
+
 def test_reference_inputs_stay_on_the_lifting_side():
     """build_channel_assembly rejects amplitude_mm < 0, so no reference input may
     put a bar at a negative station."""
