@@ -80,7 +80,9 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
 )
+from _fit_limits import deviations
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from rocker_arm_notes import DRAWING_NOTES, ISOMETRIC_VIEW_NOTE
@@ -89,6 +91,7 @@ from rocker_arm_spec import (
     ARM_THICKNESS as SPEC_ARM_THICKNESS,
     HUB_DIA,
     HUB_LENGTH,
+    PIVOT_BORE_DIA_BAND,
     ROD_HOLE_SPEC,
     SURFACE_FINISHES,
 )
@@ -480,6 +483,12 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(
         adapter, "driven rocker-arm (equations neutral)", v_measured, 0.005 * v_strap
+    )
+    set_dimension_bilateral_tolerance(
+        adapter,
+        "PivotHoleProfile",
+        "PivotDia",
+        *deviations(PIVOT_BORE_DIA_BAND),
     )
 
     await apply_material(adapter, MATERIAL)

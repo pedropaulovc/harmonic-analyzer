@@ -3,7 +3,7 @@ r"""Reproduction script: connecting rod (book ch. 13 pp. 22-25 / ch. 14 p. 29; 2
 Black rod with its original cam ring, flat shank and XY tombstone outline.
 The upper end is a centered two-cheek fork straddling the 2.5 mm silver
 rocker. A plain coaxial #47 drill passes through both ears for the selected
-peened pivot. No threaded rod hole, spacer, axial dogleg or single-sided head.
+peened pivot.
 
 The ring, shank and pin XY centerline are unchanged. The fork's 1.25 mm
 cheeks, 6 mm axial flare transition and round slot root are reconstruction
@@ -96,12 +96,12 @@ MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
 # pre-ROM-fit lobe-down phase and -7.82 deg tilt. build_channel_assembly
 # imports this as ROD_C2C (imported, NOT copied). Nominal geometry lives in
 # connecting_rod_spec so the part, channel and drawing move as one recipe.
-# Tombstone head (the "Y" upper end): proportions from the ch14 fan photo
-# scaled by the 16 mm arm-depth callout in the same frame. Rounded crown
-# (radius = half width), short vertical cheeks, angled shoulders narrowing
-# into the shank. The head is SHORTER than the arm depth and the pin sits
-# HIGH in the head / LOW in the arm (crown only 2.4 above the pin).
-HEAD_SHOULDER_RISE = 1.2  # shoulder taper height (width 8 -> 10, photo ~1.2)
+# Tombstone head: reconstruction design dimensions inside the compact rounded
+# envelope visible in the ch14 fan view; the photographs establish topology,
+# not these sizes. Rounded crown (radius = half width), short vertical cheeks
+# and angled shoulders narrow into the shank. The head is shorter than the arm
+# depth and the pin sits high in the head / low in the arm.
+HEAD_SHOULDER_RISE = 1.2
 # Both ears are drilled coaxially in one native Hole Wizard through feature.
 THROUGH_CUT_DEPTH = 20.0  # mid-plane total; > any local thickness
 
@@ -467,13 +467,6 @@ async def build(adapter) -> dict[str, str]:
     # stamp the make-critical title-block properties.
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
-        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
-    for feature_name, dimension_names in {
-        "Head": ["ForkOuterThickness"],
-        "ForkFlareProfile": ["FlareLength", "FlareAxialRise"],
-        "ForkRootProfile": ["RootCenterY", "RootDiameter"],
-        "ForkSlotProfile": ["SlotWidth"],
-    }.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(

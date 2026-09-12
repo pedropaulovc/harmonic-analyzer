@@ -212,7 +212,12 @@ async def build(adapter):
             RY180,
         )
         names[f"pin{station}"] = await place_component(
-            adapter, "rod-pivot-pin", [0, 0, z], [0, 0, 0], IDENTITY, config="Default"
+            adapter,
+            "rod-pivot-pin",
+            [0, 0, z],
+            [0, 0, 0],
+            IDENTITY,
+            configuration="Default",
         )
     models = {
         key: _early_bound(

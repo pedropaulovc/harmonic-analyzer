@@ -10,51 +10,32 @@ the offline drawing test.
 
 from __future__ import annotations
 
-from rocker_arm_spec import (
-    ARM_DEPTH,
-    ARM_THICKNESS,
-    BOT_ARC_LEN,
-    CENTER_Y,
-    PIVOT_MID_Y,
-    R_BOTTOM,
-    R_TOP,
-    TIP_FACE,
-    TOP_ARC_LEN,
-    HUB_DIA,
-    HUB_LENGTH,
-)
-
-# True free-text instructions only; geometry / datum structure / roughness live
-# in native dimensions / datum tags / FCFs / surface symbols.  Hole sizes ride
-# their native callouts (Ø6.50 dim, Ø1.99 THRU ALL) -- the notes state process,
-# fit and count, never a second copy of a sheet dimension.  16.00 depth is a
-# REF: it is fixed by the concentric R800/R816 edges.
-# --- Marked-dimension contract: feature -> the parametric dimension NAMES the
-# print shows.  build_rocker_arm marks exactly these. ---
+# Native view dimensions own all geometry and bore tolerances.  The note block
+# is only the symmetry statement and the final matched-joint cross-reference.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "StrapProfile": {"TopRadius", "BottomRadius"},
-    "PivotHoleProfile": {"PivotDia"},
+    "StrapProfile": {"BottomRodX", "RodTipLen"},
+    "PivotHoleProfile": {"PivotDia", "PivotZ"},
+    "HubProfile": {"HubDia"},
+}
+
+DIMENSION_PRECISION: dict[str, int] = {
+    "BottomRodX": 2,
+    "RodTipLen": 2,
+    "PivotDia": 2,
+    "PivotZ": 2,
+    "HubDia": 2,
+}
+
+DIMENSION_CALLOUTS: dict[str, str] = {
+    "PivotDia": "REAM THRU",
+    "RodTipLen": "2X ENDS",
 }
 
 DRAWING_NOTES = "\n".join(
     (
-        "1. PROFILE MIRROR-SYMMETRIC ABOUT THE",
-        "   PIVOT-BORE AXIS; ROD-PIN HOLE AT ONE",
-        "   END ONLY (1X), THE END SHOWN.",
-        "2. STRAP 2.50 THICK; ALL HOLES THRU",
-        "   THE THICKNESS.",
-        f"3. TOP EDGE R{R_TOP:.2f}, BOTTOM EDGE R{R_BOTTOM:.2f},",
-        "   CONCENTRIC; COMMON CENTRE ON THE",
-        f"   MIRROR AXIS, {CENTER_Y - PIVOT_MID_Y:.2f} FROM THE PIVOT",
-        f"   AXIS (STRAP DEPTH {ARM_DEPTH:.2f} REF).",
-        f"4. ARC LENGTHS {TOP_ARC_LEN:.2f} TOP / {BOT_ARC_LEN:.2f} BOTTOM",
-        "   DEFINE THE ARC ENDPOINTS.",
-        f"5. EACH END: {TIP_FACE:.2f} RADIAL LAND PERP TO",
-        "   TOP EDGE; STRAIGHT TAPER TO BOTTOM ARC.",
-        "6. PIVOT HOLE: REAM +0.03/0, Ra 1.6.",
-        f"7. INTEGRAL HUB DIA {HUB_DIA:.2f} X {HUB_LENGTH:.2f} ON THE PIVOT",
-        f"   BORE, PROUD {(HUB_LENGTH - ARM_THICKNESS) / 2.0:.2f} EACH FACE: THE HUBS",
-        "   SET THE STATION PITCH (NO SPACERS).",
+        "PROFILE SYMMETRIC ABOUT PIVOT-BORE AXIS.",
+        "ROD END MATES WITH CONNECTING ROD MHA-017.",
+        "FINAL SIDEPLAY AND FREE PIVOT PER MHA-132.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"

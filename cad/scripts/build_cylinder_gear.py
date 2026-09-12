@@ -108,18 +108,17 @@ from _fit_limits import deviations
 from _gear import build_fixed_gear, volume_check
 from _part_pmi import author_part_pmi
 from build_cone_gear import DP, gear_facts  # DP = train diametral_pitch (machine.yaml)
+from cylinder_gear_notes import DRAWING_NOTES, GEAR_DATA
 from cylinder_gear_spec import (
     BORE_DIA as BORE_DIAMETER,
     CAM_DIA as CAM_DIAMETER,
     CAM_DIA_BAND,
     CAM_THICKNESS,
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
     ECCENTRICITY,
     ECCENTRICITY_TOLERANCE_MM,
     FACE_WIDTH,
     FACE_WIDTH_TOLERANCE_MM,
-    GEAR_DATA,
     NOTCH_CENTER_X,
     NOTCH_DEPTH,
     NOTCH_FLOOR_RADIUS,
@@ -172,7 +171,9 @@ def is_solid(x: float, y: float) -> bool:
         return not (delta - inv < psi < gamma - delta + inv)
     if not (delta < psi < gamma - delta):
         return True
-    r_chord = RB_MM * math.cos((gamma - 2.0 * delta) / 2.0) / math.cos(psi - gamma / 2.0)
+    r_chord = (
+        RB_MM * math.cos((gamma - 2.0 * delta) / 2.0) / math.cos(psi - gamma / 2.0)
+    )
     return r <= r_chord
 
 
@@ -206,7 +207,9 @@ def _ref_axis_start_mm(adapter, axis_name: str) -> list[float] | None:
             return None
         _flag(feat, "IFeature")
         if str(_read_member(feat, "Name")) == axis_name:
-            axis = adapter._attempt(lambda f=feat: f.GetSpecificFeature2(), default=None)
+            axis = adapter._attempt(
+                lambda f=feat: f.GetSpecificFeature2(), default=None
+            )
             if axis is None:
                 return None
             _flag(axis, "IRefAxis")
@@ -335,7 +338,9 @@ async def build(adapter) -> dict[str, str]:
     if not mass.is_success:
         raise RuntimeError(f"cam COM check failed: {mass.error}")
     com = [float(c) for c in mass.data.center_of_mass]
-    com_z = (v_teeth * FACE_WIDTH / 2.0 + v_cam * (FACE_WIDTH + CAM_THICKNESS / 2.0)) / volume
+    com_z = (
+        v_teeth * FACE_WIDTH / 2.0 + v_cam * (FACE_WIDTH + CAM_THICKNESS / 2.0)
+    ) / volume
     com_y = v_cam * ECCENTRICITY / volume
     if abs(com[2] - com_z) > 0.1 or abs(com[1] - com_y) > 0.1:
         raise RuntimeError(
@@ -383,7 +388,10 @@ async def build(adapter) -> dict[str, str]:
         (right, "vertical"),
         (left, "vertical"),
     ):
-        check(f"notch {relation}", await adapter.add_sketch_constraint(ent, None, relation))
+        check(
+            f"notch {relation}",
+            await adapter.add_sketch_constraint(ent, None, relation),
+        )
     check(
         "dimension notch width",
         await adapter.add_sketch_dimension(bottom, None, "linear", NOTCH_WIDTH),
@@ -434,9 +442,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += notch_dims.apply(adapter, "NotchProfile")
     check(
         "cut notch",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=FACE_WIDTH + 1.0)
-        ),
+        await adapter.create_cut_extrude(ExtrusionParameters(depth=FACE_WIDTH + 1.0)),
     )
     name_last_feature(adapter, "NotchKerf")
     v_notch = notch_solid_area() * FACE_WIDTH
@@ -454,7 +460,12 @@ async def build(adapter) -> dict[str, str]:
     bore = SketchDims()
     check("create_sketch bore", await adapter.create_sketch("Front"))
     await define_circle(
-        adapter, 0.0, 0.0, BORE_RADIUS, "bore", dims=bore,
+        adapter,
+        0.0,
+        0.0,
+        BORE_RADIUS,
+        "bore",
+        dims=bore,
         names=("BoreCx", "BoreCz", "BoreDia"),
         drives=(None, None, '"BoreDiameter"'),
     )

@@ -37,10 +37,9 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
 from _surface_finish import surface_finish_by_key
+from cylinder_gear_notes import BORE_FIT_CALLOUT, CAM_AXIAL_FIT_CALLOUT
 from cylinder_gear_spec import (
     BORE_DIA,
-    BORE_FIT_CALLOUT,
-    CAM_AXIAL_FIT_CALLOUT,
     CAM_DIA,
     CAM_THICKNESS,
     ECCENTRICITY,
@@ -154,12 +153,16 @@ def _notch_detail(adapter: Any, front: Any) -> Any:
     if sketch_manager.CreateCircle(*points[0], *points[1]) is None:
         raise RuntimeError("failed to create notch-detail fence")
     detail = ddoc.CreateDetailViewAt4(
-        *NOTCH_DETAIL_CENTER, 0.0,
+        *NOTCH_DETAIL_CENTER,
+        0.0,
         0,  # swDetViewSTANDARD
         *NOTCH_DETAIL_SCALE,
         "A",
         1,  # swDetCircleCIRCLE
-        True, False, False, 5,
+        True,
+        False,
+        False,
+        5,
     )
     if detail is None:
         raise RuntimeError("failed to create native notch detail")
@@ -177,7 +180,8 @@ def _notch_detail(adapter: Any, front: Any) -> Any:
     # native origin by the measured outline-center error, rather than assigning
     # the requested crop center directly to that origin.
     positioned_origin = tuple(
-        initial_position[axis] + NOTCH_DETAIL_CENTER[axis]
+        initial_position[axis]
+        + NOTCH_DETAIL_CENTER[axis]
         - (initial_outline[axis] + initial_outline[axis + 2]) / 2.0
         for axis in range(2)
     )
@@ -246,7 +250,8 @@ def _check_notch_dimensions(
     }
     for name, text_xy in NOTCH_DETAIL_DIMENSIONS.items():
         matches = [
-            item for item, item_name in zip(target_annotations, target_names, strict=True)
+            item
+            for item, item_name in zip(target_annotations, target_names, strict=True)
             if item_name == name
         ]
         if len(matches) != 1 or any(name in names for names in other_names.values()):
@@ -266,7 +271,8 @@ def _check_notch_dimensions(
         if math.dist(position[:2], text_xy) > 0.0001:
             raise RuntimeError(f"notch dimension {name} position did not persist")
     return [
-        annotation for annotation, name in zip(target_annotations, target_names, strict=True)
+        annotation
+        for annotation, name in zip(target_annotations, target_names, strict=True)
         if name in NOTCH_DETAIL_DIMENSIONS
     ]
 
@@ -349,15 +355,9 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
 
-    front = place_view(
-        adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE
-    )
-    right = place_view(
-        adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=VIEW_SCALE
-    )
-    place_view(
-        adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE
-    )
+    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE)
+    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=VIEW_SCALE)
+    place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
     for view in (front, right):
         set_hidden_lines_visible(adapter, view)
 
@@ -449,7 +449,11 @@ async def build(adapter: Any) -> dict[str, str]:
         leader_attach_xy=_project_mm(
             adapter,
             front,
-            (-BORE_DIA / (2.0 * math.sqrt(2.0)), BORE_DIA / (2.0 * math.sqrt(2.0)), 0.0),
+            (
+                -BORE_DIA / (2.0 * math.sqrt(2.0)),
+                BORE_DIA / (2.0 * math.sqrt(2.0)),
+                0.0,
+            ),
             label="bore finish leader attachment",
         ),
         char_height=0.0025,
@@ -479,9 +483,7 @@ async def build(adapter: Any) -> dict[str, str]:
         char_height=0.0025,
     )
 
-    add_property_linked_note(
-        adapter, "Gear Data", *GEAR_DATA_POS, char_height=0.0025
-    )
+    add_property_linked_note(adapter, "Gear Data", *GEAR_DATA_POS, char_height=0.0025)
     add_property_linked_note(
         adapter,
         "Manufacturing Notes",

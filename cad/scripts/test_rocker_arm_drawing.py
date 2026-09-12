@@ -1,17 +1,20 @@
-"""Offline contracts for the rocker-arm drawing."""
+"""Offline manufacturing contracts for the rocker-arm drawing."""
 
 from __future__ import annotations
 
 import math
 from pathlib import Path
 
+import _config
+import build_rocker_arm as arm
+import draw_rocker_arm as drawing
 import rocker_arm_notes
 import rocker_arm_spec
-import draw_rocker_arm as drawing
-import build_rocker_arm as arm
+from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
-from cone_pivot_post_installation import MECHANISM_X_SHIFT
 from _hole_spec import blind_cut_dia_mm
+from cone_pivot_post_installation import MECHANISM_X_SHIFT
+import rod_pivot_spec as pivot
 
 
 def test_required_drawing_paths() -> None:
@@ -21,117 +24,80 @@ def test_required_drawing_paths() -> None:
     assert DRAWINGS_BY_NAME["rocker_arm"].script == Path(drawing.__file__).resolve()
 
 
-def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
-    # The drift alarm: build marks exactly the spec's map, the drawing keeps
-    # exactly its union across the per-view keep-maps.
+def test_every_marked_model_dimension_has_one_native_view_authority() -> None:
     assert arm.DRAWING_DIMENSIONS is rocker_arm_notes.DRAWING_DIMENSIONS
     marked = set().union(*rocker_arm_notes.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) | set(drawing.TOP_KEEP)
-    assert kept | drawing.NOTE_ONLY_DIMENSIONS == marked
+    assert set(drawing.FRONT_KEEP) == marked
+    assert drawing.RIGHT_KEEP == {}
+    assert rocker_arm_notes.DRAWING_DIMENSIONS == {
+        "StrapProfile": {"BottomRodX", "RodTipLen"},
+        "PivotHoleProfile": {"PivotDia", "PivotZ"},
+        "HubProfile": {"HubDia"},
+    }
 
 
-def test_draw_view_math_matches_the_spec() -> None:
-    # The drawing's view math reads the spec's nominal spans, not a divergent
-    # copy; the spec's geometry must match the part the build actually builds.
-    assert (drawing.ROD_HOLE_X, drawing.TOP_END_Y) == (
-        rocker_arm_spec.ROD_HOLE_X,
-        rocker_arm_spec.TOP_END_Y,
-    )
-    assert rocker_arm_spec.CURVE_RADIUS == arm.CURVE_RADIUS
-    assert rocker_arm_spec.ARM_DEPTH == arm.ARM_DEPTH
-    assert rocker_arm_spec.ARM_THICKNESS == arm.ARM_THICKNESS
-    assert rocker_arm_spec.TOP_ARC_LEN == arm.TOP_ARC_LEN
-    assert rocker_arm_spec.BOT_ARC_LEN == arm.BOT_ARC_LEN
-    assert rocker_arm_spec.TIP_FACE == arm.TIP_FACE
-    assert rocker_arm_spec.ROD_HOLE_X == arm.ROD_HOLE_X
-    assert arm.ROD_HOLE_SPEC is rocker_arm_spec.ROD_HOLE_SPEC
-    assert drawing._ROD_HOLE_DIA == blind_cut_dia_mm(rocker_arm_spec.ROD_HOLE_SPEC)
+def test_orthographic_views_are_projected_in_third_angle_alignment() -> None:
+    assert drawing.RIGHT_CENTER[0] > drawing.FRONT_CENTER[0]
+    assert drawing.RIGHT_CENTER[1] == drawing.FRONT_CENTER[1]
+    assert drawing.SHEET_SCALE == (1.0, 2.0)
+    assert rocker_arm_notes.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:4"
 
 
-def test_rod_pin_follows_the_recentered_cam_and_recloses_neutral_y() -> None:
+def test_draw_view_math_matches_the_part_and_plain_pivot_contract() -> None:
+    assert drawing.ARM_THICKNESS == rocker_arm_spec.ARM_THICKNESS == arm.ARM_THICKNESS
+    assert drawing.R_TOP == rocker_arm_spec.R_TOP
+    assert drawing.R_BOTTOM == rocker_arm_spec.R_BOTTOM
+    assert drawing.ROD_HOLE_X == rocker_arm_spec.ROD_HOLE_X == arm.ROD_HOLE_X
+    assert drawing.ROD_HOLE_Y == rocker_arm_spec.ROD_HOLE_Y == arm.ROD_HOLE_Y
+    assert drawing.ROD_HOLE_SPEC is rocker_arm_spec.ROD_HOLE_SPEC is pivot.ROCKER_HOLE_SPEC
+    assert drawing._ROD_HOLE_DIA == blind_cut_dia_mm(pivot.ROCKER_HOLE_SPEC)
     assert math.isclose(
         rocker_arm_spec.ROD_HOLE_X,
         127.3738 - MECHANISM_X_SHIFT,
         abs_tol=1e-12,
     )
-    assert math.isclose(rocker_arm_spec.ROD_HOLE_Y, 16.456064115939025, abs_tol=1e-12)
-    assert rocker_arm_spec.ROD_HOLE_ABOVE_BOTTOM == arm.ROD_HOLE_ABOVE_BOTTOM
-    assert rocker_arm_spec.ROD_HOLE_Y == arm.ROD_HOLE_Y
 
 
-def test_sheet_runs_at_1_to_2() -> None:
-    assert drawing.SHEET_SCALE == (1.0, 2.0)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "scale=(1, 2)" in source
-    assert rocker_arm_notes.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:4"
-    assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
-
-
-def test_linked_notes_are_functional_metric_and_not_title_block_duplicates() -> None:
+def test_plain_rod_end_and_final_joint_authority_are_unambiguous() -> None:
     notes = rocker_arm_notes.DRAWING_NOTES
-    assert "R800" in notes
-    assert "R816" in notes
-    # The rod hole rides its native Ø1.99 THRU ALL callout; the notes state
-    # count and process only, never a second copy of a sheet dimension.
-    assert "(1X)" in notes
-    assert "#47" not in notes
-    assert "REAM +0.03/0" in notes
-    assert "16.00 REF" in notes
-    assert "11.5 IN" not in notes
-    assert "0.22 IN" not in notes
-    # General tolerances live in the title block ONLY.
-    assert "LINEAR +/-" not in notes
-    assert "BA" not in notes
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+    assert notes.splitlines() == [
+        "PROFILE SYMMETRIC ABOUT PIVOT-BORE AXIS.",
+        "ROD END MATES WITH CONNECTING ROD MHA-017.",
+        "FINAL SIDEPLAY AND FREE PIVOT PER MHA-132.",
+    ]
+    assert rocker_arm_notes.DIMENSION_CALLOUTS == {
+        "PivotDia": "REAM THRU",
+        "RodTipLen": "2X ENDS",
+    }
+    forbidden = (
+        "THREAD",
+        "TAP",
+        "RECESS",
+        "SPACER",
+        "COUNTERBORE",
+        "0.010",
+        "0.025",
+        "0.02",
+        "0.05",
+    )
+    assert all(text not in notes.upper() for text in forbidden)
 
 
-def test_native_gdt_and_finish_present() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    # A = pivot bore axis, B = broad face (right end view), C = rod-side tip
-    # face; the rod-pin position frame references all three.
-    assert source.count("add_datum_feature(") == 3
-    assert source.count("position_tolerance_m=0.0001") == 1
-    assert "pivot_datum_angle = math.radians(135.0)" in source
-    assert 'label="pivot bore cylindrical datum feature"' in source
-    assert source.count("shoulder=True") == 1
-    assert source.count("add_feature_control_frame(") == 1
-    assert 'datums=("A", "B", "C")' in source
-    assert 'characteristic="position"' in source
-    assert "add_surface_finish(" in source
-    assert "add_native_hole_callout(" in source
-    assert source.count("edge_xy=rod_rim") == 2
+def test_pivot_bore_tolerance_is_native_and_gdt_is_absent() -> None:
+    assert rocker_arm_spec.PIVOT_BORE_DIA_BAND == (0.03, 0.00)
+    assert not hasattr(rocker_arm_spec, "GEOMETRIC_TOLERANCES_MM")
+    assert model_toleranced_dimensions(arm) == {
+        ("PivotHoleProfile", "PivotDia"): "*deviations(PIVOT_BORE_DIA_BAND)"
+    }
+    assert rocker_arm_notes.DIMENSION_PRECISION["PivotDia"] == 2
 
 
-def test_large_radius_values_are_note_only() -> None:
-    assert drawing.NOTE_ONLY_DIMENSIONS == {"TopRadius", "BottomRadius"}
-    assert "R800" in rocker_arm_notes.DRAWING_NOTES
-    assert "R816" in rocker_arm_notes.DRAWING_NOTES
-
-
-def test_part_stamps_make_critical_drawing_properties() -> None:
-    source = Path(arm.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_properties" in source
-    assert "clear_dimensions_for_drawing" in source
-    import _config
-
-    spec = _config.parts("rocker-arm")
-    assert spec["material_specification"] == "LOW-CARBON STEEL OR GRAY IRON"
-    assert spec["finish"] == "matte black oxide"
-    assert int(spec["quantity"]) == 20
-
-
-def test_surface_finish_is_part_owned_authored_and_consumed() -> None:
+def test_surface_finish_and_title_block_metadata_remain_make_ready() -> None:
     (control,) = rocker_arm_spec.SURFACE_FINISHES
     assert control.key == "pivot_bore"
     assert control.roughness_um == 1.6
     assert control.face.diameter_mm == rocker_arm_spec.PIVOT_HOLE_DIA
-    assert arm.PIVOT_HOLE_DIA == rocker_arm_spec.PIVOT_HOLE_DIA
-    part_source = "".join(Path(arm.__file__).read_text(encoding="utf-8").split())
-    assert "surface_finishes=SURFACE_FINISHES" in part_source
-    sheet_source = "".join(Path(drawing.__file__).read_text(encoding="utf-8").split())
-    assert (
-        'control=surface_finish_by_key(SURFACE_FINISHES,"pivot_bore")'
-        in sheet_source
-    )
-    assert "roughness_ra=" not in sheet_source
+    spec = _config.parts("rocker-arm")
+    assert spec["material_specification"] == "LOW-CARBON STEEL OR GRAY IRON"
+    assert spec["finish"] == "matte black oxide"
+    assert int(spec["quantity"]) == 20

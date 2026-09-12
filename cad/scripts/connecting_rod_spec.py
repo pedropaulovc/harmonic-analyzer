@@ -4,8 +4,8 @@ the part build (``build_connecting_rod.py``) and its manufacturing drawing
 
 PURE DATA, no SolidWorks/COM imports (see ``crank_arm_spec`` for the pattern).
 The nominal geometry here MUST match the constants in build_connecting_rod.py
-(the test cross-checks the load-bearing ones); the marked-dimension -> kept map
-is the drift alarm the offline test enforces.
+(the test cross-checks the load-bearing ones). Drawing-only mark, placement and
+prose metadata lives in ``connecting_rod_notes``.
 """
 
 from __future__ import annotations
@@ -50,7 +50,3 @@ SURFACE_FINISHES = (
 # notes edit into their rebuild closure (codex #354).
 
 
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "rocker pin hole position": "0.20",
-}

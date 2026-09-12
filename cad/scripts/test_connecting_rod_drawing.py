@@ -1,16 +1,18 @@
-"""Offline contracts for the connecting-rod drawing."""
+"""Offline manufacturing contracts for the connecting-rod drawing."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
+import _config
+import build_connecting_rod as rod
 import connecting_rod_notes
 import connecting_rod_spec
 import draw_connecting_rod as drawing
-import build_connecting_rod as rod
 from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import blind_cut_dia_mm
+import rod_pivot_spec as pivot
 
 
 def test_required_drawing_paths() -> None:
@@ -20,122 +22,90 @@ def test_required_drawing_paths() -> None:
     assert DRAWINGS_BY_NAME["connecting_rod"].script == Path(drawing.__file__).resolve()
 
 
-def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
+def test_every_marked_model_dimension_has_one_native_view_authority() -> None:
     assert rod.DRAWING_DIMENSIONS is connecting_rod_notes.DRAWING_DIMENSIONS
     marked = set().union(*connecting_rod_notes.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) | set(drawing.TOP_KEEP)
-    assert kept == marked
+    front = set(drawing.FRONT_KEEP)
+    section = set(drawing.SECTION_KEEP)
+    assert front.isdisjoint(section)
+    assert front | section == marked
+    assert connecting_rod_notes.DRAWING_DIMENSIONS == {
+        "RingDiscProfile": {"RingOuterDia"},
+        "StrapBoreProfile": {"StrapBoreDia"},
+        "ShankProfile": {"ShankWidthDim"},
+        "HeadProfile": {"HeadCrownR", "HeadShoulderRiseR"},
+        "ForkFlareProfile": {"FlareAxialRise", "FlareLength"},
+        "ForkRootProfile": {"RootDiameter"},
+        "ForkSlotProfile": {"SlotWidth"},
+    }
 
 
-def test_draw_view_math_matches_the_spec() -> None:
-    assert (drawing.CENTER_DISTANCE, drawing.HEAD_TOP_Y) == (
-        connecting_rod_spec.CENTER_DISTANCE,
-        connecting_rod_spec.HEAD_TOP_Y,
-    )
-    assert connecting_rod_spec.CENTER_DISTANCE == rod.CENTER_DISTANCE
-    assert connecting_rod_spec.RING_BORE_DIA == rod.RING_BORE_DIA
-    assert connecting_rod_spec.RING_BORE_DIA_BAND == rod.RING_BORE_DIA_BAND
-    assert connecting_rod_spec.SHANK_WIDTH == rod.SHANK_WIDTH
-    assert connecting_rod_spec.RING_THICKNESS == rod.RING_THICKNESS
-    assert connecting_rod_spec.SHANK_THICKNESS == rod.SHANK_THICKNESS
-    assert connecting_rod_spec.HEAD_WIDTH == rod.HEAD_WIDTH
-    assert connecting_rod_spec.HEAD_HEIGHT == rod.HEAD_HEIGHT
-    assert connecting_rod_spec.HEAD_CROWN_ABOVE_PIN == rod.HEAD_CROWN_ABOVE_PIN
-    assert connecting_rod_spec.HEAD_THICKNESS == rod.HEAD_THICKNESS
-
-
-def test_pin_hole_is_part_owned_and_drawing_geometry_is_derived() -> None:
-    assert rod.PIN_HOLE_SPEC is connecting_rod_spec.PIN_HOLE_SPEC
-    assert drawing.PIN_HOLE_SPEC is connecting_rod_spec.PIN_HOLE_SPEC
-    assert drawing._PIN_HOLE_DIA == blind_cut_dia_mm(connecting_rod_spec.PIN_HOLE_SPEC)
-    source = Path(rod.__file__).read_text(encoding="utf-8")
-    assert "HoleSpec(" not in source
-    assert "\n        PIN_HOLE_SPEC," in source
-    assert "expect_dia_mm=blind_cut_dia_mm(PIN_HOLE_SPEC)" in source
-
-
-def test_sheet_runs_at_1_to_1_with_1_to_2_isometric() -> None:
+def test_front_and_section_use_third_angle_projected_alignment() -> None:
+    assert drawing.SECTION_CENTER[0] < drawing.FRONT_CENTER[0]
+    assert drawing.SECTION_CENTER[1] == drawing.FRONT_CENTER[1]
     assert drawing.SHEET_SCALE == (1.0, 1.0)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "scale=(1, 2)" in source  # the isometric override
-    assert drawing.LEFT_CENTER == (0.080, 0.171)
-    assert (
-        'add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)'
-        in source
-    )
     assert connecting_rod_notes.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:2"
-    assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
 
 
-def test_linked_notes_are_functional_and_not_title_block_duplicates() -> None:
+def test_draw_view_math_matches_the_part_and_pivot_contracts() -> None:
+    assert drawing.CENTER_DISTANCE == connecting_rod_spec.CENTER_DISTANCE == rod.CENTER_DISTANCE
+    assert drawing.HEAD_TOP_Y == connecting_rod_spec.HEAD_TOP_Y
+    assert drawing.HEAD_WIDTH == connecting_rod_spec.HEAD_WIDTH == rod.HEAD_WIDTH
+    assert drawing.HEAD_HEIGHT == connecting_rod_spec.HEAD_HEIGHT == rod.HEAD_HEIGHT
+    assert drawing.RING_THICKNESS == connecting_rod_spec.RING_THICKNESS
+    assert drawing.SHANK_THICKNESS == connecting_rod_spec.SHANK_THICKNESS
+    assert drawing.FORK_SLOT_NOMINAL == pivot.FORK_SLOT_NOMINAL
+    assert drawing.FORK_CHEEK_THICKNESS == pivot.FORK_CHEEK_THICKNESS
+    assert drawing.FORK_OUTER_THICKNESS == pivot.FORK_OUTER_THICKNESS
+    assert drawing.FORK_ROOT_RADIUS == pivot.FORK_ROOT_RADIUS
+    assert drawing.PIN_HOLE_SPEC is connecting_rod_spec.PIN_HOLE_SPEC
+    assert drawing._PIN_HOLE_DIA == blind_cut_dia_mm(pivot.FORK_HOLE_SPEC)
+
+
+def test_fit_authority_is_not_duplicated_in_free_text() -> None:
     notes = connecting_rod_notes.DRAWING_NOTES
-    # The pin hole rides its native Ø1.99 THRU ALL callout and the bore its
-    # imported model tolerance; notes never repeat a sheet dimension.
-    assert "#47" not in notes
-    assert "1X" in notes
-    assert "RING 3.00 THICK, STEP AT THE RING OD" in notes
-    assert "SHANK AND HEAD 2.50" in notes
-    assert "ONE MIDPLANE" in notes
-    assert "0.10 MIN CLR/SIDE" in notes
-    assert "RING WALL 4.50 MIN AFTER BORING" in notes
-    assert "NO DRAFT REQUIRED" in notes
-    assert "HANGS PLUMB" not in notes  # not an inspectable requirement
-    assert "SHANK C/L" not in notes  # the 4.00 BASIC from datum B owns it
-    assert "HEAD 10.00 W x 10.50 HIGH, R5.00 CROWN" in notes
-    assert "PIN C/L 2.40 BELOW CROWN" in notes  # one line, with the 1X count
-    assert "Ra " not in notes  # the title-block surface row is never restated
-    assert "147.67" not in notes  # the BASIC sheet dimension owns it
-    assert "LINEAR +/-" not in notes
-    assert "BA" not in notes
-    assert "GRAY-IRON" not in notes
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+    assert notes.splitlines() == [
+        "MATES WITH ROCKER ARM MHA-071.",
+        "FINAL SIDEPLAY AND FREE PIVOT PER MHA-132.",
+    ]
+    assert connecting_rod_notes.DIMENSION_CALLOUTS == {
+        "StrapBoreDia": "RUNNING FIT WITH CYLINDER-GEAR CAM",
+        "RootDiameter": "ROUND SLOT ROOT",
+        "SlotWidth": "DESIGN NOMINAL; FINISH MATCHED SLOT",
+    }
+    forbidden = (
+        "ONE MIDPLANE",
+        "SHANK AND HEAD 2.50",
+        "THREAD",
+        "RECESS",
+        "SPACER",
+        "0.010",
+        "0.025",
+        "0.02",
+        "0.05",
+    )
+    assert all(text not in notes.upper() for text in forbidden)
+    assert connecting_rod_notes.DIMENSION_PRECISION["SlotWidth"] == 3
+    assert connecting_rod_notes.DIMENSION_PRECISION["RootDiameter"] == 3
 
 
-def test_native_gdt_and_finish_present() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    # A = strap bore axis, B = shank left flank (clocking); the pin-hole
-    # position frame references both and the bore imports its model-owned fit.
-    assert source.count("add_datum_feature(") == 2
-    assert 'label="strap bore axis",\n        position_tolerance_m=0.000005' in source
-    assert source.count("add_feature_control_frame(") == 1
-    assert 'datums=("A", "B")' in source
-    assert 'characteristic="position"' in source
-    assert '"StrapBoreDia": "BORE"' in source
-    assert "+0.10/0" not in source
-    assert "add_surface_finish(" in source
-    assert "add_native_hole_callout(" in source
-    # The callout owns the 9-o'clock rim; the position FCF anchors the
-    # opposite 3-o'clock rim so the two leaders cannot cross.
-    assert source.count("edge_xy=pin_rim") == 1
-    assert source.count("edge_xy=pin_fcf_rim") == 1
-
-
-def test_strap_bore_tolerance_is_owned_by_the_named_model_dimension() -> None:
+def test_only_size_tolerance_and_surface_finish_metadata_survive() -> None:
+    assert not hasattr(connecting_rod_spec, "GEOMETRIC_TOLERANCES_MM")
     assert connecting_rod_spec.RING_BORE_DIA_BAND == (0.10, 0.00)
     assert model_toleranced_dimensions(rod) == {
         ("StrapBoreProfile", "StrapBoreDia"): "*deviations(RING_BORE_DIA_BAND)"
     }
+    (control,) = connecting_rod_spec.SURFACE_FINISHES
+    assert control.key == "strap_bore"
+    assert control.roughness_um == 1.6
+    assert control.face.diameter_mm == connecting_rod_spec.RING_BORE_DIA
 
 
-def test_bore_finish_is_routed_clear_of_the_lower_dimension_stack() -> None:
-    edge_x, edge_y = drawing.BORE_FINISH_EDGE
-    symbol_x, symbol_y = drawing.BORE_FINISH_SYMBOL
-    assert symbol_x > edge_x
-    assert symbol_y > edge_y
-    assert symbol_y > drawing.FRONT_KEEP["StrapBoreDia"][1] + 0.010
-    assert symbol_x < 0.250
-
-
-def test_part_stamps_make_critical_drawing_properties() -> None:
-    source = Path(rod.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_properties" in source
-    assert "clear_dimensions_for_drawing" in source
-    import _config
-
+def test_title_block_metadata_remains_make_ready() -> None:
     spec = _config.parts("connecting-rod")
     assert spec["material_specification"] == "LOW-CARBON STEEL OR GRAY IRON"
     assert spec["finish"] == (
-        "BLACK ENAMEL; MASK STRAP BORE + PIN HOLE; OIL BARE MACHINED SURFACES"
+        "BLACK ENAMEL; MASK STRAP BORE, PIVOT BORES AND INNER FORK FACES; "
+        "OIL BARE MACHINED SURFACES"
     )
     assert int(spec["quantity"]) == 20
