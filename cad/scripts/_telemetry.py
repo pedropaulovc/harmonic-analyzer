@@ -250,7 +250,7 @@ def _resolve_otlp_endpoint(
     *,
     protocol: str | None = None,
     local_endpoints: dict[str, str | None] | None = None,
-    pending_warnings: list[tuple[str, str, str]] | None = None,
+    pending_warnings: list[str] | None = None,
 ) -> str | None:
     """Return the configured endpoint for *signal*, or a reachable local default.
 
@@ -690,7 +690,16 @@ def _otlp_protocol(signal: str) -> str:
     return protocol.strip().lower()
 
 
-def _otlp_export_timeout(signal: str) -> float:
+def _emit_otlp_warning(message: str, pending_warnings: list[str] | None) -> None:
+    if pending_warnings is not None:
+        pending_warnings.append(message)
+        return
+    logging.getLogger(_LOGGER_NAME).warning("%s", message)
+
+
+def _otlp_export_timeout(
+    signal: str, *, pending_warnings: list[str] | None = None
+) -> float:
     """Return a finite OTLP timeout in exporter-native seconds."""
     signal_timeout = f"OTEL_EXPORTER_OTLP_{signal.upper()}_TIMEOUT"
     for name in (signal_timeout, "OTEL_EXPORTER_OTLP_TIMEOUT"):
@@ -703,10 +712,10 @@ def _otlp_export_timeout(signal: str) -> float:
             timeout_milliseconds = -1
         if 0 < timeout_milliseconds <= 2_147_483_647:
             return timeout_milliseconds / 1000
-        logging.getLogger(_LOGGER_NAME).warning(
-            "Ignoring invalid %s=%r; expected 1..2147483647 milliseconds",
-            name,
-            configured_timeout,
+        _emit_otlp_warning(
+            f"Ignoring invalid {name}={configured_timeout!r}; "
+            "expected 1..2147483647 milliseconds",
+            pending_warnings,
         )
     return 1.0
 
@@ -716,20 +725,15 @@ def _warn_otlp_processor(
     protocol: str,
     reason: str,
     *,
-    pending_warnings: list[tuple[str, str, str]] | None = None,
+    pending_warnings: list[str] | None = None,
 ) -> None:
-    if pending_warnings is not None:
-        pending_warnings.append((signal, protocol, reason))
-        return
-    logging.getLogger(_LOGGER_NAME).warning(
-        "OTLP %s export is disabled for protocol %r: %s",
-        signal,
-        protocol,
-        reason,
+    _emit_otlp_warning(
+        f"OTLP {signal} export is disabled for protocol {protocol!r}: {reason}",
+        pending_warnings,
     )
 
 
-def _otlp_span_processor(*, pending_warnings: list[tuple[str, str, str]] | None = None):
+def _otlp_span_processor(*, pending_warnings: list[str] | None = None):
     """``BatchSpanProcessor`` around the configured OTLP span exporter."""
     protocol = _otlp_protocol("traces")
     try:
@@ -751,7 +755,11 @@ def _otlp_span_processor(*, pending_warnings: list[tuple[str, str, str]] | None 
             return None
 
         return BatchSpanProcessor(
-            OTLPSpanExporter(timeout=_otlp_export_timeout("traces"))
+            OTLPSpanExporter(
+                timeout=_otlp_export_timeout(
+                    "traces", pending_warnings=pending_warnings
+                )
+            )
         )
     except Exception as exc:
         _warn_otlp_processor(
@@ -760,7 +768,7 @@ def _otlp_span_processor(*, pending_warnings: list[tuple[str, str, str]] | None 
         return None
 
 
-def _otlp_log_processor(*, pending_warnings: list[tuple[str, str, str]] | None = None):
+def _otlp_log_processor(*, pending_warnings: list[str] | None = None):
     """``BatchLogRecordProcessor`` around the configured OTLP log exporter."""
     protocol = _otlp_protocol("logs")
     try:
@@ -782,7 +790,9 @@ def _otlp_log_processor(*, pending_warnings: list[tuple[str, str, str]] | None =
             return None
 
         return BatchLogRecordProcessor(
-            OTLPLogExporter(timeout=_otlp_export_timeout("logs"))
+            OTLPLogExporter(
+                timeout=_otlp_export_timeout("logs", pending_warnings=pending_warnings)
+            )
         )
     except Exception as exc:
         _warn_otlp_processor(
@@ -832,7 +842,7 @@ def configure(*, console: bool = True, force: bool = False) -> None:
     # within this configuration pass. Pin each reachable endpoint together with
     # its protocol so every child inherits one internally consistent decision.
     local_endpoints: dict[str, str | None] = {}
-    pending_otlp_warnings: list[tuple[str, str, str]] = []
+    pending_otlp_warnings: list[str] = []
     otlp_endpoints: dict[str, str | None] = {}
     for signal in ("traces", "logs"):
         protocol = _otlp_protocol(signal)
@@ -935,8 +945,8 @@ def configure(*, console: bool = True, force: bool = False) -> None:
         stream.setFormatter(_FriendlyFormatter())
         stream.setLevel(console_level)
         pylog.addHandler(stream)
-    for signal, protocol, reason in pending_otlp_warnings:
-        _warn_otlp_processor(signal, protocol, reason)
+    for warning in pending_otlp_warnings:
+        pylog.warning("%s", warning)
 
 
 def get_logger() -> logging.Logger:
