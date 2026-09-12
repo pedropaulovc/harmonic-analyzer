@@ -2543,6 +2543,10 @@ def task_check():
                 {
                     str((SCRIPTS_DIR / "error_budget.py").resolve()),
                     str((SCRIPTS_DIR / "test_error_budget.py").resolve()),
+                    # read as TEXT by the gate (the assembly imports SolidWorks so
+                    # it cannot be imported offline): module_deps_of cannot see it.
+                    str((SCRIPTS_DIR / "build_channel_assembly.py").resolve()),
+                    str((SCRIPTS_DIR / "channel_spring_installed_notes.py").resolve()),
                     str((CONFIG_DIR / "error_budget.yaml").resolve()),
                     str((CONFIG_DIR / "tolerances.yaml").resolve()),
                     str((CONFIG_DIR / "machine" / "amplitude.yaml").resolve()),

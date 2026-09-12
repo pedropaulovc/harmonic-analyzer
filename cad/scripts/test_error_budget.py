@@ -32,20 +32,24 @@ NOMINAL_FIELD = {
 
 @pytest.fixture(scope="module")
 def budget():
+    """The allocation config under test."""
     return eb.load_budget()
 
 
 @pytest.fixture(scope="module")
 def nom():
+    """The as-designed inputs from the spec modules."""
     return eb.nominal()
 
 
 @pytest.fixture(scope="module")
 def report(budget):
+    """One full model run, shared across the module."""
     return eb.build_report(budget)
 
 
 def _resolve(dotted: str) -> float:
+    """``module.ATTR`` -> its value, for the yaml's ``nominal`` references."""
     module, attr = dotted.rsplit(".", 1)
     return float(getattr(importlib.import_module(module), attr))
 
@@ -64,22 +68,24 @@ def test_every_toleranced_nominal_is_the_cad_constant(budget, nom):
 
 
 def test_analytic_gain_sensitivities_match_exact_kinematics(report):
+    """The closed-form gain sensitivities agree with central differences of the
+    exact fundamental amplitude."""
     for key, (analytic, numeric) in report["finite_difference_check"].items():
         assert numeric == pytest.approx(analytic, rel=0.02), key
 
 
 def test_calibrated_readout_cancels_common_mode_gain(nom):
     """Every channel 1 % strong -> zero coefficient error after the scale
-    calibration; only channel-to-channel differences survive."""
+    calibration; only channel-to-channel differences survive. The spring
+    sensitivity is the numerator's 1 %/% -- the common denominator of the force
+    balance is what this calibration removes, so it must not be pre-cancelled."""
     x = eb.reference_inputs()["gaussian_a0p1"]
     draws = 1
-    dev = {
-        "spring_rate": np.full(
-            (draws, eb.N_ELEMENTS), 1.0 / eb.channel_weight_sensitivity(nom)[0]
-        )
-    }
+    sens = eb.gain_sensitivities(nom)
+    assert sens["spring_rate"] == 1.0
+    dev = {"spring_rate": np.full((draws, eb.N_ELEMENTS), 1.0)}
     cal = np.zeros((draws, eb.N_ELEMENTS))
-    e = eb._channel_model(x, nom, dev, eb.gain_sensitivities(nom), cal)
+    e = eb._channel_model(x, nom, dev, sens, cal)
     assert np.max(np.abs(e)) < 1e-9
 
 
@@ -107,18 +113,31 @@ def test_null_station_is_below_the_pivot_zero(report, nom):
 
 
 def test_budget_closes(report):
+    """The Monte Carlo of the configured tolerances lands inside its targets."""
     assert eb.budget_closes(report) == []
 
 
 def test_drawing_limits_agree_with_the_budget(budget):
+    """Every budgeted limit that reaches a manufacturing output (drawing note,
+    GD&T zone, fit band) carries the SAME number as error_budget.yaml."""
+    import channel_spring_installed_notes
     import cylinder_gear_spec
     import summing_lever_spec
 
-    ecc_tol = budget["critical_features"]["cam_eccentricity"]["tolerance"]
+    feats = budget["critical_features"]
+    ecc_tol = feats["cam_eccentricity"]["tolerance"]
     assert (
         f"AXIS OFFSET {cylinder_gear_spec.ECCENTRICITY:.3f} +/-{ecc_tol:.3f}"
         in cylinder_gear_spec.DRAWING_NOTES
     ), "cylinder-gear drawing note carries a different eccentricity tolerance"
+    assert (
+        f"NOTCH CENTERLINE\n  WITHIN +/-{feats['cam_phase']['tolerance']:.2f} DEG"
+        in cylinder_gear_spec.DRAWING_NOTES
+    ), "cylinder-gear drawing note carries a different cam-phase tolerance"
+    assert (
+        f"ALL 20 WITHIN +/-{feats['spring_rate']['tolerance']:.1f}% OF THE SET MEAN"
+        in channel_spring_installed_notes.DRAWING_NOTES
+    ), "spring spec sheet carries a different matching requirement"
     zone = float(
         summing_lever_spec.GEOMETRIC_TOLERANCES_MM["spring-hole pattern position"]
     )
@@ -139,8 +158,9 @@ def test_drawing_limits_agree_with_the_budget(budget):
 
 def test_assembly_imports_the_shared_stations_instead_of_copying():
     """build_channel_assembly imports SolidWorks, so it cannot be imported in
-    this gate; pin at the SOURCE level that its PIVOT / FULCRUM / arc centre
-    come from the shared modules error_budget reads, never from a literal."""
+    this gate; pin at the SOURCE level that its PIVOT / FULCRUM / arc centre /
+    slide radius come from the shared modules error_budget reads, never from a
+    literal."""
     src = (pathlib.Path(eb.__file__).with_name("build_channel_assembly.py")).read_text(
         encoding="utf-8"
     )
@@ -149,15 +169,17 @@ def test_assembly_imports_the_shared_stations_instead_of_copying():
     assert re.search(
         r"^from rocker_arm_spec import CENTER_Y as ARM_ARC_CENTER_LOCAL_Y", src, re.M
     )
-    for name in ("PIVOT", "FULCRUM", "ARM_ARC_CENTER_LOCAL_Y"):
+    assert re.search(
+        r"^from rocker_arm_spec import CURVE_RADIUS as ARM_TOP_RADIUS", src, re.M
+    )
+    for name in ("PIVOT", "FULCRUM", "ARM_ARC_CENTER_LOCAL_Y", "ARM_TOP_RADIUS"):
         assert not re.search(rf"^{name}\s*=", src, re.M), (
             f"{name} is copied, not imported"
         )
-    assert re.search(r"^ARM_TOP_RADIUS = 800\.0", src, re.M)
-    assert eb.rocker_arm_spec.CURVE_RADIUS == 800.0
 
 
 def test_unsupported_distribution_fails_loud(budget, nom):
+    """A distribution the model does not implement raises instead of sampling uniform."""
     bad = {**budget, "monte_carlo": {**budget["monte_carlo"], "distribution": "normal"}}
     with pytest.raises(ValueError, match="distribution"):
         eb.monte_carlo(bad, nom)
