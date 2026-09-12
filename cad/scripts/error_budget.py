@@ -50,6 +50,7 @@ import channel_spring_installed_spec
 import connecting_rod_spec
 import counter_spring_spec
 import cylinder_gear_spec
+import paper_drive_geom
 import rocker_arm_spec
 import summing_lever_spec
 from channel_frame_geom import LEVER_FULCRUM_XY, ROCKER_PIVOT_XY
@@ -291,22 +292,19 @@ def ideal_coefficients(x: np.ndarray) -> np.ndarray:
 PERIOD = np.arange(720) * 2.0 * math.pi / 720
 
 
-def trace_scale(trace_all_ones: Callable[[np.ndarray], np.ndarray]) -> float:
-    """The CALIBRATION run of tolerance-policy.md: every bar at full scale, the
-    k=0 reading above the mean line is K * N * d_max. Returns K (trace units per
-    unit ordinate) -- common-mode gain, measured once, applied to every trial."""
-    y0 = float(trace_all_ones(THETA_K[:1])[0])
-    return (y0 - float(np.mean(trace_all_ones(PERIOD)))) / N_ELEMENTS
-
-
 def read_coefficients(
-    trace: Callable[[np.ndarray], np.ndarray], scale: float
+    trace: Callable[[np.ndarray], np.ndarray], x: np.ndarray, c2_total: float = 0.0
 ) -> np.ndarray:
     """The readout PROCEDURE of tolerance-policy.md applied to a trace y(theta):
-    zero = the mean line of the trial's own full period; scale = the calibration
-    run's K. Returns A_k in ordinate units."""
+    zero = the mean line of the trial's own full period; scale = the trial's own
+    k=0 reading, which the operator knows equals sum(x_i) (Michelson's
+    normalisation to the greatest term, and the CAD's pen_driver mapping of the
+    trace peak onto the pen stroke). ``c2_total`` is the sum of the channels'
+    second harmonics riding the k=0 reading, removed before scaling. Returns A_k
+    in ordinate units."""
     zero = float(np.mean(trace(PERIOD)))
-    return (trace(THETA_K) - zero) / scale
+    r = trace(THETA_K) - zero
+    return r * (float(np.sum(x)) / (r[0] - c2_total))
 
 
 def coefficient_errors_pct(measured: np.ndarray, x: np.ndarray) -> np.ndarray:
@@ -360,16 +358,19 @@ def nominal_design_errors(
             return np.zeros_like(stations)
         return np.array([second_harmonic(one_cycle(float(d)), grid) for d in stations])
 
-    inputs = reference_inputs()
-    cal_stations = inputs["all_ones"] * nom.d_max + stick_zero
-    # the calibration reading at theta=0 carries every channel's c2 too
-    scale = trace_scale(trace_for(cal_stations)) - float(np.mean(c2(cal_stations)))
     cos_2k = np.cos(2.0 * np.outer(THETA_K, HARMONICS))
     out: dict[str, dict[str, float]] = {}
-    for name, x in inputs.items():
+    for name, x in reference_inputs().items():
         stations = x * nom.d_max + stick_zero
-        measured = read_coefficients(trace_for(stations), scale)
-        measured -= (cos_2k @ c2(stations)) / scale
+        c2s = c2(stations)  # trace units, per channel
+        trace = trace_for(stations)
+        measured = read_coefficients(trace, x, c2_total=float(c2s.sum()))
+        # the correction table is in trace units; convert with the trial's scale
+        zero = float(np.mean(trace(PERIOD)))
+        scale = (float(trace(THETA_K[:1])[0]) - zero - float(c2s.sum())) / float(
+            np.sum(x)
+        )
+        measured -= (cos_2k @ c2s) / scale
         e = coefficient_errors_pct(measured, x)
         out[name] = {"mae": float(np.mean(np.abs(e))), "max": float(np.max(np.abs(e)))}
     return out
@@ -442,19 +443,16 @@ def _channel_model(
     nom: Nominal,
     dev: dict[str, np.ndarray],
     sens: dict[str, float],
-    cal_station: np.ndarray,
 ) -> np.ndarray:
     """A_k read from a linear-gain machine whose channel i has gain g_i and
     phase phi_i built from the drawn deviations ``dev[feature]`` (draws x 20),
-    scaled by the same machine's calibration run (all bars at full scale, its
-    own station-setting errors ``cal_station``). Pure cosines have a zero mean
-    line, so only the scale step of the readout is modelled here.
-    Returns e_k in % FS, shape (draws, K_MAX+1)."""
+    normalised by the trial's own k=0 reading (= sum x_i, known to the
+    operator). Pure cosines have a zero mean line, so only the scale step of the
+    readout is modelled here. Returns e_k in % FS, shape (draws, K_MAX+1)."""
     draws = next(iter(dev.values())).shape[0]
     log_g = np.zeros((draws, N_ELEMENTS))
     phi = np.zeros((draws, N_ELEMENTS))
     d = np.broadcast_to(x * nom.d_max, (draws, N_ELEMENTS)).copy()
-    d_cal = np.full((draws, N_ELEMENTS), nom.d_max)
     for key, v in dev.items():
         if key in sens:
             log_g += np.log1p(sens[key] / 100.0 * v)
@@ -462,17 +460,14 @@ def _channel_model(
             phi += np.radians(v)
         elif key == "station_setting":
             d += v
-            d_cal += cal_station
         else:
             raise KeyError(f"no model for feature {key}")
     g = np.exp(log_g)
-    scale = (g * d_cal * np.cos(phi)).sum(axis=1) / (
-        N_ELEMENTS * nom.d_max
-    )  # k=0 of the calibration run
     cos_k = np.cos(
         THETA_K[None, :, None] * HARMONICS[None, None, :] + phi[:, None, :]
     )  # draws,k,i
-    measured = np.einsum("di,dki->dk", g * d, cos_k) / (scale[:, None] * nom.d_max)
+    r = np.einsum("di,dki->dk", g * d, cos_k)
+    measured = r * (float(np.sum(x)) / r[:, :1])
     ideal = ideal_coefficients(x)
     return 100.0 * (measured - ideal[None, :]) / np.max(np.abs(ideal))
 
@@ -502,17 +497,12 @@ def monte_carlo(budget: dict[str, Any], nom: Nominal) -> dict[str, Any]:
         key: rng.uniform(-f["tolerance"], f["tolerance"], size=(draws, N_ELEMENTS))
         for key, f in feats.items()
     }
-    cal_station = rng.uniform(
-        -feats["station_setting"]["tolerance"],
-        feats["station_setting"]["tolerance"],
-        size=(draws, N_ELEMENTS),
-    )
 
     def stats(dev: dict[str, np.ndarray]) -> dict[str, Any]:
         per_input = {}
         pooled = []
         for name in names:
-            e = _channel_model(inputs[name], nom, dev, sens, cal_station)
+            e = _channel_model(inputs[name], nom, dev, sens)
             per_input[name] = {
                 "mae": float(np.mean(np.abs(e))),
                 "rms": float(np.sqrt(np.mean(e * e))),
@@ -585,44 +575,63 @@ def closed_form_terms(nom: Nominal, budget: dict[str, Any]) -> dict[str, Any]:
         "dc_step_pct_of_channel_amplitude": 100.0 * strap_c / nom.ecc,
         "note": "constant within a run (mean-line zero removes it) as long as a station keeps its sign",
     }
-    # Ordinate readout at the CAD's configured, kinematically verified pen
-    # stroke (output.yaml pen_trace_half_mm -- verify:kinematics asserts it);
-    # only the reading uncertainty is an assumption.
+    # Ordinate readout. The CAD maps the trace PEAK onto output.yaml
+    # pen_trace_half_mm (pen_driver: scale = stroke_half / peak|pen_y|), and the
+    # greatest term of a non-negative input is its k=0 reading, so the reading
+    # uncertainty is the same fraction of the greatest term for every trial --
+    # PROVIDED the magnifier can be set so each trial's k=0 spans the stroke.
+    # The magnification each reference input needs relative to the all-ones
+    # setting (N / sum x_i) is reported; it is the open magnifier-range item.
     pen_half = float(_config.machine("output", "pen_trace_half_mm"))
     reading = float(res["readout"]["reading_uncertainty_mm"])
+    spans = bool(res["readout"]["greatest_term_spans_stroke"])
+    scored = [n for n in budget["reference_inputs"]]
+    broad = [n for n in scored if n != "pair_1_20"]
+    magnification = {
+        n: float(N_ELEMENTS / np.sum(reference_inputs()[n])) for n in scored
+    }
+    per_trial = 100.0 * reading / pen_half
+    fixed = {n: per_trial * magnification[n] for n in scored}
     readout = {
         "pen_half_stroke_mm": pen_half,
         "assumed_reading_uncertainty_mm": reading,
+        "assumed_greatest_term_spans_stroke": spans,
         "ordinate_pct_fs_per_0p1mm_reading": 100.0 * 0.1 / pen_half,
-        "pct_fs": 100.0 * reading / pen_half,
+        "pct_fs_greatest_term_spans_stroke": per_trial,
+        "magnification_vs_all_ones": magnification,
+        "pct_fs_fixed_magnifier": fixed,
+        "pct_fs": per_trial if spans else max(fixed[n] for n in broad),
         "note": "reading uncertainty = half the line width + interpolation; scales as 1/(pen full scale)",
     }
     # Timebase: reading at the wrong theta. d(A_k)/d(theta) = -sum i x_i sin(i theta_k),
     # RMS over k, in % FS per rad of FUNDAMENTAL angle. One fundamental period is
     # CRANK_TURNS_PER_PERIOD crank turns (gear k turns k/80 per crank turn); the
     # budgeted procedure stops the crank on its index within +/-index_deg
-    # (uniform, so RMS = slope * half-width / sqrt 3); the abscissa-reading
-    # alternative at the configured platen feed is reported for comparison.
+    # (uniform, so RMS = slope * half-width / sqrt 3), scored on the WORST
+    # reference input; the abscissa-reading alternative at the CAD's platen feed
+    # is reported for comparison.
     slope = {}
     for name, x in reference_inputs().items():
         s = -np.sin(np.outer(THETA_K, HARMONICS)) @ (x * HARMONICS)
         fs = np.max(np.abs(ideal_coefficients(x)))
         slope[name] = float(np.sqrt(np.mean(s * s)) / fs * 100.0)
-    feed = float(budget["readout"]["platen_feed_mm_per_crank_turn"])
-    coarse = float(budget["readout"]["coarse_gear_set_feed_ratio"])
+    worst = max(scored, key=lambda n: slope[n])
     index_deg = float(res["timebase"]["crank_index_deg"])
     rad_per_crank_turn = 2.0 * math.pi / CRANK_TURNS_PER_PERIOD
-    rad_per_0p1mm = 0.1 / feed * rad_per_crank_turn
+    rad_per_0p1mm = (
+        0.1 / paper_drive_geom.NET_RACK_TRAVEL_PER_CRANK_REV * rad_per_crank_turn
+    )
     rad_index = index_deg / 360.0 * rad_per_crank_turn
     timebase = {
         "pct_fs_per_rad_rms": slope,
-        "platen_feed_mm_per_crank_turn": feed,
-        "pct_fs_all_ones_per_0p1mm_abscissa": slope["all_ones"] * rad_per_0p1mm,
-        "pct_fs_all_ones_per_0p1mm_abscissa_coarse_gears": slope["all_ones"]
+        "platen_feed_mm_per_crank_turn": paper_drive_geom.NET_RACK_TRAVEL_PER_CRANK_REV,
+        "pct_fs_worst_per_0p1mm_abscissa": slope[worst] * rad_per_0p1mm,
+        "pct_fs_worst_per_0p1mm_abscissa_coarse_gears": slope[worst]
         * rad_per_0p1mm
-        / coarse,
+        / paper_drive_geom.COARSE_FEED_RATIO,
         "assumed_crank_index_deg": index_deg,
-        "pct_fs": slope["all_ones"] * rad_index / math.sqrt(3.0),
+        "worst_input": worst,
+        "pct_fs": slope[worst] * rad_index / math.sqrt(3.0),
     }
     return {
         "knife": knife,

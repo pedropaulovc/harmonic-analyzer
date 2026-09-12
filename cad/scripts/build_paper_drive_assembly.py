@@ -346,11 +346,15 @@ REMOVABLE_TIP_R = {"T12": 14.0, "T18": 20.0, "T24": 26.0}  # m2: OD (T+2)*2
 THUMBNUT_AIR = 0.25
 THUMBNUT_Z0 = REMOVABLE_Z0 - THUMBNUT_AIR  # -156.45 (neck's gear-side face)
 THUMBNUT_FRONT_Z = THUMBNUT_Z0 - THUMBNUT_LEN  # -167.45
-_THUMBNUT_DISC_MID_Z = THUMBNUT_Z0 - THUMBNUT_NECK_LEN - THUMBNUT_DISC_LEN / 2.0  # -163.95
+_THUMBNUT_DISC_MID_Z = (
+    THUMBNUT_Z0 - THUMBNUT_NECK_LEN - THUMBNUT_DISC_LEN / 2.0
+)  # -163.95
 KNOB_SHAFT_FRONT_Z = KNOB_SHAFT_Z0 - KNOB_FRONT_STUB  # -167.0
 _nut_bore_gap = (THUMBNUT_BORE_DIA - KNOB_SHAFT_DIA) / 2.0  # 0.0375 radial
 if not (0.0 < _nut_bore_gap < 0.1):
-    raise AssertionError(f"thumbnut bore/shaft radial gap {_nut_bore_gap:.4f} not in (0, 0.1)")
+    raise AssertionError(
+        f"thumbnut bore/shaft radial gap {_nut_bore_gap:.4f} not in (0, 0.1)"
+    )
 if abs((REMOVABLE_Z0 - THUMBNUT_Z0) - THUMBNUT_AIR) > 1e-9:
     raise AssertionError("thumbnut neck must sit THUMBNUT_AIR in front of the T24 face")
 if not (THUMBNUT_FRONT_Z < KNOB_SHAFT_FRONT_Z <= _THUMBNUT_DISC_MID_Z):
@@ -361,7 +365,9 @@ if not (THUMBNUT_FRONT_Z < KNOB_SHAFT_FRONT_Z <= _THUMBNUT_DISC_MID_Z):
 # The neck must actually RETAIN the wheel: cover its O12 bore with a shoulder
 # and stay clear of the r 9.5 drive-pin holes.
 if THUMBNUT_NECK_DIA < REMOVABLE_BORE_DIA + 1.0:
-    raise AssertionError("thumbnut neck slips into the removable's bore -- retains nothing")
+    raise AssertionError(
+        "thumbnut neck slips into the removable's bore -- retains nothing"
+    )
 if THUMBNUT_NECK_DIA / 2.0 + THUMBNUT_AIR > REMOVABLE_PIN_R - REMOVABLE_PIN_DIA / 2.0:
     raise AssertionError("thumbnut neck overlaps the removable's drive-pin circle")
 # Front furniture: nothing in this sub sits in front of the T24 but the
@@ -393,7 +399,9 @@ LATCH_HOOK_AIR = 0.25
 LATCH_HOOK_ROWS = ROT_Y_180  # local -X -> machine +X (toward the disc), +Z -> -Z
 LATCH_HOOK_EULER = [0.0, 180.0, 0.0]
 LATCH_HOOK_Z_BACK = BAR_FRONT_Z - LATCH_HOOK_AIR  # -139.15: the hook's back face
-LATCH_HOOK_Z_FRONT = LATCH_HOOK_Z_BACK - LATCH_HOOK_T  # -139.95 (the Ry180 runs +Z to -Z)
+LATCH_HOOK_Z_FRONT = (
+    LATCH_HOOK_Z_BACK - LATCH_HOOK_T
+)  # -139.95 (the Ry180 runs +Z to -Z)
 # Machine extents of the hook (the Ry180 mirrors x about LATCH_HOOK_X).
 LATCH_HOOK_X_SPAN = (LATCH_HOOK_X - LATCH_HOOK_X_MAX, LATCH_HOOK_X - LATCH_HOOK_X_MIN)
 LATCH_HOOK_Y_LOW = BAR_CY + LATCH_HOOK_Y_MIN  # ~279.1
@@ -446,10 +454,15 @@ RACK_X0 = STUD_XY[0] - RACK_FIRST_GAP_X - _k * RACK_PITCH
 
 # Net platen feed per CRANK revolution through the real train (T12/T24
 # mounted): 0.5 chain * (12/120) gear * pi*PD rack = 1.596 mm. Every stage is
-# a real mate; this constant only documents the law for the kinematics probe.
-NET_RACK_TRAVEL_PER_CRANK_REV = (
-    0.5 * (THIRD_TEETH / DISC_TEETH) * math.pi * FEED_PD
-)  # 1.596 mm
+# a real mate; the law lives in paper_drive_geom (shared with the kinematics
+# probe and the offline error budget) and is only cross-checked here.
+from paper_drive_geom import NET_RACK_TRAVEL_PER_CRANK_REV  # noqa: E402
+
+assert math.isclose(
+    NET_RACK_TRAVEL_PER_CRANK_REV,
+    0.5 * (THIRD_TEETH / DISC_TEETH) * math.pi * FEED_PD,
+    rel_tol=1e-12,
+), "paper_drive_geom feed law drifted from the assembly's mounted train"
 
 # Spare T18 removable: the swap chain wheel, stored flat on the base top
 # (local z=0 underside at the deck). Rx(-90) maps local +Z to machine +Y,
@@ -469,8 +482,12 @@ CLIP_SCREW_XY = tuple((PLATE_X0 + sx, PLATE_Y0 + sy) for sx, sy in PLATEN_SOCKET
 # The clips run from the platen's top edge down; their end holes (inset
 # CLIP_HOLE_INSET) must land exactly on the platen's edge sockets.
 _CLIP_Y0_LOCAL = PLATE_HEIGHT - CLIP_LENGTH  # 51.32
-assert math.isclose(PLATEN_SOCKET_XY[0][1], _CLIP_Y0_LOCAL + CLIP_HOLE_INSET, abs_tol=1e-6)
-assert math.isclose(PLATEN_SOCKET_XY[1][1], PLATE_HEIGHT - CLIP_HOLE_INSET, abs_tol=1e-6)
+assert math.isclose(
+    PLATEN_SOCKET_XY[0][1], _CLIP_Y0_LOCAL + CLIP_HOLE_INSET, abs_tol=1e-6
+)
+assert math.isclose(
+    PLATEN_SOCKET_XY[1][1], PLATE_HEIGHT - CLIP_HOLE_INSET, abs_tol=1e-6
+)
 # The machine reflection swaps the platen's two local edge rows.  The right
 # holder uses Rz(+90) from the lower end; the left holder uses Rz(-90) from the
 # upper end.  Thus both spring rails (local +Y) point inward over the paper.
@@ -499,9 +516,7 @@ _plate_mid_x = PLATE_X0 + PLATE_WIDTH / 2.0
 for _sx, _origin_x, _origin_y, _rz in CLIP_PLACEMENTS:
     _sin_rz = math.sin(math.radians(_rz))
     _socket_x = PLATE_X0 + PLATE_WIDTH - _sx
-    assert math.isclose(
-        _origin_x - _sin_rz * CLIP_HOLE_Y, _socket_x, abs_tol=1e-9
-    )
+    assert math.isclose(_origin_x - _sin_rz * CLIP_HOLE_Y, _socket_x, abs_tol=1e-9)
     _clip_hole_y = sorted(
         _origin_y + _sin_rz * local_x
         for local_x in (CLIP_HOLE_INSET, CLIP_LENGTH - CLIP_HOLE_INSET)
@@ -1227,14 +1242,14 @@ async def build(adapter) -> dict[str, str]:
             ground=False,
             label=f"platen-clip (x{clip_x:+.0f}, Rz{rz:+.0f})",
         )
-        await _lock_to_platen(
-            clip, f"platen-clip x{clip_x:+.0f} Rz{rz:+.0f}"
-        )
+        await _lock_to_platen(clip, f"platen-clip x{clip_x:+.0f} Rz{rz:+.0f}")
     # Recording paper over the platen front face: front 0.5 proud, clear of the
     # edge clips, with the fitted side/top margins. The 0.25-thick sheet leaves 0.25 air
     # behind it (build_platen_paper) so no face lands coplanar on the platen.
     paper_side_margin = (PLATE_WIDTH - PAPER_WIDTH) / 2.0
-    paper_top_margin = 3.0  # ch30-p002: the sheet's top edge sits just under the plate top
+    paper_top_margin = (
+        3.0  # ch30-p002: the sheet's top edge sits just under the plate top
+    )
     paper = await place_component(
         adapter,
         "platen-paper",

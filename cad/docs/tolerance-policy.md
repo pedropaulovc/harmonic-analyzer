@@ -148,16 +148,16 @@ pools the all-ones, half-rectangle, Gaussian and lifted-square (odd channels on)
 
 | feature | ± limit | broad MAE | broad p99 max | pair p99 | allowable | how it is held |
 |---|---:|---:|---:|---:|---:|---|
-| cam eccentricity | 0.025 mm | 0.026 | 0.14 | 0.27 | 0.046 | offset-turn in a 4-jaw, indicate the throw |
-| rocker rod-pin radius | 0.10 mm | 0.007 | 0.03 | 0.07 | 0.71 | DRO/CNC hole position |
-| lever bar-pin arm | 0.10 mm | 0.007 | 0.04 | 0.07 | 0.68 | DRO/CNC hole position |
-| lever spring-hook arm | 0.10 mm | 0.005 | 0.03 | 0.05 | 0.96 | DRO/CNC hole position |
-| summing hook arm | 0.15 mm | 0.034 | 0.18 | 0.35 | 0.22 | ½ of the 0.30 pattern-position zone |
-| **spring rate** | **1.25 %** | **0.114** | **0.59** | **1.17** | 0.53 | **matched by measurement** — spec-sheet `SET QC`: two hanging loads at eye c-c 60/70, bin from stock (±10 %) |
+| cam eccentricity | 0.025 mm | 0.025 | 0.14 | 0.26 | 0.048 | offset-turn in a 4-jaw, indicate the throw |
+| rocker rod-pin radius | 0.10 mm | 0.006 | 0.03 | 0.07 | 0.74 | DRO/CNC hole position |
+| lever bar-pin arm | 0.10 mm | 0.007 | 0.04 | 0.07 | 0.71 | DRO/CNC hole position |
+| lever spring-hook arm | 0.10 mm | 0.005 | 0.03 | 0.05 | 1.00 | DRO/CNC hole position |
+| summing hook arm | 0.15 mm | 0.032 | 0.18 | 0.34 | 0.22 | ½ of the 0.30 pattern-position zone |
+| **spring rate** | **1.25 %** | **0.107** | **0.58** | **1.13** | 0.55 | **matched by measurement** — spec-sheet `SET QC`: two hanging loads at eye c-c 60/70, bin from stock (±10 %) |
 | cam phase | 0.25° | 0.038 | 0.21 | 0.22 | 0.33 | lobe and notch indexed in one setup (on the drawing) |
 | mesh lag spread | 0.14° | 0.021 | 0.11 | 0.12 | 0.33 | derived from the 0.05–0.20 backlash band |
-| station setting (setup) | 0.25 mm | 0.041 | 0.25 | 1.03 | 0.12 | stick drawing note 5: interpolate to 1/5 of the 1.42 minor division (0.28 step) — what the released stick can deliver |
-| **all combined** | | **0.138** | **0.70** | **1.82** | | targets 0.30 / 1.5 / 2.0 |
+| station setting (setup) | 0.25 mm | 0.038 | 0.26 | 1.24 | 0.10 | stick drawing note 5: interpolate to 1/5 of the 1.42 minor division (0.28 step) — what the released stick can deliver |
+| **all combined** | | **0.130** | **0.69** | **1.72** | | targets 0.30 / 1.5 / 2.0 |
 
 The budget closes with a factor of two in hand on the broad inputs and just inside the
 two-channel consistency target. Read it as follows.
@@ -170,7 +170,7 @@ two-channel consistency target. Read it as follows.
   hole on the channel lever, 0.56 %/mm) is the fallback if a batch cannot be binned, and
   departs from the photographs.
 - **The eccentricity limit is capability-driven, not accuracy-driven.** Accuracy alone allows
-  ±0.046 mm; the drawing's ±0.025 (`cylinder_gear_spec.DRAWING_NOTES`) is kept because an
+  ±0.048 mm; the drawing's ±0.025 (`cylinder_gear_spec.DRAWING_NOTES`) is kept because an
   indicated offset in a 4-jaw reads to 0.01 mm and costs nothing extra. Relaxing to ±0.05 is a
   legitimate decision (it consumes 0.05 % MAE); `check:budget` pins the drawing note to the
   yaml so the two cannot silently diverge.
@@ -195,18 +195,19 @@ two-channel consistency target. Read it as follows.
 |---|---|---|---|
 | term | assumption (`error_budget.yaml reserved:`) | value | allowance |
 |---|---|---:|---:|
-| nominal residual after correction | null-station zero + 2nd-harmonic correction | 0.019 % MAE | 0.05 |
-| ordinate readout | the CAD's **15 mm half-stroke** (`output.yaml pen_trace_half_mm`, asserted by `verify:kinematics`) read to ±0.075 mm (half a 0.15 mm technical-pen line against the grid) | 0.50 % FS | 0.50 — the 0.5-unit quantisation of Michelson's own tables |
-| timebase | read coefficient k with the crank stopped on its index at 2k turns, index repeatable to ±8° (uniform) — vs 0.84 % FS per 0.1 mm of abscissa at the 1.596 mm/turn feed, 0.21 % with the coarse T24/T12 set | 0.17 % FS | 0.20 |
+| nominal residual after correction | null-station zero + 2nd-harmonic correction | 0.018 % MAE | 0.05 |
+| ordinate readout | the CAD's **15 mm half-stroke** (`output.yaml pen_trace_half_mm`, asserted by `verify:kinematics`) read to ±0.075 mm (half a 0.15 mm technical-pen line against the grid), **with the magnifier set per trial so the greatest (k = 0) term spans the stroke** — the CAD's `pen_driver` convention and Michelson's normalisation. That needs 2.0–2.4× the all-ones magnification for the broad inputs (10× for the two-channel case): the open magnifier-range item. At a fixed all-ones setting the broad-input worst case is 1.2 % (`greatest_term_spans_stroke: false` in the yaml scores it and fails the gate) | 0.50 % FS | 0.50 — the 0.5-unit quantisation of Michelson's own tables |
+| timebase | read coefficient k with the crank stopped on its index at 2k turns, index repeatable to ±8° (uniform), scored on the worst reference input (the lifted square, 252 % FS/rad) — vs 1.24 % FS per 0.1 mm of abscissa at the CAD's 1.596 mm/turn feed (`paper_drive_geom`), 0.31 % with the coarse T24/T12 set | 0.25 % FS | 0.30 |
 | knife-edge hysteresis | hardened edge on a hardened seat, rolling-resistance length 0.005 mm at the derived 1.5 kN edge load (2.2 % of one channel's stroke per 0.01 mm); *measure* as trace width on a slow reversal | 0.06 % FS | 0.10 |
-| **total** | residual + RSS(scatter 0.138, readout, timebase, knife) | **0.57 % MAE** | **0.7 benchmark** |
+| **total** | residual + RSS(scatter 0.130, readout, timebase, knife) | **0.60 % MAE** | **0.7 benchmark** |
 
 `check:budget` fails if any term overruns its allowance or the total overruns the benchmark, so a
 coarser reading or a duller knife cannot be hidden behind a green scatter result. **Readout is the
 largest single term** — at the 15 mm stroke it is 0.5 % on its own, exactly Michelson's table
-quantisation, and it is why the paper's 0.7 % is hard even with perfect parts. Doubling the pen
-stroke (a magnifier setting, then a CAD/`verify:kinematics` change to `pen_trace_half_mm`) would
-halve it; that is the one design lever left, and it is not machining.
+quantisation, and it is why the paper's 0.7 % is hard even with perfect parts. A larger pen
+stroke (a CAD/`verify:kinematics` change to `pen_trace_half_mm`, once the magnifier range is
+reconciled) would reduce it proportionally; that is the one design lever left, and it is not
+machining.
 
 ## Readout and calibration procedure (what the model assumes)
 
@@ -221,9 +222,10 @@ the specification.
    own stick was "hand stamped, unevenly spaced" for the same reason. Set each bar by
    interpolating to 1/5 of the stick's 1.42 mm minor division (stick drawing note 5): a 0.28 mm
    step gives ±0.14 mm rounding, ±0.25 mm with eye and parallax — the budget's setting term.
-2. **Calibration run**: every bar at full scale, one full period. The k = 0 reading above the
-   mean line is $K\cdot 20\cdot d_\text{max}$; this $K$ scales every trial and removes all
-   common-mode gain.
+2. **Normalise each trial by its own k = 0 reading**, which equals $\sum_i x_i$ (the operator
+   set the bars) — Michelson's normalisation to the greatest term. This removes all common-mode
+   gain, including the magnifier setting, so the magnifier may be reset per trial to bring the
+   k = 0 term to the full stroke (the CAD's `pen_driver` maps the trace peak onto the stroke).
 3. **Lift signed inputs**: every bar stays on the lifting side of the pivot (the CAD realises
    no negative station), so add a constant to a signed function before setting the bars; the
    k ≥ 1 coefficients are unchanged and the k = 0 reading is corrected by the constant.
@@ -296,7 +298,7 @@ are the concrete realizations of the classes above, being lifted into `tolerance
   re-proved by `verify:kinematics`) is the cheapest remaining accuracy gain.
 - `amplitude.max_travel_mm` 88 vs. the ledger's ±146 mm foot travel: the budget uses 88; a
   larger full scale improves every readout term proportionally.
-- The eccentricity drawing limit (±0.025) vs. its accuracy allowable (±0.046): keep or relax
+- The eccentricity drawing limit (±0.025) vs. its accuracy allowable (±0.048): keep or relax
   is a stated decision, pinned either way by `check:budget`.
 
 ## Scope of manufacturing outputs

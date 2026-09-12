@@ -75,8 +75,8 @@ def test_analytic_gain_sensitivities_match_exact_kinematics(report):
 
 
 def test_calibrated_readout_cancels_common_mode_gain(nom):
-    """Every channel 1 % strong -> zero coefficient error after the scale
-    calibration; only channel-to-channel differences survive. The spring
+    """Every channel 1 % strong -> zero coefficient error after the trial's
+    own k=0 normalisation; only channel-to-channel differences survive. The spring
     sensitivity is the numerator's 1 %/% -- the common denominator of the force
     balance is what this calibration removes, so it must not be pre-cancelled."""
     x = eb.reference_inputs()["gaussian_a0p1"]
@@ -84,8 +84,7 @@ def test_calibrated_readout_cancels_common_mode_gain(nom):
     sens = eb.gain_sensitivities(nom)
     assert sens["spring_rate"] == 1.0
     dev = {"spring_rate": np.full((draws, eb.N_ELEMENTS), 1.0)}
-    cal = np.zeros((draws, eb.N_ELEMENTS))
-    e = eb._channel_model(x, nom, dev, sens, cal)
+    e = eb._channel_model(x, nom, dev, sens)
     assert np.max(np.abs(e)) < 1e-9
 
 
@@ -142,6 +141,29 @@ def test_closure_fails_when_a_reserved_term_overruns(budget):
     }
     bad = eb.budget_closes(eb.build_report(coarse))
     assert any(b.startswith("readout") for b in bad), bad
+
+
+def test_fixed_magnifier_readout_is_scored_on_the_worst_broad_input(budget):
+    """With the magnifier left at the all-ones setting, a trial whose greatest
+    term is half the stroke reads twice as coarsely; the switch must score that
+    and fail the gate."""
+    fixed = {
+        **budget,
+        "reserved": {
+            **budget["reserved"],
+            "readout": {
+                **budget["reserved"]["readout"],
+                "greatest_term_spans_stroke": False,
+            },
+        },
+    }
+    r = eb.build_report(fixed)
+    ro = r["closed_form"]["readout"]
+    assert ro["pct_fs"] == pytest.approx(
+        ro["pct_fs_greatest_term_spans_stroke"]
+        * ro["magnification_vs_all_ones"]["gaussian_a0p1"]
+    )
+    assert any(b.startswith("readout") for b in eb.budget_closes(r))
 
 
 def test_reference_inputs_stay_on_the_lifting_side():
