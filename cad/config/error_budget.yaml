@@ -1,0 +1,142 @@
+# Coefficient-error budget for the critical features -- the tolerances that the
+# sensitivity model in cad/scripts/error_budget.py (doit: check:budget) derives
+# from the whole-device benchmark in cad/docs/michelson-1898-trial-accuracy.md.
+# Method and the resulting guidance: cad/docs/tolerance-policy.md.
+#
+# This file is READ BY NO BUILD SCRIPT: it holds allocation (how much of the
+# output error each feature may consume), not geometry, so editing it never
+# rebuilds CAD. The nominal each feature is toleranced against stays in the
+# spec module named under `nominal` -- check:budget fails if that symbol moves.
+# The drawing-facing limits (tolerances.yaml, title_block.yaml, *_spec.py notes)
+# must agree with the `tolerance` here; check:budget pins the ones it can read.
+units: mm
+
+benchmark:                       # comparison values, NOT acceptance limits (see the 1898 report)
+  mae_fs_pct: 0.7                # historical 80-element mean absolute coefficient error, % of greatest term
+  max_fs_pct: 2.0                # largest tabulated individual difference
+
+# What the CHANNEL-SPECIFIC scatter of the features below may consume of the
+# benchmark, predicted by Monte Carlo over `reference_inputs` with the readout
+# procedure of tolerance-policy.md (mean-line zero, calibration-run scale). The
+# remainder of the 0.7 % is reserved for the nominal-design residual,
+# knife/magnifier hysteresis and readout (all reported by error_budget.py, none
+# of them a part tolerance).
+targets:
+  scatter_mae_fs_pct: 0.30       # mean |e_k| over k, inputs and draws
+  scatter_p99_max_fs_pct: 1.5    # 99th percentile of the worst coefficient of a draw
+  pair_consistency_p99_pct: 2.0  # 99th percentile worst coefficient for the two-channel input
+
+# Per-feature headroom the report prints as `allowable`: the tolerance at which
+# a feature ALONE would consume this much (linear scaling). A drawing limit
+# looser than its allowable is not accuracy-justified; tighter is a fit,
+# process or capability choice, not a benchmark requirement.
+allocation_share:
+  mae_fs_pct: 0.05
+  pair_p99_pct: 0.50
+
+# Inputs the budget is evaluated on (ordinates x_i in [-1, 1] on 20 elements,
+# station d_i = x_i * amplitude.max_travel_mm, coefficient k read at theta_k =
+# k*pi/20).  See error_budget.py:reference_inputs for the definitions.
+reference_inputs: [all_ones, rect_half, gaussian_a0p1, alternating, pair_1_20]
+
+# Readout-only inputs (the timebase term in the report). The feed is the
+# paper-drive law with the T12 crank / T24 knob removable set mounted
+# (build_paper_drive_assembly.NET_RACK_TRAVEL_PER_CRANK_REV, 0.5 chain *
+# 12/120 gear * pi * 10.16 rack PD = 1.596); swapping to T24/T12 multiplies it
+# by the coarse ratio. Illustrative for the doc's readout guidance -- no gate
+# or drawing limit rides on it, which is why it is a documented input here
+# rather than an import of the SolidWorks-bound assembly module.
+readout:
+  platen_feed_mm_per_crank_turn: 1.596
+  coarse_gear_set_feed_ratio: 4.0
+
+# Terms that are NOT part tolerances but are part of the closure: each carries
+# the assumption it is evaluated at and the share of the benchmark it may
+# consume. budget_closes checks every term against its allowance AND the total
+# (nominal residual + RSS of the independent terms + scatter) against the
+# benchmark MAE. Changing an assumption here is a stated design/procedure
+# decision, not a tuning knob.
+reserved:
+  nominal_residual_mae:            # what survives the null-station zero + 2nd-harmonic correction
+    allowance_pct: 0.05
+  readout:                         # ordinate reading at the pen
+    pen_half_stroke_mm: 30.0       # SETUP requirement: run the adjustable magnifier so a full-scale
+                                   # trial spans this half-stroke (output.yaml pen_trace_half_mm 15
+                                   # is the RENDER pose mapping, not the operating stroke)
+    reading_uncertainty_mm: 0.10   # half a 0.2 mm line + grid interpolation
+    allowance_pct: 0.35
+  timebase:                        # reading coefficient k with the crank stopped on its index
+    crank_index_deg: 8.0           # +/- stop repeatability on the crank index (uniform)
+    allowance_pct: 0.20
+  knife:                           # summing-lever knife-edge hysteresis (stall)
+    rolling_resistance_mm: 0.005   # hardened edge on a hardened seat; MEASURE as trace width on reversal
+    allowance_pct: 0.10
+
+monte_carlo:
+  draws: 4000
+  seed: 20260912
+  distribution: uniform          # every feature uniform within +/- tolerance (no process centring credit)
+
+# Channel-specific features. `tolerance` is the +/- half-width of the drawing
+# (or matching/setup) limit; `unit` is mm unless stated. `class`:
+#   channel  -- scatters independently per channel (enters the sum directly)
+#   setup    -- re-introduced every trial by the operator (measuring stick, alignment)
+# `quantity`: which transfer quantity the deviation perturbs.
+critical_features:
+  cam_eccentricity:
+    tolerance: 0.025
+    nominal: cylinder_gear_spec.ECCENTRICITY
+    quantity: gain
+    class: channel
+    holds: "offset-turn the cam in a 4-jaw, indicate the throw to 0.01"
+  rocker_rod_pin_radius:
+    tolerance: 0.10
+    nominal: rocker_arm_spec.ROD_HOLE_X
+    quantity: gain
+    class: channel
+    holds: "rod-pin hole position from the pivot bore, DRO/CNC"
+  lever_bar_pin_arm:
+    tolerance: 0.10
+    nominal: channel_lever_spec.BAR_PIN_X
+    quantity: gain
+    class: channel
+    holds: "bar-pin hole from the fulcrum bore, DRO/CNC"
+  lever_spring_hook_arm:
+    tolerance: 0.10
+    nominal: channel_lever_spec.LEVER_SPRING_X
+    quantity: gain
+    class: channel
+    holds: "spring hole from the fulcrum bore, DRO/CNC"
+  summing_hook_arm:
+    tolerance: 0.15
+    nominal: summing_lever_spec.HOLE_X
+    quantity: gain
+    class: channel
+    holds: "half of the 0.30 spring-hole pattern position zone (summing_lever_spec.GEOMETRIC_TOLERANCES_MM), normal to the knife line"
+  spring_rate:
+    tolerance: 1.25
+    unit: pct
+    nominal: channel_spring_installed_spec.SPRING_RATE_REF
+    quantity: gain
+    class: channel
+    holds: "MATCHED, not machined: measure every channel spring (weights + calipers, two loads) and bin the 20 within +/-1.25 % of their mean (spec-sheet SET QC: two hanging loads at eye c-c 60/70); stock springs scatter +/-10 %"
+  cam_phase:
+    tolerance: 0.25
+    unit: deg
+    nominal: null
+    quantity: phase
+    class: channel
+    holds: "cam-lobe direction vs the alignment-notch centreline, both on the cylinder gear: index on the same setup (rotary table/dividing head)"
+  mesh_lag_spread:
+    tolerance: 0.14
+    unit: deg
+    nominal: null
+    quantity: phase
+    class: channel
+    holds: "derived: half the cone<->cylinder gear_mesh backlash band (tolerances.yaml 0.05..0.20 mm) at the 120T pitch radius, one-directional cranking"
+  station_setting:
+    tolerance: 0.25
+    nominal: null
+    quantity: ordinate
+    class: setup
+    holds: "measuring-stick reading: interpolate to 1/5 of the 1.42 minor division (0.28 step, +/-0.14 rounding) plus eye/parallax -- stick drawing note 5; the stick zero is set at the assembled machine's NULL station (tolerance-policy.md), not at the pivot"

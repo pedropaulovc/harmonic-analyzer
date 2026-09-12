@@ -265,6 +265,8 @@ Accordingly, a part or assembly tolerance may claim support from this benchmark 
 
 Without that chain, the dimensional value may still be justified by fit, manufacturability, wear, or drawing practice, but **not by Michelson's reported accuracy**.
 
+The chain is executed for every critical feature in [`tolerance-policy.md`](./tolerance-policy.md) ("How a critical-feature tolerance is decided"), with the sensitivities, Monte Carlo allocation and readout procedure computed by [`cad/scripts/error_budget.py`](../scripts/error_budget.py) from [`cad/config/error_budget.yaml`](../config/error_budget.yaml).
+
 ## What this evidence does not authorize
 
 Do not infer any of the following from the 1898 plots:

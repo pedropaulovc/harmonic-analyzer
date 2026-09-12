@@ -208,12 +208,22 @@ from rocker_arm_spec import ROD_HOLE_Y as ARM_ROD_PIN_LOCAL_Y  # rod pin y: LOW
 
 # in the strap (bottom-arc y + 5.3, ch14 fan photo), NOT mid-depth like the pivot
 from rocker_arm_spec import PIVOT_MID_Y as ARM_PIVOT_LOCAL_Y  # 8.0: strap mid-depth
+
 # at the pivot. Same imported-not-copied rule as CAM_ECC, and for the same
 # reason: the rocker's rod-pin bore is NOT level with the pivot bore
 # (ROD_HOLE_Y = 15.30 vs 8.0). _arc_geometry must model that intrinsic 3.28 deg
 # lever angle or the placed pin lands 7 mm off the solved point and the J2
 # revolute drags the ring off the cam (the 0.9 deg/0.4 mm version of this slip
 # already cost 20 x 20.27 mm^3 of cylinder-gear interference at the top level).
+from rocker_arm_spec import CENTER_Y as ARM_ARC_CENTER_LOCAL_Y  # 816: arm-local arc
+from rocker_arm_spec import CURVE_RADIUS as ARM_TOP_RADIUS  # 800: the R800 slide
+
+# centre above the bottom edge (= CURVE_RADIUS + ARM_DEPTH), shared with the
+# offline error budget so the slide-arc height is never copied.
+from channel_frame_geom import (  # machine-frame shaft axes, shared with error_budget
+    LEVER_FULCRUM_XY as FULCRUM,
+    ROCKER_PIVOT_XY as PIVOT,
+)
 
 ASM_NAME = "channel"
 
@@ -235,7 +245,7 @@ ARM_MID_DZ = 0.8  # arm/bar/lever mid-planes at z_j + 0.8
 CAM_DZ = -3.25  # end-for-end cylinder gear: cam / rod-ring plane at z_j - 3.25
 
 # --- rocker bank ------------------------------------------------------------
-PIVOT = (72.9, 253.8)  # rocker pivot shaft axis (x, y); machine frame (crank at -X)
+# PIVOT (72.9, 253.8): the rocker pivot shaft axis -- imported from channel_frame_geom.
 # True pivot->rod-pin lever: 127.37 along the arm (near the rod-side tip) PLUS
 # the low pin's rise above the pivot bore (ROD_HOLE_Y 15.30 - 8.0 = 7.30).
 # Length 127.583; the intrinsic lever angle beta (3.2813 deg above the arm's
@@ -246,8 +256,7 @@ _LEVER_DX = ARM_ROD_HOLE_X
 _LEVER_DY = ARM_ROD_PIN_LOCAL_Y - ARM_PIVOT_LOCAL_Y  # 7.3025
 ARM_ROD_LEVER = math.hypot(_LEVER_DX, _LEVER_DY)  # 127.5830
 ARM_LEVER_BETA_DEG = math.degrees(math.atan2(_LEVER_DY, _LEVER_DX))  # 3.2813
-ARM_ARC_CENTER_LOCAL_Y = 816.0  # arm local arc centre above the bottom edge
-ARM_TOP_RADIUS = 800.0
+# ARM_TOP_RADIUS (800): the R800 slide -- imported from rocker_arm_spec.CURVE_RADIUS.
 
 # --- drive interface (default state) ----------------------------------------
 GEAR_PHASE_DEG = 1.5  # drive-train locks each cylinder gear at Rz(+1.5):
@@ -295,9 +304,7 @@ BAR_CONTACT_GAP = _config.fit(
 )  # cad/config/tolerances.yaml
 
 # --- lever bank -------------------------------------------------------------
-FULCRUM = (199.9, 1061.4)  # lever fulcrum shaft axis (x, y); machine frame
-# (2026-08-02 top-frame rederive: casting top face 1036.2 + ball rise 25.2;
-# was 1065.9 off the old 1040.7 rail top)
+# FULCRUM (199.9, 1061.4): the lever fulcrum shaft axis -- imported from channel_frame_geom.
 LEVER_BAR_PIN_X = 127.0
 LEVER_SPRING_X = 177.8  # 7" c2c; the 254 "2:1" guess is photo-refuted (M6.4 -
 # the lever bank ends at x ~ -30 in the ch. 30 front view and the 32 mm
@@ -398,9 +405,6 @@ def rot_z_rows(deg: float) -> list[list[float]]:
 
 def z_station(j: int) -> float:
     return Z0 + PITCH * j
-
-
-
 
 
 # --- mate scheme (validated single-channel probe) ---------------------------
@@ -565,7 +569,6 @@ async def _locate_to_datum(adapter, name: str) -> None:
             label=f"{name} datum {axis} d={abs(coord):.2f}",
             verify=(name, o),
         )
-
 
 
 BAR_TOP_TO_FOOT = BAR_TOP_PIN_LOCAL[1] - BAR_FOOT_LOCAL[1]  # 801.95

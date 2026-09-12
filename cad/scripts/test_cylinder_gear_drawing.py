@@ -67,7 +67,7 @@ def test_manufacturing_notes_cover_cam_and_teeth() -> None:
     assert "CAM FOLLOWER O.D. SURFACE: Ra 1.6" in notes
     assert "SAW KERF" in notes
     assert "THRU FULL FACE WIDTH" in notes
-    assert "(0 DEG BASIC)" in notes
+    assert "NOTCH CENTERLINE\n  WITHIN +/-0.25 DEG" in notes
     assert "RANGE OF MEASURED CAM AXIS OFFSETS 0.025 MAX" in notes
     assert "WHOLE DEPTH (mm):  1.10 +0.05/0" in spec.GEAR_DATA
     assert "FACE WIDTH (mm):  3.00 +/-0.05" in spec.GEAR_DATA
