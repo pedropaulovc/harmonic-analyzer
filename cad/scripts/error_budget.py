@@ -44,6 +44,7 @@ import numpy as np
 import yaml
 
 import _config
+import amplitude_bar_spec
 import channel_lever_spec
 import channel_spring_installed_spec
 import connecting_rod_spec
@@ -75,6 +76,9 @@ class Nominal:
     fulcrum_dy: float
     bar_pin_arm: float  # lever: fulcrum -> amplitude-bar pin
     hook_arm: float  # lever: fulcrum -> spring hook
+    bar_len: float  # amplitude bar: foot axis -> top pin (rigid)
+    contact_dx: float  # foot axis -> notch-roof contact, bar frame (untilted)
+    contact_dy: float
     spring_rate: float  # channel spring, N/mm
     counter_rate: float  # counter spring, N/mm
     sum_arm: float  # summing lever: knife -> spring hook row
@@ -95,6 +99,10 @@ def nominal() -> Nominal:
         fulcrum_dy=LEVER_FULCRUM_XY[1] - ROCKER_PIVOT_XY[1],
         bar_pin_arm=channel_lever_spec.BAR_PIN_X,
         hook_arm=channel_lever_spec.LEVER_SPRING_X,
+        bar_len=amplitude_bar_spec.TOP_PIN_Y,
+        contact_dx=amplitude_bar_spec.BAR_WIDTH / 2.0,
+        contact_dy=amplitude_bar_spec.BOTTOM_NOTCH_HEIGHT
+        - float(_config.fit("cam_follower_contact", "contact_gap_mm")),
         spring_rate=channel_spring_installed_spec.SPRING_RATE_REF,
         counter_rate=counter_spring_spec.SPRING_RATE_REF,
         sum_arm=summing_lever_spec.HOLE_X,
@@ -144,25 +152,59 @@ def rocker_angle(theta: np.ndarray, nom: Nominal) -> np.ndarray:
     return _bisect(gap, -0.4, 0.4, theta.size)
 
 
+def _lever_pin_gap(
+    kx: np.ndarray, ky: np.ndarray, beta: np.ndarray, nom: Nominal
+) -> np.ndarray:
+    """Distance error of the bar's top pin from the lever's bar-pin circle for a
+    notch-roof contact at (kx, ky) and bar tilt ``beta`` (build_channel_assembly
+    .solve_state's residual, with the contact point as the anchor): the foot axis
+    is the contact minus the rotated notch offset, the top pin ``bar_len`` up the
+    tilted bar."""
+    s, c = np.sin(beta), np.cos(beta)
+    fx = kx - (nom.contact_dx * c - nom.contact_dy * s)
+    fy = ky - (nom.contact_dx * s + nom.contact_dy * c)
+    tx = fx + nom.bar_len * s
+    ty = fy + nom.bar_len * c
+    return np.hypot(tx - nom.fulcrum_dx, ty - nom.fulcrum_dy) - nom.bar_pin_arm
+
+
+def rest_contact(d: float, nom: Nominal) -> tuple[float, float]:
+    """Where the bar's notch roof sits on the R800 arc at station ``d`` (foot-axis
+    x from the pivot), arm level -- solve_state's rest pose: the contact rides
+    the arc and the top pin the lever circle, the bar tilt closes the loop."""
+
+    def contact(beta: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        kx = d + nom.contact_dx * np.cos(beta) - nom.contact_dy * np.sin(beta)
+        ky = nom.arc_cy - np.sqrt(nom.arc_r**2 - kx**2)
+        return kx, ky
+
+    def gap(beta: np.ndarray) -> np.ndarray:
+        kx, ky = contact(beta)
+        return _lever_pin_gap(kx, ky, beta, nom)
+
+    beta = _bisect(gap, -0.4, 0.4, 1)
+    kx, ky = contact(beta)
+    return float(kx[0]), float(ky[0])
+
+
 def hook_displacement(theta: np.ndarray, d: float, nom: Nominal) -> np.ndarray:
     """Vertical displacement (mm) of the channel-spring hook on the lever for an
-    amplitude bar at station ``d`` (signed, along the arm from the pivot)."""
+    amplitude bar at station ``d`` (signed foot-axis x from the pivot).
+
+    The notch-roof contact point is fixed on the arm (the radial bar puts the
+    spring load normal to the arc, so the foot does not slide) and rides the
+    rocker's rotation; the rigid bar re-tilts so its top pin stays on the lever
+    circle, and the hook follows the lever."""
     tr = rocker_angle(theta, nom)
-    f0 = np.array([d, nom.arc_cy - math.sqrt(nom.arc_r**2 - d * d)])
-    fx = f0[0] * np.cos(tr) - f0[1] * np.sin(tr)
-    fy = f0[0] * np.sin(tr) + f0[1] * np.cos(tr)
-    top0 = np.array(
-        [nom.fulcrum_dx - nom.bar_pin_arm, nom.fulcrum_dy]
-    )  # bar top pin, lever level
-    bar = float(np.hypot(*(top0 - f0)))  # each bar's foot->pin length, fixed at rest
-
-    def gap(b: np.ndarray) -> np.ndarray:
-        tx = nom.fulcrum_dx - nom.bar_pin_arm * np.cos(b)
-        ty = nom.fulcrum_dy - nom.bar_pin_arm * np.sin(b)
-        return np.hypot(tx - fx, ty - fy) - bar
-
-    beta = _bisect(gap, -0.4, 0.4, theta.size)
-    return -nom.hook_arm * np.sin(beta)
+    k0x, k0y = rest_contact(d, nom)
+    kx = k0x * np.cos(tr) - k0y * np.sin(tr)
+    ky = k0x * np.sin(tr) + k0y * np.cos(tr)
+    beta = _bisect(lambda b: _lever_pin_gap(kx, ky, b, nom), -0.4, 0.4, theta.size)
+    s, c = np.sin(beta), np.cos(beta)
+    tx = kx - (nom.contact_dx * c - nom.contact_dy * s) + nom.bar_len * s
+    ty = ky - (nom.contact_dx * s + nom.contact_dy * c) + nom.bar_len * c
+    phi = np.arctan2(ty - nom.fulcrum_dy, nom.fulcrum_dx - tx)  # lever tilt
+    return nom.hook_arm * np.sin(phi)
 
 
 def linear_gain(nom: Nominal) -> float:
@@ -171,9 +213,12 @@ def linear_gain(nom: Nominal) -> float:
     return (nom.hook_arm / nom.bar_pin_arm) * nom.ecc / math.hypot(nom.pin_x, nom.pin_y)
 
 
-def harmonic_content(d: float, nom: Nominal, samples: int = 720) -> dict[str, float]:
+def harmonic_content(
+    d: float, nom: Nominal, samples: int = 720, null: float = 0.0
+) -> dict[str, float]:
     """DC, fundamental and 2nd/3rd harmonic of one channel's hook motion at
-    station ``d``, in mm, plus the gain relative to the ideal linear transfer."""
+    station ``d``, in mm, plus the gain relative to the ideal linear transfer
+    measured from the null station (``null``, where the fundamental vanishes)."""
     th = np.arange(samples) * 2.0 * math.pi / samples
     u = hook_displacement(th, d, nom)
     out: dict[str, float] = {"dc": float(u.mean())}
@@ -182,8 +227,8 @@ def harmonic_content(d: float, nom: Nominal, samples: int = 720) -> dict[str, fl
         b = 2.0 * float(np.mean(u * np.sin(m * th)))
         out[f"c{m}"] = math.hypot(a, b)
         out[f"c{m}_cos"] = a
-    ideal = linear_gain(nom) * d
-    out["gain_vs_linear"] = out["c1_cos"] / ideal if d else float("nan")
+    ideal = linear_gain(nom) * (d - null)
+    out["gain_vs_linear"] = out["c1_cos"] / ideal if ideal else float("nan")
     return out
 
 
@@ -495,7 +540,11 @@ def monte_carlo(budget: dict[str, Any], nom: Nominal) -> dict[str, Any]:
 
 def closed_form_terms(nom: Nominal, budget: dict[str, Any]) -> dict[str, Any]:
     """Error terms that are procedure or design-adjustment items, not part
-    tolerances: knife hysteresis, strap lost motion, ordinate readout, timebase."""
+    tolerances: knife hysteresis, strap lost motion, ordinate readout, timebase.
+    Each is evaluated at the ``reserved`` assumptions of error_budget.yaml as a
+    ``pct_fs`` (% of the greatest term on the all-ones input, whose k=0 reading is
+    the machine's full-scale output) so ``budget_closes`` can bound it."""
+    res = budget["reserved"]
     u_fs = (
         linear_gain(nom) * nom.d_max
     )  # hook displacement of one channel at full station
@@ -503,19 +552,21 @@ def closed_form_terms(nom: Nominal, budget: dict[str, Any]) -> dict[str, Any]:
     # T_f = N * f_r (N = total spring load on the edge, f_r = rolling-resistance
     # length of the edge). With D = sum s a^2 + S b^2 the equivalent hook-position
     # error is a*T_f/D and ONE channel's full-scale hook motion s*a^2*u_fs/D, so
-    # the ratio T_f/(s*a*u_fs) needs no D.
+    # the ratio T_f/(s*a*u_fs) needs no D. Against the all-ones full scale (every
+    # channel at u_fs) the stall is that ratio / N.
     preload = nom.spring_rate * (
         channel_spring_installed_spec.INSTALLED_BODY_LENGTH
         - channel_spring_installed_spec.FREE_BODY_LENGTH
     )
     knife_load = N_ELEMENTS * preload
+    f_r = float(res["knife"]["rolling_resistance_mm"])
+    stall_one = 100.0 * knife_load * f_r / (nom.spring_rate * nom.sum_arm * u_fs)
     knife = {
         "assumed_preload_N_per_spring": preload,
         "assumed_knife_load_N": knife_load,
-        "stall_pct_of_one_channel_fs_per_0p01mm_fr": 100.0
-        * knife_load
-        * 0.01
-        / (nom.spring_rate * nom.sum_arm * u_fs),
+        "assumed_rolling_resistance_mm": f_r,
+        "stall_pct_of_one_channel_fs": stall_one,
+        "pct_fs": stall_one / N_ELEMENTS,
         "note": "spring rate/preload are DERIVED from wire geometry (low confidence); measure trace width on a slow reversal",
     }
     # Lost motion on load reversal: the strap's diametral clearance shifts the
@@ -526,17 +577,26 @@ def closed_form_terms(nom: Nominal, budget: dict[str, Any]) -> dict[str, Any]:
         "dc_step_pct_of_channel_amplitude": 100.0 * strap_c / nom.ecc,
         "note": "constant within a run (mean-line zero removes it) as long as a station keeps its sign",
     }
-    pen_half = float(_config.machine("output", "pen_trace_half_mm"))
+    # Ordinate readout at the SETUP stroke the budget requires (the magnifier
+    # clamp is adjustable; output.yaml's pen_trace_half_mm is the render pose).
+    pen_half = float(res["readout"]["pen_half_stroke_mm"])
+    reading = float(res["readout"]["reading_uncertainty_mm"])
     readout = {
-        "pen_half_stroke_mm": pen_half,
+        "required_pen_half_stroke_mm": pen_half,
+        "render_pen_half_stroke_mm": float(
+            _config.machine("output", "pen_trace_half_mm")
+        ),
+        "assumed_reading_uncertainty_mm": reading,
         "ordinate_pct_fs_per_0p1mm_reading": 100.0 * 0.1 / pen_half,
+        "pct_fs": 100.0 * reading / pen_half,
         "note": "reading uncertainty = half the line width + interpolation; scales as 1/(pen full scale)",
     }
     # Timebase: reading at the wrong theta. d(A_k)/d(theta) = -sum i x_i sin(i theta_k),
     # RMS over k, in % FS per rad of FUNDAMENTAL angle. One fundamental period is
-    # CRANK_TURNS_PER_PERIOD crank turns (gear k turns k/80 per crank turn), so a
-    # 0.1 mm abscissa reading at the configured platen feed, or stopping the
-    # crank on an index within +/-8 deg, convert as below.
+    # CRANK_TURNS_PER_PERIOD crank turns (gear k turns k/80 per crank turn); the
+    # budgeted procedure stops the crank on its index within +/-index_deg
+    # (uniform, so RMS = slope * half-width / sqrt 3); the abscissa-reading
+    # alternative at the configured platen feed is reported for comparison.
     slope = {}
     for name, x in reference_inputs().items():
         s = -np.sin(np.outer(THETA_K, HARMONICS)) @ (x * HARMONICS)
@@ -544,9 +604,10 @@ def closed_form_terms(nom: Nominal, budget: dict[str, Any]) -> dict[str, Any]:
         slope[name] = float(np.sqrt(np.mean(s * s)) / fs * 100.0)
     feed = float(budget["readout"]["platen_feed_mm_per_crank_turn"])
     coarse = float(budget["readout"]["coarse_gear_set_feed_ratio"])
+    index_deg = float(res["timebase"]["crank_index_deg"])
     rad_per_crank_turn = 2.0 * math.pi / CRANK_TURNS_PER_PERIOD
     rad_per_0p1mm = 0.1 / feed * rad_per_crank_turn
-    rad_per_8deg_crank = 8.0 / 360.0 * rad_per_crank_turn
+    rad_index = index_deg / 360.0 * rad_per_crank_turn
     timebase = {
         "pct_fs_per_rad_rms": slope,
         "platen_feed_mm_per_crank_turn": feed,
@@ -554,7 +615,8 @@ def closed_form_terms(nom: Nominal, budget: dict[str, Any]) -> dict[str, Any]:
         "pct_fs_all_ones_per_0p1mm_abscissa_coarse_gears": slope["all_ones"]
         * rad_per_0p1mm
         / coarse,
-        "pct_fs_all_ones_crank_index_8deg": slope["all_ones"] * rad_per_8deg_crank,
+        "assumed_crank_index_deg": index_deg,
+        "pct_fs": slope["all_ones"] * rad_index / math.sqrt(3.0),
     }
     return {
         "knife": knife,
@@ -576,11 +638,11 @@ def build_report(budget: dict[str, Any] | None = None) -> dict[str, Any]:
     nom = nominal()
     d0 = null_station(nom)
     stations = [nom.d_max, nom.d_max / 2, 10.0, -nom.d_max / 2, -nom.d_max]
-    return {
+    r = {
         "nominal": nom.__dict__,
         "linear_gain_mm_per_mm": linear_gain(nom),
         "null_station_mm": d0,
-        "harmonics": {f"{d:+.0f}": harmonic_content(d, nom) for d in stations},
+        "harmonics": {f"{d:+.0f}": harmonic_content(d, nom, null=d0) for d in stations},
         "nominal_design_errors": {
             "stick_zero_at_pivot": nominal_design_errors(nom),
             "stick_zero_at_null_station": nominal_design_errors(nom, stick_zero=d0),
@@ -594,7 +656,12 @@ def build_report(budget: dict[str, Any] | None = None) -> dict[str, Any]:
         "closed_form": closed_form_terms(nom, budget),
         "targets": budget["targets"],
         "benchmark": budget["benchmark"],
+        "reserved_allowance": {
+            k: float(v["allowance_pct"]) for k, v in budget["reserved"].items()
+        },
     }
+    r["closure"] = closure(r, budget)
+    return r
 
 
 def _print_report(r: dict[str, Any], budget: dict[str, Any]) -> None:
@@ -672,10 +739,36 @@ def _print_report(r: dict[str, Any], budget: dict[str, Any]) -> None:
     )
     p("\n## 4. Terms that are not part tolerances")
     p(json.dumps(r["closed_form"], indent=2))
+    p("\n## 5. Closure -- every term against the benchmark MAE")
+    for k, v in r["closure"].items():
+        p(f"  {k:<28} {v:.3f}")
+
+
+def closure(r: dict[str, Any], budget: dict[str, Any]) -> dict[str, float]:
+    """Every reserved term (% FS) beside the scatter, and their total: the
+    corrected nominal residual is systematic and adds; scatter, readout,
+    timebase and knife are independent and combine root-sum-square."""
+    cf = r["closed_form"]
+    nde = r["nominal_design_errors"]["null_station_and_c2_corrected"]
+    broad = [n for n in budget["reference_inputs"] if n != "pair_1_20"]
+    terms = {
+        "nominal_residual_mae": max(nde[n]["mae"] for n in broad),
+        "scatter_mae": r["monte_carlo"]["combined"]["mae"],
+        "readout": cf["readout"]["pct_fs"],
+        "timebase": cf["timebase"]["pct_fs"],
+        "knife": cf["knife"]["pct_fs"],
+    }
+    rss = math.sqrt(
+        sum(terms[k] ** 2 for k in ("scatter_mae", "readout", "timebase", "knife"))
+    )
+    terms["total_mae"] = terms["nominal_residual_mae"] + rss
+    return terms
 
 
 def budget_closes(r: dict[str, Any]) -> list[str]:
-    """Which targets the Monte Carlo violates (empty = budget closes)."""
+    """Which limits the report violates (empty = budget closes): the Monte
+    Carlo scatter targets, each reserved term's allowance, and the total
+    against the benchmark MAE."""
     t, c = r["targets"], r["monte_carlo"]["combined"]
     bad = []
     if c["mae"] > t["scatter_mae_fs_pct"]:
@@ -687,6 +780,14 @@ def budget_closes(r: dict[str, Any]) -> list[str]:
     pair = c["per_input"]["pair_1_20"]["p99_max"]
     if pair > t["pair_consistency_p99_pct"]:
         bad.append(f"pair p99 max {pair:.3f} > {t['pair_consistency_p99_pct']}")
+    cl, allow = r["closure"], r["reserved_allowance"]
+    for k in ("nominal_residual_mae", "readout", "timebase", "knife"):
+        if cl[k] > allow[k]:
+            bad.append(f"{k} {cl[k]:.3f} > allowance {allow[k]}")
+    if cl["total_mae"] > r["benchmark"]["mae_fs_pct"]:
+        bad.append(
+            f"total MAE {cl['total_mae']:.3f} > benchmark {r['benchmark']['mae_fs_pct']}"
+        )
     return bad
 
 

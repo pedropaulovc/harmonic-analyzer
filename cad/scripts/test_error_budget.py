@@ -103,18 +103,42 @@ def test_second_harmonic_correction_removes_the_nominal_residual(report):
 
 
 def test_null_station_is_below_the_pivot_zero(report, nom):
-    """The slide arc sits above the pivot centreline, so a bar at the pivot
-    zero still moves: the stick zero belongs at the null station."""
+    """The notch-roof contact sits contact_dx off the foot axis and the slide arc
+    above the pivot centreline, so a bar at the pivot zero still moves: the
+    stick zero belongs at the null station, just past -contact_dx."""
     d0 = report["null_station_mm"]
-    assert -1.0 < d0 < -0.2
+    assert -nom.contact_dx - 1.0 < d0 < -nom.contact_dx
     assert (
         abs(eb.harmonic_content(d0, nom)["c1"]) < 1e-3 * eb.linear_gain(nom) * nom.d_max
     )
 
 
 def test_budget_closes(report):
-    """The Monte Carlo of the configured tolerances lands inside its targets."""
+    """The Monte Carlo lands inside its targets, every reserved term inside its
+    allowance, and the total inside the benchmark MAE."""
     assert eb.budget_closes(report) == []
+    assert set(report["closure"]) == {
+        "nominal_residual_mae",
+        "scatter_mae",
+        "readout",
+        "timebase",
+        "knife",
+        "total_mae",
+    }
+
+
+def test_closure_fails_when_a_reserved_term_overruns(budget):
+    """A pen stroke too small for the assumed reading uncertainty must fail the
+    gate through the readout allowance, not pass on scatter alone."""
+    small = {
+        **budget,
+        "reserved": {
+            **budget["reserved"],
+            "readout": {**budget["reserved"]["readout"], "pen_half_stroke_mm": 10.0},
+        },
+    }
+    bad = eb.budget_closes(eb.build_report(small))
+    assert any(b.startswith("readout") for b in bad), bad
 
 
 def test_drawing_limits_agree_with_the_budget(budget):

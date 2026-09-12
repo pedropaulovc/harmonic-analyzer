@@ -102,30 +102,33 @@ lag are.
 
 ### The nominal design has a residual before any tolerance
 
-The exact kinematics (eccentric + rod + rocker pin on an arc + bar foot on the R800 slide + lever
-arc) are not a pure cosine. From the report:
+The exact kinematics (eccentric + rod + rocker pin on an arc + the rigid 801.95 mm bar whose
+notch-roof contact rides the R800 slide + lever arc, exactly `build_channel_assembly.solve_state`)
+are not a pure cosine. From the report (gain measured from the null station):
 
 | station (mm) | gain / linear | 2nd harmonic / fundamental |
 |---:|---:|---:|
-| +88 | 1.0112 | 1.50 % |
-| +44 | 1.0182 | 1.22 % |
-| −44 | 0.9979 | 1.72 % |
-| −88 | 1.0064 | 1.62 % |
+| +88 | 1.0089 | 1.49 % |
+| +44 | 1.0096 | 1.22 % |
+| −44 | 1.0133 | 1.73 % |
+| −88 | 1.0164 | 1.61 % |
 
 - **Slider-crank distortion**: rod/throw ratio $e/L$ = 8.64/163.1 gives a second harmonic of
   $\approx e/4L$ = 1.3 % of each channel's amplitude, 1.2–1.7 % once the arc geometry is
   added. It aliases onto every readout point (channel 20's 2nd harmonic is +1.5 % at *all*
   $\theta_k$), so uncorrected it costs 0.1–0.2 % MAE and 1.3–1.5 % max on broad inputs and
   1.1 % MAE / 3.0 % max on the two-channel input — larger than every machining term combined.
-- **Null station −0.52 mm**: the slide arc's low point sits 8 mm above the pivot centreline and
-  the swing is one-sided (arm level at the top of the stroke), so a bar at the geometric zero
-  still moves. 18 idle bars at "zero" add a coherent 0.6 %-of-a-channel error each.
-- **Gain asymmetry** ±0.5 % between +d and −d from the same one-sided swing.
+- **Null station −3.62 mm** (foot-axis x from the pivot): the notch roof touches the arc
+  3.175 mm from the foot axis (`amplitude_bar_spec.BAR_WIDTH/2`) and the arc's low point sits
+  8 mm above the pivot centreline, so a bar at the geometric zero still moves — 18 idle bars at
+  "zero" add a coherent 3.6 %-of-a-channel error each (up to 34 % on a two-channel input if the
+  stick is zeroed at the pivot).
+- **Gain non-uniformity** +0.9 % to +1.6 % across the range, once measured from the null station.
 
 All three are deterministic functions of the design, so they are removed by procedure, not by
 tolerance (readout section below). With the stick zeroed at the null station and the
-second-harmonic correction applied, the nominal residual falls to ≤ 0.04 % MAE / 0.09 % max on
-broad inputs (0.36 % max on the alternating-sign input) — the "+c2 corrected" column of the report.
+second-harmonic correction applied, the nominal residual falls to ≤ 0.05 % MAE / 0.09 % max on
+broad inputs (0.39 % max on the alternating-sign input) — the "+c2 corrected" column of the report.
 Lengthening the rod would remove it by design but is not photo-faithful; the correction is the
 period-appropriate answer (the machine computes, the operator corrects a known table).
 
@@ -184,14 +187,18 @@ two-channel consistency target. Read it as follows.
 
 | term | size | what it depends on | controlled by |
 |---|---|---|---|
-| nominal residual after correction | ≤ 0.04 % MAE | design geometry | null-station zero + 2nd-harmonic correction |
-| knife-edge hysteresis | 2.2 % of one channel's full scale per 0.01 mm of edge rolling-resistance length, at the derived 1.5 kN edge load | edge sharpness/hardness, total spring load | hardened insert on a hardened seat (assessment §6); *measured* as trace width on a slow reversal |
-| ordinate readout | 0.67 % FS per 0.1 mm of reading at the modelled 15 mm half-stroke | pen line width, grid interpolation, pen stroke | run the magnifier/pen at the largest stroke the paper allows: a 0.3 mm line read to half its width is ±1.0 % FS at 15 mm half-stroke, ±0.4 % at 40 mm |
-| timebase (reading at the wrong θ) | 0.84 % FS per 0.1 mm of abscissa at the 1.596 mm/crank-turn feed; 0.21 % with the coarse T24/T12 set; 0.30 % for a crank stopped on an index within ±8° | paper feed ratio, index repeatability | stop the crank on its index at 2k turns and read the pen, or use the coarsest feed |
+| term | assumption (`error_budget.yaml reserved:`) | value | allowance |
+|---|---|---:|---:|
+| nominal residual after correction | null-station zero + 2nd-harmonic correction | 0.045 % MAE | 0.05 |
+| ordinate readout | run the adjustable magnifier so a full-scale trial spans a **30 mm half-stroke** (the 15 mm in `output.yaml` is the render pose, not the operating stroke); read to ±0.10 mm (half a 0.2 mm line + grid interpolation) | 0.33 % FS | 0.35 |
+| timebase | read coefficient k with the crank stopped on its index at 2k turns, index repeatable to ±8° (uniform) — vs 0.84 % FS per 0.1 mm of abscissa at the 1.596 mm/turn feed, 0.21 % with the coarse T24/T12 set | 0.17 % FS | 0.20 |
+| knife-edge hysteresis | hardened edge on a hardened seat, rolling-resistance length 0.005 mm at the derived 1.5 kN edge load (2.2 % of one channel's stroke per 0.01 mm); *measure* as trace width on a slow reversal | 0.06 % FS | 0.10 |
+| **total** | residual + RSS(scatter 0.126, readout, timebase, knife) | **0.45 % MAE** | **0.7 benchmark** |
 
-The knife and readout terms are why the paper's 0.7 % is hard even with perfect parts. They are
-procedure and design-adjustment items and are listed so no one tries to buy them back with
-tighter machining.
+`check:budget` fails if any term overruns its allowance or the total overruns the benchmark, so a
+smaller pen stroke or a duller knife cannot be hidden behind a green scatter result. The readout
+and knife terms are why the paper's 0.7 % is hard even with perfect parts; they are procedure and
+design-adjustment items and are listed so no one tries to buy them back with tighter machining.
 
 ## Readout and calibration procedure (what the model assumes)
 
@@ -199,9 +206,10 @@ The Monte Carlo and the residual numbers above hold only under this procedure; i
 the specification.
 
 1. **Zero the measuring stick at the null station**, found on the assembled machine: with one
-   bar alone, slide it until the fundamental vanishes (the model says −0.52 mm from the pivot
-   zero). Graduate or calibrate the stick from single-channel runs, not from a ruler — the gain
-   deviates from linear by up to 1.8 % and differs between +d and −d (table above), and Michelson's
+   bar alone, slide it until the fundamental vanishes (the model says −3.62 mm of foot-axis
+   travel from the pivot zero, the notch-roof contact being 3.175 mm off the foot axis).
+   Graduate or calibrate the stick from single-channel runs, not from a ruler — the gain
+   deviates from linear by 0.9–1.6 % across the range (table above), and Michelson's
    own stick was "hand stamped, unevenly spaced" for the same reason. Set each bar by
    interpolating to 1/5 of the stick's 1.42 mm minor division (stick drawing note 5): a 0.28 mm
    step gives ±0.14 mm rounding, ±0.25 mm with eye and parallax — the budget's setting term.
@@ -272,8 +280,9 @@ are the concrete realizations of the classes above, being lifted into `tolerance
   preload does not balance against the modelled counter spring (0.51 N/mm would need ~1.5 m of
   extension). Specify both as requirements; the hysteresis term scales with the edge load.
 - **Magnification bookkeeping**: the lever is stated "up to 4×", the wheel 5× by geometry,
-  and the model uses a single `magnify_factor` 4.0; the pen half-stroke (15 mm) that sets the
-  readout term depends on the reconciliation.
+  and the model uses a single `magnify_factor` 4.0; the budget requires a 30 mm operating
+  half-stroke for its readout term, which the reconciliation (and the spring rates) must show the
+  magnifier can deliver.
 - `amplitude.max_travel_mm` 88 vs. the ledger's ±146 mm foot travel: the budget uses 88; a
   larger full scale improves every readout term proportionally.
 - The eccentricity drawing limit (±0.025) vs. its accuracy allowable (±0.046): keep or relax

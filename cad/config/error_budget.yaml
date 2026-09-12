@@ -50,6 +50,28 @@ readout:
   platen_feed_mm_per_crank_turn: 1.596
   coarse_gear_set_feed_ratio: 4.0
 
+# Terms that are NOT part tolerances but are part of the closure: each carries
+# the assumption it is evaluated at and the share of the benchmark it may
+# consume. budget_closes checks every term against its allowance AND the total
+# (nominal residual + RSS of the independent terms + scatter) against the
+# benchmark MAE. Changing an assumption here is a stated design/procedure
+# decision, not a tuning knob.
+reserved:
+  nominal_residual_mae:            # what survives the null-station zero + 2nd-harmonic correction
+    allowance_pct: 0.05
+  readout:                         # ordinate reading at the pen
+    pen_half_stroke_mm: 30.0       # SETUP requirement: run the adjustable magnifier so a full-scale
+                                   # trial spans this half-stroke (output.yaml pen_trace_half_mm 15
+                                   # is the RENDER pose mapping, not the operating stroke)
+    reading_uncertainty_mm: 0.10   # half a 0.2 mm line + grid interpolation
+    allowance_pct: 0.35
+  timebase:                        # reading coefficient k with the crank stopped on its index
+    crank_index_deg: 8.0           # +/- stop repeatability on the crank index (uniform)
+    allowance_pct: 0.20
+  knife:                           # summing-lever knife-edge hysteresis (stall)
+    rolling_resistance_mm: 0.005   # hardened edge on a hardened seat; MEASURE as trace width on reversal
+    allowance_pct: 0.10
+
 monte_carlo:
   draws: 4000
   seed: 20260912
