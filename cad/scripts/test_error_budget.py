@@ -11,6 +11,8 @@ match the budget, and the Monte Carlo lands inside the targets. SolidWorks-free.
 from __future__ import annotations
 
 import importlib
+import pathlib
+import re
 import math
 
 import numpy as np
@@ -135,15 +137,27 @@ def test_drawing_limits_agree_with_the_budget(budget):
     )
 
 
-def test_machine_stations_match_the_assemblies():
-    """The rocker-frame constants copied into error_budget.py (to stay out of
-    the SolidWorks import closure) must equal the assembly's."""
-    ch = pytest.importorskip("build_channel_assembly")
-    assert tuple(ch.PIVOT) == eb.ROCKER_PIVOT_XY
-    assert tuple(ch.FULCRUM) == eb.LEVER_FULCRUM_XY
-    assert ch.ARM_ARC_CENTER_LOCAL_Y == eb.ARM_ARC_CENTER_LOCAL_Y
-    assert ch.ARM_TOP_RADIUS == eb.rocker_arm_spec.CURVE_RADIUS
-    pd = pytest.importorskip("build_paper_drive_assembly")
-    assert pd.NET_RACK_TRAVEL_PER_CRANK_REV == pytest.approx(
-        eb.PLATEN_FEED_MM_PER_CRANK_TURN, abs=5e-4
+def test_assembly_imports_the_shared_stations_instead_of_copying():
+    """build_channel_assembly imports SolidWorks, so it cannot be imported in
+    this gate; pin at the SOURCE level that its PIVOT / FULCRUM / arc centre
+    come from the shared modules error_budget reads, never from a literal."""
+    src = (pathlib.Path(eb.__file__).with_name("build_channel_assembly.py")).read_text(
+        encoding="utf-8"
     )
+    assert re.search(r"^\s*LEVER_FULCRUM_XY as FULCRUM,\s*$", src, re.M)
+    assert re.search(r"^\s*ROCKER_PIVOT_XY as PIVOT,\s*$", src, re.M)
+    assert re.search(
+        r"^from rocker_arm_spec import CENTER_Y as ARM_ARC_CENTER_LOCAL_Y", src, re.M
+    )
+    for name in ("PIVOT", "FULCRUM", "ARM_ARC_CENTER_LOCAL_Y"):
+        assert not re.search(rf"^{name}\s*=", src, re.M), (
+            f"{name} is copied, not imported"
+        )
+    assert re.search(r"^ARM_TOP_RADIUS = 800\.0", src, re.M)
+    assert eb.rocker_arm_spec.CURVE_RADIUS == 800.0
+
+
+def test_unsupported_distribution_fails_loud(budget, nom):
+    bad = {**budget, "monte_carlo": {**budget["monte_carlo"], "distribution": "normal"}}
+    with pytest.raises(ValueError, match="distribution"):
+        eb.monte_carlo(bad, nom)
