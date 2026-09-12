@@ -1059,6 +1059,7 @@ _CHECK_NAMES = (
     "freshness",
     "flagonly",
     "partiso",
+    "budget",
 )
 # Offline checks that are OPT-IN only (runnable via `doit check:<name>` but NOT
 # depended on by `build`/`release`). ``verify_telemetry`` drives the real gates
@@ -2527,6 +2528,34 @@ def task_check():
                 }
             ),
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_part_isolation.py")],
+        },
+        "budget": {
+            # The coefficient-error budget (cad/docs/tolerance-policy.md): the
+            # sensitivity model's linear gains agree with the exact channel
+            # kinematics, the calibrated readout cancels common-mode error, the
+            # nominal-design residual is corrected below 0.05 % MAE, every
+            # toleranced nominal still resolves to the spec constant the CAD
+            # builds from, the drawing limits equal the budget's, and the Monte
+            # Carlo of error_budget.yaml lands inside its targets. Pure python.
+            # Deps: the model, its config, and every spec module it imports (a
+            # geometry re-anchor must re-run the budget, not reuse the stamp).
+            "file_dep": sorted(
+                {
+                    str((SCRIPTS_DIR / "error_budget.py").resolve()),
+                    str((SCRIPTS_DIR / "test_error_budget.py").resolve()),
+                    str((CONFIG_DIR / "error_budget.yaml").resolve()),
+                    str((CONFIG_DIR / "tolerances.yaml").resolve()),
+                    str((CONFIG_DIR / "machine" / "amplitude.yaml").resolve()),
+                    str((CONFIG_DIR / "machine" / "output.yaml").resolve()),
+                    str(
+                        (
+                            CONFIG_DIR / "parts" / "channel-spring-installed.yaml"
+                        ).resolve()
+                    ),
+                    *module_deps_of(SCRIPTS_DIR / "error_budget.py"),
+                }
+            ),
+            "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_error_budget.py")],
         },
     }
     # Tripwire: `build` and `release` depend on f"check:{c}" for c in _CHECK_NAMES, so a
