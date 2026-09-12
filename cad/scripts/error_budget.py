@@ -137,10 +137,15 @@ def _bisect(
 def rocker_angle(theta: np.ndarray, nom: Nominal) -> np.ndarray:
     """Rocker rotation (rad, level = 0 at the top of stroke) versus cam angle.
 
-    Rod hangs plumb below the pin at rest with the lobe up, so the gear axis sits
-    ``rod + ecc`` below the pin; the pin rides its arc about the pivot.
+    Machine hand, as build_channel_assembly._arc_geometry: the rod pin sits on
+    the rocker's -X (crank) side at (-pin_x, +pin_y) from the pivot, the
+    amplitude bars ride the +X side. The rod hangs plumb below the pin at rest
+    with the lobe up, so the gear axis sits ``rod + ecc`` below the pin; the
+    lobe's horizontal excursion is the cam's own (x = -ecc sin theta about its
+    axis, as build_cylinder_gear's +Y-lobe cosine home), and the pin rides its
+    arc about the pivot.
     """
-    p0 = np.array([nom.pin_x, nom.pin_y])
+    p0 = np.array([-nom.pin_x, nom.pin_y])
     axis = p0 - np.array([0.0, nom.rod + nom.ecc])
     cx = axis[0] - nom.ecc * np.sin(theta)
     cy = axis[1] + nom.ecc * np.cos(theta)
@@ -323,6 +328,7 @@ def nominal_design_errors(
     nom: Nominal,
     null_lift: float = 0.0,
     correct_second_harmonic: bool = False,
+    calibrated_stick: bool = False,
 ) -> dict[str, dict[str, float]]:
     """Coefficient errors of the NOMINAL machine (no tolerances) through the
     exact kinematics, per reference input, every bar on the lifting side
@@ -334,9 +340,13 @@ def nominal_design_errors(
     channel. Under the 20-element rule a lift reads N*lift at k=0 and -lift at
     every odd k; pass ``null_lift`` to subtract that known vector after the
     k=0 normalisation (the buildable form of "zero the stick at the null
-    station"). ``correct_second_harmonic`` applies the readout
-    correction of tolerance-policy.md: the operator subtracts
-    sum_i x_i kappa_i cos(2 i theta_k) using the per-station kappa table."""
+    station"). ``correct_second_harmonic`` applies the readout correction of
+    tolerance-policy.md: the operator subtracts sum_i x_i kappa_i cos(2 i theta_k)
+    using the per-station kappa table. ``calibrated_stick`` graduates the stick
+    from single-channel runs instead of a ruler (Michelson's "hand stamped,
+    unevenly spaced" stick): each channel's fundamental is read as the
+    ordinate the calibration table assigns its station, so the machine-hand
+    gain curvature (-1.010 at the null to -1.025 at full scale) is removed."""
     grid = np.arange(1440) * 2.0 * math.pi / 1440
     cycle: dict[float, np.ndarray] = {}
 
@@ -365,11 +375,20 @@ def nominal_design_errors(
             return np.zeros_like(stations)
         return np.array([second_harmonic(one_cycle(float(d)), grid) for d in stations])
 
+    def fundamental(d: float) -> float:
+        return 2.0 * float(np.mean(one_cycle(d) * np.cos(grid)))
+
+    # the calibration table: a full-scale bar's fundamental defines "1 ordinate";
+    # a bar at station d is read as fundamental(d)/fundamental(d_max) (signed).
+    f_full = fundamental(nom.d_max)
     cos_2k = np.cos(2.0 * np.outer(THETA_K, HARMONICS))
     out: dict[str, dict[str, float]] = {}
     for name, x in reference_inputs().items():
         stations = x * nom.d_max
-        x_read = x + null_lift  # what the machine actually sums, per channel
+        if calibrated_stick:
+            x_read = np.array([fundamental(float(d)) / f_full for d in stations])
+        else:
+            x_read = x + null_lift  # what the machine actually sums, per channel
         c2s = c2(stations)  # trace units, per channel
         trace = trace_for(stations)
         measured = read_coefficients(trace, x_read, c2_total=float(c2s.sum()))
@@ -379,10 +398,11 @@ def nominal_design_errors(
             np.sum(x_read)
         )
         measured -= (cos_2k @ c2s) / scale
-        # the lift is common to every channel; under the 20-element rule it reads
-        # 20*lift at k=0 and -lift at every ODD k (sum cos(i k pi/20) = -1 for odd
-        # k, 0 for even k >= 2) -- subtract that whole vector, as the procedure says.
-        measured -= ideal_coefficients(np.full(N_ELEMENTS, null_lift))
+        # what the operator subtracts: the known deviation of every channel's
+        # read ordinate from its set ordinate -- the null-lift vector (20*lift
+        # at k=0, -lift at odd k) or, with a calibrated stick, the table's
+        # full per-channel deviation vector.
+        measured -= ideal_coefficients(x_read - x)
         e = coefficient_errors_pct(measured, x)
         out[name] = {"mae": float(np.mean(np.abs(e))), "max": float(np.max(np.abs(e)))}
     return out
@@ -715,6 +735,9 @@ def build_report(budget: dict[str, Any] | None = None) -> dict[str, Any]:
             "null_lift_and_c2_corrected": nominal_design_errors(
                 nom, null_lift=-d0 / nom.d_max, correct_second_harmonic=True
             ),
+            "calibrated_stick_and_c2_corrected": nominal_design_errors(
+                nom, correct_second_harmonic=True, calibrated_stick=True
+            ),
         },
         "gain_sensitivities": gain_sensitivities(nom),
         "finite_difference_check": finite_difference_check(nom),
@@ -757,18 +780,19 @@ def _print_report(r: dict[str, Any], budget: dict[str, Any]) -> None:
         "\ncoefficient error of the NOMINAL machine through the calibrated readout, % of greatest term:"
     )
     p(
-        f"{'input':>16} {'uncorrected':>14} {'max':>7} {'+null lift':>12} {'max':>7} {'+c2 corrected':>14} {'max':>7}"
+        f"{'input':>16} {'uncorrected':>12} {'max':>6} {'+null lift':>11} {'max':>6} {'+c2':>8} {'max':>6} {'+cal stick':>11} {'max':>6}"
     )
     nde = r["nominal_design_errors"]
-    a, b, c3 = (
+    a, b, c3, c4 = (
         nde["uncorrected"],
         nde["null_lift_corrected"],
         nde["null_lift_and_c2_corrected"],
+        nde["calibrated_stick_and_c2_corrected"],
     )
     for name in a:
         p(
-            f"{name:>16} {a[name]['mae']:>14.3f} {a[name]['max']:>7.3f} {b[name]['mae']:>12.3f} {b[name]['max']:>7.3f} "
-            f"{c3[name]['mae']:>14.3f} {c3[name]['max']:>7.3f}"
+            f"{name:>16} {a[name]['mae']:>12.3f} {a[name]['max']:>6.3f} {b[name]['mae']:>11.3f} {b[name]['max']:>6.3f} "
+            f"{c3[name]['mae']:>8.3f} {c3[name]['max']:>6.3f} {c4[name]['mae']:>11.3f} {c4[name]['max']:>6.3f}"
         )
     p(
         "\n## 2. Gain sensitivities (% of channel gain per mm; spring: % per %)  [analytic | finite-difference]"
@@ -819,7 +843,7 @@ def closure(r: dict[str, Any], budget: dict[str, Any]) -> dict[str, float]:
     corrected nominal residual is systematic and adds; scatter, readout,
     timebase and knife are independent and combine root-sum-square."""
     cf = r["closed_form"]
-    nde = r["nominal_design_errors"]["null_lift_and_c2_corrected"]
+    nde = r["nominal_design_errors"]["calibrated_stick_and_c2_corrected"]
     broad = [n for n in budget["reference_inputs"] if n != "pair_1_20"]
     terms = {
         "nominal_residual_mae": max(nde[n]["mae"] for n in broad),
@@ -868,13 +892,124 @@ def budget_closes(r: dict[str, Any]) -> list[str]:
     return bad
 
 
+def calibration_table(
+    nom: Nominal, step_mm: float = 4.0
+) -> list[tuple[float, float, float]]:
+    """(station mm, read ordinate, kappa) per station from the pivot zero to
+    full scale: the stick graduation and the second-harmonic table the operator
+    uses. ``read ordinate`` is the channel's fundamental as a fraction of a
+    full-scale bar's (signed -- the machine-hand drive reads a +X bar negative,
+    which the operator absorbs as a sign convention); ``kappa`` is c2/c1."""
+    grid = np.arange(1440) * 2.0 * math.pi / 1440
+    rows = []
+    f_full = None
+    stations = np.arange(0.0, nom.d_max + 1e-9, step_mm)
+    cycles = {float(d): hook_displacement(grid, float(d), nom) for d in stations}
+    if nom.d_max not in cycles:
+        cycles[nom.d_max] = hook_displacement(grid, nom.d_max, nom)
+    f_full = 2.0 * float(np.mean(cycles[nom.d_max] * np.cos(grid)))
+    for d in stations:
+        u = cycles[float(d)]
+        c1 = 2.0 * float(np.mean(u * np.cos(grid)))
+        c2 = 2.0 * float(np.mean(u * np.cos(2.0 * grid)))
+        rows.append((float(d), c1 / f_full, c2 / c1))
+    return rows
+
+
+def readout_procedure(r: dict[str, Any], nom: Nominal) -> str:
+    """The operating/readout procedure the budget's residual assumes, as a
+    self-contained Markdown document for the release bundle -- generated from
+    the model's own numbers so it cannot drift from what check:budget proved."""
+    cf = r["closed_form"]
+    rows = calibration_table(nom)
+    lift = r["null_lift_ordinate"]
+    table = "\n".join(f"| {d:6.1f} | {x:+.4f} | {k * 100:6.2f} % |" for d, x, k in rows)
+    return f"""# Reading the analyzer -- operating and readout procedure
+
+Generated by `cad/scripts/error_budget.py --procedure` from the model that
+`check:budget` gates; the residual it credits (nominal design
+{r["closure"]["nominal_residual_mae"]:.3f} % of the greatest term) is reached
+only by following every step below. Coefficient $k$ is read at crank position
+$\\theta_k = k\\pi/20$, i.e. with the crank stopped on its index after $2k$
+turns of the {CRANK_TURNS_PER_PERIOD}-turn period.
+
+## 1. Set the bars from the calibrated stick
+
+The stick's 0 tick sits at the rocker pivot axis (stick drawing note 5); every
+station is on the lifting side. The stick is graduated in **read ordinate**,
+not millimetres: the machine's gain is not linear in station (the null lies at
+{r["null_station_mm"]:+.2f} mm, unreachable, and the slope of read ordinate per
+mm changes by {100.0 * ((rows[-1][1] - rows[-2][1]) / (rows[1][1] - rows[0][1]) - 1.0):+.1f} %
+from the pivot to full scale). Set each bar to the station whose read ordinate is the wanted $x_i$,
+interpolating to 1/5 minor division (setting error +/-0.25 mm max per bar).
+
+| station (mm) | read ordinate $x$ | $\\kappa$ = c2/c1 |
+|---:|---:|---:|
+{table}
+
+A bar parked at 0 reads {rows[0][1]:+.4f}: idle channels are NOT zero. Sum the
+read ordinates of all 20 bars; that sum is what the machine reports at $k=0$.
+The sign is a convention of the machine-hand drive (a +X bar reads negative at
+the top of stroke); the coefficients' signs follow it uniformly.
+
+Signed functions: every bar stays on the lifting side, so add a constant $c$
+to a signed input before setting the bars; its lift vector ($20c$ at $k=0$,
+$-c$ at every odd $k$, $0$ at even $k$) is subtracted in step 4.
+
+## 2. Run and read
+
+Crank in ONE direction only (a reversal re-seats every mesh on the other flank).
+Take the zero of each trial as the mean line of the trace over one full period.
+Read the pen at each $\\theta_k$ to +/-{cf["readout"]["assumed_reading_uncertainty_mm"]:.3f} mm
+(half the line width against the grid) with the magnifier set so the $k=0$
+reading spans the {cf["readout"]["pen_half_stroke_mm"]:.0f} mm half-stroke.
+
+## 3. Normalise
+
+Divide every reading by the $k=0$ reading and multiply by the sum of the read
+ordinates from step 1 (Michelson's normalisation to the greatest term). Before
+dividing, subtract from the $k=0$ reading the second-harmonic total
+$\\sum_i x_i \\kappa_i$ in the same units (step 4's correction at $k=0$).
+
+## 4. Correct
+
+Subtract, at each $k$:
+
+- the second-harmonic term $\\sum_i x_i\\,\\kappa_i \\cos(2 i \\theta_k)$ with
+  $\\kappa_i$ from the table above at each bar's station (the connecting-rod
+  distortion, 1.4-5 % of each channel's amplitude);
+- the read-vs-set deviation vector $\\sum_i (x^{{read}}_i - x^{{set}}_i)\\cos(i\\theta_k)$
+  -- for an idle bar $x^{{read}} = {rows[0][1]:+.4f}$ against $x^{{set}} = 0$, so this
+  is the null lift ($20\\ell$ at $k=0$, $-\\ell$ at odd $k$, $\\ell = {lift:.4f}$)
+  plus the same for any lift constant $c$ from step 1.
+
+## 5. Report
+
+$e_k = (O_k - C_k) / \\max_j |C_j|$ with $C_k$ computed by the same 20-sample
+rule, $C_k = \\sum_i x_i \\cos(i k \\pi / 20)$, so quadrature error is never charged
+to the hardware. Historical comparison: Michelson & Stratton 1898, about 0.7 %
+mean absolute error of the greatest term.
+"""
+
+
 def _main() -> int:
     """CLI: print the report (or ``--json``); exit 1 if the budget does not close."""
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--json", action="store_true", help="emit the report as JSON")
+    ap.add_argument(
+        "--procedure",
+        type=Path,
+        metavar="PATH",
+        help="write the operating/readout procedure (Markdown) the residual assumes",
+    )
     args = ap.parse_args()
     budget = load_budget()
     r = build_report(budget)
+    if args.procedure:
+        args.procedure.parent.mkdir(parents=True, exist_ok=True)
+        args.procedure.write_text(readout_procedure(r, nominal()), encoding="utf-8")
+        print(f"wrote {args.procedure}")
+        return 0 if not budget_closes(r) else 1
     if args.json:
         print(json.dumps(r, indent=2, default=float))
     else:

@@ -897,6 +897,21 @@ def package_drawings(
     return staged
 
 
+def stage_readout_procedure(stage: Path) -> str:
+    """Write the operating/readout procedure (error_budget.readout_procedure)
+    into the bundle root as ``READOUT.md``. Not COM: the model is offline."""
+    import error_budget
+
+    dst = stage / "READOUT.md"
+    dst.write_text(
+        error_budget.readout_procedure(
+            error_budget.build_report(), error_budget.nominal()
+        ),
+        encoding="utf-8",
+    )
+    return dst.name
+
+
 def bundle(
     sw: Any, revision: str, version: str, prev_tag: str | None = None
 ) -> tuple[Path, dict[str, Any]]:
@@ -948,6 +963,12 @@ def bundle(
     #     Blender render off the stable STLs) under stage/comparisons. Export fails
     #     loudly when Blender is unavailable, so a release cannot silently omit it.
     facts["comparisons"] = stage_comparisons(stage)
+
+    # 4c. Operating/readout procedure: the release ships the drawings, and the
+    #     accuracy those drawings' limits are derived from (check:budget) is
+    #     reached only by the calibration + correction procedure the budget
+    #     assumes -- generated from the same model so it cannot drift.
+    facts["readout_procedure"] = stage_readout_procedure(stage)
 
     # 5. Provenance manifest LAST -- it hashes everything staged above, so it must
     #    run after the diff is written and before the zip is sealed. (Build logs
