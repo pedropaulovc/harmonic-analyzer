@@ -691,13 +691,14 @@ def _otlp_protocol(signal: str) -> str:
 
 
 def _otlp_export_timeout(signal: str) -> float:
-    """Return the signal-specific or global per-export deadline in seconds."""
+    """Return the configured OTLP timeout in exporter-native seconds."""
     signal_timeout = f"OTEL_EXPORTER_OTLP_{signal.upper()}_TIMEOUT"
-    return float(
-        os.environ.get(signal_timeout)
-        or os.environ.get("OTEL_EXPORTER_OTLP_TIMEOUT")
-        or "1"
+    configured_timeout = os.environ.get(signal_timeout) or os.environ.get(
+        "OTEL_EXPORTER_OTLP_TIMEOUT"
     )
+    if configured_timeout is None:
+        return 1.0
+    return float(configured_timeout) / 1000
 
 
 def _warn_otlp_processor(

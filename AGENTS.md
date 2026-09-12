@@ -785,10 +785,11 @@ scripts that `from _common import log, check` are instrumented unchanged.
   the COM seat for its whole life. Console + `.jsonl` stay on Simple processors
   (live console; capture that cannot lose a record to a queue). The batch trade is
   safe only because `shutdown()` flushes both providers on both exit paths
-  (`run_build`'s tail and the watchdog before `os._exit`). Each OTel Python export
-  call defaults to a one-second retry deadline; signal-specific
+  (`run_build`'s tail and the watchdog before `os._exit`). The timeout environment
+  values are standard integer milliseconds: signal-specific
   `OTEL_EXPORTER_OTLP_TRACES_TIMEOUT` / `OTEL_EXPORTER_OTLP_LOGS_TIMEOUT` override
-  global `OTEL_EXPORTER_OTLP_TIMEOUT`. Shutdown can make one call per queued batch.
+  global `OTEL_EXPORTER_OTLP_TIMEOUT`; when none is set, each OTel Python export
+  call gets a one-second deadline. Shutdown can make one call per queued batch.
 - **Where it goes.** Console (stderr) by default; full span/log JSON is also
   captured (best-effort, never fatal) under `cad/out/reports/telemetry/`
   (`traces.jsonl` / `logs.jsonl`, gitignored). Pass `configure(console=False)` to

@@ -64,6 +64,14 @@ finally:
     )
 
 
+def _log_exporter(processor):
+    """Return the exporter across supported OTel batch-processor layouts."""
+    batch_processor = getattr(processor, "_batch_processor", None)
+    if batch_processor is not None:
+        return batch_processor._exporter
+    return processor._exporter
+
+
 @pytest.fixture(autouse=True)
 def deterministic_otlp_environment(monkeypatch):
     """Keep every test offline, then restore a clean provider and caller env."""
@@ -441,7 +449,7 @@ def test_otlp_export_honors_standard_transport_env(
         assert log_processor is not None
         exporters = [
             span_processor.span_exporter,
-            log_processor._batch_processor._exporter,
+            _log_exporter(log_processor),
         ]
         assert all(
             module_fragment in type(exporter).__module__ for exporter in exporters
@@ -455,8 +463,8 @@ def test_otlp_export_honors_standard_transport_env(
 @pytest.mark.parametrize("signal", ("traces", "logs"))
 def test_otlp_export_honors_signal_specific_timeout(monkeypatch, signal):
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc")
-    monkeypatch.setenv("OTEL_EXPORTER_OTLP_TIMEOUT", "30")
-    monkeypatch.setenv(f"OTEL_EXPORTER_OTLP_{signal.upper()}_TIMEOUT", "17")
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_TIMEOUT", "30000")
+    monkeypatch.setenv(f"OTEL_EXPORTER_OTLP_{signal.upper()}_TIMEOUT", "17000")
     monkeypatch.setenv(
         f"OTEL_EXPORTER_OTLP_{signal.upper()}_ENDPOINT", "http://127.0.0.1:4317"
     )
@@ -466,7 +474,7 @@ def test_otlp_export_honors_signal_specific_timeout(monkeypatch, signal):
         exporter = processor.span_exporter
     else:
         processor = _telemetry._otlp_log_processor()
-        exporter = processor._batch_processor._exporter
+        exporter = _log_exporter(processor)
     try:
         assert exporter._timeout == 17.0
     finally:
