@@ -497,6 +497,9 @@ def test_invalid_otlp_export_timeout_warns_and_falls_back(
     monkeypatch, capsys, invalid_timeout
 ):
     monkeypatch.delenv("HARMONIC_VERBOSITY", raising=False)
+    monkeypatch.setattr(_telemetry, "_telemetry_dir", lambda: None)
+    _telemetry.configure(force=True)
+    capsys.readouterr()
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_TRACES_TIMEOUT", invalid_timeout)
 
     assert _telemetry._otlp_export_timeout("traces") == 1.0
@@ -615,6 +618,7 @@ def test_explicit_local_grpc_endpoint_is_probed(monkeypatch, endpoint):
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc")
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", endpoint)
     probed = []
+    pending = []
 
     def unavailable(candidate, timeout=0.15):
         probed.append(candidate)
@@ -622,8 +626,10 @@ def test_explicit_local_grpc_endpoint_is_probed(monkeypatch, endpoint):
 
     monkeypatch.setattr(_telemetry, "_endpoint_listening", unavailable)
 
-    assert _telemetry._resolve_otlp_endpoint("traces", pending_warnings=[]) is None
+    assert _telemetry._resolve_otlp_endpoint("traces", pending_warnings=pending) is None
     assert probed == [endpoint]
+    assert "OTLP trace export is disabled for protocol 'grpc'" in pending[0]
+    assert "configured local endpoint is unavailable" in pending[0]
 
 
 def test_schemeless_remote_grpc_endpoint_keeps_stock_secure_target(monkeypatch):
