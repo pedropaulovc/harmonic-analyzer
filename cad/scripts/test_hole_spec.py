@@ -36,9 +36,9 @@ def test_part_builds_consume_shared_drill_specs() -> None:
     assert build_channel_assembly.PLATE_HOLE_DIA == blind_cut_dia_mm(
         summing_lever_spec.HOLE_SPEC
     )
-    assert blind_cut_dia_mm(channel_lever_spec.BAR_PIN_HOLE_SPEC) == 1.994
+    assert blind_cut_dia_mm(channel_lever_spec.BAR_PIN_HOLE_SPEC) == 1.9939
     assert blind_cut_dia_mm(channel_lever_spec.SPRING_EYE_HOLE_SPEC) == 4.039
-    assert blind_cut_dia_mm(rocker_arm_spec.ROD_HOLE_SPEC) == 1.994
+    assert blind_cut_dia_mm(rocker_arm_spec.ROD_HOLE_SPEC) == 1.9939
 
 
 def test_pivot_bracket_is_a_true_number_19_drill() -> None:

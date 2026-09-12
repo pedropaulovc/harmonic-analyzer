@@ -4,15 +4,15 @@ the part build (``build_connecting_rod.py``) and its manufacturing drawing
 
 PURE DATA, no SolidWorks/COM imports (see ``crank_arm_spec`` for the pattern).
 The nominal geometry here MUST match the constants in build_connecting_rod.py
-(the test cross-checks the load-bearing ones); the marked-dimension -> kept map
-is the drift alarm the offline test enforces.
+(the test cross-checks the load-bearing ones). Drawing-only mark, placement and
+prose metadata lives in ``connecting_rod_notes``.
 """
 
 from __future__ import annotations
 
-from _hole_spec import HoleSpec
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from rod_pivot_spec import FORK_HOLE_SPEC, FORK_OUTER_THICKNESS
 
 # --- Nominal geometry (DIMENSIONS.md "Chapter 13 - Connecting rods"). ---
 CENTER_DISTANCE = 163.1010299795349  # fixed-post recenter; level arm, plumb rod
@@ -25,12 +25,12 @@ SHANK_THICKNESS = 2.5
 HEAD_WIDTH = 10.0  # across the tombstone cheeks
 HEAD_HEIGHT = 10.5  # crown top -> shoulder root
 HEAD_CROWN_ABOVE_PIN = 2.4  # crown top above the pin centre
-HEAD_THICKNESS = 2.5
-PIN_HOLE_SPEC = HoleSpec("drilled_number", "#47")
+HEAD_THICKNESS = FORK_OUTER_THICKNESS  # overall fork, not a solid single cheek
+PIN_HOLE_SPEC = FORK_HOLE_SPEC  # coaxial through both ears
 
 # --- Derived spans (mirror build_connecting_rod). ---
 RING_OUTER_RADIUS = RING_BORE_DIA / 2.0 + RING_WALL  # 20.4
-HEAD_TOP_Y = CENTER_DISTANCE + HEAD_CROWN_ABOVE_PIN  # crown top (150.07)
+HEAD_TOP_Y = CENTER_DISTANCE + HEAD_CROWN_ABOVE_PIN
 RING_BOTTOM_Y = -RING_OUTER_RADIUS  # -20.4
 
 SURFACE_FINISHES = (
@@ -50,7 +50,3 @@ SURFACE_FINISHES = (
 # notes edit into their rebuild closure (codex #354).
 
 
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "rocker pin hole position": "0.20",
-}

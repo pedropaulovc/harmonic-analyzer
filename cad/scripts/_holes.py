@@ -24,6 +24,7 @@ still resolves in the table fails loud instead of cutting the wrong drill).
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import math
 from typing import Any
 
 import _telemetry
@@ -39,6 +40,25 @@ from _hole_spec import (
     HoleSpec,
     blind_cut_dia_mm,
 )
+
+def _wizard_hole_diameter_mm(definition: Any, *, tapped: bool) -> float:
+    """Read the cut diameter from properties applicable to the native hole type."""
+    properties = (
+        ("TapDrillDiameter", "ThruTapDrillDiameter")
+        if tapped else ("HoleDiameter", "ThruHoleDiameter")
+    )
+    readings = {}
+    for name in properties:
+        try:
+            value = float(getattr(definition, name)) * 1000.0
+        except Exception as exc:
+            readings[name] = f"{type(exc).__name__}: {exc}"
+            continue
+        readings[name] = value
+        if math.isfinite(value) and value > 0.0:
+            return value
+    raise RuntimeError(f"native hole has no valid applicable cut diameter: {readings!r}")
+
 
 PlacementDimension = tuple[str | None, str | None]
 PlacementDimensions = tuple[PlacementDimension, PlacementDimension]
@@ -365,18 +385,8 @@ def wizard_holes(
         data = fm.CreateDefinition(SW_FM_HOLE_WZD)
         data = _early_bound(data, "IWizardHoleFeatureData2")
         data.InitializeHole(hole_type, _STD_ANSI_INCH, fastener, spec.size, end)
-        if hole_type == 4:  # taps carry a class + their own thread end condition
-            # Pre-create sets are the support-foot precedent for these two;
-            # every other customization (fit, dim overrides) must go through
-            # the post-create ModifyDefinition flow.
-            for prop, val in (
-                ("ThreadClass", spec.thread_class),
-                ("ThreadEndCondition", end),
-            ):
-                try:
-                    setattr(data, prop, val)
-                except Exception:  # noqa: BLE001
-                    pass
+        if hole_type == 4:
+            data.ThreadEndCondition = end
         feat = fm.CreateFeature(data)
         if feat is None:
             raise RuntimeError(
@@ -598,6 +608,30 @@ def wizard_holes(
         model.EditRebuild3()
         defn = _early_bound(feat.GetDefinition(), "IWizardHoleFeatureData2")
 
+    if hole_type == 4:
+        # Native taps lose pre-create ThreadClass assignments. A post-create
+        # edit persists through save/reopen (#2-56 and #0-80 native controls).
+        if not defn.AccessSelections(model, None):
+            raise RuntimeError(f"hole wizard {label}: thread-class AccessSelections failed")
+        try:
+            defn.ThreadClass = spec.thread_class
+            if not feat.ModifyDefinition(defn._oleobj_, model, null_callout()):
+                raise RuntimeError(f"hole wizard {label}: thread-class ModifyDefinition failed")
+        except Exception as exc:
+            try:
+                defn.ReleaseSelectionAccess()
+            except Exception as release_error:
+                exc.add_note(f"thread-class selection cleanup also failed: {release_error}")
+            raise
+        model.EditRebuild3()
+        defn = _early_bound(feat.GetDefinition(), "IWizardHoleFeatureData2")
+        actual_class = str(defn.ThreadClass or "").strip()
+        if actual_class != spec.thread_class:
+            raise RuntimeError(
+                f"hole wizard {label}: native thread class {actual_class!r} "
+                f"!= requested {spec.thread_class!r}"
+            )
+
     def _dim(prop: str) -> float:
         try:
             return float(getattr(defn, prop)) * 1000.0
@@ -610,18 +644,15 @@ def wizard_holes(
             f"hole wizard {label}: stored size {stored_size!r} "
             f"!= requested {spec.size!r}"
         )
-    # The post-create definition reads 0.0 for HoleDiameter on EVERY hole Type
-    # on this seat (diag_hole_wizard 2026-07-21: all 7 cases read 0.000 while
-    # the cut geometry was exact), so the ``expect_dia_mm`` tripwire would
-    # always trip on it. The populated knob for a thru hole is
-    # ThruHoleDiameter (the same property the clearance drift check reads) --
-    # fall back to it so the tripwire gates against the real table value.
+    # Tapped holes expose their tap-drill diameter, not the plain-hole knobs.
+    # Native #2-56 and #0-80 probes both prove the plain knobs read zero while
+    # ThruTapDrillDiameter agrees with the cylindrical BREP.
     # HoleDepth likewise reads 0.0 on the legacy blind path. Its documented
     # HoleWizard5 Depth input remains spec.depth_mm, and callers verify the cut
     # independently by volume. ThreadDepth is populated and is gated below.
     result = WizardHoleResult(
         name=str(feat.Name),
-        hole_dia_mm=_dim("HoleDiameter") or _dim("ThruHoleDiameter"),
+        hole_dia_mm=_wizard_hole_diameter_mm(defn, tapped=hole_type == 4),
         depth_mm=_dim("HoleDepth"),
         cbore_dia_mm=_dim("CounterBoreDiameter"),
         cbore_depth_mm=_dim("CounterBoreDepth"),

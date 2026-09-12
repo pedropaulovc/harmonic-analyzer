@@ -1,32 +1,19 @@
 r"""Reproduction script: connecting rod (book ch. 13 pp. 22-25 / ch. 14 p. 29; 20 used).
 
-Black rough-finished rod converting each cam's rotation into the rocker
-arm's see-saw: a full ring (strap) riding the Ø30.6 eccentric cam (cast
-integral with each cylinder gear), a thin flat shank, and a rounded
-TOMBSTONE head (the Y-shaped upper end of the ch14 fan photo) pinned (Ø2)
-to the rocker arm's rod-pin hole near the arm's rod-side tip. Centre
-distance 163.10103: the rod hangs PLUMB with the arm LEVEL after the fixed-post
-photos show every rod dropping vertically from the arm tip onto its cam,
-the ch14 end views show the 0-crank tip row dead level (cos-mode home =
-top of stroke, cam lobe UP), so the pin (127.37 out from the mid-seesaw
-pivot) sits directly above the phased lobe centre at machine
-(-54.474, 99.155) and the rod length closes that vertical link. The head
-is SHORTER than the 16 mm arm depth (10.5 crown-to-shoulder), 10 wide,
-crown 2.4 above the pin, angled shoulders narrowing into the 8 shank --
-proportions read off the ch14 fan photo against the 16 mm arm-depth
-callout. It matches the arm's 2.5 thickness so the pin joint stacks
-head-beside-arm inside the 7.06 channel pitch; the M2 "thick stepped tip
-blocks" read of p.29 was amplitude-bar feet, not these rods.
+Black rod with its original cam ring, flat shank and XY tombstone outline.
+The upper end is a centered two-cheek fork straddling the 2.5 mm silver
+rocker. A plain coaxial #47 drill passes through both ears for the selected
+peened pivot.
 
-Dimensions: cad/DIMENSIONS.md "Chapter 13 - Connecting rods" - centre
-distance derived (high), ring bore derived from the cam OD + confirmed on
-the p.25 overlay (med), head proportions photo-scaled vs the 16 mm callout
-(med), everything else photo-scaled (low).
+The ring, shank and pin XY centerline are unchanged. The fork's 1.25 mm
+cheeks, 6 mm axial flare transition and round slot root are reconstruction
+design sizes, not measurements from the photographs. The short flare is
+chosen to remain comparable to the visible compact head in ch14 end views.
+Peened retention is user-selected, not established by the historical source.
 
-Layout: ring centre at the origin, shank rising +Y to the head;
-thicknesses extruded mid-plane in Z. Build order matters: ring disc,
-shank and head are bossed first, then the bore is cut so the strap
-opening also trims the shank sliver that dips into it.
+Layout: ring at the origin, rod along +Y, fork centered on Z=0. Boss the
+unchanged ring/shank and XY head envelope, merge the symmetric Y transition,
+then cut the round-ended fork slot across X and drill both ears along Z.
 
 Run (SolidWorks already open)::
 
@@ -44,11 +31,13 @@ from _common import (
     apply_material,
     check,
     define_circle,
+    define_polygon_chain,
     define_rectilinear_chain,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
     name_bore_axis,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -85,6 +74,10 @@ from connecting_rod_spec import (
     SHANK_WIDTH,
     SURFACE_FINISHES,
 )
+from rod_pivot_spec import (
+    FORK_FLARE_LENGTH, FORK_ROOT_CENTER_BELOW_PIN, FORK_ROOT_RADIUS,
+    FORK_SLOT_NOMINAL,
+)
 
 import _telemetry
 
@@ -103,14 +96,13 @@ MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
 # pre-ROM-fit lobe-down phase and -7.82 deg tilt. build_channel_assembly
 # imports this as ROD_C2C (imported, NOT copied). Nominal geometry lives in
 # connecting_rod_spec so the part, channel and drawing move as one recipe.
-# Tombstone head (the "Y" upper end): proportions from the ch14 fan photo
-# scaled by the 16 mm arm-depth callout in the same frame. Rounded crown
-# (radius = half width), short vertical cheeks, angled shoulders narrowing
-# into the shank. The head is SHORTER than the arm depth and the pin sits
-# HIGH in the head / LOW in the arm (crown only 2.4 above the pin).
-HEAD_SHOULDER_RISE = 1.2  # shoulder taper height (width 8 -> 10, photo ~1.2)
-# The rocker-arm rod-end pin hole is a native Hole Wizard number-drill feature;
-# its identity lives in connecting_rod_spec.
+# Tombstone head: reconstruction design dimensions inside the compact rounded
+# envelope visible in the ch14 fan view; the photographs establish topology,
+# not these sizes. Rounded crown (radius = half width), short vertical cheeks
+# and angled shoulders narrow into the shank. The head is shorter than the arm
+# depth and the pin sits high in the head / low in the arm.
+HEAD_SHOULDER_RISE = 1.2
+# Both ears are drilled coaxially in one native Hole Wizard through feature.
 THROUGH_CUT_DEPTH = 20.0  # mid-plane total; > any local thickness
 
 RING_OUTER_RADIUS = RING_BORE_DIA / 2.0 + RING_WALL  # 20.4
@@ -119,6 +111,8 @@ HEAD_TOP_Y = CENTER_DISTANCE + HEAD_CROWN_ABOVE_PIN
 HEAD_START_Y = HEAD_TOP_Y - HEAD_HEIGHT
 HEAD_CROWN_CY = HEAD_TOP_Y - HEAD_WIDTH / 2.0
 SHOULDER_TOP_Y = HEAD_START_Y + HEAD_SHOULDER_RISE
+FORK_FLARE_START_Y = HEAD_START_Y - FORK_FLARE_LENGTH
+FORK_ROOT_CENTER_Y = CENTER_DISTANCE - FORK_ROOT_CENTER_BELOW_PIN
 
 
 async def build(adapter) -> dict[str, str]:
@@ -215,9 +209,9 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "Shank")
 
-    # Tombstone head, pinned beside the rocker arm at assembly (the ch14 fan
-    # photo's "Y" upper end): angled shoulders flare the 8 shank to the 10-wide
-    # cheeks, short vertical cheeks, and a semicircular crown (R = HeadWidth/2,
+    # Original XY tombstone envelope, now the envelope of BOTH fork cheeks.
+    # A Right-plane round-ended slot below splits this into two ears.
+    # Angled XY shoulders and the semicircular crown are unchanged (R=width/2,
     # tangent to the cheeks -- add_arc runs CCW start->end, so right-cheek-top ->
     # left-cheek-top bows over the TOP). Because the crown centre sits on the
     # sketch axis (x 0) with radius = the cheek half-width, each cheek-top lands
@@ -324,11 +318,77 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "Head")
-    res = await adapter.get_mass_properties()
-    _telemetry.info(f"volume after bosses: {res.data.volume:.1f} mm^3")
-    # disc ~3922 + shank ~2467 + head ~233 (shoulder trapezoid 10.8 + cheeks
-    # 43.0 + crown semicircle 39.3 = 93.1 mm^2 x 2.5) - overlap; Phase 3
-    # rebuild confirms
+    name_dimensions(adapter, "Head", ["ForkOuterThickness"])
+
+    # Right-plane sketch coordinates are axial Z and rod Y (the axial sign is
+    # immaterial for this symmetric profile). The unchanged 8 x 2.5 shank
+    # remains underneath; this merged trapezoid widens it into the fork.
+    flare_sd = SketchDims()
+    check("create fork flare", await adapter.create_sketch("Right"))
+    flare_points = [
+        (-SHANK_THICKNESS / 2.0, FORK_FLARE_START_Y),
+        (SHANK_THICKNESS / 2.0, FORK_FLARE_START_Y),
+        (HEAD_THICKNESS / 2.0, HEAD_START_Y),
+        (-HEAD_THICKNESS / 2.0, HEAD_START_Y),
+    ]
+    set_sketch_direct_db(adapter, True)
+    flare_lines = await add_line_chain(adapter, flare_points)
+    set_sketch_direct_db(adapter, False)
+    await define_polygon_chain(
+        adapter, flare_lines, flare_points, label="fork flare", dims=flare_sd,
+        names=["FlareRootHalfThickness", "FlareStartY", "FlareRootThickness",
+               "FlareAxialRise", "FlareLength", "FlareOuterThickness"],
+    )
+    await ensure_fully_defined(adapter, "fork flare")
+    check("exit fork flare", await adapter.exit_sketch())
+    name_last_feature(adapter, "ForkFlareProfile")
+    flare_sd.apply(adapter, "ForkFlareProfile")
+    check("extrude fork flare", await adapter.create_extrusion(
+        ExtrusionParameters(depth=SHANK_WIDTH, both_directions=True)
+    ))
+    name_last_feature(adapter, "ForkFlare")
+
+    # Two overlapping cuts make a tangent round-ended open slot, avoiding
+    # sketch fillet selection/trim ambiguity. The lower semicircle is the
+    # explicit internal root radius; the upper half joins the straight slot.
+    root_sd = SketchDims()
+    check("create fork root", await adapter.create_sketch("Right"))
+    await define_circle(
+        adapter, 0.0, FORK_ROOT_CENTER_Y, FORK_ROOT_RADIUS, "fork slot root",
+        dims=root_sd, names=(None, "RootCenterY", "RootDiameter"),
+    )
+    await ensure_fully_defined(adapter, "fork root")
+    check("exit fork root", await adapter.exit_sketch())
+    name_last_feature(adapter, "ForkRootProfile")
+    root_sd.apply(adapter, "ForkRootProfile")
+    check("cut fork root", await adapter.create_cut_extrude(
+        ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
+    ))
+    name_last_feature(adapter, "ForkRoot")
+
+    slot_sd = SketchDims()
+    check("create fork slot", await adapter.create_sketch("Right"))
+    slot_points = [
+        (-FORK_SLOT_NOMINAL / 2.0, FORK_ROOT_CENTER_Y),
+        (FORK_SLOT_NOMINAL / 2.0, FORK_ROOT_CENTER_Y),
+        (FORK_SLOT_NOMINAL / 2.0, HEAD_TOP_Y + 1.0),
+        (-FORK_SLOT_NOMINAL / 2.0, HEAD_TOP_Y + 1.0),
+    ]
+    set_sketch_direct_db(adapter, True)
+    slot_lines = await add_line_chain(adapter, slot_points)
+    set_sketch_direct_db(adapter, False)
+    await define_rectilinear_chain(
+        adapter, slot_lines, slot_points, label="fork slot", dims=slot_sd,
+        names=["SlotWidth", "SlotCutHeight", "SlotHalfWidth", "SlotStartY"],
+    )
+    await ensure_fully_defined(adapter, "fork slot")
+    check("exit fork slot", await adapter.exit_sketch())
+    name_last_feature(adapter, "ForkSlotProfile")
+    slot_sd.apply(adapter, "ForkSlotProfile")
+    check("cut fork slot", await adapter.create_cut_extrude(
+        ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
+    ))
+    name_last_feature(adapter, "ForkSlot")
 
     # Strap bore - rides the eccentric cam. On-axis circle: diameter only.
     bore_sd = SketchDims()
@@ -350,15 +410,13 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "StrapBore")
 
-    # Rocker pin hole through the head (high in the crown, 2.4 below the crown
-    # top), drilled +Z through the 2.5 mm head. Through-all is geometrically
-    # identical to the old mid-plane both-directions cut.
+    # One #47 through drill crosses the near cheek, open slot and far cheek.
     pin_cut = wizard_holes(
         adapter,
         PIN_HOLE_SPEC,
-        [[0.0, CENTER_DISTANCE, HEAD_THICKNESS / 2.0]],
-        (0.0, 0.0, 1.0),
-        "rocker pin hole",
+        [[0.0, CENTER_DISTANCE, -HEAD_THICKNESS / 2.0]],
+        (0.0, 0.0, -1.0),
+        "coaxial fork pivot drill",
         name="PinHole",
         placement_dims=[((None, None), ("PinCz", '"CenterDistance"'))],
         expect_dia_mm=blind_cut_dia_mm(PIN_HOLE_SPEC),
