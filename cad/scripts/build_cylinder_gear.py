@@ -135,8 +135,7 @@ import _telemetry
 PART_NAME = "cylinder-gear"
 MATERIAL = "Brass"  # ch. 13 text p.22: polished brass
 
-# The dimensional sources live in cylinder_gear_spec.  These public aliases
-# remain importable for the assembly recipes that consume the cam package.
+# Shared geometry lives in cylinder_gear_spec; assemblies consume it directly.
 NOTCH_CLEARANCE = 1.5  # kerf overshoot past the OD so the cut always opens (geom)
 
 BORE_RADIUS = BORE_DIAMETER / 2.0

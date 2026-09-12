@@ -358,8 +358,6 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE)
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=VIEW_SCALE)
     place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
-    for view in (front, right):
-        set_hidden_lines_visible(adapter, view)
 
     detail = _notch_detail(adapter, front)
     set_hidden_lines_visible(adapter, detail)
@@ -490,6 +488,8 @@ async def build(adapter: Any) -> dict[str, str]:
         *MANUFACTURING_NOTES_POS,
         char_height=0.0025,
     )
+    for view in (front, right):
+        set_hidden_lines_visible(adapter, view)
     # Check the complete native requirement after all annotation formatting.
     drawing_model.EditRebuild3()
     drawing_model.GraphicsRedraw2()
