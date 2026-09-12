@@ -92,12 +92,12 @@ critical_features:
     class: channel
     holds: "half of the 0.30 spring-hole pattern position zone (summing_lever_spec.GEOMETRIC_TOLERANCES_MM), normal to the knife line"
   spring_rate:
-    tolerance: 1.5
+    tolerance: 1.25
     unit: pct
     nominal: channel_spring_installed_spec.SPRING_RATE_REF
     quantity: gain
     class: channel
-    holds: "MATCHED, not machined: measure every channel spring (weights + calipers, two loads) and bin the 20 within +/-1.5 % of their mean; stock springs scatter +/-10 %"
+    holds: "MATCHED, not machined: measure every channel spring (weights + calipers, two loads) and bin the 20 within +/-1.25 % of their mean (spec-sheet SET QC: two hanging loads at eye c-c 60/70); stock springs scatter +/-10 %"
   cam_phase:
     tolerance: 0.25
     unit: deg
@@ -113,8 +113,8 @@ critical_features:
     class: channel
     holds: "derived: half the cone<->cylinder gear_mesh backlash band (tolerances.yaml 0.05..0.20 mm) at the 120T pitch radius, one-directional cranking"
   station_setting:
-    tolerance: 0.20
+    tolerance: 0.25
     nominal: null
     quantity: ordinate
     class: setup
-    holds: "measuring-stick reading (a vernier-graduated stick reads to 0.1); the stick zero is set at the assembled machine's NULL station (tolerance-policy.md), not at the pivot"
+    holds: "measuring-stick reading: interpolate to 1/5 of the 1.42 minor division (0.28 step, +/-0.14 rounding) plus eye/parallax -- stick drawing note 5; the stick zero is set at the assembled machine's NULL station (tolerance-policy.md), not at the pivot"
