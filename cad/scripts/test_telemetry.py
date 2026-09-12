@@ -632,6 +632,19 @@ def test_explicit_local_grpc_endpoint_is_probed(monkeypatch, endpoint):
     assert "configured local endpoint is unavailable" in pending[0]
 
 
+@pytest.mark.parametrize(
+    "endpoint", ("http://localhost:notaport", "http://127.0.0.1:99999")
+)
+def test_invalid_local_grpc_port_disables_signal(monkeypatch, endpoint):
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc")
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", endpoint)
+    pending = []
+
+    assert _telemetry._resolve_otlp_endpoint("traces", pending_warnings=pending) is None
+    assert "OTLP trace export is disabled for protocol 'grpc'" in pending[0]
+    assert "configured local endpoint is unavailable" in pending[0]
+
+
 def test_schemeless_remote_grpc_endpoint_keeps_stock_secure_target(monkeypatch):
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc")
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "collector:4317")

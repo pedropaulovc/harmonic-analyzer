@@ -181,7 +181,7 @@ def _endpoint_listening(endpoint: str, timeout: float = 0.15) -> bool:
         port = parsed.port or (443 if parsed.scheme == "https" else 80)
         with socket.create_connection((host, port), timeout=timeout):
             return True
-    except OSError:
+    except (OSError, ValueError):
         return False
 
 
