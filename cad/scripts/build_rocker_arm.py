@@ -80,7 +80,9 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
 )
+from _fit_limits import deviations
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from rocker_arm_notes import DRAWING_NOTES, ISOMETRIC_VIEW_NOTE
@@ -89,6 +91,7 @@ from rocker_arm_spec import (
     ARM_THICKNESS as SPEC_ARM_THICKNESS,
     HUB_DIA,
     HUB_LENGTH,
+    PIVOT_BORE_DIA_BAND,
     ROD_HOLE_SPEC,
     SURFACE_FINISHES,
 )
@@ -99,7 +102,7 @@ MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
 CURVE_RADIUS = 800.0  # DIMENSIONS.md ch14: top edge R = amplitude bar length (stated)
 ARM_DEPTH = 16.0  # ch14: p.29 photo callout, perpendicular top-to-bottom depth
-ARM_THICKNESS = 2.5  # ch14: p.27 photo callout (plate thickness, Z)
+ARM_THICKNESS = SPEC_ARM_THICKNESS  # shared rod-pivot stack thickness
 TOP_ARC_LEN = 292.1  # top edge arc length = 11.5" (ch.30 back view, manual)
 BOT_ARC_LEN = 266.7  # bottom edge arc length = 10.5" (ch.30 back-view sketch)
 TIP_FACE = 5.588  # 0.22" tip face, PERPENDICULAR to the top edge (ch.30 sketch)
@@ -224,10 +227,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "HubDia", f"{HUB_DIA}mm")
     await set_global(adapter, "HubLength", f"{HUB_LENGTH}mm")
     await set_global(adapter, "RodHoleX", f"{ROD_HOLE_X}mm")
-    # (The old RodHoleDia/RodHoleX knobs are gone: the rod pin hole is now a native
-    # Hole Wizard #47 feature whose diameter comes from the drill standard; its
-    # location rides the ROD_HOLE_X/ROD_HOLE_Y module constants that the channel
-    # assembly imports.)
+    # Plain #47 running bore between the connecting rod's two fork cheeks.
     await set_global(adapter, "ThroughCutDepth", f"{THROUGH_CUT_DEPTH}mm")
     await set_global(adapter, "RTop", '"CurveRadius"')
     await set_global(adapter, "RBottom", '"CurveRadius" + "ArmDepth"')
@@ -429,13 +429,13 @@ async def build(adapter) -> dict[str, str]:
         adapter, "Right Plane", 0.0, "Top Plane", _mid_y(0.0), "pivot bore"
     )
 
-    # Connecting-rod pin hole near the rod-side tip, low in the strap.
+    # Connecting-rod pivot bearing near the rod-side tip, low in the strap.
     rod_cut = wizard_holes(
         adapter,
         ROD_HOLE_SPEC,
         [[ROD_HOLE_X, ROD_HOLE_Y, ARM_THICKNESS / 2.0]],
         (0.0, 0.0, 1.0),
-        f"rod pin hole ({ROD_HOLE_SPEC.size})",
+        f"rod pivot bearing ({ROD_HOLE_SPEC.size})",
         name="RodHole",
         expect_dia_mm=blind_cut_dia_mm(ROD_HOLE_SPEC),
         placement_dims=[(("RodPinX", '"RodHoleX"'), (None, None))],
@@ -483,6 +483,12 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(
         adapter, "driven rocker-arm (equations neutral)", v_measured, 0.005 * v_strap
+    )
+    set_dimension_bilateral_tolerance(
+        adapter,
+        "PivotHoleProfile",
+        "PivotDia",
+        *deviations(PIVOT_BORE_DIA_BAND),
     )
 
     await apply_material(adapter, MATERIAL)

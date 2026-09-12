@@ -11,33 +11,41 @@ and leaves the assembly to its cheap token refresh.
 
 from __future__ import annotations
 
-# The strap-bore fit rides the Ø30.80 dimension callout (+0.10/0); the ring
-# centre-to-pin distance is a BASIC sheet dimension.  Notes carry only what the
-# sheet does not dimension natively, so no number appears in both places.
-# Kept to 9 display lines: the notes share the left column with the 170 mm
-# stepped-thickness view (outline ~180 mm tall), and the column between the
-# bottom border and the top zone border is ~186 mm -- a taller block either
-# overlaps the view or pushes it across the border (layout audit).  The
-# title-block surface row is never restated here (simplicity policy rule 1).
-# --- Marked-dimension contract: feature -> the parametric dimension NAMES the
-# print shows.  build_connecting_rod marks exactly these. ---
+# Every value that can be read from a view stays on a native dimension.  The
+# two short notes below carry only the cross-part acceptance authority that a
+# part view cannot show.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "RingDiscProfile": {"RingOuterDia"},
     "StrapBoreProfile": {"StrapBoreDia"},
     "ShankProfile": {"ShankWidthDim"},
+    "HeadProfile": {"HeadCrownR", "HeadShoulderRiseR"},
+    "ForkFlareProfile": {"FlareAxialRise", "FlareLength"},
+    "ForkRootProfile": {"RootDiameter"},
+    "ForkSlotProfile": {"SlotWidth"},
+}
+
+DIMENSION_PRECISION: dict[str, int] = {
+    "RingOuterDia": 2,
+    "StrapBoreDia": 2,
+    "ShankWidthDim": 2,
+    "HeadCrownR": 2,
+    "HeadShoulderRiseR": 2,
+    "FlareAxialRise": 3,
+    "FlareLength": 2,
+    "RootDiameter": 3,
+    "SlotWidth": 3,
+}
+
+DIMENSION_CALLOUTS: dict[str, str] = {
+    "StrapBoreDia": "RUNNING FIT WITH CYLINDER-GEAR CAM",
+    "RootDiameter": "ROUND SLOT ROOT",
+    "SlotWidth": "DESIGN NOMINAL; FINISH MATCHED SLOT",
 }
 
 DRAWING_NOTES = "\n".join(
     (
-        "1. STRAP BORE MACHINED; RUNS THE 30.60",
-        "   CAM, 0.10 MIN CLR/SIDE.",
-        "2. RING 3.00 THICK, STEP AT THE RING OD;",
-        "   SHANK AND HEAD 2.50; ONE MIDPLANE.",
-        "3. RING WALL 4.50 MIN AFTER BORING.",
-        "4. HEAD 10.00 W x 10.50 HIGH, R5.00 CROWN;",
-        "   SHOULDERS RISE 1.20 OFF THE 8.00 SHANK.",
-        "5. PIN C/L 2.40 BELOW CROWN; PIN HOLE 1X.",
-        "6. FILLETS R1.0 MAX; NO DRAFT REQUIRED.",
+        "MATES WITH ROCKER ARM MHA-071.",
+        "FINAL SIDEPLAY AND FREE PIVOT PER MHA-132.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"

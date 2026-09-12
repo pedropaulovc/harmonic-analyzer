@@ -19,38 +19,55 @@ import argparse
 import sys
 from typing import Any
 
-from connecting_rod_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
     add_edge_dimension,
-    add_feature_control_frame,
     add_native_hole_callout,
     add_property_linked_note,
     add_surface_finish,
+    create_section_view,
     curate_view_dimensions,
     finalize_drawing,
+    model_point_in_view,
     new_project_drawing,
     read_required_properties,
-    set_basic_dimension,
+    set_arc_endpoints_to_center,
+    set_arc_endpoints_to_max,
     set_dimension_callouts,
+    set_dimension_precision,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
+    set_reference_dimensions,
     stamp_drawing_summary,
 )
-from _hole_spec import blind_cut_dia_mm
 from _drawing_registry import DRAWINGS_BY_NAME
+from _hole_spec import blind_cut_dia_mm
 from _surface_finish import surface_finish_by_key
+from connecting_rod_notes import (
+    DIMENSION_CALLOUTS,
+    DIMENSION_PRECISION,
+)
 from connecting_rod_spec import (
     CENTER_DISTANCE,
+    HEAD_HEIGHT,
     HEAD_TOP_Y,
+    HEAD_WIDTH,
     PIN_HOLE_SPEC,
     RING_BORE_DIA,
     RING_BOTTOM_Y,
+    RING_THICKNESS,
+    SHANK_THICKNESS,
     SURFACE_FINISHES,
+)
+from rod_pivot_spec import (
+    FORK_CHEEK_THICKNESS,
+    FORK_OUTER_THICKNESS,
+    FORK_ROOT_CENTER_BELOW_PIN,
+    FORK_ROOT_RADIUS,
+    FORK_SLOT_NOMINAL,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -73,13 +90,13 @@ _PIN_HOLE_DIA = blind_cut_dia_mm(PIN_HOLE_SPEC)
 
 SHEET_SCALE = (1.0, 1.0)  # 1:1
 
-# Front-view model bbox: X symmetric about 0, Y from the ring bottom up to the
-# head crown.
+# The front view defines the XY outline.  Section A-A is a native full section
+# through the rod centre plane and is held on the same horizontal projection
+# line to show the ring, shank, flare, two cheeks and finished slot.
 _BBOX_CY = (RING_BOTTOM_Y + HEAD_TOP_Y) / 2.0
-
-FRONT_CENTER = (0.180, 0.135)
-LEFT_CENTER = (0.080, 0.171)  # stepped-thickness profile, inside the top zone
-ISO_CENTER = (0.360, 0.140)
+FRONT_CENTER = (0.190, 0.137)
+SECTION_CENTER = (0.075, FRONT_CENTER[1])
+ISO_CENTER = (0.355, 0.145)
 
 
 def _sheet_xy(mx: float, my: float) -> tuple[float, float]:
@@ -90,13 +107,76 @@ def _sheet_xy(mx: float, my: float) -> tuple[float, float]:
     )
 
 
+def _project_mm(
+    adapter: Any,
+    view: Any,
+    xyz_mm: tuple[float, float, float],
+    *,
+    label: str,
+) -> tuple[float, float]:
+    return model_point_in_view(
+        adapter,
+        view,
+        tuple(value / 1000.0 for value in xyz_mm),
+        label=label,
+    )
+
+
+def _checked_dimension(
+    adapter: Any,
+    view: Any,
+    *,
+    p0: tuple[float, float],
+    p1: tuple[float, float],
+    text_xy: tuple[float, float],
+    label: str,
+    expected_mm: float,
+    precision: int = 2,
+    orientation: str = "smart",
+    arc_condition: str | None = None,
+) -> Any:
+    """Dimension actual view geometry and reject a wrong edge or precision."""
+    display = add_edge_dimension(
+        adapter,
+        view,
+        p0=p0,
+        p1=p1,
+        text_xy=text_xy,
+        label=label,
+        orientation=orientation,
+    )
+    if arc_condition == "center":
+        set_arc_endpoints_to_center(adapter, display, label=label)
+    elif arc_condition == "max":
+        set_arc_endpoints_to_max(adapter, display, label=label)
+    elif arc_condition is not None:
+        raise ValueError(f"unknown arc condition {arc_condition!r}")
+    display = _early_bound(display, "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    measured_mm = abs(float(dimension.SystemValue) * 1000.0)
+    if abs(measured_mm - expected_mm) > 1e-5:
+        raise RuntimeError(
+            f"{label}: measured {measured_mm:g}, expected {expected_mm:g} mm"
+        )
+    display.SetPrecision3(precision, -1, -1, -1)
+    if int(display.GetPrimaryPrecision2()) != precision:
+        raise RuntimeError(f"{label}: precision did not persist")
+    return display
+
+
 FRONT_KEEP = {
-    "RingOuterDia": (0.185, 0.070),
-    "StrapBoreDia": (0.190, 0.052),
-    "ShankWidthDim": (0.180, 0.150),
+    "RingOuterDia": (0.185, 0.067),
+    "StrapBoreDia": (0.190, 0.050),
+    "ShankWidthDim": (0.190, 0.145),
+    "HeadCrownR": (0.230, 0.220),
+    "HeadShoulderRiseR": (0.245, 0.195),
 }
-RIGHT_KEEP: dict[str, tuple[float, float]] = {}
-TOP_KEEP: dict[str, tuple[float, float]] = {}
+SECTION_KEEP = {
+    "FlareLength": (0.040, 0.188),
+    "FlareAxialRise": (0.108, 0.188),
+    "RootDiameter": (0.040, 0.210),
+    "SlotWidth": (0.075, 0.223),
+}
 
 BORE_FINISH_EDGE = _sheet_xy(RING_BORE_DIA / 2.0, 0.0)
 BORE_FINISH_SYMBOL = (BORE_FINISH_EDGE[0] + 0.025, BORE_FINISH_EDGE[1] + 0.015)
@@ -138,95 +218,225 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Connecting Rod Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "connecting rod; cast iron; cam strap",
+            3: "connecting rod; two-cheek fork; cam strap",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
-    # The 1:1 left view (third angle: placed LEFT of the front) shows the
-    # stepped thickness (ring 3.0 / shank+head 2.5) the notes describe -- a
-    # single orthographic view left the step geometry to prose (machinist
-    # round 2).  The right-hand column belongs to the title block, so the
-    # section lives on the left.
-    left = place_view(adapter, str(SOURCE), "*Left", *LEFT_CENTER, scale=(1, 1))
+    section = create_section_view(
+        adapter,
+        front,
+        line_start=(FRONT_CENTER[0], FRONT_CENTER[1] - 0.094),
+        line_end=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.094),
+        view_xy=SECTION_CENTER,
+        section_label="A",
+        scale=(1, 1),
+        label="rod centre-plane section",
+    )
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
-    for view in (left, iso):
-        set_hidden_lines_removed(adapter, view)
     set_hidden_lines_visible(adapter, front)
+    for view in (section, iso):
+        set_hidden_lines_removed(adapter, view)
 
+    # Source-model dimensions stay on the view where their geometry reads
+    # conventionally.  The matched slot nominal remains reference-only: MHA-132
+    # owns the final post-peen fit inspection.
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
     )
-    # The strap-bore tolerance imports with the named model dimension.  The
-    # drawing owns only this descriptive text beneath the native value/band.
-    set_dimension_callouts(adapter, front_annotations, {"StrapBoreDia": "BORE"})
+    section_annotations = curate_view_dimensions(
+        adapter, section, keep=SECTION_KEEP, view_label="section A-A"
+    )
+    annotations = [*front_annotations, *section_annotations]
+    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    set_dimension_precision(adapter, annotations, DIMENSION_PRECISION)
+    set_reference_dimensions(adapter, annotations, {"SlotWidth"})
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
 
-    # Centre distance: ring bore edge to the rocker-pin bore edge (SolidWorks
-    # dimensions circle edges centre-to-centre); box it BASIC.  Pick each bore's
-    # LEFT rim -- the pin bore is tiny and sits inside the head crown, so a TOP
-    # pick snapped to the crown arc (read 145.07); the left rim is unambiguously
-    # on the pin circle, clear of the wider crown.
     ring_rim = _sheet_xy(-RING_BORE_DIA / 2.0, 0.0)
     pin_rim = _sheet_xy(-_PIN_HOLE_DIA / 2.0, CENTER_DISTANCE)
-    centre_distance = add_edge_dimension(
+    _checked_dimension(
         adapter,
         front,
         p0=ring_rim,
         p1=pin_rim,
-        text_xy=(0.125, FRONT_CENTER[1]),
+        text_xy=(0.140, FRONT_CENTER[1]),
         label="rod centre distance",
+        expected_mm=CENTER_DISTANCE,
+        orientation="vertical",
+        arc_condition="center",
     )
-    set_basic_dimension(adapter, centre_distance, label="rod centre distance")
+    _checked_dimension(
+        adapter,
+        front,
+        p0=_project_mm(
+            adapter,
+            front,
+            (0.0, RING_BOTTOM_Y, 0.0),
+            label="rod overall lower extreme",
+        ),
+        p1=_project_mm(
+            adapter,
+            front,
+            (0.0, HEAD_TOP_Y, 0.0),
+            label="rod overall upper extreme",
+        ),
+        text_xy=(0.120, FRONT_CENTER[1]),
+        label="rod overall length",
+        expected_mm=HEAD_TOP_Y - RING_BOTTOM_Y,
+        orientation="vertical",
+        arc_condition="max",
+    )
+    _checked_dimension(
+        adapter,
+        front,
+        p0=_project_mm(
+            adapter,
+            front,
+            (-HEAD_WIDTH / 2.0, HEAD_TOP_Y - HEAD_WIDTH / 2.0 - 0.5, 0.0),
+            label="head left cheek",
+        ),
+        p1=_project_mm(
+            adapter,
+            front,
+            (HEAD_WIDTH / 2.0, HEAD_TOP_Y - HEAD_WIDTH / 2.0 - 0.5, 0.0),
+            label="head right cheek",
+        ),
+        text_xy=(FRONT_CENTER[0], 0.238),
+        label="head overall width",
+        expected_mm=HEAD_WIDTH,
+        orientation="horizontal",
+    )
+    _checked_dimension(
+        adapter,
+        front,
+        p0=_project_mm(
+            adapter,
+            front,
+            (-4.0, HEAD_TOP_Y - HEAD_HEIGHT, 0.0),
+            label="head shoulder root",
+        ),
+        p1=_project_mm(
+            adapter,
+            front,
+            (0.0, HEAD_TOP_Y, 0.0),
+            label="head crown top",
+        ),
+        text_xy=(0.255, 0.216),
+        label="head overall height",
+        expected_mm=HEAD_HEIGHT,
+        orientation="vertical",
+        arc_condition="max",
+    )
 
-    # Rocker pin hole native callout.
+    # Section A-A exposes every axial face; no dimension is attached to a
+    # hidden line.  Both physical cheeks are dimensioned independently.
+    ring_sample_y = RING_BORE_DIA / 2.0 + 2.0
+    _checked_dimension(
+        adapter,
+        section,
+        p0=_project_mm(
+            adapter,
+            section,
+            (0.0, ring_sample_y, -RING_THICKNESS / 2.0),
+            label="ring rear face",
+        ),
+        p1=_project_mm(
+            adapter,
+            section,
+            (0.0, ring_sample_y, RING_THICKNESS / 2.0),
+            label="ring front face",
+        ),
+        text_xy=(0.040, 0.060),
+        label="ring thickness",
+        expected_mm=RING_THICKNESS,
+        orientation="horizontal",
+    )
+    _checked_dimension(
+        adapter,
+        section,
+        p0=_project_mm(
+            adapter,
+            section,
+            (0.0, 100.0, -SHANK_THICKNESS / 2.0),
+            label="shank rear face",
+        ),
+        p1=_project_mm(
+            adapter,
+            section,
+            (0.0, 100.0, SHANK_THICKNESS / 2.0),
+            label="shank front face",
+        ),
+        text_xy=(0.040, 0.145),
+        label="shank thickness",
+        expected_mm=SHANK_THICKNESS,
+        orientation="horizontal",
+    )
+    cheek_y = CENTER_DISTANCE - 2.5
+    for label, z0, z1, text_x in (
+        (
+            "rear fork cheek thickness",
+            -FORK_OUTER_THICKNESS / 2.0,
+            -FORK_SLOT_NOMINAL / 2.0,
+            0.040,
+        ),
+        (
+            "front fork cheek thickness",
+            FORK_SLOT_NOMINAL / 2.0,
+            FORK_OUTER_THICKNESS / 2.0,
+            0.108,
+        ),
+    ):
+        _checked_dimension(
+            adapter,
+            section,
+            p0=_project_mm(
+                adapter, section, (0.0, cheek_y, z0), label=f"{label} outer"
+            ),
+            p1=_project_mm(
+                adapter, section, (0.0, cheek_y, z1), label=f"{label} inner"
+            ),
+            text_xy=(text_x, 0.229),
+            label=label,
+            expected_mm=FORK_CHEEK_THICKNESS,
+            orientation="horizontal",
+        )
+    root_center_y = CENTER_DISTANCE - FORK_ROOT_CENTER_BELOW_PIN
+    _checked_dimension(
+        adapter,
+        section,
+        p0=_project_mm(
+            adapter,
+            section,
+            (
+                0.0,
+                HEAD_TOP_Y,
+                (FORK_SLOT_NOMINAL + FORK_OUTER_THICKNESS) / 4.0,
+            ),
+            label="fork crown top",
+        ),
+        p1=_project_mm(
+            adapter,
+            section,
+            (0.0, root_center_y - FORK_ROOT_RADIUS, 0.0),
+            label="round slot root",
+        ),
+        text_xy=(0.018, 0.211),
+        label="slot-root centre from crown",
+        orientation="vertical",
+        arc_condition="center",
+    )
+
     add_native_hole_callout(
         adapter,
         front,
         edge_xy=pin_rim,
-        callout_xy=(0.235, 0.208),
-        label="rocker pin hole",
+        callout_xy=(0.255, 0.205),
+        label="coaxial fork pivot bores",
     )
-
-    # Datum A on the strap bore axis (picked at 9 o'clock so the tag stands off
-    # to the LEFT), Ra on the bore at 6 o'clock, and a position FCF tying the
-    # rocker pin hole to A.
-    bore_left = _sheet_xy(-RING_BORE_DIA / 2.0, 0.0)
-    add_datum_feature(
-        adapter,
-        front,
-        edge_xy=bore_left,
-        symbol_xy=(bore_left[0] - 0.020, bore_left[1]),
-        datum="A",
-        label="strap bore axis",
-        position_tolerance_m=0.000005,
-    )
-    # Datum B: the shank's left flank.  A alone leaves rotation about the bore
-    # axis unconstrained, so the pin-hole position (and the 147.67 direction)
-    # could not be inspected; B clocks the rod and the 4.00 BASIC below ties
-    # the pin to the shank centreline.
-    shank_flank = _sheet_xy(-4.0, 100.0)
-    add_datum_feature(
-        adapter,
-        front,
-        edge_xy=shank_flank,
-        symbol_xy=(shank_flank[0] - 0.016, shank_flank[1] - 0.010),
-        datum="B",
-        label="shank left flank",
-    )
-    pin_offset = add_edge_dimension(
-        adapter,
-        front,
-        p0=shank_flank,
-        p1=pin_rim,
-        text_xy=(0.152, 0.224),
-        label="pin C/L from shank flank",
-        orientation="horizontal",
-    )
-    set_basic_dimension(adapter, pin_offset, label="pin C/L from shank flank")
     add_surface_finish(
         adapter,
         front,
@@ -235,24 +445,8 @@ async def build(adapter: Any) -> dict[str, str]:
         control=surface_finish_by_key(SURFACE_FINISHES, "strap_bore"),
         label="strap bore finish",
     )
-    # The hole callout owns the 9-o'clock rim and routes down-right to its
-    # text; anchoring the FCF at the same point crossed the two leaders (layout
-    # audit).  Attach the frame at 3 o'clock and keep it in a higher lane so
-    # its whole leader stays clear of the callout path.
-    pin_fcf_rim = _sheet_xy(_PIN_HOLE_DIA / 2.0, CENTER_DISTANCE)
-    add_feature_control_frame(
-        adapter,
-        front,
-        edge_xy=pin_fcf_rim,
-        frame_xy=(0.222, 0.222),
-        characteristic="position",
-        tolerance=GEOMETRIC_TOLERANCES_MM["rocker pin hole position"],
-        datums=("A", "B"),
-        diameter=True,
-        label="rocker pin hole position",
-    )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.275, 0.085)
     add_property_linked_note(adapter, "Isometric View Note", 0.325, 0.205)
 
     return await finalize_drawing(

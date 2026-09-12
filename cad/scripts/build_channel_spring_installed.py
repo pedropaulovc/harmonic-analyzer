@@ -32,7 +32,7 @@ one, and the bottom eye sits above the plate:
 
 The bottom eye is on the spring axis now (the hook reaches +X to it, not the
 spring reaching down through the plate), so the summing-lever plate holes are
-coaxial with the spring axis in Z (z_j + 0.8) and shifted one arm-offset -X to
+coaxial with the spring axis in Z (the shared channel axial plane) and shifted one arm-offset -X to
 seat the hook shank (see build_summing_lever.py and build_channel_assembly.py).
 
 Dimensions: cad/DIMENSIONS.md ch. 17 + ch. 18 (M6.4).

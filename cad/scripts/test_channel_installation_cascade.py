@@ -4,16 +4,16 @@ from __future__ import annotations
 
 import math
 
-import pytest
-
 import _config
-import _cwm
 import build_channel_assembly as channel
 import connecting_rod_spec
 import fulcrum_shaft_spec
 import pivot_shaft_spec
+import summing_lever_spec
+from channel_axial_spec import CHANNEL_MID_DZ
+from cylinder_gear_spec import CAM_THICKNESS, FACE_WIDTH
 from _assembly import _seed_flip
-from cone_pivot_post_installation import CHANNEL_Z0, DRUM_X, MECHANISM_Z_SHIFT
+from cone_pivot_post_installation import CHANNEL_Z0, DRUM_X, MECHANISM_Z_SHIFT, SUMMING_Z
 
 
 def test_machine_config_and_channel_interface_share_one_installation_contract() -> None:
@@ -22,7 +22,7 @@ def test_machine_config_and_channel_interface_share_one_installation_contract() 
     )
     assert math.isclose(channel.Z0, CHANNEL_Z0, abs_tol=1e-12)
     assert channel.X_DRUM == DRUM_X
-    assert channel.CAM_DZ == -3.25
+    assert CHANNEL_MID_DZ == -(FACE_WIDTH + CAM_THICKNESS) / 2.0
 
     phase = math.radians(channel.GEAR_PHASE_DEG)
     assert channel.RING_CENTER == (
@@ -40,10 +40,10 @@ def test_rocker_and_rod_reclose_the_level_plumb_neutral_pose() -> None:
 def test_existing_shafts_and_translated_mounts_cover_the_shifted_bank() -> None:
     assert channel.CHANNEL_BANK_REAR_SHIFT == MECHANISM_Z_SHIFT
 
-    row_min = channel.z_station(0) + channel.ARM_MID_DZ - channel.LEVER_THICKNESS / 2.0
+    row_min = channel.z_station(0) + CHANNEL_MID_DZ - channel.LEVER_THICKNESS / 2.0
     row_max = (
         channel.z_station(channel.CHANNELS - 1)
-        + channel.ARM_MID_DZ
+        + CHANNEL_MID_DZ
         + channel.LEVER_THICKNESS / 2.0
     )
 
@@ -72,20 +72,14 @@ def test_positive_fulcrum_station_uses_the_relearned_mate_side() -> None:
     )
 
 
-def test_copied_internal_rod_axial_mate_is_reset_to_the_seed_side(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    class Mate:
-        Flipped = False
-        CanBeFlipped = True
+def test_spring_holes_follow_cam_plane_inside_fixed_summing_casting() -> None:
+    for j in range(summing_lever_spec.HOLE_COUNT):
+        hole_z = (
+            summing_lever_spec.CHANNEL_Z0
+            + j * summing_lever_spec.CHANNEL_PITCH
+            + summing_lever_spec.HOLE_Z_OFFSET
+        )
+        assert math.isclose(hole_z + SUMMING_Z, channel.z_station(j) + CHANNEL_MID_DZ)
+        assert -summing_lever_spec.PLATE_L / 2.0 < hole_z < summing_lever_spec.PLATE_L / 2.0
 
-    mate = Mate()
-    monkeypatch.setattr(_cwm, "_component_distance_mate", lambda *_a, **_kw: mate)
 
-    assert _cwm.ensure_component_distance_mate_flip(
-        object(), "connecting-rod-3", 4.05, True
-    )
-    assert mate.Flipped is True
-    assert not _cwm.ensure_component_distance_mate_flip(
-        object(), "connecting-rod-3", 4.05, True
-    )

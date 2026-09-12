@@ -41,8 +41,8 @@ from _assembly import (  # noqa: E402
     component_transform,
     place_component,
 )
+from channel_axial_spec import CHANNEL_MID_DZ  # noqa: E402
 from build_channel_assembly import (  # noqa: E402
-    ARM_MID_DZ,
     CHANNELS,
     IDENTITY,
     PITCH,
@@ -64,7 +64,7 @@ SEED_TOL = 0.5  # mm; Z classification slack
 
 # Top inter-channel gap: where the retired code seeded the bank (old
 # build_channel_assembly z_gap_top = z_mid(top) - PITCH/2).
-Z_TOP_GAP = z_station(CHANNELS - 1) + ARM_MID_DZ - PITCH / 2.0
+Z_TOP_GAP = z_station(CHANNELS - 1) + CHANNEL_MID_DZ - PITCH / 2.0
 PIVOT_OD_PT = [PIVOT[0] + SHAFT_R, PIVOT[1], 0.0]  # historic face pick
 
 

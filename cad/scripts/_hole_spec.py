@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 # expectations from these pinned values; diag_hole_wizard.py re-proves the
 # representative cases by measured volume.
 TAP_DRILL_MM = {  # taps cut the tap-drill diameter (TAP_DRILL column)
+    "#0-80": 1.19126,  # .0469 in standard tap-drill table; native ANSI BREP verified
     "#2-56": 1.778,
     "#3-48": 1.994,
     "#4-40": 2.261,
@@ -28,6 +29,7 @@ TAP_DRILL_MM = {  # taps cut the tap-drill diameter (TAP_DRILL column)
     "9/16-12": 12.304,
 }
 THREAD_MAJOR_MM = {  # basic external-thread major diameters (ASME B1.1)
+    "#0-80": 1.524,
     "#2-56": 2.184,
     "#3-48": 2.515,
     "#4-40": 2.845,
@@ -77,7 +79,7 @@ NUMBER_DRILL_MM = {  # number drills cut diameter exactly
     "#14": 4.623,
     "#37": 2.642,
     "#43": 2.261,
-    "#47": 1.994,
+    "#47": 1.9939,  # .0785 in; exact standard conversion, native ANSI BREP verified
     "#54": 1.397,
 }
 FRACTIONAL_DRILL_MM = {

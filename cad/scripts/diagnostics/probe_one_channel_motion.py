@@ -27,8 +27,9 @@ from __future__ import annotations
 import math
 import sys
 
+from channel_axial_spec import CHANNEL_MID_DZ
 from build_channel_assembly import (
-    ARM_MID_DZ, ARM_PIVOT_LOCAL_Y, CAM_DZ, PIVOT,
+    ARM_PIVOT_LOCAL_Y, PIVOT,
     RING_CENTER, SHAFT_R, rot_z_rows, solve_default_state,
     z_station,
 )
@@ -139,7 +140,7 @@ async def build(adapter):
     state = solve_default_state()
     j = 0
     zj = z_station(j)
-    z_mid = zj + ARM_MID_DZ
+    z_mid = zj + CHANNEL_MID_DZ
     t = math.radians(state["arm_tilt"])
     arm_dx = ARM_PIVOT_LOCAL_Y * math.sin(t)
     arm_dy = ARM_PIVOT_LOCAL_Y * math.cos(t)
@@ -159,7 +160,7 @@ async def build(adapter):
         euler_from_rows(cylinder_rows), cylinder_rows,
         ground=False, label="cam (end-for-end cylinder-gear)")
     rod = await place_component(
-        adapter, "connecting-rod", [RING_CENTER[0], RING_CENTER[1], zj + CAM_DZ],
+        adapter, "connecting-rod", [RING_CENTER[0], RING_CENTER[1], z_mid],
         [0, 0, state["rod_tilt"]], rot_z_rows(state["rod_tilt"]),
         ground=False, label="connecting-rod")
     rocker = await place_component(
