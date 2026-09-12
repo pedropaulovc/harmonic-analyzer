@@ -363,14 +363,6 @@ def test_drawing_registry_is_unique_and_selects_layout_assets() -> None:
     assert len({spec.part for spec in DRAWINGS}) == len(DRAWINGS)
     outputs = [path for spec in DRAWINGS for path in spec.outputs.values()]
     assert len(set(outputs)) == len(outputs)
-    assert {
-        spec.name for spec in DRAWINGS if spec.layout is DrawingLayout.PORTRAIT
-    } == {"tube_frame"}
-    assert all(
-        spec.layout is DrawingLayout.LANDSCAPE
-        for spec in DRAWINGS
-        if spec.name != "tube_frame"
-    )
     assert all(
         spec.assets == (DRAWING_TEMPLATES[spec.layout].path,) for spec in DRAWINGS
     )

@@ -9,6 +9,7 @@ on-disk sinks (cache.jsonl, the per-label key sidecar) are redirected to a tmp d
 from __future__ import annotations
 
 import json
+import logging
 import sys
 from pathlib import Path
 
@@ -193,7 +194,7 @@ def test_store_nothing_on_disk_logs_empty(tmp_path, fake):
 # --------------------------------------------------------------------------- #
 # THE issue-#73 case: store-skip-on-hit drift is surfaced on a HIT
 # --------------------------------------------------------------------------- #
-def test_hit_under_new_key_warns_drift(tmp_path, fake, capsys):
+def test_hit_under_new_key_warns_drift(tmp_path, fake, caplog, monkeypatch):
     out = tmp_path / "out.bin"
     out.write_text("v0", encoding="utf-8")
     k_old = "1" * 64
@@ -201,12 +202,21 @@ def test_hit_under_new_key_warns_drift(tmp_path, fake, capsys):
 
     cache.store(k_old, [out], "part:x")          # this seat publishes k_old
     fake.blobs[k_new] = b"built-elsewhere"        # another seat publishes k_new
-    capsys.readouterr()                           # drop the store log
+    logger = _telemetry.get_logger()
+    monkeypatch.setattr(logger, "propagate", True)
+    caplog.clear()
 
-    assert cache.restore(k_new, [out], "part:x") is True
-    err = capsys.readouterr().err
-    assert "store-skip-on-hit drift" in err
-    assert [e["event"] for e in _events(tmp_path)][-1] == "restore_hit_drift"
+    with caplog.at_level(logging.WARNING, logger=logger.name):
+        assert cache.restore(k_new, [out], "part:x") is True
+    assert any(
+        record.name == logger.name and record.levelno == logging.WARNING
+        for record in caplog.records
+    )
+    event = _events(tmp_path)[-1]
+    assert event["event"] == "restore_hit_drift"
+    assert event["label"] == "part:x"
+    assert event["key"] == k_new
+    assert event["previous_key"] == k_old
     # A HIT does NOT re-stamp the sidecar -- the seat still only ever published k_old.
     assert cache.last_stored_key("part:x") == k_old
 
