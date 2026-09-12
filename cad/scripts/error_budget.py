@@ -262,13 +262,21 @@ HARMONICS = np.arange(1, N_ELEMENTS + 1)
 
 
 def reference_inputs() -> dict[str, np.ndarray]:
-    """Ordinates x_i (i = 1..20), |x| <= 1. Station d_i = x_i * d_max."""
+    """Ordinates x_i (i = 1..20), 0 <= x <= 1. Station d_i = x_i * d_max.
+
+    Signed ordinates are NOT realised as negative stations: the built CAD keeps
+    every bar on the lifting side (build_channel_assembly rejects
+    amplitude_mm < 0). A signed function is analysed by lifting it with a
+    constant (its k >= 1 coefficients are invariant; k = 0 is corrected), so
+    the signed +/-1 square input is the 1/0 pattern below."""
     i = HARMONICS.astype(float)
     return {
         "all_ones": np.ones(N_ELEMENTS),  # constant: only k=0 survives
         "rect_half": (i <= 10).astype(float),  # step at the half range
         "gaussian_a0p1": np.exp(-((0.1 * i) ** 2)),  # Michelson trial 2, x in elements
-        "alternating": np.where(i % 2 == 0, 1.0, -1.0),  # exercises negative stations
+        "alternating": np.where(
+            i % 2 == 0, 0.0, 1.0
+        ),  # lifted +/-1 square: odd channels on
         "pair_1_20": np.where(
             (i == 1) | (i == 20), 1.0, 0.0
         ),  # sparse: two channels, no averaging
@@ -577,15 +585,13 @@ def closed_form_terms(nom: Nominal, budget: dict[str, Any]) -> dict[str, Any]:
         "dc_step_pct_of_channel_amplitude": 100.0 * strap_c / nom.ecc,
         "note": "constant within a run (mean-line zero removes it) as long as a station keeps its sign",
     }
-    # Ordinate readout at the SETUP stroke the budget requires (the magnifier
-    # clamp is adjustable; output.yaml's pen_trace_half_mm is the render pose).
-    pen_half = float(res["readout"]["pen_half_stroke_mm"])
+    # Ordinate readout at the CAD's configured, kinematically verified pen
+    # stroke (output.yaml pen_trace_half_mm -- verify:kinematics asserts it);
+    # only the reading uncertainty is an assumption.
+    pen_half = float(_config.machine("output", "pen_trace_half_mm"))
     reading = float(res["readout"]["reading_uncertainty_mm"])
     readout = {
-        "required_pen_half_stroke_mm": pen_half,
-        "render_pen_half_stroke_mm": float(
-            _config.machine("output", "pen_trace_half_mm")
-        ),
+        "pen_half_stroke_mm": pen_half,
         "assumed_reading_uncertainty_mm": reading,
         "ordinate_pct_fs_per_0p1mm_reading": 100.0 * 0.1 / pen_half,
         "pct_fs": 100.0 * reading / pen_half,
@@ -637,7 +643,7 @@ def build_report(budget: dict[str, Any] | None = None) -> dict[str, Any]:
     budget = load_budget() if budget is None else budget
     nom = nominal()
     d0 = null_station(nom)
-    stations = [nom.d_max, nom.d_max / 2, 10.0, -nom.d_max / 2, -nom.d_max]
+    stations = [nom.d_max, nom.d_max / 2, nom.d_max / 4, 10.0]  # lifting side only
     r = {
         "nominal": nom.__dict__,
         "linear_gain_mm_per_mm": linear_gain(nom),

@@ -128,17 +128,27 @@ def test_budget_closes(report):
 
 
 def test_closure_fails_when_a_reserved_term_overruns(budget):
-    """A pen stroke too small for the assumed reading uncertainty must fail the
+    """A reading uncertainty the CAD's pen stroke cannot carry must fail the
     gate through the readout allowance, not pass on scatter alone."""
-    small = {
+    coarse = {
         **budget,
         "reserved": {
             **budget["reserved"],
-            "readout": {**budget["reserved"]["readout"], "pen_half_stroke_mm": 10.0},
+            "readout": {
+                **budget["reserved"]["readout"],
+                "reading_uncertainty_mm": 0.3,
+            },
         },
     }
-    bad = eb.budget_closes(eb.build_report(small))
+    bad = eb.budget_closes(eb.build_report(coarse))
     assert any(b.startswith("readout") for b in bad), bad
+
+
+def test_reference_inputs_stay_on_the_lifting_side():
+    """build_channel_assembly rejects amplitude_mm < 0, so no reference input may
+    put a bar at a negative station."""
+    for name, x in eb.reference_inputs().items():
+        assert np.all(x >= 0.0), name
 
 
 def test_drawing_limits_agree_with_the_budget(budget):
