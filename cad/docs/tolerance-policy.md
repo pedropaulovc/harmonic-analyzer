@@ -90,8 +90,8 @@ on the exact kinematics):
 | rocker rod-pin radius `rocker_arm_spec.ROD_HOLE_X` | 133.07 | −0.75 \| −0.74 | |
 | channel-lever bar-pin arm `channel_lever_spec.BAR_PIN_X` | 127.0 | −0.79 \| −0.78 | |
 | channel-lever spring-hook arm `channel_lever_spec.LEVER_SPRING_X` | 177.8 | +0.56 \| +0.56 | |
-| summing-lever hook arm `summing_lever_spec.HOLE_X` (normal to the knife line) | 39.85 | +2.27 | hole position across the plate; the along-knife pitch is irrelevant |
-| channel spring rate | 2.13 N/mm (derived) | +0.95 %/% | the spring's own share of the common denominator gives the 0.95 |
+| summing-lever hook arm `summing_lever_spec.HOLE_X` (normal to the knife line) | 39.85 | +2.51 | hole position across the plate; the along-knife pitch is irrelevant |
+| channel spring rate | 2.13 N/mm (derived) | +1.00 %/% | numerator only: the spring's share of the common denominator is calibrated out (below) |
 | rocker slide radius, rod length, cam OD roundness, gear runout | — | < 0.1 %/mm | DC or 2·i harmonic only; not gain |
 
 Phase: 1° of cam phase = 1.75 % of that channel's amplitude at the readout points where
@@ -143,21 +143,23 @@ pools the all-ones, half-rectangle, Gaussian and alternating inputs; "pair" is c
 | rocker rod-pin radius | 0.10 mm | 0.006 | 0.04 | 0.07 | 0.71 | DRO/CNC hole position |
 | lever bar-pin arm | 0.10 mm | 0.007 | 0.04 | 0.07 | 0.68 | DRO/CNC hole position |
 | lever spring-hook arm | 0.10 mm | 0.005 | 0.03 | 0.05 | 0.96 | DRO/CNC hole position |
-| summing hook arm | 0.15 mm | 0.029 | 0.16 | 0.32 | 0.24 | ½ of the 0.30 pattern-position zone |
-| **spring rate** | **1.5 %** | **0.120** | **0.66** | **1.34** | 0.56 | **matched by measurement**, stock is ±10 % |
-| cam phase | 0.25° | 0.035 | 0.19 | 0.22 | 0.36 | lobe and notch indexed in one setup |
+| summing hook arm | 0.15 mm | 0.032 | 0.18 | 0.35 | 0.22 | ½ of the 0.30 pattern-position zone |
+| **spring rate** | **1.5 %** | **0.126** | **0.70** | **1.41** | 0.53 | **matched by measurement** (on the spec sheet), stock is ±10 % |
+| cam phase | 0.25° | 0.035 | 0.19 | 0.22 | 0.36 | lobe and notch indexed in one setup (on the drawing) |
 | mesh lag spread | 0.14° | 0.019 | 0.11 | 0.12 | 0.36 | derived from the 0.05–0.20 backlash band |
-| station setting (setup) | 0.25 mm | 0.035 | 0.25 | 1.03 | 0.12 | measuring-stick reading |
-| **all combined** | | **0.139** | **0.75** | **1.96** | | targets 0.30 / 1.5 / 2.0 |
+| station setting (setup) | 0.20 mm | 0.028 | 0.20 | 0.82 | 0.12 | measuring-stick reading, vernier-graduated |
+| **all combined** | | **0.143** | **0.77** | **1.90** | | targets 0.30 / 1.5 / 2.0 |
 
 The budget closes with a factor of two in hand on the broad inputs and just inside the
 two-channel consistency target. Read it as follows.
 
 - **The spring is the tolerance problem, not the machining.** At ±1.5 % matched it is half the
   scatter; stock springs at ±10 % would alone give ~0.8 % MAE and ~9 % worst-case on sparse
-  spectra — more than the whole benchmark. Match first; the adjustable-hook alternative
-  (a slotted spring hole on the channel lever, 0.56 %/mm) is the fallback if a batch cannot be
-  binned, and departs from the photographs.
+  spectra — more than the whole benchmark. The matching requirement is a manufacturing output:
+  the spring spec sheet's `SET QC` note (`channel_spring_installed_notes.DRAWING_NOTES`,
+  pinned by `check:budget`). Match first; the adjustable-hook alternative (a slotted spring
+  hole on the channel lever, 0.56 %/mm) is the fallback if a batch cannot be binned, and
+  departs from the photographs.
 - **The eccentricity limit is capability-driven, not accuracy-driven.** Accuracy alone allows
   ±0.046 mm; the drawing's ±0.025 (`cylinder_gear_spec.DRAWING_NOTES`) is kept because an
   indicated offset in a 4-jaw reads to 0.01 mm and costs nothing extra. Relaxing to ±0.05 is a
@@ -166,7 +168,7 @@ two-channel consistency target. Read it as follows.
 - **The lever arms need no `precision` grade for accuracy**: at the general ±0.10 they use 1/7
   to 1/10 of their allowable. Their bores still carry the `shaft_in_bushing` fit, which is
   what the tighter size limit on the *bore* is for.
-- **Summing-lever hole position is the one plate feature that matters** (2.27 %/mm across the
+- **Summing-lever hole position is the one plate feature that matters** (2.51 %/mm across the
   knife line). Drill the 20 holes from one fixture; the along-knife pitch can be loose.
 - **Phase is cheap if lobe and notch are cut in one setup.** ±0.25° is 0.13 mm at the notch.
   Crank in one direction only; a reversal re-seats every mesh on the other flank
@@ -221,7 +223,7 @@ the specification.
 
 | trial | procedure | detects | pass |
 |---|---|---|---|
-| channel consistency | each bar alone at full scale, read the k = 0 amplitude | spring rate, eccentricity, arms, summing holes (gain scatter) | every channel within ±2 % of the mean (the budget's combined worst case is ±2.3 %); an outlier is a spring to swap |
+| channel consistency | each bar alone at full scale, read the k = 0 amplitude | spring rate, eccentricity, arms, summing holes (gain scatter) | every channel within ±2 % of the mean (the budget's combined worst case is ±2.4 %); an outlier is a spring to swap |
 | channel phase | same runs, zero-crossing position vs. expected | cam-to-notch, mesh lag | ≤ 0.4° each (0.25° + 0.14° budgeted) |
 | hysteresis | one bar at full scale, crank forward then back slowly | knife edge, wheel bearing, wire preload | proposed: trace width ≤ 1 % of that channel's stroke (an edge rolling-resistance length ≤ 0.005 mm at the derived load) |
 | null station | one bar near zero, find the station of vanishing fundamental | slide-arc height, stick zero | record; stamp the stick from it |

@@ -83,6 +83,7 @@ class Nominal:
 
 
 def nominal() -> Nominal:
+    """The as-designed inputs, read from the spec modules the CAD builds from."""
     return Nominal(
         ecc=cylinder_gear_spec.ECCENTRICITY,
         rod=connecting_rod_spec.CENTER_DISTANCE,
@@ -110,6 +111,7 @@ def nominal() -> Nominal:
 def _bisect(
     f: Callable[[np.ndarray], np.ndarray], lo: float, hi: float, n: int, iters: int = 50
 ) -> np.ndarray:
+    """Vectorised bisection of ``f`` on [lo, hi] for ``n`` independent roots."""
     lo_a = np.full(n, lo)
     hi_a = np.full(n, hi)
     f_lo = f(lo_a)
@@ -325,30 +327,22 @@ def nominal_design_errors(
 # --------------------------------------------------------------------------
 
 
-def channel_weight_sensitivity(nom: Nominal) -> tuple[float, float]:
-    """d ln(w_i)/d ln(s_i) and d ln(w_i)/d ln(a_i) for the force balance
-    w_i = s_i a_i / (sum_j s_j a_j^2 + S b^2): a channel's own spring also
-    stiffens the common denominator, which the k=0 scale calibration removes --
-    the channel-SPECIFIC part is what is returned."""
-    denom = (
-        N_ELEMENTS * nom.spring_rate * nom.sum_arm**2
-        + nom.counter_rate * nom.counter_arm**2
-    )
-    own = nom.spring_rate * nom.sum_arm**2 / denom
-    return 1.0 - own, 1.0 - 2.0 * own
-
-
 def gain_sensitivities(nom: Nominal) -> dict[str, float]:
-    """% of channel gain per unit of each gain feature (mm, or % for the spring)."""
-    ds, da = channel_weight_sensitivity(nom)
+    """% of channel gain per unit of each gain feature (mm, or % for the spring),
+    BEFORE calibration. For the force balance w_i = s_i a_i / (sum_j s_j a_j^2 +
+    S b^2) a channel's own spring or arm also stiffens the common denominator,
+    but that factor is shared by every channel and the calibration-run scale in
+    ``_channel_model`` divides it out -- so only the numerator's sensitivity
+    belongs here (folding the denominator in as well would cancel it twice;
+    codex #742)."""
     r_pin = math.hypot(nom.pin_x, nom.pin_y)
     return {
         "cam_eccentricity": 100.0 / nom.ecc,
         "rocker_rod_pin_radius": -100.0 * nom.pin_x / r_pin**2,
         "lever_bar_pin_arm": -100.0 / nom.bar_pin_arm,
         "lever_spring_hook_arm": 100.0 / nom.hook_arm,
-        "summing_hook_arm": 100.0 * da / nom.sum_arm,
-        "spring_rate": ds,  # % per %
+        "summing_hook_arm": 100.0 / nom.sum_arm,
+        "spring_rate": 1.0,  # % per %
     }
 
 
@@ -386,6 +380,7 @@ def finite_difference_check(
 
 
 def load_budget(path: Path = BUDGET_YAML) -> dict[str, Any]:
+    """The allocation config (cad/config/error_budget.yaml)."""
     return yaml.safe_load(path.read_text(encoding="utf-8"))
 
 
@@ -430,6 +425,9 @@ def _channel_model(
 
 
 def monte_carlo(budget: dict[str, Any], nom: Nominal) -> dict[str, Any]:
+    """Per-feature and combined coefficient-error statistics (% FS) with every
+    critical feature drawn uniformly within its tolerance, per channel, on the
+    budget's reference inputs through the calibrated readout."""
     mc = budget["monte_carlo"]
     rng = np.random.default_rng(int(mc["seed"]))
     draws = int(mc["draws"])
@@ -496,6 +494,8 @@ def monte_carlo(budget: dict[str, Any], nom: Nominal) -> dict[str, Any]:
 
 
 def closed_form_terms(nom: Nominal, budget: dict[str, Any]) -> dict[str, Any]:
+    """Error terms that are procedure or design-adjustment items, not part
+    tolerances: knife hysteresis, strap lost motion, ordinate readout, timebase."""
     u_fs = (
         linear_gain(nom) * nom.d_max
     )  # hook displacement of one channel at full station
@@ -570,6 +570,8 @@ def closed_form_terms(nom: Nominal, budget: dict[str, Any]) -> dict[str, Any]:
 
 
 def build_report(budget: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Every layer of the budget as one JSON-able dict (what the CLI prints and
+    test_error_budget.py asserts on)."""
     budget = load_budget() if budget is None else budget
     nom = nominal()
     d0 = null_station(nom)
@@ -596,6 +598,7 @@ def build_report(budget: dict[str, Any] | None = None) -> dict[str, Any]:
 
 
 def _print_report(r: dict[str, Any], budget: dict[str, Any]) -> None:
+    """Human-readable rendering of ``build_report``."""
     p = print
     n = r["nominal"]
     p("# Coefficient-error budget (error_budget.py)")
@@ -688,6 +691,7 @@ def budget_closes(r: dict[str, Any]) -> list[str]:
 
 
 def _main() -> int:
+    """CLI: print the report (or ``--json``); exit 1 if the budget does not close."""
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--json", action="store_true", help="emit the report as JSON")
     args = ap.parse_args()

@@ -48,6 +48,8 @@ DRAWING_NOTES = "\n".join(
         f"  FREE PITCH ........ {FREE_PITCH:.2f} (OPEN-WOUND)",
         "  WIND .............. RIGHT HAND",
         f"  RATE .............. ~{SPRING_RATE_REF:.2f} N/MM (REF)",
+        "  SET QC (20-SPRING ANALYZER SET): MEASURE EACH RATE AT TWO",
+        "    LOADS; ALL 20 WITHIN +/-1.5% OF THE SET MEAN. BIN FROM STOCK.",
         f"  HOOK LEADS ......... {HOOK_LEAD:.2f} EACH END",
         "    (BODY END TO EYE C/L)",
         f"  ENDS .............. 270 DEG LOOP, R{HOOK_CL_RADIUS:.2f} CL;",

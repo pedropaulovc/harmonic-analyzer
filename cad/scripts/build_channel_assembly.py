@@ -216,6 +216,7 @@ from rocker_arm_spec import PIVOT_MID_Y as ARM_PIVOT_LOCAL_Y  # 8.0: strap mid-d
 # revolute drags the ring off the cam (the 0.9 deg/0.4 mm version of this slip
 # already cost 20 x 20.27 mm^3 of cylinder-gear interference at the top level).
 from rocker_arm_spec import CENTER_Y as ARM_ARC_CENTER_LOCAL_Y  # 816: arm-local arc
+from rocker_arm_spec import CURVE_RADIUS as ARM_TOP_RADIUS  # 800: the R800 slide
 
 # centre above the bottom edge (= CURVE_RADIUS + ARM_DEPTH), shared with the
 # offline error budget so the slide-arc height is never copied.
@@ -255,7 +256,7 @@ _LEVER_DX = ARM_ROD_HOLE_X
 _LEVER_DY = ARM_ROD_PIN_LOCAL_Y - ARM_PIVOT_LOCAL_Y  # 7.3025
 ARM_ROD_LEVER = math.hypot(_LEVER_DX, _LEVER_DY)  # 127.5830
 ARM_LEVER_BETA_DEG = math.degrees(math.atan2(_LEVER_DY, _LEVER_DX))  # 3.2813
-ARM_TOP_RADIUS = 800.0
+# ARM_TOP_RADIUS (800): the R800 slide -- imported from rocker_arm_spec.CURVE_RADIUS.
 
 # --- drive interface (default state) ----------------------------------------
 GEAR_PHASE_DEG = 1.5  # drive-train locks each cylinder gear at Rz(+1.5):
